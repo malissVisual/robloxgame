@@ -140,7 +140,8 @@ for _, def in Config.JobTypes do
 	end
 end
 check("a job that lends a company vehicle needs level 4+", lent)
-check("level 2 tells of the bike shop, level 4 of the Old Van", string.find(Config.Levels.Rewards[2].text or "", "bike", 1, true) ~= nil
+check("level 2 tells of the bikes (6.12.7: Dead End Motors' BIKES counter), level 4 of the Old Van", string.find(Config.Levels.Rewards[2].text or "", "bike", 1, true) ~= nil
+	and string.find(Config.Levels.Rewards[2].text or "", Config.BikeShop.Shop, 1, true) ~= nil and string.find(Config.Levels.Rewards[2].text or "", "Spoke", 1, true) == nil
 	and string.find(Config.Levels.Rewards[4].text or "", "Old Van", 1, true) ~= nil)
 check("the light looks include the mail, documents, medicine, pizza, parcels and bread", Config.Cargo.LightLooks.mail and Config.Cargo.LightLooks.documents
 	and Config.Cargo.LightLooks.medicine and Config.Cargo.LightLooks.pizza and Config.Cargo.LightLooks.parcel and Config.Cargo.LightLooks.bread)

@@ -117,7 +117,7 @@
 --   * 5.1, "bike": the board's BIKE section (footOffer with Config.Jobs.Bike, Bike.Offers of them) from Bike.Level:
 --     light pieces, a longer ride (Downtown, the Suburbs, the Harbor), never more than your bike holds (Transport.bikeOf:
 --     its room + its bike gear + your bag), JobRules.footPay / footTime with the Bike numbers, a ★ job's XP +
---     Bike.XpBonus. Locked without a bike ("NEEDS A BIKE", Spoke & Chain) and while your car is the one you drive
+--     Bike.XpBonus. Locked without a bike ("NEEDS A BIKE", the BIKES counter) and while your car is the one you drive
 --     ("RIDE YOUR BIKE": the phone's MY BIKE). Cargo's light flow like a foot job (Info.foot), the pack is the bike's
 --     whole room (riding stows everything); no waves, bandits or road events, Bike.Stray* walkers. A foot job may be
 --     done on a bike too (riding stows the hands: its pack is your whole room then).
@@ -1660,7 +1660,7 @@ local function vehicleLock(player: Player): (string, string)
 end
 
 -- 5.1: why a BIKE job is not for this player now (its text and the board's button), or nil: no bike of your own
--- (Spoke & Chain), or your car is the one you drive (the phone's MY BIKE switches).
+-- (the BIKES counter at Dead End Motors), or your car is the one you drive (the phone's MY BIKE switches).
 local function bikeLock(player: Player, offer: Offer): (string?, string?)
 	if offer.mode ~= "bike" then
 		return nil, nil
@@ -1759,7 +1759,7 @@ local function slotsShort(player: Player, offer: Offer): string?
 		if offer.total <= room then
 			return nil
 		end
-		return `This job has {offer.total} {offer.plural}: your {name}'s bag and yours hold {room}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
+		return `This job has {offer.total} {offer.plural}: your {name}'s bag and yours hold {room}. Bike gear from the BIKES counter at Dead End Motors (a basket, panniers) holds more.`
 	end
 	if offer.mode == "foot" then
 		local _, room = slotsFor(player, offer)

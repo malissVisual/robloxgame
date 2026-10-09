@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.8"
+Config.Version = "6.12.9"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -234,11 +234,12 @@ export type CarDef = {
 	-- (StageDef.gearSlots); nil: none (the company vehicles come with what their job needs). Economy.gearSlots.
 	gearSlots: number?,
 	-- 5.1: a bicycle (style "bike"; Config.Cars ids rustbike, citybike, cargobike, ebike, appended after the cars): sold at
-	-- Spoke & Chain (Map.Shops.bikes), light cargo only, no fuel, no traffic / chauffeur / car gun / paint / car
-	-- upgrade tracks; it never counts as "a vehicle" for car jobs and missions (shared/Transport.luau mode "bike").
+	-- the bike counter (Map.Shops.bikes; 6.12.7: Dead End Motors' BIKES counter), light cargo only, no fuel, no traffic /
+	-- chauffeur / car gun / paint / car upgrade tracks; it never counts as "a vehicle" for car jobs and missions
+	-- (shared/Transport.luau mode "bike").
 	bike: boolean?,
 	-- 5.1.1: the rider stands (the E-Scooter, style "scooter": a deck, no saddle, no pedals; client/BikeRider.luau's
-	-- standing pose through shared/RiderPose.luau), and a badge on its card at Spoke & Chain ("⚡ ELECTRIC · STAND-UP").
+	-- standing pose through shared/RiderPose.luau), and a badge on its card at the BIKES counter ("⚡ ELECTRIC · STAND-UP").
 	stand: boolean?,
 	badge: string?,
 	-- 5.4, fuel (Config.Fuel, shared/FuelMath.luau): the tank in litres and what it burns, litres per 1,000 studs driven.
@@ -656,7 +657,8 @@ Config.Cars = {
 		company = true,
 		employer = "gas",
 	},
-	-- 5.1, the bikes (CarDef.bike): sold at Spoke & Chain from level 2, after the cars (Config.Cars[1] stays the van).
+	-- 5.1, the bikes (CarDef.bike): sold at the bike counter from level 2 (6.12.7: Dead End Motors' BIKES counter), after
+	-- the cars (Config.Cars[1] stays the van).
 	-- server/Vehicles.luau builds them on the styles "bike" (a rear rack: 1 slot) and "cargobike" (a front box: 4) with
 	-- Codex's art (server/BikeArt/Geometry.luau, the art id = the car id). No fuel, no passengers, no car gun, no stages;
 	-- the bike gear (Config.Gear bikeOnly: basket, panniers, trailer) adds light slots. Sprint on foot is 28 for ~6 s,
@@ -698,7 +700,7 @@ Config.Cars = {
 		description = "A clean red courier frame with a front lamp. A rear rack for one light parcel and room for two pieces of bike gear. Rider only.",
 	},
 	-- 5.1.1, the E-Scooter (style "scooter": a narrow low deck, two small wheels, a tall stem; server/ScooterArt): a
-	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold at Spoke & Chain) that you ride standing. Quick off
+	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold with the bikes) that you ride standing. Quick off
 	-- the line and nippy; a small rack over the rear wheel and one gear slot for the basket (a handlebar bag: no
 	-- panniers, no trailer, Config.Gear notOn). 5.7 (the owner: "a bit slower, so it isn't too much"): 36 at the top
 	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
@@ -1084,7 +1086,7 @@ export type GearDef = {
 	icon: string, -- an emoji (the shop card, the career road)
 	needs: string?, -- a CarDef flag the car must have ("trolley")
 	notOn: { string }?, -- car ids it does not fit
-	bikeOnly: boolean?, -- 5.1: bike gear (basket, panniers, trailer): fits only CarDef.bike, installed at Spoke & Chain
+	bikeOnly: boolean?, -- 5.1: bike gear (basket, panniers, trailer): fits only CarDef.bike, installed at the BIKES counter
 	room: number?, -- 5.1: bike gear's extra light slots
 }
 
@@ -1212,18 +1214,40 @@ Config.VanQuest = {
 	Sold = "Already sold you one, kid. Treat her right.",
 }
 
--- 5.1, Spoke & Chain Cycles (Map.Shops.bikes, Downtown block (-1, 1), its door on Main St): the bikes (Config.Cars with
--- bike = true) and the bike gear (Config.Gear bikeOnly). A bike needs no garage slot and comes to you at once (MY
--- BIKE); you may own bikes and cars: profile.car is the one CAR / MY BIKE brings, profile.bike your bike of choice,
--- profile.lastCar the car CALL CAR brings back (server/Shops.luau). At Career.BIKE_LEVEL Marge texts you about the
--- shop (server/Tutorial.luau, the Tutorial remote's "message" with the GPS): Unlock ({price}: the cheapest bike's).
+-- 5.1, the bikes (Config.Cars with bike = true) and the bike gear (Config.Gear bikeOnly), sold at Spoke & Chain Cycles
+-- on Downtown block (-1, 1) until 6.12.7. A bike needs no garage slot and comes to you at once (MY BIKE); you may own
+-- bikes and cars: profile.car is the one CAR / MY BIKE brings, profile.bike your bike of choice, profile.lastCar the car
+-- CALL CAR brings back (server/Shops.luau). At Career.BIKE_LEVEL Marge texts you about the bikes (server/Tutorial.luau,
+-- the Tutorial remote's "message" with the GPS to the BIKES counter): Unlock ({price}: the cheapest bike's).
+-- 6.12.7 (the owner: "I wanted to merge the bike shop with Motors, so it's one shop"): one shop, Dead End Motors on
+-- 6th Ave, with two counters at the back of its showroom (World buildDealer), like the gear stall at the spawn: CARS
+-- (Sal, shop id "dealer", the car catalog) and BIKES (Kip, shop id "bikes": the bikes, the E-Scooter, the bike gear and
+-- Kip's bike paint), the bikes on their stands behind the front glass. Spoke & Chain's old building on block (-1, 1) is
+-- an ordinary one now (Map.FormerBikeShop). Where it all stands, in Dead End Motors' own frame (x across the showroom,
+-- + toward its north end; z from the building's middle, - toward the front glass and the door, + toward the back wall):
+--   Building  the showroom, Width × Depth × Height, its middle Back studs east of its block's middle (Map.Shops.dealer);
+--             its front, the glass and the door, to the west (the park)
+--   Cars      the CARS counter: its middle (X, Z) and Width (where World's counter() puts it: 8 in from the back wall)
+--   Desk      the BIKES counter beside it, to the north: its middle (X, Z), Width and Deep (Map.Shops.bikes is its
+--             front, the customers' side)
+--   Stands    the bike stands (World.BikeSlots: server/Shops.luau puts a bike and its "Look" prompt on each, in
+--             Config.Cars' order): their X in one row at Z, turned Turn degrees toward the door
+--   Radius    studs from the BIKES counter's front the bikes count as "here" (the counter's BUY, the server's check, Kip's
+--             paint): the counter and every stand with room round it, most of the showroom (Dead End Motors' own
+--             "here" is its whole block, Map.ShopRadius)
 Config.BikeShop = {
-	Shop = "Spoke & Chain",
-	Street = "Main St",
-	Unlock = "You've got legs, now get wheels — Spoke & Chain on Main St sells a rusty bike for {price}. I put it on your GPS.",
-	Reminder = "Spoke & Chain on Main St still has bikes for you. More room and way faster than walking. It's on your GPS.",
+	Shop = "Dead End Motors",
+	Counter = "the BIKES counter",
+	Street = "6th Ave",
+	Unlock = "You've got legs, now get wheels — Dead End Motors on 6th Ave sells bikes too: a rusty bike for {price} at the BIKES counter. I put it on your GPS.",
+	Reminder = "Dead End Motors on 6th Ave still has bikes for you at the BIKES counter. More room and way faster than walking. It's on your GPS.",
 	Bought = "Nice wheels. The BIKE runs on the board are yours now. A basket holds more.",
 	MissionsNeed = "Missions need your car (a bike won't do): CALL CAR on your phone.",
+	Building = { Width = 84, Depth = 52, Height = 18, Back = 22 },
+	Cars = { X = 0, Z = 18, Width = 16 },
+	Desk = { X = 17.5, Z = 18, Width = 11, Deep = 3 },
+	Stands = { X = { 12.5, 18.75, 25, 31.25, 37.5 } :: { number }, Z = -14, Turn = 30 },
+	Radius = 44,
 }
 
 Config.Gear = {
@@ -1231,8 +1255,9 @@ Config.Gear = {
 	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses from bumps and damage ×0.6. Cars only." },
 	{ id = "cooler", name = "Cooler Box", level = 5, price = 1400, icon = "🧊", description = "Food in the car stays fresh twice as long (freshness drains ×0.5). Cars only." },
 	{ id = "roofrack", name = "Roof Rack", level = 7, price = 2500, icon = "🧳", notOn = { "muscle", "pickup" }, description = "+2 cargo slots on the roof for light pieces only (pizza, parcels, mail, bread, medicine …). Not on the Muscle Car or the Pickup." }, -- 6.7: +1 → +2
-	-- 5.1, bike gear (bikeOnly: only on a bike, CarDef.bike; the car gear never goes on one), sold and fitted at Spoke &
-	-- Chain (Map.Shops.bikes) for the bike you ride: `room` more light pieces (Economy.capacity, Transport mode "bike").
+	-- 5.1, bike gear (bikeOnly: only on a bike, CarDef.bike; the car gear never goes on one), sold and fitted at the bike
+	-- counter (Map.Shops.bikes; 6.12.7: Dead End Motors' BIKES counter) for the bike you ride: `room` more light pieces
+	-- (Economy.capacity, Transport mode "bike").
 	{ id = "basket", name = "Front Basket", level = 2, price = 150, icon = "🧺", bikeOnly = true, room = 2, description = "+2 light pieces in a wire basket over the front wheel. Fits every bike and the E-Scooter." },
 	{ id = "panniers", name = "Panniers", level = 3, price = 450, icon = "👜", bikeOnly = true, room = 3, notOn = { "escooter" }, description = "+3 light pieces in two bags on the rear rack. Not on the E-Scooter." },
 	{ id = "trailer", name = "Bike Trailer", level = 4, price = 1200, icon = "📦", bikeOnly = true, room = 4, notOn = { "cargobike", "escooter" }, description = "+4 light pieces in a two-wheeled trailer behind you: bike runs take up to 8 pieces. Not on the Cargo Bike or the E-Scooter." },
@@ -1423,7 +1448,8 @@ export type CosmeticCounter = { clerk: string, place: string, tab: string, pitch
 Config.Cosmetics = {
 	-- The slots, one item worn in each, in the app's order; `tab` is the app's tab ("courier" | "vehicle"); `shops`, who
 	-- sells it: the courier's looks at the gear stall (Dot's GEAR counter, and Nell's BAGS beside it), the wraps and
-	-- decals at Wrench Garage (Gus), the bike paint at Spoke & Chain (Kip) and at Wrench Garage.
+	-- decals at Wrench Garage (Gus), the bike paint at Dead End Motors' BIKES counter (Kip; 6.12.7: Spoke & Chain before)
+	-- and at Wrench Garage.
 	Slots = {
 		{ id = "hat", tab = "courier", name = "Hats", shops = { "supplies", "bags" }, note = "Your own hats and hair hide under it while you wear it." },
 		{ id = "jacket", tab = "courier", name = "Jackets", shops = { "supplies", "bags" }, note = "Over your own clothes; the vest and the bag go on top." },
@@ -1439,7 +1465,7 @@ Config.Cosmetics = {
 	Counters = {
 		supplies = { clerk = "Dot", place = "the gear stall", tab = "courier", pitch = "Looks for you" },
 		mechanic = { clerk = "Gus", place = "Wrench Garage", tab = "vehicle", pitch = "Looks for your rides" },
-		bikes = { clerk = "Kip", place = "Spoke & Chain", tab = "vehicle", pitch = "Paint for your bikes" },
+		bikes = { clerk = "Kip", place = "Dead End Motors", tab = "vehicle", pitch = "Paint for your bikes" }, -- (6.12.7: its BIKES counter)
 	} :: { [string]: CosmeticCounter },
 	Items = {
 		-- Hats (StyleLooks.hat: fitted to the head; the player's own hat and hair accessories hide under it)
@@ -1842,7 +1868,7 @@ Config.Levels = {
 	-- the Running Shoes: Config.Kit; 6.12.2: the shoes are gone, level 4 gives the Thermal Delivery Bag); the car's items
 	-- (repair kits, nitro, mines) start at 5, once you drive.
 	Rewards = {
-		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
+		[2] = { money = 500, items = { medkit = 2 }, text = "Your first bike: the BIKES counter at Dead End Motors" }, -- (6.12.7: Spoke & Chain before)
 		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
 		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "Old Van: Earl's Used Wheels (Marge's quest)" }, -- (6.12.2: the shoes before)
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
@@ -2529,7 +2555,7 @@ Config.Jobs = {
 		StrayMax = 2,
 		StrayDistance = { 70, 130 } :: { number },
 		-- The board's words: no bike yet; in your car (a bike job is ridden); on your bike (a car job needs your car).
-		NeedsBike = "Needs a bike: Spoke & Chain on Main St sells them from level 2 (the Rusty Bike is the cheapest).",
+		NeedsBike = "Needs a bike: Dead End Motors sells them at its BIKES counter from level 2 (the Rusty Bike is the cheapest).",
 		NeedsBikeButton = "🚲 NEEDS A BIKE",
 		RideBike = "Bike jobs are ridden: MY BIKE on your phone brings your bike (your car stays where it is).",
 		RideBikeButton = "🚲 RIDE YOUR BIKE",

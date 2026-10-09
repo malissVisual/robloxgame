@@ -7,8 +7,9 @@
 -- remote). Presentation only, no state of its own.
 -- 5.8, the courier phone's look: the head is the phone's card (the red square and caps, SLOTS in big type, a thin rule
 -- under it); BUY and INSTALL are the phone's red primary.
--- 5.1: the car gear only (GearDef.bikeOnly is not shown here; riding your bike: a note sends you to Spoke & Chain).
--- Spoke & Chain's GEAR tab (client/BikeShop.luau) draws the bike gear for your bike with the same rows (forBike).
+-- 5.1: the car gear only (GearDef.bikeOnly is not shown here; riding your bike: a note sends you to the BIKES counter).
+-- The BIKES counter's GEAR tab (client/BikeShop.luau; Spoke & Chain's until 6.12.7) draws the bike gear for your bike
+-- with the same rows (forBike).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -78,7 +79,7 @@ local function note(body: Instance, title: string, text: string)
 end
 
 -- Draws the GEAR tab into `body` (the shop's scrolling body, a vertical list; Hud clears it first). `here`: at the
--- counter (only there the actions work). 5.1: `forBike` (Spoke & Chain): the bike gear of `bikeId` (your bike).
+-- counter (only there the actions work). 5.1: `forBike` (the BIKES counter): the bike gear of `bikeId` (your bike).
 function GearShop.render(body: Instance, state: any, here: boolean, forBike: boolean?, bikeId: string?)
 	local vehicleId: string? = if forBike then bikeId elseif type(state.car) == "string" then state.car else nil
 	if vehicleId == nil then
@@ -91,7 +92,7 @@ function GearShop.render(body: Instance, state: any, here: boolean, forBike: boo
 		return
 	end
 	if not forBike and Transport.isBike(vehicleId) then
-		note(body, "Gear · you ride your bike", "A bike takes bike gear, at Spoke & Chain on Main St. For your car's gear, CALL CAR on your phone first.")
+		note(body, "Gear · you ride your bike", "A bike takes bike gear, at the BIKES counter of Dead End Motors. For your car's gear, CALL CAR on your phone first.")
 		return
 	end
 	local carId: string = vehicleId
@@ -130,7 +131,7 @@ function GearShop.render(body: Instance, state: any, here: boolean, forBike: boo
 
 	for order, gear in Config.Gear do
 		if (gear.bikeOnly == true) ~= (forBike == true) then
-			continue -- (5.1: the bike gear at Spoke & Chain, the car gear at Wrench Garage)
+			continue -- (5.1: the bike gear at the BIKES counter, the car gear at Wrench Garage)
 		end
 		local now = Economy.gearState(carGear, carId, gear.id)
 		local fits = not company and Economy.gearFits(carId, gear.id)

@@ -12,6 +12,8 @@ local function all(root,predicate)
 end
 local function named(name) return all(M.gui,function(object) return object.Name==name end)[1] end
 local function text(value) return all(M.gui,function(object) return object.Text==value end)[1] end
+-- (a caps label: the real one writes it in capitals, the recorder as given)
+local function caps(value) return all(M.gui,function(object) return type(object.Text)=="string" and string.upper(object.Text)==string.upper(value) end)[1] end
 local function tap(value) local target=text(value);assert(target,value);target.Activated:Fire() end
 -- 6.0.1: the apps open in a centred popup; the phone never turns.
 local function popup() return named("AppPopup") end
@@ -273,8 +275,8 @@ check("the message banner opens MESSAGES",showing("messages") and text("MESSAGES
 -- 6.5: the home's messages row shows the unread count and the newest line; a tap opens MESSAGES and reads them.
 Phone.close();Phone.open()
 M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="The bike shop is open."})
-M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Spoke & Chain is on your GPS."})
-check("the messages row counts the unread",named("Unread").Visible and named("Unread").Text=="2" and text("Spoke & Chain is on your GPS.")~=nil)
+M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Dead End Motors is on your GPS."})
+check("the messages row counts the unread",named("Unread").Visible and named("Unread").Text=="2" and text("Dead End Motors is on your GPS.")~=nil)
 named("MessagesRow").Activated:Fire()
 check("the messages row opens MESSAGES",showing("messages"))
 named("Close").Activated:Fire()
@@ -292,12 +294,29 @@ for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage
 end
 -- 6.5: SHOP lists the shops and what they sell; a tap sets the GPS, puts the phone away and says so.
 Phone.open("shop")
-check("SHOP lists the six shops first",named("Shops")~=nil and named("Shops").LayoutOrder<named("Columns").LayoutOrder
-	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_bikes")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil)
+-- 6.12.7: five shops: the bikes are Dead End Motors' (its CARS and BIKES counters), no Spoke & Chain row.
+check("SHOP lists the five shops first",named("Shops")~=nil and named("Shops").LayoutOrder<named("Columns").LayoutOrder
+	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil
+	and named("Shop_bikes")==nil and named("Shop_guns").LayoutOrder<named("Shop_dealer").LayoutOrder and named("Shop_dealer").LayoutOrder<named("Shop_mechanic").LayoutOrder)
 check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
 check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items and vests, next to the bags")~=nil and text("Lead & Co.")~=nil and text("Guns, gun upgrades, a baseball bat")~=nil
-	and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells)
+	and text("Dead End Motors")~=nil and text("Cars, vans, trucks · bikes, the E-Scooter, bike gear")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells; 6.12.7: the bikes at Dead End Motors)
+check("6.12.7: Spoke & Chain is gone from SHOP, its bikes named as part of Dead End Motors",all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.upper(object.Text),"SPOKE",1,true)~=nil end)[1]==nil
+	and caps("Dead End Motors · bikes")~=nil and caps("Dead End Motors · vehicles")~=nil
+	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Dead End Motors, the BIKES counter",1,true)==1 end)[1]~=nil)
+do
+	-- 6.12.7: the bikes' Set GPS goes to the BIKES counter in Dead End Motors (Map.Shops.bikes), named as part of it.
+	local waypoint
+	local setWaypoint=M.MapView.setWaypoint
+	M.MapView.setWaypoint=function(at) waypoint=at end
+	local header=caps("Dead End Motors · bikes").Parent
+	local pill=all(header,function(object) return object.Name=="Pill" end)[1]
+	pill.Activated:Fire()
+	local counter=require("./Map").Shops.bikes
+	check("the bikes' Set GPS: the BIKES counter at Dead End Motors",waypoint~=nil and waypoint.X==counter.x and waypoint.Z==counter.z and toasts[#toasts]=="GPS: Dead End Motors · Bikes")
+	M.MapView.setWaypoint=setWaypoint
+end
 do
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint

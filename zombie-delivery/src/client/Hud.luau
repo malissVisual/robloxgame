@@ -883,7 +883,7 @@ local function renderShop()
 		supplies = { "🧰", "Items and vests · the GEAR counter", "shop" }, -- 6.7 (6.12.2: no shoes; at the gear stall)
 		bags = { "🛍️", "Bags · sprint with your deliveries", "shop" }, -- 6.6 (6.12.2: the gear stall's BAGS counter)
 		mechanic = { "🔧", "Stages, car upgrades, gear, paint, car guns", "settings" }, -- 6.7
-		bikes = { "🚲", "Bikes and bike gear", "shop" }, -- 5.1
+		bikes = { "🚲", "Bikes and bike gear · the BIKES counter", "shop" }, -- 5.1 (6.12.7: at Dead End Motors)
 	} :: { [string]: { string } })[shopId] or { "🏪", "", "shop" }
 	shop.icon.Text = about[1]
 	shop.subtitle.Text = about[2]
@@ -905,10 +905,10 @@ local function renderShop()
 		end
 		local full = owned >= (tonumber(player:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots)
 		-- 3.5: not "the next van": every car has a role, and its own stages at Wrench Garage (📦 from → to).
-		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to; more room makes the body longer). A van ends at 4 slots: more needs the High-Roof Van, the Box Truck or the Freight Truck (pallets).", C.dim, 1)
+		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to; more room makes the body longer). A van ends at 4 slots: more needs the High-Roof Van, the Box Truck or the Freight Truck (pallets). The bikes: the BIKES counter next to this one (Kip).", C.dim, 1)
 		for order, def in Config.Cars do
 			if def.company or def.bike then
-				continue -- (5.1: the bikes are Spoke & Chain's)
+				continue -- (5.1: the bikes are Spoke & Chain's; 6.12.7: the BIKES counter's)
 			end
 			local c = card(shop.body, 100, order + 1, def.id == shopFocus)
 			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
@@ -1033,7 +1033,7 @@ local function renderShop()
 			end
 		end)
 	elseif shopId == "bikes" then
-		-- 5.1: Spoke & Chain: BIKES and GEAR (client/BikeShop.luau; it keeps the open tab).
+		-- 5.1: Spoke & Chain (6.12.7: Dead End Motors' BIKES counter): BIKES and GEAR (client/BikeShop.luau, the open tab).
 		tabs(shop.body, { { "bikes", "BIKES" }, { "gear", "GEAR" } }, require(script.Parent.BikeShop).tab, function(id)
 			require(script.Parent.BikeShop).tab = id
 			renderShop()

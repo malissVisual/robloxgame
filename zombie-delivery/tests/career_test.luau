@@ -291,7 +291,7 @@ for _, kit in Config.Kit do
 	kitEverywhere = kitEverywhere and at ~= nil and has(at.unlocks, "kit", kit.id)
 end
 check("5.0: every piece of personal gear (Config.Kit) is on the road at its level", kitEverywhere and #Config.Kit >= 4)
--- 5.1: the bikes are on the road (kind "bike", at Spoke & Chain), no "coming in 5.1" line any more.
+-- 5.1: the bikes are on the road (kind "bike", at Spoke & Chain; 6.12.7: Dead End Motors), no "coming in 5.1" line any more.
 local bikes = false
 for _, def in Config.Cars do
 	bikes = bikes or def.bike == true
@@ -307,7 +307,9 @@ for _, step in road50 do
 	end
 end
 check("5.1: no line about the next release", soon == 0)
-check("5.1: level 2 opens the bikes at Spoke & Chain", bikeAt >= 1 and string.find(road50[Career.BIKE_LEVEL].unlocks[1].name .. Career.summary(road50[Career.BIKE_LEVEL].unlocks, 9), "Spoke & Chain", 1, true) ~= nil)
+local bikeWords = road50[Career.BIKE_LEVEL].unlocks[1].name .. Career.summary(road50[Career.BIKE_LEVEL].unlocks, 9)
+check("5.1: level 2 opens the bikes (6.12.7: at Dead End Motors, no Spoke & Chain any more)", bikeAt >= 1 and string.find(bikeWords, "Dead End Motors", 1, true) ~= nil
+	and string.find(bikeWords, "Spoke", 1, true) == nil, bikeWords)
 check("5.1: … and no bike counts as a car", not has(road50[Career.BIKE_LEVEL].unlocks, "car", "rustbike") and (not bikes or has(road50[Career.BIKE_LEVEL].unlocks, "bike", "rustbike")))
 
 if failures == 0 then

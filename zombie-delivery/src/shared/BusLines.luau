@@ -162,6 +162,11 @@ local function keys(): { KeyPlace }
 		local x = if former then Map.LastStop.x elseif yard then landmark.x - Map.Depot.x + Map.Park.x else landmark.x
 		local z = if former then Map.LastStop.z elseif yard then landmark.z - Map.Depot.z + Map.Park.z else landmark.z
 		table.insert(list, { id = landmark.id, name = name, x = x, z = z, weight = weight })
+		-- 6.12.7: Spoke & Chain's own entry (it came after Last Stop's) is gone, its bikes sold at Dead End Motors' BIKES
+		-- counter: its old block (Map.FormerBikeShop) still draws as the shop did, in its old place, and names none.
+		if landmark.id == "supplies" then
+			table.insert(list, { id = "bikes", name = nil, x = Map.FormerBikeShop.x, z = Map.FormerBikeShop.z, weight = 3 })
+		end
 	end
 	for _, d in Map.Districts do
 		table.insert(list, { id = nil, name = nil, x = d.ox + (d.i0 + d.i1) / 2 * Map.Cell, z = d.oz + (d.j0 + d.j1) / 2 * Map.Cell, weight = 1 })

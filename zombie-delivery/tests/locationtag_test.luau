@@ -39,7 +39,17 @@ check("every name is a sign's name (no brackets)", #badName == 0, table.concat(b
 check("every second line is in caps", #badSub == 0, table.concat(badSub, ", "))
 local depot = byId.depot
 check("the depot reads like its sign", depot ~= nil and depot.name == "Zombie Delivery Co." and depot.sub == "DEPOT · JOBS · GARAGE", depot and depot.name)
-check("a shop says what it sells", byId.guns ~= nil and byId.guns.sub == "GUN SHOP" and byId.dealer.sub == "CAR DEALER")
+check("a shop says what it sells", byId.guns ~= nil and byId.guns.sub == "GUN SHOP" and byId.dealer.sub == "CARS · VANS · BIKES")
+-- 6.12.7: one shop for the cars and the bikes: Dead End Motors names them both, Spoke & Chain has no tag of its own.
+check("6.12.7: no Spoke & Chain tag, Dead End Motors is the bikes' place", byId.bikes == nil and byId.dealer ~= nil and byId.dealer.name == "Dead End Motors"
+	and (function()
+		for _, t in tags do
+			if string.find(t.name, "Spoke", 1, true) then
+				return false
+			end
+		end
+		return true
+	end)())
 local kinds: { [string]: string } = {}
 for _, landmark in Map.Landmarks do
 	kinds[landmark.id] = landmark.kind

@@ -1,6 +1,7 @@
 --!strict
--- 5.1: Spoke & Chain's shop window (the shop window in client/Hud.luau draws it with BikeShop.render under its tabs
--- BIKES and GEAR; the counter's prompt, a display bike's "Look" and the phone's SHOP app open it). The bikes are
+-- 5.1: Spoke & Chain's shop window (6.12.7: Dead End Motors' BIKES counter's; the shop window in client/Hud.luau
+-- draws it with BikeShop.render under its tabs BIKES and GEAR; the counter's prompt, a display bike's "Look" and the
+-- phone's SHOP app open it). The bikes are
 -- Config.Cars entries with bike = true; the bike gear is Config.Gear bikeOnly (client/GearShop.luau draws it for your
 -- bike). Presentation only: the server checks everything again (server/Shops.luau: "Buy" "car", "Equip" "bike",
 -- "Gear").

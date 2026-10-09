@@ -18,8 +18,8 @@
 -- "carId:stage", `car` its car id), gear (Config.Gear), gun, cargun, campaign (shared/Missions.luau), garage, estate
 -- (homes and offices). Level 1 lists what you start with (the Pistol, the first jobs).
 -- 5.0, the career starts on foot: foot (the ON FOOT runs of the board, Config.Jobs.Foot), kit (personal gear,
--- Config.Kit: the bags, the vests …). 5.1: bike (a bike of Config.Cars at its level, "at Spoke & Chain";
--- before Config.Cars has one, a line "Bikes at Spoke & Chain" at BIKE_LEVEL); the bike gear is gear.
+-- Config.Kit: the bags, the vests …). 5.1: bike (a bike of Config.Cars at its level, "at Config.BikeShop.Shop":
+-- 6.12.7: Dead End Motors; before Config.Cars has one, a line "Bikes at …" at BIKE_LEVEL); the bike gear is gear.
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
@@ -42,7 +42,7 @@ export type Step = {
 -- real estate.
 local ORDER: { [string]: number } = { foot = 0, tier = 1, job = 2, kit = 3, bike = 3, car = 3, stage = 4, gear = 5, gun = 6, cargun = 7, campaign = 8, garage = 9, estate = 10 }
 
--- 5.0: the level the bikes come at (5.1: Spoke & Chain, Config.BikeShop; the BIKE runs, Config.Jobs.Bike.Level).
+-- 5.0: the level the bikes come at (5.1: the bike counter, Config.BikeShop; the BIKE runs, Config.Jobs.Bike.Level).
 Career.BIKE_LEVEL = Config.Jobs.Bike.Level
 
 -- Is there a bike in Config.Cars (5.1)?
@@ -114,7 +114,7 @@ function Career.unlocksAt(level: number): { Unlock }
 		if def.company then
 			continue
 		elseif def.bike then
-			-- 5.1: a bike, at Spoke & Chain (no stages).
+			-- 5.1: a bike, at the bike counter (no stages; 6.12.7: Dead End Motors' BIKES counter).
 			if (def.level or 1) == level then
 				add(list, "bike", def.id, `{def.name} at {Config.BikeShop.Shop}`)
 			end

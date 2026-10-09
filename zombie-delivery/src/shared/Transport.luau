@@ -38,7 +38,7 @@
 --   Transport.foot(kit)        Info on foot
 --   Transport.car(room)        Info in a car that holds `room` pieces
 --
--- 5.1, the bike (Config.Cars with bike = true, sold at Spoke & Chain): light pieces only, the bike's own room and its
+-- 5.1, the bike (Config.Cars with bike = true, sold at Dead End Motors' BIKES counter): light pieces only, the bike's own room and its
 -- bike gear's (Economy.capacity) plus your bag (packRoom: the hands hold nothing while you ride, the pieces ride in
 -- your bag and the bike's own bag, 6.6); the kit's walk speed does not count on a bike.
 --   Transport.isBike(carId)    is this Config.Cars id a bike (CarDef.bike)?

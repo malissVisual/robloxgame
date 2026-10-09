@@ -216,6 +216,11 @@ local used = {}
 for _, landmark in Map.Landmarks do
 	used[Icons.landmark(landmark.id) or ""] = true
 end
+-- (6.12.7: the bikes are Dead End Motors' BIKES counter, no landmark of their own: the shop's marker, map_bikes, stays
+-- routed through Map.Shops.bikes)
+for id in Map.Shops do
+	used[Icons.landmark(id) or ""] = true
+end
 for name in Icons.Ids do
 	if string.sub(name, 1, 4) == "map_" then
 		if TRANSPORT[name] then

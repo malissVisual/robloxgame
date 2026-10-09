@@ -7,8 +7,10 @@
 -- handler on the same prompt (it opens the shop); a counter without room for a clerk keeps its prompt.
 -- 6.12.2: Dot (Last Stop Supplies) and Nell (ZDC Bags) stand side by side, behind the GEAR and BAGS counters of the
 -- gear stall at the spawn (server/GearStall.luau); Last Stop's old building has no counter, so nobody stands there.
+-- 6.12.7: Sal (CARS) and Kip (BIKES) stand side by side the same way, behind the two counters of Dead End Motors
+-- (server/World.luau buildDealer); Spoke & Chain's old building has no counter any more.
 -- 6.12, the looks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the clerks who sell
--- them (Config.Cosmetics.Counters: Dot at the gear stall, Gus at Wrench Garage, Kip at Spoke & Chain) get a second
+-- them (Config.Cosmetics.Counters: Dot at the gear stall, Gus at Wrench Garage, Kip at Dead End Motors) get a second
 -- prompt under "Shop": "Style" on R (the gamepad's L2), so both show at once (E is "Shop"'s). It greets you as "Shop"
 -- does and opens the phone's STYLE app on their tab (StyleWear.invite: COURIER at Dot, VEHICLE at Gus and Kip), where
 -- BUY works while you stand at the shop (server/StyleWear.luau checks it).
@@ -33,8 +35,8 @@ type Clerk = { name: string, title: string, role: string, lines: { string } }
 local CLERKS: { [string]: Clerk } = {
 	supplies = { name = "Dot", title = "Last Stop Supplies", role = "townsperson", lines = { "Vests, medkits, a drink for the road. Take a look.", "Stock up, courier. The night is long." } }, -- (6.12.2: at the gear stall)
 	guns = { name = "Ray", title = "Lead & Co.", role = "townsperson", lines = { "Looking for something with a kick?", "Every round counts out there." } },
-	bikes = { name = "Kip", title = "Spoke & Chain", role = "townsperson", lines = { "Two wheels beat two feet. Have a look.", "Fresh chains, fresh tyres." } },
-	dealer = { name = "Sal", title = "Dead End Motors", role = "townsperson", lines = { "Every one of these runs. Mostly.", "Need more room in the back? Let's talk." } },
+	bikes = { name = "Kip", title = "Dead End Motors · Bikes", role = "townsperson", lines = { "Two wheels beat two feet. Have a look.", "Fresh chains, fresh tyres." } }, -- (6.12.7: the BIKES counter, next to Sal)
+	dealer = { name = "Sal", title = "Dead End Motors · Cars", role = "townsperson", lines = { "Every one of these runs. Mostly.", "Need more room in the back? Let's talk." } },
 	mechanic = { name = "Gus", title = "Wrench Garage", role = "townsperson", lines = { "Bring it in, I'll make it purr.", "Armour, tyres, a bigger engine?" } },
 	bags = { name = "Nell", title = "ZDC Bags", role = "townsperson", lines = { "A good bag and you can sprint with the goods.", "Pick a bag, any bag." } }, -- (6.12.2: next to Dot)
 }

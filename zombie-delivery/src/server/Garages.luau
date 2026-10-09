@@ -10,7 +10,7 @@
 -- (Vehicles.remove: its damage is kept) and puts the chosen one at the garage's drive-out spot (Vehicles.placeAt).
 -- Not during a delivery (the job's car stays). Calling your car (CAR, server/CarCall.luau) still brings the equipped
 -- car anywhere.
--- 5.1.1: no bikes here (CarDef.bike: the bikes and the E-Scooter need no garage slot; you switch them at Spoke & Chain
+-- 5.1.1: no bikes here (CarDef.bike: the bikes and the E-Scooter need no garage slot; you switch them at the BIKES counter
 -- or with the phone's MY BIKE): the window leaves them out and "take" refuses one.
 --
 -- The "Garage" remote (shared/Net.luau):

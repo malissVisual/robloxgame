@@ -29,6 +29,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.9: Dead End Motors sells the bikes too (a BIKES counter with Kip, the stands inside, the bike prop on its roof); Spoke & Chain's old building plain (`Map.FormerBikeShop`).
 - Claude · 6.12.8: the gear stall's spinning props (`gearvest` over GEAR, the new `zdcbag` over BAGS; ShopArt, GearStall); Last Stop's old roof bare; a stall case in the polish-art shops check.
 - Claude · 6.12.7: fuel lasts 5× (`Config.Fuel.Lasts`); Depot Gas (2, 0) and Tower Gas (−2, −1) by the safe zone; fuel_test and the street-art budget (2600) updated.
 - Claude · 6.12.6: the slow-mo sprint: `Sprint.Stride` 13, `Sprint.Hang` 0.45 (`RunCycle.hang`), bigger swings and float; tests/runcycle_test.luau updated.

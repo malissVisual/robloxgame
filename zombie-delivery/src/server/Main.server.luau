@@ -86,7 +86,7 @@ local function sendState(player: Player)
 		money = profile.money,
 		cars = profile.cars,
 		car = profile.car,
-		bike = profile.bike, -- 5.1: your bike of choice (Spoke & Chain, the phone's MY BIKE)
+		bike = profile.bike, -- 5.1: your bike of choice (the BIKES counter, the phone's MY BIKE)
 		lastCar = profile.lastCar, -- 5.1: the car the phone's CALL CAR brings back
 		weapons = profile.weapons,
 		weapon = profile.weapon,

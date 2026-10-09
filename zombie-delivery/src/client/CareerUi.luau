@@ -17,8 +17,8 @@
 --     up (CareerUi.blocked, set by Main), and a jump over several levels shows them as one card.
 -- While the window or the card is open the mouse is free (Main: CameraRig.mouseNeeded).
 -- 5.0: the road starts on foot (shared/Career.luau): level 1 the on-foot runs and the personal gear (Config.Kit, with
--- its price at Last Stop Supplies), the bikes at Spoke & Chain (5.1), the Old Van and the car tiers at their new
--- levels (all from Config). Below the first car tier the next goal counts on-foot runs. The phone's CAREER app
+-- its price at Last Stop Supplies), the bikes at Spoke & Chain (5.1; 6.12.7: Dead End Motors' BIKES counter), the Old
+-- Van and the car tiers at their new levels (all from Config). Below the first car tier the next goal counts on-foot runs. The phone's CAREER app
 -- (client/Phone.luau) reads CareerUi.unlockText and CareerUi.toGo.
 -- 5.8, the courier phone's look (design/phone-ui/): the ZDC window header with the career glyph; the road's rows are
 -- slim (a hairline between them), the current one selected (raised, the red rule); the level-up card opens with the
@@ -98,7 +98,7 @@ local KIND_ICON: { [string]: string } = {
 	garage = "🅿",
 	estate = "🏠",
 	foot = "🚶", -- 5.0: the on-foot runs
-	bike = "🚲", -- 5.1: a bike at Spoke & Chain
+	bike = "🚲", -- 5.1: a bike at the BIKES counter
 }
 
 -- An unlock as the road shows it: its kind's mark and its name ("🔧 Work Van (Old Van)" for a stage).

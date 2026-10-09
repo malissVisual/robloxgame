@@ -897,7 +897,8 @@ local function shopApp(list: Instance, wide: boolean)
 			end
 		end
 	end
-	-- 5.1: the bikes at Spoke & Chain you do not own yet (two of them, the cheapest first), SET GPS to the shop.
+	-- 5.1: the bikes at Spoke & Chain you do not own yet (two of them, the cheapest first), SET GPS to the shop. 6.12.7:
+	-- named as part of Dead End Motors, the GPS to its BIKES counter (Map.Shops.bikes).
 	local cars = if state and type(state.cars) == "table" then state.cars else {}
 	local bikesShown = 0
 	for _, def in Config.Cars do
@@ -907,10 +908,10 @@ local function shopApp(list: Instance, wide: boolean)
 		bikesShown += 1
 		order += 1
 		if bikesShown == 1 then
-			shopHeader(rides, order, "bikes", "Spoke & Chain · bikes")
+			shopHeader(rides, order, "bikes", "Dead End Motors · bikes")
 			order += 1
 		end
-		goal(rides, order, if def.stand then "🛴" else "🚲", def.name, `Spoke & Chain, {Config.BikeShop.Street}`, def.price, def.level or 1)
+		goal(rides, order, if def.stand then "🛴" else "🚲", def.name, `{Config.BikeShop.Shop}, {Config.BikeShop.Counter}`, def.price, def.level or 1)
 	end
 	-- The first vehicles you do not own yet (two of them). 5.0: the Old Van comes from Earl (Marge's quest), SET GPS
 	-- to him; the others from Dead End Motors.

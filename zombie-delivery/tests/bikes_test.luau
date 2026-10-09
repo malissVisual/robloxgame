@@ -96,15 +96,20 @@ check("6.6: an old backpack adds nothing on a bike", Transport.bike(3, { backpac
 
 -- The shop -------------------------------------------------------------------------------------------------------------
 
+-- (6.12.7: the bikes are Dead End Motors' BIKES counter, one shop with the cars: tests/motors_test.luau has its layout.)
 local shop = Map.Shops.bikes
-check("Spoke & Chain is Downtown block (-1, 1)", shop ~= nil and shop.x == -Map.Cell and shop.z == Map.Cell and Map.special("downtown", -1, 1) == "bikes")
-local landmark = false
+local district, i, j = Map.blockAt(shop.x, shop.z)
+check("6.12.7: the bikes are sold at Dead End Motors' block (1, 0), not Spoke & Chain's (-1, 1)", district ~= nil and district.id == "downtown" and i == 1 and j == 0
+	and Map.special("downtown", 1, 0) == "dealer" and string.find(shop.name, "Dead End Motors", 1, true) == 1)
+local landmark, dealer = false, false
 for _, entry in Map.Landmarks do
-	landmark = landmark or (entry.id == "bikes" and entry.kind == "shop")
+	landmark = landmark or entry.id == "bikes"
+	dealer = dealer or (entry.id == "dealer" and entry.kind == "shop" and string.find(entry.description, "bikes", 1, true) ~= nil)
 end
-check("… a landmark (the GPS, the location tag)", landmark)
+check("… one landmark for the cars and the bikes, Dead End Motors' (the GPS, the map, the location tag)", not landmark and dealer)
 check("… in the safe zone", Map.isSafe(shop.x, shop.z))
-check("Marge's text names the price", string.find(Config.BikeShop.Unlock, "{price}", 1, true) ~= nil and string.find(Config.BikeShop.Unlock, Config.BikeShop.Street, 1, true) ~= nil)
+check("Marge's text names the price, the shop and its street", string.find(Config.BikeShop.Unlock, "{price}", 1, true) ~= nil and string.find(Config.BikeShop.Unlock, Config.BikeShop.Street, 1, true) ~= nil
+	and string.find(Config.BikeShop.Unlock, Config.BikeShop.Shop, 1, true) ~= nil)
 
 -- The BIKE jobs ---------------------------------------------------------------------------------------------------------
 
@@ -139,7 +144,7 @@ local function has(level: number, kind: string, id: string): boolean
 	end
 	return false
 end
-check("L2: the Rusty and the Courier Bike at Spoke & Chain", has(2, "bike", "rustbike") and has(2, "bike", "citybike"))
+check("L2: the Rusty and the Courier Bike at the BIKES counter", has(2, "bike", "rustbike") and has(2, "bike", "citybike"))
 check("L3 the Cargo Bike, L5 the E-Bike", has(3, "bike", "cargobike") and has(5, "bike", "ebike"))
 check("the bike gear at its levels", has(2, "gear", "basket") and has(3, "gear", "panniers") and has(4, "gear", "trailer"))
 check("a bike is never a car on the road", not has(2, "car", "rustbike"))
@@ -194,7 +199,7 @@ for _, def in Config.Cars do
 end
 check("6.0: a rental's accel is capped (36), still the quickest start after the bought one", Config.Rental.Accel == 36
 	and Config.Rental.Accel <= scooter.accel and quickStart)
-check("… on the career road at level 3 (Spoke & Chain), never a car", has(3, "bike", "escooter") and not has(3, "car", "escooter"))
+check("… on the career road at level 3 (the BIKES counter), never a car", has(3, "bike", "escooter") and not has(3, "car", "escooter"))
 check("… not advice for a bigger car", string.find(Economy.roomAdvice("van", 0, 4), "Scooter", 1, true) == nil)
 
 -- The rider (shared/RiderPose.luau): pedalling on a bike, standing on the scooter.

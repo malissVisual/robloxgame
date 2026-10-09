@@ -28,7 +28,7 @@
 --   Style.canBuyAt(style, def, money, level, shop?)  Style.canBuy, and the shop you stand at (`shop`, nil: none) must
 --                                            sell it: false and "shop" (checked after "level", before "money")
 --   Style.atLabel(def) / Style.soldBy(tab)   "AT WRENCH GARAGE" (the app's button away from the shop); "Gus at Wrench
---                                            Garage and Kip at Spoke & Chain" (who sells a tab's looks)
+--                                            Garage and Kip at Dead End Motors" (who sells a tab's looks)
 -- Pure Luau (tests/style_test.luau).
 
 local Config = require(script.Parent.Config)
