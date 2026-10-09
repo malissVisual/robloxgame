@@ -29,6 +29,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.4: `SoundSheet.Sfx3Id` filled in (the owner uploaded `art/audio/sfx3.ogg`): the 6.12 sounds play.
 - Claude · 6.12.3:
   - **Cosmetics** (`Config.Cosmetics`, `server/StyleWear.luau`, shared Style / StyleLooks / StyleBuild): hats, jackets, vest and bag colours, wraps, bike paint, decals.
   - **Bought from the clerks:** "Style" [R / L2] on Dot, Gus and Kip opens the phone's STYLE on their tab; the server checks you stand at the shop. STYLE in the phone is the wardrobe (TRY, WEAR, TAKE OFF anywhere).
