@@ -189,6 +189,11 @@
 -- paid or lost and the end of a run (endJob); Jobs.queueApi is what the queue needs (the run, an offer's readiness
 -- and why it waits, the room, the same start paths as ACCEPT and + ADD: takeOffer / addOrder with `quiet`). YOUR RUN
 -- reads the payload's orders' `from` / `to`.
+--
+-- 6.13, analytics (server/Analytics.luau, reached only through PlayerData.track: no require, nothing breaks when it
+-- is missing): every order's Delivery funnel (newOrder: taken; advance / freeStep: a pick-up stop done; payOrder:
+-- delivered; failOrder and Jobs.fail: failed, with `why`: "time", "cargo", "gaveup"); a mission's Fail; the money's
+-- reasons (DeliveryPay, CrewPay, Tip, Reroll).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -2397,7 +2402,7 @@ local function reroll(player: Player, tierIndex: any)
 		notice:FireClient(player, `The {stars} jobs were rerolled already. New ones come with the next board.`)
 	elseif PlayerData.level(player) < tier.level or not hasLicence(player, tierIndex) then
 		notice:FireClient(player, `The {stars} jobs are locked for you: nothing to reroll.`)
-	elseif not PlayerData.spend(player, fee) then
+	elseif not PlayerData.spend(player, fee, "Reroll") then
 		notice:FireClient(player, `A reroll of the {stars} jobs costs ${fee}.`)
 	else
 		board.rerolled[tierIndex] = true
@@ -2507,6 +2512,7 @@ local function newOrder(job: Job, offer: Offer, stops: { number }): Order
 		addOn = false,
 	}
 	table.insert(job.orders, order)
+	PlayerData.track("order", job.owner, order, "taken") -- 6.13: the Delivery funnel's Taken (FirstJob)
 	return order
 end
 
@@ -3200,7 +3206,9 @@ local function withXp(result: { [string]: any }, xp: XpInfo): { [string]: any }
 	return result
 end
 
-function Jobs.fail(player: Player, reason: string)
+-- 6.13, `why` (analytics: server/Analytics.luau): "time" (a clock ran out), "cargo" (the cargo is gone or ruined),
+-- "gaveup" (CancelJob), nil for anything else.
+function Jobs.fail(player: Player, reason: string, why: string?)
 	local job = jobs[player]
 	if not job then
 		return
@@ -3227,6 +3235,7 @@ function Jobs.fail(player: Player, reason: string)
 	local delivered, worked = JobRules.failedWork(work, kills)
 	-- 5.2: every order still open fails with it (the ones paid stay paid); the card names the focused one.
 	local offer = focusOrder(job).offer
+	PlayerData.track("jobFailed", player, job.orders, why) -- 6.13: the open ones (a mission: Fail)
 	for _, order in job.orders do
 		if order.state == "open" then
 			order.state = "failed"
@@ -3435,7 +3444,8 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			}
 		end
 	end
-	PlayerData.addMoney(player, driverTotal)
+	PlayerData.addMoney(player, driverTotal, "DeliveryPay")
+	PlayerData.track("order", player, order, "delivered") -- 6.13: the Delivery funnel's Delivered (FirstDelivery)
 	-- 6.12: the daily and weekly tasks (server/Tasks.luau): the pieces of its look, a bike or scooter run, ★★★, the pay
 	require(script.Parent.Tasks).note(player, "order", delivered, { look = offer.look, mode = offer.mode, stars = if rating then rating.stars elseif offer.mission then stars else nil, pay = driverTotal, owner = true })
 	if final then
@@ -3504,7 +3514,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		local again = offer.mission ~= nil and memberProfile ~= nil and Missions.cleared(memberProfile.missions, offer.mission)
 		local memberPay = if again then Missions.replayPay(share) else share
 		missionPaid[member] = memberPay
-		PlayerData.addMoney(member, memberPay)
+		PlayerData.addMoney(member, memberPay, "CrewPay")
 		require(script.Parent.Tasks).note(member, "order", delivered, { look = offer.look, pay = memberPay }) -- 6.12: the crew's tasks
 		resultRemote:FireClient(member, withXp({
 			success = true,
@@ -3591,8 +3601,9 @@ end
 
 -- 5.2: one order failed while others go on (its clock ran out, nothing of it is left): its pieces go back, its stops
 -- are skipped, the streak of good jobs ends (4.7), a notice and a short card (no XP). The run goes on.
-local function failOrder(player: Player, job: Job, order: Order, reason: string)
+local function failOrder(player: Player, job: Job, order: Order, reason: string, why: string?)
 	local offer = order.offer
+	PlayerData.track("order", player, order, "failed", why) -- 6.13: why as in Jobs.fail
 	order.state = "failed"
 	for _, index in order.stops do
 		job.stopsDone[index] = true
@@ -3698,7 +3709,7 @@ local function spotlessFailed(player: Player, job: Job): boolean
 	if not job.offer.twists.spotless or job.condition >= Config.Missions.SpotlessFail or jobs[player] ~= job then
 		return false
 	end
-	Jobs.fail(player, `SPOTLESS failed: the cargo is down to {math.floor(job.condition * 100)} % (it had to stay above {math.floor(Config.Missions.SpotlessFail * 100 + 0.5)} %).`)
+	Jobs.fail(player, `SPOTLESS failed: the cargo is down to {math.floor(job.condition * 100)} % (it had to stay above {math.floor(Config.Missions.SpotlessFail * 100 + 0.5)} %).`, "cargo")
 	return true
 end
 
@@ -3754,7 +3765,7 @@ local function loseCondition(player: Player, job: Job, share: number, reason: st
 		return
 	end
 	if job.condition <= 0 then
-		Jobs.fail(player, reason)
+		Jobs.fail(player, reason, "cargo")
 		return
 	end
 	spotlessFailed(player, job)
@@ -3889,6 +3900,7 @@ end
 local function advance(player: Player, job: Job)
 	local offer = job.offer
 	local stop = offer.stops[job.stop]
+	PlayerData.track("stopDone", player, job.orders, offer.stops, job.stop) -- 6.13: a pick-up done: PickedUp
 	job.stop += 1
 	job.footSince = nil
 	if stop.dock and stop.kind == "pickup" then
@@ -4225,7 +4237,7 @@ local function liftStep(player: Player, now: number)
 	local car = Vehicles.seatedIn(player)
 	if car and car.owner == player and World.isSafe(car.chassis.Position) then
 		lifts[player] = nil
-		PlayerData.addMoney(player, lift.bonus)
+		PlayerData.addMoney(player, lift.bonus, "Tip", "Lift")
 		notice:FireClient(player, `{lift.name} is safe at the depot! +${lift.bonus}`)
 		local job = jobs[player]
 		if job then
@@ -4500,10 +4512,10 @@ local function ordersClock(player: Player, job: Job, serverNow: number): boolean
 			continue
 		end
 		if #openOrders(job) <= 1 then
-			Jobs.fail(player, lateReason(order.offer))
+			Jobs.fail(player, lateReason(order.offer), "time")
 			return true
 		end
-		failOrder(player, job, order, lateReason(order.offer))
+		failOrder(player, job, order, lateReason(order.offer), "time")
 	end
 	return jobs[player] ~= job
 end
@@ -4533,7 +4545,7 @@ local function closeOrders(player: Player, job: Job): boolean
 		local delivered = Cargo.deliveredOf(job.cargo, order.id)
 		if #openOrders(job) <= 1 then
 			if delivered <= 0 then
-				Jobs.fail(player, "All of your cargo is gone!")
+				Jobs.fail(player, "All of your cargo is gone!", "cargo")
 			else
 				local allDone = true
 				for _, index in order.stops do
@@ -4549,7 +4561,7 @@ local function closeOrders(player: Player, job: Job): boolean
 		if delivered > 0 then
 			settleOrder(player, job, order)
 		else
-			failOrder(player, job, order, "All of its cargo is gone.")
+			failOrder(player, job, order, "All of its cargo is gone.", "cargo")
 		end
 	end
 	return jobs[player] ~= job
@@ -4579,6 +4591,7 @@ local function freeStep(player: Player, job: Job, position: Vector3, now: number
 		job.stopsDone[job.stop] = true
 		doneHere = true
 		job.dirty = true
+		PlayerData.track("stopDone", player, job.orders, job.offer.stops, job.stop) -- 6.13: PickedUp
 		local poke = Jobs.onQueuePoke -- 6.12.8: a drop frees room: the next queued job may join the run
 		if poke and job.offer.stops[job.stop].kind == "drop" then
 			poke(player)
@@ -4700,7 +4713,7 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 		local finished = done and lastStop
 		if finished or Cargo.remaining(session) + futurePieces(job) == 0 then
 			if session.deliveredTotal <= 0 then
-				Jobs.fail(player, "All of your cargo is gone!")
+				Jobs.fail(player, "All of your cargo is gone!", "cargo")
 			else
 				if not finished then
 					notice:FireClient(player, "Nothing left to deliver. You get paid for what arrived.")
@@ -4963,7 +4976,7 @@ function Jobs.start()
 	Net.get("AcceptEmployer").OnServerEvent:Connect(acceptEmployer)
 	Net.get("CancelJob").OnServerEvent:Connect(function(player)
 		if not Net.limit(player, "CancelJob", Config.Robust.Limits.CancelJob) then return end -- 5.7
-		Jobs.fail(player, "Delivery cancelled.")
+		Jobs.fail(player, "Delivery cancelled.", "gaveup")
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		-- 3.7: the board (boards, by UserId) stays until it expires (refreshBoards): coming back does not reroll it.

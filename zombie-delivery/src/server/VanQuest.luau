@@ -142,7 +142,7 @@ local function buy(player: Player)
 		earlSays("Finish your job first, kid. The van ain't going anywhere.")
 		return
 	end
-	if not PlayerData.spend(player, Rules.price()) then
+	if not PlayerData.spend(player, Rules.price(), "Car", Config.VanQuest.Car) then
 		earlSays(Rules.sellerLine("money"))
 		return
 	end

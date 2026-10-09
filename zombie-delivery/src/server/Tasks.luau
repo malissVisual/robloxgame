@@ -86,7 +86,7 @@ local function tasksOf(player: Player): TaskData.Saved?
 	assert(saved)
 	local changed, owed, dayNew = TaskData.roll(saved, player.UserId, now, level)
 	if owed.money > 0 or owed.xp > 0 then
-		PlayerData.addMoney(player, owed.money)
+		PlayerData.addMoney(player, owed.money, "TaskReward", "Reset")
 		PlayerData.addXp(player, owed.xp)
 		say(player, `Tasks paid at the reset: {table.concat(owed.titles, ", ")} · +{TaskData.money(owed.money)} · +{owed.xp} XP`)
 		saveSoon(player)
@@ -221,7 +221,7 @@ local function onRequest(player: Player, action: any, slot: any)
 		sendState(player, true)
 		return
 	end
-	PlayerData.addMoney(player, paid)
+	PlayerData.addMoney(player, paid, "TaskReward", if type(which) == "number" then "Daily" else which)
 	PlayerData.addXp(player, xp)
 	getRemote():FireClient(player, "claimed", { title = title, money = paid, xp = xp })
 	saveSoon(player)

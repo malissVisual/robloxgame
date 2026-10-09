@@ -275,7 +275,7 @@ local function onStyle(player: Player, action: any, arg: any)
 			tell(player, Style.say(why or "money", def))
 			return
 		end
-		if not PlayerData.spend(player, def.price) then
+		if not PlayerData.spend(player, def.price, "Style", def.id) then
 			tell(player, Style.say("money", def))
 			return
 		end
@@ -283,6 +283,7 @@ local function onStyle(player: Player, action: any, arg: any)
 		style.worn[def.slot] = def.id
 		slot = def.slot
 		tell(player, Style.say("bought", def))
+		PlayerData.track("event", player, "StylePurchase", def.price, def.slot) -- 6.13
 	elseif action == "wear" then
 		local def = Style.find(arg)
 		if not def then

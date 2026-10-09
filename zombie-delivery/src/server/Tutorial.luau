@@ -32,6 +32,8 @@
 -- and owns no bike, Marge texts them (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's
 -- "message" with the GPS to the shop, client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
 -- (the phone's messages are not saved).
+-- 6.13: her welcome showing (on its own, or when you talk to her first) is the onboarding funnel's WelcomeSeen
+-- (server/Analytics.luau).
 -- 6.0, Lead & Co.: no free gun; Marge texted a player with the pistol's price and no gun. 6.7: gone: every profile has
 -- the pistol since 6.0.2 (server/PlayerData.luau newProfile, the starterKit flag), so that text could never come.
 
@@ -114,7 +116,7 @@ local function finish(player: Player, delivered: boolean)
 	profile.tutorial = true
 	givePhone(player) -- 5.0: the phone all the same (6.7: also after a first job taken before her welcome)
 	if delivered then
-		PlayerData.addMoney(player, Tuning.Reward) -- (fires PlayerData.Changed: the HUD's money)
+		PlayerData.addMoney(player, Tuning.Reward, "TutorialReward") -- (fires PlayerData.Changed: the HUD's money)
 		-- 6.7: a toast, no page (the delivery's own result shows); "done" ends the phase on the client
 		notice:FireClient(player, `First delivery! +${Tuning.Reward} from {Tuning.NpcName}.`)
 		send(player, "done", { reward = Tuning.Reward })
@@ -172,6 +174,7 @@ local function onTalk(player: Player)
 	if session.phase == "wait" or session.phase == "welcome" then
 		session.phase = "welcome" -- (6.7: her greeting again, or before PLAY's delay ran out)
 		send(player, "welcome")
+		PlayerData.track("step", player, "WelcomeSeen") -- 6.13 (once for life: a second time does nothing)
 	elseif session.phase == "tour" then
 		bubble(TutorialSteps.Bubble.tour) -- (the arrows are on screen: no page)
 	else
@@ -269,6 +272,7 @@ local function check(player: Player, session: Session, now: number)
 		if readyAt and now >= readyAt then
 			session.phase = "welcome"
 			send(player, "welcome")
+			PlayerData.track("step", player, "WelcomeSeen") -- 6.13: the onboarding funnel
 		end
 	elseif session.phase == "job" then
 		if Jobs.active(player) then

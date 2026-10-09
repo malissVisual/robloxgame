@@ -131,7 +131,7 @@ local function explode(b: Bandit, killer: Player?)
 	fire.Parent = npc.chassis
 	npc.model:SetAttribute("Health", 0)
 	if killer and killer.Parent then
-		PlayerData.addMoney(killer, Tuning.Reward)
+		PlayerData.addMoney(killer, Tuning.Reward, "KillReward")
 		local profile = PlayerData.get(killer)
 		if profile then
 			profile.kills += 1

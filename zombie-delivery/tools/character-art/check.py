@@ -119,10 +119,10 @@ def style_check(tmp, luau):
     build = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (src / "shared/StyleBuild.luau").read_text())
     (tmp / "StyleBuild.luau").write_text(prefix + build)
     # the profile StyleWear reads (the check sets it); 6.12, the clerks: the level, the money and the state's push for
-    # the Style remote's "buy" (StyleWear.handle)
+    # the Style remote's "buy" (StyleWear.handle); 6.13: PlayerData.track (analytics) does nothing here
     (tmp / "StylePlayerData.luau").write_text(
         "local M = { profile = nil, at = 15, notified = 0 }\nfunction M.get() return M.profile end\n"
-        "function M.level() return M.at end\nfunction M.notify() M.notified += 1 end\n"
+        "function M.level() return M.at end\nfunction M.notify() M.notified += 1 end\nfunction M.track() end\n"
         "function M.spend(_, n) if M.profile.money < n then return false end\nM.profile.money -= n\nreturn true end\nreturn M\n")
     wear = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (src / "server/StyleWear.luau").read_text())
     for module, local in (("PlayerData", "StylePlayerData"), ("Vehicles", "Stub"), ("KitWear", "KitWear")):

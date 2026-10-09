@@ -30,6 +30,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.13: analytics (`server/Analytics.luau`, `shared/AnalyticsPlan.luau`: onboarding funnel, delivery/mission funnels, economy with reasons on every money call, progression, custom events, error counts; `PlayerData.track` hooks so gameplay never depends on it).
 - Claude · 6.12.16: the footbridge reworked: 10 wide, curved in an S with turning ramps (`shared/FootbridgeShape.luau`), nothing in the walking volume (torii at the ends), beds and hedges under its low parts.
 - Claude · 6.12.15: the Lantern Garden on (0, −1) (`server/LanternGarden.luau`) and the footbridge over Bone St (`server/Footbridge.luau`, clearance checked against every vehicle); Last Stop's old building gone.
 - Claude · 6.12.14: Lead & Co. at a shooting range on (−2, 1) (`server/GunRange.luau`: a small shop with Ray, 4 lanes, targets that tip when shot); the old (−1, 0) building plain.

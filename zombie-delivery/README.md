@@ -1143,6 +1143,24 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Analytics: where new players drop off, the economy, errors (6.13)
+
+The game is public. `server/Analytics.luau` (rules in `shared/AnalyticsPlan.luau`, `Config.Analytics`) reports to
+Roblox's AnalyticsService; it is off in Studio, where events are only counted. The owner's guide is
+`design/analytics/NAVOD.md` (Czech).
+
+- **The onboarding funnel** (once per new player, `profile.onboarding`): joined → PLAY → Marge's welcome → the first
+  job → the first delivery → level 2 → the first vehicle → the first mission → the first chapter done.
+- **Funnels:** a delivery (taken → picked up → delivered) and a mission (started → completed).
+- **Economy:** every `PlayerData.addMoney` / `spend` names its reason and item, as sources (pay, tips, tasks, rewards
+  …) and sinks (shops, style, fuel, repairs, estate …). Small sums are added up once a minute.
+- **Progression:** level-ups and the mission chapters.
+- **Custom events:** deaths on a job, failed and given-up jobs, ADD ALL, zip, bus and scooter rides, style purchases,
+  session length. Also server and client error counts by script: a ClientError remote, rate limited.
+- **Safety:** gameplay code never requires Analytics. It calls `PlayerData.track(...)`, a no-op until `Analytics.start`
+  fills the hooks, and every call is in a pcall. There is a per-minute budget, and the admin panel's WORLD tab shows
+  what was sent.
+
 ## The footbridge wider, curved and clear to walk (6.12.16)
 
 The owner, on the bridge in Studio: "good for walking, only I walk through this [a timber]; make it wider for two

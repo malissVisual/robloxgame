@@ -383,6 +383,7 @@ local function addAll(player: Player)
 		end
 	end
 	notice:FireClient(player, Rules.addAllText(started, added, queued, total))
+	require(script.Parent.PlayerData).track("event", player, "QueueAddAll", started + added + queued) -- 6.13
 	push(player)
 	api.sendBoard(player, board)
 	JobQueue.poke(player)

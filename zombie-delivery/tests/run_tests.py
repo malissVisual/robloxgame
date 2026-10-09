@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt")
+PURE = ("Config", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -145,6 +145,54 @@ def clerks_check():
     return not bad
 
 if not clerks_check():
+    ok = False
+
+# 6.13, analytics: every money reason the server passes (PlayerData.addMoney / spend, Analytics.money) is one of
+# shared/AnalyticsPlan.luau's Sources or Sinks, and every custom event it names (Analytics.event, custom) one of its
+# Events: a typo would only show as "Other" or a refused event in the dashboard, never here otherwise.
+def analytics_check():
+    root = os.path.dirname(HERE)
+    plan = open(os.path.join(root, "src", "shared", "AnalyticsPlan.luau"), encoding="utf-8").read()
+    def keys(name):
+        start = plan.index(f"AnalyticsPlan.{name} = {{")
+        return set(re.findall(r"^\t(\w+) = \"", plan[start:plan.index("\n}", start)], re.M))
+    sources, sinks = keys("Sources"), keys("Sinks")
+    start = plan.index("AnalyticsPlan.Events = {")
+    events = set(re.findall(r'^\t"(\w+)",', plan[start:plan.index("\n}", start)], re.M))
+    # 6.13 review: the game reaches Analytics only through PlayerData.track (the hooks Analytics.start registers) and
+    # PlayerData.onMoney; only Main.server (inside `safely`) and Admin (inside a pcall) require the module.
+    analytics = open(os.path.join(root, "src", "server", "Analytics.luau"), encoding="utf-8").read()
+    start = analytics.index("PlayerData.analytics = {")
+    hooks = set(re.findall(r"^\t\t(\w+) = Analytics\.", analytics[start:analytics.index("\n\t}", start)], re.M))
+    bad, reasons, named, tracked = [], 0, 0, 0
+    for folder, _, files in os.walk(os.path.join(root, "src", "server")):
+        for name in sorted(files):
+            if not name.endswith(".luau"):
+                continue
+            for number, line in enumerate(open(os.path.join(folder, name), encoding="utf-8"), 1):
+                code = line.split("--", 1)[0]
+                money = re.search(r"\b(addMoney|spend|tellMoney)\(.*?\"(\w+)\"", code) or re.search(r"\b(track)\(\"money\", [^\"]*\"(\w+)\"", code)
+                if money:
+                    reasons += 1
+                    allowed = sources if money.group(1) == "addMoney" else sinks if money.group(1) == "spend" else sources | sinks
+                    if money.group(2) not in allowed:
+                        bad.append(f"{name}:{number}: money reason {money.group(2)} ({money.group(1)})")
+                event = re.search(r"(?:\.event|\bcustom)\(\w+, \"(\w+)\"", code) or re.search(r"\btrack\(\"event\", \w+, \"(\w+)\"", code)
+                if event:
+                    named += 1
+                    if event.group(1) not in events:
+                        bad.append(f"{name}:{number}: event {event.group(1)}")
+                hook = re.search(r"\btrack\(\"(\w+)\"", code)
+                if hook:
+                    tracked += 1
+                    if hook.group(1) not in hooks:
+                        bad.append(f"{name}:{number}: PlayerData.track(\"{hook.group(1)}\") is no hook of Analytics.start")
+                if re.search(r"require\((?:script\.Parent|Server)\.Analytics\)", code) and name not in ("Main.server.luau", "Admin.luau"):
+                    bad.append(f"{name}:{number}: requires Analytics (use PlayerData.track: the game must not depend on it)")
+    print("== analytics: " + (f"{reasons} money reasons, {named} event names and {tracked} hook calls in src/server, all known ({len(sources)} sources, {len(sinks)} sinks, {len(events)} events, {len(hooks)} hooks)" if not bad else "; ".join(bad)))
+    return not bad
+
+if not analytics_check():
     ok = False
 
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)

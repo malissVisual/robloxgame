@@ -40,6 +40,7 @@
 -- "cleared" table says first / replay and what the job paid this player (Jobs passes it: `paid`), the step and the
 -- chapter's size, the next mission. The saved record is profile.missions (best rating; >= 1 = done), saved at once
 -- after a first clear (server/PlayerData.luau keeps the retired ids of a pre-6.8 save, uncounted).
+-- 6.13, analytics (server/Analytics.luau): a start (begin) and every credit (onComplete) are told to it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -254,6 +255,7 @@ local function begin(player: Player, def: MissionData.MissionDef): boolean
 		return false
 	end
 	started[player] = def.id
+	PlayerData.track("missionStarted", player, def.id) -- 6.13: the Mission funnel, the progression's Start
 	Missions.send(player)
 	-- The crew's windows show the running mission too.
 	for _, member in Crew.members(player) do
@@ -363,7 +365,7 @@ local function credit(player: Player, def: MissionData.MissionDef, stars: number
 
 	local money = reward + starBonus + campaignReward
 	if money > 0 then
-		PlayerData.addMoney(player, money) -- fires Changed (the HUD's money, the State)
+		PlayerData.addMoney(player, money, "MissionReward", def.id) -- fires Changed (the HUD's money, the State)
 	else
 		PlayerData.notify(player)
 	end
@@ -445,6 +447,8 @@ function Missions.onComplete(owner: Player, missionId: string, stars: number, me
 		if not ok then
 			warn(`[Missions] credit for {player.Name} failed: {result}`)
 		elseif result then
+			-- 6.13: the Mission funnel's Completed and the progression (the owner), a chapter's end (FirstChapter)
+			PlayerData.track("missionDone", player, def.id, player == owner, result.campaignDone ~= nil)
 			getRemote():FireClient(player, "cleared", result)
 			Missions.send(player)
 			Challenges.check(player) -- 3.1: missions, stars, campaigns (and the counters Jobs just told)

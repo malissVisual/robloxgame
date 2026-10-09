@@ -299,7 +299,7 @@ local function finalRewards(player: Player, profile: PlayerData.Profile): boolea
 		profile.rewards.secrets = true
 		giveItem(profile, nil, secrets.paint)
 		giveTitle(player, profile, secrets.title)
-		PlayerData.addMoney(player, secrets.money)
+		PlayerData.addMoney(player, secrets.money, "ChallengeReward", "Secrets")
 		unlocked(player, {
 			kind = "secrets",
 			id = "secrets",
@@ -318,7 +318,7 @@ local function finalRewards(player: Player, profile: PlayerData.Profile): boolea
 		profile.rewards.challenges = true
 		giveItem(profile, last.weapon, nil)
 		giveTitle(player, profile, last.title)
-		PlayerData.addMoney(player, last.money)
+		PlayerData.addMoney(player, last.money, "ChallengeReward", "Challenges")
 		unlocked(player, {
 			kind = "challenges",
 			id = "challenges",
@@ -355,7 +355,7 @@ local function evaluate(player: Player)
 				giveTitle(player, profile, def.title)
 			end
 			if def.money > 0 then
-				PlayerData.addMoney(player, def.money)
+				PlayerData.addMoney(player, def.money, "ChallengeReward", def.id)
 			end
 			unlocked(player, {
 				kind = "challenge",
@@ -546,7 +546,7 @@ local function foundSecret(player: Player, id: string)
 	end
 	profile.secrets[id] = true
 	local money = Config.Rewards.SecretMoney
-	PlayerData.addMoney(player, money)
+	PlayerData.addMoney(player, money, "ChallengeReward", "Secret")
 	local _, found, total = allSecrets(profile)
 	unlocked(player, {
 		kind = "secret",
@@ -789,7 +789,7 @@ function Challenges.adminAll(player: Player): number
 		campaignReward(player, profile, campaign.id)
 	end
 	if money > 0 then
-		PlayerData.addMoney(player, money)
+		PlayerData.addMoney(player, money, "Admin")
 	end
 	finalRewards(player, profile)
 	PlayerData.notify(player)

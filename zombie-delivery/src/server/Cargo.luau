@@ -3162,7 +3162,7 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 	paid = math.max(0, math.min(paid, (Config.Throw.TipCap or 60) - before))
 	if paid > 0 then
 		tipsPaid[session] = before + paid
-		PlayerData.addMoney(player, paid)
+		PlayerData.addMoney(player, paid, "Tip", "Trickshot")
 	end
 	-- 6.2: the customer's PERFECT tip (its own cap a job: Config.Throw.PerfectCap)
 	local customerTip = 0
@@ -3171,7 +3171,7 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 		customerTip = math.max(0, math.min(Config.Throw.PerfectTip, Config.Throw.PerfectCap - given))
 		if customerTip > 0 then
 			perfectPaid[session] = given + customerTip
-			PlayerData.addMoney(player, customerTip)
+			PlayerData.addMoney(player, customerTip, "Tip", "Perfect")
 		end
 		require(script.Parent.Tasks).note(player, "perfect", 1) -- 6.12: the PERFECT throws task (server/Tasks.luau)
 	end
