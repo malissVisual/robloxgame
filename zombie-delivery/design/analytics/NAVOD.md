@@ -146,6 +146,11 @@ tisíce. Důvod **Other** znamená pohyb peněz, který hra nepojmenovala; když
 | SessionLength | hráč odešel ze hry | hodnota: minuty hraní, 01: `New` (ještě neprošel všech 9 kroků) nebo `Veteran` |
 | ServerError | chyba ve skriptu na serveru | 01: jméno skriptu |
 | ClientError | chyba ve skriptu u hráče v zařízení | 01: jméno skriptu |
+| GoldenOffered | (6.14) na tabuli se objevila ZLATÁ ZAKÁZKA | hodnota: hvězdy, 01: jak (`car` / `bike` / `foot`) |
+| GoldenTaken | (6.14) hráč zlatou zakázku vzal | stejně jako výše |
+| GoldenDone | (6.14) zlatá zakázka doručena a zaplacena | stejně jako výše |
+| GoldenExpired | (6.14) zlaté zakázce došel čas dřív, než ji hráč vzal | stejně jako výše, 02: kde (`board` / `queue`) |
+| RegularTierUp | (6.14) hráč je u firmy stálým zákazníkem o stupeň výš | hodnota: stupeň (1–4), 01: stupeň (`bronze` …), 02: firma (`pizzeria` …) |
 
 ## Chyby (Error Report)
 

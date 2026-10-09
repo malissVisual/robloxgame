@@ -50,7 +50,8 @@ for _,name in {"MAP","SHOP","BAG & ITEMS","GARAGE","STYLE","MORE"} do
 	local label=text(name)
 	check(`the {name} tile has its name and a one-line subtitle`,label~=nil and label.Parent.Parent==named("Tiles") and label.Parent:FindFirstChild("Sub")~=nil and label.Parent:FindFirstChild("Sub").Text~="")
 end
-check("MORE: career, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,crew,top,estate,bank,messages,settings")
+-- 6.14: REGULARS after CAREER.
+check("MORE: career, regulars, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,regulars,crew,top,estate,bank,messages,settings")
 -- 6.12.5: MISSIONS' line is the chapter you are at (Phone.missionInfo: MissionsUi.summary), with its bar and NEW.
 do
 	local info={name="First Shift",done=0,total=6,open=false,why="Level 4",new=false}
@@ -67,9 +68,9 @@ do
 	Phone.missionInfo=nil
 end
 check("MORE waits behind the tiles",named("Home").Visible and not named("More").Visible)
-check("all sixteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==16)
+check("all seventeen apps constructed (6.14: REGULARS)",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==17)
 check("the messages row is always on home",named("MessagesRow")~=nil and named("MessagesRow").Visible and text("No new messages")~=nil)
-check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==16)
+check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==17)
 do
 	local icons=require("./Icons")
 	icons.Ids.app_settings="rbxassetid://12345"
@@ -354,6 +355,84 @@ do
 	Phone.close()
 end
 
+-- 6.14: the regulars (client/RegularsApp.luau) and the golden orders (client/SpecialOrderUi.luau). The State's counts:
+-- a tier reached says so (a toast, the level-up sting). MORE → REGULARS: every business (25) as a card with its picture,
+-- the highest tier first with its medal, bar and next tier, the ones never met greyed. On the job list a golden order
+-- heads the board in a section of its own, its card in gold with its perks and countdown (a toast and the sting when it
+-- comes, once); every card names your tier with its business; NEXT UP says when a queued one runs out; a run's toast
+-- carries its result lines.
+do
+	local RegularsApp=require("./RegularsApp")
+	local SpecialOrderUi=require("./SpecialOrderUi")
+	local said={}
+	local function say(value) table.insert(said,value) end
+	RegularsApp.start(say)
+	SpecialOrderUi.start(say)
+	M.remotes.State.OnClientEvent:Fire({regulars={pizzeria=4,clinic=15,nowhere=9}})
+	check("6.14: the first State: the counts, no toast",#said==0 and RegularsApp.counts().pizzeria==4 and RegularsApp.counts().nowhere==nil)
+	M.remotes.State.OnClientEvent:Fire({regulars={pizzeria=5,clinic=15}})
+	check("a tier reached: its toast and the sting",said[#said]=="Luigi's Pizza: you're a BRONZE regular · +5% pay" and M.played[#M.played]=="level_up")
+	Phone.close();Phone.open()
+	named("moreApp").Activated:Fire()
+	named("regularsApp").Activated:Fire()
+	check("MORE → REGULARS opens in the popup",showing("regulars") and named("Glyph"):FindFirstChild("NativeGlyph")~=nil and #M.warnings==0)
+	local function inPopup(name) return all(named("AppPopup"),function(object) return object.Name==name end) end
+	local cards=all(named("AppPopup"),function(object) return string.match(object.Name,"^Regular_")~=nil end)
+	check("a card for every business",#cards==25,#cards)
+	check("the summary: who knows you, the tiers held",text("2 / 25 businesses know you")~=nil and text("🥈 SILVER 1")~=nil and text("🥉 BRONZE 1")~=nil)
+	local clinic,pizza,bakery=named("Regular_clinic"),named("Regular_pizzeria"),named("Regular_bakery")
+	check("the highest tier first",clinic.LayoutOrder<pizza.LayoutOrder and pizza.LayoutOrder<bakery.LayoutOrder)
+	local function within(card,value) return all(card,function(object) return object.Text==value end)[1] end
+	check("a regular's card: its picture, name, medal, bar and the way to the next tier",clinic:FindFirstChild("Body"):FindFirstChild("Thumb")~=nil and within(clinic,"CITY CLINIC")~=nil
+		and within(clinic,"🥈 SILVER · +10%")~=nil and all(clinic,function(object) return object.Name=="Progress" end)[1]~=nil and within(clinic,"15 deliveries · 25 more for GOLD (+15%)")~=nil)
+	local thumb=bakery:FindFirstChild("Body"):FindFirstChild("Thumb")
+	local picture=thumb and thumb:FindFirstChild("Picture")
+	check("never met: greyed, how to meet them",picture~=nil and picture.ImageTransparency==0.35 and within(bakery,"Deliver for them once to meet them.")~=nil and within(bakery,"NOT MET")~=nil)
+	named("Close").Activated:Fire()
+	check("REGULARS closes back to MORE",popup()==nil and named("More").Visible)
+	-- A golden order on the board.
+	local golden={index=41,mode="car",cargo="Gold",customer="Vault",first="First Zombie Bank",address="Depot",distance=1200,time=300,pay=2100,stars=3,tierName="Deadly",business="bank",
+		specialOrder={kind="golden",expiresAt=M.now+150,seconds=180,pay=3,xp=2,waves=2,boost=2,light=false}}
+	local plain={index=42,mode="foot",cargo="Pizzas",customer="Hannah",first="Luigi's Pizza",address="3 Oak Ave",distance=300,time=150,pay=60,stars=1,business="pizzeria"}
+	local before=#said
+	M.remotes.Offers.OnClientEvent:Fire({golden,plain},M.now+300,{})
+	check("6.14: a golden order comes: its toast (the time it has left) and the sting",said[#said]=="★ A GOLDEN ORDER is on your board · 2:30 · ×3 PAY · ×2 XP · MORE DANGER · JOBS" and M.played[#M.played]=="event_start",said[#said])
+	M.remotes.Offers.OnClientEvent:Fire({golden,plain},M.now+300,{})
+	check("… once",#said==before+1)
+	Phone.close();Phone.open("board")
+	local section=text("★ Special orders · 1")
+	check("its own section heads the list",section~=nil and section.Parent.LayoutOrder<text("On foot · 1").Parent.LayoutOrder)
+	local body=text("GOLD → VAULT").Parent.Parent
+	local card=body.Parent
+	local head=body:FindFirstChild("SpecialOrder")
+	check("its card in gold: the frame, the ★ line with its perks, the countdown",card:FindFirstChildOfClass("UIStroke").Color.R==214/255 and card:FindFirstChildOfClass("UIStroke").Thickness==2
+		and head~=nil and head.LayoutOrder<body:FindFirstChild("Thumb").LayoutOrder and head:FindFirstChild("Perks").Text=="★ GOLDEN ORDER · ×3 PAY · ×2 XP · MORE DANGER"
+		and head:FindFirstChild("Countdown").Text=="⏱ 2:30" and card:GetAttribute("SpecialOrder")=="golden")
+	check("… the pay shown is its golden pay, ACCEPT takes it",text("$2100")~=nil)
+	check("every card names your tier with its business (Luigi's: Bronze)",text("🥉 BRONZE REGULAR +5%")~=nil and within(body,"🥉 BRONZE REGULAR +5%")==nil)
+	tap("ACCEPT")
+	check("… ACCEPT fires the golden row's id",lastSent("AcceptJob").args[1]==41)
+	-- NEXT UP: a queued golden order runs out there too.
+	local queued={id=9,title="Gold → Vault",cargo="Gold",customer="Vault",mode="car",stars=3,from="Bank",to="Depot",pay=2100,business="bank",specialOrder=golden.specialOrder}
+	M.remotes.Job.OnClientEvent:Fire(M.queueFixture.run(M.now))
+	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={queued}})
+	Phone.close();Phone.open("board")
+	check("NEXT UP: a queued golden order says when it runs out",named("RunsOut")~=nil and named("RunsOut").Text=="★ GOLDEN ORDER · leaves NEXT UP in 2:30",named("RunsOut") and named("RunsOut").Text)
+	M.remotes.Job.OnClientEvent:Fire(nil)
+	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
+	-- An expired one says nothing; a run's toast carries the result's lines.
+	before=#said
+	M.remotes.Offers.OnClientEvent:Fire({{index=43,mode="foot",cargo="Bread",customer="Ed",pay=150,stars=1,specialOrder={kind="golden",expiresAt=M.now-1,seconds=180,pay=3,xp=2}}},M.now+300,{})
+	check("an expired one comes with no toast",#said==before)
+	SpecialOrderUi.toast({success=true,mode="foot",special={golden={pay=3,xp=2},regular={name="Luigi's Pizza",tier="Bronze",money=4}}},say)
+	check("a run's toast: the golden order and the regular's bonus",said[#said]=="★ GOLDEN ORDER ×3 · ×2 XP · Regular · Luigi's Pizza (Bronze) +$4",said[#said])
+	before=#said
+	SpecialOrderUi.toast({success=true,mode="car",special={golden={pay=3,xp=2}}},say)
+	check("… not for a car job's window (it shows them as lines)",#said==before)
+	check("6.14: no warnings",#M.warnings==0)
+	Phone.close()
+end
+
 -- CAREER and SHOP: two columns in the wide popup, the phone upright.
 for _,id in {"career","shop"} do
 	Phone.open(id)
@@ -410,7 +489,7 @@ named("Close").Activated:Fire()
 check("read: the count goes",not named("Unread").Visible and text("No new messages")~=nil)
 -- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
 -- 6.5: the tiles (JOBS off duty: the board) and MORE's rows; each closes back to the page it came from.
-for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks"},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
+for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks"},{"regulars","regulars",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
 	local id,shows,inMore=entry[1],entry[2],entry[3]==true
 	Phone.close();Phone.open()
 	if inMore then named("moreApp").Activated:Fire() end

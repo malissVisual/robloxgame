@@ -25,7 +25,9 @@
 -- is no new courier; a step is marked only once Roblox took it); every money change tells its reason (addMoney /
 -- spend's `reason` and `sku`, the level rewards, the retired kit's refunds) to PlayerData.onMoney; and the game's
 -- other analytics calls go through PlayerData.track (the hooks Analytics.start puts in PlayerData.analytics: without
--- them nothing happens, so the game never depends on server/Analytics.luau loading).
+-- them nothing happens, so the game never depends on server/Analytics.luau loading). 6.14: the regulars (regulars: the
+-- deliveries for each business, shared/Regulars.luau; server/Regulars.luau counts them): a new field, checked on load
+-- (Regulars.clean), an empty table in a save from before (no migration).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -100,6 +102,9 @@ export type Profile = {
 	tasks: TaskData.Saved?,
 	-- 6.13: the onboarding funnel's steps reached (a bit a step, shared/AnalyticsPlan.luau; server/Analytics.luau)
 	onboarding: number,
+	-- 6.14: the regulars: deliveries for each business (shared/Regulars.luau ids, the job pictures'; server/Regulars.luau
+	-- counts them); a save from before 6.14 has none (the empty table, no migration)
+	regulars: { [string]: number },
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -190,6 +195,7 @@ local function newProfile(): Profile
 		vanQuest = nil,
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
 		onboarding = 0, -- 6.13: a new courier, no step yet
+		regulars = {}, -- 6.14: no business knows you yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -439,6 +445,8 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	-- 6.13: the onboarding funnel's steps (only a real save has them; one from before 6.13 is past every step).
 	profile.onboarding = AnalyticsPlan.onboardingFrom(saved)
+	-- 6.14: the regulars, checked (known businesses, whole counts up to Config.Regulars.Cap); none before 6.14: empty.
+	profile.regulars = require(Shared.Regulars).clean(saved.regulars)
 	-- 6.4: the bag chosen: kept only while it is a bag you own (else nil: the best one)
 	local chosen = if type(saved.activeBag) == "string" then saved.activeBag else nil
 	for _, def in Config.Kit do
@@ -796,6 +804,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		vanQuest = profile.vanQuest, -- 5.0
 		tasks = profile.tasks, -- 6.12
 		onboarding = profile.onboarding, -- 6.13
+		regulars = profile.regulars, -- 6.14
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

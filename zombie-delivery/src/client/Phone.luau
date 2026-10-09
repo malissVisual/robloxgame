@@ -39,6 +39,8 @@
 --   BOARD, during a run too (YOUR RUN and NEXT UP on top, + ADD / + QUEUE / ADD ALL: client/PhoneApps.luau); the
 --   home's contract card still opens ORDERS, and so does YOUR RUN's DETAILS. The JobQueue remote's state (the NEXT UP
 --   queue, server/JobQueue.luau) is kept in refs.queue: JOBS' line says "Your run · 2 orders · 3 next".
+-- 6.14, MORE → REGULARS (client/RegularsApp.luau): every business that gives jobs, your tier with it and the way to the
+--   next one, in the popup.
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -127,6 +129,7 @@ local TILES: { AppDef } = {
 -- … and MORE's entries (the 5.5 MENU's windows among them).
 local MORE: { AppDef } = {
 	{ id = "career", name = "CAREER", sub = "Your level and what's next" },
+	{ id = "regulars", name = "REGULARS", sub = "Businesses that know you" }, -- 6.14 (client/RegularsApp.luau)
 	{ id = "crew", name = "CREW", sub = "Work with friends", window = true },
 	{ id = "top", name = "TOP", sub = "The best couriers", window = true },
 	{ id = "estate", name = "ESTATE", sub = "Homes, garages, offices", window = true },
@@ -147,6 +150,7 @@ refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
 refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
 refs.tasks = require(script.Parent.TasksApp) -- 6.12: TASKS, the daily and weekly tasks (6.12.5: on home)
 refs.style = require(script.Parent.StyleApp) -- 6.12: STYLE, the cosmetics
+refs.regulars = require(script.Parent.RegularsApp) -- 6.14: REGULARS, the businesses that know you
 refs.queueRules = require(Shared.JobQueue) -- 6.12.8: the NEXT UP queue's words (refs.queue: the server's state)
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
@@ -1533,7 +1537,7 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
-local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE" }
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS" }
 
 -- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
 renderApp = function()
@@ -1610,6 +1614,8 @@ renderApp = function()
 			refs.tasks.draw(list, look, wide) -- 6.12
 		elseif app == "style" then
 			refs.style.render(list, look, refs.host, wide) -- 6.12: the cosmetics (client/StyleApp.luau)
+		elseif app == "regulars" then
+			refs.regulars.draw(list, look, wide) -- 6.14: the businesses that know you
 		end
 	end)
 	if refs.spareRoute then

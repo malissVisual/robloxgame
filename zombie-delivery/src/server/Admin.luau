@@ -45,6 +45,10 @@
 --   shift [T]  n              6.14: this session's shift at n deliveries (0 … Config.Jobs.Shift.Jobs − 1; the next
 --                             one paid finishes it at Jobs − 1) (server/Shift.luau)
 --   roadEvent [T] kind        4.8: "survivor" | "addon" | "roadblock" on the current job as you drive on (Jobs.adminRoadEvent)
+--   goldenOrder [T]           6.14: a GOLDEN ORDER on the board now, whatever the roll and the level (the one there
+--                             goes first; server/SpecialOrders.luau force)
+--   regularOrder [T]          6.14: a REGULAR'S ORDER on the board now (needs a business where you are Silver or better)
+--   regulars [T] count        6.14: every business at that many deliveries (0 clears them; server/Regulars.luau adminSet)
 --   god [T]    boolean?       toggle (or set) invulnerable: you and your car
 --   fly [T] / noclip [T] / jump [T] / carBoost [T] / hidden [T] / oneHit [T]   boolean?: toggle (or set) the player
 --                             attributes AdminFly, AdminNoclip (client/AdminFly.luau), AdminJump (super jump, there
@@ -1247,6 +1251,16 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	job = job,
 	finishStop = finishStop,
 	roadEvent = roadEvent, -- 4.8
+	-- 6.14: the golden orders and the regulars
+	goldenOrder = function(player: Player)
+		say(player, require(Server.SpecialOrders).force(player, "golden"))
+	end,
+	regularOrder = function(player: Player)
+		say(player, require(Server.SpecialOrders).force(player, "regular"))
+	end,
+	regulars = function(player: Player, arg: any)
+		say(player, require(Server.Regulars).adminSet(player, arg))
+	end,
 	god = setGod,
 	spawn = spawnEnemies,
 	banditCar = banditCar,
@@ -1309,7 +1323,7 @@ for _, name in {
 	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "refuel", "speed",
 	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
 	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
-	"title", "streak", "shift",
+	"title", "streak", "shift", "goldenOrder", "regularOrder", "regulars",
 } do
 	TARGETED[name] = true
 end

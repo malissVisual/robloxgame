@@ -17,6 +17,8 @@
 --   "kill"     Main (Zombies.onKillInfo): a zombie killed (not a bandit), `night` after dark
 --   "mission"  server/Missions.luau onComplete: a mission finished (each credited player)
 --   "shift"    6.14, server/Shift.luau: a shift finished (its deliveries in one go, Config.Jobs.Shift)
+--   "regular"  6.14, server/Regulars.luau paid: an order for a business where you were a regular already (Bronze+)
+--   "golden"   6.14, server/Regulars.luau paid: a golden order delivered (the owner and the crew)
 -- A note never blocks or breaks its caller (deferred, guarded).
 --
 -- The "Tasks" remote (shared/Net.luau), rate-limited (Config.Robust.Limits.Tasks):

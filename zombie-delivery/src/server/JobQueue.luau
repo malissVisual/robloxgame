@@ -31,6 +31,10 @@
 --   * Jobs.onBoardSend: every board sent gets the rows' `queue` (+ QUEUE: during a run, a row that can't be added but
 --     may wait), `queueButton` / `queueText` (the queue is full) and the info's `addAll` (ADD ALL's count and total)
 --     and `queue` (its size and max).
+--   * 6.14, a GOLDEN ORDER or a REGULAR'S ORDER (the offer's `specialOrder`, server/SpecialOrders.luau) queues like any
+--     ordinary job (ADD ALL takes it first: it heads the board) and keeps its clock: when it runs out it leaves NEXT UP
+--     as it leaves the board (expire: every check and every step, paused or not; "The GOLDEN ORDER ran out: dropped
+--     from NEXT UP"). JobQueue.holds: one of that kind waiting (server/SpecialOrders.luau: one at a time).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -75,6 +79,18 @@ end
 function JobQueue.size(player: Player): number
 	local queue = queues[player]
 	return if queue then #queue.list else 0
+end
+
+-- 6.14: does NEXT UP hold a golden or a regular's order (`kind`: "golden" | "regular")?
+function JobQueue.holds(player: Player, kind: string): boolean
+	local queue = queues[player]
+	for _, entry in (if queue then queue.list else {}) :: { Entry } do
+		local spec = entry.offer.specialOrder
+		if type(spec) == "table" and spec.kind == kind then
+			return true
+		end
+	end
+	return false
 end
 
 -- What the phone and the J board show: every queued job (what, from → to, pay …), its reason to wait, the next one's
@@ -142,6 +158,36 @@ local function enqueue(player: Player, board: any, offer: any): Entry
 	return entry
 end
 
+-- 6.14: a golden or a regular's order whose clock ran out leaves NEXT UP as it leaves the board (an idle start waiting
+-- for it is cancelled). True when one went (the queue is sent).
+local function expire(player: Player, queue: Queue): boolean
+	local now = workspace:GetServerTimeNow()
+	local gone = false
+	for index = #queue.list, 1, -1 do
+		local entry = queue.list[index]
+		local spec = entry.offer.specialOrder
+		if type(spec) == "table" and (tonumber(spec.expiresAt) or 0) <= now then
+			table.remove(queue.list, index)
+			if queue.startId == entry.id then
+				queue.startId = nil
+			end
+			gone = true
+			notice:FireClient(player, `{if spec.kind == "golden" then "The GOLDEN ORDER" else "The REGULAR'S ORDER"} ran out: dropped from NEXT UP ({entry.offer.cargo}).`)
+			if spec.kind == "golden" then
+				require(script.Parent.PlayerData).track("event", player, "GoldenExpired", entry.offer.tier, entry.offer.mode, "queue") -- 6.14
+			end
+		end
+	end
+	if gone then
+		if #queue.list == 0 then
+			queue.paused = false
+			queue.pausedWhy = nil
+		end
+		push(player)
+	end
+	return gone
+end
+
 -- The queue's next jobs start while they can (no job: after the StartDelay; a run that takes them: at once); the
 -- next one that can't says why. One toast for what started.
 local function step(player: Player)
@@ -149,6 +195,7 @@ local function step(player: Player)
 	if not queue or #queue.list == 0 or not player.Parent then
 		return
 	end
+	expire(player, queue) -- 6.14
 	if queue.paused then
 		queue.startId = nil
 		push(player)
@@ -471,6 +518,9 @@ function JobQueue.start()
 		while true do
 			task.wait(math.max(0.5, QueueConfig.CheckEvery))
 			for player, queue in queues do
+				if #queue.list > 0 and queue.paused then
+					pcall(expire, player, queue) -- 6.14: a paused queue's golden order runs out too
+				end
 				if #queue.list > 0 and not queue.paused then
 					local ok, err = pcall(function()
 						step(player)

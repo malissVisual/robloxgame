@@ -194,6 +194,20 @@
 -- is missing): every order's Delivery funnel (newOrder: taken; advance / freeStep: a pick-up stop done; payOrder:
 -- delivered; failOrder and Jobs.fail: failed, with `why`: "time", "cargo", "gaveup"); a mission's Fail; the money's
 -- reasons (DeliveryPay, CrewPay, Tip, Reroll).
+--
+-- 6.14, the regulars and the golden orders (server/Regulars.luau, server/SpecialOrders.luau; shared/Regulars.luau,
+-- shared/SpecialOrders.luau): module fields and calls only (no new top-level local here).
+--   * An offer may carry a `specialOrder` (a GOLDEN ORDER or a REGULAR'S ORDER: SpecialOrders.Spec, its pay already in
+--     Offer.pay). Jobs.specialApi is what server/SpecialOrders.luau needs: what the courier can take (reach), a new
+--     ordinary offer of a transport and tier, from some businesses only (make: ordinaryOffer / footOffer's `only`), and
+--     putting it on the board (place). It heads the board (boardOrder), stays on a new board until its clock runs out
+--     (makeBoard), is never refilled (refillBoard) and is refused once its clock ran out (accept); the board's rows
+--     and NEXT UP's carry it (describe, queueApi.view).
+--   * Its run's danger (Jobs.dangerOf): an open golden order's waves (× its Spec's `waves`, the way WANTED does it) and
+--     its bandits' boost on top of the job's own; a golden run on foot or by bike its own stray walkers (strayStep,
+--     Config.Jobs.Golden.Light).
+--   * payOrder calls Regulars.paid: the owner's regular's bonus on the rated pay, the delivery counted for its business
+--     (the owner and the crew), a golden order's XP, the result's `special` lines.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -289,6 +303,9 @@ type Offer = {
 	replay: boolean?,
 	-- 6.12.8: the business it is for (Config.Jobs.Businesses id; applyRules): a queued job re-checks its hours at start
 	business: string?,
+	-- 6.14: a GOLDEN ORDER or a REGULAR'S ORDER (shared/SpecialOrders.luau Spec: kind, expiresAt, pay, xp, the danger),
+	-- nil for every other offer (server/SpecialOrders.luau sets it)
+	specialOrder: { [string]: any }?,
 }
 
 -- 5.1: the numbers of a light job: Config.Jobs.Foot or Config.Jobs.Bike (footOffer, strayStep; JobRules.LightRules).
@@ -1102,7 +1119,8 @@ end
 -- tier's BulkExtra. Without a role (the tutorial, the admin's "ordinaryN") it is made as before 4.7.
 -- 5.7, `room`: what the player's own car holds now; a ★ delivery takes Config.Jobs.CarStep's pieces up to it
 -- (JobRules.carStepPieces: at least the Rusty Van's EasyMaxPieces).
-local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, role: string?, room: number?): Offer?
+-- 6.14, `only`: from these businesses only (Config.Jobs.Businesses ids: a REGULAR'S ORDER, Jobs.specialApi.make).
+local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, role: string?, room: number?, only: { [string]: boolean }?): Offer?
 	local Deliveries = require(Shared.Deliveries) -- 5.3 (required here: Jobs keeps its top-level locals)
 	local tier = JobsConfig.Tiers[tierIndex]
 	local choice = JobsConfig.Choice
@@ -1122,6 +1140,9 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 	local businesses: { Config.BusinessDef } = {}
 	local near: { Config.BusinessDef } = {} -- (the tutorial's: a storefront within its pick-up reach)
 	for _, business in JobsConfig.Businesses do
+		if only and not only[business.id] then
+			continue -- (6.14: a regular's order: its business only)
+		end
 		local handy = not easy or (not Cargo.isPeople(business.kind) and business.kind ~= "horse")
 		-- 5.3: only a business open at this hour (the bakery in the morning …). 5.3 review: and one that delivers
 		-- somewhere in this tier's range from its storefront (no ★ ice cream to a home 1,700 studs away).
@@ -1279,8 +1300,8 @@ end
 -- storefront (shared/Deliveries.luau), only the businesses open at this hour (6.6: every light look fits your bag and
 -- the bike's, so no smaller count for a bouquet or a cake). `role` "round": the
 -- newspaper round instead (Config.Jobs.Round: the bundle at The Daily Undead, one paper to every door on one or two
--- streets, JobRules.roundPay / roundTime).
-local function footOffer(from: Vector3, role: string?, room: number, tutorial: boolean?, bike: boolean?): Offer?
+-- streets, JobRules.roundPay / roundTime). 6.14, `only`: from these businesses only (as ordinaryOffer's).
+local function footOffer(from: Vector3, role: string?, room: number, tutorial: boolean?, bike: boolean?, only: { [string]: boolean }?): Offer?
 	local Deliveries = require(Shared.Deliveries)
 	local foot: LightJob = if bike then JobsConfig.Bike else JobsConfig.Foot
 	local choice = JobsConfig.Choice
@@ -1357,6 +1378,9 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 	local function gather(within: number): { Config.BusinessDef }
 		local found: { Config.BusinessDef } = {}
 		for _, business in JobsConfig.Businesses do
+			if only and not only[business.id] then
+				continue -- (6.14: a regular's order: its business only)
+			end
 			local light = Tuning.LightLooks[business.look] and not Cargo.isPeople(business.kind)
 			if tutorial then
 				if light and business.id == "post" then
@@ -2130,14 +2154,19 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 		addOrder = if stackOk then true else nil, -- 5.2
 		orderButton = stackButton,
 		orderText = stackText,
+		specialOrder = offer.specialOrder, -- 6.14: a GOLDEN ORDER or a REGULAR'S ORDER (its kind, expiresAt, pay, xp)
 	}
 end
 
 -- 3.7: the board's order: ★ on top, then ★★, ★★★, ★★★★ (the specials at their stars, the locked ones in their place);
 -- at the same stars the lower driver level first, the ordinary delivery before a special; else as they were made.
--- 5.0: the ON FOOT jobs on top. 5.1: then the BIKE jobs.
+-- 5.0: the ON FOOT jobs on top. 5.1: then the BIKE jobs. 6.14: a golden or a regular's order before them all (ADD ALL
+-- takes it first; the job lists show it in a section of its own).
 local MODE_ORDER: { [string]: number } = { foot = 1, bike = 2, car = 3 }
 local function boardOrder(a: Offer, b: Offer): boolean
+	if (a.specialOrder ~= nil) ~= (b.specialOrder ~= nil) then
+		return a.specialOrder ~= nil
+	end
 	local aMode, bMode = MODE_ORDER[a.mode] or 3, MODE_ORDER[b.mode] or 3
 	if aMode ~= bMode then
 		return aMode < bMode
@@ -2272,6 +2301,15 @@ local function makeBoard(player: Player): Board
 	for _, offer in list do
 		stamp(offer, from)
 	end
+	-- 6.14: a golden or a regular's order still on its clock stays on the new board as it was (server/SpecialOrders.luau
+	-- takes it off when its time is up).
+	local old = boards[player.UserId]
+	for _, offer in (if old then old.list else {}) :: { Offer } do
+		local special = offer.specialOrder
+		if special and (tonumber(special.expiresAt) or 0) > workspace:GetServerTimeNow() then
+			table.insert(list, offer)
+		end
+	end
 	table.sort(list, boardOrder)
 	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds), rerolled = {}, footNote = footNote }
 	boards[player.UserId] = board
@@ -2357,6 +2395,9 @@ function Jobs.refillBoard(player: Player)
 	local from = playerPosition(player)
 	local added = 0
 	for _, old in taken do
+		if old.specialOrder then
+			continue -- 6.14: a golden or a regular's order came on top of the board: nothing comes in its place
+		end
 		local role = if old.round then "round" else old.role
 		local fresh: Offer? = nil
 		if old.mode == "foot" then
@@ -2409,7 +2450,7 @@ local function reroll(player: Player, tierIndex: any)
 		local from = playerPosition(player)
 		local list: { Offer } = {}
 		for _, offer in board.list do
-			if offer.jobType ~= nil or offer.tier ~= tierIndex or offer.mode ~= "car" then -- (5.0: the foot jobs stay; 5.1: the bike jobs)
+			if offer.jobType ~= nil or offer.tier ~= tierIndex or offer.mode ~= "car" or offer.specialOrder ~= nil then -- (5.0: the foot jobs stay; 5.1: the bike jobs; 6.14: a golden or a regular's order)
 				table.insert(list, offer)
 			end
 		end
@@ -3138,7 +3179,9 @@ local function accept(player: Player, id: any)
 	end
 	local offer: Offer? = nil
 	for _, candidate in board.list do
-		if candidate.id == id then
+		-- (6.14: a golden or a regular's order whose clock ran out is gone, a second before server/SpecialOrders.luau
+		-- takes it off)
+		if candidate.id == id and not (candidate.specialOrder and (tonumber(candidate.specialOrder.expiresAt) or 0) <= workspace:GetServerTimeNow()) then
 			offer = candidate
 			break
 		end
@@ -3370,6 +3413,10 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			JobRules.countJob(profile.licenceJobs, offer.tier, rating.stars)
 		end
 	end
+	-- 6.14 (server/Regulars.luau): your tier's bonus with its business on the rated pay, the delivery counted for you and
+	-- your crew, a golden or a regular's order's XP, the result's lines (never a mission).
+	local regular = require(script.Parent.Regulars).paid(player, offer, payTotal, crew, order.addOn)
+	payTotal += regular.money
 	if offer.round then
 		-- 5.3, the newspaper round: the tip for no paper in the bushes (a line in the rating's checks).
 		payTotal += JobRules.roundTip(Cargo.missesOf(session, order.id))
@@ -3409,6 +3456,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	if rating then
 		xp = JobRules.ratedXp(xp, rating.stars)
 	end
+	xp = math.floor(xp * regular.xp + 0.5) -- 6.14: a golden order's XP (the crew's too)
 	local crewXp = xp -- (6.8 review: each crew member's own replay cut, below)
 	if offer.replay then
 		xp = Missions.replayXp(xp) -- 6.8: a replayed mission (the owner's share was cut above)
@@ -3508,6 +3556,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		-- 6.14: the shift one further (server/Shift.luau: every delivery paid but a road event's add-on), its pay when
 		-- full: { count, target, idleUntil?, shifts, done?, money?, xp? }
 		shift = if order.addOn then nil else require(script.Parent.Shift).paid(player),
+		special = regular.info, -- 6.14: { golden?, regularOrder?, regular? } (client/SpecialOrderUi.luau's lines)
 	}, ownerXp))
 	-- 6.8: what this order paid everybody (a mission's "cleared" card says it); a crew member who has done the mission
 	-- before (and is not on a replay of the owner's already) gets the replay share of their pay and XP.
@@ -3538,6 +3587,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			mission = missionResult,
 			rating = if rating then { stars = rating.stars } else nil, -- 4.7: the owner's rating of the job
 			shift = if order.addOn then nil else require(script.Parent.Shift).paid(member), -- 6.14: their own shift
+			special = regular.crewInfo, -- 6.14: a golden or a regular's order
 		}, giveXp(member, if again then Missions.replayXp(crewXp) else crewXp)))
 	end
 	local missionId = offer.mission
@@ -4074,18 +4124,22 @@ end
 
 -- 5.0, a foot job: no waves, no bandits. While you walk out of the safe zone, now and then (Foot.StrayEvery ± 20 %,
 -- StrayChance) a single walker comes from StrayDistance studs away, StrayMax of yours alive at most.
+-- 6.14: a golden run on foot or by bike has its own lighter danger (Config.Jobs.Golden.Light: more strays, runners
+-- among them; shared/SpecialOrders.luau strays).
 local function strayStep(player: Player, job: Job, position: Vector3, now: number)
 	local foot: LightJob = if job.offer.mode == "bike" then JobsConfig.Bike else JobsConfig.Foot -- (5.1: its own walkers)
 	if now < job.nextStray then
 		return
 	end
-	job.nextStray = now + foot.StrayEvery * rng:NextNumber(0.8, 1.2)
-	if World.isSafe(position) or rng:NextNumber() >= foot.StrayChance or Zombies.countFor(player) >= foot.StrayMax then
+	local _, _, golden = Jobs.dangerOf(job)
+	local every, chance, most, runners = require(Shared.SpecialOrders).strays(foot.StrayEvery, foot.StrayChance, foot.StrayMax, golden)
+	job.nextStray = now + every * rng:NextNumber(0.8, 1.2)
+	if World.isSafe(position) or rng:NextNumber() >= chance or Zombies.countFor(player) >= most then
 		return
 	end
 	local spot = Zombies.findSpot(position, nil, foot.StrayDistance[1], foot.StrayDistance[2])
 	if spot then
-		Zombies.spawn("walker", spot, player, false)
+		Zombies.spawn(if rng:NextNumber() < runners then "runner" else "walker", spot, player, false)
 	end
 end
 
@@ -4101,8 +4155,9 @@ local function roadEnemies(player: Player, job: Job, tier: Config.TierDef, posit
 		end
 	end
 	-- Wanted cargo (banditBoost, the hunted twist): the bandit cars and the roadblocks come that many times as often.
-	-- Hunted on a ★ job (no bandits there): the ★★ bandits.
-	local bandits = multiplier * offer.boost
+	-- Hunted on a ★ job (no bandits there): the ★★ bandits. 6.14: an open golden order's boost too (Jobs.dangerOf).
+	local _, boost = Jobs.dangerOf(job)
+	local bandits = multiplier * boost
 	local banditTier = if offer.twists.hunted and tier.chaseEvery <= 0 then JobsConfig.Tiers[2] or tier else tier
 	local driving = Vehicles.isDriving(player)
 	if driving and banditTier.chaseEvery > 0 and now >= job.nextChase and not World.isSafe(position) then
@@ -4413,6 +4468,7 @@ local function addOnOrder(player: Player, job: Job, addOn: AddOn)
 	offer.destNames = nil
 	offer.id = 0
 	offer.role = nil
+	offer.specialOrder = nil -- 6.14: a side pick-up is no golden or regular's order (its pay, XP, danger)
 	-- 5.2 review: a side pick-up, not a job of the focused order's tier: ★ pay and XP (AddOnPay), no rating, streak or
 	-- licence progress (payOrder), and losing it costs no streak (failOrder).
 	offer.tier = 1
@@ -4624,6 +4680,27 @@ local function freeStep(player: Player, job: Job, position: Vector3, now: number
 	return false
 end
 
+-- 6.14: the run's danger: the waves' spawn multiplier (the job's modifier, WANTED's 2 …) and the bandits' boost of the
+-- job, raised by every open GOLDEN ORDER of the run (its own modifier × its Spec's `waves`, its offer's boost or its
+-- Spec's: shared/SpecialOrders.luau make), and whether one is open (`golden`: a light run's strays, strayStep). Once
+-- the golden order is paid the run is as dangerous as before.
+function Jobs.dangerOf(job: Job): (number, number, boolean)
+	local modifier = job.offer.modifier
+	local spawn = if modifier then modifier.spawnMultiplier else 1
+	local boost = job.offer.boost
+	local golden = false
+	for _, order in job.orders do
+		local special = order.offer.specialOrder
+		if order.state == "open" and special and special.kind == "golden" then
+			local own = order.offer.modifier
+			spawn = math.max(spawn, (if own then own.spawnMultiplier else 1) * (tonumber(special.waves) or 1))
+			boost = math.max(boost, order.offer.boost, tonumber(special.boost) or 1)
+			golden = true
+		end
+	end
+	return spawn, boost, golden
+end
+
 -- One player's tick of update (below): the job's timer, crew, cargo, waves and bandits.
 local function updatePlayer(player: Player, step: number, now: number, serverNow: number, nightWaves: number)
 	local job = jobs[player]
@@ -4639,7 +4716,6 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 
 	local offer = job.offer
 	local tier = JobsConfig.Tiers[tierNow(job)] or JobsConfig.Tiers[offer.tier] -- (5.2: the hardest open order's)
-	local modifier = offer.modifier
 	local session = job.cargo
 	-- 5.2: every order's own clock (a job of one order: its clock, as before).
 	if ordersClock(player, job, serverNow) then
@@ -4739,7 +4815,7 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	local flatDistance = Vector3.new(position.X - stop.park.X, 0, position.Z - stop.park.Z).Magnitude
 	spawnHordes(player, job, tier, stop, lastStop, flatDistance)
 
-	local multiplier = if modifier then modifier.spawnMultiplier else 1
+	local multiplier = (Jobs.dangerOf(job)) -- (the modifier's spawn multiplier; 6.14: an open golden order's waves)
 	if offer.twists.defend and lastStop and not job.defendDone then
 		defendStep(player, job, tier, stop, position, now, step, multiplier * nightWaves)
 	end
@@ -5237,7 +5313,75 @@ Jobs.queueApi = {
 			piece = offer.piece,
 			plural = offer.plural,
 			business = offer.business, -- 6.12.11: its picture (only ordinary jobs queue)
+			specialOrder = offer.specialOrder, -- 6.14: a golden or a regular's order (its countdown in NEXT UP)
 		}
+	end,
+}
+
+-- 6.14, the golden orders and the regulars' orders (server/SpecialOrders.luau decides with shared/SpecialOrders.luau):
+-- what it needs of the board, the run and the offers, as module fields (no new top-level locals here).
+Jobs.specialApi = {
+	-- the player's run (nil: none) and board as they are (nil: none yet; never made here)
+	job = function(player: Player): any
+		return jobs[player]
+	end,
+	board = function(player: Player): any
+		return boards[player.UserId]
+	end,
+	sendBoard = function(player: Player, board: any)
+		sendBoard(player, board)
+	end,
+	-- what the courier can take now (shared/SpecialOrders.luau Reach): the level, the car tiers open to them (the level
+	-- and the licence), a car of their own, a bike of their own at its level, riding it now
+	reach = function(player: Player): any
+		local level = PlayerData.level(player)
+		local tiers: { number } = {}
+		for index, tier in JobsConfig.Tiers do
+			if level >= tier.level and hasLicence(player, index) then
+				table.insert(tiers, index)
+			end
+		end
+		local profile = PlayerData.get(player)
+		local car = ownsCar(player) and profile ~= nil and profile.car ~= nil
+		return { level = level, tiers = tiers, car = car, bike = Transport.bikeOf(player) ~= nil and level >= JobsConfig.Bike.Level, riding = Transport.riding(player) }
+	end,
+	-- a new board offer (a LONG HAUL) of `mode` ("foot" | "bike" | "car" at `tierIndex`), from the businesses `only`
+	-- (Config.Jobs.Businesses ids) when given, sized like the board's (what you carry, your bike, your car), stamped
+	-- from where the player is; nil when none fits the player now (a few tries: a shut shop, too big for the car). A
+	-- bike run may wait for your bike (RIDE YOUR BIKE: the phone's MY BIKE brings it).
+	make = function(player: Player, mode: string, tierIndex: number, only: { [string]: boolean }?): Offer?
+		local from = playerPosition(player)
+		for _ = 1, 3 do
+			local offer: Offer? = nil
+			if mode == "foot" then
+				offer = footOffer(from, "long", Transport.footOf(player).room, nil, nil, only)
+			elseif mode == "bike" then
+				local _, bike = Transport.bikeOf(player)
+				offer = footOffer(from, "long", if bike then bike.room else JobsConfig.Bike.Pieces[1], nil, true, only)
+			elseif JobsConfig.Tiers[tierIndex] then
+				-- (5.7: a ★ delivery takes as many pieces as your own car holds now, as tierOffers)
+				local room: number? = nil
+				local profile = PlayerData.get(player)
+				local carId = if profile then profile.car else nil
+				if tierIndex == 1 and profile and carId and not Transport.riding(player) then
+					room = Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId), Economy.installedGear(profile.carGear, carId))
+				end
+				offer = ordinaryOffer(from, tierIndex, nil, "long", room, only)
+			end
+			-- (a foot or bike run is sized for what you carry; a car run must fit your car)
+			if offer and offer.level <= PlayerData.level(player) and (mode ~= "car" or slotsShort(player, offer) == nil) then
+				stamp(offer, from)
+				return offer
+			end
+		end
+		return nil
+	end,
+	-- an offer onto the player's board (made when there is none or it expired), in board order, sent to them
+	place = function(player: Player, offer: Offer)
+		local board = boardOf(player)
+		table.insert(board.list, offer)
+		table.sort(board.list, boardOrder)
+		sendBoard(player, board)
 	end,
 }
 

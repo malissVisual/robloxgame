@@ -211,6 +211,8 @@ end)
 Net.get("Job").OnClientEvent:Connect(Hud.setJob)
 Net.get("Offers").OnClientEvent:Connect(DispatchUi.setOffers)
 Net.get("DeliveryResult").OnClientEvent:Connect(Hud.showResult)
+require(Client.RegularsApp).start(Hud.toast) -- 6.14: a regulars' tier reached (the State): a toast and a sting
+require(Client.SpecialOrderUi).start(Hud.toast) -- 6.14: a golden or a regular's order on the board: a toast and a sting
 Net.get("Notice").OnClientEvent:Connect(Hud.toast)
 Net.get("OpenShop").OnClientEvent:Connect(Hud.openShop)
 Net.get("Boost").OnClientEvent:Connect(Drive.boost)

@@ -1589,6 +1589,7 @@ end
 
 function Hud.showResult(r: any)
 	view.goal.result(r) -- 6.5: the NEXT card says "Delivered! +$45 · Press J for the next job" for a few seconds
+	require(script.Parent.SpecialOrderUi).toast(r, Hud.toast) -- 6.14: a run's toast: its golden / regular's lines
 	-- 5.7: a foot or bike run done (r.mode): a toast and the pay floating up from the money (client/PayFloat.luau), not
 	-- this window; a level-up still shows its card (client/CareerUi.luau). Car jobs, missions and failures keep it.
 	if type(r) == "table" and r.success == true and (r.mode == "foot" or r.mode == "bike") then
@@ -1831,6 +1832,12 @@ function Hud.showResult(r: any)
 				local count = tonumber(shift.count) or 0
 				line(`Shift {count}/{target} · {target - count} more for the shift's pay`, nil, C.dim, 25)
 			end
+		end
+	end
+	do -- 6.14: a golden order, a regular's order, your regular's bonus (client/SpecialOrderUi.luau), before TOTAL
+		local special = require(script.Parent.SpecialOrderUi)
+		for _, extra in special.resultLines(r) do
+			special.tint(line(extra.text, special.money(extra), C.green, 15), extra.gold)
 		end
 	end
 	-- The XP of the job, the level bar and a level-up with what it unlocks.
