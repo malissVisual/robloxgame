@@ -61,7 +61,9 @@
 --     nothing covers them. A click dismisses one.
 --   * During a mission a compact banner in the Hud's top stack (Hud.topSlot("mission")): "MISSION 3/10 · Name", the
 --     twists, the CO-OP crew count and the HOLD OUT countdown. It follows your own job (the Job remote's `mission`)
---     or, for a crew member, the leader's (CrewState status.mission).
+--     or, for a crew member, the leader's (CrewState status.mission). 6.15: else its enemies ("🧟 ZOMBIES 7/20",
+--     delivered: "CLEAR THE ZOMBIES · 3 LEFT"); the action card says how many ("🧟 20 zombies to clear") and names the
+--     route's addresses (shared/MissionPlan.luau: always the same).
 --   * When a mission is done (the Missions remote's "cleared"): a celebration card with the stars flying in, the
 --     client's debrief, the rewards, a finished campaign and NEXT MISSION.
 -- The window is built on the first open. The server answers START with a Notice; while the window is open it shows
@@ -716,7 +718,7 @@ end
 local function coopChip(parent: any, order: number?): any
 	local chip = Extras.chip(parent, "👥 CO-OP", "coop", order)
 	chip.MouseEnter:Connect(function()
-		showTip(chip, "👥  CO-OP", `Made for a crew: every member adds +{math.floor(T.CoopPayPerMember * 100 + 0.5)} % pay and +{math.floor(T.CoopEnemyPerMember * 100 + 0.5)} % enemies. You can still play it alone.`)
+		showTip(chip, "👥  CO-OP", `Made for a crew: every member adds +{math.floor(T.CoopPayPerMember * 100 + 0.5)} % pay and +{math.floor(T.CoopEnemyPerMember * 100 + 0.5)} % enemy health (the same enemies, tougher). You can still play it alone.`)
 	end)
 	chip.MouseLeave:Connect(function()
 		hideTip(chip)
@@ -1165,12 +1167,17 @@ local function detailLine(parent: any, text: string, color: Color3?, order: numb
 	})
 end
 
--- Where the mission goes: "Pick up at the Old Farm → the Harbor Docks (2 drops)".
+-- Where the mission goes: "Pick up at the Old Farm → the Harbor Docks (2 drops)". 6.15: always the same way
+-- (shared/MissionPlan.luau route): the addresses without a place are named too ("Pick up at 26 7th Ave").
 local function routeText(def: MissionDef): string
+	local route = require(Shared.MissionPlan).route(def)
+	local first = if route then route[1] else nil
+	local last = if route then route[#route] else nil
 	local from = if def.pickups == 0 then "Starts loaded"
 		elseif def.pickupAt then `Pick up at <b>{esc(placeName(def.pickupAt) or "")}</b>`
-		else "Pick up near you"
-	local to = if def.dropAt then `<b>{esc(placeName(def.dropAt) or "")}</b>` else "an address in town"
+		elseif first then `Pick up at <b>{esc(first.name)}</b>`
+		else "Pick up in town"
+	local to = if def.dropAt then `<b>{esc(placeName(def.dropAt) or "")}</b>` elseif last then `<b>{esc(last.name)}</b>` else "an address in town"
 	local stops = {}
 	if def.pickups > 1 then
 		table.insert(stops, `{def.pickups} pick-ups`)
@@ -1318,6 +1325,9 @@ function Page.action(campaign: Campaign, order: number)
 	table.insert(facts, if vehicle then `🚚 lent: {esc(vehicle)}` elseif slotsNeed > 0 then `🚗 your own car · 📦 {slotsNeed} slots` else "🚗 your own car")
 	-- 6.8: the danger as dots (the stars are the rating's).
 	table.insert(facts, `☣ danger {string.rep("●", def.tier)}{string.rep("○", math.max(0, 4 - def.tier))}`)
+	-- 6.15: the mission's enemies, always the same (shared/MissionPlan.luau): kill them all and deliver.
+	local enemyTotal, enemyLabel = require(Shared.MissionPlan).size(def)
+	table.insert(facts, `🧟 {enemyTotal} {string.lower(enemyLabel)} to clear`)
 	detailLine(body, table.concat(facts, "   ·   "), P.ink2, 6, layout.small + 1)
 	-- The twists, explained (touch players have no hover).
 	local line = 7
@@ -2633,6 +2643,15 @@ local function updateBanner()
 		refs.bannerDefend.Visible = true
 		refs.bannerDefend.Text = `🎛 PULL BOTH LEVERS TOGETHER  ·  {math.clamp(mission.gatePulled, 0, 2)}/2`
 		refs.bannerDefend.TextColor3 = P.ink
+	end
+	-- 6.15: the mission's enemies (the same every time): how many are dead, and once delivered how many are left.
+	local enemies = mission.enemies
+	if not refs.bannerDefend.Visible and type(enemies) == "table" and type(enemies.total) == "number" and enemies.total > 0 then
+		local label = tostring(enemies.label or "ZOMBIES")
+		local clearing = mission.clearing == true
+		refs.bannerDefend.Visible = true
+		refs.bannerDefend.Text = if clearing then `🧟 CLEAR THE {label}  ·  {tonumber(enemies.left) or 0} LEFT` else `🧟 {label} {math.min(tonumber(enemies.killed) or 0, enemies.total)}/{enemies.total}  ·  kill them all`
+		refs.bannerDefend.TextColor3 = if clearing then P.danger else P.ink
 	end
 end
 

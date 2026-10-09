@@ -824,17 +824,10 @@ function Economy.coopPay(members: number): number
 	return 1 + Config.Missions.CoopPayPerMember * math.max(0, members)
 end
 
--- … and the enemies (wave sizes, foot waves, hordes) × this.
+-- … and its enemies' health × this (6.15: a mission's enemies are always the same number, Config.Missions.Fixed:
+-- a crew makes them tougher, server/MissionEnemies.luau).
 function Economy.coopEnemies(members: number): number
 	return 1 + Config.Missions.CoopEnemyPerMember * math.max(0, members)
-end
-
--- The guarded twist: the horde waiting at every stop of a mission of this danger level (GuardedHorde × the tier's
--- stars / 2, at least GuardedHorde), × the co-op enemy multiplier.
-function Economy.guardedHorde(tier: Config.TierDef, multiplier: number?): number
-	local base = Config.Missions.GuardedHorde
-	local count = math.max(base, math.floor(base * tier.stars / 2 + 0.5))
-	return math.max(1, math.floor(count * (multiplier or 1) + 0.5))
 end
 
 -- The kills a payout counts (Economy.payout's kills × KillBonus): the gunner twist makes every kill from a passenger

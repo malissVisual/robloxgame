@@ -149,6 +149,9 @@ AnalyticsPlan.Events = {
 	"GoldenDone", -- a golden order delivered and paid
 	"GoldenExpired", -- a golden order's clock ran out (on the board or in NEXT UP)
 	"RegularTierUp", -- a courier became a business's Bronze / Silver / Gold / Platinum regular
+	-- 6.15, the fixed missions (server/Jobs.luau): a mission done with every enemy of its plan killed (value: how many;
+	-- fields: the chapter, "solo" or "crew")
+	"MissionCleared",
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.

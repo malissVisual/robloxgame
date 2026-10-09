@@ -110,7 +110,10 @@ Missions.List = {} :: { MissionDef }
 -- look come from the Cast. Notes for whoever writes more:
 --   * pickupAt only with pickups = 1 (every pick-up would be at that place); pickups = 0: the vehicle starts loaded.
 --   * dropAt is the LAST drop's place; the drops before it are addresses on the way.
---   * a rush (timeLimit) starts at an address near you (no pickupAt) and never has defend.
+--   * a rush (timeLimit) starts at an address near the depot (no pickupAt) and never has defend.
+--   * 6.15: a mission is always the same (shared/MissionPlan.luau): the addresses without a place are rolled once
+--     with the mission id's own dice (renaming an id moves them), and its enemies follow its tier, twists and chapter
+--     (Config.Missions.Fixed); the mission is done when the cargo is delivered AND every one of them is dead.
 --   * horse = lead (livestock truck); kid / patient / survivor = board; serve = street selling (icebox, pizza,
 --     bread, soup) after a carry load.
 --   * lift and gunner are crew twists: their missions are coop. defend needs defendTime.

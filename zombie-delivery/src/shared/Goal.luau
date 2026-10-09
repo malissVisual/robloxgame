@@ -27,6 +27,10 @@
 --   wait        the server says to wait (the crew loads, the kids get on)
 --   defend      holding out at the last drop ("HOLD OUT 0:23 · keep them off Bob!")
 --   blocked     the stop is blocked ("Hold out first! Nothing gets unloaded until the area is safe.")
+--   clear       6.15: a mission delivered with enemies left: "Clear the zombies: 3 left", the nearest's place and
+--               distance (the mission is done when the last one dies)
+-- 6.15: during a mission the tag counts its enemies (the payload's mission.enemies, server/MissionEnemies.luau):
+-- "MISSION 3 · ZOMBIES 7/20" (ENEMIES when bandits are in it; Goal.enemyLine).
 -- The server's step texts stay the truth: the card only shortens the travelling ones ("Walk to Sarah with the pizzas:
 -- the red circle" → "Deliver to Sarah · Apt 4C") and names the pieces left at a pile.
 
@@ -208,11 +212,26 @@ local function plainAction(words: string, touch: boolean?): Action?
 	return { key = if touch then nil else key, text = if touch then forTouch(words) else Goal.withoutKey(words) }
 end
 
+-- 6.15: a mission's count ("ZOMBIES 7/20", "ENEMIES 3/18") from the payload's mission (its `enemies`: killed, total,
+-- label), nil for any other job. The NEXT card's tag, the contract's row, the banner.
+function Goal.enemyLine(mission: any): string?
+	local enemies = if type(mission) == "table" then mission.enemies else nil
+	if type(enemies) ~= "table" or count(enemies.total) <= 0 then
+		return nil
+	end
+	local label = text(enemies.label)
+	return `{if label ~= "" then label else "ZOMBIES"} {math.min(count(enemies.killed), count(enemies.total))}/{count(enemies.total)}`
+end
+
 -- The card for a running job.
 local function forJob(job: { [string]: any }, input: Input): Card
 	local touch = input.touch == true
 	local mission = job.mission
 	local tag = if type(mission) == "table" and mission.number then `MISSION {mission.number}` else "NEXT"
+	local enemyLine = Goal.enemyLine(mission)
+	if enemyLine then
+		tag ..= ` · {enemyLine}` -- 6.15: "MISSION 3 · ZOMBIES 7/20"
+	end
 	local title, place = trip(job)
 	local step = text(job.step)
 	local handling = text(job.handling)
@@ -228,6 +247,14 @@ local function forJob(job: { [string]: any }, input: Input): Card
 			tag = tag,
 			action = action,
 		}
+	end
+	-- 6.15: delivered, enemies left: clear them (the server's words; the place of the nearest, how far).
+	if type(mission) == "table" and mission.clearing == true then
+		local enemies = mission.enemies
+		local words = if step ~= "" then step
+			elseif type(enemies) == "table" then `Clear the {string.lower(text(enemies.label))}: {count(enemies.left)} left`
+			else "Clear the zombies"
+		return card("clear", words, place, input.distance, nil)
 	end
 	-- Holding out at the last drop, and a blocked stop: the server's words, the clock in them.
 	local hold, why = string.match(step, "^HOLD OUT ([%d:]+) · (.+)$")

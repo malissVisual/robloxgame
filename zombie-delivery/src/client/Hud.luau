@@ -1717,6 +1717,13 @@ function Hud.showResult(r: any)
 	end
 	local crew = crewList(r)
 	local riders = if type(r.crew) == "number" then r.crew else math.max(0, #crew - 1)
+	-- 6.15: a mission's enemies killed of its plan's, first under the card ("Zombies cleared 20/20")
+	local cleared = if r.success and type(r.mission) == "table" and type(r.mission.cleared) == "table" then r.mission.cleared else nil
+	if cleared then
+		local label = string.lower(tostring(cleared.label or "zombies"))
+		local total = tonumber(cleared.total) or 0
+		line(`{string.upper(string.sub(label, 1, 1))}{string.sub(label, 2)} cleared {math.min(tonumber(cleared.killed) or 0, total)}/{total}`, nil, if (tonumber(cleared.killed) or 0) >= total then C.green else C.yellow, 1)
+	end
 	if r.success and r.rider then
 		-- (5.8: the card says it: CREW DELIVERY, the driver, your share and the owner's rating, 4.7, in the tag line)
 		line(`You helped {r.driver} deliver {r.cargo}.`, nil, C.dim, 2)
@@ -2806,7 +2813,11 @@ function view.tickTicket(distance: number?)
 	local condition = tonumber(job.condition) or 1
 	-- (6.5: the bag's chip "🎒 2 newspapers · 1 pizza stack · I" and the backpack's "1/2" went: the bottom bar's bag
 	-- slot shows them.)
-	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{job.ordersLine}`
+	-- 6.15: a mission's enemies (the payload's mission.enemies: "Zombies: 7 of 20 killed", ticked when all are)
+	local mission = job.mission
+	local enemies = if type(mission) == "table" and type(mission.enemies) == "table" then mission.enemies else nil
+	local killed, enemyTotal = if enemies then tonumber(enemies.killed) or 0 else 0, if enemies then tonumber(enemies.total) or 0 else 0
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{job.ordersLine}|{killed}/{enemyTotal}`
 	if signature == t.meta0 then
 		return
 	end
@@ -2822,6 +2833,9 @@ function view.tickTicket(distance: number?)
 		add(if done >= needed then "done" else "todo", `{t.action}: {math.min(done, needed)} of {needed} {if needed == 1 then cargo.one else cargo.many} {verb}`)
 	else
 		add("todo", tostring(t.action))
+	end
+	if enemies and enemyTotal > 0 then
+		add(if killed >= enemyTotal then "done" else "todo", `{sentence(tostring(enemies.label or "zombies"))}: {math.min(killed, enemyTotal)} of {enemyTotal} killed`)
 	end
 	-- 5.2: the other orders of the run ("+2 ORDERS · …"; every one on the phone's ORDERS app).
 	if type(job.ordersLine) == "string" then

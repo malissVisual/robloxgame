@@ -36,17 +36,18 @@
 -- (Missions.twistPay) and the twists (Config.Missions):
 --   defend    at the last drop nothing is unloaded (Cargo.setBlocked) until somebody of the job held the area on foot
 --             within DefendRadius of the receiver for defendTime s (leaving pauses it); waves come around the stop
+--             (6.15: the plan's fixed waves)
 --   lift      heavy pieces: carried alone you walk slowly (server/Cargo.luau, Info.lift)
 --   quiet     every shot of the job's people costs QuietCost condition (server/Gun.luau Gun.onShot → Jobs.onShot)
---   guarded   a horde waits at every stop, not only at the last one
+--   guarded   a horde waits at every stop, not only at the last one (6.15: the plan's bigger hordes)
 --   night     it starts only at night (Jobs.startMission)
 --   gunner    kills from the passenger seats of the owner's car count GunnerKillBonus times in the kill bonus
 --   spotless  below SpotlessFail condition the mission fails at once
---   hunted    the bandits come HuntedBoost times as often (a ★ mission gets the ★★ bandits)
+--   hunted    the bandits come HuntedBoost times as often (6.15: the plan's fixed roadblocks instead)
 -- A co-op mission pays × Economy.coopPay and its enemies are × Economy.coopEnemies of the crew (riders and members
--- besides the owner, crewOf: MaxMembers at most), recounted when the crew changes. Done: the rating (Missions.rate)
--- goes into the result and to Jobs.onMissionComplete (server/Missions.luau pays the rewards and saves the stars) with
--- the crew who are there at the finish.
+-- besides the owner, crewOf: MaxMembers at most; 6.15: their health, not their number), recounted when the crew
+-- changes. Done: the rating (Missions.rate) goes into the result and to Jobs.onMissionComplete (server/Missions.luau
+-- pays the rewards and saves the stars) with the crew who are there at the finish.
 --
 -- 3.1, the challenges (server/Challenges.luau): Jobs.onStat (wired in Main) hears the waves that came, a HOLD OUT won,
 -- the pieces delivered (and the people boarded, the horses) for the owner and the crew with them, and at a mission's
@@ -208,6 +209,22 @@
 --     Config.Jobs.Golden.Light).
 --   * payOrder calls Regulars.paid: the owner's regular's bonus on the rated pay, the delivery counted for its business
 --     (the owner and the crew), a golden order's XP, the result's `special` lines.
+--
+-- 6.15, the fixed missions (the owner: "I want them to be about a number of zombies, and you have to complete it, so
+-- the mission is always the same, not random"; shared/MissionPlan.luau, server/MissionEnemies.luau, Config.Missions.Fixed).
+-- Module fields and calls only (no new top-level local here).
+--   * The same route: a mission's stops are MissionPlan.route's (rolled with the mission id's own dice from the depot,
+--     jobOffer), its pay measured from the depot (missionOffer: the same every time); the clock gets the longer drive
+--     from where START was pressed (fromHere) and Fixed.TimePerEnemy for every enemy. Nobody is ever "not home".
+--   * The same enemies: missionOffer makes the plan for its stops (Offer.plan), startJob hands it to MissionEnemies
+--     (they wait at their spots and come as the crew gets near), updatePlayer steps it every tick; endJob (and a player
+--     leaving) takes them away. No hordes, waves, foot waves, strays, bandit chases or roadblocks of chance on a
+--     mission (Jobs.isMission: the HOLD OUT waves are the plan's, defendStep).
+--   * Deliver AND kill all: the last drop done with enemies left, the mission waits (Job.clearing; stepOf "Clear the
+--     zombies: 3 left", the payload's position the nearest of them, Jobs.clearTarget); the last one dead, it is done
+--     and paid as ever. The clock still fails it; the cargo keeps the condition it arrived with. The payload's
+--     mission.enemies = { killed, total, left, label } (the HUD's ZOMBIES 7/20), the result's mission.cleared.
+--   * Jobs.adminKillMission: the admin's KILL MISSION ZOMBIES.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -306,6 +323,9 @@ type Offer = {
 	-- 6.14: a GOLDEN ORDER or a REGULAR'S ORDER (shared/SpecialOrders.luau Spec: kind, expiresAt, pay, xp, the danger),
 	-- nil for every other offer (server/SpecialOrders.luau sets it)
 	specialOrder: { [string]: any }?,
+	-- 6.15: a mission's fixed enemies (shared/MissionPlan.luau Plan, made by missionOffer for its stops; startJob hands
+	-- it to server/MissionEnemies.luau), nil for every other offer
+	plan: any?,
 }
 
 -- 5.1: the numbers of a light job: Config.Jobs.Foot or Config.Jobs.Bike (footOffer, strayStep; JobRules.LightRules).
@@ -367,8 +387,7 @@ type Job = {
 	defendDone: boolean,
 	defendInside: boolean, -- somebody holds the area right now
 	defendWho: string, -- the receiver's name (the HUD's hint)
-	defendWave: number,
-	nextDefendWave: number,
+	defendWave: number, -- 6.15: the plan's waves let loose so far (MissionEnemies.release)
 	quietNotice: { [Player]: number }, -- quiet: when the shooter was last warned
 	-- 3.1, the challenges' counters (Jobs.onStat):
 	shots: number, -- shots of the job's people (counted on a quiet mission: NO SHOOTING finished without one)
@@ -407,6 +426,11 @@ type Job = {
 	switchAt: number, -- os.clock(): the current stop may change again after this (Orders.SwitchEvery)
 	killsPaid: number, -- the kills already paid with an order
 	tickFails: number?, -- 5.7: the server ticks in a row that failed (Config.Jobs.TickFails of them: Jobs.fail)
+	-- 6.15: a mission delivered while some of its enemies still stand: it waits for the last one (the cargo's condition
+	-- stays what it arrived with; the HUD: "Clear the zombies: 3 left", its marker on the nearest)
+	clearing: boolean?,
+	clearAt: Vector3?, -- … the marker's point as last sent (it moves on when they do: Fixed.Retarget)
+	cleared: { killed: number, total: number, left: number, label: string }?, -- the count at the finish (complete)
 }
 
 -- 5.2: one order of a job. `offer` is its own (pay, clock, cargo, customer, pieces, rules); the job's offer is the
@@ -506,15 +530,21 @@ local function defendHint(job: Job): string?
 end
 
 -- What to do now (Cargo.step), the defend countdown instead while holding out, then (3.2) the twin-lever gate while it
--- is shut and you are at the stop.
+-- is shut and you are at the stop. 6.15: a mission delivered with enemies left: "Clear the zombies: 3 left".
 local function stepOf(job: Job): (string, string)
+	if job.clearing then
+		local info = require(script.Parent.MissionEnemies).info(job.owner)
+		local left = if info then info.left else 0
+		return "drive", `Clear the {string.lower(if info then info.label else "zombies")}: {left} left`
+	end
 	local handling, step = Cargo.step(job.cargo)
 	local gate = if job.gateClosed and handling ~= "drive" then DuoGates.hint(job.owner) else nil
 	return handling, defendHint(job) or gate or step
 end
 
 -- The mission part of the job payload and of Jobs.crewStatus, nil for every other job: id, name, campaign, number,
--- twists, coop, defendLeft (seconds, while holding out), and for the HUD crew, coopPay, gunnerKills.
+-- twists, coop, defendLeft (seconds, while holding out), and for the HUD crew, coopPay, gunnerKills. 6.15: enemies
+-- = { killed, total, left, label } (MissionEnemies.info: the HUD's ZOMBIES 7/20) and clearing (delivered, enemies left).
 local function missionInfo(job: Job): { [string]: any }?
 	local offer = job.offer
 	local id = offer.mission
@@ -544,6 +574,8 @@ local function missionInfo(job: Job): { [string]: any }?
 		gunnerKills = if offer.twists.gunner then job.gunnerKills else nil,
 		duo = if offer.duo then true else nil, -- 3.2: a DUO mission
 		gatePulled = if job.gateClosed then job.gatePulled else nil, -- 3.2: switches, the gate shut: levers down (0 – 2)
+		enemies = require(script.Parent.MissionEnemies).info(job.owner), -- 6.15
+		clearing = if job.clearing then true else nil, -- 6.15
 	}
 end
 
@@ -734,12 +766,36 @@ local function carriedInfo(job: Job): { { [string]: any } }
 	return out
 end
 
+-- 6.15: a mission delivered with enemies left (Job.clearing): the point the HUD's marker and the GPS show (the
+-- nearest of them: MissionEnemies.target), its stop label ("CLEAR THE ZOMBIES at Lighthouse Point") and the marker's
+-- words ("3 ZOMBIES LEFT"). (A module field: this module's top-level locals are at the -O0 limit.)
+function Jobs.clearTarget(job: Job): (Vector3, string, string)
+	local enemies = require(script.Parent.MissionEnemies)
+	local at, place = enemies.target(job.owner, playerPosition(job.owner))
+	local info = enemies.info(job.owner)
+	local label = if info then info.label else "ZOMBIES"
+	local last = job.offer.stops[#job.offer.stops]
+	return at or last.park, `CLEAR THE {label} at {place or last.address.name}`, `{if info then info.left else 0} {label} LEFT`
+end
+
+-- 6.15: is this job a mission (its enemies are its plan's alone: no random waves, strays, chases or roadblocks; the
+-- board's and free roam's events leave it alone)?
+function Jobs.isMission(job: Job): boolean
+	return job.offer.mission ~= nil
+end
+
 -- (set below, with the board: may the board add an order to this run now, and the room)
 local stackInfo: (Player, Job) -> { [string]: any }?
 
 local function payload(job: Job): { [string]: any }
 	local offer = job.offer
 	local stop = offer.stops[job.stop]
+	-- 6.15: delivered, enemies left: the HUD goes to the nearest of them (Jobs.clearTarget).
+	local clearAt: Vector3?, clearLabel: string?, clearWords: string? = nil, nil, nil
+	if job.clearing then
+		clearAt, clearLabel, clearWords = Jobs.clearTarget(job)
+		job.clearAt = clearAt
+	end
 	-- 5.2: the focused order (the current stop's): its cargo, customer, clock, pay, pieces and rules.
 	local order = focusOrder(job)
 	local mine = order.offer
@@ -754,12 +810,12 @@ local function payload(job: Job): { [string]: any }
 		customer = mine.customer,
 		address = last.address.name,
 		district = last.address.district,
-		position = stop.park,
-		stage = stop.kind,
+		position = clearAt or stop.park,
+		stage = if clearAt then "clear" else stop.kind, -- (6.15: "clear": the cargo is delivered, enemies left)
 		stopIndex = table.find(order.stops, job.stop) or 1, -- (5.2: of the focused order's stops)
 		stopCount = #order.stops,
-		stopLabel = stop.label,
-		progress = if stop.mode == "serve" or stop.mode == "board" then status.progress else 0,
+		stopLabel = clearLabel or stop.label,
+		progress = if clearAt then 0 elseif stop.mode == "serve" or stop.mode == "board" then status.progress else 0,
 		endsAt = order.endsAt,
 		timeLimit = mine.time,
 		condition = if job.free then order.condition else job.condition, -- (5.2 review: the focused order's)
@@ -781,9 +837,9 @@ local function payload(job: Job): { [string]: any }
 		deliveredTotal = Cargo.deliveredOf(job.cargo, order.id),
 		lost = Cargo.lostOf(job.cargo, order.id), -- stolen or wrecked
 		carrying = status.carrying,
-		person = status.person,
-		pile = status.pile,
-		looseAt = status.looseAt, -- a piece put down (G): pick it up again
+		person = clearWords or status.person, -- (6.15: the marker's "3 ZOMBIES LEFT" while clearing)
+		pile = if clearAt then nil else status.pile,
+		looseAt = if clearAt then nil else status.looseAt, -- a piece put down (G): pick it up again
 		piece = mine.piece,
 		pieces = mine.plural,
 		itemKind = mine.kind,
@@ -1629,10 +1685,19 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	local loads = Economy.splitPieces(jobType.items, jobType.pickups)
 	-- A rush (a fixed clock) stays in reach: the pick-up close by, the drop a short drive on.
 	local rush = jobType.timeLimit ~= nil
+	-- 6.15: a mission always goes the same way: its addresses rolled with its own dice from the depot
+	-- (shared/MissionPlan.luau route: the same bands as below), never round where START was pressed.
+	local mission = if jobType.mission then Missions.find(jobType.mission) else nil
+	local fixed = if mission then require(Shared.MissionPlan).route(mission) else nil
+	if mission and not fixed then
+		return nil
+	end
 	for n = 1, jobType.pickups do
 		local low = if n == 1 then (if rush then 100 else 120) else 90
 		local high = if n == 1 then (if rush then 350 else 450) else 280
-		local address = if jobType.pickupAt then placeAddress(jobType.pickupAt) else addressAround(x, z, low, high, 0, avoid)
+		local address = if fixed then fixed[n]
+			elseif jobType.pickupAt then placeAddress(jobType.pickupAt)
+			else addressAround(x, z, low, high, 0, avoid)
 		if not address then
 			return nil
 		end
@@ -1650,7 +1715,9 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 		local last = n == jobType.drops
 		local low = if jobType.drops > 1 then 150 elseif rush then 300 else 450
 		local high = if jobType.drops > 1 then 450 elseif rush then 800 else 1100
-		local address = if last and jobType.dropAt then placeAddress(jobType.dropAt) else addressAround(x, z, low, high, 0, avoid)
+		local address = if fixed then fixed[jobType.pickups + n]
+			elseif last and jobType.dropAt then placeAddress(jobType.dropAt)
+			else addressAround(x, z, low, high, 0, avoid)
 		if not address then
 			return nil
 		end
@@ -1678,7 +1745,8 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	local kind = Tuning.Kinds[jobType.itemKind] or Tuning.Kinds.crate
 	local pieces: CargoInfo = { kind = jobType.itemKind, look = kind.look, piece = kind.piece, plural = kind.plural, total = jobType.items }
 	-- A mission starts wherever START was pressed: the drive to its first stop counts (pay and clock) for at most
-	-- the board's pick-up distance, nothing for coming from across the map.
+	-- the board's pick-up distance, nothing for coming from across the map. 6.15: a mission's `from` is the depot
+	-- (missionOffer): the same pay every time; the clock gets the longer drive from where you are there.
 	local route = routeLength(from.X, from.Z, stops)
 	if jobType.mission then
 		local first = stops[1].address
@@ -2744,6 +2812,7 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	freeDocks(player) -- 4.0: its loading dock and receiving pad
 	Cargo.finish(job.cargo, linger)
 	DuoGates.clear(player) -- 3.2: the twin-lever gate, if any
+	require(script.Parent.MissionEnemies).finish(player) -- 6.15: a mission's own enemies go (done, failed, given up)
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	require(script.Parent.RunEvents).finish(player) -- 5.7: a survivor still calling, a locked gate
 	task.defer(Jobs.refillBoard, player) -- 5.7: new offers where the taken ones were (after the result)
@@ -2970,7 +3039,6 @@ local function startJob(player: Player, offer: Offer, quiet: boolean?): (boolean
 		defendInside = false,
 		defendWho = "the receiver",
 		defendWave = 0,
-		nextDefendWave = 0,
 		quietNotice = {},
 		shots = 0,
 		piecesCounted = 0,
@@ -3010,6 +3078,11 @@ local function startJob(player: Player, offer: Offer, quiet: boolean?): (boolean
 	-- 5.4.1 kind of bug). On failure the job ends, the HUD hears it, the player is told and the Output warned.
 	local ok, err = pcall(function()
 		placeDocks(player, offer)
+		-- 6.15: a mission's fixed enemies wait at their spots (server/MissionEnemies.luau; missionOffer made the plan).
+		local fixed = offer.plan
+		if fixed then
+			require(script.Parent.MissionEnemies).begin(player, fixed.plan, fixed.ground)
+		end
 		-- 5.2: the first order. A run that may take more keeps the order's own offer (its stops, pieces, pay) apart from
 		-- the job's, which gets the stops of the orders added later; a job of stops one after the other is its only order.
 		local all: { number } = {}
@@ -3374,8 +3447,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local payout = Economy.payout(pay, condition, timeLeft, offer.time, Economy.paidKills(kills, job.gunnerKills), nightPay)
 	-- A mission is rated (1 – 3 stars): the cargo's condition and the clock left.
 	local stars = Missions.rate(condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0)
+	-- (6.15: `cleared`, the enemies killed of the plan's: the result's "Zombies cleared 20/20")
 	local missionResult = if offer.mission
-		then { id = offer.mission, name = if offer.jobType then offer.jobType.name else offer.mission, stars = stars }
+		then { id = offer.mission, name = if offer.jobType then offer.jobType.name else offer.mission, stars = stars, cleared = job.cleared }
 		else nil
 	-- 4.7: an ordinary or special job (not a mission) is rated ★ … ★★★ (JobRules.rate): the pay × the rating plus the
 	-- owner's streak of good jobs, the XP × the rating; a good one counts toward the owner's licences.
@@ -3618,6 +3692,12 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 				stat(who, "quietMissions", 1)
 			end
 		end
+		-- 6.15, analytics: the mission's every enemy killed (value: how many; fields: the chapter, solo or with a crew)
+		local cleared = job.cleared
+		if cleared and cleared.left <= 0 then
+			local def = Missions.find(missionId)
+			PlayerData.track("event", player, "MissionCleared", cleared.total, if def then def.campaign else nil, if #finishers > 1 then "crew" else "solo")
+		end
 	end
 	-- The mission's rewards and stars (server/Missions.luau), after the pay: the owner and everybody paid with them.
 	local onMission = Jobs.onMissionComplete
@@ -3640,6 +3720,7 @@ local function complete(player: Player, job: Job)
 		end
 	end
 	local crew, present = crewNow(job, player)
+	job.cleared = require(script.Parent.MissionEnemies).info(player) -- 6.15: the mission's count (endJob ends its run)
 	endJob(player, job, true)
 	if last then
 		payOrder(player, job, last, crew, present, true)
@@ -3765,9 +3846,10 @@ function Jobs.onKill(player: Player)
 	end
 end
 
--- Spotless: below Config.Missions.SpotlessFail the mission fails at once. True when it failed.
+-- Spotless: below Config.Missions.SpotlessFail the mission fails at once. True when it failed. (6.15: not once it is
+-- delivered: the condition stays what it arrived with.)
 local function spotlessFailed(player: Player, job: Job): boolean
-	if not job.offer.twists.spotless or job.condition >= Config.Missions.SpotlessFail or jobs[player] ~= job then
+	if not job.offer.twists.spotless or job.clearing or job.condition >= Config.Missions.SpotlessFail or jobs[player] ~= job then
 		return false
 	end
 	Jobs.fail(player, `SPOTLESS failed: the cargo is down to {math.floor(job.condition * 100)} % (it had to stay above {math.floor(Config.Missions.SpotlessFail * 100 + 0.5)} %).`, "cargo")
@@ -3780,8 +3862,8 @@ end
 function Jobs.onShot(player: Player)
 	local owner = currentOwner(player)
 	local job = owner and jobs[owner]
-	if not owner or not job or not job.offer.twists.quiet then
-		return
+	if not owner or not job or not job.offer.twists.quiet or job.clearing then
+		return -- (6.15: delivered: the dynamite is gone, the crew shoots the rest down freely)
 	end
 	job.shots += 1
 	job.condition = math.max(0, job.condition - Config.Missions.QuietCost)
@@ -3810,6 +3892,9 @@ end
 -- own). With a `reason` the job fails at 0 (people: they had enough) and a spotless mission below its line; without one
 -- (a hit, a jolt of a crate) it only counts.
 local function loseCondition(player: Player, job: Job, share: number, reason: string?)
+	if job.clearing then
+		return -- 6.15: delivered: the cargo keeps the condition it arrived with (the rating, SPOTLESS)
+	end
 	job.condition = math.max(0, job.condition - share)
 	job.dirty = true
 	local work: { JobRules.OrderWork } = {}
@@ -4005,31 +4090,16 @@ local function tellJob(player: Player, text: string)
 	end
 end
 
--- The hordes waiting at the stops: the last one's (the tier's guardHorde), and with the guarded twist one at every
--- stop (Economy.guardedHorde), spawned when the owner gets within GuardTriggerDistance. Co-op: × job.enemyScale.
+-- The horde waiting at the last stop (the tier's guardHorde), spawned when the owner gets within
+-- GuardTriggerDistance. (6.15: a mission's hordes are its plan's, server/MissionEnemies.luau: HOT ZONE's among them.)
 local function spawnHordes(player: Player, job: Job, tier: Config.TierDef, stop: Stop, lastStop: boolean, flatDistance: number)
-	if flatDistance >= JobsConfig.GuardTriggerDistance then
+	if flatDistance >= JobsConfig.GuardTriggerDistance or not lastStop or job.guarded[job.stop] or tier.guardHorde <= 0 then
 		return
 	end
-	local outward = Vector3.new(stop.address.nx, 0, stop.address.nz)
-	if job.offer.twists.guarded then
-		if job.guarded[job.stop] then
-			return
-		end
-		job.guarded[job.stop] = true
-		job.guards = job.guards or lastStop
-		local count = Economy.guardedHorde(tier, job.enemyScale)
-		if lastStop then
-			count = math.max(count, math.floor(tier.guardHorde * job.enemyScale + 0.5))
-		end
-		Zombies.spawnGuards(player, stop.park, outward, count, tier.kinds)
-		tellJob(player, `HOT ZONE! {count} of them are waiting at the stop.`)
-	elseif lastStop and not job.guarded[job.stop] and tier.guardHorde > 0 then
-		-- (5.2: every order's last drop has its horde: guarded by stop)
-		job.guards = true
-		job.guarded[job.stop] = true
-		Zombies.spawnGuards(player, stop.park, outward, math.floor(tier.guardHorde * job.enemyScale + 0.5), tier.kinds)
-	end
+	-- (5.2: every order's last drop has its horde: guarded by stop)
+	job.guards = true
+	job.guarded[job.stop] = true
+	Zombies.spawnGuards(player, stop.park, Vector3.new(stop.address.nx, 0, stop.address.nz), math.floor(tier.guardHorde * job.enemyScale + 0.5), tier.kinds)
 end
 
 -- Does somebody of the job (the owner, the invited crew, whoever rode along) stand on foot, alive, within the
@@ -4051,9 +4121,11 @@ local function holdingArea(player: Player, job: Job, at: Vector3): boolean
 end
 
 -- The defend twist at the last drop (Cargo.setBlocked holds the unloading): it starts when the owner (or somebody of
--- the job on foot) gets within DefendRadius of the receiver; the clock runs while somebody holds the area on foot;
--- a wave comes around the stop every DefendWaveEvery s meanwhile. Held long enough: the unloading goes on.
-local function defendStep(player: Player, job: Job, tier: Config.TierDef, stop: Stop, position: Vector3, now: number, step: number, multiplier: number)
+-- the job on foot) gets within DefendRadius of the receiver; the clock runs while somebody holds the area on foot.
+-- 6.15: the waves are the mission plan's (shared/MissionPlan.luau: a fixed number in fixed waves, the last the
+-- biggest): wave n comes (MissionEnemies.release) once the held time is (n − 1) / waves of defendTime, the first at
+-- once. Held long enough: the unloading goes on (the waves' zombies still have to die for the mission to be done).
+local function defendStep(player: Player, job: Job, stop: Stop, position: Vector3, step: number)
 	local tuning = Config.Missions
 	local inside = holdingArea(player, job, stop.pile)
 	if job.defendLeft == nil then
@@ -4063,7 +4135,6 @@ local function defendStep(player: Player, job: Job, tier: Config.TierDef, stop: 
 		end
 		job.defendLeft = job.offer.defendTime
 		job.defendWho = if stop.person then stop.person.name else "the receiver"
-		job.nextDefendWave = now + 3
 		job.dirty = true
 		tellJob(player, `HOLD OUT! Keep {job.defendWho} safe for {Economy.clock(job.offer.defendTime)}: stay on foot within {tuning.DefendRadius} studs.`)
 	end
@@ -4080,22 +4151,19 @@ local function defendStep(player: Player, job: Job, tier: Config.TierDef, stop: 
 	if math.ceil(left) ~= before then
 		job.dirty = true
 	end
-	if now >= job.nextDefendWave and left > 2 then
-		job.nextDefendWave = now + tuning.DefendWaveEvery * rng:NextNumber(0.9, 1.1)
-		local number = job.defendWave + 1
-		local room = Economy.waveAlive(tier, multiplier * job.enemyScale) - Zombies.countFor(player, true)
-		local size = math.min(math.floor(Economy.waveSize(tier, number, multiplier) * job.enemyScale + 0.5), room)
-		local made = 0
-		for _ = 1, math.max(0, size) do
-			local spot = Zombies.findSpot(stop.park, nil, 55, 110)
-			if spot and Zombies.spawn(Economy.pickKind(tier.waveKinds, rng:NextNumber()), spot, player, false) then
-				made += 1
-			end
+	-- 6.15: the plan's waves, each at its share of the held time.
+	local enemies = require(script.Parent.MissionEnemies)
+	local waves = enemies.waves(player)
+	local held = job.offer.defendTime - left
+	for wave = job.defendWave + 1, waves do
+		if held < (wave - 1) * job.offer.defendTime / waves then
+			break
 		end
+		job.defendWave = wave
+		local made = enemies.release(player, wave)
 		if made > 0 then
-			job.defendWave = number
 			statCrew(player, job, "waves", 1)
-			tellJob(player, `HOLD THE LINE! {made} {if made == 1 then "zombie" else "zombies"} coming at you`)
+			tellJob(player, `HOLD THE LINE! Wave {wave}/{waves}: {made} {if made == 1 then "zombie" else "zombies"} coming at you`)
 		end
 	end
 	if left <= 0 then
@@ -4178,7 +4246,9 @@ local function roadEnemies(player: Player, job: Job, tier: Config.TierDef, posit
 	end
 end
 
--- The crew changed (riders, members): co-op scales the enemies with it, and says so.
+-- The crew changed (riders, members): co-op scales the enemies with it, and says so. 6.15: a mission's enemies are
+-- always the same number: a crew makes the ones that come from now on tougher (their health × enemyScale,
+-- server/MissionEnemies.luau).
 local function recount(player: Player, job: Job)
 	local crewCount = #crewOf(job, player)
 	if crewCount == job.crewCount then
@@ -4188,7 +4258,7 @@ local function recount(player: Player, job: Job)
 	job.dirty = true
 	if job.offer.coop then
 		job.enemyScale = Economy.coopEnemies(crewCount)
-		tellJob(player, `CO-OP: crew of {crewCount + 1} · pay × {string.format("%.2f", Economy.coopPay(crewCount))} · enemies × {string.format("%.2f", job.enemyScale)}`)
+		tellJob(player, `CO-OP: crew of {crewCount + 1} · pay × {string.format("%.2f", Economy.coopPay(crewCount))} · enemy health × {string.format("%.2f", job.enemyScale)}`)
 	end
 end
 
@@ -4581,7 +4651,9 @@ local function ordersClock(player: Player, job: Job, serverNow: number): boolean
 			continue
 		end
 		if #openOrders(job) <= 1 then
-			Jobs.fail(player, lateReason(order.offer), "time")
+			-- (6.15: a mission delivered with enemies still standing fails on its clock too)
+			local info = if job.clearing then require(script.Parent.MissionEnemies).info(player) else nil
+			Jobs.fail(player, if info then `Time's up! {info.left} {string.lower(info.label)} still standing: the mission needed every one of them.` else lateReason(order.offer), "time")
 			return true
 		end
 		failOrder(player, job, order, lateReason(order.offer), "time")
@@ -4750,6 +4822,12 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 		end
 	end
 	recount(player, job)
+	-- 6.15: a mission's own enemies (server/MissionEnemies.luau): the dead counted, the groups near the job's people
+	-- brought in (a crew makes the new ones tougher: enemyScale).
+	local fixed = Jobs.isMission(job)
+	if fixed and require(script.Parent.MissionEnemies).step(player, crewOf(job, player), job.enemyScale) then
+		job.dirty = true
+	end
 	if session.info.foot then
 		orderRoomOf(player, offer, job) -- 5.2 review: bike gear bought during the run grows the bike's bag now (6.6)
 	end
@@ -4797,21 +4875,38 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 		stop = offer.stops[job.stop]
 		lastStop = job.stop == #offer.stops
 		-- The last stop done, or nothing left anywhere to deliver (stolen, wrecked): what arrived is paid, nothing
-		-- arrived fails.
+		-- arrived fails. 6.15: a mission is done only once every enemy of its plan is dead too: delivered before that,
+		-- it waits (Job.clearing: the HUD says how many are left and goes to the nearest; the clock still runs).
 		local done = Cargo.stopDone(session)
 		local finished = done and lastStop
-		if finished or Cargo.remaining(session) + futurePieces(job) == 0 then
+		if job.clearing or finished or Cargo.remaining(session) + futurePieces(job) == 0 then
 			if session.deliveredTotal <= 0 then
 				Jobs.fail(player, "All of your cargo is gone!", "cargo")
-			else
-				if not finished then
+				return
+			end
+			local enemies = require(script.Parent.MissionEnemies)
+			local left = if fixed then enemies.left(player) else 0
+			if left <= 0 then
+				if not finished and not job.clearing then
 					notice:FireClient(player, "Nothing left to deliver. You get paid for what arrived.")
 				end
 				complete(player, job)
+				return
 			end
-			return
-		end
-		if done then
+			if not job.clearing then
+				job.clearing = true
+				job.dirty = true
+				enemies.releaseAll(player) -- (HOLD OUT's waves still to come come now: they count too)
+				local info = enemies.info(player)
+				tellJob(player, `{if finished then "Delivered!" else "Nothing left to deliver."} Now clear the {string.lower(if info then info.label else "zombies")}: {left} left.`)
+			end
+			-- The marker follows the nearest of them once it moved on (the payload's position).
+			local at = enemies.target(player, position)
+			local shown = job.clearAt
+			if at and (not shown or (at - shown).Magnitude > Config.Missions.Fixed.Retarget) then
+				job.dirty = true
+			end
+		elseif done then
 			advance(player, job)
 			stop = offer.stops[job.stop]
 			lastStop = job.stop == #offer.stops
@@ -4819,14 +4914,19 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	end
 
 	local flatDistance = Vector3.new(position.X - stop.park.X, 0, position.Z - stop.park.Z).Magnitude
-	spawnHordes(player, job, tier, stop, lastStop, flatDistance)
+	if not fixed then
+		spawnHordes(player, job, tier, stop, lastStop, flatDistance) -- (6.15: a mission's hordes are its plan's)
+	end
 
 	local multiplier = (Jobs.dangerOf(job)) -- (the modifier's spawn multiplier; 6.14: an open golden order's waves)
-	if offer.twists.defend and lastStop and not job.defendDone then
-		defendStep(player, job, tier, stop, position, now, step, multiplier * nightWaves)
+	if offer.twists.defend and lastStop and not job.defendDone and not job.clearing then
+		defendStep(player, job, stop, position, step)
 	end
 	local foot = offer.mode == "foot" or offer.mode == "bike"
-	if foot then
+	if fixed then
+		-- 6.15: a mission has its plan's enemies only (MissionEnemies.step above): no waves, foot waves, strays,
+		-- bandit chases or roadblocks of chance. (Jobs.isMission: what the board's and free roam's events skip too.)
+	elseif foot then
 		strayStep(player, job, position, now) -- 5.0: no waves, no bandits on foot (5.1: nor on a bike job)
 		require(script.Parent.RunEvents).step(player, position, stop, job.stop, step) -- 5.7: a runner, a survivor, a gate, walkers at a drop
 	elseif Cargo.onFoot(session) then
@@ -4902,13 +5002,35 @@ end
 -- 6.8: what this order paid each of them).
 Jobs.onMissionComplete = nil :: ((owner: Player, missionId: string, stars: number, members: { Player }, paid: { [Player]: number }?) -> ())?
 
--- A mission's offer from where the player is (its stops, the pay × the twists, its clock), marked as the mission.
+-- A mission's offer (its stops, the pay × the twists, its clock), marked as the mission. 6.15, always the same: its
+-- stops (shared/MissionPlan.luau route) and its pay are measured from the depot, whoever starts it wherever; its
+-- enemies are its plan's (MissionPlan.make for these stops: Offer.plan). The clock gets the longer drive from where the
+-- player is (fromHere: the board's rule) and Fixed.TimePerEnemy for every enemy; nobody is ever "not home" (the
+-- receiver is the story's person, waiting).
 local function missionOffer(player: Player, def: Config.JobTypeDef): Offer?
-	local offer = jobOffer(playerPosition(player), def)
-	if offer then
-		offer.mission = def.mission or def.id
-		offer.rules = {} -- 4.8: a mission is told as it is written
+	local mission = Missions.find(def.mission or def.id)
+	local MissionPlan = require(Shared.MissionPlan)
+	local origin = MissionPlan.origin()
+	local depot = Vector3.new(origin.x, 0, origin.z)
+	local offer = jobOffer(depot, def)
+	if not offer or not mission then
+		return nil
 	end
+	offer.mission = mission.id
+	offer.rules = {} -- 4.8: a mission is told as it is written
+	local stops: { any } = {}
+	local ground: { [number]: number } = {}
+	for index, stop in offer.stops do
+		stop.nobody = nil
+		table.insert(stops, { kind = stop.kind, x = stop.park.X, z = stop.park.Z, nx = stop.address.nx, nz = stop.address.nz, name = stop.address.name })
+		ground[index] = stop.park.Y
+	end
+	local plan = MissionPlan.make(mission, stops)
+	offer.plan = { plan = plan, ground = ground }
+	offer.approach = approachFrom(depot, offer)
+	local _, clock = fromHere(offer, playerPosition(player))
+	offer.time = clock + math.floor(plan.total * Config.Missions.Fixed.TimePerEnemy + 0.5)
+	offer.approach = 0
 	return offer
 end
 
@@ -4996,6 +5118,19 @@ function Jobs.adminFinishStop(player: Player): boolean
 	return done
 end
 
+-- 6.15: KILL MISSION ZOMBIES (server/Admin.luau): every enemy left of the mission the player is on (their own or the
+-- crew's they ride or help with) dies at once and counts; a mission delivered already is done on the next tick. How
+-- many died (0: no mission, or none left).
+function Jobs.adminKillMission(player: Player): number
+	local owner = jobOwner(player)
+	local job = if owner then jobs[owner] else nil
+	if not owner or not job or not Jobs.isMission(job) then
+		return 0
+	end
+	job.dirty = true
+	return require(script.Parent.MissionEnemies).killAll(owner)
+end
+
 -- 4.8: a road event ("survivor" | "addon" | "roadblock") on the current job at once (the next tick driving out of the
 -- safe zone; an add-on once you drive to a drop). False without a job of your own or with an unknown kind.
 function Jobs.adminRoadEvent(player: Player, kind: any): boolean
@@ -5077,6 +5212,7 @@ function Jobs.start()
 			Cargo.finish(job.cargo, false)
 			Crew.disband(player)
 		end
+		require(script.Parent.MissionEnemies).finish(player) -- 6.15: a mission's enemies and its bandit cars
 		require(script.Parent.RunEvents).finish(player) -- 5.7
 		lifts[player] = nil
 		DuoGates.clear(player)
@@ -5131,14 +5267,19 @@ function Jobs.crewStatus(owner: Player): { [string]: any }?
 	local stop = offer.stops[job.stop]
 	local order = focusOrder(job) -- 5.2: the focused order's (the current stop's)
 	local mine = order.offer
+	-- 6.15: delivered with enemies left: the crew goes to the nearest of them too (Jobs.clearTarget).
+	local clearAt: Vector3?, clearLabel: string? = nil, nil
+	if job.clearing then
+		clearAt, clearLabel = Jobs.clearTarget(job)
+	end
 	return {
 		name = if mine.jobType then mine.jobType.name else `{mine.cargo} → {mine.customer}`,
-		step = stop.label,
+		step = clearLabel or stop.label,
 		hint = job.lastStep,
-		position = stop.park,
+		position = clearAt or stop.park,
 		stars = mine.tier,
 		endsAt = order.endsAt,
-		stage = stop.kind,
+		stage = if clearAt then "clear" else stop.kind,
 		stopIndex = table.find(order.stops, job.stop) or 1,
 		stopCount = #order.stops,
 		cargo = mine.cargo,

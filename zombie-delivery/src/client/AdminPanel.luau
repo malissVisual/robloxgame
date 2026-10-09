@@ -19,7 +19,7 @@
 --   JOBS & MISSIONS  any special job or ordinary tier, finish the stop / the whole job, 6.14: the streak of good jobs
 --                    and the shift (STREAK 0 / 1 / 4, SHIFT 0 / 4 of 5), a GOLDEN ORDER or a REGULAR'S ORDER on the
 --                    board now, every business's deliveries at a regulars' tier (or none), the missions (all at 3
---                    stars, reset, start any), the challenges, secrets and titles
+--                    stars, reset, 6.15: KILL MISSION ZOMBIES, start any), the challenges, secrets and titles
 --   ESTATE           properties, the home, teleport to a property, the company's safe
 --   BUDDIES          NPC companions (server/Buddy.luau): + ADD, FOLLOW / STAY / GUARD, DISMISS, how many
 
@@ -559,13 +559,16 @@ R.jobs = function()
 	end)
 
 	local got, most = MissionData.stars(missionProgress, nil)
-	heading(`Missions · your {got} / {most} ★`, "ALL 3 ★: every mission done at 3 stars (no money). RESET: the progress cleared. A mission button starts it now (locks ignored; NIGHT ONLY turns the clock to night). The stars shown are yours.")
+	heading(`Missions · your {got} / {most} ★`, "ALL 3 ★: every mission done at 3 stars (no money). RESET: the progress cleared. KILL MISSION ZOMBIES (6.15): every enemy left of the running mission dies and counts (delivered already: it is done). A mission button starts it now (locks ignored; NIGHT ONLY turns the clock to night). The stars shown are yours.")
 	local all = grid(200)
 	action(all, "ALL MISSIONS 3 ★", C.yellow, function()
 		send("missionsAll")
 	end)
 	action(all, "RESET MISSIONS", C.red, function()
 		send("missionsReset")
+	end)
+	action(all, "KILL MISSION ZOMBIES", C.red, function()
+		send("missionKill") -- 6.15 (server/Admin.luau → Jobs.adminKillMission)
 	end)
 	for _, campaign in MissionData.Campaigns do
 		local done, total = MissionData.done(missionProgress, campaign.id)
