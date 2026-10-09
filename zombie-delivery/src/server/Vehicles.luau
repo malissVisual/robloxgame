@@ -135,8 +135,8 @@
 -- to it); the E starts a hop from where you stand onto the deck (client/CarBoarding.luau) and the server seats you
 -- ScooterHop later (boardSeconds); off it is a hop down to its left side. MY BIKE (and PLAY, a respawn) puts the
 -- scooter right beside you when there is room (placeNear) and you hop on (spawnAt → Vehicles.mount), a rental's slide
--- off its dock plays while you hop. Its load rides on the BikeFrame (Vehicles.cargoHolder: it leans and wheelies
--- with the deck; server/Wheelie.luau and client/CarVisuals.luau for the wheelie). The bikes keep their step and leg over.
+-- off its dock plays while you hop. Its load rides on the BikeFrame (Vehicles.cargoHolder: it leans with the deck,
+-- client/CarVisuals.luau). The bikes keep their step and leg over.
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -3593,8 +3593,8 @@ function Vehicles.cargoSlots(car: Car): { CFrame }
 	return list
 end
 
--- 6.10: the part a loaded piece is welded to (server/Cargo.luau): on a scooter its BikeFrame (the load leans and
--- wheelies with the deck: client/CarVisuals.luau), else the chassis. The slots stay relative to the chassis.
+-- 6.10: the part a loaded piece is welded to (server/Cargo.luau): on a scooter its BikeFrame (the load leans with the
+-- deck: client/CarVisuals.luau), else the chassis. The slots stay relative to the chassis.
 function Vehicles.cargoHolder(car: Car): BasePart
 	if car.model:GetAttribute("BikeStand") == true then
 		local frame = car.model:FindFirstChild("BikeFrame")

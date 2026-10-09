@@ -1,8 +1,9 @@
 --!strict
 -- 6.10: the E-Scooter's ride, the pure part (no Roblox at its top level, so tests/scooter_test.luau runs it in the
 -- standalone Luau; the numbers are Config.Scooter and Config.Interact's Scooter… ones). A ZDC RIDE rental is the same
--- scooter. Used by client/Drive.luau (the handling and the wheelie of your own scooter), client/CarVisuals.luau (the
--- lean and the wheelie's pitch everybody sees) and client/CarBoarding.luau (the hop on and off).
+-- scooter. Used by client/Drive.luau (the handling of your own scooter), client/CarVisuals.luau (the lean everybody
+-- sees) and client/CarBoarding.luau (the hop on and off). (6.14.2: the 6.10 wheelie is gone, the owner: "take the
+-- wheelie away, it looks silly".)
 --
 --   ScooterRide.turnRate(speed, maxSpeed, turn)   how fast it turns (rad/s) at `speed`: LowTurn of the car's `turn` at
 --                                                  walking pace easing to HighTurn at its top speed, faded in from a stand
@@ -12,26 +13,11 @@
 --                                                  Pull: a soft first push, a glide into the top speed)
 --   ScooterRide.carve(dt)                         6.14.1: how much of the way to its nose the motion turns in a step
 --   ScooterRide.lean(yawRate, forward)            the lean into a turn (radians, the look only)
---   ScooterRide.wheelie() / wheelieStep(w, held, speed, braking, dt)   the wheelie: up while the key is held, rolling and
---                                                  not braking, down after MaxSeconds by itself (then let go, Cooldown)
---   ScooterRide.knock(w)                          a heavy hit: the wheelie comes down
---   ScooterRide.amountStep(amount, up, dt)        how far up it is drawn (0 … 1: Pop seconds up, Drop down)
---   ScooterRide.pitch(amount, time)               the deck's pitch back round the rear axle (radians, with the wobble)
---   ScooterRide.speedFactor(amount) / turnFactor(amount)   the top speed and the steering while up
 --   ScooterRide.hop(u)                            the hop onto the deck (or off it): the share of the way, the arc, the turn
 
 local Config = require(script.Parent.Config)
 
 local ScooterRide = {}
-
-export type Wheelie = {
-	up: boolean, -- on the back wheel now (the server is told when this changes)
-	time: number, -- seconds up
-	rest: number, -- seconds before it may pop again
-	armed: boolean, -- the key was let go since the last drop (or since getting on)
-	amount: number, -- how far up it is drawn (0 … 1)
-	held: number, -- 6.14.1: seconds the key has been held while armed (it pops at Config.Scooter.Wheelie.Hold)
-}
 
 local function smooth(x: number): number
 	local u = math.clamp(x, 0, 1)
@@ -109,81 +95,6 @@ end
 function ScooterRide.lean(yawRate: number, forward: number): number
 	local cfg = Config.Scooter
 	return math.clamp(yawRate * forward * cfg.LeanRate, -cfg.LeanMax, cfg.LeanMax)
-end
-
--- ── The wheelie ─────────────────────────────────────────────────────────────
-
-function ScooterRide.wheelie(): Wheelie
-	return { up = false, time = 0, rest = 0, armed = false, amount = 0, held = 0 }
-end
-
--- How far up it is drawn, one step on toward up (1) or down (0).
-function ScooterRide.amountStep(amount: number, up: boolean, dt: number): number
-	local cfg = Config.Scooter.Wheelie
-	if up then
-		return math.min(1, amount + dt / math.max(1e-3, cfg.Pop))
-	end
-	return math.max(0, amount - dt / math.max(1e-3, cfg.Drop))
-end
-
--- One step of the wheelie: `held` the key, `speed` along the nose (studs/s), `braking` S while rolling forward. Up
--- when the key is held (pressed again since the last drop; 6.14.1: for Hold seconds, a tap is nothing), rolling at
--- MinSpeed or more and not braking; down when it is let go, on the brake, under DropSpeed or after MaxSeconds (the
--- balance). Returns whether `up` changed.
-function ScooterRide.wheelieStep(w: Wheelie, held: boolean, speed: number, braking: boolean, dt: number): boolean
-	local cfg = Config.Scooter.Wheelie
-	local was = w.up
-	w.rest = math.max(0, w.rest - dt)
-	if not held then
-		w.armed = true
-		w.held = 0
-	elseif w.armed and not w.up then
-		w.held += dt
-	end
-	if w.up then
-		w.time += dt
-		if not held or braking or speed < cfg.DropSpeed or w.time >= cfg.MaxSeconds then
-			w.up = false
-			w.rest = cfg.Cooldown
-			w.armed = false
-		end
-	elseif held and w.armed and w.rest <= 0 and not braking and speed >= cfg.MinSpeed and w.held >= (cfg.Hold or 0) - 1e-9 then
-		w.up = true
-		w.time = 0
-	end
-	w.amount = ScooterRide.amountStep(w.amount, w.up, dt)
-	return w.up ~= was
-end
-
--- A knock (the scooter hit something heavy: client/Drive.luau's bump): the balance is gone, it comes down next step.
-function ScooterRide.knock(w: Wheelie)
-	if w.up then
-		w.time = math.max(w.time, Config.Scooter.Wheelie.MaxSeconds)
-	end
-end
-
--- The deck's pitch back round the rear axle (radians, positive lifts the front): Angle eased by how far up it is, and
--- the balance's wobble (a third of Wobble at the start, all of it at MaxSeconds) `time` seconds after it went up.
-function ScooterRide.pitch(amount: number, time: number): number
-	local cfg = Config.Scooter.Wheelie
-	local a = math.clamp(amount, 0, 1)
-	if a <= 0 then
-		return 0
-	end
-	local t = math.clamp(time, 0, 600) -- (never a NaN from a huge time)
-	local late = math.clamp(t / math.max(0.1, cfg.MaxSeconds), 0, 1)
-	local wobble = math.rad(cfg.Wobble) * (1 + 2 * late) / 3 * math.sin(2 * math.pi * cfg.WobbleHz * t)
-	return math.rad(cfg.Angle) * smooth(a) + wobble * a
-end
-
--- The top speed's factor while up (amount: how far up).
-function ScooterRide.speedFactor(amount: number): number
-	return 1 + Config.Scooter.Wheelie.SpeedBonus * math.clamp(amount, 0, 1)
-end
-
--- The steering's factor while up.
-function ScooterRide.turnFactor(amount: number): number
-	return 1 + (Config.Scooter.Wheelie.Turn - 1) * math.clamp(amount, 0, 1)
 end
 
 -- ── The hop on (and off) ────────────────────────────────────────────────────

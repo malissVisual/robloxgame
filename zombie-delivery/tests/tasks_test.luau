@@ -25,7 +25,7 @@ local NOW = 1791331200 -- 2026-10-07 00:00 UTC (a Wednesday)
 local USER = 123456789
 
 -- ── The pool ──────────────────────────────────────────────────────────────
-local EVENTS = { deliver = true, ride = true, stars3 = true, perfect = true, zip = true, wheelie = true, bus = true, kill = true, tips = true, earn = true, mission = true, shift = true, regular = true, golden = true } -- (6.14: shift, server/Shift.luau; regular, golden)
+local EVENTS = { deliver = true, ride = true, stars3 = true, perfect = true, zip = true, bus = true, kill = true, tips = true, earn = true, mission = true, shift = true, regular = true, golden = true } -- (6.14: shift, server/Shift.luau; regular, golden)
 do
 	local seen: { [string]: boolean } = {}
 	local bad = {}
@@ -161,10 +161,10 @@ do
 	local missionAt1 = false
 	for n = 0, 199 do
 		for _, pick in Tasks.pickDaily(day + n, USER, 1) do
-			missionAt1 = missionAt1 or pick.id == "mission" or pick.id == "ride" or pick.id == "wheelie"
+			missionAt1 = missionAt1 or pick.id == "mission" or pick.id == "ride"
 		end
 	end
-	check("no mission, ride or wheelie task at level 1", not missionAt1 and #low == 3)
+	check("no mission or ride task at level 1", not missionAt1 and #low == 3)
 	local top = Tasks.pickDaily(day, USER, 15)
 	local lowMoney, topMoney = 0, 0
 	for _, pick in low do

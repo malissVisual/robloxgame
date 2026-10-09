@@ -5,8 +5,7 @@
 --   on foot   [1] Fists [2] Bag [3] Gun (what you have; the one you hold bright) · [E] Use · [G] Put down (cargo in
 --             your hands) · [X] Throw (only while a throw is possible: the server's ThrowReady / ThrowTo) · [E] Pick up
 --             bag (while yours lies on the ground: BagDown) · [V] Punch / Strike
---   in a seat [W/S] Drive [A/D] Steer · [E] Get out · [F] Shoot (6.10: on an E-Scooter also [Shift] Wheelie; 6.12:
---             the driver [H] Horn / Bell / Beep)
+--   in a seat [W/S] Drive [A/D] Steer · [E] Get out · [F] Shoot (6.12: the driver [H] Horn / Bell / Beep)
 -- A keyboard only: hidden on a touch screen and with a gamepad alone. Hidden with the HUD and while a window, the phone,
 -- a dialog or the result card covers the game (KeyHints.covered, the bottom bar's rule, set by the client's Main).
 -- The KEYS chip (a click, or F1) folds and unfolds it; the choice stays for the session. A courier with fewer than
@@ -87,9 +86,6 @@ local function linesNow(): { { Chip } }
 		elseif car and driving then
 			table.insert(first, chipText("W/S", "Drive"))
 			table.insert(first, chipText("A/D", "Steer"))
-			if car:GetAttribute("BikeStand") == true then
-				table.insert(first, chipText("Shift", "Wheelie")) -- 6.10: the E-Scooter onto its back wheel (client/Drive.luau)
-			end
 			-- 6.12: the horn (client/SoundScape.luau): a bike rings its bell, a scooter beeps
 			table.insert(first, chipText("H", if car:GetAttribute("BikeStand") == true then "Beep" elseif car:GetAttribute("Bike") == true then "Bell" else "Horn"))
 			table.insert(first, chipText("E", "Get out"))

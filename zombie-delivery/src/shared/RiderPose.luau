@@ -5,8 +5,7 @@
 --   the sit toward the pedals and pumping with the crank (crank: its angle in radians).
 -- * "stand" (the E-Scooter, CarDef.stand: its DriverSeat sits a hip's height over the deck, server/Vehicles.luau): the
 --   legs straightened out of the sit (the thighs down, the knees opened) so the feet stand on the deck, a slight
---   forward lean, both hands on the bar, the knees a little soft; no pedalling (the crank is ignored). 6.10: on the
---   back wheel (a wheelie) the knees bend and the body sits back (RiderPose.Wheelie, RiderPose.uprightAt).
+--   forward lean, both hands on the bar, the knees a little soft; no pedalling (the crank is ignored).
 -- Each joint gets rotations about X (forward is negative for the waist and the thighs: the R15 joints' own frames),
 -- then Y (the arms turned in toward the bar). Angles in radians.
 
@@ -65,23 +64,6 @@ RiderPose.Upright = {
 	MaxYaw = math.rad(40), -- the arm turned in or out at most
 	MaxElbow = math.rad(140),
 }
-
--- 6.10, the wheelie (shared/ScooterRide.luau: the deck pitched back round the rear axle, the rider on it tips back
--- with it): the knees bend and come forward, the hips drop, the upper body sits up over them; the hands stay on the
--- bar (RiderPose.armIk reaches the grips wherever they are). Blended in by how far up it is (RiderPose.uprightAt).
-RiderPose.Wheelie = {
-	Lean = math.rad(-2), -- the waist (Upright's -8: the forward lean eases off, the body sits back with the deck)
-	Thigh = math.rad(20), -- both thighs forward of the standing legs
-	Knee = math.rad(-34), -- the knees bent (the shins back)
-}
-
--- The standing rider's waist lean, thighs (both hips, before the stagger) and knees with the wheelie `k` (0 on both
--- wheels … 1 up), radians about X.
-function RiderPose.uprightAt(k: number): (number, number, number)
-	local u, w = RiderPose.Upright, RiderPose.Wheelie
-	local x = math.clamp(k, 0, 1)
-	return u.Lean + (w.Lean - u.Lean) * x, w.Thigh * x, u.Knee + (w.Knee - u.Knee) * x
-end
 
 -- A two-bone arm reaching a point (pure): `dx, dy, dz` the grip from the shoulder in the shoulder joint's parent frame
 -- (+X right, +Y up, -Z forward), `upper` / `lower` the bones' lengths (shoulder→elbow, elbow→grip). Returns the
