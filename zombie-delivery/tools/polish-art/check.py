@@ -105,7 +105,7 @@ for _,block in Plan.blocks() do
  end
 end
 print(encode({city={props=props,parts=total,kinds=counts}}))
-assert(total<=2500,"Whole-city street art exceeds 2500 parts")
+assert(total<=2600,"Whole-city street art exceeds 2600 parts") -- (6.12.7: 2500; the two gas stations by the safe zone put a few more props on their sidewalks)
 """
     if mode == "towers":
         return """

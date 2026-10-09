@@ -70,6 +70,8 @@ local PLACE_SUB: { [string]: string } = {
 	gas_downtown = "GAS STATION", -- 5.4, the new gas stations (Map.GasStations)
 	gas_harbor = "GAS STATION",
 	gas_suburbs = "GAS STATION",
+	gas_depot = "GAS STATION", -- 6.12.7
+	gas_tower = "GAS STATION",
 }
 local ESTATE_SUB: { [string]: string } = {
 	garage = "GARAGE",

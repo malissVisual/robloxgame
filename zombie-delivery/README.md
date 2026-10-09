@@ -1143,6 +1143,19 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Fuel lasts five times as long, two gas stations by the safe zone (6.12.7)
+
+The owner: "one or two gas stations closer, and the fuel lasts really long".
+
+- **Fuel:** `Config.Fuel.Lasts` = 5 (`shared/FuelMath.luau` burn and range). A tank now lasts about 15 – 25 typical
+  jobs instead of 3 – 5. The Old Van goes about 16,700 studs on a tank. Price, pumps, tow and jerry can are as before.
+- **Two new stations** (`Map.GasStations`), just outside the safe zone on its corner streets:
+  - **Depot Gas:** east of Dead End Motors (block 2, 0), a block from the depot.
+  - **Tower Gas:** west of the Dispatch Tower (block −2, −1).
+  - Each has the pumps, the kiosk with jerry cans, the map icon and GPS, built like the 5.4 stations on a row of lots
+    that held apartments and a car park.
+  - There are six stations in all. No storefront, zip line or alley moved.
+
 ## The slow-mo sprint (6.12.6)
 
 The owner: "make the sprint look like a slow-mo sprint". The body still runs at the sprint's speed; the run cycle on it

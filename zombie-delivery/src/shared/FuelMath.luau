@@ -3,7 +3,8 @@
 -- tow), the client (client/Drive.luau: the crawl; client/FuelGauge.luau: the gauge) and tests/fuel_test.luau share.
 --
 --   * A car's tank (CarDef.tank, litres) and its burn (CarDef.burn, litres per 1,000 studs). A bike has neither: no fuel.
---   * Driving `studs` burns burn × studs / 1000 litres; an empty tank caps the top speed at CrawlSpeed.
+--   * Driving `studs` burns burn × studs / 1000 litres (6.12.7: ÷ Config.Fuel.Lasts, a tank goes 5 times as far); an
+--     empty tank caps the top speed at CrawlSpeed.
 --   * A pump pours PourRate litres a second and charges PricePerLitre for each, in whole dollars as it pours
 --     (FuelMath.pourStep: never more than you can pay), the cents left over at the end (FuelMath.settle).
 --   * The check that a tank lasts: a typical job of a tier is the middle of its pick-up drive plus the middle of its
@@ -30,13 +31,13 @@ function FuelMath.burn(def: Config.CarDef?, studs: number): number
 	if not def or not FuelMath.hasFuel(def) or studs ~= studs or studs <= 0 then
 		return 0
 	end
-	return (def.burn or 0) * studs / 1000
+	return (def.burn or 0) * studs / 1000 / math.max(Tuning.Lasts or 1, 0.1)
 end
 
 -- Studs on a full tank.
 function FuelMath.range(def: Config.CarDef?): number
 	local burn = if def then def.burn or 0 else 0
-	return if burn > 0 then FuelMath.tank(def) * 1000 / burn else math.huge
+	return if burn > 0 then FuelMath.tank(def) * 1000 / burn * math.max(Tuning.Lasts or 1, 0.1) else math.huge
 end
 
 -- The price of `litres`, in dollars (with cents).

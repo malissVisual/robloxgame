@@ -322,6 +322,8 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	gas_downtown = "gas", -- 5.4, the new gas stations (Map.GasStations): the Gas Station's pump
 	gas_harbor = "gas",
 	gas_suburbs = "gas",
+	gas_depot = "gas", -- 6.12.7
+	gas_tower = "gas",
 	-- The missions' places (3.0) have no map icons of their own either: the closest ones.
 	market = "supplies", -- a shop full of things
 	airfield = "army",

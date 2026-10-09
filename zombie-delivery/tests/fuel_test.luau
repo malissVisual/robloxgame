@@ -52,11 +52,11 @@ check("the brief's tanks: the Old Van 40 L, the Box Truck 80 L, the Freight Truc
 -- ── Burn, price, crawl ─────────────────────────────────────────────────────
 
 local van = car("van")
-check("burn: 1,000 studs in the Old Van burn its burn", near(FuelMath.burn(van, 1000), van.burn :: number))
-check("burn: half the way, half the fuel", near(FuelMath.burn(van, 500), (van.burn :: number) / 2))
+check("burn: 1,000 studs in the Old Van burn its burn (6.12.7: ÷ Lasts)", near(FuelMath.burn(van, 1000), (van.burn :: number) / Config.Fuel.Lasts))
+check("burn: half the way, half the fuel", near(FuelMath.burn(van, 500), FuelMath.burn(van, 1000) / 2))
 check("burn: nothing for no way, a way back or NaN", FuelMath.burn(van, 0) == 0 and FuelMath.burn(van, -50) == 0 and FuelMath.burn(van, 0 / 0) == 0)
 check("burn: a bike burns nothing", FuelMath.burn(car("rustbike"), 1000) == 0 and FuelMath.burn(nil, 1000) == 0)
-check("range: a full tank's studs", near(FuelMath.range(van), 40 * 1000 / (van.burn :: number)))
+check("range: a full tank's studs", near(FuelMath.range(van), 40 * 1000 / (van.burn :: number) * Config.Fuel.Lasts))
 check("price: $2 a litre", F.PricePerLitre == 2 and near(FuelMath.cost(10), 20) and FuelMath.cost(-3) == 0)
 check("charge: whole dollars, the cents up", FuelMath.charge(10) == 20 and FuelMath.charge(10.2) == 21 and FuelMath.charge(0) == 0)
 check("crawl: an empty tank tops out at 6 studs/s", F.CrawlSpeed == 6 and FuelMath.topSpeed(42, 0, 40) == 6 and FuelMath.topSpeed(42, 0.0001, 40) == 6)
@@ -119,11 +119,11 @@ for _, def in Config.Cars do
 	local tier = FuelMath.tierFor(def)
 	local jobs = FuelMath.jobsPerTank(def, tier)
 	print(string.format("  %-14s tank %3d L, %4.1f L / 1,000 studs: %5d studs, %s job %4d studs: %.1f jobs a tank, $%d to fill", def.name, def.tank or 0, def.burn or 0, math.floor(FuelMath.range(def)), string.rep("★", Config.Jobs.Tiers[tier].stars), math.floor(FuelMath.jobDistance(tier)), jobs, FuelMath.charge(def.tank or 0)))
-	if jobs < 3 or jobs > 5 then
+	if jobs < 3 * Config.Fuel.Lasts or jobs > 5 * Config.Fuel.Lasts then
 		jobsProblem = `{def.id}: {jobs} jobs`
 	end
 end
-check("every dealer car: a full tank lasts 3 – 5 jobs of the tier it opens at", jobsProblem == nil, jobsProblem)
+check("every dealer car: a full tank lasts 3 – 5 jobs of the tier it opens at, times Lasts (6.12.7: 15 – 25)", Config.Fuel.Lasts >= 1 and jobsProblem == nil, jobsProblem)
 check("the Old Van is meant for ★ jobs, the Rally Van for ★★★★", FuelMath.tierFor(van) == 1 and FuelMath.tierFor(car("rallyvan")) == 4)
 
 -- ── The gas stations ───────────────────────────────────────────────────────
@@ -157,8 +157,20 @@ local function stationBox(station: Map.GasStation): Box
 	return { x0 = station.x - hx, z0 = station.z - hz, x1 = station.x + hx, z1 = station.z + hz }
 end
 
-check("four gas stations: the old one and three new", #Map.GasStations == 4 and Map.gasStation("gas") ~= nil and Map.gasStation("gas_downtown") ~= nil
-	and Map.gasStation("gas_harbor") ~= nil and Map.gasStation("gas_suburbs") ~= nil and Map.gasStation("moon") == nil)
+check("six gas stations: the old one, three of 5.4 and two by the safe zone (6.12.7)", #Map.GasStations == 6 and Map.gasStation("gas") ~= nil and Map.gasStation("gas_downtown") ~= nil
+	and Map.gasStation("gas_harbor") ~= nil and Map.gasStation("gas_suburbs") ~= nil and Map.gasStation("gas_depot") ~= nil
+	and Map.gasStation("gas_tower") ~= nil and Map.gasStation("moon") == nil)
+do
+	-- 6.12.7: the two new ones are close: within 360 studs of the park's middle and 450 of the depot, outside the safe zone
+	local close = true
+	for _, id in { "gas_depot", "gas_tower" } do
+		local s = Map.gasStation(id) :: Map.GasStation
+		local fromPark = math.sqrt(s.x * s.x + s.z * s.z)
+		local fromDepot = math.sqrt((s.x - Map.Depot.x) ^ 2 + (s.z - Map.Depot.z) ^ 2)
+		close = close and fromPark < 360 and fromDepot < 450 and (math.abs(s.x) > Config.City.SafeHalf or math.abs(s.z) > Config.City.SafeHalf)
+	end
+	check("the two new stations sit close to the safe zone and the depot", close)
+end
 check("the layout is Codex's 70 x 50 lot", L.width == 70 and L.depth == 50)
 local landmarks: { [string]: Map.Landmark } = {}
 for _, landmark in Map.Landmarks do
@@ -333,10 +345,10 @@ local spread = true
 for n, a in Map.GasStations do
 	for m = n + 1, #Map.GasStations do
 		local b = Map.GasStations[m]
-		spread = spread and math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2) > 500
+		spread = spread and math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2) > 400 -- (6.12.7: 500; Tower Gas is 444 from Westside Gas)
 	end
 end
-check("spread over the map (500+ studs apart)", spread)
+check("spread over the map (400+ studs apart)", spread)
 local nearestHarbor = Map.nearestGas(1300, 100)
 local nearestNorth = Map.nearestGas(150, -1100)
 check("the nearest station: the Harbor's in the Harbor, the old one up north", nearestHarbor.id == "gas_harbor" and nearestNorth.id == "gas")
