@@ -91,11 +91,15 @@ check("home stands upright, no popup",upright() and popup()==nil and not Phone.a
 local payload={stopLabel="Harbor warehouse",customer="Earl",cargo="Parcels",total=2,pay=180,endsAt=376,timeLimit=400,position=M.Vector3.new(150,0,100),mode="foot",stopCount=2,stopIndex=2,orders={{id=1,state="open",focused=true,pay=180,endsAt=376,stops={{label="ZDC DEPOT",kind="pickup",done=true},{label="HARBOR WAREHOUSE",kind="drop",current=true}}},{id=2,state="open",title="Medicine",pay=80,stops={{label="Clinic",current=true}}}}}
 M.remotes.Job.OnClientEvent:Fire(payload)
 check("home reflects incoming order",text("HARBOR WAREHOUSE")~=nil and text("$180")~=nil)
--- 6.5: during a run JOBS counts the open orders and opens ORDERS.
+-- 6.5: during a run JOBS counts the open orders. 6.12.8: it opens the job list (BOARD), YOUR RUN on top; its DETAILS
+-- (and the home's contract card) open ORDERS.
 local jobsBadge=named("jobsApp"):FindFirstChild("Badge")
 check("JOBS' badge counts the open orders",jobsBadge.Visible and jobsBadge.Text=="2" and named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders")
 named("jobsApp").Activated:Fire()
-check("JOBS opens ORDERS during a run",showing("orders") and text("ORDERS")~=nil)
+check("6.12.8: JOBS opens BOARD during a run, not ORDERS",showing("board") and text("JOB BOARD")~=nil and text("ORDERS")==nil)
+check("6.12.8: YOUR RUN heads the board with DETAILS",named("YourRun")~=nil and text("Your run · 2 orders · $260")~=nil and text("DETAILS")~=nil)
+text("DETAILS").Parent.Activated:Fire()
+check("6.12.8: YOUR RUN's DETAILS opens ORDERS as before",showing("orders") and text("ORDERS")~=nil)
 named("Close").Activated:Fire()
 named("HomeContract").Activated:Fire()
 M.flush()
@@ -211,8 +215,8 @@ for _,offer in offers do if offer.index==12 then offer.addOrder=true end end
 check("an accepted offer leaves the phone's board",offers[1].index==12)
 M.remotes.Offers.OnClientEvent:Fire(offers,M.now+240,{})
 Phone.open("board")
-tap("+ ADD ORDER")
-check("+ ADD ORDER fires AcceptJob and stays on the board",lastSent("AcceptJob").args[1]==12 and showing("board") and Phone.isOpen())
+tap("+ ADD")
+check("+ ADD fires AcceptJob and stays on the board",lastSent("AcceptJob").args[1]==12 and showing("board") and Phone.isOpen())
 -- GIVE UP: two presses within 4 s.
 Phone.open("orders")
 local cancels=0
@@ -222,11 +226,82 @@ check("GIVE UP asks once first",lastSent("CancelJob")==nil and named("GiveUp").T
 named("GiveUp").Activated:Fire()
 check("a second press gives the delivery up",lastSent("CancelJob")~=nil)
 M.remotes.Job.OnClientEvent:Fire(nil)
--- On a delivery that takes no more orders the board says so.
-M.remotes.Job.OnClientEvent:Fire({cargo="Gold",customer="Dee",total=1,pay=900,endsAt=M.now+100})
-Phone.open("board")
-check("on a delivery the board points to ORDERS",text("You are on a delivery")~=nil and text("OPEN ORDERS")~=nil)
-M.remotes.Job.OnClientEvent:Fire(nil)
+-- 6.12.8: JOBS is the job list during a run too: YOUR RUN (every open order in one line, the run's pay, the next stop),
+-- NEXT UP (the queue: what, where, pay, why the next one waits, ✕), every row's one add button (+ ADD / + QUEUE / why
+-- neither) and ADD ALL · $total.
+do
+	local fixture=M.queueFixture
+	M.remotes.Job.OnClientEvent:Fire(fixture.run(M.now))
+	local list=fixture.board()
+	-- review: ADD ALL's plan from the real shared/JobQueue.luau on these rows (as server/JobQueue.luau makes it): the
+	-- special (Cash Transport) and the paper round are never taken, the full foot run takes nothing, the rest queue.
+	local Rules=require("./JobQueue")
+	local plan=Rules.plan({mode="foot",open=2,free=0,stacks=true},{foot=5,bike=8,car=4},fixture.candidates(list),#fixture.queue.list)
+	check("review: ADD ALL never takes the special or the paper round",plan.total==55+130+50 and plan.queued==3 and plan.started==0)
+	local info=table.clone(fixture.info)
+	info.addAll={count=plan.count,total=plan.total,started=plan.started,added=plan.added,queued=plan.queued}
+	M.remotes.Offers.OnClientEvent:Fire(list,M.now+300,info)
+	M.remotes.JobQueue.OnClientEvent:Fire("state",fixture.queue)
+	Phone.close();Phone.open()
+	check("6.12.8: JOBS' line: the run's orders and the jobs waiting",named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders · 2 next")
+	named("jobsApp").Activated:Fire()
+	check("6.12.8: JOBS opens BOARD during a run",showing("board") and text("JOB BOARD")~=nil and text("You are on a delivery")==nil)
+	-- YOUR RUN: one line an open order (what, from → to · pay · clock), the run's pay, the next stop.
+	check("YOUR RUN: the open orders and what they pay together",named("YourRun")~=nil and text("Your run · 2 orders · $160")~=nil)
+	check("YOUR RUN: one line an order, what and from → to",text("🚶  Pizza → Bob · Luigi's Pizza → 3 Oak Ave")~=nil and text("🚶  Letters → Ann · Post Office → 12 Elm St")~=nil and text("🚶  Cake → Flo")==nil)
+	check("YOUR RUN: each line's pay and clock",text("$120 · 03:20")~=nil and text("$40 · 01:30")~=nil)
+	check("YOUR RUN: the next stop",text("Next stop: PICK UP at Luigi's Pizza")~=nil)
+	M.now+=10;require("./OrdersUi").tick()
+	check("YOUR RUN's clocks tick",text("$120 · 03:10")~=nil and text("$40 · 01:20")~=nil)
+	-- NEXT UP: the queue in order, what, where, pay, the next one's reason to wait, ✕.
+	check("NEXT UP under YOUR RUN, in order",named("NextUp")~=nil and named("NextUp").LayoutOrder>named("YourRun").LayoutOrder and text("Next up · 2 / 6")~=nil and text("▶ They start on their own")~=nil
+		and text("1  ★★  Crates → Cid")~=nil and text("2  🚶  Soup → Flo")~=nil)
+	check("NEXT UP: where and the pay",text("Depot → Harbor")~=nil and text("Wok Dead → 9 Oak Ave")~=nil and text("$300")~=nil and text("$70")~=nil)
+	check("NEXT UP: the next one says why it waits",text("⏸ Waits: needs your car: CALL CAR")~=nil and #all(M.gui,function(object) return object.Name=="Why" end)==1)
+	named("Drop").Activated:Fire()
+	check("NEXT UP's ✕ drops it through the JobQueue remote",M.lastSent("JobQueue").args[1]=="drop" and M.lastSent("JobQueue").args[2]==5)
+	-- The rows: + QUEUE (the run is full, or another transport waiting for your bike), the locks, the queue full.
+	check("the board's rows come under NEXT UP",named("AddAll").LayoutOrder>named("NextUp").LayoutOrder)
+	local queueButtons=all(named("AppPopup"),function(object) return object.Text=="+ QUEUE" end)
+	check("+ QUEUE on a row the full run can't take and on one waiting for your bike",#queueButtons==2 and text("🚲 RIDE YOUR BIKE")==nil and text("+ ADD")==nil)
+	check("a locked row keeps its lock, a special and the paper round say why they can't",text("🔒 LEVEL 7")~=nil and #all(named("AppPopup"),function(object) return object.Text=="FINISH YOUR RUN" end)==2)
+	tap("QUEUE FULL (6/6)")
+	check("a full queue says so",toasts[#toasts]=="NEXT UP holds 6 jobs." and M.lastSent("JobQueue").args[1]=="drop")
+	check("every row shows its pay",text("$55")~=nil and text("$130")~=nil and text("$50")~=nil and named("Pay")~=nil)
+	queueButtons[1].Activated:Fire()
+	check("+ QUEUE fires JobQueue with the offer's index and stays on the board",M.lastSent("JobQueue").args[1]=="queue" and M.lastSent("JobQueue").args[2]==21 and showing("board"))
+	check("a queued offer leaves the phone's board",list[1].index==22 and text("$55")==nil)
+	-- ADD ALL · $total sends the right request.
+	check("ADD ALL shows what it adds and pays (not the special, not the round)",text("ADD ALL · $235")~=nil and text("3 jobs: 3 wait in NEXT UP.")~=nil)
+	tap("ADD ALL · $235")
+	check("ADD ALL fires JobQueue addAll",M.lastSent("JobQueue").args[1]=="addAll" and #M.lastSent("JobQueue").args==1)
+	-- review: PAUSE, CLEAR ALL; the idle start's "Starts in a few seconds"; PAUSED with RESUME.
+	named("Pause").Activated:Fire()
+	check("review: PAUSE pauses NEXT UP through the JobQueue remote",M.lastSent("JobQueue").args[1]=="pause")
+	named("ClearAll").Activated:Fire()
+	check("review: CLEAR ALL empties it",M.lastSent("JobQueue").args[1]=="clear")
+	M.remotes.JobQueue.OnClientEvent:Fire("state",fixture.starting)
+	check("review: the next one's idle start says so (PAUSE to wait)",text("▶ Starts in a few seconds · PAUSE to wait")~=nil and named("Starting")~=nil and named("Why")==nil)
+	M.remotes.JobQueue.OnClientEvent:Fire("state",fixture.paused)
+	check("review: PAUSED after a failed delivery, with RESUME",text("⏸ Paused after a failed delivery · RESUME to go on")~=nil and named("Resume")~=nil and named("Pause")==nil and named("Starting")==nil and named("ClearAll")~=nil)
+	named("Resume").Activated:Fire()
+	check("review: RESUME goes on through the JobQueue remote",M.lastSent("JobQueue").args[1]=="resume")
+	Phone.close();Phone.open()
+	check("review: JOBS' line says it is paused",named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders · 2 next (paused)")
+	named("jobsApp").Activated:Fire()
+	-- A run that takes no more orders (a mission): the board still shows, its rows queue.
+	M.remotes.Job.OnClientEvent:Fire({cargo="Gold",customer="Dee",total=1,pay=900,endsAt=M.now+100,stars=3,address="Vault",mission={name="Code Red"}})
+	Phone.open("board")
+	check("6.12.8: on a mission the board shows YOUR RUN and + QUEUE, not 'You are on a delivery'",text("You are on a delivery")==nil and text("Your run · 1 order · $900")~=nil and text("★★★  Gold → Dee · Vault")~=nil and text("+ QUEUE")~=nil)
+	-- Off duty the rows are ACCEPT again; the queue's state clears.
+	M.remotes.Job.OnClientEvent:Fire(nil)
+	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
+	Phone.open("board")
+	check("off duty: ACCEPT, no YOUR RUN, no NEXT UP",text("ACCEPT")~=nil and text("+ QUEUE")==nil and named("YourRun")==nil and named("NextUp")==nil)
+	check("6.12.8: no warnings on the board",#M.warnings==0)
+	Phone.close()
+end
+
 -- CAREER and SHOP: two columns in the wide popup, the phone upright.
 for _,id in {"career","shop"} do
 	Phone.open(id)

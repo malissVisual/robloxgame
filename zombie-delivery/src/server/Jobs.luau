@@ -183,6 +183,12 @@
 -- 6.12, the daily and weekly tasks (server/Tasks.luau, required where it is called: no new top-level local here):
 -- payOrder tells Tasks.note every order paid ("order": its pieces, look, mode, ★★★, pay; the crew's share for each
 -- member) and its tips (the round's, the Courier Vest's).
+--
+-- 6.12.8, the NEXT UP queue (server/JobQueue.luau, shared/JobQueue.luau): the board is sent during every run
+-- (RequestOffers; its rows' + QUEUE and ADD ALL added by Jobs.onBoardSend); Jobs.onQueuePoke after a drop, an order
+-- paid or lost and the end of a run (endJob); Jobs.queueApi is what the queue needs (the run, an offer's readiness
+-- and why it waits, the room, the same start paths as ACCEPT and + ADD: takeOffer / addOrder with `quiet`). YOUR RUN
+-- reads the payload's orders' `from` / `to`.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -276,6 +282,8 @@ type Offer = {
 	-- 6.8: a mission the owner has done before (Jobs.startMission): payOrder pays the owner Missions.replayPay of their
 	-- share and Missions.replayXp of the XP (6.8 review: each crew member by their own record)
 	replay: boolean?,
+	-- 6.12.8: the business it is for (Config.Jobs.Businesses id; applyRules): a queued job re-checks its hours at start
+	business: string?,
 }
 
 -- 5.1: the numbers of a light job: Config.Jobs.Foot or Config.Jobs.Bike (footOffer, strayStep; JobRules.LightRules).
@@ -405,6 +413,15 @@ type XpInfo = { xp: number, level: number, rank: string, levelUp: boolean }
 type CargoSpot = { pile: { x: number, z: number }, park: { x: number, z: number }, facing: { x: number, z: number } }
 
 local Jobs = {}
+
+-- 6.12.8, set by server/JobQueue.luau (the NEXT UP queue): onQueuePoke(player) after a drop, an order done or lost
+-- and the end of a run (it may start the next queued job, deferred: after the board's refill); onBoardSend(player,
+-- board, rows, info) adds the rows' + QUEUE and ADD ALL to a board before it is sent.
+Jobs.onQueuePoke = nil :: ((player: Player) -> ())?
+-- 6.12.8 review: onQueuePause(player, why) after a failed delivery or a lost order (Jobs.fail, failOrder) and when a
+-- mission or an employer's job starts: NEXT UP waits (PAUSED) until the player resumes it.
+Jobs.onQueuePause = nil :: ((player: Player, why: string) -> ())?
+Jobs.onBoardSend = nil :: ((player: Player, board: any, rows: { { [string]: any } }, info: { [string]: any }) -> ())?
 
 local boards: { [number]: Board } = {} -- 3.7: by UserId, so leaving and coming back does not reroll the board
 local nextOfferId = 0
@@ -632,6 +649,9 @@ local function ordersInfo(job: Job, focus: Order): { { [string]: any } }
 	local out: { { [string]: any } } = {}
 	for _, order in job.orders do
 		local mine = order.offer
+		-- 6.12.8: YOUR RUN's "from → to" (the board and the J board): its first stop's place and its last one's.
+		local firstStop = job.offer.stops[order.stops[1]]
+		local lastStop = job.offer.stops[order.stops[#order.stops]]
 		local stops: { { [string]: any } } = {}
 		for _, index in order.stops do
 			local stop = job.offer.stops[index]
@@ -660,6 +680,8 @@ local function ordersInfo(job: Job, focus: Order): { { [string]: any } }
 			stops = stops,
 			pinned = job.pinned == order.id,
 			focused = order == focus,
+			from = if firstStop then firstStop.address.name else nil,
+			to = if lastStop then lastStop.address.name else nil,
 		})
 	end
 	return out
@@ -1040,6 +1062,7 @@ local function applyRules(offer: Offer, business: string?)
 		return
 	end
 	offer.rules = JobRules.cargoRules(offer.kind, offer.look, business)
+	offer.business = business -- (6.12.8)
 	local tier = JobsConfig.Tiers[offer.tier]
 	if JobRules.hasRule(offer.rules, "cash") and tier and (tier.ambushEvery > 0 or tier.chaseEvery > 0) then
 		offer.boost = math.max(offer.boost, JobsConfig.CargoRules.CashBoost)
@@ -2283,7 +2306,19 @@ local function sendBoard(player: Player, board: Board)
 	local bikeId, bike = Transport.bikeOf(player)
 	local bikeDef = if bikeId then Economy.findCar(bikeId) else nil
 	local bikeInfo = if bikeDef and bike then { id = bikeDef.id, name = bikeDef.name, room = bike.room, riding = Transport.riding(player) } else nil
-	Net.get("Offers"):FireClient(player, out, board.refreshAt, { tiers = tiers, streak = if profile then profile.streak else 0, foot = carry, hasCar = hasCar, ownsCar = ownsCar(player), bike = bikeInfo, bikeLevel = JobsConfig.Bike.Level, run = if run then stackInfo(player, run) else nil, footNote = board.footNote })
+	local boardInfo: { [string]: any } = { tiers = tiers, streak = if profile then profile.streak else 0, foot = carry, hasCar = hasCar, ownsCar = ownsCar(player), bike = bikeInfo, bikeLevel = JobsConfig.Bike.Level, run = if run then stackInfo(player, run) else nil, footNote = board.footNote }
+	-- 6.12.8: the rows' + QUEUE and ADD ALL (server/JobQueue.luau); `onDuty`: any run (the rows show + ADD / + QUEUE).
+	boardInfo.onDuty = if current then true else nil
+	local extend = Jobs.onBoardSend
+	if extend then
+		local ok, err = pcall(function()
+			extend(player, board, out, boardInfo)
+		end)
+		if not ok then
+			warn(`[Jobs] the board's queue info failed: {err}`)
+		end
+	end
+	Net.get("Offers"):FireClient(player, out, board.refreshAt, boardInfo)
 end
 
 -- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
@@ -2655,6 +2690,10 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	require(script.Parent.RunEvents).finish(player) -- 5.7: a survivor still calling, a locked gate
 	task.defer(Jobs.refillBoard, player) -- 5.7: new offers where the taken ones were (after the result)
+	local poke = Jobs.onQueuePoke -- 6.12.8: the NEXT UP queue's next job (deferred too: after the refill)
+	if poke then
+		poke(player)
+	end
 	Vehicles.setSpeedMultiplier(player, 1)
 	-- 3.0: the crew stays together (no Crew.disband): the next mission is one START away.
 	-- A company vehicle goes back; your own car comes to you. 5.0: without a car of your own the lent one just goes
@@ -2758,8 +2797,9 @@ local function placeDocks(player: Player, offer: Offer)
 	offer.stops = stops
 end
 
--- Starts the job. False and why not (no notice: the caller tells the player).
-local function startJob(player: Player, offer: Offer): (boolean, string?)
+-- Starts the job. False and why not (no notice: the caller tells the player). 6.12.8, `quiet`: no start notice (the
+-- NEXT UP queue says "NEXT UP: …" instead).
+local function startJob(player: Player, offer: Offer, quiet: boolean?): (boolean, string?)
 	local jobType = offer.jobType
 	local foot = offer.mode == "foot" or offer.mode == "bike" -- 5.0: no vehicle at all (5.1: the bike's room is the pack)
 	local bikeText = bikeLock(player, offer)
@@ -2942,7 +2982,9 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		elseif offer.boost > 1 then
 			text ..= " · Every bandit in town wants this cargo!"
 		end
-		notice:FireClient(player, text)
+		if not quiet then
+			notice:FireClient(player, text)
+		end
 		-- The invited crew hears about it too (their HUD follows the owner's job: server/Crew.luau, Jobs.crewStatus).
 		for _, member in Crew.members(player) do
 			if offer.mission then
@@ -2962,13 +3004,18 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		notice:FireClient(player, "That job could not start. Pick another one from the board.")
 		return false, nil
 	end
+	-- 6.12.8 review: a mission or an employer's job pauses NEXT UP (it waits instead of fighting the mission).
+	local pause = Jobs.onQueuePause
+	if pause and (offer.mission ~= nil or (jobType ~= nil and jobType.employer ~= nil and not jobType.board)) then
+		pause(player, if offer.mission then "for your mission" else "for your job")
+	end
 	return true, nil
 end
 
 -- startJob for the job board and the employers: a refusal is told to the player.
-local function startOrTell(player: Player, offer: Offer): boolean
-	local ok, err = startJob(player, offer)
-	if not ok and err then
+local function startOrTell(player: Player, offer: Offer, quiet: boolean?): boolean
+	local ok, err = startJob(player, offer, quiet)
+	if not ok and err and not quiet then
 		notice:FireClient(player, err)
 	end
 	return ok
@@ -2976,71 +3023,79 @@ end
 
 -- Can this player take a job of their own now? (Not with one running, not in somebody else's crew, not above their
 -- level.) Says why not.
-local function canTake(player: Player, level: number): boolean
-	if jobs[player] then
-		notice:FireClient(player, "Finish your current delivery first.")
-		return false
-	end
+local function canTake(player: Player, level: number, quiet: boolean?): boolean
+	local why: string? = nil
 	local owner = Crew.ownerOf(player)
-	if owner and owner ~= player then
-		notice:FireClient(player, `You are in {owner.DisplayName}'s crew. Help with their job, or leave the crew (K) to take your own.`)
-		return false
+	if jobs[player] then
+		why = "Finish your current delivery first."
+	elseif owner and owner ~= player then
+		why = `You are in {owner.DisplayName}'s crew. Help with their job, or leave the crew (K) to take your own.`
+	elseif level > PlayerData.level(player) then
+		why = `Locked: this job needs level {level} ({Levels.rank(level)}). Deliver more to level up!`
 	end
-	if level > PlayerData.level(player) then
-		notice:FireClient(player, `Locked: this job needs level {level} ({Levels.rank(level)}). Deliver more to level up!`)
-		return false
+	if why and not quiet then -- (6.12.8 review: the NEXT UP queue and ADD ALL refuse silently)
+		notice:FireClient(player, why)
 	end
-	return true
+	return why == nil
 end
 
 -- Takes an offer the way the job board does (3.7: the tutorial's delivery too): the checks (canTake, slotsShort) and
--- startJob, every refusal told to the player.
-local function takeOffer(player: Player, offer: Offer): boolean
-	if not canTake(player, offer.level) then
+-- startJob, every refusal told to the player. 6.12.8, `quiet`: no start notice (startJob) and (review) no refusal told.
+local function takeOffer(player: Player, offer: Offer, quiet: boolean?): boolean
+	if not canTake(player, offer.level, quiet) then
 		return false
 	end
 	-- 4.7: the ★★★ / ★★★★ board jobs need their licence.
 	local licence = licenceTier(offer)
 	if licence and not hasLicence(player, licence) then
 		local info = licenceInfo(player, licence)
-		notice:FireClient(player, if info then `Locked: {licenceText(info)}` else "Locked: this job needs a licence.")
+		if not quiet then
+			notice:FireClient(player, if info then `Locked: {licenceText(info)}` else "Locked: this job needs a licence.")
+		end
 		return false
 	end
 	local short = slotsShort(player, offer)
 	if short then
-		notice:FireClient(player, short)
+		if not quiet then
+			notice:FireClient(player, short)
+		end
 		return false
 	end
-	return startOrTell(player, offer)
+	return startOrTell(player, offer, quiet)
 end
 
 -- 5.2: an offer added to the player's run as another order (the board's + ADD ORDER): the board's checks (its level,
 -- its licence, what it needs: slotsShort) and the run's (stackCheck: a run that takes more, the same mode, a free order
--- slot and the room). Its clock starts now. False (and told) when it may not.
-local function addOrder(player: Player, job: Job, offer: Offer): boolean
-	if offer.level > PlayerData.level(player) then
-		notice:FireClient(player, `Locked: this job needs level {offer.level} ({Levels.rank(offer.level)}). Deliver more to level up!`)
-		return false
-	end
+-- slot and the room). Its clock starts now. False (and told) when it may not. 6.12.8, `quiet`: no ORDER ADDED notice
+-- (ADD ALL and the NEXT UP queue say it their way) and (review) no refusal told either.
+local function addOrder(player: Player, job: Job, offer: Offer, quiet: boolean?): boolean
 	local licence = licenceTier(offer)
-	if licence and not hasLicence(player, licence) then
-		notice:FireClient(player, "Locked: this job needs a licence.")
-		return false
+	local refused: string? = nil
+	if offer.level > PlayerData.level(player) then
+		refused = `Locked: this job needs level {offer.level} ({Levels.rank(offer.level)}). Deliver more to level up!`
+	elseif licence and not hasLicence(player, licence) then
+		refused = "Locked: this job needs a licence."
+	else
+		refused = slotsShort(player, offer)
+		if not refused then
+			local ok, _, why = stackCheck(player, job, offer)
+			if not ok then
+				refused = why or "Finish your current delivery first."
+			end
+		end
 	end
-	local short = slotsShort(player, offer)
-	if short then
-		notice:FireClient(player, short)
-		return false
-	end
-	local ok, _, why = stackCheck(player, job, offer)
-	if not ok then
-		notice:FireClient(player, why or "Finish your current delivery first.")
+	if refused then
+		if not quiet then
+			notice:FireClient(player, refused)
+		end
 		return false
 	end
 	local order = appendOrder(job, offer)
 	local open = #openOrders(job)
 	local text = `ORDER ADDED ({open} on the go): {offer.cargo} for {offer.customer}, ${offer.pay} · {Economy.clock(offer.time)} on its clock. {offer.stops[1].label}`
-	notice:FireClient(player, text)
+	if not quiet then
+		notice:FireClient(player, text)
+	end
 	for _, member in Crew.members(player) do
 		notice:FireClient(member, `{player.DisplayName} took another order: {offer.cargo}. Help them out!`)
 	end
@@ -3168,6 +3223,10 @@ function Jobs.fail(player: Player, reason: string)
 		end
 	end
 	local xp = if worked then Levels.jobXp(offer.tier, delivered, kills, DayNight.isNight(), false) else 0
+	local pause = Jobs.onQueuePause -- 6.12.8 review: a failed delivery pauses NEXT UP (before endJob's poke)
+	if pause then
+		pause(player, "after a failed delivery")
+	end
 	endJob(player, job, false)
 	send(player)
 	-- 4.7: a failed job (not a mission) ends the streak of good jobs.
@@ -3514,6 +3573,10 @@ local function settleOrder(player: Player, job: Job, order: Order)
 	local crew, present = crewNow(job, player)
 	payOrder(player, job, order, crew, present, false)
 	resendBoard(player)
+	local poke = Jobs.onQueuePoke -- 6.12.8: room on the run: the next queued job may join it
+	if poke then
+		poke(player)
+	end
 end
 
 -- 5.2: one order failed while others go on (its clock ran out, nothing of it is left): its pieces go back, its stops
@@ -3546,11 +3609,19 @@ local function failOrder(player: Player, job: Job, order: Order, reason: string)
 	})
 	local text = `ORDER LOST · {offer.cargo} for {offer.customer}: {reason}{if streakLost > 0 then " Your streak is over." else ""}`
 	notice:FireClient(player, text)
+	local pause = Jobs.onQueuePause -- 6.12.8 review: a lost order pauses NEXT UP
+	if pause then
+		pause(player, "after a lost order")
+	end
 	for _, member in Crew.members(player) do
 		notice:FireClient(member, text)
 	end
 	job.dirty = true
 	resendBoard(player)
+	local poke = Jobs.onQueuePoke -- 6.12.8: room on the run: the next queued job may join it
+	if poke then
+		poke(player)
+	end
 end
 
 -- The job a player is on right now: their own, the one of the crew they were invited into, or the one of the car they
@@ -4498,6 +4569,10 @@ local function freeStep(player: Player, job: Job, position: Vector3, now: number
 		job.stopsDone[job.stop] = true
 		doneHere = true
 		job.dirty = true
+		local poke = Jobs.onQueuePoke -- 6.12.8: a drop frees room: the next queued job may join the run
+		if poke and job.offer.stops[job.stop].kind == "drop" then
+			poke(player)
+		end
 	end
 	local states, withYou = stopStates(job)
 	for index in states do
@@ -4855,10 +4930,8 @@ function Jobs.start()
 	-- (5.7: Net.latest rate limits these two, Config.Robust.Limits; a burst of board requests is answered once)
 	Net.get("RequestOffers").OnServerEvent:Connect(function(player)
 		Net.latest(player, "RequestOffers", Config.Robust.Limits.RequestOffers, function()
-			local job = jobs[player]
-			if not job or runStacks(job) then -- (5.2: a run that takes more orders shows the board too)
-				sendBoard(player, boardOf(player))
-			end
+			-- (5.2: a run that takes more orders shows the board too; 6.12.8: every run: its rows queue)
+			sendBoard(player, boardOf(player))
 		end)
 	end)
 	-- 5.2: the phone's ORDERS app pins an order (its id; nil: none): the GPS follows it.
@@ -4968,5 +5041,173 @@ function Jobs.crewStatus(owner: Player): { [string]: any }?
 		mode = offer.mode, -- 5.0
 	}
 end
+
+-- 6.12.8, the NEXT UP queue (server/JobQueue.luau decides with shared/JobQueue.luau): what it needs of the board, the
+-- run and the start paths, as module fields (this module's top-level locals are at the -O0 limit: no new ones here).
+Jobs.queueApi = {
+	-- the player's run (nil: none)
+	job = function(player: Player): any
+		return jobs[player]
+	end,
+	-- the player's board as it is now (a new one when it expired) and sending it
+	boardOf = function(player: Player): any
+		return boardOf(player)
+	end,
+	sendBoard = function(player: Player, board: any)
+		sendBoard(player, board)
+	end,
+	-- the run as the queue sees it (shared/JobQueue.luau Run: 5.2's stackInfo), nil without one
+	run = function(player: Player): any
+		local job = jobs[player]
+		if not job then
+			return nil
+		end
+		local stack = stackInfo(player, job)
+		if not stack then
+			return { mode = job.offer.mode, open = #openOrders(job), free = 0, stacks = false }
+		end
+		return { mode = stack.mode, open = stack.open, free = stack.free, stacks = stack.can == true }
+	end,
+	-- the room a new run has on each transport (ADD ALL's plan): hands + bag, the bike's, your car's
+	rooms = function(player: Player): { [string]: number }
+		local _, bike = Transport.bikeOf(player)
+		local profile = PlayerData.get(player)
+		local carId = if profile then profile.car else nil
+		local car = 0
+		if profile and carId and not Transport.riding(player) then
+			car = Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId), Economy.installedGear(profile.carGear, carId))
+		end
+		return { foot = Transport.footOf(player).room, bike = if bike then bike.room else 0, car = car }
+	end,
+	-- the transport you are on (ADD ALL with no run starts with its jobs): "bike" on your bike, "car" in your own car
+	transport = function(player: Player): string?
+		if Transport.riding(player) then
+			return "bike"
+		end
+		local car = Vehicles.seatedIn(player)
+		return if car and car.owner == player and not car.lent then "car" else nil
+	end,
+	-- an offer as the queue sees it (shared/JobQueue.luau Job): locked (the level, the licence, no vehicle or bike of your
+	-- own, too big: never taken), queueable (an ordinary board job not locked), ready (nothing but a run keeps it from
+	-- starting now) and why not, in a few words (the NEXT UP row: "needs your car: CALL CAR"). No notices.
+	candidate = function(player: Player, offer: Offer): any
+		local licence = licenceTier(offer)
+		local locked = offer.level > PlayerData.level(player) or (licence ~= nil and not hasLicence(player, licence))
+		local why: string? = if offer.level > PlayerData.level(player) then `locked: level {offer.level}` elseif locked then "locked: needs its licence" else nil
+		local permanent = false
+		local lent = offer.jobType ~= nil and offer.jobType.vehicle ~= nil
+		if why then
+			-- (locked by the level or the licence: nothing else to say)
+		elseif offer.mode == "car" and not lent then
+			if needsVehicle(player, offer) then
+				permanent = not ownsCar(player)
+				why = if permanent then "needs a vehicle" else "needs your car: CALL CAR"
+			elseif not Vehicles.get(player) then
+				why = "needs your car: CALL CAR"
+			end
+		elseif offer.mode == "bike" and bikeLock(player, offer) ~= nil then
+			permanent = Transport.bikeOf(player) == nil
+			why = if permanent then "needs a bike" else "needs your bike: MY BIKE"
+		end
+		if not why and slotsShort(player, offer) ~= nil then
+			permanent = true
+			why = if offer.mode == "car" then "too big for your car" else "too many pieces for your bag"
+		end
+		local owner = Crew.ownerOf(player)
+		if not why and owner and owner ~= player then
+			why = `you're in {owner.DisplayName}'s crew`
+		end
+		local kind = { special = offer.jobType ~= nil, mission = offer.mission ~= nil, tutorial = offer.tutorial, duo = offer.duo, round = offer.round == true }
+		-- review: may it join the run now, by 5.2's own stackCheck (the new offer's look: a Roof Rack's light piece)
+		local job = jobs[player]
+		local fits: boolean? = nil
+		if job then
+			fits = (stackCheck(player, job, offer))
+		end
+		return {
+			id = offer.id,
+			mode = offer.mode,
+			pieces = offer.total,
+			pay = offer.pay,
+			stackable = isStackable(offer),
+			queueable = not locked and not permanent and require(Shared.JobQueue).queueable(kind),
+			ready = not locked and why == nil,
+			why = why,
+			locked = locked or permanent,
+			fits = fits,
+		}
+	end,
+	-- takes an offer the way AcceptJob does ("start": takeOffer, "add": addOrder; `quiet`: no notice of its own) with
+	-- its clock from now, from where the player is now (fromHere). From the board (`board`): it leaves it (Board.taken:
+	-- refilled after the run). A queued job is its snapshot (no board).
+	take = function(player: Player, board: any, offer: Offer, how: string, quiet: boolean?): boolean
+		local taken = table.clone(offer)
+		taken.distance, taken.time = fromHere(offer, playerPosition(player))
+		local job = jobs[player]
+		local ok = false
+		if how == "add" and job then
+			ok = addOrder(player, job, taken, quiet)
+		elseif how == "start" and not job then
+			-- review: the company vehicle of the job before goes back (endJob gives it 2 s), your own comes as after any
+			-- job (endJob's own way: Vehicles.spawn next to you; a car job then starts in it)
+			local car = Vehicles.get(player)
+			if car and car.lent and Jobs.returnLent(player) then
+				local profile = PlayerData.get(player)
+				if profile and profile.car then
+					Vehicles.spawn(player, true)
+				end
+			end
+			ok = takeOffer(player, taken, quiet)
+		end
+		if ok and board then
+			Jobs.queueApi.unlist(board, offer)
+		end
+		return ok
+	end,
+	-- an offer leaves the board (taken or queued): a new one of its kind comes after the run (Jobs.refillBoard)
+	unlist = function(board: any, offer: Offer)
+		local at = table.find(board.list, offer)
+		if at then
+			table.remove(board.list, at)
+		end
+		local list = board.taken or {}
+		table.insert(list, offer)
+		board.taken = list
+	end,
+	-- review: is the place of a queued job shut now (its business's hours, the paper round's)? Its name, else nil.
+	closed = function(offer: Offer): string?
+		local Deliveries = require(Shared.Deliveries)
+		local hour = DayNight.hour()
+		local place = offer.stops[1].address.name
+		if offer.round and not Deliveries.inHours(JobsConfig.Round.Hours, hour) then
+			return place
+		end
+		for _, business in JobsConfig.Businesses do
+			if business.id == offer.business and not Deliveries.open(business, hour) then
+				return place
+			end
+		end
+		return nil
+	end,
+	-- what the phone and the J board show of a queued job
+	view = function(offer: Offer): { [string]: any }
+		local first = offer.stops[1]
+		local last = offer.stops[#offer.stops]
+		return {
+			title = if offer.jobType then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo} → {offer.customer}`,
+			cargo = offer.cargo,
+			customer = offer.customer,
+			from = if first then first.address.name else nil,
+			to = if last then last.address.name else nil,
+			pay = offer.pay,
+			mode = offer.mode,
+			stars = offer.tier,
+			time = offer.time,
+			pieces = offer.total,
+			piece = offer.piece,
+			plural = offer.plural,
+		}
+	end,
+}
 
 return Jobs

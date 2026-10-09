@@ -35,6 +35,10 @@
 -- 6.12, MORE → STYLE (client/StyleApp.luau): the wardrobe; the looks are bought from the clerks at the shops. A clerk's
 --   "Style" prompt (the Style remote's ("open", tab)) opens the phone on STYLE at that tab; the ticker re-checks the
 --   shop you stand at while it shows.
+-- 6.12.8 (the owner: "I don't need to see this window, I want a list of the jobs and what I earn"): JOBS always opens
+--   BOARD, during a run too (YOUR RUN and NEXT UP on top, + ADD / + QUEUE / ADD ALL: client/PhoneApps.luau); the
+--   home's contract card still opens ORDERS, and so does YOUR RUN's DETAILS. The JobQueue remote's state (the NEXT UP
+--   queue, server/JobQueue.luau) is kept in refs.queue: JOBS' line says "Your run · 2 orders · 3 next".
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -109,7 +113,7 @@ local MAIN: { AppDef } = {
 	{ id = "tasks", name = "TASKS", sub = "Daily and weekly" },
 }
 
--- … then the six smaller tiles, two to a row (6.5's big tiles; JOBS opens BOARD, or ORDERS during a run; MORE its
+-- … then the six smaller tiles, two to a row (6.5's big tiles; 6.12.8: JOBS always opens BOARD; MORE its
 -- sub-screen) …
 local TILES: { AppDef } = {
 	{ id = "map", name = "MAP", sub = "The city, your GPS", window = true },
@@ -143,6 +147,7 @@ refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
 refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
 refs.tasks = require(script.Parent.TasksApp) -- 6.12: TASKS, the daily and weekly tasks (6.12.5: on home)
 refs.style = require(script.Parent.StyleApp) -- 6.12: STYLE, the cosmetics
+refs.queueRules = require(Shared.JobQueue) -- 6.12.8: the NEXT UP queue's words (refs.queue: the server's state)
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
 refs.bars = {} -- 6.12.5: the MAIN tiles' progress bars by app id (MISSIONS, TASKS: fillMain)
@@ -710,8 +715,7 @@ local function ordersApp(list: Instance)
 	local pack = button(list, `BAG · {if carried then rich(string.sub(carried, 6)) else "EMPTY"}`, "quiet", n + 1, openBag)
 	pack.RichText = true
 	pack.TextTruncate = Enum.TextTruncate.AtEnd
-	local stack = job.stack
-	button(list, if type(stack) == "table" and stack.can == true then "OPEN BOARD · + ADD ORDER" else "OPEN BOARD", "quiet", n + 2, openBoard)
+	button(list, "OPEN BOARD · ADD MORE", "quiet", n + 2, openBoard) -- (6.12.8: + ADD to the run, or + QUEUE)
 	-- 5.5: GIVE UP (the MENU's), quiet and red at the bottom; a second press within 4 s gives the delivery up.
 	local giveUp: any = nil
 	giveUp = button(list, "GIVE UP THIS DELIVERY", "quiet", n + 3, function()
@@ -1006,13 +1010,13 @@ local function launch(id: string, from: GuiObject?)
 		refs.lastTile = from
 		refs.lastPage = refs.page
 	end
-	-- 6.5: MORE turns the home to its sub-screen; JOBS is the board, or ORDERS during a run; BAG & ITEMS opens on the
-	-- tab that fits (BAG during a run).
+	-- 6.5: MORE turns the home to its sub-screen; BAG & ITEMS opens on the tab that fits (BAG during a run). 6.12.8:
+	-- JOBS is always the board (YOUR RUN and NEXT UP on top during a run; its DETAILS opens ORDERS).
 	if id == "more" then
 		refs.showPage("more", true)
 		return
 	elseif id == "jobs" then
-		id = if job then "orders" else "board"
+		id = "board"
 	elseif id == "bag" then
 		refs.apps.bagTab = nil
 	end
@@ -1661,13 +1665,13 @@ refreshBadges = function()
 			end
 		end
 	end
-	-- 6.5: JOBS counts the open orders during a run, the new runs off duty; its subtitle says which it opens.
-	set("jobs", if job then open else boardNew)
+	-- 6.5: JOBS counts the open orders during a run, the new runs off duty; its subtitle says which it opens. 6.12.8:
+	-- and the jobs waiting in NEXT UP ("Your run · 2 orders · 3 next").
+	local queued = if type(refs.queue) == "table" and type(refs.queue.list) == "table" then #refs.queue.list else 0
+	set("jobs", if job then open elseif queued > 0 then queued else boardNew)
 	local jobsSub = refs.subs.jobs
 	if jobsSub then
-		jobsSub.Text = if job then (if open > 1 then `Your run · {open} orders` else "Your run · orders")
-			elseif boardNew > 0 then `{boardNew} new {if boardNew == 1 then "run" else "runs"} on the board`
-			else "Take a delivery"
+		jobsSub.Text = refs.queueRules.jobsLine(if job then math.max(1, open) else 0, queued, boardNew, type(refs.queue) == "table" and refs.queue.paused == true)
 	end
 	set("shop", 0, if affordable() then "$" else nil)
 	local ready = refs.tasks.ready() -- 6.12: the task rewards waiting (TASKS and the dot; 6.12.5: TASKS is on home)
@@ -1744,6 +1748,8 @@ local function startTicker()
 				if app == "orders" then
 					OrdersUi.tick() -- 5.2: every order's clock
 					if refs.route then refs.route.update() end
+				elseif app == "board" then
+					OrdersUi.tick() -- 6.12.8: YOUR RUN's clocks
 				elseif app == "tasks" then
 					refs.tasks.tick() -- 6.12: the time until the tasks are new
 				elseif app == "style" then
@@ -2187,6 +2193,9 @@ function Phone.start()
 		board = function(): ({ any }?, any, number?)
 			return refs.offers, refs.offersInfo, lastRefreshAt
 		end,
+		queue = function(): any
+			return refs.queue -- 6.12.8
+		end,
 		go = function(id: string)
 			setApp(id)
 		end,
@@ -2234,10 +2243,33 @@ function Phone.start()
 	Net.get("Job").OnClientEvent:Connect(function(payload)
 		job = if type(payload) == "table" then payload else nil
 		refreshBadges()
-		if isOpen and (app == "orders" or app == "bag") then -- (6.5: BAG & ITEMS shows what you carry)
+		-- 6.12.8: BOARD's YOUR RUN is drawn again when the run's orders or its next stop change (not every payload).
+		local runKey = ""
+		if job then
+			runKey = tostring(job.stopLabel)
+			for _, entry in (if type(job.orders) == "table" then job.orders else {}) :: { any } do
+				if type(entry) == "table" and entry.state == "open" then
+					runKey ..= `|{entry.id}:{entry.pay}`
+				end
+			end
+		end
+		local runChanged = runKey ~= refs.runKey
+		refs.runKey = runKey
+		if isOpen and (app == "orders" or app == "bag" or (app == "board" and runChanged)) then -- (6.5: BAG & ITEMS shows what you carry)
 			renderApp()
 		end
 	end)
+	-- 6.12.8: the NEXT UP queue (server/JobQueue.luau): the JOBS tile's line, BOARD's NEXT UP while it shows.
+	Net.get("JobQueue").OnClientEvent:Connect(function(action, data)
+		if action == "state" and type(data) == "table" then
+			refs.queue = data
+			refreshBadges()
+			if isOpen and app == "board" then
+				renderApp()
+			end
+		end
+	end)
+	Net.get("JobQueue"):FireServer("open")
 	Net.get("Offers").OnClientEvent:Connect(onOffers)
 	-- 5.0: the tutorial's "phone" (server/Tutorial.luau: Marge gives it). Only the name is shared; it may not come.
 	Net.get("Tutorial").OnClientEvent:Connect(function(phase, data)
