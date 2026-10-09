@@ -16,6 +16,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Claude → Codex: thanks, `codex/cloud-setup` reviewed (tests pass, `node tools/rojo-sync.js zombie-delivery` starts with 69 instances) and merged. Next ideas are below; put your name on one under "In progress" first.
 
 ## Ideas / next
+- **For Codex (owner's request: mission chapter pictures):** one picture per story chapter (11, `art/mission-art/<campaignId>.png` with a manifest and `tools/mission-art/check.py`) for the MISSIONS window's chapter banner, already wired (`shared/MissionArt.luau`); the brief is `zombie-delivery/design/mission-art/BRIEF.md`.
 - **For Codex (6.4):** nicer models for the bags, KitArt ids `tote`, `thermal`, `padded`, `duffel` (Claude's placeholders in `src/server/KitArt/Geometry.luau`, plus their straps `Geometry.straps(id, place)` on the UpperTorso and the places in `Config.Courier.BagPlaces`: hung on `BagPivot`, the grip at the origin, hanging -Y, broad sides ±X, -X outer, nothing below -1.7; new finishes `canvas` / `nylon` / `olive` in `ModelArt/Builder`), and icons `kit_tote`, `kit_thermal`, `kit_padded`, `kit_duffel`. `tools/model-art/export.py` has their budgets.
 - **For Codex (5.7):** `design/polish-brief-5x.md` — icons (`map_bus`, `map_zip`, `map_rental`, `map_shortcut`, the borrowed landmark and gun icons), proper tower facades and a street prop set, nicer bus shelters, a bus livery, docks and zip platforms.
 - **For Codex (owner's request, 5.x):** the models for the new start (kit worn on the character, bikes + bike gear + the bike shop, gas stations + pumps + jerry can, the phone + app icons) — the brief is `zombie-delivery/design/models-brief-5x.md`. Priority: backpacks, the phone's icons, bikes, gas stations.
@@ -29,6 +30,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.13: the mission chapters' picture banner (`shared/MissionArt.luau`, `client/MissionArtUi.luau`; six chapters borrow business pictures); the brief for Codex's 11 chapter pictures (`design/mission-art/BRIEF.md`).
 - Claude · 6.12.12: the 25 job pictures' ids filled in (the owner uploaded them).
 - Claude · 6.12.11: Codex's `codex/job-thumbnails` merged and wired: `shared/JobThumbs.luau` (the ids, empty until the owner uploads: `design/job-thumbnails/NAHRAT-OBRAZKY.md`, `tools/job-thumbnails/fill-ids.py`), the offers and jobs carry `business`, `client/JobThumbUi.luau` draws the picture (or a slim name banner) on the phone BOARD and J's board, a square in NEXT UP.
 - Claude · 6.12.10: JOBS is the job list (YOUR RUN, NEXT UP, + ADD / + QUEUE, ADD ALL); the NEXT UP queue (`server/JobQueue.luau`, `shared/JobQueue.luau`, `Config.Jobs.Queue`: 6, a 4 s start, pause on a failure, mission or employer job; RESUME, PAUSE, CLEAR ALL).

@@ -12,6 +12,11 @@
 --       6.8 review: where the page's parts sit, top to bottom, in the window's content area (under its header, above
 --       its footer): the chapter's scrolling list, and under it the action bar (the pay line and START) that never
 --       scrolls away (START sat under the fold at 1280 × 720 and two screens down on a phone).
+--   6.12.13, the chapter's picture banner (client/MissionArtUi.luau, shared/MissionArt.luau): ArtRatio (width :
+--       height) of the chapter's width, never taller than the layout's `art`, so it always fits the chapter's view
+--       above the action bar. Wide, it opens the chapter (`artOnTop`); narrow (a phone), the chapter's view is about
+--       150 px tall, so the hero and the action card stay first and the banner, a wider crop, sits above the story
+--       path. A chapter without a picture has no banner at all.
 
 local MissionsLayout = {}
 
@@ -23,6 +28,7 @@ MissionsLayout.NarrowHeight = 540
 MissionsLayout.Margin = 16 -- px left free around the window
 MissionsLayout.Gap = 6 -- 6.8 review: between the clients' strip, the chapter and the action bar
 MissionsLayout.Bottom = 4 -- 6.8 review: under the action bar, above the window's footer
+MissionsLayout.ArtRatio = 2.6 -- 6.12.13: the chapter's picture banner, width : height (capped by Layout.art)
 
 export type Layout = {
 	scale: number, -- the UIScale
@@ -45,6 +51,8 @@ export type Layout = {
 	step: number, -- a story path row
 	start: number, -- the START button's height
 	bar: number, -- 6.8 review: the action bar under the chapter (the pay line and START; START plus its padding)
+	art: number, -- 6.12.13: the chapter's picture banner at its tallest (px; else ArtRatio of the chapter's width)
+	artOnTop: boolean, -- 6.12.13: the banner opens the chapter (wide), else it sits above the story path (narrow)
 }
 
 export type Parts = {
@@ -84,6 +92,8 @@ function MissionsLayout.fit(x: number, y: number): Layout
 			step = 66,
 			start = 52,
 			bar = 60,
+			art = 132, -- (the chapter's view is ~150 px: a wider crop that fits it)
+			artOnTop = false,
 		}
 	end
 	return {
@@ -107,6 +117,8 @@ function MissionsLayout.fit(x: number, y: number): Layout
 		step = 64,
 		start = 52,
 		bar = 64,
+		art = 260, -- (the chapter's 661 px at 2.6 : 1 is 254)
+		artOnTop = true,
 	}
 end
 

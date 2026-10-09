@@ -2,8 +2,12 @@
 -- the shared data against recorded instances (tools/phone-ui/missions_mock.luau): the clients' cards, the chosen
 -- client's chapter (the hero, the action card, the story path, the finale's reward), START, the locks, a replay, the
 -- DUO chapter, a phone's narrow layout, the banner and the cleared card. Behaviour, not looks: Studio shows those.
+-- 6.12.13: the chapter's picture banner (client/MissionArtUi.luau, shared/MissionArt.luau): a fallback business
+-- picture, a chapter's own, a dimmed shut one, none for a chapter without one, on a phone above the story path.
 local M = require("./missions_mock")
 local Missions = require("./Missions")
+local MissionArt = require("./MissionArt")
+local JobThumbs = require("./JobThumbs")
 local Portrait = require("./Portrait")
 local MissionsUi = require("./MissionsUi")
 
@@ -105,6 +109,26 @@ check("the story's place: Marge's chapter is chosen, 3 / 6 done", named(clients,
 check("a shut chapter says why: Ellie waits for Marge's chapter", has(named(clients, "clinic"), "🔒 Finish Marge's chapter first"))
 check("… the DUO chapter says so", has(named(clients, "duo"), "🤝 DUO"))
 check("the hero: Marge, her role and place, the pitch", named(chapter, "Hero") ~= nil and has(named(chapter, "Hero"), "Marge") and has(named(chapter, "Hero"), "Dispatcher  ·  Dead End Dispatch"))
+-- 6.12.13: First Shift has no picture yet (Dead End Dispatch has no business picture): nothing is added.
+local function orders(): { [number]: number }
+	local seen = {}
+	for _, child in chapter:GetChildren() do
+		if child:IsA("GuiObject") then
+			seen[child.LayoutOrder] = (seen[child.LayoutOrder] or 0) + 1
+		end
+	end
+	return seen
+end
+local function distinct(): boolean
+	for _, count in orders() do
+		if count > 1 then
+			return false
+		end
+	end
+	return true
+end
+check("no picture for First Shift yet: no banner, the chapter as before (the hero first)", named(chapter, "ChapterArt") == nil and named(chapter, "Picture") == nil
+	and orders()[0] == nil and orders()[1] == 1 and distinct())
 local action = named(chapter, "Action")
 check("the action card shows the next mission: Dead Letter Office, its briefing, FIRST TIME pay", has(action, "▶ NEXT · MISSION 4 OF 6") and has(action, "Dead Letter Office") and has(action, "Timmy's uncle Percy") and has(action, "FIRST TIME"))
 -- 6.8 review: START and the pay line in the action bar under the chapter (never scrolled away).
@@ -179,17 +203,39 @@ M.flush()
 -- 6.8 review: a client chosen with a gamepad keeps the selection on its (rebuilt) card.
 local duoCard = named(clients, "duo")
 M.focus = duoCard
+MissionArt.Images.duo = "rbxassetid://4242" -- (6.12.13: as if the chapter's own picture were uploaded)
 duoCard.Activated:Fire()
 M.flush()
+local duoArt = named(chapter, "ChapterArt")
+check("a chapter's own picture (uploaded): its banner, the twins on the label", duoArt ~= nil and named(duoArt, "Picture").Image == "rbxassetid://4242"
+	and duoArt:GetAttribute("Art") == "chapter" and has(duoArt, "🤝  PARTNERS IN CRIME") and has(duoArt, "Rosa & Rico  ·  Survivor Camp"))
+MissionArt.Images.duo = ""
 action = named(chapter, "Action")
 check("the twins: both names, NEEDS A PARTNER, START waits for a partner", has(named(chapter, "Hero"), "Rosa & Rico") and has(named(chapter, "Hero"), "NEEDS A PARTNER") and has(bar, "NEEDS A PARTNER") and button(bar, "🔎 FIND CREW") ~= nil)
 check("… the gamepad's selection back on the twins' card", duoCard.Parent == nil and M.focus ~= nil and M.focus.Name == "duo" and M.focus.Parent == clients)
 named(clients, "clinic").Activated:Fire()
 M.flush()
 check("Ellie's chapter opens after Marge's: NEW, her first mission next", has(named(clients, "clinic"), "NEW") and has(named(chapter, "Action"), "House Call"))
+-- 6.12.13: Code Red opens with the City Clinic's picture (the job list's, until the chapter's own is uploaded).
+local art = named(chapter, "ChapterArt")
+local picture = art and named(art, "Picture")
+check("Code Red opens with a picture banner: the City Clinic's, cropped, above the hero", art ~= nil and picture ~= nil and picture.Image == JobThumbs.Images.clinic
+	and picture.Image ~= "" and picture.ScaleType.Name == "Crop" and picture.ImageTransparency == 0 and art:GetAttribute("Art") == "clinic"
+	and art.LayoutOrder < named(chapter, "Hero").LayoutOrder and distinct())
+check("… the chapter's and the client's names on a dark label, a dark gradient under it", has(art, "🏥  CODE RED") and has(art, "Doctor Ellie  ·  City Clinic")
+	and named(art, "Label").BackgroundTransparency < 0.5 and named(art, "Rule") ~= nil and named(art, "Shade"):FindFirstChildOfClass("UIGradient") ~= nil)
+local artWide = art.AbsoluteSize.X
+check("… about 2.6 : 1 across the chapter, never over the layout's art", math.abs(artWide / art.Size.Y.Offset - 2.6) < 0.05 and art.Size.Y.Offset <= 260, `{artWide} × {art.Size.Y.Offset}`)
+check("… START still in view under it", startInView())
+named(clients, "market").Activated:Fire()
+M.flush()
+local shutArt = named(chapter, "ChapterArt")
+check("a shut chapter's picture is dimmed like its portrait (Empty Shelves: FreshMart)", shutArt ~= nil and shutArt:GetAttribute("Art") == "supermarket"
+	and named(shutArt, "Picture").ImageTransparency > 0 and has(named(chapter, "Action"), "IS STILL SHUT"))
 named(clients, "exodus").Activated:Fire()
 M.flush()
 check("a far chapter: shut, says what to do and GO TO", has(named(chapter, "Action"), "IS STILL SHUT") and has(bar, "IS STILL SHUT") and button(bar, "GO TO DOCTOR ELLIE ▶") ~= nil)
+check("… no picture for Last Convoy yet: no banner", named(chapter, "ChapterArt") == nil and distinct())
 M.focus = button(bar, "GO TO DOCTOR ELLIE ▶")
 M.focus.Activated:Fire()
 M.flush()
@@ -206,11 +252,17 @@ check("… the slim chrome (no subtitle), still every card and the chapter", not
 end) == #Missions.Campaigns and named(chapter, "Hero") ~= nil)
 check("… START in view on an iPhone SE sideways (6.8 review)", startInView())
 check("… a small hero portrait (6.8 review)", named(named(chapter, "Hero"), "Portrait").Size.X.Offset <= 80)
+-- 6.12.13: on the phone the hero and the action card stay first; Code Red's picture sits above the story path, a
+-- wider crop that fits the chapter's view.
+local phoneArt = named(chapter, "ChapterArt")
+check("… Code Red's picture above the story path, short enough for the chapter's view", phoneArt ~= nil and phoneArt.LayoutOrder > named(chapter, "Action").LayoutOrder
+	and phoneArt.LayoutOrder < named(chapter, "clinic_1").LayoutOrder and phoneArt.Size.Y.Offset <= 132 and distinct(), phoneArt and phoneArt.Size.Y.Offset)
 M.width, M.height = 1280, 684
 M.workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Fire()
 M.flush()
 check("back on a monitor: the column again", list.FillDirection == M.Enum.FillDirection.Vertical and named(M.gui, "Column").Visible)
 check("… START in view at 1280 × 720 (6.8 review)", startInView())
+check("… the picture opens the chapter again", named(chapter, "ChapterArt") ~= nil and named(chapter, "ChapterArt").LayoutOrder < named(chapter, "Hero").LayoutOrder)
 
 -- The other tabs still work.
 named(window, "challengesTab").Activated:Fire()

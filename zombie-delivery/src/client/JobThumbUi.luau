@@ -11,6 +11,8 @@
 --       job without a picture (a mission, an older server's row).
 --   JobThumbUi.square(parent, info, size, props?)     a small square of the picture (cropped) for a NEXT UP row; nil
 --       while its id is empty or for a job without one (the row stays as it was).
+--   JobThumbUi.keepRatio(frame, ratio, most?)          keeps a picture frame's height at its width / ratio (6.12.13:
+--       never over `most` px; the MISSIONS window's chapter banner, client/MissionArtUi.luau, uses it too).
 -- Presentation only: a picture grants nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,9 +29,10 @@ JobThumbUi.RATIO = 2.4 -- the strip's width : height
 JobThumbUi.BANNER = 26 -- the fallback banner's height (px)
 JobThumbUi.GUESS = 128 -- the strip's height until its card's width is known (a phone card ~300 px wide)
 
--- Keeps `frame`'s height at its width / ratio. Its height is pure offset, so AbsoluteSize.Y / Size.Y.Offset is the
--- scale of every UIScale above it (the phone's popup, J's window): the width in the frame's own px is X / that.
-local function keepRatio(frame: GuiObject, ratio: number)
+-- Keeps `frame`'s height at its width / ratio (never over `most` px when given). Its height is pure offset, so
+-- AbsoluteSize.Y / Size.Y.Offset is the scale of every UIScale above it (the phone's popup, J's window, the MISSIONS
+-- window): the width in the frame's own px is X / that.
+function JobThumbUi.keepRatio(frame: GuiObject, ratio: number, most: number?)
 	local function fit()
 		local size = frame.AbsoluteSize
 		local offset = frame.Size.Y.Offset
@@ -37,6 +40,9 @@ local function keepRatio(frame: GuiObject, ratio: number)
 			return
 		end
 		local want = math.max(24, math.floor(size.X * offset / size.Y / ratio + 0.5))
+		if most then
+			want = math.min(want, math.max(24, most))
+		end
 		if math.abs(want - offset) >= 1 then
 			frame.Size = UDim2.new(frame.Size.X.Scale, frame.Size.X.Offset, 0, want)
 		end
@@ -111,7 +117,7 @@ function JobThumbUi.strip(parent: Instance, info: any, order: number, height: nu
 	})
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, tag)
 	if not height then
-		keepRatio(strip, JobThumbUi.RATIO)
+		JobThumbUi.keepRatio(strip, JobThumbUi.RATIO)
 	end
 	return strip
 end
