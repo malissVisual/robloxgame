@@ -136,6 +136,10 @@ Hud.onCareer = CareerUi.toggle
 -- 5.0: the phone is one more window (it closes the others); its apps open the board, the career, the map.
 Phone.onOpen = Hud.closeWindows
 Phone.onBoard = DispatchUi.open
+DispatchUi.onDetails = function() -- 6.12.8: YOUR RUN's DETAILS on J's board: the phone's ORDERS, as before
+	DispatchUi.close()
+	Phone.open("orders")
+end
 Phone.onCareer = CareerUi.open
 -- 5.5: the HUD MENU's actions are phone apps (their windows open; the phone closes first), and MENU opens the phone.
 Phone.onMissions = function() -- 6.8: MORE → MISSIONS always opens it (on the chapter you are at)

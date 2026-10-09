@@ -18,6 +18,9 @@
 -- client/TutorialUi.luau reads it (this module does not change her tutorial, it only listens).
 -- Hud builds it (Objective.build), feeds it ten times a second (Objective.update: the job, the state, the distance) and
 -- shows the card's `action` as its pill at the lower centre.
+-- 6.12.8, the NEXT UP queue (server/JobQueue.luau, the JobQueue remote): ▼ DETAILS adds "+3 NEXT UP"; with no job and
+-- jobs waiting the idle card says what comes next and why it waits ("Next up: Crates → Cid" · "needs your car: CALL
+-- CAR"), never held back; a click opens the board.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +47,8 @@ local lastResult: { success: boolean, total: number?, at: number }? = nil
 local current: Goal.Card? = nil
 local shown = "" -- what the card shows (it redraws only when this changes)
 local hadJob = false
+local queue: { any } = {} -- 6.12.8: the NEXT UP queue's jobs (the JobQueue remote's state)
+local queuePaused = false -- (review: PAUSED, RESUME in JOBS)
 
 -- The depot's job board (Config.Goal.BoardSpot from the depot's centre, Map.Shops.depot), on the walk level.
 function Objective.boardSpot(): Vector3
@@ -171,6 +176,9 @@ local function detailsLine(job: any): string
 	if type(job.orders) == "table" and #job.orders > 1 then
 		table.insert(parts, `{#job.orders} ORDERS`)
 	end
+	if #queue > 0 then
+		table.insert(parts, `+{#queue} NEXT UP{if queuePaused then " (PAUSED)" else ""}`) -- 6.12.8
+	end
 	return table.concat(parts, " · ")
 end
 
@@ -216,6 +224,16 @@ function Objective.update(job: any, state: any, distance: number?, hidden: boole
 		touch = Ui.touchLayout(),
 		seat = seatNow(character),
 	})
+	-- 6.12.8: no job but jobs waiting in NEXT UP: what comes next and why it waits (a click opens the board).
+	local head = queue[1]
+	if not hasJob and (card.kind == "nojob" or card.kind == "first") and type(head) == "table" then
+		card.title = `Next up: {head.title or head.cargo or "your next job"}`
+		card.place = if queuePaused then "Paused · RESUME in JOBS"
+			elseif head.starting == true then "Starts in a few seconds · JOBS to pause"
+			elseif type(head.why) == "string" and head.why ~= "" then `Waits: {head.why}`
+			else "Starting…"
+		card.kind = "queued"
+	end
 	current = card
 	-- 6.12.1: no "Take a delivery job" for a courier who knows the way (Config.Goal.HintJobs deliveries done)
 	quiet = not hasJob and card.kind == "nojob" and (tonumber(state.deliveries) or 0) >= G.HintJobs
@@ -271,6 +289,19 @@ function Objective.start()
 	end)
 	if not ok then
 		warn(`[Objective] no Tutorial remote: {err}`)
+	end
+	-- 6.12.8: the NEXT UP queue (the phone and the J board ask for it; this only listens).
+	local queued, why = pcall(function()
+		Net.get("JobQueue").OnClientEvent:Connect(function(action: any, data: any)
+			if action == "state" and type(data) == "table" and type(data.list) == "table" then
+				queue = data.list
+				queuePaused = data.paused == true
+				shown = ""
+			end
+		end)
+	end)
+	if not queued then
+		warn(`[Objective] no JobQueue remote: {why}`)
 	end
 end
 

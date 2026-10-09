@@ -6,11 +6,21 @@
 -- two columns) splits the board's cards in two:
 --   BOARD    the job board in the phone: the offers the phone keeps from the
 --            Offers remote under ON FOOT / BIKE / one section per danger level (★ … ★★★★, the server's tierName), two
---            columns of cards (the cargo → the customer, the pickup → the address, the distance, the time, the pay);
---            ACCEPT and + ADD ORDER fire AcceptJob with the offer's index like the Dispatch board
+--            columns of cards (the cargo → the customer and its pay, big; the pickup → the address, the distance, the
+--            time); ACCEPT and + ADD fire AcceptJob with the offer's index like the Dispatch board
 --            (client/DispatchUi.luau); a locked offer says why (its level, licence, slots or vehicle). The board's
 --            footNote (the shops near you are shut) heads ON FOOT. FULL BOARD opens the Dispatch board. No offers
 --            yet, or old ones: it asks for the board (RequestOffers, at most every 3 s).
+--            6.12.8 (the owner: "I don't need to see this window. I want a list where I have the jobs and how much I
+--            earn, and add even all of them"): JOBS always opens it, during a run too. On top, while you have orders
+--            on the go, YOUR RUN (every open order in one line: what, from → to, its pay and its clock; the run's
+--            pay; the next stop; DETAILS opens ORDERS), then NEXT UP (the queued jobs in order: what, where, pay, ✕
+--            to drop one; the next one says why it waits: shared/JobQueue.luau, the JobQueue remote). Every row has
+--            Review: NEXT UP's PAUSE / RESUME (it pauses itself after a failed delivery, a lost order, a mission)
+--            and CLEAR ALL; the next one says "Starts in a few seconds" while its idle start waits. Every row has
+--            one add button during a run: + ADD (it joins the run now: AcceptJob) or + QUEUE (the run is full or it
+--            can't stack: JobQueue "queue"); ADD ALL · $total over the rows adds every job it can (JobQueue
+--            "addAll": into the run up to its room and max, the rest into the queue).
 --   BAG      your bag (client/BagUi.luau's render) in the phone.
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
@@ -39,6 +49,7 @@ local Theme = require(script.Parent.Theme)
 local BagUi = require(script.Parent.BagUi)
 local OrdersUi = require(script.Parent.OrdersUi)
 local MapView = require(script.Parent.MapView)
+local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN, NEXT UP's words
 
 local K = Theme.Contract
 local PhoneApps = {}
@@ -49,6 +60,7 @@ export type Host = {
 	state: () -> any,
 	-- the last offers the server sent (nil before any), their info (footNote ...), when the next ones come
 	board: () -> ({ any }?, any, number?),
+	queue: () -> any, -- 6.12.8: the NEXT UP queue the server sent ({ list, max }), nil before any
 	go: (id: string) -> (),
 	close: () -> (),
 	redraw: () -> (),
@@ -120,11 +132,6 @@ local function ask()
 	Net.get("RequestOffers"):FireServer()
 end
 
--- 5.2: a run that takes more orders (+ ADD ORDER).
-local function stacking(job: any): boolean
-	return type(job) == "table" and type(job.stack) == "table" and job.stack.can == true
-end
-
 -- A locked offer's button and why (nil, nil: it is open). The server refuses a locked one anyway.
 local function lockOf(offer: any): (string?, string?)
 	local licence = if offer.locked == true and offer.lockReason == "licence" and type(offer.licence) == "table" then offer.licence else nil
@@ -142,17 +149,36 @@ local function lockOf(offer: any): (string?, string?)
 	return nil, nil
 end
 
--- One offer as a card: the cargo → the customer and the pay, the pickup → the address, chips (how it travels or its
--- stars, the distance, the time, its trade-off), the action.
+-- One offer as a card: the cargo → the customer and the pay (6.12.8: big, the first thing you read), the pickup → the
+-- address, chips (how it travels or its stars, the distance, the time, its trade-off), the one action: off duty
+-- ACCEPT; on a run + ADD (it joins the run), + QUEUE (it waits in NEXT UP) or why neither.
 local function offerCard(parent: Instance, offer: any, order: number, look: OrdersUi.Kit, host: Host)
 	local label, why = lockOf(offer)
 	local job = host.job()
-	local b = look.block(parent, order, label == nil)
+	local onDuty = type(job) == "table"
+	local waits = onDuty and offer.queue == true -- (6.12.8: a job waiting for your car or bike may still queue)
+	local open = label == nil or waits
+	local b = look.block(parent, order, open)
 	local title = if type(offer.jobType) == "table" then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo or "Cargo"} → {offer.customer or "a customer"}`
-	local _, left, right = look.row2(b, string.upper(title), Ui.money(tonumber(offer.pay) or 0), 1, true)
-	left.Font = Theme.HeadingFont
-	left.TextColor3 = if label then K.secondary else K.text
-	right.TextColor3 = if label then K.secondary else K.text
+	local payText = Ui.money(tonumber(offer.pay) or 0)
+	local payW = look.width(payText, 18, Theme.HeadingFont)
+	local head = Ui.make("Frame", { Name = "TitleRow", Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
+	look.text(head, payText, UDim2.new(0, payW, 1, 0), {
+		Name = "Pay",
+		Position = UDim2.fromScale(1, 0),
+		AnchorPoint = Vector2.new(1, 0),
+		Font = Theme.HeadingFont,
+		TextSize = 18,
+		TextColor3 = if open then K.text else K.secondary,
+		TextWrapped = false,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	})
+	look.text(head, string.upper(title), UDim2.new(1, -(payW + 8), 1, 0), {
+		Font = Theme.HeadingFont,
+		TextColor3 = if open then K.text else K.secondary,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
 	look.meta(b, `{offer.first or "Pick up"} → {offer.address or "?"}{if type(offer.district) == "string" and offer.district ~= "" then `, {offer.district}` else ""}`, 2)
 	local chips = look.chipRow(b, 3)
 	look.chip(chips, if offer.mode == "foot" then "🚶 On foot" elseif offer.mode == "bike" then "🚲 Bike" else string.rep("★", math.max(1, tonumber(offer.stars) or 1)))
@@ -168,54 +194,167 @@ local function offerCard(parent: Instance, offer: any, order: number, look: Orde
 	if night and night > 1 then
 		look.chip(chips, string.format("Night ×%.1f", night))
 	end
-	local function take()
-		Net.get("AcceptJob"):FireServer(offer.index)
-		-- It leaves the board on the server once taken: not shown again before the board comes back.
+	-- It leaves the board on the server once taken or queued: not shown again before the board comes back.
+	local function unlist()
 		local list = host.board()
 		local spot = if list then table.find(list, offer) else nil
 		if list and spot then
 			table.remove(list, spot)
 		end
-		if stacking(job) then
+	end
+	local function take()
+		Net.get("AcceptJob"):FireServer(offer.index)
+		unlist()
+		if onDuty then
 			host.redraw()
 		else
 			host.go("orders")
 		end
 	end
-	if label then
+	if label and not waits then
 		look.button(b, label, "off", 4, function()
 			host.notify(why or "Not this one yet.")
 		end)
-	elseif stacking(job) then
-		if offer.addOrder == true then
-			look.button(b, "+ ADD ORDER", "main", 4, take)
-		else
-			look.button(b, if type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN", "off", 4, function()
-				host.notify(if type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first.")
-			end)
-		end
-	else
+	elseif not onDuty then
 		look.button(b, "ACCEPT", "main", 4, take)
+	elseif offer.addOrder == true then
+		look.button(b, "+ ADD", "main", 4, take)
+	elseif waits then
+		look.button(b, "+ QUEUE", "main", 4, function()
+			Net.get("JobQueue"):FireServer("queue", offer.index)
+			unlist()
+			host.redraw()
+		end)
+	else
+		local button = if type(offer.queueButton) == "string" then offer.queueButton elseif type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN"
+		local text = if type(offer.queueText) == "string" then offer.queueText elseif type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first."
+		look.button(b, button, "off", 4, function()
+			host.notify(text)
+		end)
 	end
 end
 
-function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
+-- 6.12.8, YOUR RUN: the open orders of your run, one line each (what, from → to · its pay and its clock, ticked by
+-- OrdersUi.tick), the run's pay, the next stop, DETAILS (the ORDERS app). Returns the last layout order used.
+function PhoneApps.runCard(list: Instance, look: OrdersUi.Kit, host: Host, order: number): number
 	local job = host.job()
-	if job and not stacking(job) then
-		look.emptyState(list, "📦", "You are on a delivery", "Finish it, or give it up in ORDERS, and the board is yours again.", 1)
-		look.button(list, "OPEN ORDERS", "main", 2, function()
-			host.go("orders")
-		end)
-		look.button(list, fullBoardLabel(), "quiet", 3, host.fullBoard)
-		return
+	if type(job) ~= "table" then
+		return order
 	end
+	local lines, total, nextStop = JobQueue.runLines(job)
+	local b = look.block(list, order + 1, true)
+	b.Parent.Name = "YourRun"
+	local head = Ui.make("Frame", { Name = "Head", Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
+	local count = #lines
+	local cap = look.caps(head, `Your run · {count} {if count == 1 then "order" else "orders"} · {Ui.money(total)}`, 0, K.red)
+	cap.Size = UDim2.new(1, -96, 1, 0)
+	cap.TextSize = 11
+	look.pill(head, "Details", function()
+		host.go("orders")
+	end)
+	for index, line in lines do
+		local route = if line.route ~= "" then ` · {line.route}` else ""
+		local prefix = `{Ui.money(line.pay)} · `
+		local _, left, right = look.row2(b, `{line.icon}  {line.title}{route}`, `{prefix}00:00`, 1 + index, true)
+		left.Name = "RunLine"
+		left.TextSize = 13
+		left.Font = if line.focused then Theme.HeadingFont else Theme.Font
+		right.TextSize = 13
+		if line.endsAt then
+			OrdersUi.track(right, line.endsAt, prefix)
+		else
+			right.Text = Ui.money(line.pay)
+		end
+	end
+	if nextStop then
+		look.meta(b, `Next stop: {nextStop}`, 2 + count, K.text).Name = "NextStop"
+	end
+	return order + 1
+end
+
+-- 6.12.8, NEXT UP: the queued jobs in order (what, from → to, pay, ✕ drops one); the next one says why it waits.
+-- Returns the last layout order used.
+function PhoneApps.nextUp(list: Instance, look: OrdersUi.Kit, host: Host, order: number): number
+	local queue = host.queue()
+	local entries = if type(queue) == "table" and type(queue.list) == "table" then queue.list else {}
+	if #entries == 0 then
+		return order
+	end
+	local max = tonumber(queue.max) or JobQueue.max()
+	local paused = queue.paused == true
+	look.section(list, `Next up · {#entries} / {max}`, order + 1)
+	local b = look.block(list, order + 2, paused)
+	b.Parent.Name = "NextUp"
+	-- review: PAUSED (after a failed delivery, a lost order, a mission: RESUME) or PAUSE, and CLEAR ALL.
+	local controls = Ui.make("Frame", { Name = "Controls", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 0 }, b)
+	local status = look.caps(controls, if paused then JobQueue.pausedLine(queue.pausedWhy) else "▶ They start on their own", 0, if paused then K.red else K.secondary)
+	status.Name = "QueueState"
+	status.Size = UDim2.new(1, -190, 1, 0)
+	status.TextSize = 11
+	status.TextWrapped = true
+	local clear = look.pill(controls, "Clear all", function()
+		Net.get("JobQueue"):FireServer("clear")
+	end)
+	clear.Name = "ClearAll"
+	local toggle = look.pill(controls, if paused then "Resume" else "Pause", function()
+		Net.get("JobQueue"):FireServer(if paused then "resume" else "pause")
+	end, paused)
+	toggle.Name = if paused then "Resume" else "Pause"
+	toggle.Position = UDim2.new(1, -(look.width("CLEAR ALL", 11, Theme.HeadingFont) + 28), 0.5, 0)
+	for index, entry in entries do
+		if type(entry) ~= "table" then
+			continue
+		end
+		local row = Ui.make("Frame", { Name = "NextRow", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = index }, b)
+		Ui.list(row, true, 2)
+		local line = Ui.make("Frame", { Name = "Line", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 1 }, row)
+		local payText = Ui.money(tonumber(entry.pay) or 0)
+		local payW = look.width(payText, 15, Theme.HeadingFont)
+		look.text(line, `{index}  {JobQueue.icon(entry.mode, entry.stars)}  {entry.title or entry.cargo or "Job"}`, UDim2.new(1, -(payW + 64), 0, 18), {
+			Font = Theme.HeadingFont,
+			TextSize = 13,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		look.text(line, JobQueue.route(entry.from, entry.to), UDim2.new(1, -(payW + 64), 0, 16), {
+			Position = UDim2.fromOffset(0, 19),
+			TextSize = 12,
+			TextColor3 = K.secondary,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		look.text(line, payText, UDim2.new(0, payW, 1, 0), {
+			Position = UDim2.new(1, -52, 0, 0),
+			AnchorPoint = Vector2.new(1, 0),
+			Font = Theme.HeadingFont,
+			TextSize = 15,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		})
+		local id = tonumber(entry.id)
+		local drop = look.pill(line, "✕", function()
+			Net.get("JobQueue"):FireServer("drop", id)
+		end)
+		drop.Name = "Drop"
+		if entry.starting == true and not paused then
+			look.meta(row, "▶ Starts in a few seconds · PAUSE to wait", 2, K.text).Name = "Starting"
+		elseif type(entry.why) == "string" and entry.why ~= "" then
+			look.meta(row, `⏸ Waits: {entry.why}`, 2, K.red).Name = "Why"
+		end
+	end
+	return order + 2
+end
+
+function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
 	local offers, info, refreshAt = host.board()
 	if offers == nil or (refreshAt ~= nil and workspace:GetServerTimeNow() >= refreshAt) then
 		ask()
 	end
+	-- 6.12.8: YOUR RUN and NEXT UP on top (each draws nothing without a run / a queue).
+	local top = PhoneApps.nextUp(list, look, host, PhoneApps.runCard(list, look, host, 0))
 	if offers == nil then
-		look.emptyState(list, "📋", "Calling the dispatcher...", "The board comes in a moment.", 1)
-		look.button(list, fullBoardLabel(), "quiet", 2, host.fullBoard)
+		look.emptyState(list, "📋", "Calling the dispatcher...", "The board comes in a moment.", top + 1)
+		look.button(list, fullBoardLabel(), "quiet", top + 2, host.fullBoard)
 		return
 	end
 	local walks: { any } = {}
@@ -246,8 +385,31 @@ function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 		count += #entry.list
 	end
 	local fresh = if refreshAt then math.max(0, refreshAt - workspace:GetServerTimeNow()) else nil
-	look.section(list, `{count} {if count == 1 then "job" else "jobs"} on the board{if fresh then ` · new ones in {Ui.clock(fresh)}` else ""}`, 1)
-	local order = 1
+	look.section(list, `{count} {if count == 1 then "job" else "jobs"} on the board{if fresh then ` · new ones in {Ui.clock(fresh)}` else ""}`, top + 1)
+	local order = top + 1
+	-- 6.12.8: ADD ALL · $total: every job it can (the server's plan: into the run, then NEXT UP) and what it will do.
+	local plan = if type(info) == "table" and type(info.addAll) == "table" then info.addAll else nil
+	if plan and (tonumber(plan.count) or 0) > 0 then
+		order += 1
+		local all = look.button(list, `ADD ALL · {Ui.money(tonumber(plan.total) or 0)}`, "main", order, function()
+			Net.get("JobQueue"):FireServer("addAll")
+		end)
+		all.Name = "AddAll"
+		local parts: { string } = {}
+		local started, added, queued = tonumber(plan.started) or 0, tonumber(plan.added) or 0, tonumber(plan.queued) or 0
+		if started > 0 then
+			table.insert(parts, "the first one starts")
+		end
+		if added > 0 then
+			table.insert(parts, `{added} {if added == 1 then "joins" else "join"} your run`)
+		end
+		if queued > 0 then
+			table.insert(parts, `{queued} wait in NEXT UP`)
+		end
+		order += 1
+		local total = tonumber(plan.count) or 0
+		look.meta(list, `{total} {if total == 1 then "job" else "jobs"}: {table.concat(parts, ", ")}.`, order)
+	end
 	local footNote = if type(info) == "table" and type(info.footNote) == "string" then info.footNote else nil
 	local two = wide == true
 	local function group(title: string, items: { any }, note: string?)

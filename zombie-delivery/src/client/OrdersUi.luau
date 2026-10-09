@@ -46,7 +46,7 @@ export type Kit = {
 	width: (value: string, size: number, font: Enum.Font) -> number,
 }
 
-type Timer = { label: any, endsAt: number }
+type Timer = { label: any, endsAt: number, prefix: string? }
 
 local timers: { Timer } = {}
 
@@ -184,6 +184,14 @@ function OrdersUi.render(list: Instance, job: any, kit: Kit, order: number): num
 	return n
 end
 
+-- 6.12.8: a label that shows an order's clock (YOUR RUN on the phone's BOARD): ticked with the others, `prefix` before
+-- it ("$120 · ").
+function OrdersUi.track(label: any, endsAt: number, prefix: string?)
+	table.insert(timers, { label = label, endsAt = endsAt, prefix = prefix })
+	local left = endsAt - workspace:GetServerTimeNow()
+	label.Text = (prefix or "") .. Ui.clock(math.max(0, left))
+end
+
 -- The orders' clocks (the phone's open loop, twice a second).
 function OrdersUi.tick()
 	local now = workspace:GetServerTimeNow()
@@ -191,7 +199,7 @@ function OrdersUi.tick()
 		local label = timer.label
 		if label and label.Parent then
 			local left = timer.endsAt - now
-			label.Text = Ui.clock(math.max(0, left))
+			label.Text = (timer.prefix or "") .. Ui.clock(math.max(0, left))
 			label.TextColor3 = if left < 30 then K.red else K.text
 		end
 	end

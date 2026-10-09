@@ -46,6 +46,12 @@
 --     offers as slim hairline cards like the phone's BOARD (the title in caps, the twists as the phone's chips, the
 --     payout behind a thin divider) with ACCEPT JOB / + ADD ORDER as the red primary action, and the section headers
 --     (ON FOOT, BIKE, the danger levels) led by the small red marker.
+--   * 6.12.8 (the owner: "once I take a job I can't add more … a list where I have the jobs and how much I earn, and
+--     add even all of them"): the board shows its offers during every run. On top YOUR RUN (the phone's summary,
+--     shared/JobQueue.luau runLines: every open order in one line with its pay and clock, the run's pay, the next
+--     stop; DETAILS opens the phone's ORDERS, GIVE UP), NEXT UP (the queued jobs: what, where, pay, why the next one
+--     waits, ✕; review: PAUSE / RESUME, PAUSED after a failed delivery, CLEAR ALL) and ADD ALL · $total. A row's one action during a run: + ADD (AcceptJob: it joins the run) or + QUEUE
+--     (the JobQueue remote: it waits in NEXT UP), else why neither; off duty ACCEPT JOB as before.
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
 -- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
 -- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()). 4.2, a gamepad: the selection starts on the first
@@ -69,6 +75,7 @@ local Hud = require(script.Parent.Hud)
 local KitShop = require(script.Parent.KitShop) -- 5.0: the room on foot in words ("HANDS 2 / TOTE 5")
 local BikeShop = require(script.Parent.BikeShop) -- 5.1: your bike and what it holds
 local Transport = require(Shared.Transport)
+local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN and NEXT UP, the same words as the phone's BOARD
 
 local K = Theme.Contract
 local C = Theme.Colors
@@ -76,6 +83,8 @@ local DispatchUi = {}
 
 -- Set by Main: opening this window closes the others.
 DispatchUi.onOpen = nil :: (() -> ())?
+-- 6.12.8, set by Main: YOUR RUN's DETAILS (the phone's ORDERS app).
+DispatchUi.onDetails = nil :: (() -> ())?
 
 local player = Players.LocalPlayer
 
@@ -139,9 +148,10 @@ local askedAt = 0 -- os.clock() of the RequestOffers still waiting for its answe
 local refreshAt: number? = nil -- 3.7: when the server makes the next offers (workspace:GetServerTimeNow())
 local boardInfo: any = nil -- 4.7: { tiers = { { stars, name, fee, rerolled, open, level, licence? } }, streak } (Offers' third value)
 local ticking = false -- 3.7: the countdown's loop runs (while the board is open)
+local queueState: any = nil -- 6.12.8: the NEXT UP queue the server sent ({ list, max }; the JobQueue remote)
 
 -- 5.2: is the board open on a run that takes more orders (the job payload's `stack`)? Then it shows the offers with
--- + ADD ORDER on the ones that fit and why not on the others (NO ROOM (3/4 slots), ORDERS FULL (2/2)).
+-- + ADD on the ones that fit (6.12.8: + QUEUE on the others when they may wait; every run shows the offers now).
 local function stacking(): boolean
 	return job ~= nil and type(job.stack) == "table" and job.stack.can == true
 end
@@ -603,7 +613,7 @@ local function refreshChrome()
 		refs.capacity.Text = `YOUR CAPACITY · {slots} {if slots == 1 then "SLOT" else "SLOTS"}`
 		refs.context.Text = `{string.upper(name)} · {slots} CARGO {if slots == 1 then "SLOT" else "SLOTS"}  ·  {Levels.rank(level)} / level {level}`
 	end
-	local list: { any } = if (job and not stacking()) or offers == nil then {} else offers
+	local list: { any } = if offers == nil then {} else offers
 	local special = 0
 	for _, offer in list do
 		if isSpecial(offer) then
@@ -619,18 +629,18 @@ local function refreshChrome()
 		count.Text = if offers or job then tostring(counts[id] or 0) else "–"
 		count.TextColor3 = if filter == id then K.text else K.secondary
 	end
-	refs.countdown.Visible = (job == nil or stacking()) and offers ~= nil
+	refs.countdown.Visible = offers ~= nil
 end
 
 -- ── The tickets ────────────────────────────────────────────────────────────
 
--- A one-line message in the list (waiting, nothing on the board).
+-- A one-line message in the list (waiting, nothing on the board). 6.12.8: under YOUR RUN and NEXT UP (no clear).
 local function message(value: string)
-	Ui.clear(refs.list)
 	text(refs.list, value, UDim2.new(1, 0, 0, 60), {
 		TextColor3 = K.secondary,
 		TextSize = 15,
 		TextXAlignment = Enum.TextXAlignment.Center,
+		LayoutOrder = 1,
 	})
 end
 
@@ -885,6 +895,30 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			local what = if offer.jobType then `The {offer.jobType.name}` else `{offer.tierName} jobs`
 			Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
 		end)
+	elseif job ~= nil and offer.addOrder == true then
+		-- 5.2: on a run that takes more orders: + ADD where it fits (the board stays open for another).
+		local add = action(stub, "+ ADD", size, at, K.red, function() -- 5.8: the red primary action
+			Net.get("AcceptJob"):FireServer(offer.index)
+			local list = offers
+			local spot = if list then table.find(list, offer) else nil
+			if list and spot then
+				table.remove(list, spot)
+			end
+			renderList()
+		end)
+		refs.firstAccept = refs.firstAccept or add
+	elseif job ~= nil and offer.queue == true then
+		-- 6.12.8: it can't join the run now (full, another transport, a ★★★ car job, waiting for your car): NEXT UP.
+		local queue = action(stub, "+ QUEUE", size, at, K.red, function()
+			Net.get("JobQueue"):FireServer("queue", offer.index)
+			local list = offers
+			local spot = if list then table.find(list, offer) else nil
+			if list and spot then
+				table.remove(list, spot)
+			end
+			renderList()
+		end)
+		refs.firstAccept = refs.firstAccept or queue
 	elseif why then
 		-- 4.0: a Freight Run is locked by pallets (the server's lockButton: "NEEDS N PALLETS"). 4.7: a tier without its
 		-- licence: "LICENCE 3 / 5".
@@ -897,25 +931,14 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			flash()
 			Hud.toast(why)
 		end)
-	elseif stacking() then
-		-- 5.2: on a run that takes more orders: + ADD ORDER where it fits (the board stays open for another), else why not.
-		if offer.addOrder == true then
-			local add = action(stub, "+ ADD ORDER", size, at, K.red, function() -- 5.8: the red primary action
-				Net.get("AcceptJob"):FireServer(offer.index)
-				local list = offers
-				local spot = if list then table.find(list, offer) else nil
-				if list and spot then
-					table.remove(list, spot)
-				end
-				renderList()
-			end)
-			refs.firstAccept = refs.firstAccept or add
-		else
-			action(stub, if type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN", size, at, nil, function()
-				flash()
-				Hud.toast(if type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first.")
-			end)
-		end
+	elseif job ~= nil then
+		-- 5.2 / 6.12.8: on a run, neither + ADD nor + QUEUE: why (the queue is full, ORDERS FULL, a special …).
+		local label = if type(offer.queueButton) == "string" then offer.queueButton elseif type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN"
+		local words = if type(offer.queueText) == "string" then offer.queueText elseif type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first."
+		action(stub, label, size, at, nil, function()
+			flash()
+			Hud.toast(words)
+		end)
 	else
 		local accept = action(stub, "ACCEPT JOB", size, at, K.red, function() -- 5.8: the red primary action
 			Net.get("AcceptJob"):FireServer(offer.index)
@@ -959,7 +982,8 @@ local function offerTicket(offer: any, number: number, order: number?)
 	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundTransparency = 1, LayoutOrder = order or number }, refs.list)
 	local card: any, body: any, stub: any = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB)
 	local holder = card.Parent
-	card.BackgroundColor3 = if note then LOCKED_ROW else ROW
+	local waits = job ~= nil and offer.queue == true and lockLevel == nil -- 6.12.8: + QUEUE: it waits for your car or bike
+	card.BackgroundColor3 = if note and not waits then LOCKED_ROW else ROW
 	body.ZIndex = 2
 	stub.ZIndex = 2
 	spine(card, offer, number)
@@ -975,7 +999,7 @@ local function offerTicket(offer: any, number: number, order: number?)
 		Position = UDim2.fromOffset(0, 38),
 		Font = Theme.HeadingFont,
 		TextSize = 18,
-		TextColor3 = if note then K.secondary else K.text,
+		TextColor3 = if note and not waits then K.secondary else K.text,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = 2,
@@ -983,7 +1007,7 @@ local function offerTicket(offer: any, number: number, order: number?)
 	local after = details(column, offer, bodyW)
 	local noteBox: any = nil
 	if note then
-		Ui.caps(column, "Locked", UDim2.fromOffset(80, 14), {
+		Ui.caps(column, if waits then "Waits in NEXT UP" else "Locked", UDim2.fromOffset(if waits then 140 else 80, 14), {
 			Position = UDim2.new(1, 0, 0, 17),
 			AnchorPoint = Vector2.new(1, 0),
 			TextSize = 11,
@@ -1122,37 +1146,174 @@ local function bikeHeader(count: number, order: number)
 	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, row)
 end
 
--- On a delivery: that job, and giving it up. 5.2: `run`, on top of the offers of a run that takes more orders (its
--- orders and room).
-local function jobTicket(run: boolean?)
-	if not run then
-		Ui.clear(refs.list)
-	end
-	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 132), BackgroundTransparency = 1, LayoutOrder = 0 }, refs.list)
+-- 6.12.8, YOUR RUN (any run: J's board shows the offers during every run now), the same summary as the phone's BOARD
+-- (shared/JobQueue.luau runLines): every open order in one line (what, from → to, its pay and its clock, ticked by
+-- tickCountdown), the run's pay, the next stop; DETAILS (the phone's ORDERS: DispatchUi.onDetails) and GIVE UP THIS
+-- DELIVERY (CancelJob).
+local function runTicket()
+	local lines, total, nextStop = JobQueue.runLines(job)
+	local count = #lines
+	local slot = Ui.make("Frame", { Name = "YourRun", Size = UDim2.new(1, 0, 0, math.max(132, 64 + count * 24 + (if nextStop then 24 else 0))), BackgroundTransparency = 1, LayoutOrder = -30 }, refs.list)
 	local card, body, stub = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB + 60)
-	Ui.selectRow(card, true) -- the job you are on: the selected look (the red rule)
+	Ui.selectRow(card, true) -- the run you are on: the selected look (the red rule)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 24), PaddingTop = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, body)
-	Ui.caps(body, "On a delivery", UDim2.new(1, 0, 0, 16), { TextSize = 11 })
-	text(body, string.upper(`{job.cargo or "Cargo"} → {job.customer or "the customer"}`), UDim2.new(1, 0, 0, 30), {
-		Position = UDim2.fromOffset(0, 22),
-		Font = Theme.HeadingFont,
-		TextSize = 20,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local stack = job.stack
-	local words = if run and type(stack) == "table"
-		then `{stack.open or 1} {if stack.open == 1 then "order" else "orders"} on the go (at most {stack.max or 1}) · {stack.used or 0} of your {stack.room or 0} slots taken, {stack.free or 0} free. + ADD ORDER below takes another one along.`
-		else `You are delivering {job.cargo or "cargo"} to {job.customer or "a customer"}. Finish it first, or give it up.`
-	text(body, words, UDim2.new(1, 0, 0, 40), {
-		Position = UDim2.fromOffset(0, 56),
-		TextColor3 = K.secondary,
-		TextYAlignment = Enum.TextYAlignment.Top,
-	})
-	action(stub, "GIVE UP THIS DELIVERY", UDim2.new(1, -28, 0, 48), UDim2.new(0.5, 0, 0.5, -24), C.red, function()
+	Ui.caps(body, `Your run · {count} {if count == 1 then "order" else "orders"} · {Ui.money(total)}`, UDim2.new(1, 0, 0, 16), { TextSize = 11, TextColor3 = K.red })
+	refs.runClocks = {}
+	for index, line in lines do
+		local y = 24 + (index - 1) * 24
+		local route = if line.route ~= "" then ` · {line.route}` else ""
+		text(body, `{line.icon}  {line.title}{route}`, UDim2.new(1, -150, 0, 22), {
+			Position = UDim2.fromOffset(0, y),
+			Font = if line.focused then Theme.HeadingFont else Theme.Font,
+			TextSize = 14,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		local prefix = `{Ui.money(line.pay)} · `
+		local clock = text(body, Ui.money(line.pay), UDim2.fromOffset(144, 22), {
+			Position = UDim2.new(1, 0, 0, y),
+			AnchorPoint = Vector2.new(1, 0),
+			Font = Theme.HeadingFont,
+			TextSize = 14,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		})
+		if line.endsAt then
+			table.insert(refs.runClocks, { label = clock, endsAt = line.endsAt, prefix = prefix })
+		end
+	end
+	if nextStop then
+		text(body, `Next stop: {nextStop}`, UDim2.new(1, 0, 0, 22), {
+			Position = UDim2.fromOffset(0, 24 + count * 24),
+			TextSize = 13,
+			TextColor3 = K.secondary,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+	end
+	action(stub, "DETAILS", UDim2.new(1, -28, 0, 40), UDim2.new(0.5, 0, 0.5, -46), K.red, function()
+		local details = DispatchUi.onDetails
+		if details then
+			details()
+		end
+	end)
+	action(stub, "GIVE UP THIS DELIVERY", UDim2.new(1, -28, 0, 40), UDim2.new(0.5, 0, 0.5, 4), C.red, function()
 		Net.get("CancelJob"):FireServer()
 		DispatchUi.close()
 	end)
+end
+
+-- 6.12.8, NEXT UP (the JobQueue remote's state, server/JobQueue.luau): the queued jobs in order, each with what, from →
+-- to, its pay and ✕ (JobQueue "drop"); the next one says why it waits.
+local function nextUpRows()
+	local entries = if type(queueState) == "table" and type(queueState.list) == "table" then queueState.list else {}
+	if #entries == 0 then
+		return
+	end
+	local paused = queueState.paused == true
+	local head = Ui.make("Frame", { Name = "NextUpHeader", Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = -21 }, refs.list)
+	marker(head)
+	text(head, `▶  NEXT UP · {#entries} / {tonumber(queueState.max) or JobQueue.max()}`, UDim2.new(1, -324, 0, 18), {
+		Position = UDim2.fromOffset(18, 4),
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextWrapped = false,
+	})
+	text(head, if paused then JobQueue.pausedLine(queueState.pausedWhy) else "They start on their own: when you have no job, or they join your run when it has room.", UDim2.new(1, -324, 0, 16), {
+		Position = UDim2.fromOffset(18, 22),
+		Font = if paused then Theme.HeadingFont else Theme.Font,
+		TextSize = 12,
+		TextColor3 = if paused then K.red else K.secondary,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	-- review: PAUSE / RESUME and CLEAR ALL (the phone's NEXT UP has the same).
+	local toggle = action(head, if paused then "▶ RESUME" else "⏸ PAUSE", UDim2.fromOffset(140, 32), UDim2.new(1, -230, 0, 4), if paused then K.red else nil, function()
+		Net.get("JobQueue"):FireServer(if paused then "resume" else "pause")
+	end)
+	toggle.Name = if paused then "Resume" else "Pause"
+	local clear = action(head, "CLEAR ALL", UDim2.fromOffset(140, 32), UDim2.new(1, -74, 0, 4), nil, function()
+		Net.get("JobQueue"):FireServer("clear")
+	end)
+	clear.Name = "ClearAll"
+	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, head)
+	for index, entry in entries do
+		if type(entry) ~= "table" then
+			continue
+		end
+		local starting = entry.starting == true and not paused
+		local why = if starting then "starts in a few seconds (PAUSE to wait)" elseif type(entry.why) == "string" and entry.why ~= "" then entry.why else nil
+		local row = Ui.make("Frame", { Name = "NextRow", Size = UDim2.new(1, 0, 0, if why then 66 else 48), BackgroundColor3 = ROW, BorderSizePixel = 0, LayoutOrder = -20 + index }, refs.list)
+		Ui.stroke(row, K.rule, 1)
+		text(row, `{index}  {JobQueue.icon(entry.mode, entry.stars)}  {string.upper(tostring(entry.title or entry.cargo or "Job"))}`, UDim2.new(1, -200, 0, 20), {
+			Position = UDim2.fromOffset(14, 5),
+			Font = Theme.HeadingFont,
+			TextSize = 14,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		text(row, JobQueue.route(entry.from, entry.to), UDim2.new(1, -200, 0, 18), {
+			Position = UDim2.fromOffset(14, 25),
+			TextSize = 12,
+			TextColor3 = K.secondary,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		if why then
+			text(row, if starting then `▶ {why}` else `⏸ Waits: {why}`, UDim2.new(1, -200, 0, 18), {
+				Position = UDim2.fromOffset(14, 43),
+				Font = Theme.HeadingFont,
+				TextSize = 12,
+				TextColor3 = if starting then K.text else K.red,
+				TextWrapped = false,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+			})
+		end
+		text(row, Ui.money(tonumber(entry.pay) or 0), UDim2.fromOffset(110, 24), {
+			Position = UDim2.new(1, -70, 0, 6),
+			AnchorPoint = Vector2.new(1, 0),
+			Font = Theme.HeadingFont,
+			TextSize = 18,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		})
+		local id = tonumber(entry.id)
+		action(row, "✕", UDim2.fromOffset(44, 36), UDim2.new(1, -32, 0, 6), nil, function()
+			Net.get("JobQueue"):FireServer("drop", id)
+		end)
+	end
+end
+
+-- 6.12.8, ADD ALL · $total (the server's plan in the board's info: into the run up to its room and max, the rest into
+-- NEXT UP) and what it will do.
+local function addAllRow()
+	local plan = if boardInfo and type(boardInfo.addAll) == "table" then boardInfo.addAll else nil
+	local count = if plan then tonumber(plan.count) or 0 else 0
+	if not plan or count <= 0 then
+		return
+	end
+	local row = Ui.make("Frame", { Name = "AddAllRow", Size = UDim2.new(1, 0, 0, 48), BackgroundTransparency = 1, LayoutOrder = -5 }, refs.list)
+	local parts: { string } = {}
+	local started, added, queued = tonumber(plan.started) or 0, tonumber(plan.added) or 0, tonumber(plan.queued) or 0
+	if started > 0 then
+		table.insert(parts, "the first one starts")
+	end
+	if added > 0 then
+		table.insert(parts, `{added} {if added == 1 then "joins" else "join"} your run`)
+	end
+	if queued > 0 then
+		table.insert(parts, `{queued} wait in NEXT UP`)
+	end
+	text(row, `{count} {if count == 1 then "job" else "jobs"} on the board you can take: {table.concat(parts, ", ")}.`, UDim2.new(1, -250, 0, 40), {
+		Position = UDim2.fromOffset(4, 4),
+		TextSize = 13,
+		TextColor3 = K.secondary,
+		TextYAlignment = Enum.TextYAlignment.Center,
+	})
+	local all = action(row, `ADD ALL · {Ui.money(tonumber(plan.total) or 0)}`, UDim2.fromOffset(230, 40), UDim2.new(1, -117, 0, 4), K.red, function()
+		Net.get("JobQueue"):FireServer("addAll")
+	end)
+	all.Name = "AddAll"
 end
 
 renderList = function()
@@ -1160,12 +1321,25 @@ renderList = function()
 		return
 	end
 	refreshChrome()
-	if job and not stacking() then
-		refs.caption.Text = "You are on a delivery"
-		jobTicket()
-		return
-	end
+	refs.firstAccept = nil
+	Ui.clear(refs.list)
 	local list = offers
+	-- 6.12.8: YOUR RUN (any run), NEXT UP and ADD ALL on top of the offers.
+	local draws: { () -> () } = { nextUpRows }
+	if job then
+		table.insert(draws, 1, runTicket)
+	end
+	if list then
+		table.insert(draws, addAllRow)
+	end
+	for _, draw in draws do
+		local ok, err = pcall(function()
+			draw()
+		end)
+		if not ok then
+			warn(`[DispatchUi] the run's summary failed: {err}`)
+		end
+	end
 	if list == nil then
 		refs.caption.Text = "Calling the dispatcher..."
 		message("Calling the dispatcher...")
@@ -1176,14 +1350,6 @@ renderList = function()
 	local streak = if boardInfo and type(boardInfo.streak) == "number" then boardInfo.streak else 0
 	local bonus = math.floor(math.min(Config.Jobs.Rating.StreakMax, Config.Jobs.Rating.StreakStep * streak) * 100 + 0.5)
 	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board{if streak > 0 then `  ·  STREAK {streak} (+{bonus}% pay)` else ""}`
-	refs.firstAccept = nil
-	Ui.clear(refs.list)
-	if stacking() then
-		local ok, err = pcall(jobTicket, true) -- 5.2: the run on top
-		if not ok then
-			warn(`[DispatchUi] the run's ticket failed: {err}`)
-		end
-	end
 	local footNote = if boardInfo and type(boardInfo.footNote) == "string" then boardInfo.footNote else nil -- 5.3 review
 	if #visible == 0 then
 		message(if footNote and filter == "all" then footNote elseif #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
@@ -1273,8 +1439,18 @@ local function tickCountdown()
 	if not label then
 		return
 	end
+	-- 6.12.8: YOUR RUN's clocks.
+	local now = workspace:GetServerTimeNow()
+	for _, timer in (refs.runClocks or {}) :: { any } do
+		local clock = timer.label
+		if clock and clock.Parent then
+			local left = timer.endsAt - now
+			clock.Text = timer.prefix .. Ui.clock(math.max(0, left))
+			clock.TextColor3 = if left < 30 then K.red else K.text
+		end
+	end
 	local at = refreshAt
-	if (job and not stacking()) or not at then
+	if not at then
 		label.Text = ""
 		return
 	end
@@ -1310,9 +1486,6 @@ end
 -- Ask the dispatcher for the board (3.7: the current offers; the server makes new ones only when they expired). The
 -- offers already here stay on show until the answer, unless their time is up ("Calling the dispatcher...").
 function DispatchUi.request()
-	if job and not stacking() then
-		return
-	end
 	local now = os.clock()
 	if askedAt > 0 and now - askedAt < 3 then
 		return
@@ -1345,11 +1518,7 @@ function DispatchUi.open()
 	local made = gui :: ScreenGui
 	made.Enabled = true
 	fit()
-	if job and not stacking() then
-		renderList()
-	else
-		DispatchUi.request()
-	end
+	DispatchUi.request() -- (6.12.8: during a run too: its rows + ADD / + QUEUE)
 	startTicker()
 end
 
@@ -1371,7 +1540,7 @@ function DispatchUi.setOffers(list: { any }, nextAt: number?, info: any?)
 	offers = list
 	boardInfo = if type(info) == "table" then info else nil -- 4.7: the tiers' REROLL and licences, the streak
 	refreshAt = if type(nextAt) == "number" then nextAt else nil
-	if open and (not job or stacking()) then
+	if open then
 		renderList()
 		tickCountdown()
 	end
@@ -1393,7 +1562,13 @@ function DispatchUi.start()
 			return ""
 		end
 		local stack = if type(job.stack) == "table" then job.stack else {}
-		return `{job.cargo}|{job.customer}|{stacking()}|{stack.open}|{stack.free}|{stack.room}`
+		local orders: { string } = {} -- 6.12.8: YOUR RUN's lines and its next stop
+		for _, entry in (if type(job.orders) == "table" then job.orders else {}) :: { any } do
+			if type(entry) == "table" and entry.state == "open" then
+				table.insert(orders, `{entry.id}:{entry.pay}`)
+			end
+		end
+		return `{job.cargo}|{job.customer}|{stacking()}|{stack.open}|{stack.free}|{stack.room}|{job.stopLabel}|{table.concat(orders, ",")}`
 	end
 	Net.get("Job").OnClientEvent:Connect(function(payload)
 		local had = job ~= nil
@@ -1403,6 +1578,15 @@ function DispatchUi.start()
 			if had and job == nil then
 				DispatchUi.request()
 			elseif runKey() ~= before then
+				renderList()
+			end
+		end
+	end)
+	-- 6.12.8: the NEXT UP queue (server/JobQueue.luau).
+	Net.get("JobQueue").OnClientEvent:Connect(function(action, data)
+		if action == "state" and type(data) == "table" then
+			queueState = data
+			if open then
 				renderList()
 			end
 		end

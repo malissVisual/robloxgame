@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.9"
+Config.Version = "6.12.10"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -2897,6 +2897,23 @@ Config.Jobs = {
 		SwitchEvery = 1, -- seconds between two changes of the stop the GPS shows (no flicker between two close ones)
 		AddOnTime = 30,
 	},
+	-- 6.12.8, the NEXT UP queue (server/JobQueue.luau, shared/JobQueue.luau; the owner: "once I take a job I can't add
+	-- more … I want to add even all of them"): the board's + QUEUE (a run that is full, a job that does not stack: a
+	-- ★★★ / ★★★★ car job, another transport) and ADD ALL put ordinary board jobs in a line of Max at most. A queued
+	-- job is the offer as it was (its pay); its clock starts when it starts (taken from where you are then). The next
+	-- one starts on its own when you have no job, or joins the run when it stacks and fits (the same paths as ACCEPT
+	-- and + ADD): after a drop, an order done or lost, the end of a run, and every CheckEvery s (a vehicle switched).
+	-- One that could not start waits RetryAfter s before it tries again. Never saved (gone when you leave); kept
+	-- through a death. Missions, specials, employers' jobs, the Freight Run, DUO, the tutorial's and the paper round
+	-- never queue. Review: with no job running the next one starts StartDelay s after "NEXT UP in 4 s: …" (PAUSE or ✕
+	-- cancels it; joining a run that goes on is at once); a failed delivery, a lost order, a mission or an employer's
+	-- job PAUSE the queue until RESUME; CLEAR ALL empties it; a job whose place is shut by its start is dropped.
+	Queue = {
+		Max = 6,
+		CheckEvery = 1.5,
+		RetryAfter = 8,
+		StartDelay = 4,
+	},
 	-- 5.3, real places (shared/Deliveries.luau, server/Jobs.luau, server/Cargo.luau): the board's deliveries start at
 	-- the business's storefront (Map.Venues; the nearest one to you: within the light job's PickupMax + PickupWiden on
 	-- foot or by bike, CarReach in a car) where its cook / clerk hands the order over in the doorway, and go to a home's
@@ -4184,6 +4201,7 @@ Config.Robust = {
 		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
 		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
+		JobQueue = 4, -- 6.12.8: the board's + QUEUE, ADD ALL and NEXT UP's ✕ (server/JobQueue.luau)
 	},
 }
 

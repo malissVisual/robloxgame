@@ -1143,6 +1143,30 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## JOBS is the job list: ADD ALL and a NEXT UP queue (6.12.10)
+
+The owner: "once I take a job I can't add more; I don't need this window, I want a list with the jobs and what I earn,
+add even all of them, and see what I do next".
+
+- **JOBS always opens the job list** (the phone's BOARD and J's board), during a run too:
+  - **YOUR RUN:** your orders, each with what, from → to, pay and clock, plus the next stop, the total and DETAILS
+    (the old ORDERS window).
+  - **NEXT UP:** the queued jobs in order, with pay, why one waits, and ✕.
+  - **The rows:** each job's pay shown big, with ACCEPT, **+ ADD** (it joins your run now, by today's
+    stacking rules) or **+ QUEUE**.
+  - **ADD ALL · $total:** fills your run, then the queue. It never takes a special or the paper round.
+- **The queue** (`server/JobQueue.luau`, the pure rules in `shared/JobQueue.luau`, `Config.Jobs.Queue`):
+  - It holds up to 6 jobs. A queued job's clock does not run; it starts when the job starts.
+  - A job joins a running run as soon as it fits. With no job, the next one starts after 4 s, with the toast
+    "NEXT UP in 4 s: … (JOBS to pause)". A job that can't start yet waits and says why ("needs your car: CALL
+    CAR"); the ones behind it go first.
+  - **It pauses** on a failed or lost delivery and on a mission or employer job. NEXT UP then shows PAUSED with
+    RESUME; PAUSE and CLEAR ALL are always there.
+  - A company vehicle goes back when a queued job starts. A place that has closed drops its job with a toast.
+  - It is not saved: leaving clears it. A death keeps it.
+- **The NEXT card and the JOBS tile** say "+3 NEXT UP" and "Your run · 2 orders · 3 next".
+- Tests: `tests/jobqueue_test.luau` and the phone recorder.
+
 ## Dead End Motors sells the bikes too (6.12.9)
 
 The owner: "I wanted to merge the bike shop with Motors, so it's one shop".

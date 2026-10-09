@@ -58,6 +58,7 @@ local NAMES = {
 	"PhoneHold", -- 5.0: client → server: (holding boolean) the phone window opened / closed; the server shows the phone in your right hand to everybody while you are on foot with your hands free (server/KitWear.luau, the character attribute PhoneHeld)
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
 	"PinOrder", -- 5.2: client → server: (order id or nil) the GPS follows that order of your run (the phone's ORDERS app, server/Jobs.luau)
+	"JobQueue", -- 6.12.8: client → server: ("queue", offer id) | ("addAll") | ("drop", queued id) | ("open"); server → client: ("state", { list = { { id, title, cargo, customer, from, to, pay, mode, stars, time, pieces, why? } }, max }) the NEXT UP queue (server/JobQueue.luau)
 	"Fuel", -- 5.4: client → server: ("tow") the phone's TOW: your empty car to the nearest gas station's pump (server/Fuel.luau)
 	"Bus", -- 5.5: client → server: ("stop") on a city bus: the bell (off at the next stop), or off now while it stands at a stop (server/Buses.luau, client/BusRide.luau)
 	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); 6.10: ("grab", line id) a jump on that line's start platform grabs the trolley (checked as the Zip prompt; the ladders are real trusses, no climbs here any more)
