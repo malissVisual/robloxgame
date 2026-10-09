@@ -1143,6 +1143,22 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## JOBS, MISSIONS and TASKS up front in the phone (6.12.5)
+
+The owner: "the main things in the phone, jobs, missions and tasks, make them more visible".
+
+- **MAIN apps:** the phone's home opens with three big red-edged tiles (`Phone.luau` MAIN, `mainTile`):
+  - **JOBS** across the top. Its line says "Your run · 2 orders", "3 new runs on the board" or "Take a delivery";
+    its badge counts the orders or the new runs.
+  - **MISSIONS** and **TASKS** side by side under it, each with its live line and a progress bar:
+    - MISSIONS: the chapter you are at, e.g. "Code Red · 2 / 6", or why it is shut ("🔒 First Shift ·
+      Level 4"). NEW shows on a chapter newly open (`MissionsUi.summary`, `Phone.missionInfo`).
+    - TASKS: "1 to claim · 1 / 3 today" in green when a reward waits, or "All done today ✓"
+      (`TasksApp.summary`). Its badge counts the rewards waiting.
+- **The other tiles,** smaller and two to a row: MAP, SHOP, BAG & ITEMS, GARAGE, STYLE (out of MORE) and MORE.
+  MORE keeps CAREER, CREW, TOP, ESTATE, BANK, MESSAGES and SETTINGS.
+- The texts that said "MORE → TASKS" now say TASKS.
+
 ## The third sound sheet is uploaded (6.12.4)
 
 The owner uploaded `art/audio/sfx3.ogg`: `SoundSheet.Sfx3Id` is `rbxassetid://86357789297571`. The doors, horns,

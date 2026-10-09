@@ -67,6 +67,8 @@ Phone.onOpen = nil :: (() -> ())? -- the phone opens: close the other windows (H
 Phone.onUnread = nil :: ((number) -> ())? -- 6.5: the unread messages, for the HUD's PHONE button (Hud.setPhoneUnread)
 Phone.onBoard = nil :: (() -> ())? -- FULL BOARD: DispatchUi.open
 Phone.onMissions = nil :: (() -> ())? -- 5.5, the MENU's apps: MissionsUi.toggle
+-- 6.12.5: the MISSIONS tile's line (set by Main: MissionsUi.summary, the chapter you are at)
+Phone.missionInfo = nil :: (() -> { name: string, done: number, total: number, open: boolean, why: string?, new: boolean })?
 Phone.onCrew = nil :: (() -> ())? -- CrewPanel.toggle
 Phone.onTop = nil :: (() -> ())? -- Leaderboard.toggle
 Phone.onEstate = nil :: (() -> ())? -- EstateUi.toggleList
@@ -98,22 +100,29 @@ type Message = { from: string, text: string, time: string, unread: boolean, kind
 -- 6.5: `sub`, the one line under the name.
 type AppDef = { id: string, name: string, sub: string, window: boolean? }
 
--- 6.5: the home's six big tiles, in this order (JOBS opens BOARD, or ORDERS during a run; MORE its sub-screen) …
-local TILES: { AppDef } = {
+-- 6.12.5 (the owner: "the main things, jobs, missions and tasks, more visible in the phone"): home opens with the
+-- three main apps, big and red-edged, each with its live line (MAIN: JOBS across the top, MISSIONS and TASKS under it;
+-- fillMain) …
+local MAIN: { AppDef } = {
 	{ id = "jobs", name = "JOBS", sub = "Take a delivery" },
-	{ id = "map", name = "MAP", sub = "The city and your GPS", window = true },
+	{ id = "missions", name = "MISSIONS", sub = "Story chapters", window = true },
+	{ id = "tasks", name = "TASKS", sub = "Daily and weekly" },
+}
+
+-- … then the six smaller tiles, two to a row (6.5's big tiles; JOBS opens BOARD, or ORDERS during a run; MORE its
+-- sub-screen) …
+local TILES: { AppDef } = {
+	{ id = "map", name = "MAP", sub = "The city, your GPS", window = true },
 	{ id = "shop", name = "SHOP", sub = "Where to buy what" },
 	{ id = "bag", name = "BAG & ITEMS", sub = "Bag, items, bags" },
 	{ id = "garage", name = "GARAGE", sub = "Bike, car, tow" },
-	{ id = "more", name = "MORE", sub = "Career, style, crew …" },
+	{ id = "style", name = "STYLE", sub = "Your looks" }, -- 6.12 (the clerks sell them: client/StyleApp.luau)
+	{ id = "more", name = "MORE", sub = "Career, crew, estate …" },
 }
 
--- … and MORE's entries (the 5.5 MENU's windows among them; 6.12: STYLE, client/StyleApp.luau).
+-- … and MORE's entries (the 5.5 MENU's windows among them).
 local MORE: { AppDef } = {
 	{ id = "career", name = "CAREER", sub = "Your level and what's next" },
-	{ id = "tasks", name = "TASKS", sub = "Daily and weekly tasks" }, -- 6.12
-	{ id = "style", name = "STYLE", sub = "Your looks; buy them at the shops" }, -- (the clerks sell them: client/StyleApp.luau)
-	{ id = "missions", name = "MISSIONS", sub = "Missions and challenges", window = true },
 	{ id = "crew", name = "CREW", sub = "Work with friends", window = true },
 	{ id = "top", name = "TOP", sub = "The best couriers", window = true },
 	{ id = "estate", name = "ESTATE", sub = "Homes, garages, offices", window = true },
@@ -132,10 +141,11 @@ refs.routes = require(script.Parent.PhoneRoute)
 refs.apps = require(script.Parent.PhoneApps) -- 5.5: BOARD, BAG, GARAGE, the keys
 refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
 refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
-refs.tasks = require(script.Parent.TasksApp) -- 6.12: MORE → TASKS, the daily and weekly tasks
+refs.tasks = require(script.Parent.TasksApp) -- 6.12: TASKS, the daily and weekly tasks (6.12.5: on home)
 refs.style = require(script.Parent.StyleApp) -- 6.12: STYLE, the cosmetics
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
+refs.bars = {} -- 6.12.5: the MAIN tiles' progress bars by app id (MISSIONS, TASKS: fillMain)
 refs.page = "home" -- 6.5: the home's page: "home" (the six tiles) or "more" (MORE's sub-screen)
 local isOpen = false
 local app = "home"
@@ -1033,55 +1043,9 @@ local function launch(id: string, from: GuiObject?)
 	setApp(id)
 end
 
--- 6.5: an app's button. `big`: a home tile (a raised square: the white line glyph, the name in caps, the one-line
--- subtitle under it; JOBS has the red edge); else a MORE row (the glyph in a square, the name and the subtitle beside
--- it, a chevron). Both carry a red unread/count badge (`tiles`) and the subtitle's label (refs.subs).
-local function tile(parent: Instance, def: AppDef, order: number, big: boolean): any
-	local accent = def.id == "jobs"
-	local cell = Ui.make("TextButton", {
-		Name = `{def.id}App`,
-		Size = if big then UDim2.new(0.5, -4, 0, 104) else UDim2.new(1, 0, 0, 56),
-		BackgroundColor3 = TILE,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		LayoutOrder = order,
-	}, parent)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if accent then K.red else K.line, Thickness = 1, Transparency = if accent then 0.25 else 0.65 }, cell)
-	local face = Ui.make("Frame", {
-		Name = "Face",
-		Size = if big then UDim2.fromOffset(36, 36) else UDim2.fromOffset(40, 40),
-		Position = if big then UDim2.new(0.5, 0, 0, 12) else UDim2.fromOffset(8, 8),
-		AnchorPoint = if big then Vector2.new(0.5, 0) else Vector2.zero,
-		BackgroundColor3 = SCREEN,
-		BackgroundTransparency = if big then 1 else 0,
-		BorderSizePixel = 0,
-	}, cell)
-	if not big then
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, face)
-	end
-	-- (uploaded shared/Icons app art, otherwise native monochrome line glyphs)
-	refs.design.glyph(face, def.id, if big then 30 else 24)
-	local name = P.caps(cell, def.name, if big then UDim2.new(1, -12, 0, 18) else UDim2.new(1, -96, 0, 18), {
-		Position = if big then UDim2.fromOffset(6, 54) else UDim2.fromOffset(60, 9),
-		TextXAlignment = if big then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
-		TextStrokeTransparency = 1,
-		TextSize = if big then 15 else 14,
-		TextColor3 = K.text,
-	})
-	refs.subs[def.id] = text(cell, def.sub, if big then UDim2.new(1, -12, 0, 16) else UDim2.new(1, -96, 0, 16), {
-		Name = "Sub",
-		Position = if big then UDim2.fromOffset(6, 76) else UDim2.fromOffset(60, 30),
-		TextSize = if big then 11 else 12,
-		TextColor3 = K.secondary,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		TextXAlignment = if big then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
-	})
-	if not big then
-		text(cell, "›", UDim2.fromOffset(16, 56), { Position = UDim2.new(1, -24, 0, 0), Font = Theme.HeadingFont, TextSize = 22, TextColor3 = K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
-	end
-	local underline = Ui.make("Frame", { Size = UDim2.new(0, 28, 0, 2), Position = if big then UDim2.new(0.5, -14, 1, -8) else UDim2.new(0, 60, 1, -6), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
+-- An app's button, wired: the hover line under its name, its lit background, the red unread/count badge (`tiles`, at
+-- `badgeAt`) and the tap that opens it.
+local function wire(cell: any, def: AppDef, name: any, underline: Frame, badgeAt: UDim2)
 	P.hover(cell :: any, underline, name)
 	local function lit(on: boolean)
 		cell.BackgroundColor3 = if on then TILE_HOVER else TILE
@@ -1100,7 +1064,7 @@ local function tile(parent: Instance, def: AppDef, order: number, big: boolean):
 	end)
 	local badge = Ui.label(cell, "", UDim2.fromOffset(18, 18), {
 		Name = "Badge",
-		Position = if big then UDim2.new(1, -8, 0, 8) else UDim2.new(1, -34, 0.5, -9),
+		Position = badgeAt,
 		AnchorPoint = Vector2.new(1, 0),
 		BackgroundColor3 = K.red,
 		BackgroundTransparency = 0,
@@ -1115,6 +1079,111 @@ local function tile(parent: Instance, def: AppDef, order: number, big: boolean):
 	cell.Activated:Connect(function()
 		launch(def.id, cell)
 	end)
+end
+
+-- 6.5: an app's button. `big`: a home tile (6.12.5: a smaller one, two to a row: the white line glyph on the left, the
+-- name in caps and the one-line subtitle beside it); else a MORE row (the glyph in a square, the name and the subtitle
+-- beside it, a chevron). Both carry a red unread/count badge (`tiles`) and the subtitle's label (refs.subs).
+local function tile(parent: Instance, def: AppDef, order: number, big: boolean): any
+	local cell = Ui.make("TextButton", {
+		Name = `{def.id}App`,
+		Size = if big then UDim2.new(0.5, -4, 0, 60) else UDim2.new(1, 0, 0, 56),
+		BackgroundColor3 = TILE,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		LayoutOrder = order,
+	}, parent)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.65 }, cell)
+	local face = Ui.make("Frame", {
+		Name = "Face",
+		Size = if big then UDim2.fromOffset(30, 30) else UDim2.fromOffset(40, 40),
+		Position = if big then UDim2.new(0, 8, 0.5, 0) else UDim2.fromOffset(8, 8),
+		AnchorPoint = if big then Vector2.new(0, 0.5) else Vector2.zero,
+		BackgroundColor3 = SCREEN,
+		BackgroundTransparency = if big then 1 else 0,
+		BorderSizePixel = 0,
+	}, cell)
+	if not big then
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, face)
+	end
+	-- (uploaded shared/Icons app art, otherwise native monochrome line glyphs)
+	refs.design.glyph(face, def.id, 24)
+	local name = P.caps(cell, def.name, if big then UDim2.new(1, -50, 0, 18) else UDim2.new(1, -96, 0, 18), {
+		Position = if big then UDim2.fromOffset(44, 12) else UDim2.fromOffset(60, 9),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextStrokeTransparency = 1,
+		TextSize = if big then 13 else 14,
+		TextColor3 = K.text,
+	})
+	refs.subs[def.id] = text(cell, def.sub, if big then UDim2.new(1, -50, 0, 16) else UDim2.new(1, -96, 0, 16), {
+		Name = "Sub",
+		Position = if big then UDim2.fromOffset(44, 31) else UDim2.fromOffset(60, 30),
+		TextSize = 11,
+		TextColor3 = K.secondary,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	if not big then
+		text(cell, "›", UDim2.fromOffset(16, 56), { Position = UDim2.new(1, -24, 0, 0), Font = Theme.HeadingFont, TextSize = 22, TextColor3 = K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+	end
+	local underline = Ui.make("Frame", { Size = UDim2.new(0, 28, 0, 2), Position = if big then UDim2.new(0, 44, 1, -7) else UDim2.new(0, 60, 1, -6), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
+	wire(cell, def, name, underline, if big then UDim2.new(1, -6, 0, 6) else UDim2.new(1, -34, 0.5, -9))
+	return cell
+end
+
+-- 6.12.5: a MAIN app's tile (JOBS, MISSIONS, TASKS): bigger, the red edge and a red band on its left, the glyph in a
+-- red-edged square, the name in big caps, its live line (refs.subs, fillMain) and, for MISSIONS and TASKS, a thin bar
+-- of the progress (refs.bars). `wide`: JOBS across the home (the glyph on the left, the text beside it); else half the
+-- row under it (the glyph over the text).
+local function mainTile(parent: Instance, def: AppDef, order: number, wide: boolean): any
+	local cell = Ui.make("TextButton", {
+		Name = `{def.id}App`,
+		Size = if wide then UDim2.new(1, 0, 0, 76) else UDim2.new(0.5, -4, 1, 0),
+		BackgroundColor3 = TILE,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		LayoutOrder = order,
+	}, parent)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.red, Thickness = 1.5, Transparency = 0.2 }, cell)
+	Ui.make("Frame", { Name = "Edge", Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0 }, cell)
+	local face = Ui.make("Frame", {
+		Name = "Face",
+		Size = if wide then UDim2.fromOffset(46, 46) else UDim2.fromOffset(34, 34),
+		Position = if wide then UDim2.new(0, 16, 0.5, 0) else UDim2.fromOffset(14, 10),
+		AnchorPoint = if wide then Vector2.new(0, 0.5) else Vector2.zero,
+		BackgroundColor3 = SCREEN,
+		BorderSizePixel = 0,
+	}, cell)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.red, Thickness = 1, Transparency = 0.45 }, face)
+	refs.design.glyph(face, def.id, if wide then 30 else 22)
+	local left = if wide then 76 else 14
+	local name = P.caps(cell, def.name, UDim2.new(1, -(left + 30), 0, 22), {
+		Position = UDim2.fromOffset(left, if wide then 14 else 48),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextStrokeTransparency = 1,
+		TextSize = if wide then 20 else 16,
+		TextColor3 = K.text,
+	})
+	refs.subs[def.id] = text(cell, def.sub, UDim2.new(1, -(left + 10), 0, 16), {
+		Name = "Sub",
+		Position = UDim2.fromOffset(left, if wide then 40 else 70),
+		TextSize = 12,
+		TextColor3 = K.text,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	if not wide then
+		local holder = Ui.make("Frame", { Name = "Progress", Size = UDim2.new(1, -28, 0, 4), Position = UDim2.new(0, 14, 1, -10), BackgroundTransparency = 1 }, cell)
+		local _, fill = P.bar(holder, UDim2.new(1, 0, 1, 0), K.red)
+		fill.Size = UDim2.fromScale(0, 1)
+		refs.bars[def.id] = fill
+	end
+	local underline = Ui.make("Frame", { Size = UDim2.new(0, 36, 0, 2), Position = UDim2.new(0, left, 0, if wide then 37 else 68), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
+	wire(cell, def, name, underline, UDim2.new(1, -8, 0, 8))
 	return cell
 end
 
@@ -1146,14 +1215,15 @@ local function statusBar(screen: Instance, height: number)
 	Ui.make("Frame", { Size = UDim2.fromOffset(2, 4), Position = UDim2.new(1, 2, 0.5, -2), BackgroundColor3 = K.text, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 4 }, battery)
 end
 
--- Home (6.5, around the tiles: buildBody puts them at order 2): the shift line, the messages row under the tiles,
--- the focused contract and the courier ID. (The depot brand gave its room to the tiles.)
+-- Home (6.5, around the tiles: buildBody puts them at order 2, 6.12.5: the MAIN apps at 2, the tiles at 3): the shift
+-- line, the messages row under the tiles, the focused contract and the courier ID. (The depot brand gave its room to
+-- the tiles.)
 local function homeWidgets(parent: Instance)
 	local head = Ui.make("Frame", { Name = "Shift", Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 1 }, parent)
 	P.marker(head, 7, { Position = UDim2.fromOffset(2, 5) })
 	refs.shift = P.caps(head, shiftText(), UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1, TextSize = 10 })
 	-- The courier ID.
-	local card = block(parent, 5)
+	local card = block(parent, 6)
 	local nameRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 2 }, card)
 	text(nameRow, player.DisplayName, UDim2.new(1, -84, 1, 0), { Font = Theme.HeadingFont, TextSize = 16, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 	refs.idMoney = text(nameRow, "", UDim2.fromOffset(84, 22), { Position = UDim2.new(1, 0, 0, 0), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
@@ -1197,7 +1267,7 @@ local function homeWidgets(parent: Instance)
 	end
 	refs.homeContract = refs.design.card(parent, function()
 		launch(if job then "orders" else "board", refs.homeContract.hit)
-	end, 4)
+	end, 5)
 	-- 6.5: the messages row, always under the tiles: 💬 MESSAGES, the unread count (a red badge) and the newest unread
 	-- line (else "No new messages"); a tap opens MESSAGES.
 	local note = Ui.make("TextButton", {
@@ -1209,7 +1279,7 @@ local function homeWidgets(parent: Instance)
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 	}, parent)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.82 }, note)
 	Ui.list(note, true, 2)
@@ -1235,11 +1305,42 @@ local function homeWidgets(parent: Instance)
 	end)
 end
 
+-- 6.12.5: the MAIN tiles' live lines: MISSIONS the chapter you are at (its missions done, or why it is shut), TASKS
+-- today's dailies done and the rewards waiting, each with its bar.
+refs.fillMain = function()
+	local info = Phone.missionInfo and Phone.missionInfo()
+	local missionsSub, missionsBar = refs.subs.missions, refs.bars.missions
+	if info and missionsSub then
+		local finished = info.total > 0 and info.done >= info.total
+		missionsSub.Text = if not info.open then `🔒 {info.name} · {info.why or "Locked"}`
+			elseif finished then `{info.name} · done ✓`
+			else `{info.name} · {info.done} / {info.total}`
+		missionsSub.TextColor3 = if info.open then K.text else K.secondary
+		if missionsBar then
+			missionsBar.Size = UDim2.fromScale(if info.total > 0 then math.clamp(info.done / info.total, 0, 1) else 0, 1)
+		end
+	end
+	local done, total, ready = refs.tasks.summary()
+	local tasksSub, tasksBar = refs.subs.tasks, refs.bars.tasks
+	if tasksSub then
+		tasksSub.Text = if total == 0 then "Daily and weekly"
+			elseif ready > 0 then `{ready} to claim · {done} / {total} today`
+			elseif done >= total then "All done today ✓"
+			else `{done} / {total} done today`
+		tasksSub.TextColor3 = if ready > 0 then K.good else K.text
+	end
+	if tasksBar then
+		tasksBar.Size = UDim2.fromScale(if total > 0 then math.clamp(done / total, 0, 1) else 0, 1)
+		tasksBar.BackgroundColor3 = if total > 0 and done >= total then K.good else K.red
+	end
+end
+
 -- Fills the home widgets with the state right now.
 local function fillHome()
 	if not refs.idMoney then
 		return
 	end
+	refs.fillMain() -- 6.12.5
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	local pos = if root and root:IsA("BasePart") then root.Position else nil
 	refs.design.updateCard(refs.homeContract, refs.layout.summary(job, workspace:GetServerTimeNow(), if pos then pos.X else nil, if pos then pos.Z else nil))
@@ -1368,18 +1469,26 @@ local function buildBody()
 	Ui.list(widgets, true, 8)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 16) }, widgets)
 	homeWidgets(widgets)
+	-- 6.12.5: the MAIN apps right under the shift line: JOBS across, MISSIONS and TASKS side by side under it.
+	local main = Ui.make("Frame", { Name = "Main", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, widgets)
+	Ui.list(main, true, 8)
+	refs.firstTile = mainTile(main, MAIN[1], 1, true)
+	local pair = Ui.make("Frame", { Name = "MainPair", Size = UDim2.new(1, 0, 0, 104), BackgroundTransparency = 1, LayoutOrder = 2 }, main)
+	Ui.list(pair, false, 8)
+	for order = 2, #MAIN do
+		mainTile(pair, MAIN[order], order, false)
+	end
 	local grid = Ui.make("Frame", {
-		-- (6.5: the six big tiles, two to a row, right under the shift line)
-		Name = "Tiles", Size = UDim2.new(1, 0, 0, math.ceil(#TILES / 2) * 112 - 8),
-		BackgroundTransparency = 1, LayoutOrder = 2,
+		-- (6.5: the big tiles, two to a row; 6.12.5: smaller, under the MAIN apps)
+		Name = "Tiles", Size = UDim2.new(1, 0, 0, math.ceil(#TILES / 2) * 68 - 8),
+		BackgroundTransparency = 1, LayoutOrder = 3,
 	}, widgets)
 	Ui.make("UIGridLayout", {
-		CellSize = UDim2.new(.5, -4, 0, 104), CellPadding = UDim2.fromOffset(8, 8), FillDirectionMaxCells = 2,
+		CellSize = UDim2.new(.5, -4, 0, 60), CellPadding = UDim2.fromOffset(8, 8), FillDirectionMaxCells = 2,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
 	for order, def in TILES do
-		local cell = tile(grid, def, order, true)
-		if order == 1 then refs.firstTile = cell end
+		tile(grid, def, order, true)
 	end
 	-- 6.5: MORE's sub-screen in the phone (home's place): ‹ BACK, then a row an app.
 	local more = Ui.make("ScrollingFrame", {
@@ -1535,7 +1644,7 @@ refreshBadges = function()
 		if badge then
 			badge.Visible = count > 0 or word ~= nil
 			badge.Text = word or (if count > 9 then "9+" else tostring(count))
-			badge.Size = UDim2.fromOffset(if (word or "") ~= "" or count > 9 then 24 else 18, 18)
+			badge.Size = UDim2.fromOffset(if word and #word > 2 then 34 elseif (word or "") ~= "" or count > 9 then 24 else 18, 18)
 		end
 	end
 	set("messages", unread)
@@ -1555,12 +1664,16 @@ refreshBadges = function()
 	set("jobs", if job then open else boardNew)
 	local jobsSub = refs.subs.jobs
 	if jobsSub then
-		jobsSub.Text = if not job then "Take a delivery" elseif open > 1 then `Your run · {open} orders` else "Your run · orders"
+		jobsSub.Text = if job then (if open > 1 then `Your run · {open} orders` else "Your run · orders")
+			elseif boardNew > 0 then `{boardNew} new {if boardNew == 1 then "run" else "runs"} on the board`
+			else "Take a delivery"
 	end
 	set("shop", 0, if affordable() then "$" else nil)
-	local ready = refs.tasks.ready() -- 6.12: the task rewards waiting (TASKS, MORE and the dot)
+	local ready = refs.tasks.ready() -- 6.12: the task rewards waiting (TASKS and the dot; 6.12.5: TASKS is on home)
 	set("tasks", ready)
-	set("more", crewInvites + ready) -- (6.5 review: MORE → CREW has your invitations)
+	local info = Phone.missionInfo and Phone.missionInfo() -- 6.12.5: a chapter newly open: NEW on MISSIONS
+	set("missions", 0, if info and info.new then "NEW" else nil)
+	set("more", crewInvites) -- (6.5 review: MORE → CREW has your invitations)
 	set("garage", 0, if refs.apps.towDue() then "!" else nil) -- 5.5: the tank ran dry: TOW
 	local dot = refs.buttonDot
 	if dot then

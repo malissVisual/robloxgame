@@ -92,7 +92,7 @@ local function tasksOf(player: Player): TaskData.Saved?
 		saveSoon(player)
 	end
 	if changed and dayNew and loaded[player] then
-		say(player, "New daily tasks in your phone: MORE → TASKS.")
+		say(player, "New daily tasks in your phone: TASKS.")
 	end
 	return saved
 end

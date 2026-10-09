@@ -1,5 +1,5 @@
 --!strict
--- 6.12, the phone's TASKS app (MORE → TASKS; client/Phone.luau draws it in its centred popup with the phone's own kit,
+-- 6.12, the phone's TASKS app (6.12.5: on the phone's home, a MAIN tile; client/Phone.luau draws it in its centred popup with the phone's own kit,
 -- OrdersUi.Kit, design/phone-ui/): the three daily tasks and the weekly one as cards (the title, a thin progress bar,
 -- "3 / 5" and the reward, a red CLAIM once it is done, ✓ CLAIMED after), the card of the bonus for every daily done,
 -- and how long until the tasks are new (00:00 UTC; the weekly's on Monday 00:00 UTC). The CLAIM buttons are the
@@ -84,6 +84,23 @@ end
 -- How many rewards wait to be claimed (the phone's badges and dot).
 function TasksApp.ready(): number
 	return if type(view) == "table" and type(view.ready) == "number" then view.ready else 0
+end
+
+-- 6.12.5: the phone home's TASKS tile: today's dailies done, how many there are, the rewards waiting.
+function TasksApp.summary(): (number, number, number)
+	if type(view) ~= "table" or type(view.daily) ~= "table" then
+		return 0, 0, 0
+	end
+	local done, total = 0, 0
+	for _, task in view.daily do
+		if type(task) == "table" then
+			total += 1
+			if task.done == true then
+				done += 1
+			end
+		end
+	end
+	return done, total, TasksApp.ready()
 end
 
 -- CLAIM: asks the server (a second press of the same CLAIM while its answer is on the way is not sent).
@@ -224,7 +241,7 @@ local function onEvent(kind: any, data: any)
 		end
 	elseif kind == "done" and type(data) == "table" then
 		sound(DONE_SOUND)
-		tell(`{if data.weekly == true then "WEEKLY TASK" else "TASK"} DONE: {data.title or "a task"} · claim {Ui.money(tonumber(data.money) or 0)} in your phone (MORE → TASKS)`)
+		tell(`{if data.weekly == true then "WEEKLY TASK" else "TASK"} DONE: {data.title or "a task"} · claim {Ui.money(tonumber(data.money) or 0)} in your phone (TASKS)`)
 	elseif kind == "claimed" and type(data) == "table" then
 		sound(CLAIM_SOUND)
 		tell(`{data.title or "Task"}: +{Ui.money(tonumber(data.money) or 0)} · +{tonumber(data.xp) or 0} XP`)

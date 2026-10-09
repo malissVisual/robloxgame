@@ -273,6 +273,15 @@ local function currentCampaign(): string
 	return fallback
 end
 
+-- 6.12.5: the phone home's MISSIONS tile (client/Phone.luau, Phone.missionInfo): the chapter you are at, its missions
+-- done / all, whether it is open (else why not: "Level 4") and whether it is new (open, nothing done yet).
+function MissionsUi.summary(): { name: string, done: number, total: number, open: boolean, why: string?, new: boolean }
+	local id = currentCampaign()
+	local entry = Missions.findCampaign(id)
+	local state = Missions.chapterState(id, progress, myLevel())
+	return { name = if entry then entry.name else "Missions", done = state.done, total = state.total, open = state.open, why = state.why, new = state.new }
+end
+
 -- The mission after this one: its chapter's next (the cleared card's NEXT; the server's nextId comes first).
 local function nextMission(id: string): MissionDef?
 	local def = Missions.find(id)
