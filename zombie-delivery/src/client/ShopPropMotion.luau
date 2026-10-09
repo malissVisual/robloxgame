@@ -1,7 +1,8 @@
 --!strict
 -- 6.11, the rooftop props that move (server/ShopProps.luau tags their moving part, a Model, "ShopPropMotion"): the
--- bank's gold coin spins on its dome, Luigi's pizza slice bobs and sways. Only on this client and only for the eye:
--- the server never moves them (anchored, no collisions). Cheap: about 30 updates a second, only the props within RANGE
+-- bank's gold coin spins on its dome, Luigi's pizza slice bobs and sways (6.12.6: the vest and the ZDC bag over the gear
+-- stall at the spawn turn slowly, each at its own pace). Only on this client and only for the eye: the server never
+-- moves them (anchored, no collisions). Cheap: about 30 updates a second, only the props within RANGE
 -- of the camera, one PivotTo each. StreamingEnabled: a prop streams as a whole (Atomic); one that streams out leaves the
 -- list with its tag, one that streams back in is picked up again and starts from its "Rest" pose (a CFrame attribute;
 -- without it, where the prop stood when it came in).

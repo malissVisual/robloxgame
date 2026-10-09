@@ -11,6 +11,9 @@
 -- a partition between the two, the name board LAST STOP SUPPLIES · ZDC BAGS on the roof, each counter's own board
 -- (BAGS, GEAR) under the awning, two lamps that light up at night. Where it stands: Config.GearStall (from the depot's
 -- middle, Map.Depot; clear of the spawn pad, the scooter rack, the JOBS spot, the garage terminal and Marge).
+-- 6.12.6 (the owner: "that shop has nothing, put those props on my stalls"): a giant prop over each counter on the roof,
+-- just behind the name board, both turning slowly on the clients (server/ShopProps.luau, ShopArt "gearvest" and
+-- "zdcbag"): over GEAR the hi-vis courier vest that stood on Last Stop's old roof, over BAGS a red ZDC delivery bag.
 --
 -- server/World.luau's buildDepot calls GearStall.build with its own helpers (no new top-level locals there: the -O0
 -- register limit), as it did for 6.6's BagKiosk.
@@ -140,6 +143,10 @@ function GearStall.build(parent: Instance, tools: Tools)
 	end
 	-- The name board on the roof, facing the yard (the contract look of every shop's board).
 	tools.sign(folder, tuning.Board, Vector3.new(W, 3.2, 0.4), frame * CFrame.new(0, H + 2.1, -D / 2 + 0.6), Color3.fromRGB(255, 255, 255), nil, "supplies")
+	-- 6.12.6: the giant props over the counters, behind the board (ShopArt.Mounts: the vest over GEAR, the bag over BAGS).
+	local props = require(script.Parent.ShopProps)
+	props.place(folder, "gearvest", frame * props.mount("gearvest"))
+	props.place(folder, "zdcbag", frame * props.mount("zdcbag"))
 end
 
 return GearStall

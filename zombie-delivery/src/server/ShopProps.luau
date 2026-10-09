@@ -1,7 +1,8 @@
 --!strict
 -- 6.11, the shops' rooftop set pieces (server/ShopArt/Geometry.luau has the art: a giant pizza slice over Luigi's,
--- GUN STORE and a cartridge over Lead & Co., the vest and the shoe, the bike, the car on its pylon, the wrench and the
--- tyre, the ZDC parcel, the gold coin, the red cross). World's shop builders call ShopProps.place once each:
+-- GUN STORE and a cartridge over Lead & Co., the bike, the car on its pylon, the wrench and the tyre, the ZDC parcel,
+-- the gold coin, the red cross; 6.12.6: the hi-vis vest and a ZDC bag over the gear stall's two counters). World's shop
+-- builders call ShopProps.place once each (server/GearStall.luau twice, "gearvest" and "zdcbag"):
 --     require(script.Parent.ShopProps).place(shop, "guns", frame * require(script.Parent.ShopProps).mount("guns"))
 -- (ShopProps.mount: the default spot on that building's roof, in the building's own frame; any roof frame works).
 -- One Model "ShopProp_<id>" per prop, decoration only: anchored, CanCollide/CanQuery/CanTouch off, only big pieces
