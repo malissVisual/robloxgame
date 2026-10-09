@@ -1143,6 +1143,12 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The third sound sheet is uploaded (6.12.4)
+
+The owner uploaded `art/audio/sfx3.ogg`: `SoundSheet.Sfx3Id` is `rbxassetid://86357789297571`. The doors, horns,
+footsteps by surface, the pond's splash, the ambience loops and the UI stings (a task done, a purchase) play their
+own sounds now, not the stand-ins.
+
 ## Style: looks for you and your rides, bought from the clerks (6.12.3)
 
 The owner: "something to spend the money on, looks only" and "things are bought only from the NPCs in the shops,
