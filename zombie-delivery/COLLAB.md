@@ -29,6 +29,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.7: fuel lasts 5× (`Config.Fuel.Lasts`); Depot Gas (2, 0) and Tower Gas (−2, −1) by the safe zone; fuel_test and the street-art budget (2600) updated.
 - Claude · 6.12.6: the slow-mo sprint: `Sprint.Stride` 13, `Sprint.Hang` 0.45 (`RunCycle.hang`), bigger swings and float; tests/runcycle_test.luau updated.
 - Claude · 6.12.5: the phone's home: JOBS, MISSIONS and TASKS as big MAIN tiles with live lines and bars (`mainTile`, `MissionsUi.summary`, `TasksApp.summary`); MAP, SHOP, BAG, GARAGE, STYLE, MORE smaller; MORE without TASKS, STYLE and MISSIONS.
 - Claude · 6.12.4: `SoundSheet.Sfx3Id` filled in (the owner uploaded `art/audio/sfx3.ogg`): the 6.12 sounds play.

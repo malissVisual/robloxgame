@@ -935,6 +935,11 @@ do
 		{ "gas_downtown", "Westside Gas", "Downtown's west edge, on Cedar St where the West Highway starts. Fuel at the pumps, jerry cans in the kiosk.", "downtown", -4, 1, 1, 0, 1 },
 		{ "gas_harbor", "Harbor Gas", "In the Harbor, where the Rust Bridge comes over. Fuel at the pumps, jerry cans in the kiosk.", "harbor", 0, 0, -1, 0, 1 },
 		{ "gas_suburbs", "Willow Gas", "The Suburbs, on Willow Ln, the first street from town. Fuel at the pumps, jerry cans in the kiosk.", "suburbs", 1, 0, 0, 0, -1 },
+		-- 6.12.7 (the owner: "one or two gas stations closer"): two just outside the safe zone, their fronts on its
+		-- corner streets: east of Dead End Motors, a block from the depot, and west of the Dispatch Tower. Their rows held
+		-- apartments and a car park (no storefront, zip line or alley: tests/fuel_test.luau).
+		{ "gas_depot", "Depot Gas", "Just outside the safe zone, east of Dead End Motors: a block from the depot. Fuel at the pumps, jerry cans in the kiosk.", "downtown", 2, 0, 0, 0, -1 },
+		{ "gas_tower", "Tower Gas", "Just outside the safe zone, west of the Dispatch Tower. Fuel at the pumps, jerry cans in the kiosk.", "downtown", -2, -1, 0, 0, -1 },
 	} :: { { any } } do
 		local d = districtById(row[4])
 		local i, j, b, fx, fz = row[5], row[6], row[7], row[8], row[9]

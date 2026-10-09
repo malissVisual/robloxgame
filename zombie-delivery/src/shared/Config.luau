@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.6"
+Config.Version = "6.12.7"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1296,7 +1296,7 @@ Config.ItemTuning = {
 -- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)
 -- has a tank (CarDef.tank, litres) and burns CarDef.burn litres per 1,000 studs it is driven: the server's Tick measures
 -- the chassis' flat distance while somebody drives it, never while a chauffeur does, and skips a jump of more than
--- MaxJump studs (a teleport, a tow, a rebuild). A full tank lasts about 3 – 5 jobs of the tier the car opens at
+-- MaxJump studs (a teleport, a tow, a rebuild). A full tank lasts about 3 – 5 jobs of the tier the car opens at (6.12.7: × Lasts, 15 – 25)
 -- (FuelMath.jobsPerTank, tests/fuel_test.luau). Below Low (a share of the tank) the gauge turns red and a toast says LOW
 -- FUEL; empty, the car crawls at CrawlSpeed at most (client/Drive.luau) to a pump, or the phone's TOW brings it to the
 -- nearest station's pump with TowLitres for TowPrice (only with an empty tank). The gas stations (Map.GasStations) sell
@@ -1305,6 +1305,9 @@ Config.ItemTuning = {
 -- The jerry can (Config.Items "jerrycan") pours CanLitres next to your car. Your own cars' levels are saved
 -- (profile.carFuel); a new car comes full, a company vehicle a job lends you comes full and is not saved.
 Config.Fuel = {
+	-- 6.12.7 (the owner: "make the fuel last really long"): a tank goes this many times as far as the 5.4 balance
+	-- (shared/FuelMath.luau burn and range: CarDef.burn ÷ Lasts): about 15 – 25 jobs a tank instead of 3 – 5
+	Lasts = 5,
 	PricePerLitre = 2,
 	CrawlSpeed = 6, -- studs / s: the top speed with an empty tank
 	Low = 0.15, -- the share of the tank under which it is low (red gauge, the LOW FUEL toast)
