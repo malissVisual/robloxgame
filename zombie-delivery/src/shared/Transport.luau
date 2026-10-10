@@ -241,6 +241,20 @@ end
 -- 6.23: what an old save is paid back for the bags it owned for good (its kit's bags, each at Config.BagShop.Refund:
 -- the price it was sold at), and their names in Config.Kit's order. Only a real save (its money is set) without the
 -- Config.BagShop.Flag mark; anything else: 0 and none. (The plastic bag was free: 0.)
+-- 6.23 review: was this bag a level reward the save already had (Config.Levels.Rewards `kit`)? Then it was free, or its
+-- price was paid out instead: nothing to pay back. A save without levelRewards (before 4.6) counts as rewarded.
+local function rewarded(saved: any, id: string): boolean
+	for level, reward in Config.Levels.Rewards do
+		if type(reward) == "table" and reward.kit == id then
+			local given = saved.levelRewards
+			if type(given) ~= "table" or given[tostring(level)] == true then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 function Transport.bagRefund(saved: any): (number, { string })
 	local names: { string } = {}
 	if type(saved) ~= "table" or saved.money == nil or saved[Config.BagShop.Flag] == true or type(saved.kit) ~= "table" then
@@ -248,7 +262,7 @@ function Transport.bagRefund(saved: any): (number, { string })
 	end
 	local money = 0
 	for _, def in Config.Kit do
-		if Transport.isBag(def) and saved.kit[def.id] == true then
+		if Transport.isBag(def) and saved.kit[def.id] == true and not rewarded(saved, def.id) then
 			local paid = math.max(0, math.floor(Config.BagShop.Refund[def.id] or 0))
 			money += paid
 			if paid > 0 then

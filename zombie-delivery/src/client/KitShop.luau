@@ -165,7 +165,7 @@ function KitShop.items(state: any, here: boolean, shopId: string): { ShopView.It
 			continue -- (6.6: the bags at ZDC Bags, the rest at Last Stop Supplies; 6.7: the bat at Lead & Co.)
 		end
 		local owned = kit[def.id] == true
-		local game = Transport.perGame(def) -- 6.23: a bag is bought for this game only
+		local perGame = Transport.perGame(def) -- 6.23: a bag is bought for this game only
 		-- 6.0: a vest no better than the one you have adds nothing either (the best vest counts).
 		local outclassed = not owned and def.armour ~= nil and def.armour * 100 <= armour
 		local id = def.id
@@ -174,7 +174,7 @@ function KitShop.items(state: any, here: boolean, shopId: string): { ShopView.It
 			name = def.name,
 			picture = { icon = Icons.kit(def.id), emoji = def.icon },
 			-- (6.23: a bag still to buy this game: "FOR THIS GAME · $60" first)
-			fact = if game and not owned then `{Config.BagShop.ForGame} · {Ui.money(def.price)} · {effect(def)}` else effect(def),
+			fact = if perGame and not owned then `{Config.BagShop.ForGame} · {Ui.money(def.price)} · {effect(def)}` else effect(def),
 			price = if owned or def.starter then nil else def.price,
 			-- (a bag of yours: the light pieces it carries is its big number; one for sale: its price)
 			value = if def.extra and (owned or def.starter) then `+{def.extra}` else nil,
@@ -183,18 +183,18 @@ function KitShop.items(state: any, here: boolean, shopId: string): { ShopView.It
 			current = shopId == "bags" and owned and active ~= nil and active.id == def.id,
 			lines = {
 				def.description,
-				if game then `Level {def.level} · {Ui.money(def.price)} for this game: bags are bought for each game (leaving the game loses them).`
+				if perGame then `Level {def.level} · {Ui.money(def.price)} for this game: bags are bought for each game (leaving the game loses them).`
 					else `Level {def.level}{if def.starter then " · STARTER: yours" else ` · {Ui.money(def.price)}`}`,
 			},
 		}
 		if owned and def.extra and active and active.id == def.id then
 			item.act = { text = "IN USE", on = false } -- 6.4: the bag in your hand
-			item.fact = `✓ IN USE{if game then " · BOUGHT THIS GAME" else ""} · {item.fact}`
+			item.fact = `✓ IN USE{if perGame then " · BOUGHT THIS GAME" else ""} · {item.fact}`
 		elseif owned and def.extra then
 			item.act = { text = "USE THIS BAG", short = "USE", on = true, kind = "good", run = function()
 				Net.get("Kit"):FireServer("use", id) -- 6.4 (the server refuses while your bag is loaded)
 			end }
-			item.fact = `{if game then "✓ BOUGHT THIS GAME" else "✓ OWNED"} · {item.fact}`
+			item.fact = `{if perGame then "✓ BOUGHT THIS GAME" else "✓ OWNED"} · {item.fact}`
 		elseif owned then
 			item.act = { text = "OWNED", on = false }
 			item.fact = `✓ OWNED · {item.fact}`

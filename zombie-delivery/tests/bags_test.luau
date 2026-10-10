@@ -284,13 +284,17 @@ check("6.23: had this game already: its price for one game instead", Career.gran
 check("6.23: the reward in words says for this game", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "Canvas Tote for this game", 1, true) ~= nil)
 
 -- an old save's bags, paid back once at the price they were sold at (base × Prices.Kit)
-local old = { money = 500, kit = { bag = true, tote = true, thermal = true, kevlar = true } }
+local old = { money = 500, levelRewards = { ["2"] = true }, kit = { bag = true, tote = true, thermal = true, kevlar = true } }
 local money, names = Transport.bagRefund(old)
 check("6.23: an old save's bags paid back: the tote and the thermal bag (the plastic bag was free)",
 	money == Config.priced(120, Config.Prices.Kit) + Config.priced(300, Config.Prices.Kit) and money == 300 + 750, money)
 check("6.23: their names (no plastic bag: nothing paid for it)", table.concat(names, ",") == "Canvas Tote,Thermal Delivery Bag", table.concat(names, ","))
-local every = { money = 0, kit = { bag = true, tote = true, thermal = true, padded = true, duffel = true } }
+local every = { money = 0, levelRewards = {}, kit = { bag = true, tote = true, thermal = true, padded = true, duffel = true } }
 check("6.23: every bag: $300 + $750 + $1,600 + $3,000", (Transport.bagRefund(every)) == 300 + 750 + 1600 + 3000, (Transport.bagRefund(every)))
+check("6.23 review: a bag a level gave (level 3's tote, level 4's thermal) is not paid back",
+	(Transport.bagRefund({ money = 1, levelRewards = { ["2"] = true, ["3"] = true, ["4"] = true }, kit = { tote = true, thermal = true, duffel = true } })) == 3000)
+check("6.23 review: a save from before the level rewards (none listed): its reward bags count as given",
+	(Transport.bagRefund({ money = 1, kit = { tote = true, padded = true } })) == 1600)
 check("6.23: once: a save with the flag gets nothing", (Transport.bagRefund({ money = 500, kit = { tote = true }, [B.Flag] = true })) == 0 and B.Flag == "perGameBags")
 check("6.23: only a real save (a lock-only record of a new player has no money)", (Transport.bagRefund({ kit = { tote = true } })) == 0)
 check("6.23: no kit, a broken save: nothing", (Transport.bagRefund({ money = 1 })) == 0 and (Transport.bagRefund(nil)) == 0 and (Transport.bagRefund("x")) == 0

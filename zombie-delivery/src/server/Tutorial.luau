@@ -450,6 +450,7 @@ function Tutorial.onPlay(player: Player)
 		profile.packRefund = nil
 		profile.jacketRefund = nil
 		profile.shoeRefund = nil
+		profile.bagRefund = nil -- (6.23 review: a PLAY again says it once)
 	end
 	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0.1: the vest's price in your pocket, not owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
