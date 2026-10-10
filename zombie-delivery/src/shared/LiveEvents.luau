@@ -25,6 +25,11 @@
 --   LiveEvents.hordeShares(kills, killed, total, beaten, levelOf)   every killer's share of the horde's reward
 --   LiveEvents.Sides, gates(side), hordeSpot(gate, out, lateral), bursts(count, n)   the horde's way in
 --   LiveEvents.supplySpot(side, along, out), dropOff(), delivered(x, z)   the supply drop's spot and the depot's pad
+--   6.15 review:
+--   LiveEvents.budget(total, due)                        the event's zombies: how many may come now, how many calm
+--                                                        roamers make room for them
+--   LiveEvents.hordeGoal(count)                          the kills that beat the horde (Beaten of it)
+--   LiveEvents.paceOk(moved, seconds, walk)              a carried crate's step: a walk, not a teleport
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -469,6 +474,11 @@ function LiveEvents.hordeSpot(gate: Gate, out: number, lateral: number): (number
 	return gate.x + gate.dx * beyond - gate.dz * across, gate.z + gate.dz * beyond + gate.dx * across
 end
 
+-- 6.15 review: the kills that beat a horde of `count` (Beaten of it, rounded up; one straggler never holds it up).
+function LiveEvents.hordeGoal(count: number): number
+	return math.max(1, math.ceil(math.max(1, count) * tuning().Horde.Beaten - 1e-9))
+end
+
 -- The horde's bursts: `count` split over `n` (the first ones take the odd ones).
 function LiveEvents.bursts(count: number, n: number): { number }
 	local list: { number } = {}
@@ -480,6 +490,19 @@ function LiveEvents.bursts(count: number, n: number): { number }
 		table.insert(list, each + (if k <= extra then 1 else 0))
 	end
 	return list
+end
+
+-- ── 6.15 review: the event's own zombie budget ─────────────────────────────
+
+-- With `total` zombies in the server and `due` of the event's to come now: how many may spawn this step (StepSpawn
+-- at most, up to Config.Horde.MaxTotal − Headroom: the job waves keep that room) and how many calm roamers to let go
+-- first so the rest of this step's fits (the server lets go of what it can: Zombies.trimRoamers).
+function LiveEvents.budget(total: number, due: number): (number, number)
+	local t = tuning()
+	local cap = Config.Horde.MaxTotal - t.Headroom
+	local want = math.min(math.max(0, due), t.StepSpawn)
+	local room = math.max(0, cap - total)
+	return math.min(want, room), math.max(0, want - room)
 end
 
 -- ── The supply drop ────────────────────────────────────────────────────────
@@ -520,6 +543,13 @@ end
 function LiveEvents.dropOff(): (number, number)
 	local off = tuning().Supply.DropOff
 	return Map.Depot.x + off[1], Map.Depot.z + off[2]
+end
+
+-- 6.15 review: may a carried crate move `moved` studs (flat) in `seconds`? A walk at the carry's pace (MaxPace, × an
+-- admin's walk `walk`) plus Slack a step; more is a teleport (the crate goes back down where it was).
+function LiveEvents.paceOk(moved: number, seconds: number, walk: number?): boolean
+	local t = tuning().Supply
+	return moved <= t.MaxPace * math.clamp(walk or 1, 1, 4) * math.max(0, seconds) + t.Slack
 end
 
 -- Is (x, z) on the drop-off (within DeliverRadius, flat)?

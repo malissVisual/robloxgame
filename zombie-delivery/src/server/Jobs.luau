@@ -484,6 +484,7 @@ Jobs.onBoardSend = nil :: ((player: Player, board: any, rows: { { [string]: any 
 -- 6.15: what a live event changes (server/LiveEvents.luau puts its own in at its start; these: no event): a job's pay
 -- multiplier (and its daily task), the job waves' multiplier, rush hour's extra offers and sooner board, the event's id.
 Jobs.live = {
+	joined = function(_player: Player) end, -- (6.15 review: a crew member paid with the event's bonus: the daily task)
 	pay = function(_player: Player, _mission: boolean): number
 		return 1
 	end,
@@ -3692,6 +3693,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		local again = offer.mission ~= nil and memberProfile ~= nil and Missions.cleared(memberProfile.missions, offer.mission)
 		local memberPay = if again then Missions.replayPay(share) else share
 		missionPaid[member] = memberPay
+		if payout.eventBonus > 0 then
+			Jobs.live.joined(member) -- 6.15 review: a live event's pay: the crew took part too (the daily task)
+		end
 		PlayerData.addMoney(member, memberPay, "CrewPay")
 		require(script.Parent.Tasks).note(member, "order", delivered, { look = offer.look, pay = memberPay }) -- 6.12: the crew's tasks
 		resultRemote:FireClient(member, withXp({
@@ -4832,7 +4836,7 @@ function Jobs.dangerOf(job: Job): (number, number, boolean)
 			golden = true
 		end
 	end
-	return spawn * Jobs.live.waves(job.offer.mission ~= nil), boost, golden
+	return spawn * Jobs.live.waves(job.offer.mission ~= nil or job.offer.tutorial), boost, golden -- (6.15 review: nor the tutorial's)
 end
 
 -- One player's tick of update (below): the job's timer, crew, cargo, waves and bandits.

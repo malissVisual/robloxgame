@@ -4545,13 +4545,24 @@ Config.Regulars = {
 --              Guards gather (First at the landing, Batch every Every s up to Max alive, Near … Far studs round it,
 --              Kinds); anybody picks it up (Pickup studs, Hold s) and carries it on foot (G / PUT DOWN sets it down; it
 --              drops when the carrier dies, sits or leaves); the first who brings it within DeliverRadius of the depot's
---              drop-off (DropOff: x, z from the depot's middle) gets Money and Xp (× LevelScale) ("SupplyDrop")
+--              drop-off (DropOff: x, z from the depot's middle) gets Money and Xp (× LevelScale) ("SupplyDrop").
+--              6.15 review: set down, it lands on the floor under it (a ray Drop studs down at most in front of a
+--              grounded carrier, past the cars and the people; else where the carrier last stood); it drops by itself
+--              when its carrier stands still Idle s or gets no StallGain studs nearer the drop-off in Stall s (no
+--              hostage), and a carry faster than MaxPace studs / s (× an admin's walk) plus Slack studs a step is no
+--              carry: the crate goes back down where it was (no teleport to the depot)
 --   Horde      Count zombies (Kinds) in Bursts, one every BurstEvery s, Out studs past the safe zone's edge on the streets
 --              of one side, walking to its Gates gates (Stop studs outside the edge; they never come in); beaten when all
---              came and fell before its time is up; then (or at its end) everybody who killed some shares Money and Xp
---              by their kills (× LevelScale; at its end only the share of the horde that fell) ("HordeReward")
---   Headroom   the supply's guards and the horde only spawn while the server has fewer than Config.Horde.MaxTotal − this
---              zombies: the job waves of the other players keep their room
+--              came and Beaten of it fell before its time is up (6.15 review: a straggler stuck behind a building
+--              does not hold it up); then (or at its end) everybody who killed some shares Money and Xp by their kills
+--              (× LevelScale; at its end only the share of the horde that fell, of Beaten × Count) ("HordeReward")
+--   Headroom   6.15 review, the event's own zombie budget: its zombies (the horde, the guards) spawn up to
+--              Config.Horde.MaxTotal − Headroom (the job waves keep that room), StepSpawn a step at most. What it still
+--              wants holds the roamers back (Zombies.eventReserve: they stop that much lower), and when a burst does not
+--              fit, calm roamers far from everybody make room (Zombies.trimRoamers). The 36 residents and the whole
+--              horde fit: 36 + Count ≤ MaxTotal − Headroom (tests/liveevents_test.luau runs a full server)
+--   Linger     6.15 review: at its end its zombies nobody is within Vanish studs of go at once; the others fall back
+--              (they walk away, after nobody) and go once nobody is that close, Linger s at most
 export type LiveEventDef = { name: string, icon: string, hint: string, minutes: number, color: { number } }
 
 Config.LiveEvents = {
@@ -4563,7 +4574,10 @@ Config.LiveEvents = {
 	Tick = 0.25, -- seconds between the server's steps of a running event
 	LevelScale = 0.15,
 	Reach = 140,
-	Headroom = 30,
+	Headroom = 12,
+	StepSpawn = 5,
+	Linger = 30,
+	Vanish = 150,
 	Order = { "bloodmoon", "rush", "supply", "horde" } :: { string },
 	Events = {
 		bloodmoon = { name = "BLOOD MOON", icon = "🌕", hint = "Jobs pay ×2 · more zombies, and faster", minutes = 5, color = { 222, 64, 58 } },
@@ -4597,6 +4611,12 @@ Config.LiveEvents = {
 		Hold = 0.6,
 		DropOff = { 24, 10 } :: { number },
 		DeliverRadius = 12,
+		Drop = 8,
+		Idle = 20,
+		Stall = 60,
+		StallGain = 10,
+		MaxPace = 16,
+		Slack = 10,
 		Guards = { First = 6, Every = 20, Batch = 2, Max = 10, Near = 18, Far = 45 },
 		Kinds = { walker = 0.65, runner = 0.25, brute = 0.1 } :: { [string]: number },
 	},
@@ -4607,6 +4627,7 @@ Config.LiveEvents = {
 		Out = { 150, 300 } :: { number },
 		Stop = 18,
 		Gates = 2,
+		Beaten = 0.9,
 		Kinds = { walker = 0.6, runner = 0.28, brute = 0.12 } :: { [string]: number },
 		Money = 900,
 		Xp = 450,

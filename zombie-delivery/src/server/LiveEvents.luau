@@ -29,6 +29,13 @@
 --   * The daily task (server/Tasks.luau "liveevent": once an event for each player who took part: a job paid with its
 --     bonus, the crate brought in, a share of the horde), analytics through PlayerData.track (EventStarted,
 --     SupplyDelivered, HordeBeaten; the game never needs it).
+--   * 6.15 review: the event's own zombie budget (shared/LiveEvents.luau budget: up to MaxTotal − Headroom, calm
+--     roamers far from everybody make room, Zombies.eventReserve holds the roamers back while it still wants some);
+--     its zombies leave players on a mission alone (Zombies.eventSpared) and their kills add nothing to a mission's
+--     kill bonus; at its end its zombies nobody is near go at once and the rest fall back and go (Linger); the horde
+--     is beaten at Beaten of it; the crate lands on the floor (never in a roof or on a car), drops by itself from an
+--     idle or stalling carrier and goes back down where it was after a step faster than a walk; `finish` clears the
+--     state first and survives an error in an event's end.
 --
 --   LiveEvents.current()                  the running event's id (nil: none)
 --   LiveEvents.pay(player, mission)       a job paid now pays × this (server/Jobs.luau payOrder; the task noted)
@@ -97,6 +104,15 @@ type Supply = {
 	guards: { Zombies.Zombie },
 	nextGuards: number,
 	shown: Vector3?, -- the Spot attribute as it was sent
+	-- 6.15 review, the carry: its carrier's last checked spot and when (the pace), where they last stood on a floor
+	-- (the crate's way back down), since when they stand still and where, their best gap to the drop-off and when
+	lastAt: Vector3?,
+	lastAtTime: number,
+	lastGround: Vector3?,
+	stillAt: Vector3?,
+	stillSince: number,
+	bestGap: number,
+	bestAt: number,
 }
 
 type Horde = {
@@ -111,6 +127,7 @@ type Horde = {
 	list: { Zombies.Zombie },
 	kills: { [Player]: number },
 	done: number,
+	goal: number, -- 6.15 review: the kills that beat it (Rules.hordeGoal)
 }
 
 local running: Running? = nil
@@ -120,6 +137,7 @@ local deck: { string } = {}
 local last: string? = nil
 local nextAt: number? = nil -- os.clock() of the next event (nil: nobody came yet)
 local retryAt = 0
+local fading: { { z: Zombies.Zombie, ends: number } } = {} -- 6.15 review: an ended event's zombies falling back
 local waitingSince: number? = nil
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
@@ -175,8 +193,10 @@ local function playersCount(): number
 	return #Players:GetPlayers()
 end
 
--- The floor under a point (the crate set down): a ray down past the characters, the zombies and the crate.
-local function groundBelow(at: Vector3, skip: { Instance }): number
+-- 6.15 review: the floor under a point, at most `depth` studs down: a ray past the cars (yours, the traffic, the
+-- bandits'), the people, the zombies, the animals, the loot and the crate itself. Nil when there is none that close.
+local SKIP_FOLDERS = { "Cars", "Traffic", "BanditCars", "Npcs", "Zombies", "Animals", "Loot" }
+local function floorBelow(at: Vector3, depth: number, skip: { Instance }): number?
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local list = table.clone(skip)
@@ -185,18 +205,94 @@ local function groundBelow(at: Vector3, skip: { Instance }): number
 			table.insert(list, player.Character)
 		end
 	end
-	local enemies = workspace:FindFirstChild("Zombies")
-	if enemies then
-		table.insert(list, enemies)
+	for _, name in SKIP_FOLDERS do
+		local folder = workspace:FindFirstChild(name)
+		if folder then
+			table.insert(list, folder)
+		end
 	end
 	params.FilterDescendantsInstances = list
-	local hit = workspace:Raycast(at + Vector3.new(0, 3, 0), Vector3.new(0, -40, 0), params)
-	return if hit then hit.Position.Y else World.RoadTop
+	params.IgnoreWater = false
+	local hit = workspace:Raycast(at + Vector3.new(0, 1, 0), Vector3.new(0, -(depth + 1), 0), params)
+	return if hit then hit.Position.Y else nil
 end
 
--- Is there room for an event's zombies (the other players' waves keep theirs)?
-local function room(): boolean
-	return #Zombies.all() < Config.Horde.MaxTotal - T.Headroom
+-- 6.15 review: how many of the event's `due` zombies may come now (its own budget: shared/LiveEvents.luau budget);
+-- calm roamers far from everybody make room for the ones that do not fit.
+local function allowance(due: number): number
+	local count, short = Rules.budget(#Zombies.all(), due)
+	if short > 0 then
+		count += Zombies.trimRoamers(short)
+	end
+	return count
+end
+
+-- Is somebody (anywhere, the safe zone too) within `reach` studs of the point?
+local function anybodyNear(at: Vector3, reach: number): boolean
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local body = character and character:FindFirstChild("HumanoidRootPart")
+		if body and body:IsA("BasePart") and (body.Position - at).Magnitude < reach then
+			return true
+		end
+	end
+	return false
+end
+
+-- 6.15 review: an ended event's zombies: the ones nobody is within Vanish of go at once; the others fall back (away
+-- from the safe zone, after nobody) and go once nobody is that close, Linger s at most (fadeStep).
+local function letGo(list: { Zombies.Zombie })
+	local now = os.clock()
+	for _, z in list do
+		if z.dead then
+			continue
+		end
+		local at = z.root.Position
+		if not anybodyNear(at, T.Vanish) then
+			Zombies.despawn(z)
+			continue
+		end
+		local flat = Vector3.new(at.X, 0, at.Z)
+		local away = if flat.Magnitude > 1 then flat.Unit else Vector3.new(1, 0, 0)
+		Zombies.retreat(z, Vector3.new(at.X, World.RoadTop, at.Z) + away * 220)
+		table.insert(fading, { z = z, ends = now + T.Linger })
+	end
+end
+
+local function fadeStep(now: number)
+	for index = #fading, 1, -1 do
+		local entry = fading[index]
+		local z = entry.z
+		if z.dead then
+			table.remove(fading, index)
+		elseif now >= entry.ends or not anybodyNear(z.root.Position, T.Vanish) then
+			Zombies.despawn(z)
+			table.remove(fading, index)
+		end
+	end
+end
+
+-- 6.15 review: what the running event still wants to place (the roamers stop that much lower under the cap), and the
+-- players its zombies leave alone (on a mission), every step.
+local function shareRoom()
+	local want = 0
+	local h = horde
+	if h then
+		want += math.max(0, h.total - h.spawned)
+	end
+	local sup = supply
+	if sup then
+		want += if sup.landed then math.max(0, T.Supply.Guards.Max - #sup.guards) else T.Supply.Guards.First
+	end
+	Zombies.eventReserve = want
+	table.clear(Zombies.eventSpared)
+	if h or sup then
+		for _, player in Players:GetPlayers() do
+			if Jobs.onMission(player) then
+				Zombies.eventSpared[player] = true
+			end
+		end
+	end
 end
 
 -- ── The Blood Moon ─────────────────────────────────────────────────────────
@@ -384,7 +480,7 @@ end
 
 -- ── The supply drop: carrying ──────────────────────────────────────────────
 
-local putDown: (Supply, string) -> ()
+local putDown: (Supply, string, boolean?) -> ()
 local deliver: (Supply, Player) -> ()
 
 local function clearHands(character: Model?)
@@ -428,6 +524,9 @@ local function carry(s: Supply, player: Player, character: Model, body: BasePart
 	down.HoldDuration = 0
 	down.MaxActivationDistance = 4 -- (only for the one holding it)
 	down.RequiresLineOfSight = false
+	-- (6.15 review: tagged like a job's prompt, client/CargoPrompts.luau shows it to its carrier only)
+	down:SetAttribute("CargoOwner", player.UserId)
+	game:GetService("CollectionService"):AddTag(down, Config.Cargo.PromptTag)
 	down.Parent = crate
 	s.down = down
 	table.insert(s.hooks, down.Triggered:Connect(function(by: Player)
@@ -454,11 +553,18 @@ local function carry(s: Supply, player: Player, character: Model, body: BasePart
 	end))
 	set(A.Phase, "carried")
 	set(A.Carrier, player.DisplayName)
+	-- (6.15 review: the carry's checks start here: the pace, standing still, getting nearer the drop-off)
+	local now = os.clock()
+	local dx, dz = Rules.dropOff()
+	s.lastAt, s.lastAtTime, s.lastGround = body.Position, now, body.Position
+	s.stillAt, s.stillSince = body.Position, now
+	s.bestGap, s.bestAt = Vector3.new(body.Position.X - dx, 0, body.Position.Z - dz).Magnitude, now
 end
 
 -- The crate set down where it is (on the floor under it); `why` "put" (G, PUT DOWN: on the drop-off it counts as
--- brought in), "lost" (a death, a seat, the body gone), "left", "end".
-putDown = function(s: Supply, why: string)
+-- brought in), "lost" (a death, a seat, the body gone), "left", "end", 6.15 review "idle", "stall", "pace". `back`:
+-- where its carrier last stood on a floor (a step faster than a walk: back there).
+putDown = function(s: Supply, why: string, back: boolean?)
 	local player = s.carrier
 	if not player then
 		return
@@ -476,15 +582,28 @@ putDown = function(s: Supply, why: string)
 		s.down:Destroy()
 		s.down = nil
 	end
-	clearHands(player.Character)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	clearHands(character)
 	local crate = s.root
 	local at = crate.Position
-	local floor = groundBelow(at, { s.model })
+	-- 6.15 review: on the floor in front of a carrier who stands on one (a step down at most), else where they last
+	-- stood (in the air over a roof, off a car, dead, after a step too fast); never buried, never on a car
+	local floor: number? = nil
+	if not back and humanoid and humanoid.Health > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+		floor = floorBelow(at, T.Supply.Drop + CRATE.Y, { s.model })
+	end
+	local stood = s.lastGround
+	if not floor and stood then
+		at = stood
+		floor = floorBelow(stood, 12, { s.model })
+	end
+	floor = floor or World.RoadTop
 	local yaw = select(2, crate.CFrame:ToOrientation())
 	crate.Anchored = true
 	crate.Massless = false
 	crate.CanCollide = true
-	crate.CFrame = CFrame.new(at.X, floor + CRATE.Y / 2, at.Z) * CFrame.Angles(0, yaw, 0)
+	crate.CFrame = CFrame.new(at.X, (floor :: number) + CRATE.Y / 2, at.Z) * CFrame.Angles(0, yaw, 0)
 	local pick = s.pick
 	if pick then
 		pick.Enabled = true
@@ -534,10 +653,7 @@ local function spawnGuards(s: Supply, count: number)
 		return
 	end
 	local g = T.Supply.Guards
-	for _ = 1, count do
-		if not room() then
-			return
-		end
+	for _ = 1, allowance(count) do -- (6.15 review: the event's own budget)
 		local spot = Zombies.findSpot(center, nil, g.Near, g.Far)
 		local made = if spot then Zombies.spawn(Economy.pickKind(T.Supply.Kinds, rng:NextNumber()), spot, nil, false, false, false) else nil
 		if made then
@@ -612,6 +728,13 @@ local function startSupply(): (boolean, string?)
 		guards = {},
 		nextGuards = math.huge,
 		shown = nil,
+		lastAt = nil,
+		lastAtTime = now,
+		lastGround = nil,
+		stillAt = nil,
+		stillSince = now,
+		bestGap = math.huge,
+		bestAt = now,
 	}
 	local dx, dz = Rules.dropOff()
 	set(A.Goal, Vector3.new(dx, Map.WalkTop, dz))
@@ -661,11 +784,42 @@ local function supplyStep(s: Supply, now: number)
 	if carrier then
 		local character = carrier.Character
 		local body = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		if carrier.Parent ~= Players or not body or not body:IsA("BasePart") then
 			putDown(s, "lost")
-		elseif Rules.delivered(body.Position.X, body.Position.Z) then
-			deliver(s, carrier)
-			return
+		else
+			local at = body.Position
+			local last = s.lastAt or at
+			local walk = carrier:GetAttribute("AdminSpeed")
+			if not Rules.paceOk(Vector3.new(at.X - last.X, 0, at.Z - last.Z).Magnitude, now - s.lastAtTime, if type(walk) == "number" then walk else 1) then
+				-- 6.15 review: a step faster than a walk (a teleport): no carry, the crate goes back where it was (quietly)
+				putDown(s, "pace", true)
+			elseif Rules.delivered(at.X, at.Z) then
+				deliver(s, carrier)
+				return
+			else
+				s.lastAt, s.lastAtTime = at, now
+				if humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then
+					s.lastGround = at
+				end
+				-- 6.15 review: no hostage: standing still Idle s, or no StallGain studs nearer the drop-off in Stall s
+				local still = s.stillAt or at
+				if Vector3.new(at.X - still.X, 0, at.Z - still.Z).Magnitude > 4 then
+					s.stillAt, s.stillSince = at, now
+				end
+				local dx, dz = Rules.dropOff()
+				local gap = Vector3.new(at.X - dx, 0, at.Z - dz).Magnitude
+				if gap < s.bestGap - T.Supply.StallGain then
+					s.bestGap, s.bestAt = gap, now
+				end
+				if now - s.stillSince >= T.Supply.Idle then
+					putDown(s, "idle")
+					notice:FireClient(carrier, "📦 You stood still too long: the crate is on the ground for anybody.")
+				elseif now - s.bestAt >= T.Supply.Stall then
+					putDown(s, "stall")
+					notice:FireClient(carrier, "📦 The depot is the other way: the crate is on the ground for anybody.")
+				end
+			end
 		end
 	end
 	local at = s.root.Position
@@ -695,11 +849,9 @@ local function stopSupply()
 	if s.carrier then
 		putDown(s, "end")
 	end
-	for _, z in s.guards do
-		Zombies.march(z, nil) -- (they roam on)
-	end
 	s.model:Destroy()
 	s.pad:Destroy()
+	letGo(s.guards) -- (6.15 review: they go, or fall back and go)
 end
 
 -- ── The horde at the gates ─────────────────────────────────────────────────
@@ -719,6 +871,7 @@ local function startHorde(): string
 		list = {},
 		kills = {},
 		done = 0,
+		goal = Rules.hordeGoal(T.Horde.Count),
 	}
 	local x, z = 0, 0
 	for _, gate in gates do
@@ -727,7 +880,7 @@ local function startHorde(): string
 	end
 	set(A.Side, side)
 	set(A.Spot, Vector3.new(x, World.RoadTop, z))
-	set(A.Total, T.Horde.Count)
+	set(A.Total, Rules.hordeGoal(T.Horde.Count)) -- (6.15 review: the banner counts to the kills that beat it)
 	set(A.Done, 0)
 	set(A.Phase, "coming")
 	return side
@@ -739,9 +892,9 @@ local function hordeStep(h: Horde, now: number)
 		h.due += h.bursts[h.burst]
 		h.nextBurst = now + T.Horde.BurstEvery
 	end
-	-- What is due comes, a few a step, while the server has room (else a little later).
-	local budget = 5
-	while h.spawned < h.due and budget > 0 and #h.gates > 0 and room() do
+	-- What is due comes, a few a step, in the event's own budget (6.15 review: calm roamers make room; else later).
+	local budget = if h.spawned < h.due and #h.gates > 0 then allowance(h.due - h.spawned) else 0
+	while h.spawned < h.due and budget > 0 and #h.gates > 0 do
 		budget -= 1
 		local gate = h.gates[h.spawned % #h.gates + 1]
 		local x, z = Rules.hordeSpot(gate, rng:NextNumber(), rng:NextNumber())
@@ -765,8 +918,8 @@ local function hordeStep(h: Horde, now: number)
 	end
 	if h.spawned >= h.total then
 		set(A.Phase, "gate")
-		if done >= h.total then
-			LiveEvents.finish("beaten")
+		if done >= h.goal then
+			LiveEvents.finish("beaten") -- (6.15 review: Beaten of it; a straggler never holds it up)
 		end
 	end
 end
@@ -779,9 +932,7 @@ local function stopHorde(run: Running, why: string): boolean
 		return false
 	end
 	horde = nil
-	for _, z in h.list do
-		Zombies.march(z, nil) -- (whoever is left roams on)
-	end
+	letGo(h.list) -- (6.15 review: whoever is left goes, or falls back and goes)
 	if why == "nobody" then
 		return true
 	end
@@ -792,7 +943,7 @@ local function stopHorde(run: Running, why: string): boolean
 			kills[player] = n
 		end
 	end
-	local shares = Rules.hordeShares(kills, h.done, h.total, beaten, function(player: Player): number
+	local shares = Rules.hordeShares(kills, h.done, h.goal, beaten, function(player: Player): number
 		return PlayerData.level(player)
 	end)
 	local head = if beaten then "🧟 HORDE BEATEN!" else "🧟 The horde falls back."
@@ -805,7 +956,7 @@ local function stopHorde(run: Running, why: string): boolean
 			PlayerData.track("event", player, "HordeBeaten", share.kills, if beaten then "beaten" else "time") -- (a no-op without Analytics)
 			notice:FireClient(player, `{head} Your {share.kills} {if share.kills == 1 then "kill" else "kills"}: +{Rules.money(share.money)} · +{share.xp} XP`)
 		else
-			notice:FireClient(player, `{head} {h.done} of {h.total} fell; kill some next time for a share.`)
+			notice:FireClient(player, `{head} {math.min(h.done, h.goal)} of {h.goal} fell; kill some next time for a share.`)
 		end
 	end
 	return true
@@ -863,16 +1014,26 @@ function LiveEvents.finish(why: string)
 	end
 	running = nil
 	last = run.id
-	local told = why == "delivered" or why == "nobody"
-	if run.id == "bloodmoon" then
-		stopBloodMoon()
-	elseif run.id == "supply" then
-		stopSupply()
-	elseif run.id == "horde" then
-		told = stopHorde(run, why) or told
-	end
+	-- (6.15 review: the state goes first, so an error in an event's end never leaves the banner and the markers up)
 	for _, name in Rules.AttrNames do
 		set(name, nil)
+	end
+	Zombies.eventReserve = 0
+	table.clear(Zombies.eventSpared)
+	local told = why == "delivered" or why == "nobody"
+	local ok, err: any = pcall(function()
+		if run.id == "bloodmoon" then
+			stopBloodMoon()
+		elseif run.id == "supply" then
+			stopSupply()
+		elseif run.id == "horde" then
+			told = stopHorde(run, why) or told
+		end
+	end)
+	if not ok then
+		warn(`[LiveEvents] the end of {run.id} failed: {err}`)
+		supply, horde = nil, nil
+		pcall(stopBloodMoon)
 	end
 	if not told then
 		notice:FireAllClients(Rules.endText(run.id, why))
@@ -926,11 +1087,13 @@ end
 
 local function step()
 	local now = os.clock()
+	fadeStep(now) -- (6.15 review: an ended event's zombies falling back)
 	local run = running
 	if not run then
 		schedule(now)
 		return
 	end
+	shareRoom() -- (6.15 review: its budget's hold on the roamers, the players its zombies leave alone)
 	if playersCount() == 0 then
 		LiveEvents.finish("nobody")
 		return
@@ -1022,6 +1185,9 @@ function LiveEvents.start()
 		set(name, nil)
 	end
 	Jobs.live = {
+		joined = function(player: Player) -- (6.15 review: a crew member paid with the event's bonus took part too)
+			tookPart(running, player)
+		end,
 		pay = LiveEvents.pay,
 		waves = LiveEvents.waves,
 		extraOffers = LiveEvents.extraOffers,
@@ -1031,7 +1197,10 @@ function LiveEvents.start()
 	-- The horde's kills (Main wired Zombies.onKill before this: the jobs' kills go on as they were).
 	local before = Zombies.onKill
 	Zombies.onKill = function(player: Player, z: Zombies.Zombie)
-		before(player, z)
+		-- (6.15 review: an event's zombie adds nothing to a mission's kill bonus: missions are never touched)
+		if not (z.event and Jobs.onMission(player)) then
+			before(player, z)
+		end
 		onKill(player, z)
 	end
 	-- The touch PUT DOWN (server/Cargo.luau and server/Equipment.luau hear it too: they hold nothing of the crate).

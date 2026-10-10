@@ -61,8 +61,11 @@ do
 	local nightWindow = (24 - D.NightFrom + D.NightTo) * D.DayLength / 24 - T.BloodMoon.MinNightLeft
 	local dayWindow = (D.NightFrom - D.NightTo) * D.DayLength / 24 - T.Rush.MinDayLeft
 	check("MaxWait outlasts the wait for the Blood Moon's and rush hour's moment", T.MaxWait >= D.DayLength - math.min(nightWindow, dayWindow) + T.Retry, T.MaxWait)
-	check("headroom under the server's zombie cap for the other players' waves", T.Headroom >= Config.Horde.Roam.reserve and T.Headroom < Config.Horde.MaxTotal - 20, T.Headroom)
-	check("the horde fits under the cap with its headroom", T.Horde.Count <= Config.Horde.MaxTotal - T.Headroom, T.Horde.Count)
+	-- 6.15 review: the event's own budget: the job waves keep Headroom under the cap; the residents (always there) and
+	-- the whole horde fit under it with the guards' room to spare.
+	check("headroom under the server's zombie cap for the other players' waves", T.Headroom >= 8 and T.Headroom < Config.Horde.MaxTotal - 20, T.Headroom)
+	check("the residents and the whole horde fit under the event's cap", Config.Horde.Residents.count + T.Horde.Count <= Config.Horde.MaxTotal - T.Headroom, Config.Horde.Residents.count + T.Horde.Count)
+	check("… and the residents and all the guards", Config.Horde.Residents.count + T.Supply.Guards.Max <= Config.Horde.MaxTotal - T.Headroom)
 end
 
 -- ── The clock ─────────────────────────────────────────────────────────────
@@ -228,6 +231,89 @@ do
 		return if key == "a" then 11 else 1
 	end)
 	check("each share × its own level scale", scaled.a.money > scaled.b.money and scaled.b.money == T.Horde.Money / 2, `{scaled.a.money} {scaled.b.money}`)
+end
+
+-- ── 6.15 review: the event's budget, the horde's goal, the carry's pace ────────
+do
+	local cap = Config.Horde.MaxTotal - T.Headroom
+	local a, b = LiveEvents.budget(50, 10)
+	check("room: a step's worth comes (StepSpawn), nothing to trim", a == T.StepSpawn and b == 0, `{a} {b}`)
+	local c, d = LiveEvents.budget(cap - 2, 10)
+	check("little room: what fits comes, calm roamers make room for the rest of the step", c == 2 and d == T.StepSpawn - 2, `{c} {d}`)
+	local e, f = LiveEvents.budget(cap + 4, 3)
+	check("over the cap: nothing comes, the step's worth to trim", e == 0 and f == 3, `{e} {f}`)
+	local g, h = LiveEvents.budget(10, 0)
+	check("nothing due: nothing", g == 0 and h == 0)
+	check("the horde's goal: Beaten of it, rounded up", LiveEvents.hordeGoal(40) == math.ceil(40 * T.Horde.Beaten) and LiveEvents.hordeGoal(40) < 40 and LiveEvents.hordeGoal(1) == 1 and LiveEvents.hordeGoal(10) == 9, LiveEvents.hordeGoal(40))
+	local pace = T.Supply.MaxPace
+	check("the carry's pace: a walk passes", LiveEvents.paceOk(8 * 0.25, 0.25) and LiveEvents.paceOk(pace * 2 + T.Supply.Slack - 0.1, 2))
+	check("… a teleport does not", not LiveEvents.paceOk(200, 0.25) and not LiveEvents.paceOk(pace * 10 + T.Supply.Slack + 1, 10))
+	check("… an admin's quick walk does", LiveEvents.paceOk(pace * 4 * 0.25 + T.Supply.Slack - 0.1, 0.25, 4) and not LiveEvents.paceOk(pace * 4 * 0.25 + T.Supply.Slack - 0.1, 0.25, 1))
+	check("the carry's checks: idle and stall shorter than the event, the carry's walk under MaxPace", T.Supply.Idle > 5 and T.Supply.Stall > T.Supply.Idle and T.Supply.Stall < LiveEvents.seconds("supply") / 2 and T.Supply.MaxPace >= 8)
+
+	-- A server's horde, step by step (Tick s): the residents always there, every player's roamers (refilled up to the
+	-- roamers' cap less what the event still wants, Zombies.eventReserve; calm ones let go for a burst that does not
+	-- fit, Zombies.trimRoamers), the job waves' zombies of the players on a job, the horde's bursts in its budget and
+	-- the players at the gate killing one every `killEvery` s. Returns when the whole horde had come (nil: never in
+	-- `seconds`), the most zombies at once while the event placed some, and the horde alive at most.
+	local Roam = Config.Horde.Roam
+	local function simulate(players: number, night: boolean, jobZombies: number, killEvery: number?, seconds: number): (number?, number, number)
+		local residents = Config.Horde.Residents.count
+		local wantRoam = math.floor(players * (Roam.min + Roam.max) / 2 * (if night then Config.DayNight.NightRoam else 1))
+		local roamers = math.max(0, math.min(wantRoam, Config.Horde.MaxTotal - Roam.reserve - residents - jobZombies))
+		local bursts = LiveEvents.bursts(T.Horde.Count, T.Horde.Bursts)
+		local released, spawned, alive, burst = 0, 0, 0, 0
+		local nextBurst, nextKill, nextRoam = 4, 10, 1
+		local done: number? = nil
+		local most, mostAlive = 0, 0
+		local t = 0
+		while t < seconds do
+			t += T.Tick
+			if burst < #bursts and t >= nextBurst then
+				burst += 1
+				released += bursts[burst]
+				nextBurst = t + T.Horde.BurstEvery
+			end
+			local total = residents + roamers + jobZombies + alive
+			local count, short = LiveEvents.budget(total, released - spawned)
+			local trimmed = math.min(short, roamers)
+			roamers -= trimmed
+			count += trimmed
+			spawned += count
+			alive += count
+			if count > 0 then
+				most = math.max(most, residents + roamers + jobZombies + alive)
+			end
+			mostAlive = math.max(mostAlive, alive)
+			if spawned >= T.Horde.Count and not done then
+				done = t
+			end
+			if killEvery and t >= nextKill then
+				nextKill = t + killEvery
+				if alive > 0 then
+					alive -= 1
+				end
+			end
+			if t >= nextRoam then
+				nextRoam = t + Roam.every
+				local roamCap = Config.Horde.MaxTotal - Roam.reserve - (T.Horde.Count - spawned)
+				local room = roamCap - (residents + roamers + jobZombies + alive)
+				roamers += math.max(0, math.min(room, Roam.batch * players, wantRoam - roamers))
+			end
+		end
+		return done, most, mostAlive
+	end
+	local lastBurst = 4 + (T.Horde.Bursts - 1) * T.Horde.BurstEvery
+	local quietDay, quietMost = simulate(8, false, 0, nil, LiveEvents.seconds("horde"))
+	check("8 players by day, nobody fighting: the whole horde comes in its bursts", quietDay ~= nil and quietDay <= lastBurst + 2, quietDay)
+	check("… never over the event's cap (the job waves keep their room)", quietMost <= Config.Horde.MaxTotal - T.Headroom, quietMost)
+	local quietNight = simulate(8, true, 0, nil, LiveEvents.seconds("horde"))
+	check("8 players at night (more roamers): the whole horde too", quietNight ~= nil and quietNight <= lastBurst + 2, quietNight)
+	local busy, busyMost = simulate(8, false, 24, 3, LiveEvents.seconds("horde"))
+	check("8 players, four on jobs with their waves, a kill every 3 s at the gate: the whole horde within its first two minutes", busy ~= nil and busy <= 120, busy)
+	check("… never over the event's cap", busyMost <= Config.Horde.MaxTotal - T.Headroom, busyMost)
+	local solo = simulate(1, false, 0, nil, LiveEvents.seconds("horde"))
+	check("one player: the whole horde in its bursts", solo ~= nil and solo <= lastBurst + 2, solo)
 end
 
 -- ── The horde's way in ────────────────────────────────────────────────────

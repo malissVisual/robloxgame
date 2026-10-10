@@ -31,6 +31,10 @@
 --   * Zombies.march(z, at): an event's zombie (the horde at the gates, a supply drop's guards): it never despawns, goes
 --     after a player within Config.LiveEvents.Reach, else walks to `at` (never into the safe zone) and waits there;
 --     nil lets it go (it roams on and despawns as a roamer does). Zombie.event says whose it is ("horde", "supply").
+--   * 6.15 review: Zombies.eventReserve (what the event still wants: the roamers stop that much lower),
+--     Zombies.trimRoamers(n) (calm roamers far from everybody go, to make room for the event's), Zombies.eventSpared
+--     (players an event's zombie leaves alone: on a mission) and Zombies.retreat(z, at) (an ended event's zombie walks
+--     away after nobody; server/LiveEvents.luau takes it away).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -88,6 +92,7 @@ export type Zombie = {
 	baseSpeed: number, -- 6.15: its own full speed (walkSpeed is this, or the Blood Moon's frenzy of it)
 	march: Vector3?, -- 6.15: an event's zombie: where it walks to and waits (Zombies.march)
 	event: string?, -- 6.15: the live event it belongs to ("horde", "supply")
+	retreat: boolean?, -- 6.15 review: an ended event's zombie walking away (Zombies.retreat): after nobody
 }
 
 local Zombies = {}
@@ -131,6 +136,10 @@ Zombies.extraTargets = nil :: (() -> { ExtraTarget })?
 Zombies.frozen = false
 -- 6.15, a live event (server/LiveEvents.luau): × the roamers wanted around every player (the Blood Moon's).
 Zombies.roamBoost = 1
+-- 6.15 review (server/LiveEvents.luau): the zombies a live event still wants to place (the roamers stop that much
+-- lower under the cap), and the players its zombies leave alone (on a mission: missions are never touched).
+Zombies.eventReserve = 0
+Zombies.eventSpared = {} :: { [Player]: boolean }
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -710,6 +719,61 @@ function Zombies.march(z: Zombie, at: Vector3?, event: string?)
 	end
 end
 
+-- 6.15 review: up to `count` calm roamers (not hunting, on no car, nobody's guard or event) go, the farthest from
+-- every player first and none within 100 studs of one: room for a live event's zombies. Returns how many went.
+function Zombies.trimRoamers(count: number): number
+	if count <= 0 then
+		return 0
+	end
+	local spots: { Vector3 } = {}
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if rootPart then
+			table.insert(spots, rootPart.Position)
+		end
+	end
+	local calmOnes: { { z: Zombie, far: number } } = {}
+	for _, z in zombies do
+		if z.dead or not z.roamer or z.resident or z.hunting or z.car or z.march or z.leash then
+			continue
+		end
+		local far = math.huge
+		for _, at in spots do
+			far = math.min(far, (z.root.Position - at).Magnitude)
+		end
+		if far >= 100 then
+			table.insert(calmOnes, { z = z, far = far })
+		end
+	end
+	table.sort(calmOnes, function(a, b)
+		return a.far > b.far
+	end)
+	local gone = 0
+	for _, entry in calmOnes do
+		if gone >= count then
+			break
+		end
+		Zombies.despawn(entry.z)
+		gone += 1
+	end
+	return gone
+end
+
+-- 6.15 review: an ended event's zombie walks away to `at` after nobody (server/LiveEvents.luau takes it away once
+-- nobody is near or its time is up).
+function Zombies.retreat(z: Zombie, at: Vector3)
+	if z.dead then
+		return
+	end
+	z.march = at
+	z.retreat = true
+	z.hunting = false
+	z.lostSince = nil
+	z.guard = false
+	z.humanoid.WalkSpeed = z.walkSpeed
+end
+
 -- roamer = one of the zombies around a player without a job (Config.Horde.Roam): it wanders until it notices you.
 -- 6.15 review: reserved = a mission's own (server/MissionEnemies.luau): it may use Zombies.missionReserve, the others not.
 function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean?, resident: boolean?, roamer: boolean?, reserved: boolean?): Zombie?
@@ -1208,6 +1272,23 @@ local function flatSpeed(v: Vector3): number
 	return Vector3.new(v.X, 0, v.Z).Magnitude
 end
 
+-- 6.15 review: an event's zombie's target: the nearest within reach, never a player on a mission (Zombies.eventSpared)
+-- nor anybody once it retreats.
+local function eventTarget(z: Zombie, position: Vector3, targets: { Target }, reach: number): (Target?, number)
+	local best: Target? = nil
+	local bestDistance = if z.retreat then 0 else reach
+	for _, t in targets do
+		if Zombies.eventSpared[t.player] then
+			continue
+		end
+		local d = (t.position - position).Magnitude
+		if d < bestDistance then
+			best, bestDistance = t, d
+		end
+	end
+	return best, bestDistance
+end
+
 -- The nearest target within reach. people = only the players they go after (Zombies.hunts); 6.15 review: `resident`
 -- (the world's own people) not a mission's crew (Zombies.spares).
 local function nearestTarget(position: Vector3, targets: { Target }, reach: number, people: boolean, resident: boolean?): (Target?, number)
@@ -1446,7 +1527,11 @@ local function step()
 		else
 			local march = z.march
 			local reach = if ranged then range + 40 elseif march then Config.LiveEvents.Reach elseif z.guard then 90 elseif z.resident then 160 else 400
-			best, bestDistance = nearestTarget(position, targets, reach, z.def.jobOnly == true, z.resident)
+			if march then
+				best, bestDistance = eventTarget(z, position, targets, reach) -- (6.15 review: missions spared)
+			else
+				best, bestDistance = nearestTarget(position, targets, reach, z.def.jobOnly == true, z.resident)
+			end
 			if not best then
 				if z.def.jobOnly then
 					standGuard(z, position, now)
@@ -1595,8 +1680,8 @@ local function keepRoamers()
 	-- More of them at night (smoothly at dusk and dawn).
 	local night = Economy.nightScale(Config.DayNight.NightRoam, DayNight.nightFactor())
 	for _, player in Players:GetPlayers() do
-		if #zombies >= Horde.MaxTotal - Roam.reserve then
-			return -- the rest is for the jobs' waves
+		if #zombies >= Horde.MaxTotal - Roam.reserve - Zombies.eventReserve then
+			return -- the rest is for the jobs' waves (6.15 review: and what a live event still wants)
 		end
 		if Zombies.hunts(player) then
 			continue -- on a job: the waves come instead
