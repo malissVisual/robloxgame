@@ -613,7 +613,7 @@ local function drawHands(): boolean
 	local pieces, room = carryNow()
 	local weapon = if state and type(state.weapon) == "string" then state.weapon else nil
 	local bat = kitOwned().bat == true -- 6.7: the Baseball Bat (V swings it with the gun away)
-	local key = `{held}|{mine}|{count}|{pieces}|{room}|{down}|{carJob}|{weapon}|{bagId()}|{bat}`
+	local key = `{held}|{mine}|{count}|{pieces}|{room}|{down}|{carJob}|{weapon}|{bagId()}|{bat}|{job and job.round == true}`
 	if key == shownHands then
 		return false
 	end
@@ -659,13 +659,20 @@ local function drawHands(): boolean
 		tile.line = { name, sub }
 		if hand == "bag" then
 			local share, text = Inventory.fill(pieces, room)
+			if job and job.round == true then
+				-- 6.21.1: a newspaper round's papers ride in its satchel whatever the room (the owner: "8/14, I can take
+				-- 14 newspapers?"): the papers still to deliver, the ring their share of the round
+				local total = math.max(1, tonumber(job.total) or pieces)
+				share, text = math.clamp(pieces / total, 0, 1), `📰 {pieces}`
+			end
 			local right, left = Inventory.ring(share)
 			local ring = tile.ring
 			ring.Right.Rotation = right
 			ring.Left.Rotation = left
-			ring.Frame.Visible = mine and not down
-			setPill(tile, if not mine then "" elseif down then "DOWN" else text)
-			tile.pill.BackgroundColor3 = if down then P.warn else BLUE
+			local round = job ~= nil and job.round == true -- (the satchel shows with or without a bag)
+			ring.Frame.Visible = (mine or round) and not down
+			setPill(tile, if round then text elseif not mine then "" elseif down then "DOWN" else text)
+			tile.pill.BackgroundColor3 = if down and not round then P.warn else BLUE
 		end
 		if hand == held then
 			heldLine = tile.line
