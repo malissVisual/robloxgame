@@ -241,7 +241,7 @@ local function heroCard(parent: Instance, screen: Screen, item: Item, height: nu
 		action = if act then {
 			name = act.name or "HeroAction",
 			text = act.text,
-			kind = act.kind or (if act.on then "primary" else "shut"),
+			kind = if act.on then (act.kind or "primary") else "shut", -- (6.18 review: a button that only says why looks shut)
 			onClick = function()
 				run(act, screen.toast)
 			end,

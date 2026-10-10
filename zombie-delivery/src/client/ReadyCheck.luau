@@ -335,7 +335,7 @@ function ReadyCheck.fillTile(t: { [string]: any }?)
 	local action = t.action
 	if action then
 		local kind = if not mission then "shut" elseif result.ready and result.start.can then "good" elseif result.ready then "warn" else "primary"
-		action.Text = if not mission then "MISSIONS ›" elseif kind == "good" then "▶ START" elseif kind == "warn" then "READY CHECK ›" else "GET READY ›"
+		action.Text = if not mission then "MISSIONS ›" elseif kind == "good" then "READY · GO ›" elseif kind == "warn" then "READY CHECK ›" else "GET READY ›"
 		CardKit.paint(action, kind)
 	end
 	local goal = result.goal

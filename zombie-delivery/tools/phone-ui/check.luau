@@ -948,7 +948,7 @@ do
 	Phone.open()
 	tile=named("nextApp")
 	check("6.14 NEXT MISSION: READY · START in green, nothing to buy",tile:FindFirstChild("Status",true).Text=="✔ READY · START" and tile:FindFirstChild("Status",true).TextColor3==M.Theme.Contract.good
-		and tile:FindFirstChild("Goal",true).Text=="Everything it needs is yours" and tile:FindFirstChild("Go",true).Text=="▶ START")
+		and tile:FindFirstChild("Goal",true).Text=="Everything it needs is yours" and tile:FindFirstChild("Go",true).Text=="READY · GO ›")
 	named("nextApp").Activated:Fire()
 	check("… the READY CHECK: every required row ✔, START",named("Start")~=nil and named("Check_vehicle"):FindFirstChild("Mark").Text=="✔" and named("Check_vehicle"):FindFirstChild("Action")==nil and named("SavingsGoal")==nil
 		and named("Start").BackgroundColor3==M.Theme.Contract.good and named("MissionCard"):FindFirstChild("Start",true)==named("Start"))

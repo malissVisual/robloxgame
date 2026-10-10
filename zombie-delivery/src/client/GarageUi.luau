@@ -408,6 +408,7 @@ local function open()
 	end
 	if not window.Visible then
 		selected = nil
+		ShopView.home("garage") -- (6.18 review: never back on the last car's details)
 	end
 	fit()
 	window.Visible = true

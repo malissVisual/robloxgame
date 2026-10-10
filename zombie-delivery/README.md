@@ -1143,6 +1143,23 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## One look everywhere (6.18)
+
+The owner: "unify it so the phone and the other popups look like JOBS". A UI kit (`client/CardKit.luau`,
+`shared/CardLayout.luau`, `Config.UiKit`, `design/ui-kit/README.md`) carries the 6.17 JOBS look to every window: one
+hero card for what matters most now, compact rows (a picture or icon, a name, one tiny facts line, one big number, a
+round action), chips for state, one big button, and every detail behind a tap.
+- **The phone's home** (`client/PhoneHome.luau`): chips for the cash (BANK), the level (CAREER) and the shift; the hero
+  is the NEXT MISSION with its readiness and savings bar, or YOUR RUN during a run; the apps are rows with one live fact
+  each ("JOBS · 7 jobs · best $1,140").
+- **The shops** (every counter, `client/ShopWindow.luau`, `client/ShopView.luau`), **BAG & ITEMS**, **GARAGE**,
+  **STYLE**: the goal or the best buy (or what you use) as the hero with its price big, the items as rows with BUY / USE
+  / EQUIP / WEAR.
+- **MISSIONS** (the chapter's mission as the hero with START or GET READY beside its rows, tabs as chips), **TASKS**
+  (CLAIM big), **READY CHECK**, **REGULARS**, **CAREER**, **ESTATE**, **CREW**, **BANK**, **MESSAGES**, **SETTINGS**
+  (`client/PhoneMore.luau`).
+Every action goes through the same server paths as before.
+
 ## JOBS at a glance (6.17)
 
 The owner: "When I open JOBS I want to leave: it's cluttered and doesn't make me want to click a job." JOBS (the

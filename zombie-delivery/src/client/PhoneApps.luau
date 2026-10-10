@@ -711,7 +711,8 @@ function PhoneApps.garage(list: Instance, look: OrdersUi.Kit, host: Host, wide: 
 		fact = if #heroFacts > 0 then table.concat(heroFacts, " · ") else host.transport(),
 		value = if out and levels then `📦 {Economy.capacity(out.id, levels)}` else nil,
 		current = true,
-		act = if hasCar then { text = "BRING MY CAR", on = true, run = function()
+		-- (6.18 review: a job's company vehicle comes too without a car of your own: SpawnCar brings it)
+		act = if hasCar or type(host.job()) == "table" then { text = if hasCar then "BRING MY CAR" else "BRING THE VEHICLE", on = true, run = function()
 			Net.get("SpawnCar"):FireServer()
 			host.close()
 		end, name = "BringCar" } else { text = if hasBike then "NO CAR YET" else "NO VEHICLE YET", on = false, why = "No vehicle of your own yet: the SHOP app says what comes next." },

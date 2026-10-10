@@ -104,7 +104,7 @@ function GearShop.items(state: any, here: boolean, forBike: boolean?, bikeId: st
 		elseif not fits then
 			item.act = { text = misfit(gear), on = false }
 		elseif now == "installed" then
-			item.act = { text = "REMOVE", short = "OFF", on = here, kind = "shut", why = "Walk into the shop to fit gear here.", run = function()
+			item.act = { text = "REMOVE", short = "OFF", on = here, kind = "warn", why = "Walk into the shop to fit gear here.", run = function()
 				send("remove", id)
 			end }
 		elseif now == "owned" then
