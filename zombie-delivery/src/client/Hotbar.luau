@@ -70,7 +70,6 @@ local ITEMS_W = Hotbar.SLOTS * SLOT + (Hotbar.SLOTS - 1) * SLOT_GAP
 local HANDS_W = #Holding.Order * SLOT + (#Holding.Order - 1) * SLOT_GAP -- 6.1
 local ROW_W = HANDS_W + DIVIDER + ITEMS_W -- the hands and the items (6.3: the pill over them)
 local HAND_ICON: { [string]: string } = { fists = "✊", bag = "🛍", gun = "🔫" }
-local BADGE: { [string]: string } = Bag.Marks -- (6.6: ✋ hands, 🛍 the bag, 🚲 the bike's bag, 📰 the satchel)
 local FLASH = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local LIT = 0.6 -- seconds the used slot keeps its red outline
 
@@ -530,7 +529,7 @@ local function carriedNow(): { any }
 		for _, piece in job.carried do
 			if type(piece) == "table" then
 				table.insert(list, piece)
-				if piece.where == "pack" or piece.where == "rack" then
+				if piece.where == "pack" or piece.where == "rack" or piece.where == "bag" then -- (6.19: the bag's pieces too: "7/6")
 					inPack += 1
 				end
 			end
@@ -544,31 +543,33 @@ local function carriedNow(): { any }
 end
 
 -- 6.3: one piece in the pill: its small icon and, at its corner, the badge of where it is ("+N" when `more`).
-local function pillPiece(piece: any, where: string, other: boolean, order: number)
+local function pillPiece(piece: any, _where: string, _other: boolean, order: number, count: number?)
+	-- 6.19: the kind's icon, and ×n when there are more of it (the place badges are gone)
+	local n = count or 1
 	local holder = Ui.make("Frame", {
 		Name = "Piece",
-		Size = UDim2.fromOffset(PIECE_W, PILL_H),
+		Size = UDim2.fromOffset(if n > 1 then PIECE_W + 18 else PIECE_W, PILL_H),
 		BackgroundTransparency = 1,
 		LayoutOrder = order,
 	}, pillRow)
 	local look = if type(piece.look) == "string" then piece.look else nil
 	Ui.icon(holder, Icons.cargo(look), BagUi.emoji(look), UDim2.fromOffset(PIECE_ICON, PIECE_ICON), {
-		Position = UDim2.new(0.5, -2, 0.5, 0),
+		Position = UDim2.new(0, PIECE_W / 2 - 2, 0.5, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextTransparency = if other then 0.6 else 0,
-		ImageColor3 = if other then P.ink2 else P.ink,
-		ImageTransparency = if other then 0.6 else 0,
+		ImageColor3 = P.ink,
 	})
-	Ui.label(holder, BADGE[where] or "📦", UDim2.fromOffset(11, 11), {
-		Position = UDim2.new(1, 0, 1, -3),
-		AnchorPoint = Vector2.new(1, 1),
-		TextSize = 9,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextTransparency = if other then 0.6 else 0,
-		ZIndex = 2,
-	})
+	if n > 1 then
+		Ui.label(holder, `×{n}`, UDim2.fromOffset(20, PILL_H), {
+			Name = "Count",
+			Position = UDim2.fromOffset(PIECE_W - 4, 0),
+			Font = Theme.HeadingFont,
+			TextSize = 12,
+			TextColor3 = P.ink,
+			TextXAlignment = Enum.TextXAlignment.Left,
+		})
+	end
 end
 
 local function drawStrip()
@@ -585,20 +586,32 @@ local function drawStrip()
 	for _, place in places do
 		room += place.room
 	end
+	-- 6.19 (the owner: "CARRYING looks all weird"): one icon per kind of piece with its count (×3), no badge per piece
 	local parts: { string } = {}
 	local shown: { Bag.Tile } = {}
+	local counts: { [string]: number } = {}
+	local hidden = 0
 	for _, t in tiles do
 		local piece = t.piece
-		if piece and #shown < maxPieces then
-			table.insert(shown, t)
-			table.insert(parts, `{t.where}:{tostring(piece.look)}:{t.other}`)
-		end
 		if piece then
 			pieces += 1
+			local look = tostring(piece.look)
+			if counts[look] then
+				counts[look] += 1
+			elseif #shown < maxPieces then
+				counts[look] = 1
+				table.insert(shown, t)
+			else
+				hidden += 1
+			end
 		end
 	end
 	pieces += morePieces
-	local more = pieces - #shown
+	for _, t in shown do
+		local look = tostring((t.piece :: any).look)
+		table.insert(parts, `{look}:{counts[look]}`)
+	end
+	local more = hidden + morePieces
 	local count = `{pieces}/{room}`
 	local visible = pieces > 0 or job ~= nil
 	local key = `{table.concat(parts, ",")}|{more}|{count}|{visible}`
@@ -608,7 +621,7 @@ local function drawStrip()
 	shownStrip = key
 	Ui.clear(pillRow)
 	for index, t in shown do
-		pillPiece(t.piece, t.where, t.other, index)
+		pillPiece(t.piece, t.where, false, index, counts[tostring((t.piece :: any).look)])
 	end
 	if more > 0 then
 		P.text(pillRow, `+{more}`, UDim2.fromOffset(0, PILL_H), {
