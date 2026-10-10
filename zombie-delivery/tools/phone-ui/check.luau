@@ -93,10 +93,10 @@ end
 check("no job has honest empty contract",text("READY FOR YOUR NEXT RUN")~=nil)
 named("HomeContract").Activated:Fire()
 -- 5.5: the board is in the phone; 6.0.1: in its centred popup. FULL BOARD opens the Dispatch board.
-check("empty contract opens the board in the popup",Phone.isOpen() and showing("board") and text("JOB BOARD")~=nil and text("Calling the dispatcher...")~=nil)
+check("empty contract opens the board in the popup",Phone.isOpen() and showing("board") and text("JOBS")~=nil and text("Calling the dispatcher...")~=nil)
 check("the board asks the server for offers",M.sent[#M.sent].name=="RequestOffers")
 check("the phone stays upright under the popup",upright() and named("Home").Visible and blur()~=nil and Phone.appOpen())
-tap("FULL BOARD  [J]")
+tap("FULL BOARD")
 check("FULL BOARD opens the real board, the popup and its blur go",boards==1 and not Phone.isOpen() and popup()==nil and blur()==nil)
 Phone.open()
 check("home stands upright, no popup",upright() and popup()==nil and not Phone.appOpen())
@@ -108,8 +108,11 @@ check("home reflects incoming order",text("HARBOR WAREHOUSE")~=nil and text("$18
 local jobsBadge=named("jobsApp"):FindFirstChild("Badge")
 check("JOBS' badge counts the open orders",jobsBadge.Visible and jobsBadge.Text=="2" and named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders")
 named("jobsApp").Activated:Fire()
-check("6.12.8: JOBS opens BOARD during a run, not ORDERS",showing("board") and text("JOB BOARD")~=nil and text("ORDERS")==nil)
-check("6.12.8: YOUR RUN heads the board with DETAILS",named("YourRun")~=nil and text("Your run · 2 orders · $260")~=nil and text("DETAILS")~=nil)
+check("6.12.8: JOBS opens BOARD during a run, not ORDERS",showing("board") and text("JOBS")~=nil and text("ORDERS")==nil)
+-- 6.17: YOUR RUN is a chip in the popup's header ("▶ YOUR RUN · 2 · $260"); a tap shows its card (DETAILS as before).
+check("6.17: the run's chip in the header's bar, not its card on the list",named("RunChip")~=nil and named("RunChip").Text=="▶ YOUR RUN · 2 · $260" and named("RunChip").Parent.Parent==named("HeaderBar") and named("YourRun")==nil)
+named("RunChip").Activated:Fire()
+check("6.17: the chip opens YOUR RUN with DETAILS and ‹ JOBS",named("YourRun")~=nil and text("Your run · 2 orders · $260")~=nil and text("DETAILS")~=nil and named("BackToJobs")~=nil)
 text("DETAILS").Parent.Activated:Fire()
 check("6.12.8: YOUR RUN's DETAILS opens ORDERS as before",showing("orders") and text("ORDERS")~=nil)
 named("Close").Activated:Fire()
@@ -196,7 +199,11 @@ Phone.open();named("mapApp").Activated:Fire()
 check("MAP opens the big map and puts the phone away",M.mapOpen and not Phone.isOpen())
 M.mapOpen=false
 check("Phone.has follows the state",Phone.has())
--- The board: sections, two columns, locks, ACCEPT, a banner for a new board.
+-- The board: 6.17's hero and rows (client/JobsView.luau, shared/JobPick.luau), locks, ACCEPT, a banner for a new board.
+-- (a row by its offer's index; a label in it by its name)
+local function rowOf(index) return all(named("AppPopup"),function(object) return object.Name=="JobRow" and object:GetAttribute("Index")==index end)[1] end
+local function within(root,name) return root and all(root,function(object) return object.Name==name end)[1] end
+local function rowOrder() local rows=all(named("AppPopup"),function(object) return object.Name=="JobRow" end);table.sort(rows,function(a,b) return a.LayoutOrder<b.LayoutOrder end);local out={};for _,row in rows do table.insert(out,row:GetAttribute("Index")) end;return table.concat(out,",") end
 Phone.open()
 local offers={
 	{index=11,mode="foot",cargo="Letters",customer="Ann",first="Post office",address="12 Elm St",district="Old Town",distance=240,time=180,pay=40,stars=1,tierName="Easy"},
@@ -209,32 +216,55 @@ M.remotes.Offers.OnClientEvent:Fire(offers,M.now+120,{footNote="Two shops near y
 check("a new board drops a banner on the open phone",named("Banner")~=nil and named("Banner").Parent==named("Screen"))
 named("Banner").Activated:Fire()
 check("the banner opens the board in the popup",showing("board") and upright())
-check("board sections: on foot, bike, each danger level",text("On foot · 1")~=nil and text("Bike · 1")~=nil and text("★★ Risky · 2")~=nil and text("★★★ Deadly · 1")~=nil)
-check("the footNote heads ON FOOT",text("Two shops near you are shut.")~=nil)
--- 6.15: rush hour's strip heads the jobs (server/LiveEvents.luau's workspace attributes), its clock from LiveEventEnds.
+-- 6.17: the hero is the best-paying job you can take (the locked $900 one is passed over), the rest are compact rows.
+local hero=named("Hero")
+check("6.17: the hero card: the best-paying job you can take",hero~=nil and hero:GetAttribute("Index")==13 and hero:GetAttribute("Hero")=="best"
+	and within(hero,"Pay").Text=="$300" and within(hero,"Take").Text=="TAKE JOB" and within(hero,"Danger").Text=="★★" and within(hero,"Facts").Text=="📍 900    ⏱ 5:00")
+check("… no ribbon or countdown for a plain job, its ⓘ",within(hero,"Ribbon")==nil and within(hero,"Countdown")==nil and within(hero,"Details")~=nil and within(hero,"Details").Text=="ⓘ")
+check("6.17: N MORE JOBS, the open rows first, the locked ones last",text("4 MORE JOBS")~=nil and rowOrder()=="11,12,14,15",rowOrder())
+local walk=rowOf(11)
+check("6.17: a row: 🚶, the distance and time, the pay, a red +",within(walk,"Danger").Text=="🚶" and within(walk,"Facts").Text=="📍 240 · ⏱ 3:00" and within(walk,"Pay").Text=="$40"
+	and within(walk,"Add").Text=="+" and within(walk,"Add").BackgroundColor3==M.Theme.Contract.red and within(rowOf(12),"Danger").Text=="🚲")
+check("… the old card's words are not on the list",text("LETTERS → ANN")==nil and text("Post office → 12 Elm St, Old Town")==nil and text("On foot · 1")==nil)
+check("a locked row: 🔒 LV 7 in place of +",within(rowOf(14),"Add").Text=="🔒 LV 7" and within(rowOf(15),"Add").Text=="📦 6 SLOTS")
+check("the footNote under the rows",text("Two shops near you are shut.")~=nil and named("FootNote")~=nil)
+-- 6.15: rush hour's chip in the header (server/LiveEvents.luau's workspace attributes), its clock from LiveEventEnds.
 M.workspace:SetAttribute("LiveEvent","rush");M.workspace:SetAttribute("LiveEventEnds",M.now+192)
 Phone.open("board")
-check("6.15: rush hour heads the board with its pay and its clock",text("🕑 RUSH HOUR · ×1.5 pay · 3:12")~=nil)
+check("6.15 / 6.17: rush hour's chip at the header's right with its clock",named("RushChip")~=nil and named("RushChip").Text=="🕑 RUSH ×1.5 · 3:12" and named("RushChip").Parent==named("HeaderBar"))
 M.workspace:SetAttribute("LiveEvent",nil);M.workspace:SetAttribute("LiveEventEnds",nil)
 Phone.open("board")
-check("6.15: no strip without an event that pays",text("🕑 RUSH HOUR · ×1.5 pay · 3:12")==nil and #M.warnings==0)
-check("a wide popup: two columns of cards",named("Columns")~=nil and named("Left")~=nil and named("Right")~=nil)
-check("a card: the cargo → the customer, the pickup, the pay",text("LETTERS → ANN")~=nil and text("Post office → 12 Elm St, Old Town")~=nil and text("$40")~=nil)
-tap("🔒 LEVEL 7")
+check("6.15: no chip without an event that pays",named("RushChip")==nil and #M.warnings==0)
+check("6.17: a wide popup: the hero on the left, the rows on the right",named("JobsView")~=nil and named("Left").Size.X.Scale==Config.JobsView.HeroShare and math.abs(named("Right").Size.X.Scale-(1-Config.JobsView.HeroShare))<1e-9
+	and named("JobsView"):FindFirstChildOfClass("UIListLayout").FillDirection.Name=="Horizontal" and named("Hero").Parent==named("Left") and rowOf(11).Parent==named("Right"))
+check("6.17: the gamepad lands on the hero's button",M.focus==within(named("Hero"),"Take"))
+-- 6.17: a tap on a row opens its details: the old full card (the cargo → the customer, the route, the chips, ACCEPT).
+rowOf(11).Activated:Fire()
+check("6.17: a row's details: the old card, ‹ JOBS",text("LETTERS → ANN")~=nil and text("Post office → 12 Elm St, Old Town")~=nil and text("$40")~=nil and text("ACCEPT")~=nil and named("BackToJobs")~=nil and named("Hero")==nil)
+named("BackToJobs").Activated:Fire()
+check("… ‹ JOBS goes back to the list",named("Hero")~=nil and text("LETTERS → ANN")==nil)
+within(named("Hero"),"Details").Activated:Fire()
+check("6.17: the hero's ⓘ opens its details (its role chip there)",text("CRATES → CID")~=nil and caps("🛣 Long haul")~=nil)
+tap("‹ JOBS")
+within(rowOf(14),"Add").Activated:Fire()
 check("a locked offer says why",string.find(toasts[#toasts] or "","level 7",1,true)~=nil and lastSent("AcceptJob")==nil)
-tap("📦 NEEDS 6 SLOTS")
+within(rowOf(15),"Add").Activated:Fire()
 check("a too-big offer says why",toasts[#toasts]=="Your van holds 4.")
-tap("ACCEPT")
-check("ACCEPT fires AcceptJob with the offer's index",lastSent("AcceptJob").args[1]==11)
+rowOf(15).Activated:Fire()
+check("… its details say NEEDS 6 SLOTS",text("📦 NEEDS 6 SLOTS")~=nil)
+tap("‹ JOBS")
+within(rowOf(11),"Add").Activated:Fire()
+check("a row's + off duty is ACCEPT: AcceptJob with the offer's index",lastSent("AcceptJob").args[1]==11)
 check("after ACCEPT the popup shows ORDERS",showing("orders") and text("ORDERS")~=nil and upright())
--- A run that takes more orders: + ADD ORDER keeps the board open.
+-- A run that takes more orders: + ADD keeps the board open.
 local run={cargo="Letters",customer="Ann",total=1,pay=40,endsAt=M.now+100,timeLimit=200,position=M.Vector3.new(10,0,10),mode="foot",stack={can=true}}
 M.remotes.Job.OnClientEvent:Fire(run)
 for _,offer in offers do if offer.index==12 then offer.addOrder=true end end
 check("an accepted offer leaves the phone's board",offers[1].index==12)
 M.remotes.Offers.OnClientEvent:Fire(offers,M.now+240,{})
 Phone.open("board")
-tap("+ ADD")
+check("6.17: during a run the hero is the job that joins it: + ADD",named("Hero"):GetAttribute("Index")==12 and within(named("Hero"),"Take").Text=="+ ADD")
+within(named("Hero"),"Take").Activated:Fire()
 check("+ ADD fires AcceptJob and stays on the board",lastSent("AcceptJob").args[1]==12 and showing("board") and Phone.isOpen())
 -- GIVE UP: two presses within 4 s.
 Phone.open("orders")
@@ -264,37 +294,50 @@ do
 	Phone.close();Phone.open()
 	check("6.12.8: JOBS' line: the run's orders and the jobs waiting",named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders · 2 next")
 	named("jobsApp").Activated:Fire()
-	check("6.12.8: JOBS opens BOARD during a run",showing("board") and text("JOB BOARD")~=nil and text("You are on a delivery")==nil)
+	check("6.12.8: JOBS opens BOARD during a run",showing("board") and text("JOBS")~=nil and text("You are on a delivery")==nil)
+	-- 6.17: YOUR RUN and NEXT UP open from the header's chips (not on top of the list any more).
+	check("6.17: the header's chips: YOUR RUN with its pay, NEXT UP with its count",named("RunChip").Text=="▶ YOUR RUN · 2 · $160" and named("NextChip").Text=="NEXT UP · 2"
+		and named("YourRun")==nil and named("NextUp")==nil and named("Hero")~=nil)
+	named("RunChip").Activated:Fire()
 	-- YOUR RUN: one line an open order (what, from → to · pay · clock), the run's pay, the next stop.
-	check("YOUR RUN: the open orders and what they pay together",named("YourRun")~=nil and text("Your run · 2 orders · $160")~=nil)
+	check("YOUR RUN: the open orders and what they pay together",named("YourRun")~=nil and text("Your run · 2 orders · $160")~=nil and named("Hero")==nil)
 	check("YOUR RUN: one line an order, what and from → to",text("🚶  Pizza → Bob · Luigi's Pizza → 3 Oak Ave")~=nil and text("🚶  Letters → Ann · Post Office → 12 Elm St")~=nil and text("🚶  Cake → Flo")==nil)
 	check("YOUR RUN: each line's pay and clock",text("$120 · 03:20")~=nil and text("$40 · 01:30")~=nil)
 	check("YOUR RUN: the next stop",text("Next stop: PICK UP at Luigi's Pizza")~=nil)
 	M.now+=10;require("./OrdersUi").tick()
 	check("YOUR RUN's clocks tick",text("$120 · 03:10")~=nil and text("$40 · 01:20")~=nil)
+	named("RunChip").Activated:Fire()
+	check("6.17: the chip again goes back to the list",named("YourRun")==nil and named("Hero")~=nil)
+	named("NextChip").Activated:Fire()
 	-- NEXT UP: the queue in order, what, where, pay, the next one's reason to wait, ✕.
-	check("NEXT UP under YOUR RUN, in order",named("NextUp")~=nil and named("NextUp").LayoutOrder>named("YourRun").LayoutOrder and text("Next up · 2 / 6")~=nil and text("▶ They start on their own")~=nil
+	check("NEXT UP from its chip, in order",named("NextUp")~=nil and named("YourRun")==nil and text("Next up · 2 / 6")~=nil and text("▶ They start on their own")~=nil
 		and text("1  ★★  Crates → Cid")~=nil and text("2  🚶  Soup → Flo")~=nil)
 	check("NEXT UP: where and the pay",text("Depot → Harbor")~=nil and text("Wok Dead → 9 Oak Ave")~=nil and text("$300")~=nil and text("$70")~=nil)
 	check("NEXT UP: the next one says why it waits",text("⏸ Waits: needs your car: CALL CAR")~=nil and #all(M.gui,function(object) return object.Name=="Why" end)==1)
 	named("Drop").Activated:Fire()
 	check("NEXT UP's ✕ drops it through the JobQueue remote",M.lastSent("JobQueue").args[1]=="drop" and M.lastSent("JobQueue").args[2]==5)
-	-- The rows: + QUEUE (the run is full, or another transport waiting for your bike), the locks, the queue full.
-	check("the board's rows come under NEXT UP",named("AddAll").LayoutOrder>named("NextUp").LayoutOrder)
-	local queueButtons=all(named("AppPopup"),function(object) return object.Text=="+ QUEUE" end)
-	check("+ QUEUE on a row the full run can't take and on one waiting for your bike",#queueButtons==2 and text("🚲 RIDE YOUR BIKE")==nil and text("+ ADD")==nil)
-	check("a locked row keeps its lock, a special and the paper round say why they can't",text("🔒 LEVEL 7")~=nil and #all(named("AppPopup"),function(object) return object.Text=="FINISH YOUR RUN" end)==2)
-	tap("QUEUE FULL (6/6)")
+	tap("‹ JOBS")
+	-- The hero and the rows: + QUEUE (the run is full, or another transport waiting for your bike), the locks, the queue full.
+	local hero=named("Hero")
+	check("6.17: during a full run the hero is the best job that can wait in NEXT UP: + QUEUE",hero:GetAttribute("Index")==22 and within(hero,"Take").Text=="+ QUEUE" and within(rowOf(21),"Add").Text=="+"
+		and text("🚲 RIDE YOUR BIKE")==nil and text("+ ADD")==nil)
+	check("a locked row keeps its lock, a special and the paper round can't (⏸)",within(rowOf(23),"Add").Text=="🔒 LV 7" and within(rowOf(25),"Add").Text=="⏸" and within(rowOf(26),"Add").Text=="⏸"
+		and rowOrder()=="21,23,24,25,26",rowOrder())
+	rowOf(25).Activated:Fire()
+	check("… its details say why: FINISH YOUR RUN",text("FINISH YOUR RUN")~=nil and text("CASH TRANSPORT: CASH")~=nil)
+	tap("‹ JOBS")
+	within(rowOf(24),"Add").Activated:Fire()
 	check("a full queue says so",toasts[#toasts]=="NEXT UP holds 6 jobs." and M.lastSent("JobQueue").args[1]=="drop")
-	check("every row shows its pay",text("$55")~=nil and text("$130")~=nil and text("$50")~=nil and named("Pay")~=nil)
-	queueButtons[1].Activated:Fire()
-	check("+ QUEUE fires JobQueue with the offer's index and stays on the board",M.lastSent("JobQueue").args[1]=="queue" and M.lastSent("JobQueue").args[2]==21 and showing("board"))
-	check("a queued offer leaves the phone's board",list[1].index==22 and text("$55")==nil)
-	-- ADD ALL · $total sends the right request.
-	check("ADD ALL shows what it adds and pays (not the special, not the round)",text("ADD ALL · $235")~=nil and text("3 jobs: 3 wait in NEXT UP.")~=nil)
+	check("every row shows its pay",within(rowOf(21),"Pay").Text=="$55" and within(named("Hero"),"Pay").Text=="$130" and within(rowOf(24),"Pay").Text=="$50")
+	within(rowOf(21),"Add").Activated:Fire()
+	check("a row's + QUEUE fires JobQueue with the offer's index and stays on the board",M.lastSent("JobQueue").args[1]=="queue" and M.lastSent("JobQueue").args[2]==21 and showing("board"))
+	check("a queued offer leaves the phone's board",list[1].index==22 and rowOf(21)==nil)
+	-- ADD ALL · $total sends the right request, and says what it does.
+	check("ADD ALL shows what it pays (not the special, not the round)",named("AddAll").Text=="ADD ALL · $235" and named("AddAll").Parent==named("MoreHead") and text("4 MORE JOBS")~=nil)
 	tap("ADD ALL · $235")
-	check("ADD ALL fires JobQueue addAll",M.lastSent("JobQueue").args[1]=="addAll" and #M.lastSent("JobQueue").args==1)
+	check("ADD ALL fires JobQueue addAll and says what it does",M.lastSent("JobQueue").args[1]=="addAll" and #M.lastSent("JobQueue").args==1 and toasts[#toasts]=="3 jobs: 3 wait in NEXT UP.")
 	-- review: PAUSE, CLEAR ALL; the idle start's "Starts in a few seconds"; PAUSED with RESUME.
+	named("NextChip").Activated:Fire()
 	named("Pause").Activated:Fire()
 	check("review: PAUSE pauses NEXT UP through the JobQueue remote",M.lastSent("JobQueue").args[1]=="pause")
 	named("ClearAll").Activated:Fire()
@@ -308,15 +351,18 @@ do
 	Phone.close();Phone.open()
 	check("review: JOBS' line says it is paused",named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders · 2 next (paused)")
 	named("jobsApp").Activated:Fire()
+	check("6.17: JOBS opens on its list again",named("Hero")~=nil and named("NextUp")==nil)
 	-- A run that takes no more orders (a mission): the board still shows, its rows queue.
 	M.remotes.Job.OnClientEvent:Fire({cargo="Gold",customer="Dee",total=1,pay=900,endsAt=M.now+100,stars=3,address="Vault",mission={name="Code Red"}})
 	Phone.open("board")
-	check("6.12.8: on a mission the board shows YOUR RUN and + QUEUE, not 'You are on a delivery'",text("You are on a delivery")==nil and text("Your run · 1 order · $900")~=nil and text("★★★  Gold → Dee · Vault")~=nil and text("+ QUEUE")~=nil)
+	check("6.12.8: on a mission the board shows + QUEUE, not 'You are on a delivery'",text("You are on a delivery")==nil and named("RunChip").Text=="▶ YOUR RUN · 1 · $900" and text("+ QUEUE")~=nil)
+	named("RunChip").Activated:Fire()
+	check("… and its YOUR RUN",text("Your run · 1 order · $900")~=nil and text("★★★  Gold → Dee · Vault")~=nil)
 	-- Off duty the rows are ACCEPT again; the queue's state clears.
 	M.remotes.Job.OnClientEvent:Fire(nil)
 	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
 	Phone.open("board")
-	check("off duty: ACCEPT, no YOUR RUN, no NEXT UP",text("ACCEPT")~=nil and text("+ QUEUE")==nil and named("YourRun")==nil and named("NextUp")==nil)
+	check("off duty: TAKE JOB, no chips, no YOUR RUN, no NEXT UP",within(named("Hero"),"Take").Text=="TAKE JOB" and text("+ QUEUE")==nil and named("RunChip")==nil and named("NextChip")==nil and named("YourRun")==nil and named("NextUp")==nil)
 	check("6.12.8: no warnings on the board",#M.warnings==0)
 	Phone.close()
 end
@@ -340,32 +386,43 @@ do
 	M.remotes.Offers.OnClientEvent:Fire(rows,M.now+300,{})
 	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={soup}})
 	Phone.open("board")
-	local function cardOf(title) local label=text(title);return label and label.Parent and label.Parent.Parent end
 	local function inPopup(name) return all(named("AppPopup"),function(object) return object.Name==name end) end
+	-- 6.17: the rows and the hero show the picture, or its emoji on charcoal while the id is empty.
+	local thumb=within(rowOf(31),"Thumb")
+	check("6.17: an empty image id: the row's emoji, no image",within(thumb,"Emoji")~=nil and within(thumb,"Emoji").Text=="🍕" and within(thumb,"Picture")==nil
+		and within(rowOf(31),"Business").Text=="LUIGI'S PIZZA")
+	check("… the hero's by its job type (a special: the bank), a row without a business: its cargo and a parcel",named("Hero"):GetAttribute("Index")==32 and within(named("Hero"),"Business").Text=="FIRST ZOMBIE BANK  ·"
+		and within(rowOf(33),"Business").Text=="THE DAILY UNDEAD" and within(rowOf(34),"Business").Text=="CRATES" and within(within(rowOf(34),"Thumb"),"Emoji").Text=="📦" and #inPopup("Picture")==0)
+	rowOf(31).Activated:Fire()
+	local function cardOf(title) local label=text(title);return label and label.Parent and label.Parent.Parent end
 	local pizza=cardOf("PIZZAS → HANNAH")
 	local banner=pizza and pizza:FindFirstChild("ThumbBanner")
-	check("6.12.11: an empty image id: a slim banner on top of the card, the business's name and its emoji",banner~=nil and banner.LayoutOrder<text("PIZZAS → HANNAH").Parent.LayoutOrder
+	check("6.12.11: its details: a slim banner on top of the card, the business's name and its emoji",banner~=nil and banner.LayoutOrder<text("PIZZAS → HANNAH").Parent.LayoutOrder
 		and banner:FindFirstChild("Business").Text=="LUIGI'S PIZZA" and banner:FindFirstChild("Emoji").Text=="🍕" and banner.Size.Y.Offset<=30)
-	check("… a special's by its job type, the round's, none for a row without a business",cardOf("CASH TRANSPORT: CASH"):FindFirstChild("ThumbBanner"):FindFirstChild("Business").Text=="FIRST ZOMBIE BANK"
-		and cardOf("MORNING PAPERS → 12 DOORS ON ELM ST"):FindFirstChild("ThumbBanner"):FindFirstChild("Business").Text=="THE DAILY UNDEAD"
-		and cardOf("CRATES → CID"):FindFirstChild("ThumbBanner")==nil and #inPopup("ThumbBanner")==3)
-	check("… no image while the ids are empty, NEXT UP's row as before",#inPopup("Picture")==0 and #inPopup("Thumb")==0 and #inPopup("ThumbSquare")==0 and text("1  🚶  Soup → Flo").Position.X.Offset==0)
+	named("NextChip").Activated:Fire()
+	check("… NEXT UP's row as before",#inPopup("ThumbSquare")==0 and text("1  🚶  Soup → Flo").Position.X.Offset==0)
 	JobThumbs.Images.pizzeria="rbxassetid://424242"
 	JobThumbs.Images.noodles="rbxassetid://515151"
 	Phone.close();Phone.open("board")
+	local picture=within(within(rowOf(31),"Thumb"),"Picture")
+	check("6.17: an uploaded id: the row's picture, cropped, the business's name beside it",picture~=nil and picture.ClassName=="ImageLabel" and picture.Image=="rbxassetid://424242" and picture.ScaleType.Name=="Crop"
+		and within(rowOf(31),"Business").Text=="LUIGI'S PIZZA")
+	rowOf(31).Activated:Fire()
 	pizza=cardOf("PIZZAS → HANNAH")
 	local strip=pizza and pizza:FindFirstChild("Thumb")
-	local picture=strip and strip:FindFirstChild("Picture")
-	check("6.12.11: an uploaded id: an ImageLabel with that id across the top of the card, cropped",picture~=nil and picture.ClassName=="ImageLabel" and picture.Image=="rbxassetid://424242"
-		and picture.ScaleType.Name=="Crop" and strip.LayoutOrder<text("PIZZAS → HANNAH").Parent.LayoutOrder and pizza:FindFirstChild("ThumbBanner")==nil)
+	local cardPicture=strip and strip:FindFirstChild("Picture")
+	check("6.12.11: its details: an ImageLabel with that id across the top of the card, cropped",cardPicture~=nil and cardPicture.Image=="rbxassetid://424242"
+		and cardPicture.ScaleType.Name=="Crop" and strip.LayoutOrder<text("PIZZAS → HANNAH").Parent.LayoutOrder and pizza:FindFirstChild("ThumbBanner")==nil)
 	check("… the business's name on a dark label over its bottom-left corner",strip:FindFirstChild("Business").Text=="LUIGI'S PIZZA" and strip:FindFirstChild("Business").AnchorPoint.Y==1 and strip.ClipsDescendants==true)
 	local size=strip.AbsoluteSize
 	check("… about 2.4 : 1 (its height follows its width)",size.Y>0 and math.abs(size.X/size.Y-2.4)<0.05)
-	check("… the rest of the card unchanged: the pay, the route, the chips, ACCEPT",text("$60")~=nil and text("Luigi's Pizza → 3 Oak Ave")~=nil and pizza:FindFirstChild("Chips")~=nil and #inPopup("ThumbBanner")==2)
+	check("… the rest of the card unchanged: the pay, the route, the chips, ACCEPT",text("$60")~=nil and text("Luigi's Pizza → 3 Oak Ave")~=nil and pizza:FindFirstChild("Chips")~=nil and text("ACCEPT")~=nil)
+	named("NextChip").Activated:Fire()
 	local square=named("NextUp") and all(named("NextUp"),function(object) return object.Name=="ThumbSquare" end)[1]
 	check("6.12.11: NEXT UP's row: a small square of the picture, its words beside it",square~=nil and square.Image=="rbxassetid://515151" and square.ScaleType.Name=="Crop" and text("1  🚶  Soup → Flo").Position.X.Offset==44)
-	tap("ACCEPT")
-	check("… ACCEPT still takes the row",lastSent("AcceptJob").args[1]==31)
+	tap("‹ JOBS")
+	within(rowOf(31),"Add").Activated:Fire()
+	check("… the row's + still takes it",lastSent("AcceptJob").args[1]==31)
 	for id,value in uploadedIds do JobThumbs.Images[id]=value end -- (the owner's ids back)
 	M.remotes.Job.OnClientEvent:Fire(nil)
 	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
@@ -418,23 +475,30 @@ do
 	M.remotes.Offers.OnClientEvent:Fire({golden,plain},M.now+300,{})
 	check("… once",#said==before+1)
 	Phone.close();Phone.open("board")
-	local section=text("★ Special orders · 1")
-	check("its own section heads the list",section~=nil and section.Parent.LayoutOrder<text("On foot · 1").Parent.LayoutOrder)
-	local body=text("GOLD → VAULT").Parent.Parent
-	local card=body.Parent
-	local head=body:FindFirstChild("SpecialOrder")
-	check("its card in gold: the frame, the ★ line with its perks, the countdown",card:FindFirstChildOfClass("UIStroke").Color.R==214/255 and card:FindFirstChildOfClass("UIStroke").Thickness==2
-		and head~=nil and head.LayoutOrder<body:FindFirstChild("Thumb").LayoutOrder and head:FindFirstChild("Perks").Text=="★ GOLDEN ORDER · ×3 PAY · ×2 XP · MORE DANGER"
-		and head:FindFirstChild("Countdown").Text=="⏱ 2:30" and card:GetAttribute("SpecialOrder")=="golden")
-	check("… the pay shown is its golden pay, ACCEPT takes it",text("$2100")~=nil)
-	check("every card names your tier with its business (Luigi's: Bronze)",text("🥉 BRONZE REGULAR +5%")~=nil and within(body,"🥉 BRONZE REGULAR +5%")==nil)
-	tap("ACCEPT")
-	check("… ACCEPT fires the golden row's id",lastSent("AcceptJob").args[1]==41)
+	-- 6.17: a golden order is the hero: the gold frame, its ribbon and countdown, the pay in gold, +2× XP, TAKE GOLDEN ORDER.
+	local function part(root,name) return root and all(root,function(object) return object.Name==name end)[1] end
+	local hero=named("Hero")
+	check("6.17: a golden order is the hero, in gold: the frame, the ribbon, the countdown",hero~=nil and hero:GetAttribute("Index")==41 and hero:GetAttribute("Hero")=="golden" and hero:GetAttribute("SpecialOrder")=="golden"
+		and hero:FindFirstChildOfClass("UIStroke").Thickness==2 and hero:FindFirstChildOfClass("UIStroke").Color.R==242/255
+		and part(hero,"Ribbon").Text=="★ GOLDEN ORDER ×3" and part(hero,"Countdown").Text=="⏳ 2:30")
+	check("… its pay big in gold, its facts with +2× XP, TAKE GOLDEN ORDER",part(hero,"Pay").Text=="$2100" and part(hero,"Pay").TextColor3.R==242/255 and part(hero,"Facts").Text=="📍 1200    ⏱ 5:00    +2× XP"
+		and part(hero,"Take").Text=="TAKE GOLDEN ORDER" and text("1 MORE JOB")~=nil)
+	check("6.17: a row names your tier with its business by a medal on its picture (Luigi's: Bronze)",part(part(rowOf(42),"Thumb"),"Medal")~=nil and part(part(rowOf(42),"Thumb"),"Medal").Text=="🥉"
+		and text("🥉 BRONZE REGULAR +5%")==nil)
+	rowOf(42).Activated:Fire()
+	check("… its details say it in words",text("🥉 BRONZE REGULAR +5%")~=nil)
+	tap("‹ JOBS")
+	part(named("Hero"),"Details").Activated:Fire()
+	check("… the golden order's details: the old card in gold with its perks",text("GOLD → VAULT")~=nil and text("★ GOLDEN ORDER · ×3 PAY · ×2 XP · MORE DANGER")~=nil)
+	tap("‹ JOBS")
+	part(named("Hero"),"Take").Activated:Fire()
+	check("… TAKE GOLDEN ORDER fires the golden row's id",lastSent("AcceptJob").args[1]==41)
 	-- NEXT UP: a queued golden order runs out there too.
 	local queued={id=9,title="Gold → Vault",cargo="Gold",customer="Vault",mode="car",stars=3,from="Bank",to="Depot",pay=2100,business="bank",specialOrder=golden.specialOrder}
 	M.remotes.Job.OnClientEvent:Fire(M.queueFixture.run(M.now))
 	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={queued}})
 	Phone.close();Phone.open("board")
+	named("NextChip").Activated:Fire()
 	check("NEXT UP: a queued golden order says when it runs out",named("RunsOut")~=nil and named("RunsOut").Text=="★ GOLDEN ORDER · leaves NEXT UP in 2:30",named("RunsOut") and named("RunsOut").Text)
 	M.remotes.Job.OnClientEvent:Fire(nil)
 	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
@@ -936,7 +1000,15 @@ key(M.Enum.KeyCode.Escape)
 check("the Roblox menu closes the popup; its ESC leaves the phone open",popup()==nil and Phone.isOpen())
 Phone.close()
 check("no runtime warnings in the 5.5 apps",#M.warnings==0)
-for _,screen in {{320,448},{844,350},{1280,800}} do
+-- 6.17: a board with a hero and rows for the small screens (a run: the header's run chip; rush hour: its chip).
+M.remotes.Offers.OnClientEvent:Fire({
+	{index=51,mode="foot",cargo="Letters",customer="Ann",first="Post office",address="12 Elm St",distance=240,time=180,pay=40,stars=1,business="pizzeria"},
+	{index=52,mode="car",cargo="Crates",customer="Cid",first="Depot",address="Harbor",distance=900,time=300,pay=300,stars=2,addOrder=true},
+	{index=53,mode="car",cargo="Gold",customer="Dee",first="Bank",address="Vault",distance=1200,time=300,pay=900,stars=3,locked=true,level=9},
+},M.now+300,{})
+M.remotes.Job.OnClientEvent:Fire(M.queueFixture.run(M.now))
+M.workspace:SetAttribute("LiveEvent","rush");M.workspace:SetAttribute("LiveEventEnds",M.now+192)
+for _,screen in {{320,448},{568,320},{844,390},{844,350},{1280,800}} do
 	Phone.close();M.width,M.height=screen[1],screen[2];M.touch=true
 	Phone.open()
 	check(`resize {M.width}x{M.height} opens`,Phone.isOpen() and #M.warnings==0)
@@ -945,12 +1017,23 @@ for _,screen in {{320,448},{844,350},{1280,800}} do
 	Phone.open("board")
 	local size=popup().Size
 	check(`the popup fits {M.width}x{M.height}`,size.X.Offset<=M.width*.92+.001 and size.Y.Offset<=M.height*.86+.001 and showing("board"))
-	check("two columns only in a wide popup",(named("Columns")~=nil)==(size.X.Offset>=600))
+	local side=named("JobsView"):FindFirstChildOfClass("UIListLayout").FillDirection.Name=="Horizontal"
+	check("6.17: the hero beside the rows only in a wide popup",side==(size.X.Offset>=600) and named("Hero")~=nil and rowOf(51)~=nil)
+	local room=size.Y.Offset-64-36
+	check(`6.17: the hero fits {M.width}x{M.height} (its height the room, at least {Config.JobsView.HeroMin})`,named("Hero").Size.Y.Offset==math.clamp(math.floor(room),Config.JobsView.HeroMin,Config.JobsView.HeroMax))
+	local bar=named("HeaderBar")
+	local inBar=named("RunChip").Parent.Parent==bar
+	check("6.17: the run chip, long only when wide",named("RunChip").Text==(if side then "▶ YOUR RUN · 2 · $160" else "▶ RUN · 2 · $160"))
+	check("6.17: the chips in the header where they fit (from 844 px wide always), else heading the body",(inBar or named("Chips").Parent==popup():FindFirstChild("Body")) and (inBar or M.width<844)
+		and (not inBar or bar.AbsoluteSize.X>=named("RunChip").Size.X.Offset+8+(if named("RushChip").Parent==bar then named("RushChip").Size.X.Offset else 0)))
+	check("… rush hour's at the header's right only beside the hero",(named("RushChip").Parent==bar)==(side and inBar))
 end
+M.remotes.Job.OnClientEvent:Fire(nil)
+M.workspace:SetAttribute("LiveEvent",nil);M.workspace:SetAttribute("LiveEventEnds",nil)
 -- The screen turns while an app is open: the popup fits again and the columns follow.
 M.width,M.height=390,800
 M.workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Fire();M.flush()
-check("a resized popup fits the narrow screen in one column",popup().Size.X.Offset<=390*.92+.001 and named("Columns")==nil and upright() and #M.warnings==0)
+check("a resized popup fits the narrow screen in one column",popup().Size.X.Offset<=390*.92+.001 and named("JobsView"):FindFirstChildOfClass("UIListLayout").FillDirection.Name=="Vertical" and upright() and #M.warnings==0)
 Phone.close()
 check("hold lifecycle clears phone",M.sent[#M.sent].name=="PhoneHold" and M.sent[#M.sent].args[1]==false)
 print("ALL CHECKS PASSED")

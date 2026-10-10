@@ -136,12 +136,25 @@ CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
 MissionsUi.onOpen = Hud.closeWindows
 DispatchUi.onOpen = Hud.closeWindows
-Hud.onJobs = DispatchUi.open -- (the depot counter and NEXT JOB must not close an open board; ✕ or J closes it)
+-- 6.17: J, the depot counter and NEXT JOB open the phone's JOBS (client/JobsView.luau: the hero and the rows) once
+-- Marge gave the phone; before it, the Dispatch board as before (it stays behind JOBS' FULL BOARD too).
+local function openJobs()
+	if Phone.has() then
+		if Phone.showing() ~= "board" then
+			Phone.open("board")
+		end
+	else
+		DispatchUi.open()
+	end
+end
+Hud.onJobs = openJobs -- (the depot counter and NEXT JOB must not close an open board; ✕ or J closes it)
 Hud.onJobsKey = function() -- 4.0.2: J opens the board, J again closes it
 	if DispatchUi.isOpen() then
 		DispatchUi.close()
+	elseif Phone.showing() == "board" then
+		Phone.close()
 	else
-		DispatchUi.open()
+		openJobs()
 	end
 end
 GarageUi.onOpen = Hud.closeWindows

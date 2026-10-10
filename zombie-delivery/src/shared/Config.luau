@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.16.2"
+Config.Version = "6.17"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5163,6 +5163,20 @@ Config.Performance = {
 	-- The admin's performance overlay (client/PerfOverlay.luau; the P panel's WORLD tab: PERFORMANCE): its numbers
 	-- every Refresh seconds, the workspace counted every Count seconds, PerFrame instances a frame (never a hitch).
 	Overlay = { Refresh = 0.5, Count = 5, PerFrame = 1500 },
+}
+
+-- 6.17, the JOBS app at a glance (redesign B; client/JobsView.luau draws it, shared/JobPick.luau picks the hero): the
+-- hero card on the left (HeroShare of a wide popup's body; its height the popup's room, between HeroMin and HeroMax
+-- px), the compact rows on the right (Row px tall, the picture Thumb px wide, the add button Add px square), the chips
+-- of the top bar Chip px tall.
+Config.JobsView = {
+	HeroShare = 0.46,
+	HeroMin = 196,
+	HeroMax = 330,
+	Row = 52,
+	Thumb = 76,
+	Add = 40,
+	Chip = 24,
 }
 
 return Config
