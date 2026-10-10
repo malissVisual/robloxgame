@@ -28,6 +28,12 @@
 -- 3 places (a bike: Dead End Motors' BIKES counter; the van: Earl's Used Wheels; a gun: Lead & Co.'s range; kit: the
 -- gear stall; a stage or car gear: Wrench Garage; an employer's job: the employer; client/Gps.luau), then MISSIONS for
 -- a new chapter and ESTATE for a garage or a home (CareerUi.openWindow, set by Main).
+-- 6.18 (the UI kit, client/CardKit.luau; design/ui-kit/README.md; the owner: "every window like JOBS"): the CAREER
+-- window in the JOBS look. On the left the NEXT LEVEL is the hero ("LV 5 / 30 · RANK" on the ribbon,
+-- "NEXT: LEVEL 6 · ROAD WARRIOR", the XP to go big in gold, "about 8 runs · 🎁 $500" and the XP bar), then
+-- the licences, the streak and the ranks as before. THE ROAD is the kit's rows (Level<n>): the level's number on its
+-- thumb, "LEVEL 6 · RANK", what it unlocks on one line, its reward money big (dim ahead), the edge green done / red
+-- YOU ARE HERE / amber NEXT (its bar) / grey ahead, and ✓, HERE, NEXT or "🔒 2,400 XP" at the right.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +50,7 @@ local Theme = require(script.Parent.Theme)
 local DialogKeys = require(script.Parent.DialogKeys)
 local P = require(script.Parent.HudContract)
 local Gps = require(script.Parent.Gps) -- 6.14: the level-up card's GPS buttons
+local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit (the next level's hero, the road's rows)
 
 local K = Theme.Contract
 local CareerUi = {}
@@ -237,31 +244,35 @@ local function driverPanel(parent: Instance, road: { Career.Step })
 	local level = Levels.levelFor(xp)
 	local max = Config.Levels.MaxLevel
 	local rank = Levels.rank(level)
-	caps(parent, "Your career", 1)
-	label(parent, string.upper(rank), { LayoutOrder = 2, Font = Theme.DisplayFont, TextSize = 24, TextColor3 = P.ink })
-	label(parent, `LEVEL {level} OF {max}  ·  {num(xp)} XP`, { LayoutOrder = 3, Font = Theme.HeadingFont, TextSize = 13 })
-	local barRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 6), BackgroundTransparency = 1, LayoutOrder = 4 }, parent)
-	local _, fill = P.bar(barRow, UDim2.new(1, 0, 0, 4), P.accent)
-	fill.Size = UDim2.fromScale(Levels.progress(xp), 1)
-	P.rule(parent, UDim2.new(1, 0, 0, 1), { LayoutOrder = 5 })
+	-- 6.18: the next level as the kit's hero (see the header).
 	local nextStep = road[level + 1]
+	local hero: CardKit.Hero = {
+		name = "NextLevel",
+		order = 1,
+		height = 236,
+		picture = { emoji = "🎖" },
+		title = if nextStep then `NEXT: LEVEL {nextStep.level}{if nextStep.newRank then `  ·  {string.upper(nextStep.rank)}` else ""}` else "THE TOP OF THE ROAD",
+		value = "",
+		valueColor = CardKit.Color.gold,
+		bar = { share = Levels.progress(xp), color = CardKit.Color.gold },
+		ribbon = { text = `LV {level} / {max} · {string.upper(rank)}`, face = K.raised, ink = K.text },
+	}
 	if nextStep then
 		local left = math.max(0, nextStep.xp - xp)
 		local count, stars = deliveriesFor(left, level)
-		caps(parent, "Next goal", 6, P.danger)
-		label(parent, `<b>LEVEL {nextStep.level}</b>{if nextStep.newRank then `  ·  {string.upper(nextStep.rank)}` else ""}`, { LayoutOrder = 7, TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink })
-		label(parent, `{num(left)} XP to go: about {deliveriesText(count, stars)}. Missions, kills and night jobs give more.`, { LayoutOrder = 8 })
+		local parts = Career.rewardParts(nextStep.reward)
+		hero.value = `{num(left)} XP`
+		hero.facts = `about {deliveriesText(count, stars)}{if parts[1] then `  ·  🎁 {parts[1]}` else ""}`
+	else
+		hero.value = `LEVEL {level}`
+		hero.facts = "Every car, gun and job is open"
+	end
+	CardKit.hero(parent, hero)
+	if nextStep then
 		local opens = unlockLine(nextStep.unlocks, 5)
 		if opens ~= "" then
-			label(parent, `<b>Opens</b>  {opens}`, { LayoutOrder = 9, TextColor3 = P.ink })
+			label(parent, `<b>Opens</b>  {opens}`, { LayoutOrder = 9, TextColor3 = P.ink, TextSize = 13 })
 		end
-		local parts = Career.rewardParts(nextStep.reward)
-		if #parts > 0 then
-			label(parent, `<b>Reward</b>  <font color="{P.hex(P.good)}">{table.concat(parts, "  ·  ")}</font>`, { LayoutOrder = 10, TextColor3 = P.ink })
-		end
-	else
-		caps(parent, "The top", 6, P.danger)
-		label(parent, "You reached the last level. Every car, gun and job is open: the road is yours.", { LayoutOrder = 7, TextColor3 = P.ink })
 	end
 	P.rule(parent, UDim2.new(1, 0, 0, 1), { LayoutOrder = 11 })
 	-- 4.7: the licences for the dangerous board jobs (Config.Jobs.Licences) and the streak of good jobs.
@@ -305,105 +316,47 @@ end
 
 -- ── The road ───────────────────────────────────────────────────────────────
 
--- One level of the road. Returns the row (the current one is scrolled to).
-local function roadRow(step: Career.Step, level: number, xp: number, order: number, last: boolean): any
+-- One level of the road (6.18: the kit's compact row; see the header). Returns the row (the current one is scrolled to).
+local function roadRow(step: Career.Step, level: number, xp: number, order: number, _last: boolean): any
 	local done = step.level < level
 	local here = step.level == level
 	local nextOne = step.level == level + 1
 	local locked = step.level > level
-	local row = Ui.make("Frame", {
-		Name = `Level{step.level}`,
-		Size = UDim2.new(1, -8, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = if here then P.raised else P.surface,
-		BackgroundTransparency = if here then 0 else 1,
-		BorderSizePixel = 0,
-		LayoutOrder = order,
-	}, refs.road)
-	if here then
-		Ui.make("Frame", { Name = "Selected", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = P.red, BorderSizePixel = 0, ZIndex = 2 }, row)
-	end
-	-- 5.8: a hairline under each slim row (from the words' column, clear of the milestones' line).
-	if not last then
-		Ui.make("Frame", { Name = "Hairline", Size = UDim2.new(1, -64, 0, 1), Position = UDim2.new(0, 64, 1, -1), BackgroundColor3 = P.line, BackgroundTransparency = Ui.HAIRLINE, BorderSizePixel = 0 }, row)
-	end
-	-- The milestone: a line down the road through a square with the level's number.
-	-- (it starts at the first stone's middle and ends at the last one's)
-	local railTop = if step.level == 1 then 26 else 0
-	local rail = Ui.make("Frame", {
-		Size = if last then UDim2.fromOffset(2, 26 - railTop) else UDim2.new(0, 2, 1, -railTop),
-		Position = UDim2.fromOffset(31, railTop),
-		BackgroundColor3 = if done or here then P.ink2 else P.line,
-		BackgroundTransparency = if done or here then 0.2 else 0.6,
-		BorderSizePixel = 0,
-	}, row)
-	rail.ZIndex = 1
-	local stone = Ui.label(row, tostring(step.level), UDim2.fromOffset(32, 32), {
-		Position = UDim2.fromOffset(16, 10),
-		BackgroundColor3 = if done then P.ink2 elseif here then P.red else K.charcoal,
-		BackgroundTransparency = 0,
-		Font = Theme.HeadingFont,
-		TextSize = 15,
-		TextColor3 = if done or here then K.charcoal else (if nextOne then P.ink else P.line),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-		ZIndex = 3,
-	})
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if nextOne then P.ink else P.line, Thickness = 1, Transparency = if locked and not nextOne then 0.5 else 0 }, stone)
-	-- The words.
-	local text = Ui.make("Frame", {
-		Size = UDim2.new(1, -72, 0, 0),
-		Position = UDim2.fromOffset(64, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-	}, row)
-	Ui.list(text, true, 3)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12), PaddingRight = UDim.new(0, 8) }, text)
-	local dim = if locked and not nextOne then 0.35 else 0
-	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, text)
-	Ui.label(head, `LEVEL {step.level}{if step.newRank then `  ·  {string.upper(step.rank)}` else ""}`, UDim2.new(1, -150, 1, 0), {
-		Font = Theme.HeadingFont,
-		TextSize = 15,
-		TextColor3 = P.ink,
-		TextTransparency = dim,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local status = if here then "YOU ARE HERE" elseif done then "✓ DONE" elseif nextOne then "NEXT" else `🔒 {num(step.xp)} XP`
-	local tag = P.tag(head, status, if here or nextOne then P.danger elseif done then P.good else P.line)
-	tag.AnchorPoint = Vector2.new(1, 0)
-	tag.Position = UDim2.new(1, 0, 0, 1)
-	if nextOne then
-		-- The way to it: the share of the XP between your level and this one.
-		local from = Levels.xpFor(level)
-		local share = math.clamp((xp - from) / math.max(1, step.xp - from), 0, 1)
-		local barRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 2 }, text)
-		local back, fill = P.bar(barRow, UDim2.new(1, -150, 0, 3), P.danger)
-		back.Position = UDim2.fromOffset(0, 7)
-		fill.Size = UDim2.fromScale(share, 1)
-		Ui.label(barRow, `{num(math.max(0, step.xp - xp))} XP TO GO`, UDim2.fromOffset(140, 16), {
-			Position = UDim2.new(1, 0, 0, 0),
-			AnchorPoint = Vector2.new(1, 0),
-			Font = Theme.HeadingFont,
-			TextSize = 11,
-			TextColor3 = P.ink2,
-			TextXAlignment = Enum.TextXAlignment.Right,
-			TextWrapped = false,
-		})
-	end
-	local opens = unlockLine(step.unlocks)
+	local opens = unlockLine(step.unlocks, 3)
 	if step.level == 1 then
 		opens = `{opens}{if opens ~= "" then "   ·   " else ""}{Career.money(Config.StartMoney)} to start`
 	end
-	if opens ~= "" then
-		label(text, `<b>{if step.level == 1 then "START" else "UNLOCKS"}</b>   {opens}`, { LayoutOrder = 3, TextColor3 = P.ink, TextTransparency = dim })
+	local reward = step.reward
+	local parts = Career.rewardParts(reward)
+	local money = if reward and reward.money and reward.money > 0 then Career.money(reward.money) else parts[1]
+	local made = CardKit.row(refs.road, {
+		name = `Level{step.level}`,
+		order = order,
+		accent = if done then K.good elseif here then K.red elseif nextOne then K.warn else K.line,
+		picture = { emoji = tostring(step.level), face = if here then K.red elseif done then K.raised else K.charcoal },
+		thumb = Config.UiKit.Icon,
+		emojiSize = 18,
+		shut = locked and not nextOne,
+		rest = if here then K.raised else nil,
+		title = `LEVEL {step.level}{if step.newRank then `  ·  {string.upper(step.rank)}` else ""}`,
+		titleColor = if here or nextOne then K.text else nil,
+		facts = if opens ~= "" then opens else "better pay and harder roads",
+		value = money,
+		valueColor = if done then K.secondary else CardKit.Color.money,
+		word = if here then "YOU ARE HERE" elseif nextOne then "NEXT" else nil,
+		actionFace = if here then K.red elseif nextOne then K.warn else nil,
+		wordInk = if nextOne then CardKit.Color.goldInk else nil,
+		action = if done then "✓" else nil,
+		lock = if locked and not nextOne then `🔒 {num(step.xp)} XP` else nil,
+		silent = true,
+		onOpen = function() end,
+	})
+	if nextOne then
+		-- The way to it: the share of the XP between your level and this one.
+		local from = Levels.xpFor(level)
+		CardKit.rowBar(made, math.clamp((xp - from) / math.max(1, step.xp - from), 0, 1), K.warn)
 	end
-	local parts = Career.rewardParts(step.reward)
-	if #parts > 0 then
-		local color = if done then P.ink2 else P.good
-		label(text, `<b>REWARD</b>   <font color="{P.hex(color)}">{table.concat(parts, "  ·  ")}</font>{if done then "  (given)" else ""}`, { LayoutOrder = 4, TextColor3 = P.ink, TextTransparency = dim })
-	end
-	return row
+	return made.row
 end
 
 -- ── The window ─────────────────────────────────────────────────────────────
@@ -457,8 +410,8 @@ local function build()
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, right)
-	Ui.list(road, true, 0)
-	Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 12) }, road)
+	Ui.list(road, true, Config.UiKit.Gap) -- (6.18: the kit's rows, 6 px apart)
+	Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 12), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 2) }, road)
 	refs.road = road
 end
 

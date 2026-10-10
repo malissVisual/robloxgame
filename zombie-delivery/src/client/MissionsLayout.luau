@@ -17,6 +17,13 @@
 --       above the action bar. Wide, it opens the chapter (`artOnTop`); narrow (a phone), the chapter's view is about
 --       150 px tall, so the hero and the action card stay first and the banner, a wider crop, sits above the story
 --       path. A chapter without a picture has no banner at all.
+--   6.18 (the UI kit, client/CardKit.luau; design/ui-kit/README.md): the chapter is the kit's hero (the next mission:
+--       the chapter's picture, the name, the zombies, the reward big, START / GET READY) beside the missions' rows (a
+--       chapter CardLayout.side wide; else the hero on top), so START lives in the hero and the action bar is gone:
+--       `bar` is 0 and the chapter fills the room down to the window's footer (MissionsLayout.parts; barTop is where
+--       it ends). The client cards are the kit's compact rows (cardH 64, the strip's 62 on a phone), and the picture
+--       banner opens the chapter's details (ⓘ). MissionsLayout.heroRoom(layout): the room the hero has in the
+--       chapter's view (its height less the list's padding), so START is in view without scrolling.
 
 local MissionsLayout = {}
 
@@ -26,8 +33,9 @@ MissionsLayout.MaxScale = 1.1
 MissionsLayout.NarrowWidth = 860
 MissionsLayout.NarrowHeight = 540
 MissionsLayout.Margin = 16 -- px left free around the window
-MissionsLayout.Gap = 6 -- 6.8 review: between the clients' strip, the chapter and the action bar
-MissionsLayout.Bottom = 4 -- 6.8 review: under the action bar, above the window's footer
+MissionsLayout.Gap = 6 -- 6.8 review: between the clients' strip and the chapter
+MissionsLayout.ListPad = 13 -- 6.18: the chapter list's padding (5 on top, 8 under): the hero's room is the rest
+MissionsLayout.Bottom = 4 -- 6.8 review: under the chapter, above the window's footer
 MissionsLayout.ArtRatio = 2.6 -- 6.12.13: the chapter's picture banner, width : height (capped by Layout.art)
 
 export type Layout = {
@@ -50,7 +58,7 @@ export type Layout = {
 	title: number, -- the client's name
 	step: number, -- a story path row
 	start: number, -- the START button's height
-	bar: number, -- 6.8 review: the action bar under the chapter (the pay line and START; START plus its padding)
+	bar: number, -- 6.8 review: the action bar under the chapter (6.18: 0, START is the hero's)
 	art: number, -- 6.12.13: the chapter's picture banner at its tallest (px; else ArtRatio of the chapter's width)
 	artOnTop: boolean, -- 6.12.13: the banner opens the chapter (wide), else it sits above the story path (narrow)
 }
@@ -59,7 +67,7 @@ export type Parts = {
 	contentH: number, -- the window's content area (between its header and its footer)
 	chapterTop: number, -- the chapter's scrolling list
 	chapterH: number,
-	barTop: number, -- the action bar (always in view)
+	barTop: number, -- where the chapter ends (6.18: no action bar under it)
 	barH: number,
 }
 
@@ -80,10 +88,10 @@ function MissionsLayout.fit(x: number, y: number): Layout
 			footer = 30,
 			tabs = 40,
 			listW = 0,
-			stripH = 100,
-			cardW = 196,
-			cardH = 86,
-			cardPortrait = 60,
+			stripH = 66, -- (6.18: the kit's compact client cards)
+			cardW = 188,
+			cardH = 62,
+			cardPortrait = 50,
 			heroW = 72, -- (6.8 review: 104 × 118 before; the chapter's room is short on a phone)
 			heroH = 80,
 			text = 16,
@@ -91,7 +99,7 @@ function MissionsLayout.fit(x: number, y: number): Layout
 			title = 26,
 			step = 66,
 			start = 52,
-			bar = 60,
+			bar = 0, -- (6.18: START is the hero's)
 			art = 132, -- (the chapter's view is ~150 px: a wider crop that fits it)
 			artOnTop = false,
 		}
@@ -107,8 +115,8 @@ function MissionsLayout.fit(x: number, y: number): Layout
 		listW = 300,
 		stripH = 0,
 		cardW = 300,
-		cardH = 84,
-		cardPortrait = 64,
+		cardH = 64,
+		cardPortrait = 52,
 		heroW = 168,
 		heroH = 188,
 		text = 15,
@@ -116,7 +124,7 @@ function MissionsLayout.fit(x: number, y: number): Layout
 		title = 32,
 		step = 64,
 		start = 52,
-		bar = 64,
+		bar = 0,
 		art = 260, -- (the chapter's 661 px at 2.6 : 1 is 254)
 		artOnTop = true,
 	}
@@ -128,8 +136,8 @@ function MissionsLayout.pageHeight(layout: Layout): number
 	return layout.height - layout.header - layout.footer - layout.tabs
 end
 
--- 6.8 review: the chapter and the action bar under it (see the header). Wide, the chapter starts under the tabs;
--- narrow, under the clients' strip. The bar sits at the content's bottom, the chapter fills the room above it.
+-- 6.8 review: the chapter (and 6.8's action bar under it, 0 tall since 6.18; see the header). Wide, the chapter starts
+-- under the tabs; narrow, under the clients' strip. It fills the room down to the content's bottom.
 function MissionsLayout.parts(layout: Layout): Parts
 	local gap = MissionsLayout.Gap
 	local contentH = layout.height - layout.header - layout.footer
@@ -142,6 +150,11 @@ function MissionsLayout.parts(layout: Layout): Parts
 		barTop = barTop,
 		barH = layout.bar,
 	}
+end
+
+-- 6.18: the room the chapter's hero has in the chapter's view (without scrolling): its height less the list's padding.
+function MissionsLayout.heroRoom(layout: Layout): number
+	return MissionsLayout.parts(layout).chapterH - MissionsLayout.ListPad
 end
 
 return MissionsLayout

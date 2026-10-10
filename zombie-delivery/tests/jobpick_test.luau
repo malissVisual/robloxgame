@@ -104,8 +104,22 @@ do
 	check("rush hour's chip", JobPick.rushPrefix("rush") == "🕑 RUSH ×1.5 · ", JobPick.rushPrefix("rush"))
 	check("… none for an event that doesn't pay, none without one", JobPick.rushPrefix("supply") == nil and JobPick.rushPrefix(nil) == nil)
 	check("the list's title", JobPick.more(7, true) == "7 MORE JOBS" and JobPick.more(1, true) == "1 MORE JOB" and JobPick.more(3, false) == "3 JOBS")
-	local view = Config.JobsView
-	check("Config.JobsView: the hero's heights in order, sizes set", view.HeroMin > 0 and view.HeroMin < view.HeroMax and view.Row >= view.Add and view.HeroShare > 0 and view.HeroShare < 1)
+	local view = Config.UiKit
+	check("Config.UiKit (6.18, was Config.JobsView): the hero's heights in order, sizes set", view.HeroMin > 0 and view.HeroMin < view.HeroMax and view.Row >= view.Add and view.HeroShare > 0 and view.HeroShare < 1)
+end
+
+-- ── 6.18: the phone home's JOBS row ─────────────────────────────────────────
+do
+	local count, top, gold = JobPick.summary({ plain(1, 300), plain(2, 900, { locked = true }), plain(3, 500) }, false, NOW)
+	check("6.18 summary: the jobs you can take and the best pay (a locked one not counted)", count == 2 and top == 500 and not gold, `{count} {top}`)
+	count, top, gold = JobPick.summary({ plain(1, 300), golden(2, 1140) }, false, NOW)
+	check("… a golden order the best: its pay, in gold", count == 2 and top == 1140 and gold)
+	count, top = JobPick.summary({ golden(2, 1140, NOW - 1), plain(1, 300) }, false, NOW)
+	check("… an expired one is not counted", count == 1 and top == 300)
+	count = JobPick.summary({ plain(1, 300), plain(3, 500, { addOrder = true }) }, true, NOW)
+	check("… during a run only what joins it", count == 1)
+	check("… nothing without a board", JobPick.summary(nil, false, NOW) == 0)
+	check("its line", JobPick.homeLine(7) == "7 jobs · best " and JobPick.homeLine(1) == "1 job · best " and JobPick.homeLine(0) == nil)
 end
 
 if failures == 0 then

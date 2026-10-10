@@ -39,13 +39,16 @@ for _, screen in SCREENS do
 	else
 		check(`{screen.name}: wide: the column and the chapter side by side, a hero portrait`, layout.width - layout.listW >= 560 and page >= 400 and layout.heroH <= page, `{layout.width - layout.listW} × {page}`)
 	end
-	-- 6.8 review: START in view (it sat under the fold at 1280 × 720, two screens down on a phone): the action bar
-	-- under the chapter ends inside the window's content, holds START, and the chapter above it still scrolls a story.
+	-- 6.8 review: START in view (it sat under the fold at 1280 × 720, two screens down on a phone). 6.18: START is the
+	-- chapter hero's button (client/CardKit.luau): the chapter ends inside the window's content (no action bar under
+	-- it), and the hero's room in its view (MissionsLayout.heroRoom) holds the whole hero, its button at its foot.
 	local parts = MissionsLayout.parts(layout)
-	check(`{screen.name}: START in view: the action bar under the chapter, inside the window`, parts.barTop >= parts.chapterTop + parts.chapterH
-		and parts.barTop + parts.barH <= parts.contentH and parts.barH >= layout.start and parts.chapterTop >= layout.tabs,
-		`bar {parts.barTop} – {parts.barTop + parts.barH} of {parts.contentH}`)
-	check(`{screen.name}: the chapter keeps room above the bar`, parts.chapterH >= (if layout.narrow then 140 else 360), parts.chapterH)
+	local room = MissionsLayout.heroRoom(layout)
+	check(`{screen.name}: START in view: the chapter inside the window, no action bar`, layout.bar == 0 and parts.barH == 0
+		and parts.chapterTop + parts.chapterH <= parts.contentH and parts.chapterTop >= layout.tabs,
+		`chapter {parts.chapterTop} – {parts.chapterTop + parts.chapterH} of {parts.contentH}`)
+	check(`{screen.name}: 6.18: the hero's room holds a hero with its button (≥ 150 px)`, room >= 150 and room == parts.chapterH - MissionsLayout.ListPad, room)
+	check(`{screen.name}: the chapter keeps its room`, parts.chapterH >= (if layout.narrow then 160 else 400), parts.chapterH)
 	-- 6.12.13: the chapter's picture banner (client/MissionArtUi.luau) fits the chapter's view whole.
 	check(`{screen.name}: the picture banner fits the chapter's view`, layout.art >= 96 and layout.art <= parts.chapterH - 8, `{layout.art} of {parts.chapterH}`)
 end

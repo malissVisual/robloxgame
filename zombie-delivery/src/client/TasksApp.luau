@@ -8,15 +8,24 @@
 -- Tasks remote: ("open") when the app needs the state, ("claim", slot) on CLAIM. A task finished brings a toast and a
 -- sound, a claim paid the money's sound; TasksApp.ready (the rewards waiting) feeds the phone's badges (TASKS, MORE)
 -- and its unread dot (Phone: refreshBadges, Phone.onUnread → Hud.setPhoneUnread).
+-- 6.18 (the UI kit, client/CardKit.luau; design/ui-kit/README.md): TASKS in the JOBS look. The chips (in the popup's
+-- header right of TASKS when they fit, else heading the body; CardKit.toHeader) say when
+-- the tasks are new ("⏱ DAILY · 3 h 2 min", "📅 WEEKLY · 2 d 1 h") and how many wait ("1 TO CLAIM"). The HERO is the
+-- task to claim (else the one closest to done): its kind on the ribbon (DAILY / BONUS / WEEKLY), its progress on the
+-- corner, its name, the money big, "+110 XP", its bar and ONE button: CLAIM · $180 (green), else a grey "2 / 5 · KEEP
+-- GOING". The other tasks are the kit's rows (Task_<slot>): the emoji, the name, "0 / 1 · +80 XP" (✓ CLAIMED), the
+-- money big (dim once claimed), a CLAIM word on a done one, the bar at the row's foot. The hero sits beside the rows
+-- in a wide popup (CardKit.columns), its height the popup's room. CLAIM is still Claim_<slot> (the gamepad's first).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
+local Config = require(Shared.Config)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
-local P = require(script.Parent.HudContract)
 local OrdersUi = require(script.Parent.OrdersUi)
+local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit
 
 local K = Theme.Contract
 local TasksApp = {}
@@ -114,71 +123,166 @@ local function claim(slot: any)
 	Net.get("Tasks"):FireServer("claim", slot)
 end
 
--- A thin bar (share 0 … 1) in a card.
-local function bar(parent: Instance, share: number, done: boolean, order: number)
-	local holder = Ui.make("Frame", { Name = "Progress", Size = UDim2.new(1, 0, 0, 10), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	local back, fill = P.bar(holder, UDim2.new(1, 0, 0, 4), if done then K.good else K.red)
-	back.Position = UDim2.fromOffset(0, 3)
-	fill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
+-- 6.18: the chips' words for the clocks (the ticker keeps them live).
+local function dayWords(seconds: number): string
+	return `⏱ DAILY · {left(seconds)}`
+end
+local function weekWords(seconds: number): string
+	return `📅 WEEKLY · {left(seconds)}`
 end
 
--- One task's card: the title, the bar, "3 / 5" and the reward, CLAIM (done) or ✓ CLAIMED.
-local function card(list: Instance, task: any, order: number, look: OrdersUi.Kit)
-	local target = math.max(1, tonumber(task.target) or 1)
-	local have = math.clamp(tonumber(task.progress) or 0, 0, target)
-	local done, claimed = task.done == true, task.claimed == true
-	local b = look.block(list, order, done and not claimed)
-	b.Parent.Name = `Task_{task.slot}`
-	look.text(b, tostring(task.title or "Task"), UDim2.new(1, 0, 0, 0), {
-		Name = "Title",
-		AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = 1,
-		Font = Theme.HeadingFont,
-		TextSize = 15,
-		TextColor3 = if claimed then K.secondary else K.text,
-	})
-	bar(b, have / target, done, 2)
-	local status = if claimed then "✓ CLAIMED" elseif done then "DONE" else `{amount(have, task.unit)} / {amount(target, task.unit)}`
-	local _, statusLabel, reward = look.row2(b, status, `{Ui.money(tonumber(task.money) or 0)} · {tonumber(task.xp) or 0} XP`, 3, true)
-	statusLabel.Name = "Status"
-	statusLabel.TextColor3 = if done then K.good else K.secondary
-	reward.TextColor3 = if claimed then K.secondary else K.text
-	if done and not claimed then
-		local slot = task.slot
-		look.button(b, "CLAIM", "main", 4, function()
-			claim(slot)
-		end).Name = `Claim_{slot}`
-	end
-end
+-- 6.18: every task as one shape (the dailies, the bonus for every daily done, the weekly), in the order they show.
+type Entry = { slot: any, kind: string, title: string, have: number, target: number, unit: string?, money: number, xp: number, done: boolean, claimed: boolean }
+local KINDS: { [string]: { ribbon: string, emoji: string } } = {
+	daily = { ribbon = "DAILY TASK", emoji = "📋" },
+	bonus = { ribbon = "BONUS · EVERY DAILY", emoji = "⭐" },
+	weekly = { ribbon = "WEEKLY TASK", emoji = "🏆" },
+}
 
--- The bonus for every daily done: how many are done, its reward, CLAIM BONUS.
-local function bonusCard(list: Instance, order: number, look: OrdersUi.Kit)
-	local bonus = if type(view.bonus) == "table" then view.bonus else {}
+local function entries(): { Entry }
+	local out: { Entry } = {}
 	local daily = if type(view.daily) == "table" then view.daily else {}
 	local doneCount = 0
-	for _, task in daily do
-		if type(task) == "table" and task.done == true then
-			doneCount += 1
+	for _, task in daily :: { any } do
+		if type(task) == "table" then
+			local target = math.max(1, tonumber(task.target) or 1)
+			if task.done == true then
+				doneCount += 1
+			end
+			table.insert(out, {
+				slot = task.slot,
+				kind = "daily",
+				title = tostring(task.title or "Task"),
+				have = math.clamp(tonumber(task.progress) or 0, 0, target),
+				target = target,
+				unit = task.unit,
+				money = tonumber(task.money) or 0,
+				xp = tonumber(task.xp) or 0,
+				done = task.done == true,
+				claimed = task.claimed == true,
+			})
 		end
 	end
-	local ready, claimed = bonus.done == true and bonus.claimed ~= true, bonus.claimed == true
-	local b = look.block(list, order, ready)
-	b.Parent.Name = "Task_bonus"
-	look.caps(b, "BONUS · EVERY DAILY DONE", 1, if claimed then K.secondary else K.text)
-	bar(b, if #daily > 0 then doneCount / #daily else 0, bonus.done == true, 2)
-	local status = if claimed then "✓ CLAIMED" else `{doneCount} / {#daily} done`
-	local _, statusLabel = look.row2(b, status, `{Ui.money(tonumber(bonus.money) or 0)} · {tonumber(bonus.xp) or 0} XP`, 3, true)
-	statusLabel.Name = "Status"
-	statusLabel.TextColor3 = if bonus.done == true then K.good else K.secondary
-	if ready then
-		look.button(b, "CLAIM BONUS", "main", 4, function()
-			claim("bonus")
-		end).Name = "Claim_bonus"
+	local bonus = if type(view.bonus) == "table" then view.bonus else {}
+	table.insert(out, {
+		slot = "bonus",
+		kind = "bonus",
+		title = "Every daily done",
+		have = doneCount,
+		target = math.max(1, #daily),
+		money = tonumber(bonus.money) or 0,
+		xp = tonumber(bonus.xp) or 0,
+		done = bonus.done == true,
+		claimed = bonus.claimed == true,
+	})
+	local weekly = view.weekly
+	if type(weekly) == "table" then
+		local target = math.max(1, tonumber(weekly.target) or 1)
+		table.insert(out, {
+			slot = weekly.slot or "weekly",
+			kind = "weekly",
+			title = tostring(weekly.title or "Weekly task"),
+			have = math.clamp(tonumber(weekly.progress) or 0, 0, target),
+			target = target,
+			unit = weekly.unit,
+			money = tonumber(weekly.money) or 0,
+			xp = tonumber(weekly.xp) or 0,
+			done = weekly.done == true,
+			claimed = weekly.claimed == true,
+		})
+	end
+	return out
+end
+
+-- The hero: the first reward to claim, else the task closest to done (not claimed), else none.
+local function heroOf(list: { Entry }): Entry?
+	local best: Entry? = nil
+	local share = -1
+	for _, entry in list do
+		if entry.done and not entry.claimed then
+			return entry
+		end
+		if not entry.claimed and entry.have / entry.target > share then
+			best, share = entry, entry.have / entry.target
+		end
+	end
+	return best
+end
+
+local function progressWords(entry: Entry): string
+	return `{amount(entry.have, entry.unit)} / {amount(entry.target, entry.unit)}`
+end
+
+-- The hero card (see the header), `height` px tall.
+local function heroCard(parent: Instance, entry: Entry, height: number)
+	local claimable = entry.done and not entry.claimed
+	local kind = KINDS[entry.kind] or KINDS.daily
+	local slot = entry.slot
+	local made = CardKit.hero(parent, {
+		name = `Task_{slot}`,
+		height = height,
+		stroke = if claimable then K.good else K.line,
+		strong = claimable,
+		picture = { emoji = kind.emoji },
+		title = string.upper(entry.title),
+		value = Ui.money(entry.money),
+		valueColor = if entry.kind == "weekly" then CardKit.Color.gold else CardKit.Color.money,
+		facts = `+{entry.xp} XP`,
+		bar = { share = entry.have / entry.target, color = if entry.done then K.good else K.red },
+		ribbon = { text = kind.ribbon, face = if claimable then K.good else K.raised, ink = if claimable then CardKit.Color.goldInk else K.text },
+		corner = { text = if entry.done then "✓ DONE" else progressWords(entry), ink = if entry.done then K.good else K.text, width = CardKit.width(progressWords(entry), 13, Theme.HeadingFont) + 24 },
+		action = if claimable
+			then { name = `Claim_{slot}`, text = `CLAIM · {Ui.money(entry.money)}`, kind = "good", onClick = function()
+				claim(slot)
+			end }
+			else { name = "Waiting", text = `{progressWords(entry)} · KEEP GOING`, kind = "shut" },
+		onOpen = function() end,
+		silent = true,
+	})
+	made.corner.Name = "Status"
+end
+
+-- One task's row (see the header).
+local function taskRow(parent: Instance, entry: Entry, order: number)
+	local claimable = entry.done and not entry.claimed
+	local kind = KINDS[entry.kind] or KINDS.daily
+	local slot = entry.slot
+	local made = CardKit.row(parent, {
+		name = `Task_{slot}`,
+		order = order,
+		accent = if claimable then K.good elseif entry.claimed then K.line elseif entry.kind == "weekly" then CardKit.Color.gold else K.red,
+		picture = { emoji = kind.emoji },
+		thumb = Config.UiKit.Icon,
+		shut = entry.claimed,
+		title = entry.title,
+		titleColor = if entry.claimed then K.secondary else K.text,
+		facts = if entry.claimed then "✓ CLAIMED" else `{progressWords(entry)} · +{entry.xp} XP`,
+		factsColor = if claimable then K.good else nil,
+		value = Ui.money(entry.money),
+		valueColor = if entry.kind == "weekly" then CardKit.Color.gold else CardKit.Color.money,
+		word = if claimable then "CLAIM" else nil,
+		actionFace = if claimable then K.good else nil,
+		wordInk = CardKit.Color.goldInk,
+		onAction = if claimable then function()
+			claim(slot)
+		end else nil,
+		silent = not claimable,
+		onOpen = function()
+			if claimable then
+				claim(slot)
+			end
+		end,
+	})
+	if made.action then
+		made.action.Name = `Claim_{slot}`
+	end
+	if not entry.claimed then
+		CardKit.rowBar(made, entry.have / entry.target, if entry.done then K.good else K.red)
 	end
 end
 
--- The app in the phone's popup (`list`, its scrolling body).
-function TasksApp.draw(list: Instance, look: OrdersUi.Kit, _wide: boolean?)
+-- The app in the phone's popup (`list`, its scrolling body; `wide`: the hero beside the rows).
+function TasksApp.draw(list: Instance, look: OrdersUi.Kit, wide: boolean?)
 	clocks = {}
 	if type(view) ~= "table" then
 		ask()
@@ -186,31 +290,33 @@ function TasksApp.draw(list: Instance, look: OrdersUi.Kit, _wide: boolean?)
 		return
 	end
 	local now = workspace:GetServerTimeNow()
-	look.section(list, "Daily tasks", 1)
-	local dayClock = look.meta(list, `New tasks in {left((tonumber(view.dayEnds) or now) - now)} · at 00:00 UTC`, 2)
-	dayClock.Name = "DayClock"
-	clocks.day = dayClock
-	local order = 2
-	for _, task in (if type(view.daily) == "table" then view.daily else {}) :: { any } do
-		if type(task) == "table" then
+	-- The chips: the clocks and the rewards waiting.
+	local chips = CardKit.chips(list, "Chips", 0)
+	clocks.day = CardKit.chip(chips, { name = "DayClock", text = dayWords((tonumber(view.dayEnds) or now) - now), room = "⏱ DAILY · 23 h 59 min", order = 1, static = true })
+	clocks.week = CardKit.chip(chips, { name = "WeekClock", text = weekWords((tonumber(view.weekEnds) or now) - now), room = "📅 WEEKLY · 6 d 23 h", order = 2, static = true })
+	local ready = TasksApp.ready()
+	if ready > 0 then
+		CardKit.chip(chips, { name = "ReadyChip", text = `{ready} TO CLAIM`, face = CardKit.Color.goodFace, ink = K.good, order = 3, static = true })
+	end
+	-- (in the popup's header when they fit, like JOBS' chips; else heading the body, the hero that much shorter)
+	local popup = require(script.Parent.PhonePopup)
+	local bar, barRoom = popup.bar()
+	local taken = CardKit.toHeader(chips, bar, barRoom, list)
+	local all = entries()
+	local hero = heroOf(all)
+	local height = CardKit.Layout.heroHeight(popup.room() - taken)
+	local _, left, right = CardKit.columns(list, { name = "TasksView", order = 1, side = wide == true and hero ~= nil, hero = hero ~= nil, heroHeight = height })
+	if hero then
+		heroCard(left, hero, height)
+	end
+	local order = 0
+	for _, entry in all do
+		if entry ~= hero then
 			order += 1
-			card(list, task, order, look)
+			taskRow(right, entry, order)
 		end
 	end
-	order += 1
-	bonusCard(list, order, look)
-	order += 1
-	look.section(list, "Weekly task", order)
-	order += 1
-	local weekClock = look.meta(list, `New in {left((tonumber(view.weekEnds) or now) - now)} · Monday 00:00 UTC`, order)
-	weekClock.Name = "WeekClock"
-	clocks.week = weekClock
-	if type(view.weekly) == "table" then
-		order += 1
-		card(list, view.weekly, order, look)
-	end
-	order += 1
-	look.meta(list, "Deliveries, throws, rides and the night all count. A task done and not claimed is paid at the reset.", order)
+	look.meta(right, "Deliveries, throws, rides and the night all count. A task done and not claimed is paid at the reset.", order + 1).Name = "FootNote"
 end
 
 -- The countdowns (the phone's ticker, twice a second while TASKS shows). Past the reset: the new state is asked for.
@@ -222,10 +328,10 @@ function TasksApp.tick()
 	local dayEnds, weekEnds = tonumber(view.dayEnds) or now, tonumber(view.weekEnds) or now
 	local day, week = clocks.day, clocks.week
 	if day and day.Parent then
-		day.Text = `New tasks in {left(dayEnds - now)} · at 00:00 UTC`
+		day.Text = dayWords(dayEnds - now) -- (6.18: the chip; its width holds the longest clock)
 	end
 	if week and week.Parent then
-		week.Text = `New in {left(weekEnds - now)} · Monday 00:00 UTC`
+		week.Text = weekWords(weekEnds - now)
 	end
 	if now >= dayEnds or now >= weekEnds then
 		ask() -- (the server resets within Config.Tasks.CheckEvery and sends it anyway)

@@ -19,40 +19,47 @@ function PhoneLayout.fit(width: number, height: number, touch: boolean, cap: num
 	return { scale = scale, width = 340, height = math.min(680, (height - 32) / scale) }
 end
 
--- 6.14: the home's two wide MAIN tiles (client/Phone.luau mainTile): NEXT MISSION (its lines: the chapter, the mission,
--- the readiness, the savings bar) over WORK (the board's line and what you earn for). HOME_CHROME: the status bar over
--- the home's scrolling list and the home bar under it; HOME_HEAD: the list's padding, the shift line and the gap under it.
-PhoneLayout.NEXT_H, PhoneLayout.WORK_H, PhoneLayout.MAIN_GAP = 108, 80, 8
-PhoneLayout.HOME_CHROME, PhoneLayout.HOME_HEAD = 30 + 56, 6 + 18 + 8
--- 6.14 review: the phone's frame around its screen (client/Phone.luau BEZEL, top and bottom) and the smaller tiles
--- under the MAIN ones (two to a row: client/Phone.luau's grid).
+-- 6.14: the home's chrome. HOME_CHROME: the status bar over the home's scrolling list and the home bar under it;
+-- BEZELS: the phone's frame around its screen (client/Phone.luau BEZEL, top and bottom).
+-- 6.18, the home in the UI kit's look (client/PhoneHome.luau): HOME_HEAD the list's padding, the header's chips
+-- (Config.UiKit.Chip) and the gap under them; then the hero card (NEXT MISSION, or YOUR RUN during a run: heroHeight,
+-- HERO_MIN .. HERO_MAX = Config.UiKit.HomeHeroMin .. HomeHeroMax), MAIN_GAP, and a compact row an app (ROW_H =
+-- Config.UiKit.Row, ROW_GAP = Config.UiKit.Gap apart; JOBS first). (This module stays pure: tests/phone_layout_test.luau
+-- checks the numbers against Config.UiKit.)
+PhoneLayout.HOME_CHROME, PhoneLayout.HOME_HEAD = 30 + 56, 6 + 24 + 8
 PhoneLayout.BEZELS = 9 * 2
-PhoneLayout.TILE_H, PhoneLayout.TILE_GAP = 60, 8
+PhoneLayout.MAIN_GAP = 8
+PhoneLayout.HERO_MIN, PhoneLayout.HERO_MAX = 128, 190
+PhoneLayout.ROW_H, PhoneLayout.ROW_GAP = 52, 6
 
 -- 6.14 review: the height of the home's scrolling list on the phone (`fit`: PhoneLayout.fit), at scale 1.
 function PhoneLayout.homeView(fit: Fit): number
 	return fit.height - PhoneLayout.BEZELS - PhoneLayout.HOME_CHROME
 end
 
--- 6.14: do NEXT MISSION and WORK sit wholly above the fold of the phone's home (no scrolling to see them)?
+-- 6.18: the hero's height on this phone: what the view leaves over the header and the first row (JOBS), between
+-- HERO_MIN and HERO_MAX (a short phone's hero drops its button: Config.UiKit.ButtonHeroMin).
+function PhoneLayout.heroHeight(fit: Fit): number
+	local room = PhoneLayout.homeView(fit) - PhoneLayout.HOME_HEAD - PhoneLayout.MAIN_GAP - PhoneLayout.ROW_H
+	return math.clamp(math.floor(room), PhoneLayout.HERO_MIN, PhoneLayout.HERO_MAX)
+end
+
+-- 6.14: does the hero (6.18; was NEXT MISSION and WORK) with the JOBS row sit wholly above the fold (no scrolling)?
 function PhoneLayout.mainVisible(fit: Fit): boolean
-	return PhoneLayout.HOME_HEAD + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP + PhoneLayout.WORK_H <= PhoneLayout.homeView(fit)
+	return PhoneLayout.HOME_HEAD + PhoneLayout.heroHeight(fit) + PhoneLayout.MAIN_GAP + PhoneLayout.ROW_H <= PhoneLayout.homeView(fit)
 end
 
 -- 6.14 review: where a home tile is in the home's scrolling list (its top and height, at scale 1), from the layout
--- itself, not from where the tile is drawn now (a phone opening, a resize: that is a frame late). `main`: the MAIN
--- tiles (1 NEXT MISSION, 2 WORK), else the index among the smaller tiles (two to a row).
-function PhoneLayout.tileSpan(main: boolean, index: number): (number, number)
+-- itself, not from where the tile is drawn now (a phone opening, a resize: that is a frame late). 6.18: `main` the
+-- hero, else the index among the app rows (one a line).
+function PhoneLayout.tileSpan(main: boolean, index: number, fit: Fit): (number, number)
 	local top = PhoneLayout.HOME_HEAD
+	local hero = PhoneLayout.heroHeight(fit)
 	if main then
-		if index <= 1 then
-			return top, PhoneLayout.NEXT_H
-		end
-		return top + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP, PhoneLayout.WORK_H
+		return top, hero
 	end
-	local grid = top + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP + PhoneLayout.WORK_H + PhoneLayout.MAIN_GAP
-	local row = math.ceil(math.max(1, index) / 2)
-	return grid + (row - 1) * (PhoneLayout.TILE_H + PhoneLayout.TILE_GAP), PhoneLayout.TILE_H
+	local rows = top + hero + PhoneLayout.MAIN_GAP
+	return rows + (math.max(1, index) - 1) * (PhoneLayout.ROW_H + PhoneLayout.ROW_GAP), PhoneLayout.ROW_H
 end
 
 -- 6.14 review: the home list's scroll (`y`, its view `view` tall) that shows `top` .. `top + height` whole: as it is

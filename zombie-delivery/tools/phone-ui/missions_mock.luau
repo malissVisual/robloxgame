@@ -214,6 +214,8 @@ end
 function Ui.padding(parent)
 	M.make("UIPadding", {}, parent)
 end
+-- 6.18: the UI kit's corners (client/CardKit.luau draws the hero, the rows and the chips).
+Ui.corner = M.Ui.corner
 function Ui.button(parent, text, size, c, onClick)
 	local made = M.make("TextButton", { Text = text, Size = size, BackgroundColor3 = c }, parent)
 	made.Activated:Connect(onClick)

@@ -27,28 +27,40 @@ for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{1150,680,f
 	check(`{w}x{h}: the popup is at most 760 x 520`, pop.width <= 760 and pop.height <= 520)
 	if touch then check(`{w}x{h}: popup touch targets >=36`, 54*pop.scale >= 36 and pop.scale == 1) end
 end
--- 6.14: NEXT MISSION and WORK (the home's two wide tiles) stand wholly above the fold, on the shortest phone too.
+-- 6.14: the main things stand wholly above the fold, on the shortest phone too. 6.18: the hero card (NEXT MISSION or
+-- YOUR RUN) and the JOBS row under it.
 for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{320,448,true},{390,800,true},{844,350,true},{844,390,true},{667,335,true},{640,324,true},{640,316,true}} do
 	local w,h,touch = screen[1],screen[2],screen[3]
-	check(`{w}x{h}: NEXT MISSION and WORK above the fold`, Phone.mainVisible(Phone.fit(w,h,touch,.9)))
+	check(`{w}x{h}: the hero and JOBS above the fold`, Phone.mainVisible(Phone.fit(w,h,touch,.9)))
 end
-check("6.14: NEXT MISSION is the taller tile, touch-sized", Phone.NEXT_H > Phone.WORK_H and Phone.WORK_H >= 54)
+-- 6.18: the home's sizes are the UI kit's (Config.UiKit; PhoneLayout stays pure).
+local Config = require("./Config")
+local Kit = Config.UiKit
+check("6.18: the home's rows and hero are the kit's sizes", Phone.ROW_H == Kit.Row and Phone.ROW_GAP == Kit.Gap and Phone.HERO_MIN == Kit.HomeHeroMin and Phone.HERO_MAX == Kit.HomeHeroMax
+	and Phone.HOME_HEAD == 6 + Kit.Chip + Phone.MAIN_GAP)
+check("6.18: a tall phone's hero is the biggest, with its button", Phone.heroHeight(Phone.fit(1920,1000,false,.9)) == Kit.HomeHeroMax and Kit.HomeHeroMax >= Kit.ButtonHeroMin)
+check("6.18: 844 x 390 (a landscape phone) keeps the hero's button", Phone.heroHeight(Phone.fit(844,390,true,1)) >= Kit.ButtonHeroMin)
+local small = Phone.heroHeight(Phone.fit(640,316,true,.9))
+check("6.18: the shortest phone's hero is shorter, never under its least, the card itself the button", small >= Kit.HomeHeroMin and small < Kit.ButtonHeroMin)
+check("6.18: the hero is touch-sized and the rows too", Kit.HomeHeroMin >= 2 * 54 and Kit.Row >= 44)
 -- 6.14 review: the home's list is the phone's height less its frame (BEZELS) and its chrome; where each tile is comes
 -- from the layout (Phone.reveal scrolls with it: no stale positions right after opening or a resize).
-check("the home's view: the phone less its frame and chrome", Phone.homeView(Phone.fit(1920,1000,false,.9)) == 680 - Phone.BEZELS - Phone.HOME_CHROME)
-local nextTop, nextH = Phone.tileSpan(true, 1)
-local workTop, workH = Phone.tileSpan(true, 2)
-local firstTop, firstH = Phone.tileSpan(false, 1)
-local secondTop = Phone.tileSpan(false, 2)
-local mapTop = Phone.tileSpan(false, 3)
-check("the tiles' spans: NEXT, WORK under it, the grid two to a row", nextTop == Phone.HOME_HEAD and nextH == Phone.NEXT_H and workTop == nextTop + Phone.NEXT_H + Phone.MAIN_GAP and workH == Phone.WORK_H
-	and firstTop == workTop + Phone.WORK_H + Phone.MAIN_GAP and firstH == Phone.TILE_H and secondTop == firstTop and mapTop == firstTop + Phone.TILE_H + Phone.TILE_GAP)
-check("reveal: a tile in view keeps the scroll", Phone.reveal(mapTop, Phone.TILE_H, 0, 500) == 0)
-local short = Phone.homeView(Phone.fit(640,316,true,.9))
-local bagTop = Phone.tileSpan(false, 5)
-local y = Phone.reveal(bagTop, Phone.TILE_H, 0, short)
-check("reveal: a tile under the fold scrolls up just enough (640 x 316)", y > 0 and bagTop + Phone.TILE_H <= y + short and bagTop >= y)
-check("reveal: a tile over the top scrolls back", Phone.reveal(nextTop, nextH, 200, short) == math.max(0, nextTop - 8))
+local tall = Phone.fit(1920,1000,false,.9)
+check("the home's view: the phone less its frame and chrome", Phone.homeView(tall) == 680 - Phone.BEZELS - Phone.HOME_CHROME)
+local heroTop, heroH = Phone.tileSpan(true, 1, tall)
+local jobsTop, jobsH = Phone.tileSpan(false, 1, tall)
+local tasksTop = Phone.tileSpan(false, 2, tall)
+local mapTop = Phone.tileSpan(false, 4, tall)
+check("6.18: the spans: the hero under the header, a row an app under it", heroTop == Phone.HOME_HEAD and heroH == Phone.heroHeight(tall) and jobsTop == heroTop + heroH + Phone.MAIN_GAP and jobsH == Phone.ROW_H
+	and tasksTop == jobsTop + Phone.ROW_H + Phone.ROW_GAP and mapTop == jobsTop + 3 * (Phone.ROW_H + Phone.ROW_GAP))
+check("reveal: a tile in view keeps the scroll", Phone.reveal(jobsTop, Phone.ROW_H, 0, 500) == 0)
+local shortFit = Phone.fit(640,316,true,.9)
+local short = Phone.homeView(shortFit)
+local bagTop = Phone.tileSpan(false, 6, shortFit)
+local y = Phone.reveal(bagTop, Phone.ROW_H, 0, short)
+check("reveal: a row under the fold scrolls up just enough (640 x 316)", y > 0 and bagTop + Phone.ROW_H <= y + short and bagTop >= y)
+local shortHero, shortHeroH = Phone.tileSpan(true, 1, shortFit)
+check("reveal: the hero over the top scrolls back", Phone.reveal(shortHero, shortHeroH, 200, short) == math.max(0, shortHero - 8))
 local desk = Phone.popup(1150,680,false,1)
 check("the desktop popup is 760 x 520", desk.width == 760 and desk.height == 520 and desk.wide)
 check("a narrow phone's popup has one column", not Phone.popup(390,800,true,1).wide)

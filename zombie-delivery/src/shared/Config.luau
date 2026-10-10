@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.17"
+Config.Version = "6.18"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5165,18 +5165,39 @@ Config.Performance = {
 	Overlay = { Refresh = 0.5, Count = 5, PerFrame = 1500 },
 }
 
--- 6.17, the JOBS app at a glance (redesign B; client/JobsView.luau draws it, shared/JobPick.luau picks the hero): the
--- hero card on the left (HeroShare of a wide popup's body; its height the popup's room, between HeroMin and HeroMax
--- px), the compact rows on the right (Row px tall, the picture Thumb px wide, the add button Add px square), the chips
--- of the top bar Chip px tall.
-Config.JobsView = {
+-- 6.17, the JOBS app at a glance (redesign B; client/JobsView.luau draws it, shared/JobPick.luau picks the hero).
+-- 6.18: its look is the UI kit's now (client/CardKit.luau draws, shared/CardLayout.luau measures, design/ui-kit/): every
+-- popup and the phone's home use these sizes.
+--   * a body SplitMin px wide (or wider) shows the hero card on the left (HeroShare of it) beside the compact rows;
+--     narrower, the hero heads the rows;
+--   * a popup's hero is the popup's room tall, between HeroMin and HeroMax px; its big value PayBig px from PayTall px
+--     of hero, else PayMid; its big button Button px tall;
+--   * the phone home's hero (6.18: NEXT MISSION, or YOUR RUN during a run) is HomeHeroMin .. HomeHeroMax px, its value
+--     HomeValue px, its button HomeButton px and only from ButtonHeroMin px (a shorter hero is the button itself);
+--   * a compact row is Row px tall: the picture Thumb px wide (an app's icon Icon px), the round action Add px square;
+--     the rows Gap px apart; the header chips Chip px tall; the corners Corner (cards) and RowCorner (rows) px.
+Config.UiKit = {
+	SplitMin = 600,
 	HeroShare = 0.46,
 	HeroMin = 196,
 	HeroMax = 330,
+	PayTall = 260,
+	PayBig = 52,
+	PayMid = 42,
+	Button = 44,
+	HomeHeroMin = 128,
+	HomeHeroMax = 190,
+	HomeValue = 26,
+	HomeButton = 40,
+	ButtonHeroMin = 178,
 	Row = 52,
 	Thumb = 76,
+	Icon = 52,
 	Add = 40,
+	Gap = 6,
 	Chip = 24,
+	Corner = 12,
+	RowCorner = 10,
 }
 
 return Config
