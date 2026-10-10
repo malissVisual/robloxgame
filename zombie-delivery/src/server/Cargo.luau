@@ -162,6 +162,12 @@
 --     a fall on foot does not knock them.
 --   * PackRoom / Status.packRoom: the bag's room (yours now: bagHeld / bagStays), the bike's bag (Info.rack) and the
 --     satchel's; PackCount every piece in the pack.
+-- 6.19, loading the bike on purpose (the owner: "on bike jobs I can't put things onto the bike ... I don't even know how
+-- I managed it"): standing by your bike with pieces in your hands that fit its bag, E at its rack / basket / box
+-- ("Load onto bike", the bike's CargoDoor, Holding.bikeAction; no hold, like the van's Load) puts them on it; with
+-- empty hands at a drop it takes one of this stop's off ("Take off bike"). The prompt counts ("Your bike: pizza 2 / 3"),
+-- the pieces on the bike show in its slots (Vehicles.cargoSlots, welded like a car's load), and the step says it
+-- ("Put the pizza on your bike: E at the rack (1 / 3)"). Getting on still loads your hands (said once with the tip).
 -- 6.7, real sizes and items in the hand (the owner: "the bag is small, the things would never really fit in it … no
 -- animations"):
 --   * a light piece is built at its real size (Config.Cargo.LightScale / LookScale: a pizza box about 33 cm, a parcel
@@ -323,6 +329,11 @@ export type Session = {
 	car: Vehicles.Car?,
 	carPrompt: ProximityPrompt?,
 	shown: { Model },
+	bikePrompt: ProximityPrompt?, -- 6.19: "Load onto bike" / "Take off bike" at your bike's rack (bikeRack)
+	rackShown: { Model }?, -- 6.19: the pieces on the bike, shown in its slots …
+	rackOn: Model?, -- … on this bike …
+	rackCount: number?, -- … this many of them
+	rackTold: boolean?, -- 6.19: the tip "E at the rack" was given with the first load by sitting
 	ended: boolean,
 	busy: number, -- people being spawned right now (Npcs.spawn may yield): the stop is not done meanwhile
 	blocked: boolean, -- the defend twist: nothing is unloaded at this stop until the area is held (Cargo.setBlocked)
@@ -4091,6 +4102,136 @@ function Cargo.setStop(session: Session, plan: Plan, replace: boolean?)
 end
 
 -- Every job tick (Jobs, 0.2 s): follow the car, check the carriers, build the stop, walk the kids, serve.
+-- 6.19: your bike, when this run has its bag (Info.rack) and the vehicle out is a bike (or a rental scooter); nil else.
+local function rackBike(session: Session): Vehicles.Car?
+	local car = Vehicles.get(session.owner)
+	return if car and rackRoomOf(session) > 0 and TransportRules.isBike(car.id) and car.model.Parent and not car.wrecked then car else nil
+end
+
+-- 6.19: what E at the bike's rack does now (Holding.bikeAction): "load" the hands' pieces, "take" one of this stop's
+-- off at a drop, or nil (not while you sit, push a tool or lead a horse).
+local function rackAction(session: Session): string?
+	local owner = session.owner
+	if not rackBike(session) or Vehicles.seatedIn(owner) ~= nil then
+		return nil
+	end
+	local held = session.held[owner]
+	if held and held.tool then
+		return nil
+	end
+	local fits = true
+	for _, piece in (if held then held.pieces else {}) :: { Piece } do
+		fits = fits and piece.horse == nil and bagFits(piece)
+	end
+	local plan = session.plan
+	local drop = plan ~= nil and plan.stage ~= "pickup"
+	local here = 0
+	for _, piece in session.pack do
+		if packPlace(piece) == "bike" and forHere(session, piece) then
+			here += 1
+		end
+	end
+	return Holding.bikeAction(if held then #held.pieces else 0, fits, rackRoomOf(session) - bikeCount(session), here, drop)
+end
+
+local bikeRack: (Session) -> ()
+
+-- 6.19: E at the rack: the hands' pieces onto the bike (while it has room), or one of this stop's into the hands.
+local function onRack(session: Session, player: Player)
+	if player ~= session.owner or session.ended then
+		return
+	end
+	local action = rackAction(session)
+	if action == "load" then
+		while session.held[player] and rackRoomOf(session) - bikeCount(session) > 0 do
+			local piece = release(session, player)
+			if not piece then
+				break
+			end
+			stash(session, piece, "bike")
+		end
+		tell(player, `Loaded onto your bike ({bikeCount(session)} / {rackRoomOf(session)}).`)
+	elseif action == "take" then
+		for index = #session.pack, 1, -1 do
+			local piece = session.pack[index]
+			if packPlace(piece) == "bike" and forHere(session, piece) then
+				table.remove(session.pack, index)
+				if take(session, player, piece) then
+					tell(player, `Off your bike ({bikeCount(session)} / {rackRoomOf(session)} left on it).`)
+				else
+					table.insert(session.pack, index, piece)
+				end
+				break
+			end
+		end
+	else
+		return
+	end
+	packShown(session)
+	refresh(session)
+	bikeRack(session)
+	session.info.changed()
+end
+
+-- 6.19: every tick of a foot or bike run: the rack's prompt on your bike (its words and count) and the bike's pieces
+-- shown in its slots (built again only when the bike or the count changes).
+bikeRack = function(session: Session)
+	local bike = if session.ended then nil else rackBike(session)
+	local count = if bike then bikeCount(session) else 0
+	local model = if bike then bike.model else nil
+	if model ~= session.rackOn or count ~= session.rackCount then
+		session.rackOn, session.rackCount = model, count
+		local shown: { Model } = session.rackShown or {}
+		session.rackShown = shown
+		for _, old in shown do
+			old:Destroy()
+		end
+		table.clear(shown)
+		local slots = if bike then Vehicles.cargoSlots(bike) else {}
+		if bike and #slots > 0 then
+			local n = 0
+			for _, piece in session.pack do
+				if packPlace(piece) == "bike" then
+					n += 1
+					local look = buildLook(piece.look, piece.variant)
+					local _, size = look:GetBoundingBox()
+					local slot = slots[(n - 1) % #slots + 1] * CFrame.new(0, ((n - 1) // #slots) * size.Y, 0)
+					weldTo(look, Vehicles.cargoHolder(bike), bike.chassis.CFrame * slot)
+					look.Parent = bike.model
+					table.insert(shown, look)
+				end
+			end
+		end
+	end
+	local door = if bike then Vehicles.cargoDoor(bike) else nil
+	local p = session.bikePrompt
+	if p and (door == nil or p.Parent ~= door) then
+		p:Destroy()
+		p = nil
+		session.bikePrompt = nil
+	end
+	if door and not p then
+		local made = prompt(door, "Load onto bike", "Your bike", nil, holdFor(session), session.owner)
+		made.MaxActivationDistance = 8
+		made.Triggered:Connect(function(player)
+			onRack(session, player)
+		end)
+		session.bikePrompt = made
+		p = made
+	end
+	if p then
+		local action = rackAction(session)
+		local text, object = Holding.bikeText(action, session.info.piece, count, rackRoomOf(session))
+		p.Enabled = action ~= nil
+		if p.ActionText ~= text then
+			p.ActionText = text
+		end
+		if p.ObjectText ~= object then
+			p.ObjectText = object
+		end
+	end
+end
+
 function Cargo.update(session: Session, dt: number)
 	if session.ended then
 		return
@@ -4135,7 +4276,9 @@ function Cargo.update(session: Session, dt: number)
 				stash(session, piece, places[index])
 			end
 			local last = held.pieces[#held.pieces]
-			tell(player, if last and last.inBag then `Stowed in your bag ({bagCount(session)} / {bagRoomOf(session)}).` else `Loaded onto your bike ({bikeCount(session)} / {rackRoomOf(session)}).`)
+			local tip = if session.rackTold or (last and last.inBag) then "" else " Next time: E at its rack loads it."
+			session.rackTold = session.rackTold or tip ~= "" -- 6.19: the tip once a run
+			tell(player, if last and last.inBag then `Stowed in your bag ({bagCount(session)} / {bagRoomOf(session)}).` else `Loaded onto your bike ({bikeCount(session)} / {rackRoomOf(session)}).{tip}`)
 			dropped = true
 		else
 			putDown(session, player, true)
@@ -4173,6 +4316,9 @@ function Cargo.update(session: Session, dt: number)
 		updateLift(session) -- (the lift twist, 4.8's heavy rule: 5.2, by the piece's order)
 	end
 	throwShown(session) -- 6.0
+	if session.info.foot then
+		bikeRack(session) -- 6.19: the rack's prompt and the pieces shown on the bike
+	end
 
 	local plan = session.plan
 	if not plan then
@@ -4869,7 +5015,12 @@ local function footStep(session: Session, plan: Plan, near: boolean): (string, s
 	if down and not pickup and countHere(session, down.pieces) > 0 and countHere(session, session.pack) + (if held then countHere(session, held.pieces) else 0) == 0 then
 		return "carry", `Your bag with the {session.info.plural} is where you set it down: go back for it (E: Pick up bag)`
 	end
+	-- 6.19: pieces in your hands that your bike's bag takes: say where they go (E at its rack)
+	local onBike = if held and rackAction(session) == "load" then `Put the {piece} on your bike: E at the rack ({bikeCount(session)} / {rackRoomOf(session)})` else nil
 	if not near then
+		if onBike then
+			return "carry", onBike
+		end
 		if pickup and carrying > 0 then
 			return "drive", `Back to {who}: more {session.info.plural} to pick up (the red circle)`
 		end
@@ -4888,6 +5039,9 @@ local function footStep(session: Session, plan: Plan, near: boolean): (string, s
 		end
 		if carrying == 0 then
 			return "carry", `{start} {article(piece)} from {who} (E)`
+		end
+		if onBike and held and (#session.pile == 0 or #held.pieces >= handsMax(session, owner)) then
+			return "carry", onBike -- 6.19: the hands full (or nothing left here): onto the bike
 		end
 		-- (6.6: the bag's and the bike's bag's fill, no backpack)
 		local notes: { string } = {}
@@ -5251,6 +5405,15 @@ function Cargo.finish(session: Session, linger: boolean?)
 		session.carPrompt:Destroy()
 		session.carPrompt = nil
 	end
+	if session.bikePrompt then
+		session.bikePrompt:Destroy() -- 6.19
+		session.bikePrompt = nil
+	end
+	local rackShown: { Model } = session.rackShown or {}
+	for _, model in rackShown do
+		model:Destroy()
+	end
+	session.rackShown, session.rackOn, session.rackCount = nil, nil, nil
 	local car = session.car
 	if car and car.model.Parent then
 		car.model:SetAttribute("CargoCount", 0)

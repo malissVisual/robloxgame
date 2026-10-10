@@ -25,6 +25,7 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "CharacterArt", "Geometry.luau"), os.path.join(tmp, "CharacterGeometry.luau"))
     # 6.4: the kit art (pure: the bags' pieces, tests/bags_test.luau)
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "KitArt", "Geometry.luau"), os.path.join(tmp, "KitGeometry.luau"))
+    shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "BikeArt", "Geometry.luau"), os.path.join(tmp, "BikeGeometry.luau"))  # 6.19
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
@@ -52,7 +53,7 @@ def slot_count(body, key="cargo = cargo("):
             depth -= 1
             if depth == 0:
                 break
-    return len(re.findall(r"Vector3\.new", body[open_at:end]))
+    return len(re.findall(r"Vector3\.new|bikeArt\(", body[open_at:end]))  # (6.19: a bike's slots at its art's scale)
 
 def entries(text):
     blocks = {}

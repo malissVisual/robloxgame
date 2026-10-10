@@ -100,39 +100,39 @@ check("its rows: the level and the van (required), a medkit (recommended)", ids(
 local levelRow = find(fresh, "level") :: Readiness.Check
 check("the level row: Reach level 4, the XP have / need, JOBS", levelRow.text == "Reach level 4" and levelRow.required and levelRow.have == 0 and levelRow.need == Levels.xpFor(4) and levelRow.action == "jobs")
 local van = find(fresh, "vehicle") :: Readiness.Check
-check("the van row: Earl's Old Van, its price and level, the GPS to Earl", van.text == "A van of your own" and van.cost == 1800 and van.place == "earl" and van.action == "gps" and van.name == "Old Van" and van.level == 4
-	and Readiness.line(van) == "A van of your own → Old Van at Earl's Used Wheels · $1,800 · level 4", Readiness.line(van))
+check("the van row: Earl's Old Van, its price and level, the GPS to Earl", van.text == "A van of your own" and van.cost == 5400 and van.place == "earl" and van.action == "gps" and van.name == "Old Van" and van.level == 4
+	and Readiness.line(van) == "A van of your own → Old Van at Earl's Used Wheels · $5,400 · level 4", Readiness.line(van))
 check("not ready: 0 of 2", not fresh.ready and fresh.done == 0 and fresh.required == 2 and Readiness.status(fresh) == "0 of 2 ready")
-check("the goal: the Old Van, below its level too (save up early)", fresh.goal ~= nil and fresh.goal.name == "Old Van" and fresh.goal.have == 40 and fresh.goal.need == 1800 and fresh.goal.left == 1760 and fresh.goal.place == "earl" and not fresh.goal.afford)
+check("the goal: the Old Van, below its level too (save up early)", fresh.goal ~= nil and fresh.goal.name == "Old Van" and fresh.goal.have == 40 and fresh.goal.need == 5400 and fresh.goal.left == 5360 and fresh.goal.place == "earl" and not fresh.goal.afford)
 check("Marge's first day: quiet (no HUD line, no toast)", fresh.quiet)
 check("no phone yet: quiet", Readiness.evaluate({ phone = false }).quiet and not Readiness.evaluate({ phone = true, tutorial = "done" }).quiet and not Readiness.evaluate({}).quiet)
 check("the marks: ✖ required, ☆ recommended, ✔ done", Readiness.mark(van) == "✖" and Readiness.mark(find(fresh, "medkit") :: Readiness.Check) == "☆" and Readiness.mark({ id = "x", icon = "", text = "", done = true, required = false }) == "✔")
 
 -- The words.
 local goal = fresh.goal :: Readiness.Goal
-check("the goal's line: Old Van · $40 / $1,800, $1,760 to go", Readiness.goalLine(goal) == "Old Van · $40 / $1,800" and Readiness.toGo(goal) == "$1,760 to go")
-check("the HUD's savings line: 🚐 Old Van  $40 / $1,800", Readiness.hudLine(goal) == "🚐 Old Van  $40 / $1,800" and goal.icon == "🚐", Readiness.hudLine(goal))
-check("WORK's line: Earn for the Old Van · $1,760 to go", Readiness.workLine(goal) == "Earn for the Old Van · $1,760 to go" and Readiness.workLine(nil) == nil)
-check("the job result's line: +$85 · $1,675 to go for the Old Van", Readiness.resultLine(85, goal, 40 + 85) == "+$85 · $1,675 to go for the Old Van" and Readiness.resultLine(85, nil, 125) == nil and Readiness.resultLine(0, goal, 40) == nil)
-check("… the money there below its level: saved, the level to reach", Readiness.resultLine(85, goal, 1850) == "+$85 · the Old Van is saved: level 4 to buy", Readiness.resultLine(85, goal, 1850))
+check("the goal's line: Old Van · $40 / $5,400, $5,360 to go", Readiness.goalLine(goal) == "Old Van · $40 / $5,400" and Readiness.toGo(goal) == "$5,360 to go")
+check("the HUD's savings line: 🚐 Old Van  $40 / $5,400", Readiness.hudLine(goal) == "🚐 Old Van  $40 / $5,400" and goal.icon == "🚐", Readiness.hudLine(goal))
+check("WORK's line: Earn for the Old Van · $5,360 to go", Readiness.workLine(goal) == "Earn for the Old Van · $5,360 to go" and Readiness.workLine(nil) == nil)
+check("the job result's line: +$85 · $5,275 to go for the Old Van", Readiness.resultLine(85, goal, 40 + 85) == "+$85 · $5,275 to go for the Old Van" and Readiness.resultLine(85, nil, 125) == nil and Readiness.resultLine(0, goal, 40) == nil)
+check("… the money there below its level: saved, the level to reach", Readiness.resultLine(85, goal, 5450) == "+$85 · the Old Van is saved: level 4 to buy", Readiness.resultLine(85, goal, 5450))
 check("Readiness.money: $1,234,567", Readiness.money(1234567) == "$1,234,567" and Readiness.money(80) == "$80")
 
--- Level 4 with the money, no van: the GPS to Earl, the goal affordable.
-local rich = Readiness.evaluate({ xp = Levels.xpFor(4), money = 1900, cars = {}, vanQuest = "open" })
-check("level 4 with $1,900: the level done, the van to buy (no level note), the goal affordable", (find(rich, "level") :: Readiness.Check).done and Readiness.line(find(rich, "vehicle") :: Readiness.Check) == "A van of your own → Old Van at Earl's Used Wheels · $1,800"
-	and rich.goal ~= nil and rich.goal.afford and Readiness.toGo(rich.goal) == "✓ you can buy it" and Readiness.workLine(rich.goal) == "Buy the Old Van now · $1,800" and Readiness.status(rich) == "1 of 2 ready")
-check("… the HUD says buy it", rich.goal ~= nil and Readiness.hudLine(rich.goal) == "🚐 Old Van  ✓ buy it · $1,800")
-check("… the job result's line: enough now", rich.goal ~= nil and Readiness.resultLine(85, rich.goal, 1985) == "+$85 · enough for the Old Van now")
+-- Level 4 with the money, no van (6.19: the Old Van $5,400): the GPS to Earl, the goal affordable.
+local rich = Readiness.evaluate({ xp = Levels.xpFor(4), money = 5500, cars = {}, vanQuest = "open" })
+check("level 4 with $5,500: the level done, the van to buy (no level note), the goal affordable", (find(rich, "level") :: Readiness.Check).done and Readiness.line(find(rich, "vehicle") :: Readiness.Check) == "A van of your own → Old Van at Earl's Used Wheels · $5,400"
+	and rich.goal ~= nil and rich.goal.afford and Readiness.toGo(rich.goal) == "✓ you can buy it" and Readiness.workLine(rich.goal) == "Buy the Old Van now · $5,400" and Readiness.status(rich) == "1 of 2 ready")
+check("… the HUD says buy it", rich.goal ~= nil and Readiness.hudLine(rich.goal) == "🚐 Old Van  ✓ buy it · $5,400")
+check("… the job result's line: enough now", rich.goal ~= nil and Readiness.resultLine(85, rich.goal, 5585) == "+$85 · enough for the Old Van now")
 
 -- 6.14 review: the money without the level is no "buy it" (Earl refuses below level 4).
-local early = Readiness.evaluate({ xp = Levels.xpFor(3), money = 2000, cars = {}, vanQuest = "open" })
+local early = Readiness.evaluate({ xp = Levels.xpFor(3), money = 5600, cars = {}, vanQuest = "open" })
 local saved = early.goal :: Readiness.Goal
-check("level 3 with $2,000: the goal is locked, not affordable, its level carried", saved ~= nil and saved.locked and not saved.afford and saved.level == 4 and saved.left == 0)
-check("… the HUD: $1,800 saved · level 4", Readiness.hudLine(saved) == "🚐 Old Van  $1,800 saved · level 4" and Readiness.goalMoney(saved) == "$1,800 saved · level 4", Readiness.hudLine(saved))
+check("level 3 with $5,600: the goal is locked, not affordable, its level carried", saved ~= nil and saved.locked and not saved.afford and saved.level == 4 and saved.left == 0)
+check("… the HUD: $5,400 saved · level 4", Readiness.hudLine(saved) == "🚐 Old Van  $5,400 saved · level 4" and Readiness.goalMoney(saved) == "$5,400 saved · level 4", Readiness.hudLine(saved))
 check("… WORK: Old Van saved · reach level 4 to buy", Readiness.workLine(saved) == "Old Van saved · reach level 4 to buy" and Readiness.toGo(saved) == "level 4 to buy", Readiness.workLine(saved))
-check("… the result line and the goal line say so too", Readiness.resultLine(85, saved, 2085) == "+$85 · the Old Van is saved: level 4 to buy" and Readiness.goalLine(saved) == "Old Van · $1,800 saved · level 4")
+check("… the result line and the goal line say so too", Readiness.resultLine(85, saved, 5685) == "+$85 · the Old Van is saved: level 4 to buy" and Readiness.goalLine(saved) == "Old Van · $5,400 saved · level 4")
 local short = Readiness.evaluate({ xp = Levels.xpFor(3), money = 600, cars = {}, vanQuest = "open" }).goal :: Readiness.Goal
-check("… short of the money too: the money as before", short.locked and not short.afford and Readiness.hudLine(short) == "🚐 Old Van  $600 / $1,800" and Readiness.toGo(short) == "$1,200 to go")
+check("… short of the money too: the money as before", short.locked and not short.afford and Readiness.hudLine(short) == "🚐 Old Van  $600 / $5,400" and Readiness.toGo(short) == "$4,800 to go")
 
 -- 6.14 review: a company vehicle is not a car of your own (it waits at the depot, CALL CAR does not bring it).
 local company: string? = nil
@@ -164,25 +164,28 @@ check("a bike out, the van at home: not ready, CALL CAR (GARAGE), nothing to buy
 check("… its room counted in the van", (find(biking, "cargo") :: Readiness.Check).done)
 
 -- The van quest done but no car (sold): the dealer's cheapest.
-local dealer = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {}, vanQuest = "done", progress = progressTo("dispatch", 0) })
+-- (6.19: the Courier Van once Many Hands, Code Red's third, is done: progressTo("clinic", 3))
+local dealer = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {}, vanQuest = "done", progress = progressTo("clinic", 3) })
 check("no car and Earl's van bought once: the dealer's cheapest car", (find(dealer, "vehicle") :: Readiness.Check).place == "dealer" and (find(dealer, "vehicle") :: Readiness.Check).name == "Courier Van")
+local early = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {}, vanQuest = "done", progress = progressTo("dispatch", 0) })
+check("6.19: … before Many Hands no dealer car is open: never a car the dealer would refuse", (find(early, "vehicle") :: Readiness.Check).name ~= "Courier Van" and (find(early, "vehicle") :: Readiness.Check).place ~= "dealer")
 
 -- ── Room: a stage, another car of yours, the dealer ─────────────────────────
 
 local quarantine = progressTo("clinic", 4)
-local q = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 900, cars = { van = true }, car = "van", progress = quarantine, items = { medkit = 1, repair = 1 } })
+local q = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 2400, cars = { van = true }, car = "van", progress = quarantine, items = { medkit = 1, repair = 1 } })
 check("Quarantine Zone (3 sample cases) in the Rusty Van: room missing", q.mission ~= nil and q.mission.name == "Quarantine Zone" and not q.ready and q.done == 2, q.mission and q.mission.name)
 local room = find(q, "cargo") :: Readiness.Check
-check("… build it up to a Work Van at Wrench Garage: both stages' price, the GPS there", room.text == "A vehicle for 3 pieces" and room.place == "mechanic" and room.name == "Work Van" and room.cost == 250 + 700 and room.action == "gps"
-	and Readiness.line(room) == "A vehicle for 3 pieces → Your Old Van holds 2: build it up to a Work Van at Wrench Garage · $950", Readiness.line(room))
+check("… build it up to a Work Van at Wrench Garage: both stages' price, the GPS there", room.text == "A vehicle for 3 pieces" and room.place == "mechanic" and room.name == "Work Van" and room.cost == 650 + 1800 and room.action == "gps"
+	and Readiness.line(room) == "A vehicle for 3 pieces → Your Old Van holds 2: build it up to a Work Van at Wrench Garage · $2,450", Readiness.line(room))
 check("… it is the goal ($50 to go)", q.goal ~= nil and q.goal.name == "Work Van" and q.goal.left == 50)
-local built = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 900, cars = { van = true }, car = "van", carUpgrades = { van = { stage = 2 } }, progress = quarantine })
+local built = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 2400, cars = { van = true }, car = "van", carUpgrades = { van = { stage = 2 } }, progress = quarantine })
 check("… as a Work Van it holds 3: done", (find(built, "cargo") :: Readiness.Check).done and built.ready)
-local hard = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 900, cars = { van = true, highroof = true }, car = "van", progress = quarantine })
+local hard = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 2400, cars = { van = true, highroof = true }, car = "van", progress = quarantine })
 local other = find(hard, "cargo") :: Readiness.Check
 check("… a High-Roof Van of yours holds it now: nothing to buy, no garage of yours: the GPS to the depot lot", other.action == "gps" and other.cost == nil and other.place == "depot"
 	and other.detail == "Your Old Van holds 2: take out your High-Roof Van (holds 4) at the depot lot", other.detail)
-local garaged = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 900, cars = { van = true, highroof = true }, car = "van", progress = quarantine, garages = { "garage_rented", "garage_harbor" }, at = { x = 1000, z = -400 } })
+local garaged = Readiness.evaluate({ xp = Levels.xpFor(5) + 10, money = 2400, cars = { van = true, highroof = true }, car = "van", progress = quarantine, garages = { "garage_rented", "garage_harbor" }, at = { x = 1000, z = -400 } })
 local kept = find(garaged, "cargo") :: Readiness.Check
 check("… with garages: the one nearest to you (the Harbor Lockup)", kept.place == "garage_harbor" and string.find(kept.detail or "", "at Harbor Lockup", 1, true) ~= nil, kept.detail)
 check("… keptAt: the starting van and a company vehicle at the depot lot, a car of yours at your garage", (Readiness.keptAt({ garages = { "garage_rented" }, cars = { van = true, highroof = true } }, "van")) == "depot"
@@ -193,7 +196,7 @@ local mess = Missions.find("army_2") :: Missions.MissionDef
 check("Mess Hall takes 6 pieces of its own (the test's premise)", mess ~= nil and Economy.cargoNeed(mess.load, mess.items) == 6 and mess.vehicle == nil)
 local truck = Readiness.evaluate({ mission = "army_2", xp = Levels.xpFor(9), money = 5000, cars = { van = true }, car = "van", carUpgrades = { van = { stage = 3 } }, progress = progressTo("army", 1) })
 local need6 = find(truck, "cargo") :: Readiness.Check
-check("… the van's last stage holds 4: the Box Truck at Dead End Motors", need6.place == "dealer" and need6.name == "Box Truck" and need6.cost == 22000, need6 and Readiness.line(need6))
+check("… the van's last stage holds 4: the Box Truck at Dead End Motors", need6.place == "dealer" and need6.name == "Box Truck" and need6.cost == 66000, need6 and Readiness.line(need6))
 -- A mission that lends its vehicle: no room row (a car of your own is still asked for, as the server does).
 local lent = Readiness.evaluate({ mission = "clinic_2", xp = Levels.xpFor(5), money = 0, cars = {}, progress = progressTo("clinic", 1) })
 check("a mission that lends its vehicle (the ambulance): no room row, a car of your own still required", find(lent, "cargo") == nil and find(lent, "vehicle") ~= nil and lent.mission ~= nil and lent.mission.lends == "ambulance")
@@ -220,7 +223,13 @@ local busy = Readiness.evaluate({ xp = Levels.xpFor(5), money = 400, cars = { va
 check("… the rows still to do come before the done ones (the friend cut at MaxRows)", find(busy, "friend") == nil and #busy.checks == tuning.MaxRows, ids(busy))
 local gun = Readiness.evaluate({ xp = Levels.xpFor(5), money = 400, cars = { van = true }, car = "van", progress = progressTo("dispatch", 5), crewSize = 1, kit = { kevlar = true }, items = { medkit = 1, repair = 1 } })
 local long = find(gun, "gun") :: Readiness.Check
-check("… no two-handed gun: the Shotgun at Lead & Co.'s range", long ~= nil and long.name == "Shotgun" and long.place == "guns" and long.cost == 7500 and gun.goal ~= nil and gun.goal.id == "gun")
+-- 6.19: the Shotgun is the First Shift finale's own unlock: no two-handed gun is open before it (no row, no goal) …
+check("6.19: … no two-handed gun open before the finale: no gun row, no gun goal", long == nil and (gun.goal == nil or gun.goal.id ~= "gun"), gun.goal and gun.goal.id)
+-- … and once the finale is done (a replay of it): the Shotgun at Lead & Co.'s range, the goal.
+local done = progressTo("dispatch", 6)
+local replayGun = Readiness.evaluate({ xp = Levels.xpFor(5), money = 400, cars = { van = true }, car = "van", progress = done, mission = "dispatch_10", crewSize = 1, kit = { kevlar = true }, items = { medkit = 1, repair = 1 } })
+local long2 = find(replayGun, "gun") :: Readiness.Check
+check("… no two-handed gun: the Shotgun at Lead & Co.'s range", long2 ~= nil and long2.name == "Shotgun" and long2.place == "guns" and long2.cost == 15000 and replayGun.goal ~= nil and replayGun.goal.id == "gun")
 local easy = Readiness.evaluate({ xp = Levels.xpFor(4), money = 400, cars = { van = true }, car = "van", progress = {} })
 check("an easy mission: no vest, no gun, no friend", find(easy, "vest") == nil and find(easy, "gun") == nil and find(easy, "friend") == nil)
 local duo = Readiness.evaluate({ xp = Levels.xpFor(15), money = 0, cars = { van = true }, car = "van", progress = story })
@@ -276,7 +285,7 @@ check("nothing left: ALL DONE", none.start.label == "ALL DONE" and not none.star
 
 -- ── A level-locked chapter: the next chapter's first mission and its level ─
 
-local waits = Readiness.evaluate({ xp = Levels.xpFor(4) + 500, money = 900, cars = { van = true }, car = "van", progress = progressTo("dispatch", 6) })
+local waits = Readiness.evaluate({ xp = Levels.xpFor(4) + 500, money = 2400, cars = { van = true }, car = "van", progress = progressTo("dispatch", 6) })
 local reach = find(waits, "level") :: Readiness.Check
 check("First Shift done at level 4: Code Red's House Call, Reach level 5", waits.mission ~= nil and waits.mission.chapter == "Code Red" and reach ~= nil and reach.text == "Reach level 5" and not reach.done and not waits.ready)
 check("… its XP: have / need", reach.have == Levels.xpFor(4) + 500 and reach.need == Levels.xpFor(5) and reach.detail == `{string.sub(Readiness.money(Levels.xpFor(4) + 500), 2)} / {string.sub(Readiness.money(Levels.xpFor(5)), 2)} XP`)
@@ -286,7 +295,7 @@ check("input.mission checks that one", pick.mission ~= nil and pick.mission.id =
 
 -- The READY CHECK is drawn again only when what it shows changes: not for money.
 local before = Readiness.key(Readiness.evaluate({ xp = Levels.xpFor(4), money = 100, cars = { van = true }, car = "van" }))
-check("the key ignores the money, follows the rows", before == Readiness.key(Readiness.evaluate({ xp = Levels.xpFor(4), money = 900, cars = { van = true }, car = "van" }))
+check("the key ignores the money, follows the rows", before == Readiness.key(Readiness.evaluate({ xp = Levels.xpFor(4), money = 2400, cars = { van = true }, car = "van" }))
 	and before ~= Readiness.key(Readiness.evaluate({ xp = Levels.xpFor(4), money = 100, cars = { van = true }, car = "van", items = { medkit = 1 } })))
 
 -- Every story mission at its own level with a car that has the room: never a missing required row but the level.

@@ -45,6 +45,17 @@ check("the rows keep the catalog's order, the locked ones last", table.concat(Sh
 	and table.concat(ShopPick.order({ shop[5], shop[2], shop[3] }), ",") == "2,3,1")
 check("the hero's bar: your money toward the price", ShopPick.share(shop[4], 450) == 0.5 and ShopPick.share(shop[2], 900) == 1 and ShopPick.share(shop[1], 0) == 1)
 
+-- 6.19: a gun or a car a mission unlocks ("🔒 Finish Mail Call"; its button opens MISSIONS, so client/ShopView.luau
+-- never calls it buyable): the lock's tone, last, never the best buy nor the one to save up for; the goal only by name.
+do
+	local guns: { ShopPick.Entry } = {
+		{ name = "SMG", price = 8000, forSale = true, locked = true, buyable = false },
+		{ name = "Shotgun", price = 15000, forSale = true, locked = true, buyable = false },
+	}
+	check("6.19: a mission's lock reads as a lock and sorts last", ShopPick.tone(guns[1], 99999) == "lock" and table.concat(ShopPick.order(guns), ",") == "1,2")
+	check("6.19: … never the best buy or the cheapest to save up for", ShopPick.hero(guns, 99999, nil) == nil)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

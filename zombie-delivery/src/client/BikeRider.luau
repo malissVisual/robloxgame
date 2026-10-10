@@ -16,6 +16,13 @@
 -- through the deck and threw the arms up on some avatars): straight legs, the body raised or lowered on its Root joint
 -- until the lower foot rests on the scooter's Deck point (measured every frame, so any leg length stands right), and
 -- the hands on the bar's LeftGrip / RightGrip points (RiderPose.armIk, a two-bone reach).
+-- 6.19 (the owner: "the bike doesn't fit, the legs ... make it visible how he pedals"): the seated rider is posed
+-- ABSOLUTE too (no more thighs pumping over the sit, which stuck out like a chair's): the body moved on its Root joint
+-- until the hips sit on the art's Saddle point (measured every frame, like the scooter's deck), the upper body leaning
+-- over the bars, each foot ON its pedal round the crank (RiderPose.legIk: hip -> knee -> ankle to the pedal point
+-- from the bike's CrankAxis and the crank's own LeftPedal / RightPedal points at this frame's crank angle, the knees
+-- forward; the ankle keeps the foot on the pedal), the hands on the grips (RiderPose.armIk). The bikes' art is built
+-- to the classic R15 (server/BikeArt/Geometry.luau Scale). Everybody's client poses every rider near its camera.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -39,12 +46,17 @@ local BODY = {
 	{ "RightLowerLeg", "RightKnee" },
 	{ "LeftUpperLeg", "LeftHip" },
 	{ "LeftLowerLeg", "LeftKnee" },
+	{ "RightFoot", "RightAnkle" }, -- 6.19: the feet on the pedals
+	{ "LeftFoot", "LeftAnkle" },
 }
 
 local written: { [Instance]: CFrame } = {}
 local animated: { [Instance]: CFrame } = {}
 local riders: { [Model]: { any } } = {} -- the joints posed on each rider (released on the way off)
 local lifts: { [Model]: number } = {} -- 5.8.2: a standing rider's Root lift (studs), corrected toward the deck
+local seats: { [Model]: Vector3 } = {} -- 6.19: a pedalling rider's Root offset (studs), corrected toward the saddle
+type Legs = { thigh: number, shin: number, ankle: number, upper: number, lower: number }
+local legs: { [Model]: Legs } = {} -- 6.19: the rider's bone lengths (measured once a ride)
 local absolute: { [Instance]: boolean } = {} -- 5.9.1: the joints posed absolute (given back to the rest pose, not a sit)
 local watching: RBXScriptConnection? = nil -- 5.9.1: lets go of riders whose scooter vanished under them
 
@@ -131,6 +143,21 @@ local function armLengths(character: Model, side: string): (number, number)
 	return math.max(upper, 0.3), math.max(lower, 0.3)
 end
 
+-- 6.19: a leg's bones (hip->knee, knee->ankle, the ankle over the sole) and an arm's, from the rig attachments.
+local function bonesOf(character: Model): Legs
+	local thighPart = character:FindFirstChild("RightUpperLeg")
+	local shinPart = character:FindFirstChild("RightLowerLeg")
+	local foot = character:FindFirstChild("RightFoot")
+	local h, k = attachmentAt(thighPart, "RightHipRigAttachment"), attachmentAt(thighPart, "RightKneeRigAttachment")
+	local k2, a = attachmentAt(shinPart, "RightKneeRigAttachment"), attachmentAt(shinPart, "RightAnkleRigAttachment")
+	local a2 = attachmentAt(foot, "RightAnkleRigAttachment")
+	local thigh = if h and k then (h - k).Magnitude elseif thighPart and thighPart:IsA("BasePart") then thighPart.Size.Y * 0.7 else 0.8
+	local shin = if k2 and a then (k2 - a).Magnitude elseif shinPart and shinPart:IsA("BasePart") then shinPart.Size.Y * 0.8 else 0.9
+	local ankle = if a2 and foot and foot:IsA("BasePart") then math.max(0.05, a2.Y + foot.Size.Y / 2) else 0.2
+	local upper, lower = armLengths(character, "Right")
+	return { thigh = math.max(thigh, 0.3), shin = math.max(shin, 0.3), ankle = ankle, upper = upper, lower = lower }
+end
+
 -- The lowest point of the feet now (world Y), or nil.
 local function feetBottom(character: Model): number?
 	local low: number? = nil
@@ -193,6 +220,93 @@ local function poseStanding(character: Model)
 	end
 end
 
+-- 6.19: the arms to the grips (absolute; RiderPose.armIk), unless the rider aims (ArmPose has the arms then).
+local function gripArms(character: Model, frame: BasePart, bones: Legs, reach: number, inward: number, elbow: number)
+	if character:GetAttribute("Aiming") == true then
+		for _, pair in ARMS do
+			local joint = find(character, pair)
+			if joint and written[joint] then
+				layer(joint, nil)
+				absolute[joint] = nil
+			end
+		end
+		return
+	end
+	local torso = character:FindFirstChild("UpperTorso")
+	for index, side in { "Right", "Left" } do
+		local point = frame:FindFirstChild(side .. "Grip")
+		local upperArm = character:FindFirstChild(side .. "UpperArm")
+		local at = upperArm and upperArm:FindFirstChild(side .. "ShoulderRigAttachment")
+		local pitch, yaw, bend = reach, if side == "Right" then inward else -inward, elbow
+		if point and point:IsA("Attachment") and at and at:IsA("Attachment") and torso and torso:IsA("BasePart") then
+			local d = torso.CFrame:VectorToObjectSpace(point.WorldPosition - at.WorldPosition)
+			pitch, yaw, bend = RiderPose.armIk(d.X, d.Y, d.Z, bones.upper, bones.lower)
+		end
+		put(find(character, ARMS[index * 2 - 1]), CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0))
+		put(find(character, ARMS[index * 2]), CFrame.Angles(bend, 0, 0))
+	end
+end
+
+-- 6.19: the pedalling rider (a bike's saddle), absolute; false when the bike's points are missing (the old layered
+-- pose then).
+local function posePedalling(character: Model, crank: number): boolean
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	local car = seat and seat.Parent
+	local frame = car and car:FindFirstChild("BikeFrame")
+	local crankPart = car and car:FindFirstChild("Crank")
+	local lower = character:FindFirstChild("LowerTorso")
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not (frame and frame:IsA("BasePart") and crankPart and lower and lower:IsA("BasePart") and rootPart and rootPart:IsA("BasePart")) then
+		return false
+	end
+	local saddle, axis = frame:FindFirstChild("Saddle"), frame:FindFirstChild("CrankAxis")
+	if not (saddle and saddle:IsA("Attachment") and axis and axis:IsA("Attachment")) then
+		return false
+	end
+	local r = RiderPose.Ride
+	local bones = legs[character]
+	if not bones then
+		bones = bonesOf(character)
+		legs[character] = bones
+	end
+	local bike = frame.CFrame
+	-- The hips onto the saddle: the Root joint moves the body by half of what the last frame missed.
+	local hipR = lower:FindFirstChild("RightHipRigAttachment")
+	local hipL = lower:FindFirstChild("LeftHipRigAttachment")
+	if not (hipR and hipR:IsA("Attachment") and hipL and hipL:IsA("Attachment")) then
+		return false
+	end
+	local want = bike:PointToWorldSpace(saddle.Position + Vector3.new(0, r.HipUp, r.HipBack))
+	local miss = rootPart.CFrame:VectorToObjectSpace(want - (hipR.WorldPosition + hipL.WorldPosition) / 2)
+	local offset = (seats[character] or Vector3.zero) + miss * 0.5
+	if offset.Magnitude > 3 then
+		offset = offset.Unit * 3
+	end
+	seats[character] = offset
+	put(Joints.find(lower, "Root"), CFrame.new(offset))
+	put(find(character, BODY[1]), CFrame.Angles(r.Lean, 0, 0))
+	-- Each foot on its pedal: the pedal's point turned with the crank about the bike's crank axis.
+	for index, side in { "Right", "Left" } do
+		local pedal = crankPart:FindFirstChild(side .. "Pedal")
+		local hip = if side == "Right" then hipR else hipL
+		if not (pedal and pedal:IsA("Attachment") and hip:IsA("Attachment")) then
+			continue
+		end
+		local onFrame = axis.Position + CFrame.Angles(crank, 0, 0):PointToWorldSpace(pedal.Position)
+		local target = bike:PointToWorldSpace(onFrame + Vector3.new(0, r.PedalTop + bones.ankle, r.AnkleBack))
+		local d = (lower.CFrame * hip.CFrame):PointToObjectSpace(target)
+		local pitch, roll, knee = RiderPose.legIk(d.X, d.Y, d.Z, bones.thigh, bones.shin)
+		local own = if side == "Right" then crank else crank + math.pi
+		put(find(character, BODY[index * 2]), CFrame.Angles(0, 0, roll) * CFrame.Angles(pitch, 0, 0))
+		put(find(character, BODY[index * 2 + 1]), CFrame.Angles(knee, 0, 0))
+		put(find(character, BODY[5 + index]), CFrame.Angles(RiderPose.ankle(pitch, knee, own), 0, 0))
+	end
+	local p = RiderPose.Pedal
+	gripArms(character, frame, bones, p.Reach, p.Inward, p.Elbow)
+	return true
+end
+
 -- The rider's pose this frame. crank: the bike's crank angle (radians, client/CarVisuals.luau); stand (5.1.1): the
 -- E-Scooter's standing rider (the crank does nothing then).
 function BikeRider.pose(character: Model, crank: number, stand: boolean?)
@@ -235,6 +349,14 @@ function BikeRider.pose(character: Model, crank: number, stand: boolean?)
 		poseStanding(character)
 		return
 	end
+	local list = riders[character]
+	local root = Joints.find(character:FindFirstChild("LowerTorso"), "Root")
+	if root and not table.find(list, root) then
+		table.insert(list, root) -- (6.19: released with the rest on the way off)
+	end
+	if posePedalling(character, crank) then
+		return
+	end
 	local pose = RiderPose.pose(false, crank)
 	layer(waist, CFrame.Angles(pose.waist.x, 0, 0))
 	layer(find(character, BODY[2]), CFrame.Angles(pose.rightHip.x, 0, 0))
@@ -266,6 +388,8 @@ function BikeRider.release(character: Model)
 	end
 	riders[character] = nil
 	lifts[character] = nil
+	seats[character] = nil
+	legs[character] = nil
 	for _, joint in posed do
 		if absolute[joint] then
 			-- 5.9.1: back to the rest pose (the Animator writes over it next frame where it animates; the Root joint it

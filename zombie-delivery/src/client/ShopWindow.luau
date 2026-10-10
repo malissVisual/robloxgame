@@ -4,7 +4,7 @@
 -- the footer with your money) calls ShopWindow.render for its body; what each counter sells is drawn by
 -- client/ShopView.luau (a hero card, compact rows, the details on a tap):
 --   dealer    Dead End Motors' CARS counter: the cars (a display car's "Look" is the hero: `focus`), YOUR CAR, IN GARAGE,
---             🔒 SOLD PRIVATELY (Earl's Old Van), the level, a campaign first, 🅿 NEEDS A GARAGE, BUY (the Buy remote)
+--             🔒 SOLD PRIVATELY (Earl's Old Van), 6.19's mission first, the level, a campaign first, 🅿 NEEDS A GARAGE, BUY (the Buy remote)
 --   guns      Lead & Co.'s range: tabs GUNS (EQUIP, IN HAND, STARTER, the earned and the reward guns last), UPGRADES
 --             (the gun tracks: the Upgrade remote) and MELEE (the bat: client/KitShop.luau)
 --   bikes     the BIKES counter: tabs BIKES (client/BikeShop.luau) and GEAR (client/GearShop.luau, the bike gear)
@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Career = require(Shared.Career) -- 6.19: the guns and the cars a mission unlocks
 local Economy = require(Shared.Economy)
 local Icons = require(Shared.Icons)
 local Net = require(Shared.Net)
@@ -51,6 +52,9 @@ export type Ctx = {
 	findEmployer: (id: string?) -> any,
 	goal: string?, -- the savings goal's name (client/ReadyCheck.luau)
 }
+
+-- 6.19: opens MISSIONS on a mission (a lock's "🔒 Finish Mail Call"; client/Main.client.luau sets it).
+ShopWindow.onMission = nil :: ((missionId: string) -> ())?
 
 -- The open tabs (the guns' and Wrench Garage's; the bikes' and the supplies' are BikeShop.tab and KitShop.tab).
 ShopWindow.gunTab = "guns"
@@ -149,6 +153,21 @@ local function levelLock(item: Item, level: number)
 	item.act = shut(`🔒 LEVEL {level}`, `Opens at level {level}: deliveries give XP.`)
 end
 
+-- 6.19: a mission first (Career.missionLock): the facts read "🔒 Finish Mail Call", and the lock's pill (MISSIONS ›)
+-- and the big button open MISSIONS on that mission.
+local function missionLock(item: Item, id: string)
+	local text = Career.lockText(id)
+	item.fact = `🔒 {text} · {item.fact}`
+	item.lock = "MISSIONS ›"
+	item.act = { text = `🔒 {string.upper(text)} ›`, short = "MISSIONS", on = true, kind = "warn", name = "Mission", run = function()
+		local open = ShopWindow.onMission
+		if open then
+			open(id)
+		end
+	end }
+	table.insert(item.lines or {}, 1, `🔒 {text} first: the mission unlocks the {item.name} (MISSIONS, U).`)
+end
+
 local function campaignLock(item: Item, need: string)
 	item.lock = "🔒 STORY"
 	item.act = shut(`🔒 {string.upper(need)}`, `{need} first: it opens with that campaign (MISSIONS, U).`)
@@ -209,7 +228,8 @@ local function dealer(ctx: Ctx): ({ Item }, string?)
 		end
 		-- 5.0: the Old Van is sold privately (Config.VanQuest: Earl, Marge's quest), not here.
 		local private = def.id == Config.VanQuest.Car and not mine
-		local lock = if mine then nil elseif (def.level or 1) > ctx.level then (def.level or 1) else nil
+		local mission = if mine then nil else Career.missionLock(def, state.missions) -- 6.19: a mission, not a level
+		local lock = if mine or Career.missionOf(def) then nil elseif (def.level or 1) > ctx.level then (def.level or 1) else nil
 		local need = needs(state, def, mine)
 		if state.car == def.id then
 			item.act = shut("YOUR CAR")
@@ -221,6 +241,8 @@ local function dealer(ctx: Ctx): ({ Item }, string?)
 			item.forSale = false
 			item.lock = "🔒 EARL"
 			item.act = shut("🔒 SOLD PRIVATELY", `{Config.VanQuest.DealerNote} {Config.VanQuest.Seller} sells it at {Config.VanQuest.Place}, far out west.`)
+		elseif mission then
+			missionLock(item, mission)
 		elseif lock then
 			levelLock(item, lock)
 		elseif need then
@@ -260,7 +282,8 @@ local function gunItem(ctx: Ctx, def: Config.WeaponDef): Item
 		item.fact = "💥 ??? · ???/s · ↔ ???"
 		item.lines = { "Nobody has ever seen it. Some say it waits for the courier who does everything." }
 	end
-	local lock = if mine or Economy.rewardOnly(def) or def.starter then nil elseif (def.level or 1) > ctx.level then (def.level or 1) else nil
+	local mission = if mine or Economy.rewardOnly(def) or def.starter then nil else Career.missionLock(def, state.missions) -- 6.19
+	local lock = if mine or Economy.rewardOnly(def) or def.starter or Career.missionOf(def) then nil elseif (def.level or 1) > ctx.level then (def.level or 1) else nil
 	local need = if Economy.rewardOnly(def) then nil else needs(state, def, mine)
 	if exclusive and mine then
 		item.special = true
@@ -284,6 +307,8 @@ local function gunItem(ctx: Ctx, def: Config.WeaponDef): Item
 		item.act = shut(`EARNED AT {string.upper(if employer then employer.name else def.earned)}`, `Not for sale: work for {if employer then employer.name else def.earned} to earn it.`)
 	elseif def.starter then
 		item.act = shut("STARTER") -- 6.7: never sold (the server gives a missing one back)
+	elseif mission then
+		missionLock(item, mission)
 	elseif lock then
 		levelLock(item, lock)
 	elseif need then
@@ -404,7 +429,8 @@ local function mechanic(ctx: Ctx): ({ Item }, string?, string?, { CardKit.Chip }
 		local carGuns = state.carGuns or {}
 		local installed: string? = if canMount then carGuns[state.car] else nil
 		for _, def in Config.CarGuns do
-			local lock = if installed == def.id or (def.level or 1) <= ctx.level then nil else (def.level or 1)
+			local mission = if installed == def.id then nil else Career.missionLock(def, state.missions) -- 6.19
+			local lock = if installed == def.id or Career.missionOf(def) or (def.level or 1) <= ctx.level then nil else (def.level or 1)
 			local need = needs(state, def, installed == def.id)
 			local item: Item = {
 				id = def.id,
@@ -421,6 +447,8 @@ local function mechanic(ctx: Ctx): ({ Item }, string?, string?, { CardKit.Chip }
 				item.act = shut("INSTALLED")
 			elseif not canMount then
 				item.act = shut("CAN'T MOUNT", `This vehicle can't carry a gun. Car guns fit: {mountableCars()}.`)
+			elseif mission then
+				missionLock(item, mission)
 			elseif lock then
 				levelLock(item, lock)
 			elseif need then

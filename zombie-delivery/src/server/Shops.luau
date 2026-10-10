@@ -1,7 +1,8 @@
 --!strict
 -- The shops in the safe zone around the park. You walk in and use the prompt at the counter (it opens the shop on
 -- your screen); the purchases are checked here, also that you really stand in that shop and that your driver level
--- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns).
+-- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns; 6.19: a def
+-- with a `mission` needs that mission finished instead, Career.missionLock: "Finish Mail Call first.").
 --
 --   Dead End Motors     cars, from the catalog at the sales counter (3.5: no lot of every car outside any more; a
 --                       small showroom inside shows three of them, World.DealerSlots, each with a "Look" prompt that
@@ -49,6 +50,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Career = require(Shared.Career) -- 6.19: the guns and the cars a mission unlocks
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
@@ -126,6 +128,17 @@ local function tooLow(player: Player, name: string, level: number?): boolean
 		return false
 	end
 	notice:FireClient(player, `The {name} needs driver level {level} ({Levels.rank(level)}). You are level {mine}: deliveries give XP.`)
+	return true
+end
+
+-- 6.19: is this sold only after a mission (its `mission`, Career.missionLock) you have not finished? Then it says
+-- which and refuses (true). A def you already own never gets here (the callers return first).
+local function notYet(player: Player, profile: any, def: any): boolean
+	local id = Career.missionLock(def, profile.missions)
+	if not id then
+		return false
+	end
+	notice:FireClient(player, `{Career.lockText(id)} first: the {def.name} comes with that mission (MISSIONS, U).`)
 	return true
 end
 
@@ -208,7 +221,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			notice:FireClient(player, `The {def.name} is not sold here. {Config.VanQuest.DealerNote}`)
 			return
 		end
-		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or tooLow(player, def.name, def.level) or noSlot(player) then
+		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or notYet(player, profile, def) or tooLow(player, def.name, if def.mission then nil else def.level) or noSlot(player) then
 			return
 		end
 		if not PlayerData.spend(player, def.price, "Car", def.id) then
@@ -265,7 +278,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			notice:FireClient(player, `The {def.name} is not for sale. Work for {if employer then employer.name else "its owner"} to earn it.`)
 			return
 		end
-		if refuse(player, "guns") or tooLow(player, def.name, def.level) then
+		if refuse(player, "guns") or notYet(player, profile, def) or tooLow(player, def.name, if def.mission then nil else def.level) then
 			return
 		end
 		if not PlayerData.spend(player, def.price, "Gun", def.id) then
@@ -295,7 +308,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			notice:FireClient(player, `Your {carDef.name} already has the {def.name}.`)
 			return
 		end
-		if tooLow(player, def.name, def.level) then
+		if notYet(player, profile, def) or tooLow(player, def.name, if def.mission then nil else def.level) then
 			return
 		end
 		if not PlayerData.spend(player, def.price, "CarGun", def.id) then
@@ -774,7 +787,9 @@ local function buildShowroom()
 		local price = if VanQuestRules.isQuestCar(def.id) then "SOLD PRIVATELY · ASK MARGE"
 			elseif def.price > 0 then "$" .. def.price else "BUILD YOURS AT WRENCH GARAGE"
 		local name = if stage and stage.name ~= def.name then `{stage.name} ({def.name}, stage {entry.stage})` else def.name
-		label.Text = if def.level and def.level > 1 then `{name}\n{price} · LEVEL {def.level}+` else `{name}\n{price}`
+		local mission = Career.missionOf(def) -- 6.19: a car a mission unlocks says the mission, not a level
+		label.Text = if mission then `{name}\n{price} · {string.upper(Career.lockText(mission))}`
+			elseif def.level and def.level > 1 then `{name}\n{price} · LEVEL {def.level}+` else `{name}\n{price}`
 		label.TextScaled = true
 		label.Font = Enum.Font.GothamBlack
 		label.TextColor3 = Color3.fromRGB(255, 220, 120)

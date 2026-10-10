@@ -269,8 +269,15 @@ check("no bus stop named after Lead & Co. (the lines kept their stops: its old b
 check("the board: LEAD & CO. · RANGE", string.find(R.Board, "LEAD & CO. · RANGE", 1, true) == 1)
 local gunWords: string? = nil
 local starterWords: string? = nil
+local gunLists: { { Career.Unlock } } = {}
 for _, step in Career.road() do
-	for _, unlock in step.unlocks do
+	table.insert(gunLists, step.unlocks)
+end
+for _, mission in require("./Missions").List do
+	table.insert(gunLists, Career.missionUnlocks(mission.id)) -- 6.19: the guns a mission unlocks
+end
+for _, list in gunLists do
+	for _, unlock in list do
 		if unlock.kind == "gun" then
 			if unlock.id == Config.Arms.Starter then
 				starterWords = unlock.name

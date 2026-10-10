@@ -113,7 +113,7 @@ local function entryOf(item: Item, money: number): ShopPick.Entry
 	return {
 		name = item.name,
 		price = item.price,
-		buyable = act ~= nil and act.on and item.price ~= nil and not item.owned,
+		buyable = act ~= nil and act.on and item.price ~= nil and not item.owned and item.lock == nil, -- (6.19: a lock may act)
 		forSale = item.forSale,
 		locked = item.lock ~= nil,
 		owned = item.owned,
@@ -281,8 +281,8 @@ local function itemRow(parent: Instance, screen: Screen, item: Item, order: numb
 		valueColor = color,
 		action = if item.lock then nil elseif word then word else "›",
 		lock = item.lock,
-		onAction = if word and act then function()
-			run(act, screen.toast)
+		onAction = if (word or (item.lock and act and act.on and act.run)) and act then function()
+			run(act, screen.toast) -- (6.19: a lock that acts, "MISSIONS ›", opens what unlocks it)
 		end else nil,
 		decorate = item.decorate,
 		onOpen = function()

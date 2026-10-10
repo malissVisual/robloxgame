@@ -25,6 +25,10 @@
 --   Career.whereOf(unlock)        where an unlock is found: a place for the GPS (a Map.Shops / Map.Landmarks id) or
 --                                 the window that opens it, and the place in words (client/CareerUi.luau's level-up
 --                                 card: GPS / MISSIONS / ESTATE buttons; client/Hud.luau's small banner)
+-- 6.19 (at the end of this file): the guns and the cars a mission unlocks instead of a level:
+--   Career.missionLock(def, progress)  the mission id still to finish before `def` is sold, else nil
+--   Career.missionUnlocks(id)    what finishing a mission unlocks ({ Unlock }); Career.unlocksLine(id) "🔓 Unlocks: SMG";
+--                                Career.newLines(id) the cleared card's "🔓 NEW: SMG at Lead & Co." (and its place)
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
@@ -130,7 +134,7 @@ function Career.unlocksAt(level: number): { Unlock }
 			end
 			continue
 		end
-		if (def.level or 1) == level then
+		if def.mission == nil and (def.level or 1) == level then -- (6.19: a car a mission unlocks is on its mission's list)
 			-- 5.0: the Old Van is not the dealer's: "Old Van: Earl's Used Wheels (Marge's quest at level 4)".
 			add(list, "car", def.id, if def.id == Config.VanQuest.Car then `{def.name}: {Config.VanQuest.Where}` else def.name)
 		end
@@ -147,12 +151,12 @@ function Career.unlocksAt(level: number): { Unlock }
 		end
 	end
 	for _, def in Config.Weapons do
-		if not def.earned and not def.exclusive and (def.level or 1) == level then
+		if not def.earned and not def.exclusive and def.mission == nil and (def.level or 1) == level then
 			add(list, "gun", def.id, if def.starter then def.name else `{def.name} at {Config.GunRange.Shop}`)
 		end
 	end
 	for _, def in Config.CarGuns do
-		if (def.level or 1) == level then
+		if def.mission == nil and (def.level or 1) == level then
 			add(list, "cargun", def.id, def.name)
 		end
 	end
@@ -449,6 +453,82 @@ function Career.reached(level: number): { [string]: boolean }
 	local out: { [string]: boolean } = {}
 	for n = 2, math.min(math.floor(level), Config.Levels.MaxLevel) do
 		out[tostring(n)] = true
+	end
+	return out
+end
+
+-- ── 6.19, the guns and the cars a mission unlocks ─────────────────────────────
+-- The owner: the guns and the cars come with the story, not the level. A Config.Cars / Weapons / CarGuns def with a
+-- `mission` (a shared/Missions.luau id) is sold once that mission is done (any rating); its `level` is that mission's
+-- (the order, the fuel tier) and the road above leaves it out: it is on its mission's list instead. A save that owns
+-- one keeps it. server/Shops.luau refuses the buy ("Finish Mail Call first."), the shops show the lock with a
+-- MISSIONS button (client/ShopWindow.luau), MISSIONS shows "🔓 Unlocks: SMG" (client/MissionsUi.luau) and the cleared
+-- card "🔓 NEW: SMG at Lead & Co." with the GPS.
+
+-- The mission a def waits for (its `mission`), or nil.
+function Career.missionOf(def: any): string?
+	local id = if type(def) == "table" then def.mission else nil
+	return if type(id) == "string" then id else nil
+end
+
+-- A mission's name ("Mail Call"), its id when unknown.
+function Career.missionName(id: string): string
+	local def = Missions.find(id)
+	return if def then def.name else id
+end
+
+-- The mission still between you and buying `def` (`progress`: profile.missions, id → best rating), nil when open.
+function Career.missionLock(def: any, progress: { [string]: number }?): string?
+	local id = Career.missionOf(def)
+	if id and not Missions.cleared(progress, id) then
+		return id
+	end
+	return nil
+end
+
+-- "Finish Mail Call".
+function Career.lockText(id: string): string
+	return `Finish {Career.missionName(id)}`
+end
+
+-- What finishing one mission unlocks, in Config order (the cars, the guns, the car guns), as road unlocks (a gun says
+-- where: "SMG at Lead & Co."; Career.whereOf finds the shop).
+function Career.missionUnlocks(id: string): { Unlock }
+	local list: { Unlock } = {}
+	for _, def in Config.Cars do
+		if def.mission == id and not def.company and not def.bike then
+			add(list, "car", def.id, def.name)
+		end
+	end
+	for _, def in Config.Weapons do
+		if def.mission == id then
+			add(list, "gun", def.id, `{def.name} at {Config.GunRange.Shop}`)
+		end
+	end
+	for _, def in Config.CarGuns do
+		if def.mission == id then
+			add(list, "cargun", def.id, def.name)
+		end
+	end
+	return list
+end
+
+-- MISSIONS' line for a mission: "🔓 Unlocks: SMG" ("🔓 Unlocks: Courier Van, High-Roof Van"), nil for nothing.
+function Career.unlocksLine(id: string): string?
+	local names: { string } = {}
+	for _, unlock in Career.missionUnlocks(id) do
+		table.insert(names, Career.shortName(unlock))
+	end
+	return if #names > 0 then `🔓 Unlocks: {table.concat(names, ", ")}` else nil
+end
+
+-- The cleared card's lines, one a shop: { text = "🔓 NEW: SMG at Lead & Co.", place = "guns" (the GPS goes there),
+-- label = "Lead & Co." }.
+export type NewLine = { text: string, place: string?, label: string }
+function Career.newLines(id: string): { NewLine }
+	local out: { NewLine } = {}
+	for _, row in Career.whereRows(Career.missionUnlocks(id), 3, 3) do
+		table.insert(out, { text = `🔓 NEW: {table.concat(row.names, ", ")} at {row.label}`, place = row.place, label = row.label })
 	end
 	return out
 end

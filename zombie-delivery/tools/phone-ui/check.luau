@@ -797,10 +797,10 @@ do
 		and named("StyleCards")~=nil and named("StyleCards"):FindFirstChild("Left")~=nil and M.focus==deep(named("Hero"),"HeroMain"))
 	check("its sections: hats, jackets, the vest's and the bag's colours",text("Hats · your own")~=nil and text("Jackets · your own")~=nil and text("Courier Vest colour · your own")~=nil and text("Bag colour · your own")~=nil)
 	check("the live preview shows the courier with the first item",#M.previews>0 and M.previews[#M.previews].tab=="courier" and M.previews[#M.previews].id=="cap_red" and named("Preview")~=nil)
-	check("a card an item: its colours, name, price",named("Style_cap_red")~=nil and text("BACKWARDS CAP · ZDC RED")~=nil and inCard("cap_red","Colour1")~=nil and inCard("cap_red","Colour2")~=nil and text("$120")~=nil)
+	check("a card an item: its colours, name, price",named("Style_cap_red")~=nil and text("BACKWARDS CAP · ZDC RED")~=nil and inCard("cap_red","Colour1")~=nil and inCard("cap_red","Colour2")~=nil and text("$250")~=nil) -- (6.19: $120 × Prices.Style, rounded to $50)
 	check("a reward is flagged",inCard("cap_gold","Main")~=nil and inCard("cap_gold","Main").Text=="🏆 REWARD")
 	check("a level's lock shows",text("🔒 LV 4")~=nil)
-	check("the hero's full words: BUY · $120 for the first look",deep(named("Hero"),"HeroMain").Text=="BUY · $120")
+	check("the hero's full words: BUY · $250 for the first look",deep(named("Hero"),"HeroMain").Text=="BUY · $250")
 	inCard("cap_red","Main").Activated:Fire()
 	check("BUY asks the server with the item",styleSent()~=nil and styleSent().args[1]=="buy" and styleSent().args[2]=="cap_red")
 	local before=#M.sent
@@ -809,7 +809,7 @@ do
 	inCard("leather_black","Main").Activated:Fire()
 	check("too dear or too early: it says why",#M.sent==before and string.find(toasts[#toasts] or "","unlocks at level 6",1,true)~=nil)
 	inCard("hoodie_grey","Main").Activated:Fire()
-	check("not enough money: it says so",#M.sent==before and toasts[#toasts]=="Not enough money: Hoodie · Grey costs $350.")
+	check("not enough money: it says so",#M.sent==before and toasts[#toasts]=="Not enough money: Hoodie · Grey costs $700.")
 	named("Style_beanie_grey").Activated:Fire()
 	check("a row's tap TRIES it, no remote; the hero follows",#M.sent==before and M.previews[#M.previews].id=="beanie_grey" and named("Style_beanie_grey"):FindFirstChild("Accent")~=nil and named("Style_beanie_grey"):FindFirstChild("Accent").Visible
 		and deep(named("Hero"),"Business").Text=="BEANIE · HEATHER GREY")
@@ -913,19 +913,19 @@ do
 	check("6.14 NEXT MISSION: the mission, its chapter and n/N",tile:FindFirstChild("Head",true).Text=="NEXT MISSION" and tile:FindFirstChild("Mission",true).Text=="📦 Paper Trail" and tile:FindFirstChild("Chapter",true).Text=="First Shift · 1/6")
 	check("… not ready yet: '0 of 2 ready' in red",tile:FindFirstChild("Status",true).Text=="✖ 0 OF 2 READY" and tile:FindFirstChild("Status",true).TextColor3==M.Theme.Contract.red)
 	local bars=all(tile:FindFirstChild("Progress",true),function(object) return object.Name=="Fill" or object.ClassName=="Frame" end)
-	check("… the savings goal and its bar: Old Van · $640 / $1,800",tile:FindFirstChild("Goal",true).Text=="🚐 Old Van · $640 / $1,800" and math.abs(bars[#bars].Size.X.Scale-640/1800)<1e-6)
-	check("6.14 JOBS: the board's line (6.18: one line; what you earn for is the hero's goal and bar)",named("jobsApp"):FindFirstChild("Sub").Text~="" and named("jobsApp"):FindFirstChild("Goal")==nil and Ready.workLine()=="Earn for the Old Van · $1,160 to go")
+	check("… the savings goal and its bar: Old Van · $640 / $5,400",tile:FindFirstChild("Goal",true).Text=="🚐 Old Van · $640 / $5,400" and math.abs(bars[#bars].Size.X.Scale-640/5400)<1e-6)
+	check("6.14 JOBS: the board's line (6.18: one line; what you earn for is the hero's goal and bar)",named("jobsApp"):FindFirstChild("Sub").Text~="" and named("jobsApp"):FindFirstChild("Goal")==nil and Ready.workLine()=="Earn for the Old Van · $4,760 to go")
 	check("6.18: not ready: GET READY on the hero's button, its frame red",tile:FindFirstChild("Go",true).Text=="GET READY ›" and tile:FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red)
-	check("… the job result's line (client/Hud.luau)",Ready.resultLine(85)=="+$85 · $1,075 to go for the Old Van")
+	check("… the job result's line (client/Hud.luau)",Ready.resultLine(85)=="+$85 · $4,675 to go for the Old Van")
 	named("nextApp").Activated:Fire()
 	check("6.14: NEXT MISSION opens the READY CHECK in the popup",showing("ready") and text("READY CHECK")~=nil and upright() and #M.warnings==0)
 	check("… the mission card: its name, the readiness chip",text("PAPER TRAIL")~=nil and text("✖ 0 OF 2 READY")~=nil)
 	check("… the rows: the level, the van (required), a medkit (would help)",named("Check_level")~=nil and named("Check_vehicle")~=nil and named("Check_medkit")~=nil and named("Check_cargo")==nil
 		and named("Check_vehicle"):FindFirstChild("Mark").Text=="✖" and named("Check_medkit"):FindFirstChild("Mark").Text=="☆")
-	check("… the van's row (6.18: the kit's row, its icon the thumb, ✖ in red, a red edge): where and what it costs, a GPS action",text("A van of your own")~=nil and named("Check_vehicle"):FindFirstChild("Edge").BackgroundColor3==M.Theme.Contract.red and text("Old Van at Earl's Used Wheels · $1,800 · level 4")~=nil and named("Check_vehicle").ClassName=="TextButton"
+	check("… the van's row (6.18: the kit's row, its icon the thumb, ✖ in red, a red edge): where and what it costs, a GPS action",text("A van of your own")~=nil and named("Check_vehicle"):FindFirstChild("Edge").BackgroundColor3==M.Theme.Contract.red and text("Old Van at Earl's Used Wheels · $5,400 · level 4")~=nil and named("Check_vehicle").ClassName=="TextButton"
 		and named("Check_vehicle"):FindFirstChild("Action").Text=="📍 GPS  ›")
 	check("… the level's row: the XP and about how much work (CareerUi.toGo)",Levels.xpFor(2)+100<1000 and text(`{Levels.xpFor(2)+100} / 2,093 XP · about 8 runs`)~=nil and named("Check_level"):FindFirstChild("Action").Text=="JOBS  ›")
-	check("… the savings goal: Old Van, $640 / $1,800, $1,160 to go",named("SavingsGoal")~=nil and text("$640 / $1,800")~=nil and text("$1,160 to go")~=nil)
+	check("… the savings goal: Old Van, $640 / $5,400, $4,760 to go",named("SavingsGoal")~=nil and text("$640 / $5,400")~=nil and text("$4,760 to go")~=nil)
 	check("… not ready: WORK · EARN AND LEVEL UP and OPEN MISSIONS, no START",named("Jobs")~=nil and named("OpenMissions")~=nil and named("Start")==nil)
 	-- The van's GPS: Earl's Used Wheels on the map, the phone away so you can go.
 	M.waypoint=nil
@@ -997,7 +997,7 @@ do
 	Ready.setState({phone=true,money=150,kit={},cars={},vanQuest="open",items={}})
 	check("6.14: a new coin keeps the READY CHECK (no redraw), its ticker moves the goal",card~=nil and named("MissionCard")==card and card.Parent~=nil and Phone.isOpen())
 	Ready.tick()
-	check("… $150 / $1,800 now",text("$150 / $1,800")~=nil and text("$1,650 to go")~=nil)
+	check("… $150 / $5,400 now",text("$150 / $5,400")~=nil and text("$5,250 to go")~=nil)
 	Ready.setState({phone=true,money=150,kit={},cars={},vanQuest="open",items={medkit=1}})
 	check("… a row that changes draws it again",named("MissionCard")~=card and card.Parent==nil and named("Check_medkit")~=nil and named("Check_medkit"):FindFirstChild("Mark").Text=="✔")
 	Phone.close()
@@ -1011,7 +1011,7 @@ do
 	require("./SavingsLine").start(Ready)
 	local line=cash:FindFirstChild("Savings")
 	local height=require("./Config").Readiness.LineHeight
-	check("6.14 HUD: the savings line under the cash, the column taller by its height",line~=nil and line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN" and line:FindFirstChild("Money").Text=="$150 / $1,800"
+	check("6.14 HUD: the savings line under the cash, the column taller by its height",line~=nil and line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN" and line:FindFirstChild("Money").Text=="$150 / $5,400"
 		and cash.Size.Y.Offset==30+height and stack.Size.Y.Offset==258+height)
 	-- 6.14 review: the money in a label of its own at the right; the name gets the rest (cut with "…").
 	check("… the money at the right, the name left of it",line:FindFirstChild("Money").AnchorPoint.X==1 and line:FindFirstChild("Money").Size.X.Offset>0
@@ -1025,12 +1025,12 @@ do
 	M.remotes.Tutorial.OnClientEvent:Fire("board",{})
 	check("… Marge's first day: hidden, the column back",not line.Visible and cash.Size.Y.Offset==30 and stack.Size.Y.Offset==258 and Ready.resultLine(85)==nil)
 	M.remotes.Tutorial.OnClientEvent:Fire("done",{})
-	Ready.setState({phone=true,money=2000,kit={},cars={},vanQuest="open",items={medkit=1}})
-	check("… enough money: buy it, in green",line.Visible and line:FindFirstChild("Money").Text=="✓ BUY IT · $1,800" and line:FindFirstChild("Words").TextColor3==M.Theme.Contract.good)
+	Ready.setState({phone=true,money=6000,kit={},cars={},vanQuest="open",items={medkit=1}})
+	check("… enough money: buy it, in green",line.Visible and line:FindFirstChild("Money").Text=="✓ BUY IT · $5,400" and line:FindFirstChild("Words").TextColor3==M.Theme.Contract.good)
 	-- 6.14 review: the money without the level is no BUY IT (Earl sells at level 4).
 	M.player:SetAttribute("Xp",Levels.xpFor(3))
-	Ready.setState({phone=true,money=2000,kit={},cars={},vanQuest="open",items={medkit=1}})
-	check("6.14 review: the money, not the level: saved, the level to reach, in amber",line.Visible and line:FindFirstChild("Money").Text=="$1,800 SAVED · LEVEL 4" and line:FindFirstChild("Money").TextColor3==M.Theme.Contract.warn,line:FindFirstChild("Money").Text)
+	Ready.setState({phone=true,money=6000,kit={},cars={},vanQuest="open",items={medkit=1}})
+	check("6.14 review: the money, not the level: saved, the level to reach, in amber",line.Visible and line:FindFirstChild("Money").Text=="$5,400 SAVED · LEVEL 4" and line:FindFirstChild("Money").TextColor3==M.Theme.Contract.warn,line:FindFirstChild("Money").Text)
 	check("… WORK says so too",Ready.workLine()=="Old Van saved · reach level 4 to buy" and Ready.resultLine(85)=="+$85 · the Old Van is saved: level 4 to buy")
 	stack:Destroy()
 	check("6.14: no warnings",#M.warnings==0)

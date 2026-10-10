@@ -17,12 +17,14 @@
 -- 5.1, a bike (the car's attribute Bike, server/Vehicles.luau): its frame leans into the turns (the Motor6D BikeLean,
 -- by how fast it turns at its speed: only the look, the physics stay upright), the cranks and pedals turn with the
 -- speed (CrankMotor), the front wheel does not steer (the fork is part of the frame), and the rider sits posed
--- (client/BikeRider.luau: leaning forward, hands on the grips, legs pumping with the crank). A trailer's wheels are in
+-- (client/BikeRider.luau: leaning forward, hands on the grips, 6.19: the feet on the pedals). A trailer's wheels are in
 -- the kit: found again when the car's KitBuilt changes.
 -- 5.1.1, the E-Scooter (the car's attributes Bike and BikeStand): it leans the same way, has no cranks, and its rider
 -- stands (BikeRider.pose's stand: the legs straight on the deck, the hands on the bar).
 -- 6.10: a scooter leans on Config.Scooter's numbers (shared/ScooterRide.luau lean; a bike on LEAN_MAX, LEAN_RATE).
 -- (6.14.2: its wheelie is gone.)
+-- 6.19: the crank turns by shared/RiderPose.luau crankStep (the E-Bike, CarId "ebike", at a calmer cadence; stopped,
+-- it settles with one pedal forward) and the rider is posed after it, on this frame's crank: the feet on the pedals.
 -- 6.12: says when a cabin door starts to open or is shut and when the back starts to open or to close
 -- (CarVisuals.onSwing, set by client/SoundScape.luau: the doors' and the back's sounds where they are); the back's kind
 -- (two rear doors, a roll-up door, a tailgate / trunk lid / ramp) from its hinge (shared/SoundPlan.luau backKind). A car
@@ -39,6 +41,7 @@ local RunService = game:GetService("RunService")
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
 local ScooterRide = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScooterRide"))
 local SoundPlan = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SoundPlan"))
+local RiderPose = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("RiderPose"))
 
 local BikeRider = require(script.Parent.BikeRider)
 local Drive = require(script.Parent.Drive)
@@ -89,7 +92,6 @@ local PROMPT_EVERY = 0.1 -- 6.13.1: seconds between the looks at the door, back 
 local promptClock = { at = 0 }
 local LEAN_MAX = 0.16 -- 5.1: radians (about 9°) a bike leans at most (its load, welded to the hull, does not lean)
 local LEAN_RATE = 0.006 -- per (rad/s of turning × stud/s of speed)
-local CADENCE = 0.42 -- 5.1: crank turns per wheel turn
 local BACK_TIME = 0.45 -- seconds for the back to swing open or shut
 
 local function stateOf(car: Model): CarState?
@@ -447,8 +449,9 @@ local function step(dt: number)
 
 		-- Wheels.
 		local bike = state.lean ~= nil
-		if bike then
-			poseRider(car, state, distance <= riderRange)
+		local riding = bike and distance <= riderRange and distance <= range
+		if bike and not riding then
+			poseRider(car, state, false) -- (6.19: a rider near is posed below, after the crank turned)
 		end
 		if distance > range then
 			continue
@@ -483,7 +486,7 @@ local function step(dt: number)
 			state.tilt += (goal - state.tilt) * math.min(1, dt * 6)
 			leanMotor.Transform = CFrame.Angles(0, 0, state.tilt)
 			local crankMotor = state.crankMotor
-			state.crank -= forward / 1.3 * CADENCE * dt
+			state.crank = RiderPose.crankStep(state.crank, forward, dt, car:GetAttribute("CarId") == "ebike") -- 6.19
 			if crankMotor and crankMotor.Parent then
 				crankMotor.Transform = CFrame.Angles(state.crank, 0, 0)
 			end
@@ -492,6 +495,9 @@ local function step(dt: number)
 				state.kitBuilt = built
 				kitWheels(car, state)
 			end
+		end
+		if riding then
+			poseRider(car, state, true) -- 6.19: on this frame's crank (the feet on the pedals as they turn)
 		end
 
 		-- 3.7: the cabin doors swing open and shut (eased; held while open). 3.10: from DoorOpenAt to DoorCloseAt.

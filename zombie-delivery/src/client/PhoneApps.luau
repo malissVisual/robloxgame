@@ -552,13 +552,14 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 		return
 	end
 	local items: { ShopView.Item } = {}
-	local function add(id: string, name: string, picture: CardKit.Picture, where: string, shopId: string, price: number, lvl: number, label: string?)
-		local locked = level < lvl
+	-- (6.19: `mission`, a car a mission unlocks and you have not finished: "🔒 Finish Many Hands" instead of the level)
+	local function add(id: string, name: string, picture: CardKit.Picture, where: string, shopId: string, price: number, lvl: number, label: string?, mission: string?)
+		local locked = level < lvl or mission ~= nil
 		table.insert(items, {
 			id = id,
 			name = name,
 			picture = picture,
-			fact = `{where}{if locked then ` · 🔒 LV {lvl}` else ""}`,
+			fact = `{where}{if mission then ` · 🔒 {require(Shared.Career).lockText(mission)}` elseif locked then ` · 🔒 LV {lvl}` else ""}`,
 			price = price,
 			valueColor = if locked or money < price then CardKit.Color.dim else nil, -- (locked: dim, its 📍 still works)
 			forSale = true,
@@ -567,7 +568,7 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 				local shop = Map.Shops[shopId]
 				host.notify(`GPS: {if shop then shop.name elseif shopId == "earl" then Config.VanQuest.Place else label or name}`)
 			end },
-			lines = { `{name}: {Ui.money(price)} · level {lvl}.`, `Sold at {where}. Buying happens at the counter: 📍 sets the GPS there.` },
+			lines = { if mission then `{name}: {Ui.money(price)} · {require(Shared.Career).lockText(mission)} first (MISSIONS).` else `{name}: {Ui.money(price)} · level {lvl}.`, `Sold at {where}. Buying happens at the counter: 📍 sets the GPS there.` },
 		})
 	end
 	-- The personal gear still worth buying (Config.Kit), the cheapest first: 6.6: the bags (ZDC Bags), then the rest of
@@ -619,7 +620,8 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 			local quest = type(state) == "table" and state.vanQuest == "open"
 			add(def.id, def.name, ShopView.vehicle(def), if quest then `{Config.VanQuest.Seller}, far out west` else "Marge's quest", "earl", def.price, def.level or 1)
 		else
-			add(def.id, def.name, ShopView.vehicle(def), "Dead End Motors", "dealer", def.price, def.level or 1)
+			local mission = require(Shared.Career).missionLock(def, if type(state) == "table" then state.missions else nil) -- 6.19
+			add(def.id, def.name, ShopView.vehicle(def), "Dead End Motors", "dealer", def.price, if mission then 1 else def.level or 1, nil, mission)
 		end
 	end
 	local chips: { CardKit.Chip } = {

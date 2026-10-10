@@ -355,7 +355,7 @@ check("the nearest station: the Harbor's in the Harbor, the old one up north", n
 check("the jerry can is an item with its picture slot", Icons.item("jerrycan") == "jerrycan" and (function()
 	for _, def in Config.Items do
 		if def.id == "jerrycan" then
-			return def.price == 35
+			return def.price == Config.priced(35, Config.Prices.Items)
 		end
 	end
 	return false

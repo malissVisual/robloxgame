@@ -20,7 +20,7 @@ end
 
 -- Economy ---------------------------------------------------------------------
 
-check("upgrade cost level 0", Economy.upgradeCost("engine", 0) == 400, Economy.upgradeCost("engine", 0))
+check("upgrade cost level 0 ($400 base; 6.19: × Prices.Upgrades)", Economy.upgradeCost("engine", 0) == Config.priced(400, Config.Prices.Upgrades), Economy.upgradeCost("engine", 0))
 check("upgrade cost grows", (Economy.upgradeCost("engine", 1) :: number) > 400)
 check("upgrade maxed", Economy.upgradeCost("engine", 5) == nil)
 check("unknown upgrade", Economy.upgradeCost("nope", 0) == nil)
@@ -185,7 +185,7 @@ check("the holds are instant", Config.Cargo.HoldDuration == 0)
 -- 3.4: the starting van is upgraded, not replaced: every car track's first level costs a few deliveries.
 for _, def in Config.Upgrades do
 	if def.car and def.id ~= "trolley" then -- (4.0: the Hand Trolley is one tool, not a track: about $600)
-		check(`{def.id}: the first level is cheap`, (Economy.upgradeCost(def.id, 0) :: number) <= 400, Economy.upgradeCost(def.id, 0))
+		check(`{def.id}: the first level is cheap (6.19: $400 base × Prices.Upgrades at most)`, (Economy.upgradeCost(def.id, 0) :: number) <= 400 * Config.Prices.Upgrades, Economy.upgradeCost(def.id, 0))
 	end
 end
 local perCar = { van = { engine = 2 }, courier = { armor = 1 } }

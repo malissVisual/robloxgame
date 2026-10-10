@@ -66,12 +66,24 @@ for _, def in Config.Cars do
 		assert(over > 1.6 and over < 2.2, def.id .. ': the seat ' .. over .. ' over the deck')
 	else
 		assert(crank and crank.Part0 == frame and crank.Part1 and crank.Part1.Name == 'Crank', def.id .. ': the CrankMotor joint')
+		-- 6.19: the art at its smaller scale: the seat's top on the art's Saddle, the saddle 1.5 – 1.75 over the crank
+		-- axle (the classic R15's leg reaches the lower pedal), the pedals on both sides, the grips over the saddle.
+		local saddle, axis = frame:FindFirstChild('Saddle'), frame:FindFirstChild('CrankAxis')
+		local seatTop = built.seat.Position.Y + built.seat.Size.Y / 2
+		assert(saddle and axis and math.abs(seatTop - (frame.Position.Y + saddle.Position.Y)) < 0.02, def.id .. ': the seat on the Saddle point')
+		local rise = saddle.Position.Y - axis.Position.Y
+		assert(rise > 1.0 and rise < 1.3, def.id .. ': the saddle ' .. rise .. ' over the crank')
+		assert(crank.Part1:FindFirstChild('LeftPedal') and crank.Part1:FindFirstChild('RightPedal'), def.id .. ': the pedal points')
+		local grip = frame:FindFirstChild('RightGrip')
+		assert(grip and grip.Position.Y > saddle.Position.Y + 0.2 and grip.Position.Z < saddle.Position.Z - 0.4, def.id .. ': the grips ahead of and over the saddle')
 	end
 	local wheels = 0
 	for _, d in chassis:GetChildren() do
 		if d.Name == 'WheelMotor' then
 			wheels += 1
-			assert(d.Part0 == frame and d:GetAttribute('Radius') == style.wheel and style.wheel == (if stand then 0.6 else 1.3), def.id .. ': a wheel on the leaning frame')
+			-- (6.19: a bike's visible wheel spins by its art's radius, 1.3 at the art's scale; its colliders keep 5.1's)
+			local radius = d:GetAttribute('Radius')
+			assert(d.Part0 == frame and style.wheel == (if stand then 0.6 else 1.3) and math.abs(radius - (if stand then 0.6 else 1.3 * 0.75)) < 1e-6, def.id .. ': a wheel on the leaning frame')
 		end
 	end
 	assert(wheels == 2, def.id .. ': two visible wheels')

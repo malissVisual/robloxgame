@@ -379,5 +379,26 @@ check("a replay's card: REPLAY · $55, no reward", cleared ~= nil and cleared.Vi
 M.remotes.Missions.OnClientEvent:Fire("cleared", { id = "clinic_1", name = "House Call", number = 1, of = 6, stars = 3, best = 3, newStars = 3, first = true, replay = false, paid = 180, reward = 550, xp = 120, starBonus = 450, nextId = "clinic_2" })
 M.resume()
 check("a first clear's card: FIRST CLEAR!, the reward, the XP, NEXT: Code Blue", has(cleared, "FIRST CLEAR!") and has(cleared, "First time  +$550") and has(cleared, "First-time XP  +120") and button(cleared, "NEXT: Code Blue ▶") ~= nil)
+check("6.19: … House Call unlocks nothing: no NEW line", not named(cleared, "Unlocks").Visible)
+-- 6.19: Mail Call's first clear unlocks the SMG: "🔓 NEW: SMG at Lead & Co.'s range" and the GPS to the range.
+M.remotes.Missions.OnClientEvent:Fire("cleared", { id = "dispatch_2", name = "Mail Call", number = 2, of = 6, stars = 2, best = 2, newStars = 2, first = true, replay = false, paid = 120, reward = 550, xp = 100, nextId = "dispatch_3" })
+M.resume()
+check("6.19: Mail Call's first clear: 🔓 NEW: SMG at Lead & Co.'s range, 📍 GPS: LEAD & CO.'S RANGE", named(cleared, "Unlocks").Visible and has(named(cleared, "Unlocks"), "🔓 NEW: SMG at Lead &amp; Co.'s range")
+	and button(cleared, "📍 GPS: LEAD & CO.'S RANGE") ~= nil and button(cleared, "📍 GPS: LEAD & CO.'S RANGE").Visible)
+M.remotes.Missions.OnClientEvent:Fire("cleared", { id = "dispatch_2", name = "Mail Call", number = 2, of = 6, stars = 2, best = 2, newStars = 0, replay = true, paid = 55, reward = 0, xp = 0, nextId = "dispatch_3" })
+M.resume()
+check("6.19: … its replay: no NEW line", not named(cleared, "Unlocks").Visible)
+-- 6.19: MISSIONS says what a mission unlocks: the finale's hero "🔓 Unlocks: Shotgun"; openMission opens it.
+do
+	local saved, savedLevel = state.progress, state.level
+	state.progress, state.level = { dispatch_1 = 3, dispatch_2 = 2, dispatch_3 = 1, dispatch_8 = 1, dispatch_9 = 1 }, 5
+	M.remotes.Missions.OnClientEvent:Fire("state", state)
+	MissionsUi.openMission("dispatch_10")
+	M.flush()
+	check("6.19: openMission opens MISSIONS on Rush Hour of the Dead, its hero: 🔓 Unlocks: Shotgun", MissionsUi.isOpen() and has(named(chapter, "Hero"), "RUSH HOUR OF THE DEAD")
+		and has(named(chapter, "Hero"), "🔓 Unlocks: Shotgun"))
+	state.progress, state.level = saved, savedLevel
+	M.remotes.Missions.OnClientEvent:Fire("state", state)
+end
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL MISSIONS WINDOW CHECKS PASSED")

@@ -336,6 +336,9 @@ until then:
 
 (5.7: the table is `Career.road()` as the CAREER window shows it: every unlock from Config, the reward from
 `Config.Levels.Rewards`. A car's gear, the Hand Trolley, shows with the first car at level 4.)
+(6.19: the dealer's cars after the Old Van, the guns from the SMG to the Grenade Launcher and the Roof Minigun and the
+Roof Grenade Launcher have left this table. Each one now comes with a mission: see "Guns and cars unlocked by
+missions (6.19)".)
 
 * **Cars** (5.0): you start on foot; bikes from level 2 at Spoke & Chain, Earl's Old Van at 4, then the dealer's cars
   (level and price rise together). The company vehicles come with their employer's job level; the **stages** open by
@@ -1142,6 +1145,92 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## Prices as milestones (6.19)
+
+The owner: "make everything more expensive so they're real milestones." Following the 6.14 design, jobs are the grind,
+you save up for something, then you move on in the missions. One central knob sets every price: `Config.Prices`, at the end of
+`src/shared/Config.luau`. The tables above it keep their base prices. One pass, run once when Config loads, multiplies
+each `price` (and the Wrench Garage tracks' `baseCost`) by its kind's knob and rounds it to a nice step: $5 under
+$100, $50 under $1,000, $100 under $10,000 and $500 above (`Config.priced(base, knob)`). Everything that sells,
+checks or shows a price reads these tables. The shops, the server's checks, Earl, Readiness's savings goal, the career
+road and the signs all follow on their own.
+
+| Knob | × | What |
+|---|---|---|
+| Vehicles | 3 | the dealer's cars and Earl's Old Van |
+| Bikes | 4 | the bikes and the E-Scooter |
+| Stages | 2.5 | Wrench Garage's stages |
+| Upgrades | 2.5 | Wrench Garage's tracks (engine, tyres, armor, plow, gun damage, fire rate) |
+| Guns, CarGuns | 2 | Lead & Co.'s guns, the car guns |
+| Gear | 2.5 | the car and bike gear (trolley, straps, cooler, roof rack, basket, panniers, trailer) |
+| Kit | 2.5 | the bags, the vests, the bat |
+| Paints, Style | 2 | Wrench Garage's paints, the looks (`Config.Cosmetics`) |
+| Items | 1.5 | the consumables: medkit, energy drink, molotov, repair kit, nitro, landmine, jerry can |
+| Rewards | 1.5 | a level-up's money (`Config.Levels.Rewards`: $750 at level 2 … $22,500 at 15) |
+
+Some prices stay as they were (×1). The real estate and the company are already the endgame. The repair shop's fee,
+fuel at the pump, the tow and the board's reroll fee are consumables. The old backpacks' payback (`Config.RetiredKit`)
+also stays. Free things stay free (0 × n), and reward-only things stay unsold. No save stores a price, so owned things stay owned and nothing is paid
+back.
+
+| First buys | Level | Before | After | A typical job then | Jobs, before → after |
+|---|---|---|---|---|---|
+| Courier Vest | 1 | $20 | $50 | on foot ~$100 | under 1 |
+| Canvas Tote (also level 3's reward) | 2 | $120 | $300 | on foot ~$100 | 1 → 3 |
+| Rusty Bike | 2 | $300 | $1,200 | on foot ~$100 | 3 → 12 |
+| Earl's Old Van | 4 | $1,800 | $5,400 | bike run ~$200 | 9 → 27 |
+| Patched Van (the first stage) | 4 | $250 | $650 | ★ ~$200 | 1 → 3 |
+| Engine Lv 1 (the first car upgrade) | 4 | $400 | $1,000 | ★ ~$200 | 2 → 5 |
+| Shotgun | 4 | $7,500 | $15,000 | ★★ ~$450 (level 5) | 17 → 33 |
+| Courier Van | 5 | $3,500 | $10,500 | ★★ ~$450 | 8 → 23 |
+| Box Truck | 7 | $22,000 | $66,000 | ★★★ ~$1,100 | 20 → 60 |
+| Muscle Car | 9 | $40,000 | $120,000 | ★★★★ ~$2,300 | 17 → 52 |
+
+"A typical job" counts the pay with its tip or fast bonus and the shift's share. Prices quoted in older sections of this README are
+the base prices from before 6.19. The tests check the base price × its knob (`Config.priced`), so tuning a knob only
+breaks the few text checks that show a price (`tests/readiness_test.luau`, `tests/vanquest_test.luau`, the phone
+recorder).
+
+**Guns and cars unlocked by missions (6.19).** The owner asked that the story unlock the guns and the cars, not the
+level. A def in `Config.Cars`, `Weapons` or `CarGuns` with `mission = "<id>"` is sold once that mission is done, at any
+rating (`Career.missionLock`). Its `level` is now that mission's level and only orders things: it is not a gate. A save
+that owns one keeps it.
+- Mail Call: SMG.
+- First Shift finale: Shotgun.
+- Many Hands: Courier Van, High-Roof Van.
+- Code Red finale: Hunting Rifle.
+- Farm to Table: Pickup.
+- Empty Shelves finale: Box Truck.
+- Smoke and Sirens finale: Muscle Car.
+- Iron Supply finale: Freight Truck.
+- Lights Out finale: Minigun, Roof Minigun.
+- Wild West End finale: Armored Van.
+- Patient Zero finale (The Cure): Grenade Launcher, Roof Grenade Launcher.
+- Dirty Money finale: Rally Van.
+
+The bikes, the kit, the gear, Earl's Old Van, the car stages and the Roof Machine Gun keep their levels.
+
+Where it shows:
+- **The server** refuses an early buy: "Finish Mail Call first …" (`server/Shops.luau`).
+- **The shops** read "🔒 Finish Mail Call" with a MISSIONS › button that opens that mission (`ShopWindow`, `MissionsUi.openMission`).
+- **MISSIONS** shows "🔓 Unlocks: SMG" on the hero and the rows.
+- **The cleared card** says "🔓 NEW: SMG at Lead & Co.'s range" and has a GPS button.
+- **The CAREER road** lists these items under their mission (`Career.missionUnlocks`), not under a level.
+- **The READY CHECK** never suggests something that is still locked, so it can't become a savings goal.
+
+The skills that levels will give are only a proposal for now: `design/skills/PROPOSAL.md`.
+
+
+### The rider pedals, and the bike is loaded on purpose (6.19)
+The pedal bikes are built about a quarter smaller to fit the classic R15 courier (lower saddle, higher bars, longer
+cranks; the ride, speeds and hitboxes unchanged). On the Rusty, Courier, Cargo and E-Bike each foot follows its pedal
+round the crank (`RiderPose.legIk`), the knees forward, the hands on the grips, the body over the bars; the E-Bike
+pedals calmer; stopped, one pedal forward. On bike jobs: E at your bike's rack "Load onto bike" (the pieces show on
+it, the prompt counts "2 / 3"), at a drop "Take off bike"; the next-step card says so (`Holding.bikeAction`).
+
+### CARRYING reads right (6.19)
+The bag's pieces were counted twice ("7/6"); the pill now shows one icon per kind of piece with ×n.
 
 ## One look everywhere (6.18)
 
