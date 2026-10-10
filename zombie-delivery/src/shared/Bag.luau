@@ -1,6 +1,6 @@
 --!strict
 -- 5.3, the bag: where every piece you carry is (your inventory). Pure Luau, shared by server/Cargo.luau, server/Jobs.luau
--- (the bike's own room on a run), client/BagUi.luau, client/Hotbar.luau's CARRYING pill and the HUD's chip on the
+-- (the bike's own room on a run), client/BagUi.luau, client/Hotbar.luau's bag slot (6.21: its fill; 6.3 - 6.20 the CARRYING pill) and the HUD's chip on the
 -- contract ticket; tested in tests/bag_test.luau.
 --
 -- 6.6, one carrying item (the owner: "the backpacks, the bag and the bike work weirdly"): no backpack any more, so no

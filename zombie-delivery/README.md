@@ -1009,7 +1009,7 @@ INVENTORY [I] (I still works), "J FOR THE BOARD" / "Q → GARAGE" and the other 
 | Upper right | 6.5: MAP [M] · PHONE [Q] (MENU before Marge's phone: every other action, JOBS, MISSIONS, CAREER, CREW, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news; under them the small "? KEYS [F1]" |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
 | Lower right | 6.5: the speed and the fuel while you drive, the PHONE action over it; a touch screen keeps the weapon line too (its tap opens the weapon wheel) |
-| Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): 6.1: three hand slots first (✊ fists 1, 🛍 the bag 2 with its fill, 🔫 the gun 3 with its name; the one you hold outlined red) and a divider, then five square item slots (the consumables you own in their order, the count, keys 4-8; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more; 6.1: the hands and two item slots). It hides while a window, the phone or a dialog is open |
+| Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): 6.1: three hand slots first (✊ fists 1, 🛍 the bag 2 with its fill, 🔫 the gun 3 with its name; the one you hold outlined red) and a divider, then five square item slots (the consumables you own in their order, the count, keys 4-8; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more; 6.1: the hands and two item slots). It hides while a window, the phone or a dialog is open. 6.21: a clean hotbar on a frosted tray, the slot in your hand lifted with a line over the bar, the bag slot's fill ring and "5/6" pill instead of the carried strip (see "Inventory, a clean hotbar (6.21)") |
 | Lower centre | 6.5: the action pill, only while you can press something: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
 | In the world | 6.5: the beam and one pin with the place and the distance ("TONY'S PIZZA · 120 m"); with no job on the depot's job board |
 
@@ -1145,6 +1145,43 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## Inventory, a clean hotbar (6.21)
+
+The owner picked redesign B, "Clean hotbar + kit". Only the look changed: every action goes the way it went before.
+
+- **The bottom bar** (`client/Hotbar.luau`): one row of rounded slots on a frosted tray. The keys are small and grey.
+  The counts sit in pills at a slot's bottom right corner. First come the hands (1 ✊ fists, 2 your bag, 3 your gun),
+  then the item slots (4-8, the consumables you own; MORE "+N" when you have more kinds than slots). The slot in your
+  hand lifts 12 px, grows and gets the red frame and glow. The line over the bar names it with one real number:
+  "PISTOL 18 DMG", "CANVAS TOTE 5 / 6", "FISTS V PUNCHES". There is no ammo, so none is shown. Hover a slot and the
+  line names that slot.
+- **The bag slot carries what you carry.** It has a blue fill ring and a blue "5/6" pill. They show the pieces you
+  carry on foot over your room: your hands, the bag in your hand, the bike's bag and a round's satchel. Strong Back
+  (6.20) is counted. The ring and pill replace 6.3's CARRYING pill. Tap the pill to open BAG & ITEMS on what you carry.
+  It shows "DOWN" while the bag lies on the ground.
+- **A touch screen:** two item slots and no keys. Only the filled slots show, and the tray shrinks to them. The bar
+  shrinks with the HUD (about 62 % in the mock), but a slot never goes under 48 px (67 %). It sits between the
+  thumbstick and JUMP, and the bag's ring stays.
+- **BAG & ITEMS** (`client/BagUi.luau`: the I window and the phone's BAG & ITEMS) in the UI kit's look:
+  - **Header chips:** ✋ IN HAND · PISTOL, 📦 5/6 (blue) and your cash.
+  - **YOUR BAG, the hero:** a blue frame and ribbon, "CANVAS TOTE · OVER THE SHOULDER" and the fill big ("5 / 6").
+    The cargo shows as a stack of tiles (6.19's grouping, 🍕 ×2, with a dim tile for each free place), then a blue
+    bar, one facts line and one red button, **HOLD BAG · [2]**. The button is key 2's path (`Holster.choose`, the
+    Hand remote). It says IN YOUR HAND while you hold the bag, and why while you can't (no bag, on the ground).
+  - **ITEMS is ON YOU**, rows with their kind's colour on the left edge (weapons red, medical green, explosives
+    orange, cargo and bags blue, gear grey):
+    - your gun (IN HAND, else DRAW: key 3's path);
+    - the bat;
+    - the consumables (×n big, USE: the bar's path, Hud's useItem and the UseItem remote);
+    - your vests (WORN);
+    - MY BAGS (a tap opens BAGS).
+  - **The other tabs:** 📦 CARRYING, BAGS, CARS and GUNS stay as they were, with the same edges.
+- **Code:** the sizes are in `Config.Hotbar` and the colours in `Config.Inventory`. The pure maths is in
+  `shared/Inventory.luau` (kinds, grouping, the fill and its ring, the bar's size, the line;
+  `tests/inventory_test.luau`). `tests/touchlayout_test.luau` docks the new bar's size. `tools/phone-ui/hotbar.luau`
+  runs the real bar on a computer and on a touch screen. `tools/phone-ui/check.luau` checks the new window (chips,
+  hero, stack, edges, HOLD BAG / DRAW / USE / MY BAGS).
 
 ## Skills for levels (6.20)
 
@@ -2902,7 +2939,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               checked and dealt: the nearest enemy in the cone, MeleeAt / MeleeKind for the swing), Hand (6.1: what you hold,
               fists / bag / gun: the Hand remote, the Hand and Holstered attributes; Cargo sets a loaded bag down)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, 6.1: the
-              hand slots 1-3, the item slots 4-8 and what you carry), BagSway (6.1: the bag's pendulum, the BagSwing
+              hand slots 1-3, the item slots 4-8 and what you carry; 6.21: the clean hotbar, its pure maths in
+              shared/Inventory.luau), BagSway (6.1: the bag's pendulum, the BagSwing
               joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), Objective (6.5: the NEXT
               card, its words from shared/Goal.luau), TutorialUi (Marge's pages; 6.7: drives the arrow tour) and
               TutorialArrow (6.7: the tour's arrow, frame and caption), MapView (minimap, big map, GPS routes),

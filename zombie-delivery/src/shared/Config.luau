@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.20"
+Config.Version = "6.21"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5305,6 +5305,54 @@ Config.UiKit = {
 	Chip = 24,
 	Corner = 12,
 	RowCorner = 10,
+}
+
+-- 6.21, the inventory as a clean hotbar (the owner picked redesign B "Clean hotbar + kit"; shared/Inventory.luau holds
+-- the pure maths, client/Hotbar.luau and client/BagUi.luau draw it). Px at the HUD's design scale.
+--   Tile / Selected       a slot, and the slot in your hand (it lifts by Lift px and grows to Selected px)
+--   Gap / PadX / PadY     between the slots, and the frosted tray's padding around them
+--   Corner / TrayCorner   the slots' and the tray's corners
+--   Pill / PillMin        the count pill at a slot's bottom right corner (its height, its least width), Overhang px out
+--   Ring / RingInset      the bag slot's fill ring (its thickness, its inset from the slot's edge)
+--   Line / LineGap        the line over the bar (the name of what is in your hand and its count), its gap to the slots
+--   TouchMin              a touch screen: the bar shrinks with the HUD (the mock's 62 %), but a slot never under
+--                         TouchMin px (6.0.1's 48 px rule for fingers: 67 % of a slot)
+--   TouchGap / TouchPad   a touch screen's tighter gaps and padding (the bar fits a 640 px phone between the
+--                         thumbstick and JUMP)
+Config.Hotbar = {
+	Tile = 72,
+	Selected = 80,
+	Lift = 12,
+	Gap = 10,
+	PadX = 14,
+	PadY = 10,
+	Corner = 18,
+	TrayCorner = 22,
+	Pill = 22,
+	PillMin = 26,
+	Overhang = 6,
+	Ring = 5,
+	RingInset = 4,
+	Line = 22,
+	LineGap = 6,
+	TouchMin = 48,
+	TouchGap = 6,
+	TouchPad = 7,
+}
+
+-- 6.21, the inventory's colours by kind (a row's left edge in BAG & ITEMS; shared/Inventory.luau category): weapons
+-- red, medical green, explosives orange, cargo and bags blue, gear grey. Items: a consumable's kind (Config.Items id;
+-- else gear). Stack: the cargo tiles on BAG & ITEMS' YOUR BAG card (at most Max tiles of Tile px, Gap px apart).
+Config.Inventory = {
+	Colors = {
+		weapon = { 215, 74, 70 },
+		medical = { 126, 196, 120 },
+		explosive = { 240, 138, 58 },
+		cargo = { 90, 162, 230 },
+		gear = { 154, 163, 174 },
+	} :: { [string]: { number } },
+	Items = { medkit = "medical", energy = "medical", molotov = "explosive", mine = "explosive", repair = "gear", nitro = "gear", jerrycan = "gear" } :: { [string]: string },
+	Stack = { Max = 6, Tile = 46, Gap = 6 },
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

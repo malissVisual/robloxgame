@@ -743,12 +743,85 @@ check("6.7: no car, no car items in ITEMS (the energy drink is there)",named("It
 check("an item names its key in the bottom bar",all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Key 5.",1,true)~=nil end)[1]~=nil)
 named("Item_medkit"):FindFirstChild("Use").Activated:Fire()
 check("USE goes through the bottom bar's path",M.used=="medkit")
+-- 6.21, the clean hotbar's window (client/BagUi.luau, redesign B): the header chips (IN HAND, what you carry, cash),
+-- YOUR BAG as the hero (its fill big, the stack, a blue bar, HOLD BAG · [2] the hotbar's way), the ON YOU rows with
+-- their kinds' colours on the left edge (weapons red, medical green, explosives orange, gear grey, bags blue).
+do
+	local BagUi=require("./BagUi")
+	local Transport=require("./Transport")
+	local function rgb(r,g,b) return M.Color3.fromRGB(r,g,b) end
+	local function sameColor(a,b) return a~=nil and b~=nil and math.abs(a.R-b.R)<1e-6 and math.abs(a.G-b.G)<1e-6 and math.abs(a.B-b.B)<1e-6 end
+	local function pop(name) local panel=popup();return panel and panel:FindFirstChild(name,true) end
+	local function edge(id) local row=pop("Item_"..id);local e=row and row:FindFirstChild("Edge");return e and e.BackgroundColor3 end
+	local held="gun"
+	BagUi.hand=function() return held end
+	BagUi.choose=function(hand) table.insert(M.chosen,hand) end
+	local kit={bag=true,tote=true,kevlar=true,hivis=true,bat=true}
+	local mine={phone=true,money=1240,kit=kit,bag="tote",weapon="pistol",weapons={pistol=true},cars={},items={medkit=4,molotov=1},skills={strongBack=1}}
+	Phone.setState(mine)
+	Phone.close();Phone.open();named("bagApp").Activated:Fire()
+	local room=Transport.handsRoom(kit,"tote")+2 -- (6.20 Strong Back: a piece in the hands, one in the bag)
+	local hero=pop("Hero")
+	check("6.21: YOUR BAG is the hero: a blue ribbon, the fill big with Strong Back (0 / 7)",hero~=nil and pop("Ribbon").Text=="YOUR BAG" and sameColor(pop("Ribbon").BackgroundColor3,rgb(90,162,230))
+		and hero:FindFirstChild("Pay",true).Text==`0 / {room}` and room==7)
+	check("6.21: the hero's name and carry, its blue frame strong",string.find(hero:FindFirstChild("Business",true).Text,"CANVAS TOTE · OVER THE SHOULDER",1,true)~=nil
+		and sameColor(hero:FindFirstChildOfClass("UIStroke").Color,rgb(90,162,230)) and hero:FindFirstChildOfClass("UIStroke").Thickness==2)
+	check("6.21: the hero's blue fill bar",hero:FindFirstChild("Progress",true)~=nil and sameColor(hero:FindFirstChild("Fill",true).BackgroundColor3,rgb(90,162,230)))
+	check("6.21: the header chips: IN HAND · PISTOL, 📦 0/7, the cash",pop("InHand")~=nil and pop("InHand").Text=="✋ IN HAND · PISTOL" and pop("Carrying").Text==`📦 0/{room}` and pop("Cash").Text=="$1240")
+	check("6.21: ON YOU heads the rows",all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"ON YOU",1,true)~=nil end)[1]~=nil)
+	check("6.21: a row a thing on you: the gun, the bat, the items, the vests, MY BAGS",pop("Item_gun")~=nil and pop("Item_bat")~=nil and pop("Item_medkit")~=nil and pop("Item_molotov")~=nil
+		and pop("Item_kevlar")~=nil and pop("Item_hivis")~=nil and pop("Item_mybags")~=nil)
+	check("6.21: the kinds' colours on the rows' left edges",sameColor(edge("gun"),rgb(215,74,70)) and sameColor(edge("bat"),rgb(215,74,70)) and sameColor(edge("medkit"),rgb(126,196,120))
+		and sameColor(edge("molotov"),rgb(240,138,58)) and sameColor(edge("kevlar"),rgb(154,163,174)) and sameColor(edge("mybags"),rgb(90,162,230)))
+	check("6.21: the gun IN HAND, the vests WORN, the bags counted",pop("Item_gun"):FindFirstChild("Pay",true).Text=="IN HAND" and pop("Item_kevlar"):FindFirstChild("Pay",true).Text=="WORN"
+		and pop("Item_mybags"):FindFirstChild("Pay",true).Text=="2")
+	check("6.21: the items keep their count big and USE",pop("Item_medkit"):FindFirstChild("Pay").Text=="×4" and pop("Item_medkit"):FindFirstChild("Use")~=nil)
+	local hold=pop("HoldBag")
+	check("6.21: one red button: HOLD BAG · [2]",hold~=nil and hold.Text=="HOLD BAG · [2]")
+	hold.Activated:Fire()
+	check("6.21: HOLD BAG goes the hotbar's way (Holster.choose: the Hand remote)",M.chosen[#M.chosen]=="bag")
+	held="fists"
+	named("Tab_items").Activated:Fire()
+	check("6.21: the gun away: DRAW on its row",pop("Item_gun"):FindFirstChild("Draw")~=nil)
+	pop("Item_gun"):FindFirstChild("Draw").Activated:Fire()
+	check("6.21: DRAW goes the hotbar's way too",M.chosen[#M.chosen]=="gun")
+	held="bag"
+	named("Tab_items").Activated:Fire()
+	check("6.21: the bag in your hand: IN YOUR HAND, the chip says it",pop("HoldBag").Text=="IN YOUR HAND" and pop("InHand").Text=="✋ IN HAND · CANVAS TOTE")
+	pop("Item_mybags").Activated:Fire()
+	check("6.21: MY BAGS opens the BAGS tab",named("Tab_bags"):FindFirstChild("Underline")~=nil and pop("BagsRows")~=nil and sameColor(edge("tote"),rgb(90,162,230)))
+	check("6.21: BAGS keeps YOUR BAG as its hero",pop("Ribbon")~=nil and pop("Ribbon").Text=="YOUR BAG")
+	mine.skills=nil
+	Phone.setState(mine)
+	named("Tab_items").Activated:Fire()
+	check("6.21: without Strong Back two pieces fewer (0 / 5)",pop("Hero"):FindFirstChild("Pay",true).Text=="0 / 5")
+	BagUi.hand=nil
+	BagUi.choose=nil
+	Phone.setState({phone=true,money=1600,kit={},cars={},items={medkit=2}})
+	named("Tab_items").Activated:Fire()
+	check("6.21: nobody says the hand: no IN HAND chip, no bag: NO BAG YET",pop("InHand")==nil and pop("HoldBag").Text=="NO BAG YET")
+end
 named("Tab_bags").Activated:Fire()
 check("BAGS shows the bags you own",showing("bag") and named("BagsRows")~=nil and named("Tab_bags"):FindFirstChild("Underline")~=nil)
 M.remotes.Job.OnClientEvent:Fire({cargo="Letters",customer="Ann",total=2,pay=40,endsAt=M.now+100,mode="foot",orders={{id=1,state="open"}}})
 named("Close").Activated:Fire();named("bagApp").Activated:Fire()
 check("during a run it opens on BAG",named("Tab_bag")~=nil and named("BagRows")~=nil)
 check("JOBS' badge: one open order",named("jobsApp"):FindFirstChild("Badge").Text=="1" and named("jobsApp"):FindFirstChild("Sub").Text=="Your run · orders")
+-- 6.21: CARRYING: YOUR BAG's fill (3 / 5), its cargo stack (6.19's grouping: 🍕 ×2, 📦, two free places) and the
+-- 📦 chip; a blue row a piece.
+do
+	local function pop(name) local panel=popup();return panel and panel:FindFirstChild(name,true) end
+	M.remotes.Job.OnClientEvent:Fire({cargo="Letters",customer="Ann",total=2,pay=40,endsAt=M.now+100,mode="foot",packRoom=3,bagRoom=3,orders={{id=1,state="open"}},
+		carried={{look="pizza",name="pizza",where="bag",order=1,dest="Ann"},{look="pizza",name="pizza",where="bag",order=1,dest="Ann"},{look="parcel",name="parcel",where="hands",order=2,dest="Bo"}}})
+	named("Close").Activated:Fire();named("bagApp").Activated:Fire()
+	local stack=pop("CargoStack")
+	check("6.21: CARRYING: YOUR BAG's fill 3 / 5 and the 📦 3/5 chip",pop("Hero"):FindFirstChild("Pay",true).Text=="3 / 5" and pop("Carrying").Text=="📦 3/5")
+	check("6.21: the cargo stack groups the kinds (🍕 ×2, 📦) and shows the free places",stack~=nil and stack:FindFirstChild("Stack_pizza")~=nil and stack:FindFirstChild("Stack_pizza"):FindFirstChild("Count").Text=="×2"
+		and stack:FindFirstChild("Stack_parcel")~=nil and stack:FindFirstChild("Stack_parcel"):FindFirstChild("Count")==nil
+		and #all(stack,function(object) return object.Name=="Free" end)==2)
+	local edgeOf=pop("Item_bag1") and pop("Item_bag1"):FindFirstChild("Edge")
+	check("6.21: a blue row a piece",pop("BagRows")~=nil and pop("Item_bag1")~=nil and pop("Item_bag2")~=nil and pop("Item_hands1")~=nil and edgeOf~=nil and math.abs(edgeOf.BackgroundColor3.B-230/255)<1e-6)
+end
 M.remotes.Job.OnClientEvent:Fire(nil)
 check("the run ends: BAG & ITEMS falls back to ITEMS",named("Tab_bag")==nil and named("Tab_items")~=nil)
 Phone.close()

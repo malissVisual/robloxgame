@@ -1006,6 +1006,9 @@ require(script.Parent.BagUi).onOpen = function()
 	backpack.frame.Visible = true
 	renderBackpack()
 end
+-- 6.21: BAG & ITEMS' IN HAND chip, HOLD BAG · [2] and DRAW go the bottom bar's way (client/Holster.luau: the Hand remote).
+require(script.Parent.BagUi).hand = require(script.Parent.Holster).hand
+require(script.Parent.BagUi).choose = require(script.Parent.Holster).choose
 -- 6.7: the bottom bar's MORE slot (more item kinds than slots) opens the I window on ITEMS, every kind's USE there.
 require(script.Parent.Hotbar).onMore = function()
 	closeWindows()
