@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · standalone thumbnails for all 90 Career unlocks + level rewards, actual-model renders where available; `art/career-thumbnails/`, `design/career-thumbnails/`, `tools/career-thumbnails/`, board only; no gameplay/UI changes · 2026-10-09 · `codex/career-thumbnails`.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- `codex/career-thumbnails` · 100 standalone PNGs cover all 90 actual Career unlocks + every level reward, 47 real factory renders, offline gallery and upload mapping (`design/career-thumbnails/`). Review each level and concept scenes; keep unlocks separate from granted rewards. Coverage audit and full Luau tests/compilation pass; images not uploaded or wired into UI. · Codex · 2026-10-10
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
