@@ -27,7 +27,11 @@
 -- other analytics calls go through PlayerData.track (the hooks Analytics.start puts in PlayerData.analytics: without
 -- them nothing happens, so the game never depends on server/Analytics.luau loading). 6.14: the regulars (regulars: the
 -- deliveries for each business, shared/Regulars.luau; server/Regulars.luau counts them): a new field, checked on load
--- (Regulars.clean), an empty table in a save from before (no migration).
+-- (Regulars.clean), an empty table in a save from before (no migration). 6.20: the skills (skills: skill id → rank,
+-- Config.Skills; shared/Skills.luau, server/Skills.luau): only the ranks bought are kept, the points come from the
+-- level (an old save has its level's points to spend at once); checked on load (Skills.clean: a save over its level's
+-- points gets every point back), an empty table in a save from before (no migration). The player attribute Skills
+-- carries them to the client (Skills.encode).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -48,6 +52,7 @@ local JobRules = require(Shared.JobRules)
 local TaskData = require(Shared.Tasks) -- 6.12: the daily and weekly tasks (profile.tasks)
 local Style = require(Shared.Style) -- 6.12: the cosmetics' wardrobe
 local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funnel's steps in the save
+local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 
 export type Profile = {
 	money: number,
@@ -105,6 +110,8 @@ export type Profile = {
 	-- 6.14: the regulars: deliveries for each business (shared/Regulars.luau ids, the job pictures'; server/Regulars.luau
 	-- counts them); a save from before 6.14 has none (the empty table, no migration)
 	regulars: { [string]: number },
+	-- 6.20: the skills bought (Config.Skills ids → rank); the points are the level's (shared/Skills.luau points)
+	skills: { [string]: number },
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -196,6 +203,7 @@ local function newProfile(): Profile
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
 		onboarding = 0, -- 6.13: a new courier, no step yet
 		regulars = {}, -- 6.14: no business knows you yet
+		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -587,6 +595,7 @@ local function applySaved(profile: Profile, saved: any)
 	applyGear(profile, saved)
 	applyLevelRewards(profile, saved)
 	applyLicences(profile, saved) -- 4.7
+	profile.skills = SkillRules.clean(saved.skills, Levels.levelFor(profile.xp)) -- 6.20 (none saved: an empty table)
 	applyEstate(profile, saved)
 	applyMissions(profile, saved)
 	applyChallenges(profile, saved)
@@ -720,6 +729,11 @@ local function updateLeaderstats(player: Player)
 		player:SetAttribute("Level", levelNow)
 		player:SetAttribute("Rank", Levels.rank(levelNow))
 	end
+	-- 6.20: the skills' ranks for the client (client/Stamina.luau, CameraRig, Shooting, Hotbar, the SKILLS tab)
+	local skills = SkillRules.encode(profile.skills)
+	if player:GetAttribute("Skills") ~= skills then
+		player:SetAttribute("Skills", skills)
+	end
 	local stats = player:FindFirstChild("leaderstats")
 	if not stats then
 		return
@@ -805,6 +819,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		tasks = profile.tasks, -- 6.12
 		onboarding = profile.onboarding, -- 6.13
 		regulars = profile.regulars, -- 6.14
+		skills = profile.skills, -- 6.20
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -1063,6 +1078,7 @@ function PlayerData.setLevel(player: Player, level: number): number
 	end
 	local target = math.clamp(math.floor(level), 1, Config.Levels.MaxLevel)
 	profile.xp = Levels.xpFor(target)
+	profile.skills = SkillRules.clean(profile.skills, target) -- 6.20: a lower level than the points spent: all back
 	local cash = giveLevelRewards(profile) -- 4.6: the levels it reached, once
 	changed:Fire(player)
 	tellMoney(player, cash, "Admin") -- 6.13: the admin's doing, not earned in play

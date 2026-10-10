@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.19.1"
+Config.Version = "6.20"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -2294,6 +2294,91 @@ Config.Levels = {
 		[14] = { money = 12000, items = { repair = 3, medkit = 3 } },
 		[15] = { money = 15000, paint = "legend", title = "Legend of the Last Road" },
 	} :: { [number]: LevelReward },
+}
+
+-- 6.20, skills for levels (design/skills/PROPOSAL.md, approved with one change: RESET is always free). Every level from
+-- 2 gives a skill point (shared/Skills.luau points: level − 1, 14 at level 15; an old save gets its points from its
+-- level at once: nothing is stored but the ranks bought, profile.skills). Three branches; a rank costs `cost` points (1;
+-- Strong Back's one rank 2), an apex (`apex`) ApexCost and it opens once ApexNeeds points are spent in its branch. Each
+-- rank adds `effect` (every key × the rank: shared/Skills.luau effect). The server decides (server/Skills.luau: the
+-- Skills remote's "buy" and "reset", the reset never during a job or a mission); the effects are wired where the game
+-- computes them:
+--   hands / bag    +1 light piece in your hands and in your bag (server/Cargo.luau handsMax, server/Transport.luau)
+--   sprintTime     + seconds of sprint on a full breath (client/Stamina.luau)
+--   sprintSpeed    + share of the sprint's speed (client/CameraRig.luau)
+--   tips           + share of an order's pay the customer tips (server/Jobs.luau payOrder; not on a mission)
+--   express        + share of an order's pay when it arrives in time (server/Jobs.luau payOrder)
+--   carDamage      − share of the damage your vehicle takes (server/Vehicles.luau damage)
+--   handling       − share of the time a serve stop and people boarding take (server/Cargo.luau)
+--   fuel           − share of the fuel your car burns (server/Fuel.luau)
+--   repair         − share of a repair shop's fee (server/Repair.luau)
+--   stuntman       running a zombie over costs the car nothing, a bandit car's ram half (server/Vehicles.luau damage)
+--   punch          + damage of a punch (server/CloseCombat.luau)
+--   spread         − share of a hand gun's spread (server/Gun.luau; the guns have no reload to make quicker)
+--   recoil         − share of the camera's kick (client/ShotKick.luau, through client/Shooting.luau)
+--   health         + max health (server/Skills.luau, on every spawn)
+--   regen          + share of the body's own healing (server/Skills.luau; a medkit heals at once, so the healing that
+--                  takes time is what gets faster)
+--   freeMedkit     a medkit used is not spent, once a job or mission (server/Items.luau)
+--   secondWind     a lethal hit leaves you at SecondWindHealth instead, once a job or mission (server/Armour.luau)
+-- A "once a job or mission" charge fills when a job or a mission starts (yours or your crew's) and on every spawn.
+-- BaseHealth: a courier's health without Endurance (Roblox's default). Regen: the default healing a second (a share of
+-- the max health; Roblox's own Health script) that `regen` adds to.
+export type SkillDef = {
+	id: string,
+	name: string,
+	icon: string,
+	ranks: number,
+	cost: number,
+	apex: boolean?,
+	effect: { [string]: number },
+	text: string, -- what one rank does, in a few words
+}
+export type SkillBranch = { id: string, name: string, icon: string, skills: { SkillDef } }
+Config.Skills = {
+	PerLevel = 1,
+	ApexNeeds = 6,
+	SecondWindHealth = 25,
+	BaseHealth = 100,
+	Regen = 0.01,
+	Branches = {
+		{
+			id = "courier",
+			name = "Courier",
+			icon = "📦",
+			skills = {
+				{ id = "strongBack", name = "Strong Back", icon = "🎒", ranks = 1, cost = 2, effect = { hands = 1, bag = 1 }, text = "+1 piece in your hands and in your bag" },
+				{ id = "longBreath", name = "Long Breath", icon = "🫁", ranks = 3, cost = 1, effect = { sprintTime = 1.5 }, text = "+1.5 s of sprint" },
+				{ id = "doorstepSmile", name = "Doorstep Smile", icon = "😊", ranks = 3, cost = 1, effect = { tips = 0.05 }, text = "+5% of the pay as a tip" },
+				{ id = "lightStep", name = "Light Step", icon = "👟", ranks = 2, cost = 1, effect = { sprintSpeed = 0.04 }, text = "+4% sprint speed" },
+				{ id = "express", name = "Express", icon = "⚡", ranks = 1, cost = 3, apex = true, effect = { express = 0.1 }, text = "+10% pay for an order delivered in time" },
+			},
+		},
+		{
+			id = "driver",
+			name = "Driver",
+			icon = "🚐",
+			skills = {
+				{ id = "toughBody", name = "Tough Body", icon = "🛡", ranks = 3, cost = 1, effect = { carDamage = 0.08 }, text = "−8% damage to your vehicle" },
+				{ id = "quickHands", name = "Quick Hands", icon = "🙌", ranks = 3, cost = 1, effect = { handling = 0.1 }, text = "−10% time to serve and to board people" },
+				{ id = "lightFoot", name = "Light Foot", icon = "⛽", ranks = 3, cost = 1, effect = { fuel = 0.07 }, text = "−7% fuel burnt" },
+				{ id = "knownAtShop", name = "Known at the Shop", icon = "🔧", ranks = 2, cost = 1, effect = { repair = 0.15 }, text = "−15% repair fee" },
+				{ id = "stuntman", name = "Stuntman", icon = "💥", ranks = 1, cost = 3, apex = true, effect = { stuntman = 1 }, text = "No damage from running zombies over, half from a ram" },
+			},
+		},
+		{
+			id = "fighter",
+			name = "Fighter",
+			icon = "🥊",
+			skills = {
+				{ id = "hardFist", name = "Hard Fist", icon = "👊", ranks = 3, cost = 1, effect = { punch = 3 }, text = "+3 punch damage" },
+				{ id = "steadyHand", name = "Steady Hand", icon = "🎯", ranks = 3, cost = 1, effect = { spread = 0.1, recoil = 0.15 }, text = "−10% gun spread, −15% recoil" },
+				{ id = "endurance", name = "Endurance", icon = "❤", ranks = 3, cost = 1, effect = { health = 10 }, text = "+10 max health" },
+				{ id = "fieldMedic", name = "Field Medic", icon = "➕", ranks = 2, cost = 1, effect = { regen = 0.2, freeMedkit = 1 }, text = "+20% healing; a free medkit a job" },
+				{ id = "secondWind", name = "Second Wind", icon = "💨", ranks = 1, cost = 3, apex = true, effect = { secondWind = 1 }, text = "Survive a lethal hit with 25 health, once a job" },
+			},
+		},
+	} :: { SkillBranch },
 }
 
 -- Traffic (server/Traffic.luau): civilian cars driving the roads and people walking the sidewalks, near the players
@@ -4822,6 +4907,7 @@ Config.Robust = {
 		JobQueue = 4, -- 6.12.8: the board's + QUEUE, ADD ALL and NEXT UP's ✕ (server/JobQueue.luau)
 		ClientError = 0.05, -- 6.13: a client's script error (its script and line): one every 20 s at most (server/Analytics.luau)
 		CrateDown = 4, -- 6.15: the PutDown remote (the touch PUT DOWN) while you carry a supply drop's crate (server/LiveEvents.luau)
+		Skills = 4, -- 6.20: the SKILLS tab's +1 POINT and RESET (server/Skills.luau)
 	},
 }
 

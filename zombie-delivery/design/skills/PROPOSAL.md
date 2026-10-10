@@ -1,6 +1,12 @@
-# Dovednosti za úrovně: návrh ke schválení (6.19)
+# Dovednosti za úrovně: schváleno a postaveno (6.20)
 
-Toto je jen návrh. Nic z něj zatím ve hře není. Od 6.19 odemykají zbraně a auta mise (viz README, 6.19). Úroveň proto
+> **Postaveno ve verzi 6.20** (README, „Skills for levels (6.20)“). Vlastník návrh schválil s jednou změnou:
+> **přerozdělení bodů je vždy zdarma** (nikdy nestojí peníze; během zakázky ani mise ale nejde). Staré uložené hry
+> dostaly body zpětně podle úrovně. Odchylky od návrhu: hra nemá přebíjení, Klidná ruka proto místo něj zužuje rozptyl
+> zbraně (−10 % na stupeň). Lékárnička léčí okamžitě, Polní lékař proto zrychluje léčení v čase (+20 % na stupeň).
+> Známý v dílně platí ve všech opravnách. Oddíl „Přerozdělení bodů“ níže platí jen v upravené podobě: vždy zdarma.
+
+Původní návrh (6.19). Od 6.19 odemykají zbraně a auta mise (viz README, 6.19). Úroveň proto
 bude dávat dvě věci:
 1. **Bod dovednosti za každou úroveň.** Úrovně 2 až 15 dají 14 bodů. Body utratíte ve stromu dovedností.
 2. **Těžší a lépe placené zakázky.** Patří sem ★★, ★★★, ★★★★ a zaměstnavatelé. Ty už teď hlídá úroveň a tak to zůstane.

@@ -1847,7 +1847,7 @@ local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	end
 	if offer.mode == "foot" then
 		local room = Transport.footOf(player).room
-		return offer.total, room, if room > Config.Cargo.HandsMax then "hands and bag" else "hands"
+		return offer.total, room, if room > Config.Cargo.HandsMax + require(script.Parent.Skills).hands(player) then "hands and bag" else "hands"
 	elseif offer.mode == "bike" then
 		-- 5.1: what your bike holds with its bike gear and your bag.
 		local bikeId, bike = Transport.bikeOf(player)
@@ -2455,7 +2455,8 @@ local function sendBoard(player: Player, board: Board)
 	local profile = PlayerData.get(player)
 	-- 5.0: what you carry on foot (the ON FOOT section's "HANDS 2 / BAG 4") and whether you have a vehicle.
 	local foot = Transport.footOf(player)
-	local carry = { hands = Config.Cargo.HandsMax, room = foot.room, pack = math.max(0, foot.room - Config.Cargo.HandsMax), speed = foot.speedMult }
+	local hands = Config.Cargo.HandsMax + require(script.Parent.Skills).hands(player) -- (6.20: + Strong Back)
+	local carry = { hands = hands, room = foot.room, pack = math.max(0, foot.room - hands), speed = foot.speedMult }
 	local hasCar = profile ~= nil and profile.car ~= nil
 	-- 5.1: your bike (its name, what it holds with its gear and your bag) and whether you ride it now.
 	local bikeId, bike = Transport.bikeOf(player)
@@ -3545,6 +3546,29 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		require(script.Parent.Tasks).note(player, "tips", JobRules.roundTip(Cargo.missesOf(session, order.id))) -- 6.12: the tips task
 		if ratingInfo then
 			table.insert(ratingInfo.checks, JobRules.roundCheck(Cargo.missesOf(session, order.id)))
+		end
+	end
+	-- 6.20, the skills (Config.Skills, server/Skills.luau): ★ Express pays a share more for an order in time (before the
+	-- tips: they are a share of this pay), Doorstep Smile's tip beside the vest's (every delivery but a mission).
+	do
+		local Skills = require(script.Parent.Skills)
+		local express = Skills.effect(player, "express")
+		if express > 0 and offer.time > 0 and timeLeft > 0 then
+			local bonus = math.floor(payTotal * express + 0.5)
+			if bonus > 0 then
+				payTotal += bonus
+				if ratingInfo then
+					table.insert(ratingInfo.checks, { text = `★ Express: in time, +${bonus}`, ok = true })
+				end
+			end
+		end
+		local smile = if offer.mission then 0 else JobRules.kitTip(payTotal, Skills.effect(player, "tips"))
+		if smile > 0 then
+			payTotal += smile
+			require(script.Parent.Tasks).note(player, "tips", smile) -- (the tips task)
+			if ratingInfo then
+				table.insert(ratingInfo.checks, { text = `Doorstep Smile: the customer tips +${smile}`, ok = true })
+			end
 		end
 	end
 	-- 6.7: the Courier Vest: the customer tips a share of the pay (Config.Kit tips; every delivery but a mission)

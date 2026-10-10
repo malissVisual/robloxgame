@@ -1231,9 +1231,11 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 		if not killed then
 			-- Something big: the car bounces off it and takes a dent (6.7: × the Ram Plow's guard, Economy.ramGuard).
 			bump:FireClient(car.owner, Horde.RamSlowdown)
-			local dent = health * Horde.RamSelfDamage * car.stats.ramGuard
-			Vehicles.damage(car, dent)
-			Zombies.onCarDamaged(car.owner, dent)
+			-- (6.20: "ram": ★ Stuntman's car takes nothing, Tough Body less: what it really took is told)
+			local dent = Vehicles.damage(car, health * Horde.RamSelfDamage * car.stats.ramGuard, nil, "ram")
+			if dent > 0 then
+				Zombies.onCarDamaged(car.owner, dent)
+			end
 			z.root.AssemblyLinearVelocity = velocity * 0.6 + Vector3.new(0, 15, 0)
 		end
 		return
@@ -1252,8 +1254,7 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 	if now >= z.nextAttack then
 		z.nextAttack = now + z.def.attackEvery
 		showAttack(z) -- 6.16: the clients' lunge
-		Vehicles.damage(car, z.def.damage)
-		Zombies.onCarDamaged(car.owner, z.def.damage)
+		Zombies.onCarDamaged(car.owner, Vehicles.damage(car, z.def.damage)) -- (6.20: what it took after Tough Body)
 	end
 end
 
@@ -1296,8 +1297,7 @@ function shoot(z: Zombie, target: Target)
 		tracer:FireAllClients(from, aim, BANDIT_TRACER, 0)
 		local car = target.car
 		if car then
-			Vehicles.damage(car, damage, "The bandits shot your car to pieces!")
-			Zombies.onCarDamaged(car.owner, damage)
+			Zombies.onCarDamaged(car.owner, Vehicles.damage(car, damage, "The bandits shot your car to pieces!"))
 		elseif target.humanoid then
 			Armour.hurt(target.humanoid, damage)
 		end
@@ -1553,8 +1553,7 @@ local function step()
 			elseif now >= z.nextAttack then
 				z.nextAttack = now + z.def.attackEvery
 				showAttack(z) -- 6.16
-				Vehicles.damage(car, z.def.damage)
-				Zombies.onCarDamaged(car.owner, z.def.damage)
+				Zombies.onCarDamaged(car.owner, Vehicles.damage(car, z.def.damage))
 			end
 			continue
 		end

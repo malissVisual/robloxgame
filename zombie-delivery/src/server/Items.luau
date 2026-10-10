@@ -257,6 +257,11 @@ local function onUse(player: Player, id: any, target: any)
 		notice:FireClient(player, err)
 		return
 	end
+	-- 6.20: Field Medic (Config.Skills): one medkit a job or a mission is not spent (server/Skills.luau's charge)
+	if id == "medkit" and require(script.Parent.Skills).freeMedkit(player) then
+		notice:FireClient(player, "➕ Field Medic: that medkit was free.")
+		return
+	end
 	PlayerData.addItem(player, id, -1)
 end
 

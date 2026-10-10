@@ -9,6 +9,7 @@
 -- left; the owner's HUD gets the "Repair" remote (client/GarageUi.luau): ({ car, shop, seconds, total, fee }) when it
 -- starts, (nil) when it ends. A job's clock keeps running while you wait: your choice.
 -- Any car can be repaired, a company vehicle lent for a job too (at the same fee). There are no free repairs.
+-- 6.20: Known at the Shop (Config.Skills) takes a share off the fee, at every repair shop.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -149,6 +150,12 @@ local function missingOf(car: Vehicles.Car): number
 	return math.clamp(1 - car.health / math.max(1, car.stats.health), 0, 1)
 end
 
+-- 6.20: the fee for this player: Economy.repairFee less Known at the Shop's share (Config.Skills, server/Skills.luau).
+local function feeFor(player: Player, missing: number): number
+	local share = math.max(0, 1 - require(Server.Skills).effect(player, "repair"))
+	return math.floor(Economy.repairFee(missing) * share + 0.5)
+end
+
 local function carName(car: Vehicles.Car): string
 	local def = Economy.findCar(car.id)
 	return if def then def.name else "car"
@@ -188,7 +195,7 @@ end
 
 local function begin(player: Player, car: Vehicles.Car, bay: Bay)
 	local missing = missingOf(car)
-	local fee = Economy.repairFee(missing)
+	local fee = feeFor(player, missing)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return
@@ -216,7 +223,7 @@ local function finish(player: Player, job: Running)
 	local car = job.car
 	-- The fee in full, never less: the damage the car took on the lift costs too, and money spent while waiting is
 	-- not there any more (no repair then).
-	local fee = math.max(job.fee, Economy.repairFee(missingOf(car)))
+	local fee = math.max(job.fee, feeFor(player, missingOf(car)))
 	if not PlayerData.spend(player, fee, "Repair", car.id) then
 		release(player, job)
 		notice:FireClient(player, `The repair of your {job.name} costs {money(fee)}: not enough money. Repair cancelled.`)
@@ -276,7 +283,7 @@ local function step()
 		if not empty or not still then
 			waiting[player] = nil
 			if not empty and still then
-				say(player, `out{bay.index}{bay.shop}`, `Repair bay {bay.index}: get out (E) and wait. {Economy.repairTime(missingOf(car))} s, {money(Economy.repairFee(missingOf(car)))}.`)
+				say(player, `out{bay.index}{bay.shop}`, `Repair bay {bay.index}: get out (E) and wait. {Economy.repairTime(missingOf(car))} s, {money(feeFor(player, missingOf(car)))}.`)
 			end
 			continue
 		end

@@ -43,8 +43,9 @@ end
 
 -- How many pieces of a job one player may hold at once: with nothing (`tool` nil), on a trolley or on a jack. 0 means
 -- not at all (a pallet by hand, a crate on a jack, a horse on a trolley); the caller says why (Freight.refusal).
--- Without a tool it is server/Cargo.luau's 3.7 rule: two of a light look, else one.
-function Freight.handsMax(kind: string, look: string, lift: boolean?, pair: boolean?, tool: string?): number
+-- Without a tool it is server/Cargo.luau's 3.7 rule: two of a light look, else one. 6.20: `extra` more of a light look
+-- (Strong Back, Config.Skills; nil = none).
+function Freight.handsMax(kind: string, look: string, lift: boolean?, pair: boolean?, tool: string?, extra: number?): number
 	local tuning = Config.Cargo
 	if tool == "jack" then
 		return if Freight.isPallet(kind) then 1 else 0
@@ -58,7 +59,7 @@ function Freight.handsMax(kind: string, look: string, lift: boolean?, pair: bool
 	if alive(kind) or lift or pair or not tuning.LightLooks[look] then
 		return 1
 	end
-	return math.max(1, tuning.HandsMax)
+	return math.max(1, tuning.HandsMax) + math.max(0, math.floor(extra or 0))
 end
 
 -- Why handsMax said 0, for the player.

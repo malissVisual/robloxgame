@@ -1108,6 +1108,7 @@ refs.moreCtx = function(wide: boolean): any
 		xp = myXp(),
 		level = myLevel(),
 		cars = if state and type(state.cars) == "table" then state.cars else {},
+		skills = if state and type(state.skills) == "table" then state.skills else {}, -- 6.20: CAREER's SKILLS tab
 		toGo = CareerUi.toGo,
 		onCareer = Phone.onCareer,
 		money = money(),
@@ -1259,6 +1260,8 @@ refreshBadges = function()
 	local info = Phone.missionInfo and Phone.missionInfo() -- 6.12.5: a chapter newly open: NEW on MISSIONS
 	set("missions", 0, if info and info.new then "NEW" else nil)
 	set("more", crewInvites) -- (6.5 review: MORE → CREW has your invitations)
+	-- 6.20: CAREER (in MORE) counts the free skill points (home's level chip shows a dot: client/PhoneHome.luau header)
+	set("career", require(Shared.Skills).free(if state and type(state.skills) == "table" then state.skills else {}, myLevel()))
 	set("garage", 0, if refs.apps.towDue() then "!" else nil) -- 5.5: the tank ran dry: TOW
 	local dot = refs.buttonDot
 	if dot then

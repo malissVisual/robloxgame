@@ -102,20 +102,26 @@ export type Ctx = {
 type Item = ShopView.Item
 
 -- The bag in use and what you carry on foot (Transport: the hands + ONE bag).
-local function myBag(state: any): (Config.KitDef?, number)
+-- 6.20: + Strong Back's pieces (Config.Skills: the state's skills), a bag's only with a bag. Returns the bag, the room
+-- and the hands' part of it.
+local function myBag(state: any): (Config.KitDef?, number, number)
 	local kit = if type(state) == "table" and type(state.kit) == "table" then state.kit else {}
 	local inUse = if type(state) == "table" and type(state.bag) == "string" then state.bag else nil
-	return Transport.activeBag(kit, inUse), Transport.handsRoom(kit, inUse)
+	local Skills = require(Shared.Skills)
+	local ranks = if type(state) == "table" and type(state.skills) == "table" then state.skills else {}
+	local active = Transport.activeBag(kit, inUse)
+	local hands = Config.Cargo.HandsMax + Skills.effect(ranks, "hands")
+	return active, Transport.handsRoom(kit, inUse) + Skills.effect(ranks, "hands") + (if active then Skills.effect(ranks, "bag") else 0), hands
 end
 
 -- The hero: your bag (see the header).
 local function bagHero(state: any, job: any): Item
-	local active, room = myBag(state)
+	local active, room, hands = myBag(state)
 	local picture: CardKit.Picture = if active then { icon = Icons.kit(active.id), emoji = active.icon } else { emoji = "✋" }
 	local name = if active then active.name else "Your hands"
 	if type(job) ~= "table" then
-		return { id = "yourbag", name = name, picture = picture, value = tostring(room), valueColor = C.money, fact = `LIGHT PIECES ON FOOT · ✋ {Config.Cargo.HandsMax} + 🛍 {room - Config.Cargo.HandsMax}`, current = true,
-			lines = { "On foot you carry light things: two in your hands, the rest in your bag (the one IN USE). On a bike, its own bag takes pickups too." } }
+		return { id = "yourbag", name = name, picture = picture, value = tostring(room), valueColor = C.money, fact = `LIGHT PIECES ON FOOT · ✋ {hands} + 🛍 {room - hands}`, current = true,
+			lines = { `On foot you carry light things: {hands} in your hands, the rest in your bag (the one IN USE). On a bike, its own bag takes pickups too.` } }
 	end
 	local carried = if type(job.carried) == "table" then job.carried else {}
 	local mode = if type(job.mode) == "string" then job.mode else "car"
@@ -133,7 +139,7 @@ local function bagHero(state: any, job: any): Item
 	end
 	local parts: { string } = {}
 	local have, total = 0, 0
-	for _, place in Bag.places(mode, packRoom, rack, math.max(bagRoom, count.bag)) do
+	for _, place in Bag.places(mode, packRoom, rack, math.max(bagRoom, count.bag), hands) do
 		if place.where == "hands" or place.room > 0 or count[place.where] > 0 then
 			local roomHere = math.max(place.room, count[place.where])
 			table.insert(parts, `{Bag.Marks[place.where]} {count[place.where]}/{roomHere}`)

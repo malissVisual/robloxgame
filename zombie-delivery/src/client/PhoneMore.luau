@@ -4,6 +4,8 @@
 --   * CAREER (the phone's): the NEXT LEVEL is the hero (the rank and the level on the ribbon, "NEXT: LEVEL 6", the XP to
 --     go big in gold, about how much work that is and its reward on one line, the XP bar, FULL CAREER [C] the one
 --     button); the road after it as the kit's rows (the level's number, what it unlocks, its reward money, 🔒 LV n).
+--     6.20: two tabs on top, ROAD (the above) and SKILLS ("SKILLS · 2" with free points; client/SkillsView.luau: the
+--     skill points, RESET · FREE, the three branches, a skill's details with +1 POINT).
 --   * BANK: the cash is the hero (AVAILABLE CASH, the money big in green, FIND A DELIVERY), what you earned since you
 --     joined a row (its money big).
 --   * MESSAGES: a row a message, the newest first (the sender's initial on its colour, "MARGE · 21:04", the message's
@@ -24,6 +26,7 @@ local Theme = require(script.Parent.Theme)
 local OrdersUi = require(script.Parent.OrdersUi)
 local PhoneContract = require(script.Parent.PhoneContract)
 local CardKit = require(script.Parent.CardKit)
+local SkillsView = require(script.Parent.SkillsView) -- 6.20: CAREER's SKILLS tab
 
 local K = Theme.Contract
 local KIT = Config.UiKit
@@ -41,6 +44,7 @@ export type Ctx = {
 	level: number?,
 	cars: { [string]: boolean }?,
 	toGo: ((xpLeft: number, level: number) -> string)?, -- CareerUi.toGo
+	skills: { [string]: number }?, -- 6.20: the skills' ranks (the state's)
 	onCareer: (() -> ())?, -- FULL CAREER: the window (Phone.onCareer)
 	-- BANK
 	money: number?,
@@ -60,6 +64,8 @@ export type Ctx = {
 
 -- MESSAGES' sub-view: the message open whole (its index), nil the list.
 PhoneMore.open = nil :: number?
+-- 6.20: CAREER's tab: "road" or "skills".
+PhoneMore.careerTab = "road"
 
 -- An app glyph as a picture (client/PhoneContract.luau).
 local function glyph(id: string): CardKit.Picture
@@ -80,6 +86,19 @@ end
 function PhoneMore.career(list: Instance, _look: OrdersUi.Kit, ctx: Ctx)
 	local xp = ctx.xp or 0
 	local level = ctx.level or 1
+	-- 6.20: the ROAD / SKILLS tabs (the free points on SKILLS' chip)
+	local free = SkillsView.free(ctx.skills, level)
+	CardKit.tabList(list, { { id = "road", text = "ROAD" }, { id = "skills", text = if free > 0 then `SKILLS · {free}` else "SKILLS" } }, function(id: string)
+		if id ~= PhoneMore.careerTab then
+			PhoneMore.careerTab = id
+			SkillsView.open = nil
+			ctx.redraw()
+		end
+	end, PhoneMore.careerTab)
+	if PhoneMore.careerTab == "skills" then
+		SkillsView.draw(list, { wide = ctx.wide, level = level, skills = ctx.skills or {}, heroHeight = math.min(CardKit.Layout.heroHeight(ctx.room), 200), redraw = ctx.redraw }, 1)
+		return
+	end
 	local road = Career.road()
 	local owned = ctx.cars or {}
 	local nextStep = road[level + 1]

@@ -362,8 +362,7 @@ local function shoot(b: Bandit, targetPosition: Vector3, targetVelocity: Vector3
 	if rng:NextNumber() < chance then
 		tracer:FireAllClients(from, aim, color, 0)
 		if car then
-			Vehicles.damage(car, Tuning.ShotDamage, "The bandits shot your car to pieces!")
-			BanditCars.onCarDamaged(car.owner, Tuning.ShotDamage)
+			BanditCars.onCarDamaged(car.owner, Vehicles.damage(car, Tuning.ShotDamage, "The bandits shot your car to pieces!")) -- (6.20: after Tough Body)
 		elseif humanoid then
 			Armour.hurt(humanoid, Tuning.ShotDamage)
 		end
@@ -483,8 +482,8 @@ local function drive(b: Bandit, dt: number, now: number)
 		relative = math.min(relative, Vehicles.ramSpeed(playerCar) + flat(chassis.AssemblyLinearVelocity).Magnitude)
 		if wanted and playerCar.owner == b.target and now >= b.nextSwipe then
 			b.nextSwipe = now + 1.2
-			Vehicles.damage(playerCar, Tuning.SwipeDamage, "The bandits rammed your car to pieces!")
-			BanditCars.onCarDamaged(playerCar.owner, Tuning.SwipeDamage)
+			-- (6.20: "crash": ★ Stuntman takes half; what it really took is told)
+			BanditCars.onCarDamaged(playerCar.owner, Vehicles.damage(playerCar, Tuning.SwipeDamage, "The bandits rammed your car to pieces!", "crash"))
 		end
 		if relative > 25 and now >= b.nextRammed then
 			b.nextRammed = now + 0.6

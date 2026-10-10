@@ -205,8 +205,10 @@ local function onFire(player: Player, target: any, aimed: any)
 		end
 		return
 	end
+	-- 6.20: Steady Hand (Config.Skills) narrows a hand gun's spread (the hand, out of a window; never the roof gun)
+	local spread = if mode == "cargun" then stats.spread else stats.spread * math.max(0, 1 - require(script.Parent.Skills).effect(player, "spread"))
 	for _ = 1, stats.pellets do
-		local dir = spreadDirection(direction, stats.spread)
+		local dir = spreadDirection(direction, spread)
 		-- 3.1: a piercing round (WeaponDef.pierce) goes on through that many more enemies, each taking the full
 		-- damage; it stops at anything else (a wall, the ground) and the tracer ends at its last hit, else the range.
 		local rayParams = params

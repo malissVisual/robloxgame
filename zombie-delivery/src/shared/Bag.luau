@@ -19,7 +19,7 @@
 --   Bag.line(carried)                    the HUD's chip: "📦 2 newspapers · 1 pizza stack" (nil when you carry nothing)
 --   Bag.groups(carried, mode)            the pieces by where they are (hands, bag, the bike, the satchel, vehicle),
 --                                        for BagUi
---   Bag.places(mode, packRoom, rack, bagRoom)  6.0.1: the room by place for the bottom bar: the hands
+--   Bag.places(mode, packRoom, rack, bagRoom, hands?)  6.0.1: the room by place for the bottom bar: the hands
 --                                        (Config.Cargo.HandsMax), the bag (`bagRoom`), the bike's bag (`rack`) and a
 --                                        round's satchel (what `packRoom` holds over those; a car run: the hands only)
 --   Bag.strip(carried, places, focus, max)  6.0.1: the strip's tiles: per place its pieces, then its free room; a
@@ -147,9 +147,10 @@ local PLACES = { "hands", "bag", "rack", "pack" }
 
 -- The room by place, in the order hands, bag, the bike's bag, the satchel. `packRoom` is the room over the hands (the
 -- payload's packRoom / the PackRoom attribute: the bag's, the bike's bag and a round's satchel), `rack` the bike's part
--- of it, `bagRoom` the bag's part. A car run: the hands only.
-function Bag.places(mode: string, packRoom: number, rack: number, bagRoom: number): { Place }
-	local hands = Config.Cargo.HandsMax
+-- of it, `bagRoom` the bag's part. A car run: the hands only. 6.20: `handsRoom` the hands' room (Strong Back's extra,
+-- Config.Skills; nil = Config.Cargo.HandsMax).
+function Bag.places(mode: string, packRoom: number, rack: number, bagRoom: number, handsRoom: number?): { Place }
+	local hands = handsRoom or Config.Cargo.HandsMax
 	if mode == "car" then
 		return { { where = "hands", room = hands }, { where = "bag", room = 0 }, { where = "rack", room = 0 }, { where = "pack", room = 0 } }
 	end

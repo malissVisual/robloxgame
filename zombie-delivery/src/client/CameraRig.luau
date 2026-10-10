@@ -531,7 +531,7 @@ local function update(dt: number)
 	if not car and not busy then
 		local target = if wantAim then AIM_WALK_SPEED
 			elseif handsFull then carrySpeed(character)
-			elseif sprinting then SPRINT_SPEED
+			elseif sprinting then SPRINT_SPEED * Stamina.sprintBoost() -- (6.20: Light Step)
 			else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
@@ -680,7 +680,7 @@ local function touchSpeed()
 			written = nil
 			return
 		end
-		local target = if handsFull then carrySpeed(character) elseif sprinting then SPRINT_SPEED else WALK_SPEED
+		local target = if handsFull then carrySpeed(character) elseif sprinting then SPRINT_SPEED * Stamina.sprintBoost() else WALK_SPEED -- (6.20: Light Step)
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
 		local walk = speed * adminSpeed()
