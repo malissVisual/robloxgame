@@ -30,6 +30,11 @@
 --            +10%", "🤝 3/5 TO BRONZE").
 --            6.15: while a live event pays (rush hour, the Blood Moon) its strip heads the jobs ("🕑 RUSH HOUR · ×1.5
 --            pay · 3:12", its clock ticking: shared/LiveEvents.luau, SpecialOrderUi.countdown).
+--            6.17 (the owner: "when I open JOBS I want to leave, it doesn't make me want to click a job"; redesign B):
+--            the list is client/JobsView.luau's: the top bar's chips (YOUR RUN, NEXT UP: the cards above as its
+--            sub-views; rush hour), the HERO card (the best job right now: shared/JobPick.luau) and compact rows (the
+--            picture, the danger, the business, the distance and time, the pay, "+"). The card above is a job's
+--            details (a tap on a row or the hero's ⓘ); every action keeps its path (act: AcceptJob, JobQueue).
 --   BAG      your bag (client/BagUi.luau's render) in the phone.
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
@@ -62,6 +67,7 @@ local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN, NEXT UP's words
 local JobThumbUi = require(script.Parent.JobThumbUi) -- 6.12.11: the job pictures
 local SpecialOrderUi = require(script.Parent.SpecialOrderUi) -- 6.14: the golden and the regulars' orders
 local RegularsApp = require(script.Parent.RegularsApp) -- 6.14: your tier with a job's business
+local JobsView = require(script.Parent.JobsView) -- 6.17: the JOBS app at a glance (hero + rows)
 
 local K = Theme.Contract
 local PhoneApps = {}
@@ -80,6 +86,8 @@ export type Host = {
 	fullBoard: () -> (),
 	transport: () -> string,
 	gps: (shopId: string) -> (), -- 6.5: the GPS to one of Map.Shops
+	bar: () -> (any, number), -- 6.17: the popup header's strip and its width (PhonePopup.bar), nil while closed
+	room: () -> number, -- 6.17: what shows of the popup's body without scrolling (PhonePopup.room)
 }
 
 local player = Players.LocalPlayer
@@ -126,14 +134,12 @@ function PhoneApps.towDue(): boolean
 end
 
 local function fullBoardLabel(): string
-	return if Ui.touchLayout() then "FULL BOARD" else "FULL BOARD  [J]"
+	return "FULL BOARD" -- (6.17: J opens JOBS now; the old Dispatch board, its REROLL and car card, stays here)
 end
 
 -- ── BOARD ──────────────────────────────────────────────────────────────────
 
 local askedAt = 0
-
-type Tier = { stars: number, name: string, list: { any } }
 
 local function ask()
 	local now = os.clock()
@@ -161,11 +167,45 @@ local function lockOf(offer: any): (string?, string?)
 	return nil, nil
 end
 
+-- 6.17: a job's one action (the old card's button, the JOBS app's hero button and its rows' "+"): locked, why; off
+-- duty ACCEPT (AcceptJob, then ORDERS); on a run + ADD (AcceptJob: it joins the run), + QUEUE (JobQueue "queue": it
+-- waits in NEXT UP) or why neither. A job taken or queued leaves the phone's board until the board comes back.
+local function act(offer: any, host: Host)
+	local label, why = lockOf(offer)
+	local onDuty = type(host.job()) == "table"
+	local waits = onDuty and offer.queue == true -- (6.12.8: a job waiting for your car or bike may still queue)
+	local function unlist()
+		local list = host.board()
+		local spot = if list then table.find(list, offer) else nil
+		if list and spot then
+			table.remove(list, spot)
+		end
+	end
+	if label and not waits then
+		host.notify(why or "Not this one yet.")
+	elseif not onDuty or offer.addOrder == true then
+		Net.get("AcceptJob"):FireServer(offer.index)
+		unlist()
+		if onDuty then
+			host.redraw()
+		else
+			host.go("orders")
+		end
+	elseif waits then
+		Net.get("JobQueue"):FireServer("queue", offer.index)
+		unlist()
+		host.redraw()
+	else
+		host.notify(if type(offer.queueText) == "string" then offer.queueText elseif type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first.")
+	end
+end
+
 -- One offer as a card: the cargo → the customer and the pay (6.12.8: big, the first thing you read), the pickup → the
 -- address, chips (how it travels or its stars, the distance, the time, its trade-off), the one action: off duty
--- ACCEPT; on a run + ADD (it joins the run), + QUEUE (it waits in NEXT UP) or why neither.
+-- ACCEPT; on a run + ADD (it joins the run), + QUEUE (it waits in NEXT UP) or why neither. 6.17: the JOBS app's
+-- details of a job (client/JobsView.luau).
 local function offerCard(parent: Instance, offer: any, order: number, look: OrdersUi.Kit, host: Host)
-	local label, why = lockOf(offer)
+	local label = lockOf(offer)
 	local job = host.job()
 	local onDuty = type(job) == "table"
 	local waits = onDuty and offer.queue == true -- (6.12.8: a job waiting for your car or bike may still queue)
@@ -213,44 +253,20 @@ local function offerCard(parent: Instance, offer: any, order: number, look: Orde
 	if night and night > 1 then
 		look.chip(chips, string.format("Night ×%.1f", night))
 	end
-	-- It leaves the board on the server once taken or queued: not shown again before the board comes back.
-	local function unlist()
-		local list = host.board()
-		local spot = if list then table.find(list, offer) else nil
-		if list and spot then
-			table.remove(list, spot)
-		end
-	end
-	local function take()
-		Net.get("AcceptJob"):FireServer(offer.index)
-		unlist()
-		if onDuty then
-			host.redraw()
-		else
-			host.go("orders")
-		end
-	end
+	local button, kind = "ACCEPT", "main"
 	if label and not waits then
-		look.button(b, label, "off", 4, function()
-			host.notify(why or "Not this one yet.")
-		end)
-	elseif not onDuty then
-		look.button(b, "ACCEPT", "main", 4, take)
-	elseif offer.addOrder == true then
-		look.button(b, "+ ADD", "main", 4, take)
+		button, kind = label, "off"
+	elseif onDuty and offer.addOrder == true then
+		button = "+ ADD"
 	elseif waits then
-		look.button(b, "+ QUEUE", "main", 4, function()
-			Net.get("JobQueue"):FireServer("queue", offer.index)
-			unlist()
-			host.redraw()
-		end)
-	else
-		local button = if type(offer.queueButton) == "string" then offer.queueButton elseif type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN"
-		local text = if type(offer.queueText) == "string" then offer.queueText elseif type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first."
-		look.button(b, button, "off", 4, function()
-			host.notify(text)
-		end)
+		button = "+ QUEUE"
+	elseif onDuty then
+		button = if type(offer.queueButton) == "string" then offer.queueButton elseif type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN"
+		kind = "off"
 	end
+	look.button(b, button, kind, 4, function()
+		act(offer, host)
+	end)
 end
 
 -- 6.12.8, YOUR RUN: the open orders of your run, one line each (what, from → to · its pay and its clock, ticked by
@@ -374,125 +390,33 @@ function PhoneApps.nextUp(list: Instance, look: OrdersUi.Kit, host: Host, order:
 	return order + 2
 end
 
+-- 6.17: JOBS opens on its list (Phone: a tap on JOBS, Phone.open("board")).
+function PhoneApps.boardHome()
+	JobsView.home()
+end
+
+-- The JOBS app: 6.17's hero card and compact rows (client/JobsView.luau), the old card as a job's details, YOUR RUN and
+-- NEXT UP behind the top bar's chips. No offers yet, or old ones: it asks for the board.
 function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
-	local offers, info, refreshAt = host.board()
+	local offers, _, refreshAt = host.board()
 	if offers == nil or (refreshAt ~= nil and workspace:GetServerTimeNow() >= refreshAt) then
 		ask()
 	end
-	-- 6.12.8: YOUR RUN and NEXT UP on top (each draws nothing without a run / a queue).
-	local top = PhoneApps.nextUp(list, look, host, PhoneApps.runCard(list, look, host, 0))
-	if offers == nil then
-		look.emptyState(list, "📋", "Calling the dispatcher...", "The board comes in a moment.", top + 1)
-		look.button(list, fullBoardLabel(), "quiet", top + 2, host.fullBoard)
-		return
-	end
-	local walks: { any } = {}
-	local rides: { any } = {}
-	local tiers: { Tier } = {}
-	local byStars: { [number]: Tier } = {}
-	local specials: { any } = {} -- 6.14: a golden or a regular's order (their own section, on top)
-	for _, offer in offers do
-		if type(offer) ~= "table" then
-			continue
-		end
-		if type(offer.specialOrder) == "table" then
-			table.insert(specials, offer)
-		elseif offer.mode == "foot" then
-			table.insert(walks, offer)
-		elseif offer.mode == "bike" then
-			table.insert(rides, offer)
-		else
-			local stars = tonumber(offer.stars) or 1
-			local known = byStars[stars]
-			local group = known or { stars = stars, name = tostring(offer.tierName or "Jobs"), list = {} }
-			if known == nil then
-				byStars[stars] = group
-				table.insert(tiers, group)
-			end
-			table.insert(group.list, offer)
-		end
-	end
-	local count = #walks + #rides + #specials
-	for _, entry in tiers do
-		count += #entry.list
-	end
-	local fresh = if refreshAt then math.max(0, refreshAt - workspace:GetServerTimeNow()) else nil
-	look.section(list, `{count} {if count == 1 then "job" else "jobs"} on the board{if fresh then ` · new ones in {Ui.clock(fresh)}` else ""}`, top + 1)
-	local order = top + 1
-	-- 6.15: a live event that pays heads the jobs ("🕑 RUSH HOUR · ×1.5 pay · 3:12", its clock ticking; the state is the
-	-- workspace attributes server/LiveEvents.luau keeps, shared/LiveEvents.luau's words)
-	do
-		local live = require(Shared.LiveEvents)
-		local id = workspace:GetAttribute(live.Attr.Id)
-		local prefix = live.boardPrefix(if type(id) == "string" then id else nil)
-		if prefix then
-			order += 1
-			local color = live.color(id)
-			SpecialOrderUi.countdown(look.meta(list, prefix, order, Color3.fromRGB(color[1], color[2], color[3])), workspace:GetAttribute(live.Attr.Ends), prefix)
-		end
-	end
-	-- 6.12.8: ADD ALL · $total: every job it can (the server's plan: into the run, then NEXT UP) and what it will do.
-	local plan = if type(info) == "table" and type(info.addAll) == "table" then info.addAll else nil
-	if plan and (tonumber(plan.count) or 0) > 0 then
-		order += 1
-		local all = look.button(list, `ADD ALL · {Ui.money(tonumber(plan.total) or 0)}`, "main", order, function()
-			Net.get("JobQueue"):FireServer("addAll")
-		end)
-		all.Name = "AddAll"
-		local parts: { string } = {}
-		local started, added, queued = tonumber(plan.started) or 0, tonumber(plan.added) or 0, tonumber(plan.queued) or 0
-		if started > 0 then
-			table.insert(parts, "the first one starts")
-		end
-		if added > 0 then
-			table.insert(parts, `{added} {if added == 1 then "joins" else "join"} your run`)
-		end
-		if queued > 0 then
-			table.insert(parts, `{queued} wait in NEXT UP`)
-		end
-		order += 1
-		local total = tonumber(plan.count) or 0
-		look.meta(list, `{total} {if total == 1 then "job" else "jobs"}: {table.concat(parts, ", ")}.`, order)
-	end
-	local footNote = if type(info) == "table" and type(info.footNote) == "string" then info.footNote else nil
-	local two = wide == true
-	local function group(title: string, items: { any }, note: string?)
-		order += 1
-		look.section(list, title, order)
-		if note then
-			order += 1
-			look.meta(list, note, order, if #items == 0 then K.red else K.secondary)
-		end
-		order += 1
-		local left, right = PhoneApps.columns(list, order, two)
-		for index, offer in items do
-			order += 1
-			local column = if index % 2 == 1 then left else right
-			local ok, err = pcall(function()
-				offerCard(column, offer, order, look, host)
-			end)
-			if not ok then
-				warn(`[PhoneApps] a board card failed: {err}`)
-			end
-		end
-	end
-	if #specials > 0 then
-		group(`★ Special orders · {#specials}`, specials) -- 6.14
-	end
-	if #walks > 0 or footNote then
-		group(`On foot · {#walks}`, walks, footNote)
-	end
-	if #rides > 0 then
-		group(`Bike · {#rides}`, rides)
-	end
-	for _, entry in tiers do
-		group(`{string.rep("★", math.max(1, entry.stars))} {entry.name} · {#entry.list}`, entry.list)
-	end
-	if count == 0 and not footNote then
-		order += 1
-		look.emptyState(list, "📋", "No jobs right now", "New ones come soon.", order)
-	end
-	look.button(list, fullBoardLabel(), "quiet", order + 1, host.fullBoard)
+	JobsView.draw(list, look, host, wide == true, {
+		card = function(parent: Instance, offer: any, order: number)
+			offerCard(parent, offer, order, look, host)
+		end,
+		run = function(into: Instance, order: number): number
+			return PhoneApps.runCard(into, look, host, order)
+		end,
+		nextUp = function(into: Instance, order: number): number
+			return PhoneApps.nextUp(into, look, host, order)
+		end,
+		act = function(offer: any)
+			act(offer, host)
+		end,
+		why = lockOf,
+	}, fullBoardLabel())
 end
 
 -- ── BAG ────────────────────────────────────────────────────────────────────

@@ -49,6 +49,9 @@
 --   you earn for ("Earn for the Old Van · $1,160 to go"; 6.15: while a live event pays, "🌕 BLOOD MOON · jobs pay ×2"
 --   in amber first, shared/LiveEvents.luau workLine). TASKS and MISSIONS join the smaller tiles (their lines, bars
 --   and badges as before).
+-- 6.17, JOBS at a glance (client/JobsView.luau): the app is titled JOBS; its chips (YOUR RUN, NEXT UP, rush hour) sit
+--   in the popup's header (PhonePopup.bar, host.bar / host.room); a tap on JOBS opens it on its list
+--   (PhoneApps.boardHome); Phone.showing() names the open app (Main: J closes JOBS again).
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -1026,6 +1029,7 @@ local function launch(id: string, from: GuiObject?)
 	end
 	if id == "board" then
 		boardNew = 0
+		refs.apps.boardHome() -- 6.17: JOBS opens on its list (not on a job's details, YOUR RUN or NEXT UP)
 		refreshBadges()
 	end
 	-- MAP and the MENU's windows (5.5): the phone closes, their window opens.
@@ -1580,7 +1584,7 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
-local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS", ready = "READY CHECK" }
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOBS", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS", ready = "READY CHECK" }
 
 -- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
 renderApp = function()
@@ -1866,6 +1870,11 @@ function Phone.back()
 	end
 end
 
+-- 6.17: the app open in the popup, nil for none (Main: J closes JOBS while it shows).
+function Phone.showing(): string?
+	return if isOpen and refs.popup.isOpen() then app else nil
+end
+
 -- 5.5: does the player have the phone (Marge gave it)? The HUD's MENU opens it then (Main: Hud.onMenu).
 function Phone.has(): boolean
 	return hasPhone()
@@ -1984,6 +1993,9 @@ openPhone = function(startApp: string?)
 	body.AnchorPoint = Vector2.new(1, 1)
 	local rest, hidden = restPosition()
 	app = startApp or "home"
+	if app == "board" then
+		refs.apps.boardHome() -- 6.17: on its list
+	end
 	if not isOpen then
 		Net.get("PhoneHold"):FireServer(true) -- (5.0: everybody sees it in your hand while you are on foot: server/KitWear.luau)
 	end
@@ -2313,6 +2325,12 @@ function Phone.start()
 		end,
 		transport = transportText,
 		gps = gpsTo, -- 6.5: SHOP's list of the shops
+		bar = function(): (any, number)
+			return refs.popup.bar() -- 6.17: the JOBS app's chips in the popup's header (and its width)
+		end,
+		room = function(): number
+			return refs.popup.room() -- 6.17: the hero card's height
+		end,
 	}
 	buildButton(made)
 	buildBody()

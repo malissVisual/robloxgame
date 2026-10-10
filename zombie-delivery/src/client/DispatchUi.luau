@@ -2,6 +2,8 @@
 -- The Dispatch board: the job board as a charcoal window of delivery briefings (3.8, the contract UI,
 -- design/ui-contract/; it replaced 3.6's die-cut tickets). J, the JOBS menu entry, the depot counter and the result
 -- window's NEXT JOB open it (Main sets Hud.onJobs = DispatchUi.open; another window opening closes it).
+-- 6.17: once Marge gave the phone, J, the depot counter and NEXT JOB open the phone's JOBS instead (client/JobsView.luau:
+-- the hero card and compact rows; Main's openJobs); this board stays behind JOBS' FULL BOARD (REROLL, the car card).
 --
 --   * Opening asks the server for the board (RequestOffers): it sends the current offers, sorted ★ → ★★★★, and when
 --     the next ones come (Offers → DispatchUi.setOffers(list, refreshAt), wired in Main; "Calling the dispatcher..."

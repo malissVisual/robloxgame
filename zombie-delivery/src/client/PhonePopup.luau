@@ -16,6 +16,9 @@
 --   PhonePopup.panel()   the open panel (a banner drops in it), PhonePopup.focus()   gamepad focus on its first action.
 --   PhonePopup.refit() -> boolean   the screen resized: fits the panel again; true when `wide` changed.
 --   PhonePopup.onClose   set by Phone: the ✕ or the backdrop was pressed.
+--   6.17: PhonePopup.bar() -> (Frame?, width)   a strip in the header right of the title, emptied with the body on
+--       every show (the JOBS app's chips: client/JobsView.luau), and its width; PhonePopup.room() -> number   the body's height (px at its
+--       scale) inside its padding: what shows without scrolling.
 -- Presentation only.
 
 local Lighting = game:GetService("Lighting")
@@ -53,9 +56,20 @@ type Shown = {
 	close: any,
 	body: any,
 	blur: any,
+	bar: any, -- 6.17
 }
 
 local shown: Shown? = nil
+local BODY_PAD = 12 + 24 -- the body's padding, top and bottom (6.17: PhonePopup.room)
+
+-- 6.17: the header's strip starts after the title (its words about 14 px a letter at 20 px caps) and ends before ✕.
+local function placeBar(bar: any, heading: any, title: string)
+	local titleX = heading.title.Position.X.Offset
+	local left = 24 + titleX + (utf8.len(title) or #title) * 14 + 14
+	bar.Position = UDim2.new(0, left, 0.5, 0)
+	bar.Size = UDim2.new(1, -(left + 72), 0, 30)
+	bar:SetAttribute("Left", left + 72)
+end
 local gui: ScreenGui? = nil
 
 -- The popup's ScreenGui (over the phone and the HUD, with the windows).
@@ -160,6 +174,8 @@ local function build(id: string, title: string, from: Vector2?): Shown
 	local heading = Ui.heading(header, title, { glyph = id, textSize = 20, height = 30 })
 	heading.frame.Size = UDim2.new(1, -(24 + 64), 0, 30)
 	heading.frame.Position = UDim2.fromOffset(24, (headerH - 30) / 2)
+	local bar = Ui.make("Frame", { Name = "HeaderBar", AnchorPoint = Vector2.new(0, 0.5), BackgroundTransparency = 1, ZIndex = 3 }, header)
+	placeBar(bar, heading, title)
 	local close = Ui.closeButton(header, requestClose)
 	close.AnchorPoint = Vector2.new(1, 0.5)
 	close.Position = UDim2.new(1, -16, 0, headerH / 2)
@@ -197,6 +213,7 @@ local function build(id: string, title: string, from: Vector2?): Shown
 		close = close,
 		body = body,
 		blur = blur,
+		bar = bar,
 	}
 end
 
@@ -244,7 +261,9 @@ function PhonePopup.show(id: string, title: string, from: Vector2?): (ScrollingF
 		open.id = id
 		open.heading.title.Text = title
 		Ui.glyph(open.heading.glyph, id)
+		placeBar(open.bar, open.heading, title)
 	end
+	Ui.clear(open.bar)
 	Ui.clear(open.body)
 	open.body.CanvasPosition = Vector2.zero
 	return open.body, open.wide
@@ -285,6 +304,20 @@ end
 function PhonePopup.panel(): GuiObject?
 	local open = shown
 	return if open then open.panel else nil
+end
+
+-- 6.17: the header's strip for the open app (nil when closed) and its width (px at the panel's scale). See the header.
+function PhonePopup.bar(): (Frame?, number)
+	local open = shown
+	if not open then
+		return nil, 0
+	end
+	return open.bar, layout().width - (tonumber(open.bar:GetAttribute("Left")) or 0)
+end
+
+-- 6.17: what shows of the body without scrolling (px at the panel's scale).
+function PhonePopup.room(): number
+	return layout().height - PhonePopup.HEADER - BODY_PAD
 end
 
 -- The gamepad's selection on the app's first action (by layout order), else on the ✕.
