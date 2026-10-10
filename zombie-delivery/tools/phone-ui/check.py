@@ -5,6 +5,7 @@ This checks callbacks, construction, current server data, resizing and cleanup, 
 6.14: ReadyCheck (NEXT MISSION, the READY CHECK), Gps and SavingsLine (the HUD's savings line) run for real too.
 6.18 wave 2: ShopView (the kit's list screens) and BagUi (BAG & ITEMS) run for real too.
 6.18 wave 2: PhoneMore (CAREER, BANK, MESSAGES, SETTINGS in the UI kit) runs for real; the MISSIONS window with CardKit.
+6.21: the bottom bar (Hotbar) runs for real too (hotbar.luau: a computer's bar and a touch screen's).
 """
 import argparse
 from pathlib import Path
@@ -25,6 +26,7 @@ with tempfile.TemporaryDirectory() as folder:
 local game, workspace, task = mock.game, mock.workspace, mock.task
 local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
 local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
     for name in ("Phone", "PhoneContract", "PhoneLayout", "PhoneRoute", "PhoneApps", "PhoneMotion", "PhonePopup", "OrdersUi", "TasksApp", "StyleApp", "JobThumbUi", "JobsView", "CardKit", "PhoneHome", "RegularsApp", "SpecialOrderUi", "ReadyCheck", "Gps", "SavingsLine", "ShopView", "BagUi", "PhoneMore", "SkillsView"):
         text = (ROOT / f"src/client/{name}.luau").read_text()
@@ -33,9 +35,16 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
     for name in ("Ui", "Theme", "Net", "MapView", "KitShop", "CareerUi", "Sounds", "Discovery", "Hotbar", "StylePreview"):
         (dest / f"{name}.luau").write_text(f'return require("./mock").{name}')
     (dest / "HudContract.luau").write_text('return require("./mock").P')
-    for name in ("mock.luau", "check.luau"):
+    (dest / "Holster.luau").write_text('return require("./mock").Holster')  # 6.21: what is in your hand
+    # 6.21: the bottom bar (client/Hotbar.luau) for real, twice: a computer's (HotbarLive) and a touch screen's
+    # (HotbarTouch: it reads Ui.touchLayout when it loads); hotbar.luau drives them. The phone checks keep mock.Hotbar.
+    text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (ROOT / "src/client/Hotbar.luau").read_text())
+    for name in ("HotbarLive", "HotbarTouch"):
+        (dest / f"{name}.luau").write_text(prefix + text)
+    for name in ("mock.luau", "check.luau", "hotbar.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "check.luau"], cwd=dest, check=True)
+    subprocess.run([args.luau, "hotbar.luau"], cwd=dest, check=True)
 
 # 6.8: the MISSIONS window (client/MissionsUi.luau with client/MissionsLayout.luau and client/Portrait.luau, the real
 # shared data) against missions_mock.luau's fuller stand-ins: the clients, the chapter, START, the locks, a replay,

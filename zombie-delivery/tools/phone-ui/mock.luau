@@ -8,6 +8,11 @@ local function signal()
 		table.insert(self.connections,connection)
 		return connection
 	end
+	function s:Once(fn) -- (6.21: the bottom bar's cooldown tween)
+		local connection
+		connection=self:Connect(function(...) connection:Disconnect();fn(...) end)
+		return connection
+	end
 	function s:Fire(...)
 		for _, c in table.clone(self.connections) do if c.Connected then c.fn(...) end end
 	end
@@ -181,6 +186,21 @@ function M.P.button(parent,value,size,kind,fn)
 end
 function M.P.dot(parent,props) return M.Ui.label(parent,"",M.UDim2.fromOffset(14,14),props) end
 function M.P.tag(parent,value) return M.Ui.label(parent,value,M.UDim2.fromOffset(100,20)) end
+-- 6.21: an icon (no uploaded ids here: the emoji as a label, like Ui.icon without its picture), the bottom bar's colours
+-- (HudContract), the bag's fill ring's gradient and what is in your hand (client/Holster.luau, recorded).
+function M.Ui.icon(parent,iconName,fallback,size,props)
+	local made=M.make("TextLabel",{Name="Icon",Text=fallback,Size=size,BackgroundTransparency=1},parent)
+	for key,value in props or {} do if string.sub(key,1,5)~="Image" then made[key]=value end end
+	return made
+end
+for key,value in {ink={242,242,240},ink2={196,199,203},line={133,139,147},red={215,74,70},good={126,196,120},warn={228,170,82},surface={20,23,28},raised={32,36,42}} do
+	M.P[key]=M.Color3.fromRGB(unpack(value))
+end
+M.NumberSequence={new=function(points) return {Keypoints=points} end}
+M.NumberSequenceKeypoint={new=function(time,value) return {Time=time,Value=value} end}
+M.hand="fists"
+M.chosen={}
+M.Holster={hand=function() return M.hand end,choose=function(hand) table.insert(M.chosen,hand) end}
 M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapOpen=not M.mapOpen end,setWaypoint=function(at) M.waypoint=at end}
 -- 6.12, the clerks: where the local character stands (STYLE's BUY only at a shop that sells the look; the GPS above)
 function M.stand(x,z) M.root.Position=M.Vector3.new(x,0,z) end

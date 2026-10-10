@@ -61,6 +61,10 @@ export type Item = {
 	more: { Act }?,
 	lines: { string }?,
 	ribbon: string?,
+	ribbonFace: Color3?, -- 6.21: the ribbon's own colours (BAG & ITEMS' blue YOUR BAG)
+	ribbonInk: Color3?,
+	strong: boolean?, -- 6.21: the hero's frame drawn strong in its accent
+	bar: { share: number, color: Color3 }?, -- 6.21: a bar on the hero (BAG & ITEMS' fill)
 	rowName: string?, -- the row's name (default Item_<id>)
 	actionName: string?, -- its round action's name (default Add)
 	decorate: ((row: any) -> ())?,
@@ -229,7 +233,7 @@ local function heroCard(parent: Instance, screen: Screen, item: Item, height: nu
 		name = if inside then "ItemHero" else (screen.heroName or "Hero"),
 		height = height,
 		stroke = if item.special or ribbon == "★ YOUR GOAL" then C.gold else (item.accent or K.line),
-		strong = item.special == true,
+		strong = item.special == true or item.strong == true,
 		picture = item.picture,
 		shut = item.lock ~= nil,
 		title = string.upper(item.name),
@@ -237,7 +241,7 @@ local function heroCard(parent: Instance, screen: Screen, item: Item, height: nu
 		value = value or "",
 		valueColor = color,
 		facts = item.fact,
-		bar = if saving then { share = ShopPick.share(entry, money), color = C.money } else nil,
+		bar = if saving then { share = ShopPick.share(entry, money), color = C.money } else item.bar,
 		action = if act then {
 			name = act.name or "HeroAction",
 			text = act.text,
@@ -246,7 +250,7 @@ local function heroCard(parent: Instance, screen: Screen, item: Item, height: nu
 				run(act, screen.toast)
 			end,
 		} else nil,
-		ribbon = if ribbon then { text = ribbon, face = if ribbon == "★ YOUR GOAL" then C.gold elseif ribbon == "BEST BUY" then K.good else K.raised, ink = if ribbon == "SAVE UP" then K.text else C.goldInk } else nil,
+		ribbon = if ribbon then { text = ribbon, face = item.ribbonFace or (if ribbon == "★ YOUR GOAL" then C.gold elseif ribbon == "BEST BUY" then K.good else K.raised), ink = item.ribbonInk or (if ribbon == "SAVE UP" then K.text else C.goldInk) } else nil,
 		onOpen = if more then open else nil,
 		onDetails = if more then open else nil,
 	})

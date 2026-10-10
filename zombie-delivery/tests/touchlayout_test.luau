@@ -5,6 +5,8 @@
 -- Run: python3 tests/run_tests.py [path to the luau binary] (it copies client/TouchLayout.luau next to this test).
 
 local TouchLayout = require("./TouchLayout")
+local Config = require("./Config")
+local Inventory = require("./Inventory") -- 6.21: the bottom bar's size
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -125,10 +127,13 @@ for _, screen in SCREENS do
 		-- 6.0.1, the bottom bar (client/Hotbar.luau: 5 item slots of 56 over the carried strip, 304 × 100 unscaled; a
 		-- slot at least 48 px on a touch screen) with the right column (now 158 tall: the items left it) and the action.
 		-- 6.1: the three hand slots, a divider and two item slots over the strip: 311 × 100 (wider fails the iPhone SE).
-		local barScale = math.max(S, 48 / 56)
+		-- 6.21, the clean hotbar (shared/Inventory.luau size, Config.Hotbar): the three hand slots and two item slots on
+		-- the tray, the line over it (no CARRYING pill any more), a slot of 72 at least TouchMin px (minScale).
+		local barW, barH = Inventory.size(3 + 2, true)
+		local barScale = math.max(S, Inventory.minScale(true))
 		local rowLeft = if admin then math.min(row.x0, W - 16 - 90) else row.x0
-		local col2, over2, bar = TouchLayout.dock(c, W, H, 300 * S, 158 * S, rowBottom, rowLeft, 311 * barScale, 100 * barScale)
-		check(`{name}{tag}: the bar's slots 48 px or bigger`, 56 * barScale >= 48)
+		local col2, over2, bar = TouchLayout.dock(c, W, H, 300 * S, 158 * S, rowBottom, rowLeft, barW * barScale, barH * barScale)
+		check(`{name}{tag}: the bar's slots 48 px or bigger`, Config.Hotbar.Tile * barScale >= 48 - 0.001, Config.Hotbar.Tile * barScale)
 		check(`{name}{tag}: the bar on the screen`, inside(bar, W, H), show(bar))
 		check(`{name}{tag}: the bar clear of the thumbstick`, not TouchLayout.overlap(bar, c.thumb), `{show(bar)} / {show(c.thumb)}`)
 		check(`{name}{tag}: the bar clear of the jump button`, not TouchLayout.overlap(bar, c.jump), `{show(bar)} / {show(c.jump)}`)

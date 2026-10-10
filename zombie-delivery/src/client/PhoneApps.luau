@@ -433,7 +433,7 @@ end
 -- 6.5: BAG & ITEMS, the I window's tabs (🛍 BAG during a run, ITEMS, BAGS). 6.18 wave 2: client/BagUi.luau draws them
 -- in the UI kit's look (the bag as the hero, a row an item with its count big and a round USE), the tabs as chips in
 -- the popup's header strip when they fit.
-local BAG_TABS: { { string } } = { { "bag", "🛍 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
+local BAG_TABS: { { string } } = { { "bag", "📦 CARRYING" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
 
 function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
 	local job = host.job()
