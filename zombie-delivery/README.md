@@ -1143,6 +1143,13 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The job pictures ready at once (6.16.1)
+
+The owner: "when I open JOBS the pictures load slowly". Roblox fetches an image the first time it is drawn, so the job
+list waited on its 25 downloads. Now every uploaded job picture (and the mission chapters' once they are uploaded) is
+fetched in the background 4 seconds after joining (`JobThumbUi.preload`, `ContentProvider:PreloadAsync`), so the JOBS
+list and J's board show them at once; a picture still on its way fades in when it arrives instead of popping in.
+
 ## Visuals and feel: light, shooting, driving, zombies (6.16)
 
 The owner: "I want to upgrade the visuals and the feel." Four parts, all looks and sound: nothing plays differently.

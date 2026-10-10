@@ -102,6 +102,7 @@ safely("ShopPropMotion", require(Client.ShopPropMotion).start) -- 6.11: the bank
 safely("PerfOverlay", require(Client.PerfOverlay).start) -- 6.13.1: the admin's performance overlay (the P panel's WORLD tab)
 safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SHIFT 3/5 at the top, SHIFT DONE
 safely("EnemyOutline", require(Client.EnemyOutline).start) -- 6.15: a subtle outline on the enemies (zombies red, bandits orange)
+safely("JobThumbs", require(Client.JobThumbUi).preload) -- 6.16.1: the job and chapter pictures fetched ahead (JOBS shows them at once)
 safely("ZombieLife", require(Client.ZombieLife).start) -- 6.16: the zombies' eyes glowing at night, their groans, screams, grunts
 safely("EventBanner", require(Client.EventBanner).start) -- 6.15: the live event's banner at the top, its stings
 safely("CarSway", require(Client.CarSway).start) -- 6.16: the cars' bodies roll in a turn, dip on the brake, squat on the throttle
