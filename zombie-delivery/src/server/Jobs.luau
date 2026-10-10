@@ -3156,7 +3156,7 @@ local function startJob(player: Player, offer: Offer, quiet: boolean?): (boolean
 		elseif offer.boost > 1 then
 			text ..= " · Every bandit in town wants this cargo!"
 		end
-		if not quiet then
+		if not quiet and (offer.mission or offer.tutorial) then -- (6.19.1: a job's own card says it: client/JobStartCard.luau)
 			notice:FireClient(player, text)
 		end
 		-- The invited crew hears about it too (their HUD follows the owner's job: server/Crew.luau, Jobs.crewStatus).
