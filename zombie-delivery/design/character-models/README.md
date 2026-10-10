@@ -67,6 +67,14 @@ python3 tools/character-art/check.py /path/to/luau design/character-models/geome
 blender -b -t 4 --python tools/model-art/render.py -- design/character-models/geometry.json design/character-models/renders --workbench
 ```
 
+**6.16, the infected's looks:** `shared/ZombieStyle.luau` gives every zombie kind several looks (walker 10, runner 6,
+brute 5, soldier 4; look 1 is the classic body above, unchanged), picked from the zombie's id: skins from pale green to
+grey-blue to bruised, a hospital gown, a torn suit with a tie, a hi-vis vest, a tracksuit, a hoodie, a butcher's apron,
+a prison jumpsuit, a bare chest, a torn-off sleeve, a cap or a hard hat, blood stains (`Geometry.spec`'s `outfit`;
+37–47 parts, within the 64). The checker builds every look through the real factory and keeps them out of
+`geometry.json`; `--looks out.json` writes them for a preview. The eyes are a round 0.16 ball now (a Roblox ball takes
+its smallest side: the 6.0 eye's 0.04 was a dot); the clients paint them dull by day and glowing at night.
+
 The normal test runner includes connected-skeleton, kit-dimension, scale/ground-clearance and locomotion checks.
 The additional recorder executes the real factory/controller: attachment bind positions, flags, welds, clone
 references, animation choices, initial replacement, respawns and cleanup. It records BuildRigFromAttachments and

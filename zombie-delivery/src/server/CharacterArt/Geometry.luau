@@ -11,6 +11,11 @@
 -- jacket over a shirt, trousers with a belt, boots with round toes. The infected keep the 6.0 block body (BLOCK).
 -- The R15 part, joint and attachment names are unchanged, so the stock animations, shared/Joints.luau and the kit
 -- (shared/KitFit.luau fits Codex's art, authored on the block body, to these sizes) keep working.
+-- 6.16, the infected's looks (shared/ZombieStyle.luau picks one per zombie): Geometry.spec's `outfit` dresses the block
+-- body: a torn jacket, a tee or a tank top, a hospital gown (bare legs and feet, the open back, a wristband), a torn
+-- suit with a tie, a hi-vis vest with reflectors, a tracksuit with stripes, a hoodie, a butcher's apron, a prison
+-- jumpsuit, a bare chest; a missing sleeve (the upper arm in the skin's colour), a cap or a hard hat, blood stains.
+-- Without one it is the 6.0 body exactly. Every look stays within the 64 parts (tools/character-art/check.luau).
 local Geometry = {}
 
 export type Triple = { number }
@@ -18,6 +23,8 @@ export type Piece = { name: string, attach: string, size: Triple, at: Triple, co
 export type Bone = { name: string, size: Triple, at: Triple, color: Triple, shape: string?, paint: string? }
 export type Joint = { name: string, parent: string, child: string, at: Triple }
 export type Spec = { id: string, bones: { Bone }, joints: { Joint }, pieces: { Piece }, hipHeight: number, budget: number, grips: { [string]: Triple } }
+-- 6.16: what an infected wears (shared/ZombieStyle.luau Outfit: the same fields, the meaning there).
+export type Outfit = { wear: string, bare: string, legs: string?, hat: string?, hatColor: Triple?, trim: Triple?, stains: number }
 
 Geometry.ids = { "courier", "person", "walker", "runner", "soldier", "brute" }
 local SKIN = { 218, 166, 119 }
@@ -202,9 +209,182 @@ local function humanPieces(add: (string, string, Triple, Triple, Triple, Triple?
 	add("Belt", "LowerTorso", { 1.27, 0.1, 0.8 }, { 0, 0.25, 0 }, { 24, 24, 26 })
 end
 
+-- 6.16: the bones an outfit leaves bare take the skin's colour: an arm without its sleeve; under a gown the legs and the
+-- feet (the gown's colour on the pelvis).
+local function undress(bones: { Bone }, colors: { [string]: Triple }, outfit: Outfit)
+	for _, b in bones do
+		local name = b.name
+		if (name == "LeftUpperArm" and (outfit.bare == "left" or outfit.bare == "both")) or (name == "RightUpperArm" and (outfit.bare == "right" or outfit.bare == "both")) then
+			b.color = table.clone(colors.skin)
+		elseif outfit.legs == "bare" then
+			if string.find(name, "Leg") or string.find(name, "Foot") then
+				b.color = table.clone(colors.skin)
+			elseif name == "LowerTorso" then
+				b.color = table.clone(colors.shirt)
+			end
+		end
+	end
+end
+
+local BLOOD = { 92, 24, 20 }
+local WHITE_SHIRT = { 196, 192, 180 }
+local REFLECTOR = { 214, 218, 206 }
+local HARD_HAT = { 232, 196, 40 }
+local function darker(c: Triple, k: number): Triple
+	return { math.floor(c[1] * k), math.floor(c[2] * k), math.floor(c[3] * k) }
+end
+
+-- The infected's pieces: the 6.0 face and torn clothes (outfit nil: exactly as before), 6.16 dressed by the outfit.
+type Add = (string, string, Triple, Triple, Triple, Triple?, string?, string?, string?) -> ()
+local function infected(add: Add, id: string, colors: { [string]: Triple }, outfit: Outfit?)
+	local wear = if outfit then outfit.wear else "jacket"
+	local bare = if outfit then outfit.bare else "none"
+	local legsBare = outfit ~= nil and outfit.legs == "bare"
+	local hat = if outfit and id ~= "soldier" then outfit.hat else nil
+	local trim = if outfit then outfit.trim else nil
+	local lapels = wear == "jacket" or wear == "suit"
+	local hem = wear == "jacket" or wear == "suit" or wear == "tee" or wear == "tank" or wear == "hoodie"
+	local covered = wear == "hivis" or wear == "apron" -- (a vest or an apron over the chest)
+	for _, side in { -1, 1 } do
+		local suffix = if side < 0 then "L" else "R"
+		add("EyeSocket" .. suffix, "Head", { 0.38, 0.34, 0.035 }, { side * 0.34, 0.11, -0.72 }, INK, { 0, 0, side * -15 })
+		-- (6.16: a round eye 0.16 across, as the approved render shows it: a Roblox ball takes its smallest side, and the
+		-- 6.0 eye's 0.04 made it a dot; client/ZombieLife.luau lights it up at night)
+		add("Eye" .. suffix, "Head", { 0.16, 0.16, 0.16 }, { side * 0.34, 0.08, -0.755 }, CREAM, nil, "Neon", "Ball")
+		add("AngryBrow" .. suffix, "Head", { 0.48, 0.09, 0.045 }, { side * 0.35, 0.3, -0.737 }, { 59, 71, 45 }, { 0, 0, side * 21 })
+		if lapels then
+			add("Lapels" .. suffix, "UpperTorso", { 0.3, 0.72, 0.06 }, { side * 0.38, 0.35, -0.54 }, if wear == "suit" then darker(colors.shirt, 0.7) else { 68, 60, 47 }, { 0, 0, side * -18 }, "Fabric")
+		end
+		if hem then
+			add("RaggedHem" .. suffix, "UpperTorso", { 0.4, 0.3, 0.06 }, { side * 0.73, -0.74, -0.54 }, colors.shirt, { 0, 0, side * 16 }, "Fabric", "Wedge")
+		end
+	end
+	add("OpenMouth", "Head", { 0.66, 0.34, 0.04 }, { 0, -0.3, -0.725 }, INK)
+	for i = 1, 4 do
+		add("Tooth" .. i, "Head", { 0.1, 0.11, 0.025 }, { (i - 2.5) * 0.14, -0.19 - (i % 2) * 0.035, -0.762 }, CREAM, { 0, 0, (i % 2) * 13 })
+	end
+	add("LowerTooth", "Head", { 0.16, 0.07, 0.025 }, { 0.17, -0.43, -0.762 }, CREAM)
+	add("CheekScar", "Head", { 0.24, 0.04, 0.028 }, { -0.59, -0.22, -0.72 }, { 78, 88, 53 }, { 0, 0, -27 })
+	if not hat then
+		add("ForeheadScar", "Head", { 0.19, 0.045, 0.028 }, { 0.06, 0.46, -0.72 }, { 78, 88, 53 }, { 0, 0, 56 })
+	end
+	if wear == "jacket" then
+		add("TornShirt", "UpperTorso", { 0.65, 0.58, 0.035 }, { 0, 0.23, -0.522 }, { 157, 139, 102 }, { 0, 0, 5 }, "Fabric")
+	elseif wear == "suit" then
+		add("TornShirt", "UpperTorso", { 0.65, 0.58, 0.035 }, { 0, 0.23, -0.522 }, WHITE_SHIRT, { 0, 0, 5 }, "Fabric")
+	end
+	if wear ~= "bare" and wear ~= "apron" then
+		add("ShirtHole", "UpperTorso", { 0.27, 0.19, 0.025 }, { -0.09, 0.32, -0.555 }, colors.skin, { 0, 0, -19 })
+	end
+	if wear ~= "bare" and bare ~= "left" and bare ~= "both" then
+		add("SleeveRip", "LeftUpperArm", { 0.32, 0.47, 0.028 }, { -0.18, -0.27, -0.514 }, colors.skin, { 0, 0, -15 })
+	end
+	if wear ~= "bare" and bare ~= "right" and bare ~= "both" then
+		add("RightSleeveRip", "RightUpperArm", { 0.29, 0.26, 0.028 }, { 0.22, -0.43, -0.514 }, colors.skin, { 0, 0, 23 })
+	end
+	if not legsBare then
+		add("KneeRip", "LeftLowerLeg", { 0.45, 0.27, 0.028 }, { 0, 0.2, -0.514 }, colors.skin, { 0, 0, 13 })
+		add("TrouserPatch", "RightUpperLeg", { 0.38, 0.33, 0.028 }, { 0.16, -0.19, -0.514 }, { 67, 63, 51 }, { 0, 0, -8 })
+	end
+	if wear ~= "gown" and wear ~= "jumpsuit" and wear ~= "tracksuit" and wear ~= "apron" then
+		add("Belt", "LowerTorso", { 1.95, 0.14, 0.05 }, { 0, 0.07, -0.526 }, BLACK)
+		add("Buckle", "LowerTorso", { 0.26, 0.19, 0.027 }, { 0.1, 0.07, -0.565 }, { 160, 145, 103 })
+	end
+	if id == "soldier" then
+		add("Helmet", "Head", { 1.72, 0.28, 1.51 }, { 0, 0.62, 0 }, trim or { 66, 76, 46 })
+		add("ChestPlate", "UpperTorso", { 1.34, 0.62, 0.13 }, { 0, -0.28, -0.59 }, { 53, 66, 44 })
+	elseif id == "brute" then
+		add("ShoulderPlate", "LeftUpperArm", { 1.05, 0.34, 1.07 }, { 0, 0.45, 0 }, { 85, 77, 61 })
+		if wear ~= "bare" then
+			add("BackSeam", "UpperTorso", { 0.13, 1.5, 0.025 }, { 0.38, 0, 0.518 }, { 104, 93, 76 })
+		end
+	end
+	if not outfit then
+		return
+	end
+	-- 6.16: what the outfit adds.
+	local second = trim or WHITE_SHIRT
+	if wear == "gown" then
+		-- The hospital gown: its hem round the thighs, the open back, a tie, the patient's wristband.
+		for _, side in { -1, 1 } do
+			local limb = if side < 0 then "Left" else "Right"
+			add("GownHem" .. (if side < 0 then "L" else "R"), limb .. "UpperLeg", { 1.08, 0.5, 1.08 }, { 0, 0.25, 0 }, colors.shirt, nil, "Fabric")
+		end
+		add("GownBack", "UpperTorso", { 0.3, 1.5, 0.03 }, { 0, -0.02, 0.51 }, colors.skin)
+		add("GownTie", "UpperTorso", { 0.44, 0.06, 0.035 }, { 0, 0.4, 0.525 }, second)
+		add("Wristband", "LeftLowerArm", { 1.04, 0.12, 1.04 }, { 0, 0.1, 0 }, second)
+	elseif wear == "suit" then
+		add("Tie", "UpperTorso", { 0.16, 0.62, 0.03 }, { 0, 0.24, -0.56 }, second, nil, "Fabric")
+		add("TieKnot", "UpperTorso", { 0.2, 0.12, 0.035 }, { 0, 0.57, -0.56 }, darker(second, 0.8))
+	elseif wear == "hivis" then
+		-- The reflective vest over the shirt: two front panels and a back, a silver band round it.
+		for _, side in { -1, 1 } do
+			local suffix = if side < 0 then "L" else "R"
+			add("Vest" .. suffix, "UpperTorso", { 0.72, 1.3, 0.05 }, { side * 0.62, -0.08, -0.535 }, second, nil, "Fabric")
+			add("Reflect" .. suffix, "UpperTorso", { 0.72, 0.13, 0.02 }, { side * 0.62, -0.38, -0.565 }, REFLECTOR)
+		end
+		add("VestBack", "UpperTorso", { 1.98, 1.3, 0.05 }, { 0, -0.08, 0.535 }, second, nil, "Fabric")
+		add("ReflectBack", "UpperTorso", { 1.94, 0.13, 0.02 }, { 0, -0.38, 0.565 }, REFLECTOR)
+	elseif wear == "tracksuit" then
+		-- Stripes down the sleeves and the legs, a zip.
+		for _, side in { -1, 1 } do
+			local suffix = if side < 0 then "L" else "R"
+			local limb = if side < 0 then "Left" else "Right"
+			add("ArmStripe" .. suffix, limb .. "UpperArm", { 0.03, 1.17, 0.16 }, { side * 0.51, 0, 0 }, second)
+			add("ThighStripe" .. suffix, limb .. "UpperLeg", { 0.03, 0.95, 0.16 }, { side * 0.51, 0, 0 }, second)
+			add("ShinStripe" .. suffix, limb .. "LowerLeg", { 0.03, 0.77, 0.16 }, { side * 0.51, 0, 0 }, second)
+		end
+		add("Zip", "UpperTorso", { 0.05, 1.5, 0.02 }, { 0, -0.02, -0.51 }, second)
+	elseif wear == "hoodie" then
+		add("Hood", "UpperTorso", { 1.4, 0.5, 0.62 }, { 0, 0.9, 0.28 }, colors.shirt, nil, "Fabric", "Ellipsoid")
+		add("HoodiePocket", "UpperTorso", { 1.1, 0.42, 0.03 }, { 0, -0.5, -0.515 }, darker(colors.shirt, 0.85), nil, "Fabric")
+		for _, side in { -1, 1 } do
+			add("String" .. (if side < 0 then "L" else "R"), "UpperTorso", { 0.05, 0.4, 0.02 }, { side * 0.2, 0.55, -0.512 }, second)
+		end
+	elseif wear == "apron" then
+		-- The butcher's apron, its strings up to the neck.
+		add("Apron", "UpperTorso", { 1.5, 1.25, 0.04 }, { 0, -0.18, -0.535 }, second, nil, "Fabric")
+		add("ApronLow", "LowerTorso", { 1.5, 0.4, 0.04 }, { 0, 0, -0.535 }, second, nil, "Fabric")
+		for _, side in { -1, 1 } do
+			add("ApronString" .. (if side < 0 then "L" else "R"), "UpperTorso", { 0.08, 0.42, 0.03 }, { side * 0.5, 0.6, -0.53 }, darker(second, 0.7), { 0, 0, side * 15 })
+		end
+	elseif wear == "jumpsuit" then
+		add("NumberPatch", "UpperTorso", { 0.55, 0.3, 0.02 }, { 0.45, 0.35, -0.51 }, second)
+	elseif wear == "tee" and trim then
+		add("Print", "UpperTorso", { 0.5, 0.4, 0.02 }, { 0.18, 0.05, -0.515 }, trim)
+	elseif wear == "bare" then
+		add("ChestScar", "UpperTorso", { 0.6, 0.05, 0.025 }, { -0.2, 0.1, -0.512 }, { 78, 88, 53 }, { 0, 0, 30 })
+	end
+	-- A sleeve torn off: a ragged cuff at the shoulder.
+	for _, side in { -1, 1 } do
+		local gone = bare == "both" or bare == (if side < 0 then "left" else "right")
+		if gone and wear ~= "bare" and wear ~= "tank" and wear ~= "gown" then
+			local limb = if side < 0 then "Left" else "Right"
+			add("TornCuff" .. (if side < 0 then "L" else "R"), limb .. "UpperArm", { 1.04, 0.24, 1.04 }, { 0, 0.47, 0 }, colors.shirt, nil, "Fabric")
+		end
+	end
+	if hat == "cap" then
+		local color = outfit.hatColor or BLACK
+		add("CapCrown", "Head", { 1.66, 0.32, 1.46 }, { 0, 0.6, 0 }, color, nil, "Fabric")
+		add("CapBrim", "Head", { 1.1, 0.07, 0.55 }, { 0, 0.48, -0.95 }, darker(color, 0.8))
+	elseif hat == "hard" then
+		local color = outfit.hatColor or HARD_HAT
+		add("HardHat", "Head", { 1.7, 0.45, 1.5 }, { 0, 0.72, 0 }, color, nil, nil, "Ellipsoid")
+		add("HardHatBrim", "Head", { 1.95, 0.06, 1.75 }, { 0, 0.52, -0.05 }, color)
+	end
+	-- Blood: on the chest (over a vest or an apron), on the right thigh (over a gown's hem).
+	if outfit.stains >= 1 then
+		add("Stain1", "UpperTorso", { 0.5, 0.42, 0.02 }, { 0.45, -0.35, if covered then -0.575 else -0.545 }, BLOOD, { 0, 0, 20 })
+	end
+	if outfit.stains >= 2 then
+		add("Stain2", "RightUpperLeg", { 0.42, 0.34, 0.02 }, { 0.05, 0.12, if wear == "gown" then -0.56 else -0.54 }, BLOOD, { 0, 0, -15 })
+	end
+end
+
 -- Zombie palette arguments are the existing Config.Zombies data; no gameplay numbers are duplicated here.
 -- 6.7: "person" (the people of server/Npcs.luau) takes `scale` too (a kid is smaller).
-function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?, pants: Triple?): Spec
+-- 6.16: `outfit` dresses an infected (nil: the 6.0 look; the people ignore it).
+function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?, pants: Triple?, outfit: Outfit?): Spec
 	assert(table.find(Geometry.ids, id), `Unknown character art: {id}`)
 	local courier = id == "courier"
 	local human = courier or id == "person"
@@ -234,6 +414,9 @@ function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?
 	for _, b in body do
 		table.insert(spec.bones, { name = b[1], size = triple(b[2], factors), at = triple(b[3], factors), color = table.clone(colors[b[4]]), shape = b[5], paint = if human then b[4] else nil })
 	end
+	if outfit and not human then
+		undress(spec.bones, colors, outfit) -- 6.16: a bare arm, bare legs under a gown
+	end
 	for _, j in joints do
 		table.insert(spec.joints, { name = j[1], parent = j[2], child = j[3], at = triple(j[4], factors) })
 	end
@@ -250,36 +433,7 @@ function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?
 	if human then
 		humanPieces(add, courier, colors)
 	else
-		for _, side in { -1, 1 } do
-			local suffix = if side < 0 then "L" else "R"
-			add("EyeSocket" .. suffix, "Head", { 0.38, 0.34, 0.035 }, { side * 0.34, 0.11, -0.72 }, INK, { 0, 0, side * -15 })
-			add("Eye" .. suffix, "Head", { 0.14, 0.15, 0.04 }, { side * 0.34, 0.08, -0.755 }, CREAM, nil, "Neon", "Ball")
-			add("AngryBrow" .. suffix, "Head", { 0.48, 0.09, 0.045 }, { side * 0.35, 0.3, -0.737 }, { 59, 71, 45 }, { 0, 0, side * 21 })
-			add("Lapels" .. suffix, "UpperTorso", { 0.3, 0.72, 0.06 }, { side * 0.38, 0.35, -0.54 }, { 68, 60, 47 }, { 0, 0, side * -18 }, "Fabric")
-			add("RaggedHem" .. suffix, "UpperTorso", { 0.4, 0.3, 0.06 }, { side * 0.73, -0.74, -0.54 }, colors.shirt, { 0, 0, side * 16 }, "Fabric", "Wedge")
-		end
-		add("OpenMouth", "Head", { 0.66, 0.34, 0.04 }, { 0, -0.3, -0.725 }, INK)
-		for i = 1, 4 do
-			add("Tooth" .. i, "Head", { 0.1, 0.11, 0.025 }, { (i - 2.5) * 0.14, -0.19 - (i % 2) * 0.035, -0.762 }, CREAM, { 0, 0, (i % 2) * 13 })
-		end
-		add("LowerTooth", "Head", { 0.16, 0.07, 0.025 }, { 0.17, -0.43, -0.762 }, CREAM)
-		add("CheekScar", "Head", { 0.24, 0.04, 0.028 }, { -0.59, -0.22, -0.72 }, { 78, 88, 53 }, { 0, 0, -27 })
-		add("ForeheadScar", "Head", { 0.19, 0.045, 0.028 }, { 0.06, 0.46, -0.72 }, { 78, 88, 53 }, { 0, 0, 56 })
-		add("TornShirt", "UpperTorso", { 0.65, 0.58, 0.035 }, { 0, 0.23, -0.522 }, { 157, 139, 102 }, { 0, 0, 5 }, "Fabric")
-		add("ShirtHole", "UpperTorso", { 0.27, 0.19, 0.025 }, { -0.09, 0.32, -0.555 }, colors.skin, { 0, 0, -19 })
-		add("SleeveRip", "LeftUpperArm", { 0.32, 0.47, 0.028 }, { -0.18, -0.27, -0.514 }, colors.skin, { 0, 0, -15 })
-		add("RightSleeveRip", "RightUpperArm", { 0.29, 0.26, 0.028 }, { 0.22, -0.43, -0.514 }, colors.skin, { 0, 0, 23 })
-		add("KneeRip", "LeftLowerLeg", { 0.45, 0.27, 0.028 }, { 0, 0.2, -0.514 }, colors.skin, { 0, 0, 13 })
-		add("TrouserPatch", "RightUpperLeg", { 0.38, 0.33, 0.028 }, { 0.16, -0.19, -0.514 }, { 67, 63, 51 }, { 0, 0, -8 })
-		add("Belt", "LowerTorso", { 1.95, 0.14, 0.05 }, { 0, 0.07, -0.526 }, BLACK)
-		add("Buckle", "LowerTorso", { 0.26, 0.19, 0.027 }, { 0.1, 0.07, -0.565 }, { 160, 145, 103 })
-		if id == "soldier" then
-			add("Helmet", "Head", { 1.72, 0.28, 1.51 }, { 0, 0.62, 0 }, { 66, 76, 46 })
-			add("ChestPlate", "UpperTorso", { 1.34, 0.62, 0.13 }, { 0, -0.28, -0.59 }, { 53, 66, 44 })
-		elseif id == "brute" then
-			add("ShoulderPlate", "LeftUpperArm", { 1.05, 0.34, 1.07 }, { 0, 0.45, 0 }, { 85, 77, 61 })
-			add("BackSeam", "UpperTorso", { 0.13, 1.5, 0.025 }, { 0.38, 0, 0.518 }, { 104, 93, 76 })
-		end
+		infected(add, id, colors, outfit)
 	end
 	assert(#spec.bones + #spec.pieces <= spec.budget, "Character part budget exceeded")
 	return spec

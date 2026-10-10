@@ -24,6 +24,16 @@
 --
 -- The limbs are animated on the clients (client/ZombieAnimator.luau), the server only moves the bodies.
 --
+-- 6.16, zombies with a life of their own (looks only: nothing here changes what an enemy does):
+--   * every zombie wears one of its kind's looks (shared/ZombieStyle.luau, picked from its id: the model's Seed
+--     attribute, which the clients read for its gait and voice too); a template is built once per kind and look;
+--   * the Hit attribute marks a hit that did not kill (how: ZombieStyle.hitMark; at most every
+--     Config.ZombieLife.HitEvery s a zombie, a hard one always) and Attack counts its bites and swipes: the clients'
+--     flinch and lunge (client/ZombieAnimator.luau) and grunts (client/ZombieLife.luau);
+--   * a death falls its own way (ZombieStyle.death): knocked back (a headshot, a punch), forward on its face, a spin,
+--     a crumple where it stands; a car or a blast still flings the parts as before. The 6 s clean-up and the counting
+--     are unchanged.
+--
 -- 6.15, the live events (server/LiveEvents.luau sets these; shared/LiveEvents.luau has the numbers' rules):
 --   * Zombies.roamBoost: × the roamers wanted around every player (the Blood Moon's, on top of the night's).
 --   * Zombies.setFrenzy(speedOf, spared): every zombie's full speed through speedOf (the Blood Moon's, capped), but the
@@ -52,6 +62,7 @@ local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
 local Armour = require(script.Parent.Armour) -- 6.0: every bite and bullet on a player goes through the vest
+local ZombieStyle = require(Shared.ZombieStyle) -- 6.16: the looks, the falls, the Hit attribute
 
 local Horde = Config.Horde
 local Roam = Horde.Roam
@@ -93,6 +104,10 @@ export type Zombie = {
 	march: Vector3?, -- 6.15: an event's zombie: where it walks to and waits (Zombies.march)
 	event: string?, -- 6.15: the live event it belongs to ("horde", "supply")
 	retreat: boolean?, -- 6.15 review: an ended event's zombie walking away (Zombies.retreat): after nobody
+	-- 6.16 (looks only): its Hit and Attack attributes' counts, when it last showed a hit
+	hits: number?,
+	hitShown: number?,
+	attacks: number?,
 }
 
 local Zombies = {}
@@ -298,15 +313,17 @@ local function attach(model: Model, to: BasePart, name: string, size: Vector3, o
 	return p
 end
 
-local function template(kind: string, def: Config.ZombieDef): Model?
-	if templates[kind] or noTemplate[kind] then
-		return templates[kind]
+-- 6.16: one template per kind and look (shared/ZombieStyle.luau; the people have only their classic one).
+local function template(kind: string, def: Config.ZombieDef, look: ZombieStyle.Look): Model?
+	local key = kind .. "#" .. look.variant
+	if templates[key] or noTemplate[kind] then
+		return templates[key]
 	end
 	local s = def.scale
 	local bandit = def.ranged == true
 	local ok, result = pcall(function()
 		if not bandit then
-			return CharacterRig.build(CharacterGeometry.spec(kind, s, def.skin, def.shirt, def.pants))
+			return CharacterRig.build(CharacterGeometry.spec(kind, s, look.skin, look.shirt, look.pants, look.outfit))
 		end
 		local description = Instance.new("HumanoidDescription")
 		local skin, shirt, pants = rgb(def.skin), rgb(def.shirt), rgb(def.pants)
@@ -372,12 +389,14 @@ local function template(kind: string, def: Config.ZombieDef): Model?
 	if bandit then
 		model:SetAttribute("Bandit", true)
 	end
-	templates[kind] = model
+	templates[key] = model
 	return model
 end
 
-local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Model, Humanoid, Part, Part)
-	local source = template(kind, def)
+-- seed (6.16): the zombie's id: its look (shared/ZombieStyle.luau).
+local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3, seed: number): (Model, Humanoid, Part, Part)
+	local look = ZombieStyle.look(kind, seed)
+	local source = template(kind, def, look)
 	if not source then
 		return buildBlocky(kind, def, at)
 	end
@@ -385,11 +404,11 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 	local root = model:FindFirstChild("HumanoidRootPart") :: Part
 	local torso = (model:FindFirstChild("UpperTorso") or root) :: Part
-	-- Every zombie a little different.
-	local tint = rng:NextNumber(-0.1, 0.1)
+	-- Every zombie a little different (6.16: the classic look; the others have their own colours).
+	local tint = if look.variant == 1 then rng:NextNumber(-0.1, 0.1) else 0
 	for _, name in { "UpperTorso", "LowerTorso" } do
 		local part = model:FindFirstChild(name)
-		if part and part:IsA("BasePart") then
+		if part and part:IsA("BasePart") and tint ~= 0 then
 			part.Color = part.Color:Lerp(if tint > 0 then Color3.new(1, 1, 1) else Color3.new(0, 0, 0), math.abs(tint) * 2)
 		end
 	end
@@ -565,6 +584,81 @@ local function remove(z: Zombie)
 	end
 end
 
+-- 6.16, looks only: the clients' flinch (the Hit attribute: how it was hit, ZombieStyle.hitMark; a plain body shot at
+-- most every Config.ZombieLife.HitEvery s a zombie) and lunge (Attack: a count of its bites and swipes).
+local Life = Config.ZombieLife
+local function showHit(z: Zombie, code: number)
+	local now = os.clock()
+	if code == 0 and z.hitShown and now - (z.hitShown :: number) < Life.HitEvery then
+		return
+	end
+	z.hitShown = now
+	z.hits = (z.hits or 0) + 1
+	z.model:SetAttribute("Hit", ZombieStyle.hitMark(z.hits :: number, code))
+end
+local function showAttack(z: Zombie)
+	z.attacks = (z.attacks or 0) + 1
+	z.model:SetAttribute("Attack", z.attacks)
+end
+
+-- 6.16: how a dead body falls (ZombieStyle.death's style; not "flung"): every part set moving as one body tipping over
+-- about its feet (and turning round its middle on a spin), so the ragdoll falls that way. Knocked back: away from the
+-- shot (its push, else from the killer), a headshot's head a little more; forward: onto its face; a spin; a crumple:
+-- it sinks where it stands.
+local function deathMotion(z: Zombie, style: string, push: Vector3?, killer: Player?, headshot: boolean?): (BasePart) -> ()
+	local D = Life.Death
+	local cf = z.root.CFrame
+	local up = Vector3.yAxis
+	local feet = cf.Position - up * (z.humanoid.HipHeight + z.root.Size.Y / 2)
+	local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
+	local forward = if look.Magnitude > 0.1 then look.Unit else Vector3.new(0, 0, -1)
+	local away = -forward
+	local flat = if push then Vector3.new(push.X, 0, push.Z) else Vector3.zero
+	if flat.Magnitude > 0.1 then
+		away = flat.Unit
+	else
+		local character = killer and killer.Character
+		local from = character and character:FindFirstChild("HumanoidRootPart")
+		if from and from:IsA("BasePart") then
+			local d = cf.Position - from.Position
+			d = Vector3.new(d.X, 0, d.Z)
+			if d.Magnitude > 0.1 then
+				away = d.Unit
+			end
+		end
+	end
+	local fall = D.Fall / math.max(z.def.scale, 0.5)
+	local base, tip, spin = Vector3.zero, Vector3.zero, Vector3.zero
+	if style == "back" then
+		tip = up:Cross(away) * fall -- (the top goes `away`)
+		base = away * D.Back + up * D.Lift
+	elseif style == "forward" then
+		tip = up:Cross(forward) * fall
+		base = forward * 2
+	elseif style == "spin" then
+		local turn = if z.id % 2 == 0 then 1 else -1
+		local side = forward:Cross(up) * turn
+		spin = up * D.Spin * turn
+		tip = up:Cross(side) * fall * 0.7
+		base = side * 3 + up * D.Lift * 0.5
+	else
+		tip = up:Cross(forward) * fall * 0.35
+		base = Vector3.new(0, -D.Slump, 0)
+	end
+	base += z.root.AssemblyLinearVelocity -- (its own run, or the car it hung on, carries on)
+	local centre = cf.Position
+	local head = if headshot and style == "back" then z.model:FindFirstChild("Head") else nil
+	return function(part: BasePart)
+		local at = part.Position
+		local v = base + tip:Cross(at - feet) + spin:Cross(at - centre)
+		if head and (part == head or part.AssemblyRootPart == head) then
+			v += away * D.HeadBack
+		end
+		part.AssemblyLinearVelocity = v
+		part.AssemblyAngularVelocity = tip + spin
+	end
+end
+
 -- killer = nil: no reward (despawn, the safe zone). push = velocity for the flying parts. cause, headshot and from:
 -- how (Zombies.onKillInfo).
 local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, headshot: boolean?, from: string?)
@@ -573,6 +667,9 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 	end
 	z.killed = true -- (6.15: a mission counts it, whoever or whatever killed it)
 	remove(z)
+	-- 6.16: how it falls (before the ragdoll: from where it stands)
+	local style = ZombieStyle.death(z.id, cause, headshot, push ~= nil)
+	local fall = if style ~= "flung" then deathMotion(z, style, push, killer, headshot) else nil
 	z.humanoid.Health = 0
 	ragdoll(z.model)
 	-- The body collapses: collides only with the ground and buildings, never with cars or players.
@@ -582,7 +679,9 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 			d.CanCollide = not decoration and d.Name ~= "HumanoidRootPart"
 			d.CollisionGroup = "Corpse"
 			d.Massless = decoration -- the thin face/clothing skin stays nonblocking even on a corpse
-			if push then
+			if fall then
+				fall(d)
+			elseif push then
 				d.AssemblyLinearVelocity = push + Vector3.new(rng:NextNumber(-8, 8), rng:NextNumber(10, 25), rng:NextNumber(-8, 8))
 			end
 		end
@@ -632,6 +731,7 @@ function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?):
 		return true
 	end
 	z.humanoid.Health = health
+	showHit(z, ZombieStyle.hitCode(info and info.cause, info ~= nil and info.crit == true)) -- 6.16: the clients' flinch
 	-- A short red flash.
 	local torso = z.torso
 	local color = torso.Color
@@ -781,8 +881,9 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 		return nil
 	end
 	local def = Config.Zombies[kind] or Config.Zombies.walker
-	local model, humanoid, root, torso = buildBody(kind, def, at + Vector3.new(0, 3 * def.scale, 0))
+	local model, humanoid, root, torso = buildBody(kind, def, at + Vector3.new(0, 3 * def.scale, 0), nextId + 1)
 	nextId += 1
+	model:SetAttribute("Seed", nextId) -- 6.16: its look, gait and voice (shared/ZombieStyle.luau)
 	local z: Zombie = {
 		id = nextId,
 		kind = kind,
@@ -1150,6 +1251,7 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 	-- No room on the car: bite it from the ground.
 	if now >= z.nextAttack then
 		z.nextAttack = now + z.def.attackEvery
+		showAttack(z) -- 6.16: the clients' lunge
 		Vehicles.damage(car, z.def.damage)
 		Zombies.onCarDamaged(car.owner, z.def.damage)
 	end
@@ -1450,6 +1552,7 @@ local function step()
 				z.humanoid.PlatformStand = false
 			elseif now >= z.nextAttack then
 				z.nextAttack = now + z.def.attackEvery
+				showAttack(z) -- 6.16
 				Vehicles.damage(car, z.def.damage)
 				Zombies.onCarDamaged(car.owner, z.def.damage)
 			end
@@ -1600,6 +1703,7 @@ local function step()
 		local humanoid = best.humanoid
 		if humanoid and bestDistance < Horde.BiteReach * z.def.scale + 1 and now >= z.nextAttack then
 			z.nextAttack = now + z.def.attackEvery
+			showAttack(z) -- 6.16: the clients' lunge
 			Armour.hurt(humanoid, z.def.damage)
 		end
 	end
@@ -1726,7 +1830,10 @@ function Zombies.start()
 	-- Build the R15 bodies up front (it can take a moment), not in the middle of a fight.
 	task.spawn(function()
 		for kind, def in Config.Zombies do
-			template(kind, def)
+			for variant = 1, ZombieStyle.count(kind) do
+				template(kind, def, ZombieStyle.variant(kind, variant)) -- 6.16: every look
+				task.wait() -- (a look a frame)
+			end
 		end
 	end)
 	RunService.Heartbeat:Connect(step)

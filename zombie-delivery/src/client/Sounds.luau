@@ -6,7 +6,8 @@
 -- Music: "menu" on the start screen, then "day" or "night" (workspace attribute Night), and "tension" on a job
 -- while a zombie wave has just arrived or zombies crowd you; the loops crossfade (Config.Audio).
 -- Effects: listened for on the remotes the HUD uses too (shots: Tracer, hit markers: Hit, results, notices, the car
--- call), on the world (explosions, your cargo, your car's engine, zombies' groans near you, elevator rides) and on
+-- call), on the world (explosions, your cargo, your car's engine, elevator rides; 6.16: the zombies' voices are
+-- client/ZombieLife.luau's, through Sounds.playAt) and on
 -- every Ui.button (a soft click). Other players' shots and explosions are 3D sounds at their place.
 -- The SOUND button (Hud.onSound) and the N key cycle: everything on → music off → all off.
 -- Until the two asset ids are filled in SoundSheet, it stays silent (one note in the Output).
@@ -705,32 +706,7 @@ local function listenKnocks()
 	Players.PlayerAdded:Connect(watchPlayer)
 end
 
-local lastGroan = 0
-local function groan()
-	local now = os.clock()
-	if now - lastGroan < AUDIO.GroanEvery * (0.7 + math.random() * 0.6) then
-		return
-	end
-	lastGroan = now
-	local camera = workspace.CurrentCamera
-	local folder = workspace:FindFirstChild("Zombies")
-	if not camera or not folder then
-		return
-	end
-	local near: { BasePart } = {}
-	for _, model in folder:GetChildren() do
-		if model:IsA("Model") and model:GetAttribute("Bandit") ~= true then
-			local body = model:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if body and (body.Position - camera.Focus.Position).Magnitude < AUDIO.GroanRange then
-				table.insert(near, body)
-			end
-		end
-	end
-	if #near > 0 then
-		local body = near[math.random(1, #near)]
-		playAt(if math.random() < 0.5 then "zombie_a" else "zombie_b", body.Position, 0.55, 0.85 + math.random() * 0.3, AUDIO.GroanRange + 20)
-	end
-end
+-- (6.16: the zombies' groans are client/ZombieLife.luau's: the nearest few, each its own voice)
 
 local lastPosition: Vector3? = nil
 local spawnedAt = 0
@@ -812,9 +788,6 @@ function Sounds.start()
 			if enabled then
 				updateZip()
 				elevator()
-				if tick % 5 == 0 and mode ~= 3 then
-					groan()
-				end
 			end
 			if tick % 10 == 0 then
 				pickMusic()

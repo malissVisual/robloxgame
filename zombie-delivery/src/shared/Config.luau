@@ -1860,6 +1860,93 @@ Config.Outline = {
 	HumanKinds = { soldier = false } :: { [string]: boolean },
 }
 
+-- 6.16, the owner: "upgrade the visuals and the feel" (the zombies). The looks are shared/ZombieStyle.luau's (several
+-- per kind, picked from the zombie's id: its Seed attribute); these are the numbers of how they move, glow, sound and
+-- fall. Angles in degrees, distances in studs, times in seconds.
+--   * The poses (client/ZombieAnimator.luau, laid over the stock zombie animations through client/PoseLedger.luau):
+--     the MaxPosed nearest within Range of the camera, worked out every frame within Near, every FarEvery frames
+--     farther (the pose in between kept), picked again every Retarget s; a phone: DeviceBudget.range / count of them.
+--   * The server marks a hit (the Hit attribute, at most every HitEvery s a zombie but a hard one) and a bite or a
+--     swipe (Attack) for the clients' flinch and lunge (server/Zombies.luau); Death has the falls' speeds.
+--   * Eyes: dull by day, a glow by night (Map.nightFactor of the clock), within EyeRange, looked at every EyeEvery s.
+--   * Voices (client/ZombieLife.luau, the existing zombie_a / zombie_b cues pitched): groans from the nearest within
+--     Groan.Range (each its own pause, at most Voices at once), a runner's scream when it comes for you, a grunt on a
+--     hit, a gurgle on a death, a brute's stomp.
+Config.ZombieLife = {
+	Range = 160,
+	Near = 70,
+	FarEvery = 3,
+	MaxPosed = 24,
+	Retarget = 0.3,
+	WalkRef = 12, -- studs / s that count as a full walk (the shamble's and the stomp's full size)
+	HipSwing = 35, -- degrees of the stock walk's thigh swing that count as a full step (the limp and the stomp follow it)
+	-- The shamble (walkers, soldiers): the body dips and rolls onto the bad leg, a hunch, the head on one side, an arm
+	-- hanging lower.
+	Limp = 0.22,
+	LimpRoll = 8,
+	Hunch = 12,
+	HeadTilt = 16,
+	ArmDrop = 28,
+	-- The runner's lurch: leaning into it, the body thrown from side to side, the arms flailing.
+	RunLean = 20,
+	RunRoll = 9,
+	Flail = 14,
+	-- The brute's stomp: the body drops on every step and sways onto the leg, the arms held out.
+	StompDip = 0.4,
+	StompRoll = 7,
+	StompArms = 14,
+	-- Waiting (under IdleBelow studs / s): a slow sway and a lolling head (each its own rhythm).
+	IdleBelow = 1.5,
+	Sway = 5,
+	SwayHz = 0.32,
+	Loll = 12,
+	-- The attack (the Attack attribute): a wind-up, a lunge and a swipe of one arm (the brute both, overhead).
+	AttackTime = 0.55,
+	Wind = 12, -- the body back on the wind-up
+	Lunge = 26, -- … and forward on the strike
+	LungeStuds = 0.6,
+	ArmRaise = 55,
+	ArmStrike = 75,
+	Bite = 18, -- the head forward on the strike
+	-- The flinch (the Hit attribute): the chest jerked back, the head snapped; a hard hit (a headshot, a punch, a ram or a
+	-- blast) further and longer, a stagger back.
+	FlinchTime = 0.35,
+	HardTime = 0.7,
+	Flinch = 16,
+	FlinchHard = 32,
+	HeadSnap = 18,
+	HeadShotSnap = 45,
+	Stagger = 0.55,
+	HitEvery = 0.12,
+	-- The clawing at a car it hangs on.
+	Claw = 35,
+	-- Eyes (the Neon EyeL / EyeR, the block body's Eye): Day's colour by day, the kind's Glow at night.
+	EyeRange = 260,
+	EyeEvery = 0.5,
+	EyeDay = { 150, 140, 104 },
+	Glow = {
+		walker = { 215, 255, 120 },
+		runner = { 255, 226, 90 },
+		soldier = { 255, 160, 50 },
+		brute = { 255, 70, 40 },
+	} :: { [string]: { number } },
+	GlowDefault = { 230, 240, 140 },
+	-- Voices.
+	Groan = { Range = 55, Min = 4, Max = 9, Night = 0.75, Hunt = 0.7, Voices = 3, Gap = 0.45, Volume = 0.55 },
+	Scream = { Range = 80, Speed = 14, Toward = 0.75, Again = 25, Gap = 1.5, Volume = 0.9, Pitch = 1.55 },
+	Grunt = { Range = 70, Again = 0.6, Gap = 0.12, Volume = 0.45, Pitch = 1.35 },
+	Gurgle = { Range = 70, Gap = 0.3, Volume = 0.5, Pitch = 0.72 },
+	Stomp = { Range = 60, Volume = 0.9, Pitch = 0.55 },
+	Snarl = { Range = 40, Again = 2.5, Volume = 0.5, Pitch = 1.2 },
+	-- Each kind's voice (× the pitch of every cue, ± Spread for each zombie).
+	Pitch = { walker = 0.95, runner = 1.2, soldier = 0.85, brute = 0.62 } :: { [string]: number },
+	Spread = 0.08,
+	-- Deaths (server/Zombies.luau kill; shared/ZombieStyle.luau death picks which): Fall rad / s the body tips over
+	-- about its feet (÷ its scale), Spin rad / s round on a spin, Back studs / s on a knock back (a headshot's head
+	-- HeadBack more), Slump studs / s down on a crumple.
+	Death = { Fall = 2.6, Spin = 8, Back = 9, HeadBack = 10, Slump = 3, Lift = 4 },
+}
+
 -- Zombies around the cars.
 Config.Horde = {
 	SpotTime = 0.7, -- 4.0.4: a bandit has to see you this long (a clear line, nothing in between) before it fires
