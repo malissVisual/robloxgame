@@ -17,6 +17,7 @@
 -- (Holster.cycle), the melee moved to L1 (6.1 review: the right stick's click is the default camera's zoom). B still draws and holsters (the server makes the gun the
 -- hand, or goes back to the bag / fists). A loaded bag in your hand is not set down by an aim or a shot press (only
 -- 3, B or the wheel do that, on purpose): such a press tells you so instead of drawing.
+-- 6.23: bags are bought for each game: asking for the bag without one this game says so and sets the GPS to ZDC Bags.
 -- (No Roblox UI here and nothing that requires CameraRig or ArmPose: both read this module.)
 
 local Players = game:GetService("Players")
@@ -169,6 +170,12 @@ function Holster.choose(hand: string)
 	local ok, why = Holding.can(hand, bagOwned, armed, bagDown())
 	if not ok then
 		say(Holding.whyText(why))
+		if why == "nobag" then
+			-- 6.23: no bag this game (bags are bought for each game): the GPS to ZDC Bags (required here, late: the map)
+			pcall(function()
+				require(script.Parent.Gps).to("bags")
+			end)
+		end
 		return
 	end
 	if hand == "gun" and not handsFree() then

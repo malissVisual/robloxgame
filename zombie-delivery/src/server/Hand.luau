@@ -34,7 +34,7 @@ local listeners: { (Player, string, string) -> () } = {}
 -- (6.4: any bag: the active one is in the hand, shared/Transport.luau activeBag)
 local function ownsBag(player: Player): boolean
 	local profile = PlayerData.get(player)
-	return profile ~= nil and TransportRules.activeBag(profile.kit, profile.activeBag) ~= nil
+	return profile ~= nil and TransportRules.activeBag(profile.bags, profile.activeBag) ~= nil -- (6.23: bought this game)
 end
 
 local function hasGun(player: Player): boolean

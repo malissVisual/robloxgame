@@ -106,9 +106,12 @@ local function sendState(player: Player)
 		shift = require(Server.Shift).view(player), -- 6.14: this session's shift (the HUD's SHIFT chip, client/GrindChips)
 		licences = profile.licences, -- 4.7: the licences held (tier → true)
 		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
-		kit = profile.kit, -- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau)
-		-- 6.4: the bag in your hand (the server's answer: the choice, else the best owned; nil without a bag)
-		bag = (require(Shared.Transport).activeBag(profile.kit, profile.activeBag) or ({} :: any)).id,
+		-- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau). 6.23: with the bags bought this
+		-- game (PlayerData.kitNow: profile.kit + profile.bags), and those bags alone as `bags`
+		kit = PlayerData.kitNow(profile),
+		bags = profile.bags, -- 6.23: the bags bought this game (never saved)
+		-- 6.4: the bag in your hand (the server's answer: the choice, else the best one; nil without a bag)
+		bag = (require(Shared.Transport).activeBag(profile.bags, profile.activeBag) or ({} :: any)).id,
 		style = profile.style, -- 6.12: the cosmetics owned and worn (the phone's STYLE app)
 		regulars = profile.regulars, -- 6.14: the deliveries for each business (the REGULARS app, the job lists' badges)
 		skills = profile.skills, -- 6.20: the skills' ranks (CAREER's SKILLS tab; the points are the level's)

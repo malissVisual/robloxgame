@@ -23,6 +23,9 @@
 -- picture, the name, what it does in one line, the price big, the one action; the description on a tap) and YOUR ROOM
 -- is the counter's chip (KitShop.roomChip); client/ShopWindow.luau draws them at ZDC Bags, Last Stop Supplies' KIT tab
 -- and Lead & Co.'s MELEE tab.
+-- 6.23, bags for each game (Config.BagShop): ZDC Bags sells every bag FOR THIS GAME (its row: "FOR THIS GAME · $60",
+-- the per-game price); one bought this game says "✓ BOUGHT THIS GAME" with USE / IN USE (the state's kit carries this
+-- game's bags: the server's PlayerData.kitNow). No bag is a starter any more.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -162,6 +165,7 @@ function KitShop.items(state: any, here: boolean, shopId: string): { ShopView.It
 			continue -- (6.6: the bags at ZDC Bags, the rest at Last Stop Supplies; 6.7: the bat at Lead & Co.)
 		end
 		local owned = kit[def.id] == true
+		local game = Transport.perGame(def) -- 6.23: a bag is bought for this game only
 		-- 6.0: a vest no better than the one you have adds nothing either (the best vest counts).
 		local outclassed = not owned and def.armour ~= nil and def.armour * 100 <= armour
 		local id = def.id
@@ -169,23 +173,28 @@ function KitShop.items(state: any, here: boolean, shopId: string): { ShopView.It
 			id = def.id,
 			name = def.name,
 			picture = { icon = Icons.kit(def.id), emoji = def.icon },
-			fact = effect(def),
+			-- (6.23: a bag still to buy this game: "FOR THIS GAME · $60" first)
+			fact = if game and not owned then `{Config.BagShop.ForGame} · {Ui.money(def.price)} · {effect(def)}` else effect(def),
 			price = if owned or def.starter then nil else def.price,
 			-- (a bag of yours: the light pieces it carries is its big number; one for sale: its price)
 			value = if def.extra and (owned or def.starter) then `+{def.extra}` else nil,
 			forSale = not def.starter,
 			owned = owned,
 			current = shopId == "bags" and owned and active ~= nil and active.id == def.id,
-			lines = { def.description, `Level {def.level}{if def.starter then " · STARTER: yours" else ` · {Ui.money(def.price)}`}` },
+			lines = {
+				def.description,
+				if game then `Level {def.level} · {Ui.money(def.price)} for this game: bags are bought for each game (leaving the game loses them).`
+					else `Level {def.level}{if def.starter then " · STARTER: yours" else ` · {Ui.money(def.price)}`}`,
+			},
 		}
 		if owned and def.extra and active and active.id == def.id then
 			item.act = { text = "IN USE", on = false } -- 6.4: the bag in your hand
-			item.fact = `✓ IN USE · {item.fact}`
+			item.fact = `✓ IN USE{if game then " · BOUGHT THIS GAME" else ""} · {item.fact}`
 		elseif owned and def.extra then
 			item.act = { text = "USE THIS BAG", short = "USE", on = true, kind = "good", run = function()
 				Net.get("Kit"):FireServer("use", id) -- 6.4 (the server refuses while your bag is loaded)
 			end }
-			item.fact = `✓ OWNED · {item.fact}`
+			item.fact = `{if game then "✓ BOUGHT THIS GAME" else "✓ OWNED"} · {item.fact}`
 		elseif owned then
 			item.act = { text = "OWNED", on = false }
 			item.fact = `✓ OWNED · {item.fact}`

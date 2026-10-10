@@ -222,6 +222,7 @@ AnalyticsPlan.Sources = {
 	HordeReward = "Gameplay", -- 6.15: a share of the horde at the gates' reward (server/LiveEvents.luau)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
+	BagRefund = "Refund", -- 6.23: an old save's bags, owned for good before, paid back once (bags are bought each game now)
 	PropertySale = "Sale", -- real estate sold
 	Admin = "Admin", -- the admin panel
 }
@@ -234,6 +235,7 @@ AnalyticsPlan.Sinks = {
 	CarGun = "Shop",
 	Item = "Shop",
 	Kit = "Shop",
+	Bag = "Shop", -- 6.23: a bag for this game at ZDC Bags (Config.BagShop.PerGame)
 	Gear = "Shop",
 	Paint = "Shop",
 	Stage = "Shop",

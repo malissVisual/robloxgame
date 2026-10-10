@@ -41,9 +41,10 @@ local Transport = {}
 
 local NEAR = 25 -- studs from your car's chassis that still count as "with your car"
 
+-- 6.23: the kit as it is this game (the kit for good + the bags bought this game: PlayerData.kitNow).
 function Transport.kitOf(player: Player): Rules.Kit
 	local profile = PlayerData.get(player)
-	return if profile then profile.kit else {}
+	return if profile then PlayerData.kitNow(profile) else {}
 end
 
 -- 6.4: the bag choice (nil: the best bag owned).
@@ -93,7 +94,7 @@ function Transport.bikeOf(player: Player): (string?, Rules.Info?)
 	if id == nil or not profile.cars[id] or not Rules.isBike(id) then
 		return nil, nil
 	end
-	local info = Rules.bike(Rules.bikeRoom(id, profile.carGear), profile.kit, profile.activeBag)
+	local info = Rules.bike(Rules.bikeRoom(id, profile.carGear), profile.bags, profile.activeBag) -- (6.23: this game's bags)
 	info.room += skillBag(player) -- 6.20: Strong Back's piece in your bag
 	return id, info
 end

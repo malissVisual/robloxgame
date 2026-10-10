@@ -32,6 +32,14 @@
 --   Transport.bagPadded(kit, bag)  fragile pieces in it are safe (the padded messenger)?
 --   Transport.bagBreath(kit, bag)  the sprint drains the breath × this while it is your hand (the duffel; 1 = none)
 -- (Every bag's point: you sprint with your deliveries. Pieces in a bag are never in your hands.)
+-- 6.23, bags for each game (Config.BagShop): the bags are bought for one game and kept in the server's profile.bags
+-- (never saved), not in the saved kit. The functions above take any table whose bag ids are the bags you have: the
+-- server passes profile.bags, the client the state's kit (the server's withBags).
+--   Transport.withBags(kit, bags)   the kit as it is this game: kit's pieces that are no bags + the bags of `bags`
+--   Transport.startBags(tutorialDone)  the bags a game starts with: Config.BagShop.Free while the tutorial is ahead
+--   Transport.bagRefund(saved)      an old save's payback for the bags it owned for good (Config.BagShop.Refund):
+--                                   money and names; only a real save without Config.BagShop.Flag (else 0)
+--   Transport.perGame(def)          is this piece bought for each game (a bag)?
 --   Transport.mixWarm(share, bagWarm)  the drain multiplier of an order whose `share` of pieces with you is in a
 --                              warm bag: 1 − share × (1 − bagWarm)
 --   Transport.speedMult(kit)   the walk / sprint multiplier (the best speed-up × the slowest piece; 1 = none)
@@ -200,6 +208,55 @@ function Transport.tipShare(kit: Kit): number
 		end
 	end
 	return share
+end
+
+-- 6.23: the kit as it is this game: every piece of `kit` that is no bag (a bag there is ignored: bags are never kept
+-- for good) and every bag of `bags` (the ones bought this game). A new table.
+function Transport.withBags(kit: Kit, bags: Kit?): Kit
+	local out: Kit = {}
+	for _, def in Config.Kit do
+		local from = if Transport.isBag(def) then bags else kit
+		if from and from[def.id] == true then
+			out[def.id] = true
+		end
+	end
+	return out
+end
+
+-- 6.23: is a piece bought for each game (a bag)?
+function Transport.perGame(def: Config.KitDef?): boolean
+	return Transport.isBag(def)
+end
+
+-- 6.23: the bags a game starts with: the free one (Config.BagShop.Free) while the tutorial is ahead, else none.
+function Transport.startBags(tutorialDone: boolean): Kit
+	local out: Kit = {}
+	local free = Config.BagShop.Free
+	if not tutorialDone and free and Transport.isBag(Transport.findKit(free)) then
+		out[free] = true
+	end
+	return out
+end
+
+-- 6.23: what an old save is paid back for the bags it owned for good (its kit's bags, each at Config.BagShop.Refund:
+-- the price it was sold at), and their names in Config.Kit's order. Only a real save (its money is set) without the
+-- Config.BagShop.Flag mark; anything else: 0 and none. (The plastic bag was free: 0.)
+function Transport.bagRefund(saved: any): (number, { string })
+	local names: { string } = {}
+	if type(saved) ~= "table" or saved.money == nil or saved[Config.BagShop.Flag] == true or type(saved.kit) ~= "table" then
+		return 0, names
+	end
+	local money = 0
+	for _, def in Config.Kit do
+		if Transport.isBag(def) and saved.kit[def.id] == true then
+			local paid = math.max(0, math.floor(Config.BagShop.Refund[def.id] or 0))
+			money += paid
+			if paid > 0 then
+				table.insert(names, def.name)
+			end
+		end
+	end
+	return money, names
 end
 
 -- 6.7: the shop that sells a piece of kit (a Map.Shops id): its own `shop` (the bat: "guns"), else a bag at ZDC Bags

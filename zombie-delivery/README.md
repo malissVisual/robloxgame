@@ -1146,6 +1146,47 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Bags for each game (6.23)
+The owner: "what if you always had to buy a backpack for the game". He chose **a bag bought for each game** (each
+server session): after you join you have only your hands until you buy one.
+
+- **Prices** (`Config.BagShop.PerGame`, set over the 6.19 knob: a bag's price is for one game, a small share of what a
+  game pays; the level locks stay):
+
+  | Bag | Level | For this game | Was (for good, × Prices.Kit) |
+  |---|---|---|---|
+  | Plastic Bag (+2) | 1 | $20 | free (the starter) |
+  | Canvas Tote (+3) | 2 | $60 | $300 |
+  | Thermal Delivery Bag (+4) | 3 | $120 | $750 |
+  | Padded Messenger Bag (+4) | 4 | $200 | $1,600 |
+  | Big Delivery Duffel (+6) | 6 | $350 | $3,000 |
+- **Ownership for one game** (`server/PlayerData.luau`): the bags bought this game are `profile.bags`, a per-game
+  table that is **never saved**, and the bag in use (`profile.activeBag`) is no longer saved either. Leaving the game
+  loses them; dying and respawning keeps them. `profile.kit` (saved) holds the vests and the bat only.
+  `PlayerData.giveKit` puts a bag into `profile.bags`; `PlayerData.kitNow` is the kit as it is this game (the client's
+  state `kit`, the outfit, the room on foot); the server's bag readers (`server/Cargo.luau`, `server/Hand.luau`,
+  `server/KitWear.luau`, `server/Transport.luau`, `server/Shops.luau`, `server/Tutorial.luau`) read `profile.bags`.
+  Pure helpers in `shared/Transport.luau`: `withBags`, `startBags`, `bagRefund`, `perGame`.
+- **ZDC Bags** (the gear stall's BAGS counter): every row says "FOR THIS GAME · $60"; a bag bought this game says
+  "✓ BOUGHT THIS GAME" with USE / IN USE, so you can switch between the bags you bought this game (I → BAGS:
+  "BOUGHT THIS GAME · n"). The money's reason is `Bag` (`shared/AnalyticsPlan.luau`).
+- **On join without a bag:** the bottom bar's bag slot shows the plastic bag faint with an amber **BUY** pill and the
+  line "NO BAG · BUY A BAG"; key 2, a tap on the slot or the pill says "No bag this game: buy one at ZDC Bags (by the
+  spawn)." and sets the GPS to ZDC Bags (`Gps.to("bags")`). BAG & ITEMS' hero button is BUY A BAG (the GPS). The first
+  run on foot of a game without a bag tells you the same once (`server/Cargo.luau`, `profile.bagHinted`).
+- **The tutorial:** while it is ahead (`profile.tutorial` false: a brand-new courier's first game, a Studio test) the
+  Plastic Bag is free for that game (`Config.BagShop.Free`, `Transport.startBags`), so the tour's "2 your bag" and the
+  first job work as before. A level's reward bag (the tote at 3, the thermal at 4) is given for that game.
+- **Old saves:** a real save from before 6.23 (no `perGameBags` flag) is paid back once for every bag it owned, at the
+  price it was sold at (`Config.BagShop.Refund`: the base price × the 6.19 knob; the plastic bag was free), and its
+  bags are dropped from the kit. Marge's notice: "Bags are now bought for each game: $X refunded for your bags."
+  (reason `BagRefund`).
+- **Not a savings goal:** a bag is never READY CHECK's goal (`Config.Readiness.NotGoals`) nor in the phone SHOP app's
+  SAVE UP list.
+- **Checks:** `tests/bags_test.luau` (the per-game prices, the refund maths, the session ownership), `tests/
+  tutorial_test.luau` (the tutorial's free bag), `tests/inventory_test.luau`, the hotbar and phone checks
+  (`tools/phone-ui`: BUY, BUY A BAG).
+
 ## Every item has a look (6.22)
 The owner: "every thing must look like something, not only an icon". Everything in the bottom bar and in BAG & ITEMS
 is now a small 3D model, drawn in a ViewportFrame with one studio look: a 3/4 angle, a soft key light and fill

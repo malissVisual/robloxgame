@@ -621,7 +621,8 @@ function ShopWindow.render(ctx: Ctx): any
 	elseif id == "bags" then
 		items = KitShop.items(state, ctx.here, "bags")
 		chips = { KitShop.roomChip(state) }
-		foot = "One bag at a time: the one IN USE counts. Bought once, kept for good."
+		-- (6.23: bags are bought for each game, Config.BagShop)
+		foot = "Bags are bought for this game: leaving the game loses them. One bag at a time: the one IN USE counts."
 	elseif id == "supplies" then
 		items, foot = supplies(ctx)
 		if KitShop.currentTab(state) == "kit" then

@@ -274,7 +274,7 @@ local function unlockAll(player: Player)
 		end)
 	end
 	for _, def in Config.Kit do
-		profile.kit[def.id] = true
+		PlayerData.kitTable(profile, def)[def.id] = true -- (6.23: the bags for this game)
 	end
 	profile.phone = true
 	for _, weapon in Config.Weapons do

@@ -25,7 +25,9 @@
 --   ZDC Bags            6.6: the depot's bag kiosk (Map.Shops.bags, Config.BagShop; 6.12.2: the gear stall's BAGS counter):
 --                       the five bags (Config.Kit pieces with `extra`, the same "Kit" remote: a bag is bought only
 --                       here, the rest of the kit only at Last Stop Supplies); the Kit remote's ("use", bag id) picks
---                       the one in your hand (profile.activeBag), anywhere. 6.6: no backpacks any more
+--                       the one in your hand (profile.activeBag), anywhere. 6.6: no backpacks any more. 6.23: a bag is
+--                       bought for this game only (Config.BagShop.PerGame; profile.bags, never saved; the money's
+--                       reason "Bag"), USE switches between the bags bought this game
 --   Depot Garage        3.4: the depot lot's garage terminal (server/Garages.luau: the starting van, company vehicles);
 --                       it sells nothing (6.7: no shop window of its own in client/Hud.luau)
 --   Job Board           the depot's job board
@@ -690,11 +692,11 @@ local function useBag(player: Player, def: Config.KitDef)
 	if not profile then
 		return
 	end
-	if not profile.kit[def.id] or not TransportRules.isBag(def) then
-		notice:FireClient(player, `You don't have the {def.name}.`)
+	if not profile.bags[def.id] or not TransportRules.isBag(def) then -- (6.23: the bags bought this game)
+		notice:FireClient(player, `You haven't bought the {def.name} this game.`)
 		return
 	end
-	local current = TransportRules.activeBag(profile.kit, profile.activeBag)
+	local current = TransportRules.activeBag(profile.bags, profile.activeBag)
 	if current and current.id == def.id then
 		profile.activeBag = def.id
 		notice:FireClient(player, `The {def.name} is already in use.`)
@@ -706,7 +708,7 @@ local function useBag(player: Player, def: Config.KitDef)
 	end
 	profile.activeBag = def.id
 	PlayerData.notify(player)
-	notice:FireClient(player, `{def.icon} The {def.name} is your bag now: {TransportRules.bagRoom(profile.kit, def.id)} light pieces.`)
+	notice:FireClient(player, `{def.icon} The {def.name} is your bag now: {TransportRules.bagRoom(profile.bags, def.id)} light pieces.`)
 end
 
 -- 5.0, personal gear (Config.Kit) at Last Stop Supplies: ("buy", kit id): not owned yet, its driver level, its price.
@@ -725,12 +727,14 @@ local function onKit(player: Player, action: any, id: any)
 	if not profile or action ~= "buy" or not def or refuse(player, TransportRules.kitShop(def)) then
 		return
 	end
-	if profile.kit[def.id] then
-		notice:FireClient(player, `You already have the {def.name}.`)
+	local bagNow = TransportRules.isBag(def) -- 6.23: a bag is bought for this game (profile.bags)
+	if PlayerData.kitTable(profile, def)[def.id] then
+		notice:FireClient(player, if bagNow then `You bought the {def.name} this game already.` else `You already have the {def.name}.`)
 		return
 	end
 	if def.starter then
-		-- 6.7: the plastic bag is every courier's from the start, never sold (a profile without it gets it back, free)
+		-- 6.7: the plastic bag was every courier's from the start, never sold (6.23: no piece is a starter any more; a
+		-- bag is bought for each game)
 		PlayerData.giveKit(player, def.id)
 		notice:FireClient(player, `The {def.name} is your starter: it's yours.`)
 		return
@@ -738,19 +742,23 @@ local function onKit(player: Player, action: any, id: any)
 	if tooLow(player, def.name, def.level) then
 		return
 	end
-	if not PlayerData.spend(player, def.price, "Kit", def.id) then
+	if not PlayerData.spend(player, def.price, if bagNow then "Bag" else "Kit", def.id) then
 		notice:FireClient(player, "Not enough money.")
 		return
 	end
 	-- 6.4: a bag bought goes into your hand at once while yours is empty and with you; else your bag stays as it is
-	local inUse = TransportRules.activeBag(profile.kit, profile.activeBag)
-	local switch = TransportRules.isBag(def) and not Cargo.bagBusy(player)
-	if TransportRules.isBag(def) then
+	local inUse = TransportRules.activeBag(profile.bags, profile.activeBag)
+	local switch = bagNow and not Cargo.bagBusy(player)
+	if bagNow then
 		profile.activeBag = if switch then def.id elseif inUse then inUse.id else nil
 	end
 	PlayerData.giveKit(player, def.id)
-	notice:FireClient(player, `{def.icon} The {def.name} is yours! {def.description}`
-		.. (if TransportRules.isBag(def) and not switch then " Empty your bag, then USE it (I → BAGS)." else ""))
+	if bagNow then
+		notice:FireClient(player, `{def.icon} The {def.name} is yours for this game! {def.description}`
+			.. (if switch then "" else " Empty your bag, then USE it (I → BAGS)."))
+		return
+	end
+	notice:FireClient(player, `{def.icon} The {def.name} is yours! {def.description}`)
 end
 
 -- 3.5, the showroom: three cars inside the dealership (World.DealerSlots), not every car on a lot. Each one is shown

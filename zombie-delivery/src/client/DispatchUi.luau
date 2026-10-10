@@ -355,7 +355,7 @@ local function roomRemedy(offer: any): string
 	if isFoot(offer) then
 		-- 5.0: on foot the room is your hands and your bag (6.6).
 		local room = Transport.handsRoom(myKit(), myBag())
-		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit(), myBag())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger bag at {Config.BagShop.Name} (by the spawn) carries more.`
+		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit(), myBag())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. {if myBag() == nil then "No bag this game: one" else "A bigger bag"} at {Config.BagShop.Name} (by the spawn) carries more.` -- (6.23: bags for each game)
 	elseif isBike(offer) then
 		-- 5.1: your bike, its bike gear and your bag (6.6: the bike's own bag and yours).
 		return `Your {offer.carName or "bike"}'s bag and yours hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear from the BIKES counter at Dead End Motors (a basket, panniers) holds more.`

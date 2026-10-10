@@ -140,7 +140,8 @@ local function unlockText(unlock: Career.Unlock): string
 					return `{kit.icon} {unlock.name} (yours from the start)`
 				end
 				local shop = require(Shared.Map).Shops[require(Shared.Transport).kitShop(kit)]
-				return `{kit.icon} {unlock.name} ({Career.money(kit.price)} at {if shop then shop.name else "Last Stop Supplies"})`
+				-- (6.23: a bag is bought for each game)
+				return `{kit.icon} {unlock.name} ({Career.money(kit.price)}{if kit.extra then " a game" else ""} at {if shop then shop.name else "Last Stop Supplies"})`
 			end
 		end
 		return `🛍 {unlock.name}`

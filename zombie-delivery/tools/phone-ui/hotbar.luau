@@ -139,6 +139,18 @@ check("6.22: MORE keeps its +N (no model)",model(slot5)==nil)
 Bar.setState({items={},kit={},cars={}})
 check("6.22: no bag, no gun: the starter ones faint",shows(hand2,"kit:"..Config.Courier.BagKit) and model(hand2).ImageTransparency==Config.ItemModel.Dim
 	and shows(hand3,"gun:"..Config.Arms.Starter) and model(hand3).ImageTransparency==Config.ItemModel.Dim and model(hand1).ImageTransparency==0)
+-- 6.23: no bag this game (bags are bought for each game): the slot's pill says BUY (amber), no ring, the line BUY A BAG,
+-- and the pill's tap asks for the bag (Holster.choose: it says where and sets the GPS to ZDC Bags), not BAG & ITEMS
+do
+	local buy=hand2:FindFirstChild("Count")
+	check("6.23: no bag: the pill says BUY, amber, no ring",buy.Visible and buy.Text==Config.BagShop.Pill and sameColor(buy.BackgroundColor3,M.P.warn) and not find(hand2,"Ring").Visible)
+	hand2.MouseEnter:Fire()
+	check("6.23: no bag: the line says NO BAG · BUY A BAG",line:FindFirstChild("Name").Text=="NO BAG" and line:FindFirstChild("Count").Text=="BUY A BAG")
+	hand2.MouseLeave:Fire()
+	local before,openedBefore=#M.chosen,opened
+	buy:FindFirstChild("Open").Activated:Fire()
+	check("6.23: no bag: the pill's tap asks for the bag (where to buy one), not BAG & ITEMS",#M.chosen==before+1 and M.chosen[#M.chosen]=="bag" and opened==openedBefore)
+end
 
 -- ── A touch screen's bar ──────────────────────────────────────────────────
 M.touch=true

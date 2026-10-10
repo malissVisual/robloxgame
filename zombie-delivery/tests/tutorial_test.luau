@@ -177,6 +177,17 @@ local wantTexts = {
 	hotbar = "1 fists, 2 your bag, 3 your gun, 4–8 items.",
 	minimap = "The minimap: M opens the big map.",
 }
+-- 6.23, bags for each game: a courier with the tutorial ahead has the free bag this game (Config.BagShop.Free), so the
+-- tour's "2 your bag" and BAG are true and the first foot run's pieces fit the hands and that bag; once it is done, none
+do
+	local Transport = require("./Transport")
+	local bags = Transport.startBags(false)
+	local foot = (Config.Jobs :: any).Foot
+	check("6.23: the tutorial ahead: the free bag for this game (the tour's \"2 your bag\")", Transport.activeBag(bags, nil) ~= nil
+		and (Transport.activeBag(bags, nil) :: Config.KitDef).id == Config.BagShop.Free)
+	check("6.23: the first foot run fits the hands and the free bag", Transport.handsRoom(bags, nil) >= foot.Pieces[2], Transport.handsRoom(bags, nil))
+	check("6.23: the tutorial done: no free bag", next(Transport.startBags(true)) == nil)
+end
 for index, stop in tourList do
 	check(`tour {stop.id}: its target`, stop.target == wantTargets[stop.id], stop.target)
 	check(`tour {stop.id}: its words`, stop.text == wantTexts[stop.id], stop.text)

@@ -600,6 +600,10 @@ local function buildHand(index: number, hand: string): Tile
 			if click then
 				click()
 			end
+			if bagId() == nil and not (job ~= nil and job.round == true) then
+				Holster.choose("bag") -- 6.23: no bag this game: the pill says BUY, its tap says where and sets the GPS
+				return
+			end
 			BagUi.open()
 		end)
 	end
@@ -694,8 +698,9 @@ local function drawHands(): boolean
 			ring.Left.Rotation = left
 			local round = job ~= nil and job.round == true -- (the satchel shows with or without a bag)
 			ring.Frame.Visible = (mine or round) and not down
-			setPill(tile, if round then text elseif not mine then "" elseif down then "DOWN" else text)
-			tile.pill.BackgroundColor3 = if down and not round then P.warn else BLUE
+			-- (6.23: no bag this game: the pill says BUY, amber, the line over the bar BUY A BAG; a tap sets the GPS)
+			setPill(tile, if round then text elseif not mine then Config.BagShop.Pill elseif down then "DOWN" else text)
+			tile.pill.BackgroundColor3 = if (down or not mine) and not round then P.warn else BLUE
 		end
 		if hand == held then
 			heldLine = tile.line

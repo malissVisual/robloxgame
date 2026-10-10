@@ -132,7 +132,7 @@ function Inventory.handLine(hand: string, info: HandInfo): (string, string)
 	if hand == "bag" then
 		local name = string.upper(info.bagName or "Bag")
 		if not info.ownsBag then
-			return "NO BAG", ""
+			return "NO BAG", Config.BagShop.BuyHint -- 6.23: bags are bought for each game ("BUY A BAG")
 		elseif info.down then
 			return name, "ON THE GROUND"
 		elseif info.carJob then

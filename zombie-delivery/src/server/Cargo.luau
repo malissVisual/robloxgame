@@ -951,7 +951,7 @@ end
 -- 6.4: the owner's active bag now (its Config.Kit entry; nil without a bag or the save).
 local function activeBag(owner: Player): Config.KitDef?
 	local profile = PlayerData.get(owner)
-	return if profile then TransportRules.activeBag(profile.kit, profile.activeBag) else nil
+	return if profile then TransportRules.activeBag(profile.bags, profile.activeBag) else nil -- (6.23: this game's bags)
 end
 
 local function bagHeld(session: Session): boolean
@@ -3550,6 +3550,14 @@ function Cargo.begin(owner: Player, info: Info): Session
 	-- 6.4: the active bag's room on this run (Transport.packRoomOf; 6.6: the bike's bag is Info.rack)
 	local bag = if info.foot then activeBag(owner) else nil
 	session.bagRoom = if bag and bag.extra then math.max(0, math.floor(bag.extra)) + require(script.Parent.Skills).bag(owner) else 0 -- (6.20: + Strong Back)
+	-- 6.23: a run on foot with no bag this game (the bags are bought for each game): the hint, once a game
+	if info.foot and not bag then
+		local profile = PlayerData.get(owner)
+		if profile and not profile.bagHinted then
+			profile.bagHinted = true
+			tell(owner, Config.BagShop.NoBag)
+		end
+	end
 	active[owner] = session
 	packShown(session)
 	return session
@@ -4021,7 +4029,7 @@ function Cargo.bagWarm(session: Session, order: number): number
 		return 1
 	end
 	local profile = PlayerData.get(session.owner)
-	local warm = if profile then TransportRules.bagWarm(profile.kit, profile.activeBag) else 1
+	local warm = if profile then TransportRules.bagWarm(profile.bags, profile.activeBag) else 1
 	if warm >= 1 then
 		return 1
 	end
@@ -4081,7 +4089,7 @@ function Cargo.footKnock(session: Session, now: number): (string?, { [number]: n
 		return nil, hit
 	end
 	local profile = PlayerData.get(owner)
-	local padded = (bagHeld(session) or bagStays(session)) and profile ~= nil and TransportRules.bagPadded(profile.kit, profile.activeBag)
+	local padded = (bagHeld(session) or bagStays(session)) and profile ~= nil and TransportRules.bagPadded(profile.bags, profile.activeBag)
 	local job = session.info.fragile == true
 	local any = false
 	local hands = session.held[owner]
