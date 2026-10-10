@@ -28,6 +28,7 @@
 -- "event_end", volume?, pitch?). Until Sfx3Id is filled in, a few play a stand-in (FALLBACK: the steps the 5.7 steps, a
 -- door (or a tailgate) shut the putdown, the horns the chauffeur's horn, the bell the coin, the beep the notice,
 -- task_done job_done, purchase cash, event_start the wave alarm, event_end the notice) and the rest stay silent.
+-- 6.16: a soft tick under every hit of yours (the hit marker's, Config.Shots.Marker.Ticks: a sheet's sound pitched up).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,6 +41,7 @@ local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local SoundSheet = require(Shared.SoundSheet)
+local ShotFeel = require(Shared.ShotFeel) -- 6.16: the hit marker's tick
 local Drive = require(script.Parent.Drive)
 local Ui = require(script.Parent.Ui)
 local PhoneMotion = require(script.Parent.PhoneMotion)
@@ -340,6 +342,11 @@ local function listenShots()
 			playAt(name, from, if id == 0 then 0.65 else 0.8)
 		end
 	end)
+	-- 6.16: a soft tick under it, the hit marker's (Config.Shots.Marker.Ticks: a sound of the sheet pitched up; a
+	-- headshot's brighter); a shotgun's pellets tick once, the strongest of them.
+	local ticks = Config.Shots.Marker
+	local RANK: { [string]: number } = { hit = 1, kill = 2, head = 3 }
+	local tickAt, tickRank = -math.huge, 0
 	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: boolean)
 		if crit then
 			play("headshot", 0.7)
@@ -347,6 +354,13 @@ local function listenShots()
 			play("kill", 0.8)
 		else
 			play("hit", 0.6, 0.95 + math.random() * 0.1)
+		end
+		local kind = ShotFeel.hitKind(crit, killed)
+		local now = os.clock()
+		local tick = ticks.Ticks[kind]
+		if tick and (now - tickAt >= ticks.TickGap or RANK[kind] > tickRank) then
+			tickAt, tickRank = now, RANK[kind]
+			play(tick[1], tick[2], tick[3])
 		end
 	end)
 	workspace.ChildAdded:Connect(function(child)

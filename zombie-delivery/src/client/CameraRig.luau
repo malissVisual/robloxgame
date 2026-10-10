@@ -26,6 +26,7 @@
 -- and lower, swings back behind you sooner, quicker and the same at any frame rate, looks a little into the turn, tilts
 -- with the lean (not with reduced motion) and widens from a lower share of the top speed (Config.LivingCity.Camera
 -- TwoWheels).
+-- 6.16: every shot kicks the aiming camera up and a headshot punches it in (client/ShotKick.luau, one call a frame).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -39,6 +40,7 @@ local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Co
 local Drive = require(script.Parent.Drive)
 local Stamina = require(script.Parent.Stamina)
 local Holster = require(script.Parent.Holster)
+local ShotKick = require(script.Parent.ShotKick) -- 6.16: the shots' kick and a headshot's punch
 
 local CameraRig = {}
 
@@ -229,7 +231,7 @@ end
 
 -- ── The crosshair: one small dot ────────────────────────────────────────────
 -- Dim grey over nothing, white over an enemy (it fades between the two), a quick pulse on every hit, a short red
--- tint on a kill (Shooting draws the X of a headshot on top).
+-- tint on a kill (6.16: client/HitMarker.luau draws the X of every hit around it).
 
 local DOT_SIZE = 6
 local DOT_IDLE = Color3.fromRGB(62, 64, 68)
@@ -600,6 +602,7 @@ local function update(dt: number)
 	rideRoll += (rollGoal - rideRoll) * (1 - math.exp(-Feel.TwoWheels.RollRate * dt))
 	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector) * shakeTurn() * CFrame.Angles(0, 0, rideRoll) -- (5.7: the shake)
 	camera.FieldOfView = lerp(70, 55, aimBlend) + fovBoost * (1 - aimBlend)
+	ShotKick.apply(camera, dt) -- 6.16: this frame's kick on top (never kept: the aim below is the kicked crosshair's)
 
 	-- The gun arm points from the shoulder at whatever is under the crosshair (not simply where the camera looks:
 	-- a camera looking down from above would point the arms at your feet).

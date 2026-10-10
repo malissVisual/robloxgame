@@ -1028,6 +1028,108 @@ Config.CarGuns = {
 	},
 } :: { CarGunDef }
 
+-- 6.16, the owner: "I want to upgrade the visuals and the feel" (shooting and hits). Everything here is the shooter's
+-- own client's show (client/ShotKick.luau, client/ShotFx.luau, client/HitMarker.luau, the arms in client/ArmPose.luau;
+-- the pure rules in shared/ShotFeel.luau): the server still decides every hit (server/Gun.luau).
+export type ShotKickDef = {
+	pitch: number, -- degrees the aiming camera kicks up a shot (at its peak; it springs back by itself)
+	yaw: number, -- degrees of sideways kick at most, either way (random)
+	arm: number, -- the arms' kick (the shoulders lift, the elbow bends, the hand and the gun slide back)
+	casing: string?, -- "brass" | "shell": what flies out to the side (nil: nothing; a revolver keeps its brass)
+	casingDelay: number?, -- seconds after the shot (a pump, a bolt, a lever)
+}
+
+Config.Shots = {
+	-- Per gun (Config.Weapons and Config.CarGuns ids; anything not named kicks like Default).
+	Guns = {
+		pistol = { pitch = 0.9, yaw = 0.3, arm = 1, casing = "brass" },
+		smg = { pitch = 0.35, yaw = 0.3, arm = 0.45, casing = "brass" },
+		shotgun = { pitch = 2.6, yaw = 0.6, arm = 1.9, casing = "shell", casingDelay = 0.35 },
+		rifle = { pitch = 2.1, yaw = 0.35, arm = 1.5, casing = "brass", casingDelay = 0.3 },
+		minigun = { pitch = 0.18, yaw = 0.22, arm = 0.3, casing = "brass" },
+		launcher = { pitch = 2.3, yaw = 0.4, arm = 2 },
+		revolver = { pitch = 1.6, yaw = 0.35, arm = 1.3 },
+		carbine = { pitch = 0.5, yaw = 0.3, arm = 0.6, casing = "brass" },
+		reyes = { pitch = 0.55, yaw = 0.25, arm = 0.65, casing = "brass" },
+		lever = { pitch = 2.1, yaw = 0.3, arm = 1.6, casing = "brass", casingDelay = 0.3 },
+		goldpistol = { pitch = 1.1, yaw = 0.3, arm = 1.1, casing = "brass" },
+		deadend = { pitch = 1.3, yaw = 0.3, arm = 1.2, casing = "brass" },
+		roofmg = { pitch = 0.3, yaw = 0.15, arm = 0 },
+		roofminigun = { pitch = 0.15, yaw = 0.12, arm = 0 },
+		rooflauncher = { pitch = 1.2, yaw = 0.2, arm = 0 },
+	} :: { [string]: ShotKickDef },
+	Default = { pitch = 0.8, yaw = 0.3, arm = 1 } :: ShotKickDef,
+	-- The camera's kick (a computer's aiming camera only: a touch screen's Roblox camera is never turned).
+	KickRate = 18, -- 1/s: a critically damped spring, at its peak 1/KickRate s after the shot, settled in about 4 ×
+	KickMax = 5, -- degrees: held down, the kick never piles up past this
+	WindowShare = 0.6, -- a gun out of a car window kicks the camera this share (the car's camera is further back)
+	ReducedMotion = 0.2, -- the kick's share with reduced motion (the player's Roblox setting); no headshot punch then
+	ArmMax = 2.5, -- the arms' kick piles up to this at most (client/ArmPose.luau)
+	ArmBack = 0.1, -- studs the hand (and the gun in it) slides back per unit of the arms' kick
+	ArmWrist = 0.07, -- radians the wrist tips the muzzle up per unit
+	-- The flash at the muzzle: a glowing ball, a small burst of flame and, near the camera and within the light budget,
+	-- a real light for a blink. Everybody's on-foot shots that this client draws (their tracers), the car guns' too.
+	Flash = {
+		Seconds = 0.06,
+		Pool = 6, -- flashes at once (a 7th takes the oldest's place)
+		Lights = 3, -- real lights at once (a phone: LiteLights)
+		LiteLights = 1,
+		LightRange = 160, -- studs from the camera
+		LightBrightness = 3,
+		LightReach = 12, -- the light's Range
+		Burst = 3, -- flame particles a shot
+	},
+	-- Shell casings: client-only parts thrown out to the gun's right, falling, bouncing on the floor under them and fading.
+	Casings = {
+		Max = 24, -- at once (the oldest goes first); a phone throws none (DeviceBudget.lite)
+		Life = 1.5, -- seconds, the last Fade of them fading out
+		Fade = 0.35,
+		Range = 70, -- studs: another player's casings only this close to the camera
+		Side = { 5, 8 } :: { number }, -- studs/s out to the right …
+		Up = { 4, 7 } :: { number }, -- … and up
+		Gravity = 110, -- studs/s² (Roblox's own is 196: a little floaty, so the eye catches them)
+		Bounce = 0.35, -- the share of the fall's speed a bounce keeps
+		Friction = 0.6, -- the share of the sideways speed a bounce keeps
+		Spin = 25, -- radians/s at most
+	},
+	-- Where a round stops: sparks on metal and stone, dust on the ground, chips off wood, a dark mark on a wall that
+	-- fades; on a zombie (or a bandit) a small dark-red puff, never gore.
+	Impacts = {
+		Range = 220, -- studs from the camera (a phone: DeviceBudget.range): other shooters' impacts farther are not drawn
+		PerSecond = 40, -- other shooters' impacts drawn a second at most (a busy fight); your own always
+		Burst = 12, -- … with this many at once
+		Pellets = 4, -- a shotgun's shot shows at most this many impacts of its own (a phone: 2)
+		Emitters = 4, -- spots that can puff in the same frame (round robin)
+		Marks = 30, -- dark marks on the walls at once (a phone: LiteMarks)
+		LiteMarks = 8,
+		MarkSize = 0.45,
+		MarkLife = 6, -- seconds, the last MarkFade of them fading
+		MarkFade = 2,
+		Sparks = 9, -- particles: a hit on metal …
+		StoneSparks = 4, -- … on stone, concrete, brick (with Dust/2 of dust)
+		Dust = 5, -- on the ground, grass, sand, wood
+		Splat = 5, -- on a zombie or a bandit (a dark-red puff)
+	},
+	-- The hit marker: an X around the crosshair on every hit (on a touch screen, or with the mouse free, at the spot hit),
+	-- white on a hit, red on a kill, gold and bigger on a headshot; a kill shows a small skull over it.
+	Marker = {
+		Hit = { color = { 255, 255, 255 } :: { number }, size = 1, seconds = 0.2, thick = 2 },
+		Kill = { color = { 255, 64, 52 } :: { number }, size = 1.25, seconds = 0.32, thick = 3 },
+		Head = { color = { 255, 196, 60 } :: { number }, size = 1.6, seconds = 0.45, thick = 3 },
+		Skull = true,
+		Pop = 1.4, -- the X starts this much bigger and settles in 0.08 s
+		HeadPunch = 1.6, -- degrees the field of view closes for a blink on a headshot (computer)
+		HeadShake = 0.12, -- a touch screen's camera: a small shake instead (CameraRig.shake)
+		-- The soft tick under the hit's own sound (client/Sounds.luau): a sound of the sheet, its volume, its pitch.
+		Ticks = {
+			hit = { "ui_click", 0.3, 1.8 },
+			kill = { "ui_click", 0.45, 1.35 },
+			head = { "ding", 0.22, 2.2 },
+		} :: { [string]: { any } },
+		TickGap = 0.05, -- seconds: a shotgun's seven pellets tick once
+	},
+}
+
 export type UpgradeDef = {
 	id: string,
 	name: string,
