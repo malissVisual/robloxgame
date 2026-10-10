@@ -688,7 +688,8 @@ local function ordersApp(list: Instance)
 			end
 		end
 		local packed = inHands + (tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0)
-		local room = Config.Cargo.HandsMax + packRoom
+		local Skills = require(ReplicatedStorage.Shared.Skills) -- (6.20: + Strong Back's piece in your hands)
+		local room = Config.Cargo.HandsMax + Skills.effect(Skills.decode(player:GetAttribute("Skills")), "hands") + packRoom
 		look.chip(chips, `CARRYING {packed} / {room}`, if packed >= room then K.red else nil)
 	end
 	local condition = tonumber(job.condition)
