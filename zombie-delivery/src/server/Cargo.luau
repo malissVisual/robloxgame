@@ -2444,7 +2444,7 @@ local function handsFull(session: Session, player: Player): boolean
 			tell(player, `The trolley is full: {#held.pieces} {info.plural}.`)
 		else
 			local room = if info.foot and player == session.owner and not bagHeld(session) and session.bagDown == nil then bagRoomOf(session) - bagCount(session) else 0
-			tell(player, (if #held.pieces > 1 then `Your hands are full: two {info.plural}.` else "Your hands are full.")
+			tell(player, (if #held.pieces > 1 then `Your hands are full: {#held.pieces} {info.plural}.` else "Your hands are full.")
 				.. (if room > 0 then ` Hold the bag (2): room for {room} more.` else "")) -- 6.1
 		end
 		return true
@@ -3356,7 +3356,7 @@ local function onCar(session: Session, player: Player)
 		-- 3.2: only through an open back (a race with somebody closing it). 3.7: a light piece leaves a hand free.
 		-- 4.0: so does a tool (one hand on its handle).
 		local open = Vehicles.backVerb(car, true)
-		local full = held ~= nil and held.tool == nil and (#held.pieces > 1 or handsMax(session) == 1)
+		local full = held ~= nil and held.tool == nil and (#held.pieces >= handsMax(session, player) or handsMax(session, player) == 1) -- (6.20: Strong Back)
 		tell(player, if full then `Put it down (G) and {open} (E).` else `{capital(open)} first (E).`)
 		return
 	end

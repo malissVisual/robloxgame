@@ -2341,6 +2341,9 @@ Config.Skills = {
 	SecondWindHealth = 25,
 	BaseHealth = 100,
 	Regen = 0.01,
+	-- 6.20 review: a spent charge (Second Wind, the free medkit) fills again only in a different job or mission and
+	-- at least this many seconds after it was spent (accepting and cancelling jobs, or a respawn, does not refill it)
+	Recharge = 180,
 	Branches = {
 		{
 			id = "courier",

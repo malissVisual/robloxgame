@@ -38,9 +38,16 @@ end
 
 local notice = Net.get("Notice")
 local EMPTY: Rules.Ranks = {}
-local medkitUsed: { [Player]: boolean } = {}
-local windUsed: { [Player]: boolean } = {}
-local wasInvolved: { [Player]: boolean } = {}
+-- Set by Main (Jobs.jobKey): the job or mission the player is in, as an identity (nil: none).
+Skills.jobKey = function(_player: Player): any
+	return nil
+end
+
+-- A spent charge: in which job (nil: none) and when (os.clock). 6.20 review: it fills again only in a different job or
+-- mission and Config.Skills.Recharge s later (no refill from a respawn, nor from accepting and cancelling a job).
+type Spent = { key: any, at: number }
+local medkitUsed: { [Player]: Spent } = {}
+local windUsed: { [Player]: Spent } = {}
 
 function Skills.of(player: Player): Rules.Ranks
 	local profile = PlayerData.get(player)
@@ -69,26 +76,26 @@ function Skills.bag(player: Player?): number
 	return math.max(0, math.floor(Skills.effect(player, "bag")))
 end
 
--- The charges of a job or a mission (and of a life) fill again.
-local function refill(player: Player)
-	medkitUsed[player] = nil
-	windUsed[player] = nil
+-- Can a charge be spent now (none spent yet, or spent in another job long enough ago)? Spends it if so.
+local function useCharge(used: { [Player]: Spent }, player: Player, key: string): boolean
+	if Skills.effect(player, key) <= 0 then
+		return false
+	end
+	local job = Skills.jobKey(player)
+	local last = used[player]
+	if last and (job == nil or job == last.key or os.clock() - last.at < Config.Skills.Recharge) then
+		return false
+	end
+	used[player] = { key = job, at = os.clock() }
+	return true
 end
 
 function Skills.freeMedkit(player: Player): boolean
-	if medkitUsed[player] or Skills.effect(player, "freeMedkit") <= 0 then
-		return false
-	end
-	medkitUsed[player] = true
-	return true
+	return useCharge(medkitUsed, player, "freeMedkit")
 end
 
 function Skills.secondWind(player: Player): boolean
-	if windUsed[player] or Skills.effect(player, "secondWind") <= 0 then
-		return false
-	end
-	windUsed[player] = true
-	return true
+	return useCharge(windUsed, player, "secondWind")
 end
 
 -- Endurance: the max health (the share of health kept when it changes; a fresh body full).
@@ -149,7 +156,6 @@ function Skills.start()
 	Net.get("Skills").OnServerEvent:Connect(onRemote)
 	local function watch(player: Player)
 		player.CharacterAdded:Connect(function(character)
-			refill(player)
 			local humanoid = character:WaitForChild("Humanoid", 10)
 			if humanoid and humanoid:IsA("Humanoid") then
 				applyHealth(player, true)
@@ -163,22 +169,16 @@ function Skills.start()
 	Players.PlayerRemoving:Connect(function(player)
 		medkitUsed[player] = nil
 		windUsed[player] = nil
-		wasInvolved[player] = nil
 	end)
 	-- A level-up or a loaded save (the points), a purchase elsewhere: the max health follows the profile.
 	PlayerData.Changed:Connect(function(player: Player)
 		applyHealth(player)
 	end)
-	-- Once a second: Field Medic's healing on top of Roblox's own, and the charges of a job or a mission that starts.
+	-- Once a second: Field Medic's healing on top of Roblox's own.
 	task.spawn(function()
 		while true do
 			task.wait(1)
 			for _, player in Players:GetPlayers() do
-				local involved = Skills.involved(player)
-				if involved and not wasInvolved[player] then
-					refill(player)
-				end
-				wasInvolved[player] = involved
 				local regen = Skills.effect(player, "regen")
 				local character = player.Character
 				local humanoid = character and character:FindFirstChildOfClass("Humanoid")

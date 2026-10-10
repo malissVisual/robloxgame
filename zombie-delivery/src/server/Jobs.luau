@@ -3906,6 +3906,13 @@ function Jobs.involved(player: Player): boolean
 	return jobOwner(player) ~= nil
 end
 
+-- 6.20: which job or mission the player is in (theirs or their crew's), as an identity (nil: none). Skills' charges
+-- (Second Wind, the free medkit) fill once for each new one (server/Skills.luau).
+function Jobs.jobKey(player: Player): any
+	local owner = jobOwner(player)
+	return if owner then jobs[owner] else nil
+end
+
 -- 5.5: on a mission (their own or their crew's)? The city bus does not take them (server/Buses.luau).
 function Jobs.onMission(player: Player): boolean
 	local owner = jobOwner(player)

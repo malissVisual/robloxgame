@@ -251,6 +251,7 @@ safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (
 safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
 safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the character (KitSpeed)
 require(Server.Skills).involved = Jobs.involved -- 6.20: no RESET during a job or a mission; its charges fill when one starts
+require(Server.Skills).jobKey = Jobs.jobKey -- 6.20 review: the charges fill once a new job (not a respawn, not a cancelled one)
 safely("Skills", require(Server.Skills).start) -- 6.20: the skill tree (+1 POINT, RESET), the max health, the healing
 safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
 safely("KitWear", KitWear.start) -- 5.0: the kit you own worn on your character, the phone in your hand
