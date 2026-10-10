@@ -452,7 +452,8 @@ local function tourTarget(name: string): GuiObject?
 		return hudPart({ "LeftStack", "Minimap" }) -- client/MapView.luau
 	end
 	-- a tile of the phone's home (client/Phone.luau: jobsApp, mapApp, shopApp, bagApp; 6.14: anywhere on the home, the
-	-- WORK tile (jobsApp) sits over the smaller tiles since 6.12.5)
+	-- WORK tile (jobsApp) sits over the smaller tiles since 6.12.5; 6.18: the app rows under the hero keep these names,
+	-- client/PhoneHome.luau)
 	local phoneGui = playerGui:FindFirstChild("ZombieDeliveryPhone")
 	local body = phoneGui and phoneGui:FindFirstChild("Phone")
 	local tile = body and body:FindFirstChild(name, true)

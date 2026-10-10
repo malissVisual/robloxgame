@@ -7,7 +7,8 @@
 --     (the Tutorial remote). ReadyCheck.current() is the answer, worked out again only when one of them changed.
 --   * The phone's home (client/Phone.luau): the wide NEXT MISSION tile (ReadyCheck.tile / fillTile: the chapter and
 --     n/N, the mission, "2 of 3 ready" in red or "READY · START" in green, the savings goal's bar) and the WORK tile's
---     goal line (ReadyCheck.workLine: "Earn for the Old Van · $1,160 to go").
+--     goal line (ReadyCheck.workLine: "Earn for the Old Van · $1,160 to go"). 6.18: the tile is the home's hero card
+--     (client/CardKit.luau hero, client/PhoneHome.luau): the chapter's picture, the mission big, GET READY / ▶ START.
 --   * The READY CHECK (ReadyCheck.draw, the NEXT MISSION tile's app in the phone's popup): the mission, the checklist
 --     (✔ done, ✖ required and missing, ☆ would help) with each row's action (GPS to the shop, INVITE a friend, JOBS to
 --     earn, GARAGE to switch cars), the savings goal, START (ready: the MISSIONS window on that mission and its own
@@ -32,11 +33,13 @@ local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Readiness = require(Shared.Readiness)
+local MissionArt = require(Shared.MissionArt)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
 local Gps = require(script.Parent.Gps)
 local OrdersUi = require(script.Parent.OrdersUi)
+local CardKit = require(script.Parent.CardKit) -- 6.18: the home's hero in the UI kit's look
 
 local K = Theme.Contract
 local ReadyCheck = {}
@@ -246,29 +249,58 @@ function ReadyCheck.goalWords(pay: number): string?
 	return Readiness.goalWords(result.goal, (tonumber(state.money) or 0) + pay)
 end
 
--- ── The phone's NEXT MISSION tile ─────────────────────────────────────────
+-- ── The phone's NEXT MISSION hero ─────────────────────────────────────────
 
--- Its lines in the tile Phone's mainTile made (`left`: where its text starts): NEXT MISSION and the readiness on top
--- ("✖ 1 OF 2 READY" / "✔ READY · START" at the right), the mission, its chapter and n/N, the savings goal and its bar.
--- Returns them (`name`, the mission, is the hover's label). (About 218 px of text at the phone's width: short lines.)
-function ReadyCheck.tile(cell: Instance, left: number): { [string]: any }
-	local width = UDim2.new(1, -(left + 12), 0, 16)
-	local t: { [string]: any } = {}
-	t.head = P.caps(cell, "NEXT MISSION", UDim2.fromOffset(92, 16), { Name = "Head", Position = UDim2.fromOffset(left, 12), TextSize = 11, TextColor3 = K.red, TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left })
-	t.status = P.caps(cell, "", UDim2.new(1, -(left + 12 + 92), 0, 16), { Name = "Status", Position = UDim2.fromOffset(left + 92, 12), TextSize = 11, TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Right })
-	t.name = P.text(cell, "", UDim2.new(1, -(left + 12), 0, 20), { Name = "Mission", Position = UDim2.fromOffset(left, 29), Font = Theme.HeadingFont, TextSize = 16, TextScaled = true, TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left })
+-- 6.18: the home's hero card in the UI kit's look (client/CardKit.luau hero; client/PhoneHome.luau places it): the
+-- chapter's picture (else the mission's emoji big), "NEXT MISSION" on its ribbon, the readiness chip at the right
+-- ("✖ 1 OF 2 READY" red / "✔ READY · START" green / amber), then at its foot the chapter and n/N, the mission big, the
+-- savings goal and its bar, and (a tall enough hero, `spec.button`) GET READY / ▶ START. The whole card opens the
+-- READY CHECK. Returns its parts (`card`, `name` the mission, `status`, `chapter`, `goal`, `track`, `bar`, `action`).
+function ReadyCheck.tile(parent: Instance, spec: { name: string, height: number, button: boolean, onOpen: () -> () }): { [string]: any }
+	local parts = CardKit.hero(parent, {
+		name = spec.name,
+		order = 1,
+		height = spec.height,
+		button = true,
+		silent = true,
+		stroke = K.red,
+		picture = { emoji = "🏁" },
+		title = "",
+		titleColor = K.secondary,
+		value = "",
+		valueColor = K.text,
+		valueSize = Config.UiKit.HomeValue,
+		valueFont = Theme.HeadingFont,
+		facts = "",
+		bar = { share = 0, color = K.red },
+		action = if spec.button then { name = "Go", text = "GET READY ›", height = Config.UiKit.HomeButton, textSize = 16, silent = true, onClick = spec.onOpen } else nil,
+		ribbon = { text = "NEXT MISSION", face = K.red, ink = K.text },
+		corner = { text = "", ink = K.red, width = 120 },
+		onOpen = spec.onOpen,
+	})
+	parts.ribbon.Name = "Head"
+	parts.corner.Name = "Status"
+	parts.title.Name = "Chapter"
+	parts.value.Name = "Mission"
+	parts.facts.Name = "Goal"
 	-- (a long name, "Rush Hour of the Dead", shrinks a little before it would be cut)
-	Ui.make("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 12 }, t.name)
-	t.chapter = P.text(cell, "", width, { Name = "Chapter", Position = UDim2.fromOffset(left, 52), TextSize = 12, TextColor3 = K.secondary, TextStrokeTransparency = 1, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	t.goal = P.text(cell, "", width, { Name = "Goal", Position = UDim2.fromOffset(left, 70), TextSize = 12, TextColor3 = K.text, TextStrokeTransparency = 1, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	local holder = Ui.make("Frame", { Name = "Progress", Size = UDim2.new(1, -(left + 16), 0, 4), Position = UDim2.fromOffset(left, 91), BackgroundTransparency = 1 }, cell)
-	local back, fill = P.bar(holder, UDim2.new(1, 0, 1, 0), K.red)
-	fill.Size = UDim2.fromScale(0, 1)
-	t.track, t.bar = back, fill
-	return t
+	parts.value.TextScaled = true
+	Ui.make("UITextSizeConstraint", { MaxTextSize = Config.UiKit.HomeValue, MinTextSize = 16 }, parts.value)
+	return {
+		card = parts.card,
+		head = parts.ribbon,
+		status = parts.corner,
+		name = parts.value,
+		chapter = parts.title,
+		goal = parts.facts,
+		track = parts.track,
+		bar = parts.bar,
+		action = parts.action,
+		stroke = parts.card:FindFirstChildOfClass("UIStroke"),
+	}
 end
 
--- Fills the tile's lines with the answer now.
+-- Fills the hero with the answer now.
 function ReadyCheck.fillTile(t: { [string]: any }?)
 	if not t then
 		return
@@ -277,9 +309,27 @@ function ReadyCheck.fillTile(t: { [string]: any }?)
 	local mission = result.mission
 	t.name.Text = if mission then `{mission.icon} {mission.name}` else "🏆 Every mission done"
 	t.chapter.Text = Readiness.chapterLine(mission)
+	-- the chapter's picture (shared/MissionArt.luau), else the mission's emoji
+	local image = if mission then MissionArt.forCampaign(mission.campaign) else nil
+	local key = image or (if mission then mission.icon else "🏆")
+	if t.picture ~= key then
+		t.picture = key
+		CardKit.repicture(t.card, { image = image, emoji = if mission then mission.icon else "🏆" }, 64)
+	end
 	local badge, tone = Readiness.badge(result)
+	local color = if tone == "good" then K.good elseif tone == "wait" then K.warn else K.red
 	t.status.Text = badge
-	t.status.TextColor3 = if tone == "good" then K.good elseif tone == "wait" then K.warn else K.red
+	t.status.TextColor3 = color
+	t.status.Size = UDim2.fromOffset(CardKit.width(badge, 13, Theme.HeadingFont) + 20, 24)
+	if t.stroke then
+		t.stroke.Color = color
+	end
+	local action = t.action
+	if action then
+		local kind = if not mission then "shut" elseif result.ready and result.start.can then "good" elseif result.ready then "warn" else "primary"
+		action.Text = if not mission then "MISSIONS ›" elseif kind == "good" then "▶ START" elseif kind == "warn" then "READY CHECK ›" else "GET READY ›"
+		CardKit.paint(action, kind)
+	end
 	local goal = result.goal
 	t.goal.Text = if goal then `{goal.icon} {Readiness.goalLine(goal)}` elseif mission and result.ready then (result.start.why or "Everything it needs is yours") else ""
 	t.goal.TextColor3 = if goal and goal.afford then K.good elseif goal and goal.locked and goal.left <= 0 then K.warn elseif goal then K.text else K.secondary

@@ -203,4 +203,30 @@ function JobPick.more(count: number, hero: boolean): string
 	return if hero then `{count} MORE {noun}` else `{count} {noun}`
 end
 
+-- 6.18, the phone home's JOBS row ("7 jobs · best $1,140"): how many jobs you can take now, the best pay among them
+-- and whether that best one is a golden order (its value in gold). (0, 0, false) without a board.
+function JobPick.summary(offers: { any }?, onDuty: boolean, now: number): (number, number, boolean)
+	local count, top, golden = 0, 0, false
+	for _, offer in (if type(offers) == "table" then offers else {}) :: { any } do
+		local s = if type(offer) == "table" then spec(offer) else nil
+		if JobPick.blocked(offer, onDuty) or (s and (tonumber(s.expiresAt) or 0) <= now) then
+			continue
+		end
+		count += 1
+		if pay(offer) > top then
+			top = pay(offer)
+			golden = s ~= nil and s.kind == "golden"
+		end
+	end
+	return count, top, golden
+end
+
+-- 6.18: its facts line: "7 jobs · best " (the money is the caller's to write, Ui.money), nil without one to take.
+function JobPick.homeLine(count: number): string?
+	if count <= 0 then
+		return nil
+	end
+	return `{count} {if count == 1 then "job" else "jobs"} · best `
+end
+
 return JobPick

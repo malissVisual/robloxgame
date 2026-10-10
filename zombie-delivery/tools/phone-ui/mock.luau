@@ -63,8 +63,11 @@ function M.make(class,props,parent)
 end
 function methods:GetChildren() return table.clone(self._children) end
 function methods:IsA(class) return class==self.ClassName or class=="GuiObject" and not string.match(self.ClassName,"^UI") and self.ClassName~="ScreenGui" end
-function methods:FindFirstChild(name)
+function methods:FindFirstChild(name,recursive)
 	for _, child in self._children do if child.Name==name then return child end end
+	if recursive then
+		for _, child in self._children do local found=child:FindFirstChild(name,true);if found then return found end end
+	end
 	return nil
 end
 function methods:FindFirstChildOfClass(class)
