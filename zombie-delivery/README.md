@@ -1143,6 +1143,18 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## JOBS at a glance (6.17)
+
+The owner: "When I open JOBS I want to leave: it's cluttered and doesn't make me want to click a job." JOBS (the
+phone's app, and J once you have the phone) now shows the best job right now on one big card: a golden order when one
+is on the board (gold frame, "★ GOLDEN ORDER ×3", its countdown), else a regular's order, else the best-paying job you
+can take, with the business's picture, its danger stars, the pay in big numbers, the distance and time and one big
+button (TAKE GOLDEN ORDER, TAKE JOB, + ADD or + QUEUE). Beside it "N MORE JOBS" lists every other job in a compact row
+(picture, danger, business, distance and time, pay, a red "+"); a locked job is greyed and says why on a tap ("🔒 LV
+9"), a medal marks a business where you're a regular. A tap on a row (or the big card's ⓘ) shows all its details.
+YOUR RUN, NEXT UP and the rush-hour clock are chips at the top; ADD ALL · $X adds what it can; the old Dispatch board
+(REROLL, the car card) is behind FULL BOARD (`client/JobsView.luau`, `shared/JobPick.luau`, `Config.JobsView`).
+
 ## The job pictures ready at once (6.16.1)
 
 The owner: "when I open JOBS the pictures load slowly". Roblox fetches an image the first time it is drawn, so the job
