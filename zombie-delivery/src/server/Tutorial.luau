@@ -369,7 +369,7 @@ local function bikeCheck(player: Player)
 	-- biggest such bag when one level opens two)
 	local opened: Config.KitDef? = nil
 	for _, def in Config.Kit do
-		if def.extra and def.level > before and def.level <= level and not profile.kit[def.id] then
+		if def.extra and def.level > before and def.level <= level and not profile.bags[def.id] then -- (6.23: this game's)
 			opened = def
 		end
 	end
@@ -430,6 +430,8 @@ function Tutorial.onPlay(player: Player)
 		{ money = if profile then profile.packRefund else nil, text = Config.Courier.PackRefund, shop = "bags" },
 		{ money = if profile then profile.jacketRefund else nil, text = Config.Courier.JacketRefund, shop = "bags" },
 		{ money = if profile then profile.shoeRefund else nil, text = Config.Courier.ShoeRefund, shop = "supplies" },
+		-- 6.23: the bags owned for good before (bags are bought for each game now: profile.bagRefund, never saved)
+		{ money = if profile then profile.bagRefund else nil, text = Config.BagShop.Refunded, shop = "bags" },
 	} do
 		local refund = retired.money
 		if profile and refund and refund > 0 then
@@ -448,6 +450,7 @@ function Tutorial.onPlay(player: Player)
 		profile.packRefund = nil
 		profile.jacketRefund = nil
 		profile.shoeRefund = nil
+		profile.bagRefund = nil -- (6.23 review: a PLAY again says it once)
 	end
 	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0.1: the vest's price in your pocket, not owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then

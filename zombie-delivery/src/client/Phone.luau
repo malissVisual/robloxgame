@@ -257,16 +257,17 @@ local function margeTips(level: number): { string }
 	local tips: { string } = {}
 	if level == 1 then
 		table.insert(tips, "Welcome to Dead End Dispatch. No wheels yet, so you walk: letters, medicine, pizza, parcels. Take the ON FOOT runs on the board (J). Be quick and they tip.")
-		-- (6.6: no backpacks: the next bag up, at ZDC Bags by the spawn)
-		local bigger: Config.KitDef? = nil
+		-- (6.6: no backpacks: the next bag up, at ZDC Bags by the spawn; 6.23: every bag is bought for each game, the
+		-- cheapest first)
+		local cheapest: Config.KitDef? = nil
 		for _, def in Config.Kit do
-			if def.extra and def.id ~= Config.Courier.BagKit and (bigger == nil or def.price < (bigger :: Config.KitDef).price) then
-				bigger = def
+			if def.extra and (cheapest == nil or def.price < (cheapest :: Config.KitDef).price) then
+				cheapest = def
 			end
 		end
 		-- (6.12.2: no Running Shoes in her tip any more: they are gone)
-		if bigger then
-			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}, your bag more. The {bigger.name} at {Config.BagShop.Name} (by the spawn) holds {bigger.extra or 0} ({Career.money(bigger.price)}). The SHOP app says what you can afford.`)
+		if cheapest then
+			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}. A bag holds more, and you buy it for each game at {Config.BagShop.Name} (by the spawn): the {cheapest.name} holds {cheapest.extra or 0} ({Career.money(cheapest.price)}). The SHOP app says what you can afford.`)
 		end
 	end
 	-- (5.1: the bike shop at Career.BIKE_LEVEL is Marge's own text from the server, with the GPS: server/Tutorial.luau)
@@ -1208,7 +1209,8 @@ local function affordable(): boolean
 	local owned = kit()
 	local level = myLevel()
 	for _, def in Config.Kit do
-		if not owned[def.id] and level >= def.level and money() >= def.price then
+		-- (6.23: no bag: bought for each game, not in the SHOP app's SAVE UP)
+		if not def.extra and not owned[def.id] and level >= def.level and money() >= def.price then
 			return true
 		end
 	end

@@ -359,9 +359,9 @@ do
 			and (where("stage", "van:2") :: Career.Where).place == "mechanic" and (where("cargun", Config.CarGuns[1].id) :: Career.Where).label == "Wrench Garage")
 	check("6.14: a gun at Lead & Co.'s range; the starter pistol and a reward gun need no trip", (where("gun", "shotgun") :: Career.Where).place == "guns" and (where("gun", "shotgun") :: Career.Where).label == Config.GunRange.Shop
 		and where("gun", "pistol") == nil and where("gun", "carbine") == nil)
-	check("6.14: kit at its counter of the gear stall (a bag at ZDC Bags, a vest at Last Stop Supplies), the bat at the range, the starter bag nowhere",
+	check("6.14: kit at its counter of the gear stall (a bag at ZDC Bags, a vest at Last Stop Supplies), the bat at the range (6.23: the plastic bag too, bought for each game)",
 		(where("kit", "tote") :: Career.Where).place == "bags" and (where("kit", "kevlar") :: Career.Where).place == "supplies" and (where("kit", "kevlar") :: Career.Where).label == "Last Stop Supplies"
-			and (where("kit", "bat") :: Career.Where).place == "guns" and where("kit", "bag") == nil)
+			and (where("kit", "bat") :: Career.Where).place == "guns" and (where("kit", "bag") :: Career.Where).place == "bags")
 	check("6.14: an employer's job at the employer's place (its landmark), a board job and a danger level on JOBS",
 		(where("job", "schoolrun") :: Career.Where).place == "school" and landmarks.school == true and (where("tier", "1") :: Career.Where).window == "jobs" and (where("foot", "foot") :: Career.Where).window == "jobs")
 	check("6.14: a campaign opens MISSIONS, a garage or a home ESTATE", (where("campaign", "dispatch") :: Career.Where).window == "missions" and (where("garage", "garage_rented") :: Career.Where).window == "estate" and (where("estate", "sunset") :: Career.Where).window == "estate")

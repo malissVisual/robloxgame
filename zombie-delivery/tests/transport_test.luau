@@ -43,7 +43,7 @@ check("6.12.2: nothing in the kit speeds you up any more (the Heavy Armour only 
 	return true
 end)())
 check("an unknown id is nil", Transport.findKit("rocketpack") == nil)
-check("6.0: the plastic bag at level 1: 2 extra (6.7: the starter, $0)", kit("bag").price == 0 and kit("bag").starter == true and kit("bag").level == 1 and kit("bag").extra == 2 and (kit("bag") :: any).room == nil)
+check("6.0: the plastic bag at level 1: 2 extra (6.23: $20 for each game, no starter)", kit("bag").price == 20 and kit("bag").starter == nil and kit("bag").level == 1 and kit("bag").extra == 2 and (kit("bag") :: any).room == nil)
 local seen: { [string]: boolean } = {}
 local unique = true
 for _, def in Config.Kit do

@@ -819,7 +819,7 @@ do
 	M.broken["kit:hivis"]=nil
 	Phone.setState({phone=true,money=1600,kit={},cars={},items={medkit=2}})
 	named("Tab_items").Activated:Fire()
-	check("6.21: nobody says the hand: no IN HAND chip, no bag: NO BAG YET",pop("InHand")==nil and pop("HoldBag").Text=="NO BAG YET")
+	check("6.21: nobody says the hand: no IN HAND chip; 6.23: no bag this game: BUY A BAG",pop("InHand")==nil and pop("HoldBag").Text=="BUY A BAG")
 end
 named("Tab_bags").Activated:Fire()
 check("BAGS shows the bags you own",showing("bag") and named("BagsRows")~=nil and named("Tab_bags"):FindFirstChild("Underline")~=nil)

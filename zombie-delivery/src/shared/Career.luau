@@ -264,7 +264,7 @@ function Career.rewardParts(reward: Config.LevelReward?): { string }
 	end
 	local kit = Career.kitOf(reward)
 	if kit then
-		table.insert(parts, `the {kit.name}`) -- 5.7
+		table.insert(parts, if kit.extra then `the {kit.name} for this game` else `the {kit.name}`) -- 5.7 (6.23: a bag is per game)
 	end
 	if reward.paint then
 		local paint = Economy.findPaint(reward.paint)

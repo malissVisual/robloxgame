@@ -222,6 +222,9 @@ function StylePreview.show(holder: Instance, tab: string, def: Config.CosmeticDe
 			if def and (def.slot == "vest" or def.slot == "bag") then
 				note = "Your vest and bag show once you are in the world."
 			end
+		elseif def and def.slot == "bag" and not model:FindFirstChild("KitBagArt") then
+			-- 6.23: no bag on you this game (bags are bought for each game): the colour shows on the bag you buy
+			note = `No bag this game: the colour shows on the bag you buy at {Config.BagShop.Name}.`
 		end
 		local m = model :: Model
 		still(m)

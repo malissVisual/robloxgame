@@ -125,7 +125,7 @@ do
 	info.down, info.carJob = false, true
 	check("a car job: hands only", select(2, Inventory.handLine("bag", info)) == "HANDS ONLY ON THIS JOB")
 	info.ownsBag = false
-	check("no bag", Inventory.handLine("bag", info) == "NO BAG")
+	check("no bag (6.23: this game: BUY A BAG)", Inventory.handLine("bag", info) == "NO BAG" and select(2, Inventory.handLine("bag", info)) == "BUY A BAG")
 	info.gun = nil
 	check("no gun", Inventory.handLine("gun", info) == "NO GUN")
 	info.keys = false

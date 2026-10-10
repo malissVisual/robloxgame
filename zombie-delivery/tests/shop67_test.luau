@@ -169,8 +169,8 @@ end
 check("ZDC Bags: the five bags", table.concat(shops.bags or {}, ",") == "bag,tote,thermal,padded,duffel", table.concat(shops.bags or {}, ","))
 check("Last Stop Supplies: the vest, the armour (6.12.2: no shoes)", table.concat(shops.supplies or {}, ",") == "hivis,kevlar,heavy", table.concat(shops.supplies or {}, ","))
 check("Lead & Co.: the bat", table.concat(shops.guns or {}, ",") == "bat")
-check("the starters are never sold ($0): the plastic bag and the pistol", (Transport.findKit("bag") :: Config.KitDef).starter == true
-	and (Transport.findKit("bag") :: Config.KitDef).price == 0 and (Economy.findWeapon("pistol") :: Config.WeaponDef).starter == true
+check("the starter is never sold ($0): the pistol (6.23: the plastic bag is sold for each game, $20)", (Transport.findKit("bag") :: Config.KitDef).starter == nil
+	and (Transport.findKit("bag") :: Config.KitDef).price == Config.BagShop.PerGame.bag and (Economy.findWeapon("pistol") :: Config.WeaponDef).starter == true
 	and (Economy.findWeapon("pistol") :: Config.WeaponDef).price == 0)
 check("every other piece of kit has a price", (function()
 	for _, def in Config.Kit do

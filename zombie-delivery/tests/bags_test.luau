@@ -48,12 +48,15 @@ local want = {
 }
 for id, n in want do
 	local def = kit(id)
-	check(`{def.name}: \${n[1]} base (6.19: × Prices.Kit), level {n[2]}, +{n[3]}`, def.price == Config.priced(n[1], Config.Prices.Kit) and def.level == n[2] and def.extra == n[3], `{def.price} {def.level} {def.extra}`)
+	-- (6.23: the price is for one game, Config.BagShop.PerGame; the base × Prices.Kit is an old save's refund)
+	check(`{def.name}: \${n[1]} base (6.19: × Prices.Kit, 6.23: the refund), level {n[2]}, +{n[3]}`, Config.BagShop.Refund[id] == Config.priced(n[1], Config.Prices.Kit)
+		and def.level == n[2] and def.extra == n[3], `{Config.BagShop.Refund[id]} {def.level} {def.extra}`)
+	check(`6.23: {def.name} for one game: \${Config.BagShop.PerGame[id]}`, def.price == Config.BagShop.PerGame[id] and def.price > 0, def.price)
 	check(`{def.name}: the sprint first in its words`, string.find(def.description, "Sprint with your deliveries", 1, true) ~= nil, def.description)
 	check(`{def.name}: no room on the back, no walk speed`, (def :: any).room == nil and def.speed == nil and (def :: any).warm == nil)
 end
 check("the shoes are no bag", not Transport.isBag(kit("shoes")) and not Transport.isBag(nil))
-check("6.7: the plastic bag is the starter (not sold), the other bags are", kit("bag").starter == true and kit("tote").starter == nil and kit("duffel").starter == nil)
+check("6.23: no bag is a starter (every bag is bought for each game)", kit("bag").starter == nil and kit("tote").starter == nil and kit("duffel").starter == nil)
 check("6.7: every bag at ZDC Bags", Transport.kitShop(kit("bag")) == "bags" and Transport.kitShop(kit("duffel")) == "bags")
 
 -- 6.6, one carrying item: the backpacks are gone, their owners paid back ------------------------------------------
@@ -230,6 +233,76 @@ check("a worn bag's bounce: none standing, some walking, never over the amount",
 check("a broken bounce is none", BagSwing.bob(0 / 0, 10, 0.06, 3.5, 28) == 0 and BagSwing.bob(1, 10, 0.06, 0, 28) == 0)
 local wear = BagSwing.tuning(base, Config.Courier.Wear)
 check("on the shoulder or the hip: stiffer and smaller than in the hand", wear.Spring > base.Spring and wear.MaxTilt < base.MaxTilt and wear.Flutter == 0)
+
+-- 6.23, bags for each game (Config.BagShop: PerGame, Free, Refund, Flag; Transport.withBags / startBags / bagRefund) --
+
+local B = Config.BagShop
+local foot = (Config.Jobs :: any).Foot
+local last = 0
+for _, id in bags do
+	local def = kit(id)
+	check(`6.23: {def.name}: dearer than the bag before it, cheaper than it was for good`, def.price > last and (B.Refund[id] == 0 or def.price < B.Refund[id]), `{def.price} {B.Refund[id]}`)
+	last = def.price
+	check(`6.23: {def.name}: a small share of a game's pay (at most 4 of the best foot jobs)`, def.price <= foot.PayMax * 4, def.price)
+end
+check("6.23: the plastic bag costs less than the smallest foot job pays", kit("bag").price <= foot.PayMin and kit("bag").price > 0)
+check("6.23: the prices are $20 / $60 / $120 / $200 / $350", kit("bag").price == 20 and kit("tote").price == 60 and kit("thermal").price == 120
+	and kit("padded").price == 200 and kit("duffel").price == 350)
+check("6.23: the vests and the bat keep their price for good (× Prices.Kit)", kit("kevlar").price == Config.priced(600, Config.Prices.Kit)
+	and kit("bat").price == Config.priced(150, Config.Prices.Kit) and B.Refund.kevlar == nil)
+check("6.23: every bag is per game, nothing else is", Transport.perGame(kit("tote")) and Transport.perGame(kit("bag")) and not Transport.perGame(kit("kevlar"))
+	and not Transport.perGame(kit("bat")) and not Transport.perGame(nil))
+check("6.23: a bag never becomes the savings goal", Config.Readiness.NotGoals.bag == true)
+
+-- the start of a game: the tutorial's free bag, else none
+local fresh = Transport.startBags(false)
+check("6.23: the tutorial ahead: the free plastic bag for this game", fresh.bag == true and B.Free == "bag" and Transport.bagRoom(fresh, nil) == 2)
+local veteran = Transport.startBags(true)
+check("6.23: the tutorial done: no bag, the hands only", next(veteran) == nil and Transport.activeBag(veteran, nil) == nil
+	and Transport.bagRoom(veteran, nil) == 0 and Transport.handsRoom(veteran, nil) == Config.Cargo.HandsMax)
+
+-- the kit as it is this game: the saved kit's bags never count, this game's bags do
+local savedKit = { kevlar = true, hivis = true, tote = true, duffel = true }
+local now = Transport.withBags(savedKit, {})
+check("6.23: a bag in the kit for good is ignored (none bought this game)", now.kevlar == true and now.hivis == true and now.tote == nil and now.duffel == nil
+	and Transport.activeBag(now, "duffel") == nil)
+local session = { thermal = true }
+now = Transport.withBags(savedKit, session)
+check("6.23: this game's bags join the kit", now.thermal == true and now.kevlar == true and now.tote == nil and Transport.activeBag(now, nil) == kit("thermal"))
+check("6.23: no bags table at all: no bag", Transport.withBags(savedKit, nil).tote == nil)
+check("6.23: withBags makes a new table", Transport.withBags(savedKit, session) ~= savedKit and savedKit.thermal == nil)
+-- buying a better one this game: the bags bought this game are the ones you switch between (USE)
+session.duffel = true
+check("6.23: two bags this game: the best by default, USE picks the other", Transport.activeBag(session, nil) == kit("duffel")
+	and Transport.activeBag(session, "thermal") == kit("thermal") and Transport.activeBag(session, "tote") == kit("duffel"))
+check("6.23: the room is the bag in use's, never the sum", Transport.bagRoom(session, "thermal") == 4 and Transport.bagRoom(session, nil) == 6)
+-- a level's reward bag goes into this game's bags (server/PlayerData.luau kitTable); had already: its per-game price
+local Career = require("./Career")
+local rewardBags: { [string]: boolean } = {}
+check("6.23: level 3's Canvas Tote for this game", Career.grantKit(Career.reward(3), rewardBags) == 0 and rewardBags.tote == true)
+check("6.23: had this game already: its price for one game instead", Career.grantKit(Career.reward(3), rewardBags) == kit("tote").price)
+check("6.23: the reward in words says for this game", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "Canvas Tote for this game", 1, true) ~= nil)
+
+-- an old save's bags, paid back once at the price they were sold at (base × Prices.Kit)
+local old = { money = 500, levelRewards = { ["2"] = true }, kit = { bag = true, tote = true, thermal = true, kevlar = true } }
+local money, names = Transport.bagRefund(old)
+check("6.23: an old save's bags paid back: the tote and the thermal bag (the plastic bag was free)",
+	money == Config.priced(120, Config.Prices.Kit) + Config.priced(300, Config.Prices.Kit) and money == 300 + 750, money)
+check("6.23: their names (no plastic bag: nothing paid for it)", table.concat(names, ",") == "Canvas Tote,Thermal Delivery Bag", table.concat(names, ","))
+local every = { money = 0, levelRewards = {}, kit = { bag = true, tote = true, thermal = true, padded = true, duffel = true } }
+check("6.23: every bag: $300 + $750 + $1,600 + $3,000", (Transport.bagRefund(every)) == 300 + 750 + 1600 + 3000, (Transport.bagRefund(every)))
+check("6.23 review: a bag a level gave (level 3's tote, level 4's thermal) is not paid back",
+	(Transport.bagRefund({ money = 1, levelRewards = { ["2"] = true, ["3"] = true, ["4"] = true }, kit = { tote = true, thermal = true, duffel = true } })) == 3000)
+check("6.23 review: a save from before the level rewards (none listed): its reward bags count as given",
+	(Transport.bagRefund({ money = 1, kit = { tote = true, padded = true } })) == 1600)
+check("6.23: once: a save with the flag gets nothing", (Transport.bagRefund({ money = 500, kit = { tote = true }, [B.Flag] = true })) == 0 and B.Flag == "perGameBags")
+check("6.23: only a real save (a lock-only record of a new player has no money)", (Transport.bagRefund({ kit = { tote = true } })) == 0)
+check("6.23: no kit, a broken save: nothing", (Transport.bagRefund({ money = 1 })) == 0 and (Transport.bagRefund(nil)) == 0 and (Transport.bagRefund("x")) == 0
+	and (Transport.bagRefund({ money = 1, kit = "tote" })) == 0)
+check("6.23: only the plastic bag: nothing to pay back", (Transport.bagRefund({ money = 1, kit = { bag = true } })) == 0)
+check("6.23: the notice names the money", string.find(string.gsub(B.Refunded, "{money}", "$1050"), "Bags are now bought for each game: $1050 refunded for your bags.", 1, true) ~= nil)
+check("6.23: the hints", B.NoBag == "No bag this game: buy one at ZDC Bags (by the spawn)." and B.BuyHint == "BUY A BAG" and B.ForGame == "FOR THIS GAME"
+	and Holding.whyText("nobag") == B.NoBag)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

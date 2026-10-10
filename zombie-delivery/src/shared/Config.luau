@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.22"
+Config.Version = "6.23"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1216,7 +1216,8 @@ export type GearDef = {
 -- 6.7: the Thermal Jacket (warm: food cooled ×0.8) is gone (the Thermal Delivery Bag keeps food hot; Config.RetiredKit
 -- pays it back once). `tips` = the share of an order's pay a piece adds as the customer's tip on every delivery (the
 -- Courier Vest: shared/JobRules.luau kitTip, server/Jobs.luau payOrder). `starter` = every profile has it (the plastic
--- bag: "STARTER · yours", never sold). `shop` = the Map.Shops id that sells it (shared/Transport.luau kitShop: else a
+-- bag: "STARTER · yours", never sold; 6.23: no piece is a starter any more). 6.23: the bags (a piece with `extra`) are
+-- not kept for good: they are bought for each game (Config.BagShop PerGame, profile.bags, never saved). `shop` = the Map.Shops id that sells it (shared/Transport.luau kitShop: else a
 -- bag at ZDC Bags, the rest at Last Stop Supplies): the Baseball Bat at Lead & Co. `melee` = the Config.Melee kind it
 -- turns the punch into (the bat).
 -- 6.0: extra = light pieces a bag adds on top of the hands.
@@ -1246,8 +1247,10 @@ export type GearDef = {
 --              from it) only while it is your hand: press 2 to swing it to the front again.
 export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, speed: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number?, carry: string?, stays: boolean?, tips: number?, starter: boolean?, shop: string?, melee: string? }
 Config.Kit = {
-	-- 6.7: every profile has it (newProfile, starterKit): not sold, "STARTER · yours" at ZDC Bags
-	{ id = "bag", name = "Plastic Bag", level = 1, price = 0, starter = true, icon = "🛍️", extra = 2, description = "Your starter bag. Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in." },
+	-- 6.7: every profile had it (newProfile, starterKit). 6.23: sold for each game like every bag (Config.BagShop
+	-- PerGame), free for the game only while the tutorial is ahead (Config.BagShop.Free); its base price stays 0, so an
+	-- old save is paid nothing back for it (Config.BagShop.Refund)
+	{ id = "bag", name = "Plastic Bag", level = 1, price = 0, icon = "🛍️", extra = 2, description = "A thin plastic bag. Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in." },
 	-- 6.0.1: the red reflective vest, no longer part of a new courier's body (server/CharacterArt/Geometry.luau hivis):
 	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
 	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it. 6.7: customers tip a courier
@@ -1311,6 +1314,29 @@ Config.BagShop = {
 	X = Config.GearStall.X + Config.GearStall.Depth / 2,
 	Z = Config.GearStall.Z - Config.GearStall.Counter,
 	Radius = Config.GearStall.Radius,
+	-- 6.23, bags for each game (the owner: "what if you always had to buy a backpack for the game"; he chose a bag
+	-- bought for each game, each server session): a bag is no longer yours for good. The bags bought this game live in
+	-- the server's profile only (profile.bags, never saved: server/PlayerData.luau), and so does the one in use
+	-- (profile.activeBag); leaving the game loses them, a death keeps them. After you join your hands carry alone until
+	-- you buy one here (the bottom bar's bag slot says BUY A BAG: a tap sets the GPS here).
+	--   PerGame   each bag's price for one game ($): set over Config.Kit's price after the 6.19 pass (no Kit knob on a
+	--             bag); a small share of one game's pay (a foot job pays ~$60 - $150)
+	--   Free      the bag a courier gets for free for the game while the tutorial is ahead (profile.tutorial false: a
+	--             brand-new courier's first game, a Studio test), so the first job and its tour stop "2 your bag" work
+	--   Refund    filled by the 6.19 pass below: each bag's price for good before 6.23 (its base price × the Kit knob),
+	--             what an old save is paid back once for each bag it owned (shared/Transport.luau bagRefund)
+	--   Flag      the save's mark that its bags were paid back (only real saves; every save is written with it)
+	--   Refunded  the notice ({money}), NoBag the one-time hint on your first foot run of a game without a bag, BuyHint
+	--             the bottom bar's bag slot line without a bag, Pill its pill, ForGame a bag's price label
+	PerGame = { bag = 20, tote = 60, thermal = 120, padded = 200, duffel = 350 } :: { [string]: number },
+	Free = "bag",
+	Refund = {} :: { [string]: number },
+	Flag = "perGameBags",
+	Refunded = "Bags are now bought for each game: {money} refunded for your bags.",
+	NoBag = "No bag this game: buy one at ZDC Bags (by the spawn).",
+	BuyHint = "BUY A BAG",
+	Pill = "BUY",
+	ForGame = "FOR THIS GAME",
 }
 
 -- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
@@ -4337,7 +4363,7 @@ Config.Courier = {
 	Step = 3.5,
 	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
-	BagUnlock = "Sprint with more of your deliveries: ZDC Bags at the depot has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
+	BagUnlock = "Sprint with more of your deliveries: ZDC Bags at the depot has the {name} for you now, {room} pieces in it, {price} for this game. It's on your GPS.", -- (6.23: bags for each game)
 	-- 6.6: Marge's text, once, to a save that owned a backpack (Config.RetiredKit): {money} is the refund
 	PackRefund = "Backpacks are gone: bags do it all now. You got {money} back.",
 	-- 6.7: Marge's text, once, to a save that owned the Thermal Jacket (Config.RetiredKit, its noJacket flag)
@@ -4461,7 +4487,7 @@ Config.Readiness = {
 	HardTier = 3,
 	Medkits = 1,
 	RepairKits = 1,
-	NotGoals = { medkit = true, repair = true } :: { [string]: boolean }, -- rows that never become the savings goal
+	NotGoals = { medkit = true, repair = true, bag = true } :: { [string]: boolean }, -- rows that never become the savings goal
 	Sound = "task_done",
 	LineHeight = 20,
 }
@@ -5402,7 +5428,8 @@ Config.ItemModel = {
 --   Vehicles  the dealer's cars and Earl's Old Van      Bikes    the bikes and the E-Scooter
 --   Stages    Wrench Garage's stages                    Upgrades Wrench Garage's tracks (baseCost)
 --   Guns      Lead & Co.'s guns                         CarGuns  the car guns
---   Gear      the car and bike gear                     Kit      the bags, the vests, the bat
+--   Gear      the car and bike gear                     Kit      the vests, the bat (6.23: a bag's price is set
+--                                                                for one game after it: Config.BagShop.PerGame)
 --   Paints    Wrench Garage's paints                    Style    the looks (Config.Cosmetics)
 --   Items     the consumables (medkits, repair kits, nitro, mines, molotovs, the energy drink, the jerry can)
 --   Rewards   the money of a level-up (Config.Levels.Rewards), raised in step so a level still feels like a boost
@@ -5464,6 +5491,14 @@ do -- 6.19: the one pass over the tables (see Config.Prices)
 	for _, reward in Config.Levels.Rewards do
 		if reward.money then
 			reward.money = priced(reward.money, P.Rewards)
+		end
+	end
+	-- 6.23: a bag's price is for one game (Config.BagShop.PerGame); its price for good (after the Kit knob) is kept as
+	-- an old save's refund (Config.BagShop.Refund)
+	for _, def in Config.Kit do
+		if def.extra then
+			Config.BagShop.Refund[def.id] = def.price
+			def.price = Config.BagShop.PerGame[def.id] or def.price
 		end
 	end
 end

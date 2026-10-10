@@ -32,6 +32,12 @@
 -- level (an old save has its level's points to spend at once); checked on load (Skills.clean: a save over its level's
 -- points gets every point back), an empty table in a save from before (no migration). The player attribute Skills
 -- carries them to the client (Skills.encode).
+-- 6.23, bags for each game (Config.BagShop): the bags bought this game are profile.bags, a per-game table that is never
+-- saved (leaving loses them, a death keeps them), and the bag in use (profile.activeBag) is no longer saved either. A
+-- game starts with no bag, except the free one while the tutorial is ahead (Transport.startBags: a brand-new courier's
+-- first game). The saved kit holds no bag any more: a real save from before (no perGameBags flag) is paid back once for
+-- the bags it owned (Transport.bagRefund, at the price they were sold at; profile.bagRefund, never saved, tells
+-- server/Tutorial.luau to say so; the money's reason "BagRefund"). PlayerData.giveKit puts a bag into profile.bags.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -92,10 +98,15 @@ export type Profile = {
 	title: string?, -- the title shown over your head and on the leaderboard (an earned one)
 	tutorial: boolean, -- 3.7: the first-day tutorial is done (or skipped); older saves with a delivery count as done
 	explored: string, -- 3.7: the map cells uncovered (shared/Explore.luau encodes them)
-	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: bags, shoes, a jacket, vests), yours for good
-	-- 6.4: the bag you chose to hold (a Config.Kit bag you own: USE in the KIT tab or the I window's BAGS); nil = the
-	-- best one owned (shared/Transport.luau activeBag decides, a choice no longer owned falls back to it too)
+	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: vests, the bat), yours for good (6.23: no bags)
+	-- 6.23: the bags bought this game (Config.Kit bag ids): per game, NEVER saved (Transport.startBags at the start)
+	bags: { [string]: boolean },
+	-- 6.4: the bag you chose to hold (a Config.Kit bag you have: USE in the KIT tab or the I window's BAGS); nil = the
+	-- best one (shared/Transport.luau activeBag decides, a choice no longer had falls back to it too). 6.23: per game,
+	-- never saved
 	activeBag: string?,
+	bagRefund: number?, -- 6.23: the money this load paid back for the bags owned for good before (never saved)
+	bagHinted: boolean?, -- 6.23: the "no bag this game" hint was given this game (server/Cargo.luau; never saved)
 	packRefund: number?, -- 6.6: the money this load paid back for retired backpacks (Marge says so once; never saved)
 	jacketRefund: number?, -- 6.7: … and for the retired Thermal Jacket (the same way)
 	shoeRefund: number?, -- 6.12.2: … and for the retired Running Shoes (the same way)
@@ -192,8 +203,11 @@ local function newProfile(): Profile
 		title = nil,
 		tutorial = false,
 		explored = "",
-		kit = { bag = true }, -- 6.0.2: the plastic bag from the start (the vest is bought)
+		kit = {}, -- 5.0 (6.23: no bag in it: the bags are bought for each game)
+		bags = require(Shared.Transport).startBags(false), -- 6.23: the tutorial's free bag (a new courier's first game)
 		activeBag = nil, -- 6.4: the best bag owned
+		bagRefund = nil, -- 6.23
+		bagHinted = nil, -- 6.23
 		packRefund = nil, -- 6.6
 		jacketRefund = nil, -- 6.7
 		shoeRefund = nil, -- 6.12.2
@@ -422,9 +436,16 @@ local function applySaved(profile: Profile, saved: any)
 	profile.packRefund = refunds.noPacks
 	profile.jacketRefund = refunds.noJacket
 	profile.shoeRefund = refunds.noShoes -- 6.12.2: the Running Shoes (their noShoes flag)
+	-- 6.23: the bags are bought for each game: a real save from before (no perGameBags flag) gets the price of the
+	-- bags it owned for good back, once (Transport.bagRefund); no bag is read into the kit (they are not kept)
+	local bagRefund = require(Shared.Transport).bagRefund(saved)
+	if bagRefund > 0 then
+		profile.money = math.min(profile.money + bagRefund, 2 ^ 50)
+		profile.bagRefund = bagRefund
+	end
 	if type(saved.kit) == "table" then
 		for _, def in Config.Kit do
-			if saved.kit[def.id] == true then
+			if saved.kit[def.id] == true and def.extra == nil then
 				profile.kit[def.id] = true
 			end
 		end
@@ -438,7 +459,7 @@ local function applySaved(profile: Profile, saved: any)
 		if profile.weapon == nil then
 			profile.weapon = Config.Arms.Starter
 		end
-		profile.kit.bag = true
+		-- (6.23: no plastic bag any more: the bags are bought for each game)
 	end
 	if saved.vestKit ~= true and saved.money ~= nil then -- (a real old save: not a lock-only record of a new player)
 		profile.kit[Config.Courier.VestKit] = true
@@ -455,13 +476,7 @@ local function applySaved(profile: Profile, saved: any)
 	profile.onboarding = AnalyticsPlan.onboardingFrom(saved)
 	-- 6.14: the regulars, checked (known businesses, whole counts up to Config.Regulars.Cap); none before 6.14: empty.
 	profile.regulars = require(Shared.Regulars).clean(saved.regulars)
-	-- 6.4: the bag chosen: kept only while it is a bag you own (else nil: the best one)
-	local chosen = if type(saved.activeBag) == "string" then saved.activeBag else nil
-	for _, def in Config.Kit do
-		if chosen ~= nil and def.id == chosen and def.extra ~= nil and profile.kit[def.id] == true then
-			profile.activeBag = def.id
-		end
-	end
+	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
 	end
@@ -677,6 +692,7 @@ function PlayerData.load(player: Player)
 			end
 		end
 		applySaved(profile, saved)
+		profile.bags = require(Shared.Transport).startBags(profile.tutorial) -- 6.23: the free bag only with the tutorial ahead
 		if not ok and player.Parent and not RunService:IsStudio() then
 			-- Never let a live player play on a profile that cannot be saved: they would lose all of it.
 			player:Kick("Your save could not be loaded right now (Roblox data service). Please rejoin in a moment.")
@@ -712,6 +728,7 @@ function PlayerData.load(player: Player)
 		changed:Fire(player)
 		-- 6.13: the retired kit's money back (applySaved), for the economy's numbers
 		tellMoney(player, (profile.packRefund or 0) + (profile.jacketRefund or 0) + (profile.shoeRefund or 0), "Refund", "RetiredKit")
+		tellMoney(player, profile.bagRefund or 0, "BagRefund", "Bags") -- 6.23: the bags owned for good, paid back
 	end
 end
 
@@ -797,6 +814,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		noPacks = true, -- 6.6: the backpacks are gone (applySaved pays an older save's back once)
 		noJacket = true, -- 6.7: the Thermal Jacket is gone (applySaved pays it back once)
 		noShoes = true, -- 6.12.2: the Running Shoes are gone (applySaved pays them back once)
+		perGameBags = true, -- 6.23: the bags are bought for each game (applySaved pays an older save's bags back once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,
@@ -811,8 +829,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		title = profile.title,
 		tutorial = profile.tutorial,
 		explored = profile.explored,
-		kit = profile.kit, -- 5.0
-		activeBag = profile.activeBag, -- 6.4
+		kit = profile.kit, -- 5.0 (6.23: no bag: profile.bags and profile.activeBag are per game, never saved)
 		style = profile.style, -- 6.12: the cosmetics owned and worn
 		phone = profile.phone, -- 5.0
 		vanQuest = profile.vanQuest, -- 5.0
@@ -977,20 +994,36 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 end
 
 -- 5.0: gives a piece of personal gear (Config.Kit: bought at Last Stop Supplies or ZDC Bags, the admin tools); true when it is new.
+-- 6.23: a bag goes into profile.bags (this game only, never saved), the rest into the kit (yours for good).
 function PlayerData.giveKit(player: Player, id: string): boolean
 	local profile = profiles[player]
-	local known = false
+	local found: Config.KitDef? = nil
 	for _, def in Config.Kit do
 		if def.id == id then
-			known = true
+			found = def
 		end
 	end
-	if not profile or not known or profile.kit[id] then
+	if not profile or not found then
 		return false
 	end
-	profile.kit[id] = true
+	local into = PlayerData.kitTable(profile, found)
+	if into[id] then
+		return false
+	end
+	into[id] = true
 	changed:Fire(player)
 	return true
+end
+
+-- 6.23: the table a piece of kit is had in: a bag in profile.bags (this game), the rest in profile.kit (for good).
+function PlayerData.kitTable(profile: Profile, def: Config.KitDef?): { [string]: boolean }
+	return if def and def.extra ~= nil then profile.bags else profile.kit
+end
+
+-- 6.23: the kit as it is this game (profile.kit's pieces + the bags bought this game): what the client's state carries
+-- and every reader that needs both (the room on foot, the outfit).
+function PlayerData.kitNow(profile: Profile): { [string]: boolean }
+	return require(Shared.Transport).withBags(profile.kit, profile.bags)
 end
 
 -- ── Driver levels (Config.Levels, shared/Levels.luau) ─────────────────────
@@ -1021,7 +1054,8 @@ local function giveLevelRewards(profile: Profile): number
 				end
 			end
 		end
-		local kitCash = Career.grantKit(reward, profile.kit) -- 5.7: the shoes, 6.6: the tote (owned: their price)
+		-- 5.7: the shoes, 6.6: the tote (owned: their price); 6.23: a bag for this game (profile.bags)
+		local kitCash = Career.grantKit(reward, PlayerData.kitTable(profile, Career.kitOf(reward)))
 		profile.money += kitCash
 		profile.earned += kitCash
 		cash += kitCash

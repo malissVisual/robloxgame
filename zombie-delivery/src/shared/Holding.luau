@@ -47,7 +47,7 @@ local Holding = {}
 Holding.Order = { "fists", "bag", "gun" }
 
 local WHY: { [string]: string } = {
-	nobag = "No bag yet: ZDC Bags at the depot sells them.", -- (6.6: the bag kiosk by the spawn)
+	nobag = "No bag this game: buy one at ZDC Bags (by the spawn).", -- (6.6: the bag kiosk by the spawn; 6.23: Config.BagShop.NoBag)
 	bagdown = "Your bag is on the ground where you set it down: go back and pick it up (E).",
 	nogun = "No gun in your hands yet: Lead & Co. sells guns. Till then, your fists.", -- (6.7: the pistol is every courier's, not sold)
 	seated = "Get out first.",

@@ -384,8 +384,8 @@ local function refresh(player: Player)
 	local wanted: { [string]: string } = {}
 	local worn: string? = nil
 	if humanoid and humanoid.Health > 0 and profile and player.Character == character and character.Parent then
-		local bag = TransportRules.activeBag(profile.kit, profile.activeBag) -- 6.4: the bag in your hand
-		wanted = KitFit.outfit(profile.kit, if bag then bag.id else "")
+		local bag = TransportRules.activeBag(profile.bags, profile.activeBag) -- 6.4: the bag in your hand (6.23: this game's)
+		wanted = KitFit.outfit(PlayerData.kitNow(profile), if bag then bag.id else "")
 		if holdsPhone(player, character, humanoid) then
 			wanted.phone = "phone"
 		end
@@ -405,7 +405,7 @@ local function refresh(player: Player)
 		if character:GetAttribute("Hand") == "bag" and not wanted.hand and not wearer.told then
 			wearer.told = true
 			local owned: { string } = {}
-			for id, on in profile.kit do
+			for id, on in PlayerData.kitNow(profile) do
 				if on == true then
 					table.insert(owned, tostring(id))
 				end

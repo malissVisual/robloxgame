@@ -219,8 +219,14 @@ local function holdAct(ctx: Ctx): ShopView.Act
 		return { name = "HoldBag", text = "IN YOUR HAND", on = false }
 	end
 	local can, why = Holding.can("bag", owns, true, bagDown())
-	if not can then
-		return { name = "HoldBag", text = if why == "bagdown" then "BAG ON THE GROUND" else "NO BAG YET", on = false, why = Holding.whyText(why or "nobag") }
+	if not can and why ~= "bagdown" then
+		-- 6.23: no bag this game (bags are bought for each game): BUY A BAG sets the GPS to ZDC Bags
+		return { name = "HoldBag", text = Config.BagShop.BuyHint, on = true, kind = "good", run = function()
+			local name = require(script.Parent.Gps).to("bags")
+			ctx.toast(`GPS: {name or Config.BagShop.Name}`)
+		end }
+	elseif not can then
+		return { name = "HoldBag", text = "BAG ON THE GROUND", on = false, why = Holding.whyText(why) }
 	end
 	local key = Holding.keyOf("bag") or 2
 	return {
@@ -476,7 +482,7 @@ local function onYou(ctx: Ctx): { Item }
 	if #names > 0 then
 		table.insert(out, {
 			id = "mybags",
-			name = "My bags",
+			name = "Bags this game", -- (6.23: bought for each game)
 			picture = { model = if shown then `kit:{shown}` else nil, emoji = "👜" },
 			fact = table.concat(names, " · "),
 			value = tostring(#names),
@@ -510,14 +516,14 @@ local function bags(ctx: Ctx): ({ Item }, number)
 			id = def.id,
 			name = def.name,
 			picture = { model = `kit:{def.id}`, icon = Icons.kit(def.id), emoji = def.icon },
-			fact = (if mine then "✓ IN USE · " else "") .. `🏃 LIGHT PIECES{perk}`,
+			fact = (if mine then "✓ IN USE · " else "✓ THIS GAME · ") .. `🏃 LIGHT PIECES{perk}`, -- (6.23)
 			value = `+{def.extra}`,
 			owned = true,
 			accent = BLUE,
 			act = if mine then { text = "IN USE", on = false } else { text = "USE THIS BAG", short = "USE", on = true, kind = "good", run = function()
 				Net.get("Kit"):FireServer("use", id)
 			end },
-			lines = { def.description },
+			lines = { def.description, "Bought this game: leaving the game loses it (a death does not)." },
 		})
 	end
 	return out, missing
@@ -638,7 +644,11 @@ function BagUi.draw(list: Instance, ctx: Ctx, order: number): any
 		local missing
 		items, missing = bags(ctx)
 		name = "BagsRows"
-		foot = if missing > 0 then `{missing} more {if missing == 1 then "bag" else "bags"} at {Config.BagShop.Name}, by the spawn.` else nil
+		-- 6.23: the bags bought this game (bags are bought for each game, Config.BagShop)
+		section = if #items > 0 then `BOUGHT THIS GAME · {#items}` else nil
+		foot = if #items == 0 then Config.BagShop.NoBag
+			elseif missing > 0 then `{missing} more {if missing == 1 then "bag" else "bags"} at {Config.BagShop.Name}, by the spawn: bought for this game.`
+			else nil
 	elseif ctx.tab == "cars" then
 		items = cars(ctx)
 		hero = nil

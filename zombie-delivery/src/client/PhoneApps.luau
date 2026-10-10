@@ -572,9 +572,10 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 		})
 	end
 	-- The personal gear still worth buying (Config.Kit), the cheapest first: 6.6: the bags (ZDC Bags), then the rest of
-	-- the kit (Last Stop Supplies); 6.7: each piece at its own shop (the Baseball Bat at Lead & Co.'s range).
+	-- the kit (Last Stop Supplies); 6.7: each piece at its own shop (the Baseball Bat at Lead & Co.'s range). 6.23: no
+	-- bags here: a bag is bought for each game (Config.BagShop), nothing to save up for (the bottom bar's BUY A BAG).
 	local owned = if type(state) == "table" and type(state.kit) == "table" then state.kit else {}
-	for _, shopId in { "bags", "supplies", "guns" } do
+	for _, shopId in { "supplies", "guns" } do
 		local wanted: { Config.KitDef } = {}
 		for _, def in Config.Kit do
 			if not owned[def.id] and Transport.kitShop(def) == shopId then
