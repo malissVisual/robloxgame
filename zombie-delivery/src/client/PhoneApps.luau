@@ -177,7 +177,7 @@ local function lockOf(offer: any): (string?, string?)
 end
 
 -- 6.17: a job's one action (the old card's button, the JOBS app's hero button and its rows' "+"): locked, why; off
--- duty ACCEPT (AcceptJob, then ORDERS); on a run + ADD (AcceptJob: it joins the run), + QUEUE (JobQueue "queue": it
+-- duty ACCEPT (AcceptJob, then the phone closes: 6.19.1); on a run + ADD (AcceptJob: it joins the run), + QUEUE (JobQueue "queue": it
 -- waits in NEXT UP) or why neither. A job taken or queued leaves the phone's board until the board comes back.
 local function act(offer: any, host: Host)
 	local label, why = lockOf(offer)
@@ -198,7 +198,7 @@ local function act(offer: any, host: Host)
 		if onDuty then
 			host.redraw()
 		else
-			host.go("orders")
+			host.close() -- 6.19.1: the phone closes; client/JobStartCard.luau shows the job (ORDERS stays a tap away)
 		end
 	elseif waits then
 		Net.get("JobQueue"):FireServer("queue", offer.index)

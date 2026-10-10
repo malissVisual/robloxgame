@@ -272,7 +272,7 @@ check("… its details say NEEDS 6 SLOTS",text("📦 NEEDS 6 SLOTS")~=nil)
 tap("‹ JOBS")
 within(rowOf(11),"Add").Activated:Fire()
 check("a row's + off duty is ACCEPT: AcceptJob with the offer's index",lastSent("AcceptJob").args[1]==11)
-check("after ACCEPT the popup shows ORDERS",showing("orders") and text("ORDERS")~=nil and upright())
+check("6.19.1: after ACCEPT the phone closes (no ORDERS popping up)",not Phone.isOpen())
 -- A run that takes more orders: + ADD keeps the board open.
 local run={cargo="Letters",customer="Ann",total=1,pay=40,endsAt=M.now+100,timeLimit=200,position=M.Vector3.new(10,0,10),mode="foot",stack={can=true}}
 M.remotes.Job.OnClientEvent:Fire(run)

@@ -1232,6 +1232,14 @@ it, the prompt counts "2 / 3"), at a drop "Take off bike"; the next-step card sa
 ### CARRYING reads right (6.19)
 The bag's pieces were counted twice ("7/6"); the pill now shows one icon per kind of piece with ×n.
 
+### JOB STARTED instead of ORDERS (6.19.1)
+The owner: "when you take a job something else pops up, SHOW ROUTE, that's boring; only for missions, and a nicer UI".
+Taking a job no longer opens the phone's ORDERS: the phone closes and a card slides in at the top for 4 s
+(`client/JobStartCard.luau`, the UI kit's look): the business's picture, "JOB STARTED · 🚲 BY BIKE", its name, where it
+goes, the pay big and green, the clock, the first stop's words and a red line running out. The GPS draws the route.
+The server's start notice now goes only for a mission or the tutorial (the card says the rest). Missions keep their
+briefing; ORDERS stays on the phone (YOUR RUN's DETAILS).
+
 ## One look everywhere (6.18)
 
 The owner: "unify it so the phone and the other popups look like JOBS". A UI kit (`client/CardKit.luau`,

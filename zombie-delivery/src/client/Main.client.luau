@@ -272,6 +272,7 @@ Net.get("State").OnClientEvent:Connect(function(state)
 	Phone.setState(state)
 end)
 Net.get("Job").OnClientEvent:Connect(Hud.setJob)
+Net.get("Job").OnClientEvent:Connect(require(Client.JobStartCard).onJob) -- 6.19.1: JOB STARTED (no ORDERS popping up)
 Net.get("Offers").OnClientEvent:Connect(DispatchUi.setOffers)
 Net.get("DeliveryResult").OnClientEvent:Connect(Hud.showResult)
 require(Client.RegularsApp).start(Hud.toast) -- 6.14: a regulars' tier reached (the State): a toast and a sting
