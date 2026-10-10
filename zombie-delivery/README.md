@@ -1143,6 +1143,52 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Prices as milestones (6.19)
+
+The owner: "make everything more expensive so they're real milestones." Following the 6.14 design, jobs are the grind,
+you save up for something, then you move on in the missions. One central knob sets every price: `Config.Prices`, at the end of
+`src/shared/Config.luau`. The tables above it keep their base prices. One pass, run once when Config loads, multiplies
+each `price` (and the Wrench Garage tracks' `baseCost`) by its kind's knob and rounds it to a nice step: $5 under
+$100, $50 under $1,000, $100 under $10,000 and $500 above (`Config.priced(base, knob)`). Everything that sells,
+checks or shows a price reads these tables. The shops, the server's checks, Earl, Readiness's savings goal, the career
+road and the signs all follow on their own.
+
+| Knob | × | What |
+|---|---|---|
+| Vehicles | 3 | the dealer's cars and Earl's Old Van |
+| Bikes | 4 | the bikes and the E-Scooter |
+| Stages | 2.5 | Wrench Garage's stages |
+| Upgrades | 2.5 | Wrench Garage's tracks (engine, tyres, armor, plow, gun damage, fire rate) |
+| Guns, CarGuns | 2 | Lead & Co.'s guns, the car guns |
+| Gear | 2.5 | the car and bike gear (trolley, straps, cooler, roof rack, basket, panniers, trailer) |
+| Kit | 2.5 | the bags, the vests, the bat |
+| Paints, Style | 2 | Wrench Garage's paints, the looks (`Config.Cosmetics`) |
+| Items | 1.5 | the consumables: medkit, energy drink, molotov, repair kit, nitro, landmine, jerry can |
+| Rewards | 1.5 | a level-up's money (`Config.Levels.Rewards`: $750 at level 2 … $22,500 at 15) |
+
+Some prices stay as they were (×1). The real estate and the company are already the endgame. The repair shop's fee,
+fuel at the pump, the tow and the board's reroll fee are consumables. The old backpacks' payback (`Config.RetiredKit`)
+also stays. Free things stay free (0 × n), and reward-only things stay unsold. No save stores a price, so owned things stay owned and nothing is paid
+back.
+
+| First buys | Level | Before | After | A typical job then | Jobs, before → after |
+|---|---|---|---|---|---|
+| Courier Vest | 1 | $20 | $50 | on foot ~$100 | under 1 |
+| Canvas Tote (also level 3's reward) | 2 | $120 | $300 | on foot ~$100 | 1 → 3 |
+| Rusty Bike | 2 | $300 | $1,200 | on foot ~$100 | 3 → 12 |
+| Earl's Old Van | 4 | $1,800 | $5,400 | bike run ~$200 | 9 → 27 |
+| Patched Van (the first stage) | 4 | $250 | $650 | ★ ~$200 | 1 → 3 |
+| Engine Lv 1 (the first car upgrade) | 4 | $400 | $1,000 | ★ ~$200 | 2 → 5 |
+| Shotgun | 4 | $7,500 | $15,000 | ★★ ~$450 (level 5) | 17 → 33 |
+| Courier Van | 5 | $3,500 | $10,500 | ★★ ~$450 | 8 → 23 |
+| Box Truck | 7 | $22,000 | $66,000 | ★★★ ~$1,100 | 20 → 60 |
+| Muscle Car | 9 | $40,000 | $120,000 | ★★★★ ~$2,300 | 17 → 52 |
+
+"A typical job" counts the pay with its tip or fast bonus and the shift's share. Prices quoted in older sections of this README are
+the base prices from before 6.19. The tests check the base price × its knob (`Config.priced`), so tuning a knob only
+breaks the few text checks that show a price (`tests/readiness_test.luau`, `tests/vanquest_test.luau`, the phone
+recorder).
+
 ## One look everywhere (6.18)
 
 The owner: "unify it so the phone and the other popups look like JOBS". A UI kit (`client/CardKit.luau`,

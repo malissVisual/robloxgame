@@ -41,8 +41,8 @@ for _, stub in STUBS do
 end
 for _, stub in STUBS do
 	local def = Economy.findCar(stub.id) :: Config.CarDef
-	check(`{stub.id}: a bike, level {stub.level}, ${stub.price}, room {stub.capacity}, {stub.gearSlots} gear slots`, def.bike == true and def.level == stub.level
-		and def.price == stub.price and def.capacity == stub.capacity and def.gearSlots == stub.gearSlots)
+	check(`{stub.id}: a bike, level {stub.level}, ${stub.price} base (6.19: × Prices.Bikes), room {stub.capacity}, {stub.gearSlots} gear slots`, def.bike == true and def.level == stub.level
+		and def.price == Config.priced(stub.price, Config.Prices.Bikes) and def.capacity == stub.capacity and def.gearSlots == stub.gearSlots)
 end
 check("the van is still the first car", Config.Cars[1].id == "van" and not Config.Cars[1].bike)
 
@@ -51,9 +51,9 @@ check("the van is still the first car", Config.Cars[1].id == "van" and not Confi
 local function gear(id: string): Config.GearDef
 	return Economy.findGear(id) :: Config.GearDef
 end
-check("basket L2 $150 +2, panniers L3 $450 +3, trailer L4 $1,200 +4", gear("basket").level == 2 and gear("basket").price == 150 and gear("basket").room == 2
-	and gear("panniers").level == 3 and gear("panniers").price == 450 and gear("panniers").room == 3
-	and gear("trailer").level == 4 and gear("trailer").price == 1200 and gear("trailer").room == 4)
+check("basket L2 $150 +2, panniers L3 $450 +3, trailer L4 $1,200 +4 (bases; 6.19: × Prices.Gear)", gear("basket").level == 2 and gear("basket").price == Config.priced(150, Config.Prices.Gear) and gear("basket").room == 2
+	and gear("panniers").level == 3 and gear("panniers").price == Config.priced(450, Config.Prices.Gear) and gear("panniers").room == 3
+	and gear("trailer").level == 4 and gear("trailer").price == Config.priced(1200, Config.Prices.Gear) and gear("trailer").room == 4)
 check("all three are bike gear", gear("basket").bikeOnly == true and gear("panniers").bikeOnly == true and gear("trailer").bikeOnly == true)
 check("bike gear fits a bike", Economy.gearFits("rustbike", "basket") and Economy.gearFits("citybike", "panniers") and Economy.gearFits("ebike", "trailer"))
 check("… not a car", not Economy.gearFits("van", "basket") and not Economy.gearFits("courier", "panniers") and not Economy.gearFits("freight", "trailer"))
@@ -153,8 +153,8 @@ check("Career.BIKE_LEVEL is the BIKE jobs' level", Career.BIKE_LEVEL == bike.Lev
 -- 5.1.1, the E-Scooter ---------------------------------------------------------------------------------------------------
 
 local scooter = Economy.findCar("escooter") :: Config.CarDef
-check("the E-Scooter: a bike, level 3, $1,900 (6.7: below the Cargo Bike, at its level)", scooter ~= nil and scooter.bike == true and scooter.level == 3
-	and scooter.price == 1900 and scooter.price < (Economy.findCar("cargobike") :: Config.CarDef).price and not scooter.company)
+check("the E-Scooter: a bike, level 3, $1,900 base (6.19: × Prices.Bikes; 6.7: below the Cargo Bike, at its level)", scooter ~= nil and scooter.bike == true and scooter.level == 3
+	and scooter.price == Config.priced(1900, Config.Prices.Bikes) and scooter.price < (Economy.findCar("cargobike") :: Config.CarDef).price and not scooter.company)
 check("… style scooter, the rider stands, the badge", scooter.style == "scooter" and scooter.stand == true
 	and string.find(scooter.badge or "", "ELECTRIC", 1, true) ~= nil and string.find(scooter.badge or "", "STAND-UP", 1, true) ~= nil)
 check("… speed ~34 (6.0: not too fast; 6.14.1: 32 → 34), accel ~38 (a quick start, softened by Config.Scooter.Pull), turn ~2.8, health ~110", math.abs(scooter.maxSpeed - 34) <= 2 and math.abs(scooter.accel - 38) <= 2

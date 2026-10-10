@@ -34,7 +34,7 @@ end
 
 local drink = item("energy")
 local T = Config.ItemTuning
-check("the Energy Drink: $40, at most 5, not for a car, its words", drink ~= nil and drink.price == 40 and drink.max == 5 and drink.car == nil
+check("the Energy Drink: $40 base (6.19: × Prices.Items), at most 5, not for a car, its words", drink ~= nil and drink.price == Config.priced(40, Config.Prices.Items) and drink.max == 5 and drink.car == nil
 	and string.find(drink.description, "30 s", 1, true) ~= nil and string.find(drink.description, "1.3", 1, true) ~= nil)
 check("… 30 s of ×1.3 breath (Config.ItemTuning)", T.EnergyTime == 30 and T.EnergyBreath == 1.3)
 check("… sold with the items on foot, before the car items", (function()
@@ -71,7 +71,7 @@ check("a drain under 1 is kept (not clamped back to 1)", Stamina.step(Stamina.ne
 -- ── The Baseball Bat ─────────────────────────────────────────────────────────────────────────────────────────────
 
 local bat = Transport.findKit("bat") :: Config.KitDef
-check("the Baseball Bat: $150, level 1, at Lead & Co., a melee piece", bat ~= nil and bat.price == 150 and bat.level == 1 and bat.shop == "guns"
+check("the Baseball Bat: $150 base (6.19: × Prices.Kit), level 1, at Lead & Co., a melee piece", bat ~= nil and bat.price == Config.priced(150, Config.Prices.Kit) and bat.level == 1 and bat.shop == "guns"
 	and bat.melee == "bat" and Config.Melee.BatKit == "bat" and Transport.kitShop(bat) == "guns")
 local punch, strike, swing = Melee.def("punch"), Melee.def("gun"), Melee.def("bat")
 check("the bat's numbers: 30 damage, 0.7 s, push 44, 7 studs", swing.damage == 30 and swing.cooldown == 0.7 and swing.push == 44 and swing.reach == 7)

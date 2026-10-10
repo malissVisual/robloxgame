@@ -22,9 +22,9 @@ end
 
 local kevlar = Transport.findKit("kevlar") :: Config.KitDef
 local heavy = Transport.findKit("heavy") :: Config.KitDef
-check("the Kevlar Vest: −30%, $600, level 3", kevlar ~= nil and kevlar.armour == 0.3 and kevlar.price == 600 and kevlar.level == 3 and kevlar.speed == nil)
-check("the Heavy Armour: −50%, a little slower (×0.92), $1,500, level 5", heavy ~= nil and heavy.armour == 0.5 and heavy.speed == 0.92
-	and heavy.price == 1500 and heavy.level == 5)
+check("the Kevlar Vest: −30%, $600 base (6.19: × Prices.Kit), level 3", kevlar ~= nil and kevlar.armour == 0.3 and kevlar.price == Config.priced(600, Config.Prices.Kit) and kevlar.level == 3 and kevlar.speed == nil)
+check("the Heavy Armour: −50%, a little slower (×0.92), $1,500 base (6.19: × Prices.Kit), level 5", heavy ~= nil and heavy.armour == 0.5 and heavy.speed == 0.92
+	and heavy.price == Config.priced(1500, Config.Prices.Kit) and heavy.level == 5)
 check("both: a name, an icon, words", kevlar.name ~= "" and kevlar.icon ~= "" and kevlar.description ~= "" and heavy.name ~= "" and heavy.icon ~= "" and heavy.description ~= "")
 check("a vest carries nothing", Transport.handsRoom({ kevlar = true, heavy = true }) == Config.Cargo.HandsMax)
 local others = true
@@ -74,7 +74,7 @@ end)())
 
 -- 6.0.1: the Courier Vest (the red reflective vest a new courier buys): a look, no armour, sold next to the bag.
 local hivis = Transport.findKit(Config.Courier.VestKit) :: Config.KitDef
-check("the Courier Vest: $20, level 1, an icon and words", hivis ~= nil and hivis.id == "hivis" and hivis.name == "Courier Vest" and hivis.price == 20
+check("the Courier Vest: $20 base (6.19: × Prices.Kit, still under one job), level 1, an icon and words", hivis ~= nil and hivis.id == "hivis" and hivis.name == "Courier Vest" and hivis.price == Config.priced(20, Config.Prices.Kit) and hivis.price <= 60
 	and hivis.level == 1 and hivis.icon == "🦺" and hivis.description ~= "")
 check("the Courier Vest takes nothing off and adds nothing", hivis.armour == nil and Armour.best({ hivis = true }) == nil and Armour.percent({ hivis = true, kevlar = true }) == 30
 	and (hivis :: any).room == nil and hivis.extra == nil and hivis.speed == nil and Transport.speedMult({ hivis = true }) == 1)

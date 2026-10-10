@@ -48,7 +48,7 @@ local want = {
 }
 for id, n in want do
 	local def = kit(id)
-	check(`{def.name}: \${n[1]}, level {n[2]}, +{n[3]}`, def.price == n[1] and def.level == n[2] and def.extra == n[3], `{def.price} {def.level} {def.extra}`)
+	check(`{def.name}: \${n[1]} base (6.19: × Prices.Kit), level {n[2]}, +{n[3]}`, def.price == Config.priced(n[1], Config.Prices.Kit) and def.level == n[2] and def.extra == n[3], `{def.price} {def.level} {def.extra}`)
 	check(`{def.name}: the sprint first in its words`, string.find(def.description, "Sprint with your deliveries", 1, true) ~= nil, def.description)
 	check(`{def.name}: no room on the back, no walk speed`, (def :: any).room == nil and def.speed == nil and (def :: any).warm == nil)
 end

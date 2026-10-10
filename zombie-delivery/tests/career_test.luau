@@ -170,14 +170,14 @@ for level = 2, max do
 		end
 	end
 end
-check("the money grows from $500 to $15,000", sane and (Career.reward(2) :: any).money == 500 and (Career.reward(max) :: any).money == 15000)
+check("the money grows from $500 to $15,000 (bases; 6.19: × Prices.Rewards)", sane and (Career.reward(2) :: any).money == Config.priced(500, Config.Prices.Rewards) and (Career.reward(max) :: any).money == Config.priced(15000, Config.Prices.Rewards))
 print(`  all the rewards together: {Career.money(money)}`)
 for _, level in { 5, 10, 15 } do
 	local reward = Career.reward(level) :: any
 	check(`level {level}: a paint or a title`, reward.paint ~= nil or reward.title ~= nil)
 end
-check("the rewards in words", table.concat(Career.rewardParts(Career.reward(2)), ", ") == "$500, 2 Medkits"
-	and table.concat(Career.rewardParts(Career.reward(5)), ", ") == "$1,500, 2 Repair Kits, Hi-Vis Orange paint"
+check("the rewards in words", table.concat(Career.rewardParts(Career.reward(2)), ", ") == `{Career.money(Config.priced(500, Config.Prices.Rewards))}, 2 Medkits`
+	and table.concat(Career.rewardParts(Career.reward(5)), ", ") == `{Career.money(Config.priced(1500, Config.Prices.Rewards))}, 2 Repair Kits, Hi-Vis Orange paint`
 	and string.find(table.concat(Career.rewardParts(Career.reward(15)), ", "), "Legend of the Last Road", 1, true) ~= nil)
 check("money in words", Career.money(15000) == "$15,000" and Career.money(500) == "$500" and Career.money(1234567) == "$1,234,567")
 
@@ -216,8 +216,8 @@ for _, def in Config.Gear do
 end
 check("four pieces: trolley 3 · straps 4 · cooler 5 · roof rack 7", carGearCount == 4 and gear("trolley").level == 3 and gear("straps").level == 4
 	and gear("cooler").level == 5 and gear("roofrack").level == 7)
-check("the prices: $600, about $900, $1,400, $2,500", gear("trolley").price == 600 and math.abs(gear("straps").price - 900) <= 200
-	and math.abs(gear("cooler").price - 1400) <= 300 and math.abs(gear("roofrack").price - 2500) <= 500)
+check("the prices: $600, about $900, $1,400, $2,500 (bases; 6.19: × Prices.Gear)", gear("trolley").price == Config.priced(600, Config.Prices.Gear) and math.abs(gear("straps").price - 900 * Config.Prices.Gear) <= 200 * Config.Prices.Gear
+	and math.abs(gear("cooler").price - 1400 * Config.Prices.Gear) <= 300 * Config.Prices.Gear and math.abs(gear("roofrack").price - 2500 * Config.Prices.Gear) <= 500 * Config.Prices.Gear)
 check("what the gear does is tuned in Config", Config.GearTuning.StrapsLoss == 0.6 and Config.GearTuning.CoolerDrain == 0.5 and Config.GearTuning.RoofRackSlots == 2) -- (6.7: the rack takes two)
 check("the Hand Trolley is no upgrade track any more", Economy.findUpgrade("trolley") == nil)
 

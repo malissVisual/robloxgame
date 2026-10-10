@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.18"
+Config.Version = "6.19"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5199,5 +5199,82 @@ Config.UiKit = {
 	Corner = 12,
 	RowCorner = 10,
 }
+
+-- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:
+-- jobs are the grind, you save up for something, then progress in the missions). The tables above keep the old base
+-- prices; this one pass, run once here, multiplies every `price` (and the upgrade tracks' baseCost) by its kind's
+-- knob and rounds it to a nice step (Round: { below, step }, the first that fits): $5 under 100, $50 under 1,000, $100
+-- under 10,000, $500 above. Every reader (the shops, the server's checks, Readiness, Career, the dealer's signs) reads
+-- these tables, and no save stores a price: owned things stay owned, nothing is paid back. Free stays free (0 × n = 0),
+-- reward-only things stay unsold. Kept as they were (×1): the real estate and the company (the endgame already),
+-- the old backpacks' payback (Config.RetiredKit), fuel, the repair shop's fee and the board's reroll fee.
+--   Vehicles  the dealer's cars and Earl's Old Van      Bikes    the bikes and the E-Scooter
+--   Stages    Wrench Garage's stages                    Upgrades Wrench Garage's tracks (baseCost)
+--   Guns      Lead & Co.'s guns                         CarGuns  the car guns
+--   Gear      the car and bike gear                     Kit      the bags, the vests, the bat
+--   Paints    Wrench Garage's paints                    Style    the looks (Config.Cosmetics)
+--   Items     the consumables (medkits, repair kits, nitro, mines, molotovs, the energy drink, the jerry can)
+--   Rewards   the money of a level-up (Config.Levels.Rewards), raised in step so a level still feels like a boost
+Config.Prices = {
+	Vehicles = 3,
+	Bikes = 4,
+	Stages = 2.5,
+	Upgrades = 2.5,
+	Guns = 2,
+	CarGuns = 2,
+	Gear = 2.5,
+	Kit = 2.5,
+	Paints = 2,
+	Style = 2,
+	Items = 1.5,
+	Rewards = 1.5,
+	Round = { { 100, 5 }, { 1000, 50 }, { 10000, 100 }, { math.huge, 500 } } :: { { number } },
+}
+
+-- 6.19: a base price × a knob, rounded to Config.Prices.Round's step (0 stays 0).
+function Config.priced(base: number, knob: number): number
+	local raw = base * knob
+	for _, r in Config.Prices.Round do
+		if raw < r[1] then
+			return math.floor(raw / r[2] + 0.5) * r[2]
+		end
+	end
+	return raw
+end
+
+do -- 6.19: the one pass over the tables (see Config.Prices)
+	local P, priced = Config.Prices, Config.priced
+	for _, def in Config.Cars do
+		def.price = priced(def.price, if def.bike then P.Bikes else P.Vehicles)
+		local stages = def.stages
+		if stages then
+			for _, stage in stages do
+				stage.price = priced(stage.price, P.Stages)
+			end
+		end
+	end
+	for _, def in Config.Upgrades do
+		def.baseCost = priced(def.baseCost, P.Upgrades)
+	end
+	local lists: { [string]: { { price: number } } } = {
+		Guns = Config.Weapons :: any,
+		CarGuns = Config.CarGuns :: any,
+		Gear = Config.Gear :: any,
+		Kit = Config.Kit :: any,
+		Paints = Config.Paints :: any,
+		Style = Config.Cosmetics.Items :: any,
+		Items = Config.Items :: any,
+	}
+	for knob, list in lists do
+		for _, def in list do
+			def.price = priced(def.price, (P :: any)[knob])
+		end
+	end
+	for _, reward in Config.Levels.Rewards do
+		if reward.money then
+			reward.money = priced(reward.money, P.Rewards)
+		end
+	end
+end
 
 return Config

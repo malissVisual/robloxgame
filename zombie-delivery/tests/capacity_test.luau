@@ -68,12 +68,12 @@ end
 -- The Old Van: 2 → 2 → 3 → 4 (4.0: the Patched Van first), and 4 is where a van ends ("6 needs a bigger vehicle").
 local van = start.stages or {}
 -- 5.0: you start on foot; the Old Van is the first vehicle you buy (level 4, $1,800).
-check("the first vehicle is the Old Van, bought at level 4", start.id == "van" and start.price == 1800 and start.level == 4)
+check("the first vehicle is the Old Van, bought at level 4 ($1,800 base; 6.19: × Prices.Vehicles)", start.id == "van" and start.price == Config.priced(1800, Config.Prices.Vehicles) and start.level == 4)
 check("the Old Van: Rusty Van 2 → Patched Van 2 → Work Van 3 → Long Cargo Van 4", #van == 4 and van[1].name == "Rusty Van" and van[1].capacity == 2
 	and van[2].name == "Patched Van" and van[2].capacity == 2 and van[3].name == "Work Van" and van[3].capacity == 3
 	and van[4].name == "Long Cargo Van" and van[4].capacity == 4)
-check("the Patched Van and the Work Van are cheap and early (5.0: levels 4 and 5)", #van == 4 and van[2].price <= 300 and (van[2].level or 1) <= 4
-	and van[3].price <= 800 and (van[3].level or 1) <= 5)
+check("the Patched Van and the Work Van are cheap and early (5.0: levels 4 and 5; 6.19: priced against the van)", #van == 4 and van[2].price <= start.price * 0.15 and (van[2].level or 1) <= 4
+	and van[3].price <= start.price * 0.4 and (van[3].level or 1) <= 5)
 check("the Freight Truck is the biggest (12), the Box Truck the big one before it (8)", biggestId == "freight" and biggest == 12
 	and Economy.maxCapacity("boxtruck") == 8 and Economy.stageCapacity("boxtruck", 0) == 6, `{biggestId} {biggest}`)
 for _, def in Config.Cars do

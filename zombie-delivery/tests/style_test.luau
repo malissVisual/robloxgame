@@ -96,7 +96,7 @@ for id, slot in perSlot do
 	local courier = (Style.slot(id) :: any).tab == "courier"
 	check(`{id}: three or more for sale and a reward for later`, slot.buyable >= 3 and slot.rewards >= 1, `{slot.buyable} / {slot.rewards}`)
 	if courier then
-		check(`{id}: the cheapest within four walks`, slot.cheapest <= walk * 4, slot.cheapest)
+		check(`{id}: the cheapest within four walks (6.19: × Prices.Style)`, slot.cheapest <= walk * 4 * Config.Prices.Style, slot.cheapest)
 		check(`{id}: none dearer than the dearest kit`, slot.dearest <= kitHigh, slot.dearest)
 	else
 		check(`{id}: priced with the garage's paints`, slot.cheapest >= 100 and slot.dearest <= paintHigh, `{slot.cheapest} – {slot.dearest}`)
@@ -112,8 +112,8 @@ check("sanitize: known owned items only", clean.owned.cap_red == true and clean.
 check("sanitize: a worn item owned and in its own slot", clean.worn.hat == "cap_red" and clean.worn.jacket == nil and clean.worn.wrap == nil and clean.worn.decal == nil)
 check("sanitize: anything else is the empty wardrobe", next(Style.sanitize(nil).owned) == nil and next(Style.sanitize("x").worn) == nil)
 local style = Style.empty()
-check("buy: enough money and level", (Style.canBuy(style, cap, 120, 1)))
-check("buy: not enough money", select(2, Style.canBuy(style, cap, 119, 1)) == "money")
+check("buy: enough money and level", (Style.canBuy(style, cap, cap.price, 1)))
+check("buy: not enough money", select(2, Style.canBuy(style, cap, cap.price - 1, 1)) == "money")
 local cowboy = Style.find("cowboy") :: any
 check("buy: under its level", select(2, Style.canBuy(style, cowboy, 99999, cowboy.level - 1)) == "level")
 check("buy: a reward never", select(2, Style.canBuy(style, reward, 99999, 15)) == "reward")
@@ -134,7 +134,7 @@ end
 check("a wrap and a decal fit a car, not a bike", Style.forVehicle("wrap", van) and Style.forVehicle("decal", van) and not Style.forVehicle("wrap", bike) and not Style.forVehicle("decal", scooter))
 check("bike paint fits the bikes and the E-Scooter, not a car", Style.forVehicle("bikepaint", bike) and Style.forVehicle("bikepaint", scooter) and not Style.forVehicle("bikepaint", van))
 check("never on a company vehicle", company ~= nil and not Style.forVehicle("wrap", company) and not Style.forVehicle("decal", company))
-check("the toasts", Style.say("bought", cap) == "Backwards Cap · ZDC Red is yours. You're wearing it." and Style.say("money", wrap) == "Not enough money: Satin Teal costs $900."
+check("the toasts", Style.say("bought", cap) == "Backwards Cap · ZDC Red is yours. You're wearing it." and Style.say("money", wrap) == `Not enough money: Satin Teal costs {Style.money(wrap.price)}.`
 	and Style.say("level", cowboy) == `Cowboy Hat unlocks at level {cowboy.level}.` and string.find(Style.say("off", nil, "hat"), "Hats off", 1, true) ~= nil
 	and Style.say("off", cap, "hat") == "Backwards Cap · ZDC Red is off.")
 check("money with thousands", Style.money(1200) == "$1,200" and Style.money(80) == "$80" and Style.money(15000) == "$15,000")
@@ -200,7 +200,7 @@ check("far from every shop: none", Style.shopAt(cap, 1e5, 1e5) == nil and Style.
 local function buy(def: any, money: number, level: number, x: number, z: number): (boolean, string?)
 	return Style.canBuyAt(Style.empty(), def, money, level, Style.shopAt(def, x, z))
 end
-check("buy at its shop", (buy(wrap, 99999, 15, mx, mz)) and (buy(cap, 120, 1, gx, gz)) and (buy(cap, 120, 1, nx, nz)) and (buy(bikePaint, 150, 1, bx, bz)) and (buy(bikePaint, 150, 1, mx, mz)))
+check("buy at its shop", (buy(wrap, 99999, 15, mx, mz)) and (buy(cap, cap.price, 1, gx, gz)) and (buy(cap, cap.price, 1, nx, nz)) and (buy(bikePaint, bikePaint.price, 1, bx, bz)) and (buy(bikePaint, bikePaint.price, 1, mx, mz)))
 check("buy away from its shops: \"shop\"", select(2, buy(wrap, 99999, 15, gx, gz)) == "shop" and select(2, buy(cap, 99999, 15, mx, mz)) == "shop"
 	and select(2, buy(wrap, 99999, 15, 1e5, 1e5)) == "shop" and select(2, buy(bikePaint, 99999, 15, gx, gz)) == "shop")
 check("too poor: \"money\" at the shop, \"shop\" away from it", select(2, buy(wrap, 10, 15, mx, mz)) == "money" and select(2, buy(wrap, 10, 15, gx, gz)) == "shop")

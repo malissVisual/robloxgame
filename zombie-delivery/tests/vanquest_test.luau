@@ -24,10 +24,10 @@ local LEVEL, PRICE = van.level or 1, van.price
 
 -- The quest car -------------------------------------------------------------------------------------------------
 
-check("Earl sells the Old Van, level 4, $1,800", van.id == "van" and Config.VanQuest.Car == "van" and LEVEL == 4 and PRICE == 1800)
+check("Earl sells the Old Van, level 4, $5,400 (6.19: $1,800 × Prices.Vehicles)", van.id == "van" and Config.VanQuest.Car == "van" and LEVEL == 4 and PRICE == 5400)
 check("level and price come from the car", VanQuest.level() == LEVEL and VanQuest.price() == PRICE)
 check("only the van is the quest car", VanQuest.isQuestCar("van") and not VanQuest.isQuestCar("courier") and not VanQuest.isQuestCar(nil))
-check("the price in words", VanQuest.priceText() == "$1,800" and VanQuest.promptText() == "Buy the van ($1,800)", VanQuest.promptText())
+check("the price in words", VanQuest.priceText() == "$5,400" and VanQuest.promptText() == "Buy the van ($5,400)", VanQuest.promptText())
 
 -- The states ----------------------------------------------------------------------------------------------------
 
@@ -63,7 +63,7 @@ check("far wins over money (no words across the lot)", why({ distance = 99, mone
 
 -- Earl's words --------------------------------------------------------------------------------------------------
 
-check("no money: 'Come back with $1,800, kid.'", VanQuest.sellerLine("money") == "Come back with $1,800, kid.", VanQuest.sellerLine("money"))
+check("no money: 'Come back with $5,400, kid.'", VanQuest.sellerLine("money") == "Come back with $5,400, kid.", VanQuest.sellerLine("money"))
 check("sold: the keys", VanQuest.sellerLine(nil) == Config.VanQuest.Keys)
 check("too early, already sold", VanQuest.sellerLine("level") == Config.VanQuest.TooYoung and VanQuest.sellerLine("owned") == Config.VanQuest.Sold)
 check("Marge's texts as the owner wrote them", Config.VanQuest.Unlock == "A guy out west is selling his old van. Cheap-ish. Go see Earl — I put him on your GPS."

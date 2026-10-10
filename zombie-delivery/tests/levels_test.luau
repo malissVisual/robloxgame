@@ -104,7 +104,7 @@ check("the last level is the longest step", Levels.xpFor(MAX) - Levels.xpFor(MAX
 local function car(id: string): Config.CarDef
 	return Economy.findCar(id) :: Config.CarDef
 end
-check("the van is the first vehicle: $1,800 at level 4 (5.0)", car("van").price == 1800 and car("van").level == 4)
+check("the van is the first vehicle: $1,800 base at level 4 (5.0; 6.19: × Prices.Vehicles)", car("van").price == Config.priced(1800, Config.Prices.Vehicles) and car("van").level == 4)
 check("the pickup opens at level 6", car("pickup").level == 6, car("pickup").level)
 check("the muscle car opens at level 9", car("muscle").level == 9, car("muscle").level)
 local function ordered(list: { any }, skip: (any) -> boolean): (boolean, string?)
