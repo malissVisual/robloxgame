@@ -84,6 +84,19 @@ function methods:SetAttribute(key,value) self._attrs[key]=value end
 function methods:GetAttribute(key) return self._attrs[key] end
 function methods:GetPropertyChangedSignal(key) self._signals[key]=self._signals[key] or signal(); return self._signals[key] end
 methods.GetAttributeChangedSignal=methods.GetPropertyChangedSignal
+-- 6.22: a ViewportFrame's model (client/ItemModel.luau): its parts, and the copy put in each view.
+function methods:GetDescendants()
+	local out={}
+	for _,child in self._children do table.insert(out,child);for _,d in child:GetDescendants() do table.insert(out,d) end end
+	return out
+end
+function methods:Clone()
+	local copy=M.make(self.ClassName,{Name=self.Name})
+	for key,value in self._attrs do copy._attrs[key]=value end
+	for _,child in self._children do child:Clone().Parent=copy end
+	M.clones=(M.clones or 0)+1
+	return copy
+end
 function methods:Destroy()
 	self.Destroying:Fire()
 	for _, child in self:GetChildren() do child:Destroy() end
@@ -103,7 +116,7 @@ local input={InputBegan=signal()}
 function input:GetFocusedTextBox() return nil end
 -- 6.0.1: Lighting is an instance (the popup's BlurEffect goes in it); GuiService has the Roblox menu's signal.
 M.lighting=M.make("Lighting",{ClockTime=21.133})
-M.services={Players={LocalPlayer=M.player},ReplicatedStorage=storage,GuiService={ReducedMotionEnabled=true,MenuOpened=signal()},Lighting=M.lighting,UserInputService=input,TextService={}}
+M.services={RunService={Heartbeat=signal()},Players={LocalPlayer=M.player},ReplicatedStorage=storage,GuiService={ReducedMotionEnabled=true,MenuOpened=signal()},Lighting=M.lighting,UserInputService=input,TextService={}}
 function M.services.TextService:GetTextSize(value,size) return M.Vector2.new(#value*size*.55,size) end
 M.services.TweenService={Create=function(_,target,_,props)
 	local tween={Completed=signal()}
@@ -197,6 +210,24 @@ for key,value in {ink={242,242,240},ink2={196,199,203},line={133,139,147},red={2
 	M.P[key]=M.Color3.fromRGB(unpack(value))
 end
 M.NumberSequence={new=function(points) return {Keypoints=points} end}
+-- 6.22: the camera's frame (client/ItemModel.luau looks from the eye at the model's middle), and shared/ItemLooks'
+-- stand-in: a model a key (its build counted: once a key), "broken" keys fail (the icon comes back).
+M.CFrame={new=function(x,y,z) return {Position=M.Vector3.new(x or 0,y or 0,z or 0)} end,lookAt=function(eye,at) return {Position=eye,LookAt=at} end}
+M.built={}
+M.broken={}
+M.ItemLooks={
+	has=function(key) return not M.broken[key] end,
+	build=function(key)
+		if M.broken[key] then error("no look for "..key) end
+		M.built[key]=(M.built[key] or 0)+1
+		local model=M.make("Model",{Name="ItemLook"})
+		model:SetAttribute("Look",key)
+		M.make("Part",{Name="Body"},model)
+		return model
+	end,
+	bounds=function() return {-1,-1,-1},{1,1,1} end,
+	frame=function() return {3,2,-4},{0,0,0} end,
+}
 M.NumberSequenceKeypoint={new=function(time,value) return {Time=time,Value=value} end}
 M.hand="fists"
 M.chosen={}

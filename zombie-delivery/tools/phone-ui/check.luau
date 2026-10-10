@@ -753,6 +753,10 @@ do
 	local function sameColor(a,b) return a~=nil and b~=nil and math.abs(a.R-b.R)<1e-6 and math.abs(a.G-b.G)<1e-6 and math.abs(a.B-b.B)<1e-6 end
 	local function pop(name) local panel=popup();return panel and panel:FindFirstChild(name,true) end
 	local function edge(id) local row=pop("Item_"..id);local e=row and row:FindFirstChild("Edge");return e and e.BackgroundColor3 end
+	-- 6.22: every thing as its model (a ViewportFrame "ItemModel" in its thumb); a look that can't be built: its icon
+	local function view(name) local row=pop(name);return row and row:FindFirstChild("ItemModel",true) end
+	local function looks(name,key) local made=view(name);return made~=nil and made:GetAttribute("Look")==key and made.CurrentCamera~=nil end
+	M.broken["kit:hivis"]=true
 	local held="gun"
 	BagUi.hand=function() return held end
 	BagUi.choose=function(hand) table.insert(M.chosen,hand) end
@@ -776,6 +780,20 @@ do
 	check("6.21: the gun IN HAND, the vests WORN, the bags counted",pop("Item_gun"):FindFirstChild("Pay",true).Text=="IN HAND" and pop("Item_kevlar"):FindFirstChild("Pay",true).Text=="WORN"
 		and pop("Item_mybags"):FindFirstChild("Pay",true).Text=="2")
 	check("6.21: the items keep their count big and USE",pop("Item_medkit"):FindFirstChild("Pay").Text=="×4" and pop("Item_medkit"):FindFirstChild("Use")~=nil)
+	check("6.22: every row shows its thing as a model: the gun, the bat, the items, the vest, MY BAGS (the bag in use)",looks("Item_gun","gun:pistol") and looks("Item_bat","melee:bat")
+		and looks("Item_medkit","item:medkit") and looks("Item_molotov","item:molotov") and looks("Item_kevlar","kit:kevlar") and looks("Item_mybags","kit:tote")
+		and pop("Item_medkit"):FindFirstChild("Emoji",true)==nil)
+	check("6.22: a row's model is a square in its thumb",view("Item_medkit"):FindFirstChildOfClass("UIAspectRatioConstraint")~=nil and view("Item_medkit").Parent.Name=="Model")
+	check("6.22: a look that can't be built: the row's emoji instead",view("Item_hivis")==nil and pop("Item_hivis"):FindFirstChild("Emoji",true)~=nil)
+	do -- (… and says so once in the output: the recorder's warnings keep only the others)
+		local said=0
+		for index=#M.warnings,1,-1 do
+			if string.find(tostring(M.warnings[index]),"[ItemModel] kit:hivis",1,true) then said+=1;table.remove(M.warnings,index) end
+		end
+		check("6.22: … it warns once (the failed look is not tried again)",said==1)
+	end
+	local heroModel=hero:FindFirstChild("ItemModel",true)
+	check("6.22: the hero shows your bag as its model at its right (still: Reduced Motion)",heroModel~=nil and heroModel:GetAttribute("Look")=="kit:tote" and heroModel.AnchorPoint.X==1 and heroModel:GetAttribute("Spin")==nil)
 	local hold=pop("HoldBag")
 	check("6.21: one red button: HOLD BAG · [2]",hold~=nil and hold.Text=="HOLD BAG · [2]")
 	hold.Activated:Fire()
@@ -790,6 +808,7 @@ do
 	check("6.21: the bag in your hand: IN YOUR HAND, the chip says it",pop("HoldBag").Text=="IN YOUR HAND" and pop("InHand").Text=="✋ IN HAND · CANVAS TOTE")
 	pop("Item_mybags").Activated:Fire()
 	check("6.21: MY BAGS opens the BAGS tab",named("Tab_bags"):FindFirstChild("Underline")~=nil and pop("BagsRows")~=nil and sameColor(edge("tote"),rgb(90,162,230)))
+	check("6.22: BAGS shows each bag's model",looks("Item_tote","kit:tote") and looks("Item_bag","kit:bag"))
 	check("6.21: BAGS keeps YOUR BAG as its hero",pop("Ribbon")~=nil and pop("Ribbon").Text=="YOUR BAG")
 	mine.skills=nil
 	Phone.setState(mine)
@@ -797,6 +816,7 @@ do
 	check("6.21: without Strong Back two pieces fewer (0 / 5)",pop("Hero"):FindFirstChild("Pay",true).Text=="0 / 5")
 	BagUi.hand=nil
 	BagUi.choose=nil
+	M.broken["kit:hivis"]=nil
 	Phone.setState({phone=true,money=1600,kit={},cars={},items={medkit=2}})
 	named("Tab_items").Activated:Fire()
 	check("6.21: nobody says the hand: no IN HAND chip, no bag: NO BAG YET",pop("InHand")==nil and pop("HoldBag").Text=="NO BAG YET")
@@ -819,6 +839,10 @@ do
 	check("6.21: the cargo stack groups the kinds (🍕 ×2, 📦) and shows the free places",stack~=nil and stack:FindFirstChild("Stack_pizza")~=nil and stack:FindFirstChild("Stack_pizza"):FindFirstChild("Count").Text=="×2"
 		and stack:FindFirstChild("Stack_parcel")~=nil and stack:FindFirstChild("Stack_parcel"):FindFirstChild("Count")==nil
 		and #all(stack,function(object) return object.Name=="Free" end)==2)
+	local function model(root) return root and root:FindFirstChild("ItemModel",true) end
+	check("6.22: the stack's tiles show the pieces' models",model(stack:FindFirstChild("Stack_pizza")):GetAttribute("Look")=="cargo:pizza" and model(stack:FindFirstChild("Stack_parcel")):GetAttribute("Look")=="cargo:parcel"
+		and stack:FindFirstChild("Stack_pizza"):FindFirstChild("Icon")==nil)
+	check("6.22: a CARRYING row a piece's model",model(pop("Item_bag1")):GetAttribute("Look")=="cargo:pizza" and model(pop("Item_hands1")):GetAttribute("Look")=="cargo:parcel")
 	local edgeOf=pop("Item_bag1") and pop("Item_bag1"):FindFirstChild("Edge")
 	check("6.21: a blue row a piece",pop("BagRows")~=nil and pop("Item_bag1")~=nil and pop("Item_bag2")~=nil and pop("Item_hands1")~=nil and edgeOf~=nil and math.abs(edgeOf.BackgroundColor3.B-230/255)<1e-6)
 end

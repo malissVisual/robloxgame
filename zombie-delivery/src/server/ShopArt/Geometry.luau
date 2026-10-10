@@ -418,7 +418,7 @@ local function gearvest()
 end
 
 local function zdcbag()
-	-- The shop's Thermal Delivery Bag (server/KitArt/Geometry.luau "thermal") 5 studs wide: red nylon, black piping down
+	-- The shop's Thermal Delivery Bag (shared/KitArt.luau "thermal") 5 studs wide: red nylon, black piping down
 	-- its corners, a black base and a black zip-round lid; the ZDC logo on the front and the back (the red square and ZDC
 	-- in white block letters on a black patch, as on the name boards), a reflective strip round it under the logo (the
 	-- logo and the strip glow at night), two straps from the lid up to a padded grip. It turns on a turntable on a short

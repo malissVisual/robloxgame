@@ -26,6 +26,10 @@
 --   * CARS and GUNS (the I window): yours (📦 slots big; EQUIP), the employers' still to earn (locked).
 -- Every row has its kind's colour on its left edge (Inventory.category: weapons red, medical green, explosives orange,
 -- cargo and bags blue, gear grey). A tap on a row opens its details (what it does, the stats).
+-- 6.22, every thing has a look (the owner: "every thing must look like something, not only an icon"): the hero's bag (or
+-- your fists), the cargo stack's tiles, every row's thumb (the pieces, the gun, the bat, the items, the vests, the bags,
+-- the guns) are small 3D models (client/ItemModel.luau, shared/ItemLooks.luau keys through CardKit's picture `model`);
+-- the icon or the emoji only when a model can't be built. The cars keep their pictures.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +48,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
 local ShopView = require(script.Parent.ShopView)
+local ItemModel = require(script.Parent.ItemModel) -- 6.22: the cargo stack's models
 
 local C = CardKit.Color
 local K = Theme.Contract
@@ -260,7 +265,7 @@ local function bagHero(ctx: Ctx): Item
 	return {
 		id = "yourbag",
 		name = name,
-		picture = if active then { icon = Icons.kit(active.id), emoji = active.icon } else { emoji = "✋" },
+		picture = if active then { model = `kit:{active.id}`, icon = Icons.kit(active.id), emoji = active.icon } else { model = "fists", emoji = "✋" },
 		value = `{have} / {total}`,
 		valueColor = if have >= total and total > 0 then C.gold else C.text,
 		fact = fact,
@@ -299,14 +304,18 @@ local function drawStack(card: any, ctx: Ctx)
 		local tile = Ui.make("Frame", { Name = `Stack_{group.look}`, Size = UDim2.fromOffset(STACK.Tile, STACK.Tile), BackgroundColor3 = Color3.fromRGB(27, 39, 53), BorderSizePixel = 0, LayoutOrder = n, ZIndex = 4 }, strip)
 		Ui.corner(tile, 10)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = BLUE, Thickness = 1, Transparency = 0.55 }, tile)
-		Ui.icon(tile, Icons.cargo(group.look), BagUi.emoji(group.look), UDim2.fromOffset(26, 26), {
-			Position = UDim2.fromScale(0.5, 0.5),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			TextScaled = true,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ImageColor3 = K.text,
-			ZIndex = 5,
-		})
+		local inset = Config.ItemModel.Tile
+		-- 6.22: the piece as its model (the icon only if it can't be built)
+		if not ItemModel.view(tile, `cargo:{group.look}`, { size = UDim2.new(1, -2 * inset, 1, -2 * inset), z = 5 }) then
+			Ui.icon(tile, Icons.cargo(group.look), BagUi.emoji(group.look), UDim2.fromOffset(26, 26), {
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				TextScaled = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				ImageColor3 = K.text,
+				ZIndex = 5,
+			})
+		end
 		if group.count > 1 then
 			Ui.label(tile, `×{group.count}`, UDim2.fromOffset(STACK.Tile - 4, 14), {
 				Name = "Count",
@@ -347,7 +356,7 @@ local function pieces(job: any): { Item }
 			table.insert(out, {
 				id = `{group.where}{index}`,
 				name = capital(tostring(piece.name or "piece")),
-				picture = { icon = Icons.cargo(look), emoji = EMOJI[look] or "📦" },
+				picture = { model = `cargo:{if look ~= "" then look else "parcel"}`, icon = Icons.cargo(look), emoji = EMOJI[look] or "📦" },
 				fact = `{group.icon} #{tonumber(piece.order) or 1} · {who}{fits}`,
 				owned = true,
 				accent = BLUE,
@@ -374,7 +383,7 @@ local function consumables(ctx: Ctx): { Item }
 		table.insert(out, {
 			id = def.id,
 			name = def.name,
-			picture = { icon = Icons.item(def.id), emoji = def.icon },
+			picture = { model = `item:{def.id}`, icon = Icons.item(def.id), emoji = def.icon },
 			fact = if count <= 0 then "NONE LEFT" elseif slot and ctx.keys then `Key {slot}.` elseif slot then "ON THE BAR" else "NOT ON THE BAR: USE IT HERE",
 			value = `×{count}`,
 			valueColor = if count > 0 then C.money else C.dim,
@@ -404,7 +413,7 @@ local function onYou(ctx: Ctx): { Item }
 		table.insert(out, {
 			id = "gun",
 			name = gun.name,
-			picture = { icon = Icons.weapon(gun.id), emoji = "🔫" },
+			picture = { model = `gun:{gun.id}`, icon = Icons.weapon(gun.id), emoji = "🔫" },
 			fact = `🎯 {math.floor(gun.damage * math.max(1, gun.pellets) + 0.5)} DMG · {gun.range} STUDS{if gun.oneHanded then " · 1-HAND" else ""}`,
 			value = if inHand then "IN HAND" elseif ctx.keys then `KEY {key}` else nil,
 			valueColor = if inHand then K.red else C.secondary,
@@ -426,7 +435,7 @@ local function onYou(ctx: Ctx): { Item }
 			table.insert(out, {
 				id = def.id,
 				name = def.name,
-				picture = { icon = Icons.kit(def.id), emoji = def.icon },
+				picture = { model = "melee:bat", icon = Icons.kit(def.id), emoji = def.icon },
 				fact = `💥 {melee.damage} DMG · V SWINGS IT`,
 				owned = true,
 				accent = tint("melee"),
@@ -446,7 +455,7 @@ local function onYou(ctx: Ctx): { Item }
 		table.insert(out, {
 			id = def.id,
 			name = def.name,
-			picture = { icon = Icons.kit(def.id), emoji = def.icon },
+			picture = { model = `kit:{def.id}`, icon = Icons.kit(def.id), emoji = def.icon },
 			fact = if def.armour then `🛡 −{math.floor(def.armour * 100 + 0.5)}% DAMAGE{if def.speed then ` · 🐢 ×{def.speed}` else ""}` else `💵 +{math.floor((def.tips or 0) * 100 + 0.5)}% TIPS`,
 			value = if wearing then "WORN" else "SPARE",
 			valueColor = if wearing then K.good else C.dim,
@@ -456,16 +465,19 @@ local function onYou(ctx: Ctx): { Item }
 		})
 	end
 	local names: { string } = {}
+	local shown: string? = nil -- 6.22: MY BAGS shows the bag in use (else the last one owned)
+	local using = myBag(state)
 	for _, def in Config.Kit do
 		if def.extra and kit[def.id] == true then
 			table.insert(names, `{def.icon} {string.match(def.name, "^(%S+)") or def.name}`)
+			shown = if using then using.id else def.id
 		end
 	end
 	if #names > 0 then
 		table.insert(out, {
 			id = "mybags",
 			name = "My bags",
-			picture = { emoji = "👜" },
+			picture = { model = if shown then `kit:{shown}` else nil, emoji = "👜" },
 			fact = table.concat(names, " · "),
 			value = tostring(#names),
 			valueColor = C.secondary,
@@ -497,7 +509,7 @@ local function bags(ctx: Ctx): ({ Item }, number)
 		table.insert(out, {
 			id = def.id,
 			name = def.name,
-			picture = { icon = Icons.kit(def.id), emoji = def.icon },
+			picture = { model = `kit:{def.id}`, icon = Icons.kit(def.id), emoji = def.icon },
 			fact = (if mine then "✓ IN USE · " else "") .. `🏃 LIGHT PIECES{perk}`,
 			value = `+{def.extra}`,
 			owned = true,
@@ -558,7 +570,7 @@ local function guns(ctx: Ctx): { Item }
 			table.insert(out, {
 				id = def.id,
 				name = def.name,
-				picture = { icon = Icons.weapon(def.id), emoji = "🔫" },
+				picture = { model = `gun:{def.id}`, icon = Icons.weapon(def.id), emoji = "🔫" },
 				fact = ShopWindow.gunFact(def) .. (if def.oneHanded then " · 1-HAND" else ""),
 				owned = true,
 				accent = if def.exclusive then nil else tint("weapon"),
@@ -577,7 +589,7 @@ local function guns(ctx: Ctx): { Item }
 			if employer then
 				local done = state.rep[employer.id] or 0
 				local at = employer.weaponAt or employer.needed
-				table.insert(out, { id = def.id, name = def.name, picture = { icon = Icons.weapon(def.id), emoji = "🔫" }, fact = `EARNED AT {string.upper(employer.name)} · {math.min(done, at)}/{at}`, lock = "🔒 WORK", lines = { def.description } })
+				table.insert(out, { id = def.id, name = def.name, picture = { model = `gun:{def.id}`, icon = Icons.weapon(def.id), emoji = "🔫" }, fact = `EARNED AT {string.upper(employer.name)} · {math.min(done, at)}/{at}`, lock = "🔒 WORK", lines = { def.description } })
 			end
 		end
 	end

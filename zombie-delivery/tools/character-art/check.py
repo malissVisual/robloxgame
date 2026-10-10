@@ -96,14 +96,14 @@ def bag_check(tmp, luau):
         text = (src / "shared" / f"{name}.luau").read_text()
         (tmp / f"{name}.luau").write_text(re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text))
     (tmp / "Builder.luau").write_text(prefix + (src / "server/ModelArt/Builder.luau").read_text())
-    (tmp / "KitGeometry.luau").write_text((src / "server/KitArt/Geometry.luau").read_text())
+    (tmp / "KitArt.luau").write_text((src / "shared/KitArt.luau").read_text())  # (6.22: shared, KitWear requires Shared.KitArt)
     (tmp / "PhoneGeometry.luau").write_text((src / "server/PhoneArt/Geometry.luau").read_text())
     (tmp / "Stub.luau").write_text("return {}\n")
     (tmp / "Net.luau").write_text("return {}\n")  # (only KitWear.start uses the remotes)
     wear = (src / "server/KitWear.luau").read_text()
     wear = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', wear)
     for module, local in (("PlayerData", "Stub"), ("ModelArt.Builder", "Builder"), ("Npcs", "Stub"),
-                          ("KitArt.Geometry", "KitGeometry"), ("PhoneArt.Geometry", "PhoneGeometry"),
+                          ("PhoneArt.Geometry", "PhoneGeometry"),
                           ("CharacterArt.Geometry", "Geometry")):
         call = f"require(script.Parent.{module})"
         if call not in wear:

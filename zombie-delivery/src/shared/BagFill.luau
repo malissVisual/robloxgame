@@ -2,7 +2,7 @@
 -- 6.4.1, what is in the bag shows (the owner: "it would be good if it were more visible, and that there is something
 -- in it"): the pure part. server/KitWear.luau builds the pieces with the bag on you (again only when the BagCount /
 -- BagLooks attributes change: nothing per frame), server/Cargo.luau on the bag set down on the ground. Every piece is a
--- Builder piece on "BagPivot" (server/KitArt/Geometry.luau's frame: the grip at the origin, the bag hanging -Y, its
+-- Builder piece on "BagPivot" (shared/KitArt.luau's frame: the grip at the origin, the bag hanging -Y, its
 -- broad sides out along ±X, its length along Z).
 -- 6.7, real sizes (the owner: "the bag is small, the things would never really fit in it"): the bags are real-size
 -- now, and so is what is in them. Each piece is its real packed size (Config.Courier.BagFill.Packed: a pizza box

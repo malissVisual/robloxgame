@@ -1,6 +1,6 @@
 --!strict
 -- 5.0: the worn kit and the phone in hand, the pure part (server/KitWear.luau builds them). Which pieces of Codex's
--- art (server/KitArt/Geometry.luau, server/PhoneArt/Geometry.luau) a player wears for their profile.kit, and how the
+-- art (shared/KitArt.luau, server/PhoneArt/Geometry.luau) a player wears for their profile.kit, and how the
 -- art, authored for a nominal block R15 body, is fitted to the body the character really has.
 --
 --   KitFit.outfit(kit, bag)      slot → art id (6.6: no backpack slot any more, one carrying item; 6.7: no jacket,

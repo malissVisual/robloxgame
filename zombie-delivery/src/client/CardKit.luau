@@ -25,6 +25,9 @@
 -- uploaded white silhouette drawn whole, not cropped; a hero's as its mark at the right); a row's action may be a short
 -- word ("BUY", "USE", "WEAR": a pill sized to it); CardKit.tabs, a row of tab chips (Tab_<id>, the open one lit with its
 -- red Underline).
+-- 6.22 (additive): a Picture's `model` (a shared/ItemLooks.luau key, "item:medkit"): the thing as a small 3D model
+-- (client/ItemModel.luau) on charcoal, before its icon or emoji (they show only if the model can't be built); a hero's
+-- at its right like a mark, turning slowly (not with Reduced Motion).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -34,6 +37,7 @@ local CardLayout = require(Shared.CardLayout)
 local Icons = require(Shared.Icons)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
+local ItemModel = require(script.Parent.ItemModel) -- 6.22
 
 local K = Theme.Contract
 local KIT = Config.UiKit
@@ -79,7 +83,8 @@ CardKit.Danger = {
 -- What a thumb or a hero shows: an uploaded picture, else an emoji on charcoal, else an app's glyph (`glyph`: draws it
 -- in a frame, e.g. client/PhoneContract.luau glyph).
 -- 6.18 wave 2: `icon` an Icons name (its silhouette once uploaded, before the emoji).
-export type Picture = { image: string?, emoji: string?, glyph: ((face: Instance, size: number) -> ())?, face: Color3?, icon: string? }
+-- 6.22: `model` a shared/ItemLooks.luau key (the thing as a 3D model, before its icon and emoji).
+export type Picture = { image: string?, emoji: string?, glyph: ((face: Instance, size: number) -> ())?, face: Color3?, icon: string?, model: string? }
 
 -- The soft click every button makes (client/Sounds.luau sets Ui.onClick).
 function CardKit.click()
@@ -100,6 +105,30 @@ end
 -- The picture filling `parent` (greyed when `shut`), else its emoji, else its glyph (`size`: the emoji's / glyph's).
 -- `mark`: a hero's emoji (no picture uploaded) is a big faint mark at the card's right, not hidden under its shade.
 function CardKit.picture(parent: Instance, picture: Picture, shut: boolean, size: number, z: number, mark: boolean?)
+	if picture.model and (not picture.image or picture.image == "") then
+		-- 6.22: the thing as a 3D model on charcoal (a hero's at its right, turning slowly); its icon if it can't be built
+		local face = Ui.make("Frame", { Name = "Model", Size = UDim2.fromScale(1, 1), BackgroundColor3 = picture.face or K.charcoal, BorderSizePixel = 0, ZIndex = z }, parent)
+		local inset = Config.ItemModel.Row
+		local made = ItemModel.view(face, picture.model, if mark then {
+			size = UDim2.fromOffset(size, size),
+			position = UDim2.new(1, -Config.ItemModel.Shift, 0.42, 0),
+			anchor = Vector2.new(1, 0.5),
+			z = z,
+			shut = shut,
+			spin = not shut,
+		} else {
+			size = UDim2.new(1, -2 * inset, 1, -2 * inset),
+			z = z,
+			shut = shut,
+		})
+		if made then
+			if not mark then
+				Ui.make("UIAspectRatioConstraint", { AspectRatio = 1 }, made) -- (a square in the thumb)
+			end
+			return
+		end
+		face:Destroy()
+	end
 	if picture.image and picture.image ~= "" then
 		Ui.make("ImageLabel", {
 			Name = "Picture",
@@ -635,7 +664,7 @@ end
 -- A card's picture changed (the phone's hero: another mission, another run): the old one goes, the new one fills it
 -- (a hero's emoji as its mark).
 function CardKit.repicture(card: Instance, picture: Picture, size: number)
-	for _, name in { "Picture", "Emoji", "Icon" } do
+	for _, name in { "Picture", "Emoji", "Icon", "Model" } do
 		local old = card:FindFirstChild(name)
 		if old then
 			old:Destroy()

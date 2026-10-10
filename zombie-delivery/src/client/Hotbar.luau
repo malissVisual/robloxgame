@@ -25,6 +25,10 @@
 -- in its ScreenGui) and while a window, the phone or a dialog covers the game (Hotbar.covered, set by the client's
 -- Main; checked 10 times a second). Drawn again only when what it shows changed (a State, a job update, the pack
 -- attributes, the hand).
+-- 6.22, every thing has a look (the owner: "every thing must look like something, not only an icon"): each slot shows its
+-- thing as a small 3D model (client/ItemModel.luau, shared/ItemLooks.luau): your fists (a clenched glove), the bag in
+-- use (its own art; inside the fill ring), your gun, each consumable. Still pictures, built again only when the thing
+-- (or whether you can take it: faint when you can't) changes; the icon or the emoji only if a model can't be built.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,6 +47,7 @@ local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
 local BagUi = require(script.Parent.BagUi)
 local Holster = require(script.Parent.Holster) -- 6.1: what you hold
+local ItemModel = require(script.Parent.ItemModel) -- 6.22: the slots' models
 
 local Hotbar = {}
 
@@ -83,6 +88,7 @@ type Tile = {
 	shade: any,
 	flash: any,
 	icon: any,
+	look: string?, -- 6.22: what its model shows ("key|can"), built again only when it changes
 	ring: any, -- the bag's fill ring { right, left } (its gradients)
 	hand: string?,
 	index: number?,
@@ -201,6 +207,7 @@ local function buildTile(name: string, x: number): Tile
 		shade = nil,
 		flash = Ui.make("Frame", { Name = "Flash", Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.ink, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 4 }, button),
 		icon = nil,
+		look = nil,
 		ring = nil,
 		hand = nil,
 		index = nil,
@@ -420,14 +427,17 @@ local function drawItems()
 				})
 				slot.line = { "MORE ITEMS", "THE I WINDOW" }
 			elseif id and def then
-				slot.icon = Ui.icon(slot.button, Icons.item(id), def.icon, UDim2.fromOffset(34, 34), {
-					Position = UDim2.fromScale(0.5, 0.5),
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					TextScaled = true,
-					TextXAlignment = Enum.TextXAlignment.Center,
-					ImageColor3 = P.ink,
-					ZIndex = 2,
-				})
+				-- 6.22: the item as its model (its icon only if the model can't be built)
+				local size = Config.ItemModel.Slot
+				slot.icon = ItemModel.view(slot.button, `item:{id}`, { size = UDim2.fromOffset(size, size), z = 2 })
+					or Ui.icon(slot.button, Icons.item(id), def.icon, UDim2.fromOffset(34, 34), {
+						Position = UDim2.fromScale(0.5, 0.5),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						TextScaled = true,
+						TextXAlignment = Enum.TextXAlignment.Center,
+						ImageColor3 = P.ink,
+						ZIndex = 2,
+					})
 			end
 			paint(slot, false)
 		end
@@ -635,26 +645,39 @@ local function drawHands(): boolean
 	for _, tile in hands do
 		local hand = tile.hand :: string
 		tile.can = Holding.can(hand, mine, def ~= nil, down)
-		local image = nil
-		if hand == "bag" then
-			image = Icons.kit(bagId() or Config.Courier.BagKit)
-		elseif hand == "gun" then
-			image = if def then Icons.weapon(def.id) else nil
+		-- 6.22: the hand's thing as its model: your fists, the bag in use (else the plastic bag, faint), your gun (else
+		-- the starter pistol, faint); faint while you can't take it. Built again only when that changes.
+		local look = if hand == "bag" then `kit:{if mine then bagId() or Config.Courier.BagKit else Config.Courier.BagKit}`
+			elseif hand == "gun" then `gun:{if def then def.id else Config.Arms.Starter}`
+			else "fists"
+		local seen = `{look}|{tile.can}`
+		if tile.look ~= seen or not tile.icon then
+			if tile.icon then
+				tile.icon:Destroy()
+			end
+			tile.look = seen
+			local size = if hand == "bag" then Config.ItemModel.Bag else Config.ItemModel.Hand
+			tile.icon = ItemModel.view(tile.button, look, { size = UDim2.fromOffset(size, size), z = 4, dim = not tile.can, name = "Icon" })
+			if not tile.icon then
+				local image = nil
+				if hand == "bag" then
+					image = Icons.kit(bagId() or Config.Courier.BagKit)
+				elseif hand == "gun" then
+					image = if def then Icons.weapon(def.id) else nil
+				end
+				tile.icon = Ui.icon(tile.button, image, if hand == "bag" and bagDef and mine then bagDef.icon else HAND_ICON[hand], UDim2.fromOffset(if hand == "bag" then 30 else 34, if hand == "bag" then 30 else 34), {
+					Name = "Icon",
+					Position = UDim2.fromScale(0.5, 0.5),
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					TextScaled = true,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					ImageColor3 = P.ink,
+					TextTransparency = if tile.can then 0 else 0.55,
+					ImageTransparency = if tile.can then 0 else 0.55,
+					ZIndex = 4,
+				})
+			end
 		end
-		if tile.icon then
-			tile.icon:Destroy()
-		end
-		tile.icon = Ui.icon(tile.button, image, if hand == "bag" and bagDef and mine then bagDef.icon else HAND_ICON[hand], UDim2.fromOffset(if hand == "bag" then 30 else 34, if hand == "bag" then 30 else 34), {
-			Name = "Icon",
-			Position = UDim2.fromScale(0.5, 0.5),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			TextScaled = true,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ImageColor3 = P.ink,
-			TextTransparency = if tile.can then 0 else 0.55,
-			ImageTransparency = if tile.can then 0 else 0.55,
-			ZIndex = 4,
-		})
 		local name, sub = Inventory.handLine(hand, info)
 		tile.line = { name, sub }
 		if hand == "bag" then

@@ -246,6 +246,32 @@ function GunModels.has(weapon: string): boolean
 	return LOOKS[weapon] ~= nil
 end
 
+-- One piece of a look as a part in gun space × `s` (its CFrame relative to the grip).
+local function piecePart(piece: Piece, s: number): (Part, CFrame)
+	local p = Instance.new("Part")
+	p.Name = "GunPart"
+	p.Color = piece.color
+	p.Material = piece.material
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.CastShadow = false
+	local offset = CFrame.new(piece.at * s) * CFrame.Angles(math.rad(piece.tilt or 0), 0, 0)
+	if piece.tube then
+		-- A cylinder's axis is its X: turned to lie along Z.
+		p.Shape = Enum.PartType.Cylinder
+		p.Size = Vector3.new(piece.size.Z, piece.size.Y, piece.size.X) * s
+		offset *= CFrame.Angles(0, math.rad(90), 0)
+	elseif piece.ball then
+		p.Shape = Enum.PartType.Ball
+		p.Size = piece.size * s
+	else
+		p.Size = piece.size * s
+	end
+	return p, offset
+end
+
 -- A gun model welded to `hand`, its grip at `grip` (a CFrame in gun space: -Z forward, Y up), `scale` × the size.
 function GunModels.build(weapon: string, hand: BasePart, grip: CFrame, scale: number?): Model
 	local look = LOOKS[weapon] or LOOKS.pistol
@@ -255,27 +281,7 @@ function GunModels.build(weapon: string, hand: BasePart, grip: CFrame, scale: nu
 	model:SetAttribute("Weapon", weapon)
 	local first: Part? = nil
 	for _, piece in look.pieces do
-		local p = Instance.new("Part")
-		p.Name = "GunPart"
-		p.Color = piece.color
-		p.Material = piece.material
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.Massless = true
-		p.CastShadow = false
-		local offset = CFrame.new(piece.at * s) * CFrame.Angles(math.rad(piece.tilt or 0), 0, 0)
-		if piece.tube then
-			-- A cylinder's axis is its X: turned to lie along Z.
-			p.Shape = Enum.PartType.Cylinder
-			p.Size = Vector3.new(piece.size.Z, piece.size.Y, piece.size.X) * s
-			offset *= CFrame.Angles(0, math.rad(90), 0)
-		elseif piece.ball then
-			p.Shape = Enum.PartType.Ball
-			p.Size = piece.size * s
-		else
-			p.Size = piece.size * s
-		end
+		local p, offset = piecePart(piece, s)
 		p.CFrame = grip * offset
 		if piece.glow then
 			local light = Instance.new("PointLight")
@@ -299,6 +305,23 @@ function GunModels.build(weapon: string, hand: BasePart, grip: CFrame, scale: nu
 		muzzle.Name = "Muzzle"
 		muzzle.WorldCFrame = grip * CFrame.new(look.muzzle * s)
 		muzzle.Parent = first
+	end
+	return model
+end
+
+-- 6.22: the same gun on its own (BAG & ITEMS and the bottom bar draw it: shared/ItemLooks.luau): anchored parts in gun
+-- space (the grip at the origin, the barrel along -Z), no weld, no light, no muzzle.
+function GunModels.display(weapon: string, scale: number?): Model
+	local look = LOOKS[weapon] or LOOKS.pistol
+	local s = scale or 1
+	local model = Instance.new("Model")
+	model.Name = "Gun"
+	model:SetAttribute("Weapon", weapon)
+	for _, piece in look.pieces do
+		local p, offset = piecePart(piece, s)
+		p.CFrame = offset
+		p.Anchored = true
+		p.Parent = model
 	end
 	return model
 end
