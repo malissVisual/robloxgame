@@ -87,12 +87,12 @@ check("owned already: its price instead", Career.grantKit(Career.reward(3), owne
 check("no kit, nothing", Career.grantKit(Career.reward(2), ownedKit) == 0 and Career.grantKit(nil, ownedKit) == 0)
 check("level 4: the Old Van, the Patched Van stage, ★ jobs, First Shift, the Ratchet Straps", has(road[4].unlocks, "car", "van") and has(road[4].unlocks, "stage", "van:1")
 	and has(road[4].unlocks, "tier", "1") and has(road[4].unlocks, "campaign", "dispatch") and has(road[4].unlocks, "gear", "straps"))
-check("level 5: the Courier Van, the High-Roof Van, ★★ jobs", has(road[5].unlocks, "car", "courier") and has(road[5].unlocks, "car", "highroof") and has(road[5].unlocks, "tier", "2"))
-check("level 6: the Pickup, the Long Cargo Van stage, ★★★ jobs", has(road[6].unlocks, "car", "pickup") and has(road[6].unlocks, "stage", "van:3") and has(road[6].unlocks, "tier", "3"))
+check("level 5: ★★ jobs; 6.19: the Courier Van and the High-Roof Van are Many Hands', not the level's", not has(road[5].unlocks, "car", "courier") and not has(road[5].unlocks, "car", "highroof") and has(road[5].unlocks, "tier", "2"))
+check("level 6: the Long Cargo Van stage, ★★★ jobs (6.19: the Pickup is Farm to Table's)", not has(road[6].unlocks, "car", "pickup") and has(road[6].unlocks, "stage", "van:3") and has(road[6].unlocks, "tier", "3"))
 check("level 5: the Cooler Box, the Roof Machine Gun, the Cash Transport", has(road[5].unlocks, "gear", "cooler") and has(road[5].unlocks, "cargun", "roofmg")
 	and has(road[5].unlocks, "job", "cashrun"))
-check("level 7: the Roof Rack, Birch Cottage, the Box Truck", has(road[7].unlocks, "gear", "roofrack") and has(road[7].unlocks, "estate", "birch")
-	and has(road[7].unlocks, "car", "boxtruck"))
+check("level 7: the Roof Rack, Birch Cottage (6.19: the Box Truck is the Empty Shelves finale's)", has(road[7].unlocks, "gear", "roofrack") and has(road[7].unlocks, "estate", "birch")
+	and not has(road[7].unlocks, "car", "boxtruck"))
 check("level 9: ★★★★ jobs", has(road[9].unlocks, "tier", "4"))
 check("level 15: the Hilltop Mansion and the Penthouse", has(road[15].unlocks, "estate", "hilltop") and has(road[15].unlocks, "estate", "office_penthouse"))
 check("an employer's job says where", (function()
@@ -113,10 +113,17 @@ check("no mission is listed as a job", (function()
 	end
 	return true
 end)())
--- Everything with a level is somewhere on the road, exactly once.
+-- Everything with a level is somewhere on the road, exactly once (6.19: or on its mission's list, and then not on the
+-- road).
 local seen: { [string]: number } = {}
 for _, step in road do
 	for _, unlock in step.unlocks do
+		local key = `{unlock.kind}:{unlock.id}`
+		seen[key] = (seen[key] or 0) + 1
+	end
+end
+for _, mission in require("./Missions").List do
+	for _, unlock in Career.missionUnlocks(mission.id) do
 		local key = `{unlock.kind}:{unlock.id}`
 		seen[key] = (seen[key] or 0) + 1
 	end
@@ -313,8 +320,15 @@ check("5.1: level 2 opens the bikes (6.12.7: at Dead End Motors, no Spoke & Chai
 check("5.1: … and no bike counts as a car", not has(road50[Career.BIKE_LEVEL].unlocks, "car", "rustbike") and (not bikes or has(road50[Career.BIKE_LEVEL].unlocks, "bike", "rustbike")))
 -- 6.12.14: Lead & Co. sells at its shooting range: a gun you buy says so on the road; the starter pistol only its name.
 local gunsSay, guns = true, 0
+local gunLists: { { Career.Unlock } } = {}
 for _, step in road50 do
-	for _, unlock in step.unlocks do
+	table.insert(gunLists, step.unlocks)
+end
+for _, mission in require("./Missions").List do
+	table.insert(gunLists, Career.missionUnlocks(mission.id)) -- 6.19: the guns a mission unlocks say it too
+end
+for _, list in gunLists do
+	for _, unlock in list do
 		if unlock.kind == "gun" then
 			local def = Economy.findWeapon(unlock.id)
 			local starter = def ~= nil and def.starter == true
@@ -388,9 +402,9 @@ do
 		end
 		return table.concat(out, " | ")
 	end
-	check("6.14: level 4's card: Earl's van first, the range's Shotgun, the Padded Messenger Bag at ZDC Bags, then MISSIONS",
-		#rows == 4 and rows[1].place == "earl" and rows[1].names[1] == "Old Van" and #rows[1].names == 1 and rows[2].place == "guns" and rows[2].names[1] == "Shotgun"
-			and rows[3].place == "bags" and rows[4].window == "missions" and rows[4].id == "dispatch" and rows[4].names[1] == "First Shift", labels())
+	check("6.14: level 4's card: Earl's van first, the Padded Messenger Bag at ZDC Bags (6.19: no gun: the Shotgun is a mission's), then MISSIONS",
+		#rows == 4 and rows[1].place == "earl" and rows[1].names[1] == "Old Van" and #rows[1].names == 1 and rows[2].place == "bags"
+			and rows[3].place == "mechanic" and rows[4].window == "missions" and rows[4].id == "dispatch" and rows[4].names[1] == "First Shift", labels())
 	local grouped = Career.whereRows(road[4].unlocks, 9, 9)
 	local garage: Career.WhereRow? = nil
 	for _, row in grouped do
@@ -407,6 +421,125 @@ do
 		estateRow = estateRow or row.window == "estate"
 	end
 	check("6.14: level 2's card: the bikes at the BIKES counter and ESTATE for the Rented Lockup", two[1] ~= nil and two[1].place == "bikes" and estateRow and #two <= 4)
+end
+
+-- ── 6.19: the guns and the cars a mission unlocks ──────────────────────────────
+do
+	local Missions = require("./Missions")
+	-- The owner's table (+ the Freight Truck: the Iron Supply finale), by the missions' names.
+	local function finale(campaignId: string): string
+		local def = Missions.finale(campaignId)
+		return if def then def.id else "?"
+	end
+	local function step(campaignId: string, number: number): string
+		local def = Missions.ofCampaign(campaignId)[number]
+		return if def then def.id else "?"
+	end
+	local want: { { string } } = {
+		{ "smg", step("dispatch", 2), "Mail Call" },
+		{ "shotgun", finale("dispatch"), "Rush Hour of the Dead" },
+		{ "courier", step("clinic", 3), "Many Hands" },
+		{ "highroof", step("clinic", 3), "Many Hands" },
+		{ "rifle", finale("clinic"), "Code Red" },
+		{ "pickup", step("market", 3), "Farm to Table" },
+		{ "boxtruck", finale("market"), "Empty Shelves" },
+		{ "muscle", finale("firehouse"), "Smoke and Sirens" },
+		{ "freight", finale("army"), "Iron Supply" },
+		{ "minigun", finale("power"), "Lights Out" },
+		{ "roofminigun", finale("power"), "Lights Out" },
+		{ "armorvan", finale("ranch"), "Wild West End" },
+		{ "launcher", finale("lab"), "The Cure" },
+		{ "rooflauncher", finale("lab"), "The Cure" },
+		{ "rallyvan", finale("underworld"), "Dirty Money" },
+	}
+	local function defOf(id: string): any
+		return Economy.findCar(id) or Economy.findWeapon(id) or Economy.findCarGun(id)
+	end
+	local mapped: { [string]: boolean } = {}
+	for _, entry in want do
+		local def = defOf(entry[1])
+		local mission = if def then Missions.find(def.mission or "") else nil
+		mapped[entry[1]] = true
+		check(`6.19: the {entry[1]} comes with {entry[3]} ({entry[2]})`, def ~= nil and def.mission == entry[2] and mission ~= nil and mission.name == entry[3], def and def.mission)
+		check(`6.19: the {entry[1]}'s level is its mission's`, def ~= nil and mission ~= nil and def.level == mission.level, def and def.level)
+	end
+	-- Every `mission` in Config is a real mission, and only the mapped defs have one.
+	local others = true
+	for _, list in { Config.Cars, Config.Weapons, Config.CarGuns } :: { { any } } do
+		for _, def in list do
+			if def.mission ~= nil and (not mapped[def.id] or Missions.find(def.mission) == nil) then
+				others = false
+				print(`  unexpected mission on {def.id}: {def.mission}`)
+			end
+		end
+	end
+	check("6.19: every mission unlock is a real mission, and only the mapped guns and cars have one", others)
+	-- The story order: an item a mission unlocks never comes before an item of an earlier mission costs less (the
+	-- missions in Missions.Campaigns' story order; the guns and the cars each rise in price along it).
+	local order: { [string]: number } = {}
+	local n = 0
+	for _, campaign in Missions.Campaigns do
+		for _, def in Missions.ofCampaign(campaign.id) do
+			n += 1
+			order[def.id] = n
+		end
+	end
+	local function rising(list: { any }): (boolean, string?)
+		local items: { any } = {}
+		for _, def in list do
+			if def.mission then
+				table.insert(items, def)
+			end
+		end
+		table.sort(items, function(a: any, b: any): boolean
+			return order[a.mission] < order[b.mission]
+		end)
+		for index = 2, #items do
+			if order[items[index].mission] > order[items[index - 1].mission] and items[index].price < items[index - 1].price then
+				return false, `{items[index].id} after {items[index - 1].id}`
+			end
+		end
+		return true, nil
+	end
+	local carsOk, carsWhy = rising(Config.Cars)
+	local gunsOk, gunsWhy = rising(Config.Weapons)
+	local roofOk, roofWhy = rising(Config.CarGuns)
+	check("6.19: the cars come in story order, dearer along the story", carsOk, carsWhy)
+	check("6.19: the guns come in story order, dearer along the story", gunsOk, gunsWhy)
+	check("6.19: the car guns come in story order, dearer along the story", roofOk, roofWhy)
+	-- A mission's level is never above its chapter's finale's, and the main story missions come first: every mapped
+	-- mission is a story chapter's (no DUO side story).
+	local story = true
+	for _, entry in want do
+		local mission = Missions.find(entry[2])
+		local campaign = if mission then Missions.findCampaign(mission.campaign) else nil
+		story = story and campaign ~= nil and not campaign.duo
+	end
+	check("6.19: every unlock mission is in the main story (not the DUO side story)", story)
+	-- The lock, the lists and the words.
+	local smg = Economy.findWeapon("smg")
+	check("6.19: the SMG is locked until Mail Call is done (any rating), then open", Career.missionLock(smg, {}) == "dispatch_2" and Career.missionLock(smg, nil) == "dispatch_2"
+		and Career.missionLock(smg, { dispatch_2 = 1 }) == nil and Career.missionLock(Economy.findWeapon("pistol"), {}) == nil)
+	check("6.19: the lock's words", Career.lockText("dispatch_2") == "Finish Mail Call")
+	local hands = Career.missionUnlocks(step("clinic", 3))
+	check("6.19: Many Hands unlocks the Courier Van and the High-Roof Van", #hands == 2 and hands[1].id == "courier" and hands[2].id == "highroof" and hands[1].kind == "car")
+	check("6.19: MISSIONS' line", Career.unlocksLine("dispatch_2") == "🔓 Unlocks: SMG" and Career.unlocksLine(step("clinic", 3)) == "🔓 Unlocks: Courier Van, High-Roof Van"
+		and Career.unlocksLine("dispatch_1") == nil, Career.unlocksLine("dispatch_2"))
+	local news = Career.newLines("dispatch_2")
+	check("6.19: the cleared card: \"🔓 NEW: SMG at Lead & Co.'s range\" and the GPS to the range", #news == 1 and news[1].text == `🔓 NEW: SMG at {Config.GunRange.Shop}` and news[1].place == "guns", news[1] and news[1].text)
+	local lights = Career.newLines(finale("power"))
+	check("6.19: Lights Out: the Minigun at the range, the Roof Minigun at Wrench Garage", #lights == 2 and lights[1].place == "guns" and lights[2].place == "mechanic")
+	check("6.19: a mission that unlocks nothing has no lines", #Career.newLines("dispatch_1") == 0)
+	-- Not on the road any more: no mapped item at any level.
+	local onRoad = false
+	for _, stepOf in road do
+		for _, unlock in stepOf.unlocks do
+			if mapped[unlock.id] and (unlock.kind == "car" or unlock.kind == "gun" or unlock.kind == "cargun") then
+				onRoad = true
+			end
+		end
+	end
+	check("6.19: the road lists none of them under a level", not onRoad)
 end
 
 if failures == 0 then

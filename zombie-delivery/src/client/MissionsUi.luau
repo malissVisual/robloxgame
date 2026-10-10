@@ -350,6 +350,7 @@ Extras.hasState = false
 Extras.remote = nil :: RemoteEvent?
 Extras.secretCache = nil :: { SecretEntry }?
 Extras.clearedPending = 0 -- "cleared" cards on their way (waiting for the DELIVERY result to close): popups wait too
+Extras.clearedPlace = nil :: string? -- 6.19: the shop the cleared card's GPS goes to (what the mission unlocked)
 Extras.pumpPopups = nil :: (() -> ())? -- shows the next waiting popup (set by the popups' block)
 Extras.crewSize = 0 -- 3.2: members of my own crew (the server's state, CrewState as the owner): DUO missions need some
 Extras.DUO_COLOR = P.danger -- 3.2: the DUO badge (the Partners in Crime red; 3.6: the danger ink on paper)
@@ -1399,7 +1400,7 @@ function Page.action(campaign: Campaign, order: number)
 	local _, _, replay = Page.payout(def)
 	local payLine = if replay
 		then `<font color="{Extras.hex(P.ink2)}"><b>REPLAY</b></font>  a quarter of the pay: no reward, no XP bonus, no unlock{if stars < 3 then `  ·  a new best ★ still pays {Ui.money(T.StarBonus)}` else ""}`
-		else `<font color="{good}"><b>FIRST TIME</b></font>  the reward {Ui.money(def.reward)} and about {Ui.money(payHint(def))} pay, the first-clear XP{if finale then `  ·  <font color="{Extras.hex(Extras.GOLD)}"><b>+ THE CHAPTER'S REWARD</b></font>` else ""}`
+		else `<font color="{good}"><b>FIRST TIME</b></font>  the reward {Ui.money(def.reward)} and about {Ui.money(payHint(def))} pay, the first-clear XP{esc(Page.unlockTail(def))}{if finale then `  ·  <font color="{Extras.hex(Extras.GOLD)}"><b>+ THE CHAPTER'S REWARD</b></font>` else ""}`
 	detailLine(body, payLine, P.ink, 20, layout.small + 1)
 	-- 6.18: why START would be refused (6.8's action bar said it; the hero has one line for it)
 	local blocker = Page.blocker(def)
@@ -1432,6 +1433,10 @@ function Page.factsOf(def: MissionDef): (string, Color3?)
 	local _, xp, replay = Page.payout(def)
 	local parts = { `🧟 {enemyTotal} {string.lower(enemyLabel)}`, `{cargoEmoji(def)} {def.items}` }
 	table.insert(parts, if replay then "↻ REPLAY" else `+{xp} XP`)
+	local unlocks = if replay then nil else require(Shared.Career).unlocksLine(def.id) -- 6.19: "🔓 Unlocks: SMG"
+	if unlocks then
+		table.insert(parts, unlocks)
+	end
 	return table.concat(parts, " · "), nil
 end
 
@@ -1570,6 +1575,12 @@ function Page.cards(campaign: Campaign)
 	Page.finale(right, campaign, 40)
 end
 
+-- 6.19: a row's short note of what the mission unlocks (" · 🔓 SMG"; "" for nothing).
+function Page.unlockTail(def: MissionDef): string
+	local line = require(Shared.Career).unlocksLine(def.id)
+	return if line then ` · 🔓 {string.sub(line, #"🔓 Unlocks: " + 1)}` else ""
+end
+
 -- One mission of the chapter (6.18: the kit's compact row; see the header). A tap puts it in the hero.
 function Page.step(parent: Instance, def: MissionDef, campaign: Campaign, order: number, last: boolean)
 	local Kit = Page.Kit
@@ -1582,7 +1593,7 @@ function Page.step(parent: Instance, def: MissionDef, campaign: Campaign, order:
 	local facts = if locked then `🔒 {why or "Locked"}`
 		elseif status == "active" then "▶ PLAYING"
 		elseif replay then `REPLAY · 🧟 {(require(Shared.MissionPlan).size(def))}`
-		else `FIRST TIME · +{xp} XP{if last then " · + 🏆" else ""}`
+		else `FIRST TIME · +{xp} XP{if last then " · + 🏆" else ""}{Page.unlockTail(def)}`
 	local made = Kit.row(parent, {
 		name = id,
 		order = 10 + order,
@@ -2791,7 +2802,20 @@ local function buildCleared()
 	line("clearedDebrief", 5, 16, Theme.Font, P.ink)
 	line("clearedRewards", 6, 15, Theme.HeadingFont, C.money)
 	line("clearedCampaign", 7, 18, Theme.DisplayFont, C.yellow)
-	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 8 }, card)
+	-- 6.19: what the first clear unlocks ("🔓 NEW: SMG at Lead & Co.", Career.newLines) and a GPS to the first shop.
+	local news = Ui.make("Frame", { Name = "Unlocks", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 8, Visible = false }, card)
+	Ui.list(news, true, 6, Enum.HorizontalAlignment.Center)
+	refs.clearedUnlocks = news
+	refs.clearedUnlockText = Ui.label(news, "", UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, TextSize = 16, Font = Theme.HeadingFont, TextColor3 = C.green, TextXAlignment = Enum.TextXAlignment.Center, RichText = true })
+	refs.clearedGps = Ui.ghostButton(news, "📍 GPS", UDim2.fromOffset(200, 34), C.green, function()
+		local place = Extras.clearedPlace
+		if place then
+			require(script.Parent.Gps).to(place)
+			hideCleared()
+		end
+	end)
+	refs.clearedGps.LayoutOrder = 2
+	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 9 }, card)
 	Ui.list(buttons, false, 10, Enum.HorizontalAlignment.Center)
 	refs.clearedNext = Ui.button(buttons, "NEXT MISSION ▶", UDim2.fromOffset(220, 44), K.red, function()
 		local id = clearedNext
@@ -2895,6 +2919,18 @@ local function showCleared(data: any)
 	local campaignDone = if type(data.campaignDone) == "string" then data.campaignDone else nil
 	refs.clearedCampaign.Text = if campaignDone then `🏆  {esc(string.upper(campaignDone))} COMPLETE!` else ""
 	refs.clearedCampaign.Visible = campaignDone ~= nil
+	-- 6.19: the guns and the cars this first clear unlocks, and the GPS to their shop.
+	local Career = require(Shared.Career)
+	local news: { Career.NewLine } = if def and not replay and (data.first == true or reward > 0) then Career.newLines(def.id) else {}
+	local texts = {}
+	for _, entry in news do
+		table.insert(texts, esc(entry.text))
+	end
+	Extras.clearedPlace = if news[1] then news[1].place else nil
+	refs.clearedUnlockText.Text = table.concat(texts, "\n")
+	refs.clearedUnlocks.Visible = #news > 0
+	refs.clearedGps.Visible = Extras.clearedPlace ~= nil
+	refs.clearedGps.Text = if news[1] then `📍 GPS: {string.upper(news[1].label)}` else "📍 GPS"
 	-- NEXT MISSION (members: their leader picks; the button still opens the window there). 6.8: the chapter's next
 	-- (the server's nextId: the client's progress may be a step behind); the chapter done: the clients.
 	local following = if type(data.nextId) == "string" then Missions.find(data.nextId) elseif data.nextId == nil and data.of ~= nil then nil else nextMission(data.id)
@@ -3311,6 +3347,17 @@ end
 -- Opens the window (on a campaign, else where you are in the story).
 function MissionsUi.open(campaignId: string?)
 	setOpen(true, campaignId)
+end
+
+-- 6.19: opens the window on one mission (a shop's "🔒 Finish Mail Call": its chapter, that mission in the hero).
+function MissionsUi.openMission(id: string)
+	local def = Missions.find(id)
+	if def then
+		Extras.tab = "missions"
+		selectedCampaign = def.campaign
+		selectedMission = def.id
+	end
+	setOpen(true, if def then def.campaign else nil)
 end
 
 -- 3.1: opens the window on a page ("missions" | "challenges" | "secrets" | "rewards").

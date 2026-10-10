@@ -40,6 +40,8 @@
 --   * `start`   whether START can work right now and else what it says: IN PROGRESS (that mission runs), LEADER PICKS
 --               (in somebody else's crew), AFTER YOUR RUN (a job of yours runs), CALL CAR (no car of yours out and the
 --               mission lends none: server/Jobs.luau "Call your car first"). The tile and the READY CHECK say it.
+-- 6.19: the guns and the cars a mission unlocks (Config `mission`) are only suggested once that mission is done: a row
+-- never asks you to save up for something the shop would refuse (the cheapest car or gun open to you instead).
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
@@ -282,12 +284,19 @@ local function stageFor(carId: string, stage: number, need: number, extra: numbe
 	return nil, 0, 1
 end
 
+-- 6.19: is `def` sold to you yet? A car or a gun with a `mission` (Config: the guns and the cars a mission unlocks)
+-- only once that mission is done: until then it is never a row's buy nor the savings goal (its mission comes first).
+local function unlocked(input: Input, def: any): boolean
+	local mission = def.mission
+	return type(mission) ~= "string" or Missions.cleared(input.progress, mission)
+end
+
 -- The cheapest vehicle you do not own that holds `need` at some stage (its price and the stages up to it).
 local function dealerFor(input: Input, need: number): (Config.CarDef?, Config.StageDef?, number, number)
 	local cars = input.cars or {}
 	local best: Config.CarDef?, bestStage: Config.StageDef?, bestCost, bestLevel = nil, nil, math.huge, 1
 	for _, def in Config.Cars do
-		if def.company or def.bike or cars[def.id] then
+		if def.company or def.bike or cars[def.id] or not unlocked(input, def) then
 			continue
 		end
 		local cost, level, stage = def.price, def.level or 1, nil
@@ -314,7 +323,7 @@ local function firstCar(input: Input, level: number): Config.CarDef
 	end
 	local cheapest: Config.CarDef? = nil
 	for _, def in Config.Cars do
-		if not def.company and not def.bike and def.id ~= van.id and (cheapest == nil or def.price < (cheapest :: Config.CarDef).price) then
+		if not def.company and not def.bike and def.id ~= van.id and unlocked(input, def) and (cheapest == nil or def.price < (cheapest :: Config.CarDef).price) then
 			cheapest = def
 		end
 	end
@@ -473,10 +482,10 @@ local function cheapestVest(upTo: number): Config.KitDef?
 	return best
 end
 
-local function cheapestLongGun(upTo: number): Config.WeaponDef?
+local function cheapestLongGun(input: Input, upTo: number): Config.WeaponDef?
 	local best: Config.WeaponDef? = nil
 	for _, def in Config.Weapons do
-		if def.oneHanded or def.starter or Economy.rewardOnly(def) then
+		if def.oneHanded or def.starter or Economy.rewardOnly(def) or not unlocked(input, def) then
 			continue
 		end
 		local b = best
@@ -544,7 +553,7 @@ local function recommended(input: Input, def: Missions.MissionDef, level: number
 		if ownsLongGun(input.weapons) then
 			table.insert(list, { id = "gun", icon = "🔫", text = "A two-handed gun", detail = "Yours: for the fights on foot at the stops", done = true, required = false })
 		else
-			local gun = cheapestLongGun(upTo)
+			local gun = cheapestLongGun(input, upTo)
 			if gun then
 				table.insert(list, { id = "gun", icon = "🔫", text = "A two-handed gun", detail = `{gun.name} at {PLACES.guns} · {money(gun.price)}{levelNote(gun.level, level)}`, done = false, required = false, have = cash, need = gun.price, cost = gun.price, name = gun.name, place = "guns", action = "gps", level = gun.level })
 			end

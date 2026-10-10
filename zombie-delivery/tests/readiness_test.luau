@@ -164,8 +164,11 @@ check("a bike out, the van at home: not ready, CALL CAR (GARAGE), nothing to buy
 check("… its room counted in the van", (find(biking, "cargo") :: Readiness.Check).done)
 
 -- The van quest done but no car (sold): the dealer's cheapest.
-local dealer = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {}, vanQuest = "done", progress = progressTo("dispatch", 0) })
+-- (6.19: the Courier Van once Many Hands, Code Red's third, is done: progressTo("clinic", 3))
+local dealer = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {}, vanQuest = "done", progress = progressTo("clinic", 3) })
 check("no car and Earl's van bought once: the dealer's cheapest car", (find(dealer, "vehicle") :: Readiness.Check).place == "dealer" and (find(dealer, "vehicle") :: Readiness.Check).name == "Courier Van")
+local early = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {}, vanQuest = "done", progress = progressTo("dispatch", 0) })
+check("6.19: … before Many Hands no dealer car is open: never a car the dealer would refuse", (find(early, "vehicle") :: Readiness.Check).name ~= "Courier Van" and (find(early, "vehicle") :: Readiness.Check).place ~= "dealer")
 
 -- ── Room: a stage, another car of yours, the dealer ─────────────────────────
 
@@ -220,7 +223,13 @@ local busy = Readiness.evaluate({ xp = Levels.xpFor(5), money = 400, cars = { va
 check("… the rows still to do come before the done ones (the friend cut at MaxRows)", find(busy, "friend") == nil and #busy.checks == tuning.MaxRows, ids(busy))
 local gun = Readiness.evaluate({ xp = Levels.xpFor(5), money = 400, cars = { van = true }, car = "van", progress = progressTo("dispatch", 5), crewSize = 1, kit = { kevlar = true }, items = { medkit = 1, repair = 1 } })
 local long = find(gun, "gun") :: Readiness.Check
-check("… no two-handed gun: the Shotgun at Lead & Co.'s range", long ~= nil and long.name == "Shotgun" and long.place == "guns" and long.cost == 15000 and gun.goal ~= nil and gun.goal.id == "gun")
+-- 6.19: the Shotgun is the First Shift finale's own unlock: no two-handed gun is open before it (no row, no goal) …
+check("6.19: … no two-handed gun open before the finale: no gun row, no gun goal", long == nil and (gun.goal == nil or gun.goal.id ~= "gun"), gun.goal and gun.goal.id)
+-- … and once the finale is done (a replay of it): the Shotgun at Lead & Co.'s range, the goal.
+local done = progressTo("dispatch", 6)
+local replayGun = Readiness.evaluate({ xp = Levels.xpFor(5), money = 400, cars = { van = true }, car = "van", progress = done, mission = "dispatch_10", crewSize = 1, kit = { kevlar = true }, items = { medkit = 1, repair = 1 } })
+local long2 = find(replayGun, "gun") :: Readiness.Check
+check("… no two-handed gun: the Shotgun at Lead & Co.'s range", long2 ~= nil and long2.name == "Shotgun" and long2.place == "guns" and long2.cost == 15000 and replayGun.goal ~= nil and replayGun.goal.id == "gun")
 local easy = Readiness.evaluate({ xp = Levels.xpFor(4), money = 400, cars = { van = true }, car = "van", progress = {} })
 check("an easy mission: no vest, no gun, no friend", find(easy, "vest") == nil and find(easy, "gun") == nil and find(easy, "friend") == nil)
 local duo = Readiness.evaluate({ xp = Levels.xpFor(15), money = 0, cars = { van = true }, car = "van", progress = story })

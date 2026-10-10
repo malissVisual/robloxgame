@@ -336,6 +336,9 @@ until then:
 
 (5.7: the table is `Career.road()` as the CAREER window shows it: every unlock from Config, the reward from
 `Config.Levels.Rewards`. A car's gear, the Hand Trolley, shows with the first car at level 4.)
+(6.19: the dealer's cars after the Old Van, the guns from the SMG to the Grenade Launcher and the Roof Minigun and the
+Roof Grenade Launcher have left this table. Each one now comes with a mission: see "Guns and cars unlocked by
+missions (6.19)".)
 
 * **Cars** (5.0): you start on foot; bikes from level 2 at Spoke & Chain, Earl's Old Van at 4, then the dealer's cars
   (level and price rise together). The company vehicles come with their employer's job level; the **stages** open by
@@ -1188,6 +1191,35 @@ back.
 the base prices from before 6.19. The tests check the base price × its knob (`Config.priced`), so tuning a knob only
 breaks the few text checks that show a price (`tests/readiness_test.luau`, `tests/vanquest_test.luau`, the phone
 recorder).
+
+**Guns and cars unlocked by missions (6.19).** The owner asked that the story unlock the guns and the cars, not the
+level. A def in `Config.Cars`, `Weapons` or `CarGuns` with `mission = "<id>"` is sold once that mission is done, at any
+rating (`Career.missionLock`). Its `level` is now that mission's level and only orders things: it is not a gate. A save
+that owns one keeps it.
+- Mail Call: SMG.
+- First Shift finale: Shotgun.
+- Many Hands: Courier Van, High-Roof Van.
+- Code Red finale: Hunting Rifle.
+- Farm to Table: Pickup.
+- Empty Shelves finale: Box Truck.
+- Smoke and Sirens finale: Muscle Car.
+- Iron Supply finale: Freight Truck.
+- Lights Out finale: Minigun, Roof Minigun.
+- Wild West End finale: Armored Van.
+- Patient Zero finale (The Cure): Grenade Launcher, Roof Grenade Launcher.
+- Dirty Money finale: Rally Van.
+
+The bikes, the kit, the gear, Earl's Old Van, the car stages and the Roof Machine Gun keep their levels.
+
+Where it shows:
+- **The server** refuses an early buy: "Finish Mail Call first …" (`server/Shops.luau`).
+- **The shops** read "🔒 Finish Mail Call" with a MISSIONS › button that opens that mission (`ShopWindow`, `MissionsUi.openMission`).
+- **MISSIONS** shows "🔓 Unlocks: SMG" on the hero and the rows.
+- **The cleared card** says "🔓 NEW: SMG at Lead & Co.'s range" and has a GPS button.
+- **The CAREER road** lists these items under their mission (`Career.missionUnlocks`), not under a level.
+- **The READY CHECK** never suggests something that is still locked, so it can't become a savings goal.
+
+The skills that levels will give are only a proposal for now: `design/skills/PROPOSAL.md`.
 
 ## One look everywhere (6.18)
 

@@ -579,7 +579,7 @@ local function unlocksAt(level: number): { string }
 		end
 	end
 	for _, def in Config.Cars do
-		if def.level == level and not def.company then
+		if def.level == level and not def.company and def.mission == nil then -- (6.19: a mission's, not a level's)
 			table.insert(list, def.name)
 		end
 		-- 3.5: a stage of a car you own (Wrench Garage).
@@ -591,12 +591,12 @@ local function unlocksAt(level: number): { string }
 		end
 	end
 	for _, def in Config.Weapons do
-		if def.level == level and not def.earned then
+		if def.level == level and not def.earned and def.mission == nil then
 			table.insert(list, def.name)
 		end
 	end
 	for _, def in Config.CarGuns do
-		if def.level == level then
+		if def.level == level and def.mission == nil then
 			table.insert(list, def.name)
 		end
 	end

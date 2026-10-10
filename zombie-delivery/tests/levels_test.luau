@@ -153,7 +153,8 @@ end
 check("the pickup is not free money (more than the first missions' rewards)", car("pickup").price > rewardsUpTo(1), rewardsUpTo(1))
 check("the muscle car costs real money", car("muscle").price >= 3 * car("pickup").price)
 -- 3.3: five more vans between the start van and the endgame.
-for _, want in { { "courier", 5 }, { "highroof", 5 }, { "boxtruck", 7 }, { "armorvan", 11 }, { "rallyvan", 13 } } do
+-- (6.19: their level is now the level of the mission that unlocks them: the Armored Van 11 → 12, the Rally Van 13 → 14)
+for _, want in { { "courier", 5 }, { "highroof", 5 }, { "boxtruck", 7 }, { "armorvan", 12 }, { "rallyvan", 14 } } do
 	local def = Economy.findCar(want[1] :: string)
 	check(`the {want[1]} is at the dealer from level {want[2]}`, def ~= nil and not def.company and def.level == want[2] and def.mount == true, def and def.level)
 end

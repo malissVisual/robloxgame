@@ -218,6 +218,7 @@ export type CarDef = {
 	description: string,
 	company: boolean?, -- not for sale: an employer lends it for their jobs and gives it to you after a few of them
 	level: number?, -- the driver level (Config.Levels) needed to buy it
+	mission: string?, -- 6.19: the mission (shared/Missions.luau id) to finish before it is sold (Career.missionLock); `level` is then that mission's level
 	employer: string?, -- who (Config.Employers)
 	mount: boolean?, -- a car gun (Config.CarGuns) fits on its roof; the company / work vehicles carry none
 	capacity: number, -- 3.4: cargo slots (the pieces carried or led by hand it takes at once), = its body's slots
@@ -317,7 +318,8 @@ Config.Cars = {
 		id = "courier",
 		gearSlots = 2, -- 4.6
 		trolley = true,
-		level = 5,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "clinic_4", -- 6.19: sold once you finish Code Red 3, Many Hands (Career.missionLock)
 		mount = true,
 		name = "Courier Van",
 		price = 3500,
@@ -342,7 +344,8 @@ Config.Cars = {
 		id = "highroof",
 		gearSlots = 3, -- 4.6
 		trolley = true,
-		level = 5,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "clinic_4", -- 6.19: sold once you finish Code Red 3, Many Hands (Career.missionLock)
 		mount = true,
 		name = "High-Roof Van",
 		price = 7000,
@@ -366,7 +369,8 @@ Config.Cars = {
 	{
 		id = "pickup",
 		gearSlots = 2, -- 4.6
-		level = 6,
+		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "market_3", -- 6.19: sold once you finish Empty Shelves 3, Farm to Table (Career.missionLock)
 		mount = true,
 		name = "Pickup",
 		price = 12000,
@@ -391,7 +395,8 @@ Config.Cars = {
 		id = "boxtruck",
 		gearSlots = 3, -- 4.6
 		trolley = true,
-		level = 7,
+		level = 7, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "market_10", -- 6.19: sold once you finish the Empty Shelves finale (Career.missionLock)
 		mount = true,
 		name = "Box Truck",
 		price = 22000,
@@ -416,7 +421,8 @@ Config.Cars = {
 	{
 		id = "muscle",
 		gearSlots = 1, -- 4.6
-		level = 9,
+		level = 9, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "firehouse_10", -- 6.19: sold once you finish the Smoke and Sirens finale (Career.missionLock)
 		mount = true,
 		name = "Muscle Car",
 		price = 40000,
@@ -440,7 +446,8 @@ Config.Cars = {
 	{
 		id = "freight",
 		gearSlots = 4, -- 4.6
-		level = 10,
+		level = 10, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "army_10", -- 6.19: sold once you finish the Iron Supply finale (Career.missionLock)
 		trolley = true,
 		pallets = 3,
 		name = "Freight Truck",
@@ -464,7 +471,8 @@ Config.Cars = {
 	{
 		id = "armorvan",
 		gearSlots = 3, -- 4.6
-		level = 11,
+		level = 12, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "ranch_10", -- 6.19: sold once you finish the Wild West End finale (Career.missionLock)
 		mount = true,
 		name = "Armored Van",
 		price = 55000,
@@ -488,7 +496,8 @@ Config.Cars = {
 	{
 		id = "rallyvan",
 		gearSlots = 2, -- 4.6
-		level = 13,
+		level = 14, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "underworld_10", -- 6.19: sold once you finish the Dirty Money finale (Career.missionLock)
 		mount = true,
 		name = "Rally Van",
 		price = 80000,
@@ -779,6 +788,7 @@ export type WeaponDef = {
 	description: string,
 	earned: string?, -- not sold: this employer (Config.Employers) gives it to you after some jobs
 	level: number?, -- the driver level (Config.Levels) needed to buy it
+	mission: string?, -- 6.19: the mission (shared/Missions.luau id) to finish before it is sold (Career.missionLock); `level` is then that mission's level
 	oneHanded: boolean?, -- fires out of a car window too (any seat); the two-handed guns only on foot
 	exclusive: string?, -- 3.1: not sold, a reward nobody can buy (Config.Rewards: a campaign id, "secrets" or "challenges")
 	pierce: number?, -- 3.1: the bullet goes on through this many more enemies
@@ -804,7 +814,8 @@ Config.Weapons = {
 	},
 	{
 		id = "smg",
-		level = 3,
+		level = 4, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "dispatch_2", -- 6.19: sold once you finish First Shift 2, Mail Call (Career.missionLock)
 		oneHanded = true,
 		name = "SMG",
 		price = 4000,
@@ -819,7 +830,8 @@ Config.Weapons = {
 	},
 	{
 		id = "shotgun",
-		level = 4,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "dispatch_10", -- 6.19: sold once you finish the First Shift finale, Rush Hour of the Dead (Career.missionLock)
 		name = "Shotgun",
 		price = 7500,
 		damage = 15,
@@ -833,7 +845,8 @@ Config.Weapons = {
 	},
 	{
 		id = "rifle",
-		level = 6,
+		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "clinic_10", -- 6.19: sold once you finish the Code Red finale (Career.missionLock)
 		name = "Hunting Rifle",
 		price = 15000,
 		damage = 60, -- 6.7: 48 → 60 (132 a second: more than the SMG's 117 even before its spread misses at range)
@@ -847,7 +860,8 @@ Config.Weapons = {
 	},
 	{
 		id = "minigun",
-		level = 10,
+		level = 11, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "power_10", -- 6.19: sold once you finish the Lights Out finale (Career.missionLock)
 		name = "Minigun",
 		price = 40000,
 		damage = 15,
@@ -861,7 +875,8 @@ Config.Weapons = {
 	},
 	{
 		id = "launcher",
-		level = 12,
+		level = 13, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "lab_10", -- 6.19: sold once you finish the Patient Zero finale, The Cure (Career.missionLock)
 		name = "Grenade Launcher",
 		price = 60000,
 		damage = 90,
@@ -981,6 +996,7 @@ export type CarGunDef = {
 	color: { number }, -- tracer colour
 	description: string,
 	level: number?, -- the driver level (Config.Levels) needed to buy it
+	mission: string?, -- 6.19: the mission (shared/Missions.luau id) to finish before it is sold (Career.missionLock); `level` is then that mission's level
 }
 
 Config.CarGuns = {
@@ -1000,7 +1016,8 @@ Config.CarGuns = {
 	},
 	{
 		id = "roofminigun",
-		level = 10,
+		level = 11, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "power_10", -- 6.19: sold once you finish the Lights Out finale (Career.missionLock)
 		name = "Roof Minigun",
 		price = 45000,
 		damage = 16,
@@ -1014,7 +1031,8 @@ Config.CarGuns = {
 	},
 	{
 		id = "rooflauncher",
-		level = 12,
+		level = 13, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "lab_10", -- 6.19: sold once you finish the Patient Zero finale, The Cure (Career.missionLock)
 		name = "Roof Grenade Launcher",
 		price = 55000,
 		damage = 80,

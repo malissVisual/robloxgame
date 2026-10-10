@@ -187,6 +187,8 @@ end
 ReadyCheck.onMissions = function(campaignId: string?)
 	MissionsUi.open(campaignId)
 end
+-- 6.19: a shop's "🔒 Finish Mail Call" (MISSIONS ›) opens MISSIONS on that mission.
+require(Client.ShopWindow).onMission = MissionsUi.openMission
 ReadyCheck.onCrew = function(missionId: string?)
 	if missionId then
 		MissionsUi.findCrew(missionId)

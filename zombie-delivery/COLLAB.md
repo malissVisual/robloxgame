@@ -30,6 +30,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.19: missions now unlock the guns and the cars (`mission` on the Config defs, `Career.missionLock` / `missionUnlocks`). Locked items show "🔒 Finish …" in the shops, and the server refuses them. MISSIONS shows "🔓 Unlocks: …" and the cleared card "🔓 NEW: … at …" with GPS. A Czech skills draft is in `design/skills/PROPOSAL.md`, waiting for the owner. Test in Studio: Lead & Co. before and after Mail Call, and the cleared card of Mail Call.
 - Claude · 6.19: prices as milestones: one knob, `Config.Prices` (Vehicles ×3, Bikes ×4, Stages/Upgrades/Gear/Kit ×2.5, Guns/CarGuns/Paints/Style ×2, Items ×1.5, level-up money ×1.5; estate, fuel, repair fee as before), applied once at the end of `shared/Config.luau`; Earl's van $5,400, the Rusty Bike $1,200. Test in Studio: the shops, Earl, the savings line.
 - Claude · 6.18: one look everywhere: the UI kit (`client/CardKit.luau`, `design/ui-kit/README.md`), the phone's home, the shops, bag, garage, style, missions, tasks, ready check, regulars, career, estate, crew, bank, messages, settings.
 - Claude · 6.17: JOBS redesigned (redesign B): the best job on a big hero card, compact rows with pay and +, YOUR RUN / NEXT UP / RUSH as chips, details on a tap; J opens it too (`client/JobsView.luau`, `shared/JobPick.luau`).
