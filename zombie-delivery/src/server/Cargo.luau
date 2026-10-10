@@ -1037,8 +1037,12 @@ end
 local function spawnFor(session: Session, look: Npcs.Look, at: CFrame): Model?
 	local visit = session.visit -- (5.2: the same stop may come again later: its visit, not its number)
 	session.busy += 1
-	local npc = Npcs.spawn(look, at)
+	local ok, result = pcall(Npcs.spawn, look, at)
 	session.busy -= 1
+	if not ok then
+		error(result, 0) -- Jobs counts failing ticks; a failed spawn must never leave the stop permanently busy.
+	end
+	local npc = result :: Model
 	if session.ended or session.visit ~= visit then
 		npc:Destroy()
 		return nil
@@ -2707,7 +2711,7 @@ local function attachCar(session: Session, old: Vehicles.Car?)
 end
 
 -- The stop's people and pieces: built when the owner gets close.
-local function build(session: Session)
+local function buildStop(session: Session)
 	local plan = session.plan
 	if not plan or session.built then
 		return
@@ -2891,6 +2895,39 @@ local function clearStop(session: Session, linger: boolean)
 	else
 		destroy()
 	end
+end
+
+-- Build failures go back to Jobs' tick guard. Roll back the partial stop first so a transient failure retries,
+-- instead of keeping built = true with no pile / prompt. Leave already-carried pieces and another visit alone.
+local function build(session: Session)
+	local plan = session.plan
+	if not plan or session.built then
+		return
+	end
+	local visit = session.visit
+	local pile, personAt = plan.pile, plan.personAt
+	local made, madeHere, variant = session.made, session.madeHere, session.nextVariant
+	local looseCount = #session.loose -- pallet pickups build Loose pieces rather than a pile
+	local ok, err = pcall(buildStop, session)
+	if ok then
+		return
+	end
+	if not session.ended and session.visit == visit and session.plan == plan then
+		for index = #session.loose, looseCount + 1, -1 do
+			local loose = table.remove(session.loose, index) :: Loose
+			loose.prompt:Destroy()
+			if loose.piece.model then
+				loose.piece.model:Destroy()
+			end
+		end
+		clearStop(session, false)
+		plan.pile, plan.personAt = pile, personAt
+		session.made, session.madeHere, session.nextVariant = made, madeHere, variant
+		session.built = false
+		session.anchor = nil
+		session.slot = 0
+	end
+	error(err, 0)
 end
 
 -- ── Kids, patients and customers ───────────────────────────────────────────

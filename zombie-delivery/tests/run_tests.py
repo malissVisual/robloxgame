@@ -21,13 +21,27 @@ with tempfile.TemporaryDirectory() as tmp:
     # 3.7: the client's pure modules (no Roblox at their top level) that a test requires.
     for name in ("Stamina", "TouchLayout", "PhoneLayout"):
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
+    # Exercise Cargo's actual public API and prompt callbacks, including failures while building a stop.
+    root = os.path.dirname(HERE)
+    shutil.copy(os.path.join(root, "tools", "vehicle-preview", "roblox-mock.luau"), os.path.join(tmp, "RobloxMock.luau"))
+    shutil.copy(os.path.join(HERE, "runtime", "CargoRuntime.luau"), os.path.join(tmp, "CargoRuntime.luau"))
+    source = open(os.path.join(root, "src", "server", "Cargo.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r"E.\1", source)
+    prefix = '''local E = require("./CargoRuntime")
+local M = E.Mock
+local game, workspace, task = E.game, M.workspace, E.task
+local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum
+local Random, RaycastParams, UDim2 = M.Random, M.RaycastParams, M.UDim2
+'''
+    open(os.path.join(tmp, "CargoServer.luau"), "w", encoding="utf-8").write(prefix + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
         result = subprocess.run([luau, "test.luau"], cwd=tmp, capture_output=True, text=True)
         sys.stdout.write(result.stdout)
         sys.stderr.write(result.stderr)
-        if "ALL CHECKS PASSED" not in result.stdout:
+        if result.returncode != 0 or "ALL CHECKS PASSED" not in result.stdout:
             ok = False
 # 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
 # has a body; every dealer car's body takes cargo and has a back that opens (the 3.2 loading).
