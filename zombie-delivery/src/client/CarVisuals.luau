@@ -29,6 +29,8 @@
 -- just seen (streamed in, its back already open) stays quiet its first second.
 -- 6.13.1 (performance): the prompts and the name tags are looked at PROMPT_EVERY seconds (not every frame); a phone
 -- spins the wheels, poses the riders and smokes the exhausts of the nearer cars only (client/DeviceBudget.luau).
+-- 6.16: CarVisuals.perCar, the hooks every car runs each frame (client/CarSway.luau the body's sway, client/TyreFx.luau
+-- the tyres' dust, smoke and skid marks, client/CrashFx.luau a crash's sparks; each keeps to its own range).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,6 +50,8 @@ local CarVisuals = {}
 -- 6.12: set by client/SoundScape.luau. what: "door" or the back's kind (SoundPlan.backKind); moment: "opening" (it
 -- starts to open), "closing" (the back starts to close) or "shut"; part: the leaf that moves.
 CarVisuals.onSwing = nil :: ((what: string, moment: string, part: BasePart) -> ())?
+-- 6.16: run for every car each frame (Stepped): the car, its chassis, dt, its distance from the camera, is it yours.
+CarVisuals.perCar = {} :: { (car: Model, chassis: BasePart, dt: number, distance: number, mine: boolean) -> () }
 
 type Wheel = { motor: Motor6D, front: boolean, radius: number }
 type Hinge = { motor: Motor6D, axis: Vector3, angle: number } -- angle: the open turn in radians
@@ -435,6 +439,10 @@ local function step(dt: number)
 			if smoke.Rate ~= rate then
 				smoke.Rate = rate
 			end
+		end
+
+		for _, hook in CarVisuals.perCar do
+			hook(car, chassis, dt, distance, mine) -- 6.16: the body's sway, the tyres, the sparks
 		end
 
 		-- Wheels.

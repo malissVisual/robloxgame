@@ -70,6 +70,8 @@
 --   freeze     boolean?       toggle (or set) FREEZE: every enemy and bandit car stands still (Zombies.frozen,
 --                             BanditCars.frozen; the workspace attribute AdminFrozen; off when its admin leaves)
 --   time       hour           the clock (DayNight.setClock: the night comes with it)
+--   weather    state          6.16: "rain" | "fog" | "clear" now, for the whole server (DayNight.setWeather: a spell
+--                             lasts its usual minutes; every client blends into it, to preview the looks)
 --   heal [T]                  you and your car full
 --   refuel [T] share?         5.4: the car's tank full (share 1, the default) or empty (0: try the crawl and the TOW)
 --                             (server/Fuel.luau adminFill)
@@ -1281,6 +1283,12 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	banditCar = banditCar,
 	clear = clear,
 	time = setTime,
+	-- 6.16: the weather now (the looks in the rain and the fog)
+	weather = function(player: Player, arg: any)
+		local state = if arg == "rain" or arg == "fog" then arg else "clear"
+		DayNight.setWeather(state)
+		say(player, `ADMIN: the weather is {state} now (it blends in over {Config.LivingCity.Weather.Fade} s).`)
+	end,
 	heal = function(player: Player)
 		heal(player, false)
 	end,

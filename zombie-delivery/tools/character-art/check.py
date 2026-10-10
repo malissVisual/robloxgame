@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).parent
 
-def export(luau, output):
+def export(luau, output, looks_output=None):
     with tempfile.TemporaryDirectory() as folder:
         tmp = Path(folder)
         mock = (ROOT / "tools/vehicle-preview/roblox-mock.luau").read_text()
@@ -26,6 +26,9 @@ return Mock""")
         (tmp / "mock.luau").write_text(mock)
         (tmp / "Geometry.luau").write_text((ROOT / "src/server/CharacterArt/Geometry.luau").read_text())
         (tmp / "Config.luau").write_text((ROOT / "src/shared/Config.luau").read_text())
+        # 6.16: the infected's looks (pure; check.luau builds every one)
+        (tmp / "ZombieStyle.luau").write_text((ROOT / "src/shared/ZombieStyle.luau").read_text().replace(
+            "require(script.Parent.Config)", 'require("./Config")'))
         rig = (ROOT / "src/server/CharacterArt/Rig.luau").read_text().replace(
             "require(script.Parent.Geometry)", 'require("./Geometry")')
         (tmp / "Rig.luau").write_text(
@@ -61,10 +64,19 @@ return Mock""")
             raise RuntimeError(lifecycle.stdout + lifecycle.stderr)
         bags = bag_check(tmp, luau)
         style = style_check(tmp, luau)
-    models = [json.loads(line) for line in result.stdout.splitlines()]
+    records = [json.loads(line) for line in result.stdout.splitlines()]
+    models = [m for m in records if "look" not in m]
+    looks = [m for m in records if "look" in m]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(models, separators=(",", ":")) + "\n")
     print("Native character factory PASS:", {m["id"]: len(m["parts"]) for m in models})
+    # 6.16: the infected's looks (shared/ZombieStyle.luau), not in geometry.json; --looks writes them for a preview.
+    kinds = {}
+    for m in looks:
+        kinds.setdefault(m["id"].rsplit("-", 1)[0], []).append(len(m["parts"]))
+    print("Infected looks PASS:", {k: f"{len(v)} looks, {min(v)}-{max(v)} parts" for k, v in kinds.items()})
+    if looks_output:
+        looks_output.write_text(json.dumps(looks, separators=(",", ":")) + "\n")
     print("PASS: attachment bind positions, real builder flags/welds, clones, clearance and native-only budgets.")
     print(lifecycle.stdout.strip())
     print(bags)
@@ -143,5 +155,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("luau")
     parser.add_argument("output", type=Path)
+    parser.add_argument("--looks", type=Path, help="6.16: also write every infected look's parts here (a preview)")
     args = parser.parse_args()
-    export(args.luau, args.output)
+    export(args.luau, args.output, args.looks)

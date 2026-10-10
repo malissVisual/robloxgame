@@ -11,6 +11,10 @@
 -- 3.9: on foot nothing fires while the gun is holstered (client/Holster.luau): the first press of the left mouse, F or
 -- FIRE draws it instead (that press does not shoot).
 -- 6.0: a new courier has no gun (fists only): nothing fires, a press says where to buy one (now and then).
+-- 6.16 (the owner: "upgrade the visuals and the feel"): every shot kicks the aiming camera (client/ShotKick.luau) and the
+-- arms (client/ArmPose.luau), flashes at the muzzle, throws a casing and shows where its rounds stop (sparks, dust, a mark,
+-- a dark-red puff on a zombie: client/ShotFx.luau); other players' shots flash and hit the same from their tracers; every
+-- hit draws the X (client/HitMarker.luau). All of it is this client's picture: the server decides the hits.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -27,6 +31,10 @@ local Drive = require(script.Parent.Drive)
 local CameraRig = require(script.Parent.CameraRig)
 local ArmPose = require(script.Parent.ArmPose)
 local Holster = require(script.Parent.Holster)
+local ShotFeel = require(Shared.ShotFeel)
+local ShotFx = require(script.Parent.ShotFx)
+local ShotKick = require(script.Parent.ShotKick)
+local HitMarker = require(script.Parent.HitMarker)
 
 local Shooting = {}
 
@@ -39,9 +47,7 @@ local nextShot = 0
 local weapon: string? = nil -- 6.0: nil = no gun yet (fists only)
 local upgrades: { [string]: number } = {}
 
-local effects = Instance.new("Folder")
-effects.Name = "LocalEffects"
-effects.Parent = workspace
+local effects = ShotFx.folder -- (6.16: made there, the same LocalEffects folder)
 
 function Shooting.setState(state: any)
 	weapon = if type(state.weapon) == "string" then state.weapon else nil
@@ -137,72 +143,12 @@ function Shooting.floatText(position: Vector3, text: string, color: Color3, size
 end
 
 -- ── Hit feedback ───────────────────────────────────────────────────────────
--- The dot in the middle (client/CameraRig.luau) pulses on every hit and turns red for a moment on a kill; only a
--- headshot draws an X around it.
+-- 6.16: the X on every hit (white; a kill red, a headshot gold and bigger, a skull on a kill), around the crosshair or
+-- at the spot hit, with the dot's pulse: client/HitMarker.luau.
 
-local markerBars: { Frame } = {}
-local markerStrokes: { UIStroke } = {}
-local markerScale: UIScale? = nil
-local HEAD_COLOR = Color3.fromRGB(255, 64, 52)
-
-local function makeHitmarker()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "Hitmarker"
-	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
-	gui.DisplayOrder = 6
-	gui.Parent = player:WaitForChild("PlayerGui")
-	local holder = Instance.new("Frame")
-	holder.Size = UDim2.fromOffset(40, 40)
-	holder.Position = UDim2.fromScale(0.5, 0.5)
-	holder.AnchorPoint = Vector2.new(0.5, 0.5)
-	holder.BackgroundTransparency = 1
-	holder.Parent = gui
-	local scale = Instance.new("UIScale")
-	scale.Parent = holder
-	markerScale = scale
-	-- Four short strokes on the diagonals, leaving the dot free in the middle.
-	for _, info in { { -1, -1, -45 }, { 1, 1, -45 }, { 1, -1, 45 }, { -1, 1, 45 } } do
-		local bar = Instance.new("Frame")
-		bar.Size = UDim2.fromOffset(2, 9)
-		bar.AnchorPoint = Vector2.new(0.5, 0.5)
-		bar.Position = UDim2.new(0.5, info[1] * 8, 0.5, info[2] * 8)
-		bar.Rotation = info[3]
-		bar.BorderSizePixel = 0
-		bar.BackgroundColor3 = HEAD_COLOR
-		bar.BackgroundTransparency = 1
-		bar.Parent = holder
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = Color3.new(0, 0, 0)
-		stroke.Thickness = 1
-		stroke.Transparency = 1
-		stroke.Parent = bar
-		table.insert(markerBars, bar)
-		table.insert(markerStrokes, stroke)
-	end
-end
-
--- kind: "hit" | "kill" | "head" (a headshot; it counts as a kill unless `killed` says otherwise).
-function Shooting.hitmarker(kind: string, killed: boolean?)
-	local kill = kind == "kill" or (kind == "head" and killed ~= false)
-	CameraRig.hitFeedback(if kill then "kill" else "hit")
-	if kind ~= "head" then
-		return
-	end
-	local fade = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	for _, bar in markerBars do
-		bar.BackgroundTransparency = 0
-		TweenService:Create(bar, fade, { BackgroundTransparency = 1 }):Play()
-	end
-	for _, stroke in markerStrokes do
-		stroke.Transparency = 0.3
-		TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
-	end
-	local scale = markerScale
-	if scale then
-		scale.Scale = 1.7
-		TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	end
+-- kind: "hit" | "kill" | "head" (a headshot; it counts as a kill unless `killed` says otherwise); position: the spot hit.
+function Shooting.hitmarker(kind: string, killed: boolean?, position: Vector3?)
+	HitMarker.show(kind, killed, position)
 end
 
 -- The muzzle of the gun in a character's hand (on foot), if it is close enough to be the real one.
@@ -220,8 +166,8 @@ local function handMuzzle(character: Model?): Attachment?
 	return nil
 end
 
--- A shot from a gun in the hand: the flash at the muzzle, the arms kick (once per shot: a shotgun's pellets
--- arrive as several tracers).
+-- A shot from a gun in the hand: the flash at the muzzle, the arms kick, a casing flies out to the side (6.16:
+-- client/ShotFx.luau; once per shot: a shotgun's pellets arrive as several tracers).
 local lastFlash: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 local function muzzleFlash(character: Model, at: Attachment)
 	local now = os.clock()
@@ -229,26 +175,34 @@ local function muzzleFlash(character: Model, at: Attachment)
 		return
 	end
 	lastFlash[character] = now
-	local flash = Instance.new("Part")
-	flash.Anchored = true
-	flash.CanCollide = false
-	flash.CanQuery = false
-	flash.CanTouch = false
-	flash.CastShadow = false
-	flash.Shape = Enum.PartType.Ball
-	flash.Material = Enum.Material.Neon
-	flash.Color = Color3.fromRGB(255, 210, 120)
-	flash.Size = Vector3.new(0.55, 0.55, 0.55)
-	flash.CFrame = at.WorldCFrame
-	local light = Instance.new("PointLight")
-	light.Color = Color3.fromRGB(255, 190, 110)
-	light.Range = 12
-	light.Brightness = 3
-	light.Parent = flash
-	flash.Parent = effects
-	TweenService:Create(flash, TweenInfo.new(0.06), { Transparency = 1, Size = Vector3.new(0.9, 0.9, 0.9) }):Play()
-	Debris:AddItem(flash, 0.08)
+	ShotFx.flash(at.WorldCFrame)
 	ArmPose.kick(character)
+	local gun = character:FindFirstChild("HandGun")
+	local id = gun and gun:GetAttribute("Weapon")
+	local kick = ShotFeel.kick(if type(id) == "string" then id else nil)
+	local casing = kick.casing
+	if casing then
+		local delay = kick.casingDelay
+		if delay and delay > 0 then
+			task.delay(delay, ShotFx.eject, at, casing, character)
+		else
+			ShotFx.eject(at, casing, character)
+		end
+	end
+end
+
+-- 6.16: a shot from a car (the roof gun, a gun out of the window): the flash where it starts (once per shot).
+local function carFlash(character: Model?, from: Vector3, to: Vector3)
+	local now = os.clock()
+	if character then
+		if now - (lastFlash[character] or 0) < 0.05 then
+			return
+		end
+		lastFlash[character] = now
+	end
+	if (to - from).Magnitude > 0.5 then
+		ShotFx.flash(CFrame.lookAt(from, to))
+	end
 end
 
 -- ── Aiming ─────────────────────────────────────────────────────────────────
@@ -449,9 +403,14 @@ local function step()
 	nextShot = now + stats.interval
 	CameraRig.noteFire()
 	fireRemote:FireServer(target, aimed)
+	-- 6.16: the kick, the flash, the casing and where the rounds stop (the shot already went where the crosshair was).
+	ShotKick.shot(if carGun then carGun.id else weapon, if mode == "window" then Config.Shots.WindowShare else 1)
 	if gunMuzzle and character then
 		muzzleFlash(character, gunMuzzle)
+	else
+		carFlash(character, from, target)
 	end
+	ShotFx.shot(from, target, stats.range, stats.pellets, stats.spread, if car then { character :: Instance, car } else { character :: Instance })
 	local def = Economy.findWeapon(weapon)
 	local look: { number }? = if carGun then carGun.color elseif def then def.color else nil
 	local color = if look then Color3.fromRGB(look[1], look[2], look[3]) else Color3.new(1, 1, 0.6)
@@ -505,14 +464,18 @@ function Shooting.start()
 			if at and character and (at.WorldPosition - from).Magnitude < 8 then
 				from = at.WorldPosition
 				muzzleFlash(character, at)
+			elseif character then
+				carFlash(character, from, to) -- 6.16: a car's roof gun, a gun out of a window
 			end
 			Shooting.tracer(from, to, color)
+			ShotFx.impactAt(from, to) -- 6.16: sparks, dust, a mark, a puff where it ended (yours are drawn as you shoot)
 		end
 	end)
-	makeHitmarker()
-	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: any)
-		local dead = killed == true or (type(killed) == "number" and killed > 0)
-		Shooting.hitmarker(if crit then "head" elseif dead then "kill" else "hit", dead)
+	ShotFx.start()
+	HitMarker.start()
+	Net.get("Hit").OnClientEvent:Connect(function(position: Vector3, _damage: number, crit: boolean, killed: any)
+		local kind, dead = ShotFeel.hitKind(crit, killed)
+		Shooting.hitmarker(kind, dead, if typeof(position) == "Vector3" then position else nil)
 	end)
 	Net.get("Reward").OnClientEvent:Connect(function(position: Vector3, amount: number)
 		Shooting.floatText(position + Vector3.new(0, 1, 0), `+${amount}`, Color3.fromRGB(120, 240, 110), 26)

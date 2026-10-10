@@ -6,7 +6,8 @@
 -- Music: "menu" on the start screen, then "day" or "night" (workspace attribute Night), and "tension" on a job
 -- while a zombie wave has just arrived or zombies crowd you; the loops crossfade (Config.Audio).
 -- Effects: listened for on the remotes the HUD uses too (shots: Tracer, hit markers: Hit, results, notices, the car
--- call), on the world (explosions, your cargo, your car's engine, zombies' groans near you, elevator rides) and on
+-- call), on the world (explosions, your cargo, your car's engine, elevator rides; 6.16: the zombies' voices are
+-- client/ZombieLife.luau's, through Sounds.playAt) and on
 -- every Ui.button (a soft click). Other players' shots and explosions are 3D sounds at their place.
 -- The SOUND button (Hud.onSound) and the N key cycle: everything on → music off → all off.
 -- Until the two asset ids are filled in SoundSheet, it stays silent (one note in the Output).
@@ -28,9 +29,16 @@
 -- "event_end", volume?, pitch?). Until Sfx3Id is filled in, a few play a stand-in (FALLBACK: the steps the 5.7 steps, a
 -- door (or a tailgate) shut the putdown, the horns the chauffeur's horn, the bell the coin, the beep the notice,
 -- task_done job_done, purchase cash, event_start the wave alarm, event_end the notice) and the rest stay silent.
+-- 6.16: a soft tick under every hit of yours (the hit marker's, Config.Shots.Marker.Ticks: a sheet's sound pitched up).
+--
+-- 6.16, the engine's note (shared/DriveFeel.luau engine, Config.DriveFeel.Engine): a little gearbox by the vehicle's
+-- class (a car, a van, a truck, the monster truck: their own Idle and Top pitch), the pitch climbing through each gear
+-- and dropping at the shift, a touch higher on the throttle (Drive.throttle) and lower as it coasts, the volume by the
+-- speed and the throttle; followed every frame (a shift is heard as one). A bike's freewheel and a scooter's hum stay.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -40,6 +48,8 @@ local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local SoundSheet = require(Shared.SoundSheet)
+local ShotFeel = require(Shared.ShotFeel) -- 6.16: the hit marker's tick
+local DriveFeel = require(Shared.DriveFeel)
 local Drive = require(script.Parent.Drive)
 local Ui = require(script.Parent.Ui)
 local PhoneMotion = require(script.Parent.PhoneMotion)
@@ -340,6 +350,11 @@ local function listenShots()
 			playAt(name, from, if id == 0 then 0.65 else 0.8)
 		end
 	end)
+	-- 6.16: a soft tick under it, the hit marker's (Config.Shots.Marker.Ticks: a sound of the sheet pitched up; a
+	-- headshot's brighter); a shotgun's pellets tick once, the strongest of them.
+	local ticks = Config.Shots.Marker
+	local RANK: { [string]: number } = { hit = 1, kill = 2, head = 3 }
+	local tickAt, tickRank = -math.huge, 0
 	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: boolean)
 		if crit then
 			play("headshot", 0.7)
@@ -347,6 +362,13 @@ local function listenShots()
 			play("kill", 0.8)
 		else
 			play("hit", 0.6, 0.95 + math.random() * 0.1)
+		end
+		local kind = ShotFeel.hitKind(crit, killed)
+		local now = os.clock()
+		local tick = ticks.Ticks[kind]
+		if tick and (now - tickAt >= ticks.TickGap or RANK[kind] > tickRank) then
+			tickAt, tickRank = now, RANK[kind]
+			play(tick[1], tick[2], tick[3])
 		end
 	end)
 	workspace.ChildAdded:Connect(function(child)
@@ -510,6 +532,7 @@ end
 local engine: Sound? = nil
 local engineCar: Model? = nil
 local engineKind = "engine"
+local engineNote = { class = "van", gear = 1 } -- 6.16: the class of your car's engine and the gear it is in
 
 -- 5.7: what your ride sounds like: a pedal bike's freewheel, an electric scooter's (or the E-Bike's) hum, else the
 -- engine. (No stand-in: a bike never plays the van's engine.)
@@ -520,7 +543,7 @@ local function loopFor(car: Model): string
 	return "engine"
 end
 
-local function updateEngine()
+local function updateEngine(dt: number)
 	local car, driving = Drive.seatedCar()
 	if not driving or not car then
 		car = nil
@@ -542,6 +565,9 @@ local function updateEngine()
 			sound:Play()
 			engine = sound
 			engineKind = kind
+			local id = car and car:GetAttribute("CarId")
+			engineNote.class = DriveFeel.engineClass(DriveFeel.styleOf(if type(id) == "string" then id else nil))
+			engineNote.gear = 1
 		end
 	end
 	local sound = engine
@@ -549,17 +575,22 @@ local function updateEngine()
 		local top = car:GetAttribute("MaxSpeed")
 		local share = math.clamp(math.abs(Drive.speed()) / (if type(top) == "number" and top > 0 then top else 80), 0, 1.3)
 		local boost = if Drive.boosting() then 0.12 else 0
+		local ease = 1 - 0.65 ^ (dt / 0.1) -- (the 5.7 ease: 0.35 every 0.1 s)
 		if engineKind == "freewheel" then
 			-- The ratchet ticks faster with the wheel; silent standing still.
-			sound.PlaybackSpeed += (0.6 + share * 0.9 - sound.PlaybackSpeed) * 0.35
+			sound.PlaybackSpeed += (0.6 + share * 0.9 - sound.PlaybackSpeed) * ease
 			sound.Volume = JUICE.BikeVolume * math.clamp(share * 2.5, 0, 1)
 		elseif engineKind == "scooter" then
-			sound.PlaybackSpeed += (0.75 + share * 0.55 + boost - sound.PlaybackSpeed) * 0.35
+			sound.PlaybackSpeed += (0.75 + share * 0.55 + boost - sound.PlaybackSpeed) * ease
 			sound.Volume = JUICE.ScooterVolume * (0.35 + 0.65 * math.min(share, 1))
 		else
-			local pitch = 0.75 + share * 0.8 + boost
-			sound.PlaybackSpeed += (pitch - sound.PlaybackSpeed) * 0.35
-			sound.Volume = 0.3 + share * 0.25
+			-- 6.16: the gearbox (DriveFeel.engine), followed every frame
+			local spec = Config.DriveFeel.Engine.Classes[engineNote.class]
+			engineNote.gear = DriveFeel.shift(engineNote.gear, share, if spec then spec.Gears else 4)
+			local pitch, volume = DriveFeel.engine(engineNote.class, share, engineNote.gear, Drive.throttle(), boost > 0)
+			local follow = 1 - math.exp(-dt * Config.DriveFeel.Engine.Follow)
+			sound.PlaybackSpeed += (pitch - sound.PlaybackSpeed) * follow
+			sound.Volume += (volume - sound.Volume) * follow
 		end
 	end
 end
@@ -675,32 +706,7 @@ local function listenKnocks()
 	Players.PlayerAdded:Connect(watchPlayer)
 end
 
-local lastGroan = 0
-local function groan()
-	local now = os.clock()
-	if now - lastGroan < AUDIO.GroanEvery * (0.7 + math.random() * 0.6) then
-		return
-	end
-	lastGroan = now
-	local camera = workspace.CurrentCamera
-	local folder = workspace:FindFirstChild("Zombies")
-	if not camera or not folder then
-		return
-	end
-	local near: { BasePart } = {}
-	for _, model in folder:GetChildren() do
-		if model:IsA("Model") and model:GetAttribute("Bandit") ~= true then
-			local body = model:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if body and (body.Position - camera.Focus.Position).Magnitude < AUDIO.GroanRange then
-				table.insert(near, body)
-			end
-		end
-	end
-	if #near > 0 then
-		local body = near[math.random(1, #near)]
-		playAt(if math.random() < 0.5 then "zombie_a" else "zombie_b", body.Position, 0.55, 0.85 + math.random() * 0.3, AUDIO.GroanRange + 20)
-	end
-end
+-- (6.16: the zombies' groans are client/ZombieLife.luau's: the nearest few, each its own voice)
 
 local lastPosition: Vector3? = nil
 local spawnedAt = 0
@@ -769,18 +775,19 @@ function Sounds.start()
 		end,
 		sheet3 = enabled and sheet3,
 	})
+	RunService.Heartbeat:Connect(function(dt: number)
+		if enabled then
+			updateEngine(dt) -- 6.16: every frame (the gear shifts)
+		end
+	end)
 	task.spawn(function()
 		local tick = 0
 		while true do
 			task.wait(0.1)
 			tick += 1
 			if enabled then
-				updateEngine()
 				updateZip()
 				elevator()
-				if tick % 5 == 0 and mode ~= 3 then
-					groan()
-				end
 			end
 			if tick % 10 == 0 then
 				pickMusic()

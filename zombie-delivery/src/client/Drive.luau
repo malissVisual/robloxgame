@@ -20,6 +20,8 @@
 -- 6.14.1 (the owner: "a more pleasant ride on the scooter"): a gentler steering ramp, a calmer middle and a less lazy top
 -- of the turn, a soft first push and a glide into the top speed (ScooterRide.pull), a softer brake, a longer coast, the
 -- carve (its way follows its nose a touch later).
+-- 6.16: Drive.throttle() says the driver's throttle (-1 … 1) for the engine's note (client/Sounds.luau); only read, the
+-- driving is as it was.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,6 +38,7 @@ local Drive = {}
 local player = Players.LocalPlayer
 local speed = 0 -- signed, along the nose
 local steerInput = 0
+local throttleInput = 0 -- 6.16: the driver's throttle (-1 … 1) this step
 local boostUntil = 0
 local boostMultiplier = 1
 local backToldAt = -math.huge -- the "close the back" toast, at most every few seconds
@@ -174,6 +177,11 @@ function Drive.steer(): number
 	return steerInput
 end
 
+-- 6.16: -1 … 1, the local driver's throttle (S brakes or reverses: < 0); 0 when nobody drives.
+function Drive.throttle(): number
+	return throttleInput
+end
+
 function Drive.boosting(): boolean
 	return os.clock() < boostUntil
 end
@@ -220,6 +228,7 @@ end
 local function step(dt: number)
 	local car = Drive.myCar()
 	local chassis = car and car.PrimaryPart
+	throttleInput = 0
 	if not car or not chassis then
 		speed = 0
 		return
@@ -251,6 +260,7 @@ local function step(dt: number)
 		end
 	end
 
+	throttleInput = throttle
 	local maxSpeed = (car:GetAttribute("MaxSpeed") or 60) :: number * ((car:GetAttribute("SpeedMult") or 1) :: number)
 	local accel = (car:GetAttribute("Accel") or 26) :: number
 	if player:GetAttribute("AdminCarBoost") == true then

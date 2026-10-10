@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.15"
+Config.Version = "6.16"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1028,6 +1028,108 @@ Config.CarGuns = {
 	},
 } :: { CarGunDef }
 
+-- 6.16, the owner: "I want to upgrade the visuals and the feel" (shooting and hits). Everything here is the shooter's
+-- own client's show (client/ShotKick.luau, client/ShotFx.luau, client/HitMarker.luau, the arms in client/ArmPose.luau;
+-- the pure rules in shared/ShotFeel.luau): the server still decides every hit (server/Gun.luau).
+export type ShotKickDef = {
+	pitch: number, -- degrees the aiming camera kicks up a shot (at its peak; it springs back by itself)
+	yaw: number, -- degrees of sideways kick at most, either way (random)
+	arm: number, -- the arms' kick (the shoulders lift, the elbow bends, the hand and the gun slide back)
+	casing: string?, -- "brass" | "shell": what flies out to the side (nil: nothing; a revolver keeps its brass)
+	casingDelay: number?, -- seconds after the shot (a pump, a bolt, a lever)
+}
+
+Config.Shots = {
+	-- Per gun (Config.Weapons and Config.CarGuns ids; anything not named kicks like Default).
+	Guns = {
+		pistol = { pitch = 0.9, yaw = 0.3, arm = 1, casing = "brass" },
+		smg = { pitch = 0.35, yaw = 0.3, arm = 0.45, casing = "brass" },
+		shotgun = { pitch = 2.6, yaw = 0.6, arm = 1.9, casing = "shell", casingDelay = 0.35 },
+		rifle = { pitch = 2.1, yaw = 0.35, arm = 1.5, casing = "brass", casingDelay = 0.3 },
+		minigun = { pitch = 0.18, yaw = 0.22, arm = 0.3, casing = "brass" },
+		launcher = { pitch = 2.3, yaw = 0.4, arm = 2 },
+		revolver = { pitch = 1.6, yaw = 0.35, arm = 1.3 },
+		carbine = { pitch = 0.5, yaw = 0.3, arm = 0.6, casing = "brass" },
+		reyes = { pitch = 0.55, yaw = 0.25, arm = 0.65, casing = "brass" },
+		lever = { pitch = 2.1, yaw = 0.3, arm = 1.6, casing = "brass", casingDelay = 0.3 },
+		goldpistol = { pitch = 1.1, yaw = 0.3, arm = 1.1, casing = "brass" },
+		deadend = { pitch = 1.3, yaw = 0.3, arm = 1.2, casing = "brass" },
+		roofmg = { pitch = 0.3, yaw = 0.15, arm = 0 },
+		roofminigun = { pitch = 0.15, yaw = 0.12, arm = 0 },
+		rooflauncher = { pitch = 1.2, yaw = 0.2, arm = 0 },
+	} :: { [string]: ShotKickDef },
+	Default = { pitch = 0.8, yaw = 0.3, arm = 1 } :: ShotKickDef,
+	-- The camera's kick (a computer's aiming camera only: a touch screen's Roblox camera is never turned).
+	KickRate = 18, -- 1/s: a critically damped spring, at its peak 1/KickRate s after the shot, settled in about 4 ×
+	KickMax = 5, -- degrees: held down, the kick never piles up past this
+	WindowShare = 0.6, -- a gun out of a car window kicks the camera this share (the car's camera is further back)
+	ReducedMotion = 0.2, -- the kick's share with reduced motion (the player's Roblox setting); no headshot punch then
+	ArmMax = 2.5, -- the arms' kick piles up to this at most (client/ArmPose.luau)
+	ArmBack = 0.1, -- studs the hand (and the gun in it) slides back per unit of the arms' kick
+	ArmWrist = 0.07, -- radians the wrist tips the muzzle up per unit
+	-- The flash at the muzzle: a glowing ball, a small burst of flame and, near the camera and within the light budget,
+	-- a real light for a blink. Everybody's on-foot shots that this client draws (their tracers), the car guns' too.
+	Flash = {
+		Seconds = 0.06,
+		Pool = 6, -- flashes at once (a 7th takes the oldest's place)
+		Lights = 3, -- real lights at once (a phone: LiteLights)
+		LiteLights = 1,
+		LightRange = 160, -- studs from the camera
+		LightBrightness = 3,
+		LightReach = 12, -- the light's Range
+		Burst = 3, -- flame particles a shot
+	},
+	-- Shell casings: client-only parts thrown out to the gun's right, falling, bouncing on the floor under them and fading.
+	Casings = {
+		Max = 24, -- at once (the oldest goes first); a phone throws none (DeviceBudget.lite)
+		Life = 1.5, -- seconds, the last Fade of them fading out
+		Fade = 0.35,
+		Range = 70, -- studs: another player's casings only this close to the camera
+		Side = { 5, 8 } :: { number }, -- studs/s out to the right …
+		Up = { 4, 7 } :: { number }, -- … and up
+		Gravity = 110, -- studs/s² (Roblox's own is 196: a little floaty, so the eye catches them)
+		Bounce = 0.35, -- the share of the fall's speed a bounce keeps
+		Friction = 0.6, -- the share of the sideways speed a bounce keeps
+		Spin = 25, -- radians/s at most
+	},
+	-- Where a round stops: sparks on metal and stone, dust on the ground, chips off wood, a dark mark on a wall that
+	-- fades; on a zombie (or a bandit) a small dark-red puff, never gore.
+	Impacts = {
+		Range = 220, -- studs from the camera (a phone: DeviceBudget.range): other shooters' impacts farther are not drawn
+		PerSecond = 40, -- other shooters' impacts drawn a second at most (a busy fight); your own always
+		Burst = 12, -- … with this many at once
+		Pellets = 4, -- a shotgun's shot shows at most this many impacts of its own (a phone: 2)
+		Emitters = 4, -- spots that can puff in the same frame (round robin)
+		Marks = 30, -- dark marks on the walls at once (a phone: LiteMarks)
+		LiteMarks = 8,
+		MarkSize = 0.45,
+		MarkLife = 6, -- seconds, the last MarkFade of them fading
+		MarkFade = 2,
+		Sparks = 9, -- particles: a hit on metal …
+		StoneSparks = 4, -- … on stone, concrete, brick (with Dust/2 of dust)
+		Dust = 5, -- on the ground, grass, sand, wood
+		Splat = 5, -- on a zombie or a bandit (a dark-red puff)
+	},
+	-- The hit marker: an X around the crosshair on every hit (on a touch screen, or with the mouse free, at the spot hit),
+	-- white on a hit, red on a kill, gold and bigger on a headshot; a kill shows a small skull over it.
+	Marker = {
+		Hit = { color = { 255, 255, 255 } :: { number }, size = 1, seconds = 0.2, thick = 2 },
+		Kill = { color = { 255, 64, 52 } :: { number }, size = 1.25, seconds = 0.32, thick = 3 },
+		Head = { color = { 255, 196, 60 } :: { number }, size = 1.6, seconds = 0.45, thick = 3 },
+		Skull = true,
+		Pop = 1.4, -- the X starts this much bigger and settles in 0.08 s
+		HeadPunch = 1.6, -- degrees the field of view closes for a blink on a headshot (computer)
+		HeadShake = 0.12, -- a touch screen's camera: a small shake instead (CameraRig.shake)
+		-- The soft tick under the hit's own sound (client/Sounds.luau): a sound of the sheet, its volume, its pitch.
+		Ticks = {
+			hit = { "ui_click", 0.3, 1.8 },
+			kill = { "ui_click", 0.45, 1.35 },
+			head = { "ding", 0.22, 2.2 },
+		} :: { [string]: { any } },
+		TickGap = 0.05, -- seconds: a shotgun's seven pellets tick once
+	},
+}
+
 export type UpgradeDef = {
 	id: string,
 	name: string,
@@ -1758,6 +1860,93 @@ Config.Outline = {
 	HumanKinds = { soldier = false } :: { [string]: boolean },
 }
 
+-- 6.16, the owner: "upgrade the visuals and the feel" (the zombies). The looks are shared/ZombieStyle.luau's (several
+-- per kind, picked from the zombie's id: its Seed attribute); these are the numbers of how they move, glow, sound and
+-- fall. Angles in degrees, distances in studs, times in seconds.
+--   * The poses (client/ZombieAnimator.luau, laid over the stock zombie animations through client/PoseLedger.luau):
+--     the MaxPosed nearest within Range of the camera, worked out every frame within Near, every FarEvery frames
+--     farther (the pose in between kept), picked again every Retarget s; a phone: DeviceBudget.range / count of them.
+--   * The server marks a hit (the Hit attribute, at most every HitEvery s a zombie but a hard one) and a bite or a
+--     swipe (Attack) for the clients' flinch and lunge (server/Zombies.luau); Death has the falls' speeds.
+--   * Eyes: dull by day, a glow by night (Map.nightFactor of the clock), within EyeRange, looked at every EyeEvery s.
+--   * Voices (client/ZombieLife.luau, the existing zombie_a / zombie_b cues pitched): groans from the nearest within
+--     Groan.Range (each its own pause, at most Voices at once), a runner's scream when it comes for you, a grunt on a
+--     hit, a gurgle on a death, a brute's stomp.
+Config.ZombieLife = {
+	Range = 160,
+	Near = 70,
+	FarEvery = 3,
+	MaxPosed = 24,
+	Retarget = 0.3,
+	WalkRef = 12, -- studs / s that count as a full walk (the shamble's and the stomp's full size)
+	HipSwing = 35, -- degrees of the stock walk's thigh swing that count as a full step (the limp and the stomp follow it)
+	-- The shamble (walkers, soldiers): the body dips and rolls onto the bad leg, a hunch, the head on one side, an arm
+	-- hanging lower.
+	Limp = 0.22,
+	LimpRoll = 8,
+	Hunch = 12,
+	HeadTilt = 16,
+	ArmDrop = 28,
+	-- The runner's lurch: leaning into it, the body thrown from side to side, the arms flailing.
+	RunLean = 20,
+	RunRoll = 9,
+	Flail = 14,
+	-- The brute's stomp: the body drops on every step and sways onto the leg, the arms held out.
+	StompDip = 0.4,
+	StompRoll = 7,
+	StompArms = 14,
+	-- Waiting (under IdleBelow studs / s): a slow sway and a lolling head (each its own rhythm).
+	IdleBelow = 1.5,
+	Sway = 5,
+	SwayHz = 0.32,
+	Loll = 12,
+	-- The attack (the Attack attribute): a wind-up, a lunge and a swipe of one arm (the brute both, overhead).
+	AttackTime = 0.55,
+	Wind = 12, -- the body back on the wind-up
+	Lunge = 26, -- … and forward on the strike
+	LungeStuds = 0.6,
+	ArmRaise = 55,
+	ArmStrike = 75,
+	Bite = 18, -- the head forward on the strike
+	-- The flinch (the Hit attribute): the chest jerked back, the head snapped; a hard hit (a headshot, a punch, a ram or a
+	-- blast) further and longer, a stagger back.
+	FlinchTime = 0.35,
+	HardTime = 0.7,
+	Flinch = 16,
+	FlinchHard = 32,
+	HeadSnap = 18,
+	HeadShotSnap = 45,
+	Stagger = 0.55,
+	HitEvery = 0.12,
+	-- The clawing at a car it hangs on.
+	Claw = 35,
+	-- Eyes (the Neon EyeL / EyeR, the block body's Eye): Day's colour by day, the kind's Glow at night.
+	EyeRange = 260,
+	EyeEvery = 0.5,
+	EyeDay = { 150, 140, 104 },
+	Glow = {
+		walker = { 215, 255, 120 },
+		runner = { 255, 226, 90 },
+		soldier = { 255, 160, 50 },
+		brute = { 255, 70, 40 },
+	} :: { [string]: { number } },
+	GlowDefault = { 230, 240, 140 },
+	-- Voices.
+	Groan = { Range = 55, Min = 4, Max = 9, Night = 0.75, Hunt = 0.7, Voices = 3, Gap = 0.45, Volume = 0.55 },
+	Scream = { Range = 80, Speed = 14, Toward = 0.75, Again = 25, Gap = 1.5, Volume = 0.9, Pitch = 1.55 },
+	Grunt = { Range = 70, Again = 0.6, Gap = 0.12, Volume = 0.45, Pitch = 1.35 },
+	Gurgle = { Range = 70, Gap = 0.3, Volume = 0.5, Pitch = 0.72 },
+	Stomp = { Range = 60, Volume = 0.9, Pitch = 0.55 },
+	Snarl = { Range = 40, Again = 2.5, Volume = 0.5, Pitch = 1.2 },
+	-- Each kind's voice (× the pitch of every cue, ± Spread for each zombie).
+	Pitch = { walker = 0.95, runner = 1.2, soldier = 0.85, brute = 0.62 } :: { [string]: number },
+	Spread = 0.08,
+	-- Deaths (server/Zombies.luau kill; shared/ZombieStyle.luau death picks which): Fall rad / s the body tips over
+	-- about its feet (÷ its scale), Spin rad / s round on a spin, Back studs / s on a knock back (a headshot's head
+	-- HeadBack more), Slump studs / s down on a crumple.
+	Death = { Fall = 2.6, Spin = 8, Back = 9, HeadBack = 10, Slump = 3, Lift = 4 },
+}
+
 -- Zombies around the cars.
 Config.Horde = {
 	SpotTime = 0.7, -- 4.0.4: a bandit has to see you this long (a clear line, nothing in between) before it fires
@@ -1881,6 +2070,145 @@ Config.DayNight = {
 	NightPay = 1.4, -- pay multiplier for a job finished at night
 	NightWaves = 1.5, -- wave size multiplier at night
 	NightRoam = 1.6, -- roaming zombies multiplier at night
+}
+
+-- 6.16, light and atmosphere (shared/SkyGrade.luau; drawn on every client: client/Weather.luau, client/SkyFx.luau): the
+-- look of every time of day. Looks names a look; Clock says at which hour each one is full (sorted, 0 … 24; after the
+-- last the clock wraps round to the first), and in between two looks blend smoothly (smoothstep). Colours are
+-- { r, g, b } (0 … 255). A look holds:
+--   brightness, exposure     Lighting.Brightness (the sun or the moon) and ExposureCompensation
+--   ambient, outdoor         Lighting.Ambient and OutdoorAmbient (the light in the shade, indoors and out)
+--   top, bottom              Lighting.ColorShift_Top (the sunlit sides: a golden sun) and ColorShift_Bottom (the bounce)
+--   diffuse, specular, soft  Lighting.EnvironmentDiffuseScale, EnvironmentSpecularScale (the sky's light and shine) and
+--                            ShadowSoftness
+--   tint, saturation, contrast, lift   the colour grade (the ColorCorrection ZombieGrade: TintColor, Saturation,
+--                            Contrast, Brightness)
+--   bloom, bloomSize, threshold   the bloom: the lamps, the lit windows and the headlights glow at night (a high
+--                            threshold by day, so nothing washes out)
+--   rays                     the sun rays' intensity (under a clear sky, from a medium graphics quality up)
+--   air, decay, density, offset, glare, haze   the atmosphere (it is the fog too: Lighting's Fog* do nothing with an
+--                            Atmosphere): Color, Decay, Density, Offset, Glare, Haze
+--   clouds                   the clouds' colour
+--   blur                     0 … 1 of Blur.Far (the soft blur far away)
+--   dust                     0 … 1 of Dust.Rate (the motes floating in the sun)
+-- The rain, the fog, the snow, the town's glow at night and the Blood Moon (Config.LiveEvents) blend over it as before.
+-- 3.0.1's rule: the night is dark but readable, never so dark a zombie hides in it: ReadableFloor is the least any hour
+-- may have (the luma of OutdoorAmbient, Ambient and the tint, 0 … 255; the sun's or the moon's brightness);
+-- tests/skygrade_test.luau checks every minute of the day.
+Config.Atmosphere = {
+	Looks = {
+		-- Night: a readable blue night (3.0.1's look: a bright moon, a blue grade, a dark blue haze); the lamps bloom.
+		night = {
+			brightness = 1.5, exposure = 0.05, ambient = { 68, 72, 94 }, outdoor = { 96, 104, 138 },
+			top = { 0, 8, 30 }, bottom = { 4, 6, 14 }, diffuse = 0.3, specular = 0.55, soft = 0.6,
+			tint = { 200, 212, 255 }, saturation = -0.25, contrast = 0.12, lift = 0,
+			bloom = 1, bloomSize = 30, threshold = 1.05, rays = 0,
+			air = { 62, 72, 102 }, decay = { 30, 36, 56 }, density = 0.3, offset = 0.25, glare = 0, haze = 0.7,
+			clouds = { 70, 78, 104 }, blur = 0.6, dust = 0,
+		},
+		-- Dawn, the blue hour before the sun: cool and blue, the lamps still on.
+		dawn = {
+			brightness = 1.45, exposure = 0.1, ambient = { 66, 74, 100 }, outdoor = { 94, 106, 144 },
+			top = { 16, 26, 60 }, bottom = { 6, 10, 22 }, diffuse = 0.4, specular = 0.55, soft = 0.6,
+			tint = { 206, 222, 255 }, saturation = -0.18, contrast = 0.1, lift = 0.01,
+			bloom = 0.85, bloomSize = 28, threshold = 1.1, rays = 0.04,
+			air = { 112, 128, 168 }, decay = { 58, 70, 112 }, density = 0.33, offset = 0.15, glare = 0.3, haze = 1.3,
+			clouds = { 150, 162, 196 }, blur = 1, dust = 0.1,
+		},
+		-- Sunrise: the golden hour, a warm low sun, long soft shadows, rays and dust in the light.
+		sunrise = {
+			brightness = 1.6, exposure = 0.05, ambient = { 84, 74, 72 }, outdoor = { 122, 106, 102 },
+			top = { 120, 70, 30 }, bottom = { 30, 18, 14 }, diffuse = 0.5, specular = 0.65, soft = 0.45,
+			tint = { 255, 226, 198 }, saturation = 0, contrast = 0.14, lift = 0.01,
+			bloom = 0.6, bloomSize = 26, threshold = 1.25, rays = 0.16,
+			air = { 214, 152, 114 }, decay = { 150, 98, 82 }, density = 0.33, offset = 0.08, glare = 1.6, haze = 1.8,
+			clouds = { 255, 208, 172 }, blur = 1, dust = 1,
+		},
+		-- Morning: fresh and clear, a touch warm.
+		morning = {
+			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 104, 106, 114 },
+			top = { 36, 26, 12 }, bottom = { 10, 10, 10 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
+			tint = { 246, 245, 236 }, saturation = -0.06, contrast = 0.12, lift = 0,
+			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
+			air = { 168, 180, 184 }, decay = { 102, 112, 118 }, density = 0.3, offset = 0.15, glare = 0.5, haze = 1.5,
+			clouds = { 255, 255, 255 }, blur = 0.8, dust = 0.7,
+		},
+		-- Noon: clean and crisp, truer colours (a little grit left), sharp shadows, the least haze.
+		noon = {
+			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 104, 104, 112 },
+			top = { 14, 12, 6 }, bottom = { 8, 8, 8 }, diffuse = 0.6, specular = 0.7, soft = 0.2,
+			tint = { 250, 250, 244 }, saturation = -0.08, contrast = 0.14, lift = 0,
+			bloom = 0.3, bloomSize = 20, threshold = 1.5, rays = 0.03,
+			air = { 166, 178, 176 }, decay = { 104, 114, 116 }, density = 0.28, offset = 0.15, glare = 0.2, haze = 1.3,
+			clouds = { 255, 255, 255 }, blur = 0.7, dust = 0.5,
+		},
+		-- Afternoon: warming up.
+		afternoon = {
+			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 104, 106 },
+			top = { 50, 34, 14 }, bottom = { 12, 10, 8 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
+			tint = { 252, 242, 224 }, saturation = -0.04, contrast = 0.13, lift = 0,
+			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
+			air = { 182, 170, 150 }, decay = { 116, 104, 90 }, density = 0.3, offset = 0.12, glare = 0.6, haze = 1.5,
+			clouds = { 255, 246, 232 }, blur = 0.8, dust = 0.7,
+		},
+		-- Sunset, the golden hour: the warmest look, an orange haze and the sun's glare, rays and dust in the light.
+		golden = {
+			brightness = 1.65, exposure = 0.05, ambient = { 90, 74, 70 }, outdoor = { 128, 104, 98 },
+			top = { 140, 78, 30 }, bottom = { 34, 18, 14 }, diffuse = 0.5, specular = 0.65, soft = 0.45,
+			tint = { 255, 218, 186 }, saturation = 0.04, contrast = 0.16, lift = 0.01,
+			bloom = 0.65, bloomSize = 26, threshold = 1.2, rays = 0.18,
+			air = { 222, 142, 98 }, decay = { 160, 88, 72 }, density = 0.34, offset = 0.06, glare = 2, haze = 2,
+			clouds = { 255, 192, 152 }, blur = 1, dust = 1,
+		},
+		-- Dusk, the blue hour after the sun: violet and blue, the lamps coming on.
+		dusk = {
+			brightness = 1.45, exposure = 0.1, ambient = { 74, 70, 98 }, outdoor = { 104, 100, 142 },
+			top = { 40, 20, 50 }, bottom = { 10, 8, 20 }, diffuse = 0.4, specular = 0.55, soft = 0.55,
+			tint = { 214, 208, 255 }, saturation = -0.12, contrast = 0.12, lift = 0.01,
+			bloom = 0.9, bloomSize = 28, threshold = 1.08, rays = 0.04,
+			air = { 118, 94, 132 }, decay = { 64, 46, 80 }, density = 0.32, offset = 0.15, glare = 0.5, haze = 1.2,
+			clouds = { 172, 134, 162 }, blur = 0.9, dust = 0.1,
+		},
+	},
+	-- When each look is full (hours; the default Roblox sun rises at about 6:00 and sets at about 18:00).
+	Clock = {
+		{ hour = 4.6, look = "night" },
+		{ hour = 5.5, look = "dawn" },
+		{ hour = 6.5, look = "sunrise" },
+		{ hour = 8.5, look = "morning" },
+		{ hour = 12.5, look = "noon" },
+		{ hour = 16.2, look = "afternoon" },
+		{ hour = 17.7, look = "golden" },
+		{ hour = 18.9, look = "dusk" },
+		{ hour = 20.3, look = "night" },
+	} :: { { hour: number, look: string } },
+	ReadableFloor = { outdoor = 95, ambient = 64, tint = 200, brightness = 1.4 },
+	-- The sky (server/World.luau): the sun's and the moon's size (degrees), the stars (0 … 5000). Optional pictures:
+	-- empty strings keep Roblox's own sky; an "rbxassetid://…" in all six Skybox sides (Bk, Dn, Ft, Lf, Rt, Up), in Sun
+	-- or in Moon sets that one.
+	Sky = {
+		SunSize = 12,
+		MoonSize = 16,
+		Stars = 5000,
+		Skybox = { Bk = "", Dn = "", Ft = "", Lf = "", Rt = "", Up = "" } :: { [string]: string },
+		Sun = "",
+		Moon = "",
+	},
+	-- Roblox's moving clouds (Terrain.Clouds, made on every client): Cover and Density in clear weather, in the rain and
+	-- in a fog (blended with the weather); their colour is the look's. Lite: on a phone or a tablet too (false: none
+	-- there, unless the place has its own).
+	Clouds = { Cover = 0.5, Density = 0.55, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
+	-- The soft blur far away (a DepthOfFieldEffect): sharp out to Focus + Radius studs, beyond that Far × the look's blur
+	-- (half of it in the rain or the fog: the air blurs already). Never on a phone or a tablet, below graphics quality
+	-- Quality (1 … 10), or while you aim (it fades out over Fade seconds).
+	Blur = { Focus = 200, Radius = 50, Far = 0.12, Quality = 4, Fade = 0.4 },
+	-- Dust in the air by day: tiny slow motes in a Box-stud box around the camera, Rate a second × the look's dust (none
+	-- in the rain, the fog, the snow, at night, or with Reduced Motion); a phone or a tablet Lite of them, fewer at a low
+	-- graphics quality.
+	Dust = { Rate = 7, Lite = 0.4, Box = 44, Size = 0.09, Life = { 7, 11 } :: { number } },
+	-- A soft haze around the street lamps at night: the Count nearest lamps that shine (the 6.13.1 light budget) within
+	-- Range of the camera get a faint glow Size studs across (a phone or a tablet: Lite of them).
+	Halo = { Count = 12, Lite = 0, Range = 160, Size = 7, Transparency = 0.9 },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
@@ -2209,6 +2537,85 @@ Config.Scooter = {
 	Reverse = 0.2, -- of the top speed: S from a stand walks it back
 	LeanMax = 0.2, -- radians (about 11°) the scooter leans into a turn at most (the look only; a bike: 0.16)
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
+}
+
+-- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
+-- driving's physics stay as they are). Accelerations in studs/s² (gravity is 196), speeds in studs/s.
+Config.DriveFeel = {
+	-- The body sways on its springs (shared/Suspension.luau, client/CarSway.luau: the Motor6D "BodyRoll" of a player's
+	-- car, server/Vehicles.luau): it rolls out of a turn, dips its nose on the brake, squats as it pulls away and sinks
+	-- as it lands. A style's Soft share (1 when not listed) scales the angles up and the springs' swing down.
+	Sway = {
+		Roll = 3, -- degrees the body rolls out of a turn …
+		RollAt = 100, -- … at this sideways acceleration (a car on full lock at about 55 studs/s)
+		RollMax = 4.5, -- degrees at most
+		Dive = 2, -- degrees the nose dips on the brake …
+		DiveAt = 60, -- … at this deceleration (a van's full brake is about 65)
+		Squat = 1.3, -- degrees the nose lifts as it pulls away …
+		SquatAt = 30, -- … at this acceleration
+		PitchMax = 3, -- degrees either way at most
+		Sink = 0.12, -- studs the body sinks as it lands …
+		SinkAt = 150, -- … at this upward acceleration
+		HeaveMax = 0.25, -- studs either way at most
+		Frequency = 1.9, -- Hz: how quickly the springs swing
+		Damping = 0.42, -- of the critical damping: under 1 it rocks back once after a hard stop
+		Smooth = 0.08, -- seconds: your own car's accelerations are smoothed over this …
+		SmoothOthers = 0.16, -- … another player's (their speed arrives over the network in steps)
+		Range = 140, -- studs: the cars this close to the camera sway (a phone: DeviceBudget.range)
+		Soft = {
+			muscle = 0.6, rallyvan = 0.75, armored = 0.75, pickup = 0.9, highroof = 1.2, icecream = 1.2, ambulance = 1.15,
+			boxtruck = 1.15, movingtruck = 1.15, livestock = 1.15, fueltruck = 1.15, freighttruck = 1.2, bus = 1.2, monster = 1.15,
+		} :: { [string]: number }, -- (6.16 review: the tall ones 1.3 – 1.4 before: a box truck's roof swung 1 – 1.5 studs)
+	},
+	-- What the tyres throw (shared/DriveFeel.luau tyres, client/TyreFx.luau): dust off grass and dirt, snow spray in
+	-- the winter and on the ice, light smoke on asphalt when they work hard (a hard brake, a sharp fast turn, a slide,
+	-- a hard launch), and skid marks then.
+	Tyres = {
+		Range = 110, -- studs: the cars this close to the camera throw something …
+		Cars = 5, -- … this many of them at most (yours first; a phone: yours only)
+		Dust = { Rate = 28, From = 8, Full = 45 }, -- particles a second per rear wheel, by the speed (From … Full)
+		Snow = { Rate = 36, From = 6, Full = 40 },
+		Smoke = { Rate = 24, From = 0.25 }, -- on asphalt, by the strain, from this strain
+		Brake = { From = 38, Full = 62 }, -- the strain of braking (deceleration) …
+		Corner = { From = 70, Full = 110 }, -- … of a fast turn (sideways acceleration) …
+		Slide = { From = 5, Full = 14 }, -- … of a slide (sideways speed: the ice, the snow) …
+		Launch = { From = 30, Full = 45, Below = 14 }, -- … of a hard launch (acceleration, under Below studs/s)
+		MinSpeed = 14, -- the brake and the turn strain only from this speed
+		Lite = 0.5, -- a phone's share of the particles
+	},
+	-- Skid marks: dark thin strips behind the wheels on asphalt while the strain is at least From; each fades out
+	-- from FadeFrom to Life seconds. Count of them at most (the oldest is used again; a phone: Lite of them).
+	Skids = { From = 0.4, Count = 160, Lite = 0.35, FadeFrom = 4.5, Life = 7.5, Step = 0.8, Length = 3.5, Width = 0.5, Opacity = 0.62 },
+	-- A hard hit (client/CrashFx.luau): your car or a car near you loses at least From of its speed in a blink (Full:
+	-- the hardest); a spark burst of up to Sparks (a phone: half), a metal thunk, and on top of CameraRig's ram shake
+	-- (Config.LivingCity.Camera Ram) a little more, Shake at the hardest. Scraping a wall at Scrape.Speed or more
+	-- throws sparks (Scrape.Rate a second) and trembles the camera a touch (Scrape.Shake a second).
+	Crash = { From = 24, Full = 60, Sparks = 34, Shake = 0.25, Range = 120, Scrape = { Speed = 14, Rate = 70, Shake = 0.5, Reach = 0.9 } },
+	-- The engine's note (client/Sounds.luau, shared/DriveFeel.luau engine): a little gearbox (Gears gears over the top
+	-- speed, Shift of hysteresis), the pitch from Idle at a stand to Top at the top of the last gear, a touch higher on
+	-- the throttle (Load) and lower as it coasts (Coast), the volume by the speed and the throttle. Styles: a style's
+	-- class (a van when not listed). (A bike's freewheel and a scooter's hum stay as they were.)
+	Engine = {
+		Classes = {
+			car = { Idle = 0.8, Top = 1.8, Gears = 5, Volume = 0.52 },
+			van = { Idle = 0.7, Top = 1.5, Gears = 4, Volume = 0.52 },
+			truck = { Idle = 0.52, Top = 1.18, Gears = 5, Volume = 0.58 },
+			monster = { Idle = 0.6, Top = 1.38, Gears = 4, Volume = 0.6 },
+		} :: { [string]: { Idle: number, Top: number, Gears: number, Volume: number } },
+		Styles = {
+			muscle = "car", pickup = "car", rallyvan = "car", boxtruck = "truck", freighttruck = "truck", bus = "truck",
+			movingtruck = "truck", livestock = "truck", fueltruck = "truck", armored = "truck", monster = "monster",
+		} :: { [string]: string },
+		Shift = 0.03, -- of the top speed: a gear changes this far past its edge (no hunting at the edge)
+		Load = 0.05, -- pitch added on the throttle
+		Coast = 0.05, -- pitch taken off without it
+		Rev = 0.55, -- the share of the rev range a held throttle reaches at a stand (stuck, the back open)
+		Follow = 12, -- 1/s: how quickly the sound follows its pitch (a shift is heard as one)
+	},
+	-- Speed lines (client/SpeedLines.luau): thin streaks at the screen's edges from From of the top speed (full at
+	-- Full); a scooter's or a bike's (TwoWheels) from a lower share. Count of them (a phone: Lite of them); none with
+	-- reduced motion.
+	SpeedLines = { From = 0.8, Full = 1.05, TwoFrom = 0.6, TwoFull = 0.95, Count = 16, Lite = 0.5, Opacity = 0.55 },
 }
 
 -- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
@@ -4686,7 +5093,7 @@ Config.LivingCity = {
 		WetReflectance = 0.16, -- the roads' shine in the rain
 		RainRate = 900, -- raindrops a second around the camera
 		MistRange = 650, -- the river's mist shows within this of the camera
-		SunRays = 0.18, -- the sun rays' intensity at dawn
+		-- (6.16: the sun rays follow the time of day: Config.Atmosphere's looks, rays)
 	},
 	Camera = {
 		Explosion = 0.9, -- shake (0 … 1) next to an explosion …

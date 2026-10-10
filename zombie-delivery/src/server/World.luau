@@ -5948,16 +5948,32 @@ local function buildSecrets(world: Instance)
 	end
 end
 
--- The day look (the clock and the night are server/DayNight.luau's; every client blends the night look over this,
--- client/Weather.luau). A sky with stars and a big moon for the night.
+-- The day look (the clock and the night are server/DayNight.luau's; every client draws the look of the hour over this,
+-- 6.16: shared/SkyGrade.luau, client/Weather.luau). A sky with stars and a big moon for the night. 6.16: a smaller,
+-- crisper sun, a bigger moon, the most stars, and the optional sky pictures (Config.Atmosphere.Sky: none by default),
+-- the shadows on (their softness follows the hour on every client).
 local function setLighting()
 	Lighting.Brightness = 1.6
 	Lighting.Ambient = Color3.fromRGB(70, 70, 80)
 	Lighting.OutdoorAmbient = Color3.fromRGB(100, 100, 110)
+	Lighting.GlobalShadows = true
 	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
-	sky.StarCount = 3000
-	sky.MoonAngularSize = 14
+	local skyLook = Config.Atmosphere.Sky
+	sky.StarCount = skyLook.Stars
+	sky.SunAngularSize = skyLook.SunSize
+	sky.MoonAngularSize = skyLook.MoonSize
 	sky.CelestialBodiesShown = true
+	local box = skyLook.Skybox
+	if box.Bk ~= "" and box.Dn ~= "" and box.Ft ~= "" and box.Lf ~= "" and box.Rt ~= "" and box.Up ~= "" then
+		sky.SkyboxBk, sky.SkyboxDn, sky.SkyboxFt = box.Bk, box.Dn, box.Ft
+		sky.SkyboxLf, sky.SkyboxRt, sky.SkyboxUp = box.Lf, box.Rt, box.Up
+	end
+	if skyLook.Sun ~= "" then
+		sky.SunTextureId = skyLook.Sun
+	end
+	if skyLook.Moon ~= "" then
+		sky.MoonTextureId = skyLook.Moon
+	end
 	sky.Parent = Lighting
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
 	atmosphere.Density = 0.3

@@ -18,9 +18,7 @@ local function encode(v)
 	error("Unsupported art record")
 end
 local function v(a) return { a.X, a.Y, a.Z } end
-for _, id in Geometry.ids do
-	local def = Config.Zombies[id]
-	local spec = if def then Geometry.spec(id, def.scale, def.skin, def.shirt, def.pants) else Geometry.spec(id)
+local function audit(id, spec)
 	local model = Rig.build(spec)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	assert(humanoid and humanoid.built == true and humanoid.RigType == "R15")
@@ -94,5 +92,53 @@ for _, id in Geometry.ids do
 	clone:Destroy()
 	model:Destroy()
 	assert(model.Parent == nil and #model:GetChildren() == 0)
+	return parts
+end
+for _, id in Geometry.ids do
+	local def = Config.Zombies[id]
+	local spec = if def then Geometry.spec(id, def.scale, def.skin, def.shirt, def.pants) else Geometry.spec(id)
+	local parts = audit(id, spec)
 	print(encode({ id = id, parts = parts, spec = spec, camera = "front" }))
+end
+-- 6.16: every infected look (shared/ZombieStyle.luau) through the same factory and audit: the budget, the native parts,
+-- the decoration rules, unique part names; a bare arm and bare legs in the skin's colour. Each is a "look" line:
+-- check.py counts them and keeps them out of geometry.json (--looks writes them to a file of their own).
+local ZombieStyle = require("./ZombieStyle")
+local function same(a, b)
+	return a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
+end
+for _, id in Geometry.ids do
+	local def = Config.Zombies[id]
+	if not def then
+		continue
+	end
+	for variant = 1, ZombieStyle.count(id) do
+		local look = ZombieStyle.variant(id, variant)
+		local spec = Geometry.spec(id, def.scale, look.skin, look.shirt, look.pants, look.outfit)
+		local seen = {}
+		for _, list in { spec.bones, spec.pieces } do
+			for _, p in list do
+				assert(not seen[p.name], id .. " look " .. variant .. ": two parts called " .. p.name)
+				seen[p.name] = true
+			end
+		end
+		local bones = {}
+		for _, b in spec.bones do
+			bones[b.name] = b
+		end
+		local outfit = look.outfit
+		if outfit then
+			if outfit.bare == "left" or outfit.bare == "both" then
+				assert(same(bones.LeftUpperArm.color, look.skin), id .. " look " .. variant .. ": a bare left arm")
+			end
+			if outfit.bare == "right" or outfit.bare == "both" then
+				assert(same(bones.RightUpperArm.color, look.skin), id .. " look " .. variant .. ": a bare right arm")
+			end
+			if outfit.legs == "bare" then
+				assert(same(bones.LeftLowerLeg.color, look.skin) and same(bones.RightFoot.color, look.skin), id .. " look " .. variant .. ": bare legs")
+			end
+		end
+		local parts = audit(id, spec)
+		print(encode({ id = id .. "-" .. variant, look = variant, parts = parts, spec = spec, camera = "front" }))
+	end
 end

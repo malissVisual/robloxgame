@@ -49,6 +49,7 @@ local Gestures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local BodyMotion = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BodyMotion")) -- 6.7
 local KitFit = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("KitFit")) -- 6.9: the phone in a palm or not
+local ShotFeel = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ShotFeel")) -- 6.16: the guns' kicks
 local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
@@ -80,15 +81,16 @@ local hiddenGuns: { [Model]: Instance } = {}
 -- Instance's Lua handle from a weak table while the Instance still exists.)
 local written: { [Instance]: boolean } = {}
 local reported = false
--- Recoil: every shot kicks the arms up a little, then they settle back on the aim.
+-- Recoil: every shot kicks the arms up a little, then they settle back on the aim. 6.16: by the gun's own number
+-- (Config.Shots.Guns arm, shared/ShotFeel.luau), and on an R15 body the hand (with the gun in it) slides back and tips
+-- the muzzle up too (ArmBack, ArmWrist).
 local kicks: { [Model]: number } = {}
-local KICK: { [string]: number } = { pistol = 1, smg = 0.45, shotgun = 1.9, rifle = 1.5, minigun = 0.3, launcher = 2 }
 
 function ArmPose.kick(character: Model)
 	local gun = character:FindFirstChild("HandGun")
 	local weapon = gun and gun:GetAttribute("Weapon")
-	local strength = KICK[if type(weapon) == "string" then weapon else "pistol"] or 1
-	kicks[character] = math.min(2.5, (kicks[character] or 0) + strength)
+	local strength = ShotFeel.kick(if type(weapon) == "string" then weapon else "pistol").arm
+	kicks[character] = math.min(Config.Shots.ArmMax, (kicks[character] or 0) + strength)
 end
 
 -- The joint given back (this module no longer poses it).
@@ -483,7 +485,9 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 		local h: ArmGoals = if shape then shape.hit else {}
 		lay(rig.rs, CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT, between(w.rs, h.rs, sw.k), sw.t, g.rs, gt)
 		lay(rig.re, CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT, between(w.re, h.re, sw.k), sw.t, g.re, gt)
-		lay(rig.rw, CFrame.identity, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t, g.rw, gt)
+		-- (6.16: the hand slides back up the arm and tips the muzzle up with the kick)
+		local wrist = if kick > 0 then CFrame.new(0, kick * Config.Shots.ArmBack, 0) * CFrame.Angles(kick * Config.Shots.ArmWrist, 0, 0) else CFrame.identity
+		lay(rig.rw, wrist, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t, g.rw, gt)
 		lay(rig.ls, CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT, nil, 0, g.ls, gt)
 		lay(rig.le, CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT, nil, 0, g.le, gt)
 		lay(rig.lw, CFrame.identity, aimT, c.lw, carryT, nil, 0, g.lw, gt)

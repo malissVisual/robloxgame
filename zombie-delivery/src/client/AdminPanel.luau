@@ -417,23 +417,29 @@ R.world = function()
 		render(true)
 	end)
 	local night = Config.DayNight
-	heading("Time of day", string.format("The clock runs (a day is %d min). Night from %02d:%02d to %02d:%02d: dark, more zombies, bigger waves, better pay, the lamps and headlights on.", math.floor(night.DayLength / 60), math.floor(night.NightFrom), math.floor(night.NightFrom % 1 * 60), math.floor(night.NightTo), math.floor(night.NightTo % 1 * 60)))
+	heading("Time of day", string.format("The clock runs (a day is %d min). Night from %02d:%02d to %02d:%02d: dark, more zombies, bigger waves, better pay, the lamps and headlights on. 6.16: each button jumps to the hour a look of the day is full (the blue dawn, the golden sunrise and sunset, the clean noon, the violet dusk, the blue night), to preview it.", math.floor(night.DayLength / 60), math.floor(night.NightFrom), math.floor(night.NightFrom % 1 * 60), math.floor(night.NightTo), math.floor(night.NightTo % 1 * 60)))
 	local cells = grid(150)
-	local times: { { hour: number, label: string } } = {
-		{ hour = 0, label = "00:00 Midnight" },
-		{ hour = 5.5, label = "05:30 Dawn" },
-		{ hour = 9, label = "09:00 Morning" },
-		{ hour = 12, label = "12:00 Noon" },
-		{ hour = 15, label = "15:00 Afternoon" },
-		{ hour = 17.75, label = "17:45 Dusk" },
-		{ hour = 20, label = "20:00 Evening" },
-		{ hour = 22, label = "22:00 Night" },
-	}
+	-- 6.16: one button for each look on Config.Atmosphere.Clock (the night once, in the evening), and midnight.
+	local lookNames: { [string]: string } = { night = "Night", dawn = "Dawn", sunrise = "Sunrise", morning = "Morning", noon = "Noon", afternoon = "Afternoon", golden = "Sunset", dusk = "Dusk" }
+	local times: { { hour: number, label: string } } = { { hour = 0, label = "00:00 Midnight" } }
+	for _, key in Config.Atmosphere.Clock do
+		if key.look ~= "night" or key.hour >= 12 then
+			local minutes = math.floor(key.hour * 60 + 0.5)
+			table.insert(times, { hour = key.hour, label = string.format("%02d:%02d %s", minutes // 60, minutes % 60, lookNames[key.look] or key.look) })
+		end
+	end
 	for _, entry in times do
 		local hour = entry.hour
 		local dark = hour >= night.NightFrom or hour < night.NightTo
 		action(cells, entry.label, if dark then P.violet elseif hour >= 7 and hour <= 17 then C.blue else P.bronze, function()
 			send("time", hour)
+		end)
+	end
+	-- 6.16: the weather now, for the whole server (the looks in the rain and the fog; it blends in over a few seconds)
+	local skies = row("Weather (whole server)")
+	for _, state in { "clear", "rain", "fog" } do
+		small(skies, string.upper(state), if state == "clear" then C.blue else C.grey, function()
+			send("weather", state)
 		end)
 	end
 

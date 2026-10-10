@@ -24,6 +24,15 @@
 --     a red fog over the night look, the moonlight on the tops red (Lighting.ColorShift_Top), eased in and out over
 --     Config.LiveEvents.BloodMoon.Fade s (smoothstep). A colour fade only (nothing moves: the same with reduced motion);
 --     the night stays as readable (the red ambient is as bright as the night's, your own light stays).
+--   * 6.16, light and atmosphere: the base look is the hour's (shared/SkyGrade.luau, Config.Atmosphere): a cool blue
+--     dawn, a golden sunrise and sunset, a clean noon, a violet dusk, a readable blue night, blended smoothly by the
+--     clock. It sets Lighting (Brightness, Ambient, OutdoorAmbient, ColorShift_Top / _Bottom, ExposureCompensation,
+--     EnvironmentDiffuseScale / SpecularScale, ShadowSoftness: those three only when they moved a little), the
+--     atmosphere (the fog: Color, Decay, Density, Offset, Glare, Haze), the grade (tint, saturation, contrast,
+--     brightness), the bloom (the lamps, windows and headlights glow at night; nothing washes out by day) and the sun
+--     rays (most at the golden hours); the town's glow, the snow, the rain and the fog (greyer, softer shadows, no
+--     glare) and the Blood Moon blend over it as before. client/SkyFx.luau (stepped here) adds the clouds, the soft far
+--     blur and the dust in the air.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -34,59 +43,21 @@ local RunService = game:GetService("RunService")
 local Map = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Map"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local WeatherPlan = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WeatherPlan"))
+local SkyGrade = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SkyGrade"))
 local WorldFx = require(script.Parent.WorldFx)
+local SkyFx = require(script.Parent.SkyFx)
+local DeviceBudget = require(script.Parent.DeviceBudget)
+local PhoneMotion = require(script.Parent.PhoneMotion)
 
 local Weather = {}
 
 local LOOK_EVERY = 0.1 -- seconds between look updates (the clock moves slowly; 10 Hz is smooth)
+local HOUR_STEP = 0.03 -- 6.16: hours the clock moves before the look is drawn again (6.16 review: 0.004, about every 0.16 s; each look lasts hours)
 local FLASH_EVERY = 0.22 -- the light bar's beat
 local SIREN_TAG = "SirenLight"
 
--- The look at noon, at midnight, in the middle of dusk / dawn, and in the snow.
-type Look = {
-	brightness: number,
-	ambient: Color3,
-	outdoor: Color3,
-	exposure: number,
-	haze: Color3, -- the atmosphere's colour
-	decay: Color3,
-	density: number,
-	hazeAmount: number,
-	tint: Color3, -- the colour grade
-	saturation: number,
-	contrast: number,
-	bloom: number,
-}
-
-local DAY: Look = {
-	brightness = 1.6,
-	ambient = Color3.fromRGB(70, 70, 80),
-	outdoor = Color3.fromRGB(100, 100, 110),
-	exposure = 0,
-	haze = Color3.fromRGB(150, 160, 140),
-	decay = Color3.fromRGB(90, 100, 80),
-	density = 0.3,
-	hazeAmount = 1.8,
-	tint = Color3.fromRGB(235, 245, 225),
-	saturation = -0.2,
-	contrast = 0.1,
-	bloom = 0.35,
-}
-local NIGHT: Look = {
-	-- Moody but readable: you see the lamps are needed, never so dark that a zombie hides in the black.
-	brightness = 1.5, -- the moon
-	ambient = Color3.fromRGB(68, 72, 94),
-	outdoor = Color3.fromRGB(96, 104, 138),
-	exposure = 0,
-	haze = Color3.fromRGB(62, 72, 102),
-	decay = Color3.fromRGB(30, 36, 56),
-	density = 0.3,
-	hazeAmount = 0.7,
-	tint = Color3.fromRGB(200, 212, 255),
-	saturation = -0.25,
-	contrast = 0.12,
-	bloom = 0.9,
-}
+-- 6.16: the hour's look is shared/SkyGrade.luau's (Config.Atmosphere); the night's haze tints the rain at night.
+local NIGHT_AIR = (SkyGrade.look("night") :: SkyGrade.Look).air
 -- In town at night the streets glow back: a warm sodium haze and more light from everywhere (blended in with the
 -- distance to the nearest district, CITY_FADE studs outside its edge roads).
 local CITY_OUTDOOR = Color3.fromRGB(128, 120, 122)
@@ -96,8 +67,6 @@ local CITY_FADE = 220
 -- Your own soft light at night (only on your screen): the zombie right next to you is never in the black.
 local AURA_RANGE = 26
 local AURA_BRIGHTNESS = 0.9
-local DUSK_HAZE = Color3.fromRGB(196, 128, 92)
-local DUSK_TINT = Color3.fromRGB(255, 216, 190)
 local WINTER_HAZE_DAY = Color3.fromRGB(220, 230, 240)
 local WINTER_HAZE_NIGHT = Color3.fromRGB(110, 122, 150)
 local WINTER_DENSITY = 0.12 -- added to the density in the snow
@@ -120,8 +89,9 @@ local BLOOD = {
 	hazeAmount = 0.9, -- added to its haze
 }
 
-local function lerp(a: number, b: number, t: number): number
-	return a + (b - a) * t
+-- 6.16: a look's { r, g, b } as a Color3.
+local function rgb(c: SkyGrade.Rgb): Color3
+	return Color3.fromRGB(c[1], c[2], c[3])
 end
 
 -- 5.9.2: the graphics quality, 1 … 10: your saved slider, else the rendering's level, else AUTO_QUALITY.
@@ -277,7 +247,7 @@ function Weather.start()
 	mist.Rate = 0
 	mist.Parent = mistPart
 	local rays = Instance.new("SunRaysEffect")
-	rays.Name = "DawnRays"
+	rays.Name = "ZombieSunRays" -- (6.16: by the hour's look, most at the golden hours)
 	rays.Intensity = 0
 	rays.Spread = 0.5
 	rays.Enabled = false
@@ -329,21 +299,23 @@ function Weather.start()
 		return if type(state) == "string" then state else "clear"
 	end
 
-	-- A soft bloom of our own (the lamps, the headlights and the neon signs glow more at night).
+	-- A soft bloom of our own (the lamps, the headlights and the neon signs glow more at night; 6.16: the hour's look).
+	local look: SkyGrade.Look = SkyGrade.at(Lighting.ClockTime)
 	local bloom = Instance.new("BloomEffect")
 	bloom.Name = "NightBloom"
-	bloom.Size = 24
-	bloom.Threshold = 1.4
-	bloom.Intensity = DAY.bloom
+	bloom.Size = look.bloomSize
+	bloom.Threshold = look.threshold
+	bloom.Intensity = look.bloom
 	bloom.Parent = Lighting
+	SkyFx.start() -- 6.16: the clouds, the soft far blur, the dust
+	local reduced = PhoneMotion.reducedMotion() -- (looked at with the graphics quality)
 
 	watchSirens()
 
 	local winter = 0 -- 0 … 1: how far the winter look is blended in (fades over ~2 s)
 	local blood = 0 -- 6.15: 0 … 1: how far the Blood Moon has come in (Config.LiveEvents.BloodMoon.Fade s each way)
 	local lastBlood = -1
-	local shiftBase = Lighting.ColorShift_Top -- (the place's own: the Blood Moon blends from it and back)
-	local lastNight, lastWinter, lastCity = -1, -1, -1
+	local lastHour, lastWinter, lastCity = -1, -1, -1
 	local city = 0 -- 0 … 1: the town glow (follows the camera, eases over ~1 s)
 	local lookClock, flashClock, beat = 0, 0, 0
 	local function newAura(): PointLight
@@ -357,8 +329,9 @@ function Weather.start()
 	end
 	local aura = newAura()
 
-	-- The look for this night factor and winter blend: written only when it changed (the clock crawls).
-	local function applyLook(f: number)
+	-- The look for this hour, night factor, winter, town glow, weather and Blood Moon: written only when one of them
+	-- moved (the clock crawls). 6.16: the base is the hour's look (SkyGrade.at); kept in `look` for the tick.
+	local function applyLook(f: number, hour: number)
 		-- Your own light follows your character (re-parented after a respawn).
 		local character = Players.LocalPlayer.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -375,39 +348,57 @@ function Weather.start()
 		end
 		aura.Brightness = AURA_BRIGHTNESS * f
 		aura.Enabled = f > 0.02
-		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 and math.abs(wet.density - lastWet) < 0.002 and math.abs(blood - lastBlood) < 0.002 then
+		local moved = math.abs(hour - lastHour)
+		if math.min(moved, 24 - moved) < HOUR_STEP and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 and math.abs(wet.density - lastWet) < 0.002 and math.abs(blood - lastBlood) < 0.002 then
 			return
 		end
+		look = SkyGrade.at(hour)
 		local red = blood * blood * (3 - 2 * blood) -- 6.15: the Blood Moon, eased in and out
 		local grey = math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1) -- 1 in a full fog
 		local gloom = math.clamp(wet.rain * 0.6 + grey * 0.4, 0, 1)
-		local dusk = 4 * f * (1 - f) -- 1 halfway through dusk or dawn
 		local glow = city * f -- the town glow is a night thing
-		Lighting.Brightness = lerp(DAY.brightness, NIGHT.brightness, f) * (1 - 0.25 * gloom) * (1 - 0.1 * red)
-		Lighting.Ambient = DAY.ambient:Lerp(NIGHT.ambient, f):Lerp(CITY_AMBIENT, glow):Lerp(BLOOD.ambient, red * 0.8)
-		Lighting.OutdoorAmbient = DAY.outdoor:Lerp(NIGHT.outdoor, f):Lerp(CITY_OUTDOOR, glow):Lerp(BLOOD.outdoor, red * 0.8)
-		Lighting.ColorShift_Top = shiftBase:Lerp(BLOOD.shift, red)
-		Lighting.ExposureCompensation = lerp(DAY.exposure, NIGHT.exposure, f)
+		Lighting.Brightness = look.brightness * (1 - 0.25 * gloom) * (1 - 0.1 * red)
+		Lighting.Ambient = rgb(look.ambient):Lerp(CITY_AMBIENT, glow):Lerp(BLOOD.ambient, red * 0.8)
+		Lighting.OutdoorAmbient = rgb(look.outdoor):Lerp(CITY_OUTDOOR, glow):Lerp(BLOOD.outdoor, red * 0.8)
+		Lighting.ColorShift_Top = rgb(look.top):Lerp(BLOOD.shift, red)
+		Lighting.ColorShift_Bottom = rgb(look.bottom)
+		Lighting.ExposureCompensation = look.exposure
+		-- 6.16: these may re-light the world: written only when they moved a little. An overcast sky softens the shadows
+		-- and wets the shine.
+		local specular = math.min(1, look.specular + 0.2 * gloom)
+		local soft = math.min(1, look.soft + 0.35 * gloom)
+		if math.abs(Lighting.EnvironmentDiffuseScale - look.diffuse) > 0.01 then
+			Lighting.EnvironmentDiffuseScale = look.diffuse
+		end
+		if math.abs(Lighting.EnvironmentSpecularScale - specular) > 0.01 then
+			Lighting.EnvironmentSpecularScale = specular
+		end
+		if math.abs(Lighting.ShadowSoftness - soft) > 0.01 then
+			Lighting.ShadowSoftness = soft
+		end
 		local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 		if atmosphere then
-			local haze = DAY.haze:Lerp(NIGHT.haze, f):Lerp(DUSK_HAZE, dusk * 0.55)
-			local wetHaze = WET_HAZE:Lerp(NIGHT.haze, f * 0.7)
-			atmosphere.Color = haze:Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter):Lerp(wetHaze, gloom * 0.7):Lerp(BLOOD.haze, red * 0.85)
-			atmosphere.Decay = DAY.decay:Lerp(NIGHT.decay, f):Lerp(BLOOD.decay, red)
-			atmosphere.Density = lerp(DAY.density, NIGHT.density, f) + WINTER_DENSITY * winter + wet.density + BLOOD.density * red
-			atmosphere.Haze = lerp(DAY.hazeAmount, NIGHT.hazeAmount, f) + grey * 1.2 + BLOOD.hazeAmount * red
+			local wetHaze = WET_HAZE:Lerp(rgb(NIGHT_AIR), f * 0.7)
+			atmosphere.Color = rgb(look.air):Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter):Lerp(wetHaze, gloom * 0.7):Lerp(BLOOD.haze, red * 0.85)
+			atmosphere.Decay = rgb(look.decay):Lerp(BLOOD.decay, red)
+			atmosphere.Density = look.density + WINTER_DENSITY * winter + wet.density + BLOOD.density * red
+			atmosphere.Offset = look.offset * (1 - grey) -- (a fog swallows the skyline)
+			atmosphere.Glare = look.glare * wet.rays -- (no sun's glare under the clouds)
+			atmosphere.Haze = look.haze + grey * 1.2 + BLOOD.hazeAmount * red
 		end
 		local grade = Lighting:FindFirstChild("ZombieGrade")
 		if grade and grade:IsA("ColorCorrectionEffect") then
-			grade.TintColor = DAY.tint:Lerp(NIGHT.tint, f):Lerp(DUSK_TINT, dusk * 0.5):Lerp(BLOOD.tint, red * 0.9)
-			grade.Saturation = lerp(DAY.saturation, NIGHT.saturation, f) - 0.1 * gloom + 0.12 * red
-			grade.Contrast = lerp(DAY.contrast, NIGHT.contrast, f) + 0.06 * red
+			grade.TintColor = rgb(look.tint):Lerp(BLOOD.tint, red * 0.9)
+			grade.Saturation = look.saturation - 0.1 * gloom + 0.12 * red
+			grade.Contrast = look.contrast + 0.06 * red
+			grade.Brightness = look.lift
 		end
-		bloom.Intensity = lerp(DAY.bloom, NIGHT.bloom, f)
-		bloom.Threshold = lerp(1.4, 1.05, f)
+		bloom.Intensity = look.bloom
+		bloom.Size = look.bloomSize
+		bloom.Threshold = look.threshold
 		-- Until the server has made the atmosphere and the grade (the world is still building), try again next time.
 		if atmosphere and grade then
-			lastNight, lastWinter, lastCity, lastWet, lastBlood = f, winter, city, wet.density, blood
+			lastHour, lastWinter, lastCity, lastWet, lastBlood = hour, winter, city, wet.density, blood
 		end
 	end
 
@@ -454,7 +445,7 @@ function Weather.start()
 			lookClock = 0
 			local hour = Lighting.ClockTime
 			local nightF = Map.nightFactor(hour)
-			applyLook(nightF)
+			applyLook(nightF, hour)
 			-- The roads shine in the rain (5.9.2: dry or wet, wet past half way to the wet look; near the camera only).
 			local goal = WeatherPlan.look(weatherNow()).reflect
 			if goal > 0 then
@@ -472,22 +463,29 @@ function Weather.start()
 			if qualityClock >= QUALITY_EVERY then
 				qualityClock = 0
 				quality = qualityNow()
+				reduced = PhoneMotion.reducedMotion()
 			end
 			local fancy = quality >= MEDIUM_QUALITY
+			local grey = math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1)
 			-- The river's mist: at night, at dawn and in the fog, near the river.
 			local dawn = math.clamp(1 - math.abs(hour - 7) / 1.6, 0, 1)
 			local riverX = (Map.River.x0 + Map.River.x1) / 2
 			local nearRiver = math.abs(position.X - riverX) < tuning.MistRange
-			local mistAmount = if nearRiver and fancy then math.max(nightF * 0.6, dawn, math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1)) else 0
+			local mistAmount = if nearRiver and fancy then math.max(nightF * 0.6, dawn, grey) else 0
 			mist.Rate = 7 * mistAmount
 			if mistAmount > 0 then
 				local b = Map.Bounds
 				mistPart.CFrame = CFrame.new(riverX, Map.WaterLevel + 1.5, math.clamp(position.Z, b.z0 + 160, b.z1 - 160))
 			end
-			-- Sun rays at dawn under a clear sky.
-			local intensity = if fancy then tuning.SunRays * dawn * wet.rays else 0
+			-- Sun rays under a clear sky (6.16: the hour's look: most at sunrise and sunset).
+			local intensity = if fancy then look.rays * wet.rays else 0
 			rays.Enabled = intensity > 0.002
-			rays.Intensity = intensity
+			if math.abs(rays.Intensity - intensity) > 0.001 then
+				rays.Intensity = intensity
+			end
+			-- 6.16: the clouds, the soft far blur, the dust (client/SkyFx.luau).
+			local scene: SkyGrade.Scene = { clear = wet.rays, winter = winter, aiming = false, lite = DeviceBudget.lite, quality = quality, reduced = reduced }
+			SkyFx.step(look, scene, wet.rain, grey, blood * blood * (3 - 2 * blood), LOOK_EVERY)
 		end
 	end)
 end
