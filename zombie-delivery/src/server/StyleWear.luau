@@ -233,7 +233,7 @@ local function styleCar(car: Vehicles.Car)
 	if decal and car.model:GetAttribute("FleetArt") ~= true then
 		return -- (only the fleet's own bodies have the panels a decal lies on)
 	end
-	StyleBuild.decals(car.model, car.chassis, decal)
+	StyleBuild.decals(car.model, Vehicles.bodyPart(car), decal) -- (6.16: on the body that sways; at rest on the chassis)
 	if car.model.Parent then
 		-- the new parts joined the car's assembly: its driver keeps simulating it (as Vehicles.refreshStats does; 6.13.1:
 		-- the server while it stands empty)

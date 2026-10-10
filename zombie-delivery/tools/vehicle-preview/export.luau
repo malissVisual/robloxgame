@@ -38,6 +38,18 @@ local function audit(built, display)
 			if p.Name=='WheelMotor' then wheels+=1 elseif p.Name=='DoorHinge' then doors+=1 elseif p.Name=='BackHinge' then backs+=1 end
 		end
 		assert(wheels>=4 and doors>=2 and backs>=1,'lost moving joints')
+		-- 6.16: the body that sways (client/CarSway.luau) on its Motor6D BodyRoll: a hidden root that affects no physics,
+		-- resting on the chassis (C0 = C1), the doors and the back hung on it. (The baseline factory has none.)
+		local roll=model.PrimaryPart:FindFirstChild('BodyRoll')
+		if roll then
+			assert(roll.ClassName=='Motor6D' and roll.Part0==model.PrimaryPart and roll.Part1.Name=='BodyRoot','a broken BodyRoll')
+			local root=roll.Part1
+			assert(not root.CanCollide and not root.CanQuery and not root.CanTouch and root.Massless and root.Transparency==1,'the BodyRoot affects physics')
+			assert((roll.C0.Position-roll.C1.Position).Magnitude<1e-6,'the BodyRoot does not rest on the chassis')
+			for _,p in model:GetDescendants() do
+				if p.Name=='DoorHinge' or p.Name=='BackHinge' then assert(p.Part0==root,p.Name..' does not sway with the body') end
+			end
+		end
 	end
 end
 local function physics(built)
@@ -48,7 +60,7 @@ local function physics(built)
             table.insert(out.hulls,{name=p.Name,size=triple(p.Size),pose=pose,group=p.CollisionGroup,massless=p.Massless})
         elseif p.ClassName=='VehicleSeat' or p.ClassName=='Seat' then
             table.insert(out.seats,{name=p.Name,size=triple(p.Size),pose=pose,door=p:GetAttribute('Door')})
-        elseif p.ClassName=='Motor6D' then
+        elseif p.ClassName=='Motor6D' and p.Name~='BodyRoll' then -- (6.16: the body's sway moves only looks: audit)
             table.insert(out.joints,{name=p.Name,part=p.Part1.Name,c0={triple(p.C0.Position),p.C0.R},c1={triple(p.C1.Position),p.C1.R},attributes=p:GetAttributes()})
         elseif p.ClassName=='Attachment' then
             table.insert(out.attachments,{name=p.Name,position=triple(p.Position)})

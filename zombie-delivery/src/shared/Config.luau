@@ -2452,6 +2452,85 @@ Config.Scooter = {
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
 }
 
+-- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
+-- driving's physics stay as they are). Accelerations in studs/s² (gravity is 196), speeds in studs/s.
+Config.DriveFeel = {
+	-- The body sways on its springs (shared/Suspension.luau, client/CarSway.luau: the Motor6D "BodyRoll" of a player's
+	-- car, server/Vehicles.luau): it rolls out of a turn, dips its nose on the brake, squats as it pulls away and sinks
+	-- as it lands. A style's Soft share (1 when not listed) scales the angles up and the springs' swing down.
+	Sway = {
+		Roll = 3, -- degrees the body rolls out of a turn …
+		RollAt = 100, -- … at this sideways acceleration (a car on full lock at about 55 studs/s)
+		RollMax = 4.5, -- degrees at most
+		Dive = 2, -- degrees the nose dips on the brake …
+		DiveAt = 60, -- … at this deceleration (a van's full brake is about 65)
+		Squat = 1.3, -- degrees the nose lifts as it pulls away …
+		SquatAt = 30, -- … at this acceleration
+		PitchMax = 3, -- degrees either way at most
+		Sink = 0.12, -- studs the body sinks as it lands …
+		SinkAt = 150, -- … at this upward acceleration
+		HeaveMax = 0.25, -- studs either way at most
+		Frequency = 1.9, -- Hz: how quickly the springs swing
+		Damping = 0.42, -- of the critical damping: under 1 it rocks back once after a hard stop
+		Smooth = 0.08, -- seconds: your own car's accelerations are smoothed over this …
+		SmoothOthers = 0.16, -- … another player's (their speed arrives over the network in steps)
+		Range = 140, -- studs: the cars this close to the camera sway (a phone: DeviceBudget.range)
+		Soft = {
+			muscle = 0.6, rallyvan = 0.75, armored = 0.75, pickup = 0.9, highroof = 1.2, icecream = 1.2, ambulance = 1.15,
+			boxtruck = 1.3, movingtruck = 1.3, livestock = 1.3, fueltruck = 1.3, freighttruck = 1.35, bus = 1.4, monster = 1.25,
+		} :: { [string]: number },
+	},
+	-- What the tyres throw (shared/DriveFeel.luau tyres, client/TyreFx.luau): dust off grass and dirt, snow spray in
+	-- the winter and on the ice, light smoke on asphalt when they work hard (a hard brake, a sharp fast turn, a slide,
+	-- a hard launch), and skid marks then.
+	Tyres = {
+		Range = 110, -- studs: the cars this close to the camera throw something …
+		Cars = 5, -- … this many of them at most (yours first; a phone: yours only)
+		Dust = { Rate = 28, From = 8, Full = 45 }, -- particles a second per rear wheel, by the speed (From … Full)
+		Snow = { Rate = 36, From = 6, Full = 40 },
+		Smoke = { Rate = 24, From = 0.25 }, -- on asphalt, by the strain, from this strain
+		Brake = { From = 38, Full = 62 }, -- the strain of braking (deceleration) …
+		Corner = { From = 70, Full = 110 }, -- … of a fast turn (sideways acceleration) …
+		Slide = { From = 5, Full = 14 }, -- … of a slide (sideways speed: the ice, the snow) …
+		Launch = { From = 30, Full = 45, Below = 14 }, -- … of a hard launch (acceleration, under Below studs/s)
+		MinSpeed = 14, -- the brake and the turn strain only from this speed
+		Lite = 0.5, -- a phone's share of the particles
+	},
+	-- Skid marks: dark thin strips behind the wheels on asphalt while the strain is at least From; each fades out
+	-- from FadeFrom to Life seconds. Count of them at most (the oldest is used again; a phone: Lite of them).
+	Skids = { From = 0.4, Count = 160, Lite = 0.35, FadeFrom = 4.5, Life = 7.5, Step = 0.8, Length = 3.5, Width = 0.5, Opacity = 0.62 },
+	-- A hard hit (client/CrashFx.luau): your car or a car near you loses at least From of its speed in a blink (Full:
+	-- the hardest); a spark burst of up to Sparks (a phone: half), a metal thunk, and on top of CameraRig's ram shake
+	-- (Config.LivingCity.Camera Ram) a little more, Shake at the hardest. Scraping a wall at Scrape.Speed or more
+	-- throws sparks (Scrape.Rate a second) and trembles the camera a touch (Scrape.Shake a second).
+	Crash = { From = 24, Full = 60, Sparks = 34, Shake = 0.25, Range = 120, Scrape = { Speed = 14, Rate = 70, Shake = 0.5, Reach = 0.9 } },
+	-- The engine's note (client/Sounds.luau, shared/DriveFeel.luau engine): a little gearbox (Gears gears over the top
+	-- speed, Shift of hysteresis), the pitch from Idle at a stand to Top at the top of the last gear, a touch higher on
+	-- the throttle (Load) and lower as it coasts (Coast), the volume by the speed and the throttle. Styles: a style's
+	-- class (a van when not listed). (A bike's freewheel and a scooter's hum stay as they were.)
+	Engine = {
+		Classes = {
+			car = { Idle = 0.8, Top = 1.8, Gears = 5, Volume = 0.52 },
+			van = { Idle = 0.7, Top = 1.5, Gears = 4, Volume = 0.52 },
+			truck = { Idle = 0.52, Top = 1.18, Gears = 5, Volume = 0.58 },
+			monster = { Idle = 0.6, Top = 1.38, Gears = 4, Volume = 0.6 },
+		} :: { [string]: { Idle: number, Top: number, Gears: number, Volume: number } },
+		Styles = {
+			muscle = "car", pickup = "car", rallyvan = "car", boxtruck = "truck", freighttruck = "truck", bus = "truck",
+			movingtruck = "truck", livestock = "truck", fueltruck = "truck", armored = "truck", monster = "monster",
+		} :: { [string]: string },
+		Shift = 0.03, -- of the top speed: a gear changes this far past its edge (no hunting at the edge)
+		Load = 0.05, -- pitch added on the throttle
+		Coast = 0.05, -- pitch taken off without it
+		Rev = 0.55, -- the share of the rev range a held throttle reaches at a stand (stuck, the back open)
+		Follow = 12, -- 1/s: how quickly the sound follows its pitch (a shift is heard as one)
+	},
+	-- Speed lines (client/SpeedLines.luau): thin streaks at the screen's edges from From of the top speed (full at
+	-- Full); a scooter's or a bike's (TwoWheels) from a lower share. Count of them (a phone: Lite of them); none with
+	-- reduced motion.
+	SpeedLines = { From = 0.8, Full = 1.05, TwoFrom = 0.6, TwoFull = 0.95, Count = 16, Lite = 0.5, Opacity = 0.55 },
+}
+
 -- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
 -- path straight through a Downtown block where two neighbouring lots are open (a lawn or a parking lot), a low fence
 -- to hop at each end and a SHORTCUT sign.

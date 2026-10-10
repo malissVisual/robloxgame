@@ -103,6 +103,10 @@ safely("PerfOverlay", require(Client.PerfOverlay).start) -- 6.13.1: the admin's 
 safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SHIFT 3/5 at the top, SHIFT DONE
 safely("EnemyOutline", require(Client.EnemyOutline).start) -- 6.15: a subtle outline on the enemies (zombies red, bandits orange)
 safely("EventBanner", require(Client.EventBanner).start) -- 6.15: the live event's banner at the top, its stings
+safely("CarSway", require(Client.CarSway).start) -- 6.16: the cars' bodies roll in a turn, dip on the brake, squat on the throttle
+safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyre smoke from the wheels, skid marks (after CarSway)
+safely("CrashFx", require(Client.CrashFx).start) -- 6.16: sparks and a kick on a hard hit, sparks scraping a wall
+safely("SpeedLines", require(Client.SpeedLines).start) -- 6.16: streaks at the screen's edges near the top speed
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast

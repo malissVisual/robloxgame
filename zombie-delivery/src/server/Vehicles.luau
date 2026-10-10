@@ -137,6 +137,13 @@
 -- scooter right beside you when there is room (placeNear) and you hop on (spawnAt → Vehicles.mount), a rental's slide
 -- off its dock plays while you hop. Its load rides on the BikeFrame (Vehicles.cargoHolder: it leans with the deck,
 -- client/CarVisuals.luau). The bikes keep their step and leg over.
+-- 6.16, THE BODY SWAYS (the owner: "upgrade the visuals and the feel"): a player's car (not a bike) hangs what you see
+-- of its body on the hidden part "BodyRoot" on the Motor6D "BodyRoll" (build, bodyRoot): the skin, the trim, the doors'
+-- and the back's hinges (still children of the chassis), the lamps, the UpgradeKit, the roof gun, the load
+-- (Vehicles.cargoHolder) and the style decals (Vehicles.bodyPart). Every client rolls it out of a turn, dips its nose on
+-- the brake and squats it as it pulls away (client/CarSway.luau); the server never moves it, so it sits on the chassis
+-- there. The hull (the physics), the wheel colliders, the tyres and the seats stay on the chassis: nothing that
+-- collides moves (a hull box you see on a car without the fleet's skin is hidden behind a non-colliding twin).
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -1545,6 +1552,12 @@ local function weld(a: BasePart, b: BasePart)
 	w.Parent = b
 end
 
+-- 6.16: what the body's looks hang on: the hidden BodyRoot that sways (a player's car, build), else the chassis.
+local function lookOf(model: Model, chassis: BasePart): BasePart
+	local root = model:FindFirstChild("BodyRoot")
+	return if root and root:IsA("BasePart") then root else chassis
+end
+
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
 end
@@ -1672,7 +1685,7 @@ local function buildTurret(model: Model, chassis: BasePart, turretBase: CFrame, 
 	base.Massless = true
 	local turret = Instance.new("Weld")
 	turret.Name = "TurretWeld"
-	turret.Part0 = chassis
+	turret.Part0 = lookOf(model, chassis) -- 6.16: on the roof that sways (the same frame at rest)
 	turret.Part1 = base
 	turret.C0 = turretBase
 	turret.C1 = CFrame.Angles(0, 0, math.rad(90)):Inverse()
@@ -1764,8 +1777,9 @@ end
 -- each leaf hangs on a Motor6D "BackHinge" that the clients turn (client/CarVisuals.luau), else it is welded shut.
 -- The body-coloured leaves join paintParts.
 local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
+	local on = lookOf(model, chassis) -- 6.16: the body that sways (the hinges stay children of the chassis)
 	if back.hole then
-		local hole = trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), chassis, color, accent)
+		local hole = trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), on, color, accent)
 		if model:GetAttribute("FleetArt") then hole.Transparency = 1 end
 	end
 	for _, leaf in back.leaves do
@@ -1788,7 +1802,7 @@ local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, w
 			-- Hinged, not welded: Part1 = chassis * C0 * Transform * C1:Inverse(), closed with no Transform.
 			local hinge = Instance.new("Motor6D")
 			hinge.Name = "BackHinge"
-			hinge.Part0 = chassis
+			hinge.Part0 = on
 			hinge.Part1 = p
 			hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + leaf.hinge)
 			hinge.C1 = CFrame.new(leaf.hinge - leaf.center)
@@ -2009,6 +2023,22 @@ local function hiddenPart(parent: Instance, name: string, size: Vector3, at: CFr
 	return p
 end
 
+-- 6.16: the hidden BodyRoot of a player's car on the Motor6D "BodyRoll" (Part0 the chassis; at rest the root sits
+-- right on the chassis, C0 = C1 = the pivot on the axle line under the middle, so its Transform turns the body about
+-- that line). Its attribute Style picks the springs (shared/Suspension.luau tune; client/CarSway.luau writes it).
+local function bodyRoot(model: Model, chassis: BasePart, axle: number, styleId: string): Part
+	local root = hiddenPart(model, "BodyRoot", Vector3.new(0.4, 0.4, 0.4), chassis.CFrame)
+	local roll = Instance.new("Motor6D")
+	roll.Name = "BodyRoll"
+	roll.Part0 = chassis
+	roll.Part1 = root
+	roll.C0 = CFrame.new(0, axle, 0)
+	roll.C1 = CFrame.new(0, axle, 0)
+	roll:SetAttribute("Style", styleId)
+	roll.Parent = chassis
+	return root
+end
+
 -- A hidden wheel root on a WheelMotor (client/CarVisuals.luau spins every WheelMotor by the speed; Front ones steer,
 -- not on a bike: its fork is part of the frame).
 local function wheelRoot(model: Instance, parent: Instance, on: BasePart, at: Vector3, radius: number, width: number, front: boolean): Part
@@ -2207,6 +2237,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	end
 	fitTyres(model, folder, style, Economy.level(levels, "handling"))
 	local top = chassis.CFrame * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
+	local on = lookOf(model, chassis) -- 6.16: the kit sways with the body (the same frame at rest)
 	local function add(name: string, size: Vector3, at: Vector3, color: Color3, material: Enum.Material, cylinder: boolean?): Part
 		local frame = top * CFrame.new(at)
 		local p = newPart(model, name, size, if cylinder then frame * ALONG_Z else frame, color, material)
@@ -2218,13 +2249,13 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 		p.CanTouch = false
 		p.Massless = true
 		p.Parent = folder
-		weld(chassis, p)
+		weld(on, p)
 		return p
 	end
 	local hull = hullOf(style)
 
 	if model:GetAttribute("FleetArt") then
-		VehicleArt.upgrades(model, chassis, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
+		VehicleArt.upgrades(model, on, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
 	else
 	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
 	if plow >= 1 then
@@ -2356,7 +2387,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 			front = math.min(front, slot.Z - Config.Cargo.SlotDepth / 2)
 			back = math.max(back, slot.Z + Config.Cargo.SlotDepth / 2)
 		end
-		local spot = VehicleArt.gear(model, chassis, style :: any, folder, { straps = straps, cooler = cooler, roofrack = rack }, { floor = floor, front = front, back = back }, { weld = weld, nightLight = DayNight.nightLight })
+		local spot = VehicleArt.gear(model, on, style :: any, folder, { straps = straps, cooler = cooler, roofrack = rack }, { floor = floor, front = front, back = back }, { weld = weld, nightLight = DayNight.nightLight })
 		if spot then
 			local slot = Instance.new("Attachment")
 			slot.Name = "RoofRackSlot"
@@ -2510,6 +2541,7 @@ end
 -- The door panels: hinged on a player's car (Motor6D "DoorHinge", the attributes Axis, Angle and Door; the clients
 -- swing it open from its attribute DoorOpenAt to DoorCloseAt, server times: client/CarVisuals.luau), else welded shut.
 local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
+	local on = lookOf(model, chassis) -- 6.16: the body that sways (the hinges stay children of the chassis)
 	for index, door in doorsOf(style) do
 		local panel, hingeAt = door.panel, door.hinge
 		if not panel or not hingeAt then
@@ -2533,7 +2565,7 @@ local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style
 		if working then
 			local hinge = Instance.new("Motor6D")
 			hinge.Name = "DoorHinge"
-			hinge.Part0 = chassis
+			hinge.Part0 = on
 			hinge.Part1 = p
 			hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + hingeAt)
 			hinge.C1 = CFrame.new(hingeAt - panel.offset)
@@ -2583,6 +2615,13 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	local paintParts: { BasePart } = {}
 	local top = chassisCF * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
 	local height = CHASSIS_HEIGHT
+	-- 6.16, the body that sways (client/CarSway.luau): a player's car (not a bike, a showroom model or an NPC car)
+	-- hangs what you see of its body (the skin, the trim, the doors, the back, the lamps, the kit, the roof gun, the
+	-- load: Vehicles.cargoHolder) on the hidden part "BodyRoot", on the Motor6D "BodyRoll" (bodyRoot): every client
+	-- rolls it out of a turn, dips its nose on the brake and squats it as it pulls away. The hull (the physics), the
+	-- wheels and the seats stay on the chassis; a hull box you see (a car without the fleet's skin) leaves a twin that
+	-- sways and hides itself.
+	local look: BasePart = if not display and not oneBeam and not style.bike then bodyRoot(model, chassis, style.wheel - chassisY, def.style) else chassis
 	for _, b in style.boxes do
 		local c, material = boxLook(b.kind, color, accent)
 		local name = if b.kind == "glass" then "Cabin" elseif b.kind == "lightbar" then "LightBar" elseif SIREN_DIM[b.kind] then "SirenLens" else "Body"
@@ -2594,8 +2633,18 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		elseif b.kind == "ball" then
 			p.Shape = Enum.PartType.Ball
 		end
+		local shown: BasePart = p -- 6.16: what is seen of it (its twin on the BodyRoot)
+		if look ~= chassis and not polished and p.CanCollide and not (SIREN_DIM[b.kind] or b.kind == "lightbar") then
+			shown = p:Clone()
+			shown.CanCollide = false
+			shown.CanQuery = false
+			shown.CanTouch = false
+			shown.Parent = model
+			weld(look, shown)
+			p.Transparency = 1
+		end
 		if b.kind == "body" then
-			table.insert(paintParts, p)
+			table.insert(paintParts, shown)
 		elseif SIREN_DIM[b.kind] or b.kind == "lightbar" then
 			-- The light bar: the lenses flash red / blue, the bar holds the light that throws the colour around.
 			p.CanCollide = false
@@ -2614,13 +2663,14 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		end
 		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance (5.1: a bike's art).
 		if polished or style.bike then p.Transparency = 1 end
-		weld(chassis, p)
+		-- (6.16: the light bar's lenses, never colliding, sway themselves)
+		weld(if p.CanCollide then chassis else look, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
 	end
 	-- 3.5: the cosmetic trim (the Rusty Van's rust, a stage's ladder, racks, lamps …); body-coloured trim is painted.
 	local trim: { Box } = if polished then {} else style.trim or {}
 	for _, b in trim do
-		local p = trimPart(model, "Trim", b, top * CFrame.new(b.offset) * tilted(b), chassis, color, accent)
+		local p = trimPart(model, "Trim", b, top * CFrame.new(b.offset) * tilted(b), look, color, accent)
 		if b.kind == "body" then
 			table.insert(paintParts, p)
 		end
@@ -2634,7 +2684,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 				table.insert(spans, { side = door.side, front = panel.offset.Z - panel.size.Z / 2, back = panel.offset.Z + panel.size.Z / 2 })
 			end
 		end
-		VehicleArt.body(model, chassis, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
+		VehicleArt.body(model, look, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
@@ -2719,7 +2769,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		head.CanCollide = false
 		head.CanQuery = false
 		head.Massless = true
-		weld(chassis, head)
+		weld(look, head)
 		if not display and (n == 1 or not oneBeam) then
 			local spot = Instance.new("SpotLight")
 			spot.Face = Enum.NormalId.Front
@@ -2739,7 +2789,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		tail.CanCollide = false
 		tail.CanQuery = false
 		tail.Massless = true
-		weld(chassis, tail)
+		weld(look, tail)
 		DayNight.nightLight(tail, TAIL_LIT, TAIL_DIM, "SmoothPlastic")
 	end
 
@@ -3593,8 +3643,15 @@ function Vehicles.cargoSlots(car: Car): { CFrame }
 	return list
 end
 
+-- 6.16: the part the body's looks hang on: a player's car's BodyRoot (it sways: client/CarSway.luau), else the chassis.
+-- At rest (always, on the server) it sits right on the chassis: place things by the chassis, weld them to this.
+function Vehicles.bodyPart(car: Car): BasePart
+	return lookOf(car.model, car.chassis)
+end
+
 -- 6.10: the part a loaded piece is welded to (server/Cargo.luau): on a scooter its BikeFrame (the load leans with the
--- deck: client/CarVisuals.luau), else the chassis. The slots stay relative to the chassis.
+-- deck: client/CarVisuals.luau), else the body (6.16: Vehicles.bodyPart, the load sways with it). The slots stay
+-- relative to the chassis.
 function Vehicles.cargoHolder(car: Car): BasePart
 	if car.model:GetAttribute("BikeStand") == true then
 		local frame = car.model:FindFirstChild("BikeFrame")
@@ -3602,7 +3659,7 @@ function Vehicles.cargoHolder(car: Car): BasePart
 			return frame
 		end
 	end
-	return car.chassis
+	return Vehicles.bodyPart(car)
 end
 
 -- 5.1: is this car a bike (CarDef.bike)?
