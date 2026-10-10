@@ -107,6 +107,14 @@ local function impact(car: Model, chassis: BasePart, way: Vector3): Vector3
 	return (frame * CFrame.new(0, 0.6, nose * chassis.Size.Z / 2)).Position
 end
 
+-- 6.16 review: is there something in front of it, the way it was going (another player's car: a real contact)?
+local function touching(car: Model, chassis: BasePart, way: Vector3): boolean
+	local flat = Vector3.new(way.X, 0, way.Z)
+	local dir = if flat.Magnitude > 0.01 then flat.Unit else chassis.CFrame.LookVector
+	rayParams.FilterDescendantsInstances = { car }
+	return workspace:Raycast(chassis.CFrame.Position + chassis.CFrame.UpVector * 0.8, dir * (chassis.Size.Z / 2 + 4), rayParams) ~= nil
+end
+
 local function crash(car: Model, chassis: BasePart, way: Vector3, strength: number, seated: boolean)
 	local point = impact(car, chassis, way)
 	local flat = Vector3.new(way.X, 0, way.Z)
@@ -199,7 +207,11 @@ local function step(car: Model, chassis: BasePart, _dt: number, distance: number
 	end
 	local strength = DriveFeel.crash(watch.speed - speed)
 	local seated = mine and Drive.seatedCar() == car -- (your own car with you in it: the camera feels it)
-	if strength > 0 and now - watch.crashedAt > COOLDOWN and (car:GetAttribute("Health") or 1) :: number > 0 then
+	-- (6.16 review: not on a repair lift or while the admin froze things, and another player's car only with something
+	-- really there, its speed arrives in steps: no sparks out of thin air)
+	local held = car:GetAttribute("Repairing") == true or workspace:GetAttribute("AdminFrozen") == true
+	if strength > 0 and not held and now - watch.crashedAt > COOLDOWN and (car:GetAttribute("Health") or 1) :: number > 0
+		and (mine or touching(car, chassis, watch.velocity)) then
 		watch.crashedAt = now
 		crash(car, chassis, watch.velocity, strength, seated)
 	end

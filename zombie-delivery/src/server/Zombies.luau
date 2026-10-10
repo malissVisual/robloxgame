@@ -589,7 +589,7 @@ end
 local Life = Config.ZombieLife
 local function showHit(z: Zombie, code: number)
 	local now = os.clock()
-	if code == 0 and z.hitShown and now - (z.hitShown :: number) < Life.HitEvery then
+	if code <= 1 and z.hitShown and now - (z.hitShown :: number) < Life.HitEvery then -- (6.16 review: a headshot too)
 		return
 	end
 	z.hitShown = now

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.15"
+Config.Version = "6.16"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -2564,8 +2564,8 @@ Config.DriveFeel = {
 		Range = 140, -- studs: the cars this close to the camera sway (a phone: DeviceBudget.range)
 		Soft = {
 			muscle = 0.6, rallyvan = 0.75, armored = 0.75, pickup = 0.9, highroof = 1.2, icecream = 1.2, ambulance = 1.15,
-			boxtruck = 1.3, movingtruck = 1.3, livestock = 1.3, fueltruck = 1.3, freighttruck = 1.35, bus = 1.4, monster = 1.25,
-		} :: { [string]: number },
+			boxtruck = 1.15, movingtruck = 1.15, livestock = 1.15, fueltruck = 1.15, freighttruck = 1.2, bus = 1.2, monster = 1.15,
+		} :: { [string]: number }, -- (6.16 review: the tall ones 1.3 – 1.4 before: a box truck's roof swung 1 – 1.5 studs)
 	},
 	-- What the tyres throw (shared/DriveFeel.luau tyres, client/TyreFx.luau): dust off grass and dirt, snow spray in
 	-- the winter and on the ice, light smoke on asphalt when they work hard (a hard brake, a sharp fast turn, a slide,

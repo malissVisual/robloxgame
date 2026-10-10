@@ -52,7 +52,7 @@ local PhoneMotion = require(script.Parent.PhoneMotion)
 local Weather = {}
 
 local LOOK_EVERY = 0.1 -- seconds between look updates (the clock moves slowly; 10 Hz is smooth)
-local HOUR_STEP = 0.004 -- 6.16: hours the clock moves before the look is drawn again (the client writes it every 0.01)
+local HOUR_STEP = 0.03 -- 6.16: hours the clock moves before the look is drawn again (6.16 review: 0.004, about every 0.16 s; each look lasts hours)
 local FLASH_EVERY = 0.22 -- the light bar's beat
 local SIREN_TAG = "SirenLight"
 

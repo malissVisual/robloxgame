@@ -1143,6 +1143,54 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Visuals and feel: light, shooting, driving, zombies (6.16)
+
+The owner: "I want to upgrade the visuals and the feel." Four parts, all looks and sound: nothing plays differently.
+
+### Light and atmosphere
+Every time of day has its own look (`shared/SkyGrade.luau`, `Config.Atmosphere`): a cool blue dawn, a golden sunrise
+with sun rays and dust in the light, a clean noon, a warm golden sunset with an orange haze, a violet dusk and a blue
+night that is dark but readable (the 3.0.1 rule, tested for every minute of the day). The looks blend with the clock
+(the light, the colour grade, the atmosphere and fog, the bloom and the rays; `client/Weather.luau`), with the town's
+glow, rain, fog, snow and the Blood Moon on top. A crisper sun, a bigger moon, more stars and Roblox's moving clouds
+(thicker in the rain, golden at sunset, red under the Blood Moon); a very soft blur far away (not on phones, at low
+graphics quality or while you aim); a few dust motes by day (`client/SkyFx.luau`); at night the lamps, windows and
+headlights glow and the nearest street lamps have a faint haze (`client/WorldFx.luau`). Admins jump to each look and
+switch the weather (P → WORLD). The Studio settings scripts cannot set (Lighting.Technology = Future) are in
+`design/lighting/NAVOD.md`.
+
+### Shooting that feels like it
+The camera kicks up and a little to the side and springs back (hard for the shotgun, the rifles and the launcher,
+soft for the pistol, barely for the SMG and the minigun; a fifth with reduced motion; `client/ShotKick.luau`); the
+hands jolt back, the muzzle flashes with a short burst of light, brass casings flip out and bounce (a red shell on
+the shotgun's pump); where a round stops: sparks off metal and cars, dust off concrete, chips off wood, a splash on
+water, a fading mark, a dark-red puff on a zombie (`client/ShotFx.luau`); others' shots too. Every hit draws an X with
+a soft tick: white for a hit, red with a skull for a kill, a big gold X and a camera punch for a headshot; on a phone
+where the shot landed (`client/HitMarker.luau`). `shared/ShotFeel.luau`, `Config.Shots`; pooled, capped, lighter on
+phones; the server still decides every hit.
+
+### Driving that feels alive
+The body of a player's car rides on visible suspension (a hidden `BodyRoot` on a `BodyRoll` Motor6D; the colliders,
+wheels and seats stay on the chassis): it rolls out of a turn, dips its nose on the brake, squats pulling away and
+bounces on landing; heavy trucks sway more, the muscle car less (`shared/Suspension.luau`, `client/CarSway.luau`). The
+wheels throw dust on grass and dirt, snow spray in the winter and light smoke on asphalt in a hard brake or a fast
+corner, with fading skid marks (`client/TyreFx.luau`); a crash throws sparks with a thunk and a kick of the camera,
+scraping a wall a stream of sparks (`client/CrashFx.luau`); the engine climbs through its gears by class
+(`shared/DriveFeel.luau`); near the top speed thin speed lines streak at the screen's edges (`client/SpeedLines.luau`).
+`Config.DriveFeel`; lighter on phones; reduced motion turns the lines and the shakes off.
+
+### Zombies with a life of their own
+Every walker, runner, brute and soldier wears one of several looks picked from its id (`shared/ZombieStyle.luau`,
+CharacterArt outfits): skin from pale green to grey-blue to bruised, a hospital gown, a torn suit and tie, a hi-vis vest
+and hard hat, a tracksuit, a hoodie, an apron, a prison jumpsuit, torn sleeves and stains; each kind keeps its build.
+Their eyes are dull by day and glow at night. Walkers limp and shamble with their heads lolling, runners lurch with
+flailing arms, brutes stomp, a waiting horde sways; they lunge and swipe when they bite (the `Attack` attribute),
+flinch when shot and stagger from a headshot, a punch or a car (the `Hit` attribute), and fall different ways when they
+die. Groans from the nearest few, a runner's shriek, grunts and gurgles (`client/ZombieLife.luau`,
+`client/ZombieAnimator.luau`, `Config.ZombieLife`); distance LOD, lighter on phones.
+
+The new sounds (squeals, scrapes, impacts by surface, casings, zombie groans and shrieks) borrow existing cues for now.
+
 ## Fixed missions, live events and enemy outlines (6.15)
 
 The owner: "When you do missions, I want them to be about a number of zombies, and you have to complete it, so the

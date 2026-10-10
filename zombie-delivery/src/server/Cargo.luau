@@ -1966,7 +1966,8 @@ local function render(session: Session)
 		local frames = palletFrames(car, #session.load)
 		for index, piece in session.load do
 			local model = buildLook(piece.look, piece.variant)
-			weldTo(model, car.chassis, car.chassis.CFrame * frames[index])
+			-- (6.16 review: on the body root, Vehicles.cargoHolder, so the pallets sway with the body like the slots' pieces)
+			weldTo(model, Vehicles.cargoHolder(car), car.chassis.CFrame * frames[index])
 			model.Parent = car.model
 			table.insert(session.shown, model)
 		end
