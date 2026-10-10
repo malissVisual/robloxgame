@@ -186,6 +186,8 @@ end
 Jobs.onStat = Challenges.add
 -- The bandits, gunners and soldiers only go after players on a job (or in its crew); zombies after everybody.
 Zombies.hunts = Jobs.involved
+-- 6.15 review: the world's own people (resident bandit camps, the base's soldiers) leave a mission's crew alone.
+Zombies.spares = Jobs.onMission
 Vehicles.onWrecked = function(player, car, reason)
 	Zombies.releaseCar(car)
 	if Jobs.active(player) then

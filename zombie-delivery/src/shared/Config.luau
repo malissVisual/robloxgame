@@ -2578,21 +2578,33 @@ Config.Missions = {
 		RingMax = 45,
 		FromStop = 140,
 		DefendRing = { 60, 100 },
-		-- In the world (server/MissionEnemies.luau). A group comes when somebody of the crew is within SpawnRange of its
-		-- spot (Config.Horde.DespawnDistance, 300: one nobody is near goes back to waiting, alive again when you come
-		-- back); MaxAlive of a mission alive at once (the rest come as those die), Batch a tick at most.
+		-- In the world (server/MissionEnemies.luau). One comes when somebody of the crew (alive, out of the safe zone) is
+		-- within SpawnRange of its spot (a HOLD OUT wave's: once let loose too); one nobody of the crew is within
+		-- ParkRange of goes back to waiting at its spot (alive again when they come back: the alive cap follows the crew;
+		-- Zombies' own despawn leaves them alone). MaxAlive of a mission alive at once (the rest come as those die), Batch
+		-- a tick at most. Reserve: while a mission runs, every other enemy (a board job's waves, the admin's) stops this
+		-- many short of Config.Horde.MaxTotal (the roamers and the live events stop shorter already).
 		SpawnRange = 230,
+		ParkRange = 300,
 		MaxAlive = 18,
 		Batch = 6,
+		Reserve = 15,
+		-- A spot inside something (a wall, a bunker, the rock) is not used: the spot halfway to its anchor, else round the
+		-- anchor (the stop's circle, the road), else (a HOLD OUT wave's) the nearest road. Delivered (clearing), one that
+		-- has not moved StuckMove studs nor been hit for StuckTime s while it should (somebody close, or away from its
+		-- spot; a bandit: it sees nobody) goes back to waiting and comes again by its anchor.
+		StuckTime = 20,
+		StuckMove = 3,
 		-- They guard their spot: a zombie goes after somebody within Aggro of it (a bandit or a gunner: its range + 40)
 		-- while they are within Leash of its spot, else it walks back; hit from further, it goes after them within its
 		-- leash for AlertTime s.
 		Aggro = 90,
 		Leash = 150,
 		AlertTime = 8,
-		-- The clock: TimePerEnemy s more for every enemy of the mission (to clear them); a mission started far from its
-		-- first stop gets the longer drive too (the pay stays the mission's own).
-		TimePerEnemy = 3,
+		-- The clock: TimePerEnemy s more for every enemy of the mission (to clear them, the drive back to a horde you
+		-- passed included: 6.15 review, 3 s was tight); a mission started far from its first stop gets the longer drive
+		-- too (the pay stays the mission's own).
+		TimePerEnemy = 5,
 		-- Delivered with enemies left: the HUD's marker follows the nearest of them once it moved Retarget studs.
 		Retarget = 10,
 	},

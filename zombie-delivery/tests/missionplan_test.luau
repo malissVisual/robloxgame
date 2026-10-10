@@ -249,6 +249,37 @@ do
 	check("plan: every group one spot an enemy", #counts == 0, offenders(counts))
 	check("plan: only known kinds (Config.Zombies)", #kinds == 0, offenders(kinds))
 	check("plan: no spot in the safe zone or the water", #spots == 0, offenders(spots))
+	-- 6.15 review: duo_9's second gunner post stood in the rock behind the tunnel's wall (unkillable: the clock failed it)
+	local rock, tunnel = {}, {}
+	local mountain = Map.Mountain
+	for _, def in Missions.List do
+		local plan = planOf(def)
+		for _, group in (if plan then plan.groups else {}) do
+			for _, spot in group.spots do
+				if math.sqrt((spot.x - mountain.x) ^ 2 + (spot.z - mountain.z) ^ 2) < mountain.radius and not Map.onRoad(spot.x, spot.z) then
+					table.insert(rock, `{def.id} #{group.id} {math.floor(spot.x)},{math.floor(spot.z)}`)
+				end
+				if MissionPlan.inRock(spot.x, spot.z) then
+					table.insert(rock, `{def.id} #{group.id} rock {math.floor(spot.x)},{math.floor(spot.z)}`)
+				end
+			end
+			if group.anchor == "route" and MissionPlan.inTunnel(group.x, group.z) then
+				table.insert(tunnel, `{def.id} point {group.point}`)
+			end
+		end
+	end
+	check("plan: no spot within the mountain's radius off its roads (the rock)", #rock == 0, offenders(rock))
+	check("plan: no route point in the mountain's tunnel (World's lamp box)", #tunnel == 0, offenders(tunnel))
+	local mirror = Missions.find("duo_9")
+	local mirrorPlan = if mirror then planOf(mirror) else nil
+	local inside = false
+	for _, group in (if mirrorPlan then mirrorPlan.groups else {}) do
+		for _, spot in group.spots do
+			inside = inside or (MissionPlan.inTunnel(spot.x, spot.z) and not Map.onRoad(spot.x, spot.z))
+		end
+	end
+	check("plan: Mirror Run (duo_9) has nobody in the tunnel's rock", mirrorPlan ~= nil and not inside)
+	check("plan: the tunnel box is World's (the road through it is on a road, its walls are not)", MissionPlan.inTunnel(mountain.x, (mountain.tunnelZ0 + mountain.tunnelZ1) / 2) and MissionPlan.inRock(mountain.x - 25, (mountain.tunnelZ0 + mountain.tunnelZ1) / 2) and not MissionPlan.inRock(mountain.x, (mountain.tunnelZ0 + mountain.tunnelZ1) / 2))
 	check("plan: every group says where", #places == 0, offenders(places))
 	check("plan: a route point is on a road, out of the safe zone", #anchors == 0, offenders(anchors))
 	check("plan: ENEMIES with bandits or gunners, else ZOMBIES", #labels == 0, offenders(labels))

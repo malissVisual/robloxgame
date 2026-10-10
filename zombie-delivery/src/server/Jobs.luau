@@ -225,6 +225,8 @@
 --     and paid as ever. The clock still fails it; the cargo keeps the condition it arrived with. The payload's
 --     mission.enemies = { killed, total, left, label } (the HUD's ZOMBIES 7/20), the result's mission.cleared.
 --   * Jobs.adminKillMission: the admin's KILL MISSION ZOMBIES.
+--   * 6.15 review: the crew splits up to clear: who was there at the delivery keeps the mission's credit at the last
+--     kill (Job.clearPresent, complete) and the riders stay on the job however far they go (pruneRiders).
 -- 6.15, the live events (server/LiveEvents.luau, shared/LiveEvents.luau), through Jobs.live (server/LiveEvents.luau
 -- fills it at its start: it requires this module, so this one cannot require it; no new top-level local here). Never a
 -- mission's (Offer.mission):
@@ -441,6 +443,7 @@ type Job = {
 	clearing: boolean?,
 	clearAt: Vector3?, -- … the marker's point as last sent (it moves on when they do: Fixed.Retarget)
 	cleared: { killed: number, total: number, left: number, label: string }?, -- the count at the finish (complete)
+	clearPresent: { Player }?, -- 6.15 review: the crew there at the delivery (they keep the credit while clearing)
 }
 
 -- 5.2: one order of a job. `offer` is its own (pay, clock, cargo, customer, pieces, rules); the job's offer is the
@@ -2809,7 +2812,8 @@ local function statCrew(owner: Player, job: Job, name: string, amount: number)
 end
 
 -- Who rode along stays on the job only while they are with it (withOwner): not on a job of their own or in another
--- crew, not far off, and not after leaving the owner's crew (or being taken out of it). Every tick.
+-- crew, not far off, and not after leaving the owner's crew (or being taken out of it). Every tick. 6.15 review: a
+-- mission delivered and being cleared keeps its riders however far they go (the crew splits up to clear).
 local function pruneRiders(player: Player, job: Job)
 	local members: { [Player]: boolean } = {}
 	for _, member in Crew.members(player) do
@@ -2818,7 +2822,7 @@ local function pruneRiders(player: Player, job: Job)
 	for rider in job.crew do
 		local leader = Crew.ownerOf(rider)
 		local leftCrew = job.members[rider] and not members[rider]
-		if not rider.Parent or jobs[rider] or (leader and leader ~= player) or leftCrew or not withOwner(player, rider) then
+		if not rider.Parent or jobs[rider] or (leader and leader ~= player) or leftCrew or (not job.clearing and not withOwner(player, rider)) then
 			job.crew[rider] = nil
 		end
 	end
@@ -3763,6 +3767,14 @@ local function complete(player: Player, job: Job)
 		end
 	end
 	local crew, present = crewNow(job, player)
+	-- 6.15 review: a mission finishes at its last kill; who was there at the delivery (and is still of the crew) is
+	-- there for its credit too, wherever the clearing took them
+	local delivered: { Player } = job.clearPresent or {}
+	for _, member in delivered do
+		if member.Parent and table.find(crew, member) and not table.find(present, member) then
+			table.insert(present, member)
+		end
+	end
 	job.cleared = require(script.Parent.MissionEnemies).info(player) -- 6.15: the mission's count (endJob ends its run)
 	endJob(player, job, true)
 	if last then
@@ -4869,7 +4881,7 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	-- 6.15: a mission's own enemies (server/MissionEnemies.luau): the dead counted, the groups near the job's people
 	-- brought in (a crew makes the new ones tougher: enemyScale).
 	local fixed = Jobs.isMission(job)
-	if fixed and require(script.Parent.MissionEnemies).step(player, crewOf(job, player), job.enemyScale) then
+	if fixed and require(script.Parent.MissionEnemies).step(player, crewOf(job, player), job.enemyScale, job.clearing == true) then
 		job.dirty = true
 	end
 	if session.info.foot then
@@ -4940,6 +4952,10 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 			if not job.clearing then
 				job.clearing = true
 				job.dirty = true
+				-- 6.15 review: who is there at the delivery keeps the mission's credit while the crew splits up to clear
+				-- (complete), and the riders stay on the job however far they go (pruneRiders)
+				local _, present = crewNow(job, player)
+				job.clearPresent = present
 				enemies.releaseAll(player) -- (HOLD OUT's waves still to come come now: they count too)
 				local info = enemies.info(player)
 				tellJob(player, `{if finished then "Delivered!" else "Nothing left to deliver."} Now clear the {string.lower(if info then info.label else "zombies")}: {left} left.`)

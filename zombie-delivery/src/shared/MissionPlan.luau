@@ -33,7 +33,9 @@
 --   shrunk alike, each at least one), at least Min.
 -- Where: a stop's enemies stand on the road by its circle (a yard's in a ring round it); a route point is on the road
 -- at an even share of the route between the stops, FromStop studs from each; HOLD OUT's waves come from DefendRing
--- studs round the last drop, on the roads. Never in the safe zone or the water.
+-- studs round the last drop, on the roads. Never in the safe zone, the water or the mountain's rock (no route point in
+-- its tunnel at all: MissionPlan.inTunnel / inRock). Walls and buildings the plan cannot see: server/MissionEnemies.luau
+-- checks every spot in the world before it uses it.
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -425,8 +427,24 @@ end
 
 -- ── The places ─────────────────────────────────────────────────────────────
 
+-- 6.15 review: the tunnel through the mountain (Map.Mountain): rock round its carved road, its walls a step off the
+-- lanes (server/World.luau buildMountain); its lamps keep out of this same box.
+function MissionPlan.inTunnel(x: number, z: number): boolean
+	local m = Map.Mountain
+	return math.abs(x - m.x) < 60 and z > m.tunnelZ0 - 20 and z < m.tunnelZ1 + 20
+end
+
+-- The mountain's rock (its main hill, and the two lower ones World puts beside it: about MOUNTAIN_REACH × its radius
+-- at the ground), off its roads.
+local MOUNTAIN_REACH = 1.45
+function MissionPlan.inRock(x: number, z: number): boolean
+	local m = Map.Mountain
+	return (x - m.x) ^ 2 + (z - m.z) ^ 2 < (m.radius * MOUNTAIN_REACH) ^ 2 and not Map.onRoad(x, z)
+end
+
+-- No enemy there: the safe zone (it burns), the water, the mountain's rock.
 local function bad(x: number, z: number): boolean
-	return Map.isSafe(x, z) or Map.inWater(x, z)
+	return Map.isSafe(x, z) or Map.inWater(x, z) or MissionPlan.inRock(x, z)
 end
 
 -- A spot never in the safe zone or the water: else the other side of the anchor, else the anchor itself.
@@ -507,7 +525,8 @@ end
 -- `count` points on the roads along the route, each near its even share of it: out of the safe zone and the water,
 -- FromStop studs from every stop and 80 from each other (a short route: what it has room for; the depot's leg is
 -- added to a route too short for them). The share nearest the even one that fits; else the one farthest from the
--- stops; never one in the safe zone (else by the last stop's circle).
+-- stops; never one in the safe zone or the mountain's tunnel (6.15 review: a gunner's post by the road there stood in
+-- the rock behind the tunnel's wall: unkillable), else by the last stop's circle.
 local function routePoints(stops: { StopInfo }, count: number): { RoutePoint }
 	local line: { Spot } = {}
 	for _, stop in stops do
@@ -541,7 +560,7 @@ local function routePoints(stops: { StopInfo }, count: number): { RoutePoint }
 		local bestGap, bestFar = math.huge, -1
 		local fallback: RoutePoint? = nil
 		for index, point in candidates do
-			if bad(point.x, point.z) then
+			if bad(point.x, point.z) or MissionPlan.inTunnel(point.x, point.z) then
 				continue
 			end
 			local near = math.huge
