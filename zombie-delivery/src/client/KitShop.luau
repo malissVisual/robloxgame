@@ -91,9 +91,11 @@ end
 -- What you carry, in words: "HANDS 2" or "HANDS 2 / TOTE 5" (the hands + the bag: 6.6, one carrying item). Also for
 -- the job board and the phone. 6.4: `bag` the active bag (the state's `bag`; nil = the best owned): only that one counts.
 function KitShop.roomText(kit: Transport.Kit, bag: string?): string
-	local hands = Config.Cargo.HandsMax
-	local room = Transport.handsRoom(kit, bag)
+	local Skills = require(Shared.Skills) -- (6.20: + Strong Back's pieces, Config.Skills)
+	local ranks = Skills.decode(player:GetAttribute("Skills"))
 	local active = Transport.activeBag(kit, bag)
+	local hands = Config.Cargo.HandsMax + Skills.effect(ranks, "hands")
+	local room = Transport.handsRoom(kit, bag) + Skills.effect(ranks, "hands") + (if active then Skills.effect(ranks, "bag") else 0)
 	if active and room > hands then
 		return `HANDS {hands} / {shortName(active)} {room}`
 	end

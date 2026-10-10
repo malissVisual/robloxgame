@@ -404,7 +404,9 @@ local function step()
 	CameraRig.noteFire()
 	fireRemote:FireServer(target, aimed)
 	-- 6.16: the kick, the flash, the casing and where the rounds stop (the shot already went where the crosshair was).
-	ShotKick.shot(if carGun then carGun.id else weapon, if mode == "window" then Config.Shots.WindowShare else 1)
+	-- 6.20: Steady Hand (Config.Skills recoil, the player attribute Skills) softens a hand gun's kick (not the roof gun's)
+	local steady = if carGun then 1 else ShotKick.steady(player:GetAttribute("Skills"))
+	ShotKick.shot(if carGun then carGun.id else weapon, (if mode == "window" then Config.Shots.WindowShare else 1) * steady)
 	if gunMuzzle and character then
 		muzzleFlash(character, gunMuzzle)
 	else

@@ -1146,6 +1146,49 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Skills for levels (6.20)
+
+Every level from 2 gives a **skill point**: 14 at level 15. You spend them in CAREER's new **SKILLS** tab (the phone's
+CAREER app and the CAREER window, C) on three branches. The owner approved the design (`design/skills/PROPOSAL.md`)
+with one change: **RESET is always free**. It gives every point back, but not during a job or a mission. Old saves get
+their points at once from their level (level 9: 8 points). Only the ranks you buy are saved (`profile.skills`); the
+points always come from the level.
+
+| Branch | Skill | Ranks | Each rank |
+|---|---|---|---|
+| 📦 Courier | Strong Back | 1 (2 points) | +1 light piece in your hands and +1 in your bag |
+| | Long Breath | 3 | +1.5 s of sprint (6 s → 10.5 s) |
+| | Doorstep Smile | 3 | the customer tips +5% of the pay (not on a mission) |
+| | Light Step | 2 | +4% sprint speed (28 → 30.2) |
+| | ★ Express | 1 (3 points) | +10% pay for an order delivered in time |
+| 🚐 Driver | Tough Body | 3 | −8% damage to your vehicle |
+| | Quick Hands | 3 | −10% time at a serve stop and while people board (3 s → 2.1 s) |
+| | Light Foot | 3 | −7% fuel burnt |
+| | Known at the Shop | 2 | −15% repair fee (at every repair shop) |
+| | ★ Stuntman | 1 (3 points) | running zombies over costs the car nothing, a bandit car's ram half |
+| 🥊 Fighter | Hard Fist | 3 | +3 punch damage (12 → 21) |
+| | Steady Hand | 3 | −10% gun spread, −15% recoil (the guns have no reload) |
+| | Endurance | 3 | +10 max health (100 → 130) |
+| | Field Medic | 2 | +20% healing over time; one free medkit a job or mission |
+| | ★ Second Wind | 1 (3 points) | a lethal hit leaves you with 25 health, once a job or mission |
+
+A ★ apex costs 3 points and opens once its branch has 6 points. All of it costs 41 points, so at level 15 you fill one
+branch and part of another. "Once a job or mission" charges fill when a job or a mission starts (yours or your crew's)
+and on every spawn.
+
+- **Where you see it:** SKILLS shows the free points big with RESET · FREE, then the three branches (side by side on a
+  wide screen). A row shows the ranks as ■■□; an apex shows 🔒 6 until it opens. Tap a row for what it gives now and
+  with the next rank (the game's real numbers), and +1 POINT. The level-up card says "+1 skill point" with OPEN. The
+  phone's home puts a red dot on the level chip while a point is free, and MORE → CAREER counts them.
+- **Code:** the numbers are in `Config.Skills`. `shared/Skills.luau` has the rules (points, costs, locks, effects;
+  `tests/skills_test.luau`). `server/Skills.luau` handles the `Skills` remote (buy, reset), the max health, the healing
+  and the charges. The effects are wired where the game computes them: `server/Cargo.luau` and `server/Transport.luau`
+  (Strong Back), `client/Stamina.luau` and `client/CameraRig.luau` (the sprint), `server/Jobs.luau` payOrder (tips,
+  Express), `server/Vehicles.luau` damage (Tough Body, Stuntman), `server/Cargo.luau` (Quick Hands), `server/Fuel.luau`,
+  `server/Repair.luau`, `server/CloseCombat.luau` (the punch), `server/Gun.luau` and `client/ShotKick.luau` (Steady
+  Hand), `server/Items.luau` (the free medkit) and `server/Armour.luau` (Second Wind). The UI is
+  `client/SkillsView.luau`, drawn by `client/PhoneMore.luau` and `client/CareerUi.luau`.
+
 ## Prices as milestones (6.19)
 
 The owner: "make everything more expensive so they're real milestones." Following the 6.14 design, jobs are the grind,

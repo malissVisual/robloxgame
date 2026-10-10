@@ -178,7 +178,8 @@ local function burnAll()
 		if moved > Tuning.MaxJump or moved < 0.05 or litres <= 0 then
 			continue
 		end
-		Fuel.set(car, litres - FuelMath.burn(defOf(car), moved))
+		-- (6.20: Light Foot, Config.Skills: the driver's car burns a share less)
+		Fuel.set(car, litres - FuelMath.burn(defOf(car), moved) * math.max(0, 1 - require(script.Parent.Skills).effect(car.owner, "fuel")))
 	end
 end
 

@@ -597,6 +597,51 @@ check("6.18 wave 2: BANK's hero: the cash big in green, FIND A DELIVERY its one 
 Phone.open("career")
 check("6.18 wave 2: CAREER: the next level the hero, the road its rows",named("NextLevel")~=nil and string.find(named("NextLevel"):FindFirstChild("Pay",true).Text," XP",1,true)~=nil
 	and named("FullCareer")~=nil and named("Level_3")~=nil and named("Level_3"):FindFirstChild("Add").Text=="🔒 LV 3")
+-- 6.20: CAREER's ROAD / SKILLS tabs (client/SkillsView.luau): the free points, RESET · FREE, the three branches, a
+-- skill's details with +1 POINT (the Skills remote), the apex's lock; home's level chip dots a free point.
+do
+	check("6.20: CAREER has ROAD and SKILLS tabs, ROAD open",named("roadTab")~=nil and named("skillsTab")~=nil and named("skillsTab").Text=="SKILLS" and named("NextLevel")~=nil and named("SkillsHero")==nil)
+	M.player:SetAttribute("Xp",require("./Levels").xpFor(7))
+	M.player:SetAttribute("Skills","longBreath:2")
+	Phone.setState({phone=true,money=1240,kit={bag=true},cars={},skills={longBreath=2}})
+	Phone.open("career")
+	check("6.20: … SKILLS counts the free points (level 7: 6, 2 spent)",named("skillsTab").Text=="SKILLS · 4")
+	named("skillsTab").Activated:Fire()
+	check("6.20: SKILLS: the hero says the free points big, RESET · FREE its button",named("SkillsHero")~=nil and named("SkillsHero"):FindFirstChild("Pay",true).Text=="4 FREE POINTS"
+		and named("SkillsReset")~=nil and named("SkillsReset").Text=="RESET · FREE" and named("NextLevel")==nil)
+	check("6.20: … three branches, five skills each",named("Column_courier")~=nil and named("Column_driver")~=nil and named("Column_fighter")~=nil
+		and #all(named("SkillTree"),function(object) return string.match(object.Name,"^Skill_")~=nil end)==15)
+	check("6.20: … a skill's ranks big (■■□), an apex locked until 6 points in its branch",named("Skill_longBreath"):FindFirstChild("Pay").Text=="■■□"
+		and named("Skill_express"):FindFirstChild("Add").Text=="🔒 6" and named("Branch_courier"):FindFirstChild("Section").Text=="📦 COURIER · 2")
+	named("Skill_longBreath").Activated:Fire()
+	check("6.20: a tap opens its details: now and next with the real numbers, +1 POINT",named("SkillDetails")~=nil and named("SkillsBack")~=nil
+		and string.find(named("SkillDetails"):FindFirstChild("Facts",true).Text,"Sprint 9 s",1,true)~=nil and string.find(named("SkillDetails"):FindFirstChild("Facts",true).Text,"NEXT: Sprint 10.5 s",1,true)~=nil
+		and named("SkillBuy").Text=="+1 POINT")
+	named("SkillBuy").Activated:Fire()
+	check("6.20: +1 POINT asks the server (Skills: buy)",M.lastSent("Skills")~=nil and M.lastSent("Skills").args[1]=="buy" and M.lastSent("Skills").args[2]=="longBreath")
+	named("SkillsBack").Activated:Fire()
+	check("6.20: ‹ SKILLS goes back to the tree",named("SkillDetails")==nil and named("SkillsHero")~=nil)
+	named("Skill_express").Activated:Fire()
+	check("6.20: a locked apex's details say why, its button grey",named("SkillBuy")~=nil and named("SkillBuy").Text=="🔒 6 POINTS IN COURIER")
+	named("SkillBuy").Activated:Fire()
+	check("6.20: … and it asks nothing",M.lastSent("Skills").args[1]=="buy" and #all(M.gui,function(o) return o.Name=="SkillBuy" end)==1 and M.sent[#M.sent].name=="Skills" and M.sent[#M.sent].args[2]=="longBreath")
+	named("SkillsBack").Activated:Fire()
+	named("SkillsReset").Activated:Fire()
+	check("6.20: RESET · FREE asks the server (Skills: reset)",M.lastSent("Skills").args[1]=="reset")
+	Phone.close();Phone.open()
+	check("6.20: home: the level chip dots a free point, CAREER's row counts them",named("SkillDot")~=nil and named("SkillDot").Visible and named("careerApp"):FindFirstChild("Badge").Visible and named("careerApp"):FindFirstChild("Badge").Text=="4")
+	M.player:SetAttribute("Skills","longBreath:3,doorstepSmile:3")
+	Phone.setState({phone=true,money=1240,kit={bag=true},cars={},skills={longBreath=3,doorstepSmile=3}})
+	Phone.close();Phone.open()
+	check("6.20: … no free point: no dot",not named("SkillDot").Visible and not named("careerApp"):FindFirstChild("Badge").Visible)
+	Phone.open("career")
+	check("6.20: the tab stays SKILLS; 6 points in a branch open its apex",named("SkillsHero")~=nil and named("Skill_express"):FindFirstChild("Add").Text=="›")
+	named("roadTab").Activated:Fire()
+	check("6.20: ROAD again",named("NextLevel")~=nil and named("SkillsHero")==nil)
+	M.player:SetAttribute("Xp",0)
+	M.player:SetAttribute("Skills",nil)
+	Phone.setState({phone=true,money=1240,kit={bag=true},cars={}})
+end
 -- A new message drops a banner while another app shows; it opens MESSAGES.
 Phone.open("bank")
 M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Earl has a van for you."})

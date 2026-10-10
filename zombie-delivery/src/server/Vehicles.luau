@@ -4429,9 +4429,18 @@ local function wreck(car: Car, reason: string)
 	end)
 end
 
-function Vehicles.damage(car: Car, amount: number, reason: string?)
+-- 6.20: `cause` what hit it ("ram": a zombie run over, "crash": a bandit car's ram; nil anything else): the driver's
+-- skills take their share off (Tough Body, ★ Stuntman: server/Skills.luau carDamage; the car's owner's, a lent car's
+-- too). Returns the damage it took.
+function Vehicles.damage(car: Car, amount: number, reason: string?, cause: string?): number
 	if car.wrecked or amount <= 0 then
-		return
+		return 0
+	end
+	if amount < math.huge then
+		amount *= require(script.Parent.Skills).carDamage(car.owner, cause)
+		if amount <= 0 then
+			return 0
+		end
 	end
 	car.health = math.max(0, car.health - amount)
 	car.model:SetAttribute("Health", math.ceil(car.health))
@@ -4440,6 +4449,7 @@ function Vehicles.damage(car: Car, amount: number, reason: string?)
 	else
 		remember(car)
 	end
+	return amount
 end
 
 function Vehicles.repair(car: Car, share: number)

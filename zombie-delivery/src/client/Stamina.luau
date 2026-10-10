@@ -9,6 +9,8 @@
 -- plain Luau CLI, so nothing at the top level of this module may touch Roblox; start() and update() do that.
 -- 6.7, the Energy Drink (Config.Items "energy"): the server sets the character's EnergyUntil; update() fills the breath
 -- once for every new value (Stamina.refill) and lets the sprint cost ÷ EnergyBreath until then (Stamina.energized).
+-- 6.20: Long Breath (Config.Skills sprintTime, the player attribute Skills): a full breath lasts that many seconds more
+-- (Stamina.stretched: the drain × Stamina / (Stamina + extra)).
 
 local Stamina = {}
 
@@ -83,6 +85,14 @@ function Stamina.energized(cost: number?, active: boolean, breath: number): numb
 	return if active and breath > 0 then base / breath else base
 end
 
+-- 6.20: the drain multiplier for a breath `extra` seconds longer than `stamina` (Long Breath; 0 = as it is).
+function Stamina.stretched(cost: number, stamina: number, extra: number): number
+	if extra <= 0 or stamina <= 0 then
+		return cost
+	end
+	return cost * stamina / (stamina + extra)
+end
+
 -- 6.7: a drink's breath: full at once, rested (the sprint may start again), the bar shown as full.
 function Stamina.refill(state: State): State
 	return { breath = 1, exhausted = false, rest = state.rest, full = 0, sprinting = state.sprinting }
@@ -125,8 +135,20 @@ end
 -- 6.7: the Energy Drink: the character's EnergyUntil (server time, server/Items.luau): a new value fills the breath,
 -- and until then the sprint costs ÷ Config.ItemTuning.EnergyBreath.
 local drunk: number? = nil -- the EnergyUntil already filled
+local skillText: string? = nil -- 6.20: the Skills attribute last read, and its Long Breath seconds
+local skillBreath = 0
+local skillSpeed = 1 -- 6.20: Light Step's sprint speed multiplier (Stamina.sprintBoost)
 function Stamina.update(dt: number, wantSprint: boolean, moving: boolean): boolean
-	local character = game:GetService("Players").LocalPlayer.Character
+	local localPlayer = game:GetService("Players").LocalPlayer
+	local character = localPlayer.Character
+	local text = localPlayer:GetAttribute("Skills")
+	if text ~= skillText then
+		skillText = if type(text) == "string" then text else nil
+		local SkillRules = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Skills"))
+		local ranks = SkillRules.decode(text)
+		skillBreath = SkillRules.effect(ranks, "sprintTime")
+		skillSpeed = 1 + SkillRules.effect(ranks, "sprintSpeed")
+	end
 	local cost = if character then character:GetAttribute("BreathCost") else nil
 	local untilAt = if character then character:GetAttribute("EnergyUntil") else nil
 	local active = type(untilAt) == "number" and workspace:GetServerTimeNow() < untilAt
@@ -135,9 +157,14 @@ function Stamina.update(dt: number, wantSprint: boolean, moving: boolean): boole
 		current = Stamina.refill(current)
 	end
 	local movementNow = tuningNow()
-	local drain = Stamina.energized(if type(cost) == "number" then cost else nil, active, energyBreath)
+	local drain = Stamina.stretched(Stamina.energized(if type(cost) == "number" then cost else nil, active, energyBreath), movementNow.Stamina, skillBreath)
 	current = Stamina.step(current, dt, wantSprint, moving, movementNow, drain)
 	return current.sprinting
+end
+
+-- 6.20: the sprint's speed multiplier from Light Step (Config.Skills sprintSpeed; 1 = none), as of the last update.
+function Stamina.sprintBoost(): number
+	return skillSpeed
 end
 
 -- 4.2: may a sprint start now (not out of breath)? The touch SPRINT toggle turns off when this says no.

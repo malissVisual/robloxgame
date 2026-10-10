@@ -3,7 +3,9 @@
 -- looks like that"). client/Phone.luau builds the phone and calls this for its home (and MORE's rows); the parts are
 -- client/CardKit.luau's, the sizes Config.UiKit's, where everything sits client/PhoneLayout.luau's:
 --   * The header: chips for the secondary state: your cash (green; a tap: BANK), your level with a thin XP line (a
---     tap: CAREER) and the shift (amber at night, when jobs pay more).
+--     tap: CAREER) and the shift (amber at night, when jobs pay more). 6.20: a red dot on the level chip ("SkillDot")
+--     while a skill point is free (shared/Skills.luau: the level's points less the ranks bought, the player attribute
+--     Skills).
 --   * The HERO card, the most important thing now: NEXT MISSION (client/ReadyCheck.luau tile: the mission big, its
 --     chapter and n/N, the readiness chip in red / green / amber, the savings goal and its bar, GET READY / ▶ START;
 --     the chapter's picture when there is one) or, during a run, YOUR RUN (the next stop, the pay big in green, the
@@ -235,6 +237,17 @@ function PhoneHome.header(home: Home, cash: string, level: number, share: number
 		chip.Size = UDim2.fromOffset(CardKit.width(chip.Text, 11, Theme.HeadingFont) + 22, KIT.Chip)
 	end
 	refs.idXp.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
+	-- 6.20: a free skill point: the red dot on the level chip
+	local Skills = require(Shared.Skills)
+	local free = Skills.free(Skills.decode(game:GetService("Players").LocalPlayer:GetAttribute("Skills")), level)
+	local dot = refs.idRank:FindFirstChild("SkillDot")
+	if not dot and free > 0 then
+		dot = Ui.make("Frame", { Name = "SkillDot", Size = UDim2.fromOffset(8, 8), Position = UDim2.new(1, -3, 0, -1), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 3 }, refs.idRank)
+		Ui.corner(dot, 4)
+	end
+	if dot then
+		dot.Visible = free > 0
+	end
 	refs.shift.Text = shift
 	refs.shift.BackgroundColor3 = if night then C.rushFace else K.raised
 	refs.shift.TextColor3 = if night then C.rushInk else K.secondary

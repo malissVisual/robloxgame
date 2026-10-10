@@ -348,8 +348,10 @@ local function bagNow(): (boolean, number, number, boolean, boolean)
 	-- (6.3 review: the server decides: no BagRoom on this job = the bag takes nothing here; a mission's foot job is
 	-- built with the car mode, so the mode alone said "CAR JOB" wrongly)
 	local carJob = job ~= nil and player:GetAttribute("BagRoom") == nil
+	-- (off duty: the bag's room + 6.20 Strong Back's piece, Config.Skills; on a job the server counted it)
 	local room = if job then math.floor(tonumber(player:GetAttribute("BagRoom")) or 0)
-		else Transport.bagRoom(kit, bagId())
+		elseif owned then Transport.bagRoom(kit, bagId()) + require(Shared.Skills).effect(require(Shared.Skills).decode(player:GetAttribute("Skills")), "bag")
+		else 0
 	local count = math.floor(tonumber(player:GetAttribute("BagCount")) or 0)
 	return owned, count, room, typeof(player:GetAttribute("BagDown")) == "Vector3", carJob
 end
@@ -510,12 +512,14 @@ local function placesNow(): { Bag.Place }
 	local _, count, room = bagNow()
 	local active = Transport.activeBag(kit, bagId())
 	local bagRoom = if Holster.hand() == "bag" then room elseif active and active.stays then math.min(count, room) else 0
+	-- 6.20: the hands' room with Strong Back (Config.Skills, the player attribute Skills)
+	local hands = Config.Cargo.HandsMax + require(Shared.Skills).effect(require(Shared.Skills).decode(player:GetAttribute("Skills")), "hands")
 	if job then
 		local mode = if type(job.mode) == "string" then job.mode else "car"
 		local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
-		return Bag.places(mode, packRoom, tonumber(job.rack) or 0, bagRoom)
+		return Bag.places(mode, packRoom, tonumber(job.rack) or 0, bagRoom, hands)
 	end
-	return Bag.places("foot", bagRoom, 0, bagRoom)
+	return Bag.places("foot", bagRoom, 0, bagRoom, hands)
 end
 
 -- The pieces: the payload's `carried`; the live PackCount attribute adds the pack's pieces the payload has not yet.

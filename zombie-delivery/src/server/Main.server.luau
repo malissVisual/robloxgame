@@ -111,6 +111,7 @@ local function sendState(player: Player)
 		bag = (require(Shared.Transport).activeBag(profile.kit, profile.activeBag) or ({} :: any)).id,
 		style = profile.style, -- 6.12: the cosmetics owned and worn (the phone's STYLE app)
 		regulars = profile.regulars, -- 6.14: the deliveries for each business (the REGULARS app, the job lists' badges)
+		skills = profile.skills, -- 6.20: the skills' ranks (CAREER's SKILLS tab; the points are the level's)
 		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
 		vanQuest = profile.vanQuest, -- 5.0: Earl's van (nil, "open", "done"; the phone's SHOP, the career road)
 	})
@@ -249,6 +250,9 @@ safely("Hand", require(Server.Hand).start) -- 6.1: what you hold (fists / bag / 
 safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (V)
 safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
 safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the character (KitSpeed)
+require(Server.Skills).involved = Jobs.involved -- 6.20: no RESET during a job or a mission; its charges fill when one starts
+require(Server.Skills).jobKey = Jobs.jobKey -- 6.20 review: the charges fill once a new job (not a respawn, not a cancelled one)
+safely("Skills", require(Server.Skills).start) -- 6.20: the skill tree (+1 POINT, RESET), the max health, the healing
 safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
 safely("KitWear", KitWear.start) -- 5.0: the kit you own worn on your character, the phone in your hand
 safely("Fuel", Fuel.start) -- 5.4: the tanks, the burn, the pumps, the jerry cans, the tow

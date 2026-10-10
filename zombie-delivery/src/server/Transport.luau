@@ -24,6 +24,8 @@
 --   Transport.bagOf(player)    6.4: the bag choice (profile.activeBag; nil = the best owned): every room here and in
 --                              shared/Transport.luau counts the ACTIVE bag only (Rules.activeBag / bagRoom)
 --   Transport.activeBagOf(player)  6.4: that bag's Config.Kit entry (nil without a bag)
+-- 6.20, Strong Back (Config.Skills, server/Skills.luau): +1 light piece in the hands and +1 in a bag; every room here
+-- counts them (footOf, packRoomOf, bikeOf, of), as server/Cargo.luau's hands and bag do.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +35,7 @@ local Rules = require(Shared.Transport)
 local Config = require(Shared.Config) -- 6.4: the bag's KitDef
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
+local Skills = require(script.Parent.Skills) -- 6.20: Strong Back's room
 
 local Transport = {}
 
@@ -53,13 +56,20 @@ function Transport.activeBagOf(player: Player): Config.KitDef?
 	return Rules.activeBag(Transport.kitOf(player), Transport.bagOf(player))
 end
 
+-- 6.20: Strong Back's extra room in a bag (none without a bag).
+local function skillBag(player: Player): number
+	return if Transport.activeBagOf(player) then Skills.bag(player) else 0
+end
+
 function Transport.footOf(player: Player): Rules.Info
-	return Rules.foot(Transport.kitOf(player), Transport.bagOf(player))
+	local info = Rules.foot(Transport.kitOf(player), Transport.bagOf(player))
+	info.room += Skills.hands(player) + skillBag(player) -- 6.20
+	return info
 end
 
 -- The pieces of a foot job that ride over the hands (server/Cargo.luau's pack; 6.6: the active bag's, no backpack).
 function Transport.packRoomOf(player: Player): number
-	return Rules.packRoom(Transport.kitOf(player), Transport.bagOf(player))
+	return Rules.packRoom(Transport.kitOf(player), Transport.bagOf(player)) + skillBag(player) -- (6.20: + Strong Back)
 end
 
 -- 6.7: the share of an order's pay this player's kit adds as a tip (the Courier Vest; the jacket's warmOf is gone).
@@ -83,7 +93,9 @@ function Transport.bikeOf(player: Player): (string?, Rules.Info?)
 	if id == nil or not profile.cars[id] or not Rules.isBike(id) then
 		return nil, nil
 	end
-	return id, Rules.bike(Rules.bikeRoom(id, profile.carGear), profile.kit, profile.activeBag)
+	local info = Rules.bike(Rules.bikeRoom(id, profile.carGear), profile.kit, profile.activeBag)
+	info.room += skillBag(player) -- 6.20: Strong Back's piece in your bag
+	return id, info
 end
 
 -- 6.6: the bike's own bag of the bike bikeOf names (0 without one).
@@ -102,7 +114,9 @@ function Transport.of(player: Player): Rules.Info
 		local near = root ~= nil and root:IsA("BasePart") and (root.Position - car.chassis.Position).Magnitude <= NEAR
 		if seated == car or near then
 			if Rules.isBike(car.id) then
-				return Rules.bike(Vehicles.capacity(car, nil), Transport.kitOf(player), Transport.bagOf(player)) -- 5.1
+				local info = Rules.bike(Vehicles.capacity(car, nil), Transport.kitOf(player), Transport.bagOf(player)) -- 5.1
+				info.room += skillBag(player) -- 6.20
+				return info
 			end
 			return Rules.car(Vehicles.capacity(car, nil))
 		end

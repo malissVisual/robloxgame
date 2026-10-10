@@ -50,6 +50,19 @@ function ShotKick.shot(id: string?, share: number?)
 	yawV = math.clamp(yawV + ShotFeel.impulse(def.yaw * k * rng:NextNumber(-1, 1), RATE), -most, most)
 end
 
+-- 6.20: the share of a hand gun's kick left with Steady Hand (Config.Skills recoil; `skills` the player attribute
+-- Skills, shared/Skills.luau encode), cached by the attribute's text.
+local steadyFor: any = false
+local steadyShare = 1
+function ShotKick.steady(skills: any): number
+	if skills ~= steadyFor then
+		steadyFor = skills
+		local Rules = require(Shared.Skills)
+		steadyShare = math.max(0, 1 - Rules.effect(Rules.decode(skills), "recoil"))
+	end
+	return steadyShare
+end
+
 -- A headshot of yours: the picture punches in a little. false: the camera is not this module's (a touch screen).
 function ShotKick.punch(): boolean
 	if not ours() then

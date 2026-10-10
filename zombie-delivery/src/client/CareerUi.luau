@@ -34,6 +34,9 @@
 -- the licences, the streak and the ranks as before. THE ROAD is the kit's rows (Level<n>): the level's number on its
 -- thumb, "LEVEL 6 · RANK", what it unlocks on one line, its reward money big (dim ahead), the edge green done / red
 -- YOU ARE HERE / amber NEXT (its bar) / grey ahead, and ✓, HERE, NEXT or "🔒 2,400 XP" at the right.
+-- 6.20, skills for levels (Config.Skills): the right side has two tabs, THE ROAD and SKILLS (client/SkillsView.luau: the
+-- free points, RESET · FREE, the three branches, a skill's details with +1 POINT); the level-up card says "+1 skill
+-- point" with OPEN (the window on SKILLS). CareerUi.openSkills opens it there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -51,6 +54,8 @@ local DialogKeys = require(script.Parent.DialogKeys)
 local P = require(script.Parent.HudContract)
 local Gps = require(script.Parent.Gps) -- 6.14: the level-up card's GPS buttons
 local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit (the next level's hero, the road's rows)
+local SkillsView = require(script.Parent.SkillsView) -- 6.20: the SKILLS tab
+local SkillRules = require(Shared.Skills) -- 6.20: the level-up card's skill points
 
 local K = Theme.Contract
 local CareerUi = {}
@@ -59,6 +64,8 @@ local CareerUi = {}
 CareerUi.onOpen = nil :: (() -> ())?
 -- Set by Main: while this says so, the level-up card waits (the DELIVERY result, a mission's cleared card).
 CareerUi.blocked = nil :: (() -> boolean)?
+-- 6.20: the right side's tab: "road" or "skills".
+CareerUi.tab = "road"
 -- 6.14, set by Main: the level-up card's MISSIONS ("missions", the chapter's id) and ESTATE ("estate") buttons, and
 -- its toasts ("GPS set: Earl's Used Wheels").
 CareerUi.openWindow = nil :: ((window: string, id: string?) -> ())?
@@ -443,6 +450,23 @@ local function render()
 	Ui.clear(refs.road)
 	driverPanel(refs.left, road)
 	refs.roadTitle.Text = `THE ROAD  ·  LEVEL 1 → {Config.Levels.MaxLevel}`
+	-- 6.20: THE ROAD / SKILLS (the free points on SKILLS' chip)
+	local skills = if state and type(state.skills) == "table" then state.skills else {}
+	local free = SkillRules.free(skills, level)
+	CardKit.tabList(refs.road, { { id = "road", text = "THE ROAD" }, { id = "skills", text = if free > 0 then `SKILLS · {free}` else "SKILLS" } }, function(id: string)
+		if id ~= CareerUi.tab then
+			CareerUi.tab = id
+			SkillsView.open = nil
+			render()
+		end
+	end, CareerUi.tab)
+	if CareerUi.tab == "skills" then
+		refs.roadTitle.Text = `SKILLS  ·  A POINT EVERY LEVEL  ·  {SkillRules.points(level)} AT LEVEL {level}`
+		local rightWidth = window.Size.X.Offset - (if narrow then 0 else LEFT_W)
+		SkillsView.draw(refs.road, { wide = rightWidth >= 600, level = level, skills = skills, heroHeight = 176, redraw = render }, 1)
+		chrome.context.Text = `<b>LEVEL {level} · {string.upper(Levels.rank(level))}</b> · {free} FREE {if free == 1 then "POINT" else "POINTS"}{if Ui.touchLayout() then "" else " · C TO CLOSE"}`
+		return
+	end
 	local order = 0
 	if narrow then
 		-- The summary on top of the road.
@@ -473,6 +497,9 @@ end
 
 function CareerUi.setState(newState: any)
 	state = newState
+	if CareerUi.tab == "skills" and CareerUi.isOpen() then
+		render() -- (6.20: a rank bought or a reset: the tab again)
+	end
 end
 
 function CareerUi.isOpen(): boolean
@@ -495,6 +522,17 @@ function CareerUi.open()
 	window.Visible = true
 	render()
 	Ui.gamepadFocus(chrome.close)
+end
+
+-- 6.20: the window on its SKILLS tab (the level-up card's OPEN).
+function CareerUi.openSkills()
+	CareerUi.tab = "skills"
+	SkillsView.open = nil
+	if CareerUi.isOpen() then
+		render()
+	else
+		CareerUi.open()
+	end
 end
 
 function CareerUi.toggle()
@@ -552,9 +590,21 @@ local function buildCard()
 	cardRefs.where = Ui.make("Frame", { Name = "Where", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 6 }, card)
 	Ui.list(cardRefs.where, true, 4)
 	cardRefs.reward = label(card, "", { LayoutOrder = 7, TextColor3 = P.ink, TextSize = 15 })
-	P.rule(card, UDim2.new(1, 0, 0, 1), { LayoutOrder = 8 })
-	cardRefs.nextLine = label(card, "", { LayoutOrder = 9, TextSize = 14 })
-	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 10 }, card)
+	-- 6.20: "+1 skill point · OPEN" (the window on its SKILLS tab)
+	local skill = Ui.make("Frame", { Name = "SkillPoint", Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 8 }, card)
+	cardRefs.skillLine = label(skill, "", { Size = UDim2.new(1, -104, 1, 0), AutomaticSize = Enum.AutomaticSize.None, TextColor3 = P.ink, TextSize = 15, TextYAlignment = Enum.TextYAlignment.Center })
+	local openSkills = P.button(skill, "OPEN", UDim2.fromOffset(96, 28), "quiet", function()
+		cardRefs.close()
+		CareerUi.openSkills()
+	end)
+	openSkills.Name = "OpenSkills"
+	openSkills.AnchorPoint = Vector2.new(1, 0.5)
+	openSkills.Position = UDim2.new(1, 0, 0.5, 0)
+	openSkills.TextSize = 12
+	cardRefs.skill = skill
+	P.rule(card, UDim2.new(1, 0, 0, 1), { LayoutOrder = 9 })
+	cardRefs.nextLine = label(card, "", { LayoutOrder = 10, TextSize = 14 })
+	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 11 }, card)
 	Ui.list(buttons, false, 10)
 	local function closeCard()
 		cardToken += 1
@@ -665,6 +715,11 @@ local function showCard(from: number, to: number)
 	end
 	cardRefs.reward.Text = if #paid > 0 then `<b>REWARD</b>   <font color="{P.hex(P.good)}">{table.concat(paid, "  ·  ")}</font>` else ""
 	cardRefs.reward.Visible = #paid > 0
+	-- 6.20: the skill points this jump gave (Config.Skills: one a level) and how many are free now
+	local gained = SkillRules.points(to) - SkillRules.points(from)
+	local free = SkillRules.free(if state and type(state.skills) == "table" then state.skills else nil, to)
+	cardRefs.skill.Visible = gained > 0
+	cardRefs.skillLine.Text = `⭐  <b>+{gained} skill {if gained == 1 then "point" else "points"}</b>  ·  {free} free to spend`
 	local nextStep = road[to + 1]
 	if nextStep then
 		local left = math.max(0, nextStep.xp - myXp())

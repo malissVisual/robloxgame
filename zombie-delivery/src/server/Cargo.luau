@@ -1415,7 +1415,8 @@ local function handsMax(session: Session, player: Player?): number
 	local plan = session.plan
 	local kind = if first then first.kind elseif plan and plan.kind then plan.kind else info.kind
 	local look = if first then first.look elseif plan and plan.look then plan.look else info.look
-	return Freight.handsMax(kind, look, info.lift, info.pair, if player then toolOf(player) else nil)
+	-- 6.20: Strong Back's extra light piece (Config.Skills; the run's owner when no player is given)
+	return Freight.handsMax(kind, look, info.lift, info.pair, if player then toolOf(player) else nil, require(script.Parent.Skills).hands(player or session.owner))
 end
 
 -- 4.0: is this job's cargo pallets (the Freight Run)?
@@ -1625,7 +1626,7 @@ local function bagSync(session: Session)
 		return
 	end
 	local bag = activeBag(session.owner)
-	local live = if bag and bag.extra then math.max(0, math.floor(bag.extra)) else 0
+	local live = if bag and bag.extra then math.max(0, math.floor(bag.extra)) + require(script.Parent.Skills).bag(session.owner) else 0 -- (6.20: + Strong Back)
 	local inBag = bagCount(session) + (if session.bagDown then #session.bagDown.pieces else 0)
 	if live == session.bagRoom or live < inBag then
 		return
@@ -2242,7 +2243,7 @@ local function take(session: Session, player: Player, piece: Piece): boolean
 	local tool = Equipment.pushing(player)
 	-- (5.2: a second piece only when both of them may go two at a time: orders of different cargo on one run)
 	local info = session.info
-	local both = math.min(handsMax(session, player), Freight.handsMax(piece.kind, piece.look, info.lift, info.pair, if tool then tool.kind else nil))
+	local both = math.min(handsMax(session, player), Freight.handsMax(piece.kind, piece.look, info.lift, info.pair, if tool then tool.kind else nil, require(script.Parent.Skills).hands(player)))
 	if existing and (existing.character ~= character or existing.tool ~= tool or piece.horse or existing.pieces[1].horse or #existing.pieces >= both) then
 		return false
 	end
@@ -2443,7 +2444,7 @@ local function handsFull(session: Session, player: Player): boolean
 			tell(player, `The trolley is full: {#held.pieces} {info.plural}.`)
 		else
 			local room = if info.foot and player == session.owner and not bagHeld(session) and session.bagDown == nil then bagRoomOf(session) - bagCount(session) else 0
-			tell(player, (if #held.pieces > 1 then `Your hands are full: two {info.plural}.` else "Your hands are full.")
+			tell(player, (if #held.pieces > 1 then `Your hands are full: {#held.pieces} {info.plural}.` else "Your hands are full.")
 				.. (if room > 0 then ` Hold the bag (2): room for {room} more.` else "")) -- 6.1
 		end
 		return true
@@ -3355,7 +3356,7 @@ local function onCar(session: Session, player: Player)
 		-- 3.2: only through an open back (a race with somebody closing it). 3.7: a light piece leaves a hand free.
 		-- 4.0: so does a tool (one hand on its handle).
 		local open = Vehicles.backVerb(car, true)
-		local full = held ~= nil and held.tool == nil and (#held.pieces > 1 or handsMax(session) == 1)
+		local full = held ~= nil and held.tool == nil and (#held.pieces >= handsMax(session, player) or handsMax(session, player) == 1) -- (6.20: Strong Back)
 		tell(player, if full then `Put it down (G) and {open} (E).` else `{capital(open)} first (E).`)
 		return
 	end
@@ -3759,7 +3760,7 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 	if plan.stage == "pickup" then
 		local piece = table.remove(session.pile, 1)
 		if piece then
-			session.nextKid = now + Tuning.KidGap
+			session.nextKid = now + Tuning.KidGap * math.max(0.1, 1 - require(script.Parent.Skills).effect(session.owner, "handling")) -- (6.20: Quick Hands)
 			if session.moved == 0 and #session.walking == 0 then
 				say(session.person, if isPatient(session) then "There's the ambulance! Easy now, one step at a time."
 					elseif isSurvivor(session) then "That's our ride! Go, go, go!"
@@ -3773,7 +3774,7 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 	elseif session.moved + #session.walking < neededNow(session) then
 		local piece = table.remove(session.load)
 		if piece then
-			session.nextKid = now + Tuning.KidGap
+			session.nextKid = now + Tuning.KidGap * math.max(0.1, 1 - require(script.Parent.Skills).effect(session.owner, "handling")) -- (6.20: Quick Hands)
 			render(session)
 			local door = Vehicles.cargoEntry(car)
 			local spot = onGround(door)
@@ -3815,7 +3816,8 @@ local function updateServe(session: Session, plan: Plan, dt: number)
 			task.delay(n * 0.6, say, npc, line(LINES.customer))
 		end
 	end
-	session.hold += dt
+	-- (6.20: Quick Hands, Config.Skills: the stop's time × (1 − handling), so the hold fills that much quicker)
+	session.hold += dt / math.max(0.1, 1 - require(script.Parent.Skills).effect(session.owner, "handling"))
 	session.info.changed()
 	if session.hold >= plan.hold and not session.served then
 		session.served = true
@@ -4042,7 +4044,7 @@ function Cargo.begin(owner: Player, info: Info): Session
 	}
 	-- 6.4: the active bag's room on this run (Transport.packRoomOf; 6.6: the bike's bag is Info.rack)
 	local bag = if info.foot then activeBag(owner) else nil
-	session.bagRoom = if bag and bag.extra then math.max(0, math.floor(bag.extra)) else 0
+	session.bagRoom = if bag and bag.extra then math.max(0, math.floor(bag.extra)) + require(script.Parent.Skills).bag(owner) else 0 -- (6.20: + Strong Back)
 	active[owner] = session
 	packShown(session)
 	return session
