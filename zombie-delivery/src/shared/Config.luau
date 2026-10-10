@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.21.1"
+Config.Version = "6.22"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1235,7 +1235,7 @@ export type GearDef = {
 --   padded     fragile pieces in it take no knock from a hard fall or a bite on foot (Config.Jobs.CargoRules FootFall …)
 --   bagBreath  the sprint drains the breath × this while you hold it (the character's BreathCost attribute,
 --              server/Transport.luau applyKit; client/Stamina.luau): a heavy bag, you still sprint, a little shorter
--- Its look in the hand: server/KitArt/Geometry.luau (the same id); its swing: Config.Courier.Bags[id].
+-- Its look in the hand: shared/KitArt.luau (the same id); its swing: Config.Courier.Bags[id].
 -- 6.4, how it is carried (shared/Holding.luau wornAs / bagLeaves, server/KitWear.luau, Config.Courier.BagPlaces):
 --   carry      while it is your hand: "hand" (in the left hand; the default), "shoulder" (the handles over the left
 --              shoulder, the bag at the hip) or "hip" (cross-body: the strap over the right shoulder, the bag on the
@@ -4355,7 +4355,7 @@ Config.Courier = {
 	-- the rim, seen through the open top); a piece that fits no way round is shrunk, never under MinScale; an overfull bag
 	-- pushes them up. Gap studs between them, Tilt degrees of lean (every other one the other way). The body swells as
 	-- it fills: its thickness by up to the bag's `bulge` (else Bulge), its length by up to Swell.
-	-- Mouth: each bag's opening on its pivot (server/KitArt/Geometry.luau's frame: the grip at the origin, hanging -Y):
+	-- Mouth: each bag's opening on its pivot (shared/KitArt.luau's frame: the grip at the origin, hanging -Y):
 	-- the rim's height (y), the inside's thickness (x) and length (z), its depth from the rim to the bottom (d).
 	BagFill = {
 		Max = 6,
@@ -5353,6 +5353,42 @@ Config.Inventory = {
 	} :: { [string]: { number } },
 	Items = { medkit = "medical", energy = "medical", molotov = "explosive", mine = "explosive", repair = "gear", nitro = "gear", jerrycan = "gear" } :: { [string]: string },
 	Stack = { Max = 6, Tile = 46, Gap = 6 },
+}
+
+-- 6.22, every thing in the inventory has a look (the owner: "every thing must look like something, not only an icon"):
+-- client/ItemModel.luau draws each gun, the bat, your fists, the consumables, the bags, the vests and the cargo as a
+-- small 3D model (shared/ItemLooks.luau) in a ViewportFrame: the bottom bar's slots, BAG & ITEMS' hero, rows and cargo
+-- stack. The icon (or the emoji) shows only if a model cannot be built.
+--   MaxParts          a look's parts at most (tests/itemlooks_test.luau builds every one)
+--   Yaw / Pitch       the 3/4 angle (degrees): the camera turned from the front toward the right, and looking down
+--   Fov / Fill        the camera's field of view (degrees) and the share of the frame the model fills
+--   Ambient           the soft fill light (RGB); LightColor / LightDirection the key light (from the top left front)
+--   Spin              the hero's slow turn (degrees a second; not with Reduced Motion), redrawn SpinRate times a second
+--   Slot / Hand / Bag a model's square in a bottom bar item slot, a hand slot and inside the bag slot's ring (px)
+--   Row               a row's thumb: its model's inset from the thumb's edges (px; a square)
+--   Tile              the cargo stack's tile: its model's inset (px)
+--   Hero              the hero card's model: its square as a share of the card's height, Shift px in from its right
+--   Dim / Shut        a model's transparency while it can't be taken (a dim slot) and greyed while locked
+Config.ItemModel = {
+	MaxParts = 40,
+	Yaw = 35,
+	Pitch = 22,
+	Fov = 30,
+	Fill = 0.86,
+	Ambient = { 150, 156, 166 },
+	LightColor = { 255, 244, 226 },
+	LightDirection = { 0.5, -1, 0.65 },
+	Spin = 24,
+	SpinRate = 30,
+	Slot = 50,
+	Hand = 50,
+	Bag = 38,
+	Row = 4,
+	Tile = 4,
+	Hero = 0.62,
+	Shift = 10,
+	Dim = 0.55,
+	Shut = 0.35,
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

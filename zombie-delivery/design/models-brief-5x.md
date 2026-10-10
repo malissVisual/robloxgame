@@ -24,7 +24,7 @@ Weld to an R15 character (UpperTorso / LowerTorso / feet). It must not block the
 | `jacket` | Thermal jacket / vest (torso and upper-arm panels, a collar, a reflective strip) | ≤ 16 parts |
 | `cart` (5.1) | Personal hand cart (two-wheeled sack truck) the player pushes; same rules as the existing hand trolley (`server/Equipment.luau` builds the trolley today; give geometry with a handle grip point and a deck) | ≤ 22 parts |
 
-Output a module like `server/KitArt/Geometry.luau`: `pieces(id) -> { name, size, at (relative to the attach part), attach = "UpperTorso" | "LeftFoot" …, finish }`.
+Output a module like `shared/KitArt.luau`: `pieces(id) -> { name, size, at (relative to the attach part), attach = "UpperTorso" | "LeftFoot" …, finish }`.
 
 ## 2. Bikes and bike gear (`codex/bike-models`)
 Claude adds a vehicle style `bike`:

@@ -3,7 +3,7 @@
 -- the sum of the bags you own, the perks' numbers (the thermal bag's warm, the padded messenger, the duffel's breath),
 -- the fragile knocks on foot (JobRules.footKnock / knockLoss), the sprint (pieces in the bag are never in your hands:
 -- Holding.place; the duffel's breath cost: client/Stamina.luau), each bag's swing (BagSwing.tuning) and its art
--- (server/KitArt/Geometry.luau, copied as KitGeometry). 6.6: one carrying item (no backpacks), the bags sold at ZDC
+-- (shared/KitArt.luau, copied as KitGeometry). 6.6: one carrying item (no backpacks), the bags sold at ZDC
 -- Bags (Map.Shops.bags), the retired backpacks' refund (Transport.packRefund). Run with tests/run_tests.py.
 local Config = require("./Config")
 local Transport = require("./Transport")

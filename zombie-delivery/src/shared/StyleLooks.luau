@@ -70,7 +70,7 @@ StyleLooks.BikeFrame = {
 }
 
 -- The Courier Vest's cloth (server/CharacterArt/Geometry.luau hivis; its reflective bands and badge stay silver) and
--- each bag's body (server/KitArt/Geometry.luau): name → the share of the colour (a pocket a little darker).
+-- each bag's body (shared/KitArt.luau): name → the share of the colour (a pocket a little darker).
 StyleLooks.Vest = { VestL = 1, VestR = 1, VestBack = 1, CollarL = 1, CollarR = 1, PocketL = 0.82, PocketR = 0.82 } :: { [string]: number }
 StyleLooks.Bags = {
 	bag = { BagBody = 1, BagBottom = 1, BagHandleF = 1, BagHandleB = 1, BagKnot = 1 },

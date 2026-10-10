@@ -3,7 +3,9 @@
 -- your hand (lifted, grown, the red frame and glow) and the line over the bar, the count pills, the bag slot's fill
 -- ring and "5/6" pill (6.21: it replaces the CARRYING pill; 6.20 Strong Back counted), that a slot, a key and the pill
 -- go the same ways as before (Hud's useItem through Hotbar.onUse, Holster.choose, BagUi.open), MORE, and a touch
--- screen's filled slots only at 48 px or more. Not Studio's layout or fonts.
+-- screen's filled slots only at 48 px or more. 6.22: every slot shows its thing as a 3D model (a ViewportFrame from
+-- client/ItemModel.luau, each look built once), faint when you can't take it, the icon back when a model can't be built.
+-- Not Studio's layout or fonts.
 local M=require("./mock")
 local Config=require("./Config")
 local Inventory=require("./Inventory")
@@ -14,6 +16,9 @@ local function find(root,name) return root:FindFirstChild(name,true) end
 local function near(a,b) return math.abs(a-b)<1e-6 end
 local function sameColor(a,b) return a~=nil and b~=nil and near(a.R,b.R) and near(a.G,b.G) and near(a.B,b.B) end
 local function stroke(button) return button:FindFirstChildOfClass("UIStroke") end
+-- 6.22: a slot's model (its ViewportFrame) and what it shows
+local function model(tile) return tile:FindFirstChildOfClass("ViewportFrame") end
+local function shows(tile,key) local view=model(tile);return view~=nil and view:GetAttribute("Look")==key and view.CurrentCamera~=nil and view:FindFirstChildOfClass("Model")~=nil end
 local pistol=require("./Economy").findWeapon("pistol")
 local car=nil
 for _,def in Config.Cars do if not def.bike and car==nil then car=def.id end end
@@ -54,6 +59,13 @@ check("the counts as pills at the bottom right corner",slot1:FindFirstChild("Cou
 check("an empty slot: no pill, dim",not slot3:FindFirstChild("Count").Visible and slot3.BackgroundTransparency>0.4)
 check("the item keys 4 and 5 (Hotbar.slotOf)",Bar.slotOf("medkit")==4 and Bar.slotOf("molotov")==5 and slot1:FindFirstChild("Key").Text=="4")
 check("the slots in a row: a slot and a gap apart",slot1.Position.X.Offset-hand3.Position.X.Offset==H.Tile+H.Gap and hand1.Position.X.Offset==Inventory.slotX(1))
+-- 6.22: the models (the owner: "every thing must look like something, not only an icon")
+check("6.22: the item slots show their things as models (medkit, molotov), Config.ItemModel.Slot px",shows(slot1,"item:medkit") and shows(slot2,"item:molotov")
+	and model(slot1).Size.X.Offset==Config.ItemModel.Slot and model(slot1).BackgroundTransparency==1 and slot1:FindFirstChild("Icon")==nil)
+check("6.22: the hands too: the fists, the bag in use (in its ring), the gun",shows(hand1,"fists") and shows(hand2,"kit:tote") and shows(hand3,"gun:pistol")
+	and model(hand2).Size.X.Offset==Config.ItemModel.Bag and model(hand1).Size.X.Offset==Config.ItemModel.Hand)
+check("6.22: an empty slot has no model",model(slot3)==nil)
+check("6.22: the studio light (Config.ItemModel's ambient and key light)",sameColor(model(slot1).Ambient,M.Color3.fromRGB(table.unpack(Config.ItemModel.Ambient))) and model(slot1).LightDirection~=nil)
 slot1.Activated:Fire()
 check("a slot's tap uses it through Hud's useItem (Hotbar.onUse)",used[#used]=="medkit")
 Bar.useKey(5)
@@ -107,6 +119,13 @@ M.player:SetAttribute("BagRoom",nil)
 M.player:SetAttribute("PackRoom",nil)
 M.player:SetAttribute("Skills",nil)
 
+-- 6.22: each look built once (a cache), the slots' views kept while what they show does not change
+check("6.22: each look built once however often the bar is drawn",M.built["item:medkit"]==1 and M.built["fists"]==1 and M.built["kit:tote"]==1 and M.built["gun:pistol"]==1)
+do
+	local before=model(hand1)
+	Bar.setState(state)
+	check("6.22: a hand's model stays while its thing does not change",model(hand1)==before)
+end
 -- 6.7: more kinds than slots: the last slot is MORE (+N, the I window).
 state={items={medkit=4,energy=2,molotov=1,repair=1,nitro=1,mine=2},kit={bag=true},bag="bag",weapon="pistol",cars={[car]=true}}
 Bar.setState(state)
@@ -115,6 +134,11 @@ check("six kinds for five slots: the last is MORE (+2)",find(slot5,"More")~=nil 
 slot5.Activated:Fire()
 check("MORE opens the I window's ITEMS (Hotbar.onMore)",more==1)
 check("the line names MORE",(function() slot5.MouseEnter:Fire();local ok=line:FindFirstChild("Name").Text=="MORE ITEMS";slot5.MouseLeave:Fire();return ok end)())
+check("6.22: MORE keeps its +N (no model)",model(slot5)==nil)
+-- 6.22: no bag and no gun yet: the plastic bag and the starter pistol, faint (you can't take them)
+Bar.setState({items={},kit={},cars={}})
+check("6.22: no bag, no gun: the starter ones faint",shows(hand2,"kit:"..Config.Courier.BagKit) and model(hand2).ImageTransparency==Config.ItemModel.Dim
+	and shows(hand3,"gun:"..Config.Arms.Starter) and model(hand3).ImageTransparency==Config.ItemModel.Dim and model(hand1).ImageTransparency==0)
 
 -- ── A touch screen's bar ──────────────────────────────────────────────────
 M.touch=true
@@ -138,4 +162,11 @@ Touch.setState({items={medkit=4,energy=1},kit={bag=true},bag="bag",weapon="pisto
 check("a second item: its slot shows, the tray grows",ttray:FindFirstChild("Slot2").Visible and ttray.Size.X.Offset==Inventory.size(5,true))
 ttray:FindFirstChild("Slot2").Activated:Fire()
 check("a tap uses it (the same path)",used[#used]=="energy")
+check("6.22: a touch screen's slots show their models too",shows(ttray:FindFirstChild("Slot1"),"item:medkit") and shows(ttray:FindFirstChild("Hand1"),"fists"))
+-- 6.22: a look that can't be built: the slot's icon (its emoji here) comes back
+M.broken["item:nitro"]=true
+Touch.setState({items={nitro=1},kit={bag=true},bag="bag",weapon="pistol",cars={[car]=true}})
+local fallback=ttray:FindFirstChild("Slot1")
+check("6.22: a model that can't be built: the icon instead",model(fallback)==nil and fallback:FindFirstChild("Icon")~=nil and fallback:FindFirstChild("Icon").Text=="⚡")
+M.broken["item:nitro"]=nil
 print("ALL HOTBAR CHECKS PASSED")

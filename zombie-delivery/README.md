@@ -1146,6 +1146,38 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Every item has a look (6.22)
+The owner: "every thing must look like something, not only an icon". Everything in the bottom bar and in BAG & ITEMS
+is now a small 3D model, drawn in a ViewportFrame with one studio look: a 3/4 angle, a soft key light and fill
+(`Config.ItemModel`), a transparent background, the camera fitted to the model.
+
+- **What has a look** (`shared/ItemLooks.luau`, keys such as `gun:pistol`, `item:medkit`, `kit:tote`, `cargo:pizza`):
+  - **every gun**: the model the hands hold (`shared/GunModels.luau`, now with `GunModels.display`), its barrel across
+    the view;
+  - **the Baseball Bat**: from `Config.Melee.BatLook` (the bat the swing puts in your hand);
+  - **your fists**: a clenched charcoal courier glove with a red cuff;
+  - **the consumables**: a white medkit with a red cross and a handle, a black-and-lime energy drink can, a molotov
+    (a green bottle with a burning rag), a red toolbox with a wrench (repair kit), a blue nitrous bottle (nitro), an
+    olive landmine with its red light and a red jerry can;
+  - **the bags**: their own art (`shared/KitArt.luau`, moved from the server unchanged so the client can draw it);
+  - **the vests**: the Kevlar vest and the heavy armour (KitArt) and the Courier Vest on a grey display form;
+  - **the cargo**: the very piece the server builds in the world (`shared/CargoLooks.luau`, factored out of
+    `server/Cargo.luau` unchanged): pizza stacks, parcels, mail sacks, newspapers, every storefront's and mission's
+    piece. A horse on the lead is drawn in `ItemLooks` (the live horse is the server's).
+- **Where** (`client/ItemModel.luau`): the bottom bar's slots (the fists, the bag in use inside its ring, the gun, each
+  item; faint while you can't take it), BAG & ITEMS' hero (your bag, at its right, turning slowly unless Reduced Motion
+  is on), every row's thumb (ON YOU, CARRYING, BAGS, GUNS; `CardKit`'s picture `model`) and the cargo stack's tiles.
+  The cars keep their pictures. The icon or the emoji shows only when a model can't be built (it warns once).
+- **Cheap:** each look is built once and copied into each view. The views are still pictures; only the hero's slow turn
+  updates, about 30 times a second, while it is on screen. A look has at most `Config.ItemModel.MaxParts` (40) parts;
+  the largest is the horse with 24.
+- **Checks:** `tests/itemlooks_test.luau` builds every gun, item, kit and cargo look in Config with the real builders on
+  a recorder (`tools/fixtures/item-mock.luau`): none is left as an icon, each within the budget, framed.
+  `tests/run_tests.py` checks that the bags' colours match `server/ModelArt/Builder.luau`. The phone and hotbar checks
+  (`tools/phone-ui`) check the models in every slot and row, the cache and the icon fallback.
+- **Preview:** `tools/item-models/render.py` renders a contact sheet of every look at the in-game camera (three.js in
+  headless Chromium).
+
 ## Inventory, a clean hotbar (6.21)
 
 The owner picked redesign B, "Clean hotbar + kit". Only the look changed: every action goes the way it went before.

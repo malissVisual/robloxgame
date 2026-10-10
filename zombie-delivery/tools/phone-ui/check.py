@@ -6,6 +6,8 @@ This checks callbacks, construction, current server data, resizing and cleanup, 
 6.18 wave 2: ShopView (the kit's list screens) and BagUi (BAG & ITEMS) run for real too.
 6.18 wave 2: PhoneMore (CAREER, BANK, MESSAGES, SETTINGS in the UI kit) runs for real; the MISSIONS window with CardKit.
 6.21: the bottom bar (Hotbar) runs for real too (hotbar.luau: a computer's bar and a touch screen's).
+6.22: ItemModel (every thing's 3D model in a ViewportFrame) runs for real in both, over a recorded shared/ItemLooks
+(mock.luau's ItemLooks: a model a key, a key that fails to build to see the icon come back).
 """
 import argparse
 from pathlib import Path
@@ -27,8 +29,11 @@ local game, workspace, task = mock.game, mock.workspace, mock.task
 local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
 local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
 local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+local CFrame = mock.CFrame
 '''
-    for name in ("Phone", "PhoneContract", "PhoneLayout", "PhoneRoute", "PhoneApps", "PhoneMotion", "PhonePopup", "OrdersUi", "TasksApp", "StyleApp", "JobThumbUi", "JobsView", "CardKit", "PhoneHome", "RegularsApp", "SpecialOrderUi", "ReadyCheck", "Gps", "SavingsLine", "ShopView", "BagUi", "PhoneMore", "SkillsView"):
+    # 6.22: the looks' builders are Roblox's (tests/itemlooks_test.luau builds them): the recorder's stand-in here
+    (dest / "ItemLooks.luau").write_text('return require("./mock").ItemLooks')
+    for name in ("Phone", "PhoneContract", "PhoneLayout", "PhoneRoute", "PhoneApps", "PhoneMotion", "PhonePopup", "OrdersUi", "TasksApp", "StyleApp", "JobThumbUi", "JobsView", "CardKit", "PhoneHome", "RegularsApp", "SpecialOrderUi", "ReadyCheck", "Gps", "SavingsLine", "ShopView", "BagUi", "PhoneMore", "SkillsView", "ItemModel"):
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
@@ -66,6 +71,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
+    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")  # 6.22
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Hud", "MHud"), ("CrewPanel", "MCrewPanel"), ("DialogKeys", "MDialogKeys"), ("Net", "Net")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "missions.luau"):

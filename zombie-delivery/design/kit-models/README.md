@@ -1,6 +1,6 @@
 # Personal kit — 5.x art handoff
 
-Native Parts, WedgeParts and Cylinders, charcoal cloth/rubber, worn steel and restrained red accents. No mesh or texture IDs. `server/KitArt/Geometry.luau` is pure data; Claude supplies its caller-owned R15 bones or cart assembly roots to `server/ModelArt/Builder.luau`.
+Native Parts, WedgeParts and Cylinders, charcoal cloth/rubber, worn steel and restrained red accents. No mesh or texture IDs. `shared/KitArt.luau` is pure data; Claude supplies its caller-owned R15 bones or cart assembly roots to `server/ModelArt/Builder.luau`.
 
 ![Actual kit geometry](preview.png)
 

@@ -1,6 +1,6 @@
 --!strict
 -- 5.0: the kit you own, worn on your character for everybody to see, and the phone in your hand while you use it.
--- The art is Codex's (server/KitArt/Geometry.luau, server/PhoneArt/Geometry.luau, design/kit-models/ and
+-- The art is Codex's (shared/KitArt.luau, server/PhoneArt/Geometry.luau, design/kit-models/ and
 -- design/phone-art/), built by server/ModelArt/Builder.luau: native parts welded to the R15 body parts (UpperTorso,
 -- the upper arms, the feet, the right hand), massless and never colliding, touching or hit by rays. The joints are
 -- never touched (no C0); the parts ride the body parts wherever the animation puts them, seated in a car too.
@@ -49,7 +49,7 @@
 -- (the player's BagCount / BagLooks attributes, server/Cargo.luau) stick out of its opening and the body swells; only
 -- the bag's art is built again when they change (the pivot and its swinging joint stay). tools/character-art/check.py
 -- builds every bag in every place on the courier's R15 body and on an R6 body offline.
--- 6.7: the bags are real-size (server/KitArt/Geometry.luau) and so are the pieces packed in them (BagFill); a loaded
+-- 6.7: the bags are real-size (shared/KitArt.luau) and so are the pieces packed in them (BagFill); a loaded
 -- bag's moving pieces take their open place first (KitArt.open through BagFill.open: the thermal bag's lid stands open).
 -- 6.12: the tint hook (KitWear.tint, set by server/StyleWear.luau): every slot built (and the bag's art built again for
 -- what is in it) is handed to it, so the Courier Vest's cloth and the bag's body take the colour worn in the phone's
@@ -68,7 +68,7 @@ local BagFill = require(Shared.BagFill) -- 6.4.1: what is in the bag shows
 local PlayerData = require(script.Parent.PlayerData)
 local Builder = require(script.Parent.ModelArt.Builder)
 local Npcs = require(script.Parent.Npcs) -- 6.0: the vest's put-on gesture
-local KitArt = require(script.Parent.KitArt.Geometry)
+local KitArt = require(Shared.KitArt) -- (6.22: shared: the client draws the bags too, shared/ItemLooks.luau)
 local PhoneArt = require(script.Parent.PhoneArt.Geometry)
 local CharacterArt = require(script.Parent.CharacterArt.Geometry) -- 6.0.1: the Courier Vest's pieces
 

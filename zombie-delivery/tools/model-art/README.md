@@ -7,7 +7,7 @@ Each group's pure geometry module exports `ids`, `pieces(id)` and `spec(id)`. Sp
 Run from the repository root:
 
 ```sh
-python3 zombie-delivery/tools/model-art/export.py zombie-delivery/src/server/KitArt/Geometry.luau /path/to/luau /tmp/kit.json
+python3 zombie-delivery/tools/model-art/export.py zombie-delivery/src/shared/KitArt.luau /path/to/luau /tmp/kit.json
 blender -b -t 6 --python zombie-delivery/tools/model-art/render.py -- /tmp/kit.json /tmp/kit-renders --workbench
 python3 zombie-delivery/tools/model-art/sheets.py /tmp/kit.json /tmp/kit-renders /tmp/kit-sheet.png 'ZOMBIE DELIVERY / KIT'
 python3 zombie-delivery/tools/model-art/rasterize.py zombie-delivery/art/icons/kit_*.svg
