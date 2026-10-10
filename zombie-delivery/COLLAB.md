@@ -30,6 +30,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.16.1: the job and chapter pictures fetched in the background after joining (`JobThumbUi.preload`), a picture still loading fades in.
 - Claude · 6.16: visuals and feel: the light and atmosphere by the time of day (`shared/SkyGrade.luau`, `client/SkyFx.luau`, `design/lighting/NAVOD.md`), shooting (`client/ShotKick.luau`, `client/ShotFx.luau`, `client/HitMarker.luau`), driving (`client/CarSway.luau`, `client/TyreFx.luau`, `client/CrashFx.luau`, `client/SpeedLines.luau`), zombies (`shared/ZombieStyle.luau`, `client/ZombieLife.luau`). **Next:** an sfx4 sheet with the sounds the streams listed (squeals, scrapes, impacts, casings, zombie voices).
 - Claude · 6.15:
   - **Fixed missions** (`shared/MissionPlan.luau`, `server/MissionEnemies.luau`, `Config.Missions.Fixed`): the same route and enemies every time, deliver AND kill all ("ZOMBIES 7/20").

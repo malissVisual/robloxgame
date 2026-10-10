@@ -13,9 +13,14 @@
 --       while its id is empty or for a job without one (the row stays as it was).
 --   JobThumbUi.keepRatio(frame, ratio, most?)          keeps a picture frame's height at its width / ratio (6.12.13:
 --       never over `most` px; the MISSIONS window's chapter banner, client/MissionArtUi.luau, uses it too).
+--   JobThumbUi.preload()                               6.16.1 (the owner: "the pictures in JOBS load slowly"): Roblox
+--       fetches an image the first time it is drawn, so the job list waited on 25 downloads; every uploaded job and
+--       chapter picture is fetched in the background PRELOAD_AFTER s after joining (ContentProvider), and a picture
+--       still on its way fades in when it is there instead of popping.
 -- Presentation only: a picture grants nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local JobThumbs = require(Shared.JobThumbs)
@@ -28,6 +33,53 @@ local JobThumbUi = {}
 JobThumbUi.RATIO = 2.4 -- the strip's width : height
 JobThumbUi.BANNER = 26 -- the fallback banner's height (px)
 JobThumbUi.GUESS = 128 -- the strip's height until its card's width is known (a phone card ~300 px wide)
+JobThumbUi.PRELOAD_AFTER = 4 -- 6.16.1: seconds after joining before the pictures are fetched (the world first)
+JobThumbUi.FADE = 0.25 -- 6.16.1: seconds a picture that was still loading fades in
+
+-- 6.16.1: a picture still on its way is drawn invisible and fades in once Roblox has it (one already fetched at once).
+local function fadeIn(label: ImageLabel)
+	if label.IsLoaded then
+		return
+	end
+	label.ImageTransparency = 1
+	local watch: RBXScriptConnection? = nil
+	watch = label:GetPropertyChangedSignal("IsLoaded"):Connect(function()
+		if label.IsLoaded then
+			if watch then
+				watch:Disconnect()
+			end
+			TweenService:Create(label, TweenInfo.new(JobThumbUi.FADE), { ImageTransparency = 0 }):Play()
+		end
+	end)
+end
+
+-- 6.16.1: fetches every uploaded job picture and mission chapter picture in the background (see the header).
+function JobThumbUi.preload()
+	task.delay(JobThumbUi.PRELOAD_AFTER, function()
+		local ids: { any } = {}
+		for _, id in JobThumbs.Images do
+			if id ~= "" then
+				table.insert(ids, id)
+			end
+		end
+		local ok, MissionArt = pcall(require, Shared:FindFirstChild("MissionArt") :: ModuleScript)
+		if ok and type(MissionArt) == "table" and type(MissionArt.Images) == "table" then
+			for _, id in MissionArt.Images do
+				if type(id) == "string" and id ~= "" then
+					table.insert(ids, id)
+				end
+			end
+		end
+		if #ids > 0 then
+			local fetched, err = pcall(function()
+				game:GetService("ContentProvider"):PreloadAsync(ids) -- (asked here: the phone recorder's mock has no ContentProvider)
+			end)
+			if not fetched then
+				warn(`[JobThumbUi] preload: {err}`)
+			end
+		end
+	end)
+end
 
 -- Keeps `frame`'s height at its width / ratio (never over `most` px when given). Its height is pure offset, so
 -- AbsoluteSize.Y / Size.Y.Offset is the scale of every UIScale above it (the phone's popup, J's window, the MISSIONS
@@ -94,14 +146,14 @@ function JobThumbUi.strip(parent: Instance, info: any, order: number, height: nu
 		ClipsDescendants = true,
 		LayoutOrder = order,
 	}, parent)
-	Ui.make("ImageLabel", {
+	fadeIn(Ui.make("ImageLabel", {
 		Name = "Picture",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Image = image,
 		ScaleType = Enum.ScaleType.Crop,
-	}, strip)
+	}, strip) :: ImageLabel)
 	local tag = Ui.label(strip, title, UDim2.fromOffset(0, 22), {
 		Name = "Business",
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -137,6 +189,7 @@ function JobThumbUi.square(parent: Instance, info: any, size: number, props: { [
 		ScaleType = Enum.ScaleType.Crop,
 	}, parent)
 	made:SetAttribute("Business", name)
+	fadeIn(made :: ImageLabel)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, made)
 	if props then
 		for key, value in props do
