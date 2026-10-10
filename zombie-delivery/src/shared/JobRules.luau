@@ -3,8 +3,9 @@
 -- (no Roblox API), shared by server/Jobs.luau, server/PlayerData.luau, the board (client/DispatchUi.luau), the result
 -- card (client/Hud.luau) and the CAREER window (client/CareerUi.luau); tested in tests/jobrules_test.luau.
 --
---   JobRules.roles(r)                     the trade-offs of one tier's ordinary offers: "short" first, then two of
---                                         "long" | "risky" | "bulk" (r: a random number 0 … 1 each call)
+--   JobRules.roles(r, extra?)             the trade-offs of one tier's ordinary offers: "short" first, then two of
+--                                         "long" | "risky" | "bulk" (r: a random number 0 … 1 each call); 6.15: `extra`
+--                                         more of them (rush hour, Config.LiveEvents.Rush.ExtraOffers: all four)
 --   JobRules.window(role, low, high)      the drop's distance band of a role inside a tier's range
 --   JobRules.roleInfo(role)               { name, icon, why } for the board's row
 --   JobRules.rerollFee(stars)             what a REROLL of that tier costs
@@ -87,8 +88,8 @@ local OTHER_ROLES = { "long", "risky", "bulk" }
 
 -- ── The board's choice ─────────────────────────────────────────────────────
 
-function JobRules.roles(r: () -> number): { string }
-	local count = math.clamp(math.floor(Config.Jobs.Choice.Offers), 1, 1 + #OTHER_ROLES)
+function JobRules.roles(r: () -> number, extra: number?): { string }
+	local count = math.clamp(math.floor(Config.Jobs.Choice.Offers + (extra or 0)), 1, 1 + #OTHER_ROLES)
 	local out = { "short" }
 	local pool = table.clone(OTHER_ROLES)
 	while #out < count and #pool > 0 do

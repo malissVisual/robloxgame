@@ -27,6 +27,8 @@
 --     line, and REROLL $100 on the header (RerollTier: new offers of that tier, once until the board refreshes). A
 --     tier without its licence (shared/JobRules.luau) shows one row locked "🪪 LICENCE 3 / 5" with what it needs; the
 --     caption names your streak of good jobs (6.14: "ON A ROLL: next ★★+ job ×1.2", shared/Shift.luau).
+--     6.15: while a live event pays (rush hour, the Blood Moon) its strip heads the list ("🕑 RUSH HOUR · ×1.5 pay ·
+--     3:12", client/EventBanner.luau boardStrip); rush hour's board has more offers (server/LiveEvents.luau).
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 --   * 5.0, the career starts on foot: the offers with mode = "foot" (a missing mode is "car") come first in an ON FOOT
@@ -1423,6 +1425,10 @@ renderList = function()
 			warn(`[DispatchUi] the run's summary failed: {err}`)
 		end
 	end
+	-- 6.15: a live event that pays heads the list (client/EventBanner.luau: "🕑 RUSH HOUR · ×1.5 pay · 3:12", ticking)
+	pcall(function()
+		require(script.Parent.EventBanner).boardStrip(refs.list, -40)
+	end)
 	if list == nil then
 		refs.caption.Text = "Calling the dispatcher..."
 		message("Calling the dispatcher...")

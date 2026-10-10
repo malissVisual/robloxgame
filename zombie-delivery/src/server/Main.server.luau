@@ -169,7 +169,10 @@ end
 BanditCars.onSteal = function(player, share)
 	Jobs.steal(player, share)
 end
-BanditCars.wanted = Jobs.active
+-- 6.15: not on a mission (its enemies are its own fixed plan: a bandit car left from a job before drives off)
+BanditCars.wanted = function(player: Player): boolean
+	return Jobs.active(player) and not Jobs.onMission(player)
+end
 -- 3.1, the challenges' counters (server/Challenges.luau): how the kills happened, and what the jobs tell.
 Zombies.onKillInfo = function(player, info)
 	Challenges.onKill(player, { kind = info.kind, bandit = info.bandit, headshot = info.headshot, cause = info.cause, from = info.from })
@@ -183,6 +186,8 @@ end
 Jobs.onStat = Challenges.add
 -- The bandits, gunners and soldiers only go after players on a job (or in its crew); zombies after everybody.
 Zombies.hunts = Jobs.involved
+-- 6.15 review: the world's own people (resident bandit camps, the base's soldiers) leave a mission's crew alone.
+Zombies.spares = Jobs.onMission
 Vehicles.onWrecked = function(player, car, reason)
 	Zombies.releaseCar(car)
 	if Jobs.active(player) then
@@ -212,6 +217,7 @@ safely("Zombies", Zombies.start)
 safely("Jobs", Jobs.start)
 safely("JobQueue", require(Server.JobQueue).start) -- 6.12.8: the NEXT UP queue (+ QUEUE, ADD ALL)
 safely("SpecialOrders", require(Server.SpecialOrders).start) -- 6.14: the golden orders and the regulars' orders
+safely("LiveEvents", require(Server.LiveEvents).start) -- 6.15: the Blood Moon, rush hour, supply drops, the horde
 safely("Gun", Gun.start)
 safely("Items", Items.start)
 safely("Shops", Shops.start)

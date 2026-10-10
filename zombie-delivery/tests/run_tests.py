@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, BuddyBrain, Goal, Tasks, 6.14: Regulars, SpecialOrders ...) in the
+Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, BuddyBrain, Goal, Tasks, 6.14: Regulars, SpecialOrders, 6.15: LiveEvents ...) in the
 standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS PASSED".
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness")
+PURE = ("Config", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True

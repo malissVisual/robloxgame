@@ -149,6 +149,13 @@ AnalyticsPlan.Events = {
 	"GoldenDone", -- a golden order delivered and paid
 	"GoldenExpired", -- a golden order's clock ran out (on the board or in NEXT UP)
 	"RegularTierUp", -- a courier became a business's Bronze / Silver / Gold / Platinum regular
+	-- 6.15, the fixed missions (server/Jobs.luau): a mission done with every enemy of its plan killed (value: how many;
+	-- fields: the chapter, "solo" or "crew")
+	"MissionCleared",
+	-- 6.15, the live events (server/LiveEvents.luau)
+	"EventStarted", -- a live event started (value: the players in the server; field: its id); logged with one of them
+	"SupplyDelivered", -- a supply drop brought to the depot (value: seconds since it landed; field: the driver level)
+	"HordeBeaten", -- a share of the horde's reward paid (value: the player's kills; field: "beaten" or "time")
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -211,6 +218,8 @@ AnalyticsPlan.Sources = {
 	CompanySafe = "Gameplay", -- your company's safe emptied
 	TaskReward = "TimedReward", -- the daily and weekly tasks
 	ShiftBonus = "Gameplay", -- 6.14: a shift's pay (Config.Jobs.Shift: its deliveries in one go, server/Shift.luau)
+	SupplyDrop = "Gameplay", -- 6.15: a live event's supply drop brought to the depot (server/LiveEvents.luau)
+	HordeReward = "Gameplay", -- 6.15: a share of the horde at the gates' reward (server/LiveEvents.luau)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
 	PropertySale = "Sale", -- real estate sold

@@ -173,6 +173,25 @@ do
 	check("defend: the clock", card.kind == "defend" and card.title == "Hold out 0:23" and card.place == "Keep them off Bob!" and card.action == nil, show(card))
 	card = Goal.now({ deliveries = 9, job = job({ mission = { number = 3, name = "Iron Supply" }, stopLabel = "LOAD THE AMMO at the Armory", step = "Drive to the red circle" }) })
 	check("a mission: its tag", card.tag == "MISSION 3" and card.kind == "to_pickup" and card.title == "Load the ammo" and card.place == "the Armory", show(card))
+	-- 6.15, the fixed missions: the tag counts the mission's enemies; delivered with some left, the card says to clear them.
+	local enemies = { killed = 7, total = 20, left = 13, label = "ZOMBIES" }
+	card = Goal.now({ deliveries = 9, job = job({ mission = { number = 3, name = "Iron Supply", enemies = enemies }, stopLabel = "LOAD THE AMMO at the Armory", step = "Drive to the red circle" }) })
+	check("6.15: a mission's tag counts its zombies", card.tag == "MISSION 3 · ZOMBIES 7/20" and card.kind == "to_pickup", card.tag)
+	check("6.15: the count's words", Goal.enemyLine({ enemies = { killed = 2, total = 18, label = "ENEMIES" } }) == "ENEMIES 2/18" and Goal.enemyLine({ number = 1 }) == nil and Goal.enemyLine(nil) == nil)
+	check("6.15: never more killed than there are", Goal.enemyLine({ enemies = { killed = 25, total = 20, label = "ZOMBIES" } }) == "ZOMBIES 20/20")
+	local clearing = job({
+		mission = { number = 3, clearing = true, enemies = { killed = 17, total = 20, left = 3, label = "ZOMBIES" } },
+		stage = "clear",
+		handling = "drive",
+		stopLabel = "CLEAR THE ZOMBIES at Lighthouse Point",
+		step = "Clear the zombies: 3 left",
+		person = "3 ZOMBIES LEFT",
+	})
+	card = Goal.now({ deliveries = 9, distance = 120, job = clearing })
+	check("6.15: delivered, zombies left: clear them, where the nearest are", card.kind == "clear" and card.title == "Clear the zombies: 3 left" and card.place == "Lighthouse Point" and card.distance == 120 and card.action == nil and card.tag == "MISSION 3 · ZOMBIES 17/20", show(card))
+	clearing.step = ""
+	card = Goal.now({ deliveries = 9, job = clearing })
+	check("6.15: the clearing card without the server's words", card.kind == "clear" and card.title == "Clear the zombies: 3 left", show(card))
 end
 
 -- ── Delivered ──────────────────────────────────────────────────────────────

@@ -206,9 +206,14 @@ local function missionTitle(mission: any): string
 	return `🎯 MISSION {number}  ·  {tostring(mission.name or "?")}`
 end
 
--- The twists (icon and name), the CO-OP badge and, while holding out, the countdown: one line.
+-- The twists (icon and name), the CO-OP badge and, while holding out, the countdown: one line. 6.15: first the
+-- mission's enemies ("🧟 7/20", delivered: "🧟 3 LEFT").
 local function missionLine(mission: any, short: boolean?): string
 	local parts = {}
+	local enemies = mission.enemies
+	if type(enemies) == "table" and type(enemies.total) == "number" and enemies.total > 0 then
+		table.insert(parts, if mission.clearing == true then `🧟 {tonumber(enemies.left) or 0} LEFT` else `🧟 {math.min(tonumber(enemies.killed) or 0, enemies.total)}/{enemies.total}`)
+	end
 	if type(mission.defendLeft) == "number" and mission.defendLeft > 0 then
 		table.insert(parts, `🛡 HOLD OUT {Ui.clock(mission.defendLeft)}`)
 	end

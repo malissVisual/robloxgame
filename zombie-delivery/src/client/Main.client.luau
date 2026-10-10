@@ -101,6 +101,8 @@ safely("CurbRide", require(Client.CurbRide).start) -- 6.10: up the kerb's slope 
 safely("ShopPropMotion", require(Client.ShopPropMotion).start) -- 6.11: the bank's coin spins, Luigi's pizza slice bobs
 safely("PerfOverlay", require(Client.PerfOverlay).start) -- 6.13.1: the admin's performance overlay (the P panel's WORLD tab)
 safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SHIFT 3/5 at the top, SHIFT DONE
+safely("EnemyOutline", require(Client.EnemyOutline).start) -- 6.15: a subtle outline on the enemies (zombies red, bandits orange)
+safely("EventBanner", require(Client.EventBanner).start) -- 6.15: the live event's banner at the top, its stings
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast
@@ -187,6 +189,8 @@ end
 Phone.onTop = Leaderboard.toggle
 Phone.onEstate = EstateUi.toggleList
 Phone.onSound = Sounds.cycle
+Phone.onOutline = require(Client.EnemyOutline).toggle -- 6.15: SETTINGS' ENEMY OUTLINES (this session)
+Phone.outlineOn = require(Client.EnemyOutline).isOn
 Hud.onMenu = function(): boolean
 	if not Phone.has() then
 		return false -- (before Marge: the old list)

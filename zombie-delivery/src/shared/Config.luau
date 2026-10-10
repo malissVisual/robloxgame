@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.14.2"
+Config.Version = "6.15"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1736,6 +1736,28 @@ Config.Zombies = {
 	},
 } :: { [string]: ZombieDef }
 
+-- 6.15, the owner: "I'd outline the zombies: a red outline, but just subtle." A thin outline (a Highlight: no fill,
+-- never through walls) on the nearest living enemies on each client (client/EnemyOutline.luau, shared/OutlinePick.luau):
+-- the zombies in Zombie's colour, the people in Human's (the ones the server marks Bandit: the bandits, the gunners, and
+-- with Pickups the bandits' pickups as a whole, their crew inside; plus any kind HumanKinds names true). Roblox draws at
+-- most 31 Highlights on a client: Count at most (Spare left for anything else), within Range studs of the camera, picked
+-- again every Every seconds; a phone gets DeviceBudget.count / range of them (Config.Performance.Lite). One already
+-- outlined keeps it out to HoldRange × the range and counts HoldRange times nearer (no blinking at the edge).
+Config.Outline = {
+	Zombie = { 255, 45, 45 },
+	Human = { 255, 150, 30 },
+	Transparency = 0.6, -- the outline's (0 solid … 1 none): just subtle
+	Count = 24,
+	Spare = 7, -- Count + Spare stays within Roblox's 31
+	Range = 160,
+	Every = 0.25,
+	HoldRange = 1.15,
+	Pickups = true,
+	-- The base's soldiers bite and look infected since 5.9 (a green face, glowing eyes): red like the zombies. true
+	-- here outlines a kind orange (a person) though the server does not mark it Bandit.
+	HumanKinds = { soldier = false } :: { [string]: boolean },
+}
+
 -- Zombies around the cars.
 Config.Horde = {
 	SpotTime = 0.7, -- 4.0.4: a bandit has to see you this long (a clear line, nothing in between) before it fires
@@ -2470,7 +2492,7 @@ Config.Missions = {
 	ReplayPay = 0.25,
 	ReplayXp = 0.25,
 	-- Co-op missions (MissionDef.coop): every crew member besides the owner adds this share of the pay (for everyone)
-	-- and this share of enemies (waves, foot waves, hordes).
+	-- and this share of the enemies' health (6.15: their number is the mission's own, Fixed below: the same for a crew).
 	CoopPayPerMember = 0.25,
 	CoopEnemyPerMember = 0.35,
 	CrewCredit = true, -- crew members who helped get the stars too (friends progress together)
@@ -2481,9 +2503,9 @@ Config.Missions = {
 		quiet = { name = "NO SHOOTING", icon = "🤫", description = "Explosive cargo: every shot from your crew costs cargo condition", pay = 1.35 },
 		guarded = { name = "HOT ZONE", icon = "☣", description = "A horde waits at every stop", pay = 1.3 },
 		night = { name = "NIGHT ONLY", icon = "🌙", description = "Only after dark", pay = 1.2 },
-		gunner = { name = "SHOTGUN SEAT", icon = "🎯", description = "Kills from the passenger seats pay triple", pay = 1.1 },
+		gunner = { name = "SHOTGUN SEAT", icon = "🎯", description = "Gunners wait on the route; kills from the passenger seats pay triple", pay = 1.1 },
 		spotless = { name = "SPOTLESS", icon = "💎", description = "The cargo must arrive in good shape: below 60 % the mission fails", pay = 1.4 },
-		hunted = { name = "HUNTED", icon = "🏴", description = "Bandit cars hunt you the whole way", pay = 1.35 },
+		hunted = { name = "HUNTED", icon = "🏴", description = "Bandit roadblocks wait on the route", pay = 1.35 },
 		pair = { name = "PAIR LIFT", icon = "🤝", description = "These pieces only move with two of you carrying together", pay = 1.3 },
 		switches = { name = "TWIN SWITCHES", icon = "🎛", description = "Two levers far apart must be pulled at the same moment to open the gate", pay = 1.25 },
 	} :: { [string]: { name: string, icon: string, description: string, pay: number } },
@@ -2492,10 +2514,10 @@ Config.Missions = {
 	LiftSlowSpeed = 4.5, -- lift: walking speed carrying alone (with a crew mate within LiftHelpRange: normal)
 	LiftHelpRange = 10,
 	GunnerKillBonus = 3, -- gunner: a passenger's kill pays KillBonus × this
-	HuntedBoost = 2.5, -- hunted: roadblocks and chases this many times as often
+	-- hunted: the cargo is wanted this many times as much (the start's "Every bandit in town wants this cargo!"; 6.15:
+	-- a mission's bandits are its plan's roadblocks, Fixed.Roadblocks, never random chases)
+	HuntedBoost = 2.5,
 	DefendRadius = 45, -- defend: stay within this of the receiver
-	DefendWaveEvery = 9, -- defend: a wave around the stop every … s
-	GuardedHorde = 5, -- guarded: zombies waiting at every stop (× the tier's stars / 2, at least this)
 	-- 3.2, DUO missions (MissionDef.duo, the "duo" campaign): only with a crew. START needs at least MinCrew crew
 	-- members within StartRange of you; the twists made for two:
 	--   pair      heavy pieces only move with two: nobody of the job within PairRange of the carrier, no pick-up
@@ -2508,6 +2530,83 @@ Config.Missions = {
 		LeverApart = 22, -- studs between the two levers (one player cannot pull both in time)
 		-- 6.8: what START says without a partner (server/Missions.luau, the MISSIONS window)
 		NeedsPartner = "NEEDS A PARTNER: invite a friend to your crew (K) and bring them here. Rosa & Rico's chapter is a side story: the main story never waits for it.",
+	},
+	-- 6.15, the fixed missions (the owner: "I want them to be about a number of zombies, and you have to complete it, so
+	-- the mission is always the same, not random"): every mission has the same route and the same enemies at the same
+	-- spots (shared/MissionPlan.luau plans them, server/MissionEnemies.luau puts them in the world); it is done when the
+	-- cargo is delivered AND every one of them is dead. No random waves, strays, chases or roadblocks on a mission.
+	Fixed = {
+		-- How many. The zombies at the stops: Stops[tier], PerStop more for every stop past two, × (1 + ChapterGrow a
+		-- story chapter after the first: the DUO chapter counts as the one at its level), × Guarded on a HOT ZONE mission;
+		-- shared out by Weight (the last drop's horde the biggest; HOT ZONE: the other stops × GuardedStop) and by the
+		-- tier's Kinds (largest remainders: the same every time).
+		Stops = { 8, 11, 14, 18 },
+		PerStop = 2,
+		ChapterGrow = 0.06,
+		Weight = { Drop = 2, Pickup = 1, OnTheWay = 0.6 },
+		Guarded = 1.4,
+		GuardedStop = 1.6,
+		Kinds = {
+			{ walker = 0.8, runner = 0.2 },
+			{ walker = 0.65, runner = 0.3, brute = 0.05 },
+			{ walker = 0.5, runner = 0.3, brute = 0.12, soldier = 0.08 },
+			{ walker = 0.4, runner = 0.33, brute = 0.15, soldier = 0.12 },
+		} :: { { [string]: number } },
+		-- HUNTED: bandit roadblocks at fixed points of the route (Roadblocks[tier] × the mission's banditBoost, at most
+		-- RoadblocksMax), RoadblockSize[tier] bandits each (× the chapter's growth; from ★★★ one of them a gunner).
+		Roadblocks = { 1, 2, 2, 2 },
+		RoadblocksMax = 4,
+		RoadblockSize = { 2, 3, 3, 4 },
+		-- SHOTGUN SEAT: Gunners[tier] gunners posted by the road (× the chapter's growth), at GunnerPosts points at most.
+		Gunners = { 1, 2, 2, 3 },
+		GunnerPosts = 2,
+		-- HOLD OUT: Defend[tier] zombies (× the chapter's growth) come at the last drop in #DefendSplit waves, shared by
+		-- these weights (the last the biggest); wave n comes when the hold-out clock is (n − 1) / waves through.
+		Defend = { 5, 8, 10, 12 },
+		DefendSplit = { 2, 3, 4 },
+		-- Every mission's enemies in all: at most Max (every group shrunk alike), at least Min.
+		Max = 40,
+		Min = 6,
+		-- Where. A stop's group stands on the road by its circle: along the road up to SpreadAlong studs either way (more
+		-- for a bigger group), out to SpreadOut; a yard's group in a ring Ring[1] … Ring[2] (+ RingPer a zombie, at most
+		-- RingMax) round it. A route point (a roadblock, a gunner post) lies on the road at an even share of the route,
+		-- at least FromStop studs from every stop; HOLD OUT's waves come from DefendRing studs round the last drop.
+		SpreadAlong = 40,
+		SpreadOut = 14,
+		Ring = { 10, 24 },
+		RingPer = 1.2,
+		RingMax = 45,
+		FromStop = 140,
+		DefendRing = { 60, 100 },
+		-- In the world (server/MissionEnemies.luau). One comes when somebody of the crew (alive, out of the safe zone) is
+		-- within SpawnRange of its spot (a HOLD OUT wave's: once let loose too); one nobody of the crew is within
+		-- ParkRange of goes back to waiting at its spot (alive again when they come back: the alive cap follows the crew;
+		-- Zombies' own despawn leaves them alone). MaxAlive of a mission alive at once (the rest come as those die), Batch
+		-- a tick at most. Reserve: while a mission runs, every other enemy (a board job's waves, the admin's) stops this
+		-- many short of Config.Horde.MaxTotal (the roamers and the live events stop shorter already).
+		SpawnRange = 230,
+		ParkRange = 300,
+		MaxAlive = 18,
+		Batch = 6,
+		Reserve = 15,
+		-- A spot inside something (a wall, a bunker, the rock) is not used: the spot halfway to its anchor, else round the
+		-- anchor (the stop's circle, the road), else (a HOLD OUT wave's) the nearest road. Delivered (clearing), one that
+		-- has not moved StuckMove studs nor been hit for StuckTime s while it should (somebody close, or away from its
+		-- spot; a bandit: it sees nobody) goes back to waiting and comes again by its anchor.
+		StuckTime = 20,
+		StuckMove = 3,
+		-- They guard their spot: a zombie goes after somebody within Aggro of it (a bandit or a gunner: its range + 40)
+		-- while they are within Leash of its spot, else it walks back; hit from further, it goes after them within its
+		-- leash for AlertTime s.
+		Aggro = 90,
+		Leash = 150,
+		AlertTime = 8,
+		-- The clock: TimePerEnemy s more for every enemy of the mission (to clear them, the drive back to a horde you
+		-- passed included: 6.15 review, 3 s was tight); a mission started far from its first stop gets the longer drive
+		-- too (the pay stays the mission's own).
+		TimePerEnemy = 5,
+		-- Delivered with enemies left: the HUD's marker follows the nearest of them once it moved Retarget studs.
+		Retarget = 10,
 	},
 }
 
@@ -3861,7 +3960,7 @@ export type JobTypeDef = {
 	vehicle: string?, -- the employer lends this car for the job
 	employer: string?, -- taken at the employer's place (Config.Employers), not on the job board
 	pickups: number, -- pick-up stops (0 = the vehicle starts loaded)
-	pickupAt: string?, -- the pick-up is at this place (shared/Map.luau Places), else around you
+	pickupAt: string?, -- the pick-up is at this place (shared/Map.luau Places), else around you (6.15: a mission's: a fixed address, shared/MissionPlan.luau)
 	drops: number, -- delivery stops
 	dropAt: string?, -- the last delivery is at this place, else an address
 	loadTime: number,
@@ -4297,6 +4396,7 @@ Config.Robust = {
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
 		JobQueue = 4, -- 6.12.8: the board's + QUEUE, ADD ALL and NEXT UP's ✕ (server/JobQueue.luau)
 		ClientError = 0.05, -- 6.13: a client's script error (its script and line): one every 20 s at most (server/Analytics.luau)
+		CrateDown = 4, -- 6.15: the PutDown remote (the touch PUT DOWN) while you carry a supply drop's crate (server/LiveEvents.luau)
 	},
 }
 
@@ -4373,6 +4473,9 @@ Config.Tasks = {
 		-- 6.14: the regulars (an order for a business you are Bronze or better at) and the golden orders
 		{ id = "regular", event = "regular", text = "Deliver {n} orders where you're a regular", one = "Deliver an order where you're a regular", target = { 2, 4 }, money = 180, xp = 110, level = 3 },
 		{ id = "golden", event = "golden", text = "Finish {n} golden orders", one = "Finish a golden order", target = { 1, 1 }, money = 300, xp = 160, level = 3 },
+		-- 6.15: a live event (server/LiveEvents.luau notes "liveevent" once an event for each player: a job paid during a
+		-- Blood Moon or a rush hour, the supply drop brought in, a share of the horde's reward)
+		{ id = "liveevent", event = "liveevent", text = "Take part in {n} live events", one = "Take part in a live event", target = { 1, 1 }, money = 220, xp = 130, level = 2 },
 	} :: { TaskDef },
 	WeeklyPool = {
 		{ id = "w_deliver", event = "deliver", text = "Deliver {n} pieces of cargo", target = { 40, 60 }, step = 5, money = 1500, xp = 600 },
@@ -4411,6 +4514,123 @@ Config.Regulars = {
 		Seconds = 300,
 		Pay = 1.5,
 		Xp = 1,
+	},
+}
+
+-- 6.15, LIVE EVENTS (the owner: "events where working is better for earning, e.g. a Blood Moon"): one at a time for
+-- the whole server (server/LiveEvents.luau runs them, shared/LiveEvents.luau holds the rules and the words,
+-- tests/liveevents_test.luau checks them, client/EventBanner.luau shows them). The first one comes First minutes after
+-- a player is in, then one every Every minutes (start to start, random in between), never in an empty server: the next
+-- of a shuffled deck (Order) whose moment it is. The BLOOD MOON only at night with MinNightLeft s of it to go (it ends at
+-- dawn at the latest), RUSH HOUR only by day with MinDayLeft s of it to go (it ends at dusk at the latest); a card whose
+-- moment has not come waits in the deck while a later one goes first; none can start: the server looks again every
+-- Retry s, after MaxWait s the deck is shuffled anew (MaxWait: longer than a day's cycle, Config.DayNight.DayLength,
+-- less the event's window, so the night or the day always comes first). Missions are never touched: no event pay, no
+-- event zombies, no faster zombies (Offer.mission).
+--   Events     each event's name, icon, one-line hint, length in minutes and colour (the banner, the board, the toasts)
+--   LevelScale the supply drop's and the horde's rewards × (1 + this × (level − 1)) for each player
+--   Reach      an event zombie (the horde, the crate's guards) goes after a player this close; else it walks to its spot
+--              (the gate, the crate) and waits there; it never despawns while its event runs (server/Zombies.luau march)
+--   BloodMoon  Pay: jobs finished during it pay × this (on the job's pay: the same subtotal the night bonus takes,
+--              Economy.payout; the rating, the streak, the regulars and the tips come on top as they do on the night's);
+--              Waves: × the job waves' spawn multiplier (Jobs.dangerOf: bigger, more often, a higher cap of the alive
+--              ones, like WANTED); Roam: × the roamers around every player (server/Zombies.luau, on top of the night's);
+--              Speed: × every zombie's speed but a mission's (the people too are spared), at most MaxSpeed studs / s;
+--              Fade: seconds the red sky and fog ease in and out (client/Weather.luau)
+--   Rush       Pay: × the pay of a job finished during it (as the Blood Moon's); ExtraOffers: more ordinary offers a
+--              danger level and on foot / by bike (JobRules.roles); Refresh: the board's new offers this often at most
+--              (Config.Jobs.RefreshSeconds otherwise); every board is made anew when it starts (not during a run)
+--   Supply     a crate falls by parachute (FallFrom studs, FallSpeed studs / s) onto a street Distance studs from the safe
+--              zone's middle (on its square: past SafeHalf + Margin), a light beam and a map marker for everybody; its
+--              Guards gather (First at the landing, Batch every Every s up to Max alive, Near … Far studs round it,
+--              Kinds); anybody picks it up (Pickup studs, Hold s) and carries it on foot (G / PUT DOWN sets it down; it
+--              drops when the carrier dies, sits or leaves); the first who brings it within DeliverRadius of the depot's
+--              drop-off (DropOff: x, z from the depot's middle) gets Money and Xp (× LevelScale) ("SupplyDrop").
+--              6.15 review: set down, it lands on the floor under it (a ray Drop studs down at most in front of a
+--              grounded carrier, past the cars and the people; else where the carrier last stood); it drops by itself
+--              when its carrier stands still Idle s or gets no StallGain studs nearer the drop-off in Stall s (no
+--              hostage), and a carry faster than MaxPace studs / s (× an admin's walk) plus Slack studs a step is no
+--              carry: the crate goes back down where it was (no teleport to the depot)
+--   Horde      Count zombies (Kinds) in Bursts, one every BurstEvery s, Out studs past the safe zone's edge on the streets
+--              of one side, walking to its Gates gates (Stop studs outside the edge; they never come in); beaten when all
+--              came and Beaten of it fell before its time is up (6.15 review: a straggler stuck behind a building
+--              does not hold it up); then (or at its end) everybody who killed some shares Money and Xp by their kills
+--              (× LevelScale; at its end only the share of the horde that fell, of Beaten × Count) ("HordeReward")
+--   Headroom   6.15 review, the event's own zombie budget: its zombies (the horde, the guards) spawn up to
+--              Config.Horde.MaxTotal − Headroom (the job waves keep that room), StepSpawn a step at most. What it still
+--              wants holds the roamers back (Zombies.eventReserve: they stop that much lower), and when a burst does not
+--              fit, calm roamers far from everybody make room (Zombies.trimRoamers). The 36 residents and the whole
+--              horde fit: 36 + Count ≤ MaxTotal − Headroom (tests/liveevents_test.luau runs a full server)
+--   Linger     6.15 review: at its end its zombies nobody is within Vanish studs of go at once; the others fall back
+--              (they walk away, after nobody) and go once nobody is that close, Linger s at most
+export type LiveEventDef = { name: string, icon: string, hint: string, minutes: number, color: { number } }
+
+Config.LiveEvents = {
+	Enabled = true,
+	First = { 10, 15 } :: { number },
+	Every = { 20, 30 } :: { number },
+	Retry = 5,
+	MaxWait = 840,
+	Tick = 0.25, -- seconds between the server's steps of a running event
+	LevelScale = 0.15,
+	Reach = 140,
+	Headroom = 12,
+	StepSpawn = 5,
+	Linger = 30,
+	Vanish = 150,
+	Order = { "bloodmoon", "rush", "supply", "horde" } :: { string },
+	Events = {
+		bloodmoon = { name = "BLOOD MOON", icon = "🌕", hint = "Jobs pay ×2 · more zombies, and faster", minutes = 5, color = { 222, 64, 58 } },
+		rush = { name = "RUSH HOUR", icon = "🕑", hint = "Jobs pay ×1.5 · more jobs on the board", minutes = 5, color = { 232, 174, 84 } },
+		supply = { name = "SUPPLY DROP", icon = "📦", hint = "First to bring the crate to the depot wins", minutes = 6, color = { 126, 196, 120 } },
+		horde = { name = "HORDE AT THE GATES", icon = "🧟", hint = "Hold the gate · share the reward by your kills", minutes = 6, color = { 178, 110, 222 } },
+	} :: { [string]: LiveEventDef },
+	BloodMoon = {
+		Pay = 2,
+		Waves = 1.5,
+		Roam = 1.5,
+		Speed = 1.2,
+		MaxSpeed = 30,
+		MinNightLeft = 300,
+		Fade = 4,
+	},
+	Rush = {
+		Pay = 1.5,
+		ExtraOffers = 1,
+		Refresh = 60,
+		MinDayLeft = 300,
+	},
+	Supply = {
+		Money = 450,
+		Xp = 220,
+		Distance = { 280, 480 } :: { number },
+		Margin = 40,
+		FallFrom = 150,
+		FallSpeed = 7,
+		Pickup = 9,
+		Hold = 0.6,
+		DropOff = { 24, 10 } :: { number },
+		DeliverRadius = 12,
+		Drop = 8,
+		Idle = 20,
+		Stall = 60,
+		StallGain = 10,
+		MaxPace = 16,
+		Slack = 10,
+		Guards = { First = 6, Every = 20, Batch = 2, Max = 10, Near = 18, Far = 45 },
+		Kinds = { walker = 0.65, runner = 0.25, brute = 0.1 } :: { [string]: number },
+	},
+	Horde = {
+		Count = 40,
+		Bursts = 4,
+		BurstEvery = 20,
+		Out = { 150, 300 } :: { number },
+		Stop = 18,
+		Gates = 2,
+		Beaten = 0.9,
+		Kinds = { walker = 0.6, runner = 0.28, brute = 0.12 } :: { [string]: number },
+		Money = 900,
+		Xp = 450,
 	},
 }
 

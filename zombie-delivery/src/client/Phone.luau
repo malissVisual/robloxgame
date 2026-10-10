@@ -46,7 +46,8 @@
 --   three equal ones. NEXT MISSION (the chapter and n/N, the mission, "2 of 3 ready" in red or "READY · START" in green,
 --   the savings goal's bar) opens the READY CHECK in the popup (app "ready": the checklist with its GPS / INVITE / JOBS
 --   / GARAGE actions, START, MISSIONS). WORK is the JOBS app as before (id "jobs", the board) with a second line, what
---   you earn for ("Earn for the Old Van · $1,160 to go"). TASKS and MISSIONS join the smaller tiles (their lines, bars
+--   you earn for ("Earn for the Old Van · $1,160 to go"; 6.15: while a live event pays, "🌕 BLOOD MOON · jobs pay ×2"
+--   in amber first, shared/LiveEvents.luau workLine). TASKS and MISSIONS join the smaller tiles (their lines, bars
 --   and badges as before).
 
 local GuiService = game:GetService("GuiService")
@@ -86,6 +87,8 @@ Phone.onCrew = nil :: (() -> ())? -- CrewPanel.toggle
 Phone.onTop = nil :: (() -> ())? -- Leaderboard.toggle
 Phone.onEstate = nil :: (() -> ())? -- EstateUi.toggleList
 Phone.onSound = nil :: (() -> ())? -- Sounds.cycle
+Phone.onOutline = nil :: (() -> boolean)? -- 6.15, SETTINGS: the enemies' outline off / on, the new state (EnemyOutline.toggle)
+Phone.outlineOn = nil :: (() -> boolean)? -- 6.15: is it on (EnemyOutline.isOn)
 Phone.onCareer = nil :: (() -> ())? -- FULL CAREER: CareerUi.open
 Phone.boardOpen = nil :: (() -> boolean)? -- is the Dispatch board open (DispatchUi.isOpen): no "new runs" then
 Phone.blocked = nil :: (() -> boolean)? -- the NEW PHONE pop-up waits while this says so (Marge's dialog, a result)
@@ -1346,11 +1349,15 @@ refs.fillMain = function()
 	refs.ready.fillTile(refs.nextTile)
 	local workGoal = refs.workGoal
 	if workGoal then
-		local line = refs.ready.workLine()
+		-- 6.15: a live event that pays says so first ("🌕 BLOOD MOON · jobs pay ×2"; server/LiveEvents.luau's attribute)
+		local live = require(Shared.LiveEvents)
+		local liveId = workspace:GetAttribute(live.Attr.Id)
+		local event = live.workLine(if type(liveId) == "string" then liveId else nil)
+		local line = event or refs.ready.workLine()
 		workGoal.Text = line or ""
 		workGoal.Visible = line ~= nil
 		local goal = refs.ready.current().goal
-		workGoal.TextColor3 = if goal and goal.afford then K.good else K.secondary
+		workGoal.TextColor3 = if event then K.warn elseif goal and goal.afford then K.good else K.secondary
 	end
 	local info = Phone.missionInfo and Phone.missionInfo()
 	local missionsSub, missionsBar = refs.subs.missions, refs.bars.missions
@@ -1633,6 +1640,17 @@ renderApp = function()
 					require(script.Parent.Sounds).cycle()
 				end
 			end)
+			local outlineOn, onOutline = Phone.outlineOn, Phone.onOutline -- 6.15: the enemies' subtle outline (client/EnemyOutline.luau)
+			if outlineOn and onOutline then
+				button(list, if outlineOn() then "ENEMY OUTLINES: ON" else "ENEMY OUTLINES: OFF", "quiet", 2, function()
+					local now = onOutline()
+					local notify = Phone.notify
+					if notify then
+						notify(if now then "Enemy outlines on: zombies red, bandits orange" else "Enemy outlines off")
+					end
+					renderApp()
+				end)
+			end
 			button(list, "PUT PHONE AWAY", "main", 3, Phone.close)
 			local tour = Phone.onTour -- 6.7: Marge's tours again (client/TutorialUi.luau: the phone closes first)
 			if tour then

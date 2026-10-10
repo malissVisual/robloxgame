@@ -15,6 +15,9 @@
 -- edge), pooled per row; when cells are uncovered only their rows are drawn again. The job's star and route, the GPS,
 -- you, your car on its way and the live markers stay over the fog: you must find your delivery.
 -- 5.6: a small 🛴 marker at every ZDC RIDE rental dock (shared/RentalDocks.luau), under the fog.
+-- 6.15: a live event's spot (server/LiveEvents.luau: the workspace attributes LiveEvent and LiveEventSpot: the supply
+-- drop's crate, wherever it is, or the horde's gate) on both maps, a dot in the event's colour with its icon, over the fog;
+-- on the minimap it sticks to the edge when far, like the GPS point.
 -- 6.3, the bus map: on the big map the express lines (shared/BusLines.luau mapLines: a few corners a loop) in their
 -- colours and their stops as white-ringed dots, under the fog like the docks; the BUS chip in the header hides them or
 -- shows them again (MapView.busShown, for the session).
@@ -684,6 +687,28 @@ local function layer(canvas: Canvas): Layer
 	}
 end
 
+-- 6.15: the live event's marker on both maps (built with them) and its spot (nil without one); the marker takes the
+-- event's icon and colour when the event changes.
+local liveMark: { mini: any, big: any, id: string? } = { mini = nil, big = nil, id = nil }
+local function liveSpot(): Vector3?
+	local id = workspace:GetAttribute("LiveEvent")
+	local at = workspace:GetAttribute("LiveEventSpot")
+	if type(id) ~= "string" or typeof(at) ~= "Vector3" then
+		return nil
+	end
+	if liveMark.id ~= id then
+		liveMark.id = id
+		local def = Config.LiveEvents.Events[id]
+		for _, mark in { liveMark.mini, liveMark.big } do
+			if mark and def then
+				mark.Text = def.icon
+				mark.BackgroundColor3 = Color3.fromRGB(def.color[1], def.color[2], def.color[3])
+			end
+		end
+	end
+	return at
+end
+
 -- rotation: the markers' own rotation (on the turning minimap they turn back to stay upright).
 local function updateLayer(l: Layer, rotation: number)
 	local scale = l.canvas.scale
@@ -993,6 +1018,7 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number, hea
 	local scale = MINI_SCALE * zoom
 	pin(miniStar, position, target, scale)
 	pin(miniGps, position, waypoint, scale)
+	pin(liveMark.mini, position, liveSpot(), scale) -- 6.15
 	pin(miniCar, position, calledCarPosition(), scale)
 	local nx, ny = clampToEdge(turn(0, -MINI_H, -cameraHeading))
 	miniNorth.Position = UDim2.fromOffset(MINI_W / 2 + nx, MINI_H / 2 + ny)
@@ -1058,6 +1084,9 @@ local function buildMini(column: any, touch: boolean)
 	miniMe.Visible = true
 	miniStar = symbol(group, "■", 14, C.job, 23)
 	miniGps = symbol(group, "◆", 16, C.gps, 23)
+	liveMark.mini = dot(group, K.warn, "!", 18) -- 6.15: a live event's spot
+	liveMark.mini.ZIndex = 23
+	liveMark.mini.Visible = false
 	miniCar = dot(group, C.car, "🚗", 20)
 	miniCar.ZIndex = 23
 	miniCar.Visible = false
@@ -1188,6 +1217,11 @@ local function updateBig(position: Vector3, facing: Vector3)
 	bigCar.Visible = car ~= nil
 	if car then
 		bigCar.Position = point(car.X, car.Z, BIG_SCALE)
+	end
+	local live = liveSpot() -- 6.15
+	liveMark.big.Visible = live ~= nil
+	if live then
+		liveMark.big.Position = point(live.X, live.Z, BIG_SCALE)
 	end
 end
 
@@ -1436,6 +1470,10 @@ local function buildBig(gui: any)
 	bigCar = dot(canvas.markers, C.car, "🚗", 22)
 	bigCar.ZIndex = 21
 	bigCar.Visible = false
+	liveMark.big = dot(canvas.markers, K.warn, "!", 26) -- 6.15: a live event's spot
+	liveMark.big.ZIndex = 21
+	liveMark.big.Visible = false
+	liveMark.id = nil -- (its icon and colour again on the next look)
 	buildList(big)
 end
 

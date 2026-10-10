@@ -27,6 +27,13 @@ Phone.start()
 Phone.setState({phone=true,money=1240,kit={bag=true},cars={}})
 Phone.open()
 check("phone opens without warning",Phone.isOpen() and #M.warnings==0)
+-- 6.15: a Blood Moon says so on WORK first (server/LiveEvents.luau's workspace attribute).
+M.workspace:SetAttribute("LiveEvent","bloodmoon")
+Phone.close();Phone.open()
+check("6.15: WORK says the Blood Moon's pay",text("🌕 BLOOD MOON · jobs pay ×2")~=nil)
+M.workspace:SetAttribute("LiveEvent",nil)
+Phone.close();Phone.open()
+check("6.15: … and nothing of it without one",text("🌕 BLOOD MOON · jobs pay ×2")==nil and Phone.isOpen() and #M.warnings==0)
 -- 6.5: home is six big tiles in this order; MORE's sub-screen holds the other eight apps (5.5's MENU among them).
 -- 6.12: and TASKS (the daily and weekly tasks) after CAREER: nine.
 local function appIds(frame)
@@ -204,6 +211,13 @@ named("Banner").Activated:Fire()
 check("the banner opens the board in the popup",showing("board") and upright())
 check("board sections: on foot, bike, each danger level",text("On foot · 1")~=nil and text("Bike · 1")~=nil and text("★★ Risky · 2")~=nil and text("★★★ Deadly · 1")~=nil)
 check("the footNote heads ON FOOT",text("Two shops near you are shut.")~=nil)
+-- 6.15: rush hour's strip heads the jobs (server/LiveEvents.luau's workspace attributes), its clock from LiveEventEnds.
+M.workspace:SetAttribute("LiveEvent","rush");M.workspace:SetAttribute("LiveEventEnds",M.now+192)
+Phone.open("board")
+check("6.15: rush hour heads the board with its pay and its clock",text("🕑 RUSH HOUR · ×1.5 pay · 3:12")~=nil)
+M.workspace:SetAttribute("LiveEvent",nil);M.workspace:SetAttribute("LiveEventEnds",nil)
+Phone.open("board")
+check("6.15: no strip without an event that pays",text("🕑 RUSH HOUR · ×1.5 pay · 3:12")==nil and #M.warnings==0)
 check("a wide popup: two columns of cards",named("Columns")~=nil and named("Left")~=nil and named("Right")~=nil)
 check("a card: the cargo → the customer, the pickup, the pay",text("LETTERS → ANN")~=nil and text("Post office → 12 Elm St, Old Town")~=nil and text("$40")~=nil)
 tap("🔒 LEVEL 7")
@@ -474,6 +488,17 @@ Phone.open("settings")
 check("settings lists every key and the version",text("Weapon wheel")~=nil and text("Sprint")~=nil and text(`ZDC courier terminal · Zombie Delivery {Config.Version}`)~=nil)
 tap("CYCLE SOUND MODE")
 check("settings' sound goes through Phone.onSound",sounds==1)
+-- 6.15: ENEMY OUTLINES off and on (client/EnemyOutline.luau through Phone.onOutline; no button without it).
+check("no outline button before Main wires it",text("ENEMY OUTLINES: ON")==nil and text("ENEMY OUTLINES: OFF")==nil)
+local outlined=true
+Phone.outlineOn=function() return outlined end
+Phone.onOutline=function() outlined=not outlined;return outlined end
+Phone.open("settings")
+tap("ENEMY OUTLINES: ON")
+check("settings turns the enemies' outline off, says so and shows it",not outlined and toasts[#toasts]=="Enemy outlines off" and text("ENEMY OUTLINES: OFF")~=nil)
+tap("ENEMY OUTLINES: OFF")
+check("and on again",outlined and toasts[#toasts]=="Enemy outlines on: zombies red, bandits orange" and text("ENEMY OUTLINES: ON")~=nil)
+Phone.outlineOn,Phone.onOutline=nil,nil
 Phone.open("bank")
 check("bank shows what you earned since you joined",text("+$360")~=nil)
 -- A new message drops a banner while another app shows; it opens MESSAGES.

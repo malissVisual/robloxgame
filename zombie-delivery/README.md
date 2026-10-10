@@ -1143,6 +1143,70 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Fixed missions, live events and enemy outlines (6.15)
+
+The owner: "When you do missions, I want them to be about a number of zombies, and you have to complete it, so the
+mission is always the same, not random"; "events where working is better for earning, e.g. a Blood Moon"; "I'd
+outline the zombies: a red outline, but just subtle".
+
+### Missions are always the same
+Every mission plays **the same route with the same enemies at the same spots**, for every start, replay and player,
+and it is done only when the cargo is delivered **and** every one of them is dead.
+- **The route** (`shared/MissionPlan.luau`): the addresses are rolled once with the mission id's own dice, from the
+  depot (a rush's pick-up too: it was "near you"); the pay is measured from the depot, so it is the same every time.
+  The clock adds the longer drive from wherever you pressed START and `Config.Missions.Fixed.TimePerEnemy` (5 s) for
+  every enemy. No spot lands in the mountain's tunnel or rock, the safe zone or the water.
+- **The enemies** (`Config.Missions.Fixed`, from the tier, the twists and the chapter, never the crew): a horde at
+  every stop, the last drop's the biggest; HOT ZONE bigger hordes; HUNTED bandit roadblocks at fixed points of the
+  route (no random chases); SHOTGUN SEAT gunners posted by the road; HOLD OUT a fixed number in 3 fixed waves at the
+  last drop (the timer kept). From 8 for Paper Trail up to 40 at most. The MISSIONS window shows the route's
+  addresses and "🧟 20 zombies to clear".
+- **In the world** (`server/MissionEnemies.luau`): a group comes when a crew member (out of the safe zone) gets within
+  230 studs of its spot, 18 alive at once at most; each spot is checked in the world first (room for the body, a
+  clear line from its anchor, else nearer to it). They guard their spot (`Zombie.leash`): they go after you when you
+  are close and walk back when you leave; nobody of the crew within 300 studs and they wait at their spot again. One
+  stuck for 20 s while clearing comes again round its spot. Any death counts, a crew mate's or a car's too. They all
+  go when the mission ends. While a mission runs the other enemies leave it room under the server's cap
+  (`Zombies.missionReserve`). The camps' resident bandits and the Military Base soldiers leave a mission crew alone.
+- During a mission: no random waves, strays, bandit cars or roadblocks (`Jobs.isMission`), and no live event.
+- **The HUD**: the NEXT card's "MISSION 3 · ZOMBIES 7/20" (ENEMIES with bandits), a contract row "Zombies: 7 of 20
+  killed", the count on the banner and the crew strip. Delivered with some left, the mission waits: "Clear the
+  zombies: 3 left", the marker and the minimap on the nearest; the last one dead, it is paid as ever (the crew there
+  at the delivery keeps its credit); the clock still fails it. The result: "Zombies cleared 20/20".
+- **Co-op**: the same enemies; every crew mate makes them 35 % tougher (health).
+- Admin: P → JOBS & MISSIONS → KILL MISSION ZOMBIES. Analytics: `MissionCleared`. Tests: `tests/missionplan_test.luau`.
+
+### Live events
+One live event at a time for the whole server: the first 10 – 15 minutes after a player arrives, then one every 20 –
+30 minutes, each only when its moment comes (`server/LiveEvents.luau`, `shared/LiveEvents.luau`,
+`Config.LiveEvents`). A toast and a sting say when one starts and ends; a banner at the top of the HUD
+(`client/EventBanner.luau`, `TouchLayout.banner`) shows its name, the time left and a hint. Missions are never
+touched, and a golden or a regular's order keeps its own multiplier (no event's on top).
+- **🌕 BLOOD MOON** (5 min, night only): the sky, the fog and the moonlight turn red (`client/Weather.luau`); roaming
+  zombies × 1.5, job waves × 1.5, every zombie × 1.2 faster (30 studs/s at most). Jobs pay × 2: the bonus sits beside
+  the night bonus on the same subtotal (`Economy.payout` eventMultiplier); the result says "🌕 BLOOD MOON ×2 +$…".
+- **🕑 RUSH HOUR** (5 min, day only): jobs pay × 1.5; every board is made anew with one more offer per danger level
+  and on foot and by bike, new offers every minute; J and the phone's JOBS show "🕑 RUSH HOUR · ×1.5 pay · 3:12".
+- **📦 SUPPLY DROP** (6 min): a crate on a parachute comes down on a street outside the safe zone (a light beam, a
+  marker on both maps, tap the banner for the GPS); zombies gather round it. Anyone on foot with free hands picks it
+  up (E) and carries it like cargo (no gun, no car; G puts it down on the floor in front of you, never on a car); it
+  drops when you die, sit, stand still 20 s or do not get closer to the depot in a minute, and a too-fast step puts it
+  back. The first to bring it onto the DROP-OFF pad in the depot's yard gets $450 and 220 XP (more at higher levels).
+- **🧟 HORDE AT THE GATES** (6 min): 40 zombies come in bursts down two streets on one side and wait at the safe
+  zone's edge (they never come in). The event has its own room under the zombie cap (`Zombies.eventReserve`; calm far
+  roamers make way), so it comes in full on a busy server. Beaten at 90 % ("HORDE 34/36"), everybody who killed some
+  shares $900 and 450 XP by their kills (at the time limit, the share that fell). At the end the leftovers despawn or
+  walk away.
+- P → EVENTS starts or ends any event; analytics `EventStarted`, `SupplyDelivered`, `HordeBeaten` and the
+  `SupplyDrop` / `HordeReward` money; the daily task "Take part in a live event". Tests: `tests/liveevents_test.luau`.
+
+### A subtle outline on the enemies
+The nearest living enemies get a thin outline with no fill, never through walls (`client/EnemyOutline.luau`,
+`shared/OutlinePick.luau`, `Config.Outline`): zombies red, bandits, gunners and the bandits' pickups orange. Roblox
+draws at most 31 highlights, so a pool of 24 goes every 0.25 s to the nearest within 160 studs (a phone: 12 within
+96), held a little farther so nothing flickers; a dead one loses it at once. SETTINGS → ENEMY OUTLINES ON/OFF.
+Tests: `tests/outline_test.luau`.
+
 ## No more wheelie (6.14.2)
 
 The owner: "take the wheelie away, it looks silly". The 6.10 wheelie is gone: no Shift / R1 / touch WHEELIE on a

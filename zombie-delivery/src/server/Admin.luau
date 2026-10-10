@@ -49,6 +49,9 @@
 --                             goes first; server/SpecialOrders.luau force)
 --   regularOrder [T]          6.14: a REGULAR'S ORDER on the board now (needs a business where you are Silver or better)
 --   regulars [T] count        6.14: every business at that many deliveries (0 clears them; server/Regulars.luau adminSet)
+--   liveEvent  id             6.15: "bloodmoon" | "rush" | "supply" | "horde" starts that live event now for the whole
+--                             server (the running one ends first; the Blood Moon turns the clock to the night, rush
+--                             hour to the morning), "end" ends it (server/LiveEvents.luau adminStart checks the id)
 --   god [T]    boolean?       toggle (or set) invulnerable: you and your car
 --   fly [T] / noclip [T] / jump [T] / carBoost [T] / hidden [T] / oneHit [T]   boolean?: toggle (or set) the player
 --                             attributes AdminFly, AdminNoclip (client/AdminFly.luau), AdminJump (super jump, there
@@ -82,6 +85,8 @@
 --   missionsAll [T]           every mission at 3 stars, every campaign rewarded (no money; 3.1: its exclusive gun or
 --                             paint and title); unlockAll does it too
 --   missionsReset [T]         the mission progress and the campaign rewards cleared
+--   missionKill [T]           6.15: KILL MISSION ZOMBIES: every enemy left of the mission the target is on dies and counts
+--                             (Jobs.adminKillMission); delivered already, the mission is done
 --   challengesAll [T]         3.1: every challenge done (its money and title), every campaign's reward and the last
 --                             one (Dead End) (server/Challenges.luau)
 --   secretsAll [T]            every lost package found (no money each) and their reward (Phantom)
@@ -663,6 +668,12 @@ end
 local function missionsReset(player: Player)
 	Missions.adminReset(player)
 	say(player, "ADMIN: mission progress cleared. Every campaign starts at mission 1 again.")
+end
+
+-- 6.15: every enemy left of the mission dies at once (server/MissionEnemies.luau; they count for it).
+local function missionKill(player: Player)
+	local count = Jobs.adminKillMission(player)
+	say(player, if count > 0 then `ADMIN: {count} mission {if count == 1 then "enemy" else "enemies"} killed.` else "ADMIN: no mission running, or none of its enemies left.")
 end
 
 -- ── Challenges, secrets, titles (3.1, server/Challenges.luau) ─────────────
@@ -1261,6 +1272,10 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	regulars = function(player: Player, arg: any)
 		say(player, require(Server.Regulars).adminSet(player, arg))
 	end,
+	-- 6.15: the live events, for the whole server
+	liveEvent = function(player: Player, arg: any)
+		say(player, require(Server.LiveEvents).adminStart(arg))
+	end,
 	god = setGod,
 	spawn = spawnEnemies,
 	banditCar = banditCar,
@@ -1280,6 +1295,7 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	missionStart = missionStart,
 	missionsAll = missionsAll,
 	missionsReset = missionsReset,
+	missionKill = missionKill, -- 6.15
 	challengesAll = challengesAll,
 	secretsAll = secretsAll,
 	challengesReset = challengesReset,
@@ -1323,7 +1339,7 @@ for _, name in {
 	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "refuel", "speed",
 	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
 	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
-	"title", "streak", "shift", "goldenOrder", "regularOrder", "regulars",
+	"title", "streak", "shift", "goldenOrder", "regularOrder", "regulars", "missionKill",
 } do
 	TARGETED[name] = true
 end

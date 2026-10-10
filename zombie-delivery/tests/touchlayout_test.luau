@@ -199,6 +199,31 @@ for _, screen in SCREENS do
 		if W > H and W >= 700 and not admin then
 			check(`{name}: the chips big enough to read ({math.floor(16 * scale * 10 + 0.5) / 10} px title)`, scale >= TouchLayout.CHIPS_TOUCH - 1e-9, scale)
 		end
+
+		-- 6.15, the live event's banner (client/EventBanner.luau) with the chips showing (and without them): on the
+		-- screen, clear of the chips, the touch buttons, the thumbstick, the row, ADMIN and the columns; never under
+		-- BANNER_MIN (its 16 px title at 9.6 px).
+		for _, withChips in { true, false } do
+			local chipsBox = if withChips then chips else nil
+			local banner, bannerScale = TouchLayout.banner(W, H, TouchLayout.BANNER, chipScale, leftEdge, 16, rowLeft, rowBottom, chipsBox, blocks)
+			local what = if withChips then " (with the chips)" else ""
+			check(`{name}{tag}: the banner on the screen{what}`, inside(banner, W, H), show(banner))
+			if withChips then
+				check(`{name}{tag}: the banner clear of the chips`, not TouchLayout.overlap(banner, chips), `{show(banner)} / {show(chips)}`)
+			end
+			check(`{name}{tag}: the banner clear of the row, the columns and the bar{what}`, not (TouchLayout.overlap(banner, row) or TouchLayout.overlap(banner, leftCol) or TouchLayout.overlap(banner, contract) or TouchLayout.overlap(banner, col2) or TouchLayout.overlap(banner, bar)), show(banner))
+			check(`{name}{tag}: the banner clear of the thumbstick and the jump button{what}`, not (TouchLayout.overlap(banner, c.thumb) or TouchLayout.overlap(banner, c.jump)), show(banner))
+			for i, b in buttons do
+				check(`{name}{tag}: the banner clear of {names[i]}{what}`, not TouchLayout.overlap(banner, b), `{show(banner)} / {show(b)}`)
+			end
+			if admin then
+				check(`{name}{tag}: the banner clear of ADMIN{what}`, not TouchLayout.overlap(banner, adminBox), show(banner))
+			end
+			check(`{name}{tag}: the banner at BANNER_TINY or bigger{what}`, bannerScale >= TouchLayout.BANNER_TINY - 1e-9, bannerScale)
+			if W > H and W >= 700 and not admin then
+				check(`{name}: the banner big enough to read{what} ({math.floor(16 * bannerScale * 10 + 0.5) / 10} px title)`, bannerScale >= TouchLayout.BANNER_MIN - 1e-9, bannerScale)
+			end
+		end
 	end
 end
 
@@ -212,6 +237,13 @@ do
 	-- Little room up there (a narrow window): still on the screen, clear of the column and the row.
 	local narrow, small = TouchLayout.chips(900, 600, wide, stacked, 0.78, 16 + 380 * 0.78, 8, 900 - 16 - 200 * 0.78, 4 + 44 * 0.78, {})
 	check("a narrow computer window: the chips fit somewhere on the screen", inside(narrow, 900, 600) and small >= TouchLayout.CHIPS_MIN, `{show(narrow)} {small}`)
+	-- 6.15: the live event's banner right under the chips in the top middle, at the HUD's scale; without the chips at
+	-- the top edge itself.
+	local playerList = TouchLayout.box(W - 16 - 370, 0, W, 52 + 40 * 4)
+	local banner, bannerScale = TouchLayout.banner(W, H, TouchLayout.BANNER, S, 16 + 380 * S, 8, W - 16 - 370 - 200 * S, 4 + 44 * S, chips, { playerList })
+	check("a computer: the banner under the chips in the top middle at the HUD's scale", bannerScale == S and math.abs((banner.x0 + banner.x1) / 2 - W / 2) < 1 and banner.y0 == chips.y1 + TouchLayout.GAP and not TouchLayout.overlap(banner, chips), `{show(banner)} {bannerScale}`)
+	local alone = TouchLayout.banner(W, H, TouchLayout.BANNER, S, 16 + 380 * S, 8, W - 16 - 370 - 200 * S, 4 + 44 * S, nil, { playerList })
+	check("a computer without the chips: the banner at the top edge", alone.y0 == 8 and math.abs((alone.x0 + alone.x1) / 2 - W / 2) < 1, show(alone))
 end
 
 -- 6.14 review: the HUD's left column at the top left (client/Hud.luau LEFT_H: the cash 30 + 6 + the minimap 172 + 6 +

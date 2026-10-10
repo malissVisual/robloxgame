@@ -49,6 +49,7 @@
 -- Bandits among them. During a player's job (driving, out of the safe zone, ★★ and up when Jobs.crewStatus tells
 -- the stars) a traffic car behind them can turn out to be a bandit pickup now and then: it vanishes and
 -- BanditCars.chase spawns the pickup on that spot, heading the same way. Never more than one chasing at a time.
+-- 6.15: never during a mission (Jobs.onMission): a mission's enemies are always the same (server/MissionEnemies.luau).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -1699,7 +1700,8 @@ end
 local function banditCheck(list: { Viewer }, now: number)
 	for _, v in list do
 		local player = v.player
-		if not Jobs.active(player) then
+		-- (6.15: never on a mission: its enemies are its own fixed plan, server/MissionEnemies.luau)
+		if not Jobs.active(player) or Jobs.onMission(player) then
 			jobSince[player] = nil
 			continue
 		end
