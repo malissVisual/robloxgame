@@ -1221,6 +1221,17 @@ Where it shows:
 
 The skills that levels will give are only a proposal for now: `design/skills/PROPOSAL.md`.
 
+
+### The rider pedals, and the bike is loaded on purpose (6.19)
+The pedal bikes are built about a quarter smaller to fit the classic R15 courier (lower saddle, higher bars, longer
+cranks; the ride, speeds and hitboxes unchanged). On the Rusty, Courier, Cargo and E-Bike each foot follows its pedal
+round the crank (`RiderPose.legIk`), the knees forward, the hands on the grips, the body over the bars; the E-Bike
+pedals calmer; stopped, one pedal forward. On bike jobs: E at your bike's rack "Load onto bike" (the pieces show on
+it, the prompt counts "2 / 3"), at a drop "Take off bike"; the next-step card says so (`Holding.bikeAction`).
+
+### CARRYING reads right (6.19)
+The bag's pieces were counted twice ("7/6"); the pill now shows one icon per kind of piece with ×n.
+
 ## One look everywhere (6.18)
 
 The owner: "unify it so the phone and the other popups look like JOBS". A UI kit (`client/CardKit.luau`,

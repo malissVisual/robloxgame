@@ -115,6 +115,9 @@
 --   spin and lean with it), its cranks and pedals to the hidden "Crank" on the Motor6D "CrankMotor" (turned by the
 --   speed). The saddle (the DriverSeat) sits on the BikeFrame, so the rider leans too (client/BikeRider.luau poses
 --   the arms forward and pumps the legs). The art's NightLamp parts glow at night; a player's bike throws a small beam.
+-- * 6.19: the art is built at BikeArt.Scale (smaller, to Roblox's classic R15 rider: the feet reach the pedals, the
+--   hands the grips; client/BikeRider.luau's leg IK). The saddle (the DriverSeat), the rack's / box's slots and the Load
+--   point follow the art (bikeArt); the hidden hull, the four colliders and every number of the ride stay 5.1's.
 -- * Bike gear (Config.Gear bikeOnly: basket, panniers, trailer; Vehicles.hasGear) shows in the UpgradeKit from the
 --   same art, and adds its light slots to Vehicles.cargoSlots (the art's slot points; the trailer hangs rigidly at the
 --   rear Hitch, its wheels on WheelMotors too). None of the car kit (plow, armour, engine, tyres, car gear) on a bike.
@@ -301,6 +304,13 @@ local function cargo(noun: string, length: number, width: number, slots: { Vecto
 		door = door or Vector3.new(0, 2.4, length / 2 + 0.6),
 		entry = entry or Vector3.new(width / 2 + 1.5, 0, 0),
 	}
+end
+
+-- 6.19: a point of the bikes' art (5.1's units, from the ground under the bike) where the art is built now (at
+-- BikeArt.Scale), relative to a bike's chassis top (2.1 over the ground: its clearance 0.9 + the chassis' 1.2).
+local function bikeArt(x: number, y: number, z: number): Vector3
+	local k = BikeArt.Scale
+	return Vector3.new(x * k, y * k - 2.1, z * k)
 end
 
 -- 3.2: two rear doors over the back face of a box (`width` wide, from `bottom` to `top`, the face at z = `rear`),
@@ -1046,20 +1056,22 @@ local STYLES: { [string]: Style } = {
 	-- 2.1 over the ground (clearance 0.9 + the chassis' 1.2): the art's points (from the ground) less 2.1. The boxes are
 	-- a hidden hull over the frame; the wheels come from the art (bikeBody), two on the centre line, four hidden
 	-- colliders 1.9 apart. No back: the rear rack's one light slot (the art's Slot1) loads straight away.
+	-- 6.19: the art is built at BikeArt.Scale (smaller, to the classic R15 rider): the saddle, the slots and the Load
+	-- point follow it (bikeArt); the hull, the colliders and every number of the ride stay 5.1's.
 	bike = {
 		width = 2.4,
 		length = 6.5,
 		wheel = 1.3,
 		wheelWidth = 0.5,
 		clearance = 0.9,
-		seat = Vector3.new(0, 0.86, 0.55), -- the saddle's top at 3.16 (the art's Saddle point)
+		seat = bikeArt(0, 3.16 - BikeArt.SaddleDrop, 0.55) - Vector3.new(0, 0.2, 0), -- the seat's top on the art's Saddle point
 		passengers = {},
 		roof = 2,
 		bike = true,
 		boxes = {
 			box(Vector3.new(0.8, 1.2, 4.2), Vector3.new(0, 0.6, 0), "dark"), -- the frame, the saddle, the bars
 		},
-		cargo = cargo("rack", 6.5, 2.4, { Vector3.new(0, 0.71, 1.8) }, nil, Vector3.new(0, 1.0, 2.9)),
+		cargo = cargo("rack", 6.5, 2.4, { bikeArt(0, 2.81, 1.8) }, nil, Vector3.new(0, 0.5, 2.3)),
 	},
 	-- The Cargo Bike: a longer, low frame with a box up front: four light slots on the box floor (four of the art's six
 	-- box points, spread 2 x 2), loaded from the box's left side.
@@ -1069,7 +1081,7 @@ local STYLES: { [string]: Style } = {
 		wheel = 1.3,
 		wheelWidth = 0.5,
 		clearance = 0.9,
-		seat = Vector3.new(0, 0.86, 0.85),
+		seat = bikeArt(0, 3.16 - BikeArt.SaddleDrop, 0.85) - Vector3.new(0, 0.2, 0),
 		passengers = {},
 		roof = 2,
 		bike = true,
@@ -1078,11 +1090,11 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(1.6, 0.7, 1.6), Vector3.new(0, 0.35, -0.575), "dark"), -- the box
 		},
 		cargo = cargo("cargo box", 6.9, 2.4, {
-			Vector3.new(-0.35, 0.11, -0.95),
-			Vector3.new(0.35, 0.11, -0.95),
-			Vector3.new(-0.35, 0.11, -0.2),
-			Vector3.new(0.35, 0.11, -0.2),
-		}, nil, Vector3.new(-1.3, 0.5, -0.6)),
+			bikeArt(-0.35, 2.21, -0.95),
+			bikeArt(0.35, 2.21, -0.95),
+			bikeArt(-0.35, 2.21, -0.2),
+			bikeArt(0.35, 2.21, -0.2),
+		}, nil, Vector3.new(-1.2, 0.2, -0.45)),
 	},
 	-- 5.1.1, the E-Scooter (server/ScooterArt/Geometry.luau over this hidden hull): small wheels (radius 0.6, axles at
 	-- z -1.95 and 1.45), so a low hull: the chassis top 1.5 over the ground (clearance 0.3 + 1.2); one low hidden box
@@ -2070,10 +2082,12 @@ local function bikeBody(model: Model, chassis: Part, chassisY: number, style: St
 	lean.C0 = ground
 	lean.Parent = chassis
 	local front, rear = artOrigin(spec, "FrontWheel"), artOrigin(spec, "RearWheel")
+	-- 6.19: a bike's visible wheels spin by their own (scaled) size: the axle's height over the ground
+	local scaled = spec.origins.Crank ~= nil -- (the E-Scooter's art is not scaled)
 	local targets: { [string]: BasePart } = {
 		Frame = frame,
-		FrontWheel = wheelRoot(model, chassis, frame, front, style.wheel, 0.3, true),
-		RearWheel = wheelRoot(model, chassis, frame, rear, style.wheel, 0.3, false),
+		FrontWheel = wheelRoot(model, chassis, frame, front, if scaled then front.Y else style.wheel, 0.3, true),
+		RearWheel = wheelRoot(model, chassis, frame, rear, if scaled then rear.Y else style.wheel, 0.3, false),
 	}
 	if spec.origins.Crank then
 		-- (5.1.1: the E-Scooter has no crank: nothing to pedal.)
@@ -2093,9 +2107,11 @@ local function bikeBody(model: Model, chassis: Part, chassisY: number, style: St
 			DayNight.nightLight(p, BIKE_LAMP_LIT, p.Color, p.Material.Name)
 		end
 	end
-	-- The hidden wheel colliders: four, a stable stance under the two visible wheels (no balance physics).
+	-- The hidden wheel colliders: four, a stable stance under the two visible wheels (no balance physics). 6.19: where
+	-- 5.1's full-size art had its axles (the art is smaller now; the ride is not).
 	local x = style.width / 2 - style.wheelWidth / 2
-	for _, z in { front.Z, rear.Z } do
+	local unscale = if scaled then 1 / BikeArt.Scale else 1
+	for _, z in { front.Z * unscale, rear.Z * unscale } do
 		for _, side in { -1, 1 } do
 			local collider = newPart(model, "WheelCollider", Vector3.new(style.wheelWidth, style.wheel * 2, style.wheel * 2), chassis.CFrame * ground * CFrame.new(side * x, style.wheel, z), DARK, Enum.Material.Rubber)
 			collider.Shape = Enum.PartType.Cylinder

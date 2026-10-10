@@ -28,6 +28,11 @@
 --   Holding.bikeNear(seated, distance, reach)  6.6: is your bike's own bag within reach: you sit on it, or it stands
 --                                              `distance` studs from you, no more than `reach` (Config.Cargo.BikeReach);
 --                                              nil distance: no bike out
+--   Holding.bikeAction(held, fits, bikeFree, onBike, drop)  6.19: what E at your bike's rack does (server/Cargo.luau's
+--                                              prompt on it): "load" (the `held` pieces in your hands all `fits` the
+--                                              bike's bag and it has `bikeFree` room for one), "take" (empty hands at a
+--                                              `drop` with `onBike` pieces on it: one into your hands), else nil (off)
+--   Holding.bikeText(action, piece, count, room)  6.19: the prompt's words: ("Load onto bike", "Your bike: pizza 1 / 3")
 --   Holding.place(light, bikeNear, bikeFree, bagHeld, bagFree)  6.6: where a piece you pick up goes: "bike" (a light
 --                                              piece, the bike within reach with room on it), else "bag" (a light
 --                                              piece, the bag in your hand with room in it), else "hands". A heavy
@@ -129,6 +134,21 @@ function Holding.bikeNear(seated: boolean, distance: number?, reach: number): bo
 		return true
 	end
 	return distance ~= nil and distance == distance and distance <= reach
+end
+
+function Holding.bikeAction(held: number, fits: boolean, bikeFree: number, onBike: number, drop: boolean): string?
+	if held > 0 then
+		return if fits and bikeFree > 0 then "load" else nil
+	end
+	return if drop and onBike > 0 then "take" else nil
+end
+
+function Holding.bikeText(action: string?, piece: string, count: number, room: number): (string, string)
+	local object = `Your bike: {piece} {count} / {room}`
+	if action == "take" then
+		return "Take off bike", object
+	end
+	return "Load onto bike", object
 end
 
 function Holding.place(light: boolean, bikeNear: boolean, bikeFree: number, bagHeld: boolean, bagFree: number): string

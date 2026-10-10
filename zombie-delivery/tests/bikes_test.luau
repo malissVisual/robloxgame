@@ -251,6 +251,98 @@ do
 	check("arm IK: a degenerate point falls back", p3 == RiderPose.Upright.Reach and b3 == RiderPose.Upright.Elbow)
 end
 
+-- 6.19: the rider pedals (the owner: "the bike doesn't fit, the legs"). The bikes' art is built at BikeGeometry.Scale
+-- (server/BikeArt/Geometry.luau) and the classic R15's feet follow the pedals round the crank (RiderPose.legIk).
+do
+	local BikeGeometry = require("./BikeGeometry")
+	type V = { x: number, y: number, z: number }
+	local function v(x: number, y: number, z: number): V
+		return { x = x, y = y, z = z }
+	end
+	local function rx(p: V, a: number): V
+		return v(p.x, p.y * math.cos(a) - p.z * math.sin(a), p.y * math.sin(a) + p.z * math.cos(a))
+	end
+	local function rz(p: V, a: number): V
+		return v(p.x * math.cos(a) - p.y * math.sin(a), p.x * math.sin(a) + p.y * math.cos(a), p.z)
+	end
+	-- Forward kinematics of RiderPose.legIk's answer: Rz(roll) * Rx(pitch) on the thigh, Rx(knee) more on the shin.
+	local function ankleOf(pitch: number, roll: number, knee: number, thigh: number, shin: number): (V, V)
+		local down = v(0, -1, 0)
+		local t = rz(rx(down, pitch), roll)
+		local sh = rz(rx(down, pitch + knee), roll)
+		local kneeAt = v(t.x * thigh, t.y * thigh, t.z * thigh)
+		return v(kneeAt.x + sh.x * shin, kneeAt.y + sh.y * shin, kneeAt.z + sh.z * shin), kneeAt
+	end
+	local worst = 0
+	for _, t in { v(0, -1.5, -0.1), v(0.2, -1.1, -0.6), v(-0.15, -1.3, 0.4), v(0.1, -0.9, -0.2) } do
+		local pitch, roll, knee = RiderPose.legIk(t.x, t.y, t.z, 0.83, 0.94)
+		local at = ankleOf(pitch, roll, knee, 0.83, 0.94)
+		worst = math.max(worst, math.sqrt((at.x - t.x) ^ 2 + (at.y - t.y) ^ 2 + (at.z - t.z) ^ 2))
+	end
+	check("6.19 leg IK: the ankle reaches points within the leg (error < 0.03)", worst < 0.03, worst)
+	local p2, r2, k2 = RiderPose.legIk(0, -5, 0, 0.83, 0.94)
+	check("6.19 leg IK: out of reach the leg points straight at it", math.abs(p2) < 0.1 and math.abs(r2) < 1e-6 and k2 > -0.1 and k2 <= 0, `{p2} {k2}`)
+	local p3, r3, k3 = RiderPose.legIk(0, 0, 0, 0.83, 0.94)
+	check("6.19 leg IK: a degenerate point falls back to the rest", p3 == 0 and r3 == 0 and k3 == 0)
+
+	-- The classic R15 (thigh 0.83, shin 0.94, the ankle 0.23 over the sole: hip to sole about its HipHeight 2) on every
+	-- pedalling bike's art: the hips RiderPose.Ride over the Saddle point, each ankle over its pedal round a whole turn.
+	local ride = RiderPose.Ride
+	local THIGH, SHIN, ANKLE = 0.83, 0.94, 0.23
+	local function point(spec: any, name: string): V
+		for _, pt in spec.attachments do
+			if pt.name == name then
+				return v(pt.at[1], pt.at[2], pt.at[3])
+			end
+		end
+		error("no point " .. name)
+	end
+	check("6.19: the bikes built smaller (about three quarters), the wheels to the rider", BikeGeometry.Scale >= 0.7 and BikeGeometry.Scale <= 0.85)
+	for _, id in { "rustbike", "citybike", "cargobike", "ebike" } do
+		local spec = BikeGeometry.spec(id)
+		local saddle, axis, pedal = point(spec, "Saddle"), point(spec, "CrankAxis"), point(spec, "RightPedal")
+		local grip = point(spec, "RightGrip")
+		local hip = v(0.5, saddle.y + ride.HipUp, saddle.z + ride.HipBack)
+		local reachMin, reachMax, kneeMax, missMax, inverted, thighMax = math.huge, 0, 0, 0, false, -math.huge
+		for step = 0, 23 do
+			local crank = -step * math.pi / 12
+			local pd = rx(pedal, crank)
+			local target = v(axis.x + pd.x, axis.y + pd.y + ride.PedalTop + ANKLE, axis.z + pd.z + ride.AnkleBack)
+			local d = v(target.x - hip.x, target.y - hip.y, target.z - hip.z)
+			local reach = math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z) / (THIGH + SHIN)
+			reachMin, reachMax = math.min(reachMin, reach), math.max(reachMax, reach)
+			local pitch, roll, knee = RiderPose.legIk(d.x, d.y, d.z, THIGH, SHIN)
+			local at, kneeAt = ankleOf(pitch, roll, knee, THIGH, SHIN)
+			missMax = math.max(missMax, math.sqrt((at.x - d.x) ^ 2 + (at.y - d.y) ^ 2 + (at.z - d.z) ^ 2))
+			kneeMax = math.max(kneeMax, -knee)
+			thighMax = math.max(thighMax, pitch)
+			-- the knee forward of the hip-to-ankle line (never bent backwards)
+			local cross = d.y * kneeAt.z - d.z * kneeAt.y
+			inverted = inverted or knee > 0 or cross < -1e-6
+		end
+		check(`6.19 {id}: the classic R15's foot on the pedal all round the crank (miss {string.format("%.3f", missMax)})`, missMax < 0.03, missMax)
+		check(`6.19 {id}: the leg never straight, never folded (reach {string.format("%.2f", reachMin)} – {string.format("%.2f", reachMax)} of the leg)`, reachMax < 0.97 and reachMin > 0.45, `{reachMin} {reachMax}`)
+		check(`6.19 {id}: the knees forward, never inverted; the thigh at most a little over level ({string.format("%.0f", math.deg(thighMax))}°)`, not inverted and math.deg(thighMax) < 100 and math.deg(kneeMax) < 140)
+		check(`6.19 {id}: the grips ahead of the saddle and over it`, grip.z < saddle.z - 0.4 and grip.y > saddle.y + 0.2)
+	end
+
+	-- The crank: it turns with the speed (forward: the pedal at the top goes forward, the angle down), the E-Bike calmer,
+	-- and stopped it settles with one pedal forward, level.
+	local a1 = RiderPose.crankStep(0.3, 20, 0.1)
+	local a2 = RiderPose.crankStep(0.3, 20, 0.1, true)
+	local turned1 = (0.3 - a1) % (2 * math.pi)
+	local turned2 = (0.3 - a2) % (2 * math.pi)
+	check("6.19 crank: riding turns it forward, the E-Bike calmer but still turning", turned1 > 0.3 and turned2 > 0.2 and turned2 < turned1, `{turned1} {turned2}`)
+	check("6.19 crank: never faster than MaxCrank", (0.3 - RiderPose.crankStep(0.3, 500, 0.01)) % (2 * math.pi) <= ride.MaxCrank * 0.01 + 1e-9)
+	local rest = 1.0
+	for _ = 1, 120 do
+		rest = RiderPose.crankStep(rest, 0, 1 / 60)
+	end
+	check("6.19 crank: stopped, one pedal forward and level (the right pedal at the front or the back)", math.abs(math.sin(rest)) > 0.999, rest)
+	check("6.19 ankle: the foot kept level with the bike, the toes a touch down", math.abs(RiderPose.ankle(0.5, -0.8, 0) - (0.3 + ride.Toe)) < 1e-9
+		and RiderPose.ankle(0.5, -0.8, -math.pi / 2) < RiderPose.ankle(0.5, -0.8, 0))
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

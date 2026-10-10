@@ -1,6 +1,15 @@
 --!strict
 -- Pure bike/gear skins. Frame, wheels and Crank are separate caller-owned assemblies; no controllers or seats.
+-- 6.19 (the owner: "the bike doesn't fit, the legs"): every bike and its gear is built at Geometry.Scale of the 5.1
+-- art (the frames were sized for a rider a third taller than Roblox's classic R15), the saddle a little lower
+-- (SaddleDrop), the bars a little higher (BarRise), the cranks a little longer (CrankArm, so the pedalling shows) and
+-- the pedals out under the blocky legs' hips, all in the 5.1 art's units before the scale. The classic courier's feet then reach the pedals round the whole crank
+-- (client/BikeRider.luau's leg IK, shared/RiderPose.luau legIk). The colliders and the physics are not the art's.
 local Geometry = {}
+Geometry.Scale = .75
+Geometry.SaddleDrop = .38
+Geometry.BarRise = .3
+Geometry.CrankArm = .45
 type V = { number }
 type Piece = { name: string, size: V, at: V, attach: string, finish: string, turn: V?, shape: string?, shadow: boolean?, text: string?, night: boolean? }
 Geometry.ids = { "rustbike", "citybike", "cargobike", "cargobike_loaded", "ebike", "basket", "panniers", "trailer", "bell", "light" }
@@ -38,7 +47,8 @@ function Geometry.pieces(id: string): { Piece }
 		local paint = if rusty then "worn" else "red"
 		wheel(p, "Front", 1.19, 12, "steel", true)
 		wheel(p, "Rear", 1.19, 12, if rusty then "worn" else "steel", true)
-		local h, s, c = { 0, 2.83, head }, { 0, 2.95, seat }, { 0, 1.22, seat - .12 }
+		local drop, rise, arm = Geometry.SaddleDrop, Geometry.BarRise, Geometry.CrankArm
+		local h, s, c = { 0, 2.83, head }, { 0, 2.95 - drop, seat }, { 0, 1.22, seat - .12 }
 		if not cargo then bar(p, "TopTube", h, s, .11, "Frame", paint) end
 		bar(p, "DownTube", h, c, .13, "Frame", paint)
 		bar(p, "SeatTube", c, s, .12, "Frame", paint)
@@ -48,10 +58,10 @@ function Geometry.pieces(id: string): { Piece }
 			bar(p, "Fork" .. side, { side * .15, if cargo then 2.6 else h[2], if cargo then front + .12 else h[3] }, { side * .15, 1.3, front }, .095, "Frame", "steel")
 		end
 		if cargo then bar(p, "LowCargoBeam", { 0, 1.22, seat - .12 }, { 0, 1.48, front + .12 }, .13, "Frame", paint) end
-		bar(p, "Stem", h, { 0, 3.25, head - .18 }, .1, "Frame", "steel")
-		add(p, "Handlebar", { 1.42, .09, .09 }, { 0, 3.25, head - .18 }, "Frame", "steel", "Cylinder")
-		for _, side in { -1, 1 } do add(p, "Grip" .. side, { .34, .14, .14 }, { side * .61, 3.25, head - .18 }, "Frame", "sole", "Cylinder") end
-		add(p, "Saddle", { .66, .15, .72 }, { 0, 3.08, seat }, "Frame", "sole")
+		bar(p, "Stem", h, { 0, 3.25 + rise, head - .18 }, .1, "Frame", "steel")
+		add(p, "Handlebar", { 1.42, .09, .09 }, { 0, 3.25 + rise, head - .18 }, "Frame", "steel", "Cylinder")
+		for _, side in { -1, 1 } do add(p, "Grip" .. side, { .34, .14, .14 }, { side * .61, 3.25 + rise, head - .18 }, "Frame", "sole", "Cylinder") end
+		add(p, "Saddle", { .66, .15, .72 }, { 0, 3.08 - drop, seat }, "Frame", "sole")
 		if not cargo then
 			add(p, "RearRack", { .76, .065, 1 }, { 0, 2.77, rear - .2 }, "Frame", "steel")
 			for _, side in { -1, 1 } do bar(p, "RackStay" .. side, { side * .16, 1.3, rear }, { side * .33, 2.74, rear + .15 }, .05, "Frame", "steel") end
@@ -59,8 +69,8 @@ function Geometry.pieces(id: string): { Piece }
 		add(p, "ChainRing", { .07, .62, .62 }, { .22, 0, 0 }, "Crank", "steel", "Cylinder")
 		if not cargo and id ~= "ebike" then bar(p, "ChainUpper", { .25, 1.44, seat - .12 }, { .25, 1.42, rear }, .035, "Frame", "sole") end
 		for _, side in { -1, 1 } do
-			bar(p, "CrankArm" .. side, { side * .28, 0, 0 }, { side * .28, side * .38, 0 }, .075, "Crank", "steel")
-			add(p, "Pedal" .. side, { .38, .1, .26 }, { side * .47, side * .38, 0 }, "Crank", "sole")
+			bar(p, "CrankArm" .. side, { side * .36, 0, 0 }, { side * .36, side * arm, 0 }, .075, "Crank", "steel")
+			add(p, "Pedal" .. side, { .38, .1, .26 }, { side * .62, side * arm, 0 }, "Crank", "sole")
 		end
 		if cargo then
 			add(p, "CargoFloor", { 1.5, .12, 1.55 }, { 0, 2.14, -.575 }, "Frame", "worn")
@@ -82,7 +92,7 @@ function Geometry.pieces(id: string): { Piece }
 		if id == "ebike" then
 			add(p, "Battery", { .3, .7, .26 }, { 0, 1.97, -.55 }, "Frame", "charcoal", nil, { 24, 0, 0 })
 			add(p, "BatteryStripe", { .31, .07, .27 }, { 0, 1.91, -.55 }, "Frame", "red", nil, { 24, 0, 0 })
-			add(p, "BarDisplay", { .29, .06, .22 }, { -.22, 3.32, head - .18 }, "Frame", "glass", nil, { 15, 0, 0 })
+			add(p, "BarDisplay", { .29, .06, .22 }, { -.22, 3.32 + rise, head - .18 }, "Frame", "glass", nil, { 15, 0, 0 })
 			add(p, "FrontDisc", { .04, .62, .62 }, { .18, 0, 0 }, "FrontWheel", "steel", "Cylinder")
 			add(p, "RearDisc", { .04, .62, .62 }, { .18, 0, 0 }, "RearWheel", "steel", "Cylinder")
 		end
@@ -115,6 +125,12 @@ function Geometry.pieces(id: string): { Piece }
 		p[#p].night = true
 		add(p, "Clip", { .1, .12, .12 }, { 0, -.19, .04 }, "Mount", "sole")
 	else error("Unknown bike art id: " .. id) end
+	-- 6.19: the whole skin at Geometry.Scale (from the ground origin, or the gear's mount).
+	local k = Geometry.Scale
+	for _, piece in p do
+		piece.size = { piece.size[1] * k, piece.size[2] * k, piece.size[3] * k }
+		piece.at = { piece.at[1] * k, piece.at[2] * k, piece.at[3] * k }
+	end
 	return p
 end
 function Geometry.spec(id: string): any
@@ -125,11 +141,12 @@ function Geometry.spec(id: string): any
 	if bike(id) then
 		local front, rear, head, seat = dims(id)
 		origins = { Frame = { 0, 0, 0 }, FrontWheel = { 0, 1.3, front }, RearWheel = { 0, 1.3, rear }, Crank = { 0, 1.22, seat - .12 } }; roots = 4
-		point("Saddle", "Frame", { 0, 3.16, seat }); point("LeftGrip", "Frame", { -.61, 3.25, head - .18 }); point("RightGrip", "Frame", { .61, 3.25, head - .18 })
-		point("LeftPedal", "Crank", { -.47, -.38, 0 }); point("RightPedal", "Crank", { .47, .38, 0 })
+		local drop, rise, arm = Geometry.SaddleDrop, Geometry.BarRise, Geometry.CrankArm
+		point("Saddle", "Frame", { 0, 3.16 - drop, seat }); point("LeftGrip", "Frame", { -.61, 3.25 + rise, head - .18 }); point("RightGrip", "Frame", { .61, 3.25 + rise, head - .18 })
+		point("LeftPedal", "Crank", { -.62, -arm, 0 }); point("RightPedal", "Crank", { .62, arm, 0 })
 		point("FrontAxle", "Frame", { 0, 1.3, front }); point("RearAxle", "Frame", { 0, 1.3, rear }); point("CrankAxis", "Frame", { 0, 1.22, seat - .12 })
 		point("BasketMount", "Frame", { 0, 2.75, if id == "cargobike" or id == "cargobike_loaded" then -1.88 else head - .6 }); point("PannierMount", "Frame", { 0, 2.82, rear - .2 }); point("Hitch", "Frame", { 0, .75, rear + 1.35 })
-		point("BellMount", "Frame", { -.35, 3.3, head - .18 }); point("LightMount", "Frame", { 0, 3.02, head - .23 })
+		point("BellMount", "Frame", { -.35, 3.3 + rise, head - .18 }); point("LightMount", "Frame", { 0, 3.02, head - .23 })
 		if id == "cargobike" or id == "cargobike_loaded" then
 			for n = 1, 6 do point("Slot" .. n, "Frame", { if n % 2 == 1 then -.35 else .35, 2.21, -1.06 + math.floor((n - 1) / 2) * .48 }) end
 		else point("Slot1", "Frame", { 0, 2.81, rear - .2 }) end
@@ -139,6 +156,14 @@ function Geometry.spec(id: string): any
 		origins = { Frame = { 0, 0, 0 }, LeftWheel = { -.94, .64, .25 }, RightWheel = { .94, .64, .25 } }; roots = 3
 		point("Hitch", "Frame", { 0, .75, -1.85 }); point("LeftAxle", "Frame", { -.94, .64, .25 }); point("RightAxle", "Frame", { .94, .64, .25 })
 		for n = 1, 4 do point("Slot" .. n, "Frame", { if n % 2 == 1 then -.4 else .4, .63, if n <= 2 then -.4 else .4 }) end
+	end
+	-- 6.19: the points and the roots at Geometry.Scale too
+	local k = Geometry.Scale
+	for _, at in points do
+		at.at = { at.at[1] * k, at.at[2] * k, at.at[3] * k }
+	end
+	for name, o in origins do
+		origins[name] = { o[1] * k, o[2] * k, o[3] * k }
 	end
 	return { id = id, pieces = Geometry.pieces(id), attachments = points, origins = origins, newRoots = roots,
 		reservedParts = if bike(id) then 2 else 0, -- Claude's stable collider + doorless seat, in the 70-part total
