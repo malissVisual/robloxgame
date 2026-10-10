@@ -170,6 +170,7 @@ refs.queueRules = require(Shared.JobQueue) -- 6.12.8: the NEXT UP queue's words 
 refs.ready = require(script.Parent.ReadyCheck) -- 6.14: NEXT MISSION, its READY CHECK, WORK's goal line
 refs.gps = require(script.Parent.Gps) -- 6.14: the GPS to a shop or a landmark (gpsTo)
 refs.homeUi = require(script.Parent.PhoneHome) -- 6.18: the home in the UI kit's look (the hero, the app rows)
+refs.moreApps = require(script.Parent.PhoneMore) -- 6.18 wave 2: CAREER, BANK, MESSAGES and SETTINGS in the UI kit's look
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
 refs.bars = {} -- 6.12.5: the MAIN tiles' progress bars by app id (MISSIONS, TASKS: fillMain)
@@ -753,74 +754,8 @@ local function ordersApp(list: Instance)
 end
 
 local function careerApp(list: Instance, wide: boolean)
-	local xp = myXp()
-	local level = myLevel()
-	local road = Career.road()
-	-- 5.5, a wide popup (6.0.1): the current level on the left, the next steps on the right.
-	local here, ahead = refs.apps.columns(list, 1, wide)
-	look.section(here, "Dead End Dispatch · your career", 1)
-	local b = block(here, 2, true)
-	text(b, string.upper(Levels.rank(level)), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Font = Theme.DisplayFont, TextSize = 22 })
-	local chips = look.chipRow(b, 2)
-	look.chip(chips, `Level {level} of {Config.Levels.MaxLevel}`, K.text)
-	look.chip(chips, `{string.sub(Career.money(xp), 2)} XP`)
-	bar(b, Levels.progress(xp), K.text, 3)
-	local nextStep = road[level + 1]
-	if nextStep then
-		local left = math.max(0, nextStep.xp - xp)
-		look.section(here, "Next goal", 3)
-		local g = block(here, 4)
-		caps(g, `Level {nextStep.level}{if nextStep.newRank then ` · {nextStep.rank}` else ""}`, 1, K.red).TextSize = 11
-		text(g, `{string.sub(Career.money(left), 2)} XP to go: about {CareerUi.toGo(left, level)}.`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextSize = 14 })
-		local opens: { string } = {}
-		for _, unlock in nextStep.unlocks do
-			if unlock.kind ~= "stage" or (state and type(state.cars) == "table" and state.cars[unlock.car or ""]) then
-				table.insert(opens, CareerUi.unlockText(unlock))
-			end
-		end
-		if #opens > 0 then
-			look.meta(g, table.concat(opens, "\n", 1, math.min(#opens, 5)), 3)
-		end
-		local parts = Career.rewardParts(nextStep.reward)
-		if #parts > 0 then
-			look.section(g, "Reward", 4)
-			local row = look.chipRow(g, 5)
-			for _, part in parts do
-				look.chip(row, part, K.good)
-			end
-		end
-	end
-	-- The next few levels of the road.
-	look.section(ahead, "The road ahead", 5)
-	local r = block(ahead, 6)
-	local layout = r:FindFirstChildOfClass("UIListLayout")
-	if layout then
-		layout.Padding = UDim.new(0, 8) -- (a step more air between the levels)
-	end
-	local shown = 0
-	for n = level + 2, Config.Levels.MaxLevel do
-		local step = road[n]
-		if not step or shown >= 3 then
-			break
-		end
-		shown += 1
-		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = shown }, r)
-		Ui.make("UISizeConstraint", { MinSize = Vector2.new(0, 24) }, row)
-		local stone = Ui.label(row, tostring(n), UDim2.fromOffset(24, 24), { BackgroundColor3 = K.raised, BackgroundTransparency = 0, Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
-		Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, stone)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, stone)
-		local summary = Career.summary(step.unlocks, 3, if state and type(state.cars) == "table" then state.cars else {})
-		text(row, if summary ~= "" then summary else "better pay and harder roads", UDim2.new(1, -34, 0, 0), { Position = UDim2.fromOffset(34, 4), AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = K.secondary, TextSize = 13 })
-	end
-	if shown == 0 then
-		look.meta(r, "The top of the road is close.", 1)
-	end
-	button(ahead, if Ui.touchLayout() then "FULL CAREER" else "FULL CAREER  [C]", "main", 7, function()
-		local cb = Phone.onCareer
-		if cb then
-			cb()
-		end
-	end)
+	-- 6.18 wave 2: in the UI kit (client/PhoneMore.luau): the next level the hero, the road ahead its rows.
+	refs.moreApps.career(list, look, refs.moreCtx(wide))
 end
 
 -- 6.18 wave 2: SHOP is client/PhoneApps.luau's (PhoneApps.shop: SAVE UP and SHOPS in the UI kit's look).
@@ -829,56 +764,10 @@ local function shopApp(list: Instance, wide: boolean)
 	refs.apps.shop(list, look, refs.host, wide, if goal then goal.name else nil)
 end
 
--- A chat list: one card, a row per message (newest first) split by hairlines: the round avatar, the name and the time,
--- the text under them (muted once read), a red dot at the right edge while unread.
+-- MESSAGES (6.18 wave 2: client/PhoneMore.luau, the kit's rows: the sender's initial, who and when, the first line, a
+-- red dot while unread; a tap opens the message whole). Read now: the badge goes; the dots stay until it is drawn again.
 local function messagesApp(list: Instance)
-	if #messages == 0 then
-		look.emptyState(list, "✉️", "No messages yet", nil, 1)
-		return
-	end
-	look.section(list, "Recent", 1)
-	local card = block(list, 2)
-	local layout = card:FindFirstChildOfClass("UIListLayout")
-	if layout then
-		layout.Padding = UDim.new(0, 0)
-	end
-	local padding = card:FindFirstChildOfClass("UIPadding")
-	if padding then
-		padding.PaddingTop = UDim.new(0, 0)
-		padding.PaddingBottom = UDim.new(0, 0)
-	end
-	local order = 0
-	for index = #messages, 1, -1 do
-		local message = messages[index]
-		order += 1
-		if order > 1 then
-			local hair = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), BackgroundTransparency = 1, LayoutOrder = order * 2 - 1 }, card)
-			Ui.make("Frame", { Size = UDim2.new(1, -48, 1, 0), Position = UDim2.fromOffset(48, 0), BackgroundColor3 = K.line, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, hair)
-		end
-		local row = Ui.make("Frame", { Name = "Message", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order * 2 }, card)
-		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, row)
-		local avatar = Ui.label(row, string.upper(string.sub(message.from, 1, 1)), UDim2.fromOffset(36, 36), {
-			BackgroundColor3 = if message.kind == "marge" then K.red elseif message.kind == "level" then K.text else K.charcoal,
-			BackgroundTransparency = 0,
-			Font = Theme.HeadingFont,
-			TextSize = 15,
-			TextColor3 = if message.kind == "level" then K.charcoal else K.text,
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		if message.kind ~= "marge" and message.kind ~= "level" then
-			Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, avatar)
-		end
-		local content = Ui.make("Frame", { Size = UDim2.new(1, -64, 0, 0), Position = UDim2.fromOffset(48, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, row)
-		Ui.list(content, true, 2)
-		local _, name = look.row2(content, message.from, message.time, 1)
-		name.Font = Theme.HeadingFont
-		text(content, message.text, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextSize = 14, TextColor3 = if message.unread then K.text else K.secondary })
-		if message.unread then
-			local dot = Ui.make("Frame", { Name = "Unread", Size = UDim2.fromOffset(8, 8), Position = UDim2.new(1, 0, 0, 18), AnchorPoint = Vector2.new(1, 0.5), BackgroundColor3 = K.red, BorderSizePixel = 0 }, row)
-			Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, dot)
-		end
-	end
-	-- Read now (the badge goes; the dots stay until the app is drawn again).
+	refs.moreApps.messages(list, look, refs.moreCtx(false))
 	for _, message in messages do
 		message.unread = false
 	end
@@ -1208,6 +1097,42 @@ end
 local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOBS", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS", ready = "READY CHECK" }
 
 -- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
+-- 6.18 wave 2: what client/PhoneMore.luau's apps read (CAREER, BANK, MESSAGES, SETTINGS) and their actions' paths.
+refs.moreCtx = function(wide: boolean): any
+	return {
+		wide = wide,
+		room = refs.popup.room(),
+		redraw = function()
+			renderApp()
+		end,
+		xp = myXp(),
+		level = myLevel(),
+		cars = if state and type(state.cars) == "table" then state.cars else {},
+		toGo = CareerUi.toGo,
+		onCareer = Phone.onCareer,
+		money = money(),
+		earned = refs.earned or 0,
+		onBoard = function()
+			launch("board")
+		end,
+		messages = messages,
+		onSound = function()
+			local cycle = Phone.onSound -- 5.5 (Main: Sounds.cycle)
+			if cycle then
+				cycle()
+			else
+				require(script.Parent.Sounds).cycle()
+			end
+		end,
+		outlineOn = Phone.outlineOn,
+		onOutline = Phone.onOutline,
+		notify = Phone.notify,
+		onClose = Phone.close,
+		onTour = Phone.onTour,
+		keys = refs.apps.keys,
+	}
+end
+
 renderApp = function()
 	if not refs.body then
 		return
@@ -1246,43 +1171,9 @@ renderApp = function()
 		elseif app == "messages" then
 			messagesApp(list)
 		elseif app == "bank" then
-			local balance = block(list, 1)
-			caps(balance, "AVAILABLE CASH", 1)
-			text(balance, Ui.money(money()), UDim2.new(1, 0, 0, 44), { Font = Theme.DisplayFont, TextSize = 32, LayoutOrder = 2 })
-			look.meta(balance, "Your current courier balance. Earn money by completing deliveries.", 3)
-			look.row2(balance, "Earned since you joined", `+{Ui.money(refs.earned or 0)}`, 4, true) -- 5.5
-			button(list, "FIND A DELIVERY", "main", 2, function() launch("board") end)
+			refs.moreApps.bank(list, look, refs.moreCtx(wide)) -- 6.18 wave 2: the cash the hero (client/PhoneMore.luau)
 		elseif app == "settings" then
-			local controls = block(list, 1)
-			caps(controls, "PHONE CONTROLS", 1)
-			look.meta(controls, if Ui.touchLayout() then "Tap an app to open it. The ✕ or a tap beside it returns to the phone; the bottom bar puts the phone away." else "Q opens the phone; Q, ESC or the ✕ close an app, then the phone. T opens the weapon wheel. Hold right mouse to turn the camera while only the phone is open.", 2)
-			look.meta(controls, "Sound cycles: everything on → music off → all off. The selected mode is shown in the game's notification.", 3)
-			button(list, "CYCLE SOUND MODE", "quiet", 2, function()
-				local cycle = Phone.onSound -- 5.5 (Main: Sounds.cycle)
-				if cycle then
-					cycle()
-				else
-					require(script.Parent.Sounds).cycle()
-				end
-			end)
-			local outlineOn, onOutline = Phone.outlineOn, Phone.onOutline -- 6.15: the enemies' subtle outline (client/EnemyOutline.luau)
-			if outlineOn and onOutline then
-				button(list, if outlineOn() then "ENEMY OUTLINES: ON" else "ENEMY OUTLINES: OFF", "quiet", 2, function()
-					local now = onOutline()
-					local notify = Phone.notify
-					if notify then
-						notify(if now then "Enemy outlines on: zombies red, bandits orange" else "Enemy outlines off")
-					end
-					renderApp()
-				end)
-			end
-			button(list, "PUT PHONE AWAY", "main", 3, Phone.close)
-			local tour = Phone.onTour -- 6.7: Marge's tours again (client/TutorialUi.luau: the phone closes first)
-			if tour then
-				button(list, "SHOW ME THE SCREEN", "quiet", 3, function() tour("screen") end)
-				button(list, "SHOW ME AROUND", "quiet", 3, function() tour("around") end)
-			end
-			refs.apps.keys(list, look, 4) -- 5.5: every key, the version
+			refs.moreApps.settings(list, look, refs.moreCtx(wide)) -- 6.18 wave 2: a row a setting, the keys
 		elseif app == "board" then
 			refs.apps.board(list, look, refs.host, wide) -- 5.5; 6.0.1: two columns in a wide popup
 		elseif app == "bag" then

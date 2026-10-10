@@ -10,6 +10,8 @@
 --       colour: the chapter (its icon and name) over the client (the name and the place). `dim` (a shut chapter)
 --       dims the picture like the portraits. Nil, nothing drawn, for a chapter without a picture: the window then
 --       looks exactly as it did before 6.12.13.
+--   6.18: MissionArtUi.picture(campaign)   the chapter's picture for the UI kit's hero (client/CardKit.luau Picture: the
+--       picture, else the chapter's emoji as the hero's big faint mark). The banner now opens the chapter's details.
 -- Presentation only: a picture grants nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -121,6 +123,12 @@ function MissionArtUi.banner(parent: Instance, campaign: Missions.Campaign, orde
 	})
 	JobThumbUi.keepRatio(banner, MissionsLayout.ArtRatio, layout.art)
 	return banner
+end
+
+-- 6.18: the chapter's picture for the kit's hero (see the header).
+function MissionArtUi.picture(campaign: Missions.Campaign): { image: string?, emoji: string? }
+	local image = MissionArt.forCampaign(campaign.id)
+	return { image = image, emoji = campaign.icon }
 end
 
 return MissionArtUi

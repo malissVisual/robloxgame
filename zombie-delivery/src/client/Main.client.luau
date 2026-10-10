@@ -231,6 +231,10 @@ end
 Hud.onEstate = EstateUi.toggleList
 Hud.onMissions = MissionsUi.toggle
 MissionsUi.onFindCrew = CrewPanel.open
+MissionsUi.onGetReady = function() -- 6.18: the chapter hero's GET READY: the phone's READY CHECK (what is missing)
+	MissionsUi.close()
+	Phone.open("ready")
+end
 CameraRig.mouseNeeded = function(): boolean
 	return CameraRig.windowOpen() or Phone.isOpen()
 end

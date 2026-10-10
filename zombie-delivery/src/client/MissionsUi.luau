@@ -85,6 +85,24 @@
 -- and badges are square outlined tags; START is the red primary action (it wears the "off" face while something
 -- blocks it, and FIND CREW is the red one on a DUO mission still short of a crew), EQUIP the main one; section heads
 -- carry the phone's small red marker. The cleared card has the ZDC heading, a red NEXT MISSION and a plain OK.
+-- 6.18 (the UI kit, client/CardKit.luau, design/ui-kit/README.md; the owner: "every window like JOBS"): the MISSIONS page
+-- in the kit's look. The page tabs are chips (MISSIONS · CHALLENGES n/40 · SECRETS · REWARDS; CardKit.tabs, the stars a
+-- chip at the right), the clients compact rows (the portrait, the name, "📮 3 / 6 · First Shift" or the lock's words,
+-- the chapter's colour on the edge, its bar), and the chosen chapter is ONE hero beside the missions' rows (a chapter
+-- 600 px wide; else the hero on top, MissionsLayout.heroRoom: START in view):
+--   * the hero (Page.heroCard): the focused mission (the chapter's next one, or the one tapped): the chapter's picture
+--     (MissionArtUi.picture, else its emoji as a big mark), the client and n/N on the ribbon, FIRST TIME / ✓ ★★☆ /
+--     ▶ PLAYING on the corner, the mission's name, the pay big (gold for the finale's first time), one line "🧟 20
+--     zombies · 📦 3 · +540 XP" (or why START would be refused), the chapter's bar and ONE button: START ▶ / PLAY
+--     AGAIN ▶ (green), GET READY › (red: something is missing; MissionsUi.onGetReady opens the phone's READY CHECK),
+--     🔎 FIND CREW (a DUO mission short of a partner), GO TO <client> ▶ (a shut chapter), a grey one that says why.
+--     A co-op mission's FIND CREW is a chip over the rows. ⓘ (or a tap on the card) opens the details.
+--   * the rows (Page.step): a mission each: its cargo's emoji, the stars, "4. DEAD LETTER OFFICE", one facts line
+--     (FIRST TIME · +540 XP, REPLAY · 🧟 20, 🔒 Finish "X" first), the pay big (dim while locked) and › (a lock's 🔒);
+--     a tap puts it in the hero. Then the finale's reward as a row (its gun or paint, the money in gold).
+--   * the details (Page.detail, "‹ BACK"): 6.8's chapter as it was: the picture banner, the client (portrait, pitch),
+--     the action card (the briefing, the route, the twists, what it pays) and why START would be refused.
+-- Every action keeps its path (START: MissionsUi.startMission → the Missions remote; FIND CREW: MissionsUi.findCrew).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -119,6 +137,9 @@ MissionsUi.onOpen = nil :: (() -> ())?
 -- Set by Main: FIND CREW on a co-op mission opens the crew panel (CrewPanel.open); the mission id it was for.
 -- Without it FIND CREW opens the crew panel itself.
 MissionsUi.onFindCrew = nil :: ((missionId: string) -> ())?
+-- 6.18, set by Main: the hero's GET READY (something is missing) opens the phone's READY CHECK. Without it GET READY
+-- asks START (the window says why it is refused).
+MissionsUi.onGetReady = nil :: ((missionId: string) -> ())?
 
 local player = Players.LocalPlayer
 
@@ -163,6 +184,8 @@ Page.Layout = require(script.Parent.MissionsLayout)
 Page.Portrait = require(script.Parent.Portrait)
 Page.Art = require(script.Parent.MissionArtUi) -- 6.12.13: the chapter's picture banner
 Page.Levels = require(Shared.Levels)
+Page.Kit = require(script.Parent.CardKit) -- 6.18: the UI kit (the hero, the rows, the chips)
+Page.detail = false -- 6.18: the chapter's details sub-view (ⓘ) instead of the hero and the rows
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -297,15 +320,6 @@ local function nextMission(id: string): MissionDef?
 	end
 	local following = Missions.nextUp(progress, def.campaign)
 	return if following and following.id ~= id then following else nil
-end
-
--- An action on (its `color`: Contract.red is the primary face, white caps) or off (the sunk disabled face, the quiet
--- text). Only the look: the click still asks (and the window says why not).
-local function paintButton(button: any, text: string, color: Color3, enabled: boolean)
-	button.Text = text
-	button.BackgroundColor3 = if enabled then color else P.lavenderDeep
-	button.TextColor3 = if enabled then P.ink else P.ink2
-	button.AutoButtonColor = false
 end
 
 -- ── 3.1: challenges, secrets, rewards (the state and the small helpers) ─────
@@ -800,20 +814,21 @@ function Page.fit()
 	chrome.footer.Position = UDim2.new(0, 0, 1, -layout.footer)
 	local page = Page.Layout.pageHeight(layout)
 	local top = layout.tabs
-	refs.pageTabs.frame.Size = UDim2.new(1, if layout.narrow then -24 else -220, 0, top - 8)
+	refs.pageTabs.frame.Size = UDim2.new(1, if layout.narrow then -24 else -220, 0, Config.UiKit.Chip)
+	refs.pageTabs.frame.Position = UDim2.fromOffset(16, (top - Config.UiKit.Chip) // 2)
+	refs.stars.Position = UDim2.new(1, -(refs.stars.Size.X.Offset + 16), 0, (top - Config.UiKit.Chip) // 2)
 	refs.stars.Visible = not layout.narrow
 	refs.extra.Size = UDim2.new(1, -28, 0, page)
 	refs.extra.Position = UDim2.fromOffset(14, top)
 	local clients, list = refs.clients, refs.clientsList
-	-- 6.8 review: the chapter stops above the action bar (START in view); the bar lines up with the chapter's rows
-	-- (the list's padding: 3 px on the left, 10 + 4 on the right).
+	-- 6.18: the chapter fills the room down to the footer (START is the hero's; 6.8's action bar is gone); the kit's
+	-- columns split it from 600 px (its width less the list's padding: 3 px on the left, 10 on the right).
 	local parts = Page.Layout.parts(layout)
 	local chapterX = if layout.narrow then 8 else layout.listW + 14
 	local chapterInset = if layout.narrow then 16 else layout.listW + 22
 	refs.chapter.Size = UDim2.new(1, -chapterInset, 0, parts.chapterH)
 	refs.chapter.Position = UDim2.fromOffset(chapterX, parts.chapterTop)
-	refs.bar.Size = UDim2.new(1, -(chapterInset + 17), 0, parts.barH)
-	refs.bar.Position = UDim2.fromOffset(chapterX + 3, parts.barTop)
+	refs.chapterW = layout.width - chapterInset - 13
 	if layout.narrow then
 		refs.clientsHead.Visible = false
 		refs.column.Visible = false
@@ -862,22 +877,27 @@ local function build()
 	end
 
 	-- ── The page tabs (MISSIONS | CHALLENGES | SECRETS | REWARDS; 5.8: Ui.tabs) and the stars on the right ──
+	-- 6.18: the kit's chips (CardKit.tabs: the open one lit); the stars a gold chip at the right.
 	do
-		local pages = Ui.tabs(content, Extras.PAGES, function(id: string)
+		local pages = Page.Kit.tabList(content, Extras.PAGES, function(id: string)
 			Extras.setTab(id)
-		end, { selected = Extras.tab, gap = 6, textSize = 13 })
-		pages.frame.Size = UDim2.new(1, -220, 0, 36)
-		pages.frame.Position = UDim2.fromOffset(16, 6)
+		end, Extras.tab)
+		pages.frame.Size = UDim2.new(1, -220, 0, Config.UiKit.Chip)
+		pages.frame.Position = UDim2.fromOffset(16, 11)
 		refs.pageTabs = pages
 	end
-	refs.stars = Ui.label(content, `★ 0 / {#Missions.List * 3}`, UDim2.fromOffset(190, 36), {
-		Position = UDim2.new(1, -206, 0, 6),
-		TextSize = 21,
-		Font = Theme.DisplayFont,
-		TextColor3 = P.ink,
-		TextXAlignment = Enum.TextXAlignment.Right,
+	refs.stars = Ui.label(content, `★ 0 / {#Missions.List * 3}`, UDim2.fromOffset(150, Config.UiKit.Chip), {
+		Name = "Stars",
+		Position = UDim2.new(1, -166, 0, 11),
+		BackgroundColor3 = K.raised,
+		BackgroundTransparency = 0,
+		TextSize = 12,
+		Font = Theme.HeadingFont,
+		TextColor3 = Page.Kit.Color.gold,
+		TextXAlignment = Enum.TextXAlignment.Center,
 		TextWrapped = false,
 	})
+	Ui.corner(refs.stars, Config.UiKit.Chip // 2)
 
 	-- ── 6.8: the clients (a sunk column on the left, or a strip on top) and the chosen one's chapter ──
 	local column = Ui.make("Frame", { Name = "Column", BackgroundColor3 = K.recessed, BackgroundTransparency = 0.3, BorderSizePixel = 0 }, content)
@@ -894,10 +914,7 @@ local function build()
 	refs.clientsList = clients:FindFirstChildOfClass("UIListLayout")
 	refs.chapter = scrolling(content, UDim2.fromOffset(600, 400), UDim2.fromOffset(310, 46), 10)
 	refs.chapter.Name = "Chapter"
-	-- 6.8 review: the action bar under the chapter (the pay line and START, never scrolled away; Page.bar fills it,
-	-- Page.fit places it): the raised face, a hairline in the chapter's colour.
-	refs.bar = Ui.make("Frame", { Name = "ActionBar", BackgroundColor3 = K.raised, BorderSizePixel = 0 }, content)
-	refs.barStroke = Ui.stroke(refs.bar, K.line, 1)
+	-- (6.18: 6.8's action bar under the chapter is gone: START is the chapter hero's button, always in view)
 	-- 3.1: the CHALLENGES / SECRETS / REWARDS pages (one full-width list, rebuilt by render).
 	refs.extra = scrolling(content, UDim2.fromOffset(600, 400), UDim2.fromOffset(14, 46), 8)
 	refs.extra.Visible = false
@@ -942,6 +959,7 @@ function Page.select(id: string)
 	end
 	selectedCampaign = id
 	selectedMission = nil
+	Page.detail = false
 	blindPick = false
 	render()
 	if refs.chapter then
@@ -971,33 +989,50 @@ end
 
 -- A client's card (6.8): the portrait, the name and the role, the chapter's progress "2 / 6" (or why it is shut:
 -- "🔒 Level 6", "🔒 Finish Raj's chapter first"), NEW / DONE badges. Wide: a row of the column; narrow: a card of
--- the strip. The chosen one raised with the red rule, a shut one sunk with a dimmed portrait.
+-- the strip. 6.18: the kit's compact row (charcoal, 10 px corners, the chapter's colour on its edge, grey when shut;
+-- the chosen one raised with a light hairline, Selected), the facts line and the chapter's bar at its foot.
 function Page.clientCard(campaign: Campaign, order: number)
 	local layout = refs.layout
 	local state = Missions.chapterState(campaign.id, progress, myLevel())
 	local color = colorOf(campaign)
 	local main = Missions.clientOf(campaign.id)
 	local id = campaign.id
+	local chosen = id == selectedCampaign
 	local h, p = layout.cardH, layout.cardPortrait
 	local card = Ui.make("TextButton", {
 		Name = id,
 		Size = if layout.narrow then UDim2.fromOffset(layout.cardW, h) else UDim2.new(1, -2, 0, h),
+		BackgroundColor3 = if chosen then K.raised else K.row,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
+		ClipsDescendants = true,
 		Text = "",
 		LayoutOrder = order,
 	}, refs.clients)
-	Extras.row(card, if state.open then nil else K.recessed)
-	if id == selectedCampaign then
-		Ui.selectRow(card, true) -- raised, the narrow red rule
+	Ui.corner(card, Config.UiKit.RowCorner)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if chosen then K.text else K.line, Thickness = 1, Transparency = if chosen then 0.35 else 0.8 }, card)
+	Ui.make("Frame", { Name = "Edge", Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = if state.open then color else K.line, BorderSizePixel = 0, ZIndex = 3 }, card)
+	if chosen then
+		card:SetAttribute("Selected", true)
 		refs.selectedCard = card
 	end
-	Ui.tactile(card)
+	local function lit(on: boolean)
+		card.BackgroundColor3 = if on or chosen then K.raised else K.row
+	end
+	card.MouseEnter:Connect(function()
+		lit(true)
+	end)
+	card.MouseLeave:Connect(function()
+		lit(false)
+	end)
+	card.SelectionGained:Connect(function()
+		lit(true)
+	end)
+	card.SelectionLost:Connect(function()
+		lit(false)
+	end)
 	card.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
-		end
+		Page.Kit.click()
 		Page.select(id)
 	end)
 	local frame = Ui.make("Frame", {
@@ -1009,39 +1044,44 @@ function Page.clientCard(campaign: Campaign, order: number)
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 	}, card)
-	Ui.stroke(frame, if state.open then color else K.line, 1).Transparency = if state.open then 0.2 else Ui.HAIRLINE
+	Ui.corner(frame, 8)
 	Page.Portrait.mount(frame, Page.Portrait.people(campaign.clientId, campaign.partnerId), color, { dim = not state.open })
 	local x = p + 20
-	-- The badge on the right: DONE, NEW, the DUO's partner.
-	local badgeText, badgeKind = nil :: string?, "quiet"
+	-- The badge on the right: DONE, NEW, the DUO's partner (a static chip).
+	local badgeText, badgeInk = nil :: string?, K.secondary
 	if state.complete then
-		badgeText, badgeKind = "✓ DONE", "good"
+		badgeText, badgeInk = "✓ DONE", K.good
 	elseif campaign.duo then
-		badgeText, badgeKind = "🤝 DUO", "duo"
+		badgeText, badgeInk = "🤝 DUO", K.red
 	elseif state.new then
-		badgeText, badgeKind = "NEW", "warn"
+		badgeText, badgeInk = "NEW", K.warn
 	end
+	local badgeW = 0
 	if badgeText then
-		local badge = Extras.chip(card, badgeText, badgeKind)
-		badge.Size = UDim2.fromOffset(0, 18)
-		badge.AnchorPoint = Vector2.new(1, 0)
-		badge.Position = UDim2.new(1, -8, 0, 8)
-		badge.TextSize = 11
+		-- (a label, not a chip's button: the card itself is the button)
+		badgeW = Page.Kit.width(badgeText, 11, Theme.HeadingFont) + 18
+		local badge = Ui.label(card, badgeText, UDim2.fromOffset(badgeW, 20), {
+			Name = "Badge",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -8, 0, 7),
+			BackgroundColor3 = K.charcoal,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextColor3 = badgeInk,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 2,
+		})
+		Ui.corner(badge, 10)
+		badgeW += 8
 	end
-	local nameW = if badgeText then -(x + 72) else -(x + 8)
-	Ui.label(card, Missions.clientName(id), UDim2.new(1, nameW, 0, 20), {
-		Position = UDim2.fromOffset(x, 7),
-		TextSize = if layout.narrow then 16 else 17,
-		Font = Theme.DisplayFont,
-		TextColor3 = if state.open then P.ink else P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	Ui.label(card, if main then `{main.job} · {main.place}` else campaign.client, UDim2.new(1, -(x + 8), 0, 16), {
-		Position = UDim2.fromOffset(x, 28),
-		TextSize = layout.small,
-		Font = Theme.Font,
-		TextColor3 = P.ink2,
+	Ui.label(card, string.upper(Missions.clientName(id)), UDim2.new(1, -(x + badgeW + 8), 0, 18), {
+		Name = "Business",
+		Position = UDim2.fromOffset(x, if layout.narrow then 6 else 8),
+		TextSize = 12,
+		Font = Theme.HeadingFont,
+		TextColor3 = if state.open then K.text else K.secondary,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
@@ -1049,31 +1089,44 @@ function Page.clientCard(campaign: Campaign, order: number)
 		elseif state.complete then `{campaign.icon} {campaign.name} · {state.done} / {state.total}`
 		else `{campaign.icon} {state.done} / {state.total} · {campaign.name}`
 	Ui.label(card, line, UDim2.new(1, -(x + 8), 0, 16), {
-		Position = UDim2.new(0, x, 1, -(if state.open and not state.complete then 30 else 24)),
-		TextSize = layout.small,
+		Name = "Facts",
+		Position = UDim2.fromOffset(x, if layout.narrow then 24 else 27),
+		TextSize = 11,
 		Font = Theme.HeadingFont,
-		TextColor3 = if not state.open then P.danger elseif state.complete then C.green else P.ink,
+		TextColor3 = if not state.open then Page.Kit.Color.faint elseif state.complete then K.good else K.secondary,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
+	if not layout.narrow and main then
+		Ui.label(card, `{main.job} · {main.place}`, UDim2.new(1, -(x + 8), 0, 14), {
+			Name = "Role",
+			Position = UDim2.fromOffset(x, 43),
+			TextSize = 10,
+			Font = Theme.Font,
+			TextColor3 = Page.Kit.Color.faint,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+	end
 	if state.open and not state.complete then
-		local back, fill = Ui.bar(card, UDim2.new(1, -(x + 10), 0, 4), color)
-		back.Position = UDim2.new(0, x, 1, -11)
+		local back, fill = Ui.bar(card, UDim2.new(1, -(x + 10), 0, 3), color)
+		back.Position = UDim2.new(0, x, 1, -6)
 		fill.Size = UDim2.fromScale(if state.total > 0 then state.done / state.total else 0, 1)
 	end
 end
 
 -- ── 6.8: the chosen client's chapter ─────────────────────────────────────────
 
--- The hero: the big portrait, the name, the role and the place, the pitch, the chapter's progress (or why it is shut).
-function Page.hero(campaign: Campaign, order: number)
+-- The client (6.8's hero; 6.18: in the chapter's details): the big portrait, the name, the role and the place, the
+-- pitch, the chapter's progress (or why it is shut).
+function Page.client(campaign: Campaign, order: number)
 	local layout = refs.layout
 	local color = colorOf(campaign)
 	local state = Missions.chapterState(campaign.id, progress, myLevel())
 	local main = Missions.clientOf(campaign.id)
 	local got, most = Missions.stars(progress, campaign.id)
 	local frame = Ui.make("Frame", {
-		Name = "Hero",
+		Name = "Client",
 		Size = UDim2.new(1, -4, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BorderSizePixel = 0,
@@ -1214,8 +1267,8 @@ end
 
 -- The action card: the focused mission (the next one unless one was clicked on the path) with the client's
 -- briefing, the route, the twists and what it pays you now (FIRST TIME or REPLAY); a shut chapter says what to do
--- first, a finished one says so. (6.8 review: START, FIND CREW, GO TO, the pay and why START is refused are in the
--- action bar under the chapter, Page.bar: always in view.)
+-- first, a finished one says so. (6.18: in the chapter's details; START, FIND CREW, GO TO and the pay are the kit's
+-- hero's, Page.heroCard; why START is refused closes this card.)
 function Page.action(campaign: Campaign, order: number)
 	local layout = refs.layout
 	local color = colorOf(campaign)
@@ -1348,271 +1401,270 @@ function Page.action(campaign: Campaign, order: number)
 		then `<font color="{Extras.hex(P.ink2)}"><b>REPLAY</b></font>  a quarter of the pay: no reward, no XP bonus, no unlock{if stars < 3 then `  ·  a new best ★ still pays {Ui.money(T.StarBonus)}` else ""}`
 		else `<font color="{good}"><b>FIRST TIME</b></font>  the reward {Ui.money(def.reward)} and about {Ui.money(payHint(def))} pay, the first-clear XP{if finale then `  ·  <font color="{Extras.hex(Extras.GOLD)}"><b>+ THE CHAPTER'S REWARD</b></font>` else ""}`
 	detailLine(body, payLine, P.ink, 20, layout.small + 1)
+	-- 6.18: why START would be refused (6.8's action bar said it; the hero has one line for it)
+	local blocker = Page.blocker(def)
+	if blocker then
+		detailLine(body, esc(blocker), if crewOwner then P.violet else P.danger, 21, layout.small + 1)
+	end
 end
 
--- 6.8 review, the action bar under the chapter (MissionsLayout.parts: never scrolled away): on the left what the
--- focused mission pays you now ("FIRST TIME · ≈ $1,220 + 540 XP", "REPLAY · ≈ $300") and under it why START would be
--- refused (else which mission it starts); on the right FIND CREW on a co-op or DUO mission and the big START (PLAY
--- AGAIN, ▶ PLAYING; none for a member of somebody else's crew). A shut chapter: what it waits for and GO TO <client>.
--- START is named "Start" (the gamepad's selection goes back to it after a rebuild).
-function Page.bar(campaign: Campaign)
-	local layout = refs.layout
-	local bar = refs.bar
-	Ui.clear(bar)
-	refs.startButton = nil
+-- 6.18: the hero's corner chip for a mission: what playing it is now (FIRST TIME, ✓ ★★☆, ▶ PLAYING, 🔒) and its ink.
+function Page.cornerOf(def: MissionDef): (string, Color3)
+	local status = statusOf(def)
+	if status == "active" then
+		return "▶ PLAYING", K.warn
+	elseif status == "locked" then
+		return "🔒 LOCKED", K.secondary
+	elseif status == "done" then
+		return `✓ {Ui.stars(best(def.id))}`, Page.Kit.Color.gold
+	end
+	return "FIRST TIME", Page.Kit.Color.money
+end
+
+-- 6.18: the hero's one facts line: the enemies, the cargo and the first-time XP ("🧟 20 zombies · 📦 3 · +540 XP"), a
+-- replay's "↻ REPLAY", or why START would be refused (amber; a crew member's in the quiet colour).
+function Page.factsOf(def: MissionDef): (string, Color3?)
+	local blocker = Page.blocker(def)
+	if blocker then
+		return blocker, if crewOwner then K.secondary else K.warn
+	end
+	local enemyTotal, enemyLabel = require(Shared.MissionPlan).size(def)
+	local _, xp, replay = Page.payout(def)
+	local parts = { `🧟 {enemyTotal} {string.lower(enemyLabel)}`, `{cargoEmoji(def)} {def.items}` }
+	table.insert(parts, if replay then "↻ REPLAY" else `+{xp} XP`)
+	return table.concat(parts, " · "), nil
+end
+
+-- 6.18: the hero's ONE button (see the header) for the focused mission: its spec for CardKit.hero. The button is
+-- "Start" (START, PLAY AGAIN, GET READY, a grey why: the gamepad's selection goes back to it after a rebuild),
+-- "FindCrew" or "Waiting" (a member of somebody else's crew).
+function Page.actionOf(def: MissionDef): any
+	local status = statusOf(def)
+	local id = def.id
+	if crewOwner then
+		return { name = "Waiting", text = "👥 YOUR LEADER PICKS", kind = "shut", onClick = function()
+			say(`Your crew leader {crewOwner} picks the mission.`, P.violet)
+		end }
+	elseif status == "active" then
+		return { name = "Start", text = "▶ PLAYING", kind = "shut" }
+	elseif status == "locked" then
+		return { name = "Start", text = "🔒 LOCKED", kind = "shut", onClick = function()
+			MissionsUi.startMission(id) -- (it says why)
+		end }
+	elseif Extras.needsCrew(def) then
+		return { name = "FindCrew", text = "🔎 FIND CREW", kind = "primary", onClick = function()
+			MissionsUi.findCrew(id)
+		end }
+	elseif Page.blocker(def) then
+		return { name = "Start", text = "GET READY ›", kind = "primary", onClick = function()
+			local ready = MissionsUi.onGetReady
+			if ready then
+				ready(id)
+			else
+				MissionsUi.startMission(id)
+			end
+		end }
+	end
+	return { name = "Start", text = if status == "done" then "PLAY AGAIN ▶" else "START ▶", kind = "good", onClick = function()
+		MissionsUi.startMission(id)
+	end }
+end
+
+-- 6.18: the chapter's details (ⓘ, a tap on the hero; "‹ BACK" returns).
+function Page.openDetails(on: boolean)
+	Page.detail = on
+	render()
+	if refs.chapter then
+		refs.chapter.CanvasPosition = Vector2.zero
+	end
+end
+
+-- 6.18: the chapter's hero card (see the header), `height` px tall in `parent` (the kit's left column).
+function Page.heroCard(parent: Instance, campaign: Campaign, height: number)
+	local Kit = Page.Kit
+	local color = colorOf(campaign)
 	local state = Missions.chapterState(campaign.id, progress, myLevel())
 	local def = Page.focus(campaign)
-	refs.barStroke.Color = if state.open then colorOf(campaign) else K.line
-	refs.barStroke.Transparency = if state.open then 0.35 else Ui.HAIRLINE
-	-- The buttons on the right (START last, at the edge), the words in the room left of them.
-	local pad = if layout.narrow then 3 else 6
-	local buttons: { { name: string, text: string, width: number, color: Color3, size: number, on: boolean, click: () -> () } } = {}
-	local top, under = "", ""
-	local topColor, underColor = P.ink, P.ink2
-	if not state.open then
-		top, topColor = `🔒  {string.upper(campaign.name)} IS STILL SHUT`, P.danger
+	local size = Missions.size(campaign.id)
+	local function details()
+		Page.openDetails(true)
+	end
+	local spec: any = {
+		name = "Hero",
+		height = height,
+		picture = Page.Art.picture(campaign),
+		stroke = if state.open then color else K.line,
+		strong = state.open,
+		bar = { share = if state.total > 0 then state.done / state.total else 0, color = color },
+		onOpen = details,
+		onDetails = details,
+	}
+	if not state.open or not def then
+		-- Shut: what it waits for, and a way there (GO TO <client>).
 		local missing = Missions.missing(campaign.id, progress)
 		local first = missing[1]
+		spec.shut = true
+		spec.ribbon = { text = `🔒 {string.upper(campaign.name)} IS STILL SHUT`, face = K.raised, ink = K.secondary }
+		spec.title = string.upper(Missions.clientName(campaign.id))
+		spec.value = Ui.money(campaign.reward)
+		spec.valueColor = Kit.Color.dim
+		spec.facts = if first then Missions.missingText(missing) else `🔒 Level {campaign.level} (you are level {myLevel()})`
+		spec.factsColor = K.secondary
+		spec.bar = nil
 		if first then
-			under = Missions.missingText(missing)
-			table.insert(buttons, {
-				name = "GoTo",
-				text = `GO TO {string.upper(Missions.clientName(first.id))} ▶`,
-				width = if layout.narrow then 220 else 240,
-				color = K.red,
-				size = 15,
-				on = true,
-				click = function()
-					Page.select(first.id)
-				end,
-			})
+			local target = first.id
+			spec.action = { name = "GoTo", text = `GO TO {string.upper(Missions.clientName(target))} ▶`, kind = "primary", onClick = function()
+				Page.select(target)
+			end }
 		else
-			under = `It opens at driver level {campaign.level} (you are level {myLevel()}).`
+			spec.action = { name = "Start", text = `🔒 LEVEL {campaign.level}`, kind = "shut" }
 		end
-	elseif def then
+	else
 		local status = statusOf(def)
-		local cash, xp, replay = Page.payout(def)
-		local finale = def.number == Missions.size(campaign.id)
-		top = if replay then `REPLAY · ≈ {Ui.money(cash)}` else `FIRST TIME · ≈ {Ui.money(cash)} + {xp} XP{if finale then " + 🏆" else ""}`
-		topColor = if replay then P.ink else C.money
-		local blocker = Page.blocker(def)
-		local member = crewOwner ~= nil
-		under = blocker or `▶ {def.name}  ·  mission {def.number} of {Missions.size(campaign.id)}`
-		underColor = if blocker and not member then P.danger elseif blocker then P.violet else P.ink2
-		local id = def.id
-		local crew = (def.coop or def.duo) and not member
-		if crew then
-			table.insert(buttons, {
-				name = "FindCrew",
-				text = "🔎 FIND CREW",
-				width = 150,
-				color = if Extras.needsCrew(def) then K.red else P.violet,
-				size = 15,
-				on = true,
-				click = function()
-					MissionsUi.findCrew(id)
-				end,
-			})
-		end
-		if not member then
-			table.insert(buttons, {
-				name = "Start",
-				text = if status == "done" then "PLAY AGAIN ▶" elseif status == "active" then "▶ PLAYING" else "START ▶",
-				width = if layout.narrow then 190 elseif crew then 180 else 220, -- (beside FIND CREW: room for the pay)
-				color = K.red,
-				size = 18,
-				on = blocker == nil,
-				click = function()
-					MissionsUi.startMission(id)
-				end,
-			})
-		end
+		local cash, _, replay = Page.payout(def)
+		local finale = def.number == size
+		local corner, ink = Page.cornerOf(def)
+		local facts, factsColor = Page.factsOf(def)
+		spec.ribbon = { text = `{campaign.icon} {string.upper(Missions.clientName(campaign.id))} · {def.number}/{size}`, face = color, ink = Theme.textOn(color) }
+		spec.corner = { text = corner, ink = ink, width = Kit.width(corner, 13, Theme.HeadingFont) + 20 }
+		spec.title = `{string.upper(def.name)}{if finale then "  🏆" else ""}`
+		spec.tag = if def.duo then "· 🤝 DUO" elseif def.coop then "· 👥 CO-OP" else nil
+		spec.tagColor = if def.duo then K.red else K.secondary
+		spec.shut = status == "locked"
+		spec.value = Ui.money(cash)
+		spec.valueColor = if status == "locked" then Kit.Color.dim elseif finale and not replay then Kit.Color.gold else Kit.Color.money
+		spec.facts = facts
+		spec.factsColor = factsColor
+		spec.action = Page.actionOf(def)
 	end
-	local x = 10
-	for index = #buttons, 1, -1 do
-		local info = buttons[index]
-		local button = Ui.button(bar, info.text, UDim2.fromOffset(info.width, layout.start), info.color, info.click)
-		button.Name = info.name
-		button.AnchorPoint = Vector2.new(1, 0.5)
-		button.Position = UDim2.new(1, -x, 0.5, 0)
-		button.TextSize = info.size
-		if info.name == "Start" then
-			paintButton(button, info.text, info.color, info.on) -- (the "off" face while something blocks it)
-		end
-		if info.name == "Start" or info.name == "GoTo" then
-			refs.startButton = button
-		end
-		x += info.width + 10
-	end
-	local words = Ui.make("Frame", {
-		Name = "Words",
-		Size = UDim2.new(1, -(x + 14), 1, -pad * 2),
-		Position = UDim2.fromOffset(14, pad),
-		BackgroundTransparency = 1,
-	}, bar)
-	Ui.label(words, top, UDim2.new(1, 0, 0, layout.text + 3), {
-		Name = "Pay",
-		TextSize = layout.text,
-		Font = Theme.DisplayFont,
-		TextColor3 = topColor,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	-- (two lines at most: the long reasons, the DUO's partner and the slots, are told in full in the hero and the card)
-	Ui.label(words, under, UDim2.new(1, 0, 1, -(layout.text + 4)), {
-		Name = "Why",
-		Position = UDim2.fromOffset(0, layout.text + 4),
-		TextSize = layout.small + 1,
-		Font = Theme.HeadingFont,
-		TextColor3 = underColor,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
+	local parts = Kit.hero(parent, spec)
+	parts.card:SetAttribute("Mission", if def then def.id else nil)
+	refs.startButton = parts.action
 end
 
--- One step of the story path: the node (✓ done, ▶ next, 🔒 locked) on the chapter's line, the number and the name,
--- a one-line description, and what it pays you now (FIRST TIME / REPLAY) or why it waits. A click shows it in the
--- action card above.
-function Page.step(def: MissionDef, campaign: Campaign, order: number, last: boolean)
+-- 6.18: the chosen chapter (see the header): the hero beside the missions' rows (`CardLayout.side` wide), else on top
+-- of them, its height the chapter's view (MissionsLayout.heroRoom: START in view).
+function Page.cards(campaign: Campaign)
+	local Kit = Page.Kit
 	local layout = refs.layout
-	local color = colorOf(campaign)
+	local room = Page.Layout.heroRoom(layout)
+	local heroH = math.min(Kit.Layout.heroHeight(room), room)
+	local _, left, right = Kit.columns(refs.chapter, { name = "Cards", order = 1, side = Kit.Layout.side(refs.chapterW or layout.width), hero = true, heroHeight = heroH })
+	Page.heroCard(left, campaign, heroH)
+	-- the story's head: the chapter and its count, a co-op mission's FIND CREW as a chip
+	local got, total = Missions.done(progress, campaign.id)
+	local def = Page.focus(campaign)
+	local crewChip = if def and def.coop and not def.duo and crewOwner == nil and statusOf(def) ~= "locked" then { name = "FindCrew", text = "🔎 FIND CREW", order = 1 } else nil
+	local _, _, chip = Kit.sectionHeader(right, { name = "StoryHead", label = "Story", text = string.upper(`{campaign.icon} {campaign.name} · {got} / {total} done`), order = 0, chip = crewChip })
+	if chip and def then
+		local id = def.id
+		chip.Activated:Connect(function()
+			Kit.click()
+			MissionsUi.findCrew(id)
+		end)
+	end
+	local list = Missions.ofCampaign(campaign.id)
+	for index, mission in list do
+		Page.step(right, mission, campaign, index, index == #list)
+	end
+	Page.finale(right, campaign, 40)
+end
+
+-- One mission of the chapter (6.18: the kit's compact row; see the header). A tap puts it in the hero.
+function Page.step(parent: Instance, def: MissionDef, campaign: Campaign, order: number, last: boolean)
+	local Kit = Page.Kit
 	local status, why = statusOf(def)
 	local stars = best(def.id)
-	local focus = Page.focus(campaign)
-	local id = def.id
-	local row = Ui.make("TextButton", {
-		Name = id,
-		Size = UDim2.new(1, -4, 0, layout.step),
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		LayoutOrder = order,
-	}, refs.chapter)
-	Extras.row(row, if status == "locked" then K.recessed else nil, if status == "next" then K.red else nil)
-	if focus == def then
-		Ui.selectRow(row, true)
-	end
-	Ui.tactile(row)
-	row.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
-		end
-		selectedMission = id
-		render()
-		if refs.chapter then
-			refs.chapter.CanvasPosition = Vector2.zero -- (the action card is on top)
-		end
-	end)
-	-- The chapter's line through the nodes (not above the first, not below the last).
-	local node = 30
-	if def.number > 1 then
-		Ui.make("Frame", { Size = UDim2.new(0, 2, 0.5, -node / 2), Position = UDim2.fromOffset(27, 0), BackgroundColor3 = if status == "locked" then K.track else color, BorderSizePixel = 0 }, row)
-	end
-	if not last then
-		Ui.make("Frame", { Size = UDim2.new(0, 2, 0.5, -node / 2), Position = UDim2.new(0, 27, 0.5, node / 2), BackgroundColor3 = if status == "done" then color else K.track, BorderSizePixel = 0 }, row)
-	end
-	local badge = Ui.make("Frame", {
-		Size = UDim2.fromOffset(node, node),
-		Position = UDim2.new(0, 13, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = if status == "done" then color elseif status == "next" or status == "active" then K.red else K.recessed,
-		BorderSizePixel = 0,
-	}, row)
-	Ui.stroke(badge, if status == "locked" then K.line else color, 1).Transparency = if status == "locked" then Ui.HAIRLINE_SELECTED else 0
-	Ui.label(badge, if status == "done" then "✓" elseif status == "locked" then "🔒" else "▶", UDim2.fromScale(1, 1), {
-		TextSize = if status == "locked" then 13 else 16,
-		Font = Theme.DisplayFont,
-		TextColor3 = if status == "done" then Theme.textOn(color) else K.text,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	local x = 56
-	local payW = if layout.narrow then 150 else 176
-	Ui.label(row, `{def.number}.  {def.name}{if last then "  🏆" else ""}`, UDim2.new(1, -(x + payW + 8), 0, 22), {
-		Position = UDim2.fromOffset(x, 9),
-		TextSize = layout.text + 1,
-		Font = Theme.DisplayFont,
-		TextColor3 = if status == "locked" then P.ink2 else P.ink,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	Ui.label(row, def.description, UDim2.new(1, -(x + payW + 8), 0, 18), {
-		Position = UDim2.fromOffset(x, 33),
-		TextSize = layout.small + 1,
-		Font = Theme.Font,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	-- What it pays, or why it waits.
+	local chosen = Page.focus(campaign) == def
 	local cash, xp, replay = Page.payout(def)
-	local top, bottom, topColor = "", "", P.ink
-	if status == "locked" then
-		top, bottom, topColor = `🔒 {why or "Locked"}`, if def.number == Missions.size(campaign.id) then "the chapter's reward" else `first time ≈ {Ui.money(cash)}`, P.ink2
-	elseif replay then
-		top, bottom, topColor = `REPLAY {Ui.money(cash)}`, Ui.stars(stars), P.ink2
-	else
-		top, bottom, topColor = `FIRST TIME {Ui.money(cash)}`, `+{xp} XP{if last then " · + 🏆" else ""}`, C.money
-	end
-	if status == "active" then
-		top, topColor = "▶ PLAYING", C.blue
-	end
-	Ui.label(row, top, UDim2.new(0, payW, 0, 20), {
-		Position = UDim2.new(1, -(payW + 10), 0, 10),
-		TextSize = if status == "locked" then layout.small else layout.small + 2,
-		Font = Theme.DisplayFont,
-		TextColor3 = topColor,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+	local locked = status == "locked"
+	local id = def.id
+	local facts = if locked then `🔒 {why or "Locked"}`
+		elseif status == "active" then "▶ PLAYING"
+		elseif replay then `REPLAY · 🧟 {(require(Shared.MissionPlan).size(def))}`
+		else `FIRST TIME · +{xp} XP{if last then " · + 🏆" else ""}`
+	local made = Kit.row(parent, {
+		name = id,
+		order = 10 + order,
+		accent = if status == "done" then K.good elseif status == "active" then K.warn elseif status == "next" then K.red else K.line,
+		picture = { emoji = if last then "🏆" else cargoEmoji(def) },
+		thumb = Config.UiKit.Icon,
+		shut = locked,
+		rest = if chosen then K.raised else nil,
+		tag = if stars > 0 then Ui.stars(stars) else nil,
+		tagColor = Kit.Color.gold,
+		tagWidth = if stars > 0 then 40 else 0,
+		title = `{def.number}. {string.upper(def.name)}`,
+		titleColor = if chosen then K.text else nil,
+		facts = facts,
+		factsColor = if status == "next" and not replay then Kit.Color.money else nil,
+		value = Ui.money(cash),
+		valueColor = if last and not replay then Kit.Color.gold else Kit.Color.money,
+		action = if locked then nil else "›",
+		lock = if locked then "🔒" else nil,
+		onOpen = function()
+			selectedMission = id
+			Page.openDetails(false)
+		end,
 	})
-	Ui.label(row, bottom, UDim2.new(0, payW, 0, 18), {
-		Position = UDim2.new(1, -(payW + 10), 0, 32),
-		TextSize = layout.small,
-		Font = Theme.HeadingFont,
-		TextColor3 = if replay and status ~= "locked" then C.yellow else P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
+	if chosen then
+		made.row.BackgroundColor3 = K.raised
+		made.row:SetAttribute("Selected", true)
+	end
 end
 
--- The finale's reward: the chapter's money and its exclusive gun or paint (its picture) and title, ✓ once yours.
-function Page.finale(campaign: Campaign, order: number)
-	local layout = refs.layout
+-- The finale's reward (6.18: a row under the missions): its gun or paint, the money in gold, the item and the title,
+-- ✓ once yours. A tap opens the chapter's details.
+function Page.finale(parent: Instance, campaign: Campaign, order: number)
+	local Kit = Page.Kit
 	local reward = Config.Rewards.Campaigns[campaign.id]
 	local earned = Extras.state.campaigns[campaign.id] == true or (Missions.done(progress, campaign.id)) >= Missions.size(campaign.id)
-	local frame = Ui.make("Frame", {
-		Name = "Finale",
-		Size = UDim2.new(1, -4, 0, 84),
-		BorderSizePixel = 0,
-		LayoutOrder = order,
-	}, refs.chapter)
-	Extras.row(frame, if earned then K.raised else nil, if earned then C.green else colorOf(campaign))
-	local art = Ui.make("Frame", { Size = UDim2.fromOffset(64, 64), Position = UDim2.fromOffset(10, 10), BackgroundColor3 = K.charcoal, BorderSizePixel = 0 }, frame)
-	Ui.stroke(art, if reward then Extras.itemColor(reward) else C.yellow, 1).Transparency = 0
+	local words = { if reward then Extras.itemName(reward) else "the chapter's reward" }
 	if reward then
-		Extras.itemIcon(art, reward, 48, if earned then "shown" else "dim", { Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
-	else
-		Ui.label(art, "🏆", UDim2.fromScale(1, 1), { TextSize = 32, TextXAlignment = Enum.TextXAlignment.Center })
+		table.insert(words, `“{reward.title}”`)
 	end
-	Ui.caps(frame, if earned then "🏆  The finale's reward  ·  ✓ yours" else "🏆  The finale's reward", UDim2.new(1, -96, 0, 16), {
-		Position = UDim2.fromOffset(86, 10),
-		TextSize = layout.small,
-		TextColor3 = if earned then C.green else P.ink2,
+	local made = Kit.row(parent, {
+		name = "Finale",
+		order = order,
+		accent = if earned then K.good else Kit.Color.gold,
+		picture = if reward then { glyph = function(face: Instance, size: number)
+			Extras.itemIcon(face, reward, size, if earned then "shown" else "dim", { Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
+		end } else { emoji = "🏆" },
+		thumb = Config.UiKit.Icon,
+		emojiSize = 34,
+		title = if earned then "🏆 THE FINALE'S REWARD · ✓ YOURS" else "🏆 THE FINALE'S REWARD",
+		titleColor = if earned then K.good else nil,
+		facts = table.concat(words, " · "),
+		factsColor = if earned then K.secondary else Extras.GOLD,
+		value = Ui.money(campaign.reward),
+		valueColor = Kit.Color.gold,
+		action = if earned then "✓" else "›",
+		onOpen = function()
+			Page.openDetails(true)
+		end,
 	})
-	local parts = { Ui.money(campaign.reward) }
-	if reward then
-		table.insert(parts, Extras.itemName(reward))
-		table.insert(parts, `title “{reward.title}”`)
+	made.row:SetAttribute("Earned", earned)
+end
+
+-- 6.18: the chapter's details (Page.detail): "‹ BACK", the picture banner (none without one), the client and the
+-- action card (6.8's, as they were).
+function Page.details(campaign: Campaign)
+	local layout = refs.layout
+	local back = Ui.button(refs.chapter, "‹ BACK", UDim2.new(1, -4, 0, 40), K.raised, function()
+		Page.openDetails(false)
+	end)
+	back.Name = "Back"
+	back.LayoutOrder = 0
+	back.TextSize = 14
+	back.TextColor3 = K.text
+	local backCorner = back:FindFirstChildOfClass("UICorner") -- (6.18: Ui.button's own corner, rounded like the kit's)
+	if backCorner then
+		backCorner.CornerRadius = UDim.new(0, 8)
 	end
-	Ui.label(frame, table.concat(parts, "  +  "), UDim2.new(1, -96, 0, 0), {
-		Position = UDim2.fromOffset(86, 28),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		TextSize = layout.text,
-		Font = Theme.DisplayFont,
-		TextColor3 = if earned then P.ink else Extras.GOLD,
-	})
+	refs.startButton = back
+	Page.Art.banner(refs.chapter, campaign, 1, layout, not Missions.chapterState(campaign.id, progress, myLevel()).open)
+	Page.client(campaign, 2)
+	Page.action(campaign, 3)
 end
 
 -- 6.8 review: everything the MISSIONS page shows that can change, as one string: a render with the same key draws
@@ -1645,6 +1697,8 @@ function Page.key(): string
 		tostring(Extras.state.campaigns[selectedCampaign] == true),
 		tostring(layout and layout.narrow),
 		tostring(layout and layout.text),
+		tostring(Page.detail), -- 6.18
+		tostring(refs.chapterW),
 	}, "|")
 end
 
@@ -1657,7 +1711,7 @@ function Page.keepSelection(): Kept?
 	if not selected or not window or not selected:IsDescendantOf(window) then
 		return nil
 	end
-	for _, within in { refs.clients, refs.chapter, refs.bar, refs.extra } do
+	for _, within in { refs.clients, refs.chapter, refs.extra } do
 		if within and selected:IsDescendantOf(within) then
 			return { object = selected, name = selected.Name, within = within }
 		end
@@ -1685,8 +1739,8 @@ function Page.refocus(kept: Kept?, fallback: GuiObject?)
 	end
 end
 
--- The MISSIONS page: the clients, then the chosen one's chapter (the hero, the action card, the story path, the
--- finale's reward) and the action bar under it. 6.8 review: not again when nothing it shows changed (Page.key).
+-- The MISSIONS page: the clients, then the chosen one's chapter (6.18: the kit's hero and the missions' rows, or the
+-- details). 6.8 review: not again when nothing it shows changed (Page.key).
 function Page.render()
 	local layout = refs.layout
 	local key = Page.key()
@@ -1705,20 +1759,14 @@ function Page.render()
 	end
 	refs.clientsHeadText.Text = string.upper(`Who you work for  ·  {done} / {#Missions.Campaigns} done`)
 	Ui.clear(refs.chapter)
+	refs.startButton = nil
 	local campaign = Missions.findCampaign(selectedCampaign) or Missions.Campaigns[1]
-	-- 6.12.13: the chapter's picture (client/MissionArtUi.luau; none without one): it opens the chapter, on a phone it
-	-- sits above the story path (MissionsLayout artOnTop). A shut chapter's is dimmed like its portrait.
-	Page.Art.banner(refs.chapter, campaign, if layout.artOnTop then 0 else 3, layout, not Missions.chapterState(campaign.id, progress, myLevel()).open)
-	Page.hero(campaign, 1)
-	Page.action(campaign, 2)
-	local got, total = Missions.done(progress, campaign.id)
-	Extras.section(refs.chapter, "The story", `{got} / {total} done`, 4)
-	local list = Missions.ofCampaign(campaign.id)
-	for index, def in list do
-		Page.step(def, campaign, 10 + index, index == #list)
+	-- 6.18: the kit's hero beside the missions' rows, or the chapter's details (ⓘ: 6.8's banner, client, action card)
+	if Page.detail then
+		Page.details(campaign)
+	else
+		Page.cards(campaign)
 	end
-	Page.finale(campaign, 40)
-	Page.bar(campaign)
 	refs.pageKey = key
 	if layout.narrow and refs.selectedCard then
 		-- The chosen client's card in view on the strip.
@@ -2393,12 +2441,11 @@ render = function()
 		local page = Extras.tab
 		local S = Extras.state
 		local done = Extras.count(S.done)
-		refs.pageTabs.select(page)
 		refs.pageTabs.buttons.challenges.Text = `CHALLENGES {math.min(done, #Challenges.List)}/{#Challenges.List}`
+		refs.pageTabs.select(page) -- (6.18: lit, and fitted to its words)
 		local missionsPage = page == "missions"
 		refs.clients.Visible = missionsPage
 		refs.chapter.Visible = missionsPage
-		refs.bar.Visible = missionsPage
 		refs.column.Visible = missionsPage and not layout.narrow
 		refs.clientsHead.Visible = missionsPage and not layout.narrow
 		refs.extra.Visible = not missionsPage

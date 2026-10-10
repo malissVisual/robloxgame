@@ -24,6 +24,14 @@
 -- crew's members near you, your garages (the Missions state: server/Missions.luau asks the server's own answers) and
 -- where you stand. The tile and the READY CHECK say Readiness.badge / start (START, CALL CAR, IN PROGRESS, LEADER
 -- PICKS, AFTER YOUR RUN); the READY toast waits for a START that can work (by day a night mission is not ready).
+-- 6.18 (the UI kit, client/CardKit.luau; design/ui-kit/README.md): the READY CHECK in the JOBS look. The mission is the
+-- HERO ("MissionCard": the chapter's picture, the chapter and n/N on the ribbon, the readiness chip on the corner, the
+-- mission's name, its reward big, one facts line (the stars, DUO / co-op, what it lends; or why START waits), the
+-- savings goal's bar, and ONE button: ▶ START (green), CALL CAR FIRST (amber), a grey IN PROGRESS / YOUR LEADER PICKS,
+-- else WORK · EARN AND LEVEL UP (red). The checks are the kit's rows ("Check_<id>": the icon, the mark ✔ / ✖ / ☆
+-- in its colour, the headline, one line of how and where, the action's words: 📍 GPS ›, INVITE ›, JOBS ›; the edge
+-- green / red / grey), MISSIONS › a chip over them, and the savings goal a row ("SavingsGoal": $640 / $1,800, the money
+-- to go big, its bar; the ticker keeps it live). The hero sits beside the rows in a wide popup.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,10 +44,9 @@ local Readiness = require(Shared.Readiness)
 local MissionArt = require(Shared.MissionArt)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
-local P = require(script.Parent.HudContract)
 local Gps = require(script.Parent.Gps)
 local OrdersUi = require(script.Parent.OrdersUi)
-local CardKit = require(script.Parent.CardKit) -- 6.18: the home's hero in the UI kit's look
+local CardKit = require(script.Parent.CardKit) -- 6.18: the home's hero and the READY CHECK in the UI kit's look
 
 local K = Theme.Contract
 local ReadyCheck = {}
@@ -55,6 +62,7 @@ type Host = {
 	go: (id: string) -> (),
 	close: () -> (),
 	notify: (text: string) -> (),
+	room: (() -> number)?, -- 6.18: the popup's room (the hero's height; client/Phone.luau's host)
 }
 
 local player = Players.LocalPlayer
@@ -396,104 +404,87 @@ local function act(check: Readiness.Check, host: Host, result: Readiness.Result)
 	end
 end
 
--- One row: the mark (✔ green, ✖ red, ☆ grey), the headline and how / where, the action on the right (the row is a
--- button then: Name "Check_<id>").
-local function row(parent: Instance, look: OrdersUi.Kit, check: Readiness.Check, order: number, onAct: () -> ())
+-- One row (6.18: the kit's compact row): the check's icon, its mark (✔ green, ✖ red, ☆ grey) in the tag, the
+-- headline and how / where (an optional one says it helps), the action's words on the right ("Action": the row and
+-- the words act). Name "Check_<id>".
+local function row(parent: Instance, check: Readiness.Check, order: number, onAct: () -> ())
 	local actionable = check.action ~= nil and not check.done
 	local missing = check.required and not check.done
-	local cell = Ui.make(if actionable then "TextButton" else "Frame", {
-		Name = `Check_{check.id}`,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = K.row,
-		BorderSizePixel = 0,
-		LayoutOrder = order,
-	}, parent)
-	if actionable then
-		cell.AutoButtonColor = false
-		cell.Text = ""
-	end
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if missing then K.red else K.line, Thickness = 1, Transparency = if missing then 0.45 else 0.82 }, cell)
-	Ui.make("UISizeConstraint", { MinSize = Vector2.new(0, 54) }, cell)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, cell)
-	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, cell)
-	look.text(cell, Readiness.mark(check), UDim2.fromOffset(22, 22), {
-		Name = "Mark",
-		LayoutOrder = 1,
-		Font = Theme.HeadingFont,
-		TextSize = 16,
-		TextColor3 = if check.done then K.good elseif check.required then K.red else K.secondary,
-		TextWrapped = false,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	local words = Ui.make("Frame", { Name = "Words", Size = UDim2.new(1, if actionable then -128 else -30, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, cell)
-	Ui.list(words, true, 2)
-	look.text(words, `{check.icon}  {check.text}`, UDim2.new(1, 0, 0, 0), { Name = "Text", AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Font = Theme.HeadingFont, TextSize = 14, TextColor3 = if check.done then K.secondary else K.text })
-	if check.detail then
-		look.text(words, check.detail, UDim2.new(1, 0, 0, 0), { Name = "Detail", AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextSize = 12, TextColor3 = K.secondary })
-	end
+	local tone = if check.done then K.good elseif check.required then K.red else K.secondary
+	local facts = check.detail or ""
 	if not check.required and not check.done then
-		look.text(words, "Not needed to start: it helps", UDim2.new(1, 0, 0, 0), { Name = "Optional", AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextSize = 11, TextColor3 = K.secondary, TextTransparency = 0.25 })
+		facts = if facts ~= "" then `{facts} · it helps` else "Not needed to start: it helps"
 	end
-	if actionable then
-		local label = look.text(cell, ACTION_WORDS[check.action or ""] or "›", UDim2.fromOffset(90, 22), { Name = "Action", LayoutOrder = 3, Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if missing then K.red else K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
-		local button = cell :: any
-		local function lit(on: boolean)
-			button.BackgroundColor3 = if on then K.raised else K.row
-			label.TextColor3 = if on then K.red elseif missing then K.red else K.text
-		end
-		button.MouseEnter:Connect(function()
-			lit(true)
-		end)
-		button.MouseLeave:Connect(function()
-			lit(false)
-		end)
-		button.SelectionGained:Connect(function()
-			lit(true)
-		end)
-		button.SelectionLost:Connect(function()
-			lit(false)
-		end)
-		button.Activated:Connect(function()
-			local sound = Ui.onClick
-			if sound then
-				sound()
+	local made = CardKit.row(parent, {
+		name = `Check_{check.id}`,
+		order = order,
+		accent = if check.done then K.good elseif missing then K.red else K.line,
+		picture = { emoji = check.icon },
+		thumb = Config.UiKit.Icon,
+		tag = Readiness.mark(check),
+		tagColor = tone,
+		tagWidth = 24,
+		title = check.text,
+		titleColor = if check.done then K.secondary else K.text,
+		facts = facts,
+		word = if actionable then ACTION_WORDS[check.action or ""] or "›" else nil,
+		actionFace = if missing then K.red else nil,
+		onAction = if actionable then onAct else nil,
+		silent = not actionable,
+		onOpen = function()
+			if actionable then
+				onAct()
 			end
-			onAct()
-		end)
+		end,
+	})
+	made.tag.Name = "Mark"
+	if made.action then
+		made.action.Name = "Action"
 	end
 end
 
--- The savings goal's card: what for, your money / its price, what is left, the bar (tick keeps the money live).
-local function goalCard(parent: Instance, look: OrdersUi.Kit, goal: Readiness.Goal, order: number)
-	local card = look.block(parent, order)
-	card.Parent.Name = "SavingsGoal"
-	look.caps(card, "Saving for", 1, K.red).TextSize = 11
-	look.text(card, goal.name, UDim2.new(1, 0, 0, 22), { LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	local _, have, left = look.row2(card, `{Readiness.money(goal.have)} / {Readiness.money(goal.need)}`, Readiness.toGo(goal), 3, true)
-	local holder = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 8), BackgroundTransparency = 1, LayoutOrder = 4 }, card)
-	local back, fill = P.bar(holder, UDim2.new(1, 0, 0, 4), K.red)
-	back.Position = UDim2.fromOffset(0, 2)
-	look.meta(card, `Jobs pay for it: WORK has the board.{if goal.place then ` Its row's GPS shows the way.` else ""}`, 5)
-	data.view = { have = have, left = left, fill = fill, goal = goal }
+-- The savings goal's row (6.18): what for, your money / its price, the money to go big, the bar (tick keeps it live).
+local function goalRow(parent: Instance, goal: Readiness.Goal, order: number)
+	local made = CardKit.row(parent, {
+		name = "SavingsGoal",
+		order = order,
+		accent = K.red,
+		picture = { emoji = goal.icon },
+		thumb = Config.UiKit.Icon,
+		title = `SAVING FOR · {string.upper(goal.name)}`,
+		titleColor = K.text,
+		facts = `{Readiness.money(goal.have)} / {Readiness.money(goal.need)}`,
+		value = Readiness.toGo(goal),
+		valueColor = K.text,
+		silent = true,
+		onOpen = function() end,
+	})
+	local fill = CardKit.rowBar(made, 0, K.red)
+	data.view = { parts = made, fill = fill, goal = goal, hero = data.view and data.view.hero }
 	ReadyCheck.tick()
 end
 
--- The goal's money line and bar, from the state now (the phone's ticker, twice a second while it shows).
+-- The goal's money line, its value and the bars, from the state now (the phone's ticker, twice a second while it shows).
 function ReadyCheck.tick()
 	local view = data.view
-	if not view or not view.have.Parent then
+	if not view or not view.parts or not view.parts.row.Parent then
 		return
 	end
 	local goal = ReadyCheck.current().goal
 	if not goal or goal.id ~= view.goal.id then
 		return
 	end
-	view.have.Text = `{Readiness.money(goal.have)} / {Readiness.money(goal.need)}`
-	view.left.Text = Readiness.toGo(goal)
-	view.left.TextColor3 = if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.text
-	view.fill.Size = UDim2.fromScale(math.clamp(goal.have / math.max(1, goal.need), 0, 1), 1)
-	view.fill.BackgroundColor3 = if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.red
+	local color = if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.red
+	local share = math.clamp(goal.have / math.max(1, goal.need), 0, 1)
+	view.parts.facts.Text = `{Readiness.money(goal.have)} / {Readiness.money(goal.need)}`
+	CardKit.setValue(view.parts, Readiness.toGo(goal), if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.text)
+	view.fill.Size = UDim2.fromScale(share, 1)
+	view.fill.BackgroundColor3 = color
+	local hero = view.hero
+	if hero and hero.Parent then
+		hero.Size = UDim2.fromScale(share, 1)
+		hero.BackgroundColor3 = color
+	end
 end
 
 -- What the READY CHECK shows right now (the phone draws it again when this changes, not for every coin).
@@ -501,85 +492,98 @@ function ReadyCheck.key(): string
 	return Readiness.key(ReadyCheck.current())
 end
 
--- The READY CHECK in the phone's popup (`wide`: two columns: the mission, its buttons and the goal on the left, the
--- checklist on the right).
-function ReadyCheck.draw(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
-	data.view = nil
-	local result = ReadyCheck.current()
-	local mission = result.mission
-	local columns = require(script.Parent.PhoneApps).columns
-	if not mission then
-		look.emptyState(list, "🏆", "Every mission done", "Every chapter, every star. Replay any of them in MISSIONS for fun.", 1)
-		look.button(list, "OPEN MISSIONS", "main", 2, function()
-			act({ id = "missions", icon = "", text = "", done = false, required = false, action = "missions" }, host, result)
-		end)
-		return
-	end
-	local left, right = columns(list, 1, wide == true)
-	-- The mission.
-	local card = look.block(left, 1, true)
-	card.Parent.Name = "MissionCard"
-	look.caps(card, `{mission.icon}  {Readiness.chapterLine(mission)}`, 1, K.red).TextSize = 11
-	look.text(card, string.upper(mission.name), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 19 })
-	look.meta(card, mission.description, 3)
-	local chips = look.chipRow(card, 4)
-	local badge, tone = Readiness.badge(result)
-	look.chip(chips, badge, if tone == "good" then K.good elseif tone == "wait" then K.warn else K.red)
-	look.chip(chips, string.rep("★", math.clamp(mission.tier, 1, 4)), K.text)
-	if mission.duo then
-		look.chip(chips, "🤝 DUO", K.red)
-	elseif mission.coop then
-		look.chip(chips, "Co-op", K.text)
-	end
-	if mission.lends then
-		look.chip(chips, "Lends its vehicle")
-	end
-	local owner = ReadyCheck.input().crewOwner
-	if owner then
-		look.meta(card, `👥 You ride in {owner}'s crew: your leader picks the mission. Leave the crew (CREW) to start your own.`, 5)
-	end
-	-- The buttons: START when it can work (the MISSIONS window on it, its START), CALL CAR FIRST (the GARAGE), what
-	-- stands in the way (IN PROGRESS, LEADER PICKS, AFTER YOUR RUN: quiet), else JOBS (earn, level up); MISSIONS.
-	local actions = if wide then left else list
-	local base = if wide then 2 else 30
+-- The hero's ONE button (see the header) and its look: START when it can work (the MISSIONS window on it, its START),
+-- CALL CAR FIRST (the GARAGE), what stands in the way (IN PROGRESS, LEADER PICKS, AFTER YOUR RUN: grey), else JOBS.
+local function heroAction(result: Readiness.Result, host: Host): CardKit.Button
+	local mission = result.mission :: Readiness.MissionInfo
 	local start = result.start
-	if start.why and not start.can and start.label ~= "NOT READY" and start.label ~= "LEADER PICKS" then
-		look.meta(card, `⏸ {start.why}.`, 6)
-	end
 	if start.can then
-		local button = look.button(actions, `START ▶   {string.upper(mission.name)}`, "main", base, function()
+		return { name = "Start", text = "▶ START", kind = "good", onClick = function()
 			host.close()
 			local go = ReadyCheck.onStart
 			if go then
 				go(mission.id)
 			end
-		end)
-		button.Name = "Start"
+		end }
 	elseif start.label == "IN PROGRESS" or (result.ready and (start.label == "LEADER PICKS" or start.label == "AFTER YOUR RUN")) then
 		local words = if start.label == "IN PROGRESS" then "▶ IN PROGRESS" elseif start.label == "LEADER PICKS" then "👥 YOUR LEADER PICKS" else "FINISH YOUR RUN FIRST"
-		local button = look.button(actions, words, "quiet", base, function()
+		return { name = "Waiting", text = words, kind = "shut", onClick = function()
 			host.notify(start.why or start.label)
-		end)
-		button.Name = "Waiting"
+		end }
 	elseif result.ready and start.label == "CALL CAR" then
-		local button = look.button(actions, "CALL CAR FIRST  ›", "main", base, function()
+		return { name = "CallCar", text = "CALL CAR FIRST  ›", kind = "warn", onClick = function()
 			host.go("garage")
-		end)
-		button.Name = "CallCar"
-	else
-		local jobs = look.button(actions, "WORK · EARN AND LEVEL UP", "main", base, function()
-			host.go("board")
-		end)
-		jobs.Name = "Jobs"
+		end }
 	end
-	local open = look.button(actions, "OPEN MISSIONS", "quiet", base + 1, function()
+	return { name = "Jobs", text = "WORK · EARN AND LEVEL UP", kind = "primary", onClick = function()
+		host.go("board")
+	end }
+end
+
+-- The READY CHECK in the phone's popup (see the header; `wide`: the hero beside the rows).
+function ReadyCheck.draw(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
+	data.view = nil
+	local result = ReadyCheck.current()
+	local mission = result.mission
+	local function openMissions()
 		act({ id = "missions", icon = "", text = "", done = false, required = false, action = "missions" }, host, result)
-	end)
-	open.Name = "OpenMissions"
-	-- The checklist.
-	look.section(right, if result.ready then "Ready · what would help" else "Before you can start", if wide then 1 else 2)
-	local rows = Ui.make("Frame", { Name = "Checks", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = if wide then 2 else 3 }, right)
-	Ui.list(rows, true, 6)
+	end
+	if not mission then
+		look.emptyState(list, "🏆", "Every mission done", "Every chapter, every star. Replay any of them in MISSIONS for fun.", 1)
+		look.button(list, "OPEN MISSIONS", "main", 2, openMissions)
+		return
+	end
+	local room = if host.room then host.room() else Config.UiKit.HeroMin
+	local height = CardKit.Layout.heroHeight(room)
+	local _, left, right = CardKit.columns(list, { name = "ReadyView", order = 1, side = wide == true, hero = true, heroHeight = height })
+	-- The mission: the hero.
+	local badge, tone = Readiness.badge(result)
+	local color = if tone == "good" then K.good elseif tone == "wait" then K.warn else K.red
+	local def = require(Shared.Missions).find(mission.id)
+	local start = result.start
+	local facts = { string.rep("★", math.clamp(mission.tier, 1, 4)) }
+	if mission.duo then
+		table.insert(facts, "🤝 DUO")
+	elseif mission.coop then
+		table.insert(facts, "👥 co-op")
+	end
+	if mission.lends then
+		table.insert(facts, "lends its vehicle")
+	end
+	local owner = ReadyCheck.input().crewOwner
+	local why = if owner then `👥 {owner}'s crew: your leader picks`
+		elseif start.why and not start.can and start.label ~= "NOT READY" and start.label ~= "LEADER PICKS" then `⏸ {start.why}`
+		else nil
+	local goal = result.goal
+	local image = MissionArt.forCampaign(mission.campaign)
+	local parts = CardKit.hero(left, {
+		name = "MissionCard",
+		height = height,
+		stroke = color,
+		strong = true,
+		picture = { image = image, emoji = mission.icon },
+		title = string.upper(mission.name),
+		value = if def then Ui.money(def.reward) else "",
+		valueColor = if mission.replay then CardKit.Color.dim else CardKit.Color.money,
+		facts = why or table.concat(facts, " · "),
+		factsColor = if why then K.warn else K.text,
+		bar = if goal then { share = math.clamp(goal.have / math.max(1, goal.need), 0, 1), color = K.red } else nil,
+		action = heroAction(result, host),
+		ribbon = { text = `{mission.icon}  {string.upper(Readiness.chapterLine(mission))}`, face = K.raised, ink = K.text },
+		corner = { text = badge, ink = color, width = CardKit.width(badge, 13, Theme.HeadingFont) + 20 },
+		onOpen = function() end,
+		silent = true,
+	})
+	parts.corner.Name = "Status"
+	data.view = { hero = parts.bar }
+	-- The checklist (MISSIONS › a chip at its head).
+	local _, _, missionsChip = CardKit.sectionHeader(right, {
+		name = "ChecksHead",
+		text = string.upper(if result.ready then "Ready · what would help" else "Before you can start"),
+		order = 0,
+		chip = { name = "OpenMissions", text = "MISSIONS ›", order = 1, onClick = openMissions },
+	})
+	missionsChip.Name = "OpenMissions"
 	for index, check in result.checks do
 		local text = check
 		if check.id == "level" and not check.done and check.have and check.need then
@@ -593,13 +597,13 @@ function ReadyCheck.draw(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 				end
 			end
 		end
-		row(rows, look, text, index, function()
+		row(right, text, index, function()
 			act(check, host, result)
 		end)
 	end
 	-- The savings goal.
-	if result.goal then
-		goalCard(if wide then left else list, look, result.goal, if wide then 4 else 20)
+	if goal then
+		goalRow(right, goal, #result.checks + 1)
 	end
 end
 

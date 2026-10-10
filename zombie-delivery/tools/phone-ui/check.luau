@@ -167,9 +167,12 @@ check("balance uses current money",text("$1240")~=nil)
 Phone.setState({phone=true,money=1450,kit={},cars={}})
 check("balance updates with server state",text("$1450")~=nil)
 Phone.open("settings")
-tap("CYCLE SOUND MODE")
+-- 6.18 wave 2 (client/PhoneMore.luau): a row a setting, its action's word (SOUND · CYCLE).
+named("CycleSound").Activated:Fire()
 check("settings uses existing sound cycle",M.soundCycles==1)
-check("gamepad focus moves into the popup",M.focus==text("CYCLE SOUND MODE"))
+check("gamepad focus moves into the popup (6.18: the SOUND row)",M.focus==named("SoundRow") and named("CycleSound").Text=="CYCLE" and named("SoundRow"):FindFirstChild("Edge")~=nil)
+named("SoundRow").Activated:Fire()
+check("… the row itself cycles too",M.soundCycles==2)
 named("Backdrop").Activated:Fire()
 check("a tap on the backdrop returns home",popup()==nil and Phone.isOpen() and named("Home").Visible)
 -- 6.5: MORE is a sub-screen in the phone; its apps close back to it, ESC goes back to the tiles, then puts it away.
@@ -468,15 +471,17 @@ do
 	local function inPopup(name) return all(named("AppPopup"),function(object) return object.Name==name end) end
 	local cards=all(named("AppPopup"),function(object) return string.match(object.Name,"^Regular_")~=nil end)
 	check("a card for every business",#cards==25,#cards)
-	check("the summary: who knows you, the tiers held",text("2 / 25 businesses know you")~=nil and text("🥈 SILVER 1")~=nil and text("🥉 BRONZE 1")~=nil)
+	check("the summary (6.18: chips on top): who knows you, the tiers held",text("2 / 25 KNOW YOU")~=nil and text("🥈 SILVER 1")~=nil and text("🥉 BRONZE 1")~=nil)
 	local clinic,pizza,bakery=named("Regular_clinic"),named("Regular_pizzeria"),named("Regular_bakery")
 	check("the highest tier first",clinic.LayoutOrder<pizza.LayoutOrder and pizza.LayoutOrder<bakery.LayoutOrder)
 	local function within(card,value) return all(card,function(object) return object.Text==value end)[1] end
-	check("a regular's card: its picture, name, medal, bar and the way to the next tier",clinic:FindFirstChild("Body"):FindFirstChild("Thumb")~=nil and within(clinic,"CITY CLINIC")~=nil
+	check("6.18: your best regular is the hero: its picture, the bonus big in its medal's colour",clinic:FindFirstChild("Shade")~=nil and clinic:FindFirstChild("Pay",true).Text=="+10%"
+		and clinic:FindFirstChild("Pay",true).TextColor3==RegularsApp.colorOf("silver") and named("Regular_pizzeria"):FindFirstChild("Edge")~=nil and named("Regular_pizzeria"):FindFirstChild("Pay").Text=="+5%")
+	check("a regular's card: its picture, name, medal, bar and the way to the next tier",(clinic:FindFirstChild("Picture")~=nil or clinic:FindFirstChild("Emoji")~=nil) and within(clinic,"CITY CLINIC")~=nil
 		and within(clinic,"🥈 SILVER · +10%")~=nil and all(clinic,function(object) return object.Name=="Progress" end)[1]~=nil and within(clinic,"15 deliveries · 25 more for GOLD (+15%)")~=nil)
-	local thumb=bakery:FindFirstChild("Body"):FindFirstChild("Thumb")
+	local thumb=bakery:FindFirstChild("Thumb")
 	local picture=thumb and thumb:FindFirstChild("Picture")
-	check("never met: greyed, how to meet them",picture~=nil and picture.ImageTransparency==0.35 and within(bakery,"Deliver for them once to meet them.")~=nil and within(bakery,"NOT MET")~=nil)
+	check("never met: greyed, how to meet them",picture~=nil and picture.ImageColor3==require("./CardKit").Color.grey and within(bakery,"Deliver for them once to meet them.")~=nil and within(bakery,"NOT MET")~=nil)
 	named("Close").Activated:Fire()
 	check("REGULARS closes back to MORE",popup()==nil and named("More").Visible)
 	-- A golden order on the board.
@@ -529,9 +534,9 @@ do
 	Phone.close()
 end
 
--- CAREER: two columns in the wide popup, the phone upright. 6.18 wave 2: SHOP the kit's hero beside its rows.
+-- CAREER: its hero beside its rows (6.18 wave 2: the kit's columns, client/PhoneMore.luau). SHOP: the kit's hero beside its rows.
 Phone.open("career")
-check("career opens in the popup in two columns",showing("career") and upright() and named("Columns")~=nil and #M.warnings==0)
+check("career opens in the popup in two columns",showing("career") and upright() and named("CareerView")~=nil and named("CareerView"):FindFirstChildOfClass("UIListLayout").FillDirection.Name=="Horizontal" and #M.warnings==0)
 Phone.open("shop")
 check("shop opens in the popup: SAVE UP, the hero beside the rows",showing("shop") and upright() and named("ShopCards")~=nil and named("ShopCards"):FindFirstChild("Left")~=nil and named("Hero")~=nil and #M.warnings==0)
 -- GARAGE: BRING MY CAR, MY BIKE, CALL CAR.
@@ -570,21 +575,28 @@ local sounds=0
 Phone.onSound=function() sounds+=1 end
 Phone.open("settings")
 check("settings lists every key and the version",text("Weapon wheel")~=nil and text("Sprint")~=nil and text(`ZDC courier terminal · Zombie Delivery {Config.Version}`)~=nil)
-tap("CYCLE SOUND MODE")
+named("CycleSound").Activated:Fire()
 check("settings' sound goes through Phone.onSound",sounds==1)
 -- 6.15: ENEMY OUTLINES off and on (client/EnemyOutline.luau through Phone.onOutline; no button without it).
-check("no outline button before Main wires it",text("ENEMY OUTLINES: ON")==nil and text("ENEMY OUTLINES: OFF")==nil)
+check("no outline button before Main wires it",named("Outlines")==nil and named("OutlineRow")==nil)
 local outlined=true
 Phone.outlineOn=function() return outlined end
 Phone.onOutline=function() outlined=not outlined;return outlined end
 Phone.open("settings")
-tap("ENEMY OUTLINES: ON")
-check("settings turns the enemies' outline off, says so and shows it",not outlined and toasts[#toasts]=="Enemy outlines off" and text("ENEMY OUTLINES: OFF")~=nil)
-tap("ENEMY OUTLINES: OFF")
-check("and on again",outlined and toasts[#toasts]=="Enemy outlines on: zombies red, bandits orange" and text("ENEMY OUTLINES: ON")~=nil)
+check("6.18: ENEMY OUTLINES · ON",named("Outlines").Text=="ON" and text("ENEMY OUTLINES")~=nil)
+named("Outlines").Activated:Fire()
+check("settings turns the enemies' outline off, says so and shows it",not outlined and toasts[#toasts]=="Enemy outlines off" and named("Outlines").Text=="OFF")
+named("Outlines").Activated:Fire()
+check("and on again",outlined and toasts[#toasts]=="Enemy outlines on: zombies red, bandits orange" and named("Outlines").Text=="ON")
 Phone.outlineOn,Phone.onOutline=nil,nil
 Phone.open("bank")
 check("bank shows what you earned since you joined",text("+$360")~=nil)
+check("6.18 wave 2: BANK's hero: the cash big in green, FIND A DELIVERY its one button",named("Balance")~=nil and named("Balance"):FindFirstChild("Pay",true).TextColor3==require("./CardKit").Color.money
+	and named("FindDelivery")~=nil and named("Earned"):FindFirstChild("Pay").Text=="+$360")
+-- 6.18 wave 2: CAREER's hero is the next level (the XP to go big, FULL CAREER), the road after it rows.
+Phone.open("career")
+check("6.18 wave 2: CAREER: the next level the hero, the road its rows",named("NextLevel")~=nil and string.find(named("NextLevel"):FindFirstChild("Pay",true).Text," XP",1,true)~=nil
+	and named("FullCareer")~=nil and named("Level_3")~=nil and named("Level_3"):FindFirstChild("Add").Text=="🔒 LV 3")
 -- A new message drops a banner while another app shows; it opens MESSAGES.
 Phone.open("bank")
 M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Earl has a van for you."})
@@ -598,6 +610,14 @@ M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Dead End Mot
 check("the messages row counts the unread",named("Unread").Visible and named("Unread").Text=="2" and text("Dead End Motors is on your GPS.")~=nil)
 named("MessagesRow").Activated:Fire()
 check("the messages row opens MESSAGES",showing("messages"))
+-- 6.18 wave 2: a row a message (the newest first, the red dot while unread); a tap opens it whole, ‹ MESSAGES back.
+local rows=all(named("AppPopup"),function(object) return object.Name=="Message" and object.ClassName=="TextButton" end)
+table.sort(rows,function(a,b) return a.LayoutOrder<b.LayoutOrder end)
+check("6.18 wave 2: MESSAGES' rows, the newest first, unread dotted",#rows>=2 and rows[1]:FindFirstChild("Facts").Text=="Dead End Motors is on your GPS." and rows[1]:FindFirstChild("Unread")~=nil)
+rows[1].Activated:Fire()
+check("… a tap opens the message whole, ‹ MESSAGES goes back",showing("messages") and named("BackToMessages")~=nil and named("Words").Text=="Dead End Motors is on your GPS.")
+named("BackToMessages").Activated:Fire()
+check("… back to the rows",named("BackToMessages")==nil and named("RecentHead")~=nil)
 named("Close").Activated:Fire()
 check("read: the count goes",not named("Unread").Visible and text("No new messages")~=nil)
 -- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
@@ -713,9 +733,17 @@ do
 	named("tasksApp").Activated:Fire()
 	check("TASKS opens in the popup",showing("tasks") and text("TASKS")~=nil and upright() and #M.warnings==0)
 	check("three daily cards, the bonus card and the weekly card",named("Task_1")~=nil and named("Task_2")~=nil and named("Task_3")~=nil and named("Task_bonus")~=nil and named("Task_weekly")~=nil)
-	check("a card: its title, its progress and its reward",text("Ride a zip line")~=nil and text("0 / 1")~=nil and text("$120 · 80 XP")~=nil and text("20 / 150")~=nil)
-	check("money tasks read in dollars",text("$40 / $80")~=nil)
-	check("how long until the tasks are new",text("New tasks in 3 h 2 min · at 00:00 UTC")~=nil and text("New in 2 d 1 h · Monday 00:00 UTC")~=nil)
+	-- 6.18 (client/CardKit.luau): the task to claim is the hero (its kind, its progress, the money big, CLAIM · $X in
+	-- green); the others are the kit's rows (the name, "0 / 1 · +80 XP", the money big, a bar at the foot).
+	local Kit=require("./CardKit")
+	local hero=named("Task_1")
+	check("6.18: the hero: the task to claim, its ribbon, ✓ DONE, the money big, CLAIM · $180 in green",hero:FindFirstChild("Ribbon").Text=="DAILY TASK" and hero:FindFirstChild("Status").Text=="✓ DONE"
+		and hero:FindFirstChild("Pay",true).Text=="$180" and named("Claim_1").Text=="CLAIM · $180" and named("Claim_1").BackgroundColor3==M.Theme.Contract.good and hero:FindFirstChild("Shade")~=nil)
+	check("6.18: … the others are rows: an edge, the money big, a bar",named("Task_2"):FindFirstChild("Edge")~=nil and named("Task_2"):FindFirstChild("Pay").Text=="$120"
+		and named("Task_2"):FindFirstChild("Pay").TextColor3==Kit.Color.money and named("Task_2"):FindFirstChild("Progress")~=nil and named("Task_weekly"):FindFirstChild("Pay").TextColor3==Kit.Color.gold)
+	check("a card: its title, its progress and its reward",text("Ride a zip line")~=nil and text("0 / 1 · +80 XP")~=nil and text("$120")~=nil and text("20 / 150 · +550 XP")~=nil)
+	check("money tasks read in dollars",text("$40 / $80 · +100 XP")~=nil)
+	check("how long until the tasks are new (6.18: the chips on top)",text("⏱ DAILY · 3 h 2 min")~=nil and text("📅 WEEKLY · 2 d 1 h")~=nil and named("DayClock").Parent.Name=="Chips" and text("1 TO CLAIM")~=nil)
 	check("CLAIM only on the done task, the gamepad on it",named("Claim_1")~=nil and named("Claim_2")==nil and named("Claim_weekly")==nil and named("Claim_bonus")==nil and M.focus==named("Claim_1"))
 	named("Claim_1").Activated:Fire()
 	check("CLAIM asks the server for that task",lastSent("Tasks").args[1]=="claim" and lastSent("Tasks").args[2]==1)
@@ -729,12 +757,12 @@ do
 	for _,task in state.daily do task.progress=task.target;task.done=true;task.claimed=true end
 	state.bonus.done=true;state.ready=1
 	M.remotes.Tasks.OnClientEvent:Fire("state",state)
-	check("every daily done: CLAIM BONUS",named("Claim_bonus")~=nil and M.focus==named("Claim_bonus"))
+	check("every daily done: CLAIM the bonus (6.18: the hero's)",named("Claim_bonus")~=nil and M.focus==named("Claim_bonus") and named("Task_bonus"):FindFirstChild("Ribbon").Text=="BONUS · EVERY DAILY")
 	named("Claim_bonus").Activated:Fire()
 	check("CLAIM BONUS asks for the bonus",lastSent("Tasks").args[1]=="claim" and lastSent("Tasks").args[2]=="bonus")
-	check("before the reset the countdown runs",text("New tasks in 3 h 2 min · at 00:00 UTC")~=nil)
+	check("before the reset the countdown runs",text("⏱ DAILY · 3 h 2 min")~=nil)
 	M.now=state.dayEnds+1;require("./TasksApp").tick()
-	check("the phone's ticker counts down to the reset",text("New tasks in 0 s · at 00:00 UTC")~=nil)
+	check("the phone's ticker counts down to the reset",text("⏱ DAILY · 0 s")~=nil)
 	M.now=100
 	named("Close").Activated:Fire()
 	check("TASKS closes back to the phone",popup()==nil and Phone.isOpen() and #M.warnings==0)
@@ -894,7 +922,7 @@ do
 	check("… the mission card: its name, the readiness chip",text("PAPER TRAIL")~=nil and text("✖ 0 OF 2 READY")~=nil)
 	check("… the rows: the level, the van (required), a medkit (would help)",named("Check_level")~=nil and named("Check_vehicle")~=nil and named("Check_medkit")~=nil and named("Check_cargo")==nil
 		and named("Check_vehicle"):FindFirstChild("Mark").Text=="✖" and named("Check_medkit"):FindFirstChild("Mark").Text=="☆")
-	check("… the van's row: where and what it costs, a GPS action",text("🚐  A van of your own")~=nil and text("Old Van at Earl's Used Wheels · $1,800 · level 4")~=nil and named("Check_vehicle").ClassName=="TextButton"
+	check("… the van's row (6.18: the kit's row, its icon the thumb, ✖ in red, a red edge): where and what it costs, a GPS action",text("A van of your own")~=nil and named("Check_vehicle"):FindFirstChild("Edge").BackgroundColor3==M.Theme.Contract.red and text("Old Van at Earl's Used Wheels · $1,800 · level 4")~=nil and named("Check_vehicle").ClassName=="TextButton"
 		and named("Check_vehicle"):FindFirstChild("Action").Text=="📍 GPS  ›")
 	check("… the level's row: the XP and about how much work (CareerUi.toGo)",Levels.xpFor(2)+100<1000 and text(`{Levels.xpFor(2)+100} / 2,093 XP · about 8 runs`)~=nil and named("Check_level"):FindFirstChild("Action").Text=="JOBS  ›")
 	check("… the savings goal: Old Van, $640 / $1,800, $1,160 to go",named("SavingsGoal")~=nil and text("$640 / $1,800")~=nil and text("$1,160 to go")~=nil)
@@ -922,7 +950,8 @@ do
 	check("6.14 NEXT MISSION: READY · START in green, nothing to buy",tile:FindFirstChild("Status",true).Text=="✔ READY · START" and tile:FindFirstChild("Status",true).TextColor3==M.Theme.Contract.good
 		and tile:FindFirstChild("Goal",true).Text=="Everything it needs is yours" and tile:FindFirstChild("Go",true).Text=="▶ START")
 	named("nextApp").Activated:Fire()
-	check("… the READY CHECK: every required row ✔, START",named("Start")~=nil and named("Check_vehicle"):FindFirstChild("Mark").Text=="✔" and named("Check_vehicle").ClassName=="Frame" and named("SavingsGoal")==nil)
+	check("… the READY CHECK: every required row ✔, START",named("Start")~=nil and named("Check_vehicle"):FindFirstChild("Mark").Text=="✔" and named("Check_vehicle"):FindFirstChild("Action")==nil and named("SavingsGoal")==nil
+		and named("Start").BackgroundColor3==M.Theme.Contract.good and named("MissionCard"):FindFirstChild("Start",true)==named("Start"))
 	named("Start").Activated:Fire()
 	check("… START goes through the MISSIONS window (ReadyCheck.onStart), the phone away",started[#started]=="dispatch_1" and not Phone.isOpen())
 	-- 6.14 review: START only when it can work (the Missions state: carOut, active, crewOwner): no car of yours out

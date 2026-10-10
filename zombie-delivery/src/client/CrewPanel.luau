@@ -30,6 +30,13 @@
 -- narrow rule on its left: red for the job / an invitation / a co-op seeker, amber for the leader and your own board
 -- entry); ACCEPT (in the window and on the invitation card) is the red primary action; KICK, DECLINE, STOP and LEAVE
 -- keep the dark danger face, INVITE / LOOK the main one; the pay split is a square bar (the leader's part red).
+-- 6.18 (the UI kit, client/CardKit.luau; design/ui-kit/README.md; the owner: "every window like JOBS"): the window in
+-- the JOBS look. The section heads are the kit's (caps, quiet, no marker); every row is the kit's compact row (charcoal,
+-- 10 px corners, a faint line, the state on a 4 px edge at its left: red the crew's job / an invitation / a co-op
+-- seeker, gold the leader and your board entry, green a player nearby; the name in caps, ONE quiet line under it); the
+-- row's actions are the kit's rounded buttons (INVITE / LOOK / ACCEPT green or red, KICK / DECLINE / STOP / LEAVE in
+-- the quiet face with red words, a grey one that can't act); the crew's job leads with the clock big. Every action keeps
+-- its remote (CrewInvite, CrewAnswer, CrewBoard).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,6 +52,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local MapView = require(script.Parent.MapView)
 local Hud = require(script.Parent.Hud)
+local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit (the rows' look, the section heads, the buttons)
 
 local C = Ui.Colors
 local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
@@ -287,86 +295,80 @@ local function nextOrder(): number
 	return order
 end
 
--- A section head (5.8: the phone's "■ ACTIVE ORDER"): the small red marker, the caps and a thin line under them.
+-- A section head (6.18: the kit's: caps 11, quiet, "YOUR CREW · 2/3 MEMBERS").
 local function heading(text: string)
-	local frame = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 30), BackgroundTransparency = 1, LayoutOrder = nextOrder() }, body)
-	Ui.make("Frame", {
-		Name = "Marker",
-		Size = UDim2.fromOffset(7, 7),
-		Position = UDim2.new(0, 2, 0.5, 2),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = K.red,
-		BorderSizePixel = 0,
-	}, frame)
-	Ui.caps(frame, text, UDim2.new(1, -18, 1, -4), { Position = UDim2.fromOffset(18, 4), TextSize = 13, TextColor3 = C.dim })
-	Ui.make("Frame", { Name = "Rule", Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, frame)
+	local frame = Ui.make("Frame", { Name = "Section", Size = UDim2.new(1, -10, 0, 30), BackgroundTransparency = 1, LayoutOrder = nextOrder() }, body)
+	Ui.label(frame, string.upper(text), UDim2.new(1, 0, 0, 16), { Position = UDim2.new(0, 2, 1, -18), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 end
 
 local function note(text: string, color: Color3?)
 	Ui.label(body, text, UDim2.new(1, -10, 0, 0), {
 		LayoutOrder = nextOrder(),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		TextSize = 14,
+		TextSize = 13,
 		Font = Theme.Font,
-		TextColor3 = color or C.dim,
+		TextColor3 = color or CardKit.Color.faint,
 	})
 end
 
--- 5.8: a slim row like the phone's (square, a hairline). A highlighted row is raised with a narrow rule on its left
--- and a brighter hairline (red for the GPS / crew highlight, else the caller's colour, e.g. the leader's amber).
+-- 6.18: the kit's compact row: charcoal, 10 px corners, a faint line, the state as a 4 px edge on its left (`highlight`:
+-- red for the GPS / crew highlight, else the caller's colour, e.g. the leader's gold; none a quiet grey).
 local function row(height: number, highlight: Color3?): any
 	local frame = Ui.make("Frame", {
-		Size = UDim2.new(1, -10, 0, height),
-		BackgroundColor3 = K.row,
+		Size = UDim2.new(1, -10, 0, math.max(height, Config.UiKit.Row)),
+		BackgroundColor3 = if highlight then K.raised else K.row,
 		BorderSizePixel = 0,
+		ClipsDescendants = true,
 		LayoutOrder = nextOrder(),
 	}, body)
-	Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE
-	if highlight then
-		Ui.selectRow(frame, true)
-		local rule = frame:FindFirstChild("Rule")
-		if rule and rule:IsA("Frame") and highlight ~= GPS then
-			rule.BackgroundColor3 = highlight
-		end
-	end
+	Ui.corner(frame, Config.UiKit.RowCorner)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, frame)
+	Ui.make("Frame", { Name = "Edge", Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = if highlight == GPS then K.red elseif highlight then (if highlight == C.yellow then CardKit.Color.gold else highlight) else K.line, BorderSizePixel = 0, ZIndex = 3 }, frame)
 	return frame
 end
 
--- The name (big) and a line under it on the left of a row; returns the line (for live updates).
+-- The name (caps, the kit's title) and ONE quiet line under it on the left of a row; returns the line (live updates).
 local function rowText(frame: any, name: string, sub: string, nameColor: Color3?, buttons: number): any
-	local width = -24 - buttons * 120
-	Ui.label(frame, name, UDim2.new(1, width, 0, 24), {
-		Position = UDim2.fromOffset(14, 6),
-		TextSize = 18,
-		Font = Theme.DisplayFont,
-		TextColor3 = nameColor or C.text,
+	local width = -28 - buttons * 112
+	Ui.label(frame, string.upper(name), UDim2.new(1, width, 0, 18), {
+		Name = "Business",
+		Position = UDim2.fromOffset(16, 8),
+		TextSize = 13,
+		Font = Theme.HeadingFont,
+		TextColor3 = if nameColor == C.yellow then CardKit.Color.gold else (nameColor or K.text),
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	return Ui.label(frame, sub, UDim2.new(1, width, 0, 18), {
-		Position = UDim2.fromOffset(14, 31),
-		TextSize = 14,
+	return Ui.label(frame, sub, UDim2.new(1, width, 0, 16), {
+		Name = "Facts",
+		Position = UDim2.fromOffset(16, 28),
+		TextSize = 12,
 		Font = Theme.Font,
-		TextColor3 = C.dim,
+		TextColor3 = CardKit.Color.faint,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 end
 
--- A button on the right of a row (slot 1 = the rightmost; 112 × 36, square like the phone's); `color` says what it
--- means (Theme.Contract.red: the primary action, Theme.Colors.red: danger, green: the main one); a disabled one is
--- grey and does nothing.
+-- A button on the right of a row (slot 1 = the rightmost; 6.18: the kit's rounded 104 × 40 action): `color` says what
+-- it means (Theme.Contract.red: the primary action, Theme.Colors.red: danger in the quiet face with red words, green:
+-- the main one on the kit's green); a disabled one is grey and does nothing.
 local function rowButton(frame: any, text: string, color: Color3, enabled: boolean, slot: number, onClick: () -> ()): any
-	local button = Ui.button(frame, text, UDim2.fromOffset(112, 36), if enabled then color else C.grey, function()
+	local danger = color == C.red
+	local green = color == C.green
+	local button = Ui.button(frame, text, UDim2.fromOffset(104, Config.UiKit.Add), if not enabled or danger then K.raised elseif green then K.good else color, function()
 		if enabled then
 			onClick()
 		end
 	end)
-	button.TextSize = 14
+	button.TextSize = 12
+	button.Font = Theme.HeadingFont
 	button.AnchorPoint = Vector2.new(1, 0.5)
-	button.Position = UDim2.new(1, -10 - (slot - 1) * 120, 0.5, 0)
-	if not enabled then
-		button.TextColor3 = C.dim
+	button.Position = UDim2.new(1, -8 - (slot - 1) * 112, 0.5, 0)
+	button.TextColor3 = if not enabled then K.secondary elseif danger then K.red elseif green then CardKit.Color.goldInk else K.text
+	local buttonCorner = button:FindFirstChildOfClass("UICorner") -- (6.18: Ui.button's own corner, rounded like the kit's)
+	if buttonCorner then
+		buttonCorner.CornerRadius = UDim.new(0, 9)
 	end
 	return button
 end
@@ -743,11 +745,16 @@ local function render()
 	renderBoard(myRole)
 	renderPlayers(myRole)
 	if myRole then
-		local leave = Ui.button(body, if myRole == "owner" then "BREAK UP THE CREW" else "LEAVE THE CREW", UDim2.new(1, -10, 0, 44), C.red, function()
+		local leave = Ui.button(body, if myRole == "owner" then "BREAK UP THE CREW" else "LEAVE THE CREW", UDim2.new(1, -10, 0, Config.UiKit.Button), K.raised, function()
 			answer("leave")
 		end)
 		leave.LayoutOrder = nextOrder()
-		leave.TextSize = 17
+		leave.TextSize = 15
+		leave.TextColor3 = K.red
+		local leaveCorner = leave:FindFirstChildOfClass("UICorner") -- (6.18: Ui.button's own corner, rounded like the kit's)
+		if leaveCorner then
+			leaveCorner.CornerRadius = UDim.new(0, 8)
+		end
 	end
 	for _, refresh in live do
 		refresh()

@@ -22,6 +22,12 @@
 -- phone's square tabs (Ui.tabs: the open one raised with a red underline), the summary a slim row led by the red
 -- marker, the properties as slim hairline rows (no corners; your home selected: raised, the red rule; one you own a
 -- thin green rule), the facts as flat hairline cells, and BUY as the red primary action.
+-- 6.18 (the UI kit, client/CardKit.luau; design/ui-kit/README.md; the owner: "every window like JOBS"): the list in the
+-- JOBS look. The filters are chips (CardKit.tabs, the open one lit), the summary a rounded strip, and every property
+-- the kit's row ("Property_<id>"): its kind's icon, the name, ONE line (the kind, the district, what it holds), the
+-- PRICE big (green when you can pay it, dim while you can't), the edge in its state (gold your home, green owned, grey
+-- locked, else its kind's colour), and at the right 📍 GPS (the GPS, the window closes), ★ HOME / OWNED, or the lock's
+-- words ("🔒 LV 7", "🔒 IRON SUPPLY"). A tap opens its listing (the details: every fact, BUY, SELL, SET AS HOME).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,6 +43,7 @@ local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local MapView = require(script.Parent.MapView)
+local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit (the filters' chips, the properties' rows)
 
 local C = Ui.Colors
 local K = Theme.Contract
@@ -92,7 +99,7 @@ local scale: any = nil
 local subtitle: any = nil
 local summary: any = nil
 local listPage: any = nil
-local filterTabs: Ui.Tabs? = nil -- 5.8: the filters (Ui.tabs)
+local filterTabs: any = nil -- 5.8: the filters (6.18: CardKit.tabs, the kit's chips)
 local body: any = nil
 local listingPage: any = nil
 local designWidth = BASE_W
@@ -308,6 +315,7 @@ local function build()
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	Ui.stroke(summary, K.line, 1).Transparency = Ui.HAIRLINE
+	Ui.corner(summary, Config.UiKit.RowCorner) -- (6.18: the kit's rounded strip)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 26), PaddingRight = UDim.new(0, 12) }, summary)
 	Ui.make("Frame", {
 		Name = "Marker",
@@ -318,19 +326,19 @@ local function build()
 		BorderSizePixel = 0,
 	}, summary)
 
-	-- The list page: the filters (5.8: the phone's square tabs, 36 px tall) and the rows.
+	-- The list page: the filters (6.18: the kit's chips, 24 px tall) and the rows.
 	listPage = Ui.make("Frame", { Size = UDim2.new(1, -36, 1, -60), Position = UDim2.fromOffset(18, 54), BackgroundTransparency = 1 }, content)
-	local items: { Ui.TabItem } = {}
+	local items: { CardKit.TabItem } = {}
 	for _, entry in FILTERS do
 		table.insert(items, { id = entry.id, text = entry.label })
 	end
-	filterTabs = Ui.tabs(listPage, items, function(id: string)
+	filterTabs = CardKit.tabList(listPage, items, function(id: string)
 		filter = id
 		render()
-	end, { selected = filter, height = 36, gap = 4, textSize = 13 })
+	end, filter)
 	body = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, 0, 1, -46),
-		Position = UDim2.fromOffset(0, 46),
+		Size = UDim2.new(1, 0, 1, -(Config.UiKit.Chip + 10)),
+		Position = UDim2.fromOffset(0, Config.UiKit.Chip + 10),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 3,
@@ -338,8 +346,8 @@ local function build()
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, listPage)
-	Ui.list(body, true, 8)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingBottom = UDim.new(0, 8) }, body)
+	Ui.list(body, true, Config.UiKit.Gap)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 8) }, body)
 
 	-- The listing page: one property.
 	listingPage = Ui.make("ScrollingFrame", {
@@ -376,7 +384,7 @@ local function passes(def: Config.EstateDef): boolean
 	return def.kind == filter
 end
 
--- The filter tabs (5.8: Ui.tabs, built once): the chosen one raised with a red rule under it, the others quiet.
+-- The filter tabs (5.8: Ui.tabs, built once; 6.18: the kit's chips): the chosen one lit, the others quiet.
 local function renderFilters()
 	local tabs = filterTabs
 	if tabs and tabs.selected ~= filter then
@@ -385,105 +393,50 @@ local function renderFilters()
 end
 
 local function row(def: Config.EstateDef, order: number)
+	-- 6.18: the kit's compact row (see the header).
 	local mine = state.owned[def.id] == true
 	local isHome = state.home == def.id
 	local kind = kindOf(def)
-	local narrow = designWidth < NARROW
-	local right = if narrow then 190 else 236 -- the status column and the GPS button
-	-- A slim row (5.8: no corners, a hairline): the status column behind a fine line; your home is selected (raised,
-	-- the red rule), a property you own has a thin green rule on its left. Hover / gamepad focus brightens it.
-	local frame = Ui.make("TextButton", {
-		Size = UDim2.new(1, -10, 0, 64),
-		BackgroundColor3 = K.row,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		LayoutOrder = order,
-	}, body)
-	Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE
-	if isHome then
-		Ui.selectRow(frame, true)
-	elseif mine then
-		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = C.green, BorderSizePixel = 0, ZIndex = 2 }, frame)
-	end
-	Ui.dashes(frame, true, 6, K.rule, UDim2.new(0, 1, 1, -16), UDim2.new(1, -right - 10, 0, 8))
-	Ui.tactile(frame)
-	frame.Activated:Connect(function()
-		EstateUi.openListing(def.id, false)
-	end)
-	Ui.icon(frame, "estate_" .. def.kind, kind.icon, UDim2.fromOffset(42, 42), {
-		Position = UDim2.fromOffset(10, 11),
-		TextScaled = true,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		ImageColor3 = kind.color,
-	})
-	Ui.label(frame, def.name, UDim2.new(1, -(62 + right), 0, 24), {
-		Position = UDim2.fromOffset(62, 8),
-		TextSize = 18,
-		Font = Theme.DisplayFont,
-		TextColor3 = C.text,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
 	local plot = plotOf(def.id)
 	local district = districtName(plot and plot.district)
-	Ui.label(frame, `{kind.name}{if district then " · " .. district else ""} · {capacity(def)}`, UDim2.new(1, -(62 + right), 0, 18), {
-		Position = UDim2.fromOffset(62, 34),
-		TextSize = 13,
-		Font = Theme.Font,
-		TextColor3 = C.dim,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+	local story = needs(def)
+	local shut = not mine and (locked(def) or story ~= nil)
+	local lock = if mine then nil elseif locked(def) then `🔒 LV {def.level}` elseif story then `🔒 {string.upper(story)}` else nil
+	local afford = money >= def.price
+	local made = CardKit.row(body, {
+		name = `Property_{def.id}`,
+		order = order,
+		accent = if isHome then CardKit.Color.gold elseif mine then K.good elseif shut then K.line else kind.color,
+		picture = { glyph = function(face: Instance, size: number)
+			Ui.icon(face, "estate_" .. def.kind, kind.icon, UDim2.fromOffset(size, size), {
+				TextScaled = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				ImageColor3 = kind.color,
+			})
+		end },
+		thumb = Config.UiKit.Icon,
+		emojiSize = 36,
+		shut = shut,
+		rest = if isHome then K.raised else nil,
+		title = string.upper(def.name),
+		titleColor = if shut then nil else K.text,
+		facts = `{kind.name}{if district then " · " .. district else ""} · {capacity(def)}`,
+		value = if mine then (if def.kind == "office" and state.office == def.id then "YOUR COMPANY" else nil) else Ui.money(def.price),
+		valueColor = if mine then K.secondary elseif afford then CardKit.Color.money else CardKit.Color.dim,
+		word = if isHome then "★ HOME" elseif mine then "OWNED" else "📍 GPS",
+		actionFace = if isHome then CardKit.Color.gold elseif mine then CardKit.Color.goodFace else GPS_COLOR,
+		wordInk = if isHome then CardKit.Color.goldInk elseif mine then K.good else nil,
+		lock = lock,
+		onAction = if mine then nil else function()
+			if setGps(def) then
+				EstateUi.close()
+			end
+		end,
+		onOpen = function()
+			EstateUi.openListing(def.id, false)
+		end,
 	})
-	-- The status column: the price (or OWNED / YOUR HOME) and the level lock.
-	local statusW = right - 76
-	local top: string
-	local topColor: Color3
-	local bottom: string
-	local bottomColor: Color3
-	if isHome then
-		top, topColor = "★ YOUR HOME", C.yellow
-		bottom, bottomColor = "you spawn here", C.dim
-	elseif mine then
-		top, topColor = "OWNED", C.green
-		bottom, bottomColor = if def.kind == "office" and state.office == def.id then "your company" else `sells {Ui.money(sellValue(def))}`, C.dim
-	else
-		top, topColor = Ui.money(def.price), if money >= def.price then C.money else C.dim
-		local story = needs(def)
-		if locked(def) then
-			bottom, bottomColor = `🔒 LEVEL {def.level}`, C.red
-		elseif story then
-			bottom, bottomColor = `🔒 {string.upper(story)}`, C.red
-		else
-			bottom, bottomColor = if money >= def.price then "FOR SALE" else `{Ui.money(def.price - money)} more`, C.dim
-		end
-	end
-	Ui.label(frame, top, UDim2.fromOffset(statusW, 24), {
-		Position = UDim2.new(1, -right, 0, 8),
-		TextSize = 17,
-		Font = Theme.DisplayFont,
-		TextColor3 = topColor,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextScaled = true,
-	})
-	Ui.label(frame, bottom, UDim2.fromOffset(statusW, 18), {
-		Position = UDim2.new(1, -right, 0, 34),
-		TextSize = 13,
-		Font = Theme.HeadingFont,
-		TextColor3 = bottomColor,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local gps = Ui.button(frame, "GPS", UDim2.fromOffset(58, 36), GPS_COLOR, function()
-		if setGps(def) then
-			EstateUi.close()
-		end
-	end)
-	gps.AnchorPoint = Vector2.new(1, 0.5)
-	gps.Position = UDim2.new(1, -8, 0.5, 0)
-	gps.TextSize = 14
+	made.row:SetAttribute("Owned", mine)
 end
 
 -- The OWNED filter with nothing owned: the cheapest home and its level (from Config, not hard-coded).

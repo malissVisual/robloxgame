@@ -17,6 +17,9 @@
 --   * CardKit.details(list, look, spec) a tap-for-details sub-view: "‹ BACK" (‹ JOBS) and what it draws
 --   * CardKit.Color / CardKit.Danger   the palette: money green, gold, the danger tiers, dim and faint words, the run's
 --                                      and rush hour's chips
+-- 6.18 wave 2 (added, nothing above changed): a row's worded action (`word`: CLAIM, GPS ›, on a face you give), a thin
+-- bar at a row's foot (CardKit.rowBar: a task's progress), a chips strip heading a body (CardKit.chips) or in the
+-- popup's header (CardKit.toHeader) and page tabs as chips (CardKit.tabs: MISSIONS' CHALLENGES / SECRETS / REWARDS).
 -- Presentation only: every action keeps its caller's server path.
 -- 6.18 wave 2 (additive, for the SHOP, BAG, GARAGE and STYLE windows): a Picture's `icon` (a shared/Icons.luau name: its
 -- uploaded white silhouette drawn whole, not cropped; a hero's as its mark at the right); a row's action may be a short
@@ -463,6 +466,8 @@ export type Row = {
 	action: string?, -- the round action ("+", "›"); a button when onAction is given, else a mark
 	lock: string?, -- instead of the action: a lock's short words ("🔒 LV 9")
 	actionFace: Color3?, -- default red ("+") or raised ("›", a lock)
+	word: string?, -- 6.18 wave 2: a worded action instead ("CLAIM", "📍 GPS ›"): a button with onAction, else a mark
+	wordInk: Color3?, -- its words' colour (default white)
 	onAction: (() -> ())?,
 	badge: boolean?, -- a red count / word badge on the thumb's corner ("Badge", hidden)
 	silent: boolean?, -- no click of its own (its onOpen clicks)
@@ -504,24 +509,26 @@ function CardKit.row(parent: Instance, spec: Row): RowParts
 	end
 	-- the action at the right: the round button, a mark, or the lock's short words
 	local lock = spec.lock
-	-- (6.18 wave 2: a short word for the action, "BUY", "USE": a pill sized to it, like a lock's words)
-	local word = if not lock and spec.action and (utf8.len(spec.action) or 1) > 1 then spec.action else nil
+	-- (6.18 wave 2: a short word for the action, "BUY", "USE" (spec.action longer than one character, a red pill when
+	-- it acts), or spec.word (a quiet worded action, its own ink): a pill sized to it, like a lock's words)
+	local actionWord = if not lock and spec.action and (utf8.len(spec.action) or 1) > 1 then spec.action else nil
+	local word = if lock then nil else (spec.word or actionWord)
 	local small = lock or word
 	local addW = CardLayout.action(if small then CardKit.width(small, if word then 12 else 11, Theme.HeadingFont) else nil)
 	local onAction = spec.onAction
-	if lock or spec.action then
+	if lock or word or spec.action then
 		local plus = spec.action == "+"
 		local made = Ui.make(if onAction then "TextButton" else "TextLabel", {
 			Name = "Add",
 			Size = UDim2.fromOffset(addW, KIT.Add),
 			Position = UDim2.new(1, -6, 0.5, 0),
 			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundColor3 = spec.actionFace or (if lock or not (plus or (word and onAction)) then K.raised else K.red),
+			BackgroundColor3 = spec.actionFace or (if lock or (spec.word and not actionWord) or not (plus or (actionWord and onAction)) then K.raised else K.red),
 			BorderSizePixel = 0,
-			Text = lock or spec.action,
+			Text = lock or word or spec.action,
 			Font = Theme.HeadingFont,
 			TextSize = if lock then 11 elseif word then 12 else 24,
-			TextColor3 = if lock then K.secondary else C.white,
+			TextColor3 = if lock then K.secondary elseif spec.word and not actionWord then (spec.wordInk or C.white) else C.white,
 			ZIndex = 2,
 		}, row)
 		if onAction then
@@ -699,6 +706,86 @@ function CardKit.details(list: Instance, look: any, spec: Details): any
 		spec.draw(list, order + 1)
 	end
 	return button
+end
+
+-- ── 6.18 wave 2: a row's bar, a chips strip, the tabs as chips ──────────────
+
+-- A thin bar at a row's foot under its name and facts (a task's progress): share 0 … 1 in `color`. Returns its fill.
+function CardKit.rowBar(parts: RowParts, share: number, color: Color3): any
+	local layout = parts.layout
+	local x = layout.thumb + 10 + layout.tag
+	local track = Ui.make("Frame", {
+		Name = "Progress",
+		Size = UDim2.new(1, -(x + layout.action + 20), 0, 3),
+		Position = UDim2.new(0, x, 1, -6),
+		BackgroundColor3 = C.white,
+		BackgroundTransparency = 0.85,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+	}, parts.row)
+	return Ui.make("Frame", { Name = "Fill", Size = UDim2.fromScale(math.clamp(share, 0, 1), 1), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 2 }, track)
+end
+
+-- A strip of chips heading a body: a horizontal list `order` in its parent. Returns the strip.
+function CardKit.chips(parent: Instance, name: string?, order: number?): any
+	local strip = Ui.make("Frame", { Name = name or "Chips", Size = UDim2.new(1, 0, 0, KIT.Chip), BackgroundTransparency = 1, LayoutOrder = order or 0 }, parent)
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, KIT.Gap),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+	}, strip)
+	return strip
+end
+
+-- A chips strip (CardKit.chips) into the popup header's strip right of the title when they fit there (`bar`, `room`:
+-- PhonePopup.bar), else heading the body `list` (rule 6). Returns the px the strip takes from the body (0 or a chip
+-- and its gap): a hero under it is that much shorter, its button still in view.
+function CardKit.toHeader(strip: any, bar: Instance?, room: number, list: Instance): number
+	local need = 0
+	for _, chip in strip:GetChildren() do
+		if chip:IsA("GuiObject") then
+			need += chip.Size.X.Offset + KIT.Gap
+		end
+	end
+	if bar and need <= room then
+		strip.Size = UDim2.fromScale(1, 1)
+		strip.Parent = bar
+		return 0
+	end
+	strip.Parent = list
+	return KIT.Chip + 12
+end
+
+-- Page tabs as chips (MISSIONS' MISSIONS / CHALLENGES / SECRETS / REWARDS): the open one lit (raised, a light
+-- hairline), the others faint. Each chip is `{id}Tab`. Returns { frame, buttons, select(id) } like Ui.tabs; select
+-- also fits a chip whose words changed (a count).
+export type TabItem = { id: string, text: string }
+function CardKit.tabList(parent: Instance, items: { TabItem }, onPick: (id: string) -> (), selected: string?): any
+	local strip = CardKit.chips(parent, "Tabs", 0)
+	local buttons: { [string]: any } = {}
+	local tabs = { frame = strip, buttons = buttons, selected = selected } :: any
+	for index, item in items do
+		local id = item.id
+		buttons[id] = CardKit.chip(strip, { name = `{id}Tab`, text = item.text, order = index, stroke = K.text, faint = 0.85, onClick = function()
+			onPick(id)
+		end })
+	end
+	function tabs.select(id: string)
+		tabs.selected = id
+		for key, chip in buttons do
+			local on = key == id
+			chip.BackgroundColor3 = if on then K.raised else K.row
+			chip.TextColor3 = if on then K.text else K.secondary
+			chip.Size = UDim2.fromOffset(CardKit.width(chip.Text, 11, Theme.HeadingFont) + 22, KIT.Chip)
+			local stroke = chip:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke.Transparency = if on then 0 else 0.85
+			end
+		end
+	end
+	tabs.select(selected or (if items[1] then items[1].id else ""))
+	return tabs
 end
 
 return CardKit
