@@ -45,6 +45,10 @@
 -- Wrench Garage) and the Baseball Bat (client/KitShop.luau KitShop.rows "guns"); Last Stop Supplies' ITEMS shows the
 -- car-only items (Config.Items car) only once you own a car (Economy.itemShown); the Depot Garage is the garage
 -- terminal, no shop window of its own.
+-- 6.18 wave 2, the UI kit (design/ui-kit/README.md): the shop window's body is client/ShopWindow.luau's and the I
+-- window's (BAG & ITEMS) client/BagUi.luau's, both drawn by client/ShopView.luau (a hero card, compact rows with the
+-- price or the count big, the tabs as chips, the details on a tap; the REWARDS fold is gone: the rewards are the last,
+-- gold rows); here only the windows' chrome; opening one puts the gamepad on its hero's button (else its first row).
 -- 5.8, every window in the courier phone's style (design/phone-ui/): the shop, employer, backpack and result windows
 -- wear Ui.window's ZDC header with a line glyph (the shop's follows its kind), Ui.tabs' square tabs, the phone's red
 -- primary for a row's main action (BUY, UPGRADE, USE, TAKE THE JOB) and tag lines (the red square and caps); the
@@ -538,48 +542,8 @@ local function card(parent: any, height: number, order: number, highlight: boole
 	return P.row(parent, height, order, highlight)
 end
 
--- name / stats / description on the left of a card.
-local function cardText(c: any, name: string, stats: string, description: string, left: number?)
-	local x = left or 16
-	Ui.label(c, name, UDim2.new(1, -190 - x, 0, 24), { Position = UDim2.fromOffset(x, 7), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	Ui.label(c, stats, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 33), TextColor3 = P.ink, TextTransparency = 0.15, TextSize = 13, Font = Theme.Font, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	Ui.label(c, description, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 55), TextColor3 = P.ink2, TextSize = 13, Font = Theme.Font })
-end
-
--- The button of a card, in the column on its right: the row's main action (BUY, UPGRADE, USE) 5.8 the phone's red
--- primary (a red face, white caps), a secondary one (`color` C.blue or C.grey) an outline, what you cannot press a dim
--- one with the reason in it.
-local function cardButton(parent: any, text: string, color: Color3, enabled: boolean, onClick: () -> (), slot: number?): any
-	local function press()
-		if enabled then
-			onClick()
-		end
-	end
-	local kind: P.ButtonKind = if not enabled then "off" elseif color == C.blue or color == C.grey then "quiet" else "primary"
-	local button = P.button(parent, text, UDim2.fromOffset(150, 40), kind, press)
-	button.TextSize = 14
-	local n = slot or 0
-	button.Position = UDim2.new(1, -162, 0, if n == 0 then 21 else 2 + (n - 1) * 44)
-	return button
-end
-
--- The tabs of a window (5.8: Ui.tabs, the phone's square tabs: the open one raised with a red underline), first in
--- the body (LayoutOrder 0). A pick re-renders the window (onPick), the open tab too.
-local function tabs(parent: any, list: { { string } }, selected: string, onPick: (string) -> ())
-	local items: { Ui.TabItem } = {}
-	for _, entry in list do
-		table.insert(items, { id = entry[1], text = entry[2] })
-	end
-	-- (6.4 review: five tabs during a run (BAG, ITEMS, BAGS, CARS, GUNS) fit the window: narrower ones)
-	local row = Ui.tabs(parent, items, onPick, { selected = selected, width = if #list > 4 then 104 else 120, height = 36, gap = 6 }).frame
-	row.Size = UDim2.new(1, -12, 0, 36)
-	row.LayoutOrder = 0
-end
-
--- A line of text in a window (C.red: a warning, in the contract red).
-local function note(parent: any, text: string, color: Color3, order: number)
-	Ui.label(parent, text, UDim2.new(1, -12, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = if color == C.red then P.danger else P.ink2, TextSize = 14, Font = Theme.Font })
-end
+-- (6.18 wave 2: the shops' and the bag's rows, tabs and notes are the UI kit's now: client/ShopWindow.luau,
+-- client/BagUi.luau, client/ShopView.luau)
 
 -- ── Driver level ───────────────────────────────────────────────────────────
 -- The XP comes with the player attribute Xp (server/PlayerData.luau), or the state's xp; nil until the save loaded.
@@ -599,13 +563,6 @@ end
 -- The level something needs (its level field) when yours is lower, else nil.
 local function lockedAt(level: number?): number?
 	return if level ~= nil and level > myLevel() then level else nil
-end
-
--- A card's button for something your level does not reach yet.
-local function lockButton(c: any, level: number): any
-	local button = cardButton(c, `🔒 LEVEL {level}`, C.grey, false, function() end)
-	button.TextColor3 = P.ink2
-	return button
 end
 
 -- What a level unlocks, in words: danger levels, special jobs, cars, guns and car guns.
@@ -649,16 +606,6 @@ end
 -- ── Icons ──────────────────────────────────────────────────────────────────
 -- The icon set (shared/Icons.luau). While an icon's id is empty everything below draws exactly what the interface
 -- always drew (the emoji); a filled-in id swaps the emoji for the picture.
-
--- The picture on the left of a shop / backpack card (the icon, else the emoji; nothing when there is neither).
--- Returns where the card's text starts (nil = the usual place).
-local function cardIcon(c: any, iconName: string?, fallback: string?, y: number): number?
-	if fallback == nil and not Icons.get(iconName) then
-		return nil
-	end
-	Ui.icon(c, iconName, fallback or "", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, y), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
-	return 70
-end
 
 -- A line of text with an icon in it: before .. icon .. after. Without the icon's id it is the one label it always
 -- was (the emoji inside the text); with it a row of the text before, the icon (tinted like the text) and the rest.
@@ -739,142 +686,16 @@ end
 local shop = window("Shop", Vector2.new(700, 540), "🏪", "")
 local shopId = "dealer"
 local shopFocus: string? = nil
-local mechanicTab = "upgrades"
 
--- 3.5: with a car's own levels its stage's numbers (the stage's name first); without (the dealer's catalog) the room
--- it has from stage 0 to its last stage.
-local function carStats(def: Config.CarDef, levels: { [string]: number }?): string
-	if levels then
-		local stats = Economy.carStats(def.id, levels)
-		local stage = Economy.stageDef(def.id, Economy.stageOf(def.id, levels))
-		local prefix = if stage and stage.name ~= def.name then `{stage.name} · ` else ""
-		local pallets = Economy.palletsOf(def.id, Economy.stageOf(def.id, levels)) -- 4.0
-		return `{prefix}Speed {math.floor(stats.maxSpeed + 0.5)} · Health {stats.health} · 📦 {Economy.capacity(def.id, levels)} slots{if pallets > 0 then ` · {pallets} pallet{if pallets > 1 then "s" else ""}` else ""}`
-	end
-	local most = Economy.maxCapacity(def.id)
-	local pallets = Economy.palletsOf(def.id, Economy.maxStage(def.id)) -- 4.0: what it takes at its last stage
-	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower} · 📦 {if most > def.capacity then `{def.capacity} → {most}` else def.capacity} slots{if pallets > 0 then ` · {pallets} pallet{if pallets > 1 then "s" else ""}` else ""}`
-end
-
--- Damage, rate, range (and pellets, blast) of a hand gun or a car gun.
-local function gunStats(def: { damage: number, pellets: number, fireRate: number, range: number, splash: number }): string
-	local pellets = if def.pellets > 1 then ` x{def.pellets}` else ""
-	local splash = if def.splash > 0 then ` · Blast {def.splash}` else ""
-	return `Damage {def.damage}{pellets} · {def.fireRate}/s · Range {def.range}{splash}`
-end
-
--- The cars a car gun fits on (CarDef.mount), by name.
-local function mountableCars(): string
-	local names = {}
-	for _, def in Config.Cars do
-		if def.mount then
-			table.insert(names, def.name)
-		end
-	end
-	return table.concat(names, ", ")
-end
-
-local function renderShop()
+-- 6.18 wave 2: the counter's body is client/ShopWindow.luau's (the UI kit: a hero card, compact rows, the details on a
+-- tap; every action keeps its remote); here only the window's chrome. Returns the gamepad's first stop.
+local function renderShop(): any
+	local selected = Ui.gamepadSelection()
+	local inside = selected ~= nil and selected:IsDescendantOf(shop.body)
 	Ui.clear(shop.body)
 	if not state then
-		return
-	end
-	-- 3.1: the exclusive guns and paints (WeaponDef / PaintDef.exclusive) are never sold. Not yours yet: a dimmed card
-	-- with a REWARD chip and how to earn it (Config.Rewards: a campaign, every lost package, or a secret: the
-	-- every-challenge gun keeps even its stats hidden). Yours: the normal card with an EXCLUSIVE badge.
-	-- (Locals in here, not at the top: Hud.luau sits at the 200-register limit.)
-	local function rewardHow(exclusive: string): (string, string)
-		if exclusive == "challenges" then
-			return "???", "a secret reward"
-		elseif exclusive == "secrets" then
-			return "REWARD", "find every lost package"
-		elseif exclusive == "career" then
-			return "REWARD", "a career level (CAREER, C)" -- 4.6: Config.Levels.Rewards
-		end
-		for _, campaign in require(Shared.Missions).Campaigns do
-			if campaign.id == exclusive then
-				return "REWARD", `finish {campaign.name}`
-			end
-		end
-		return "REWARD", "a reward"
-	end
-		local function badge(c: any, text: string, color: Color3, y: number)
-		-- 3.8: a small outlined tag over the button: an exclusive (Ui.Gps) in white, a reward in the warm good.
-		local chip = P.tag(c, text, if color == Ui.Gps then P.ink else P.warn)
-		chip.Position = UDim2.new(1, -162, 0, y)
-		chip.ZIndex = 3
-	end
-	local function rewardCard(c: any, exclusive: string)
-		-- Dim what is on the card so far (the name, the stats, the swatch), then the bright chip and the how-to.
-		c.BackgroundTransparency = 0.45
-		for _, d in c:GetChildren() do
-			if d:IsA("TextLabel") then
-				d.TextTransparency = 0.35
-			elseif d:IsA("Frame") then
-				d.BackgroundTransparency = 0.35
-			end
-		end
-		local chip, how = rewardHow(exclusive)
-		badge(c, if chip == "???" then "???  SECRET" else "🏆 REWARD", C.yellow, 2)
-		local button = cardButton(c, how, C.grey, false, function() end)
-		button.TextSize = 12
-		button.TextWrapped = true
-	end
-	-- 3.2: a def may need a campaign finished first (`requires`: a campaign id or a list of them; the server checks
-	-- it too). The first one not finished yet, as "Finish Iron Supply", else nil.
-	local function needs(def: any, owned: boolean): string?
-		local list: any = def.requires
-		if owned or list == nil then
-			return nil
-		end
-		if type(list) == "string" then
-			list = { list }
-		end
-		if type(list) ~= "table" then
-			return nil
-		end
-		local Missions = require(Shared.Missions)
-		for _, id in list do
-			if type(id) ~= "string" or (type(state.campaigns) == "table" and state.campaigns[id] == true) then
-				continue
-			end
-			local missions = Missions.ofCampaign(id)
-			local finale = missions[#missions]
-			if not (finale and type(state.missions) == "table" and state.missions[finale.id]) then
-				local campaign = Missions.findCampaign(id)
-				return `Finish {if campaign then campaign.name else id}`
-			end
-		end
 		return nil
 	end
-	local function needsButton(c: any, text: string)
-		local button = cardButton(c, `🔒 {string.upper(text)}`, C.grey, false, function() end)
-		button.TextSize = 12
-		button.TextWrapped = true
-		button.Activated:Connect(function()
-			Hud.toast(`{text} first: it opens with that campaign (MISSIONS, U).`)
-		end)
-	end
-	-- 6.7: the reward-only things of a tab (the earned and exclusive guns, the never-sold paints), folded at its bottom:
-	-- a head (how many are yours, SHOW / HIDE: the window's Rewards<key> attribute), then, open, their cards (draw:
-	-- from LayoutOrder `order` + 1 on).
-	local function rewardsSection(key: string, count: number, mine: number, order: number, draw: (number) -> ())
-		if count == 0 then
-			return
-		end
-		local attribute = `Rewards{key}`
-		local open = shop.frame:GetAttribute(attribute) == true
-		local c = card(shop.body, 60, order)
-		cardText(c, `🏆 REWARDS · {mine} of {count} yours`, "Never sold: earned by work, campaigns, secrets and challenges.", "")
-		cardButton(c, if open then "HIDE ▴" else "SHOW ▾", C.blue, true, function()
-			shop.frame:SetAttribute(attribute, not open)
-			renderShop()
-		end).Position = UDim2.new(1, -162, 0.5, -20)
-		if open then
-			draw(order)
-		end
-	end
-	local money = state.money
 	local here = nearShop(shopId)
 	-- 3.6: the header (the shop's name, what it sells, its icon) and the footer (at the counter or not, your money).
 	-- 5.8: and the line glyph of the ZDC header (the phone's: garage for the cars, settings for the mechanic, shop).
@@ -892,350 +713,25 @@ local function renderShop()
 	if shop.glyph:GetAttribute("Glyph") ~= about[3] then
 		Ui.glyph(shop.glyph, about[3])
 	end
-	shop.footer.Text = `{if here then "At the counter" else "Walk in to buy"} · {Ui.money(money)}`
-	if not here then
-		note(shop.body, "Walk into the shop to buy here.", C.red, 1)
+	shop.footer.Text = `{if here then "At the counter" else "Walk in to buy"} · {Ui.money(state.money)}`
+	local goal = require(script.Parent.ReadyCheck).current().goal
+	local first = require(script.Parent.ShopWindow).render({
+		shopId = shopId,
+		focus = shopFocus,
+		state = state,
+		here = here,
+		level = myLevel(),
+		frame = shop.frame,
+		body = shop.body,
+		toast = Hud.toast,
+		redraw = renderShop,
+		findEmployer = findEmployer,
+		goal = if goal then goal.name else nil,
+	})
+	if inside then
+		Ui.gamepadFocus(first) -- 6.8 review's rule: a redraw keeps the gamepad in the window
 	end
-	if shopId == "dealer" then
-		-- 3.4: every car you own takes a garage slot (the company vehicles none); a new one needs a free one.
-		local owned = 0
-		for id, yes in state.cars do
-			local def = Economy.findCar(id)
-			if yes and def and not def.company and not def.bike then -- (5.1: a bike needs no garage slot)
-				owned += 1
-			end
-		end
-		local full = owned >= (tonumber(player:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots)
-		-- 3.5: not "the next van": every car has a role, and its own stages at Wrench Garage (📦 from → to).
-		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to; more room makes the body longer). A van ends at 4 slots: more needs the High-Roof Van, the Box Truck or the Freight Truck (pallets). The bikes: the BIKES counter next to this one (Kip).", C.dim, 1)
-		for order, def in Config.Cars do
-			if def.company or def.bike then
-				continue -- (5.1: the bikes are Spoke & Chain's; 6.12.7: the BIKES counter's)
-			end
-			local c = card(shop.body, 100, order + 1, def.id == shopFocus)
-			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
-			local need = needs(def, state.cars[def.id] == true)
-			-- 5.0: the Old Van is sold privately (Config.VanQuest: Earl, Marge's quest), not here.
-			local private = def.id == Config.VanQuest.Car and not state.cars[def.id]
-			cardText(c, def.name, carStats(def) .. (if private then ` · {Config.VanQuest.DealerNote}` elseif lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
-			if def.role then
-				Ui.label(c, `ROLE · {string.upper(def.role)}`, UDim2.new(1, -206, 0, 16), { Position = UDim2.fromOffset(16, 78), TextColor3 = P.ink2, TextSize = 11, Font = Theme.HeadingFont })
-			end
-			if state.car == def.id then
-				cardButton(c, "YOUR CAR", C.grey, false, function() end)
-			elseif state.cars[def.id] then
-				-- 3.4: your cars wait in your garages; you switch them only there.
-				cardButton(c, "IN GARAGE", C.grey, true, function()
-					Hud.toast("Switch cars at one of your garages (🅿 GARAGE), or at the depot lot for your starting van.")
-				end)
-			elseif private then
-				local sold = cardButton(c, "🔒 SOLD PRIVATELY", C.grey, true, function()
-					Hud.toast(`{Config.VanQuest.DealerNote} {Config.VanQuest.Seller} sells it at {Config.VanQuest.Place}, far out west.`)
-				end)
-				sold.TextSize = 12
-				sold.TextColor3 = P.ink2
-			elseif lock then
-				lockButton(c, lock)
-			elseif need then
-				needsButton(c, need)
-			elseif full then
-				local garage = cardButton(c, "🅿 NEEDS A GARAGE", C.grey, true, function()
-					Hud.toast("No free garage slot. Buy or rent a garage (ESTATE, H) first.")
-				end)
-				garage.TextSize = 12
-				garage.TextColor3 = P.ink2
-			else
-				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
-					Net.get("Buy"):FireServer("car", def.id)
-				end)
-			end
-		end
-	elseif shopId == "guns" then
-		note(shop.body, "Guns for your hands: one-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage. The gun upgrades and the Baseball Bat are sold here too. Try them on the lanes beside the shop: the targets drop when you hit them.", C.dim, 1)
-		-- 6.7: one gun's card (the starter pistol: STARTER · yours; a reward: how to earn it).
-		local function gunCard(def: Config.WeaponDef, order: number)
-			local c = card(shop.body, 84, order)
-			local lock = if state.weapons[def.id] or Economy.rewardOnly(def) or def.starter then nil else lockedAt(def.level)
-			local need = if Economy.rewardOnly(def) then nil else needs(def, state.weapons[def.id] == true)
-			local exclusive = def.exclusive
-			if exclusive and exclusive == "challenges" and not state.weapons[def.id] then
-				-- The gun nobody else has: an ink silhouette, nothing given away.
-				Ui.icon(c, Icons.weapon(def.id), "❔", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 17), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = P.ink })
-				cardText(c, "???", "Damage ??? · ???/s · Range ???", "Nobody has ever seen it. Some say it waits for the courier who does everything.", 70)
-			else
-				cardText(c, def.name, (if def.starter then "STARTER · yours · " else "") .. gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
-			end
-			if exclusive and state.weapons[def.id] then
-				badge(c, "★ EXCLUSIVE", Ui.Gps, 2)
-			end
-			if exclusive and not state.weapons[def.id] then
-				rewardCard(c, exclusive)
-			elseif state.weapon == def.id then
-				cardButton(c, "IN HAND", C.grey, false, function() end)
-			elseif state.weapons[def.id] then
-				cardButton(c, "EQUIP", C.blue, true, function()
-					Net.get("Equip"):FireServer("weapon", def.id)
-				end)
-			elseif def.earned then
-				-- Not for sale: you earn it by working.
-				local employer = findEmployer(def.earned)
-				local button = cardButton(c, `Earned at {if employer then employer.name else def.earned}`, C.grey, false, function() end)
-				button.TextSize = 13
-				button.TextWrapped = true
-			elseif def.starter then
-				cardButton(c, "STARTER", C.grey, false, function() end) -- 6.7: never sold (the server gives a missing one back)
-			elseif lock then
-				lockButton(c, lock)
-			elseif need then
-				needsButton(c, need)
-			else
-				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
-					Net.get("Buy"):FireServer("weapon", def.id)
-				end)
-			end
-		end
-		-- The guns for sale (the starter first), then 6.7's gun upgrades and the bat, then the folded REWARDS.
-		local row = 1
-		local rewards: { Config.WeaponDef } = {}
-		local mine = 0
-		for _, def in Config.Weapons do
-			if Economy.rewardOnly(def) then
-				table.insert(rewards, def)
-				mine += if state.weapons[def.id] then 1 else 0
-			else
-				row += 1
-				gunCard(def, row)
-			end
-		end
-		row += 1
-		note(shop.body, "Gun upgrades · for every gun you own, the car guns too:", C.dim, row)
-		for _, def in Config.Upgrades do
-			if def.car then
-				continue -- (the car tracks: Wrench Garage)
-			end
-			row += 1
-			local c = card(shop.body, 84, row)
-			local level = Economy.level(state.upgrades, def.id)
-			cardText(c, def.name, string.rep("■", level) .. string.rep("□", def.maxLevel - level) .. `  Lv {level}/{def.maxLevel}`, def.description)
-			local cost = Economy.upgradeCost(def.id, level)
-			if cost then
-				cardButton(c, `UPGRADE {Ui.money(cost)}`, C.green, here and money >= cost, function()
-					Net.get("Upgrade"):FireServer(def.id)
-				end)
-			else
-				cardButton(c, "MAX", C.grey, false, function() end)
-			end
-		end
-		row += 1
-		note(shop.body, "Melee · when the gun is away (fists or the bag), V:", C.dim, row)
-		row = require(script.Parent.KitShop).rows(shop.body, state, here, "guns", row) + 1
-		rewardsSection("guns", #rewards, mine, row, function(order: number)
-			for index, def in rewards do
-				gunCard(def, order + index)
-			end
-		end)
-	elseif shopId == "bikes" then
-		-- 5.1: Spoke & Chain (6.12.7: Dead End Motors' BIKES counter): BIKES and GEAR (client/BikeShop.luau, the open tab).
-		tabs(shop.body, { { "bikes", "BIKES" }, { "gear", "GEAR" } }, require(script.Parent.BikeShop).tab, function(id)
-			require(script.Parent.BikeShop).tab = id
-			renderShop()
-		end)
-		require(script.Parent.BikeShop).render(shop.body, state, here, shopFocus)
-	elseif shopId == "bags" then
-		-- 6.6: ZDC Bags, the depot's bag kiosk: the bags only (client/KitShop.luau's list, USE for the one you own)
-		require(script.Parent.KitShop).render(shop.body, state, here, "bags")
-	elseif shopId == "supplies" then
-		-- 5.0: two tabs: ITEMS (the consumables) and KIT (personal gear, client/KitShop.luau; it keeps the open tab).
-		tabs(shop.body, { { "items", "ITEMS" }, { "kit", "KIT" } }, require(script.Parent.KitShop).currentTab(state), function(id)
-			require(script.Parent.KitShop).tab = id
-			renderShop()
-		end)
-		if require(script.Parent.KitShop).currentTab(state) == "kit" then
-			require(script.Parent.KitShop).render(shop.body, state, here, "kit")
-			return
-		end
-		-- 6.7: the car-only items (Config.Items car) once you own a car (Economy.itemShown; the server sells them only then)
-		if not Economy.ownsCar(state.cars) then
-			note(shop.body, "Car items (repair kits, nitro, landmines, jerry cans) show here once you own a car.", C.dim, 1)
-		end
-		for order, def in Config.Items do
-			if not Economy.itemShown(def, state.cars) then
-				continue
-			end
-			local c = card(shop.body, 90, order + 1)
-			local have = state.items[def.id] or 0
-			cardText(c, def.name, `{Ui.money(def.price)} each · you have {have}/{def.max}`, def.description, cardIcon(c, Icons.item(def.id), def.icon, 18))
-			cardButton(c, `BUY 1  {Ui.money(def.price)}`, C.green, here and money >= def.price and have < def.max, function()
-				Net.get("Buy"):FireServer("item", def.id, 1)
-			end, 1)
-			cardButton(c, `BUY 5  {Ui.money(def.price * 5)}`, C.blue, here and money >= def.price * 5 and have + 5 <= def.max, function()
-				Net.get("Buy"):FireServer("item", def.id, 5)
-			end, 2)
-		end
-	elseif shopId == "mechanic" then
-		tabs(shop.body, { { "upgrades", "UPGRADES" }, { "gear", "GEAR" }, { "paint", "PAINT" }, { "carguns", "CAR GUNS" } }, mechanicTab, function(id)
-			mechanicTab = id
-			renderShop()
-		end)
-		if mechanicTab == "upgrades" then
-			-- 3.3: the car tracks belong to the equipped car (its own levels, shown on it); the gun tracks to every gun.
-			local upCar = Economy.findCar(state.car)
-			local carOk = upCar ~= nil and Economy.canUpgrade(upCar.id)
-			local carLevels = Economy.carLevels(state.carUpgrades, state.car)
-			if carOk then
-				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (new tyres and rims, a bull bar, plates, a scoop); a STAGE rebuilds the car itself, the trolley and the other gear are in GEAR. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
-			else
-				-- 5.0: on foot, no vehicle yet
-				note(shop.body, if upCar then `Your {upCar.name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.` else `You don't have a vehicle yet: the Old Van comes from {Config.VanQuest.Where}.`, C.red, 1)
-			end
-			local row = 1
-			-- 3.5: the STAGE card: the car's next stage (its new look, its room, before → after) or its last one.
-			if carOk and upCar and Economy.maxStage(upCar.id) > 0 then
-				row += 1
-				local stage = Economy.stageOf(upCar.id, carLevels)
-				local last = Economy.maxStage(upCar.id)
-				local now = Economy.stageDef(upCar.id, stage)
-				local nextStage = Economy.stageDef(upCar.id, stage + 1)
-				local c = card(shop.body, 112, row, nextStage ~= nil)
-				local pips = string.rep("■", stage) .. string.rep("□", last - stage)
-				local nowName = if now then now.name else upCar.name
-				if nextStage then
-					local after = table.clone(carLevels)
-					after.stage = stage + 1
-					local a, b = Economy.carStats(upCar.id, carLevels), Economy.carStats(upCar.id, after)
-					cardText(c, `STAGE {stage + 1}/{last}: {nextStage.name}`, `{pips}  {nowName} → {nextStage.name}`, `Adds {nextStage.adds}.`)
-					Ui.label(c, `📦 {Economy.capacity(upCar.id, carLevels)} → {nextStage.capacity} slots · Health {a.health} → {b.health} · Speed {math.floor(a.maxSpeed + 0.5)} → {math.floor(b.maxSpeed + 0.5)}`, UDim2.new(1, -206, 0, 18), {
-						Position = UDim2.fromOffset(16, 80),
-						TextColor3 = P.good,
-						TextSize = 14,
-						Font = Theme.HeadingFont,
-					})
-					local lock = lockedAt(nextStage.level)
-					if lock then
-						lockButton(c, lock)
-					else
-						cardButton(c, `STAGE UP {Ui.money(nextStage.price)}`, C.green, here and money >= nextStage.price, function()
-							Net.get("Upgrade"):FireServer("stage")
-						end)
-					end
-				else
-					cardText(c, `STAGE {stage}/{last}: {nowName}`, `{pips}  the last stage · 📦 {Economy.capacity(upCar.id, carLevels)} slots`, `Your {upCar.name} is all it can be. More room needs a bigger vehicle (Dead End Motors).`)
-					cardButton(c, "LAST STAGE", C.grey, false, function() end)
-				end
-			end
-			for _, def in Config.Upgrades do
-				if not def.car then
-					continue -- (6.7: the gun tracks are sold at Lead & Co.)
-				end
-				row += 1
-				local c = card(shop.body, 84, row)
-				local level = Economy.level(carLevels, def.id)
-				cardText(c, def.name, string.rep("■", level) .. string.rep("□", def.maxLevel - level) .. `  Lv {level}/{def.maxLevel}`, def.description)
-				local cost = Economy.upgradeCost(def.id, level)
-				if not carOk then
-					cardButton(c, "COMPANY CAR", C.grey, false, function() end)
-				elseif not Economy.upgradeFits(state.car, def.id) then
-					cardButton(c, "VANS & TRUCKS", C.grey, false, function() end) -- 4.0: the Hand Trolley
-				elseif cost then
-					cardButton(c, `UPGRADE {Ui.money(cost)}`, C.green, here and money >= cost, function()
-						Net.get("Upgrade"):FireServer(def.id)
-					end)
-				else
-					cardButton(c, "MAX", C.grey, false, function() end)
-				end
-			end
-			row += 1
-			note(shop.body, "Gun Damage and Fire Rate (every gun, the car guns too): Lead & Co.'s range, south-west of the park, just outside the safe zone.", C.dim, row)
-		elseif mechanicTab == "gear" then
-			require(script.Parent.GearShop).render(shop.body, state, here) -- 4.6: the car's gear and its slots
-		elseif mechanicTab == "carguns" then
-			-- One gun on the roof of the car you have equipped; the driver fires it.
-			local carDef = Economy.findCar(state.car)
-			local carName = if carDef then carDef.name else "car"
-			local canMount = carDef ~= nil and carDef.mount == true
-			local carGuns = state.carGuns or {}
-			local installed: string? = if canMount then carGuns[state.car] else nil
-			if canMount then
-				local current = if installed then Economy.findCarGun(installed) else nil
-				note(shop.body, `CAR GUNS for your {carName}: {if current then current.name else "no gun yet"}. On the roof, the driver fires it. A new one replaces the old one (no refund); the Gun Damage and Fire Rate upgrades (Lead & Co.) work for car guns too.`, C.dim, 1)
-			else
-				note(shop.body, `This vehicle can't carry a gun (your {carName}). Car guns fit: {mountableCars()}.`, C.red, 1)
-			end
-			for order, def in Config.CarGuns do
-				local c = card(shop.body, 84, order + 1, installed == def.id)
-				local lock = if installed == def.id then nil else lockedAt(def.level)
-				local need = needs(def, installed == def.id)
-				cardText(c, def.name, `{gunStats(def)} · {Ui.money(def.price)}` .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
-				if installed == def.id then
-					cardButton(c, "INSTALLED", C.grey, false, function() end)
-				elseif not canMount then
-					cardButton(c, "CAN'T MOUNT", C.grey, false, function() end)
-				elseif lock then
-					lockButton(c, lock)
-				elseif need then
-					needsButton(c, need)
-				else
-					cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
-						Net.get("Buy"):FireServer("cargun", def.id)
-					end)
-				end
-			end
-		else
-			local carDef = Economy.findCar(state.car)
-			note(shop.body, `Paint for your {if carDef then carDef.name else "car"}. Bought paints are yours for every car.`, C.dim, 1)
-			local current = state.carPaint[state.car] or "factory"
-			-- 6.7: the never-sold paints (PaintDef exclusive) in the folded REWARDS section after the ones for sale
-			local rewards: { Config.PaintDef } = {}
-			local mine = 0
-			local function paintCard(def: Config.PaintDef, order: number)
-				-- 3.1: an exclusive paint's card is taller (its chip sits above the button).
-				local c = card(shop.body, if def.exclusive then 84 else 70, order)
-				local swatchColor = if def.color then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) elseif carDef then Color3.fromRGB(carDef.color[1], carDef.color[2], carDef.color[3]) else C.grey
-				local swatch = Ui.make("Frame", { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, if def.exclusive then 20 else 13), BackgroundColor3 = swatchColor }, c)
-				Ui.stroke(swatch, if def.material == "Neon" then swatchColor:Lerp(P.ink, 0.5) else P.line, 1)
-				Ui.label(c, def.name, UDim2.new(1, -260, 0, 24), { Position = UDim2.fromOffset(70, 9), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink })
-				-- The finish (PaintDef.material) after the price: "Owned · Neon finish".
-				local finish = if def.material then ` · {def.material} finish` else ""
-				Ui.label(c, (if state.paints[def.id] then "Owned" elseif def.exclusive then "Never sold" else Ui.money(def.price)) .. finish, UDim2.new(1, -260, 0, 20), { Position = UDim2.fromOffset(70, 36), TextColor3 = P.ink2, TextSize = 13, Font = Theme.Font })
-				local exclusive = def.exclusive
-				if exclusive then
-					if state.paints[def.id] then
-						badge(c, "★ EXCLUSIVE", Ui.Gps, 2)
-					else
-						rewardCard(c, exclusive)
-						return
-					end
-				end
-				local y = if exclusive then 22 else 15
-				if current == def.id then
-					cardButton(c, "ON YOUR CAR", C.grey, false, function() end).Position = UDim2.new(1, -162, 0, y)
-				elseif state.paints[def.id] then
-					cardButton(c, "APPLY", C.blue, here, function()
-						Net.get("Paint"):FireServer(def.id)
-					end).Position = UDim2.new(1, -162, 0, y)
-				else
-					cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
-						Net.get("Paint"):FireServer(def.id)
-					end).Position = UDim2.new(1, -162, 0, y)
-				end
-			end
-			local row = 1
-			for _, def in Config.Paints do
-				if def.exclusive then
-					table.insert(rewards, def)
-					mine += if state.paints[def.id] then 1 else 0
-				else
-					row += 1
-					paintCard(def, row)
-				end
-			end
-			rewardsSection("paint", #rewards, mine, row + 1, function(order: number)
-				for index, def in rewards do
-					paintCard(def, order + index)
-				end
-			end)
-		end
-	end
+	return first
 end
 
 -- ── Employers ──────────────────────────────────────────────────────────────
@@ -1373,8 +869,9 @@ function Hud.openShop(id: string, focus: string?)
 	end
 	shopId = id
 	shopFocus = focus
+	require(script.Parent.ShopView).home(`shop:{id}`) -- 6.18 wave 2: a counter opens on its list, not an old item's details
 	shop.frame.Visible = true
-	renderShop()
+	Ui.gamepadFocus(renderShop())
 end
 end
 
@@ -1444,9 +941,11 @@ local function cargoCard(parent: any)
 end
 
 function renderBackpack()
+	local selected = Ui.gamepadSelection()
+	local inside = selected ~= nil and selected:IsDescendantOf(backpack.body)
 	Ui.clear(backpack.body)
 	if not state then
-		return
+		return nil
 	end
 	if backpackTab == "bag" and not job then
 		backpackTab = "items" -- (5.3: the run ended)
@@ -1456,84 +955,35 @@ function renderBackpack()
 	end
 	backpack.footer.Text = `{Ui.money(state.money)} · level {myLevel()}`
 	-- 5.3: during a run the BAG tab first (client/BagUi.luau: every piece you carry and where).
-	-- 6.4: BAGS, the bags you own and the one in use (client/BagUi.luau BagUi.bags: USE)
+	-- 6.4: BAGS, the bags you own and the one in use. 6.18 wave 2: every tab in the UI kit's look (BagUi.draw: the
+	-- bag as the hero, a row an item with its count big and a round USE / EQUIP; the tabs as chips).
 	local tabList = { { "items", "ITEMS" }, { "bags", "BAGS" }, { "cars", "CARS" }, { "guns", "GUNS" } }
 	if job then
 		table.insert(tabList, 1, { "bag", "📦 CARRYING" }) -- (6.6: what you carry: hands, bag, the bike's bag)
 	end
-	tabs(backpack.body, tabList, backpackTab, function(id)
-		backpackTab = id
-		renderBackpack()
-	end)
-	if backpackTab == "bag" then
-		require(script.Parent.BagUi).render(backpack.body, job, 1)
-	elseif backpackTab == "bags" then
-		require(script.Parent.BagUi).bags(backpack.body, state, 1)
-	elseif backpackTab == "items" then
-		for order, def in Config.Items do
-			local have = state.items[def.id] or 0
-			if have <= 0 and not Economy.itemShown(def, state.cars) then
-				continue -- 6.7: a car item without a car (one you have still shows)
-			end
-			local c = card(backpack.body, 84, order + 1)
-			local slot = require(script.Parent.Hotbar).slotOf(def.id) -- 6.0.1: the key is its place in the bottom bar
-			cardText(c, `{def.name}  x{have}`, if slot then `Key {slot}` elseif have > 0 then "Not on the bar: USE it here" else "None left", def.description, cardIcon(c, Icons.item(def.id), def.icon, 16))
-			cardButton(c, "USE", C.green, have > 0, function()
-				useItem(def.id)
-			end)
-		end
-	elseif backpackTab == "cars" then
-		note(backpack.body, "Switch cars at one of your garages (🅿 GARAGE), the starting van at the depot lot. Repairs: Wrench Garage and Rust Bridge Repairs. Buy at Dead End Motors, or earn one by working (M = map).", C.dim, 1)
-		for order, def in Config.Cars do
-			if not state.cars[def.id] and def.employer then
-				-- Not yours yet: who gives it to you.
-				local employer = findEmployer(def.employer)
-				if employer then
-					local c = card(backpack.body, 84, order + 1)
-					local done = state.rep[employer.id] or 0
-					cardText(c, `{def.name}  (locked)`, `Work for {employer.name}: {math.min(done, employer.needed)}/{employer.needed} jobs`, def.description)
-				end
-				continue
-			end
-			if state.cars[def.id] then
-				local c = card(backpack.body, 84, order + 1)
-				local gunId = if def.mount and state.carGuns then state.carGuns[def.id] else nil
-				local gun = if gunId then Economy.findCarGun(gunId) else nil
-				cardText(c, def.name, carStats(def, Economy.carLevels(state.carUpgrades, def.id)) .. (if gun then ` · 🔫 {gun.name}` else "") .. (if type(state.carHealth) == "table" and type(state.carHealth[def.id]) == "number" and state.carHealth[def.id] < 0.995 then ` · 🔧 {math.floor(state.carHealth[def.id] * 100 + 0.5)}%` else ""), def.description)
-				if state.car == def.id then
-					cardButton(c, "DRIVING", C.grey, false, function() end)
-				end
-			end
-		end
-	else
-		for order, def in Config.Weapons do
-			if state.weapons[def.id] then
-				local c = card(backpack.body, 84, order + 1)
-				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
-				if def.exclusive then
-					-- 3.1: a reward nobody can buy (Config.Rewards).
-					local chip = P.tag(c, "★ EXCLUSIVE", P.ink)
-					chip.Position = UDim2.new(1, -162, 0, 2)
-				end
-				if state.weapon == def.id then
-					cardButton(c, "IN HAND", C.grey, false, function() end)
-				else
-					cardButton(c, "EQUIP", C.blue, true, function()
-						Net.get("Equip"):FireServer("weapon", def.id)
-					end)
-				end
-			elseif def.earned then
-				-- Earned by working, not bought.
-				local employer = findEmployer(def.earned)
-				if employer then
-					local c = card(backpack.body, 84, order + 1)
-					local done = state.rep[employer.id] or 0
-					local at = employer.weaponAt or employer.needed
-					cardText(c, `{def.name}  (locked)`, `Earned at {employer.name}: {math.min(done, at)}/{at} jobs`, def.description)
-				end
-			end
-		end
+	local size = require(script.Parent.ShopView).measure(backpack.body, Vector2.new(600, 420))
+	local first = require(script.Parent.BagUi).draw(backpack.body, {
+		tab = backpackTab,
+		tabs = tabList,
+		pick = function(id: string)
+			backpackTab = id
+			renderBackpack()
+		end,
+		state = state,
+		job = job,
+		side = require(script.Parent.CardKit).Layout.side(size.X),
+		room = size.Y,
+		redraw = renderBackpack,
+		toast = Hud.toast,
+		use = useItem,
+		slotOf = require(script.Parent.Hotbar).slotOf, -- 6.0.1: the key is its place in the bottom bar
+		keys = not Ui.touchLayout(),
+		findEmployer = findEmployer,
+	}, 0)
+	if inside then
+		Ui.gamepadFocus(first)
 	end
+	return first
 end
 
 function toggleBackpack()
@@ -1546,7 +996,7 @@ function toggleBackpack()
 			backpackTab = "bag"
 		end
 		backpack.frame.Visible = true
-		renderBackpack()
+		Ui.gamepadFocus(renderBackpack())
 	end
 end
 -- 5.3: the phone's ORDERS app (🛍 BAG) opens the I window on its BAG tab (client/BagUi.luau).

@@ -46,6 +46,11 @@
 --            the bags you own, USE). PhoneApps.bagTab keeps the tab (nil: BAG during a run, else ITEMS).
 --   SHOPS    SHOP's list of the shops (Map.Shops) and what each sells; a tap sets the GPS there (host.gps), puts the
 --            phone away and says "GPS set: <shop>". Buying stays at the counters (Map.ShopRadius).
+-- 6.18 wave 2 (the UI kit, design/ui-kit/README.md: "I need it unified so the phone looks like that"): BAG & ITEMS is
+-- client/BagUi.luau's (the bag as the hero, the items' counts big, USE); SHOP (PhoneApps.shop, out of client/Phone.luau)
+-- is SAVE UP (the savings goal as the hero, a row a thing to buy with its price big, 📍 its counter) and SHOPS (the list
+-- above as the kit's rows); GARAGE the vehicle you have out as the hero (BRING MY CAR) and a row for MY BIKE, CALL CAR,
+-- TOW and ZDC RIDE (PhoneApps.rideItem). client/ShopView.luau draws them.
 -- Presentation only: the server decides every job, every vehicle and the money.
 
 local Players = game:GetService("Players")
@@ -68,6 +73,10 @@ local JobThumbUi = require(script.Parent.JobThumbUi) -- 6.12.11: the job picture
 local SpecialOrderUi = require(script.Parent.SpecialOrderUi) -- 6.14: the golden and the regulars' orders
 local RegularsApp = require(script.Parent.RegularsApp) -- 6.14: your tier with a job's business
 local JobsView = require(script.Parent.JobsView) -- 6.17: the JOBS app at a glance (hero + rows)
+local CardKit = require(script.Parent.CardKit) -- 6.18 wave 2: SHOP, BAG & ITEMS, GARAGE in the UI kit's look
+local ShopView = require(script.Parent.ShopView)
+local Icons = require(Shared.Icons)
+local Transport = require(Shared.Transport)
 
 local K = Theme.Contract
 local PhoneApps = {}
@@ -421,81 +430,10 @@ end
 
 -- ── BAG ────────────────────────────────────────────────────────────────────
 
--- 6.5: BAG & ITEMS, the I window's tabs (🛍 BAG during a run, ITEMS, BAGS) in a row of square tab buttons.
+-- 6.5: BAG & ITEMS, the I window's tabs (🛍 BAG during a run, ITEMS, BAGS). 6.18 wave 2: client/BagUi.luau draws them
+-- in the UI kit's look (the bag as the hero, a row an item with its count big and a round USE), the tabs as chips in
+-- the popup's header strip when they fit.
 local BAG_TABS: { { string } } = { { "bag", "🛍 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
-
-local function bagTabs(list: Instance, current: string, running: boolean, host: Host)
-	local row = Ui.make("Frame", { Name = "Tabs", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 1 }, list)
-	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, row)
-	for index, entry in BAG_TABS do
-		local id = entry[1]
-		if id == "bag" and not running then
-			continue
-		end
-		local on = id == current
-		local tab = Ui.make("TextButton", {
-			Name = `Tab_{id}`,
-			Size = UDim2.fromOffset(0, 44),
-			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = K.raised,
-			BackgroundTransparency = if on then 0 else 1,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = entry[2],
-			Font = Theme.HeadingFont,
-			TextSize = 13,
-			TextColor3 = if on then K.text else K.secondary,
-			LayoutOrder = index,
-		}, row)
-		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, tab)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if on then 0.5 else 0.8 }, tab)
-		if on then
-			Ui.make("Frame", { Name = "Underline", Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, -2), BackgroundColor3 = K.red, BorderSizePixel = 0 }, tab)
-		end
-		tab.Activated:Connect(function()
-			local sound = Ui.onClick
-			if sound then
-				sound()
-			end
-			PhoneApps.bagTab = id
-			host.redraw()
-		end)
-	end
-end
-
--- ITEMS: your consumables (Config.Items), how many, the key in the bottom bar, USE (Hotbar.onUse: the HUD's own
--- useItem, the UseItem remote with your aim). 6.7: a car-only item without a car only while you have some.
-local function items(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean, order: number)
-	local Hotbar = require(script.Parent.Hotbar)
-	local state = host.state()
-	local have = if type(state) == "table" and type(state.items) == "table" then state.items else {}
-	local left, right = PhoneApps.columns(list, order, wide)
-	local cars = if type(state) == "table" and type(state.cars) == "table" then state.cars else nil
-	local shown = 0
-	for index, def in Config.Items do
-		local count = tonumber(have[def.id]) or 0
-		if count <= 0 and not Economy.itemShown(def, cars) then
-			continue -- 6.7: a car item without a car (one you have still shows)
-		end
-		shown += 1
-		local b = look.block(if shown % 2 == 1 then left else right, order + index)
-		look.row2(b, `{def.icon}  {string.upper(def.name)}`, `×{count}`, 1, true)
-		local slot = if count > 0 then Hotbar.slotOf(def.id) else nil
-		look.meta(b, `{def.description}{if slot and not Ui.touchLayout() then ` Key {slot}.` else ""}`, 2)
-		look.button(b, "USE", if count > 0 then "main" else "off", 3, function()
-			if count <= 0 then
-				host.notify(`No {def.name} left. Last Stop Supplies sells them (SHOP sets the GPS).`)
-				return
-			end
-			local use = Hotbar.onUse
-			if use then
-				use(def.id)
-			else
-				Net.get("UseItem"):FireServer(def.id)
-			end
-		end)
-	end
-end
 
 function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
 	local job = host.job()
@@ -504,15 +442,38 @@ function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host, wide: boo
 	if tab == "bag" and not running then
 		tab = "items" -- (the run ended)
 	end
-	bagTabs(list, tab, running, host)
-	if tab == "bag" then
-		local n = BagUi.render(list, job, 2)
-		look.meta(list, `Pieces ride where they fit: your hands, your bag, your bike's bag, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1) -- (6.6)
-	elseif tab == "bags" then
-		BagUi.bags(list, host.state(), 2)
-	else
-		items(list, look, host, wide == true, 2)
+	local tabs: { { string } } = {}
+	for _, entry in BAG_TABS do
+		if entry[1] ~= "bag" or running then
+			table.insert(tabs, entry)
+		end
 	end
+	local Hotbar = require(script.Parent.Hotbar)
+	BagUi.draw(list, {
+		tab = tab,
+		tabs = tabs,
+		pick = function(id: string)
+			PhoneApps.bagTab = id
+			host.redraw()
+		end,
+		state = host.state(),
+		job = job,
+		side = wide == true,
+		room = host.room(),
+		bar = host.bar,
+		redraw = host.redraw,
+		toast = host.notify,
+		use = function(id: string)
+			local use = Hotbar.onUse
+			if use then
+				use(id) -- (the HUD's own useItem, the UseItem remote with your aim)
+			else
+				Net.get("UseItem"):FireServer(id)
+			end
+		end,
+		slotOf = Hotbar.slotOf,
+		keys = not Ui.touchLayout(),
+	}, 1)
 end
 
 -- ── 6.5: SHOP's list of the shops ─────────────────────────────────────────
@@ -532,113 +493,290 @@ local SHOPS: { { id: string, icon: string, sells: string } } = {
 	{ id = "mechanic", icon = "🔧", sells = "Stages, car upgrades, gear, paint, car guns, repairs" },
 }
 
--- Draws the list at `order` in the SHOP app: a row a shop (its icon, name, what it sells, "📍 GPS"); a tap sets the
--- GPS to it, puts the phone away and says so.
+-- Draws the list at `order` in the SHOP app: a row a shop (6.18 wave 2: the kit's compact row: its icon, name, what it
+-- sells, a round "📍"); a tap sets the GPS to it, puts the phone away and says so.
 function PhoneApps.shops(list: Instance, look: OrdersUi.Kit, host: Host, order: number)
 	local holder = Ui.make("Frame", { Name = "Shops", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, list)
-	Ui.list(holder, true, 6)
-	look.section(holder, "The shops · tap one for the GPS", 0)
+	Ui.list(holder, true, Config.UiKit.Gap)
+	CardKit.sectionHeader(holder, { text = "THE SHOPS · TAP ONE FOR THE GPS", order = 0 })
 	for index, entry in SHOPS do
 		local shop = Map.Shops[entry.id]
 		if not shop then
 			continue
 		end
-		local row = Ui.make("TextButton", {
-			Name = `Shop_{entry.id}`,
-			Size = UDim2.new(1, 0, 0, 56),
-			BackgroundColor3 = K.row,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = "",
-			LayoutOrder = index,
-		}, holder)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, row)
-		look.text(row, entry.icon, UDim2.fromOffset(40, 56), { Position = UDim2.fromOffset(8, 0), TextSize = 24, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
-		look.text(row, shop.name, UDim2.new(1, -150, 0, 20), { Position = UDim2.fromOffset(56, 9), Font = Theme.HeadingFont, TextSize = 15, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-		look.text(row, entry.sells, UDim2.new(1, -150, 0, 16), { Position = UDim2.fromOffset(56, 31), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-		local gps = look.text(row, "📍 GPS  ›", UDim2.fromOffset(84, 56), { Position = UDim2.new(1, -92, 0, 0), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
-		local function lit(on: boolean)
-			row.BackgroundColor3 = if on then K.raised else K.row
-			gps.TextColor3 = if on then K.red else K.text
-		end
-		row.MouseEnter:Connect(function()
-			lit(true)
-		end)
-		row.MouseLeave:Connect(function()
-			lit(false)
-		end)
-		row.SelectionGained:Connect(function()
-			lit(true)
-		end)
-		row.SelectionLost:Connect(function()
-			lit(false)
-		end)
-		row.Activated:Connect(function()
-			local sound = Ui.onClick
-			if sound then
-				sound()
-			end
+		local function go()
 			host.gps(entry.id)
 			host.close()
 			host.notify(`GPS set: {shop.name}`)
-		end)
+		end
+		CardKit.row(holder, {
+			name = `Shop_{entry.id}`,
+			order = index,
+			accent = K.line,
+			picture = { emoji = entry.icon },
+			thumb = Config.UiKit.Icon,
+			title = shop.name,
+			facts = entry.sells,
+			action = "📍",
+			silent = true,
+			onOpen = function()
+				CardKit.click()
+				go()
+			end,
+		})
 	end
+end
+
+-- The SHOP app (6.18 wave 2, the UI kit; client/Phone.luau opens it): two tabs as chips, SAVE UP (what to save up for:
+-- the savings goal, 6.14's Readiness goal, or the best thing you can buy, as the HERO with your money's bar toward its
+-- price; then a row each: the personal gear still to buy, the next bikes and vehicles, the PRICE big, green when you
+-- can buy it; 📍 sets the GPS to its counter, buying stays at the counters) and SHOPS (the list above).
+PhoneApps.shopTab = "save"
+
+function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?, goal: string?)
+	local state = host.state()
+	local money = if type(state) == "table" then tonumber(state.money) or 0 else 0
+	local xp = tonumber(player:GetAttribute("Xp"))
+	if xp == nil and type(state) == "table" and type(state.xp) == "number" then
+		xp = state.xp
+	end
+	local level = Levels.levelFor(xp or 0)
+	local tabs = { tabs = { { "save", "SAVE UP" }, { "shops", "SHOPS" } }, selected = PhoneApps.shopTab, onPick = function(id: string)
+		PhoneApps.shopTab = id
+		host.redraw()
+	end }
+	if PhoneApps.shopTab == "shops" then
+		local strip = Ui.make("Frame", { Name = "ShopTabs", Size = UDim2.new(1, 0, 0, Config.UiKit.Chip + 4), BackgroundTransparency = 1, LayoutOrder = 0 }, list)
+		CardKit.tabs(strip, tabs)
+		PhoneApps.shops(list, look, host, 1)
+		return
+	end
+	local items: { ShopView.Item } = {}
+	local function add(id: string, name: string, picture: CardKit.Picture, where: string, shopId: string, price: number, lvl: number, label: string?)
+		local locked = level < lvl
+		table.insert(items, {
+			id = id,
+			name = name,
+			picture = picture,
+			fact = `{where}{if locked then ` · 🔒 LV {lvl}` else ""}`,
+			price = price,
+			valueColor = if locked or money < price then CardKit.Color.dim else nil, -- (locked: dim, its 📍 still works)
+			forSale = true,
+			act = { text = "📍 SET GPS", short = "📍", on = true, kind = if money >= price and not locked then "good" else "primary", run = function()
+				host.gps(shopId)
+				local shop = Map.Shops[shopId]
+				host.notify(`GPS: {if shop then shop.name elseif shopId == "earl" then Config.VanQuest.Place else label or name}`)
+			end },
+			lines = { `{name}: {Ui.money(price)} · level {lvl}.`, `Sold at {where}. Buying happens at the counter: 📍 sets the GPS there.` },
+		})
+	end
+	-- The personal gear still worth buying (Config.Kit), the cheapest first: 6.6: the bags (ZDC Bags), then the rest of
+	-- the kit (Last Stop Supplies); 6.7: each piece at its own shop (the Baseball Bat at Lead & Co.'s range).
+	local owned = if type(state) == "table" and type(state.kit) == "table" then state.kit else {}
+	for _, shopId in { "bags", "supplies", "guns" } do
+		local wanted: { Config.KitDef } = {}
+		for _, def in Config.Kit do
+			if not owned[def.id] and Transport.kitShop(def) == shopId then
+				table.insert(wanted, def)
+			end
+		end
+		table.sort(wanted, function(a: Config.KitDef, b: Config.KitDef): boolean
+			return a.price < b.price
+		end)
+		local shop = Map.Shops[shopId]
+		for _, def in wanted do
+			add(def.id, def.name, { icon = Icons.kit(def.id), emoji = def.icon }, if shop then shop.name else shopId, shopId, def.price, def.level)
+		end
+	end
+	-- 5.1: the next two bikes you do not own (6.12.7: Dead End Motors' BIKES counter, Map.Shops.bikes), then the next two
+	-- vehicles (5.0: the Old Van from Earl, Marge's quest; the others from Dead End Motors).
+	local cars = if type(state) == "table" and type(state.cars) == "table" then state.cars else {}
+	local bikes, rides = 0, 0
+	for _, def in Config.Cars do
+		if def.bike and not cars[def.id] and bikes < 2 then
+			bikes += 1
+			add(def.id, def.name, ShopView.vehicle(def), `{Config.BikeShop.Shop}, {Config.BikeShop.Counter}`, "bikes", def.price, def.level or 1, "Dead End Motors · Bikes")
+		end
+	end
+	local list2: { Config.CarDef } = {}
+	for _, def in Config.Cars do
+		if not def.company and not def.bike then
+			table.insert(list2, def)
+		end
+	end
+	table.sort(list2, function(a: Config.CarDef, b: Config.CarDef): boolean
+		if (a.level or 1) ~= (b.level or 1) then
+			return (a.level or 1) < (b.level or 1)
+		end
+		return a.price < b.price
+	end)
+	for _, def in list2 do
+		if cars[def.id] or rides >= 2 then
+			continue
+		end
+		rides += 1
+		if def.id == Config.VanQuest.Car then
+			local quest = type(state) == "table" and state.vanQuest == "open"
+			add(def.id, def.name, ShopView.vehicle(def), if quest then `{Config.VanQuest.Seller}, far out west` else "Marge's quest", "earl", def.price, def.level or 1)
+		else
+			add(def.id, def.name, ShopView.vehicle(def), "Dead End Motors", "dealer", def.price, def.level or 1)
+		end
+	end
+	local chips: { CardKit.Chip } = {
+		{ name = "CashChip", text = Ui.money(money), ink = CardKit.Color.money, face = CardKit.Color.goodFace, static = true },
+		{ name = "LevelChip", text = `LV {level}`, static = true },
+	}
+	ShopView.draw(list, {
+		key = "phone:shop",
+		items = items,
+		money = money,
+		goal = goal,
+		side = wide == true,
+		room = host.room(),
+		order = 0,
+		tabs = tabs,
+		chips = chips,
+		bar = host.bar,
+		section = "SAVE UP FOR",
+		empty = "You have it all. The counters still sell items, upgrades and looks.",
+		foot = "Buying happens at the counters: 📍 sets the GPS.",
+		redraw = host.redraw,
+		toast = host.notify,
+	})
 end
 
 -- ── GARAGE ─────────────────────────────────────────────────────────────────
 
-function PhoneApps.garage(list: Instance, look: OrdersUi.Kit, host: Host)
+-- Your own car's fuel share (its Tank / Fuel attributes, server/Fuel.luau), nil without one out.
+local function fuelShare(): number?
+	local cars = workspace:FindFirstChild("Cars")
+	for _, car in if cars then cars:GetChildren() else {} do
+		if car:GetAttribute("OwnerId") == player.UserId then
+			local tank, fuel = car:GetAttribute("Tank"), car:GetAttribute("Fuel")
+			if type(tank) == "number" and tank > 0 and type(fuel) == "number" then
+				return math.clamp(fuel / tank, 0, 1)
+			end
+		end
+	end
+	return nil
+end
+
+-- 6.18 wave 2, GARAGE in the UI kit's look: the vehicle you have out as the HERO (its picture, its name, its cargo
+-- slots big, its condition and fuel as facts, BRING MY CAR: SpawnCar), then a row each: 🚲 MY BIKE (RIDE: the Equip
+-- remote's "ride"), 🚐 CALL CAR (CALL: "drive"), ⛽ TOW while your own car's tank is empty (the Fuel remote), and ZDC
+-- RIDE (5.6: the nearest rental dock, shared/RentalDocks.luau; 📍 its GPS, MapView.setWaypoint).
+function PhoneApps.garage(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
 	local state = host.state()
 	local owned = if type(state) == "table" and type(state.cars) == "table" then state.cars else {}
 	local hasBike, hasCar = false, false
+	local bikeDef: Config.CarDef?, carDef: Config.CarDef? = nil, nil
 	for _, def in Config.Cars do
 		if owned[def.id] and not def.company then
 			hasBike = hasBike or def.bike == true
 			hasCar = hasCar or not def.bike
+			if def.bike and not bikeDef then
+				bikeDef = def
+			elseif not def.bike and not carDef then
+				carDef = def
+			end
 		end
 	end
-	local now = look.block(list, 1, true)
-	look.caps(now, "Now", 1, K.secondary)
-	look.text(now, host.transport(), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 15 })
-	look.meta(now, if hasCar then "BRING MY CAR sets your car (or a job's company vehicle) down next to you."
-		elseif hasBike then "Your bike is yours; the first car comes later (the SHOP app says when)."
-		else "No vehicle of your own yet: the SHOP app says what comes next.", 3)
-	look.button(list, "BRING MY CAR", if hasCar then "main" else "quiet", 2, function()
-		Net.get("SpawnCar"):FireServer()
-		host.close()
-	end)
-	local order = 2
-	if hasBike then
-		order += 1
-		look.button(list, "🚲 MY BIKE", "quiet", order, function()
-			Net.get("Equip"):FireServer("ride")
+	local outId = if type(state) == "table" and type(state.car) == "string" then state.car else nil
+	local out = if outId then Economy.findCar(outId) else nil
+	if out and out.bike then
+		bikeDef = out
+	elseif out then
+		carDef = out
+	end
+	local lastCar = if type(state) == "table" and type(state.lastCar) == "string" then Economy.findCar(state.lastCar) else nil
+	if lastCar and not lastCar.bike then
+		carDef = lastCar
+	end
+	local items: { ShopView.Item } = {}
+	-- the hero: what you have out
+	local heroFacts: { string } = {}
+	local health = if out and type(state.carHealth) == "table" and type(state.carHealth[out.id]) == "number" then state.carHealth[out.id] else nil
+	if health then
+		table.insert(heroFacts, `🔧 {math.floor(health * 100 + 0.5)}%`)
+	end
+	local fuel = if out and not out.bike then fuelShare() else nil
+	if fuel then
+		table.insert(heroFacts, `⛽ {math.floor(fuel * 100 + 0.5)}%`)
+	end
+	local levels = if out then Economy.carLevels(state.carUpgrades, out.id) else nil
+	table.insert(items, {
+		id = "out",
+		name = if out then out.name else "On foot",
+		picture = ShopView.vehicle(out),
+		fact = if #heroFacts > 0 then table.concat(heroFacts, " · ") else host.transport(),
+		value = if out and levels then `📦 {Economy.capacity(out.id, levels)}` else nil,
+		current = true,
+		act = if hasCar then { text = "BRING MY CAR", on = true, run = function()
+			Net.get("SpawnCar"):FireServer()
 			host.close()
-		end)
-		if hasCar then
-			order += 1
-			look.button(list, "🚐 CALL CAR", "quiet", order, function()
-				Net.get("Equip"):FireServer("drive")
+		end, name = "BringCar" } else { text = if hasBike then "NO CAR YET" else "NO VEHICLE YET", on = false, why = "No vehicle of your own yet: the SHOP app says what comes next." },
+		lines = { host.transport(), if hasCar then "BRING MY CAR sets your car (or a job's company vehicle) down next to you." elseif hasBike then "Your bike is yours; the first car comes later (the SHOP app says when)." else "No vehicle of your own yet: the SHOP app says what comes next." },
+	})
+	if hasBike and bikeDef then
+		table.insert(items, {
+			id = "bike",
+			name = "🚲 MY BIKE",
+			picture = ShopView.vehicle(bikeDef),
+			fact = `{string.upper(bikeDef.name)} · NO GARAGE, AT ONCE`,
+			owned = true,
+			act = { text = "🚲 MY BIKE", short = "RIDE", on = true, kind = "good", run = function()
+				Net.get("Equip"):FireServer("ride")
 				host.close()
-			end)
+			end },
+			actionName = "Ride",
+		})
+		if hasCar and carDef then
+			table.insert(items, {
+				id = "car",
+				name = "🚐 CALL CAR",
+				picture = ShopView.vehicle(carDef),
+				fact = `{string.upper(carDef.name)} · A CHAUFFEUR BRINGS IT`,
+				owned = true,
+				act = { text = "🚐 CALL CAR", short = "CALL", on = true, kind = "good", run = function()
+					Net.get("Equip"):FireServer("drive")
+					host.close()
+				end },
+				actionName = "Call",
+			})
 		end
 	end
-	order = PhoneApps.rideLine(list, look, host, order + 1)
 	if PhoneApps.towDue() then
-		order += 1
-		look.section(list, "Out of fuel", order)
-		order += 1
-		look.meta(list, "Your car's tank is empty. The tow takes it to the nearest pump with a little fuel in it.", order)
-		order += 1
-		look.button(list, `⛽ TOW  {Ui.money(Config.Fuel.TowPrice)}`, "main", order, function()
-			Net.get("Fuel"):FireServer("tow")
-			host.close()
-		end)
+		table.insert(items, {
+			id = "tow",
+			name = "⛽ Out of fuel",
+			picture = { emoji = "⛽" },
+			fact = "TOW TO THE NEAREST PUMP",
+			price = Config.Fuel.TowPrice,
+			accent = K.red,
+			act = { text = `⛽ TOW  {Ui.money(Config.Fuel.TowPrice)}`, short = "TOW", on = true, run = function()
+				Net.get("Fuel"):FireServer("tow")
+				host.close()
+			end },
+			actionName = "Tow",
+			lines = { "Your car's tank is empty. The tow takes it to the nearest pump with a little fuel in it." },
+		})
 	end
+	table.insert(items, PhoneApps.rideItem(host))
+	ShopView.draw(list, {
+		key = "phone:garage",
+		items = items,
+		money = if type(state) == "table" then tonumber(state.money) or 0 else 0,
+		side = wide == true,
+		room = host.room(),
+		order = 1,
+		redraw = host.redraw,
+		toast = host.notify,
+	})
 end
 
--- 5.6, ZDC RIDE: the nearest rental dock (straight, from where you stand) and the GPS to it; under it what to do
--- (you have one out: the player attribute Rental). Returns the last order used.
-function PhoneApps.rideLine(list: Instance, look: OrdersUi.Kit, host: Host, order: number): number
+-- 5.6, ZDC RIDE: the nearest rental dock (straight, from where you stand) and the GPS to it, as GARAGE's row; its
+-- details say what to do (you have one out: the player attribute Rental).
+function PhoneApps.rideItem(host: Host): ShopView.Item
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local here = if root and root:IsA("BasePart") then root.Position else nil
@@ -646,23 +784,24 @@ function PhoneApps.rideLine(list: Instance, look: OrdersUi.Kit, host: Host, orde
 	if here then
 		dock, far = RentalDocks.nearest(here.X, here.Z)
 	end
-	local card = look.block(list, order)
-	local head = Ui.make("Frame", { Name = "Head", Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
-	local title = if dock then `🛴 ZDC RIDE · nearest dock {math.floor(far)} studs` else "🛴 ZDC RIDE · free e-scooters"
-	look.text(head, title, UDim2.new(1, if dock then -96 else 0, 1, 0), { Font = Theme.HeadingFont, TextSize = 14, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	if dock then
-		local found = dock
-		look.pill(head, "📍 GPS", function()
+	local found = dock
+	return {
+		id = "ride",
+		name = "🛴 ZDC RIDE",
+		picture = { emoji = "🛴" },
+		fact = if found then `ZDC RIDE · nearest dock {math.floor(far)} studs` else "ZDC RIDE · free e-scooters",
+		owned = true,
+		accent = K.warn,
+		act = if found then { text = "📍 GPS", short = "📍", on = true, run = function()
 			MapView.setWaypoint(Vector3.new(found.x, Map.RoadTop, found.z))
 			pcall(function()
 				MapView.onWaypoint({ id = "zdcride", name = `ZDC RIDE · {found.name}`, icon = "🛴", x = found.x, z = found.z, kind = "shop", description = "" })
 			end)
 			host.notify(`GPS: ZDC RIDE · {found.name}`)
-		end)
-	end
-	look.meta(card, if player:GetAttribute("Rental") ~= nil then "Your rental: leave it anywhere, or Return it at any dock."
-		else "Free e-scooters at docks across Downtown and the Suburbs: hold Rent.", 2)
-	return order
+		end } else nil,
+		actionName = "Gps",
+		lines = { if player:GetAttribute("Rental") ~= nil then "Your rental: leave it anywhere, or Return it at any dock." else "Free e-scooters at docks across Downtown and the Suburbs: hold Rent." },
+	}
 end
 
 -- ── SETTINGS: the keys ─────────────────────────────────────────────────────

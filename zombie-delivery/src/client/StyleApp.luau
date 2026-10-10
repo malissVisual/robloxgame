@@ -21,6 +21,17 @@
 --   * Keys while the app is open (bound with ContextActionService only then): TAB, the gamepad's L1 / R1 switch the
 --     tab; ↑ / ↓ pick the item before / after (the preview follows, the list scrolls to it); ENTER does its main
 --     action. A gamepad's selection moving over a card's buttons previews that card.
+-- 6.18 wave 2, the UI kit's look (the owner: "I need it unified so the phone looks like that [6.17's JOBS], and the
+-- other popups too"; design/ui-kit/README.md, client/CardKit.luau):
+--   * the tabs are chips (Tab_courier, Tab_vehicle: the open one lit, its red Underline) in the popup's header strip
+--     when they fit;
+--   * the HERO is the look you try: the live 3D preview fills it, its name, its PRICE big (green while you can buy it
+--     here; WEARING / OWNED / 🏆 REWARD), one line under it (the caption: who sells it away from its shop), and the one
+--     big button: its main action (BUY · $X, WEAR, TAKE OFF, AT WRENCH GARAGE: the GPS, REWARD ONLY);
+--   * beside it (a wide popup) or under it, a section a slot ("Hats · your own") and a compact row a look: its two
+--     colours as the thumb, its name, one line, its price big, and a round action (BUY, WEAR, OFF, 📍 where it is sold;
+--     the lock's words "🔒 LV 6", "🏆 REWARD" say why on a press); a tap on the row TRIES it (the hero follows);
+--   * the keys and the gamepad as before (a row's selection tries it on).
 -- Presentation only: the server decides every purchase and every look.
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -37,6 +48,7 @@ local OrdersUi = require(script.Parent.OrdersUi)
 local PhoneApps = require(script.Parent.PhoneApps)
 local StylePreview = require(script.Parent.StylePreview)
 local Sounds = require(script.Parent.Sounds)
+local CardKit = require(script.Parent.CardKit) -- 6.18 wave 2: the UI kit
 
 local K = Theme.Contract
 local StyleApp = {}
@@ -51,9 +63,11 @@ StyleApp.pick = {} :: { [string]: string }
 type Host = PhoneApps.Host
 
 local player = Players.LocalPlayer
-local shown: { host: Host?, preview: Instance?, row: Instance?, cards: { [string]: Instance }, bound: boolean, key: string } = {
+local shown: { host: Host?, preview: Instance?, row: Instance?, cards: { [string]: Instance }, bound: boolean, key: string, hero: any, caption: any } = {
 	host = nil,
 	preview = nil,
+	hero = nil, -- 6.18 wave 2: the hero card's parts (CardKit.hero), filled again when another look is tried
+	caption = nil, -- its line under the price (PreviewCaption)
 	row = nil, -- the tabs row drawn last (only its going frees the keys)
 	cards = {},
 	bound = false,
@@ -161,7 +175,7 @@ local function preview(def: Config.CosmeticDef?)
 	if not holder or not holder.Parent then
 		return
 	end
-	local caption = holder.Parent and holder.Parent:FindFirstChild("PreviewCaption")
+	local caption = shown.caption
 	local ok, kind, note = pcall(StylePreview.show, holder, StyleApp.tab, def)
 	local text = if def then string.upper(def.name) else ""
 	if not ok or kind == "" then
@@ -171,7 +185,7 @@ local function preview(def: Config.CosmeticDef?)
 	elseif def and shown.host and Style.state(wardrobe(shown.host.state()), def) == "sale" and not shopHere(def) then
 		text = `{text} · {Style.say("sold", def)}` -- (tried away from its shop: who sells it)
 	end
-	if caption and caption:IsA("TextLabel") then
+	if caption and caption.Parent then
 		caption.Text = text
 	end
 end
@@ -197,6 +211,10 @@ local function pick(def: Config.CosmeticDef, redraw: boolean)
 		if accent and accent:IsA("GuiObject") then
 			accent.Visible = on
 		end
+	end
+	local fill = StyleApp.fillHero
+	if fill and host then
+		fill(def, host)
 	end
 	preview(def)
 end
@@ -295,41 +313,20 @@ end
 
 -- ── Drawing ───────────────────────────────────────────────────────────────
 
-local function tabs(list: Instance)
-	local row = Ui.make("Frame", { Name = "StyleTabs", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 1 }, list)
-	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, row)
-	for index, entry in TABS do
-		local id = entry[1]
-		local on = id == StyleApp.tab
-		local tab = Ui.make("TextButton", {
-			Name = `Tab_{id}`,
-			Size = UDim2.fromOffset(0, 44),
-			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = K.raised,
-			BackgroundTransparency = if on then 0 else 1,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = entry[2],
-			Font = Theme.HeadingFont,
-			TextSize = 13,
-			TextColor3 = if on then K.text else K.secondary,
-			LayoutOrder = index,
-		}, row)
-		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, tab)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if on then 0.5 else 0.8 }, tab)
-		if on then
-			Ui.make("Frame", { Name = "Underline", Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, -2), BackgroundColor3 = K.red, BorderSizePixel = 0 }, tab)
-		end
-		tab.Activated:Connect(function()
-			local sound = Ui.onClick
-			if sound then
-				sound()
-			end
-			switch(id)
-		end)
+local function tabs(list: Instance, host: Host): number
+	local row = Ui.make("Frame", { Name = "StyleTabs", Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = 1 })
+	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, row)
+	local strip, made = CardKit.tabs(row, { tabs = TABS, selected = StyleApp.tab, order = 1, onPick = function(id: string)
+		switch(id)
+	end })
+	local width = 0
+	for _, chip in made do
+		width += chip.Size.X.Offset + 6
 	end
+	strip.Size = UDim2.new(0, width, 1, 0)
 	if not Ui.touchLayout() then
-		Ui.label(row, "TAB · ↑ ↓ · ENTER", UDim2.fromOffset(150, 44), { Name = "KeyHint", TextSize = 11, TextColor3 = K.secondary, LayoutOrder = 3, TextXAlignment = Enum.TextXAlignment.Left })
+		Ui.label(row, "TAB · ↑ ↓ · ENTER", UDim2.fromOffset(120, 28), { Name = "KeyHint", TextSize = 11, TextColor3 = K.secondary, LayoutOrder = 3, TextXAlignment = Enum.TextXAlignment.Left })
+		width += 128
 	end
 	-- the row goes with the app (another app, the popup closed): the keys are free again. Only the row drawn last
 	-- does it: an older row going later (a redraw with deferred signals, the closing popup's tween while STYLE is
@@ -341,78 +338,137 @@ local function tabs(list: Instance)
 			unbind()
 		end
 	end)
+	-- (6.18 wave 2: in the popup's header strip when they fit, like JOBS' chips; else heading the body)
+	local bar, room = host.bar()
+	if bar and width <= (tonumber(room) or 0) then
+		row.Size = UDim2.fromScale(1, 1)
+		row.Parent = bar
+		return 1
+	end
+	row.Parent = list
+	return 2
 end
 
--- Two small squares of the item's colours.
-local function swatch(parent: Instance, def: Config.CosmeticDef, order: number)
-	local row = Ui.make("Frame", { Name = "Swatch", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, row)
-	local colours: { { number } } = { def.color }
-	if def.trim then
-		table.insert(colours, def.trim)
-	end
-	for n, c in colours do
-		local chip = Ui.make("Frame", { Name = `Colour{n}`, Size = UDim2.fromOffset(28, 14), BackgroundColor3 = color3(c), BorderSizePixel = 0, LayoutOrder = n }, row)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, chip)
+-- An item's two colours as its row's thumb (Colour1, Colour2: what the checks find).
+local function swatch(def: Config.CosmeticDef): (face: Instance, size: number) -> ()
+	return function(slot: Instance, _: number)
+		local colours: { { number } } = { def.color }
+		if def.trim then
+			table.insert(colours, def.trim)
+		end
+		for n, c in colours do
+			local chip = Ui.make("Frame", {
+				Name = `Colour{n}`,
+				Size = UDim2.fromOffset(if #colours == 1 then 30 else 22, 30),
+				Position = UDim2.new(0.5, if #colours == 1 then -15 else (n - 1) * 24 - 23, 0.5, -15),
+				BackgroundColor3 = color3(c),
+				BorderSizePixel = 0,
+			}, slot)
+			Ui.corner(chip, 6)
+			Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, chip)
+		end
 	end
 end
 
--- An item's card: its colours, its name and what it is to you, its line, TRY and the main action.
-local function card(parent: Instance, def: Config.CosmeticDef, order: number, look: OrdersUi.Kit, host: Host, style: Style.Wardrobe, money: number, lvl: number, selected: boolean)
-	local b = look.block(parent, order, selected)
-	local frame = b.Parent
-	if frame then
-		frame.Name = `Style_{def.id}`
-		shown.cards[def.id] = frame
-	end
-	swatch(b, def, 1)
+-- What a look is to you, and its main action's words (the hero's button) and short word (its row's round action).
+local function actionOf(def: Config.CosmeticDef, style: Style.Wardrobe, money: number, lvl: number): (string, string, string, boolean)
 	local now = Style.state(style, def)
-	local locked = now == "sale" and lvl < (def.level or 1)
-	local status = if now == "wearing" then "WEARING" elseif now == "owned" then "OWNED" elseif now == "reward" then "🏆 REWARD"
-		elseif locked then `🔒 LEVEL {def.level}` else Style.money(def.price)
-	look.row2(b, string.upper(def.name), status, 2, true)
-	look.meta(b, def.description, 3)
-	local row = Ui.make("Frame", { Name = "Actions", Size = UDim2.new(1, 0, 0, 54), BackgroundTransparency = 1, LayoutOrder = 4 }, b)
-	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, row)
-	local function half(index: number): Instance
-		return Ui.make("Frame", { Name = `Half{index}`, Size = UDim2.new(0.5, -4, 1, 0), BackgroundTransparency = 1, LayoutOrder = index }, row)
-	end
-	local try = look.button(half(1), "TRY", "quiet", 1, function()
-		pick(def, false)
-	end)
-	try.Name = "Try"
-	local label, kind
 	if now == "wearing" then
-		label, kind = "TAKE OFF", "quiet"
+		return "TAKE OFF", "OFF", "shut", true
 	elseif now == "owned" then
-		label, kind = "WEAR", "main"
+		return "WEAR", "WEAR", "good", true
 	elseif now == "reward" then
-		label, kind = "REWARD ONLY", "off"
-	else
-		local here = shopHere(def)
-		if here or locked then
-			local ok = Style.canBuyAt(style, def, money, lvl, here)
-			label, kind = `BUY · {Style.money(def.price)}`, if ok then "main" else "off"
-		else
-			label, kind = Style.atLabel(def), "off" -- (sold at a shop: a press sets the GPS there)
-		end
+		return "REWARD ONLY", "🏆 REWARD", "shut", false
 	end
-	local main = look.button(half(2), label, kind, 1, function()
-		act(def, host)
-	end)
-	main.Name = "Main"
-	for _, button in { try, main } do
-		if button.SelectionGained then
-			button.SelectionGained:Connect(function()
-				if StyleApp.pick[StyleApp.tab] ~= def.id then
-					pick(def, false)
-				end
-			end)
-		end
+	local locked = lvl < (def.level or 1)
+	local here = shopHere(def)
+	if locked then
+		return `BUY · {Style.money(def.price)}`, `🔒 LV {def.level}`, "shut", false
+	elseif here then
+		local ok = Style.canBuyAt(style, def, money, lvl, here)
+		return `BUY · {Style.money(def.price)}`, "BUY", if ok then "primary" else "shut", true
+	end
+	return Style.atLabel(def), "📍", "shut", true -- (sold at a shop: a press sets the GPS there)
+end
+
+-- The big value of a look: WEARING, OWNED, 🏆 REWARD or its price (green while you can buy it here).
+local function valueOf(def: Config.CosmeticDef, style: Style.Wardrobe, money: number, lvl: number): (string, Color3)
+	local now = Style.state(style, def)
+	if now == "wearing" then
+		return "WEARING", CardKit.Color.money
+	elseif now == "owned" then
+		return "OWNED", CardKit.Color.money
+	elseif now == "reward" then
+		return "🏆 REWARD", CardKit.Color.gold
+	end
+	local ok = Style.canBuyAt(style, def, money, lvl, shopHere(def))
+	return Style.money(def.price), if ok then CardKit.Color.money else CardKit.Color.dim
+end
+
+-- The hero shows another look (TRY, ↑ / ↓, a row's selection): its name, its value, its button.
+function StyleApp.fillHero(def: Config.CosmeticDef, host: Host)
+	local parts = shown.hero
+	if not parts or not parts.card or not parts.card.Parent then
+		return
+	end
+	local state = host.state()
+	local style = wardrobe(state)
+	local money, lvl = moneyOf(state), level()
+	local label, _, kind = actionOf(def, style, money, lvl)
+	local value, color = valueOf(def, style, money, lvl)
+	parts.title.Text = string.upper(def.name)
+	parts.value.Text = value
+	parts.value.TextColor3 = color
+	if parts.action then
+		parts.action.Text = label
+		CardKit.paint(parts.action, kind)
 	end
 end
 
--- The app in the phone's popup (`list`: its body; `wide`: two columns of cards).
+-- A look's compact row (see the header): a tap tries it on.
+local function itemRow(parent: Instance, def: Config.CosmeticDef, order: number, host: Host, style: Style.Wardrobe, money: number, lvl: number, selected: boolean)
+	local now = Style.state(style, def)
+	local _, short, _, on = actionOf(def, style, money, lvl)
+	local value, color = valueOf(def, style, money, lvl)
+	local locked = short == "🏆 REWARD" or string.sub(short, 1, #"🔒") == "🔒"
+	local slot = Style.slot(def.slot)
+	local made = CardKit.row(parent, {
+		name = `Style_{def.id}`,
+		order = order,
+		accent = if now == "wearing" then K.good elseif now == "reward" then CardKit.Color.gold elseif locked then CardKit.Color.grey else K.line,
+		picture = { glyph = swatch(def) },
+		title = string.upper(def.name),
+		facts = (if now == "wearing" then "✓ WEARING · " elseif now == "owned" then "✓ OWNED · " else "") .. (if slot then string.upper(slot.name) else ""),
+		value = if now == "sale" then value else nil,
+		valueColor = color,
+		action = if locked then nil else short,
+		lock = if locked then short else nil,
+		actionFace = if short == "BUY" and on then K.red elseif short == "WEAR" then K.good else nil,
+		onAction = function()
+			act(def, host)
+		end,
+		silent = true,
+		onOpen = function()
+			CardKit.click()
+			pick(def, false)
+		end,
+	})
+	local row = made.row
+	shown.cards[def.id] = row
+	if made.action then
+		made.action.Name = "Main"
+	end
+	if selected then
+		Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 2, 1, 0), Position = UDim2.fromOffset(4, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 3 }, row)
+	end
+	row.SelectionGained:Connect(function()
+		if StyleApp.pick[StyleApp.tab] ~= def.id then
+			pick(def, false)
+		end
+	end)
+end
+
+-- The app in the phone's popup (`list`: its body; `wide`: the hero beside the rows).
 function StyleApp.render(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
 	shown.host = host
 	shown.cards = {}
@@ -421,27 +477,49 @@ function StyleApp.render(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	local money, lvl = moneyOf(state), level()
 	local tab = StyleApp.tab
 	local current = picked(tab, style)
-	tabs(list)
+	local order = tabs(list, host)
 	bind()
-	-- the preview
-	local b = look.block(list, 2)
-	b.Name = "PreviewCard"
-	local holder = Ui.make("Frame", { Name = "Preview", Size = UDim2.new(1, 0, 0, 200), BackgroundColor3 = K.charcoal, BorderSizePixel = 0, LayoutOrder = 1, ClipsDescendants = true }, b)
-	Ui.label(b, "", UDim2.new(1, 0, 0, 18), { Name = "PreviewCaption", TextSize = 12, TextColor3 = K.secondary, LayoutOrder = 2 })
-	shown.preview = holder
 	look.meta(list, `Buy them from {Style.soldBy(tab)}; wear them from here, anywhere. `
 		.. (if tab == "courier" then "Looks only: no item changes a number of the game; your own look stays under them."
-			else "Looks only, on every vehicle of yours they fit; a lent company vehicle and a ZDC RIDE scooter keep theirs."), 3)
-	local n = 4
+			else "Looks only, on every vehicle of yours they fit; a lent company vehicle and a ZDC RIDE scooter keep theirs."), order)
+	-- the hero: the look you try, the live preview filling it
+	local height = CardKit.Layout.heroHeight(host.room() - 40)
+	local _, left, right = CardKit.columns(list, { name = "StyleCards", order = order + 1, side = wide == true, hero = true, heroHeight = height })
+	local label, _, kind = actionOf(current, style, money, lvl)
+	local value, color = valueOf(current, style, money, lvl)
+	local parts = CardKit.hero(left, {
+		name = "Hero",
+		height = height,
+		picture = { emoji = "" },
+		title = string.upper(current.name),
+		value = value,
+		valueColor = color,
+		facts = "",
+		action = { name = "HeroMain", text = label, kind = kind, onClick = function()
+			local live = shown.host
+			if live then
+				act(picked(StyleApp.tab, wardrobe(live.state())), live)
+			end
+		end },
+	})
+	shown.hero = parts
+	parts.facts.Name = "PreviewCaption"
+	parts.facts.TextSize = 12
+	parts.facts.TextColor3 = K.secondary
+	shown.caption = parts.facts
+	local holder = Ui.make("Frame", { Name = "Preview", Size = UDim2.fromScale(1, 1), BackgroundColor3 = K.charcoal, BorderSizePixel = 0, ZIndex = 1, ClipsDescendants = true }, parts.card)
+	CardKit.shade(parts.card, true) -- (the preview fills it: the words keep their dark foot)
+	shown.preview = holder
+	-- a section a slot, a row a look
+	local n = 0
 	for _, slot in Style.slots(tab) do
 		local worn = Style.worn(style, slot.id)
-		look.section(list, `{slot.name} · {if worn then worn.name else "your own"}`, n)
-		look.meta(list, slot.note, n + 1)
-		local left, right = PhoneApps.columns(list, n + 2, wide == true)
-		for index, def in Style.items(slot.id) do
-			card(if index % 2 == 1 then left else right, def, n + 2 + index, look, host, style, money, lvl, def == current)
+		n += 1
+		CardKit.sectionHeader(right, { name = `Slot_{slot.id}`, text = `{slot.name} · {if worn then worn.name else "your own"}`, order = n })
+		for _, def in Style.items(slot.id) do
+			n += 1
+			itemRow(right, def, n, host, style, money, lvl, def == current)
 		end
-		n += 3 + #Style.items(slot.id)
 	end
 	preview(current)
 	local selectedCard = shown.cards[current.id]
@@ -511,6 +589,8 @@ function StyleApp.close()
 	shown.preview = nil
 	shown.host = nil
 	shown.cards = {}
+	shown.hero = nil
+	shown.caption = nil
 end
 
 return StyleApp

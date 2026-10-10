@@ -155,7 +155,7 @@ tap("SHOW ROUTE")
 check("route opens existing full map and puts phone away",M.mapOpen and not Phone.isOpen())
 check("the closed phone leaves no popup",popup()==nil and blur()==nil)
 Phone.open("orders");tap("BAG · EMPTY")
-check("bag opens in the same popup",(M.bagRendered or 0)>0 and Phone.isOpen() and showing("bag") and #all(M.gui,function(object) return object.Name=="AppPopup" end)==1 and named("BagRows")~=nil and upright())
+check("bag opens in the same popup (6.18 wave 2: client/BagUi.luau for real)",Phone.isOpen() and showing("bag") and #all(M.gui,function(object) return object.Name=="AppPopup" end)==1 and named("BagRows")~=nil and upright())
 named("Close").Activated:Fire()
 check("the ✕ returns to the phone's home",popup()==nil and blur()==nil and Phone.isOpen() and named("Home").Visible and upright())
 for _,app in {"career","shop","messages"} do
@@ -529,11 +529,11 @@ do
 	Phone.close()
 end
 
--- CAREER and SHOP: two columns in the wide popup, the phone upright.
-for _,id in {"career","shop"} do
-	Phone.open(id)
-	check(`{id} opens in the popup in two columns`,showing(id) and upright() and named("Columns")~=nil and #M.warnings==0)
-end
+-- CAREER: two columns in the wide popup, the phone upright. 6.18 wave 2: SHOP the kit's hero beside its rows.
+Phone.open("career")
+check("career opens in the popup in two columns",showing("career") and upright() and named("Columns")~=nil and #M.warnings==0)
+Phone.open("shop")
+check("shop opens in the popup: SAVE UP, the hero beside the rows",showing("shop") and upright() and named("ShopCards")~=nil and named("ShopCards"):FindFirstChild("Left")~=nil and named("Hero")~=nil and #M.warnings==0)
 -- GARAGE: BRING MY CAR, MY BIKE, CALL CAR.
 local bike,car
 for _,def in Config.Cars do
@@ -542,12 +542,14 @@ for _,def in Config.Cars do
 end
 Phone.setState({phone=true,money=1600,kit={},cars={[bike]=true,[car]=true}})
 Phone.open("garage")
-check("garage opens in the popup",showing("garage") and upright())
+-- 6.18 wave 2: the vehicle you have out as the hero (BRING MY CAR its big button), MY BIKE / CALL CAR / ZDC RIDE as rows.
+check("garage opens in the popup: the hero and the rows",showing("garage") and upright() and named("Hero")~=nil and deep(named("Hero"),"BringCar")~=nil
+	and named("Item_bike")~=nil and named("Item_car")~=nil and named("Item_ride")~=nil and M.focus==deep(named("Hero"),"BringCar"))
 tap("BRING MY CAR")
 check("BRING MY CAR fires SpawnCar and puts the phone away",lastSent("SpawnCar")~=nil and not Phone.isOpen())
-Phone.open("garage");tap("🚲 MY BIKE")
+Phone.open("garage");deep(named("Item_bike"),"Ride").Activated:Fire()
 check("MY BIKE rides the bike",lastSent("Equip").args[1]=="ride")
-Phone.open("garage");tap("🚐 CALL CAR")
+Phone.open("garage");deep(named("Item_car"),"Call").Activated:Fire()
 check("CALL CAR calls the car",lastSent("Equip").args[1]=="drive")
 -- 5.6: ZDC RIDE, the nearest rental dock and the GPS to it.
 Phone.open("garage")
@@ -556,8 +558,12 @@ check("garage names the nearest ZDC RIDE dock",rideLine~=nil and #M.warnings==0)
 local waypoints=0
 local setWaypoint=M.MapView.setWaypoint
 M.MapView.setWaypoint=function() waypoints+=1 end
-text("📍 GPS").Parent.Activated:Fire()
+deep(named("Item_ride"),"Gps").Activated:Fire()
 check("ZDC RIDE's GPS sets the waypoint",waypoints==1)
+named("Item_ride").Activated:Fire()
+check("a row's tap opens its details, ‹ BACK returns",named("ItemHero")~=nil and named("Back")~=nil)
+named("Back").Activated:Fire()
+check("… back on the list",named("ItemHero")==nil and named("Hero")~=nil)
 M.MapView.setWaypoint=setWaypoint
 -- SETTINGS: the keys and the version; BANK: what you earned since you joined.
 local sounds=0
@@ -607,25 +613,33 @@ for _,entry in {{"next","ready"},{"jobs","board"},{"shop","shop"},{"bag","bag"},
 end
 -- 6.5: SHOP lists the shops and what they sell; a tap sets the GPS, puts the phone away and says so.
 Phone.open("shop")
+-- 6.18 wave 2: SAVE UP (the goal as the hero, a row a thing to buy, 📍 its counter) and SHOPS, two tabs as chips.
+check("SHOP opens on SAVE UP: the tabs, the cash chip, a row a thing to save up for",named("Tab_save")~=nil and named("Tab_shops")~=nil and named("Tab_save"):FindFirstChild("Underline")~=nil
+	and named("CashChip")~=nil and #all(M.gui,function(object) return string.match(object.Name,"^Item_")~=nil end)>0)
+named("Tab_shops").Activated:Fire()
 -- 6.12.7: five shops: the bikes are Dead End Motors' (its CARS and BIKES counters), no Spoke & Chain row.
-check("SHOP lists the five shops first",named("Shops")~=nil and named("Shops").LayoutOrder<named("Columns").LayoutOrder
+check("SHOPS lists the five shops",named("Shops")~=nil and named("Tab_shops"):FindFirstChild("Underline")~=nil
 	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil
 	and named("Shop_bikes")==nil and named("Shop_guns").LayoutOrder<named("Shop_dealer").LayoutOrder and named("Shop_dealer").LayoutOrder<named("Shop_mechanic").LayoutOrder)
 check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
 check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items and vests, next to the bags")~=nil and text("Lead & Co.")~=nil and text("Range · guns, gun upgrades, a baseball bat")~=nil
 	and text("Dead End Motors")~=nil and text("Cars, vans, trucks · bikes, the E-Scooter, bike gear")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells; 6.12.7: the bikes at Dead End Motors)
+named("Tab_save").Activated:Fire()
 check("6.12.7: Spoke & Chain is gone from SHOP, its bikes named as part of Dead End Motors",all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.upper(object.Text),"SPOKE",1,true)~=nil end)[1]==nil
-	and caps("Dead End Motors · bikes")~=nil and caps("Dead End Motors · vehicles")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Dead End Motors, the BIKES counter",1,true)==1 end)[1]~=nil)
 do
 	-- 6.12.7: the bikes' Set GPS goes to the BIKES counter in Dead End Motors (Map.Shops.bikes), named as part of it.
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint
 	M.MapView.setWaypoint=function(at) waypoint=at end
-	local header=caps("Dead End Motors · bikes").Parent
-	local pill=all(header,function(object) return object.Name=="Pill" end)[1]
-	pill.Activated:Fire()
+	-- (the first bike you don't own: a row of its own, or the hero)
+	local bike
+	local hero=named("Hero")
+	for _,def in require("./Config").Cars do if def.bike and not bike and (named(`Item_{def.id}`)~=nil or hero:GetAttribute("Item")==def.id) then bike=def.id end end
+	local row=named(`Item_{bike}`)
+	check("6.18 wave 2: a bike's row (its price big, a round 📍) or the hero",(row~=nil and row:FindFirstChild("Pay")~=nil and row:FindFirstChild("Add")~=nil) or hero:GetAttribute("Item")==bike)
+	if row then row:FindFirstChild("Add").Activated:Fire() else deep(hero,"HeroAction").Activated:Fire() end
 	local counter=require("./Map").Shops.bikes
 	check("the bikes' Set GPS: the BIKES counter at Dead End Motors",waypoint~=nil and waypoint.X==counter.x and waypoint.Z==counter.z and toasts[#toasts]=="GPS: Dead End Motors · Bikes")
 	M.MapView.setWaypoint=setWaypoint
@@ -635,6 +649,7 @@ do
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint
 	M.MapView.setWaypoint=function(at) waypoint=at end
+	named("Tab_shops").Activated:Fire()
 	named("Shop_guns").Activated:Fire()
 	local Map=require("./Map")
 	local range=Map.Shops.guns
@@ -647,6 +662,7 @@ do
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint
 	M.MapView.setWaypoint=function(at) waypoint=at end
+	named("Tab_shops").Activated:Fire()
 	named("Shop_supplies").Activated:Fire()
 	local gear=require("./Map").Shops.supplies -- (6.12.2: Last Stop Supplies is the gear stall's GEAR counter at the depot)
 	check("a shop's tap sets the GPS there, puts the phone away and says so",waypoint~=nil and waypoint.X==gear.x and waypoint.Z==gear.z and not Phone.isOpen() and toasts[#toasts]=="GPS set: Last Stop Supplies")
@@ -655,12 +671,12 @@ end
 -- 6.5: BAG & ITEMS, the I window's tabs: ITEMS (USE through the bottom bar's path), BAGS; BAG during a run.
 Phone.setState({phone=true,money=1600,kit={},cars={},items={medkit=2}})
 Phone.open();named("bagApp").Activated:Fire()
-check("off duty BAG & ITEMS opens on ITEMS, no BAG tab",showing("bag") and text("BAG & ITEMS")~=nil and named("Tab_items")~=nil and named("Tab_bags")~=nil and named("Tab_bag")==nil and text("➕  MEDKIT")~=nil and text("×2")~=nil)
-check("6.7: no car, no car items in ITEMS (the energy drink is there)",text("🔧  REPAIR KIT")==nil and text("⛽  JERRY CAN")==nil and text("🥤  ENERGY DRINK")~=nil)
+-- 6.18 wave 2: the bag as the hero, a row an item with its count big and a round USE (client/BagUi.luau).
+check("off duty BAG & ITEMS opens on ITEMS, no BAG tab",showing("bag") and text("BAG & ITEMS")~=nil and named("Tab_items")~=nil and named("Tab_bags")~=nil and named("Tab_bag")==nil
+	and named("Item_medkit")~=nil and named("Item_medkit"):FindFirstChild("Pay").Text=="×2" and named("Hero")~=nil and named("ItemRows")~=nil)
+check("6.7: no car, no car items in ITEMS (the energy drink is there)",named("Item_repair")==nil and named("Item_jerrycan")==nil and named("Item_energy")~=nil)
 check("an item names its key in the bottom bar",all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Key 5.",1,true)~=nil end)[1]~=nil)
-for _,button in all(named("AppPopup"),function(object) return object.Text=="USE" end) do
-	if button.Parent==text("➕  MEDKIT").Parent.Parent then button.Activated:Fire() end
-end
+named("Item_medkit"):FindFirstChild("Use").Activated:Fire()
 check("USE goes through the bottom bar's path",M.used=="medkit")
 named("Tab_bags").Activated:Fire()
 check("BAGS shows the bags you own",showing("bag") and named("BagsRows")~=nil and named("Tab_bags"):FindFirstChild("Underline")~=nil)
@@ -729,6 +745,8 @@ end
 -- The clerks: BUY only at a shop that sells the look (the courier stands at the gear stall for it); away from it the
 -- button says where ("AT THE GEAR STALL") and a press sets the GPS there; walking up or away redraws the cards (the
 -- phone's ticker, StyleApp.tick); a clerk's "Style" prompt (the Style remote's ("open", tab)) opens STYLE on the tab.
+-- 6.18 wave 2 (the UI kit): the look you try is the hero (the preview, its price big, HeroMain its full action), a
+-- compact row a look (its colours, its price, a round "Main": BUY, WEAR, OFF, 📍; the lock's words); a row's tap TRIES.
 do
 	M.played={}
 	local Map=require("./Map")
@@ -740,18 +758,21 @@ do
 		return card and all(card,function(object) return object.Name==name end)[1]
 	end
 	local function styleSent() return lastSent("Style") end
+	local function hasText(value) return all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,value,1,true)~=nil end)[1]~=nil end
 	Phone.setState({phone=true,money=300,kit={},cars={},style={owned={},worn={}}})
 	Phone.open()
 	check("home's STYLE row: your looks",named("styleApp").Parent==named("Apps") and text("Your looks")~=nil)
 	named("styleApp").Activated:Fire()
 	check("the line under the tabs says who sells them",text("Buy them from Dot at the gear stall; wear them from here, anywhere. Looks only: no item changes a number of the game; your own look stays under them.")~=nil)
 	check("STYLE opens in the popup on COURIER",showing("style") and text("STYLE")~=nil and named("Tab_courier")~=nil and named("Tab_vehicle")~=nil and named("Tab_courier"):FindFirstChild("Underline")~=nil)
+	check("6.18 wave 2: the hero (the preview in it, its button) beside the rows; the gamepad on its button",named("Hero")~=nil and named("Hero"):FindFirstChild("Preview")~=nil and deep(named("Hero"),"HeroMain")~=nil
+		and named("StyleCards")~=nil and named("StyleCards"):FindFirstChild("Left")~=nil and M.focus==deep(named("Hero"),"HeroMain"))
 	check("its sections: hats, jackets, the vest's and the bag's colours",text("Hats · your own")~=nil and text("Jackets · your own")~=nil and text("Courier Vest colour · your own")~=nil and text("Bag colour · your own")~=nil)
 	check("the live preview shows the courier with the first item",#M.previews>0 and M.previews[#M.previews].tab=="courier" and M.previews[#M.previews].id=="cap_red" and named("Preview")~=nil)
 	check("a card an item: its colours, name, price",named("Style_cap_red")~=nil and text("BACKWARDS CAP · ZDC RED")~=nil and inCard("cap_red","Colour1")~=nil and inCard("cap_red","Colour2")~=nil and text("$120")~=nil)
-	check("a reward is flagged",inCard("cap_gold","Main")~=nil and inCard("cap_gold","Main").Text=="REWARD ONLY" and text("🏆 REWARD")~=nil)
-	check("a level's lock shows",text("🔒 LEVEL 4")~=nil)
-	check("two columns of cards in a wide popup",named("Columns")~=nil)
+	check("a reward is flagged",inCard("cap_gold","Main")~=nil and inCard("cap_gold","Main").Text=="🏆 REWARD")
+	check("a level's lock shows",text("🔒 LV 4")~=nil)
+	check("the hero's full words: BUY · $120 for the first look",deep(named("Hero"),"HeroMain").Text=="BUY · $120")
 	inCard("cap_red","Main").Activated:Fire()
 	check("BUY asks the server with the item",styleSent()~=nil and styleSent().args[1]=="buy" and styleSent().args[2]=="cap_red")
 	local before=#M.sent
@@ -761,12 +782,13 @@ do
 	check("too dear or too early: it says why",#M.sent==before and string.find(toasts[#toasts] or "","unlocks at level 6",1,true)~=nil)
 	inCard("hoodie_grey","Main").Activated:Fire()
 	check("not enough money: it says so",#M.sent==before and toasts[#toasts]=="Not enough money: Hoodie · Grey costs $350.")
-	inCard("beanie_grey","Try").Activated:Fire()
-	check("TRY previews it, no remote",#M.sent==before and M.previews[#M.previews].id=="beanie_grey" and named("Style_beanie_grey"):FindFirstChild("Accent")~=nil and named("Style_beanie_grey"):FindFirstChild("Accent").Visible)
+	named("Style_beanie_grey").Activated:Fire()
+	check("a row's tap TRIES it, no remote; the hero follows",#M.sent==before and M.previews[#M.previews].id=="beanie_grey" and named("Style_beanie_grey"):FindFirstChild("Accent")~=nil and named("Style_beanie_grey"):FindFirstChild("Accent").Visible
+		and deep(named("Hero"),"Business").Text=="BEANIE · HEATHER GREY")
 	-- the state brings the purchase back: "cash", OWNED → WEAR, WEARING → TAKE OFF
 	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={hat="cap_red"}}})
 	check("the purchase plays cash once",M.played[#M.played]=="cash" and #M.played==1)
-	check("WEARING and TAKE OFF",text("WEARING")~=nil and inCard("cap_red","Main").Text=="TAKE OFF" and text("Hats · Backwards Cap · ZDC Red")~=nil)
+	check("WEARING and TAKE OFF",hasText("WEARING") and inCard("cap_red","Main").Text=="OFF" and text("Hats · Backwards Cap · ZDC Red")~=nil)
 	inCard("cap_red","Main").Activated:Fire()
 	check("TAKE OFF asks the server with the slot",styleSent().args[1]=="unwear" and styleSent().args[2]=="hat")
 	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={}}})
@@ -787,13 +809,13 @@ do
 	check("↑ the one before",M.previews[#M.previews].id==pickedBefore)
 	press(M.Enum.KeyCode.Tab)
 	check("TAB switches to VEHICLE: wraps, bike paint, decals",named("Tab_vehicle"):FindFirstChild("Underline")~=nil and text("Wraps · cars, vans, trucks · your own")~=nil and text("Decals · cars, vans, trucks · your own")~=nil and M.previews[#M.previews].tab=="vehicle")
-	check("at the gear stall a wrap is sold at Wrench Garage",inCard("wrap_sand","Main").Text=="AT WRENCH GARAGE")
+	check("at the gear stall a wrap is sold at Wrench Garage (📍; the hero says where)",inCard("wrap_sand","Main").Text=="📍" and hasText("AT WRENCH GARAGE"))
 	M.waypoint=nil
 	press(M.Enum.KeyCode.Return)
 	check("ENTER does the picked item's action (a wrap away from Gus: where, and the GPS)",toasts[#toasts]=="Gus sells it at Wrench Garage. It's on your GPS."
 		and M.waypoint~=nil and M.waypoint.X==garage.x and M.waypoint.Z==garage.z and showing("style"))
 	M.stand(garage.x,garage.z);StyleApp.tick()
-	check("walked up to Wrench Garage: the cards follow, BUY there",inCard("wrap_sand","Main").Text=="BUY · $800" and inCard("bike_mint","Main").Text=="BUY · $150")
+	check("walked up to Wrench Garage: the cards follow, BUY there",inCard("wrap_sand","Main").Text=="BUY" and inCard("bike_mint","Main").Text=="BUY" and hasText("BUY · $"))
 	press(M.Enum.KeyCode.Return)
 	check("ENTER at the shop: a wrap too dear says so",string.find(toasts[#toasts] or "","Not enough money",1,true)~=nil)
 	M.stand(gear.x,gear.z);StyleApp.tick()
@@ -805,13 +827,13 @@ do
 	-- away from the gear stall: what you own still WEAR, TRY still previews, the rest says where it is sold
 	local before=#M.sent
 	M.stand(5000,5000);StyleApp.tick()
-	check("away: a look for sale says where (AT THE GEAR STALL)",inCard("beanie_orange","Main").Text=="AT THE GEAR STALL" and inCard("cap_red","Main").Text=="WEAR")
-	check("away: a reward and a level's lock as before",inCard("cap_gold","Main").Text=="REWARD ONLY" and inCard("cowboy","Main").Text=="BUY · $450")
+	check("away: a look for sale says where (📍)",inCard("beanie_orange","Main").Text=="📍" and inCard("cap_red","Main").Text=="WEAR")
+	check("away: a reward and a level's lock as before",inCard("cap_gold","Main").Text=="🏆 REWARD" and string.find(inCard("cowboy","Main").Text,"🔒 LV",1,true)==1)
 	M.waypoint=nil
 	inCard("beanie_orange","Main").Activated:Fire()
 	check("its press: who sells it and the GPS to the gear stall, no remote",#M.sent==before and toasts[#toasts]=="Dot sells it at the gear stall. It's on your GPS."
 		and M.waypoint~=nil and M.waypoint.X==gear.x and M.waypoint.Z==gear.z and showing("style"))
-	inCard("beanie_orange","Try").Activated:Fire()
+	named("Style_beanie_orange").Activated:Fire()
 	check("away: TRY previews, the caption says who sells it",M.previews[#M.previews].id=="beanie_orange" and text("BEANIE · SAFETY ORANGE · Dot sells it at the gear stall.")~=nil and #M.sent==before)
 	inCard("cap_red","Main").Activated:Fire()
 	check("away: WEAR works anywhere",lastSent("Style").args[1]=="wear" and lastSent("Style").args[2]=="cap_red")
@@ -819,7 +841,7 @@ do
 	StyleApp.tick()
 	check("standing still draws nothing again",#M.previews==drawn)
 	M.stand(gear.x,gear.z);StyleApp.tick()
-	check("back at the gear stall: BUY again",inCard("beanie_orange","Main").Text=="BUY · $150")
+	check("back at the gear stall: BUY again",inCard("beanie_orange","Main").Text=="BUY")
 	named("Close").Activated:Fire()
 	M.flush()
 	check("closed: the keys are free again",M.actions.ZombieDeliveryStyleKeys==nil and Phone.isOpen() and named("Home").Visible)

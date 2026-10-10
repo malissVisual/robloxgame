@@ -10,6 +10,9 @@
 -- 5.1: the car gear only (GearDef.bikeOnly is not shown here; riding your bike: a note sends you to the BIKES counter).
 -- The BIKES counter's GEAR tab (client/BikeShop.luau; Spoke & Chain's until 6.12.7) draws the bike gear for your bike
 -- with the same rows (forBike).
+-- 6.18 wave 2, the UI kit (design/ui-kit/README.md): GearShop.items gives the pieces to client/ShopView.luau (the
+-- icon, the name, INSTALLED / OWNED / its level in one line, the price big, the one action: BUY, INSTALL, REMOVE; the
+-- description on a tap) and the slots as a chip; client/ShopWindow.luau draws them at Wrench Garage and the BIKES counter.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,14 +25,12 @@ local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Transport = require(Shared.Transport)
 local Ui = require(script.Parent.Ui)
-local Theme = require(script.Parent.Theme)
-local P = require(script.Parent.HudContract)
+local CardKit = require(script.Parent.CardKit)
+local ShopView = require(script.Parent.ShopView)
 
 local GearShop = {}
 
 local player = Players.LocalPlayer
-local ROW_H = 92
-local BUTTON_W = 150
 
 local function myLevel(state: any): number
 	local xp = tonumber(player:GetAttribute("Xp"))
@@ -43,15 +44,6 @@ local function send(action: string, id: string)
 	Net.get("Gear"):FireServer(action, id)
 end
 
--- The row's action on its right (like the shop's other cards): "primary" the one clear action (5.8: the phone's red
--- face), "quiet" an outline, "off" a dim face whose words say why not.
-local function action(row: any, text: string, kind: P.ButtonKind, onClick: () -> ())
-	local button = P.button(row, text, UDim2.fromOffset(BUTTON_W, 40), kind, if kind == "off" then function() end else onClick)
-	button.Position = UDim2.new(1, -BUTTON_W - 12, 0.5, -20)
-	button.TextSize = 14
-	return button
-end
-
 -- Why a piece does not fit a car, in a few words (the button).
 local function misfit(gear: Config.GearDef): string
 	if gear.bikeOnly then
@@ -62,38 +54,20 @@ local function misfit(gear: Config.GearDef): string
 	return "NOT ON THIS CAR"
 end
 
--- 5.8, the courier phone's tag line (design/phone-ui/): the small red square and the caps label, over a head.
-local function tagLine(parent: Instance, text: string, order: number): any
-	local row = Ui.make("Frame", { Name = "Tag", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	P.marker(row, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5) })
-	P.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
-	return row
-end
-
--- A note instead of the rows (no vehicle, no bike, the wrong shop).
-local function note(body: Instance, title: string, text: string)
-	local none = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
-	Ui.list(none, true, 4)
-	tagLine(none, title, 1)
-	Ui.label(none, text, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
-end
-
--- Draws the GEAR tab into `body` (the shop's scrolling body, a vertical list; Hud clears it first). `here`: at the
--- counter (only there the actions work). 5.1: `forBike` (the BIKES counter): the bike gear of `bikeId` (your bike).
-function GearShop.render(body: Instance, state: any, here: boolean, forBike: boolean?, bikeId: string?)
+-- The gear of a vehicle as items for client/ShopView.luau (6.18 wave 2), the vehicle's slots as a chip ("⚙ SLOTS 1 / 2")
+-- and, with no gear to show (no vehicle, no bike, the wrong counter, a company vehicle), the note that says so instead.
+-- `here`: at the counter (only there the actions work). 5.1: `forBike` (the BIKES counter): the bike gear of `bikeId`.
+function GearShop.items(state: any, here: boolean, forBike: boolean?, bikeId: string?): ({ ShopView.Item }, CardKit.Chip?, string?)
 	local vehicleId: string? = if forBike then bikeId elseif type(state.car) == "string" then state.car else nil
 	if vehicleId == nil then
 		-- 5.0: you start on foot: no car, no gear to show (not the van's list with BUY buttons).
 		if forBike then
-			note(body, "Bike gear · no bike yet", "Bike gear goes on a bike of your own: buy one in the BIKES tab first.")
-		else
-			note(body, "Gear · no vehicle yet", `Gear goes on a car of your own, and you are still on foot. Your first one: the Old Van from {Config.VanQuest.Where}.`)
+			return {}, nil, "Bike gear goes on a bike of your own: buy one in the BIKES tab first."
 		end
-		return
+		return {}, nil, `Gear goes on a car of your own. Your first one: the Old Van from {Config.VanQuest.Where}.`
 	end
 	if not forBike and Transport.isBike(vehicleId) then
-		note(body, "Gear · you ride your bike", "A bike takes bike gear, at the BIKES counter of Dead End Motors. For your car's gear, CALL CAR on your phone first.")
-		return
+		return {}, nil, "You ride your bike: bike gear is at Dead End Motors' BIKES counter. CALL CAR for your car's gear."
 	end
 	local carId: string = vehicleId
 	local carDef = Economy.findCar(carId)
@@ -105,75 +79,55 @@ function GearShop.render(body: Instance, state: any, here: boolean, forBike: boo
 	local company = carDef == nil or not Economy.canUpgrade(carId)
 	local level = myLevel(state)
 	local money = tonumber(state.money) or 0
-
-	-- The car and its gear slots: a pip for each, filled while a piece is in it.
-	local head = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
-	Ui.list(head, true, 4)
-	tagLine(head, if company then "Gear · company vehicle" else `Gear for your {Economy.carTitle(carId, levels)}`, 1)
-	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
-	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
-	P.text(line, `SLOTS  {used} / {slots}`, UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
-	for n = 1, slots do
-		local pip = Ui.make("Frame", {
-			Size = UDim2.fromOffset(14, 14),
-			BackgroundColor3 = if n <= used then P.ink else P.surface,
-			BackgroundTransparency = if n <= used then 0 else 0.4,
-			BorderSizePixel = 0,
-			LayoutOrder = 1 + n,
-		}, line)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.2 }, pip)
-	end
-	local explain = if company then "A company vehicle comes with what its job needs: no gear slots. Take one of your own cars out of your garage."
-		elseif forBike then "Buy a piece once for this bike, then fit or remove it here for free. Each piece takes a gear slot and holds more light pieces."
-		else "Buy a piece once for this car, then install or remove it here for free. Each piece takes one gear slot; bigger cars and later stages have more."
-	Ui.label(head, explain, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = if company then P.danger else P.ink2, TextSize = 14, Font = Theme.Font })
-	P.rule(head, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
-
-	for order, gear in Config.Gear do
+	local chip: CardKit.Chip = { name = "SlotsChip", text = if company then "⚙ COMPANY VEHICLE" else `⚙ SLOTS {used} / {slots}`, static = true }
+	local note = if company then "A company vehicle comes with what its job needs: no gear slots." else nil
+	local out: { ShopView.Item } = {}
+	for _, gear in Config.Gear do
 		if (gear.bikeOnly == true) ~= (forBike == true) then
 			continue -- (5.1: the bike gear at the BIKES counter, the car gear at Wrench Garage)
 		end
 		local now = Economy.gearState(carGear, carId, gear.id)
 		local fits = not company and Economy.gearFits(carId, gear.id)
-		local row = P.row(body, ROW_H, order + 1, now == "installed")
-		Ui.icon(row, Icons.gear(gear.id), gear.icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(14, ROW_H / 2 - 20), ImageColor3 = P.ink, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center })
-		local left = 64
-		Ui.label(row, gear.name, UDim2.new(1, -(left + BUTTON_W + 24), 0, 22), { Position = UDim2.fromOffset(left, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-		local status = if now == "installed" then `<font color="{P.hex(P.good)}">INSTALLED</font>`
-			elseif now == "owned" then "OWNED · NOT INSTALLED"
-			elseif level < gear.level then `<font color="{P.hex(P.warn)}">LEVEL {gear.level}</font>`
-			else "NOT BOUGHT"
-		Ui.label(row, `Level {gear.level} · {Ui.money(gear.price)} · {status}`, UDim2.new(1, -(left + BUTTON_W + 24), 0, 18), {
-			Position = UDim2.fromOffset(left, 32),
-			TextSize = 13,
-			Font = Theme.HeadingFont,
-			TextColor3 = P.ink2,
-			RichText = true,
-			TextWrapped = false,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
-		Ui.label(row, gear.description, UDim2.new(1, -(left + BUTTON_W + 24), 0, 34), { Position = UDim2.fromOffset(left, 52), TextSize = 13, Font = Theme.Font, TextColor3 = P.ink2, TextYAlignment = Enum.TextYAlignment.Top })
+		local id = gear.id
+		local item: ShopView.Item = {
+			id = gear.id,
+			name = gear.name,
+			picture = { icon = Icons.gear(gear.id), emoji = gear.icon },
+			fact = if now == "installed" then "✓ INSTALLED" elseif now == "owned" then "✓ OWNED · NOT INSTALLED" else `LV {gear.level} · ⚙ 1 SLOT`,
+			price = if now == nil or now == "none" then gear.price else nil,
+			forSale = fits and (now == nil or now == "none"),
+			owned = now == "installed" or now == "owned",
+			lines = { gear.description, "Buy a piece once for this vehicle, then install or remove it here for free. Each piece takes one gear slot." },
+		}
 		if company then
-			action(row, "COMPANY CAR", "off", function() end)
+			item.act = { text = "COMPANY CAR", on = false }
 		elseif not fits then
-			action(row, misfit(gear), "off", function() end)
+			item.act = { text = misfit(gear), on = false }
 		elseif now == "installed" then
-			action(row, "REMOVE", if here then "quiet" else "off", function()
-				send("remove", gear.id)
-			end)
+			item.act = { text = "REMOVE", short = "OFF", on = here, kind = "shut", why = "Walk into the shop to fit gear here.", run = function()
+				send("remove", id)
+			end }
 		elseif now == "owned" then
 			local free = used < slots
-			action(row, if free then "INSTALL" else "NO FREE SLOT", if free and here then "primary" else "off", function()
-				send("install", gear.id)
-			end)
+			item.act = { text = if free then "INSTALL" else "NO FREE SLOT", short = "FIT", on = free and here, kind = "good", why = if free then "Walk into the shop to fit gear here." else "No free gear slot: REMOVE a piece first.", run = function()
+				send("install", id)
+			end }
 		elseif level < gear.level then
-			action(row, `🔒 LEVEL {gear.level}`, "off", function() end)
+			item.lock = `🔒 LV {gear.level}`
+			item.act = { text = `🔒 LEVEL {gear.level}`, on = false, why = `Opens at level {gear.level}: deliveries give XP.` }
 		else
-			action(row, `BUY {Ui.money(gear.price)}`, if here and money >= gear.price then "primary" else "off", function()
-				send("buy", gear.id)
-			end)
+			item.act = {
+				text = `BUY {Ui.money(gear.price)}`,
+				on = here and money >= gear.price,
+				why = if not here then "Walk into the shop to buy here." else `Not enough money: {gear.name} costs {Ui.money(gear.price)}.`,
+				run = function()
+					send("buy", id)
+				end,
+			}
 		end
+		table.insert(out, item)
 	end
+	return out, chip, note
 end
 
 return GearShop

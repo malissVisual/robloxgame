@@ -15,20 +15,20 @@
 -- (CarDef.stand) shows 🛴 until its picture is uploaded.
 -- 5.8, the courier phone's look: YOUR BIKE is the phone's card (the red square and caps, the bike in big type, a thin
 -- rule under it); BUY and EQUIP are the phone's red primary.
+-- 6.18 wave 2, the UI kit (design/ui-kit/README.md): BikeShop.items gives the bikes to client/ShopView.luau and YOUR
+-- BIKE is a chip; client/ShopWindow.luau draws the counter (its GEAR tab: client/GearShop.luau items, forBike).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Icons = require(Shared.Icons)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Transport = require(Shared.Transport)
 local Ui = require(script.Parent.Ui)
-local Theme = require(script.Parent.Theme)
-local P = require(script.Parent.HudContract)
-local GearShop = require(script.Parent.GearShop)
+local CardKit = require(script.Parent.CardKit)
+local ShopView = require(script.Parent.ShopView)
 
 local BikeShop = {}
 
@@ -36,8 +36,6 @@ local BikeShop = {}
 BikeShop.tab = "bikes"
 
 local player = Players.LocalPlayer
-local ROW_H = 96
-local BUTTON_W = 150
 
 local function myLevel(state: any): number
 	local xp = tonumber(player:GetAttribute("Xp"))
@@ -83,113 +81,66 @@ function BikeShop.room(state: any, bikeId: string): number
 	return Transport.bike(Transport.bikeRoom(bikeId, if type(state.carGear) == "table" then state.carGear else nil), kit).room
 end
 
-local function action(row: any, text: string, kind: P.ButtonKind, onClick: () -> ())
-	local button = P.button(row, text, UDim2.fromOffset(BUTTON_W, 40), kind, if kind == "off" then function() end else onClick)
-	button.Position = UDim2.new(1, -BUTTON_W - 12, 0.5, -20)
-	button.TextSize = 14
-	return button
-end
-
--- 5.8, the courier phone's tag line (design/phone-ui/): the small red square and the caps label, over a head.
-local function tagLine(parent: Instance, text: string, order: number): any
-	local row = Ui.make("Frame", { Name = "Tag", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	P.marker(row, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5) })
-	P.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
-	return row
-end
-
--- YOUR BIKE: the head of the BIKES tab.
-local function head(body: Instance, state: any)
-	local box = Ui.make("Frame", { Name = "YourBike", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, body)
-	Ui.list(box, true, 4)
-	local mine = BikeShop.mine(state)
-	local def: Config.CarDef? = nil
-	for _, bike in BikeShop.bikes() do
-		if bike.id == mine then
-			def = bike
-		end
-	end
-	tagLine(box, if def then "Your bike" else "Bikes · light runs, faster", 1)
-	local riding = type(state.car) == "string" and Transport.isBike(state.car)
-	local line: string
-	if def then
-		local room = BikeShop.room(state, def.id)
-		line = `🚲 {string.upper(def.name)} · {room} LIGHT {if room == 1 then "PIECE" else "PIECES"}{if riding then " · RIDING" else ""}`
-	else
-		line = `🚲 NO BIKE YET · FROM LEVEL {Config.Jobs.Bike.Level}`
-	end
-	P.text(box, line, UDim2.new(1, 0, 0, 30), { Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 2, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd })
-	local about = if def and not riding and type(state.car) == "string"
-		then "Your car is the one you drive now: MY BIKE on your phone gets you on the bike (CALL CAR brings the car back)."
-		elseif def then "Its own bag (its rack, basket or box + its bike gear, the GEAR tab) + your bag: pickups go onto it while it stands close, and getting on loads your hands onto it. Light pieces only. It needs no garage and comes to you at once (MY BIKE)."
-		else "A bike is faster than walking and carries more: its own bag (a rack, a basket or panniers) and your bag. It opens the BIKE runs on the board. No garage needed."
-	Ui.label(box, about, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
-	P.rule(box, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
-end
-
--- The BIKES tab.
-local function bikesTab(body: Instance, state: any, here: boolean, focus: string?)
-	head(body, state)
+-- 6.18 wave 2: the BIKES tab as items for client/ShopView.luau (the bike's picture, its name and badge, speed and room
+-- in one line, the price big, the one action: BUY, EQUIP, YOUR BIKE, a level's lock; what it is on a tap; a display
+-- bike's "Look" (`focus`) or your bike of choice is the hero) and YOUR BIKE as a chip ("🚲 CITY BIKE · 4 LIGHT").
+function BikeShop.items(state: any, here: boolean, focus: string?): ({ ShopView.Item }, CardKit.Chip)
 	local level = myLevel(state)
 	local money = tonumber(state.money) or 0
 	local mine = BikeShop.mine(state)
-	local list = BikeShop.bikes()
-	if #list == 0 then
-		Ui.label(body, "The bikes are on their way from the warehouse. Come back soon.", UDim2.new(1, -12, 0, 30), { LayoutOrder = 3, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
-		return
-	end
-	for order, def in list do
+	local riding = type(state.car) == "string" and Transport.isBike(state.car)
+	local out: { ShopView.Item } = {}
+	local chip: CardKit.Chip = { name = "BikeChip", text = `🚲 NO BIKE YET · LV {Config.Jobs.Bike.Level}`, static = true }
+	for _, def in BikeShop.bikes() do
 		local owned = type(state.cars) == "table" and state.cars[def.id] == true
-		local row = P.row(body, ROW_H, order + 2, def.id == mine or def.id == focus)
-		Ui.icon(row, Icons.bike(def.id), if def.stand then "🛴" else "🚲", UDim2.fromOffset(44, 44), {
-			Position = UDim2.fromOffset(12, ROW_H / 2 - 22),
-			ImageColor3 = P.ink,
-			TextSize = 28,
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		local left = 66
-		local width = UDim2.new(1, -(left + BUTTON_W + 24), 0, 22)
-		local badge = if def.badge then `  <font size="12" color="{P.hex(P.warn)}">{def.badge}</font>` else ""
-		Ui.label(row, def.name .. badge, width, { Position = UDim2.fromOffset(left, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, RichText = true, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		local lvl = def.level or 1
-		local status = if owned then `<font color="{P.hex(P.good)}">✓ OWNED</font>`
-			elseif level < lvl then `<font color="{P.hex(P.warn)}">LEVEL {lvl}</font>`
-			else `{def.gearSlots or 0} GEAR {if (def.gearSlots or 0) == 1 then "SLOT" else "SLOTS"}`
-		Ui.label(row, `Level {lvl} · {Ui.money(def.price)} · Speed {def.maxSpeed} · 📦 {def.capacity} · {status}`, UDim2.new(1, -(left + BUTTON_W + 24), 0, 18), {
-			Position = UDim2.fromOffset(left, 32),
-			TextSize = 13,
-			Font = Theme.HeadingFont,
-			TextColor3 = P.ink2,
-			RichText = true,
-			TextWrapped = false,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
-		Ui.label(row, def.description, UDim2.new(1, -(left + BUTTON_W + 24), 0, 36), { Position = UDim2.fromOffset(left, 52), TextSize = 13, Font = Theme.Font, TextColor3 = P.ink2, TextYAlignment = Enum.TextYAlignment.Top })
+		local id = def.id
+		local item: ShopView.Item = {
+			id = def.id,
+			name = def.name,
+			picture = ShopView.vehicle(def),
+			fact = `⚡ {def.maxSpeed} · 📦 {def.capacity} · ⚙ {def.gearSlots or 0}{if def.badge then ` · {def.badge}` else ""}`,
+			price = if owned then nil else def.price,
+			forSale = not owned,
+			owned = owned,
+			current = def.id == focus,
+			lines = { def.description, "Its own bag (a rack, a basket or a box + its gear) and your bag: light pieces only. No garage needed: MY BIKE brings it at once." },
+		}
 		if owned and def.id == mine then
-			action(row, "YOUR BIKE", "off", function() end)
+			local room = BikeShop.room(state, def.id)
+			chip.text = `🚲 {string.upper(def.name)} · {room} LIGHT{if riding then " · RIDING" else ""}`
+			item.act = { text = "YOUR BIKE", on = false }
+			item.fact = `✓ YOUR BIKE · {item.fact}`
+			item.current = focus == nil or def.id == focus
 		elseif owned then
-			action(row, "EQUIP", "primary", function()
-				Net.get("Equip"):FireServer("bike", def.id)
-			end)
+			item.act = { text = "EQUIP", short = "EQUIP", on = true, kind = "good", run = function()
+				Net.get("Equip"):FireServer("bike", id)
+			end }
+			item.fact = `✓ OWNED · {item.fact}`
 		elseif level < lvl then
-			action(row, `🔒 LEVEL {lvl}`, "off", function() end)
+			item.lock = `🔒 LV {lvl}`
+			item.act = { text = `🔒 LEVEL {lvl}`, on = false, why = `Opens at level {lvl}: deliveries give XP.` }
 		else
-			action(row, `BUY {Ui.money(def.price)}`, if here and money >= def.price then "primary" else "off", function()
-				Net.get("Buy"):FireServer("car", def.id)
-			end)
+			item.act = {
+				text = `BUY {Ui.money(def.price)}`,
+				on = here and money >= def.price,
+				why = if not here then "Walk into the shop to buy here." else `Not enough money: {def.name} costs {Ui.money(def.price)}.`,
+				run = function()
+					Net.get("Buy"):FireServer("car", id)
+				end,
+			}
+		end
+		table.insert(out, item)
+	end
+	-- (one hero: a display bike's Look before your own bike)
+	if focus then
+		for _, item in out do
+			if item.id ~= focus then
+				item.current = nil
+			end
 		end
 	end
-end
-
--- Draws the open tab into `body` (the shop's scrolling body, a vertical list; Hud clears it and puts the tabs at
--- LayoutOrder 0 first). `here`: at the counter (only there BUY and the gear work). `focus`: a bike id to mark (a
--- display bike's "Look").
-function BikeShop.render(body: Instance, state: any, here: boolean, focus: string?)
-	if BikeShop.tab == "gear" then
-		GearShop.render(body, state, here, true, BikeShop.mine(state))
-		return
-	end
-	bikesTab(body, state, here, focus)
+	return out, chip
 end
 
 return BikeShop

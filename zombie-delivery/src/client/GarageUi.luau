@@ -20,6 +20,12 @@
 -- hairline rows (no corners; the shown one selected: raised, the red rule), the status as the phone's outlined caps
 -- tags, the two boxes and the repairs note as flat hairline cards. TAKE OUT VEHICLE is the red primary action on the
 -- car shown on the left (the one main action of the view) and the main action on the others.
+-- 6.18 wave 2, the UI kit's look (the owner: "I need it unified so the phone looks like that [6.17's JOBS], and the
+-- other popups too"; design/ui-kit/README.md; client/ShopView.luau draws it): the car shown is the HERO card (its 3D
+-- preview or drawing over it, its name, its cargo slots big, its condition and where it is as facts, its one button:
+-- TAKE OUT VEHICLE, 🔧 FIND REPAIR BAY for the damaged one you drive, grey else), beside the other cars as compact rows
+-- (the picture, the name, 🔧 condition · ACTIVE / PARKED HERE / ELSEWHERE, 📦 slots big, a round TAKE for one kept
+-- here; a tap shows that car in the hero). The free garage slots and the place are chips; the repairs one short line.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +40,9 @@ local Theme = require(script.Parent.Theme)
 local Hud = require(script.Parent.Hud)
 local MapView = require(script.Parent.MapView)
 local VehiclePreview = require(script.Parent.VehiclePreview)
+local CardKit = require(script.Parent.CardKit) -- 6.18 wave 2: the UI kit
+local ShopView = require(script.Parent.ShopView)
+local CardLayout = require(Shared.CardLayout)
 
 local C = Ui.Colors
 local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
@@ -73,24 +82,6 @@ local function rootPosition(): Vector3?
 end
 
 -- ── Small pieces (the window is Ui.window) ──────────────────────────────────
-
--- A compact tag ("ACTIVE", "PARKED HERE"), the phone's chip (5.8): a raised square face, the caps in `tint` and a
--- faint outline of it.
-local function tag(parent: Instance, text: string, tint: Color3): any
-	local label = Ui.label(parent, string.upper(text), UDim2.new(0, 0, 0, 22), {
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 0,
-		BackgroundColor3 = K.raised,
-		Font = Theme.HeadingFont,
-		TextSize = 11,
-		TextColor3 = tint,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-	})
-	Ui.stroke(label, tint, 1).Transparency = if tint == K.red then 0.5 else 0.72
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, label)
-	return label
-end
 
 -- ── The car drawing (garage.png's van, from frames) ────────────────────────
 
@@ -169,7 +160,7 @@ end
 
 -- ── The window ─────────────────────────────────────────────────────────────
 
-local render: () -> ()
+local render: () -> any
 
 local function build()
 	if gui then
@@ -191,80 +182,24 @@ local function build()
 		GarageUi.close()
 	end
 
-	-- The left side: the drawing over a fine floor line, its caption, the two boxes.
-	local left = Ui.make("Frame", { Name = "Preview", Size = UDim2.new(0.47, 0, 1, 0), BackgroundColor3 = K.row, BorderSizePixel = 0 }, content)
-	Ui.make("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = P.line, BorderSizePixel = 0 }, left)
-	Ui.make("Frame", { Size = UDim2.new(1, -40, 0, 1), Position = UDim2.fromOffset(20, 178), BackgroundColor3 = P.line, BorderSizePixel = 0 }, left)
-	refs.drawing = Ui.make("Frame", { Size = UDim2.fromOffset(300, 150), Position = UDim2.new(0.5, 0, 0, 44), AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 1 }, left)
-	refs.carName = Ui.label(left, "", UDim2.new(1, -40, 0, 22), {
-		Position = UDim2.fromOffset(20, 204),
-		Font = Theme.DisplayFont,
-		TextSize = 18,
-		TextColor3 = P.ink,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	refs.caption = Ui.caps(left, "", UDim2.new(1, -40, 0, 18), {
-		Position = UDim2.fromOffset(20, 228),
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	local boxes = Ui.make("Frame", { Size = UDim2.new(1, -40, 0, 80), Position = UDim2.new(0, 20, 1, -100), BackgroundTransparency = 1 }, left)
-	for index, name in { "capacity", "slots" } do
-		local box = Ui.make("Frame", {
-			Size = UDim2.new(0.5, -5, 1, 0),
-			Position = UDim2.new((index - 1) * 0.5, (index - 1) * 5, 0, 0),
-			BackgroundColor3 = K.charcoal, -- 5.8: a flat hairline card on the row surface
-			BorderSizePixel = 0,
-		}, boxes)
-		Ui.stroke(box, K.line, 1).Transparency = Ui.HAIRLINE
-		Ui.caps(box, if index == 1 then "Cargo capacity" else "Free garage slots", UDim2.new(1, -24, 0, 16), {
-			Position = UDim2.fromOffset(12, 14),
-			TextSize = 12,
-			TextColor3 = P.ink2,
-		})
-		refs[name] = Ui.label(box, "", UDim2.new(1, -24, 0, 30), {
-			Position = UDim2.fromOffset(12, 36),
-			Font = Theme.DisplayFont,
-			TextSize = 22,
-			TextColor3 = P.ink,
-			TextWrapped = false,
-		})
-	end
-
-	-- The right side: the cars as slim rows, the note under them.
-	local right = Ui.make("Frame", { Name = "Cars", Size = UDim2.new(0.53, 0, 1, 0), Position = UDim2.fromScale(0.47, 0), BackgroundTransparency = 1 }, content)
-	refs.listTitle = Ui.caps(right, "", UDim2.new(1, -48, 0, 16), {
-		Position = UDim2.fromOffset(24, 18),
-		TextSize = 12,
-		TextColor3 = P.ink2,
-	})
+	-- 6.18 wave 2: one scrolling body (the hero card beside the rows, client/ShopView.luau)
 	local list = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -36, 1, -48),
-		Position = UDim2.fromOffset(22, 42),
+		Name = "Body",
+		Size = UDim2.new(1, -36, 1, -12),
+		Position = UDim2.fromOffset(20, 6),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 3,
 		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, right)
-	Ui.list(list, true, 10)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, list)
+	}, content)
+	Ui.list(list, true, 8)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10) }, list)
 	refs.list = list
 end
 
-local function healthText(share: number): (string, Color3)
-	local percent = math.floor(share * 100 + 0.5)
-	if share < 0.35 then
-		return `⚠ {percent}% · badly damaged`, P.danger
-	end
-	return `{percent}%`, K.text
-end
-
--- The car the window shows on the left: the one picked, else the one you drive, else the first.
+-- The car the window shows in its hero: the one picked, else the one you drive, else the first.
 local function shownCar(cars: { any }): any
 	for _, car in cars do
 		if selected and tostring(car.id) == selected then
@@ -319,108 +254,52 @@ local function findRepairBay()
 	GarageUi.close()
 end
 
--- One car as a slim row (5.8: no corners, a hairline; the shown one selected). `primary`: its TAKE OUT is the view's
--- red primary action.
-local function carCard(car: any, order: number, primary: boolean)
+-- One car as an item of the view (see the header). `shown`: the car in the hero.
+local function carItem(car: any, shown: boolean): ShopView.Item
 	local id = tostring(car.id)
+	local def = Economy.findCar(id)
 	local health = math.clamp(tonumber(car.health) or 1, 0, 1)
 	local damaged = health < 0.995
 	local active = car.out == true
-	local hasAction = car.here == true or active
-	local card = Ui.make("TextButton", {
-		Name = id,
-		Size = UDim2.new(1, -4, 0, if hasAction and not (active and not damaged) then 168 else 124),
-		BackgroundColor3 = K.row,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		LayoutOrder = order,
-	}, refs.list)
-	local isShown = selected == id or (selected == nil and active)
-	Ui.stroke(card, K.line, 1).Transparency = Ui.HAIRLINE
-	if isShown then
-		Ui.selectRow(card, true) -- the car shown on the left: the quiet highlight and the narrow red rule
-	end
-	Ui.tactile(card)
-	card.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
-		end
-		selected = id
-		render()
-	end)
-	Ui.label(card, tostring(car.name), UDim2.new(1, -150, 0, 24), {
-		Position = UDim2.fromOffset(16, 12),
-		Font = Theme.DisplayFont,
-		TextSize = 18,
-		TextColor3 = P.ink,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local status = if active then tag(card, "ACTIVE", K.red)
-		elseif car.here then tag(card, "PARKED HERE", K.text)
-		else tag(card, "IN ANOTHER GARAGE", K.secondary)
-	status.AnchorPoint = Vector2.new(1, 0)
-	status.Position = UDim2.new(1, -14, 0, 14)
+	local percent = math.floor(health * 100 + 0.5)
+	local where = if active then "ACTIVE" elseif car.here then "PARKED HERE" else "ELSEWHERE"
 	local slots = tonumber(car.capacity) or 0
-	Ui.label(card, `{slots} cargo {if slots == 1 then "slot" else "slots"} · {if car.company then "🚚 " else ""}{tostring(car.upgrades or "stock")}`, UDim2.new(1, -32, 0, 18), {
-		Position = UDim2.fromOffset(16, 42),
-		Font = Theme.Font,
-		TextSize = 14,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local text, color = healthText(health)
-	Ui.label(card, `Vehicle condition <b><font color="#{color:ToHex()}">{text}</font></b>{if damaged and not active then " · a repair shop fixes it" else ""}`, UDim2.new(1, -32, 0, 18), {
-		Position = UDim2.fromOffset(16, 64),
-		Font = Theme.Font,
-		TextSize = 14,
-		TextColor3 = P.ink2,
-		RichText = true,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local back, fill = Ui.bar(card, UDim2.new(1, -32, 0, 5), color)
-	back.Position = UDim2.fromOffset(16, 90)
-	fill.Size = UDim2.fromScale(health, 1)
-	-- The action.
-	local button: any = nil
+	local item: ShopView.Item = {
+		id = id,
+		name = tostring(car.name),
+		picture = ShopView.vehicle(def),
+		fact = `{if health < 0.35 then "⚠ " else "🔧 "}{percent}% · {where}{if def and def.role then ` · {string.upper(def.role)}` else ""}`,
+		value = `📦 {slots}`,
+		valueColor = if health < 0.35 then K.red else nil,
+		accent = if health < 0.35 then K.red elseif active then K.red elseif car.here then K.good else C.grey,
+		owned = true,
+		current = shown,
+		lines = {
+			`{slots} cargo {if slots == 1 then "slot" else "slots"} · {if car.company then "🚚 " else ""}{tostring(car.upgrades or "stock")}`,
+			`Vehicle condition {percent}%{if damaged and not active then " · a repair shop fixes it" else ""}.`,
+		},
+	}
 	if active and damaged then
-		button = Ui.button(card, "🔧  FIND REPAIR BAY", UDim2.new(1, -32, 0, 44), Theme.Gps, findRepairBay) -- (a GPS action)
+		item.act = { text = "🔧  FIND REPAIR BAY", short = "🔧", on = true, kind = "warn", run = findRepairBay, name = "RepairBay" } -- (a GPS action)
 	elseif active then
-		Ui.label(card, "You are driving it · in top shape", UDim2.new(1, -32, 0, 18), {
-			Position = UDim2.fromOffset(16, 100),
-			Font = Theme.HeadingFont,
-			TextSize = 12,
-			TextColor3 = P.ink2,
-		})
+		item.act = { text = "YOU ARE DRIVING IT", on = false }
 	elseif car.here then
-		-- 5.8: the view's red primary action on one car (see render), the main action (raised, the red rule) on the others.
-		button = Ui.button(card, "TAKE OUT VEHICLE", UDim2.new(1, -32, 0, 44), if primary then K.red else C.yellow, function()
+		item.act = { text = "TAKE OUT VEHICLE", short = "TAKE", on = true, name = "TakeOut", run = function()
 			getRemote():FireServer("take", id)
-		end)
+		end }
 	else
-		Ui.label(card, "Take it out at the garage that keeps it (🅿 GARAGE).", UDim2.new(1, -32, 0, 18), {
-			Position = UDim2.fromOffset(16, 100),
-			Font = Theme.Font,
-			TextSize = 12,
-			TextColor3 = P.ink2,
-			TextWrapped = false,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
+		item.act = { text = "IN ANOTHER GARAGE", on = false, why = "Take it out at the garage that keeps it (🅿 GARAGE)." }
 	end
-	if button then
-		button.Position = UDim2.fromOffset(16, 108)
-		button.TextSize = 14
-		button.TextColor3 = P.ink
-	end
+	return item
 end
 
 render = function()
 	if not window or not state then
 		return
+	end
+	if refs.drawing then
+		VehiclePreview.clear(refs.drawing)
+		refs.drawing = nil
 	end
 	Ui.clear(refs.list)
 	local cars: { any } = if type(state.cars) == "table" then state.cars else {}
@@ -429,23 +308,6 @@ render = function()
 	local place = tostring(state.name or "Garage")
 	chrome.title.Text = if state.depot then "The depot lot" else "Your garage"
 	chrome.subtitle.Text = if state.depot then `{place} · your starting van and the company vehicles` else `{place} · vehicle status and cargo capacity`
-	refs.listTitle.Text = if state.depot then "YOUR VEHICLES · AT THE DEPOT LOT" else "YOUR VEHICLES · AT THIS GARAGE"
-	-- The left side: the car shown.
-	local shown = shownCar(cars)
-	if shown then
-		drawCar(refs.drawing, shown)
-		local def = Economy.findCar(tostring(shown.id))
-		refs.carName.Text = tostring(shown.name)
-		refs.caption.Text = string.upper(if def and def.role then def.role else "")
-		local capacity = tonumber(shown.capacity) or 0
-		refs.capacity.Text = `{capacity} {if capacity == 1 then "slot" else "slots"}`
-	else
-		Ui.clear(refs.drawing)
-		refs.carName.Text = "No car yet"
-		refs.caption.Text = ""
-		refs.capacity.Text = "—"
-	end
-	refs.slots.Text = `{math.max(0, slots - used)} / {slots}`
 	-- The footer: the car you drive, your rank and level.
 	local driving = nil
 	for _, car in cars do
@@ -458,7 +320,7 @@ render = function()
 	chrome.context.Text = if driving
 		then `<b>{string.upper(tostring(driving.name))} · {tonumber(driving.capacity) or 0} CARGO SLOTS</b> · {rank} / level {level}`
 		else `{rank} / level {level}`
-	-- The cars: the one you drive first, then the ones kept here, then the rest.
+	-- The cars: the one you drive first, then the ones kept here, then the rest; the shown one is the hero.
 	local sorted = table.clone(cars)
 	local function rankOf(car: any): number
 		return if car.out then 0 elseif car.here then 1 else 2
@@ -466,34 +328,53 @@ render = function()
 	table.sort(sorted, function(a, b)
 		return rankOf(a) < rankOf(b)
 	end)
-	-- 5.8: one red TAKE OUT VEHICLE: the shown car's when it is kept here, else the first one kept here.
-	local primaryId: string? = if shown and shown.here == true and not shown.out then tostring(shown.id) else nil
-	if primaryId == nil then
-		for _, car in sorted do
-			if car.here == true and not car.out then
-				primaryId = tostring(car.id)
-				break
-			end
-		end
-	end
-	for order, car in sorted do
-		carCard(car, order, tostring(car.id) == primaryId)
+	local shown = shownCar(sorted)
+	local byId: { [string]: any } = {}
+	local items: { ShopView.Item } = {}
+	for _, car in sorted do
+		byId[tostring(car.id)] = car
+		table.insert(items, carItem(car, car == shown))
 	end
 	-- Where repairs happen (Map.RepairShops), and the depot's rule.
 	local shops: { string } = {}
 	for _, shop in Map.RepairShops do
 		table.insert(shops, shop.name)
 	end
-	local note = Ui.make("Frame", { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = K.recessed, BorderSizePixel = 0, LayoutOrder = 100 }, refs.list)
-	Ui.stroke(note, K.line, 1).Transparency = Ui.HAIRLINE
-	Ui.padding(note, 12)
-	local repairs = `Repairs take place at {table.concat(shops, " or ")}. Park in a bay, get out and let the mechanic work.`
-	Ui.label(note, if state.depot then `The depot lot keeps your starting van and the company vehicles; your other cars wait in your garages. {repairs}` else repairs, UDim2.new(1, 0, 0, 0), {
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Font = Theme.Font,
-		TextSize = 14,
-		TextColor3 = P.ink2,
+	local size = ShopView.measure(refs.list, Vector2.new(WIDTH - 40, HEIGHT - 110))
+	local first = ShopView.draw(refs.list, {
+		key = "garage",
+		items = items,
+		money = 0,
+		side = CardLayout.side(size.X),
+		room = size.Y,
+		order = 0,
+		chips = {
+			{ name = "PlaceChip", text = if state.depot then "🅿 THE DEPOT LOT" else `🅿 {string.upper(place)}`, static = true },
+			{ name = "SlotsChip", text = `FREE {math.max(0, slots - used)} / {slots}`, static = true, ink = if slots - used > 0 then CardKit.Color.money else K.secondary },
+		},
+		foot = `Repairs: {table.concat(shops, " or ")}. Park in a bay, get out and wait.{if state.depot then " The depot lot keeps your starting van and the company vehicles." else ""}`,
+		empty = "No car here yet.",
+		redraw = render,
+		toast = Hud.toast,
+		heroArt = function(card: any, item: ShopView.Item)
+			local car = byId[item.id]
+			if not car then
+				return
+			end
+			local mark = card:FindFirstChild("Emoji") or card:FindFirstChild("Icon")
+			if mark then
+				mark:Destroy() -- (the drawing is its picture)
+			end
+			local holder = Ui.make("Frame", { Name = "Drawing", Size = UDim2.fromOffset(300, 150), Position = UDim2.new(0.5, 0, 0, 34), AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 1, ZIndex = 3 }, card)
+			refs.drawing = holder
+			drawCar(holder, car)
+		end,
+		onPick = function(item: ShopView.Item)
+			selected = item.id
+			render()
+		end,
 	})
+	return first
 end
 
 function GarageUi.isOpen(): boolean
@@ -531,7 +412,7 @@ local function open()
 	fit()
 	window.Visible = true
 	openedAt = rootPosition()
-	render()
+	Ui.gamepadFocus(render()) -- 6.18 wave 2: the hero's button, else the first row
 	running += 1
 	local mine = running
 	task.spawn(function()

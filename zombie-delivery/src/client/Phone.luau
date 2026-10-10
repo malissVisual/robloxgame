@@ -25,7 +25,8 @@
 -- 6.5, the home of everything ("I can't find my way in anything"): home is six big tiles in this order, each with its
 --   line glyph, its name and a one-line subtitle: JOBS (the board, or ORDERS during a run; its badge counts the open
 --   orders, off duty the new runs), MAP (the big map), SHOP (client/PhoneApps.luau: the shops and what they sell, a
---   tap sets the GPS and puts the phone away; under them what to save up for, as before), BAG & ITEMS (the I window's
+--   tap sets the GPS and puts the phone away; under them what to save up for, as before; 6.18 wave 2: PhoneApps.shop, SAVE
+--   UP and SHOPS in the UI kit's look), BAG & ITEMS (the I window's
 --   BAG / ITEMS / BAGS tabs), GARAGE and MORE (a sub-screen in the phone: CAREER, MISSIONS, CREW, TOP, ESTATE, BANK,
 --   MESSAGES, SETTINGS; ESC or ‹ BACK returns to the tiles). Under the tiles a messages row (always there: the unread
 --   count and the newest line), the focused contract and the courier card. Every app and window is the same as
@@ -822,131 +823,10 @@ local function careerApp(list: Instance, wide: boolean)
 	end)
 end
 
--- One thing to save up for: its icon, name, where, and what is missing (the level, the money: a bar to its price).
-local function goal(parent: Instance, order: number, icon: string, name: string, where: string, price: number, level: number, soon: string?)
-	local b = block(parent, order)
-	local mine = money()
-	local status: string, color: Color3
-	if soon then
-		status, color = soon, K.secondary
-	elseif myLevel() < level then
-		status, color = `🔒 Level {level}`, K.warn
-	elseif mine >= price then
-		status, color = "✓ Afford it", K.good
-	else
-		status, color = `{Ui.money(price - mine)} to go`, K.secondary
-	end
-	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
-	local tag = look.chip(head, status, color)
-	tag.AnchorPoint = Vector2.new(1, 0.5)
-	tag.Position = UDim2.new(1, 0, 0.5, 0)
-	local w = look.width(string.upper(status), 11, Theme.HeadingFont) + 18
-	text(head, `{icon}  {name}`, UDim2.new(1, -(w + 8), 1, 0), { Font = Theme.HeadingFont, TextSize = 15, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	look.meta(b, if price > 0 then `{where} · {Ui.money(price)} · level {level}` else `{where} · level {level}`, 2)
-	if not soon then
-		bar(b, if price > 0 then mine / price else 1, if mine >= price and myLevel() >= level then K.good else K.text, 3)
-	end
-end
-
--- A shop's section label in the SHOP app with SET GPS.
-local function shopHeader(parent: Instance, order: number, shopId: string, title: string)
-	local row = Ui.make("Frame", { Name = "Section", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	P.caps(row, title, UDim2.new(1, -110, 0, 14), { Position = UDim2.new(0, 2, 1, -11), AnchorPoint = Vector2.new(0, 1), TextSize = 11, TextStrokeTransparency = 1, TextColor3 = K.secondary })
-	local gps = look.pill(row, "📍 Set GPS", function()
-		gpsTo(shopId)
-		local notify = Phone.notify
-		local shop = Map.Shops[shopId]
-		if notify then
-			notify(`GPS: {if shop then shop.name elseif shopId == "earl" then Config.VanQuest.Place else title}`)
-		end
-	end)
-	gps.Position = UDim2.new(1, 0, 1, 0)
-	gps.AnchorPoint = Vector2.new(1, 1)
-end
-
+-- 6.18 wave 2: SHOP is client/PhoneApps.luau's (PhoneApps.shop: SAVE UP and SHOPS in the UI kit's look).
 local function shopApp(list: Instance, wide: boolean)
-	local level = myLevel()
-	-- 6.5: first the shops and what they sell (a tap: the GPS, the phone goes away), then what to save up for.
-	refs.apps.shops(list, look, refs.host, 0)
-	look.section(list, "What to save up for", 1)
-	-- 5.5, a wide popup (6.0.1): what's next and the kit on the left, the bikes and the vehicles on the right.
-	local gear, rides = refs.apps.columns(list, 2, wide)
-	local top = block(gear, 1, true)
-	caps(top, "What's next", 1, K.red).TextSize = 11
-	local chips = look.chipRow(top, 2)
-	look.chip(chips, `{Ui.money(money())} in your pocket`, K.good)
-	look.chip(chips, `Level {level}`, K.text)
-	look.meta(top, "Personal gear is yours for good; a vehicle opens the car jobs.", 3)
-	local order = 1
-	-- The personal gear still worth buying (Config.Kit), the cheapest first.
-	local owned = kit()
-	-- 6.6: the bags first (ZDC Bags, the depot's kiosk), then the rest of the kit (Last Stop Supplies); 6.7: each piece
-	-- at its own shop (Transport.kitShop: the Baseball Bat at Lead & Co.; 6.12.14: its range)
-	local titles: { [string]: string } = {
-		bags = `{Config.BagShop.Name} · bags (sprint with your deliveries)`,
-		supplies = "Last Stop Supplies · kit",
-		guns = "Lead & Co. range · the bat",
-	}
-	for _, shopId in { "bags", "supplies", "guns" } do
-		local wanted: { Config.KitDef } = {}
-		for _, def in Config.Kit do
-			if not owned[def.id] and Transport.kitShop(def) == shopId then
-				table.insert(wanted, def)
-			end
-		end
-		table.sort(wanted, function(a: Config.KitDef, b: Config.KitDef): boolean
-			return a.price < b.price
-		end)
-		if #wanted > 0 then
-			order += 1
-			shopHeader(gear, order, shopId, titles[shopId])
-			local shop = Map.Shops[shopId]
-			for _, def in wanted do
-				order += 1
-				goal(gear, order, def.icon, def.name, if shop then shop.name else titles[shopId], def.price, def.level)
-			end
-		end
-	end
-	-- 5.1: the bikes at Spoke & Chain you do not own yet (two of them, the cheapest first), SET GPS to the shop. 6.12.7:
-	-- named as part of Dead End Motors, the GPS to its BIKES counter (Map.Shops.bikes).
-	local cars = if state and type(state.cars) == "table" then state.cars else {}
-	local bikesShown = 0
-	for _, def in Config.Cars do
-		if not def.bike or cars[def.id] or bikesShown >= 2 then
-			continue
-		end
-		bikesShown += 1
-		order += 1
-		if bikesShown == 1 then
-			shopHeader(rides, order, "bikes", "Dead End Motors · bikes")
-			order += 1
-		end
-		goal(rides, order, if def.stand then "🛴" else "🚲", def.name, `{Config.BikeShop.Shop}, {Config.BikeShop.Counter}`, def.price, def.level or 1)
-	end
-	-- The first vehicles you do not own yet (two of them). 5.0: the Old Van comes from Earl (Marge's quest), SET GPS
-	-- to him; the others from Dead End Motors.
-	local count = 0
-	local dealerShown = false
-	for _, def in vehicles() do
-		if cars[def.id] or count >= 2 then
-			continue
-		end
-		count += 1
-		order += 1
-		if def.id == Config.VanQuest.Car then
-			local quest = if state and state.vanQuest == "open" then "open" else nil
-			shopHeader(rides, order, "earl", `{Config.VanQuest.Place} · {def.name}`)
-			order += 1
-			goal(rides, order, "🚐", def.name, if quest then `{Config.VanQuest.Seller}, far out west` else "Marge's quest", def.price, def.level or 1)
-			continue
-		end
-		if not dealerShown then
-			dealerShown = true
-			shopHeader(rides, order, "dealer", "Dead End Motors · vehicles")
-			order += 1
-		end
-		goal(rides, order, "🚐", def.name, "Dead End Motors", def.price, def.level or 1)
-	end
+	local goal = refs.ready.current().goal -- (6.14: the savings goal is SAVE UP's hero while a counter sells it)
+	refs.apps.shop(list, look, refs.host, wide, if goal then goal.name else nil)
 end
 
 -- A chat list: one card, a row per message (newest first) split by hairlines: the round avatar, the name and the time,
@@ -1408,7 +1288,7 @@ renderApp = function()
 		elseif app == "bag" then
 			refs.apps.bag(list, look, refs.host, wide) -- 6.5: BAG & ITEMS, the I window's tabs
 		elseif app == "garage" then
-			refs.apps.garage(list, look, refs.host)
+			refs.apps.garage(list, look, refs.host, wide) -- 6.18 wave 2: the kit's hero and rows
 		elseif app == "tasks" then
 			refs.tasks.draw(list, look, wide) -- 6.12
 		elseif app == "style" then

@@ -18,12 +18,17 @@
 --   * CardKit.Color / CardKit.Danger   the palette: money green, gold, the danger tiers, dim and faint words, the run's
 --                                      and rush hour's chips
 -- Presentation only: every action keeps its caller's server path.
+-- 6.18 wave 2 (additive, for the SHOP, BAG, GARAGE and STYLE windows): a Picture's `icon` (a shared/Icons.luau name: its
+-- uploaded white silhouette drawn whole, not cropped; a hero's as its mark at the right); a row's action may be a short
+-- word ("BUY", "USE", "WEAR": a pill sized to it); CardKit.tabs, a row of tab chips (Tab_<id>, the open one lit with its
+-- red Underline).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local CardLayout = require(Shared.CardLayout)
+local Icons = require(Shared.Icons)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 
@@ -70,7 +75,8 @@ CardKit.Danger = {
 
 -- What a thumb or a hero shows: an uploaded picture, else an emoji on charcoal, else an app's glyph (`glyph`: draws it
 -- in a frame, e.g. client/PhoneContract.luau glyph).
-export type Picture = { image: string?, emoji: string?, glyph: ((face: Instance, size: number) -> ())?, face: Color3? }
+-- 6.18 wave 2: `icon` an Icons name (its silhouette once uploaded, before the emoji).
+export type Picture = { image: string?, emoji: string?, glyph: ((face: Instance, size: number) -> ())?, face: Color3?, icon: string? }
 
 -- The soft click every button makes (client/Sounds.luau sets Ui.onClick).
 function CardKit.click()
@@ -102,6 +108,21 @@ function CardKit.picture(parent: Instance, picture: Picture, shut: boolean, size
 			ScaleType = Enum.ScaleType.Crop,
 			ZIndex = z,
 		}, parent)
+	elseif Icons.get(picture.icon) then
+		-- 6.18 wave 2: an uploaded icon, whole (a hero's at its right like an emoji's mark)
+		local face = Ui.make("Frame", { Name = "Icon", Size = UDim2.fromScale(1, 1), BackgroundColor3 = picture.face or K.charcoal, BorderSizePixel = 0, ZIndex = z }, parent)
+		Ui.make("ImageLabel", {
+			Name = "Silhouette",
+			Size = UDim2.fromOffset(size, size),
+			Position = if mark then UDim2.new(1, -12, 0.42, 0) else UDim2.fromScale(0.5, 0.5),
+			AnchorPoint = if mark then Vector2.new(1, 0.5) else Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = Icons.get(picture.icon),
+			ScaleType = Enum.ScaleType.Fit,
+			ImageColor3 = if shut then C.grey else C.white,
+			ImageTransparency = if mark then 0.45 elseif shut then 0.4 else 0,
+			ZIndex = z,
+		}, face)
 	elseif picture.glyph then
 		local face = Ui.make("Frame", { Name = "Icon", Size = UDim2.fromScale(1, 1), BackgroundColor3 = picture.face or K.charcoal, BorderSizePixel = 0, ZIndex = z }, parent)
 		local slot = Ui.make("Frame", { Name = "Slot", Size = UDim2.fromOffset(size, size), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, ZIndex = z }, face)
@@ -483,7 +504,10 @@ function CardKit.row(parent: Instance, spec: Row): RowParts
 	end
 	-- the action at the right: the round button, a mark, or the lock's short words
 	local lock = spec.lock
-	local addW = CardLayout.action(if lock then CardKit.width(lock, 11, Theme.HeadingFont) else nil)
+	-- (6.18 wave 2: a short word for the action, "BUY", "USE": a pill sized to it, like a lock's words)
+	local word = if not lock and spec.action and (utf8.len(spec.action) or 1) > 1 then spec.action else nil
+	local small = lock or word
+	local addW = CardLayout.action(if small then CardKit.width(small, if word then 12 else 11, Theme.HeadingFont) else nil)
 	local onAction = spec.onAction
 	if lock or spec.action then
 		local plus = spec.action == "+"
@@ -492,18 +516,18 @@ function CardKit.row(parent: Instance, spec: Row): RowParts
 			Size = UDim2.fromOffset(addW, KIT.Add),
 			Position = UDim2.new(1, -6, 0.5, 0),
 			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundColor3 = spec.actionFace or (if lock or not plus then K.raised else K.red),
+			BackgroundColor3 = spec.actionFace or (if lock or not (plus or (word and onAction)) then K.raised else K.red),
 			BorderSizePixel = 0,
 			Text = lock or spec.action,
 			Font = Theme.HeadingFont,
-			TextSize = if lock then 11 else 24,
+			TextSize = if lock then 11 elseif word then 12 else 24,
 			TextColor3 = if lock then K.secondary else C.white,
 			ZIndex = 2,
 		}, row)
 		if onAction then
 			made.AutoButtonColor = false
 		end
-		Ui.corner(made, if plus or lock then 9 else KIT.Add // 2)
+		Ui.corner(made, if plus or small then 9 else KIT.Add // 2)
 		if onAction then
 			made.Activated:Connect(function()
 				CardKit.click()
@@ -613,6 +637,30 @@ function CardKit.repicture(card: Instance, picture: Picture, size: number)
 	local mark = card:GetAttribute("Mark")
 	CardKit.picture(card, picture, false, if type(mark) == "number" then mark else size, 1, type(mark) == "number")
 	CardKit.shade(card, picture.image ~= nil and picture.image ~= "")
+end
+
+-- 6.18 wave 2: a row of tab chips (the SHOP counters', BAG & ITEMS', STYLE's tabs): "Tab_<id>" each, the open one lit
+-- (a strong hairline and the red "Underline"); a tap picks it (onPick: the caller draws again). Returns the row and the
+-- chips by id.
+export type Tabs = { name: string?, order: number?, tabs: { { string } }, selected: string, onPick: (id: string) -> () }
+
+function CardKit.tabs(parent: Instance, spec: Tabs): (any, { [string]: any })
+	local row = Ui.make("Frame", { Name = spec.name or "Tabs", Size = UDim2.new(1, 0, 0, KIT.Chip + 4), BackgroundTransparency = 1, LayoutOrder = spec.order or 0 }, parent)
+	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, row)
+	local made: { [string]: any } = {}
+	for index, entry in spec.tabs do
+		local id = entry[1]
+		local on = id == spec.selected
+		local chip = CardKit.chip(row, { name = `Tab_{id}`, text = entry[2], order = index, face = if on then K.raised else K.row, ink = if on then K.text else K.secondary, stroke = if on then K.text else K.line, lit = on, faint = 0.8, onClick = function()
+			spec.onPick(id)
+		end })
+		chip.Size = UDim2.fromOffset(chip.Size.X.Offset + 8, KIT.Chip + 4)
+		if on then
+			Ui.make("Frame", { Name = "Underline", Size = UDim2.new(1, -16, 0, 2), Position = UDim2.new(0, 8, 1, -2), BackgroundColor3 = K.red, BorderSizePixel = 0 }, chip)
+		end
+		made[id] = chip
+	end
+	return row, made
 end
 
 -- ── Layout and the details sub-view ─────────────────────────────────────────
