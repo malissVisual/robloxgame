@@ -22,6 +22,9 @@
 --     broken lamp's flicker snaps). Every lamp still glows (its part turns Neon); the far ones just light nothing.
 --     Every Light found in or as a night light takes part (found when it is restyled or streams in), whoever switches it
 --     (a server write that lights one over the budget is put out again).
+--   * 6.16, a soft haze around the street lamps at night: the nearest few lamps that shine within the budget glow
+--     faintly (Config.Atmosphere.Halo: one ParticleEmitter in the lamp's head, a few big soft particles; none on a phone
+--     by default), chosen again with the budget.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -172,6 +175,68 @@ local function switch(light: Light, on: boolean, snap: boolean?)
 	end
 end
 
+-- 6.16: a soft haze around the street lamps at night (Config.Atmosphere.Halo): the Count nearest lamp heads (World's
+-- lamp(): a part "Lamp" with its SpotLight) whose light shines within the budget, within Range of the camera, not a
+-- broken one, get one faint glowing puff (a ParticleEmitter in the head, a few big soft particles that barely move); a
+-- phone or a tablet Lite of them. Looked at with the light budget; the rest are taken away (by day: all of them).
+local halos: { [BasePart]: ParticleEmitter } = {}
+local HALO = Config.Atmosphere.Halo
+
+local function newHalo(head: BasePart): ParticleEmitter
+	local lit = head:GetAttribute("LitColor")
+	local glow = Instance.new("ParticleEmitter")
+	glow.Name = "LampHaze"
+	glow.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	glow.Color = ColorSequence.new(if typeof(lit) == "Color3" then lit else Color3.fromRGB(255, 214, 150))
+	glow.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, HALO.Transparency), NumberSequenceKeypoint.new(0.7, HALO.Transparency), NumberSequenceKeypoint.new(1, 1) })
+	glow.Size = NumberSequence.new(HALO.Size * 0.85, HALO.Size)
+	glow.LightEmission = 1
+	glow.LightInfluence = 0
+	glow.Lifetime = NumberRange.new(3, 4)
+	glow.Rate = 1
+	glow.Speed = NumberRange.new(0)
+	glow.Rotation = NumberRange.new(0, 360)
+	glow.RotSpeed = NumberRange.new(-8, 8)
+	glow.LockedToPart = true
+	glow.ZOffset = 0.5
+	glow.Parent = head
+	return glow
+end
+
+local function hazeLamps(eye: Vector3, night: boolean)
+	local most = if DeviceBudget.lite then HALO.Lite else HALO.Count
+	local near: { { head: BasePart, distance: number } } = {}
+	if night and most > 0 then
+		for _, light in budget.lights do
+			local head = light.Parent
+			if budget.shining[light] and light:IsA("SpotLight") and head and head:IsA("BasePart") and head.Name == "Lamp" and not CollectionService:HasTag(head, "BrokenLamp") then
+				local distance = (head.Position - eye).Magnitude
+				if distance <= HALO.Range then
+					table.insert(near, { head = head, distance = distance })
+				end
+			end
+		end
+		table.sort(near, function(a, b)
+			return a.distance < b.distance
+		end)
+	end
+	local keep: { [BasePart]: boolean } = {}
+	for n = 1, math.min(most, #near) do
+		keep[near[n].head] = true
+	end
+	for head, glow in halos do
+		if not keep[head] then
+			halos[head] = nil
+			glow:Destroy()
+		end
+	end
+	for head in keep do
+		if not halos[head] then
+			halos[head] = newHalo(head)
+		end
+	end
+end
+
 -- Every LightEvery seconds: the nearest within range shine (a vehicle's lights together, a little hold at the edge),
 -- the rest fade out.
 local function chooseLights()
@@ -226,6 +291,7 @@ local function chooseLights()
 			switch(light, night)
 		end
 	end
+	hazeLamps(eye, night) -- 6.16
 end
 
 -- How many Lights of the night lights this client knows and how many shine now (the admin's overlay).

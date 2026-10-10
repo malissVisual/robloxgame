@@ -1985,6 +1985,145 @@ Config.DayNight = {
 	NightRoam = 1.6, -- roaming zombies multiplier at night
 }
 
+-- 6.16, light and atmosphere (shared/SkyGrade.luau; drawn on every client: client/Weather.luau, client/SkyFx.luau): the
+-- look of every time of day. Looks names a look; Clock says at which hour each one is full (sorted, 0 … 24; after the
+-- last the clock wraps round to the first), and in between two looks blend smoothly (smoothstep). Colours are
+-- { r, g, b } (0 … 255). A look holds:
+--   brightness, exposure     Lighting.Brightness (the sun or the moon) and ExposureCompensation
+--   ambient, outdoor         Lighting.Ambient and OutdoorAmbient (the light in the shade, indoors and out)
+--   top, bottom              Lighting.ColorShift_Top (the sunlit sides: a golden sun) and ColorShift_Bottom (the bounce)
+--   diffuse, specular, soft  Lighting.EnvironmentDiffuseScale, EnvironmentSpecularScale (the sky's light and shine) and
+--                            ShadowSoftness
+--   tint, saturation, contrast, lift   the colour grade (the ColorCorrection ZombieGrade: TintColor, Saturation,
+--                            Contrast, Brightness)
+--   bloom, bloomSize, threshold   the bloom: the lamps, the lit windows and the headlights glow at night (a high
+--                            threshold by day, so nothing washes out)
+--   rays                     the sun rays' intensity (under a clear sky, from a medium graphics quality up)
+--   air, decay, density, offset, glare, haze   the atmosphere (it is the fog too: Lighting's Fog* do nothing with an
+--                            Atmosphere): Color, Decay, Density, Offset, Glare, Haze
+--   clouds                   the clouds' colour
+--   blur                     0 … 1 of Blur.Far (the soft blur far away)
+--   dust                     0 … 1 of Dust.Rate (the motes floating in the sun)
+-- The rain, the fog, the snow, the town's glow at night and the Blood Moon (Config.LiveEvents) blend over it as before.
+-- 3.0.1's rule: the night is dark but readable, never so dark a zombie hides in it: ReadableFloor is the least any hour
+-- may have (the luma of OutdoorAmbient, Ambient and the tint, 0 … 255; the sun's or the moon's brightness);
+-- tests/skygrade_test.luau checks every minute of the day.
+Config.Atmosphere = {
+	Looks = {
+		-- Night: a readable blue night (3.0.1's look: a bright moon, a blue grade, a dark blue haze); the lamps bloom.
+		night = {
+			brightness = 1.5, exposure = 0.05, ambient = { 68, 72, 94 }, outdoor = { 96, 104, 138 },
+			top = { 0, 8, 30 }, bottom = { 4, 6, 14 }, diffuse = 0.3, specular = 0.55, soft = 0.6,
+			tint = { 200, 212, 255 }, saturation = -0.25, contrast = 0.12, lift = 0,
+			bloom = 1, bloomSize = 30, threshold = 1.05, rays = 0,
+			air = { 62, 72, 102 }, decay = { 30, 36, 56 }, density = 0.3, offset = 0.25, glare = 0, haze = 0.7,
+			clouds = { 70, 78, 104 }, blur = 0.6, dust = 0,
+		},
+		-- Dawn, the blue hour before the sun: cool and blue, the lamps still on.
+		dawn = {
+			brightness = 1.45, exposure = 0.1, ambient = { 66, 74, 100 }, outdoor = { 94, 106, 144 },
+			top = { 16, 26, 60 }, bottom = { 6, 10, 22 }, diffuse = 0.4, specular = 0.55, soft = 0.6,
+			tint = { 206, 222, 255 }, saturation = -0.18, contrast = 0.1, lift = 0.01,
+			bloom = 0.85, bloomSize = 28, threshold = 1.1, rays = 0.04,
+			air = { 112, 128, 168 }, decay = { 58, 70, 112 }, density = 0.33, offset = 0.15, glare = 0.3, haze = 1.3,
+			clouds = { 150, 162, 196 }, blur = 1, dust = 0.1,
+		},
+		-- Sunrise: the golden hour, a warm low sun, long soft shadows, rays and dust in the light.
+		sunrise = {
+			brightness = 1.6, exposure = 0.05, ambient = { 84, 74, 72 }, outdoor = { 122, 106, 102 },
+			top = { 120, 70, 30 }, bottom = { 30, 18, 14 }, diffuse = 0.5, specular = 0.65, soft = 0.45,
+			tint = { 255, 226, 198 }, saturation = 0, contrast = 0.14, lift = 0.01,
+			bloom = 0.6, bloomSize = 26, threshold = 1.25, rays = 0.16,
+			air = { 214, 152, 114 }, decay = { 150, 98, 82 }, density = 0.33, offset = 0.08, glare = 1.6, haze = 1.8,
+			clouds = { 255, 208, 172 }, blur = 1, dust = 1,
+		},
+		-- Morning: fresh and clear, a touch warm.
+		morning = {
+			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 104, 106, 114 },
+			top = { 36, 26, 12 }, bottom = { 10, 10, 10 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
+			tint = { 246, 245, 236 }, saturation = -0.06, contrast = 0.12, lift = 0,
+			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
+			air = { 168, 180, 184 }, decay = { 102, 112, 118 }, density = 0.3, offset = 0.15, glare = 0.5, haze = 1.5,
+			clouds = { 255, 255, 255 }, blur = 0.8, dust = 0.7,
+		},
+		-- Noon: clean and crisp, truer colours (a little grit left), sharp shadows, the least haze.
+		noon = {
+			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 104, 104, 112 },
+			top = { 14, 12, 6 }, bottom = { 8, 8, 8 }, diffuse = 0.6, specular = 0.7, soft = 0.2,
+			tint = { 250, 250, 244 }, saturation = -0.08, contrast = 0.14, lift = 0,
+			bloom = 0.3, bloomSize = 20, threshold = 1.5, rays = 0.03,
+			air = { 166, 178, 176 }, decay = { 104, 114, 116 }, density = 0.28, offset = 0.15, glare = 0.2, haze = 1.3,
+			clouds = { 255, 255, 255 }, blur = 0.7, dust = 0.5,
+		},
+		-- Afternoon: warming up.
+		afternoon = {
+			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 104, 106 },
+			top = { 50, 34, 14 }, bottom = { 12, 10, 8 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
+			tint = { 252, 242, 224 }, saturation = -0.04, contrast = 0.13, lift = 0,
+			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
+			air = { 182, 170, 150 }, decay = { 116, 104, 90 }, density = 0.3, offset = 0.12, glare = 0.6, haze = 1.5,
+			clouds = { 255, 246, 232 }, blur = 0.8, dust = 0.7,
+		},
+		-- Sunset, the golden hour: the warmest look, an orange haze and the sun's glare, rays and dust in the light.
+		golden = {
+			brightness = 1.65, exposure = 0.05, ambient = { 90, 74, 70 }, outdoor = { 128, 104, 98 },
+			top = { 140, 78, 30 }, bottom = { 34, 18, 14 }, diffuse = 0.5, specular = 0.65, soft = 0.45,
+			tint = { 255, 218, 186 }, saturation = 0.04, contrast = 0.16, lift = 0.01,
+			bloom = 0.65, bloomSize = 26, threshold = 1.2, rays = 0.18,
+			air = { 222, 142, 98 }, decay = { 160, 88, 72 }, density = 0.34, offset = 0.06, glare = 2, haze = 2,
+			clouds = { 255, 192, 152 }, blur = 1, dust = 1,
+		},
+		-- Dusk, the blue hour after the sun: violet and blue, the lamps coming on.
+		dusk = {
+			brightness = 1.45, exposure = 0.1, ambient = { 74, 70, 98 }, outdoor = { 104, 100, 142 },
+			top = { 40, 20, 50 }, bottom = { 10, 8, 20 }, diffuse = 0.4, specular = 0.55, soft = 0.55,
+			tint = { 214, 208, 255 }, saturation = -0.12, contrast = 0.12, lift = 0.01,
+			bloom = 0.9, bloomSize = 28, threshold = 1.08, rays = 0.04,
+			air = { 118, 94, 132 }, decay = { 64, 46, 80 }, density = 0.32, offset = 0.15, glare = 0.5, haze = 1.2,
+			clouds = { 172, 134, 162 }, blur = 0.9, dust = 0.1,
+		},
+	},
+	-- When each look is full (hours; the default Roblox sun rises at about 6:00 and sets at about 18:00).
+	Clock = {
+		{ hour = 4.6, look = "night" },
+		{ hour = 5.5, look = "dawn" },
+		{ hour = 6.5, look = "sunrise" },
+		{ hour = 8.5, look = "morning" },
+		{ hour = 12.5, look = "noon" },
+		{ hour = 16.2, look = "afternoon" },
+		{ hour = 17.7, look = "golden" },
+		{ hour = 18.9, look = "dusk" },
+		{ hour = 20.3, look = "night" },
+	} :: { { hour: number, look: string } },
+	ReadableFloor = { outdoor = 95, ambient = 64, tint = 200, brightness = 1.4 },
+	-- The sky (server/World.luau): the sun's and the moon's size (degrees), the stars (0 … 5000). Optional pictures:
+	-- empty strings keep Roblox's own sky; an "rbxassetid://…" in all six Skybox sides (Bk, Dn, Ft, Lf, Rt, Up), in Sun
+	-- or in Moon sets that one.
+	Sky = {
+		SunSize = 12,
+		MoonSize = 16,
+		Stars = 5000,
+		Skybox = { Bk = "", Dn = "", Ft = "", Lf = "", Rt = "", Up = "" } :: { [string]: string },
+		Sun = "",
+		Moon = "",
+	},
+	-- Roblox's moving clouds (Terrain.Clouds, made on every client): Cover and Density in clear weather, in the rain and
+	-- in a fog (blended with the weather); their colour is the look's. Lite: on a phone or a tablet too (false: none
+	-- there, unless the place has its own).
+	Clouds = { Cover = 0.5, Density = 0.55, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
+	-- The soft blur far away (a DepthOfFieldEffect): sharp out to Focus + Radius studs, beyond that Far × the look's blur
+	-- (half of it in the rain or the fog: the air blurs already). Never on a phone or a tablet, below graphics quality
+	-- Quality (1 … 10), or while you aim (it fades out over Fade seconds).
+	Blur = { Focus = 200, Radius = 50, Far = 0.12, Quality = 4, Fade = 0.4 },
+	-- Dust in the air by day: tiny slow motes in a Box-stud box around the camera, Rate a second × the look's dust (none
+	-- in the rain, the fog, the snow, at night, or with Reduced Motion); a phone or a tablet Lite of them, fewer at a low
+	-- graphics quality.
+	Dust = { Rate = 7, Lite = 0.4, Box = 44, Size = 0.09, Life = { 7, 11 } :: { number } },
+	-- A soft haze around the street lamps at night: the Count nearest lamps that shine (the 6.13.1 light budget) within
+	-- Range of the camera get a faint glow Size studs across (a phone or a tablet: Lite of them).
+	Halo = { Count = 12, Lite = 0, Range = 160, Size = 7, Transparency = 0.9 },
+}
+
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
 export type LevelReward = {
 	money: number?,
@@ -4788,7 +4927,7 @@ Config.LivingCity = {
 		WetReflectance = 0.16, -- the roads' shine in the rain
 		RainRate = 900, -- raindrops a second around the camera
 		MistRange = 650, -- the river's mist shows within this of the camera
-		SunRays = 0.18, -- the sun rays' intensity at dawn
+		-- (6.16: the sun rays follow the time of day: Config.Atmosphere's looks, rays)
 	},
 	Camera = {
 		Explosion = 0.9, -- shake (0 … 1) next to an explosion …
