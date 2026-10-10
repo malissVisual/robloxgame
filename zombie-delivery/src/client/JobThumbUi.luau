@@ -15,12 +15,11 @@
 --       never over `most` px; the MISSIONS window's chapter banner, client/MissionArtUi.luau, uses it too).
 --   JobThumbUi.preload()                               6.16.1 (the owner: "the pictures in JOBS load slowly"): Roblox
 --       fetches an image the first time it is drawn, so the job list waited on 25 downloads; every uploaded job and
---       chapter picture is fetched in the background PRELOAD_AFTER s after joining (ContentProvider), and a picture
---       still on its way fades in when it is there instead of popping.
+--       chapter picture is fetched in the background PRELOAD_AFTER s after joining (ContentProvider). (6.16.2: the 6.16.1
+--       fade-in is gone: IsLoaded did not always report, and the pictures stayed invisible.)
 -- Presentation only: a picture grants nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local JobThumbs = require(Shared.JobThumbs)
@@ -34,24 +33,6 @@ JobThumbUi.RATIO = 2.4 -- the strip's width : height
 JobThumbUi.BANNER = 26 -- the fallback banner's height (px)
 JobThumbUi.GUESS = 128 -- the strip's height until its card's width is known (a phone card ~300 px wide)
 JobThumbUi.PRELOAD_AFTER = 4 -- 6.16.1: seconds after joining before the pictures are fetched (the world first)
-JobThumbUi.FADE = 0.25 -- 6.16.1: seconds a picture that was still loading fades in
-
--- 6.16.1: a picture still on its way is drawn invisible and fades in once Roblox has it (one already fetched at once).
-local function fadeIn(label: ImageLabel)
-	if label.IsLoaded then
-		return
-	end
-	label.ImageTransparency = 1
-	local watch: RBXScriptConnection? = nil
-	watch = label:GetPropertyChangedSignal("IsLoaded"):Connect(function()
-		if label.IsLoaded then
-			if watch then
-				watch:Disconnect()
-			end
-			TweenService:Create(label, TweenInfo.new(JobThumbUi.FADE), { ImageTransparency = 0 }):Play()
-		end
-	end)
-end
 
 -- 6.16.1: fetches every uploaded job picture and mission chapter picture in the background (see the header).
 function JobThumbUi.preload()
@@ -146,14 +127,14 @@ function JobThumbUi.strip(parent: Instance, info: any, order: number, height: nu
 		ClipsDescendants = true,
 		LayoutOrder = order,
 	}, parent)
-	fadeIn(Ui.make("ImageLabel", {
+	Ui.make("ImageLabel", {
 		Name = "Picture",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Image = image,
 		ScaleType = Enum.ScaleType.Crop,
-	}, strip) :: ImageLabel)
+	}, strip)
 	local tag = Ui.label(strip, title, UDim2.fromOffset(0, 22), {
 		Name = "Business",
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -189,7 +170,6 @@ function JobThumbUi.square(parent: Instance, info: any, size: number, props: { [
 		ScaleType = Enum.ScaleType.Crop,
 	}, parent)
 	made:SetAttribute("Business", name)
-	fadeIn(made :: ImageLabel)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, made)
 	if props then
 		for key, value in props do
