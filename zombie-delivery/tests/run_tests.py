@@ -36,13 +36,24 @@ with tempfile.TemporaryDirectory() as tmp:
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 6.23 (Codex's codex/cargo-missions-fix): the real server/Cargo.luau as CargoServer.luau for
+    # tests/cargo_runtime_test.luau: its server modules, Net and services from tests/runtime/CargoRuntime.luau (on the
+    # same recorder as CargoLooks), its shared modules the copies above.
+    shutil.copy(os.path.join(HERE, "runtime", "CargoRuntime.luau"), os.path.join(tmp, "CargoRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Cargo.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r"E.\1", source)
+    head = ('local E = require("./CargoRuntime")\nlocal M = E.Mock\nlocal game, workspace, task = E.game, M.workspace, E.task\n'
+            'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
+            'local Random, RaycastParams, UDim2, TweenInfo, typeof = M.Random, M.RaycastParams, M.UDim2, M.TweenInfo, M.typeof\n')
+    open(os.path.join(tmp, "CargoServer.luau"), "w", encoding="utf-8").write(head + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
         result = subprocess.run([luau, "test.luau"], cwd=tmp, capture_output=True, text=True)
         sys.stdout.write(result.stdout)
         sys.stderr.write(result.stderr)
-        if "ALL CHECKS PASSED" not in result.stdout:
+        if result.returncode != 0 or "ALL CHECKS PASSED" not in result.stdout:
             ok = False
 # 6.22: shared/ItemLooks.luau's Finish (the bags' and vests' colours on the client) agrees with
 # server/ModelArt/Builder.luau's FINISH (the server-only builder of the kit worn on the character).
