@@ -28,6 +28,8 @@
 -- PRICE big (green when you can pay it, dim while you can't), the edge in its state (gold your home, green owned, grey
 -- locked, else its kind's colour), and at the right 📍 GPS (the GPS, the window closes), ★ HOME / OWNED, or the lock's
 -- words ("🔒 LV 7", "🔒 IRON SUPPLY"). A tap opens its listing (the details: every fact, BUY, SELL, SET AS HOME).
+-- 6.23: a property's row shows its picture (Codex's career scenes, shared/CareerArt.luau) once the owner uploads it;
+-- until then its kind's icon as before.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +46,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local MapView = require(script.Parent.MapView)
 local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit (the filters' chips, the properties' rows)
+local CareerArt = require(Shared.CareerArt) -- 6.23: a property's picture on its row
 
 local C = Ui.Colors
 local K = Theme.Contract
@@ -407,7 +410,8 @@ local function row(def: Config.EstateDef, order: number)
 		name = `Property_{def.id}`,
 		order = order,
 		accent = if isHome then CardKit.Color.gold elseif mine then K.good elseif shut then K.line else kind.color,
-		picture = { glyph = function(face: Instance, size: number)
+		-- (6.23: its picture once uploaded, shared/CareerArt.luau; meanwhile its kind's icon)
+		picture = { image = CareerArt.image(CareerArt.propertyKey(def)), glyph = function(face: Instance, size: number)
 			Ui.icon(face, "estate_" .. def.kind, kind.icon, UDim2.fromOffset(size, size), {
 				TextScaled = true,
 				TextXAlignment = Enum.TextXAlignment.Center,
