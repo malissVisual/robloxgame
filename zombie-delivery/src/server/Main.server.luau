@@ -72,6 +72,9 @@ PhysicsService:CollisionGroupSetCollidable("Bullet", "Corpse", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
+-- 7.2: the maps' Alps for every client (shared/MapStyle.luau, client/MapView.luau): the ring and the forest worked out
+-- once here (World.build's Alpine piece then reuses them) and packed in ReplicatedStorage.MapStyle.
+require(Shared.MapStyle).publish(ReplicatedStorage)
 World.build()
 -- 7.1 review: the Alps' terrain fills and forests (thousands of fills) once the server is wired: PLAY and the lighting
 -- never wait for them (the far silhouettes and the pass stand already).

@@ -106,6 +106,7 @@ while not MapView.alpine.done and steps < 20 do
 end
 dressT = os.clock() - dressT - calls.ringTime - calls.forestTime
 check("the Alps are drawn after a few frames", MapView.alpine.done and steps >= 4, steps)
+check("no summary from the server: this client worked the plan out itself", MapView.alpine.source == "client", MapView.alpine.source)
 check("the ring and the forest are worked out once", calls.ring == 1 and calls.forest == 1, `{calls.ring} rings, {calls.forest} forests`)
 local alpineMade = M.made - madeBefore - baseMade
 
@@ -423,9 +424,105 @@ for _, name in { "Fountain", "RoadClosed" } do
 end
 check("the minimap turns, the ⛲ and the ⛔ stay upright", upright)
 
+-- ── The server's summary ───────────────────────────────────────────────────
+
+local summaryLength = 0
+do
+	local plan = MapStyle.plan(ring, forest)
+	local text = MapStyle.encode(plan)
+	summaryLength = #text
+	check(`the summary is short: ≤ {S.Budget.Summary} characters (a StringValue holds 200,000)`, #text <= S.Budget.Summary and #text < 200000, #text)
+	check("the summary is plain ASCII (no separators, nothing to escape)", string.find(text, "[^%w%-_]") == nil)
+	local back = MapStyle.decode(text)
+	local same = back ~= nil
+	local function near(a: number, b: number, tolerance: number): boolean
+		return math.abs(a - b) <= tolerance
+	end
+	if back then
+		same = #back.peaks == #plan.peaks and #back.relief == #plan.relief and #back.runs == #plan.runs and #back.meadows == #plan.meadows and #back.huts == #plan.huts and #back.passes == #plan.passes
+		for k, p in plan.peaks do
+			local q = back.peaks[k]
+			same = same and q and near(p.x, q.x, 0.05) and near(p.z, q.z, 0.05) and near(p.half, q.half, 0.05) and near(p.cap, q.cap, 0.05) and near(p.depth, q.depth, 0.0005)
+			same = same and q.ox == p.ox and q.oz == p.oz and q.sx == p.sx and q.sz == p.sz and q.winter == p.winter and q.side == p.side
+		end
+		for k, d in plan.relief do
+			local e = back.relief[k]
+			same = same and e and e.kind == d.kind and near(d.x, e.x, 0.05) and near(d.z, e.z, 0.05) and near(d.r, e.r, 0.05)
+		end
+		for k, run in plan.runs do
+			local r = back.runs[k]
+			same = same and r and near(run.x0, r.x0, 0.05) and near(run.x1, r.x1, 0.05) and near(run.z, r.z, 0.05) and r.cells == run.cells and r.snowy == run.snowy
+		end
+		for k, spot in plan.meadows do
+			same = same and near(spot.x, back.meadows[k].x, 0.05) and near(spot.z, back.meadows[k].z, 0.05)
+		end
+		for k, hut in plan.huts do
+			same = same and back.huts[k].kind == hut.kind and near(hut.x, back.huts[k].x, 0.05)
+		end
+		for k, pass in plan.passes do
+			local q = back.passes[k]
+			same = same and q.id == pass.id and q.name == pass.name and q.x == pass.x and q.z == pass.z and q.nx == pass.nx and q.from == pass.from and q.face == pass.face and q.text == pass.text
+		end
+	end
+	check("the summary unpacks to the same plan (to a tenth of a stud)", same)
+	check("not a summary: nil (garbage, cut short, another version)", MapStyle.decode("hello") == nil and MapStyle.decode(string.sub(text, 1, #text - 3)) == nil and MapStyle.decode("MS9" .. string.sub(text, 4)) == nil and MapStyle.decode("") == nil)
+	local x0 = B.x0
+	B.x0 -= 100
+	check("a summary made for other bounds: nil (the client works its own plan out)", MapStyle.decode(text) == nil)
+	B.x0 = x0
+
+	-- The server's publish (MapStyle with the recorder's Instance): a StringValue in ReplicatedStorage, the same one
+	-- when it publishes again; a failure only warns.
+	local Server = require("./MapStyleServer")
+	local storage = M.make("Folder", { Name = "ReplicatedStorage" })
+	Server.publish(storage)
+	local value = storage:FindFirstChild("MapStyle")
+	check("the server publishes the summary in ReplicatedStorage.MapStyle (a StringValue)", value ~= nil and value.ClassName == "StringValue" and value.Value == text)
+	Server.publish(storage)
+	check("…the same StringValue when it publishes again", #storage._children == 1 and storage:FindFirstChild("MapStyle") == value)
+	local warned = #M.warnings
+	local broken = M.make("Folder", { Name = "Broken" })
+	local ring1 = AlpineLayout.ring
+	AlpineLayout.ring = function()
+		error("no ring")
+	end
+	Server.publish(broken)
+	AlpineLayout.ring = ring1
+	check("a summary that fails only warns (no StringValue: the clients work it out)", #broken._children == 0 and #M.warnings == warned + 1)
+
+	-- A second MapView with the summary published: built from it, the ring and the forest not worked out again, the
+	-- same layers as the first one's.
+	M.published.MapStyle = M.make("StringValue", { Name = "MapStyle", Value = text })
+	local before = { ring = calls.ring, forest = calls.forest }
+	local hud2 = M.make("ScreenGui", { Name = "ZombieDeliveryHud2" }, M.gui)
+	local column2 = M.make("Frame", { Name = "LeftStack", Size = M.UDim2.fromOffset(200, 300), BackgroundTransparency = 1 }, hud2)
+	local MapView2 = require("./MapViewServer")
+	MapView2.start(hud2, column2)
+	local frames = 0
+	while not MapView2.alpine.done and frames < 20 do
+		M.frame()
+		M.resume()
+		frames += 1
+	end
+	check("from the server's summary: drawn, the ring and the forest not worked out on the client", MapView2.alpine.done and MapView2.alpine.source == "server" and calls.ring == before.ring and calls.forest == before.forest, `{MapView2.alpine.source}, {calls.ring - before.ring} rings`)
+	local mini2, big2 = find(column2, "Minimap"), find(hud2, "BigMap")
+	local alike = true
+	for _, pair in { { bigPeaks, find(big2, "Peaks") }, { miniRelief, find(mini2, "Relief") }, { bigForest, find(big2, "Forest") }, { miniForest, find(mini2, "Forest") }, { bigMeadows, find(big2, "Meadows") } } do
+		local a, b = pair[1], pair[2]
+		alike = alike and M.count(a) == M.count(b)
+		for k, node in a._children do
+			local other = b._children[k]
+			alike = alike and other ~= nil and math.abs(node.Position.X.Offset - other.Position.X.Offset) < 0.1 and math.abs(node.Size.Y.Offset - other.Size.Y.Offset) < 0.1
+		end
+	end
+	check("…the same frames in the same places as the client's own plan", alike)
+	M.published.MapStyle = nil
+end
+
 if not dump then
 	print(string.format("map: base %d instances, the Alps %d more; peaks %d (%d frames), relief %d, forest bands %d, meadows %d, huts %d", baseMade, alpineMade, #peaks, nPeaks, nRelief, #runs, #meadows, #huts))
 	print(string.format("map: GuiObjects of the Alps a map: big %d, mini %d (the maps had %d and %d); ring %.0f ms, forest %.0f ms, plan and frames %.0f ms (this machine)", bigAlpine, miniAlpine, bigBefore, miniBefore, calls.ringTime * 1000, calls.forestTime * 1000, dressT * 1000))
+	print(string.format("map: the server's summary is %d characters (budget %d; a StringValue holds 200,000)", summaryLength, S.Budget.Summary))
 end
 
 -- ── The preview's scenes (mapview_preview.py) ──────────────────────────────

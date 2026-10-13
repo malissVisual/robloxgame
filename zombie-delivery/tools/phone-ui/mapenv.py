@@ -22,6 +22,9 @@ def map_env(dest: Path):
     for source in (ROOT / "src/shared").glob("*.luau"):
         (dest / source.name).write_text(local(source.read_text()))
     (dest / "MapView.luau").write_text(PREFIX + local((ROOT / "src/client/MapView.luau").read_text()))
+    # a second MapView (built from the server's summary) and MapStyle with the recorder's Instance (its publish)
+    (dest / "MapViewServer.luau").write_text(PREFIX + local((ROOT / "src/client/MapView.luau").read_text()))
+    (dest / "MapStyleServer.luau").write_text(PREFIX + local((ROOT / "src/shared/MapStyle.luau").read_text()))
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Discovery", "Discovery"), ("DeviceBudget", "DeviceBudget")):
         (dest / f"{name}.luau").write_text(f'return require("./mapmock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "mapmock.luau", "mapview.luau"):

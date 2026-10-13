@@ -18,6 +18,9 @@
 --   MapStyle.meadows(forest)       the wildflower meadows; MapStyle.huts(forest) the hay barns and huts
 --   MapStyle.passes(ring)          the closed roads out of the valley (the West Pass)
 --   MapStyle.villages()            the villages' labels (Map.Villages when Map names them; the Altstadt placeholder)
+--   MapStyle.plan(ring, forest)    all of the ring's and the forest's above, for both maps
+--   MapStyle.encode(plan) / .decode(text)   a plan packed into a short string and back (nil: not one for these bounds)
+--   MapStyle.summary(), .publish(parent)    the server: this place's plan packed, in a StringValue for the clients
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -415,6 +418,201 @@ function MapStyle.villages(): { Village }
 		end
 	end
 	return list
+end
+
+-- ── The plan and the server's summary ──────────────────────────────────────
+
+-- Everything the maps draw of the ring and the forest (MapView builds its layers from it).
+export type Plan = { peaks: { Peak }, relief: { Disc }, runs: { Run }, meadows: { Spot }, huts: { Hut }, passes: { Pass } }
+
+function MapStyle.plan(ring: AlpineLayout.Ring, forest: AlpineLayout.Forest): Plan
+	return {
+		peaks = MapStyle.peaks(ring),
+		relief = MapStyle.relief(ring),
+		runs = MapStyle.forestRuns(forest),
+		meadows = MapStyle.meadows(forest),
+		huts = MapStyle.huts(forest),
+		passes = MapStyle.passes(ring),
+	}
+end
+
+-- The summary: a plan packed into a short string (the server works the ring and the forest out anyway; every client
+-- reads this instead of working them out again). Every number is three digits of base 64 (−131072 … 131071) in tenths
+-- of a stud (a peak's depth in thousandths, the kinds as small codes) after the version and a header: the bounds and
+-- the margin it was made for (a client with other ones works the plan out itself), then how many of each.
+MapStyle.Name = "MapStyle" -- (the StringValue in ReplicatedStorage)
+local VERSION = "MS1"
+local DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_"
+local BIAS = 131072
+local VALUE: { [number]: number } = {}
+for k = 1, #DIGITS do
+	VALUE[string.byte(DIGITS, k)] = k - 1
+end
+local DISCS = { "foot", "rock", "snow", "winter", "mount" }
+local SIDES = { "north", "east", "south", "west" }
+local HUTS = { "barn", "hut" }
+local function codeOf(list: { string }, value: string): number
+	return table.find(list, value) or 1
+end
+-- A unit vector's code (0 up the map, 1 east, 2 down, 3 west).
+local function wayCode(x: number, z: number): number
+	return if z < 0 then 0 elseif x > 0 then 1 elseif z > 0 then 2 else 3
+end
+local WAYS = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } }
+
+function MapStyle.encode(plan: Plan): string
+	local out: { string } = { VERSION }
+	local function put(v: number, scale: number)
+		local n = math.clamp(math.floor(v * scale + 0.5), -BIAS, BIAS - 1) + BIAS
+		local a, b, c = n // 4096 + 1, (n // 64) % 64 + 1, n % 64 + 1
+		table.insert(out, string.sub(DIGITS, a, a) .. string.sub(DIGITS, b, b) .. string.sub(DIGITS, c, c))
+	end
+	local B = Map.Bounds
+	for _, v in { B.x0, B.z0, B.x1, B.z1, S.Margin } do
+		put(v, 1)
+	end
+	for _, list in { plan.peaks, plan.relief, plan.runs, plan.meadows, plan.huts, plan.passes } :: { { any } } do
+		put(#list, 1)
+	end
+	for _, p in plan.peaks do
+		put(p.x, 10)
+		put(p.z, 10)
+		put(p.half, 10)
+		put(p.cap, 10)
+		put(p.depth, 1000)
+		put(wayCode(p.ox, p.oz) * 4 + wayCode(p.sx, p.sz), 1)
+		put(codeOf(SIDES, p.side) * 2 + (if p.winter then 1 else 0), 1)
+	end
+	for _, d in plan.relief do
+		put(codeOf(DISCS, d.kind), 1)
+		put(d.x, 10)
+		put(d.z, 10)
+		put(d.r, 10)
+	end
+	for _, run in plan.runs do
+		put(run.x0, 10)
+		put(run.x1, 10)
+		put(run.z, 10)
+		put(run.cells, 1)
+		put(if run.snowy then 1 else 0, 1)
+	end
+	for _, spot in plan.meadows do
+		put(spot.x, 10)
+		put(spot.z, 10)
+	end
+	for _, hut in plan.huts do
+		put(hut.x, 10)
+		put(hut.z, 10)
+		put(codeOf(HUTS, hut.kind), 1)
+	end
+	for _, pass in plan.passes do
+		local index = 0
+		for k, p in Config.Alpine.Portals do
+			if p.id == pass.id then
+				index = k
+			end
+		end
+		for _, v in { index, pass.x, pass.z, pass.nx, pass.nz, pass.width, pass.from, pass.face } do
+			put(v, 10)
+		end
+	end
+	return table.concat(out)
+end
+
+-- The plan back from a summary; nil when it is not one, or one made for other bounds or another margin.
+function MapStyle.decode(text: string): Plan?
+	if type(text) ~= "string" or string.sub(text, 1, #VERSION) ~= VERSION or (#text - #VERSION) % 3 ~= 0 then
+		return nil
+	end
+	local at = #VERSION + 1
+	local function take(scale: number): number
+		local a, b, c = string.byte(text, at, at + 2)
+		at += 3
+		local va, vb, vc = VALUE[a or 0], VALUE[b or 0], VALUE[c or 0]
+		if va == nil or vb == nil or vc == nil then
+			error("not a summary")
+		end
+		return (va * 4096 + vb * 64 + vc - BIAS) / scale
+	end
+	local ok, plan = pcall(function(): Plan?
+		local B = Map.Bounds
+		if take(1) ~= B.x0 or take(1) ~= B.z0 or take(1) ~= B.x1 or take(1) ~= B.z1 or take(1) ~= S.Margin then
+			return nil
+		end
+		local counts = {}
+		for k = 1, 6 do
+			counts[k] = take(1)
+		end
+		local need = 11 + counts[1] * 7 + counts[2] * 4 + counts[3] * 5 + counts[4] * 2 + counts[5] * 3 + counts[6] * 8
+		if #text ~= #VERSION + 3 * need then
+			return nil
+		end
+		local made: Plan = { peaks = {}, relief = {}, runs = {}, meadows = {}, huts = {}, passes = {} }
+		for _ = 1, counts[1] do
+			local x, z, half, cap, depth = take(10), take(10), take(10), take(10), take(1000)
+			local ways, side = take(1), take(1)
+			local o, s = WAYS[ways // 4 + 1], WAYS[ways % 4 + 1]
+			table.insert(made.peaks, {
+				x = x,
+				z = z,
+				ox = o[1],
+				oz = o[2],
+				sx = s[1],
+				sz = s[2],
+				half = half,
+				cap = cap,
+				winter = side % 2 == 1,
+				side = SIDES[side // 2] or "north",
+				row = "",
+				cone = "",
+				depth = depth,
+			})
+		end
+		for _ = 1, counts[2] do
+			local kind = DISCS[take(1)] or "rock"
+			table.insert(made.relief, { kind = kind, x = take(10), z = take(10), r = take(10) })
+		end
+		for _ = 1, counts[3] do
+			table.insert(made.runs, { x0 = take(10), x1 = take(10), z = take(10), cells = take(1), snowy = take(1) == 1 })
+		end
+		for _ = 1, counts[4] do
+			table.insert(made.meadows, { x = take(10), z = take(10) })
+		end
+		for _ = 1, counts[5] do
+			local x, z = take(10), take(10)
+			table.insert(made.huts, { x = x, z = z, kind = HUTS[take(1)] or "hut" })
+		end
+		for _ = 1, counts[6] do
+			local portal = Config.Alpine.Portals[math.floor(take(10) + 0.5)]
+			local x, z, nx, nz, width, from, face = take(10), take(10), take(10), take(10), take(10), take(10), take(10)
+			if portal then
+				table.insert(made.passes, { id = portal.id, name = portal.name, x = x, z = z, nx = nx, nz = nz, width = width, from = from, face = face, text = "ROAD CLOSED" })
+			end
+		end
+		return made
+	end)
+	return if ok then plan else nil
+end
+
+-- The summary of this place's ring and forest (AlpineLayout's, cached: server/Alpine.luau builds from the same).
+function MapStyle.summary(): string
+	return MapStyle.encode(MapStyle.plan(AlpineLayout.ring(), AlpineLayout.forest()))
+end
+
+-- The server (server/Main.server.luau, before World.build): the summary in a StringValue in `parent`
+-- (ReplicatedStorage) for every client's maps (client/MapView.luau). A failure only warns: the clients then work the
+-- plan out themselves, and the world is built all the same.
+function MapStyle.publish(parent: Instance)
+	local ok, made = pcall(MapStyle.summary)
+	if not ok then
+		warn(`[MapStyle] no summary for the maps: {made}`)
+		return
+	end
+	local found = parent:FindFirstChild(MapStyle.Name)
+	local value: StringValue = if found and found:IsA("StringValue") then found else Instance.new("StringValue")
+	value.Name = MapStyle.Name
+	value.Value = made
+	value.Parent = parent
 end
 
 return MapStyle

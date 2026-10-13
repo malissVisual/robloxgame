@@ -2686,8 +2686,11 @@ Config.Alpine = {
 --              transparency), a flower's dot Flower studs round in it
 --   Foothills  the soft green edge round the valley on the big map: studs out from the bounds
 --   Altstadt   the old town's label (a placeholder until Map names its villages: Map.Villages) over District's name
+--   Wait       seconds a client waits for the server's summary of the ring and the forest (MapStyle.publish, before
+--              World.build) before it works them out itself
 --   Budget     the most GuiObjects a layer may make on one map (tools/phone-ui/mapview.luau holds them): Peaks (big),
---              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map)
+--              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map); Summary:
+--              the most characters the server's summary may have (a StringValue holds 200,000)
 Config.MapStyle = {
 	Margin = 420,
 	Colors = {
@@ -2739,7 +2742,8 @@ Config.MapStyle = {
 	Meadows = { Radius = 80, Flower = 10, Soft = 0.3 },
 	Foothills = 120,
 	Altstadt = { Name = "Altstadt", District = "downtown" },
-	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 90, Alpine = 640 },
+	Wait = 10,
+	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 90, Alpine = 640, Summary = 20000 },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).

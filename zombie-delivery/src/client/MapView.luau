@@ -42,9 +42,10 @@
 -- through the ring's gorges) and the lakes blue, the snowfield white, the roads light on a brown edge and the highways
 -- amber, the Hauptplatz with its ⛲, the villages named (Map.Villages; the Altstadt's placeholder over Downtown), and
 -- where the West Pass's road runs into the cliff a ROAD CLOSED marker. The flat ground is drawn with the rest; the
--- ring, the forests, the meadows, the huts and the pass come once, a moment after the start (AlpineLayout works the
--- ring and the forest out once on this client, on the start screen, a frame apart), into layers made for them under
--- the fog. Nothing of it is touched again: the frame loop is as before.
+-- ring, the forests, the meadows, the huts and the pass come once, a moment after the start (from the server's
+-- summary, shared/MapStyle.luau; without one this client works AlpineLayout's ring and forest out itself, on the start
+-- screen, a frame apart), into layers made for them under the fog. Nothing of it is touched again: the frame loop is
+-- as before.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -652,16 +653,6 @@ end
 
 -- ── The Alps (7.2) ─────────────────────────────────────────────────────────
 
--- What shared/MapStyle.luau worked out of the ring and the forest once, for both maps.
-type AlpinePlan = {
-	peaks: { MapStyle.Peak },
-	relief: { MapStyle.Disc },
-	runs: { MapStyle.Run },
-	meadows: { MapStyle.Spot },
-	huts: { MapStyle.Hut },
-	passes: { MapStyle.Pass },
-}
-
 -- A peak on the big map, its ZIndex from `z` up: the rock (a diamond whose half toward the valley the UIGradient hides:
 -- a right-angled peak on its foot line, its top the way MapStyle points it), its snow cap (a smaller one with the same
 -- top) and its shadow side (a see-through square from its top to its foot line's middle and on to the foot's corner,
@@ -718,7 +709,7 @@ end
 -- the dots do not stand in columns), the ring (the big map's peaks back to front; the minimap's grassy feet, rock and
 -- snow, discs lit from the north-west) and the closed pass (its road into the cliff, the ROAD CLOSED sign on the big
 -- map, a ⛔ on the minimap).
-local function dressAlpine(canvas: Canvas, plan: AlpinePlan)
+local function dressAlpine(canvas: Canvas, plan: MapStyle.Plan)
 	local scale, big = canvas.scale, canvas.big
 	local M, F = STYLE.Meadows, STYLE.Forest
 	local flowers = Config.Alpine.Meadows.Colors
@@ -1770,36 +1761,40 @@ local function buildBig(gui: any)
 	buildList(big)
 end
 
--- 7.2: the Alps on both maps, once (MapView.start defers it: it runs on the start screen). AlpineLayout works the ring
--- and the forest out on this client (the same numbers the server built the mountains and the trees from; a moment
--- each, a frame apart), shared/MapStyle.luau turns them into what to draw, then each map gets its frames (dressAlpine),
--- a frame apart. `alpine` says how far it got (tools/phone-ui/mapview.luau reads it).
-local alpine = { started = false, done = false }
+-- 7.2: the Alps on both maps, once (MapView.start defers it: it runs on the start screen). The server's summary of
+-- the ring and the forest (shared/MapStyle.luau: server/Main.server.luau publishes it in ReplicatedStorage before it
+-- builds the world) is all it needs; without one (it never came within Config.MapStyle.Wait seconds, or it was made
+-- for other bounds) this client works the ring and the forest out itself (AlpineLayout, a moment each, a frame apart).
+-- Then each map gets its frames (dressAlpine), a frame apart. `alpine` says how far it got and where the plan came
+-- from (tools/phone-ui/mapview.luau reads it).
+local alpine = { started = false, done = false, source = "" }
 local function buildAlpine()
 	if alpine.started then
 		return
 	end
 	alpine.started = true
 	task.wait()
-	local ring = AlpineLayout.ring()
-	task.wait()
-	local forest = AlpineLayout.forest()
-	task.wait()
-	local plan: AlpinePlan = {
-		peaks = MapStyle.peaks(ring),
-		relief = MapStyle.relief(ring),
-		runs = MapStyle.forestRuns(forest),
-		meadows = MapStyle.meadows(forest),
-		huts = MapStyle.huts(forest),
-		passes = MapStyle.passes(ring),
-	}
+	local plan: MapStyle.Plan? = nil
+	local summary = ReplicatedStorage:WaitForChild(MapStyle.Name, STYLE.Wait)
+	if summary and summary:IsA("StringValue") then
+		plan = MapStyle.decode((summary :: StringValue).Value)
+	end
+	alpine.source = if plan then "server" else "client"
+	if not plan then
+		local ring = AlpineLayout.ring()
+		task.wait()
+		local forest = AlpineLayout.forest()
+		task.wait()
+		plan = MapStyle.plan(ring, forest)
+	end
+	local drawn = plan :: MapStyle.Plan
 	if miniCanvas then
-		dressAlpine(miniCanvas, plan)
+		dressAlpine(miniCanvas, drawn)
 		iconHeading = math.huge -- (the new glyphs turn upright on the next frame)
 		task.wait()
 	end
 	if bigCanvas then
-		dressAlpine(bigCanvas, plan)
+		dressAlpine(bigCanvas, drawn)
 	end
 	alpine.done = true
 end
