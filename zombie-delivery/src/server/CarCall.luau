@@ -615,8 +615,9 @@ local function rescue(d: Delivery, now: number)
 		return
 	end
 	d.relocated = true
-	-- On the new spot as a car spawned there rides (the chauffeur, welded to it, comes along).
-	d.car.model:PivotTo(start.ground * d.rideOffset)
+	-- On the new spot as a car spawned there rides (the chauffeur, welded to it, comes along). 6.26: on free room there
+	-- (Vehicles.clearFor: nothing in the way, even ground), as a spawn.
+	d.car.model:PivotTo(Vehicles.clearFor(d.car, start.ground) * d.rideOffset)
 	chassis.AssemblyLinearVelocity = Vector3.zero
 	chassis.AssemblyAngularVelocity = Vector3.zero
 	d.route, d.step, d.speed = start.route, 1, 0
@@ -964,7 +965,7 @@ function CarCall.call(player: Player, carId: string?): string?
 		bestLeft = math.huge,
 		atLight = false,
 		relocated = false,
-		rideOffset = start.ground:ToObjectSpace(car.model:GetPivot()),
+		rideOffset = car.ground:ToObjectSpace(car.model:GetPivot()), -- (6.26: from where it came out, maybe a free spot near the start)
 		speed = 0,
 		target = start.ground.Position + start.ground.LookVector * 10,
 		limit = 0,

@@ -1149,6 +1149,75 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Cars spawn clear and stand back up (6.26)
+
+The owner (a screenshot): the new ZDC Van stood in the depot tilted 20–25°, a back wheel in the air, its nose down on the
+front right, and it stayed so. "It happens when I spawn something", the bike and the other vehicles too.
+
+**Why a tipped car stayed tipped.** Every vehicle turns with the AngularVelocity "Steer" (world space, `(0, yaw, 0)`,
+MaxTorque 6000 × its mass, `server/Vehicles.luau`). It holds every turn still, the pitch and the roll too. Gravity's torque
+on a car propped on one end is about mass × 196 × 4 (studs from the prop to its middle), an eighth of that. So whatever
+tipped a car left it tipped, parked or driven; a bike's KeepUpright only levels its roll.
+
+**What tipped it.**
+- A car came out exactly where it was asked. `freeSpot` only kept it off the players' cars, and one ray at its middle found
+  the ground. Onto a crate, a counter, a kerb, a traffic car or a body, it was shoved up.
+- Since 6.13.1 a parked car is the server's, while a player's body is that player's own. Getting in or out, your client
+  moves your body through the car (the group "Boarding" exists on your screen only). The server saw the body inside the cabin
+  and, as it cannot move a player's body, shoved the car off it with any force it took. 6.24 fixed this for the bikes and
+  thought a car too heavy; on the server the car's mass does not matter.
+- The ZDC Van's bumper boxes hung 0.155 under its chassis: 0.70 over its wheels' ground, the lowest hull of the fleet (the
+  Old Van's lowest is its chassis, 0.90). Nosed down, it came to rest on its front bumper at 18°. They start at the
+  chassis' bottom now (only hit boxes: the model shows the bumpers).
+- Ruled out: the ZDC Van's doors and back doors, the model's MeshParts (the doors, the wheels, the body) and the swaying
+  body never collide (`mesh-check.py`, `ground-check.luau`).
+
+**Vehicles come out clear** (`Vehicles.spawnAt` → `findRoom`, `shared/SpawnSpot.luau`, `Config.SpawnSpot`). Every way a
+vehicle comes out goes through it: CAR's chauffeur and a chauffeur's car put back on a road, PLAY and a respawn, the garages
+and the home garage, the admin panel, a job's company vehicle, MY BIKE, a car bought or brought by Earl.
+- Rays under its four wheels (a bike's own four, under its axles) find the ground. It must be one plane (a wheel's ground
+  no more than 0.6 studs off the plane of the other three: a crate under a wheel fails) no steeper than 15° (a hill road, a
+  ramp or two wheels up the curb pass). The vehicle comes out tilted to that plane.
+- From the spot asked for to another one, a ray at its hull's middle height must find nothing standing in the way: no car
+  is put through a wall or a fence.
+- A box query checks the room its hull needs, from 0.6 over that ground (the curb and the road's paint stay under it), 0.3
+  wider all round, in the collision group "Car". It finds the props, the crates, the counters, the walls, the other cars and
+  a player's body; never a zombie, a person of the city, a corpse, an animal or the loot (they never collide with a car or
+  are pushed along). Your own body is no obstacle when you get in at once or onto your own bike.
+- Taken: the next spot in a small spiral, a length along the way it faces and a width to either side, 12 in all. None free:
+  the spot asked for (on its ground's plane up to 40°), with a warning in Studio's Output. The ZDC RIDE scooter still comes
+  out of its dock. A car rebuilt for a new stage keeps its riders' bodies out of the way and lets them step out through it.
+
+**Getting in and out never shoves the car** (`passBody` in `server/Vehicles.luau`): the server gives the body
+NoCollisionConstraints with the car's hull for the move (a folder `BoardPass_<name>`, gone a second after); a bike keeps its
+`RiderPass` for good.
+
+**Every vehicle stands back up** (`server/CarRighting.luau` replacing BikeRighting, `shared/CarUpright.luau`,
+`Config.CarUpright` with a kind each: `car` for the cars, vans and trucks, `bike` for the bikes and the E-Scooter). Four
+times a second the server looks at every player's vehicle. It is down when:
+- it is on its back or past its side (at any speed);
+- or, moving slower than 6 studs/s (a jump, a stunt, a slide or a fall go on), its top is more than 12° off straight up
+  and a wheel is 0.6 studs or more over the ground under it, or has no ground under it at all (the owner's case: resting
+  on its nose or a bumper). On all four wheels it is never down, however steep the ground.
+
+Down for 1.5 s (a bike 1 s), its AlignOrientation "Righting" (`Vehicles.righting`) turns it back onto its wheels, facing
+where it pointed, and the Steer lets go meanwhile. It aims at the level of the ground where it will stand: rays straight
+down round where it lies (a car on its back has its wheels high up), looked at again every check while it turns (a car
+that flipped on a hill road lands on all four wheels, not on one axle); straight up when that ground is steeper than 20°;
+a bike without the ground's roll. Within 6° of that level it is the driver's again. Still down after 3 s (a bike 2.5 s) it
+is stood up where it lies, on the ground right under it, tilted to that ground's plane, nudged to free room when
+something is there (`Vehicles.standUp`). Never a car on a repair lift, an anchored one or one a chauffeur drives (it is
+righted after the hand-over). In Studio every vehicle that went down says so in the Output (how far, a wheel's gap, driven
+or parked).
+
+**Only the wheels touch the ground** (`tools/vehicle-preview/ground-check.luau`, run by `check_fleet.py`). It builds every
+car at every stage with its full kit, every bike and company vehicle, and checks:
+- every colliding part but the wheels is at least 0.25 over the wheels' contact plane;
+- everything past the axles leaves 15° (the steepest road's 14° and one more) at the front and the back;
+- nothing that swings or sways collides (the doors, the back, what is welded on them, the body that sways);
+- the ZDC Van rides no lower than the Old Van;
+- the spawn's rays look under its real wheel colliders (a bike's too).
+
 ## The ZDC Van: the owner's Blender model (6.25)
 
 The owner: "udělat můj nejlepší model na van" in Blender, then "napoj ji do hry, ať v ní jde jezdit a fungovat".
@@ -1208,7 +1277,7 @@ Where it lives: numbers in `Config.Zombies` and `Config.ZombieTypes`, rules in `
 **The bike stays on its wheels.** Since 6.19 the rider sat inside the pedal bikes' hidden hull box. While getting on and off, the server (which runs a parked bike) pushed the light bike out from under the body onto its side, where KeepUpright has nothing to turn. The fix:
 - The pedal bikes' hull boxes only take hits now.
 - Your body never collides with your own bike (NoCollisionConstraints in the bike's `RiderPass` folder).
-- `server/BikeRighting.luau` watches every bike. One tipped more than 45° for 1 s is turned back onto its wheels facing where it pointed; one still wedged after 2.5 s is stood up where it lies. The maths is in `shared/BikeUpright.luau` and the numbers in `Config.BikeUpright`.
+- `server/BikeRighting.luau` watches every bike. One tipped more than 45° for 1 s is turned back onto its wheels facing where it pointed; one still wedged after 2.5 s is stood up where it lies. The maths is in `shared/BikeUpright.luau` and the numbers in `Config.BikeUpright`. (6.26: every vehicle, `server/CarRighting.luau`, `shared/CarUpright.luau`, `Config.CarUpright`: see "Cars spawn clear and stand back up".)
 
 **Sturdier.**
 - `tools/check-requires.py` (run by `tests/run_tests.py`) resolves every `require` against the Rojo tree and catches load-time loops.

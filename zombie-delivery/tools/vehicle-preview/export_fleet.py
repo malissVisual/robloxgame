@@ -7,7 +7,7 @@ HERE=Path(__file__).resolve().parent
 
 def prepare_modules(tmp, vehicles_source=None):
     prefix='local Mock = require("./roblox-mock")\nlocal game, workspace, Instance, Vector3, Vector2, Color3, CFrame, Enum, PhysicalProperties, UDim2, typeof = Mock.game, Mock.workspace, Mock.Instance, Mock.Vector3, Mock.Vector2, Mock.Color3, Mock.CFrame, Mock.Enum, Mock.PhysicalProperties, Mock.UDim2, Mock.typeof\n'
-    for name in ['Config','Economy','Map','Boarding','RenderBudget']: # (6.13.1: RenderBudget, the cars' shadows)
+    for name in ['Config','Economy','Map','Boarding','RenderBudget','CarUpright','SpawnSpot']: # (6.13.1: RenderBudget, the cars' shadows; 6.26: SpawnSpot, the spawn's room, and its CarUpright)
         s=(ROOT/'src/shared'/f'{name}.luau').read_text()
         s=re.sub(r'require\(script.Parent.(\w+)\)',r'require("./\1")',s)
         (tmp/f'{name}.luau').write_text(s)
@@ -19,7 +19,7 @@ def prepare_modules(tmp, vehicles_source=None):
         s=s.replace('require(script.Parent.BikeArt.Geometry)','require("./BikeGeometry")').replace('require(script.Parent.ModelArt.Builder)','require("./ModelBuilder")').replace('require(script.Parent.ScooterArt.Geometry)','require("./ScooterGeometry")')
         s=re.sub(r'require\(Shared.(\w+)\)',r'require("./\1")',s)
         s=re.sub(r'require\(script.Parent.(?:VehicleArt.)?(\w+)\)',r'require("./\1")',s)
-        if name=='Vehicles':s=s.replace('return Vehicles','Vehicles.__testBuild = build\nVehicles.__testBuildKit = buildKit\nVehicles.__testStyle = styleFor\nreturn Vehicles')
+        if name=='Vehicles':s=s.replace('return Vehicles','Vehicles.__testBuild = build\nVehicles.__testBuildKit = buildKit\nVehicles.__testStyle = styleFor\nVehicles.__testWheels = wheelsOf\nreturn Vehicles')
         (tmp/f'{name}.luau').write_text(prefix+s)
     for name in ['roblox-mock','export']:(tmp/f'{name}.luau').write_text((HERE/f'{name}.luau').read_text())
 

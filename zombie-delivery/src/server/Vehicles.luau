@@ -153,8 +153,25 @@
 -- the light bike out from under it, and the body (moved in the bike's own space) followed: over it went. Lying flat,
 -- KeepUpright has no turn to give (its right side points straight up). Now the pedal bikes' hull boxes only take
 -- hits (CanCollide off), the owner's body never collides with their bike (passRider: NoCollisionConstraints), and
--- server/BikeRighting.luau stands a bike tipped over for a second back up (its AlignOrientation "Righting";
--- Vehicles.standUp when it is wedged).
+-- server/BikeRighting.luau (6.26: server/CarRighting.luau) stands a bike tipped over for a second back up (its
+-- AlignOrientation "Righting"; Vehicles.standUp when it is wedged).
+-- 6.26, CARS SPAWN CLEAR AND STAND BACK UP (the owner's screenshot: a new ZDC Van in the depot tilted 20–25°, a back
+-- wheel in the air, its nose down on the front right, and it stayed so; "it happens when I spawn something", bikes and
+-- the other vehicles too). Why it stays: the Steer (an AngularVelocity in world space, (0, yaw, 0), MaxTorque 6000 ×
+-- the mass, set in spawnAt) holds every turn still, the pitch and the roll too, and gravity's torque on a car propped
+-- on one end is about mass × 196 × 4 (studs from the prop to its middle), an eighth of that: whatever tips a car
+-- leaves it tipped, parked or driven.
+-- What tips it: (1) a car was put down where it was asked (freeSpot only kept it off the players' cars; one ray at its
+-- middle for the ground): onto a crate, a counter, a kerb, a traffic car, a body; (2) since 6.13.1 a parked car is the
+-- server's (Vehicles.claim) while a body is its own player's: on the server that body cannot be moved, so the body
+-- getting in or out (client/CarBoarding.luau moves it through the car in the group "Boarding", on its own screen
+-- only) shoved the car with all the force it took. 6.24 said "a car is too heavy for that": on the server the body
+-- counts as immovable, the car's mass does not matter. Now: the room a car needs is checked before it comes out and a
+-- free spot found near (findRoom, Vehicles.clearFor, Config.SpawnSpot, shared/SpawnSpot.luau), a body passes through
+-- the car while it gets in or out on the server too (passBody, NoCollisionConstraints for the move) and
+-- server/CarRighting.luau turns any vehicle that is down back onto its wheels (Vehicles.righting, Vehicles.standUp).
+-- The ZDC Van's bumper boxes hung 0.155 under its chassis (0.70 over the wheels' ground, the fleet's lowest hull; its
+-- nose came to rest on its bumper at 18°): they start at the chassis' bottom now, like the Old Van's lowest hull.
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -171,6 +188,7 @@ local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
 local Boarding = require(Shared.Boarding)
+local SpawnSpot = require(Shared.SpawnSpot) -- 6.26: a vehicle never comes out into something (findRoom)
 local VehicleArt = require(script.Parent.VehicleArt.Builder)
 local VanMesh = require(script.Parent.VanMesh) -- 6.25: the ZDC Van in the owner's Blender model
 VanMesh.ready("zdcvan") -- (at the start: the imported model leaves the world before anybody sees it)
@@ -205,6 +223,7 @@ export type Car = {
 	doors: { CarDoor }, -- 3.7: its doors (doorsOf): index 1 is the driver's
 	gear: { [string]: boolean }, -- 4.6: the gear installed on it (Config.Gear ids; none on a company vehicle)
 	rental: boolean, -- 5.6: a ZDC RIDE rental scooter (server/Rental.luau): lent too (never kept, never yours), no paint
+	ground: CFrame, -- 6.26: where it was put down (the spot asked for, or the free one near it: findRoom)
 }
 
 local Vehicles = {}
@@ -583,8 +602,10 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(6.6, 4.1, 3.7), Vector3.new(0, 2.05, -2.2), "glass"), -- cabin
 			box(Vector3.new(6.6, 0.4, 3.7), Vector3.new(0, 4.3, -2.2), "body"), -- cabin roof
 			box(Vector3.new(6.6, 4.5, 6.85), Vector3.new(0, 2.25, 3.075), "body"), -- cargo box
-			box(Vector3.new(6.9, 0.75, 0.55), Vector3.new(0, -0.98, -6.7), "dark"), -- the bumpers
-			box(Vector3.new(6.9, 0.7, 0.6), Vector3.new(0, -1.05, 6.7), "dark"),
+			-- the bumpers (6.26: from the chassis' bottom up, -1.2: no hull under it, 0.9 over the wheels' ground as on
+			-- the Old Van; they hung 0.155 lower, the fleet's lowest hull. Only hit boxes: the model shows the bumpers)
+			box(Vector3.new(6.9, 0.75, 0.55), Vector3.new(0, -0.825, -6.7), "dark"),
+			box(Vector3.new(6.9, 0.7, 0.6), Vector3.new(0, -0.85, 6.7), "dark"),
 		},
 		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.4, 0, 4.5), Vector3.new(1.4, 0, 4.5), Vector3.new(-1.4, 0, 1.5), Vector3.new(1.4, 0, 1.5) }),
 		back = rearDoors(4.9, -0.65, 3.9, 6.3),
@@ -2993,13 +3014,14 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		upright.Parent = chassis
 		-- 6.24: KeepUpright holds a bike that stands, but one lying flat on its side (its right side straight up) gets
 		-- no turn from it at all, and one on its back already counts as level. "Righting" (off until server/
-		-- BikeRighting.luau sees a bike tipped over) turns the whole bike back onto its wheels, facing where it pointed.
+		-- CarRighting.luau sees a bike down) turns the whole bike back onto its wheels, facing where it pointed. (6.26: a
+		-- car's is made when it is first needed, Vehicles.righting.)
 		local righting = Instance.new("AlignOrientation")
 		righting.Name = "Righting"
 		righting.Mode = Enum.OrientationAlignmentMode.OneAttachment
 		righting.Attachment0 = level
-		righting.Responsiveness = Config.BikeUpright.Responsiveness
-		righting.MaxAngularVelocity = Config.BikeUpright.TurnRate
+		righting.Responsiveness = Config.CarUpright.Kinds.bike.Responsiveness
+		righting.MaxAngularVelocity = Config.CarUpright.Kinds.bike.TurnRate
 		righting.Enabled = false
 		righting.Parent = chassis
 	end
@@ -3392,22 +3414,12 @@ end
 -- saddle through the bike in the collision group "Boarding" (client/CarBoarding.luau), but that group is only on its
 -- own screen: the server, which runs a bike standing empty (Vehicles.claim), saw the body inside the bike on every
 -- move on and off and pushed the light bike away from it, and the body, moved in the bike's own space, followed it:
--- the bike rolled over onto its side. A car is too heavy and too wide for that.
-local function passRider(car: Car, character: Instance?)
-	if not character or not character:IsA("Model") or car.model:GetAttribute("Bike") ~= true or car.wrecked then
-		return
-	end
-	local old = car.model:FindFirstChild("RiderPass")
-	if old then
-		local first = old:FindFirstChildWhichIsA("NoCollisionConstraint")
-		local part = first and first.Part1
-		if part and part.Parent == character then
-			return -- (made for this body already)
-		end
-		old:Destroy()
-	end
+-- the bike rolled over onto its side. (6.26: a car too, see passBody: on the server the body cannot be moved at all,
+-- so a car's mass does not help.)
+-- 6.26: the pass itself (a folder of NoCollisionConstraints between the vehicle's colliding parts and the body's).
+local function passFolder(car: Car, character: Model, name: string): Folder
 	local folder = Instance.new("Folder")
-	folder.Name = "RiderPass"
+	folder.Name = name
 	for _, mine in car.model:GetChildren() do
 		if not mine:IsA("BasePart") or not mine.CanCollide then
 			continue
@@ -3423,6 +3435,59 @@ local function passRider(car: Car, character: Instance?)
 		end
 	end
 	folder.Parent = car.model
+	return folder
+end
+
+local function passRider(car: Car, character: Instance?)
+	if not character or not character:IsA("Model") or car.model:GetAttribute("Bike") ~= true or car.wrecked then
+		return
+	end
+	local old = car.model:FindFirstChild("RiderPass")
+	if old then
+		local first = old:FindFirstChildWhichIsA("NoCollisionConstraint")
+		local part = first and first.Part1
+		if part and part.Parent == character then
+			return -- (made for this body already)
+		end
+		old:Destroy()
+	end
+	passFolder(car, character, "RiderPass")
+end
+
+-- 6.26: a body getting into or out of a car passes through it on the server too, for `seconds` (the move and a little
+-- more; a bike: for good, passRider). The client moves the body through the car's shell in the group "Boarding", on
+-- its own screen only; the server, which runs a parked car (6.13.1, Vehicles.claim), saw the body inside the cabin and,
+-- as a player's body is its own client's and cannot be moved there, shoved the car off it with all the force it took:
+-- the car tipped, and the Steer held it tipped (the owner's screenshot). A passenger getting into a driven car too (the
+-- driver's client saw the same). The folder "BoardPass_<name>" goes when the last move's time is over.
+local function passBody(car: Car, character: Instance?, seconds: number)
+	if not character or not character:IsA("Model") or car.wrecked or not car.model.Parent then
+		return
+	end
+	if car.model:GetAttribute("Bike") == true then
+		passRider(car, character)
+		return
+	end
+	local name = `BoardPass_{character.Name}`
+	local found = car.model:FindFirstChild(name)
+	if found then
+		local first = found:FindFirstChildWhichIsA("NoCollisionConstraint")
+		local part = first and first.Part1
+		if not part or part.Parent ~= character then
+			found:Destroy() -- (made for another body of that name: a respawn, a namesake)
+			found = nil
+		end
+	end
+	local folder: Instance = if found then found else passFolder(car, character, name)
+	local ends = os.clock() + seconds
+	local was = folder:GetAttribute("Ends")
+	folder:SetAttribute("Ends", if type(was) == "number" then math.max(was, ends) else ends)
+	task.delay(seconds + 0.05, function()
+		local last = folder:GetAttribute("Ends")
+		if folder.Parent and (type(last) ~= "number" or os.clock() >= last) then
+			folder:Destroy()
+		end
+	end)
 end
 
 -- The E at a door, checked: the seat is reserved and the move starts (the player's client plays it). 5.7: `lead`
@@ -3432,7 +3497,8 @@ local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat,
 	if not character or not character:IsA("Model") then
 		return
 	end
-	passRider(car, character) -- 6.24: onto a bike, the body passes through it on the server too
+	-- 6.24: onto a bike, the body passes through it on the server too; 6.26: into a car too, for the move
+	passBody(car, character, math.max(0, lead or 0) + boardSeconds(car) + 1)
 	local cfg = Config.Cargo
 	local now = workspace:GetServerTimeNow() + math.max(0, lead or 0)
 	local door = car.doors[index]
@@ -3529,6 +3595,7 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driv
 			return
 		end
 		local cfg = Config.Cargo
+		passBody(car, character, cfg.AlightSeconds + 1) -- 6.26: out through the car's shell without shoving it
 		local now = workspace:GetServerTimeNow()
 		character:SetAttribute("AlightAt", now)
 		character:SetAttribute("AlightReach", door.panel ~= nil)
@@ -3813,22 +3880,45 @@ function Vehicles.isBike(car: Car): boolean
 	return styleOf(car).bike == true
 end
 
--- 6.24: a bike that lay over and did not come up by server/BikeRighting.luau's turn (wedged against something) is
--- stood up where it lies: on the ground under it (Vehicles.groundY), facing `heading` (flat), Config.BikeUpright.Lift
--- over its wheels (it drops onto them), still and with its rider on it.
-function Vehicles.standUp(car: Car, heading: Vector3)
-	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
-		return
+-- 6.26: the AlignOrientation "Righting" that turns a vehicle that is down back onto its wheels (server/
+-- CarRighting.luau sets it and switches it on): a bike's is built with it (build: on its Upright attachment), a car's
+-- is made here the first time it is needed (on the movers' Root attachment, the chassis' own axes). Off until then.
+function Vehicles.righting(car: Car): AlignOrientation?
+	local found = car.chassis:FindFirstChild("Righting")
+	if found and found:IsA("AlignOrientation") then
+		return found
 	end
-	local style = styleOf(car)
-	local at = car.chassis.Position
-	local ground = Vehicles.groundY(at.X, at.Z, at.Y)
-	local position = Vector3.new(at.X, ground + style.clearance - car.lower + CHASSIS_HEIGHT / 2 + Config.BikeUpright.Lift, at.Z)
-	local flat = Vector3.new(heading.X, 0, heading.Z)
-	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
-	car.chassis.AssemblyLinearVelocity = Vector3.zero
-	car.chassis.AssemblyAngularVelocity = Vector3.zero
-	car.chassis.CFrame = CFrame.lookAt(position, position + look) -- (the whole bike follows, the rider with it)
+	local root = car.chassis:FindFirstChild("Root")
+	if not root or not root:IsA("Attachment") or car.wrecked then
+		return nil
+	end
+	local righting = Instance.new("AlignOrientation")
+	righting.Name = "Righting"
+	righting.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	righting.Attachment0 = root
+	righting.Enabled = false
+	righting.Parent = car.chassis
+	return righting
+end
+
+-- 6.26: where a vehicle's wheels touch the ground when it stands on them, in its chassis' space: the bottoms of its
+-- wheel colliders (a bike's four hidden ones too), front left, front right, back left, back right.
+-- server/CarRighting.luau looks under them for a wheel in the air and for the ground's level.
+function Vehicles.wheelContacts(car: Car): { Vector3 }
+	local frame = car.chassis.CFrame
+	local list: { Vector3 } = {}
+	for _, p in car.model:GetChildren() do
+		if p.Name == "WheelCollider" and p:IsA("BasePart") then
+			table.insert(list, frame:PointToObjectSpace(p.Position) - Vector3.new(0, p.Size.Y / 2, 0))
+		end
+	end
+	table.sort(list, function(a: Vector3, b: Vector3): boolean
+		if math.abs(a.Z - b.Z) > 0.01 then
+			return a.Z < b.Z -- (the front is -Z)
+		end
+		return a.X < b.X
+	end)
+	return list
 end
 
 -- 3.4: how many pieces the car takes at once (3.5: at its stage). 4.6: with the cargo's look, the Roof Rack's slot
@@ -4080,6 +4170,181 @@ function Vehicles.groundY(x: number, z: number, refY: number?): number
 	return World.RoadTop
 end
 
+-- 6.26, a vehicle never comes out into something (Config.SpawnSpot, shared/SpawnSpot.luau): `ground` (on the ground
+-- under its middle, Drop over it, facing its look) is tried first, then the spots near it in a small spiral. A spot is
+-- free when the ground under its four wheels (`wheels`, its own space: SpawnSpot.wheels / bikeWheels) is one plane no
+-- steeper than Slope (rays; SpawnSpot.plane), nothing stands in the way from the spot asked for at its hull's middle
+-- height (a ray: no car through a wall or a fence), and the room its hull needs over that plane (from Lift up, Pad
+-- wider) holds nothing it would collide with (a box query in the collision group "Car": the props, the walls, the
+-- other cars, a player's body; never a zombie, a person of the city or a corpse, which do not collide with a car).
+-- `ignore`: the vehicle itself, its riders, a body that gets in at once. Returns the spot (Drop over its wheels'
+-- ground, tilted to its plane, a bike without the plane's roll, facing as asked) and whether it is free; none free:
+-- the spot asked for (on its plane when it has one; a warning in Studio).
+local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }, ground: CFrame, ignore: { Instance }, what: string): (CFrame, boolean)
+	local cfg = Config.SpawnSpot
+	local flat = Vector3.new(ground.LookVector.X, 0, ground.LookVector.Z)
+	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+	local right = Vector3.new(-look.Z, 0, look.X)
+	local rays = RaycastParams.new()
+	rays.FilterType = Enum.RaycastFilterType.Exclude
+	local skip = groundIgnore()
+	for _, item in ignore do
+		table.insert(skip, item)
+	end
+	rays.FilterDescendantsInstances = skip
+	rays.IgnoreWater = true
+	rays.RespectCanCollide = true
+	local path = RaycastParams.new() -- (the way there: only what stands, not the people and the cars that move)
+	path.FilterType = Enum.RaycastFilterType.Exclude
+	path.FilterDescendantsInstances = skip
+	path.RespectCanCollide = true
+	local overlap = OverlapParams.new()
+	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	local pass = table.clone(ignore)
+	for _, name in { "Loot", "Animals" } do -- (pushed along like the zombies)
+		local folder = workspace:FindFirstChild(name)
+		if folder then
+			table.insert(pass, folder)
+		end
+	end
+	overlap.FilterDescendantsInstances = pass
+	overlap.RespectCanCollide = true
+	overlap.MaxParts = 1
+	pcall(function()
+		overlap.CollisionGroup = "Car" -- (what a car's hull collides with)
+		path.CollisionGroup = "Car"
+	end)
+	local top = CHASSIS_HEIGHT
+	for _, b in style.boxes do
+		top = math.max(top, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
+	end
+	top += style.clearance - lower -- (the hull's top over its wheels' ground)
+	local sx, sy, sz, cy = SpawnSpot.box(style.width, style.length, top, cfg.Lift, cfg.Pad)
+	local along, across = SpawnSpot.steps(style.width, style.length, cfg.Gap)
+	local why = "no ground under a wheel"
+	local asked: CFrame? = nil -- the spot asked for on its ground's plane
+	local from = ground.Position + Vector3.new(0, cy - cfg.Drop, 0) -- (the hull's middle there)
+	for n, step in SpawnSpot.candidates(cfg.Tries, along, across, cfg.Across) do
+		local at = ground.Position + look * step.along + right * step.across
+		local frame = CFrame.lookAt(at, at + look)
+		local points: { { number } } = {}
+		for _, w in wheels do
+			local spot = frame * Vector3.new(w.x, 0, w.z)
+			local hit = workspace:Raycast(spot + Vector3.new(0, cfg.Probe / 2, 0), Vector3.new(0, -cfg.Probe, 0), rays)
+			if not hit then
+				break
+			end
+			table.insert(points, { hit.Position.X, hit.Position.Y, hit.Position.Z })
+		end
+		local even, whyNot, up, middle = SpawnSpot.plane(points, cfg.Spread, cfg.Slope)
+		if not up or not middle then
+			why = if n == 1 then whyNot else why
+			continue
+		end
+		local lookOn, rightOn, upOn = SpawnSpot.frame(up, look.X, look.Z, not style.bike)
+		local origin = Vector3.new(at.X, SpawnSpot.heightAt(up, middle, at.X, at.Z), at.Z)
+		local onPlane = CFrame.fromMatrix(origin, Vector3.new(rightOn[1], rightOn[2], rightOn[3]), Vector3.new(upOn[1], upOn[2], upOn[3]),
+			-Vector3.new(lookOn[1], lookOn[2], lookOn[3]))
+		if n == 1 and up[2] >= math.cos(math.rad(cfg.Steepest)) then
+			asked = onPlane -- (too steep or taken: it stands there on its wheels when nothing is free)
+			from = (onPlane * CFrame.new(0, cy, 0)).Position
+		end
+		if not even then
+			why = if n == 1 then whyNot else why
+			continue
+		elseif n > 1 then
+			local to = (onPlane * CFrame.new(0, cy, 0)).Position
+			local wall = workspace:Raycast(from, to - from, path)
+			if wall then
+				continue -- (a wall, a fence between: not through it)
+			end
+		end
+		local hit = workspace:GetPartBoundsInBox(onPlane * CFrame.new(0, cy, 0), Vector3.new(sx, sy, sz), overlap)
+		if #hit > 0 then
+			why = if n == 1 then `{hit[1]:GetFullName()} in the way` else why
+			continue
+		end
+		if n > 1 and RunService:IsStudio() then
+			print(string.format("[Vehicles] %s: %s at the spot asked for; put %.0f studs along the way it faces, %.0f to its right (try %d)", what, why, step.along, step.across, n))
+		end
+		return onPlane * CFrame.new(0, cfg.Drop, 0), true
+	end
+	if RunService:IsStudio() then
+		warn(`[Vehicles] {what}: no free spot in {cfg.Tries} tries ({why} at the spot asked for): put there anyway`)
+	end
+	return if asked then asked * CFrame.new(0, cfg.Drop, 0) else ground, false
+end
+
+-- 6.26: where a vehicle about to be built touches the ground with its four wheels (findRoom): a car's colliders, or a
+-- bike's (and the E-Scooter's) four hidden ones under its art's axles (bikeBody's rule).
+local function wheelsOf(def: Config.CarDef, style: Style): { SpawnSpot.Wheel }
+	if not style.bike then
+		return SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
+	end
+	local spec = bikeSpec(bikeArtId(def.id, def.style))
+	local front, rear = artOrigin(spec, "FrontWheel"), artOrigin(spec, "RearWheel")
+	local unscale = if spec.origins.Crank ~= nil then 1 / BikeArt.Scale else 1
+	return SpawnSpot.bikeWheels(style.width, style.wheelWidth, front.Z * unscale, rear.Z * unscale)
+end
+
+-- 6.26: a live vehicle put somewhere new (a chauffeur's car put back on a road, one stood up where it lies) by the same
+-- check: `ground` (Drop over the ground under its middle, facing its look) or the nearest free spot (findRoom), with
+-- its own wheel colliders. Returns the spot, Drop over its wheels' ground, tilted to it.
+function Vehicles.clearFor(car: Car, ground: CFrame): CFrame
+	local ignore: { Instance } = { car.model }
+	local driver = car.seat.Occupant
+	if driver and driver.Parent then
+		table.insert(ignore, driver.Parent)
+	end
+	for _, seat in car.passengers do
+		local occupant = seat.Occupant
+		if occupant and occupant.Parent then
+			table.insert(ignore, occupant.Parent)
+		end
+	end
+	local style = styleOf(car)
+	local wheels: { SpawnSpot.Wheel } = {}
+	for _, contact in Vehicles.wheelContacts(car) do
+		table.insert(wheels, { x = contact.X, z = contact.Z })
+	end
+	if #wheels ~= 4 then
+		wheels = SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
+	end
+	local spot = findRoom(style, car.lower, wheels, ground, ignore, car.model.Name)
+	return spot
+end
+
+-- 6.24: a bike that lay over and did not come up by server/BikeRighting.luau's turn (wedged against something) is
+-- stood up where it lies: on the ground under it, facing `heading` (flat), Lift over its wheels (it drops onto them),
+-- still and with its rider on it. 6.26: any vehicle (server/CarRighting.luau; the kind's Lift, Config.CarUpright), on
+-- the ground right under it (no longer a bridge over it), tilted to the plane of the ground under its four wheels,
+-- nudged to free room when something is where it lies (Vehicles.clearFor: the spawn's check).
+function Vehicles.standUp(car: Car, heading: Vector3)
+	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
+		return
+	end
+	local style = styleOf(car)
+	local kind = if style.bike then Config.CarUpright.Kinds.bike else Config.CarUpright.Kinds.car
+	local at = car.chassis.Position
+	local flat = Vector3.new(heading.X, 0, heading.Z)
+	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+	local drop = Config.SpawnSpot.Drop
+	-- (the ground right under it: not a bridge or a roof over where it lies, as Vehicles.groundY's look from high up)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = groundIgnore()
+	params.IgnoreWater = true
+	params.RespectCanCollide = true
+	local under = workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -30, 0), params)
+	local asked = Vector3.new(at.X, (if under then under.Position.Y else Vehicles.groundY(at.X, at.Z, at.Y)) + drop, at.Z)
+	-- (its wheels' ground + drop, tilted to that ground's plane: on a hill road it stands on all four wheels)
+	local spot = Vehicles.clearFor(car, CFrame.lookAt(asked, asked + look))
+	car.chassis.AssemblyLinearVelocity = Vector3.zero
+	car.chassis.AssemblyAngularVelocity = Vector3.zero
+	-- (the whole vehicle follows, its riders with it)
+	car.chassis.CFrame = spot * CFrame.new(0, style.clearance - car.lower + CHASSIS_HEIGHT / 2 + kind.Lift - drop, 0)
+end
+
 -- Moves a spot along `direction` until no other car stands there (a few tries).
 local function freeSpot(position: Vector3, direction: Vector3, step: number): Vector3
 	for _ = 1, 6 do
@@ -4111,8 +4376,9 @@ end
 -- Builds the player's car (their equipped one, or carId: a company vehicle lent for a job) standing on `ground`
 -- (its position on the ground, facing its LookVector) and makes it theirs; the old one goes. seat: the player gets
 -- in at once. chauffeured: a chauffeur drives it (server/CarCall.luau): the server owns it and nobody gets in until
--- Vehicles.handOver. Returns nil when the profile is not loaded yet.
-function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?): Car?
+-- Vehicles.handOver. Returns nil when the profile is not loaded yet. 6.26: keep: bodies that are in the car's room
+-- already and no obstacle (the riders of the car it replaces where it stands: rebuild).
+function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?, keep: { Instance }?): Car?
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil
@@ -4141,6 +4407,20 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local stage = if plain then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
 	local lower = if def.bike then 0 else stanceOf(levels) -- 4.0: Tyres & Suspension 5 (5.1: never on a bike)
 	local gear = if plain then {} else Economy.installedGear(profile.carGear, def.id) -- 4.6
+	-- 6.26: never into something (findRoom): the room it needs at `ground`, else the nearest free spot (not a ZDC RIDE
+	-- scooter: it comes out of its dock, its own place). The body of a player who gets in at once (or onto their own
+	-- bike: RiderPass) is in no way; one who stays out is (on the server a body cannot be moved: it would shove the car).
+	if not rental then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local boards = def.bike == true or (seat and not chauffeured and humanoid ~= nil and humanoid.Health > 0 and not carrying(character))
+		local ignore: { Instance } = if keep then table.clone(keep) else {}
+		if boards and character then
+			table.insert(ignore, character)
+		end
+		local style = styleFor(def, stage)
+		ground = findRoom(style, lower, wheelsOf(def, style), ground, ignore, `{player.Name}'s {def.name}`)
+	end
 	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage, lower)
 	applyPaint(built.paintParts, def, paintId)
 	buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
@@ -4173,6 +4453,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		doors = doors,
 		gear = gear,
 		rental = rental == true,
+		ground = ground,
 	}
 	car.model.Name = if rental then `ZDC RIDE · {player.DisplayName}` else `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
@@ -4216,7 +4497,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	end
 
 	Vehicles.claim(car) -- 6.13.1: the server's until its driver sits (the seat's watcher hands it over)
-	passRider(car, player.Character) -- 6.24: a bike put out next to you is never pushed away by your body
+	-- 6.24: a bike put out next to you is never pushed away by your body; 6.26: nor a car you are put into (until the
+	-- seat holds you: passBody)
+	passBody(car, player.Character, 1)
 
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -4426,7 +4709,25 @@ local function rebuild(car: Car): boolean
 	local position = frame.Position - Vector3.new(0, base.clearance - car.lower + CHASSIS_HEIGHT / 2, 0)
 	local occupant = car.seat.Occupant
 	local seated = occupant ~= nil and Players:GetPlayerFromCharacter(occupant.Parent) == player
-	return Vehicles.spawnAt(player, car.id, CFrame.lookAt(position, position + look), seated) ~= nil
+	-- 6.26: its riders are in the new body's room (no obstacle: it is built where it stands) and step out through it
+	local riders: { Instance } = {}
+	local function rider(who: Humanoid?)
+		local body = who and who.Parent
+		if body then
+			table.insert(riders, body)
+		end
+	end
+	rider(occupant)
+	for _, seat in car.passengers do
+		rider(seat.Occupant)
+	end
+	local new = Vehicles.spawnAt(player, car.id, CFrame.lookAt(position, position + look), seated, nil, nil, riders)
+	if new then
+		for _, body in riders do
+			passBody(new, body, Config.Cargo.AlightSeconds + 1)
+		end
+	end
+	return new ~= nil
 end
 
 -- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share), and (3.3) its

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.25"
+Config.Version = "6.26"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -2948,22 +2948,59 @@ Config.Scooter = {
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
 }
 
--- 6.24, a bike knocked over gets back up (server/BikeRighting.luau, shared/BikeUpright.luau; any bike, the E-Scooter
--- too, ridden or parked): tipped over (its top more than Tilt degrees off straight up) for Hold seconds, the server
--- turns it back onto its wheels (its AlignOrientation "Righting", server/Vehicles.luau) at most TurnRate rad/s, gently
--- (Responsiveness), the steering's hold let go meanwhile; up again within Settled degrees it is the rider's once more.
--- Still down after Give seconds (wedged against something) it is stood up where it lies, Lift studs over its wheels.
--- The roads climb 14° at most (a curb, a ramp), so a bike on a hill never counts as tipped over.
-Config.BikeUpright = {
-	Check = 0.2, -- seconds between the looks at the bikes
-	Tilt = 45, -- degrees off upright: tipped over
-	Hold = 1, -- seconds tipped over before it is turned back up (a bump that rights itself is left alone)
-	Settled = 20, -- degrees off upright: up again (a ramp's 14° counts)
-	Give = 2.5, -- seconds of turning before it is stood up at once
-	Responsiveness = 12, -- the Righting AlignOrientation's (smooth: about half a second from lying flat)
-	TurnRate = 5, -- rad/s at most while it turns back up
-	Torque = 40000, -- × the bike's mass: the Righting's MaxTorque (the rider and gravity never hold it down)
-	Lift = 0.5, -- studs over its wheels when it is stood up at once (it drops onto them)
+-- 6.26 (6.24's bikes, now every vehicle of a player: the cars, the vans, the trucks, the bikes, the E-Scooter, ridden
+-- or parked), a vehicle knocked over gets back up (server/CarRighting.luau, shared/CarUpright.luau). Why it is needed:
+-- the steering's AngularVelocity "Steer" (server/Vehicles.luau) holds every turn still, pitch and roll too, with about
+-- ten times the torque gravity has on a car propped up on one end, so a car tipped by anything never falls back onto
+-- its wheels by itself. Down means (shared/CarUpright.luau CarUpright.down): on its back or past its side (over 90°)
+-- at any speed; or, moving slower than Slow studs/s (a jump, a stunt, a slide go on), its top more than the kind's
+-- Lean degrees off straight up with a wheel Gap studs or more over the ground under it, or with no ground under a
+-- wheel within Probe (resting on its nose, a bumper or its side: the owner's screenshot, a ZDC Van 20–25° nose down).
+-- On all four wheels it is never down, however steep the ground. Down for Hold seconds, the server turns it back onto
+-- its wheels (its AlignOrientation "Righting", Vehicles.righting) at most TurnRate rad/s, gently (Responsiveness),
+-- level with the ground where it will stand (rays straight down round where it lies, aimed again every look while it
+-- turns; ground steeper than Level degrees counts as none: straight up instead; a bike without the ground's roll),
+-- facing where it pointed, the Steer's hold let go meanwhile; within Settled degrees of that it is the driver's again.
+-- Still down after Give seconds (wedged against something) it is stood up where it lies, on the ground's plane, Lift
+-- studs over it, nudged to free room when something is there (Vehicles.standUp, Config.SpawnSpot). Not a car on a
+-- repair lift, an anchored one or one a chauffeur drives (righted after the hand-over).
+Config.CarUpright = {
+	Check = 0.25, -- seconds between the looks at the vehicles
+	Slow = 6, -- studs/s (its whole speed, a fall too): only slower than this is a tilted vehicle down (on its back: any)
+	Gap = 0.6, -- studs between a wheel's bottom and the ground under it: that wheel is in the air
+	Probe = 6, -- studs a wheel's ray looks down (from half of it over the wheel's bottom): no ground in it, none at all
+	Level = 20, -- degrees: the ground under the wheels is the level to turn back to only up to this steep
+	Kinds = {
+		-- (6.24's bike numbers; 6.24's Tilt 45° gone: a wheel off the ground decides, not an angle; Settled 20 → 6 from
+		-- the ground's level: the Steer holds any tilt left once the turn lets go)
+		bike = { Lean = 12, Hold = 1, Settled = 6, Give = 2.5, Responsiveness = 12, TurnRate = 5, Torque = 40000, Lift = 0.5 },
+		car = { Lean = 12, Hold = 1.5, Settled = 6, Give = 3, Responsiveness = 10, TurnRate = 3, Torque = 40000, Lift = 0.4 },
+	},
+}
+
+-- 6.26, a vehicle never comes out into something (Vehicles.spawnAt: the CAR button's chauffeur, PLAY, a respawn, the
+-- garages, the admin panel, a job's company vehicle, MY BIKE; shared/SpawnSpot.luau): the room it needs (its hull's
+-- length × width × height, Pad wider all round, from Lift over the ground under its wheels: a curb and the road's
+-- paint stay under it) must hold nothing it would collide with (the props, the crates, the counters, the walls, the
+-- other cars, a player's body: not a zombie, a person of the city or an animal, which never collide with a car), and
+-- the ground under its four wheels must be one plane (Spread: a wheel's ground off the others' plane at most; a crate,
+-- a step) no steeper than Slope degrees (a hill road or a ramp is fine: it comes out tilted to it). From the spot asked
+-- for to another one nothing may stand in the way at its hull's middle height (no car through a wall). Else the next
+-- spot, in a small spiral round it (SpawnSpot.candidates): steps of its length (+ Gap) along the way it faces, of its
+-- width (+ Gap) to either side (Across at most: a road's other lanes), Tries in all. None free: the spot asked for, as
+-- before (on its ground's plane when it has one; a warning in Studio). It is put down Drop studs over its wheels'
+-- ground. Not a ZDC RIDE scooter (its dock is its place).
+Config.SpawnSpot = {
+	Tries = 12, -- spots looked at, the one asked for first
+	Gap = 1.5, -- studs between two spots tried, past the vehicle's length or width
+	Lift = 0.6, -- studs over its wheels' ground where the room it needs starts
+	Pad = 0.3, -- studs of room all round
+	Spread = 0.6, -- studs at most a wheel's ground lies off the plane of the other three
+	Slope = 15, -- degrees at most of that plane (the roads climb 14° at most)
+	Steepest = 40, -- degrees: nothing free, the spot asked for still stands it on its ground's plane up to this steep
+	Probe = 8, -- studs a wheel's ray looks down (from half of it over the spot)
+	Drop = 0.5, -- studs over its wheels' ground it is put down at (it drops onto them)
+	Across = 1, -- spots to either side at most (a road's other lanes; never up onto the sidewalk)
 }
 
 -- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
