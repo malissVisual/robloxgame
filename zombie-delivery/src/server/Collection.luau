@@ -17,6 +17,7 @@
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now
 --   Collection.openPicker(player, stand)       (Warehouse: an empty display stand's prompt) ask the player's client to
 --                                              pick a piece for it (the "Collection" remote's { kind = "pick", stand })
+--   Collection.clear(player)                   (the admin's CLEAR STOCK) the whole collection gone for nothing → how many
 --   Collection.onChanged(fn)                   fn(player) after any change to a player's collection (and when their
 --                                              save has loaded)
 --   Collection.tick()                          pays everybody here what their stands earned since the last payout (the
@@ -319,6 +320,20 @@ function Collection.sell(player: Player, uid: string): (number?, string?)
 	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)))
 	changed(player)
 	return price, nil
+end
+
+-- The admin's CLEAR STOCK (server/Admin.luau "sandbox"): the whole collection gone, on show or not, for nothing (what
+-- the pieces on show earned up to now still counts). → how many pieces went (nil: no save yet).
+function Collection.clear(player: Player): number?
+	local collection = collectionOf(player)
+	if not collection then
+		return nil
+	end
+	settle(player)
+	local count = #collection.entries
+	table.clear(collection.entries)
+	changed(player)
+	return count
 end
 
 function Collection.incomePerMinute(player: Player): number

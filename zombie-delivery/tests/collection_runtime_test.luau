@@ -426,6 +426,11 @@ local g = (PlayerData.get(G) :: any).collection
 check("a garbled save: cleaned (bad and doubled pieces out, one piece a stand, stands past the warehouse's to the stock)", #g.entries == 3 and g.entries[1].condition == 1 and g.entries[1].stand == 1 and g.entries[2].stand == nil and g.entries[3].stand == nil and g.nextUid == 10)
 check("… it earns only what stands on its stands (the sofa, $7.70)", near(Collection.incomePerMinute(G), 7.7))
 
+-- the admin's CLEAR STOCK: everything gone for nothing (the money as it was), the stands empty
+local moneyG = (PlayerData.get(G) :: any).money
+local cleared = Collection.clear(G)
+check("clear: every piece gone, on show or not, no money paid", cleared == 3 and #Collection.stock(G) == 0 and (PlayerData.get(G) :: any).money >= moneyG and (PlayerData.get(G) :: any).money - moneyG < 1 and Collection.incomePerMinute(G) == 0, cleared)
+
 check("no warnings (no failed save, no failed payout)", #E.warnings == 0, E.warnings[1])
 
 if failures == 0 then
