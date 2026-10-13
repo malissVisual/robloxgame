@@ -65,6 +65,19 @@ function M.screen(width, height)
 	end
 end
 
+-- ReplicatedStorage: the Shared modules, and what the server published there (M.published: the maps' summary, a
+-- StringValue named MapStyle, when a check puts one; WaitForChild's timeout runs out at once without it).
+M.published = {}
+M.services.ReplicatedStorage.WaitForChild = function(self, name)
+	if name == "Shared" then
+		return self.Shared
+	end
+	return M.published[name]
+end
+M.services.ReplicatedStorage.FindFirstChild = function(_, name)
+	return M.published[name]
+end
+
 -- Services.
 M.services.Players.GetPlayers = function()
 	return { M.player }

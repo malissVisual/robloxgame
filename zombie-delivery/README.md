@@ -1242,10 +1242,13 @@ is a slate grey over the paper. Everything follows the data: step 2's bounds, it
 drawn without a change to the map's code.
 
 - **Cost:** the flat map is built at the start as before; the ring, the forests, the meadows, the huts and the pass
-  come a moment later, once, on the start screen (this client works `AlpineLayout.ring()` and `.forest()` out, a frame
-  apart: about 0.2 s and 0.3 s on a computer), into layers made for them under the fog: about 560 GuiObjects on the
-  big map and 400 on the minimap (`Config.MapStyle.Budget`). Nothing of it is touched again: the frame loop is as
-  before and makes nothing new.
+  come a moment later, once, on the start screen, into layers made for them under the fog: about 560 GuiObjects on
+  the big map and 400 on the minimap (`Config.MapStyle.Budget`). The server works the ring and the forest out once
+  (before `World.build`, whose Alpine piece reuses them) and publishes what the maps draw as a summary of about 7,000
+  characters in `ReplicatedStorage.MapStyle` (a StringValue: `MapStyle.publish`); every client unpacks it in a few
+  milliseconds. A client without one (it never came within `Config.MapStyle.Wait` seconds, or it was made for other
+  bounds) works `AlpineLayout.ring()` and `.forest()` out itself, a frame apart (about 0.2 s and 0.3 s on a
+  computer). Nothing of it is touched again: the frame loop is as before and makes nothing new.
 - **Checks:** `tools/phone-ui/mapview.luau` (run by `tools/phone-ui/check.py`): the real MapView on a recorder: built
   once, within the budgets, everything there in its order, step 2's data read, the frame loop leaves it alone.
   Preview: `NODE_PATH=… python3 tools/phone-ui/mapview_preview.py <luau> <sheet.png>` (the big map and the minimap at
