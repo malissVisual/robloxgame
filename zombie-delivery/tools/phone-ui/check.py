@@ -136,3 +136,32 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     for name in ("mock.luau", "missions_mock.luau", "movehud.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "movehud.luau"], cwd=dest, check=True)
+
+# 7.0 grip: the carry's grip bar (client/CarryGripUi.luau with shared/CarryGrip.luau) on a phone held sideways
+# (844 x 390) and a computer, beside the move's panel, Danny's strip, the quick chat's button and the HUD's groups where
+# client/Hud.luau puts them (tools/phone-ui/carrygrip.luau): the bar and the round HOLD button (72 px and more) clear of
+# the touch buttons and everything else, HOLD raising the grip box, the reports, SLIPPING! and the slip, the tip, the
+# fade, the mouse button and F on a computer.
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+'''
+    for name in ("CarryGripUi", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+        text = (ROOT / f"src/client/{name}.luau").read_text()
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
+        (dest / f"{name}.luau").write_text(prefix + text)
+    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
+    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "carrygrip.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)

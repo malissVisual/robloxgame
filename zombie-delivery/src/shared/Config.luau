@@ -5759,6 +5759,60 @@ Config.ItemModel = {
 	Shut = 0.35,
 }
 
+-- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
+-- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): shared/
+-- CarryGrip.luau runs the bar (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows it and reads the presses,
+-- server/Moving.luau's grip block (the character attribute CarryGrip; the Moving remote's "slip" and "grip") drops a
+-- thing that slipped and wears one that shook. The bar runs from 0 (its bottom) to 1 (its top).
+--   Kinds      the carries with a bar (a one-hand thing that is not fragile has none): Zone, the grip box's share of
+--              the bar; Load, the load's own wildness; Gravity, × the box's fall. "hand": a fragile one-hand thing
+--              (gentler); "both"; "pair": two carry it (each their own bar; either slips: it drops); "solo": a Mover
+--              lifts a pair thing alone (harder); "drag": a pair thing dragged alone, low (calmer)
+--   Mover      × the zone for a Mover (every kind)
+--   Weight     + the load's wildness a weight point (1 … 10); Fragile: + when fragile
+--   Motion     × the wildness: Still standing still (under StillAt studs/s); + Speed × your speed / the walk (at most
+--              SpeedMax × it); + Turn turning at TurnFull rad/s or more; + Slope going up or down at SlopeFull studs/s
+--              or more; + Air in the air (a jump); + a bite's jolt (Bite at BiteFull hp or more, ShockMax at most, Fade
+--              a second off it)
+--   Grip       the box: Lift (/s² up while held), Gravity (/s² down when let go), Rise / Fall (the fastest, /s), Bounce
+--              (× its speed back up off the bottom when it hits faster than BounceMin)
+--   Marker     the load (the thing's icon): a new aim every Dart[1] s (wild, at WildAt) … Dart[2] s (calm), up to Reach
+--              × (Base + the wildness) away; pulled to it by Spring × (Base + the wildness), Damp a second, Jitter ×
+--              the wildness; never nearer the ends than Edge
+--   Meter      Fill a second inside the box, Drain outside; standing still it drains no lower than Floor; Start at the
+--              lift (HeavyStart from HeavyAt weight on: the first seconds matter); full: steady (× SteadySpeed on the
+--              carry's walk, the server's at most) until it is under SteadyOff; SLIPPING! at Warn or under; 0: it slips
+--   Step       the longest step the bar takes at once (a slow frame takes several); MaxDt: the most time one frame counts
+--   Report     s between the client's ("grip", spot, quality, steady) reports (quality: the share of the time outside)
+--   Server     Wear: the condition a second fully outside the box (× WearFragile when fragile), WearCap a second at most;
+--              Gap: the most s one report counts; Every: the least s between two reports that count; SteadyOutside: a
+--              report this much outside or less may be steady; Slip: the condition a slip takes (× Moving.Damage.Fragile
+--              when fragile)
+--   Ui         Tutorial: the carries with the "Hold to keep it steady!" tip (the key's hint on the first one only);
+--              Shake: px at SLIPPING! (ReducedShake with Reduced Motion); Hold: the touch HOLD button's side (px, at
+--              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere
+Config.CarryGrip = {
+	Kinds = {
+		hand = { Zone = 0.36, Load = 0.35, Gravity = 1 },
+		both = { Zone = 0.3, Load = 0.55, Gravity = 1 },
+		pair = { Zone = 0.3, Load = 0.6, Gravity = 1 },
+		solo = { Zone = 0.21, Load = 0.9, Gravity = 1.2 },
+		drag = { Zone = 0.34, Load = 0.4, Gravity = 1 },
+	} :: { [string]: { Zone: number, Load: number, Gravity: number } },
+	Mover = 1.35,
+	Weight = 0.04,
+	Fragile = 0.2,
+	Motion = { StillAt = 1.5, Still = 0.3, Speed = 0.7, SpeedMax = 2, Turn = 0.35, TurnFull = 3, Slope = 0.4, SlopeFull = 6, Air = 0.8, Bite = 1.2, BiteFull = 20, ShockMax = 2, Fade = 1 },
+	Grip = { Lift = 4, Gravity = 3.2, Rise = 1.6, Fall = 2, Bounce = 0.35, BounceMin = 0.12 },
+	Marker = { Dart = { 0.5, 1.6 } :: { number }, WildAt = 1.4, Reach = 0.38, Base = 0.3, Spring = 3.5, Damp = 2.6, Jitter = 0.8, Edge = 0.06 },
+	Meter = { Fill = 0.45, Drain = 0.28, Floor = 0.35, Start = 0.85, HeavyStart = 0.6, HeavyAt = 6, SteadySpeed = 1.1, SteadyOff = 0.85, Warn = 0.3 },
+	Step = 1 / 60,
+	MaxDt = 0.25,
+	Report = 1,
+	Server = { Wear = 0.008, WearFragile = 1.5, WearCap = 0.015, Gap = 1.5, Every = 0.7, SteadyOutside = 0.1, Slip = 0.06 },
+	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55 },
+}
+
 -- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside
 -- it): server/Moving.luau runs a move, shared/MovingRules.luau has its rules (tests/moving_test.luau), client/
 -- MovingHud.luau shows it. The art is shared/FurnitureLooks.luau, shared/HouseLayout.luau and server/HouseInterior.luau.

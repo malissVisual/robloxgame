@@ -1178,6 +1178,12 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - The Moving Truck is lent next to you. Drive to 155 Willow Ln (GPS).
 - At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
 - Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
+- **The grip** (like Fisch's reeling): while you carry a 🙌 or 👥 piece, or a fragile ✋ one (gentler), a bar shows right of the middle.
+  - The piece (its icon) darts up and down: wilder when heavy or fragile, when you walk fast, turn, go up or down, jump or get bitten; calmer standing still.
+  - Hold the left mouse button or F (gamepad R2; on a phone the round HOLD button over FIRE) and the grip box rises; let go and it falls (momentum, a little bounce).
+  - The piece inside the box fills the meter (full: STEADY, +10% walk), outside drains it (standing still never under a third). SLIPPING! warns; at 0 it slips: dropped, with damage (fragile more), and a shaky carry wears it a little.
+  - Two carriers each have their own bar (either slip drops it); a Mover's box is 35% bigger, a Mover lifting a 👥 piece alone gets a harder bar; a heavy lift starts at 60%; Danny never slips.
+  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, Moving's grip hook and grip block (the Moving remote's "slip" and "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau`.
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
 - At 3:00 left a horde comes to the house.
