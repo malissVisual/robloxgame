@@ -2671,6 +2671,24 @@ Config.Scooter = {
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
 }
 
+-- 6.24, a bike knocked over gets back up (server/BikeRighting.luau, shared/BikeUpright.luau; any bike, the E-Scooter
+-- too, ridden or parked): tipped over (its top more than Tilt degrees off straight up) for Hold seconds, the server
+-- turns it back onto its wheels (its AlignOrientation "Righting", server/Vehicles.luau) at most TurnRate rad/s, gently
+-- (Responsiveness), the steering's hold let go meanwhile; up again within Settled degrees it is the rider's once more.
+-- Still down after Give seconds (wedged against something) it is stood up where it lies, Lift studs over its wheels.
+-- The roads climb 14° at most (a curb, a ramp), so a bike on a hill never counts as tipped over.
+Config.BikeUpright = {
+	Check = 0.2, -- seconds between the looks at the bikes
+	Tilt = 45, -- degrees off upright: tipped over
+	Hold = 1, -- seconds tipped over before it is turned back up (a bump that rights itself is left alone)
+	Settled = 20, -- degrees off upright: up again (a ramp's 14° counts)
+	Give = 2.5, -- seconds of turning before it is stood up at once
+	Responsiveness = 12, -- the Righting AlignOrientation's (smooth: about half a second from lying flat)
+	TurnRate = 5, -- rad/s at most while it turns back up
+	Torque = 40000, -- × the bike's mass: the Righting's MaxTorque (the rider and gravity never hold it down)
+	Lift = 0.5, -- studs over its wheels when it is stood up at once (it drops onto them)
+}
+
 -- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
 -- driving's physics stay as they are). Accelerations in studs/s² (gravity is 196), speeds in studs/s.
 Config.DriveFeel = {
