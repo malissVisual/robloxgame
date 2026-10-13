@@ -25,7 +25,8 @@
 -- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.reward (done),
 -- data.text / data.board (say); (nil) = over (skipped). Client → server: ("tour") her welcome's SHOW ME (6.5's "go"
 -- counts the same), ("board") the tour's TAKE A JOB, ("skip"). 7.0: ("story", key) a story card of Marge's seen
--- (client/MoveStoryUi.luau: her moving intro; PlayerData.markStory, shared/MoveStory.luau SeenKeys), at any time.
+-- (client/MoveStoryUi.luau: her moving intro; PlayerData.markStory, shared/MoveStory.luau SeenKeys), at any time
+-- (7.2 review: only a card's key, MoveStory.CardKeys; a chapter done is the server's).
 -- 5.0, the phone: profile.phone = true at SHOW ME (6.7; or when the tutorial ends, delivered or skipped; a player
 -- without the tutorial gets it at once), and the message ("phone", { npc }): client/Phone.luau shows its "NEW PHONE"
 -- moment (TutorialUi ignores it: not a phase; 6.7: the tour opens the phone itself, the moment's pop-up waits for it).
@@ -234,9 +235,10 @@ local function onRemote(player: Player, action: any, arg: any)
 		return
 	end
 	-- 7.0: a story card of Marge's seen (client/MoveStoryUi.luau: her moving intro), kept in the save. Any time, with
-	-- or without the first day: PlayerData.markStory takes only a known key, once.
+	-- or without the first day: PlayerData.markStory takes only a known key, once. 7.2 review: and from a client only a
+	-- card's key (MoveStory.isCardKey): a chapter done ("done:<chapter>") is server/Moving.luau's alone.
 	if action == "story" then
-		if Net.limit(player, "TutorialStory", 2) then
+		if Net.limit(player, "TutorialStory", 2) and require(Shared.MoveStory).isCardKey(arg) then
 			PlayerData.markStory(player, arg)
 		end
 		return

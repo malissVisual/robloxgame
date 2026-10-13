@@ -631,6 +631,9 @@ check("…FINISH is the owner's", E.last(ann, "Moving", "result") == resultBefor
 E.request(ann, "finish")
 local result = E.last(ann, "Moving", "result")
 check("FINISH: the result card, paid for what was delivered", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.stars >= 1 and result.a.trips == 1)
+-- 7.2 review: one ★ thing of three and FINISH is no chapter done (every ★ thing at the Wall whole: MovingRules.starsHome)
+check("7.2 review: one thing (a ★ of three) and FINISH: the prologue is not done for anybody", (E.story[ann] or {})["done:prologue"] ~= true and (E.story[bob] or {})["done:prologue"] ~= true
+	and MoveStory.forContract("marge") ~= nil and MoveStory.forContract("marge").id == "prologue")
 check("…Marge left the porch", porchOf(ann) == nil)
 check("…the van's Load and Take out gone, Take out's own spot too", promptIn(truck.model, "Load") == nil and promptIn(truck.model, "Take out") == nil
 	and truck.chassis:FindFirstChild("MoveTakeOut") == nil and truck.chassis:FindFirstChild("CargoDoor") ~= nil)
@@ -705,9 +708,10 @@ check("the owner left: the planning closes for the crew", E.last(dan, "MoveLobby
 -- The owner leaves; the truck lost; the admin's other commands ---------------------------------------------------------------
 
 check("no move: the admin says so", string.find(Moving.admin(ann, "horde"), "not running", 1, true) ~= nil)
--- 7.x van moves: a thing carried out of the house into `player`'s move's van (its back opened)
-local function loadOne(player: any, spot: number)
-	local van = E.cars[ann]
+-- 7.x van moves: a thing carried out of the house into `player`'s move's van (its back opened; 7.2 review: `owner`'s
+-- move, Ann's without one)
+local function loadOne(player: any, spot: number, owner: any?)
+	local van = E.cars[owner or ann]
 	van.chassis.CFrame = M.CFrame.new(home.park.x, 2, home.park.z) -- (the owner's van, out already: at the house)
 	E.place(player, outside)
 	trigger(promptIn(site, "Enter house"), player)
@@ -736,6 +740,13 @@ check("the van gone: what was in it is lost (condition 0), the move goes on", E.
 	and stateOf(ann, 1).state == "lost" and stateOf(ann, 1).condition == 0)
 check("…CAR waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) or "", "comes back", 1, true) ~= nil
 	and string.find(E.Vehicles.placeNear(ann, nil) or "", "comes back", 1, true) ~= nil and E.cars[ann] == nil)
+do
+	local calls = E.vehicleCalls or 0
+	local before = #E.messages
+	check("7.2 review: …the garage's TAKE OUT (placeAt) and a ZDC RIDE scooter (spawnAt) wait too, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
+		and E.Vehicles.spawnAt(ann, "escooter", M.CFrame.new(0, 0, 0), false) == nil and (E.vehicleCalls or 0) == calls and heard(ann, "comes back", before + 1),
+		`{(E.vehicleCalls or 0) - calls} calls`)
+end
 E.now += T.VanAgain
 E.Vehicles.placeNear(ann, nil)
 E.clock += 0.3
@@ -752,6 +763,18 @@ E.clock += 0.3
 Moving.step()
 result = E.last(ann, "Moving", "result")
 check("7.x van moves: 0:00, an empty van and nothing delivered: the end at once, nothing paid", result ~= nil and result.a.how == "failed" and result.a.pay == 0, result and result.a.how)
+-- 7.2 review: 0:00 with a trip delivered in time and the van empty: nothing reached the Wall late, so not "late"
+Moving.admin(ann, "start")
+Moving.step()
+loadOne(ann, 1)
+Moving.admin(ann, "trip")
+Moving.admin(ann, "time")
+E.now += 61
+E.clock += 0.3
+Moving.step()
+result = E.last(ann, "Moving", "result")
+check("7.2 review: 0:00, a trip in time, the van empty: the end as delivered (not late), paid in full", result ~= nil and result.a.how == "done" and result.a.delivered == 1
+	and result.a.pay > 0, result and result.a.how)
 Moving.admin(ann, "start")
 Moving.step()
 loadOne(ann, 1)
@@ -765,6 +788,20 @@ E.now += T.LateGrace
 Moving.step()
 result = E.last(ann, "Moving", "result")
 check("…the Wall not reached in time: nothing delivered, nothing paid", result ~= nil and result.a.how == "failed" and result.a.pay == 0, result and result.a.how)
+-- 7.2 review: a trip in time, then 0:00 with a load in the van and FINISH in the grace: nothing reached the Wall late
+Moving.admin(ann, "start")
+Moving.step()
+loadOne(ann, 1)
+Moving.admin(ann, "trip")
+loadOne(ann, 2)
+Moving.admin(ann, "time")
+E.now += 61
+E.clock += 0.3
+Moving.step()
+E.request(ann, "finish")
+result = E.last(ann, "Moving", "result")
+check("7.2 review: FINISH in the grace after 0:00, the trip before in time: delivered (not late)", result ~= nil and result.a.how == "done" and result.a.delivered == 1,
+	result and result.a.how)
 -- 7.0 review: the end's pay fails (a save down): the cleanup runs anyway, the slot frees
 do
 	Moving.admin(ann, "start")
@@ -798,11 +835,87 @@ do
 	Moving.admin(ann, "end")
 end
 check("7.0 review: the contract's plan was made once (every card and START reuse it)", plans == 1, plans)
-Moving.admin(ann, "start")
-Moving.step()
-E.leave(ann)
-result = E.last(bob, "Moving", "result")
-check("the owner left: called off for the crew", result ~= nil and result.a.how == "cancelled" and string.find(E.lastNotice(bob), "Ann left", 1, true) ~= nil)
+-- 7.2 review: GIVE UP after a trip: what reached the Wall is paid (the end as FINISH's), not called off for nothing
+do
+	Moving.admin(ann, "start")
+	Moving.step()
+	loadOne(ann, 1)
+	Moving.admin(ann, "trip")
+	local paidBefore = #E.money
+	E.request(ann, "giveup")
+	result = E.last(ann, "Moving", "result")
+	local paid = 0
+	for index = paidBefore + 1, #E.money do
+		paid += if E.money[index].player == ann and E.money[index].reason == "MovePay" then E.money[index].amount else 0
+	end
+	check("7.2 review: GIVE UP after a trip: the trip is paid (not called off)", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and paid > 0
+		and result.a.money == paid, result and `{result.a.how} {paid}`)
+end
+-- A bike is never the move's van (7.2 review: no back, nothing could be loaded; CAR, MY BIKE and the garage were shut)
+do
+	local eve = E.player(88, "Eve", board + V3(-3, 0, 3))
+	E.profiles[eve] = { car = "rustbike" }
+	E.Vehicles.placeNear(eve, nil) -- (MY BIKE: her bike by the kerb, the vehicle she rides)
+	local bike = E.cars[eve]
+	check("(Eve rides her bike: her profile's car, out, no back)", bike ~= nil and bike.id == "rustbike" and E.Vehicles.isBike(bike) and not E.Vehicles.hasBack(bike))
+	Moving.admin(eve, "start")
+	local van = E.cars[eve]
+	check("7.2 review: a move started on a bike goes with the ZDC Van, put out for it (not the bike)", van ~= nil and van ~= bike and van.id == T.Van and E.Vehicles.hasBack(van)
+		and bike.model.destroyed == true, van and van.id)
+	check("…and CAR brings the van from now on (her car the van, the bike her bike of choice)", E.profiles[eve].car == T.Van and E.profiles[eve].bike == "rustbike"
+		and E.profiles[eve].lastCar == T.Van, E.profiles[eve].car)
+	E.clock += 0.3
+	Moving.step()
+	check("…the van's Load is there", van ~= nil and promptIn(van.model, "Load") ~= nil)
+	-- MY BIKE while the van is out: refused (the van stays), but server/Shops.luau's ride made the bike her car already
+	E.profiles[eve].car = "rustbike"
+	check("(MY BIKE mid-move: refused, the van stays)", string.find(E.Vehicles.spawn(eve, false, nil) or "", "Your van is out", 1, true) ~= nil and E.cars[eve] == van)
+	-- the van gone; her bike out after the wait (MY BIKE): the move never takes a bike over
+	E.cars[eve] = nil
+	E.clock += 0.3
+	Moving.step()
+	check("7.2 review: the van lost: CAR brings the van again (her car the van once more, the bike her bike of choice)", E.profiles[eve].car == T.Van
+		and E.profiles[eve].bike == "rustbike", E.profiles[eve].car)
+	E.now += T.VanAgain
+	local since = #E.messages
+	E.Vehicles.placeNear(eve, "rustbike")
+	E.clock += 0.3
+	Moving.step()
+	check("7.2 review: the van lost, her bike out: the move does not take the bike over", E.cars[eve] ~= nil and E.cars[eve].id == "rustbike"
+		and E.last(eve, "Moving", "state").a.truck == false and not heard(eve, "van is back", since + 1))
+	E.Vehicles.placeNear(eve, nil) -- (CAR: her profile's car, the van)
+	E.clock += 0.3
+	Moving.step()
+	check("…CAR brings the van and the move takes it", E.cars[eve].id == T.Van and E.last(eve, "Moving", "state").a.truck == true and heard(eve, "van is back", since + 1))
+	Moving.admin(eve, "end")
+end
+-- 7.2 review: the owner leaves after a trip: the trip pays the crew there (not called off for nothing)
+do
+	Moving.admin(ann, "start")
+	Moving.step()
+	loadOne(ann, 1)
+	Moving.admin(ann, "trip")
+	E.place(bob, E.cars[ann].chassis.Position + V3(4, 1, 0))
+	local paidBefore = #E.money
+	E.leave(ann)
+	result = E.last(bob, "Moving", "result")
+	local paid = 0
+	for index = paidBefore + 1, #E.money do
+		paid += if E.money[index].player == bob and E.money[index].reason == "MovePay" then E.money[index].amount else 0
+	end
+	check("7.2 review: the owner left after a trip: the trip pays the crew there", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and paid > 0
+		and string.find(E.lastNotice(bob), "Ann left", 1, true) ~= nil, result and `{result.a.how} {paid} {E.lastNotice(bob)}`)
+end
+do
+	local fay = E.player(66, "Fay", board + V3(-3, 0, -3))
+	local gus = E.player(77, "Gus", board + V3(-4, 0, -3))
+	E.crew[fay] = { gus }
+	Moving.admin(fay, "start")
+	Moving.step()
+	E.leave(fay)
+	result = E.last(gus, "Moving", "result")
+	check("the owner left with nothing delivered: called off for the crew", result ~= nil and result.a.how == "cancelled" and string.find(E.lastNotice(gus), "Fay left", 1, true) ~= nil)
+end
 check("every interior went (slots free again)", E.destroyed == E.built, `{E.destroyed} of {E.built}`)
 
 if failures == 0 then

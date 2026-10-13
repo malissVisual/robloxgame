@@ -246,7 +246,9 @@ end
 check("the big map: a peak is its rock, its cap and its shadow side", nPeaks == expectPeaks, `{nPeaks} frames for {#peaks} peaks`)
 check("the minimap: a disc a cone's foot, rock or snow", nRelief == #relief, nRelief)
 check("a forest band a run, on each map", nForestBig == #runs and nForestMini == #runs, nForestBig)
-check("a meadow is a disc and its flower; the huts", nMeadowsBig == 2 * #meadows + #huts and nMeadowsMini == nMeadowsBig)
+-- (7.2 review: a meadow is one disc with its flower the dot on it: the minimap's CanvasGroup draws every object again
+-- on every move)
+check("7.2 review: a meadow is one disc, its flower on it; the huts", nMeadowsBig == #meadows + #huts and nMeadowsMini == nMeadowsBig, nMeadowsBig)
 check(`budget: the peaks ≤ {S.Budget.Peaks}`, nPeaks <= S.Budget.Peaks, nPeaks)
 check(`budget: the relief ≤ {S.Budget.Relief}`, nRelief <= S.Budget.Relief, nRelief)
 check(`budget: the forests ≤ {S.Budget.Forest} a map`, nForestBig <= S.Budget.Forest, nForestBig)
@@ -254,6 +256,19 @@ check(`budget: the meadows and huts ≤ {S.Budget.Meadows} a map`, nMeadowsBig <
 local bigAlpine = nPeaks + nForestBig + nMeadowsBig + 4 * #passes
 local miniAlpine = nRelief + nForestMini + nMeadowsMini + 3 * #passes
 check(`budget: all of the Alps ≤ {S.Budget.Alpine} GuiObjects a map`, bigAlpine <= S.Budget.Alpine and miniAlpine <= S.Budget.Alpine, `big {bigAlpine}, mini {miniAlpine}`)
+check(`7.2 review: budget: the minimap's Alps ≤ {S.Budget.Mini} GuiObjects (its CanvasGroup draws them all again on every move)`, miniAlpine <= S.Budget.Mini, miniAlpine)
+do
+	-- 7.2 review: no TextScaled label among the minimap's forests and meadows (one fits its text again on every redraw)
+	local scaled = findAll(miniForest, function(node)
+		return node.TextScaled == true
+	end)
+	for _, node in findAll(miniMeadows, function(node)
+		return node.TextScaled == true
+	end) do
+		table.insert(scaled, node)
+	end
+	check("7.2 review: the minimap's forests and meadows: no TextScaled label", #scaled == 0, #scaled)
+end
 
 -- ── What is there ──────────────────────────────────────────────────────────
 
@@ -283,14 +298,34 @@ for _, root in { mini, big } do
 	check(`{root.Name}: the Hauptplatz's ⛲`, fountain ~= nil and fountain.Text == "⛲")
 	local closed = find(root, "RoadClosed")
 	check(`{root.Name}: the West Pass's ROAD CLOSED`, closed ~= nil and (if root == big then string.find(closed.Text, "ROAD CLOSED", 1, true) ~= nil else closed.Text == "⛔"))
-	local bands = findAll(find(root, "Forest"), function(node)
-		return node.ClassName == "TextLabel"
-	end)
-	local dotted = #bands > 0
-	for _, band in bands do
-		dotted = dotted and string.find(band.Text, "●", 1, true) ~= nil and band:FindFirstChildOfClass("UICorner") ~= nil
+	local forestLayer = find(root, "Forest")
+	if root == big then
+		local bands = findAll(forestLayer, function(node)
+			return node.ClassName == "TextLabel"
+		end)
+		local dotted = #bands > 0
+		for _, band in bands do
+			dotted = dotted and string.find(band.Text, "●", 1, true) ~= nil and band:FindFirstChildOfClass("UICorner") ~= nil
+		end
+		check(`{root.Name}: the forest bands are rounded, full of tree dots`, dotted)
+	else
+		-- 7.2 review: the minimap's bands are plain rounded frames in the forest's colours (no dots to fit on a redraw)
+		local plain = #forestLayer._children > 0
+		for _, band in forestLayer._children do
+			plain = plain and band.ClassName == "Frame" and band:FindFirstChildOfClass("UICorner") ~= nil
+				and (rgb(band.BackgroundColor3) == style("Forest") or rgb(band.BackgroundColor3) == style("SnowForest"))
+		end
+		check(`{root.Name}: 7.2 review: the forest bands are plain rounded frames, the forest's colour`, plain)
 	end
-	check(`{root.Name}: the forest bands are rounded, full of tree dots`, dotted)
+	local meadowsLayer = find(root, "Meadows")
+	local flowered = #meadows > 0
+	for _, node in meadowsLayer._children do
+		if node.Name ~= "Hut" then
+			flowered = flowered and node.ClassName == "TextLabel" and node.Text == "●" and not node.TextScaled and node:FindFirstChildOfClass("UICorner") ~= nil
+				and rgb(node.BackgroundColor3) == style("Meadow")
+		end
+	end
+	check(`{root.Name}: 7.2 review: a meadow's disc carries its flower (its dot, a fixed size)`, flowered)
 	check(`{root.Name}: the huts`, #findAll(root, function(node)
 		return node.Name == "Hut"
 	end) == #huts)

@@ -656,6 +656,28 @@ local fined = fresh()
 loadAll(fined, { 2 })
 fined.things[2].condition = 0
 check("never below nothing", Rules.result(fined, "done", 0).total == 0)
+-- 7.2 review: what reached the Wall late (Counts.late): server/Moving.luau ends a move "late" only with something late
+check("7.2 review: the things delivered late counted (all of the late move's, none of the one on time)", Rules.counts(lateMove).late == 6 and Rules.counts(whole).late == 0
+	and Rules.counts(fresh()).late == 0)
+-- 7.2 review: a chapter's move is done (server/Moving.luau chapterDone) only with every ★ thing at the Wall whole
+-- (Rules.starsHome): one thing and FINISH is no chapter done. A ★ thing no van can take at all (too big for its empty bed,
+-- lying down too, and not one that rides the hitch: Marge's Grandfather Clock in the ZDC Van) is not asked for.
+check("7.2 review: every ★ thing at the Wall whole: the chapter's done", Rules.starsHome(whole))
+check("…a ★ thing left behind, or nothing delivered: not", not Rules.starsHome(partial) and not Rules.starsHome(fresh()))
+do
+	local cracked = fresh()
+	loadAll(cracked, { 1, 2, 3, 4, 5, 6 })
+	cracked.things[4].condition = 0.1 -- (the ★ clock broke on the way)
+	check("…a ★ thing broken: not", not Rules.starsHome(cracked))
+	local vanBed = { width = T.Beds.zdcvan.Width, length = T.Beds.zdcvan.Length, height = T.Beds.zdcvan.Height, cell = T.Beds.zdcvan.Cell }
+	local tall = table.clone(defs)
+	tall.clock = { id = "clock", name = "Grandfather Clock", icon = "🕰", size = { X = 2, Y = 7.2, Z = 1.4 }, class = "pair", weight = 7, value = 900, fragile = true, room = "living" }
+	local clockSpots: { Rules.Spot } = { { id = 1, item = "box", room = "attic", star = true }, { id = 2, item = "clock", room = "living", star = true }, { id = 3, item = "lamp", room = "living", star = false } }
+	local inVan = Rules.newMove(clockSpots, tall, vanBed, 0, 600)
+	check("…(the 7.2 clock never fits the ZDC Van's bay, not even lying down)", not Rules.canLoad(inVan, 2))
+	loadAll(inVan, { 1 })
+	check("…a ★ thing no van can take is not asked for: the box home whole is the chapter", Rules.starsHome(inVan) and inVan.things[2].state ~= "delivered")
+end
 check("the card's estimate: everything whole, ★ with its bonus", Rules.estimate(spots, defs) == math.floor(values + starred * (P.Star - 1) + 0.5))
 
 -- The contract's place ---------------------------------------------------------------------------------------------------

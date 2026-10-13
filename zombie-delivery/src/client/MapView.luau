@@ -708,15 +708,29 @@ end
 -- a run: a TextLabel whose background is the forest and whose text its tree dots, every other row's a dot's width on so
 -- the dots do not stand in columns), the ring (the big map's peaks back to front; the minimap's grassy feet, rock and
 -- snow, discs lit from the north-west) and the closed pass (its road into the cliff, the ROAD CLOSED sign on the big
--- map, a ⛔ on the minimap).
+-- map, a ⛔ on the minimap). 7.2 review: the minimap's CanvasGroup draws everything in it again on every move, so a
+-- meadow is one disc with its flower as its text (a fixed size; on both maps) and the minimap's forest bands are plain
+-- rounded frames (no tree dots: a TextScaled label fits its text again on every redraw).
 local function dressAlpine(canvas: Canvas, plan: MapStyle.Plan)
 	local scale, big = canvas.scale, canvas.big
 	local M, F = STYLE.Meadows, STYLE.Forest
 	local flowers = Config.Alpine.Meadows.Colors
 	for n, spot in plan.meadows do
-		disc(canvas.meadows, spot.x, spot.z, M.Radius, scale, C.meadow, 1).BackgroundTransparency = M.Soft
 		local c = flowers[(n - 1) % #flowers + 1]
-		disc(canvas.meadows, spot.x, spot.z, M.Flower, scale, Color3.fromRGB(c[1], c[2], c[3]), 2)
+		local r = M.Radius
+		local meadow = Ui.make("TextLabel", {
+			Position = point(spot.x - r, spot.z - r, scale),
+			Size = UDim2.fromOffset(2 * r * scale, 2 * r * scale),
+			BackgroundColor3 = C.meadow,
+			BackgroundTransparency = M.Soft,
+			BorderSizePixel = 0,
+			Text = "●",
+			TextSize = math.max(4, math.floor(M.Flower * 3.6 * scale + 0.5)), -- (the dot about Flower studs round)
+			Font = Enum.Font.GothamBlack,
+			TextColor3 = Color3.fromRGB(c[1], c[2], c[3]),
+			ZIndex = 1,
+		}, canvas.meadows)
+		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, meadow)
 	end
 	for _, hut in plan.huts do
 		local size = math.max(3, 16 * scale)
@@ -733,18 +747,20 @@ local function dressAlpine(canvas: Canvas, plan: MapStyle.Plan)
 	local h = F.Cell * F.Overlap
 	for _, run in plan.runs do
 		local odd = math.floor((run.z - B.z0) / F.Cell) % 2 == 1
-		local forest = Ui.make("TextLabel", {
+		local forest = Ui.make(if big then "TextLabel" else "Frame", {
 			Position = point(run.x0, run.z - h / 2, scale),
 			Size = UDim2.fromOffset((run.x1 - run.x0) * scale, h * scale),
 			BackgroundColor3 = if run.snowy then C.snowForest else C.forest,
 			BorderSizePixel = 0,
-			Text = string.rep(if odd then " ●" else "● ", run.cells * F.PerCell),
-			TextScaled = true,
-			Font = Enum.Font.GothamBlack,
-			TextColor3 = if run.snowy then C.snowTrees else C.trees,
-			TextTransparency = 0.25,
 			ZIndex = 1,
 		}, canvas.forest)
+		if big then
+			forest.Text = string.rep(if odd then " ●" else "● ", run.cells * F.PerCell)
+			forest.TextScaled = true
+			forest.Font = Enum.Font.GothamBlack
+			forest.TextColor3 = if run.snowy then C.snowTrees else C.trees
+			forest.TextTransparency = 0.25
+		end
 		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, forest)
 	end
 	if big then

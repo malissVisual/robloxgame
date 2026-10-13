@@ -324,6 +324,28 @@ def alps_order_check():
 if not alps_order_check():
     ok = False
 
+# 7.2 review: two server wirings the Luau tests cannot run. PlayerData.save writes the one-car flag into `rewards` too
+# (an older server drops unknown fields but keeps that table's short keys: Economy.vanMigrated reads either mark), and
+# the Tutorial remote's ("story", key) marks only a card's key (MoveStory.isCardKey): a chapter done is the server's.
+def review72_check():
+    root = os.path.dirname(HERE)
+    data = open(os.path.join(root, "src", "server", "PlayerData.luau"), encoding="utf-8").read()
+    tutorial = open(os.path.join(root, "src", "server", "Tutorial.luau"), encoding="utf-8").read()
+    bad = []
+    start = data.find("function PlayerData.save(")
+    save = data[start:data.find("\nend\n", start)] if start >= 0 else ""
+    if "profile.rewards[Config.CompanyVan.Flag] = true" not in save:
+        bad.append("PlayerData.save: the one-car flag into rewards too")
+    start = tutorial.find('if action == "story" then')
+    story = tutorial[start:tutorial.find("return", start)] if start >= 0 else ""
+    if "isCardKey(arg)" not in story or "PlayerData.markStory(player, arg)" not in story:
+        bad.append("Tutorial: the story action marks only MoveStory.isCardKey keys")
+    print("== 7.2 review: " + ("the one-car flag saved into rewards too; the client marks only story cards" if not bad else "; ".join(bad)))
+    return not bad
+
+if not review72_check():
+    ok = False
+
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that
 # moved, like 6.22's KitArt, or a typo shows here instead of as "X is not a valid member of Folder" in Studio).
 requires = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "check-requires.py")], capture_output=True, text=True)

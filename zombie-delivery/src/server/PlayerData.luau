@@ -47,7 +47,10 @@
 -- before (no vanOnly flag) is paid back once for the cars it owned (Economy.carRefund: their price and the stages it
 -- bought, as sold; profile.carRefund, never saved, tells server/Tutorial.luau to say so; the money's reason
 -- "CarRefund") and the van takes over their best car tracks, gear, paint and roof gun (Economy.vanCarry). Earl's
--- quest (vanQuest) is no longer read or saved.
+-- quest (vanQuest) is no longer read or saved. 7.2 review: the refund also pays what the van could not take over
+-- (VanCarry.lost) and the bonus of every employer whose vehicle the save had earned (Economy.employerBonus), never the
+-- ZDC Van itself; the flag is written into `rewards` too (an older server drops unknown fields but keeps that table's
+-- short keys: Economy.vanMigrated reads either), and so are the chapters done (its story keeps only "intro").
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -536,7 +539,7 @@ local function applySaved(profile: Profile, saved: any)
 	-- 7.0: the moves' story cards seen, checked (known keys only), only from a real save (not a lock-only record of a
 	-- new player); a save from before 7.0 has none: the empty table (Marge's moving intro shows once for it too).
 	if saved.money ~= nil then
-		profile.story = MoveStory.cleanSeen(saved.story)
+		profile.story = MoveStory.cleanSeen(saved.story, saved.rewards) -- (7.2 review: + the chapters done kept in rewards)
 	end
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
@@ -544,13 +547,16 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	-- 7.x, one car: only the vehicles a player may have (Economy.isPlayerCar: the ZDC Van, the bikes); a real save from
 	-- before (no vanOnly flag) is paid back once for the other cars it owned (Economy.carRefund) and its van takes over
-	-- their best (Economy.vanCarry, below once the cars' tables are read)
-	local carRefund = Economy.carRefund(saved)
+	-- their best (Economy.vanCarry, below once the cars' tables are read). 7.2 review: + what the van could not take
+	-- over (VanCarry.lost: track levels, roof guns, gear, as sold) and the bonus of every employer whose vehicle it had
+	-- earned (Economy.employerBonus); a save put right already counts by its flag or the same mark in its rewards
+	-- (Economy.vanMigrated: an older server drops the flag)
 	local carry = Economy.vanCarry(saved)
+	local carRefund = Economy.carRefund(saved) + (if carry then carry.lost else 0) + Economy.employerBonus(saved)
 	if carRefund > 0 then
 		profile.money = math.min(profile.money + carRefund, 2 ^ 50)
 	end
-	if carry and (carRefund > 0 or carry.retired > 0) then
+	if carRefund > 0 or (carry and carry.retired > 0) then
 		profile.carRefund = carRefund
 	end
 	if type(saved.cars) == "table" then
@@ -865,6 +871,15 @@ function PlayerData.save(player: Player, final: boolean?)
 	end
 	if final then
 		finished[player] = true
+	end
+	-- 7.2 review: an older server (main before 7.x) keeps the fields it knows only, but every short key of `rewards`:
+	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
+	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
+	profile.rewards[Config.CompanyVan.Flag] = true
+	for key in profile.story do
+		if string.sub(key, 1, 5) == "done:" then
+			profile.rewards[key] = true
+		end
 	end
 	local data = {
 		money = profile.money,
