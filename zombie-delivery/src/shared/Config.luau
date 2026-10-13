@@ -6663,4 +6663,49 @@ Config.Sandbox = {
 	MaxPlayers = 4,
 }
 
+-- 8.0 SANDBOX, the HUD and the warehouse picker (client/SandboxHud.luau, client/WarehouseUi.luau; the "Collection"
+-- remote). Px at the HUD's scale 1 unless said.
+--   MoneySize / IncomeSize   the money's text (money green, counting up) and the "+$X/min" line under it (green)
+--   Chip / ChipText          the "📦 N in stock" chip under them (on a touch screen at least Ui.MinTouch screen px high)
+--   TouchScale               the money block's smallest scale on a touch screen (it is never smaller than this)
+--   StockKey                 the key that opens / closes the STOCK list (a computer)
+--   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
+--   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
+--                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
+--                            height over the tile's width, PictureTouch on a touch screen), Gap between them, Button:
+--                            a tile's buttons (a touch screen: Ui.MinTouch screen px at least)
+--   MaxViews                 3D pictures (ViewportFrames) alive at once in the grid: only the tiles on screen get one,
+--                            the others show the piece's emoji
+--   MaxModels                the pieces' models kept built for the pictures (one a piece and variant), the oldest go
+--   Models                   false: emoji only (no ViewportFrames at all)
+--   Fallback                 only until shared/CollectionRules.luau answers (the server decides what is paid): Rarity
+--                            the value from which a piece is uncommon, rare, epic, legendary; Sell the price's share of
+--                            the piece's value at condition 0 and 1; IncomeShare the price's share it earns a minute
+Config.SandboxHud = {
+	MoneySize = 34,
+	IncomeSize = 15,
+	Chip = 32,
+	ChipText = 14,
+	TouchScale = 0.8,
+	StockKey = "B",
+	Toast = 3,
+	MaxToasts = 3,
+	Picker = {
+		Width = 900,
+		Height = 620,
+		Margin = 16,
+		TouchMargin = 8,
+		Tile = 160,
+		TileTouch = 180,
+		Picture = 0.6,
+		PictureTouch = 0.42,
+		Gap = 10,
+		Button = 32,
+	},
+	MaxViews = 12,
+	MaxModels = 24,
+	Models = true,
+	Fallback = { Rarity = { 120, 260, 520, 1000 } :: { number }, Sell = { 0.5, 1 } :: { number }, IncomeShare = 0.02 },
+}
+
 return Config
