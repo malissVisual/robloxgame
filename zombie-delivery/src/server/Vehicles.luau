@@ -1,5 +1,9 @@
 --!strict
 -- The cars. Each player has at most one car in the world, built in code from its style.
+-- 7.x, one car (Config.CompanyVan): a player's car is the ZDC Van (or a bike); every other style here is a body the
+-- world still builds (Config.AmbientCars: the traffic, the city buses, the bandits, Earl's old van, the fleet checks).
+-- A player's own car is never one of those (spawnAt falls back to the van); only an explicit company vehicle can be
+-- lent by id (no job lends one any more; 7.0's moves asked for the moving truck).
 --
 -- Driving is arcade, not wheel physics: invisible frictionless wheel colliders (they ride over curbs) and two
 -- constraints on the chassis move the car. A LinearVelocity in the ground plane (gravity still works) and an
@@ -228,8 +232,9 @@ export type Car = {
 
 local Vehicles = {}
 
--- 5.0: what Vehicles.spawn (the CAR button, a job, PLAY) says to a player who owns no vehicle yet.
-Vehicles.NO_VEHICLE = `You don't have a vehicle yet: deliver on foot (J: the job board). The Old Van: {Config.VanQuest.Where}.`
+-- 5.0: what Vehicles.spawn (the CAR button, a job, PLAY) says to a player who owns no vehicle yet. (7.x: everybody owns
+-- the ZDC Van, so only a save that is still loading hears it.)
+Vehicles.NO_VEHICLE = "Your ZDC Van is not ready yet: try CAR again in a moment."
 
 local cars: { [Player]: Car } = {}
 local lastSpawn: { [Player]: number } = {}
@@ -3136,7 +3141,7 @@ end
 -- A car for the enemies, driven by the server (server/BanditCars.luau): no seats, no prompts, bandit figures inside.
 function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
 	if def.bike then
-		def = Config.Cars[1] -- 5.1: the bandits never ride bikes
+		def = Config.AmbientCars[1] -- 5.1: the bandits never ride bikes (7.x: the old van's body)
 	end
 	local built = build(def, rgb(def.color), ground, false, "roofmg", true)
 	local model = built.model
@@ -3198,7 +3203,7 @@ local DRIVER_SKINS = { Color3.fromRGB(255, 224, 196), Color3.fromRGB(214, 160, 1
 -- look; the traffic picks one at random). 5.5: keepSeats keeps the passenger seats (a city bus: server/Buses.luau).
 function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?, stage: number?, keepSeats: boolean?): TrafficCar
 	if def.bike then
-		def, stage = Config.Cars[1], nil -- 5.1: no bikes in the traffic
+		def, stage = Config.AmbientCars[1], nil -- 5.1: no bikes in the traffic (7.x: the old van's body)
 	end
 	local built = build(def, color or rgb(def.color), ground, false, nil, true, stage)
 	local model = built.model
@@ -4388,6 +4393,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		return nil -- 5.0: no vehicle yet (Vehicles.spawn says so)
 	end
 	local def = Economy.findCar(id) or Config.Cars[1]
+	if def.ambient and not (carId ~= nil and def.company) then
+		def = Config.Cars[1] -- 7.x: a player's own car is never a body of the world: a car that is gone falls back to the van
+	end
 	Vehicles.remove(player)
 
 	-- 3.3: this car's own car-track levels (a company vehicle has none; 5.6: nor a rental, whatever you own).
@@ -4668,7 +4676,7 @@ end
 -- 4.0: how long the car the player would get is (its style at its stage: a stretched van, the Freight Truck).
 local function lengthFor(player: Player, carId: string?): number
 	local profile = PlayerData.get(player)
-	local def = Economy.findCar(carId or (if profile then profile.car else nil) or "van") or Config.Cars[1]
+	local def = Economy.findCar(carId or (if profile then profile.car else nil) or Config.CompanyVan.Car) or Config.Cars[1]
 	local levels = if profile then Economy.carLevels(profile.carUpgrades, def.id) else {}
 	return styleFor(def, if def.company then 0 else Economy.stageOf(def.id, levels)).length
 end

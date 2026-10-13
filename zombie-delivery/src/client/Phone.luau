@@ -256,7 +256,10 @@ end
 local function margeTips(level: number): { string }
 	local tips: { string } = {}
 	if level == 1 then
-		table.insert(tips, "Welcome to Dead End Dispatch. No wheels yet, so you walk: letters, medicine, pizza, parcels. Take the ON FOOT runs on the board (J). Be quick and they tip.")
+		table.insert(tips, "Welcome to Dead End Dispatch. Your first runs are on foot: letters, medicine, pizza, parcels. Take the ON FOOT runs on the board (J). Be quick and they tip.")
+		-- 7.x (one car, Config.CompanyVan): the van is yours from day one
+		local van = Economy.findCar(Config.CompanyVan.Car)
+		table.insert(tips, `The company's {if van then van.name else "van"} is yours: CAR brings it anywhere. The ★ car jobs open at level {Config.Jobs.Tiers[1].level}.`)
 		-- (6.6: no backpacks: the next bag up, at ZDC Bags by the spawn; 6.23: every bag is bought for each game, the
 		-- cheapest first)
 		local cheapest: Config.KitDef? = nil
@@ -272,9 +275,8 @@ local function margeTips(level: number): { string }
 	end
 	-- (5.1: the bike shop at Career.BIKE_LEVEL is Marge's own text from the server, with the GPS: server/Tutorial.luau)
 	local first = vehicles()[1]
-	if first and (first.level or 1) == level and level > 1 then
-		local private = first.id == Config.VanQuest.Car -- (5.0: Earl sells it, not the dealer)
-		table.insert(tips, `Level {level}: the {first.name} is yours to buy {if private then `from {Config.VanQuest.Seller} at {Config.VanQuest.Place}, far out west` else "at Dead End Motors"} ({Career.money(first.price)}). With a vehicle the car jobs open, and the missions.`)
+	if first and (first.level or 1) == level and level > 1 and not first.starter then -- (7.x: the ZDC Van is yours from level 1)
+		table.insert(tips, `Level {level}: the {first.name} is yours to buy at Dead End Motors ({Career.money(first.price)}). With a vehicle the car jobs open, and the missions.`)
 	end
 	for _, tier in Config.Jobs.Tiers do
 		if tier.level == level and level > 1 then

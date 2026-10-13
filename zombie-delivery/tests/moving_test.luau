@@ -689,6 +689,13 @@ check("the board is in the safe zone", Map.isSafe(Map.Depot.x + T.Board[1], Map.
 check("the drop-off reaches the road in front of the depot", T.DropRadius >= 15 and T.DropOff[2] + T.DropRadius > Map.BlockSize / 2 + 4)
 check("7.x van moves: a move goes with the owner's ZDC Van, its bed set", T.Van == "zdcvan" and T.Beds[T.Van] ~= nil and T.Beds[T.Van].Cell > 0 and T.VanAgain > 0)
 check("the numbers", T.Fade > 0 and T.Fade < 1 and T.Slots >= 2 and T.Tether >= 4 and T.Grace > 0 and Config.Robust.Limits.Moving > 0)
+local van = nil
+for _, def in Config.Cars do -- (7.x: the ZDC Van is the one car a player owns, Config.Cars)
+	if def.id == T.Van then
+		van = def
+	end
+end
+check("7.x: the move's van is the player's own car (Config.Cars)", van ~= nil)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

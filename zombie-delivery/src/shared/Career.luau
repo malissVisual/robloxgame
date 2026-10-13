@@ -14,6 +14,8 @@
 --   Career.grantKit(reward, kit)  5.7: a reward's kit (Config.Kit) marked owned in `kit` (profile.kit); the money to pay
 --                                 instead when it was owned already (0 otherwise)
 --
+-- 7.x, one car (Config.CompanyVan): the only car on the road is the ZDC Van at level 1 ("ZDC Van: yours from day one",
+-- no place to go: it is yours); no mission unlocks a car any more (Config.Cars has no `mission` car).
 -- Unlock kinds: tier (a danger level on the job board), job (a special job), car, stage (a stage of a car: id
 -- "carId:stage", `car` its car id), gear (Config.Gear), gun, cargun, campaign (shared/Missions.luau), garage, estate
 -- (homes and offices). Level 1 lists what you start with (the Pistol, the first jobs).
@@ -74,14 +76,15 @@ local function add(list: { Unlock }, kind: string, id: string, name: string, car
 end
 
 -- 5.7: the level a piece of gear shows at on the road: its own, but a car's gear (not bikeOnly: the Hand Trolley at 3)
--- never before the first car (Config.VanQuest's car, level 4): nothing to put it in before that.
+-- never before the first car (5.0 – 6.x: Earl's van at level 4; 7.x: the ZDC Van, yours at level 1): nothing to put it
+-- in before that.
 function Career.gearLevel(gear: Config.GearDef): number
 	if gear.bikeOnly then
 		return gear.level
 	end
 	local first: Config.CarDef? = nil
 	for _, def in Config.Cars do
-		if def.id == Config.VanQuest.Car then
+		if def.id == Config.CompanyVan.Car then
 			first = def
 		end
 	end
@@ -135,8 +138,8 @@ function Career.unlocksAt(level: number): { Unlock }
 			continue
 		end
 		if def.mission == nil and (def.level or 1) == level then -- (6.19: a car a mission unlocks is on its mission's list)
-			-- 5.0: the Old Van is not the dealer's: "Old Van: Earl's Used Wheels (Marge's quest at level 4)".
-			add(list, "car", def.id, if def.id == Config.VanQuest.Car then `{def.name}: {Config.VanQuest.Where}` else def.name)
+			-- 7.x: the ZDC Van is every courier's from the start (CarDef.starter): "ZDC Van: yours from day one".
+			add(list, "car", def.id, if def.starter then `{def.name}: yours from day one` else def.name)
 		end
 		local stages: { Config.StageDef } = def.stages or {}
 		for n, stage in stages do
@@ -296,7 +299,7 @@ end
 
 -- 6.14: where an unlock is found (see Where above), nil for what needs no trip (the starter pistol, the starter bag):
 --   bike, bike gear  Dead End Motors' BIKES counter (Map.Shops.bikes)
---   car              the Old Van at Earl's Used Wheels (Map.VanSeller, the landmark "earl"), the others Dead End Motors
+--   car              Dead End Motors (7.x: the ZDC Van, yours from the start, needs no trip: nil)
 --   stage, car gear, car gun   Wrench Garage
 --   gun              Lead & Co.'s range;  kit  its shop (Transport.kitShop: the gear stall's two counters, the bat the range)
 --   job              an employer's: their place (its landmark); a board job: JOBS
@@ -312,8 +315,9 @@ function Career.whereOf(unlock: Unlock): Where?
 	if kind == "bike" then
 		return shop("bikes", bikes)
 	elseif kind == "car" then
-		if unlock.id == Config.VanQuest.Car then
-			return { place = "earl", label = Config.VanQuest.Place }
+		local car = Economy.findCar(unlock.id)
+		if car and car.starter then
+			return nil -- 7.x: the ZDC Van is yours already (CAR brings it)
 		end
 		return shop("dealer")
 	elseif kind == "stage" or kind == "cargun" then

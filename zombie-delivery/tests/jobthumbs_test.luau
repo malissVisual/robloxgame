@@ -72,7 +72,7 @@ for _, def in Config.JobTypes do
 		table.insert(specials, def.id)
 	end
 end
-check("every special job type has a picture", #Config.JobTypes >= 12 and #specials == 0, table.concat(specials, ", "))
+check("every special job type has a picture", #Config.JobTypes >= 11 and #specials == 0, table.concat(specials, ", "))
 local staleTypes: { string } = {}
 for id in JobThumbs.Special do
 	if not typeIds[id] then
@@ -107,7 +107,7 @@ end
 check("the cakes are the bakery's", name({ business = "cake" }) == "Daily Bread Bakery" and JobThumbs.assetFor({ business = "cake" }) == JobThumbs.assetFor({ business = "bakery" }))
 check("the samples are the lab's", JobThumbs.assetFor({ business = "samples" }) == "lab" and name({ business = "lab" }) == "Research Lab")
 check("the Pizza Rush is Luigi's", JobThumbs.assetFor({ special = "pizzarush" }) == JobThumbs.assetFor({ business = "pizzeria" }))
-check("Cash Transport is the bank's, the Freight Run the warehouse's", name({ special = "cashrun" }) == "First Zombie Bank" and name({ special = "freightrun" }) == "Harbor Warehouse")
+check("Cash Transport is the bank's (7.x: the Freight Run is retired)", name({ special = "cashrun" }) == "First Zombie Bank" and JobThumbs.Special.freightrun == nil)
 check("the ice cream route and delivery share Frosty's", JobThumbs.assetFor({ special = "icecream" }) == JobThumbs.assetFor({ business = "icecream" }))
 check("a board row's special: its jobType.id (special is true there)", JobThumbs.assetFor({ special = true, jobType = { id = "schoolrun", name = "School Run" } }) == "school")
 check("the round: The Daily Undead", name({ round = true }) == "The Daily Undead" and name({ round = true, business = "news" }) == "The Daily Undead")

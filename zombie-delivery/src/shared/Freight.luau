@@ -134,7 +134,7 @@ function Freight.palletAdvice(need: number): string
 		end
 	end
 	if #names == 0 then
-		return "None of the dealer's cars takes that many pallets."
+		return "No car of the company takes pallets (7.x: the ZDC Van is the only one)."
 	end
 	return `Pallets go in a truck: {table.concat(names, ", ")}.`
 end

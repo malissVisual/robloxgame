@@ -114,14 +114,16 @@ Missions.List = {} :: { MissionDef }
 --   * 6.15: a mission is always the same (shared/MissionPlan.luau): the addresses without a place are rolled once
 --     with the mission id's own dice (renaming an id moves them), and its enemies follow its tier, twists and chapter
 --     (Config.Missions.Fixed); the mission is done when the cargo is delivered AND every one of them is dead.
---   * horse = lead (livestock truck); kid / patient / survivor = board; serve = street selling (icebox, pizza,
---     bread, soup) after a carry load.
+--   * horse = lead (the livestock truck, until 7.x: no mission leads horses now); kid / patient / survivor = board;
+--     serve = street selling (icebox, pizza, bread, soup) after a carry load.
+--   * 7.x, one car (Config.CompanyVan): every mission goes in your ZDC Van: no `vehicle` (no company vehicle is lent)
+--     and never more than its four slots carried (tests/capacity_test.luau). The people who board take none.
 --   * lift and gunner are crew twists: their missions are coop. defend needs defendTime.
 --   * labels: the pick-up label ends with AT (" at <place>" is added), the drop label is followed by the place.
 --   * a DUO mission (any mission of the DUO chapter) is co-op too; pair needs carrying; switches puts its gate at
 --     the last drop (gates = "pickup": at every pick-up).
 --   * the pieces must fit a car the player can have at the mission's level (tests/capacity_test.luau); five and
---     more say "load" in the description.
+--     more said "load" in the description (7.x: four at most, the ZDC Van's slots).
 
 type Spec = {
 	id: number,
@@ -351,10 +353,10 @@ do
 	})
 	add("clinic", {
 		id = 2, name = "Code Blue", tier = 1, reward = 700, twists = {},
-		description = "A heart attack across town: the ambulance, the patient, the clinic. Three minutes.",
-		briefing = "Greta's neighbour just collapsed in his kitchen, and no, he was not bitten, I checked over the radio. Take the ambulance, sirens on, three minutes. He walks slowly, so park close and be patient. Ha. Patient.",
+		description = "A heart attack across town: your van, the patient, the clinic. Three minutes.",
+		briefing = "Greta's neighbour just collapsed in his kitchen, and no, he was not bitten, I checked over the radio. Your van is the ambulance today: foot down, three minutes. He walks slowly, so park close and be patient. Ha. Patient.",
 		debrief = "Stable. Thanks to you. And to me. Mostly to me. Now, about my lights...",
-		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Patient",
+		vehicle = nil, load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Patient",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "clinic", payPerStop = 80, timeLimit = 180,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "RUSH THE PATIENT TO",
 		giver = "Ingrid, his wife", giverRole = "townsperson", receiver = "ada",
@@ -371,10 +373,10 @@ do
 	})
 	add("clinic", {
 		id = 5, name = "Ambulance Chaser", tier = 2, reward = 1200, coop = true, twists = { "gunner" },
-		description = "Three emergency calls, three homes, the same fever. One ambulance; the crew in the back shoots.",
-		briefing = "Three calls at once, three homes, the same fever in all of them. That's not a coincidence, that's a pattern, and I hate patterns. One of you drives the ambulance, the rest sit in the back and keep the biters off the stretchers.",
+		description = "Three emergency calls, three homes, the same fever. One van; the crew rides along and shoots.",
+		briefing = "Three calls at once, three homes, the same fever in all of them. That's not a coincidence, that's a pattern, and I hate patterns. One of you drives the van, the rest ride along and keep the biters off the patients.",
 		debrief = "Three in, three alive, and all three were bitten by the same kind of runner. Faster. Meaner. Something new is out there.",
-		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 3, cargo = "Patients",
+		vehicle = nil, load = "board", unload = "board", itemKind = "patient", items = 3, cargo = "Patients",
 		pickups = 3, pickupAt = nil, drops = 1, dropAt = "clinic", payPerStop = 160,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "BRING THE PATIENTS TO",
 		giver = "Grace's family, worried", giverRole = "townsperson", receiver = "ada",
@@ -402,7 +404,7 @@ do
 end
 
 -- ── 3. Empty Shelves (Raj, FreshMart) ──────────────────────────────
--- Groceries, warm bread from an ice cream truck, potatoes the bandits want, seedlings for the blighted farm, Tusk's
+-- Groceries, warm bread sold from your van, potatoes the bandits want, seedlings for the blighted farm, Tusk's
 -- price war and the city's ration.
 do
 	add("market", {
@@ -417,20 +419,20 @@ do
 	})
 	add("market", {
 		id = 2, name = "Bread Line", tier = 1, reward = 800, twists = {},
-		description = "Warm bread sold from Frosty's ice cream truck at three corners. Hold still while they buy.",
-		briefing = "Rosie's ovens work again, but people are too scared to walk to the bakery. Frosty lent us his truck. It still plays the ice cream song, sorry. Park at three corners and sell the bread while it's warm.",
+		description = "Four sacks of warm bread sold from your van at three corners. Hold still while they buy.",
+		briefing = "Rosie's ovens work again, but people are too scared to walk to the bakery. Load four sacks into your van, park at three corners and sell the bread while it's warm. Honk if you like. Frosty would play the ice cream song.",
 		debrief = "Everybody got a loaf. One man cried into his baguette. Beautiful. Bread, yes. Potatoes, no: the farm road is the problem.",
-		vehicle = "icecream", load = "carry", unload = "serve", itemKind = "bread", items = 6, cargo = "Warm Bread",
+		vehicle = nil, load = "carry", unload = "serve", itemKind = "bread", items = 4, cargo = "Warm Bread",
 		pickups = 1, pickupAt = nil, drops = 3, dropAt = nil, payPerStop = 70,
 		pickupLabel = "LOAD THE BREAD AT", dropLabel = "SELL BREAD AT",
 		giver = "rosie", receiver = "Hungry neighbours", receiverRole = "townsperson",
 	})
 	add("market", {
 		id = 3, name = "Farm to Table", tier = 2, reward = 1000, twists = { "hunted" },
-		description = "Potatoes from the Old Farm in the monster truck. Tusk's bandits hunt you all the way back.",
-		briefing = "Old Man Jed dug up a whole field of potatoes, and the bandits heard about it. They work for a man called Tusk now, and they'll come at you from everywhere. Take Jed's monster truck, and drive over anything that says 'hand it over'.",
+		description = "Four sacks of potatoes from the Old Farm in your van. Tusk's bandits hunt you all the way back.",
+		briefing = "Old Man Jed dug up a whole field of potatoes, and the bandits heard about it. They work for a man called Tusk now, and they'll come at you from everywhere. Fill your van with four sacks, and drive over anything that says 'hand it over'.",
 		debrief = "Potatoes! Real potatoes! Tonight, everybody eats fries. Jed says the next field won't grow without help, though.",
-		vehicle = "monster", load = "carry", unload = "carry", itemKind = "sack", items = 5, cargo = "Potatoes",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "sack", items = 4, cargo = "Potatoes",
 		pickups = 1, pickupAt = "farm", drops = 1, dropAt = "market", loadTime = 4, payPerStop = 130,
 		pickupLabel = "LOAD THE POTATOES AT", dropLabel = "DELIVER THE POTATOES TO",
 		giver = "jed", receiver = "raj",
@@ -457,10 +459,10 @@ do
 	})
 	add("market", {
 		id = 10, name = "Empty Shelves", tier = 3, reward = 2800, coop = true, twists = { "guarded", "defend" }, defendTime = 50,
-		description = "The city's ration in the big truck: two shelters, then FreshMart's doors to hold.",
-		briefing = "The city's ration for a month sits in the Harbor Warehouse, and every horde in the harbor is sitting on it. Load the big truck, feed two shelters on the way, then hold FreshMart's doors while we fill the shelves. Today, nobody goes hungry.",
+		description = "The city's rations, a full van: two shelters, then FreshMart's doors to hold.",
+		briefing = "The city's rations sit in the Harbor Warehouse, and every horde in the harbor is sitting on them. Fill your van, feed two shelters on the way, then hold FreshMart's doors while we fill the shelves. Today, nobody goes hungry.",
 		debrief = "Shelves full, city fed. My father would be proud. My accountant is confused. Chief Carlos says the smoke over the east side gets worse every day.",
-		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "groceries", items = 10, cargo = "Rations",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "groceries", items = 4, cargo = "Rations",
 		pickups = 1, pickupAt = "warehouse", drops = 3, dropAt = "market", loadTime = 4, unloadTime = 4, payPerStop = 300,
 		pickupLabel = "LOAD THE RATIONS AT", dropLabel = "DELIVER THE RATIONS TO",
 		giver = "rocco", receiver = "raj",
@@ -476,7 +478,7 @@ do
 		description = "The twins' old diner jukebox to the Survivor Camp. Too heavy for one: you lift it together or not at all.",
 		briefing = "Rosa here, and the one grinning is Rico. We're twins, we're couriers, and we never take a job alone. Rule one: nothing heavy moves unless both of you are on it. Our old diner's jukebox goes to the Survivor Camp. Show us you can lift together.",
 		debrief = "Rico: Not a scratch on the jukebox. Rosa: And not one argument. You two are hired. Next: the camp's water.",
-		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "furniture", items = 2, cargo = "Jukebox and Speakers",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "furniture", items = 2, cargo = "Jukebox and Speakers",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "camp", loadTime = 5, unloadTime = 5, payPerStop = 110,
 		pickupLabel = "LOAD THE JUKEBOX AT", dropLabel = "CARRY IT INTO",
 		giver = "rico", receiver = "martha",
@@ -496,7 +498,7 @@ do
 		description = "The city's emergency fund from the bank vault: two keys turned at once, then bandits all the way to City Hall.",
 		briefing = "Rosa: The First Zombie Bank's vault opens with two keys turned at the same moment, on two desks far apart. Rico: Gordon, the manager, hates us, so naturally he gave us both keys. Rosa: Mayor Ruth wants the emergency fund at City Hall, and every bandit with wheels wants it more. Turn the keys, load the cash, drive like you stole it. You didn't. Legally.",
 		debrief = "Rico: The mayor counted it twice. Rosa: Then she counted us. We're on the city's list of trusted people now. Short list. Rico: And the fund already has a job.",
-		vehicle = "armored", load = "carry", unload = "carry", itemKind = "cash", items = 3, cargo = "Emergency Fund",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "cash", items = 3, cargo = "Emergency Fund",
 		pickups = 1, pickupAt = "bank", drops = 1, dropAt = "cityhall", payPerStop = 200,
 		pickupLabel = "LOAD THE CASH AT", dropLabel = "DELIVER THE FUND TO",
 		giver = "gordon", receiver = "percy",
@@ -526,7 +528,7 @@ do
 		description = "Tusk's medicine hoard from two hideouts, a drop on the way, then the stadium's two-lever gate. Lift together, pull together.",
 		briefing = "Rosa: Tusk has been hoarding the city's medicine in two hideouts and selling it back one pill at a time. Tonight we take all of it. Rico: The crates are heavy, so you carry them together. Some go to a field post on the way, the rest to the Stadium Shelter. Rosa: The stadium's loading gate opens with two levers, and Tusk's men will be right behind you. This is what we trained you for, partners.",
 		debrief = "Rico: The whole city has its medicine back. Rosa: And Tusk has an empty garage and a bad mood. Partners, it was an honour.",
-		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "medicine", items = 8, cargo = "Tusk's Medicine Hoard",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "medicine", items = 4, cargo = "Tusk's Medicine Hoard",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "stadium", loadTime = 4, unloadTime = 4, payPerStop = 380,
 		pickupLabel = "RAID THE STASH AT", dropLabel = "DELIVER THE MEDICINE TO",
 		giver = "Mona, Tusk's ex-accountant", giverRole = "clerk", receiver = "dan",
@@ -549,20 +551,20 @@ do
 	})
 	add("firehouse", {
 		id = 2, name = "Smoke Eaters", tier = 2, reward = 1000, twists = {},
-		description = "The school bus, two burning blocks, four people on the street. Five minutes before the roofs fall.",
-		briefing = "Two apartment blocks are burning and the people got out onto the street. Grab the school bus and pick them up before the smoke brings every zombie in the district. Five minutes, then the roofs come down.",
+		description = "Your van, two burning blocks, four people on the street. Five minutes before the roofs fall.",
+		briefing = "Two apartment blocks are burning and the people got out onto the street. Take your van and pick them up before the smoke brings every zombie in the district. Five minutes, then the roofs come down.",
 		debrief = "Four people out, zero people toasted. Good driving. Bad news: the engines drank the last of the diesel getting there.",
-		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 4, cargo = "Survivors",
+		vehicle = nil, load = "board", unload = "board", itemKind = "survivor", items = 4, cargo = "Survivors",
 		pickups = 2, pickupAt = nil, drops = 1, dropAt = "firestation", payPerStop = 130, timeLimit = 300,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
 		giver = "Sami, a neighbour", giverRole = "townsperson", receiver = "duke",
 	})
 	add("firehouse", {
 		id = 3, name = "Fuel the Engines", tier = 2, reward = 1200, twists = { "hunted" },
-		description = "Diesel barrels from the Harbor Fuel Depot to the fire engines. Bandits hunt the fuel truck.",
+		description = "Diesel barrels from the Harbor Fuel Depot to the fire engines. Bandits hunt the fuel run.",
 		briefing = "My engines drink diesel like I drink coffee, and we're both running on empty. Hank at the Harbor Fuel Depot has barrels, and the bandits know fuel is worth more than gold now. They'll hunt you the whole way. Don't let them siphon my trucks.",
 		debrief = "Tanks full. Coffee next, please. Then trouble: a grass fire is crawling toward the Old Farm.",
-		vehicle = "fueltruck", load = "carry", unload = "carry", itemKind = "barrel", items = 4, cargo = "Diesel",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "barrel", items = 4, cargo = "Diesel",
 		pickups = 1, pickupAt = "fueldepot", drops = 1, dropAt = "firestation", payPerStop = 150,
 		pickupLabel = "LOAD THE FUEL AT", dropLabel = "REFUEL THE ENGINES AT",
 		giver = "hank", receiver = "duke",
@@ -579,10 +581,10 @@ do
 	})
 	add("firehouse", {
 		id = 9, name = "Oil Fire", tier = 4, reward = 2000, coop = true, twists = { "guarded" },
-		description = "A big load: five drums of foam concentrate for an oil fire at the Power Plant. Hordes at both ends.",
-		briefing = "The Power Plant has an oil fire, and water only makes it worse. Rocco has foam concentrate, and the plant has a horde that wandered in to warm up. Five drums, so bring something big. Clear them, deliver the foam, and nobody breathe the smoke.",
+		description = "A full van: four drums of foam concentrate for an oil fire at the Power Plant. Hordes at both ends.",
+		briefing = "The Power Plant has an oil fire, and water only makes it worse. Rocco has foam concentrate, and the plant has a horde that wandered in to warm up. Four drums, a full van. Clear them, deliver the foam, and nobody breathe the smoke.",
 		debrief = "Fire's out. Engineer Ivan owes me one, and I will collect. But look east: the whole side of town is glowing.",
-		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 5, cargo = "Fire Foam",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 4, cargo = "Fire Foam",
 		pickups = 1, pickupAt = "warehouse", drops = 1, dropAt = "powerplant", payPerStop = 300,
 		pickupLabel = "LOAD THE FOAM AT", dropLabel = "DELIVER THE FOAM TO",
 		giver = "rocco", receiver = "ivan",
@@ -590,9 +592,9 @@ do
 	add("firehouse", {
 		id = 10, name = "Smoke and Sirens", tier = 4, reward = 3400, coop = true, twists = { "defend", "gunner" }, defendTime = 60,
 		description = "The east side burns: two rooftops of survivors, a safe house, and the stadium gate to hold.",
-		briefing = "Half of the east side is on fire, and people are trapped between the flames and the dead. We take the bus, we go in, we pick up everyone we find. At the stadium you hold the gate until the last of them is inside. Station 9 leaves no one behind.",
+		briefing = "Half of the east side is on fire, and people are trapped between the flames and the dead. We take your van, we go in, we pick up everyone we find. At the stadium you hold the gate until the last of them is inside. Station 9 leaves no one behind.",
 		debrief = "Eight lives today. You're one of us now: there's a helmet with your name on it. Captain Maria watched the whole thing from the base. She wants you.",
-		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 8, cargo = "Survivors",
+		vehicle = nil, load = "board", unload = "board", itemKind = "survivor", items = 8, cargo = "Survivors",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "stadium", payPerStop = 340,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
 		giver = "Tess, a survivor", giverRole = "townsperson", receiver = "dan",
@@ -605,20 +607,20 @@ end
 do
 	add("army", {
 		id = 1, name = "Ammo Run", tier = 2, reward = 1100, twists = {},
-		description = "Ammo from the Harbor Docks to the base in the army's armored truck.",
-		briefing = "Chief Carlos says you drive like a soldier and talk like a civilian. I can work with that. The big horde is coming down from the mountains, and my men are down to harsh language. The ammo came in at the Harbor Docks: take the armored truck through the tunnel.",
+		description = "Ammo from the Harbor Docks to the base in your van, through the tunnel.",
+		briefing = "Chief Carlos says you drive like a soldier and talk like a civilian. I can work with that. The big horde is coming down from the mountains, and my men are down to harsh language. The ammo came in at the Harbor Docks: load your van and take it through the tunnel.",
 		debrief = "Ammo received. You may now salute. Badly, like a civilian. Next problem: my men are starving.",
-		vehicle = "armored", load = "carry", unload = "carry", itemKind = "ammo", items = 4, cargo = "Ammo Crates",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "ammo", items = 4, cargo = "Ammo Crates",
 		pickups = 1, pickupAt = "docks", drops = 1, dropAt = "base", payPerStop = 150,
 		pickupLabel = "LOAD THE AMMO AT", dropLabel = "DELIVER THE AMMO TO",
 		giver = "rocco", receiver = "roy",
 	})
 	add("army", {
 		id = 2, name = "Mess Hall", tier = 2, reward = 1300, twists = {},
-		description = "A truckload of hot stew (six big pots) from a diner, served from your window at three army checkpoints.",
-		briefing = "My checkpoints have eaten cold beans for a month, and a hungry soldier aims badly. A diner in town cooks hot stew, six pots the size of oil drums: bring a truck. Stop at three checkpoints and serve it from your window. Hold still while they eat. They're armed.",
+		description = "A van full of hot stew (four big pots) from a diner, served from your window at three army checkpoints.",
+		briefing = "My checkpoints have eaten cold beans for a month, and a hungry soldier aims badly. A diner in town cooks hot stew, four pots the size of oil drums: that fills your van. Stop at three checkpoints and serve it from your window. Hold still while they eat. They're armed.",
 		debrief = "The men say it's the best stew they've ever had. They're lying, but they're happy. Now we close the north tunnel.",
-		vehicle = nil, load = "carry", unload = "serve", itemKind = "soup", items = 6, cargo = "Hot Stew",
+		vehicle = nil, load = "carry", unload = "serve", itemKind = "soup", items = 4, cargo = "Hot Stew",
 		pickups = 1, pickupAt = nil, drops = 3, dropAt = nil, unloadTime = 5, payPerStop = 140,
 		pickupLabel = "PICK UP THE STEW AT", dropLabel = "SERVE STEW AT",
 		giver = "Dolores, the diner cook", giverRole = "cook", receiver = "Soldiers at the checkpoint", receiverRole = "soldier",
@@ -636,9 +638,9 @@ do
 	add("army", {
 		id = 4, name = "Wounded in Action", tier = 3, reward = 1900, coop = true, twists = { "gunner" },
 		description = "The scout chopper down at the Old Airfield: three wounded to the clinic. The crew rides shotgun.",
-		briefing = "Corporal Danny took the chopper up to count the horde and came down hard at the Old Airfield. Three of my people are hurt and can't hold a rifle. You drive the ambulance, your friends ride shotgun. City Clinic. Nobody gets left behind.",
+		briefing = "Corporal Danny took the chopper up to count the horde and came down hard at the Old Airfield. Three of my people are hurt and can't hold a rifle. You drive your van, your friends ride shotgun. City Clinic. Nobody gets left behind.",
 		debrief = "All three will walk again. Danny counted the horde before he crashed. I wish he hadn't told me the number.",
-		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 3, cargo = "Wounded Soldiers",
+		vehicle = nil, load = "board", unload = "board", itemKind = "patient", items = 3, cargo = "Wounded Soldiers",
 		pickups = 1, pickupAt = "airfield", drops = 1, dropAt = "clinic", payPerStop = 250,
 		pickupLabel = "PICK UP THE WOUNDED AT", dropLabel = "BRING THE WOUNDED TO",
 		giver = "danny", receiver = "ada",
@@ -658,7 +660,7 @@ do
 		description = "The last ammo in two gun shops, hunted all the way, and the base gate to hold while it's unloaded.",
 		briefing = "The radar says the horde reaches the base tonight. Two gun shops in town still have ammo, and every bandit gang wants it too. Load up, punch through, and at the base, hold the gate while my men stock the walls. This is it, soldier.",
 		debrief = "The line held, and you held it with us. I've seen generals with less nerve. Engineer Ivan says the fighting knocked out half the grid. He's asking for you.",
-		vehicle = "armored", load = "carry", unload = "carry", itemKind = "ammo", items = 8, cargo = "Ammo Crates",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "ammo", items = 4, cargo = "Ammo Crates",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "base", payPerStop = 380,
 		pickupLabel = "LOAD THE AMMO AT", dropLabel = "DELIVER THE AMMO TO",
 		giver = "Mack, the gun store owner", giverRole = "shopkeeper", receiver = "roy",
@@ -711,10 +713,10 @@ do
 	})
 	add("power", {
 		id = 8, name = "Cooling Water", tier = 4, reward = 2800, coop = true, twists = { "guarded" },
-		description = "A truckload of treated water: six barrels for the overheating boilers. Hordes at both ends.",
-		briefing = "Full power means hot boilers, and hot boilers mean the plant becomes a very large firework. Six barrels of treated water from Hugo at the Water Works, a truckload, and hordes at both ends, because I am unlucky.",
+		description = "A van full of treated water: four jugs for the overheating boilers. Hordes at both ends.",
+		briefing = "Full power means hot boilers, and hot boilers mean the plant becomes a very large firework. Four big jugs of treated water from Hugo at the Water Works, a full van, and hordes at both ends, because I am unlucky.",
 		debrief = "Temperature normal. City not exploded. Today is a good day. And now I have enough power for my big idea.",
-		vehicle = nil, load = "carry", unload = "carry", itemKind = "water", items = 6, cargo = "Treated Water",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "water", items = 4, cargo = "Treated Water",
 		pickups = 1, pickupAt = "waterworks", drops = 1, dropAt = "powerplant", loadTime = 4, unloadTime = 4, payPerStop = 320,
 		pickupLabel = "LOAD THE WATER AT", dropLabel = "DELIVER THE WATER TO",
 		giver = "hugo", receiver = "ivan",
@@ -724,7 +726,7 @@ do
 		description = "Four huge generators to light the Stadium Shelter. Carry them in pairs, hold the stadium while they're wired.",
 		briefing = "My big idea: four huge generators to light the Stadium Shelter and the streets around it, so nobody there sleeps in the dark again. They're the heaviest things I own. Bring a crew to carry, and hold the stadium while I wire them in. When the lights come on, the dead will come to look.",
 		debrief = "The stadium is lit, and the whole city can see it glowing. Hope, comrade. Even Walt saw it from his ranch, and Walt never calls anybody. He called.",
-		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "generator", items = 4, cargo = "Generators",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "generator", items = 4, cargo = "Generators",
 		pickups = 1, pickupAt = "powerplant", drops = 2, dropAt = "stadium", loadTime = 5, unloadTime = 5, payPerStop = 380,
 		pickupLabel = "LOAD THE GENERATORS AT", dropLabel = "DELIVER THE GENERATORS TO",
 		giver = "ivan", receiver = "dan",
@@ -733,46 +735,47 @@ end
 
 -- ── 8. Wild West End (Walt, the rancher) ─────────────────────────────────
 -- Two mares for the Riding School, oats the Rust Riders want, Thunder spooked by their raid, the stolen mares at
--- night, rifles for the walls and the last raid.
+-- night, rifles for the walls and the last raid. 7.x (one car: a horse does not fit a van): the horses walk; your van
+-- carries their saddles, Thunder's medicine, the stolen saddles and the herd's last feed.
 do
 	add("ranch", {
 		id = 1, name = "Saddle Up", tier = 2, reward = 1400, twists = {},
-		description = "Lead two mares into the livestock truck and out at the Riverside Riding School.",
-		briefing = "Howdy, partner. Saw your stadium lights from my porch. Two of my mares are going to the Riding School: they teach the kids to ride, and a horse is quieter than a car out there. Lead 'em in gentle. They kick harder than zombies.",
-		debrief = "Emma says they settled right in. You've got soft hands, partner. Now, the feed: that's where the Rust Riders come in.",
-		vehicle = "livestock", load = "lead", unload = "lead", itemKind = "horse", items = 2, cargo = "Mares",
+		description = "Two mares are moving to the Riverside Riding School. Jesse walks them; their saddles ride in your van.",
+		briefing = "Howdy, partner. Saw your stadium lights from my porch. Two of my mares are going to the Riding School: they teach the kids to ride, and a horse is quieter than a car out there. Jesse walks 'em down the river trail, their saddles go in your van. Handle 'em gentle: that leather's older than you.",
+		debrief = "Emma says the mares settled right in, saddles and all. You've got soft hands, partner. Now, the feed: that's where the Rust Riders come in.",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 2, cargo = "Saddles",
 		pickups = 1, pickupAt = "ranch", drops = 1, dropAt = "stables", payPerStop = 180,
-		pickupLabel = "LEAD THE HORSES IN AT", dropLabel = "LEAD THE HORSES OUT AT",
+		pickupLabel = "LOAD THE SADDLES AT", dropLabel = "DELIVER THE SADDLES TO",
 		giver = "jesse", receiver = "emma",
 	})
 	add("ranch", {
 		id = 2, name = "Feed Run", tier = 2, reward = 1600, twists = { "hunted" },
-		description = "Six sacks of oats from the Old Farm in the monster truck. The Rust Riders hunt every feed truck.",
-		briefing = "My horses eat more than a bunkhouse of cowboys, and the Rust Riders hit every feed truck on the west road. Old Man Jed has six sacks of oats. Take his monster truck and drive like the devil's on your tail. Because he will be.",
+		description = "Four sacks of oats from the Old Farm in your van. The Rust Riders hunt every feed run.",
+		briefing = "My horses eat more than a bunkhouse of cowboys, and the Rust Riders hit every feed run on the west road. Old Man Jed has four sacks of oats. Fill your van and drive like the devil's on your tail. Because he will be.",
 		debrief = "Oats in the barn, Rust Riders in the ditch. Good day's work. Bad night, though: they shot up the Riding School.",
-		vehicle = "monster", load = "carry", unload = "carry", itemKind = "sack", items = 6, cargo = "Oats",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "sack", items = 4, cargo = "Oats",
 		pickups = 1, pickupAt = "farm", drops = 1, dropAt = "ranch", loadTime = 4, payPerStop = 190,
 		pickupLabel = "LOAD THE OATS AT", dropLabel = "DELIVER THE OATS TO",
 		giver = "jed", receiver = "jesse",
 	})
 	add("ranch", {
 		id = 3, name = "Horse Whisperer", tier = 3, reward = 1900, twists = { "spotless" },
-		description = "Thunder, Walt's spooked stallion, home from the Riding School without a scratch.",
-		briefing = "The Rust Riders shot up the Riding School last night, and Thunder, my old stallion, won't let anybody near him. He trusts slow drivers. Bring him home without a scratch, or he'll never get in a truck again.",
+		description = "Thunder, Walt's spooked stallion, trots home by himself. His calming medicine comes in your van, without a scratch.",
+		briefing = "The Rust Riders shot up the Riding School last night, and Thunder, my old stallion, won't let anybody near him. He'll find his own way home, he always does. Emma has his calming medicine, and those bottles crack if you so much as look at a pothole. Bring 'em home without a scratch.",
 		debrief = "Thunder's home, eating apples like nothing happened. My two mares aren't, though. The Rust Riders took 'em.",
-		vehicle = "livestock", load = "lead", unload = "lead", itemKind = "horse", items = 1, cargo = "Thunder",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "medicine", items = 1, cargo = "Thunder's Medicine",
 		pickups = 1, pickupAt = "stables", drops = 1, dropAt = "ranch", payPerStop = 220,
-		pickupLabel = "LEAD THE STALLION IN AT", dropLabel = "LEAD HIM HOME TO",
+		pickupLabel = "PICK UP THE MEDICINE AT", dropLabel = "BRING IT HOME TO",
 		giver = "emma", receiver = "walt",
 	})
 	add("ranch", {
 		id = 5, name = "Moonlight Rustlers", tier = 3, reward = 2300, twists = { "night" },
-		description = "The two stolen mares, hidden in the Old Farm's barn. Only fools move horses by daylight.",
-		briefing = "Jed spotted my two stolen mares in his old barn: the Rust Riders hid 'em there. Only fools move horses in daylight with bandits watching, so we go at night. Quiet-like.",
-		debrief = "Both mares home. The rustlers will wake up to an empty barn and a bad mood. They'll come for the ranch now. Time to get ready.",
-		vehicle = "livestock", load = "lead", unload = "lead", itemKind = "horse", items = 2, cargo = "Stolen Mares",
+		description = "The stolen mares' saddles, in the Old Farm's barn with the rustlers asleep next to them. Only fools go by daylight.",
+		briefing = "Jed spotted my two stolen mares in his old barn: the Rust Riders hid 'em there. He walked 'em out at dusk, but their saddles are still in the tack room, and the rustlers sleep right next to it. Only fools go in daylight with bandits watching, so we go at night. Quiet-like.",
+		debrief = "Mares and saddles home. The rustlers will wake up to an empty barn and a bad mood. They'll come for the ranch now. Time to get ready.",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 2, cargo = "Stolen Saddles",
 		pickups = 1, pickupAt = "farm", drops = 1, dropAt = "ranch", payPerStop = 250,
-		pickupLabel = "LEAD THE HORSES IN AT", dropLabel = "LEAD THE HORSES OUT AT",
+		pickupLabel = "LOAD THE SADDLES AT", dropLabel = "DELIVER THE SADDLES TO",
 		giver = "jed", receiver = "walt",
 	})
 	add("ranch", {
@@ -787,12 +790,12 @@ do
 	})
 	add("ranch", {
 		id = 10, name = "Wild West End", tier = 4, reward = 5400, coop = true, twists = { "defend", "hunted" }, defendTime = 75,
-		description = "The last of the herd from the burned stables, hunted by the Rust Riders, and the ranch to hold.",
-		briefing = "This is it, partner. The Rust Riders burned the Riding School's stables, and the last of my herd is waiting there. Leave one horse at a safe barn on the way, bring the other home, then hold the ranch with me. They're coming for everything I've got.",
+		description = "The herd's last feed from the burned stables, hunted by the Rust Riders, and the ranch to hold.",
+		briefing = "This is it, partner. The Rust Riders burned the Riding School's stables. The herd ran to my place, and it starves without the last feed in those ruins. Leave a sack at a safe barn on the way, bring the other home, then hold the ranch with me. They're coming for everything I've got.",
 		debrief = "The Rust Riders are done. The west is ours again. You're family now, partner. Doctor Hiro rode out here asking for the best driver in the city. Reckon that's you.",
-		vehicle = "livestock", load = "lead", unload = "lead", itemKind = "horse", items = 2, cargo = "The Last Herd",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "sack", items = 2, cargo = "The Last Feed",
 		pickups = 1, pickupAt = "stables", drops = 2, dropAt = "ranch", payPerStop = 380,
-		pickupLabel = "LEAD THE HORSES IN AT", dropLabel = "LEAD THE HORSES OUT AT",
+		pickupLabel = "LOAD THE FEED AT", dropLabel = "DELIVER THE FEED TO",
 		giver = "emma", receiver = "walt",
 	})
 end
@@ -836,7 +839,7 @@ do
 		description = "The first person ever bitten, hiding at the Old Airfield. The hordes follow her. Bring her in unhurt.",
 		briefing = "We found her: the woman who was bitten on day one and never turned. She's hiding at the Old Airfield, Corporal Danny is keeping her company, and the hordes are drawn to her, nobody knows why. Bring her to me unhurt. Everything depends on it.",
 		debrief = "Patient Zero is safe, and the cure is in her blood. I can feel it. Now the formula has to survive a night drive.",
-		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Patient Zero",
+		vehicle = nil, load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Patient Zero",
 		pickups = 1, pickupAt = "airfield", drops = 1, dropAt = "lab", payPerStop = 360,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "BRING THE PATIENT TO",
 		giver = "danny", receiver = "hiro",
@@ -853,10 +856,10 @@ do
 	})
 	add("lab", {
 		id = 10, name = "The Cure", tier = 4, reward = 7000, coop = true, twists = { "defend", "spotless" }, defendTime = 90,
-		description = "The biggest load yet, eight coolers of the cure: two homes, then the Survivor Camp to hold until every dose is given.",
-		briefing = "Everything I could make: eight coolers of the cure. Two homes on the way, then the Survivor Camp, the biggest crowd we have. When the dead smell that many people in one place, they'll come in waves. Hold the camp until every dose is given. And don't drop anything. Please.",
+		description = "A full van, four coolers of the cure: two homes, then the Survivor Camp to hold until every dose is given.",
+		briefing = "Everything I could make: four coolers of the cure, a full van. Two homes on the way, then the Survivor Camp, the biggest crowd we have. When the dead smell that many people in one place, they'll come in waves. Hold the camp until every dose is given. And don't drop anything. Please.",
 		debrief = "The camp is cured. The rest of the city is not: this lab made enough for one camp, and it can't make more. The cure has to leave the city. A man called Vinnie says he can move anything. I don't like him. I need him.",
-		vehicle = nil, load = "carry", unload = "carry", itemKind = "vaccine", items = 8, cargo = "The Cure",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "vaccine", items = 4, cargo = "The Cure",
 		pickups = 1, pickupAt = "lab", drops = 3, dropAt = "camp", payPerStop = 420,
 		pickupLabel = "LOAD THE CURE AT", dropLabel = "DELIVER THE CURE TO",
 		giver = "hiro", receiver = "hal",
@@ -899,10 +902,10 @@ do
 	})
 	add("underworld", {
 		id = 5, name = "Heavy Business", tier = 4, reward = 3500, coop = true, twists = { "lift" },
-		description = "A big load: five heavy cases of hardware from the Harbor Warehouse to Blackrock Prison. Bring the muscle.",
-		briefing = "My business partners run Blackrock Prison now, and the Syndicate is knocking on their walls. Five cases of hardware wait at the Harbor Warehouse, where my man Bruno keeps a corner. Heavy stuff, so bring a muscle or two.",
+		description = "A full van: four heavy cases of hardware from the Harbor Warehouse to Blackrock Prison. Bring the muscle.",
+		briefing = "My business partners run Blackrock Prison now, and the Syndicate is knocking on their walls. Four cases of hardware wait at the Harbor Warehouse, where my man Bruno keeps a corner. Heavy stuff, so bring a muscle or two.",
 		debrief = "My partners are grateful. Grateful partners are good partners. Now: the Syndicate's boss keeps a boat at the docks. Keeps. For now.",
-		vehicle = nil, load = "carry", unload = "carry", itemKind = "weapons", items = 5, cargo = "Hardware",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "weapons", items = 4, cargo = "Hardware",
 		pickups = 1, pickupAt = "warehouse", drops = 1, dropAt = "prison", loadTime = 5, unloadTime = 5, payPerStop = 320,
 		pickupLabel = "LOAD THE CASES AT", dropLabel = "DELIVER THE CASES TO",
 		giver = "Bruno, Vinnie's man", giverRole = "worker", receiver = "Big Sal, the yard boss", receiverRole = "guard",
@@ -922,7 +925,7 @@ do
 		description = "Vinnie's last two stashes, a cut for his mother, and the pier at Lighthouse Point to hold.",
 		briefing = "The city's going down and I'm going out on a yacht. My last two stashes are hidden in town. Collect them, drop a cut at my mother's, God bless her, and bring the rest to Lighthouse Point. Every gang left wants a piece. Hold the pier while my boys load the yacht, and you'll never have to work again. In the good way.",
 		debrief = "Pleasure doing business, kid. If anybody asks, you never met me. And tell the mayor her boats can use my pier. Consider it a donation.",
-		vehicle = "armored", load = "carry", unload = "carry", itemKind = "cash", items = 8, cargo = "Vinnie's Fortune",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "cash", items = 4, cargo = "Vinnie's Fortune",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "lighthouse", payPerStop = 420,
 		pickupLabel = "COLLECT THE STASH AT", dropLabel = "DELIVER THE MONEY TO",
 		giver = "Lefty, a lookout", giverRole = "townsperson", receiver = "vinnie",
@@ -946,9 +949,9 @@ do
 	add("exodus", {
 		id = 3, name = "Fuel for the Flight", tier = 3, reward = 3100, twists = { "quiet" },
 		description = "The depot's last leaking barrels to the evacuation plane. One spark and it's over: no shooting.",
-		briefing = "The last plane at the Old Airfield needs fuel, and Hank's last barrels leak like a sieve. One spark and the fuel truck becomes a small sun. No shooting, not a single bullet. Drive around the dead, not through them.",
+		briefing = "The last plane at the Old Airfield needs fuel, and Hank's last four barrels leak like a sieve. One spark and your van becomes a small sun. No shooting, not a single bullet. Drive around the dead, not through them.",
 		debrief = "Tanks full, and you still have all your fingers. Captain Jo says the plane will fly. Now, what goes on the boat.",
-		vehicle = "fueltruck", load = "carry", unload = "carry", itemKind = "barrel", items = 6, cargo = "Jet Fuel",
+		vehicle = nil, load = "carry", unload = "carry", itemKind = "barrel", items = 4, cargo = "Jet Fuel",
 		pickups = 1, pickupAt = "fueldepot", drops = 1, dropAt = "airfield", payPerStop = 330,
 		pickupLabel = "LOAD THE FUEL AT", dropLabel = "REFUEL THE PLANE AT",
 		giver = "hank", receiver = "jo",
@@ -965,10 +968,10 @@ do
 	})
 	add("exodus", {
 		id = 8, name = "The Mayor's Kids", tier = 4, reward = 4500, coop = true, twists = { "hunted" },
-		description = "The mayor's own kids from Sunny Hill School to the plane, in the armored truck. Bandits want a hostage.",
-		briefing = "My own kids are at Sunny Hill School with the last class. The bandits know who I am, and they'd love a hostage. Take the armored truck. Please. I'm asking as a mother, not as a mayor.",
+		description = "The mayor's own kids from Sunny Hill School to the plane, in your van. Bandits want a hostage.",
+		briefing = "My own kids are at Sunny Hill School with the last class. The bandits know who I am, and they'd love a hostage. Bring them in your van. Please. I'm asking as a mother, not as a mayor.",
 		debrief = "My kids are on the plane. I... thank you. I owe you everything. Now the hardest part.",
-		vehicle = "armored", load = "board", unload = "board", itemKind = "kid", items = 3, cargo = "The Mayor's Kids",
+		vehicle = nil, load = "board", unload = "board", itemKind = "kid", items = 3, cargo = "The Mayor's Kids",
 		pickups = 1, pickupAt = "school", drops = 1, dropAt = "airfield", payPerStop = 400,
 		pickupLabel = "PICK UP THE KIDS AT", dropLabel = "BRING THE KIDS TO",
 		giver = "amy", receiver = "jo",
@@ -978,7 +981,7 @@ do
 		description = "The last people from the Stadium Shelter to the last boat. Hordes at both ends, the pier to hold.",
 		briefing = "The last boat leaves Lighthouse Point at dawn. Bring the last people from the Stadium Shelter, and hold the pier while they board. The dead are thick at both ends. This is the part they'll write songs about.",
 		debrief = "The boat is out. They're singing on deck. Off key, but singing. One more run, driver. The last one.",
-		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 6, cargo = "The Last Survivors",
+		vehicle = nil, load = "board", unload = "board", itemKind = "survivor", items = 6, cargo = "The Last Survivors",
 		pickups = 1, pickupAt = "stadium", drops = 1, dropAt = "lighthouse", payPerStop = 420,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
 		giver = "dan", receiver = "tom",
@@ -986,9 +989,9 @@ do
 	add("exodus", {
 		id = 10, name = "Last Convoy", tier = 4, reward = 11000, coop = true, twists = { "defend", "gunner" }, defendTime = 90,
 		description = "Three hideouts, a field post for the sick, the last plane. Hold the runway until it's in the air.",
-		briefing = "This is the end of the city and the start of something else. The last survivors hide in three places. Fill the bus, drop the sick ones at the field post, and bring the rest to the airfield. When the engines start, every dead thing for miles will come running. Hold them off until the plane is up. Then get on board yourself.",
+		briefing = "This is the end of the city and the start of something else. The last survivors hide in three places. Fill your van, drop the sick ones at the field post, and bring the rest to the airfield. When the engines start, every dead thing for miles will come running. Hold them off until the plane is up. Then get on board yourself.",
 		debrief = "Wheels up. The city is behind us, and the cure is with us. You're the reason anyone made it out. Thank you, driver.",
-		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 10, cargo = "The Last Convoy",
+		vehicle = nil, load = "board", unload = "board", itemKind = "survivor", items = 10, cargo = "The Last Convoy",
 		pickups = 3, pickupAt = nil, drops = 2, dropAt = "airfield", payPerStop = 480,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
 		giver = "Tess, a survivor", giverRole = "townsperson", receiver = "jo",

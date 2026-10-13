@@ -276,7 +276,7 @@ R.player = function()
 		end)
 	end
 
-	heading("Spawn a car", "It comes right now on the road next to the target (yellow = an employer's company vehicle).")
+	heading("Spawn a car", "It comes right now on the road next to the target (7.x: the ZDC Van and the bikes, the only vehicles a player has).")
 	local cars = grid(150)
 	for _, def in Config.Cars do
 		action(cars, def.name, if def.company then C.yellow else C.blue, function()
@@ -284,7 +284,13 @@ R.player = function()
 		end)
 	end
 
-	heading("Car stages", "The car at that stage (given first if the target lacks it). The equipped car is rebuilt now, during a job after it.")
+	local staged = false -- (7.x: the ZDC Van has one stage: no rows, no heading)
+	for _, def in Config.Cars do
+		staged = staged or Economy.maxStage(def.id) > 0
+	end
+	if staged then
+		heading("Car stages", "The car at that stage (given first if the target lacks it). The equipped car is rebuilt now, during a job after it.")
+	end
 	for _, def in Config.Cars do
 		local top = Economy.maxStage(def.id)
 		if top > 0 then

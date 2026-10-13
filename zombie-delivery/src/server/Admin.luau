@@ -15,18 +15,18 @@
 -- Commands over the "Admin" remote (name, arg, target?): target = the UserId of a player in this server (nil: you).
 -- Only [T] commands take it; the others always act on / near you. Every notice goes to the target, and a copy to you.
 -- Every argument is checked here (types, NaN, ranges, ids that exist); a bad one does nothing but say so.
---   unlockAll [T]             every car (company ones too), every gun (earned ones too), every paint, 10 of each
+--   unlockAll [T]             every vehicle (7.x: the ZDC Van and the bikes), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), every
 --                             property (the biggest mansion as the home if you have none), the top driver level
 --                             and (4.7) every licence (Config.Jobs.Licences); 5.0: every piece of kit (Config.Kit),
---                             the phone, and the Old Van as the car you drive when you had none
+--                             the phone, and the ZDC Van as the car you drive when you had none
 --   maxUpgrades [T]           every upgrade track at its last level (3.3: the car tracks of every car you own; 3.5:
 --                             and every such car at its last stage)
 --   money [T]  amount         + money (1 … 10 000 000)
 --   xp [T]     amount         + driver XP (1 … 10 000 000)
 --   setLevel [T] level        the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
 --   item [T]   { id, count }  a consumable (Config.Items): + count (-1000 … 1000), kept within 0 … its max
---   car [T]    car id         that car, now, next to you
+--   car [T]    car id         that vehicle, now, next to you (7.x: only one a player may have: the ZDC Van, a bike)
 --   carGun [T] id | "none"    the gun on the roof of your equipped car (Config.CarGuns)
 --   carStage [T] { car, stage }   a car's stage (0 … Economy.maxStage), the car given first if you lack it; the live
 --                             car is rebuilt (not during a job: then it shows from the next car call)
@@ -268,8 +268,7 @@ local function unlockAll(player: Player)
 	for _, car in Config.Cars do
 		profile.cars[car.id] = true
 	end
-	profile.vanQuest = "done" -- 5.0: Earl's van is yours already
-	-- 5.0: a player still on foot drives the Old Van from now on; every piece of personal gear, and the phone.
+	-- 5.0: a player still on foot drives the van from now on (7.x: the ZDC Van); every piece of personal gear, and the phone.
 	if profile.car == nil then
 		profile.car = Config.Cars[1].id
 		task.defer(function()
@@ -291,7 +290,7 @@ local function unlockAll(player: Player)
 	for _, item in Config.Items do
 		profile.items[item.id] = math.max(profile.items[item.id] or 0, math.min(10, item.max))
 	end
-	-- Every employer's jobs counted as done: their car and gun are "earned" in the windows too.
+	-- Every employer's jobs counted as done: their bonus (7.x; their car before) and gun are "earned" in the windows too.
 	for _, employer in Config.Employers do
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
 	end
@@ -337,11 +336,11 @@ local function carGun(player: Player, arg: any)
 	end
 	local carId = profile.car
 	if not carId then
-		say(player, "ADMIN: you have no vehicle yet (unlockAll gives the Old Van).")
+		say(player, "ADMIN: your ZDC Van is not ready yet (the save is loading).")
 		return
 	end
 	if not Economy.canMount(carId) then
-		say(player, "ADMIN: this vehicle can't carry a gun (the dealer's cars, the monster truck and the armored truck can).")
+		say(player, "ADMIN: this vehicle can't carry a gun (the ZDC Van can; a bike can't).")
 		return
 	end
 	if arg == "none" then
@@ -377,9 +376,10 @@ local function money(player: Player, arg: any)
 end
 
 local function car(player: Player, arg: any)
-	local def = if type(arg) == "string" then Economy.findCar(arg) else nil
+	-- 7.x, one car: only a vehicle a player may have (the ZDC Van, a bike), never a body of Config.AmbientCars
+	local def = if type(arg) == "string" and Economy.isPlayerCar(arg) then Economy.findCar(arg) else nil
 	if not def then
-		say(player, "ADMIN: unknown car.")
+		say(player, "ADMIN: unknown car (the ZDC Van and the bikes).")
 		return
 	end
 	local err = Vehicles.spawn(player, true, def.id)
@@ -923,7 +923,7 @@ end
 -- { car, stage }: that car at that stage (given first if the player lacks it).
 function Give.carStage(player: Player, arg: any)
 	local carId = if type(arg) == "table" then arg.car else nil
-	local def = if type(carId) == "string" then Economy.findCar(carId) else nil
+	local def = if type(carId) == "string" and Economy.isPlayerCar(carId) then Economy.findCar(carId) else nil -- (7.x)
 	if not def then
 		say(player, "ADMIN: unknown car.")
 		return
@@ -977,7 +977,7 @@ function Give.upgrade(player: Player, arg: any)
 	if def.car then
 		local carId = profile.car
 		if not carId then
-			say(player, "ADMIN: you have no vehicle yet (unlockAll gives the Old Van).")
+			say(player, "ADMIN: your ZDC Van is not ready yet (the save is loading).")
 			return
 		end
 		if not Economy.upgradeFits(carId, def.id) then

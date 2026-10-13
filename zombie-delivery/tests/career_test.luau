@@ -47,12 +47,13 @@ for _, step in road do
 end
 check("a new rank is marked where it starts", road[1].newRank and road[5].newRank and not road[7].newRank and road[8].newRank)
 -- 5.0: you start on foot; the Old Van, the ★ car jobs and First Shift come at level 4.
-check("level 1: the Pistol (on foot: no car, no car jobs)", has(road[1].unlocks, "gun", "pistol") and not has(road[1].unlocks, "car", "van")
-	and not has(road[1].unlocks, "tier", "1"))
+-- 7.x (one car, Config.CompanyVan): the ZDC Van is yours at level 1; the ★ car jobs still open at 4.
+check("level 1: the Pistol and the ZDC Van (yours from day one), no car jobs yet", has(road[1].unlocks, "gun", "pistol") and has(road[1].unlocks, "car", "zdcvan")
+	and not has(road[1].unlocks, "car", "van") and not has(road[1].unlocks, "tier", "1"))
 check("level 2: the Rented Lockup", has(road[2].unlocks, "garage", "garage_rented"))
--- 5.7: the Hand Trolley (gear for a car, level 3) shows on the road with the first car, at level 4.
-check("level 4: the Hand Trolley (car gear: not before the first car)", has(road[4].unlocks, "gear", "trolley") and not has(road[3].unlocks, "gear", "trolley")
-	and Career.gearLevel((Economy.findGear("trolley") :: any)) == 4)
+-- 5.7: the Hand Trolley (gear for a car, level 3) shows on the road with the first car (7.x: the ZDC Van, level 1: at 3).
+check("level 3: the Hand Trolley (car gear: the van is yours from the start)", has(road[3].unlocks, "gear", "trolley") and not has(road[4].unlocks, "gear", "trolley")
+	and Career.gearLevel((Economy.findGear("trolley") :: any)) == 3)
 check("bike gear keeps its level on the road", has(road[2].unlocks, "gear", "basket"))
 -- 5.7: the levels before a car give kit, not car items; a kit owned already pays its price instead.
 for level = 2, 4 do
@@ -85,10 +86,19 @@ check("6.6: no level gives a backpack", (function()
 end)())
 check("owned already: its price instead", Career.grantKit(Career.reward(3), ownedKit) == (Career.kitOf(Career.reward(3)) :: any).price)
 check("no kit, nothing", Career.grantKit(Career.reward(2), ownedKit) == 0 and Career.grantKit(nil, ownedKit) == 0)
-check("level 4: the Old Van, the Patched Van stage, ★ jobs, First Shift, the Ratchet Straps", has(road[4].unlocks, "car", "van") and has(road[4].unlocks, "stage", "van:1")
+check("level 4: ★ jobs, First Shift, the Ratchet Straps (7.x: no car and no stage: the van is yours already)", not has(road[4].unlocks, "car", "van") and not has(road[4].unlocks, "stage", "van:1")
 	and has(road[4].unlocks, "tier", "1") and has(road[4].unlocks, "campaign", "dispatch") and has(road[4].unlocks, "gear", "straps"))
 check("level 5: ★★ jobs; 6.19: the Courier Van and the High-Roof Van are Many Hands', not the level's", not has(road[5].unlocks, "car", "courier") and not has(road[5].unlocks, "car", "highroof") and has(road[5].unlocks, "tier", "2"))
-check("level 6: the Long Cargo Van stage, ★★★ jobs (6.19: the Pickup is Farm to Table's)", not has(road[6].unlocks, "car", "pickup") and has(road[6].unlocks, "stage", "van:3") and has(road[6].unlocks, "tier", "3"))
+check("level 6: ★★★ jobs (7.x: no car, no stage on the road)", not has(road[6].unlocks, "car", "pickup") and not has(road[6].unlocks, "stage", "van:3") and has(road[6].unlocks, "tier", "3"))
+local carsOnRoad: { string } = {}
+for _, stepOf in road do
+	for _, unlock in stepOf.unlocks do
+		if unlock.kind == "car" or unlock.kind == "stage" then
+			table.insert(carsOnRoad, `{stepOf.level}:{unlock.id}`)
+		end
+	end
+end
+check("7.x: the only car on the road is the ZDC Van at level 1, no stage", #carsOnRoad == 1 and carsOnRoad[1] == "1:zdcvan", table.concat(carsOnRoad, ", "))
 check("level 5: the Cooler Box, the Roof Machine Gun, the Cash Transport", has(road[5].unlocks, "gear", "cooler") and has(road[5].unlocks, "cargun", "roofmg")
 	and has(road[5].unlocks, "job", "cashrun"))
 check("level 7: the Roof Rack, Birch Cottage (6.19: the Box Truck is the Empty Shelves finale's)", has(road[7].unlocks, "gear", "roofrack") and has(road[7].unlocks, "estate", "birch")
@@ -207,8 +217,9 @@ check("never past the top", #Career.pending(99, Career.reached(99)) == 0 and Car
 local steps = Career.road()
 check("a short summary with … when there is more", string.find(Career.summary(steps[4].unlocks, 2), " …", 1, true) ~= nil
 	and string.find(Career.summary(steps[3].unlocks, 99), "…", 1, true) == nil)
-check("the summary leaves out the stages of cars you do not own", string.find(Career.summary(steps[6].unlocks, 99, { van = false } :: any), "Long Cargo Van", 1, true) == nil
-	and string.find(Career.summary(steps[6].unlocks, 99, { van = true }), "Long Cargo Van", 1, true) ~= nil)
+local staged: { Career.Unlock } = { { kind = "tier", id = "3", name = "★★★ Dangerous jobs" }, { kind = "stage", id = "van:3", name = "Long Cargo Van", car = "van" } }
+check("the summary leaves out the stages of cars you do not own", string.find(Career.summary(staged, 99, { van = false } :: any), "Long Cargo Van", 1, true) == nil
+	and string.find(Career.summary(staged, 99, { van = true }), "Long Cargo Van", 1, true) ~= nil)
 
 -- ── The gear ────────────────────────────────────────────────────────────────
 
@@ -230,6 +241,7 @@ check("the Hand Trolley is no upgrade track any more", Economy.findUpgrade("trol
 
 -- The slots: the stage wins over the car; the company vehicles have none.
 local SLOTS: { [string]: { number } } = {
+	zdcvan = { 3 }, -- 7.x: the one car
 	van = { 1, 1, 2, 3 },
 	courier = { 2, 2 },
 	highroof = { 3, 3 },
@@ -349,8 +361,7 @@ do
 	local function where(kind: string, id: string): Career.Where?
 		return Career.whereOf({ kind = kind, id = id, name = id })
 	end
-	local van = where("car", "van") :: Career.Where
-	check("6.14: the Old Van is at Earl's Used Wheels (the GPS to Earl)", van.place == "earl" and van.label == "Earl's Used Wheels" and landmarks.earl == true)
+	check("7.x: the ZDC Van needs no trip (yours from the start); Earl's lot is still on the map", where("car", "zdcvan") == nil and landmarks.earl == true)
 	check("6.14: a dealer's car at Dead End Motors", (where("car", "boxtruck") :: Career.Where).place == "dealer" and (where("car", "boxtruck") :: Career.Where).label == "Dead End Motors")
 	local bike = where("bike", "rustbike") :: Career.Where
 	check("6.14: a bike at Dead End Motors' BIKES counter (Map.Shops.bikes)", bike.place == "bikes" and Map.Shops.bikes ~= nil and bike.label == "Dead End Motors' BIKES counter")
@@ -402,17 +413,17 @@ do
 		end
 		return table.concat(out, " | ")
 	end
-	check("6.14: level 4's card: Earl's van first, the Padded Messenger Bag at ZDC Bags (6.19: no gun: the Shotgun is a mission's), then MISSIONS",
-		#rows == 4 and rows[1].place == "earl" and rows[1].names[1] == "Old Van" and #rows[1].names == 1 and rows[2].place == "bags"
-			and rows[3].place == "mechanic" and rows[4].window == "missions" and rows[4].id == "dispatch" and rows[4].names[1] == "First Shift", labels())
-	local grouped = Career.whereRows(road[4].unlocks, 9, 9)
+	check("6.14: level 4's card: the Padded Messenger Bag at ZDC Bags, Wrench Garage, the BIKES counter, then MISSIONS (7.x: no car to fetch from Earl)",
+		#rows == 4 and rows[1].place == "bags" and rows[2].place == "mechanic" and rows[3].place == "bikes"
+			and rows[4].window == "missions" and rows[4].id == "dispatch" and rows[4].names[1] == "First Shift", labels())
+	local grouped = Career.whereRows(road[5].unlocks, 9, 9)
 	local garage: Career.WhereRow? = nil
 	for _, row in grouped do
 		if row.place == "mechanic" then
 			garage = row
 		end
 	end
-	check("6.14: one row a place: Wrench Garage's stage and gear together", garage ~= nil and #garage.names >= 3, labels())
+	check("6.14: one row a place: Wrench Garage's gear and car gun together (level 5)", garage ~= nil and #garage.names >= 2, labels())
 	check("6.14: short names leave out where ('SMG at Lead & Co.'s range' → SMG)", Career.shortName({ kind = "gun", id = "smg", name = "SMG at Lead & Co.'s range" }) == "SMG"
 		and Career.shortName({ kind = "job", id = "schoolrun", name = "School Run (Sunny Hill School)" }) == "School Run" and Career.shortName({ kind = "gear", id = "basket", name = "Front Basket" }) == "Front Basket")
 	local two = Career.whereRows(road[2].unlocks, 3, 4)
@@ -438,21 +449,21 @@ do
 	local want: { { string } } = {
 		{ "smg", step("dispatch", 2), "Mail Call" },
 		{ "shotgun", finale("dispatch"), "Rush Hour of the Dead" },
-		{ "courier", step("clinic", 3), "Many Hands" },
-		{ "highroof", step("clinic", 3), "Many Hands" },
 		{ "rifle", finale("clinic"), "Code Red" },
-		{ "pickup", step("market", 3), "Farm to Table" },
-		{ "zdcvan", step("market", 5), "Price War" }, -- 6.25: the owner's Blender van
-		{ "boxtruck", finale("market"), "Empty Shelves" },
-		{ "muscle", finale("firehouse"), "Smoke and Sirens" },
-		{ "freight", finale("army"), "Iron Supply" },
 		{ "minigun", finale("power"), "Lights Out" },
 		{ "roofminigun", finale("power"), "Lights Out" },
-		{ "armorvan", finale("ranch"), "Wild West End" },
 		{ "launcher", finale("lab"), "The Cure" },
 		{ "rooflauncher", finale("lab"), "The Cure" },
-		{ "rallyvan", finale("underworld"), "Dirty Money" },
 	}
+	-- 7.x (one car): no mission unlocks a car any more (the Courier Van … the Rally Van left the game; the ZDC Van is
+	-- everybody's from the start)
+	local carMissions: { string } = {}
+	for _, def in Config.Cars do
+		if def.mission ~= nil then
+			table.insert(carMissions, def.id)
+		end
+	end
+	check("7.x: no car of Config.Cars waits for a mission", #carMissions == 0, table.concat(carMissions, ", "))
 	local function defOf(id: string): any
 		return Economy.findCar(id) or Economy.findWeapon(id) or Economy.findCarGun(id)
 	end
@@ -523,8 +534,8 @@ do
 		and Career.missionLock(smg, { dispatch_2 = 1 }) == nil and Career.missionLock(Economy.findWeapon("pistol"), {}) == nil)
 	check("6.19: the lock's words", Career.lockText("dispatch_2") == "Finish Mail Call")
 	local hands = Career.missionUnlocks(step("clinic", 3))
-	check("6.19: Many Hands unlocks the Courier Van and the High-Roof Van", #hands == 2 and hands[1].id == "courier" and hands[2].id == "highroof" and hands[1].kind == "car")
-	check("6.19: MISSIONS' line", Career.unlocksLine("dispatch_2") == "🔓 Unlocks: SMG" and Career.unlocksLine(step("clinic", 3)) == "🔓 Unlocks: Courier Van, High-Roof Van"
+	check("7.x: Many Hands unlocks nothing any more (it gave the Courier Van and the High-Roof Van)", #hands == 0)
+	check("6.19: MISSIONS' line", Career.unlocksLine("dispatch_2") == "🔓 Unlocks: SMG" and Career.unlocksLine(step("clinic", 3)) == nil
 		and Career.unlocksLine("dispatch_1") == nil, Career.unlocksLine("dispatch_2"))
 	local news = Career.newLines("dispatch_2")
 	check("6.19: the cleared card: \"🔓 NEW: SMG at Lead & Co.'s range\" and the GPS to the range", #news == 1 and news[1].text == `🔓 NEW: SMG at {Config.GunRange.Shop}` and news[1].place == "guns", news[1] and news[1].text)

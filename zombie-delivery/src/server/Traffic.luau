@@ -97,7 +97,8 @@ local BANDIT_FIRST = 25 -- seconds into a job before a traffic car can be bandit
 local BANDIT_GAP = { 70, 120 } -- seconds between them (one player)
 local BANDIT_RANGE = { 70, 220 }
 
--- The bodies: the dealer's cars mostly, now and then a work truck (Config.Cars ids, weight). 5.1: no bikes.
+-- The bodies: the dealer's cars mostly, now and then a work truck (Config.Cars ids, weight). 5.1: no bikes. 7.x: the cars
+-- nobody owns any more (Config.AmbientCars: the players drive only the ZDC Van).
 local BODIES: { { id: string, weight: number } } = {
 	{ id = "van", weight = 4 },
 	{ id = "courier", weight = 2 }, -- 3.3: the new vans drive past too (their backs welded shut, no kit; 3.5: any stage)
@@ -269,7 +270,7 @@ local function pickBody(): Config.CarDef?
 			break
 		end
 	end
-	for _, def in Config.Cars do
+	for _, def in Config.AmbientCars do
 		if def.id == id and not def.bike then -- (5.1: never a bike, CarDef.bike: Vehicles.buildTraffic takes the van)
 			local copy = table.clone(def)
 			if id ~= "bus" then

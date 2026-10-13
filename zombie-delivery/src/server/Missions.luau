@@ -252,7 +252,7 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	-- 5.0: the missions and the campaigns need a vehicle of your own (you start on foot).
 	local carId = profile.car
 	if not carId then
-		return Config.VanQuest.MissionsNeed
+		return Config.CompanyVan.MissionsNeed
 	end
 	if TransportRules.isBike(carId) then
 		return Config.BikeShop.MissionsNeed -- 5.1: a bike is not a car

@@ -60,6 +60,9 @@
 --             (server/DuoGates.luau) and stays blocked (Cargo.setBlocked) until two different players of the job
 --             pulled them together; with defend at the same drop both must be done (blockStop).
 --
+-- 7.x, one car (Config.CompanyVan): every car job, special job and mission goes in your ZDC Van (no job lends a company
+-- vehicle any more: JobTypeDef.vehicle is never set; the code for it stays harmless), no offer carries more pieces than
+-- its slots (ordinaryOffer caps the bulk orders), and an employer pays a bonus where it gave its vehicle.
 -- 3.4, cargo capacity: a job's pieces carried or led by hand (Economy.cargoNeed) must fit the vehicle that does it:
 -- the company vehicle a special job lends, else your equipped car at its stage (3.5, Economy.capacity). The board
 -- shows a job too big for your car locked ("NEEDS N SLOTS · your Old Van holds 2") and accepting it is refused
@@ -1307,6 +1310,8 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 	if not easy and extra and extra[2] > 0 and rng:NextNumber() < bulkChance then
 		count += rng:NextInteger(extra[1], extra[2])
 	end
+	-- 7.x, one car (Config.CompanyVan): never more pieces than the ZDC Van's slots
+	count = math.min(count, Economy.maxCapacity(Config.CompanyVan.Car))
 	local customer = if drop.poi then `{receiver.name}, {drop.name}` else receiver.name
 	local stops: { Stop } = {
 		newStop(pickup, "pickup", "carry", count, if venue then `PICK UP at {pickup.name}` else `PICK UP at the {business.place}, {pickup.name}`, business.giver),
@@ -1813,7 +1818,7 @@ local function ownsCar(player: Player): boolean
 end
 
 -- 5.1: the board's words for a car job needsVehicle refuses: on your bike with a car of your own, "CALL YOUR CAR";
--- else "NEEDS A VEHICLE" (the Old Van at level 4).
+-- else "NEEDS A VEHICLE" (the Old Van at level 4; 7.x: everybody has the ZDC Van, "CALL YOUR VAN").
 local function vehicleLock(player: Player): (string, string)
 	if Transport.riding(player) and ownsCar(player) then
 		return JobsConfig.Bike.NeedsCar, JobsConfig.Bike.NeedsCarButton
@@ -3618,17 +3623,20 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local unlockedWeapon: string? = nil
 	if profile then
 		profile.deliveries += 1
-		-- Work for an employer: after enough jobs their gun and their vehicle are yours.
+		-- Work for an employer: after enough jobs their gun and (until 7.x) their vehicle are yours. 7.x, one car
+		-- (Config.CompanyVan): their bonus instead (EmployerDef bonus), once, at the job that reaches `needed`.
 		local employer = if offer.jobType and offer.jobType.employer then Economy.findEmployer(offer.jobType.employer) else nil
 		if employer then
 			local done = (profile.rep[employer.id] or 0) + 1
 			profile.rep[employer.id] = done
 			local unlocked: string? = nil
-			local rewardCar = Economy.findCar(employer.reward)
-			if rewardCar and not profile.cars[rewardCar.id] and done >= employer.needed then
-				PlayerData.giveCar(player, rewardCar.id)
-				unlocked = rewardCar.name
-				notice:FireClient(player, `{employer.name} gives you the {rewardCar.name}! It needs no garage slot: take it out at the depot lot or one of your garages.`)
+			local bonus = employer.bonus or 0
+			if bonus > 0 and done == employer.needed then
+				PlayerData.addMoney(player, bonus, "EmployerBonus", employer.id)
+				local cash = require(Shared.Career).money(bonus)
+				unlocked = `{cash} bonus`
+				local words = string.gsub(string.gsub(Config.CompanyVan.Bonus, "{employer}", employer.name), "{money}", cash)
+				notice:FireClient(player, words)
 			end
 			local weapon = if employer.weapon then Economy.findWeapon(employer.weapon) else nil
 			if weapon and done >= (employer.weaponAt or employer.needed) and not profile.weapons[weapon.id] then
@@ -3640,7 +3648,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 				name = employer.name,
 				done = done,
 				needed = employer.needed,
-				reward = if rewardCar then rewardCar.name else "",
+				reward = if bonus > 0 then employer.reward else "",
 				unlocked = unlocked,
 				weapon = if weapon then weapon.name else nil,
 				weaponAt = employer.weaponAt,

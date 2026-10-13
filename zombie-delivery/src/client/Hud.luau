@@ -777,13 +777,13 @@ local function openEmployer(id: string)
 			jobType = def
 		end
 	end
-	local reward = Economy.findCar(employer.reward)
+	local bonus = tonumber(employer.bonus) -- 7.x: their bonus (Config.Employers; their vehicle until 7.x)
 	local gun = if employer.weapon then Economy.findWeapon(employer.weapon) else nil
 	local body = employerWindow.body
 	Ui.clear(body)
 	employerWindow.title.Text = employer.name
 	employerWindow.icon.Text = employer.icon
-	employerWindow.subtitle.Text = `{employer.person} · they lend you the vehicle`
+	employerWindow.subtitle.Text = `{employer.person} · the job goes in your ZDC Van`
 	employerWindow.footer.Text = `{state.rep[employer.id] or 0} jobs done here`
 	employerWindow.frame.Visible = true
 	-- The person who runs it (5.8: the phone's tag line, the red square and caps), and what they say.
@@ -818,14 +818,14 @@ local function openEmployer(id: string)
 			TextYAlignment = Enum.TextYAlignment.Top,
 		})
 	end
-	Ui.caps(body, `Rewards  ·  they lend you the {if reward then reward.name else "vehicle"} for every job`, UDim2.new(1, -10, 0, 22), {
+	Ui.caps(body, "Rewards  ·  your ZDC Van does every job", UDim2.new(1, -10, 0, 22), {
 		LayoutOrder = 4,
 		TextSize = 12,
 		TextColor3 = P.ink2,
 	})
 	local done = state.rep[employer.id] or 0
-	if reward then
-		rewardRow(body, 5, nil, "🚚", reward.name, done, employer.needed, state.cars[reward.id] == true)
+	if bonus and bonus > 0 then
+		rewardRow(body, 5, nil, "💵", `{Ui.money(bonus)} bonus`, done, employer.needed, done >= employer.needed)
 	end
 	if gun and employer.weaponAt then
 		rewardRow(body, 6, Icons.weapon(gun.id), "🔫", gun.name, done, employer.weaponAt, state.weapons[gun.id] == true)
@@ -1078,7 +1078,7 @@ function Hud.showResult(r: any)
 			end
 			local newCar = r.unlockedCar or (employer and employer.unlocked)
 			if type(newCar) == "string" then
-				Hud.toast(`🚚 NEW CAR: the {newCar} is yours!`)
+				Hud.toast(`💵 {string.upper(newCar)} from {if employer then employer.name else "your employer"}!`) -- 7.x: a bonus, no car
 			end
 			if type(r.unlockedWeapon) == "string" then
 				local gun = Economy.findWeapon(r.unlockedWeapon)
@@ -1281,7 +1281,7 @@ function Hud.showResult(r: any)
 		end
 		local newCar = r.unlockedCar or (employer and employer.unlocked)
 		if newCar then
-			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 23)
+			line(`💵 {string.upper(tostring(newCar))} from {if employer then employer.name else "your employer"}!`, nil, C.green, 23) -- 7.x: a bonus, no car
 		end
 		if type(r.unlockedWeapon) == "string" then
 			local gun = Economy.findWeapon(r.unlockedWeapon)

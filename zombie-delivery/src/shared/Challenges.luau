@@ -114,7 +114,8 @@ Challenges.List = {
 	{ id = "three_star_general", name = "Three-Star General", description = `Collect all {STARS_TOTAL} story stars: 3 on every story mission.`, category = "missions", stat = "stars", goal = STARS_TOTAL, money = 20000, title = "Three-Star General" },
 	-- hidden: odd feats, ??? until done
 	{ id = "ghost", name = "Ghost Courier", description = "Finish 1 NO SHOOTING mission without firing a single shot.", category = "missions", stat = "quietMissions", goal = 1, money = 2000, title = "The Ghost", hidden = true },
-	{ id = "horse_whisperer", name = "Horse Whisperer", description = "Deliver 25 horses.", category = "missions", stat = "horses", goal = 25, money = 2500, title = "Horse Whisperer", hidden = true },
+	-- (7.x, one car: Horse Whisperer, 25 horses, is retired: a horse does not fit the ZDC Van and no job leads one now; a
+	-- title earned stays the player's, the stat "horses" is still counted.)
 	{ id = "against_the_clock", name = "Against the Clock", description = "Finish 10 missions with the clock ticking.", category = "missions", stat = "rushes", goal = 10, money = 3000, hidden = true },
 
 	-- ── Explorer ──
@@ -132,7 +133,7 @@ Challenges.List = {
 	-- ── Wealth ──
 	{ id = "first_paycheck", name = "First Paycheck", description = "Earn $10,000.", category = "wealth", stat = "earned", goal = 10000, money = 300 },
 	{ id = "home_sweet_home", name = "Home Sweet Home", description = "Buy 1 property.", category = "wealth", stat = "properties", goal = 1, money = 1000 },
-	{ id = "car_collector", name = "Car Collector", description = "Own 5 cars.", category = "wealth", stat = "cars", goal = 5, money = 2000 },
+	{ id = "car_collector", name = "Car Collector", description = "Own 5 vehicles: the ZDC Van and bikes.", category = "wealth", stat = "cars", goal = 5, money = 2000 },
 	{ id = "millionaire", name = "Millionaire", description = "Earn $1,000,000.", category = "wealth", stat = "earned", goal = 1000000, money = 10000, title = "Millionaire", hidden = true },
 } :: { ChallengeDef }
 

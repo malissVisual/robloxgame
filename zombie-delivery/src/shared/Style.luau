@@ -144,7 +144,7 @@ function Style.worn(style: Wardrobe, slot: string): Config.CosmeticDef?
 end
 
 function Style.forVehicle(slot: string, car: Config.CarDef?): boolean
-	if not car or car.company == true then
+	if not car or car.company == true or car.ambient == true then -- (7.x: nor a body nobody owns, Config.AmbientCars)
 		return false
 	end
 	if slot == "bikepaint" then
