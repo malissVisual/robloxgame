@@ -26,7 +26,8 @@
 --     down where its carrier was.
 --   * The truck: "Load" (E) at its open back puts what you hold onto the bed (MovingRules' packer: first-fit, turned
 --     90° when that fits, stacked flat; "No room — unload something or bring a bigger truck"), welded in the box where
---     it is seen through the open back; "Unload" (Z) takes the last one in that nothing rests on back into your hands.
+--     it is seen through the open back; "Take out" (Z, Unload) takes the last one in that nothing rests on back into
+--     your hands: beside the door on its own spot, and only while nobody at the back carries a thing.
 --     The back is the owner's and the crew's (Vehicles.backAllowed, BackCrew); its own prompt waits while Load shows
 --     (one E at a time).
 --   * The clock: Config.Moving.Time; at HordeAt left the horde (Zombies.spawn + Zombies.march to the door, in bursts);
@@ -1019,7 +1020,13 @@ local function truckPrompts(s: Session)
 		return
 	end
 	local load = newPrompt(door, "Load", "Moving truck", Enum.KeyCode.E, 0.25, T.Reach.Truck)
-	local unload = newPrompt(door, "Unload", "Moving truck", Enum.KeyCode.Z, 0.4, T.Reach.Truck)
+	-- (the owner's report: on the door's own attachment Unload stacked with Load and the back's E: its own spot, 2.5
+	-- studs aside from the door's middle, toward the bed's edge; destroyed with the prompts at the end)
+	local side = Instance.new("Attachment")
+	side.Name = "MoveTakeOut"
+	side.Position = door.Position + Vector3.new(2.5, 0, 0)
+	side.Parent = door.Parent
+	local unload = newPrompt(side, "Take out", "Moving truck", Enum.KeyCode.Z, 0.4, T.Reach.Truck)
 	unload.GamepadKeyCode = Enum.KeyCode.ButtonY
 	load.Enabled, unload.Enabled = false, false
 	tag(load, s.owner)
@@ -1033,8 +1040,9 @@ local function truckPrompts(s: Session)
 	s.load, s.unload = load, unload
 end
 
--- The truck's prompts as things stand: Load while somebody of the crew carries a thing (the back's own E waits
--- then), Unload while one may come out; the back for the crew too (BackCrew).
+-- The truck's prompts as things stand (MovingRules.truckPrompts): Load while somebody of the crew at the back carries
+-- a thing (the back's own E and Unload wait then), Unload ("Take out") while one may come out and nobody there
+-- carries one; the back for the crew too (BackCrew).
 local function refreshTruck(s: Session)
 	local truck = truckOk(s)
 	local load, unload = s.load, s.unload
@@ -1055,16 +1063,17 @@ local function refreshTruck(s: Session)
 		end
 	end
 	local fill = math.floor(Rules.fill(s.move.packing) * 100 + 0.5)
-	load.Enabled = open and carriers > 0
+	local out = Rules.lastOut(s.move)
+	local showLoad, showUnload, showBack = Rules.truckPrompts(open, carriers > 0, out ~= nil)
+	load.Enabled = showLoad
 	load.ActionText = if carriers == 1 and carried then `Load {carried.name}` else "Load"
 	load.ObjectText = `Moving truck · {fill}% full`
-	local out = Rules.lastOut(s.move)
-	unload.Enabled = open and out ~= nil
-	unload.ActionText = if out then `Unload {s.move.things[out].name}` else "Unload"
+	unload.Enabled = showUnload
+	unload.ActionText = if out then `Take out {s.move.things[out].name}` else "Take out"
 	unload.ObjectText = `Moving truck · {fill}% full`
 	local back = Vehicles.backPrompt(truck)
 	if back then
-		back.Enabled = not load.Enabled
+		back.Enabled = showBack
 	end
 	local ids: { string } = {}
 	for _, member in Crew.members(s.owner) do
@@ -1959,10 +1968,14 @@ local function cleanup(s: Session)
 			slots[s.slot] = nil
 		end
 	end)
+	local takeOut = if s.unload then s.unload.Parent else nil -- (Unload's own attachment on the truck)
 	for _, prompt in { s.load, s.unload } do
 		if prompt then
 			prompt:Destroy()
 		end
+	end
+	if takeOut and takeOut.Name == "MoveTakeOut" then
+		takeOut:Destroy()
 	end
 	local truck = s.truck
 	if truck and truck.model.Parent then

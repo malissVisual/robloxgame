@@ -277,7 +277,7 @@ check("…he waits at the truck", danny.action == "wait" and sol:GetAttribute("M
 -- The shut back, a bite ----------------------------------------------------------------------------------------------------
 
 local lamp = itemModel(1)
-local unload = promptIn(truck.model, "Unload")
+local unload = promptIn(truck.model, "Take out")
 E.place(sol, back)
 trigger(unload, sol)
 check("Sol takes the lamp back out", character:GetAttribute("MoveCarry") == 1, E.lastNotice(sol))
