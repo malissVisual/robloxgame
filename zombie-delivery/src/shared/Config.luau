@@ -5879,9 +5879,21 @@ Config.MoveRoles = {
 --   Grid               the reachability check's step (every piece must get out of the front door, carried)
 --   Slot               the interiors' places, far off the map (Map.Bounds): Origin { x, y, z }, Spacing along X
 --   Ground             the safety floor under an interior: this far round the house, this deep under its floor
---   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau)
---   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom)
+--   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau; 7.x alpine:
+--                      620, was 600: the chalet's beams, Kachelofen, corner bench and shelf, lace, painted front door,
+--                      antlers and pictures add about 30 parts, the one plank floor, the tiled bathroom walls, the one sink
+--                      run and the handle-less cabinets win back about 16; seeds 1-1000: the busiest 614 (was 599), on
+--                      average 558 (was 539))
+--   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom); 7.x alpine:
+--                      a warmer Color
 --   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
+--   Alpine             7.x, a house's inside as a chalet's (shared/HouseLayout.luau places, server/HouseInterior.luau draws):
+--                      Stove the living room's Kachelofen (along its wall, tall, deep: its bench in front included); Bench
+--                      the kitchen's corner bench (its long leg on the outer wall, its short leg on the back wall, deep,
+--                      tall with its back); Shelf the Herrgottswinkel's corner shelf over it (its legs, its height over the
+--                      floor); Wainscot the wood panelling's height on the walls; Decor the wall decor's bottom over the
+--                      floor (over every piece), Picture and Antlers their size (wide, tall, deep); Beam a ceiling beam's
+--                      thickness, BeamRows the beams across a row of rooms
 Config.Furniture = {
 	MaxParts = 30,
 	Ceiling = 12,
@@ -5906,9 +5918,20 @@ Config.Furniture = {
 	Grid = 0.5,
 	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
 	Ground = { Margin = 24, Depth = 4 },
-	InteriorMaxParts = 600,
-	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 236, 204 } :: { number } },
+	InteriorMaxParts = 620,
+	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 218, 168 } :: { number } },
 	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
+	Alpine = {
+		Stove = { 6, 6.6, 3.2 } :: { number },
+		Bench = { 7, 2.4, 1.6, 3.4 } :: { number },
+		Shelf = { 2.2, 4.9 } :: { number },
+		Wainscot = 3.8,
+		Decor = 7.6,
+		Picture = { 2.6, 2.0, 0.2 } :: { number },
+		Antlers = { 2.6, 2.0, 0.6 } :: { number },
+		Beam = 0.9,
+		BeamRows = 2,
+	},
 }
 
 -- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
