@@ -2657,6 +2657,91 @@ Config.Alpine = {
 	Huts = { Count = 4, Gap = 600, Road = { 34, 110 } :: { number } },
 }
 
+-- 7.2, the Alps on the maps (client/MapView.luau draws the minimap and the big map, shared/MapStyle.luau works out
+-- what from Map and AlpineLayout, tools/phone-ui/mapview.luau checks it): a paper map, the valley green on cream, grey
+-- rock and white snow round it, the roads light with a brown edge, the highways amber.
+--   Margin     studs of the mountain ring drawn round Map.Bounds on both maps (the minimap sees at most about 300
+--              studs from you, and you stay inside the bounds)
+--   Colors     { r, g, b }: Paper (round the valley on the big map), Valley, Meadow (the wildflower meadows), Slope
+--              (the ring's grass on the minimap), Forest and Trees (a forest band and its tree dots; SnowForest and
+--              SnowTrees in the winter), Winter (the snowfield), Rock, Snow, Shadow (the peaks' shadow side), Water,
+--              Shore, Ice, Yard, Blocks (by district style), Special, Park, Square, Footbridge, Road, RoadEdge,
+--              Highway, Bridge, IceRoad, Fog, Ink / InkSoft / Halo (the captions), Closed (the ROAD CLOSED sign), Hut
+--   Peaks      the big map's mountains: a shaded peak with its snow cap for every cone of the ring (the shoulders
+--              only east and west), pulled into the margin. Base: where a peak's foot line stands, a share of Margin
+--              out from the bounds { front row, back row }: north (the peaks rise up the map, away from the valley),
+--              south (up the map, toward it, never into it), side (east and west, at most Side × Margin high, wide
+--              enough to overlap into one range, their inner feet at most Into × Margin over the valley's edge);
+--              Height: the lowest … the tallest cone's peak, a share of Margin; Cap: a snow cap's share of its peak
+--              { least, most } (the winter's peaks: Winter); Shade: the shadow side's transparency; Haze: how far the
+--              back row's rock fades toward the paper
+--   Relief     the minimap's mountains seen from above: a cone's grassy foot, its rock (from its grass line up) and
+--              its snow (from its snow line up) as discs lit from the north-west, each that reaches within Reach
+--              studs of the bounds (the minimap sees about 290 from you at its widest); a snow disc smaller than
+--              MinSnow studs is left out; Light: the far side of a disc is its colour × (1 - 2 × Light)
+--   Forest     the valley's trees (AlpineLayout.forest) binned in Cell × Cell squares; a square with Min trees or
+--              more is forest; a row's run of forest squares is one rounded band Overlap × Cell high (the rows melt
+--              into each other) with PerCell tree dots a square
+--   Meadows    a lighter disc Radius studs round every wildflower patch (AlpineLayout's meadows; Soft its
+--              transparency), a flower's dot Flower studs round in it
+--   Foothills  the soft green edge round the valley on the big map: studs out from the bounds
+--   Altstadt   the old town's label (a placeholder until Map names its villages: Map.Villages) over District's name
+--   Budget     the most GuiObjects a layer may make on one map (tools/phone-ui/mapview.luau holds them): Peaks (big),
+--              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map)
+Config.MapStyle = {
+	Margin = 420,
+	Colors = {
+		Paper = { 236, 228, 208 },
+		Valley = { 186, 206, 150 },
+		Meadow = { 208, 224, 166 },
+		Slope = { 146, 164, 114 },
+		Forest = { 118, 152, 98 },
+		Trees = { 70, 108, 64 },
+		SnowForest = { 164, 182, 172 },
+		SnowTrees = { 92, 118, 104 },
+		Winter = { 236, 241, 243 },
+		Rock = { 164, 158, 148 },
+		Snow = { 252, 252, 250 },
+		Shadow = { 52, 56, 66 },
+		Water = { 146, 194, 222 },
+		Shore = { 98, 150, 188 },
+		Ice = { 208, 228, 238 },
+		Yard = { 216, 206, 182 },
+		Blocks = { downtown = { 216, 200, 180 }, harbor = { 204, 198, 188 }, suburbs = { 224, 210, 186 } } :: { [string]: { number } },
+		Special = { 202, 180, 152 },
+		Park = { 150, 192, 118 },
+		Square = { 210, 190, 154 },
+		Footbridge = { 150, 108, 72 },
+		Road = { 252, 250, 244 },
+		RoadEdge = { 136, 122, 104 },
+		Highway = { 244, 198, 96 },
+		Bridge = { 214, 210, 200 },
+		IceRoad = { 226, 238, 244 },
+		Fog = { 92, 100, 112 },
+		Ink = { 62, 54, 44 },
+		InkSoft = { 106, 96, 82 },
+		Halo = { 246, 240, 224 },
+		Closed = { 196, 58, 46 },
+		Hut = { 128, 86, 54 },
+	} :: { [string]: any },
+	Peaks = {
+		Base = { north = { 0.12, 0.4 } :: { number }, south = { 0.62, 0.98 } :: { number }, side = { 0.42, 0.62 } :: { number } },
+		Height = { 0.48, 0.84 } :: { number },
+		Side = 0.6,
+		Into = 0.12,
+		Cap = { 0.2, 0.42 } :: { number },
+		Winter = 0.6,
+		Shade = 0.72,
+		Haze = 0.4,
+	},
+	Relief = { Reach = 300, MinSnow = 10, Light = 0.12 },
+	Forest = { Cell = 48, Min = 2, Overlap = 1.3, PerCell = 2 },
+	Meadows = { Radius = 80, Flower = 10, Soft = 0.3 },
+	Foothills = 120,
+	Altstadt = { Name = "Altstadt", District = "downtown" },
+	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 90, Alpine = 640 },
+}
+
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
 export type LevelReward = {
 	money: number?,
