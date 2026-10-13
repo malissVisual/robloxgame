@@ -1149,6 +1149,58 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## MOVES: the moving rework, prototype (7.0)
+
+The owner's rework (`design/rework/NAVRH.md`, the story in `design/rework/PRIBEH.md`): the game turns into **moving**.
+Crews carry real furniture out of houses into a truck against the clock, with zombies, and every move is planned first,
+like a heist. 7.0 is the first playable house, **the prologue, Marge's House**. The old game stays playable beside it
+until the moves are complete.
+
+**Story, "The Last Move".** The city is evacuated district by district while Captain Maria's army builds the Wall.
+Marge turns the company into ZDC Moving & Evacuation ("We move your life. The rest they eat.").
+- The clients are the people from the missions.
+- The first time you open the depot's **Moving contracts** kiosk, Marge explains it all in a few cutscene-style cards (once per save: `profile.story`).
+- The contract card shows the story road (CHAPTERS). The prologue is ▶ PLAY; seven chapters are 🔒 SOON.
+- START plays the chapter's briefing, which ends with Dana of Big Move Movers taunting on the radio.
+- Marge texts the crew at the start and the end, and the client thanks you on the result card.
+- Code: `shared/MoveStory.luau`, `client/MoveStoryUi.luau`.
+
+**Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and the Moving Truck.
+- Everyone picks one of four roles and LAUNCH starts once all are READY (solo at once):
+  - 🚚 **Driver:** no wait at the truck's back, less truck damage at the wheel, "Call truck to door" once.
+  - 💪 **Mover:** lifts a two-person piece alone, carries 15% faster, no slowdown on slopes.
+  - 🛡️ **Guard:** +50% damage, two plank barricades, sees zombies through walls.
+  - 🔧 **Technician:** picks the locked front door quietly (anyone else kicks it in and the noise brings zombies), and fixes the garage fuse box so the lights come back.
+- Solo players switch roles from the item list (Tab, every 30 s).
+- Hold **T** (💬 on phones) for quick chat: six lines your crew sees as a bubble and a line in the move panel.
+
+**The move** (`server/Moving.luau`, rules `shared/MovingRules.luau`, HUD `client/MovingHud.luau`, `client/Fade.luau`, `Config.Moving`):
+- The Moving Truck is lent next to you. Drive to 155 Willow Ln (GPS).
+- At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
+- Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
+- Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
+- Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
+- At 3:00 left a horde comes to the house.
+- Drive into the Wall's checkpoint at the depot to finish. Pay is Σ value × condition, with ★ × 1.5 and a time bonus, split with the crew at the truck; you also get XP and 1–5 stars.
+
+**Danny from the depot** (`server/MoveHelper.luau`, `shared/MoveHelperBrain.luau`, `Config.MoveHelper`) helps a solo player.
+- He takes the other end of a two-person piece and carries the small ones out on his own, ★ first.
+- He runs from zombies and is back at the truck 15 s after he goes down.
+- Orders: HELP ME, SMALL STUFF, WAIT AT TRUCK; the quick chat "Need a hand here" calls him too.
+
+**The world** (`server/MoveSites.luau`, `shared/MoveSiteLooks.luau`):
+- the Wall's evacuation checkpoint at the depot is the drop-off;
+- the Moving contracts kiosk;
+- a ZDC MOVING & EVACUATION banner;
+- Marge's house dressed for moving day;
+- EVACUATE — ZONE CLOSING spots around town.
+
+**Tests:**
+- the rules: `moving_test`, `moveroles_test`, `movehelper_test`, `movestory_test`;
+- the art: `furniture_test`, `houselayout_test`, `houseinterior_test`, `movesites_test`;
+- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`;
+- an end-to-end move with the real house art: `moving_art_runtime_test`.
+
 ## Cars spawn clear and stand back up (6.26)
 
 The owner (a screenshot): the new ZDC Van stood in the depot tilted 20–25°, a back wheel in the air, its nose down on the
