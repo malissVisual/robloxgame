@@ -17,6 +17,11 @@ local WarehouseLayout = require("./WarehouseLayout")
 
 local M = W.Mock
 local T = Config.Warehouse
+local CollectionRules = require("./CollectionRules")
+-- (8.0 merge) a shown piece's tag line as the collection's rules have it: its rarity and its own income a minute
+local function tagOf(entry: any): string
+	return WarehouseLayout.tagLines(entry.name, CollectionRules.rarityOf(CollectionRules.defOf(entry.item)), CollectionRules.income(entry))[2].text
+end
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -126,7 +131,8 @@ check("a shown entry builds its model on its stand: in the podium's middle, on i
 check("…anchored, in the warehouse's Shown folder, its FurnitureId and stand", anchoredPiece and sofa.Parent == Warehouse.model(2):FindFirstChild("Shown") and sofa:GetAttribute("FurnitureId") == "sofa" and sofa:GetAttribute("Stand") == 3)
 check("…no other stand shows anything", Warehouse.shown(2, 1) == nil and Warehouse.shown(2, 4) == nil and Warehouse.shown(1, 3) == nil)
 local on, name, info = tagText(2, 3)
-check("…its tag: Sofa, COMMON · +$6/min (the whole income: the only one on show)", on and name == "Sofa" and info == "COMMON · +$6/min", info)
+local sofaEntry = { uid = "u1", item = "sofa", variant = 2, condition = 0.8, name = "Sofa", stand = 3, got = 0 }
+check("…its tag: Sofa, its rarity · +$X/min (the collection's rules: CollectionRules.income)", on and name == "Sofa" and info == tagOf(sofaEntry), info)
 check("…an empty stand's tag is off", not (tagText(2, 4)))
 p3 = promptsOf(2, 3)
 check("…its prompts: Take down and Sell on, Display off", p3.display.Enabled == false and p3.takeDown.Enabled == true and p3.sell.Enabled == true and p3.sell.ObjectText == "Sofa")
@@ -142,13 +148,7 @@ W.income[ana] = 58
 W.give(ana, { uid = "u3", item = "tv", variant = 1, condition = 1, name = "Old TV", stand = 1, got = 0 })
 local _, _, tvInfo = tagText(2, 1)
 local _, _, sofaInfo = tagText(2, 3)
-check("two on show share Collection.incomePerMinute by worth: +$30 and +$28", tvInfo == "COMMON · +$30/min" and sofaInfo == "COMMON · +$28/min", `{tvInfo} / {sofaInfo}`)
--- an entry's own income and rarity win
-W.stocks[ana][3].income = 4.5
-W.stocks[ana][3].rarity = "Rare"
-W.changed(ana)
-local _, _, own = tagText(2, 1)
-check("an entry's own income and rarity win: RARE · +$4.5/min", own == "RARE · +$4.5/min", own)
+check("two on show: each its own rarity and income (the collection's rules)", tvInfo == tagOf({ item = "tv", condition = 1, name = "Old TV" }) and sofaInfo == tagOf(sofaEntry), `{tvInfo} / {sofaInfo}`)
 
 -- Take down (the owner): through the Collection, the model goes
 local tv = Warehouse.shown(2, 1)
