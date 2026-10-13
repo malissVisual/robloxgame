@@ -107,6 +107,8 @@ if Config.Sandbox.On then
 	safely("MoveLobbyUi", MoveLobbyUi.start)
 	safely("QuickChat", QuickChat.start)
 	safely("CarryGripUi", require(Client.CarryGripUi).start)
+	-- (8.0 merge: the moves' and the warehouse stands' prompts are their owner's: the others' hidden, as in the city)
+	safely("CargoPrompts", require(Client.CargoPrompts).start)
 	for _, entry in own do
 		local start = entry.module.start
 		if type(start) == "function" then

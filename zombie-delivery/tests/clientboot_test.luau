@@ -41,7 +41,7 @@ local SANDBOX = {
 	"Drive", "ZombieAnimator", "CarVisuals", "Hud", "CameraRig", "ArmPose", "AdminPanel", "AdminFly", "CrewPanel",
 	"Sounds", "Stamina", "CarBoarding", "GaitPose", "BodyLife", "KeyHints", "Unstuck", "CurbRide", "PerfOverlay",
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
-	"QuickChat", "CarryGripUi",
+	"QuickChat", "CarryGripUi", "CargoPrompts",
 }
 local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide" }
 
@@ -52,7 +52,7 @@ local CITY_ONLY = {
 	"Phone", "MissionsUi", "DispatchUi", "EstateUi", "BusinessUi", "GarageUi", "CareerUi", "Discovery", "TutorialUi",
 	"LocationTag", "RoadEventUi", "BusRide", "BusMapBoard", "RentalUi", "ZipRide", "Throw", "GrindChips", "EventBanner",
 	"JobThumbUi", "ReadyCheck", "Leaderboard", "Weather", "Shooting", "Holster", "WeaponWheel", "Secrets",
-	"AnimalAnimator", "TrafficAnimator", "CargoPrompts", "BagSway", "ShopPropMotion", "SpeedLines", "SavingsLine",
+	"AnimalAnimator", "TrafficAnimator", "BagSway", "ShopPropMotion", "SpeedLines", "SavingsLine",
 	"ShopWindow", "RegularsApp", "SpecialOrderUi", "JobStartCard", "MapView",
 }
 
