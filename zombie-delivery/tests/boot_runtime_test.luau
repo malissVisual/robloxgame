@@ -10,6 +10,9 @@
 --     RequestState through Main's queueState.
 --   * Off: the city's boot as before (the Alps, World.build, World.buildLate deferred, every service in Main's order,
 --     the hooks, its PLAY asking Marge's tutorial before the car).
+--   * 8.0.1: Moving's hook parkVan is SandboxBoot.parkVan, set before Moving starts (a move's START parks the van the
+--     sandbox's way: at the vanSpot, not seated, repaired); a respawn on a move stands where Moving.respawnAt says (by
+--     the move's van, else outside the house), off a move at home.
 local E = require("./BootRuntime")
 local main = require("./MainServer")
 local loadBoot = require("./SandboxBootServer")
@@ -64,6 +67,7 @@ local plotOf: { [any]: number } = {}
 local moving: { [any]: string } = {}
 local placed: { any } = {}
 local repaired: { any } = {}
+local respawn: { [any]: any } = {} -- 8.0.1: player → Moving.respawnAt's frame (on a move)
 
 local function boot(absent: { string }?)
 	Config.Sandbox.On = true
@@ -71,7 +75,7 @@ local function boot(absent: { string }?)
 	for _, name in absent or {} do
 		E.absent[name] = true
 	end
-	profiles, cars, plotOf, moving, placed, repaired = {}, {}, {}, {}, {}, {}
+	profiles, cars, plotOf, moving, placed, repaired, respawn = {}, {}, {}, {}, {}, {}, {}
 	E.override("PlayerData", {
 		get = function(player: any): any
 			return profiles[player]
@@ -106,6 +110,9 @@ local function boot(absent: { string }?)
 	E.override("Moving", {
 		busy = function(player: any): string?
 			return moving[player]
+		end,
+		respawnAt = function(player: any): any
+			return respawn[player]
 		end,
 	})
 	E.fakes.SandboxBoot = loadBoot()
@@ -207,6 +214,9 @@ for _, hook in { "callCar", "homeGarage", "placeNear", "onWrecked" } do
 	hooksSet = hooksSet and at ~= nil and at < started.Moving and type(E.module("Vehicles")[hook]) == "function"
 end
 check("sandbox: the van's hooks set before Moving wraps them (CAR, a forced spawn, placeNear, a wreck)", hooksSet)
+local parkHook = E.find("set Moving.parkVan")
+check("8.0.1: Moving's hook parkVan is SandboxBoot.parkVan, set before Moving starts (a move's START parks the van the sandbox's way)",
+	parkHook ~= nil and parkHook < started.Moving and E.module("Moving").parkVan == Boot.parkVan and type(Boot.parkVan) == "function")
 local folders = {}
 for _, made in E.made do
 	if made.ClassName == "Folder" then
@@ -271,6 +281,17 @@ moving[ann] = nil
 
 local curb = Map.House.curb
 cars[ann] = placed[2]
+-- 8.0.1: a death on a move: the new body where Moving.respawnAt says (by the move's van, else outside the house)
+moving[ann] = "You are on a move"
+respawn[ann] = E.CFrame.new(curb.x + 7, 3, curb.z + 10)
+body = spawnBody(ann, 0, 0)
+at = pivotOf(body)
+check("8.0.1: a respawn on a move: where Moving.respawnAt says (by the move's van), not at the plot", at ~= nil and near(at.Position.X, curb.x + 7)
+	and near(at.Position.Z, curb.z + 10) and #placed == 2, at and `{at.Position.X}, {at.Position.Z}`)
+moving[ann], respawn[ann] = nil, nil
+body = spawnBody(ann, 0, 0)
+at = pivotOf(body)
+check("…off a move again: at the plot's spawn", at ~= nil and near(at.Position.X, plot.spawn.x) and near(at.Position.Z, plot.spawn.z))
 local _, root = spawnBody(ann, 0, 0)
 root.Position = E.Vector3.new(curb.x + 6, 3, curb.z + 20)
 check("CAR answered", E.fire("Net.get(SpawnCar).OnServerEvent", ann) == 1)
@@ -294,6 +315,15 @@ check("no plot (the server full): on Depot Row in front of plot 1", at ~= nil an
 E.fire("Net.get(Play).OnServerEvent", bob)
 van = placed[#placed]
 check("no plot: the van on Depot Row", van.player == bob and van.frame.Position.Z > row.z0 and van.frame.Position.Z < row.z1 and string.find(lastNotice(), "on Depot Row", 1, true) ~= nil)
+
+-- 8.0.1: SandboxBoot.parkVan (Moving's hook: a move's START without a van out) parks it the sandbox's way
+profiles[ann].carHealth = { [vanId] = 0.2 } -- (wrecked before: the save keeps the damage)
+local repairsBefore = #repaired
+local parkErr, parkedVan = Boot.parkVan(ann, plot.vanSpot, false)
+van = placed[#placed]
+check("8.0.1: SandboxBoot.parkVan: the player's own van at the spot (placeAt's 3 studs taken back), not seated", parkErr == nil and parkedVan ~= nil
+	and van.player == ann and van.carId == nil and van.seat == false and near(van.frame.Position.X, plot.vanSpot.x) and near(van.frame.Position.Z + 3, plot.vanSpot.z))
+check("…repaired whole (never the save's 0.2: a 144/720 hp Sprinter)", #repaired == repairsBefore + 1 and repaired[#repaired].car == parkedVan and repaired[#repaired].share == 1)
 
 -- ── Sandbox: the modules written alongside are not in the place yet ─────────
 boot(PARALLEL)

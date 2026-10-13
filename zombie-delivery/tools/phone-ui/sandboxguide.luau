@@ -8,7 +8,8 @@
 -- buttons, readable on a phone, its ✕ a finger's size; every row of the owner's table with its words and its 3D target
 -- (the board, the house's curb, its door, the van's back, the unload circle, the nearest empty stand), the path along
 -- the roads; a step done once goes quiet, the arrow home stays while driving; the ✕ and a held G; the 💡 chip on a
--- phone; nothing made loop after loop; no warnings.
+-- phone; nothing made loop after loop; no warnings. 8.0.1: one arrow: the move's HUD (client/MovingHud.luau) sets no GPS
+-- in the sandbox (no waypoint, so none of client/Hud.luau's GPS ring, beacon, label or toasts) beside the guide's.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's, as movehud.luau) ────────
@@ -98,7 +99,18 @@ M.MFade = { out = function() end, into = function() end }
 M.MapView.waypointAt = function()
 	return M.waypoint
 end
-M.MapView.onWaypoint = function() end
+-- (8.0.1: every GPS the move would set, counted: none in the sandbox)
+local gpsSets, gpsTold = 0, 0
+M.MapView.onWaypoint = function()
+	gpsTold += 1
+end
+local setWaypoint = M.MapView.setWaypoint
+M.MapView.setWaypoint = function(at)
+	if at ~= nil then
+		gpsSets += 1
+	end
+	setWaypoint(at)
+end
 local camera = M.workspace.CurrentCamera
 
 -- the world: the Terrain (the path's points live in it), the cars' folder, your character's humanoid
@@ -551,5 +563,7 @@ tick()
 check("held again: back on (driving: the arrow to the house again)", SandboxGuide.enabled() and marker.Enabled and lit() > 0)
 humanoid.SeatPart = nil
 M.services.UserInputService.InputEnded:Fire({ KeyCode = M.Enum.KeyCode.G })
+check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",
+	Config.Sandbox.On == true and gpsSets == 0 and gpsTold == 0 and M.waypoint == nil, `{gpsSets} {gpsTold}`)
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL SANDBOX GUIDE CHECKS PASSED")

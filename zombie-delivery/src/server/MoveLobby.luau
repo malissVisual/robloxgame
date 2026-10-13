@@ -337,7 +337,9 @@ function MoveLobby.step()
 		elseif Crew.ownerOf(owner) then
 			MoveLobby.close(owner, "📋 The planning was called off: its leader joined another crew.")
 		elseif t - entry.lobby.openedAt > T.Lobby.Timeout then
-			MoveLobby.close(owner, "📋 The planning ran out of time: take the contract again at the depot's board.")
+			MoveLobby.close(owner, if Config.Sandbox.On -- (8.0 SANDBOX: the kiosks by the warehouses)
+				then "📋 The planning ran out of time: take the contract again at a Moving contracts board (by your warehouse)."
+				else "📋 The planning ran out of time: take the contract again at the depot's board.")
 		else
 			sync(entry)
 			if entry.dirty then

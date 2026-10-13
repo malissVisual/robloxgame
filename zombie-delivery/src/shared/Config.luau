@@ -6132,7 +6132,9 @@ Config.CarryGrip = {
 --                     about 60 ms with its repack, 0.5 about 15 ms, and only about 2% fewer pieces packed). WalkIn:
 --                     a carrier standing inside the bay (its box over the floor) may Load from there too (the bay's own
 --                     Load prompt), not only at the back doors. Back: the bay's back end this far in front of the car's
---                     CargoDoor (its z from the door: it follows the body's length; Center's z only without a door)
+--                     CargoDoor (its z from the door: it follows the body's length; Center's z only without a door, and
+--                     for the admin's SHOW ZONES box, client/SandboxZones.luau: the same middle, the Sprinter's CargoDoor
+--                     z 11.6 − Back − Length / 2 = 3.85)
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
 --                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
 --                     trip; the move goes on until the owner's FINISH or the clock)
@@ -6230,7 +6232,7 @@ Config.Moving = {
 	Beds = {
 		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.4, Center = { 0, 2.98 } :: { number } }, -- (Cell 0.4: its whole 6.4 length, 15 × 16 cells)
 		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
-		sprinter = { Width = 6.6, Length = 13.7, Height = 7.6, Cell = 0.5, Center = { 0, 2.7 } :: { number }, Back = 0.9, WalkIn = true }, -- 8.0 SANDBOX
+		sprinter = { Width = 6.6, Length = 13.7, Height = 7.6, Cell = 0.5, Center = { 0, 3.85 } :: { number }, Back = 0.9, WalkIn = true }, -- 8.0 SANDBOX (Center z: CargoDoor 11.6 − Back − Length / 2)
 	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number }, Back: number?, WalkIn: boolean? } },
 	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
 	VanAgain = 20,

@@ -97,16 +97,23 @@
 --     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
 --     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
 --     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
---     placed at their plot's vanSpot when none is out), its bed Config.Moving.Beds' (the Sprinter's WalkIn: a carrier
---     inside the bay Loads there, the bay's own Load prompt; the truckPrompts rules as ever). No Wall: the drop-off is
---     the move owner's plot (server/SandboxPlots.luau: the van's back inside its unload circle): every piece in the van
+--     parked at their plot's vanSpot when none is out, the sandbox's way: server/SandboxBoot.luau's parkVan, the hook
+--     Moving.parkVan, repaired), its bed Config.Moving.Beds' (the Sprinter's WalkIn: a carrier inside the bay Loads
+--     there, the bay's own Load prompt; the truckPrompts rules as ever). No Wall: the drop-off is the move owner's plot
+--     (server/SandboxPlots.luau: the van's back, its middle or its centre line between them inside its unload circle:
+--     backed up or nose-in; loaded elsewhere in that plot, its driver hears how to unload): every piece in the van
 --     goes into their warehouse's stock (server/Collection.luau Collection.add: item, variant, condition, name), a trip;
 --     the move goes on until FINISH or the clock; what is still in the van at the end is lost. No pay per piece, no XP
---     (the warehouse earns): the result card says what came home (its pieces, their value, the trips). The clock and
---     the zombies are Config.Moving.Sandbox's (Time, HordeAt, Horde, Roam: no horde and no roamers by default, nobody
---     has a gun there; hordeAt 0 is "never"); Danny comes to a crew of one as ever.
+--     (the warehouse earns): the result card says what came home (its pieces, their value, the trips), and no word at
+--     the end names the Wall, pay or XP. A death mid-move stands the new body by the move's van, else outside the
+--     house (Moving.respawnAt, SandboxBoot's spawn). The clock and the zombies are Config.Moving.Sandbox's (Time,
+--     HordeAt, Horde, Roam: no horde and no roamers by default, nobody has a gun there; hordeAt 0 is "never"); Danny
+--     comes to a crew of one as ever.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
+--   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
+--                             outside the house), or nil (off a move, the city)
+--   Moving.parkVan            8.0 SANDBOX: the hook server/SandboxBoot.luau sets (its parkVan: START's van, repaired)
 --   Moving.admin(player, arg) the admin panel's MOVES buttons: "card" | "start" | "house" | "horde" | "time" | "deliver"
 --                             | "end"; returns what to say (8.0 SANDBOX: the house's; "refill": a new house for your
 --                             next move)
@@ -242,6 +249,7 @@ type Session = {
 	greeterWarned: number?, -- 7.1 review: os.clock of the last warning of a greeters' error (one every 30 s at most)
 	ways: { Way }, -- 7.x farm move: the ways out (ways[1] the front door: `exit`)
 	lostAt: number?, -- 7.x van moves: the van was lost then (server time; nil: it is out or never was)
+	backWarned: number?, -- 8.0 SANDBOX: os.clock of the last "Back the van up" (SB.backUp)
 }
 
 local art: Art? = nil
@@ -613,16 +621,47 @@ function SB.dropAt(s: Session): Vector3
 	return if plot then Vector3.new(plot.unload.x, SandboxMap.GroundTop, plot.unload.z) else dropOffAt()
 end
 
--- Is the van at the move's drop-off? The city: within DropRadius of the Wall; 8.0 SANDBOX: its back (the CargoDoor)
--- inside its owner's plot's unload circle.
+-- Is the van at the move's drop-off? The city: within DropRadius of the Wall; 8.0 SANDBOX: inside its owner's plot's
+-- unload circle with its back (the CargoDoor), its middle (the chassis: parked nose-in, the back is 11.6 studs farther
+-- out) or anything of its centre line between them (the line's nearest point to the circle's middle).
 function SB.atDrop(s: Session, truck: Vehicles.Car): boolean
 	if not SB.on then
 		return flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius
 	end
 	local plot = SB.plotOf(s.owner)
+	if not plot then
+		return false
+	end
+	local middle = truck.chassis.Position
 	local door = Vehicles.cargoDoor(truck)
-	local back = if door then door.WorldPosition else truck.chassis.Position
-	return plot ~= nil and flat(back, Vector3.new(plot.unload.x, back.Y, plot.unload.z)) <= plot.unload.r
+	local back = if door then door.WorldPosition else middle
+	local a = Vector3.new(back.X, 0, back.Z)
+	local line = Vector3.new(middle.X, 0, middle.Z) - a
+	local centre = Vector3.new(plot.unload.x, 0, plot.unload.z)
+	local along = line:Dot(line)
+	local t = if along > 1e-6 then math.clamp((centre - a):Dot(line) / along, 0, 1) else 0
+	return (a + line * t - centre).Magnitude <= plot.unload.r
+end
+
+-- 8.0 SANDBOX: the loaded van inside its owner's plot but not at the drop-off (parked away from the roller door): its
+-- driver (else the move's owner) hears how to unload, once, again only after BackEvery s.
+SB.BackEvery = 20
+function SB.backUp(s: Session, truck: Vehicles.Car, clock: number)
+	local plot = SB.plotOf(s.owner)
+	local at = truck.chassis.Position
+	local inside = SandboxMap.plotAt(at.X, at.Z)
+	if not plot or not inside or inside.id ~= plot.id or Rules.counts(s.move).out == 0 or clock - (s.backWarned or -math.huge) < SB.BackEvery then
+		return
+	end
+	s.backWarned = clock
+	local driver = s.owner
+	for _, member in everyone(s) do
+		local car, driving = Vehicles.seatedIn(member)
+		if car == truck and driving then
+			driver = member
+		end
+	end
+	say(driver, "Back the van up to the roller door to unload.")
 end
 
 -- The "Moving contracts" prompt on a board's corkboard: the contract card (8.0 SANDBOX: on every plot's board).
@@ -1201,7 +1240,7 @@ hurtThing = function(s: Session, spot: number, share: number)
 	local broke = Rules.hurt(thing, share)
 	s.dirty = true
 	if broke then
-		tellAll(s, `💥 The {thing.name} broke! It pays nothing now.`)
+		tellAll(s, if SB.on then `💥 The {thing.name} broke! It is worth next to nothing now.` else `💥 The {thing.name} broke! It pays nothing now.`)
 	elseif before - thing.condition >= 0.1 then
 		local holder = playerById(thing.carrier)
 		if holder then
@@ -1257,18 +1296,23 @@ function SB.inBay(truck: Vehicles.Car, at: Vector3): boolean
 	return math.abs(p.X - cx) <= bed.Width / 2 + 0.5 and math.abs(p.Z - cz) <= bed.Length / 2 + 0.5 and p.Y >= floor - 1 and p.Y <= floor + bed.Height + 2
 end
 
--- 8.0 SANDBOX: the player's own van when none is out (a move's START): Config.Sandbox.Van (the Sprinter; the ZDC Van
--- while the place has no such car) at their plot's vanSpot, its back to the warehouse (no plot: next to them). nil, or
--- why it could not come.
+-- 8.0 SANDBOX: server/SandboxBoot.luau's parkVan (the player's van parked at a spot as their one vehicle, repaired:
+-- PLAY's and CAR's way), set by it before Moving.start (a hook: the two modules never require each other); nil in the
+-- city.
+Moving.parkVan = nil :: ((player: Player, spot: SandboxMap.Spot, seat: boolean, carId: string?) -> (string?, Vehicles.Car?))?
+
+-- 8.0 SANDBOX: the player's own van when none is out (a move's START) at their plot's vanSpot, its back to the
+-- warehouse, not seated, the sandbox's way (Moving.parkVan: repaired; a van wrecked before keeps its damage in the
+-- save: never a Sprinter at a fifth of its health). No plot (or no hook): next to them (SandboxBoot's placeNear, the
+-- van repaired too). nil, or why it could not come.
 function SB.bringVan(owner: Player): string?
-	local id = if Economy.findCar(Config.Sandbox.Van) then Config.Sandbox.Van else T.Van
 	local plot = SB.plotOf(owner)
-	if not plot then
-		return Vehicles.placeNear(owner, id)
+	local park = Moving.parkVan
+	if not plot or not park then
+		return Vehicles.placeNear(owner, nil)
 	end
-	local spot = plot.vanSpot -- (SandboxMap.cframe's frame: its look by yaw)
-	local car = Vehicles.spawnAt(owner, id, CFrame.new(spot.x, spot.y, spot.z) * CFrame.Angles(0, math.rad(spot.yaw), 0), false)
-	return if car then nil else "Your van could not come: try again."
+	local err, car = park(owner, plot.vanSpot, false)
+	return err or (if car then nil else "Your van could not come: try again.")
 end
 
 -- The van's name on its prompts: "ZDC Van" (the city), the car's own (8.0 SANDBOX: "Sprinter").
@@ -3123,7 +3167,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	truckPrompts(s)
 	if SB.on then -- 8.0 SANDBOX: this house is spent: the owner's next card shows a new one
 		SB.forget(owner)
-		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them home to your warehouse: as many trips as it takes, then FINISH.`)
+		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (follow the arrow), carry the things out, load them and bring them home to your warehouse: as many trips as it takes, then FINISH.`)
 	else
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them to the Wall at the depot: as many trips as it takes, then FINISH. {Rules.counts(s.move).stars} ★ things are a must!`)
 	end
@@ -3468,7 +3512,7 @@ local function tick(s: Session)
 	end
 	refreshTruck(s)
 	local truck = truckOk(s) -- (7.x van moves: none while it is lost)
-	if truck and SB.atDrop(s, truck) then -- (8.0 SANDBOX: its back in the owner's plot's unload circle)
+	if truck and SB.atDrop(s, truck) then -- (8.0 SANDBOX: its back or middle in the owner's plot's unload circle)
 		if Rules.counts(s.move).out > 0 then
 			deliverTrip(s, clock) -- 7.x van moves: a trip: its load delivered, the move goes on (late: then it ends)
 			if s.ended then
@@ -3478,6 +3522,8 @@ local function tick(s: Session)
 			s.emptyWarned = clock
 			say(s.owner, "The van is empty: load the things at the house first.")
 		end
+	elseif truck and SB.on then
+		SB.backUp(s, truck, clock) -- 8.0 SANDBOX: loaded in the owner's plot, away from the roller door: how to unload
 	end
 	if (s.dirty and clock - s.sentAt > 0.25) or clock - s.sentAt > 5 then
 		send(s)
@@ -3713,8 +3759,8 @@ local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3:
 		if s then
 			-- 7.2 review: after a trip, what reached the Wall is paid (FINISH's end: the crew there shares it)
 			local c = Rules.counts(s.move)
-			if c.delivered > 0 then
-				finish(s, if c.late > 0 then "timeout" else "deliver", "You called it off: the Wall paid what reached it")
+			if c.delivered > 0 then -- (8.0 SANDBOX: no pay: what came home stays in the warehouse)
+				finish(s, if c.late > 0 then "timeout" else "deliver", if SB.on then "You called it off: what came home is yours" else "You called it off: the Wall paid what reached it")
 			else
 				finish(s, "cancel", "You called it off")
 			end
@@ -3755,6 +3801,29 @@ function Moving.busy(player: Player): string?
 		return "You are on a move: finish it first (or GIVE UP in the move's list, Tab)."
 	end
 	return nil
+end
+
+-- 8.0 SANDBOX (server/SandboxBoot.luau: every spawn): where a new body of a player on a move (its owner or its crew)
+-- stands, never stranded at home while the van is out: by the move's van when it is out and not wrecked (beside its
+-- back, its side's way, on the ground, looking at the back doors), else 6 studs out of the house's front door
+-- (SandboxMap.House.door, looking out); nil off a move (and in the city).
+function Moving.respawnAt(player: Player): CFrame?
+	local s = sessionOf(player)
+	if not SB.on or not s then
+		return nil
+	end
+	local truck = truckOk(s)
+	if truck then
+		local door = Vehicles.cargoDoor(truck)
+		local frame = truck.chassis.CFrame
+		local backZ = if door then frame:PointToObjectSpace(door.WorldPosition).Z else 0
+		local side = frame * Vector3.new(bedOf(truck).Width / 2 + 3, 0, backZ - 1)
+		local at = Vector3.new(side.X, Vehicles.groundY(side.X, side.Z, frame.Position.Y) + 3, side.Z)
+		local look = frame * Vector3.new(0, 0, backZ)
+		return CFrame.lookAt(at, Vector3.new(look.X, at.Y, look.Z))
+	end
+	local spot = SandboxMap.House.door
+	return CFrame.new(spot.x, spot.y + 3, spot.z) * CFrame.Angles(0, math.rad(spot.yaw), 0) * CFrame.new(0, 0, -6)
 end
 
 local function wireHooks()
@@ -3926,11 +3995,13 @@ function Moving.start()
 			local c = Rules.counts(own.move)
 			for _, member in everyone(own) do
 				if member ~= player then
-					say(member, if c.delivered > 0 then `The move ended: {player.DisplayName} left. The Wall paid what reached it.` else `The move was called off: {player.DisplayName} left.`)
+					say(member, if c.delivered == 0 then `The move was called off: {player.DisplayName} left.`
+						elseif SB.on then `The move ended: {player.DisplayName} left. What came home is in their warehouse.` -- (8.0 SANDBOX)
+						else `The move ended: {player.DisplayName} left. The Wall paid what reached it.`)
 				end
 			end
 			if c.delivered > 0 then
-				finish(own, if c.late > 0 then "timeout" else "deliver", `{player.DisplayName} left the game: the Wall paid what reached it`)
+				finish(own, if c.late > 0 then "timeout" else "deliver", if SB.on then `{player.DisplayName} left the game: what came home is in their warehouse` else `{player.DisplayName} left the game: the Wall paid what reached it`)
 			else
 				finish(own, "cancel", `{player.DisplayName} left the game`)
 			end

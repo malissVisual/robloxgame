@@ -23,7 +23,8 @@
 --
 -- The player:
 --   * every spawn stands you at your plot's `spawn` (SandboxPlots.of, SandboxMap.cframe; streamed in first), holstered
---     (the character's Holstered: no aim arm); without a plot (the server full) on Depot Row in front of plot 1;
+--     (the character's Holstered: no aim arm); without a plot (the server full) on Depot Row in front of plot 1; on a
+--     move by the move's van, else outside the house (server/Moving.luau respawnAt);
 --   * PLAY (the Play remote) parks your van at your plot's vanSpot, you not in it: Config.Sandbox.Van, the ZDC Van
 --     while that one is not in Config.Cars. It is your only vehicle (profile.car; no bike, no dealer). Marge's first
 --     day is off (no Tutorial: the van never waits for it). A respawn leaves the van where it is (a new one only when
@@ -38,6 +39,7 @@
 --   SandboxBoot.vanId()             the van's Config.Cars id
 --   SandboxBoot.spawnSpot(player)   where the player stands at every spawn (SandboxMap.Spot)
 --   SandboxBoot.vanSpot(player)     where PLAY parks their van (SandboxMap.Spot)
+--   SandboxBoot.parkVan(player, spot, seat, carId?)   the van parked there, repaired (PLAY, CAR, a move's START): err, car
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -161,7 +163,8 @@ end
 
 -- Parks the player's van (or carId's car) at `spot` (the old one goes: Vehicles.placeAt), repaired: the sandbox has
 -- no repair bay. Returns an error text and the car (nil with no error: server/Moving.luau's wrap refused and said why).
-local function parkVan(player: Player, spot: SandboxMap.Spot, seat: boolean, carId: string?): (string?, Vehicles.Car?)
+-- (server/Moving.luau's START brings the van this way too, when none is out: its hook Moving.parkVan.)
+function SandboxBoot.parkVan(player: Player, spot: SandboxMap.Spot, seat: boolean, carId: string?): (string?, Vehicles.Car?)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return "Still loading...", nil
@@ -185,7 +188,7 @@ local function vanAtHome(player: Player)
 	if not player.Parent or not playing[player] then
 		return
 	end
-	local err, car = parkVan(player, SandboxBoot.vanSpot(player), false)
+	local err, car = SandboxBoot.parkVan(player, SandboxBoot.vanSpot(player), false)
 	if err then
 		notice:FireClient(player, err)
 	elseif car then
@@ -200,7 +203,7 @@ local function callVan(player: Player, _carId: string?): string?
 		return busy
 	end
 	local spot, where = parkingNear(player)
-	local err, car = parkVan(player, spot, false)
+	local err, car = SandboxBoot.parkVan(player, spot, false)
 	if car then
 		notice:FireClient(player, `Your {nameOf(car)} is parked {where}.`)
 	end
@@ -221,7 +224,7 @@ local function vehicleHooks()
 	end
 	-- the city's "next to you on the nearest road" (a move's LAUNCH without a van out): the spot nearest you, seated
 	Vehicles.placeNear = function(player: Player, carId: string?): string?
-		local err, car = parkVan(player, (parkingNear(player)), true, carId)
+		local err, car = SandboxBoot.parkVan(player, (parkingNear(player)), true, carId)
 		return err or (if car then nil else "Your van could not come: try again.")
 	end
 	Vehicles.onWrecked = function(player: Player, car: Vehicles.Car, reason: string)
@@ -232,7 +235,8 @@ end
 
 -- ── The players ────────────────────────────────────────────────────────────
 
--- A new body stands at the player's plot's spawn (the plot is claimed as they join: a moment's wait for it).
+-- A new body stands at the player's plot's spawn (the plot is claimed as they join: a moment's wait for it); on a move
+-- where server/Moving.luau's respawnAt says (by the move's van, else outside the house: never stranded at home).
 local function standAtHome(player: Player, character: Model)
 	character:SetAttribute("Holstered", true) -- (no weapons here: holding a mouse button never raises the aim arm)
 	local waited = 0
@@ -243,7 +247,7 @@ local function standAtHome(player: Player, character: Model)
 	if not root or player.Character ~= character then
 		return
 	end
-	local frame = SandboxMap.cframe(SandboxBoot.spawnSpot(player))
+	local frame = require(Server.Moving).respawnAt(player) or SandboxMap.cframe(SandboxBoot.spawnSpot(player))
 	pcall(function()
 		player:RequestStreamAroundAsync(frame.Position, 5)
 	end)
@@ -404,7 +408,9 @@ local function sandbox()
 	optional("SprinterMesh", "start") -- (before any van: PLAY parks one)
 	vehicleHooks()
 	safely("Moving", function()
-		require(Server.Moving).start()
+		local Moving = require(Server.Moving)
+		Moving.parkVan = SandboxBoot.parkVan -- (a move's START brings the van this way too: repaired)
+		Moving.start()
 	end)
 end
 
