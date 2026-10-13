@@ -53,12 +53,22 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(HERE, "runtime", "MovingRuntime.luau"), os.path.join(tmp, "MovingRuntime.luau"))
     source = open(os.path.join(os.path.dirname(SHARED), "server", "Moving.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
     source = re.sub(r"require\(script\.Parent\.(\w+)\)", r"E.\1", source)
     head = ('local E = require("./MovingRuntime")\nlocal M = E.Mock\nlocal game, workspace, task, os = E.game, M.workspace, E.task, E.os\n'
             'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
             'local RaycastParams, UDim2, UDim, typeof = M.RaycastParams, M.UDim2, M.UDim, M.typeof\n'
             'local warn = function(...) print("WARN", ...) end\n')
     open(os.path.join(tmp, "MovingServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
+    # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
+    # and for tests/movesites_test.luau.
+    looks = open(os.path.join(SHARED, "MoveSiteLooks.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "MoveSiteLooks.luau"), "w", encoding="utf-8").write(re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', looks))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "MoveSites.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
+    open(os.path.join(tmp, "MoveSitesServer.luau"), "w", encoding="utf-8").write(head + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
