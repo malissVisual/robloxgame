@@ -1,27 +1,42 @@
 --!strict
--- 7.1, the Alps, step 1B: builds shared/AlpineLayout.luau's mountains and forests once, from World.build (its own
--- piece, World's helpers handed over; Config.Alpine has the numbers). Nothing you play on moves: it only fills what is
--- empty, after everything else is built.
+-- 7.1, the Alps, step 1B: builds shared/AlpineLayout.luau's mountains and forests once (World's helpers handed over;
+-- Config.Alpine has the numbers). Nothing you play on moves: it only fills what is empty, after everything else is
+-- built. 7.1 review: in two steps, so a new server is up long before its mountains are (PLAY and the lighting never
+-- wait for the thousands of terrain fills):
+--
+--   Alpine.start(world, tools)   from World.build (its last piece), the cheap part at once: the valley's colours, the
+--                                far silhouettes, the pass and the waterfall, and what the forests may stand on
+--   Alpine.finish()              deferred (World.buildLate: Main.server.luau defers it right after World.build): the
+--                                terrain's fills, then the forests, with a breath now and then so the server stays awake
+--   Alpine.build(world, tools)   both at once
 --
 --   * The valley's open ground (World's "Ground" tiles) turns lush grass (Config.Alpine.Valley); the terrain's
 --     materials get the Alps' colours (Terrain:SetMaterialColor: the grass, the rock, the limestone, the snow, the
 --     glacier).
---   * The ring of mountains in workspace.Terrain: every fill the layout lists (the cones' layers, the glaciers, the
---     scree, the pass's cliff, then the tunnel's mouth cut out), with a breath now and then so the server stays awake.
 --   * "MountainSilhouettes" (a Persistent model: every client always has it): a square pyramid of four corner wedges
 --     inside every big peak (a snow cap over it): with streaming on, a client gets the terrain near it only; these
 --     stand in for the far mountains and hide inside the terrain once it is there. No collision, no rays, no shadows.
+--     Built first: the far mountains are there from the start.
 --   * The portal (the West Pass): the road from the Old Farm into the cliff, the ROAD CLOSED — EVACUATION ZONE barrier
 --     at the box's edge (the world's wall stands just behind it), the tunnel's portal and its closed shutter; the
 --     waterfall where the river comes out of the north gorge.
---   * The forests: every tree (a trunk that collides, three needle tiers that do not: SpecialMesh ellipsoids), the
+--   * The ring of mountains in workspace.Terrain: every fill the layout lists (the cones' layers, the glaciers, the
+--     scree, the pass's cliff, then the tunnel's mouth cut out). Config.Alpine.SkipInStudio (a dev toggle) leaves them
+--     out in a Studio Play test: the rest still stands (the slope trees on the flat ground under the mountains).
+--   * The forests: every tree (a trunk that collides, one needle spire that does not: a SpecialMesh ellipsoid), the
 --     meadows' wildflowers and the hay barns and huts, in one Atomic model per Config.Alpine.Trees.Chunk square
 --     (streamed together, a coarse far look with LevelOfDetail StreamingMesh). Each stands on whatever a ray straight
---     down finds (the ground tiles, the snow, the terrain: the lodge's hill, the old edge hills, the ring's slopes);
---     where the ray finds anything else, or something already stands in the tree's room (an older tree, a fence, a
---     lamp), the tree is left out (the build log counts them).
+--     down finds of what World.build made (the ground tiles, the snow) and of the terrain (the lodge's hill, the old
+--     edge hills, the ring's slopes); where the ray finds anything else, or something World built already stands in
+--     the tree's room (a fence, a lamp, a sign), the tree is left out (the build log counts them). Only World's own
+--     parts count: the rays and the room checks include World's folder as Alpine.start found it (and the terrain),
+--     never the cars, the zombies, the people or what the server added later, so the forests are the same on every
+--     server, however late they are built (tests/alpinebuild_test.luau). The trees keep apart from each other by the
+--     layout itself (its grid, tests/alpine_test.luau): the room check does not see the forest's own trees, whose
+--     chunks go into the world at the end, in one go each.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -119,12 +134,6 @@ end
 
 local function fill(ring: AlpineLayout.Ring)
 	local terrain = workspace.Terrain
-	for name, color in Config.Alpine.Colors do
-		local m = MATERIALS[name]
-		if m then
-			terrain:SetMaterialColor(m, rgb(color))
-		end
-	end
 	for _, f in ring.fills do
 		local frame = CFrame.new(f.x, f.y, f.z) * CFrame.Angles(0, f.yaw, 0) * CFrame.Angles(f.pitch, 0, 0)
 		local m = material(f.material)
@@ -184,7 +193,8 @@ end
 -- ── The forests ────────────────────────────────────────────────────────────
 
 -- Where something may stand: the ground under (x, z) a ray straight down finds (the ground tiles, the winter's snow,
--- the terrain but its water), or nil when it finds anything else.
+-- the terrain but its water), or nil when it finds anything else. The ray and the room check see World's own parts
+-- only (Include: the folders World.build made, the ray the terrain too).
 type Ground = { params: RaycastParams, overlap: OverlapParams }
 local function groundAt(g: Ground, x: number, z: number, fallback: number): number?
 	local hit = workspace:Raycast(Vector3.new(x, 1200, z), Vector3.new(0, -1300, 0), g.params)
@@ -201,13 +211,13 @@ local function groundAt(g: Ground, x: number, z: number, fallback: number): numb
 	return nil
 end
 
--- Is the room (a box `w` wide and `h` high over y) free of anything already built?
+-- Is the room (a box `w` wide and `h` high over y) free of anything World built?
 local function roomFree(g: Ground, x: number, y: number, z: number, w: number, h: number): boolean
 	local found = workspace:GetPartBoundsInBox(CFrame.new(x, y + 1.5 + h / 2, z), Vector3.new(w, h, w), g.overlap)
 	return #found == 0
 end
 
-local function forests(tools: Tools, parent: Instance, forest: AlpineLayout.Forest): (number, number)
+local function forests(tools: Tools, parent: Instance, forest: AlpineLayout.Forest, ground: { Instance }): (number, number)
 	local holder = folder(parent, "Forests")
 	local chunks: { [string]: Model } = {}
 	local function chunk(key: string): Model
@@ -224,11 +234,14 @@ local function forests(tools: Tools, parent: Instance, forest: AlpineLayout.Fore
 		chunks[key] = model
 		return model
 	end
+	-- (Include, not Exclude: a car, a zombie, a courier or a rental dock where a tree goes never moves the forest)
 	local g: Ground = { params = RaycastParams.new(), overlap = OverlapParams.new() }
-	g.params.FilterType = Enum.RaycastFilterType.Exclude
-	g.params.FilterDescendantsInstances = { holder }
-	g.overlap.FilterType = Enum.RaycastFilterType.Exclude
-	g.overlap.FilterDescendantsInstances = { holder, workspace.Terrain }
+	local rays = table.clone(ground)
+	table.insert(rays, workspace.Terrain)
+	g.params.FilterType = Enum.RaycastFilterType.Include
+	g.params.FilterDescendantsInstances = rays
+	g.overlap.FilterType = Enum.RaycastFilterType.Include
+	g.overlap.FilterDescendantsInstances = ground
 
 	local placed, skipped = 0, 0
 	for _, t in forest.trees do
@@ -299,38 +312,74 @@ end
 
 -- ── The build ──────────────────────────────────────────────────────────────
 
-function Alpine.build(world: Instance, tools: Tools)
+-- What Alpine.start leaves to Alpine.finish.
+type Pending = { tools: Tools, alps: Folder, ring: AlpineLayout.Ring, ground: { Instance } }
+local pending: Pending? = nil
+
+-- The cheap part, at once (World.build's last piece): the valley, the terrain's colours, the silhouettes, the pass.
+function Alpine.start(world: Instance, tools: Tools)
 	local started = os.clock()
-	last = started
 	local A = Config.Alpine
+	-- (what the forests may stand on: World's folder as World.build made it, before the Alps' own folder)
+	local ground = world:GetChildren()
 	local alps = folder(world, "Alps")
 	-- The valley: the open ground lush grass.
-	for _, child in world:GetChildren() do
+	for _, child in ground do
 		if child.Name == "Ground" and child:IsA("BasePart") then
 			child.Color = rgb(A.Valley.Color)
 			child.Material = material(A.Valley.Material)
 		end
 	end
+	for name, color in A.Colors do
+		local m = MATERIALS[name]
+		if m then
+			workspace.Terrain:SetMaterialColor(m, rgb(color))
+		end
+	end
 	local ring = AlpineLayout.ring()
-	fill(ring)
-	local filled = os.clock() - started
 	silhouettes(alps, ring)
 	portals(tools, alps, ring)
+	pending = { tools = tools, alps = alps, ring = ring, ground = ground }
+	print(string.format("[Alpine] %d silhouettes and the pass in %.2f s (the terrain and the forests follow)", #ring.silhouettes, os.clock() - started))
+end
+
+-- The rest, deferred (World.buildLate), once: the terrain's fills (none in a Studio test with SkipInStudio on), then
+-- the forests on them.
+function Alpine.finish()
+	local job = pending
+	if job == nil then
+		return
+	end
+	pending = nil
+	local started = os.clock()
+	last = started
+	local ring = job.ring
+	local skip = Config.Alpine.SkipInStudio and RunService:IsStudio()
+	if not skip then
+		fill(ring)
+	end
+	local filled = os.clock() - started
 	local forest = AlpineLayout.forest()
-	local placed, skipped = forests(tools, alps, forest)
+	local placed, skipped = forests(job.tools, job.alps, forest, job.ground)
+	local terrain = if skip
+		then "the terrain's fills skipped (Config.Alpine.SkipInStudio)"
+		else string.format("%d terrain fills (%.1f billion studs³, %.1f s)", #ring.fills, AlpineLayout.volume(ring.fills) / 1e9, filled)
 	print(string.format(
-		"[Alpine] %d mountains, %d terrain fills (%.1f billion studs³, %.1f s), %d silhouettes, %d trees (%d left out), %d meadows, %d huts, in %.1f s",
+		"[Alpine] %d mountains, %s, %d trees (%d left out), %d meadows, %d huts, in %.1f s",
 		#ring.cones,
-		#ring.fills,
-		AlpineLayout.volume(ring.fills) / 1e9,
-		filled,
-		#ring.silhouettes,
+		terrain,
 		placed,
 		skipped,
 		#forest.patches,
 		#forest.huts,
 		os.clock() - started
 	))
+end
+
+-- Both at once.
+function Alpine.build(world: Instance, tools: Tools)
+	Alpine.start(world, tools)
+	Alpine.finish()
 end
 
 return Alpine

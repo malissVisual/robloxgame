@@ -8,7 +8,7 @@
 <script type="module">
 // 7.1, the Alps: a 3/4 view of one stretch of shared/AlpineLayout.luau (render.py's export): the terrain's top as a
 // height field coloured by its material (the cones' layers, the glaciers, the scree, the pass's cliff), the valley's
-// grass, the roads and yards, the trees (a trunk and three ellipsoid tiers each, as server/Alpine.luau builds them),
+// grass, the roads and yards, the trees (their layout parts, as server/Alpine.luau builds them: a trunk and a spire),
 // the huts, the meadows' flowers, the West Pass's road, barrier, portal and shutter. A sun with shadows, a blue haze.
 import * as THREE from './three.module.min.js';
 
@@ -144,27 +144,23 @@ for (const entry of data.portals) {
 }
 data.waterfall.forEach(p => part(p));
 
-// The trees: instanced trunks and tiers (the layout's own parts for one tree, scaled to each).
-const trees = data.trees.filter(t => inStretch(t[0], t[2], 60));
+// The trees: the layout's own parts for every tree of the stretch (7.1 review: a trunk and one needle spire),
+// instanced by shape, each with its colour.
 {
-  const variants = data.treeColors.map(rgb);
-  const trunkMesh = new THREE.InstancedMesh(unitCyl, new THREE.MeshStandardMaterial({ color: rgb(data.trunk), roughness: 1 }), trees.length);
-  const tierMesh = new THREE.InstancedMesh(unitBall, new THREE.MeshStandardMaterial({ roughness: 1 }), trees.length * 3);
-  const tiers = [[0.36, 0.38, 0.42, 0.86], [0.58, 0.28, 0.36, 1.0], [0.80, 0.16, 0.40, 1.12]];
+  const byShape = {};
+  for (const spec of data.treeSpecs) (byShape[spec.shape] = byShape[spec.shape] || []).push(spec);
   const o = new THREE.Object3D();
-  trees.forEach(([x, y, z, h, variant, snowy, slope, yaw], n) => {
-    const d = 1.3 + h * 0.024;
-    o.position.set(x, y + h * 0.27 - 1, z); o.rotation.set(0, 0, 0); o.scale.set(d, h * 0.54 + 2, d); o.updateMatrix();
-    trunkMesh.setMatrixAt(n, o.matrix);
-    tiers.forEach(([mid, w, th, shade], k) => {
-      o.position.set(x, y + h * mid, z); o.rotation.set(0, yaw, 0); o.scale.set(h * w, h * th, h * w * 0.94); o.updateMatrix();
-      tierMesh.setMatrixAt(n * 3 + k, o.matrix);
-      let c = variants[variant - 1].clone().multiplyScalar(shade);
-      if (snowy) c = k === 2 ? rgb(data.snowy) : c.lerp(rgb(data.snowy), 0.22);
-      tierMesh.setColorAt(n * 3 + k, c);
+  for (const [shape, specs] of Object.entries(byShape)) {
+    const geo = shape === 'cylinder' ? unitCyl : shape === 'ellipsoid' || shape === 'ball' ? unitBall : shape === 'wedge' ? unitWedge : unitBox;
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 1 }), specs.length);
+    specs.forEach((s, n) => {
+      o.position.set(s.x, s.y, s.z); o.rotation.order = 'YXZ'; o.rotation.set(s.pitch || 0, s.yaw, 0); o.scale.set(s.sx, s.sy, s.sz); o.updateMatrix();
+      mesh.setMatrixAt(n, o.matrix);
+      mesh.setColorAt(n, rgb(s.color));
     });
-  });
-  for (const m of [trunkMesh, tierMesh]) { m.castShadow = m.receiveShadow = true; scene.add(m); }
+    mesh.castShadow = mesh.receiveShadow = true;
+    scene.add(mesh);
+  }
 }
 // The wildflowers.
 {

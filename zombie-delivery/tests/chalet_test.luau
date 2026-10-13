@@ -8,8 +8,9 @@
 --     the lot's edges, nothing under the walk
 --   * clear of a moving day's dress (shared/MoveSiteLooks.luau house: the boxes by the door, the MOVING DAY banner
 --     over it, the yard and realtor signs), on every house: any of them can be a move's
---   * within the part budget (ChaletLooks.Budget a chalet; the whole Suburbs' houses under the 7.1 budget), the three
---     looks all used, the roof steep with wide eaves, the balcony under the roof's verge
+--   * within the part budget (ChaletLooks.Budget a chalet; the whole Suburbs' houses under the 7.1 budget; 7.1 review:
+--     about 32 parts a chalet, it was 45), the three looks all used, the roof steep with wide eaves, the balcony under
+--     the roof's verge
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
 local Map = require("./Map")
@@ -156,6 +157,10 @@ check(`within the budget: {ChaletLooks.Budget} pieces a chalet at most, one body
 -- (7.1's budget: the Suburbs' houses were about 11 parts each with the path, the mailbox and the tree; the whole city
 -- 22,851 parts in 7.0: the chalets and the square stay within 15 % of it, tools/perf/world_count.py)
 check("the chalets add less than 15 % of the city's 7.0 parts (22,851)", (total - 6 * #houses) <= 22851 * 0.15, total - 6 * #houses)
+-- 7.1 review: what stood together is one piece (the plinth, the fence and its rail, the firewood, a flower box and its
+-- geraniums, the balcony's box with its flowers), the purlin ends gone: 13 pieces fewer a chalet (31.6 on the map on
+-- average, 44.6 before)
+check("7.1 review: at most 32 pieces a chalet on average (it was 44.6)", total <= 32 * #houses, string.format("%.1f", total / #houses))
 check("the three looks all on the map (tyrol, salzburg, bregenz)", (used[1] or 0) >= 5 and (used[2] or 0) >= 5 and (used[3] or 0) >= 5)
 
 -- The roof: steep, its eaves wide; the balcony under its verge; for every width a house may have.
@@ -200,7 +205,7 @@ for _, upper in { false, true } do
 		door = { at = -14, width = 5 },
 	}
 	local pieces = ChaletLooks.estate(layout)
-	estateOk = estateOk and #pieces <= (if upper then 28 else 16)
+	estateOk = estateOk and #pieces <= (if upper then 18 else 9) -- (7.1 review: 24 and 13 before)
 	for _, p in pieces do
 		local b = boxOf(p)
 		-- outside the walls (nothing inside the rooms)

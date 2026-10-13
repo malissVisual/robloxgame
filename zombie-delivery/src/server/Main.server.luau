@@ -73,6 +73,9 @@ PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 World.build()
+-- 7.1 review: the Alps' terrain fills and forests (thousands of fills) once the server is wired: PLAY and the lighting
+-- never wait for them (the far silhouettes and the pass stand already).
+task.defer(World.buildLate)
 
 local notice = Net.get("Notice")
 local stateRemote = Net.get("State")

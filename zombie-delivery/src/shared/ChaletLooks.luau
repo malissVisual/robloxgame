@@ -4,7 +4,9 @@
 -- makes a part of each piece (World's buildHouse hands it the house's lot and the world's dice); tests/chalet_test.luau
 -- checks every house of the map: the body, the door and the windows where the house always had them, nothing on the
 -- path from the door to the kerb or in the door's swing, everything on its own lot, clear of a moving day's dress
--- (shared/MoveSiteLooks.luau house) and within the part budget. Pure Luau.
+-- (shared/MoveSiteLooks.luau house) and within the part budget. Pure Luau. 7.1 review: about 32 parts a chalet (it
+-- was 45): what stood together is one piece (the plinth, a fence and its rail, the firewood, a flower box and its
+-- geraniums, the balcony's box with its flowers), the purlin ends are gone; the house, the door and the roof the same.
 --
 -- The frame is the house's door frame (World's buildHouse): its origin on the walk at the middle of the front wall
 -- (the door), +X to the right of somebody looking out of the door, +Y up, -Z out to the street; the house stands from
@@ -16,9 +18,9 @@
 --                 open shutters over boxes of red geraniums; two small upper windows when the house is tall enough
 --   the roof      a steep gable to the street (the ridge from the front to the back), the gable's triangle in timber
 --                 (solid, as the old roof's wedges were), two shingle slabs with wide eaves (deepest over the front),
---                 the ridge cap and three purlin ends under the front eave
+--                 the ridge cap
 --   the balcony   across the gable over the front wall: its floor on two struts, a carved balustrade with a darker
---                 band, the hand rail, a long box of red geraniums trailing over it, the balcony door behind it
+--                 band, the hand rail, a long box of red geraniums on it, the balcony door behind it
 --   the yard      stacked firewood under the side eave and a low wooden fence along the front of the lot either side of
 --                 the path (decoration: nothing to stop a courier, a mover or a car)
 -- Three looks (ChaletLooks.variantOf, from the lot's own dice, never the world's): "tyrol" (dark timber, green shutters,
@@ -60,7 +62,7 @@ export type Spec = {
 }
 
 ChaletLooks.Variants = { "tyrol", "salzburg", "bregenz" }
-ChaletLooks.Budget = 50
+ChaletLooks.Budget = 36
 ChaletLooks.Ground = 7.6 -- the ground floor's top: the render below, the timber above
 ChaletLooks.Path = 2.6 -- half the path's width kept clear from the door to the lot's front edge (and the door's swing)
 
@@ -92,9 +94,7 @@ local DARK_WOOD = { 70, 48, 32 }
 local STONE = { 132, 128, 120 }
 local GLASS = { 40, 50, 60 }
 local GERANIUM = { 210, 38, 46 }
-local LEAVES = { 60, 110, 52 }
 local LOGS = { 152, 108, 68 }
-local LOG_ENDS = { 200, 164, 116 }
 local FENCE = { 128, 92, 60 }
 local SUN = { 214, 168, 70 }
 
@@ -135,12 +135,10 @@ function ChaletLooks.house(spec: Spec): { Piece }
 
 	-- ── The body ────────────────────────────────────────────────────────────
 	add("House", { w, h, d }, { 0, h / 2, d / 2 }, render, "Plaster", { solid = true })
-	-- (the plinth and the timber stand out of the side and back walls; on the front only a hair, and the plinth not
-	-- across the doorway: a moving day's MOVING DAY banner, MoveSiteLooks, hangs on the front wall over the door)
-	add("Plinth", { w + 0.4, 1, d + 0.24 }, { 0, 0.5, d / 2 + 0.08 }, STONE, "Slate")
-	for _, side in { -1, 1 } do
-		add("PlinthFront", { half - 2.5, 1, 0.2 }, { side * (half + 2.9) / 2, 0.5, -0.1 }, STONE, "Slate")
-	end
+	-- (the plinth and the timber stand out of the side and back walls; on the front only a hair: the wall's skin
+	-- stays within 0.13 of it, the door's way out clear, and a moving day's MOVING DAY banner, MoveSiteLooks, hangs on
+	-- the front wall over the door. 7.1 review: one plinth all round, its front 0.08 out, behind the door's surround)
+	add("Plinth", { w + 0.4, 1, d + 0.28 }, { 0, 0.5, d / 2 + 0.06 }, STONE, "Slate")
 	add("Timber", { w + 0.3, h - g, d + 0.19 }, { 0, (g + h) / 2, d / 2 + 0.055 }, look.timber, look.timberMaterial)
 	if look.corners then
 		for _, side in { -1, 1 } do
@@ -154,8 +152,7 @@ function ChaletLooks.house(spec: Spec): { Piece }
 		local x = side * column
 		add("Shutters", { 5.6, 3.4, 0.12 }, { x, 5.3, -0.06 }, look.shutter, "Wood")
 		add("Window", { 3.4, 3.2, 0.3 }, { x, 5.3, -0.15 }, GLASS, "Glass", { window = n })
-		add("FlowerBox", { 4, 0.6, 0.7 }, { x, 3.35, -0.45 }, DARK_WOOD, "Wood")
-		add("Geraniums", { 3.8, 0.6, 0.8 }, { x, 3.85, -0.5 }, GERANIUM, "Grass")
+		add("Geraniums", { 4, 1.1, 0.8 }, { x, 3.6, -0.5 }, GERANIUM, "Grass") -- (a box of them, one piece)
 	end
 	if h - g >= 4.8 then
 		for n, side in { -1, 1 } do
@@ -182,12 +179,7 @@ function ChaletLooks.house(spec: Spec): { Piece }
 		add("RoofShingles", { length, thick, along }, { x, y, zMid }, roofColor, "Slate", { turn = { 0, 0, -side * math.deg(pitch) } })
 	end
 	add("RoofRidge", { 0.8, 0.45, along + 0.2 }, { 0, h + rise + thick / math.cos(pitch) - 0.05, zMid }, shade(roofColor, -18), "Wood")
-	-- (the balcony's width first: the side purlins stick out just beyond its ends)
 	local wb = math.floor(math.min(w - 3, widest) * look.balcony * 2 + 0.5) / 2
-	for _, x in { -(wb / 2 + 0.8), 0, wb / 2 + 0.8 } do
-		local top = h + rise - math.abs(x) * math.tan(pitch) - 0.04
-		add("PurlinEnd", { 0.6, 0.7, eaveFront - 0.4 }, { x, top - 0.35, -(eaveFront - 0.4) / 2 }, DARK_WOOD, "Wood")
-	end
 
 	-- ── The balcony ─────────────────────────────────────────────────────────
 	local floor = h + 0.25
@@ -201,9 +193,7 @@ function ChaletLooks.house(spec: Spec): { Piece }
 		add("BalconyStrut", { 0.4, 0.4, 2.7 }, { side * (wb / 2 - 1), h - 0.775, -1.2 }, DARK_WOOD, "Wood", { turn = { math.deg(math.atan2(1.25, 2.4)), 0, 0 } })
 	end
 	add("BalconyDoor", { 3.2, 4.4, 0.2 }, { 0, floor + 2.2, -0.1 }, GLASS, "Glass", { window = 2 })
-	add("BalconyBox", { wb - 1.2, 0.7, 0.7 }, { 0, floor + 2.2, -3.15 }, DARK_WOOD, "Wood")
-	add("BalconyGeraniums", { wb - 1.4, 0.7, 0.8 }, { 0, floor + 2.75, -3.2 }, GERANIUM, "Grass")
-	add("TrailingLeaves", { wb - 1.2, 0.8, 0.4 }, { 0, floor + 1.6, -3.4 }, LEAVES, "Grass")
+	add("BalconyGeraniums", { wb - 1.2, 1.45, 0.8 }, { 0, floor + 2.375, -3.2 }, GERANIUM, "Grass") -- (the box, its flowers hanging over the rail)
 	if look.sun then
 		add("GableSun", { 0.15, 2.2, 2.2 }, { 0, h + rise - 2.3, -0.09 }, SUN, "Wood", { shape = "Cylinder", turn = { 0, 90, 0 } })
 	end
@@ -213,17 +203,14 @@ function ChaletLooks.house(spec: Spec): { Piece }
 		local side = look.firewood
 		local x = side * (half + 0.95)
 		local z0, z1 = d * 0.3, d * 0.8
-		add("Firewood", { 1.6, 3.2, z1 - z0 }, { x, 1.6, (z0 + z1) / 2 }, LOGS, "Wood")
-		add("FirewoodEnds", { 1.5, 3, 0.1 }, { x, 1.6, z0 - 0.05 }, LOG_ENDS, "Wood")
-		add("FirewoodRoof", { 2.2, 0.25, z1 - z0 + 0.6 }, { x, 3.45, (z0 + z1) / 2 }, DARK_WOOD, "Wood", { turn = { 0, 0, -side * 12 } }) -- (high at the wall)
+		add("Firewood", { 1.6, 3.4, z1 - z0 }, { x, 1.7, (z0 + z1) / 2 }, LOGS, "Wood") -- (the stack, one piece, under the side eave)
 	end
 	do
 		local edge = -(spec.lot / 2 - spec.front) + 0.6 -- (the lot's front edge, a little in)
 		local from, to = ChaletLooks.Path + 0.6, spec.lot / 2 - 1.5
 		for _, side in { -1, 1 } do
 			local x = side * (from + to) / 2
-			add("Fence", { to - from, 1.1, 0.12 }, { x, 0.85, edge }, FENCE, "WoodPlanks")
-			add("FenceRail", { to - from + 0.3, 0.22, 0.2 }, { x, 1.5, edge }, shade(FENCE, -24), "Wood")
+			add("Fence", { to - from + 0.3, 1.3, 0.16 }, { x, 0.95, edge }, FENCE, "WoodPlanks") -- (its boards and rail, one piece)
 		end
 	end
 	return out
@@ -234,7 +221,8 @@ end
 -- a timber band round its walls under the eaves (front, back and the left: the garage stands on the right), open
 -- shutters either side of each front window (its glass sits in the wall's opening: nothing over it) and a box of red
 -- geraniums under it, firewood stacked by the left wall, and over a two-storey house's door a balcony along the
--- upper floor. Decoration only (the walls, the roof and the doors are World's).
+-- upper floor. Decoration only (the walls, the roof and the doors are World's). (7.1 review: the same one-piece flower
+-- boxes, firewood and balcony box as a chalet's.)
 export type EstateLayout = {
 	x0: number, -- the house's walls (its garage beyond x1)
 	x1: number,
@@ -267,15 +255,12 @@ function ChaletLooks.estate(layout: EstateLayout): { Piece }
 				add("Shutter", { leaf, window.top - window.bottom + 0.2, 0.12 }, { x, (window.bottom + window.top) / 2, z0 - 0.06 }, shutter, "Wood")
 			end
 		end
-		add("FlowerBox", { window.width, 0.6, 0.7 }, { window.at, window.bottom - 0.4, z0 - 0.4 }, DARK_WOOD, "Wood")
-		add("Geraniums", { window.width - 0.2, 0.6, 0.8 }, { window.at, window.bottom + 0.1, z0 - 0.45 }, GERANIUM, "Grass")
+		add("Geraniums", { window.width, 1.1, 0.8 }, { window.at, window.bottom - 0.15, z0 - 0.45 }, GERANIUM, "Grass")
 	end
 	do
 		local x = x0 - 0.95
 		local a, b = z0 + 2.5, z1 - 2.5
-		add("Firewood", { 1.6, 3.2, b - a }, { x, 1.6, (a + b) / 2 }, LOGS, "Wood")
-		add("FirewoodEnds", { 1.5, 3, 0.1 }, { x, 1.6, a - 0.05 }, LOG_ENDS, "Wood")
-		add("FirewoodRoof", { 2.2, 0.25, b - a + 0.6 }, { x, 3.45, (a + b) / 2 }, DARK_WOOD, "Wood", { 0, 0, 12 }) -- (high at the wall)
+		add("Firewood", { 1.6, 3.4, b - a }, { x, 1.7, (a + b) / 2 }, LOGS, "Wood")
 	end
 	if layout.upper then
 		local wb, floor = x1 - x0 - 2, top + 0.25
@@ -288,9 +273,7 @@ function ChaletLooks.estate(layout: EstateLayout): { Piece }
 			add("BalconySide", { 0.22, 2.4, 2.6 }, { mid + side * (wb / 2 - 0.11), floor + 1.2, z0 - 1.4 }, LIGHT_WOOD, "WoodPlanks")
 			add("BalconyStrut", { 0.4, 0.4, 3.1 }, { mid + side * (wb / 2 - 1), top - 1.15, z0 - 1.2 }, DARK_WOOD, "Wood", { math.deg(math.atan2(2.05, 2.4)), 0, 0 })
 		end
-		add("BalconyBox", { wb - 1.2, 0.7, 0.7 }, { mid, floor + 2.2, z0 - 3.15 }, DARK_WOOD, "Wood")
-		add("BalconyGeraniums", { wb - 1.4, 0.7, 0.8 }, { mid, floor + 2.75, z0 - 3.2 }, GERANIUM, "Grass")
-		add("TrailingLeaves", { wb - 1.2, 0.8, 0.4 }, { mid, floor + 1.6, z0 - 3.4 }, LEAVES, "Grass")
+		add("BalconyGeraniums", { wb - 1.2, 1.45, 0.8 }, { mid, floor + 2.375, z0 - 3.2 }, GERANIUM, "Grass")
 	end
 	return out
 end
