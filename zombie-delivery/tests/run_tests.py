@@ -32,10 +32,17 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(tools, "vehicle-preview", "roblox-mock.luau"), os.path.join(tmp, "rbxmock.luau"))
     shutil.copy(os.path.join(tools, "fixtures", "item-mock.luau"), os.path.join(tmp, "ItemMock.luau"))
     prefix = 'local M = require("./ItemMock")\nlocal Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n'
-    for name in ("GunModels", "CargoLooks", "ItemLooks"):
+    # 7.0 (the moving prototype): the furniture and the house plans are made of Vector3s and CFrames, so they load on
+    # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
+    for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 7.0 (the moving prototype): the real server/HouseInterior.luau (tests/houseinterior_test.luau) on the recorder,
+    # its shared modules the copies above, the recorder's `game`.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseInterior.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "HouseInterior.luau"), "w", encoding="utf-8").write(prefix + "local game = M.game\n" + source)
     # 6.23 (Codex's codex/cargo-missions-fix): the real server/Cargo.luau as CargoServer.luau for
     # tests/cargo_runtime_test.luau: its server modules, Net and services from tests/runtime/CargoRuntime.luau (on the
     # same recorder as CargoLooks), its shared modules the copies above.
