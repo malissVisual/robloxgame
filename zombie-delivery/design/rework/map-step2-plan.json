@@ -1,0 +1,5332 @@
+{
+ "title": "Zombie Delivery — map step 2: shrink the world to an alpine valley (about half)",
+ "base": "claude/adoring-mendel-v77f7v @ 4758292 (version 7.0; the map data is identical to 8b6d8cf, the commits between touch the moves and the sounds only). Step 1 (Japanese garden out, chalets, mountain ring, forests) must be merged first.",
+ "generatedBy": "the real shared modules exported in the plain Luau CLI (Map, Config, Missions, BusLines, RentalDocks, ZipLines, Shortcuts, Explore) and every part of the real World.build() on tools/perf's stand-in, binned by position; layout checks: every new yard/plot inside the bounds, on land, no overlaps, roads clear of yards",
+ "bounds": {
+  "current": {
+   "x0": -2150,
+   "x1": 1900,
+   "z0": -2950,
+   "z1": 1500
+  },
+  "proposed": {
+   "x0": -1350,
+   "x1": 1500,
+   "z0": -1500,
+   "z1": 1500
+  },
+  "areaNow": 18022500,
+  "areaProposed": 8550000,
+  "areaShare": 0.474,
+  "linear": {
+   "x": 0.7,
+   "z": 0.67
+  },
+  "mountainRing": {
+   "from": "the walls (Map.Bounds)",
+   "outward": 420,
+   "note": "terrain only; replaces buildGround's ten edge hills; step 1's ring must read Map.Bounds so it moves with this change"
+  },
+  "explore": {
+   "now": {
+    "Cols": 35,
+    "Encoded": 244,
+    "Rows": 39,
+    "Size": 120,
+    "X0": -2210,
+    "Z0": -3010
+   },
+   "proposed": {
+    "Size": 120,
+    "Pad": 60,
+    "X0": -1410,
+    "Z0": -1560,
+    "Cols": 25,
+    "Rows": 26
+   }
+  }
+ },
+ "geography": {
+  "river": {
+   "x0": 760,
+   "x1": 920,
+   "note": "unchanged (still the whole valley north to south; both bridges stay)"
+  },
+  "lake": {
+   "x0": 1230,
+   "x1": 1480,
+   "z0": -540,
+   "z1": 470,
+   "shape": "ellipse",
+   "note": "new Map.AlpineLake (terrain water, swimmable, cars sink like the river); replaces Map.Sea; Map.inWater = river or lake"
+  },
+  "winter": {
+   "x0": 120,
+   "x1": 760,
+   "z0": -1500,
+   "z1": -1240,
+   "note": "new Map.Winter rect (the ski slope round the lodge); Map.isWinter(x, z) reads it; Map.WinterZ goes"
+  },
+  "removed": [
+   "Map.Mountain + tunnel (TrafficLanes.NorthLimit → Map.Bounds.z0 + 100)",
+   "Map.Lake (frozen) + Ice Road (Map.onIce → always false, kept as an API)",
+   "Map.Sea (x > 1660)",
+   "Map.WinterZ snowfield"
+  ]
+ },
+ "districts": {
+  "downtown": {
+   "fate": "keep all 81 blocks in place",
+   "step3": "the inner ring (|i|, |j| ≤ 2) becomes the Altstadt: church and square on the park block, Gasthof, shops; the Wall stays Config.City.SafeHalf"
+  },
+  "suburbs": {
+   "fate": "keep all 15 blocks in place (step 1 already restyles the houses as chalets)",
+   "note": "Marge's house home_suburbs_2_0_00 (155 Willow Ln) and its EVACUATE spot stay byte-identical"
+  },
+  "harbor": {
+   "fate": "keep column i = 0 (7 blocks, x 991…1169: the lake shore 'Seeufer'); cut columns i = 1…3 (21 blocks) for the lake",
+   "kept": [
+    "0,-3",
+    "0,-2",
+    "0,-1",
+    "0,0",
+    "0,1",
+    "0,2",
+    "0,3"
+   ],
+   "cut": [
+    "1,-3",
+    "1,-2",
+    "1,-1",
+    "1,1",
+    "1,2",
+    "1,3",
+    "2,-3",
+    "2,-2",
+    "2,-1",
+    "2,0",
+    "2,1",
+    "2,3",
+    "3,-3",
+    "3,-2",
+    "3,0",
+    "3,1",
+    "3,2",
+    "3,3"
+   ],
+   "relocatedSpecials": {
+    "1,0 frosty": "0,-1",
+    "3,-1 harborpoint": "0,-2",
+    "2,2 warehouse": "0,2"
+   },
+   "dice": "Map.addresses rolls ONE stream over all districts (harbor before suburbs): the cut ordinary blocks must roll their 5 dice dry (district.diceI1 = 3), and the three blocks that turn special roll dry too (Map.FormerBlocks harbor 0,-2 / 0,-1 / 0,2), so every Suburbs address stays as it is"
+  },
+  "villages": {
+   "Seewinkel": "the lake shore: Harbor column 0 + the pier, Frosty's, the lighthouse (boathouses in step 3)",
+   "Bergdorf": "up the slope NE: Sunset Hills (Hilltop) and the slope over the lake (Ocean View, the Lakeside Villa); room for chalets x 1270…1480, z −960…−740",
+   "Sankt Alm": "NW pine forest, the players' estates: Pinecrest, the Sunset Villa (and the old fortress-prison at the road's end)",
+   "Suburbs": "south of town, chalets since step 1 (name it in step 3)"
+  }
+ },
+ "relocations": {
+  "base": {
+   "from": [
+    300,
+    -2600
+   ],
+   "to": [
+    1200,
+    -1220
+   ],
+   "turn": 0,
+   "why": "Military Base: NE top of the valley, at the end of the new Army Road (entrance south)",
+   "newYard": {
+    "x0": 940,
+    "z0": -1460,
+    "x1": 1460,
+    "z1": -980,
+    "id": "base",
+    "name": "Military Base"
+   },
+   "newPlot": null
+  },
+  "farm": {
+   "from": [
+    -1880,
+    520
+   ],
+   "to": [
+    -648,
+    -1320
+   ],
+   "turn": 90,
+   "why": "Old Farm: north of town (concept: FARM between town and the lodge), end of the new Farm Road (entrance east → south)",
+   "newYard": {
+    "x0": -798,
+    "z0": -1470,
+    "x1": -498,
+    "z1": -1170,
+    "id": "farm",
+    "name": "Old Farm"
+   },
+   "newPlot": null
+  },
+  "docks": {
+   "from": [
+    1628.5,
+    0
+   ],
+   "to": [
+    1196.5,
+    0
+   ],
+   "turn": 0,
+   "why": "Harbor Docks → the lake pier on the west shore (piers and the ship over the lake)",
+   "newYard": {
+    "x0": 1169.0,
+    "z0": -200,
+    "x1": 1224.0,
+    "z1": 200,
+    "id": "docks",
+    "name": "Harbor Docks"
+   },
+   "newPlot": null
+  },
+  "lodge": {
+   "from": [
+    -655,
+    -2200
+   ],
+   "to": [
+    300,
+    -1365
+   ],
+   "turn": 90,
+   "why": "Ski Lodge: top of the North Highway (entrance east → south), the lift runs up into the peaks",
+   "newYard": {
+    "x0": 180,
+    "z0": -1490,
+    "x1": 420,
+    "z1": -1240,
+    "id": "lodge",
+    "name": "Ski Lodge"
+   },
+   "newPlot": null
+  },
+  "fueldepot": {
+   "from": [
+    1465,
+    620.5
+   ],
+   "to": [
+    1110,
+    899.5
+   ],
+   "turn": 0,
+   "why": "Harbor Fuel Depot: south of the Power Plant, on the new Depot Road",
+   "newYard": {
+    "x0": 935,
+    "z0": 800.0,
+    "x1": 1285,
+    "z1": 999.0,
+    "id": "fueldepot",
+    "name": "Harbor Fuel Depot"
+   },
+   "newPlot": null
+  },
+  "airfield": {
+   "from": [
+    -1500,
+    1265
+   ],
+   "to": [
+    1220,
+    1375
+   ],
+   "turn": 0,
+   "why": "Old Airfield: the empty SE corner, end of the new Lake Road South",
+   "newYard": {
+    "x0": 960,
+    "z0": 1260,
+    "x1": 1480,
+    "z1": 1490,
+    "id": "airfield",
+    "name": "Old Airfield"
+   },
+   "newPlot": null
+  },
+  "prison": {
+   "from": [
+    -1600,
+    -1080
+   ],
+   "to": [
+    -1140,
+    -1300
+   ],
+   "turn": 0,
+   "why": "Blackrock Prison: NW, end of the re-routed Blackrock Road (step 3 idea: an old fortress, Burg)",
+   "newYard": {
+    "x0": -1340,
+    "z0": -1480,
+    "x1": -940,
+    "z1": -1120,
+    "id": "prison",
+    "name": "Blackrock Prison"
+   },
+   "newPlot": null
+  },
+  "lighthouse": {
+   "from": [
+    1585,
+    -1080
+   ],
+   "to": [
+    1380,
+    -635
+   ],
+   "turn": 90,
+   "why": "Lighthouse Point → on the lake's north end (sea side east → lake side south), off the new Seeweg",
+   "newYard": {
+    "x0": 1280,
+    "z0": -700,
+    "x1": 1480,
+    "z1": -570,
+    "id": "lighthouse",
+    "name": "Lighthouse Point"
+   },
+   "newPlot": null
+  },
+  "earl": {
+   "from": [
+    -1570,
+    460
+   ],
+   "to": [
+    -1240,
+    156
+   ],
+   "turn": 0,
+   "why": "Earl's Used Wheels: the end of the shortened West Highway",
+   "newYard": {
+    "x0": -1320,
+    "z0": 116,
+    "x1": -1160,
+    "z1": 196,
+    "id": "earl",
+    "name": "Earl's Used Wheels"
+   },
+   "newPlot": null
+  },
+  "frosty": {
+   "from": [
+    1224,
+    0
+   ],
+   "to": [
+    1080,
+    -144
+   ],
+   "turn": 0,
+   "why": "Frosty's: Harbor block (1,0) → (0,-1), ice cream on the lake shore",
+   "newYard": null,
+   "newPlot": null
+  },
+  "harborpoint": {
+   "from": [
+    1512,
+    -144
+   ],
+   "to": [
+    1080,
+    -288
+   ],
+   "turn": 0,
+   "why": "Harbor Point tower (office_harbor): Harbor block (3,-1) → (0,-2)",
+   "newYard": null,
+   "newPlot": null
+  },
+  "warehouse": {
+   "from": [
+    1368,
+    288
+   ],
+   "to": [
+    1080,
+    288
+   ],
+   "turn": 0,
+   "why": "Harbor Warehouse (freight hub): Harbor block (2,2) → (0,2)",
+   "newYard": null,
+   "newPlot": null
+  },
+  "oceanview": {
+   "from": [
+    1486,
+    -720
+   ],
+   "to": [
+    1200,
+    -850
+   ],
+   "turn": 0,
+   "why": "Ocean View mansion → on the NE slope over the lake (Bergdorf), facing the Army Road",
+   "newYard": null,
+   "newPlot": {
+    "x": 1200,
+    "z": -850,
+    "facing": {
+     "x": -1,
+     "z": 0
+    }
+   }
+  },
+  "pinecrest": {
+   "from": [
+    -1550,
+    806
+   ],
+   "to": [
+    -1000,
+    -1014
+   ],
+   "turn": 0,
+   "why": "Pinecrest mansion → Sankt Alm (NW pine forest), on the Blackrock Road",
+   "newYard": null,
+   "newPlot": {
+    "x": -1000,
+    "z": -1014,
+    "facing": {
+     "x": 0,
+     "z": -1
+    }
+   }
+  },
+  "lakeside": {
+   "from": [
+    -60,
+    -2157
+   ],
+   "to": [
+    1220,
+    -677
+   ],
+   "turn": 0,
+   "why": "Lakeside Villa → the alpine lake's north shore, on the Seeweg (its jetty to the lake)",
+   "newYard": null,
+   "newPlot": {
+    "x": 1220,
+    "z": -677,
+    "facing": {
+     "x": 0,
+     "z": -1
+    }
+   }
+  },
+  "sunset": {
+   "from": [
+    -1460,
+    -100
+   ],
+   "to": [
+    -870,
+    -1100
+   ],
+   "turn": 90,
+   "why": "Sunset Villa → Sankt Alm, facing south onto the Blackrock Road (front east → south)",
+   "newYard": null,
+   "newPlot": {
+    "x": -870,
+    "z": -1100,
+    "facing": {
+     "x": 0,
+     "z": 1
+    }
+   }
+  }
+ },
+ "relocationRecipe": [
+  "Map.luau keeps every relocated datum in its OLD coordinates in the source (reviewable diff) and adds Map.Relocations = { [id] = { from = {x, z}, to = {x, z}, turn = 0|90|180|270 } }.",
+  "Map.relocate(id, x, z) / relocateDir(id, dx, dz) / relocateRect(id, rect): new = to + R(turn)·(old − from); R(90): (dx, dz) → (−dz, dx) (clockwise on the map, north up).",
+  "One pass at load, right after the raw tables and BEFORE anything derived (Venues, Landmarks, makeLots' free(), addresses, Explore): Yards, Clearings, Places (x, z, nx, nz), Secrets (x, z; y unchanged), EmployerSpots, CargoSpots (park, pile; facing recomputed), FreightDocks, ReceivingDocks, EstatePlots (x, z, facing), Towers (x, z, facing), VanSeller (all its spots, facing), SunsetDrive untouched.",
+  "Map.raw keeps the unrelocated copies (Yards, EmployerSpots, CargoSpots, EstatePlots, VanSeller, Places, Secrets) for World's builders.",
+  "World: a relocated far place is built as today into its own folder, its builder reading Map.raw (yardOf → raw), then the folder is moved rigidly: PivotTo(CFrame.new(to) * CFrame.Angles(0, −rad(turn), 0) * CFrame.new(−from) * old pivot), parts and prompts move with it.",
+  "World: side effects outside the folder are moved by hand: Terrain fills (the lodge's snow hill → relocate the point), the employer NPCs (World.EmployerNpcs[id]: PivotTo the same transform), Earl (World.VanSeller.npc and its spots), World.EstateSpawns / EstateGarages of the four moved estates (their builders are plot-relative: they read the RELOCATED plot and need no folder move; only their literal pieces — Ocean View's sea pier, palms and rocks, Lakeside's frozen-lake jetty — are rewritten for the alpine lake).",
+  "Harbor specials move by whole cells: change Map.SpecialBlocks.harbor keys; their builders are block-relative (cx, cz) and read the relocated CargoSpots / FreightDocks / Towers, so no folder move."
+ ],
+ "roads": [
+  {
+   "name": "Airfield Road",
+   "fate": "remove",
+   "old": [
+    [
+     -1400,
+     520
+    ],
+    [
+     -1400,
+     1150
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Birch Lane",
+   "fate": "keep",
+   "old": [
+    [
+     -360,
+     1260
+    ],
+    [
+     -480,
+     1260
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Blackrock Road",
+   "fate": "change",
+   "old": [
+    [
+     -1100,
+     -380
+    ],
+    [
+     -1600,
+     -380
+    ],
+    [
+     -1600,
+     -900
+    ]
+   ],
+   "new": [
+    [
+     -648,
+     -1060
+    ],
+    [
+     -1140,
+     -1060
+    ],
+    [
+     -1140,
+     -1120
+    ]
+   ],
+   "note": "re-routed: off the Farm Road to the prison's gate; Pinecrest and the Sunset Villa on it"
+  },
+  {
+   "name": "Cliff Road",
+   "fate": "remove",
+   "old": [
+    [
+     1440,
+     -504
+    ],
+    [
+     1440,
+     -820
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Ice Road",
+   "fate": "remove",
+   "old": [
+    [
+     -110,
+     -2200
+    ],
+    [
+     -530,
+     -2200
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Lab Road",
+   "fate": "keep",
+   "old": [
+    [
+     72,
+     -1000
+    ],
+    [
+     -150,
+     -1000
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Lighthouse Road",
+   "fate": "remove",
+   "old": [
+    [
+     1440,
+     -820
+    ],
+    [
+     1440,
+     -1080
+    ],
+    [
+     1520,
+     -1080
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Lodge Road",
+   "fate": "remove",
+   "old": [
+    [
+     280,
+     -2200
+    ],
+    [
+     -110,
+     -2200
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "North Highway",
+   "fate": "change",
+   "old": [
+    [
+     72,
+     -665
+    ],
+    [
+     72,
+     -1000
+    ],
+    [
+     300,
+     -1240
+    ],
+    [
+     300,
+     -2360
+    ]
+   ],
+   "new": [
+    [
+     72,
+     -665
+    ],
+    [
+     72,
+     -1000
+    ],
+    [
+     300,
+     -1240
+    ]
+   ],
+   "note": "ends at the Ski Lodge's gate (no tunnel, no base road)"
+  },
+  {
+   "name": "Old Bridge",
+   "fate": "keep",
+   "old": [
+    [
+     665,
+     -360
+    ],
+    [
+     991,
+     -360
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Pine Lane",
+   "fate": "remove",
+   "old": [
+    [
+     -1550,
+     520
+    ],
+    [
+     -1550,
+     760
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Radio Road",
+   "fate": "keep",
+   "old": [
+    [
+     -1100,
+     216
+    ],
+    [
+     -1100,
+     -460
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Rail Yard Road",
+   "fate": "keep",
+   "old": [
+    [
+     -216,
+     -648
+    ],
+    [
+     -216,
+     -740
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Ranch Road",
+   "fate": "keep",
+   "old": [
+    [
+     -900,
+     216
+    ],
+    [
+     -900,
+     700
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Riding School Lane",
+   "fate": "keep",
+   "old": [
+    [
+     360,
+     972
+    ],
+    [
+     580,
+     972
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Rust Bridge",
+   "fate": "keep",
+   "old": [
+    [
+     665,
+     72
+    ],
+    [
+     991,
+     72
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Sunset Drive",
+   "fate": "keep",
+   "old": [
+    [
+     504,
+     -648
+    ],
+    [
+     504,
+     -760
+    ],
+    [
+     600,
+     -850
+    ],
+    [
+     600,
+     -960
+    ],
+    [
+     520,
+     -1050
+    ],
+    [
+     520,
+     -1140
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Sunset Lane",
+   "fate": "remove",
+   "old": [
+    [
+     -1100,
+     -100
+    ],
+    [
+     -1420,
+     -100
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "Waterworks Road",
+   "fate": "keep",
+   "old": [
+    [
+     360,
+     780
+    ],
+    [
+     430,
+     780
+    ]
+   ],
+   "new": null,
+   "note": null
+  },
+  {
+   "name": "West Highway",
+   "fate": "change",
+   "old": [
+    [
+     -665,
+     216
+    ],
+    [
+     -1100,
+     216
+    ],
+    [
+     -1400,
+     520
+    ],
+    [
+     -1730,
+     520
+    ]
+   ],
+   "new": [
+    [
+     -665,
+     216
+    ],
+    [
+     -1100,
+     216
+    ],
+    [
+     -1330,
+     216
+    ]
+   ],
+   "note": "straight; ends at Earl's lot by the west mountains"
+  },
+  {
+   "name": "Farm Road",
+   "fate": "new",
+   "new": [
+    [
+     -648,
+     -648
+    ],
+    [
+     -648,
+     -1170
+    ]
+   ],
+   "note": "Downtown's NW corner north to the Old Farm's gate"
+  },
+  {
+   "name": "Army Road",
+   "fate": "new",
+   "new": [
+    [
+     1152,
+     -504
+    ],
+    [
+     1152,
+     -940
+    ],
+    [
+     1200,
+     -940
+    ],
+    [
+     1200,
+     -980
+    ]
+   ],
+   "note": "the lake shore's north end up to the base's gate; Ocean View on it"
+  },
+  {
+   "name": "Seeweg",
+   "fate": "new",
+   "new": [
+    [
+     1152,
+     -720
+    ],
+    [
+     1380,
+     -720
+    ],
+    [
+     1380,
+     -700
+    ]
+   ],
+   "note": "along the lake's north end: the Lakeside Villa, Lighthouse Point"
+  },
+  {
+   "name": "Lake Road South",
+   "fate": "new",
+   "new": [
+    [
+     1152,
+     504
+    ],
+    [
+     1320,
+     504
+    ],
+    [
+     1320,
+     1260
+    ]
+   ],
+   "note": "the lake shore's south end down to the airfield's gate"
+  },
+  {
+   "name": "Depot Road",
+   "fate": "new",
+   "new": [
+    [
+     1320,
+     780
+    ],
+    [
+     950,
+     780
+    ]
+   ],
+   "note": "to the Fuel Depot's north side"
+  }
+ ],
+ "inventory": {
+  "counts": {
+   "Config.MoveSites.Spots · keep": 3,
+   "Config.Moving.Contracts · keep": 1,
+   "Map.CargoSpots · keep": 19,
+   "Map.CargoSpots · move": 10,
+   "Map.Clearings · keep": 2,
+   "Map.Depot · keep": 1,
+   "Map.EmployerSpots · keep": 5,
+   "Map.EmployerSpots · move": 3,
+   "Map.EstatePlots · keep": 12,
+   "Map.EstatePlots · move": 5,
+   "Map.FreightDocks · move": 1,
+   "Map.Garden · retire": 1,
+   "Map.GasStations · keep": 6,
+   "Map.GunRange · keep": 1,
+   "Map.Lake · cut": 1,
+   "Map.Landmarks · keep": 51,
+   "Map.Landmarks · move": 16,
+   "Map.Mountain · cut": 1,
+   "Map.Park · keep": 1,
+   "Map.Places · keep": 19,
+   "Map.Places · move": 10,
+   "Map.ReceivingDocks · keep": 3,
+   "Map.RepairShops · keep": 2,
+   "Map.Sea · cut": 1,
+   "Map.Secrets · keep": 20,
+   "Map.Secrets · move": 10,
+   "Map.Shops · keep": 7,
+   "Map.Towers · keep": 1,
+   "Map.Towers · move": 1,
+   "Map.VanSeller · move": 1,
+   "Map.Venues · keep": 14,
+   "Map.Venues · move": 2,
+   "Map.WinterZ · cut": 1,
+   "Map.Yards · keep": 10,
+   "Map.Yards · move": 9
+  },
+  "items": [
+   {
+    "group": "Map.Places",
+    "id": "base",
+    "name": "Military Base",
+    "x": 300,
+    "z": -2600,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1200,
+    "nz": -1220,
+    "relocation": "base",
+    "refs": [
+     "missions (4): duo_9, army_1, army_3, army_10",
+     "job types: armysupply.dropAt, cashrun.dropAt",
+     "employer army (board Map.EmployerSpots)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_base (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Military Base"
+   },
+   {
+    "group": "Map.Places",
+    "id": "radio",
+    "name": "Radio Station",
+    "x": -1100,
+    "z": -560,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_radio (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Radio"
+   },
+   {
+    "group": "Map.Places",
+    "id": "farm",
+    "name": "Old Farm",
+    "x": -1880,
+    "z": 520,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -648,
+    "nz": -1320,
+    "relocation": "farm",
+    "refs": [
+     "missions (5): market_3, market_7, firehouse_5, ranch_2, ranch_5",
+     "job types: farmrun.pickupAt",
+     "employer farm (board Map.EmployerSpots)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_farm (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Old Farm"
+   },
+   {
+    "group": "Map.Places",
+    "id": "docks",
+    "name": "Harbor Docks",
+    "x": 1626,
+    "z": 0,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1194.0,
+    "nz": 0,
+    "relocation": "docks",
+    "refs": [
+     "missions (3): market_9, army_1, underworld_8",
+     "job types: armysupply.pickupAt",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_docks (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Docks→pier"
+   },
+   {
+    "group": "Map.Places",
+    "id": "gas",
+    "name": "Gas Station",
+    "x": 146,
+    "z": -900,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (1): dispatch_9",
+     "job types: fuelrun.dropAt",
+     "employer gas (board Map.EmployerSpots)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_gas (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Gas Station"
+   },
+   {
+    "group": "Map.Places",
+    "id": "lodge",
+    "name": "Ski Lodge",
+    "x": -655,
+    "z": -2200,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 300,
+    "nz": -1365,
+    "relocation": "lodge",
+    "refs": [
+     "job types: winter.dropAt",
+     "MoveStory ch.3 Room Service (the Grand Hotel: the concept's ski lodge/hotel)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_lodge (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Ski Lodge"
+   },
+   {
+    "group": "Map.Places",
+    "id": "school",
+    "name": "Sunny Hill School",
+    "x": 0,
+    "z": 1127,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (1): exodus_8",
+     "job types: schoolrun.dropAt",
+     "employer school (board Map.EmployerSpots)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_school (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "frosty",
+    "name": "Frosty's Ice Cream",
+    "x": 1163,
+    "z": 0,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1019,
+    "nz": -144,
+    "relocation": "frosty",
+    "refs": [
+     "missions (1): lab_5",
+     "job types: icecream.pickupAt",
+     "employer icecream (board Map.EmployerSpots)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_frosty (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Frosty's"
+   },
+   {
+    "group": "Map.Places",
+    "id": "movers",
+    "name": "Big Move Movers",
+    "x": 349,
+    "z": 144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "job types: freightrun.dropChoices",
+     "employer movers (board Map.EmployerSpots)",
+     "MoveStory villain Dana (Big Move Movers' board)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_movers (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "ranch",
+    "name": "Silver Spur Ranch",
+    "x": -900,
+    "z": 740,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (6): ranch_1, ranch_2, ranch_3, ranch_5, ranch_8, ranch_10",
+     "job types: horses.pickupAt",
+     "employer ranch (board Map.EmployerSpots)",
+     "MoveStory ch.1 Hold Your Horses (Walt, Silver Spur Ranch)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_ranch (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Ranch"
+   },
+   {
+    "group": "Map.Places",
+    "id": "stables",
+    "name": "Riverside Riding School",
+    "x": 640,
+    "z": 972,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (3): ranch_1, ranch_3, ranch_10",
+     "job types: horses.dropAt",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_stables (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Riding School"
+   },
+   {
+    "group": "Map.Places",
+    "id": "fueldepot",
+    "name": "Harbor Fuel Depot",
+    "x": 1440,
+    "z": 550,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1085,
+    "nz": 829.0,
+    "relocation": "fueldepot",
+    "refs": [
+     "missions (2): firehouse_3, exodus_3",
+     "job types: fuelrun.pickupAt",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_fueldepot (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Fuel Depot"
+   },
+   {
+    "group": "Map.Places",
+    "id": "bank",
+    "name": "First Zombie Bank",
+    "x": 83,
+    "z": -288,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (3): duo_4, underworld_1, underworld_2",
+     "job types: cashrun.pickupAt",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_bank (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "clinic",
+    "name": "City Clinic",
+    "x": -227,
+    "z": 300,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (7): clinic_2, clinic_4, clinic_5, duo_7, army_4, power_2, lab_9",
+     "job types: ambulance.dropAt",
+     "employer clinic (board Map.EmployerSpots)",
+     "MoveStory ch.2 Handle With Care (City Clinic)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_clinic (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "pharmacy",
+    "name": "Corner Pharmacy",
+    "x": 144,
+    "z": 371,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (1): clinic_1",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_pharmacy (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "market",
+    "name": "FreshMart Supermarket",
+    "x": -371,
+    "z": 144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (4): market_1, market_3, market_9, market_10",
+     "job types: freightrun.dropChoices",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_market (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "warehouse",
+    "name": "Harbor Warehouse",
+    "x": 1307,
+    "z": 288,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1019,
+    "nz": 288,
+    "relocation": "warehouse",
+    "refs": [
+     "missions (9): dispatch_9, clinic_4, market_1, market_10, duo_2, firehouse_1, firehouse_9, power_1, underworld_5",
+     "job types: freightrun.pickupAt",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_warehouse (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Warehouse"
+   },
+   {
+    "group": "Map.Places",
+    "id": "firestation",
+    "name": "Fire Station 9",
+    "x": 349,
+    "z": -144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (3): firehouse_1, firehouse_2, firehouse_3",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_firestation (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "police",
+    "name": "Precinct 13",
+    "x": -288,
+    "z": -227,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (3): dispatch_8, ranch_8, exodus_1",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_police (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "cityhall",
+    "name": "City Hall",
+    "x": 0,
+    "z": -371,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (3): dispatch_8, duo_4, exodus_1",
+     "MoveStory ch.6 Heavy History (city museum: old town, step 3)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_cityhall (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.Places",
+    "id": "airfield",
+    "name": "Old Airfield",
+    "x": -1400,
+    "z": 1185,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1320,
+    "nz": 1295,
+    "relocation": "airfield",
+    "refs": [
+     "missions (6): army_4, army_9, lab_8, exodus_3, exodus_8, exodus_10",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_airfield (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Airfield"
+   },
+   {
+    "group": "Map.Places",
+    "id": "powerplant",
+    "name": "Power Plant",
+    "x": 1100,
+    "z": 548,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (7): firehouse_9, power_1, power_2, power_7, power_8, power_10, lab_7",
+     "job types: freightrun.dropChoices",
+     "MoveStory ch.5 The Zero Files (power plant)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_powerplant (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Power Plant"
+   },
+   {
+    "group": "Map.Places",
+    "id": "waterworks",
+    "name": "Water Works",
+    "x": 452,
+    "z": 780,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (2): duo_2, power_8",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_waterworks (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Water Works"
+   },
+   {
+    "group": "Map.Places",
+    "id": "lab",
+    "name": "Biotech Lab",
+    "x": -172,
+    "z": -1000,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (10): clinic_7, clinic_10, market_7, lab_2, lab_5, lab_7, lab_8, lab_9, lab_10, exodus_7",
+     "MoveStory ch.5 The Zero Files (Biotech Lab)",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_lab (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Lab"
+   },
+   {
+    "group": "Map.Places",
+    "id": "prison",
+    "name": "Blackrock Prison",
+    "x": -1600,
+    "z": -925,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1140,
+    "nz": -1145,
+    "relocation": "prison",
+    "refs": [
+     "missions (1): underworld_5",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_prison (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Prison"
+   },
+   {
+    "group": "Map.Places",
+    "id": "lighthouse",
+    "name": "Lighthouse Point",
+    "x": 1545,
+    "z": -1080,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1380,
+    "nz": -675,
+    "relocation": "lighthouse",
+    "refs": [
+     "missions (5): army_9, underworld_4, underworld_10, exodus_7, exodus_9",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_lighthouse (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Lighthouse"
+   },
+   {
+    "group": "Map.Places",
+    "id": "trainyard",
+    "name": "Train Yard",
+    "x": -216,
+    "z": -765,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (4): firehouse_5, army_3, power_7, underworld_8",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_trainyard (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Train Yard"
+   },
+   {
+    "group": "Map.Places",
+    "id": "camp",
+    "name": "Survivor Camp",
+    "x": -1058,
+    "z": -250,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (2): duo_1, lab_10",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_camp (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Camp"
+   },
+   {
+    "group": "Map.Places",
+    "id": "stadium",
+    "name": "Stadium Shelter",
+    "x": 0,
+    "z": 1300,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "missions (6): dispatch_10, clinic_10, duo_10, firehouse_10, power_10, exodus_9",
+     "challenges: Sightseer/Cartographer (profile.visited)",
+     "secret_stadium (Every Last Box)",
+     "landmark + Explore discovery + location tag + GPS"
+    ],
+    "label": "Stadium"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "base",
+    "name": "Military Base",
+    "x": 300.0,
+    "z": -2600.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1200.0,
+    "nz": -1220.0,
+    "relocation": "base"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "radio",
+    "name": "Radio Station",
+    "x": -1100.0,
+    "z": -560.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "farm",
+    "name": "Old Farm",
+    "x": -1880.0,
+    "z": 520.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -648.0,
+    "nz": -1320.0,
+    "relocation": "farm"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "docks",
+    "name": "Harbor Docks",
+    "x": 1628.5,
+    "z": 0.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1196.5,
+    "nz": 0.0,
+    "relocation": "docks"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "gas",
+    "name": "Gas Station",
+    "x": 146.0,
+    "z": -900.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "lodge",
+    "name": "Ski Lodge",
+    "x": -655.0,
+    "z": -2200.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 300.0,
+    "nz": -1365.0,
+    "relocation": "lodge"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "ranch",
+    "name": "Silver Spur Ranch",
+    "x": -900.0,
+    "z": 790.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "stables",
+    "name": "Riverside Riding School",
+    "x": 662.5,
+    "z": 975.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "fueldepot",
+    "name": "Harbor Fuel Depot",
+    "x": 1465.0,
+    "z": 620.5,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1110.0,
+    "nz": 899.5,
+    "relocation": "fueldepot"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "airfield",
+    "name": "Old Airfield",
+    "x": -1500.0,
+    "z": 1265.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1220.0,
+    "nz": 1375.0,
+    "relocation": "airfield"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "powerplant",
+    "name": "Power Plant",
+    "x": 1142.5,
+    "z": 640.5,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "waterworks",
+    "name": "Water Works",
+    "x": 587.5,
+    "z": 780.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "lab",
+    "name": "Biotech Lab",
+    "x": -285.0,
+    "z": -1050.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "prison",
+    "name": "Blackrock Prison",
+    "x": -1600.0,
+    "z": -1080.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1140.0,
+    "nz": -1300.0,
+    "relocation": "prison"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "lighthouse",
+    "name": "Lighthouse Point",
+    "x": 1585.0,
+    "z": -1080.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1380.0,
+    "nz": -635.0,
+    "relocation": "lighthouse"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "trainyard",
+    "name": "Train Yard",
+    "x": -340.0,
+    "z": -820.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "camp",
+    "name": "Survivor Camp",
+    "x": -970.0,
+    "z": -250.0,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "stadium",
+    "name": "Stadium Shelter",
+    "x": 0.0,
+    "z": 1358.5,
+    "kind": "yard",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Yards",
+    "id": "earl",
+    "name": "Earl's Used Wheels",
+    "x": -1570.0,
+    "z": 460.0,
+    "kind": "yard",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1240.0,
+    "nz": 156.0,
+    "relocation": "earl"
+   },
+   {
+    "group": "Map.Clearings",
+    "id": "paddock",
+    "name": "Paddock",
+    "x": -900.0,
+    "z": 950.0,
+    "kind": "area",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Clearings",
+    "id": "arena",
+    "name": "Riding Arena",
+    "x": 667.5,
+    "z": 1147.5,
+    "kind": "area",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_base",
+    "name": "The soldiers built a little sandbag nest…",
+    "x": 330,
+    "z": -2632,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1230,
+    "nz": -1252,
+    "relocation": "base",
+    "refs": [
+     "place base",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_radio",
+    "name": "At the feet of the tall steel giant, und…",
+    "x": -1061,
+    "z": -603.5,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place radio",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_farm",
+    "name": "Fresh food is sold out front; something …",
+    "x": -1874.5,
+    "z": 470.2,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -598.2,
+    "nz": -1314.5,
+    "relocation": "farm",
+    "refs": [
+     "place farm",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_docks",
+    "name": "Behind the tallest stack of ammo crates,…",
+    "x": 1650.5,
+    "z": -14,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1218.5,
+    "nz": -14,
+    "relocation": "docks",
+    "refs": [
+     "place docks",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_gas",
+    "name": "Behind the little shop, where the pumps …",
+    "x": 196.5,
+    "z": -890,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place gas",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_lodge",
+    "name": "A cold guard with a carrot nose keeps wa…",
+    "x": -690,
+    "z": -2241.5,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 341.5,
+    "nz": -1400,
+    "relocation": "lodge",
+    "refs": [
+     "place lodge",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_ranch",
+    "name": "Just inside the gate, the hay hides some…",
+    "x": -940,
+    "z": 708,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place ranch",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_stables",
+    "name": "Hay by the lamp near the clubhouse: look…",
+    "x": 619.6,
+    "z": 931.5,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place stables",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_fueldepot",
+    "name": "Behind the full barrels at the back of t…",
+    "x": 1465,
+    "z": 592,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1110,
+    "nz": 871.0,
+    "relocation": "fueldepot",
+    "refs": [
+     "place fueldepot",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_school",
+    "name": "Class is out. In the corner of the front…",
+    "x": -38.5,
+    "z": 1171,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place school",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_frosty",
+    "name": "Hugging the pink wall north of the door,…",
+    "x": 1209.6,
+    "z": -30,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1065.6,
+    "nz": -174,
+    "relocation": "frosty",
+    "refs": [
+     "place frosty",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_movers",
+    "name": "Among the moving boxes nobody ever moved…",
+    "x": 302.4,
+    "z": 111,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place movers",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_bank",
+    "name": "Up the steps, between marble and money: …",
+    "x": 127.6,
+    "z": -266,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place bank",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_clinic",
+    "name": "The patients' bench by the front door hi…",
+    "x": -266,
+    "z": 324,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place clinic",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_pharmacy",
+    "name": "Right under the green cross, against the…",
+    "x": 116,
+    "z": 414,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place pharmacy",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_market",
+    "name": "Between the grocery pallets at the deliv…",
+    "x": -411,
+    "z": 109,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place market",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_warehouse",
+    "name": "The yellow forklift parked out front is …",
+    "x": 1345,
+    "z": 252,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1057,
+    "nz": 252,
+    "relocation": "warehouse",
+    "refs": [
+     "place warehouse",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_firestation",
+    "name": "Tucked behind the red hydrant on the cor…",
+    "x": 316,
+    "z": -104,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place firestation",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_police",
+    "name": "Between the two parked patrol cars. Nobo…",
+    "x": -258,
+    "z": -258,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place police",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_cityhall",
+    "name": "Make a wish at the fountain, then look o…",
+    "x": 22,
+    "z": -401.5,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place cityhall",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_airfield",
+    "name": "Old tyres by the fence, just inside the …",
+    "x": -1430.5,
+    "z": 1156,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1289.5,
+    "nz": 1266,
+    "relocation": "airfield",
+    "refs": [
+     "place airfield",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_powerplant",
+    "name": "A big cable reel by the lamp in front of…",
+    "x": 1114,
+    "z": 602.6,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place powerplant",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_waterworks",
+    "name": "The pump house hums. Walk down its west …",
+    "x": 483,
+    "z": 732,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place waterworks",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_lab",
+    "name": "Right under the yellow BIOHAZARD sign. N…",
+    "x": -213.2,
+    "z": -1036,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place lab",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_prison",
+    "name": "At the foot of the left gate tower, wher…",
+    "x": -1626,
+    "z": -961.5,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1166,
+    "nz": -1181.5,
+    "relocation": "prison",
+    "refs": [
+     "place prison",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_lighthouse",
+    "name": "Behind the keeper's cottage, right below…",
+    "x": 1590.4,
+    "z": -1051,
+    "kind": "secret",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1351,
+    "nz": -629.6,
+    "relocation": "lighthouse",
+    "refs": [
+     "place lighthouse",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_trainyard",
+    "name": "Up on the freight platform, past the las…",
+    "x": -203,
+    "z": -817,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place trainyard",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_camp",
+    "name": "Behind the sandbags by the gate, in the …",
+    "x": -1073,
+    "z": -285.5,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place camp",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_stadium",
+    "name": "Under the supply table by the gate, amon…",
+    "x": 15,
+    "z": 1318,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place stadium",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.Secrets",
+    "id": "secret_stadium_top",
+    "name": "Climb to the very top row of the east st…",
+    "x": 191,
+    "z": 1430,
+    "kind": "secret",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "place stadium",
+     "Every Last Box / Package Sniffer (profile.secrets)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "army",
+    "name": "WORK HERE board (army)",
+    "x": 330,
+    "z": -2385,
+    "kind": "employer",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1230,
+    "nz": -1005,
+    "relocation": "base",
+    "refs": [
+     "Config.Employers army",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "clinic",
+    "name": "WORK HERE board (clinic)",
+    "x": -241,
+    "z": 262,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Employers clinic",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "farm",
+    "name": "WORK HERE board (farm)",
+    "x": -1790,
+    "z": 560,
+    "kind": "employer",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -688,
+    "nz": -1230,
+    "relocation": "farm",
+    "refs": [
+     "Config.Employers farm",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "gas",
+    "name": "WORK HERE board (gas)",
+    "x": 188,
+    "z": -948,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Employers gas",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "icecream",
+    "name": "WORK HERE board (icecream)",
+    "x": 1177,
+    "z": 0,
+    "kind": "employer",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1033,
+    "nz": -144,
+    "relocation": "frosty",
+    "refs": [
+     "Config.Employers icecream",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "movers",
+    "name": "WORK HERE board (movers)",
+    "x": 335,
+    "z": 144,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Employers movers",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "ranch",
+    "name": "WORK HERE board (ranch)",
+    "x": -930,
+    "z": 728,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Employers ranch",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.EmployerSpots",
+    "id": "school",
+    "name": "WORK HERE board (school)",
+    "x": 0,
+    "z": 1141,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Employers school",
+     "Npcs (the employer)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "airfield",
+    "name": "cargo spot airfield",
+    "x": -1430,
+    "z": 1200,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1290,
+    "nz": 1310,
+    "relocation": "airfield",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "bank",
+    "name": "cargo spot bank",
+    "x": 76,
+    "z": -292,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "base",
+    "name": "cargo spot base",
+    "x": 282,
+    "z": -2420,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1182,
+    "nz": -1040,
+    "relocation": "base",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "camp",
+    "name": "cargo spot camp",
+    "x": -1050,
+    "z": -240,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "cityhall",
+    "name": "cargo spot cityhall",
+    "x": -16,
+    "z": -366,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "clinic",
+    "name": "cargo spot clinic",
+    "x": -219,
+    "z": 300,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "docks",
+    "name": "cargo spot docks",
+    "x": 1622,
+    "z": -12,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1190.0,
+    "nz": -12,
+    "relocation": "docks",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "farm",
+    "name": "cargo spot farm",
+    "x": -1850,
+    "z": 490,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -618,
+    "nz": -1290,
+    "relocation": "farm",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "firestation",
+    "name": "cargo spot firestation",
+    "x": 354,
+    "z": -116,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "frosty",
+    "name": "cargo spot frosty",
+    "x": 1162,
+    "z": 16,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1018,
+    "nz": -128,
+    "relocation": "frosty",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "fueldepot",
+    "name": "cargo spot fueldepot",
+    "x": 1436,
+    "z": 565,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1081,
+    "nz": 844.0,
+    "relocation": "fueldepot",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "gas",
+    "name": "cargo spot gas",
+    "x": 150,
+    "z": -945,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "lab",
+    "name": "cargo spot lab",
+    "x": -190,
+    "z": -992,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "lighthouse",
+    "name": "cargo spot lighthouse",
+    "x": 1550,
+    "z": -1068,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1368,
+    "nz": -670,
+    "relocation": "lighthouse",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "lodge",
+    "name": "cargo spot lodge",
+    "x": -684,
+    "z": -2208,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 308,
+    "nz": -1394,
+    "relocation": "lodge",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "market",
+    "name": "cargo spot market",
+    "x": -366,
+    "z": 128,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "movers",
+    "name": "cargo spot movers",
+    "x": 349,
+    "z": 172,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "pharmacy",
+    "name": "cargo spot pharmacy",
+    "x": 156,
+    "z": 366,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "police",
+    "name": "cargo spot police",
+    "x": -300,
+    "z": -222,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "powerplant",
+    "name": "cargo spot powerplant",
+    "x": 1080,
+    "z": 560,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "prison",
+    "name": "cargo spot prison",
+    "x": -1580,
+    "z": -930,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1120,
+    "nz": -1150,
+    "relocation": "prison",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "radio",
+    "name": "cargo spot radio",
+    "x": -1126,
+    "z": -590,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "ranch",
+    "name": "cargo spot ranch",
+    "x": -858,
+    "z": 800,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "school",
+    "name": "cargo spot school",
+    "x": 14,
+    "z": 1124,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "stables",
+    "name": "cargo spot stables",
+    "x": 650,
+    "z": 960,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "stadium",
+    "name": "cargo spot stadium",
+    "x": 40,
+    "z": 1298,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "trainyard",
+    "name": "cargo spot trainyard",
+    "x": -232,
+    "z": -775,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "warehouse",
+    "name": "cargo spot warehouse",
+    "x": 1302,
+    "z": 270,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1014,
+    "nz": 270,
+    "relocation": "warehouse",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.CargoSpots",
+    "id": "waterworks",
+    "name": "cargo spot waterworks",
+    "x": 470,
+    "z": 770,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Cargo (load/unload circle)"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "birch",
+    "name": "Birch Cottage (house, $150,000)",
+    "x": -513,
+    "z": 1260,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "elm",
+    "name": "Elm Bungalow (house, $90,000)",
+    "x": -313,
+    "z": 1074,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "garage_downtown",
+    "name": "Downtown Parking (garage, $70,000)",
+    "x": 144,
+    "z": 140,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "garage_harbor",
+    "name": "Harbor Lockup (garage, $25,000)",
+    "x": 1049,
+    "z": -432,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "garage_north",
+    "name": "Highway Garage (garage, $45,000)",
+    "x": 119,
+    "z": -722,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "garage_rented",
+    "name": "Rented Lockup (garage, $2,500)",
+    "x": -30,
+    "z": 738,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "garage_south",
+    "name": "Southside Garage (garage, $12,000)",
+    "x": 172,
+    "z": 738,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "hilltop",
+    "name": "Hilltop Mansion (mansion, $6,000,000)",
+    "x": 520,
+    "z": -1186,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "lakeside",
+    "name": "Lakeside Villa (villa, $1,500,000)",
+    "x": -60,
+    "z": -2157,
+    "kind": "estate",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1220,
+    "nz": -677,
+    "relocation": "lakeside",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ],
+    "label": "Lakeside Villa"
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "maple",
+    "name": "12 Maple Street (house, $300,000)",
+    "x": -169,
+    "z": 870,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "oak",
+    "name": "7 Oak Lane (house, $220,000)",
+    "x": 169,
+    "z": 1014,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "oceanview",
+    "name": "Ocean View Mansion (mansion, $4,500,000)",
+    "x": 1486,
+    "z": -720,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1200,
+    "nz": -850,
+    "relocation": "oceanview",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ],
+    "label": "Ocean View"
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "office_harbor",
+    "name": "Harbor Point Office (office, $500,000)",
+    "x": 1512,
+    "z": -144,
+    "kind": "estate",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1080,
+    "nz": -288,
+    "relocation": "harborpoint",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ],
+    "label": null
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "office_penthouse",
+    "name": "Dispatch Tower Penthouse (office, $2,500,000)",
+    "x": -144,
+    "z": -144,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "office_tower",
+    "name": "Dispatch Tower, 8th floor (office, $900,000)",
+    "x": -144,
+    "z": -144,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ]
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "pinecrest",
+    "name": "Pinecrest Mansion (mansion, $3,000,000)",
+    "x": -1550,
+    "z": 806,
+    "kind": "estate",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1000,
+    "nz": -1014,
+    "relocation": "pinecrest",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ],
+    "label": "Pinecrest"
+   },
+   {
+    "group": "Map.EstatePlots",
+    "id": "sunset",
+    "name": "Sunset Villa (villa, $1,000,000)",
+    "x": -1460,
+    "z": -100,
+    "kind": "estate",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -870,
+    "nz": -1100,
+    "relocation": "sunset",
+    "refs": [
+     "Config.Estate",
+     "profile.properties / profile.home (spawn) / profile.business (offices)",
+     "server/Estate, CarCall, Garages, Business; client/EstateUi"
+    ],
+    "label": "Sunset Villa"
+   },
+   {
+    "group": "Map.Towers",
+    "id": "dispatchtower",
+    "name": "Dispatch Tower",
+    "x": -144,
+    "z": -144,
+    "kind": "tower",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Towers",
+    "id": "harborpoint",
+    "name": "Harbor Point",
+    "x": 1512,
+    "z": -144,
+    "kind": "tower",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1080,
+    "nz": -288,
+    "relocation": "harborpoint"
+   },
+   {
+    "group": "Map.GasStations",
+    "id": "gas",
+    "name": "Gas Station",
+    "x": 136,
+    "z": -900,
+    "kind": "gas",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Fuel (pumps, kiosk, the tow)",
+     "Map.nearestGas"
+    ]
+   },
+   {
+    "group": "Map.GasStations",
+    "id": "gas_downtown",
+    "name": "Westside Gas",
+    "x": -576,
+    "z": 169,
+    "kind": "gas",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Fuel (pumps, kiosk, the tow)",
+     "Map.nearestGas"
+    ]
+   },
+   {
+    "group": "Map.GasStations",
+    "id": "gas_harbor",
+    "name": "Harbor Gas",
+    "x": 1080,
+    "z": 25,
+    "kind": "gas",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Fuel (pumps, kiosk, the tow)",
+     "Map.nearestGas"
+    ]
+   },
+   {
+    "group": "Map.GasStations",
+    "id": "gas_suburbs",
+    "name": "Willow Gas",
+    "x": 144,
+    "z": 875,
+    "kind": "gas",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Fuel (pumps, kiosk, the tow)",
+     "Map.nearestGas"
+    ]
+   },
+   {
+    "group": "Map.GasStations",
+    "id": "gas_depot",
+    "name": "Depot Gas",
+    "x": 288,
+    "z": -25,
+    "kind": "gas",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Fuel (pumps, kiosk, the tow)",
+     "Map.nearestGas"
+    ]
+   },
+   {
+    "group": "Map.GasStations",
+    "id": "gas_tower",
+    "name": "Tower Gas",
+    "x": -288,
+    "z": -169,
+    "kind": "gas",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Fuel (pumps, kiosk, the tow)",
+     "Map.nearestGas"
+    ]
+   },
+   {
+    "group": "Map.RepairShops",
+    "id": "mechanic",
+    "name": "Wrench Garage",
+    "x": 0,
+    "z": 144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Repair (bays)"
+    ]
+   },
+   {
+    "group": "Map.RepairShops",
+    "id": "repairs",
+    "name": "Rust Bridge Repairs",
+    "x": 1080,
+    "z": 144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "server/Repair (bays)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "luigis",
+    "name": "Luigi's Pizza",
+    "x": 265.5,
+    "z": 320,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business pizzeria (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "dailybread",
+    "name": "Daily Bread Bakery",
+    "x": -121.5,
+    "z": 400,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business bakery (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "lastbite",
+    "name": "Last Bite Burgers",
+    "x": -320,
+    "z": -121.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business burgers (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "wokdead",
+    "name": "Wok Dead",
+    "x": 454.5,
+    "z": 112,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business noodles (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "grindhouse",
+    "name": "Grind House",
+    "x": -25,
+    "z": 868,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business cafe (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "postoffice",
+    "name": "Post Office",
+    "x": 22.5,
+    "z": 320,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business post (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "dailyundead",
+    "name": "The Daily Undead",
+    "x": -32,
+    "z": -310.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business news (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "boltnail",
+    "name": "Bolt & Nail Hardware",
+    "x": -464,
+    "z": 310.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business hardware (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "volt",
+    "name": "Volt Electronics",
+    "x": 400,
+    "z": -310.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business electronics (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "secondlife",
+    "name": "Second Life Pawn",
+    "x": -409.5,
+    "z": -400,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business pawnshop (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "bloom",
+    "name": "Bloom",
+    "x": -112,
+    "z": 1163,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business flowers (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "pharmacy",
+    "name": "Corner Pharmacy",
+    "x": 144,
+    "z": 432,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business pharmacy (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "market",
+    "name": "FreshMart Supermarket",
+    "x": -432,
+    "z": 144,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business supermarket (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "bank",
+    "name": "First Zombie Bank",
+    "x": 144,
+    "z": -288,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "business bank (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "frosty",
+    "name": "Frosty's Ice Cream",
+    "x": 1224,
+    "z": 0,
+    "kind": "venue",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1080,
+    "nz": -144,
+    "relocation": "frosty",
+    "refs": [
+     "business icecream (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Venues",
+    "id": "warehouse",
+    "name": "Harbor Warehouse",
+    "x": 1368,
+    "z": 288,
+    "kind": "venue",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1080,
+    "nz": 288,
+    "relocation": "warehouse",
+    "refs": [
+     "business warehouse (Config.Jobs.Businesses, Regulars)"
+    ]
+   },
+   {
+    "group": "Map.Shops",
+    "id": "bags",
+    "name": "ZDC Bags",
+    "x": 115.5,
+    "z": -142.5,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Shops",
+    "id": "bikes",
+    "name": "Dead End Motors · Bikes",
+    "x": 182.5,
+    "z": -17.5,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Shops",
+    "id": "dealer",
+    "name": "Dead End Motors",
+    "x": 144,
+    "z": 0,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Shops",
+    "id": "depot",
+    "name": "Depot Garage",
+    "x": 144,
+    "z": -144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Shops",
+    "id": "guns",
+    "name": "Lead & Co.",
+    "x": -265,
+    "z": 116,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Shops",
+    "id": "mechanic",
+    "name": "Wrench Garage",
+    "x": 0,
+    "z": 144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Shops",
+    "id": "supplies",
+    "name": "Last Stop Supplies",
+    "x": 115.5,
+    "z": -129.5,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.VanSeller",
+    "id": "earl",
+    "name": "Earl's van for sale",
+    "x": -1592,
+    "z": 458,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1262,
+    "nz": 154,
+    "relocation": "earl",
+    "refs": [
+     "Config.VanQuest (Marge's quest at level 4)",
+     "shared/Career, Readiness (\"earl\")",
+     "server/VanQuest"
+    ]
+   },
+   {
+    "group": "Map.FreightDocks",
+    "id": "warehouse",
+    "name": "freight hub (Harbor Warehouse)",
+    "x": 1355,
+    "z": 306,
+    "kind": "spot",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1067,
+    "nz": 306,
+    "relocation": "warehouse",
+    "refs": [
+     "Config.JobTypes freightrun",
+     "shared/Freight",
+     "server/Equipment (pallet jacks)"
+    ]
+   },
+   {
+    "group": "Map.ReceivingDocks",
+    "id": "market",
+    "name": "receiving dock market",
+    "x": -389,
+    "z": 138,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "freightrun drop"
+    ]
+   },
+   {
+    "group": "Map.ReceivingDocks",
+    "id": "movers",
+    "name": "receiving dock movers",
+    "x": 326,
+    "z": 180,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "freightrun drop"
+    ]
+   },
+   {
+    "group": "Map.ReceivingDocks",
+    "id": "powerplant",
+    "name": "receiving dock powerplant",
+    "x": 1064,
+    "z": 574,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "freightrun drop"
+    ]
+   },
+   {
+    "group": "Map.Depot",
+    "id": "depot",
+    "name": "ZDC depot (spawn, JOBS, Marge, the Wall's checkpoint)",
+    "x": 144,
+    "z": -144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "World.DepotSpawn",
+     "Config.Tutorial.NpcSpot",
+     "Config.Goal.BoardSpot",
+     "Config.Moving.Board/DropOff (the Wall)",
+     "LiveEvents supply drop-off",
+     "MissionPlan.origin"
+    ]
+   },
+   {
+    "group": "Map.Park",
+    "id": "park",
+    "name": "Central Park (the Wall's middle)",
+    "x": 0,
+    "z": 0,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "the safe zone"
+    ]
+   },
+   {
+    "group": "Map.Garden",
+    "id": "garden",
+    "name": "Lantern Garden + footbridge",
+    "x": 0,
+    "z": -144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "retire",
+    "refs": [
+     "STEP 1 removes it"
+    ]
+   },
+   {
+    "group": "Map.GunRange",
+    "id": "gunrange",
+    "name": "Lead & Co. range",
+    "x": -288,
+    "z": 144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "depot",
+    "name": "Depot (your company)",
+    "x": 144,
+    "z": -144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "park",
+    "name": "Central Park",
+    "x": 0,
+    "z": 0,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "garden",
+    "name": "Lantern Garden",
+    "x": 0,
+    "z": -144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "dealer",
+    "name": "Dead End Motors",
+    "x": 144,
+    "z": 0,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "guns",
+    "name": "Lead & Co.",
+    "x": -265,
+    "z": 116,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "mechanic",
+    "name": "Wrench Garage",
+    "x": 0,
+    "z": 144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "repairs",
+    "name": "Rust Bridge Repairs",
+    "x": 1080,
+    "z": 144,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "bags",
+    "name": "ZDC Bags",
+    "x": 115.5,
+    "z": -142.5,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "supplies",
+    "name": "Last Stop Supplies",
+    "x": 115.5,
+    "z": -129.5,
+    "kind": "shop",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "earl",
+    "name": "Earl's Used Wheels",
+    "x": -1572,
+    "z": 474,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1242,
+    "nz": 170,
+    "relocation": "earl",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "school",
+    "name": "Sunny Hill School",
+    "x": 0,
+    "z": 1141,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "army",
+    "name": "Military Base",
+    "x": 330,
+    "z": -2385,
+    "kind": "employer",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1230,
+    "nz": -1005,
+    "relocation": "base",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "icecream",
+    "name": "Frosty's Ice Cream",
+    "x": 1177,
+    "z": 0,
+    "kind": "employer",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1033,
+    "nz": -144,
+    "relocation": "frosty",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "movers",
+    "name": "Big Move Movers",
+    "x": 335,
+    "z": 144,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "farm",
+    "name": "Old Farm",
+    "x": -1790,
+    "z": 560,
+    "kind": "employer",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -688,
+    "nz": -1230,
+    "relocation": "farm",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "ranch",
+    "name": "Silver Spur Ranch",
+    "x": -930,
+    "z": 728,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "clinic",
+    "name": "City Clinic",
+    "x": -241,
+    "z": 262,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "gas",
+    "name": "Gas Station",
+    "x": 188,
+    "z": -948,
+    "kind": "employer",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "lodge",
+    "name": "Ski Lodge",
+    "x": -655,
+    "z": -2200,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 300,
+    "nz": -1365,
+    "relocation": "lodge",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "radio",
+    "name": "Radio Station",
+    "x": -1100,
+    "z": -560,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "docks",
+    "name": "Harbor Docks",
+    "x": 1626,
+    "z": 0,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1194.0,
+    "nz": 0,
+    "relocation": "docks",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "stables",
+    "name": "Riverside Riding School",
+    "x": 640,
+    "z": 972,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "fueldepot",
+    "name": "Harbor Fuel Depot",
+    "x": 1440,
+    "z": 550,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1085,
+    "nz": 829.0,
+    "relocation": "fueldepot",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "bank",
+    "name": "First Zombie Bank",
+    "x": 83,
+    "z": -288,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "pharmacy",
+    "name": "Corner Pharmacy",
+    "x": 144,
+    "z": 371,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "market",
+    "name": "FreshMart Supermarket",
+    "x": -371,
+    "z": 144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "warehouse",
+    "name": "Harbor Warehouse",
+    "x": 1307,
+    "z": 288,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1019,
+    "nz": 288,
+    "relocation": "warehouse",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "firestation",
+    "name": "Fire Station 9",
+    "x": 349,
+    "z": -144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "police",
+    "name": "Precinct 13",
+    "x": -288,
+    "z": -227,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "cityhall",
+    "name": "City Hall",
+    "x": 0,
+    "z": -371,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "airfield",
+    "name": "Old Airfield",
+    "x": -1400,
+    "z": 1185,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1320,
+    "nz": 1295,
+    "relocation": "airfield",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "powerplant",
+    "name": "Power Plant",
+    "x": 1100,
+    "z": 548,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "waterworks",
+    "name": "Water Works",
+    "x": 452,
+    "z": 780,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "lab",
+    "name": "Biotech Lab",
+    "x": -172,
+    "z": -1000,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "prison",
+    "name": "Blackrock Prison",
+    "x": -1600,
+    "z": -925,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1140,
+    "nz": -1145,
+    "relocation": "prison",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "lighthouse",
+    "name": "Lighthouse Point",
+    "x": 1545,
+    "z": -1080,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1380,
+    "nz": -675,
+    "relocation": "lighthouse",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "trainyard",
+    "name": "Train Yard",
+    "x": -216,
+    "z": -765,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "camp",
+    "name": "Survivor Camp",
+    "x": -1058,
+    "z": -250,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "stadium",
+    "name": "Stadium Shelter",
+    "x": 0,
+    "z": 1300,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "luigis",
+    "name": "Luigi's Pizza",
+    "x": 265.5,
+    "z": 349,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "dailybread",
+    "name": "Daily Bread Bakery",
+    "x": -121.5,
+    "z": 371,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "lastbite",
+    "name": "Last Bite Burgers",
+    "x": -349,
+    "z": -121.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "wokdead",
+    "name": "Wok Dead",
+    "x": 454.5,
+    "z": 83,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "grindhouse",
+    "name": "Grind House",
+    "x": -25,
+    "z": 839,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "postoffice",
+    "name": "Post Office",
+    "x": 22.5,
+    "z": 349,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "dailyundead",
+    "name": "The Daily Undead",
+    "x": -61,
+    "z": -310.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "boltnail",
+    "name": "Bolt & Nail Hardware",
+    "x": -493,
+    "z": 310.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "volt",
+    "name": "Volt Electronics",
+    "x": 371,
+    "z": -310.5,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "secondlife",
+    "name": "Second Life Pawn",
+    "x": -409.5,
+    "z": -371,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "bloom",
+    "name": "Bloom",
+    "x": -83,
+    "z": 1163,
+    "kind": "venue",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "gas_downtown",
+    "name": "Westside Gas",
+    "x": -576,
+    "z": 205,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "gas_harbor",
+    "name": "Harbor Gas",
+    "x": 1080,
+    "z": 61,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "gas_suburbs",
+    "name": "Willow Gas",
+    "x": 144,
+    "z": 839,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "gas_depot",
+    "name": "Depot Gas",
+    "x": 288,
+    "z": -61,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "gas_tower",
+    "name": "Tower Gas",
+    "x": -288,
+    "z": -205,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "sunsethills",
+    "name": "Sunset Hills",
+    "x": 600,
+    "z": -900,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "dispatchtower",
+    "name": "Dispatch Tower",
+    "x": -100,
+    "z": -144,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "harborpoint",
+    "name": "Harbor Point",
+    "x": 1472,
+    "z": -144,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1040,
+    "nz": -288,
+    "relocation": "harborpoint",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "oceanview",
+    "name": "Ocean View Mansion",
+    "x": 1455,
+    "z": -720,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "move",
+    "nx": 1169,
+    "nz": -850,
+    "relocation": "oceanview",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "pinecrest",
+    "name": "Pinecrest Mansion",
+    "x": -1550,
+    "z": 775,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -1000,
+    "nz": -1045,
+    "relocation": "pinecrest",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "lakeside",
+    "name": "Lakeside Villa",
+    "x": -60,
+    "z": -2182,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": 1220,
+    "nz": -702,
+    "relocation": "lakeside",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "sunset",
+    "name": "Sunset Villa",
+    "x": -1435,
+    "z": -100,
+    "kind": "place",
+    "insideNewBounds": false,
+    "status": "move",
+    "nx": -870,
+    "nz": -1075,
+    "relocation": "sunset",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "garage_rented",
+    "name": "Rented Lockup",
+    "x": -47,
+    "z": 738,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "garage_south",
+    "name": "Southside Garage",
+    "x": 191,
+    "z": 738,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "garage_harbor",
+    "name": "Harbor Lockup",
+    "x": 1029,
+    "z": -432,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "garage_north",
+    "name": "Highway Garage",
+    "x": 98,
+    "z": -722,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Map.Landmarks",
+    "id": "garage_downtown",
+    "name": "Downtown Parking",
+    "x": 144,
+    "z": 182,
+    "kind": "place",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "client/MapView list + GPS",
+     "shared/Explore discovery",
+     "shared/LocationTags caption",
+     "BusLines stop names (KeyReach)"
+    ]
+   },
+   {
+    "group": "Config.Moving.Contracts",
+    "id": "marge",
+    "name": "Marge's House, 155 Willow Ln (home_suburbs_2_0_00)",
+    "x": 263,
+    "z": 875,
+    "kind": "estate",
+    "insideNewBounds": true,
+    "status": "keep",
+    "refs": [
+     "MoveStory prologue",
+     "server/Moving",
+     "server/MoveSites.house"
+    ]
+   },
+   {
+    "group": "Config.MoveSites.Spots",
+    "id": "spot1",
+    "name": "EVACUATE spot downtown (2,-1) s",
+    "x": 288,
+    "z": -144,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Config.MoveSites.Spots",
+    "id": "spot2",
+    "name": "EVACUATE spot downtown (2,2) w",
+    "x": 288,
+    "z": 288,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Config.MoveSites.Spots",
+    "id": "spot3",
+    "name": "EVACUATE spot suburbs (2,0) n",
+    "x": 288,
+    "z": 900,
+    "kind": "spot",
+    "insideNewBounds": true,
+    "status": "keep"
+   },
+   {
+    "group": "Map.Mountain",
+    "id": "mountain",
+    "name": "Mount Rot + the tunnel",
+    "x": 300,
+    "z": -1700,
+    "kind": "geo",
+    "insideNewBounds": false,
+    "status": "cut",
+    "refs": [
+     "World.buildMountain",
+     "MapView",
+     "TrafficLanes.NorthLimit",
+     "MissionPlan.inRock",
+     "server/CarCall + Vehicles (no spawn in rock)"
+    ],
+    "note": "the mountain ring replaces it"
+   },
+   {
+    "group": "Map.Lake",
+    "id": "frozenlake",
+    "name": "the frozen lake (ice)",
+    "x": -300.0,
+    "z": -2200.0,
+    "kind": "geo",
+    "insideNewBounds": false,
+    "status": "cut",
+    "refs": [
+     "Map.onIce (Drive/TyreFx/Traffic/BanditCars)",
+     "World.buildWinter",
+     "MapView"
+    ],
+    "note": "summer valley: no ice"
+   },
+   {
+    "group": "Map.Sea",
+    "id": "sea",
+    "name": "the sea (x > 1660)",
+    "x": 1780,
+    "z": 0,
+    "kind": "geo",
+    "insideNewBounds": false,
+    "status": "cut",
+    "refs": [
+     "Map.inWater",
+     "World ground/water/embankment",
+     "Ocean View pier, Lighthouse jetty",
+     "MapView",
+     "SoundPlan"
+    ],
+    "note": "the alpine lake replaces it"
+   },
+   {
+    "group": "Map.WinterZ",
+    "id": "winter",
+    "name": "winter north of z -1965 (snow ground)",
+    "x": -500,
+    "z": -2400,
+    "kind": "geo",
+    "insideNewBounds": false,
+    "status": "cut",
+    "refs": [
+     "Map.isWinter (Drive, TyreFx, Weather, estate looks)",
+     "World.buildWinter",
+     "MapView"
+    ],
+    "note": "a snowy slope round the Ski Lodge (Map.Winter rect)"
+   }
+  ],
+  "homes": {
+   "total": 208,
+   "keptInPlace": 208,
+   "note": "no home is in the Harbor; all 208 keep their ids, addresses and residents"
+  },
+  "addresses": {
+   "Downtown (kept)": 125,
+   "Harbor (block 0,-2 turns special)": 2,
+   "Harbor (block 0,-1 turns special)": 2,
+   "Harbor (block 0,2 turns special)": 2,
+   "Harbor (kept)": 2,
+   "Harbor (cut with its block)": 36,
+   "Suburbs (kept)": 28
+  },
+  "transit": {
+   "busStops": [
+    14,
+    14
+   ],
+   "rentalDocks": [
+    21,
+    21
+   ],
+   "zipLines": [
+    8,
+    8
+   ],
+   "shortcuts": [
+    8,
+    8
+   ]
+  },
+  "landmarks": {
+   "total": 67,
+   "note": "derived from Places / Venues / GasStations / EstatePlots / Towers / Shops: they follow automatically; texts to rewrite: EMPLOYER_WHERE (army, farm, icecream), the far places' lines (lodge, docks, fueldepot, lighthouse, prison, airfield), the WHERE lines of the four estates, Harbor Point, Earl"
+  },
+  "systems": {
+   "missions": "ids unchanged; 36 mission stops at moved places follow them; MissionPlan routes that used cut Harbor addresses pick others",
+   "jobTypesEmployers": "army, farm, icecream boards move with their places; armysupply, cashrun, winter, farmrun, fuelrun, freightrun follow; retune fixed pay",
+   "tutorial": "depot and Marge: unchanged",
+   "moves": "Marge's house, the Wall (Moving.Board/DropOff), MoveSites spots, MoveGreeters: unchanged",
+   "shops": "all inside, unchanged",
+   "liveEvents": "round the safe zone/depot: unchanged",
+   "challenges": "ids and totals unchanged (29 places, 30 secrets)",
+   "badges": "none in the game (no BadgeService)",
+   "analytics": "mission progression and economy only: unchanged",
+   "discovery": "landmarks follow; Explore.migrate keeps moved places discovered",
+   "zombies": "bandit camps (gas, farm, radio, lodge) and soldiers (base) follow their yards by id",
+   "transit": "buses, rental docks, zip lines, shortcuts: Downtown/Suburbs only, unchanged"
+  }
+ },
+ "layoutIssues": [
+  "road North Highway runs through lodge (accepted: the North Highway's last diagonal ends on the lodge's gate, as it reached its old bend point)"
+ ],
+ "performance": {
+  "method": "tools/perf/world_count.py's stand-in (the real server/World.luau on the mock), every BasePart binned by its position against the proposed bounds and by its piece; the relocated places' parts counted as kept (they move); terrain is not parts",
+  "partsNow": 22823,
+  "partsAfterStep1Garden": 21468,
+  "removedByStep2": {
+   "Harbor columns 1-3 (containers, roads, lamps, wrecks)": 464,
+   "Highways outside the valley / on cut blocks": 95,
+   "Crossings outside the valley / on cut blocks": 184,
+   "StreetProps outside the valley / on cut blocks": 237,
+   "Estate/Homes (outside)": 77,
+   "the tunnel": 24,
+   "frozen lake, snowfield tiles, lake signs": 21
+  },
+  "removedByStep1": 1355,
+  "relocated": {
+   "frosty": 59,
+   "warehouse": 192,
+   "harborpoint": 271,
+   "oceanview": 260,
+   "pinecrest": 281,
+   "lakeside": 136,
+   "sunset": 133,
+   "base": 152,
+   "farm": 84,
+   "docks": 109,
+   "fueldepot": 210,
+   "lodge": 77,
+   "airfield": 180,
+   "prison": 127,
+   "lighthouse": 100,
+   "earl": 95
+  },
+  "keptInPlace": 17900,
+  "addedEstimate": {
+   "lake shore promenade, boathouses, a pier walk (Seeufer, block (0,3) and the shore strip)": 220,
+   "new roads (Farm Road, Army Road, Seeweg, Lake Road South, Depot Road: highway lamps/edges)": 40,
+   "mountain ring (terrain, step 1's; a few rock parts at the road ends)": 30,
+   "lodge snow slope (terrain)": 0
+  },
+  "partsAfterStep2": 20656,
+  "terrain": "the sea (488 × 5050 studs of water), Mount Rot, the frozen lake and the far edge hills go; the alpine lake (an ellipse 250 × 1010) comes and the river gets shorter: about −75 % water surface; the mountain ring is step 1's terrain"
+ },
+ "relocationModes": {
+  "data": {
+   "ids": [
+    "base",
+    "docks",
+    "fueldepot",
+    "earl",
+    "frosty",
+    "warehouse",
+    "harborpoint",
+    "oceanview",
+    "pinecrest",
+    "lakeside",
+    "sunset"
+   ],
+   "how": "the builder already reads only Map data (its yard, plot, block, cargo spot, VanSeller) and turn is 0 (or the plot's facing turns it): it builds at the new place by itself; nothing else to do but the literal extras listed below",
+   "literalExtras": {
+    "docks": "the ship's z is the literal 0 (= the old yard's middle z; the move keeps z, fine)",
+    "oceanview": "its pier to Map.Sea.x0 + 70, the palms at Map.Sea.x0 - 14, the cliff rocks along Map.Sea.x0 (World ~4030-4046): rewrite for the slope (a viewpoint terrace, no sea)",
+    "lakeside": "its jetty to Map.Lake.x1 - 40 (the frozen lake, World ~4054): a jetty south into the alpine lake",
+    "sunset": "turned by its plot's facing (east → south); check its driveway meets the Blackrock Road"
+   }
+  },
+  "frame": {
+   "ids": [
+    "farm",
+    "lodge",
+    "airfield",
+    "prison",
+    "lighthouse"
+   ],
+   "how": "the builder mixes yard-relative and literal world coordinates (airfield 10, prison 10, lighthouse 7 literal calls) or has a fixed orientation (farm, lodge: turned 90°): build it unchanged with the RAW (old) Map data into its folder, then pivot the folder rigidly (relocation transform)",
+   "sideEffects": [
+    "World.EmployerNpcs.farm (spawned by employerBoard outside the folder): PivotTo it by the same transform; employerBoard must read the RAW spot inside a frame build",
+    "LighthouseBeam parts' attribute \"Hub\" (a world Vector3 read by client/WorldFx.luau): transform it",
+    "Terrain: the lodge's snow hill FillBall (World buildWinter): transform its centre (it lands in the north mountain ring)",
+    "anything else registered with a world position during the build (DayNight lists parts: fine; prompts ride on parts: fine)"
+   ]
+  }
+ },
+ "workPackages": [
+  {
+   "id": "WP-A",
+   "name": "Map foundation (first, alone)",
+   "agent": "Claude Code (systems)",
+   "dependsOn": [
+    "step 1 merged into main"
+   ],
+   "branch": "wt-map2-a (from main after step 1)",
+   "owns": [
+    "src/shared/Map.luau",
+    "src/shared/Explore.luau",
+    "tests/logic_test.luau",
+    "tests/roads_test.luau",
+    "tests/places_test.luau",
+    "tests/explore_test.luau",
+    "tests/locationtag_test.luau",
+    "tests/centre_test.luau",
+    "tests/icons_test.luau",
+    "NEW tests/mapstep2_test.luau",
+    "NEW tests/mapgolden_test.luau"
+   ],
+   "tasks": [
+    "FIRST, before any change: export the golden snapshot of the kept area (Map.Homes ids/names/door/park/floors, every non-Harbor address, Map.Venues except frosty/warehouse, RentalDocks, BusLines stops, ZipLines, Shortcuts, Map.Depot/Park/GunRange/Shops, Config.MoveSites spots, Marge's home) into tests/mapgolden_test.luau; it must stay green through every WP",
+    "Map.Bounds = { x0 = -1350, z0 = -1500, x1 = 1500, z1 = 1500 }; Map.Ring = 420 (the mountain ring's depth outside the walls)",
+    "Map.AlpineLake = { x0 = 1230, x1 = 1480, z0 = -540, z1 = 470 } (an ellipse) + Map.inLake; Map.inWater = river or lake",
+    "Map.Winter = { x0 = 120, x1 = 760, z0 = -1500, z1 = -1240 }; Map.isWinter reads it; Map.onIce stays as an API and returns false",
+    "Harbor district: i1 = 0 and diceI1 = 3 (Map.addresses rolls the cut ordinary blocks' 5 dice dry); SpecialBlocks.harbor: frosty 0,-1, harborpoint 0,-2, warehouse 0,2; FormerBlocks.harbor += 0,-2 / 0,-1 / 0,2",
+    "Map.Relocations (16 entries, the exact from/to/turn of map-step2-plan.json relocations) + Map.relocate / relocateDir / relocateRect + the one relocation pass before the derived tables + Map.raw (the unrelocated copies World's frame builds read)",
+    "roads: Map.Connectors per the plan (keep / change / new / remove); Map.EstateRoads and Map.PlaceRoads hold the new road names (Farm Road, Army Road, Seeweg, Lake Road South, Depot Road, Blackrock Road)",
+    "texts in Map.luau: EMPLOYER_WHERE (army, farm, icecream), the far places' lines (lodge, docks, fueldepot, airfield, prison, lighthouse), the WHERE lines of the four estates, Harbor Point, Earl, the depot/park lines stay; the secret_docks hint (\"with the sea at your back\" → the lake)",
+    "compat shims until WP-E: Map.Sea, Map.Lake (frozen), Map.Mountain, Map.WinterZ kept with harmless off-valley values and a DEPRECATED comment, so World/MapView still run between the merges",
+    "Explore: the grid follows the bounds (25 × 26 cells of 120 instead of 35 × 39); Explore.migrate(set, oldHeader): a relocated landmark whose RAW position's cell was explored on the old grid gets its new cell; decode: skip the middle mark when the old cell lies outside the new grid (today it clamps to an edge cell)",
+    "tests: every relocated datum = transform(raw) exactly; every place, yard, secret, cargo spot, employer spot, plot and landmark inside the bounds, on land (the docks' piers excepted) and ≤ 40 studs from a road; no two yards or plots overlap; the road graph connects every place (roads_test); the golden snapshot unchanged"
+   ],
+   "size": "about one agent-day; the other packages branch from it"
+  },
+  {
+   "id": "WP-B",
+   "name": "World build (parallel after WP-A)",
+   "agent": "Claude Code or Codex (one helper: World.luau is one file)",
+   "dependsOn": [
+    "WP-A"
+   ],
+   "branch": "wt-map2-b",
+   "owns": [
+    "src/server/World.luau",
+    "NEW src/server/Relocate.luau (frame-mode helper, optional)",
+    "src/server/BuildingLooks/Lodge.luau (only if the turned lodge needs it)",
+    "tools/perf/world-count.luau",
+    "tools/perf/world_count.py",
+    "tools/check-building-looks.py",
+    "design/performance/REPORT.md"
+   ],
+   "tasks": [
+    "buildGround: ground tiles over the valley plus the ring's margin; no SeaBed, no sea water, no sea embankment; river water and bed from the north ring to the south ring; the alpine lake as terrain water (rows of FillBlock or FillCylinder to an ellipse) with a lake bed and a shore; the ten edge hills replaced by step 1's ring (check it reads Map.Bounds)",
+    "buildBoundary: automatic from Map.Bounds (verify)",
+    "Harbor: only column i = 0 is built (automatic); the shore strip x 1169…1230 and block (0,3): promenade, boathouses, a pier walk (budget ~220 parts); the three moved specials build on their new blocks by themselves",
+    "remove buildMountain (and the Tunnel), the frozen lake, its cracks, the snowfield tiles, the ice-road signs; the lodge (frame mode, turned 90°: entrance south onto the North Highway) with a snow slope (terrain snow over Map.Winter; its hill moved)",
+    "relocated places: data mode (base, docks, fueldepot, earl, frosty, warehouse, harborpoint, oceanview, pinecrest, lakeside, sunset) and frame mode (farm, lodge, airfield, prison, lighthouse) with the side effects of relocationModes; Ocean View's sea pier/palms/rocks and Lakeside's frozen-lake jetty rewritten",
+    "forests and road wrecks: inside the valley (automatic with Map.Bounds/inWater); the new roads in the no-wreck lists (Map.PlaceRoads / EstateRoads)",
+    "run tools/perf/world_count.py before and after; update design/performance/REPORT.md; tools/check-building-looks.py (the warehouse's spot moved)"
+   ],
+   "size": "one to two agent-days"
+  },
+  {
+   "id": "WP-C",
+   "name": "Runtime consumers: maps, weather, vehicles, traffic (parallel after WP-A)",
+   "agent": "Codex or Claude Code",
+   "dependsOn": [
+    "WP-A"
+   ],
+   "branch": "wt-map2-c",
+   "owns": [
+    "src/client/MapView.luau",
+    "src/client/Weather.luau",
+    "src/client/Menu.luau",
+    "src/client/WorldFx.luau",
+    "src/client/Drive.luau",
+    "src/client/TyreFx.luau",
+    "src/server/CarCall.luau",
+    "src/server/Vehicles.luau",
+    "src/server/Traffic.luau",
+    "src/server/BanditCars.luau",
+    "src/server/Admin.luau",
+    "src/server/Zombies.luau",
+    "src/shared/TrafficLanes.luau",
+    "src/shared/MissionPlan.luau",
+    "src/shared/SoundPlan.luau",
+    "src/shared/DriveFeel.luau",
+    "tests/traffic_test.luau",
+    "tests/missionplan_test.luau",
+    "tests/soundplan_test.luau",
+    "tests/curb_test.luau",
+    "tests/liveevents_test.luau",
+    "tests/board_test.luau",
+    "tests/transport_test.luau"
+   ],
+   "tasks": [
+    "MapView: the ring at the edge, the lake (rounded), the snow slope; no sea strip, frozen lake, mountain disc; captions SEEWINKEL, BERGDORF, SANKT ALM (ALTSTADT in step 3); WORLD_W/H follow the bounds (the big map gets about 40 % bigger on screen)",
+    "Weather: snow only over Map.Winter; the river mist and the clouds inside the new bounds",
+    "Vehicles.groundY, CarCall.roadStart: no Map.Mountain (the tunnel is gone); TrafficLanes.NorthLimit → the winter slope's edge (nothing drives up to the lodge but players); MissionPlan.inRock → false (or the ring); SoundPlan.waterTop: the lake",
+    "Drive/TyreFx/DriveFeel: Map.isWinter/onIce keep their API (snow traction only on the lodge slope); Traffic/BanditCars: the ice checks become no-ops",
+    "Menu camera shots and Admin teleports: check they stand inside the valley; Zombies' bandit camps (gas, farm, radio, lodge yards) and soldiers (base yard) follow the relocated yards by themselves",
+    "tests: traffic_test (the point 1200,100 is lake now; NorthLimit), missionplan_test, soundplan_test (lake water), curb_test (its sweep to x 1700), liveevents_test, board_test, transport_test"
+   ],
+   "size": "about one agent-day"
+  },
+  {
+   "id": "WP-D",
+   "name": "Gameplay data, texts and saves (parallel after WP-A)",
+   "agent": "Claude Code (saves) with Codex for texts",
+   "dependsOn": [
+    "WP-A"
+   ],
+   "branch": "wt-map2-d",
+   "owns": [
+    "src/shared/Config.luau",
+    "src/shared/Deliveries.luau",
+    "src/shared/Missions.luau",
+    "src/shared/Challenges.luau",
+    "src/server/Challenges.luau",
+    "src/server/PlayerData.luau",
+    "src/server/Explore.luau",
+    "src/server/Jobs.luau",
+    "tests/deliveries_test.luau",
+    "tests/freight_test.luau",
+    "tests/fuel_test.luau",
+    "tests/missions_test.luau",
+    "tests/challenges_test.luau",
+    "tests/readiness_test.luau",
+    "tests/vanquest_test.luau",
+    "tests/career_test.luau",
+    "tests/regulars_test.luau",
+    "tests/cargorules_test.luau",
+    "tests/jobthumbs_test.luau"
+   ],
+   "tasks": [
+    "Config texts: JobTypes winter (\"Through the tunnel … over the frozen lake\" → up the mountain road to the lodge, snow), the Estate descriptions of oceanview / lakeside / sunset / pinecrest / garage_harbor / office_harbor, the employers' pitches that name the far places",
+    "Missions briefings: 6 × tunnel, 2 × coast, 1 × ice (the word Harbor may stay until step 3 renames the shore)",
+    "Deliveries: the \"harbor\" target (the dock foreman) → the lake shore (Harbor column addresses + the pier); only 2 Harbor addresses are left after the cut",
+    "balance: the special jobs got shorter (army supply 3.9k → 1.2k studs, the lodge from the depot 2.9k → 1.4k, cash run 2.5k → 2.0k): payPerStop and tiers of armysupply, winter, cashrun, farmrun",
+    "saves: PlayerData.applySaved once (flag map2 = true): Explore.migrate on profile.explored; nothing else moves (no position is saved; every estate, place, secret and mission id stays: no refunds)",
+    "Challenges (shared + server): count visited and secrets only over the current Map.Places / Map.Secrets ids (safe against any later removal)",
+    "tests: deliveries_test (the Harbor target; its spot 1302,270 is lake now), freight_test (the hub on block 0,2), fuel_test, missions_test, challenges_test, readiness_test, vanquest_test, career_test, regulars_test, cargorules_test, jobthumbs_test"
+   ],
+   "size": "about one agent-day"
+  },
+  {
+   "id": "WP-E",
+   "name": "Integration, checks and release",
+   "agent": "Claude Code (the reviewer who merges)",
+   "dependsOn": [
+    "WP-B",
+    "WP-C",
+    "WP-D"
+   ],
+   "branch": "claude/adoring-mendel-v77f7v → main (a pull request)",
+   "owns": [
+    "README.md",
+    "COLLAB.md",
+    "design/rework/*",
+    "Config.Version"
+   ],
+   "tasks": [
+    "merge B, C and D onto A; remove the compat shims (Map.Sea, Map.Lake, Map.Mountain, Map.WinterZ) once nothing reads them",
+    "python3 tests/run_tests.py <luau> (every test and the -O0 -g2 register check); luau-lsp analyze; tools/perf/world_count.py; tools/move-sites/check.py; tools/polish-art/check.py; tools/check-building-looks.py; the map render",
+    "Studio checklist: drive every new and changed road; each moved place's employer job and a mission there; the prologue (155 Willow Ln → the Wall); the lake (swim, a car sinks, the pier); the lodge's snow; the minimap and the big map; discovering a moved place; an old save (explored map, an owned Lakeside Villa / Ocean View / Harbor Point office as the home spawn, the Harbor Lockup)",
+    "README (the map sections, version), COLLAB, this plan's status; version bump"
+   ],
+   "size": "half a day"
+  }
+ ],
+ "parallelism": "A alone first (everything reads Map); then B, C and D at once, their files disjoint (B: World; C: client + vehicle/traffic modules; D: Config, Deliveries, Missions, saves); E merges. Step 1 (garden out, chalets, ring, forests) is in World.luau, Map.luau and MapView.luau too: start A only after step 1 is on main.",
+ "testsToUpdate": {
+  "WP-A": [
+   "logic_test",
+   "roads_test",
+   "places_test",
+   "explore_test",
+   "locationtag_test",
+   "centre_test",
+   "icons_test",
+   "NEW mapstep2_test",
+   "NEW mapgolden_test"
+  ],
+  "WP-C": [
+   "traffic_test",
+   "missionplan_test",
+   "soundplan_test",
+   "curb_test",
+   "liveevents_test",
+   "board_test",
+   "transport_test"
+  ],
+  "WP-D": [
+   "deliveries_test",
+   "freight_test",
+   "fuel_test",
+   "missions_test",
+   "challenges_test",
+   "readiness_test",
+   "vanquest_test",
+   "career_test",
+   "regulars_test",
+   "cargorules_test",
+   "jobthumbs_test"
+  ],
+  "unchanged but must stay green": [
+   "buslines_test",
+   "rentaldocks_test",
+   "ziplines_test",
+   "shortcuts_test",
+   "streetprops_test",
+   "towerlooks_test",
+   "residents_test",
+   "movesites_test",
+   "movegreeters_runtime_test (the greeters stand at the client's door and the Wall: both unchanged)",
+   "moving_*",
+   "gunrange_test",
+   "gearstall_test",
+   "houseinterior_test (the interiors at 9000, 400, 9000 stay beyond the ring)",
+   "garden_test (step 1 deletes it)"
+  ]
+ },
+ "toolsToUpdate": {
+  "tools/perf/world_count.py + world-count.luau": "re-run; the before/after numbers into design/performance/REPORT.md",
+  "tools/check-building-looks.py": "reads Map.CargoSpots.warehouse (moved by a cell: the check itself follows the data)",
+  "tools/move-sites/check.py, render.py": "the depot and Marge's house are unchanged: must pass as they are",
+  "tools/polish-art/check.py": "the gun range and the gear stall are unchanged",
+  "tools/vehicle-preview/clearance-check.luau": "the footbridge (step 1 removes it with the garden)",
+  "a map render": "this plan's export.luau + render.py (scratchpad) or a tools/map-render/ copy, to compare with the concept"
+ },
+ "saveData": {
+  "positionsSaved": "none (no last position: you spawn at the depot or your home)",
+  "properties / home / business": "every Config.Estate id stays; the four moved estates and the Harbor Point office keep their owners; the home spawn and the garage drive-out come from the relocated plots (World.EstateSpawns / EstateGarages): no refund",
+  "explored (the fogged map)": "the grid changes with the bounds (its header says so); Explore.decode already maps an old grid onto the new one; add Explore.migrate for the moved landmarks (their old cell explored → their new cell) and fix the edge clamp (an old far-north cell would otherwise uncover an edge cell)",
+  "visited, secrets (Sightseer, Cartographer, Every Last Box)": "ids unchanged, totals unchanged (29 places, 30 secrets); count only current ids anyway",
+  "missions / campaigns": "ids unchanged; a few fixed routes (MissionPlan) pick other ordinary addresses where the cut Harbor blocks' addresses were: no save field",
+  "vanQuest, regulars, tasks, story": "unchanged (Earl moves with his lot; Frosty's venue moves with its block)",
+  "ifTheOwnerRemovesSomething": "refund once through applySaved (the 6.6 / 6.7 / 6.12.2 pattern: a flag and a refund line): an estate → its full Config.Estate price (an office: plus its business upgrades and the safe), profile.home cleared if it pointed there; a place or secret → nothing to refund, the counts already ignore unknown ids; a done challenge stays done"
+ },
+ "risks": [
+  {
+   "risk": "step 1 and step 2 edit the same files (World.luau, Map.luau, MapView.luau)",
+   "mitigation": "start WP-A from main after step 1; step 1's ring must be built from Map.Bounds (and Map.Ring)"
+  },
+  {
+   "risk": "the address dice: Map.addresses rolls one stream over all districts, the Harbor before the Suburbs",
+   "mitigation": "the cut blocks roll dry (diceI1), the three new special blocks roll dry (FormerBlocks); the golden test proves every kept home/address/venue/dock/stop is identical"
+  },
+  {
+   "risk": "frame-mode builds leave something behind (an NPC, the lighthouse beams' Hub attribute, a terrain fill)",
+   "mitigation": "the side-effect list in relocationModes; a test on the perf mock: every part of a frame-mode folder inside its new yard; a Studio walk-through"
+  },
+  {
+   "risk": "the turned places (farm, lodge, lighthouse, the Sunset Villa) face the wrong way or their signs read backwards",
+   "mitigation": "turn by whole quarters with the transform; check the gate faces its road in Studio"
+  },
+  {
+   "risk": "the road graph (GPS, traffic lanes, the buses) loses a link",
+   "mitigation": "roads_test (every place reachable), traffic_test; the new roads start on another road's centre line (T-junctions), like the old country roads"
+  },
+  {
+   "risk": "economy: the far jobs got shorter, their fixed payPerStop now pays more per minute",
+   "mitigation": "WP-D retunes armysupply, winter, cashrun, farmrun; board jobs pay by distance already"
+  },
+  {
+   "risk": "the fixed missions (6.15) that used Harbor addresses get other stops",
+   "mitigation": "missionplan_test invariants; mention it in the README"
+  },
+  {
+   "risk": "the lake's terrain water and the shore",
+   "mitigation": "a car that drives in sinks like in the river (Map.inWater); the piers and the shore strip tested in Studio"
+  },
+  {
+   "risk": "the concept is not to scale: the lake lies east (where the Harbor was), not south-east",
+   "mitigation": "variant B (a bigger lake, the whole Harbor) if the owner wants it"
+  }
+ ],
+ "variants": {
+  "A (recommended)": "this plan: 47 % of the area, everything kept (16 moves, 0 removals), the lake on Harbor columns 1-3 (about 250 × 1010 studs)",
+  "B (bigger lake)": "also cut Harbor column 0: the lake x 991…1480 (about 490 wide); Harbor Gas, the Harbor Lockup (an owned garage), Rust Bridge Repairs, Frosty's, Harbor Point and the warehouse all move (onto Downtown's east edge or the shore); the bridges end on the lake shore",
+  "C (smaller, about 38 %)": "also retire the far corners (the airfield: 6 missions, the prison: 1, the base: 4 missions and 2 job types → re-pointed): bounds x -1150…1350, z -1300…1450"
+ },
+ "decisionsForTheOwner": [
+  "variant A, B or C",
+  "keep the prison (step 3: an old fortress) and the airfield (an alpine airfield), or retire them (variant C)",
+  "the village names: Seewinkel = the lake shore, Bergdorf = the NE slope (Sunset Hills), Sankt Alm = the NW forest estates; the Suburbs keep their name until step 3",
+  "the Harbor district's display name (\"Harbor\" until step 3, then e.g. \"Seeufer\")"
+ ],
+ "acceptance": [
+  "tests/run_tests.py all green, including the golden snapshot of the kept area and the relocation invariants",
+  "every Map.Places / Yards / Secrets / CargoSpots / EmployerSpots / EstatePlots / Landmarks point inside the new bounds, on land, reachable by road",
+  "world part count ≤ the estimate (about 20.7k after both steps) on tools/perf/world_count.py",
+  "the prologue plays as before: 155 Willow Ln, the Wall's checkpoint at the depot",
+  "an old save loads with its estates, home spawn, explored map (moved places carried over) and challenge counts"
+ ],
+ "distances": {
+  "note": "manhattan, straight from point to point (the roads add some)",
+  "depotToPlaceMean": [
+   1431,
+   1264
+  ],
+  "specialJobs": {
+   "armysupply docks→base": [
+    3926,
+    1226
+   ],
+   "cashrun bank→base": [
+    2529,
+    2049
+   ],
+   "fuelrun fueldepot→gas": [
+    2744,
+    2668
+   ],
+   "horses ranch→stables": [
+    1772,
+    1772
+   ],
+   "freightrun warehouse→powerplant": [
+    467,
+    341
+   ]
+  },
+  "depotToMoved": {
+   "base": [
+    2612,
+    2132
+   ],
+   "farm": [
+    2688,
+    1968
+   ],
+   "docks": [
+    1626,
+    1194
+   ],
+   "lodge": [
+    2855,
+    1377
+   ],
+   "frosty": [
+    1163,
+    875
+   ],
+   "fueldepot": [
+    1990,
+    1914
+   ],
+   "warehouse": [
+    1595,
+    1307
+   ],
+   "airfield": [
+    2873,
+    2615
+   ],
+   "prison": [
+    2525,
+    2285
+   ],
+   "lighthouse": [
+    2337,
+    1767
+   ]
+  },
+  "acrossTheMap": {
+   "x": [
+    4050,
+    2850
+   ],
+   "z": [
+    4450,
+    3000
+   ]
+  }
+ },
+ "summary": {
+  "newBounds": "x -1350…1500, z -1500…1500 (2850 × 3000 = 8.55 M stud², 47 % of today's 18.0 M)",
+  "kept": "Downtown (81 blocks), the Suburbs (15), the Harbor's column i = 0 (7): every home (208), venue, bus stop, rental dock, zip line, shortcut and non-Harbor address unchanged",
+  "cut": "Harbor columns 1-3 (18 ordinary blocks; their 3 special blocks move onto column 0), the sea, Mount Rot + tunnel, the frozen lake + Ice Road, the snowfield, 7 roads",
+  "relocated": "16 units, ids unchanged: 9 far yards (base, farm, docks, lodge, fueldepot, airfield, prison, lighthouse, earl), 3 Harbor special blocks (frosty, harborpoint + office_harbor, warehouse), 4 estates (oceanview, pinecrest, lakeside, sunset) = 10 Map.Places, 10 secrets, 3 employer boards, 5 estate plots, 1 tower",
+  "removedPlaces": 0,
+  "parts": "22,823 today → ~21,470 after step 1's garden removal → ~20,660 after step 2 (−1,100 removed, +~290 added)"
+ }
+}
