@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "WarehouseLayout")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -100,6 +100,17 @@ with tempfile.TemporaryDirectory() as tmp:
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
     open(os.path.join(tmp, "MoveSitesServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.0 sandbox, the warehouse: the real server/Warehouse.luau as WarehouseServer.luau for
+    # tests/warehouse_runtime_test.luau: SandboxPlots, Collection, Net and the services from tests/runtime/WarehouseRuntime.luau
+    # (on MovingRuntime's recorder and players), FurnitureMesh the copy above, its shared modules the copies.
+    shutil.copy(os.path.join(HERE, "runtime", "WarehouseRuntime.luau"), os.path.join(tmp, "WarehouseRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Warehouse.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "W.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: 'require("./FurnitureMesh")' if m[1] == "FurnitureMesh" else f"W.{m[1]}", source)
+    warehouse_head = ('local W = require("./WarehouseRuntime")\nlocal M = W.Mock\nlocal game, workspace, task, os = W.game, M.workspace, W.task, W.os\n'
+                      'local Instance, Vector3, Color3, CFrame, Enum, UDim2, UDim = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum, M.UDim2, M.UDim\n'
+                      'local warn = function(...) print("WARN", ...) end\n')
+    open(os.path.join(tmp, "WarehouseServer.luau"), "w", encoding="utf-8").write(warehouse_head + source)
     # 7.1 review: the real server/Alpine.luau as AlpineServer.luau on tools/perf/world-mock.luau (WorldMock.luau) for
     # tests/alpinebuild_test.luau (the forests stand on World's parts only; SkipInStudio), its shared modules the copies.
     shutil.copy(os.path.join(tools, "perf", "world-mock.luau"), os.path.join(tmp, "WorldMock.luau"))

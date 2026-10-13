@@ -6663,4 +6663,47 @@ Config.Sandbox = {
 	MaxPlayers = 4,
 }
 
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
+-- shared/WarehouseLayout.luau lays it out, server/Warehouse.luau builds it) and its display stands, where the pieces of
+-- your collection stand on show (and earn every minute you play).
+--   Stands          how many display stands (Collection.display's stand: 1 … Stands; 1 nearest the door, west to east)
+--   Columns         the stands across the hall (even: half each side of the middle aisle); the rows go back from the door
+--   StandSize       a stand's podium (square, studs): every piece fits on it unturned (the biggest, the hay wagon, 6.4 × 9.6)
+--   StandHeight     the podium's top over the floor
+--   Aisle           the least walk between two stands and between the stands and the side walls (a player with a sofa)
+--   MiddleAisle     the walk from the roller door to the back wall, between the two halves
+--   Receiving       the receiving zone's depth inside the roller door (its width the door's, SandboxMap.DoorWidth)
+--   DoorHeight      the roller door's opening (kept open)
+--   Ridge           the gable roof's ridge (north-south) over the walls' top
+--   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length } (the van parks in it)
+--   PromptDistance  the stands' prompts' reach; SellHold the Sell prompt's hold (s)
+--   Rebuild         s: the changes to one collection this close together rebuild its shown pieces once
+--   MaxParts        one warehouse's part budget (the building, its stands and its bay; not the pieces on show)
+--   Lamp            the hall's lights (PointLights, always on)
+--   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
+Config.Warehouse = {
+	Stands = 12,
+	Columns = 4,
+	StandSize = 10,
+	StandHeight = 1,
+	Aisle = 6,
+	MiddleAisle = 14,
+	Receiving = 9,
+	DoorHeight = 16,
+	Ridge = 8,
+	Bay = { 14, 26 } :: { number },
+	PromptDistance = 8,
+	SellHold = 1,
+	Rebuild = 0.15,
+	MaxParts = 400,
+	Lamp = { Range = 40, Brightness = 1.3, Color = { 255, 238, 214 } :: { number } },
+	Rarity = {
+		common = { 222, 224, 228 },
+		uncommon = { 104, 214, 120 },
+		rare = { 86, 164, 255 },
+		epic = { 192, 120, 255 },
+		legendary = { 255, 196, 64 },
+	} :: { [string]: { number } },
+}
+
 return Config
