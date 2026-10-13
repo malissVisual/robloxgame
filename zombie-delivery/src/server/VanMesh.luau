@@ -73,7 +73,7 @@ local function find(): Instance?
 	return nil
 end
 
-local function load()
+local function loadArt()
 	tried = true
 	local art = find()
 	if not art then
@@ -147,7 +147,10 @@ function VanMesh.ready(style: string): boolean
 		return false
 	end
 	if not tried then
-		local ok, err = pcall(load)
+		local ok, err = pcall(function(): any
+			loadArt()
+			return nil
+		end)
 		if not ok then
 			say(tostring(err))
 		end
@@ -157,8 +160,8 @@ end
 
 -- One group's pieces where `at` (the ground under the car's middle, the car's axes) puts them, welded to `to`.
 local function dress(parent: Instance, group: string, at: CFrame, to: BasePart, paint: Color3, paintParts: { BasePart }, context: Context)
-	local list = if groups then groups[group] else nil
-	for _, piece in list or {} do
+	local list: { Piece } = if groups then groups[group] or {} else {}
+	for _, piece in list do
 		local p = piece.part:Clone()
 		p.Size = piece.size
 		p.CFrame = at * piece.cf
@@ -176,13 +179,14 @@ local function dress(parent: Instance, group: string, at: CFrame, to: BasePart, 
 end
 
 local function folder(model: Instance, name: string): Instance
-	local f = model:FindFirstChild(name)
-	if not f then
-		f = Instance.new("Folder")
-		f.Name = name
-		f.Parent = model
+	local found = model:FindFirstChild(name)
+	if found then
+		return found
 	end
-	return f :: Instance
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = model
+	return f
 end
 
 -- The body (with its lamps, the interior and the kit) on the body that sways; top: the chassis top centre.
@@ -208,8 +212,8 @@ function VanMesh.wheel(model: Model, tyre: BasePart, x: number, context: Context
 	if side > 0 then
 		onto *= CFrame.Angles(0, math.pi, 0)
 	end
-	local list = if groups then groups.wheel else nil
-	for _, piece in list or {} do
+	local list: { Piece } = if groups then groups.wheel or {} else {}
+	for _, piece in list do
 		local p = piece.part:Clone()
 		p.Size = piece.size
 		p.CFrame = onto * CFrame.new(-wheelAt) * piece.cf
