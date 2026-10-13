@@ -18,10 +18,13 @@
 --           the contract's chapter's briefing before START (once a game for each chapter), Big Move Movers' taunt on
 --           the radio its last card: ▶ START THE MOVE or SKIP run `go` (the card's START), ✕ runs `back` (the card
 --           again). No chapter, or briefed already this game: `go` at once.
---   * MoveStoryUi.chapters(body, order, contract)   the contract card's CHAPTERS: the story road as a strip of tiles
---     that scrolls sideways (the client's portrait, PROLOGUE / CHAPTER n / FINALE, ▶ PLAY or 🔒 SOON, the title, the
---     client), the contract's own chapter lit; a tap on a tile shows its words under the strip (the playable one: the
---     client's blurb; the others: their hook).
+--   * MoveStoryUi.chapters(body, order, contract, open?, onPlay?)   the contract card's CHAPTERS: the story road as a
+--     strip of tiles that scrolls sideways (the client's portrait, PROLOGUE / CHAPTER n / FINALE, ▶ PLAY, 🔒 LOCKED or
+--     🔒 SOON, the title, the client), the contract's own chapter lit; a tap on a tile shows its words under the strip
+--     (a playable one: the client's blurb; a locked one: what to finish first; the others: their hook). 7.x farm move:
+--     `open` (the card's contracts: id → open) says which chapters play (else the player's save flags, the attribute
+--     MoveStory: a chapter opens once the chapters before it are done); a tap on another playable chapter's tile also
+--     runs onPlay(its contract) (the card asks the server for that contract's card).
 --   * MoveStoryUi.thanks(body, order, result, contract)   the client's line on the result card for the outcome
 --     (MoveStory.thanksLine: great / ok / late / failed) by their small portrait.
 -- MoveStoryUi.isOpen(): a story card is up (MovingHud.isOpen says so: the mouse is free). Presentation only: the only
@@ -370,8 +373,20 @@ end
 
 -- ── The contract card's CHAPTERS ────────────────────────────────────────────
 
-local function tile(strip: Instance, chapter: MoveStory.Chapter, index: number, onPick: () -> ()): any
-	local open = MoveStory.status(chapter) == "play"
+-- 7.x farm move: a chapter's state on the card: "play" | "locked" | "soon" (`open`: the card's contracts, else the save).
+local function stateOf(chapter: MoveStory.Chapter, open: { [string]: boolean }?): string
+	local contract = chapter.contract
+	if chapter.soon == true or contract == nil then
+		return "soon"
+	elseif open then
+		return if open[contract] == true then "play" else "locked"
+	end
+	local seen = player:GetAttribute("MoveStory")
+	return MoveStory.status(chapter, if type(seen) == "string" then MoveStory.decodeSeen(seen) else nil)
+end
+
+local function tile(strip: Instance, chapter: MoveStory.Chapter, index: number, state: string, onPick: () -> ()): any
+	local open = state == "play"
 	local color = rgb(chapter.color)
 	local made = Ui.make("TextButton", {
 		Name = `Chapter_{chapter.id}`,
@@ -389,7 +404,7 @@ local function tile(strip: Instance, chapter: MoveStory.Chapter, index: number, 
 	local face = Ui.make("Frame", { Name = "Face", Size = UDim2.fromOffset(THUMB, THUMB), Position = UDim2.fromOffset(8, 9), BackgroundTransparency = 1, ZIndex = 23 }, made)
 	Portrait.mount(face, Portrait.people(chapter.clientId, chapter.partnerId), color, { dim = not open })
 	text(made, MoveStory.label(chapter), UDim2.fromOffset(TILE_W - THUMB - 22, 14), { Name = "Label", Position = UDim2.fromOffset(THUMB + 14, 9), Font = Theme.HeadingFont, TextSize = 10, TextColor3 = C.faint, ZIndex = 23 })
-	local pill = text(made, if open then "▶ PLAY" else "🔒 SOON", UDim2.fromOffset(TILE_W - THUMB - 22, 18), {
+	local pill = text(made, if open then "▶ PLAY" elseif state == "locked" then "🔒 LOCKED" else "🔒 SOON", UDim2.fromOffset(TILE_W - THUMB - 22, 18), {
 		Name = "State",
 		Position = UDim2.fromOffset(THUMB + 14, 25),
 		Font = Theme.HeadingFont,
@@ -410,20 +425,24 @@ local function tile(strip: Instance, chapter: MoveStory.Chapter, index: number, 
 	return made
 end
 
-function MoveStoryUi.chapters(body: Instance, order: number, contract: any): any
+function MoveStoryUi.chapters(body: Instance, order: number, contract: any, open: { [string]: boolean }?, onPlay: ((string) -> ())?): any
 	local chapters = MoveStory.Chapters
 	local current = MoveStory.forContract(contract)
+	local states: { [string]: string } = {}
+	for _, chapter in chapters do
+		states[chapter.id] = stateOf(chapter, open)
+	end
 	local section = Ui.make("Frame", { Name = "MoveStoryChapters", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 22 }, body)
 	Ui.list(section, true, 6)
-	local open = 0
+	local playable = 0
 	for _, chapter in chapters do
-		if MoveStory.status(chapter) == "play" then
-			open += 1
+		if states[chapter.id] == "play" then
+			playable += 1
 		end
 	end
 	local head = Ui.make("Frame", { Name = "Head", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 1, ZIndex = 22 }, section)
 	text(head, "THE LAST MOVE · CHAPTERS", UDim2.new(1, -110, 1, 0), { Name = "Title", Font = Theme.HeadingFont, TextSize = 11, TextColor3 = ORANGE, ZIndex = 22 })
-	text(head, `{open} OF {#chapters} OPEN`, UDim2.new(0, 110, 1, 0), {
+	text(head, `{playable} OF {#chapters} OPEN`, UDim2.new(0, 110, 1, 0), {
 		Name = "Open",
 		Position = UDim2.fromScale(1, 0),
 		AnchorPoint = Vector2.new(1, 0),
@@ -465,13 +484,22 @@ function MoveStoryUi.chapters(body: Instance, order: number, contract: any): any
 				lit.Thickness = if id == chapter.id then 2 else 1
 			end
 		end
-		detail.Text = if MoveStory.status(chapter) == "play"
+		local state = states[chapter.id]
+		local seen = player:GetAttribute("MoveStory")
+		local lock = if state == "locked" then MoveStory.lockText(chapter, if type(seen) == "string" then MoveStory.decodeSeen(seen) else {}) else nil
+		detail.Text = if state == "play"
 			then `{chapter.icon} {string.upper(chapter.title)} · “{chapter.blurb}” — {chapter.client}`
+			elseif state == "locked" then `{chapter.icon} {string.upper(chapter.title)} · {lock or "🔒 Finish the chapter before it first."} {chapter.hook}`
 			else `{chapter.icon} {string.upper(chapter.title)} · 🔒 SOON · {chapter.hook}`
 	end
 	for index, chapter in chapters do
-		tiles[chapter.id] = tile(strip, chapter, index, function()
+		tiles[chapter.id] = tile(strip, chapter, index, states[chapter.id], function()
 			pick(chapter)
+			-- 7.x farm move: another playable chapter: its contract's card
+			local other = chapter.contract
+			if onPlay and other and states[chapter.id] == "play" and chapter ~= current then
+				onPlay(other)
+			end
 		end)
 	end
 	pick(current or chapters[1])

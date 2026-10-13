@@ -26,6 +26,7 @@
 -- 6.9 (the owner: "everybody blocky R15, like Roblox"): the people are Roblox's own classic blocky R15 again, the
 -- couriers' body (shared/AvatarLook.luau's Body; a kid smaller), dressed as before 6.7. The realistic body's paint
 -- groups, head sizes and stride stay for a body that carries CharacterArt (none is built here any more).
+-- 7.x farm move: a moustache and a check shirt (NpcLooks moustache, plaid: Walt at his farm) from a few welded parts.
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -253,6 +254,16 @@ local function dress(model: Model, look: Look)
 			end
 			wear(model, torso, "Pocket", Vector3.new(s.X * 0.18, s.Y * 0.16, 0.04), CFrame.new(-s.X * 0.32, s.Y * 0.16, -s.Z * 0.6), Color3.fromRGB(60, 120, 200), Enum.Material.SmoothPlastic)
 		end
+		if look.plaid then
+			-- 7.x farm move: a check shirt (Walt): two bands across and two down, round the torso
+			local band = rgb(look.plaid, shirt)
+			for _, y in { 0.18, -0.22 } do
+				wear(model, torso, "Plaid", Vector3.new(s.X * 1.02, s.Y * 0.09, s.Z * 1.04), CFrame.new(0, s.Y * y, 0), band)
+			end
+			for _, x in { -0.22, 0.22 } do
+				wear(model, torso, "Plaid", Vector3.new(s.X * 0.09, s.Y * 0.98, s.Z * 1.04), CFrame.new(s.X * x, 0, 0), band)
+			end
+		end
 		-- A collar.
 		wear(model, torso, "Collar", Vector3.new(s.X * 0.42, s.Y * 0.08, s.Z * 0.9), CFrame.new(0, s.Y * 0.48, 0), shirt:Lerp(Color3.new(0, 0, 0), 0.15))
 	end
@@ -290,6 +301,14 @@ local function dress(model: Model, look: Look)
 		-- Hair: an ellipsoid over the top and the back of the head.
 		wear(model, head, "Hair", Vector3.new(h.X * 1.04, h.Y * 0.62, h.Z * 1.06), CFrame.new(0, h.Y * 0.24, h.Z * 0.06), rgb(look.hair, Color3.new(0, 0, 0)), Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
 	end
+	if look.moustache then
+		-- 7.x farm move: a moustache under the nose (Walt's), its ends drooping a little
+		local tache = rgb(look.moustache, Color3.fromRGB(120, 110, 100))
+		wear(model, head, "Moustache", Vector3.new(h.X * 0.46, h.Y * 0.1, h.Z * 0.12), CFrame.new(0, -h.Y * 0.14, -h.Z * 0.5), tache, Enum.Material.SmoothPlastic)
+		for _, side in { -1, 1 } do
+			wear(model, head, "Moustache", Vector3.new(h.X * 0.09, h.Y * 0.16, h.Z * 0.1), CFrame.new(side * h.X * 0.23, -h.Y * 0.2, -h.Z * 0.49), tache, Enum.Material.SmoothPlastic)
+		end
+	end
 	if look.bandage then
 		-- A white band round the forehead, a plaster on the cheek.
 		wear(model, head, "Bandage", Vector3.new(h.Y * 0.24, h.X * 1.08, h.Z * 1.1), CFrame.new(0, h.Y * 0.2, 0) * UPRIGHT, Color3.fromRGB(246, 244, 238), Enum.Material.Fabric, nil, Enum.PartType.Cylinder)
@@ -322,7 +341,7 @@ local function lookKey(look: Look): string
 	return table.concat({
 		c(look.skin), c(look.shirt), c(look.pants), c(look.hatColor), c(look.hair), c(look.vest), c(look.apron), c(look.shoes),
 		look.hat or "none", tostring(look.child == true), tostring(look.boots == true), tostring(look.shortSleeves == true),
-		c(look.coat), c(look.tie), tostring(look.bandage == true),
+		c(look.coat), c(look.tie), tostring(look.bandage == true), c(look.moustache), c(look.plaid), -- (7.x farm move: Walt's)
 	}, "|")
 end
 

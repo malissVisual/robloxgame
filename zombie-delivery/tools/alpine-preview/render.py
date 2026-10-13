@@ -218,7 +218,7 @@ def overview(data, path):
     lines = [
         f"Mountains: {s['cones']} terrain cones (front row 250–420, back row 480–700 studs, shoulders, gorge closers, the pass), {s['fills']} terrain fills, "
         f"{s['volume'] / 1e9:.1f} billion studs³, {s['glaciers']} glaciers, {s['scree']} scree fans, {s['silhouettes']} far silhouettes.",
-        f"Forests: {s['trees']} trees × 4 parts (spruce and fir, snowy in the winter), {s['patches']} wildflower meadows, {s['huts']} hay barns and huts; "
+        f"Forests: {s['trees']} trees × {data['treePartCount']} parts (spruce and fir, frosted in the winter), {s['patches']} wildflower meadows, {s['huts']} hay barns and huts; "
         f"{s['parts']} parts in all.",
         f"The ring holds the box: a car {'cannot' if s['sealedCar'] else 'CAN'} get out over ground lower than the seal; "
         f"{'not even swimming' if s['sealedSwim'] else 'BUT swimming can'} (the river's gorges and the lake are closed).",

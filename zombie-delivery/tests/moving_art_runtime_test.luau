@@ -179,7 +179,7 @@ E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
 E.clock += 0.3
 Moving.step()
 trigger(promptIn(truck.model, "Load"), ann)
-check(`the {second.item} loaded too`, ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "2/", 1, true) ~= nil, E.lastNotice(ann))
+check(`the {second.item} loaded too`, ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "2 in the van", 1, true) ~= nil, E.lastNotice(ann))
 piece2:Destroy()
 local wall = V3(Map.Depot.x + T.DropOff[1], 2, Map.Depot.z + T.DropOff[2])
 truck.chassis.CFrame = M.CFrame.new(wall.X + 4, wall.Y, wall.Z)
@@ -187,6 +187,7 @@ E.place(ann, wall + V3(0, 1, 0))
 E.place(bob, wall + V3(3, 1, 0))
 E.clock += 0.3
 Moving.step()
+E.request(ann, "finish") -- (7.x van moves: the Wall unloaded it, a trip; the owner's FINISH ends the move)
 local result = E.last(ann, "Moving", "result")
 check("delivered at the Wall: the pay for the real piece (7.0 review: the one whose model went never counts)", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.pay > 0 and result.a.money > 0,
 	result and result.a.how)

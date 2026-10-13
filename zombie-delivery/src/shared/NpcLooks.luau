@@ -24,6 +24,8 @@ export type Look = {
 	coat: { number }?, -- a long coat over everything (the doctor's white coat)
 	tie: { number }?, -- a tie down the shirt front
 	bandage: boolean?, -- a bandage round the head (a patient)
+	moustache: { number }?, -- 7.x farm move: a moustache under the nose (its colour)
+	plaid: { number }?, -- 7.x farm move: a check shirt: bands of this colour across and down the shirt
 	walkSpeed: number?, -- studs / s (default 8, a kid 9; a patient shuffles)
 }
 
@@ -163,6 +165,29 @@ function NpcLooks.marge(name: string, title: string?): Look
 	look.shirt, look.vest, look.pants = { 236, 236, 240 }, { 240, 170, 50 }, { 52, 56, 70 }
 	look.hair, look.skin = { 160, 156, 150 }, { 241, 194, 160 }
 	return look
+end
+
+-- 7.x farm move: Walt, the rancher (the chapter 1 client: server/MoveGreeters.luau at his farmhouse's door, his portrait
+-- on the story's cards): the rancher's hat and boots, a red check shirt with dark bands and no vest, jeans, grey hair
+-- and a big grey moustache.
+function NpcLooks.walt(name: string, title: string?): Look
+	local look = NpcLooks.look("rancher", name, title)
+	look.vest = nil
+	look.shirt, look.plaid, look.pants = { 176, 46, 40 }, { 70, 26, 26 }, { 58, 76, 112 }
+	look.hair, look.moustache, look.skin = { 176, 172, 164 }, { 196, 192, 184 }, { 226, 176, 140 }
+	look.hatColor = { 140, 98, 60 }
+	return look
+end
+
+-- 7.x farm move: a Cast person as they look (shared/Cast.luau: id, look): Marge as the depot's dispatcher, Walt as
+-- himself, anybody else their role's look.
+function NpcLooks.person(id: string, role: string, name: string, title: string?): Look
+	if id == "marge" then
+		return NpcLooks.marge(name, title)
+	elseif id == "walt" then
+		return NpcLooks.walt(name, title)
+	end
+	return NpcLooks.look(role, name, title)
 end
 
 return NpcLooks

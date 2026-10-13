@@ -134,12 +134,27 @@ for _, contract in Config.Moving.Contracts do
 		table.insert(houses, { id = contract.id, model = site, sign = sign.Name })
 	end
 end
+-- 7.x farm move: each farm contract's site at its place (Walt's farmhouse and the dress)
+local farms = {}
+for _, contract in Config.Moving.Contracts do
+	if contract.kind == "farm" and contract.place then
+		local site = M.Instance.new("Model")
+		site.Name = "Move_" .. contract.id
+		local sign = MoveSites.farm(site, contract.name, contract.place)
+		site.PrimaryPart = sign
+		site.Parent = world
+		table.insert(farms, { id = contract.id, model = site, sign = sign and sign.Name, place = contract.place, kind = contract.kind })
+	end
+end
 local dressing = MoveSites.dressing(world)
 
 exportModel("board", board)
 exportModel("checkpoint", drop)
 for _, h in houses do
 	exportModel("house_" .. h.id, h.model)
+end
+for _, f in farms do
+	exportModel("farm_" .. f.id, f.model)
 end
 for _, model in dressing:GetChildren() do
 	exportModel(if model.Name == "DepotBanner" then "banner" else model.Name, model)
@@ -242,6 +257,19 @@ for _, contract in Config.Moving.Contracts do
 	end
 end
 
+-- 7.x farm move: the Old Farm round each farm site (World.buildFarm's yard, barn and silo in the place's frame)
+for _, f in farms do
+	local place = Looks.sitePlace(f.place)
+	if place then
+		local set = "farm_" .. f.id
+		local frame = CF(place.x, place.y, place.z) * ANG(0, math.rad(place.yaw), 0)
+		box(set, "Yard", { 300, 0.2, 300 }, frame * CF(0, -0.1, 0), { 110, 96, 70 }, "Ground")
+		box(set, "Barn", { 40, 18, 30 }, frame * CF(-60, 9, -80), { 150, 40, 36 }, "WoodPlanks")
+		box(set, "BarnDoors", { 14, 12, 0.3 }, frame * CF(-60, 6, -64.85), { 118, 34, 30 }, "WoodPlanks")
+		box(set, "Silo", { 36, 14, 14 }, frame * CF(-20, 18, -90) * ANG(0, 0, math.rad(90)), { 170, 170, 170 }, "Metal", "Cylinder")
+	end
+end
+
 -- A tower behind each evacuation spot on a Downtown block (the street's look), the ground under it.
 for _, place in Looks.spotPlaces() do
 	local district, i, j = Map.blockAt(place.x, place.z)
@@ -262,7 +290,7 @@ print(encode({ kind = "summary", parts = count, budget = Config.MoveSites.Budget
 	modes = { board = board.ModelStreamingMode, checkpoint = drop.ModelStreamingMode, banner = dressing:FindFirstChild("DepotBanner").ModelStreamingMode,
 		spot = dressing:FindFirstChild("EvacuationSpot1").ModelStreamingMode },
 	primary = { board = board.PrimaryPart and board.PrimaryPart.Name, corkboard = corkboard.Name, checkpoint = drop.PrimaryPart and drop.PrimaryPart.Name,
-		house = houses[1] and houses[1].sign },
+		house = houses[1] and houses[1].sign, farm = farms[1] and farms[1].sign },
 	homes = (function()
 		local list = {}
 		for _, contract in Config.Moving.Contracts do
@@ -270,6 +298,17 @@ print(encode({ kind = "summary", parts = count, budget = Config.MoveSites.Budget
 			if home then
 				table.insert(list, { id = contract.id, door = { home.door.x, home.door.z }, facing = { home.facing.x, home.facing.z }, park = { home.park.x, home.park.z } })
 			end
+		end
+		return list
+	end)(),
+	farms = (function() -- 7.x farm move: each farm's doors (foot, facing, width, the van's spot) and Walt's spot
+		local list = {}
+		for _, f in farms do
+			local doors = {}
+			for _, d in Looks.siteDoors(f.kind, f.place) or {} do
+				table.insert(doors, { door = { d.x, d.z }, facing = { d.fx, d.fz }, width = d.width, park = { d.park.x, d.park.z } })
+			end
+			table.insert(list, { id = f.id, doors = doors, curb = Config.Moving.Sites[f.kind].Curb, porch = Config.MoveGreeters.Porch, ground = Map.RoadTop })
 		end
 		return list
 	end)(),

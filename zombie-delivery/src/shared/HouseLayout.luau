@@ -13,6 +13,9 @@
 --   HouseLayout.extent(id, turn)   a piece's footprint (X, Z) turned by `turn` degrees (a multiple of 90)
 --   HouseLayout.stuck(plan)        the spots whose piece cannot be carried out of the front door (empty for every plan
 --                                  it makes: it checks this while it lays the pieces out)
+--   7.x farm move (server/Moving.luau): HouseLayout.exitsOf(plan) the ways out (a farm's exits, a house's front
+--   door), HouseLayout.entries(plan) where you come in by each, HouseLayout.exitsFor(plan, id) the ways out a piece
+--   may take (a farm's bigDoor piece: the barn doors only)
 --
 -- A Plan:
 --   kind, seed, mirrored          what it is, its dice, and whether it is the left-right mirror of the template
@@ -1430,6 +1433,44 @@ HouseLayout.Kinds = { "house", "farm" }
 function HouseLayout.plan(seed: number, kind: string): Plan
 	local make = KINDS[kind] or KINDS.house
 	return make(seed)
+end
+
+-- 7.x farm move (server/Moving.luau): a plan's ways out, in order: its exits (a farm's: the front door, the barn doors),
+-- else its one front door (exit).
+function HouseLayout.exitsOf(plan: Plan): { Vector3 }
+	local exits = (plan :: any).exits
+	return if type(exits) == "table" and #exits > 0 then exits else { plan.exit }
+end
+
+-- Where you come in by each exit (the same order): the front door's the plan's entry, another's EntryIn in from its
+-- doorway's inside (the exit) facing into the room behind it.
+function HouseLayout.entries(plan: Plan): { CFrame }
+	local list: { CFrame } = { plan.entry }
+	local exits = HouseLayout.exitsOf(plan)
+	local n = 0
+	for _, door in plan.doors do
+		if door.rooms[2] ~= "outside" then
+			continue
+		end
+		n += 1
+		local exit = exits[n]
+		if n > 1 and exit then
+			local into = Vector3.new(exit.X - door.at.X, 0, exit.Z - door.at.Z)
+			into = if into.Magnitude > 1e-3 then into.Unit else Vector3.new(0, 0, 1)
+			local at = Vector3.new(exit.X, T.EntryUp, exit.Z) + into * T.EntryIn
+			list[n] = CFrame.lookAt(at, at + into)
+		end
+	end
+	return list
+end
+
+-- The exits (indexes into exitsOf) a piece of this FurnitureLooks id can be carried out of: a farm's Farm.exitsFor (a
+-- bigDoor piece only the barn doors), a house's its front door.
+function HouseLayout.exitsFor(plan: Plan, id: string): { number }
+	if plan.kind == "farm" then
+		return Farm.exitsFor(plan :: any, id)
+	end
+	return { 1 }
 end
 
 -- The spots of a plan whose piece cannot be carried out of the front door (with every other piece in place).

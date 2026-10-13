@@ -164,8 +164,14 @@ for _, c in ring.cones do
 	table.insert(cones, { id = c.id, row = c.row, x = c.x, z = c.z, r = c.radii[1] or 0, top = c.floor + #c.radii * A.Layer, winter = c.winter })
 end
 local trees = {}
+local treeSpecs = {} -- (7.1 review: the 3/4 view draws the stretch's trees from the layout's own parts)
 for _, t in forest.trees do
 	table.insert(trees, { t.x, t.y, t.z, t.height, t.variant, t.snowy, t.slope, t.yaw })
+	if t.x > sx0 - 60 and t.x < sx1 + 60 and t.z > sz0 - 60 and t.z < sz1 + 60 then
+		for _, spec in AlpineLayout.treeParts(t) do
+			table.insert(treeSpecs, spec)
+		end
+	end
 end
 local patches = {}
 for _, p in forest.patches do
@@ -207,6 +213,8 @@ print(encode({
 	waterfall = AlpineLayout.waterfallParts(ring),
 	trees = trees,
 	treeParts = if #forest.trees > 0 then AlpineLayout.treeParts(forest.trees[1]) else {},
+	treeSpecs = treeSpecs,
+	treePartCount = A.Trees.Parts,
 	colors = A.Colors,
 	treeColors = A.Trees.Colors,
 	trunk = A.Trees.Trunk,

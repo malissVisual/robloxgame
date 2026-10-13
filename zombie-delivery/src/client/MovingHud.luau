@@ -31,6 +31,12 @@
 -- truck's Load / Unload for the Driver) holds no time for it; a Guard sees the zombies through walls
 -- (client/EnemyOutline.luau setXray). The contract card's START opens the planning.
 -- (the list's YOUR ROLE comes first; its countdown "SWITCH ROLE IN n S" is kept up to date every second)
+-- 7.x farm move: the contract card lists the board's contracts (card.contracts: a chip each, the open ones ask the
+-- server for their card: the Moving remote's ("card", id); a locked one shows why), its CHAPTERS from the same list
+-- (MoveStoryUi.chapters' open map: chapter 1 ▶ PLAY once the prologue is done).
+-- 7.x van moves (the move goes with your own van, several trips to the Wall): the panel's line is "TRIP n · delivered
+-- x/y · ★", the bar the van's room; the owner's FINISH on the panel (and in the list's sheet on a phone), asked twice
+-- (the remote's "finish": paid for every trip); the van lost: when CAR brings it back.
 -- Presentation only.
 
 local CollectionService = game:GetService("CollectionService")
@@ -66,7 +72,7 @@ local PANEL_W = MoveLayout.PANEL_W
 local PANEL_H = MoveLayout.PANEL_H -- (7.0 planning: + the role's line)
 local CARD_W = 440
 local LIST_KEY = Enum.KeyCode.O -- 7.0 review: Tab is Roblox's player list (L the leaderboard)
-local GIVE_UP_SURE = 3 -- s: a second tap of GIVE UP within this gives the move up
+local GIVE_UP_SURE = 3 -- s: a second tap of GIVE UP within this gives the move up (7.x van moves: FINISH's too)
 
 local remote = Net.get("Moving")
 local gui: ScreenGui? = nil
@@ -76,6 +82,7 @@ local listFrame: any = nil
 local listOpen = false
 local listKey = "" -- 7.0 review: what the open list shows (drawn again only when this changes)
 local giveUpAt = 0 -- 7.0 review: the first tap of GIVE UP (os.clock)
+local finishAt = 0 -- 7.x van moves: the first tap of FINISH (os.clock)
 local cardFrame: any = nil -- the contract card or the result (one at a time)
 local gpsAt: Vector3? = nil -- the waypoint set here (cleared here)
 local hidden: { [ProximityPrompt]: number } = {} -- the move prompts hidden for you, with their reach
@@ -125,7 +132,7 @@ local function clock(seconds: number): string
 end
 
 local CLASS_TEXT: { [string]: string } = { hand = "✋ one hand", both = "🙌 both hands", pair = "👥 two people" }
-local STATE_TEXT: { [string]: string } = { home = "IN THE HOUSE", carried = "CARRIED", ground = "ON THE GROUND", truck = "IN THE TRUCK" }
+local STATE_TEXT: { [string]: string } = { home = "IN THE HOUSE", carried = "CARRIED", ground = "ON THE GROUND", truck = "IN THE VAN", delivered = "AT THE WALL", lost = "LOST" }
 
 -- ── The prompts of your move only ──────────────────────────────────────────
 
@@ -271,6 +278,7 @@ end
 -- ── The panel ──────────────────────────────────────────────────────────────
 
 local toggleList: () -> ()
+local refreshPanel: () -> ()
 
 local function buildPanel(root: ScreenGui)
 	local panel = Ui.make("TextButton", {
@@ -310,6 +318,28 @@ local function buildPanel(root: ScreenGui)
 	Ui.corner(refs.fill, 4)
 	refs.next = text(panel, "", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(12, 74), TextSize = 13, TextColor3 = K.text })
 	refs.role = text(panel, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 96), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary }) -- 7.0 planning
+	-- 7.x van moves: the owner's FINISH (asked twice), once something reached the Wall
+	local finish = CardKit.bigButton(panel, {
+		name = "Finish",
+		text = "✓ FINISH",
+		kind = "good",
+		height = 22,
+		textSize = 12,
+		onClick = function()
+			if os.clock() - finishAt <= GIVE_UP_SURE then
+				finishAt = 0
+				remote:FireServer("finish")
+				return
+			end
+			finishAt = os.clock()
+			refreshPanel()
+		end,
+	})
+	finish.Size = UDim2.fromOffset(112, 22)
+	finish.Position = UDim2.new(1, -12, 0, 92)
+	finish.AnchorPoint = Vector2.new(1, 0)
+	finish.Visible = false
+	refs.finish = finish
 	panel.Activated:Connect(function()
 		toggleList()
 	end)
@@ -320,22 +350,27 @@ local function nextStep(s: any): string
 	local counts = s.counts or {}
 	local out, total = tonumber(counts.out) or 0, tonumber(counts.total) or 0
 	local carried = tonumber(counts.carried) or 0
+	local delivered = tonumber(counts.delivered) or 0
+	if s.truck ~= true then -- (7.x van moves: the van lost)
+		local wait = math.ceil((tonumber(s.vanAgainAt) or 0) - workspace:GetServerTimeNow())
+		return if wait > 0 then `💥 The van is lost · CAR brings it back in {wait} s` else "💥 The van is lost · CAR brings it back now"
+	end
 	if s.horde == true then
-		return if out > 0 then "🧟 THE HORDE! Drive the truck to the Wall NOW" else "🧟 THE HORDE! Load something and get out"
+		return if out > 0 then "🧟 THE HORDE! Drive the van to the Wall NOW" else "🧟 THE HORDE! Load something and get out"
 	end
 	if s.inside == true then
-		return if carried > 0 then "Carry it out: \"Leave house\" by the front door" else "Pick up the things (E) · ★ first"
+		return if carried > 0 then "Carry it out: \"Leave\" by a door" else "Pick up the things (E) · ★ first"
 	end
 	if carried > 0 then
-		return if s.backOpen == true then "Load it at the truck's back (E)" else "Open the truck's back (E), then Load"
+		return if s.backOpen == true then "Load it at the van's back (E)" else "Open the van's back (E), then Load"
 	end
-	if out >= total and total > 0 then
+	if out > 0 and out + delivered >= total and total > 0 then
 		return "Everything is in: drive to the Wall at the depot"
 	end
 	if seated() then
-		return if out > 0 then "Drive to the Wall (GPS), or back for more" else `Drive to {s.name} (GPS)`
+		return if out > 0 then "Drive to the Wall (GPS), or back for more" elseif delivered > 0 then `Back to {s.name} for more, or FINISH` else `Drive to {s.name} (GPS)`
 	end
-	return `"Enter house" at {s.name}'s front door`
+	return `"Enter" at {s.name}'s door`
 end
 
 -- 7.0 planning: your role and what only it does (the panel's last line).
@@ -354,7 +389,7 @@ local function roleLine(s: any): string
 	return `{def.icon} {string.upper(def.name)} · {hint}`
 end
 
-local function refreshPanel()
+refreshPanel = function()
 	local panel = refs.panel
 	if not panel then
 		return
@@ -375,14 +410,24 @@ local function refreshPanel()
 	refs.timer.Text = if late and grace then `⏱ {clock(grace - nowAt)}` else `⏱ {clock(left)}`
 	refs.timer.TextColor3 = if left <= 60 then K.red elseif s.horde == true then K.warn else K.text
 	local broken = tonumber(counts.broken) or 0
-	refs.check.Text = `📦 {counts.out or 0}/{counts.total or 0} out · ★ {counts.starsOut or 0}/{counts.stars or 0}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 in {clock(hordeIn)}` else ""}`
+	local delivered = tonumber(counts.delivered) or 0
+	-- 7.x van moves: the trip under way and what reached the Wall over every trip
+	refs.check.Text = `TRIP {(tonumber(s.trips) or 0) + 1} · delivered {delivered}/{counts.total or 0} · ★ {counts.starsDelivered or 0}/{counts.stars or 0}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 {clock(hordeIn)}` else ""}`
 	local fill = math.clamp(tonumber(s.fill) or 0, 0, 1)
-	refs.truckLabel.Text = `🚚 TRUCK {math.floor(fill * 100 + 0.5)}%`
+	refs.truckLabel.Text = `🚐 VAN {math.floor(fill * 100 + 0.5)}%`
 	refs.fill.Size = UDim2.fromScale(fill, 1)
 	refs.fill.BackgroundColor3 = if fill > 0.9 then K.red elseif fill > 0.7 then K.warn else ORANGE
 	refs.next.Text = if late and grace then `⏱ TIME'S UP · REACH THE WALL · {clock(grace - nowAt)}` else nextStep(s)
 	refs.next.TextColor3 = if s.horde == true or late then K.red else K.text
 	refs.role.Text = roleLine(s) -- 7.0 planning
+	local finish = refs.finish -- 7.x van moves: the owner's FINISH once something reached the Wall (asked twice)
+	if finish then
+		local can = s.mine == true and delivered > 0
+		local sure = os.clock() - finishAt <= GIVE_UP_SURE
+		finish.Visible = can
+		finish.Text = if sure then "TAP TO FINISH" else "✓ FINISH"
+		refs.role.Size = UDim2.new(1, if can then -140 else -24, 0, 16)
+	end
 	if refs.edge then
 		refs.edge.Color = if s.horde == true then K.red else ORANGE
 	end
@@ -420,7 +465,7 @@ end
 local function itemRow(parent: Instance, item: any, order: number)
 	local row = Ui.make("Frame", { Name = `Item{item.spot}`, Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = C.card, BorderSizePixel = 0, LayoutOrder = order }, parent)
 	Ui.corner(row, 6)
-	local accent = if item.broken == true then K.red elseif item.state == "truck" then K.good elseif item.star == true then C.gold else K.rule
+	local accent = if item.broken == true then K.red elseif item.state == "truck" or item.state == "delivered" then K.good elseif item.star == true then C.gold else K.rule
 	Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 3, 1, -12), Position = UDim2.fromOffset(4, 6), BackgroundColor3 = accent, BorderSizePixel = 0 }, row)
 	text(row, tostring(item.icon or "📦"), UDim2.fromOffset(36, 36), { Position = UDim2.fromOffset(12, 8), TextSize = 26, Font = Theme.Font, TextXAlignment = Enum.TextXAlignment.Center })
 	text(row, `{item.name}{if item.star == true then " ★" else ""}`, UDim2.new(1, -150, 0, 18), {
@@ -443,7 +488,7 @@ local function itemRow(parent: Instance, item: any, order: number)
 		AnchorPoint = Vector2.new(1, 0),
 		Font = Theme.HeadingFont,
 		TextSize = 10,
-		TextColor3 = if item.state == "truck" then K.good elseif item.state == "carried" then ORANGE else K.secondary,
+		TextColor3 = if item.state == "truck" or item.state == "delivered" then K.good elseif item.state == "carried" then ORANGE else K.secondary,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
 	local condition = math.floor((tonumber(item.condition) or 1) * 100 + 0.5)
@@ -550,7 +595,7 @@ local function keyOf(s: any): string
 	local counts = s.counts or {}
 	local size = Ui.screenSize()
 	return table.concat(parts, ";")
-		.. `|{team.role}|{team.called}|{team.barricades}|{free}|{waiting}|{s.mine}|{counts.out}/{counts.total}|{s.name}`
+		.. `|{team.role}|{team.called}|{team.barricades}|{free}|{waiting}|{s.mine}|{counts.out}/{counts.total}|{counts.delivered}|{s.name}`
 		.. `|{size.X}x{size.Y}|{Ui.screenScale()}|{Ui.touchLayout()}`
 end
 
@@ -639,7 +684,7 @@ local function drawList()
 	listFrame = if sheet then holder else frame
 	text(frame, `{s.icon or "🏠"} {string.upper(s.name or "")} · THINGS`, UDim2.new(1, -60, 0, 22), { Position = UDim2.fromOffset(12, 10), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = C.title })
 	local counts = s.counts or {}
-	text(frame, `★ must-haves first · {counts.out or 0} of {counts.total or 0} in the truck`, UDim2.new(1, -60, 0, 16), { Position = UDim2.fromOffset(12, 32), TextSize = 12, TextColor3 = C.faint })
+	text(frame, `★ must-haves first · {counts.delivered or 0} of {counts.total or 0} at the Wall · {counts.out or 0} in the van`, UDim2.new(1, -60, 0, 16), { Position = UDim2.fromOffset(12, 32), TextSize = 12, TextColor3 = C.faint })
 	Ui.closeButton(frame, function()
 		closeList()
 	end)
@@ -662,7 +707,7 @@ local function drawList()
 	local list = s.items or {}
 	-- ★ first, then what is still in the house, then the rest
 	local ordered = table.clone(list)
-	local rank: { [string]: number } = { carried = 0, ground = 1, home = 2, truck = 3 }
+	local rank: { [string]: number } = { carried = 0, ground = 1, home = 2, truck = 3, delivered = 4, lost = 5 }
 	table.sort(ordered, function(a: any, b: any): boolean
 		if (a.star == true) ~= (b.star == true) then
 			return a.star == true
@@ -679,6 +724,28 @@ local function drawList()
 	rows.CanvasPosition = keep
 	if s.mine == true then
 		if sheet then
+			if (tonumber(counts.delivered) or 0) > 0 then -- 7.x van moves: FINISH a finger's size on a phone (asked twice)
+				local row = Ui.make("Frame", { Name = "FinishRow", Size = UDim2.new(1, 0, 0, finger), BackgroundTransparency = 1, LayoutOrder = #ordered + 9 }, rows)
+				CardKit.bigButton(row, {
+					name = "FinishMove",
+					text = "✓ FINISH THE MOVE",
+					kind = "good",
+					height = finger,
+					textSize = 14,
+					onClick = function()
+						if os.clock() - finishAt <= GIVE_UP_SURE then
+							finishAt = 0
+							remote:FireServer("finish")
+							return
+						end
+						finishAt = os.clock()
+						local made: any = row:FindFirstChild("FinishMove")
+						if made then
+							made.Text = "TAP AGAIN TO FINISH"
+						end
+					end,
+				})
+			end
 			local foot = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, finger), BackgroundTransparency = 1, LayoutOrder = #ordered + 10 }, rows)
 			giveUpButton(foot, finger)
 		else
@@ -810,6 +877,38 @@ local function showContract(card: any)
 		return
 	end
 	line(body, "ZDC MOVING · CONTRACT", 1, { Font = Theme.HeadingFont, TextSize = 12, TextColor3 = ORANGE })
+	-- 7.x farm move: the board's contracts (open ones ask for their card, a locked one says why)
+	local list = if type(card.contracts) == "table" then card.contracts else {}
+	local open: { [string]: boolean }? = nil
+	if #list > 1 then
+		open = {}
+		local strip = Ui.make("Frame", { Name = "Contracts", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1, ZIndex = 22 }, body)
+		Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(196, 30), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder }, strip)
+		local why = line(body, "", 1, { Name = "ContractWhy", TextSize = 12, TextColor3 = C.faint, Visible = false })
+		for index, entry in list do
+			local id = tostring(entry.id)
+			local isOpen = entry.open == true
+			local mine = id == tostring(card.id);
+			(open :: { [string]: boolean })[id] = isOpen
+			local chip = CardKit.chip(strip, {
+				name = `Contract_{id}`,
+				text = `{if isOpen then tostring(entry.icon or "🏠") else "🔒"} {string.upper(tostring(entry.name))}`,
+				order = index,
+				stroke = if mine then ORANGE else K.rule,
+				onClick = function()
+					if mine then
+						return
+					elseif isOpen then
+						remote:FireServer("card", id)
+					else
+						why.Text = tostring(entry.why or "🔒 Not open yet.")
+						why.Visible = true
+					end
+				end,
+			})
+			chip.ZIndex = 22
+		end
+	end
 	line(body, `{card.icon or "🏠"} {string.upper(tostring(card.name))}`, 2, { Font = Theme.HeadingFont, TextSize = 24, TextColor3 = C.title })
 	line(body, `Client: {card.client} · {card.address}`, 3, { TextColor3 = K.text })
 	line(body, tostring(card.blurb or ""), 4)
@@ -849,7 +948,11 @@ local function showContract(card: any)
 		end,
 	})
 	Ui.gamepadFocus(start)
-	MoveStoryUi.chapters(body, 11, card.id) -- MoveStory hook: the story road (CHAPTERS) under START
+	-- MoveStory hook: the story road (CHAPTERS) under START (7.x farm move: open as the card's contracts say; a tap on
+	-- another playable chapter asks for its contract's card)
+	MoveStoryUi.chapters(body, 11, card.id, open, function(id: string)
+		remote:FireServer("card", id)
+	end)
 	sound("notify")
 end
 
@@ -883,8 +986,10 @@ local function showResult(r: any)
 		end
 		line(body, table.concat(parts, " · ") .. ` → {Ui.money(tonumber(r.pay) or 0)}`, 5, { TextSize = 13 })
 		line(body, `YOUR SHARE {Ui.money(tonumber(r.money) or 0)} · +{r.xp or 0} XP`, 6, { Font = Theme.HeadingFont, TextSize = 24, TextColor3 = C.money, TextXAlignment = Enum.TextXAlignment.Center })
-		if (tonumber(r.crew) or 1) > 1 then
-			line(body, `Split with the crew at the truck ({r.crew} of you).`, 7, { TextSize = 12, TextColor3 = C.faint, TextXAlignment = Enum.TextXAlignment.Center })
+		local trips = tonumber(r.trips) or 0 -- 7.x van moves
+		local crewText = if (tonumber(r.crew) or 1) > 1 then `Split with the crew at the van ({r.crew} of you).` else ""
+		if trips > 0 or crewText ~= "" then
+			line(body, `{if trips > 0 then `In {trips} trip{if trips == 1 then "" else "s"} to the Wall. ` else ""}{crewText}`, 7, { TextSize = 12, TextColor3 = C.faint, TextXAlignment = Enum.TextXAlignment.Center })
 		end
 	end
 	MoveStoryUi.thanks(body, 8, r, if type(state) == "table" then state.contract else nil) -- MoveStory hook: the client's thanks

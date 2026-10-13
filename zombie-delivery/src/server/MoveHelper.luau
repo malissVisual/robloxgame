@@ -54,6 +54,9 @@
 --   MoveHelper.find(player)    the helper on this player's move (his state: tests, the admin)
 --   MoveHelper.order(p, mode)  7.0 planning: an order as the Moving remote's ("helper", mode) (server/Moving.luau: the
 --                              quick chat's "Need a hand here" is HELP ME)
+-- 7.x farm move: a place with several ways in and out (a farm's front door and barn doors: the session's `ways`, each
+-- an exit inside, where you come in by it and its door's outside) has him take the nearest way he may (Moving's
+-- helperExits: a piece may only leave by the exits it fits through) and come out at its own door.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -76,6 +79,7 @@ export type Port = {
 	helperDrop: (s: any, npc: Model, why: string) -> (),
 	helperLoad: (s: any, npc: Model) -> (boolean, string?),
 	helperHurt: (s: any, npc: Model, hp: number) -> (),
+	helperExits: ((s: any, spot: number?) -> { number })?, -- 7.x farm move: the ways out he may take with it
 }
 
 -- 7.x his hold on the far end of your piece (the real mover's): the attachment on the piece and on his root, the two
@@ -90,6 +94,10 @@ export type Grip = {
 	offset: CFrame,
 	lastAt: Vector3?,
 }
+
+-- 7.x farm move: one way in and out (the house's front door; a farm's barn doors too): the exit inside, where he comes
+-- in, the door's outside, as Brain.Doors for the costs.
+type Way = { exitIn: Vector3, entryIn: CFrame, outside: CFrame, doors: Brain.Doors }
 
 export type Body = {
 	model: Model,
@@ -172,9 +180,11 @@ type Helper = {
 	freePool: { Free },
 	doors: Brain.Doors,
 	doorways: { Brain.Doorway }, -- 7.x the interior's doorways (world)
-	front: Brain.Doorway, -- 7.x the front door outside
+	fronts: { Brain.Doorway }, -- 7.x the doors outside (the front door; a farm's barn doors too)
 	exitIn: Vector3, -- the front door inside (where "Leave house" is)
 	entryIn: CFrame, -- where you come in
+	ways: { Way }, -- 7.x farm move: every way (ways[1] the front door: doors, exitIn, entryIn)
+	wayDoors: { Brain.Doors }, -- (their doors, for Brain.routeVia)
 	saidAt: { [string]: number },
 	lastSaid: number,
 	doing: string,
@@ -563,8 +573,9 @@ end
 
 -- ── Doorways (7.x: he never stands where you walk through) ─────────────────
 
--- The interior's doorways in the world (the plan's, at its origin) and the front door outside.
-local function doorwaysOf(s: any, origin: CFrame): ({ Brain.Doorway }, Brain.Doorway)
+-- The interior's doorways in the world (the plan's, at its origin) and the doors outside (the site's: the front door, a
+-- farm's barn doors too).
+local function doorwaysOf(s: any, origin: CFrame): ({ Brain.Doorway }, { Brain.Doorway })
 	local a = cfg.Aside
 	local list: { Brain.Doorway } = {}
 	local frontHalf = 2
@@ -579,9 +590,18 @@ local function doorwaysOf(s: any, origin: CFrame): ({ Brain.Doorway }, Brain.Doo
 		table.insert(list, { x = at.X, z = at.Z, half = half, dirX = dir.X, dirZ = dir.Z, depth = a.Depth })
 	end
 	local site = s.site
-	local facing: Vector3 = site.facing
-	local doorAt: Vector3 = site.door
-	return list, { x = doorAt.X, z = doorAt.Z, half = frontHalf, dirX = facing.X, dirZ = facing.Z, depth = a.FrontDepth }
+	local fronts: { Brain.Doorway } = {}
+	for index, d in (if type(site.doors) == "table" then site.doors else {}) :: { any } do
+		local foot: Vector3, facing: Vector3 = d.door, d.facing
+		local half = if index == 1 then frontHalf else (tonumber(d.width) or 4) / 2
+		table.insert(fronts, { x = foot.X, z = foot.Z, half = half, dirX = facing.X, dirZ = facing.Z, depth = a.FrontDepth })
+	end
+	if #fronts == 0 then
+		local facing: Vector3 = site.facing
+		local doorAt: Vector3 = site.door
+		table.insert(fronts, { x = doorAt.X, z = doorAt.Z, half = frontHalf, dirX = facing.X, dirZ = facing.Z, depth = a.FrontDepth })
+	end
+	return list, fronts
 end
 
 -- A place where he will stand still: moved beside a doorway it is in (inside: the interior's; outside: the front door).
@@ -595,8 +615,13 @@ local function clearOf(h: Helper, at: Vector3, inside: boolean): Vector3
 		end
 		return at
 	end
-	local x, z, moved = Brain.aside(at.X, at.Z, h.front)
-	return if moved then Vector3.new(x, at.Y, z) else at
+	for _, door in h.fronts do
+		local x, z, moved = Brain.aside(at.X, at.Z, door)
+		if moved then
+			return Vector3.new(x, at.Y, z)
+		end
+	end
+	return at
 end
 
 -- Is a point within `reach` studs of an interior doorway (or the front door inside)?
@@ -790,13 +815,38 @@ local function fall(h: Helper, body: Body, clock: number)
 	tell(h, `🧑‍🔧 {cfg.Name} is down! He is back at the van in {cfg.Respawn} s.`)
 end
 
--- Through the front door (no fade: he is not a player), to where the players come out or in.
-local function transfer(h: Helper, inside: boolean, clock: number)
+-- 7.x farm move: the ways a piece may leave by (Moving's helperExits; nil: every way, one way only, or no piece).
+local function exitsOf(h: Helper, spot: number?): { number }?
+	local exits = h.port.helperExits
+	if not exits or #h.ways < 2 then
+		return nil
+	end
+	return exits(h.s, spot)
+end
+
+-- 7.x farm move: the ways he may take now (with what he holds).
+local function allowedWays(h: Helper): { number }?
+	return exitsOf(h, (Rules.holding(h.s.move, h.id)))
+end
+
+-- 7.x farm move: the best way from `here` (inside or not) to `goal` in the other world, among those he may take.
+local function wayFor(h: Helper, here: Vector3, inside: boolean, goal: Vector3): Way
+	if #h.ways < 2 then
+		return h.ways[1]
+	end
+	local _, which = Brain.routeVia(inside, here.X, here.Z, not inside, goal.X, goal.Z, h.wayDoors, allowedWays(h))
+	return h.ways[which] or h.ways[1]
+end
+
+-- Through the front door (no fade: he is not a player), to where the players come out or in (7.x farm move: through
+-- `way`, the front door's when nil).
+local function transfer(h: Helper, inside: boolean, clock: number, way: Way?)
 	h.doorAt = clock
+	local through = way or h.ways[1]
 	if inside then
-		placeAt(h, h.entryIn.Position + h.entryIn.LookVector * 1.5, h.entryIn.LookVector)
+		placeAt(h, through.entryIn.Position + through.entryIn.LookVector * 1.5, through.entryIn.LookVector)
 	else
-		local out: CFrame = h.s.site.outside
+		local out: CFrame = through.outside
 		local right = Vector3.new(-out.LookVector.Z, 0, out.LookVector.X)
 		placeAt(h, out.Position + right * 2, out.LookVector)
 	end
@@ -850,10 +900,10 @@ local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, nea
 	local inside = insideAt(h, here)
 	local target = goal
 	if inside ~= goalInside then
-		local out: CFrame = h.s.site.outside
-		local door = if inside then h.exitIn else out.Position
+		local way = wayFor(h, here, inside, goal) -- (7.x farm move: the nearest way he may take)
+		local door = if inside then way.exitIn else way.outside.Position
 		if flat(here, door) <= cfg.DoorReach and clock - h.doorAt > 1 then
-			transfer(h, not inside, clock)
+			transfer(h, not inside, clock, way)
 			return false
 		end
 		target = door
@@ -954,15 +1004,15 @@ local function think(h: Helper, body: Body, clock: number)
 				h.candidatePool[n] = c
 			end
 			c.spot, c.class, c.state, c.star, c.broken = spot, thing.class, thing.state, thing.star, Rules.broken(thing)
-			c.cost = Brain.routeCost(fromInside, here.X, here.Z, inside, at.X, at.Z, h.doors)
-			c.haul = if back then Brain.routeCost(inside, at.X, at.Z, false, back.X, back.Z, h.doors) else 0
+			c.cost = (Brain.routeVia(fromInside, here.X, here.Z, inside, at.X, at.Z, h.wayDoors))
+			c.haul = if back then (Brain.routeVia(inside, at.X, at.Z, false, back.X, back.Z, h.wayDoors, exitsOf(h, spot))) else 0
 			c.value = thing.value * thing.condition * (if thing.star then pay.Star else 1)
 			c.weight = thing.weight
 			c.fits = fits
 			c.byTruck = back ~= nil and not inside and flat(at, back) <= 12
 			local nearest: number? = nil
 			for _, f in h.free do
-				local d = Brain.routeCost(f.inside, f.x, f.z, inside, at.X, at.Z, h.doors)
+				local d = (Brain.routeVia(f.inside, f.x, f.z, inside, at.X, at.Z, h.wayDoors))
 				if nearest == nil or d < nearest then
 					nearest = d
 				end
@@ -980,7 +1030,7 @@ local function think(h: Helper, body: Body, clock: number)
 			l.spot, l.class, l.state = spot, thing.class, thing.state
 			l.helped = thing.helper ~= nil
 			l.crew = carrier ~= nil and s.members[carrier] == true
-			l.cost = Brain.routeCost(fromInside, here.X, here.Z, inside, at.X, at.Z, h.doors)
+			l.cost = (Brain.routeVia(fromInside, here.X, here.Z, inside, at.X, at.Z, h.wayDoors))
 			l.gaveUp = h.gaveUp[spot] ~= nil
 			l.weight = thing.weight
 			l.byBack = back ~= nil and not inside and flat(at, back) <= cfg.AssistBack
@@ -1168,7 +1218,7 @@ local function actHelp(h: Helper, body: Body, action: string, spot: number, hold
 		takeEnd(h, body, spot, clock)
 		return
 	end
-	local cost = Brain.routeCost(hereInside, here.X, here.Z, inside, at.X, at.Z, h.doors)
+	local cost = (Brain.routeVia(hereInside, here.X, here.Z, inside, at.X, at.Z, h.wayDoors))
 	if cost > cfg.BlinkFar or clock - h.helpSince >= cfg.HelpBlink or h.pathFailedAt >= h.helpSince then
 		blink(h, body, goal)
 		takeEnd(h, body, spot, clock)
@@ -1216,8 +1266,8 @@ local function actFetch(h: Helper, body: Body, spot: number, dt: number, clock: 
 	-- (the way's end beside it, on his side: a path can't end inside a piece that stands in the way)
 	local from = here
 	if insideAt(h, here) ~= inside then
-		local out: CFrame = s.site.outside
-		from = if inside then h.entryIn.Position else out.Position
+		local way = wayFor(h, here, not inside, at) -- (7.x farm move: the way he will come by)
+		from = if inside then way.entryIn.Position else way.outside.Position
 	end
 	local side = Vector3.new(from.X - at.X, 0, from.Z - at.Z)
 	local beside = if side.Magnitude > 0.1 then at + side.Unit * (half + 1.5) else at
@@ -1568,7 +1618,21 @@ local function create(s: any, port: Port): Helper
 	local entry: CFrame = origin * (s.plan.entry :: CFrame)
 	local exitIn = (origin * CFrame.new(s.plan.exit :: Vector3)).Position
 	local outside: CFrame = s.site.outside
-	local doorways, front = doorwaysOf(s, origin)
+	-- 7.x farm move: every way in and out (Moving's s.ways), else the front door's
+	local ways: { Way } = {}
+	local wayDoors: { Brain.Doors } = {}
+	for _, way in (if type(s.ways) == "table" then s.ways else {}) :: { any } do
+		local out: CFrame = way.door.outside
+		local made: Way = { exitIn = way.inside, entryIn = way.entry, outside = out, doors = { outX = out.Position.X, outZ = out.Position.Z, inX = way.inside.X, inZ = way.inside.Z } }
+		table.insert(ways, made)
+		table.insert(wayDoors, made.doors)
+	end
+	if #ways == 0 then
+		local made: Way = { exitIn = exitIn, entryIn = entry, outside = outside, doors = { outX = outside.Position.X, outZ = outside.Position.Z, inX = exitIn.X, inZ = exitIn.Z } }
+		table.insert(ways, made)
+		table.insert(wayDoors, made.doors)
+	end
+	local doorways, fronts = doorwaysOf(s, origin)
 	local h: Helper = {
 		s = s,
 		port = port,
@@ -1619,11 +1683,13 @@ local function create(s: any, port: Port): Helper
 		liftPool = {},
 		free = {},
 		freePool = {},
-		doors = { outX = outside.Position.X, outZ = outside.Position.Z, inX = exitIn.X, inZ = exitIn.Z },
+		doors = ways[1].doors,
 		doorways = doorways,
-		front = front,
-		exitIn = exitIn,
-		entryIn = entry,
+		fronts = fronts,
+		exitIn = ways[1].exitIn,
+		entryIn = ways[1].entryIn,
+		ways = ways,
+		wayDoors = wayDoors,
 		saidAt = {},
 		lastSaid = -math.huge,
 		doing = Brain.doing("wait", nil, false),

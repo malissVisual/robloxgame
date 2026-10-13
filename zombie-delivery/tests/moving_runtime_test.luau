@@ -152,7 +152,7 @@ check("…not from a stranger, nor a line it doesn't have", E.last(ann, "MoveLob
 local launchedAt = #E.messages
 lobbyRequest(ann, "launch")
 local truck = E.cars[ann]
-check("LAUNCH: the truck is lent", truck ~= nil and truck.id == T.Truck, E.lastNotice(ann))
+check("LAUNCH: 7.x van moves: the owner's own van (none was out: placed by them)", truck ~= nil and truck.id == E.carId and not truck.lent, E.lastNotice(ann))
 check("…and the interior is built", E.built == 1 and #E.interiors == 1)
 check("everybody of the crew hears it", heard(bob, "Move started", launchedAt))
 check("the lobby closes for everybody", E.last(ann, "MoveLobby", "lobby").a == nil and E.last(bob, "MoveLobby", "lobby").a == nil and bob:GetAttribute("MoveLobby") == nil)
@@ -179,7 +179,7 @@ E.request(bob, "call")
 check("only the Driver calls the truck", string.find(E.lastNotice(bob), "Driver", 1, true) ~= nil and (truck.chassis.Position - depot).Magnitude < 60, E.lastNotice(bob))
 E.seated[bob] = truck
 E.request(ann, "call")
-check("not with somebody in it", string.find(E.lastNotice(ann), "sits in the truck", 1, true) ~= nil, E.lastNotice(ann))
+check("not with somebody in it", string.find(E.lastNotice(ann), "sits in the van", 1, true) ~= nil, E.lastNotice(ann))
 E.seated[bob] = nil
 E.request(ann, "call")
 check("Call truck to door: at the house's curb, stood up, with a fade", V3(truck.chassis.Position.X - door.X, 0, truck.chassis.Position.Z - door.Z).Magnitude < 45 and E.stoodUp == 1
@@ -196,7 +196,7 @@ check("the truck takes less with a Driver at its wheel", E.carHits[#E.carHits - 
 
 do
 	local calls = E.vehicleCalls or 0
-	local out = "Your moving truck is out"
+	local out = "Your van is out"
 	check("CAR / MY BIKE / a car job (Vehicles.spawn): refused, the truck stays", string.find(E.Vehicles.spawn(ann, false, nil) or "", out, 1, true) ~= nil
 		and string.find(E.Vehicles.spawn(ann, true, "van") or "", out, 1, true) ~= nil and E.cars[ann] == truck)
 	check("…the phone's CALL CAR in the truck (Vehicles.placeNear): refused", string.find(E.Vehicles.placeNear(ann, nil) or "", out, 1, true) ~= nil and E.cars[ann] == truck)
@@ -209,7 +209,7 @@ do
 	check("the crews see the move's owner busy (Crew.hasJob), not its crew", E.Crew.hasJob(ann) == true and E.Crew.hasJob(bob) == false and E.Crew.hasJob(cid) == false)
 end
 check("no wait at the truck's back for a Driver (the prompts' MoveQuick)", promptIn(truck.model, "Load"):GetAttribute("MoveQuick") == "driver"
-	and promptIn(truck.model, "Unload"):GetAttribute("MoveQuick") == "driver")
+	and promptIn(truck.model, "Take out"):GetAttribute("MoveQuick") == "driver")
 
 -- The door ---------------------------------------------------------------------------------------------------------------
 
@@ -313,8 +313,11 @@ local weld = lampRoot:FindFirstChildOfClass("WeldConstraint")
 check("…welded to the truck, inside its box", weld ~= nil and weld.Part0 == truck.chassis and (lampRoot.Position - truck.chassis.Position).Magnitude < 12)
 E.clock += 0.2
 Moving.step()
-local unload = promptIn(truck.model, "Unload")
-check("Unload (Z) shows the last one in", unload ~= nil and unload.Enabled and unload.KeyboardKeyCode == "Z" and string.find(unload.ActionText, "Lamp", 1, true) ~= nil)
+local unload = promptIn(truck.model, "Take out")
+check("Unload (Z, \"Take out\") shows the last one in", unload ~= nil and unload.Enabled and unload.KeyboardKeyCode == "Z" and string.find(unload.ActionText, "Lamp", 1, true) ~= nil)
+-- the owner's report: Unload sat on the door's own attachment with Load and the back's E (all stacked)
+check("Unload on its own spot beside the door, not stacked with Load and the back's E", unload.Parent ~= cargoDoor and unload.Parent.Name == "MoveTakeOut"
+	and unload.Parent.Parent == truck.chassis and (unload.Parent.WorldPosition - cargoDoor.WorldPosition).Magnitude > 2 and not load.Enabled and backPrompt.Enabled)
 character:SetAttribute("Pushing", "trolley")
 trigger(unload, ann)
 check("7.0 review: Unload with your hands full (a trolley): refused", character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "hands are full", 1, true) ~= nil
@@ -389,6 +392,9 @@ E.place(bob, cargoDoor.WorldPosition + V3(0, 0, 2))
 E.place(ann, cargoDoor.WorldPosition + V3(1, 0, 3))
 E.clock += 0.2
 Moving.step()
+-- the owner's report: with something in the truck already, Unload showed beside Load and E fumbled
+check("the lamp inside, the sofa carried at the back: Load only (no Unload, the back's E waits)", load.Enabled and not unload.Enabled and not backPrompt.Enabled
+	and lampRoot:FindFirstChildOfClass("WeldConstraint").Part0 == truck.chassis)
 trigger(load, ann)
 check("the helper doesn't load", string.find(E.lastNotice(ann), "front", 1, true) ~= nil, E.lastNotice(ann))
 trigger(load, bob)
@@ -564,7 +570,7 @@ E.clock += 0.2
 Moving.step()
 trigger(load, ann)
 check("the box of memories (★) in the truck", ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "loaded", 1, true) ~= nil, E.lastNotice(ann))
-check("during the move the truck stays: no CAR swap, no taking it back", E.Jobs.returnLent(ann) == false and string.find(E.Vehicles.callCar(ann, nil) or "", "moving truck", 1, true) ~= nil)
+check("during the move the truck stays: no CAR swap, no taking it back", E.Jobs.returnLent(ann) == false and string.find(E.Vehicles.callCar(ann, nil) or "", "van is out", 1, true) ~= nil)
 check("the crew is hunted (no ordinary roamers round them), a stranger not", E.Zombies.hunts(bob) == true and E.Zombies.hunts(ann) == true and E.Zombies.hunts(cid) == false)
 check("the crew may open the truck's back, a stranger not", E.Vehicles.backAllowed(bob, truck) == true and E.Vehicles.backAllowed(cid, truck) == false)
 E.Zombies.onCarDamaged(ann, 100)
@@ -584,15 +590,26 @@ for _, z in E.zombies do
 end
 check("a few roam round the house while you are outside", roamers > 0 and roamers <= T.Roam.Count)
 -- drive to the Wall: the truck within DropRadius of the drop-off
+local resultBefore = E.last(ann, "Moving", "result") -- (an earlier move's)
 local wall = V3(Map.Depot.x + T.DropOff[1], 2, Map.Depot.z + T.DropOff[2])
 truck.chassis.CFrame = M.CFrame.new(wall.X + 5, wall.Y, wall.Z)
 E.place(ann, wall + V3(0, 1, 0))
 E.place(bob, wall + V3(4, 1, 0))
-E.clock += 0.2
+E.clock += 0.3
 Moving.step()
+-- 7.x van moves: the Wall unloads the van (a trip) and the move goes on until the owner's FINISH
+check("7.x van moves: at the Wall the van's load is delivered (trip 1), the move goes on", E.last(ann, "Moving", "result") == resultBefore and heard(ann, "Trip 1")
+	and stateOf(ann, 5) ~= nil and stateOf(ann, 5).state == "delivered" and E.last(ann, "Moving", "state").a.trips == 1 and box.destroyed == true,
+	`{E.last(ann, "Moving", "result") ~= nil} {heard(ann, "Trip 1")} {stateOf(ann, 5) and stateOf(ann, 5).state} {E.last(ann, "Moving", "state").a and E.last(ann, "Moving", "state").a.trips} {box.destroyed} {E.lastNotice(ann)}`)
+check("7.0 greeters: the soldier at the Wall welcomes the van (every trip)", E.saidSince(MoveStory.Wall.welcome, 0))
+E.request(bob, "finish")
+check("…FINISH is the owner's", E.last(ann, "Moving", "result") == resultBefore)
+E.request(ann, "finish")
 local result = E.last(ann, "Moving", "result")
-check("delivered at the Wall: the result card", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.stars >= 1)
-check("7.0 greeters: the soldier at the Wall welcomes the truck, Marge left the porch", E.saidSince(MoveStory.Wall.welcome, 0) and porchOf(ann) == nil)
+check("FINISH: the result card, paid for what was delivered", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.stars >= 1 and result.a.trips == 1)
+check("…Marge left the porch", porchOf(ann) == nil)
+check("…the van's Load and Take out gone, Take out's own spot too", promptIn(truck.model, "Load") == nil and promptIn(truck.model, "Take out") == nil
+	and truck.chassis:FindFirstChild("MoveTakeOut") == nil and truck.chassis:FindFirstChild("CargoDoor") ~= nil)
 local paidAnn, paidBob = 0, 0
 for _, entry in E.money do
 	if entry.reason == "MovePay" then
@@ -664,13 +681,44 @@ check("the owner left: the planning closes for the crew", E.last(dan, "MoveLobby
 -- The owner leaves; the truck lost; the admin's other commands ---------------------------------------------------------------
 
 check("no move: the admin says so", string.find(Moving.admin(ann, "horde"), "not running", 1, true) ~= nil)
+-- 7.x van moves: a thing carried out of the house into `player`'s move's van (its back opened)
+local function loadOne(player: any, spot: number)
+	local van = E.cars[ann]
+	van.chassis.CFrame = M.CFrame.new(home.park.x, 2, home.park.z) -- (the owner's van, out already: at the house)
+	E.place(player, outside)
+	trigger(promptIn(site, "Enter house"), player)
+	local model = newItem(spot)
+	E.place(player, model.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(model, "Pick up"), player)
+	E.place(player, E.interiors[#E.interiors].Position + V3(0, 3, 1))
+	trigger(promptIn(workspace, "Leave house"), player)
+	van.model:SetAttribute("BackOpen", true)
+	E.place(player, van.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
+	E.clock += 0.3
+	Moving.step()
+	trigger(promptIn(van.model, "Load"), player)
+	E.clock += 0.3
+	Moving.step()
+end
 Moving.admin(ann, "start")
 Moving.step()
+loadOne(ann, 1)
 truck = E.cars[ann]
-E.cars[ann] = nil -- (another vehicle took its place)
+check("7.x van moves: the lamp in the new move's van", stateOf(ann, 1) ~= nil and stateOf(ann, 1).state == "truck", `{stateOf(ann, 1) and stateOf(ann, 1).state} {E.lastNotice(ann)}`)
+E.cars[ann] = nil -- (another vehicle took its place: the van gone)
+E.clock += 0.3
 Moving.step()
-result = E.last(ann, "Moving", "result")
-check("the truck gone: the move is lost", result ~= nil and result.a.how == "failed" and string.find(result.a.howText, "truck", 1, true) ~= nil)
+check("the van gone: what was in it is lost (condition 0), the move goes on", E.last(ann, "Moving", "result") == result and heard(ann, "The van is gone")
+	and stateOf(ann, 1).state == "lost" and stateOf(ann, 1).condition == 0)
+check("…CAR waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) or "", "comes back", 1, true) ~= nil
+	and string.find(E.Vehicles.placeNear(ann, nil) or "", "comes back", 1, true) ~= nil and E.cars[ann] == nil)
+E.now += T.VanAgain
+E.Vehicles.placeNear(ann, nil)
+E.clock += 0.3
+Moving.step()
+check("…then CAR brings it and the move takes it over (its prompts on it)", E.cars[ann] ~= nil and E.cars[ann] ~= truck and promptIn(E.cars[ann].model, "Load") ~= nil
+	and heard(ann, "van is back") and E.last(ann, "Moving", "state").a.truck == true)
+Moving.admin(ann, "end")
 Moving.admin(ann, "start")
 Moving.step()
 local timeSaid = Moving.admin(ann, "time")
@@ -678,12 +726,21 @@ check("the admin's one minute left", string.find(timeSaid, "minute", 1, true) ~=
 E.now += 61
 E.clock += 0.3
 Moving.step()
-check("0:00: 7.0 review: LateGrace s to reach the Wall, no end yet", E.last(ann, "Moving", "result") == result and heard(ann, "Time's up")
+result = E.last(ann, "Moving", "result")
+check("7.x van moves: 0:00, an empty van and nothing delivered: the end at once, nothing paid", result ~= nil and result.a.how == "failed" and result.a.pay == 0, result and result.a.how)
+Moving.admin(ann, "start")
+Moving.step()
+loadOne(ann, 1)
+Moving.admin(ann, "time")
+E.now += 61
+E.clock += 0.3
+Moving.step()
+check("0:00 with a load in the van: 7.0 review: LateGrace s to reach the Wall, no end yet", E.last(ann, "Moving", "result") == result and heard(ann, "Time's up")
 	and E.last(ann, "Moving", "state").a.graceEndsAt ~= nil)
 E.now += T.LateGrace
 Moving.step()
 result = E.last(ann, "Moving", "result")
-check("…the Wall not reached in time: the load is lost, nothing paid", result ~= nil and result.a.how == "failed" and result.a.pay == 0, result and result.a.how)
+check("…the Wall not reached in time: nothing delivered, nothing paid", result ~= nil and result.a.how == "failed" and result.a.pay == 0, result and result.a.how)
 -- 7.0 review: the end's pay fails (a save down): the cleanup runs anyway, the slot frees
 do
 	Moving.admin(ann, "start")

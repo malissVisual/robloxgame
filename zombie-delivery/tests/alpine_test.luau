@@ -2,9 +2,11 @@
 -- (Map.Bounds: nothing you play on moved) and holds it (no gap a car could drive through, nor a swimmer: the river's
 -- gorges and the lake are closed), the mountains are as high as asked, their layers nest, the far silhouettes hide
 -- inside them, the West Pass keeps its road and its closed tunnel, and the budgets hold; a tighter box (step 2's) is
--- held the same way. The forests: no tree on or over a road, near a junction, in a district, on a lot, a home, a
--- storefront, a yard, a place or a zone, in the water or on the ice; thinner near town, denser at the mountains, open
--- meadows with wildflowers, a few huts; the tree budget and its parts. In the standalone Luau CLI.
+-- held the same way. 7.1 review: every layer exactly two rows of the terrain's 4-stud voxels on their grid, a layer left
+-- out only where a bigger neighbour's hold it (the same terrain), the tunnel's air on the grid down to the road. The
+-- forests: no tree on or over a road, near a junction, in a district, on a lot, a home, a storefront, a yard, a place
+-- or a zone, in the water or on the ice; thinner near town, denser at the mountains, open meadows with wildflowers, a
+-- few huts; the tree budget and its two parts. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local AlpineLayout = require("./AlpineLayout")
@@ -87,6 +89,65 @@ for n, f in ring.fills do
 end
 check("every terrain fill stays out of the box", #inside == 0, table.concat(inside, ", "))
 check("the fills are grass, rock, limestone, snow, glacier and air", #unknown == 0, table.concat(unknown, ", "))
+
+-- 7.1 review: the terrain's voxels are 4 studs. Every layer is exactly two voxel rows on their grid (a layer that
+-- reached into the next row wrote that row twice, a little of it), its cone's floor on the grid.
+local VOXEL = 4
+local function onGrid(v: number): boolean
+	return math.abs(v / VOXEL - math.floor(v / VOXEL + 0.5)) < 1e-9
+end
+local offGrid = {}
+check("a layer is two voxel rows (Layer 8), the floors on the grid", layer == 2 * VOXEL and onGrid(A.Floor) and onGrid(A.WetFloor))
+local written: { [string]: { [number]: AlpineLayout.Fill } } = {}
+local layers = 0
+for _, c in ring.cones do
+	layers += #c.radii
+	if not onGrid(c.floor) then
+		table.insert(offGrid, c.id)
+	end
+end
+for _, f in ring.fills do
+	if f.shape == "cylinder" then
+		if f.b ~= layer or not onGrid(f.y - f.b / 2) then
+			table.insert(offGrid, `{f.cone}:{f.layer}`)
+		end
+		local id, i = f.cone, f.layer
+		if id and i then
+			written[id] = written[id] or {}
+			written[id][i] = f
+		end
+	end
+end
+check("every layer's fill exactly two voxel rows, on the grid", #offGrid == 0, table.concat(offGrid, ", "))
+-- A layer left out: over each of its two voxel rows a bigger layer that was written holds its whole disc.
+local left, unheld = 0, {}
+for _, c in ring.cones do
+	for i, r in c.radii do
+		if written[c.id] and written[c.id][i] then
+			continue
+		end
+		left += 1
+		local x, z = AlpineLayout.layerAt(c, i)
+		local y0 = c.floor + (i - 1) * layer
+		for _, row in { y0, y0 + VOXEL } do
+			local held = false
+			for _, o in ring.grid[`{math.floor(x / 500)},{math.floor(z / 500)}`] or {} do
+				local j = math.floor((row - o.floor) / layer) + 1
+				local f = written[o.id] and written[o.id][j]
+				if f and o ~= c and f.a > r and math.sqrt((x - f.x) ^ 2 + (z - f.z) ^ 2) + r <= f.a + 1e-6 then
+					held = true
+					break
+				end
+			end
+			if not held then
+				table.insert(unheld, `{c.id}:{i}@{row}`)
+				break
+			end
+		end
+	end
+end
+print(`  {layers} layers, {left} left out (inside a bigger neighbour's), {#ring.fills} fills`)
+check("a layer is left out only where bigger written layers hold it over both its rows (the same terrain)", #unheld == 0 and left > 0, `{left} left out; not held: {table.concat(unheld, ", ")}`)
 for _, s in ring.solids do
 	check("the pass's cliff stands Gap out from the box, over the tunnel's mouth", math.abs(AlpineLayout.boxDistance(box, s.x, s.z) - A.Gap) < 0.5 and s.height >= A.Portal.Height + 20)
 end
@@ -193,6 +254,13 @@ if pass then
 	check("the barrier's board says ROAD CLOSED — EVACUATION ZONE", signs[1] ~= nil and signs[1].text == "ROAD CLOSED — EVACUATION ZONE")
 	local cut = ring.cuts[1]
 	check("the mouth is cut out of the cliff (Depth deep)", cut ~= nil and cut.x1 - cut.x0 >= A.Gap + A.Portal.Depth - 0.5 and cut.y1 >= A.Portal.Height)
+	-- 7.1 review: whole voxels of air from the voxel row the road's top is in (a partly cut voxel keeps a skin of rock)
+	local cutsOk = #ring.cuts > 0
+	for _, c in ring.cuts do
+		cutsOk = cutsOk and onGrid(c.x0) and onGrid(c.z0) and onGrid(c.x1) and onGrid(c.z1) and onGrid(c.y0) and onGrid(c.y1)
+			and c.y0 <= Map.RoadTop and c.y0 > Map.RoadTop - VOXEL
+	end
+	check("the tunnel's air on the voxel grid, from the road's own voxel row up (no terrain skin on its road)", cutsOk)
 	if road then
 		local x0, x1 = road.x - road.sz / 2, road.x + road.sz / 2
 		local z0, z1 = road.z - road.sx / 2, road.z + road.sx / 2
@@ -228,12 +296,12 @@ for _, t in forest.trees do
 		continue
 	end
 	for n = 2, #list do
-		if list[n].collide or list[n].shape ~= "ellipsoid" then
+		if list[n].collide or list[n].shape ~= "ellipsoid" or list[n].sx / 2 > t.canopy + 1e-6 or list[n].sz / 2 > t.canopy + 1e-6 then
 			badParts += 1
 		end
 	end
 end
-check(`every tree is {T.Parts} parts: a trunk that collides, three needle tiers that do not`, badParts == 0, badParts)
+check(`every tree is {T.Parts} parts: a trunk that collides, one needle spire inside its canopy that does not`, badParts == 0, badParts)
 
 -- ── The forests' rules ─────────────────────────────────────────────────────
 

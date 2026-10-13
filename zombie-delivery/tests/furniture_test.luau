@@ -225,7 +225,7 @@ do
 		farmRooms[room] = true
 	end
 	local stars, big, wrong = {}, {}, {}
-	local bed = Config.Moving.Bed
+	local bed = Config.Moving.Beds.movingtruck -- (7.x van moves: the old truck's bed; the ZDC Van's smaller one is the packing rework's)
 	for _, id in Order do
 		local def = Items[id]
 		local s = def.size

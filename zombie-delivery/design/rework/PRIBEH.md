@@ -26,8 +26,10 @@ V páté kapitole vyjde najevo proč.
    firmy; druhou kartu říká kapitánka Maria. Úvod se ukáže jen jednou: uloží se do profilu (i u starých uložených
    her, takže ho uvidí každý jednou).
 2. **CHAPTERS na kartě zakázky.** Pod tlačítkem START je „cesta příběhem“: řada dlaždic, která jde posouvat do
-   stran. Prolog má ▶ PLAY, dalších sedm dílů 🔒 SOON, každý s portrétem klienta, názvem a jménem klienta. Klepnutím
-   na dlaždici se pod řadou ukáže, o čem díl je.
+   stran. Prolog má ▶ PLAY, kapitola 1 (Walt's Farm) 🔒 LOCKED, dokud nedokončíte prolog, a potom ▶ PLAY; zbylých
+   šest dílů má 🔒 SOON. Každá dlaždice má portrét klienta, název a jméno klienta. Klepnutím na dlaždici se pod řadou
+   ukáže, o čem díl je (u zamčené i co je potřeba dokončit dřív); klepnutím na ▶ PLAY se otevře karta té zakázky.
+   Nad cestou je řada zakázek z tabule (Marge's House, 🐴 Walt's Farm, zamčená s 🔒 a důvodem).
 3. **Briefing.** Po stisku START promluví Marge a klient (3–5 karet); poslední karta je vysílačka Big Move Movers
    s Daniným posměškem. Tlačítko ▶ START THE MOVE nebo SKIP stěhování spustí, ✕ vrátí kartu zakázky. Briefing se
    v jedné hře ukáže jednou pro každou kapitolu, další START už spustí stěhování hned.
@@ -41,14 +43,25 @@ V páté kapitole vyjde najevo proč.
      dědečkovy hodiny. Během stěhování občas něco řekne: když jde kolem ★ věc (*„Careful with that!“*), když přijde
      horda (*„They're coming! Hurry!“*) a když naložený náklaďák odjíždí (*„Thank you… see you behind the Wall.“*;
      tahle věta přijde partě i jako oznámení). Zombíci si jí nevšímají a s koncem stěhování odejde.
-   - **Voják u Zdi** stojí u budky kontrolního stanoviště. Když tam doručíte náklad, zamává a řekne
+   - **Walt u statku** (kapitola 1) stojí u dveří svého statku: kovbojský klobouk, kostkovaná košile, knír. Přivítá
+     vás (*„Howdy, ZDC! About time.“*), u každé ★ věci má vlastní větu (*„Easy with Thunder's saddle!“*), zakřičí na
+     hordu (*„Here they come! Saddle up!“*) a rozloučí se (*„Much obliged. See you behind the Wall.“*).
+   - **Voják u Zdi** stojí u budky kontrolního stanoviště. Když tam doručíte náklad (každou jízdu), zamává a řekne
      *„Welcome to the safe zone. Unload over there.“*
    - **Marge u stánku Moving contracts** je ta samá Marge z tutoriálu, co stojí v depu u tabule s joby (žádná druhá
      Marge). Když ke stánku přijdete pěšky a zrovna nestěhujete, otočí se k vám a řekne *„New contract, sweetie?“*
      (bublina a oznámení), každému hráči nejvýš jednou za tři minuty.
 
 Výsledek stěhování se pro příběh počítá takto: **skvělé** = doručeno se 4–5 hvězdami, **dobré** = doručeno s méně
-hvězdami, **pozdě** = vypršel čas, **nepovedlo se** = stěhování bylo zrušeno nebo se ztratil náklaďák.
+hvězdami, **pozdě** = vypršel čas, **nepovedlo se** = stěhování bylo zrušeno nebo ke Zdi nedorazilo nic.
+
+Kapitola se počítá jako dokončená (a odemkne další), když skončí doručením nebo pozdě a ke Zdi dorazila aspoň jedna
+věc. Uloží se do profilu (příznak `done:<kapitola>` v `profile.story`) jen u skutečně ukládané hry.
+
+**Stěhuje se vaší vlastní dodávkou** (ZDC Van; dřív se půjčoval náklaďák Moving Truck). Do dodávky se toho vejde méně,
+proto se jezdí víckrát: u Zdi se vyloží všechno, co v ní je (jedna jízda, „TRIP“), a stěhování pokračuje, dokud
+nevyprší čas nebo dokud majitel zakázky nestiskne FINISH. Platí se za všechno doručené ze všech jízd. Když se dodávka
+rozbije nebo zmizí, co v ní bylo, je ztracené, ale stěhování běží dál a za 20 s ji přivolá CAR znovu.
 
 ## Postavy
 
@@ -78,15 +91,21 @@ hvězdami, **pozdě** = vypršel čas, **nepovedlo se** = stěhování bylo zru�
   Dobře – většina jejího života to zvládla. Pozdě – Zeď se zavřela nad půlkou kuchyně. Nepovedlo se – dům patří
   mrtvým („ať si platí hypotéku“) a zkouší se to znovu.
 
-### Kapitola 1 – „Hold Your Horses“ (Držte koně) · brzy
+### Kapitola 1 – „Hold Your Horses“ (Držte koně) · hratelné teď
 
-- **Klient:** Walt · **Místo:** Silver Spur Ranch
-- **O čem:** Zeď končí míli před rančem a Walt nenechá vzadu ani jednoho koně. Sedla, traktor, stodola plná krmiva
-  a zvířata, která kopou. Těžké, hlučné a po prašné cestě.
-- **Cennosti ★:** Thunderovo sedlo (starý hřebec bez něj nikoho nepustí na hřbet, někdy ani s ním), cejch ranče
-  (značka Silver Spur od roku 1921, ukoval ho Waltův děda), Waltova kytara (tři struny, jedna písnička).
-- **Briefing:** Když Zeď nepřijde k ranči, ranč půjde ke Zdi. Koně do přívěsu, traktor za náklaďák, sedla s Waltem;
-  na kravách nejezdí nikdo. Kolem stodoly slídí Rust Riders a nějací „stěhováci“ v oranžových náklaďácích.
+- **Klient:** Walt · **Místo:** Waltův statek na místě Old Farm (zakázka „Walt's Farm“; odemkne se po prologu)
+- **O čem:** Zeď končí míli před statkem a Walt nenechá vzadu ani jedno sedlo. Statek, stodola plná krmiva a vůz na
+  seno, který projde jen vraty stodoly. Těžké, hlučné a po prašné cestě.
+- **Hraje se:** 14 minut, horda 3:30 před koncem, výplata × 1,25. Dovnitř se jde dvěma cestami: dveřmi statku
+  a vraty stodoly. Vůz na seno projde jen vraty stodoly (u dveří statku hra řekne „Too big — use the barn doors“)
+  a do dodávky se nevejde, jede zapřažený za ní. Kolem statku jsou krabice, přívěs na koně, balíky sena a cedule ZDC.
+- **Cennosti ★:** Thunderovo sedlo (starý hřebec bez něj nikoho nepustí na hřbet, někdy ani s ním), cejch
+  (značka Silver Spur od roku 1921, ukoval ho Waltův děda), babiččina máselnice (šedesát let v ní každé ráno tloukla
+  máslo). Čtvrtá cennost jsou kravské zvonce (jiný plán statku je může vybrat). Ve hře platí plán 1921: ★ jsou sedlo,
+  cejch a máselnice.
+- **Briefing:** Když Zeď nepřijde ke statku, statek půjde ke Zdi. ★ věci jedou s Waltem: Thunderovo sedlo, cejch
+  a babiččina máselnice. Marge: dvě cesty dovnitř, dům a stodola; vůz na seno projde jen vraty stodoly a jede
+  zapřažený za dodávkou. Kolem stodoly slídí Rust Riders a nějací „stěhováci“ v oranžových náklaďácích.
 - **Dana:** „Pěkní koně, kovboji. Bereme všechno, co má nohy a cenovku.“
 - **Konec:** Walt je spokojený nebo pohřbívá traktor; v každém případě volá doktorka Ellie, klinika nepočká.
 
@@ -182,9 +201,9 @@ hvězdami, **pozdě** = vypršel čas, **nepovedlo se** = stěhování bylo zru�
 
 ## Co je teď hratelné a co dál
 
-- Hrát jde jen **prolog** (zakázka „Marge's House“). Ostatní kapitoly jsou zatím jen příběh a na kartě mají
-  🔒 SOON; každá má připravené všechny texty a jakmile pro ni vznikne místo a zakázka, stačí v `MoveStory.luau`
-  doplnit `contract` a smazat `soon = true`.
+- Hrát jde **prolog** (zakázka „Marge's House“) a **kapitola 1** (zakázka „Walt's Farm“, po dokončení prologu).
+  Ostatní kapitoly jsou zatím jen příběh a na kartě mají 🔒 SOON; každá má připravené všechny texty a jakmile pro ni
+  vznikne místo a zakázka, stačí v `MoveStory.luau` doplnit `contract` a smazat `soon = true`.
 - Kapitoly se odemykají po řadě (každá potřebuje tu předchozí, finále všechny).
 - Délky textů hlídají testy (`tests/movestory_test.luau`) podle limitů v `Config.MoveStory`, aby se každá věta
   vešla na svou kartu, i na telefonu.

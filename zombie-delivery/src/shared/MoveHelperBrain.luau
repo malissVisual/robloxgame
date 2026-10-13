@@ -15,6 +15,8 @@
 --                                              (Wait at the van)
 --   MoveHelperBrain.routeCost(...)             studs on foot from one point to another, through the front door when
 --                                              they are in different worlds
+--   MoveHelperBrain.routeVia(..., list, allowed?)   7.x farm move: the same through the best of several doors (a farm's
+--                                              front door, its barn doors; only the `allowed` indexes): (studs, index)
 --   MoveHelperBrain.reserved(playerCost, myCost)   a piece a crew player with free hands is about to lift: within
 --                                              Reserve studs of it and nearer than he is (the player's lift wins)
 --   MoveHelperBrain.worth(c)                   a piece's rank for a trip: its value a second of the trip (TripBase
@@ -134,6 +136,21 @@ function MoveHelperBrain.routeCost(fromInside: boolean, fx: number, fz: number, 
 		return dist(fx, fz, doors.inX, doors.inZ) + dist(doors.outX, doors.outZ, tx, tz)
 	end
 	return dist(fx, fz, doors.outX, doors.outZ) + dist(doors.inX, doors.inZ, tx, tz)
+end
+
+-- 7.x farm move: the way through the best of `list`'s doors (`allowed`: the indexes he may use; nil: all), and which.
+function MoveHelperBrain.routeVia(fromInside: boolean, fx: number, fz: number, toInside: boolean, tx: number, tz: number, list: { Doors }, allowed: { number }?): (number, number)
+	local best, which = math.huge, 1
+	for index, doors in list do
+		if allowed and not table.find(allowed, index) then
+			continue
+		end
+		local cost = MoveHelperBrain.routeCost(fromInside, fx, fz, toInside, tx, tz, doors)
+		if cost < best then
+			best, which = cost, index
+		end
+	end
+	return best, which
 end
 
 -- Seconds without progress: `moved` studs in the last dt s at `speed` (under a fifth of it is no progress).

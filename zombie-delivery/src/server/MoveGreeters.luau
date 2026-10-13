@@ -21,7 +21,10 @@
 --     attribute Dispatcher, found by it, so never a second Marge at the depot). A player on foot and on no move who
 --     comes within Kiosk.Near of the kiosk's corkboard: she turns to them and says her kiosk line (MoveStory.kioskLine,
 --     in turn), her bubble seen from Kiosk.Hear studs (she stands by the job board, across the yard), and the player
---     gets the words as a notice; on coming up to it only, and once per player every Kiosk.Again s.
+--     gets the words as a notice; on coming up to it only, and once per player every Kiosk.Again s. 7.1 review: never into
+--     her first day: not to a player whose tutorial is still ahead (the player attribute TutorialPhase, server/
+--     Tutorial.luau), nor while her own tutorial bubble or talk is going (her attribute TutorialTalk: the os.clock it
+--     lasts until; a player still by the kiosk when it is over gets the line then).
 -- server/Moving.luau calls MoveGreeters.start(board) once, MoveGreeters.sync(s) in every tick of a move and
 -- MoveGreeters.done(s) in its cleanup; the greeters' own loop (Config.MoveGreeters.Tick) does the kiosk, the soldier's
 -- body and any porch left behind by a move that ended.
@@ -30,6 +33,10 @@
 --   MoveGreeters.done(s)        the move ended: she goes; delivered at the Wall: the soldier's welcome
 --   MoveGreeters.step()         one step of the loop (the runtime tests call it)
 --   MoveGreeters.find(s)        a move's porch greeter (her state: the tests); MoveGreeters.soldier(): his body
+--   7.x farm move: Walt greets at his farmhouse's door (NpcLooks.person: his own look, the hat, the check shirt, the
+--   moustache); a ★ piece has its own line when the chapter gives one (MoveStory.starLine: "Easy with Thunder's
+--   saddle!"); the van counts as by the house at any of the site's doors (a farm's barn doors too).
+--   7.x van moves: MoveGreeters.delivered(s)   a trip delivered at the Wall: the soldier's welcome (every trip)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -136,16 +143,26 @@ local function porchSpot(s: any): (Vector3, Vector3)
 	return door + right * G.Porch[1] - facing * G.Porch[2], facing
 end
 
--- The contract's client as their chapter has them (Marge dressed as the depot's dispatcher), the address under the name.
+-- The contract's client as their chapter has them (Marge dressed as the depot's dispatcher; 7.x farm move: Walt as
+-- himself), the address under the name.
 local function clientLook(s: any): NpcLooks.Look
 	local chapter = MoveStory.forContract(s.contract.id)
 	local person = if chapter then Cast.find(chapter.clientId) else nil
 	local name = if person then person.name else tostring(s.contract.client)
 	local title = `Client · {s.site.home.address}`
-	if person and person.id == "marge" then
-		return NpcLooks.marge(name, title)
+	if person then
+		return NpcLooks.person(person.id, person.look, name, title)
 	end
-	return NpcLooks.look(if person then person.look else "townsperson", name, title)
+	return NpcLooks.look("townsperson", name, title)
+end
+
+-- 7.x farm move: how far a point is from the nearest door of the move's site (a farm's barn doors too).
+local function fromDoors(s: any, at: Vector3): number
+	local best = flat(at, s.site.door)
+	for _, door in (if type(s.site.doors) == "table" then s.site.doors else {}) :: { any } do
+		best = math.min(best, flat(at, door.door))
+	end
+	return best
 end
 
 local function newPorch(s: any): Porch
@@ -234,7 +251,7 @@ local function react(p: Porch, lines: MoveStory.Greeter, clock: number)
 			if thing.star and thing.state == "carried" and not p.starSeen[spot] and item and flat(item.root.Position, p.spot) <= G.Star then
 				p.starSeen[spot] = true
 				p.starAt = clock
-				queue(p, { text = lines.star, toward = item.root.Position, at = clock })
+				queue(p, { text = MoveStory.starLine(lines, thing.item), toward = item.root.Position, at = clock }) -- (7.x: its own line)
 				break
 			end
 		end
@@ -246,7 +263,7 @@ local function react(p: Porch, lines: MoveStory.Greeter, clock: number)
 	local truck = s.truck
 	local chassis: BasePart? = if truck and not truck.wrecked then truck.chassis else nil
 	if chassis and chassis.Parent then
-		local away = flat(chassis.Position, s.site.door)
+		local away = fromDoors(s, chassis.Position) -- (7.x farm move: by any of its doors)
 		if away <= G.Leave.Near then
 			p.truckNear = true
 		elseif away >= G.Leave.Far and p.truckNear then
@@ -355,6 +372,23 @@ function MoveGreeters.done(s: any)
 	speak(body, MoveStory.Wall.welcome, "wave", chassis.Position, nil)
 end
 
+-- 7.x van moves: a trip delivered at the Wall (server/Moving.luau, the move goes on): the soldier turns to the van, waves
+-- and welcomes it (one welcome a Gap at most).
+function MoveGreeters.delivered(s: any)
+	local body = soldierBody
+	local truck = s.truck
+	local chassis: BasePart? = if truck then truck.chassis else nil
+	if not body or not alive(body) or not chassis or flat(chassis.Position, dropOffAt()) > G.Soldier.Greet then
+		return
+	end
+	local clock = os.clock()
+	if clock - soldierSaid < G.Gap then
+		return
+	end
+	soldierSaid = clock
+	speak(body, MoveStory.Wall.welcome, "wave", chassis.Position, nil)
+end
+
 -- ── Marge at the kiosk ─────────────────────────────────────────────────────
 
 -- The tutorial's Marge (the person with the attribute Dispatcher), looked for again at most every Respawn s.
@@ -405,10 +439,17 @@ local function kiosk(clock: number)
 		if not near or was or not root or player:GetAttribute("MoveWith") ~= nil then
 			continue
 		end
+		if player:GetAttribute("TutorialPhase") ~= nil then
+			continue -- (7.1 review: their first day with her is on: no moving pitch into it)
+		end
 		if clock - (kioskAt[player] or -math.huge) < G.Kiosk.Again then
 			continue
 		end
 		local marge = findDispatcher(clock)
+		if marge and (tonumber(marge:GetAttribute("TutorialTalk")) or -math.huge) > clock then
+			nearKiosk[player] = nil -- (7.1 review: her tutorial talk goes on: asked again next step while they stay)
+			continue
+		end
 		if marge then
 			kioskAt[player] = clock
 			kioskCount += 1

@@ -376,7 +376,7 @@ check("…he waits at the van", danny.action == "wait" and sol:GetAttribute("Mov
 -- The van's back: he opens it himself; not allowed, he asks --------------------------------------------------------------------
 
 local lamp = itemModel(1)
-local unload = promptIn(truck.model, "Unload")
+local unload = promptIn(truck.model, "Take out")
 E.place(sol, back)
 trigger(unload, sol)
 check("Sol takes the lamp back out", character:GetAttribute("MoveCarry") == 1, E.lastNotice(sol))
@@ -575,10 +575,10 @@ check("the move ends: he goes, the strip goes", MoveHelper.find(sol) == nil and 
 -- A second move: no room for his piece ----------------------------------------------------------------------------------------
 
 E.place(sol, V3(Map.Depot.x, 3, Map.Depot.z))
-local bedHeight = T.Bed.Height
-T.Bed.Height = 1.6 -- (a low bed: the box of memories fits, the lamp never does)
+local bedHeight = T.Beds[E.carId].Height
+T.Beds[E.carId].Height = 1.6 -- (a low bed: the box of memories fits, the lamp never does)
 Moving.admin(sol, "start")
-T.Bed.Height = bedHeight
+T.Beds[E.carId].Height = bedHeight
 truck = E.cars[sol]
 cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 truck.model:SetAttribute("BackOpen", true)
@@ -605,10 +605,10 @@ run(0.2)
 
 -- A third move: a van with no room for anything he carries ------------------------------------------------------------------
 
-T.Bed.Height = 1
+T.Beds[E.carId].Height = 1
 said = #E.said
 Moving.admin(sol, "start")
-T.Bed.Height = bedHeight
+T.Beds[E.carId].Height = bedHeight
 Moving.step()
 danny = MoveHelper.find(sol)
 local full = run(8, function()

@@ -27,6 +27,17 @@
 --   MoveSiteLooks.spot(seed)            an evacuation spot on a kerb: a poster board and abandoned moving boxes (frame: on
 --                                       the kerb, -Z out to the street)
 --   MoveSiteLooks.checkpointPlace() / boardPlace() / bannerPlace() / doorPlace(home) / spotPlaces()   where they stand
+--   7.x farm move (chapter 1, Walt's Farm at the Old Farm; Config.Moving.Sites.farm):
+--   MoveSiteLooks.farm(title)           Walt's farmhouse (its body solid: the "Enter house" door on its front) and the
+--                                       farm's moving-day dress (the ZDC sign, packed boxes by the house and the barn,
+--                                       hay, Walt's horse trailer; nothing solid, nothing on a door's way out to its
+--                                       truck spot), in the farm's frame
+--   MoveSiteLooks.sitePlace(placeId)    the farm's frame: its Map.Places point, the place's raw axes (+X east, +Z
+--                                       south as it stood before map step 2) turned with it (Map.Relocations' turn: a
+--                                       relocated place's frame follows it; yaw = -turn)
+--   MoveSiteLooks.siteDoors(site, placeId)   its doors in the world (Config.Moving.Sites: the house's front door, the
+--                                       barn doors): foot, facing, width, where you come out, the truck's spot
+--   MoveSiteLooks.toWorld(place, x, z) / dirToWorld(place, dx, dz)   a point / a direction of a frame in the world
 --   MoveSiteLooks.all()                 every set with its place (the checks', the preview's)
 --   MoveSiteLooks.box(place, piece)     a piece's axis-aligned box in the world: x0, x1, y0, y1, z0, z1
 --   MoveSiteLooks.shadow(piece, baseY)  does it throw a shadow (shared/RenderBudget.luau's rule)?
@@ -59,7 +70,7 @@ export type Place = { x: number, y: number, z: number, yaw: number, seed: number
 export type Set = { id: string, place: Place, pieces: { Piece } }
 
 MoveSiteLooks.Materials = {
-	"SmoothPlastic", "Metal", "Concrete", "Fabric", "Wood", "WoodPlanks", "Glass", "Neon", "Rubber", "DiamondPlate",
+	"SmoothPlastic", "Metal", "Concrete", "Fabric", "Wood", "WoodPlanks", "Glass", "Neon", "Rubber", "DiamondPlate", "Grass",
 } :: { string }
 MoveSiteLooks.Shapes = { "Block", "Cylinder", "Wedge" } :: { string }
 MoveSiteLooks.Faces = { "Front", "Back", "Left", "Right", "Top" } :: { string }
@@ -477,6 +488,157 @@ function MoveSiteLooks.spot(seed: number): { Piece }
 	return p
 end
 
+-- ── 7.x farm move: Walt's farm (the Old Farm) ───────────────────────────────
+
+local RENDER = { 236, 230, 216 }
+local PLINTH = { 122, 118, 110 }
+local TIMBER = { 92, 64, 42 }
+local SHINGLE = { 104, 72, 52 }
+local SHUTTER = { 64, 104, 66 }
+local GERANIUM = { 212, 52, 62 }
+local HAY = { 212, 184, 96 }
+local TRAILER = { 204, 200, 190 }
+
+-- The farm's pieces in its frame (the place's raw axes: +X east, +Z south; the doors face +Z, Config.Moving.Sites.farm):
+-- the farmhouse round House.At (its front door Doors[1]), the dress by its door and the barn doors (Doors[2]).
+function MoveSiteLooks.farm(title: string): { Piece }
+	local site = Config.Moving.Sites.farm
+	local p: { Piece } = {}
+	local hx, hz = site.House.At[1], site.House.At[2]
+	local w, h, d = site.House.Size[1], site.House.Size[2], site.House.Size[3]
+	local front = hz + d / 2 -- (its front wall's face: the door's foot)
+	-- The farmhouse: a white-rendered body on a stone plinth, a timber upper band, a shingle gable roof along X.
+	add(p, "FarmhouseBody", { w, h, d }, { hx, h / 2, hz }, RENDER, "Concrete", { solid = true })
+	add(p, "FarmhousePlinth", { w + 0.4, 1.4, d + 0.4 }, { hx, 0.7, hz }, PLINTH, "Concrete")
+	add(p, "FarmhouseTimber", { w + 0.4, 3, d + 0.4 }, { hx, h - 1.4, hz }, TIMBER, "WoodPlanks")
+	local half = d / 2 + 1.2
+	add(p, "RoofFront", { w + 2, 5.2, half }, { hx, h + 2.6, hz + half / 2 }, SHINGLE, "WoodPlanks", { shape = "Wedge", yaw = 180 })
+	add(p, "RoofBack", { w + 2, 5.2, half }, { hx, h + 2.6, hz - half / 2 }, SHINGLE, "WoodPlanks", { shape = "Wedge" })
+	add(p, "Chimney", { 1.8, 4.2, 1.8 }, { hx + 7, h + 4.2, hz - 3 }, PLINTH, "Concrete")
+	-- The front: the green door in its frame, a lamp, a window with shutters and geraniums each side, MOVING DAY.
+	add(p, "DoorFrame", { 4.6, 7.6, 0.15 }, { hx, 3.8, front + 0.1 }, TIMBER, "Wood")
+	add(p, "FrontDoor", { 3.6, 7, 0.25 }, { hx, 3.5, front + 0.2 }, SHUTTER, "Wood")
+	add(p, "DoorLamp", { 0.7, 1, 0.7 }, { hx - 3.1, 7.4, front + 0.5 }, { 200, 190, 160 }, "Glass", { glow = WARM })
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "L" else "R"
+		local x = hx + side * 8
+		add(p, "Window" .. tag, { 3.4, 3.2, 0.15 }, { x, 5, front + 0.1 }, GLASS, "Glass")
+		add(p, "Shutter" .. tag .. "1", { 1.6, 3.4, 0.15 }, { x - 2.55, 5, front + 0.12 }, SHUTTER, "Wood")
+		add(p, "Shutter" .. tag .. "2", { 1.6, 3.4, 0.15 }, { x + 2.55, 5, front + 0.12 }, SHUTTER, "Wood")
+		add(p, "FlowerBox" .. tag, { 3.8, 0.6, 0.7 }, { x, 3.1, front + 0.45 }, WOOD, "Wood")
+		add(p, "Geraniums" .. tag, { 3.4, 0.5, 0.5 }, { x, 3.6, front + 0.45 }, GERANIUM, "Fabric")
+	end
+	add(p, "DayBanner", { 8.4, 1.2, 0.06 }, { hx, h - 1.3, front + 0.35 }, { 250, 246, 236 }, "Fabric", { yaw = 180, words = {
+		{ face = "Front", lines = { line("MOVING DAY!", ORANGE, 0.58, "Black"), line("ZDC MOVING & EVACUATION", CHARCOAL, 0.24, "Bold") } },
+	} })
+	-- The ZDC yard sign left of the house's way out (facing the yard: turned 180°).
+	local sx, sz = hx - 7.5, front + 9
+	add(p, "YardSign", { 4.6, 2.3, 0.15 }, { sx, 3.35, sz }, CHARCOAL, "SmoothPlastic", { yaw = 180, words = {
+		{ face = "Front", lit = true, lines = {
+			line("ZDC MOVING", ORANGE, 0.34, "Black"),
+			line(string.upper(title), INK, 0.28, "Bold"),
+			line("Moving day · We move your life.", GREY, 0.13),
+		} },
+	} })
+	add(p, "YardSignTop", { 4.8, 0.35, 0.22 }, { sx, 4.68, sz }, ORANGE, "SmoothPlastic", { yaw = 180 })
+	add(p, "YardPostL", { 0.22, 4.9, 0.22 }, { sx - 2.1, 2.45, sz - 0.15 }, WOOD, "Wood")
+	add(p, "YardPostR", { 0.22, 4.9, 0.22 }, { sx + 2.1, 2.45, sz - 0.15 }, WOOD, "Wood")
+	-- Packed boxes left of the front door (Walt waits right of it), two by the barn doors with the hay.
+	local boxes: { Box } = {
+		{ name = "BoxA", size = { 1.6, 1.3, 1.4 }, at = { hx - 4.4, 0.65, front + 1.4 }, turn = 4, label = "KITCHEN", ink = CHARCOAL },
+		{ name = "BoxB", size = { 1.4, 1.1, 1.2 }, at = { hx - 4.3, 1.85, front + 1.4 }, turn = -6 },
+		{ name = "BoxC", size = { 1.3, 1.0, 1.2 }, at = { hx - 6.2, 0.5, front + 1.7 }, turn = 10, label = "FRAGILE", ink = RED },
+	}
+	local barn = site.Doors[2]
+	local bx, bz = barn.At[1], barn.At[2]
+	local edge = barn.Width / 2
+	table.insert(boxes, { name = "BarnBoxA", size = { 1.8, 1.4, 1.5 }, at = { bx - edge - 3, 0.7, bz + 2 }, turn = -5, label = "TACK", ink = CHARCOAL })
+	table.insert(boxes, { name = "BarnBoxB", size = { 1.5, 1.2, 1.3 }, at = { bx - edge - 3.2, 2.0, bz + 2 }, turn = 8 })
+	for _, b in boxes do
+		local label = b.label
+		add(p, b.name, b.size, b.at, CARDBOARD, "SmoothPlastic", { yaw = 180 + b.turn, words = if label then {
+			{ face = "Front", lines = { line(label, b.ink or CHARCOAL, 0.26, "Black") } },
+		} else nil })
+		add(p, b.name .. "Tape", { 0.32, 0.04, b.size[3] + 0.02 }, { b.at[1], b.at[2] + b.size[2] / 2 + 0.02, b.at[3] }, TAPE, "SmoothPlastic", { yaw = 180 + b.turn })
+	end
+	add(p, "HayBale1", { 3.2, 3.6, 3.6 }, { bx - edge - 8, 1.8, bz + 3.4 }, HAY, "Grass", { shape = "Cylinder" })
+	add(p, "HayBale2", { 3.2, 3.6, 3.6 }, { bx - edge - 8.4, 1.8, bz + 7.2 }, HAY, "Grass", { shape = "Cylinder", yaw = 12 })
+	-- Walt's horse trailer, parked in the yard east of the barn's way out, its ramp down (Silver Spur on its side).
+	local tx, tz = bx + 30, bz + 9.4
+	add(p, "TrailerBody", { 11, 6, 5.6 }, { tx, 3.6, tz }, TRAILER, "Metal", { words = {
+		{ face = "Back", lines = { line("SILVER SPUR", { 130, 36, 32 }, 0.22, "Black") } },
+	} })
+	add(p, "TrailerRoof", { 11.2, 0.5, 5.8 }, { tx, 6.85, tz }, WHITE, "SmoothPlastic")
+	add(p, "TrailerStripe", { 11.06, 0.6, 5.66 }, { tx, 2.2, tz }, { 130, 36, 32 }, "SmoothPlastic")
+	for _, side in { -1, 1 } do
+		add(p, if side < 0 then "TrailerWheelN" else "TrailerWheelS", { 0.8, 1.8, 1.8 }, { tx - 1, 0.9, tz + side * 2.95 }, BLACK, "Rubber", { shape = "Cylinder", yaw = 90 })
+	end
+	add(p, "TrailerRamp", { 4.2, 0.3, 4.8 }, { tx - 7.5, 0.45, tz }, WOOD, "WoodPlanks", { rotation = { 0, 0, 8 } })
+	add(p, "TrailerHitch", { 3, 0.3, 0.3 }, { tx + 7, 1.2, tz }, DARK, "Metal")
+	return p
+end
+
+-- Map step 2's turn of a place: Map.Relocations[id].turn (degrees clockwise on the map), 0 without one.
+local function turnOf(id: string): number
+	local relocations = (Map :: any).Relocations
+	local r = if type(relocations) == "table" then relocations[id] else nil
+	return if type(r) == "table" and type(r.turn) == "number" then r.turn else 0
+end
+
+function MoveSiteLooks.sitePlace(placeId: string): Place?
+	for _, place in Map.Places do
+		if place.id == placeId then
+			return { x = place.x, y = Map.RoadTop, z = place.z, yaw = -turnOf(placeId) }
+		end
+	end
+	return nil
+end
+
+-- A frame's point (x, z) / direction (dx, dz) in the world (MoveSites.build's: CFrame.Angles(0, yaw, 0)).
+function MoveSiteLooks.dirToWorld(place: Place, dx: number, dz: number): (number, number)
+	local r = math.rad(place.yaw)
+	local c, s = math.cos(r), math.sin(r)
+	local x, z = dx * c + dz * s, -dx * s + dz * c
+	-- (a quarter turn's cos is 6e-17, not 0: whole numbers stay whole)
+	return math.floor(x * 1e9 + 0.5) / 1e9, math.floor(z * 1e9 + 0.5) / 1e9
+end
+
+function MoveSiteLooks.toWorld(place: Place, x: number, z: number): (number, number)
+	local wx, wz = MoveSiteLooks.dirToWorld(place, x, z)
+	return place.x + wx, place.z + wz
+end
+
+export type SiteDoor = {
+	id: string,
+	name: string, -- "front door", "barn doors" (the hints')
+	x: number, -- its foot outside
+	z: number,
+	fx: number, -- out of it
+	fz: number,
+	width: number,
+	out: { x: number, z: number }, -- where you come out (Out studs out)
+	park: { x: number, z: number }, -- the truck's middle (Curb studs out, its back to the door)
+}
+
+-- A site's doors in the world, in the plan's exits' order (nil: no such site or place).
+function MoveSiteLooks.siteDoors(site: string, placeId: string): { SiteDoor }?
+	local cfg = Config.Moving.Sites[site]
+	local place = MoveSiteLooks.sitePlace(placeId)
+	if not cfg or not place then
+		return nil
+	end
+	local list: { SiteDoor } = {}
+	for _, d in cfg.Doors do
+		local ax, az, fx, fz = d.At[1], d.At[2], d.Facing[1], d.Facing[2]
+		local x, z = MoveSiteLooks.toWorld(place, ax, az)
+		local wfx, wfz = MoveSiteLooks.dirToWorld(place, fx, fz)
+		local ox, oz = MoveSiteLooks.toWorld(place, ax + fx * cfg.Out, az + fz * cfg.Out)
+		local px, pz = MoveSiteLooks.toWorld(place, ax + fx * cfg.Curb, az + fz * cfg.Curb)
+		table.insert(list, { id = d.Id, name = d.Name, x = x, z = z, fx = wfx, fz = wfz, width = d.Width, out = { x = ox, z = oz }, park = { x = px, z = pz } })
+	end
+	return list
+end
+
 -- ── Where they stand ────────────────────────────────────────────────────────
 
 function MoveSiteLooks.checkpointPlace(): Place
@@ -538,9 +700,12 @@ function MoveSiteLooks.all(): { Set }
 		{ id = "banner", place = MoveSiteLooks.bannerPlace(), pieces = MoveSiteLooks.banner() },
 	}
 	for _, contract in Config.Moving.Contracts do
-		local home = Map.home(contract.home)
+		local home = if contract.home then Map.home(contract.home) else nil
+		local farm = if contract.kind == "farm" and contract.place then MoveSiteLooks.sitePlace(contract.place) else nil
 		if home then
 			table.insert(sets, { id = "house_" .. contract.id, place = MoveSiteLooks.doorPlace(home), pieces = MoveSiteLooks.house(contract.name, MoveSiteLooks.parkDepth(home)) })
+		elseif farm then -- 7.x farm move
+			table.insert(sets, { id = "farm_" .. contract.id, place = farm, pieces = MoveSiteLooks.farm(contract.name) })
 		end
 	end
 	for _, place in MoveSiteLooks.spotPlaces() do

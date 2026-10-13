@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "7.0"
+Config.Version = "7.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -293,6 +293,7 @@ Config.Tutorial = {
 	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
 	StartDelay = 2, -- seconds after PLAY before her welcome shows (6.7: on its own; the start screen fades out first)
 	RetryAfter = 1.5, -- a first job gone this long without a result (a special job ended, an admin): back to "board"
+	TalkQuiet = 6, -- 7.1 review: s after a Talk with her in which her Moving kiosk line waits (server/MoveGreeters.luau; her bubbles: their own time)
 	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
 	-- 6.7: the arrow tour of the screen (client/TutorialArrow.luau; px at the screen's scale)
 	TourBounce = 10, -- how far the arrow bounces back from its target
@@ -2539,8 +2540,10 @@ Config.Atmosphere = {
 --   Box          the ring of mountains stands round this box (Map.Bounds today: the world's walls); step 2 pulls it in
 --   Gap          studs from the box to the front row's foot (the mountains never reach into the box)
 --   Layer        a mountain is a stack of terrain cylinders this many studs thick (a cone: its radius at height y is
---                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit)
---   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed
+--                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit);
+--                7.1 review: exactly two rows of the terrain's 4-stud voxels (a layer never writes a row of the next)
+--   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed (both on the
+--                4-stud voxel grid, so every layer covers whole voxel rows)
 --   Front / Back the two rows: Height (summits, studs), Spread (the base's radius = the height × this), Profile; the back
 --                row's feet Behind studs behind the front row's, each back peak with up to two lower Shoulders (chance)
 --   Lean         a peak leans one way (a steep face on that side, a long ridge on the other): each layer's middle moves
@@ -2565,15 +2568,20 @@ Config.Atmosphere = {
 --   Colors       the terrain's material colours (Terrain:SetMaterialColor), Valley the open ground's colour and material
 --   Budget       Volume: studs³ the fills may hold at most (overlaps counted twice); Fills: terrain calls; Parts: the
 --                parts of it all (the trees, the flowers, the huts, the silhouettes, the portal, the waterfall)
---   Trees        the forests: at most Max trees of Parts parts (a trunk and three tiers: spruce and fir), on a grid
---                Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the Treeline), Height (studs);
+--   SkipInStudio a dev toggle (default off): in a Studio Play test the terrain's fills are left out (the slowest part of
+--                the build); the silhouettes, the pass and the forests still stand (the slope trees on the flat ground
+--                under where the mountains would be). Never on a live server (RunService:IsStudio())
+--   Trees        the forests: at most Max trees of Parts parts (7.1 review: a trunk and one needle spire; spruce and
+--                fir), on a grid Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the
+--                Treeline), Height (studs);
 --                never within RoadClear of a road's edge (nor its canopy over it), JunctionClear of a road's end or bend
 --                (the drivers' view at the junctions), TownClear of a district's edge roads, YardClear of a yard,
 --                LotClear of a home's lot, PlaceClear of a place, WaterClear of the water, nor in Keep (the ski lift);
 --                thinner near town (TownFade studs; Copses of the valley's trees stand there in small copses), denser
 --                within Edge of the box's edge; Noise: the forests' and the
 --                meadows' patch sizes; ShadowNear: only trees this close to a road throw shadows; Chunk: one Atomic
---                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter tops
+--                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter's
+--                frost on them
 --   Meadows      open meadows with wildflowers: Patches of Flowers small parts, Gap apart, Road studs from a road's edge
 --   Huts         Count wooden hay barns and huts in the meadows, Gap apart, Road studs from a road's edge
 Config.Alpine = {
@@ -2581,8 +2589,8 @@ Config.Alpine = {
 	Gap = 40,
 	Seed = 4711,
 	Layer = 8,
-	Floor = -10,
-	WetFloor = -30,
+	Floor = -12,
+	WetFloor = -32,
 	Front = { Height = { 250, 420 } :: { number }, Spread = { 1.0, 1.25 } :: { number }, Profile = 1.3 },
 	Back = { Height = { 480, 700 } :: { number }, Spread = { 0.85, 1.05 } :: { number }, Profile = 1.5, Behind = 170, Shoulders = 0.6 },
 	Lean = { 0.1, 0.5 } :: { number },
@@ -2611,10 +2619,11 @@ Config.Alpine = {
 		Glacier = { 176, 214, 232 },
 	} :: { [string]: { number } },
 	Valley = { Color = { 96, 138, 60 } :: { number }, Material = "Grass" },
-	Budget = { Volume = 1.2e10, Fills = 9000, Parts = 11500 },
+	Budget = { Volume = 1.0e10, Fills = 7500, Parts = 6500 },
+	SkipInStudio = false,
 	Trees = {
 		Max = 2500,
-		Parts = 4,
+		Parts = 2,
 		Spacing = 25,
 		Jitter = 7,
 		Slope = 0.25,
@@ -2633,7 +2642,7 @@ Config.Alpine = {
 		Keep = { { x0 = -1140, z0 = -2270, x1 = -790, z1 = -2180 } } :: { { x0: number, z0: number, x1: number, z1: number } },
 		Noise = { Big = 420, Small = 140 },
 		ShadowNear = 110,
-		Chunk = 256,
+		Chunk = 128,
 		Colors = { { 34, 58, 40 }, { 44, 72, 46 }, { 58, 86, 50 } } :: { { number } },
 		Trunk = { 86, 62, 44 } :: { number },
 		Snowy = { 236, 240, 244 } :: { number },
@@ -2646,6 +2655,91 @@ Config.Alpine = {
 		Colors = { { 245, 245, 238 }, { 250, 208, 60 }, { 170, 110, 210 }, { 222, 64, 72 }, { 92, 140, 230 } } :: { { number } },
 	},
 	Huts = { Count = 4, Gap = 600, Road = { 34, 110 } :: { number } },
+}
+
+-- 7.2, the Alps on the maps (client/MapView.luau draws the minimap and the big map, shared/MapStyle.luau works out
+-- what from Map and AlpineLayout, tools/phone-ui/mapview.luau checks it): a paper map, the valley green on cream, grey
+-- rock and white snow round it, the roads light with a brown edge, the highways amber.
+--   Margin     studs of the mountain ring drawn round Map.Bounds on both maps (the minimap sees at most about 300
+--              studs from you, and you stay inside the bounds)
+--   Colors     { r, g, b }: Paper (round the valley on the big map), Valley, Meadow (the wildflower meadows), Slope
+--              (the ring's grass on the minimap), Forest and Trees (a forest band and its tree dots; SnowForest and
+--              SnowTrees in the winter), Winter (the snowfield), Rock, Snow, Shadow (the peaks' shadow side), Water,
+--              Shore, Ice, Yard, Blocks (by district style), Special, Park, Square, Footbridge, Road, RoadEdge,
+--              Highway, Bridge, IceRoad, Fog, Ink / InkSoft / Halo (the captions), Closed (the ROAD CLOSED sign), Hut
+--   Peaks      the big map's mountains: a shaded peak with its snow cap for every cone of the ring (the shoulders
+--              only east and west), pulled into the margin. Base: where a peak's foot line stands, a share of Margin
+--              out from the bounds { front row, back row }: north (the peaks rise up the map, away from the valley),
+--              south (up the map, toward it, never into it), side (east and west, at most Side × Margin high, wide
+--              enough to overlap into one range, their inner feet at most Into × Margin over the valley's edge);
+--              Height: the lowest … the tallest cone's peak, a share of Margin; Cap: a snow cap's share of its peak
+--              { least, most } (the winter's peaks: Winter); Shade: the shadow side's transparency; Haze: how far the
+--              back row's rock fades toward the paper
+--   Relief     the minimap's mountains seen from above: a cone's grassy foot, its rock (from its grass line up) and
+--              its snow (from its snow line up) as discs lit from the north-west, each that reaches within Reach
+--              studs of the bounds (the minimap sees about 290 from you at its widest); a snow disc smaller than
+--              MinSnow studs is left out; Light: the far side of a disc is its colour × (1 - 2 × Light)
+--   Forest     the valley's trees (AlpineLayout.forest) binned in Cell × Cell squares; a square with Min trees or
+--              more is forest; a row's run of forest squares is one rounded band Overlap × Cell high (the rows melt
+--              into each other) with PerCell tree dots a square
+--   Meadows    a lighter disc Radius studs round every wildflower patch (AlpineLayout's meadows; Soft its
+--              transparency), a flower's dot Flower studs round in it
+--   Foothills  the soft green edge round the valley on the big map: studs out from the bounds
+--   Altstadt   the old town's label (a placeholder until Map names its villages: Map.Villages) over District's name
+--   Budget     the most GuiObjects a layer may make on one map (tools/phone-ui/mapview.luau holds them): Peaks (big),
+--              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map)
+Config.MapStyle = {
+	Margin = 420,
+	Colors = {
+		Paper = { 236, 228, 208 },
+		Valley = { 186, 206, 150 },
+		Meadow = { 208, 224, 166 },
+		Slope = { 146, 164, 114 },
+		Forest = { 118, 152, 98 },
+		Trees = { 70, 108, 64 },
+		SnowForest = { 164, 182, 172 },
+		SnowTrees = { 92, 118, 104 },
+		Winter = { 236, 241, 243 },
+		Rock = { 164, 158, 148 },
+		Snow = { 252, 252, 250 },
+		Shadow = { 52, 56, 66 },
+		Water = { 146, 194, 222 },
+		Shore = { 98, 150, 188 },
+		Ice = { 208, 228, 238 },
+		Yard = { 216, 206, 182 },
+		Blocks = { downtown = { 216, 200, 180 }, harbor = { 204, 198, 188 }, suburbs = { 224, 210, 186 } } :: { [string]: { number } },
+		Special = { 202, 180, 152 },
+		Park = { 150, 192, 118 },
+		Square = { 210, 190, 154 },
+		Footbridge = { 150, 108, 72 },
+		Road = { 252, 250, 244 },
+		RoadEdge = { 136, 122, 104 },
+		Highway = { 244, 198, 96 },
+		Bridge = { 214, 210, 200 },
+		IceRoad = { 226, 238, 244 },
+		Fog = { 92, 100, 112 },
+		Ink = { 62, 54, 44 },
+		InkSoft = { 106, 96, 82 },
+		Halo = { 246, 240, 224 },
+		Closed = { 196, 58, 46 },
+		Hut = { 128, 86, 54 },
+	} :: { [string]: any },
+	Peaks = {
+		Base = { north = { 0.12, 0.4 } :: { number }, south = { 0.62, 0.98 } :: { number }, side = { 0.42, 0.62 } :: { number } },
+		Height = { 0.48, 0.84 } :: { number },
+		Side = 0.6,
+		Into = 0.12,
+		Cap = { 0.2, 0.42 } :: { number },
+		Winter = 0.6,
+		Shade = 0.72,
+		Haze = 0.4,
+	},
+	Relief = { Reach = 300, MinSnow = 10, Light = 0.12 },
+	Forest = { Cell = 48, Min = 2, Overlap = 1.3, PerCell = 2 },
+	Meadows = { Radius = 80, Flower = 10, Soft = 0.3 },
+	Foothills = 120,
+	Altstadt = { Name = "Altstadt", District = "downtown" },
+	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 90, Alpine = 640 },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
@@ -3484,7 +3578,7 @@ Config.Soundscape = {
 		-- the put-down), at most this many seconds later (the server sends it 0.25 – 0.45 s after a change)
 		Gate = 0.7, -- the Wall's gate opening as the move is delivered (the result card plays its jingle)
 		Slip = 0.8, -- a heavy piece slipping from your hands (MoveSounds.slipped, for the grip's UI) …
-		SlipQuiet = 1.5, -- … and no put-down for this many seconds after (grip_slip has its thud)
+		SlipQuiet = 1.5, -- … and no put-down and no heavy_drop (the slip's damage) for this many seconds after (grip_slip has its thud)
 		Scrape = 0.5, -- a two-person piece dragged alone (wood_scrape_loop), while you move faster than …
 		ScrapeFrom = 1.2, -- … studs a second
 		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick
@@ -5969,10 +6063,19 @@ Config.CarryGrip = {
 --   Time / HordeAt    the move's clock (s) and when the horde comes (s left); Fade: the fade at a door (s)
 --   Contracts         the moves on the depot's board (home: a Map.Homes id, the house whose front door leads inside;
 --                     seed: shared/HouseLayout.luau plan's)
---   Truck             the company vehicle lent for a move (Config.Cars); Bed: its box inside (studs from the chassis'
---                     top middle: Center x / z, the floor at the chassis' top), the packing grid's Cell
+--   Van / Beds        7.x van moves (the owner: "the move should be driven with MY van"): no truck is lent any more, a
+--                     move uses its owner's own car (the ZDC Van, Van); Beds: the packing bed of a car by its id (its
+--                     cargo bay: studs from the chassis' middle, Center x / z its middle, the floor at the chassis' top,
+--                     the grid's Cell), a car without one the Van's. The ZDC Van's bay (server/Vehicles.luau
+--                     STYLES.zdcvan: the cargo box 6.6 wide, 4.5 tall, from the bulkhead at z -0.35 to the back doors at
+--                     z 6.3) less its walls: 6.2 × 6.4 × 4.3 round z 2.98; the old Moving Truck's box stays for a player
+--                     who still drives one. Hitch: a piece too big for any bed that may be towed (FurnitureLooks bigDoor:
+--                     the hay wagon) rides hitched behind the car, Gap studs behind its back (Back: the back's z), its
+--                     wheels on the ground (Drop: the chassis' middle over the ground). VanAgain: s after the van was
+--                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
---                     drop-off ("the Wall"); a truck within DropRadius of it with a load ends the move
+--                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
+--                     trip; the move goes on until the owner's FINISH or the clock)
 --   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair, drag
 --   Damage            shares of a thing's condition: a fall over SafeDrop studs (over a jump's top, about 7) PerStud a
 --                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
@@ -5986,6 +6089,17 @@ Config.CarryGrip = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   7.x farm move (chapter 1, Walt's Farm): a contract may have its own clock (time, hordeAt: s, over Time / HordeAt)
+--                     and pay (pay: × the move's pay); a contract of kind "farm" stands at a Map.Places place (place,
+--                     its site in Sites) instead of a Map.Homes house (home). It opens once its chapter's (shared/
+--                     MoveStory.luau) chapters before it are done (the save's story flags "done:<chapter>")
+--   Sites             a place's site (studs in the place's own frame from its Map.Places point: +X east, +Z south as
+--                     the place stood before map step 2, Map.Relocations' turn turns them with it): Doors, in the plan's
+--                     exits' order (exits[1] the farmhouse's front door, exits[2] the barn doors): At the door's foot
+--                     outside, Facing out of it, Width, Name (the hints'); Curb: studs out of a door to the truck's
+--                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
+--                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
+--                     depth; its front door is Doors[1])
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6002,9 +6116,40 @@ Config.Moving = {
 			kind = "house",
 			blurb = "Prologue: Marge's family house on Willow Lane. Get her things out before the Wall closes.",
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string, seed: number, kind: string, blurb: string } },
-	Truck = "movingtruck",
-	Bed = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+		-- 7.x farm move: chapter 1 "Hold Your Horses" (seed 1921: the Silver Spur's mark; its ★ pieces are Thunder's
+		-- saddle, the branding iron and Grandma's milk churn, as shared/MoveStory.luau's keepsakes say)
+		{
+			id = "walt",
+			name = "Walt's Farm",
+			client = "Walt",
+			icon = "🐴",
+			place = "farm", -- Map.Places: the Old Farm (its site: Sites.farm)
+			seed = 1921,
+			kind = "farm",
+			blurb = "Chapter 1: Walt's farm, the house and the barn. The hay wagon only fits through the barn doors.",
+			time = 14 * 60,
+			hordeAt = 3.5 * 60,
+			pay = 1.25,
+		},
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? } },
+	Sites = {
+		farm = {
+			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
+			Doors = {
+				{ Id = "house", Name = "front door", At = { 45, -76 } :: { number }, Facing = { 0, 1 } :: { number }, Width = 4 },
+				{ Id = "barn", Name = "barn doors", At = { -60, -64.4 } :: { number }, Facing = { 0, 1 } :: { number }, Width = 12 }, -- (World's barn: its doors' face)
+			},
+			Curb = 16,
+			Out = 4,
+		},
+	} :: { [string]: { House: { At: { number }, Size: { number } }, Doors: { { Id: string, Name: string, At: { number }, Facing: { number }, Width: number } }, Curb: number, Out: number } },
+	Van = "zdcvan",
+	Beds = {
+		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.5, Center = { 0, 2.98 } :: { number } },
+		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number } } },
+	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
+	VanAgain = 20,
 	Board = { 44, 12 } :: { number },
 	DropOff = { 34, 46 } :: { number },
 	DropRadius = 20,

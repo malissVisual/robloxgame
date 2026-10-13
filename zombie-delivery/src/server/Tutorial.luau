@@ -37,6 +37,10 @@
 -- (server/Analytics.luau).
 -- 6.0, Lead & Co.: no free gun; Marge texted a player with the pistol's price and no gun. 6.7: gone: every profile has
 -- the pistol since 6.0.2 (server/PlayerData.luau newProfile, the starterKit flag), so that text could never come.
+-- 7.1 review, for her Moving kiosk line (server/MoveGreeters.luau: it never cuts into her first day): the player
+-- attribute TutorialPhase is the phase while a player's first day is ahead (nil when there is none, it ended or it was
+-- skipped), and her model's attribute TutorialTalk the os.clock her tutorial talk lasts until (a bubble of hers for its
+-- time, a Talk for Config.Tutorial.TalkQuiet s at least).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -90,10 +94,29 @@ local function send(player: Player, phase: string?, data: { [string]: any }?)
 	remote:FireClient(player, phase, if phase then out else nil)
 end
 
+-- 7.1 review: her tutorial talk goes on for `seconds` more (TutorialTalk: her kiosk line waits).
+local function quiet(seconds: number)
+	local npc = marge
+	if npc and npc.Parent then
+		local endsAt = os.clock() + seconds
+		if (tonumber(npc:GetAttribute("TutorialTalk")) or 0) < endsAt then
+			npc:SetAttribute("TutorialTalk", endsAt)
+		end
+	end
+end
+
 local function bubble(text: string)
 	local npc = marge
 	if npc and npc.Parent then
 		Npcs.say(npc, text)
+		quiet(math.clamp(2.5 + #text / 18, 3, 9)) -- (the bubble's own time: server/Npcs.luau say's)
+	end
+end
+
+-- 7.1 review: the player attribute TutorialPhase (their first day's phase; nil: none ahead).
+local function markPhase(player: Player, phase: string?)
+	if player:GetAttribute("TutorialPhase") ~= phase then
+		player:SetAttribute("TutorialPhase", phase)
 	end
 end
 
@@ -112,6 +135,7 @@ end
 local function finish(player: Player, delivered: boolean)
 	local profile = PlayerData.get(player)
 	sessions[player] = nil
+	markPhase(player, nil)
 	if not profile or profile.tutorial then
 		return
 	end
@@ -155,6 +179,7 @@ local function onTalk(player: Player)
 		return
 	end
 	talked[player] = now
+	quiet(Tuning.TalkQuiet) -- 7.1 review: a talk with her (her kiosk line waits)
 	local npc = marge
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -315,8 +340,10 @@ local function update()
 		elseif PlayerData.get(player) then
 			if pending(player) then
 				check(player, session, now)
+				markPhase(player, if sessions[player] then session.phase else nil)
 			else
 				sessions[player] = nil -- done (an older save, an admin, skipped): never shown
+				markPhase(player, nil)
 				givePhone(player) -- 5.0: no tutorial ahead (a Studio test without it, a save not read): the phone at once
 			end
 		end

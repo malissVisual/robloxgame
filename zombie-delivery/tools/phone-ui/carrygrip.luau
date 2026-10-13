@@ -10,7 +10,18 @@
 -- box, letting go drops it; the load is the thing's icon; the report about once a second; SLIPPING! before the slip,
 -- the "slip" sent once; the tutorial's tip; a door's fade pauses it; a computer has no HOLD button and the left mouse
 -- button or F holds; no warnings.
+-- 7.1 review: the slipped bar stays (DROPPED!) till the server drops it, "slip" asked again a second later; dropped and
+-- the same piece picked up again inside DROPPED!'s moment: a new bar, no second "slip" (the old bar's would hurt it
+-- twice); the real client/MoveSounds.luau: grip_slip at the slip and no heavy_drop for the slip's damage in the state
+-- that follows (one thud), a jolt otherwise thuds; the bar and HOLD clear of everything on three touch screens (a phone
+-- sideways 844 × 390, a small one 740 × 360, a 1024 × 768 tablet; each under Roblox's top bar). CarryGripUi's and
+-- MoveSounds' os.clock is this check's M.clock (check.py gives them mock.os): a frame moves it on by its dt, a wait is
+-- M.clock += s, so the bar's seed and every timing are the same each run.
 local M = require("./missions_mock")
+M.clock = 500
+M.os = setmetatable({ clock = function()
+	return M.clock
+end }, { __index = os })
 
 -- ── The stand-ins (as movehud.luau's) ───────────────────────────────────────
 local v2 = {}
@@ -172,6 +183,7 @@ local MovingHud = require("./MovingHud")
 local MoveHelperHud = require("./MoveHelperHud")
 local QuickChat = require("./QuickChat")
 local CarryGripUi = require("./CarryGripUi")
+local MoveSounds = require("./MoveSounds")
 
 local function check(name, condition, detail)
 	if not condition then
@@ -219,58 +231,109 @@ end
 local function frames(count, dt)
 	for _ = 1, count do
 		M.frame += 1
+		M.clock += dt or 1 / 60
 		M.services.RunService.RenderStepped:Fire(dt or 1 / 60)
 	end
 end
+local function slipsSent()
+	local count = 0
+	for _, args in sentOn("Moving") do
+		if args[1] == "slip" then
+			count += 1
+		end
+	end
+	return count
+end
+-- 7.1: the move's sounds as client/MoveSounds.luau asks client/Sounds.luau to play them (its api, recorded)
+M.cues = {}
+local function cues(name)
+	local count = 0
+	for _, cue in M.cues do
+		if cue == name then
+			count += 1
+		end
+	end
+	return count
+end
 
 -- ── A phone sideways, with the HUD's groups where client/Hud.luau puts them ──
+local hud = named(M.gui, "ZombieDeliveryHud")
+local HUD_NAMES = { "HudButtons", "Fire", "RightStack", "BottomBar", "Hint" }
+-- The HUD's groups on a touch screen of M.width × M.height at M.scale (the old ones go): (the touch cluster, the touch
+-- buttons with the thumbstick's corner and the jump button, the groups' boxes, their names)
+local function layoutHud()
+	for _, name in HUD_NAMES do
+		local old = named(hud, name)
+		if old then
+			old:Destroy()
+		end
+	end
+	local W, H, scale = M.width, M.height, M.scale
+	local c = TouchLayout.cluster(W, H, scale)
+	local blocks = table.clone(TouchLayout.buttons(c))
+	table.insert(blocks, c.thumb)
+	table.insert(blocks, c.jump)
+	local names, boxes = {}, {}
+	local function hudGroup(name, b)
+		M.make("Frame", { Name = name, Position = M.UDim2.fromOffset(b.x0, b.y0), Size = M.UDim2.fromOffset(b.x1 - b.x0, b.y1 - b.y0) }, hud)
+		table.insert(names, name)
+		table.insert(boxes, b)
+	end
+	-- (client/Hud.luau's touch layout: the actions' row 170 × 44 at 0.8 top right, FIRE, the right column 300 × 130,
+	-- the bottom bar (client/Hotbar.luau: the hands and two slots), the contextual action over it)
+	local rowW, rowH = 170 * 0.8, 44 * 0.8
+	hudGroup("HudButtons", TouchLayout.box(W - 16 - rowW, 16, W - 16, 16 + rowH))
+	hudGroup("Fire", c.fire)
+	local barW, barH = Inventory.size(#Holding.Order + 2, true)
+	local barScale = math.max(scale, Inventory.minScale(true))
+	local column, _, bar = TouchLayout.dock(c, W, H, 300 * scale, 130 * scale, 16 + rowH, W - 16 - rowW, barW * barScale, barH * barScale)
+	hudGroup("RightStack", column)
+	hudGroup("BottomBar", bar)
+	local buttons = table.clone(TouchLayout.buttons(c))
+	table.insert(buttons, column)
+	local hintX, hintBottom, hintW = TouchLayout.hint(c, buttons, W, H, scale, bar.y0)
+	hudGroup("Hint", TouchLayout.box(hintX - hintW / 2, hintBottom - 96 * scale, hintX + hintW / 2, hintBottom))
+	return c, blocks, boxes, names
+end
 M.touch, M.width, M.height = true, 844, 354
 M.scale = math.clamp(math.min(M.width / 1150, M.height / 680), 0.55, 1.1)
-local S = M.scale
-local cluster = TouchLayout.cluster(M.width, M.height, S)
-local touchBlocks = TouchLayout.buttons(cluster)
-table.insert(touchBlocks, cluster.thumb)
-table.insert(touchBlocks, cluster.jump)
-local hud = named(M.gui, "ZombieDeliveryHud")
-local hudNames = {}
-local function hudGroup(name, b)
-	M.make("Frame", { Name = name, Position = M.UDim2.fromOffset(b.x0, b.y0), Size = M.UDim2.fromOffset(b.x1 - b.x0, b.y1 - b.y0) }, hud)
-	table.insert(hudNames, name)
-	return b
-end
--- (client/Hud.luau's touch layout: the actions' row 170 × 44 at 0.8 top right, FIRE, the right column 300 × 130,
--- the bottom bar (client/Hotbar.luau: the hands and two slots), the contextual action over it)
-local rowW, rowH = 170 * 0.8, 44 * 0.8
-local hudBoxes = {}
-table.insert(hudBoxes, hudGroup("HudButtons", TouchLayout.box(M.width - 16 - rowW, 16, M.width - 16, 16 + rowH)))
-table.insert(hudBoxes, hudGroup("Fire", cluster.fire))
-local barW, barH = Inventory.size(#Holding.Order + 2, true)
-local barScale = math.max(S, Inventory.minScale(true))
-local column, _, bar = TouchLayout.dock(cluster, M.width, M.height, 300 * S, 130 * S, 16 + rowH, M.width - 16 - rowW, barW * barScale, barH * barScale)
-table.insert(hudBoxes, hudGroup("RightStack", column))
-table.insert(hudBoxes, hudGroup("BottomBar", bar))
-local buttons = table.clone(TouchLayout.buttons(cluster))
-table.insert(buttons, column)
-local hintX, hintBottom, hintW = TouchLayout.hint(cluster, buttons, M.width, M.height, S, bar.y0)
-table.insert(hudBoxes, hudGroup("Hint", TouchLayout.box(hintX - hintW / 2, hintBottom - 96 * S, hintX + hintW / 2, hintBottom)))
+local cluster, touchBlocks, hudBoxes, hudNames = layoutHud()
 
 MovingHud.start()
 MoveHelperHud.start()
 QuickChat.start()
 CarryGripUi.start()
+MoveSounds.start({
+	play = function(name)
+		table.insert(M.cues, name)
+		if name == "grip_slip" then
+			M.slipped = (M.slipped or 0) + 1
+		end
+	end,
+	make = function()
+		return nil
+	end,
+	on = function()
+		return true
+	end,
+})
 
 local moving = M.remotes.Moving or M.Net.get("Moving")
-moving.OnClientEvent:Fire("state", {
-	id = 1, contract = "marge", name = "Marge's House", icon = "🏠", client = "Marge", owner = "Courier", mine = true,
-	endsAt = M.now + 600, hordeAt = M.now + 420, seconds = Config.Moving.Time, horde = false,
-	items = {
-		{ spot = 2, name = "Old TV", icon = "📺", star = false, class = "both", weight = 4, fragile = true, value = 300, room = "living", state = "carried", condition = 1, broken = false, mine = true, by = "Courier" },
-		{ spot = 7, name = "Sofa", icon = "🛋️", star = false, class = "pair", weight = 8, fragile = false, value = 350, room = "living", state = "home", condition = 1, broken = false, mine = false },
-	},
-	counts = { total = 2, out = 0, stars = 0, starsOut = 0, broken = 0, carried = 1, home = 1 }, fill = 0,
-	truck = true, backOpen = false, house = { x = 263, z = 839 }, door = { x = 263, z = 857 }, dropOff = { x = 178, z = -98 }, inside = true,
-	team = { role = "driver", called = false, barricades = 0, free = {}, switchAt = 0 },
-})
+-- The move's state (a new table each time: the sounds compare it with the last), the TV (spot 2) as given.
+local function moveState(tvState, tvCondition)
+	return {
+		id = 1, contract = "marge", name = "Marge's House", icon = "🏠", client = "Marge", owner = "Courier", mine = true,
+		endsAt = M.now + 600, hordeAt = M.now + 420, seconds = Config.Moving.Time, horde = false,
+		items = {
+			{ spot = 2, name = "Old TV", icon = "📺", star = false, class = "both", weight = 4, fragile = true, value = 300, room = "living", state = tvState, condition = tvCondition, broken = false, mine = true, by = "Courier" },
+			{ spot = 7, name = "Sofa", icon = "🛋️", star = false, class = "pair", weight = 8, fragile = false, value = 350, room = "living", state = "home", condition = 1, broken = false, mine = false },
+		},
+		counts = { total = 2, out = 0, stars = 0, starsOut = 0, broken = 0, carried = if tvState == "carried" then 1 else 0, home = 1 }, fill = 0,
+		truck = true, backOpen = false, house = { x = 263, z = 839 }, door = { x = 263, z = 857 }, dropOff = { x = 178, z = -98 }, inside = true,
+		team = { role = "driver", called = false, barricades = 0, free = {}, switchAt = 0 },
+	}
+end
+moving.OnClientEvent:Fire("state", moveState("carried", 1))
 setAttr(M.player, "MoveHelper", "carry") -- (Danny's strip)
 setAttr(M.player, "MoveWith", 14) -- (the 💬 button)
 local panel = named(M.gui, "MovePanel")
@@ -281,6 +344,8 @@ check("the move's pieces show: the panel, Danny's strip, the 💬 button", panel
 -- ── No bar without a carry that has one ─────────────────────────────────────
 local grip = CarryGripUi.panel()
 check("no carry: no bar", not CarryGripUi.active() and (grip == nil or not grip.Visible))
+moving.OnClientEvent:Fire("state", moveState("carried", 0.8))
+check("7.1: a jolt in your hands (its condition down 0.2, no slip): heavy_drop", cues("heavy_drop") == 1, cues("heavy_drop"))
 setAttr(character, "MoveCarry", 5)
 check("a carry without CarryGrip (a plain one-hand thing): no bar", not CarryGripUi.active())
 
@@ -380,23 +445,29 @@ for i = 2, #M.playedAt do
 	closest = math.min(closest, M.playedAt[i] - M.playedAt[i - 1])
 end
 check("grip_tick as the meter moves, at volume 0.5, never closer than 0.08 s (5 frames at 60 fps)", #M.playedAt > 5 and M.tickVolume == 0.5 and closest >= 5, `{#M.playedAt} {closest}`)
-local slips = 0
 frames(30)
-for _, args in sentOn("Moving") do
-	if args[1] == "slip" then
-		slips += 1
-	end
-end
-check("…once (not every frame)", slips == 1 and title.Text == "DROPPED!" and M.slipped == 1)
--- the server drops it: the attributes go, the bar with them (after DROPPED! a moment)
+check("…once (not every frame)", slipsSent() == 1 and title.Text == "DROPPED!" and M.slipped == 1)
+-- 7.1 review: the slip's damage in the move's next state (fragile: 0.15, over the jolt's 0.12): one thud, grip_slip's
+local drops = cues("heavy_drop")
+moving.OnClientEvent:Fire("state", moveState("carried", 0.65))
+check("7.1 review: the state with the slip's damage: no heavy_drop (grip_slip had its thud)", cues("heavy_drop") == drops and cues("grip_slip") == 1,
+	`{cues("heavy_drop")} {cues("grip_slip")}`)
+-- 7.1 review: the server has not dropped it yet (the carry's attributes still on): the same slipped bar
+M.resume() -- (the bar's look at the attributes four times a second)
+check("7.1 review: not dropped yet (the attributes still on): the same bar, DROPPED!, no new one", CarryGripUi.active() and title.Text == "DROPPED!" and slipsSent() == 1)
+M.clock += 1.05
+frames(2)
+check("…still in your hands a second later: \"slip\" asked again, once", slipsSent() == 2 and title.Text == "DROPPED!", slipsSent())
+-- the server drops it: the attributes go, the bar with them (DROPPED!'s moment, 0.8 s from the slip, is over by now;
+-- a drop inside it: below)
 setAttr(character, "MoveCarry", nil)
 setAttr(character, "CarryGrip", nil)
 M.now += 1
-local t0 = os.clock()
-while os.clock() - t0 < 0.85 do
-end
 M.resume()
 check("the carry ends: the bar and the HOLD button go", not CarryGripUi.active() and not grip.Visible and not hold.Visible)
+M.clock += Config.Soundscape.Move.SlipQuiet
+moving.OnClientEvent:Fire("state", moveState("ground", 0.5))
+check("7.1 review: SlipQuiet s later a jolt thuds again", cues("heavy_drop") == drops + 1, cues("heavy_drop"))
 
 -- ── The second carry: the tip again; the third: none ────────────────────────
 walk(0)
@@ -408,9 +479,117 @@ M.resume()
 setAttr(character, "MoveCarry", 2)
 setAttr(character, "CarryGrip", "both 4 fragile")
 check("the third: no tip", CarryGripUi.active() and not tip.Visible)
+
+-- ── 7.1 review: dropped and picked up again inside DROPPED!'s moment ────────
+walk(10.5)
+local sentBefore = slipsSent()
+for _ = 1, 60 * 30 do
+	frames(1)
+	if slipsSent() > sentBefore then
+		break
+	end
+end
+check("the TV slips again (walking, never holding)", slipsSent() == sentBefore + 1 and title.Text == "DROPPED!", slipsSent())
+setAttr(character, "MoveCarry", nil) -- (the server drops it …)
+setAttr(character, "CarryGrip", nil)
+frames(5)
+check("…dropped at once: DROPPED! stays a moment", CarryGripUi.active() and grip.Visible and title.Text == "DROPPED!")
+setAttr(character, "MoveCarry", 2) -- (… and the TV is picked up again a moment later, inside DROPPED!'s moment)
+setAttr(character, "CarryGrip", "both 4 fragile")
+check("7.1 review: the same piece picked up again inside DROPPED!'s moment: a new bar (GRIP, not DROPPED!)", CarryGripUi.active() and grip.Visible and title.Text == "GRIP",
+	title.Text)
+M.clock += 1.1
+frames(3)
+M.resume()
+check("…and no \"slip\" asked again for the old bar (the server would hurt the new carry with it)", slipsSent() == sentBefore + 1 and title.Text ~= "DROPPED!",
+	`{slipsSent()} {title.Text}`)
+-- ── 7.1 review: STEADY +10% only when the server gives it ────────────────────
+-- an attentive hold (HOLD while the load is over the box's middle, a quarter second ahead) fills the meter; the title
+-- says STEADY +10% only after a report steady as the server takes it (at most Server.SteadyOutside of it outside)
+walk(0)
+local thumb = { UserInputType = M.Enum.UserInputType.Touch }
+local pressed, lastZone = false, zoneTop()
+local reportSteady, seen = false, #sentOn("Moving")
+local shownSteady, shownWrong, steadyReports, badReports = 0, 0, 0, 0
+for _ = 1, 60 * 20 do
+	local top = zoneTop()
+	local ahead = top + zone.Size.Y.Offset / 2 + (top - lastZone) * 15
+	lastZone = top
+	local want = marker.Position.Y.Offset < ahead
+	if want ~= pressed then
+		pressed = want
+		if want then
+			hold.InputBegan:Fire(thumb)
+		else
+			M.services.UserInputService.InputEnded:Fire(thumb)
+		end
+	end
+	frames(1)
+	local sent = sentOn("Moving")
+	for index = seen + 1, #sent do
+		local args = sent[index]
+		if args[1] == "grip" then
+			reportSteady = args[4] == true
+			if reportSteady then
+				steadyReports += 1
+				badReports += if args[3] > Config.CarryGrip.Server.SteadyOutside then 1 else 0
+			end
+		end
+	end
+	seen = #sent
+	if title.Text == "STEADY +10%" then
+		shownSteady += 1
+		shownWrong += if reportSteady then 0 else 1
+	end
+end
+M.services.UserInputService.InputEnded:Fire(thumb)
+check("7.1 review: held attentively, the bar gets steady: STEADY +10% (its reports steady as the server takes them)", shownSteady > 0 and steadyReports > 0 and badReports == 0,
+	`{shownSteady} frames, {steadyReports} steady reports, {badReports} over SteadyOutside`)
+check("…STEADY +10% never shown before a report the server takes as steady (no +10% then)", shownWrong == 0, shownWrong)
 setAttr(character, "MoveCarry", nil)
 setAttr(character, "CarryGrip", nil)
-M.resume()
+check("a bar that did not slip goes at once with the carry", not CarryGripUi.active() and not grip.Visible)
+
+-- ── 7.1 review: three touch screens: the bar and HOLD clear of everything ─
+-- (a small phone has no clear place for the bar at its smallest, Config.CarryGrip.Ui.Min: client/MoveLayout.luau grip
+-- takes the one that covers the least, never a touch control, a sliver of the HUD's right column)
+local function area(a, b)
+	return math.max(0, math.min(a.x1, b.x1) - math.max(a.x0, b.x0)) * math.max(0, math.min(a.y1, b.y1) - math.max(a.y0, b.y0))
+end
+for _, screen in { { 844, 390, "a phone sideways", true }, { 740, 360, "a small phone sideways", false }, { 1024, 768, "a tablet", true } } do
+	M.touch, M.width, M.height = true, screen[1], screen[2] - 36 -- (under Roblox's top bar)
+	M.scale = math.clamp(math.min(M.width / 1150, M.height / 680), 0.55, 1.1)
+	local _, blocks, groups, names = layoutHud()
+	camera:GetPropertyChangedSignal("ViewportSize"):Fire()
+	setAttr(character, "MoveCarry", 2)
+	setAttr(character, "CarryGrip", "both 4 fragile")
+	local g, h = box(grip), box(hold)
+	local pieces = { ["the move's panel"] = box(panel), ["Danny's strip"] = box(strip), ["the 💬 button"] = box(chatButton) }
+	for index, b in blocks do
+		pieces[touchNames[index]] = b
+	end
+	local hit = {}
+	for what, b in pieces do
+		if overlap(g, b) or overlap(h, b) then
+			table.insert(hit, what)
+		end
+	end
+	local covered = 0 -- (the share of the bar on the HUD's groups)
+	for index, b in groups do
+		if overlap(h, b) then
+			table.insert(hit, `the HUD's {names[index]}`)
+		end
+		covered += area(g, b) / ((g.x1 - g.x0) * (g.y1 - g.y0))
+	end
+	local label = `{screen[1]} × {screen[2]} ({screen[3]}): the bar and a HOLD of 72 px and more on the screen, clear of the touch controls, the move's pieces and each other; HOLD of the HUD's groups`
+	check(label .. (if screen[4] then ", the bar too" else ", the bar at most a sliver of them (no place is clear: the one that covers the least)"),
+		grip.Visible and hold.Visible and #hit == 0 and inside(g) and inside(h) and not overlap(g, h) and h.x1 - h.x0 >= 72
+			and (if screen[4] then covered == 0 else covered < 0.12),
+		`{show(g)} {show(h)} on {table.concat(hit, ", ")}, {math.floor(covered * 100 + 0.5)}% of the bar on the HUD's groups`)
+	print(`      ({M.width} × {M.height}: the bar {show(g)} at {uiScale(grip)}, HOLD {show(h)}, {math.floor(covered * 100 + 0.5)}% of the bar on the HUD's groups)`)
+	setAttr(character, "MoveCarry", nil)
+	setAttr(character, "CarryGrip", nil)
+end
 check("gone again", not CarryGripUi.active() and not grip.Visible)
 
 -- ── A computer: no HOLD button; the left mouse button or F holds ───────────

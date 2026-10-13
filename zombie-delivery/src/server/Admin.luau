@@ -51,8 +51,9 @@
 --   regulars [T] count        6.14: every business at that many deliveries (0 clears them; server/Regulars.luau adminSet)
 --   move       arg            7.0: your house move (server/Moving.luau admin): "card" the contract card, "start" Marge's
 --                             House now, "house" to its door (your car with you when you drive it), "horde" the horde
---                             now, "time" one minute left, "deliver" ends it delivered with the truck's load, "end" calls
---                             it off
+--                             now, "time" one minute left, "deliver" ends it delivered with the van's load, "end" calls
+--                             it off; 7.x: "farmcard" / "farm" / "farmgo" the same for Walt's Farm, "trip" the van's
+--                             load delivered now (a trip, the move goes on)
 --   liveEvent  id             6.15: "bloodmoon" | "rush" | "supply" | "horde" starts that live event now for the whole
 --                             server (the running one ends first; the Blood Moon turns the clock to the night, rush
 --                             hour to the morning), "end" ends it (server/LiveEvents.luau adminStart checks the id)
