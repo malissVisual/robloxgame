@@ -341,71 +341,17 @@ local function invisible(name: string, size: Vector3, frame: CFrame, parent: Ins
 	return part
 end
 
-local function solid(name: string, size: Vector3, frame: CFrame, color: Color3, material: Enum.Material, parent: Instance): Part
-	local part = Instance.new("Part")
-	part.Name = name
-	part.Size = size
-	part.CFrame = frame
-	part.Anchored = true
-	part.Color = color
-	part.Material = material
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	part.Parent = parent
-	return part
-end
-
--- Words on a part's front face (-Z).
-local function words(part: BasePart, lines: { { text: string, color: Color3, size: number } })
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 40
-	gui.LightInfluence = 0
-	gui.Parent = part
-	local list = Instance.new("UIListLayout")
-	list.FillDirection = Enum.FillDirection.Vertical
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	list.Padding = UDim.new(0, 6)
-	list.Parent = gui
-	for index, line in lines do
-		local label = Instance.new("TextLabel")
-		label.LayoutOrder = index
-		label.Size = UDim2.new(1, -20, 0, line.size + 8)
-		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.GothamBold
-		label.TextScaled = true
-		label.Text = line.text
-		label.TextColor3 = line.color
-		label.Parent = gui
-	end
-end
-
 -- ── The places: the board, the drop-off, the houses' doors ─────────────────
-
-local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (the Moving Truck's)
-local INK = Color3.fromRGB(242, 242, 240)
+-- (their art: server/MoveSites.luau, shared/MoveSiteLooks.luau; the prompts and the rules stay here)
 
 local function dropOffAt(): Vector3
 	return Vector3.new(Map.Depot.x + T.DropOff[1], Map.WalkTop, Map.Depot.z + T.DropOff[2])
 end
 
 local function buildBoard(parent: Instance)
-	local model = Instance.new("Model")
-	model.Name = "MovingBoard"
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- (by the spawn, like the depot's own counters)
-	local base = Vector3.new(Map.Depot.x + T.Board[1], Map.WalkTop, Map.Depot.z + T.Board[2])
-	local frame = CFrame.lookAt(base, base + Vector3.new(-1, 0, 0)) -- facing the yard (-X)
-	for _, side in { -1, 1 } do
-		solid("Post", Vector3.new(0.4, 7, 0.4), frame * CFrame.new(side * 3.2, 3.5, 0.3), Color3.fromRGB(60, 62, 66), Enum.Material.Metal, model)
-	end
-	local board = solid("Board", Vector3.new(7, 4, 0.3), frame * CFrame.new(0, 5, 0), Color3.fromRGB(28, 30, 34), Enum.Material.SmoothPlastic, model)
-	words(board, {
-		{ text = "ZDC MOVING & EVACUATION", color = ORANGE, size = 40 },
-		{ text = "MOVING CONTRACTS", color = INK, size = 56 },
-		{ text = "We move your life. The rest they eat.", color = Color3.fromRGB(196, 199, 203), size = 26 },
-	})
+	-- the "MovingBoard" kiosk (server/MoveSites.luau, Persistent, facing the yard: the corkboard with the houses' photos
+	-- and the notices, its lamp, the ZDC logo); the prompt hangs on its corkboard
+	local _, board = require(script.Parent.MoveSites).board(parent)
 	local prompt = newPrompt(board, "Moving contracts", "ZDC Moving", Enum.KeyCode.E, 0, T.Reach.Board)
 	prompt.Triggered:Connect(function(player: Player)
 		local _, _, root = bodyOf(player)
@@ -413,44 +359,23 @@ local function buildBoard(parent: Instance)
 			Moving.openCard(player, nil, false)
 		end
 	end)
-	model.PrimaryPart = board
-	model.Parent = parent
 	boardPart = board
 end
 
--- The drop-off at the depot ("the Wall"): an orange outline on the yard and its sign.
+-- The drop-off at the depot ("the Wall"): the army's checkpoint round its bay (server/MoveSites.luau, Persistent: the
+-- bay's orange outline as before, the gantry's SAFE ZONE sign, the Wall's stubs, the booth, the raised barrier, the
+-- floodlights, the army truck; nothing in the truck's way in from Bone St), and with it the rework's dressing (the
+-- depot's ZDC MOVING & EVACUATION banner, the evacuation spots in the city).
 local function buildDropOff(parent: Instance)
-	local model = Instance.new("Model")
-	model.Name = "MovingDropOff"
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-	local at = dropOffAt()
-	local w, d = 22, 18
-	local function strip(size: Vector3, offset: Vector3)
-		local part = solid("Line", size, CFrame.new(at + offset + Vector3.new(0, 0.05, 0)), ORANGE, Enum.Material.Neon, model)
-		part.CanCollide = false
-		part.CanQuery = false
-		part.CanTouch = false
-	end
-	strip(Vector3.new(w, 0.1, 0.6), Vector3.new(0, 0, -d / 2))
-	strip(Vector3.new(w, 0.1, 0.6), Vector3.new(0, 0, d / 2))
-	strip(Vector3.new(0.6, 0.1, d), Vector3.new(-w / 2, 0, 0))
-	strip(Vector3.new(0.6, 0.1, d), Vector3.new(w / 2, 0, 0))
-	local signAt = at + Vector3.new(w / 2 + 1.5, 0, -d / 2)
-	local frame = CFrame.lookAt(signAt, signAt + Vector3.new(-1, 0, 1).Unit)
-	solid("Post", Vector3.new(0.4, 8, 0.4), frame * CFrame.new(0, 4, 0.3), Color3.fromRGB(60, 62, 66), Enum.Material.Metal, model)
-	local sign = solid("Sign", Vector3.new(6, 2.6, 0.25), frame * CFrame.new(0, 6.6, 0), Color3.fromRGB(28, 30, 34), Enum.Material.SmoothPlastic, model)
-	words(sign, {
-		{ text = "THE WALL", color = ORANGE, size = 50 },
-		{ text = "MOVING DROP-OFF · DRIVE THE TRUCK IN", color = INK, size = 24 },
-	})
-	model.PrimaryPart = sign
-	model.Parent = parent
+	local sites = require(script.Parent.MoveSites)
+	sites.dropOff(parent)
+	sites.dressing(parent)
 end
 
 local onEnter: (Player, string) -> ()
 
--- A contract's house: the "Enter house" prompt at its front door and a ZDC MOVING sign in its front yard (the rest of
--- the house stays as server/World.luau built it).
+-- A contract's house: the "Enter house" prompt at its front door and its moving-day dress-up outside (the rest of the
+-- house stays as server/World.luau built it).
 local function buildSite(contract: Contract, parent: Instance): Site?
 	local home = Map.home(contract.home)
 	if not home then
@@ -467,13 +392,9 @@ local function buildSite(contract: Contract, parent: Instance): Site?
 	prompt.Triggered:Connect(function(player: Player)
 		onEnter(player, contract.id)
 	end)
-	local right = Vector3.new(-facing.Z, 0, facing.X)
-	local signAt = door + facing * 4.5 - right * 5 -- (left of the path: the mailbox stands on its right)
-	local frame = CFrame.lookAt(signAt, signAt + facing)
-	solid("SignPost", Vector3.new(0.3, 4, 0.3), frame * CFrame.new(0, 2, 0.2), Color3.fromRGB(70, 60, 50), Enum.Material.Wood, model)
-	local sign = solid("Sign", Vector3.new(3.4, 1.8, 0.2), frame * CFrame.new(0, 3.6, 0), Color3.fromRGB(28, 30, 34), Enum.Material.SmoothPlastic, model)
-	words(sign, { { text = "ZDC MOVING", color = ORANGE, size = 40 }, { text = string.upper(contract.name), color = INK, size = 28 } })
-	model.PrimaryPart = sign
+	-- (server/MoveSites.luau: the ZDC MOVING yard sign left of the path, boxes by the door, MOVING DAY over it, cones at
+	-- the truck's kerb, the EVACUATED realtor's sign; nothing solid, nothing on the path to the kerb)
+	model.PrimaryPart = require(script.Parent.MoveSites).house(model, contract.name, home)
 	model.Parent = parent
 	local out = door + facing * 4 + Vector3.new(0, 0.1, 0)
 	return {
