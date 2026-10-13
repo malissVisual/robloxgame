@@ -48,6 +48,8 @@
 -- bought, as sold; profile.carRefund, never saved, tells server/Tutorial.luau to say so; the money's reason
 -- "CarRefund") and the van takes over their best car tracks, gear, paint and roof gun (Economy.vanCarry). Earl's
 -- quest (vanQuest) is no longer read or saved.
+-- 8.0 SANDBOX: the collection (collection: the pieces the moves brought home, shared/CollectionRules.luau; kept by
+-- server/Collection.luau), read only from a real save written with its flag (collectionKept); older saves: empty.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -70,6 +72,7 @@ local Style = require(Shared.Style) -- 6.12: the cosmetics' wardrobe
 local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funnel's steps in the save
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
+local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
 
 export type Profile = {
 	money: number,
@@ -136,6 +139,9 @@ export type Profile = {
 	skills: { [string]: number },
 	-- 7.0: the moves' story cards seen (shared/MoveStory.luau SeenKeys: "intro"); none before 7.0 (the empty table)
 	story: { [string]: boolean },
+	-- 8.0 SANDBOX: the pieces the moves brought home (shared/CollectionRules.luau; server/Collection.luau keeps it): read
+	-- only from a real save written with its flag (CollectionRules.fromSave); an older one starts with the empty one
+	collection: CollectionRules.Saved,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -232,6 +238,7 @@ local function newProfile(): Profile
 		regulars = {}, -- 6.14: no business knows you yet
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		story = {}, -- 7.0: no story card seen yet
+		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -538,6 +545,9 @@ local function applySaved(profile: Profile, saved: any)
 	if saved.money ~= nil then
 		profile.story = MoveStory.cleanSeen(saved.story)
 	end
+	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); a save from before
+	-- 8.0 (or a lock-only record of a new player) starts with the empty one (CollectionRules.fromSave)
+	profile.collection = CollectionRules.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -921,6 +931,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		regulars = profile.regulars, -- 6.14
 		skills = profile.skills, -- 6.20
 		story = profile.story, -- 7.0
+		collection = profile.collection, -- 8.0
+		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

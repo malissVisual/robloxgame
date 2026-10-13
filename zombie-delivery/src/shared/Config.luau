@@ -5540,6 +5540,7 @@ Config.Robust = {
 		MoveLobby = 6, -- 7.0 planning: the MoveLobby remote's role, READY, LAUNCH, CANCEL (server/MoveLobby.luau)
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
+		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
 	},
 }
 
@@ -6661,6 +6662,41 @@ Config.Sandbox = {
 	On = true,
 	Van = "sprinter",
 	MaxPlayers = 4,
+}
+
+-- 8.0 SANDBOX, the collection (design/sandbox/KONTRAKT.md "Collection"): everything a move brings home is yours. It
+-- waits in your warehouse's stock, stands on show on a display stand (it earns money every minute you play) or is sold
+-- (any time). shared/CollectionRules.luau has the rules (tests/collection_test.luau), server/Collection.luau keeps
+-- profile.collection, pays and answers the "Collection" remote (tests/collection_runtime_test.luau). A piece's worth
+-- is its furniture's value (shared/FurnitureLooks.luau Items: the moves' `value`) × its condition (0 … 1).
+--   Tiers      the rarities by id: name, colour (RGB), rank (1 common … 5 legendary), min (a piece without a `rarity`
+--              of its own is the rarest tier whose min its value reaches), income (× the worth a minute on show) and
+--              sell (× the worth when sold: about ten minutes of showing it)
+--   Order      the tiers' ids, common first
+--   BrokenAt   a condition at or under it is broken (the moves' own, Config.Moving.Damage.BrokenAt): it earns nothing
+--              on show and sells for scrap, Scrap × its value (at least $1)
+--   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why)
+--   Stands     the display stands when Config.Warehouse.Stands is missing (CollectionRules.standsFor)
+--   Tick       s between two payouts of the stands' income (exact: the fractions carry over to the next one)
+-- The tuning: a house's haul (HouseLayout's 40 first seeds: 18 – 24 pieces worth $4,800 – 7,800) at 90 % condition,
+-- its best 12 on the 12 stands, earns $88 – 140 a minute (median $100); selling all of it pays $850 – 1,470, 9.6 –
+-- 10.9 minutes of that (tests/collection_test.luau checks a sample haul). A legendary piece (none in a house by
+-- itself: the collectibles' own `rarity`) earns 4 % of its value a minute: one at $1,500 out-earns a haul's best three.
+export type CollectionTier = { name: string, rank: number, color: { number }, min: number, income: number, sell: number }
+Config.Collection = {
+	Tiers = {
+		common = { name = "Common", rank = 1, color = { 178, 182, 188 }, min = 0, income = 0.015, sell = 0.14 },
+		uncommon = { name = "Uncommon", rank = 2, color = { 92, 196, 104 }, min = 100, income = 0.018, sell = 0.17 },
+		rare = { name = "Rare", rank = 3, color = { 70, 144, 240 }, min = 300, income = 0.022, sell = 0.2 },
+		epic = { name = "Epic", rank = 4, color = { 178, 96, 236 }, min = 600, income = 0.026, sell = 0.24 },
+		legendary = { name = "Legendary", rank = 5, color = { 255, 178, 36 }, min = 1500, income = 0.04, sell = 0.4 },
+	} :: { [string]: CollectionTier },
+	Order = { "common", "uncommon", "rare", "epic", "legendary" } :: { string },
+	BrokenAt = Config.Moving.Damage.BrokenAt,
+	Scrap = 0.03,
+	MaxStock = 300,
+	Stands = 12,
+	Tick = 10,
 }
 
 return Config
