@@ -36,6 +36,8 @@
 --   MovingRules.pick(move, spot, who) / help(move, spot, who) / release(move, who) / load(move, who) /
 --   unload(move, who, spot?) -> (ok / spot / placement, why?)   the carry's steps (why: a short code, whyText)
 --   MovingRules.lastOut(move)                  the thing Unload takes: the last loaded one nothing rests on
+--   MovingRules.truckPrompts(open, carrying, inside) -> (load, unload, back)   which of the truck's prompts show:
+--                                              Load (E) or Unload (Z, Take out), never both; the back's own E
 --   MovingRules.counts(move)                   { total, out, stars, starsOut, broken, carried, home }
 --   MovingRules.advance(phase, event)          the phase machine: running → horde → done | late | cancelled | failed
 --   MovingRules.due(move, now)                 the event the clock brings now ("horde", "timeout") or nil
@@ -495,6 +497,17 @@ function MovingRules.lastOut(move: Move): number?
 		end
 	end
 	return nil
+end
+
+-- Which of the truck's prompts show (the owner's report: Unload over Load at the same spot, E fumbled): while somebody
+-- of the crew at the back is `carrying` a thing, only Load (E) on an `open` back (shut: only the back's own E, to open
+-- it), never Unload, and the back's E never shuts it on them; with empty hands there, Unload while something may come
+-- out (`inside`: lastOut has one) of an open back, and the back's own E.
+function MovingRules.truckPrompts(open: boolean, carrying: boolean, inside: boolean): (boolean, boolean, boolean)
+	if carrying then
+		return open, false, not open
+	end
+	return false, open and inside, true
 end
 
 -- `who` (empty hands) takes a thing back out of the truck (`spot`, else lastOut) into their hands.

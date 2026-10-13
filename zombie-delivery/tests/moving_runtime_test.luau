@@ -188,7 +188,7 @@ do
 	check("the crews see the move's owner busy (Crew.hasJob), not its crew", E.Crew.hasJob(ann) == true and E.Crew.hasJob(bob) == false and E.Crew.hasJob(cid) == false)
 end
 check("no wait at the truck's back for a Driver (the prompts' MoveQuick)", promptIn(truck.model, "Load"):GetAttribute("MoveQuick") == "driver"
-	and promptIn(truck.model, "Unload"):GetAttribute("MoveQuick") == "driver")
+	and promptIn(truck.model, "Take out"):GetAttribute("MoveQuick") == "driver")
 
 -- The door ---------------------------------------------------------------------------------------------------------------
 
@@ -316,8 +316,11 @@ local weld = lampRoot:FindFirstChildOfClass("WeldConstraint")
 check("…welded to the truck, inside its box", weld ~= nil and weld.Part0 == truck.chassis and (lampRoot.Position - truck.chassis.Position).Magnitude < 12)
 E.clock += 0.2
 Moving.step()
-local unload = promptIn(truck.model, "Unload")
-check("Unload (Z) shows the last one in", unload ~= nil and unload.Enabled and unload.KeyboardKeyCode == "Z" and string.find(unload.ActionText, "Lamp", 1, true) ~= nil)
+local unload = promptIn(truck.model, "Take out")
+check("Unload (Z, \"Take out\") shows the last one in", unload ~= nil and unload.Enabled and unload.KeyboardKeyCode == "Z" and string.find(unload.ActionText, "Lamp", 1, true) ~= nil)
+-- the owner's report: Unload sat on the door's own attachment with Load and the back's E (all stacked)
+check("Unload on its own spot beside the door, not stacked with Load and the back's E", unload.Parent ~= cargoDoor and unload.Parent.Name == "MoveTakeOut"
+	and unload.Parent.Parent == truck.chassis and (unload.Parent.WorldPosition - cargoDoor.WorldPosition).Magnitude > 2 and not load.Enabled and backPrompt.Enabled)
 character:SetAttribute("Pushing", "trolley")
 trigger(unload, ann)
 check("7.0 review: Unload with your hands full (a trolley): refused", character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "hands are full", 1, true) ~= nil
@@ -392,6 +395,9 @@ E.place(bob, cargoDoor.WorldPosition + V3(0, 0, 2))
 E.place(ann, cargoDoor.WorldPosition + V3(1, 0, 3))
 E.clock += 0.2
 Moving.step()
+-- the owner's report: with something in the truck already, Unload showed beside Load and E fumbled
+check("the lamp inside, the sofa carried at the back: Load only (no Unload, the back's E waits)", load.Enabled and not unload.Enabled and not backPrompt.Enabled
+	and lampRoot:FindFirstChildOfClass("WeldConstraint").Part0 == truck.chassis)
 trigger(load, ann)
 check("the helper doesn't load", string.find(E.lastNotice(ann), "front", 1, true) ~= nil, E.lastNotice(ann))
 trigger(load, bob)
@@ -594,6 +600,8 @@ E.clock += 0.2
 Moving.step()
 local result = E.last(ann, "Moving", "result")
 check("delivered at the Wall: the result card", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.stars >= 1)
+check("…the truck's Load and Take out gone, Take out's own spot too", promptIn(truck.model, "Load") == nil and promptIn(truck.model, "Take out") == nil
+	and truck.chassis:FindFirstChild("MoveTakeOut") == nil and truck.chassis:FindFirstChild("CargoDoor") ~= nil)
 local paidAnn, paidBob = 0, 0
 for _, entry in E.money do
 	if entry.reason == "MovePay" then
