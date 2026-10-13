@@ -159,13 +159,13 @@ check("6.11: the Central Park says SAFE ZONE", park ~= nil and park.name == "Cen
 action, t = L.step(L.new(), real, Map.Park.x, Map.Park.z + 24, 0, true)
 check("6.11: on the path round the pond: CENTRAL PARK", action == "show" and t ~= nil and t.id == "park", t and t.id)
 action, t = L.step(L.new(), real, Map.Park.x, Map.Park.z - 85, 0, true)
--- 6.12.2: Last Stop Supplies is the GEAR counter of the gear stall at the depot; its old block is no shop (6.12.15: the
--- Lantern Garden)
+-- 6.12.2: Last Stop Supplies is the GEAR counter of the gear stall at the depot; its old block is no shop (7.1: the
+-- Hauptplatz)
 check("6.12.2: on the kerb across Bone St from the park: no shop's tag", t == nil or t.id ~= "supplies", t and t.id)
-local garden = byId.garden
-check("6.12.15: the Lantern Garden says SAFE ZONE", garden ~= nil and garden.name == "Lantern Garden" and garden.sub == "SAFE ZONE", garden and garden.sub)
-action, t = L.step(L.new(), real, Map.Garden.x + 6, Map.Garden.z + 20, 0, true)
-check("6.12.15: on the path south of the koi pond: LANTERN GARDEN", action == "show" and t ~= nil and t.id == "garden", t and t.id)
+local square = byId.square
+check("7.1: the Hauptplatz says SAFE ZONE", square ~= nil and square.name == "Hauptplatz" and square.sub == "SAFE ZONE", square and square.sub)
+action, t = L.step(L.new(), real, Map.Square.x + 20, Map.Square.z + 18, 0, true)
+check("7.1: on the cobbles south-east of the fountain: HAUPTPLATZ", action == "show" and t ~= nil and t.id == "square", t and t.id)
 local gear = Map.Shops.supplies
 action, t = L.step(L.new(), real, gear.x + 3, gear.z, 0, true)
 check("6.12.2: at the gear stall's GEAR counter: LAST STOP SUPPLIES", action == "show" and t ~= nil and t.id == "supplies" and t.sub == "GEAR", t and t.id)

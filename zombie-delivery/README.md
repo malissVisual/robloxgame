@@ -1149,6 +1149,44 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The Alps, step 1 (7.1)
+
+The owner: the map becomes a smaller Austrian valley, step by step, a summer valley under snowy peaks; "keep everything,
+only the Japanese part goes … Austria, mountains, and lovely little houses where the players live, a little village".
+Step 1A changes looks only: every address, home, door, venue, road, job, mission and move stays where it was.
+
+- **The Japanese part is gone.** The Lantern Garden (`server/LanternGarden.luau`: the cherry trees, the koi pond, the
+  waterfall, the stone lanterns, the tea pavilion, the raked gravel) and the torii and paper lanterns on the footbridge.
+- **The Hauptplatz** (`Map.Square`, `server/Hauptplatz.luau`) stands on block (0, −1), north of the Central Park, in the
+  safe zone. It is on the map's list as **Hauptplatz** ⛲, with GPS and a HAUPTPLATZ · SAFE ZONE location tag. It has:
+  - cobbles with granite bands, a stone fountain under a column with a gilded figure;
+  - a red and white maypole with its wreath, ribbons, guild boards and fir crown;
+  - the **Gasthof Edelweiss** on the north side: white render, green shutters, geraniums, an arched door between two
+    lamps, a steep shingle roof, café tables under umbrellas in front of it;
+  - wooden benches, gas-style street lamps, long geranium planters, linden trees and a board by every sidewalk.
+  - About 200 parts and four lights (the garden had about 430 parts and five lights).
+- **The footbridge** over Bone St keeps its walkway, ramps and clearance. It is an alpine timber bridge now: larch
+  railings with wooden caps, iron lanterns, and a roofed timber portal at each end of the span. Its square-side ramp
+  comes down over a green strip with its planted bed.
+- **The Suburbs houses are chalets** (`shared/ChaletLooks.luau`, `server/Chalets.luau`; all 44 of `Map.Homes`):
+  - the same box, door (Cargo still swings it), path, mailbox and number as before;
+  - a white or pastel render, a stone plinth and dark timber (or silver shingles) upstairs;
+  - shutters and geranium boxes, a steep gable to the street with wide eaves and purlin ends;
+  - a carved balcony with a geranium box in the gable, stacked firewood and a low wooden front fence.
+  - Three looks from the lot's own dice (tyrol, salzburg with painted corners, bregenz with a carved sun). The world's
+    dice are rolled as before, so nothing else in the city moves.
+  - Nothing stands on the path to the kerb or in the door's swing, and the chalets stay clear of a moving day's dress.
+- **The four houses for sale** on the Suburbs lots (Maple, Oak, Elm, Birch) wear a chalet's render and shingles with a
+  timber band, shutters, geraniums and firewood. 12 Maple Street gets a timber upper floor and a balcony.
+- **Parts:** the whole city goes from 22,851 to 24,385 parts (+6.7 %, `tools/perf/world_count.py`). The Suburbs piece
+  goes from 1,127 to 2,875 parts; a chalet has at most 48 parts (`ChaletLooks.Budget` 50).
+- **Tests:**
+  - `tests/square_test.luau` (6.12.15's garden_test) holds every footbridge check, plus the square: tiled by cobbles
+    and the green strip, everything on its cobbles and apart, a way in from every sidewalk, nothing Japanese.
+  - `tests/chalet_test.luau` checks every house's box, door, windows and path, its lot, the moving day's dress and
+    the budget.
+- Street names stay for now (step 3 renames them).
+
 ## MOVES: the moving rework, prototype (7.0)
 
 The owner's rework (`design/rework/NAVRH.md`, the story in `design/rework/PRIBEH.md`): the game turns into **moving**.
@@ -1926,6 +1964,8 @@ Roblox's AnalyticsService; it is off in Studio, where events are only counted. T
 
 ## The footbridge wider, curved and clear to walk (6.12.16)
 
+7.1: the torii are roofed timber portals now, and the checks are in `tests/square_test.luau` (see **The Alps, step 1**).
+
 The owner, on the bridge in Studio: "good for walking, only I walk through this [a timber]; make it wider for two
 people, and don't be afraid to make it curve".
 
@@ -1946,6 +1986,8 @@ people, and don't be afraid to make it curve".
   - that the ground under every low part is closed.
 
 ## The Lantern Garden and a wooden footbridge (6.12.15)
+
+7.1: the garden is gone. The Hauptplatz stands on its block (see **The Alps, step 1**).
 
 The owner: "a bit bigger park, a wooden bridge to another park, its own style".
 
