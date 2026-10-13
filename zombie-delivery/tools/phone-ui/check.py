@@ -176,6 +176,31 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)
 
+# 8.0 SANDBOX: the admin panel (client/AdminPanel.luau, its SANDBOX tab with shared/SandboxAdmin.luau;
+# client/SandboxZones.luau recorded) on missions_mock.luau's recorder (tools/phone-ui/adminpanel.luau): the tab only in
+# the sandbox world (first, and open by default there), every button's ("sandbox", id, target), SHOW ZONES on this
+# screen only, the window and the buttons on a phone held sideways (844 x 390), no panel for a player who is no admin.
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+'''
+    text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (ROOT / "src/client/AdminPanel.luau").read_text())
+    for name in ("AdminPanelOn", "AdminPanelOff", "AdminPanelGuest"):  # (three loads: Config.Sandbox.On is read as it loads)
+        (dest / f"{name}.luau").write_text(prefix + text)
+    (dest / "SandboxZones.luau").write_text('return require("./missions_mock").MZones')
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "adminpanel.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "adminpanel.luau"], cwd=dest, check=True)
+
 
 # 7.2, the Alps on the maps: the real client/MapView.luau (shared/MapStyle.luau, AlpineLayout, Map, Roads, Explore and
 # the rest of the real shared data) on mapmock.luau's recorder (missions_mock.luau's, the services, the camera, your

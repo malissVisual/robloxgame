@@ -105,6 +105,17 @@
 --                             kicked: join again (in Studio: Play again) to start fresh, the tutorial included
 --   title [T]  name           that title given and shown over your head ("none": no title shown); a reward's title
 --                             comes without its reward
+--   sandbox [T] id            8.0 SANDBOX, the panel's SANDBOX tab (only when Config.Sandbox.On; shared/SandboxAdmin.luau
+--                             checks the id; at most Config.Robust.Limits.AdminSandbox a second from one admin):
+--                             "money" +$10 000, "broke" the money at $0; "refill" a running move called off (the next
+--                             START brings a new seed: the house filled anew), "start" / "clock" / "horde" (Moving.admin's
+--                             start / time / horde); "fill" 10 random pieces in random condition into the stock
+--                             (Collection.add), "clear" the stock emptied ($0 for it: Collection.clear, else every piece
+--                             sold and the money put back), "stands" the stock's pieces on the free display stands
+--                             (Collection.display, Config.Warehouse.Stands); "van" the sandbox van (Config.Sandbox.Van)
+--                             to the plot's vanSpot (the live van moved with its load, else a new one), "house" to the
+--                             house's front door, "warehouse" to the plot's spawn (driving your van: it goes with you,
+--                             to the house's curb / the vanSpot)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1255,6 +1266,305 @@ function Give.buddyMode(player: Player, arg: any)
 	say(player, `ADMIN: your buddies {if arg == "follow" then "follow you" elseif arg == "stay" then "stay where they are" else "guard this spot"}.`)
 end
 
+-- ── 8.0 SANDBOX: the panel's SANDBOX tab (shared/SandboxAdmin.luau) ───────
+-- (in a table, not more top-level locals: the 200-register limit). The other 8.0 workers' modules (design/sandbox/
+-- KONTRAKT.md: Collection, Moving, SandboxPlots, Config.Warehouse) are called by the contract's names, each call in a
+-- pcall: a module that is missing or mid-change says so in the notice instead of failing the whole command.
+
+local Sandbox = {}
+Sandbox.Rules = require(Shared.SandboxAdmin)
+Sandbox.Map = require(Shared.SandboxMap)
+Sandbox.run = {} :: { [string]: (Player, Player) -> () }
+
+type Spot = { x: number, y: number, z: number, yaw: number }
+
+-- A SandboxMap spot as a CFrame, `up` studs over it (SandboxMap.cframe's: yaw about Y, 0 looks north, -z).
+function Sandbox.frame(spot: Spot, up: number?): CFrame
+	return CFrame.new(spot.x, spot.y + (up or 0), spot.z) * CFrame.Angles(0, math.rad(spot.yaw), 0)
+end
+
+-- The player's plot (server/SandboxPlots.luau), nil without one.
+function Sandbox.plot(player: Player): any
+	local ok, plot = pcall(function()
+		return require(Server.SandboxPlots).of(player)
+	end)
+	return if ok then plot else nil
+end
+
+-- Collection[name](...) in a pcall (server/Collection.luau, the collection worker's): ok, then its answers.
+function Sandbox.collection(name: string, ...: any): (boolean, any, any)
+	return pcall(function(...: any)
+		return (require(Server.Collection) :: any)[name](...)
+	end, ...)
+end
+
+function Sandbox.hasCollection(name: string): boolean
+	local ok, found = pcall(function()
+		return type((require(Server.Collection) :: any)[name]) == "function"
+	end)
+	return ok and found == true
+end
+
+-- Moving.admin(player, arg) (the MOVES buttons' own: server/Moving.luau) in a pcall: what to say.
+function Sandbox.moving(player: Player, arg: string): string
+	local ok, text = pcall(function()
+		return require(Server.Moving).admin(player, arg)
+	end)
+	if ok and type(text) == "string" then
+		return text
+	end
+	warn(`[Admin] sandbox: Moving.admin {arg} failed: {text}`)
+	return `ADMIN: the move's {arg} failed (see the server Output).`
+end
+
+-- On a move (its owner or its crew: Moving.busy)?
+function Sandbox.onMove(player: Player): boolean
+	local ok, why = pcall(function()
+		return require(Server.Moving).busy(player)
+	end)
+	return ok and why ~= nil
+end
+
+-- The sandbox's van (Config.Sandbox.Van; the first car while that one is not in Config.Cars yet).
+function Sandbox.vanId(): string
+	local def = Economy.findCar(Config.Sandbox.Van)
+	return if def then def.id else Config.Cars[1].id
+end
+
+-- A car (with whoever sits in it and what it carries) onto a ground spot, its nose the spot's way. True when it went.
+function Sandbox.park(vehicle: Vehicles.Car, spot: Spot): boolean
+	local ground = Vector3.new(spot.x, spot.y, spot.z)
+	local look = Sandbox.frame(spot).LookVector
+	local height = rideHeight(vehicle)
+	pcall(function()
+		vehicle.owner:RequestStreamAroundAsync(ground, 5)
+	end)
+	if not vehicle.model.Parent or vehicle.wrecked then
+		return false
+	end
+	local at = ground + Vector3.new(0, height + 0.5, 0)
+	vehicle.model:PivotTo(CFrame.lookAt(at, at + look))
+	vehicle.chassis.AssemblyLinearVelocity = Vector3.zero
+	vehicle.chassis.AssemblyAngularVelocity = Vector3.zero
+	return true
+end
+
+-- A character `up` studs over a spot and `out` studs ahead along its look; `back`: turned to face the way it came.
+function Sandbox.walkTo(player: Player, spot: Spot, up: number, out: number, back: boolean): boolean
+	local at = Sandbox.frame(spot, up) * CFrame.new(0, 0, -out)
+	if back then
+		at *= CFrame.Angles(0, math.pi, 0)
+	end
+	return moveCharacter(player, at)
+end
+
+-- Your own car while you drive it, else nil.
+function Sandbox.driven(player: Player): Vehicles.Car?
+	local vehicle, driving = Vehicles.seatedIn(player)
+	return if vehicle and driving and vehicle.owner == player then vehicle else nil
+end
+
+Sandbox.NoPlot = "ADMIN: no plot (server/SandboxPlots.luau gives one to each of the first Config.Sandbox.MaxPlayers players)."
+
+-- Money ----------------------------------------------------------------------------------------------------------------
+
+Sandbox.run.money = function(player: Player)
+	if not PlayerData.get(player) then
+		say(player, "Still loading...")
+		return
+	end
+	PlayerData.addMoney(player, Sandbox.Rules.Money, "Admin")
+	say(player, `ADMIN: +{moneyText(Sandbox.Rules.Money)}.`)
+end
+
+Sandbox.run.broke = function(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	profile.money = 0
+	PlayerData.notify(player)
+	say(player, "ADMIN: your money is $0.")
+end
+
+-- Moves (the sandbox house: Moving's admin) ----------------------------------------------------------------------------
+
+-- Every move gets a new seed (KONTRAKT: "Each move gets a new seed, so the house is refilled"): a running one ends
+-- cleanly (Moving.admin "end", called off) and the next START fills the house anew.
+Sandbox.run.refill = function(player: Player)
+	local ended = if Sandbox.onMove(player) then string.gsub(Sandbox.moving(player, "end"), "^ADMIN: ", "") .. " " else "No move was running. "
+	say(player, `ADMIN: REFILL HOUSE: {ended}The next START MOVE fills the house anew (a new seed).`)
+end
+
+Sandbox.run.start = function(player: Player)
+	say(player, Sandbox.moving(player, "start"))
+end
+
+Sandbox.run.clock = function(player: Player)
+	say(player, Sandbox.moving(player, "time"))
+end
+
+Sandbox.run.horde = function(player: Player)
+	say(player, Sandbox.moving(player, "horde"))
+end
+
+-- Collection (server/Collection.luau) ---------------------------------------------------------------------------------
+
+-- 10 random pieces of the furniture catalogue (shared/FurnitureLooks.luau's ids) in random condition.
+Sandbox.run.fill = function(player: Player)
+	if not PlayerData.get(player) then
+		say(player, "Still loading...")
+		return
+	end
+	local fill = Sandbox.Rules.Fill
+	local picks = Sandbox.Rules.picks(require(Shared.FurnitureLooks).Order, fill.Count, function(a: number, b: number): number
+		return rng:NextInteger(a, b)
+	end, function(): number
+		return rng:NextNumber()
+	end)
+	local added, why = 0, nil
+	for _, pick in picks do
+		local ok, uid = Sandbox.collection("add", player, { item = pick.item, variant = pick.variant, condition = pick.condition })
+		if ok and type(uid) == "string" then
+			added += 1
+		elseif not ok then
+			why = uid
+		end
+	end
+	if why then
+		warn(`[Admin] sandbox fill: Collection.add failed: {why}`)
+	end
+	say(player, if added > 0 then `ADMIN: {added} random pieces in your stock.` else "ADMIN: the stock took nothing (Collection.add refused: no save yet, or the collection is not in this build).")
+end
+
+-- Every piece gone, $0 for them: Collection.clear (an admin helper the collection may have), else each one sold and
+-- the money and the earnings put back as they were.
+Sandbox.run.clear = function(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	if Sandbox.hasCollection("clear") then
+		local ok, count = Sandbox.collection("clear", player)
+		say(player, if ok then `ADMIN: your stock is empty{if type(count) == "number" then ` ({count} pieces gone)` else ""}.` else "ADMIN: Collection.clear failed (see the server Output).")
+		if not ok then
+			warn(`[Admin] sandbox clear: Collection.clear failed: {count}`)
+		end
+		return
+	end
+	local ok, stock = Sandbox.collection("stock", player)
+	if not ok or type(stock) ~= "table" then
+		say(player, "ADMIN: the stock can't be read (Collection.stock).")
+		return
+	end
+	local money, earned = profile.money, profile.earned
+	local sold = 0
+	for _, entry in stock do
+		if type(entry) == "table" and type(entry.uid) == "string" then
+			local done, paid = Sandbox.collection("sell", player, entry.uid)
+			if done and paid ~= nil then
+				sold += 1
+			end
+		end
+	end
+	profile.money, profile.earned = money, earned -- (the sales paid nothing: $0 for them)
+	PlayerData.notify(player)
+	say(player, if sold > 0 then `ADMIN: {sold} pieces gone from your stock ($0 for them).` elseif #stock == 0 then "ADMIN: your stock is empty already." else "ADMIN: the stock kept its pieces (Collection.sell refused them).")
+end
+
+-- The stock's pieces not on show onto the free display stands (Config.Warehouse.Stands of them).
+Sandbox.run.stands = function(player: Player)
+	local stands = Sandbox.Rules.standCount((Config :: any).Warehouse)
+	if stands <= 0 then
+		say(player, "ADMIN: no display stands in this build yet (Config.Warehouse.Stands).")
+		return
+	end
+	local ok, stock = Sandbox.collection("stock", player)
+	if not ok or type(stock) ~= "table" then
+		say(player, "ADMIN: the stock can't be read (Collection.stock).")
+		return
+	end
+	local plan = Sandbox.Rules.standPlan(stock, stands)
+	local shown, why = 0, nil
+	for _, step in plan do
+		local done, put, reason = Sandbox.collection("display", player, step.uid, step.stand)
+		if done and put == true then
+			shown += 1
+		else
+			why = if done then reason else put
+		end
+	end
+	say(player, if shown > 0 then `ADMIN: {shown} pieces put on show.` elseif #plan == 0 then "ADMIN: nothing to put on show (no piece in the stock, or no free stand)." else `ADMIN: the stands took nothing ({why or "Collection.display refused"}).`)
+end
+
+-- Travel and the van (shared/SandboxMap.luau's spots) -----------------------------------------------------------------
+
+-- Your sandbox van to your plot's vanSpot, its nose to the street and its back doors to the roller door: the live one
+-- moved with its load (and whoever is in it), else a new one built there.
+Sandbox.run.van = function(player: Player)
+	local plot = Sandbox.plot(player)
+	if not plot then
+		say(player, Sandbox.NoPlot)
+		return
+	end
+	local vanId = Sandbox.vanId()
+	local car = Vehicles.get(player)
+	if car and car.id == vanId and not car.wrecked and car.model.Parent and Sandbox.park(car, plot.vanSpot) then
+		say(player, "ADMIN: your van is at your warehouse, its back to the roller door.")
+		return
+	end
+	local made = Vehicles.spawnAt(player, vanId, Sandbox.frame(plot.vanSpot), false)
+	say(player, if made then `ADMIN: your {carName(vanId)} is at your warehouse, its back to the roller door.` else "ADMIN: no van (the save is still loading).")
+end
+
+-- To the house's front door (facing it: Enter house); driving your van: the van to its curb, its back to the door.
+Sandbox.run.house = function(player: Player)
+	local house = Sandbox.Map.House
+	local vehicle = Sandbox.driven(player)
+	if vehicle and Sandbox.park(vehicle, house.curb) then
+		say(player, `ADMIN: {house.name}, your van at its curb.`)
+		return
+	end
+	say(player, if Sandbox.walkTo(player, house.door, 3, 4, true) then `ADMIN: at {house.name}'s front door.` else "ADMIN: you have no body right now.")
+end
+
+-- To your plot's spawn; driving your van: the van to its vanSpot.
+Sandbox.run.warehouse = function(player: Player)
+	local plot = Sandbox.plot(player)
+	if not plot then
+		say(player, Sandbox.NoPlot)
+		return
+	end
+	local vehicle = Sandbox.driven(player)
+	if vehicle and Sandbox.park(vehicle, plot.vanSpot) then
+		say(player, "ADMIN: your warehouse, the van at its roller door.")
+		return
+	end
+	say(player, if Sandbox.walkTo(player, plot.spawn, 0.5, 0, false) then "ADMIN: your warehouse." else "ADMIN: you have no body right now.")
+end
+
+-- ("sandbox", id) [T]: the admin's clicks at most Config.Robust.Limits.AdminSandbox a second (Net.limit: the rest
+-- dropped), then SandboxAdmin.check (an admin, the sandbox world, a button's id; refused: the admin is told why).
+function Sandbox.command(player: Player, arg: any, admin: Player)
+	local isAdmin = Admin.isAdmin(admin)
+	if isAdmin and not Net.limit(admin, "AdminSandbox", Config.Robust.Limits.AdminSandbox) then
+		return
+	end
+	local action, why = Sandbox.Rules.check(isAdmin, Config.Sandbox.On, arg)
+	if not action then
+		if isAdmin then
+			notice:FireClient(admin, `ADMIN: {why}`)
+		end
+		return
+	end
+	local run = Sandbox.run[action.id]
+	if run then
+		run(player, admin)
+	end
+end
+
 -- ── The remote ─────────────────────────────────────────────────────────────
 
 local COMMANDS: { [string]: (Player, any, Player) -> () } = {
@@ -1342,6 +1652,7 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	buddy = Give.buddy,
 	buddyDismiss = Give.buddyDismiss,
 	buddyMode = Give.buddyMode,
+	sandbox = Sandbox.command, -- 8.0 SANDBOX
 }
 for command in FLAGS do
 	COMMANDS[command] = function(player: Player, arg: any)
@@ -1356,7 +1667,7 @@ for _, name in {
 	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "refuel", "speed",
 	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
 	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
-	"title", "streak", "shift", "goldenOrder", "regularOrder", "regulars", "missionKill",
+	"title", "streak", "shift", "goldenOrder", "regularOrder", "regulars", "missionKill", "sandbox",
 } do
 	TARGETED[name] = true
 end

@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -106,6 +106,17 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "Alpine.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     open(os.path.join(tmp, "AlpineServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 8.0 SANDBOX: the real server/Admin.luau as AdminServer.luau for tests/adminsandbox_runtime_test.luau (the SANDBOX
+    # tab's "sandbox" command: a non-admin refused, the checks, the rate limit, each button): its server modules, Net and
+    # the services from tests/runtime/AdminRuntime.luau (on the item recorder), its shared modules the copies above.
+    shutil.copy(os.path.join(HERE, "runtime", "AdminRuntime.luau"), os.path.join(tmp, "AdminRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Admin.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = re.sub(r"require\(Server\.(\w+)\)", r"E.\1", source)
+    head = ('local E = require("./AdminRuntime")\nlocal M = E.Mock\nlocal game, workspace, task, os, script = E.game, E.workspace, E.task, E.os, E.script\n'
+            'local Instance, Vector3, CFrame, Enum, Random, RaycastParams, typeof = M.Instance, M.Vector3, M.CFrame, E.Enum, E.Random, E.RaycastParams, M.typeof\n'
+            'local warn = function(...) print("WARN", ...) end\n')
+    open(os.path.join(tmp, "AdminServer.luau"), "w", encoding="utf-8").write(head + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
