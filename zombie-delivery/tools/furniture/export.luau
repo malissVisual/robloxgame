@@ -1,7 +1,7 @@
 -- 7.0, the moving prototype's previews: every piece of furniture (shared/FurnitureLooks.luau) and one house's inside
 -- (shared/HouseLayout.luau + server/HouseInterior.luau) built by the real builders on the recorder
 -- (tools/fixtures/item-mock.luau), written as JSON lines for render.mjs: each part's class, shape, size, place, turn,
--- colour, material and opacity, the pieces' catalogue entries, the house's rooms, spots, entry and lights.
+-- colour, material and opacity, the pieces' catalogue entries, the house's rooms, spots, fixtures, entry and lights.
 -- Run by tools/furniture/render.py:  luau export.luau -a <seed>
 local M = require("./ItemMock")
 local FurnitureLooks = require("./FurnitureLooks")
@@ -123,6 +123,11 @@ end
 for _, s in plan.spots do
 	table.insert(spots, { id = s.id, item = s.item, room = s.room, star = s.star, position = vec(s.at.Position), label = FurnitureLooks.Items[s.item].name })
 end
+-- 7.x alpine: the fixtures too (render.py's eye-level views aim at the Kachelofen, the corner bench, the wall decor)
+local fixtures = {}
+for _, f in plan.fixtures do
+	table.insert(fixtures, { kind = f.kind, room = f.room, position = vec(f.at.Position), size = vec(f.size), turn = f.turn })
+end
 print(encode({
 	kind = "house",
 	name = string.format("house-%d", seed),
@@ -133,6 +138,7 @@ print(encode({
 		max = vec(plan.max),
 		rooms = rooms,
 		spots = spots,
+		fixtures = fixtures,
 		entry = vec(plan.entry.Position),
 		parts = count,
 		lights = lights,
