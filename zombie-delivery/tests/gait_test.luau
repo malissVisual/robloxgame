@@ -610,6 +610,9 @@ do
 	local s, i, pose = Gait.new(0.5), Gait.input(), Gait.pose()
 	local function run(n: number): number
 		collectgarbage("collect")
+		-- (the full collect shrinks the Lua stack and the next step grows it back: 1–2 KB every run, however many
+		-- steps; one step first, so only what the steps keep counts)
+		Gait.step(s, i, B, pose)
 		local before = collectgarbage("count")
 		for f = 1, n do
 			i.dt, i.vx, i.vz = DT, 3 * math.sin(f * 0.01), -14
@@ -619,8 +622,15 @@ do
 		end
 		return collectgarbage("count") - before
 	end
+	-- The middle of three runs: the VM also grows by 3 KB once in a while (at most once a process, at a run's first
+	-- step, as much for 3,000 steps as for 30,000), which broke the limit now and then; a table per step shows in
+	-- every run, the more the longer.
+	local function middle(n: number): number
+		local a, b, c = run(n), run(n), run(n)
+		return math.max(math.min(a, b), math.min(math.max(a, b), c))
+	end
 	run(600)
-	local few, many = run(3000), run(30000)
+	local few, many = middle(3000), middle(30000)
 	check("no new tables per step (the memory does not grow with the steps)", many < 4 and many < few + 2, `{few} KB, {many} KB`)
 end
 
