@@ -9,6 +9,7 @@
 -- changed, its countdown ticking in place; the 💬 button hidden under a card, the list and the planning; the ring shut
 -- while T is held stays shut; the key O (not Tab) and a taken key left alone; ESC; the GPS cleared only when it is still
 -- the move's; the late grace's countdown; the panel following a resize; a computer's list under the player list.
+-- The city's move screen (Config.Sandbox.On false: its GPS); 8.0.1: in the sandbox the move sets no GPS at all.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's) ─────────────────────────
@@ -149,6 +150,7 @@ local function show(b)
 end
 
 local Config = require("./Config")
+Config.Sandbox.On = false -- (the city's move screen; 8.0.1: the sandbox's GPS, none, after the city's GPS checks)
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
 local MovingHud = require("./MovingHud")
@@ -387,6 +389,41 @@ moving.OnClientEvent:Fire("state", view())
 check("a new move: its GPS", M.waypoint.X == 263)
 moving.OnClientEvent:Fire("state", nil)
 check("its end clears it (still the move's)", M.waypoint == nil)
+-- 8.0.1: in the sandbox (Config.Sandbox.On) the move sets no GPS: client/SandboxGuide.luau's chevron and path point at
+-- the same spot (one arrow, not two: no waypoint, so no GPS ring, beacon, label or "GPS: …" toasts in client/Hud.luau)
+do
+	Config.Sandbox.On = true
+	local onWaypoint, told = M.MapView.onWaypoint, 0
+	M.MapView.onWaypoint = function()
+		told += 1
+	end
+	moving.OnClientEvent:Fire("state", view({ drop = "your warehouse", dropOff = { x = -195, z = -122 }, horde = true }))
+	check("8.0.1: the sandbox: no GPS from the move with a load (no waypoint to your warehouse, no GPS toast)", M.waypoint == nil and told == 0)
+	moving.OnClientEvent:Fire("state", view({ drop = "your warehouse", dropOff = { x = -195, z = -122 }, counts = { total = 2, out = 0, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 2 } }))
+	check("…nor to the house", M.waypoint == nil and told == 0)
+	-- the end (server/Moving.luau's SB.result): what came home, never the Wall, pay or XP
+	moving.OnClientEvent:Fire("result", { name = "The Old Chalet", icon = "🏡", how = "done", howText = "Finished: what came home is in your warehouse",
+		delivered = 3, left = 3, broken = 0, total = 6, starsOut = 1, starsTotal = 2, stars = 4, pay = 0, money = 0, xp = 0, base = 0, starBonus = 0,
+		timeBonus = 0, fine = 0, crew = 1, trips = 2, home = { pieces = 3, value = 640 } })
+	local resultCard = named(M.gui, "MoveResult")
+	local words = {}
+	for _, object in all(resultCard, function(o)
+		return type(o.Text) == "string"
+	end) do
+		table.insert(words, object.Text)
+	end
+	local said = table.concat(words, " | ")
+	check("8.0.1: the sandbox's result card: what came home, no Wall, no pay, no XP, no share", resultCard ~= nil and string.find(said, "3 PIECES CAME HOME", 1, true) ~= nil
+		and string.find(said, "Wall", 1, true) == nil and string.find(said, "XP", 1, true) == nil and string.find(string.upper(said), "SHARE", 1, true) == nil
+		and string.find(string.lower(said), "%f[%a]pa[iy][ds]?%f[%A]") == nil, said)
+	MovingHud.closeAll()
+	moving.OnClientEvent:Fire("state", nil)
+	M.MapView.onWaypoint = onWaypoint
+	Config.Sandbox.On = false
+	moving.OnClientEvent:Fire("state", view())
+	check("…the city's GPS as before (the house)", M.waypoint ~= nil and M.waypoint.X == 263)
+	moving.OnClientEvent:Fire("state", nil)
+end
 
 -- ── 7.x van moves: the trip line, FINISH (the owner's, asked twice) ──────────
 local tripView = view({ trips = 1, counts = { total = 2, out = 0, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 1, delivered = 1, starsDelivered = 0, lost = 0 } })

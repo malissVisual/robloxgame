@@ -124,10 +124,13 @@ click(owner, "horde")
 check("🧟 HORDE NOW: Moving.admin horde", lastMove() == "horde")
 table.clear(E.moving)
 mark = click(owner, "refill")
-check("🏠 REFILL HOUSE with no move: nothing ended, the next START gets a new seed", #E.moving == 0 and string.find(E.said(owner, mark), "new seed", 1, true) ~= nil, E.said(owner, mark))
+check("🏠 REFILL HOUSE with no move: nothing ended; 8.0.1: Moving.admin refill (the card's seed forgotten): the next START gets a new seed", #E.moving == 1
+	and E.moving[1].arg == "refill" and E.moving[1].player == owner and string.find(E.said(owner, mark), "new seed", 1, true) ~= nil, E.said(owner, mark))
+table.clear(E.moving)
 E.onMove[owner] = true
 mark = click(owner, "refill")
-check("🏠 REFILL HOUSE on a move: the move ends cleanly (Moving.admin end)", lastMove() == "end" and E.onMove[owner] == nil and string.find(E.said(owner, mark), "called off", 1, true) ~= nil, E.said(owner, mark))
+check("🏠 REFILL HOUSE on a move: the move ends cleanly (Moving.admin end), then Moving.admin refill", #E.moving == 2 and E.moving[1].arg == "end"
+	and lastMove() == "refill" and E.onMove[owner] == nil and string.find(E.said(owner, mark), "called off", 1, true) ~= nil, E.said(owner, mark))
 
 -- ── Collection ───────────────────────────────────────────────────────────────
 

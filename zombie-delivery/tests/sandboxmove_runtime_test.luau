@@ -16,13 +16,28 @@
 --   * The edges: a piece still in the van at FINISH is lost (never collected), a Collection.add that refuses is said,
 --     no plot: no START, no van out: the van comes to the plot's vanSpot, the admin's start / time / horde / end /
 --     refill, a new seed every move, the horde and the roamers switched on (Config.Moving.Sandbox).
+-- 8.0.1 (the review's moves findings):
+--   * nose-in at home unloads (the van's middle in the circle, its back out of it); loaded in your plot but away from
+--     the roller door: no trip, the driver hears "Back the van up to the roller door to unload" (once, then every
+--     BackEvery s); never at another player's plot or with an empty van;
+--   * START without a van out parks it the sandbox's way (server/SandboxBoot.luau's parkVan through the hook
+--     Moving.parkVan: at the vanSpot, not seated, the player's own van repaired), never a bare spawnAt;
+--   * a death mid-move (Moving.respawnAt, SandboxBoot's spawn): beside the van's back on the ground, the van wrecked:
+--     outside the house's front door; off a move: home;
+--   * the Sprinter bed's Center (SHOW ZONES' box) the bay's real middle from its CargoDoor;
+--   * the words: GIVE UP after a trip, the owner leaving, the planning's timeout, the plot kiosks' corkboard (the
+--     chalet, no Marge, Walt or Wall), Danny's lines; nothing a crew hears or reads at the end mentions the Wall, pay
+--     or XP.
 local E = require("./MovingRuntime")
 local Config = require("./Config")
 Config.Sandbox.On = true -- (before Moving.start: it reads the mode there)
 local Moving = require("./MovingServer")
 local Greeters = require("./MoveGreetersServer")
 local MoveHelper = require("./MoveHelperServer")
+local Lobby = require("./MoveLobbyServer")
 local SandboxMap = require("./SandboxMap")
+local SprinterLooks = require("./SprinterLooks")
+local Brain = require("./MoveHelperBrain")
 local Economy = require("./Economy")
 
 local failures = 0
@@ -128,6 +143,23 @@ E.plots[ann] = plot1
 E.plots[bob] = plot2 -- (Cid has none: a fifth player)
 E.carId = "sprinter"
 
+-- server/SandboxBoot.luau's parkVan, set as its hook before Moving.start (as SandboxBoot.sandbox does): the player's van
+-- (no carId: their own, Config.Sandbox.Van) at the spot, the old one gone, repaired (the save's damage, E.carHealth, only
+-- for another car); every call kept. (tests/boot_runtime_test.luau runs the real one: its repair.)
+local parked: { any } = {}
+E.carHealth = {} -- player → the save's share of the van's health (0.2: wrecked before)
+Moving.parkVan = function(player: any, spot: any, seat: boolean, carId: string?): (string?, any)
+	table.insert(parked, { player = player, spot = spot, seat = seat, carId = carId })
+	local old = E.cars[player]
+	if old then
+		old.model:Destroy()
+	end
+	local car = E.makeCar(player, carId or Config.Sandbox.Van, V3(spot.x, 2, spot.z))
+	car.health = if carId == nil then 1 else E.carHealth[player] or 1
+	E.cars[player] = car
+	return nil, car
+end
+
 -- the map's front door (server/SandboxWorld.luau's FrontDoor: the attribute SandboxDoor), built before the move
 local frontDoor = M.Instance.new("Part")
 frontDoor.Name = "FrontDoor"
@@ -153,6 +185,29 @@ local kiosk1 = moves:FindFirstChild("MovingBoard1")
 local cork1 = kiosk1:FindFirstChild("Board")
 check("plot 1's kiosk: its corkboard by the plot's board spot (Plot 1), streamed in for good", cork1 ~= nil and cork1:GetAttribute("Plot") == 1
 	and flatDistance(cork1.Position, V3(plot1.board.x, 0, plot1.board.z)) < 1.2 and kiosk1.ModelStreamingMode == "Persistent", cork1 and cork1.Position)
+-- Every text on a model (its signs' SurfaceGui labels).
+local function textsOf(model: any): { string }
+	local list = {}
+	for _, d in model:GetDescendants() do
+		if d.ClassName == "TextLabel" and type(d.Text) == "string" then
+			table.insert(list, d.Text)
+		end
+	end
+	return list
+end
+local function anyText(list: { string }, word: string): boolean
+	for _, text in list do
+		if string.find(string.lower(text), string.lower(word), 1, true) then
+			return true
+		end
+	end
+	return false
+end
+local corkWords = textsOf(kiosk1)
+check("8.0.1: the plot kiosk's corkboard is the sandbox's: THE OLD CHALET, bring it home to your warehouse", anyText(corkWords, "THE OLD CHALET")
+	and anyText(corkWords, "Bring it home to your warehouse") and anyText(corkWords, "MOVING CONTRACTS"), table.concat(corkWords, " | "))
+check("…no Marge, no Walt, no Wall, no evacuation on it", not anyText(corkWords, "Marge") and not anyText(corkWords, "Walt") and not anyText(corkWords, "Wall")
+	and not anyText(corkWords, "evacuat"), table.concat(corkWords, " | "))
 
 -- The card ---------------------------------------------------------------------------------------------------------------------
 
@@ -221,6 +276,26 @@ end
 check("nobody on the porch, no Marge's text (no story)", not porch and E.last(ann, "Tutorial", "message") == nil)
 local danny = MoveHelper.find(ann)
 check("Danny joins a crew of one", danny ~= nil and danny.body ~= nil)
+check("8.0.1: Danny says hello without the city's depot; his full van's line names no Wall", E.saidSince(Brain.line("hello", true) :: string, 0)
+	and not E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.line("full", true) :: string, "Wall", 1, true) == nil)
+
+-- A death mid-move (server/SandboxBoot.luau's spawn asks Moving.respawnAt) ------------------------------------------------
+
+local cargoBack = truck.chassis:FindFirstChild("CargoDoor")
+local again = Moving.respawnAt(ann)
+local rel = if again then truck.chassis.CFrame:PointToObjectSpace(again.Position) else nil
+check("8.0.1: a death on a move, the van out: the new body beside the van's back (out of its body), on the ground", again ~= nil and rel ~= nil
+	and math.abs(rel.X) > T.Beds.sprinter.Width / 2 + 1 and math.abs(rel.Z - truck.chassis.CFrame:PointToObjectSpace(cargoBack.WorldPosition).Z) < 3
+	and math.abs(again.Position.Y - 3) < 1e-6
+	and flatDistance(again.Position, cargoBack.WorldPosition) < 10, rel and `{rel.X}, {rel.Y}, {rel.Z} at {again.Position.X}, {again.Position.Y}, {again.Position.Z}`)
+local toBack = V3(cargoBack.WorldPosition.X - again.Position.X, 0, cargoBack.WorldPosition.Z - again.Position.Z).Unit
+check("…looking at the back doors", again.LookVector:Dot(toBack) > 0.95, `{again.LookVector.X}, {again.LookVector.Y}, {again.LookVector.Z}`)
+truck.wrecked = true
+local out = Moving.respawnAt(ann)
+check("…the van wrecked: 6 studs out of the house's front door (SandboxMap.House.door), looking out", out ~= nil
+	and flatDistance(out.Position, V3(House.door.x, 0, House.door.z - 6)) < 1e-6 and math.abs(out.Position.Y - 3) < 1e-6 and out.LookVector.Z < -0.99, out and out.Position)
+truck.wrecked = false
+check("…off a move: nil (home, the plot's spawn)", Moving.respawnAt(bob) == nil and Moving.respawnAt(cid) == nil)
 check("the van's prompts say Sprinter (or the car's name), and a Load for the walk-in bay", promptIn(truck.model, "Load") ~= nil
 	and truck.chassis:FindFirstChild("MoveLoadBay") ~= nil and truck.chassis:FindFirstChild("MoveTakeOut") ~= nil)
 
@@ -262,6 +337,8 @@ step()
 check("loaded at the back doors", ann.Character:GetAttribute("MoveCarry") == nil and stateOf(ann, 1).state == "truck", E.lastNotice(ann))
 local BED = T.Beds.sprinter
 local cz = cargoDoor.Position.Z - BED.Back - BED.Length / 2 -- (the bay's middle: Back in front of the doors)
+check("8.0.1: the Sprinter bed's Center (SHOW ZONES' box without a door) is its bay's middle from the real CargoDoor", BED.Center[1] == 0
+	and math.abs(BED.Center[2] - (SprinterLooks.CargoDoor[3] - BED.Back - BED.Length / 2)) < 1e-6 and math.abs(BED.Center[2] - 3.85) < 1e-6, BED.Center[2])
 local function inBay(model: any): boolean
 	local p = truck.chassis.CFrame:PointToObjectSpace(model.PrimaryPart.Position)
 	return math.abs(p.X) <= BED.Width / 2 and math.abs(p.Z - cz) <= BED.Length / 2 and p.Y > 0.6 and p.Y < 0.6 + BED.Height
@@ -310,12 +387,25 @@ E.Net.get("PutDown").OnServerEvent:Fire(ann)
 
 -- The drop-off: the owner's plot -------------------------------------------------------------------------------------------------
 
+local BACK_UP = "Back the van up to the roller door to unload"
+-- How many times `player` heard `text` (since message `since`).
+local function times(player: any, text: string, since: number?): number
+	local n = 0
+	for index = since or 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then
+			n += 1
+		end
+	end
+	return n
+end
 park(truck, plot2.vanSpot)
 step()
-check("the van at another player's plot: no trip", #E.collected == 0 and E.last(ann, "Moving", "state").a.trips == 0)
+check("the van at another player's plot: no trip (and no word on backing up: not your plot)", #E.collected == 0 and E.last(ann, "Moving", "state").a.trips == 0
+	and not heard(ann, BACK_UP))
 park(truck, { x = 0, z = 200, yaw = 180 })
 step()
-check("…nor on Main Street", #E.collected == 0)
+check("…nor on Main Street", #E.collected == 0 and not heard(ann, BACK_UP))
 park(truck, plot1.vanSpot)
 check("(the van's back inside the owner's unload circle)", flatDistance(cargoDoor.WorldPosition, V3(plot1.unload.x, 0, plot1.unload.z)) <= plot1.unload.r)
 local tripAt = #E.messages
@@ -350,9 +440,32 @@ step()
 trigger(load, ann)
 step()
 check("the box of memories (★) loaded", stateOf(ann, 5).state == "truck")
-park(truck, plot1.vanSpot)
+-- 8.0.1: home, but parked in the plot away from the roller door (its side to the warehouse): no trip; how to unload
+local away = { x = plot1.unload.x + 40, z = plot1.unload.z + 24, yaw = 90 }
+E.seated[ann] = truck -- (Ann drives)
+park(truck, away)
+local hintAt = #E.messages
 step()
-check("trip 2: home, into the stock", E.last(ann, "Moving", "state").a.trips == 2 and #E.collected == 3 and E.collected[3].entry.item == "box" and heard(ann, "Trip 2 home"))
+check("8.0.1: loaded, in your plot away from the roller door: no trip, the driver hears how to unload", E.last(ann, "Moving", "state").a.trips == 1
+	and #E.collected == 2 and times(ann, BACK_UP, hintAt) == 1, E.lastNotice(ann))
+step(5)
+step(5)
+check("…once (not every tick)", times(ann, BACK_UP, hintAt) == 1)
+step(20)
+check("…again after a while if the van stays there", times(ann, BACK_UP, hintAt) == 2)
+-- nose-in to the roller door: the van's back out of the unload circle, its middle in it
+park(truck, { x = plot1.unload.x, z = plot1.unload.z + 8, yaw = 0 })
+local unloadAt = V3(plot1.unload.x, 0, plot1.unload.z)
+check("(nose-in: the van's back outside the unload circle, its middle inside)", flatDistance(cargoDoor.WorldPosition, unloadAt) > plot1.unload.r
+	and flatDistance(truck.chassis.Position, unloadAt) <= plot1.unload.r, flatDistance(cargoDoor.WorldPosition, unloadAt))
+step()
+check("trip 2: home nose-in (8.0.1: the van's middle in the circle), into the stock", E.last(ann, "Moving", "state").a.trips == 2 and #E.collected == 3
+	and E.collected[3].entry.item == "box" and heard(ann, "Trip 2 home"))
+park(truck, away)
+hintAt = #E.messages
+step(25)
+check("…the van empty, away in the plot: no word on backing up", times(ann, BACK_UP, hintAt) == 0)
+E.seated[ann] = nil
 
 -- FINISH -----------------------------------------------------------------------------------------------------------------------
 
@@ -431,13 +544,19 @@ check("admin: refill: a new house for the next move, its card", string.find(Movi
 
 -- No van out: it comes to the plot; a refusing collection; the horde and roamers switched on --------------------------------------
 
-E.cars[bob] = nil
+E.cars[bob] = nil -- (wrecked before: the save keeps its damage)
+E.carHealth[bob] = 0.2
 S.Horde, S.Roam = true, 2
+local parkedBefore, callsBefore = #parked, E.vehicleCalls or 0
 local said = Moving.admin(bob, "start")
 local van = E.cars[bob]
 local wanted = if Economy.findCar(Config.Sandbox.Van) then Config.Sandbox.Van else T.Van
 check("no van out: the player's own comes to their plot's vanSpot (the Sprinter, else the ZDC Van)", string.find(said, "started", 1, true) ~= nil and van ~= nil
 	and van.id == wanted and flatDistance(van.chassis.Position, V3(plot2.vanSpot.x, 0, plot2.vanSpot.z)) < 1, said)
+local how = parked[#parked]
+check("8.0.1: …the sandbox's way (SandboxBoot.parkVan, the hook Moving.parkVan): at his vanSpot, not seated, his own van, repaired (not the save's 0.2)",
+	#parked == parkedBefore + 1 and how.player == bob and how.spot == plot2.vanSpot and how.seat == false and how.carId == nil and van.health == 1, van.health)
+check("…never a bare spawnAt / placeAt / placeNear (they would skip the repair)", (E.vehicleCalls or 0) == callsBefore, E.vehicleCalls)
 step()
 check("…its clock 20 minutes, the horde switched on at HordeAt", E.last(bob, "Moving", "state").a.hordeAt == E.last(bob, "Moving", "state").a.endsAt - S.HordeAt)
 local zombies = #E.zombies
@@ -474,7 +593,68 @@ park(bobVan, plot2.vanSpot)
 step()
 check("a Collection.add that refuses (no save yet): the trip says so", heard(bob, "could not be stored") and #E.collected == 4)
 E.refuse = false
-Moving.admin(bob, "end")
+
+-- 8.0.1: the words -------------------------------------------------------------------------------------------------------------
+
+E.request(bob, "giveup")
+local bobResult = E.last(bob, "Moving", "result")
+check("8.0.1: GIVE UP after a trip: \"what came home is yours\" (no Wall), no pay, no XP", bobResult ~= nil and bobResult.a.how == "done"
+	and bobResult.a.howText == "You called it off: what came home is yours" and bobResult.a.money == 0 and bobResult.a.xp == 0, bobResult and bobResult.a.howText)
+
+-- the planning left open past Config.MoveRoles.Lobby.Timeout
+E.place(bob, moves:FindFirstChild("MovingBoard2"):FindFirstChild("Board").Position + V3(0, 0, 4))
+trigger(board2, bob)
+E.request(bob, "start", House.id)
+check("(Bob's planning open)", E.last(bob, "MoveLobby", "lobby") ~= nil and E.last(bob, "MoveLobby", "lobby").a ~= nil, E.lastNotice(bob))
+E.now += Config.MoveRoles.Lobby.Timeout + 1
+local lobbyAt = #E.messages
+Lobby.step()
+check("8.0.1: the planning ran out of time: take it again at a Moving contracts board (by your warehouse), not the depot's", heard(bob, "ran out of time", lobbyAt)
+	and heard(bob, "Moving contracts board", lobbyAt) and not heard(bob, "depot", lobbyAt), E.lastNotice(bob))
+
+-- the owner leaves after a trip: the crew hears that what came home is in the warehouse
+E.crew[ann] = { cid }
+check("(Ann's move with Cid in her crew)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil)
+E.place(cid, outside)
+step()
+park(truck, { x = House.curb.x, z = House.curb.z, yaw = 0 })
+loadOne(1)
+park(truck, plot1.vanSpot)
+step()
+check("(a trip home)", E.last(ann, "Moving", "state").a.trips == 1, E.lastNotice(ann))
+E.place(cid, truck.chassis.Position + V3(4, 1, 0))
+local leftAt = #E.messages
+E.leave(ann)
+local cidResult = E.last(cid, "Moving", "result")
+check("8.0.1: the owner left after a trip: the crew hears what came home is in the warehouse (no Wall)", heard(cid, "What came home is in their warehouse", leftAt)
+	and not heard(cid, "Wall", leftAt) and cidResult ~= nil and cidResult.a.how == "done"
+	and cidResult.a.howText == "Ann left the game: what came home is in their warehouse", cidResult and cidResult.a.howText)
+
+-- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or
+-- XP (the contract card's note says "No pay per piece" on purpose: not checked); Danny's lines name no Wall.
+local function noisy(text: string): boolean
+	return string.find(text, "Wall", 1, true) ~= nil or string.find(string.lower(text), "%f[%a]pa[iy][ds]?%f[%A]") ~= nil
+		or string.find(text, "%f[%a]XP%f[%A]") ~= nil
+end
+local loud: { string } = {}
+local results = 0
+for _, m in E.messages do
+	if m.remote == "Notice" and type(m.kind) == "string" and noisy(m.kind) then
+		table.insert(loud, m.kind)
+	elseif m.remote == "Moving" and m.kind == "result" and type(m.a) == "table" then
+		results += 1
+		if noisy(tostring(m.a.howText)) or m.a.pay ~= 0 or m.a.money ~= 0 or m.a.xp ~= 0 then
+			table.insert(loud, `result: {m.a.howText} {m.a.pay} {m.a.money} {m.a.xp}`)
+		end
+	end
+end
+for _, text in E.said do
+	if string.find(text, "Wall", 1, true) then
+		table.insert(loud, text)
+	end
+end
+check("8.0.1: done is quiet: no notice, result card (of " .. results .. ") or Danny's line in the sandbox mentions the Wall, pay or XP", #loud == 0 and results >= 6,
+	table.concat(loud, " | "))
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

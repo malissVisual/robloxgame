@@ -1,12 +1,14 @@
 --!strict
 -- 8.0 SANDBOX: the admin panel's 🔍 SHOW ZONES (client/AdminPanel.luau's SANDBOX tab): see-through debug marks, on this
 -- screen only, for what the sandbox's code measures against:
---   * each plot's unload circle (green: the van's back inside it unloads into that warehouse) and the house's curb (yellow:
---     the van's spot at the chalet, a van's footprint, its nose marked), from shared/SandboxAdmin.luau's zones;
+--   * each plot's unload circle (green: the van's back or middle inside it unloads into that warehouse) and the house's
+--     curb (yellow: the van's spot at the chalet, a van's footprint, its nose marked), from shared/SandboxAdmin.luau's
+--     zones;
 --   * the warehouses' display stands (violet boxes): the parts that hold a Display / Take down / Sell prompt
 --     (server/Warehouse.luau's, design/sandbox/KONTRAKT.md), looked for again every STANDS_EVERY s;
 --   * every van's cargo bay (blue: Config.Moving.Beds of its CarId, else the moves' van's): a box on its chassis (the
---     floor at the chassis' top: near enough to see the bed), so it drives along; vans that come or go every REFRESH s.
+--     floor at the chassis' top: near enough to see the bed; along the van where the load goes: Back in front of its
+--     CargoDoor, else Center), so it drives along; vans that come or go every REFRESH s.
 -- Nothing collides or is queried, nothing goes to the server. Off again: every mark goes.
 --
 --   SandboxZones.isOn()     shown now?
@@ -148,7 +150,11 @@ local function scanBays(folder: Folder)
 					local box = Instance.new("BoxHandleAdornment")
 					box.Adornee = chassis
 					box.Size = Vector3.new(bed.Width, bed.Height, bed.Length)
-					box.CFrame = CFrame.new(bed.Center[1], chassis.Size.Y / 2 + bed.Height / 2, bed.Center[2])
+					-- (its middle along the van as server/Moving.luau's SB.center puts the load: a bed with Back from the
+					-- car's CargoDoor, Back in front of it; else its Center; +Z is the van's back)
+					local door = chassis:FindFirstChild("CargoDoor")
+					local cz = if bed.Back and door and door:IsA("Attachment") then door.Position.Z - bed.Back - bed.Length / 2 else bed.Center[2]
+					box.CFrame = CFrame.new(bed.Center[1], chassis.Size.Y / 2 + bed.Height / 2, cz)
 					box.Color3 = COLORS.bay
 					box.Transparency = 0.6
 					box.AlwaysOnTop = false

@@ -137,7 +137,7 @@ def check(records: list) -> list:
         need(b["mode"] == "Persistent" and b["primary"] == "Board" and b["corkboard"] == "Board" and b["plot"] == b["id"],
              f"{where}: streaming {b['mode']}, primary {b['primary']}, Plot {b['plot']}")
         mine = [p for p in sandbox if p["set"] == f"plotboard{int(b['id'])}"]
-        need(len(mine) == summary["boardPieces"], f"{where}: {len(mine)} parts for {summary['boardPieces']} pieces")
+        need(len(mine) == summary["plotBoardPieces"], f"{where}: {len(mine)} parts for {summary['plotBoardPieces']} pieces")
         (sx, sz), (dx, dz), (ux, uz, ur), (vx, vz) = b["spot"], b["door"], b["unload"], b["vanSpot"]
         for p in mine:
             name = f"{where}.{p['name']}"

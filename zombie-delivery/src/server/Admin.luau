@@ -107,8 +107,9 @@
 --                             comes without its reward
 --   sandbox [T] id            8.0 SANDBOX, the panel's SANDBOX tab (only when Config.Sandbox.On; shared/SandboxAdmin.luau
 --                             checks the id; at most Config.Robust.Limits.AdminSandbox a second from one admin):
---                             "money" +$10 000, "broke" the money at $0; "refill" a running move called off (the next
---                             START brings a new seed: the house filled anew), "start" / "clock" / "horde" (Moving.admin's
+--                             "money" +$10 000, "broke" the money at $0; "refill" a running move called off, the card's
+--                             seed forgotten (Moving.admin's refill: the next START brings a new seed, the house filled
+--                             anew), "start" / "clock" / "horde" (Moving.admin's
 --                             start / time / horde); "fill" 10 random pieces in random condition into the stock
 --                             (Collection.add), "clear" the stock emptied ($0 for it: Collection.clear, else every piece
 --                             sold and the money put back), "stands" the stock's pieces on the free display stands
@@ -1391,9 +1392,11 @@ end
 -- Moves (the sandbox house: Moving's admin) ----------------------------------------------------------------------------
 
 -- Every move gets a new seed (KONTRAKT: "Each move gets a new seed, so the house is refilled"): a running one ends
--- cleanly (Moving.admin "end", called off) and the next START fills the house anew.
+-- cleanly (Moving.admin "end", called off), then Moving.admin "refill" forgets the seed your card holds (a card opened
+-- before keeps its house until its move starts) and opens the card on a new one: the next START fills the house anew.
 Sandbox.run.refill = function(player: Player)
 	local ended = if Sandbox.onMove(player) then string.gsub(Sandbox.moving(player, "end"), "^ADMIN: ", "") .. " " else "No move was running. "
+	Sandbox.moving(player, "refill")
 	say(player, `ADMIN: REFILL HOUSE: {ended}The next START MOVE fills the house anew (a new seed).`)
 end
 

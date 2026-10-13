@@ -42,7 +42,8 @@
 --   * He stays out of fights: a zombie within FleeRange, he runs (never while holding the other end of your piece). The
 --     zombies go after him like after a player on foot (Zombies.extraTargets); a bite knocks what he holds
 --     (Moving.helperHurt); at 0 health he drops it (knocked) and lies down; he is back at the van Respawn s later.
---   * He talks a little: a speech bubble (Npcs.say) on the way's events, never the same line within TalkRepeat s.
+--   * He talks a little: a speech bubble (Npcs.say) on the way's events, never the same line within TalkRepeat s (8.0
+--     SANDBOX: MoveHelperBrain.line's sandbox words: no Wall, no depot).
 -- Performance: one helper per move, one loop for all of them, a path at most every Repath s (computed in the background,
 -- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), the lists he chooses from kept
 -- and refilled (every Think s), the van's room for each piece worked out only when the load changes; carrying together
@@ -517,7 +518,7 @@ end
 local URGENT: { [string]: boolean } = { help = true, assist = true, three = true, door = true, open = true, mine = true }
 local function say(h: Helper, key: string, clock: number, force: boolean?): boolean
 	local body = h.body
-	local text = Brain.Lines[key]
+	local text = Brain.line(key, Config.Sandbox.On) -- (8.0 SANDBOX: no Wall, no depot in his words)
 	if not body or not text then
 		return false
 	end

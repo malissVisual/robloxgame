@@ -38,6 +38,55 @@ end
 check("every set: the checkpoint, the kiosk, the banner, Marge's house, the evacuation spots",
 	byId.checkpoint ~= nil and byId.board ~= nil and byId.banner ~= nil and byId.house_marge ~= nil and #Looks.spotPlaces() == #t.Spots and #t.Spots >= 2)
 
+-- 8.0.1, the plots' kiosks (MoveSiteLooks.board(true), server/MoveSites.luau plotBoard): the same kiosk, its corkboard
+-- the sandbox's (the chalet, bring it home to your warehouse), nothing of the city's story on it; the depot's unchanged.
+local function wordsOf(pieces: { Looks.Piece }): { [string]: string }
+	local out = {}
+	for _, p in pieces do
+		local lines = {}
+		for _, w in p.words or {} do
+			for _, l in w.lines do
+				table.insert(lines, l.text)
+			end
+		end
+		out[p.name] = table.concat(lines, " / ")
+	end
+	return out
+end
+local city, plot = Looks.board(), Looks.board(true)
+local cityText, plotText = wordsOf(city), wordsOf(plot)
+local all: { string } = {}
+local names: { [string]: boolean } = {}
+local twice = false
+for _, text in plotText do
+	table.insert(all, text)
+end
+for _, p in plot do
+	twice = twice or names[p.name] == true
+	names[p.name] = true
+end
+local plotAll = table.concat(all, " | ")
+local sameKiosk = true
+for _, p in city do
+	if not string.find(p.name, "^Photo") and not string.find(p.name, "^Flyer") and p.name ~= "Logo" then
+		local mine = nil
+		for _, q in plot do
+			if q.name == p.name then
+				mine = q
+			end
+		end
+		sameKiosk = sameKiosk and mine ~= nil and mine.size[1] == p.size[1] and mine.at[2] == p.at[2] and mine.solid == p.solid
+	end
+end
+check("8.0.1: the plots' kiosk: as many pieces as the depot's, unique names, the same kiosk round the corkboard (the Board solid where it was)",
+	#plot == #city and not twice and sameKiosk, `{#plot} / {#city}`)
+check("8.0.1: …its corkboard says THE OLD CHALET and \"Bring it home to your warehouse.\"", string.find(plotAll, "THE OLD CHALET", 1, true) ~= nil
+	and string.find(plotAll, "Bring it home to your warehouse.", 1, true) ~= nil, plotAll)
+check("8.0.1: …no Marge, no Walt, no Wall, no evacuation", string.find(plotAll, "MARGE", 1, true) == nil and string.find(plotAll, "WALT", 1, true) == nil
+	and string.find(plotAll, "Wall", 1, true) == nil and string.find(string.upper(plotAll), "EVACUAT", 1, true) == nil, plotAll)
+check("8.0.1: the depot's kiosk unchanged (Marge's photo, Go to the Wall, ZDC MOVING & EVACUATION)", cityText.PhotoMarge ~= nil
+	and string.find(cityText.FlyerEvac, "Go to the Wall", 1, true) ~= nil and string.find(cityText.Header, "EVACUATION", 1, true) ~= nil)
+
 -- Sound pieces --------------------------------------------------------------------------------------------------------
 
 local function finite(list: { number }, count: number): boolean

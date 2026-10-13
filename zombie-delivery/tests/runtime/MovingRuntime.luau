@@ -11,7 +11,8 @@
 -- runs on these too: its body from the fake Npcs (Runtime.said: what he says), the zombies' roots and Zombies.all.
 -- 8.0 SANDBOX: the city's game by default (Config.Sandbox.On false: Moving.start reads it); a sandbox test sets it true
 -- before Moving.start (tests/sandboxmove_runtime_test.luau). Its fakes: SandboxPlots (Runtime.plots: player → a
--- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse).
+-- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); the
+-- test sets server/SandboxBoot.luau's hook Moving.parkVan itself (Runtime.makeCar: a fake car).
 local Mock = require("./ItemMock") :: any
 local CityConfig = require("./Config") :: any
 CityConfig.Sandbox.On = false
@@ -455,6 +456,7 @@ local function makeCar(owner: any, id: string, at: any): any
 	model.Parent = workspace
 	return { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false, bike = bike }
 end
+Runtime.makeCar = makeCar -- (8.0 SANDBOX: the test's own Moving.parkVan parks one)
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
 -- 7.x van moves: a move goes with its owner's own car: the one placeNear makes when it is given no id (the old tests'
 -- big Moving Truck bed: Config.Moving.Beds.movingtruck; the van tests set "zdcvan")
