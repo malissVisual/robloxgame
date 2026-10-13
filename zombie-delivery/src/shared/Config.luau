@@ -5821,6 +5821,60 @@ Config.Moving = {
 	Tick = 0.2,
 }
 
+-- 7.0, the depot's helper ("Danny from the depot": server/MoveHelper.luau, his decisions shared/MoveHelperBrain.luau,
+-- tests/movehelper_test.luau; the owner: solo play is allowed with an AI helper). An NPC mover who joins a move whose
+-- crew is one player: he carries the one-hand things to the truck and takes the other end of a two-person thing.
+--   Solo / Duo         a crew of one / of two players gets him (Duo: off)
+--   Name / Title       his name tag
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the truck Respawn s later
+--   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a thing:
+--                      slower than a player
+--   KeepUp / Flee      × the pair's carry speed he may walk holding his end (to keep up); × the walk running away
+--   Tick / Think / Repath   s between his steps / his looks for the next thing / two paths (PathfindingService)
+--   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpWait: s stuck on the way,
+--                      or too far from his end while carrying, before the player drags it alone; HelpRetry: s before he
+--                      tries that lift again
+--   HelpReach / PickReach   studs from a thing's edge he takes its end / picks it up; LoadReach: from the truck's back
+--                      he loads; DoorReach: from a door he goes through it
+--   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
+--   WaitShut           s he waits with a thing at the truck's shut back before he sets it down beside it
+--   StuckSnap / Far    s without progress before he appears at his way's next point; studs away he appears at once
+--   TruckFar           studs from the house: a truck farther away is driving off (he waits at the house's door)
+--   TalkGap / TalkRepeat   s at least between two lines / before the same line again
+--   Follow / Orders    studs behind you on "Help me"; the orders (the Moving remote's "helper") a player may send a second
+Config.MoveHelper = {
+	Solo = true,
+	Duo = false,
+	Name = "Danny",
+	Title = "ZDC Moving",
+	Health = 100,
+	Respawn = 15,
+	Speed = 0.7,
+	KeepUp = 1.2,
+	Flee = 1,
+	Tick = 0.1,
+	Think = 0.5,
+	Repath = 1,
+	HelpFar = 140,
+	HelpWait = 3,
+	HelpRetry = 8,
+	HelpReach = 3,
+	PickReach = 3,
+	LoadReach = 5,
+	DoorReach = 3.5,
+	FleeRange = 14,
+	SafeRange = 24,
+	FleeStep = 18,
+	WaitShut = 8,
+	StuckSnap = 4,
+	Far = 120,
+	TruckFar = 150,
+	TalkGap = 3,
+	TalkRepeat = 12,
+	Follow = 5,
+	Orders = 4,
+}
+
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:
 -- jobs are the grind, you save up for something, then progress in the missions). The tables above keep the old base
 -- prices; this one pass, run once here, multiplies every `price` (and the upgrade tracks' baseCost) by its kind's

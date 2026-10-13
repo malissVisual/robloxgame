@@ -44,6 +44,8 @@
 --                             | "end"; returns what to say
 --   Moving.useArt(art)        the art modules given (a test or a fallback), instead of finding them by name
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
+--   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
+--                             Danny joins a crew of one; MoveHelper.sync in the tick)
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -56,6 +58,7 @@ local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
 local Crew = require(script.Parent.Crew)
+local MoveHelper = require(script.Parent.MoveHelper) -- 7.0: the depot's helper (Danny) for a crew of one
 local PlayerData = require(script.Parent.PlayerData)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
@@ -898,7 +901,7 @@ local function refreshTruck(s: Session)
 	local carriers = 0
 	for _, spot in s.move.order do
 		local thing = s.move.things[spot]
-		if thing.state == "carried" then
+		if thing.state == "carried" and playerById(thing.carrier) then -- (7.0 helper: not what Danny carries)
 			carriers += 1
 			carried = thing
 		end
@@ -922,6 +925,139 @@ local function refreshTruck(s: Session)
 	local crew = if #ids > 0 then table.concat(ids, ",") else nil
 	if truck.model:GetAttribute("BackCrew") ~= crew then
 		truck.model:SetAttribute("BackCrew", crew)
+	end
+end
+
+-- ── 7.0: the depot's helper's hands (server/MoveHelper.luau) ──────────────
+-- Danny ("Danny from the depot", an NPC for a crew of one) does what a player's hands do through these, with the same
+-- rules, welds and damage. `npc` is his body; its attribute MoveHelper is his id in the rules (a negative number: no
+-- player has it, so the player-only paths above leave him alone: no G prompt, no pace or apart check, no Load prompt).
+-- Server/MoveHelper.luau checks how near he is; these check the rules.
+
+local function helperIdOf(npc: Model): number?
+	local id = npc:GetAttribute("MoveHelper")
+	return if type(id) == "number" then id else nil
+end
+
+-- A holder's name for the list: a player's, or the helper's.
+local function holderName(id: number?): string?
+	local player = playerById(id)
+	if player then
+		return player.DisplayName
+	end
+	return MoveHelper.nameOf(id)
+end
+
+-- He takes `spot`: a one-hand thing into his arms (in front of his chest, like a player's), or the other end of a pair
+-- thing a player lifted (their walk: two people's now). Never a "both" thing, never a pair thing alone. (ok, why)
+function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, string?)
+	local who = helperIdOf(npc)
+	local item = s.items[spot]
+	local thing = s.move.things[spot]
+	local root = npc.PrimaryPart
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if s.ended or not who or not item or not thing or not root or not humanoid then
+		return false, "gone"
+	end
+	if thing.class == "pair" then
+		local ok, why = Rules.help(s.move, spot, who)
+		if not ok then
+			return false, why
+		end
+		carry(s, item) -- (carried now, not dragged: the carrier's weld and walk change)
+		local carrier = playerById(thing.carrier)
+		if carrier then
+			say(carrier, `{npc.Name} took the other end of the {thing.name}: walk together.`)
+		end
+		s.dirty = true
+		return true, nil
+	elseif thing.class ~= "hand" then
+		return false, "single"
+	end
+	local ok, why = Rules.pick(s.move, spot, who)
+	if not ok then
+		return false, why
+	end
+	item.model.Parent = folder
+	weldTo(item, root, root.CFrame * holdOffset(thing, "hand", root, humanoid))
+	item.lastAt, item.lastTime, item.apartSince, item.fallFrom = nil, 0, nil, nil
+	rewire(s, item)
+	s.dirty = true
+	return true, nil
+end
+
+-- He lets go. why: "put" (set down gently where he is), "died" (it falls: knocked), "apart" (his end of a pair thing:
+-- left behind) or "end". His end of a pair thing: the carrier drags it on alone.
+function Moving.helperDrop(s: Session, npc: Model, why: string)
+	local who = helperIdOf(npc)
+	if not who then
+		return
+	end
+	local spot, role = Rules.holding(s.move, who)
+	if not spot then
+		return
+	end
+	local item = s.items[spot]
+	local thing = s.move.things[spot]
+	if role == "helper" then
+		Rules.release(s.move, who)
+		local carrier = playerById(thing.carrier)
+		if item and carrier and not s.ended then
+			if why ~= "end" then
+				say(carrier, `{npc.Name} let go: you drag the {thing.name} alone now.`)
+			end
+			carry(s, item) -- (dragged again: the carrier's weld and walk)
+		end
+		s.dirty = true
+		return
+	end
+	local at = if item then item.root.CFrame else nil
+	Rules.release(s.move, who)
+	if item and at then
+		for _, hook in item.hooks do
+			hook:Disconnect()
+		end
+		table.clear(item.hooks)
+		local fell = settle(item, thing, at)
+		rewire(s, item)
+		if why == "died" then
+			hurtThing(s, spot, Rules.deathDamage(thing.fragile))
+		elseif why == "put" then
+			hurtThing(s, spot, Rules.fallDamage(fell, thing.fragile))
+		end
+	end
+	s.dirty = true
+end
+
+-- He puts what he carries into the truck (MovingRules' packer, like Load). (ok, why: "noroom", "empty" …)
+function Moving.helperLoad(s: Session, npc: Model): (boolean, string?)
+	local who = helperIdOf(npc)
+	if s.ended or not who or not truckOk(s) then
+		return false, "over"
+	end
+	local spot = Rules.holding(s.move, who)
+	local thing = if spot then s.move.things[spot] else nil
+	local at, refused = Rules.load(s.move, who)
+	if not at or not spot or not thing then
+		return false, refused
+	end
+	local item = s.items[spot]
+	if item then
+		stow(s, item, at)
+	end
+	local c = Rules.counts(s.move)
+	say(s.owner, `{npc.Name} loaded {labelOf(thing)} · {c.out}/{c.total} out · truck {math.floor(Rules.fill(s.move.packing) * 100 + 0.5)}% full`)
+	s.dirty = true
+	return true, nil
+end
+
+-- A bite took `hp` of his health: what he holds takes the knock (like a player's).
+function Moving.helperHurt(s: Session, npc: Model, hp: number)
+	local who = helperIdOf(npc)
+	local spot = if who then Rules.holding(s.move, who) else nil
+	local thing = if spot then s.move.things[spot] else nil
+	if spot and thing then
+		hurtThing(s, spot, Rules.hitDamage(hp, thing.fragile))
 	end
 end
 
@@ -1129,7 +1265,7 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 	local items = {}
 	for _, spot in s.move.order do
 		local thing = s.move.things[spot]
-		local carrier, helper = playerById(thing.carrier), playerById(thing.helper)
+		local carrier, helper = holderName(thing.carrier), holderName(thing.helper) -- (7.0 helper: Danny's name too)
 		table.insert(items, {
 			spot = spot,
 			name = thing.name,
@@ -1143,7 +1279,7 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 			state = thing.state,
 			condition = math.floor(thing.condition * 100 + 0.5) / 100,
 			broken = Rules.broken(thing),
-			by = if carrier then carrier.DisplayName .. (if helper then ` + {helper.DisplayName}` else "") else nil,
+			by = if carrier then carrier .. (if helper then ` + {helper}` else "") else nil,
 			mine = thing.carrier == player.UserId or thing.helper == player.UserId,
 		})
 	end
@@ -1674,6 +1810,7 @@ local function tick(s: Session)
 	if s.move.phase == "horde" then
 		hordeBurst(s, clock)
 	end
+	MoveHelper.sync(s, Moving) -- 7.0: Danny joins a crew of one, goes when it grows (his own loop walks him)
 	refreshTruck(s)
 	local truck = s.truck :: Vehicles.Car
 	if flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius then
