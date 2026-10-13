@@ -5821,6 +5821,57 @@ Config.Moving = {
 	Tick = 0.2,
 }
 
+-- 7.0 prototype, the moving (design/rework/NAVRH.md): the furniture a moving job carries out of a house and the house
+-- it stands in. shared/FurnitureLooks.luau draws every piece (its catalogue: size, class, weight, value),
+-- shared/HouseLayout.luau lays a house out (rooms, doors, where every piece stands), server/HouseInterior.luau builds it
+-- far off the map. Studs throughout.
+--   MaxParts           a piece's parts at most, its invisible Root included (tests/furniture_test.luau builds each)
+--   Ceiling / Wall     the rooms' height and the walls' thickness
+--   DoorHeight         every doorway's height; Door, FrontDoor and HallOpening their widths (a "pair" piece passes Door)
+--   HallWidth          the entrance hall's width between its walls' middles (the front door in its middle)
+--   Corridor           the corridor's width between its walls' middles (inside: Corridor - Wall)
+--   Spots              a house's pieces: at least, at most; Stars of them the client's ★ (sentimental first)
+--   Gap / WallGap      the room left between two pieces / between a piece and the wall behind it
+--   FixtureGap         the room left between a piece and the built-in things (counters, the tub)
+--   DoorClear          how far into a room a doorway is kept clear (nothing stands there)
+--   WindowSill         the windows' sill; a piece taller than this stands clear of them
+--   Window             a window's width and height (BathWindow: the bath's small high one)
+--   EntryIn / EntryUp  where you appear: this far in from the front door, the root this high over the floor
+--   Grid               the reachability check's step (every piece must get out of the front door, carried)
+--   Slot               the interiors' places, far off the map (Map.Bounds): Origin { x, y, z }, Spacing along X
+--   Ground             the safety floor under an interior: this far round the house, this deep under its floor
+--   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau)
+--   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom)
+--   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
+Config.Furniture = {
+	MaxParts = 30,
+	Ceiling = 12,
+	Wall = 1,
+	DoorHeight = 9,
+	Door = 6,
+	FrontDoor = 7,
+	HallOpening = 10,
+	HallWidth = 12,
+	Corridor = 8,
+	Spots = { 18, 24 } :: { number },
+	Stars = 3,
+	Gap = 0.5,
+	WallGap = 0.1,
+	FixtureGap = 0.3,
+	DoorClear = 5,
+	WindowSill = 4,
+	Window = { 5, 4 } :: { number },
+	BathWindow = { 3, 2.5 } :: { number },
+	EntryIn = 4.5,
+	EntryUp = 3,
+	Grid = 0.5,
+	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
+	Ground = { Margin = 24, Depth = 4 },
+	InteriorMaxParts = 600,
+	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 236, 204 } :: { number } },
+	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
+}
+
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:
 -- jobs are the grind, you save up for something, then progress in the missions). The tables above keep the old base
 -- prices; this one pass, run once here, multiplies every `price` (and the upgrade tracks' baseCost) by its kind's
