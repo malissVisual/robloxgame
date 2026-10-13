@@ -11,11 +11,14 @@ This checks callbacks, construction, current server data, resizing and cleanup, 
 7.0: the moves' story (MoveStoryUi) with its hooks in the real MovingHud (movestory.luau, on missions_mock.luau).
 7.0 review: the move's screen at 844 x 390 (MovingHud, MoveHelperHud, QuickChat, MoveLobbyUi: movehud.luau): nothing on
 the touch buttons or on each other, a finger's sizes, the list a sheet, the keys, ESC, the GPS, a resize.
+7.2: the maps' alpine look (the real MapView with MapStyle and AlpineLayout: mapview.luau on mapmock.luau): built once,
+within Config.MapStyle.Budget, everything there in its order, nothing made frame after frame.
 """
 import argparse
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -167,3 +170,17 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     for name in ("mock.luau", "missions_mock.luau", "carrygrip.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)
+
+
+# 7.2, the Alps on the maps: the real client/MapView.luau (shared/MapStyle.luau, AlpineLayout, Map, Roads, Explore and
+# the rest of the real shared data) on mapmock.luau's recorder (missions_mock.luau's, the services, the camera, your
+# character, Discovery's grid, DeviceBudget): tools/phone-ui/mapview.luau checks the paper map and the Alps (built once,
+# within Config.MapStyle.Budget, everything there and in its order) and that the frame loop leaves them alone.
+# (mapenv.py builds the folder; mapview_preview.py draws the same map's scenes.)
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mapenv import map_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    map_env(Path(folder))
+    subprocess.run([args.luau, "mapview.luau"], cwd=folder, check=True)

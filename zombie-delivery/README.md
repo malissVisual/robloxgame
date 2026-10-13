@@ -1227,6 +1227,33 @@ after everything else).
   past the Old Farm; the north gorge's waterfall; the forests along the West Highway; noon and dusk (the haze); with
   streaming on, the far silhouettes from Downtown.
 
+## The Alps on the maps (7.2)
+
+The big map (M) and the minimap are a **paper map** now (`client/MapView.luau`; what to draw is worked out by
+`shared/MapStyle.luau` from `Map` and `AlpineLayout`, the numbers and colours in `Config.MapStyle`): the valley green on
+cream, **the mountain ring round it** (on the big map a shaded peak with its snow cap for every cone, the far ones
+paler; on the minimap the same cones from above: grassy feet, rock and snow), the **forests** as rounded bands of tree
+dots (one TextLabel a row's run), the wildflower meadows lighter, the huts, the river (on through the gorges) and the
+lakes blue, the snowfield white, the roads light on a brown edge and the highways amber, the Hauptplatz's ⛲, the
+**ALTSTADT** over Downtown (a placeholder until `Map.Villages` names the villages: then Sankt Alm, Bergdorf and
+Seewinkel are labelled where Map puts them), and the **West Pass**'s road running into the cliff with a red ROAD
+CLOSED sign. The routes, the GPS, the markers, the icons, the fog and the minimap's turning work as before; the fog
+is a slate grey over the paper. Everything follows the data: step 2's bounds, its alpine lake and its snowfield are
+drawn without a change to the map's code.
+
+- **Cost:** the flat map is built at the start as before; the ring, the forests, the meadows, the huts and the pass
+  come a moment later, once, on the start screen (this client works `AlpineLayout.ring()` and `.forest()` out, a frame
+  apart: about 0.2 s and 0.3 s on a computer), into layers made for them under the fog: about 560 GuiObjects on the
+  big map and 400 on the minimap (`Config.MapStyle.Budget`). Nothing of it is touched again: the frame loop is as
+  before and makes nothing new.
+- **Checks:** `tools/phone-ui/mapview.luau` (run by `tools/phone-ui/check.py`): the real MapView on a recorder: built
+  once, within the budgets, everything there in its order, step 2's data read, the frame loop leaves it alone.
+  Preview: `NODE_PATH=… python3 tools/phone-ui/mapview_preview.py <luau> <sheet.png>` (the big map and the minimap at
+  1280 × 800 and 844 × 390, drawn in headless Chromium).
+- **Test in Studio:** open the big map (M) and the phone's MAP: the peaks round the edge, the forests, the West Pass's
+  sign, ALTSTADT; drive to the map's edge and watch the minimap (the ring's slopes, the snow in the north-west) while it
+  turns; a job's red route and the GPS over the paper; the fog lifting.
+
 ## MOVES: the moving rework, prototype (7.0)
 
 The owner's rework (`design/rework/NAVRH.md`, the story in `design/rework/PRIBEH.md`): the game turns into **moving**.
