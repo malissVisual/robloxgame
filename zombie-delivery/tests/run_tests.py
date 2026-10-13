@@ -65,6 +65,18 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "FurnitureMesh.luau"), encoding="utf-8").read()
     source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
     open(os.path.join(tmp, "FurnitureMesh.luau"), "w", encoding="utf-8").write(prefix + "local game, workspace = M.game, M.workspace\n" + source)
+    # 8.0 SANDBOX: the real server/Main.server.luau and server/SandboxBoot.luau as MainServer.luau and
+    # SandboxBootServer.luau for tests/boot_runtime_test.luau: each source wrapped in a function (the test runs it once
+    # per world: the sandbox's, the city's), its Roblox globals and `require` tests/runtime/BootRuntime.luau's recorders,
+    # bound again at every run; Config, Economy and SandboxMap the real copies above.
+    shutil.copy(os.path.join(HERE, "runtime", "BootRuntime.luau"), os.path.join(tmp, "BootRuntime.luau"))
+    bind = ('local E = require("./BootRuntime")\nreturn function()\n'
+            'local game, workspace, script, task, require, warn, print = E.game, E.workspace, E.script, E.task, E.require, E.warn, E.print\n'
+            'local Instance, CFrame, Vector3 = E.Instance, E.CFrame, E.Vector3\n')
+    for module, built in (("Main.server", "MainServer"), ("SandboxBoot", "SandboxBootServer")):
+        source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
+        source = re.sub(r"^export type ", "type ", source, flags=re.M)  # (only at a module's top level)
+        open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(bind + source + "\nend\n")
     # 6.23 (Codex's codex/cargo-missions-fix): the real server/Cargo.luau as CargoServer.luau for
     # tests/cargo_runtime_test.luau: its server modules, Net and services from tests/runtime/CargoRuntime.luau (on the
     # same recorder as CargoLooks), its shared modules the copies above.
@@ -310,7 +322,8 @@ def analytics_check():
     start = plan.index("AnalyticsPlan.Events = {")
     events = set(re.findall(r'^\t"(\w+)",', plan[start:plan.index("\n}", start)], re.M))
     # 6.13 review: the game reaches Analytics only through PlayerData.track (the hooks Analytics.start registers) and
-    # PlayerData.onMoney; only Main.server (inside `safely`) and Admin (inside a pcall) require the module.
+    # PlayerData.onMoney; only Main.server (inside `safely`) and Admin (inside a pcall) require the module (8.0: and
+    # SandboxBoot, the sandbox's Main, inside its `safely`).
     analytics = open(os.path.join(root, "src", "server", "Analytics.luau"), encoding="utf-8").read()
     start = analytics.index("PlayerData.analytics = {")
     hooks = set(re.findall(r"^\t\t(\w+) = Analytics\.", analytics[start:analytics.index("\n\t}", start)], re.M))
@@ -337,7 +350,7 @@ def analytics_check():
                     tracked += 1
                     if hook.group(1) not in hooks:
                         bad.append(f"{name}:{number}: PlayerData.track(\"{hook.group(1)}\") is no hook of Analytics.start")
-                if re.search(r"require\((?:script\.Parent|Server)\.Analytics\)", code) and name not in ("Main.server.luau", "Admin.luau"):
+                if re.search(r"require\((?:script\.Parent|Server)\.Analytics\)", code) and name not in ("Main.server.luau", "Admin.luau", "SandboxBoot.luau"):
                     bad.append(f"{name}:{number}: requires Analytics (use PlayerData.track: the game must not depend on it)")
     print("== analytics: " + (f"{reasons} money reasons, {named} event names and {tracked} hook calls in src/server, all known ({len(sources)} sources, {len(sinks)} sinks, {len(events)} events, {len(hooks)} hooks)" if not bad else "; ".join(bad)))
     return not bad

@@ -6686,12 +6686,18 @@ end
 -- city: one house to empty, your walk-in Sprinter van, your ZDC warehouse where what you bring is put on show (it earns
 -- while it stands there) or sold. On = false builds the old city as before (until it is deleted).
 --   On          the sandbox world instead of the city (server/Main.server.luau, client/Main.client.luau)
---   Van         the car every player has in the sandbox (Config.Cars id; parked at their plot's vanSpot at PLAY)
+--   Van         the car every player has in the sandbox (Config.Cars id; parked at their plot's vanSpot at PLAY; the
+--               ZDC Van, Config.CompanyVan.Car, while this one is not in Config.Cars yet: server/SandboxBoot.luau)
 --   MaxPlayers  the plots (SandboxMap.Plots): one player each (set the place's max players to this)
+--   Store       the sandbox's own DataStore (server/PlayerData.luau): the city's saves (DataStoreName) are never read
+--               or written while On
+--   StartMoney  a new sandbox save's money (in Studio without saves too)
 Config.Sandbox = {
 	On = true,
 	Van = "sprinter",
 	MaxPlayers = 4,
+	Store = Config.DataStoreName .. "_Sandbox",
+	StartMoney = 500,
 }
 
 -- 8.0 SANDBOX, the collection (design/sandbox/KONTRAKT.md "Collection"): everything a move brings home is yours. It

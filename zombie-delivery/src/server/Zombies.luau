@@ -198,6 +198,10 @@ Zombies.tierOf = function(_player: Player): number?
 	return nil
 end
 Zombies.bloodMoon = false
+-- 8.0 SANDBOX (server/SandboxBoot.luau sets it false): the world's own zombies, the residents (the camps, the base,
+-- the addresses) and the roamers round every player. Off, only who calls Zombies.spawn brings any (the moves' horde
+-- and roamers).
+Zombies.ambient = true
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -2098,6 +2102,9 @@ local function residentSpot(): (Vector3?, string)
 end
 
 local function keepResidents()
+	if not Zombies.ambient then
+		return -- (8.0: none in the sandbox)
+	end
 	local alive = 0
 	for _, z in zombies do
 		if z.resident then
@@ -2118,6 +2125,9 @@ end
 -- ── Roamers: zombies around every player without a job ────────────────────
 
 local function keepRoamers()
+	if not Zombies.ambient then
+		return -- (8.0: none in the sandbox)
+	end
 	local now = os.clock()
 	local radius = Roam.far + 40
 	-- More of them at night (smoothly at dusk and dawn).
