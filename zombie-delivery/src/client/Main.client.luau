@@ -110,6 +110,7 @@ safely("CarSway", require(Client.CarSway).start) -- 6.16: the cars' bodies roll 
 safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyre smoke from the wheels, skid marks (after CarSway)
 safely("CrashFx", require(Client.CrashFx).start) -- 6.16: sparks and a kick on a hard hit, sparks scraping a wall
 safely("SpeedLines", require(Client.SpeedLines).start) -- 6.16: streaks at the screen's edges near the top speed
+safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract card, the move's panel and list (Tab), the fade, the result
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast
@@ -244,7 +245,7 @@ end
 -- Every window but the phone (5.4.1: with only the phone open, the right mouse still turns the camera).
 CameraRig.windowOpen = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
-		or CareerUi.isOpen() or CareerUi.cardOpen()
+		or CareerUi.isOpen() or CareerUi.cardOpen() or require(Client.MovingHud).isOpen() -- (7.0: the move's card, its list)
 end
 -- 6.0.1: not while an app is open in the phone's popup (the mouse is needed there).
 CameraRig.freeLook = function(): boolean

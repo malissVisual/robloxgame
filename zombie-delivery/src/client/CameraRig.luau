@@ -81,10 +81,11 @@ local function adminSpeed(): number
 end
 
 -- The step with cargo in the hands: slower still with a heavy piece and nobody helping (the TWO-MAN LIFT twist:
--- server/Cargo.luau sets the character's CarrySpeed attribute).
+-- server/Cargo.luau sets the character's CarrySpeed attribute). 7.0: a move's thing (MoveCarry, server/Moving.luau)
+-- walks at its own CarrySpeed (a lamp near the walk, a sofa dragged alone a crawl).
 local function carrySpeed(character: Model): number
 	local lift = character:GetAttribute("CarrySpeed")
-	if type(lift) == "number" and character:GetAttribute("Pushing") ~= nil then
+	if type(lift) == "number" and (character:GetAttribute("Pushing") ~= nil or character:GetAttribute("MoveCarry") ~= nil) then
 		return lift -- 4.0: a trolley rolls a little faster than a crate is carried (server/Equipment.luau)
 	end
 	return if type(lift) == "number" then math.min(lift, CARRY_SPEED) else CARRY_SPEED

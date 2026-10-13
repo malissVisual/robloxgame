@@ -5275,6 +5275,7 @@ Config.Robust = {
 		ClientError = 0.05, -- 6.13: a client's script error (its script and line): one every 20 s at most (server/Analytics.luau)
 		CrateDown = 4, -- 6.15: the PutDown remote (the touch PUT DOWN) while you carry a supply drop's crate (server/LiveEvents.luau)
 		Skills = 4, -- 6.20: the SKILLS tab's +1 POINT and RESET (server/Skills.luau)
+		Moving = 6, -- 7.0: the Moving remote: the contract card's START, GIVE UP, the item list (server/Moving.luau)
 	},
 }
 
@@ -5753,6 +5754,71 @@ Config.ItemModel = {
 	Shift = 10,
 	Dim = 0.55,
 	Shut = 0.35,
+}
+
+-- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside
+-- it): server/Moving.luau runs a move, shared/MovingRules.luau has its rules (tests/moving_test.luau), client/
+-- MovingHud.luau shows it. The art is shared/FurnitureLooks.luau, shared/HouseLayout.luau and server/HouseInterior.luau.
+--   Time / HordeAt    the move's clock (s) and when the horde comes (s left); Fade: the fade at a door (s)
+--   Contracts         the moves on the depot's board (home: a Map.Homes id, the house whose front door leads inside;
+--                     seed: shared/HouseLayout.luau plan's)
+--   Truck             the company vehicle lent for a move (Config.Cars); Bed: its box inside (studs from the chassis'
+--                     top middle: Center x / z, the floor at the chassis' top), the packing grid's Cell
+--   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
+--                     drop-off ("the Wall"); a truck within DropRadius of it with a load ends the move
+--   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair, drag
+--   Damage            shares of a thing's condition: a fall over SafeDrop studs (over a jump's top, about 7) PerStud a
+--                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
+--                     Fragile × as much; broken at BrokenAt or less (it pays nothing and costs Pay.BrokenFine × its value)
+--   Pay               Σ value × condition × Scale, ★ things × Star, + TimeBonus × the share of the time left, late (the
+--                     clock ran out) × LateShare; XP Xp + XpPerStar × the stars; the crew within Present studs of the
+--                     truck shares it (Economy.crewSplit)
+--   Tether / Grace    a pair thing's helper stays within Tether studs of its end; farther for Grace s, it goes down
+--   Pace              a carried thing that moves faster than the carry's walk × Factor + Slack goes down (a teleport)
+--   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
+--                     door), the few zombies round it while somebody is outside within Range
+--   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+Config.Moving = {
+	Time = 12 * 60,
+	HordeAt = 3 * 60,
+	Fade = 0.35,
+	CardFor = 120, -- s the contract card's START stays good after the board (or the admin) opened it
+	Contracts = {
+		{
+			id = "marge",
+			name = "Marge's House",
+			client = "Marge",
+			icon = "🏠",
+			home = "home_suburbs_2_0_00", -- 155 Willow Ln, the nearest Suburbs house to the depot (its door faces north)
+			seed = 1955,
+			kind = "house",
+			blurb = "Prologue: Marge's family house on Willow Lane. Get her things out before the Wall closes.",
+		},
+	} :: { { id: string, name: string, client: string, icon: string, home: string, seed: number, kind: string, blurb: string } },
+	Truck = "movingtruck",
+	Bed = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+	Board = { 44, 12 } :: { number },
+	DropOff = { 34, 46 } :: { number },
+	DropRadius = 20,
+	Speed = { HandPerWeight = 0.03, MinHand = 0.6, Both = 0.75, Pair = 0.8, Drag = 0.35 },
+	Damage = { SafeDrop = 8, PerStud = 0.05, PerHp = 0.006, Death = 0.2, PerTruckHp = 0.002, Fragile = 2.5, BrokenAt = 0.2 },
+	Pay = { Scale = 1, Star = 1.5, TimeBonus = 0.25, BrokenFine = 0.25, LateShare = 0.5, Xp = 150, XpPerStar = 40 },
+	Present = 250,
+	Tether = 6,
+	Grace = 1.5,
+	Pace = { Factor = 1.8, Slack = 8 },
+	Horde = {
+		Count = 14,
+		Bursts = 3,
+		Every = 12,
+		Near = 45,
+		Far = 110,
+		Kinds = { walker = 0.55, runner = 0.25, brute = 0.12, bloater = 0.08 } :: { [string]: number },
+	},
+	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
+	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
+	Slots = 6,
+	Tick = 0.2,
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

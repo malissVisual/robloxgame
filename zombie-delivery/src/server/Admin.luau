@@ -49,6 +49,10 @@
 --                             goes first; server/SpecialOrders.luau force)
 --   regularOrder [T]          6.14: a REGULAR'S ORDER on the board now (needs a business where you are Silver or better)
 --   regulars [T] count        6.14: every business at that many deliveries (0 clears them; server/Regulars.luau adminSet)
+--   move       arg            7.0: your house move (server/Moving.luau admin): "card" the contract card, "start" Marge's
+--                             House now, "house" to its door (your car with you when you drive it), "horde" the horde
+--                             now, "time" one minute left, "deliver" ends it delivered with the truck's load, "end" calls
+--                             it off
 --   liveEvent  id             6.15: "bloodmoon" | "rush" | "supply" | "horde" starts that live event now for the whole
 --                             server (the running one ends first; the Blood Moon turns the clock to the night, rush
 --                             hour to the morning), "end" ends it (server/LiveEvents.luau adminStart checks the id)
@@ -1277,6 +1281,10 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	-- 6.15: the live events, for the whole server
 	liveEvent = function(player: Player, arg: any)
 		say(player, require(Server.LiveEvents).adminStart(arg))
+	end,
+	-- 7.0: MOVES, your own move (server/Moving.luau checks the argument)
+	move = function(player: Player, arg: any)
+		say(player, require(Server.Moving).admin(player, arg))
 	end,
 	god = setGod,
 	spawn = spawnEnemies,
