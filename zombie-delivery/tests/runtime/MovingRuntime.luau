@@ -450,6 +450,10 @@ Runtime.Vehicles = stub("Vehicles", {
 	backOpen = function(car: any): boolean
 		return car.model:GetAttribute("BackOpen") == true
 	end,
+	setBack = function(car: any, open: boolean) -- (7.x Danny opens the back himself)
+		car.model:SetAttribute("BackOpen", open)
+		Runtime.backSet = (Runtime.backSet or 0) + 1
+	end,
 	backVerb = function(_car: any, opening: boolean): string
 		return if opening then "open the back doors" else "close the back doors"
 	end,

@@ -1076,7 +1076,8 @@ local function holderName(id: number?): string?
 end
 
 -- He takes `spot`: a one-hand thing into his arms (in front of his chest, like a player's), or the other end of a pair
--- thing a player lifted (their walk: two people's now). Never a "both" thing, never a pair thing alone. (ok, why)
+-- thing a player lifted (their walk: two people's now). Never a pair thing alone. (ok, why)
+-- 7.x Danny, a partner: a "both" thing into his arms too, or the other side of one a player carries (the pair's walk).
 function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, string?)
 	local who = helperIdOf(npc)
 	local item = s.items[spot]
@@ -1086,8 +1087,8 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 	if s.ended or not who or not item or not thing or not root or not humanoid then
 		return false, "gone"
 	end
-	if thing.class == "pair" then
-		local ok, why = Rules.help(s.move, spot, who)
+	if thing.class == "pair" or (thing.class == "both" and thing.state == "carried") then -- (7.x: a both thing's other side)
+		local ok, why = Rules.help(s.move, spot, who, true)
 		if not ok then
 			return false, why
 		end
@@ -1098,7 +1099,7 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 		end
 		s.dirty = true
 		return true, nil
-	elseif thing.class ~= "hand" then
+	elseif thing.class ~= "hand" and thing.class ~= "both" then -- (7.x: a both thing alone too)
 		return false, "single"
 	end
 	local ok, why = Rules.pick(s.move, spot, who)
@@ -1106,7 +1107,7 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 		return false, why
 	end
 	item.model.Parent = folder
-	weldTo(item, root, root.CFrame * holdOffset(thing, "hand", root, humanoid))
+	weldTo(item, root, root.CFrame * holdOffset(thing, Rules.mode(thing), root, humanoid)) -- (7.x: "hand" or "both")
 	item.lastAt, item.lastTime, item.apartSince, item.fallFrom = nil, 0, nil, nil
 	rewire(s, item)
 	s.dirty = true

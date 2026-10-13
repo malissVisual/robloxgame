@@ -15,6 +15,8 @@
 -- makes no progress (`stuck`) instead of pushing against a wall.
 -- 5.7: Npcs.act names a short arm gesture (a wave, holding a piece out, reaching for it, a knock) on a person or a
 -- courier; the clients play it (client/ArmPose.luau, shared/Gestures.luau).
+-- 7.x: Npcs.carried / Npcs.stride: a person moved by constraints (Danny at the far end of a piece you carry together,
+-- server/MoveHelper.luau): its own walk off, the legs stepping with the speed it moves at.
 
 -- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
 -- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
@@ -725,6 +727,57 @@ function Npcs.gesture(npc: Model)
 	local tween = TweenService:Create(root, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), { CFrame = goal })
 	state.turn = tween
 	tween:Play()
+end
+
+-- 7.x Danny's two-person carry (server/MoveHelper.luau): a body moved by something else (constraints on its root at
+-- the far end of a piece a player carries), not by its own walk. Npcs.carried(npc, true): any walk stops, the root is
+-- free (unanchored) and the humanoid stands still on it (PlatformStand: no forces of its own, no turns); false: it
+-- stands again (anchored, upright, idle). Npcs.stride(npc, speed) meanwhile: the legs for `speed` studs/s along its
+-- facing (negative: backwards, the walk played in reverse), idle under half a stud a second.
+function Npcs.carried(npc: Model, on: boolean)
+	local state = states[npc]
+	if not state then
+		return
+	end
+	state.walkToken += 1
+	if state.turn then
+		state.turn:Cancel()
+		state.turn = nil
+	end
+	local humanoid = state.humanoid
+	if on then
+		state.root.Anchored = false
+		if humanoid then
+			humanoid:Move(Vector3.zero)
+			humanoid.PlatformStand = true
+		end
+		return
+	end
+	if humanoid then
+		humanoid.PlatformStand = false
+	end
+	stand(state)
+end
+
+function Npcs.stride(npc: Model, speed: number)
+	local state = states[npc]
+	if not state or not state.humanoid then
+		return
+	end
+	local pace = math.abs(speed)
+	if pace < 0.5 then
+		if state.moving then
+			play(state, false)
+		end
+		return
+	end
+	state.gait = state.walk -- (a carry's steps: never the run)
+	state.walkRate = pace / (STRIDE * state.scale)
+	play(state, true)
+	local gait = state.gait
+	if gait then
+		gait:AdjustSpeed(if speed < 0 then -state.walkRate else state.walkRate)
+	end
 end
 
 -- 5.7: a short arm gesture (shared/Gestures.luau: "wave", "give", "take", "knock") on a person or a player's

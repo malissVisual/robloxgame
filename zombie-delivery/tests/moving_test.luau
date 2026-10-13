@@ -31,7 +31,8 @@ check("dragging is the slowest, a light thing in a hand the fastest", Rules.spee
 check("a hand free only with a hand thing", Rules.hands("hand") == 1 and Rules.hands("both") == 2 and Rules.hands("pair") == 2 and Rules.hands("drag") == 2)
 local thing = { class = "pair", helper = nil } :: any
 check("a pair thing alone is dragged, with a helper carried", Rules.mode(thing) == "drag" and Rules.mode({ class = "pair", helper = 7 } :: any) == "pair")
-check("hand and both are what they are", Rules.mode({ class = "hand" } :: any) == "hand" and Rules.mode({ class = "both", helper = 3 } :: any) == "both")
+check("hand and both are what they are", Rules.mode({ class = "hand" } :: any) == "hand" and Rules.mode({ class = "both" } :: any) == "both")
+check("7.x: a both thing with Danny on its other side walks as a pair", Rules.mode({ class = "both", helper = 3 } :: any) == "pair")
 
 -- Damage -------------------------------------------------------------------------------------------------------------
 
@@ -150,7 +151,14 @@ spot, down = Rules.release(move, ME)
 check("the carrier sets it down", spot == 1 and down and move.things[1].state == "ground" and move.things[1].carrier == nil)
 check("picked up again from the ground", (Rules.pick(move, 1, YOU)) and Rules.load(move, YOU) ~= nil)
 check("the clock and the fridge in too", (Rules.pick(move, 4, ME)) and Rules.load(move, ME) ~= nil and (Rules.pick(move, 6, THEM)) and Rules.load(move, THEM) ~= nil)
-check("the TV and the box too", (Rules.pick(move, 2, ME)) and Rules.load(move, ME) ~= nil and (Rules.pick(move, 5, ME)) and Rules.load(move, ME) ~= nil)
+-- 7.x: Danny's other side of a "both" thing (help's `both`): the pair's walk for both
+check("7.x: the TV lifted alone: both hands", (Rules.pick(move, 2, ME)) and Rules.mode(move.things[2]) == "both")
+ok, why = Rules.help(move, 2, THEM)
+check("…a player's Help lift is for pair things only", not ok and why == "single", why)
+ok, why = Rules.help(move, 2, THEM, true)
+check("…Danny takes its other side: carried by two", ok and Rules.mode(move.things[2]) == "pair" and move.things[2].helper == THEM, why)
+check("…its carrier loads it: both pairs of hands free", Rules.load(move, ME) ~= nil and Rules.holding(move, THEM) == nil and Rules.holding(move, ME) == nil)
+check("the box too", (Rules.pick(move, 5, ME)) and Rules.load(move, ME) ~= nil)
 counts = Rules.counts(move)
 check("all out, all ★", counts.out == 6 and counts.starsOut == 3 and counts.home == 0)
 check("the truck's fill shows", Rules.fill(move.packing) > 0 and Rules.fill(move.packing) < 1)

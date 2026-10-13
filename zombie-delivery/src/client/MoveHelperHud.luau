@@ -2,7 +2,8 @@
 -- 7.0, the depot's helper's orders (server/MoveHelper.luau: Danny joins a move whose crew is one player): a small strip
 -- under the move's panel (client/MovingHud.luau) while he is on your move (your player attribute MoveHelper = the order
 -- in force): what he does now (MoveHelperDoing) and three buttons, HELP ME (he follows you and lifts with you), SMALL
--- STUFF (he carries the one-hand things to the truck: the default) and WAIT AT TRUCK, the one in force lit. A tap sends
+-- STUFF (he carries the smaller pieces to the van: the default) and WAIT AT VAN (7.x: the van, not the truck), the one
+-- in force lit. He lifts your two-person pieces with you on every order but WAIT AT VAN. A tap sends
 -- the Moving remote's ("helper", order); the server checks it. On a touch screen the buttons are at least Ui.MinTouch
 -- high. 7.0 review: the strip sits under the move's panel where it really is (client/TopBlocks.luau "MovePanel", its
 -- height measured, not assumed), follows it and the screen's size, and is a top-centre block itself ("MoveHelper": the
@@ -29,7 +30,7 @@ local WIDTH, ROW, GAP = MoveLayout.PANEL_W, 30, 6
 local ORDERS = {
 	{ id = "help", text = "HELP ME" },
 	{ id = "carry", text = "SMALL STUFF" },
-	{ id = "wait", text = "WAIT AT TRUCK" },
+	{ id = "wait", text = "WAIT AT VAN" },
 }
 
 local remote = Net.get("Moving")

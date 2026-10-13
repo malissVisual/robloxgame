@@ -1269,9 +1269,18 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Drive into the Wall's checkpoint at the depot to finish. Pay is Σ value × condition, with ★ × 1.5 and a time bonus, split with the crew at the truck; you also get XP and 1–5 stars.
 
 **Danny from the depot** (`server/MoveHelper.luau`, `shared/MoveHelperBrain.luau`, `Config.MoveHelper`) helps a solo player.
-- He takes the other end of a two-person piece and carries the small ones out on his own, ★ first.
-- He runs from zombies and is back at the truck 15 s after he goes down.
-- Orders: HELP ME, SMALL STUFF, WAIT AT TRUCK; the quick chat "Need a hand here" calls him too.
+7.x (the owner: "he helps weirdly, mainly we don't carry anything together") made him a partner with a clear priority list each step:
+- **Carrying together just works.** You Lift a 👥 piece and he sprints to its far end (from far away, or when his path fails, or not there in 1.6 s: a quick fade-over) and takes it within ~2 s: "Got the other end!", then "On three... lift!".
+  - Then he moves WITH the piece: his own walk is off and constraints on his root (AlignPosition / AlignOrientation to an attachment at the far end, turned to you) hold him there, on the floor under that end (stairs, steps), through door frames like the piece itself and through the front door's fade with you. No "too far apart" drop any more.
+  - His arms hold its edge (client/ArmPose.luau from his Carrying / CarryAt / CarrySize), his legs step with his speed (backwards too: `Npcs.carried`, `Npcs.stride`), and your grip bar's box is 1.3× bigger while he steadies it (the character attribute GripSteady, `Config.CarryGrip.Steadied`).
+  - On the way: "Watch the doorframe!" at a doorway; by the van he opens its back for the two of you, else "That's going in the van."
+- **He carries more.** 🙌 pieces too (slower), not only ✋ ones: ★ first, then the most value a second of the trip. He opens the van's back himself (`OpenBack`; not allowed: "Open the back, boss!"), and says "Van's full, boss - drive it to the Wall?" and waits when it is.
+- **Your lift wins.** A piece you stand by with free hands (within 8 studs, nearer than he is) is yours: he drops his plan ("All yours, boss.").
+- **A heavy 🙌 piece you carry alone** (weight 4+): he takes its other side, so both walk at the pair's 0.8 (`MovingRules.help`'s `both`).
+- **The van's back for you:** you come with a piece, the back shut, he is near: "I'll get the doors!"
+- He flees zombies only when he is not carrying with you; stuck 2 s, a new path; 4 s, a nudge to the next waypoint; where he stands still he keeps out of doorways.
+- He is back at the van 15 s after he goes down.
+- Orders: HELP ME, SMALL STUFF, WAIT AT VAN; the quick chat "Need a hand here" calls him too. The strip under the move's panel says what he does.
 
 **The greeters** (`server/MoveGreeters.luau`, the words in `shared/MoveStory.luau`, `Config.MoveGreeters`): people who welcome you.
 - **Marge on her porch.** She stands beside the front door of 155 Willow Ln from the move's start, off the path.
@@ -1292,7 +1301,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - the rules: `moving_test`, `moveroles_test`, `movehelper_test`, `movestory_test`;
 - the art: `furniture_test`, `houselayout_test`, `houseinterior_test`, `movesites_test`;
 - the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`, `movegreeters_runtime_test`;
-- an end-to-end move with the real house art: `moving_art_runtime_test`.
+- an end-to-end move with the real house art: `moving_art_runtime_test`; Danny carrying the real sofa out with you: `movehelper_art_runtime_test`.
 
 ## Cars spawn clear and stand back up (6.26)
 
