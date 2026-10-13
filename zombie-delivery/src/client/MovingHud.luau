@@ -37,6 +37,10 @@
 -- 7.x van moves (the move goes with your own van, several trips to the Wall): the panel's line is "TRIP n · delivered
 -- x/y · ★", the bar the van's room; the owner's FINISH on the panel (and in the list's sheet on a phone), asked twice
 -- (the remote's "finish": paid for every trip); the van lost: when CAR brings it back.
+-- 8.0 SANDBOX (server/Moving.luau's SB; design/sandbox/KONTRAKT.md), from the server's own fields (none: the city's as
+-- before): the state's `drop` ("your warehouse": the drop-off's words in the panel, the list, the GPS, a delivered
+-- thing is HOME); the card's `story` false (no intro, no CHAPTERS) and `note` (no pay per piece), a horde at 0:00 none;
+-- the result's `home` (what came home: the pieces, their value; no pay lines).
 -- Presentation only.
 
 local CollectionService = game:GetService("CollectionService")
@@ -133,6 +137,11 @@ end
 
 local CLASS_TEXT: { [string]: string } = { hand = "✋ one hand", both = "🙌 both hands", pair = "👥 two people" }
 local STATE_TEXT: { [string]: string } = { home = "IN THE HOUSE", carried = "CARRIED", ground = "ON THE GROUND", truck = "IN THE VAN", delivered = "AT THE WALL", lost = "LOST" }
+
+-- The move's drop-off in a sentence: the state's `drop` (8.0 SANDBOX: "your warehouse"), else "the Wall".
+local function wallOf(s: any): string
+	return if type(s) == "table" and type(s.drop) == "string" then s.drop else "the Wall"
+end
 
 -- ── The prompts of your move only ──────────────────────────────────────────
 
@@ -269,7 +278,11 @@ local function updateGps()
 	local counts = s.counts or {}
 	local out = tonumber(counts.out) or 0
 	if out > 0 and (seated() or s.horde == true or s.graceEndsAt ~= nil) then -- (7.0 review: late: the Wall)
-		setGps(Vector3.new(s.dropOff.x, Map.RoadTop, s.dropOff.z), "The Wall (drop-off)", "🧱")
+		if type(s.drop) == "string" then -- (8.0 SANDBOX: your warehouse)
+			setGps(Vector3.new(s.dropOff.x, Map.RoadTop, s.dropOff.z), "Your warehouse", "🏠")
+		else
+			setGps(Vector3.new(s.dropOff.x, Map.RoadTop, s.dropOff.z), "The Wall (drop-off)", "🧱")
+		end
 	else
 		setGps(Vector3.new(s.house.x, Map.RoadTop, s.house.z), s.name, s.icon)
 	end
@@ -356,7 +369,7 @@ local function nextStep(s: any): string
 		return if wait > 0 then `💥 The van is lost · CAR brings it back in {wait} s` else "💥 The van is lost · CAR brings it back now"
 	end
 	if s.horde == true then
-		return if out > 0 then "🧟 THE HORDE! Drive the van to the Wall NOW" else "🧟 THE HORDE! Load something and get out"
+		return if out > 0 then `🧟 THE HORDE! Drive the van to {wallOf(s)} NOW` else "🧟 THE HORDE! Load something and get out"
 	end
 	if s.inside == true then
 		return if carried > 0 then "Carry it out: \"Leave\" by a door" else "Pick up the things (E) · ★ first"
@@ -365,10 +378,10 @@ local function nextStep(s: any): string
 		return if s.backOpen == true then "Load it at the van's back (E)" else "Open the van's back (E), then Load"
 	end
 	if out > 0 and out + delivered >= total and total > 0 then
-		return "Everything is in: drive to the Wall at the depot"
+		return if s.drop then `Everything is in: drive to {wallOf(s)}` else "Everything is in: drive to the Wall at the depot"
 	end
 	if seated() then
-		return if out > 0 then "Drive to the Wall (GPS), or back for more" elseif delivered > 0 then `Back to {s.name} for more, or FINISH` else `Drive to {s.name} (GPS)`
+		return if out > 0 then `Drive to {wallOf(s)} (GPS), or back for more` elseif delivered > 0 then `Back to {s.name} for more, or FINISH` else `Drive to {s.name} (GPS)`
 	end
 	return `"Enter" at {s.name}'s door`
 end
@@ -417,7 +430,7 @@ refreshPanel = function()
 	refs.truckLabel.Text = `🚐 VAN {math.floor(fill * 100 + 0.5)}%`
 	refs.fill.Size = UDim2.fromScale(fill, 1)
 	refs.fill.BackgroundColor3 = if fill > 0.9 then K.red elseif fill > 0.7 then K.warn else ORANGE
-	refs.next.Text = if late and grace then `⏱ TIME'S UP · REACH THE WALL · {clock(grace - nowAt)}` else nextStep(s)
+	refs.next.Text = if late and grace then `⏱ TIME'S UP · REACH {string.upper(wallOf(s))} · {clock(grace - nowAt)}` else nextStep(s)
 	refs.next.TextColor3 = if s.horde == true or late then K.red else K.text
 	refs.role.Text = roleLine(s) -- 7.0 planning
 	local finish = refs.finish -- 7.x van moves: the owner's FINISH once something reached the Wall (asked twice)
@@ -479,7 +492,7 @@ local function itemRow(parent: Instance, item: any, order: number)
 		facts ..= " · fragile"
 	end
 	text(row, facts, UDim2.new(1, -150, 0, 16), { Position = UDim2.fromOffset(54, 28), TextSize = 12, TextColor3 = C.faint })
-	local where = STATE_TEXT[item.state] or ""
+	local where = if item.state == "delivered" and type(state) == "table" and state.drop then "HOME" else STATE_TEXT[item.state] or ""
 	if item.state == "carried" and type(item.by) == "string" then
 		where = if item.mine == true then "IN YOUR HANDS" else `CARRIED · {string.upper(item.by)}`
 	end
@@ -684,7 +697,7 @@ local function drawList()
 	listFrame = if sheet then holder else frame
 	text(frame, `{s.icon or "🏠"} {string.upper(s.name or "")} · THINGS`, UDim2.new(1, -60, 0, 22), { Position = UDim2.fromOffset(12, 10), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = C.title })
 	local counts = s.counts or {}
-	text(frame, `★ must-haves first · {counts.delivered or 0} of {counts.total or 0} at the Wall · {counts.out or 0} in the van`, UDim2.new(1, -60, 0, 16), { Position = UDim2.fromOffset(12, 32), TextSize = 12, TextColor3 = C.faint })
+	text(frame, `★ must-haves first · {counts.delivered or 0} of {counts.total or 0} {if s.drop then "home" else "at the Wall"} · {counts.out or 0} in the van`, UDim2.new(1, -60, 0, 16), { Position = UDim2.fromOffset(12, 32), TextSize = 12, TextColor3 = C.faint })
 	Ui.closeButton(frame, function()
 		closeList()
 	end)
@@ -866,8 +879,9 @@ local function showContract(card: any)
 	if type(card) ~= "table" then
 		return
 	end
-	-- MoveStory hook: the first board ever opens on Marge's intro (client/MoveStoryUi.luau), this card after it
-	if MoveStoryUi.intro(function()
+	-- MoveStory hook: the first board ever opens on Marge's intro (client/MoveStoryUi.luau), this card after it (8.0
+	-- SANDBOX: no story)
+	if card.story ~= false and MoveStoryUi.intro(function()
 		showContract(card)
 	end) then
 		return
@@ -915,14 +929,14 @@ local function showContract(card: any)
 	local minutes = math.floor((tonumber(card.time) or 0) / 60)
 	chipRow(body, 5, {
 		`⏱ {minutes} MIN`,
-		`🧟 HORDE AT {clock(tonumber(card.hordeAt) or 0)} LEFT`,
+		if (tonumber(card.hordeAt) or 0) > 0 then `🧟 HORDE AT {clock(tonumber(card.hordeAt) or 0)} LEFT` else "🧟 NO HORDE",
 		`📦 {card.items or 0} THINGS`,
 		`🚚 {string.upper(tostring(card.truck))} LENT`,
 	})
 	local stars = card.stars or {}
 	line(body, if #stars > 0 then `★ MUST-HAVES: {table.concat(stars, " · ")}` else "★ MUST-HAVES: none", 6, { TextColor3 = C.gold, Font = Theme.HeadingFont, TextSize = 13 })
 	line(body, `UP TO {Ui.money(tonumber(card.estimate) or 0)}`, 7, { Font = Theme.HeadingFont, TextSize = 28, TextColor3 = C.money })
-	line(body, "Paid by what arrives and its condition; ★ things ×1.5, a time bonus, broken things cost you. Your crew (K) helps and shares the pay.", 8, { TextSize = 12, TextColor3 = C.faint })
+	line(body, if type(card.note) == "string" then card.note else "Paid by what arrives and its condition; ★ things ×1.5, a time bonus, broken things cost you. Your crew (K) helps and shares the pay.", 8, { TextSize = 12, TextColor3 = C.faint })
 	local busy = card.busy
 	if type(busy) == "string" then
 		line(body, busy, 9, { TextColor3 = K.red, Font = Theme.HeadingFont, TextSize = 13 })
@@ -950,9 +964,11 @@ local function showContract(card: any)
 	Ui.gamepadFocus(start)
 	-- MoveStory hook: the story road (CHAPTERS) under START (7.x farm move: open as the card's contracts say; a tap on
 	-- another playable chapter asks for its contract's card)
-	MoveStoryUi.chapters(body, 11, card.id, open, function(id: string)
-		remote:FireServer("card", id)
-	end)
+	if card.story ~= false then
+		MoveStoryUi.chapters(body, 11, card.id, open, function(id: string)
+			remote:FireServer("card", id)
+		end)
+	end
 	sound("notify")
 end
 
@@ -978,7 +994,12 @@ local function showResult(r: any)
 		`🏠 LEFT BEHIND {r.left or 0}`,
 		`💥 BROKEN {r.broken or 0}`,
 	})
-	if good then
+	local home = if type(r.home) == "table" then r.home else nil
+	if home then -- 8.0 SANDBOX: no pay: what came home to your warehouse (also when called off: it is there)
+		local trips = tonumber(r.trips) or 0
+		line(body, `{tonumber(home.pieces) or 0} PIECES CAME HOME · WORTH {Ui.money(tonumber(home.value) or 0)}`, 5, { Font = Theme.HeadingFont, TextSize = 22, TextColor3 = C.money, TextXAlignment = Enum.TextXAlignment.Center })
+		line(body, `In {trips} trip{if trips == 1 then "" else "s"} home. They wait in your warehouse: put them on show (they earn every minute) or sell them.`, 6, { TextSize = 12, TextColor3 = C.faint, TextXAlignment = Enum.TextXAlignment.Center })
+	elseif good then
 		local parts = { `Things {Ui.money(tonumber(r.base) or 0)}`, `★ bonus {Ui.money(tonumber(r.starBonus) or 0)}`, `time bonus {Ui.money(tonumber(r.timeBonus) or 0)}` }
 		local fine = tonumber(r.fine) or 0
 		if fine > 0 then

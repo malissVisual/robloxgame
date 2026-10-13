@@ -13,6 +13,9 @@
 -- 7.0 review (server): nothing replaces the truck mid-move (Vehicles' spawn / placeNear / placeAt / spawnAt), Moving.busy
 -- and Crew.hasJob, a door trip whose move ends meanwhile, Load's pace check, Unload's full hands, the end's pay failing
 -- (the cleanup still runs), the late grace, LAUNCH at the board, the Guard's range, the plan made once.
+-- 8.0 SANDBOX off (tests/runtime/MovingRuntime.luau: Config.Sandbox.On false): the city's game as it was: the depot's
+-- board, the Wall, Marge and Walt, the story, the pay; no plot kiosks, no walk-in bay's Load, no sandbox fields
+-- (tests/sandboxmove_runtime_test.luau has the sandbox).
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -63,6 +66,8 @@ Moving.start()
 local moves = workspace:FindFirstChild("Moves")
 check("the Moves folder: the board, the drop-off, the house's door", moves ~= nil and moves:FindFirstChild("MovingBoard") ~= nil and moves:FindFirstChild("MovingDropOff") ~= nil
 	and moves:FindFirstChild("Move_marge") ~= nil)
+check("8.0 SANDBOX off: the city's world (no plot kiosks, no sandbox house)", Config.Sandbox.On == false and moves:FindFirstChild("MovingBoard1") == nil
+	and moves:FindFirstChild("Move_sandbox_house") == nil and moves:FindFirstChild("MoveDressing") ~= nil)
 Greeters.step() -- (the greeters' loop: the soldier at the Wall)
 check("7.0 greeters: the soldier stands at the Wall", Greeters.soldier() ~= nil and Greeters.soldier().Parent ~= nil)
 -- The porch greeter of `owner`'s move (her body in the world), or nil.
@@ -107,6 +112,8 @@ check("the board's prompt", boardPrompt ~= nil)
 trigger(boardPrompt, ann)
 local card = E.last(ann, "Moving", "contract")
 check("the board opens the contract card", card ~= nil and card.a.id == "marge" and card.a.name == "Marge's House")
+check("8.0 SANDBOX off: the card as ever (Marge's and Walt's, the story, the pay; no note)", card ~= nil and #card.a.contracts == 2 and card.a.story == nil
+	and card.a.note == nil and card.a.hordeAt == T.HordeAt)
 check("the card: the ★ must-haves, the things, the pay, the time", card ~= nil and #card.a.stars == 3 and card.a.items == 6 and card.a.estimate > 0 and card.a.time == T.Time and card.a.busy == nil,
 	card and card.a.busy)
 local cardFromFar = #E.messages
@@ -163,6 +170,8 @@ check("7.0 greeters: Marge on the porch from the move's start (the crew still at
 	and not E.saidSince(MoveStory.greeterOf("marge").hello[1], 0))
 check("the crew is on the move (MoveWith)", ann:GetAttribute("MoveWith") == 11 and bob:GetAttribute("MoveWith") == 11 and cid:GetAttribute("MoveWith") == nil)
 local view = E.last(ann, "Moving", "state")
+check("8.0 SANDBOX off: the state's drop-off is the Wall (no drop words), the horde at HordeAt", view ~= nil and view.a ~= nil and view.a.drop == nil
+	and view.a.hordeAt == view.a.endsAt - T.HordeAt and view.a.dropOff.x == Map.Depot.x + T.DropOff[1])
 check("the state: 6 things, 3 ★, the clock", view ~= nil and view.a ~= nil and #view.a.items == 6 and view.a.counts.stars == 3 and view.a.endsAt == E.now + T.Time and view.a.mine == true)
 check("…and Bob's says it is Ann's", E.last(bob, "Moving", "state") ~= nil and E.last(bob, "Moving", "state").a.mine == false)
 check("the state: the roles (no lock, no lights to fix)", view.a.team.role == "driver" and E.last(bob, "Moving", "state").a.team.role == "guard" and #view.a.team.crew == 2
@@ -306,6 +315,8 @@ E.clock += 0.2
 Moving.step()
 local backPrompt = cargoDoor:FindFirstChild("BackPrompt")
 check("back open, a thing carried: Load shows, the back's own E waits", load.Enabled and not backPrompt.Enabled and string.find(load.ActionText, "Lamp", 1, true) ~= nil, load.ActionText)
+check("8.0 SANDBOX off: the prompts say ZDC Van, no walk-in bay's Load", string.find(load.ObjectText, "ZDC Van ·", 1, true) == 1 and truck.chassis:FindFirstChild("MoveLoadBay") == nil,
+	load.ObjectText)
 check("the crew may open the back (BackCrew, backAllowed)", truck.model:GetAttribute("BackCrew") == "22")
 trigger(load, ann)
 check("loaded: hands free, in the truck", character:GetAttribute("MoveCarry") == nil and character:GetAttribute("Carrying") == nil and string.find(E.lastNotice(ann), "loaded", 1, true) ~= nil, E.lastNotice(ann))
@@ -631,6 +642,7 @@ check("…FINISH is the owner's", E.last(ann, "Moving", "result") == resultBefor
 E.request(ann, "finish")
 local result = E.last(ann, "Moving", "result")
 check("FINISH: the result card, paid for what was delivered", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.stars >= 1 and result.a.trips == 1)
+check("8.0 SANDBOX off: no warehouse on the card, nothing collected", result.a.home == nil and #E.collected == 0)
 check("…Marge left the porch", porchOf(ann) == nil)
 check("…the van's Load and Take out gone, Take out's own spot too", promptIn(truck.model, "Load") == nil and promptIn(truck.model, "Take out") == nil
 	and truck.chassis:FindFirstChild("MoveTakeOut") == nil and truck.chassis:FindFirstChild("CargoDoor") ~= nil)

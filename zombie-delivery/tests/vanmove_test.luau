@@ -149,6 +149,86 @@ check("Marge as the dispatcher, anybody else their role's look", NpcLooks.person
 local greeter = MoveStory.greeterOf("walt") :: MoveStory.Greeter
 check("Walt's ★ lines: Thunder's saddle its own, another ★ piece his star line", MoveStory.starLine(greeter, "thunders_saddle") == "Easy with Thunder's saddle!"
 	and MoveStory.starLine(greeter, "nothing") == greeter.star and MoveStory.starLine(MoveStory.greeterOf("marge") :: MoveStory.Greeter, "grandfather_clock") == "Careful with that!")
+-- 8.0 SANDBOX: the Sprinter's walk-in bay, the sandbox's house ------------------------------------------------------------
+
+local FurnitureLooks = require("./FurnitureLooks")
+local SandboxMap = require("./SandboxMap")
+local SP = T.Beds.sprinter
+local SPRINTER: Rules.Bed = { width = SP.Width, length = SP.Length, height = SP.Height, cell = SP.Cell }
+check("the Sprinter's bay: 6.6 wide, 7.6 tall, 14 long, walk-in, its back from the van's doors; far bigger than the ZDC Van's", SP ~= nil and SP.Width == 6.6
+	and SP.Height == 7.6 and SP.Length == 14 and SP.WalkIn == true and type(SP.Back) == "number" and SP.Cell >= 0.4 and SP.Cell <= 0.5
+	and SP.Width * SP.Length * SP.Height > 2.5 * V.Width * V.Length * V.Height)
+check("…the ZDC Van's bay is no walk-in one (the city's game as it was)", V.WalkIn ~= true and V.Back == nil)
+do
+	local lying, missing = {}, {}
+	local farm: { [string]: boolean } = {}
+	for _, id in FurnitureLooks.FarmPieces do
+		farm[id] = true
+	end
+	for _, id in FurnitureLooks.Order do
+		local def = FurnitureLooks.Items[id]
+		local size = { X = def.size.X, Y = def.size.Y, Z = def.size.Z }
+		local empty = Rules.newPacking(SP.Width, SP.Length, SP.Height, SP.Cell)
+		if not Rules.fit(empty, size, def.fragile, false) then
+			table.insert(lying, id)
+		end
+		if not Rules.room(empty, size, def.class ~= "hand") then
+			table.insert(missing, id)
+		end
+		if not farm[id] and table.find(lying, id) then
+			table.insert(missing, `{id} (a house piece lying)`)
+		end
+	end
+	check("every piece goes into the empty Sprinter (the farm's hay wagon too); every house piece standing", #missing == 0, table.concat(missing, ", "))
+end
+do -- a whole house (shared/HouseLayout.luau plan) loaded piece after piece: the Sprinter takes far more than the ZDC Van
+	local defs2: { [string]: Rules.ItemDef } = {}
+	for id, def in FurnitureLooks.Items do
+		defs2[id] = { id = id, name = def.name, icon = def.icon, size = { X = def.size.X, Y = def.size.Y, Z = def.size.Z }, class = def.class, weight = def.weight, value = def.value,
+			fragile = def.fragile, room = def.room, tow = def.bigDoor == true }
+	end
+	local function loaded(seed: number, bed: Rules.Bed): number
+		local plan = HouseLayout.plan(seed, "house")
+		local list: { Rules.Spot } = {}
+		for _, spot in plan.spots do
+			table.insert(list, { id = spot.id, item = spot.item, room = spot.room, star = spot.star })
+		end
+		local m = Rules.newMove(list, defs2, bed, 0, 600)
+		local n = 0
+		for _, spot in m.order do
+			Rules.pick(m, spot, ME)
+			if Rules.load(m, ME) then
+				n += 1
+			else
+				Rules.release(m, ME)
+			end
+		end
+		return n
+	end
+	local sprinter, van = loaded(7, SPRINTER), loaded(7, VAN)
+	check("a whole house loaded in one go: the Sprinter takes far more than the ZDC Van", sprinter >= 1.6 * van and sprinter >= 12, `{sprinter} vs {van}`)
+end
+check("a new seed is a new house (the sandbox refills it every move)", (function()
+	local a, b = HouseLayout.plan(101, "house"), HouseLayout.plan(202, "house")
+	local same = #a.spots == #b.spots
+	for index, spot in a.spots do
+		local other = b.spots[index]
+		if not other or other.item ~= spot.item or (other.at.Position - spot.at.Position).Magnitude > 0.01 then
+			same = false
+		end
+	end
+	return not same
+end)())
+check("the sandbox's house: SandboxMap.House's id and name, 20 minutes, no horde and no roamers by default (no guns), switches kept",
+	SandboxMap.House.id == "sandbox_house" and SandboxMap.House.name == "The Old Chalet" and T.Sandbox.Time == 20 * 60 and T.Sandbox.Horde == false
+	and T.Sandbox.Roam == 0 and T.Sandbox.HordeAt > 0 and T.Sandbox.HordeAt < T.Sandbox.Time and #T.Sandbox.Blurb <= Config.MoveStory.Limits.Blurb)
+check("the sandbox's van is the Sprinter, its bed set", Config.Sandbox.Van == "sprinter" and T.Beds[Config.Sandbox.Van] ~= nil)
+check("the house's front door looks out to the road, the van's curb between them (its back to the door)", (function()
+	local h = SandboxMap.House
+	local road = SandboxMap.Turnaround
+	return h.door.yaw == 0 and h.curb.yaw == 0 and h.curb.z < h.door.z and math.abs(h.curb.z - road.z) <= road.r and h.door.z - h.curb.z > SP.Length / 2
+end)())
+
 check("Walt's lines fit their bubbles", (function()
 	local L = Config.MoveStory.Limits.Bubble
 	for _, text in greeter.hello do
