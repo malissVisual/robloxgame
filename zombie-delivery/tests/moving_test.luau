@@ -162,6 +162,24 @@ check("…into your hands", out == 5 and outWhy == nil and move.things[5].state 
 out, outWhy = Rules.unload(move, ME)
 check("not with your hands full", out == nil and outWhy == "full", outWhy)
 check("and back in", Rules.load(move, ME) ~= nil)
+-- the truck's prompts (the owner's report: Unload over Load at the same spot, E fumbled): never both
+local function shows(open: boolean, carrying: boolean, inside: boolean): string
+	local load, unload, back = Rules.truckPrompts(open, carrying, inside)
+	return `{if load then "L" else "-"}{if unload then "U" else "-"}{if back then "B" else "-"}`
+end
+check("carrying at an open back: Load only (no Unload, the back's E never shuts it)", shows(true, true, true) == "L--" and shows(true, true, false) == "L--", shows(true, true, true))
+check("carrying at a shut back: only the back's E (to open it)", shows(false, true, true) == "--B" and shows(false, true, false) == "--B", shows(false, true, true))
+check("empty hands, something inside an open back: Unload only (and the back's E)", shows(true, false, true) == "-UB", shows(true, false, true))
+check("empty hands, an empty truck: neither Load nor Unload", shows(true, false, false) == "--B" and shows(false, false, false) == "--B", shows(true, false, false))
+check("empty hands, a shut back with things in: no Unload", shows(false, false, true) == "--B", shows(false, false, true))
+for _, open in { true, false } do
+	for _, carrying in { true, false } do
+		for _, inside in { true, false } do
+			local load, unload = Rules.truckPrompts(open, carrying, inside)
+			check(`never Load and Unload at once ({open}, {carrying}, {inside})`, not (load and unload))
+		end
+	end
+end
 -- a bed full: no room
 local tiny = Rules.newMove({ { id = 1, item = "fridge", room = "k", star = false }, { id = 2, item = "fridge", room = "k", star = false } }, defs,
 	{ width = 3, length = 3, height = 6, cell = 0.5 }, 0, 60)
