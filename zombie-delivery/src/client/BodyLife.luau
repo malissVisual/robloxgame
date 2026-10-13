@@ -8,23 +8,19 @@
 --     bends, the legs keep the feet where they stand), blinks (the eyes' sphere meshes squeezed shut);
 --   * the head turns to a person or a courier near and in front (your own courier also to the job's ring), the chest a
 --     little with it, smoothly; the people look at the players who come up to them;
---   * walking (WalkFrom studs / s up to the sprint, where client/SprintPose.luau's run takes over and this fades out):
---     the weight read off the stock walk's own thighs: the body sinks with the legs apart, the arms swing a little more,
---     the chest turns against the hips, the head stays steady;
---   * landing from a jump or a fall: a knee dip by the fall's speed (the hips down, the legs bent with the feet
---     planted, the upper body forward);
 --   * hit (health lost): a flinch, the chest jerked back, the head turned away;
+--   (6.24: the walk's weight and the landing's dip are client/GaitPose.luau's gait now: this is its third stage in
+--   client/PoseLedger.luau, laid on top of the gait; the weight shift steps aside while the gait holds the legs)
 --   (the bag in the hand holds its arm out itself: client/BagSway.luau, 6.7 A)
 -- The arms are client/ArmPose.luau's while it has them (ArmPose.armsBusy: the aim, the carry, the phone, a swing, a
 -- gesture), the waist, the head and the legs while a gesture bends the body (ArmPose.legsBusy: the pick-up). Nothing
 -- moves in a seat, on a zip line or a ladder, swimming, climbing, dead or in an interaction move (client/Interact.luau):
--- the joints go back to the animation. Beyond Config.Body.Detail studs only the landing, the flinch and the walk's
--- weight are drawn. Joints and eyes are looked up once per body (again every RIG_REFRESH seconds); the bodies to pose
--- are chosen every Config.Body.Retarget seconds; no tables are made per frame.
+-- the joints go back to the animation. Beyond Config.Body.Detail studs only the flinch is drawn. Joints and eyes are
+-- looked up once per body (again every RIG_REFRESH seconds); the bodies to pose are chosen every Config.Body.Retarget
+-- seconds; no tables are made per frame.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -33,7 +29,7 @@ local BodyMotion = require(Shared.BodyMotion)
 local Bodies = require(script.Parent.Bodies)
 local Ledger = require(script.Parent.PoseLedger)
 local ArmPose = require(script.Parent.ArmPose)
-local SprintPose = require(script.Parent.SprintPose)
+local GaitPose = require(script.Parent.GaitPose) -- 6.24: the gait holds the legs (the weight shift steps aside)
 local Interact = require(script.Parent.Interact)
 local BikeRider = require(script.Parent.BikeRider)
 local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone poses only the nearer bodies
@@ -68,13 +64,9 @@ type Life = {
 	health: number,
 	flinchAt: number,
 	flinchSide: number,
-	fall: number, -- the fastest fall (studs / s down) since leaving the ground; 0 on it
-	landAt: number,
-	landDrop: number,
 	exertion: number, -- 0..1: out of breath after a sprint
 	breath: number, -- the breath's phase 0..1
-	idle: number, -- the shares (0..1, eased): standing still, walking
-	walk: number,
+	idle: number, -- standing still (0..1, eased)
 	yaw: number, -- the head's turn now (radians)
 	pitch: number,
 	target: BasePart?, -- what the head looks at (a head, the job's ring)
@@ -213,7 +205,7 @@ local function letGo(character: Model)
 		end
 	end
 	if life then
-		life.fall, life.landAt, life.walk, life.idle = 0, -math.huge, 0, 0
+		life.idle = 0
 		life.released = true
 	end
 end
@@ -229,13 +221,9 @@ local function lifeOf(character: Model, humanoid: Humanoid): Life
 		health = humanoid.Health,
 		flinchAt = -math.huge,
 		flinchSide = 1,
-		fall = 0,
-		landAt = -math.huge,
-		landDrop = 0,
 		exertion = 0,
 		breath = (serial * 0.37) % 1,
 		idle = 0,
-		walk = 0,
 		yaw = 0,
 		pitch = 0,
 		target = nil,
@@ -307,17 +295,7 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 	life.released = false
 	local v = root.AssemblyLinearVelocity
 	local speed = Vector3.new(v.X, 0, v.Z).Magnitude
-	-- The landing: the fastest fall since the feet left the ground, dipped once they are back on it.
-	if v.Y < -B.LandFrom * 0.5 then
-		life.fall = math.max(life.fall, -v.Y)
-	elseif life.fall > 0 and v.Y > -4 then
-		local drop = BodyMotion.landDrop(life.fall)
-		if drop > 0 then
-			life.landAt, life.landDrop = now, drop
-		end
-		life.fall = 0
-	end
-	local grounded = life.fall == 0 and math.abs(v.Y) < 8
+	local grounded = math.abs(v.Y) < 8
 	-- The flinch: health lost (a regained one is not a hit).
 	local health = humanoid.Health
 	if health < life.health - B.FlinchMin then
@@ -329,8 +307,6 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 	local ease = math.min(1, dt * 3)
 	life.exertion = if speed > SPRINT_FROM then math.min(1, life.exertion + dt * 2) else math.max(0, life.exertion - dt / B.Recover)
 	life.idle += ((if grounded and speed < B.IdleBelow and detail then 1 else 0) - life.idle) * ease
-	local walking = if grounded then math.clamp((speed - B.WalkFrom) / 3, 0, 1) * (1 - SprintPose.weight(character)) else 0
-	life.walk += (walking - life.walk) * math.min(1, dt * 6)
 	local armsFree = not ArmPose.armsBusy(character)
 	local legsFree = not ArmPose.legsBusy(character)
 	-- The breath.
@@ -339,21 +315,10 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 	local breath = BodyMotion.breath(life.breath, 1)
 	local tilt = rad(B.BreathTilt) * deep * (breath - 0.5)
 	local lift = B.BreathLift * deep * breath
-	-- The weight on one foot (standing still).
-	local k = if detail then BodyMotion.shift(now, life.seed) * life.idle else 0
+	-- The weight on one foot (standing still; 6.24: not while the gait holds the legs: a landing, catching the breath).
+	local k = if detail then BodyMotion.shift(now, life.seed) * life.idle * (1 - GaitPose.legs(character)) else 0
 	local sway, roll = k * B.ShiftSway, k * rad(B.ShiftRoll)
-	-- The landing's dip and the flinch.
-	local landT = now - life.landAt
-	local dip = if landT < BodyMotion.landTime() then BodyMotion.land(landT) * life.landDrop else 0
 	local flinch = BodyMotion.flinch(now - life.flinchAt)
-	-- The walk's weight from the stock walk's own thighs.
-	local bob, swing, twist = 0, 0, 0
-	if life.walk > 0.01 and rig.rh and rig.lh then
-		local hipR = Ledger.base(rig.rh):ToEulerAnglesXYZ()
-		local hipL = Ledger.base(rig.lh):ToEulerAnglesXYZ()
-		bob, swing, twist = BodyMotion.stride(hipR, hipL)
-		bob, swing, twist = bob * life.walk, swing * life.walk, twist * life.walk
-	end
 	-- The head.
 	if detail and now >= life.lookAt then
 		life.lookAt = now + B.Retarget * (0.8 + 0.4 * life.seed)
@@ -373,42 +338,39 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 	life.pitch += (pitchGoal - life.pitch) * follow
 	local flinchTurn = life.flinchSide * rad(B.FlinchTurn) * flinch
 
-	-- Onto the joints. The Root: the hips' sway and tip, the dip, the walk's bob.
-	local lean = if life.landDrop > 0 then rad(B.LandLean) * dip / life.landDrop else 0
-	if legsFree and (math.abs(sway) > 1e-4 or dip > 1e-4 or math.abs(bob) > 1e-4) then
-		layer(rig.root, CFrame.new(sway, bob - dip, 0) * CFrame.Angles(0, 0, roll))
+	-- Onto the joints. The Root: the hips' sway and tip.
+	if legsFree and math.abs(sway) > 1e-4 then
+		layer(rig.root, CFrame.new(sway, 0, 0) * CFrame.Angles(0, 0, roll))
 	else
 		layer(rig.root, nil)
 	end
-	-- The waist: the breath, the chest against the hips' tip, the head's turn shared, the walk's turn, the dip's lean,
-	-- the flinch.
-	local waistX = tilt - lean + rad(B.FlinchBack) * flinch
-	local waistY = life.yaw * B.LookChest + twist + flinchTurn * 0.3
+	-- The waist: the breath, the chest against the hips' tip, the head's turn shared, the flinch.
+	local waistX = tilt + rad(B.FlinchBack) * flinch
+	local waistY = life.yaw * B.LookChest + flinchTurn * 0.3
 	if legsFree and (math.abs(waistX) > 1e-4 or math.abs(waistY) > 1e-4 or math.abs(roll) > 1e-4) then
 		layer(rig.waist, CFrame.Angles(waistX, waistY, -roll * 0.8))
 	else
 		layer(rig.waist, nil)
 	end
-	-- The head: the rest of the turn, steady over the walk and the breath, away from the hit.
-	local neckY = life.yaw * (1 - B.LookChest) - twist + flinchTurn
-	local neckX = life.pitch - tilt * 0.8 + lean * 0.5 + rad(6) * flinch
+	-- The head: the rest of the turn, steady over the breath, away from the hit.
+	local neckY = life.yaw * (1 - B.LookChest) + flinchTurn
+	local neckX = life.pitch - tilt * 0.8 + rad(6) * flinch
 	if legsFree and (math.abs(neckX) > 1e-4 or math.abs(neckY) > 1e-4 or math.abs(roll) > 1e-4) then
 		layer(rig.neck, CFrame.Angles(0, neckY, 0) * CFrame.Angles(neckX, 0, -roll * 0.2))
 	else
 		layer(rig.neck, nil)
 	end
-	-- The legs: the dip's bend (the feet planted), the sway taken out at the hips, the free knee bent.
-	if legsFree and (dip > 1e-4 or math.abs(k) > 1e-3) then
-		local hip, knee, ankle = BodyMotion.crouch(dip, 0, rig.thigh, rig.shin)
+	-- The legs: the sway taken out at the hips, the free knee bent (the feet planted).
+	if legsFree and math.abs(k) > 1e-3 then
 		local out = -roll - math.asin(math.clamp(sway / rig.leg, -0.5, 0.5))
 		local bend = rad(B.ShiftKnee) * math.abs(k)
 		local freeR, freeL = if k < 0 then bend else 0, if k > 0 then bend else 0
-		layer(rig.rh, CFrame.Angles(hip + freeR * 0.5, 0, out))
-		layer(rig.rk, CFrame.Angles(knee - freeR, 0, 0))
-		layer(rig.ra, CFrame.Angles(ankle + freeR * 0.5, 0, -out - roll))
-		layer(rig.lh, CFrame.Angles(hip + freeL * 0.5, 0, out))
-		layer(rig.lk, CFrame.Angles(knee - freeL, 0, 0))
-		layer(rig.la, CFrame.Angles(ankle + freeL * 0.5, 0, -out - roll))
+		layer(rig.rh, CFrame.Angles(freeR * 0.5, 0, out))
+		layer(rig.rk, CFrame.Angles(-freeR, 0, 0))
+		layer(rig.ra, CFrame.Angles(freeR * 0.5, 0, -out - roll))
+		layer(rig.lh, CFrame.Angles(freeL * 0.5, 0, out))
+		layer(rig.lk, CFrame.Angles(-freeL, 0, 0))
+		layer(rig.la, CFrame.Angles(freeL * 0.5, 0, -out - roll))
 	else
 		layer(rig.rh, nil)
 		layer(rig.rk, nil)
@@ -417,12 +379,12 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 		layer(rig.lk, nil)
 		layer(rig.la, nil)
 	end
-	-- The arms (while ArmPose leaves them): the shoulders rise with the breath and the flinch, the walk's extra swing,
-	-- (the bag arm is client/BagSway.luau's)
+	-- The arms (while ArmPose leaves them): the shoulders rise with the breath and the flinch (the bag arm is
+	-- client/BagSway.luau's)
 	local up = lift + 0.05 * flinch
-	if armsFree and (up > 1e-4 or math.abs(swing) > 1e-4) then
-		layer(rig.rs, CFrame.new(0, up, 0) * CFrame.Angles(-swing, 0, 0))
-		layer(rig.ls, CFrame.new(0, up, 0) * CFrame.Angles(swing, 0, 0))
+	if armsFree and up > 1e-4 then
+		layer(rig.rs, CFrame.new(0, up, 0))
+		layer(rig.ls, CFrame.new(0, up, 0))
 	else
 		layer(rig.rs, nil)
 		layer(rig.ls, nil)
@@ -544,7 +506,7 @@ local function step(dt: number)
 end
 
 function BodyLife.start()
-	RunService.PreSimulation:Connect(step)
+	Ledger.stage(30, "BodyLife", step) -- 6.24: client/PoseLedger.luau's third stage, over the gait and ArmPose
 end
 
 return BodyLife

@@ -85,7 +85,9 @@ Config.Body = {
 	FlinchOut = 0.38,
 	FlinchBack = 10,
 	FlinchTurn = 16,
-	-- The walk (WalkFrom studs / s up to Config.Courier.Sprint.From, where client/SprintPose.luau's run takes over): the
+	-- 6.24: the walk's weight and the landing below are client/GaitPose.luau's gait now (Config.Gait); these numbers stay
+	-- shared/BodyMotion.luau's (stride, landDrop: tests/bodymotion_test.luau).
+	-- The walk (WalkFrom studs / s up to Config.Courier.Sprint.From, where the sprint's run takes over): the
 	-- stock walk's own thighs give the weight: the body sinks WalkBob studs with the legs apart (Spread degrees at the
 	-- widest), the arms swing WalkArm of the legs' spread more, the chest turns WalkTwist degrees against the hips.
 	WalkFrom = 4,
@@ -111,6 +113,136 @@ Config.Body = {
 	-- it, then comes up into them as the body rises.
 	PickupLift = 0.4,
 	Gestures = { pickup = 0.7, land = 0.42 } :: { [string]: number },
+}
+
+-- 6.24, the gait (the owner: "better animations, how he walks and moves"): client/GaitPose.luau walks every courier and
+-- person near the camera with shared/Gait.luau's procedural gait over the stock tracks (they stay underneath: a far body
+-- shows them alone). Speeds in studs / s, angles in degrees, times in seconds; "legs" are the body's own leg, hip to sole
+-- (the classic R15's 2 studs), so a kid steps in proportion.
+Config.Gait = {
+	Range = 150, -- studs from the camera: the bodies walked (yours always) …
+	MaxPosed = 40, -- … at most this many, the nearest …
+	Detail = 60, -- … the whole gait this close (ground rays, fidgets); farther it is worked out FarHz times a second
+	FarHz = 15,
+	Retarget = 0.4, -- seconds between the looks for whom to walk
+	-- The walk. A cycle (two steps) covers StrideBase legs + StrideGain × the speed, so the steps quicken with the speed
+	-- (about 1.6 cycles a second at the aim's 3.5, 2.4 at the brisk 14). A foot on the ground is planted: it goes back
+	-- under the body at the body's speed (the leg reaches it: two bones), rolling from the heel onto the toe.
+	StrideBase = 0.55,
+	StrideGain = 0.335,
+	WalkRef = 14, -- the brisk walk (Config.Movement.Walk): the swings, rolls and sways below are full here
+	DutySlow = 0.62, -- the share of a cycle a foot is down, strolling …
+	DutyBrisk = 0.52, -- … and at WalkRef
+	Lift = 0.12, -- legs: the swinging foot's lift at WalkRef …
+	LiftSlow = 0.04, -- … and strolling
+	Heel = 15, -- the heel strike's toe-up at WalkRef …
+	Toe = 32, -- … and the push-off's heel-up
+	Reach = 0.995, -- of the leg the knee never straightens past (a soft knee)
+	MaxDrop = 0.12, -- legs: the hips dip at most this much reaching for both feet (the walk's bob comes from this) …
+	DipRate = 30, -- … followed at this rate (1 / s: the reach turns steeply near the leg's length, no snap)
+	MoveFrom = 0.8, -- faster than this a body walks …
+	StopBelow = 0.5, -- … and slower than this it settles
+	StartTime = 0.14, -- seconds the stride takes to open from standing
+	SettleTime = 0.3, -- seconds of the settling step (the trailing foot comes down beside the other) …
+	LetGo = 0.25, -- … then back to the stock idle over this
+	-- The body over the steps (at WalkRef; strolling the *Slow ones; nothing standing still).
+	Sway = 0.025, -- legs the hips shift over the foot on the ground …
+	SwaySlow = 0.04,
+	HipRoll = 4.5, -- the free side's hip drops
+	HipTurn = 6, -- the hips turn with the leg in front …
+	ChestTurn = 7, -- … and the shoulders against them
+	HeadKeep = 0.85, -- the neck takes back this share of the body's turns and tips: the head stays level
+	WalkLean = 3, -- the upper body forward at WalkRef
+	ArmSwing = 32, -- the arms forward and back against the legs …
+	ArmSlow = 7,
+	Elbow = 24, -- the elbows bent …
+	ElbowSlow = 8,
+	ElbowForward = 18, -- … more on the forward swing
+	ArmOut = 5, -- the arms a little away from the body
+	ArmLag = 0.04, -- of a cycle the arms come after the legs
+	-- Walking any way (aiming, the body faces the crosshair): the hips turn toward where you go, at most StrafeYaw
+	-- (backwards: against it, the legs walk back), the chest turns back to the front (all of it aiming, ChestFollow of it
+	-- else); the feet never cross (FootGap legs from the middle at least).
+	StrafeYaw = 55,
+	YawRate = 9,
+	ChestFollow = 0.5,
+	FootGap = 0.06,
+	-- The run: from RunFrom the walk turns into Config.Courier.Sprint's run cycle (shared/RunCycle.luau), all of it at
+	-- the sprint's From; the run's keys sit RunPhase of a cycle after the walk's.
+	RunFrom = 15,
+	RunPhase = 0.08,
+	-- Starting and stopping: the body leans into the speed it gains (Accel degrees per stud / s², at most LeanMax
+	-- forward, LeanBack back braking) on a spring (LeanHz, LeanDamp: a small sway forward as it stops); LeanRoot of it
+	-- tips the whole body about the feet, the rest bends the waist.
+	Accel = 0.18,
+	LeanMax = 9,
+	LeanBack = 7,
+	LeanHz = 2.4,
+	LeanDamp = 0.5,
+	LeanRoot = 0.35,
+	-- Turning: the body leans into the turn about the feet, TurnLean of what the turn's pull would tip it, at most
+	-- TurnMax.
+	TurnLean = 0.8,
+	TurnMax = 11,
+	-- Slopes (a ray down every SlopeEvery seconds, within Detail): the feet land on the slope, the body leans into it
+	-- (SlopeLean degrees per stud of rise a stud: uphill forward), the stride shortens SlopeStride of it.
+	SlopeEvery = 0.15,
+	SlopeLean = 14,
+	SlopeStride = 0.3,
+	-- Out of breath (your breath, client/Stamina.luau; another courier's guessed from their sprint): under TiredFrom of
+	-- it the run tires (the body hunches, the head drops, the arms pump lower and across, the body wobbles). Spent
+	-- (under 5 %, until half is back) the walk droops, and standing still with a hand free the courier catches the breath
+	-- bent over, the hands on the knees (CatchAfter seconds after stopping, until CatchUntil of the breath is back).
+	TiredFrom = 0.4,
+	TiredLean = 9,
+	TiredHead = 10,
+	TiredArms = 0.35,
+	TiredWobble = 3,
+	SpentHead = 8,
+	SpentArms = 0.6,
+	CatchAfter = 0.35,
+	CatchUntil = 0.55,
+	-- The jump: up from the ground faster than JumpFrom the body springs out of a crouch (TakeoffDrop legs over
+	-- TakeoffTime), tucks the knees rising, reaches for the ground falling and flails falling long (FlailAfter). A body
+	-- in the air under FallAfter (a kerb's step down) is not posed.
+	JumpFrom = 8,
+	TakeoffDrop = 0.17,
+	TakeoffTime = 0.14,
+	FallAfter = 0.15,
+	FlailAfter = 0.9,
+	AirBlend = 0.08, -- seconds into the air pose (falling) …
+	JumpBlend = 0.06, -- … and jumping
+	-- The landing squashes by the height fallen: LandMin legs from LandFrom studs up to LandMax at LandFull (never more:
+	-- client/Unstuck.luau sets a body hung 0.8 studs low straight), LandDown seconds down, LandUp (LandUpFull from a
+	-- full fall) back up; landing on the move MoveLand of it.
+	LandFrom = 1.5,
+	LandFull = 30,
+	LandMin = 0.05,
+	LandMax = 0.28,
+	LandDown = 0.07,
+	LandUp = 0.22,
+	LandUpFull = 0.55,
+	LandLean = 16,
+	MoveLand = 0.55,
+	Lowest = 0.72, -- studs: the Root joint never hangs lower, whatever adds up (a squash, a crouch, the catch)
+	-- Idle: after IdleAfter seconds standing still a small fidget now and then (about every FidgetEvery seconds, each
+	-- body its own moment; their seconds in Fidgets), what fits the hands: a look round, a stretch, a look at the watch,
+	-- the shoulders rolled, the gun checked, a peek into the bag, the load hoisted. None with Reduced Motion.
+	IdleAfter = 5,
+	FidgetEvery = 9,
+	Fidgets = { look = 3.2, stretch = 2.8, watch = 2.2, shoulders = 2.4, checkgun = 2.4, peek = 2, hoist = 1.3 } :: { [string]: number },
+	-- What the hands hold: the gun out (not aiming) is held low and ready (GunHold: the right shoulder's x, y, z, the
+	-- elbow, the wrist), swinging GunSwing of a free arm; the bag in the left hand hangs out (Config.Courier.BagArm);
+	-- a load in the hands widens the stance (CarryWide legs), shortens the steps (CarryStride) and sways the hips
+-- CarrySway × as much (a heavy one);
+	-- aiming the knees soften (AimDrop legs). Blended in and out over HoldBlend.
+	GunHold = { 24, 8, 0, 62, -14 } :: { number },
+	GunSwing = 0.2,
+	CarryWide = 0.06,
+	CarryStride = 0.85, -- … and shortens the steps
+	CarrySway = 1.7,
+	AimDrop = 0.03,
+	HoldBlend = 0.25,
 }
 
 -- 3.9: the gun goes away (B: holster / draw) and the hands fight (V: melee). Holstered (the default after every spawn)
@@ -4292,7 +4424,7 @@ Config.Throw = {
 	FragileLooks = { cake = true, vaccine = true, sample = true, electronics = true, painting = true, gadget = true } :: { [string]: boolean },
 }
 
--- 6.0, the courier's look on foot (client/SprintPose.luau, server/KitWear.luau): the plastic bag (Config.Kit BagKit)
+-- 6.0, the courier's look on foot (6.24: client/GaitPose.luau, server/KitWear.luau): the plastic bag (Config.Kit BagKit)
 -- in the left hand flies behind you by your speed. 6.0.1: from From studs / s on foot the sprint is a real run cycle
 -- (shared/RunCycle.luau: the legs, the arms, the waist, the head and the body's bob, set over the stock run animation),
 -- for everybody within Range of the camera.
@@ -4307,7 +4439,7 @@ Config.Courier = {
 		Range = 150, -- studs from the camera (yours always)
 		BlendTime = 0.15, -- seconds to blend the cycle in or out
 		Stride = 13, -- studs run per full cycle (two steps): the cadence follows the speed (6.8 review: on the stock 2-stud
-		-- leg; client/SprintPose.luau scales it by each body's own, shared/CourierMotion.luau stride). 6.12.6, the slow-mo
+		-- leg; shared/Gait.luau scales it by each body's own leg). 6.12.6, the slow-mo
 		-- sprint: 7 → 13, big strides at about half the old cadence (2 cycles a second at 28 studs / s)
 		Hang = 0.45, -- 6.12.6: the cycle slows by this share in the flights and hurries through the steps (RunCycle.hang)
 	},
