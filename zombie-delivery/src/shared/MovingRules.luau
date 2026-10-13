@@ -21,14 +21,22 @@
 --   MovingRules.deathDamage(fragile)           its carrier died: it fell
 --   MovingRules.truckDamage(hp, fragile)       the truck it rides in took `hp` damage
 --   MovingRules.hurt(thing, share) -> broke    takes it off (true when this broke it); MovingRules.broken(thing)
---   The truck bed (a grid of Bed.Cell studs under the box: cols across, rows from the cab to the door; a thing stands
---   on the floor or flat on others, its footprint turned 90° when that fits better; the lowest place first, the cab's
---   end first: first-fit)
+--   The truck bed (a grid of cells `cell` studs square under the box, any size: cols across, rows from the cab to the
+--   door). A thing rests on the highest top under its footprint (the floor, or the things it covers, overhanging the
+--   lower ones) when at least Pack.Support of it lies level there round its middle; never through the roof. Of every
+--   place it can stand, both ways round, the best score wins, like Tetris: snug against the walls and its neighbours,
+--   its top level with theirs, little air under it, low, to one side, near the cab, a fragile thing high up
+--   (Config.Moving.Pack)
 --   MovingRules.newPacking(width, length, height, cell)   an empty bed
 --   MovingRules.footprint(size, cell, turned)  the cells it covers (cols, rows)
---   MovingRules.fit(packing, size) -> Placement?   where it would go (nil: no room); place(packing, spot, size) puts it
+--   MovingRules.fit(packing, size, fragile?, lie?) -> Placement?   where it would go (nil: no room); place(packing,
+--                                              spot, size, fragile?, lie?) puts it; room(packing, size, lie?): does it
+--                                              still go in (the HUD); lie: it may lie on its side when it has no place
+--                                              standing (a both / pair piece, Pack.Lie: Placement.lying, laid(size,
+--                                              lying) its size so)
 --   MovingRules.free(packing, spot)            nothing rests on it (it may come out); remove(packing, spot)
---   MovingRules.fill(packing)                  the share of the bed's room taken (0 … 1)
+--   MovingRules.fill(packing)                  the share of the bed's room used (0 … 1): up to every top, and to the
+--                                              roof where nothing goes any more (a crack, a sliver under the roof)
 --   MovingRules.where(packing, placement)      its middle in studs from the bed's middle (x across, z toward the door)
 --   A move
 --   MovingRules.newMove(spots, defs, bed, now, seconds)   from the plan's spots and the furniture defs
@@ -73,6 +81,7 @@ export type Placement = {
 	base: number, -- studs over the floor where it stands
 	top: number,
 	turned: boolean, -- its footprint turned 90°
+	lying: string?, -- on its side (Pack.Lie): "x" its height along its width, "z" along its depth (MovingRules.laid)
 }
 export type Packing = {
 	cols: number,
@@ -223,45 +232,200 @@ function MovingRules.footprint(size: Size, cell: number, turned: boolean): (numb
 	return math.max(1, math.ceil(across / cell - 1e-3)), math.max(1, math.ceil(along / cell - 1e-3))
 end
 
--- The lowest and the highest top under a footprint.
-local function span(p: Packing, col: number, row: number, cols: number, rows: number): (number, number)
-	local low, high = math.huge, -math.huge
+-- Under a footprint: the highest top (where it would stand) and the sum of the tops; nil when a top there is over
+-- `limit` (the roof would not let it in).
+local function survey(p: Packing, col: number, row: number, cols: number, rows: number, limit: number): (number?, number)
+	local high, sum = 0, 0
 	for r = row, row + rows - 1 do
 		local at = (r - 1) * p.cols
 		for c = col, col + cols - 1 do
 			local h = p.heights[at + c]
-			if h < low then
-				low = h
+			if h > limit then
+				return nil, 0
 			end
 			if h > high then
 				high = h
 			end
+			sum += h
 		end
 	end
-	return low, high
+	return high, sum
 end
 
-function MovingRules.fit(p: Packing, size: Size): Placement?
-	local best: Placement? = nil
-	for row = 1, p.rows do
-		for col = 1, p.cols do
-			for _, turned in { false, true } do
-				local cols, rows = MovingRules.footprint(size, p.cell, turned)
-				if col + cols - 1 > p.cols or row + rows - 1 > p.rows then
-					continue
-				end
-				local low, high = span(p, col, row, cols, rows)
-				-- flat under it (the floor, or the tops of what it rests on all level), and under the roof
-				if high - low > 0.05 or high + size.Y > p.height + 1e-3 then
-					continue
-				end
-				if best == nil or high < best.base - 1e-3 then
-					best = { spot = 0, col = col, row = row, cols = cols, rows = rows, base = high, top = high + size.Y, turned = turned }
+-- Does it stand on `base`: at least Pack.Support of its cells within Pack.Level under it (the floor: all of them), and
+-- those cells reach past its middle both across and along (not on one corner or one edge)?
+local function supported(p: Packing, col: number, row: number, cols: number, rows: number, base: number): boolean
+	if base <= EPS then
+		return true
+	end
+	local k = tune().Pack
+	local level = base - k.Level - 1e-3
+	local count = 0
+	local c0, c1, r0, r1 = math.huge, -math.huge, math.huge, -math.huge
+	for r = row, row + rows - 1 do
+		local at = (r - 1) * p.cols
+		for c = col, col + cols - 1 do
+			if p.heights[at + c] >= level then
+				count += 1
+				c0, c1 = math.min(c0, c), math.max(c1, c)
+				r0, r1 = math.min(r0, r), math.max(r1, r)
+			end
+		end
+	end
+	if count < k.Support * cols * rows - 1e-6 then
+		return false
+	end
+	local midCol, midRow = col - 1 + cols / 2, row - 1 + rows / 2 -- its middle (from the cells' edges)
+	return c0 - 1 < midCol and c1 > midCol and r0 - 1 < midRow and r1 > midRow
+end
+
+-- Its sides, from `base` to `top`: the share against the bed's walls or the things beside it, and the share of its
+-- edge where the top beside it is level with its own (a wall counts for both).
+local function contact(p: Packing, col: number, row: number, cols: number, rows: number, base: number, top: number, level: number): (number, number)
+	local heights, width = p.heights, p.cols
+	local tall = top - base
+	local touch, flush = 0, 0
+	local function beside(index: number)
+		local h = heights[index]
+		touch += math.max(0, math.min(h, top) - base)
+		if math.abs(h - top) <= level then
+			flush += 1
+		end
+	end
+	local last = row + rows - 1
+	for r = row, last do
+		local at = (r - 1) * width
+		if col == 1 then
+			touch += tall
+			flush += 1
+		else
+			beside(at + col - 1)
+		end
+		if col + cols - 1 == p.cols then
+			touch += tall
+			flush += 1
+		else
+			beside(at + col + cols)
+		end
+	end
+	for c = col, col + cols - 1 do
+		if row == 1 then
+			touch += tall
+			flush += 1
+		else
+			beside((row - 2) * width + c)
+		end
+		if last == p.rows then
+			touch += tall
+			flush += 1
+		else
+			beside(last * width + c)
+		end
+	end
+	local edge = 2 * (cols + rows)
+	return touch / (edge * tall), flush / edge
+end
+
+local TURNS = { false, true }
+
+-- Every place it can stand, both ways round: on the highest top under it, supported, under the roof. Calls
+-- `each(col, row, cols, rows, turned, base, sum)` for each; stops when it returns true.
+local function places(p: Packing, size: Size, each: (number, number, number, number, boolean, number, number) -> boolean?)
+	local limit = p.height - size.Y + 1e-3 -- the highest base under the roof
+	if limit < 0 then
+		return
+	end
+	for _, turned in TURNS do
+		local cols, rows = MovingRules.footprint(size, p.cell, turned)
+		if cols > p.cols or rows > p.rows or (turned and cols == rows) then
+			continue
+		end
+		for row = 1, p.rows - rows + 1 do
+			for col = 1, p.cols - cols + 1 do
+				local base, sum = survey(p, col, row, cols, rows, limit)
+				if base ~= nil and supported(p, col, row, cols, rows, base) and each(col, row, cols, rows, turned, base, sum) then
+					return
 				end
 			end
 		end
 	end
+end
+
+-- Its best place standing as `size` (nil: none) and that place's score. Of every place it can stand (places) the
+-- lowest score wins (Config.Moving.Pack): snug against the walls and its neighbours, its top level with theirs, little
+-- air under it, low, to one side, near the cab, no sliver of room left over it; a fragile thing high up (little room
+-- over it: little goes on it).
+local function choose(p: Packing, size: Size, fragile: boolean?): (Placement?, number)
+	local k = tune().Pack
+	local cell = p.cell
+	local best: Placement? = nil
+	local bestScore = math.huge
+	places(p, size, function(col: number, row: number, cols: number, rows: number, turned: boolean, base: number, sum: number): boolean?
+		local area = cols * rows
+		local top = base + size.Y
+		local air = (area * base - sum) / (area * size.Y) -- the air left under it, a share of its own room
+		local snug, flush = contact(p, col, row, cols, rows, base, top, k.Level)
+		local depth = (row - 1 + rows / 2) * cell -- its middle from the cab
+		local side = math.min(col - 1, p.cols - col - cols + 1) * cell
+		local over = p.height - top
+		local dead = if over < k.Headroom then over else 0 -- a sliver nothing goes into
+		local score = k.Base * base + k.Waste * air - k.Contact * snug - k.Flush * flush + k.Depth * depth + k.Side * side
+			+ (k.Dead * dead + (if fragile then k.High * over else 0)) / size.Y
+		if score < bestScore - 1e-9 then
+			bestScore = score
+			best = { spot = 0, col = col, row = row, cols = cols, rows = rows, base = base, top = top, turned = turned }
+		end
+		return nil
+	end)
+	return best, bestScore
+end
+
+-- Its size lying on its side (`lying` "x": its height along its width, "z": along its depth; else as it is).
+function MovingRules.laid(size: Size, lying: string?): Size
+	if lying == "x" then
+		return { X = size.Y, Y = size.X, Z = size.Z }
+	elseif lying == "z" then
+		return { X = size.X, Y = size.Z, Z = size.Y }
+	end
+	return size
+end
+
+local SIDES = { "x", "z" }
+
+-- Where it would go (nil: no room): standing up (choose); when it has no place standing and it may lie (`lie`: a
+-- both / pair piece, and Pack.Lie), the better of its places lying on either side (Placement.lying).
+function MovingRules.fit(p: Packing, size: Size, fragile: boolean?, lie: boolean?): Placement?
+	local best, bestScore = choose(p, size, fragile)
+	if best or not lie or not tune().Pack.Lie then
+		return best
+	end
+	for _, lying in SIDES do
+		local at, score = choose(p, MovingRules.laid(size, lying), fragile)
+		if at and score < bestScore then
+			at.lying = lying
+			best, bestScore = at, score
+		end
+	end
 	return best
+end
+
+-- Does it still go in (the HUD: the carried thing; `lie` as fit's)? The first place found is enough.
+function MovingRules.room(p: Packing, size: Size, lie: boolean?): boolean
+	local found = false
+	local function any(): boolean?
+		found = true
+		return true
+	end
+	places(p, size, any)
+	if not found and lie and tune().Pack.Lie then
+		for _, lying in SIDES do
+			places(p, MovingRules.laid(size, lying), any)
+			if found then
+				break
+			end
+		end
+	end
+	return found
 end
 
 local function stamp(p: Packing, at: Placement)
@@ -273,8 +437,8 @@ local function stamp(p: Packing, at: Placement)
 	end
 end
 
-function MovingRules.place(p: Packing, spot: number, size: Size): Placement?
-	local at = MovingRules.fit(p, size)
+function MovingRules.place(p: Packing, spot: number, size: Size, fragile: boolean?, lie: boolean?): Placement?
+	local at = MovingRules.fit(p, size, fragile, lie)
 	if not at then
 		return nil
 	end
@@ -297,6 +461,7 @@ local function placementOf(p: Packing, spot: number): (Placement?, number?)
 	return nil, nil
 end
 
+-- Nothing rests on it: no other thing over its footprint at or above its top (one that only overhangs it counts too).
 function MovingRules.free(p: Packing, spot: number): boolean
 	local at = placementOf(p, spot)
 	if not at then
@@ -325,14 +490,41 @@ function MovingRules.remove(p: Packing, spot: number): boolean
 	return true
 end
 
+-- The share of the bed's room used (0 … 1): every cell up to its top (the things, and the air under them nothing reaches
+-- any more), and up to the roof where nothing goes any more: no flat Pack.Probe-stud square with Pack.Headroom over it
+-- covers the cell (a crack between two things, a sliver under the roof).
 function MovingRules.fill(p: Packing): number
-	local room = p.cols * p.rows * p.height
+	local cells = p.cols * p.rows
+	local room = cells * p.height
 	if room <= 0 then
 		return 0
 	end
+	local k = tune().Pack
+	local heights, width = p.heights, p.cols
+	local n = math.clamp(math.ceil(k.Probe / p.cell - 1e-3), 1, math.min(p.cols, p.rows))
+	local roof = math.max(0, p.height - k.Headroom) + 1e-3
+	local open: { boolean } = table.create(cells, false)
+	for row = 1, p.rows - n + 1 do
+		for col = 1, p.cols - n + 1 do
+			local low, high = math.huge, -math.huge
+			for r = row, row + n - 1 do
+				for c = col, col + n - 1 do
+					local h = heights[(r - 1) * width + c]
+					low, high = math.min(low, h), math.max(high, h)
+				end
+			end
+			if high <= roof and high - low <= k.Level + 1e-3 then
+				for r = row, row + n - 1 do
+					for c = col, col + n - 1 do
+						open[(r - 1) * width + c] = true
+					end
+				end
+			end
+		end
+	end
 	local used = 0
-	for _, at in p.placed do
-		used += at.cols * at.rows * (at.top - at.base)
+	for i = 1, cells do
+		used += if open[i] then heights[i] else p.height
 	end
 	return math.clamp(used / room, 0, 1)
 end
@@ -474,7 +666,7 @@ function MovingRules.load(move: Move, who: number): (Placement?, string?)
 		return nil, "helper"
 	end
 	local thing = move.things[spot]
-	local at = MovingRules.place(move.packing, spot, thing.size)
+	local at = MovingRules.place(move.packing, spot, thing.size, thing.fragile, thing.class ~= "hand")
 	if not at then
 		return nil, "noroom"
 	end

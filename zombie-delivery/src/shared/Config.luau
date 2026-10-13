@@ -5782,6 +5782,17 @@ Config.ItemModel = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
+--                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
+--                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
+--                     sides against the walls and the things beside it − Flush × the share of its edge level with its
+--                     neighbours' tops + Waste × the air left under it (a share of its own room) + Base × its base +
+--                     Side × its distance from the nearer side wall + Depth × its middle's distance from the cab
+--                     (studs) + Dead × a sliver over it under Headroom studs (nothing goes there) + High × all the room
+--                     over a fragile thing (it rides on top), both a share of its height. The fill counts a cell up to
+--                     the roof when no flat Probe-stud square with Headroom over it covers it (Headroom 1.1: the
+--                     smallest thing, the kitchen radio, is 1.1 tall). Lie: a both / pair piece with no place standing
+--                     may lie on its side (Placement.lying; off until server/Moving.luau turns the model with it)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -5824,6 +5835,7 @@ Config.Moving = {
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
 	Slots = 6,
 	Tick = 0.2,
+	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = false },
 }
 
 -- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the four roles.

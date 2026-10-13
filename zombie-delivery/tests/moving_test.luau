@@ -1,10 +1,15 @@
 -- 7.0 prototype, MOVES (shared/MovingRules.luau, Config.Moving): the carry's speeds and hands, the damage, the truck
--- bed's packing (first-fit, a turn of 90°, stacking only on a flat top, what may come out), a whole move on fake
--- furniture (pick, help, let go, load, unload, the refusals), the phases and the clock, the pay and the stars, the
--- contract card's estimate and the contract's house on the map. Run with tests/run_tests.py.
+-- bed's packing (a turn of 90°, resting on the highest top with enough of it level there, an overhang, never on one
+-- lamp or one edge, a fragile thing on top, the fill with the cracks and slivers nothing goes into, what may come
+-- out), Marge's whole house loaded in seven orders into the old truck's bed and the ZDC Van's bay (every thing left out
+-- has no room, nothing overlaps or floats, how full; lying on its side), a whole move on fake furniture (pick, help, let go,
+-- load, unload, the refusals), the phases and the clock, the pay and the stars, the contract card's estimate and the
+-- contract's house on the map. Run with tests/run_tests.py.
 local Rules = require("./MovingRules")
 local Config = require("./Config")
 local Map = require("./Map")
+local HouseLayout = require("./HouseLayout")
+local FurnitureLooks = require("./FurnitureLooks")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -50,6 +55,80 @@ check("nothing for nothing", not Rules.hurt({ condition = 1 } :: any, 0 / 0))
 
 -- The truck bed ------------------------------------------------------------------------------------------------------
 
+local K = T.Pack
+-- A thing set straight onto the bed (the test's own: for the support cases), on the highest top under it.
+local function put(pk: Rules.Packing, spot: number, col: number, row: number, cols: number, rows: number, tall: number): Rules.Placement
+	local base = 0
+	for r = row, row + rows - 1 do
+		for c = col, col + cols - 1 do
+			base = math.max(base, pk.heights[(r - 1) * pk.cols + c])
+		end
+	end
+	local at: Rules.Placement = { spot = spot, col = col, row = row, cols = cols, rows = rows, base = base, top = base + tall, turned = false }
+	for r = row, row + rows - 1 do
+		for c = col, col + cols - 1 do
+			local i = (r - 1) * pk.cols + c
+			pk.heights[i] = math.max(pk.heights[i], at.top)
+		end
+	end
+	table.insert(pk.placed, at)
+	return at
+end
+-- Replays a bed's placements in order (its own count, not the module's): what is wrong with it, nil when nothing.
+-- Inside the bed and under the roof; each on the highest top under it when it went in, supported there (Pack.Support
+-- of it within Pack.Level, round its middle); no two overlapping; the heights its tops.
+local function audit(pk: Rules.Packing): string?
+	local tops = table.create(pk.cols * pk.rows, 0)
+	for n, at in pk.placed do
+		if at.col < 1 or at.row < 1 or at.col + at.cols - 1 > pk.cols or at.row + at.rows - 1 > pk.rows then
+			return `{at.spot} outside the bed`
+		elseif at.top > pk.height + 1e-3 then
+			return `{at.spot} through the roof`
+		end
+		local high, count = 0, 0
+		local c0, c1, r0, r1 = math.huge, -math.huge, math.huge, -math.huge
+		for r = at.row, at.row + at.rows - 1 do
+			for c = at.col, at.col + at.cols - 1 do
+				high = math.max(high, tops[(r - 1) * pk.cols + c])
+			end
+		end
+		for r = at.row, at.row + at.rows - 1 do
+			for c = at.col, at.col + at.cols - 1 do
+				if tops[(r - 1) * pk.cols + c] >= at.base - K.Level - 1e-3 then
+					count += 1
+					c0, c1, r0, r1 = math.min(c0, c), math.max(c1, c), math.min(r0, r), math.max(r1, r)
+				end
+			end
+		end
+		if math.abs(high - at.base) > 1e-6 then
+			return `{at.spot} not on the highest top under it ({at.base} vs {high})`
+		elseif at.base > 0 and count < K.Support * at.cols * at.rows - 1e-6 then
+			return `{at.spot} on too little ({count} of {at.cols * at.rows} cells)`
+		elseif at.base > 0 and not (c0 - 1 < at.col - 1 + at.cols / 2 and c1 > at.col - 1 + at.cols / 2 and r0 - 1 < at.row - 1 + at.rows / 2 and r1 > at.row - 1 + at.rows / 2) then
+			return `{at.spot} off balance (its middle not over what holds it)`
+		end
+		for r = at.row, at.row + at.rows - 1 do
+			for c = at.col, at.col + at.cols - 1 do
+				local i = (r - 1) * pk.cols + c
+				tops[i] = math.max(tops[i], at.top)
+			end
+		end
+		for m = 1, n - 1 do
+			local o = pk.placed[m]
+			local flat = at.col < o.col + o.cols and o.col < at.col + at.cols and at.row < o.row + o.rows and o.row < at.row + at.rows
+			if flat and at.base < o.top - 1e-3 and o.base < at.top - 1e-3 then
+				return `{at.spot} overlaps {o.spot}`
+			end
+		end
+	end
+	for i = 1, pk.cols * pk.rows do
+		if math.abs(tops[i] - pk.heights[i]) > 1e-6 then
+			return `the heights are not its tops at cell {i}`
+		end
+	end
+	return nil
+end
+
 local p = Rules.newPacking(7, 10, 7.4, 0.5)
 check("the bed's grid: 14 × 20 cells of half a stud", p.cols == 14 and p.rows == 20 and #p.heights == 280)
 local c1, r1 = Rules.footprint({ X = 2, Y = 1, Z = 1.2 }, 0.5, false)
@@ -62,16 +141,17 @@ check("a sofa across the cab end", a ~= nil and a.col == 1 and a.row == 1 and a.
 local b = Rules.place(p, 2, { X = 3, Y = 7, Z = 2 })
 check("a wardrobe stands on the floor behind it (too tall for its top)", b ~= nil and b.row == 7 and b.col == 1 and b.base == 0, b and `{b.col},{b.row}`)
 local d = Rules.place(p, 3, { X = 1, Y = 2, Z = 1 })
-check("a lamp: the floor before a top (the lowest place first)", d ~= nil and d.base == 0 and d.row == 7 and d.col == 7, d and `{d.col},{d.row} base {d.base}`)
-check("the free ones: nothing on them", Rules.free(p, 1) and Rules.free(p, 2) and Rules.free(p, 3) and not Rules.free(p, 99))
+check("a lamp snug in the cab's corner, on the sofa (two walls beside it)", d ~= nil and d.base == 3 and d.row == 1 and d.col == 1, d and `{d.col},{d.row} base {d.base}`)
+check("the free ones: nothing on them (the lamp keeps the sofa in)", not Rules.free(p, 1) and Rules.free(p, 2) and Rules.free(p, 3) and not Rules.free(p, 99))
 local turn = Rules.newPacking(7, 10, 7.4, 0.5)
 local long = Rules.place(turn, 1, { X = 8, Y = 1, Z = 3 })
 check("too wide across: turned 90° to fit along", long ~= nil and long.turned and long.cols == 6 and long.rows == 16 and long.base == 0)
 local chest = Rules.place(p, 4, { X = 7, Y = 2, Z = 3 })
 check("a chest turned onto the free floor beside them", chest ~= nil and chest.turned and chest.row == 7 and chest.col == 9 and chest.base == 0, chest and `{chest.col},{chest.row} base {chest.base}`)
 local onTop = Rules.place(p, 5, { X = 7, Y = 2, Z = 3 })
-check("the floor full for another: flat on the lowest top (the chest's)", onTop ~= nil and onTop.col == 9 and near(onTop.base, 2), onTop and `{onTop.col},{onTop.row} base {onTop.base}`)
+check("the floor full for another: flat on the chest's top", onTop ~= nil and onTop.col == 9 and near(onTop.base, 2), onTop and `{onTop.col},{onTop.row} base {onTop.base}`)
 check("the chest can't come out from under it", not Rules.free(p, 4) and Rules.free(p, 5) and not Rules.remove(p, 4))
+check("the bed so far: every thing where the rules allow", audit(p) == nil, audit(p))
 -- fill the floor, then the next goes on a flat top
 local q = Rules.newPacking(4, 4, 6, 1)
 Rules.place(q, 1, { X = 4, Y = 2, Z = 4 })
@@ -79,18 +159,67 @@ local top = Rules.place(q, 2, { X = 2, Y = 2, Z = 2 })
 check("on the floor's full, stacked flat on top", top ~= nil and top.base == 2 and top.top == 4)
 check("what rests on another keeps it in", not Rules.free(q, 1) and Rules.free(q, 2) and not Rules.remove(q, 1))
 local tall = Rules.fit(q, { X = 2, Y = 5, Z = 2 })
-check("never through the roof", tall == nil)
+check("never through the roof", tall == nil and not Rules.room(q, { X = 2, Y = 5, Z = 2 }))
 check("a thing too big for the bed never fits", Rules.fit(Rules.newPacking(7, 10, 7.4, 0.5), { X = 8, Y = 1, Z = 11 }) == nil)
--- not on an uneven top: a 1-high and a 2-high side by side, a 4 × 4 slab over both does not fit
-local u = Rules.newPacking(4, 4, 10, 1)
-Rules.place(u, 1, { X = 2, Y = 1, Z = 4 })
-Rules.place(u, 2, { X = 2, Y = 2, Z = 4 })
-check("never on an uneven top", Rules.fit(u, { X = 4, Y = 1, Z = 4 }) == nil)
+check("…nor one taller than the bed", not Rules.room(Rules.newPacking(7, 10, 7.4, 0.5), { X = 1, Y = 8, Z = 1 }))
 check("removing the top one frees the bottom", Rules.remove(q, 2) and Rules.free(q, 1) and Rules.remove(q, 1) and #q.placed == 0 and q.heights[1] == 0)
-local f = Rules.newPacking(2, 2, 2, 1)
+-- (the packing fix) uneven tops: a thing rests on the highest top under it when enough of it lies level there
+do
+	-- a sofa (7 × 15 cells turned, the only way into a bed this narrow) on two dressers at its ends, 3.2 high
+	local bridge = Rules.newPacking(3.5, 7.5, 7.4, 0.5)
+	put(bridge, 1, 1, 1, 7, 4, 3.2)
+	put(bridge, 2, 1, 12, 7, 4, 3.2)
+	local on = Rules.place(bridge, 3, { X = 7.2, Y = 3.4, Z = 3.2 })
+	check("a sofa on two dressers at its ends: it bridges them", on ~= nil and near(on.base, 3.2) and on.turned and on.row == 1, on and `base {on.base}`)
+	check("…and keeps both in", not Rules.free(bridge, 1) and not Rules.free(bridge, 2) and Rules.free(bridge, 3))
+	-- a bookshelf (9 × 4 cells, the bed's whole floor) over a floor lamp (3 × 3) in its middle: a quarter of it
+	local shelf = Rules.newPacking(4.5, 2, 14, 0.5)
+	put(shelf, 1, 4, 1, 3, 3, 5.2)
+	check("a bookshelf on one lamp: no (a quarter of it held)", Rules.fit(shelf, { X = 4.2, Y = 6.6, Z = 1.6 }) == nil and not Rules.room(shelf, { X = 4.2, Y = 6.6, Z = 1.6 }))
+	-- half on a box, half over the air: it would tip; five eighths on it: it rests there, overhanging
+	local half = Rules.newPacking(4, 2, 10, 0.5)
+	put(half, 1, 1, 1, 4, 4, 2)
+	check("half on a box, half over the air: it would tip", Rules.fit(half, { X = 4, Y = 1, Z = 2 }) == nil)
+	local most = Rules.newPacking(4, 2, 10, 0.5)
+	put(most, 1, 1, 1, 5, 4, 2)
+	local over = Rules.fit(most, { X = 4, Y = 1, Z = 2 })
+	check("five eighths on it: it rests there, overhanging", over ~= nil and near(over.base, 2) and over.cols == 8, over and over.base)
+	-- two tops within Pack.Level of each other are one level; a stud apart, the higher one holds half: no
+	local level = Rules.newPacking(4, 4, 10, 1)
+	put(level, 1, 1, 1, 2, 4, 1.8)
+	put(level, 2, 3, 1, 2, 4, 2)
+	local slab = Rules.fit(level, { X = 4, Y = 1, Z = 4 })
+	check("tops 0.2 apart are one level: a slab rests on both", slab ~= nil and near(slab.base, 2), slab and slab.base)
+	local step = Rules.newPacking(4, 4, 10, 1)
+	put(step, 1, 1, 1, 2, 4, 1)
+	put(step, 2, 3, 1, 2, 4, 2)
+	check("tops a stud apart: not on half of it", Rules.fit(step, { X = 4, Y = 1, Z = 4 }) == nil)
+	-- a fragile thing rides on top where it can (little room over it: little goes on it); a sturdy one takes the floor
+	local crates = Rules.newPacking(4, 2, 4, 1)
+	put(crates, 1, 1, 1, 2, 2, 2)
+	local glass = Rules.fit(crates, { X = 1, Y = 1, Z = 1 }, true)
+	local box = Rules.fit(crates, { X = 1, Y = 1, Z = 1 })
+	check("a fragile thing rides on top, a sturdy one takes the floor", glass ~= nil and glass.base == 2 and box ~= nil and box.base == 0, `{glass and glass.base} {box and box.base}`)
+end
+-- the fill: up to every top, and to the roof where nothing goes any more
+local f = Rules.newPacking(2, 2, 4, 1)
 check("an empty bed is empty", Rules.fill(f) == 0)
 Rules.place(f, 1, { X = 2, Y = 1, Z = 2 })
-check("the fill: the share of the room taken", near(Rules.fill(f), 0.5))
+check("the fill: the share of the room taken", near(Rules.fill(f), 0.25))
+Rules.place(f, 2, { X = 2, Y = 2.5, Z = 2 })
+check("a sliver under the roof (no Headroom) counts full", near(Rules.fill(f), 1), Rules.fill(f))
+do
+	-- two things 3 high with a crack half a stud wide between them: under a roof 5 high the crack counts full
+	local crack = Rules.newPacking(3, 2, 5, 0.5)
+	put(crack, 1, 1, 1, 2, 4, 3)
+	put(crack, 2, 4, 1, 3, 4, 3)
+	check("a crack nothing goes into counts full", near(Rules.fill(crack), (20 * 3 + 4 * 5) / (24 * 5)), Rules.fill(crack))
+	-- the air under an overhang is taken too (nothing reaches it any more)
+	local roof = Rules.newPacking(4, 2, 10, 0.5)
+	put(roof, 1, 1, 1, 5, 4, 2)
+	Rules.place(roof, 2, { X = 4, Y = 1, Z = 2 })
+	check("the air under an overhang counts", near(Rules.fill(roof), 3 / 10), Rules.fill(roof))
+end
 local w = Rules.newPacking(4, 6, 4, 1)
 local at = Rules.place(w, 9, { X = 2, Y = 2, Z = 2 }) :: any
 local x, y, z = Rules.where(w, at)
@@ -176,6 +305,211 @@ local over = Rules.newMove(spots, defs, BED, 0, 60)
 over.phase = "done"
 ok, why = Rules.pick(over, 3, ME)
 check("nothing moves once it is over", not ok and why == "over", why)
+
+-- Marge's house into the truck (the packing fix) -----------------------------------------------------------------------
+-- Her contract's plan (shared/HouseLayout.luau) and the furniture (shared/FurnitureLooks.luau) as server/Moving.luau
+-- makes them, loaded thing by thing through the move's own Load in several orders (the plan's, the biggest first, the
+-- smallest first, four shuffles); each refused one is set down and tried again later, until nothing more goes in. Then
+-- every thing left out really has no room, the bed passes the audit, the share of the bed the things take and the fill.
+-- The beds by their numbers: the old moving truck's 7 × 10 × 7.4 and the ZDC Van's bay, 6.2 × 6.4 × 4.3.
+
+do
+	local marge = T.Contracts[1]
+	local plan = HouseLayout.plan(marge.seed, marge.kind)
+	local furniture: { [string]: Rules.ItemDef } = {}
+	for key, item in FurnitureLooks.Items do
+		furniture[key] = { id = item.id, name = item.name, icon = item.icon, size = { X = item.size.X, Y = item.size.Y, Z = item.size.Z }, class = item.class, weight = item.weight, value = item.value, fragile = item.fragile, room = item.room }
+	end
+	local house: { Rules.Spot } = {}
+	for _, s in plan.spots do
+		table.insert(house, { id = s.id, item = s.item, room = s.room, star = s.star })
+	end
+	local function volume(size: Rules.Size): number
+		return size.X * size.Y * size.Z
+	end
+	local MOVER = 7
+	local function orders(m: Rules.Move): { { number } }
+		local list = { table.clone(m.order) }
+		local big = table.clone(m.order)
+		table.sort(big, function(i, j)
+			local vi, vj = volume(m.things[i].size), volume(m.things[j].size)
+			return vi > vj or (vi == vj and i < j)
+		end)
+		table.insert(list, big)
+		local small = table.clone(big)
+		table.sort(small, function(i, j)
+			local vi, vj = volume(m.things[i].size), volume(m.things[j].size)
+			return vi < vj or (vi == vj and i < j)
+		end)
+		table.insert(list, small)
+		for seed = 1, 4 do
+			local o = table.clone(m.order)
+			local r = seed * 7919
+			for i = #o, 2, -1 do
+				r = (r * 1103515245 + 12345) % 2147483648
+				local j = r % i + 1
+				o[i], o[j] = o[j], o[i]
+			end
+			table.insert(list, o)
+		end
+		return list
+	end
+	local NAMES = { "the plan's order", "the biggest first", "the smallest first", "shuffle 1", "shuffle 2", "shuffle 3", "shuffle 4" }
+	-- Loads everything that goes in; returns the move, the share of the bed the things take and the fill.
+	local function pack(bed: Rules.Bed, order: { number }): (Rules.Move, number, number)
+		local m = Rules.newMove(house, furniture, bed, 0, 600)
+		local more = true
+		while more do
+			more = false
+			for _, spot in order do
+				if m.things[spot].state ~= "truck" then
+					Rules.pick(m, spot, MOVER)
+					if Rules.load(m, MOVER) then
+						more = true
+					else
+						Rules.release(m, MOVER)
+					end
+				end
+			end
+		end
+		local inside = 0
+		for _, at in m.packing.placed do
+			inside += volume(m.things[at.spot].size)
+		end
+		return m, inside / (bed.width * bed.length * bed.height), Rules.fill(m.packing)
+	end
+	local function report(label: string, bed: Rules.Bed, m: Rules.Move, share: number, full: number)
+		print(string.format("      %s, %s × %s × %s: %d of %d things in, %d%% of the bed, %d%% full", label, bed.width, bed.length, bed.height, #m.packing.placed, #m.order, math.floor(share * 100 + 0.5), math.floor(full * 100 + 0.5)))
+	end
+	-- every thing left out has no room; the bed passes the audit; the models sit inside the bed on their base
+	local function sound(m: Rules.Move): string?
+		for _, spot in m.order do
+			local thing = m.things[spot]
+			if thing.state ~= "truck" and Rules.room(m.packing, thing.size, thing.class ~= "hand") then
+				return `{thing.name} was refused but has room`
+			elseif thing.state == "truck" and (thing.place == nil or table.find(m.packing.placed, thing.place) == nil) then
+				return `{thing.name} in the truck without its place`
+			end
+		end
+		local pk = m.packing
+		for _, placed in pk.placed do
+			local px, py, pz = Rules.where(pk, placed)
+			local halfX, halfZ = placed.cols * pk.cell / 2, placed.rows * pk.cell / 2
+			if math.abs(px) + halfX > pk.cols * pk.cell / 2 + 1e-6 or math.abs(pz) + halfZ > pk.rows * pk.cell / 2 + 1e-6 or not near(py - (placed.top - placed.base) / 2, placed.base) then
+				return `{m.things[placed.spot].name}'s model outside the bed`
+			end
+		end
+		return audit(pk)
+	end
+
+	local BED = { width = 7, length = 10, height = 7.4, cell = 0.5 }
+	check("Marge's house: 18 to 24 things, more than the truck takes", #house >= 18 and #house <= 24)
+	local probe = Rules.newMove(house, furniture, BED, 0, 600)
+	local shares, fills = 0, 0
+	local best, worst, worstFill = 0, 1, 1
+	local planShare, planFill = 0, 0
+	local packed: Rules.Move? = nil
+	for n, order in orders(probe) do
+		local m, share, full = pack(BED, order)
+		report(NAMES[n], BED, m, share, full)
+		check(`the default bed, {NAMES[n]}: everything sound`, sound(m) == nil, sound(m))
+		shares += share
+		fills += full
+		best, worst, worstFill = math.max(best, share), math.min(worst, share), math.min(worstFill, full)
+		if n == 1 then
+			planShare, planFill, packed = share, full, m
+		end
+	end
+	check("the truck, the plan's order: over 60% of it things, 85% full when nothing more goes in", planShare >= 0.6 and planFill >= 0.85, `{planShare} {planFill}`)
+	check("the truck, any order: 80% full on average when nothing more goes in, never under 70%", fills / 7 >= 0.8 and worstFill >= 0.7, `{fills / 7} {worstFill}`)
+	check("the truck, any order: on average 60% of it things (the old flat first-fit: 59%, 67% full)", shares / 7 >= 0.6, shares / 7)
+	check("…the biggest first: over 70%", best >= 0.7, best)
+	check("…on average 80% of the best order's things, the worst order 70%", shares / 7 >= 0.8 * best and worst >= 0.7 * best, `{shares / 7} {worst} vs {best}`)
+
+	-- unloading: only what nothing rests on comes out, the last loaded first; the heights follow
+	if packed then
+		local m = packed
+		local stuck: number? = nil
+		for _, placed in m.packing.placed do
+			if not Rules.free(m.packing, placed.spot) then
+				stuck = placed.spot
+				break
+			end
+		end
+		check("Marge's load in the truck: something rests on another (stacked)", stuck ~= nil)
+		if stuck then
+			local got, why = Rules.unload(m, MOVER, stuck)
+			check("…which can't come out from under it", got == nil and why == "under" and m.things[stuck].state == "truck", why)
+		end
+		local outs, fine = 0, true
+		while true do
+			local last = Rules.lastOut(m)
+			if not last then
+				break
+			end
+			local newest = true -- nothing loaded after it is free (it is the last free one)
+			for index = #m.packing.placed, 1, -1 do
+				local placed = m.packing.placed[index]
+				if placed.spot == last then
+					break
+				elseif Rules.free(m.packing, placed.spot) then
+					newest = false
+				end
+			end
+			local got = Rules.unload(m, MOVER)
+			fine = fine and got == last and newest and audit(m.packing) == nil
+			Rules.release(m, MOVER)
+			outs += 1
+		end
+		local empty = #m.packing.placed == 0
+		for i = 1, m.packing.cols * m.packing.rows do
+			empty = empty and m.packing.heights[i] == 0
+		end
+		check("Unload empties it top first, the last free one each time, the heights rebuilt", fine and empty and outs > 0, outs)
+	end
+
+	-- the ZDC Van's bay (6.2 × 6.4 × 4.3; its grid 12 × 12 cells): the same rules, fewer things, the tall ones never
+	local VAN = { width = 6.2, length = 6.4, height = 4.3, cell = 0.5 }
+	local vanShares, vanFills, vanWorst = 0, 0, 1
+	local never = true
+	for n, order in orders(probe) do
+		local m, share, full = pack(VAN, order)
+		report(NAMES[n], VAN, m, share, full)
+		check(`the van, {NAMES[n]}: everything sound`, sound(m) == nil, sound(m))
+		vanShares += share
+		vanFills += full
+		vanWorst = math.min(vanWorst, share)
+		for _, spot in m.order do
+			local thing = m.things[spot]
+			never = never and (thing.size.Y <= 4.3 or thing.state ~= "truck")
+		end
+	end
+	check("the van: nothing over 4.3 tall gets in (standing)", never)
+	check("the van, any order: on average half of it things, 80% full, never under 40% things (the old: 50%, 63% full)", vanShares / 7 >= 0.5 and vanFills / 7 >= 0.8 and vanWorst >= 0.4, `{vanShares / 7} {vanFills / 7} {vanWorst}`)
+	-- Pack.Lie: a both / pair piece with no place standing lies on its side (a hand thing never; one that stands, stands)
+	local lie = K.Lie
+	K.Lie = true
+	local bay = Rules.newPacking(6.2, 6.4, 4.3, 0.5)
+	local piano = furniture.piano.size
+	local laid = Rules.fit(bay, piano, false, true)
+	check("Lie: the piano (4.6 tall) lies down in the van", laid ~= nil and laid.lying ~= nil and laid.top <= 4.3 + 1e-6 and Rules.room(bay, piano, true) and not Rules.room(bay, piano), laid and laid.lying)
+	local laidSize = if laid then Rules.laid(piano, laid.lying) else piano
+	check("…its size on its side: the height swapped", near(laidSize.X * laidSize.Y * laidSize.Z, piano.X * piano.Y * piano.Z) and laidSize.Y < 4.3)
+	check("…a hand thing never lies, nor one that stands", Rules.fit(bay, furniture.coat_rack.size, false, false) == nil and (Rules.fit(bay, furniture.armchair.size, false, true) :: any).lying == nil)
+	K.Lie = false
+	check("…and only with Pack.Lie", Rules.fit(bay, piano, false, true) == nil)
+	K.Lie = lie
+	local lying = Rules.newMove(house, furniture, VAN, 0, 600)
+	K.Lie = true
+	local _, lyingShare = pack(VAN, lying.order)
+	local _, standingShare = pack(VAN, probe.order)
+	K.Lie = lie
+	check("…the van takes more of Marge's things with it", lyingShare >= standingShare - 1e-9, `{lyingShare} vs {standingShare}`)
+	-- an odd bed (not whole cells, low): still sound
+	local ODD = { width = 5.3, length = 7.9, height = 4.4, cell = 0.5 }
+	local odd, oddShare = pack(ODD, probe.order)
+	check("an odd bed (5.3 × 7.9 × 4.4): sound, and things in", sound(odd) == nil and oddShare > 0.3, sound(odd) or oddShare)
+end
 
 -- The phases and the clock -------------------------------------------------------------------------------------------
 
