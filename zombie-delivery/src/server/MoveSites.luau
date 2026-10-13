@@ -15,6 +15,9 @@
 --   MoveSites.house(model, title, home)  a contract's house dressed for moving day ("MovingDay" in its site's model: the
 --                                     ZDC MOVING yard sign, boxes by the door, MOVING DAY over it, cones at the truck's
 --                                     kerb, the EVACUATED realtor's sign); returns the yard sign
+--   MoveSites.farm(model, title, placeId)   7.x farm move: Walt's farm at its place (Map.Places, turned with it: the
+--                                     frame MoveSiteLooks.sitePlace): the farmhouse and the moving-day dress
+--                                     ("MovingDay" in its site's model); returns the yard sign
 --   MoveSites.dressing(parent)        the "MoveDressing" folder: the depot's ZDC MOVING & EVACUATION banner (Persistent)
 --                                     and the city's evacuation spots (Atomic each)
 --   MoveSites.build(parent, place, pieces, name, mode?)   one set as a Model (the others' builder)
@@ -160,6 +163,16 @@ end
 
 function MoveSites.house(model: Model, title: string, home: Map.Home): BasePart
 	local dressed = MoveSites.build(model, Looks.doorPlace(home), Looks.house(title, Looks.parkDepth(home)), "MovingDay")
+	return named(dressed, "YardSign")
+end
+
+-- 7.x farm move: the farm's set, nil when its place is not on the map.
+function MoveSites.farm(model: Model, title: string, placeId: string): BasePart?
+	local place = Looks.sitePlace(placeId)
+	if not place then
+		return nil
+	end
+	local dressed = MoveSites.build(model, place, Looks.farm(title), "MovingDay")
 	return named(dressed, "YardSign")
 end
 

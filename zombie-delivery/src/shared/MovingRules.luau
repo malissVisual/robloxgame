@@ -31,19 +31,29 @@
 --   MovingRules.fill(packing)                  the share of the bed's room taken (0 … 1)
 --   MovingRules.where(packing, placement)      its middle in studs from the bed's middle (x across, z toward the door)
 --   A move
---   MovingRules.newMove(spots, defs, bed, now, seconds)   from the plan's spots and the furniture defs
+--   MovingRules.newMove(spots, defs, bed, now, seconds, hordeAt?, pay?)   from the plan's spots and the furniture defs
+--                                              (7.x farm move: a contract's own horde time, s left, and × on its pay)
 --   MovingRules.holding(move, who) -> (spot?, "carrier" | "helper" | nil)
 --   MovingRules.pick(move, spot, who) / help(move, spot, who) / release(move, who) / load(move, who) /
 --   unload(move, who, spot?) -> (ok / spot / placement, why?)   the carry's steps (why: a short code, whyText)
 --   MovingRules.lastOut(move)                  the thing Unload takes: the last loaded one nothing rests on
 --   MovingRules.counts(move)                   { total, out, stars, starsOut, broken, carried, home }
 --   MovingRules.advance(phase, event)          the phase machine: running → horde → done | late | cancelled | failed
---   MovingRules.due(move, now)                 the event the clock brings now ("horde", "timeout") or nil
+--   MovingRules.due(move, now)                 the event the clock brings now ("horde", "timeout") or nil (the horde at
+--                                              the move's own hordeAt, else HordeAt)
 --   MovingRules.result(move, how, now)         the pay: Σ value × condition, ★ × Pay.Star, a time bonus, − the broken
 --                                              ones' fine; late: × LateShare; the stars 1 … 5 and the XP (Xp + the
 --                                              value delivered / XpPerValue + XpPerStar × the stars, at most XpMax)
---   MovingRules.estimate(spots, defs)          the contract card's pay: everything out whole, in time
+--   MovingRules.estimate(spots, defs, pay?)    the contract card's pay: everything out whole, in time (× pay)
 --   MovingRules.whyText(why)                   what the player is told
+--   7.x van moves (the owner: the move is driven with the owner's own van; several trips to the Wall):
+--   MovingRules.deliver(move, now) -> spots    at the Wall: everything in the van (and on its hitch) is delivered
+--                                              (state "delivered", late when the clock had run out), the bed empty again
+--   MovingRules.lose(move) -> spots            the van was lost: what was in it is lost (state "lost", condition 0)
+--   MovingRules.setBed(move, bed)              another car's bed (an empty one: after the van was lost)
+--   The hitch: a piece too big for the bed that may be towed (ItemDef.tow: FurnitureLooks bigDoor, the hay wagon) is
+--   hitched behind the car instead (Placement.hitch; one at a time), Unload takes it off once the bed is empty.
+--   The pay counts the delivered things only (each trip's); one delivered late pays LateShare of it.
 
 local Config = require(script.Parent.Config)
 
@@ -62,6 +72,7 @@ export type ItemDef = {
 	value: number,
 	fragile: boolean,
 	room: string,
+	tow: boolean?, -- 7.x van moves: too big for a bed, it may ride hitched behind the car (FurnitureLooks bigDoor)
 }
 export type Spot = { id: number, item: string, room: string, star: boolean }
 export type Placement = {
@@ -73,6 +84,7 @@ export type Placement = {
 	base: number, -- studs over the floor where it stands
 	top: number,
 	turned: boolean, -- its footprint turned 90°
+	hitch: boolean?, -- 7.x van moves: hitched behind the car, not on the bed
 }
 export type Packing = {
 	cols: number,
@@ -95,10 +107,12 @@ export type Thing = {
 	room: string,
 	size: Size,
 	condition: number,
-	state: string, -- home | carried | ground | truck
+	state: string, -- home | carried | ground | truck (in the van) | delivered (at the Wall) | lost (with a lost van)
 	carrier: number?,
 	helper: number?,
 	place: Placement?,
+	tow: boolean?, -- 7.x van moves: it may ride hitched (ItemDef.tow)
+	late: boolean?, -- 7.x van moves: delivered after the clock ran out (pays LateShare)
 }
 export type Move = {
 	things: { [number]: Thing },
@@ -108,8 +122,13 @@ export type Move = {
 	startedAt: number,
 	endsAt: number,
 	seconds: number,
+	hordeAt: number?, -- 7.x farm move: s left when the horde comes (nil: Config.Moving.HordeAt)
+	pay: number?, -- 7.x farm move: × the pay (nil: 1)
+	bed: Bed?, -- 7.x van moves: the bed's numbers (an empty bed again after a trip)
+	hitch: number?, -- 7.x van moves: the spot hitched behind the car (nil: none)
+	trips: number?, -- 7.x van moves: the trips delivered at the Wall
 }
-export type Counts = { total: number, out: number, stars: number, starsOut: number, broken: number, carried: number, home: number }
+export type Counts = { total: number, out: number, stars: number, starsOut: number, broken: number, carried: number, home: number, delivered: number, starsDelivered: number, lost: number }
 export type Result = {
 	how: string,
 	delivered: number,
@@ -349,7 +368,7 @@ end
 
 export type Bed = { width: number, length: number, height: number, cell: number }
 
-function MovingRules.newMove(spots: { Spot }, defs: { [string]: ItemDef }, bed: Bed, now: number, seconds: number): Move
+function MovingRules.newMove(spots: { Spot }, defs: { [string]: ItemDef }, bed: Bed, now: number, seconds: number, hordeAt: number?, pay: number?): Move
 	local things: { [number]: Thing } = {}
 	local order: { number } = {}
 	for _, spot in spots do
@@ -366,6 +385,7 @@ function MovingRules.newMove(spots: { Spot }, defs: { [string]: ItemDef }, bed: 
 			weight = def.weight,
 			value = math.max(0, def.value),
 			fragile = def.fragile == true,
+			tow = def.tow == true,
 			star = spot.star == true,
 			room = spot.room,
 			size = { X = def.size.X, Y = def.size.Y, Z = def.size.Z },
@@ -385,6 +405,11 @@ function MovingRules.newMove(spots: { Spot }, defs: { [string]: ItemDef }, bed: 
 		startedAt = now,
 		endsAt = now + seconds,
 		seconds = seconds,
+		hordeAt = hordeAt,
+		pay = pay,
+		bed = bed,
+		hitch = nil,
+		trips = 0,
 	}
 end
 
@@ -475,6 +500,14 @@ function MovingRules.load(move: Move, who: number): (Placement?, string?)
 	end
 	local thing = move.things[spot]
 	local at = MovingRules.place(move.packing, spot, thing.size)
+	if not at and thing.tow then
+		-- 7.x van moves: too big for the bed: hitched behind the car (one at a time)
+		if move.hitch ~= nil then
+			return nil, "hitched"
+		end
+		move.hitch = spot
+		at = { spot = spot, col = 0, row = 0, cols = 0, rows = 0, base = 0, top = thing.size.Y, turned = false, hitch = true }
+	end
 	if not at then
 		return nil, "noroom"
 	end
@@ -494,7 +527,7 @@ function MovingRules.lastOut(move: Move): number?
 			return spot
 		end
 	end
-	return nil
+	return move.hitch -- (7.x van moves: the hitched piece once the bed is empty)
 end
 
 -- `who` (empty hands) takes a thing back out of the truck (`spot`, else lastOut) into their hands.
@@ -509,7 +542,9 @@ function MovingRules.unload(move: Move, who: number, spot: number?): (number?, s
 	if not pick or not thing or thing.state ~= "truck" then
 		return nil, "nothing"
 	end
-	if not MovingRules.remove(move.packing, pick) then
+	if pick == move.hitch then
+		move.hitch = nil -- (7.x van moves: off the hitch)
+	elseif not MovingRules.remove(move.packing, pick) then
 		return nil, "under"
 	end
 	thing.state = "carried"
@@ -520,7 +555,7 @@ function MovingRules.unload(move: Move, who: number, spot: number?): (number?, s
 end
 
 function MovingRules.counts(move: Move): Counts
-	local c: Counts = { total = 0, out = 0, stars = 0, starsOut = 0, broken = 0, carried = 0, home = 0 }
+	local c: Counts = { total = 0, out = 0, stars = 0, starsOut = 0, broken = 0, carried = 0, home = 0, delivered = 0, starsDelivered = 0, lost = 0 }
 	for _, spot in move.order do
 		local thing = move.things[spot]
 		c.total += 1
@@ -536,6 +571,13 @@ function MovingRules.counts(move: Move): Counts
 			c.carried += 1
 		elseif thing.state == "home" then
 			c.home += 1
+		elseif thing.state == "delivered" then -- 7.x van moves
+			c.delivered += 1
+			if thing.star then
+				c.starsDelivered += 1
+			end
+		elseif thing.state == "lost" then
+			c.lost += 1
 		end
 		if MovingRules.broken(thing) then
 			c.broken += 1
@@ -573,7 +615,7 @@ function MovingRules.due(move: Move, now: number): string?
 	local left = MovingRules.left(move, now)
 	if left <= 0 then
 		return "timeout"
-	elseif move.phase == "running" and left <= tune().HordeAt then
+	elseif move.phase == "running" and left <= (move.hordeAt or tune().HordeAt) then
 		return "horde"
 	end
 	return nil
@@ -585,6 +627,7 @@ function MovingRules.result(move: Move, how: string, now: number): Result
 	local pay = tune().Pay
 	local r: Result = { how = how, delivered = 0, left = 0, broken = 0, starsOut = 0, stars = 0, base = 0, starBonus = 0, timeBonus = 0, fine = 0, total = 0, xp = 0 }
 	local paid = how == "done" or how == "late"
+	local scale = move.pay or 1 -- (7.x farm move: the contract's own pay)
 	local worth, got, stars = 0, 0, 0
 	for _, spot in move.order do
 		local thing = move.things[spot]
@@ -596,13 +639,13 @@ function MovingRules.result(move: Move, how: string, now: number): Result
 		if broken then
 			r.broken += 1
 		end
-		if paid and thing.state == "truck" then
+		if paid and thing.state == "delivered" then -- (7.x van moves: what reached the Wall, over every trip)
 			r.delivered += 1
 			if broken then
-				r.fine += thing.value * pay.Scale * pay.BrokenFine
+				r.fine += thing.value * pay.Scale * scale * pay.BrokenFine
 			else
 				got += thing.value * thing.condition
-				local value = thing.value * thing.condition * pay.Scale
+				local value = thing.value * thing.condition * pay.Scale * scale * (if thing.late then pay.LateShare else 1)
 				r.base += value
 				if thing.star then
 					r.starsOut += 1
@@ -619,8 +662,8 @@ function MovingRules.result(move: Move, how: string, now: number): Result
 	if how == "done" and move.seconds > 0 then
 		r.timeBonus = (r.base + r.starBonus) * pay.TimeBonus * math.clamp(MovingRules.left(move, now) / move.seconds, 0, 1)
 	end
-	local share = if how == "late" then pay.LateShare else 1
-	r.total = math.max(0, math.floor((r.base + r.starBonus + r.timeBonus) * share - r.fine + 0.5))
+	-- (7.x van moves: a thing delivered late counts LateShare of itself above, the on-time trips in full)
+	r.total = math.max(0, math.floor(r.base + r.starBonus + r.timeBonus - r.fine + 0.5))
 	-- The rating: the ★ things, the value brought whole, few broken; late: 3 at most, a ★ left behind: 3 at most.
 	local count = #move.order
 	local starShare = if stars > 0 then r.starsOut / stars else 1
@@ -638,18 +681,77 @@ function MovingRules.result(move: Move, how: string, now: number): Result
 end
 
 -- The contract card's pay: every thing out whole, ★ ones with their bonus (no time bonus).
-function MovingRules.estimate(spots: { Spot }, defs: { [string]: ItemDef }): number
+function MovingRules.estimate(spots: { Spot }, defs: { [string]: ItemDef }, scale: number?): number
 	local pay = tune().Pay
+	local factor = scale or 1
 	local total = 0
 	local seen: { [number]: boolean } = {}
 	for _, spot in spots do
 		local def = defs[spot.item]
 		if def and not seen[spot.id] then
 			seen[spot.id] = true
-			total += def.value * pay.Scale * (if spot.star then pay.Star else 1)
+			total += def.value * pay.Scale * factor * (if spot.star then pay.Star else 1)
 		end
 	end
 	return math.floor(total + 0.5)
+end
+
+-- ── 7.x van moves: the trips ────────────────────────────────────────────────
+
+local function emptyBed(move: Move)
+	local bed = move.bed
+	local p = move.packing
+	move.packing = if bed then MovingRules.newPacking(bed.width, bed.length, bed.height, bed.cell) else MovingRules.newPacking(p.cols * p.cell, p.rows * p.cell, p.height, p.cell)
+	move.hitch = nil
+end
+
+-- At the Wall: everything in the van and on its hitch is delivered (late after the clock ran out); the spots, in the
+-- order they went in (the hitch last). An empty van delivers nothing (no trip).
+function MovingRules.deliver(move: Move, now: number): { number }
+	local spots: { number } = {}
+	for _, at in move.packing.placed do
+		table.insert(spots, at.spot)
+	end
+	if move.hitch then
+		table.insert(spots, move.hitch)
+	end
+	local late = now >= move.endsAt
+	local delivered: { number } = {}
+	for _, spot in spots do
+		local thing = move.things[spot]
+		if thing and thing.state == "truck" then
+			thing.state, thing.place, thing.carrier, thing.helper = "delivered", nil, nil, nil
+			thing.late = late
+			table.insert(delivered, spot)
+		end
+	end
+	if #spots > 0 then
+		emptyBed(move)
+	end
+	if #delivered > 0 then
+		move.trips = (move.trips or 0) + 1
+	end
+	return delivered
+end
+
+-- The van was lost (wrecked, gone): what was in it is lost with it (condition 0); the spots.
+function MovingRules.lose(move: Move): { number }
+	local spots: { number } = {}
+	for _, spot in move.order do
+		local thing = move.things[spot]
+		if thing.state == "truck" then
+			thing.state, thing.place, thing.condition = "lost", nil, 0
+			table.insert(spots, spot)
+		end
+	end
+	emptyBed(move)
+	return spots
+end
+
+-- Another car's bed (the owner's new van after the old one was lost): an empty one.
+function MovingRules.setBed(move: Move, bed: Bed)
+	move.bed = bed
+	emptyBed(move)
 end
 
 local WHY: { [string]: string } = {
@@ -662,8 +764,9 @@ local WHY: { [string]: string } = {
 	helped = "Two are on it already.",
 	empty = "Carry something to the truck first.",
 	helper = "The one at the front loads it.",
-	noroom = "No room — unload something or bring a bigger truck.",
-	nothing = "Nothing in the truck.",
+	noroom = "No room — unload something, or drive this load to the Wall first.",
+	hitched = "The hitch is taken: drive that one to the Wall first.",
+	nothing = "Nothing in the van.",
 	under = "Something rests on it: take that out first.",
 }
 

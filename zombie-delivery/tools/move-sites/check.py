@@ -10,6 +10,8 @@ it) and checks what comes out, in the world's own coordinates.
   * the models as Moving needs them: MovingBoard (Persistent, its corkboard "Board" the prompt's part, within a stud of
     Config.Moving.Board), MovingDropOff (Persistent, the gantry's sign its PrimaryPart), the house's yard sign returned,
     the banner Persistent, each spot Atomic
+  * 7.x farm move: each farm site (Walt's farmhouse and the dress at its Map.Places place): only the farmhouse's body
+    solid, nothing on a door's way out to its van spot, on the van spot or on Walt's spot by the front door
   * no blocking: nothing but paint in the truck's lane from Bone St into the drop-off's bay below the gantry's sign
     (Config.MoveSites.Clear), nothing of the checkpoint off the depot's block (the road), nothing solid at a house and
     nothing on the strip from its door out to the truck's kerb spot (Map.Home park) a body's height
@@ -93,6 +95,8 @@ def check(records: list) -> list:
         need(all(n >= 0.04 for n in p["size"]), f"{p['set']}.{p['name']}: size")
     for name in ("board", "checkpoint", "banner", "house_marge", "EvacuationSpot1"):
         need(name in sets, f"no {name}")
+    for farm in summary.get("farms", []):  # 7.x farm move
+        need("farm_" + farm["id"] in sets, f"no farm_{farm['id']}")
 
     # The flags.
     lights = 0
@@ -115,7 +119,7 @@ def check(records: list) -> list:
     modes = summary["modes"]
     need(modes == {"board": "Persistent", "checkpoint": "Persistent", "banner": "Persistent", "spot": "Atomic"}, f"streaming {modes}")
     primary = summary["primary"]
-    need(primary == {"board": "Board", "corkboard": "Board", "checkpoint": "CheckpointSign", "house": "YardSign"}, f"primary parts {primary}")
+    need(primary == {"board": "Board", "corkboard": "Board", "checkpoint": "CheckpointSign", "house": "YardSign", "farm": "YardSign"}, f"primary parts {primary}")
     for p in sets.get("board", []):
         if p["name"] == "Board":
             bx, bz = summary["board"]
@@ -165,6 +169,28 @@ def check(records: list) -> list:
             side0, side1 = min(c[1] for c in corners), max(c[1] for c in corners)
             on_path = out1 > 0 and out0 < depth and side1 > -2.4 and side0 < 2.4
             need(not (on_path and y0 < walk + 7.5 and y1 > road + 0.2), f"{where}: on the path from the door to the truck's kerb")
+
+    # 7.x farm move: a farm's site: only the farmhouse's body solid; nothing on a door's way out to its van spot, on the
+    # van spot (the van 17 long, its back to the door) or on Walt's spot by the front door, a body's height
+    for farm in summary.get("farms", []):
+        ground, curb = farm["ground"], farm["curb"]
+        for p in sets.get("farm_" + farm["id"], []):
+            where = f"farm_{farm['id']}.{p['name']}"
+            need(not p["collide"] or p["name"] == "FarmhouseBody", where + " solid")
+            x0, x1, y0, y1, z0, z1 = box(p)
+            if y0 >= ground + 7.5:
+                continue
+            for n, d in enumerate(farm["doors"]):
+                (hx, hz), (fx, fz) = d["door"], d["facing"]
+                corners = [((x - hx) * fx + (z - hz) * fz, (x - hx) * -fz + (z - hz) * fx) for x in (x0, x1) for z in (z0, z1)]
+                out0, out1 = min(c[0] for c in corners), max(c[0] for c in corners)
+                side0, side1 = min(c[1] for c in corners), max(c[1] for c in corners)
+                half = d["width"] / 2 + 0.4
+                need(not (out1 > 0.6 and out0 < curb - 8.5 and side1 > -half and side0 < half), f"{where}: on door {n + 1}'s way out")
+                need(not (out1 > curb - 8.5 and out0 < curb + 8.5 and side1 > -4 and side0 < 4), f"{where}: on door {n + 1}'s van spot")
+                if n == 0:
+                    px, pz = farm["porch"][0], -farm["porch"][1]
+                    need(not (side1 > px - 1.2 and side0 < px + 1.2 and out1 > pz - 1.2 and out0 < pz + 1.2), f"{where}: on Walt's spot")
     return bad
 
 

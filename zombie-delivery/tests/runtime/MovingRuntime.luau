@@ -404,6 +404,18 @@ Runtime.PlayerData = stub("PlayerData", {
 	track = function(name: string, ...: any)
 		table.insert(Runtime.tracked, { name = name, args = { ... } })
 	end,
+	-- 7.x farm move: a player's profile (its story flags: Runtime.story[player], its car) and a flag kept in it
+	get = function(player: any): any
+		Runtime.story[player] = Runtime.story[player] or {}
+		return { story = Runtime.story[player], car = Runtime.carId }
+	end,
+	markStory = function(player: any, key: string): boolean
+		Runtime.story[player] = Runtime.story[player] or {}
+		local new = Runtime.story[player][key] ~= true
+		Runtime.story[player][key] = true
+		table.insert(Runtime.marked, { player = player, key = key })
+		return new
+	end,
 })
 
 -- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt.
@@ -424,9 +436,14 @@ local function makeCar(owner: any, id: string, at: any): any
 	back.Parent = door
 	model:SetAttribute("BackOpen", false)
 	model.Parent = workspace
-	return { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = true }
+	return { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false }
 end
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
+-- 7.x van moves: a move goes with its owner's own car: the one placeNear makes when it is given no id (the old tests'
+-- big Moving Truck bed: Config.Moving.Beds.movingtruck; the van tests set "zdcvan")
+Runtime.carId = "movingtruck"
+Runtime.story = {} -- 7.x farm move: player → their story flags (PlayerData.get(player).story)
+Runtime.marked = {} -- { { player, key } } every PlayerData.markStory
 
 Runtime.Vehicles = stub("Vehicles", {
 	get = function(player: any): any
@@ -437,7 +454,7 @@ Runtime.Vehicles = stub("Vehicles", {
 		if old then
 			old.model:Destroy()
 		end
-		Runtime.cars[player] = makeCar(player, id, Runtime.truckAt)
+		Runtime.cars[player] = makeCar(player, id or Runtime.carId, Runtime.truckAt)
 		return nil
 	end,
 	cargoDoor = function(car: any): any
@@ -634,6 +651,9 @@ local services: { [string]: any } = {
 	CollectionService = {
 		AddTag = function(_, obj: any, tag: string)
 			obj:SetAttribute("Tag_" .. tag, true)
+		end,
+		RemoveTag = function(_, obj: any, tag: string)
+			obj:SetAttribute("Tag_" .. tag, nil)
 		end,
 	},
 }

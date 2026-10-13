@@ -5966,10 +5966,19 @@ Config.CarryGrip = {
 --   Time / HordeAt    the move's clock (s) and when the horde comes (s left); Fade: the fade at a door (s)
 --   Contracts         the moves on the depot's board (home: a Map.Homes id, the house whose front door leads inside;
 --                     seed: shared/HouseLayout.luau plan's)
---   Truck             the company vehicle lent for a move (Config.Cars); Bed: its box inside (studs from the chassis'
---                     top middle: Center x / z, the floor at the chassis' top), the packing grid's Cell
+--   Van / Beds        7.x van moves (the owner: "the move should be driven with MY van"): no truck is lent any more, a
+--                     move uses its owner's own car (the ZDC Van, Van); Beds: the packing bed of a car by its id (its
+--                     cargo bay: studs from the chassis' middle, Center x / z its middle, the floor at the chassis' top,
+--                     the grid's Cell), a car without one the Van's. The ZDC Van's bay (server/Vehicles.luau
+--                     STYLES.zdcvan: the cargo box 6.6 wide, 4.5 tall, from the bulkhead at z -0.35 to the back doors at
+--                     z 6.3) less its walls: 6.2 × 6.4 × 4.3 round z 2.98; the old Moving Truck's box stays for a player
+--                     who still drives one. Hitch: a piece too big for any bed that may be towed (FurnitureLooks bigDoor:
+--                     the hay wagon) rides hitched behind the car, Gap studs behind its back (Back: the back's z), its
+--                     wheels on the ground (Drop: the chassis' middle over the ground). VanAgain: s after the van was
+--                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
---                     drop-off ("the Wall"); a truck within DropRadius of it with a load ends the move
+--                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
+--                     trip; the move goes on until the owner's FINISH or the clock)
 --   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair, drag
 --   Damage            shares of a thing's condition: a fall over SafeDrop studs (over a jump's top, about 7) PerStud a
 --                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
@@ -5983,6 +5992,17 @@ Config.CarryGrip = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   7.x farm move (chapter 1, Walt's Farm): a contract may have its own clock (time, hordeAt: s, over Time / HordeAt)
+--                     and pay (pay: × the move's pay); a contract of kind "farm" stands at a Map.Places place (place,
+--                     its site in Sites) instead of a Map.Homes house (home). It opens once its chapter's (shared/
+--                     MoveStory.luau) chapters before it are done (the save's story flags "done:<chapter>")
+--   Sites             a place's site (studs in the place's own frame from its Map.Places point: +X east, +Z south as
+--                     the place stood before map step 2, Map.Relocations' turn turns them with it): Doors, in the plan's
+--                     exits' order (exits[1] the farmhouse's front door, exits[2] the barn doors): At the door's foot
+--                     outside, Facing out of it, Width, Name (the hints'); Curb: studs out of a door to the truck's
+--                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
+--                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
+--                     depth; its front door is Doors[1])
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -5999,9 +6019,40 @@ Config.Moving = {
 			kind = "house",
 			blurb = "Prologue: Marge's family house on Willow Lane. Get her things out before the Wall closes.",
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string, seed: number, kind: string, blurb: string } },
-	Truck = "movingtruck",
-	Bed = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+		-- 7.x farm move: chapter 1 "Hold Your Horses" (seed 1921: the Silver Spur's mark; its ★ pieces are Thunder's
+		-- saddle, the branding iron and Grandma's milk churn, as shared/MoveStory.luau's keepsakes say)
+		{
+			id = "walt",
+			name = "Walt's Farm",
+			client = "Walt",
+			icon = "🐴",
+			place = "farm", -- Map.Places: the Old Farm (its site: Sites.farm)
+			seed = 1921,
+			kind = "farm",
+			blurb = "Chapter 1: Walt's farm, the house and the barn. The hay wagon only fits through the barn doors.",
+			time = 14 * 60,
+			hordeAt = 3.5 * 60,
+			pay = 1.25,
+		},
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? } },
+	Sites = {
+		farm = {
+			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
+			Doors = {
+				{ Id = "house", Name = "front door", At = { 45, -76 } :: { number }, Facing = { 0, 1 } :: { number }, Width = 4 },
+				{ Id = "barn", Name = "barn doors", At = { -60, -64.4 } :: { number }, Facing = { 0, 1 } :: { number }, Width = 12 }, -- (World's barn: its doors' face)
+			},
+			Curb = 16,
+			Out = 4,
+		},
+	} :: { [string]: { House: { At: { number }, Size: { number } }, Doors: { { Id: string, Name: string, At: { number }, Facing: { number }, Width: number } }, Curb: number, Out: number } },
+	Van = "zdcvan",
+	Beds = {
+		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.5, Center = { 0, 2.98 } :: { number } },
+		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number } } },
+	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
+	VanAgain = 20,
 	Board = { 44, 12 } :: { number },
 	DropOff = { 34, 46 } :: { number },
 	DropRadius = 20,

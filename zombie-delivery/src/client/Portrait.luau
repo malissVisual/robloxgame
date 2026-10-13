@@ -100,6 +100,16 @@ local function bust(look: NpcLooks.Look): Model
 		end
 		piece(model, "Pocket", Vector3.new(s.X * 0.18, s.Y * 0.16, 0.04), torsoAt * CFrame.new(-s.X * 0.32, s.Y * 0.16, -s.Z * 0.6), Color3.fromRGB(60, 120, 200))
 	end
+	if look.plaid then
+		-- 7.x farm move: a check shirt (Walt): bands across and down, as server/Npcs.luau dresses it
+		local band = rgb(look.plaid, shirt)
+		for _, y in { 0.18, -0.22 } do
+			piece(model, "Plaid", Vector3.new(s.X * 1.02, s.Y * 0.09, s.Z * 1.04), torsoAt * CFrame.new(0, s.Y * y, 0), band, Enum.Material.Fabric)
+		end
+		for _, x in { -0.22, 0.22 } do
+			piece(model, "Plaid", Vector3.new(s.X * 0.09, s.Y * 0.98, s.Z * 1.04), torsoAt * CFrame.new(s.X * x, 0, 0), band, Enum.Material.Fabric)
+		end
+	end
 	piece(model, "Collar", Vector3.new(s.X * 0.42, s.Y * 0.08, s.Z * 0.9), torsoAt * CFrame.new(0, s.Y * 0.48, 0), shirt:Lerp(Color3.new(0, 0, 0), 0.15), Enum.Material.Fabric)
 	piece(model, "Neck", Vector3.new(0.5, 0.3, 0.5), CFrame.new(0, s.Y + 0.12, 0), skin)
 	-- The head and its face.
@@ -115,6 +125,14 @@ local function bust(look: NpcLooks.Look): Model
 	local hatColor = rgb(look.hatColor, Color3.fromRGB(60, 60, 66))
 	if look.hair and hat ~= "helmet" and hat ~= "beanie" then
 		piece(model, "Hair", Vector3.new(h * 1.04, h * 0.62, h * 1.06), headAt * CFrame.new(0, h * 0.24, h * 0.06), rgb(look.hair, Color3.new(0, 0, 0)), Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
+	end
+	if look.moustache then
+		-- 7.x farm move: the moustache (Walt's), as server/Npcs.luau's
+		local tache = rgb(look.moustache, Color3.fromRGB(120, 110, 100))
+		piece(model, "Moustache", Vector3.new(h * 0.46, h * 0.1, h * 0.12), headAt * CFrame.new(0, -h * 0.14, -h * 0.5), tache, Enum.Material.SmoothPlastic)
+		for _, side in { -1, 1 } do
+			piece(model, "Moustache", Vector3.new(h * 0.09, h * 0.16, h * 0.1), headAt * CFrame.new(side * h * 0.23, -h * 0.2, -h * 0.49), tache, Enum.Material.SmoothPlastic)
+		end
 	end
 	if look.bandage then
 		piece(model, "Bandage", Vector3.new(h * 0.24, h * 1.08, h * 1.1), headAt * CFrame.new(0, h * 0.2, 0) * UPRIGHT, Color3.fromRGB(246, 244, 238), Enum.Material.Fabric, nil, Enum.PartType.Cylinder)
@@ -146,7 +164,7 @@ local function bustOf(person: Cast.Person, twin: Cast.Person?): Model
 	local key = if twin then `{person.id}+{twin.id}` else person.id
 	local cached = cache[key]
 	if not cached then
-		local look = NpcLooks.look(person.look, person.name, person.job)
+		local look = NpcLooks.person(person.id, person.look, person.name, person.job) -- (7.x farm move: Marge, Walt as in the world)
 		if twin then
 			local other = NpcLooks.look(twin.look, twin.name, twin.job)
 			look.skin, look.hair = other.skin, other.hair
