@@ -150,6 +150,97 @@ for _, name in { "amb_day", "amb_night", "amb_roof", "amb_fountain" } do
 	check(name .. " loops", SoundSheet.Looped[name] == true and SoundSheet.Sfx3[name] ~= nil)
 end
 
+-- ── 7.1: the move's sounds ───────────────────────────────────────────────────
+-- (states shaped as server/Moving.luau's viewFor: what SoundPlan reads of them)
+local MV = S.Move
+local function piece(spot: number, props: { [string]: any }): { [string]: any }
+	local item: { [string]: any } = { spot = spot, name = "Armchair", icon = "🪑", class = "both", state = "home", condition = 1, broken = false, fragile = false, mine = false }
+	for key, value in props do
+		item[key] = value
+	end
+	return item
+end
+local function state(props: { [string]: any }, items: { any }?): { [string]: any }
+	local view: { [string]: any } = { id = 7, seconds = 600, endsAt = 1000 + 600, horde = false, backOpen = false, inside = false, items = items or {}, team = { role = "driver" } }
+	for key, value in props do
+		view[key] = value
+	end
+	return view
+end
+local function names(cues: { SoundPlan.Cue }): string
+	local list = {}
+	for _, c in cues do
+		check(`cue {c.name} has its region`, SoundSheet.Sfx4[c.name] ~= nil)
+		check(`cue {c.name}: volume and pitch`, c.volume > 0 and c.volume <= 1 and c.pitch > 0.5 and c.pitch < 1.5, `{c.volume} {c.pitch}`)
+		table.insert(list, c.name)
+	end
+	return table.concat(list, ",")
+end
+local base = state({})
+check("a new move starts with its sting", names(SoundPlan.moveCues(nil, base, 1000 + 2)) == "move_start")
+check("joining a move half way: no sting", names(SoundPlan.moveCues(nil, base, 1000 + 300)) == "")
+check("another move's state is a new move", names(SoundPlan.moveCues(state({ id = 6 }), base, 1000 + 1)) == "move_start")
+check("nothing changed: nothing plays", names(SoundPlan.moveCues(base, state({}), 1000 + 30)) == "")
+check("the move over: nothing (its result plays)", names(SoundPlan.moveCues(base, nil, 1000 + 30)) == "")
+check("the horde comes: the siren", names(SoundPlan.moveCues(base, state({ horde = true }), 1000 + 420)) == "horde_siren")
+check("the horde stays: once", names(SoundPlan.moveCues(state({ horde = true }), state({ horde = true }), 1000 + 421)) == "")
+local opened = SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)
+check("the truck's back opens", names(opened) == "truck_ramp" and opened[1].pitch == 1)
+local shut = SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)
+check("… and shuts lower", names(shut) == "truck_ramp" and shut[1].pitch == MV.RampShut)
+check("in through the house's door", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+local out = SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)
+check("… and out", names(out) == "house_door_creak" and out[1].pitch == MV.DoorOut)
+-- the pieces
+local carried = state({}, { piece(1, { state = "carried", mine = true }), piece(2, { state = "carried" }) })
+local loaded = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "truck" }), piece(2, { state = "carried" }) }), 1000 + 30)
+check("your piece into the truck", names(loaded) == "truck_load" and loaded[1].volume == MV.Load)
+local crewLoad = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "carried", mine = true }), piece(2, { state = "truck" }) }), 1000 + 30)
+check("a crew mate's: quieter", names(crewLoad) == "truck_load" and crewLoad[1].volume == MV.LoadCrew)
+local both = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "truck" }), piece(2, { state = "truck" }) }), 1000 + 30)
+check("two at once: one load, the louder", names(both) == "truck_load" and both[1].volume == MV.Load)
+local glass = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "carried", mine = true, fragile = true, broken = true, condition = 0.1 }), piece(2, { state = "carried" }) }), 1000 + 30)
+check("a fragile piece breaks: glass", names(glass) == "glass_break" and glass[1].volume == MV.Break)
+local smashed = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "carried", mine = true }), piece(2, { state = "ground", broken = true, condition = 0.1 }) }), 1000 + 30)
+check("a crew mate's chair breaks: a crash, quieter", names(smashed) == "heavy_drop" and smashed[1].volume == MV.BreakCrew)
+local jolt = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "carried", mine = true, condition = 1 - MV.Jolt - 0.01 }), piece(2, { state = "carried" }) }), 1000 + 30)
+check("a hard knock in your hands: a thud", names(jolt) == "heavy_drop" and jolt[1].volume == MV.JoltVolume)
+check("a small knock: nothing", names(SoundPlan.moveCues(carried, state({}, { piece(1, { state = "carried", mine = true, condition = 1 - MV.Jolt / 2 }), piece(2, { state = "carried" }) }), 1000 + 30)) == "")
+check("a crew mate's knock: nothing", names(SoundPlan.moveCues(carried, state({}, { piece(1, { state = "carried", mine = true }), piece(2, { state = "carried", condition = 0.5 }) }), 1000 + 30)) == "")
+check("broken already: once", names(SoundPlan.moveCues(state({}, { piece(1, { broken = true }) }), state({}, { piece(1, { broken = true, condition = 0 }) }), 1000 + 30)) == "")
+check("junk in a state is skipped", names(SoundPlan.moveCues(state({ items = { 1, "x" } }), state({ items = { false, { spot = "a" } } }), 1000 + 30)) == "")
+-- your hands
+check("a moving box rustles", SoundPlan.isBox({ name = "Moving Box", icon = "📦" }))
+check("a box of dishes rustles", SoundPlan.isBox({ name = "Box of Dishes", icon = "🥣" }))
+check("a toolbox is not cardboard", not SoundPlan.isBox({ name = "Toolbox", icon = "🧰" }))
+check("an armchair is not a box", not SoundPlan.isBox(piece(1, {})))
+check("nothing is not a box", not SoundPlan.isBox(nil))
+check("a lift", SoundPlan.carryCue(piece(1, {}), true).name == "furniture_pickup")
+check("a put-down", SoundPlan.carryCue(piece(1, {}), false).name == "furniture_putdown")
+check("a box either way", SoundPlan.carryCue({ name = "Moving Box" }, true).name == "cardboard_box" and SoundPlan.carryCue({ name = "Moving Box" }, false).name == "cardboard_box")
+check("an unknown piece lifts as furniture", SoundPlan.carryCue(nil, true).name == "furniture_pickup")
+for _, up in { true, false } do
+	check("the hands' cues have regions", SoundSheet.Sfx4[SoundPlan.carryCue(piece(1, {}), up).name] ~= nil)
+end
+check("moveItem finds the spot", SoundPlan.moveItem(carried, 2) ~= nil and SoundPlan.moveItem(carried, 2).spot == 2)
+check("moveItem: no spot, no piece", SoundPlan.moveItem(carried, nil) == nil and SoundPlan.moveItem(nil, 1) == nil and SoundPlan.moveItem(carried, 9) == nil)
+-- the drag
+local alone = state({}, { piece(3, { class = "pair", state = "carried", by = "Pavel", mine = true }) })
+check("a two-person piece alone is dragged", SoundPlan.dragged(alone, 3))
+check("… not with a helper", not SoundPlan.dragged(state({}, { piece(3, { class = "pair", state = "carried", by = "Pavel + Danny", mine = true }) }), 3))
+check("… not by a Mover (held up)", not SoundPlan.dragged(state({ team = { role = "mover" } }, alone.items), 3))
+check("a one-person piece is carried", not SoundPlan.dragged(state({}, { piece(3, { class = "both", state = "carried", by = "Pavel", mine = true }) }), 3))
+check("nothing in your hands: no drag", not SoundPlan.dragged(alone, nil) and not SoundPlan.dragged(nil, 3))
+check("the drag's loop is a loop", SoundSheet.Looped.wood_scrape_loop == true)
+-- the end
+local gate = SoundPlan.resultCue({ how = "done" })
+check("delivered: the Wall's gate", gate ~= nil and gate.name == "checkpoint_gate" and SoundSheet.Sfx4[gate.name] ~= nil)
+check("late: the gate too", SoundPlan.resultCue({ how = "late" }) ~= nil)
+check("lost or called off: no gate", SoundPlan.resultCue({ how = "failed" }) == nil and SoundPlan.resultCue({ how = "cancelled" }) == nil and SoundPlan.resultCue(nil) == nil)
+for key, value in MV do
+	check(`Config.Soundscape.Move.{key} is a sane number`, type(value) == "number" and value >= 0 and value <= 60, value)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
