@@ -42,6 +42,7 @@ local Fade = require(script.Parent.Fade)
 local MapView = require(script.Parent.MapView)
 local TouchLayout = require(script.Parent.TouchLayout)
 local EnemyOutline = require(script.Parent.EnemyOutline) -- 7.0 planning: the Guard's sight
+local MoveStoryUi = require(script.Parent.MoveStoryUi) -- MoveStory hook (7.0 story): the intro, the briefing, CHAPTERS, the thanks
 
 local MovingHud = {}
 
@@ -678,6 +679,12 @@ local function showContract(card: any)
 	if type(card) ~= "table" then
 		return
 	end
+	-- MoveStory hook: the first board ever opens on Marge's intro (client/MoveStoryUi.luau), this card after it
+	if MoveStoryUi.intro(function()
+		showContract(card)
+	end) then
+		return
+	end
 	local body = cardShell("MoveContract", ORANGE)
 	if not body then
 		return
@@ -710,12 +717,19 @@ local function showContract(card: any)
 		z = 23,
 		onClick = function()
 			if type(busy) ~= "string" then
-				remote:FireServer("start", card.id) -- (7.0 planning: the planning lobby opens: client/MoveLobbyUi.luau)
 				closeCard()
+				-- MoveStory hook: the chapter's briefing first (once a game), then START; its ✕ brings this card back
+				-- (7.0 planning: START opens the planning lobby: client/MoveLobbyUi.luau)
+				MoveStoryUi.briefing(card.id, function()
+					remote:FireServer("start", card.id)
+				end, function()
+					showContract(card)
+				end)
 			end
 		end,
 	})
 	Ui.gamepadFocus(start)
+	MoveStoryUi.chapters(body, 11, card.id) -- MoveStory hook: the story road (CHAPTERS) under START
 	sound("notify")
 end
 
@@ -753,6 +767,7 @@ local function showResult(r: any)
 			line(body, `Split with the crew at the truck ({r.crew} of you).`, 7, { TextSize = 12, TextColor3 = C.faint, TextXAlignment = Enum.TextXAlignment.Center })
 		end
 	end
+	MoveStoryUi.thanks(body, 8, r, if type(state) == "table" then state.contract else nil) -- MoveStory hook: the client's thanks
 	local holder = Ui.make("Frame", { Name = "Ok", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 9, ZIndex = 22 }, body)
 	local ok = CardKit.bigButton(holder, { name = "Ok", text = "OK", kind = if good then "good" else "shut", height = 44, z = 23, onClick = closeCard })
 	Ui.gamepadFocus(ok)
@@ -774,7 +789,7 @@ local function setState(view: any)
 end
 
 function MovingHud.isOpen(): boolean
-	return cardFrame ~= nil or listOpen
+	return cardFrame ~= nil or listOpen or MoveStoryUi.isOpen() -- (MoveStory hook: a story card frees the mouse too)
 end
 
 function MovingHud.active(): boolean

@@ -8,6 +8,7 @@ This checks callbacks, construction, current server data, resizing and cleanup, 
 6.21: the bottom bar (Hotbar) runs for real too (hotbar.luau: a computer's bar and a touch screen's).
 6.22: ItemModel (every thing's 3D model in a ViewportFrame) runs for real in both, over a recorded shared/ItemLooks
 (mock.luau's ItemLooks: a model a key, a key that fails to build to see the icon come back).
+7.0: the moves' story (MoveStoryUi) with its hooks in the real MovingHud (movestory.luau, on missions_mock.luau).
 """
 import argparse
 from pathlib import Path
@@ -77,3 +78,30 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     for name in ("mock.luau", "missions_mock.luau", "missions.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "missions.luau"], cwd=dest, check=True)
+
+# 7.0, the moves' story: the real client/MovingHud.luau with client/MoveStoryUi.luau (client/Portrait.luau,
+# client/CardKit.luau, the real shared data) on missions_mock.luau's recorder (tools/phone-ui/movestory.luau adds the
+# few stand-ins MovingHud needs): Marge's intro the first time, the contract card's CHAPTERS, START through the
+# briefing, the client's thanks on the result card, the story card on a phone.
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+'''
+    for name in ("MovingHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout"):
+        text = (ROOT / f"src/client/{name}.luau").read_text()
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
+        (dest / f"{name}.luau").write_text(prefix + text)
+    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "movestory.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "movestory.luau"], cwd=dest, check=True)

@@ -5784,7 +5784,7 @@ Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
 	Fade = 0.35,
-	CardFor = 120, -- s the contract card's START stays good after the board (or the admin) opened it
+	CardFor = 240, -- s the contract card's START stays good after the board (or the admin) opened it (7.0 planning: the story's intro and briefing come first)
 	Contracts = {
 		{
 			id = "marge",
@@ -5854,6 +5854,128 @@ Config.MoveRoles = {
 	Guard = { Damage = 1.5, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 80, XRay = 60 },
 	Tech = { Pick = 3, Kick = 1.2, KickZombies = 4, Near = 40, Far = 90, Fuse = 5 },
 	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
+}
+
+-- 7.0 prototype, the moving (design/rework/NAVRH.md): the furniture a moving job carries out of a house and the house
+-- it stands in. shared/FurnitureLooks.luau draws every piece (its catalogue: size, class, weight, value),
+-- shared/HouseLayout.luau lays a house out (rooms, doors, where every piece stands), server/HouseInterior.luau builds it
+-- far off the map. Studs throughout.
+--   MaxParts           a piece's parts at most, its invisible Root included (tests/furniture_test.luau builds each)
+--   Ceiling / Wall     the rooms' height and the walls' thickness
+--   DoorHeight         every doorway's height; Door, FrontDoor and HallOpening their widths (a "pair" piece passes Door)
+--   HallWidth          the entrance hall's width between its walls' middles (the front door in its middle)
+--   Corridor           the corridor's width between its walls' middles (inside: Corridor - Wall)
+--   Spots              a house's pieces: at least, at most; Stars of them the client's ★ (sentimental first)
+--   Gap / WallGap      the room left between two pieces / between a piece and the wall behind it
+--   FixtureGap         the room left between a piece and the built-in things (counters, the tub)
+--   DoorClear          how far into a room a doorway is kept clear (nothing stands there)
+--   WindowSill         the windows' sill; a piece taller than this stands clear of them
+--   Window             a window's width and height (BathWindow: the bath's small high one)
+--   EntryIn / EntryUp  where you appear: this far in from the front door, the root this high over the floor
+--   Grid               the reachability check's step (every piece must get out of the front door, carried)
+--   Slot               the interiors' places, far off the map (Map.Bounds): Origin { x, y, z }, Spacing along X
+--   Ground             the safety floor under an interior: this far round the house, this deep under its floor
+--   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau)
+--   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom)
+--   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
+Config.Furniture = {
+	MaxParts = 30,
+	Ceiling = 12,
+	Wall = 1,
+	DoorHeight = 9,
+	Door = 6,
+	FrontDoor = 7,
+	HallOpening = 10,
+	HallWidth = 12,
+	Corridor = 8,
+	Spots = { 18, 24 } :: { number },
+	Stars = 3,
+	Gap = 0.5,
+	WallGap = 0.1,
+	FixtureGap = 0.3,
+	DoorClear = 5,
+	WindowSill = 4,
+	Window = { 5, 4 } :: { number },
+	BathWindow = { 3, 2.5 } :: { number },
+	EntryIn = 4.5,
+	EntryUp = 3,
+	Grid = 0.5,
+	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
+	Ground = { Margin = 24, Depth = 4 },
+	InteriorMaxParts = 600,
+	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 236, 204 } :: { number } },
+	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
+}
+
+-- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
+-- shows the story cards, the CHAPTERS on the contract card and the client's thanks on the result card; Marge's texts go
+-- out from server/Moving.luau's MoveStory hook). The limits keep every text inside its card (movestory_test.luau):
+--   Limits      characters at most: a chapter's Title, Place and Client name, its Hook (the CHAPTERS detail), the
+--               client's Blurb, a story card's Line (the intro, a briefing, the radio's Taunt), a Keepsake's story,
+--               Marge's phone Text (the dispatch at START, the debrief at the end) and the result card's Quote (thanks)
+--   Briefing    a briefing's lines (at least, at most); Intro: Marge's intro cards (at least, at most)
+--   Great       a move done with this many stars or more is "great" (its debrief and thanks), with fewer "ok"
+--   Guard       s after a story card opens before Space / Enter / A turn it (client/DialogKeys.luau)
+Config.MoveStory = {
+	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110 },
+	Briefing = { 3, 5 } :: { number },
+	Intro = { 3, 4 } :: { number },
+	Great = 4,
+	Guard = 0.35,
+}
+
+-- 7.0, the depot's helper ("Danny from the depot": server/MoveHelper.luau, his decisions shared/MoveHelperBrain.luau,
+-- tests/movehelper_test.luau; the owner: solo play is allowed with an AI helper). An NPC mover who joins a move whose
+-- crew is one player: he carries the one-hand things to the truck and takes the other end of a two-person thing.
+--   Solo / Duo         a crew of one / of two players gets him (Duo: off)
+--   Name / Title       his name tag
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the truck Respawn s later
+--   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a thing:
+--                      slower than a player
+--   KeepUp / Flee      × the pair's carry speed he may walk holding his end (to keep up); × the walk running away
+--   Tick / Think / Repath   s between his steps / his looks for the next thing / two paths (PathfindingService)
+--   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpWait: s stuck on the way,
+--                      or too far from his end while carrying, before the player drags it alone; HelpRetry: s before he
+--                      tries that lift again
+--   HelpReach / PickReach   studs from a thing's edge he takes its end / picks it up; LoadReach: from the truck's back
+--                      he loads; DoorReach: from a door he goes through it
+--   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
+--   WaitShut           s he waits with a thing at the truck's shut back before he sets it down beside it
+--   StuckSnap / Far    s without progress before he appears at his way's next point; studs away he appears at once
+--   TruckFar           studs from the house: a truck farther away is driving off (he waits at the house's door)
+--   TalkGap / TalkRepeat   s at least between two lines / before the same line again
+--   Follow / Orders    studs behind you on "Help me"; the orders (the Moving remote's "helper") a player may send a second
+Config.MoveHelper = {
+	Solo = true,
+	Duo = false,
+	Name = "Danny",
+	Title = "ZDC Moving",
+	Health = 100,
+	Respawn = 15,
+	Speed = 0.7,
+	KeepUp = 1.2,
+	Flee = 1,
+	Tick = 0.1,
+	Think = 0.5,
+	Repath = 1,
+	HelpFar = 140,
+	HelpWait = 3,
+	HelpRetry = 8,
+	HelpReach = 3,
+	PickReach = 3,
+	LoadReach = 5,
+	DoorReach = 3.5,
+	FleeRange = 14,
+	SafeRange = 24,
+	FleeStep = 18,
+	WaitShut = 8,
+	StuckSnap = 4,
+	Far = 120,
+	TruckFar = 150,
+	TalkGap = 3,
+	TalkRepeat = 12,
+	Follow = 5,
+	Orders = 4,
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

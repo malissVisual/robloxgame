@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveRoles")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -32,10 +32,17 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(tools, "vehicle-preview", "roblox-mock.luau"), os.path.join(tmp, "rbxmock.luau"))
     shutil.copy(os.path.join(tools, "fixtures", "item-mock.luau"), os.path.join(tmp, "ItemMock.luau"))
     prefix = 'local M = require("./ItemMock")\nlocal Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n'
-    for name in ("GunModels", "CargoLooks", "ItemLooks"):
+    # 7.0 (the moving prototype): the furniture and the house plans are made of Vector3s and CFrames, so they load on
+    # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
+    for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 7.0 (the moving prototype): the real server/HouseInterior.luau (tests/houseinterior_test.luau) on the recorder,
+    # its shared modules the copies above, the recorder's `game`.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseInterior.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "HouseInterior.luau"), "w", encoding="utf-8").write(prefix + "local game = M.game\n" + source)
     # 6.23 (Codex's codex/cargo-missions-fix): the real server/Cargo.luau as CargoServer.luau for
     # tests/cargo_runtime_test.luau: its server modules, Net and services from tests/runtime/CargoRuntime.luau (on the
     # same recorder as CargoLooks), its shared modules the copies above.
@@ -51,16 +58,19 @@ with tempfile.TemporaryDirectory() as tmp:
     # the services and a fake of the house art from tests/runtime/MovingRuntime.luau (on the same recorder), its shared
     # modules (Config, Economy, Map, MovingRules) the copies above; os.clock and the server time are the test's.
     shutil.copy(os.path.join(HERE, "runtime", "MovingRuntime.luau"), os.path.join(tmp, "MovingRuntime.luau"))
+    # 7.0, the depot's helper: the real server/MoveHelper.luau as MoveHelperServer.luau on the same fakes (MovingServer
+    # requires it; tests/movehelper_runtime_test.luau drives it with its own walk: no physics, no pathfinding here).
+    # 7.0 planning: the real server/MoveLobby.luau as MoveLobbyServer.luau the same way (the lobby and the quick chat;
+    # Moving requires it).
     head = ('local E = require("./MovingRuntime")\nlocal M = E.Mock\nlocal game, workspace, task, os = E.game, M.workspace, E.task, E.os\n'
             'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
             'local RaycastParams, UDim2, UDim, typeof = M.RaycastParams, M.UDim2, M.UDim, M.typeof\n'
             'local warn = function(...) print("WARN", ...) end\n')
-    # 7.0 planning: the real server/MoveLobby.luau as MoveLobbyServer.luau (the lobby and the quick chat; Moving requires
-    # it), on the same fakes.
-    for name, built in (("Moving", "MovingServer"), ("MoveLobby", "MoveLobbyServer")):
-        source = open(os.path.join(os.path.dirname(SHARED), "server", name + ".luau"), encoding="utf-8").read()
+    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer"}
+    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer")):
+        source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
-        source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: 'require("./MoveLobbyServer")' if m[1] == "MoveLobby" else f"E.{m[1]}", source)
+        source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{built_as[m[1]]}")' if m[1] in built_as else f"E.{m[1]}", source)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(head + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))

@@ -111,6 +111,7 @@ safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyr
 safely("CrashFx", require(Client.CrashFx).start) -- 6.16: sparks and a kick on a hard hit, sparks scraping a wall
 safely("SpeedLines", require(Client.SpeedLines).start) -- 6.16: streaks at the screen's edges near the top speed
 safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract card, the move's panel and list (Tab), the fade, the result
+safely("MoveHelperHud", require(Client.MoveHelperHud).start) -- 7.0: the depot's helper's orders under the move's panel (Danny)
 safely("MoveLobbyUi", require(Client.MoveLobbyUi).start) -- 7.0 planning: the move's planning lobby (roles, READY, LAUNCH)
 safely("QuickChat", require(Client.QuickChat).start) -- 7.0 planning: the crew's quick chat (hold T on a move or in its planning)
 require(Client.MoveLobbyUi).onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
