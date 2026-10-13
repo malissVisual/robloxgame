@@ -5529,6 +5529,7 @@ Config.Robust = {
 		Gear = 5,
 		Kit = 4,
 		Aiming = 12,
+		AdminSandbox = 4, -- 8.0 SANDBOX: the admin panel's SANDBOX buttons (server/Admin.luau "sandbox", shared/SandboxAdmin.luau)
 		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
 		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
