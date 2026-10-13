@@ -56,6 +56,101 @@ for _, name in { "car_door_open", "car_door_close", "horn_car", "step_concrete_a
 end
 check("the third sheet's id is a string", type(SoundSheet.Sfx3Id) == "string")
 check("the third sheet is an asset id or empty", SoundSheet.Sfx3Id == "" or string.match(SoundSheet.Sfx3Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx3Id)
+-- 7.1: the moves' sounds and the mountains' (sfx4.ogg): the furniture, the truck, the grip, the move's stings, the
+-- horde's siren, the Wall's gate, a cuckoo clock, a cowbell, birdsong, the peaks' wind, a brook.
+local USED4 = {
+	"furniture_pickup", "furniture_putdown", "heavy_drop", "glass_break", "wood_scrape_loop", "cardboard_box",
+	"truck_ramp", "truck_load", "strap_tighten", "house_door_creak", "grip_tick", "grip_warning", "grip_slip",
+	"move_start", "move_success", "move_fail", "horde_siren", "checkpoint_gate", "cuckoo", "cowbell",
+	"birds_alpine_loop", "wind_peaks_loop", "stream_loop",
+}
+local in4 = 0
+for _ in SoundSheet.Sfx4 do
+	in4 += 1
+end
+check("sfx4 holds the 23 sounds", in4 == #USED4, in4)
+local LOOPS4 = { wood_scrape_loop = 2, birds_alpine_loop = 6, wind_peaks_loop = 6, stream_loop = 6 }
+for _, name in USED4 do
+	local r = SoundSheet.Sfx4[name]
+	check("sfx4 region " .. name, r ~= nil)
+	if r then
+		local loops = LOOPS4[name]
+		if loops then
+			check(name .. " loops, long enough not to be heard repeating", SoundSheet.Looped[name] == true and r[2] >= loops, r[2])
+		else
+			check(name .. " is short and does not loop", SoundSheet.Looped[name] == nil and r[2] <= 4, r[2])
+		end
+	end
+end
+check("the grip's tick is a tick", SoundSheet.Sfx4.grip_tick ~= nil and SoundSheet.Sfx4.grip_tick[2] <= 0.1)
+check("the fourth sheet's id is a string", type(SoundSheet.Sfx4Id) == "string")
+check("the fourth sheet is an asset id or empty", SoundSheet.Sfx4Id == "" or string.match(SoundSheet.Sfx4Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx4Id)
+
+-- Every name in one sheet only (client/Sounds.luau looks in them in turn: a name in two would play the first one's).
+local SHEETS: { [string]: { [string]: { number } } } = {
+	sfx = SoundSheet.Sfx, music = SoundSheet.Music, sfx2 = SoundSheet.Sfx2, sfx3 = SoundSheet.Sfx3, sfx4 = SoundSheet.Sfx4,
+}
+local seen: { [string]: string } = {}
+for sheetName, sheet in SHEETS do
+	for name in sheet do
+		if sheetName ~= "music" then
+			check(`{name} is in one sheet only`, seen[name] == nil, `{seen[name]} and {sheetName}`)
+			seen[name] = sheetName
+		end
+	end
+end
+-- Every region inside its sheet (SoundSheet.Seconds: the .ogg's length).
+for sheetName, sheet in SHEETS do
+	local length = SoundSheet.Seconds[sheetName]
+	check(`{sheetName}'s length is known`, type(length) == "number" and length > 0)
+	for name, r in sheet do
+		check(`{name} lies inside {sheetName}`, r[1] >= 0 and r[1] + r[2] <= (length or 0) + 1e-6, `{r[1] + r[2]} > {length}`)
+	end
+end
+
+-- The stand-ins (SoundSheet.Fallback): each is for a sound of a later sheet, and plays (a stand-in's stand-in too, in
+-- a few steps, no circle) from older sheets only, as it must while that sheet is not uploaded; a loop's is a loop.
+local ORDER = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4 }
+local function sheetOf(name: string): number?
+	for i, sheet in ORDER do
+		if sheet[name] then
+			return i
+		end
+	end
+	return nil
+end
+local function resolve(name: string, upTo: number, steps: number): number?
+	local i = sheetOf(name)
+	if i and i <= upTo then
+		return i
+	end
+	local standIn = SoundSheet.Fallback[name]
+	if not standIn or steps >= 4 then
+		return nil
+	end
+	return resolve(standIn, upTo, steps + 1)
+end
+local fallbacks = 0
+for name, standIn in SoundSheet.Fallback do
+	fallbacks += 1
+	local own = sheetOf(name)
+	check(`{name}'s stand-in is for a later sheet's sound`, own ~= nil and own > 1, own)
+	if own then
+		check(`{name} plays {standIn} until its sheet is up`, resolve(name, own - 1, 0) ~= nil, standIn)
+	end
+	if SoundSheet.Looped[name] then
+		check(`{name} loops: its stand-in {standIn} loops too`, SoundSheet.Looped[standIn] == true)
+	end
+end
+check("stand-ins listed", fallbacks >= 40, fallbacks)
+check("the 5.7 stand-ins kept", SoundSheet.Fallback.coin == "cash" and SoundSheet.Fallback.knock == "putdown")
+check("the 6.12 stand-ins kept", SoundSheet.Fallback.horn_van == "horn" and SoundSheet.Fallback.step_grass_b == "step_b" and SoundSheet.Fallback.task_done == "job_done")
+-- 7.1: until sfx4.ogg is up every move's sound has a stand-in; the drag's scrape and the mountains' ambience wait.
+local SILENT4 = { wood_scrape_loop = true, cuckoo = true, cowbell = true, birds_alpine_loop = true }
+for _, name in USED4 do
+	check(`{name}: {if SILENT4[name] then "silent" else "a stand-in"} until sfx4 is up`, (SoundSheet.Fallback[name] ~= nil) ~= (SILENT4[name] == true))
+end
+check("the house's door creaks like the 5.7 door", SoundSheet.Fallback.house_door_creak == "door_creak")
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end
@@ -72,7 +167,7 @@ for _, def in Config.CarGuns do
 end
 check("weapons listed", weapons > 0)
 -- The regions never overlap (each plays only its own sound).
-for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3 } do
+for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4 } do
 	local list = {}
 	for name, r in sheet do
 		check(`region {name} is valid`, r[1] >= 0 and r[2] > 0)

@@ -3345,6 +3345,35 @@ Config.Soundscape = {
 	FountainHeight = 4, -- studs over the walk (the basin and the jet)
 	-- The UI stings (client/Sounds.luau play: "task_done", "purchase", "event_start", "event_end").
 	PurchaseVolume = 0.75, -- money that went down outside a job (a purchase; up: the old cash sound)
+	-- 7.1, the move's sounds (art/audio/sfx4.ogg): client/MoveSounds.luau hears them from the move's state, its result
+	-- and your MoveCarry (shared/SoundPlan.luau moveCues, carryCue, dragged, resultCue). Volumes 0 … 1.
+	Move = {
+		StartWithin = 20, -- a move's first state plays move_start only this many seconds into it (not on a rejoin)
+		Start = 0.7, -- move_start
+		Siren = 0.6, -- the horde's air-raid siren, far off
+		Ramp = 0.75, -- the truck's back opening …
+		RampShut = 0.88, -- … and shutting (this pitch)
+		Door = 0.6, -- the house's front door: going in …
+		DoorOut = 1.08, -- … and out (this pitch)
+		Load = 0.8, -- a piece you carried into the truck …
+		LoadCrew = 0.35, -- … a crew mate's
+		Break = 0.85, -- a piece of yours broken (glass_break if fragile, else heavy_drop) …
+		BreakCrew = 0.45, -- … a crew mate's
+		Jolt = 0.12, -- a piece in your hands losing this share of its condition at once (a fall, a hard knock) …
+		JoltVolume = 0.6, -- … thuds (heavy_drop)
+		Pickup = 0.7, -- furniture_pickup
+		PutDown = 0.7, -- furniture_putdown
+		Box = 0.6, -- a box picked up / put down (cardboard_box)
+		PutDownWait = 0.6, -- your hands empty: the move's next state says where it went (into the truck: truck_load, else
+		-- the put-down), at most this many seconds later (the server sends it 0.25 – 0.45 s after a change)
+		Gate = 0.7, -- the Wall's gate opening as the move is delivered (the result card plays its jingle)
+		Slip = 0.8, -- a heavy piece slipping from your hands (MoveSounds.slipped, for the grip's UI) …
+		SlipQuiet = 1.5, -- … and no put-down for this many seconds after (grip_slip has its thud)
+		Scrape = 0.5, -- a two-person piece dragged alone (wood_scrape_loop), while you move faster than …
+		ScrapeFrom = 1.2, -- … studs a second
+		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick
+		Tick = 0.1, -- seconds between the looks at the drag
+	},
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
