@@ -1202,9 +1202,16 @@ keeps the story's level curve (level 15 by the last chapter).
 **Old saves** (one time, real saves only: the save's `vanOnly` flag). `server/PlayerData.luau` uses the pure helpers
 `Economy.carRefund` and `Economy.vanCarry`:
 - the money paid back at today's prices (6.19's table, like 6.23's bag refund): each removed dealer car's price and the
-  stages bought on it, and the ZDC Van's $48,000 for those who bought it; nothing for employer cars (they were free) or
-  the bikes. Old Van $5,400 (all stages $13,350), Courier Van $10,500, High-Roof $21,000, Pickup $36,000, Box Truck
-  $66,000, Muscle Car $120,000, Freight Truck $135,000, Armored Van $165,000, Rally Van $240,000 (plus their stages);
+  stages bought on it; nothing for employer cars (they were free), the bikes or the ZDC Van (7.2 review: everybody's
+  for free now). Old Van $5,400 (all stages $13,350; 7.2 review: its price only if it was bought from Earl, `vanQuest`
+  "done", its stages always), Courier Van $10,500, High-Roof $21,000, Pickup $36,000, Box Truck $66,000, Muscle Car
+  $120,000, Freight Truck $135,000, Armored Van $165,000, Rally Van $240,000 (plus their stages);
+- 7.2 review: also paid back, at today's prices, what the van cannot take over (`VanCarry.lost`: the car track levels
+  over the best ones it keeps, every roof gun but the one it gets, every extra copy of a gear), and each employer's
+  bonus where the save had earned the employer's vehicle (`Economy.employerBonus`: rep at `needed` or more);
+- 7.2 review: the flag is saved as `rewards.vanOnly` too: an older server drops unknown fields but keeps that table's
+  short keys, so a save that went through one is never paid twice (`Economy.vanMigrated`); the chapters done
+  (`done:<chapter>`) are kept there too, as an older server's story keeps only `intro`;
 - the van takes over the best car track levels any car had, the car gear (installed first, up to its 3 slots), and the
   paint and roof gun of the car you drove (else the van's own, else the first car that had one);
 - the other cars are cleared, `car = "zdcvan"`, and Marge texts it at PLAY (`Config.CompanyVan.Refunded` with the money,
@@ -1323,7 +1330,8 @@ The big map (M) and the minimap are a **paper map** now (`client/MapView.luau`; 
 `shared/MapStyle.luau` from `Map` and `AlpineLayout`, the numbers and colours in `Config.MapStyle`): the valley green on
 cream, **the mountain ring round it** (on the big map a shaded peak with its snow cap for every cone, the far ones
 paler; on the minimap the same cones from above: grassy feet, rock and snow), the **forests** as rounded bands of tree
-dots (one TextLabel a row's run), the wildflower meadows lighter, the huts, the river (on through the gorges) and the
+dots (one TextLabel a row's run; 7.2 review: plain bands on the minimap), the wildflower meadows lighter (a disc with its
+flower on it), the huts, the river (on through the gorges) and the
 lakes blue, the snowfield white, the roads light on a brown edge and the highways amber, the Hauptplatz's ⛲, the
 **ALTSTADT** over Downtown (a placeholder until `Map.Villages` names the villages: then Sankt Alm, Bergdorf and
 Seewinkel are labelled where Map puts them), and the **West Pass**'s road running into the cliff with a red ROAD
@@ -1332,8 +1340,9 @@ is a slate grey over the paper. Everything follows the data: step 2's bounds, it
 drawn without a change to the map's code.
 
 - **Cost:** the flat map is built at the start as before; the ring, the forests, the meadows, the huts and the pass
-  come a moment later, once, on the start screen, into layers made for them under the fog: about 560 GuiObjects on
-  the big map and 400 on the minimap (`Config.MapStyle.Budget`). The server works the ring and the forest out once
+  come a moment later, once, on the start screen, into layers made for them under the fog: about 530 GuiObjects on
+  the big map and 360 on the minimap (`Config.MapStyle.Budget`; 7.2 review: no TextScaled label in the minimap's
+  CanvasGroup, which draws everything again on every move). The server works the ring and the forest out once
   (before `World.build`, whose Alpine piece reuses them) and publishes what the maps draw as a summary of about 7,000
   characters in `ReplicatedStorage.MapStyle` (a StringValue: `MapStyle.publish`); every client unpacks it in a few
   milliseconds. A client without one (it never came within `Config.MapStyle.Wait` seconds, or it was made for other
@@ -1350,7 +1359,7 @@ drawn without a change to the map's code.
 ## Walt's Farm and moves in your own ZDC Van (7.x)
 
 **Chapter 1 is playable: Walt's Farm** ("Hold Your Horses", `Config.Moving.Contracts` id `walt`, seed 1921).
-- It opens once you finished the prologue (Marge's House) once. The save remembers it (`profile.story` flag `done:prologue`, set only on a real save).
+- It opens once you finished the prologue (Marge's House) once. The save remembers it (`profile.story` flag `done:prologue`, set only on a real save). 7.2 review: a chapter counts as done only with every ★ piece a van can take at the Wall whole (`MovingRules.starsHome`; Marge's Grandfather Clock fits no van and is not asked for), and only for the crew who had it open; a client can mark only the story cards (`MoveStory.CardKeys`), never a chapter.
 - The contract card lists the board's contracts (Marge's House, 🐴 Walt's Farm, 🔒 while locked with the reason). A tap on an open one, or on chapter 1's ▶ PLAY tile in the CHAPTERS road, opens its card. The board opens the next contract you have not done.
 - 14 minutes on the clock, the horde at 3:30 left, the pay × 1.25 (the contract's `time`, `hordeAt`, `pay`).
 - The ★ pieces are Thunder's saddle, the branding iron and Grandma's milk churn, as Walt says in the briefing (`shared/MoveStory.luau` keepsakes; `farmmove_runtime_test` checks them against the plan's ★ pool).
@@ -1368,14 +1377,14 @@ drawn without a change to the map's code.
 - No Moving Truck is lent any more. START brings your own car (your ZDC Van, `Config.Moving.Van`) next to you; a job's or rental's car is not used.
 - The packing bed is the car's cargo bay (`Config.Moving.Beds`: the ZDC Van's 6.2 × 6.4 × 4.3; another car without its own bed uses the van's). The hay wagon does not fit any bed: it rides **hitched** behind the van, one at a time, and Unload takes it off last (`Config.Moving.Hitch`).
 - **Trips.** Driving into the Wall's checkpoint unloads everything in the van and on its hitch (delivered), and the move goes on. The HUD shows `TRIP n · delivered x/y`.
-- The move ends when the clock runs out, or when the owner presses **FINISH** on the move panel (owner only, with a confirm). A load brought in after the clock still counts, at the late share.
+- The move ends when the clock runs out, or when the owner presses **FINISH** on the move panel (owner only, with a confirm). A load brought in after the clock still counts, at the late share. 7.2 review: GIVE UP, or the owner leaving, after a trip pays what reached the Wall like FINISH (the crew there shares it); a move is rated late only when something reached the Wall late.
 - Pay is everything delivered over all trips: value × condition, ★ × 1.5, the time bonus, × the contract's pay. What is still in the van at the end pays nothing.
-- While the move runs nothing of the old game takes your van's place (CAR, MY BIKE, the phone's CALL CAR, a car job, a garage's or dealer's car) and a respawn does not take it back. If it is wrecked or gone, everything in it is lost (condition 0) and the move goes on; CAR brings it again after 20 s (`Config.Moving.VanAgain`).
+- While the move runs nothing of the old game takes your van's place (CAR, MY BIKE, the phone's CALL CAR, a car job, a garage's or dealer's car) and a respawn does not take it back. If it is wrecked or gone, everything in it is lost (condition 0) and the move goes on; CAR brings it again after 20 s (`Config.Moving.VanAgain`; 7.2 review: the garage's TAKE OUT and ZDC RIDE wait too). 7.2 review: a bike is never the move's van: START on a bike brings the van and makes it CAR's car again, and a bike out after a loss is not taken over.
 - Driver and Danny work with the van like with the old truck.
 
 **Admin:** MOVES has 🐴 FARM: CONTRACT CARD, ▶ FARM: START NOW, FARM: GO TO THE FARM and 🚐 MOVE: TRIP NOW (`move` args `farmcard`, `farm`, `farmgo`, `trip`).
 
-**Tests:** `vanmove_test` (the hitch, trips, a lost van, the pay over trips, the farm's ways, Walt), `farmmove_runtime_test` (a whole farm move on the real art: in by the barn doors, the hay wagon refused at the farmhouse and out through the barn, hitched, two trips, the van lost, FINISH, the chapter unlocked and saved), and the contract list in `tools/phone-ui/movestory.luau`.
+**Tests:** `vanmove_test` (the hitch, trips, a lost van, the pay over trips, the farm's ways, Walt), `farmmove_runtime_test` (a whole farm move on the real art: in by the barn doors, the hay wagon refused at the farmhouse and out through the barn, hitched, three trips, the van lost, FINISH, the chapter unlocked and saved (7.2 review: one piece and FINISH unlocks nothing; a crew mate without the prologue does not get chapter 1)), and the contract list in `tools/phone-ui/movestory.luau`.
 
 ## MOVES: the moving rework, prototype (7.0)
 

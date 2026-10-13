@@ -405,10 +405,17 @@ Runtime.PlayerData = stub("PlayerData", {
 		table.insert(Runtime.tracked, { name = name, args = { ... } })
 	end,
 	-- 7.x farm move: a player's profile (its story flags: Runtime.story[player], its car) and a flag kept in it
+	-- (7.2 review: a test's own Runtime.profiles[player] when it set one: its car, bike and lastCar kept)
 	get = function(player: any): any
 		Runtime.story[player] = Runtime.story[player] or {}
+		local own = Runtime.profiles[player]
+		if own then
+			own.story = Runtime.story[player]
+			return own
+		end
 		return { story = Runtime.story[player], car = Runtime.carId }
 	end,
+	notify = noop, -- (7.2 review: the profile's car changed)
 	markStory = function(player: any, key: string): boolean
 		Runtime.story[player] = Runtime.story[player] or {}
 		local new = Runtime.story[player][key] ~= true
@@ -418,7 +425,9 @@ Runtime.PlayerData = stub("PlayerData", {
 	end,
 })
 
--- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt.
+-- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt. (7.2 review: a bike,
+-- Runtime.bikes: no back at all.)
+Runtime.bikes = { rustbike = true, escooter = true }
 local function makeCar(owner: any, id: string, at: any): any
 	local model = Mock.Instance.new("Model")
 	model.Name = `{owner.Name}'s {id}`
@@ -427,16 +436,19 @@ local function makeCar(owner: any, id: string, at: any): any
 	chassis.CFrame = Mock.CFrame.new(at.X, at.Y, at.Z)
 	chassis.Parent = model
 	model.PrimaryPart = chassis
-	local door = Mock.Instance.new("Attachment")
-	door.Name = "CargoDoor"
-	door.Position = Mock.Vector3.new(0, 3, 9)
-	door.Parent = chassis
-	local back = Mock.Instance.new("ProximityPrompt")
-	back.Name = "BackPrompt"
-	back.Parent = door
-	model:SetAttribute("BackOpen", false)
+	local bike = Runtime.bikes[id] == true
+	if not bike then
+		local door = Mock.Instance.new("Attachment")
+		door.Name = "CargoDoor"
+		door.Position = Mock.Vector3.new(0, 3, 9)
+		door.Parent = chassis
+		local back = Mock.Instance.new("ProximityPrompt")
+		back.Name = "BackPrompt"
+		back.Parent = door
+		model:SetAttribute("BackOpen", false)
+	end
 	model.Parent = workspace
-	return { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false }
+	return { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false, bike = bike }
 end
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
 -- 7.x van moves: a move goes with its owner's own car: the one placeNear makes when it is given no id (the old tests'
@@ -444,18 +456,28 @@ Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (t
 Runtime.carId = "movingtruck"
 Runtime.story = {} -- 7.x farm move: player → their story flags (PlayerData.get(player).story)
 Runtime.marked = {} -- { { player, key } } every PlayerData.markStory
+Runtime.profiles = {} -- 7.2 review: player → a profile of the test's own (PlayerData.get returns it)
 
 Runtime.Vehicles = stub("Vehicles", {
 	get = function(player: any): any
 		return Runtime.cars[player]
 	end,
+	-- (no id: the profile's car, as CAR brings it: a test's own profile's, else Runtime.carId)
 	placeNear = function(player: any, id: string): any
 		local old = Runtime.cars[player]
 		if old then
 			old.model:Destroy()
 		end
-		Runtime.cars[player] = makeCar(player, id or Runtime.carId, Runtime.truckAt)
+		local own = Runtime.profiles[player]
+		Runtime.cars[player] = makeCar(player, id or (own and own.car) or Runtime.carId, Runtime.truckAt)
 		return nil
+	end,
+	isBike = function(car: any): boolean -- 7.2 review
+		return car.bike == true
+	end,
+	hasBack = function(car: any): boolean -- 7.2 review: Vehicles.hasBack's (not wrecked, a BackPrompt)
+		local door = car.chassis:FindFirstChild("CargoDoor")
+		return not car.wrecked and door ~= nil and door:FindFirstChild("BackPrompt") ~= nil
 	end,
 	cargoDoor = function(car: any): any
 		return car.chassis:FindFirstChild("CargoDoor")

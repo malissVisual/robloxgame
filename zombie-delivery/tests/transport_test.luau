@@ -129,8 +129,8 @@ check("about 8 foot jobs to level 2", jobs >= 6 and jobs <= 10, jobs)
 check("a new store (everybody starts again)", Config.DataStoreName == "ZombieDelivery_v2")
 check("a new player starts with $40", Config.StartMoney == 40)
 local van = Config.Cars[1]
-check("7.x: the first car is the ZDC Van, everybody's from level 1 (free; $16,000 base paid back to who bought it)", van.id == Config.CompanyVan.Car and van.level == 1 and van.price == 0
-	and van.refund == Config.priced(16000, Config.Prices.Vehicles))
+check("7.x: the first car is the ZDC Van, everybody's from level 1 (free; 7.2 review: never paid back)", van.id == Config.CompanyVan.Car and van.level == 1 and van.price == 0
+	and (van :: any).refund == nil)
 check("the car tiers: ★ 4, ★★ 5, ★★★ 6, ★★★★ 9", Config.Jobs.Tiers[1].level == 4 and Config.Jobs.Tiers[2].level == 5 and Config.Jobs.Tiers[3].level == 6 and Config.Jobs.Tiers[4].level == 9)
 check("the licences: ★★★ 6 + 5 jobs, ★★★★ 9 + 10 jobs", Config.Jobs.Licences[1].level == 6 and Config.Jobs.Licences[1].jobs == 5
 	and Config.Jobs.Licences[2].level == 9 and Config.Jobs.Licences[2].jobs == 10)

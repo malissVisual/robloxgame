@@ -27,7 +27,9 @@ local van = Economy.findCar(VAN) :: Config.CarDef
 
 check("the ZDC Van is Config.CompanyVan's car and Config.Cars[1]", VAN == "zdcvan" and Config.Cars[1].id == VAN and van ~= nil)
 check("everybody's from level 1: never sold (price 0, starter), no mission", van.starter == true and van.price == 0 and (van.level or 1) == 1 and van.mission == nil)
-check("its old price is kept to pay back: $16,000 × the Vehicles knob = $48,000", van.refund == Config.priced(16000, Config.Prices.Vehicles) and van.refund == 48000, van.refund)
+-- 7.2 review: every save owns the van for free now, so it is never paid back (a save that lost its flag on an older
+-- server was paid $48,000 again on every trip back)
+check("7.2 review: the ZDC Van has no price to pay back (no `refund`)", (van :: any).refund == nil, (van :: any).refund)
 check("it keeps its Blender style, its four slots, a roof gun on its rack, the trolley", van.style == "zdcvan" and van.capacity == 4 and van.mount == true and van.trolley == true)
 local others: { string } = {}
 for _, def in Config.Cars do
@@ -64,22 +66,39 @@ local function refund(saved: any): (number, { string })
 end
 check("a new profile (no money saved): nothing", (refund({ cars = { van = true } })) == 0 and (refund(nil)) == 0 and (refund("x")) == 0)
 check("a save without cars: nothing", (refund({ money = 10 })) == 0 and (refund({ money = 10, cars = {} })) == 0)
-check("the flag: paid once, never again", (refund({ money = 10, cars = { van = true }, [Config.CompanyVan.Flag] = true })) == 0 and Config.CompanyVan.Flag == "vanOnly")
-local money, names = refund({ money = 10, cars = { van = true } })
-check("a Rusty Old Van: its price, $5,400", money == 5400 and #names == 1 and names[1] == "Old Van", money)
-money = refund({ money = 10, cars = { van = true }, carUpgrades = { van = { stage = 3, engine = 2 } } })
+check("the flag: paid once, never again", (refund({ money = 10, cars = { van = true }, vanQuest = "done", [Config.CompanyVan.Flag] = true })) == 0 and Config.CompanyVan.Flag == "vanOnly")
+local money, names = refund({ money = 10, cars = { van = true }, vanQuest = "done" })
+check("a Rusty Old Van bought from Earl: its price, $5,400", money == 5400 and #names == 1 and names[1] == "Old Van", money)
+money = refund({ money = 10, cars = { van = true }, vanQuest = "done", carUpgrades = { van = { stage = 3, engine = 2 } } })
 check("a Long Cargo Van: the van and its three stages, $13,350 (no money for the car tracks: the ZDC Van takes them)", money == 5400 + 650 + 1800 + 5500 and money == 13350, money)
-money = refund({ money = 10, cars = { van = true }, carUpgrades = { van = { stage = 99 } } })
+money = refund({ money = 10, cars = { van = true }, vanQuest = "done", carUpgrades = { van = { stage = 99 } } })
 check("a stage above the last counts the last", money == 13350, money)
-money = refund({ money = 10, cars = { van = true }, carUpgrades = { van = { stage = -2 } } })
-local nan = refund({ money = 10, cars = { van = true }, carUpgrades = { van = { stage = 0 / 0 } } })
+money = refund({ money = 10, cars = { van = true }, vanQuest = "done", carUpgrades = { van = { stage = -2 } } })
+local nan = refund({ money = 10, cars = { van = true }, vanQuest = "done", carUpgrades = { van = { stage = 0 / 0 } } })
 check("a broken stage counts none", money == 5400 and nan == 5400)
-local full, fleet = refund({ money = 10, cars = { [VAN] = true, van = true, courier = true, bus = true, armored = true, rustbike = true },
+local full, fleet = refund({ money = 10, cars = { [VAN] = true, van = true, courier = true, bus = true, armored = true, rustbike = true }, vanQuest = "done",
 	carUpgrades = { courier = { stage = 1 } } })
-check("a fleet: the ZDC Van bought ($48,000), the Old Van, the Express Courier; the bus and the armored truck were free, the bike stays",
-	full == 48000 + 5400 + 10500 + stagePrice("courier", 1) and full == 66900, full)
-check("… the names in Config order (the van first)", table.concat(fleet, ", ") == "ZDC Van, Old Van, Courier Van", table.concat(fleet, ", "))
+check("a fleet: the Old Van, the Express Courier; the bus and the armored truck were free, the bike stays, the ZDC Van too (7.2 review: never paid)",
+	full == 5400 + 10500 + stagePrice("courier", 1) and full == 18900, full)
+check("… the names in Config order", table.concat(fleet, ", ") == "Old Van, Courier Van", table.concat(fleet, ", "))
 check("only cars owned count (false is not owned)", (refund({ money = 10, cars = { van = false, courier = "yes" } })) == 0)
+-- 7.2 review: the ZDC Van is everybody's for free: never paid back, bought before or not
+check("7.2 review: the ZDC Van alone (bought before 7.x or not): nothing", (refund({ money = 10, cars = { [VAN] = true }, carUpgrades = { [VAN] = { engine = 2 } } })) == 0)
+-- 7.2 review: before 5.0 the Old Van was free (the old starter): only one bought from Earl (vanQuest "done") pays its
+-- price back; the stages bought on it always do
+money = refund({ money = 10, cars = { van = true } })
+check("7.2 review: an Old Van never bought from Earl (no vanQuest \"done\"): no price back", money == 0, money)
+money = refund({ money = 10, cars = { van = true }, vanQuest = "open", carUpgrades = { van = { stage = 2 } } })
+check("…its bought stages still are ($650 + $1,800)", money == 650 + 1800, money)
+-- 7.2 review: an older server (main before 7.x) drops the fields it does not know: the flag goes, `rewards` keeps the
+-- same mark (short keys), so a save that went through one is not paid again
+do
+	local bounced = { money = 10, cars = { [VAN] = true, van = true }, vanQuest = "done", carUpgrades = { van = { stage = 1, engine = 3 } },
+		carGuns = { van = "roofmg" }, rep = { school = 9 }, rewards = { vanOnly = true, secrets = true } }
+	check("7.2 review: a save back from an older server (no flag, the mark in rewards): migrated already", Economy.vanMigrated(bounced) and Economy.vanMigrated({ money = 1, vanOnly = true })
+		and not Economy.vanMigrated({ money = 1, rewards = { secrets = true } }) and not Economy.vanMigrated(nil))
+	check("…nothing paid back again, nothing taken over again, no bonus again", (refund(bounced)) == 0 and Economy.vanCarry(bounced) == nil and Economy.employerBonus(bounced) == 0)
+end
 
 -- ── What the van takes over (Economy.vanCarry) ──────────────────────────────
 
@@ -105,6 +124,44 @@ check("driving the ZDC Van already: its own paint and gun stay first", own.paint
 local bike = Economy.vanCarry({ money = 10, car = "rustbike", lastCar = "van", cars = { van = true, rustbike = true }, carPaint = { van = "toxic" } }) :: Economy.VanCarry
 check("riding a bike: the car CALL CAR brought back counts as the one driven", bike.paint == "toxic")
 check("unknown paints and guns are left out", (Economy.vanCarry({ money = 1, cars = { van = true }, carPaint = { van = "plaid" }, carGuns = { van = "laser" } }) :: Economy.VanCarry).paint == nil)
+
+-- 7.2 review: what the van could not take over is paid back as sold (VanCarry.lost): the car tracks' levels over the
+-- ones it keeps (it keeps each track's highest), every roof gun but the one it gets, every copy of a gear but one
+local function track(id: string, level: number): number
+	local cost = 0
+	for n = 0, level - 1 do
+		cost += Economy.upgradeCost(id, n) or 0
+	end
+	return cost
+end
+local function gearPrice(id: string): number
+	return (Economy.findGear(id) :: Config.GearDef).price
+end
+local function gunPrice(id: string): number
+	return (Economy.findCarGun(id) :: Config.CarGunDef).price
+end
+check("7.2 review: the fleet above: the courier's Engine 1 (the van keeps its Engine 3) and its second Ratchet Straps paid back",
+	carry.lost == track("engine", 1) + gearPrice("straps") and carry.lost > 0, `{carry.lost} vs {track("engine", 1) + gearPrice("straps")}`)
+check("…the ZDC Van's own roof gun kept, the Old Van's paid back", own.lost == gunPrice("roofmg"), own.lost)
+local two = Economy.vanCarry({ money = 10, car = "courier", cars = { van = true, courier = true, highroof = true },
+	carUpgrades = { van = { engine = 2, plow = 1 }, courier = { engine = 4 }, highroof = { engine = 4, armor = 2 } },
+	carGuns = { van = "roofmg", highroof = "rooflauncher" }, carGear = { van = { cooler = "owned" }, highroof = { cooler = "installed" } } }) :: Economy.VanCarry
+check("…three cars: Engine 2 and one Engine 4 over the kept Engine 4, the second roof gun, the second Cooler Box",
+	two.levels.engine == 4 and two.levels.armor == 2 and two.levels.plow == 1 and two.gun == "roofmg" and two.gear.cooler == "installed"
+	and two.lost == track("engine", 2) + track("engine", 4) + gunPrice("rooflauncher") + gearPrice("cooler"), two.lost)
+check("…nothing over what it keeps: nothing back", (Economy.vanCarry({ money = 10, cars = { van = true }, carUpgrades = { van = { engine = 3 } }, carGuns = { van = "roofmg" },
+	carGear = { van = { straps = "installed" } } }) :: Economy.VanCarry).lost == 0)
+
+-- 7.2 review: an employer gave their vehicle after `needed` jobs (until 7.x); a save that had earned one (its rep there
+-- at `needed` or more) gets that employer's bonus instead, once (Jobs pays it only at the job that reaches `needed`)
+do
+	local school, army, farm = Economy.findEmployer("school") :: Config.EmployerDef, Economy.findEmployer("army") :: Config.EmployerDef, Economy.findEmployer("farm") :: Config.EmployerDef
+	local bonus = Economy.employerBonus({ money = 10, cars = {}, rep = { school = school.needed, army = army.needed - 1, farm = farm.needed + 7, nope = 99 } })
+	check("7.2 review: an employer's vehicle earned before 7.x: their bonus (the school's and the farm's, not the army's: one job short)",
+		bonus == (school.bonus or 0) + (farm.bonus or 0) and bonus > 0, bonus)
+	check("…once (the flag), never for a new profile or broken numbers", Economy.employerBonus({ money = 10, rep = { school = 9 }, vanOnly = true }) == 0
+		and Economy.employerBonus({ rep = { school = 9 } }) == 0 and Economy.employerBonus({ money = 1, rep = { school = 0 / 0, farm = "9" } }) == 0)
+end
 
 -- ── A car that is gone falls back to the van (server/PlayerData.luau, server/Vehicles.luau spawnAt) ────────────
 
