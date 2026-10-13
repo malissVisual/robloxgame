@@ -393,6 +393,14 @@ function rent(player: Player, state: DockState, chosen: number?)
 		tell(player, "Not enough money.")
 		return
 	end
+	-- 7.0 review: not on a move (its truck would go: server/Moving.luau, asked lazily)
+	local movedOk, onMove = pcall(function(): string?
+		return (require(script.Parent.Moving) :: any).busy(player)
+	end)
+	if movedOk and type(onMove) == "string" then
+		tell(player, onMove)
+		return
+	end
 	local own = Vehicles.get(player)
 	local ownId: string?, ownFrame: CFrame? = nil, nil
 	if own then

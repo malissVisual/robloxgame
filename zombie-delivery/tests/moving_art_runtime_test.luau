@@ -188,6 +188,27 @@ E.clock += 0.3
 Moving.step()
 trigger(promptIn(truck.model, "Load"), ann)
 check("…loaded into the truck", ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "loaded", 1, true) ~= nil, E.lastNotice(ann))
+-- 7.0 review: a second one-hand piece loaded, then its model goes (destroyed by something else): it never pays
+local second: any = nil
+for _, s in plan.spots do
+	local def = FurnitureLooks.Items[s.item]
+	if not second and s ~= spot and def and def.class == "hand" then
+		second = s
+	end
+end
+local piece2 = built[1].pieces[second.id]
+E.place(ann, outside)
+trigger(promptIn(site, "Enter house"), ann)
+E.place(ann, piece2.PrimaryPart.Position + V3(1, 0, 0))
+trigger(promptIn(piece2, "Pick up"), ann)
+E.place(ann, exitAt + V3(0, 3, 0))
+trigger(promptIn(workspace, "Leave house"), ann)
+E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
+E.clock += 0.3
+Moving.step()
+trigger(promptIn(truck.model, "Load"), ann)
+check(`the {second.item} loaded too`, ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "2/", 1, true) ~= nil, E.lastNotice(ann))
+piece2:Destroy()
 local wall = V3(Map.Depot.x + T.DropOff[1], 2, Map.Depot.z + T.DropOff[2])
 truck.chassis.CFrame = M.CFrame.new(wall.X + 4, wall.Y, wall.Z)
 E.place(ann, wall + V3(0, 1, 0))
@@ -195,7 +216,7 @@ E.place(bob, wall + V3(3, 1, 0))
 E.clock += 0.3
 Moving.step()
 local result = E.last(ann, "Moving", "result")
-check("delivered at the Wall: the pay for the real piece", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.pay > 0 and result.a.money > 0,
+check("delivered at the Wall: the pay for the real piece (7.0 review: the one whose model went never counts)", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.pay > 0 and result.a.money > 0,
 	result and result.a.how)
 check("the interior taken down, nobody on the move any more", E.destroyed == 1 and interior.Parent == nil and ann:GetAttribute("MoveRole") == nil and ann:GetAttribute("MoveWith") == nil)
 

@@ -40,7 +40,8 @@
 --   MovingRules.advance(phase, event)          the phase machine: running → horde → done | late | cancelled | failed
 --   MovingRules.due(move, now)                 the event the clock brings now ("horde", "timeout") or nil
 --   MovingRules.result(move, how, now)         the pay: Σ value × condition, ★ × Pay.Star, a time bonus, − the broken
---                                              ones' fine; late: × LateShare; the stars 1 … 5 and the XP
+--                                              ones' fine; late: × LateShare; the stars 1 … 5 and the XP (Xp + the
+--                                              value delivered / XpPerValue + XpPerStar × the stars, at most XpMax)
 --   MovingRules.estimate(spots, defs)          the contract card's pay: everything out whole, in time
 --   MovingRules.whyText(why)                   what the player is told
 
@@ -631,7 +632,8 @@ function MovingRules.result(move: Move, how: string, now: number): Result
 		rating = math.min(rating, 3)
 	end
 	r.stars = rating
-	r.xp = pay.Xp + pay.XpPerStar * rating
+	-- (7.0 review: the XP grows with the value brought whole: a one-lamp move is no full move)
+	r.xp = math.min(pay.XpMax, math.floor(pay.Xp + got / pay.XpPerValue + pay.XpPerStar * rating + 0.5))
 	return r
 end
 

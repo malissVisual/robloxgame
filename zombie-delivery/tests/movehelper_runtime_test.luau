@@ -474,6 +474,24 @@ local full = run(8, function()
 end)
 check("nothing fits: he says so and waits at the truck", full and danny.action == "wait" and sol:GetAttribute("MoveHelperDoing") == "Waiting: the truck is full"
 	and Rules.holding(danny.s.move, danny.id) == nil)
+Moving.admin(sol, "end")
+run(0.2)
+
+-- 7.0 review: his body taken away (by something else) while he carries a thing: it falls, nobody holds it -----------------
+
+Moving.admin(sol, "start")
+Moving.step()
+unlock()
+danny = MoveHelper.find(sol)
+local holds = run(40, function()
+	return danny.body ~= nil and Rules.holding(danny.s.move, danny.id) ~= nil
+end)
+local held = Rules.holding(danny.s.move, danny.id)
+check("a fourth move: Danny carries a thing", holds and held ~= nil)
+danny.body.model:Destroy()
+run(0.5)
+check("his body gone: what he held fell (never 'carried' by nobody)", Rules.holding(danny.s.move, danny.id) == nil and held ~= nil
+	and danny.s.move.things[held].state == "ground", held and danny.s.move.things[held].state)
 E.leave(sol)
 run(0.2)
 check("the owner leaves: the move and Danny are gone", MoveHelper.find(sol) == nil and E.destroyed == E.built)

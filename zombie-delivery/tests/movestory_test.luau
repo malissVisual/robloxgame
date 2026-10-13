@@ -271,6 +271,7 @@ Moving.step()
 Moving.admin(ann, "time")
 E.now += 61
 Moving.step()
+Moving.admin(ann, "deliver") -- (7.0 review: past 0:00 the truck has LateGrace s to reach the Wall: delivered late)
 annTexts = texts(ann)
 check("the clock ran out: the late debrief", #annTexts == 4 and annTexts[3].text == prologue.dispatch and annTexts[4].text == prologue.debrief.late, #annTexts)
 Moving.admin(ann, "start")

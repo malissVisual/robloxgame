@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # Moving requires it).
     head = ('local E = require("./MovingRuntime")\nlocal M = E.Mock\nlocal game, workspace, task, os = E.game, M.workspace, E.task, E.os\n'
             'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
-            'local RaycastParams, UDim2, UDim, typeof = M.RaycastParams, M.UDim2, M.UDim, M.typeof\n'
+            'local RaycastParams, OverlapParams, UDim2, UDim, typeof = M.RaycastParams, M.OverlapParams, M.UDim2, M.UDim, M.typeof\n'
             'local warn = function(...) print("WARN", ...) end\n')
     built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer"}
     for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer")):

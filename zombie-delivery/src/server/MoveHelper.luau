@@ -869,7 +869,11 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 		return
 	end
 	if not body or not body.model.Parent or not body.humanoid.Parent then
-		-- his body went (removed by something else): like a fall
+		-- his body went (removed by something else): like a fall (7.0 review: what he holds falls first, never left
+		-- "carried" by nobody)
+		if body then
+			h.port.helperDrop(s, body.model, "died")
+		end
 		removeBody(h)
 		h.dead, h.downAt = true, clock - FALL
 		return

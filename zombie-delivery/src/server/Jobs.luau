@@ -2971,6 +2971,13 @@ end
 -- Starts the job. False and why not (no notice: the caller tells the player). 6.12.8, `quiet`: no start notice (the
 -- NEXT UP queue says "NEXT UP: …" instead).
 local function startJob(player: Player, offer: Offer, quiet: boolean?): (boolean, string?)
+	-- 7.0 review: not while you are on a move (its owner or its crew: server/Moving.luau, asked lazily)
+	local movedOk, onMove = pcall(function(): string?
+		return (require(script.Parent.Moving) :: any).busy(player)
+	end)
+	if movedOk and type(onMove) == "string" then
+		return false, onMove
+	end
 	local jobType = offer.jobType
 	local foot = offer.mode == "foot" or offer.mode == "bike" -- 5.0: no vehicle at all (5.1: the bike's room is the pack)
 	local bikeText = bikeLock(player, offer)

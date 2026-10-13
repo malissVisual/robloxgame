@@ -5278,6 +5278,7 @@ Config.Robust = {
 		Moving = 6, -- 7.0: the Moving remote: the contract card's START, GIVE UP, the item list (server/Moving.luau)
 		MoveLobby = 6, -- 7.0 planning: the MoveLobby remote's role, READY, LAUNCH, CANCEL (server/MoveLobby.luau)
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
+		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 	},
 }
 
@@ -5773,8 +5774,9 @@ Config.ItemModel = {
 --                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
 --                     Fragile × as much; broken at BrokenAt or less (it pays nothing and costs Pay.BrokenFine × its value)
 --   Pay               Σ value × condition × Scale, ★ things × Star, + TimeBonus × the share of the time left, late (the
---                     clock ran out) × LateShare; XP Xp + XpPerStar × the stars; the crew within Present studs of the
---                     truck shares it (Economy.crewSplit)
+--                     clock ran out: delivered within LateGrace s after 0:00, else nothing) × LateShare; XP Xp + the
+--                     value delivered / XpPerValue + XpPerStar × the stars, at most XpMax (7.0 review: a one-lamp move
+--                     is no full move); the crew within Present studs of the truck shares it (Economy.crewSplit)
 --   Tether / Grace    a pair thing's helper stays within Tether studs of its end; farther for Grace s, it goes down
 --   Pace              a carried thing that moves faster than the carry's walk × Factor + Slack goes down (a teleport)
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
@@ -5804,7 +5806,8 @@ Config.Moving = {
 	DropRadius = 20,
 	Speed = { HandPerWeight = 0.03, MinHand = 0.6, Both = 0.75, Pair = 0.8, Drag = 0.35 },
 	Damage = { SafeDrop = 8, PerStud = 0.05, PerHp = 0.006, Death = 0.2, PerTruckHp = 0.002, Fragile = 2.5, BrokenAt = 0.2 },
-	Pay = { Scale = 1, Star = 1.5, TimeBonus = 0.25, BrokenFine = 0.25, LateShare = 0.5, Xp = 150, XpPerStar = 40 },
+	Pay = { Scale = 1, Star = 1.5, TimeBonus = 0.25, BrokenFine = 0.25, LateShare = 0.5, Xp = 40, XpPerValue = 8, XpPerStar = 20, XpMax = 400 },
+	LateGrace = 120, -- 7.0 review: s after 0:00 the truck still has to reach the Wall (it pays LateShare); later: lost
 	Present = 250,
 	Tether = 6,
 	Grace = 1.5,
@@ -5838,9 +5841,10 @@ Config.Moving = {
 --   Mover             Alone: × the walk with a pair thing ALONE (carried, not dragged at Moving.Speed.Drag); Carry: ×
 --                     the carry's walk on everything else (never over the walk); the others go up stairs and slopes
 --                     (Rise studs up a stud along, held Hold s) at × Climb with anything not one-handed, a Mover not
---   Guard             Damage: × weapon damage on the move; Barricades a move, each Hp (Bite hp a second off it for
---                     every zombie within Reach) for Life s, put up outside within Near of the door or the truck; XRay:
---                     the zombies outlined through walls within this (client/EnemyOutline.luau)
+--   Guard             Damage: × weapon damage on the move's zombies (within Range of its house's door or its truck);
+--                     Barricades a move, each Hp (Bite hp a second off it for every zombie within Reach) for Life s, put
+--                     up outside within Near of the house's door (off the road, clear of cars and players); XRay: the
+--                     zombies outlined through walls within this (client/EnemyOutline.luau)
 --   Tech              the front door is locked (a contract with keys = true: not): Pick s to pick it (quiet), Kick s
 --                     for anybody to kick it in (loud: KickZombies come, Near … Far from the door); Fuse s at the fuse
 --                     box (the garage) and the interior's lights come on
@@ -5851,7 +5855,7 @@ Config.MoveRoles = {
 	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
 	Driver = { TruckDamage = 0.6, Curb = 5, Near = 25 },
 	Mover = { Alone = 0.6, Carry = 1.15, Climb = 0.75, Rise = 0.35, Hold = 0.8 },
-	Guard = { Damage = 1.5, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 80, XRay = 60 },
+	Guard = { Damage = 1.5, Range = 150, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 40, XRay = 60 },
 	Tech = { Pick = 3, Kick = 1.2, KickZombies = 4, Near = 40, Far = 90, Fuse = 5 },
 	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
 }

@@ -213,7 +213,14 @@ local starred = (400 + 120 + 200) * P.Scale
 check("Σ value × condition", near(r.base, values) and r.delivered == 6 and r.left == 0)
 check("★ things × 1.5", near(r.starBonus, starred * (P.Star - 1)))
 check("no time left, no time bonus", r.timeBonus == 0 and r.total == math.floor(values + starred * (P.Star - 1) + 0.5))
-check("everything whole and every ★: 5 stars", r.stars == 5 and r.xp == P.Xp + 5 * P.XpPerStar)
+check("everything whole and every ★: 5 stars, the XP by the value brought", r.stars == 5
+	and r.xp == math.min(P.XpMax, math.floor(P.Xp + (300 + 250 + 40 + 400 + 120 + 200) / P.XpPerValue + 5 * P.XpPerStar + 0.5)), r.xp)
+do -- 7.0 review: a one-lamp move earns a little XP, not a full move's
+	local one = fresh()
+	loadAll(one, { 1 })
+	local small = Rules.result(one, "done", 600)
+	check("one lamp: a little XP", small.xp < r.xp / 2 and small.xp >= P.Xp, small.xp)
+end
 local quick = Rules.result(whole, "done", 300) -- half the time left
 check("the time bonus: TimeBonus × the share left", near(quick.timeBonus, (values + starred * (P.Star - 1)) * P.TimeBonus * 0.5) and quick.total > r.total)
 local late = Rules.result(whole, "late", 600)

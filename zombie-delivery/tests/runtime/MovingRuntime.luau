@@ -122,7 +122,14 @@ function O.FindFirstChildWhichIsA(self: any, class: string): any
 	end
 	return nil
 end
-function O.RequestStreamAroundAsync() end
+-- (7.0 review: Runtime.onStream runs once during the next door trip's stream wait: a test ends the move there)
+function O.RequestStreamAroundAsync()
+	local hook = Runtime.onStream
+	if hook then
+		Runtime.onStream = nil
+		hook()
+	end
+end
 local baseIsA = O.IsA
 function O.IsA(self: any, class: string): boolean
 	if class == "Instance" then
@@ -178,6 +185,9 @@ end }
 Mock.RaycastParams = { new = function()
 	return {}
 end }
+Mock.OverlapParams = { new = function() -- (7.0 review: the barricades' clear way)
+	return {}
+end }
 local baseTypeof = Mock.typeof
 Mock.typeof = function(x: any): string
 	if type(x) == "table" and getmetatable(x) == O then
@@ -204,6 +214,21 @@ workspace.Raycast = function(_, origin: any, _direction: any, _params: any): any
 	return { Position = Mock.Vector3.new(origin.X, floor, origin.Z) }
 end
 Runtime.interiors = {}
+-- The parts of params' Include list whose middle is within the box (in the box's own frame; a part's size not counted).
+workspace.GetPartBoundsInBox = function(_, frame: any, size: any, params: any): any
+	local found = {}
+	for _, model in (params and params.FilterDescendantsInstances) or {} do
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") then
+				local d = frame:PointToObjectSpace(part.CFrame.Position)
+				if math.abs(d.X) <= size.X / 2 and math.abs(d.Y) <= size.Y / 2 and math.abs(d.Z) <= size.Z / 2 then
+					table.insert(found, part)
+				end
+			end
+		end
+	end
+	return found
+end
 
 Runtime.os = {
 	clock = function()
@@ -363,6 +388,9 @@ Runtime.Crew = stub("Crew", {
 		end
 		return nil
 	end,
+	hasJob = function(): boolean -- (Main's: Jobs.active; 7.0 review: Moving wraps it)
+		return false
+	end,
 })
 
 Runtime.PlayerData = stub("PlayerData", {
@@ -433,6 +461,28 @@ Runtime.Vehicles = stub("Vehicles", {
 	end,
 	cargoHolder = function(car: any): any
 		return car.chassis
+	end,
+	all = function(): any -- (7.0 review: the barricades keep clear of every car)
+		local list = {}
+		for _, car in Runtime.cars do
+			table.insert(list, car)
+		end
+		return list
+	end,
+	-- (7.0 review: Moving wraps these: nothing replaces the moving truck mid-move; the fakes say what they would do)
+	spawn = function(player: any): any
+		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
+		local _ = player
+		return nil
+	end,
+	placeAt = function(player: any, carId: any): any
+		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
+		local _ = carId
+		return Runtime.cars[player]
+	end,
+	spawnAt = function(player: any): any
+		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
+		return Runtime.cars[player]
 	end,
 	seatedIn = function(player: any): (any, boolean, any)
 		local car = Runtime.seated[player]
