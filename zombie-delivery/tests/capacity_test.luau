@@ -42,6 +42,9 @@ for _, def in Config.Cars do
 		-- 5.1: a bike has no stages (its bike gear adds the room) and holds what its body has: a rack 1, a box 4.
 		check(`{def.id}: a bike has no stages`, def.stages == nil and Economy.maxStage(def.id) == 0)
 		check(`{def.id}: a bike holds 1 – 4 light pieces of its own`, def.capacity >= 1 and def.capacity <= 4, def.capacity)
+	elseif def.sandboxOnly then
+		-- 8.0 SANDBOX: the ZDC Sprinter, the sandbox's van (tests/sprinter_test.luau): no stages, its own bay
+		check(`{def.id}: the sandbox's van, no stages`, def.stages == nil and Economy.maxStage(def.id) == 0 and not def.company)
 	else
 		check(`{def.id}: the only car of Config.Cars is the van`, def.id == VAN and not def.company)
 	end

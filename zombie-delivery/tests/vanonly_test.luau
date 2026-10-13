@@ -33,11 +33,11 @@ check("7.2 review: the ZDC Van has no price to pay back (no `refund`)", (van :: 
 check("it keeps its Blender style, its four slots, a roof gun on its rack, the trolley", van.style == "zdcvan" and van.capacity == 4 and van.mount == true and van.trolley == true)
 local others: { string } = {}
 for _, def in Config.Cars do
-	if def.id ~= VAN and not def.bike then
+	if def.id ~= VAN and not def.bike and not def.sandboxOnly then -- (8.0: and the sandbox's ZDC Sprinter, tests/sprinter_test.luau)
 		table.insert(others, def.id)
 	end
 end
-check("Config.Cars holds the van and the bikes only", #others == 0, table.concat(others, ", "))
+check("Config.Cars holds the van and the bikes only (8.0: and the sandbox's van)", #others == 0, table.concat(others, ", "))
 check("a player's vehicles: the van and the bikes", Economy.isPlayerCar(VAN) and Economy.isPlayerCar("rustbike") and Economy.isPlayerCar("escooter"))
 check("… never a body of the world (the old cars, the company vehicles), nor nothing", not Economy.isPlayerCar("van") and not Economy.isPlayerCar("courier")
 	and not Economy.isPlayerCar("rallyvan") and not Economy.isPlayerCar("bus") and not Economy.isPlayerCar(nil) and not Economy.isPlayerCar("nope"))

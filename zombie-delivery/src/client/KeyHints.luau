@@ -15,6 +15,8 @@
 -- the first two deliveries. Unfolded it shows only the keys of the moment: the hands (1 / 2 / 3, V), E, G and X on foot,
 -- the driving keys in a seat. [J] Jobs, [M] Map, [Q] Phone, [T] Guns, [Shift] Sprint and [4-8] Items went: the top
 -- buttons, the bottom bar's numbers and the phone say them.
+-- 8.0 SANDBOX (Config.Sandbox.On): only the move's keys and the car's (sandboxLines): no hands, guns, throws or bags
+-- there (client/Main.client.luau does not start them).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -69,12 +71,50 @@ local function keyboard(): boolean
 	return UserInputService.KeyboardEnabled
 end
 
+-- 8.0 SANDBOX: the move's keys and the car's, nothing of the city's:
+--   in a seat   [W/S] Drive [A/D] Steer [H] Horn [E] Get out (the driver), [E] Get out (anybody else)
+--   on foot     [E] Use · [G] Put down (something in your arms: Carrying) · [LMB/F] Grip (hold: a thing with a grip
+--               bar, the character's CarryGrip; client/CarryGripUi.luau) · [O] List (on a move: the player's MoveWith;
+--               client/MovingHud.luau) · [T] Chat (hold: on a move or in its planning, MoveLobby; client/QuickChat.luau)
+local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
+	local first: { Chip } = {}
+	if humanoid.SeatPart ~= nil then
+		local car, driving = Drive.seatedCar()
+		if car and driving then
+			table.insert(first, chipText("W/S", "Drive"))
+			table.insert(first, chipText("A/D", "Steer"))
+			table.insert(first, chipText("H", "Horn"))
+		end
+		table.insert(first, chipText("E", "Get out"))
+		return { first }
+	end
+	table.insert(first, chipText("E", "Use"))
+	if character:GetAttribute("Carrying") ~= nil then
+		table.insert(first, chipText("G", "Put down"))
+	end
+	if type(character:GetAttribute("CarryGrip")) == "string" then
+		table.insert(first, chipText("LMB/F", "Grip (hold)"))
+	end
+	local second: { Chip } = {}
+	local onMove = player:GetAttribute("MoveWith") ~= nil
+	if onMove then
+		table.insert(second, chipText("O", "List"))
+	end
+	if onMove or player:GetAttribute("MoveLobby") ~= nil then
+		table.insert(second, chipText("T", "Chat (hold)"))
+	end
+	return if #second > 0 then { first, second } else { first }
+end
+
 -- What the strip says now: two groups of chips (each a line when there is room).
 local function linesNow(): { { Chip } }
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not character or not humanoid or humanoid.Health <= 0 then
 		return {}
+	end
+	if Config.Sandbox.On then
+		return sandboxLines(character, humanoid)
 	end
 	local first: { Chip } = {}
 	local second: { Chip } = {}
@@ -178,7 +218,7 @@ end
 
 local function isOpen(): boolean
 	if open == nil then
-		return deliveries < K.OpenUnder
+		return deliveries < K.OpenUnder or Config.Sandbox.On -- (8.0 SANDBOX: its keys are new: open until F1 folds them)
 	end
 	return open
 end

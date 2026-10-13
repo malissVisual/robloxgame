@@ -13,6 +13,9 @@ This checks callbacks, construction, current server data, resizing and cleanup, 
 the touch buttons or on each other, a finger's sizes, the list a sheet, the keys, ESC, the GPS, a resize.
 7.2: the maps' alpine look (the real MapView with MapStyle and AlpineLayout: mapview.luau on mapmock.luau): built once,
 within Config.MapStyle.Budget, everything there in its order, nothing made frame after frame.
+8.0 SANDBOX: the sandbox's HUD and the warehouse picker (the real SandboxHud and WarehouseUi: sandbox.luau on
+sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stock chip, the toasts, the picker on
+"pick", DISPLAY / SELL / TAKE DOWN's requests, the 3D pictures capped, clear of the touch controls, texts that fit.
 """
 import argparse
 from pathlib import Path
@@ -176,6 +179,31 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)
 
+# 8.0 SANDBOX: the admin panel (client/AdminPanel.luau, its SANDBOX tab with shared/SandboxAdmin.luau;
+# client/SandboxZones.luau recorded) on missions_mock.luau's recorder (tools/phone-ui/adminpanel.luau): the tab only in
+# the sandbox world (first, and open by default there), every button's ("sandbox", id, target), SHOW ZONES on this
+# screen only, the window and the buttons on a phone held sideways (844 x 390), no panel for a player who is no admin.
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+'''
+    text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (ROOT / "src/client/AdminPanel.luau").read_text())
+    for name in ("AdminPanelOn", "AdminPanelOff", "AdminPanelGuest"):  # (three loads: Config.Sandbox.On is read as it loads)
+        (dest / f"{name}.luau").write_text(prefix + text)
+    (dest / "SandboxZones.luau").write_text('return require("./missions_mock").MZones')
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "adminpanel.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "adminpanel.luau"], cwd=dest, check=True)
+
 
 # 7.2, the Alps on the maps: the real client/MapView.luau (shared/MapStyle.luau, AlpineLayout, Map, Roads, Explore and
 # the rest of the real shared data) on mapmock.luau's recorder (missions_mock.luau's, the services, the camera, your
@@ -189,3 +217,47 @@ from mapenv import map_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     map_env(Path(folder))
     subprocess.run([args.luau, "mapview.luau"], cwd=folder, check=True)
+
+# 8.0 SANDBOX, the guide: client/SandboxGuide.luau (shared/SandboxSteps.luau, SandboxMap) beside the real
+# client/MovingHud.luau and client/MoveHelperHud.luau (TopBlocks, MoveLayout, TouchLayout) on missions_mock.luau's
+# recorder: tools/phone-ui/sandboxguide.luau checks the hint line at 844 x 390 and on a computer (clear of the money at
+# the top left, the move's panel, Danny's strip, Roblox's player list and the touch buttons; its ✕ and the 💡 chip a
+# finger's size), every step's words and 3D target, the quiet steps, the ✕ and a held G, and nothing made loop after loop.
+# (shared/WarehouseLayout.luau is the warehouse's: a stand-in the scene gives through Shared:FindFirstChild.)
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+'''
+    # (a module found at run time, shared/WarehouseLayout.luau: the stand-in's table)
+    found = '''local __require = require
+local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
+'''
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+        text = (ROOT / f"src/client/{name}.luau").read_text()
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
+        (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
+    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
+    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "sandboxguide.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "sandboxguide.luau"], cwd=dest, check=True)
+# 8.0 SANDBOX: the sandbox's HUD (client/SandboxHud.luau) and the warehouse picker (client/WarehouseUi.luau, with
+# client/CardKit.luau, TouchLayout, MoveLayout and the real shared data; shared/FurnitureLooks.luau's catalogue loaded on
+# the recorder) on sandbox_mock.luau's recorder (missions_mock.luau's, a layout, Hud's left column, the furniture's
+# recorded models): tools/phone-ui/sandbox.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+# (sandboxenv.py builds the folder; sandbox_preview.py draws the same scenes.)
+from sandboxenv import sandbox_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "sandbox.luau"], cwd=folder, check=True)

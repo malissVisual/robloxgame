@@ -21,12 +21,20 @@
 --   MoveSites.dressing(parent)        the "MoveDressing" folder: the depot's ZDC MOVING & EVACUATION banner (Persistent)
 --                                     and the city's evacuation spots (Atomic each)
 --   MoveSites.build(parent, place, pieces, name, mode?)   one set as a Model (the others' builder)
+--   8.0 SANDBOX (design/sandbox/KONTRAKT.md): no Wall, no dressing, no city house; a kiosk on every player's plot:
+--   MoveSites.plotBoard(parent, plot)    the "MovingBoard<id>" kiosk (Persistent) at the plot's board spot
+--                                     (shared/SandboxMap.luau plot.board: by the warehouse's roller door, on its wall's
+--                                     outside, facing out), half a stud farther out (its plinth against the wall);
+--                                     returns the model and its corkboard ("Board", the part Moving hangs its prompt
+--                                     on; its attribute Plot = the plot's id)
+--   MoveSites.plotBoardPlace(plot)    where that kiosk's foot stands (tools/move-sites/check.py checks it there)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Looks = require(Shared.MoveSiteLooks)
 local Map = require(Shared.Map)
+local SandboxMap = require(Shared.SandboxMap)
 local DayNight = require(script.Parent.DayNight)
 
 local MoveSites = {}
@@ -151,6 +159,23 @@ end
 function MoveSites.board(parent: Instance): (Model, BasePart)
 	local model = MoveSites.build(parent, Looks.boardPlace(), Looks.board(), "MovingBoard", Enum.ModelStreamingMode.Persistent)
 	local board = named(model, "Board")
+	model.PrimaryPart = board
+	return model, board
+end
+
+-- 8.0 SANDBOX: the kiosk's foot at a plot's board spot, moved PLOT_OUT studs out along the way it looks (its plinth's
+-- back, 1.5 behind its foot, then rests against the warehouse's wall instead of in it).
+local PLOT_OUT = 0.5
+function MoveSites.plotBoardPlace(plot: SandboxMap.Plot): Looks.Place
+	local spot = plot.board
+	local yaw = math.rad(spot.yaw)
+	return { x = spot.x - math.sin(yaw) * PLOT_OUT, y = spot.y, z = spot.z - math.cos(yaw) * PLOT_OUT, yaw = spot.yaw }
+end
+
+function MoveSites.plotBoard(parent: Instance, plot: SandboxMap.Plot): (Model, BasePart)
+	local model = MoveSites.build(parent, MoveSites.plotBoardPlace(plot), Looks.board(), `MovingBoard{plot.id}`, Enum.ModelStreamingMode.Persistent)
+	local board = named(model, "Board")
+	board:SetAttribute("Plot", plot.id)
 	model.PrimaryPart = board
 	return model, board
 end

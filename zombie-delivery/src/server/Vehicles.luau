@@ -199,6 +199,7 @@ VanMesh.ready("zdcvan") -- (at the start: the imported model leaves the world be
 local BikeArt = require(script.Parent.BikeArt.Geometry) -- 5.1: Codex's bikes and bike gear (pure geometry)
 local ScooterArt = require(script.Parent.ScooterArt.Geometry) -- 5.1.1: the E-Scooter (pure geometry, the same convention)
 local ModelArt = require(script.Parent.ModelArt.Builder) -- 5.1: welds that geometry to our hidden roots
+local Sprinter = require(Shared.SprinterLooks) -- 8.0 SANDBOX: the ZDC Sprinter's parts look and walk-in bay (STYLES.sprinter)
 
 export type Car = {
 	owner: Player,
@@ -313,6 +314,12 @@ type Style = {
 	bike: boolean?,
 	stand: boolean?, -- 5.1.1: the rider stands on a deck (the E-Scooter): the seat a hip's height over it, no crank
 	jack: Vector3?, -- 4.0: the Attachment JackMount (the pallet jack, server/Cargo.luau), relative to the chassis top centre
+	-- 8.0 SANDBOX, the ZDC Sprinter: `art` its look is shared/SprinterLooks.luau's (SprinterBuild; its boxes are only
+	-- its hidden hull); `wheelAt` the wheels' x and z (±) when they do not stand where its length puts them; `doorSpan`
+	-- how far its cab doors reach before and behind the seat's middle (doorsOf; else DOOR_FRONT, DOOR_BACK)
+	art: string?,
+	wheelAt: Vector2?,
+	doorSpan: Vector2?,
 }
 
 local function box(size: Vector3, offset: Vector3, kind: string, tag: string?, tilt: number?): Box
@@ -536,6 +543,39 @@ local function ambulanceDoor(side: number): { Box }
 	return list
 end
 
+-- 8.0 SANDBOX, the ZDC Sprinter (Config.Cars sprinter; shared/SprinterLooks.luau: its look in the van's frame, from the
+-- ground under its middle): its hull boxes, back doors and points in a style's frame (the chassis' top centre); below,
+-- after the parts' helpers, its skin (SprinterBuild.body, door, leaf) and its doors' switches (SprinterBuild.wire). One
+-- table: Vehicles' main chunk is near the -O0 register limit (no new top-level locals for it).
+local SprinterBuild = {}
+
+function SprinterBuild.point(at: { number }): Vector3
+	return Vector3.new(at[1], at[2] - Sprinter.Top, at[3])
+end
+
+function SprinterBuild.boxes(): { Box }
+	local list: { Box } = {}
+	for _, b in Sprinter.hull() do
+		table.insert(list, box(Vector3.new(b.size[1], b.size[2], b.size[3]), SprinterBuild.point(b.at), b.kind))
+	end
+	return list
+end
+
+-- Its back doors: two leaves hinged at the body's back corners (their skin: SprinterBuild.leaf).
+function SprinterBuild.back(): Back
+	local leaves: { Leaf } = {}
+	for _, leaf in Sprinter.leaves() do
+		table.insert(leaves, {
+			size = Vector3.new(leaf.size[1], leaf.size[2], leaf.size[3]),
+			center = SprinterBuild.point(leaf.center),
+			hinge = SprinterBuild.point(leaf.hinge),
+			axis = "Y",
+			angle = leaf.angle,
+		})
+	end
+	return { noun = "doors", leaves = leaves }
+end
+
 -- Front of the car is -Z (the LookVector).
 local STYLES: { [string]: Style } = {
 	van = {
@@ -614,6 +654,38 @@ local STYLES: { [string]: Style } = {
 		},
 		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.4, 0, 4.5), Vector3.new(1.4, 0, 4.5), Vector3.new(-1.4, 0, 1.5), Vector3.new(1.4, 0, 1.5) }),
 		back = rearDoors(4.9, -0.65, 3.9, 6.3),
+	},
+	-- 8.0 SANDBOX, the ZDC Sprinter (Config.Sprinter, shared/SprinterLooks.luau): a high-roof van you walk into. Its
+	-- boxes are only its hidden hull (Style.art: the look is SprinterLooks'): the nose, the cab, the bulkhead and the
+	-- bay's walls and roof round a hollow bay whose floor is the chassis' top (2.4 over the ground). Its 13-stud
+	-- wheelbase under the 22-stud body (Style.wheelAt); the chassis 21.8 long (15° at both ends over its 1.2 clearance).
+	-- The back doors swing round the body's back corners and lie flat against its sides; the Load and back prompts at
+	-- the back opening's middle, outside it.
+	sprinter = {
+		width = Sprinter.Width,
+		length = Sprinter.Length,
+		wheel = Config.Sprinter.Wheel,
+		wheelWidth = 1,
+		clearance = Config.Sprinter.Clearance,
+		seat = SprinterBuild.point(Sprinter.Seat),
+		passengers = { SprinterBuild.point(Sprinter.Passenger) },
+		roof = Config.Sprinter.Height - Sprinter.Top,
+		head = Vector2.new(Sprinter.Head[1] - Sprinter.Top, Sprinter.Head[2]),
+		boxes = SprinterBuild.boxes(),
+		cargo = cargo("van", Sprinter.Length, Sprinter.Width, {
+			Vector3.new(-1.6, 0, -1.2),
+			Vector3.new(1.6, 0, -1.2),
+			Vector3.new(-1.6, 0, 2.2),
+			Vector3.new(1.6, 0, 2.2),
+			Vector3.new(-1.6, 0, 5.6),
+			Vector3.new(1.6, 0, 5.6),
+			Vector3.new(-1.6, 0, 9.0),
+			Vector3.new(1.6, 0, 9.0),
+		}, nil, SprinterBuild.point(Sprinter.CargoDoor)),
+		back = SprinterBuild.back(),
+		art = "sprinter",
+		wheelAt = Vector2.new(Sprinter.Track, Sprinter.Axle),
+		doorSpan = Vector2.new(Sprinter.DoorSpan[1], Sprinter.DoorSpan[2]),
 	},
 	pickup = {
 		width = 6.4,
@@ -1635,6 +1707,153 @@ local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
 end
 
+-- 8.0 SANDBOX: pieces of the ZDC Sprinter's look (shared/SprinterLooks.luau, the van's frame) as parts under `parent`:
+-- no mass, no collisions, not hit by rays, welded to `to` (nil: not welded). A "paint" piece is the car's colour (it
+-- joins paintParts); a lamp glows at night (DayNight; the bay's own lamps follow its light, SprinterBuild.wire); a
+-- label on its front face. FleetFinish as on the fleet's skin (the audits and tools/vehicle-preview read it);
+-- SprinterVisual: only looks (server/SprinterMesh.luau hides these when the owner's Blender model dresses the van).
+function SprinterBuild.emit(parent: Instance, to: BasePart?, top: CFrame, pieces: { Sprinter.Piece }, color: Color3, paintParts: { BasePart }): { BasePart }
+	local made: { BasePart } = {}
+	for _, piece in pieces do
+		local finish = Sprinter.Finish[piece.finish] or Sprinter.Finish.trim
+		local s, a, r = piece.size, piece.at, piece.turn or { 0, 0, 0 }
+		local p = Instance.new(if piece.shape == "Wedge" then "WedgePart" else "Part") :: BasePart
+		p.Name = piece.name
+		p.Size = Vector3.new(s[1], s[2], s[3])
+		p.CFrame = top * CFrame.new(a[1], a[2] - Sprinter.Top, a[3]) * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
+		local own = finish.color
+		p.Color = if own then rgb(own) else color
+		p.Material = (Enum.Material :: any)[finish.material] :: Enum.Material
+		p.Transparency = if piece.clear then 1 else finish.transparency or 0
+		p.Reflectance = finish.reflectance or 0
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.CanCollide, p.CanQuery, p.CanTouch, p.Massless = false, false, false, true
+		p.CollisionGroup = "Car"
+		-- (the panels carry the van's shadow: no glass, no label plate, nothing thin on two sides)
+		p.CastShadow = not piece.clear and finish.material ~= "Glass" and ((s[1] >= 0.6 and s[2] >= 0.6) or (s[1] >= 0.6 and s[3] >= 0.6) or (s[2] >= 0.6 and s[3] >= 0.6))
+		if piece.shape == "Cylinder" then
+			(p :: Part).Shape = Enum.PartType.Cylinder
+		end
+		p:SetAttribute("FleetFinish", if own then piece.finish else "paint")
+		p:SetAttribute("SprinterVisual", true) -- (only looks: server/SprinterMesh.luau hides it under the Blender model)
+		if own == nil then
+			table.insert(paintParts, p)
+		end
+		local lit = finish.lit
+		if lit and piece.name ~= Sprinter.Lamps then
+			DayNight.nightLight(p, rgb(lit), p.Color, finish.material)
+		end
+		local text = piece.text
+		if text then
+			local gui = Instance.new("SurfaceGui")
+			gui.Name = "FleetLabel"
+			gui.Face = Enum.NormalId.Front
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 50
+			gui.LightInfluence = 1
+			gui.Parent = p
+			local textLabel = Instance.new("TextLabel")
+			textLabel.Size = UDim2.fromScale(1, 1)
+			textLabel.BackgroundTransparency = 1
+			textLabel.Font = (Enum.Font :: any)[piece.font or "GothamBold"] :: Enum.Font
+			textLabel.TextScaled = true
+			textLabel.Text = text
+			local ink = Sprinter.Finish[piece.ink or "trim"].color or { 32, 35, 38 }
+			textLabel.TextColor3 = rgb(ink)
+			textLabel.Parent = gui
+		end
+		p.Parent = parent
+		if to then
+			weld(to, p)
+		end
+		table.insert(made, p)
+	end
+	return made
+end
+
+-- The ZDC Sprinter's body (build, Style.art): its skin on the body that sways (look); the colliders its doors switch
+-- (SprinterLooks.Switched: the shut doors' blocks, the fold-out steps; on the chassis, a new van shut); the sliding
+-- door ("SideDoor") on the Motor6D "SlideMotor" (C0 shut; the server moves it: SprinterBuild.wire) with its "SidePrompt" and the
+-- bay's ceiling light (working: a player's van; else the door welded shut, no prompt, no light).
+function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CFrame, color: Color3, paintParts: { BasePart }, working: boolean)
+	local folder = Instance.new("Folder")
+	folder.Name = "SprinterBody"
+	folder:SetAttribute("SprinterVisual", true)
+	folder.Parent = model
+	SprinterBuild.emit(folder, look, top, Sprinter.body(), color, paintParts)
+	for _, s in Sprinter.Switched do
+		local finish = if s.finish then Sprinter.Finish[s.finish] else nil
+		local own = finish and finish.color
+		local p = newPart(model, s.name, Vector3.new(s.size[1], s.size[2], s.size[3]), top * CFrame.new(SprinterBuild.point(s.at)), if own then rgb(own) else color,
+			if finish then (Enum.Material :: any)[finish.material] :: Enum.Material else Enum.Material.SmoothPlastic)
+		p.Massless = true
+		p.CanCollide = s.solid == "closed"
+		p.Transparency = if finish and p.CanCollide then 0 else 1
+		p:SetAttribute("SprinterDoor", s.door)
+		p:SetAttribute("SprinterSolid", s.solid)
+		p:SetAttribute("SprinterShown", finish ~= nil)
+		weld(chassis, p)
+	end
+	local pieces = Sprinter.slider()
+	local slide = SprinterBuild.emit(folder, nil, top, { pieces[1] }, color, paintParts)[1]
+	slide:SetAttribute("FleetFinish", nil) -- (on its Motor6D, not welded: the fleet's audit asks a weld of a FleetFinish)
+	SprinterBuild.emit(slide, slide, top, table.move(pieces, 2, #pieces, 1, {}), color, paintParts)
+	if not working then
+		weld(look, slide)
+		return
+	end
+	local motor = Instance.new("Motor6D")
+	motor.Name = "SlideMotor"
+	motor.Part0 = look
+	motor.Part1 = slide
+	motor.C0 = look.CFrame:ToObjectSpace(slide.CFrame)
+	motor.Parent = chassis
+	local at = Instance.new("Attachment")
+	at.Name = "SlidePoint" -- (not "SideDoor": that is the door, SprinterMesh's door group)
+	at.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + SprinterBuild.point(Sprinter.SidePrompt)
+	at.Parent = chassis
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "SidePrompt"
+	prompt.ActionText = "Open side door"
+	prompt.ObjectText = model.Name
+	prompt.HoldDuration = Config.Cargo.HoldDuration
+	prompt.MaxActivationDistance = Config.Sprinter.Slider.Reach
+	prompt.RequiresLineOfSight = false
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.Parent = at
+	model:SetAttribute("SlideOpen", false)
+	local spot = Instance.new("Attachment")
+	spot.Name = "BayLight"
+	spot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + SprinterBuild.point(Sprinter.Light)
+	spot.Parent = chassis
+	local tune = Config.Sprinter.Light
+	local light = Instance.new("PointLight")
+	light.Name = "BayLight"
+	light.Range = tune.Range
+	light.Brightness = tune.Brightness
+	light.Color = rgb(tune.Color)
+	light.Shadows = true -- (the bay's walls keep it in; on only while a door stands open)
+	light.Enabled = false
+	light.Parent = spot
+end
+
+-- A cab door's skin, welded to its hinged panel (buildDoors; the panel itself hidden).
+function SprinterBuild.door(panel: BasePart, side: number, top: CFrame, color: Color3, paintParts: { BasePart })
+	panel.Transparency = 1
+	panel:SetAttribute("SprinterVisual", true)
+	SprinterBuild.emit(panel, panel, top, Sprinter.door(side), color, paintParts)
+end
+
+-- A back door's skin (the leaf `index` of SprinterLooks.leaves), welded to the leaf (buildBack).
+function SprinterBuild.leaf(leaf: BasePart, index: number, top: CFrame, color: Color3, paintParts: { BasePart })
+	local spec = Sprinter.leaves()[index]
+	leaf:SetAttribute("SprinterVisual", true) -- (the leaf is its door's panel: only looks)
+	if spec then
+		SprinterBuild.emit(leaf, leaf, top, spec.pieces, color, paintParts)
+	end
+end
+
 -- The colour of a car: its paint job, or the factory colour.
 local function paintColor(def: Config.CarDef, paintId: string?): Color3
 	local paint = paintId and Economy.findPaint(paintId)
@@ -1855,7 +2074,7 @@ local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, w
 		local hole = trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), on, color, accent)
 		if model:GetAttribute("FleetArt") or model:GetAttribute("MeshArt") then hole.Transparency = 1 end
 	end
-	for _, leaf in back.leaves do
+	for index, leaf in back.leaves do
 		local kind = leaf.kind or "body"
 		local p = trimPart(model, "BackDoor", box(leaf.size, leaf.center, kind), top * CFrame.new(leaf.center), if working then nil else chassis, color, accent)
 		if kind == "body" then
@@ -1868,6 +2087,8 @@ local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, w
 		if meshed then
 			p.Transparency = 1
 			VanMesh.door(model, p, leaf.center.X, true, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		elseif model:GetAttribute("SprinterArt") then
+			SprinterBuild.leaf(p, index, top, color, paintParts) -- 8.0: the ZDC Sprinter's back doors' skin
 		end
 		local trim: { Box } = leaf.trim or {}
 		for _, b in trim do
@@ -2343,7 +2564,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 
 	if model:GetAttribute("FleetArt") then
 		VehicleArt.upgrades(model, on, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
-	elseif not model:GetAttribute("MeshArt") then -- (6.25: the ZDC Van's model has its own bull bar and roof rack)
+	elseif not model:GetAttribute("MeshArt") and not model:GetAttribute("SprinterArt") then -- (6.25: the ZDC Van's model has its own bull bar and roof rack; 8.0: the Sprinter takes no upgrades)
 	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
 	if plow >= 1 then
 		local width = math.min(style.width + 0.2, style.width - 1.6 + 0.36 * plow)
@@ -2518,7 +2739,8 @@ local doorCache: { [Style]: { CarDoor } } = setmetatable({}, { __mode = "k" }) :
 
 -- The highest point of the wheels between z0 and z1 (over the chassis top), -inf when no wheel is there.
 local function wheelTop(style: Style, z0: number, z1: number): number
-	local wz = style.length / 2 - style.wheel - 0.5
+	local wheelAt = style.wheelAt -- (8.0: the ZDC Sprinter's own)
+	local wz = if wheelAt then wheelAt.Y else style.length / 2 - style.wheel - 0.5
 	local centreY = style.wheel - style.clearance - CHASSIS_HEIGHT
 	local top = -math.huge
 	for _, wheelZ in { -wz, wz } do
@@ -2555,7 +2777,8 @@ local function doorsOf(style: Style): { CarDoor }
 	local hull = hullOf(style)
 	local list: { CarDoor } = {}
 	local function add(side: number, z: number, driver: boolean, cabin: boolean): CarDoor
-		local front, back = z - DOOR_FRONT, z + DOOR_BACK
+		local span = style.doorSpan -- (8.0: the ZDC Sprinter's long cab doors, hinged where the Blender model's are)
+		local front, back = z - (if span then span.X else DOOR_FRONT), z + (if span then span.Y else DOOR_BACK)
 		-- Over the wheel arch, up to the waist (the hood's top; the bus's lower body); a monster truck's door sits high
 		-- over its tyres.
 		local bottom = math.max(0.1, wheelTop(style, front, back) + 0.05)
@@ -2644,13 +2867,16 @@ local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style
 			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 		end
 		local meshed = model:GetAttribute("MeshArt") ~= nil -- 6.25: the model's own cab door on the hidden panel
+		local sprinter = model:GetAttribute("SprinterArt") ~= nil -- 8.0: the ZDC Sprinter's door on the hidden panel
 		if meshed then
 			p.Transparency = 1
 			VanMesh.door(model, p, door.side, false, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		elseif sprinter then
+			SprinterBuild.door(p, door.side, top, color, paintParts)
 		end
 		for _, b in door.trim do
 			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
-			if meshed then
+			if meshed or sprinter then
 				t.Transparency = 1
 			elseif b.kind == "body" then
 				table.insert(paintParts, t)
@@ -2703,6 +2929,15 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	-- chassis, the panels, the lamps' and the tyres' parts stay as they are but hidden; without it, the panelled skin.
 	local meshed = not oneBeam and VanMesh.ready(def.style)
 	local polished = not meshed and not oneBeam and VehicleArt.supports(def.style)
+	-- 8.0 SANDBOX: the ZDC Sprinter wears its parts look (SprinterBuild.body: shared/SprinterLooks.luau); its boxes are
+	-- only its hidden hull (the walk-in bay's walls round the hollow bay)
+	local sprinter = not meshed and style.art == "sprinter"
+	if sprinter then
+		model:SetAttribute("SprinterArt", true)
+		-- (server/SprinterMesh.luau: a sprinter to dress; the chassis is only looks under the Blender model's body)
+		model:SetAttribute("Sprinter", true)
+		chassis:SetAttribute("SprinterVisual", true)
+	end
 	if meshed then
 		chassis.Transparency = 1
 		model:SetAttribute("MeshArt", def.style)
@@ -2742,7 +2977,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			p.Shape = Enum.PartType.Ball
 		end
 		local shown: BasePart = p -- 6.16: what is seen of it (its twin on the BodyRoot)
-		if look ~= chassis and not polished and not meshed and p.CanCollide and not (SIREN_DIM[b.kind] or b.kind == "lightbar") then
+		if look ~= chassis and not polished and not meshed and not sprinter and p.CanCollide and not (SIREN_DIM[b.kind] or b.kind == "lightbar") then
 			shown = p:Clone()
 			shown.CanCollide = false
 			shown.CanQuery = false
@@ -2770,7 +3005,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			CollectionService:AddTag(p, Vehicles.SirenTag)
 		end
 		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance (5.1: a bike's art).
-		if polished or meshed or style.bike then p.Transparency = 1 end
+		if polished or meshed or style.bike or sprinter then p.Transparency = 1 end
 		-- (6.16: the light bar's lenses, never colliding, sway themselves)
 		weld(if p.CanCollide then chassis else look, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
@@ -2795,6 +3030,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		VehicleArt.body(model, look, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
 	elseif meshed then
 		VanMesh.body(model, look, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+	elseif sprinter then
+		SprinterBuild.body(model, look, chassis, top, color, paintParts, not display and not oneBeam)
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
@@ -2808,8 +3045,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	-- grey tyres on the Rusty Van (Style.bald; the UpgradeKit's Tyres & Suspension puts new ones on), a twin tyre inside
 	-- each rear one (Style.dual: no collider of its own).
 	local wheelY = style.wheel - chassisY
-	local wx = style.width / 2 - style.wheelWidth / 2 + 0.3
-	local wz = style.length / 2 - style.wheel - 0.5
+	local wheelAt = style.wheelAt -- (8.0: the ZDC Sprinter's own)
+	local wx = if wheelAt then wheelAt.X else style.width / 2 - style.wheelWidth / 2 + 0.3
+	local wz = if wheelAt then wheelAt.Y else style.length / 2 - style.wheel - 0.5
 	local tyreColor = if style.bald then BALD else Color3.fromRGB(24, 24, 24)
 	local function wheel(offset: Vector3, collides: boolean)
 		if collides then
@@ -2884,8 +3122,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		head.CanCollide = false
 		head.CanQuery = false
 		head.Massless = true
-		if meshed then
-			head.Transparency = 1 -- (its beam stays; the model's lamps glow)
+		if meshed or sprinter then
+			head.Transparency = 1 -- (its beam stays; the model's lamps glow; 8.0: the Sprinter's own lamps)
 		end
 		weld(look, head)
 		if not display and (n == 1 or not oneBeam) then
@@ -2902,6 +3140,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			DayNight.nightLight(head, DIM_HEAD_LIT, DIM_HEAD_DIM, "Glass")
 		else
 			DayNight.nightLight(head, HEAD_LIT, HEAD_DIM, "Glass")
+		end
+		if sprinter then
+			continue -- (8.0: the Sprinter's tail lamps are in its look)
 		end
 		local tail = newPart(model, "Taillight", Vector3.new(1, 0.5, 0.2), top * CFrame.new(x, 0.6, -front + 0.05), TAIL_DIM, Enum.Material.SmoothPlastic)
 		tail.CanCollide = false
@@ -4053,6 +4294,111 @@ local function toggleBack(car: Car, player: Player)
 	end
 end
 
+-- 8.0 SANDBOX: a player's ZDC Sprinter (spawnAt) and its walk-in bay. The back (BackOpen: its BackPrompt, setBack):
+-- shut, the BackBlock keeps the bay closed; open, the rear step folds out (solid and shown) behind the bumper. The
+-- sliding door (its SidePrompt: anybody on foot while the van stands, so nobody is ever shut in; the attribute
+-- SlideOpen): it rolls back along the side (the server moves its SlideMotor's C0: every client sees it), its block
+-- goes and the side step comes out (both back once it has shut); it shuts itself when somebody takes the wheel. The
+-- bay's light is on while either stands open. Somebody standing in the bay while the van drives rides along on its
+-- floor (the shut doors' blocks keep them in).
+function SprinterBuild.wire(car: Car)
+	local model, chassis = car.model, car.chassis
+	local switched: { BasePart } = {}
+	local lamps: { BasePart } = {}
+	local folded: BasePart? = nil
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d:GetAttribute("SprinterDoor") ~= nil then
+			table.insert(switched, d)
+		elseif d:IsA("BasePart") and d.Name == Sprinter.Lamps then
+			table.insert(lamps, d)
+		elseif d:IsA("BasePart") and d.Name == Sprinter.StepFolded then
+			folded = d
+		end
+	end
+	local spot = chassis:FindFirstChild("BayLight")
+	local light = spot and spot:FindFirstChildOfClass("PointLight")
+	local lampLit = rgb(Config.Sprinter.Light.Color)
+	local lampDim = if lamps[1] then lamps[1].Color else lampLit
+	local slideShut = true -- (the side door is shut, not only on its way shut)
+	local function sync()
+		local back = model:GetAttribute("BackOpen") == true
+		for _, p in switched do
+			local open = if p:GetAttribute("SprinterDoor") == "back" then back else not slideShut
+			local solid = (p:GetAttribute("SprinterSolid") == "open") == open
+			p.CanCollide = solid
+			if p:GetAttribute("SprinterShown") == true then
+				p.Transparency = if solid then 0 else 1
+			end
+		end
+		if folded and model:GetAttribute("SprinterMesh") == nil then -- (the Blender model hid it: left so)
+			folded.Transparency = if back then 1 else 0
+		end
+		local lit = (back or not slideShut) and not car.wrecked
+		if light and light.Parent then
+			light.Enabled = lit
+		end
+		for _, lamp in lamps do
+			lamp.Material = if lit then Enum.Material.Neon else Enum.Material.SmoothPlastic
+			lamp.Color = if lit then lampLit else lampDim
+		end
+	end
+	model:GetAttributeChangedSignal("BackOpen"):Connect(sync)
+	local motor = chassis:FindFirstChild("SlideMotor")
+	local at = chassis:FindFirstChild("SlidePoint")
+	local prompt = at and at:FindFirstChildOfClass("ProximityPrompt")
+	if motor and motor:IsA("Motor6D") and prompt then
+		local TweenService = game:GetService("TweenService")
+		local _, move = Sprinter.slider()
+		local shut = motor.C0
+		local open = CFrame.new(move[1], 0, move[2]) * shut
+		local seconds = Config.Sprinter.Slider.Seconds
+		local turn = 0
+		model:GetAttributeChangedSignal("SlideOpen"):Connect(function()
+			local opening = model:GetAttribute("SlideOpen") == true
+			prompt.ActionText = if opening then "Close side door" else "Open side door"
+			TweenService:Create(motor, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), { C0 = if opening then open else shut }):Play()
+			turn += 1
+			local mine = turn
+			if opening then
+				slideShut = false
+				sync()
+			else
+				task.delay(seconds, function()
+					if turn == mine and model.Parent then
+						slideShut = true
+						sync()
+					end
+				end)
+			end
+		end)
+		prompt.Triggered:Connect(function(player: Player)
+			local character = player.Character
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if car.wrecked or car.chauffeured or not character or not humanoid or humanoid.Health <= 0 then
+				return
+			end
+			local notice = Net.get("Notice")
+			local opening = model:GetAttribute("SlideOpen") ~= true
+			local held = carrying(character)
+			if humanoid.SeatPart then
+				notice:FireClient(player, "Get out first.")
+			elseif held and (held == "horse" or character:GetAttribute("CarryHands") ~= 1) then
+				notice:FireClient(player, `Your hands are full. Put it down (G), then {if opening then "open" else "close"} the side door (E).`)
+			elseif Vehicles.speed(car) > Config.Cargo.MaxCarSpeed then
+				notice:FireClient(player, "Stop the van first.")
+			else
+				model:SetAttribute("SlideOpen", opening)
+			end
+		end)
+		car.seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+			if car.seat.Occupant and model:GetAttribute("SlideOpen") == true then
+				model:SetAttribute("SlideOpen", false) -- (somebody took the wheel: it shuts)
+			end
+		end)
+	end
+	sync()
+end
+
 -- The car gun that goes on this car of the player's: the one in their profile, if the car can carry one.
 local function gunFor(player: Player, carId: string): string?
 	local profile = PlayerData.get(player)
@@ -4283,6 +4629,12 @@ end
 -- 6.26: where a vehicle about to be built touches the ground with its four wheels (findRoom): a car's colliders, or a
 -- bike's (and the E-Scooter's) four hidden ones under its art's axles (bikeBody's rule).
 local function wheelsOf(def: Config.CarDef, style: Style): { SpawnSpot.Wheel }
+	local wheelAt = style.wheelAt
+	if wheelAt then
+		-- (8.0: the ZDC Sprinter's own: front left, front right, back left, back right)
+		local x, z = wheelAt.X, wheelAt.Y
+		return { { x = -x, z = -z }, { x = x, z = -z }, { x = -x, z = z }, { x = x, z = z } }
+	end
 	if not style.bike then
 		return SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
 	end
@@ -4484,6 +4836,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		backPrompt.Triggered:Connect(function(by: Player)
 			toggleBack(car, by)
 		end)
+	end
+	if car.model:GetAttribute("SprinterArt") then
+		SprinterBuild.wire(car) -- 8.0 SANDBOX: the walk-in bay's doors, steps and light
 	end
 	car.model.Parent = workspace:FindFirstChild("Cars") or workspace
 	cars[player] = car

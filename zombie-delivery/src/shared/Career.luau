@@ -128,7 +128,7 @@ function Career.unlocksAt(level: number): { Unlock }
 		end
 	end
 	for _, def in Config.Cars do
-		if def.company then
+		if def.company or def.sandboxOnly then -- (8.0: the sandbox's ZDC Sprinter is no step of the career)
 			continue
 		elseif def.bike then
 			-- 5.1: a bike, at the bike counter (no stages; 6.12.7: Dead End Motors' BIKES counter).

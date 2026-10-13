@@ -1,5 +1,22 @@
 # Zombie Delivery
 
+> **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
+> small alpine test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): a meadow with one
+> road, **one house to empty** (The Old Chalet, refilled with a new random layout every move, with 2 – 4 **collectibles**
+> from uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. Every player drives a
+> **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
+> `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
+> from inside. Take the contract at the kiosk by your warehouse, carry the house out (the grip, Danny and two-person
+> lifts as before), drive home: with the van's back in your plot's unload circle the load goes into your **stock**
+> (`server/Collection.luau`). In the warehouse put pieces **on show** on its 12 stands (E at a stand → the picker):
+> they **earn money every minute you play** (`shared/CollectionRules.luau`, `Config.Collection`), or sell them any time.
+> The HUD shows the money, "+$X/min" and the stock (`client/SandboxHud.luau`, `client/WarehouseUi.luau`), a guide line
+> and a glowing path always say what to do next (`client/SandboxGuide.luau`), and the admin panel's SANDBOX tab has the
+> test tools. The sandbox saves in its own DataStore (`Config.Sandbox.Store`), so the city's saves are untouched; no
+> weapons, no day and night, the horde off (`Config.Moving.Sandbox`). `Config.Sandbox.On = false` boots the city as
+> before (it stays in the code until the owner says it may go). The contract between the parts:
+> `design/sandbox/KONTRAKT.md`.
+
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
 across the map while bandits shoot at you from roadblocks and zombies chase you, carry it to the receiver under fire,

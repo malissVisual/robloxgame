@@ -1,5 +1,6 @@
 --!strict
--- Zombie Delivery: the server. Builds the world, then wires the services together.
+-- Zombie Delivery: the server. Builds the world, then wires the services together. 8.0: in the sandbox
+-- (Config.Sandbox.On) server/SandboxBoot.luau boots the small test world instead of the city.
 
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
@@ -71,14 +72,6 @@ PhysicsService:CollisionGroupSetCollidable("Bullet", "Corpse", false)
 -- The bandits' cars bump into your car and the world, the zombies and the corpses pass through, bullets hit them.
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
-
--- 7.2: the maps' Alps for every client (shared/MapStyle.luau, client/MapView.luau): the ring and the forest worked out
--- once here (World.build's Alpine piece then reuses them) and packed in ReplicatedStorage.MapStyle.
-require(Shared.MapStyle).publish(ReplicatedStorage)
-World.build()
--- 7.1 review: the Alps' terrain fills and forests (thousands of fills) once the server is wired: PLAY and the lighting
--- never wait for them (the far silhouettes and the pass stand already).
-task.defer(World.buildLate)
 
 local notice = Net.get("Notice")
 local stateRemote = Net.get("State")
@@ -155,6 +148,25 @@ do
 		pending[player] = nil
 	end)
 end
+
+-- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): the owner's small test world instead of the city.
+-- server/SandboxBoot.luau starts only what it needs (its map, the plots, the warehouses, the collection, the moves,
+-- the van; the State above for the client) and none of the city (no world build, jobs, shops, traffic, missions,
+-- weapons, day and night). Off: the city below, as before.
+if Config.Sandbox.On then
+	require(Server.SandboxBoot).start(queueState)
+	return
+end
+
+-- ── The city ───────────────────────────────────────────────────────────────
+
+-- 7.2: the maps' Alps for every client (shared/MapStyle.luau, client/MapView.luau): the ring and the forest worked out
+-- once here (World.build's Alpine piece then reuses them) and packed in ReplicatedStorage.MapStyle.
+require(Shared.MapStyle).publish(ReplicatedStorage)
+World.build()
+-- 7.1 review: the Alps' terrain fills and forests (thousands of fills) once the server is wired: PLAY and the lighting
+-- never wait for them (the far silhouettes and the pass stand already).
+task.defer(World.buildLate)
 
 -- ── Wiring ─────────────────────────────────────────────────────────────────
 

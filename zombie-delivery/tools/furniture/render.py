@@ -5,8 +5,9 @@ Builds every piece (shared/FurnitureLooks.luau) and a house (shared/HouseLayout.
 built) with the real builders on the recorder (tools/fixtures/item-mock.luau over tools/vehicle-preview/roblox-mock.luau)
 in the Luau CLI (export.luau), renders them with three.js in headless Chromium (render.mjs, render.html) and lays out:
   - a contact sheet of every piece by room: its name, class, weight, value, size, parts, ★ and fragile (--only: just
-    these ids, e.g. the 7.x alpine pieces);
-  - the house from straight above (a floor plan, the rooms named, the ★ pieces marked) beside a 3/4 cutaway;
+    these ids, e.g. the 7.x alpine pieces, under --title; 8.0: a collectible's rarity in its picture's corner);
+  - the house from straight above (a floor plan, the rooms named, the ★ pieces marked, 8.0: the collectibles ◆ in their
+    rarity's colour) beside a 3/4 cutaway;
   - 7.x alpine, --inside PNG: the house at eye level (the living room's Kachelofen, the kitchen's corner bench, the hall
     toward the front door, the bedroom's wall) over the 3/4 cutaway.
 7.x the farm: with --farm-pieces and/or --farm-interior also Walt's farm (shared/Layouts/Farm.luau): the farm's pieces
@@ -14,7 +15,7 @@ on a sheet of their own (by the farm's rooms; the house's sheet keeps the house'
 cutaway (the hay wagon, the one big-door piece, marked).
 
     NODE_PATH=/opt/node22/lib/node_modules python3 zombie-delivery/tools/furniture/render.py <luau> <three.module.min.js> \\
-        <furniture-sheet.png> <house-interior.png> [--seed N] [--keep DIR] [--only ID,ID] [--inside PNG] \\
+        <furniture-sheet.png> <house-interior.png> [--seed N] [--keep DIR] [--only ID,ID] [--title TEXT] [--inside PNG] \\
         [--farm-pieces farm-pieces.png] [--farm-interior farm-interior.png] [--farm-seed N]
 
 three.module.min.js: three.js's build (e.g. three@0.160 from npm: package/build/three.module.min.js); Playwright and
@@ -45,6 +46,8 @@ FARM_ROOMS = (("stable", "STABLE"), ("barn", "THRESHING FLOOR"), ("workshop", "W
 FARM_PLAN_ROOMS = {"mudroom": "MUD ROOM", "stube": "STUBE", "kitchen": "KITCHEN", "bedroom": "BEDROOM", "pantry": "PANTRY",
                    "yard": "YARD", "stable": "STABLE", "barn": "THRESHING FLOOR", "workshop": "WORKSHOP"}
 CLASS_COLOR = {"hand": (126, 196, 120), "both": (240, 180, 70), "pair": (232, 96, 84)}
+# 8.0 collectibles: a piece's rarity, its tag on the sheet
+RARITY_COLOR = {"uncommon": (120, 210, 120), "rare": (96, 168, 255), "epic": (196, 120, 250), "legendary": (255, 178, 52)}
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans{}.ttf"
 
 
@@ -146,7 +149,7 @@ def outlined(draw, xy, text, fnt, fill, outline=(14, 16, 20), width=2, anchor="m
     draw.text(xy, text, font=fnt, fill=fill, anchor=anchor, stroke_width=width, stroke_fill=outline)
 
 
-def sheet(renders: Path, output: Path, farm=False, only: list | None = None):
+def sheet(renders: Path, output: Path, farm=False, only: list | None = None, title: str | None = None):
     labels = json.loads((renders / "labels.json").read_text())["items"]
     if not only:
         labels = {n: info for n, info in labels.items() if bool(info.get("farm")) == farm}  # (7.x: the farm's on its own sheet)
@@ -165,7 +168,9 @@ def sheet(renders: Path, output: Path, farm=False, only: list | None = None):
     height = 84 + sum(head + (cell + caption) * ((len(names) + cols - 1) // cols) for _, names in rows) + 40
     img = Image.new("RGB", (cols * cell + 32, height), (14, 16, 20))
     draw = ImageDraw.Draw(img)
-    if only:
+    if title:
+        title = f"{title.upper()} ({len(labels)})"
+    elif only:
         title = f"THE ALPINE PIECES ({len(labels)})"
     elif farm:
         title = f"WALT'S FARM · THE FARM PIECES ({len(labels)} pieces)"
@@ -184,6 +189,8 @@ def sheet(renders: Path, output: Path, farm=False, only: list | None = None):
             x, top = 16 + (i % cols) * cell, y + (i // cols) * (cell + caption)
             picture = Image.open(renders / f"{name}.png").convert("RGB").resize((cell - 12, cell - 12), Image.LANCZOS)
             img.paste(picture, (x + 6, top))
+            if info.get("rarity"):  # (8.0 collectibles: the rarity in the picture's corner)
+                outlined(draw, (x + 12, top + 8), info["rarity"].upper(), font(14, True), RARITY_COLOR.get(info["rarity"], (240, 240, 236)), anchor="la")
             ty = top + cell - 6
             label = info["label"].upper()
             draw.text((x + 8, ty), label, fill=(240, 240, 236), font=font(15, True))
@@ -233,10 +240,17 @@ def house(renders: Path, output: Path, key="house"):
         x, y = room["at"]
         outlined(draw, (gap + x, head + y), names.get(room["id"], room["id"].upper()), font(17, True), (250, 250, 246), width=3)
     big = {s["id"] for s in info["spots"] if s.get("bigDoor")}
+    rarity_of = {s["id"]: s.get("rarity") for s in info["spots"]}  # (8.0 collectibles: marked in their rarity's colour)
     for spot in data["top"]["spots"]:
-        if spot["star"] or spot["id"] in big:
+        rarity = rarity_of.get(spot["id"])
+        if spot["star"] or spot["id"] in big or rarity:
             x, y = spot["at"]
-            text, colour = ("★ " + spot["label"], (250, 204, 60)) if spot["star"] else (spot["label"] + " (big door)", (240, 150, 70))
+            if spot["star"]:
+                text, colour = "★ " + spot["label"], (250, 204, 60)
+            elif rarity:
+                text, colour = f"◆ {spot['label']} ({rarity})", RARITY_COLOR.get(rarity, (240, 240, 236))
+            else:
+                text, colour = spot["label"] + " (big door)", (240, 150, 70)
             outlined(draw, (gap + x, head + y - 16), text, font(14, True), colour, width=3)
     for spot in data["iso"]["spots"]:
         if spot["star"]:
@@ -251,7 +265,7 @@ def house(renders: Path, output: Path, key="house"):
     for room, title in (FARM_PLAN_ROOMS.items() if farm else ROOMS):
         pieces = [s for s in info["spots"] if s.get("room") == room]
         if pieces:
-            rooms_line.append(f"{title}: " + ", ".join(("★ " if s["star"] else "") + s["label"] for s in pieces))
+            rooms_line.append(f"{title}: " + ", ".join(("★ " if s["star"] else "◆ " if s.get("rarity") else "") + s["label"] for s in pieces))
     text = "   ".join(rooms_line)
     # wrap to the picture's width
     words, line = text.split(" "), ""
@@ -311,6 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--keep", type=Path, help="also keep the single renders in this folder")
     parser.add_argument("--only", help="the contact sheet of just these piece ids (comma separated)")
+    parser.add_argument("--title", help="8.0: the --only sheet's title (default: the alpine pieces)")
     parser.add_argument("--inside", type=Path, help="7.x alpine: the house at eye level into this picture")
     parser.add_argument("--farm-pieces", type=Path, help="7.x: also the farm's pieces' sheet here")
     parser.add_argument("--farm-interior", type=Path, help="7.x: also the farm from above and as a cutaway here")
@@ -323,7 +338,7 @@ if __name__ == "__main__":
         out = args.keep or (tmp / "renders")
         views = inside_views(scenes) if args.inside else None
         render(scenes, args.three.resolve(), out, views)
-        sheet(out, args.sheet, only=args.only.split(",") if args.only else None)
+        sheet(out, args.sheet, only=args.only.split(",") if args.only else None, title=args.title)
         house(out, args.house)
         if args.inside:
             inside(out, views, args.inside)

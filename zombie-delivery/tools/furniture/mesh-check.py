@@ -8,7 +8,9 @@ piece FurnitureLooks.build makes (three variants each): each of the item's piece
 the item's box, welded to the Root and not physical, the Root untouched, the labels kept (their parts hidden), the
 builders' other parts gone, within Config.Furniture.MaxParts, the palette finishes in the variant's colours. Then a
 whole house (HouseInterior.build) dressed within Config.Furniture.InteriorMaxParts, and without the import every piece
-left as FurnitureLooks makes it. Also: furniture.py's sizes are the catalogue's, every finish has a look.
+left as FurnitureLooks makes it. Also: furniture.py's sizes are the catalogue's, every finish has a look. 8.0: the
+catalogue's pieces the import lacks (the 7.x farm and alpine pieces, the 8.0 collectibles: no Blender model yet) keep
+FurnitureLooks' parts look exactly, with the import too; the house counts only the pieces the import has as dressed.
 
     python3 zombie-delivery/tools/furniture/mesh-check.py <luau>
 """
@@ -25,7 +27,7 @@ SHARED = ROOT / "src" / "shared"
 MANIFEST = ROOT / "design/blender-furniture/roblox/ZDCFurnitureArt.json"
 PREFIX = ('local M = require("./ItemMock")\n'
           'local Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n')
-MOCKED = ("FurnitureLooks", "HouseLayout")
+MOCKED = ("FurnitureLooks", "HouseLayout", "Farm")
 FACES = {"Front": (2, -1), "Back": (2, 1), "Left": (0, -1), "Right": (0, 1), "Top": (1, 1), "Bottom": (1, -1)}
 
 # What the recorder lacks for FurnitureMesh: CFrame ± Vector3, CFrame.fromMatrix, MeshPart as a BasePart, a
@@ -100,15 +102,16 @@ local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 local plan = HouseLayout.plan(3, "house")
 local interior, pieces = HouseInterior.build(plan, HouseInterior.slot(3))
-local parts, dressed, total = 0, 0, 0
+local parts, dressed, total, withArt = 0, 0, 0, 0
 for _, d in interior:GetDescendants() do
 	if d:IsA("BasePart") then parts += 1 end
 end
 for _, piece in pieces do
 	total += 1
 	if piece:GetAttribute("MeshArt") then dressed += 1 end
+	if FurnitureMesh.has(piece:GetAttribute("FurnitureId")) then withArt += 1 end
 end
-print(string.format('HOUSE {"parts":%d,"pieces":%d,"dressed":%d}', parts, total, dressed))
+print(string.format('HOUSE {"parts":%d,"pieces":%d,"dressed":%d,"withArt":%d}', parts, total, dressed, withArt))
 -- (FurnitureMesh found the import at the first piece it dressed)
 print(string.format('META {"moved":%s,"maxParts":%d,"interiorMax":%d}', tostring(art.Parent == storage and MODE == "art"), Config.Furniture.MaxParts, Config.Furniture.InteriorMaxParts))
 print("ALL DONE")
@@ -116,8 +119,8 @@ print("ALL DONE")
 
 
 def stage(tmp: Path, manifest: dict):
-    for source in SHARED.glob("*.luau"):
-        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+    for source in list(SHARED.glob("*.luau")) + list(SHARED.glob("Layouts/*.luau")):  # (7.x: the farm's layout too)
+        text = re.sub(r"require\(script\.Parent\.(?:Parent\.|Layouts\.)?(\w+)\)", r'require("./\1")', source.read_text())
         (tmp / source.name).write_text(PREFIX + text if source.stem in MOCKED else text)
     text = (ROOT / "src/server/HouseInterior.luau").read_text()
     text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', text)
@@ -158,6 +161,11 @@ def run(luau: str, tmp: Path, mode: str):
     return out
 
 
+def look_of(parts):
+    """A piece's parts as FurnitureLooks built them: class, name, place, size, colour, transparency (sorted)."""
+    return sorted((p["class"], p["name"], tuple(p["cf"]), tuple(p["size"]), tuple(p["color"]), p["t"]) for p in parts)
+
+
 def box_in(part, bottom):
     """The part's box in its item's space (the Root at the origin, unturned; `bottom` its bottom's height)."""
     r = part["cf"][3:]
@@ -178,8 +186,11 @@ def main():
     missing = sorted(finishes - set(looks))
     assert not missing, f"finishes without a look in FurnitureMesh.LOOKS: {missing}"
     catalogue = {i["id"]: i["size"] for i in art["ITEM"]}
-    assert set(catalogue) == set(manifest["items"]), (sorted(set(catalogue) ^ set(manifest["items"])), "furniture.py ITEMS ≠ FurnitureLooks.Order")
-    for fid, size in catalogue.items():
+    unknown = sorted(set(manifest["items"]) - set(catalogue))
+    assert not unknown, (unknown, "furniture.py ITEMS the catalogue (FurnitureLooks.Order) lacks")
+    parts_look = sorted(set(catalogue) - set(manifest["items"]))  # (no Blender model yet: FurnitureLooks' own look)
+    for fid in manifest["items"]:
+        size = catalogue[fid]
         assert all(abs(a - b) < 1e-6 for a, b in zip(size, manifest["items"][fid]["size"])), (fid, size, manifest["items"][fid]["size"], "the sizes differ")
     # Without the import nothing changes.
     for piece in plain["PIECE"]:
@@ -189,9 +200,11 @@ def main():
     # With it, every piece dressed.
     meta = art["META"]
     assert meta["moved"], "the imported model was not moved to ServerStorage"
-    parts_of = {}
+    parts_of, plain_of = {}, {}
     for p in art["PART"]:
         parts_of.setdefault((p["id"], p["v"]), []).append(p)
+    for p in plain["PART"]:
+        plain_of.setdefault((p["id"], p["v"]), []).append(p)
     by_item = {}
     for name, p in manifest["pieces"].items():
         by_item.setdefault(name.rsplit("_", 1)[0], {})[name] = p
@@ -199,9 +212,14 @@ def main():
     worst, labels = 0.0, 0
     for piece in art["PIECE"]:
         fid, v = piece["id"], piece["v"]
-        want = by_item[fid]
         size = catalogue[fid]
         root = piece["root"]
+        if fid not in by_item:
+            # no model in the import: left exactly as FurnitureLooks built it (the same parts, places, sizes, colours)
+            assert not piece["dressed"] and not piece["attr"], (fid, v, "dressed without a model in the import")
+            assert look_of(parts_of.get((fid, v), [])) == look_of(plain_of.get((fid, v), [])), (fid, v, "not FurnitureLooks' own look")
+            continue
+        want = by_item[fid]
         assert piece["dressed"] and piece["attr"], (fid, v, "not dressed")
         assert root["cf"][:3] == [0, 0, 0] and root["cf"][3:] == [1, 0, 0, 0, 1, 0, 0, 0, 1], (fid, "the Root moved")
         assert all(abs(a - b) < 1e-6 for a, b in zip(root["size"], size)) and root["t"] == 1 and root["collide"], (fid, "the Root changed")
@@ -257,14 +275,16 @@ def main():
     same = [k for k, cols in palette_colours.items() if len(cols) < 2]
     assert not same, f"a palette finish in one colour for every variant: {same[:5]}"
     house = art["HOUSE"]
-    assert house["dressed"] == house["pieces"] > 0, house
+    assert house["dressed"] == house["withArt"] > 0 and house["pieces"] >= house["withArt"], house
     assert house["parts"] <= meta["interiorMax"], (house, "parts over Config.Furniture.InteriorMaxParts")
+    assert plain["HOUSE"]["parts"] <= meta["interiorMax"], (plain["HOUSE"], "parts over Config.Furniture.InteriorMaxParts without the import")
     assert house["parts"] <= plain["HOUSE"]["parts"], (house["parts"], plain["HOUSE"]["parts"], "the dressed house has more parts")
     tris = sum(p["triangles"] for p in manifest["pieces"].values())
     print(f"Mesh furniture PASS: {len(catalogue)} items, {len(manifest['pieces'])} pieces ({tris} triangles, the largest "
           f"{max(p['triangles'] for p in manifest['pieces'].values())}) from a turned, scaled import on 3 variants each: in place "
           f"(at most {worst:.3f} out of a box), welded, not physical, {labels} labels kept readable, {len(palette_colours)} palette finishes in the "
-          f"variant's colours; a house {house['parts']} parts dressed (FurnitureLooks' {plain['HOUSE']['parts']}); no import: unchanged")
+          f"variant's colours; a house {house['parts']} parts dressed ({house['dressed']} of its {house['pieces']} pieces; FurnitureLooks' "
+          f"{plain['HOUSE']['parts']}); no import: unchanged; {len(parts_look)} items without a model keep their parts look exactly")
 
 
 if __name__ == "__main__":
