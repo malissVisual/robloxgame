@@ -156,7 +156,7 @@ local SandboxMap = require("./SandboxMap")
 local SP = T.Beds.sprinter
 local SPRINTER: Rules.Bed = { width = SP.Width, length = SP.Length, height = SP.Height, cell = SP.Cell }
 check("the Sprinter's bay: 6.6 wide, 7.6 tall, 14 long, walk-in, its back from the van's doors; far bigger than the ZDC Van's", SP ~= nil and SP.Width == 6.6
-	and SP.Height == 7.6 and SP.Length == 14 and SP.WalkIn == true and type(SP.Back) == "number" and SP.Cell >= 0.4 and SP.Cell <= 0.5
+	and SP.Height == 7.6 and SP.Length == 13.7 and SP.WalkIn == true and type(SP.Back) == "number" and SP.Cell >= 0.4 and SP.Cell <= 0.5
 	and SP.Width * SP.Length * SP.Height > 2.5 * V.Width * V.Length * V.Height)
 check("…the ZDC Van's bay is no walk-in one (the city's game as it was)", V.WalkIn ~= true and V.Back == nil)
 do

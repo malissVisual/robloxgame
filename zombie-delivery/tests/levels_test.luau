@@ -124,7 +124,7 @@ local function ordered(list: { any }, skip: (any) -> boolean): (boolean, string?
 	return true, nil
 end
 check("the dealer's cars: level and price rise together", ordered(Config.Cars, function(def)
-	return def.company == true or def.bike == true -- (5.1: the bikes are Spoke & Chain's, below)
+	return def.company == true or def.bike == true or def.sandboxOnly == true -- (5.1: the bikes are Spoke & Chain's, below; 8.0: the sandbox's van is never sold)
 end))
 -- 5.1: the bikes (CarDef.bike, sold at Spoke & Chain) rise the same way among themselves, from level 2.
 check("the bikes: level and price rise together", ordered(Config.Cars, function(def)
@@ -160,7 +160,7 @@ for _, want in { { "courier", 5 }, { "highroof", 5 }, { "boxtruck", 7 }, { "armo
 end
 local dealer = 0
 for _, def in Config.Cars do
-	if not def.company and not def.bike then
+	if not def.company and not def.bike and not def.sandboxOnly then -- (8.0: the sandbox's ZDC Sprinter is never at the dealer)
 		dealer += 1
 	end
 end

@@ -10,7 +10,7 @@ def catalog(models):
         if key not in cache:cache[key]=len(colors)+1;colors.append(key)
         return cache[key]
     for m in models:
-        if m['upgraded']:continue
+        if m['upgraded'] or m.get('sandboxOnly'):continue # (8.0: the sandbox's ZDC Sprinter is never in a city garage)
         nodes={p['id']:p for p in m['parts']};texts={}
         factory=next(p['color'] for p in m['parts'] if p.get('attributes',{}).get('FleetFinish')=='paint')
         for p in m['parts']:

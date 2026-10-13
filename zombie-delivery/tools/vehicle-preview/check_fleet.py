@@ -10,7 +10,7 @@ def lua(v):
     if isinstance(v,(list,tuple)):return '{'+','.join(lua(x) for x in v)+'}'
     if isinstance(v,bool):return str(v).lower()
     return json.dumps(v)
-NEW={'zdcvan'} # 6.25: the ZDC Van (server/VanMesh.luau), new since the baseline
+NEW={'zdcvan','sprinter'} # 6.25: the ZDC Van (server/VanMesh.luau), new since the baseline; 8.0: the ZDC Sprinter (the sandbox's)
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('luau');ap.add_argument('--baseline',default='3823dad');args=ap.parse_args()
     with tempfile.TemporaryDirectory() as tmp:

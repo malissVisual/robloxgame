@@ -6,7 +6,7 @@ local Config = require('./Config')
 local Economy = require('./Economy')
 local function encode(v)
 	local kind=type(v)
-	if kind=='string' then return string.format('%q',v) end
+	if kind=='string' then return (string.gsub(string.format('%q',v),'\\\n','\\n')) end -- (8.0: %q writes a label's newline as a backslash and a newline)
 	if kind=='number' or kind=='boolean' then return tostring(v) end
 	if kind=='nil' then return 'null' end
 	local out={}
@@ -122,7 +122,7 @@ for _,def in ALL do
 					end
 					table.insert(parts,item)
 				end
-				print(encode({id=def.id,style=def.style,stage=stage,name=(Economy.stageDef(def.id,stage) or def).name,upgraded=upgraded,capacity=Economy.stageCapacity(def.id,stage),parts=parts,physics=invariant}))
+				print(encode({id=def.id,style=def.style,stage=stage,name=(Economy.stageDef(def.id,stage) or def).name,upgraded=upgraded,capacity=Economy.stageCapacity(def.id,stage),parts=parts,physics=invariant,sandboxOnly=def.sandboxOnly==true}))
 			end
 		end
 	end

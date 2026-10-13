@@ -64,7 +64,7 @@ for id, x in PLOT_X do
 		rect = { x0 = x - 60, x1 = x + 60, z0 = -230, z1 = -78 },
 		warehouse = { x = x, y = 0, z = WALL_Z - 30, sx = 80, sy = 24, sz = 60 },
 		door = { x = x, y = 0, z = WALL_Z, yaw = 180 },
-		vanSpot = { x = x, y = SandboxMap.RoadTop, z = WALL_Z + 6 + 10, yaw = 180 }, -- (the van ~20 long: its back 6 off the wall)
+		vanSpot = { x = x, y = SandboxMap.RoadTop, z = WALL_Z + 6 + 11, yaw = 180 }, -- (the Sprinter 22 long: its back 6 off the wall)
 		unload = { x = x, z = WALL_Z + 8, r = 16 },
 		spawn = { x = x + 22, y = 3, z = WALL_Z + 18, yaw = 180 },
 		board = { x = x - 24, y = 0, z = WALL_Z + 1, yaw = 180 },
