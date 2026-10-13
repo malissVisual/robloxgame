@@ -1,8 +1,9 @@
 --!strict
--- 6.0.1: the courier's sprint as numbers (pure Luau: client/SprintPose.luau sets them ABSOLUTE into the R15 joints'
--- Transform, the rest pose times these rotations, over the stock run animation; tests/runcycle_test.luau checks them).
+-- 6.0.1: the courier's sprint as numbers (pure Luau; tests/runcycle_test.luau checks them). 6.24: shared/Gait.luau
+-- blends the walk into it from Config.Gait.RunFrom and client/GaitPose.luau sets the result ABSOLUTE into the R15 joints'
+-- Transform over the stock run animation.
 -- One cycle is two steps: `phase` 0..1 is the right leg's, the left leg is half a cycle behind and each arm swings
--- against its own side's leg. SprintPose advances the phase by the distance run (Config.Courier.Sprint.Stride studs a
+-- against its own side's leg. The gait advances the phase by the distance run (Config.Courier.Sprint.Stride studs a
 -- cycle), so the cadence follows the speed.
 --   phase 0     the right thigh fully forward (HipForward), the knee almost straight, reaching for the ground
 --   phase 0.25  the right foot under the body: the knee loaded, the body at its lowest
