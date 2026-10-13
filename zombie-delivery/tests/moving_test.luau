@@ -430,7 +430,8 @@ do
 	end
 
 	local BED = { width = 7, length = 10, height = 7.4, cell = 0.5 }
-	check("Marge's house: 18 to 24 things, more than the truck takes", #house >= 18 and #house <= 24)
+	local rare = Config.Furniture.Collectibles.Count -- (8.0 SANDBOX: a house's collectibles come besides its 18 to 24 things)
+	check(`Marge's house: 18 to 24 things and {rare[1]}-{rare[2]} collectibles, more than the truck takes`, #house >= 18 + rare[1] and #house <= 24 + rare[2])
 	local probe = Rules.newMove(house, furniture, BED, 0, 600)
 	local shares, fills = 0, 0
 	local best, worst, worstFill = 0, 1, 1

@@ -10,6 +10,9 @@
 --   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "farm", "hotel") is a function
 --                                  seed's dice → Plan added to KINDS below)
 --   HouseLayout.Recipes            what each room holds: its pieces, how each is placed, the musts and the ★ ones
+--   HouseLayout.Collectibles       8.0: how each collectible (FurnitureLooks.Collectibles, a piece with a rarity) is
+--                                  placed in its room; a house holds Config.Furniture.Collectibles.Count of them besides
+--                                  its Spots (their own dice, never ★; a legendary one in about one house of eight)
 --   HouseLayout.extent(id, turn)   a piece's footprint (X, Z) turned by `turn` degrees (a multiple of 90)
 --   HouseLayout.stuck(plan)        the spots whose piece cannot be carried out of the front door (empty for every plan
 --                                  it makes: it checks this while it lays the pieces out)
@@ -29,7 +32,8 @@
 --   exit                          the front door's inside (EntryUp over the floor): the trigger to leave
 --   spots                         { id, item, room, at, star, turn, variant }: a piece (FurnitureLooks id) standing in a
 --                                 room (its id), `at` its Root's middle (on the floor), turned `turn` degrees about Y
---                                 (its front, -Z, toward the room), `variant` its colours; Stars of them are ★
+--                                 (its front, -Z, toward the room), `variant` its colours; Stars of them are ★ (8.0: a
+--                                 house's collectibles come last in their rooms, their catalogue entries' rarity set)
 --   ceiling, wall, doorHeight     the numbers it was laid out with (Config.Furniture)
 --   faces                         { room, min, max, normal, outer, header }: the walls as slabs, one per room side
 --                                 piece (a shared wall is two, one for each room's wallpaper), cut at the doorways;
@@ -431,6 +435,24 @@ local RECIPES: { [string]: { Entry } } = {
 	},
 }
 HouseLayout.Recipes = RECIPES
+-- 8.0 collectibles (FurnitureLooks.Collectibles: the rare pieces, Config.Furniture.Collectibles the dice): how each
+-- stands in its room (the room its catalogue entry names); a "beside" one whose ref is not there, or finds no place by
+-- it, stands at any wall
+local COLLECTIBLES: { Entry } = {
+	{ item = "bowling_trophy", how = "wall" },
+	{ item = "vintage_radio", how = "wall" },
+	{ item = "old_globe", how = "corner" },
+	{ item = "stag_head", how = "wall" },
+	{ item = "gold_record", how = "wall" },
+	{ item = "ship_bottle", how = "beside", ref = "desk" },
+	{ item = "jewellery_box", how = "beside", ref = "dresser" },
+	{ item = "antique_vase", how = "corner" },
+	{ item = "arcade_cabinet", how = "wall" },
+	{ item = "jukebox", how = "wall" },
+	{ item = "oil_painting", how = "wall" },
+	{ item = "knight_armour", how = "corner" },
+}
+HouseLayout.Collectibles = COLLECTIBLES
 -- the rooms in the order they are furnished (and their spots numbered)
 local FURNISH = { "living", "kitchen", "bedroom", "kids", "bath", "garage", "hall" }
 -- where a filler box goes when a house is short of pieces
@@ -1218,6 +1240,105 @@ local function planHouse(seed: number): Plan
 			if not p.star then
 				p.star = true
 				stars += 1
+			end
+		end
+	end
+
+	-- 8.0 collectibles: Collectibles.Count of the rare pieces, after the house's own pieces and its ★ (those stay as they
+	-- were; a collectible is never ★), on their own dice: a legendary one in about one house of eight (Legendary), the
+	-- others' rarities by their Odds; each in its own room, none twice. A piece that finds no place there (or whose
+	-- place would keep a piece from getting out) gives way to another of its rarity, else of the rarity below.
+	do
+		local rules = T.Collectibles
+		local rarities = FurnitureLooks.Rarities
+		local dice = newRng(seed + rules.Salt)
+		local want = dice.int(rules.Count[1], rules.Count[2])
+		local tiers: { string } = {}
+		if dice.num() < rules.Legendary then
+			table.insert(tiers, "legendary")
+		end
+		local total = 0
+		for _, rarity in rarities do
+			total += rules.Odds[rarity] or 0
+		end
+		while #tiers < want do
+			local roll = dice.num() * total
+			local got = rarities[1]
+			for _, rarity in rarities do
+				local odds = rules.Odds[rarity] or 0
+				if odds > 0 then
+					got = rarity
+					if roll < odds then
+						break
+					end
+					roll -= odds
+				end
+			end
+			table.insert(tiers, got)
+		end
+		-- the pieces of each rarity, in an order of the dice
+		local byRarity: { [string]: { Entry } } = {}
+		for _, rarity in rarities do
+			local list: { Entry } = {}
+			for _, e in COLLECTIBLES do
+				if FurnitureLooks.Items[e.item].rarity == rarity then
+					table.insert(list, e)
+				end
+			end
+			shuffle(list, dice)
+			byRarity[rarity] = list
+		end
+		local tried: { [string]: boolean } = {}
+		local count = 0
+		-- in its room as it stands there (else at a wall), somewhere every piece still gets out from
+		local function put(e: Entry): boolean
+			tried[e.item] = true
+			local room = FurnitureLooks.Items[e.item].room
+			local ways: { Entry } = { e }
+			if e.how ~= "wall" then
+				table.insert(ways, { item = e.item, how = "wall" })
+			end
+			for _, way in ways do
+				for _ = 1, 3 do
+					local p = place(room, way, false, false)
+					if not p then
+						break
+					end
+					if #stuckNow() == 0 then
+						count += 1
+						return true
+					end
+					table.remove(placed, table.find(placed, p) :: number)
+					local key = room .. "/" .. e.item
+					banned[key] = banned[key] or {}
+					table.insert(banned[key], p.rect)
+				end
+			end
+			return false
+		end
+		for _, tier in tiers do
+			local done = false
+			for level = table.find(rarities, tier) :: number, 1, -1 do
+				for _, e in byRarity[rarities[level]] do
+					if not tried[e.item] and put(e) then
+						done = true
+						break
+					end
+				end
+				if done then
+					break
+				end
+			end
+		end
+		-- (too few that fit: any other but a legendary one, the commonest first)
+		for _, rarity in rarities do
+			for _, e in byRarity[rarity] do
+				if count >= rules.Count[1] or rarity == "legendary" then
+					break
+				end
+				if not tried[e.item] then
+					put(e)
+				end
 			end
 		end
 	end
