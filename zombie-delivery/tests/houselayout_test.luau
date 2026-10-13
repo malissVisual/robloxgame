@@ -4,7 +4,9 @@
 -- a ceiling about 12 up; 18-24 pieces, each in its room (from the room's recipe), on the floor, none overlapping another
 -- or a fixture or standing in a doorway's way, exactly 3 ★ (the sentimental ones first); every piece can be carried
 -- out of the front door (a grid walk of this test's own, the piece's narrow side wide, past everything else); the
--- seeds give different houses (mirrored, other room orders, other pieces and places).
+-- seeds give different houses (mirrored, other room orders, other pieces and places). 7.x alpine: the Kachelofen on the
+-- living room's outer wall, the kitchen's corner bench and its corner shelf, the antlers and pictures high on the walls
+-- clear of windows and doorways, the alpine pieces drawn, and Marge's House (seed 1955) keeping its story's ★.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -23,9 +25,11 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local T = Config.Furniture
+local A = T.Alpine
 local Items = FurnitureLooks.Items
 local SEEDS = 40 -- every check
 local WALKS = 12 -- the grid walk (the slow one) on this many of them
+local alpineDrawn: { [string]: number } = {} -- (7.x: how often each piece came into a house)
 
 type Rect = { x0: number, z0: number, x1: number, z1: number }
 local function rect(x0: number, z0: number, x1: number, z1: number): Rect
@@ -441,6 +445,129 @@ for seed = 1, SEEDS do
 	end
 	check(`{tag}: the kitchen, bathroom and garage fixtures are there`, kindsSeen.counter and kindsSeen.stove and kindsSeen.sink and kindsSeen.tub
 		and kindsSeen.toilet and kindsSeen.basin and kindsSeen.workbench and kindsSeen.garage_door and kindsSeen.rug == true)
+
+	-- 7.x alpine: the Kachelofen against the living room's outer side wall; the kitchen's corner bench in its back outer
+	-- corner (both legs on the back wall, the long one on the outer wall too) and the corner shelf right in that corner
+	local function of(kind: string): { any }
+		local out = {}
+		for _, f in plan.fixtures do
+			if f.kind == kind then
+				table.insert(out, f)
+			end
+		end
+		return out
+	end
+	local living, kitchen = byId.living, byId.kitchen
+	local outerX = function(r: Rect, room: any): boolean -- on the room's side wall that is the house's outside
+		return (math.abs(r.x0 - room.min.X) < 1e-6 and math.abs(room.min.X - plan.min.X - plan.wall) < 1e-6)
+			or (math.abs(r.x1 - room.max.X) < 1e-6 and math.abs(room.max.X - plan.max.X + plan.wall) < 1e-6)
+	end
+	local stoves = of("kachelofen")
+	check(`{tag}: the Kachelofen against the living room's outer side wall`, #stoves == 1 and stoves[1].room == "living" and stoves[1].solid
+		and outerX(fixtureRect(stoves[1]), living) and math.abs(stoves[1].size.Y - A.Stove[2]) < 1e-6)
+	local long, short, shelves = of("corner_bench"), of("bench"), of("corner_shelf")
+	local benchOk = #long == 1 and #short == 1 and #shelves == 1 and long[1].room == "kitchen" and short[1].room == "kitchen" and long[1].solid and short[1].solid
+	if benchOk then
+		local a, b = fixtureRect(long[1]), fixtureRect(short[1])
+		benchOk = outerX(a, kitchen) and math.abs(a.z1 - kitchen.max.Z) < 1e-6 and math.abs(b.z1 - kitchen.max.Z) < 1e-6
+			and apart(a, b) < 1e-6 and apart(a, b) > -1e-6 -- (the legs meet)
+		-- the shelf's corner (its frame's +X, +Z) in the bench's corner, over it, not in the way
+		local s = shelves[1]
+		local corner = (s.at * M.CFrame.new(s.size.X / 2, 0, s.size.Z / 2)).Position
+		local cx = if math.abs(a.x0 - kitchen.min.X) < 1e-6 then kitchen.min.X else kitchen.max.X
+		benchOk = benchOk and not s.solid and math.abs(corner.X - cx) < 1e-6 and math.abs(corner.Z - kitchen.max.Z) < 1e-6
+			and math.abs(corner.Y - A.Shelf[2]) < 1e-6 and A.Shelf[2] > long[1].size.Y
+	end
+	check(`{tag}: the corner bench in the kitchen's back outer corner, the Herrgottswinkel's shelf over its corner`, benchOk)
+
+	-- the wall decor: the antlers in the living room, a picture in the hall and in the bedroom; high on a wall of its
+	-- room (over every piece), clear of the windows and the doorways on that wall
+	local decorOk, decorWhy = true, {}
+	for _, want in { { "antlers", "living" }, { "picture", "hall" }, { "picture", "bedroom" } } do
+		local found = nil
+		for _, f in of(want[1]) do
+			if f.room == want[2] then
+				found = f
+			end
+		end
+		if not found then
+			decorOk = false
+			table.insert(decorWhy, `no {want[1]} in the {want[2]}`)
+			continue
+		end
+		local f = found
+		local room = byId[f.room]
+		local p = f.at.Position
+		local turn = f.turn % 360
+		local alongX = turn % 180 == 0
+		-- the wall behind it: N (turn 0: back +Z), S (180), W (270), E (90)
+		local back = if turn == 0 then room.max.Z elseif turn == 180 then room.min.Z elseif turn == 270 then room.min.X else room.max.X
+		local t0, t1 = (if alongX then p.X else p.Z) - f.size.X / 2, (if alongX then p.X else p.Z) + f.size.X / 2
+		local r = fixtureRect(f)
+		local onWall = if turn == 0 then math.abs(r.z1 - back) < 1e-6 elseif turn == 180 then math.abs(r.z0 - back) < 1e-6
+			elseif turn == 270 then math.abs(r.x0 - back) < 1e-6 else math.abs(r.x1 - back) < 1e-6
+		local inSpan = if alongX then t0 >= room.min.X - 1e-6 and t1 <= room.max.X + 1e-6 else t0 >= room.min.Z - 1e-6 and t1 <= room.max.Z + 1e-6
+		if f.solid or not onWall or not inSpan or math.abs(p.Y - A.Decor) > 1e-6 then
+			decorOk = false
+			table.insert(decorWhy, `{want[1]} in the {want[2]} not high on its wall`)
+		end
+		for _, w in plan.windows do
+			local sameWall = (alongX and math.abs(w.normal.X) < 0.5 and math.abs(w.at.Z - back) < 1e-6) or (not alongX and math.abs(w.normal.Z) < 0.5 and math.abs(w.at.X - back) < 1e-6)
+			local wt = if alongX then w.at.X else w.at.Z
+			if sameWall and t1 > wt - w.width / 2 and t0 < wt + w.width / 2 and w.at.Y + w.height / 2 > A.Decor then
+				decorOk = false
+				table.insert(decorWhy, `{want[1]} over a window in the {want[2]}`)
+			end
+		end
+		for _, d in plan.doors do
+			local sameWall = (alongX and d.axis == "X" and math.abs(d.at.Z - back) <= plan.wall / 2 + 1e-6) or (not alongX and d.axis == "Z" and math.abs(d.at.X - back) <= plan.wall / 2 + 1e-6)
+			local dt = if alongX then d.at.X else d.at.Z
+			if sameWall and t1 > dt - d.width / 2 - 0.4 and t0 < dt + d.width / 2 + 0.4 then
+				decorOk = false
+				table.insert(decorWhy, `{want[1]} over a doorway in the {want[2]}`)
+			end
+		end
+	end
+	check(`{tag}: the antlers and the pictures high on their walls, clear of the windows and doorways`, decorOk, table.concat(decorWhy, "; "))
+	for _, s in plan.spots do
+		alpineDrawn[s.item] = (alpineDrawn[s.item] or 0) + 1
+	end
+	if seed == 1 then
+		-- (a plan's dice are its own: the decor's are apart, the same seed always hangs them the same: the signature)
+		check("the wall decor is in the plan's signature (the same seed hangs it the same)", string.find(signature(plan), "antlers", 1, true) ~= nil)
+	end
+end
+
+-- 7.x alpine: the decor hangs over the tallest piece and under the beams; the chalet's pieces come into the houses;
+-- Marge's House (Config.Moving.Contracts' seed) keeps the ★ its story names: the clock, the record player, the rocking
+-- horse (shared/MoveStory.luau)
+do
+	local tallest = 0
+	for _, def in Items do
+		tallest = math.max(tallest, def.size.Y)
+	end
+	check(`the wall decor over every piece (from {A.Decor}, the tallest {tallest}) and under the beams`, A.Decor > tallest
+		and A.Decor + math.max(A.Picture[2], A.Antlers[2]) <= T.Ceiling - A.Beam)
+	local alpine = { "cuckoo_clock", "accordion", "heart_chair", "stein_crate", "painted_cupboard", "carved_chest", "edelweiss_frame", "ski_bundle" }
+	local total, missing = 0, {}
+	for _, id in alpine do
+		total += alpineDrawn[id] or 0
+		if not alpineDrawn[id] then
+			table.insert(missing, id)
+		end
+	end
+	check(`the alpine pieces come into the houses ({string.format("%.2f", total / SEEDS)} a house; every one in some)`, total / SEEDS >= 1 and #missing == 0,
+		table.concat(missing, ", "))
+	local marge = Config.Moving.Contracts[1]
+	local plan = HouseLayout.plan(marge.seed, marge.kind)
+	local stars = {}
+	for _, s in plan.spots do
+		if s.star then
+			table.insert(stars, s.item)
+		end
+	end
+	table.sort(stars)
+	check(`Marge's House (seed {marge.seed}): its ★ are the story's ({table.concat(stars, ", ")})`, table.concat(stars, ",") == "grandfather_clock,record_player,rocking_horse")
 end
 
 local function count(t: { [any]: boolean }): number

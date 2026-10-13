@@ -38,14 +38,15 @@
 --              gun shop's old building on block (-1, 0) an ordinary one (Map.FormerGunShop)
 --   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn;
 --              6.12.2: it and Last Stop Supplies (Map.Shops.supplies) are the two counters of the gear stall there
---              (Config.GearStall); 6.12.15: Last Stop's old building on block (0, -1) is gone, the Lantern Garden
---              stands there (Map.Garden)
+--              (Config.GearStall); 6.12.15: Last Stop's old building on block (0, -1) is gone (7.1: the Hauptplatz
+--              stands there, Map.Square)
 --   Park       (6.11) the Central Park (Map.Park, server/CentralPark.luau): the pond with its island and fountain, the
 --              paths, trees, flowerbeds, benches, lamps and a gazebo, on the middle block in the safe zone
---   Garden     (6.12.15) the Lantern Garden north of it on block (0, -1) (Map.Garden, server/LanternGarden.luau): a
---              Japanese-style garden (cherry trees, a koi pond with a waterfall, stone lanterns, a tea pavilion, raked
---              gravel, bamboo), joined to the park by a wooden footbridge over Bone St (Map.Footbridge,
---              server/Footbridge.luau) with a ramp down into each park
+--   Square     (7.1, the Alps step 1) the Hauptplatz north of it on block (0, -1) (Map.Square, server/Hauptplatz.luau):
+--              an Austrian town square (cobbles, a fountain under a stone column, the striped maypole, the Gasthof
+--              Edelweiss with café tables in front, flower boxes, benches, gas-style lamps) where 6.12.15's garden
+--              stood, joined to the park by the timber footbridge over Bone St (Map.Footbridge, server/Footbridge.luau)
+--              with a ramp down onto each block
 --   Gas       (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
 --   Places     (5.3) what stands on every lot of the ordinary Downtown and Suburbs blocks (Map.lots, seeded: towers,
 --              lawns, parking, houses ...), the storefronts the businesses work from (Map.Venues: Luigi's Pizza, the
@@ -195,7 +196,7 @@ Map.SpecialBlocks = {
 		["1,0"] = "dealer",
 		["-1,0"] = "guns", -- (6.12.14: Lead & Co.'s old building, no shop any more: Map.FormerGunShop; the block stays special)
 		["0,1"] = "mechanic",
-		["0,-1"] = "garden", -- 6.12.15: the Lantern Garden (Map.Garden), where Last Stop Supplies' old building stood (6.12.2)
+		["0,-1"] = "square", -- 7.1: the Hauptplatz (Map.Square), where Last Stop Supplies' old building stood (6.12.2)
 		["2,1"] = "movers",
 		["1,-2"] = "bank", -- First Zombie Bank: its front on 6th Ave, just out of the safe zone
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
@@ -309,30 +310,32 @@ function Map.inPond(x: number, y: number, z: number): boolean
 	return y < Map.WalkTop and dx <= park.pond and dz <= park.pond and (dx + dz) <= park.pond * math.sqrt(2)
 end
 
--- 6.12.15, the Lantern Garden (the owner: "make the park a bit bigger: a wooden bridge to another park, its own
--- style"): a Japanese-style garden on Downtown block (0, -1) north of the Central Park, where Last Stop Supplies' old
--- building stood (6.12.2). server/LanternGarden.luau builds it, client/MapView.luau draws it; the footbridge over Bone St
--- joins it to the park (Map.Footbridge). Its layout in studs from the block's middle: u east (x), v south (z), the lawn
--- inside the sidewalk band (`walk` wide, as the park's: the people's walk line stays on it, nothing of the garden there):
---   pond      the koi pond: discs of water (u, v, r) that run into each other, shallow (`water` over the walk, not
---             deeper than a step: no swimming, no Map.inPond), rocks round its shore, koi and lotus pads
---   waterfall the rock pile on the pond's north shore, its water falling into the pond
---   stones    the stepping stones across the pond: from (u, v0) to (u, v1), `count` of them
---   planks    the zig-zag plank bridge across its east lobe: from (u, v0) to (u, v1), three planks
---   pavilion  the open tea pavilion with its curved roof (its middle, its floor's side), its step to the south
---   gravel    the raked gravel (a box) and its big stones (rocks: u, v, size)
---   lanterns  the stone lanterns (tall ones and low "snow-viewing" ones), `lit`: a real light at night too
---   cherries  the cherry trees in blossom; bamboo: the clumps; shrubs: the clipped azaleas (u, v, size)
+-- 7.1, the Hauptplatz (the Alps, step 1; the owner: "leave everything, only the Japanese part goes ... Austria, mountains,
+-- and lovely little houses where the players live, a little village"): an Austrian town square on Downtown block (0, -1)
+-- north of the Central Park, where 6.12.15's garden stood (and Last Stop Supplies' old building before it, 6.12.2).
+-- server/Hauptplatz.luau builds it, client/MapView.luau draws it; the timber footbridge over Bone St joins it to the park
+-- (Map.Footbridge: its ramp comes down along the square's south and west edges, over a green strip). Its layout in studs
+-- from the block's middle: u east (x), v south (z), inside the sidewalk band (`walk` wide, as the park's: the people's
+-- walk line stays on it, nothing of the square there):
+--   paths     the cobbles (boxes u0, v0, u1, v1): the square itself, its north-west corner down to the footbridge's foot
+--             and its south-east corner in from the south sidewalk past the ramp; never under a ramp where it is low
+--   greens    the green strip under the ramp (boxes): grass, the planted bed under its low part, its timber bents
+--   fountain  the stone fountain (its middle, its basin's radius `r`, its solid rim `rim` high with the water just under
+--             its top: not a pond, nobody swims or sinks) under a stone column whose figure's top is `column` over the walk
+--   maypole   the striped maypole (its foot, its height to the fir crown)
+--   gasthof   the Gasthof Edelweiss (its walls' box, `height` to the eaves): its front to the square (south, +v) with the
+--             door in the middle, the café tables in front of it (the Schanigarten)
+--   tables    the café tables under their umbrellas (u, v)
 --   benches   (u, v) and the way they face (du, dv)
---   basin     the stone wash basin by the pavilion
---   paths     the gravel paths (boxes u0, v0, u1, v1)
---   gates     the four entrances (the middle of the gate on the hedge's line, the way out to the street); the hedge
---             runs along the lawn's edge (`hedge` in from it to its middle) between them, not under the footbridge's ramp
---   seed      the garden's own dice (the rocks' and the trees' looks): the world's random numbers are not touched
-export type GardenDisc = { u: number, v: number, r: number }
-export type GardenSpot = { u: number, v: number, size: number? }
-export type GardenBox = { u0: number, v0: number, u1: number, v1: number }
-export type Garden = {
+--   lamps     the gas-style street lamps (u, v), `lit`: a real light at night too
+--   planters  the long wooden flower troughs with red geraniums (their middle; `alongU`: their length runs along u)
+--   trees     the linden trees (u, v, the crown's size)
+--   signs     the HAUPTPLATZ · SAFE ZONE boards on their posts (u, v by the lawn's edge, the way out to the street)
+--   seed      the square's own dice (the cobbles' shades, the trees, the café chairs): the world's random numbers are not
+--             touched
+export type SquareSpot = { u: number, v: number, size: number? }
+export type SquareBox = { u0: number, v0: number, u1: number, v1: number }
+export type Square = {
 	id: string,
 	name: string,
 	i: number,
@@ -340,115 +343,87 @@ export type Garden = {
 	x: number,
 	z: number,
 	walk: number,
-	hedge: number,
 	seed: number,
-	pond: { GardenDisc },
-	water: number,
-	waterfall: GardenSpot,
-	stones: { u: number, v0: number, v1: number, count: number },
-	planks: { u: number, v0: number, v1: number },
-	pavilion: { u: number, v: number, size: number },
-	gravel: GardenBox,
-	rocks: { GardenSpot },
-	lanterns: { { u: number, v: number, kind: string, lit: boolean } },
-	cherries: { GardenSpot },
-	bamboo: { GardenSpot },
-	shrubs: { GardenSpot },
+	paths: { SquareBox },
+	greens: { SquareBox },
+	fountain: { u: number, v: number, r: number, rim: number, column: number },
+	maypole: { u: number, v: number, height: number },
+	gasthof: { u0: number, v0: number, u1: number, v1: number, height: number, name: string },
+	tables: { SquareSpot },
 	benches: { { u: number, v: number, du: number, dv: number } },
-	basin: GardenSpot,
-	paths: { GardenBox },
-	gates: { { u: number, v: number, nu: number, nv: number } },
+	lamps: { { u: number, v: number, lit: boolean } },
+	planters: { { u: number, v: number, alongU: boolean, length: number } },
+	trees: { SquareSpot },
+	signs: { { u: number, v: number, nu: number, nv: number } },
 }
-Map.Garden = {
-	id = "garden",
-	name = "Lantern Garden",
+Map.Square = {
+	id = "square",
+	name = "Hauptplatz",
 	i = 0,
 	j = -1,
 	x = 0,
 	z = -CELL,
 	walk = 10,
-	hedge = 0.6,
-	seed = Config.City.Seed + 61214,
-	pond = { { u = -2, v = -1, r = 10 }, { u = 13, v = 4, r = 7 }, { u = -14, v = 6, r = 5.5 } },
-	water = 0.5,
-	waterfall = { u = 4, v = -12.5 },
-	stones = { u = -8, v0 = 8, v1 = -10, count = 7 },
-	planks = { u = 13, v0 = 12, v1 = -4 },
-	pavilion = { u = 18, v = -32, size = 12 },
-	gravel = { u0 = -38, v0 = -41, u1 = -12, v1 = -26 },
-	rocks = { { u = -31, v = -34, size = 3.2 }, { u = -20.5, v = -30.5, size = 2.2 }, { u = -16, v = -37, size = 1.8 } },
-	lanterns = {
-		{ u = 34, v = 40, kind = "tall", lit = true }, -- by the south gate
-		{ u = 37, v = -11, kind = "tall", lit = false }, -- the east gate
-		{ u = -1, v = -40, kind = "tall", lit = false }, -- the north gate
-		{ u = -40, v = -15, kind = "tall", lit = false }, -- the west gate
-		{ u = 2, v = 12.5, kind = "low", lit = true }, -- the pond's south shore
-		{ u = 23, v = 2, kind = "low", lit = false }, -- its east shore
-		{ u = 13, v = -24, kind = "tall", lit = true }, -- the pavilion's step
-		{ u = -30.5, v = 6, kind = "tall", lit = true }, -- by the foot of the footbridge's ramp (6.12.16: off its wider walkway)
-		{ u = -10, v = -29, kind = "tall", lit = false }, -- the raked gravel
-		{ u = -3, v = -14.5, kind = "low", lit = false }, -- by the waterfall
-	},
-	-- (6.12.16: the three by the footbridge's wider, curved ramp moved: off its west run and out from under its south run)
-	cherries = { { u = -17.5, v = -11 }, { u = -14, v = 24.5 }, { u = 7, v = 24.5 }, { u = 38, v = 32 }, { u = 38, v = -18 }, { u = 4, v = -32 }, { u = -35, v = -8 } },
-	bamboo = { { u = 36, v = -37 }, { u = 28, v = -41 }, { u = -41.5, v = -30 }, { u = -41.5, v = -39 }, { u = 41, v = 10 }, { u = 41, v = 20 } },
-	shrubs = {
-		{ u = -18, v = -7, size = 2.6 },
-		{ u = 18, v = -8, size = 2.4 },
-		{ u = 24, v = 12, size = 2.6 },
-		{ u = -20, v = 14, size = 2.4 },
-		{ u = 8, v = 14.5, size = 2.2 },
-		{ u = -14, v = -15, size = 2.4 },
-		{ u = 34, v = -28, size = 2.8 },
-		{ u = -21, v = 28, size = 2.6 },
-		{ u = 18, v = 31, size = 2.4 },
-		{ u = 9, v = -41, size = 2.6 },
-	},
-	benches = { { u = -1, v = 16, du = 0, dv = -1 }, { u = 20, v = -14, du = 0, dv = 1 }, { u = -26, v = -24, du = 0, dv = -1 }, { u = 33, v = 6, du = -1, dv = 0 } },
-	basin = { u = 23, v = -24 },
+	seed = Config.City.Seed + 71,
 	paths = {
-		{ u0 = -44.4, v0 = -22, u1 = 31, v1 = -18 }, -- the loop round the pond: north (on to the west gate) …
-		{ u0 = 27, v0 = -22, u1 = 31, v1 = 44.4 }, -- … east (on to the south gate) …
-		{ u0 = -27, v0 = 18, u1 = 31, v1 = 22 }, -- … south …
-		{ u0 = -27, v0 = -22, u1 = -23, v1 = 22 }, -- … west
-		{ u0 = -44, v0 = -2, u1 = -23, v1 = 2 }, -- from the foot of the footbridge's ramp
-		{ u0 = -8, v0 = -44.4, u1 = -4, v1 = -22 }, -- from the north gate
-		{ u0 = 31, v0 = -8, u1 = 44.4, v1 = -4 }, -- from the east gate
-		{ u0 = 16, v0 = -26, u1 = 20, v1 = -22 }, -- to the pavilion's step
-		{ u0 = -10, v0 = 11.5, u1 = -6, v1 = 18 }, -- to the stepping stones from the south …
-		{ u0 = -10, v0 = -18, u1 = -6, v1 = -12 }, -- … and from the north
-		{ u0 = 11, v0 = 13, u1 = 15, v1 = 18 }, -- to the plank bridge from the south …
-		{ u0 = 11, v0 = -18, u1 = 15, v1 = -5.5 }, -- … and from the north
+		{ u0 = -31, v0 = -45, u1 = 45, v1 = 31 }, -- the square
+		{ u0 = -45, v0 = -45, u1 = -31, v1 = 2.6 }, -- its north-west corner, down to the footbridge's foot
+		{ u0 = 22, v0 = 31, u1 = 45, v1 = 45 }, -- its south-east corner, in from the south sidewalk past the ramp
 	},
-	gates = { { u = 29, v = 44.4, nu = 0, nv = 1 }, { u = 44.4, v = -6, nu = 1, nv = 0 }, { u = -6, v = -44.4, nu = 0, nv = -1 }, { u = -44.4, v = -20, nu = -1, nv = 0 } },
-} :: Garden
+	greens = {
+		{ u0 = -45, v0 = 2.6, u1 = -31, v1 = 45 }, -- under the ramp's west run …
+		{ u0 = -31, v0 = 31, u1 = 22, v1 = 45 }, -- … and its south run, where it turns out over the sidewalk
+	},
+	fountain = { u = 6, v = 0, r = 6.5, rim = 1.6, column = 21 },
+	maypole = { u = 32, v = -16, height = 44 },
+	gasthof = { u0 = -16, v0 = -43, u1 = 18, v1 = -33, height = 16, name = "Gasthof Edelweiss" },
+	tables = { { u = -12, v = -26.5 }, { u = -5.5, v = -26.5 }, { u = 7.5, v = -26.5 }, { u = 14, v = -26.5 } },
+	benches = { { u = 6, v = 11, du = 0, dv = -1 }, { u = -6, v = 0, du = 1, dv = 0 }, { u = 18, v = 0, du = -1, dv = 0 }, { u = 32, v = -7, du = 0, dv = -1 } },
+	lamps = {
+		{ u = -24.5, v = -28, lit = true }, -- by the Gasthof's terrace …
+		{ u = 26.5, v = -28, lit = false },
+		{ u = -24, v = 24, lit = true }, -- … the square's south-west …
+		{ u = 40, v = 24, lit = false }, -- … south-east …
+		{ u = 41, v = -4, lit = true }, -- … and east, toward the depot
+	},
+	planters = {
+		{ u = -19.5, v = -27, alongU = false, length = 6 }, -- the terrace's ends
+		{ u = 21.5, v = -27, alongU = false, length = 6 },
+		{ u = -16, v = 27.5, alongU = true, length = 9 }, -- along the green strip
+		{ u = 8, v = 27.5, alongU = true, length = 9 },
+	},
+	trees = { { u = -22, v = 13, size = 9 }, { u = 36, v = 12, size = 9 }, { u = -22, v = -12, size = 8 } },
+	signs = { { u = 43.5, v = -24, nu = 1, nv = 0 }, { u = -43.5, v = -24, nu = -1, nv = 0 }, { u = 32, v = -43.5, nu = 0, nv = -1 }, { u = 34, v = 43.5, nu = 0, nv = 1 } },
+} :: Square
 
--- 6.12.15, the footbridge over Bone St between the Central Park (south) and the Lantern Garden (north), mid-block, far
--- from the junctions, their lights and crosswalks. 6.12.16 (the owner: "good for walking, only I walk through this
--- [a timber of the old arch]. I'd make it wider, for two people at least, and don't be afraid to make it curve a bit"):
--- one curved walkway, `width` wide between the railings, from the park's east path up round the park's north-east
--- corner, along its north lawn, in a soft S over the street and down the garden's south and west edges to its path.
+-- 6.12.15, the footbridge over Bone St between the Central Park (south) and the block north of it (7.1: the Hauptplatz,
+-- Map.Square), mid-block, far from the junctions, their lights and crosswalks. 6.12.16 (the owner: "good for walking,
+-- only I walk through this [a timber of the old arch]. I'd make it wider, for two people at least, and don't be afraid
+-- to make it curve a bit"): one curved walkway, `width` wide between the railings, from the park's east path up round
+-- the park's north-east corner, along its north lawn, in a soft S over the street and down the square's south and west
+-- edges to its cobbles. 7.1: an alpine timber bridge (no more torii or paper lanterns), the same walkway.
 -- server/Footbridge.luau builds it (shared/FootbridgeShape.luau: its pieces), client/MapView.luau draws it.
 --   plan        the park's half from its foot (on the park's east path) to the middle over Bone St: a straight run up
 --               the east lawn, a turn round the north-east corner, a run along the north lawn, a turn (more than a
 --               quarter) out over the sidewalk, and a straight over the road; every turn `radius` and wider on the
---               centre line (a bike rounds it). The garden's half is the park's turned half round the middle (one design).
---   line        the centre line every `step` studs from the park's foot (s = 0) to the garden's (s = length): where it
+--               centre line (a bike rounds it). The square's half is the park's turned half round the middle (one design).
+--   line        the centre line every `step` studs from the park's foot (s = 0) to the square's (s = length): where it
 --               is (x, z), its way (dx, dz), the walking surface's top (y), and the stretch after it: its turn (k: 1 / the
 --               radius, + to the left) and its grade (g, + up the way it runs). Map.footbridgeAt reads it anywhere.
 --   slope       the steepest grade: the curb's (shared/CurbShape.luau, 14°: every person and every vehicle goes up
 --               that), on the centre line and on the inside edge of a turn too (it is shorter there: the centre line
 --               climbs less in a turn)
 --   deck        the walking surface where the bridge first reaches out over a sidewalk (`street`: from there to the
---               same point on the far side it is this high and more, a taiko-bridge `hump` in the middle); `thick` the
+--               same point on the far side it is this high and more, a `hump` in the middle); `thick` the
 --               structure under it there: deck - thick over the walk at least the tallest vehicle (`tallest`: the Box
 --               Truck with the Roof Launcher on it, 12.6; the Freight Truck with its roof rack 12.4, the city bus 9;
 --               tools/vehicle-preview/check_fleet.py builds the whole fleet and holds every one to it) + 3
 --   edge        the railings and the span's girders outside the walkway on each side (the structure is width / 2 +
 --               edge from the centre line); nothing at all stands in the walkway from its surface up to `headroom`
 --               over it
---   gates       where the two vermilion gates (torii) stand, one at each end of the span (at `street`), their posts
---               `gatePost` out from the centre line on outriggers under the deck (nothing of them stands on a sidewalk)
+--   gates       where the two roofed timber portals stand (7.1; the vermilion torii before), one at each end of the span
+--               (at `street`), their posts `gatePost` out from the centre line on outriggers under the deck (nothing of
+--               them stands on a sidewalk)
 --   feet        the bottom of each ramp: where it is and the way down it
 --   low, beds   (6.12.16 review) where a ramp is lower than `low` over the ground under it (its planks `slab` thick),
 --               nothing walkable is under it: from each foot (`beds`: s from … to) a planted bed, closed by clipped
@@ -480,11 +455,11 @@ export type Footbridge = {
 	street: { number },
 	gates: { number },
 	gatePost: number,
-	feet: { park: FootbridgeFoot, garden: FootbridgeFoot },
+	feet: { park: FootbridgeFoot, square: FootbridgeFoot },
 }
 do
-	local park, garden = Map.Park, Map.Garden
-	local lawn = BLOCK / 2 - park.walk -- (the lawn's edge from a park's middle; the garden's walk is as wide)
+	local park, square = Map.Park, Map.Square
+	local lawn = BLOCK / 2 - park.walk -- (the lawn's edge from a park's middle; the square's walk is as wide)
 	local inset = 0.5 -- the structure stays this far inside the lawns
 	local width, edge = 10, 0.65
 	local half = width / 2 + edge
@@ -492,7 +467,7 @@ do
 	local deck, thick = 17.2, 0.5
 	local slab, low = 0.3, 9 -- (the ramps' planks; the headroom under them below which a planted bed fills the ground)
 	local step = 0.25
-	local xm, zm = park.x, (park.z + garden.z) / 2 -- the middle: over Bone St's centre line, mid-block
+	local xm, zm = park.x, (park.z + square.z) / 2 -- the middle: over Bone St's centre line, mid-block
 	local xe = park.x + lawn - inset - half -- the east run's centre line …
 	local zn = park.z - lawn + inset + half -- … the north run's (along the lawn's north edge) …
 	local zf = park.z - 2.6 -- … and the foot: just north of the park's east path (5 wide), on its edge
@@ -620,8 +595,8 @@ do
 		b.y = y
 	end
 	points[1].y = Map.WalkTop
-	-- The whole line: the garden's half is the park's turned half round the middle.
-	-- (a point's grade is the stretch's after it: on the garden's half the park's stretch before it, run down)
+	-- The whole line: the square's half is the park's turned half round the middle.
+	-- (a point's grade is the stretch's after it: on the square's half the park's stretch before it, run down)
 	local line: { FootbridgePoint } = table.clone(points)
 	line[count + 1].g, line[count + 1].k = -points[count].g, -points[count].k
 	for i = count, 1, -1 do
@@ -662,12 +637,12 @@ do
 		gatePost = width / 2 + edge + 0.6,
 		feet = {
 			park = { x = first.x, z = first.z, dx = -first.dx, dz = -first.dz },
-			garden = { x = 2 * xm - first.x, z = 2 * zm - first.z, dx = first.dx, dz = first.dz },
+			square = { x = 2 * xm - first.x, z = 2 * zm - first.z, dx = first.dx, dz = first.dz },
 		},
 	} :: Footbridge
 end
 
--- 6.12.16: the footbridge's centre line at s (0 at the park's foot … Map.Footbridge.length at the garden's): x, the
+-- 6.12.16: the footbridge's centre line at s (0 at the park's foot … Map.Footbridge.length at the square's): x, the
 -- walking surface's top y, z, the way (dx, dz), the turn (k: 1 / the radius, + to the left) and the grade (+ up the
 -- way s runs).
 function Map.footbridgeAt(s: number): (number, number, number, number, number, number, number)
@@ -760,7 +735,7 @@ Map.Shops = {
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
 	guns = { name = "Lead & Co.", x = 0, z = 0, radius = Config.GunRange.Radius }, -- (6.12.14: the range's counter; it stood on block (-1, 0))
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
-	-- 6.12.2: the GEAR counter of the gear stall (its old building on block (0, -1) is gone: 6.12.15, the Lantern Garden)
+	-- 6.12.2: the GEAR counter of the gear stall (its old building on block (0, -1) is gone: 7.1, the Hauptplatz)
 	supplies = {
 		name = "Last Stop Supplies",
 		x = Map.Depot.x + Config.GearStall.X + Config.GearStall.Depth / 2,
@@ -1510,8 +1485,8 @@ local landmarks: { Landmark } = {
 	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (ZDC Bags and Last Stop Supplies). The safe zone." },
 	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
 	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it (Lead & Co.'s range just outside, to the south-west). The depot is across the junction to the north-east." },
-	-- 6.12.15: the Lantern Garden north of the park, over Bone St on the footbridge (Map.Garden).
-	{ id = Map.Garden.id, name = Map.Garden.name, icon = "🏮", x = Map.Garden.x, z = Map.Garden.z, kind = "place", description = "A Japanese garden north of the Central Park, joined to it by a wooden footbridge over Bone St (ramps at both ends: roll over it on a bike): cherry trees in blossom, a koi pond with a waterfall, stone lanterns that glow at night and a tea pavilion. The safe zone." },
+	-- 7.1: the Hauptplatz north of the park, over Bone St on the footbridge (Map.Square).
+	{ id = Map.Square.id, name = Map.Square.name, icon = "⛲", x = Map.Square.x, z = Map.Square.z, kind = "place", description = "The town square north of the Central Park, joined to it by a timber footbridge over Bone St (ramps at both ends: roll over it on a bike): cobbles, a fountain under a stone column, the striped maypole, café tables in front of the Gasthof Edelweiss and red geraniums in every flower box. The safe zone." },
 	-- 6.12.7: one shop for the cars and the bikes (the CARS and BIKES counters; Spoke & Chain's own entry is gone)
 	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4); every car needs a garage slot. And at the BIKES counter, from level 2: bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), faster than walking with more room for the light runs." },
 	-- 6.12.14: Lead & Co.'s range out of the safe zone (the map icon and the GPS at its counter; Map.FormerGunShop: its old building)

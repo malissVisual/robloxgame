@@ -10,7 +10,8 @@
 // 7.0, the moving prototype: draws export.luau's scenes with three.js (render.mjs drives it). renderItem: one piece
 // at a 3/4 angle from its front right; renderHouse: a house from straight above (a floor plan: the walls cut at
 // CutTop, their cut drawn dark) or a 3/4 cutaway (the ceiling off, the walls cut at CutIso), with its ceiling lights,
-// a stand-in player at the entry for scale. Plain colours on the parts, simple canvas textures on the floors.
+// a stand-in player at the entry for scale; renderInside (7.x alpine): the house at eye level from inside. Plain colours
+// on the parts, simple canvas textures on the floors.
 import * as THREE from './three.module.min.js';
 
 const CutTop = 7.6, CutIso = 6.2;
@@ -33,7 +34,7 @@ const unitWedge = (() => {
   g.computeVertexNormals();
   return g;
 })();
-const ROUGH = { SmoothPlastic: 0.45, Plastic: 0.6, Metal: 0.35, Glass: 0.08, Fabric: 0.95, Rubber: 0.9, Leather: 0.6, Wood: 0.75, WoodPlanks: 0.7, Cardboard: 0.9, Neon: 1, Plaster: 0.9, Carpet: 1, CeramicTiles: 0.35, Concrete: 0.9, Brick: 0.9, Marble: 0.25, Slate: 0.8, Grass: 1, Ground: 1 };
+const ROUGH = { SmoothPlastic: 0.45, Plastic: 0.6, Metal: 0.35, Glass: 0.08, Fabric: 0.95, Rubber: 0.9, Leather: 0.6, Wood: 0.75, WoodPlanks: 0.7, Cardboard: 0.9, Neon: 1, Plaster: 0.9, Carpet: 1, CeramicTiles: 0.35, Concrete: 0.9, Brick: 0.9, Marble: 0.25, Slate: 0.8, Grass: 1, Ground: 1, Cobblestone: 0.9, Pebble: 0.95 };
 const METAL = { Metal: 0.5, DiamondPlate: 0.5 };
 const srgb = c => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
 const rgb255 = c => new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
@@ -75,6 +76,19 @@ const TEXTURES = {
   })],
   Carpet: [6, canvasTexture(g => noise(g, '#efefef', 40, 9000))],
   Concrete: [12, canvasTexture(g => noise(g, '#e8e8e8', 50, 5000))],
+  // 7.x the farm: the yard's gravel, the stable's and the path's cobbles, the straw (Grass)
+  Pebble: [8, canvasTexture(g => noise(g, '#ececec', 70, 14000))],
+  Grass: [4, canvasTexture(g => {
+    g.fillStyle = '#e4e4e4'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 900; i++) { const v = Math.floor(200 + rnd() * 55); g.strokeStyle = `rgb(${v},${v},${v})`; g.lineWidth = 2; g.beginPath(); const x = rnd() * 256, y = rnd() * 256; g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 30, y + (rnd() - 0.5) * 30); g.stroke(); }
+  })],
+  Cobblestone: [5, canvasTexture(g => {
+    g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, 256, 256);
+    for (let row = 0; row < 6; row++) for (let k = -1; k < 6; k++) {
+      const v = Math.floor(200 + rnd() * 55); g.fillStyle = `rgb(${v},${v},${v})`;
+      g.beginPath(); g.ellipse(k * 48 + (row % 2) * 24 + 24, row * 43 + 21, 20, 17, 0, 0, Math.PI * 2); g.fill();
+    }
+  })],
   Brick: [4, canvasTexture(g => {
     g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, 256, 256);
     for (let row = 0; row < 8; row++) for (let k = -1; k < 4; k++) {
@@ -166,8 +180,8 @@ window.renderHouse = function (scene0, view, width, height) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x14171c);
   const cutAt = view === 'top' ? CutTop : CutIso;
-  const HIDE = new Set(['Ceiling', 'PorchRoof', 'Lamp', 'Tube']);
-  const CAP = new Set(['Wall', 'PorchWall', 'Chimney', 'GarageDoor', 'Daylight', 'Header']);
+  const HIDE = new Set(['Ceiling', 'PorchRoof', 'Lamp', 'Tube', 'BarnRoof', 'Eave']);
+  const CAP = new Set(['Wall', 'PorchWall', 'Chimney', 'GarageDoor', 'Daylight', 'Header', 'BarnDoor', 'BarnDaylight']);
   for (const p of scene0.parts) {
     if (HIDE.has(p.name)) continue;
     const top = p.position[1] + p.size[1] / 2;
@@ -215,6 +229,28 @@ window.renderHouse = function (scene0, view, width, height) {
     rooms: info.rooms.map(r => ({ id: r.id, at: project((r.min[0] + r.max[0]) / 2, 0.2, (r.min[2] + r.max[2]) / 2) })),
     spots: info.spots.map(s => ({ id: s.id, item: s.item, label: s.label, star: s.star, at: project(s.position[0], s.position[1], s.position[2]) })),
   };
+};
+// 7.x alpine: the house from inside at eye level (the ceiling on, nothing cut): a camera at `eye` looking at `target`,
+// lit by its ceiling lights and a dim warm fill (the windows and the porch glow on their own).
+window.renderInside = function (scene0, eye, target, width, height) {
+  renderer.setSize(width, height);
+  const info = scene0.info;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14171c);
+  for (const p of scene0.parts) scene.add(mesh(p));
+  scene.add(new THREE.HemisphereLight(0xfff0dc, 0x4a3a2c, 0.9));
+  for (const l of info.lights) {
+    if (l.kind !== 'PointLight') continue;
+    const light = new THREE.PointLight(srgb(l.color), l.brightness * 70, l.range * 1.4, 1.6);
+    light.position.set(l.position[0], l.position[1] - 1.2, l.position[2]);
+    scene.add(light);
+  }
+  const camera = new THREE.PerspectiveCamera(66, width / height, 0.2, 400);
+  camera.position.set(eye[0], eye[1], eye[2]);
+  camera.lookAt(target[0], target[1], target[2]);
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  return true;
 };
 window.ready = true;
 </script>

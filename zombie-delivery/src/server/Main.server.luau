@@ -73,6 +73,9 @@ PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 World.build()
+-- 7.1 review: the Alps' terrain fills and forests (thousands of fills) once the server is wired: PLAY and the lighting
+-- never wait for them (the far silhouettes and the pass stand already).
+task.defer(World.buildLate)
 
 local notice = Net.get("Notice")
 local stateRemote = Net.get("State")
@@ -273,6 +276,8 @@ safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental
 safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between the rooftops (the ladders, the rides)
 -- 7.0 prototype, MOVES (design/rework/NAVRH.md): the depot's moving contracts, one house move with its crew. Last: it
 -- wraps the hooks set above (Zombies.hunts, Vehicles.backAllowed, Jobs.returnLent, Vehicles.callCar, the car damage).
+-- 7.1: the moves' furniture in the owner's Blender models: the imported ZDCFurnitureArt leaves the world at once.
+safely("FurnitureMesh", require(Server.FurnitureMesh).start)
 safely("Moving", require(Server.Moving).start)
 print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
 -- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.

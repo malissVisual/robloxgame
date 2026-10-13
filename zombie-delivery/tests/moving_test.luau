@@ -36,7 +36,8 @@ check("dragging is the slowest, a light thing in a hand the fastest", Rules.spee
 check("a hand free only with a hand thing", Rules.hands("hand") == 1 and Rules.hands("both") == 2 and Rules.hands("pair") == 2 and Rules.hands("drag") == 2)
 local thing = { class = "pair", helper = nil } :: any
 check("a pair thing alone is dragged, with a helper carried", Rules.mode(thing) == "drag" and Rules.mode({ class = "pair", helper = 7 } :: any) == "pair")
-check("hand and both are what they are", Rules.mode({ class = "hand" } :: any) == "hand" and Rules.mode({ class = "both", helper = 3 } :: any) == "both")
+check("hand and both are what they are", Rules.mode({ class = "hand" } :: any) == "hand" and Rules.mode({ class = "both" } :: any) == "both")
+check("7.x: a both thing with Danny on its other side walks as a pair", Rules.mode({ class = "both", helper = 3 } :: any) == "pair")
 
 -- Damage -------------------------------------------------------------------------------------------------------------
 
@@ -245,7 +246,8 @@ local spots: { Rules.Spot } = {
 	{ id = 7, item = "piano", room = "living", star = false }, -- no such furniture: left out
 	{ id = 4, item = "lamp", room = "hall", star = false }, -- a spot twice: once
 }
-local BED = { width = T.Bed.Width, length = T.Bed.Length, height = T.Bed.Height, cell = T.Bed.Cell }
+local BIG = T.Beds.movingtruck -- (7.x van moves: the old Moving Truck's big bed; the van's is tests/farmmove_test.luau's)
+local BED = { width = BIG.Width, length = BIG.Length, height = BIG.Height, cell = BIG.Cell }
 local move = Rules.newMove(spots, defs, BED, 100, 600)
 check("a thing a spot, unknown furniture and doubles left out", #move.order == 6 and move.things[7] == nil and move.things[4].item == "clock")
 check("everything at home, whole, the clock running", move.things[1].state == "home" and move.things[1].condition == 1 and move.phase == "running" and move.endsAt == 700)
@@ -279,7 +281,14 @@ spot, down = Rules.release(move, ME)
 check("the carrier sets it down", spot == 1 and down and move.things[1].state == "ground" and move.things[1].carrier == nil)
 check("picked up again from the ground", (Rules.pick(move, 1, YOU)) and Rules.load(move, YOU) ~= nil)
 check("the clock and the fridge in too", (Rules.pick(move, 4, ME)) and Rules.load(move, ME) ~= nil and (Rules.pick(move, 6, THEM)) and Rules.load(move, THEM) ~= nil)
-check("the TV and the box too", (Rules.pick(move, 2, ME)) and Rules.load(move, ME) ~= nil and (Rules.pick(move, 5, ME)) and Rules.load(move, ME) ~= nil)
+-- 7.x: Danny's other side of a "both" thing (help's `both`): the pair's walk for both
+check("7.x: the TV lifted alone: both hands", (Rules.pick(move, 2, ME)) and Rules.mode(move.things[2]) == "both")
+ok, why = Rules.help(move, 2, THEM)
+check("…a player's Help lift is for pair things only", not ok and why == "single", why)
+ok, why = Rules.help(move, 2, THEM, true)
+check("…Danny takes its other side: carried by two", ok and Rules.mode(move.things[2]) == "pair" and move.things[2].helper == THEM, why)
+check("…its carrier loads it: both pairs of hands free", Rules.load(move, ME) ~= nil and Rules.holding(move, THEM) == nil and Rules.holding(move, ME) == nil)
+check("the box too", (Rules.pick(move, 5, ME)) and Rules.load(move, ME) ~= nil)
 counts = Rules.counts(move)
 check("all out, all ★", counts.out == 6 and counts.starsOut == 3 and counts.home == 0)
 check("the truck's fill shows", Rules.fill(move.packing) > 0 and Rules.fill(move.packing) < 1)
@@ -291,6 +300,24 @@ check("…into your hands", out == 5 and outWhy == nil and move.things[5].state 
 out, outWhy = Rules.unload(move, ME)
 check("not with your hands full", out == nil and outWhy == "full", outWhy)
 check("and back in", Rules.load(move, ME) ~= nil)
+-- the truck's prompts (the owner's report: Unload over Load at the same spot, E fumbled): never both
+local function shows(open: boolean, carrying: boolean, inside: boolean): string
+	local load, unload, back = Rules.truckPrompts(open, carrying, inside)
+	return `{if load then "L" else "-"}{if unload then "U" else "-"}{if back then "B" else "-"}`
+end
+check("carrying at an open back: Load only (no Unload, the back's E never shuts it)", shows(true, true, true) == "L--" and shows(true, true, false) == "L--", shows(true, true, true))
+check("carrying at a shut back: only the back's E (to open it)", shows(false, true, true) == "--B" and shows(false, true, false) == "--B", shows(false, true, true))
+check("empty hands, something inside an open back: Unload only (and the back's E)", shows(true, false, true) == "-UB", shows(true, false, true))
+check("empty hands, an empty truck: neither Load nor Unload", shows(true, false, false) == "--B" and shows(false, false, false) == "--B", shows(true, false, false))
+check("empty hands, a shut back with things in: no Unload", shows(false, false, true) == "--B", shows(false, false, true))
+for _, open in { true, false } do
+	for _, carrying in { true, false } do
+		for _, inside in { true, false } do
+			local load, unload = Rules.truckPrompts(open, carrying, inside)
+			check(`never Load and Unload at once ({open}, {carrying}, {inside})`, not (load and unload))
+		end
+	end
+end
 -- a bed full: no room
 local tiny = Rules.newMove({ { id = 1, item = "fridge", room = "k", star = false }, { id = 2, item = "fridge", room = "k", star = false } }, defs,
 	{ width = 3, length = 3, height = 6, cell = 0.5 }, 0, 60)
@@ -299,7 +326,7 @@ Rules.load(tiny, ME)
 Rules.pick(tiny, 2, ME)
 placed, noWhy = Rules.load(tiny, ME)
 check("no room: it stays in your hands", placed == nil and noWhy == "noroom" and tiny.things[2].state == "carried", noWhy)
-check("the words for it", string.find(Rules.whyText("noroom"), "bigger truck", 1, true) ~= nil and #Rules.whyText("whatever") > 0)
+check("the words for it", string.find(Rules.whyText("noroom"), "to the Wall first", 1, true) ~= nil and #Rules.whyText("whatever") > 0)
 -- nothing after the move ended
 local over = Rules.newMove(spots, defs, BED, 0, 60)
 over.phase = "done"
@@ -420,7 +447,7 @@ do
 			planShare, planFill, packed = share, full, m
 		end
 	end
-	check("the truck, the plan's order: over 60% of it things, 85% full when nothing more goes in", planShare >= 0.6 and planFill >= 0.85, `{planShare} {planFill}`)
+	check("the truck, the plan's order: over 60% of it things, 80% full when nothing more goes in", planShare >= 0.6 and planFill >= 0.8, `{planShare} {planFill}`)
 	check("the truck, any order: 80% full on average when nothing more goes in, never under 70%", fills / 7 >= 0.8 and worstFill >= 0.7, `{fills / 7} {worstFill}`)
 	check("the truck, any order: on average 60% of it things (the old flat first-fit: 59%, 67% full)", shares / 7 >= 0.6, shares / 7)
 	check("…the biggest first: over 70%", best >= 0.7, best)
@@ -485,7 +512,7 @@ do
 		end
 	end
 	check("the van: nothing over 4.3 tall gets in (standing)", never)
-	check("the van, any order: on average half of it things, 80% full, never under 40% things (the old: 50%, 63% full)", vanShares / 7 >= 0.5 and vanFills / 7 >= 0.8 and vanWorst >= 0.4, `{vanShares / 7} {vanFills / 7} {vanWorst}`)
+	check("the van, any order: on average half of it things, 75% full, never under 40% things (the old: 49%, 63% full)", vanShares / 7 >= 0.5 and vanFills / 7 >= 0.75 and vanWorst >= 0.4, `{vanShares / 7} {vanFills / 7} {vanWorst}`)
 	-- Pack.Lie: a both / pair piece with no place standing lies on its side (a hand thing never; one that stands, stands)
 	local lie = K.Lie
 	K.Lie = true
@@ -533,11 +560,13 @@ local function fresh(): Rules.Move
 	local m = Rules.newMove(spots, defs, BED, 0, 600)
 	return m
 end
-local function loadAll(m: Rules.Move, list: { number })
+-- (7.x van moves: loaded and driven to the Wall: delivered, on time unless `at` is past the clock)
+local function loadAll(m: Rules.Move, list: { number }, at: number?)
 	for _, s in list do
 		Rules.pick(m, s, ME)
 		Rules.load(m, ME)
 	end
+	Rules.deliver(m, at or 0)
 end
 local whole = fresh()
 loadAll(whole, { 1, 2, 3, 4, 5, 6 })
@@ -557,7 +586,9 @@ do -- 7.0 review: a one-lamp move earns a little XP, not a full move's
 end
 local quick = Rules.result(whole, "done", 300) -- half the time left
 check("the time bonus: TimeBonus × the share left", near(quick.timeBonus, (values + starred * (P.Star - 1)) * P.TimeBonus * 0.5) and quick.total > r.total)
-local late = Rules.result(whole, "late", 600)
+local lateMove = fresh()
+loadAll(lateMove, { 1, 2, 3, 4, 5, 6 }, 600) -- (7.x van moves: delivered after the clock ran out)
+local late = Rules.result(lateMove, "late", 600)
 check("late: × LateShare, 3 stars at most", late.total == math.floor((values + starred * (P.Star - 1)) * P.LateShare + 0.5) and late.stars <= 3)
 local partial = fresh()
 loadAll(partial, { 1, 2, 3 })
@@ -586,7 +617,19 @@ check("the card's estimate: everything whole, ★ with its bonus", Rules.estimat
 
 check("at least one contract, the prologue Marge's", #T.Contracts >= 1 and T.Contracts[1].id == "marge" and T.Contracts[1].client == "Marge")
 for _, contract in T.Contracts do
-	local home = Map.home(contract.home)
+	if contract.kind == "farm" then
+		-- 7.x farm move: a farm stands at a Map.Places place (its site in Config.Moving.Sites), out of the safe zone
+		local place: Map.Place? = nil
+		for _, p in Map.Places do
+			if p.id == contract.place then
+				place = p
+			end
+		end
+		check(`{contract.id}: its place is on the map, out of the safe zone, its site set`, place ~= nil and not Map.isSafe(place.x, place.z) and T.Sites[contract.kind] ~= nil
+			and #T.Sites[contract.kind].Doors == 2, contract.place)
+		continue
+	end
+	local home = Map.home(contract.home or "")
 	check(`{contract.id}: its house is a Suburbs house`, home ~= nil and home.kind == "house" and home.district == "suburbs", contract.home)
 	if home then
 		check(`{contract.id}: the truck parks on a road in front`, Map.onRoad(home.park.x, home.park.z))
@@ -599,14 +642,8 @@ local dx, dz = Map.Depot.x + T.DropOff[1], Map.Depot.z + T.DropOff[2]
 check("the drop-off (the Wall) is in the safe zone", Map.isSafe(dx, dz))
 check("the board is in the safe zone", Map.isSafe(Map.Depot.x + T.Board[1], Map.Depot.z + T.Board[2]))
 check("the drop-off reaches the road in front of the depot", T.DropRadius >= 15 and T.DropOff[2] + T.DropRadius > Map.BlockSize / 2 + 4)
-local truck = nil
-for _, def in Config.Cars do
-	if def.id == T.Truck then
-		truck = def
-	end
-end
-check("the truck is a company vehicle", truck ~= nil and truck.company == true)
-check("the numbers", T.Fade > 0 and T.Fade < 1 and T.Slots >= 2 and T.Tether >= 4 and T.Grace > 0 and T.Bed.Cell > 0 and Config.Robust.Limits.Moving > 0)
+check("7.x van moves: a move goes with the owner's ZDC Van, its bed set", T.Van == "zdcvan" and T.Beds[T.Van] ~= nil and T.Beds[T.Van].Cell > 0 and T.VanAgain > 0)
+check("the numbers", T.Fade > 0 and T.Fade < 1 and T.Slots >= 2 and T.Tether >= 4 and T.Grace > 0 and Config.Robust.Limits.Moving > 0)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

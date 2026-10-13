@@ -21,9 +21,22 @@
 --                                                 ("opening" | "closing" | "shut"): name and pitch, nil: none then
 --   SoundPlan.roofShare(height)                   0 on the street … 1 high up (the rooftop wind)
 --   SoundPlan.ambience(night, height, sheet3)     the ambience loops' volumes: { day, night, roof, hum, wind }
+--
+-- 7.1, the move's sounds (art/audio/sfx4.ogg, Config.Soundscape.Move; client/MoveSounds.luau plays them). `view` is
+-- server/Moving.luau's state of your move (the Moving remote's "state"), `result` its "result".
+--   SoundPlan.moveCues(was, now, clock)           what changed between two states in a row (was: nil before a move's
+--                                                 first; clock: the server's time now) → the cues to play, in order:
+--                                                 move_start, horde_siren, truck_ramp, house_door_creak, truck_load,
+--                                                 glass_break / heavy_drop
+--   SoundPlan.moveItem(view, spot)                the state's piece at `spot` (a table) or nil
+--   SoundPlan.isBox(item)                         is the piece a box (cardboard: its name says Box, or the 📦 icon)
+--   SoundPlan.carryCue(item, up)                  the sound of your hands taking (up) or putting down a piece
+--   SoundPlan.dragged(view, spot)                 is the piece in your hands dragged (two people's, alone, no Mover)
+--   SoundPlan.resultCue(result)                   the end: the Wall's gate when the load got there, else nil
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
+local MoveRoles = require(script.Parent.MoveRoles)
 
 local SoundPlan = {}
 
@@ -162,6 +175,127 @@ function SoundPlan.ambience(night: number, height: number, sheet3: boolean): Mix
 		hum = J.AmbienceDay + (J.AmbienceNight - J.AmbienceDay) * n,
 		wind = J.WindDay + (J.WindNight - J.WindDay) * n + S.RoofStandIn * roof,
 	}
+end
+
+-- ── 7.1: the move's sounds ──────────────────────────────────────────────────
+
+export type Cue = { name: string, volume: number, pitch: number }
+
+local function cueOf(name: string, volume: number, pitch: number?): Cue
+	return { name = name, volume = volume, pitch = pitch or 1 }
+end
+
+-- The state's pieces by their spot (the view comes over the network: anything not a table is skipped).
+local function piecesOf(view: any): { [number]: any }
+	local out: { [number]: any } = {}
+	if type(view) == "table" and type(view.items) == "table" then
+		for _, item in view.items do
+			if type(item) == "table" and type(item.spot) == "number" then
+				out[item.spot] = item
+			end
+		end
+	end
+	return out
+end
+
+function SoundPlan.moveItem(view: any, spot: any): any
+	if type(spot) ~= "number" then
+		return nil
+	end
+	return piecesOf(view)[spot]
+end
+
+function SoundPlan.isBox(item: any): boolean
+	if type(item) ~= "table" then
+		return false
+	end
+	local name = if type(item.name) == "string" then item.name else ""
+	return item.icon == "📦" or string.find(name, "%f[%a]Box%f[%A]") ~= nil
+end
+
+function SoundPlan.carryCue(item: any, up: boolean): Cue
+	local M = S.Move
+	if SoundPlan.isBox(item) then
+		return cueOf("cardboard_box", M.Box, if up then 1 else 0.92)
+	end
+	return if up then cueOf("furniture_pickup", M.Pickup) else cueOf("furniture_putdown", M.PutDown)
+end
+
+function SoundPlan.dragged(view: any, spot: any): boolean
+	local item = SoundPlan.moveItem(view, spot)
+	if not item or item.class ~= "pair" or item.state ~= "carried" then
+		return false
+	end
+	-- (the state names the holders "Carrier + Helper": somebody at the other end lifts it)
+	if type(item.by) == "string" and string.find(item.by, " + ", 1, true) then
+		return false
+	end
+	local team = if type(view.team) == "table" then view.team else nil
+	local role = if team and type(team.role) == "string" then team.role else nil
+	return MoveRoles.holdMode(role, "drag") == "drag" -- (a Mover holds it up alone)
+end
+
+function SoundPlan.moveCues(was: any, now: any, clock: number): { Cue }
+	local M = S.Move
+	local cues: { Cue } = {}
+	if type(now) ~= "table" then
+		return cues -- the move is over (its result card plays the rest)
+	end
+	if type(was) ~= "table" or was.id ~= now.id then
+		-- a new move: the sting, unless it has been running a while (you joined or rejoined in the middle)
+		local seconds, endsAt = tonumber(now.seconds), tonumber(now.endsAt)
+		if seconds and endsAt and seconds - (endsAt - clock) <= M.StartWithin then
+			table.insert(cues, cueOf("move_start", M.Start))
+		end
+		return cues
+	end
+	if now.horde == true and was.horde ~= true then
+		table.insert(cues, cueOf("horde_siren", M.Siren))
+	end
+	if (now.backOpen == true) ~= (was.backOpen == true) then
+		table.insert(cues, cueOf("truck_ramp", M.Ramp, if now.backOpen == true then 1 else M.RampShut))
+	end
+	if (now.inside == true) ~= (was.inside == true) then
+		table.insert(cues, cueOf("house_door_creak", M.Door, if now.inside == true then 1 else M.DoorOut))
+	end
+	-- the pieces: one load and one crash at most a state (the loudest), yours louder than the crew's
+	local before = piecesOf(was)
+	local load = 0
+	local crash: Cue? = nil
+	for spot, item in piecesOf(now) do
+		local old = before[spot]
+		if old then
+			local mine = old.mine == true or item.mine == true
+			if item.state == "truck" and old.state ~= "truck" then
+				load = math.max(load, if mine then M.Load else M.LoadCrew)
+			end
+			local volume = if mine then M.Break else M.BreakCrew
+			if item.broken == true and old.broken ~= true then
+				local name = if item.fragile == true then "glass_break" else "heavy_drop"
+				if not crash or volume > crash.volume or (volume == crash.volume and name == "glass_break") then
+					crash = cueOf(name, volume)
+				end
+			elseif mine and item.state ~= "truck" and (tonumber(old.condition) or 1) - (tonumber(item.condition) or 1) >= M.Jolt then
+				if not crash then
+					crash = cueOf("heavy_drop", M.JoltVolume)
+				end
+			end
+		end
+	end
+	if load > 0 then
+		table.insert(cues, cueOf("truck_load", load))
+	end
+	if crash then
+		table.insert(cues, crash)
+	end
+	return cues
+end
+
+function SoundPlan.resultCue(result: any): Cue?
+	if type(result) == "table" and (result.how == "done" or result.how == "late") then
+		return cueOf("checkpoint_gate", S.Move.Gate)
+	end
+	return nil
 end
 
 return SoundPlan

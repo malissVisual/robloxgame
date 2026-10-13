@@ -3,7 +3,9 @@
 -- room kind, every class, the sentimental ★ pieces, a "pair" piece goes through a doorway end first), and every piece
 -- in every colour builds within its part budget: its Root an invisible box of exactly its size at the origin, the only
 -- part that collides, every other part welded to it, massless, not colliding or queried, nothing anchored, the look
--- inside the box, standing on its floor and filling it (the box is honest), the attributes set.
+-- inside the box, standing on its floor and filling it (the box is honest), the attributes set; 7.x: the eight alpine
+-- pieces as asked and lean. 7.x farm pieces: Walt's farm's block (a bigDoor piece only through the barn doors), every
+-- piece fits the moving truck's bed.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -45,6 +47,9 @@ do
 	for _, room in FurnitureLooks.Rooms do
 		rooms[room] = 0
 	end
+	for _, room in FurnitureLooks.FarmRooms do -- 7.x farm pieces: the farm's own rooms
+		rooms[room] = 0
+	end
 	local classes: { [string]: number } = { hand = 0, both = 0, pair = 0 }
 	local sentimental: { string } = {}
 	for _, id in Order do
@@ -61,7 +66,12 @@ do
 		end
 		-- every piece goes through a doorway (Door wide, DoorHeight tall) end first, with room to spare
 		local narrow = math.min(s.X, s.Z)
-		check(`{id}: fits through a doorway ({narrow} × {s.Y} through {T.Door} × {T.DoorHeight})`, narrow <= T.Door - 0.5 and s.Y <= T.DoorHeight - 1)
+		if def.bigDoor then -- 7.x farm pieces: too wide for a house's doorway (honestly), through the barn doors
+			check(`{id}: a bigDoor piece fits only the barn doors ({narrow} × {s.Y} through {T.Farm.BarnDoor} × {T.Farm.BarnDoorHeight}, not {T.Door})`,
+				narrow > T.Door - 0.5 and narrow <= T.Farm.BarnDoor - 1 and s.Y <= T.Farm.BarnDoorHeight - 1)
+		else
+			check(`{id}: fits through a doorway ({narrow} × {s.Y} through {T.Door} × {T.DoorHeight})`, narrow <= T.Door - 0.5 and s.Y <= T.DoorHeight - 1)
+		end
 		-- a "hand" piece is small and light, a "pair" piece big or heavy
 		if def.class == "hand" then
 			check(`{id}: a hand piece is light (weight ≤ 3)`, def.weight <= 3)
@@ -196,6 +206,90 @@ for _, id in Order do
 		apart = math.abs(d.Magnitude - math.max(s.X, s.Z)) < 1e-6
 	end
 	check(`{id}: {#grips} grips on the box`, #grips == want and onBox and apart)
+end
+
+-- 7.x farm pieces: Walt's farm's block of the catalogue: its pieces (FarmPieces, in catalogue order after the house's),
+-- every one in a farm room or the Stube or kitchen, the four ★ keepsakes, the hay wagon the one bigDoor piece; every
+-- piece fits the moving truck's bed (Config.Moving.Bed: turned 90° about Y at most) and is no taller than it.
+do
+	local farm = FurnitureLooks.FarmPieces
+	local okList, inOrder = #farm >= 14, true
+	local first = table.find(Order, farm[1]) or 0
+	for n, id in farm do
+		okList = okList and Items[id] ~= nil
+		inOrder = inOrder and Order[first + n - 1] == id
+	end
+	check(`the farm's pieces ({#farm}): at least 14, one block of the catalogue, after the house's`, okList and inOrder and first > table.find(Order, "box") :: number)
+	local farmRooms: { [string]: boolean } = { living = true, kitchen = true }
+	for _, room in FurnitureLooks.FarmRooms do
+		farmRooms[room] = true
+	end
+	local stars, big, wrong = {}, {}, {}
+	local bed = Config.Moving.Beds.movingtruck -- (7.x van moves: the old truck's bed; the ZDC Van's smaller one is the packing rework's)
+	for _, id in Order do
+		local def = Items[id]
+		local s = def.size
+		local isFarm = table.find(farm, id) ~= nil
+		if isFarm and not farmRooms[def.room] then
+			table.insert(wrong, `{id} in {def.room}`)
+		end
+		if isFarm and def.sentimental then
+			table.insert(stars, id)
+		end
+		if def.bigDoor then
+			table.insert(big, id)
+		end
+		local fits = (s.X <= bed.Width and s.Z <= bed.Length) or (s.Z <= bed.Width and s.X <= bed.Length)
+		check(`{id}: fits the moving truck's bed ({s.X} × {s.Z}, {s.Y} tall in {bed.Width} × {bed.Length}, {bed.Height})`, fits and s.Y <= bed.Height)
+	end
+	table.sort(stars)
+	check(`the farm's pieces belong in its rooms or the Stube and kitchen`, #wrong == 0, table.concat(wrong, ", "))
+	check(`the farm's ★ keepsakes ({table.concat(stars, ", ")})`, #stars == 4 and table.find(stars, "thunders_saddle") ~= nil
+		and table.find(stars, "branding_iron") ~= nil and table.find(stars, "cowbells") ~= nil and table.find(stars, "grandmas_churn") ~= nil)
+	check(`the hay wagon is the one bigDoor piece ({table.concat(big, ", ")}), a pair piece`, #big == 1 and big[1] == "hay_wagon" and Items.hay_wagon.class == "pair")
+	local function same(a: any, b: any): boolean
+		return a.X == b.X and a.Y == b.Y and a.Z == b.Z
+	end
+	check("a ★ variant is its plain piece's size and class (the saddles, the churns), dearer", same(Items.saddle.size, Items.thunders_saddle.size)
+		and same(Items.milk_churn.size, Items.grandmas_churn.size) and Items.saddle.class == Items.thunders_saddle.class
+		and Items.milk_churn.class == Items.grandmas_churn.class and Items.thunders_saddle.value > Items.saddle.value
+		and Items.grandmas_churn.value > Items.milk_churn.value)
+	for _, id in { "hay_bale", "saddle", "wheelbarrow", "butter_churn", "sled", "beehive", "ladder", "tack_rack" } do
+		check(`{id} is a both-hands piece`, Items[id] ~= nil and Items[id].class == "both")
+	end
+	for _, id in { "milk_churn", "feed_sacks", "cheese_crate", "apple_crate", "cowbells", "branding_iron" } do
+		check(`{id} is a hand piece`, Items[id] ~= nil and Items[id].class == "hand")
+	end
+	for _, id in { "tool_chest", "anvil", "farm_bench", "hay_wagon" } do
+		check(`{id} is a pair piece`, Items[id] ~= nil and Items[id].class == "pair")
+	end
+	check("the anvil is the heaviest there is, the beehive fragile", Items.anvil.weight == 10 and Items.beehive.fragile)
+end
+
+-- 7.x alpine pieces (a chalet's things, the house's recipes draw them): the eight as asked (class, fragile, the two
+-- sentimental ★ candidates, their room) and lean: at most ALPINE_PARTS parts each, so that a house drawing several of
+-- them stays inside its part budget (Config.Furniture.InteriorMaxParts, tests/houseinterior_test.luau).
+do
+	local ALPINE_PARTS = 18
+	local want: { { any } } = {
+		--  id                  class   fragile ★      room
+		{ "cuckoo_clock", "hand", true, true, "living" },
+		{ "accordion", "both", true, true, "living" },
+		{ "heart_chair", "both", false, false, "living" },
+		{ "stein_crate", "hand", true, false, "kitchen" },
+		{ "painted_cupboard", "pair", false, false, "bedroom" },
+		{ "carved_chest", "pair", false, false, "bedroom" },
+		{ "edelweiss_frame", "hand", true, false, "bedroom" },
+		{ "ski_bundle", "both", false, false, "hall" },
+	}
+	for _, w in want do
+		local id = w[1]
+		local def = Items[id]
+		check(`alpine {id}: {w[2]}, fragile {w[3]}, sentimental {w[4]}, in the {w[5]}`, def ~= nil and def.class == w[2] and def.fragile == w[3]
+			and def.sentimental == w[4] and def.room == w[5])
+		local parts = if def then FurnitureLooks.parts(id) else 0
+		check(`alpine {id}: lean ({parts} parts, at most {ALPINE_PARTS})`, parts >= 6 and parts <= ALPINE_PARTS)
+	end
 end
 
 -- An unknown piece is a moving box that still says what was asked for; the part count helper agrees.

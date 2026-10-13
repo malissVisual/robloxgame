@@ -11,11 +11,14 @@ This checks callbacks, construction, current server data, resizing and cleanup, 
 7.0: the moves' story (MoveStoryUi) with its hooks in the real MovingHud (movestory.luau, on missions_mock.luau).
 7.0 review: the move's screen at 844 x 390 (MovingHud, MoveHelperHud, QuickChat, MoveLobbyUi: movehud.luau): nothing on
 the touch buttons or on each other, a finger's sizes, the list a sheet, the keys, ESC, the GPS, a resize.
+7.2: the maps' alpine look (the real MapView with MapStyle and AlpineLayout: mapview.luau on mapmock.luau): built once,
+within Config.MapStyle.Budget, everything there in its order, nothing made frame after frame.
 """
 import argparse
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -136,3 +139,53 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     for name in ("mock.luau", "missions_mock.luau", "movehud.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "movehud.luau"], cwd=dest, check=True)
+
+# 7.0 grip: the carry's grip bar (client/CarryGripUi.luau with shared/CarryGrip.luau) on a phone held sideways
+# (844 x 390) and a computer, beside the move's panel, Danny's strip, the quick chat's button and the HUD's groups where
+# client/Hud.luau puts them (tools/phone-ui/carrygrip.luau): the bar and the round HOLD button (72 px and more) clear of
+# the touch buttons and everything else, HOLD raising the grip box, the reports, SLIPPING! and the slip, the tip, the
+# fade, the mouse button and F on a computer. 7.1 review: the slipped bar kept till the server drops it ("slip" asked again
+# each second), a new bar for the same piece picked up again inside DROPPED!'s moment (no second "slip"), the real
+# client/MoveSounds.luau (grip_slip, no heavy_drop for the slip's damage), three touch screens (844 x 390, 740 x 360,
+# a 1024 x 768 tablet).
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+'''
+    # 7.1 review: client/MoveSounds.luau for real too (the slip's grip_slip, no second thud: carrygrip.luau starts it
+    # with a recording api); it and CarryGripUi on the check's own clock (mock.os: os.clock is carrygrip.luau's M.clock,
+    # moved on by its frames and waits, so the bar's seed and its timings are the same every run)
+    for name in ("CarryGripUi", "MoveSounds", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+        text = (ROOT / f"src/client/{name}.luau").read_text()
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
+        clock = "local os = mock.os or os\n" if name in ("CarryGripUi", "MoveSounds") else ""
+        (dest / f"{name}.luau").write_text(prefix + clock + text)
+    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
+    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "carrygrip.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)
+
+
+# 7.2, the Alps on the maps: the real client/MapView.luau (shared/MapStyle.luau, AlpineLayout, Map, Roads, Explore and
+# the rest of the real shared data) on mapmock.luau's recorder (missions_mock.luau's, the services, the camera, your
+# character, Discovery's grid, DeviceBudget): tools/phone-ui/mapview.luau checks the paper map and the Alps (built once,
+# within Config.MapStyle.Budget, everything there and in its order) and that the frame loop leaves them alone.
+# (mapenv.py builds the folder; mapview_preview.py draws the same map's scenes.)
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mapenv import map_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    map_env(Path(folder))
+    subprocess.run([args.luau, "mapview.luau"], cwd=folder, check=True)

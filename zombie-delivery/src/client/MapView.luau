@@ -30,9 +30,21 @@
 -- 5.8 (the courier phone's look): the big map's frame wears the window header: the ZDC mark, the map glyph and MAP
 -- (Ui.heading), the legend in small type after it, a thin line under it and the square ✕.
 -- 6.11: the Central Park (Map.Park) is the one green block, its pond and island drawn in the middle of the map, CENTRAL
--- PARK under it on the big map; the depot is the block north-east of it (Map.Depot). 6.12.15: the Lantern Garden north
--- of it (Map.Garden) is green too, with its koi pond, LANTERN GARDEN over it on the big map; the footbridge over the
--- street between them and its ramps (Map.Footbridge) are drawn in wood brown over the road.
+-- PARK under it on the big map; the depot is the block north-east of it (Map.Depot). 6.12.15: the footbridge over the
+-- street north of it and its ramps (Map.Footbridge) are drawn in wood brown over the road; 7.1: the Hauptplatz on the
+-- block north of it (Map.Square) is the warm stone of its cobbles with its fountain, HAUPTPLATZ over it on the big map.
+-- 7.2, the Alps on the maps (shared/MapStyle.luau works it out from Map and AlpineLayout, Config.MapStyle has the
+-- numbers and the colours): a paper map. Both maps draw Config.MapStyle.Margin studs round Map.Bounds: the big map the
+-- mountain ring as shaded peaks with their snow caps on the cream paper (each a diamond cut in half by a UIGradient, a
+-- smaller one its cap, a see-through square cut the other way its shadow side), the minimap the same cones from above
+-- (their grassy feet, rock and snow as discs lit from the north-west, on the ring's grass). The valley is green, its
+-- forests rounded bands of tree dots (one TextLabel a row's run of forest squares), its meadows lighter, the river (on
+-- through the ring's gorges) and the lakes blue, the snowfield white, the roads light on a brown edge and the highways
+-- amber, the Hauptplatz with its ⛲, the villages named (Map.Villages; the Altstadt's placeholder over Downtown), and
+-- where the West Pass's road runs into the cliff a ROAD CLOSED marker. The flat ground is drawn with the rest; the
+-- ring, the forests, the meadows, the huts and the pass come once, a moment after the start (AlpineLayout works the
+-- ring and the forest out once on this client, on the start screen, a frame apart), into layers made for them under
+-- the fog. Nothing of it is touched again: the frame loop is as before.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +56,8 @@ local Config = require(Shared.Config)
 local Icons = require(Shared.Icons)
 local Map = require(Shared.Map)
 local Roads = require(Shared.Roads)
+local MapStyle = require(Shared.MapStyle) -- 7.2: the Alps on the maps
+local AlpineLayout = require(Shared.AlpineLayout)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Discovery = require(script.Parent.Discovery)
@@ -53,8 +67,10 @@ local MapView = {}
 
 local player = Players.LocalPlayer
 local B = Map.Bounds
-local WORLD_W = B.x1 - B.x0
-local WORLD_H = B.z1 - B.z0
+local E = MapStyle.extent() -- 7.2: what the maps draw: the bounds and the mountain ring's margin round them
+local WORLD_W = E.x1 - E.x0
+local WORLD_H = E.z1 - E.z0
+local STYLE = Config.MapStyle
 
 local MINI_W, MINI_H = 200, 150 -- the map's window (its thin square line is drawn on its edge)
 local TURN_H = 18 -- the turn line under it
@@ -68,46 +84,71 @@ local LIST_W = 320
 local ROUTE_OFF = 40 -- studs off the route before it is worked out again
 local ROUTE_GAP = 0.5 -- seconds between two routes to the same target
 
--- 3.8: a monochrome map (design/ui-contract/): charcoal land, grey blocks and water, lighter streets on a dark edge,
--- the highways lightest; the job's route and star in the contract red, the GPS in white, both on a charcoal edge.
+-- 3.8: the markers and the routes keep the contract's colours (design/ui-contract/): the job's route and star in the
+-- contract red, the GPS in white, both on a charcoal edge, you a white arrow. 7.2: the map under them is the paper map
+-- (Config.MapStyle.Colors; the 3.8 charcoal map before).
 local K = Theme.Contract
 local P = { -- (the names the drawing below reads)
-	ink = K.text, -- you, the captions, the markers' text
+	ink = K.text, -- you, the markers' text
 	ink2 = K.secondary,
 	paper = K.charcoal, -- the strokes and the shading under the white
 	line = K.line,
 	danger = K.red,
 }
+local function tint(name: string, style: string?): Color3
+	local c = MapStyle.rgb(name, style)
+	return Color3.fromRGB(c[1], c[2], c[3])
+end
 local C = {
-	land = Color3.fromRGB(40, 44, 50),
-	snow = Color3.fromRGB(60, 64, 70),
-	water = Color3.fromRGB(26, 30, 37),
-	shore = Color3.fromRGB(78, 84, 92),
-	ice = Color3.fromRGB(52, 58, 66),
-	yard = Color3.fromRGB(48, 52, 58),
-	special = Color3.fromRGB(66, 70, 76),
-	park = Color3.fromRGB(58, 76, 58), -- 6.11: the Central Park's lawns (Map.Park), the one green block
-	garden = Color3.fromRGB(64, 80, 60), -- 6.12.15: the Lantern Garden's moss (Map.Garden)
-	footbridge = Color3.fromRGB(150, 108, 72), -- 6.12.15: the footbridge and its ramps (Map.Footbridge)
-	roadEdge = Color3.fromRGB(22, 25, 30),
-	road = Color3.fromRGB(132, 138, 146),
-	highway = Color3.fromRGB(176, 181, 188),
-	bridge = Color3.fromRGB(112, 116, 122),
-	iceRoad = Color3.fromRGB(150, 162, 174),
+	paper = tint("Paper"), -- 7.2: the big map's paper round the ring
+	valley = tint("Valley"),
+	slope = tint("Slope"), -- the ring's grass (the minimap's ground round the valley)
+	meadow = tint("Meadow"),
+	forest = tint("Forest"),
+	trees = tint("Trees"),
+	snowForest = tint("SnowForest"),
+	snowTrees = tint("SnowTrees"),
+	snow = tint("Winter"), -- the snowfield
+	rock = tint("Rock"),
+	peakSnow = tint("Snow"), -- the peaks' snow caps
+	shadow = tint("Shadow"),
+	water = tint("Water"),
+	shore = tint("Shore"),
+	ice = tint("Ice"),
+	yard = tint("Yard"),
+	special = tint("Special"),
+	park = tint("Park"), -- 6.11: the Central Park's lawns (Map.Park)
+	square = tint("Square"), -- 7.1: the Hauptplatz's cobbles (Map.Square)
+	footbridge = tint("Footbridge"), -- 6.12.15: the footbridge and its ramps (Map.Footbridge)
+	roadEdge = tint("RoadEdge"),
+	road = tint("Road"),
+	highway = tint("Highway"),
+	bridge = tint("Bridge"),
+	iceRoad = tint("IceRoad"),
+	ink = tint("Ink"), -- the captions (7.2: dark ink on a light halo)
+	inkSoft = tint("InkSoft"),
+	halo = tint("Halo"),
+	closed = tint("Closed"), -- the ROAD CLOSED marker
+	hut = tint("Hut"),
 	safe = K.good,
 	job = K.red, -- the job's route and star: the contract red (the Hud's 3D guide too)
 	gps = K.text, -- the GPS: white (the Hud's GPS guide too)
 	car = K.secondary, -- the car on its way
 	routeEdge = K.charcoal,
-	fog = Color3.fromRGB(12, 14, 17), -- 3.7: what you have not seen yet (near black under the charcoal map)
+	fog = tint("Fog"), -- 3.7: what you have not seen yet
 }
 local FOG_CORE = 0.04 -- the fog's transparency (the roads under it all but hidden)
 local FOG_SOFT = 0.55 -- its soft edge
-local BLOCK_COLORS = {
-	downtown = Color3.fromRGB(58, 62, 69),
-	harbor = Color3.fromRGB(56, 59, 64),
-	suburbs = Color3.fromRGB(54, 59, 60),
-}
+-- 7.2: a UIGradient's see-through half (the peaks' diamonds and their shadow squares are cut in half by it), the
+-- discs' light from the north-west and the foothills' fade, made once.
+local HALF = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 0),
+	NumberSequenceKeypoint.new(0.495, 0),
+	NumberSequenceKeypoint.new(0.505, 1),
+	NumberSequenceKeypoint.new(1, 1),
+})
+local FADE = NumberSequence.new(1, 0)
+local LIGHT = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1 - 2 * STYLE.Relief.Light, 1 - 2 * STYLE.Relief.Light, 1 - 1.6 * STYLE.Relief.Light))
 -- The landmarks' kinds: quiet tints for their discs' line and the list (the icons themselves are white).
 local KIND_COLORS = {
 	shop = Color3.fromRGB(150, 196, 146),
@@ -120,7 +161,23 @@ local KIND_COLORS = {
 type Line = { edges: { any }, fills: { any }, parent: any, color: Color3, width: number, full: number, cut: number }
 -- 3.7: the fog on one canvas: per grid row a pool of frames (a core and its soft edge for every run of fogged cells).
 type Fog = { layer: any, scale: number, feather: number, rows: { [number]: { any } } }
-type Canvas = { content: any, scale: number, markers: any, job: Line, gps: Line, fog: Fog, bus: any? }
+-- 7.2: big (the big map: peaks; the minimap: relief) and the alpine layers filled once (dressAlpine): the meadows and
+-- the huts, the forests (in the ground, under the water), the ring (round the valley) and the glyphs that stay upright
+-- on the turning minimap (upright: the ⛲ on the square, the ROAD CLOSED sign).
+type Canvas = {
+	content: any,
+	scale: number,
+	big: boolean,
+	markers: any,
+	job: Line,
+	gps: Line,
+	fog: Fog,
+	bus: any?,
+	meadows: any,
+	forest: any,
+	ring: any,
+	upright: { any },
+}
 
 -- A route to a goal (the job's target or the GPS point).
 type Route = {
@@ -191,7 +248,7 @@ end
 -- ── Drawing ────────────────────────────────────────────────────────────────
 
 local function point(x: number, z: number, scale: number): UDim2
-	return UDim2.fromOffset((x - B.x0) * scale, (z - B.z0) * scale)
+	return UDim2.fromOffset((x - E.x0) * scale, (z - E.z0) * scale)
 end
 
 local function rect(parent: any, x0: number, z0: number, x1: number, z1: number, scale: number, color: Color3, z: number): any
@@ -216,8 +273,9 @@ local function band(frame: any, ax: number, az: number, bx: number, bz: number, 
 	frame.Rotation = math.deg(math.atan2(dz, dx))
 end
 
-local function caption(parent: any, text: string, x: number, z: number, scale: number, size: number, color: Color3)
-	Ui.make("TextLabel", {
+-- (7.2: dark ink on a light halo, the paper map's captions)
+local function caption(parent: any, text: string, x: number, z: number, scale: number, size: number, color: Color3): any
+	return Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(200, size + 4),
 		Position = point(x, z, scale),
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -226,9 +284,39 @@ local function caption(parent: any, text: string, x: number, z: number, scale: n
 		TextSize = size,
 		Font = Theme.HeadingFont,
 		TextColor3 = color,
-		TextStrokeColor3 = P.paper,
-		TextStrokeTransparency = 0.35,
+		TextStrokeColor3 = C.halo,
+		TextStrokeTransparency = 0.25,
 		ZIndex = 7, -- (under the fog, 8)
+	}, parent)
+end
+
+-- 7.2: a layer of its own (a see-through frame over the whole map) that keeps what is drawn into it together: its
+-- ZIndex places it among the map's layers, the ZIndex of what is in it only among themselves.
+local function sheet(parent: any, name: string, z: number): any
+	return Ui.make("Frame", { Name = name, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = z }, parent)
+end
+
+-- 7.2: a round disc of radius r (studs) round (x, z).
+local function disc(parent: any, x: number, z: number, r: number, scale: number, color: Color3, zIndex: number): any
+	local frame = rect(parent, x - r, z - r, x + r, z + r, scale, color, zIndex)
+	Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, frame)
+	return frame
+end
+
+-- 7.2: a glyph on the map (the ⛲ on the square, the ⛔ at the West Pass), `size` px, under the fog.
+local function glyph(parent: any, text: string, x: number, z: number, scale: number, size: number, color: Color3): any
+	return Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(size, size),
+		Position = point(x, z, scale),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextScaled = true,
+		Font = Enum.Font.GothamBlack,
+		TextColor3 = color,
+		TextStrokeColor3 = C.halo,
+		TextStrokeTransparency = 0.3,
+		ZIndex = 7,
 	}, parent)
 end
 
@@ -361,46 +449,68 @@ end
 
 -- The whole world into a frame at `scale` pixels per stud.
 local function draw(parent: any, scale: number, big: boolean): Canvas
+	local upright: { any } = {}
 	local content = Ui.make("Frame", {
 		Size = UDim2.fromOffset(WORLD_W * scale, WORLD_H * scale),
-		BackgroundColor3 = C.land,
+		BackgroundColor3 = if big then C.paper else C.slope, -- 7.2: the paper round the ring (the minimap: its grass)
 		BorderSizePixel = 0,
 		ZIndex = 1,
 	}, parent)
-	-- Ground, water, winter.
-	rect(content, B.x0, B.z0, Map.River.x0, Map.WinterZ, scale, C.snow, 2)
-	local river = Map.River
-	rect(content, river.x0, B.z0, river.x1, B.z1, scale, C.water, 2)
-	rect(content, Map.Sea.x0, B.z0, B.x1, B.z1, scale, C.water, 2)
-	local shore = math.max(1, 5 * scale)
-	rect(content, river.x0, B.z0, river.x0 + shore / scale, B.z1, scale, C.shore, 2)
-	rect(content, river.x1 - shore / scale, B.z0, river.x1, B.z1, scale, C.shore, 2)
-	rect(content, Map.Sea.x0, B.z0, Map.Sea.x0 + shore / scale, B.z1, scale, C.shore, 2)
-	local lake = Map.Lake
-	rounded(rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, C.ice, 3), math.floor(40 * scale))
-	local m = Map.Mountain
-	-- (white: the gradient gives the colour, lit from the north-west)
-	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.new(1, 1, 1), 3)
-	Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, hill)
-	Ui.make("UIGradient", {
-		Color = ColorSequence.new(Color3.fromRGB(84, 88, 94), Color3.fromRGB(48, 52, 58)),
-		Rotation = 45,
-	}, hill)
+	-- 7.2, the ground (one layer, ZIndex 1, in its own order): the valley, its soft edge into the ring (the big map),
+	-- the snowfield, the meadows and the forests (dressAlpine fills them), the water, the old mountain.
+	local ground = sheet(content, "Ground", 1)
+	rect(ground, B.x0, B.z0, B.x1, B.z1, scale, C.valley, 1).Name = "Valley"
+	if big then
+		-- (four strips of the valley's green fading out over the paper under the ring's feet)
+		local f = STYLE.Foothills
+		for _, strip in { { B.x0 - f, B.z0 - f, B.x1 + f, B.z0, 90 }, { B.x0 - f, B.z1, B.x1 + f, B.z1 + f, -90 }, { B.x0 - f, B.z0, B.x0, B.z1, 0 }, { B.x1, B.z0, B.x1 + f, B.z1, 180 } } do
+			local fade = rect(ground, strip[1], strip[2], strip[3], strip[4], scale, C.valley, 1)
+			Ui.make("UIGradient", { Rotation = strip[5], Transparency = FADE }, fade)
+		end
+	end
+	local winter = MapStyle.winter()
+	local snowfield = MapStyle.winter(E) -- (on into the ring's snowy feet)
+	if snowfield then
+		rect(ground, snowfield.x0, snowfield.z0, snowfield.x1, snowfield.z1, scale, C.snow, 2).Name = "Winter"
+	end
+	local meadows = sheet(ground, "Meadows", 3)
+	local forest = sheet(ground, "Forest", 4)
+	local waters = MapStyle.waters(E)
+	for _, water in waters do
+		local frame = rect(ground, water.x0, water.z0, water.x1, water.z1, scale, if water.kind == "ice" then C.ice else C.water, 5)
+		frame.Name = "Water"
+		if water.round > 0 then
+			Ui.make("UICorner", { CornerRadius = if water.round == math.huge then UDim.new(1, 0) else UDim.new(0, math.floor(water.round * scale)) }, frame)
+		end
+		Ui.make("UIStroke", { Color = C.shore, Thickness = math.max(1, 5 * scale), Transparency = 0.25 }, frame)
+	end
+	-- (the old mountain the North Highway tunnels through, while Map has it: rock lit from the north-west, its snow)
+	local mount = MapStyle.mountain(E)
+	if mount then
+		local hill = disc(ground, mount.x, mount.z, mount.r, scale, C.rock, 6)
+		Ui.make("UIGradient", { Color = LIGHT, Rotation = 45 }, hill)
+		local cap = disc(ground, mount.x - mount.r * 0.08, mount.z - mount.r * 0.08, mount.r * 0.42, scale, C.peakSnow, 7)
+		Ui.make("UIGradient", { Color = LIGHT, Rotation = 45 }, cap)
+	end
+	-- 7.2: the ring round the valley (ZIndex 2, over the ground's edge, under the town): the big map's peaks, the
+	-- minimap's relief (dressAlpine fills it).
+	local ring = sheet(content, if big then "Peaks" else "Relief", 2)
 	for _, yard in Map.Yards do
 		rounded(rect(content, yard.x0, yard.z0, yard.x1, yard.z1, scale, C.yard, 3), math.max(2, math.floor(12 * scale)))
 	end
-	-- Blocks, lavender, sand or sage on the cream ground; the special ones warmer.
+	-- Blocks, warm paper by district style; the special ones warmer, the park green, the square its cobbles.
 	local half = Map.BlockSize / 2
 	local blockRadius = math.max(2, math.floor(8 * scale))
 	for _, d in Map.Districts do
+		local style = tint("Blocks", d.style)
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
 				local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
 				local special = Map.special(d.id, i, j)
 				local color = if special == Map.Park.id then C.park
-					elseif special == Map.Garden.id then C.garden
+					elseif special == Map.Square.id then C.square
 					elseif special then C.special
-					else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
+					else style
 				rounded(rect(content, cx - half, cz - half, cx + half, cz + half, scale, color, 3), blockRadius)
 			end
 		end
@@ -412,12 +522,14 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, park.x - r, park.z - r, park.x + r, park.z + r, scale, C.water, 3))
 		local island = park.island
 		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, park.x - island, park.z - island, park.x + island, park.z + island, scale, C.park, 3))
-		-- 6.12.15: the Lantern Garden's koi pond (its discs), and the footbridge with its ramps over the road (ZIndex 6)
-		local garden = Map.Garden
-		for _, disc in garden.pond do
-			local x, z = garden.x + disc.u, garden.z + disc.v
-			Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, x - disc.r, z - disc.r, x + disc.r, z + disc.r, scale, C.water, 3))
-		end
+		-- 7.1: the Hauptplatz's fountain (Map.Square), and the footbridge with its ramps over the road (ZIndex 6)
+		local square = Map.Square
+		local fx, fz, fr = square.x + square.fountain.u, square.z + square.fountain.v, square.fountain.r
+		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, fx - fr, fz - fr, fx + fr, fz + fr, scale, C.water, 3))
+		-- 7.2: the square's ⛲ (upright on the turning minimap), under the fog and under its landmark's icon
+		local fountain = glyph(content, "⛲", fx, fz, scale, if big then 12 else 18, C.ink)
+		fountain.Name = "Fountain"
+		table.insert(upright, fountain)
 		-- (6.12.16: its curve, chord by chord, 3 studs each, each a hair longer: no gap where the curve turns)
 		local F = Map.Footbridge
 		local every = math.max(1, math.floor(3 / F.step + 0.5))
@@ -452,18 +564,37 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 	local safeHalf = Config.City.SafeHalf
 	local safe = rect(content, -safeHalf, -safeHalf, safeHalf, safeHalf, scale, P.ink, 6)
 	safe.BackgroundTransparency = 1
-	Ui.make("UIStroke", { Color = C.safe, Thickness = if big then 1.5 else 1, Transparency = 0.4 }, safe)
+	Ui.make("UIStroke", { Color = C.safe, Thickness = if big then 1.5 else 1, Transparency = 0.25 }, safe)
 	if big then
-		for _, d in Map.Districts do
-			local x0, x1, z0 = Map.districtEdges(d)
-			caption(content, d.name:upper(), (x0 + x1) / 2, z0 - 60, scale, 13, P.ink)
+		-- 7.2: the villages (Map.Villages; the Altstadt's placeholder over Downtown, its own name small under it)
+		local named: { [string]: boolean } = {}
+		for _, v in MapStyle.villages() do
+			caption(content, string.upper(v.name), v.x, v.z, scale, 15, C.ink).Name = "Village"
+			if v.district and v.sub then
+				named[v.district] = true
+				caption(content, string.upper(v.sub), v.x, v.z + 15 / scale, scale, 10, C.inkSoft)
+			end
 		end
-		caption(content, "TUNNEL", m.x + 80, m.z, scale, 11, P.ink2)
-		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, P.ink2)
-		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, P.ink2)
-		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
-		caption(content, "CENTRAL PARK", Map.Park.x, Map.Park.z + Map.BlockSize / 2 + 30, scale, 10, P.ink2) -- 6.11
-		caption(content, "LANTERN GARDEN", Map.Garden.x, Map.Garden.z - Map.BlockSize / 2 - 30, scale, 10, P.ink2) -- 6.12.15
+		for _, d in Map.Districts do
+			if not named[d.id] then
+				local x0, x1, z0 = Map.districtEdges(d)
+				caption(content, d.name:upper(), (x0 + x1) / 2, z0 - 60, scale, 13, C.ink)
+			end
+		end
+		if mount then
+			caption(content, "TUNNEL", mount.x + 80, mount.z, scale, 11, C.inkSoft)
+		end
+		for _, water in waters do
+			if water.name and water.x1 > B.x0 and water.x0 < B.x1 and water.z1 > B.z0 and water.z0 < B.z1 then
+				caption(content, string.upper(water.name), (water.x0 + water.x1) / 2, math.max(water.z0 - 40, B.z0 + 40), scale, 11, C.inkSoft)
+			end
+		end
+		if winter then
+			caption(content, "WINTER", (winter.x0 + winter.x1) / 2, math.max(winter.z0 + 60, winter.z1 - 120), scale, 14, C.inkSoft)
+		end
+		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.ink)
+		caption(content, "CENTRAL PARK", Map.Park.x, Map.Park.z + Map.BlockSize / 2 + 30, scale, 10, C.inkSoft) -- 6.11
+		caption(content, "HAUPTPLATZ", Map.Square.x, Map.Square.z - Map.BlockSize / 2 - 30, scale, 10, C.inkSoft) -- 7.1
 	end
 	-- 5.6, ZDC RIDE: a small marker at every rental dock (shared/RentalDocks.luau), under the fog: found as you uncover
 	-- the map. The scooter's icon when Icons has one, else its emoji.
@@ -506,12 +637,168 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 	return {
 		content = content,
 		scale = scale,
+		big = big,
 		markers = markers,
 		job = newLine(jobLayer, C.job, width),
 		gps = newLine(gpsLayer, C.gps, width),
 		fog = fog,
 		bus = bus,
+		meadows = meadows,
+		forest = forest,
+		ring = ring,
+		upright = upright,
 	}
+end
+
+-- ── The Alps (7.2) ─────────────────────────────────────────────────────────
+
+-- What shared/MapStyle.luau worked out of the ring and the forest once, for both maps.
+type AlpinePlan = {
+	peaks: { MapStyle.Peak },
+	relief: { MapStyle.Disc },
+	runs: { MapStyle.Run },
+	meadows: { MapStyle.Spot },
+	huts: { MapStyle.Hut },
+	passes: { MapStyle.Pass },
+}
+
+-- A peak on the big map, its ZIndex from `z` up: the rock (a diamond whose half toward the valley the UIGradient hides:
+-- a right-angled peak on its foot line, its top the way MapStyle points it), its snow cap (a smaller one with the same
+-- top) and its shadow side (a see-through square from its top to its foot line's middle and on to the foot's corner,
+-- the half beyond that diagonal hidden: the face away from the light).
+local function peak(parent: any, p: MapStyle.Peak, scale: number, z: number)
+	local h = p.half
+	local down = math.deg(math.atan2(-p.oz, -p.ox)) -- (the way from its top to its foot)
+	local body = Ui.make("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = point(p.x, p.z, scale),
+		Size = UDim2.fromOffset(h * math.sqrt(2) * scale, h * math.sqrt(2) * scale),
+		Rotation = 45,
+		BackgroundColor3 = C.rock:Lerp(C.paper, STYLE.Peaks.Haze * p.depth), -- (the far ones paler)
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, parent)
+	Ui.make("UIGradient", { Rotation = down - 45, Transparency = HALF }, body)
+	if p.cap > 0 then
+		local cap = Ui.make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = point(p.x + p.ox * (h - p.cap), p.z + p.oz * (h - p.cap), scale),
+			Size = UDim2.fromOffset(p.cap * math.sqrt(2) * scale, p.cap * math.sqrt(2) * scale),
+			Rotation = 45,
+			BackgroundColor3 = C.peakSnow,
+			BorderSizePixel = 0,
+			ZIndex = z + 1,
+		}, parent)
+		Ui.make("UIGradient", { Rotation = down - 45, Transparency = HALF }, cap)
+	end
+	local shade = Ui.make("Frame", {
+		Position = point(p.x + math.min(0, p.ox, p.sx) * h, p.z + math.min(0, p.oz, p.sz) * h, scale),
+		Size = UDim2.fromOffset(h * scale, h * scale),
+		BackgroundColor3 = C.shadow,
+		BackgroundTransparency = STYLE.Peaks.Shade,
+		BorderSizePixel = 0,
+		ZIndex = z + 2,
+	}, parent)
+	Ui.make("UIGradient", { Rotation = math.deg(math.atan2(p.oz + p.sz, p.ox + p.sx)), Transparency = HALF }, shade)
+end
+
+-- A band of road from (ax, az) to (bx, bz) on a canvas, its edge under it (the roads' look: ZIndex 4 and 5).
+local function road(canvas: Canvas, ax: number, az: number, bx: number, bz: number, width: number)
+	local scale = canvas.scale
+	local border = if canvas.big then 1.5 else 3
+	for pass = 1, 2 do
+		local frame = Ui.make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = if pass == 1 then C.roadEdge else C.road, BorderSizePixel = 0, ZIndex = 3 + pass }, canvas.content)
+		local extra = if pass == 1 then border else 0
+		band(frame, ax, az, bx, bz, scale, math.max(2, width * scale) + extra, width * scale + extra)
+	end
+end
+
+-- Fills a canvas's alpine layers once: the meadows (a lighter disc, a flower in it) and the huts, the forests (a band
+-- a run: a TextLabel whose background is the forest and whose text its tree dots, every other row's a dot's width on so
+-- the dots do not stand in columns), the ring (the big map's peaks back to front; the minimap's grassy feet, rock and
+-- snow, discs lit from the north-west) and the closed pass (its road into the cliff, the ROAD CLOSED sign on the big
+-- map, a ⛔ on the minimap).
+local function dressAlpine(canvas: Canvas, plan: AlpinePlan)
+	local scale, big = canvas.scale, canvas.big
+	local M, F = STYLE.Meadows, STYLE.Forest
+	local flowers = Config.Alpine.Meadows.Colors
+	for n, spot in plan.meadows do
+		disc(canvas.meadows, spot.x, spot.z, M.Radius, scale, C.meadow, 1).BackgroundTransparency = M.Soft
+		local c = flowers[(n - 1) % #flowers + 1]
+		disc(canvas.meadows, spot.x, spot.z, M.Flower, scale, Color3.fromRGB(c[1], c[2], c[3]), 2)
+	end
+	for _, hut in plan.huts do
+		local size = math.max(3, 16 * scale)
+		local frame = Ui.make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = point(hut.x, hut.z, scale),
+			Size = UDim2.fromOffset(size, size * 0.75),
+			BackgroundColor3 = C.hut,
+			BorderSizePixel = 0,
+			ZIndex = 3,
+		}, canvas.meadows)
+		frame.Name = "Hut"
+	end
+	local h = F.Cell * F.Overlap
+	for _, run in plan.runs do
+		local odd = math.floor((run.z - B.z0) / F.Cell) % 2 == 1
+		local forest = Ui.make("TextLabel", {
+			Position = point(run.x0, run.z - h / 2, scale),
+			Size = UDim2.fromOffset((run.x1 - run.x0) * scale, h * scale),
+			BackgroundColor3 = if run.snowy then C.snowForest else C.forest,
+			BorderSizePixel = 0,
+			Text = string.rep(if odd then " ●" else "● ", run.cells * F.PerCell),
+			TextScaled = true,
+			Font = Enum.Font.GothamBlack,
+			TextColor3 = if run.snowy then C.snowTrees else C.trees,
+			TextTransparency = 0.25,
+			ZIndex = 1,
+		}, canvas.forest)
+		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, forest)
+	end
+	if big then
+		for k, p in plan.peaks do
+			peak(canvas.ring, p, scale, k * 3)
+		end
+	else
+		for k, d in plan.relief do
+			local color = if d.kind == "foot" then C.valley elseif d.kind == "rock" then C.rock elseif d.kind == "winter" then C.snow else C.peakSnow
+			Ui.make("UIGradient", { Color = LIGHT, Rotation = 45 }, disc(canvas.ring, d.x, d.z, d.r, scale, color, k))
+		end
+	end
+	for _, pass in plan.passes do
+		-- the road from the yard's edge to the tunnel's mouth, and the sign there
+		local mx, mz = pass.x + pass.nx * pass.face, pass.z + pass.nz * pass.face
+		if pass.nx ~= 0 then
+			road(canvas, pass.from, pass.z, mx, mz, pass.width)
+		else
+			road(canvas, pass.x, pass.from, mx, mz, pass.width)
+		end
+		if big then
+			-- (on the cliff's foot where the road ends, its name over it)
+			local sx, sz = mx, mz
+			local sign = Ui.make("TextLabel", {
+				Name = "RoadClosed",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = point(sx, sz, scale),
+				Size = UDim2.fromOffset(84, 16),
+				BackgroundColor3 = C.closed,
+				BorderSizePixel = 0,
+				Text = "⛔ " .. pass.text,
+				TextSize = 9,
+				Font = Theme.HeadingFont,
+				TextColor3 = Color3.new(1, 1, 1),
+				ZIndex = 7,
+			}, canvas.content)
+			Ui.corner(sign, 3)
+			Ui.stroke(sign, C.halo, 1)
+			caption(canvas.content, pass.name, sx, sz - 16 / scale, scale, 10, C.ink)
+		else
+			local sign = glyph(canvas.content, "⛔", mx + pass.nx * 8, mz + pass.nz * 8, scale, 18, C.closed)
+			sign.Name = "RoadClosed"
+			table.insert(canvas.upright, sign)
+		end
+	end
 end
 
 -- ── Fog (3.7) ──────────────────────────────────────────────────────────────
@@ -784,7 +1071,7 @@ local miniCanvas: Canvas? = nil
 local miniLayer: Layer? = nil
 local miniZoom: any = nil -- UIScale of the zoom frame
 local miniRotor: any = nil -- turns the map with the camera
-local miniIcons: { any } = {}
+local miniIcons: { any } = {} -- (7.2: the minimap canvas's upright list: its glyphs, then the landmarks' icons)
 local miniMe: any = nil
 local miniStar: any = nil
 local miniGps: any = nil
@@ -1000,7 +1287,7 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number, hea
 	if math.abs(miniZoom.Scale - zoom) > 0.002 then
 		miniZoom.Scale = zoom
 	end
-	local px, py = (position.X - B.x0) * MINI_SCALE, (position.Z - B.z0) * MINI_SCALE
+	local px, py = (position.X - E.x0) * MINI_SCALE, (position.Z - E.z0) * MINI_SCALE
 	canvas.content.Position = UDim2.fromOffset(-px, -py)
 	miniMe.Rotation = heading(facing) - cameraHeading
 	-- The icons on the map stay upright.
@@ -1040,7 +1327,7 @@ local function buildMini(column: any, touch: boolean)
 	-- 3.8: the map in a thin square line (no frame, no shadow), the turn line under it.
 	local group = Ui.make("CanvasGroup", {
 		Size = UDim2.fromOffset(MINI_W, MINI_H),
-		BackgroundColor3 = C.land,
+		BackgroundColor3 = C.slope,
 		BorderSizePixel = 0,
 		ZIndex = 2,
 	}, mini)
@@ -1061,6 +1348,7 @@ local function buildMini(column: any, touch: boolean)
 	}, zoomFrame)
 	local canvas = draw(miniRotor, MINI_SCALE, false)
 	miniCanvas = canvas
+	miniIcons = canvas.upright -- (7.2: the ⛲ and, once the Alps are drawn, the ⛔ stay upright like the icons)
 	for _, landmark in Map.Landmarks do
 		local icon = landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false)
 		icon.Visible = false -- (until it is known: refreshKnown)
@@ -1482,11 +1770,56 @@ local function buildBig(gui: any)
 	buildList(big)
 end
 
+-- 7.2: the Alps on both maps, once (MapView.start defers it: it runs on the start screen). AlpineLayout works the ring
+-- and the forest out on this client (the same numbers the server built the mountains and the trees from; a moment
+-- each, a frame apart), shared/MapStyle.luau turns them into what to draw, then each map gets its frames (dressAlpine),
+-- a frame apart. `alpine` says how far it got (tools/phone-ui/mapview.luau reads it).
+local alpine = { started = false, done = false }
+local function buildAlpine()
+	if alpine.started then
+		return
+	end
+	alpine.started = true
+	task.wait()
+	local ring = AlpineLayout.ring()
+	task.wait()
+	local forest = AlpineLayout.forest()
+	task.wait()
+	local plan: AlpinePlan = {
+		peaks = MapStyle.peaks(ring),
+		relief = MapStyle.relief(ring),
+		runs = MapStyle.forestRuns(forest),
+		meadows = MapStyle.meadows(forest),
+		huts = MapStyle.huts(forest),
+		passes = MapStyle.passes(ring),
+	}
+	if miniCanvas then
+		dressAlpine(miniCanvas, plan)
+		iconHeading = math.huge -- (the new glyphs turn upright on the next frame)
+		task.wait()
+	end
+	if bigCanvas then
+		dressAlpine(bigCanvas, plan)
+	end
+	alpine.done = true
+end
+MapView.alpine = alpine
+
 -- column: the frame the minimap goes into (under the money panel, laid out by Hud).
 function MapView.start(gui: any, column: any)
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	buildMini(column, touch)
 	buildBig(gui)
+	-- 7.2: the ring, the forests, the meadows, the huts and the pass once the start screen is up (pcall: the map works
+	-- without them).
+	task.defer(function()
+		local ok, err = pcall(function()
+			buildAlpine()
+		end)
+		if not ok then
+			warn(`[MapView] the Alps were not drawn: {err}`)
+		end
+	end)
 
 	-- 3.7: the fog and the known landmarks, now (all fog until the server's state comes) and whenever cells are
 	-- uncovered (only their rows are drawn again).

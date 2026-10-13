@@ -1,17 +1,18 @@
 --!strict
 -- 6.12.15, the footbridge over Bone St (Map.Footbridge) mid-block between the Central Park (south,
--- server/CentralPark.luau) and the Lantern Garden (north, server/LanternGarden.luau). server/World.luau builds it as a
--- piece of the world (Footbridge.build, with World's helpers handed over: no new top-level locals there, the -O0
--- register limit).
+-- server/CentralPark.luau) and the block north of it (7.1: the Hauptplatz, server/Hauptplatz.luau). server/World.luau
+-- builds it as a piece of the world (Footbridge.build, with World's helpers handed over: no new top-level locals there,
+-- the -O0 register limit).
 -- 6.12.16 (the owner: "good for walking, only I walk through this [a timber of the arch]. I'd make it wider, for two
--- people at least, and don't be afraid to make it curve a bit"): one curved walkway 10 studs wide between vermilion
--- railings, up from the park's east path round its north-east corner, along its north lawn, in a soft S over the street
--- (a taiko-bridge hump, a torii at each end of the span) and down the garden's south and west edges to its path. Every
--- piece of it is shared/FootbridgeShape.luau's (plain numbers, tested in tests/garden_test.luau: nothing at all stands
--- in the walkway up to 9 studs over it, no step in the walking surface, the clearance over the street); this makes a
--- part of each. Solid: the walking surface and the railings; the rest is decoration (no collision, no ray hits).
+-- people at least, and don't be afraid to make it curve a bit"): one curved walkway 10 studs wide between its railings,
+-- up from the park's east path round its north-east corner, along its north lawn, in a soft S over the street (a hump,
+-- a gate at each end of the span) and down the square's south and west edges to its cobbles. 7.1 (the Alps, step 1):
+-- an alpine timber bridge: larch railings, iron lanterns, a roofed timber portal at each end of the span. Every piece
+-- of it is shared/FootbridgeShape.luau's (plain numbers, tested in tests/square_test.luau: nothing at all stands in the
+-- walkway up to 9 studs over it, no step in the walking surface, the clearance over the street); this makes a part of
+-- each. Solid: the walking surface and the railings; the rest is decoration (no collision, no ray hits).
 -- 6.12.16 review: where a ramp is lower than 9 studs over the ground, a planted bed under it closed by solid clipped
--- hedges (nobody walks or rides under it there; the park's path to its north-east corner ends before it). About 930
+-- hedges (nobody walks or rides under it there; the park's path to its north-east corner ends before it). About 900
 -- parts, three lights.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

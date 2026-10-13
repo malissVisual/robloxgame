@@ -69,7 +69,7 @@
 --
 -- Zombie Delivery 6.12.2, the spawn's corner: the JOBS spot round the depot's job board (server/JobsSpot.luau) and the
 -- gear stall west of the spawn (server/GearStall.luau: ZDC Bags and Last Stop Supplies side by side, in place of 6.6's
--- bag kiosk); 6.12.15: Last Stop's old building on block (0, -1) is gone (the Lantern Garden stands there).
+-- bag kiosk); 6.12.15: Last Stop's old building on block (0, -1) is gone (7.1: the Hauptplatz stands there).
 --
 -- Zombie Delivery 6.12.14, Lead & Co.'s shooting range (server/GunRange.luau, Config.GunRange, Map.GunRange): a fenced
 -- compound on Downtown block (-2, 1), just outside the safe zone, its own piece of the build with World's helpers (the
@@ -78,9 +78,13 @@
 -- Co.'s old building on block (-1, 0) stands as an ordinary one (buildGuns, Map.FormerGunShop: no counter, no clerk, no
 -- name board, no prop).
 --
--- Zombie Delivery 6.12.15, the Lantern Garden on block (0, -1) north of the park (Map.Garden; server/LanternGarden.luau,
--- its own piece of the build like the park) and the footbridge over Bone St between the two (Map.Footbridge;
--- server/Footbridge.luau, its own piece).
+-- Zombie Delivery 6.12.15, the block (0, -1) north of the park its own piece of the build like the park (7.1, the Alps
+-- step 1: the Hauptplatz, Map.Square; server/Hauptplatz.luau) and the footbridge over Bone St between the two
+-- (Map.Footbridge; server/Footbridge.luau, its own piece; 7.1: an alpine timber bridge).
+--
+-- Zombie Delivery 7.1, the Alps step 1: the Suburbs houses (Map.Homes) are Austrian chalets (buildHouse:
+-- server/Chalets.luau, shared/ChaletLooks.luau; the house's box, its door, path, mailbox and the world's dice as before)
+-- and the four houses for sale on the Suburbs lots wear the chalet's colours (HOME_STYLES, Chalets.estate).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -813,6 +817,7 @@ local function harborBlock(parent: Instance, cx: number, cz: number)
 	end
 end
 
+-- (7.1: the colour die a house rolls from these five is its chalet's render now, shared/ChaletLooks.luau)
 local HOUSE_COLORS = {
 	Color3.fromRGB(200, 190, 170),
 	Color3.fromRGB(170, 190, 200),
@@ -845,10 +850,10 @@ local function suburbsBlock(parent: Instance, d: Map.District, i: number, j: num
 				tree(parent, lx + rng:NextNumber(-lot / 3, lot / 3), lz + rng:NextNumber(-lot / 3, lot / 3))
 			end
 		end
-		-- A low fence at the back of the lot.
+		-- A low fence at the back of the lot (7.1: weathered wood, the chalets' fences').
 		local back = Vector3.new(lx, WALK_TOP + 1.25, lz) - facing * (lot / 2 - 1.5)
 		local size = if facing.X ~= 0 then Vector3.new(0.4, 2.5, lot - 4) else Vector3.new(lot - 4, 2.5, 0.4)
-		deco(part(parent, "Fence", size, CFrame.new(back), Color3.fromRGB(230, 230, 225), Enum.Material.WoodPlanks)).CanCollide = true
+		deco(part(parent, "Fence", size, CFrame.new(back), Color3.fromRGB(128, 92, 60), Enum.Material.WoodPlanks)).CanCollide = true
 	end
 end
 
@@ -3101,10 +3106,12 @@ local function defineRealEstate()
 		pinecrest = { wall = Color3.fromRGB(150, 146, 136), wallMaterial = Enum.Material.Slate, inner = Color3.fromRGB(226, 216, 196), floor = Color3.fromRGB(140, 100, 68), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(70, 56, 48), accent = Color3.fromRGB(150, 60, 50), gable = true, glassy = false, doors = 3 },
 		lakeside = { wall = Color3.fromRGB(70, 74, 82), wallMaterial = Enum.Material.SmoothPlastic, inner = Color3.fromRGB(236, 234, 228), floor = Color3.fromRGB(180, 160, 130), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(40, 42, 46), accent = Color3.fromRGB(220, 160, 60), gable = false, glassy = true, doors = 2 },
 		sunset = { wall = Color3.fromRGB(246, 244, 238), wallMaterial = Enum.Material.Plaster, inner = Color3.fromRGB(244, 236, 222), floor = Color3.fromRGB(200, 150, 110), floorMaterial = Enum.Material.Slate, roof = Color3.fromRGB(176, 90, 60), accent = Color3.fromRGB(230, 120, 70), gable = false, glassy = false, doors = 2 },
-		maple = { wall = Color3.fromRGB(200, 214, 226), wallMaterial = Enum.Material.WoodPlanks, inner = Color3.fromRGB(240, 236, 226), floor = Color3.fromRGB(160, 120, 84), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(70, 74, 86), accent = Color3.fromRGB(80, 120, 170), gable = true, glassy = false, doors = 1 },
-		oak = { wall = Color3.fromRGB(150, 80, 62), wallMaterial = Enum.Material.Brick, inner = Color3.fromRGB(236, 226, 206), floor = Color3.fromRGB(150, 110, 76), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(64, 58, 54), accent = Color3.fromRGB(90, 130, 80), gable = true, glassy = false, doors = 1 },
-		birch = { wall = Color3.fromRGB(236, 220, 180), wallMaterial = Enum.Material.WoodPlanks, inner = Color3.fromRGB(246, 238, 220), floor = Color3.fromRGB(170, 130, 90), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(120, 60, 46), accent = Color3.fromRGB(200, 90, 80), gable = true, glassy = false, doors = 1 },
-		elm = { wall = Color3.fromRGB(196, 206, 176), wallMaterial = Enum.Material.WoodPlanks, inner = Color3.fromRGB(240, 238, 228), floor = Color3.fromRGB(150, 116, 86), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(90, 70, 60), accent = Color3.fromRGB(120, 100, 160), gable = true, glassy = false, doors = 1 },
+		-- (7.1, the Alps: the four houses for sale on the Suburbs lots in a chalet's render and shingles; Chalets.estate
+		-- adds the timber, the shutters, the geraniums, the firewood and Maple Street's balcony)
+		maple = { wall = Color3.fromRGB(242, 238, 228), wallMaterial = Enum.Material.Plaster, inner = Color3.fromRGB(240, 236, 226), floor = Color3.fromRGB(160, 120, 84), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(78, 58, 44), accent = Color3.fromRGB(80, 120, 170), gable = true, glassy = false, doors = 1 },
+		oak = { wall = Color3.fromRGB(238, 226, 198), wallMaterial = Enum.Material.Plaster, inner = Color3.fromRGB(236, 226, 206), floor = Color3.fromRGB(150, 110, 76), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(70, 56, 46), accent = Color3.fromRGB(90, 130, 80), gable = true, glassy = false, doors = 1 },
+		birch = { wall = Color3.fromRGB(228, 200, 136), wallMaterial = Enum.Material.Plaster, inner = Color3.fromRGB(246, 238, 220), floor = Color3.fromRGB(170, 130, 90), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(86, 60, 44), accent = Color3.fromRGB(200, 90, 80), gable = true, glassy = false, doors = 1 },
+		elm = { wall = Color3.fromRGB(216, 222, 204), wallMaterial = Enum.Material.Plaster, inner = Color3.fromRGB(240, 238, 228), floor = Color3.fromRGB(150, 116, 86), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(86, 88, 94), accent = Color3.fromRGB(120, 100, 160), gable = true, glassy = false, doors = 1 },
 	}
 
 	-- A flat roof with a low parapet (or a pitched one) over a box x0..x1, z0..z1 at height `top`.
@@ -3389,14 +3396,27 @@ local function defineRealEstate()
 		wall(home, f, false, Z0 + 1, Z1 - 1, P, L1, 11, { { at = 4.5, width = 4, bottom = 0, top = 8 }, { at = -5, width = 4, bottom = 0, top = 8 } }, inner, Enum.Material.SmoothPlastic, 0.5)
 		wall(home, f, true, P + 0.25, X1 - 1, 0, L1, 11, nil, inner, Enum.Material.SmoothPlastic, 0.5)
 		if TOP > 11 then
-			-- the upper storey (outside only): its walls, windows that light up at night
+			-- the upper storey (outside only): its walls, windows that light up at night (7.1: in a chalet's dark timber)
+			local timber, timberM = Color3.fromRGB(92, 62, 40), Enum.Material.WoodPlanks
 			box(home, "Ceiling", f, X0 + 1, 10.6, Z0 + 1, X1 - 1, 11.2, Z1 - 1, inner, Enum.Material.SmoothPlastic)
-			wall(home, f, true, X0, X1, Z0 + 0.5, 11, TOP, { { at = X0 + 6, width = 5, bottom = 2, top = 6, glass = true }, { at = X1 - 8, width = 5, bottom = 2, top = 6, glass = true } }, wallC, wallM, 1, true)
-			wall(home, f, true, X0, X1, Z1 - 0.5, 11, TOP, nil, wallC, wallM)
-			wall(home, f, false, Z0 + 1, Z1 - 1, X0 + 0.5, 11, TOP, nil, wallC, wallM)
-			wall(home, f, false, Z0 + 1, Z1 - 1, X1 - 0.5, 11, TOP, nil, wallC, wallM)
+			wall(home, f, true, X0, X1, Z0 + 0.5, 11, TOP, { { at = X0 + 6, width = 5, bottom = 2, top = 6, glass = true }, { at = X1 - 8, width = 5, bottom = 2, top = 6, glass = true } }, timber, timberM, 1, true)
+			wall(home, f, true, X0, X1, Z1 - 0.5, 11, TOP, nil, timber, timberM)
+			wall(home, f, false, Z0 + 1, Z1 - 1, X0 + 0.5, 11, TOP, nil, timber, timberM)
+			wall(home, f, false, Z0 + 1, Z1 - 1, X1 - 0.5, 11, TOP, nil, timber, timberM)
 		end
 		homeRoof(home, f, X0, Z0, X1, Z1, TOP, style)
+		-- 7.1: the chalet's dress (server/Chalets.luau): the timber band, shutters and geraniums at the front windows,
+		-- firewood by the left wall, Maple Street's balcony over the door
+		require(script.Parent.Chalets).estate(home, f, {
+			x0 = X0,
+			x1 = X1,
+			z0 = Z0,
+			z1 = Z1,
+			eaves = 11,
+			upper = TOP > 11,
+			windows = { { at = X0 + 3.5, width = 4, bottom = L1 + 3, top = L1 + 8 }, { at = P + 6, width = 5, bottom = L1 + 4, top = L1 + 8 } },
+			door = { at = doorX, width = 5 },
+		}, { part = part, deco = deco, nightLight = DayNight.nightLight })
 		ceilingLight(home, f, X0 + 7, 10.4, 0, 18)
 		ceilingLight(home, f, (P + X1) / 2, 10.4, 5, 12)
 		-- Inside.
@@ -5560,7 +5580,8 @@ defineMissionPlaces()
 --                  recessed), the steps, a buzzer panel with the flats, the house number on the canopy, a lamp that
 --                  glows at night. Eight parts.
 --   A house        (the Suburbs) its front door faces its street (the front wall Map.HouseFront forward of the lot's
---                  middle), a short path to the sidewalk, a mailbox with its number, a tree in the back yard.
+--                  middle), a short path to the sidewalk, a mailbox with its number, a tree in the back yard. 7.1 (the
+--                  Alps): an Austrian chalet on the same box, door and windows (server/Chalets.luau, ChaletLooks).
 -- Nothing here has a prompt (the jobs give and take at the piles); every part stays inside its lot. Like the real
 -- estate and the missions' places, the builders live in their own function (Luau allows 200 locals per function).
 
@@ -5655,21 +5676,27 @@ local function defineVenuesAndHomes()
 		local facing = Vector3.new(lot.facing.x, 0, lot.facing.z)
 		local door = Vector3.new(home.door.x, WALK_TOP, home.door.z)
 		local frame = CFrame.lookAt(door, door + facing) -- the middle of the front wall (forward: -Z)
-		local w, d, h = lot.w, lot.d, lot.h
-		local body = frame * CFrame.new(0, 0, d / 2) -- the house's middle on the ground
-		local color = HOUSE_COLORS[rng:NextInteger(1, #HOUSE_COLORS)]
-		part(parent, "House", Vector3.new(w, h, d), body * CFrame.new(0, h / 2, 0), color, Enum.Material.WoodPlanks)
-		gableRoof(parent, body * CFrame.new(0, h, 0), w + 2, d + 2, 6, Color3.fromRGB(100 + rng:NextInteger(-30, 30), 60, 50))
-		part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -0.2), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
-		for _, x in { -w / 3, w / 3 } do
-			local window = deco(part(parent, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -0.15), Color3.fromRGB(40, 50, 60), Enum.Material.Glass))
-			if rng:NextNumber() < 0.3 then
-				nightWindow(window)
-			end
-		end
+		local d = lot.d
+		-- 7.1, the Alps: an Austrian chalet (server/Chalets.luau, shared/ChaletLooks.luau) on the house's box, with its
+		-- door and its two windows where they were; its looks from the lot's own dice. The world's dice are rolled as
+		-- before (the colour, now the render's; the roof's shade; the two windows' lights; the tree), so everything built
+		-- after a house stays as it was.
+		local colorDie = rng:NextInteger(1, #HOUSE_COLORS)
+		local shadeDie = rng:NextInteger(-30, 30)
+		local lit = { rng:NextNumber() < 0.3, rng:NextNumber() < 0.3 }
+		require(script.Parent.Chalets).house(parent, frame, {
+			w = lot.w,
+			d = d,
+			h = lot.h,
+			lot = lot.size,
+			front = Map.HouseFront,
+			seed = lot.seed,
+			render = colorDie,
+			shade = shadeDie,
+		}, lit, { part = part, deco = deco, nightLight = DayNight.nightLight })
 		-- The path from the door over the front lawn to the sidewalk, the mailbox beside it with the number.
 		local yard = lot.size / 2 - Map.HouseFront
-		deco(part(parent, "Path", Vector3.new(3, 0.1, yard), frame * CFrame.new(0, 0.12, -yard / 2), Color3.fromRGB(176, 172, 164), Enum.Material.Concrete))
+		deco(part(parent, "Path", Vector3.new(3, 0.1, yard), frame * CFrame.new(0, 0.12, -yard / 2), Color3.fromRGB(178, 168, 148), Enum.Material.Pebble))
 		deco(part(parent, "MailboxPost", Vector3.new(0.3, 3.2, 0.3), frame * CFrame.new(3, 1.6, -(yard - 2.5)), Color3.fromRGB(90, 70, 50), Enum.Material.Wood))
 		local box = deco(part(parent, "Mailbox", Vector3.new(1.4, 1, 1.6), frame * CFrame.new(3, 3.6, -(yard - 2.5)), Color3.fromRGB(46, 58, 70), Enum.Material.Metal))
 		plate(box, string.match(home.address, "^(%d+)") or "", Color3.fromRGB(240, 236, 220))
@@ -6135,9 +6162,9 @@ function World.build()
 	piece("Central Park", function()
 		require(script.Parent.CentralPark).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
 	end)
-	-- 6.12.15: the Lantern Garden north of it and the footbridge over the street between them
-	piece("Lantern Garden", function()
-		require(script.Parent.LanternGarden).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
+	-- 7.1: the Hauptplatz north of it (6.12.15's garden before) and the footbridge over the street between them
+	piece("Hauptplatz", function()
+		require(script.Parent.Hauptplatz).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
 	end)
 	piece("footbridge", function()
 		require(script.Parent.Footbridge).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
@@ -6211,9 +6238,26 @@ function World.build()
 		buildVanLot(world) -- 5.0
 	end)
 	piece("lighting", setLighting)
+	-- 7.1: the mountains and the forests (server/Alpine.luau). 7.1 review: here only the cheap part (the silhouettes,
+	-- the pass); the terrain's thousands of fills and the forests come in World.buildLate, after the server is wired.
+	piece("alps", function() require(script.Parent.Alpine).start(world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight }) end)
 	task.wait()
 	counting:Disconnect()
 	print(`[World] {parts} parts in all`)
+end
+
+-- 7.1 review: what World.build leaves for later, so a new server answers PLAY and has its lighting at once: the Alps'
+-- terrain fills (the slowest part of the build: 10 – 40 s on a live server) and forests (server/Alpine.luau finish,
+-- breathing as it goes). Main.server.luau defers it right after World.build; it runs once.
+function World.buildLate()
+	local started = os.clock()
+	local ok, err = pcall(function()
+		require(script.Parent.Alpine).finish()
+	end)
+	if not ok then
+		warn(`[World] the alps' terrain and forests failed: {err}`)
+	end
+	print(`[World] the alps' terrain and forests built in {math.floor((os.clock() - started) * 1000)} ms`)
 end
 
 function World.isSafe(position: Vector3): boolean

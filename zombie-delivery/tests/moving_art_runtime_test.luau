@@ -1,10 +1,10 @@
 -- 7.0 planning × the real house art: a whole move end to end with the real shared/FurnitureLooks.luau,
 -- shared/HouseLayout.luau and server/HouseInterior.luau (tests/run_tests.py builds them on tools/fixtures/item-mock.luau,
 -- the recorder tests/runtime/MovingRuntime.luau's fakes stand on) and the real server/Moving.luau and MoveLobby.luau:
--- the board's card, START, the planning lobby (Ann, and Bob the Technician READY), LAUNCH, the real interior built and in
--- the world, the locked front door picked, in through it, the dark house (the real ceiling lights off, the porch's
--- daylight on) and its fuse box on the real garage's back wall clear of the workbench and the shelves, fixed; a real
--- one-hand piece picked up, carried out, loaded, driven to the Wall: the pay, and the interior taken down.
+-- the board's card, START, the planning lobby (Ann, and Bob the Guard READY), LAUNCH, the real interior built and in
+-- the world, in through the front door (open from the start: the owner took the Technician out), the house lit (the real
+-- ceiling lights on, the porch's daylight on, no fuse box); a real one-hand piece picked up, carried out, loaded, driven
+-- to the Wall: the pay, and the interior taken down.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -99,7 +99,7 @@ check("the card: the real plan's pieces and ★ must-haves", card ~= nil and car
 	card and card.a.items)
 E.request(ann, "start", "marge")
 check("START: the planning lobby", E.last(ann, "MoveLobby", "lobby") ~= nil and E.last(ann, "MoveLobby", "lobby").a ~= nil and E.built == 0)
-lobbyRequest(bob, "role", "tech")
+lobbyRequest(bob, "role", "guard")
 lobbyRequest(bob, "ready", true)
 lobbyRequest(ann, "launch")
 local truck = E.cars[ann]
@@ -108,14 +108,13 @@ local origin = built[1] and built[1].origin
 check("LAUNCH: the truck, the real interior built at its slot", truck ~= nil and interior ~= nil and E.built == 1 and origin.Position.Y == Config.Furniture.Slot.Origin[2])
 check("…and in the world (server/HouseInterior.luau builds it unparented)", interior:IsDescendantOf(workspace))
 Moving.step()
-check("the roles: Ann the Driver, Bob the Technician", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "tech" and ann:GetAttribute("MoveWith") == 11)
+check("the roles: Ann the Driver, Bob the Guard", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "guard" and ann:GetAttribute("MoveWith") == 11)
 
--- the door, the dark house, the fuse box -------------------------------------------------------------------------------------
+-- the door (open), the house (lit) -------------------------------------------------------------------------------------------
 
 local site = moves:FindFirstChild("Move_marge")
-E.place(bob, outside)
-trigger(promptIn(site, "Pick lock"), bob)
-check("Bob picks the front door's lock", ann:GetAttribute("MoveLocked") == nil)
+check("the front door open from the start: no Pick lock, no Kick door", promptIn(site, "Pick lock") == nil and promptIn(site, "Kick door") == nil
+	and promptIn(site, "Enter house") ~= nil and promptIn(site, "Enter house").Enabled)
 E.place(ann, outside)
 trigger(promptIn(site, "Enter house"), ann)
 local entry = (origin * plan.entry).Position
@@ -130,38 +129,11 @@ local function named(model: any, name: string): any -- (the recorder's FindFirst
 	return nil
 end
 local daylight = named(interior, "Daylight")
-check(`dark inside: the real ceiling lights off ({off})`, on == 0 and off >= 8 and daylight ~= nil and daylight:FindFirstChildOfClass("SurfaceLight") ~= nil
-	and daylight:FindFirstChildOfClass("SurfaceLight").Enabled ~= false, `{on} on, {off} off`)
-local fuse = named(interior, "FuseBox")
-local garage: any = nil
-for _, room in plan.rooms do
-	if room.id == "garage" then
-		garage = room
-	end
-end
-local at = fuse and origin:PointToObjectSpace(fuse.Position)
-check("the fuse box on the real garage's back wall at head height", fuse ~= nil and garage ~= nil and at.X > garage.min.X and at.X < garage.max.X
-	and math.abs(at.Z - (garage.max.Z - 0.3)) < 1e-6 and at.Y > garage.min.Y + 3 and at.Y < garage.min.Y + 6, at)
-local clear = true
-for _, f in plan.fixtures do
-	if f.room == "garage" and at then
-		local p = f.at.Position
-		local sideways = (math.floor(f.turn / 90 + 0.5) % 2) == 1
-		local hx = if sideways then f.size.Z / 2 else f.size.X / 2
-		local hz = if sideways then f.size.X / 2 else f.size.Z / 2
-		if at.X + 0.9 > p.X - hx and at.X - 0.9 < p.X + hx and at.Z + 0.3 > p.Z - hz and at.Z - 0.3 < p.Z + hz and at.Y + 1.2 > p.Y and at.Y - 1.2 < p.Y + f.size.Y then
-			clear = false
-			print(`  (in the way: {f.kind})`)
-		end
-	end
-end
-check("…clear of the workbench and the shelves", clear)
+check(`lit inside from the start: the real ceiling lights on ({on}), the porch's daylight on`, on >= 8 and off == 0 and daylight ~= nil
+	and daylight:FindFirstChildOfClass("SurfaceLight") ~= nil and daylight:FindFirstChildOfClass("SurfaceLight").Enabled ~= false, `{on} on, {off} off`)
+check("no fuse box in the house any more", named(interior, "FuseBox") == nil)
 E.place(bob, outside)
 trigger(promptIn(site, "Enter house"), bob)
-E.place(bob, fuse.Position + V3(1, 0, -1))
-trigger(promptIn(fuse, "Fix fuse box"), bob)
-on, off = lights(interior)
-check("Bob fixes it: the lights on", on >= 8 and off == 0, `{on} on, {off} off`)
 
 -- a real piece: picked up, out, loaded, delivered -------------------------------------------------------------------------
 
@@ -207,7 +179,7 @@ E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
 E.clock += 0.3
 Moving.step()
 trigger(promptIn(truck.model, "Load"), ann)
-check(`the {second.item} loaded too`, ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "2/", 1, true) ~= nil, E.lastNotice(ann))
+check(`the {second.item} loaded too`, ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "2 in the van", 1, true) ~= nil, E.lastNotice(ann))
 piece2:Destroy()
 local wall = V3(Map.Depot.x + T.DropOff[1], 2, Map.Depot.z + T.DropOff[2])
 truck.chassis.CFrame = M.CFrame.new(wall.X + 4, wall.Y, wall.Z)
@@ -215,6 +187,7 @@ E.place(ann, wall + V3(0, 1, 0))
 E.place(bob, wall + V3(3, 1, 0))
 E.clock += 0.3
 Moving.step()
+E.request(ann, "finish") -- (7.x van moves: the Wall unloaded it, a trip; the owner's FINISH ends the move)
 local result = E.last(ann, "Moving", "result")
 check("delivered at the Wall: the pay for the real piece (7.0 review: the one whose model went never counts)", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.pay > 0 and result.a.money > 0,
 	result and result.a.how)

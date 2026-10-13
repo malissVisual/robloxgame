@@ -1,0 +1,2843 @@
+{
+ "items": {
+  "armchair": {
+   "cell": [
+    10.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    3.4,
+    3.4,
+    3.2
+   ]
+  },
+  "bed": {
+   "cell": [
+    50.0,
+    -20.0,
+    0.0
+   ],
+   "size": [
+    5.4,
+    3.6,
+    7.4
+   ]
+  },
+  "bicycle": {
+   "cell": [
+    20.0,
+    -50.0,
+    0.0
+   ],
+   "size": [
+    5.4,
+    3.1,
+    1.2
+   ]
+  },
+  "bookshelf": {
+   "cell": [
+    50.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    4.2,
+    6.6,
+    1.6
+   ]
+  },
+  "box": {
+   "cell": [
+    50.0,
+    -50.0,
+    0.0
+   ],
+   "size": [
+    2.0,
+    1.8,
+    2.0
+   ]
+  },
+  "coat_rack": {
+   "cell": [
+    0.0,
+    -50.0,
+    0.0
+   ],
+   "size": [
+    1.5,
+    5.6,
+    1.5
+   ]
+  },
+  "coffee_table": {
+   "cell": [
+    30.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    4.2,
+    1.85,
+    2.4
+   ]
+  },
+  "desk": {
+   "cell": [
+    20.0,
+    -40.0,
+    0.0
+   ],
+   "size": [
+    3.6,
+    3.2,
+    2.0
+   ]
+  },
+  "dining_chair": {
+   "cell": [
+    20.0,
+    -20.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    3.8,
+    1.8
+   ]
+  },
+  "dining_table": {
+   "cell": [
+    10.0,
+    -20.0,
+    0.0
+   ],
+   "size": [
+    6.0,
+    3.3,
+    3.8
+   ]
+  },
+  "dishes_box": {
+   "cell": [
+    30.0,
+    -20.0,
+    0.0
+   ],
+   "size": [
+    2.0,
+    2.0,
+    2.0
+   ]
+  },
+  "dresser": {
+   "cell": [
+    20.0,
+    -30.0,
+    0.0
+   ],
+   "size": [
+    3.8,
+    3.2,
+    1.8
+   ]
+  },
+  "floor_lamp": {
+   "cell": [
+    40.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    1.4,
+    5.2,
+    1.4
+   ]
+  },
+  "fridge": {
+   "cell": [
+    50.0,
+    -10.0,
+    0.0
+   ],
+   "size": [
+    3.0,
+    6.4,
+    2.8
+   ]
+  },
+  "grandfather_clock": {
+   "cell": [
+    30.0,
+    -10.0,
+    0.0
+   ],
+   "size": [
+    2.0,
+    7.2,
+    1.4
+   ]
+  },
+  "guitar": {
+   "cell": [
+    30.0,
+    -40.0,
+    0.0
+   ],
+   "size": [
+    1.5,
+    4.0,
+    0.8
+   ]
+  },
+  "kids_bed": {
+   "cell": [
+    50.0,
+    -30.0,
+    0.0
+   ],
+   "size": [
+    3.6,
+    3.0,
+    6.2
+   ]
+  },
+  "laundry_basket": {
+   "cell": [
+    50.0,
+    -40.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    1.6,
+    1.4
+   ]
+  },
+  "lawn_mower": {
+   "cell": [
+    40.0,
+    -50.0,
+    0.0
+   ],
+   "size": [
+    2.2,
+    3.2,
+    4.2
+   ]
+  },
+  "microwave": {
+   "cell": [
+    0.0,
+    -20.0,
+    0.0
+   ],
+   "size": [
+    2.2,
+    1.3,
+    1.5
+   ]
+  },
+  "mirror": {
+   "cell": [
+    30.0,
+    -30.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    5.0,
+    1.0
+   ]
+  },
+  "nightstand": {
+   "cell": [
+    10.0,
+    -30.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    2.4,
+    1.6
+   ]
+  },
+  "painting": {
+   "cell": [
+    0.0,
+    -10.0,
+    0.0
+   ],
+   "size": [
+    3.0,
+    2.4,
+    0.4
+   ]
+  },
+  "photo_album": {
+   "cell": [
+    40.0,
+    -30.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    1.6,
+    1.4
+   ]
+  },
+  "piano": {
+   "cell": [
+    20.0,
+    -10.0,
+    0.0
+   ],
+   "size": [
+    5.2,
+    4.6,
+    2.2
+   ]
+  },
+  "plant": {
+   "cell": [
+    10.0,
+    -10.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    3.6,
+    1.8
+   ]
+  },
+  "radio": {
+   "cell": [
+    40.0,
+    -20.0,
+    0.0
+   ],
+   "size": [
+    1.6,
+    1.1,
+    0.8
+   ]
+  },
+  "record_player": {
+   "cell": [
+    40.0,
+    -10.0,
+    0.0
+   ],
+   "size": [
+    2.3,
+    4.8,
+    2.0
+   ]
+  },
+  "rocking_horse": {
+   "cell": [
+    0.0,
+    -40.0,
+    0.0
+   ],
+   "size": [
+    3.8,
+    3.2,
+    1.4
+   ]
+  },
+  "shoe_cabinet": {
+   "cell": [
+    10.0,
+    -50.0,
+    0.0
+   ],
+   "size": [
+    3.2,
+    2.9,
+    1.4
+   ]
+  },
+  "sofa": {
+   "cell": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    7.2,
+    3.4,
+    3.2
+   ]
+  },
+  "toolbox": {
+   "cell": [
+    30.0,
+    -50.0,
+    0.0
+   ],
+   "size": [
+    2.0,
+    1.25,
+    1.0
+   ]
+  },
+  "toy_box": {
+   "cell": [
+    10.0,
+    -40.0,
+    0.0
+   ],
+   "size": [
+    3.0,
+    2.4,
+    1.8
+   ]
+  },
+  "tv": {
+   "cell": [
+    20.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    3.4,
+    3.9,
+    2.4
+   ]
+  },
+  "wardrobe": {
+   "cell": [
+    0.0,
+    -30.0,
+    0.0
+   ],
+   "size": [
+    4.4,
+    7.0,
+    2.2
+   ]
+  },
+  "washing_machine": {
+   "cell": [
+    40.0,
+    -40.0,
+    0.0
+   ],
+   "size": [
+    2.8,
+    3.4,
+    2.8
+   ]
+  }
+ },
+ "pieces": {
+  "armchair_fabric": {
+   "center": [
+    0.0,
+    1.825,
+    0.0129
+   ],
+   "size": [
+    3.4,
+    2.95,
+    3.1258
+   ],
+   "triangles": 1576
+  },
+  "armchair_fabric2": {
+   "center": [
+    0.0,
+    2.15,
+    0.86
+   ],
+   "size": [
+    0.95,
+    0.8594,
+    0.4987
+   ],
+   "triangles": 300
+  },
+  "armchair_wood2": {
+   "center": [
+    0.0,
+    0.175,
+    0.0
+   ],
+   "size": [
+    2.8787,
+    0.35,
+    2.6787
+   ],
+   "triangles": 560
+  },
+  "bed_fabric": {
+   "center": [
+    0.0,
+    1.53,
+    -1.086
+   ],
+   "size": [
+    5.25,
+    0.35,
+    4.588
+   ],
+   "triangles": 300
+  },
+  "bed_fabric2": {
+   "center": [
+    0.0,
+    2.3,
+    0.12
+   ],
+   "size": [
+    5.3,
+    2.1,
+    6.74
+   ],
+   "triangles": 600
+  },
+  "bed_white": {
+   "center": [
+    0.0,
+    1.3853,
+    0.0
+   ],
+   "size": [
+    5.2,
+    1.0705,
+    6.8
+   ],
+   "triangles": 1200
+  },
+  "bed_wood": {
+   "center": [
+    0.0,
+    1.775,
+    0.0
+   ],
+   "size": [
+    5.4,
+    3.55,
+    7.4
+   ],
+   "triangles": 916
+  },
+  "bicycle_chrome": {
+   "center": [
+    0.0,
+    1.495,
+    0.0
+   ],
+   "size": [
+    4.99,
+    2.68,
+    1.1
+   ],
+   "triangles": 1036
+  },
+  "bicycle_dark": {
+   "center": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "size": [
+    0.85,
+    0.65,
+    0.78
+   ],
+   "triangles": 216
+  },
+  "bicycle_leather": {
+   "center": [
+    0.5,
+    2.86,
+    0.0
+   ],
+   "size": [
+    0.65,
+    0.14,
+    0.3
+   ],
+   "triangles": 188
+  },
+  "bicycle_paint": {
+   "center": [
+    0.0,
+    1.7,
+    0.0
+   ],
+   "size": [
+    5.0715,
+    1.5299,
+    0.1427
+   ],
+   "triangles": 572
+  },
+  "bicycle_rubber": {
+   "center": [
+    0.0,
+    1.43,
+    0.0
+   ],
+   "size": [
+    5.28,
+    2.84,
+    1.16
+   ],
+   "triangles": 1208
+  },
+  "bicycle_steel": {
+   "center": [
+    0.0,
+    1.05,
+    0.0
+   ],
+   "size": [
+    4.9,
+    1.7,
+    0.4547
+   ],
+   "triangles": 260
+  },
+  "bicycle_wicker": {
+   "center": [
+    -1.45,
+    2.55,
+    0.0
+   ],
+   "size": [
+    0.6,
+    0.4,
+    0.55
+   ],
+   "triangles": 108
+  },
+  "bookshelf_book1": {
+   "center": [
+    0.06,
+    3.1826,
+    -0.025
+   ],
+   "size": [
+    3.68,
+    5.4652,
+    1.25
+   ],
+   "triangles": 1512
+  },
+  "bookshelf_book2": {
+   "center": [
+    0.0,
+    3.1364,
+    -0.025
+   ],
+   "size": [
+    3.8,
+    5.3728,
+    1.25
+   ],
+   "triangles": 1512
+  },
+  "bookshelf_book3": {
+   "center": [
+    0.08,
+    3.2442,
+    -0.025
+   ],
+   "size": [
+    3.64,
+    5.5884,
+    1.25
+   ],
+   "triangles": 1404
+  },
+  "bookshelf_book4": {
+   "center": [
+    -0.025,
+    3.2261,
+    -0.025
+   ],
+   "size": [
+    3.75,
+    5.563,
+    1.25
+   ],
+   "triangles": 1512
+  },
+  "bookshelf_leaf": {
+   "center": [
+    -1.4575,
+    5.65,
+    -0.0019
+   ],
+   "size": [
+    0.8413,
+    0.4046,
+    0.8573
+   ],
+   "triangles": 672
+  },
+  "bookshelf_leaf2": {
+   "center": [
+    -1.2639,
+    5.85,
+    0.0019
+   ],
+   "size": [
+    0.8441,
+    0.4046,
+    0.8535
+   ],
+   "triangles": 672
+  },
+  "bookshelf_terracotta": {
+   "center": [
+    -1.46,
+    2.475,
+    -0.05
+   ],
+   "size": [
+    0.56,
+    0.95,
+    0.56
+   ],
+   "triangles": 240
+  },
+  "bookshelf_white": {
+   "center": [
+    -1.36,
+    5.225,
+    0.0
+   ],
+   "size": [
+    0.6,
+    0.45,
+    0.6
+   ],
+   "triangles": 128
+  },
+  "bookshelf_wood": {
+   "center": [
+    0.0,
+    3.3,
+    0.0
+   ],
+   "size": [
+    4.2,
+    6.6,
+    1.6
+   ],
+   "triangles": 756
+  },
+  "bookshelf_wood2": {
+   "center": [
+    0.0,
+    3.225,
+    -0.005
+   ],
+   "size": [
+    3.92,
+    6.45,
+    1.57
+   ],
+   "triangles": 120
+  },
+  "box_card": {
+   "center": [
+    0.0,
+    0.88,
+    0.0
+   ],
+   "size": [
+    1.95,
+    1.76,
+    1.95
+   ],
+   "triangles": 108
+  },
+  "box_tape": {
+   "center": [
+    0.0,
+    1.6875,
+    0.0
+   ],
+   "size": [
+    0.45,
+    0.175,
+    1.99
+   ],
+   "triangles": 36
+  },
+  "box_white": {
+   "center": [
+    0.45,
+    0.95,
+    -0.985
+   ],
+   "size": [
+    0.88,
+    0.48,
+    0.01
+   ],
+   "triangles": 12
+  },
+  "coat_rack_brass": {
+   "center": [
+    -0.1378,
+    2.585,
+    0.0
+   ],
+   "size": [
+    1.2045,
+    5.17,
+    1.2978
+   ],
+   "triangles": 1648
+  },
+  "coat_rack_dark": {
+   "center": [
+    0.3,
+    5.1975,
+    0.25
+   ],
+   "size": [
+    0.84,
+    0.335,
+    0.84
+   ],
+   "triangles": 300
+  },
+  "coat_rack_fabric2": {
+   "center": [
+    -0.2,
+    3.95,
+    -0.2
+   ],
+   "size": [
+    0.9329,
+    2.2,
+    0.6336
+   ],
+   "triangles": 160
+  },
+  "coat_rack_red": {
+   "center": [
+    0.4,
+    4.525,
+    -0.35
+   ],
+   "size": [
+    0.2792,
+    1.074,
+    0.2792
+   ],
+   "triangles": 28
+  },
+  "coat_rack_wood2": {
+   "center": [
+    -0.1642,
+    2.7907,
+    0.0
+   ],
+   "size": [
+    1.0951,
+    5.5786,
+    1.2521
+   ],
+   "triangles": 320
+  },
+  "coffee_table_book2": {
+   "center": [
+    0.9,
+    1.77,
+    0.1
+   ],
+   "size": [
+    1.1251,
+    0.04,
+    0.9297
+   ],
+   "triangles": 108
+  },
+  "coffee_table_book4": {
+   "center": [
+    0.85,
+    1.805,
+    0.12
+   ],
+   "size": [
+    0.9915,
+    0.03,
+    0.8236
+   ],
+   "triangles": 108
+  },
+  "coffee_table_wood": {
+   "center": [
+    0.0,
+    1.055,
+    0.0
+   ],
+   "size": [
+    4.2,
+    1.39,
+    2.4
+   ],
+   "triangles": 296
+  },
+  "coffee_table_wood2": {
+   "center": [
+    0.0,
+    0.89,
+    0.0
+   ],
+   "size": [
+    3.84,
+    1.78,
+    2.04
+   ],
+   "triangles": 744
+  },
+  "desk_accent": {
+   "center": [
+    0.0,
+    1.595,
+    0.08
+   ],
+   "size": [
+    3.4,
+    2.69,
+    1.74
+   ],
+   "triangles": 452
+  },
+  "desk_book1": {
+   "center": [
+    1.2,
+    3.058,
+    0.675
+   ],
+   "size": [
+    0.18,
+    0.236,
+    0.45
+   ],
+   "triangles": 108
+  },
+  "desk_book2": {
+   "center": [
+    0.5256,
+    2.765,
+    0.1725
+   ],
+   "size": [
+    1.1288,
+    0.78,
+    1.4549
+   ],
+   "triangles": 216
+  },
+  "desk_book3": {
+   "center": [
+    -0.0374,
+    2.7748,
+    0.289
+   ],
+   "size": [
+    1.9349,
+    0.7184,
+    1.222
+   ],
+   "triangles": 128
+  },
+  "desk_book4": {
+   "center": [
+    1.05,
+    3.0615,
+    0.675
+   ],
+   "size": [
+    1.08,
+    0.243,
+    0.45
+   ],
+   "triangles": 216
+  },
+  "desk_paint": {
+   "center": [
+    0.0,
+    1.5875,
+    0.0
+   ],
+   "size": [
+    3.6,
+    3.175,
+    2.0
+   ],
+   "triangles": 560
+  },
+  "desk_red": {
+   "center": [
+    -0.9,
+    2.565,
+    -0.3
+   ],
+   "size": [
+    0.3,
+    0.38,
+    0.3
+   ],
+   "triangles": 192
+  },
+  "desk_white": {
+   "center": [
+    -1.1,
+    1.125,
+    -0.83
+   ],
+   "size": [
+    0.12,
+    1.37,
+    0.12
+   ],
+   "triangles": 672
+  },
+  "dining_chair_fabric": {
+   "center": [
+    0.0,
+    1.92,
+    -0.1
+   ],
+   "size": [
+    1.45,
+    0.22,
+    1.35
+   ],
+   "triangles": 300
+  },
+  "dining_chair_wood": {
+   "center": [
+    0.0,
+    1.8749,
+    0.0015
+   ],
+   "size": [
+    1.7,
+    3.7497,
+    1.7029
+   ],
+   "triangles": 1524
+  },
+  "dining_table_fabric2": {
+   "center": [
+    0.0,
+    3.2825,
+    0.0
+   ],
+   "size": [
+    4.5,
+    0.025,
+    0.9
+   ],
+   "triangles": 108
+  },
+  "dining_table_wood": {
+   "center": [
+    0.0,
+    3.17,
+    0.0
+   ],
+   "size": [
+    6.0,
+    0.2,
+    3.8
+   ],
+   "triangles": 188
+  },
+  "dining_table_wood2": {
+   "center": [
+    0.0,
+    1.5375,
+    0.0
+   ],
+   "size": [
+    5.42,
+    3.075,
+    3.22
+   ],
+   "triangles": 1260
+  },
+  "dishes_box_card": {
+   "center": [
+    0.0,
+    0.9889,
+    0.0
+   ],
+   "size": [
+    2.0022,
+    1.9777,
+    1.95
+   ],
+   "triangles": 324
+  },
+  "dishes_box_ceramic": {
+   "center": [
+    0.0,
+    1.5,
+    0.0
+   ],
+   "size": [
+    1.2352,
+    1.0,
+    0.7745
+   ],
+   "triangles": 664
+  },
+  "dishes_box_paint": {
+   "center": [
+    0.0,
+    1.5,
+    0.0
+   ],
+   "size": [
+    1.0,
+    1.0,
+    0.06
+   ],
+   "triangles": 332
+  },
+  "dishes_box_tape": {
+   "center": [
+    0.0,
+    1.43,
+    -0.98
+   ],
+   "size": [
+    0.45,
+    0.14,
+    0.02
+   ],
+   "triangles": 12
+  },
+  "dresser_brass": {
+   "center": [
+    0.0,
+    1.55,
+    -0.77
+   ],
+   "size": [
+    2.35,
+    1.47,
+    0.06
+   ],
+   "triangles": 648
+  },
+  "dresser_cream": {
+   "center": [
+    -0.6,
+    2.905,
+    0.0
+   ],
+   "size": [
+    1.2,
+    0.01,
+    0.8
+   ],
+   "triangles": 12
+  },
+  "dresser_red": {
+   "center": [
+    1.0,
+    3.025,
+    0.0
+   ],
+   "size": [
+    0.6,
+    0.25,
+    0.4
+   ],
+   "triangles": 108
+  },
+  "dresser_wood": {
+   "center": [
+    0.0,
+    1.6,
+    0.0775
+   ],
+   "size": [
+    3.7,
+    2.4,
+    1.645
+   ],
+   "triangles": 756
+  },
+  "dresser_wood2": {
+   "center": [
+    0.0,
+    1.45,
+    0.0
+   ],
+   "size": [
+    3.8,
+    2.9,
+    1.8
+   ],
+   "triangles": 668
+  },
+  "floor_lamp_brass": {
+   "center": [
+    0.0,
+    2.125,
+    0.0
+   ],
+   "size": [
+    1.24,
+    4.25,
+    1.24
+   ],
+   "triangles": 432
+  },
+  "floor_lamp_cream": {
+   "center": [
+    0.0,
+    4.55,
+    0.0
+   ],
+   "size": [
+    1.38,
+    1.2,
+    1.38
+   ],
+   "triangles": 320
+  },
+  "floor_lamp_glow": {
+   "center": [
+    0.0,
+    4.545,
+    0.0
+   ],
+   "size": [
+    1.32,
+    1.15,
+    1.32
+   ],
+   "triangles": 288
+  },
+  "fridge_appliance": {
+   "center": [
+    0.0,
+    3.275,
+    0.09
+   ],
+   "size": [
+    3.0,
+    6.25,
+    2.62
+   ],
+   "triangles": 676
+  },
+  "fridge_chrome": {
+   "center": [
+    0.0,
+    3.11,
+    -1.2375
+   ],
+   "size": [
+    2.6,
+    5.86,
+    0.285
+   ],
+   "triangles": 400
+  },
+  "fridge_dark": {
+   "center": [
+    0.0,
+    0.075,
+    0.0
+   ],
+   "size": [
+    2.5902,
+    0.15,
+    2.4
+   ],
+   "triangles": 464
+  },
+  "grandfather_clock_black": {
+   "center": [
+    0.0,
+    5.85,
+    -0.65
+   ],
+   "size": [
+    1.08,
+    1.08,
+    0.03
+   ],
+   "triangles": 168
+  },
+  "grandfather_clock_brass": {
+   "center": [
+    0.0,
+    4.345,
+    -0.2899
+   ],
+   "size": [
+    1.9,
+    5.09,
+    0.7701
+   ],
+   "triangles": 1104
+  },
+  "grandfather_clock_cream": {
+   "center": [
+    0.0,
+    5.85,
+    -0.61
+   ],
+   "size": [
+    1.2,
+    1.2,
+    0.06
+   ],
+   "triangles": 476
+  },
+  "grandfather_clock_glass": {
+   "center": [
+    0.0,
+    3.0,
+    -0.545
+   ],
+   "size": [
+    1.15,
+    3.2,
+    0.05
+   ],
+   "triangles": 108
+  },
+  "grandfather_clock_wood": {
+   "center": [
+    0.0,
+    3.775,
+    0.0075
+   ],
+   "size": [
+    1.95,
+    5.75,
+    1.215
+   ],
+   "triangles": 216
+  },
+  "grandfather_clock_wood2": {
+   "center": [
+    0.0,
+    3.585,
+    0.0
+   ],
+   "size": [
+    2.0,
+    7.17,
+    1.4
+   ],
+   "triangles": 840
+  },
+  "guitar_black": {
+   "center": [
+    0.0,
+    1.9725,
+    -0.09
+   ],
+   "size": [
+    0.4,
+    3.905,
+    0.26
+   ],
+   "triangles": 228
+  },
+  "guitar_chrome": {
+   "center": [
+    0.0,
+    2.335,
+    -0.082
+   ],
+   "size": [
+    0.52,
+    3.11,
+    0.184
+   ],
+   "triangles": 216
+  },
+  "guitar_cream": {
+   "center": [
+    0.0,
+    1.6,
+    -0.215
+   ],
+   "size": [
+    0.5,
+    0.5,
+    0.0346
+   ],
+   "triangles": 288
+  },
+  "guitar_wood": {
+   "center": [
+    0.0,
+    1.1285,
+    0.0
+   ],
+   "size": [
+    1.426,
+    2.183,
+    0.4
+   ],
+   "triangles": 608
+  },
+  "guitar_wood2": {
+   "center": [
+    0.0,
+    2.3293,
+    -0.1004
+   ],
+   "size": [
+    0.55,
+    3.2787,
+    0.2992
+   ],
+   "triangles": 324
+  },
+  "kids_bed_accent": {
+   "center": [
+    0.0,
+    2.4734,
+    2.95
+   ],
+   "size": [
+    3.6,
+    1.0132,
+    0.3
+   ],
+   "triangles": 464
+  },
+  "kids_bed_fabric": {
+   "center": [
+    0.0,
+    1.43,
+    -0.734
+   ],
+   "size": [
+    3.45,
+    0.35,
+    4.092
+   ],
+   "triangles": 300
+  },
+  "kids_bed_paint": {
+   "center": [
+    0.0,
+    1.475,
+    -0.0
+   ],
+   "size": [
+    3.6,
+    2.95,
+    6.2
+   ],
+   "triangles": 916
+  },
+  "kids_bed_white": {
+   "center": [
+    0.0,
+    1.2853,
+    0.0
+   ],
+   "size": [
+    3.4,
+    1.0705,
+    5.6
+   ],
+   "triangles": 900
+  },
+  "kids_bed_wicker": {
+   "center": [
+    -0.9,
+    1.835,
+    2.1
+   ],
+   "size": [
+    0.56,
+    0.83,
+    0.56
+   ],
+   "triangles": 448
+  },
+  "laundry_basket_fabric": {
+   "center": [
+    0.25,
+    1.2,
+    0.0
+   ],
+   "size": [
+    0.85,
+    0.4291,
+    0.6137
+   ],
+   "triangles": 300
+  },
+  "laundry_basket_fabric2": {
+   "center": [
+    0.0,
+    1.2,
+    -0.15
+   ],
+   "size": [
+    0.8085,
+    0.4291,
+    0.9436
+   ],
+   "triangles": 300
+  },
+  "laundry_basket_red": {
+   "center": [
+    -0.3,
+    1.28,
+    -0.2
+   ],
+   "size": [
+    0.7388,
+    0.4291,
+    0.9155
+   ],
+   "triangles": 300
+  },
+  "laundry_basket_white": {
+   "center": [
+    -0.25,
+    1.28,
+    0.1
+   ],
+   "size": [
+    0.9495,
+    0.4291,
+    0.8881
+   ],
+   "triangles": 300
+  },
+  "laundry_basket_wicker": {
+   "center": [
+    0.0,
+    0.6,
+    0.0
+   ],
+   "size": [
+    1.764,
+    1.2,
+    1.372
+   ],
+   "triangles": 512
+  },
+  "laundry_basket_wood2": {
+   "center": [
+    0.0,
+    0.722,
+    0.0
+   ],
+   "size": [
+    1.8,
+    0.796,
+    1.3693
+   ],
+   "triangles": 1368
+  },
+  "lawn_mower_dark": {
+   "center": [
+    0.0,
+    1.7946,
+    0.2227
+   ],
+   "size": [
+    1.62,
+    2.5892,
+    3.4454
+   ],
+   "triangles": 448
+  },
+  "lawn_mower_fabric2": {
+   "center": [
+    0.0,
+    1.05,
+    0.85
+   ],
+   "size": [
+    1.4,
+    1.0874,
+    1.3392
+   ],
+   "triangles": 300
+  },
+  "lawn_mower_paint": {
+   "center": [
+    0.0,
+    0.65,
+    -1.0
+   ],
+   "size": [
+    2.0,
+    0.55,
+    2.0
+   ],
+   "triangles": 188
+  },
+  "lawn_mower_red": {
+   "center": [
+    -0.2,
+    1.73,
+    -0.9
+   ],
+   "size": [
+    0.24,
+    0.1,
+    0.24
+   ],
+   "triangles": 44
+  },
+  "lawn_mower_rubber": {
+   "center": [
+    0.0,
+    1.575,
+    -0.045
+   ],
+   "size": [
+    2.19,
+    3.15,
+    4.13
+   ],
+   "triangles": 972
+  },
+  "lawn_mower_steel": {
+   "center": [
+    0.0,
+    0.945,
+    -0.975
+   ],
+   "size": [
+    2.21,
+    1.47,
+    1.85
+   ],
+   "triangles": 460
+  },
+  "microwave_appliance": {
+   "center": [
+    0.0,
+    0.68,
+    0.1
+   ],
+   "size": [
+    2.2,
+    1.24,
+    1.3
+   ],
+   "triangles": 188
+  },
+  "microwave_chrome": {
+   "center": [
+    -0.38,
+    0.67,
+    -0.64
+   ],
+   "size": [
+    0.08,
+    0.85,
+    0.1
+   ],
+   "triangles": 108
+  },
+  "microwave_dark": {
+   "center": [
+    0.0125,
+    0.67,
+    -0.57
+   ],
+   "size": [
+    2.025,
+    1.0,
+    0.06
+   ],
+   "triangles": 216
+  },
+  "microwave_glass": {
+   "center": [
+    0.33,
+    0.67,
+    -0.595
+   ],
+   "size": [
+    1.15,
+    0.75,
+    0.04
+   ],
+   "triangles": 188
+  },
+  "microwave_glow": {
+   "center": [
+    -0.75,
+    0.98,
+    -0.59
+   ],
+   "size": [
+    0.36,
+    0.14,
+    0.03
+   ],
+   "triangles": 108
+  },
+  "microwave_rubber": {
+   "center": [
+    0.0,
+    0.03,
+    0.0
+   ],
+   "size": [
+    1.94,
+    0.06,
+    1.24
+   ],
+   "triangles": 112
+  },
+  "microwave_steel": {
+   "center": [
+    -0.75,
+    0.525,
+    -0.59
+   ],
+   "size": [
+    0.32,
+    0.55,
+    0.04
+   ],
+   "triangles": 648
+  },
+  "mirror_brass": {
+   "center": [
+    0.0,
+    3.8315,
+    0.1
+   ],
+   "size": [
+    1.74,
+    2.2771,
+    0.24
+   ],
+   "triangles": 680
+  },
+  "mirror_mirror": {
+   "center": [
+    0.0,
+    2.75,
+    -0.05
+   ],
+   "size": [
+    1.116,
+    3.51,
+    0.01
+   ],
+   "triangles": 384
+  },
+  "mirror_wood": {
+   "center": [
+    0.0,
+    2.75,
+    0.02
+   ],
+   "size": [
+    1.24,
+    3.9,
+    0.12
+   ],
+   "triangles": 384
+  },
+  "mirror_wood2": {
+   "center": [
+    0.0,
+    2.35,
+    0.0
+   ],
+   "size": [
+    1.68,
+    4.7,
+    1.0
+   ],
+   "triangles": 592
+  },
+  "nightstand_accent": {
+   "center": [
+    -0.35,
+    2.21,
+    0.05
+   ],
+   "size": [
+    0.6,
+    0.32,
+    0.35
+   ],
+   "triangles": 188
+  },
+  "nightstand_brass": {
+   "center": [
+    0.0,
+    1.25,
+    -0.67
+   ],
+   "size": [
+    0.12,
+    0.86,
+    0.12
+   ],
+   "triangles": 448
+  },
+  "nightstand_cream": {
+   "center": [
+    -0.35,
+    2.21,
+    -0.13
+   ],
+   "size": [
+    0.24,
+    0.24,
+    0.02
+   ],
+   "triangles": 76
+  },
+  "nightstand_glass": {
+   "center": [
+    0.45,
+    2.2,
+    -0.05
+   ],
+   "size": [
+    0.24,
+    0.3,
+    0.24
+   ],
+   "triangles": 128
+  },
+  "nightstand_wood": {
+   "center": [
+    0.0,
+    1.25,
+    0.06
+   ],
+   "size": [
+    1.78,
+    1.6,
+    1.48
+   ],
+   "triangles": 216
+  },
+  "nightstand_wood2": {
+   "center": [
+    0.0,
+    0.9475,
+    0.0
+   ],
+   "size": [
+    1.5193,
+    1.895,
+    1.3193
+   ],
+   "triangles": 776
+  },
+  "painting_gold": {
+   "center": [
+    0.0,
+    1.2,
+    -0.02
+   ],
+   "size": [
+    3.0,
+    2.4,
+    0.3
+   ],
+   "triangles": 752
+  },
+  "painting_grass": {
+   "center": [
+    0.015,
+    0.59,
+    0.04
+   ],
+   "size": [
+    2.47,
+    0.7,
+    0.12
+   ],
+   "triangles": 480
+  },
+  "painting_leaf": {
+   "center": [
+    0.8,
+    1.34,
+    0.0
+   ],
+   "size": [
+    0.6,
+    0.66,
+    0.072
+   ],
+   "triangles": 224
+  },
+  "painting_sky": {
+   "center": [
+    0.0,
+    1.2,
+    0.07
+   ],
+   "size": [
+    2.52,
+    1.92,
+    0.05
+   ],
+   "triangles": 12
+  },
+  "painting_sun": {
+   "center": [
+    -0.7,
+    1.65,
+    0.03
+   ],
+   "size": [
+    0.56,
+    0.56,
+    0.056
+   ],
+   "triangles": 224
+  },
+  "painting_wood2": {
+   "center": [
+    0.0,
+    1.2,
+    0.055
+   ],
+   "size": [
+    2.7,
+    2.1,
+    0.21
+   ],
+   "triangles": 40
+  },
+  "photo_album_book2": {
+   "center": [
+    0.17,
+    0.72,
+    0.05
+   ],
+   "size": [
+    0.32,
+    1.25,
+    1.1
+   ],
+   "triangles": 108
+  },
+  "photo_album_book3": {
+   "center": [
+    -0.21,
+    0.72,
+    0.05
+   ],
+   "size": [
+    0.3781,
+    1.2604,
+    1.1
+   ],
+   "triangles": 108
+  },
+  "photo_album_card": {
+   "center": [
+    0.0,
+    0.45,
+    0.005
+   ],
+   "size": [
+    1.8,
+    0.9,
+    1.39
+   ],
+   "triangles": 108
+  },
+  "photo_album_leather": {
+   "center": [
+    0.55,
+    0.72,
+    0.05
+   ],
+   "size": [
+    0.3781,
+    1.2604,
+    1.1
+   ],
+   "triangles": 108
+  },
+  "photo_album_sky": {
+   "center": [
+    -0.5,
+    1.2,
+    -0.29
+   ],
+   "size": [
+    0.4971,
+    0.5365,
+    0.1189
+   ],
+   "triangles": 12
+  },
+  "photo_album_soil": {
+   "center": [
+    0.0,
+    0.88,
+    0.0
+   ],
+   "size": [
+    1.7,
+    0.02,
+    1.28
+   ],
+   "triangles": 12
+  },
+  "photo_album_white": {
+   "center": [
+    -0.5,
+    1.15,
+    -0.25
+   ],
+   "size": [
+    0.6692,
+    0.7972,
+    0.2038
+   ],
+   "triangles": 108
+  },
+  "piano_black": {
+   "center": [
+    0.0,
+    2.64,
+    -0.55
+   ],
+   "size": [
+    4.28,
+    0.1,
+    0.38
+   ],
+   "triangles": 1728
+  },
+  "piano_brass": {
+   "center": [
+    0.0,
+    1.5625,
+    -0.6271
+   ],
+   "size": [
+    5.22,
+    3.125,
+    0.8141
+   ],
+   "triangles": 716
+  },
+  "piano_cream": {
+   "center": [
+    0.3,
+    3.42,
+    -0.39
+   ],
+   "size": [
+    0.8,
+    0.5378,
+    0.1555
+   ],
+   "triangles": 12
+  },
+  "piano_white": {
+   "center": [
+    0.0,
+    2.55,
+    -0.7
+   ],
+   "size": [
+    4.6,
+    0.1,
+    0.7
+   ],
+   "triangles": 108
+  },
+  "piano_wood": {
+   "center": [
+    0.0,
+    1.2,
+    -0.27
+   ],
+   "size": [
+    4.6,
+    1.8,
+    0.06
+   ],
+   "triangles": 108
+  },
+  "piano_wood2": {
+   "center": [
+    0.0,
+    2.2975,
+    0.0
+   ],
+   "size": [
+    5.2,
+    4.605,
+    2.2
+   ],
+   "triangles": 996
+  },
+  "plant_leaf": {
+   "center": [
+    -0.0764,
+    1.8971,
+    -0.0518
+   ],
+   "size": [
+    1.1843,
+    1.723,
+    1.0733
+   ],
+   "triangles": 852
+  },
+  "plant_leaf2": {
+   "center": [
+    0.0175,
+    2.6957,
+    0.0829
+   ],
+   "size": [
+    1.4095,
+    1.8086,
+    1.5449
+   ],
+   "triangles": 1568
+  },
+  "plant_soil": {
+   "center": [
+    0.0,
+    1.07,
+    0.0
+   ],
+   "size": [
+    1.12,
+    0.06,
+    1.12
+   ],
+   "triangles": 92
+  },
+  "plant_terracotta": {
+   "center": [
+    0.0,
+    0.575,
+    0.0
+   ],
+   "size": [
+    1.4,
+    1.15,
+    1.4
+   ],
+   "triangles": 512
+  },
+  "radio_accent": {
+   "center": [
+    0.0,
+    0.45,
+    0.06
+   ],
+   "size": [
+    1.6,
+    0.9,
+    0.68
+   ],
+   "triangles": 300
+  },
+  "radio_chrome": {
+   "center": [
+    0.041,
+    0.614,
+    -0.135
+   ],
+   "size": [
+    1.282,
+    0.932,
+    0.47
+   ],
+   "triangles": 652
+  },
+  "radio_cream": {
+   "center": [
+    0.0,
+    0.45,
+    -0.29
+   ],
+   "size": [
+    1.35,
+    0.62,
+    0.04
+   ],
+   "triangles": 108
+  },
+  "radio_fabric2": {
+   "center": [
+    0.38,
+    0.45,
+    -0.31
+   ],
+   "size": [
+    0.54,
+    0.54,
+    0.04
+   ],
+   "triangles": 284
+  },
+  "radio_glow": {
+   "center": [
+    -0.36,
+    0.56,
+    -0.31
+   ],
+   "size": [
+    0.55,
+    0.24,
+    0.03
+   ],
+   "triangles": 108
+  },
+  "record_player_black": {
+   "center": [
+    0.1,
+    2.75,
+    -0.15
+   ],
+   "size": [
+    1.56,
+    0.03,
+    1.56
+   ],
+   "triangles": 476
+  },
+  "record_player_brass": {
+   "center": [
+    -0.0161,
+    2.2376,
+    -0.0258
+   ],
+   "size": [
+    2.0605,
+    4.4752,
+    1.7916
+   ],
+   "triangles": 1268
+  },
+  "record_player_chrome": {
+   "center": [
+    -0.5507,
+    2.74,
+    0.3507
+   ],
+   "size": [
+    0.8387,
+    0.28,
+    0.8387
+   ],
+   "triangles": 160
+  },
+  "record_player_dark": {
+   "center": [
+    0.1,
+    2.7,
+    -0.15
+   ],
+   "size": [
+    1.64,
+    0.08,
+    1.64
+   ],
+   "triangles": 476
+  },
+  "record_player_fabric2": {
+   "center": [
+    0.0,
+    1.2,
+    -0.98
+   ],
+   "size": [
+    1.9,
+    1.5,
+    0.05
+   ],
+   "triangles": 108
+  },
+  "record_player_red": {
+   "center": [
+    0.1,
+    2.76,
+    -0.15
+   ],
+   "size": [
+    0.5,
+    0.035,
+    0.5
+   ],
+   "triangles": 92
+  },
+  "record_player_wood": {
+   "center": [
+    0.0,
+    2.6,
+    0.0
+   ],
+   "size": [
+    2.3,
+    0.12,
+    2.0
+   ],
+   "triangles": 108
+  },
+  "record_player_wood2": {
+   "center": [
+    0.0,
+    1.4,
+    0.0
+   ],
+   "size": [
+    2.3,
+    2.4,
+    2.0
+   ],
+   "triangles": 188
+  },
+  "rocking_horse_accent": {
+   "center": [
+    0.1258,
+    2.3632,
+    0.0
+   ],
+   "size": [
+    2.9756,
+    1.6536,
+    0.18
+   ],
+   "triangles": 1372
+  },
+  "rocking_horse_black": {
+   "center": [
+    -1.5,
+    2.95,
+    0.0
+   ],
+   "size": [
+    0.1,
+    0.1,
+    0.5
+   ],
+   "triangles": 448
+  },
+  "rocking_horse_brass": {
+   "center": [
+    -1.1,
+    2.62,
+    0.0
+   ],
+   "size": [
+    0.1,
+    0.1,
+    0.9
+   ],
+   "triangles": 28
+  },
+  "rocking_horse_red": {
+   "center": [
+    0.05,
+    2.5,
+    0.0
+   ],
+   "size": [
+    0.75,
+    0.15,
+    0.95
+   ],
+   "triangles": 188
+  },
+  "rocking_horse_wood": {
+   "center": [
+    -0.3799,
+    1.6621,
+    0.0
+   ],
+   "size": [
+    2.7848,
+    3.0593,
+    1.2458
+   ],
+   "triangles": 604
+  },
+  "rocking_horse_wood2": {
+   "center": [
+    0.0,
+    1.62,
+    0.0
+   ],
+   "size": [
+    3.6023,
+    3.06,
+    1.28
+   ],
+   "triangles": 1848
+  },
+  "shoe_cabinet_brass": {
+   "center": [
+    0.0,
+    1.33,
+    -0.54
+   ],
+   "size": [
+    2.0,
+    0.75,
+    0.06
+   ],
+   "triangles": 432
+  },
+  "shoe_cabinet_dark": {
+   "center": [
+    0.0,
+    0.1,
+    0.15
+   ],
+   "size": [
+    3.0,
+    0.2,
+    1.0
+   ],
+   "triangles": 108
+  },
+  "shoe_cabinet_leather": {
+   "center": [
+    0.725,
+    2.5,
+    0.0
+   ],
+   "size": [
+    0.625,
+    0.275,
+    0.75
+   ],
+   "triangles": 448
+  },
+  "shoe_cabinet_paint": {
+   "center": [
+    0.0,
+    1.275,
+    0.0875
+   ],
+   "size": [
+    3.14,
+    2.15,
+    1.2251
+   ],
+   "triangles": 540
+  },
+  "shoe_cabinet_red": {
+   "center": [
+    -0.775,
+    2.5,
+    0.0
+   ],
+   "size": [
+    0.625,
+    0.275,
+    0.75
+   ],
+   "triangles": 448
+  },
+  "shoe_cabinet_rubber": {
+   "center": [
+    -0.025,
+    2.43,
+    0.0
+   ],
+   "size": [
+    2.11,
+    0.06,
+    0.75
+   ],
+   "triangles": 432
+  },
+  "shoe_cabinet_wood": {
+   "center": [
+    0.0,
+    2.4,
+    0.05
+   ],
+   "size": [
+    3.2,
+    0.1,
+    1.3
+   ],
+   "triangles": 108
+  },
+  "sofa_fabric": {
+   "center": [
+    0.0,
+    1.825,
+    0.0129
+   ],
+   "size": [
+    7.2,
+    2.95,
+    3.1258
+   ],
+   "triangles": 2776
+  },
+  "sofa_fabric2": {
+   "center": [
+    0.0,
+    2.3,
+    0.83
+   ],
+   "size": [
+    5.7662,
+    1.1091,
+    0.5234
+   ],
+   "triangles": 600
+  },
+  "sofa_wood2": {
+   "center": [
+    0.0,
+    0.175,
+    0.0
+   ],
+   "size": [
+    6.6787,
+    0.35,
+    2.6787
+   ],
+   "triangles": 560
+  },
+  "toolbox_dark": {
+   "center": [
+    0.0,
+    1.135,
+    0.0
+   ],
+   "size": [
+    0.8693,
+    0.23,
+    0.1
+   ],
+   "triangles": 68
+  },
+  "toolbox_red": {
+   "center": [
+    0.0,
+    0.51,
+    0.04
+   ],
+   "size": [
+    1.98,
+    1.02,
+    0.92
+   ],
+   "triangles": 376
+  },
+  "toolbox_steel": {
+   "center": [
+    0.0,
+    0.65,
+    -0.47
+   ],
+   "size": [
+    1.42,
+    0.6,
+    0.05
+   ],
+   "triangles": 324
+  },
+  "toy_box_accent": {
+   "center": [
+    0.0,
+    0.85,
+    0.003
+   ],
+   "size": [
+    2.98,
+    1.54,
+    1.795
+   ],
+   "triangles": 216
+  },
+  "toy_box_cream": {
+   "center": [
+    -0.65,
+    1.9,
+    0.02
+   ],
+   "size": [
+    0.2,
+    0.2,
+    0.2
+   ],
+   "triangles": 224
+  },
+  "toy_box_dark": {
+   "center": [
+    0.0,
+    1.15,
+    0.0
+   ],
+   "size": [
+    3.0,
+    0.15,
+    0.5
+   ],
+   "triangles": 216
+  },
+  "toy_box_paint": {
+   "center": [
+    0.0,
+    1.1498,
+    0.005
+   ],
+   "size": [
+    3.0,
+    2.2995,
+    1.79
+   ],
+   "triangles": 216
+  },
+  "toy_box_red": {
+   "center": [
+    0.7,
+    1.85,
+    0.25
+   ],
+   "size": [
+    0.56,
+    0.56,
+    0.56
+   ],
+   "triangles": 224
+  },
+  "toy_box_wicker": {
+   "center": [
+    -0.65,
+    1.955,
+    0.3
+   ],
+   "size": [
+    0.66,
+    0.71,
+    0.64
+   ],
+   "triangles": 672
+  },
+  "tv_brass": {
+   "center": [
+    -1.22,
+    1.6,
+    -1.03
+   ],
+   "size": [
+    0.46,
+    0.26,
+    0.04
+   ],
+   "triangles": 216
+  },
+  "tv_chrome": {
+   "center": [
+    -0.4031,
+    3.0454,
+    -0.4239
+   ],
+   "size": [
+    1.9339,
+    1.6908,
+    1.3922
+   ],
+   "triangles": 416
+  },
+  "tv_dark": {
+   "center": [
+    0.0325,
+    2.379,
+    -0.325
+   ],
+   "size": [
+    3.125,
+    2.358,
+    1.41
+   ],
+   "triangles": 632
+  },
+  "tv_glass": {
+   "center": [
+    0.42,
+    2.2,
+    -1.01
+   ],
+   "size": [
+    2.1,
+    1.72,
+    0.12
+   ],
+   "triangles": 300
+  },
+  "tv_wood": {
+   "center": [
+    0.0,
+    2.175,
+    0.1
+   ],
+   "size": [
+    3.35,
+    2.55,
+    2.1
+   ],
+   "triangles": 188
+  },
+  "tv_wood2": {
+   "center": [
+    0.0,
+    0.47,
+    0.0
+   ],
+   "size": [
+    2.7745,
+    0.9102,
+    1.9745
+   ],
+   "triangles": 112
+  },
+  "wardrobe_brass": {
+   "center": [
+    0.0,
+    3.3,
+    -0.8
+   ],
+   "size": [
+    0.66,
+    0.16,
+    0.16
+   ],
+   "triangles": 448
+  },
+  "wardrobe_wood": {
+   "center": [
+    0.0,
+    3.525,
+    0.185
+   ],
+   "size": [
+    4.34,
+    6.35,
+    1.83
+   ],
+   "triangles": 324
+  },
+  "wardrobe_wood2": {
+   "center": [
+    0.0,
+    3.5,
+    0.075
+   ],
+   "size": [
+    4.4,
+    7.0,
+    2.05
+   ],
+   "triangles": 1048
+  },
+  "washing_machine_appliance": {
+   "center": [
+    0.0,
+    1.75,
+    0.13
+   ],
+   "size": [
+    2.8,
+    3.3,
+    2.54
+   ],
+   "triangles": 296
+  },
+  "washing_machine_chrome": {
+   "center": [
+    -0.08,
+    1.88,
+    -1.205
+   ],
+   "size": [
+    1.9,
+    2.6,
+    0.21
+   ],
+   "triangles": 984
+  },
+  "washing_machine_dark": {
+   "center": [
+    0.0,
+    0.05,
+    0.0
+   ],
+   "size": [
+    2.38,
+    0.1,
+    2.38
+   ],
+   "triangles": 112
+  },
+  "washing_machine_glass": {
+   "center": [
+    0.0,
+    1.915,
+    -1.15
+   ],
+   "size": [
+    1.44,
+    2.37,
+    0.08
+   ],
+   "triangles": 584
+  },
+  "washing_machine_steel": {
+   "center": [
+    0.0,
+    1.45,
+    -0.85
+   ],
+   "size": [
+    1.1,
+    1.1,
+    0.05
+   ],
+   "triangles": 124
+  },
+  "washing_machine_white": {
+   "center": [
+    0.85,
+    3.0,
+    -1.15
+   ],
+   "size": [
+    0.75,
+    0.35,
+    0.06
+   ],
+   "triangles": 108
+  }
+ }
+}

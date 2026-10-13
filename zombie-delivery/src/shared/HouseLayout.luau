@@ -3,16 +3,19 @@
 -- deterministic (the same seed and kind give the same plan on every server); it makes no instances.
 -- server/HouseInterior.luau builds a plan, the moving job (server/Moving.luau) carries its pieces out of it.
 --
---   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": Marge's family house in the suburbs, one storey; the
---                                  only kind so far, an unknown kind is a house too). Every position is LOCAL to the
---                                  house's origin: the ground (the floor's top) at the front door's middle, +Z into the
---                                  house, +Y up.
+--   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": Marge's family house in the suburbs, one storey; 7.x
+--                                  "farm": Walt's alpine farm, shared/Layouts/Farm.luau, its plan adds `exits`; an
+--                                  unknown kind is a house). Every position is LOCAL to the house's origin: the ground
+--                                  (the floor's top) at the front door's middle, +Z into the house, +Y up.
 --   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "farm", "hotel") is a function
 --                                  seed's dice → Plan added to KINDS below)
 --   HouseLayout.Recipes            what each room holds: its pieces, how each is placed, the musts and the ★ ones
 --   HouseLayout.extent(id, turn)   a piece's footprint (X, Z) turned by `turn` degrees (a multiple of 90)
 --   HouseLayout.stuck(plan)        the spots whose piece cannot be carried out of the front door (empty for every plan
 --                                  it makes: it checks this while it lays the pieces out)
+--   7.x farm move (server/Moving.luau): HouseLayout.exitsOf(plan) the ways out (a farm's exits, a house's front
+--   door), HouseLayout.entries(plan) where you come in by each, HouseLayout.exitsFor(plan, id) the ways out a piece
+--   may take (a farm's bigDoor piece: the barn doors only)
 --
 -- A Plan:
 --   kind, seed, mirrored          what it is, its dice, and whether it is the left-right mirror of the template
@@ -33,14 +36,18 @@
 --                                 `header` the wall over a doorway; `normal` points into the room
 --   windows                       { room, at, width, height, normal }: on the outer walls' inside faces
 --   fixtures                      { kind, room, at, size, turn, solid }: what stays (counters, the stove, the sink,
---                                 the tub, the toilet, the basin, the workbench, shelves, the fireplace, the garage
---                                 door, rugs ...): `at` the bottom middle, size (along the wall, height, depth), the
---                                 front toward -Z turned by `turn`; a solid one stands in the way
+--                                 the tub, the toilet, the basin, the workbench, shelves, the garage door, rugs ...;
+--                                 7.x alpine: the Kachelofen, the kitchen's corner bench and its corner shelf, the
+--                                 antlers and the pictures high on the walls): `at` the bottom middle, size (along the
+--                                 wall, height, depth), the front toward -Z turned by `turn`; a solid one stands in the
+--                                 way (a corner shelf's corner is at its +X, +Z)
 
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
+local Farm = require(script.Parent.Layouts.Farm) -- 7.x the farm
 
 local T = Config.Furniture
+local A = T.Alpine
 local HouseLayout = {}
 
 export type Axis = "X" | "Z"
@@ -360,6 +367,7 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "coat_rack", how = "corner", must = true },
 		{ item = "shoe_cabinet", how = "wall" },
 		{ item = "plant", how = "corner" },
+		{ item = "ski_bundle", how = "corner", odds = 4 }, -- (7.x alpine)
 	},
 	living = {
 		{ item = "sofa", how = "centre", must = true },
@@ -372,6 +380,11 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "piano", how = "wall", odds = 2 },
 		{ item = "floor_lamp", how = "corner", odds = 2 },
 		{ item = "painting", how = "wall", odds = 1.5 },
+		-- 7.x alpine pieces, a chalet's extras (the sentimental ones are no star entries: the ★ stay the house's own
+		-- star pieces, these are ★ only when a house is short of them)
+		{ item = "cuckoo_clock", how = "wall", odds = 4 },
+		{ item = "heart_chair", how = "wall", odds = 3 },
+		{ item = "accordion", how = "corner", odds = 3 },
 	},
 	kitchen = {
 		{ item = "fridge", how = "corner", must = true },
@@ -383,6 +396,7 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "microwave", how = "wall" },
 		{ item = "dishes_box", how = "corner" },
 		{ item = "radio", how = "wall" },
+		{ item = "stein_crate", how = "corner", odds = 3 }, -- (7.x alpine)
 	},
 	bedroom = {
 		{ item = "bed", how = "far", must = true },
@@ -392,6 +406,10 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "nightstand", how = "beside", ref = "bed" },
 		{ item = "dresser", how = "wall", odds = 1.5 },
 		{ item = "mirror", how = "corner" },
+		-- 7.x alpine
+		{ item = "painted_cupboard", how = "wall", odds = 3 },
+		{ item = "carved_chest", how = "front", ref = "bed", odds = 3 },
+		{ item = "edelweiss_frame", how = "corner", odds = 3 },
 	},
 	kids = {
 		{ item = "kids_bed", how = "far", must = true },
@@ -701,10 +719,22 @@ local function planHouse(seed: number): Plan
 		fixture("cabinets", k, side, z0 + 9.75, 4.5, 3, 1.4, 6.4, false)
 		local dir = if side == "W" then 1 else -1
 		local start = (if side == "W" then inner.x0 else inner.x1) + dir * depth
-		fixture("counter", k, "S", start + dir * 1.5, 3, 3, depth, 0, true)
-		fixture("sink", k, "S", start + dir * 4.5, 3, 3, depth, 0, true)
-		fixture("counter", k, "S", start + dir * 7.5, 3, 3, depth, 0, true)
+		fixture("sink", k, "S", start + dir * 4.5, 9, 3, depth, 0, true) -- (7.x alpine: one run, the sink in its middle)
 		window(k, "S", start + dir * 4.5, T.Window, T.WindowSill)
+		-- 7.x alpine: the corner bench (Eckbank) in the back outer corner, its long leg on the outer wall, its short leg
+		-- on the back wall (clear of the doorway to the corridor: that is at least 8 from the outer wall), and over it
+		-- the Herrgottswinkel's corner shelf (its corner at its +X, +Z: against the outer wall when that is W, else
+		-- against the back wall)
+		local bench = A.Bench
+		fixture("corner_bench", k, side, inner.z1 - bench[1] / 2, bench[1], bench[4], bench[3], 0, true)
+		local short = if side == "W" then inner.x0 + bench[3] + bench[2] / 2 else inner.x1 - bench[3] - bench[2] / 2
+		fixture("bench", k, "N", short, bench[2], bench[4], bench[3], 0, true)
+		local shelf = A.Shelf
+		if side == "W" then
+			fixture("corner_shelf", k, "W", inner.z1 - shelf[1] / 2, shelf[1], 1.4, shelf[1], shelf[2], false)
+		else
+			fixture("corner_shelf", k, "N", inner.x1 - shelf[1] / 2, shelf[1], 1.4, shelf[1], shelf[2], false)
+		end
 	end
 	-- the bathroom: the tub across its back corner, the toilet on the far side wall, the basin and mirror on the other
 	do
@@ -734,21 +764,23 @@ local function planHouse(seed: number): Plan
 		fixture("shelves", g, "N", innerEnd - dir * 2.8, 5, 7, 1.6, 0, true)
 		flat("stain", g, (inner.x0 + inner.x1) / 2, mid + 1, 4, 3, 0)
 	end
-	-- the living room: maybe a fireplace on its outer side wall (else a window there)
-	local fireplace = rng.num() < 0.6
+	-- the living room: the Kachelofen on its outer side wall (7.x alpine: a chalet's tiled stove took the fireplace's
+	-- place and its dice): in the middle, else in the front corner with a window in the middle
+	local stoveMiddle = rng.num() < 0.6
 	do
 		local lv = byId.living
 		local inner = lv.inner
 		local side = outerSide(lv)
 		local mid = (inner.z0 + inner.z1) / 2
-		if fireplace then
-			fixture("fireplace", lv, side, mid, 6, 5, 1.6, 0, true)
+		local stove = A.Stove
+		if stoveMiddle then
+			fixture("kachelofen", lv, side, mid, stove[1], stove[2], stove[3], 0, true)
 		else
+			fixture("kachelofen", lv, side, inner.z0 + stove[1] / 2, stove[1], stove[2], stove[3], 0, true)
 			window(lv, side, mid, T.Window, T.WindowSill)
 		end
 	end
-	-- the hall: a doormat inside the front door
-	flat("mat", byId.hall, 0, HALF_WALL + 1.6, 4.4, 2.4, 0)
+	-- (the hall: its runner from inside the front door; 7.x alpine: no doormat inside any more, the porch has one)
 
 	-- The windows on the outer walls: the front of the living room (two if it is wide), the back of every back room
 	-- but the garage and the bath (it has its own), the outer sides of the back row's end rooms and the corridor's ends.
@@ -1158,7 +1190,8 @@ local function planHouse(seed: number): Plan
 			table.remove(placed, table.find(placed, p) :: number)
 		end
 	end
-	-- exactly Stars ★: the sentimental pieces first, then the dearest
+	-- exactly Stars ★: the sentimental pieces first (the star entries, then a sentimental extra: 7.x alpine), then the
+	-- dearest
 	local stars = 0
 	for _, p in placed do
 		if p.star then
@@ -1168,7 +1201,11 @@ local function planHouse(seed: number): Plan
 	if stars < T.Stars then
 		local byValue = table.clone(placed)
 		table.sort(byValue, function(a: Placed, b: Placed): boolean
-			local va, vb = FurnitureLooks.Items[a.item].value, FurnitureLooks.Items[b.item].value
+			local da, db = FurnitureLooks.Items[a.item], FurnitureLooks.Items[b.item]
+			if da.sentimental ~= db.sentimental then
+				return da.sentimental
+			end
+			local va, vb = da.value, db.value
 			if va ~= vb then
 				return va > vb
 			end
@@ -1212,6 +1249,93 @@ local function planHouse(seed: number): Plan
 		rug("round_rug", "kids", (kids.x0 + kids.x1) / 2, (kids.z0 + kids.z1) / 2, 6, 6, 0)
 		local hall = byId.hall.inner
 		rug("runner", "hall", 0, (hall.z0 + 4 + hall.z1 - 3) / 2, 3.6, hall.z1 - hall.z0 - 7, 0)
+	end
+
+	-- 7.x alpine: the wall decor, high on the walls (its bottom Alpine.Decor up: over every piece and below the
+	-- ceiling's beams), clear of the doorways (and their frames), the windows and the fixtures that reach that high: the
+	-- antlers in the living room, a framed alpine picture in the hall and in the bedroom; over a piece standing at that
+	-- wall where it can (where people hang them), else the wall's middle. Its own dice: the pieces stay where they were
+	-- and the ★ the house's.
+	do
+		local dice = newRng(seed + 7919)
+		local up = A.Decor
+		type Hung = { room: string, side: string, a: number, b: number }
+		local hung: { Hung } = {}
+		local function hang(kind: string, roomId: string, size: { number })
+			local room = byId[roomId]
+			local w = size[1]
+			type DecorSpot = { side: string, t: number, score: number }
+			local cands: { DecorSpot } = {}
+			for _, side in SIDES do
+				local lo, hi = span(room.inner, side)
+				local alongX = side == "S" or side == "N"
+				local blocked: { { number } } = {}
+				for _, gap in openings(room, side) do
+					table.insert(blocked, { gap[1] - 0.6, gap[2] + 0.6 })
+				end
+				for _, wd in windows do
+					if wd.room == roomId and wd.side == side and wd.y + wd.height / 2 > up - 0.3 then
+						table.insert(blocked, { wd.t - wd.width / 2 - 0.4, wd.t + wd.width / 2 + 0.4 })
+					end
+				end
+				local inner = room.inner
+				for _, f in fixtures do
+					local r = f.rect
+					local atWall = (side == "S" and r.z0 <= inner.z0 + 0.6) or (side == "N" and r.z1 >= inner.z1 - 0.6)
+						or (side == "W" and r.x0 <= inner.x0 + 0.6) or (side == "E" and r.x1 >= inner.x1 - 0.6)
+					if f.room == roomId and f.y + f.h > up - 0.3 and atWall then
+						table.insert(blocked, if alongX then { r.x0 - 0.3, r.x1 + 0.3 } else { r.z0 - 0.3, r.z1 + 0.3 })
+					end
+				end
+				for _, h in hung do
+					if h.room == roomId and h.side == side then
+						table.insert(blocked, { h.a - 1, h.b + 1 })
+					end
+				end
+				local t = lo + w / 2 + 0.8
+				while t <= hi - w / 2 - 0.8 + 1e-6 do
+					local free = true
+					for _, b in blocked do
+						if t + w / 2 > b[1] and t - w / 2 < b[2] then
+							free = false
+							break
+						end
+					end
+					if free then
+						local score = 50 + math.abs(t - (lo + hi) / 2)
+						for _, p in placed do
+							if p.room == roomId and p.side == side and p.t then
+								score = math.min(score, math.abs(t - p.t))
+							end
+						end
+						table.insert(cands, { side = side, t = t, score = score })
+					end
+					t += 0.5
+				end
+			end
+			if #cands == 0 then
+				return
+			end
+			table.sort(cands, function(a: DecorSpot, b: DecorSpot): boolean
+				if math.abs(a.score - b.score) > 1e-9 then
+					return a.score < b.score
+				end
+				if a.side ~= b.side then
+					return a.side < b.side
+				end
+				return a.t < b.t
+			end)
+			local n = 1
+			while n < #cands and cands[n + 1].score <= cands[1].score + 1 do
+				n += 1
+			end
+			local c = cands[dice.int(1, n)]
+			fixture(kind, room, c.side, c.t, size[1], size[2], size[3], up, false)
+			table.insert(hung, { room = roomId, side = c.side, a = c.t - w / 2, b = c.t + w / 2 })
+		end
+		hang("antlers", "living", A.Antlers)
+		hang("picture", "hall", A.Picture)
+		hang("picture", "bedroom", A.Picture)
 	end
 
 	-- ── The plan ───────────────────────────────────────────────────────────────
@@ -1302,16 +1426,58 @@ end
 
 local KINDS: { [string]: (number) -> Plan } = {
 	house = planHouse,
+	farm = Farm.plan,
 }
-HouseLayout.Kinds = { "house" }
+HouseLayout.Kinds = { "house", "farm" }
 
 function HouseLayout.plan(seed: number, kind: string): Plan
 	local make = KINDS[kind] or KINDS.house
 	return make(seed)
 end
 
+-- 7.x farm move (server/Moving.luau): a plan's ways out, in order: its exits (a farm's: the front door, the barn doors),
+-- else its one front door (exit).
+function HouseLayout.exitsOf(plan: Plan): { Vector3 }
+	local exits = (plan :: any).exits
+	return if type(exits) == "table" and #exits > 0 then exits else { plan.exit }
+end
+
+-- Where you come in by each exit (the same order): the front door's the plan's entry, another's EntryIn in from its
+-- doorway's inside (the exit) facing into the room behind it.
+function HouseLayout.entries(plan: Plan): { CFrame }
+	local list: { CFrame } = { plan.entry }
+	local exits = HouseLayout.exitsOf(plan)
+	local n = 0
+	for _, door in plan.doors do
+		if door.rooms[2] ~= "outside" then
+			continue
+		end
+		n += 1
+		local exit = exits[n]
+		if n > 1 and exit then
+			local into = Vector3.new(exit.X - door.at.X, 0, exit.Z - door.at.Z)
+			into = if into.Magnitude > 1e-3 then into.Unit else Vector3.new(0, 0, 1)
+			local at = Vector3.new(exit.X, T.EntryUp, exit.Z) + into * T.EntryIn
+			list[n] = CFrame.lookAt(at, at + into)
+		end
+	end
+	return list
+end
+
+-- The exits (indexes into exitsOf) a piece of this FurnitureLooks id can be carried out of: a farm's Farm.exitsFor (a
+-- bigDoor piece only the barn doors), a house's its front door.
+function HouseLayout.exitsFor(plan: Plan, id: string): { number }
+	if plan.kind == "farm" then
+		return Farm.exitsFor(plan :: any, id)
+	end
+	return { 1 }
+end
+
 -- The spots of a plan whose piece cannot be carried out of the front door (with every other piece in place).
 function HouseLayout.stuck(plan: Plan): { number }
+	if plan.kind == "farm" then -- 7.x the farm: its exits (the barn doors too)
+		return Farm.stuck(plan :: any)
+	end
 	local half = plan.wall / 2
 	local walls: { Rect } = {}
 	for _, f in plan.faces do

@@ -388,6 +388,30 @@ check("a new move: its GPS", M.waypoint.X == 263)
 moving.OnClientEvent:Fire("state", nil)
 check("its end clears it (still the move's)", M.waypoint == nil)
 
+-- ── 7.x van moves: the trip line, FINISH (the owner's, asked twice) ──────────
+local tripView = view({ trips = 1, counts = { total = 2, out = 0, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 1, delivered = 1, starsDelivered = 0, lost = 0 } })
+moving.OnClientEvent:Fire("state", tripView)
+local finishButton = named(panel, "Finish")
+local finishBox = box(finishButton)
+local panelNow = box(panel)
+check("7.x van moves: the panel's line says TRIP 2 · delivered 1/2", #all(panel, function(o)
+	return type(o.Text) == "string" and string.find(o.Text, "TRIP 2 · delivered 1/2", 1, true) ~= nil
+end) > 0)
+check("…the owner's FINISH on the panel once something reached the Wall: inside it, clear of the touch buttons", finishButton.Visible
+	and finishBox.x0 >= panelNow.x0 - 0.5 and finishBox.x1 <= panelNow.x1 + 0.5 and finishBox.y0 >= panelNow.y0 - 0.5 and finishBox.y1 <= panelNow.y1 + 0.5
+	and clearOfTouch(finishBox), show(finishBox))
+local finishSends = #sentOn("Moving")
+press(finishButton)
+check("…a first tap asks (TAP TO FINISH), nothing sent", finishButton.Text == "TAP TO FINISH" and #sentOn("Moving") == finishSends, finishButton.Text)
+press(finishButton)
+local finishSent = sentOn("Moving")
+check("…a second tap finishes (Moving: finish)", #finishSent == finishSends + 1 and finishSent[#finishSent][1] == "finish")
+moving.OnClientEvent:Fire("state", view({ mine = false, trips = 1, counts = tripView.counts }))
+check("…not for the crew", not named(panel, "Finish").Visible)
+moving.OnClientEvent:Fire("state", view())
+check("…nor before the first delivery", not named(panel, "Finish").Visible)
+moving.OnClientEvent:Fire("state", nil)
+
 -- ── A resize, a computer ────────────────────────────────────────────────────
 moving.OnClientEvent:Fire("state", view())
 M.touch, M.width, M.height = false, 1280, 684
