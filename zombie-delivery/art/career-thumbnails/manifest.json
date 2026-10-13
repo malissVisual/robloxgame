@@ -1,0 +1,240 @@
+{
+  "schema": 1,
+  "sourceRevision": "dce35d5",
+  "date": "2026-10-12",
+  "scope": "The scenes of Codex's codex/career-thumbnails set (dce35d5, drawn on 882c11c) still on today's career road: the job board's 4 danger tiers (Config.Jobs.Tiers) and all 17 properties (Config.Estate.Properties: 5 garages, 9 homes, 3 offices).",
+  "status": "Wired in 6.23 (src/shared/CareerArt.luau: the CAREER and phone CAREER NEXT LEVEL hero, the ESTATE rows); robloxImage empty until the owner uploads them (the job pictures' steps, design/job-thumbnails/NAHRAT-OBRAZKY.md, with this folder; tools/career-thumbnails/fill-ids.py). Generated 2D concept illustrations (the homes and offices more realistic than the game), not Studio renders. The rest of Codex's set stays on the codex/career-thumbnails branch.",
+  "assets": [
+    {
+      "id": "tier:1",
+      "kind": "tier",
+      "name": "★ Easy jobs",
+      "file": "tier_1.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "4a29112ee09cdde2a6a212eaa1345c2542a07066d6b3e644837a7620a36ad23a",
+      "robloxImage": ""
+    },
+    {
+      "id": "tier:2",
+      "kind": "tier",
+      "name": "★★ Risky jobs",
+      "file": "tier_2.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "f0cd773de71289dedc9215af92ab836e59f2dfbb3996b3b32832473d074ee26d",
+      "robloxImage": ""
+    },
+    {
+      "id": "tier:3",
+      "kind": "tier",
+      "name": "★★★ Deadly jobs",
+      "file": "tier_3.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "2e3dc0a9cb61c357445f382cc7561f5023faa255a42f5ba5a8a300c6c63642f1",
+      "robloxImage": ""
+    },
+    {
+      "id": "tier:4",
+      "kind": "tier",
+      "name": "★★★★ INSANE jobs",
+      "file": "tier_4.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "ac44eaefff8a592f0eece82ec3f8d9126453bec25263cc45332ebeb7e5543b5b",
+      "robloxImage": ""
+    },
+    {
+      "id": "garage:garage_rented",
+      "kind": "garage",
+      "name": "Rented Lockup",
+      "file": "garage_garage_rented.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "7575f2fb56aff596ee2582e09a0d009488d891d0ea285e6a1a87add3b5706acc",
+      "robloxImage": ""
+    },
+    {
+      "id": "garage:garage_south",
+      "kind": "garage",
+      "name": "Southside Garage",
+      "file": "garage_garage_south.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "4a3ed2163b365c9fce9109af284a1bbdec9b27080c2b0abaabed610987e48515",
+      "robloxImage": ""
+    },
+    {
+      "id": "garage:garage_harbor",
+      "kind": "garage",
+      "name": "Harbor Lockup",
+      "file": "garage_garage_harbor.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "bd0637c9e03545ea308a7cf3b31072923ed8e5bb7eab7aa7dc8af0f003638131",
+      "robloxImage": ""
+    },
+    {
+      "id": "garage:garage_north",
+      "kind": "garage",
+      "name": "Highway Garage",
+      "file": "garage_garage_north.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "0e28ffb63b734b55187cb6f975129ab50ba218d5bacca106b0466053531844be",
+      "robloxImage": ""
+    },
+    {
+      "id": "garage:garage_downtown",
+      "kind": "garage",
+      "name": "Downtown Parking",
+      "file": "garage_garage_downtown.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "7e1734c9e1be18e00edb8d4f332c114b2659fdf9c36ec20fd1db8c6986ac4a80",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:elm",
+      "kind": "estate",
+      "name": "Elm Bungalow",
+      "file": "estate_elm.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "99380b38ca8726738b23d77421d10356b1ff10b175a8d52bfcff04a17d7e60fd",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:birch",
+      "kind": "estate",
+      "name": "Birch Cottage",
+      "file": "estate_birch.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "b7187bcbe2da9fae2cc7d904bb8aa72ab7f9c92d5ba97579efa7920f70f54122",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:oak",
+      "kind": "estate",
+      "name": "7 Oak Lane",
+      "file": "estate_oak.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "ec0e1c7f734087808192d3e96226c2af6edcaf8d3b09a2c54952e5ea1f216be5",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:maple",
+      "kind": "estate",
+      "name": "12 Maple Street",
+      "file": "estate_maple.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "6ba85fdfef5e1def37141675bc571208ce84dc646adfb25d2cd611efff587f28",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:sunset",
+      "kind": "estate",
+      "name": "Sunset Villa",
+      "file": "estate_sunset.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "2e7d3ad34b3317177322e362d2cee8364d62ac6bc501a114e5515743575f48fc",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:lakeside",
+      "kind": "estate",
+      "name": "Lakeside Villa",
+      "file": "estate_lakeside.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "dbdb97ff1a236ca44b24d8482da4deffb351c53f13a16b04ca2eb15611ca01a7",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:office_harbor",
+      "kind": "estate",
+      "name": "Harbor Point Office",
+      "file": "estate_office_harbor.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "d72687f301df6dcec8546cd845574397d6e12de6fc1576d0c81fb1cd286b54b6",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:pinecrest",
+      "kind": "estate",
+      "name": "Pinecrest Mansion",
+      "file": "estate_pinecrest.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "adade40fdb10afc6e5b684857001ed230e243a439491c5bcd88456fdcf8a0549",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:oceanview",
+      "kind": "estate",
+      "name": "Ocean View Mansion",
+      "file": "estate_oceanview.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "7e17a843e85e8df30f7b578043a484d7b7787a1939bd2120e30e52f44b44386c",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:office_tower",
+      "kind": "estate",
+      "name": "Dispatch Tower, 8th floor",
+      "file": "estate_office_tower.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "834fbc5e5ef64a126f3f5bccafb1476e9150ac6d082ec5646c3923a5b86684d3",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:hilltop",
+      "kind": "estate",
+      "name": "Hilltop Mansion",
+      "file": "estate_hilltop.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "5c7a2b632391c1632cee35256edbbb2102f007d434b694b41ee07ea6a78b9997",
+      "robloxImage": ""
+    },
+    {
+      "id": "estate:office_penthouse",
+      "kind": "estate",
+      "name": "Dispatch Tower Penthouse",
+      "file": "estate_office_penthouse.png",
+      "source": "concept-scene",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "b9200cc79fc893eb99ba27886509893795b59d3e3d260caa546db720c3cbc210",
+      "robloxImage": ""
+    }
+  ]
+}

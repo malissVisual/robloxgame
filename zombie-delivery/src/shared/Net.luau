@@ -68,6 +68,7 @@ local NAMES = {
 	"Tasks", -- 6.12: client → server: ("open") or ("claim", 1 … 3 | "bonus" | "weekly"); server → client: ("state", view), ("done", { title, weekly, money, xp }), ("claimed", { title, money, xp }) (server/Tasks.luau, client/TasksApp.luau)
 	"ClientError", -- 6.13: client → server: (script name, line) a script error on this client, counted by script (client/Unstuck.luau sends it, a few a minute at most; server/Analytics.luau; Roblox's Error Report keeps the message)
 	"Skills", -- 6.20: client → server: ("buy", skill id) a rank more, ("reset") every point back (free; never during a job or a mission); the ranks reach the client in the state (skills) and the player attribute Skills (server/Skills.luau, shared/Skills.luau)
+	"Knock", -- 6.24: server → client: (velocity Vector3) a brute's blow or a bloater's blast throws you (client/ZombieFx.luau pushes your body; server/Zombies.luau, at most every Config.ZombieTypes.KnockEvery s)
 }
 
 local folder: Folder

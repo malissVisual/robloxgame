@@ -89,7 +89,7 @@ safely("BusMapBoard", require(Client.BusMapBoard).start) -- 6.3: the bus map on 
 safely("RentalUi", require(Client.RentalUi).start) -- 5.6: ZDC RIDE's Rent / Return prompts, each player the one that fits
 safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley; 6.10: a jump on a start platform grabs it
 require(Client.ZipRide).notify = Hud.toast
-safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms
+safely("GaitPose", require(Client.GaitPose).start) -- 6.24: the gait (the walk, the run, the jump, the idle's life; 6.0's sprint)
 safely("BodyLife", require(Client.BodyLife).start) -- 6.7: the breath, the weight shift, the head, blinks, the landing, the flinch, the walk
 safely("BagSway", require(Client.BagSway).start) -- 6.1: the bag in the hand swings on a spring (its only writer)
 safely("KeyHints", function() -- 6.1: the quiet key hints under the top buttons (F1 folds them)
@@ -104,6 +104,7 @@ safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SH
 safely("EnemyOutline", require(Client.EnemyOutline).start) -- 6.15: a subtle outline on the enemies (zombies red, bandits orange)
 safely("JobThumbs", require(Client.JobThumbUi).preload) -- 6.16.1: the job and chapter pictures fetched ahead (JOBS shows them at once)
 safely("ZombieLife", require(Client.ZombieLife).start) -- 6.16: the zombies' eyes glowing at night, their groans, screams, grunts
+safely("ZombieFx", require(Client.ZombieFx).start) -- 6.24: the bloaters' glow, swell and hiss, the brutes' clink, the runners' shriek, a knock
 safely("EventBanner", require(Client.EventBanner).start) -- 6.15: the live event's banner at the top, its stings
 safely("CarSway", require(Client.CarSway).start) -- 6.16: the cars' bodies roll in a turn, dip on the brake, squat on the throttle
 safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyre smoke from the wheels, skid marks (after CarSway)

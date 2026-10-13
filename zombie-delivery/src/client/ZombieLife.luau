@@ -14,7 +14,8 @@
 --       scream a runner coming at you (within Scream.Range, faster than Speed, heading your way): a shriek, once every
 --               Again s a runner;
 --       grunt   a hit (ZombieAnimator.onHit; a hard one louder), a gurgle on a death, a snarl on a bite or a swipe
---               near you, a thud on a brute's step (a footstep cue pitched down).
+--               near you, a thud on a brute's step (a footstep cue pitched down; 6.24: within Stomp.Shake studs of you
+--               the camera shakes a little).
 --     Each kind its pitch (Config.ZombieLife.Pitch, ± Spread a zombie: shared/ZombieStyle.luau gait).
 -- Looked at four times a second; the bodies' humanoids and roots come from client/Bodies.luau's cache; the zombies that
 -- left are forgotten now and then.
@@ -30,6 +31,7 @@ local SoundSheet = require(Shared:WaitForChild("SoundSheet"))
 local ZombieStyle = require(Shared:WaitForChild("ZombieStyle"))
 local Bodies = require(script.Parent.Bodies)
 local Sounds = require(script.Parent.Sounds)
+local CameraRig = require(script.Parent.CameraRig) -- 6.24: a brute's step shakes the camera a little
 local ZombieAnimator = require(script.Parent.ZombieAnimator)
 
 local ZombieLife = {}
@@ -315,6 +317,19 @@ local function onStomp(model: Model, at: Vector3)
 		return
 	end
 	Sounds.playAt("step_concrete_a", at, Stomp.Volume, Stomp.Pitch, Stomp.Range + 20)
+	-- 6.24: the ground shakes under you a little near a brute
+	local character = player.Character
+	local root: BasePart? = nil
+	if character then
+		local _, found = Bodies.of(character)
+		root = found
+	end
+	if root then
+		local near = (root.Position - at).Magnitude
+		if near < Stomp.Shake then
+			CameraRig.shake(Stomp.ShakeAmount * (1 - near / Stomp.Shake))
+		end
+	end
 end
 
 function ZombieLife.start()

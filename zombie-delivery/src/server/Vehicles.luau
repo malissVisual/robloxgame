@@ -147,6 +147,14 @@
 -- the brake and squats it as it pulls away (client/CarSway.luau); the server never moves it, so it sits on the chassis
 -- there. The hull (the physics), the wheel colliders, the tyres and the seats stay on the chassis: nothing that
 -- collides moves (a hull box you see on a car without the fleet's skin is hidden behind a non-colliding twin).
+-- 6.24, A BIKE NO LONGER ROLLS OVER (the owner's screenshot: a bike lying flat on its side, its rider on it). 6.19 put
+-- the saddle (and so the rider's torso) inside the pedal bikes' hidden hull box; the body passes through the bike on
+-- the moves on and off only on its own client (the group "Boarding"), so the server, which runs an empty bike, pushed
+-- the light bike out from under it, and the body (moved in the bike's own space) followed: over it went. Lying flat,
+-- KeepUpright has no turn to give (its right side points straight up). Now the pedal bikes' hull boxes only take
+-- hits (CanCollide off), the owner's body never collides with their bike (passRider: NoCollisionConstraints), and
+-- server/BikeRighting.luau stands a bike tipped over for a second back up (its AlignOrientation "Righting";
+-- Vehicles.standUp when it is wedged).
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -2644,6 +2652,13 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		local p = newPart(model, name, b.size, top * CFrame.new(b.offset) * tilted(b), c, material)
 		p.Massless = true
 		p.CustomPhysicalProperties = FRICTIONLESS
+		if style.bike and not style.stand then
+			-- 6.24: a pedal bike's hidden boxes over its chassis are only hit boxes now (rays still find them; the
+			-- chassis and the wheel colliders are its hull). Since 6.19 the rider sits INSIDE them (the saddle at
+			-- BikeArt.Scale, these boxes at 5.1's size), so a body that was not welded to the bike (the moves on and
+			-- off the saddle as the server sees them) was pushed out of them sideways: the bike rolled over.
+			p.CanCollide = false
+		end
 		if b.kind == "glass" then
 			p.Transparency = 0.45
 		elseif b.kind == "ball" then
@@ -2912,6 +2927,17 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		upright.PrimaryAxis = Vector3.yAxis
 		upright.Responsiveness = 40
 		upright.Parent = chassis
+		-- 6.24: KeepUpright holds a bike that stands, but one lying flat on its side (its right side straight up) gets
+		-- no turn from it at all, and one on its back already counts as level. "Righting" (off until server/
+		-- BikeRighting.luau sees a bike tipped over) turns the whole bike back onto its wheels, facing where it pointed.
+		local righting = Instance.new("AlignOrientation")
+		righting.Name = "Righting"
+		righting.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		righting.Attachment0 = level
+		righting.Responsiveness = Config.BikeUpright.Responsiveness
+		righting.MaxAngularVelocity = Config.BikeUpright.TurnRate
+		righting.Enabled = false
+		righting.Parent = chassis
 	end
 
 	-- The cargo: the back door (server/Cargo.luau puts the Load / Take out prompt there) and the passengers' door.
@@ -3297,6 +3323,44 @@ local function boardSeconds(car: Car): number
 	return if car.model:GetAttribute("Bike") == true then Config.Interact.BikeMount else Config.Cargo.BoardSeconds
 end
 
+-- 6.24: a bike and its rider's body never collide (NoCollisionConstraints in the bike's folder "RiderPass", made for
+-- the character its owner has now: at the spawn, the E and the seat). The client moves the body onto and off the
+-- saddle through the bike in the collision group "Boarding" (client/CarBoarding.luau), but that group is only on its
+-- own screen: the server, which runs a bike standing empty (Vehicles.claim), saw the body inside the bike on every
+-- move on and off and pushed the light bike away from it, and the body, moved in the bike's own space, followed it:
+-- the bike rolled over onto its side. A car is too heavy and too wide for that.
+local function passRider(car: Car, character: Instance?)
+	if not character or not character:IsA("Model") or car.model:GetAttribute("Bike") ~= true or car.wrecked then
+		return
+	end
+	local old = car.model:FindFirstChild("RiderPass")
+	if old then
+		local first = old:FindFirstChildWhichIsA("NoCollisionConstraint")
+		local part = first and first.Part1
+		if part and part.Parent == character then
+			return -- (made for this body already)
+		end
+		old:Destroy()
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "RiderPass"
+	for _, mine in car.model:GetChildren() do
+		if not mine:IsA("BasePart") or not mine.CanCollide then
+			continue
+		end
+		for _, body in character:GetChildren() do
+			-- (the torso, the head and the root, and whatever else of the body collides now)
+			if body:IsA("BasePart") and (body.CanCollide or body.Name == "HumanoidRootPart" or body.Name == "Head" or string.find(body.Name, "Torso") ~= nil) then
+				local pass = Instance.new("NoCollisionConstraint")
+				pass.Part0 = mine
+				pass.Part1 = body
+				pass.Parent = folder
+			end
+		end
+	end
+	folder.Parent = car.model
+end
+
 -- The E at a door, checked: the seat is reserved and the move starts (the player's client plays it). 5.7: `lead`
 -- seconds later (a rented scooter slides off its dock first: Vehicles.mount); the client walks to the side meanwhile.
 local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat, index: number, humanoid: Humanoid, lead: number?)
@@ -3304,6 +3368,7 @@ local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat,
 	if not character or not character:IsA("Model") then
 		return
 	end
+	passRider(car, character) -- 6.24: onto a bike, the body passes through it on the server too
 	local cfg = Config.Cargo
 	local now = workspace:GetServerTimeNow() + math.max(0, lead or 0)
 	local door = car.doors[index]
@@ -3385,6 +3450,7 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driv
 				sitting = occupant
 				if driver then
 					Vehicles.claim(car) -- 6.13.1: its driver's client drives it
+					passRider(car, occupant.Parent) -- 6.24: off a bike again, the body passes through it (any way on)
 				end
 			end
 			return
@@ -3681,6 +3747,24 @@ end
 -- 5.1: is this car a bike (CarDef.bike)?
 function Vehicles.isBike(car: Car): boolean
 	return styleOf(car).bike == true
+end
+
+-- 6.24: a bike that lay over and did not come up by server/BikeRighting.luau's turn (wedged against something) is
+-- stood up where it lies: on the ground under it (Vehicles.groundY), facing `heading` (flat), Config.BikeUpright.Lift
+-- over its wheels (it drops onto them), still and with its rider on it.
+function Vehicles.standUp(car: Car, heading: Vector3)
+	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
+		return
+	end
+	local style = styleOf(car)
+	local at = car.chassis.Position
+	local ground = Vehicles.groundY(at.X, at.Z, at.Y)
+	local position = Vector3.new(at.X, ground + style.clearance - car.lower + CHASSIS_HEIGHT / 2 + Config.BikeUpright.Lift, at.Z)
+	local flat = Vector3.new(heading.X, 0, heading.Z)
+	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+	car.chassis.AssemblyLinearVelocity = Vector3.zero
+	car.chassis.AssemblyAngularVelocity = Vector3.zero
+	car.chassis.CFrame = CFrame.lookAt(position, position + look) -- (the whole bike follows, the rider with it)
 end
 
 -- 3.4: how many pieces the car takes at once (3.5: at its stage). 4.6: with the cargo's look, the Roof Rack's slot
@@ -4068,6 +4152,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	end
 
 	Vehicles.claim(car) -- 6.13.1: the server's until its driver sits (the seat's watcher hands it over)
+	passRider(car, player.Character) -- 6.24: a bike put out next to you is never pushed away by your body
 
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")

@@ -37,10 +37,13 @@
 --   * the phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls the palm and the screen up to the face;
 --   * every joint goes through client/PoseLedger.luau (the layers share the joints: ArmPose.armsBusy / legsBusy tell
 --     client/BodyLife.luau to step aside).
+-- 6.24: the second stage of client/PoseLedger.luau, after client/GaitPose.luau's gait: the aim, the carry, the phone,
+-- a swing and a gesture go toward their own poses from the walking arms (so they always win), and the waist's lean
+-- into the speed and against the braking is the gait's while it walks the body (GaitPose.moving); the carry's lean
+-- back stays here.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
 local Melee = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Melee"))
@@ -53,7 +56,7 @@ local ShotFeel = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
-local SprintPose = require(script.Parent.SprintPose) -- 6.0.1: its run cycle leans the waist itself
+local GaitPose = require(script.Parent.GaitPose) -- 6.24: its gait leans the waist into the speed itself
 local Ledger = require(script.Parent.PoseLedger) -- 6.7
 
 local ArmPose = {}
@@ -604,25 +607,26 @@ local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, 
 	local now = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	local braking = math.max(0, state.speed - now) / math.max(dt, 1 / 240)
 	state.speed = now
-	-- 6.8 review: on its feet as client/SprintPose.luau sees it (not seated, platform-standing, on a zip line or a
+	-- 6.8 review: on its feet as client/GaitPose.luau sees it (not seated, platform-standing, on a zip line or a
 	-- ladder, in a move of client/Interact.luau, climbing, swimming, dead …; a jump or a fall still eases the lean out).
 	-- Otherwise the waist is let go at once: an interaction move reads the waist back every frame and a braking lean
 	-- built up on it (about 7°).
-	if not humanoid or not SprintPose.onFoot(character, humanoid, mine, true) then
+	if not humanoid or not GaitPose.onFoot(character, humanoid, mine, true) then
 		if written[waist] then
 			layer(waist, nil)
 		end
 		state.amount = 0
 		return
 	end
-	-- (6.0.1: the sprint's lean is client/SprintPose.luau's run cycle while it runs: this one steps aside)
+	-- (6.24: the lean into the speed and against the braking is client/GaitPose.luau's while it walks the body: this one
+	-- steps aside, only a body the gait leaves alone (beyond its range) leans here)
 	-- 6.7: a load in both hands (a heavy one that slows you more) leans the upper body back against it
 	local carry = carries[character]
 	local load = if carry and carry.kind ~= "phone" and carry.kind ~= "horse" and character:GetAttribute("Pushing") == nil
 		then carry.t * math.rad(if character:GetAttribute("CarrySpeed") ~= nil then B.CarryHeavy elseif character:GetAttribute("CarryHands") == 1 then 0 else B.CarryLean)
 		else 0
-	local goal = LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) * (1 - SprintPose.weight(character))
-		- LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1) - load
+	local goal = (LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) - LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1))
+		* (1 - GaitPose.moving(character)) - load
 	state.amount += (goal - state.amount) * math.min(1, dt * 8)
 	if math.abs(state.amount) < 0.002 and math.abs(goal) < 0.002 then
 		if written[waist] then
@@ -1014,7 +1018,8 @@ end
 function ArmPose.start()
 	-- PreSimulation runs after the Animator and before the engine applies the joints: what is written here is what
 	-- this client shows (a write in RenderStepped or Heartbeat would be overwritten by the next animation step).
-	RunService.PreSimulation:Connect(step)
+	-- 6.24: client/PoseLedger.luau's second stage, after the gait.
+	Ledger.stage(20, "ArmPose", step)
 	-- 5.9.2: the people of the world, followed from their folder (made by the server, maybe later)
 	local folder = workspace:FindFirstChild("Npcs")
 	if folder then

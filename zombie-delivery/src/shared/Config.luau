@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.23"
+Config.Version = "6.24"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -85,7 +85,9 @@ Config.Body = {
 	FlinchOut = 0.38,
 	FlinchBack = 10,
 	FlinchTurn = 16,
-	-- The walk (WalkFrom studs / s up to Config.Courier.Sprint.From, where client/SprintPose.luau's run takes over): the
+	-- 6.24: the walk's weight and the landing below are client/GaitPose.luau's gait now (Config.Gait); these numbers stay
+	-- shared/BodyMotion.luau's (stride, landDrop: tests/bodymotion_test.luau).
+	-- The walk (WalkFrom studs / s up to Config.Courier.Sprint.From, where the sprint's run takes over): the
 	-- stock walk's own thighs give the weight: the body sinks WalkBob studs with the legs apart (Spread degrees at the
 	-- widest), the arms swing WalkArm of the legs' spread more, the chest turns WalkTwist degrees against the hips.
 	WalkFrom = 4,
@@ -111,6 +113,136 @@ Config.Body = {
 	-- it, then comes up into them as the body rises.
 	PickupLift = 0.4,
 	Gestures = { pickup = 0.7, land = 0.42 } :: { [string]: number },
+}
+
+-- 6.24, the gait (the owner: "better animations, how he walks and moves"): client/GaitPose.luau walks every courier and
+-- person near the camera with shared/Gait.luau's procedural gait over the stock tracks (they stay underneath: a far body
+-- shows them alone). Speeds in studs / s, angles in degrees, times in seconds; "legs" are the body's own leg, hip to sole
+-- (the classic R15's 2 studs), so a kid steps in proportion.
+Config.Gait = {
+	Range = 150, -- studs from the camera: the bodies walked (yours always) …
+	MaxPosed = 40, -- … at most this many, the nearest …
+	Detail = 60, -- … the whole gait this close (ground rays, fidgets); farther it is worked out FarHz times a second
+	FarHz = 15,
+	Retarget = 0.4, -- seconds between the looks for whom to walk
+	-- The walk. A cycle (two steps) covers StrideBase legs + StrideGain × the speed, so the steps quicken with the speed
+	-- (about 1.6 cycles a second at the aim's 3.5, 2.4 at the brisk 14). A foot on the ground is planted: it goes back
+	-- under the body at the body's speed (the leg reaches it: two bones), rolling from the heel onto the toe.
+	StrideBase = 0.55,
+	StrideGain = 0.335,
+	WalkRef = 14, -- the brisk walk (Config.Movement.Walk): the swings, rolls and sways below are full here
+	DutySlow = 0.62, -- the share of a cycle a foot is down, strolling …
+	DutyBrisk = 0.52, -- … and at WalkRef
+	Lift = 0.12, -- legs: the swinging foot's lift at WalkRef …
+	LiftSlow = 0.04, -- … and strolling
+	Heel = 15, -- the heel strike's toe-up at WalkRef …
+	Toe = 32, -- … and the push-off's heel-up
+	Reach = 0.995, -- of the leg the knee never straightens past (a soft knee)
+	MaxDrop = 0.12, -- legs: the hips dip at most this much reaching for both feet (the walk's bob comes from this) …
+	DipRate = 30, -- … followed at this rate (1 / s: the reach turns steeply near the leg's length, no snap)
+	MoveFrom = 0.8, -- faster than this a body walks …
+	StopBelow = 0.5, -- … and slower than this it settles
+	StartTime = 0.14, -- seconds the stride takes to open from standing
+	SettleTime = 0.3, -- seconds of the settling step (the trailing foot comes down beside the other) …
+	LetGo = 0.25, -- … then back to the stock idle over this
+	-- The body over the steps (at WalkRef; strolling the *Slow ones; nothing standing still).
+	Sway = 0.025, -- legs the hips shift over the foot on the ground …
+	SwaySlow = 0.04,
+	HipRoll = 4.5, -- the free side's hip drops
+	HipTurn = 6, -- the hips turn with the leg in front …
+	ChestTurn = 7, -- … and the shoulders against them
+	HeadKeep = 0.85, -- the neck takes back this share of the body's turns and tips: the head stays level
+	WalkLean = 3, -- the upper body forward at WalkRef
+	ArmSwing = 32, -- the arms forward and back against the legs …
+	ArmSlow = 7,
+	Elbow = 24, -- the elbows bent …
+	ElbowSlow = 8,
+	ElbowForward = 18, -- … more on the forward swing
+	ArmOut = 5, -- the arms a little away from the body
+	ArmLag = 0.04, -- of a cycle the arms come after the legs
+	-- Walking any way (aiming, the body faces the crosshair): the hips turn toward where you go, at most StrafeYaw
+	-- (backwards: against it, the legs walk back), the chest turns back to the front (all of it aiming, ChestFollow of it
+	-- else); the feet never cross (FootGap legs from the middle at least).
+	StrafeYaw = 55,
+	YawRate = 9,
+	ChestFollow = 0.5,
+	FootGap = 0.06,
+	-- The run: from RunFrom the walk turns into Config.Courier.Sprint's run cycle (shared/RunCycle.luau), all of it at
+	-- the sprint's From; the run's keys sit RunPhase of a cycle after the walk's.
+	RunFrom = 15,
+	RunPhase = 0.08,
+	-- Starting and stopping: the body leans into the speed it gains (Accel degrees per stud / s², at most LeanMax
+	-- forward, LeanBack back braking) on a spring (LeanHz, LeanDamp: a small sway forward as it stops); LeanRoot of it
+	-- tips the whole body about the feet, the rest bends the waist.
+	Accel = 0.18,
+	LeanMax = 9,
+	LeanBack = 7,
+	LeanHz = 2.4,
+	LeanDamp = 0.5,
+	LeanRoot = 0.35,
+	-- Turning: the body leans into the turn about the feet, TurnLean of what the turn's pull would tip it, at most
+	-- TurnMax.
+	TurnLean = 0.8,
+	TurnMax = 11,
+	-- Slopes (a ray down every SlopeEvery seconds, within Detail): the feet land on the slope, the body leans into it
+	-- (SlopeLean degrees per stud of rise a stud: uphill forward), the stride shortens SlopeStride of it.
+	SlopeEvery = 0.15,
+	SlopeLean = 14,
+	SlopeStride = 0.3,
+	-- Out of breath (your breath, client/Stamina.luau; another courier's guessed from their sprint): under TiredFrom of
+	-- it the run tires (the body hunches, the head drops, the arms pump lower and across, the body wobbles). Spent
+	-- (under 5 %, until half is back) the walk droops, and standing still with a hand free the courier catches the breath
+	-- bent over, the hands on the knees (CatchAfter seconds after stopping, until CatchUntil of the breath is back).
+	TiredFrom = 0.4,
+	TiredLean = 9,
+	TiredHead = 10,
+	TiredArms = 0.35,
+	TiredWobble = 3,
+	SpentHead = 8,
+	SpentArms = 0.6,
+	CatchAfter = 0.35,
+	CatchUntil = 0.55,
+	-- The jump: up from the ground faster than JumpFrom the body springs out of a crouch (TakeoffDrop legs over
+	-- TakeoffTime), tucks the knees rising, reaches for the ground falling and flails falling long (FlailAfter). A body
+	-- in the air under FallAfter (a kerb's step down) is not posed.
+	JumpFrom = 8,
+	TakeoffDrop = 0.17,
+	TakeoffTime = 0.14,
+	FallAfter = 0.15,
+	FlailAfter = 0.9,
+	AirBlend = 0.08, -- seconds into the air pose (falling) …
+	JumpBlend = 0.06, -- … and jumping
+	-- The landing squashes by the height fallen: LandMin legs from LandFrom studs up to LandMax at LandFull (never more:
+	-- client/Unstuck.luau sets a body hung 0.8 studs low straight), LandDown seconds down, LandUp (LandUpFull from a
+	-- full fall) back up; landing on the move MoveLand of it.
+	LandFrom = 1.5,
+	LandFull = 30,
+	LandMin = 0.05,
+	LandMax = 0.28,
+	LandDown = 0.07,
+	LandUp = 0.22,
+	LandUpFull = 0.55,
+	LandLean = 16,
+	MoveLand = 0.55,
+	Lowest = 0.72, -- studs: the Root joint never hangs lower, whatever adds up (a squash, a crouch, the catch)
+	-- Idle: after IdleAfter seconds standing still a small fidget now and then (about every FidgetEvery seconds, each
+	-- body its own moment; their seconds in Fidgets), what fits the hands: a look round, a stretch, a look at the watch,
+	-- the shoulders rolled, the gun checked, a peek into the bag, the load hoisted. None with Reduced Motion.
+	IdleAfter = 5,
+	FidgetEvery = 9,
+	Fidgets = { look = 3.2, stretch = 2.8, watch = 2.2, shoulders = 2.4, checkgun = 2.4, peek = 2, hoist = 1.3 } :: { [string]: number },
+	-- What the hands hold: the gun out (not aiming) is held low and ready (GunHold: the right shoulder's x, y, z, the
+	-- elbow, the wrist), swinging GunSwing of a free arm; the bag in the left hand hangs out (Config.Courier.BagArm);
+	-- a load in the hands widens the stance (CarryWide legs), shortens the steps (CarryStride) and sways the hips
+-- CarrySway × as much (a heavy one);
+	-- aiming the knees soften (AimDrop legs). Blended in and out over HoldBlend.
+	GunHold = { 24, 8, 0, 62, -14 } :: { number },
+	GunSwing = 0.2,
+	CarryWide = 0.06,
+	CarryStride = 0.85, -- … and shortens the steps
+	CarrySway = 1.7,
+	AimDrop = 0.03,
+	HoldBlend = 0.25,
 }
 
 -- 3.9: the gun goes away (B: holster / draw) and the hands fight (V: melee). Holstered (the default after every spawn)
@@ -1792,7 +1924,35 @@ export type ZombieDef = {
 	-- People (bandits, gunners, the base's soldiers): they only go after players on a job (Zombies.hunts). Without
 	-- one they stand guard; they never roam (Config.Horde.Roam).
 	jobOnly: boolean?,
+	-- 6.24, the special zombies (server/Zombies.luau; the rules shared/ZombieKinds.luau; see Config.ZombieTypes):
+	xp: number?, -- XP for the kill, on top of everything else (the kill reward is `reward`, "KillReward")
+	noLatch: boolean?, -- too big to hang on a car: it hits it from the ground
+	carDamage: number?, -- a blow on a car from the ground (else `damage`) …
+	carBump: number?, -- … and the car keeps this share of its speed (the Bump remote)
+	lunge: LungeDef?, -- the runner's leap at a player on foot
+	shove: ShoveDef?, -- its bite throws a player on foot back
+	armour: ArmourDef?, -- the brute's plates: less damage from the front and from small guns
+	blast: BlastDef?, -- the bloater: it blows up (when killed, or once it reaches you)
 }
+
+-- 6.24: the runner's leap. Within range[1] … range[2] studs of a player on foot, on the ground, every `every` s (± 15 %)
+-- it leaps at them: pushed `speed` studs / s forward and `up` up for `push` s (a LinearVelocity on its root: its walk
+-- cannot cancel it), then it flies on and lands; within `reach` studs of them during the `time` s of the leap its
+-- strike lands once (`damage`, through the vest: server/Armour.luau).
+export type LungeDef = { range: { number }, every: number, speed: number, up: number, push: number, time: number, damage: number, reach: number }
+-- 6.24: a bite that throws the player back: `speed` studs / s away, `up` up (the Knock remote: the client pushes its own
+-- body for Config.ZombieTypes.KnockTime s), at most every `every` s a zombie.
+export type ShoveDef = { speed: number, up: number, every: number }
+-- 6.24: armour plates (shared/ZombieKinds.luau armourShare). A hit within `angle` degrees of where it faces takes
+-- `front` of the damage; a small gun's round (at most `smallDamage` a pellet, fewer than `pellets` pellets) `small`
+-- (both: multiplied); never less than `least`. Full damage always: a headshot, a blast, a car, a fire, a shotgun.
+export type ArmourDef = { front: number, angle: number, small: number, smallDamage: number, least: number, pellets: number }
+-- 6.24: a blast (shared/ZombieKinds.luau blastShare). Within `trigger` studs of a player on foot (or touching a car) it
+-- stops, hisses and swells for `fuse` s and goes off; killed (a shot, a car, a blast: the chain) it goes off after
+-- `deathFuse` s. Full damage within `inner` studs, falling to `edge` of it at `radius` (nothing farther): `player`
+-- (through the vest), `car`, `zombie` (every other zombie: a blast, no armour helps; one of these dying goes off too).
+-- A player on foot is thrown `knock` studs / s away (+ `knockUp`) at full, a car keeps `carBump` of its speed.
+export type BlastDef = { trigger: number, fuse: number, deathFuse: number, radius: number, inner: number, edge: number, player: number, car: number, zombie: number, knock: number, knockUp: number, carBump: number }
 
 Config.Zombies = {
 	walker = {
@@ -1807,17 +1967,21 @@ Config.Zombies = {
 		shirt = { 90, 80, 70 },
 		pants = { 50, 55, 75 },
 	},
+	-- 6.24: thin and fast (a sprint's pace), little health; it leaps at you from a few strides away. More of them at
+	-- night and in the later missions (Config.ZombieTypes.Spawn, Config.Missions.Fixed.RunnerGrow).
 	runner = {
 		name = "Runner",
 		health = 35,
 		speed = 27,
 		damage = 4,
 		attackEvery = 0.7,
-		reward = 7,
+		reward = 8,
+		xp = 1,
 		scale = 0.9,
 		skin = { 150, 160, 110 },
 		shirt = { 150, 40, 40 },
 		pants = { 40, 40, 40 },
+		lunge = { range = { 7, 16 } :: { number }, every = 4, speed = 42, up = 9, push = 0.25, time = 0.7, damage = 8, reach = 5 },
 	},
 	soldier = {
 		name = "Soldier",
@@ -1868,19 +2032,84 @@ Config.Zombies = {
 		fireEvery = 1.8,
 		accuracy = 0.6,
 	},
+	-- 6.24: big, slow, armour plates on its chest, shoulders, arms and shins (none on its back): a hit from the front or
+	-- a small gun's round does far less (aim for the head, flank it, bring a shotgun or something that explodes). Its
+	-- blow throws you back and dents a car hard.
 	brute = {
 		name = "Brute",
 		health = 420,
 		speed = 10,
 		damage = 22,
 		attackEvery = 1.4,
-		reward = 40,
+		reward = 45,
+		xp = 6,
 		scale = 1.8,
 		skin = { 100, 120, 80 },
 		shirt = { 60, 60, 60 },
 		pants = { 70, 50, 40 },
+		noLatch = true,
+		carDamage = 40,
+		carBump = 0.55,
+		shove = { speed = 55, up = 22, every = 1.2 },
+		armour = { front = 0.45, angle = 65, small = 0.65, smallDamage = 30, least = 0.3, pellets = 4 },
+	},
+	-- 6.24: swollen, glowing, slow. It never bites: it walks up to you and blows up after a hiss (flash, swell), and a
+	-- shot that kills it sets it off too, a moment later. Shoot it from range; its blast hurts the zombies round it
+	-- (chain reactions with other bloaters), you and your car.
+	bloater = {
+		name = "Bloater",
+		health = 90,
+		speed = 8,
+		damage = 0,
+		attackEvery = 1,
+		reward = 12,
+		xp = 3,
+		scale = 1.15,
+		skin = { 150, 164, 92 },
+		shirt = { 112, 104, 78 },
+		pants = { 64, 60, 50 },
+		noLatch = true,
+		blast = { trigger = 7, fuse = 1.6, deathFuse = 0.7, radius = 16, inner = 5, edge = 0.25, player = 45, car = 70, zombie = 150, knock = 50, knockUp = 28, carBump = 0.7 },
 	},
 } :: { [string]: ZombieDef }
+
+-- 6.24, the owner: "new zombies, so the fighting isn't always the same". Where the special ones come
+-- (shared/ZombieKinds.luau weights, server/Zombies.luau pickKind: every random pick of a kind, never a mission's fixed
+-- plan) and the server's caps. Each table's kinds' weights (Roam.kinds, a tier's waveKinds and kinds, the residents', a
+-- live event's) are multiplied:
+--   Night     × (1 + Night[kind] × the night's share, 0 by day … 1 at night: DayNight.nightFactor)
+--   Danger    × (1 + Danger[kind] × the danger, 0 … 1: a job's tier ((stars − 1) / 3) or how far from the depot
+--             (DangerNear … DangerFar studs), the bigger)
+--   Level     below FromLevel[kind] (the job's owner, else the lowest level in the server) × Young[kind] (0: never)
+--   BloodMoon × BloodMoon[kind] while the Blood Moon is up (server/LiveEvents.luau sets Zombies.bloodMoon)
+-- MaxAlive: at most this many of a kind alive in the whole server (a pick over it comes as a walker); a mission's own
+-- (its plan's kinds) are never turned. Parts: the most parts of a kind's body in any of its looks (the R15 template
+-- with every piece, tests/zombiekinds_test.luau builds each), Server: the parts of a full server at the worst mix
+-- (Horde.MaxTotal bodies, the capped kinds at their caps) at most. KnockTime: seconds the client pushes its own body
+-- on a shove or a blast (client/ZombieFx.luau), KnockEvery: at most one knock a player this often (server).
+Config.ZombieTypes = {
+	Night = { runner = 0.8, bloater = 0.5 } :: { [string]: number },
+	Danger = { runner = 0.3, brute = 1, bloater = 1 } :: { [string]: number },
+	DangerNear = 350,
+	DangerFar = 1600,
+	FromLevel = { brute = 4, bloater = 3 } :: { [string]: number },
+	Young = { brute = 0.3, bloater = 0 } :: { [string]: number },
+	BloodMoon = { runner = 1.8, bloater = 2 } :: { [string]: number },
+	MaxAlive = { brute = 10, bloater = 8 } :: { [string]: number },
+	Parts = { walker = 48, runner = 50, soldier = 48, brute = 58, bloater = 58 } :: { [string]: number },
+	Server = 5000,
+	KnockTime = 0.2,
+	KnockEvery = 0.4,
+	-- The clients' warning before a bloater blows (client/ZombieFx.luau): its belly and hump swell to Swell × their size
+	-- and its boils to BoilSwell × theirs (they stay on top of the belly), the boils flash from FlashHz to FlashEnd Hz, a
+	-- hiss (a sound of the sheet pitched: HissPitch); its boils pulse Pulse Hz while it walks. Within Range of the camera,
+	-- the nearest Most of them.
+	Bloater = { Swell = 1.25, BoilSwell = 1.9, FlashHz = 3, FlashEnd = 14, HissPitch = 1.5, HissVolume = 0.9, Pulse = 0.8, Range = 160, Most = 10 },
+	-- A hit the brute's plates took (the Clank attribute): a clink (a step's metal sound pitched up) and a spark.
+	Clank = { Pitch = 1.8, Volume = 0.7, Range = 90 },
+	-- The runner's leap (the Lunge attribute): a shriek (a zombie voice pitched up).
+	Shriek = { Pitch = 1.75, Volume = 0.85, Range = 90 },
+}
 
 -- 6.15, the owner: "I'd outline the zombies: a red outline, but just subtle." A thin outline (a Highlight: no fill,
 -- never through walls) on the nearest living enemies on each client (client/EnemyOutline.luau, shared/OutlinePick.luau):
@@ -1939,6 +2168,23 @@ Config.ZombieLife = {
 	StompDip = 0.4,
 	StompRoll = 7,
 	StompArms = 14,
+	-- 6.24, the special zombies' moves (shared/ZombieStyle.luau pose):
+	--   the runner's sprint: at a run (from SprintFrom × WalkRef) the arms pump with the legs (Pump degrees) instead of
+	--     flailing, the body leans SprintLean more; its leap (the Lunge attribute): a dive for Dive.Time s, the body
+	--     Dive.Lean forward, the arms Dive.Arms up in front, the head Dive.Head up at you
+	--   the brute's stomp: StompPitch degrees forward as each foot lands (on top of the dip)
+	--   the bloater's waddle: rolled WaddleRoll from foot to foot, leaning back WaddleLean (the belly out), the arms held
+	--     out WaddleArms; its fuse (the Fuse attribute): arched back Swell.Arch, the arms flung out Swell.Arms, trembling
+	--     Swell.Tremble degrees at Swell.Hz, all growing to the blast
+	SprintFrom = 1.6,
+	SprintLean = 12,
+	Pump = 32,
+	Dive = { Time = 0.7, Lean = 55, Arms = 85, Head = 25 },
+	StompPitch = 6,
+	WaddleRoll = 13,
+	WaddleLean = 8,
+	WaddleArms = 24,
+	Swell = { Arch = 20, Arms = 45, Tremble = 5, Hz = 24 },
 	-- Waiting (under IdleBelow studs / s): a slow sway and a lolling head (each its own rhythm).
 	IdleBelow = 1.5,
 	Sway = 5,
@@ -1973,6 +2219,7 @@ Config.ZombieLife = {
 		runner = { 255, 226, 90 },
 		soldier = { 255, 160, 50 },
 		brute = { 255, 70, 40 },
+		bloater = { 190, 255, 80 }, -- 6.24
 	} :: { [string]: { number } },
 	GlowDefault = { 230, 240, 140 },
 	-- Voices.
@@ -1980,10 +2227,11 @@ Config.ZombieLife = {
 	Scream = { Range = 80, Speed = 14, Toward = 0.75, Again = 25, Gap = 1.5, Volume = 0.9, Pitch = 1.55 },
 	Grunt = { Range = 70, Again = 0.6, Gap = 0.12, Volume = 0.45, Pitch = 1.35 },
 	Gurgle = { Range = 70, Gap = 0.3, Volume = 0.5, Pitch = 0.72 },
-	Stomp = { Range = 60, Volume = 0.9, Pitch = 0.55 },
+	-- (6.24: a brute's step within Shake studs of you shakes the camera a little: ShakeAmount at its feet)
+	Stomp = { Range = 60, Volume = 0.9, Pitch = 0.55, Shake = 26, ShakeAmount = 0.22 },
 	Snarl = { Range = 40, Again = 2.5, Volume = 0.5, Pitch = 1.2 },
 	-- Each kind's voice (× the pitch of every cue, ± Spread for each zombie).
-	Pitch = { walker = 0.95, runner = 1.2, soldier = 0.85, brute = 0.62 } :: { [string]: number },
+	Pitch = { walker = 0.95, runner = 1.2, soldier = 0.85, brute = 0.62, bloater = 0.7 } :: { [string]: number },
 	Spread = 0.08,
 	-- Deaths (server/Zombies.luau kill; shared/ZombieStyle.luau death picks which): Fall rad / s the body tips over
 	-- about its feet (÷ its scale), Spin rad / s round on a spin, Back studs / s on a knock back (a headshot's head
@@ -2022,7 +2270,7 @@ Config.Horde = {
 		batch = 2,
 		reserve = 25, -- of Horde.MaxTotal, kept free for the jobs' waves
 		despawn = 420, -- a roamer this far from every player goes (Horde.DespawnDistance for the others)
-		kinds = { walker = 0.72, runner = 0.23, brute = 0.05 },
+		kinds = { walker = 0.7, runner = 0.23, brute = 0.05, bloater = 0.03 }, -- (6.24: × Config.ZombieTypes' rules)
 		wander = 18, -- studs around its spot
 		wanderSpeed = 5, -- the shamble (it runs at its full speed once it hunts)
 		idleChance = 0.4, -- how often it just stands for a while instead of a few steps
@@ -2035,8 +2283,9 @@ Config.Horde = {
 		chase = 200, -- keeps hunting while a target is this close …
 		giveUp = 8, -- … and calms down after this many seconds without one
 	},
-	-- Zombies that live in the world all the time (they never despawn, the dead come back).
-	Residents = { count = 36, respawn = 25 },
+	-- Zombies that live in the world all the time (they never despawn, the dead come back). 6.24: their kinds (were
+	-- server/Zombies.luau's), × Config.ZombieTypes' rules.
+	Residents = { count = 36, respawn = 25, kinds = { walker = 0.7, runner = 0.22, brute = 0.06, bloater = 0.03 } :: { [string]: number } },
 }
 
 export type TierDef = {
@@ -2671,6 +2920,24 @@ Config.Scooter = {
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
 }
 
+-- 6.24, a bike knocked over gets back up (server/BikeRighting.luau, shared/BikeUpright.luau; any bike, the E-Scooter
+-- too, ridden or parked): tipped over (its top more than Tilt degrees off straight up) for Hold seconds, the server
+-- turns it back onto its wheels (its AlignOrientation "Righting", server/Vehicles.luau) at most TurnRate rad/s, gently
+-- (Responsiveness), the steering's hold let go meanwhile; up again within Settled degrees it is the rider's once more.
+-- Still down after Give seconds (wedged against something) it is stood up where it lies, Lift studs over its wheels.
+-- The roads climb 14° at most (a curb, a ramp), so a bike on a hill never counts as tipped over.
+Config.BikeUpright = {
+	Check = 0.2, -- seconds between the looks at the bikes
+	Tilt = 45, -- degrees off upright: tipped over
+	Hold = 1, -- seconds tipped over before it is turned back up (a bump that rights itself is left alone)
+	Settled = 20, -- degrees off upright: up again (a ramp's 14° counts)
+	Give = 2.5, -- seconds of turning before it is stood up at once
+	Responsiveness = 12, -- the Righting AlignOrientation's (smooth: about half a second from lying flat)
+	TurnRate = 5, -- rad/s at most while it turns back up
+	Torque = 40000, -- × the bike's mass: the Righting's MaxTorque (the rider and gravity never hold it down)
+	Lift = 0.5, -- studs over its wheels when it is stood up at once (it drops onto them)
+}
+
 -- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
 -- driving's physics stay as they are). Accelerations in studs/s² (gravity is 196), speeds in studs/s.
 Config.DriveFeel = {
@@ -3091,6 +3358,12 @@ Config.Missions = {
 			{ walker = 0.5, runner = 0.3, brute = 0.12, soldier = 0.08 },
 			{ walker = 0.4, runner = 0.33, brute = 0.15, soldier = 0.12 },
 		} :: { { [string]: number } },
+		-- 6.24, the special zombies, still the same every time: the runners' weight in Kinds × (1 + RunnerGrow a story
+		-- chapter after the first); Bloaters[chapter] of the stops' walkers are bloaters (+ FinaleBloaters on a chapter's
+		-- last mission), one a stop from the last drop back to the first pick-up and round again (the total stays).
+		RunnerGrow = 0.06,
+		Bloaters = { 0, 1, 1, 1, 2, 2, 2, 3, 3, 3 } :: { number },
+		FinaleBloaters = 1,
 		-- HUNTED: bandit roadblocks at fixed points of the route (Roadblocks[tier] × the mission's banditBoost, at most
 		-- RoadblocksMax), RoadblockSize[tier] bandits each (× the chapter's growth; from ★★★ one of them a gunner).
 		Roadblocks = { 1, 2, 2, 2 },
@@ -3291,7 +3564,7 @@ Config.Jobs = {
 			waveGrow = 1,
 			waveMax = 7,
 			waveAlive = 11,
-			waveKinds = { walker = 0.65, runner = 0.3, brute = 0.05 },
+			waveKinds = { walker = 0.62, runner = 0.3, brute = 0.05, bloater = 0.03 },
 			kinds = { walker = 0.4, runner = 0.2, bandit = 0.4 },
 			guardHorde = 4,
 			modifierChance = 0.25,
@@ -3313,8 +3586,8 @@ Config.Jobs = {
 			waveGrow = 2,
 			waveMax = 10,
 			waveAlive = 16,
-			waveKinds = { walker = 0.45, runner = 0.33, brute = 0.12, soldier = 0.1 },
-			kinds = { walker = 0.25, runner = 0.2, bandit = 0.35, gunner = 0.1, brute = 0.1 },
+			waveKinds = { walker = 0.4, runner = 0.33, brute = 0.12, soldier = 0.1, bloater = 0.05 },
+			kinds = { walker = 0.22, runner = 0.2, bandit = 0.35, gunner = 0.1, brute = 0.1, bloater = 0.03 },
 			guardHorde = 7,
 			modifierChance = 0.5,
 			ambushEvery = 30,
@@ -3335,8 +3608,8 @@ Config.Jobs = {
 			waveGrow = 2,
 			waveMax = 14,
 			waveAlive = 22,
-			waveKinds = { walker = 0.3, runner = 0.35, brute = 0.15, soldier = 0.2 },
-			kinds = { walker = 0.15, runner = 0.15, soldier = 0.15, bandit = 0.3, gunner = 0.15, brute = 0.1 },
+			waveKinds = { walker = 0.24, runner = 0.35, brute = 0.15, soldier = 0.18, bloater = 0.08 },
+			kinds = { walker = 0.12, runner = 0.15, soldier = 0.15, bandit = 0.3, gunner = 0.15, brute = 0.1, bloater = 0.03 },
 			guardHorde = 10,
 			modifierChance = 1,
 			ambushEvery = 22,
@@ -4292,7 +4565,7 @@ Config.Throw = {
 	FragileLooks = { cake = true, vaccine = true, sample = true, electronics = true, painting = true, gadget = true } :: { [string]: boolean },
 }
 
--- 6.0, the courier's look on foot (client/SprintPose.luau, server/KitWear.luau): the plastic bag (Config.Kit BagKit)
+-- 6.0, the courier's look on foot (6.24: client/GaitPose.luau, server/KitWear.luau): the plastic bag (Config.Kit BagKit)
 -- in the left hand flies behind you by your speed. 6.0.1: from From studs / s on foot the sprint is a real run cycle
 -- (shared/RunCycle.luau: the legs, the arms, the waist, the head and the body's bob, set over the stock run animation),
 -- for everybody within Range of the camera.
@@ -4307,7 +4580,7 @@ Config.Courier = {
 		Range = 150, -- studs from the camera (yours always)
 		BlendTime = 0.15, -- seconds to blend the cycle in or out
 		Stride = 13, -- studs run per full cycle (two steps): the cadence follows the speed (6.8 review: on the stock 2-stud
-		-- leg; client/SprintPose.luau scales it by each body's own, shared/CourierMotion.luau stride). 6.12.6, the slow-mo
+		-- leg; shared/Gait.luau scales it by each body's own leg). 6.12.6, the slow-mo
 		-- sprint: 7 → 13, big strides at about half the old cadence (2 cycles a second at 28 studs / s)
 		Hang = 0.45, -- 6.12.6: the cycle slows by this share in the flights and hurries through the steps (RunCycle.hang)
 	},
@@ -5158,7 +5431,7 @@ Config.LiveEvents = {
 		MaxPace = 16,
 		Slack = 10,
 		Guards = { First = 6, Every = 20, Batch = 2, Max = 10, Near = 18, Far = 45 },
-		Kinds = { walker = 0.65, runner = 0.25, brute = 0.1 } :: { [string]: number },
+		Kinds = { walker = 0.6, runner = 0.25, brute = 0.1, bloater = 0.05 } :: { [string]: number },
 	},
 	Horde = {
 		Count = 40,
@@ -5168,7 +5441,7 @@ Config.LiveEvents = {
 		Stop = 18,
 		Gates = 2,
 		Beaten = 0.9,
-		Kinds = { walker = 0.6, runner = 0.28, brute = 0.12 } :: { [string]: number },
+		Kinds = { walker = 0.54, runner = 0.28, brute = 0.12, bloater = 0.06 } :: { [string]: number },
 		Money = 900,
 		Xp = 450,
 	},

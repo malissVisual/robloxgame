@@ -597,6 +597,19 @@ check("6.18 wave 2: BANK's hero: the cash big in green, FIND A DELIVERY its one 
 Phone.open("career")
 check("6.18 wave 2: CAREER: the next level the hero, the road its rows",named("NextLevel")~=nil and string.find(named("NextLevel"):FindFirstChild("Pay",true).Text," XP",1,true)~=nil
 	and named("FullCareer")~=nil and named("Level_3")~=nil and named("Level_3"):FindFirstChild("Add").Text=="🔒 LV 3")
+-- 6.23: the hero's picture is what the next level opens (shared/CareerArt.luau): level 2's Canvas Tote as its 3D
+-- model; once the Rented Lockup's career picture is uploaded, that picture (an image before a model).
+do
+	local function look(root) for _,d in root:GetDescendants() do if d:GetAttribute("Look") then return d:GetAttribute("Look") end end return nil end
+	check("6.23: CAREER's hero: level 2's bag as its model",look(named("NextLevel"))=="kit:tote" and #M.warnings==0)
+	local CareerArt=require("./CareerArt")
+	CareerArt.Images["garage:garage_rented"]="rbxassetid://616161"
+	Phone.open("career")
+	local picture=named("NextLevel"):FindFirstChild("Picture")
+	check("6.23: … the uploaded career picture before it",picture~=nil and picture.Image=="rbxassetid://616161" and look(named("NextLevel"))==nil)
+	CareerArt.Images["garage:garage_rented"]=""
+	Phone.open("career")
+end
 -- 6.20: CAREER's ROAD / SKILLS tabs (client/SkillsView.luau): the free points, RESET · FREE, the three branches, a
 -- skill's details with +1 POINT (the Skills remote), the apex's lock; home's level chip dots a free point.
 do

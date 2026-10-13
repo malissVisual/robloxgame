@@ -45,6 +45,25 @@
 --     Zombies.trimRoamers(n) (calm roamers far from everybody go, to make room for the event's), Zombies.eventSpared
 --     (players an event's zombie leaves alone: on a mission) and Zombies.retreat(z, at) (an ended event's zombie walks
 --     away after nobody; server/LiveEvents.luau takes it away).
+--
+-- 6.24, the special zombies (the owner: "new zombies, so the fighting isn't always the same"; the numbers are
+-- Config.Zombies' and Config.ZombieTypes', the rules shared/ZombieKinds.luau's; the looks and moves on the clients:
+-- client/ZombieAnimator.luau, client/ZombieFx.luau):
+--   * the runner (ZombieDef.lunge) leaps at a player on foot a few strides away (the Lunge attribute: the clients' dive
+--     and shriek); its strike lands once a leap;
+--   * the brute (armour) takes less from the front and from a small gun's round (Zombies.damage: ZombieKinds.armourShare;
+--     a headshot, a shotgun, a blast, a car do it all; the Clank attribute: the clients' clink); its bite throws a player
+--     on foot back (shove: the Knock remote), its blow on a car dents it hard and slows it (carDamage, carBump);
+--   * the bloater (blast) never bites: next to you (or touching your car) it hisses and swells for blast.fuse s and goes
+--     off; killed (with a cause: not burnt in the safe zone, not the admin's) it goes off blast.deathFuse s later. The
+--     blast (an Explosion for the looks, the sound and the camera's shake) hurts every zombie round it (a chain: another
+--     bloater goes off too; the kills are its killer's), the players on foot (through the vest, thrown away) and the
+--     cars. The Fuse attribute (the server time it goes off) shows the warning on the clients;
+--   * every random pick of a kind (the roamers, the residents, a job's waves and stops, a live event's) goes through
+--     Zombies.pickKind: the night, the danger (a job's tier from Zombies.tierOf, set by Main; else how far from the
+--     depot), the player's level, the Blood Moon (Zombies.bloodMoon, set by server/LiveEvents.luau), and MaxAlive of a
+--     special kind in the server at most. A mission's plan names its own kinds (shared/MissionPlan.luau).
+--   * a kill pays ZombieDef.xp XP on top (the money stays the "KillReward").
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -63,9 +82,12 @@ local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
 local Armour = require(script.Parent.Armour) -- 6.0: every bite and bullet on a player goes through the vest
 local ZombieStyle = require(Shared.ZombieStyle) -- 6.16: the looks, the falls, the Hit attribute
+local Kinds = require(Shared.ZombieKinds) -- 6.24: the special zombies' rules
 
 local Horde = Config.Horde
 local Roam = Horde.Roam
+local Types = Config.ZombieTypes -- 6.24
+local Special = {} -- 6.24: the special zombies' moves (filled further down: the leap, the clink, the shove, the blast)
 
 export type Zombie = {
 	id: number,
@@ -108,6 +130,19 @@ export type Zombie = {
 	hits: number?,
 	hitShown: number?,
 	attacks: number?,
+	-- 6.24, the special zombies: the runner's leap (when it may leap again, until when it is in the air, whether its
+	-- strike landed, the Lunge attribute's count), the bloater's fuse (when it goes off, whether it went, who set it off:
+	-- the blast's kills are theirs), the brute's clinks (the Clank attribute) and when it may shove again
+	nextLunge: number?,
+	lungeUntil: number?,
+	lungeHit: boolean?,
+	lunges: number?,
+	fuseAt: number?,
+	blasted: boolean?,
+	blastBy: Player?,
+	clanks: number?,
+	clankShown: number?,
+	nextShove: number?,
 }
 
 local Zombies = {}
@@ -117,6 +152,8 @@ local nextId = 0
 local rng = Random.new()
 local bump = Net.get("Bump")
 local rewardRemote = Net.get("Reward")
+Special.knockRemote = Net.get("Knock") -- 6.24
+Special.knockedAt = {} :: { [Player]: number }
 
 -- Set by Main.
 Zombies.onKill = function(_player: Player, _zombie: Zombie) end
@@ -155,6 +192,12 @@ Zombies.roamBoost = 1
 -- lower under the cap), and the players its zombies leave alone (on a mission: missions are never touched).
 Zombies.eventReserve = 0
 Zombies.eventSpared = {} :: { [Player]: boolean }
+-- 6.24: the danger of a player's job (its tier, 1 … 4; nil: none) for the special zombies' weights (Main: Jobs), and
+-- the Blood Moon (server/LiveEvents.luau): more runners and bloaters.
+Zombies.tierOf = function(_player: Player): number?
+	return nil
+end
+Zombies.bloodMoon = false
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -692,6 +735,10 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 			profile.kills += 1
 		end
 		PlayerData.addMoney(killer, z.def.reward, "KillReward")
+		local xp = z.def.xp -- 6.24: the special ones' XP
+		if xp and xp > 0 then
+			PlayerData.addXp(killer, xp)
+		end
 		rewardRemote:FireClient(killer, z.root.Position + Vector3.new(0, 4, 0), z.def.reward)
 		Zombies.onKill(killer, z)
 		local onKillInfo = Zombies.onKillInfo
@@ -705,19 +752,47 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 			})
 		end
 	end
+	-- 6.24: a bloater killed by something (a shot, a car, a punch, a blast: not burnt, not the admin's) goes off soon
+	local blast = z.def.blast
+	if blast and cause ~= nil and cause ~= "other" then
+		Special.fuse(z, blast.deathFuse, killer)
+	elseif blast then
+		-- (6.24 review: the admin's KILL ALL / CLEAR, a mission's end, a plain death: a fuse already lit goes out too)
+		z.blasted = true
+		z.fuseAt = nil
+		z.model:SetAttribute("Fuse", nil)
+	end
+	local leap = z.root:FindFirstChild("Leap") -- (6.24 review: a dead runner's leap stops pushing)
+	if leap then
+		leap:Destroy()
+	end
 	task.delay(6, function()
 		z.model:Destroy()
 	end)
 end
 
 -- cause (3.1): "car" (run over), "splash" (a blast or a fire), "melee" (3.9); nil = a gun's hit. from (3.1): the gun fired from a car
--- seat ("cargun", "window"; Zombies.KillInfo).
-export type HitInfo = { crit: boolean?, push: Vector3?, cause: string?, from: string? }
+-- seat ("cargun", "window"; Zombies.KillInfo). 6.24: pellets = the gun's pellets a shot (a shotgun's go through a
+-- brute's plates); push = the way the hit travels (a plate takes the ones on its front). "other": the admin's (a bloater
+-- does not go off).
+export type HitInfo = { crit: boolean?, push: Vector3?, cause: string?, from: string?, pellets: number? }
 
 -- Returns true when the hit killed it.
 function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?): boolean
 	if z.dead or amount <= 0 then
 		return false
+	end
+	-- 6.24: the brute's plates (shared/ZombieKinds.luau armourShare): from the front, or a small gun's round, less
+	local armour = z.def.armour
+	if armour and amount < math.huge then
+		local hit = Special.hitOf(z, amount, info, armour.angle)
+		local share = Kinds.armourShare(armour, hit)
+		if share < 1 then
+			amount *= share
+			if hit.front then
+				Special.clank(z) -- (on its plates: the clients' clink)
+			end
+		end
 	end
 	z.lastHitBy = by or z.lastHitBy
 	if roams(z) then
@@ -969,7 +1044,7 @@ function Zombies.spawnAround(owner: Player, center: Vector3, heading: Vector3?, 
 	local made = 0
 	for _ = 1, count do
 		local spot = Zombies.findSpot(center, heading)
-		if spot and Zombies.spawn(Economy.pickKind(kinds, rng:NextNumber()), spot, owner, false) then
+		if spot and Zombies.spawn(Zombies.pickKind(kinds, spot, owner), spot, owner, false) then
 			made += 1
 		end
 	end
@@ -987,7 +1062,7 @@ function Zombies.spawnGuards(owner: Player, at: Vector3, outward: Vector3, count
 			local angle = rng:NextNumber(0, math.pi * 2)
 			offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(8, 26)
 		end
-		Zombies.spawn(Economy.pickKind(kinds, rng:NextNumber()), at + offset, owner, true)
+		Zombies.spawn(Zombies.pickKind(kinds, at, owner), at + offset, owner, true)
 	end
 end
 
@@ -1035,6 +1110,7 @@ function Zombies.clearOwner(owner: Player)
 	end
 	roamWant[owner] = nil
 	noiseAt[owner] = nil
+	Special.knockedAt[owner] = nil -- 6.24
 end
 
 -- The job is over: its enemies stop being special. Its zombies roam on (they keep after you until they lose you,
@@ -1119,6 +1195,10 @@ local function latch(z: Zombie, car: Vehicles.Car): boolean
 	end
 	car.latched[slot] = true
 	z.car, z.slot = car, slot
+	local leap = z.root:FindFirstChild("Leap") -- (6.24 review: a runner's leap must not drag the car it lands on)
+	if leap then
+		leap:Destroy()
+	end
 	z.humanoid.PlatformStand = true
 	for _, d in z.model:GetDescendants() do
 		if d:IsA("BasePart") then
@@ -1210,6 +1290,232 @@ end
 
 nearestPlayerDistanceFn = nearestPlayerDistance
 
+-- ── 6.24: the special zombies ──────────────────────────────────────────────
+
+-- What the plates see of a hit: a headshot, its cause and pellets, its damage, and whether it struck the front (the way
+-- it travels, HitInfo.push, against where the body faces).
+function Special.hitOf(z: Zombie, amount: number, info: HitInfo?, angle: number): Kinds.Hit
+	local way = info and info.push
+	local look = z.root.CFrame.LookVector
+	return {
+		crit = info ~= nil and info.crit == true,
+		cause = info and info.cause,
+		pellets = info and info.pellets or 1,
+		damage = amount,
+		front = way ~= nil and Kinds.isFront(look.X, look.Z, way.X, way.Z, angle),
+	}
+end
+
+-- A hit the plates took: the clients' clink (the Clank attribute, a count), at most every Life.HitEvery s.
+function Special.clank(z: Zombie)
+	local now = os.clock()
+	if z.clankShown and now - (z.clankShown :: number) < Life.HitEvery then
+		return
+	end
+	z.clankShown = now
+	z.clanks = (z.clanks or 0) + 1
+	z.model:SetAttribute("Clank", z.clanks)
+end
+
+-- A player on foot thrown `speed` studs / s along `away` (flat) and `up` up: their own client pushes their body (the
+-- Knock remote); at most every Types.KnockEvery s a player, never a seated one or a buddy.
+function Special.knock(player: Player, humanoid: Humanoid, away: Vector3, speed: number, up: number)
+	if speed <= 0 or humanoid.Parent ~= player.Character or humanoid.SeatPart ~= nil or humanoid.Health <= 0 then
+		return
+	end
+	local now = os.clock()
+	if now - (Special.knockedAt[player] or -math.huge) < Types.KnockEvery then
+		return
+	end
+	Special.knockedAt[player] = now
+	local flat = Vector3.new(away.X, 0, away.Z)
+	local way = if flat.Magnitude > 0.1 then flat.Unit else Vector3.zero
+	Special.knockRemote:FireClient(player, way * speed + Vector3.new(0, up, 0))
+end
+
+-- The runner's leap at `best` (on foot, `distance` away): in the air its strike lands once within lunge.reach (looked at
+-- every frame or so); on the ground, within lunge.range and rested, it leaps (the Lunge attribute: the clients' dive).
+function Special.lunge(z: Zombie, best: Target, distance: number, lunge: Config.LungeDef, now: number)
+	local humanoid = best.humanoid
+	if not humanoid then
+		return
+	end
+	if z.lungeUntil and now < (z.lungeUntil :: number) then
+		z.nextPath = now + 0.05
+		if not z.lungeHit and distance < lunge.reach then
+			z.lungeHit = true
+			z.nextAttack = now + z.def.attackEvery -- (6.24 review: the leap's strike is its bite: one hit a leap)
+			showAttack(z)
+			Armour.hurt(humanoid, lunge.damage)
+		end
+		return
+	end
+	z.lungeUntil = nil
+	if distance < lunge.range[1] or distance > lunge.range[2] or now < (z.nextLunge or 0) or z.humanoid.FloorMaterial == Enum.Material.Air then
+		return
+	end
+	local from = z.root.Position
+	local to = Vector3.new(best.position.X - from.X, 0, best.position.Z - from.Z)
+	if to.Magnitude < 1 then
+		return
+	end
+	z.nextLunge = now + lunge.every * rng:NextNumber(0.85, 1.15)
+	z.lungeUntil = now + lunge.time
+	z.lungeHit = false
+	z.nextPath = now + 0.05
+	z.root.CFrame = CFrame.lookAt(from, from + to)
+	-- (pushed for lunge.push s: a velocity set on the root alone would be taken back by its walk at once)
+	local attachment = z.root:FindFirstChild("LeapAttachment")
+	if not attachment then
+		local made = Instance.new("Attachment")
+		made.Name = "LeapAttachment"
+		made.Parent = z.root
+		attachment = made
+	end
+	local push = Instance.new("LinearVelocity")
+	push.Name = "Leap"
+	push.Attachment0 = attachment :: Attachment
+	push.RelativeTo = Enum.ActuatorRelativeTo.World
+	push.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	push.VectorVelocity = to.Unit * lunge.speed + Vector3.new(0, lunge.up, 0)
+	push.MaxForce = math.max(1, z.root.AssemblyMass) * 4000
+	push.Parent = z.root
+	task.delay(lunge.push, function()
+		push:Destroy()
+	end)
+	z.lunges = (z.lunges or 0) + 1
+	z.model:SetAttribute("Lunge", z.lunges)
+end
+
+-- The bloater's fuse: it goes off `seconds` from now (never later than one burning already). `by`: who set it off (the
+-- blast's kills are theirs). The Fuse attribute (the server time it goes off) shows the warning on the clients.
+function Special.fuse(z: Zombie, seconds: number, by: Player?)
+	if z.blasted or not z.def.blast then
+		return
+	end
+	local now = os.clock()
+	local at = Kinds.fuseLeft(z.fuseAt, now, seconds)
+	z.blastBy = by or z.blastBy
+	if z.fuseAt and at >= (z.fuseAt :: number) then
+		return -- (one as soon or sooner is burning)
+	end
+	z.fuseAt = at
+	z.model:SetAttribute("Fuse", workspace:GetServerTimeNow() + (at - now))
+	task.delay(at - now, function()
+		if z.fuseAt == at then
+			Special.detonate(z)
+		end
+	end)
+end
+
+-- It goes off: dead (no reward when it blew itself up; a mission counts it), blown apart, the blast round it. Nothing
+-- when its body is gone (despawned, its mission over) or in the safe zone (it fizzles).
+function Special.detonate(z: Zombie)
+	local blast = z.def.blast
+	if z.blasted or not blast then
+		return
+	end
+	z.blasted = true
+	if not z.root.Parent then
+		return
+	end
+	local at = z.root.Position
+	if not z.dead then
+		kill(z, nil, nil, "blast")
+	end
+	if World.isSafe(at) then
+		z.model:SetAttribute("Fuse", nil)
+		return
+	end
+	local boom = Instance.new("Explosion")
+	boom.BlastPressure = 0
+	boom.DestroyJointRadiusPercent = 0
+	boom.BlastRadius = blast.radius
+	boom.Position = at
+	boom.Parent = workspace
+	z.model:Destroy()
+	Special.blast(z, at, blast)
+end
+
+-- The blast at `at` (shared/ZombieKinds.luau blastShare): every other zombie (no armour helps; a bloater among them goes
+-- off too: the chain), the players on foot (through the vest, thrown away) and the cars (a dent, a jolt) within its
+-- radius; never in the safe zone, never a player an event's zombie spares.
+function Special.blast(z: Zombie, at: Vector3, blast: Config.BlastDef)
+	local by = z.blastBy
+	for _, other in table.clone(zombies) do
+		if other.dead or other == z then
+			continue
+		end
+		local offset = other.root.Position - at
+		local share = Kinds.blastShare(blast, offset.Magnitude)
+		if share > 0 then
+			local flat = Vector3.new(offset.X, 0, offset.Z)
+			local push = (if flat.Magnitude > 0.1 then flat.Unit else Vector3.zero) * 45 + Vector3.new(0, 35, 0)
+			Zombies.damage(other, blast.zombie * share, by, { push = push, cause = "splash" })
+		end
+	end
+	for _, t in gatherTargets() do
+		if z.event and Zombies.eventSpared[t.player] then
+			continue
+		end
+		local offset = t.position - at
+		local share = Kinds.blastShare(blast, offset.Magnitude)
+		if share <= 0 then
+			continue
+		end
+		local car = t.car
+		if car then
+			local dent = Vehicles.damage(car, blast.car * share, "A bloater blew your car apart!", "blast")
+			if dent > 0 then
+				Zombies.onCarDamaged(car.owner, dent)
+			end
+			bump:FireClient(car.owner, blast.carBump)
+		elseif t.humanoid then
+			Armour.hurt(t.humanoid, blast.player * share)
+			Special.knock(t.player, t.humanoid, offset, blast.knock * share, blast.knockUp * share)
+		end
+	end
+end
+
+-- 6.24: a random kind from a kinds table for a spot (shared/ZombieKinds.luau weights: the night, the danger, the level,
+-- the Blood Moon; Config.ZombieTypes); a special kind at its MaxAlive comes as a walker. owner: whose job or area (its
+-- tier and level; nil: the lowest level in the server).
+function Zombies.pickKind(kinds: { [string]: number }, at: Vector3?, owner: Player?): string
+	local tier: number? = nil
+	local level: number? = nil
+	if owner then
+		local ok, value = pcall(Zombies.tierOf, owner)
+		tier = if ok and type(value) == "number" then value else nil
+		level = PlayerData.level(owner)
+	else
+		for _, player in Players:GetPlayers() do
+			local each = PlayerData.level(player)
+			level = if level then math.min(level :: number, each) else each
+		end
+	end
+	local depot = Map.Depot
+	local distance = if at then Vector3.new(at.X - depot.x, 0, at.Z - depot.z).Magnitude else nil
+	local weights = Kinds.weights(kinds, {
+		night = DayNight.nightFactor(),
+		danger = Kinds.danger(tier, distance),
+		level = level,
+		bloodMoon = Zombies.bloodMoon,
+	})
+	local kind = Economy.pickKind(weights, rng:NextNumber())
+	if Types.MaxAlive[kind] then
+		local alive = 0
+		for _, z in zombies do
+			if z.kind == kind and not z.dead then
+				alive += 1
+			end
+		end
+		if Kinds.capped(kind, alive) then
+			return "walker"
+		end
+	end
+	return kind
+end
+
 -- Is the zombie touching this car? (car space box test)
 local function touches(car: Vehicles.Car, position: Vector3, reach: number): boolean
 	local p = car.chassis.CFrame:PointToObjectSpace(position)
@@ -1246,15 +1552,25 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 	if z.def.jobOnly and not huntedBy(z, car.owner) then
 		return -- a soldier leaves the car of somebody without a job alone (6.15 review: a resident one a mission's too)
 	end
-	-- Brutes are too heavy to hang on a car, they hit it from the ground.
-	if z.kind ~= "brute" and latch(z, car) then
+	-- 6.24: a bloater touching a car: its fuse (it never hangs on one, never bites)
+	local blast = z.def.blast
+	if blast then
+		Special.fuse(z, blast.fuse, nil)
+		return
+	end
+	-- Brutes are too heavy to hang on a car, they hit it from the ground (6.24: ZombieDef.noLatch).
+	if not z.def.noLatch and latch(z, car) then
 		return
 	end
 	-- No room on the car: bite it from the ground.
 	if now >= z.nextAttack then
 		z.nextAttack = now + z.def.attackEvery
 		showAttack(z) -- 6.16: the clients' lunge
-		Zombies.onCarDamaged(car.owner, Vehicles.damage(car, z.def.damage)) -- (6.20: what it took after Tough Body)
+		Zombies.onCarDamaged(car.owner, Vehicles.damage(car, z.def.carDamage or z.def.damage)) -- (6.20: what it took after Tough Body)
+		local carBump = z.def.carBump -- 6.24: a brute's blow jolts the car
+		if carBump then
+			bump:FireClient(car.owner, carBump)
+		end
 	end
 end
 
@@ -1586,6 +1902,14 @@ local function step()
 		if z.touching or z.dead or z.car then
 			continue
 		end
+		if z.fuseAt then
+			-- 6.24: a bloater about to go off stands where it is, swelling
+			if now >= z.nextPath then
+				z.nextPath = now + 0.3
+				z.humanoid:MoveTo(position)
+			end
+			continue
+		end
 
 		if now < z.nextPath then
 			continue
@@ -1698,12 +2022,30 @@ local function step()
 		end
 		z.humanoid:MoveTo(goal)
 
+		-- 6.24: a bloater next to you lights its fuse (it never bites); a runner leaps at you.
+		local blast = z.def.blast
+		if blast then
+			if bestDistance < blast.trigger then
+				Special.fuse(z, blast.fuse, nil)
+			end
+			continue
+		end
+		local lunge = z.def.lunge
+		if lunge then
+			Special.lunge(z, best, bestDistance, lunge, now)
+		end
 		-- Bite a player on foot.
 		local humanoid = best.humanoid
 		if humanoid and bestDistance < Horde.BiteReach * z.def.scale + 1 and now >= z.nextAttack then
 			z.nextAttack = now + z.def.attackEvery
 			showAttack(z) -- 6.16: the clients' lunge
 			Armour.hurt(humanoid, z.def.damage)
+			-- 6.24: a brute's blow throws you back
+			local shove = z.def.shove
+			if shove and now >= (z.nextShove or 0) then
+				z.nextShove = now + shove.every
+				Special.knock(best.player, humanoid, best.position - position, shove.speed, shove.up)
+			end
 		end
 	end
 end
@@ -1731,8 +2073,6 @@ end
 
 -- ── Residents: the zombies that live in the world ──────────────────────────
 
-local RESIDENT_KINDS = { walker = 0.72, runner = 0.22, brute = 0.06 }
-
 local function residentSpot(): (Vector3?, string)
 	if rng:NextNumber() < 0.15 then
 		-- A bandit camp at one of the far places.
@@ -1754,7 +2094,7 @@ local function residentSpot(): (Vector3?, string)
 	local addresses = Map.addresses()
 	local a = addresses[rng:NextInteger(1, #addresses)]
 	local spot = Vector3.new(a.x + rng:NextNumber(-8, 8), World.RoadTop, a.z + rng:NextNumber(-8, 8))
-	return spot, Economy.pickKind(RESIDENT_KINDS, rng:NextNumber())
+	return spot, Zombies.pickKind(Horde.Residents.kinds, spot, nil) -- (6.24: Config, through the special zombies' rules)
 end
 
 local function keepResidents()
@@ -1815,7 +2155,7 @@ local function keepRoamers()
 		for _ = 1, math.min(want - around, Roam.batch) do
 			local spot = Zombies.findSpot(center, nil, Roam.near, Roam.far)
 			if spot then
-				Zombies.spawn(Economy.pickKind(Roam.kinds, rng:NextNumber()), spot, player, false, false, true)
+				Zombies.spawn(Zombies.pickKind(Roam.kinds, spot, player), spot, player, false, false, true)
 			end
 		end
 	end

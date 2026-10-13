@@ -698,11 +698,17 @@ local function say(npc: Model?, text: string)
 end
 
 -- A person for this stop. Should the spawn yield and the job end or move on meanwhile, the person goes again (nil).
+-- 6.23 (Codex's codex/cargo-missions-fix): a spawn that errors gives `busy` back before the error goes on (to the job's
+-- tick guard, server/Jobs.luau tickFails): a stuck `busy` kept the stop from ever being done.
 local function spawnFor(session: Session, look: Npcs.Look, at: CFrame): Model?
 	local visit = session.visit -- (5.2: the same stop may come again later: its visit, not its number)
 	session.busy += 1
-	local npc = Npcs.spawn(look, at)
+	local ok, made = pcall(Npcs.spawn, look, at)
 	session.busy -= 1
+	if not ok then
+		error(made, 0)
+	end
+	local npc = made :: Model
 	if session.ended or session.visit ~= visit then
 		npc:Destroy()
 		return nil
@@ -794,14 +800,20 @@ local function spawnRider(session: Session, piece: Piece, at: CFrame): Model?
 	if isSurvivor(session) then
 		local npc = spawnFor(session, Cargo.look("survivor", SURVIVOR_NAMES[piece.variant % #SURVIVOR_NAMES + 1], "Survivor"), at)
 		if npc then
-			dressSurvivor(npc)
+			local ok, err: any = pcall(function() dressSurvivor(npc) end) -- (6.24 review: a failed dress never strands the person: they go undressed)
+			if not ok then
+				warn(`[Cargo] dressSurvivor: {err}`)
+			end
 		end
 		return npc
 	end
 	if isPatient(session) then
 		local npc = spawnFor(session, Cargo.look("patient", PATIENT_NAMES[piece.variant % #PATIENT_NAMES + 1], "Patient"), at)
 		if npc then
-			dressPatient(npc)
+			local ok, err: any = pcall(function() dressPatient(npc) end) -- (6.24 review: a failed dress never strands the person: they go undressed)
+			if not ok then
+				warn(`[Cargo] dressPatient: {err}`)
+			end
 		end
 		return npc
 	end
@@ -3003,8 +3015,8 @@ local function attachCar(session: Session, old: Vehicles.Car?)
 	refresh(session)
 end
 
--- The stop's people and pieces: built when the owner gets close.
-local function build(session: Session)
+-- The stop's people and pieces: built when the owner gets close (through build, below: a failure is undone).
+local function buildStop(session: Session)
 	local plan = session.plan
 	if not plan or session.built then
 		return
@@ -3190,6 +3202,48 @@ local function clearStop(session: Session, linger: boolean)
 	end
 end
 
+-- 6.23 (Codex's codex/cargo-missions-fix): builds the stop (buildStop). Should that fail half-way (a person or a piece
+-- that could not be made), what it made goes again and the stop is as before (not built, its pile and side slot back,
+-- the pieces' counters back), so the next tick builds it again; the error goes on to the job's tick guard (it ends a
+-- job that keeps failing, server/Jobs.luau tickFails). The pieces already carried and a stop that came meanwhile (the
+-- spawn may yield) stay as they are.
+local function build(session: Session)
+	local plan = session.plan
+	if not plan or session.built then
+		return
+	end
+	local visit = session.visit
+	local pile, personAt = plan.pile, plan.personAt
+	local made, madeHere, variant = session.made, session.madeHere, session.nextVariant
+	local looseCount = #session.loose -- (a pallet pick-up's pallets are Loose pieces, not a pile)
+	local ok, err = pcall(function()
+		buildStop(session)
+	end)
+	if ok then
+		return
+	end
+	if not session.ended and session.visit == visit and session.plan == plan then
+		for index = #session.loose, looseCount + 1, -1 do
+			local loose = table.remove(session.loose, index) :: Loose
+			loose.prompt:Destroy()
+			if loose.handle then
+				loose.handle:Destroy()
+			end
+			local model = loose.piece.model
+			if model then
+				model:Destroy()
+			end
+		end
+		clearStop(session, false)
+		plan.pile, plan.personAt = pile, personAt
+		session.made, session.madeHere, session.nextVariant = made, madeHere, variant
+		session.built = false
+		session.anchor = nil
+		session.slot = 0
+	end
+	error(err, 0)
+end
+
 -- ── Kids, patients and customers ───────────────────────────────────────────
 
 local function kidArrived(session: Session, piece: Piece, visit: number, timedOut: boolean)
@@ -3283,9 +3337,18 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 			render(session)
 			local door = Vehicles.cargoEntry(car)
 			local spot = onGround(door)
-			piece.npc = spawnRider(session, piece, CFrame.lookAt(spot, Vector3.new(plan.pile.X, spot.Y, plan.pile.Z)))
+			-- 6.23: a rider who could not be made (an error) stays in the vehicle like one whose stop moved on (nil), and
+			-- the error goes on to the job's tick guard: a passenger is never lost on the way out.
+			local ok, npc = pcall(spawnRider, session, piece, CFrame.lookAt(spot, Vector3.new(plan.pile.X, spot.Y, plan.pile.Z)))
+			piece.npc = if ok then npc else nil
 			if not piece.npc then
 				table.insert(session.load, piece)
+				if not ok then
+					if not session.ended then
+						render(session) -- (back in its seat)
+					end
+					error(npc, 0)
+				end
 				return
 			end
 			say(piece.npc, line(if isPatient(session) then LINES.patientOff elseif isSurvivor(session) then LINES.survivorOff else LINES.kidOff))

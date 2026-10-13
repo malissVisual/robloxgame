@@ -6,6 +6,7 @@
 --     button); the road after it as the kit's rows (the level's number, what it unlocks, its reward money, 🔒 LV n).
 --     6.20: two tabs on top, ROAD (the above) and SKILLS ("SKILLS · 2" with free points; client/SkillsView.luau: the
 --     skill points, RESET · FREE, the three branches, a skill's details with +1 POINT).
+--     6.23: the hero's picture is what the next level opens (shared/CareerArt.luau headline), else the career glyph.
 --   * BANK: the cash is the hero (AVAILABLE CASH, the money big in green, FIND A DELIVERY), what you earned since you
 --     joined a row (its money big).
 --   * MESSAGES: a row a message, the newest first (the sender's initial on its colour, "MARGE · 21:04", the message's
@@ -27,6 +28,7 @@ local OrdersUi = require(script.Parent.OrdersUi)
 local PhoneContract = require(script.Parent.PhoneContract)
 local CardKit = require(script.Parent.CardKit)
 local SkillsView = require(script.Parent.SkillsView) -- 6.20: CAREER's SKILLS tab
+local CareerArt = require(Shared.CareerArt) -- 6.23: the next level's picture
 
 local K = Theme.Contract
 local KIT = Config.UiKit
@@ -119,10 +121,15 @@ function PhoneMore.career(list: Instance, _look: OrdersUi.Kit, ctx: Ctx)
 		if reward[1] then
 			table.insert(facts, `🎁 {reward[1]}`)
 		end
+		local picture = glyph("career")
+		local art = CareerArt.headline(nextStep.unlocks) -- (6.23; a stage has no picture)
+		if art then
+			picture.image, picture.model = art.image, art.model
+		end
 		CardKit.hero(left, {
 			name = "NextLevel",
 			height = height,
-			picture = glyph("career"),
+			picture = picture,
 			title = `NEXT: LEVEL {nextStep.level}{if nextStep.newRank then ` · {string.upper(nextStep.rank)}` else ""}`,
 			value = `{string.sub(Career.money(xpLeft), 2)} XP`,
 			valueColor = C.gold,

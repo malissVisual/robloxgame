@@ -16,6 +16,13 @@
 -- suit with a tie, a hi-vis vest with reflectors, a tracksuit with stripes, a hoodie, a butcher's apron, a prison
 -- jumpsuit, a bare chest; a missing sleeve (the upper arm in the skin's colour), a cap or a hard hat, blood stains.
 -- Without one it is the 6.0 body exactly. Every look stays within the 64 parts (tools/character-art/check.luau).
+-- 6.24, the special zombies (Config.Zombies, shared/ZombieKinds.luau), each its own build (BUILD: the block body's
+-- width and depth × its scale; the height stays its scale):
+--   * the runner thin (0.8 × 0.9), its ribs showing through a tear in its shirt;
+--   * the brute broad (1.3 × 1.2) in steel plates on its chest and belly, its shoulders, forearms and shins, held by
+--     straps across its bare back (Config.Zombies.brute.armour: the front takes less, its back is open);
+--   * the bloater swollen (1.32 × 1.36): a huge belly and a hump in the skin's colour, glowing boils on them (Neon,
+--     named Boil1 …: client/ZombieFx.luau pulses them and swells the Belly and the Hump before it blows).
 local Geometry = {}
 
 export type Triple = { number }
@@ -26,7 +33,9 @@ export type Spec = { id: string, bones: { Bone }, joints: { Joint }, pieces: { P
 -- 6.16: what an infected wears (shared/ZombieStyle.luau Outfit: the same fields, the meaning there).
 export type Outfit = { wear: string, bare: string, legs: string?, hat: string?, hatColor: Triple?, trim: Triple?, stains: number }
 
-Geometry.ids = { "courier", "person", "walker", "runner", "soldier", "brute" }
+Geometry.ids = { "courier", "person", "walker", "runner", "soldier", "brute", "bloater" }
+-- 6.24: each infected kind's build: { width, depth } × its scale (none: 1, 1).
+Geometry.Build = { brute = { 1.3, 1.2 }, runner = { 0.8, 0.9 }, bloater = { 1.32, 1.36 } } :: { [string]: { number } }
 local SKIN = { 218, 166, 119 }
 local BLACK = { 28, 31, 34 }
 local RED = { 188, 39, 37 }
@@ -227,11 +236,16 @@ local function undress(bones: { Bone }, colors: { [string]: Triple }, outfit: Ou
 end
 
 local BLOOD = { 92, 24, 20 }
+local STEEL = { 150, 156, 162 } -- 6.24: the brute's plates
+local RUST = { 120, 72, 44 }
+local LEATHER = { 58, 42, 30 }
+local VEIN = { 70, 96, 60 } -- 6.24: the bloater's
+local BOIL = { 196, 236, 92 }
 local WHITE_SHIRT = { 196, 192, 180 }
 local REFLECTOR = { 214, 218, 206 }
 local HARD_HAT = { 232, 196, 40 }
 local function darker(c: Triple, k: number): Triple
-	return { math.floor(c[1] * k), math.floor(c[2] * k), math.floor(c[3] * k) }
+	return { math.min(255, math.floor(c[1] * k)), math.min(255, math.floor(c[2] * k)), math.min(255, math.floor(c[3] * k)) }
 end
 
 -- The infected's pieces: the 6.0 face and torn clothes (outfit nil: exactly as before), 6.16 dressed by the outfit.
@@ -294,10 +308,39 @@ local function infected(add: Add, id: string, colors: { [string]: Triple }, outf
 		add("Helmet", "Head", { 1.72, 0.28, 1.51 }, { 0, 0.62, 0 }, trim or { 66, 76, 46 })
 		add("ChestPlate", "UpperTorso", { 1.34, 0.62, 0.13 }, { 0, -0.28, -0.59 }, { 53, 66, 44 })
 	elseif id == "brute" then
-		add("ShoulderPlate", "LeftUpperArm", { 1.05, 0.34, 1.07 }, { 0, 0.45, 0 }, { 85, 77, 61 })
-		if wear ~= "bare" then
-			add("BackSeam", "UpperTorso", { 0.13, 1.5, 0.025 }, { 0.38, 0, 0.518 }, { 104, 93, 76 })
+		add("ShoulderPlate", "LeftUpperArm", { 1.05, 0.34, 1.07 }, { 0, 0.45, 0 }, STEEL, nil, "Metal")
+		-- 6.24: the armour: steel plates in front (its chest, its belly, the right shoulder too, the forearms, the shins),
+		-- two straps across its back, nothing else there (where a shot does its full damage)
+		add("ShoulderPlateR", "RightUpperArm", { 1.05, 0.34, 1.07 }, { 0, 0.45, 0 }, STEEL, nil, "Metal")
+		add("ChestPlate", "UpperTorso", { 1.86, 0.92, 0.14 }, { 0, 0.3, -0.6 }, STEEL, { -4, 0, 0 }, "Metal")
+		add("BellyPlate", "UpperTorso", { 1.6, 0.52, 0.12 }, { 0, -0.42, -0.585 }, darker(STEEL, 0.85), nil, "Metal")
+		add("PlateRim", "UpperTorso", { 1.9, 0.08, 0.17 }, { 0, -0.13, -0.6 }, RUST)
+		for _, side in { -1, 1 } do
+			local suffix = if side < 0 then "L" else "R"
+			local limb = if side < 0 then "Left" else "Right"
+			add("Strap" .. suffix, "UpperTorso", { 0.2, 1.62, 0.04 }, { side * 0.55, 0, 0.53 }, LEATHER, { 0, 0, side * 14 })
+			add("Bracer" .. suffix, limb .. "LowerArm", { 1.08, 0.42, 1.08 }, { 0, 0, 0 }, STEEL, nil, "Metal")
+			add("Greave" .. suffix, limb .. "LowerLeg", { 0.86, 0.62, 0.1 }, { 0, 0.02, -0.55 }, STEEL, nil, "Metal")
 		end
+	elseif id == "runner" then
+		-- 6.24: gaunt: the ribs through a tear in the shirt
+		add("RibTear", "UpperTorso", { 0.72, 0.62, 0.03 }, { -0.42, -0.12, -0.523 }, darker(colors.skin, 0.55), { 0, 0, 8 })
+		for i = 1, 3 do
+			add("Rib" .. i, "UpperTorso", { 0.64, 0.07, 0.035 }, { -0.42, 0.06 - (i - 1) * 0.17, -0.535 }, darker(colors.skin, 1.12), { 0, 0, 8 })
+		end
+	elseif id == "bloater" then
+		-- 6.24: the swollen belly and hump in the skin's colour, veins, glowing boils (client/ZombieFx.luau: the boils
+		-- pulse; the Belly and the Hump swell before it blows)
+		local swollen = { math.min(255, colors.skin[1] + 18), math.min(255, colors.skin[2] + 12), colors.skin[3] }
+		add("Belly", "UpperTorso", { 2.1, 1.75, 1.45 }, { 0, -0.32, -0.5 }, swollen, nil, nil, "Ellipsoid")
+		add("Hump", "UpperTorso", { 1.7, 1.2, 0.95 }, { 0, 0.32, 0.4 }, swollen, nil, nil, "Ellipsoid")
+		add("Vein1", "UpperTorso", { 0.05, 0.8, 0.03 }, { -0.35, -0.3, -1.17 }, VEIN, { 0, 0, 18 })
+		add("Vein2", "UpperTorso", { 0.05, 0.6, 0.03 }, { 0.45, -0.45, -1.13 }, VEIN, { 0, 0, -24 })
+		local boils = { { 0.42, -0.05, -1.17, 0.36 }, { -0.5, -0.62, -1.08, 0.3 }, { 0.12, -0.85, -1.08, 0.24 }, { -0.42, 0.55, 0.78, 0.3 }, { 0.5, 0.25, 0.8, 0.26 } }
+		for i, b in boils do
+			add("Boil" .. i, "UpperTorso", { b[4], b[4], b[4] }, { b[1], b[2], b[3] }, BOIL, nil, "Neon", "Ball")
+		end
+		add("NeckBoil", "Head", { 0.34, 0.34, 0.34 }, { 0.62, -0.42, 0.1 }, BOIL, nil, "Neon", "Ball")
 	end
 	if not outfit then
 		return
@@ -390,7 +433,8 @@ function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?
 	local human = courier or id == "person"
 	local s = if courier then 1 else scale or 1
 	assert(s > 0 and s <= 4, "Invalid character scale")
-	local factors = { s * (if id == "brute" then 1.3 else 1), s, s * (if id == "brute" then 1.2 else 1) }
+	local build = Geometry.Build[id] -- 6.24
+	local factors = { s * (if build then build[1] else 1), s, s * (if build then build[2] else 1) }
 	local colors: { [string]: Triple }
 	if courier then
 		colors = { root = BLACK, boot = BLACK, skin = SKIN, shirt = JACKET, sleeve = JACKET, forearm = JACKET, pants = { 44, 48, 56 }, shin = { 44, 48, 56 } }

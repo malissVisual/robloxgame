@@ -1,17 +1,24 @@
 --!strict
 -- 6.7: the one book of the characters' joint poses on this client, shared by the pose layers that write the R15 joints'
--- Transform in RunService.PreSimulation (client/ArmPose.luau, client/SprintPose.luau, client/BodyLife.luau; never C0:
--- shared/Joints.luau). Several layers now move the same joint (the waist: the carry's lean, the run, the breath, the
--- flinch); each composing on what it read as "the animation" would pile the others' poses up on a frame the Animator
--- skips (a far body is animated less often). The book keeps, per joint and frame, the animation's own value:
+-- Transform in RunService.PreSimulation (client/GaitPose.luau, client/ArmPose.luau, client/BodyLife.luau,
+-- client/BagSway.luau; never C0: shared/Joints.luau). Several layers move the same joint (the waist: the gait's lean,
+-- the carry's lean, the breath, the flinch); each composing on what it read as "the animation" would pile the others'
+-- poses up on a frame the Animator skips (a far body is animated less often). The book keeps, per joint and frame, the
+-- animation's own value:
 --   PoseLedger.base(joint)    the animation's value this frame (the Animator's, or its last one when it left the joint
 --                             alone this frame: the joint still holds what was written last)
 --   PoseLedger.now(joint)     the value so far this frame: the base, or what a layer wrote over it before this one
 --   PoseLedger.write(joint, value)  the joint's Transform, the frame's value from now on
 --   PoseLedger.release(joint) a layer lets go: when nobody wrote the joint this frame it goes back to the base (the rest
 --                             pose where nothing animates it: a bob or a dip never stays on the Root joint)
--- A frame starts in RunService.PreAnimation (before the Animator, before every PreSimulation layer). The layers run in
--- any order; each composes on now(). Joints that left their body are forgotten now and then.
+-- A frame starts in RunService.PreAnimation (before the Animator, before every PreSimulation layer). Joints that left
+-- their body are forgotten now and then.
+-- 6.24: the layers run in a fixed order, PoseLedger.stage(order, name, step): one PreSimulation connection calls every
+-- stage by its `order` each frame (Roblox does not promise the order of a signal's connections): the gait first (10:
+-- client/GaitPose.luau sets the whole body absolute over the animation), then the aim, the carry and the gestures (20:
+-- client/ArmPose.luau, toward their own poses from it), the breath, the look and the flinch (30: client/BodyLife.luau,
+-- on top), the bag's arm and lean (40: client/BagSway.luau). A stage that errors does not stop the others (the Output
+-- says so, once every ERROR_EVERY seconds).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -111,6 +118,40 @@ end
 function PoseLedger.written(joint: any): boolean
 	local e = entries[joint]
 	return e ~= nil and e.frame == frame and e.wrote
+end
+
+-- 6.24: the layers, in order.
+type Stage = { order: number, name: string, step: (number) -> (), toldAt: number }
+local stages: { Stage } = {}
+local staged = false
+local ERROR_EVERY = 10 -- seconds between two warnings of one stage
+
+local function byOrder(a: Stage, b: Stage): boolean
+	return a.order < b.order
+end
+
+local function runStages(dt: number)
+	for _, stage in stages do
+		local ok, err = pcall(stage.step :: any, dt)
+		if not ok then
+			local now = os.clock()
+			if now - stage.toldAt >= ERROR_EVERY then
+				stage.toldAt = now
+				warn(`[PoseLedger] {stage.name}: {err}`)
+			end
+		end
+	end
+end
+
+-- A layer's step, called every frame in PreSimulation after the stages of a lower `order` (dt: the frame's seconds).
+function PoseLedger.stage(order: number, name: string, step: (number) -> ())
+	table.insert(stages, { order = order, name = name, step = step, toldAt = -math.huge })
+	table.sort(stages, byOrder)
+	if not staged then
+		staged = true
+		start()
+		RunService.PreSimulation:Connect(runStages)
+	end
 end
 
 return PoseLedger

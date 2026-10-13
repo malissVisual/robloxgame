@@ -1,7 +1,7 @@
 --!strict
 -- 6.13.1, performance and mobile (design/performance/REPORT.md): how much cosmetic per-frame work this device gets. A
 -- phone or a tablet (a touch screen without a keyboard, Ui.touchLayout's test) is "lite": the per-frame poses and
--- motions reach Config.Performance.Lite.Range of their distance on a computer (client/BodyLife.luau, SprintPose,
+-- motions reach Config.Performance.Lite.Range of their distance on a computer (client/BodyLife.luau, GaitPose,
 -- BagSway, ZombieAnimator, AnimalAnimator, TrafficAnimator, CarVisuals, ShopPropMotion, WorldFx's flicker), the posed
 -- bodies Lite.Count of their number, the night's real lights are fewer and closer (shared/RenderBudget.luau numbers,
 -- client/WorldFx.luau), the minimap's routes and markers redraw Lite.MapHz times a second and its turning picture moves
