@@ -6663,4 +6663,49 @@ Config.Sandbox = {
 	MaxPlayers = 4,
 }
 
+-- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
+-- the middle and a 3D guide (a soft glowing path on the ground along the roads, a floating chevron over the target with
+-- its distance) to what to do next. Each step goes quiet once done (per session); the arrow to the house and home
+-- stays while you drive. Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
+-- it back.
+--   Every         s between two looks: the step, the path, the distance (nothing is done frame by frame)
+--   Fade          s the hint line takes to fade in or out
+--   HideHold      s G is held to hide the guide or bring it back
+--   OffNote       s the "Guide off" line stays before it fades
+--   InfoSeconds   s a step that only says something (the pieces earn money) shows before it counts as done
+--   HouseMargin   studs round the house's lot (SandboxMap.House.lot) that count as "at the house"
+--   Direct        studs: a target closer than this gets a straight path, a farther one goes along the roads
+--   Near          studs: closer than this the path hides (the chevron stays)
+--   ChevronHeight studs over the target the chevron floats
+--   PathLift      studs over the ground the path glows
+--   PathWidth     studs: the path's width
+--   PathAlpha     the path's transparency (0 solid … 1 gone)
+--   Color         the guide's colour (the path, the chevron, the hint's edge): a warm ZDC orange
+--   HintWidth     px at scale 1: the widest the hint line gets (its words wrap beyond)
+--   TextSize      px at scale 1: the hint's words
+--   TouchScale    the hint's smallest scale on a touch screen (readable on a phone held sideways)
+--   SideClear     px at scale 1 kept free at the top's left and right (the money, Roblox's own buttons)
+--   Top           px from the top when nothing else holds the top's middle; Gap: px under what does
+Config.SandboxGuide = {
+	Every = 0.2,
+	Fade = 0.5,
+	HideHold = 0.8,
+	OffNote = 3,
+	InfoSeconds = 12,
+	HouseMargin = 40,
+	Direct = 70,
+	Near = 8,
+	ChevronHeight = 7,
+	PathLift = 0.45,
+	PathWidth = 1.3,
+	PathAlpha = 0.45,
+	Color = { 255, 168, 60 },
+	HintWidth = 460,
+	TextSize = 15,
+	TouchScale = 0.8,
+	SideClear = 200,
+	Top = 8,
+	Gap = 6,
+}
+
 return Config

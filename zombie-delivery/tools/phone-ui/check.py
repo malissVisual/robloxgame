@@ -189,3 +189,37 @@ from mapenv import map_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     map_env(Path(folder))
     subprocess.run([args.luau, "mapview.luau"], cwd=folder, check=True)
+
+# 8.0 SANDBOX, the guide: client/SandboxGuide.luau (shared/SandboxSteps.luau, SandboxMap) beside the real
+# client/MovingHud.luau and client/MoveHelperHud.luau (TopBlocks, MoveLayout, TouchLayout) on missions_mock.luau's
+# recorder: tools/phone-ui/sandboxguide.luau checks the hint line at 844 x 390 and on a computer (clear of the money at
+# the top left, the move's panel, Danny's strip, Roblox's player list and the touch buttons; its ✕ and the 💡 chip a
+# finger's size), every step's words and 3D target, the quiet steps, the ✕ and a held G, and nothing made loop after loop.
+# (shared/WarehouseLayout.luau is the warehouse's: a stand-in the scene gives through Shared:FindFirstChild.)
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
+local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+'''
+    # (a module found at run time, shared/WarehouseLayout.luau: the stand-in's table)
+    found = '''local __require = require
+local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
+'''
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+        text = (ROOT / f"src/client/{name}.luau").read_text()
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
+        (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
+    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
+    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "sandboxguide.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "sandboxguide.luau"], cwd=dest, check=True)
