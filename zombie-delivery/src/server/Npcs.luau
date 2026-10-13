@@ -448,8 +448,9 @@ local function nameTag(head: BasePart, look: Look)
 	end
 end
 
--- A line in a speech bubble over the head for a few seconds.
-function Npcs.say(npc: Model, text: string, seconds: number?)
+-- A line in a speech bubble over the head for a few seconds; `range`: studs it is seen from (7.0 greeters: Marge's
+-- word at the Moving contracts kiosk from the job board; nil: the name tag's NAME_RANGE).
+function Npcs.say(npc: Model, text: string, seconds: number?, range: number?)
 	local state = states[npc]
 	local head = if state then state.head or state.root else nil
 	if not state or not head then
@@ -476,7 +477,7 @@ function Npcs.say(npc: Model, text: string, seconds: number?)
 	gui.Size = UDim2.fromOffset(width, height + 10)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y * 0.5 + 0.9, 0)
 	gui.SizeOffset = Vector2.new(0, 0.5)
-	gui.MaxDistance = NAME_RANGE
+	gui.MaxDistance = range or NAME_RANGE
 	gui.LightInfluence = 0
 	gui.Parent = head
 	local bubble = Instance.new("Frame")

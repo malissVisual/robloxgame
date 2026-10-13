@@ -6,12 +6,14 @@
 --   * the header: ZDC MOVING · PLANNING, the house big, chips (the clock, the horde, the crew n/max), ✕ folds it away
 --     (a pill at the top brings it back: nothing is left);
 --   * the contract (the kit's hero): the house's picture mark, the client and address, UP TO $ big in green, one facts
---     line (★ must-haves, things, the locked door); the truck under it (the Moving Truck, SELECTED; bigger ones later);
+--     line (★ must-haves, things), DOOR OPEN in its corner (the client greets the crew there); the truck under it (the
+--     Moving Truck, SELECTED; bigger ones later);
 --   * the crew (the kit's rows): each member with their role's icon, LEADER / YOU, the role, READY (green) / NOT READY
 --     (red); the owner's + INVITE opens the crew panel (MoveLobbyUi.onInvite: client/CrewPanel.luau) and the lobby comes
 --     back when it closes;
---   * PICK YOUR ROLE: the four role cards (shared/MoveRoles.luau: icon, name, what it does, its loadout line); yours lit
---     in its colour, a crew mate's greyed with their name (no doubles while there are no more players than roles);
+--   * PICK YOUR ROLE: the three role cards (shared/MoveRoles.luau: icon, name, what it does, its loadout line) side by
+--     side, or one under the other where three would not fit (ROLE_MIN); yours lit in its colour, a crew mate's greyed
+--     with their name (no doubles while there are no more players than roles);
 --   * the footer: the one primary button: the owner's ▶ LAUNCH (green once everybody is READY; solo at once), a
 --     member's ✔ I'M READY / NOT READY; and CANCEL (the owner) or LEAVE CREW (a member: the crew's own "leave").
 -- Wide (Config.UiKit.SplitMin and more): the contract and the truck on the left, the crew and the roles on the right;
@@ -49,7 +51,9 @@ local CARD_W = 860
 local CARD_H = 640
 local HEAD_H = 64
 local FOOT_H = 72
-local ROLE_H = 122
+local ROLE_H = 170 -- a role card side by side (its words wrap in a third of the column, its kit a short list)
+local ROLE_ROW = 100 -- a role card one under the other (a narrow column: the words wrap less)
+local ROLE_MIN = 134 -- a role card's least width side by side
 
 local remote = Net.get("MoveLobby")
 local crewRemote = Net.get("CrewAnswer")
@@ -136,8 +140,9 @@ local function memberRow(parent: Instance, member: any, order: number)
 	})
 end
 
--- A role card: its icon, name, what it does and its loadout; yours lit, a crew mate's greyed with their name.
-local function roleCard(parent: Instance, id: string, order: number, holder: string?, mine: boolean)
+-- A role card: its icon, name, what it does and its loadout; yours lit, a crew mate's greyed with their name. `tall`:
+-- side by side, a third of the column (the state under the name's line, the words wrapped); else a row across it.
+local function roleCard(parent: Instance, id: string, order: number, holder: string?, mine: boolean, tall: boolean)
 	local def = MoveRoles.get(id)
 	if not def then
 		return
@@ -146,7 +151,7 @@ local function roleCard(parent: Instance, id: string, order: number, holder: str
 	local taken = holder ~= nil and not mine
 	local card = Ui.make("TextButton", {
 		Name = `Role_{id}`,
-		Size = UDim2.fromOffset(100, ROLE_H),
+		Size = UDim2.fromOffset(100, if tall then ROLE_H else ROLE_ROW),
 		BackgroundColor3 = if mine then K.raised else K.row,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
@@ -165,17 +170,30 @@ local function roleCard(parent: Instance, id: string, order: number, holder: str
 		TextSize = 15,
 		TextColor3 = if taken then C.dim else color,
 	})
-	label(card, if mine then "✔ YOURS" elseif taken then `TAKEN · {string.upper(holder :: string)}` else "FREE · TAP TO PICK", UDim2.new(1, -60, 0, 14), {
+	label(card, if mine then "✔ YOURS" elseif taken then `TAKEN · {string.upper(holder :: string)}` else "FREE · TAP TO PICK", UDim2.new(1, if tall then -24 else -60, 0, 14), {
 		Name = "State",
-		Position = UDim2.fromOffset(54, 30),
+		Position = if tall then UDim2.fromOffset(14, 50) else UDim2.fromOffset(54, 30),
 		Font = Theme.HeadingFont,
 		TextSize = 10,
 		TextColor3 = if mine then color elseif taken then C.dim else C.faint,
 	})
-	label(card, def.blurb, UDim2.new(1, -24, 0, 16), { Name = "Blurb", Position = UDim2.fromOffset(14, 52), TextSize = 12, TextColor3 = if taken then C.dim else K.secondary })
-	label(card, MoveRoles.loadout(id), UDim2.new(1, -24, 0, 44), {
+	label(card, def.blurb, UDim2.new(1, -24, 0, if tall then 30 else 16), {
+		Name = "Blurb",
+		Position = UDim2.fromOffset(14, if tall then 68 else 52),
+		TextSize = 12,
+		TextColor3 = if taken then C.dim else K.secondary,
+		TextWrapped = tall,
+		TextTruncate = if tall then Enum.TextTruncate.None else Enum.TextTruncate.AtEnd,
+		TextYAlignment = Enum.TextYAlignment.Top,
+	})
+	-- the loadout: a line (a row across the column) or, side by side, a short list (one piece of the kit a line)
+	local loadout = MoveRoles.loadout(id)
+	if tall then
+		loadout = (string.gsub(loadout, " · ", "\n"))
+	end
+	label(card, loadout, UDim2.new(1, -24, 0, if tall then 66 else 26), {
 		Name = "Loadout",
-		Position = UDim2.fromOffset(14, 70),
+		Position = UDim2.fromOffset(14, if tall then 100 else 70),
 		TextSize = 11,
 		TextColor3 = if taken then C.dim else C.faint,
 		TextWrapped = true,
@@ -198,13 +216,16 @@ local function roleGrid(parent: Instance, v: any, width: number, order: number)
 			holders[member.role] = tostring(member.name)
 		end
 	end
-	local columns = if width >= 560 then 4 elseif width >= 280 then 2 else 1
+	-- the three side by side when each gets ROLE_MIN, else one under the other (a narrow phone held upright)
+	local count = #MoveRoles.Order
 	local gap = KIT.Gap
+	local tall = width >= count * ROLE_MIN + gap * (count - 1)
+	local columns = if tall then count else 1
 	local cell = math.floor((width - gap * (columns - 1)) / columns)
 	local grid = Ui.make("Frame", { Name = "Roles", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(cell, ROLE_H), CellPadding = UDim2.fromOffset(gap, gap), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
+	Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(cell, if tall then ROLE_H else ROLE_ROW), CellPadding = UDim2.fromOffset(gap, gap), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
 	for index, id in MoveRoles.Order do
-		roleCard(grid, id, index, holders[id], mine == id)
+		roleCard(grid, id, index, holders[id], mine == id, tall)
 	end
 end
 
@@ -415,7 +436,7 @@ local function draw()
 
 	-- the contract (the hero) and the truck
 	local stars = if type(card.stars) == "table" then #card.stars else 0
-	local facts = `★ {stars} MUST-HAVES · 📦 {tonumber(card.items) or 0} THINGS{if card.keys == true then " · 🔑 KEYS" else " · 🔒 NO KEYS"}`
+	local facts = `★ {stars} MUST-HAVES · 📦 {tonumber(card.items) or 0} THINGS`
 	CardKit.hero(left, {
 		name = "Contract",
 		order = 1,
@@ -426,7 +447,7 @@ local function draw()
 		value = `UP TO {Ui.money(tonumber(card.estimate) or 0)}`,
 		facts = facts,
 		ribbon = { text = "📋 CONTRACT", face = ORANGE, ink = C.goldInk },
-		corner = { text = if card.keys == true then "OPEN" else "LOCKED", ink = if card.keys == true then K.good else K.warn },
+		corner = { text = "DOOR OPEN", ink = K.good, width = 96 }, -- (the client greets the crew at it: server/MoveGreeters.luau)
 		silent = true,
 	})
 	if wide then
