@@ -293,6 +293,7 @@ Config.Tutorial = {
 	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
 	StartDelay = 2, -- seconds after PLAY before her welcome shows (6.7: on its own; the start screen fades out first)
 	RetryAfter = 1.5, -- a first job gone this long without a result (a special job ended, an admin): back to "board"
+	TalkQuiet = 6, -- 7.1 review: s after a Talk with her in which her Moving kiosk line waits (server/MoveGreeters.luau; her bubbles: their own time)
 	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
 	-- 6.7: the arrow tour of the screen (client/TutorialArrow.luau; px at the screen's scale)
 	TourBounce = 10, -- how far the arrow bounces back from its target
@@ -3484,7 +3485,7 @@ Config.Soundscape = {
 		-- the put-down), at most this many seconds later (the server sends it 0.25 – 0.45 s after a change)
 		Gate = 0.7, -- the Wall's gate opening as the move is delivered (the result card plays its jingle)
 		Slip = 0.8, -- a heavy piece slipping from your hands (MoveSounds.slipped, for the grip's UI) …
-		SlipQuiet = 1.5, -- … and no put-down for this many seconds after (grip_slip has its thud)
+		SlipQuiet = 1.5, -- … and no put-down and no heavy_drop (the slip's damage) for this many seconds after (grip_slip has its thud)
 		Scrape = 0.5, -- a two-person piece dragged alone (wood_scrape_loop), while you move faster than …
 		ScrapeFrom = 1.2, -- … studs a second
 		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick

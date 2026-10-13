@@ -12,7 +12,8 @@
 -- Started by client/Sounds.luau (MoveSounds.start(api)), which hands over how to play: its regions, its stand-ins
 -- (SoundSheet.Fallback) while sfx4.ogg is not uploaded, the SOUND setting.
 -- MoveSounds.slipped(): for the grip's UI, the piece slipped from your hands: grip_slip (a whoosh and a thud) now,
--- and the put-down its MoveCarry clearing would play is left out.
+-- and the put-down its MoveCarry clearing would play is left out, and so is the state's heavy_drop for the slip's
+-- damage (7.1 review: one thud, not two; both for Config.Soundscape.Move.SlipQuiet s).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,7 +37,7 @@ local player = Players.LocalPlayer
 local api: Api? = nil
 local view: any = nil -- the move's last state (nil: no move)
 local pending: { spot: number }? = nil -- your hands just went empty: where did the piece go (the next state says)
-local slipAt = -math.huge -- MoveSounds.slipped (its thud is the put-down)
+local slipAt = -math.huge -- MoveSounds.slipped (its thud is the put-down and the jolt)
 local scrape: Sound? = nil
 
 local function cue(c: SoundPlan.Cue)
@@ -69,7 +70,11 @@ end
 local function onState(state: any)
 	local was = view
 	view = if type(state) == "table" then state else nil
+	local slipping = os.clock() - slipAt < M.SlipQuiet
 	for _, c in SoundPlan.moveCues(was, view, workspace:GetServerTimeNow()) do
+		if slipping and c.name == "heavy_drop" then
+			continue -- (7.1 review: it slipped: grip_slip had its thud, the slip's damage needs no second one)
+		end
 		cue(c)
 	end
 	if pending then

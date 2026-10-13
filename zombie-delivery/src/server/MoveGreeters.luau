@@ -21,7 +21,10 @@
 --     attribute Dispatcher, found by it, so never a second Marge at the depot). A player on foot and on no move who
 --     comes within Kiosk.Near of the kiosk's corkboard: she turns to them and says her kiosk line (MoveStory.kioskLine,
 --     in turn), her bubble seen from Kiosk.Hear studs (she stands by the job board, across the yard), and the player
---     gets the words as a notice; on coming up to it only, and once per player every Kiosk.Again s.
+--     gets the words as a notice; on coming up to it only, and once per player every Kiosk.Again s. 7.1 review: never into
+--     her first day: not to a player whose tutorial is still ahead (the player attribute TutorialPhase, server/
+--     Tutorial.luau), nor while her own tutorial bubble or talk is going (her attribute TutorialTalk: the os.clock it
+--     lasts until; a player still by the kiosk when it is over gets the line then).
 -- server/Moving.luau calls MoveGreeters.start(board) once, MoveGreeters.sync(s) in every tick of a move and
 -- MoveGreeters.done(s) in its cleanup; the greeters' own loop (Config.MoveGreeters.Tick) does the kiosk, the soldier's
 -- body and any porch left behind by a move that ended.
@@ -405,10 +408,17 @@ local function kiosk(clock: number)
 		if not near or was or not root or player:GetAttribute("MoveWith") ~= nil then
 			continue
 		end
+		if player:GetAttribute("TutorialPhase") ~= nil then
+			continue -- (7.1 review: their first day with her is on: no moving pitch into it)
+		end
 		if clock - (kioskAt[player] or -math.huge) < G.Kiosk.Again then
 			continue
 		end
 		local marge = findDispatcher(clock)
+		if marge and (tonumber(marge:GetAttribute("TutorialTalk")) or -math.huge) > clock then
+			nearKiosk[player] = nil -- (7.1 review: her tutorial talk goes on: asked again next step while they stay)
+			continue
+		end
 		if marge then
 			kioskAt[player] = clock
 			kioskCount += 1

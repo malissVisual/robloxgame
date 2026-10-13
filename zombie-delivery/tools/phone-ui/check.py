@@ -141,7 +141,10 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
 # (844 x 390) and a computer, beside the move's panel, Danny's strip, the quick chat's button and the HUD's groups where
 # client/Hud.luau puts them (tools/phone-ui/carrygrip.luau): the bar and the round HOLD button (72 px and more) clear of
 # the touch buttons and everything else, HOLD raising the grip box, the reports, SLIPPING! and the slip, the tip, the
-# fade, the mouse button and F on a computer.
+# fade, the mouse button and F on a computer. 7.1 review: the slipped bar kept till the server drops it ("slip" asked again
+# each second), a new bar for the same piece picked up again inside DROPPED!'s moment (no second "slip"), the real
+# client/MoveSounds.luau (grip_slip, no heavy_drop for the slip's damage), three touch screens (844 x 390, 740 x 360,
+# a 1024 x 768 tablet).
 with tempfile.TemporaryDirectory() as folder:
     dest = Path(folder)
     for source in (ROOT / "src/shared").glob("*.luau"):
@@ -154,16 +157,18 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
 local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
 local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
-    for name in ("CarryGripUi", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    # 7.1 review: client/MoveSounds.luau for real too (the slip's grip_slip, no second thud: carrygrip.luau starts it
+    # with a recording api); it and CarryGripUi on the check's own clock (mock.os: os.clock is carrygrip.luau's M.clock,
+    # moved on by its frames and waits, so the bar's seed and its timings are the same every run)
+    for name in ("CarryGripUi", "MoveSounds", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
-        (dest / f"{name}.luau").write_text(prefix + text)
+        clock = "local os = mock.os or os\n" if name in ("CarryGripUi", "MoveSounds") else ""
+        (dest / f"{name}.luau").write_text(prefix + clock + text)
     (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
     (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
-    # 7.1: the slip's sound (client/MoveSounds.luau slipped), counted
-    (dest / "MoveSounds.luau").write_text('return { slipped = function() local m = require("./missions_mock"); m.slipped = (m.slipped or 0) + 1 end }')
     for name in ("mock.luau", "missions_mock.luau", "carrygrip.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)

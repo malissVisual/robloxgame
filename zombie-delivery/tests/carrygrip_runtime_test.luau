@@ -5,6 +5,10 @@
 -- second or so, a long gap counted short, nonsense nothing) and the steady walk (× 1.1, back when not steady); ("slip",
 -- spot) dropping it with the slip's damage (fragile more), a pair thing whole when either carrier slips; and both
 -- refused for what the sender does not hold: a stranger, a crew mate's thing, another spot, a thing without a bar.
+-- 7.1 review: a "slip" sooner than any bar runs out (HeavyStart / Drain × 0.9 s after the bar began: an old bar's
+-- "slip" asked again for a piece picked up again) refused, the bar's start kept when only the kind changes (a helper
+-- takes the other end); steady only once a meter could have filled, gone again when the reports stop (2 × Report s);
+-- a pair thing by two worn half by each one's reports; nothing from either end while either is on a door trip.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -162,6 +166,29 @@ E.request(ann, "slip", 2)
 check("a slip for a thing on the ground: nothing more", thingOf(2).condition == dropped.condition)
 pick(ann, 2)
 check("picked up again: a new bar, the plain walk (the steady starts over)", grip(ann) == "both 4 fragile" and math.abs(annBody:GetAttribute("CarrySpeed") - walk) < 1e-9)
+
+-- 7.1 review: the server trusts the bar less ---------------------------------------------------------------------------------
+
+local slipGate = G.Meter.HeavyStart / G.Meter.Drain * 0.9
+check("no bar runs out sooner than the slip gate (the lowest start at the fastest drain)", slipGate > 1.5 and slipGate < math.min(G.Meter.HeavyStart, G.Meter.Start) / G.Meter.Drain)
+local tvAgain = thingOf(2).condition
+E.now += 0.3
+E.request(ann, "slip", 2) -- (the old bar's "slip" asked again, the piece picked up again a moment ago)
+check("a \"slip\" right after the lift (an old bar's, asked again): refused, still in Ann's hands", annBody:GetAttribute("MoveCarry") == 2 and thingOf(2).state == "carried"
+	and thingOf(2).condition == tvAgain)
+E.request(ann, "grip", 2, 0, true)
+check("steady sooner than a meter fills ((1 − 0.85) / Fill s): not yet, the plain walk", math.abs(annBody:GetAttribute("CarrySpeed") - walk) < 1e-9, annBody:GetAttribute("CarrySpeed"))
+E.now += 1
+E.request(ann, "grip", 2, 0, true)
+check("…a second later: steady, × 1.1", math.abs(annBody:GetAttribute("CarrySpeed") - walk * G.Meter.SteadySpeed) < 1e-9, annBody:GetAttribute("CarrySpeed"))
+E.now += 1.5
+state()
+check("no report for 1.5 s: still steady", math.abs(annBody:GetAttribute("CarrySpeed") - walk * G.Meter.SteadySpeed) < 1e-9)
+E.now += 1
+state()
+check("none for more than 2 × Report s (the client's reports stopped): the +10% goes", math.abs(annBody:GetAttribute("CarrySpeed") - walk) < 1e-9, annBody:GetAttribute("CarrySpeed"))
+E.request(ann, "grip", 2, 0, true)
+check("…the next steady report: back", math.abs(annBody:GetAttribute("CarrySpeed") - walk * G.Meter.SteadySpeed) < 1e-9)
 putDown(ann)
 
 -- A pair thing: dragged, by two, either slips ----------------------------------------------------------------------------
@@ -169,10 +196,53 @@ putDown(ann)
 check("the roles: Ann the Driver, Bob the Mover", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "mover")
 pick(ann, 3, "Lift") -- the sofa: a pair thing, weight 8
 check("a pair thing alone (not a Mover): dragged, a calm bar (\"drag 8\")", annBody:GetAttribute("MoveCarry") == 3 and grip(ann) == "drag 8", grip(ann))
+E.now += 2.5 -- (Ann drags it a while)
 local sofa = itemModel(3)
 E.place(bob, sofa.PrimaryPart.Position + V3(-1, 0, 0))
 promptIn(sofa, "Help lift").Triggered:Fire(bob)
 check("Bob takes the other end: each their own bar (\"pair 8\")", bobBody:GetAttribute("MoveCarry") == 3 and grip(ann) == "pair 8" and grip(bob) == "pair 8")
+E.request(bob, "slip", 3)
+check("7.1 review: Bob's \"slip\" as his bar has just begun: refused", thingOf(3).state == "carried" and bobBody:GetAttribute("MoveCarry") == 3)
+local sofaWorn = thingOf(3).condition
+for _ = 1, 10 do
+	E.now += 1
+	E.request(ann, "grip", 3, 1, false)
+end
+local drop = sofaWorn - thingOf(3).condition
+check("7.1 review: by two, each one's report wears it half (10 of Ann's: 10 × Wear / 2)", math.abs(drop - 10 * G.Server.Wear / 2) <= 0.011 and drop < 10 * G.Server.Wear * 0.75,
+	`{sofaWorn} → {thingOf(3).condition}`)
+
+-- 7.1 review: a door trip: nothing from either end while either is on it (the other end's fade comes a moment later)
+local pairWalk = annBody:GetAttribute("CarrySpeed")
+E.now += 1
+E.request(ann, "grip", 3, 0, true) -- (Ann steady: the walk waits for Bob's)
+check("Ann steady, Bob not (yet): the plain walk", math.abs(annBody:GetAttribute("CarrySpeed") - pairWalk) < 1e-9)
+local leave = promptIn(workspace, "Leave house")
+local queued: { () -> () } = {}
+local runAtOnce = E.task.delay
+E.task.delay = function(_: any, callback: any, ...: any) -- (the fades' delays wait: the trips are on until run)
+	local args = table.pack(...)
+	table.insert(queued, function()
+		callback(table.unpack(args, 1, args.n))
+	end)
+end
+E.place(ann, leave.Parent.Position)
+leave.Triggered:Fire(ann)
+check("Ann at the door with the sofa: her trip begins (its fade)", #queued == 1 and E.last(ann, "Moving", "fade").a == "out")
+E.request(bob, "slip", 3)
+E.request(bob, "grip", 3, 0, true)
+check("…Bob's \"slip\" and steady report during her trip: refused (the sofa in their hands, the plain walk)", thingOf(3).state == "carried"
+	and bobBody:GetAttribute("MoveCarry") == 3 and math.abs(annBody:GetAttribute("CarrySpeed") - pairWalk) < 1e-9)
+table.remove(queued, 1)() -- (Ann's trip: out of the house; Bob comes along: his own trip begins)
+check("Ann's trip done, Bob's on (his fade)", #queued == 1 and E.last(bob, "Moving", "fade").a == "out")
+E.request(ann, "slip", 3)
+check("…Ann's \"slip\" during Bob's trip: refused", thingOf(3).state == "carried" and annBody:GetAttribute("MoveCarry") == 3)
+table.remove(queued, 1)()
+E.task.delay = runAtOnce
+E.place(bob, sofa.PrimaryPart.Position + V3(-1, 0, 0)) -- (no physics here: the sofa stayed where it was)
+E.request(bob, "grip", 3, 0, true)
+check("both trips done: Bob's steady report counts, both steady: × 1.1", math.abs(annBody:GetAttribute("CarrySpeed") - pairWalk * G.Meter.SteadySpeed) < 1e-9,
+	annBody:GetAttribute("CarrySpeed"))
 local sofa0 = thingOf(3).condition
 since = #E.messages
 E.request(bob, "slip", 3)
@@ -191,8 +261,13 @@ check("Ann's grip and slip for Bob's slab: refused", bobBody:GetAttribute("MoveC
 E.now += 1
 E.request(bob, "grip", 6, 1, false)
 check("Bob's own report wears it (not fragile: less)", thingOf(6).condition < slab0 and math.abs(thingOf(6).condition - (slab0 - G.Server.Wear)) <= 0.006)
-putDown(bob)
-check("put down: Bob's bar goes", grip(bob) == nil)
+local slab = itemModel(6)
+E.place(ann, slab.PrimaryPart.Position + V3(-1, 0, 0))
+promptIn(slab, "Help lift").Triggered:Fire(ann)
+check("7.1 review: Ann takes the slab's other end: another kind for Bob (\"pair 10\"), the same carry", grip(bob) == "pair 10" and grip(ann) == "pair 10", grip(bob))
+E.request(bob, "slip", 6)
+check("…his bar's start kept: his \"slip\" lands at once (it began 2 s ago), the slab down, both bars gone", thingOf(6).state == "ground" and grip(bob) == nil
+	and grip(ann) == nil and bobBody:GetAttribute("MoveCarry") == nil)
 
 Moving.admin(ann, "end")
 check("the move ends: nobody keeps a bar", grip(ann) == nil and grip(bob) == nil)
