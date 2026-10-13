@@ -1171,7 +1171,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
   - 💪 **Mover:** lifts a two-person piece alone, carries 15% faster, no slowdown on slopes.
   - 🛡️ **Guard:** +50% damage, two plank barricades, sees zombies through walls.
   - 🔧 **Technician:** picks the locked front door quietly (anyone else kicks it in and the noise brings zombies), and fixes the garage fuse box so the lights come back.
-- Solo players switch roles from the item list (Tab, every 30 s).
+- Solo players switch roles from the item list (O or a tap on the panel, every 30 s).
 - Hold **T** (💬 on phones) for quick chat: six lines your crew sees as a bubble and a line in the move panel.
 
 **The move** (`server/Moving.luau`, rules `shared/MovingRules.luau`, HUD `client/MovingHud.luau`, `client/Fade.luau`, `Config.Moving`):
