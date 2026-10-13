@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (the Blender helper, branch `claude/magical-brahmagupta-af54ch`) · the owner's request: Marge's house (155 Willow Ln, the moves' prologue) as a classic European house modelled in Blender, worn in the game like the ZDC Van (one import) · `design/blender-house/` (new), `src/server/HouseMesh.luau` (new), `buildHouse` in `src/server/World.luau` (the house's own parts in a Model + one dress call), a check in `tools/` · 2026-10-13
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
