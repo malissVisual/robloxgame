@@ -19,6 +19,8 @@
 --              Map.nightFactor), a rooftop's wind by your height (SoundPlan.ambience), only in the game; without
 --              sfx3.ogg the 5.7 hum and wind as before (moved here from client/Sounds.luau); the park's fountain, a 3D
 --              loop at it (Map.Park) while the camera is near
+--   8.0.1, the sandbox (Config.Sandbox.On): none of the city's places (SoundPlan.cityPlaces): no fountain (Map.Park's
+--              (0, 0) is on its Main Street), no pond, river or sea to splash or wade in, no park lawn under the feet
 -- Every look is throttled (Tick, OthersEvery); the steps run on Heartbeat for a handful of bodies.
 
 local Lighting = game:GetService("Lighting")
@@ -380,11 +382,19 @@ local function updateAmbience()
 	toward("wind", mix.wind * on, 3)
 end
 
--- The park's fountain: a 3D loop at it while the camera is near (made and gone with the distance).
+-- The park's fountain: a 3D loop at it while the camera is near (made and gone with the distance). 8.0.1: only where
+-- the city's park is (SoundPlan.cityPlaces: never in the sandbox, where Map.Park's middle is on Main Street).
 local fountain: Attachment? = nil
 local function updateFountain()
 	local camera = workspace.CurrentCamera
 	if not camera or not api.sheet3 then
+		return
+	end
+	if not SoundPlan.cityPlaces() then
+		if fountain then
+			fountain:Destroy()
+			fountain = nil
+		end
 		return
 	end
 	local park = Map.Park

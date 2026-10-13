@@ -3292,6 +3292,11 @@ Config.SpawnSpot = {
 	Probe = 8, -- studs a wheel's ray looks down (from half of it over the spot)
 	Drop = 0.5, -- studs over its wheels' ground it is put down at (it drops onto them)
 	Across = 1, -- spots to either side at most (a road's other lanes; never up onto the sidewalk)
+	-- 8.0.1: the folders of the workspace (a dotted path) whose parts never take a spot's room: the loot and the
+	-- animals (pushed along like the zombies) and the sandbox's ground (server/SandboxWorld.luau: its mounds are big
+	-- buried balls, and a box query sees a part's whole box, a cube some 480 studs wide reaching 4 – 5 studs over
+	-- the meadow; the wheels' rays still stand a car on them). A path that is not there is skipped (the city).
+	Pass = { "Loot", "Animals", "Sandbox.Ground" } :: { string },
 }
 
 -- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
@@ -6830,7 +6835,8 @@ Config.SandboxGuide = {
 --   Receiving       the receiving zone's depth inside the roller door (its width the door's, SandboxMap.DoorWidth)
 --   DoorHeight      the roller door's opening (kept open)
 --   Ridge           the gable roof's ridge (north-south) over the walls' top
---   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length } (the van parks in it)
+--   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length }, centred on the plot's
+--                   vanSpot (the parked Sprinter's middle: 4 studs to spare at each end, its words at the door's end)
 --   PromptDistance  the stands' prompts' reach; SellHold the Sell prompt's hold (s)
 --   Rebuild         s: the changes to one collection this close together rebuild its shown pieces once
 --   MaxParts        one warehouse's part budget (the building, its stands and its bay; not the pieces on show)
@@ -6846,7 +6852,7 @@ Config.Warehouse = {
 	Receiving = 9,
 	DoorHeight = 16,
 	Ridge = 8,
-	Bay = { 14, 26 } :: { number },
+	Bay = { 14, 30 } :: { number },
 	PromptDistance = 8,
 	SellHold = 1,
 	Rebuild = 0.15,

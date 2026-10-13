@@ -4,6 +4,10 @@
 -- tests/soundplan_test.luau checks it.
 --
 --   SoundPlan.Surfaces                            "concrete", "grass", "wood", "metal", "water"
+--   SoundPlan.cityPlaces()                        8.0.1: are the city's places there (the park with its pond, lawns
+--                                                 and fountain, the river, the sea)? Not in the sandbox
+--                                                 (Config.Sandbox.On), whose Main Street runs over the park's (0, 0):
+--                                                 no water and no lawn found there, no fountain heard
 --   SoundPlan.waterTop(x, z)                      the water's top over (x, z) (the park's pond: the ground's 0; the
 --                                                 river and the sea: Map.WaterLevel), nil where there is none
 --   SoundPlan.inWater(x, y, z)                    is a foot at (x, y, z) in the water
@@ -44,7 +48,14 @@ SoundPlan.Surfaces = { "concrete", "grass", "wood", "metal", "water" }
 
 local S = Config.Soundscape
 
+function SoundPlan.cityPlaces(): boolean
+	return not Config.Sandbox.On
+end
+
 function SoundPlan.waterTop(x: number, z: number): number?
+	if not SoundPlan.cityPlaces() then
+		return nil -- (the sandbox: no pond, no river, no sea)
+	end
 	local park = Map.Park
 	local dx, dz = math.abs(x - park.x), math.abs(z - park.z)
 	if dx <= park.pond and dz <= park.pond and (dx + dz) <= park.pond * math.sqrt(2) then
@@ -70,6 +81,9 @@ end
 -- path, less the paths to the middles of the sides (5 wide) and to the corners (4 wide); the island's lawn round the
 -- fountain's basin.
 function SoundPlan.parkLawn(x: number, z: number): boolean
+	if not SoundPlan.cityPlaces() then
+		return false -- (the sandbox: no park; its own meadow is Grass, found by its material)
+	end
 	local park = Map.Park
 	local dx, dz = x - park.x, z - park.z
 	local lawnEdge = Map.BlockSize / 2 - park.walk

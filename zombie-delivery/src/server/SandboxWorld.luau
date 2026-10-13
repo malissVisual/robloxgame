@@ -5,7 +5,9 @@
 -- is anchored, in workspace.Sandbox:
 --
 --   Ground    the meadow's tiles (Grass, their top at GroundTop), a concrete pad on every plot (the warehouse worker's
---             building stands on it; its top flush with the meadow), the house's lawn, a few gentle mounds
+--             building stands on it; its top flush with the meadow), the house's lawn, a few gentle mounds (big
+--             buried balls: a vehicle's free-room box query passes this folder, Config.SpawnSpot.Pass, or their
+--             whole boxes would fill the map)
 --   Roads     the asphalt of SandboxMap.Roads and the turnaround (its top a hair under Main Street's where they overlap),
 --             the gravel shoulders down to the meadow on every edge (the cars roll off and on anywhere), the markings
 --   House     "TheOldChalet" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet on SandboxMap.House.house,
