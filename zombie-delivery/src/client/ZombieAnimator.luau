@@ -17,6 +17,10 @@
 -- worked out every frame, farther every FarEvery frames (the pose kept in between); one that stops being posed (far,
 -- dead) gets its joints back to the animation. The sounds hook in (client/ZombieLife.luau): ZombieAnimator.onHit /
 -- onAttack / onDeath / onStomp; ZombieAnimator.list() is the zombies' models (read it, never change it).
+-- 6.24, the special zombies (server/Zombies.luau): the runner's sprint and its leap (the Lunge attribute: a dive), the
+-- brute's heavier stomp, the bloater's waddle and its fuse (the Fuse attribute, the server time it goes off: arched
+-- back, the arms flung out, trembling to the blast) through the same pose (shared/ZombieStyle.luau); the swelling, the
+-- flashing glow and the hiss are client/ZombieFx.luau's.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -119,6 +123,9 @@ type Life = {
 	values: { CFrame }, -- the offsets last worked out, one per joint
 	attackAt: number,
 	hitAt: number,
+	lungeAt: number, -- 6.24: its leap (the Lunge attribute)
+	fuseFrom: number, -- 6.24: its fuse, seen then (os.clock) …
+	fuseTo: number, -- … going off then (os.clock; -math.huge: none)
 	distance: number,
 	computed: number, -- the frame they were worked out
 	posed: boolean,
@@ -182,10 +189,13 @@ local function lifeOf(model: Model, now: number): Life?
 		joints = joints,
 		thigh = thigh,
 		pose = ZombieStyle.newPose(),
-		motion = { speed = 0, legs = 0, t = 0, attack = -1, attackSide = 1, hit = -1, hitCode = 0, hitSide = 1, latched = false },
+		motion = { speed = 0, legs = 0, t = 0, attack = -1, attackSide = 1, hit = -1, hitCode = 0, hitSide = 1, latched = false, lunge = -1, fuse = -1 },
 		values = { CFrame.identity, CFrame.identity, CFrame.identity, CFrame.identity, CFrame.identity },
 		attackAt = -math.huge,
 		hitAt = -math.huge,
+		lungeAt = -math.huge,
+		fuseFrom = -math.huge,
+		fuseTo = -math.huge,
 		distance = math.huge,
 		computed = -math.huge,
 		posed = false,
@@ -216,6 +226,26 @@ local function lifeOf(model: Model, now: number): Life?
 			onAttack(model)
 		end
 	end))
+	-- 6.24: the runner's leap, the bloater's fuse
+	table.insert(made.links, model:GetAttributeChangedSignal("Lunge"):Connect(function()
+		made.lungeAt = os.clock()
+		made.computed = -math.huge
+	end))
+	local function fused()
+		local at = model:GetAttribute("Fuse")
+		if type(at) == "number" then
+			local now = os.clock()
+			made.fuseFrom = now
+			made.fuseTo = now + math.max(0.05, at - workspace:GetServerTimeNow())
+		else
+			made.fuseTo = -math.huge
+		end
+		made.computed = -math.huge
+	end
+	table.insert(made.links, model:GetAttributeChangedSignal("Fuse"):Connect(fused))
+	if model:GetAttribute("Fuse") ~= nil then
+		fused()
+	end
 	table.insert(made.links, humanoid.Died:Connect(function()
 		local onDeath = ZombieAnimator.onDeath
 		if onDeath then
@@ -283,6 +313,8 @@ local function work(life: Life, t: number)
 	m.attack = if t - life.attackAt < Tuning.AttackTime then t - life.attackAt else -1
 	m.hit = if t - life.hitAt < Tuning.HardTime then t - life.hitAt else -1
 	m.latched = life.model:GetAttribute("LatchedTo") ~= nil
+	m.lunge = if t - life.lungeAt < Tuning.Dive.Time then t - life.lungeAt else -1 -- 6.24
+	m.fuse = if t < life.fuseTo then (t - life.fuseFrom) / math.max(0.05, life.fuseTo - life.fuseFrom) else -1
 	local p = ZombieStyle.pose(life.pose, life.gait, m)
 	local values = life.values
 	values[1] = CFrame.new(0, p.rootY, p.rootZ)

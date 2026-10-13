@@ -104,6 +104,7 @@ safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SH
 safely("EnemyOutline", require(Client.EnemyOutline).start) -- 6.15: a subtle outline on the enemies (zombies red, bandits orange)
 safely("JobThumbs", require(Client.JobThumbUi).preload) -- 6.16.1: the job and chapter pictures fetched ahead (JOBS shows them at once)
 safely("ZombieLife", require(Client.ZombieLife).start) -- 6.16: the zombies' eyes glowing at night, their groans, screams, grunts
+safely("ZombieFx", require(Client.ZombieFx).start) -- 6.24: the bloaters' glow, swell and hiss, the brutes' clink, the runners' shriek, a knock
 safely("EventBanner", require(Client.EventBanner).start) -- 6.15: the live event's banner at the top, its stings
 safely("CarSway", require(Client.CarSway).start) -- 6.16: the cars' bodies roll in a turn, dip on the brake, squat on the throttle
 safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyre smoke from the wheels, skid marks (after CarSway)

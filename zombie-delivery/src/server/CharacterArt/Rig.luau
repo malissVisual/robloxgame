@@ -94,7 +94,7 @@ function Rig.build(spec: Geometry.Spec): Model
 		local turn = piece.turn or { 0, 0, 0 }
 		p.CFrame = bones[piece.attach].CFrame * CFrame.new(vector(piece.at)) * CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
 		paint(p, piece.color)
-		p.Material = if piece.material == "Fabric" then Enum.Material.Fabric elseif piece.material == "Neon" then Enum.Material.Neon else Enum.Material.SmoothPlastic
+		p.Material = if piece.material == "Fabric" then Enum.Material.Fabric elseif piece.material == "Neon" then Enum.Material.Neon elseif piece.material == "Metal" then Enum.Material.Metal else Enum.Material.SmoothPlastic -- (6.24: the brute's plates)
 		p.Massless = true
 		p.CanCollide, p.CanQuery, p.CanTouch = false, false, false
 		p.CastShadow = false

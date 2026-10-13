@@ -8,8 +8,11 @@ The game's dusk lighting and the existing zombie animation tracks supply the fin
 | --- | ---: | --- |
 | Courier | 52 (6.7) | The realistic body (6.7): 5.9 studs, warm tan skin, an open charcoal jacket over a grey shirt, trousers, boots, backwards black cap; the red reflective vest is bought kit (6.0.1) |
 | Person | 38 (6.7) | The same body for the people of `server/Npcs.luau`, painted per look (a kid at 0.75) |
-| Walker / runner | 42 each | Green infected face, cream glowing eyes, torn jacket and trousers |
-| Soldier / brute | 44 each | Same infected design, helmet/chest plate or reinforced shoulder; existing type scales/palettes |
+| Walker | 42 | Green infected face, cream glowing eyes, torn jacket and trousers |
+| Runner | 46 (6.24) | The walker's design, thin (0.8 × 0.9 of the width and depth), its ribs through a tear in its shirt |
+| Soldier | 44 | Same infected design, helmet and chest plate |
+| Brute | 53 (6.24) | Broad (1.3 × 1.2), steel plates on its chest, belly, shoulders, forearms and shins, two straps across its open back |
+| Bloater | 52 (6.24) | Swollen (1.32 × 1.36): a huge belly and a hump in the skin's colour, veins, six glowing Neon boils |
 
 All stay within the 64-part budget (the courier with the Courier Vest: 63). Bodies have 16 native parts and 15
 attachment-defined R15 joints. No MeshParts, imported textures or body/accessory asset downloads (6.7: a SpecialMesh
@@ -74,6 +77,14 @@ a prison jumpsuit, a bare chest, a torn-off sleeve, a cap or a hard hat, blood s
 37–47 parts, within the 64). The checker builds every look through the real factory and keeps them out of
 `geometry.json`; `--looks out.json` writes them for a preview. The eyes are a round 0.16 ball now (a Roblox ball takes
 its smallest side: the 6.0 eye's 0.04 was a dot); the clients paint them dull by day and glowing at night.
+
+**6.24, the special zombies** (the owner: "new zombies, so the fighting isn't always the same"): each infected kind
+has its own build in `Geometry.Build` (width and depth × its scale; the height stays its scale): the runner thin with its
+ribs showing, the brute in steel plates in front only (`Metal`, a material `Rig.luau` now knows; its back has straps
+only: `Config.Zombies.brute.armour` takes less from the front), the new bloater swollen with a belly, a hump and glowing
+boils (`client/ZombieFx.luau` pulses the boils and swells the Belly, the Hump and the boils before it blows). Runner 6
+looks (43–48 parts), brute 5 (48–56), bloater 5 (47–55): `Config.ZombieTypes.Parts` is each kind's budget and
+`tests/zombiekinds_test.luau` builds every look against it.
 
 The normal test runner includes connected-skeleton, kit-dimension, scale/ground-clearance and locomotion checks.
 The additional recorder executes the real factory/controller: attachment bind positions, flags, welds, clone

@@ -31,6 +31,9 @@
 --   * quiet, spotless, lift, pair, switches, night: their own rules, no enemies of their own
 --   Everything × the chapter's growth (1 + ChapterGrow a story chapter after the first), then at most Max (every part
 --   shrunk alike, each at least one), at least Min.
+--   6.24, the special zombies: the tier's Kinds with the runners × (1 + RunnerGrow a chapter after the first); then
+--   Bloaters[chapter] (+ FinaleBloaters on a chapter's last mission) of the stops' walkers are bloaters, one a stop from
+--   the last drop back to the first pick-up and round again (MissionPlan.bloaters): the total never changes.
 -- Where: a stop's enemies stand on the road by its circle (a yard's in a ring round it); a route point is on the road
 -- at an even share of the route between the stops, FromStop studs from each; HOLD OUT's waves come from DefendRing
 -- studs round the last drop, on the roads. Never in the safe zone, the water or the mountain's rock (no route point in
@@ -311,6 +314,77 @@ local function hasTwist(def: Def, twist: string): boolean
 	return table.find(twists, twist) ~= nil
 end
 
+-- 6.24: the tier's mix of kinds in a chapter (the runners grow with the story: Fixed.RunnerGrow).
+function MissionPlan.kindsOf(tier: number, chapter: number): { [string]: number }
+	local out = table.clone(Fixed.Kinds[math.clamp(tier, 1, #Fixed.Kinds)])
+	if out.runner then
+		out.runner *= 1 + Fixed.RunnerGrow * math.max(0, chapter - 1)
+	end
+	return out
+end
+
+-- 6.24: how many of a mission's walkers are bloaters (its chapter's, + FinaleBloaters on the chapter's last mission).
+function MissionPlan.bloaters(def: Def): number
+	local chapter = MissionPlan.chapter(def.campaign)
+	local count = Fixed.Bloaters[math.clamp(chapter, 1, #Fixed.Bloaters)] or 0
+	local last = 0
+	for _, other in Missions.List do
+		if other.campaign == def.campaign then
+			last = math.max(last, other.number or 0)
+		end
+	end
+	if def.number ~= nil and def.number == last and last > 0 then
+		count += Fixed.FinaleBloaters
+	end
+	return count
+end
+
+-- 6.24: `count` of the stops' walkers turned into bloaters, one a stop from the last (`stops`) back to the first and
+-- round again; a stop without a walker left is passed. The parts are changed in place, in a fixed order; the bloaters
+-- of a stop stand right after its walkers. Returns how many were turned.
+local function turnBloaters(parts: { Part }, count: number, stops: number): number
+	local turned = 0
+	while turned < count do
+		local before = turned
+		for stop = stops, 1, -1 do
+			if turned >= count then
+				break
+			end
+			local walkerAt: number? = nil
+			local bloaterAt: number? = nil
+			for index, part in parts do
+				if (part.anchor == "pickup" or part.anchor == "drop") and part.stop == stop then
+					if part.kind == "walker" and part.count > 0 then
+						walkerAt = index
+					elseif part.kind == "bloater" then
+						bloaterAt = index
+					end
+				end
+			end
+			if not walkerAt then
+				continue
+			end
+			local walker = parts[walkerAt]
+			walker.count -= 1
+			if bloaterAt then
+				parts[bloaterAt].count += 1
+			else
+				table.insert(parts, walkerAt + 1, { anchor = walker.anchor, stop = walker.stop, kind = "bloater", count = 1, wave = walker.wave, point = walker.point, roadblock = walker.roadblock })
+			end
+			turned += 1
+		end
+		if turned == before then
+			break -- (no walker left anywhere)
+		end
+	end
+	for index = #parts, 1, -1 do
+		if parts[index].count <= 0 then
+			table.remove(parts, index)
+		end
+	end
+	return turned
+end
+
 -- One anchor's enemies before they are mixed into kinds: a stop's horde, a route point, a HOLD OUT wave.
 type Piece = { anchor: string, stop: number, count: number, wave: number?, point: number?, roadblock: boolean?, kind: string? }
 
@@ -318,6 +392,7 @@ type Piece = { anchor: string, stop: number, count: number, wave: number?, point
 function MissionPlan.parts(def: Def): { Part }
 	local tier = tierOf(def)
 	local grow = MissionPlan.growth(def)
+	local kindsMix = MissionPlan.kindsOf(tier, MissionPlan.chapter(def.campaign)) -- 6.24
 	local guarded = hasTwist(def, "guarded")
 	local pickups = math.max(0, def.pickups)
 	local stops = pickups + math.max(1, def.drops)
@@ -384,7 +459,7 @@ function MissionPlan.parts(def: Def): { Part }
 			local gunners = if tier >= 3 and piece.count >= 2 then 1 else 0
 			kinds = { { kind = "bandit", count = piece.count - gunners }, { kind = "gunner", count = gunners } }
 		else
-			kinds = mix(piece.count, Fixed.Kinds[tier])
+			kinds = mix(piece.count, kindsMix)
 		end
 		for _, entry in kinds do
 			if entry.count > 0 then
@@ -400,6 +475,7 @@ function MissionPlan.parts(def: Def): { Part }
 			end
 		end
 	end
+	turnBloaters(parts, MissionPlan.bloaters(def), stops) -- 6.24
 	return parts
 end
 

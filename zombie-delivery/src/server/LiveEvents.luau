@@ -11,7 +11,8 @@
 --     shows the banner, client/Weather.luau the Blood Moon's red sky and fog, client/MapView.luau the spot on the maps.
 --   * BLOOD MOON: Zombies.roamBoost and Zombies.setFrenzy (every zombie faster but a mission's and the people), the job
 --     waves (Jobs.dangerOf asks LiveEvents.waves), the pay (Jobs' payOrder asks LiveEvents.pay); it ends at dawn at the
---     latest.
+--     latest. 6.24: Zombies.bloodMoon: more runners and bloaters in every random pick (Config.ZombieTypes.BloodMoon);
+--     the horde and the supply guards pick their kinds through Zombies.pickKind too (the night, the danger, the caps).
 --   * RUSH HOUR: the pay, and the job board: more offers (Jobs asks LiveEvents.extraOffers), sooner new ones
 --     (LiveEvents.refresh), every board made anew when it starts (Jobs.renewBoards); it ends at dusk at the latest.
 --   * SUPPLY DROP: a crate on a parachute (native parts, falling slowly on the server's physics), a light beam over its
@@ -55,7 +56,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Rules = require(Shared.LiveEvents)
@@ -305,6 +305,7 @@ end
 
 local function startBloodMoon()
 	Zombies.roamBoost = Rules.roamOf("bloodmoon")
+	Zombies.bloodMoon = true -- 6.24: more runners and bloaters
 	Zombies.setFrenzy(function(speed: number): number
 		return Rules.speedOf("bloodmoon", speed)
 	end, spared)
@@ -312,6 +313,7 @@ end
 
 local function stopBloodMoon()
 	Zombies.roamBoost = 1
+	Zombies.bloodMoon = false
 	Zombies.setFrenzy(nil, nil)
 end
 
@@ -655,7 +657,7 @@ local function spawnGuards(s: Supply, count: number)
 	local g = T.Supply.Guards
 	for _ = 1, allowance(count) do -- (6.15 review: the event's own budget)
 		local spot = Zombies.findSpot(center, nil, g.Near, g.Far)
-		local made = if spot then Zombies.spawn(Economy.pickKind(T.Supply.Kinds, rng:NextNumber()), spot, nil, false, false, false) else nil
+		local made = if spot then Zombies.spawn(Zombies.pickKind(T.Supply.Kinds, spot, nil), spot, nil, false, false, false) else nil
 		if made then
 			Zombies.march(made, center, "supply")
 			table.insert(s.guards, made)
@@ -898,7 +900,8 @@ local function hordeStep(h: Horde, now: number)
 		budget -= 1
 		local gate = h.gates[h.spawned % #h.gates + 1]
 		local x, z = Rules.hordeSpot(gate, rng:NextNumber(), rng:NextNumber())
-		local made = Zombies.spawn(Economy.pickKind(T.Horde.Kinds, rng:NextNumber()), Vector3.new(x, World.RoadTop, z), nil, false, false, false)
+		local spot = Vector3.new(x, World.RoadTop, z)
+		local made = Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot, nil), spot, nil, false, false, false)
 		if not made then
 			break
 		end
