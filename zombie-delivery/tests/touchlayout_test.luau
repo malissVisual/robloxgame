@@ -20,6 +20,10 @@ end
 
 type Box = TouchLayout.Box
 
+-- 6.14 review: client/Hud.luau's layout() asks leftColumn before dock, so it must be there straight from the require
+-- (it once sat inside dock and only existed after a dock call).
+check("leftColumn and LEFT_SHRINK exist before any dock call", type(TouchLayout.leftColumn) == "function" and type(TouchLayout.LEFT_SHRINK) == "number", type(TouchLayout.leftColumn))
+
 -- client/Ui.luau Ui.scaleFor (1 at 1150 × 680, 0.55 .. 1.1).
 local function scaleFor(W: number, H: number): number
 	return math.clamp(math.min(W / 1150, H / 680), 0.55, 1.1)

@@ -177,19 +177,7 @@ function TouchLayout.dock(c: Cluster, W: number, H: number, colW: number, colH: 
 			return nil
 		end
 		local x = math.clamp(W / 2, left + barW / 2, right - barW / 2)
-		-- 6.14 review: the left column (`base` px tall at scale 1 without the savings line, `line` px more with it; `height`:
--- its height now) from the top margin down. `fits`: with the line it ends over the thumbstick's corner at a scale of
--- at least LEFT_SHRINK × S (else the line stays away); `scale`: the column's scale for `height` (S without the line;
--- with it, as much of S as ends over the corner, never under LEFT_SHRINK × S).
-TouchLayout.LEFT_SHRINK = 0.92
-function TouchLayout.leftColumn(c: Cluster, S: number, base: number, line: number, height: number): (boolean, number)
-	local room = c.thumb.y0 - TouchLayout.MARGIN
-	local fits = room / math.max(1, base + line) >= S * TouchLayout.LEFT_SHRINK
-	local scale = if height > base then math.min(S, math.max(S * TouchLayout.LEFT_SHRINK, room / height)) else S
-	return fits, scale
-end
-
-return TouchLayout.box(x - barW / 2, bottom - barH, x + barW / 2, bottom)
+		return TouchLayout.box(x - barW / 2, bottom - barH, x + barW / 2, bottom)
 	end
 	local all = table.clone(buttons)
 	table.insert(all, column)
@@ -219,6 +207,17 @@ return TouchLayout.box(x - barW / 2, bottom - barH, x + barW / 2, bottom)
 	return column, over, TouchLayout.box(x - barW / 2, top - gap - barH, x + barW / 2, top - gap)
 end
 
+-- 6.14 review: the left column (`base` px tall at scale 1 without the savings line, `line` px more with it; `height`:
+-- its height now) from the top margin down. `fits`: with the line it ends over the thumbstick's corner at a scale of
+-- at least LEFT_SHRINK × S (else the line stays away); `scale`: the column's scale for `height` (S without the line;
+-- with it, as much of S as ends over the corner, never under LEFT_SHRINK × S).
+TouchLayout.LEFT_SHRINK = 0.92
+function TouchLayout.leftColumn(c: Cluster, S: number, base: number, line: number, height: number): (boolean, number)
+	local room = c.thumb.y0 - TouchLayout.MARGIN
+	local fits = room / math.max(1, base + line) >= S * TouchLayout.LEFT_SHRINK
+	local scale = if height > base then math.min(S, math.max(S * TouchLayout.LEFT_SHRINK, room / height)) else S
+	return fits, scale
+end
 
 -- 6.14, the grind chips (client/GrindChips.luau: ON A ROLL and SHIFT 3/5) at the top of the screen, on a computer and
 -- on touch: side by side (`wide`, w × h px at scale 1) or one over the other (`stacked`, for a narrow top), at scale
