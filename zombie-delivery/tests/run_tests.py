@@ -21,6 +21,11 @@ with tempfile.TemporaryDirectory() as tmp:
     # 3.7: the client's pure modules (no Roblox at their top level) that a test requires.
     for name in ("Stamina", "TouchLayout", "PhoneLayout", "MissionsLayout"):
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
+    # 8.0 SANDBOX: the client's real client/Main.client.luau as ClientMain.luau, a function of the globals it reads, so
+    # tests/clientboot_test.luau runs it on recorders (the city's start list unchanged, the sandbox's only its own).
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "Main.client.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "ClientMain.luau"), "w", encoding="utf-8").write(
+        "return function(script: any, game: any, workspace: any, require: any, task: any, warn: any, Enum: any)\n" + source + "\nend\n")
     # 7.0 review: client/MoveLayout.luau (pure, it requires TouchLayout: tests/movelayout_test.luau)
     source = open(os.path.join(os.path.dirname(SHARED), "client", "MoveLayout.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
@@ -322,6 +327,63 @@ def alps_order_check():
     return not bad
 
 if not alps_order_check():
+    ok = False
+
+# 8.0 SANDBOX: the HUD's city parts stay hidden in the sandbox (client/Hud.luau ── Sandbox ──, read as text: the HUD is
+# Roblox's through and through) and the key hints show the move's keys and the car's only (client/KeyHints.luau
+# sandboxLines). What the client starts there: tests/clientboot_test.luau.
+def sandbox_hud_check():
+    root = os.path.dirname(HERE)
+    hud = open(os.path.join(root, "src", "client", "Hud.luau"), encoding="utf-8").read()
+    bad = []
+    at = hud.find("function view.sandbox()")
+    body = hud[at:hud.index("\nend\n", at)] if at >= 0 else ""
+    if not body:
+        bad.append("client/Hud.luau has no view.sandbox")
+    cash = re.search(r'local (\w+) = leftStack:FindFirstChild\("Cash"\)', body)
+    if not cash or f"{cash.group(1)}.Visible = false" not in body or 'Name = "Cash"' not in hud:
+        bad.append("view.sandbox does not hide the cash line (the money, the level, the XP bar)")
+    for text, what in (('Hud.topSlot("job").Visible = false', "the NEXT card and the contract group (the job slot)"),
+                       ("hudButtons.more.Visible = false", "PHONE / MENU"), ("view.menu.Visible = false", "MENU's list"),
+                       ("weaponBar.Visible = false", "the weapon line"), ("fire.Visible = false", "FIRE"),
+                       ("for _, button in view.touchHands do", "the touch hands"), ("LEFT_H = ", "the left column's room for the minimap")):
+        if text not in body:
+            bad.append(f"view.sandbox does not hide {what}")
+    start = hud[hud.index("function Hud.start()"):]
+    lines = start[:start.index("\nend\n")].split("\n")
+
+    # Is the line holding `needle` inside an `if not Config.Sandbox.On then` (its nearest less indented line above)?
+    def city_only(needle):
+        for i, line in enumerate(lines):
+            if needle in line:
+                depth = len(line) - len(line.lstrip("\t"))
+                for above in reversed(lines[:i]):
+                    if above.strip() and not above.strip().startswith("--") and len(above) - len(above.lstrip("\t")) < depth:
+                        return above.strip() == "if not Config.Sandbox.On then"
+        return False
+    for needle, what in (("Hotbar).start(gui)", "the bottom bar (the hands, the city's items)"), ("view.goal.start()", "the NEXT card's remotes"),
+                         ("MapView.start(gui, leftStack)", "the minimap and the big map")):
+        if not city_only(needle):
+            bad.append(f"Hud.start starts {what} in the sandbox too")
+    if not any(line.strip() == "view.sandbox()" for line in lines):
+        bad.append("Hud.start never calls view.sandbox()")
+    for text, what in (("fire.Visible = touch and not Config.Sandbox.On", "FIRE comes back every frame"),
+                       ("touchHands.melee.Visible = not seatedNow and not holding and not Config.Sandbox.On", "PUNCH comes back"),
+                       ("Holster.armed() and not Config.Sandbox.On", "DRAW comes back"),
+                       ("view.goal.quiet() or Config.Sandbox.On)", "the job board's marker shows"),
+                       ("if processed or Config.Sandbox.On then", "the keys J, M, I, Y and 1-9 work")):
+        if text not in hud:
+            bad.append(f"in the sandbox {what}")
+    keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
+    at = keys.find("local function sandboxLines(")
+    chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T")]
+    if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
+        bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
+    print("== sandbox hud: " + (f"the HUD hides its city parts in the sandbox, the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))
+    return not bad
+
+if not sandbox_hud_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

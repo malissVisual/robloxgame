@@ -1814,10 +1814,10 @@ function renderWeapons()
 	local seatedNow = seatView()
 	local away = Holster.holstered()
 	if touchHands.melee then
-		touchHands.melee.Visible = not seatedNow and not holding
+		touchHands.melee.Visible = not seatedNow and not holding and not Config.Sandbox.On -- (8.0 SANDBOX: no hands there)
 		-- (6.7: the bat; 6.8 review: before the first State too, `state` is nil then)
 		touchHands.melee.Text = if not away then "STRIKE" elseif state and type(state.kit) == "table" and state.kit[Config.Melee.BatKit] == true then "BAT" else "PUNCH"
-		touchHands.holster.Visible = not seatedNow and not holding and Holster.armed() -- (6.0: no gun, nothing to draw)
+		touchHands.holster.Visible = not seatedNow and not holding and Holster.armed() and not Config.Sandbox.On -- (6.0: no gun, nothing to draw)
 		touchHands.holster.Text = if away then "DRAW" else "HOLSTER"
 	end
 	if not state or not touchLayout then
@@ -3506,7 +3506,7 @@ RunService.RenderStepped:Connect(function()
 	end
 
 	local touch = UserInputService.TouchEnabled
-	fire.Visible = touch
+	fire.Visible = touch and not Config.Sandbox.On -- (8.0 SANDBOX: no guns there)
 	-- 5.9.2: the shop you are in, the backpack's cargo and the hint at most 10 times a second (view.hintAt), not every
 	-- frame.
 	if now >= (view.hintAt or 0) then
@@ -3575,7 +3575,7 @@ RunService.RenderStepped:Connect(function()
 		view.tickTicket(distance)
 		view.goalDistance = distance -- (the NEXT card's distance: the target the marker shows)
 	else
-		view.goalDistance = view.boardMark(here, gps ~= nil or view.ticket.busy or view.goal.quiet()) -- (6.12.1: not for an experienced courier)
+		view.goalDistance = view.boardMark(here, gps ~= nil or view.ticket.busy or view.goal.quiet() or Config.Sandbox.On) -- (6.12.1: not for an experienced courier; 8.0: no job board in the sandbox)
 	end
 	if not job and gps then
 		local position = here
@@ -3593,9 +3593,47 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
+-- ── Sandbox ────────────────────────────────────────────────────────────────
+-- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): the owner's small test world has no city, so the
+-- city's parts of the HUD stay away (Hud.start calls this once; with On = false none of it runs):
+--   hidden   the cash line with the level and the XP bar (client/SandboxHud.luau shows the money: the old line would
+--            say it twice), the minimap and the big map (MapView is not started: M does nothing), the NEXT card and
+--            the contract group (the "job" slot), PHONE / MENU and its list (MOUSE [ALT] stays on a computer), the
+--            weapon line, FIRE and the touch hands (no guns or fists there: renderWeapons and the frame keep them
+--            away too), the bottom bar (client/Hotbar.luau is not started: the hands and the city's items), the bag
+--            (I), the job board's marker in the world, the keys J, M, I, Y and 1-9. The savings line and the location
+--            tag are modules of their own that the sandbox does not start (client/Main.client.luau).
+--   kept     the toasts and the server's notices, the health row (alone in the left column now), the action pill
+--            ("G  PUT IT DOWN", "E  GET OUT"), the speed and the fuel while you drive, the car call line, the GPS
+--            marker a move sets (client/MovingHud.luau through MapView.onWaypoint), ESC closing the windows.
+function view.sandbox()
+	local cash = leftStack:FindFirstChild("Cash")
+	if cash and cash:IsA("GuiObject") then
+		cash.Visible = false
+	end
+	local health = leftStack:FindFirstChild("Health")
+	if health and health:IsA("GuiObject") then
+		LEFT_H = health.Size.Y.Offset -- (the left column is the health row only: layout() places it so)
+		leftStack.Size = UDim2.fromOffset(LEFT_W, LEFT_H)
+	end
+	Hud.topSlot("job").Visible = false
+	hudButtons.more.Visible = false
+	view.menu.Visible = false
+	weaponBar.Visible = false
+	fire.Visible = false
+	for _, button in view.touchHands do
+		button.Visible = false
+	end
+end
+
 function Hud.start()
-	require(script.Parent.Hotbar).start(gui) -- 6.0.1: the bottom bar, placed by layout()
-	view.goal.start() -- 6.5: the NEXT card follows Marge's first day (the Tutorial remote)
+	-- 8.0 SANDBOX: no bottom bar and no NEXT card's remotes there, the city's parts hidden (── Sandbox ──)
+	if not Config.Sandbox.On then
+		require(script.Parent.Hotbar).start(gui) -- 6.0.1: the bottom bar, placed by layout()
+		view.goal.start() -- 6.5: the NEXT card follows Marge's first day (the Tutorial remote)
+	else
+		view.sandbox()
+	end
 	layout()
 	refreshLevel()
 	player:GetAttributeChangedSignal("Xp"):Connect(refreshLevel)
@@ -3626,7 +3664,9 @@ function Hud.start()
 	end)
 	Players.PlayerAdded:Connect(requestLayout)
 	Players.PlayerRemoving:Connect(requestLayout)
-	MapView.start(gui, leftStack)
+	if not Config.Sandbox.On then
+		MapView.start(gui, leftStack) -- (8.0 SANDBOX: no minimap, no big map)
+	end
 	-- Calling your car (server/CarCall.luau).
 	local ok, err = pcall(function()
 		Net.get("CarCall").OnClientEvent:Connect(onCarCall)
@@ -3655,8 +3695,8 @@ function Hud.start()
 			escape()
 			return
 		end
-		if processed then
-			return
+		if processed or Config.Sandbox.On then
+			return -- (8.0 SANDBOX: no bag, maps, MENU, jobs or bottom bar there: ESC only)
 		end
 		if key == Enum.KeyCode.I then
 			toggleBackpack() -- 3.9: the bag (B holsters the gun now, client/Holster.luau)

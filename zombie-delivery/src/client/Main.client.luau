@@ -1,12 +1,195 @@
 --!strict
 -- Zombie Delivery: the client. The start screen first; PLAY starts the interface and asks the server for the car.
+-- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): the owner's small test world starts only its own
+-- systems (the block right below) and never requires the city's; with On = false the city starts as before.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
+local Config = require(Shared.Config)
 
 local Client = script.Parent
+
+-- Every part starts on its own: one that fails (see the Output) does not take the others down.
+local function safely(name: string, start: () -> ())
+	local ok, err = pcall(function()
+		start()
+	end)
+	if not ok then
+		warn(`[Client] {name} failed to start: {err}`)
+	end
+end
+
+-- 8.0 SANDBOX: one house to empty, your walk-in Sprinter van, your ZDC warehouse where the pieces go on show. Started:
+--   walking, the camera and the body   Drive, CameraRig, ArmPose, Stamina, CarBoarding, GaitPose, BodyLife, Unstuck,
+--                                      CurbRide
+--   the cars                           CarVisuals, CarSway, TyreFx, CrashFx
+--   the sounds, the admin              Sounds; AdminPanel, AdminFly, PerfOverlay (the panel's performance overlay)
+--   the move's horde                   ZombieAnimator, ZombieLife, ZombieFx, EnemyOutline
+--   the moves                          MovingHud (its story cards and the door's fade: MoveStoryUi, Fade, no start of
+--                                      their own), MoveHelperHud, MoveLobbyUi, QuickChat, CarryGripUi, and CrewPanel
+--                                      (the planning's + INVITE: a move's crew is server/Crew.luau's)
+--   the HUD                            Hud (the city's parts hidden: client/Hud.luau ── Sandbox ──) and KeyHints (the
+--                                      move's keys and the car's only)
+--   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
+--                                      SandboxGuide: written by other workers, each started only when it is there
+-- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
+-- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
+-- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
+if Config.Sandbox.On then
+	local Hud = require(Client.Hud)
+	local Menu = require(Client.Menu)
+	local Drive = require(Client.Drive)
+	local CameraRig = require(Client.CameraRig)
+	local AdminPanel = require(Client.AdminPanel)
+	local Sounds = require(Client.Sounds)
+	local CrewPanel = require(Client.CrewPanel)
+	local MovingHud = require(Client.MovingHud)
+	local MoveLobbyUi = require(Client.MoveLobbyUi)
+	local QuickChat = require(Client.QuickChat)
+	local KeyHints = require(Client.KeyHints)
+	local PerfOverlay = require(Client.PerfOverlay)
+	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
+	-- fails to load is skipped with a warning.
+	local own: { { name: string, module: any } } = {}
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide" } do
+		local found = Client:FindFirstChild(name)
+		if found and found:IsA("ModuleScript") then
+			local ok, module = pcall(function(): any
+				return require(found) :: any
+			end)
+			if ok and type(module) == "table" then
+				table.insert(own, { name = name, module = module })
+			else
+				warn(`[Client] {name} did not load: {module}`)
+			end
+		end
+	end
+	local function ownModule(name: string): any
+		for _, entry in own do
+			if entry.name == name then
+				return entry.module
+			end
+		end
+		return nil
+	end
+	local WarehouseUi = ownModule("WarehouseUi")
+
+	safely("Drive", Drive.start)
+	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
+	safely("CarVisuals", require(Client.CarVisuals).start)
+	safely("Hud", Hud.start)
+	safely("CameraRig", CameraRig.start)
+	safely("ArmPose", require(Client.ArmPose).start)
+	safely("AdminPanel", AdminPanel.start)
+	safely("AdminFly", require(Client.AdminFly).start)
+	safely("CrewPanel", CrewPanel.start)
+	safely("Sounds", Sounds.start)
+	safely("Stamina", require(Client.Stamina).start)
+	safely("CarBoarding", require(Client.CarBoarding).start)
+	safely("GaitPose", require(Client.GaitPose).start)
+	safely("BodyLife", require(Client.BodyLife).start)
+	safely("KeyHints", function()
+		task.spawn(KeyHints.start)
+	end)
+	safely("Unstuck", require(Client.Unstuck).start)
+	safely("CurbRide", require(Client.CurbRide).start)
+	safely("PerfOverlay", PerfOverlay.start)
+	safely("EnemyOutline", require(Client.EnemyOutline).start)
+	safely("ZombieLife", require(Client.ZombieLife).start)
+	safely("ZombieFx", require(Client.ZombieFx).start)
+	safely("CarSway", require(Client.CarSway).start)
+	safely("TyreFx", require(Client.TyreFx).start)
+	safely("CrashFx", require(Client.CrashFx).start)
+	safely("MovingHud", MovingHud.start)
+	safely("MoveHelperHud", require(Client.MoveHelperHud).start)
+	safely("MoveLobbyUi", MoveLobbyUi.start)
+	safely("QuickChat", QuickChat.start)
+	safely("CarryGripUi", require(Client.CarryGripUi).start)
+	for _, entry in own do
+		local start = entry.module.start
+		if type(start) == "function" then
+			safely(entry.name, start)
+		end
+	end
+
+	-- The hooks (the city's, less what the sandbox does not run).
+	Drive.notify = Hud.toast
+	Sounds.notify = Hud.toast
+	AdminPanel.onPerformance = PerfOverlay.toggle
+	AdminPanel.performanceOn = PerfOverlay.isOn
+	MoveLobbyUi.onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
+	MoveLobbyUi.crewOpen = CrewPanel.isOpen
+	QuickChat.covered = function(): boolean
+		return MovingHud.isOpen() or MoveLobbyUi.isOpen() or require(Client.MoveStoryUi).isOpen()
+	end
+	-- Is the warehouse's picker open (WarehouseUi.isOpen, when it has one)?
+	local function warehouseOpen(): boolean
+		local isOpen = WarehouseUi and WarehouseUi.isOpen
+		if type(isOpen) ~= "function" then
+			return false
+		end
+		local ok, open = pcall(isOpen)
+		return ok and open == true
+	end
+	-- One window at a time; ESC closes them all (the crew panel, the move's cards and list, the quick chat's ring, the
+	-- planning folds to its pill, the warehouse's picker).
+	Hud.onCloseWindows = function()
+		CrewPanel.close()
+		MoveLobbyUi.minimize()
+		MovingHud.closeAll()
+		QuickChat.close(false)
+		local close = WarehouseUi and WarehouseUi.close
+		if type(close) == "function" then
+			pcall(close)
+		end
+	end
+	CrewPanel.onOpen = Hud.closeWindows
+	CameraRig.windowOpen = function(): boolean
+		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
+			or QuickChat.isOpen() or warehouseOpen()
+	end
+	CameraRig.mouseNeeded = CameraRig.windowOpen
+	KeyHints.covered = function(): boolean
+		return CameraRig.mouseNeeded() or Hud.resultOpen()
+	end
+
+	-- The State: the HUD (its old money line is hidden: SandboxHud shows the money), the start screen, the key hints and
+	-- SandboxHud.setState when it has one.
+	local SandboxHud = ownModule("SandboxHud")
+	Net.get("State").OnClientEvent:Connect(function(state)
+		Hud.setState(state)
+		Menu.setState(state)
+		KeyHints.setState(state)
+		local setState = SandboxHud and SandboxHud.setState
+		if type(setState) == "function" then
+			pcall(setState, state)
+		end
+	end)
+	Net.get("Notice").OnClientEvent:Connect(Hud.toast)
+
+	local function play()
+		pcall(function()
+			Hud.setVisible(true)
+			CameraRig.setEnabled(true)
+			Sounds.setInGame(true)
+		end)
+		Net.get("Play"):FireServer()
+	end
+	local ok, err = pcall(function()
+		Menu.show(play)
+	end)
+	if not ok then
+		-- No start screen: straight into the game.
+		warn(`[Client] the start screen failed: {err}`)
+		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+		play()
+	end
+	Net.get("RequestState"):FireServer()
+	return
+end
+
 local Drive = require(Client.Drive)
 local Shooting = require(Client.Shooting)
 local ZombieAnimator = require(Client.ZombieAnimator)
@@ -42,15 +225,6 @@ local Phone = require(Client.Phone)
 local CargoPrompts = require(Client.CargoPrompts)
 local ReadyCheck = require(Client.ReadyCheck) -- 6.14: get ready for the mission (the phone's NEXT MISSION, the HUD's savings line)
 
--- Every part starts on its own: one that fails (see the Output) does not take the others down.
-local function safely(name: string, start: () -> ())
-	local ok, err = pcall(function()
-		start()
-	end)
-	if not ok then
-		warn(`[Client] {name} failed to start: {err}`)
-	end
-end
 safely("Drive", Drive.start)
 safely("Shooting", Shooting.start)
 safely("ZombieAnimator", ZombieAnimator.start)
