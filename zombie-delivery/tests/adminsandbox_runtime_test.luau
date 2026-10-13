@@ -149,9 +149,11 @@ for _ in kinds do
 end
 check("…random pieces", distinct > 2, distinct)
 
+local config: any = Config
+local warehouseConfig = config.Warehouse -- (8.0 merge: the warehouse worker's Config.Warehouse is there now)
+config.Warehouse = nil
 mark = click(owner, "stands")
 check("⭐ FILL STANDS without Config.Warehouse: says so, shows nothing", #E.collection.shown == 0 and string.find(E.said(owner, mark), "Config.Warehouse.Stands", 1, true) ~= nil, E.said(owner, mark))
-local config: any = Config
 config.Warehouse = { Stands = 4 }
 local stock = E.collection.stock[owner]
 stock[2].stand = 2 -- one piece on show already
@@ -160,7 +162,7 @@ local shown = E.collection.shown
 check("⭐ FILL STANDS: the stock's pieces on the free stands 1, 3, 4 (Collection.display)", #shown == 3 and shown[1].stand == 1 and shown[2].stand == 3 and shown[3].stand == 4 and shown[1].uid == stock[1].uid and shown[2].uid == stock[3].uid)
 mark = click(owner, "stands")
 check("…again: no free stand, nothing more", #shown == 3 and string.find(E.said(owner, mark), "nothing to put on show", 1, true) ~= nil)
-config.Warehouse = nil
+config.Warehouse = warehouseConfig
 
 E.profiles[owner].money, E.profiles[owner].earned = 700, 900
 table.clear(E.collection.sold)
