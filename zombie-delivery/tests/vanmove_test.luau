@@ -206,7 +206,8 @@ do -- a whole house (shared/HouseLayout.luau plan) loaded piece after piece: the
 		return n
 	end
 	local sprinter, van = loaded(7, SPRINTER), loaded(7, VAN)
-	check("a whole house loaded in one go: the Sprinter takes far more than the ZDC Van", sprinter >= 1.6 * van and sprinter >= 12, `{sprinter} vs {van}`)
+	-- (8.0 merge: a house holds 2 – 4 small collectibles now, which both bays take: the ratio is a little lower)
+	check("a whole house loaded in one go: the Sprinter takes far more than the ZDC Van", sprinter >= 1.3 * van and sprinter >= 12, `{sprinter} vs {van}`)
 end
 check("a new seed is a new house (the sandbox refills it every move)", (function()
 	local a, b = HouseLayout.plan(101, "house"), HouseLayout.plan(202, "house")
