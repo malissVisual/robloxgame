@@ -1300,7 +1300,7 @@ Blender), then import the new `ZDCVanArt.fbx` again (delete the old `ZDCVanArt` 
 3 × the size) on the real factory: every piece once in place, the doors on their hinges, the wheel on the four tyres,
 nothing physical, the factory's look hidden. `check_fleet.py` runs it too and keeps the van's panelled skin in its budgets.
 
-## The moves' furniture: the owner's Blender models (7.0)
+## The moves' furniture: the owner's Blender models (7.1)
 
 The owner: "namodelovat jakoby na blenderu pěknou místnost … hezčí věci co odnášíš" (a nice room and nicer models of
 the things a move carries out).

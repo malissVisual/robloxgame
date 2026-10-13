@@ -1,5 +1,5 @@
 --!strict
--- 7.0, the moves' furniture in the owner's own Blender models (the owner: "nicer things, the models you carry out";
+-- 7.1, the moves' furniture in the owner's own Blender models (the owner: "nicer things, the models you carry out";
 -- design/blender-furniture/furniture.py → roblox/ZDCFurnitureArt.fbx). The owner imports ZDCFurnitureArt.fbx once in
 -- Roblox Studio (File → Import 3D, the defaults) and publishes; this finds the imported model (a top-level child of
 -- ServerStorage or Workspace named ZDCFurnitureArt, or one holding its markers), learns from the markers how the

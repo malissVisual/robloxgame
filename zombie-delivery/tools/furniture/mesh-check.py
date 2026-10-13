@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""7.0: the moves' furniture in the owner's Blender models (server/FurnitureMesh.luau) on the real builders, without Studio.
+"""7.1: the moves' furniture in the owner's Blender models (server/FurnitureMesh.luau) on the real builders, without Studio.
 
 Simulates the Roblox import of design/blender-furniture/roblox/ZDCFurnitureArt.fbx from its manifest
 (ZDCFurnitureArt.json: every piece's box in its item's space, written by furniture.py): the importer turns the model a
