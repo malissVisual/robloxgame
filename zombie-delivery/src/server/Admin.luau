@@ -836,7 +836,7 @@ local function clear(player: Player)
 	if root then
 		for _, z in table.clone(Zombies.all()) do
 			if not z.dead and (z.root.Position - root.Position).Magnitude <= CLEAR_RADIUS then
-				if Zombies.damage(z, math.huge, nil) then
+				if Zombies.damage(z, math.huge, nil, { cause = "other" }) then -- (6.24: "other": no bloater goes off)
 					killed += 1
 				end
 			end
@@ -1141,7 +1141,7 @@ end
 function Give.killAll(player: Player)
 	local killed = 0
 	for _, z in table.clone(Zombies.all()) do
-		if not z.dead and Zombies.damage(z, math.huge, nil) then
+		if not z.dead and Zombies.damage(z, math.huge, nil, { cause = "other" }) then -- (6.24: "other": no bloater goes off)
 			killed += 1
 		end
 	end

@@ -22,6 +22,10 @@
 --   * ZombieStyle.death(seed, cause, headshot, pushed): which fall: "back" (knocked back: a headshot, a punch), "flung"
 --     (a car or a blast, or thrown off a car: the 6.0 flying parts), "crumple" (no cause, no push), else one of
 --     "forward", "spin", "crumple", "back".
+-- 6.24, the special zombies (Config.Zombies' runner, brute, bloater; shared/ZombieKinds.luau has their rules): the
+-- bloater's looks; its gait "waddle" (rolled from foot to foot, leaning back, the arms out); the runner's sprint (the
+-- arms pumping with the legs at a run) and its leap (Motion.lunge: a dive at you); the brute's stomp pitches forward
+-- as a foot lands; the bloater's fuse (Motion.fuse: arched back, the arms flung out, trembling, growing to the blast).
 
 local Config = require(script.Parent.Config)
 
@@ -88,6 +92,13 @@ local LOOKS: { [string]: { LookDef } } = {
 		dress(BRUISED, { 72, 72, 74 }, { 52, 70, 110 }, { wear = "hivis", bare = "none", trim = ORANGE, hat = "hard", hatColor = HARD_HAT, stains = 1 }),
 		dress(ASHEN, ASHEN, { 64, 58, 50 }, { wear = "bare", bare = "both", stains = 2 }),
 	},
+	-- 6.24: the bloater (its belly, hump and boils are its own: server/CharacterArt/Geometry.luau)
+	bloater = {
+		dress(JAUNDICE, { 196, 190, 170 }, { 60, 56, 48 }, { wear = "tank", bare = "both", stains = 2 }),
+		dress(ROT, { 150, 188, 180 }, ROT, { wear = "gown", bare = "both", legs = "bare", trim = WHITE, stains = 2 }),
+		dress(SICKLY, { 214, 112, 38 }, { 214, 112, 38 }, { wear = "jumpsuit", bare = "none", trim = WHITE, stains = 1 }),
+		dress(BRUISED, { 88, 92, 98 }, { 52, 70, 110 }, { wear = "hivis", bare = "none", trim = ORANGE, hat = "hard", hatColor = HARD_HAT, stains = 1 }),
+	},
 	soldier = {
 		dress(GREY_BLUE, { 150, 132, 92 }, { 140, 122, 86 }, { wear = "jacket", bare = "none", trim = { 150, 132, 92 }, stains = 1 }),
 		dress(BRUISED, { 50, 62, 40 }, { 48, 58, 40 }, { wear = "jacket", bare = "right", trim = { 50, 62, 40 }, stains = 2 }),
@@ -136,7 +147,7 @@ end
 -- ── How it moves ───────────────────────────────────────────────────────────
 
 export type Gait = {
-	style: string, -- "shamble", "lurch", "stomp", "person"
+	style: string, -- "shamble", "lurch", "stomp", "waddle" (6.24: the bloater), "person"
 	limp: number, -- -1 … 1: the bad leg (- left, + right) and how bad
 	tilt: number, -- -1 … 1: the head on one side
 	hunch: number, -- 0.6 … 1
@@ -146,9 +157,13 @@ export type Gait = {
 	pitch: number, -- × its voice's pitch
 }
 
+-- Each kind's way of moving (the rest shamble; the people: "person").
+local STYLES: { [string]: string } = { runner = "lurch", brute = "stomp", bloater = "waddle" }
+ZombieStyle.Styles = STYLES
+
 function ZombieStyle.gait(kind: string, seed: number): Gait
 	local def = Config.Zombies[kind]
-	local style = if def and def.ranged then "person" elseif kind == "runner" then "lurch" elseif kind == "brute" then "stomp" else "shamble"
+	local style = if def and def.ranged then "person" else STYLES[kind] or "shamble"
 	local side = if mix(seed, 11) % 2 == 0 then -1 else 1
 	local drops = { -1, 0, 0, 1 }
 	return {
@@ -242,7 +257,8 @@ export type Pose = {
 }
 -- What it does this frame: speed (studs / s, flat), legs (the stock walk's left thigh, -1 back … 1 forward,
 -- ÷ Config.ZombieLife.HipSwing), t (the clock, s), attack / hit (s since, or -1), attackSide (-1 the left arm swipes, 1 the right),
--- hitCode (ZombieStyle.hitOf), hitSide (-1 / 1: which way it twists), latched (hangs on a car).
+-- hitCode (ZombieStyle.hitOf), hitSide (-1 / 1: which way it twists), latched (hangs on a car); 6.24: lunge (s since
+-- its leap, or -1), fuse (0 … 1 of its fuse burnt, or -1).
 export type Motion = {
 	speed: number,
 	legs: number,
@@ -253,6 +269,8 @@ export type Motion = {
 	hitCode: number,
 	hitSide: number,
 	latched: boolean,
+	lunge: number?,
+	fuse: number?,
 }
 
 function ZombieStyle.newPose(): Pose
@@ -279,23 +297,38 @@ function ZombieStyle.pose(into: Pose, gait: Gait, m: Motion): Pose
 			rightArm = rad(T.Claw) * math.sin(p * 18 + 2)
 			neckPitch = rad(T.Bite) * 0.6 * math.sin(p * 9)
 		elseif style == "lurch" then
-			-- The runner: leaning into it, thrown from side to side with the steps, the arms flailing, the head jerking.
-			waistPitch = -rad(T.RunLean) * walk - rad(T.Hunch) * 0.4 * gait.hunch
+			-- The runner: leaning into it, thrown from side to side with the steps, the arms flailing, the head jerking;
+			-- 6.24: at a sprint it leans further and the arms pump with the legs (the left arm with the right leg).
+			local sprint = math.clamp(m.speed / (T.WalkRef * T.SprintFrom) - 0.6, 0, 1)
+			waistPitch = -rad(T.RunLean) * walk - rad(T.SprintLean) * sprint - rad(T.Hunch) * 0.4 * gait.hunch
 			waistRoll = rad(T.RunRoll) * w * walk
-			neckPitch = rad(T.RunLean) * 0.5 * walk + rad(4) * math.sin(p * 7)
+			neckPitch = rad(T.RunLean) * 0.5 * walk + rad(T.SprintLean) * 0.6 * sprint + rad(4) * math.sin(p * 7)
 			neckRoll = rad(T.HeadTilt) * 0.5 * gait.tilt
-			leftArm = rad(T.Flail) * math.sin(p * 9) * walk
-			rightArm = rad(T.Flail) * math.sin(p * 9 + 2.2) * walk
+			local flail = 1 - sprint
+			leftArm = rad(T.Flail) * math.sin(p * 9) * walk * flail - rad(T.Pump) * w * sprint
+			rightArm = rad(T.Flail) * math.sin(p * 9 + 2.2) * walk * flail + rad(T.Pump) * w * sprint
 		elseif style == "stomp" then
-			-- The brute: the body drops on every step and sways onto the leg, hunched, the arms held out.
+			-- The brute: the body drops on every step and sways onto the leg, hunched, the arms held out (6.24: and
+			-- pitches forward as the foot lands).
 			local a = math.abs(w)
 			rootY = -T.StompDip * a * a * walk
 			waistRoll = rad(T.StompRoll) * w * walk
-			waistPitch = -rad(T.Hunch) * 0.8 * gait.hunch
+			waistPitch = -rad(T.Hunch) * 0.8 * gait.hunch - rad(T.StompPitch) * a * a * walk
 			neckPitch = -rad(6)
 			neckRoll = rad(T.HeadTilt) * 0.3 * gait.tilt
 			leftArmRoll = -rad(T.StompArms)
 			rightArmRoll = rad(T.StompArms)
+		elseif style == "waddle" then
+			-- 6.24, the bloater: rolled from foot to foot, leaning back with the belly out, the arms held out from it,
+			-- the head lolling.
+			waistRoll = rad(T.WaddleRoll) * w * walk + rad(3) * math.sin(p * 1.3)
+			waistPitch = rad(T.WaddleLean) - rad(2) * math.abs(w) * walk
+			neckPitch = -rad(4) + rad(4) * math.sin(p * 1.1)
+			neckRoll = -rad(T.WaddleRoll) * 0.6 * w * walk + rad(T.Loll) * 0.4 * math.sin(p * 0.8)
+			leftArmRoll = -rad(T.WaddleArms)
+			rightArmRoll = rad(T.WaddleArms)
+			leftArm = rad(8) + rad(6) * math.sin(p * 2)
+			rightArm = rad(8) + rad(6) * math.sin(p * 2 + 1.5)
 		else
 			-- The shamble: the body drops and rolls onto the bad leg as it lands (the uneven gait), a hunch, the head on
 			-- one side and lolling, one arm hanging lower.
@@ -346,6 +379,34 @@ function ZombieStyle.pose(into: Pose, gait: Gait, m: Motion): Pose
 				end
 			end
 		end
+	end
+	-- 6.24, the runner's leap: a dive at you, the arms reaching, the head up (over the attack).
+	local lunge = m.lunge or -1
+	if lunge >= 0 and style ~= "person" then
+		local u = lunge / T.Dive.Time
+		if u < 1 then
+			local k = if u < 0.2 then smooth(u / 0.2) elseif u < 0.7 then 1 else 1 - smooth((u - 0.7) / 0.3)
+			waistPitch = waistPitch * (1 - k) - rad(T.Dive.Lean) * k
+			neckPitch = neckPitch * (1 - k) + rad(T.Dive.Head) * k
+			leftArm = leftArm * (1 - k) + rad(T.Dive.Arms) * k
+			rightArm = rightArm * (1 - k) + rad(T.Dive.Arms) * k
+			leftArmRoll *= 1 - k
+			rightArmRoll *= 1 - k
+		end
+	end
+	-- 6.24, the bloater's fuse: arched back, the arms flung out, trembling harder to the blast.
+	local fuse = m.fuse or -1
+	if fuse >= 0 and style ~= "person" then
+		local f = math.clamp(fuse, 0, 1)
+		local k = smooth(f / 0.25)
+		local shake = rad(T.Swell.Tremble) * (0.4 + f) * math.sin(m.t * T.Swell.Hz * 2 * math.pi)
+		waistPitch = waistPitch * (1 - k) + rad(T.Swell.Arch) * k + shake
+		waistRoll += shake * 0.7
+		neckPitch = neckPitch * (1 - k) + rad(T.Swell.Arch) * 0.8 * k - shake
+		leftArmRoll = leftArmRoll * (1 - k) - rad(T.Swell.Arms) * k
+		rightArmRoll = rightArmRoll * (1 - k) + rad(T.Swell.Arms) * k
+		leftArm = leftArm * (1 - k) + rad(20) * k + shake
+		rightArm = rightArm * (1 - k) + rad(20) * k - shake
 	end
 	-- The flinch (the people too): the chest jerked back, the head snapped, the arms flung up; a hard hit staggers.
 	if m.hit >= 0 then

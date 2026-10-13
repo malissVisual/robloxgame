@@ -192,6 +192,12 @@ Jobs.onStat = Challenges.add
 Zombies.hunts = Jobs.involved
 -- 6.15 review: the world's own people (resident bandit camps, the base's soldiers) leave a mission's crew alone.
 Zombies.spares = Jobs.onMission
+-- 6.24: the danger of a player's job (its tier) for the special zombies' weights (shared/ZombieKinds.luau).
+Zombies.tierOf = function(player: Player): number?
+	local job = Jobs.jobKey(player)
+	local tier = if type(job) == "table" and type(job.offer) == "table" then job.offer.tier else nil
+	return if type(tier) == "number" then tier else nil
+end
 Vehicles.onWrecked = function(player, car, reason)
 	Zombies.releaseCar(car)
 	if Jobs.active(player) then
