@@ -10,7 +10,7 @@ Předek míří na -Y (pohled zepředu = Numpad 1). Každá část je samostatn�
 Bez Blenderu, jen s modulem bpy (pip install bpy):
     python van.py -- --save van.blend --render složka --export složka
 """
-import bpy, bmesh, math, os, sys
+import bpy, bmesh, json, math, os, sys
 from mathutils import Vector, Matrix
 
 # ───────────────────────────────────────────────────────────── NASTAVENÍ (změň a spusť znovu)
@@ -40,6 +40,13 @@ ARCH = WHEEL + 0.3             # poloměr podběhu
 TRACK = W / 2 - 0.48           # střed kola od osy auta
 HOOD_FRONT, HOOD_BACK = (F + 0.35, 3.12), (F + 2.45, BELT)
 SHIELD_TOP = (F + 3.7, H - 0.8)     # horní hrana čelního skla
+# Dveře, které se ve hře otvírají (stejné míry má hra: STYLES.zdcvan v server/Vehicles.luau). Pravý bok dodávky je
+# v Blenderu -X (předek míří na -Y), levý (řidič) +X.
+RIGHT, LEFT = -1, 1
+DOOR_FRONT, DOOR_BACK, DOOR_TOP = -2.85, -0.35, H - 0.45   # přední dveře: od, do, horní hrana
+SLIDE_FRONT, SLIDE_BACK = -0.15, 2.85                       # posuvné dveře vpravo
+REAR_EDGE, REAR_BOTTOM, REAR_TOP = 2.45, 1.45, H - 0.6      # zadní dveře: panty na ±REAR_EDGE, spodek, vršek
+FLOOR = 2.1                                                 # podlaha uvnitř (vršek podvozku ve hře)
 
 M = {}      # materiály
 CUT = None  # kolekce řezů (okna a spáry vyřezané modifikátorem Boolean)
@@ -52,7 +59,7 @@ def linear(hexcode):
     return tuple(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c)
 
 
-def material(name, color, rough=0.5, metal=0.0, coat=0.0, emit=0.0):
+def material(name, color, rough=0.5, metal=0.0, coat=0.0, emit=0.0, alpha=1.0):
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     try:
         m.use_nodes = True
@@ -69,6 +76,7 @@ def material(name, color, rough=0.5, metal=0.0, coat=0.0, emit=0.0):
     glow = p.inputs.get("Emission Color") or p.inputs.get("Emission")
     glow.default_value = rgba if emit else (0, 0, 0, 1)
     p.inputs["Emission Strength"].default_value = emit
+    p.inputs["Alpha"].default_value = alpha
     m["palette"] = color   # export do Robloxu: barva čtverečku v paletě
     return m
 
@@ -79,7 +87,7 @@ def materials():
         stripe=material("Van Stripe", STRIPE, 0.4, coat=0.35),
         trim=material("Van Trim", TRIM, 0.6),
         rubber=material("Van Rubber", "#111213", 0.85),
-        glass=material("Van Glass", GLASS, 0.04, coat=1.0),
+        glass=material("Van Glass", GLASS, 0.04, coat=1.0, alpha=0.7),
         chrome=material("Van Chrome", "#D5D9DD", 0.15, metal=1.0),
         rim=material("Van Rim", RIM, 0.35, metal=0.6),
         under=material("Van Underbody", "#2A2C2E", 0.9),
@@ -91,6 +99,9 @@ def materials():
         can_red=material("Van Jerry Can Red", "#A3221A", 0.5),
         can_olive=material("Van Jerry Can Olive", "#4E5A2A", 0.6),
         wood=material("Van Wood", "#8A6238", 0.8),
+        inside=material("Van Inside", "#2B2D31", 0.8),
+        bay=material("Van Cargo Bay", "#7A6A55", 0.85),
+        seat=material("Van Seat", "#3A3C40", 0.9),
         floor=material("Van Studio Floor", "#41464C", 0.85),
     )
 
@@ -402,20 +413,62 @@ def pieces(y0, y1, gaps, gap=0.07):
     return out
 
 
+def door_shape():
+    """Sklon sloupku A (dy na dz), kde spára předních dveří uhne podél něj (z) a kde potká horní hranu (y)."""
+    rake = (SHIELD_TOP[0] - HOOD_BACK[0]) / (SHIELD_TOP[1] - HOOD_BACK[1])
+    knee = BELT + (DOOR_FRONT - 0.3 - HOOD_BACK[0]) / rake
+    return rake, knee, DOOR_FRONT + (DOOR_TOP - knee) * rake
+
+
+def door_outline(bottom=Z0 - 0.1):
+    """Obrys předních dveří z boku (y, z): spodek vpředu, nahoru, podél sloupku A, horní hrana, dolů vzadu."""
+    _, knee, corner = door_shape()
+    return [(DOOR_FRONT, bottom), (DOOR_FRONT, knee), (corner, DOOR_TOP), (DOOR_BACK, DOOR_TOP), (DOOR_BACK, bottom)]
+
+
+def ring(name, center, axis, radius, thick, mat, col):
+    bm = bmesh.new()
+    rim = [bm.verts.new((radius + thick * math.cos(a), 0, thick * math.sin(a))) for a in (2 * math.pi * i / 8 for i in range(8))]
+    es = [bm.edges.new((rim[i], rim[(i + 1) % 8])) for i in range(8)]
+    bmesh.ops.spin(bm, geom=rim + es, cent=(0, 0, 0), axis=(0, 0, 1), angle=2 * math.pi, steps=24, use_merge=True)
+    o = mesh_object(name, bm, [mat], col)
+    o.matrix_world = Matrix.Translation(center) @ Vector(axis).to_track_quat("Z", "Y").to_matrix().to_4x4()
+    return o
+
+
+def interior(col):
+    """Dutá kabina a nákladový prostor (ve hře se otvírají dveře a dovnitř jde náklad), sedadla a palubní deska."""
+    span = W / 2 - 0.35
+    across = lambda q: Vector((0, q[0], q[1]))
+    cutter("Cab", [(-2.6, FLOOR), (DOOR_BACK + 0.03, FLOOR), (DOOR_BACK + 0.03, H - 0.25), (-1.9, H - 0.25), (-2.35, H - 0.55),
+                   (-2.65, H - 1.05)], across, (1, 0, 0), span, M["inside"])
+    cutter("Cargo bay", [(SLIDE_FRONT - 0.03, FLOOR), (R - 0.3, FLOOR), (R - 0.3, H - 0.25), (SLIDE_FRONT - 0.03, H - 0.25)],
+           across, (1, 0, 0), span, M["bay"])
+    # Nad zadní nápravou je podběh tunel přes celou šířku: zakryje ho podlaha a po stranách kryty kol.
+    box("Floor over the axle", (2 * span, 3.2, 0.15), (0, AXLE_R - 0.15, FLOOR + 0.02), M["bay"], col, 0.02)
+    box("Rear sill", (2 * REAR_EDGE, 0.06, FLOOR + 0.05 - REAR_BOTTOM + 0.1), (0, R - 0.39, (FLOOR + 0.05 + REAR_BOTTOM - 0.1) / 2), M["inside"], col, 0)
+    for s in (-1, 1):
+        box("Wheel well", (0.7, 3.2, 1.05), (s * (span - 0.35), AXLE_R - 0.15, FLOOR + 0.52), M["bay"], col, 0.06)
+    box("Dashboard", (2 * span - 0.1, 0.55, 1.8), (0, -2.33, FLOOR + 0.9), M["inside"], col, 0.1)
+    tube("Steering column", (LEFT * 1.4, -2.2, 3.5), (LEFT * 1.4, -1.98, 3.92), 0.06, M["inside"], col, 8)
+    ring("Steering wheel", (LEFT * 1.4, -1.95, 3.95), (0, -0.45, 1), 0.42, 0.05, M["inside"], col)
+    for x in (LEFT * 1.4, RIGHT * 1.4):
+        box("Seat base", (1.1, 1.1, 0.3), (x, -1.45, FLOOR + 0.15), M["inside"], col, 0.03)
+        box("Seat", (1.6, 1.5, 0.4), (x, -1.45, 2.55), M["seat"], col, 0.12)
+        box("Seat back", (1.6, 0.35, 1.9), Matrix.Translation((x, -0.72, 3.65)) @ Matrix.Rotation(math.radians(-10), 4, "X"), M["seat"], col, 0.12)
+        box("Headrest", (1.0, 0.3, 0.5), (x, -0.55, 4.85), M["seat"], col, 0.1)
+
+
 def body(col):
     shell = body_shell(col)
-    door_front, door_back = -2.85, -0.45
-    slide_front, slide_back = -0.25, 2.85
-    top = H - 0.45
-    rake = (SHIELD_TOP[0] - HOOD_BACK[0]) / (SHIELD_TOP[1] - HOOD_BACK[1])   # sklon sloupku A (dy na dz)
-    knee = BELT + (door_front - 0.3 - HOOD_BACK[0]) / rake                   # kde spára dveří uhne podél sloupku
-    corner = door_front + (top - knee) * rake
+    door_front, door_back, top = DOOR_FRONT, DOOR_BACK, DOOR_TOP
+    slide_front, slide_back = SLIDE_FRONT, SLIDE_BACK
+    rake, knee, corner = door_shape()
     for s in (-1, 1):
         # Dveře řidiče / spolujezdce a jejich okno.
-        side_seam(s, (door_front, Z0 - 0.1), (door_front, knee))
-        side_seam(s, (door_front, knee), (corner, top))
-        side_seam(s, (corner, top), (door_back, top))
-        side_seam(s, (door_back, top), (door_back, Z0 - 0.1))
+        outline = door_outline()
+        for a, b in zip(outline[:-1], outline[1:]):
+            side_seam(s, a, b)
         win_top, win_bottom = top - 0.4, BELT + 0.35
         cutter("Door window", [(door_front + 0.28, win_bottom), (door_back - 0.28, win_bottom), (door_back - 0.28, win_top),
                                (door_front + 0.28 + (win_top - knee) * rake, win_top), (door_front + 0.28, knee)],
@@ -424,7 +477,7 @@ def body(col):
         # Lem podběhů, ochranné lišty, pruh.
         for ya in (AXLE_F, AXLE_R):
             arch_flare("Arch flare", s, ya, col)
-        gaps = [door_front, door_back] + ([slide_front, slide_back] if s > 0 else [])
+        gaps = [door_front, door_back] + ([slide_front, slide_back] if s == RIGHT else [])
         for y0, y1 in pieces(door_front + 0.12, slide_back - 0.05, gaps):
             box("Rub strip", (0.1, y1 - y0, 0.3), (s * (W / 2 + 0.04), (y0 + y1) / 2, 1.45), M["trim"], col, 0.04)
         stripe = pieces(-4.1, R - 0.16, gaps)
@@ -444,13 +497,13 @@ def body(col):
         box("Step", (0.4, 1.7, 0.1), (s * (W / 2 + 0.1), (door_front + door_back) / 2, 0.82), M["trim"], col, 0.03)
         for ya in (AXLE_F, AXLE_R):
             box("Mud flap", (0.85, 0.06, 0.55), (s * TRACK, ya + 1.58, 0.64), M["rubber"], col, 0.02)
-    # Posuvné dveře vpravo, víčko nádrže vlevo.
-    side_seam(1, (slide_front, Z0 - 0.1), (slide_front, top))
-    side_seam(1, (slide_front, top), (slide_back, top))
-    side_seam(1, (slide_back, top), (slide_back, Z0 - 0.1))
-    box("Sliding door handle", (0.08, 0.5, 0.13), side_frame(1, slide_front + 0.55, 3.2, 0.04) @ Matrix.Rotation(math.pi / 2, 4, "Z"), M["trim"], col, 0.03)
-    box("Sliding door step", (0.4, 2.6, 0.1), (W / 2 + 0.1, (slide_front + slide_back) / 2, 0.82), M["trim"], col, 0.03)
-    disc("Fuel cap", (-(W / 2 + 0.01), 2.3, 2.2), (1, 0, 0), 0.24, 0.05, M["trim"], col)
+    # Posuvné dveře a víčko nádrže vpravo (ve hře tam tankuješ).
+    side_seam(RIGHT, (slide_front, Z0 - 0.1), (slide_front, top))
+    side_seam(RIGHT, (slide_front, top), (slide_back, top))
+    side_seam(RIGHT, (slide_back, top), (slide_back, Z0 - 0.1))
+    box("Sliding door handle", (0.08, 0.5, 0.13), side_frame(RIGHT, slide_front + 0.55, 3.2, 0.04) @ Matrix.Rotation(math.pi / 2, 4, "Z"), M["trim"], col, 0.03)
+    box("Sliding door step", (0.4, 2.6, 0.1), (RIGHT * (W / 2 + 0.1), (slide_front + slide_back) / 2, 0.82), M["trim"], col, 0.03)
+    disc("Fuel cap", (RIGHT * (W / 2 + 0.01), SLIDE_BACK + 0.3, 2.65), (1, 0, 0), 0.24, 0.05, M["trim"], col)   # (hra: GasArt/Fuelcaps zdcvan)
 
     # Předek: maska, světla, nárazník, SPZ, kapota, stěrače.
     cutter("Grille", [(-1.5, 1.8), (1.5, 1.8), (1.5, 2.5), (-1.5, 2.5)], front_point, (0, -1, 0), 0.07, M["trim"], radius=0.12)
@@ -472,20 +525,19 @@ def body(col):
         tube("Wiper", shield_point(x0, 0.12, 0.02), shield_point(x1, 0.24, 0.02), 0.035, M["trim"], col, 8)
 
     # Záď: zadní dveře, okna, světla, SPZ, nárazník, výfuk.
-    door_top = H - 0.42
-    edge = lambda z: half_width(z) - 0.6
-    seam_on(rear_point, (0, 1, 0), (0, Z0 - 0.1), (0, door_top))
+    e = REAR_EDGE
+    seam_on(rear_point, (0, 1, 0), (0, REAR_BOTTOM), (0, REAR_TOP))
+    seam_on(rear_point, (0, 1, 0), (-e, REAR_TOP), (e, REAR_TOP))
+    seam_on(rear_point, (0, 1, 0), (-e, REAR_BOTTOM), (e, REAR_BOTTOM))
     for s in (-1, 1):
-        seam_on(rear_point, (0, 1, 0), (s * edge(Z0), Z0 - 0.1), (s * edge(BELT), BELT))
-        seam_on(rear_point, (0, 1, 0), (s * edge(BELT), BELT), (s * edge(door_top), door_top))
+        seam_on(rear_point, (0, 1, 0), (s * e, REAR_BOTTOM), (s * e, REAR_TOP))
         x0, x1 = sorted((s * 0.28, s * 2.2))
-        cutter("Rear window", [(x0, 4.2), (x1, 4.2), (x1, 5.85), (x0, 5.85)], rear_point, (0, 1, 0), 0.07, M["glass"], radius=0.15)
-        for z in (1.6, 5.2):
-            box("Hinge", (0.22, 0.1, 0.4), (s * edge(z), R + 0.04, z), M["trim"], col, 0.03)
-    seam_on(rear_point, (0, 1, 0), (-edge(door_top), door_top), (edge(door_top), door_top))
-    box("Rear door handle", (0.5, 0.08, 0.13), (0.55, R + 0.04, 3.15), M["trim"], col, 0.03)
-    box("Rear plate", (1.7, 0.04, 0.4), (0, R + 0.03, 1.8), M["plate"], col, 0.02)
-    text("Rear plate text", PLATE, 0.3, frame((0, R + 0.05, 1.8), (-1, 0, 0), (0, 1, 0)), M["trim"], col)
+        cutter("Rear window", [(x0, 4.2), (x1, 4.2), (x1, 5.75), (x0, 5.75)], rear_point, (0, 1, 0), 0.07, M["glass"], radius=0.15)
+        for z in (2.0, 5.2):
+            box("Hinge", (0.22, 0.1, 0.4), (s * e, R + 0.04, z), M["trim"], col, 0.03)
+    box("Rear door handle", (0.5, 0.08, 0.13), (LEFT * 0.55, R + 0.04, 3.15), M["trim"], col, 0.03)
+    box("Rear plate", (1.7, 0.04, 0.4), (0, R + 0.52, 1.05), M["plate"], col, 0.02)
+    text("Rear plate text", PLATE, 0.3, frame((0, R + 0.54, 1.05), (-1, 0, 0), (0, 1, 0)), M["trim"], col)
     box("Rear bumper", (W + 0.3, 0.6, 0.7), (0, R + 0.2, 1.05), M["trim"], col, 0.12)
     box("Bumper step", (2.2, 0.45, 0.04), (0, R + 0.25, 1.42), M["rubber"], col, 0.01)
     tube("Exhaust", (-2.0, R - 0.9, 0.55), (-2.0, R + 0.55, 0.55), 0.1, M["chrome"], col)
@@ -511,7 +563,7 @@ def lights(col):
         box("Tail light", (0.42, 0.1, 1.2), (x, R + 0.03, 2.9), M["red"], col, 0.05)
         box("Rear indicator", (0.42, 0.1, 0.45), (x, R + 0.03, 2.05), M["amber"], col, 0.05)
         box("Rear reflector", (0.5, 0.04, 0.12), (s * 2.9, R + 0.51, 1.05), M["red"], col, 0.01)
-    box("Third brake light", (1.0, 0.06, 0.13), (0, R + 0.02, H - 0.55), M["red"], col, 0.02)
+    box("Third brake light", (1.0, 0.06, 0.13), (0, R + 0.02, REAR_TOP + 0.17), M["red"], col, 0.02)
 
 
 # ───────────────────────────────────────────────────────────── kola
@@ -561,7 +613,7 @@ def wheel_mesh():
 
 def wheels(col):
     me = wheel_mesh()
-    for name, x, y in (("Wheel_FL", -TRACK, AXLE_F), ("Wheel_FR", TRACK, AXLE_F), ("Wheel_RL", -TRACK, AXLE_R), ("Wheel_RR", TRACK, AXLE_R)):
+    for name, x, y in (("Wheel_FL", LEFT * TRACK, AXLE_F), ("Wheel_FR", RIGHT * TRACK, AXLE_F), ("Wheel_RL", LEFT * TRACK, AXLE_R), ("Wheel_RR", RIGHT * TRACK, AXLE_R)):
         o = bpy.data.objects.new(name, me)
         col.objects.link(o)
         o.location = (x, y, WHEEL)
@@ -600,7 +652,7 @@ def kit(col, light_col, wheel):
     for x, m in ((0.9, M["can_red"]), (1.5, M["can_olive"])):
         box("Jerry can", (0.5, 1.0, 1.2), (x, 4.6, z + 0.06 + 0.6), m, col, 0.06)
         box("Jerry can handle", (0.12, 0.5, 0.12), (x, 4.45, z + 0.06 + 1.26), g, col, 0.03)
-    box("Crate", (1.8, 1.4, 0.9), (1.0, 2.2, z + 0.06 + 0.45), M["wood"], col, 0.04)
+    box("Crate", (1.8, 1.4, 0.9), (1.2, 3.0, z + 0.06 + 0.45), M["wood"], col, 0.04)
     box("Light bar", (3.6, 0.12, 0.1), (0, 0.0, z + 0.08), g, col, 0.02)
     for x in (-1.35, -0.45, 0.45, 1.35):
         disc("Roof light", (x, -0.15, z + 0.25), (0, 1, 0), 0.22, 0.24, M["trim"], col)
@@ -695,6 +747,7 @@ def build():
     cols = {k: collection("Van_" + k, root) for k in ("Body", "Wheels", "Lights", "Kit", "Cutters", "Studio")}
     CUT = cols["Cutters"]
     body(cols["Body"])
+    interior(cols["Body"])
     lights(cols["Lights"])
     me = wheels(cols["Wheels"])
     if KIT:
@@ -824,6 +877,184 @@ def export_roblox(folder):
     return report
 
 
+# Hra (Zombie Delivery): server/VanMesh.luau najde v Roblox Studiu naimportovaný ZDCVanArt.fbx a postaví z něj ZDC Van.
+# Díly se jmenují "<skupina>_<povrch>": skupina body (karoserie a vše na ní), doorL / doorR (přední dveře), rearL / rearR
+# (zadní dveře), wheel (levé přední kolo, hra ho dá na všechna čtyři), kit (výbava na apokalypsu); povrch říká hře barvu
+# a materiál (paint dostane lak auta). Značky mark_o / mark_x / mark_y / mark_z / mark_w ukazují hře, jak Roblox model
+# při importu otočil a zvětšil: počátek (zem pod středem auta), +X ve hře (pravý bok, tady -X), nahoru, dozadu, střed kola.
+FINISHES = {
+    "Van Paint": "paint", "Van Stripe": "stripe", "Van Trim": "trim", "Van Rubber": "rubber", "Van Glass": "glass",
+    "Van Chrome": "chrome", "Van Rim": "rim", "Van Underbody": "under", "Van Plate": "plate", "Van Headlight": "head",
+    "Van Indicator": "amber", "Van Taillight": "red", "Van Gunmetal": "gun", "Van Jerry Can Red": "canred",
+    "Van Jerry Can Olive": "canolive", "Van Wood": "wood", "Van Inside": "inside", "Van Cargo Bay": "bay", "Van Seat": "seat",
+}
+
+
+def world_center(o):
+    return sum((o.matrix_world @ Vector(c) for c in o.bound_box), Vector()) / 8
+
+
+def inside(poly, point):
+    y, z = point
+    hit = False
+    for (y0, z0), (y1, z1) in zip(poly, poly[1:] + poly[:1]):
+        if (z0 > z) != (z1 > z) and y < y0 + (z - z0) * (y1 - y0) / (z1 - z0):
+            hit = not hit
+    return hit
+
+
+def door_of(o):
+    """Na kterých dveřích díl sedí (kliky, pruh, lišta), jinak None."""
+    c = world_center(o)
+    for s, tag in ((LEFT, "L"), (RIGHT, "R")):
+        if s * c.x > W / 2 - 0.4 and c.z > Z0 + 0.1 and inside(door_outline(), (c.y, c.z)):
+            return "door" + tag
+        if c.y > R - 0.35 and 0 < s * c.x < REAR_EDGE - 0.02 and REAR_BOTTOM < c.z < REAR_TOP:
+            return "rear" + tag
+    return None
+
+
+def door_volumes(col):
+    """Objem každých dveří: co z karoserie spadne do něj, jsou dveře (hrany leží uprostřed spár)."""
+    vols = {}
+    for s, tag in ((LEFT, "L"), (RIGHT, "R")):
+        vols["door" + tag] = prism("Door volume", door_outline(Z0 - 0.3), lambda q, s=s: Vector((s * 3.7, q[0], q[1])), (1, 0, 0), -0.8, 0.8, M["inside"], col)
+        e = s * REAR_EDGE
+        vols["rear" + tag] = prism("Rear door volume", [(0, REAR_BOTTOM), (e, REAR_BOTTOM), (e, REAR_TOP), (0, REAR_TOP)],
+                                   lambda q: Vector((q[0], R + 0.125, q[1])), (0, 1, 0), -0.475, 0.475, M["inside"], col)
+    return vols
+
+
+def evaluated(o, dg):
+    return bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
+
+
+def cut(mesh, operand, operation, col):
+    o = bpy.data.objects.new("Cut", mesh)
+    col.objects.link(o)
+    b = o.modifiers.new("Cut", "BOOLEAN")
+    b.operation, b.solver, b.material_mode = operation, "EXACT", "TRANSFER"
+    if isinstance(operand, bpy.types.Collection):
+        b.operand_type, b.collection = "COLLECTION", operand
+    else:
+        b.object = operand
+    wn = o.modifiers.new("WeightedNormal", "WEIGHTED_NORMAL")
+    wn.mode, wn.weight, wn.keep_sharp = "FACE_AREA", 80, True
+    dg = bpy.context.evaluated_depsgraph_get()
+    dg.update()
+    me = evaluated(o, dg)
+    bpy.data.objects.remove(o)
+    return me
+
+
+def split_by_finish(me, matrix, out, group):
+    """Rozdělí síť podle povrchu do out[(skupina, povrch)]; normály rohů se zachovají (atribut nrm)."""
+    loops = len(me.loops)
+    flat = [0.0] * (loops * 3)
+    me.corner_normals.foreach_get("vector", flat)
+    turn = matrix.to_3x3().inverted_safe().transposed()
+    world = []
+    for i in range(loops):
+        n = turn @ Vector(flat[i * 3:i * 3 + 3])
+        n.normalize()
+        world.extend(n)
+    attr = me.attributes.get("nrm") or me.attributes.new("nrm", "FLOAT_VECTOR", "CORNER")
+    attr.data.foreach_set("vector", world)
+    names = [FINISHES[m.name] if m else "trim" for m in me.materials] or ["trim"]
+    fin = me.attributes.get("fin") or me.attributes.new("fin", "INT", "FACE")
+    fin.data.foreach_set("value", [names.index(names[p.material_index]) if p.material_index < len(names) else 0 for p in me.polygons])
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.transform(bm, matrix=matrix, verts=bm.verts)
+    layer = bm.faces.layers.int.get("fin")
+    for k in sorted({f[layer] for f in bm.faces}):
+        part = bm.copy()
+        player = part.faces.layers.int.get("fin")
+        bmesh.ops.delete(part, geom=[f for f in part.faces if f[player] != k], context="FACES")
+        piece = bpy.data.meshes.new("piece")
+        part.to_mesh(piece)
+        part.free()
+        out.setdefault((group, names[k]), []).append(piece)
+    bm.free()
+
+
+def export_game(folder):
+    """ZDCVanArt.fbx pro hru (návod: NAVOD.md, část 4)."""
+    os.makedirs(folder, exist_ok=True)
+    temp = bpy.data.collections.new("Van_GameExport")
+    bpy.context.scene.collection.children.link(temp)
+    vol_col = bpy.data.collections.new("Van_DoorVolumes")
+    temp.children.link(vol_col)
+    vols = door_volumes(vol_col)
+    dg = bpy.context.evaluated_depsgraph_get()
+    dg.update()
+    shell = evaluated(bpy.data.objects["Body"], dg)
+    parts = [("body", cut(shell.copy(), vol_col, "DIFFERENCE", temp), Matrix())]
+    for group, v in vols.items():
+        parts.append((group, cut(shell.copy(), v, "INTERSECT", temp), Matrix()))
+    dg = bpy.context.evaluated_depsgraph_get()
+    for o in bpy.data.collections["Van_Body"].objects:
+        if o.type == "MESH" and o.name != "Body":
+            parts.append((door_of(o) or "body", evaluated(o, dg), o.matrix_world.copy()))
+    for o in bpy.data.collections["Van_Lights"].objects:
+        parts.append(("kit" if o.name.startswith("Roof light") else door_of(o) or "body", evaluated(o, dg), o.matrix_world.copy()))
+    if KIT:
+        for o in bpy.data.collections["Van_Kit"].objects:
+            parts.append(("kit", evaluated(o, dg), o.matrix_world.copy()))
+    wheel = bpy.data.objects["Wheel_FL"]
+    parts.append(("wheel", evaluated(wheel, dg), wheel.matrix_world.copy()))
+    pieces = {}
+    for group, me, matrix in parts:
+        split_by_finish(me, matrix, pieces, group)
+    made, report = [], []
+    for (group, finish), meshes in sorted(pieces.items()):
+        bm = bmesh.new()
+        for piece in meshes:
+            bm.from_mesh(piece)
+        me = bpy.data.meshes.new(f"{group}_{finish}")
+        bm.to_mesh(me)
+        bm.free()
+        normals = [0.0] * (len(me.loops) * 3)
+        me.attributes["nrm"].data.foreach_get("vector", normals)
+        for p in me.polygons:
+            p.use_smooth = True
+        me.normals_split_custom_set([normals[i:i + 3] for i in range(0, len(normals), 3)])
+        for name in ("nrm", "fin"):
+            if me.attributes.get(name):
+                me.attributes.remove(me.attributes[name])
+        me.materials.append(bpy.data.materials.get(next(k for k, v in FINISHES.items() if v == finish)))
+        o = bpy.data.objects.new(f"{group}_{finish}", me)
+        temp.objects.link(o)
+        made.append(o)
+        report.append((o.name, len(me.loop_triangles) if me.calc_loop_triangles() is None else 0))
+    # Značky: Roblox van space (x doprava, y nahoru, z dozadu) = Blender (-x, z, y).
+    for name, at in (("mark_o", (0, 0, 0)), ("mark_x", (-10, 0, 0)), ("mark_y", (0, 0, 10)), ("mark_z", (0, 10, 0)),
+                     ("mark_w", tuple(wheel.matrix_world.translation))):
+        bm = bmesh.new()
+        bmesh.ops.create_cube(bm, size=0.3)
+        bmesh.ops.translate(bm, vec=Vector(at), verts=bm.verts)
+        made.append(mesh_object(name, bm, [M["trim"]], temp, False))
+    for o in bpy.context.scene.objects:
+        o.select_set(o in made)
+    bpy.ops.export_scene.fbx(filepath=os.path.join(folder, "ZDCVanArt.fbx"), use_selection=True, object_types={"MESH"},
+                             apply_scale_options="FBX_SCALE_UNITS", mesh_smooth_type="OFF", use_mesh_modifiers=True)
+    manifest = {}
+    for o in made:
+        pts = [Vector((-v.co.x, v.co.z, v.co.y)) for v in o.data.vertices]   # (the game's axes: x right, y up, z back)
+        lo = [min(p[i] for p in pts) for i in range(3)]
+        hi = [max(p[i] for p in pts) for i in range(3)]
+        manifest[o.name] = {"center": [round((a + b) / 2, 4) for a, b in zip(lo, hi)], "size": [round(b - a, 4) for a, b in zip(lo, hi)],
+                            "triangles": sum(len(p.vertices) - 2 for p in o.data.polygons)}
+    with open(os.path.join(folder, "ZDCVanArt.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=1, sort_keys=True)
+    for c in (vol_col, temp):
+        for o in list(c.objects):
+            bpy.data.objects.remove(o, do_unlink=True)
+    bpy.data.collections.remove(vol_col)
+    bpy.data.collections.remove(temp)
+    return report
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     build()
@@ -839,7 +1070,9 @@ def main():
     if folder:
         for name, tris in export_roblox(folder):
             print(f"{name}: {tris} triangles")
-        print("FBX pro Roblox:", os.path.join(os.path.abspath(folder), "van.fbx"))
+        for name, tris in export_game(folder):
+            print(f"game {name}: {tris} triangles")
+        print("FBX pro Roblox:", os.path.join(os.path.abspath(folder), "van.fbx"), "a pro hru", os.path.join(os.path.abspath(folder), "ZDCVanArt.fbx"))
 
 
 main()

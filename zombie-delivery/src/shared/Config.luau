@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.24"
+Config.Version = "6.25"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -521,6 +521,34 @@ Config.Cars = {
 		stages = {
 			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
 			{ name = "Ranch Pickup", price = 2500, level = 7, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
+		},
+	},
+	-- 6.25, the ZDC Van (the owner: "connect it to the game so it drives and works"): the owner's own Blender model
+	-- (design/blender-van/, server/VanMesh.luau): the company's van with a bull bar and a loaded roof rack. Until
+	-- ZDCVanArt is imported in Studio it wears the fleet's panelled skin.
+	{
+		id = "zdcvan",
+		gearSlots = 3,
+		trolley = true,
+		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mission = "market_9", -- sold once you finish Empty Shelves 5, Price War (Career.missionLock)
+		mount = true,
+		name = "ZDC Van",
+		price = 16000,
+		style = "zdcvan",
+		maxSpeed = 66,
+		accel = 28,
+		turn = 1.85,
+		health = 560,
+		capacity = 4,
+		tank = 65, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.35,
+		color = { 217, 204, 176 },
+		role = "The company van: a bull bar, 4 slots",
+		description = "Zombie Delivery Co.'s own van: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces. 1 passenger.",
+		stages = {
+			{ name = "ZDC Van", price = 0, capacity = 4, adds = "" },
 		},
 	},
 	{
@@ -3255,7 +3283,7 @@ Config.Soundscape = {
 	HornPerSecond = 3, -- the Horn remote's rate limit (Net.limit)
 	-- CarId → its horn (else horn_car; a pedal bike rings bike_bell, a stand-up scooter beeps scooter_beep).
 	Horns = {
-		van = "horn_van", courier = "horn_van", highroof = "horn_van", armorvan = "horn_van", rallyvan = "horn_van",
+		van = "horn_van", zdcvan = "horn_van", courier = "horn_van", highroof = "horn_van", armorvan = "horn_van", rallyvan = "horn_van",
 		icecream = "horn_van", ambulance = "horn_van",
 		pickup = "horn_car", muscle = "horn_car",
 		boxtruck = "horn_truck", freight = "horn_truck", armored = "horn_truck", bus = "horn_truck", monster = "horn_truck",

@@ -10,6 +10,7 @@ def lua(v):
     if isinstance(v,(list,tuple)):return '{'+','.join(lua(x) for x in v)+'}'
     if isinstance(v,bool):return str(v).lower()
     return json.dumps(v)
+NEW={'zdcvan'} # 6.25: the ZDC Van (server/VanMesh.luau), new since the baseline
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('luau');ap.add_argument('--baseline',default='3823dad');args=ap.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
@@ -19,6 +20,7 @@ def main():
         before=export(args.luau,temp/'before',original)
         for a,b in zip(actual,before):
             assert (a['id'],a['stage'],a['upgraded'])==(b['id'],b['stage'],b['upgraded'])
+            if a['id'] in NEW:continue # (a car the baseline did not have: nothing to keep)
             assert a['physics']==b['physics'] and a['capacity']==b['capacity'],(a['id'],a['stage'],'physics changed')
             parts=[p for p in a['parts'] if 'size' in p]
             # 4.4 review budget: a stage body at most 170 BaseParts (hidden hulls included), its maximum kit 220.
@@ -60,5 +62,9 @@ def main():
         result=subprocess.run([str(Path(args.luau).resolve()),'clearance-check.luau'],cwd=temp,text=True,capture_output=True)
         assert result.returncode==0,result.stdout+result.stderr
         print(result.stdout,end='')
-    print('Fleet compatibility PASS: all 20 stages keep original hulls, seats, joint frames, loading attachments and capacities; 40 variants within part budget (body 170, max kit 220); garage data matches factory')
+    # 6.25: the ZDC Van in the owner's Blender model (server/VanMesh.luau) from a simulated import (mesh-check.py).
+    result=subprocess.run(['python3',str(HERE/'mesh-check.py'),args.luau],text=True,capture_output=True)
+    assert result.returncode==0,result.stdout+result.stderr
+    print(result.stdout,end='')
+    print(f'Fleet compatibility PASS: all {len(actual)//2} stages keep original hulls, seats, joint frames, loading attachments and capacities (the new {", ".join(sorted(NEW))} has its own); {len(actual)} variants within part budget (body 170, max kit 220); garage data matches factory')
 if __name__=='__main__':main()

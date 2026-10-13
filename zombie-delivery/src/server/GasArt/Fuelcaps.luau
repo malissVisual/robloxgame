@@ -1,9 +1,10 @@
 --!strict
--- Pure filler positions for all 17 fleet styles, relative to Chassis CENTER. No parts, prompts or vehicle edits.
+-- Pure filler positions for all 18 fleet styles, relative to Chassis CENTER. No parts, prompts or vehicle edits.
 local Fuelcaps = {}
 type Mount = { width: number, length: number, bodyWidth: number, y: number, z: number }
 local mounts: { [string]: Mount } = {
 	van = { width = 6.6, length = 13, bodyWidth = 6.6, y = 1.8, z = 2.3 },
+	zdcvan = { width = 6.6, length = 13, bodyWidth = 6.6, y = 0.55, z = 3.15 }, -- 6.25: the cap in the model (van.py), behind the sliding door
 	courier = { width = 6.2, length = 12, bodyWidth = 6.2, y = 1.7, z = 2.1 },
 	highroof = { width = 6.8, length = 14, bodyWidth = 6.8, y = 1.9, z = 2.6 },
 	pickup = { width = 6.4, length = 13, bodyWidth = 6.4, y = 1.1, z = 2.4 },

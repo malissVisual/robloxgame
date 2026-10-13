@@ -11,7 +11,8 @@ type Style = {
 type Context = {
 	weld: (BasePart, BasePart) -> (), nightLight: (Instance, Color3?, Color3?, string?) -> (),
 }
-local SUPPORTED: { [string]: boolean } = { van = true, courier = true, highroof = true, boxtruck = true, armorvan = true, rallyvan = true, freighttruck = true, pickup = true, muscle = true }
+-- (6.25, zdcvan: the ZDC Van's skin until the owner's model is imported, server/VanMesh.luau)
+local SUPPORTED: { [string]: boolean } = { van = true, zdcvan = true, courier = true, highroof = true, boxtruck = true, armorvan = true, rallyvan = true, freighttruck = true, pickup = true, muscle = true }
 local COLORS: { [string]: Color3 } = {
 	dark = Color3.fromRGB(27, 32, 35), steel = Color3.fromRGB(151, 163, 166), glass = Color3.fromRGB(50, 72, 77),
 	red = Color3.fromRGB(163, 47, 40), amber = Color3.fromRGB(206, 132, 48), white = Color3.fromRGB(217, 218, 207),

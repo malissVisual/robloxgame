@@ -25,7 +25,7 @@ def catalog(models):
             if p['id'] in texts:row.append(texts[p['id']])
             parts.append([round(x,5) if isinstance(x,float) else x for x in row])
         cars[f"{m['id']}:{m['stage']}"]=parts
-    assert len(cars)==20
+    assert len(cars)==21 # (6.25: + zdcvan:0)
     return {'colors':colors,'cars':cars}
 def dump(value):
     return json.dumps(value,separators=(',',':'))

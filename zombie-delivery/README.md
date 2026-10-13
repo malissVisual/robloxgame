@@ -194,7 +194,8 @@ maxSpeed, `Config.Bus`, `Config.ZipLines`):
 | Rusty Bike | 30 | | Box Truck | 64 |
 | Cargo Bike | 32 | | Courier Van | 70 |
 | E-Scooter (bought) | 34 | | Pickup | 72 |
-| Courier Bike | 38 | | Armored Van | 74 |
+| Courier Bike | 38 | | ZDC Van | 66 |
+| | | | Armored Van | 74 |
 | E-Bike | 48 | | Muscle Car | 95 |
 | City bus (free, express on its timetable; 6.3) | 55 | | Rally Van | 98 |
 | Zip line | 55 | | (the Engine upgrade: +8 % a level) | |
@@ -474,7 +475,7 @@ Since 3.2 every vehicle that takes cargo by hand has a **back that opens** (`Sty
 
 | Vehicle | The back |
 |---|---|
-| Old Van, Courier Van, High-Roof Van, Box Truck, Armored Van, Rally Van, Ice Cream Truck, Armored Truck, Moving Truck, Ambulance | two rear doors |
+| Old Van, ZDC Van (6.25), Courier Van, High-Roof Van, Box Truck, Armored Van, Rally Van, Ice Cream Truck, Armored Truck, Moving Truck, Ambulance | two rear doors |
 | Freight Truck (4.0) | a roll-up door (one slatted leaf that turns up and in under the roof: "Open roll-up door") |
 | Pickup, Monster Truck (new bed rails), Fuel Truck (the flatbed) | a tailgate |
 | Muscle Car | a trunk lid (the spoiler rides on it) |
@@ -550,6 +551,7 @@ van, the high-roof van and the box truck also drive past in the traffic.
 | **Courier Van** | 2 | $3,500 | 70 | 320 | × 1.0 | 1 | compact and low, a sliding-door line, an amber light bar on the roof |
 | **High-Roof Van** | 3 | $7,000 | 62 | 450 | × 1.1 | 2 | a tall roof, windows down the box, a jump seat |
 | Pickup | 4 | $12,000 | 72 | 420 | × 1.15 | 3 | |
+| **ZDC Van** (6.25) | 6 | $16,000 | 66 | 560 | × 1.35 | 1 | the owner's own Blender model: a bull bar, a loaded roof rack, a hollow cargo bay (see **The ZDC Van**) |
 | **Box Truck** | 6 | $22,000 | 64 | 650 | × 1.4 | 2 | a cab and a big separate box, a wind deflector, a red stripe |
 | Muscle Car | 8 | $40,000 | 95 | 340 | × 1.0 | 1 | |
 | **Freight Truck** (4.0) | 9 | $45,000 | 45 | 900 | × 2.0 | 1 | a cab-over truck with a long box, a roll-up door, twin rear tyres (see **Freight vehicles and the upgrades you see**) |
@@ -685,6 +687,7 @@ roof, a roof pod); the car gun moves up onto a high roof.
 | **Old Van** (free) | your first van: it grows with you | 4.0: **Rusty Van** 2 (max 42, accel 11: big corroded rust patches, a primer-grey driver's door, a dented crooked bumper, a cracked windscreen, bald grey tyres, a yellowed dim headlight, a smoking exhaust) → **Patched Van** 2 · $250 · 1 (the rust ground off and primed grey, a straight new bumper; 48 / 15, +20 health) → **Work Van** 3 · $700 · 2 (**1.5 studs longer**; clean paint, a chrome bumper, a new windscreen and lamps, new tyres, a rear step, a ladder, shelves; 54 / 19, +40 health) → **Long Cargo Van** 4 · $2,200 · 4 (**3.5 studs longer** with a high roof, a roof rack, a light bar, mud flaps; 56 / 21, +70 health) |
 | **Courier Van** (2, $3,500) | fast and nimble: the rush jobs | Courier Van 2 → **Express Courier** 3 · $1,200 · 3 (a roof pod, a checker stripe; +2 speed) |
 | **High-Roof Van** (3, $7,000) | tougher, the in-between | High-Roof Van 4 → **Tall Hauler** 5 · $3,000 · 5 (a ladder rack with a spare wheel, side steps, a stacked shelf; +60 health) |
+| **ZDC Van** (6, $16,000, 6.25) | the company van: a bull bar, 4 slots | ZDC Van 4 (one stage) |
 | **Pickup** (4, $12,000) | the crew car: two friends shoot from the bed | Pickup 2 → **Ranch Pickup** 3 · $2,500 · 6 (a roll bar with spotlights, chrome bed rails; +50 health) |
 | **Box Truck** (6, $22,000) | the big one: the only way to 6 and more | Box Truck 6 → **Liftgate Truck** 7 · $7,500 · 8 (a liftgate, marker lights, a chrome bumper; +80 health) → **Freight Hauler** 8 · $15,000 · 10 (4.0: **a box 3 studs longer**, four rows on the floor, **takes a pallet**; a tall wind deflector, side skirts; +150 health, −2 speed) |
 | **Muscle Car** (8, $40,000) | the getaway car: one piece, all speed | Muscle Car 1 → **Street Machine** 2 · $6,000 · 9 (a blower through the hood, side pipes; +3 speed) |
@@ -1083,7 +1086,7 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
 ## Content
 
 * **Cars**: at Dead End Motors (3.5: the car catalog at the counter, three display cars inside) the Old Van (free), the Courier Van
-  (level 2, $3,500), the High-Roof Van (3, $7,000), the Pickup (4, $12,000), the Box Truck (6, $22,000), the Muscle Car
+  (level 2, $3,500), the High-Roof Van (3, $7,000), the Pickup (4, $12,000), the ZDC Van (6, $16,000, 6.25), the Box Truck (6, $22,000), the Muscle Car
   (8, $40,000), the Freight Truck (9, $45,000, 4.0), the Armored Van (10, $55,000) and the Rally Van (12, $80,000),
   each with 1 – 3 stages (3.5; 4.0: the Old Van's Patched, Work and Long Cargo Van); earned by
   working: School Bus, Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck, Livestock Truck, Fuel Truck,
@@ -1145,6 +1148,36 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## The ZDC Van: the owner's Blender model (6.25)
+
+The owner: "udělat můj nejlepší model na van" in Blender, then "napoj ji do hry, ať v ní jde jezdit a fungovat".
+
+**The model.** `design/blender-van/van.py` builds the van in Blender (or with `pip install bpy`): the Old Van's size (13 × 6.6
+studs, the same wheels), a bevelled body with Boolean-cut windows and door seams, a hollow cab with seats and a dashboard, a
+plywood cargo bay, a bull bar and a roof rack with a spare wheel, jerry cans and lamps. `van.blend`, renders and the owner's
+Czech guide (`NAVOD.md`) are next to it.
+
+**The car.** `Config.Cars` `zdcvan` (STYLES `zdcvan`): level 6, sold at Dead End Motors once **Price War** (Empty Shelves 5)
+is done, $16,000 base (× `Config.Prices.Vehicles`), 4 slots, 66 top speed, 560 health, ram × 1.35, a trolley, 3 gear slots
+and a roof gun on the rack. Its hull boxes, seats, cab doors (seat z −1.55: the doors from −2.85 to −0.35) and back doors
+(4.9 wide, hinged at ±2.45) are the model's.
+
+**The look.** `server/VanMesh.luau` dresses every ZDC Van with the MeshParts of the imported `ZDCVanArt` model: the body,
+its lamps and the kit on the body that sways, each door on its hinged panel (so the cab doors and the back doors open), the
+wheel on every tyre, the paint on the `*_paint` pieces. Markers in the model (`mark_o/x/y/z/w`) tell it how the importer
+turned and scaled the model. The factory's own hull, panels, lamps and tyres stay (physics, prompts, spot lights) but are
+hidden; the upgrades work as on every car but add no parts (the model has its own bull bar and wheels). Until the model is
+imported the ZDC Van wears the fleet's panelled skin (VehicleArt).
+
+**What the owner does once in Studio** (meshes have to be uploaded under the owner's account): File → Import 3D →
+`design/blender-van/roblox/ZDCVanArt.fbx` (the defaults), Insert, then publish. The model can stay where it lands; at the
+start the server moves it to ServerStorage. Rebuilding the model: `python van.py -- --export roblox` (or `EXPORT = True` in
+Blender), then import the new `ZDCVanArt.fbx` again (delete the old `ZDCVanArt` first).
+
+**Checks.** `tools/vehicle-preview/mesh-check.py <luau>` simulates the import from `roblox/ZDCVanArt.json` (a quarter turn,
+3 × the size) on the real factory: every piece once in place, the doors on their hinges, the wheel on the four tyres,
+nothing physical, the factory's look hidden. `check_fleet.py` runs it too and keeps the van's panelled skin in its budgets.
 
 ## New zombies, a real walk, the bike on its wheels (6.24)
 
@@ -1390,6 +1423,7 @@ that owns one keeps it.
 - Many Hands: Courier Van, High-Roof Van.
 - Code Red finale: Hunting Rifle.
 - Farm to Table: Pickup.
+- Price War: ZDC Van (6.25).
 - Empty Shelves finale: Box Truck.
 - Smoke and Sirens finale: Muscle Car.
 - Iron Supply finale: Freight Truck.

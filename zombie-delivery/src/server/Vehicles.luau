@@ -172,6 +172,8 @@ local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
 local Boarding = require(Shared.Boarding)
 local VehicleArt = require(script.Parent.VehicleArt.Builder)
+local VanMesh = require(script.Parent.VanMesh) -- 6.25: the ZDC Van in the owner's Blender model
+VanMesh.ready("zdcvan") -- (at the start: the imported model leaves the world before anybody sees it)
 local BikeArt = require(script.Parent.BikeArt.Geometry) -- 5.1: Codex's bikes and bike gear (pure geometry)
 local ScooterArt = require(script.Parent.ScooterArt.Geometry) -- 5.1.1: the E-Scooter (pure geometry, the same convention)
 local ModelArt = require(script.Parent.ModelArt.Builder) -- 5.1: welds that geometry to our hidden roots
@@ -561,6 +563,31 @@ local STYLES: { [string]: Style } = {
 		back = rearDoors(6.6, DOOR_SILL, 4.8, 6.4, function(side: number): { Box }
 			return { box(Vector3.new(2.2, 1.2, 0.06), Vector3.new(-side * 0.25, 0.825, 0.12), "glass") } -- rear windows
 		end),
+	},
+	-- 6.25, the ZDC Van in the owner's Blender model (server/VanMesh.luau; design/blender-van/van.py has the same sizes):
+	-- the Old Van's size and wheels, a short sloping hood, a cab door each side where van.py's doors are (the seats in
+	-- their middle), the cargo bay behind a bulkhead and two back doors between the tail lights; a roof gun stands on the
+	-- roof rack. The hull boxes follow the model's outline.
+	zdcvan = {
+		width = 6.6,
+		length = 13,
+		wheel = 1.3,
+		wheelWidth = 1,
+		clearance = 0.9,
+		seat = Vector3.new(-1.4, 0.5, -1.55),
+		passengers = { Vector3.new(1.4, 0.5, -1.55) },
+		roof = 5.0,
+		head = Vector2.new(0.05, -6.6),
+		boxes = {
+			box(Vector3.new(6.6, 1.3, 2.45), Vector3.new(0, 0.65, -5.275), "body"), -- hood
+			box(Vector3.new(6.6, 4.1, 3.7), Vector3.new(0, 2.05, -2.2), "glass"), -- cabin
+			box(Vector3.new(6.6, 0.4, 3.7), Vector3.new(0, 4.3, -2.2), "body"), -- cabin roof
+			box(Vector3.new(6.6, 4.5, 6.85), Vector3.new(0, 2.25, 3.075), "body"), -- cargo box
+			box(Vector3.new(6.9, 0.75, 0.55), Vector3.new(0, -0.98, -6.7), "dark"), -- the bumpers
+			box(Vector3.new(6.9, 0.7, 0.6), Vector3.new(0, -1.05, 6.7), "dark"),
+		},
+		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.4, 0, 4.5), Vector3.new(1.4, 0, 4.5), Vector3.new(-1.4, 0, 1.5), Vector3.new(1.4, 0, 1.5) }),
+		back = rearDoors(4.9, -0.65, 3.9, 6.3),
 	},
 	pickup = {
 		width = 6.4,
@@ -1800,7 +1827,7 @@ local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, w
 	local on = lookOf(model, chassis) -- 6.16: the body that sways (the hinges stay children of the chassis)
 	if back.hole then
 		local hole = trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), on, color, accent)
-		if model:GetAttribute("FleetArt") then hole.Transparency = 1 end
+		if model:GetAttribute("FleetArt") or model:GetAttribute("MeshArt") then hole.Transparency = 1 end
 	end
 	for _, leaf in back.leaves do
 		local kind = leaf.kind or "body"
@@ -1811,10 +1838,17 @@ local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, w
 		if model:GetAttribute("FleetArt") and back.noun == "doors" then
 			VehicleArt.rear(p, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 		end
+		local meshed = model:GetAttribute("MeshArt") ~= nil -- 6.25: the model's own back doors on the hidden leaves
+		if meshed then
+			p.Transparency = 1
+			VanMesh.door(model, p, leaf.center.X, true, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		end
 		local trim: { Box } = leaf.trim or {}
 		for _, b in trim do
 			local t = trimPart(model, "BackTrim", b, top * CFrame.new(leaf.center + b.offset), p, color, accent)
-			if b.kind == "body" then
+			if meshed then
+				t.Transparency = 1
+			elseif b.kind == "body" then
 				table.insert(paintParts, t)
 			end
 		end
@@ -1934,6 +1968,9 @@ local KIT_TROLLEY = Color3.fromRGB(196, 46, 38)
 -- the tread), from 3 alloy rims (a silver disc, silver spokes); before, a Rusty Van's tyres stay bald and grey (build).
 -- The new parts are welded to the tyre (they spin with it) and live in the kit's folder.
 local function fitTyres(model: Model, folder: Instance, style: Style, handling: number)
+	if model:GetAttribute("MeshArt") then
+		return -- 6.25: the model's own wheels
+	end
 	if model:GetAttribute("FleetArt") then
 		VehicleArt.fitTyres(model, handling, { weld = weld, nightLight = DayNight.nightLight })
 		return
@@ -2280,7 +2317,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 
 	if model:GetAttribute("FleetArt") then
 		VehicleArt.upgrades(model, on, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
-	else
+	elseif not model:GetAttribute("MeshArt") then -- (6.25: the ZDC Van's model has its own bull bar and roof rack)
 	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
 	if plow >= 1 then
 		local width = math.min(style.width + 0.2, style.width - 1.6 + 0.36 * plow)
@@ -2580,9 +2617,16 @@ local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style
 		if model:GetAttribute("FleetArt") then
 			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 		end
+		local meshed = model:GetAttribute("MeshArt") ~= nil -- 6.25: the model's own cab door on the hidden panel
+		if meshed then
+			p.Transparency = 1
+			VanMesh.door(model, p, door.side, false, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		end
 		for _, b in door.trim do
 			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
-			if b.kind == "body" then
+			if meshed then
+				t.Transparency = 1
+			elseif b.kind == "body" then
 				table.insert(paintParts, t)
 			end
 		end
@@ -2629,7 +2673,14 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		end
 	end
 
-	local polished = not oneBeam and VehicleArt.supports(def.style)
+	-- 6.25: the ZDC Van wears the owner's Blender model once ZDCVanArt is imported (server/VanMesh.luau): the hull, the
+	-- chassis, the panels, the lamps' and the tyres' parts stay as they are but hidden; without it, the panelled skin.
+	local meshed = not oneBeam and VanMesh.ready(def.style)
+	local polished = not meshed and not oneBeam and VehicleArt.supports(def.style)
+	if meshed then
+		chassis.Transparency = 1
+		model:SetAttribute("MeshArt", def.style)
+	end
 	if polished then
 		-- The chassis stays visible (dark metal): the floor of the cab and the cargo bay under the skin.
 		model:SetAttribute("FleetArt", true)
@@ -2665,7 +2716,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			p.Shape = Enum.PartType.Ball
 		end
 		local shown: BasePart = p -- 6.16: what is seen of it (its twin on the BodyRoot)
-		if look ~= chassis and not polished and p.CanCollide and not (SIREN_DIM[b.kind] or b.kind == "lightbar") then
+		if look ~= chassis and not polished and not meshed and p.CanCollide and not (SIREN_DIM[b.kind] or b.kind == "lightbar") then
 			shown = p:Clone()
 			shown.CanCollide = false
 			shown.CanQuery = false
@@ -2693,13 +2744,13 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			CollectionService:AddTag(p, Vehicles.SirenTag)
 		end
 		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance (5.1: a bike's art).
-		if polished or style.bike then p.Transparency = 1 end
+		if polished or meshed or style.bike then p.Transparency = 1 end
 		-- (6.16: the light bar's lenses, never colliding, sway themselves)
 		weld(if p.CanCollide then chassis else look, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
 	end
 	-- 3.5: the cosmetic trim (the Rusty Van's rust, a stage's ladder, racks, lamps …); body-coloured trim is painted.
-	local trim: { Box } = if polished then {} else style.trim or {}
+	local trim: { Box } = if polished or meshed then {} else style.trim or {}
 	for _, b in trim do
 		local p = trimPart(model, "Trim", b, top * CFrame.new(b.offset) * tilted(b), look, color, accent)
 		if b.kind == "body" then
@@ -2716,6 +2767,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			end
 		end
 		VehicleArt.body(model, look, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
+	elseif meshed then
+		VanMesh.body(model, look, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
@@ -2753,6 +2806,11 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		motor:SetAttribute("Front", offset.Z < 0)
 		motor:SetAttribute("Radius", style.wheel)
 		motor.Parent = chassis
+		if meshed then
+			tyre.Transparency = 1
+			VanMesh.wheel(model, tyre, offset.X, { weld = weld, nightLight = DayNight.nightLight })
+			return
+		end
 		if polished then
 			-- Its outer face (the rim's side); a twin tyre inside another (no collider) shows no rim.
 			tyre:SetAttribute("FleetSide", if offset.X < 0 then -1 else 1)
@@ -2800,6 +2858,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		head.CanCollide = false
 		head.CanQuery = false
 		head.Massless = true
+		if meshed then
+			head.Transparency = 1 -- (its beam stays; the model's lamps glow)
+		end
 		weld(look, head)
 		if not display and (n == 1 or not oneBeam) then
 			local spot = Instance.new("SpotLight")
@@ -2820,6 +2881,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		tail.CanCollide = false
 		tail.CanQuery = false
 		tail.Massless = true
+		if meshed then
+			tail.Transparency = 1
+		end
 		weld(look, tail)
 		DayNight.nightLight(tail, TAIL_LIT, TAIL_DIM, "SmoothPlastic")
 	end

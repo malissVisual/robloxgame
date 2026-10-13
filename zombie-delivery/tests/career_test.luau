@@ -442,6 +442,7 @@ do
 		{ "highroof", step("clinic", 3), "Many Hands" },
 		{ "rifle", finale("clinic"), "Code Red" },
 		{ "pickup", step("market", 3), "Farm to Table" },
+		{ "zdcvan", step("market", 5), "Price War" }, -- 6.25: the owner's Blender van
 		{ "boxtruck", finale("market"), "Empty Shelves" },
 		{ "muscle", finale("firehouse"), "Smoke and Sirens" },
 		{ "freight", finale("army"), "Iron Supply" },
