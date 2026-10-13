@@ -756,6 +756,15 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 	local blast = z.def.blast
 	if blast and cause ~= nil and cause ~= "other" then
 		Special.fuse(z, blast.deathFuse, killer)
+	elseif blast then
+		-- (6.24 review: the admin's KILL ALL / CLEAR, a mission's end, a plain death: a fuse already lit goes out too)
+		z.blasted = true
+		z.fuseAt = nil
+		z.model:SetAttribute("Fuse", nil)
+	end
+	local leap = z.root:FindFirstChild("Leap") -- (6.24 review: a dead runner's leap stops pushing)
+	if leap then
+		leap:Destroy()
 	end
 	task.delay(6, function()
 		z.model:Destroy()
@@ -1186,6 +1195,10 @@ local function latch(z: Zombie, car: Vehicles.Car): boolean
 	end
 	car.latched[slot] = true
 	z.car, z.slot = car, slot
+	local leap = z.root:FindFirstChild("Leap") -- (6.24 review: a runner's leap must not drag the car it lands on)
+	if leap then
+		leap:Destroy()
+	end
 	z.humanoid.PlatformStand = true
 	for _, d in z.model:GetDescendants() do
 		if d:IsA("BasePart") then
@@ -1331,6 +1344,7 @@ function Special.lunge(z: Zombie, best: Target, distance: number, lunge: Config.
 		z.nextPath = now + 0.05
 		if not z.lungeHit and distance < lunge.reach then
 			z.lungeHit = true
+			z.nextAttack = now + z.def.attackEvery -- (6.24 review: the leap's strike is its bite: one hit a leap)
 			showAttack(z)
 			Armour.hurt(humanoid, lunge.damage)
 		end

@@ -800,14 +800,20 @@ local function spawnRider(session: Session, piece: Piece, at: CFrame): Model?
 	if isSurvivor(session) then
 		local npc = spawnFor(session, Cargo.look("survivor", SURVIVOR_NAMES[piece.variant % #SURVIVOR_NAMES + 1], "Survivor"), at)
 		if npc then
-			dressSurvivor(npc)
+			local ok, err: any = pcall(function() dressSurvivor(npc) end) -- (6.24 review: a failed dress never strands the person: they go undressed)
+			if not ok then
+				warn(`[Cargo] dressSurvivor: {err}`)
+			end
 		end
 		return npc
 	end
 	if isPatient(session) then
 		local npc = spawnFor(session, Cargo.look("patient", PATIENT_NAMES[piece.variant % #PATIENT_NAMES + 1], "Patient"), at)
 		if npc then
-			dressPatient(npc)
+			local ok, err: any = pcall(function() dressPatient(npc) end) -- (6.24 review: a failed dress never strands the person: they go undressed)
+			if not ok then
+				warn(`[Cargo] dressPatient: {err}`)
+			end
 		end
 		return npc
 	end
