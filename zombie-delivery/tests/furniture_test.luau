@@ -3,8 +3,9 @@
 -- room kind, every class, the sentimental ★ pieces, a "pair" piece goes through a doorway end first), and every piece
 -- in every colour builds within its part budget: its Root an invisible box of exactly its size at the origin, the only
 -- part that collides, every other part welded to it, massless, not colliding or queried, nothing anchored, the look
--- inside the box, standing on its floor and filling it (the box is honest), the attributes set. 7.x farm pieces: Walt's
--- farm's block (a bigDoor piece only through the barn doors), every piece fits the moving truck's bed.
+-- inside the box, standing on its floor and filling it (the box is honest), the attributes set; 7.x: the eight alpine
+-- pieces as asked and lean. 7.x farm pieces: Walt's farm's block (a bigDoor piece only through the barn doors), every
+-- piece fits the moving truck's bed.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -263,6 +264,32 @@ do
 		check(`{id} is a pair piece`, Items[id] ~= nil and Items[id].class == "pair")
 	end
 	check("the anvil is the heaviest there is, the beehive fragile", Items.anvil.weight == 10 and Items.beehive.fragile)
+end
+
+-- 7.x alpine pieces (a chalet's things, the house's recipes draw them): the eight as asked (class, fragile, the two
+-- sentimental ★ candidates, their room) and lean: at most ALPINE_PARTS parts each, so that a house drawing several of
+-- them stays inside its part budget (Config.Furniture.InteriorMaxParts, tests/houseinterior_test.luau).
+do
+	local ALPINE_PARTS = 18
+	local want: { { any } } = {
+		--  id                  class   fragile ★      room
+		{ "cuckoo_clock", "hand", true, true, "living" },
+		{ "accordion", "both", true, true, "living" },
+		{ "heart_chair", "both", false, false, "living" },
+		{ "stein_crate", "hand", true, false, "kitchen" },
+		{ "painted_cupboard", "pair", false, false, "bedroom" },
+		{ "carved_chest", "pair", false, false, "bedroom" },
+		{ "edelweiss_frame", "hand", true, false, "bedroom" },
+		{ "ski_bundle", "both", false, false, "hall" },
+	}
+	for _, w in want do
+		local id = w[1]
+		local def = Items[id]
+		check(`alpine {id}: {w[2]}, fragile {w[3]}, sentimental {w[4]}, in the {w[5]}`, def ~= nil and def.class == w[2] and def.fragile == w[3]
+			and def.sentimental == w[4] and def.room == w[5])
+		local parts = if def then FurnitureLooks.parts(id) else 0
+		check(`alpine {id}: lean ({parts} parts, at most {ALPINE_PARTS})`, parts >= 6 and parts <= ALPINE_PARTS)
+	end
 end
 
 -- An unknown piece is a moving box that still says what was asked for; the part count helper agrees.

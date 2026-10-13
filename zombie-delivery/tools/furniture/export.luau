@@ -1,7 +1,7 @@
 -- 7.0, the moving prototype's previews: every piece of furniture (shared/FurnitureLooks.luau) and one house's inside
 -- (shared/HouseLayout.luau + server/HouseInterior.luau) built by the real builders on the recorder
 -- (tools/fixtures/item-mock.luau), written as JSON lines for render.mjs: each part's class, shape, size, place, turn,
--- colour, material and opacity, the pieces' catalogue entries, the house's rooms, spots, entry and lights.
+-- colour, material and opacity, the pieces' catalogue entries, the house's rooms, spots, fixtures, entry and lights.
 -- 7.x the farm: with a second seed also Walt's farm (HouseLayout.plan(seed, "farm"), layout "farm"); a piece of the
 -- farm's block (FurnitureLooks.FarmPieces) is marked farm.
 -- Run by tools/furniture/render.py:  luau export.luau -a <seed> [<farm seed>]
@@ -135,6 +135,11 @@ local function scene(kind: string, at: number)
 		local def = FurnitureLooks.Items[s.item]
 		table.insert(spots, { id = s.id, item = s.item, room = s.room, star = s.star, position = vec(s.at.Position), label = def.name, bigDoor = def.bigDoor == true })
 	end
+	-- 7.x alpine: the fixtures too (render.py's eye-level views aim at the Kachelofen, the corner bench, the wall decor)
+	local fixtures = {}
+	for _, f in plan.fixtures do
+		table.insert(fixtures, { kind = f.kind, room = f.room, position = vec(f.at.Position), size = vec(f.size), turn = f.turn })
+	end
 	local exits = {}
 	for _, e in (plan :: any).exits or { plan.exit } do
 		table.insert(exits, vec(e))
@@ -150,6 +155,7 @@ local function scene(kind: string, at: number)
 			max = vec(plan.max),
 			rooms = rooms,
 			spots = spots,
+			fixtures = fixtures,
 			entry = vec(plan.entry.Position),
 			exits = exits,
 			parts = count,

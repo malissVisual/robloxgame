@@ -28,6 +28,13 @@
 --   MoveStory.thanksLine(contract, how, stars)   the client's line for the result card (client/MoveStoryUi.luau)
 --   MoveStory.isSeenKey(key) / cleanSeen(saved) / encodeSeen(seen) / decodeSeen(text)   the seen flags in the save
 --                             and on the player attribute (a sorted, comma-separated list of keys)
+--   The greeters (7.0: the people who welcome a crew; server/MoveGreeters.luau says these in speech bubbles, each at
+--   most Config.MoveStory.Limits.Bubble characters):
+--     a chapter's `greeter`   its client on the porch of the house: hello (2 – 3 lines when the crew comes), star (a ★
+--                             thing carried out past them), horde (the horde comes), leave (the loaded truck drives off)
+--     MoveStory.Wall          the soldier at the Wall's checkpoint: welcome (a move's truck delivered at the drop-off)
+--     MoveStory.Kiosk         Marge at the depot's Moving contracts kiosk: her lines, one each time (kioskLine)
+--     MoveStory.greeterOf(contract) / kioskLine(n)
 
 local Config = require(script.Parent.Config)
 local Cast = require(script.Parent.Cast)
@@ -40,6 +47,8 @@ export type Line = { who: string, text: string }
 -- in the story and why it matters.
 export type Keepsake = { item: string, name: string, story: string }
 export type Outcomes = { great: string, ok: string, late: string, failed: string }
+-- 7.0 greeters: what a chapter's client says on the porch (server/MoveGreeters.luau).
+export type Greeter = { hello: { string }, star: string, horde: string, leave: string }
 export type Chapter = {
 	id: string,
 	number: number, -- 0: the prologue, 1 … 6, 7: the finale
@@ -61,6 +70,7 @@ export type Chapter = {
 	dispatch: string,
 	debrief: Outcomes,
 	thanks: Outcomes,
+	greeter: Greeter?, -- 7.0 greeters: the client on the porch (a playable chapter's)
 }
 
 MoveStory.Outcomes = { "great", "ok", "late", "failed" }
@@ -135,6 +145,13 @@ MoveStory.Chapters = {
 			late = "Half my house is behind the Wall, half is somebody's dinner table. Better than nothing.",
 			failed = "My whole life is out there with the dead. Go back. I'll make coffee. Strong.",
 		},
+		-- 7.0 greeters: Marge on her porch (server/MoveGreeters.luau)
+		greeter = {
+			hello = { "Oh thank heavens, ZDC!", "The door's open. Everything inside goes.", "And mind Grandpa's clock!" },
+			star = "Careful with that!",
+			horde = "They're coming! Hurry!",
+			leave = "Thank you… see you behind the Wall.",
+		},
 	},
 	{
 		id = "ranch",
@@ -150,7 +167,7 @@ MoveStory.Chapters = {
 		hook = "The Wall stops a mile short of the Silver Spur Ranch, and Walt isn't leaving a single horse behind. Saddles, a tractor, a barn full of feed and animals that kick. Heavy, loud and down a dirt road.",
 		blurb = "Fifty years on this land, partner. The land stays. Everything that breathes or bucks comes with me.",
 		keepsakes = {
-			{ item = "saddle", name = "Thunder's saddle", story = "Walt's old stallion won't take a rider without it. Or with it, some days." },
+			{ item = "thunders_saddle", name = "Thunder's saddle", story = "Walt's old stallion won't take a rider without it. Or with it, some days." },
 			{ item = "branding_iron", name = "The branding iron", story = "The Silver Spur's mark since 1921. Walt's grandpa forged it in the barn." },
 			{ item = "guitar", name = "Walt's guitar", story = "Three strings, one song. He swears it's the only one that matters." },
 		},
@@ -501,6 +518,32 @@ end
 function MoveStory.thanksLine(contract: any, how: string?, stars: number?): string?
 	local chapter = MoveStory.forContract(contract)
 	return if chapter then (chapter.thanks :: any)[MoveStory.outcome(how, stars)] else nil
+end
+
+-- ── The greeters (7.0: server/MoveGreeters.luau) ──────────────────────────────────────────────────────────────────
+
+-- The soldier at the Wall's checkpoint, when a move's truck is delivered at the drop-off.
+MoveStory.Wall = {
+	welcome = "Welcome to the safe zone. Unload over there.",
+}
+
+-- Marge at the depot's Moving contracts kiosk, to a player who walks up to it (one line each time, in turn).
+MoveStory.Kiosk = {
+	"New contract, sweetie?",
+	"Back for more, sweetie? Pick a house.",
+	"Trucks are fuelled. New contract, sweetie?",
+} :: { string }
+
+-- The client's lines on the porch of this contract's house (nil: nobody greets there).
+function MoveStory.greeterOf(contract: any): Greeter?
+	local chapter = MoveStory.forContract(contract)
+	return if chapter then chapter.greeter else nil
+end
+
+-- Marge's kiosk line number `n` (1, 2, … round the list).
+function MoveStory.kioskLine(n: number): string
+	local count = #MoveStory.Kiosk
+	return MoveStory.Kiosk[((math.max(1, math.floor(n)) - 1) % count) + 1]
 end
 
 -- ── The seen flags (the save, the player attribute MoveStory) ───────────────

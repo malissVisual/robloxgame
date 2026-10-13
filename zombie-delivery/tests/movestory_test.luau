@@ -2,7 +2,8 @@
 -- the place, the hook, the keepsakes, the briefing, the taunt, Marge's texts and the client's thanks for every
 -- outcome), unique ids and titles, every text non-empty and inside its card's limit, a valid unlock order, the prologue
 -- the one playable chapter (its contract on the board), the speakers real people (shared/Cast.luau, Dana of Big Move
--- Movers), the outcomes, the phone texts, the seen flags of the save; then the real server/Moving.luau (MovingServer
+-- Movers), the outcomes, the phone texts, the greeters' lines (the porch, the Wall, the kiosk: each inside its bubble),
+-- the seen flags of the save; then the real server/Moving.luau (MovingServer
 -- on tests/runtime/MovingRuntime.luau's fakes) sends Marge's texts through its MoveStory hook at START and at the end.
 local MoveStory = require("./MoveStory")
 local Config = require("./Config")
@@ -208,6 +209,35 @@ check("Marge's debrief and the client's thanks follow the outcome", MoveStory.de
 	and MoveStory.thanksLine("marge", "cancelled", 0) == prologue.thanks.failed)
 check("no chapter, no text", MoveStory.dispatchText("nowhere") == nil and MoveStory.debriefText("nowhere", "done", 5) == nil and MoveStory.thanksLine(nil, "done", 5) == nil)
 check("the phone's sender is Marge (a Cast name)", Cast.named(MoveStory.Sender) ~= nil)
+
+-- The greeters (7.0: server/MoveGreeters.luau's speech bubbles) -------------------------------------------------------
+
+local greeter = prologue.greeter
+check("the prologue's client greets the crew on the porch: 2 – 3 hello lines and the three reactions", greeter ~= nil and #greeter.hello >= 2 and #greeter.hello <= 3
+	and MoveStory.greeterOf("marge") == greeter and MoveStory.greeterOf("Marge's House") == greeter and MoveStory.greeterOf("nowhere") == nil and MoveStory.greeterOf(nil) == nil)
+if greeter then
+	for index, text in greeter.hello do
+		checkText(`the porch hello {index} fits its bubble`, text, L.Bubble)
+	end
+	for _, key in { "star", "horde", "leave" } do
+		checkText(`the porch's {key} line fits its bubble`, (greeter :: any)[key], L.Bubble)
+	end
+	check("her first word is for ZDC, the last one for Grandpa's clock (the door is open)", string.find(greeter.hello[1], "ZDC", 1, true) ~= nil
+		and string.find(table.concat(greeter.hello, " "), "door's open", 1, true) ~= nil and string.find(greeter.hello[#greeter.hello], "clock", 1, true) ~= nil)
+end
+for _, chapter in chapters do
+	if chapter.greeter and chapter.soon then
+		check(`{chapter.id}: a greeter only on a playable chapter`, false)
+	end
+end
+checkText("the soldier's welcome at the Wall fits its bubble", MoveStory.Wall.welcome, L.Bubble)
+check("…and it says where to unload", string.find(MoveStory.Wall.welcome, "safe zone", 1, true) ~= nil and string.find(MoveStory.Wall.welcome, "Unload", 1, true) ~= nil)
+check("Marge's kiosk lines: two or more, the first the owner's", #MoveStory.Kiosk >= 2 and MoveStory.Kiosk[1] == "New contract, sweetie?")
+for index, text in MoveStory.Kiosk do
+	checkText(`the kiosk line {index} fits its bubble`, text, L.Bubble)
+end
+check("the kiosk lines in turn, round the list", MoveStory.kioskLine(1) == MoveStory.Kiosk[1] and MoveStory.kioskLine(2) == MoveStory.Kiosk[2]
+	and MoveStory.kioskLine(#MoveStory.Kiosk + 1) == MoveStory.Kiosk[1] and MoveStory.kioskLine(0) == MoveStory.Kiosk[1])
 
 -- The seen flags (the save, the attribute) ----------------------------------------------------------------------------
 

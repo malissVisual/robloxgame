@@ -24,10 +24,10 @@
 -- (MovingHud.closeAll, Main's Hud.onCloseWindows); the move's end clears only the GPS it set.
 --   MovingHud.start(), isOpen(), active(), closeAll(), panel()
 -- 7.0 planning (shared/MoveRoles.luau; the lobby is client/MoveLobbyUi.luau): the panel's last line is your role and
--- what only it does; what to do next knows the locked door and the dark house; the list (Tab) starts with YOUR ROLE:
--- its ability (the Driver's CALL TRUCK TO DOOR, the Guard's BARRICADE; the Moving remote's "call" / "barricade") and
--- SWITCH to a free role (the remote's "role", every Config.MoveRoles.Switch s). The prompts: "Enter house" is each
--- move's own (the server shuts it while the door is locked), a prompt for one role (MoveQuick: the
+-- what only it does (the three roles: the front door is never locked, the house lit from the start); the list (O)
+-- starts with YOUR ROLE: its ability (the Driver's CALL TRUCK TO DOOR, the Guard's BARRICADE; the Moving remote's
+-- "call" / "barricade") and SWITCH to a free role (the remote's "role", every Config.MoveRoles.Switch s). The prompts:
+-- "Enter house" is each move's own, a prompt for one role (MoveQuick: the
 -- truck's Load / Unload for the Driver) holds no time for it; a Guard sees the zombies through walls
 -- (client/EnemyOutline.luau setXray). The contract card's START opens the planning.
 -- (the list's YOUR ROLE comes first; its countdown "SWITCH ROLE IN n S" is kept up to date every second)
@@ -130,7 +130,7 @@ local STATE_TEXT: { [string]: string } = { home = "IN THE HOUSE", carried = "CAR
 -- ── The prompts of your move only ──────────────────────────────────────────
 
 local function shows(prompt: ProximityPrompt): boolean
-	-- (7.0 review: "Enter house" is each move's own and the server shuts it while the door is locked: no MoveDoor here)
+	-- (7.0 review: "Enter house" is each move's own: its MoveOwner)
 	local only = prompt:GetAttribute("MoveOnly")
 	if type(only) == "number" then
 		return only == player.UserId
@@ -323,10 +323,6 @@ local function nextStep(s: any): string
 	if s.horde == true then
 		return if out > 0 then "🧟 THE HORDE! Drive the truck to the Wall NOW" else "🧟 THE HORDE! Load something and get out"
 	end
-	local team = if type(s.team) == "table" then s.team else {} -- 7.0 planning: the dark house
-	if s.inside == true and team.fuse == true and team.lit ~= true and carried == 0 then
-		return if team.role == "tech" then "💡 Dark: fix the fuse box in the garage (hold E)" else "💡 Dark: the Technician fixes the fuse box (garage)"
-	end
 	if s.inside == true then
 		return if carried > 0 then "Carry it out: \"Leave house\" by the front door" else "Pick up the things (E) · ★ first"
 	end
@@ -338,9 +334,6 @@ local function nextStep(s: any): string
 	end
 	if seated() then
 		return if out > 0 then "Drive to the Wall (GPS), or back for more" else `Drive to {s.name} (GPS)`
-	end
-	if team.locked == true then -- 7.0 planning: the front door is locked
-		return if team.role == "tech" then "🔒 Pick the front door's lock (hold E): quiet" else "🔒 Locked: the Technician picks it, or kick it in (LOUD)"
 	end
 	return `"Enter house" at {s.name}'s front door`
 end
@@ -522,7 +515,7 @@ local function roleCard(parent: Instance, s: any, finger: number)
 			if other then
 				CardKit.chip(strip, {
 					name = `Switch_{id}`,
-					text = `{other.icon} {if id == "tech" then "TECH" else string.upper(other.name)}`,
+					text = `{other.icon} {string.upper(other.name)}`,
 					order = index,
 					stroke = K.rule,
 					onClick = function()

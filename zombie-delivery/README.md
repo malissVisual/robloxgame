@@ -1149,6 +1149,84 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The Alps, step 1 (7.1)
+
+The owner: the map becomes a smaller Austrian valley, step by step, a summer valley under snowy peaks; "keep everything,
+only the Japanese part goes … Austria, mountains, and lovely little houses where the players live, a little village".
+Step 1A changes looks only: every address, home, door, venue, road, job, mission and move stays where it was.
+
+- **The Japanese part is gone.** The Lantern Garden (`server/LanternGarden.luau`: the cherry trees, the koi pond, the
+  waterfall, the stone lanterns, the tea pavilion, the raked gravel) and the torii and paper lanterns on the footbridge.
+- **The Hauptplatz** (`Map.Square`, `server/Hauptplatz.luau`) stands on block (0, −1), north of the Central Park, in the
+  safe zone. It is on the map's list as **Hauptplatz** ⛲, with GPS and a HAUPTPLATZ · SAFE ZONE location tag. It has:
+  - cobbles with granite bands, a stone fountain under a column with a gilded figure;
+  - a red and white maypole with its wreath, ribbons, guild boards and fir crown;
+  - the **Gasthof Edelweiss** on the north side: white render, green shutters, geraniums, an arched door between two
+    lamps, a steep shingle roof, café tables under umbrellas in front of it;
+  - wooden benches, gas-style street lamps, long geranium planters, linden trees and a board by every sidewalk.
+  - About 200 parts and four lights (the garden had about 430 parts and five lights).
+- **The footbridge** over Bone St keeps its walkway, ramps and clearance. It is an alpine timber bridge now: larch
+  railings with wooden caps, iron lanterns, and a roofed timber portal at each end of the span. Its square-side ramp
+  comes down over a green strip with its planted bed.
+- **The Suburbs houses are chalets** (`shared/ChaletLooks.luau`, `server/Chalets.luau`; all 44 of `Map.Homes`):
+  - the same box, door (Cargo still swings it), path, mailbox and number as before;
+  - a white or pastel render, a stone plinth and dark timber (or silver shingles) upstairs;
+  - shutters and geranium boxes, a steep gable to the street with wide eaves and purlin ends;
+  - a carved balcony with a geranium box in the gable, stacked firewood and a low wooden front fence.
+  - Three looks from the lot's own dice (tyrol, salzburg with painted corners, bregenz with a carved sun). The world's
+    dice are rolled as before, so nothing else in the city moves.
+  - Nothing stands on the path to the kerb or in the door's swing, and the chalets stay clear of a moving day's dress.
+- **The four houses for sale** on the Suburbs lots (Maple, Oak, Elm, Birch) wear a chalet's render and shingles with a
+  timber band, shutters, geraniums and firewood. 12 Maple Street gets a timber upper floor and a balcony.
+- **Parts:** the whole city goes from 22,851 to 24,385 parts (+6.7 %, `tools/perf/world_count.py`). The Suburbs piece
+  goes from 1,127 to 2,875 parts; a chalet has at most 48 parts (`ChaletLooks.Budget` 50).
+- **Tests:**
+  - `tests/square_test.luau` (6.12.15's garden_test) holds every footbridge check, plus the square: tiled by cobbles
+    and the green strip, everything on its cobbles and apart, a way in from every sidewalk, nothing Japanese.
+  - `tests/chalet_test.luau` checks every house's box, door, windows and path, its lot, the moving day's dress and
+    the budget.
+- Street names stay for now (step 3 renames them).
+## The Alps: mountains and forests (7.1)
+
+The owner: "make the map a smaller alpine valley, step by step". Step 1B puts the valley round the city; **nothing you
+play on moves** (the roads, addresses, places, lots and zones keep their coordinates). The layout is pure numbers in
+`shared/AlpineLayout.luau` (tuning in `Config.Alpine`), `server/Alpine.luau` builds it once (one piece of `World.build`,
+after everything else).
+
+- **A ring of snowy mountains** just outside the world's walls (`Config.Alpine.Box`, today `Map.Bounds`; step 2 pulls
+  the box in and the ring follows). Terrain only (`Terrain:FillCylinder` layers): a front row of foothills (250–420
+  studs) whose feet stand 40 studs out, a row of big peaks (480–700) behind them with lower shoulders. Every peak leans
+  a little (a steep face one side, a long ridge the other) and its layers are a little rough (crags); grass at the foot,
+  rock above (Rock or Limestone, bands of the other), snow over 300–360; glacier tongues on a few tall peaks, scree at
+  the foothills' feet; north-west of the river (the winter) everything snowy with rock bands. The crest between two
+  neighbours never drops under 70 studs: no gap to drive or swim through. The river leaves through a gorge north and
+  south, each closed by a big peak (a waterfall where it comes out in the north); the old sea is an **alpine lake**
+  whose far shore rises out of the water.
+- **The West Pass:** the West Highway past the Old Farm runs on to a tunnel in a cliff, closed with a steel shutter, and
+  a **ROAD CLOSED — EVACUATION ZONE** barrier right at the world's wall. No other road reaches the edge (they all end
+  at their yards); the Mount Rot tunnel is untouched.
+- **Far mountains with streaming on:** a client only gets the terrain near it, so every big peak also has a
+  *silhouette*, a square pyramid of corner wedges (with a snow cap) inside it, in a Persistent model. Far away you see
+  the silhouettes; up close they hide in the terrain.
+- **Forests:** up to 2,500 spruce and fir (a trunk that collides and three ellipsoid tiers that do not, three greens,
+  snowy tops in the winter, 34–66 studs tall), in patches: denser toward the mountains and up their lower slopes (a
+  quarter of them), thinner near town (a few copses), meadows left open with **wildflowers** (36 patches) and **4 hay
+  barns and huts**. Never on a road (nor over it), within 60 studs of a junction or a road's bend (the drivers' view),
+  in a district, on a lot, a home, a storefront, a yard, a place, the water, the ice or the ski lift's line. Every tree
+  lands on what a ray finds under it and is left out if something already stands there. One Atomic model per 256-stud
+  square (a coarse far look), shadows only near the roads.
+- **The valley's look:** the open ground lush grass, the terrain's colours alpine (`Config.Alpine.Colors`); the day
+  looks (`Config.Atmosphere`: morning, noon, afternoon) a crisp blue air that hazes the far ring, fewer and brighter
+  clouds. The night, the dawn, the dusk and the Blood Moon as before.
+- **Budgets:** 133 terrain cones in 7,251 fills (10.2 billion studs³ counted with the overlaps; the budget is 12), 112
+  silhouettes, about 10,900 parts in all (budget 11,500); in Studio the build log prints `[Alpine] …` with the time
+  it took. Checks: `tests/alpine_test.luau` (the ring holds the box by car and swimming, nothing in the box, the
+  silhouettes inside, the pass, every tree rule, the budgets, a tighter box for step 2). Preview without Roblox:
+  `tools/alpine-preview/render.py` (a top-down map and a 3/4 three.js view).
+- **Test in Studio:** Play, fly (admin) to the map's edges: the walls stand in front of the mountains; the West Pass
+  past the Old Farm; the north gorge's waterfall; the forests along the West Highway; noon and dusk (the haze); with
+  streaming on, the far silhouettes from Downtown.
+
 ## MOVES: the moving rework, prototype (7.0)
 
 The owner's rework (`design/rework/NAVRH.md`, the story in `design/rework/PRIBEH.md`): the game turns into **moving**.
@@ -1166,11 +1244,12 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Code: `shared/MoveStory.luau`, `client/MoveStoryUi.luau`.
 
 **Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and the Moving Truck.
-- Everyone picks one of four roles and LAUNCH starts once all are READY (solo at once):
+- Everyone picks one of three roles (three cards side by side) and LAUNCH starts once all are READY (solo at once):
   - 🚚 **Driver:** no wait at the truck's back, less truck damage at the wheel, "Call truck to door" once.
   - 💪 **Mover:** lifts a two-person piece alone, carries 15% faster, no slowdown on slopes.
   - 🛡️ **Guard:** +50% damage, two plank barricades, sees zombies through walls.
-  - 🔧 **Technician:** picks the locked front door quietly (anyone else kicks it in and the noise brings zombies), and fixes the garage fuse box so the lights come back.
+- One role each while there are three players or fewer; a fourth player may double one.
+- The owner took the Technician out: the front door is never locked and the house is lit from the start.
 - Solo players switch roles from the item list (O or a tap on the panel, every 30 s).
 - Hold **T** (💬 on phones) for quick chat: six lines your crew sees as a bubble and a line in the move panel.
 
@@ -1178,6 +1257,12 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - The Moving Truck is lent next to you. Drive to 155 Willow Ln (GPS).
 - At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
 - Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
+- **The grip** (like Fisch's reeling): while you carry a 🙌 or 👥 piece, or a fragile ✋ one (gentler), a bar shows right of the middle.
+  - The piece (its icon) darts up and down: wilder when heavy or fragile, when you walk fast, turn, go up or down, jump or get bitten; calmer standing still.
+  - Hold the left mouse button or F (gamepad R2; on a phone the round HOLD button over FIRE) and the grip box rises; let go and it falls (momentum, a little bounce).
+  - The piece inside the box fills the meter (full: STEADY, +10% walk), outside drains it (standing still never under a third). SLIPPING! warns; at 0 it slips: dropped, with damage (fragile more), and a shaky carry wears it a little.
+  - Two carriers each have their own bar (either slip drops it); a Mover's box is 35% bigger, a Mover lifting a 👥 piece alone gets a harder bar; a heavy lift starts at 60%; Danny never slips.
+  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, Moving's grip hook and grip block (the Moving remote's "slip" and "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau`.
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
 - At 3:00 left a horde comes to the house.
@@ -1187,6 +1272,14 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - He takes the other end of a two-person piece and carries the small ones out on his own, ★ first.
 - He runs from zombies and is back at the truck 15 s after he goes down.
 - Orders: HELP ME, SMALL STUFF, WAIT AT TRUCK; the quick chat "Need a hand here" calls him too.
+
+**The greeters** (`server/MoveGreeters.luau`, the words in `shared/MoveStory.luau`, `Config.MoveGreeters`): people who welcome you.
+- **Marge on her porch.** She stands beside the front door of 155 Willow Ln from the move's start, off the path.
+  - When the first crew member comes within 25 studs, she turns, waves and says her hello in a speech bubble: "Oh thank heavens, ZDC!", then points you to the open door.
+  - She reacts during the move: a ★ piece carried past her ("Careful with that!"), the horde ("They're coming! Hurry!"), and the loaded truck driving off ("Thank you… see you behind the Wall.", also as a notice to the crew).
+  - Zombies ignore her. She leaves when the move ends.
+- **The soldier at the Wall.** Private Reyes stands by the checkpoint's booth. When a truck is delivered, he waves: "Welcome to the safe zone. Unload over there."
+- **Marge at the Moving contracts kiosk.** This is the tutorial's Marge by the job board, not a second one. When you walk up to the kiosk on foot and not on a move, she turns to you and says "New contract, sweetie?" (a bubble and a notice). She greets each player once every 3 minutes.
 
 **The world** (`server/MoveSites.luau`, `shared/MoveSiteLooks.luau`):
 - the Wall's evacuation checkpoint at the depot is the drop-off;
@@ -1198,7 +1291,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 **Tests:**
 - the rules: `moving_test`, `moveroles_test`, `movehelper_test`, `movestory_test`;
 - the art: `furniture_test`, `houselayout_test`, `houseinterior_test`, `movesites_test`;
-- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`;
+- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`, `movegreeters_runtime_test`;
 - an end-to-end move with the real house art: `moving_art_runtime_test`.
 
 ## Cars spawn clear and stand back up (6.26)
@@ -1911,6 +2004,8 @@ Roblox's AnalyticsService; it is off in Studio, where events are only counted. T
 
 ## The footbridge wider, curved and clear to walk (6.12.16)
 
+7.1: the torii are roofed timber portals now, and the checks are in `tests/square_test.luau` (see **The Alps, step 1**).
+
 The owner, on the bridge in Studio: "good for walking, only I walk through this [a timber]; make it wider for two
 people, and don't be afraid to make it curve".
 
@@ -1931,6 +2026,8 @@ people, and don't be afraid to make it curve".
   - that the ground under every low part is closed.
 
 ## The Lantern Garden and a wooden footbridge (6.12.15)
+
+7.1: the garden is gone. The Hauptplatz stands on its block (see **The Alps, step 1**).
 
 The owner: "a bit bigger park, a wooden bridge to another park, its own style".
 

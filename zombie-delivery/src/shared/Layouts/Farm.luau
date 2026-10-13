@@ -348,6 +348,7 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "coat_rack", how = "corner", must = true },
 		{ item = "milk_churn", how = "corner", odds = 1.5 },
 		{ item = "shoe_cabinet", how = "wall" },
+		{ item = "ski_bundle", how = "corner", odds = 2 }, -- (7.x alpine pieces: the old wooden skis)
 	},
 	stube = {
 		-- the bench along a wall and the table in front of it (the alpine Stube's corner), the chairs across
@@ -360,6 +361,8 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "armchair", how = "wall", odds = 1.5 },
 		{ item = "radio", how = "wall" },
 		{ item = "painting", how = "wall" },
+		{ item = "heart_chair", how = "wall", odds = 2 }, -- (7.x alpine pieces: the carved chair, the crate of steins)
+		{ item = "stein_crate", how = "corner", odds = 1.5 },
 	},
 	kitchen = {
 		{ item = "butter_churn", how = "corner", must = true },
@@ -374,6 +377,7 @@ local RECIPES: { [string]: { Entry } } = {
 		{ item = "wardrobe", how = "wall", must = true },
 		{ item = "dresser", how = "wall", odds = 1.5 },
 		{ item = "mirror", how = "corner" },
+		{ item = "painted_cupboard", how = "wall", odds = 2 }, -- (7.x alpine pieces: the painted farmhouse cupboard)
 	},
 	pantry = {
 		{ item = "cheese_crate", how = "wall", must = true },

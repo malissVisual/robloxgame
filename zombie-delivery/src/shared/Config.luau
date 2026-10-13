@@ -2445,32 +2445,33 @@ Config.Atmosphere = {
 			air = { 214, 152, 114 }, decay = { 150, 98, 82 }, density = 0.33, offset = 0.08, glare = 1.6, haze = 1.8,
 			clouds = { 255, 208, 172 }, blur = 1, dust = 1,
 		},
-		-- Morning: fresh and clear, a touch warm.
+		-- Morning: fresh and clear. 7.1, the Alps: a cool, crisp blue air (the far mountains fade blue), lush colours.
 		morning = {
-			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 104, 106, 114 },
+			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 106, 110, 120 },
 			top = { 36, 26, 12 }, bottom = { 10, 10, 10 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 246, 245, 236 }, saturation = -0.06, contrast = 0.12, lift = 0,
+			tint = { 246, 248, 248 }, saturation = -0.01, contrast = 0.12, lift = 0,
 			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 168, 180, 184 }, decay = { 102, 112, 118 }, density = 0.3, offset = 0.15, glare = 0.5, haze = 1.5,
+			air = { 182, 202, 226 }, decay = { 116, 138, 172 }, density = 0.26, offset = 0.15, glare = 0.5, haze = 1.25,
 			clouds = { 255, 255, 255 }, blur = 0.8, dust = 0.7,
 		},
-		-- Noon: clean and crisp, truer colours (a little grit left), sharp shadows, the least haze.
+		-- Noon: clean and crisp, true colours, sharp shadows, the least haze. 7.1: the alpine noon: a clear blue air,
+		-- lush, a touch cool.
 		noon = {
-			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 104, 104, 112 },
+			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 106, 110, 120 },
 			top = { 14, 12, 6 }, bottom = { 8, 8, 8 }, diffuse = 0.6, specular = 0.7, soft = 0.2,
-			tint = { 250, 250, 244 }, saturation = -0.08, contrast = 0.14, lift = 0,
+			tint = { 247, 251, 255 }, saturation = 0.02, contrast = 0.14, lift = 0,
 			bloom = 0.3, bloomSize = 20, threshold = 1.5, rays = 0.03,
-			air = { 166, 178, 176 }, decay = { 104, 114, 116 }, density = 0.28, offset = 0.15, glare = 0.2, haze = 1.3,
+			air = { 178, 200, 228 }, decay = { 118, 142, 178 }, density = 0.24, offset = 0.15, glare = 0.2, haze = 1,
 			clouds = { 255, 255, 255 }, blur = 0.7, dust = 0.5,
 		},
-		-- Afternoon: warming up.
+		-- Afternoon: warming up (7.1: still the clear alpine air, a little warmer).
 		afternoon = {
-			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 104, 106 },
+			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 106, 110 },
 			top = { 50, 34, 14 }, bottom = { 12, 10, 8 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 252, 242, 224 }, saturation = -0.04, contrast = 0.13, lift = 0,
+			tint = { 252, 246, 234 }, saturation = 0.02, contrast = 0.13, lift = 0,
 			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 182, 170, 150 }, decay = { 116, 104, 90 }, density = 0.3, offset = 0.12, glare = 0.6, haze = 1.5,
-			clouds = { 255, 246, 232 }, blur = 0.8, dust = 0.7,
+			air = { 196, 204, 214 }, decay = { 128, 136, 150 }, density = 0.26, offset = 0.12, glare = 0.6, haze = 1.25,
+			clouds = { 255, 250, 242 }, blur = 0.8, dust = 0.7,
 		},
 		-- Sunset, the golden hour: the warmest look, an orange haze and the sun's glare, rays and dust in the light.
 		golden = {
@@ -2517,8 +2518,8 @@ Config.Atmosphere = {
 	},
 	-- Roblox's moving clouds (Terrain.Clouds, made on every client): Cover and Density in clear weather, in the rain and
 	-- in a fog (blended with the weather); their colour is the look's. Lite: on a phone or a tablet too (false: none
-	-- there, unless the place has its own).
-	Clouds = { Cover = 0.5, Density = 0.55, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
+	-- there, unless the place has its own). 7.1: fewer, brighter fair-weather clouds over the Alps.
+	Clouds = { Cover = 0.42, Density = 0.45, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
 	-- The soft blur far away (a DepthOfFieldEffect): sharp out to Focus + Radius studs, beyond that Far × the look's blur
 	-- (half of it in the rain or the fog: the air blurs already). Never on a phone or a tablet, below graphics quality
 	-- Quality (1 … 10), or while you aim (it fades out over Fade seconds).
@@ -2530,6 +2531,121 @@ Config.Atmosphere = {
 	-- A soft haze around the street lamps at night: the Count nearest lamps that shine (the 6.13.1 light budget) within
 	-- Range of the camera get a faint glow Size studs across (a phone or a tablet: Lite of them).
 	Halo = { Count = 12, Lite = 0, Range = 160, Size = 7, Transparency = 0.9 },
+}
+
+-- 7.1, the Alps (the owner: "make the map a smaller alpine valley, step by step"; step 1B: mountains and forests, nothing
+-- you play on moves): shared/AlpineLayout.luau lays it out as plain numbers (tests/alpine_test.luau checks it),
+-- server/Alpine.luau builds it once from World.build (tools/alpine-preview draws it).
+--   Box          the ring of mountains stands round this box (Map.Bounds today: the world's walls); step 2 pulls it in
+--   Gap          studs from the box to the front row's foot (the mountains never reach into the box)
+--   Layer        a mountain is a stack of terrain cylinders this many studs thick (a cone: its radius at height y is
+--                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit)
+--   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed
+--   Front / Back the two rows: Height (summits, studs), Spread (the base's radius = the height × this), Profile; the back
+--                row's feet Behind studs behind the front row's, each back peak with up to two lower Shoulders (chance)
+--   Lean         a peak leans one way (a steep face on that side, a long ridge on the other): each layer's middle moves
+--                this share (a range) of what its radius shrinks, so every layer stays inside the one under it
+--   Spacing      two cones next to each other stand at most this × the sum of their radii at Seal height apart, so the
+--                ring's crest between them never drops under Seal (studs): no gap a car could drive through
+--   Gorge        the river leaves the valley through a gorge this deep (studs past Gap); a back peak closes it
+--   Green / Snow the slopes are grass up to Green (a height between the two; the forests climb it), rock above, snow
+--                over Snow (summer); north of Map.WinterZ, west of the river, the mountains are all snow with rock bands
+--   Strata       this share of a peak's rock layers is the other stone (a peak is Rock or Limestone): bands at random
+--                heights; Rough: each layer's radius ± half this share (the flanks' crags; still inside the one under it)
+--   Glaciers     tongues of glacier ice down the inner flanks of the tallest summer peaks: Width at the top and at the
+--                snout, Thick studs (Protrude of it out of the slope)
+--   Scree        light stone fans at the front row's foot: Count a peak (summer), Radius
+--   Silhouettes  a far look of every peak of MinHeight or more (Persistent parts inside the terrain: with streaming the
+--                terrain far away is not sent, these are): a square pyramid Lower × the summit high, Margin studs inside
+--                the slopes everywhere, its snow cap from the peak's snow line
+--   Portals      where a road would leave the valley: the mountains open into a cliff with a tunnel mouth (Depth deep,
+--                Height high, the rock over it Cliff high) and a ROAD CLOSED barrier at the box's edge; the road runs
+--                there along x from `from` (a yard's edge) at z (the West Highway past the Old Farm)
+--   Waterfall    a waterfall where the river comes out of the north gorge
+--   Colors       the terrain's material colours (Terrain:SetMaterialColor), Valley the open ground's colour and material
+--   Budget       Volume: studs³ the fills may hold at most (overlaps counted twice); Fills: terrain calls; Parts: the
+--                parts of it all (the trees, the flowers, the huts, the silhouettes, the portal, the waterfall)
+--   Trees        the forests: at most Max trees of Parts parts (a trunk and three tiers: spruce and fir), on a grid
+--                Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the Treeline), Height (studs);
+--                never within RoadClear of a road's edge (nor its canopy over it), JunctionClear of a road's end or bend
+--                (the drivers' view at the junctions), TownClear of a district's edge roads, YardClear of a yard,
+--                LotClear of a home's lot, PlaceClear of a place, WaterClear of the water, nor in Keep (the ski lift);
+--                thinner near town (TownFade studs; Copses of the valley's trees stand there in small copses), denser
+--                within Edge of the box's edge; Noise: the forests' and the
+--                meadows' patch sizes; ShadowNear: only trees this close to a road throw shadows; Chunk: one Atomic
+--                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter tops
+--   Meadows      open meadows with wildflowers: Patches of Flowers small parts, Gap apart, Road studs from a road's edge
+--   Huts         Count wooden hay barns and huts in the meadows, Gap apart, Road studs from a road's edge
+Config.Alpine = {
+	Box = { x0 = -2150, z0 = -2950, x1 = 1900, z1 = 1500 },
+	Gap = 40,
+	Seed = 4711,
+	Layer = 8,
+	Floor = -10,
+	WetFloor = -30,
+	Front = { Height = { 250, 420 } :: { number }, Spread = { 1.0, 1.25 } :: { number }, Profile = 1.3 },
+	Back = { Height = { 480, 700 } :: { number }, Spread = { 0.85, 1.05 } :: { number }, Profile = 1.5, Behind = 170, Shoulders = 0.6 },
+	Lean = { 0.1, 0.5 } :: { number },
+	Spacing = 0.8,
+	Seal = 70,
+	Gorge = 170,
+	Green = { 110, 160 } :: { number },
+	Snow = { 300, 360 } :: { number },
+	Strata = 0.12,
+	Rough = 0.1,
+	Glaciers = { Count = 7, Width = { 110, 46 } :: { number }, Thick = 14, Protrude = 3 },
+	Scree = { Count = 2, Radius = { 20, 34 } :: { number } },
+	Silhouettes = { MinHeight = 300, Lower = 0.86, Margin = 6 },
+	Portals = {
+		{ id = "westpass", name = "WEST PASS", x = -2150, z = 520, nx = -1, nz = 0, from = -2030, width = 40 },
+	} :: { { id: string, name: string, x: number, z: number, nx: number, nz: number, from: number, width: number } },
+	Portal = { Depth = 36, Height = 26, Cliff = 60, Text = "ROAD CLOSED — EVACUATION ZONE" },
+	Waterfall = true,
+	Colors = {
+		Grass = { 92, 134, 58 },
+		LeafyGrass = { 84, 124, 54 },
+		Ground = { 112, 98, 74 },
+		Rock = { 120, 118, 114 },
+		Limestone = { 158, 154, 146 },
+		Snow = { 240, 244, 248 },
+		Glacier = { 176, 214, 232 },
+	} :: { [string]: { number } },
+	Valley = { Color = { 96, 138, 60 } :: { number }, Material = "Grass" },
+	Budget = { Volume = 1.2e10, Fills = 9000, Parts = 11500 },
+	Trees = {
+		Max = 2500,
+		Parts = 4,
+		Spacing = 25,
+		Jitter = 7,
+		Slope = 0.25,
+		Copses = 0.12,
+		Height = { 34, 66 } :: { number },
+		Treeline = { 130, 180 } :: { number },
+		RoadClear = 20,
+		JunctionClear = 60,
+		TownClear = 50,
+		TownFade = 700,
+		Edge = 700,
+		YardClear = 30,
+		LotClear = 16,
+		PlaceClear = 55,
+		WaterClear = 14,
+		Keep = { { x0 = -1140, z0 = -2270, x1 = -790, z1 = -2180 } } :: { { x0: number, z0: number, x1: number, z1: number } },
+		Noise = { Big = 420, Small = 140 },
+		ShadowNear = 110,
+		Chunk = 256,
+		Colors = { { 34, 58, 40 }, { 44, 72, 46 }, { 58, 86, 50 } } :: { { number } },
+		Trunk = { 86, 62, 44 } :: { number },
+		Snowy = { 236, 240, 244 } :: { number },
+	},
+	Meadows = {
+		Patches = 36,
+		Flowers = 8,
+		Gap = 160,
+		Road = { 24, 150 } :: { number },
+		Colors = { { 245, 245, 238 }, { 250, 208, 60 }, { 170, 110, 210 }, { 222, 64, 72 }, { 92, 140, 230 } } :: { { number } },
+	},
+	Huts = { Count = 4, Gap = 600, Road = { 34, 110 } :: { number } },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
@@ -3345,6 +3461,35 @@ Config.Soundscape = {
 	FountainHeight = 4, -- studs over the walk (the basin and the jet)
 	-- The UI stings (client/Sounds.luau play: "task_done", "purchase", "event_start", "event_end").
 	PurchaseVolume = 0.75, -- money that went down outside a job (a purchase; up: the old cash sound)
+	-- 7.1, the move's sounds (art/audio/sfx4.ogg): client/MoveSounds.luau hears them from the move's state, its result
+	-- and your MoveCarry (shared/SoundPlan.luau moveCues, carryCue, dragged, resultCue). Volumes 0 … 1.
+	Move = {
+		StartWithin = 20, -- a move's first state plays move_start only this many seconds into it (not on a rejoin)
+		Start = 0.7, -- move_start
+		Siren = 0.6, -- the horde's air-raid siren, far off
+		Ramp = 0.75, -- the truck's back opening …
+		RampShut = 0.88, -- … and shutting (this pitch)
+		Door = 0.6, -- the house's front door: going in …
+		DoorOut = 1.08, -- … and out (this pitch)
+		Load = 0.8, -- a piece you carried into the truck …
+		LoadCrew = 0.35, -- … a crew mate's
+		Break = 0.85, -- a piece of yours broken (glass_break if fragile, else heavy_drop) …
+		BreakCrew = 0.45, -- … a crew mate's
+		Jolt = 0.12, -- a piece in your hands losing this share of its condition at once (a fall, a hard knock) …
+		JoltVolume = 0.6, -- … thuds (heavy_drop)
+		Pickup = 0.7, -- furniture_pickup
+		PutDown = 0.7, -- furniture_putdown
+		Box = 0.6, -- a box picked up / put down (cardboard_box)
+		PutDownWait = 0.6, -- your hands empty: the move's next state says where it went (into the truck: truck_load, else
+		-- the put-down), at most this many seconds later (the server sends it 0.25 – 0.45 s after a change)
+		Gate = 0.7, -- the Wall's gate opening as the move is delivered (the result card plays its jingle)
+		Slip = 0.8, -- a heavy piece slipping from your hands (MoveSounds.slipped, for the grip's UI) …
+		SlipQuiet = 1.5, -- … and no put-down for this many seconds after (grip_slip has its thud)
+		Scrape = 0.5, -- a two-person piece dragged alone (wood_scrape_loop), while you move faster than …
+		ScrapeFrom = 1.2, -- … studs a second
+		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick
+		Tick = 0.1, -- seconds between the looks at the drag
+	},
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
@@ -5759,6 +5904,62 @@ Config.ItemModel = {
 	Shut = 0.35,
 }
 
+-- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
+-- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): shared/
+-- CarryGrip.luau runs the bar (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows it and reads the presses,
+-- server/Moving.luau's grip block (the character attribute CarryGrip; the Moving remote's "slip" and "grip") drops a
+-- thing that slipped and wears one that shook. The bar runs from 0 (its bottom) to 1 (its top).
+--   Kinds      the carries with a bar (a one-hand thing that is not fragile has none): Zone, the grip box's share of
+--              the bar; Load, the load's own wildness; Gravity, × the box's fall. "hand": a fragile one-hand thing
+--              (gentler); "both"; "pair": two carry it (each their own bar; either slips: it drops); "solo": a Mover
+--              lifts a pair thing alone (harder); "drag": a pair thing dragged alone, low (calmer)
+--   Mover      × the zone for a Mover (every kind)
+--   Weight     + the load's wildness a weight point (1 … 10); Fragile: + when fragile
+--   Motion     × the wildness: Still standing still (under StillAt studs/s); + Speed × your speed / the walk (at most
+--              SpeedMax × it); + Turn turning at TurnFull rad/s or more; + Slope going up or down at SlopeFull studs/s
+--              or more; + Air in the air (a jump); + a bite's jolt (Bite at BiteFull hp or more, ShockMax at most, Fade
+--              a second off it)
+--   Grip       the box: Lift (/s² up while held), Gravity (/s² down when let go), Rise / Fall (the fastest, /s), Bounce
+--              (× its speed back up off the bottom when it hits faster than BounceMin)
+--   Marker     the load (the thing's icon): a new aim every Dart[1] s (wild, at WildAt) … Dart[2] s (calm), up to Reach
+--              × (Base + the wildness) away; pulled to it by Spring × (Base + the wildness), Damp a second, Jitter ×
+--              the wildness; never nearer the ends than Edge
+--   Meter      Fill a second inside the box, Drain outside; standing still it drains no lower than Floor; Start at the
+--              lift (HeavyStart from HeavyAt weight on: the first seconds matter); full: steady (× SteadySpeed on the
+--              carry's walk, the server's at most) until it is under SteadyOff; SLIPPING! at Warn or under; 0: it slips
+--   Step       the longest step the bar takes at once (a slow frame takes several); MaxDt: the most time one frame counts
+--   Report     s between the client's ("grip", spot, quality, steady) reports (quality: the share of the time outside)
+--   Server     Wear: the condition a second fully outside the box (× WearFragile when fragile), WearCap a second at most;
+--              Gap: the most s one report counts; Every: the least s between two reports that count; SteadyOutside: a
+--              report this much outside or less may be steady; Slip: the condition a slip takes (× Moving.Damage.Fragile
+--              when fragile)
+--   Ui         Tutorial: the carries with the "Hold to keep it steady!" tip (the key's hint on the first one only);
+--              Shake: px at SLIPPING! (ReducedShake with Reduced Motion); Hold: the touch HOLD button's side (px, at
+--              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere; the sounds (7.1,
+--              art/audio/sfx4.ogg): grip_tick at Tick's volume each TickNotches-th of the meter it moves, TickEvery s
+--              apart at least, grip_warning at Warning's on each entry into SLIPPING! (the slip: MoveSounds.slipped)
+Config.CarryGrip = {
+	Kinds = {
+		hand = { Zone = 0.36, Load = 0.35, Gravity = 1 },
+		both = { Zone = 0.3, Load = 0.55, Gravity = 1 },
+		pair = { Zone = 0.3, Load = 0.6, Gravity = 1 },
+		solo = { Zone = 0.21, Load = 0.9, Gravity = 1.2 },
+		drag = { Zone = 0.34, Load = 0.4, Gravity = 1 },
+	} :: { [string]: { Zone: number, Load: number, Gravity: number } },
+	Mover = 1.35,
+	Weight = 0.04,
+	Fragile = 0.2,
+	Motion = { StillAt = 1.5, Still = 0.3, Speed = 0.7, SpeedMax = 2, Turn = 0.35, TurnFull = 3, Slope = 0.4, SlopeFull = 6, Air = 0.8, Bite = 1.2, BiteFull = 20, ShockMax = 2, Fade = 1 },
+	Grip = { Lift = 4, Gravity = 3.2, Rise = 1.6, Fall = 2, Bounce = 0.35, BounceMin = 0.12 },
+	Marker = { Dart = { 0.5, 1.6 } :: { number }, WildAt = 1.4, Reach = 0.38, Base = 0.3, Spring = 3.5, Damp = 2.6, Jitter = 0.8, Edge = 0.06 },
+	Meter = { Fill = 0.45, Drain = 0.28, Floor = 0.35, Start = 0.85, HeavyStart = 0.6, HeavyAt = 6, SteadySpeed = 1.1, SteadyOff = 0.85, Warn = 0.3 },
+	Step = 1 / 60,
+	MaxDt = 0.25,
+	Report = 1,
+	Server = { Wear = 0.008, WearFragile = 1.5, WearCap = 0.015, Gap = 1.5, Every = 0.7, SteadyOutside = 0.1, Slip = 0.06 },
+	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55, Tick = 0.5, TickEvery = 0.08, TickNotches = 50, Warning = 0.7 },
+}
+
 -- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside
 -- it): server/Moving.luau runs a move, shared/MovingRules.luau has its rules (tests/moving_test.luau), client/
 -- MovingHud.luau shows it. The art is shared/FurnitureLooks.luau, shared/HouseLayout.luau and server/HouseInterior.luau.
@@ -5826,8 +6027,9 @@ Config.Moving = {
 	Tick = 0.2,
 }
 
--- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the four roles.
--- shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
+-- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the
+-- owner took the Technician out: no locked front door, no fuse box, the house is lit from the start; the client greets
+-- the crew at the door instead: Config.MoveGreeters). shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
 -- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
 -- show them.
 --   Order             the roles, in the lobby's order (a newcomer gets the first free one)
@@ -5845,18 +6047,14 @@ Config.Moving = {
 --                     Barricades a move, each Hp (Bite hp a second off it for every zombie within Reach) for Life s, put
 --                     up outside within Near of the house's door (off the road, clear of cars and players); XRay: the
 --                     zombies outlined through walls within this (client/EnemyOutline.luau)
---   Tech              the front door is locked (a contract with keys = true: not): Pick s to pick it (quiet), Kick s
---                     for anybody to kick it in (loud: KickZombies come, Near … Far from the door); Fuse s at the fuse
---                     box (the garage) and the interior's lights come on
---   Chat              the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
+--   Chat             the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
 Config.MoveRoles = {
-	Order = { "driver", "mover", "guard", "tech" } :: { string },
+	Order = { "driver", "mover", "guard" } :: { string },
 	Switch = 30,
 	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
 	Driver = { TruckDamage = 0.6, Curb = 5, Near = 25 },
 	Mover = { Alone = 0.6, Carry = 1.15, Climb = 0.75, Rise = 0.35, Hold = 0.8 },
 	Guard = { Damage = 1.5, Range = 150, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 40, XRay = 60 },
-	Tech = { Pick = 3, Kick = 1.2, KickZombies = 4, Near = 40, Far = 90, Fuse = 5 },
 	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
 }
 
@@ -5879,9 +6077,21 @@ Config.MoveRoles = {
 --   Grid               the reachability check's step (every piece must get out of the front door, carried)
 --   Slot               the interiors' places, far off the map (Map.Bounds): Origin { x, y, z }, Spacing along X
 --   Ground             the safety floor under an interior: this far round the house, this deep under its floor
---   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau)
---   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom)
+--   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau; 7.x alpine:
+--                      620, was 600: the chalet's beams, Kachelofen, corner bench and shelf, lace, painted front door,
+--                      antlers and pictures add about 30 parts, the one plank floor, the tiled bathroom walls, the one sink
+--                      run and the handle-less cabinets win back about 16; seeds 1-1000: the busiest 614 (was 599), on
+--                      average 558 (was 539))
+--   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom); 7.x alpine:
+--                      a warmer Color
 --   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
+--   Alpine             7.x, a house's inside as a chalet's (shared/HouseLayout.luau places, server/HouseInterior.luau draws):
+--                      Stove the living room's Kachelofen (along its wall, tall, deep: its bench in front included); Bench
+--                      the kitchen's corner bench (its long leg on the outer wall, its short leg on the back wall, deep,
+--                      tall with its back); Shelf the Herrgottswinkel's corner shelf over it (its legs, its height over the
+--                      floor); Wainscot the wood panelling's height on the walls; Decor the wall decor's bottom over the
+--                      floor (over every piece), Picture and Antlers their size (wide, tall, deep); Beam a ceiling beam's
+--                      thickness, BeamRows the beams across a row of rooms
 Config.Furniture = {
 	MaxParts = 30,
 	Ceiling = 12,
@@ -5906,9 +6116,20 @@ Config.Furniture = {
 	Grid = 0.5,
 	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
 	Ground = { Margin = 24, Depth = 4 },
-	InteriorMaxParts = 600,
-	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 236, 204 } :: { number } },
+	InteriorMaxParts = 620,
+	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 218, 168 } :: { number } },
 	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
+	Alpine = {
+		Stove = { 6, 6.6, 3.2 } :: { number },
+		Bench = { 7, 2.4, 1.6, 3.4 } :: { number },
+		Shelf = { 2.2, 4.9 } :: { number },
+		Wainscot = 3.8,
+		Decor = 7.6,
+		Picture = { 2.6, 2.0, 0.2 } :: { number },
+		Antlers = { 2.6, 2.0, 0.6 } :: { number },
+		Beam = 0.9,
+		BeamRows = 2,
+	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
 	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:
 	--   HouseWidth / HouseDepth   the farmhouse (an even width); Hall: its mud room, a hall straight through it from the
@@ -5971,12 +6192,13 @@ Config.Furniture = {
 -- out from server/Moving.luau's MoveStory hook). The limits keep every text inside its card (movestory_test.luau):
 --   Limits      characters at most: a chapter's Title, Place and Client name, its Hook (the CHAPTERS detail), the
 --               client's Blurb, a story card's Line (the intro, a briefing, the radio's Taunt), a Keepsake's story,
---               Marge's phone Text (the dispatch at START, the debrief at the end) and the result card's Quote (thanks)
+--               Marge's phone Text (the dispatch at START, the debrief at the end), the result card's Quote (thanks)
+--               and a greeter's Bubble (the speech bubbles of server/MoveGreeters.luau: MoveStory's greeter section)
 --   Briefing    a briefing's lines (at least, at most); Intro: Marge's intro cards (at least, at most)
 --   Great       a move done with this many stars or more is "great" (its debrief and thanks), with fewer "ok"
 --   Guard       s after a story card opens before Space / Enter / A turn it (client/DialogKeys.luau)
 Config.MoveStory = {
-	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110 },
+	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110, Bubble = 60 },
 	Briefing = { 3, 5 } :: { number },
 	Intro = { 3, 4 } :: { number },
 	Great = 4,
@@ -6069,6 +6291,40 @@ Config.MoveSites = {
 	Budget = 400,
 	Lights = 4,
 	TextRange = 90,
+}
+
+-- 7.0, the greeters (the owner: "there will be NPCs who sort of welcome you"): server/MoveGreeters.luau's people, their
+-- words shared/MoveStory.luau's greeter section (tests/movegreeters_runtime_test.luau). Studs and seconds.
+--   Porch      where a move's client stands from its start: { x, z } in the house door's frame (shared/MoveSiteLooks.luau
+--              doorPlace: +X right, -Z out to the street): beside the door, off the path (its ±2.4 studs), clear of
+--              the packed boxes and the yard sign
+--   Hello      the first crew member this near her: she turns to them, waves and says her hello lines LineGap s apart,
+--              then holds a hand out to the open door (once a move)
+--   Star       a ★ thing carried this near her: her "Careful with that!" (each ★ thing once, StarAgain s at least apart)
+--   Leave      the truck stood within Near of the house's door, then drove past Far with a load: her thanks (LeaveAgain s
+--              at least apart)
+--   Gap        s at least between two lines of hers (a reaction waits behind her hello)
+--   Soldier    the soldier at the Wall's checkpoint, always there: Name, Title, At { x, z } from the drop-off's middle
+--              (Config.Moving.DropOff: north of the booth's sandbags, off the bay and the people's walk line), facing the
+--              bay; a move delivered with its truck within Greet of the drop-off: he turns to it, waves and welcomes it
+--   Kiosk      Marge at the Moving contracts kiosk (server/Tutorial.luau's dispatcher at the depot: never a second Marge):
+--              a player on foot and on no move who comes within Near of its corkboard: her line, her bubble seen from
+--              Hear studs (she stands by the job board) and the player's notice; once per player every Again s
+--   Tick       s between two steps of the greeters' loop (the kiosk, the soldier's body); Respawn: s between two looks
+--              for a body that went (the soldier's, the dispatcher's)
+Config.MoveGreeters = {
+	Porch = { -4.4, -3.0 } :: { number },
+	Hello = 25,
+	LineGap = 2.6,
+	Star = 30,
+	StarAgain = 20,
+	Leave = { Near = 60, Far = 110 },
+	LeaveAgain = 90,
+	Gap = 2,
+	Soldier = { Name = "Private Reyes", Title = "The Wall · Checkpoint 01", At = { 13.3, -3.4 } :: { number }, Greet = 32 },
+	Kiosk = { Near = 14, Hear = 120, Again = 180 },
+	Tick = 0.4,
+	Respawn = 5,
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

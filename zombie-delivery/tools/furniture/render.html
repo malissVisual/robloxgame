@@ -10,7 +10,8 @@
 // 7.0, the moving prototype: draws export.luau's scenes with three.js (render.mjs drives it). renderItem: one piece
 // at a 3/4 angle from its front right; renderHouse: a house from straight above (a floor plan: the walls cut at
 // CutTop, their cut drawn dark) or a 3/4 cutaway (the ceiling off, the walls cut at CutIso), with its ceiling lights,
-// a stand-in player at the entry for scale. Plain colours on the parts, simple canvas textures on the floors.
+// a stand-in player at the entry for scale; renderInside (7.x alpine): the house at eye level from inside. Plain colours
+// on the parts, simple canvas textures on the floors.
 import * as THREE from './three.module.min.js';
 
 const CutTop = 7.6, CutIso = 6.2;
@@ -228,6 +229,28 @@ window.renderHouse = function (scene0, view, width, height) {
     rooms: info.rooms.map(r => ({ id: r.id, at: project((r.min[0] + r.max[0]) / 2, 0.2, (r.min[2] + r.max[2]) / 2) })),
     spots: info.spots.map(s => ({ id: s.id, item: s.item, label: s.label, star: s.star, at: project(s.position[0], s.position[1], s.position[2]) })),
   };
+};
+// 7.x alpine: the house from inside at eye level (the ceiling on, nothing cut): a camera at `eye` looking at `target`,
+// lit by its ceiling lights and a dim warm fill (the windows and the porch glow on their own).
+window.renderInside = function (scene0, eye, target, width, height) {
+  renderer.setSize(width, height);
+  const info = scene0.info;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14171c);
+  for (const p of scene0.parts) scene.add(mesh(p));
+  scene.add(new THREE.HemisphereLight(0xfff0dc, 0x4a3a2c, 0.9));
+  for (const l of info.lights) {
+    if (l.kind !== 'PointLight') continue;
+    const light = new THREE.PointLight(srgb(l.color), l.brightness * 70, l.range * 1.4, 1.6);
+    light.position.set(l.position[0], l.position[1] - 1.2, l.position[2]);
+    scene.add(light);
+  }
+  const camera = new THREE.PerspectiveCamera(66, width / height, 0.2, 400);
+  camera.position.set(eye[0], eye[1], eye[2]);
+  camera.lookAt(target[0], target[1], target[2]);
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  return true;
 };
 window.ready = true;
 </script>

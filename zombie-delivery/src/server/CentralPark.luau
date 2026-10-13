@@ -22,7 +22,7 @@
 -- About 300 parts. The ground, the coping and its posts, the island, the fountain's basin, the bridge, the trunks, the
 -- benches, the lamp posts, the gazebo and the signs' posts are solid; everything else is decoration (no collision, no
 -- ray hits).
--- 6.12.15: the footbridge over Bone St to the Lantern Garden lands on the north lawn (server/Footbridge.luau,
+-- 6.12.15: the footbridge over Bone St to the block north (7.1: the Hauptplatz) lands on the north lawn (server/Footbridge.luau,
 -- Map.Footbridge): its ramp runs east along the lawn's north edge and down its east side onto the east path. Next to
 -- it the trees are narrow columns (or left out), the north path's lamp stands further in and the east sign stands on
 -- the other side of its path. 6.12.16: the ramp is wider and curved (round the north-east corner, out over the

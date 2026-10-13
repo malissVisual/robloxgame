@@ -1,23 +1,26 @@
 --!strict
 -- 6.12.16, the footbridge over Bone St (shared/Map.luau Map.Footbridge) as plain numbers: every piece of it (its size,
 -- where it is, its turn, its colour and whether it is solid). server/Footbridge.luau makes a part of each;
--- tests/garden_test.luau scans them (nothing in the walkway, no step in the walking surface, the clearance over the
+-- tests/square_test.luau scans them (nothing in the walkway, no step in the walking surface, the clearance over the
 -- street). Pure: no Roblox in it.
+-- 7.1 (the Alps, step 1: the Japanese part goes): an alpine timber bridge. The walkway, the railings, the span and the
+-- beds are where they were; the railings are oiled larch with wooden caps, the lanterns iron ones and the two gates
+-- roofed timber portals.
 --
 --   the walking surface  plank boxes along the curved centre line (Map.Footbridge.line), each a straight chord: short
 --                        on the turns, so that where two meet the step is under a tenth of a stud across the whole
 --                        walkway, and each a little longer than its chord where the turn opens a gap (the joins
 --                        overlap: solid); level across, as steep along as the line
---   the railings         on both edges, outside the walkway: a vermilion kick board (no wheel rolls off), a hand rail,
---                        posts between them with brass caps, a red paper lantern on a post now and then (lit at night)
---   the span             between the gates, over the sidewalks and the road: a taiko-bridge hump (Map.Footbridge.hump),
---                        a dark timber girder on each outer face, deeper toward the middle (an arch), vermilion ribs on
---                        it; nothing under it but the street
---   the gates            a vermilion torii at each end of the span, on the deck's outriggers: posts outside the
---                        railings, the crossbeams more than Map.Footbridge.headroom over the walkway, a paper lantern
---                        hanging from each end of the top beam
+--   the railings         on both edges, outside the walkway: a larch kick board (no wheel rolls off), a hand rail,
+--                        posts between them with wooden caps, an iron lantern on a post now and then (lit at night)
+--   the span             between the portals, over the sidewalks and the road: a hump (Map.Footbridge.hump), a dark
+--                        timber girder on each outer face, deeper toward the middle (an arch), ribs on it; nothing under
+--                        it but the street
+--   the portals          a roofed timber portal at each end of the span, on the deck's outriggers: posts outside the
+--                        railings, the tie beam and a little shingle roof more than Map.Footbridge.headroom over the
+--                        walkway, an iron lantern hanging outside each post
 --   under the ramps      timber bents (two posts and a cap beam) where the ramp is high enough, never on a path
---   the park's foot      a lantern post on the lawn beside it
+--   the park's foot      a lamp post on the lawn beside it
 --   under the low ramps  (6.12.16 review) where a ramp is lower than Map.Footbridge.low (9) over the ground: a planted
 --                        bed (soil, shrubs, flowers) closed by clipped hedges along both edges and across its high end,
 --                        too tall for anyone to get between them and the ramp (nobody walks or rides under it there)
@@ -40,16 +43,16 @@ export type Piece = {
 	solid: boolean, -- CanCollide: the walking surface and the railings
 	walk: boolean, -- the walking surface
 	shape: string?, -- "Cylinder" (along its right) or "Ball"
-	glow: string?, -- lit at night: "paper" (a paper lantern) or "glass" (a post lantern)
+	glow: string?, -- lit at night: "glass" (a lantern's glass)
 	light: number?, -- a real light too: its range
 }
 
 local PLANKS = { 150, 110, 74 }
 local TIMBER = { 86, 60, 42 }
-local VERMILION = { 196, 62, 42 }
-local BRASS = { 206, 166, 74 }
-local INK = { 34, 30, 28 } -- the gates' top beams, their posts' sleeves, the lanterns' caps
-local PAPER = { 214, 64, 46 }
+local LARCH = { 128, 90, 56 } -- 7.1: the railings, the kick boards and the portals' posts (oiled larch)
+local CAP = { 72, 50, 34 } -- the posts' caps, the ribs, the portals' tie beams
+local SHINGLES = { 74, 60, 50 } -- the portals' little roofs
+local IRON = { 38, 38, 40 } -- the lanterns' frames, the posts' shoes
 local GLASS = { 232, 222, 196 }
 
 local SLAB = Map.Footbridge.slab -- the walking surface's planks on the ramps (on the span Map.Footbridge.thick)
@@ -110,22 +113,21 @@ local function ball(out: { Piece }, name: string, at: Vec, diameter: number, col
 	return p
 end
 
--- A red paper lantern, its middle at `at` (`size` its diameter): the paper (lit at night), a black cap over and under.
-local function paperLantern(out: { Piece }, at: Vec, size: number, light: number?)
-	local paper = upright(out, "PaperLantern", at, size * 1.2, size, PAPER, "SmoothPlastic")
-	paper.glow = "paper"
-	paper.light = light
-	for _, dy in { 1, -1 } do
-		upright(out, "LanternCap", { at[1], at[2] + dy * (size * 0.6 + 0.06), at[3] }, 0.14, size * 0.62, INK, "Wood")
-	end
+-- 7.1: an iron lantern, its middle at `at` (`size` its width): the glass (lit at night) between an iron cap and foot.
+local function ironLantern(out: { Piece }, at: Vec, size: number, light: number?)
+	local glass = add(out, "Lantern", { size * 0.8, size * 1.1, size * 0.8 }, at, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, GLASS, "Glass", false)
+	glass.glow = "glass"
+	glass.light = light
+	add(out, "LanternCap", { size * 1.05, size * 0.22, size * 1.05 }, { at[1], at[2] + size * 0.66, at[3] }, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, IRON, "Metal", false)
+	add(out, "LanternFoot", { size * 0.6, size * 0.16, size * 0.6 }, { at[1], at[2] - size * 0.63, at[3] }, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, IRON, "Metal", false)
 end
 
 -- ── Where things may stand ──────────────────────────────────────────────────
 
--- Is (x, z) on the lawn of the park or the garden (`margin` in from its edge)?
+-- Is (x, z) on the lawn of the park or the square (`margin` in from its edge)?
 local function onLawn(x: number, z: number, margin: number): boolean
 	local lawn = Map.BlockSize / 2 - Map.Park.walk - margin
-	for _, home in { { x = Map.Park.x, z = Map.Park.z }, { x = Map.Garden.x, z = Map.Garden.z } } do
+	for _, home in { { x = Map.Park.x, z = Map.Park.z }, { x = Map.Square.x, z = Map.Square.z } } do
 		if math.abs(x - home.x) <= lawn and math.abs(z - home.z) <= lawn then
 			return true
 		end
@@ -143,7 +145,7 @@ local function octagon(u: number, v: number): number
 end
 
 -- Is (x, z) on (or within `r` of) a path of the park (the ring round the pond, the paths to the sides' middles and to
--- the corners, as far as Map.Park.corners reaches) or of the garden (Map.Garden.paths)?
+-- the corners, as far as Map.Park.corners reaches) or of the square (7.1: its cobbles, Map.Square.paths)?
 function FootbridgeShape.onPath(x: number, z: number, r: number): boolean
 	local P = Map.Park
 	local u, v = x - P.x, z - P.z
@@ -165,9 +167,9 @@ function FootbridgeShape.onPath(x: number, z: number, r: number): boolean
 		end
 		return false
 	end
-	local G = Map.Garden
-	u, v = x - G.x, z - G.z
-	for _, box in G.paths do
+	local S = Map.Square
+	u, v = x - S.x, z - S.z
+	for _, box in S.paths do
 		if u > box.u0 - r and u < box.u1 + r and v > box.v0 - r and v < box.v1 + r then
 			return true
 		end
@@ -175,7 +177,8 @@ function FootbridgeShape.onPath(x: number, z: number, r: number): boolean
 	return false
 end
 
--- May a post `r` thick stand at (x, z): on a lawn, off the park's and the garden's paths, ponds and lanterns?
+-- May a post `r` thick stand at (x, z): on a lawn, off the park's paths and pond, off the square's cobbles, lamps,
+-- trees and planters?
 local function clear(x: number, z: number, r: number): boolean
 	if not onLawn(x, z, r + 0.3) or FootbridgeShape.onPath(x, z, r) then
 		return false
@@ -185,15 +188,21 @@ local function clear(x: number, z: number, r: number): boolean
 	if math.abs(u) <= Map.BlockSize / 2 and math.abs(v) <= Map.BlockSize / 2 then
 		return octagon(u, v) > P.pond + 1.5 + r -- (off the pond and its coping)
 	end
-	local G = Map.Garden
-	u, v = x - G.x, z - G.z
-	for _, disc in G.pond do
-		if (u - disc.u) ^ 2 + (v - disc.v) ^ 2 < (disc.r + r) ^ 2 then
+	local S = Map.Square
+	u, v = x - S.x, z - S.z
+	for _, lamp in S.lamps do
+		if (u - lamp.u) ^ 2 + (v - lamp.v) ^ 2 < (1.7 + r) ^ 2 then
 			return false
 		end
 	end
-	for _, l in G.lanterns do
-		if (u - l.u) ^ 2 + (v - l.v) ^ 2 < (1.7 + r) ^ 2 then
+	for _, tree in S.trees do
+		if (u - tree.u) ^ 2 + (v - tree.v) ^ 2 < (1.5 + r) ^ 2 then
+			return false
+		end
+	end
+	for _, planter in S.planters do
+		local hu, hv = if planter.alongU then planter.length / 2 else 1, if planter.alongU then 1 else planter.length / 2
+		if math.abs(u - planter.u) < hu + r and math.abs(v - planter.v) < hv + r then
 			return false
 		end
 	end
@@ -347,30 +356,30 @@ local function railings(out: { Piece }, lanternAt: { [number]: number })
 		local i, j = posts[n], posts[n + 1]
 		for _, side in { 1, -1 } do
 			local a, b = edgeChord(i, j, side, inner + CLEAR + KICK_THICK / 2, 0)
-			beam(out, "KickBoard", a, b, KICK_THICK, KICK + SLAB, (KICK - SLAB) / 2, 0.12, 0.12, VERMILION, "Wood", true)
+			beam(out, "KickBoard", a, b, KICK_THICK, KICK + SLAB, (KICK - SLAB) / 2, 0.12, 0.12, LARCH, "Wood", true)
 			a, b = edgeChord(i, j, side, inner + CLEAR + RAIL_THICK / 2, F.rail - 0.15)
-			beam(out, "Railing", a, b, RAIL_THICK, 0.3, 0, 0.15, 0.15, VERMILION, "Wood", true)
+			beam(out, "Railing", a, b, RAIL_THICK, 0.3, 0, 0.15, 0.15, LARCH, "Wood", true)
 		end
 	end
-	-- the posts (a brass cap on every other one), a paper lantern on some
+	-- the posts (a wooden cap on every other one), an iron lantern on some
 	for n, i in posts do
 		local c = line[i]
 		local f: Frame = { x = c.x, y = c.y, z = c.z, dx = c.dx, dz = c.dz }
 		for _, side in { 1, -1 } do
 			local height = F.rail + 0.3 + SLAB
-			standing(out, "RailPost", f, side * (inner + CLEAR + POST / 2), height / 2 - SLAB, 0, { POST, height, POST }, VERMILION, "Wood", true)
+			standing(out, "RailPost", f, side * (inner + CLEAR + POST / 2), height / 2 - SLAB, 0, { POST, height, POST }, LARCH, "Wood", true)
 			if lanternAt[n] == side then
 				local top = F.rail + 0.3
-				standing(out, "LanternArm", f, side * (inner + CLEAR + POST / 2 + 0.3), top + 0.1, 0, { 0.7, 0.18, 0.18 }, TIMBER, "Wood", false)
-				paperLantern(out, point(f, side * (inner + CLEAR + 0.75), top + 0.95, 0), 0.95)
+				standing(out, "LanternArm", f, side * (inner + CLEAR + POST / 2 + 0.3), top + 0.1, 0, { 0.7, 0.18, 0.18 }, IRON, "Metal", false)
+				ironLantern(out, point(f, side * (inner + CLEAR + 0.75), top + 0.9, 0), 0.85)
 			elseif n % 2 == 1 then
-				ball(out, "RailCap", point(f, side * (inner + CLEAR + POST / 2), F.rail + 0.3 + POST / 2, 0), POST, BRASS, "Metal")
+				standing(out, "RailCap", f, side * (inner + CLEAR + POST / 2), F.rail + 0.3 + 0.09, 0, { POST, 0.18, POST + 0.14 }, CAP, "Wood", false)
 			end
 		end
 	end
 end
 
--- Which posts carry a paper lantern (and on which side): every fifth or so, the sides taking turns, none by a gate or
+-- Which posts carry an iron lantern (and on which side): every fifth or so, the sides taking turns, none by a portal or
 -- at a foot, and only where the lantern hangs over a lawn or high over the street.
 local function lanternPosts(): { [number]: number }
 	local F = Map.Footbridge
@@ -423,17 +432,19 @@ local function girders(out: { Piece })
 				if n % 2 == 0 then
 					local f: Frame = { x = a0.x, y = a0.y, z = a0.z, dx = a0.dx, dz = a0.dz }
 					local depth = a0.y - ba
-					standing(out, "Rib", f, side * (o + GIRDER / 2 + 0.06), -depth / 2 - 0.02, 0, { 0.12, depth - 0.1, 0.32 }, VERMILION, "Wood", false)
+					standing(out, "Rib", f, side * (o + GIRDER / 2 + 0.06), -depth / 2 - 0.02, 0, { 0.12, depth - 0.1, 0.32 }, CAP, "Wood", false)
 				end
 			end
 		end
 	end
 end
 
--- ── The gates ───────────────────────────────────────────────────────────────
+-- ── The portals ─────────────────────────────────────────────────────────────
 
--- A vermilion torii across the walkway at s, its posts on outriggers outside the railings: everything of it over the
--- walkway is higher than Map.Footbridge.headroom over the walking surface.
+-- 7.1: a roofed timber portal across the walkway at s (where 6.12.16's gate stood), its posts on outriggers outside the
+-- railings: a tie beam, a carved board over it and a little shingle roof whose ridge runs across the walkway, an iron
+-- lantern hanging outside each post. Everything of it over the walkway is higher than Map.Footbridge.headroom over the
+-- walking surface.
 local function gate(out: { Piece }, s: number, lit: boolean)
 	local F = Map.Footbridge
 	local f = frameAt(s)
@@ -443,27 +454,28 @@ local function gate(out: { Piece }, s: number, lit: boolean)
 	end
 	across("GateBeam", 2 * (post + 0.8), -0.3, 0.5, 0.9, TIMBER, "Wood") -- (the outriggers under the deck)
 	for _, side in { 1, -1 } do
-		upright(out, "GatePost", point(f, side * post, 6, 0), 13, 1, VERMILION, "Wood")
-		upright(out, "GateSleeve", point(f, side * post, 0.3, 0), 1.6, 1.2, INK, "Wood")
+		standing(out, "GatePost", f, side * post, 6, 0, { 0.9, 13, 0.9 }, LARCH, "Wood", false)
+		standing(out, "GateShoe", f, side * post, 0.3, 0, { 1.2, 1.2, 1.2 }, IRON, "Metal", false)
 	end
-	across("GateTie", 2 * (post + 1.4), F.headroom + 1.05, 0.7, 0.55, VERMILION, "Wood") -- (nuki)
-	across("GateStrut", 0.5, F.headroom + 1.85, 1, 0.4, VERMILION, "Wood")
-	across("GatePlaque", 2, F.headroom + 1.85, 1.4, 0.2, INK, "Wood")
-	across("GateBand", 2 * (post + 2.2), F.headroom + 2.6, 0.5, 0.9, VERMILION, "Wood") -- (shimaki)
-	across("GateLintel", 2 * (post + 2.2), F.headroom + 3.15, 0.6, 1.3, INK, "Wood") -- (kasagi)
+	across("GateTie", 2 * (post + 0.9), F.headroom + 1.05, 0.8, 0.8, CAP, "Wood")
+	across("GateBoard", 2 * post - 1, F.headroom + 2.4, 1.6, 0.25, LARCH, "WoodPlanks")
+	-- the roof: two shingle slabs from the ridge (across the walkway, over the posts' tops) down along the way, 30°
+	local ridge, length, thick = 13.7, 2.6, 0.3
+	local c, sn = math.cos(math.rad(30)), math.sin(math.rad(30))
+	for _, t in { 1, -1 } do
+		local right = { t * f.dz, 0, -t * f.dx }
+		local back = { t * f.dx * c, -sn, t * f.dz * c }
+		local up = { back[2] * right[3] - back[3] * right[2], back[3] * right[1] - back[1] * right[3], back[1] * right[2] - back[2] * right[1] }
+		local along = t * (length / 2 * c - thick / 2 * sn)
+		add(out, "GateRoof", { 2 * (post + 1.6), thick, length }, point(f, 0, ridge - length / 2 * sn - thick / 2 * c, along), right, up, back, SHINGLES, "Slate", false)
+	end
+	across("GateRidge", 2 * (post + 1.7), ridge + 0.05, 0.3, 0.55, CAP, "Wood")
 	for _, side in { 1, -1 } do
-		-- its ends turned up (out along the lintel and a little up), and a paper lantern hanging under each end
-		local reach = post + 2.2
-		local tilt = math.rad(12)
-		local c, sn = math.cos(tilt), math.sin(tilt)
-		local lx, lz = f.dz * side, -f.dx * side -- (out on this side)
-		local right = { c * lx, sn, c * lz }
-		local up = { -sn * lx, c, -sn * lz }
-		local back = { right[2] * up[3] - right[3] * up[2], right[3] * up[1] - right[1] * up[3], right[1] * up[2] - right[2] * up[1] }
-		add(out, "GateLintelEnd", { 2.3, 0.6, 1.3 }, point(f, side * (reach + 1.1), F.headroom + 3.15 + 0.24, 0), right, up, back, INK, "Wood", false)
-		local middle = F.headroom + 1.2 -- (the lantern's middle; it hangs outside the posts, never over the walkway)
-		standing(out, "LanternCord", f, side * (reach - 0.6), middle + 1.16, 0, { 0.08, 0.5, 0.08 }, TIMBER, "Wood", false)
-		paperLantern(out, point(f, side * (reach - 0.6), middle, 0), 1.3, if lit and side == 1 then 26 else nil)
+		-- an iron lantern hanging outside the post, under the roof's end
+		local middle = F.headroom + 0.9 -- (the lantern's middle; it hangs outside the posts, never over the walkway)
+		local hang = ridge - 0.5 - (middle + 0.75)
+		standing(out, "LanternCord", f, side * (post + 1.1), middle + 0.75 + hang / 2, 0, { 0.1, hang, 0.1 }, IRON, "Metal", false)
+		ironLantern(out, point(f, side * (post + 1.1), middle, 0), 1.1, if lit and side == 1 then 26 else nil)
 	end
 end
 
@@ -510,8 +522,8 @@ end
 
 -- ── The park's foot ─────────────────────────────────────────────────────────
 
--- A lantern post on the lawn beside the park's foot, toward the park's middle (the garden's foot has its stone
--- lantern): a real light.
+-- A lamp post on the lawn beside the park's foot, toward the park's middle (the square's foot has a gas lamp of the
+-- square's, Map.Square.lamps): a real light. 7.1: an iron post.
 local function footLantern(out: { Piece })
 	local F = Map.Footbridge
 	local foot = F.feet.park
@@ -522,17 +534,17 @@ local function footLantern(out: { Piece })
 	local reach = F.width / 2 + F.edge + 1.6
 	local x, z = foot.x - foot.dx * 1.5 + ax * reach, foot.z - foot.dz * 1.5 + az * reach
 	local w = Map.WalkTop
-	add(out, "LanternPost", { 0.5, 6.4, 0.5 }, { x, w + 3.2, z }, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, TIMBER, "Wood", false)
+	upright(out, "LanternPost", { x, w + 3.2, z }, 6.4, 0.45, IRON, "Metal")
 	local glass = add(out, "PostLantern", { 1, 1.3, 1 }, { x, w + 7.05, z }, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, GLASS, "Glass", false)
 	glass.glow = "glass"
 	glass.light = 24
-	add(out, "PostLanternRoof", { 1.6, 0.3, 1.6 }, { x, w + 7.85, z }, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, TIMBER, "Wood", false)
+	add(out, "PostLanternRoof", { 1.5, 0.3, 1.5 }, { x, w + 7.85, z }, { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, IRON, "Metal", false)
 end
 
 -- ── Under the low ramps: a planted bed ──────────────────────────────────────
 
 local SOIL = { 82, 62, 46 }
-local BOX = { 46, 78, 46 } -- (the clipped hedges: the garden's hedge's green)
+local BOX = { 46, 78, 46 } -- (the clipped hedges' green)
 local LEAVES = { 58, 96, 52 }
 local FLOWERS = { { 226, 64, 70 }, { 236, 132, 190 }, { 246, 244, 236 }, { 246, 206, 70 } }
 local BED_GAP = 4.2 -- the most room left between a hedge's top and the ramp over it (nobody, 5.9 tall, gets in there)

@@ -35,6 +35,12 @@
 -- class (a car, a van, a truck, the monster truck: their own Idle and Top pitch), the pitch climbing through each gear
 -- and dropping at the shift, a touch higher on the throttle (Drive.throttle) and lower as it coasts, the volume by the
 -- speed and the throttle; followed every frame (a shift is heard as one). A bike's freewheel and a scooter's hum stay.
+--
+-- 7.1, the moves' sounds (art/audio/sfx4.ogg, SoundSheet.Sfx4): the furniture, the truck, the grip, the move's stings,
+-- the horde's siren, the Wall's gate and the mountains' sounds, for every module by name (Sounds.play / playAt).
+-- client/MoveSounds.luau plays the ones the move already tells (its state, its result, your MoveCarry); a move's carry
+-- no longer plays the old pickup / putdown under them. The stand-ins of every sheet not uploaded yet are
+-- SoundSheet.Fallback (written by make_audio.py; the sfx2 / sfx3 ones moved there from here).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,6 +61,7 @@ local Ui = require(script.Parent.Ui)
 local PhoneMotion = require(script.Parent.PhoneMotion)
 local Juice = require(script.Parent.Juice)
 local SoundScape = require(script.Parent.SoundScape)
+local MoveSounds = require(script.Parent.MoveSounds) -- 7.1
 
 local Sounds = {}
 
@@ -68,18 +75,11 @@ Sounds.notify = nil :: ((text: string) -> ())?
 local enabled = SoundSheet.SfxId ~= "" and SoundSheet.MusicId ~= ""
 local sheet2 = SoundSheet.Sfx2Id ~= "" -- 5.7: the world's sounds
 local sheet3 = SoundSheet.Sfx3Id ~= "" -- 6.12: doors, horns, steps by surface, ambience, UI stings
+local sheet4 = SoundSheet.Sfx4Id ~= "" -- 7.1: the moves' sounds and the mountains'
 -- 5.7: stand-ins from the first sheet while sfx2.ogg is not uploaded yet. 6.12: and from the first two while sfx3.ogg
--- is not (a stand-in of a stand-in works too: a step plays the 5.7 step once sfx2 is up).
-local FALLBACK: { [string]: string } = {
-	coin = "cash", phone_buzz = "notify", knock = "putdown",
-	car_door_close = "putdown",
-	horn_car = "horn", horn_van = "horn", horn_truck = "horn", bike_bell = "coin", scooter_beep = "notify",
-	task_done = "job_done", purchase = "cash", event_start = "wave", event_end = "notify",
-}
-for _, surface in { "concrete", "grass", "wood", "metal", "water" } do
-	FALLBACK[`step_{surface}_a`] = "step_a"
-	FALLBACK[`step_{surface}_b`] = "step_b"
-end
+-- is not (a stand-in of a stand-in works too: a step plays the 5.7 step once sfx2 is up). 7.1: the list is
+-- SoundSheet.Fallback (make_audio.py), sfx4's too.
+local FALLBACK: { [string]: string } = SoundSheet.Fallback
 local musicGroup: SoundGroup
 local effectsGroup: SoundGroup
 local started = false -- 6.12: Sounds.start made the groups (a module may play before)
@@ -112,6 +112,12 @@ local function find(name: string): (string?, NumberRange?)
 		range = region(SoundSheet.Sfx3, name)
 		if range then
 			return SoundSheet.Sfx3Id, range
+		end
+	end
+	if sheet4 then
+		range = region(SoundSheet.Sfx4, name)
+		if range then
+			return SoundSheet.Sfx4Id, range
 		end
 	end
 	local standIn = FALLBACK[name]
@@ -507,13 +513,25 @@ local function listenCargo()
 	end)
 	local function watchCharacter(character: Model)
 		local carrying = character:GetAttribute("Carrying")
+		-- 7.1: a move's piece (MoveCarry, set and cleared with Carrying) has its own sounds (client/MoveSounds.luau)
+		local moveAt = -math.huge
+		character:GetAttributeChangedSignal("MoveCarry"):Connect(function()
+			moveAt = os.clock()
+		end)
+		local function moving(): boolean
+			return character:GetAttribute("MoveCarry") ~= nil or os.clock() - moveAt < 0.6
+		end
 		character:GetAttributeChangedSignal("Carrying"):Connect(function()
 			local now = character:GetAttribute("Carrying")
 			if now ~= nil and carrying == nil then
-				play("pickup", 0.7)
+				task.delay(0.05, function() -- (MoveCarry comes right after Carrying)
+					if not moving() then
+						play("pickup", 0.7)
+					end
+				end)
 			elseif now == nil and carrying ~= nil then
 				task.delay(0.25, function()
-					if os.clock() - lastLoad > 0.5 then
+					if os.clock() - lastLoad > 0.5 and not moving() then
 						play("putdown", 0.7)
 					end
 				end)
@@ -739,6 +757,8 @@ function Sounds.start()
 		warn("[Sounds] no sound yet: upload art/audio/sfx.ogg and art/audio/music.ogg and put their ids in shared/SoundSheet.luau")
 	elseif not sheet3 then
 		print("[Sounds] 6.12: art/audio/sfx3.ogg is not uploaded yet (SoundSheet.Sfx3Id): stand-ins play (art/audio/NAHRAT-SFX3.md)")
+	elseif not sheet4 then
+		print("[Sounds] 7.1: art/audio/sfx4.ogg is not uploaded yet (SoundSheet.Sfx4Id): stand-ins play (art/audio/NAHRAT-SFX4.md)")
 	end
 	player.CharacterAdded:Connect(function()
 		spawnedAt = os.clock()
@@ -774,6 +794,14 @@ function Sounds.start()
 			return inGame
 		end,
 		sheet3 = enabled and sheet3,
+	})
+	-- 7.1: the move's sounds from what the move already sends (client/MoveSounds.luau)
+	MoveSounds.start({
+		play = play,
+		make = make,
+		on = function(): boolean
+			return enabled and mode ~= 3
+		end,
 	})
 	RunService.Heartbeat:Connect(function(dt: number)
 		if enabled then

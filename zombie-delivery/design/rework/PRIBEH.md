@@ -35,6 +35,17 @@ V páté kapitole vyjde najevo proč.
    *„Grandpa's clock is in the living room. Don't you dare drop it.“*), po konci pošle shrnutí podle výsledku, které
    zároveň navede na další kapitolu.
 5. **Poděkování na výsledkové kartě.** Klient s malým portrétem řekne jednu větu podle výsledku.
+6. **Postavy, které vás vítají** (texty v sekci greeters v `MoveStory.luau`, kód `server/MoveGreeters.luau`):
+   - **Marge na verandě** svého domu stojí u dveří od začátku stěhování. Když k domu jako první dojde někdo z party,
+     otočí se tím směrem, zamává a v bublině řekne *„Oh thank heavens, ZDC!“*, pak ukáže na otevřené dveře a připomene
+     dědečkovy hodiny. Během stěhování občas něco řekne: když jde kolem ★ věc (*„Careful with that!“*), když přijde
+     horda (*„They're coming! Hurry!“*) a když naložený náklaďák odjíždí (*„Thank you… see you behind the Wall.“*;
+     tahle věta přijde partě i jako oznámení). Zombíci si jí nevšímají a s koncem stěhování odejde.
+   - **Voják u Zdi** stojí u budky kontrolního stanoviště. Když tam doručíte náklad, zamává a řekne
+     *„Welcome to the safe zone. Unload over there.“*
+   - **Marge u stánku Moving contracts** je ta samá Marge z tutoriálu, co stojí v depu u tabule s joby (žádná druhá
+     Marge). Když ke stánku přijdete pěšky a zrovna nestěhujete, otočí se k vám a řekne *„New contract, sweetie?“*
+     (bublina a oznámení), každému hráči nejvýš jednou za tři minuty.
 
 Výsledek stěhování se pro příběh počítá takto: **skvělé** = doručeno se 4–5 hvězdami, **dobré** = doručeno s méně
 hvězdami, **pozdě** = vypršel čas, **nepovedlo se** = stěhování bylo zrušeno nebo se ztratil náklaďák.

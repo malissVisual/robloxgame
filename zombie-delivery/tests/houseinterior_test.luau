@@ -3,7 +3,9 @@
 -- (Config.Furniture.InteriorMaxParts, its furniture included) and a modest number of lights, everything anchored (a
 -- piece's looks held by welds to its anchored Root), every spot a piece of the right kind at the right place with its
 -- Spot and Star, the house closed (walls, a ceiling, ground under it all, the porch's daylight wall), the EXIT sign
--- over the front door; the slots lie far off the map (Map.Bounds) and never overlap; destroy takes it down.
+-- over the front door; the slots lie far off the map (Map.Bounds) and never overlap; destroy takes it down. 7.x alpine:
+-- the chalet's looks built (beams, wainscot, one plank floor, the Kachelofen, the corner bench and its shelf, lace, the
+-- painted front door, antlers, pictures, rag rugs), warm lights, the same plan the same interior, seeds 10-60 in budget.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -52,8 +54,10 @@ end
 
 -- ── Every interior ─────────────────────────────────────────────────────────────
 local mostParts, mostLights = 0, 0
--- (seeds 5 and 409 are the busiest of the first 800: 591 and 599 parts; the average is about 540)
-for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 409, 1955 } do -- (7.0 review: 1955 is Marge's House, Config.Moving.Contracts)
+local A = T.Alpine
+-- (7.x alpine: seeds 4, 174 and 647 are the busiest of the first 1000: 614, 613 and 612 parts; the average is about
+-- 558 (it was 539 before the chalet); 409 was the busiest before)
+for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 174, 409, 647, 1955 } do -- (7.0 review: 1955 is Marge's House, Config.Moving.Contracts)
 	local plan = HouseLayout.plan(seed, "house")
 	local origin = HouseInterior.slot(seed)
 	local ok, model, pieces = pcall(HouseInterior.build, plan, origin)
@@ -144,10 +148,102 @@ for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 409, 1955 } do -- (7.0 review: 1955 
 	check(`{tag}: a piece at each of the {#plan.spots} spots, marked Spot and Star, under Items`, #bad == 0 and count == #plan.spots, table.concat(bad, ", "))
 	check(`{tag}: named and pivoted at its origin`, model.Name == "HouseInterior" and model:GetAttribute("Seed") == seed and model.WorldPivot == origin)
 
+	-- 7.x alpine: the chalet's looks (the house's own parts, not the furniture): the beams, the wood panelling (no plain
+	-- baseboard left), one plank floor under the house with the bathroom's tiles and the garage's concrete over it, the
+	-- Kachelofen, the corner bench and its shelf, lace in the windows, the front door's painted leaves, the antlers, the
+	-- pictures, the rag rugs; the ceiling lights warm
+	local named: { [string]: number } = {}
+	local floors, laceOk, beamsOk = {}, true, true
+	local own = {}
+	for _, name in { "Shell", "Decor" } do
+		local f = model:FindFirstChild(name)
+		for _, obj in if f then f:GetDescendants() else {} do
+			table.insert(own, obj)
+		end
+	end
+	for _, obj in own do
+		if not obj:IsA("BasePart") then
+			continue
+		end
+		named[obj.Name] = (named[obj.Name] or 0) + 1
+		if obj.Name == "Floor" then
+			table.insert(floors, obj)
+		elseif obj.Name == "Lace" then
+			laceOk = laceOk and obj.Transparency > 0.1 and obj.Transparency < 0.6 and obj.CanCollide == false
+		elseif obj.Name == "Beam" then
+			local top = obj.CFrame.Position.Y + obj.Size.Y / 2
+			beamsOk = beamsOk and math.abs(top - (o.Y + plan.ceiling)) < 1e-6 and obj.CanCollide == false
+		end
+	end
+	local function n(name: string): number
+		return named[name] or 0
+	end
+	local planks = 0
+	for _, f in floors do
+		if f.Material == "WoodPlanks" and f.Size.X >= plan.size.X - plan.wall - 1e-6 and f.Size.Z >= plan.size.Z - plan.wall - 1e-6 then
+			planks += 1
+		end
+	end
+	check(`{tag}: one plank floor under the house, the bathroom's and the garage's over it ({#floors} floor parts)`, #floors == 3 and planks == 1)
+	check(`{tag}: {n("Beam")} beams under the ceiling, {n("Wainscot")} panels of wainscot, no plain baseboard`, n("Beam") >= 2 * A.BeamRows and beamsOk
+		and n("Wainscot") >= 20 and n("Baseboard") == 0)
+	check(`{tag}: the Kachelofen, the corner bench and the Herrgottswinkel's shelf`, n("FireDoor") == 1 and n("StoveBench") == 1 and n("Upper") == 1
+		and n("Backrest") == 2 and n("CornerShelf") == 1 and n("Candle") == 1)
+	check(`{tag}: lace in {n("Lace")} windows, the front door's painted leaves, the antlers, {n("PictureFrame")} pictures, rag rugs`, n("Lace") >= 4 and laceOk
+		and n("DoorLeaf") == 2 and n("Bloom") == 2 and n("Antler") == 2 and n("PictureFrame") == 2 and n("Stripe") >= 3)
+	local warm = true
+	for _, obj in model:GetDescendants() do
+		if obj.ClassName == "PointLight" and obj.Parent and obj.Parent.Name == "Lamp" then
+			warm = warm and obj.Color.R > obj.Color.B + 0.2 and obj.Color.G > obj.Color.B
+		end
+	end
+	check(`{tag}: the ceiling lights are warm`, warm)
+
 	HouseInterior.destroy(model)
 	check(`{tag}: destroy takes it down`, #model:GetChildren() == 0 and model.Parent == nil)
 end
 print(`(the most: {mostParts} parts, {mostLights} lights in an interior)`)
+
+-- 7.x alpine: the same plan builds the same interior (every part's name, class, place, size, colour, material, opacity),
+-- another seed another; and every house of seeds 10-60 stays within the part budget and the lights
+do
+	local function looks(seed: number): string
+		local model = HouseInterior.build(HouseLayout.plan(seed, "house"), HouseInterior.slot(0))
+		local out = {}
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") then
+				local q, s, c = p.CFrame.Position, p.Size, p.Color
+				table.insert(out, string.format("%s %s %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %s %.2f", p.Name, p.ClassName, q.X, q.Y, q.Z, s.X, s.Y, s.Z,
+					c.R, c.G, c.B, tostring(p.Material), p.Transparency))
+			end
+		end
+		HouseInterior.destroy(model)
+		return table.concat(out, "\n")
+	end
+	local a, b = looks(1955), looks(1955)
+	check("the same plan builds the same interior (Marge's House twice)", a == b and #a > 1000)
+	check("another seed builds another interior", looks(5) ~= a)
+	local worst, worstSeed, over = 0, 0, {}
+	for seed = 10, 60 do
+		local model = HouseInterior.build(HouseLayout.plan(seed, "house"), HouseInterior.slot(0))
+		local parts, lights = 0, 0
+		for _, obj in model:GetDescendants() do
+			if obj:IsA("BasePart") then
+				parts += 1
+			elseif obj.ClassName == "PointLight" or obj.ClassName == "SurfaceLight" then
+				lights += 1
+			end
+		end
+		HouseInterior.destroy(model)
+		if parts > worst then
+			worst, worstSeed = parts, seed
+		end
+		if parts > T.InteriorMaxParts or lights > 12 then
+			table.insert(over, `{seed}: {parts} parts, {lights} lights`)
+		end
+	end
+	check(`seeds 10-60 within {T.InteriorMaxParts} parts and 12 lights (the most: seed {worstSeed}, {worst})`, #over == 0, table.concat(over, "; "))
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

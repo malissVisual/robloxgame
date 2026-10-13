@@ -28,6 +28,7 @@ end
 
 local T = Config.Furniture
 local F = T.Farm
+local BARN_OR_YARD = { stable = true, barn = true, workshop = true, yard = true } -- (the rooms the farm builds itself)
 
 -- the farms fit the interiors' slots (as the houses do: tests/houseinterior_test.luau)
 do
@@ -51,8 +52,10 @@ local function textOf(part: any): string?
 end
 
 local mostParts, mostLights = 0, 0
--- (seeds 205 and 268 are the busiest of the first 300: 676 and 669 parts; the average is about 605)
-for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 205, 268 } do
+-- (seeds 489 and 196 are the busiest of the first 1000: 684 and 682 parts; the average is about 617. 7.x alpine merged
+-- in: the farmhouse's beams, lace, wainscot and painted door leaves, its one plank floor, the alpine pieces in its
+-- recipes; before it 676 at most, about 607 on average)
+for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 196, 489 } do
 	local plan: any = HouseLayout.plan(seed, "farm")
 	local origin = HouseInterior.slot(seed % 7)
 	local ok, model, pieces = pcall(HouseInterior.build, plan, origin)
@@ -134,20 +137,58 @@ for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 205, 268 } do
 	end
 	check(`{tag}: the farmhouse under its ceiling ({T.Ceiling} up), the barn under its roof ({F.BarnCeiling} up), the yard open to the sky`,
 		#(named.Ceiling or {}) == 1 and #(named.BarnRoof or {}) == 1 and houseCovered and barnCovered and open)
+	-- 7.x alpine in the farm: the chalet's ceiling beams in the farmhouse only (the barn has its own tie beams, Farm.Beam
+	-- up; the yard none), the Stube's tiled stove the farm's own look (its stone base and crown, not a house's)
+	local houseBack = -math.huge
+	for _, id in { "mudroom", "stube", "kitchen", "bedroom", "pantry" } do
+		houseBack = math.max(houseBack, byId[id].max.Z)
+	end
+	local function decorCount(name: string): number
+		local n = 0
+		for _, p in named[name] or {} do
+			n += if p.Parent and p.Parent.Name == "Decor" then 1 else 0
+		end
+		return n
+	end
+	local chaletBeams, strayBeams = 0, 0
+	for _, b in named.Beam or {} do
+		local c, s = b.CFrame.Position - o, b.Size
+		if b.Parent and b.Parent.Name == "Decor" and c.Y + s.Y / 2 <= T.Ceiling + 1e-6 then
+			chaletBeams += 1
+			strayBeams += if c.Z > houseBack + plan.wall then 1 else 0
+		end
+	end
+	check(`{tag}: the chalet's beams ({chaletBeams}) under the farmhouse's ceiling only, the Stube's Kachelofen the farm's own`, chaletBeams >= 4
+		and strayBeams == 0 and decorCount("Crown") == 1 and decorCount("FireDoor") == 0)
 	local barriers, barrierOk = named.Barrier or {}, true
 	for _, b in barriers do
 		local c, s = b.CFrame.Position - o, b.Size
 		barrierOk = barrierOk and b.Transparency == 1 and b.CanCollide == true and math.abs(c.Y - s.Y / 2 - F.Fence) < 1e-6 and math.abs(c.Y + s.Y / 2 - F.Barrier) < 1e-6
 	end
 	check(`{tag}: the yard's two fences, an invisible wall over each up to {F.Barrier}`, #barriers == 2 and barrierOk)
-	local walls, floors = 0, 0
+	-- (7.x alpine: the farmhouse's rooms on one plank floor, as a house's; the barn's rooms and the yard each their own)
+	local walls, floors, own = 0, 0, 0
 	for _, w in named.Wall or {} do
 		walls += if w.CanCollide == true then 1 else 0
 	end
 	for _, f in named.Floor or {} do
 		floors += if f.CanCollide == true then 1 else 0
 	end
-	check(`{tag}: walls ({walls}) round every room, a floor in each ({floors})`, walls >= #plan.rooms * 4 and floors == #plan.rooms)
+	local unfloored = {}
+	for _, r in plan.rooms do
+		own += if BARN_OR_YARD[r.kind] then 1 else 0
+		local under = false
+		for _, f in named.Floor or {} do
+			local p, s = f.CFrame.Position - o, f.Size
+			under = under or (f.CanCollide == true and math.abs(p.Y + s.Y / 2) < 1e-6 and p.X - s.X / 2 <= r.min.X + 1e-6 and p.X + s.X / 2 >= r.max.X - 1e-6
+				and p.Z - s.Z / 2 <= r.min.Z + 1e-6 and p.Z + s.Z / 2 >= r.max.Z - 1e-6)
+		end
+		if not under then
+			table.insert(unfloored, r.id)
+		end
+	end
+	check(`{tag}: walls ({walls}) round every room, a floor under each ({floors}: the farmhouse's planks, the barn's and the yard's own)`,
+		walls >= #plan.rooms * 4 and floors == own + 1 and #unfloored == 0, table.concat(unfloored, ", "))
 
 	-- the two ways out
 	local exits, daylight = #(named.ExitSign or {}), (named.Daylight or {})[1]

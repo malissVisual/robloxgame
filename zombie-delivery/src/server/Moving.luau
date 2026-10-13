@@ -51,10 +51,12 @@
 --       Mover       a pair thing alone at Mover.Alone of the walk, held up (not dragged), × Mover.Carry on the rest; the
 --                   others go up stairs and slopes slower with a thing (× Mover.Climb), a Mover not;
 --       Guard       × Guard.Damage on the zombies (Zombies.damage wrapped), plank barricades outside ("barricade": they
---                   stop the zombies, which wear them down), the outline through walls (client/EnemyOutline.luau);
---       Technician  the front door is locked (no keys): "Pick lock" (the Technician, quiet) or "Kick door" (the rest:
---                   loud, Tech.KickZombies come); "Enter house" hides for the crew meanwhile (the prompt's MoveDoor, the
---                   players' MoveLocked); the interior's lights stay off until the Technician fixes the fuse box.
+--                   stop the zombies, which wear them down), the outline through walls (client/EnemyOutline.luau).
+--     (The owner took the Technician out: the front door is never locked, the interior is lit from the start.)
+--   * 7.0 greeters (server/MoveGreeters.luau; Config.MoveGreeters, the words shared/MoveStory.luau's): the client
+--     greets the crew on the house's porch and reacts to the move (MoveGreeters.sync in the tick, gone at the end:
+--     MoveGreeters.done in cleanup), the soldier at the Wall welcomes a delivered truck (done), Marge greets a player
+--     at the Moving contracts kiosk (MoveGreeters.start's own loop).
 --   * 7.0 review (server): while you own a move with its truck out, nothing of the old game takes the truck's place
 --     (Vehicles.spawn / placeNear / placeAt / spawnAt wrapped: CAR, MY BIKE, the phone's CALL CAR in the truck, a car
 --     job, a garage's car, a dealer's; ZDC RIDE asks Moving.busy), no job or mission starts while you are on a move
@@ -71,6 +73,9 @@
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
 --                             Danny joins a crew of one; MoveHelper.sync in the tick)
+--   7.0 grip: the carry's grip bar (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
+--                             character attribute CarryGrip, the steady walk) and the grip block (the remote's "slip",
+--                             "grip")
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -86,6 +91,7 @@ local MoveRoles = require(Shared.MoveRoles) -- 7.0 planning: the roles' rules
 local Crew = require(script.Parent.Crew)
 local MoveLobby = require(script.Parent.MoveLobby) -- 7.0 planning: the lobby before a move
 local MoveHelper = require(script.Parent.MoveHelper) -- 7.0: the depot's helper (Danny) for a crew of one
+local MoveGreeters = require(script.Parent.MoveGreeters) -- 7.0 greeters: the client on the porch, the soldier at the Wall
 local PlayerData = require(script.Parent.PlayerData)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
@@ -96,7 +102,7 @@ local Moving = {}
 local remote = Net.get("Moving")
 local notice = Net.get("Notice")
 local TAG = "MovePrompt" -- client/MovingHud.luau shows a tagged prompt only to the players it is for
-local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry" }
+local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip" } -- (7.0 grip: CarryGrip)
 
 -- The art (another branch builds it): shared/FurnitureLooks.luau (Items, build), shared/HouseLayout.luau (plan),
 -- server/HouseInterior.luau (build, slot, destroy).
@@ -138,15 +144,7 @@ type Team = {
 	called: boolean, -- the Driver called the truck to the door (once a move)
 	placed: { [number]: number }, -- user id → barricades put up
 	barricades: { Barricade },
-	door: MoveRoles.Door, -- the front door: locked unless the contract has keys
-	enter: ProximityPrompt?, -- "Enter house": this move's own, for its crew only (shut while the door is locked)
-	pick: ProximityPrompt?, -- "Pick lock" (the Technician)
-	kick: ProximityPrompt?, -- "Kick door" (the rest)
-	lit: boolean, -- the interior's lights (the fuse box)
-	fuse: BasePart?,
-	fusePrompt: ProximityPrompt?,
-	lights: { Light },
-	lamps: { [BasePart]: Enum.Material }, -- the glowing lamps' material (off: plain)
+	enter: ProximityPrompt?, -- "Enter house": this move's own, for its crew only (the door is never locked)
 	climb: { [number]: Climb }, -- by spot: a carried thing going up stairs or a slope
 	lastTick: number,
 }
@@ -396,8 +394,7 @@ end
 
 -- ── 7.0 planning: the roles (shared/MoveRoles.luau; their abilities further down) ──
 
--- A plain anchored part (the roles' own things: the fuse box, the barricades' planks; the places' art is
--- server/MoveSites.luau's).
+-- A plain anchored part (the roles' own things: the barricades' planks; the places' art is server/MoveSites.luau's).
 local function rolePart(name: string, size: Vector3, frame: CFrame, color: Color3, material: Enum.Material, parent: Instance): Part
 	local part = Instance.new("Part")
 	part.Name = name
@@ -412,41 +409,14 @@ local function rolePart(name: string, size: Vector3, frame: CFrame, color: Color
 	return part
 end
 
--- One line of words on a part's front face (-Z).
-local function roleSign(part: BasePart, text: string, color: Color3)
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 40
-	gui.LightInfluence = 0
-	gui.Parent = part
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 0.4)
-	label.Position = UDim2.fromScale(0, 0.1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
-	label.Text = text
-	label.TextColor3 = color
-	label.Parent = gui
-end
-
-local function newTeam(contract: Contract): Team
+local function newTeam(): Team
 	return {
 		of = {},
 		switched = {},
 		called = false,
 		placed = {},
 		barricades = {},
-		door = MoveRoles.newDoor((contract :: any).keys == true),
 		enter = nil,
-		pick = nil,
-		kick = nil,
-		lit = true,
-		fuse = nil,
-		fusePrompt = nil,
-		lights = {},
-		lamps = {},
 		climb = {},
 		lastTick = 0,
 	}
@@ -528,7 +498,7 @@ local function buildSite(contract: Contract, parent: Instance): Site?
 	local model = Instance.new("Model")
 	model.Name = `Move_{contract.id}`
 	local up = Vector3.new(0, 3.5, 0)
-	-- (its "Enter house" prompt is each move's own, for that move's crew only: doorPrompts, 7.0 review)
+	-- (its "Enter house" prompt is each move's own, for that move's crew only: enterPrompt, 7.0 review)
 	invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
 	-- (server/MoveSites.luau: the ZDC MOVING yard sign left of the path, boxes by the door, MOVING DAY over it, cones at
 	-- the truck's kerb, the EVACUATED realtor's sign; nothing solid, nothing on the path to the kerb)
@@ -602,11 +572,48 @@ local function weldTo(item: Item, holder: BasePart, frame: CFrame)
 	setParts(item.model, false, true, item.root)
 end
 
+-- ── 7.0 grip hook (shared/CarryGrip.luau; the requests: the grip block before "Start") ───────────────────────────────
+-- Where a carry starts or changes (setHands asks first): every player holding a thing with a grip bar gets the
+-- character attribute CarryGrip (CarryGrip.encode: the kind, the weight, fragile; client/CarryGripUi.luau shows the bar
+-- while it is there), nil without one (a one-hand thing that is not fragile); Danny has none (he never slips). It goes
+-- with the other carry attributes (CARRY_ATTRIBUTES). A new carry (MoveCarry not this spot yet) or another kind (a
+-- helper took the other end) starts the holder's record over. Returns × the carry's walk: CarryGrip.speedFactor while
+-- every player holding it last reported steady.
+local CarryGrip = require(Shared.CarryGrip)
+type GripHold = { session: number, spot: number, kind: string, steady: boolean, last: number }
+local grips: { [Player]: GripHold } = {}
+Players.PlayerRemoving:Connect(function(player: Player)
+	grips[player] = nil
+end)
+
+local function gripHands(s: Session, item: Item): number
+	local thing = s.move.things[item.spot]
+	local kind = CarryGrip.kind(thing.class, thing.fragile, thing.helper ~= nil, roleOf(s, playerById(thing.carrier)))
+	local steady = kind ~= nil
+	for _, id in { thing.carrier, thing.helper } do
+		local player = playerById(id)
+		local character, humanoid = bodyOrNil(player)
+		if not player or not character or not humanoid then
+			continue -- (Danny, or a body that is gone)
+		end
+		local hold = grips[player]
+		if character:GetAttribute("MoveCarry") ~= item.spot or not hold or hold.session ~= s.id or hold.spot ~= item.spot or hold.kind ~= (kind or "") then
+			hold = { session = s.id, spot = item.spot, kind = kind or "", steady = false, last = 0 }
+			grips[player] = hold
+		end
+		character:SetAttribute("CarryGrip", if kind then CarryGrip.encode(kind, thing.weight, thing.fragile) else nil)
+		steady = steady and hold.steady
+	end
+	return CarryGrip.speedFactor(steady)
+end
+-- ── (end of the grip hook) ───────────────────────────────────────────────────────────────────────────────────────────
+
 -- The holders' attributes for the thing now (its mode: the walk, the hands).
 local function setHands(s: Session, item: Item)
 	local thing = s.move.things[item.spot]
 	local mode = heldMode(s, thing) -- 7.0 planning: a Mover holds a pair thing alone up …
-	local speed = speedOf(s, thing) * climbOf(s, item.spot) -- … and carries faster; the others slower up stairs
+	local grip = gripHands(s, item) -- 7.0 grip hook: the bar's kind for its holders, × the steady walk
+	local speed = speedOf(s, thing) * climbOf(s, item.spot) * grip -- … and carries faster; the others slower up stairs
 	local carrier = playerById(thing.carrier)
 	local _, humanoid, root = bodyOrNil(carrier)
 	local character = carrier and carrier.Character
@@ -1252,10 +1259,6 @@ onEnter = function(player: Player, contractId: string)
 	if traveling[player] or s.ended then
 		return
 	end
-	if s.team.door.locked then -- 7.0 planning: the Technician picks it, anybody kicks it in
-		say(player, "🔒 The front door is locked. The Technician picks the lock (hold E), or kick it in: LOUD.")
-		return
-	end
 	local _, humanoid, root = bodyOf(player)
 	if not humanoid or not root then
 		return
@@ -1420,58 +1423,7 @@ local function memberIds(s: Session): { number }
 	return ids
 end
 
--- The one member with `role` (nil: nobody, or several: then everybody sees its prompts and the server checks).
-local function onlyWith(s: Session, role: string): (Player?, number)
-	local found: Player? = nil
-	local count = 0
-	for _, player in membersOf(s) do
-		if s.team.of[player.UserId] == role then
-			found = player
-			count += 1
-		end
-	end
-	return if count == 1 then found else nil, count
-end
-
--- The lock's and the fuse box's prompts for the roles now: "Pick lock" and "Fix fuse box" for the Technician only
--- (MoveOnly; no Technician in the crew: hidden, a switch brings them), "Kick door" for the rest (MoveSkip the
--- Technician); the crew's MoveLocked while the door is locked (client/MovingHud.luau hides "Enter house" then).
-local function refreshTeamPrompts(s: Session)
-	local team = s.team
-	local tech, techs = onlyWith(s, "tech")
-	local pick, fuse, kick = team.pick, team.fusePrompt, team.kick
-	if team.enter then
-		team.enter.Enabled = not team.door.locked
-	end
-	if pick then
-		pick:SetAttribute("MoveOnly", if tech then tech.UserId else nil)
-		pick.Enabled = team.door.locked and techs > 0
-	end
-	if fuse then
-		fuse:SetAttribute("MoveOnly", if tech then tech.UserId else nil)
-		fuse.Enabled = not team.lit and techs > 0
-	end
-	if kick then
-		kick:SetAttribute("MoveSkip", if tech then tech.UserId else nil)
-		kick.Enabled = team.door.locked
-	end
-	for _, player in membersOf(s) do
-		setAttr(player, "MoveLocked", if team.door.locked then true else nil)
-	end
-end
-
-local function setLights(s: Session, on: boolean)
-	local team = s.team
-	team.lit = on
-	for _, light in team.lights do
-		light.Enabled = on
-	end
-	for lamp, material in team.lamps do
-		lamp.Material = if on then material else Enum.Material.SmoothPlastic
-	end
-end
-
--- Gives `player` the role: their attribute, what they hold at that role's walk and hold, the prompts.
+-- Gives `player` the role: their attribute, what they hold at that role's walk and hold.
 local function setRole(s: Session, player: Player, role: string)
 	s.team.of[player.UserId] = role
 	setAttr(player, "MoveRole", role)
@@ -1480,172 +1432,22 @@ local function setRole(s: Session, player: Player, role: string)
 	if item and as == "carrier" then
 		carry(s, item)
 	end
-	refreshTeamPrompts(s)
 	s.dirty = true
 end
 
--- The front door: "pick" (the Technician, quiet) or "kick" (anybody, loud: zombies come).
-local function openFront(s: Session, player: Player, how: string)
-	if s.ended or sessionOf(player) ~= s or traveling[player] then
-		return
-	end
-	local _, humanoid, root = bodyOf(player)
-	if not humanoid or not root or humanoid.SeatPart or flat(root.Position, s.site.door) > T.Reach.Door + 4 then
-		return
-	end
-	local ok, why, loud = MoveRoles.openDoor(s.team.door, roleOf(s, player), how)
-	if not ok then
-		say(player, MoveRoles.whyText(why))
-		return
-	end
-	if loud then
-		tellAll(s, `💥 {player.DisplayName} kicked the front door in. That was LOUD: zombies are coming!`)
-		local door = s.site.door
-		pcall(Zombies.noise, player, door)
-		for _ = 1, R.Tech.KickZombies do
-			local spot = Zombies.findSpot(door, nil, R.Tech.Near, R.Tech.Far)
-			local z = if spot then Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot, s.owner), spot, s.owner) else nil
-			if z then
-				Zombies.march(z, door, "move")
-				table.insert(s.horde, z)
-			end
-		end
-	else
-		tellAll(s, `🔓 {player.DisplayName} picked the front door's lock. Quietly.`)
-	end
-	refreshTeamPrompts(s)
-	s.dirty = true
-end
-
--- "Pick lock" and "Kick door" at the house's front door (this move's crew only); "Enter house" there learns to hide
--- for a crew whose door is locked.
-local function doorPrompts(s: Session)
-	local team = s.team
+-- "Enter house" at the house's front door: this move's own, for its crew only (MoveOwner). The door is never locked
+-- (the owner took the Technician out): the client on the porch greets the crew there (server/MoveGreeters.luau).
+local function enterPrompt(s: Session)
 	local spot = s.site.model:FindFirstChild("EnterDoor")
 	if not spot or not spot:IsA("BasePart") then
 		return
 	end
-	-- "Enter house": this move's own, for its crew only (MoveOwner); shut while the door is locked
 	local enter = newPrompt(spot, "Enter house", `{s.contract.icon} {s.contract.name}`, Enum.KeyCode.E, 0, T.Reach.Door)
 	tag(enter, s.owner)
 	enter.Triggered:Connect(function(player: Player)
 		onEnter(player, s.contract.id)
 	end)
-	team.enter = enter
-	if not team.door.locked then
-		return
-	end
-	local pick = newPrompt(spot, "Pick lock", "🔒 Front door · quiet", Enum.KeyCode.E, R.Tech.Pick, T.Reach.Door)
-	local kick = newPrompt(spot, "Kick door", "🔒 Front door · LOUD", Enum.KeyCode.E, R.Tech.Kick, T.Reach.Door)
-	tag(pick, s.owner)
-	tag(kick, s.owner)
-	pick.Triggered:Connect(function(player: Player)
-		openFront(s, player, "pick")
-	end)
-	kick.Triggered:Connect(function(player: Player)
-		openFront(s, player, "kick")
-	end)
-	team.pick, team.kick = pick, kick
-end
-
-local function fixFuse(s: Session, player: Player)
-	local box = s.team.fuse
-	local _, humanoid, root = bodyOf(player)
-	if s.ended or sessionOf(player) ~= s or traveling[player] or not box or not humanoid or not root then
-		return
-	end
-	if (root.Position - box.Position).Magnitude > 14 then
-		return
-	end
-	local ok, why = MoveRoles.canFuse(roleOf(s, player), s.team.lit)
-	if not ok then
-		say(player, MoveRoles.whyText(why))
-		return
-	end
-	setLights(s, true)
-	refreshTeamPrompts(s)
-	tellAll(s, `💡 {player.DisplayName} fixed the fuse box: the lights are on in {s.contract.name}.`)
-	s.dirty = true
-end
-
--- Where the fuse box goes (the plan's frame: the floor at the front door, +Z into the house): on the garage's back wall
--- (max Z, shared/HouseLayout.luau's "N") at head height, where no fixture stands (its workbench and shelves are there
--- too), the first free place from its corner; nil: no garage in the plan.
-local function fuseSpot(plan: any): Vector3?
-	local rooms = if type(plan.rooms) == "table" then plan.rooms else {}
-	local garage: any = nil
-	for _, room in rooms :: { any } do
-		if (room.id == "garage" or room.kind == "garage") and typeof(room.min) == "Vector3" and typeof(room.max) == "Vector3" then
-			garage = room
-		end
-	end
-	if not garage then
-		return nil
-	end
-	local lo, hi = garage.min :: Vector3, garage.max :: Vector3
-	local y0, y1 = lo.Y + 3.2, lo.Y + 5.6 -- (the box: 1.8 wide, 2.4 tall, against the wall)
-	local z0, z1 = hi.Z - 0.6, hi.Z
-	local fixtures = if type(plan.fixtures) == "table" then plan.fixtures else {}
-	local function free(x: number): boolean
-		for _, f in fixtures :: { any } do
-			if f.room ~= garage.id or typeof(f.at) ~= "CFrame" or typeof(f.size) ~= "Vector3" then
-				continue
-			end
-			local p, size = (f.at :: CFrame).Position, f.size :: Vector3
-			local sideways = (math.floor((tonumber(f.turn) or 0) / 90 + 0.5) % 2) == 1
-			local hx, hz = if sideways then size.Z / 2 else size.X / 2, if sideways then size.X / 2 else size.Z / 2
-			if x + 0.9 > p.X - hx and x - 0.9 < p.X + hx and z1 > p.Z - hz and z0 < p.Z + hz and y1 > p.Y and y0 < p.Y + size.Y then
-				return false
-			end
-		end
-		return true
-	end
-	local x = lo.X + 1.6
-	while x <= hi.X - 1.6 do
-		if free(x) then
-			return Vector3.new(x, lo.Y + 4.4, hi.Z - 0.3)
-		end
-		x += 0.5
-	end
-	return Vector3.new(lo.X + 1.6, lo.Y + 4.4, hi.Z - 0.3)
-end
-
--- The interior's lights (whatever Light the art put in it, but the porch's daylight) go off; a fuse box on the garage's
--- back wall (no garage in the plan: by the entry) brings them back. No lights in the art: nothing to fix.
-local function fuseBox(s: Session)
-	local interior = s.interior
-	if not interior then
-		return
-	end
-	local team = s.team
-	for _, d in interior:GetDescendants() do -- (once, when the move starts)
-		if d:IsA("Light") and d.Enabled ~= false then
-			local lamp = d.Parent
-			if lamp and lamp:IsA("BasePart") and string.find(lamp.Name, "Daylight", 1, true) then
-				continue
-			end
-			table.insert(team.lights, d)
-			if lamp and lamp:IsA("BasePart") and lamp.Material == Enum.Material.Neon then
-				team.lamps[lamp] = lamp.Material
-			end
-		end
-	end
-	if #team.lights == 0 then
-		return
-	end
-	local spot: Vector3? = fuseSpot(s.plan)
-	local entry: CFrame = s.plan.entry
-	local at = s.origin * CFrame.new(spot or Vector3.new(entry.X + 3, 4.4, entry.Z))
-	local box = rolePart("FuseBox", Vector3.new(1.8, 2.4, 0.5), at, Color3.fromRGB(96, 100, 104), Enum.Material.DiamondPlate, interior)
-	box.CanCollide = false
-	roleSign(box, "⚡ FUSES", Color3.fromRGB(242, 201, 76))
-	local prompt = newPrompt(box, "Fix fuse box", "⚡ Fuse box · the lights", Enum.KeyCode.E, R.Tech.Fuse, 8)
-	tag(prompt, s.owner)
-	prompt.Triggered:Connect(function(player: Player)
-		fixFuse(s, player)
-	end)
-	team.fuse, team.fusePrompt = box, prompt
-	setLights(s, false)
+	s.team.enter = enter
 end
 
 -- Is a Driver of the crew at the truck's wheel?
@@ -1902,7 +1704,6 @@ local function teamSync(s: Session)
 			local gone = playerById(id)
 			if gone then
 				setAttr(gone, "MoveRole", nil)
-				setAttr(gone, "MoveLocked", nil)
 			end
 			changed = true
 		end
@@ -1924,13 +1725,12 @@ local function teamSync(s: Session)
 		end
 	end
 	if changed then
-		refreshTeamPrompts(s)
 		s.dirty = true
 	end
 end
 
--- The move starts: the lobby's roles (by user id; nil: the admin's start, everybody gets a free one), the door, the
--- fuse box, the Driver's no-wait truck prompts.
+-- The move starts: the lobby's roles (by user id; nil: the admin's start, everybody gets a free one), the house's
+-- "Enter house" (never locked), the Driver's no-wait truck prompts. (No fuse box: the interior is lit as it was built.)
 local function teamSetup(s: Session, roles: { [number]: string }?)
 	for _, id in memberIds(s) do
 		local role = if roles then roles[id] else nil
@@ -1938,15 +1738,13 @@ local function teamSetup(s: Session, roles: { [number]: string }?)
 			s.team.of[id] = role :: string
 		end
 	end
-	doorPrompts(s)
-	fuseBox(s)
+	enterPrompt(s)
 	for _, prompt in { s.load, s.unload } do
 		if prompt then
 			prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver)
 		end
 	end
 	teamSync(s)
-	refreshTeamPrompts(s)
 end
 
 local function teamCleanup(s: Session)
@@ -1955,22 +1753,18 @@ local function teamCleanup(s: Session)
 		b.model:Destroy()
 	end
 	table.clear(team.barricades)
-	for _, prompt in { team.pick, team.kick, team.enter } do
-		if prompt then
-			prompt:Destroy()
-		end
+	if team.enter then
+		team.enter:Destroy()
+		team.enter = nil
 	end
-	team.pick, team.kick, team.enter = nil, nil, nil
 	for id in team.of do
 		local player = playerById(id)
 		if player then
 			setAttr(player, "MoveRole", nil)
-			setAttr(player, "MoveLocked", nil)
 		end
 	end
 	for _, player in everyone(s) do
 		setAttr(player, "MoveRole", nil)
-		setAttr(player, "MoveLocked", nil)
 	end
 end
 
@@ -1995,10 +1789,6 @@ local function teamView(s: Session, player: Player): { [string]: any }
 		crew = crew,
 		free = free,
 		switchAt = if last then last + R.Switch else 0,
-		locked = team.door.locked,
-		how = team.door.how,
-		lit = team.lit,
-		fuse = team.fuse ~= nil,
 		called = team.called,
 		barricades = if team.of[id] == "guard" then math.max(0, R.Guard.Barricades - (team.placed[id] or 0)) else 0,
 		up = #team.barricades,
@@ -2163,7 +1953,8 @@ local function cleanup(s: Session)
 	end
 	letGoZombies(s.horde)
 	letGoZombies(s.roam)
-	teamCleanup(s) -- 7.0 planning: the barricades, the lock's prompts, the roles' attributes
+	teamCleanup(s) -- 7.0 planning: the barricades, the Enter prompt, the roles' attributes
+	pcall(MoveGreeters.done, s) -- 7.0 greeters: the client leaves the porch; delivered: the soldier's welcome at the Wall
 	for member in s.members do
 		if member:GetAttribute("MoveWith") == s.owner.UserId then
 			member:SetAttribute("MoveWith", nil)
@@ -2455,7 +2246,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 		sentAt = 0,
 		ended = false,
 		emptyWarned = 0,
-		team = newTeam(contract), -- 7.0 planning
+		team = newTeam(), -- 7.0 planning
 		late = false,
 	}
 	sessions[owner] = s
@@ -2476,7 +2267,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	truckPrompts(s)
 	tellAll(s, `🚚 Move started: {contract.name}, {site.home.address}. Drive the truck there (GPS), carry the things out, load them and drive them to the Wall at the depot. {Rules.counts(s.move).stars} ★ things are a must!`)
 	storyText(s) -- MoveStory hook: Marge's text at the start
-	teamSetup(s, roles) -- 7.0 planning: the roles, the locked door, the fuse box
+	teamSetup(s, roles) -- 7.0 planning: the roles, the house's Enter prompt
 	return nil
 end
 
@@ -2647,6 +2438,7 @@ local function tick(s: Session)
 		hordeBurst(s, clock)
 	end
 	MoveHelper.sync(s, Moving) -- 7.0: Danny joins a crew of one, goes when it grows (his own loop walks him)
+	MoveGreeters.sync(s) -- 7.0 greeters: the client on the porch greets the crew and reacts to the move
 	refreshTruck(s)
 	local truck = s.truck :: Vehicles.Car
 	if flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius then
@@ -2717,6 +2509,65 @@ function Moving.admin(player: Player, arg: any): string
 	return "ADMIN: card | start | house | horde | time | deliver | end."
 end
 
+-- ── 7.0 grip: a slip, the wear (the Moving remote's "slip" and "grip"; the hook: setHands' gripHands) ─────────────────
+-- ("slip", spot): the sender's grip bar ran out: what they hold goes down from its carrier's hands (a pair thing whole,
+-- both ends: either carrier's slip drops it) and takes CarryGrip.slipDamage (fragile: more). ("grip", spot, quality,
+-- steady) about once a Config.CarryGrip.Report s: quality, the share of the time the load was outside the grip box,
+-- wears the thing a little (CarryGrip.wear, capped a second; a report sooner than Server.Every after the last one is
+-- dropped; a client that never reports wears nothing); a steady report (at most Server.SteadyOutside outside) makes the
+-- carry's walk × CarryGrip.speedFactor until one that is not (setHands asks gripHands). Only for what the sender holds
+-- now with a bar (its spot, their grip record on this move), never during a door's fade; Danny never slips.
+local function gripRequest(player: Player, action: string, spotArg: any, quality: any, steady: any)
+	local s = sessionOf(player)
+	if not s or s.ended or traveling[player] or type(spotArg) ~= "number" then
+		return
+	end
+	local spot = Rules.holding(s.move, player.UserId)
+	local thing = if spot then s.move.things[spot] else nil
+	local item = if spot then s.items[spot] else nil
+	local hold = grips[player]
+	if spot ~= spotArg or not thing or not item or thing.state ~= "carried" or not hold or hold.session ~= s.id or hold.spot ~= spot or hold.kind == "" then
+		return -- (not what the sender holds, or no bar on it)
+	end
+	local G = Config.CarryGrip
+	if action == "slip" then
+		local carrier = playerById(thing.carrier)
+		if not carrier then
+			return
+		end
+		local helper = playerById(thing.helper)
+		release(s, carrier, "slip")
+		hurtThing(s, thing.spot, CarryGrip.slipDamage(thing.fragile))
+		local left = math.floor(thing.condition * 100 + 0.5)
+		local holders: { Player? } = { carrier, helper }
+		for _, who in holders do
+			if who and who == player then
+				say(who, `💥 It slipped! The {thing.name} fell: {left}% left. Hold to keep it steady.`)
+			elseif who then
+				say(who, `💥 {player.DisplayName} lost their grip: the {thing.name} fell ({left}% left).`)
+			end
+		end
+		return
+	end
+	local t = now()
+	if hold.last > 0 and t - hold.last < G.Server.Every then
+		return -- (about one a second)
+	end
+	local dt = if hold.last > 0 then t - hold.last else G.Report
+	hold.last = t
+	local wear = CarryGrip.wear(quality, thing.fragile, dt)
+	if wear > 0 then
+		hurtThing(s, thing.spot, wear)
+	end
+	local outside = if type(quality) == "number" and quality == quality then quality else 1
+	local nowSteady = steady == true and outside <= G.Server.SteadyOutside
+	if nowSteady ~= hold.steady then
+		hold.steady = nowSteady
+		setHands(s, item) -- (the walk: × CarryGrip.speedFactor, or back)
+	end
+end
+-- ── (end of the grip block) ──────────────────────────────────────────────────────────────────────────────────────────
+
 -- ── Start ──────────────────────────────────────────────────────────────────
 
 local function onPutDown(player: Player)
@@ -2751,16 +2602,17 @@ local function planMove(owner: Player, contractId: any): string?
 	armed[owner] = nil
 	local summary = table.clone(card)
 	summary.busy = nil
-	summary.keys = (contract :: any).keys == true
 	summary.bed = { T.Bed.Width, T.Bed.Length }
 	return MoveLobby.open(owner, summary)
 end
 
-local function onRequest(player: Player, action: any, arg: any)
+local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3: any)
 	if not Net.limit(player, "Moving", Config.Robust.Limits.Moving) then
 		return
 	end
-	if action == "start" then
+	if action == "slip" or action == "grip" then -- 7.0 grip: the grip bar ran out / its report (the grip block)
+		gripRequest(player, action, arg, arg2, arg3)
+	elseif action == "start" then
 		local err = planMove(player, arg) -- 7.0 planning: the lobby first (its LAUNCH starts the move)
 		if err then
 			say(player, err)
@@ -2914,6 +2766,7 @@ function Moving.start()
 	end
 	buildBoard(made)
 	buildDropOff(made)
+	MoveGreeters.start(boardPart) -- 7.0 greeters: the soldier at the Wall, Marge's word at the kiosk (their own loop)
 	wireHooks()
 	-- 7.0 planning: the lobby before a move (its LAUNCH starts it with the roles; the quick chat reaches the move's crew)
 	MoveLobby.onLaunch = function(owner: Player, contractId: string, roles: { [number]: string }): string?

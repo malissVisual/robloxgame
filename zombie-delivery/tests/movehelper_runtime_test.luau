@@ -165,18 +165,9 @@ check("the zombies go after him too (Zombies.extraTargets)", hunted)
 
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
--- 7.0 planning: every move's front door is locked (no keys; Danny waits outside it): solo, Sol switches to the
--- Technician and picks it, then goes back where they were
-local function unlock()
-	local at = E.rootOf(sol).Position
-	E.request(sol, "role", "tech")
-	E.place(sol, outside)
-	trigger(promptIn(site, "Pick lock"), sol)
-	E.place(sol, at)
-end
+-- the owner took the Technician out: the front door is open from the start (no lock for Danny to wait at)
 E.place(sol, outside)
-unlock()
-check("the front door: Sol (the Technician now) picks its lock", sol:GetAttribute("MoveRole") == "tech" and sol:GetAttribute("MoveLocked") == nil)
+check("the front door is open: Enter house at once, no Pick lock", enter ~= nil and enter.Enabled and promptIn(site, "Pick lock") == nil and sol:GetAttribute("MoveRole") == "driver")
 trigger(enter, sol)
 local origin = E.interiors[1]
 check("Sol is inside", (E.rootOf(sol).Position - origin.Position).Magnitude < 10)
@@ -439,7 +430,6 @@ truck = E.cars[sol]
 cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
-unlock()
 danny = MoveHelper.find(sol)
 check("the next move: Danny again", danny ~= nil and danny.body ~= nil)
 carried = run(40, function()
@@ -467,7 +457,6 @@ said = #E.said
 Moving.admin(sol, "start")
 T.Bed.Height = bedHeight
 Moving.step()
-unlock()
 danny = MoveHelper.find(sol)
 local full = run(8, function()
 	return E.saidSince("Truck's full, boss.", said)
@@ -481,7 +470,6 @@ run(0.2)
 
 Moving.admin(sol, "start")
 Moving.step()
-unlock()
 danny = MoveHelper.find(sol)
 local holds = run(40, function()
 	return danny.body ~= nil and Rules.holding(danny.s.move, danny.id) ~= nil
