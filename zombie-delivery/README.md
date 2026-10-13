@@ -1262,6 +1262,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
   - Hold the left mouse button or F (gamepad R2; on a phone the round HOLD button over FIRE) and the grip box rises; let go and it falls (momentum, a little bounce).
   - The piece inside the box fills the meter (full: STEADY, +10% walk), outside drains it (standing still never under a third). SLIPPING! warns; at 0 it slips: dropped, with damage (fragile more), and a shaky carry wears it a little.
   - Two carriers each have their own bar (either slip drops it); a Mover's box is 35% bigger, a Mover lifting a 👥 piece alone gets a harder bar; a heavy lift starts at 60%; Danny never slips.
+  - The server checks the bar (7.1 review): no slip sooner than any bar can run out (about 1.9 s after the lift; the client asks again each second, so a real slip lands), STEADY only once a meter could have filled and only while the reports keep coming (none for 2 s: the +10% goes), STEADY +10% on the bar only when the server gives it (at most 10% of the last second outside the box), a 👥 piece carried by two worn half by each one's reports, nothing from either carrier during a door's fade. A piece that slipped and is picked up again at once gets a new bar.
   - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, Moving's grip hook and grip block (the Moving remote's "slip" and "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau`.
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
@@ -1279,7 +1280,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
   - She reacts during the move: a ★ piece carried past her ("Careful with that!"), the horde ("They're coming! Hurry!"), and the loaded truck driving off ("Thank you… see you behind the Wall.", also as a notice to the crew).
   - Zombies ignore her. She leaves when the move ends.
 - **The soldier at the Wall.** Private Reyes stands by the checkpoint's booth. When a truck is delivered, he waves: "Welcome to the safe zone. Unload over there."
-- **Marge at the Moving contracts kiosk.** This is the tutorial's Marge by the job board, not a second one. When you walk up to the kiosk on foot and not on a move, she turns to you and says "New contract, sweetie?" (a bubble and a notice). She greets each player once every 3 minutes.
+- **Marge at the Moving contracts kiosk.** This is the tutorial's Marge by the job board, not a second one. When you walk up to the kiosk on foot and not on a move, she turns to you and says "New contract, sweetie?" (a bubble and a notice). She greets each player once every 3 minutes. She never cuts into her first day: not to a player whose tutorial is still on, and not while her own tutorial bubble or a talk with her is going (the line waits till it is over).
 
 **The world** (`server/MoveSites.luau`, `shared/MoveSiteLooks.luau`):
 - the Wall's evacuation checkpoint at the depot is the drop-off;

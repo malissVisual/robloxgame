@@ -374,6 +374,42 @@ do
 	check("a computer: no HOLD button, the panel right of the middle at its scale", none == nil and (pc.x0 + pc.x1) / 2 > 640 and pcScale == scaleFor(1280, 684)
 		and math.abs((pc.y0 + pc.y1) / 2 - 342) < 1, show(pc))
 end
+do
+	-- 7.1 review: no place clear for HOLD: the one that covers the least (the touch controls CONTROL_WEIGHT × worse),
+	-- not simply the first (over FIRE)
+	local W, H = 844, 354
+	local S = scaleFor(W, H)
+	local size = math.max(sizes.holdMin, sizes.hold * S)
+	local spots = MoveLayout.holdSpots(W, H, S, size)
+	check("HOLD's places: five, each size × size", #spots == 5 and math.abs(spots[1].x1 - spots[1].x0 - size) < 1e-6 and math.abs(spots[3].y1 - spots[3].y0 - size) < 1e-6)
+	local blocks = { MoveLayout.panel(W, S) }
+	for index, spot in spots do -- (a block on each place, the first one whole, the others a corner each, smaller and smaller)
+		local side = if index == 1 then size else size * (0.6 - index * 0.08)
+		table.insert(blocks, TouchLayout.box(spot.x0, spot.y0, spot.x0 + side, spot.y0 + side))
+	end
+	local cluster = TouchLayout.cluster(W, H, S)
+	local controls = table.clone(TouchLayout.buttons(cluster))
+	table.insert(controls, cluster.thumb)
+	table.insert(controls, cluster.jump)
+	local avoid = table.clone(blocks)
+	for _, b in controls do
+		table.insert(avoid, b)
+	end
+	local function cost(b: TouchLayout.Box): number
+		return MoveLayout.clash(b, W, H, avoid) + (MoveLayout.CONTROL_WEIGHT - 1) * MoveLayout.clash(b, W, H, controls) - (MoveLayout.CONTROL_WEIGHT - 1) * MoveLayout.clash(b, W, H, {})
+	end
+	local _, _, hold = MoveLayout.grip(W, H, S, true, blocks, sizes)
+	local h = hold :: TouchLayout.Box
+	local least = true
+	for _, spot in spots do
+		least = least and cost(h) <= cost(spot) + 1e-6
+	end
+	check("no HOLD place clear: the one that covers the least, not the first (over FIRE, covered whole)", least and cost(h) > 0
+		and not (math.abs(h.x0 - spots[1].x0) < 1e-6 and math.abs(h.y0 - spots[1].y0) < 1e-6), show(h))
+	check("MoveLayout.clash: 0 when clear, the shared area, off the screen twice", MoveLayout.clash(TouchLayout.box(10, 10, 20, 20), W, H, {}) == 0
+		and MoveLayout.clash(TouchLayout.box(10, 10, 20, 20), W, H, { TouchLayout.box(15, 15, 40, 40) }) == 25
+		and MoveLayout.clash(TouchLayout.box(-10, 0, 10, 10), W, H, {}) == 200)
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

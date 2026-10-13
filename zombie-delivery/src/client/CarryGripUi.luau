@@ -8,6 +8,8 @@
 --     blocks, the quick chat's button and the touch buttons), in the UI kit's look: a charcoal panel, the bar (its
 --     track), the grip box (green steady, amber, red slipping), the LOAD as the thing's icon (from the Moving remote's
 --     state, its items by spot), the meter beside it, the title saying GRIP / STEADY +10% / SLIPPING! / DROPPED!
+--     (7.1 review: STEADY +10% only while the server gives it: the meter full and the last report steady as the server
+--     takes it, at most Config.CarryGrip.Server.SteadyOutside of it outside the box)
 --   * Hold: the left mouse button or F (a computer), R2 (a gamepad), the round HOLD button on a touch screen (at the
 --     right over the touch buttons, at least Config.CarryGrip.Ui.HoldMin px; jump, SPRINT and PUT DOWN stay free).
 --     With a thing in your arms the gun is away, so these presses neither shoot nor punch.
@@ -16,9 +18,12 @@
 --   * The sounds (7.1, art/audio/sfx4.ogg): grip_tick as the meter moves a notch (like a reel's click, TickEvery s apart
 --     at least), grip_warning on each entry into SLIPPING!, client/MoveSounds.luau slipped() at the slip.
 --   * SLIPPING!: the panel shakes (a pixel with Reduced Motion) and flashes red. At 0 it slips: the Moving remote's
---     ("slip", spot); the server drops it (the damage, the notice) and the bar goes once MoveCarry does. About
---     once a Config.CarryGrip.Report s ("grip", spot, quality, steady): the share of the time outside the box (the
---     server wears the thing a little) and whether you are steady (the server's +10% walk).
+--     ("slip", spot); the server drops it (the damage, the notice) and the bar goes once MoveCarry does (DROPPED! a
+--     moment first; still in your hands a second later: asked again). Picked up again, even the same piece inside
+--     DROPPED!'s moment, it is a new bar (7.1 review: never the old one, which would ask "slip" again). About once a
+--     Config.CarryGrip.Report s ("grip", spot, quality, steady): the share of the time outside the box (the server
+--     wears the thing a little) and whether you are steady (the server's +10% walk: the meter full and at most
+--     Server.SteadyOutside outside).
 --   * The first Ui.Tutorial carries with a bar show "Hold to keep it steady!" beside it (the key's hint on the first
 --     one only), until you are steady or a while has passed.
 --   * Paused (and dark) while a door's fade is on (the Moving remote's "fade").
@@ -76,7 +81,8 @@ type Run = {
 	tutorial: number, -- this carry's number (the tip on the first Ui.Tutorial ones)
 	tipUntil: number,
 	since: number, -- s since the last report
-	slipSent: number, -- os.clock of the last "slip" sent (0: none)
+	honoured: boolean, -- 7.1 review: the last report was steady as the server takes it (its +10% walk: the title)
+	slipSent: number, -- os.clock of the last "slip" sent (0: none, or the server dropped it: the attributes went)
 	linger: number, -- os.clock until DROPPED! stays
 	heading: number?, -- the last MoveDirection's heading (the turn)
 	health: number, -- the humanoid's health a step ago (a bite)
@@ -391,11 +397,18 @@ end
 
 local TONES = { K.good, K.warn, K.red }
 
+-- Steady as the server has it (7.1 review): the meter full and the last report honoured (not over
+-- Server.SteadyOutside outside), so STEADY +10% never shows while the walk has no +10%.
+local function shownSteady(r: Run): boolean
+	return r.sim.steady and r.honoured
+end
+
 -- The bar as the run's sim has it (a property only when it changed).
 local function draw(r: Run, now: number)
 	local p = parts
 	local sim = r.sim
 	local prof = sim.profile
+	local steady = shownSteady(r)
 	local zoneH = math.floor(prof.zone * TRACK_H + 0.5)
 	local zoneY = math.floor((1 - sim.zone - prof.zone) * TRACK_H + 0.5)
 	if zoneY ~= drawnZone then
@@ -430,13 +443,13 @@ local function draw(r: Run, now: number)
 		p.markerEdge.Color = if sim.inside then K.text else K.red
 	end
 	-- the title: DROPPED! / SLIPPING! / STEADY +10% / GRIP
-	local title = if sim.slipped then "DROPPED!" elseif sim.warn then "SLIPPING!" elseif sim.steady then "STEADY +10%" else "GRIP"
+	local title = if sim.slipped then "DROPPED!" elseif sim.warn then "SLIPPING!" elseif steady then "STEADY +10%" else "GRIP"
 	if title ~= drawnTitle then
 		drawnTitle = title
 		p.title.Text = title
-		p.title.TextColor3 = if sim.slipped or sim.warn then K.red elseif sim.steady then K.good else K.secondary
+		p.title.TextColor3 = if sim.slipped or sim.warn then K.red elseif steady then K.good else K.secondary
 		p.status.Text = if sim.slipped then "" elseif sim.warn then "HOLD!" else ""
-		p.edge.Color = if sim.slipped or sim.warn then K.red elseif sim.steady then K.good else ORANGE
+		p.edge.Color = if sim.slipped or sim.warn then K.red elseif steady then K.good else ORANGE
 	end
 	-- SLIPPING!: a shake and a red flash
 	local alarm = sim.warn or sim.slipped
@@ -568,7 +581,8 @@ local function frame(dt: number)
 		if r.since >= G.Report then
 			r.since = 0
 			local quality, steady = CarryGrip.report(sim)
-			remote:FireServer("grip", r.spot, quality, steady)
+			r.honoured = steady and quality <= G.Server.SteadyOutside -- (7.1 review: as the server takes it)
+			remote:FireServer("grip", r.spot, quality, r.honoured)
 		end
 		-- the reel's tick as the meter moves a notch (TickEvery s apart at least), the warning on each entry into SLIPPING!
 		local notch = math.floor(sim.meter * G.Ui.TickNotches)
@@ -582,13 +596,14 @@ local function frame(dt: number)
 		elseif not sim.warn then
 			r.warned = false
 		end
-		if sim.steady and not r.wasSteady then
+		local steady = shownSteady(r)
+		if steady and not r.wasSteady then
 			sound("ding", 0.25, 1.4)
 			if r.tipUntil > now then
 				r.tipUntil = now + 0.6 -- (got it: the tip goes)
 			end
 		end
-		r.wasSteady = sim.steady
+		r.wasSteady = steady
 		if event == "slip" then
 			r.slipSent = now
 			r.linger = now + LINGER
@@ -627,6 +642,7 @@ local function begin(code: string, spot: number, profile: CarryGrip.Profile, mov
 		tutorial = carries,
 		tipUntil = if carries <= G.Ui.Tutorial then os.clock() + TIP_FOR else 0,
 		since = 0,
+		honoured = false,
 		slipSent = 0,
 		linger = 0,
 		heading = nil,
@@ -657,16 +673,23 @@ local function refresh()
 	local mover = player:GetAttribute("MoveRole") == "mover"
 	if not code or not spot then
 		if r and r.sim.slipped and os.clock() < r.linger then
+			r.slipSent = 0 -- (the server dropped it: never asked again)
 			return -- (DROPPED! stays a moment)
 		end
 		stop()
 		return
 	end
-	if r and r.spot == spot then
+	-- the same carry (a slipped bar still in your hands: the server has not dropped it yet, "slip" asked again each
+	-- second). 7.1 review: a slipped bar the server dropped (its slipSent 0 since the attributes went) is over: the same
+	-- piece picked up again inside DROPPED!'s moment is a new bar, not the old one (DROPPED! and a second "slip").
+	if r and r.spot == spot and not (r.sim.slipped and r.slipSent == 0) then
 		if r.code ~= code or r.mover ~= mover then
 			local profile = profileOf(code, mover)
 			if profile then
 				CarryGrip.setProfile(r.sim, profile)
+				if r.code ~= code then
+					r.honoured = false -- (another kind: the server's steady starts over)
+				end
 				r.code, r.mover = code, mover
 			end
 		end

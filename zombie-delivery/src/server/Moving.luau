@@ -56,7 +56,8 @@
 --   * 7.0 greeters (server/MoveGreeters.luau; Config.MoveGreeters, the words shared/MoveStory.luau's): the client
 --     greets the crew on the house's porch and reacts to the move (MoveGreeters.sync in the tick, gone at the end:
 --     MoveGreeters.done in cleanup), the soldier at the Wall welcomes a delivered truck (done), Marge greets a player
---     at the Moving contracts kiosk (MoveGreeters.start's own loop).
+--     at the Moving contracts kiosk (MoveGreeters.start's own loop). 7.1 review: the sync in a pcall (a greeter's error
+--     never stops the tick: the delivery, the truck's refresh, the state's send).
 --   * 7.0 review (server): while you own a move with its truck out, nothing of the old game takes the truck's place
 --     (Vehicles.spawn / placeNear / placeAt / spawnAt wrapped: CAR, MY BIKE, the phone's CALL CAR in the truck, a car
 --     job, a garage's car, a dealer's; ZDC RIDE asks Moving.busy), no job or mission starts while you are on a move
@@ -177,6 +178,7 @@ type Session = {
 	emptyWarned: number,
 	team: Team, -- 7.0 planning: the roles and what they did
 	late: boolean, -- 7.0 review: the clock ran out: LateGrace s to reach the Wall
+	greeterWarned: number?, -- 7.1 review: os.clock of the last warning of a greeters' error (one every 30 s at most)
 }
 
 local art: Art? = nil
@@ -576,11 +578,13 @@ end
 -- Where a carry starts or changes (setHands asks first): every player holding a thing with a grip bar gets the
 -- character attribute CarryGrip (CarryGrip.encode: the kind, the weight, fragile; client/CarryGripUi.luau shows the bar
 -- while it is there), nil without one (a one-hand thing that is not fragile); Danny has none (he never slips). It goes
--- with the other carry attributes (CARRY_ATTRIBUTES). A new carry (MoveCarry not this spot yet) or another kind (a
--- helper took the other end) starts the holder's record over. Returns × the carry's walk: CarryGrip.speedFactor while
--- every player holding it last reported steady.
+-- with the other carry attributes (CARRY_ATTRIBUTES). A new carry (MoveCarry not this spot yet) starts the holder's
+-- record over (since: when its bar began, 7.1 review); another kind (a helper took the other end, a role switch) starts
+-- its steady and its reports over but keeps since (the client's bar goes on: CarryGrip.setProfile keeps its meter).
+-- Returns × the carry's walk: CarryGrip.speedFactor while every player holding it is steady (their last report was;
+-- 7.1 review: gripLapsed, in the tick, takes it back when their reports stopped).
 local CarryGrip = require(Shared.CarryGrip)
-type GripHold = { session: number, spot: number, kind: string, steady: boolean, last: number }
+type GripHold = { session: number, spot: number, kind: string, steady: boolean, last: number, since: number }
 local grips: { [Player]: GripHold } = {}
 Players.PlayerRemoving:Connect(function(player: Player)
 	grips[player] = nil
@@ -597,14 +601,31 @@ local function gripHands(s: Session, item: Item): number
 			continue -- (Danny, or a body that is gone)
 		end
 		local hold = grips[player]
-		if character:GetAttribute("MoveCarry") ~= item.spot or not hold or hold.session ~= s.id or hold.spot ~= item.spot or hold.kind ~= (kind or "") then
-			hold = { session = s.id, spot = item.spot, kind = kind or "", steady = false, last = 0 }
+		if character:GetAttribute("MoveCarry") ~= item.spot or not hold or hold.session ~= s.id or hold.spot ~= item.spot then
+			hold = { session = s.id, spot = item.spot, kind = kind or "", steady = false, last = 0, since = now() }
 			grips[player] = hold
+		elseif hold.kind ~= (kind or "") then
+			hold.kind, hold.steady, hold.last = kind or "", false, 0 -- (the same carry, another kind: since kept)
 		end
 		character:SetAttribute("CarryGrip", if kind then CarryGrip.encode(kind, thing.weight, thing.fragile) else nil)
 		steady = steady and hold.steady
 	end
 	return CarryGrip.speedFactor(steady)
+end
+
+-- 7.1 review: a steady walk lasts while its reports come: a holder of `thing` steady with no report for more than
+-- 2 × Config.CarryGrip.Report s is steady no more (the +10% goes). True when one went: the tick sets the walk again.
+local function gripLapsed(s: Session, thing: Rules.Thing, t: number): boolean
+	local lapsed = false
+	for _, id in { thing.carrier, thing.helper } do
+		local player = playerById(id)
+		local hold = if player then grips[player] else nil
+		if hold and hold.steady and hold.session == s.id and hold.spot == thing.spot and t - hold.last > 2 * Config.CarryGrip.Report then
+			hold.steady = false
+			lapsed = true
+		end
+	end
+	return lapsed
 end
 -- ── (end of the grip hook) ───────────────────────────────────────────────────────────────────────────────────────────
 
@@ -2367,8 +2388,10 @@ local function syncMembers(s: Session)
 	teamSync(s) -- 7.0 planning: a newcomer's role, a leaver's gone
 end
 
--- The carried things: a helper too far for Grace s, a carrier faster than the carry (a teleport), a fall's top.
+-- The carried things: a helper too far for Grace s, a carrier faster than the carry (a teleport), a fall's top; 7.1
+-- review: a steady walk whose grip reports stopped (gripLapsed).
 local function watchCarried(s: Session, clock: number)
+	local t = now()
 	for _, spot in s.move.order do
 		local thing = s.move.things[spot]
 		local item = s.items[spot]
@@ -2382,6 +2405,9 @@ local function watchCarried(s: Session, clock: number)
 		end
 		local holder: Player = carrier
 		climbStep(s, spot, holder, root, clock) -- 7.0 planning: slower up stairs and slopes (not a Mover)
+		if gripLapsed(s, thing, t) then
+			setHands(s, item) -- (the walk without the steady +10%)
+		end
 		if item.fallFrom then
 			item.fallFrom = math.max(item.fallFrom, root.Position.Y)
 		end
@@ -2438,7 +2464,15 @@ local function tick(s: Session)
 		hordeBurst(s, clock)
 	end
 	MoveHelper.sync(s, Moving) -- 7.0: Danny joins a crew of one, goes when it grows (his own loop walks him)
-	MoveGreeters.sync(s) -- 7.0 greeters: the client on the porch greets the crew and reacts to the move
+	-- 7.0 greeters: the client on the porch greets the crew and reacts to the move (7.1 review: in a pcall: a greeter's
+	-- error never stops the delivery, the truck's refresh or the state's send below)
+	local greeted, greeterError = pcall(function()
+		MoveGreeters.sync(s)
+	end)
+	if not greeted and clock - (s.greeterWarned or -math.huge) > 30 then
+		s.greeterWarned = clock
+		warn(`[Moving] the greeters: {greeterError}`)
+	end
 	refreshTruck(s)
 	local truck = s.truck :: Vehicles.Car
 	if flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius then
@@ -2517,6 +2551,15 @@ end
 -- dropped; a client that never reports wears nothing); a steady report (at most Server.SteadyOutside outside) makes the
 -- carry's walk × CarryGrip.speedFactor until one that is not (setHands asks gripHands). Only for what the sender holds
 -- now with a bar (its spot, their grip record on this move), never during a door's fade; Danny never slips.
+-- 7.1 review (the server trusts the client less):
+--   * neither while either end of the thing is on a door trip (its partner's fade comes a moment after: its bar ran on);
+--   * a "slip" sooner than Meter.HeavyStart / Meter.Drain × 0.9 s after the bar began (its record's since: no bar runs
+--     out faster, from its lowest start at the fastest drain) is refused; the client asks again each second, so a real
+--     slip still lands;
+--   * steady only after (1 − its profile's start) / Meter.Fill s of carry (no meter fills sooner); a steady whose
+--     reports stopped for 2 × Report s goes again (gripLapsed in the tick);
+--   * a pair thing held by two players: each one's reports wear it half (their two bars together wear it as one;
+--     either one's slip still drops it whole).
 local function gripRequest(player: Player, action: string, spotArg: any, quality: any, steady: any)
 	local s = sessionOf(player)
 	if not s or s.ended or traveling[player] or type(spotArg) ~= "number" then
@@ -2529,13 +2572,20 @@ local function gripRequest(player: Player, action: string, spotArg: any, quality
 	if spot ~= spotArg or not thing or not item or thing.state ~= "carried" or not hold or hold.session ~= s.id or hold.spot ~= spot or hold.kind == "" then
 		return -- (not what the sender holds, or no bar on it)
 	end
+	local carrier = playerById(thing.carrier)
+	local helper = playerById(thing.helper)
+	if (carrier and traveling[carrier]) or (helper and traveling[helper]) then
+		return -- (7.1 review: its other end is on a door trip)
+	end
 	local G = Config.CarryGrip
+	local t = now()
 	if action == "slip" then
-		local carrier = playerById(thing.carrier)
+		if t - hold.since < G.Meter.HeavyStart / G.Meter.Drain * 0.9 then
+			return -- (7.1 review: sooner than any bar runs out)
+		end
 		if not carrier then
 			return
 		end
-		local helper = playerById(thing.helper)
 		release(s, carrier, "slip")
 		hurtThing(s, thing.spot, CarryGrip.slipDamage(thing.fragile))
 		local left = math.floor(thing.condition * 100 + 0.5)
@@ -2549,18 +2599,18 @@ local function gripRequest(player: Player, action: string, spotArg: any, quality
 		end
 		return
 	end
-	local t = now()
 	if hold.last > 0 and t - hold.last < G.Server.Every then
 		return -- (about one a second)
 	end
 	local dt = if hold.last > 0 then t - hold.last else G.Report
 	hold.last = t
-	local wear = CarryGrip.wear(quality, thing.fragile, dt)
+	local wear = CarryGrip.wear(quality, thing.fragile, dt) * (if carrier and helper then 0.5 else 1) -- (7.1 review: by two: half each)
 	if wear > 0 then
 		hurtThing(s, thing.spot, wear)
 	end
 	local outside = if type(quality) == "number" and quality == quality then quality else 1
-	local nowSteady = steady == true and outside <= G.Server.SteadyOutside
+	local fills = (1 - CarryGrip.profile(hold.kind, thing.weight, thing.fragile, false).start) / G.Meter.Fill
+	local nowSteady = steady == true and outside <= G.Server.SteadyOutside and t - hold.since >= fills -- (7.1 review: not sooner than a meter fills)
 	if nowSteady ~= hold.steady then
 		hold.steady = nowSteady
 		setHands(s, item) -- (the walk: × CarryGrip.speedFactor, or back)

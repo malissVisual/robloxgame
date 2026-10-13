@@ -8,7 +8,8 @@
 -- notice too), the horde; the delivery at the Wall: the soldier turns to the truck, waves and welcomes it, Marge gone;
 -- a move called off: no welcome; a contract without a greeter: nobody on the porch. Marge at the kiosk: the tutorial's
 -- dispatcher (no second Marge), to a player on foot and on no move who comes up to the kiosk, once per player every
--- Again s, her bubble seen from afar, the player's notice.
+-- Again s, her bubble seen from afar, the player's notice; 7.1 review: never into her first day (a player with the
+-- attribute TutorialPhase, her own tutorial talk going: TutorialTalk), the line waiting till that talk is over.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Greeters = require("./MoveGreetersServer")
@@ -373,6 +374,33 @@ E.clock += G.Kiosk.Again
 E.place(cid, boardPart.Position + V3(-(G.Kiosk.Near - 4), 0, 0))
 Greeters.step()
 check("Cid again after Again s: greeted again", saidBy(dispatcher, MoveStory.kioskLine(3), before) == 1)
+-- 7.1 review: her kiosk line never cuts into her first day (server/Tutorial.luau's TutorialPhase and TutorialTalk)
+local away, near = boardPart.Position + V3(-(G.Kiosk.Near + 8), 0, -2), boardPart.Position + V3(-(G.Kiosk.Near - 4), 0, -2)
+local eve = E.player(55, "Eve", away)
+eve:SetAttribute("TutorialPhase", "board")
+Greeters.step()
+before = #E.saidBy
+local eveAt = #E.messages
+E.place(eve, near)
+Greeters.step()
+check("7.1 review: a player on her first day with Marge (TutorialPhase) comes up to the kiosk: no kiosk line", #E.saidBy == before and not heard(eve, "💬", eveAt))
+eve:SetAttribute("TutorialPhase", nil)
+E.clock += 1
+Greeters.step()
+check("…the first day over while still by the kiosk: nothing then either (only on coming up to it)", #E.saidBy == before)
+E.place(eve, away)
+Greeters.step()
+dispatcher:SetAttribute("TutorialTalk", E.clock + 5) -- (her tutorial bubble or a Talk with somebody: 5 s more)
+E.place(eve, near)
+Greeters.step()
+E.clock += 2
+Greeters.step()
+check("…Eve comes up again while Marge's tutorial talk goes on (TutorialTalk): she waits", #E.saidBy == before and not heard(eve, "💬", eveAt))
+E.clock += 4
+Greeters.step()
+check("…the talk over, Eve still by the kiosk: her line now, once", saidBy(dispatcher, MoveStory.kioskLine(4), before) == 1 and heard(eve, MoveStory.kioskLine(4), eveAt))
+Greeters.step()
+check("…and not again", #E.saidBy == before + 1)
 dispatcher:Destroy()
 E.clock += G.Kiosk.Again + G.Respawn
 before = #E.saidBy
