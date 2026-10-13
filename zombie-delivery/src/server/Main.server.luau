@@ -223,6 +223,7 @@ safely("Analytics", function()
 	require(Server.Analytics).start()
 end)
 safely("Vehicles", Vehicles.start)
+safely("BikeRighting", require(Server.BikeRighting).start) -- 6.24: a bike knocked over gets back up
 safely("Zombies", Zombies.start)
 safely("Jobs", Jobs.start)
 safely("JobQueue", require(Server.JobQueue).start) -- 6.12.8: the NEXT UP queue (+ QUEUE, ADD ALL)

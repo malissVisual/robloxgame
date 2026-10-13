@@ -111,6 +111,25 @@ for _, def in Config.Cars do
 			assert(d.Transparency == 1, def.id .. ': a visible collider ' .. d.Name)
 		end
 	end
+	-- 6.24: nothing of the bike that collides where its rider's body sits (6.19 put the saddle inside the pedal bikes'
+	-- hidden hull box: on the moves on and off, which the server sees unwelded, it pushed the bike over). The seated
+	-- classic R15's root, 2 × 2 × 1, Config.Cargo.BoardSitLift over the seat's top (client/CarBoarding.luau), the torso
+	-- over it; a wheel collider may touch its bottom edge (by 0.05 at most).
+	do
+		local seat = built.seat
+		local top = seat.Position.Y + seat.Size.Y / 2
+		local lo = Mock.Vector3.new(seat.Position.X - 1, top + Config.Cargo.BoardSitLift - 1 + 0.05, seat.Position.Z - 0.5)
+		local hi = Mock.Vector3.new(seat.Position.X + 1, top + Config.Cargo.BoardSitLift + 1, seat.Position.Z + 0.5)
+		for _, d in model:GetDescendants() do
+			if d:IsA('BasePart') and d.CanCollide then
+				local p, h = d.Position, d.Size / 2
+				local apart = p.X + h.X <= lo.X or p.X - h.X >= hi.X or p.Y + h.Y <= lo.Y or p.Y - h.Y >= hi.Y or p.Z + h.Z <= lo.Z or p.Z - h.Z >= hi.Z
+				assert(apart, def.id .. ': ' .. d.Name .. ' collides where the rider sits (its top ' .. (p.Y + h.Y) .. ', the rider from ' .. lo.Y .. ')')
+			end
+		end
+		local righting = chassis:FindFirstChild('Righting')
+		assert(righting and righting.ClassName == 'AlignOrientation' and righting.Enabled == false, def.id .. ': the Righting turn, off')
+	end
 	assert(named(model, 'Headlight') == nil and named(model, 'Tyre') == nil, def.id .. ': no car lamps or car tyres')
 	assert(named(model, 'BikeLamp') ~= nil, def.id .. ': a small beam at night')
 	local parts = count(model, isPart)
