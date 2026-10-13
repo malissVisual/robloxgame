@@ -25,6 +25,7 @@
 -- their ids, FurnitureLooks.FarmRooms the farm's own room kinds). An item with bigDoor = true is wider than a house's
 -- doorway (Config.Furniture.Door) and leaves only by a wide one (the farm's barn doors, Config.Furniture.Farm.BarnDoor:
 -- Farm.exitsFor), so a move must route it there.
+--   FurnitureLooks.Palettes           the colour lists the builders pick from (fabric, wood, paint, accent, appliance)
 
 local Config = require(script.Parent.Config)
 
@@ -1490,5 +1491,7 @@ function FurnitureLooks.parts(id: string): number
 end
 
 FurnitureLooks.MaxParts = Tuning.MaxParts
+-- The builders' colour lists by finish (server/FurnitureMesh.luau colours the Blender models' pieces from them).
+FurnitureLooks.Palettes = { fabric = FABRICS, wood = WOODS, paint = PAINTS, accent = ACCENTS, appliance = APPLIANCES }
 
 return FurnitureLooks

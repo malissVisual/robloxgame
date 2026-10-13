@@ -1413,6 +1413,39 @@ Blender), then import the new `ZDCVanArt.fbx` again (delete the old `ZDCVanArt` 
 3 × the size) on the real factory: every piece once in place, the doors on their hinges, the wheel on the four tyres,
 nothing physical, the factory's look hidden. `check_fleet.py` runs it too and keeps the van's panelled skin in its budgets.
 
+## The moves' furniture: the owner's Blender models (7.1)
+
+The owner: "namodelovat jakoby na blenderu pěknou místnost … hezčí věci co odnášíš" (a nice room and nicer models of
+the things a move carries out).
+
+**The models.** `design/blender-furniture/furniture.py` builds all 36 pieces of `shared/FurnitureLooks.luau` in Blender (or
+with `pip install bpy`), each exactly its catalogue box (1 unit = 1 stud, the bottom on the floor, the front −Y): bevelled
+cushions and drawers, turned legs and vases, a CRT TV, an upright piano with its keys, a grandfather clock, a gramophone,
+a fridge, a bicycle, a rocking horse and the labelled boxes. Next to the catalogue a furnished living room (planks,
+wallpaper, wainscot, a window with curtains, a rug). `furniture.blend`, the renders (`furniture-preview.png`,
+`room-preview.png`) and the owner's Czech guide (`NAVOD.md`) are next to it.
+
+**The look.** `server/FurnitureMesh.luau` dresses every piece `server/HouseInterior.luau` builds (one call after
+`FurnitureLooks.build`) with the MeshParts of the imported `ZDCFurnitureArt` model: the pieces are `<id>_<finish>` (185, about
+85,000 triangles), each finish a Roblox material and colour; fabric, wood, paint, accent and appliance take the piece's
+variant colour from `FurnitureLooks.Palettes` (the builders' own lists). The Root (the box that collides, is carried, packed
+and damaged) and its attributes stay; the builders' other parts go, except the labelled ones (FRAGILE · KITCHEN, TOYS,
+FAMILY PHOTOS, THIS SIDE UP), which turn invisible and keep their text on the box's faces. The clones are welded to the
+Root and not physical. A dressed house has fewer parts than before (365 against 513 in the check's house). Markers in the
+model (`mark_o/x/y/z` for the importer's turn and scale, `mark_<id>` for each piece's place) make the import settings
+irrelevant. Until the model is imported (or for an id it lacks) a piece keeps FurnitureLooks' look.
+
+**What the owner does once in Studio** (meshes have to be uploaded under the owner's account): File → Import 3D →
+`design/blender-furniture/roblox/ZDCFurnitureArt.fbx` (the defaults), Insert, save and publish. The model can stay where it
+lands; at the server's start (`FurnitureMesh.start` in `Main.server.luau`) it moves to ServerStorage. Rebuilding: `python furniture.py -- --export roblox` (or `EXPORT = True` in
+Blender), then import the new FBX again (delete the old `ZDCFurnitureArt` first).
+
+**Checks.** `tools/furniture/mesh-check.py <luau>` simulates the import from `roblox/ZDCFurnitureArt.json` (a quarter turn,
+3 × the size) on the real FurnitureLooks and FurnitureMesh: furniture.py's sizes are the catalogue's, every finish has a
+look, and on three variants of every piece each model piece is in place inside the box, welded and not physical, the Root
+untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
+variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
+
 ## New zombies, a real walk, the bike on its wheels (6.24)
 
 The owner: "noví zombíci", "lepší animace jak chodí a různě", and fix what is broken.
