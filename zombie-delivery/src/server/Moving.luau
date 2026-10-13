@@ -284,6 +284,21 @@ local function tellAll(s: Session, text: string)
 	end
 end
 
+-- ── MoveStory hook (7.0 story, shared/MoveStory.luau) ───────────────────────────────────────────────────────────────
+-- Marge's texts on the crew's phones (the Tutorial remote's "message": client/Phone.luau's MESSAGES): at START her
+-- word on the ★ things (`how` nil), at the end her debrief for the outcome (`how`: the phase, `stars`: the rating).
+-- A contract without a chapter says nothing. Called twice: startMove and finish.
+local MoveStory = require(Shared.MoveStory)
+local function storyText(s: Session, how: string?, stars: number?)
+	local text = if how then MoveStory.debriefText(s.contract.id, how, stars) else MoveStory.dispatchText(s.contract.id)
+	if text then
+		for _, player in everyone(s) do
+			Net.get("Tutorial"):FireClient(player, "message", { from = MoveStory.Sender, text = text })
+		end
+	end
+end
+-- ── (end of the MoveStory hook) ──────────────────────────────────────────────────────────────────────────────────────
+
 local function playerById(id: number?): Player?
 	return if id then Players:GetPlayerByUserId(id) else nil
 end
@@ -1331,6 +1346,7 @@ local function finish(s: Session, event: string, why: string?)
 		})
 		remote:FireClient(member, "state", nil)
 	end
+	storyText(s, phase, result.stars) -- MoveStory hook: Marge's debrief at the end
 	if phase == "done" or phase == "late" then
 		local owner = s.owner
 		PlayerData.track("event", owner, "MoveDone", result.stars, s.contract.id, if #present > 1 then "crew" else "solo")
@@ -1508,6 +1524,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean): string
 	s.exit = exit
 	truckPrompts(s)
 	tellAll(s, `🚚 Move started: {contract.name}, {site.home.address}. Drive the truck there (GPS), carry the things out, load them and drive them to the Wall at the depot. {Rules.counts(s.move).stars} ★ things are a must!`)
+	storyText(s) -- MoveStory hook: Marge's text at the start
 	return nil
 end
 

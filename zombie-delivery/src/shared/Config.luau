@@ -5821,6 +5821,23 @@ Config.Moving = {
 	Tick = 0.2,
 }
 
+-- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
+-- shows the story cards, the CHAPTERS on the contract card and the client's thanks on the result card; Marge's texts go
+-- out from server/Moving.luau's MoveStory hook). The limits keep every text inside its card (movestory_test.luau):
+--   Limits      characters at most: a chapter's Title, Place and Client name, its Hook (the CHAPTERS detail), the
+--               client's Blurb, a story card's Line (the intro, a briefing, the radio's Taunt), a Keepsake's story,
+--               Marge's phone Text (the dispatch at START, the debrief at the end) and the result card's Quote (thanks)
+--   Briefing    a briefing's lines (at least, at most); Intro: Marge's intro cards (at least, at most)
+--   Great       a move done with this many stars or more is "great" (its debrief and thanks), with fewer "ok"
+--   Guard       s after a story card opens before Space / Enter / A turn it (client/DialogKeys.luau)
+Config.MoveStory = {
+	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110 },
+	Briefing = { 3, 5 } :: { number },
+	Intro = { 3, 4 } :: { number },
+	Great = 4,
+	Guard = 0.35,
+}
+
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:
 -- jobs are the grind, you save up for something, then progress in the missions). The tables above keep the old base
 -- prices; this one pass, run once here, multiplies every `price` (and the upgrade tracks' baseCost) by its kind's
