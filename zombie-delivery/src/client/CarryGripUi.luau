@@ -13,8 +13,10 @@
 --     With a thing in your arms the gun is away, so these presses neither shoot nor punch.
 --   * The body says how wild the load is: your speed and turns (the humanoid's MoveDirection), going up or down (the
 --     root's vertical speed on the ground), a jump (in the air), a bite (health lost); standing still it calms down.
---   * SLIPPING!: the panel shakes (a pixel with Reduced Motion), flashes red and beeps once. At 0 it slips: the Moving
---     remote's ("slip", spot); the server drops it (the damage, the notice) and the bar goes once MoveCarry does. About
+--   * The sounds (7.1, art/audio/sfx4.ogg): grip_tick as the meter moves a notch (like a reel's click, TickEvery s apart
+--     at least), grip_warning on each entry into SLIPPING!, client/MoveSounds.luau slipped() at the slip.
+--   * SLIPPING!: the panel shakes (a pixel with Reduced Motion) and flashes red. At 0 it slips: the Moving remote's
+--     ("slip", spot); the server drops it (the damage, the notice) and the bar goes once MoveCarry does. About
 --     once a Config.CarryGrip.Report s ("grip", spot, quality, steady): the share of the time outside the box (the
 --     server wears the thing a little) and whether you are steady (the server's +10% walk).
 --   * The first Ui.Tutorial carries with a bar show "Hold to keep it steady!" beside it (the key's hint on the first
@@ -81,6 +83,8 @@ type Run = {
 	bite: number,
 	warned: boolean,
 	wasSteady: boolean,
+	notch: number, -- the meter's notch at the last grip_tick (Ui.TickNotches a meter)
+	tickAt: number, -- the bar's time (sim.time) of the last grip_tick
 	hooks: { RBXScriptConnection },
 }
 local run: Run? = nil
@@ -115,10 +119,29 @@ local function screen(): ScreenGui?
 	return made
 end
 
-local function sound(name: string, volume: number, pitch: number)
-	pcall(function()
-		(require(script.Parent.Sounds) :: any).play(name, volume, pitch)
-	end)
+-- The sounds (client/Sounds.luau, 7.1's sfx4: grip_tick, grip_warning; the slip is client/MoveSounds.luau's), found
+-- once (a frame's tick makes no closure).
+local soundsModule: any = nil
+local function loadSounds(): any
+	return require(script.Parent.Sounds)
+end
+local function sound(name: string, volume: number, pitch: number?)
+	if soundsModule == nil then
+		local ok, found = pcall(loadSounds)
+		soundsModule = if ok and type(found) == "table" then found else false
+	end
+	if soundsModule then
+		pcall(soundsModule.play, name, volume, pitch)
+	end
+end
+local function loadMoveSounds(): any
+	return require(script.Parent.MoveSounds)
+end
+local function slipped()
+	local ok, found = pcall(loadMoveSounds)
+	if ok and type(found) == "table" and type(found.slipped) == "function" then
+		pcall(found.slipped) -- (grip_slip: a whoosh and a thud; no put-down after it)
+	end
 end
 
 -- Reduced Motion (the player's Roblox setting), looked at when a bar starts and once a second (not every frame).
@@ -547,9 +570,15 @@ local function frame(dt: number)
 			local quality, steady = CarryGrip.report(sim)
 			remote:FireServer("grip", r.spot, quality, steady)
 		end
+		-- the reel's tick as the meter moves a notch (TickEvery s apart at least), the warning on each entry into SLIPPING!
+		local notch = math.floor(sim.meter * G.Ui.TickNotches)
+		if notch ~= r.notch and sim.time - r.tickAt >= G.Ui.TickEvery then
+			r.notch, r.tickAt = notch, sim.time
+			sound("grip_tick", G.Ui.Tick)
+		end
 		if sim.warn and not r.warned then
 			r.warned = true
-			sound("notify", 0.6, 0.75)
+			sound("grip_warning", G.Ui.Warning)
 		elseif not sim.warn then
 			r.warned = false
 		end
@@ -564,7 +593,7 @@ local function frame(dt: number)
 			r.slipSent = now
 			r.linger = now + LINGER
 			remote:FireServer("slip", r.spot)
-			sound("putdown", 0.8, 0.7)
+			slipped()
 		end
 	elseif r.slipSent > 0 and now - r.slipSent > 1 then
 		r.slipSent = now -- (still in your hands a second later: asked again)
@@ -605,6 +634,8 @@ local function begin(code: string, spot: number, profile: CarryGrip.Profile, mov
 		bite = 0,
 		warned = false,
 		wasSteady = false,
+		notch = math.floor(profile.start * G.Ui.TickNotches),
+		tickAt = -math.huge,
 		hooks = {},
 	}
 	run = r

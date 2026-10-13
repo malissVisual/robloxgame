@@ -5819,7 +5819,9 @@ Config.ItemModel = {
 --              when fragile)
 --   Ui         Tutorial: the carries with the "Hold to keep it steady!" tip (the key's hint on the first one only);
 --              Shake: px at SLIPPING! (ReducedShake with Reduced Motion); Hold: the touch HOLD button's side (px, at
---              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere
+--              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere; the sounds (7.1,
+--              art/audio/sfx4.ogg): grip_tick at Tick's volume each TickNotches-th of the meter it moves, TickEvery s
+--              apart at least, grip_warning at Warning's on each entry into SLIPPING! (the slip: MoveSounds.slipped)
 Config.CarryGrip = {
 	Kinds = {
 		hand = { Zone = 0.36, Load = 0.35, Gravity = 1 },
@@ -5839,7 +5841,7 @@ Config.CarryGrip = {
 	MaxDt = 0.25,
 	Report = 1,
 	Server = { Wear = 0.008, WearFragile = 1.5, WearCap = 0.015, Gap = 1.5, Every = 0.7, SteadyOutside = 0.1, Slip = 0.06 },
-	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55 },
+	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55, Tick = 0.5, TickEvery = 0.08, TickNotches = 50, Warning = 0.7 },
 }
 
 -- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside

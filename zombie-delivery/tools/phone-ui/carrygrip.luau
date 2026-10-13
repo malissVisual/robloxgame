@@ -91,8 +91,14 @@ M.MapView.waypointAt = function()
 end
 M.MapView.onWaypoint = function() end
 M.played = {}
-M.Sounds.play = function(name)
+M.playedAt = {} -- (grip_tick: the frame it played on)
+M.frame = 0
+M.Sounds.play = function(name, volume)
 	table.insert(M.played, name)
+	if name == "grip_tick" then
+		table.insert(M.playedAt, M.frame)
+		M.tickVolume = volume
+	end
 end
 local camera = M.workspace.CurrentCamera
 
@@ -212,6 +218,7 @@ local function inside(b)
 end
 local function frames(count, dt)
 	for _ = 1, count do
+		M.frame += 1
 		M.services.RunService.RenderStepped:Fire(dt or 1 / 60)
 	end
 end
@@ -360,7 +367,19 @@ for i = 1, 60 * 30 do
 	end
 end
 check("walking, never holding: SLIPPING! first, then (\"slip\", the spot) is sent", warned and slipAt ~= nil and sentOn("Moving")[#sentOn("Moving")][2] == 2, slipAt)
-check("…with a beep at SLIPPING! and the drop's sound", table.find(M.played, "notify") ~= nil and table.find(M.played, "putdown") ~= nil)
+local warnings = 0
+for _, name in M.played do
+	if name == "grip_warning" then
+		warnings += 1
+	end
+end
+check("…grip_warning on entering SLIPPING! (once), MoveSounds.slipped() at the slip (not grip_slip itself)", warnings == 1 and M.slipped == 1
+	and table.find(M.played, "grip_slip") == nil, `{warnings} {M.slipped}`)
+local closest = math.huge
+for i = 2, #M.playedAt do
+	closest = math.min(closest, M.playedAt[i] - M.playedAt[i - 1])
+end
+check("grip_tick as the meter moves, at volume 0.5, never closer than 0.08 s (5 frames at 60 fps)", #M.playedAt > 5 and M.tickVolume == 0.5 and closest >= 5, `{#M.playedAt} {closest}`)
 local slips = 0
 frames(30)
 for _, args in sentOn("Moving") do
@@ -368,7 +387,7 @@ for _, args in sentOn("Moving") do
 		slips += 1
 	end
 end
-check("…once (not every frame)", slips == 1 and title.Text == "DROPPED!")
+check("…once (not every frame)", slips == 1 and title.Text == "DROPPED!" and M.slipped == 1)
 -- the server drops it: the attributes go, the bar with them (after DROPPED! a moment)
 setAttr(character, "MoveCarry", nil)
 setAttr(character, "CarryGrip", nil)

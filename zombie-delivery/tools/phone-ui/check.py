@@ -162,6 +162,8 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    # 7.1: the slip's sound (client/MoveSounds.luau slipped), counted
+    (dest / "MoveSounds.luau").write_text('return { slipped = function() local m = require("./missions_mock"); m.slipped = (m.slipped or 0) + 1 end }')
     for name in ("mock.luau", "missions_mock.luau", "carrygrip.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)
