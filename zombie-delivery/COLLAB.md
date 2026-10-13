@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (the Blender helper, branch `claude/magical-brahmagupta-af54ch`) · the owner's request: the moves' 36 furniture pieces modelled in Blender, worn in the game like the ZDC Van (one import) · `design/blender-furniture/` (new), `src/server/FurnitureMesh.luau` (new), one hook in `src/server/HouseInterior.luau` after `FurnitureLooks.build`, `FurnitureLooks.Palettes` (additive), a check in `tools/` · 2026-10-13
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
