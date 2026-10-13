@@ -1146,6 +1146,42 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## New zombies, a real walk, the bike on its wheels (6.24)
+
+The owner: "noví zombíci", "lepší animace jak chodí a různě", and fix what is broken.
+
+**New zombies.** Next to the walker, three kinds now fight differently:
+- **Runner** (35 health, a sprint's pace). It sprints with pumping arms and leaps at you from 7–16 studs: a dive and a shriek, one strike per leap. There are more of them at night and later in the story.
+- **Brute** (420 health, slow). It wears steel plates on its chest, belly, arms and shins, so a hit from the front or a small gun's round does far less. Aim for its head, flank it to its open back, or bring a shotgun or something that explodes. Its blow throws you back (the `Knock` remote) and dents and slows your car.
+- **Bloater** (90 health, slow, swollen, glowing boils). It never bites. Next to you or your car it hisses, swells and flashes, then blows up 1.6 s later; killed, it goes off 0.7 s later. The blast hurts you (through the vest), your car and every zombie round it, and bloaters set each other off.
+
+How they spawn and pay:
+- Every random spawn weighs the night, the danger (the job's stars or the distance from the depot), your level (no bloaters before level 3) and the Blood Moon.
+- At most 10 brutes and 8 bloaters live in a server.
+- The fixed missions stay the same every time. Runners grow chapter by chapter, and each chapter turns a fixed number of its walkers into bloaters, so the kill-all count never changes.
+- Kills pay $8 / $45 / $12 and +1 / +6 / +3 XP.
+
+Where it lives: numbers in `Config.Zombies` and `Config.ZombieTypes`, rules in `shared/ZombieKinds.luau`, looks in `server/CharacterArt/Geometry.luau`, moves in `client/ZombieAnimator.luau` and `client/ZombieFx.luau`. Admin P → WORLD spawns each kind.
+
+**The courier walks for real.** Every courier and person within 150 studs walks with a procedural gait (`shared/Gait.luau`, `client/GaitPose.luau` replacing SprintPose, numbers in `Config.Gait`):
+- **Walk:** the planted foot never slides; it rolls heel to toe. The hips dip and sway, the shoulders counter-turn, the arms swing with bending elbows.
+- **Start and stop:** the body leans into a start and settles with a step on a stop. It also leans into turns and up slopes.
+- **Aiming:** walking sideways and backwards keeps the chest on the crosshair while the legs walk the real direction.
+- **Sprint:** it tires under 40 % breath; spent, you catch your breath with your hands on your knees.
+- **Jump:** you spring out of a crouch, tuck your knees, and the landing squashes deeper the higher the fall.
+- **Idle:** now and then a fidget fits your hands: look around, stretch, check the watch or the gun, peek into the bag, hoist the load.
+- **Layer order:** fixed (`PoseLedger.stage`): the gait, ArmPose, BodyLife, BagSway. Beyond 60 studs the pose is updated 15 times a second; beyond 150 the stock animations play.
+
+**The bike stays on its wheels.** Since 6.19 the rider sat inside the pedal bikes' hidden hull box. While getting on and off, the server (which runs a parked bike) pushed the light bike out from under the body onto its side, where KeepUpright has nothing to turn. The fix:
+- The pedal bikes' hull boxes only take hits now.
+- Your body never collides with your own bike (NoCollisionConstraints in the bike's `RiderPass` folder).
+- `server/BikeRighting.luau` watches every bike. One tipped more than 45° for 1 s is turned back onto its wheels facing where it pointed; one still wedged after 2.5 s is stood up where it lies. The maths is in `shared/BikeUpright.luau` and the numbers in `Config.BikeUpright`.
+
+**Sturdier.**
+- `tools/check-requires.py` (run by `tests/run_tests.py`) resolves every `require` against the Rojo tree and catches load-time loops.
+- `tools/rojo-sync.js` keeps an added folder with its scripts in one message, answers the Rojo plugin's fallback (`/api/serialize`, `/api/ref-patch`) so a script Studio could not overwrite is replaced whole instead of silently staying old, replays missed messages one by one, and retries its 5-second check after a failed read.
+- Codex's two branches are ported: a cargo stop whose person or piece fails to build is undone and built again on the next tick (`tests/cargo_runtime_test.luau` runs the real Cargo), and CAREER's NEXT LEVEL card shows what the level opens (`shared/CareerArt.luau`; 21 scene pictures in `art/career-thumbnails/` wait for an upload, `tools/career-thumbnails/fill-ids.py`).
+
 ## Bags for each game (6.23)
 The owner: "what if you always had to buy a backpack for the game". He chose **a bag bought for each game** (each
 server session): after you join you have only your hands until you buy one.

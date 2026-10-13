@@ -2,7 +2,7 @@
 -- 6.1: the plastic bag in a courier's hand swings behind them (the owner's wish: "the bag just flutters behind you"), on
 -- every player's character within Config.Courier.Bag.Range of the camera (yours always), every frame in
 -- RunService.PreSimulation. The only writer of the BagSwing joint's Transform (server/KitWear.luau hangs KitBagPivot from
--- the left hand by that Motor6D; client/SprintPose.luau no longer touches it).
+-- the left hand by that Motor6D; 6.0's sprint no longer touches it).
 --
 -- shared/BagSwing.luau is the pendulum: a damped spring driven by the grip's real acceleration (it trails when you start,
 -- swings forward when you stop, out on a turn) and the speed's air (it leans back at a run), a flutter and a twist at
@@ -31,15 +31,17 @@
 -- 6.7, the body under the bag (the owner: "no animations … I want better animations"), in the same pass on every
 -- player's R15 body near the camera (Config.Courier.BagArm), each laid on top of the animation and let go to the
 -- identity when it does not apply: while the bag hangs in the left hand (BagWorn "hand") its arm is a little straighter
--- and out, swinging less, only while client/ArmPose.luau and client/SprintPose.luau leave that arm (no aim, no cargo
--- in the hands, no phone, gesture, swing or car door, no sprint; BagArm.Hold seconds after); a loaded bag (the
--- player's BagCount) leans the torso the other way, and a gesture's torso and head (shared/Gestures.luau body: the
--- throw's turn back and through, the look down into the bag) go on the Waist and the Neck, the waist only standing or
--- slower than BagArm.Calm (ArmPose leans it when you move faster) and never in the sprint (SprintPose's).
+-- and out, swinging less, only while client/ArmPose.luau leaves that arm (no aim, no cargo in the hands, no phone,
+-- gesture, swing or car door; BagArm.Hold seconds after); a loaded bag (the player's BagCount) leans the torso the other
+-- way, and a gesture's torso and head (shared/Gestures.luau body: the throw's turn back and through, the look down into
+-- the bag) go on the Waist and the Neck, the waist only standing or slower than BagArm.Calm (the gait leans it when you
+-- move faster) and never in the sprint (the gait's run).
+-- 6.24: walking, the gait (client/GaitPose.luau) swings the bag's arm itself the same way (out, straighter, less
+-- swing): the bag arm here takes only what the gait leaves of the arm (GaitPose.arm), so it hands over smoothly as you
+-- stop and start. client/PoseLedger.luau's fourth stage, last over the gait, ArmPose and BodyLife.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -48,11 +50,11 @@ local Joints = require(Shared.Joints) -- 6.7: the bag arm, the lean, the gesture
 local Gestures = require(Shared.Gestures)
 local Bodies = require(script.Parent.Bodies)
 local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone poses only the nearer bodies
-local CameraRig = require(script.Parent.CameraRig) -- 6.7: who has the arm now (as client/SprintPose.luau asks)
+local CameraRig = require(script.Parent.CameraRig) -- 6.7: who has the arm now
 local Holster = require(script.Parent.Holster)
-local SprintPose = require(script.Parent.SprintPose)
+local GaitPose = require(script.Parent.GaitPose) -- 6.24: the gait's own bag arm, its run
 local Interact = require(script.Parent.Interact)
-local Ledger = require(script.Parent.PoseLedger) -- 6.7 B: the joints shared with ArmPose, SprintPose and BodyLife
+local Ledger = require(script.Parent.PoseLedger) -- 6.7 B: the joints shared with the gait, ArmPose and BodyLife
 
 local BagSway = {}
 
@@ -190,12 +192,12 @@ end
 
 -- ── 6.7: the bag arm, the counter-lean, the gestures' torso and head ─────────────────────────────────────────────────
 -- Laid on top of the animation (Transform only, never C0; let go back to the animation: 6.7 B, client/PoseLedger.luau), each
--- joint only while nobody else writes it: the left arm while ArmPose / SprintPose leave it (and A.Hold after), the
+-- joint only while nobody else writes it: the left arm while ArmPose leaves it (and A.Hold after) and the gait does not, the
 -- waist only standing or slow (A.Calm) and not sprinting, the neck while not sprinting. As in client/ArmPose.luau, a
 -- joint that still holds what we wrote was not written by the Animator this frame: its last animation value is the base.
 
 local A = Config.Courier.BagArm
-local BUSY_FOR = 1.5 -- seconds after a swing or a car door's handle the arms stay ArmPose's (as client/SprintPose.luau)
+local BUSY_FOR = 1.5 -- seconds after a swing or a car door's handle the arms stay ArmPose's
 local CALM_FOR = 0.6 -- seconds slower than A.Calm before the waist is ours (ArmPose's own lean has died away by then)
 local RIG_REFRESH = 2 -- seconds a body's joints are kept before they are looked up again
 
@@ -213,9 +215,8 @@ type Body = {
 	gestureStart: number, -- … and when it began here (os.clock)
 }
 local bodies: { [Model]: Body } = {}
--- 6.7 B: the joints these layers wrote; their values go through client/PoseLedger.luau (shared with ArmPose,
--- SprintPose and BodyLife, so the waist's and the arm's layers add up instead of piling up on a frame the Animator
--- skips).
+-- 6.7 B: the joints these layers wrote; their values go through client/PoseLedger.luau (shared with the gait, ArmPose
+-- and BodyLife, so the waist's and the arm's layers add up instead of piling up on a frame the Animator skips).
 local written: { [Instance]: boolean } = {}
 
 -- The animation's own value of a joint this frame (client/PoseLedger.luau).
@@ -263,10 +264,9 @@ local function recent(character: Model, name: string): boolean
 	return type(at) == "number" and workspace:GetServerTimeNow() - at < BUSY_FOR
 end
 
--- Has something else the left arm now (client/ArmPose.luau: aiming, carrying, the phone, a gesture, a swing, a car
--- door; client/SprintPose.luau: the sprint)?
+-- Has client/ArmPose.luau the left arm now (aiming, carrying, the phone, a gesture, a swing, a car door)?
 local function armTaken(character: Model, mine: boolean, gesturing: boolean): boolean
-	if gesturing or character:GetAttribute("Carrying") ~= nil or character:GetAttribute("PhoneHeld") == true or SprintPose.weight(character) > 0.001 then
+	if gesturing or character:GetAttribute("Carrying") ~= nil or character:GetAttribute("PhoneHeld") == true then
 		return true
 	end
 	if mine then
@@ -321,7 +321,7 @@ local function bodyStep(player: Player, character: Model, humanoid: Humanoid, ro
 	end
 	local onFoot = humanoid.Health > 0 and not humanoid.Sit and humanoid.SeatPart == nil and character:GetAttribute("ZipLine") == nil
 		and character:GetAttribute("ClimbLine") == nil and not Interact.posing(character)
-	local sprinting = SprintPose.weight(character) > 0.001
+	local sprinting = GaitPose.sprint(character) > 0.001
 	local kind, t = gestureOf(character, b)
 	-- the bag arm: a little straighter and out while the bag hangs in the left hand and nothing else has the arm
 	local inHand = onFoot and character:GetAttribute("BagWorn") == "hand"
@@ -331,8 +331,10 @@ local function bodyStep(player: Player, character: Model, humanoid: Humanoid, ro
 	local want = if inHand and now >= b.busyUntil then 1 else 0
 	local rate = dt / math.max(0.05, A.Blend)
 	b.arm = math.clamp(b.arm + math.clamp(want - b.arm, -rate, rate), 0, 1)
-	if b.arm > 0.001 then
-		local w = b.arm * b.arm * (3 - 2 * b.arm)
+	-- (6.24: only what the gait leaves of the arm: walking, it swings the bag's arm itself)
+	local share = b.arm * (1 - GaitPose.arm(character, true))
+	if share > 0.001 then
+		local w = share * share * (3 - 2 * share)
 		if b.ls and b.ls.Parent then
 			-- out from the body; the animation's swing cut (the weight pulls the arm down)
 			local swing = baseOf(b.ls):ToEulerAnglesXYZ()
@@ -347,7 +349,7 @@ local function bodyStep(player: Player, character: Model, humanoid: Humanoid, ro
 		lay(b.le, nil)
 	end
 	-- the torso: the counter-lean of a loaded bag in the hand and a gesture's turn (the throw, the bag), only standing
-	-- or slow and not sprinting (ArmPose leans the waist itself faster, SprintPose owns it in the sprint)
+	-- or slow and not sprinting (the gait leans the waist itself faster and owns it in the sprint)
 	local velocity = root.AssemblyLinearVelocity
 	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	if onFoot and not sprinting and speed < A.Calm then
@@ -550,7 +552,7 @@ local function step(dt: number)
 end
 
 function BagSway.start()
-	RunService.PreSimulation:Connect(step)
+	Ledger.stage(40, "BagSway", step) -- 6.24: client/PoseLedger.luau's fourth stage, last
 end
 
 return BagSway

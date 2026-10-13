@@ -76,7 +76,7 @@ local function hitPart(player: Player, result: Hit, dir: Vector3, stats: Economy
 		if crit then
 			damage = if zombie.kind == "brute" then stats.damage * Config.Horde.HeadshotMultiplier * 2 else zombie.humanoid.Health + 1
 		end
-		local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40, from = from })
+		local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40, from = from, pellets = stats.pellets }) -- (6.24: a shotgun goes through a brute's plates)
 		hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
 		return zombie.model, false
 	end

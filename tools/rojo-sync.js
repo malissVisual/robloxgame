@@ -12,6 +12,9 @@
  *   GET  /api/read/{id,id,..}  → celý strom (msgpack)
  *   GET  /api/socket/{cursor}  → WebSocket, binární msgpack rámce se změnami
  *   POST /api/write            → zápis ze Studia zpět (jen potvrzujeme, ignorujeme)
+ *   POST /api/serialize        → záchranná cesta: instance, které ve Studiu nešlo
+ *                                přepsat, pošleme celé jako .rbxm (writeRbxm)
+ *   POST /api/ref-patch        → k tomu Ref vlastnosti (u nás žádné: prázdný patch)
  *   POST /api/open/{id}        → "otevři skript v editoru"
  *   POST /api/rojo-sync/stop   → náš vlastní: nově spuštěný rojo-sync tím vypne starý
  *
@@ -221,6 +224,220 @@ function writeMapHeader(length, out) {
 		b.writeUInt32BE(length, 1);
 		out.push(b);
 	}
+}
+
+// Decode — jen pro těla záchranné cesty pluginu (/api/serialize, /api/ref-patch):
+// mapa { sessionId, ids }. Umí všechny běžné typy kromě ext.
+function decode(buffer) {
+	let offset = 0;
+	const u8 = () => buffer[offset++];
+	const take = (n) => {
+		const slice = buffer.subarray(offset, offset + n);
+		offset += n;
+		return slice;
+	};
+	const array = (n) => {
+		const out = [];
+		for (let i = 0; i < n; i++) out.push(read());
+		return out;
+	};
+	const map = (n) => {
+		const out = {};
+		for (let i = 0; i < n; i++) {
+			const key = read();
+			out[String(key)] = read();
+		}
+		return out;
+	};
+	function read() {
+		const b = u8();
+		if (b === undefined) throw new Error("msgpack: konec dat");
+		if (b <= 0x7f) return b;
+		if (b >= 0xe0) return b - 0x100;
+		if ((b & 0xf0) === 0x80) return map(b & 0x0f);
+		if ((b & 0xf0) === 0x90) return array(b & 0x0f);
+		if ((b & 0xe0) === 0xa0) return take(b & 0x1f).toString("utf8");
+		let n;
+		switch (b) {
+			case 0xc0: return null;
+			case 0xc2: return false;
+			case 0xc3: return true;
+			case 0xc4: return Buffer.from(take(u8()));
+			case 0xc5: n = buffer.readUInt16BE(offset); offset += 2; return Buffer.from(take(n));
+			case 0xc6: n = buffer.readUInt32BE(offset); offset += 4; return Buffer.from(take(n));
+			case 0xca: n = buffer.readFloatBE(offset); offset += 4; return n;
+			case 0xcb: n = buffer.readDoubleBE(offset); offset += 8; return n;
+			case 0xcc: return u8();
+			case 0xcd: n = buffer.readUInt16BE(offset); offset += 2; return n;
+			case 0xce: n = buffer.readUInt32BE(offset); offset += 4; return n;
+			case 0xcf: n = Number(buffer.readBigUInt64BE(offset)); offset += 8; return n;
+			case 0xd0: n = buffer.readInt8(offset); offset += 1; return n;
+			case 0xd1: n = buffer.readInt16BE(offset); offset += 2; return n;
+			case 0xd2: n = buffer.readInt32BE(offset); offset += 4; return n;
+			case 0xd3: n = Number(buffer.readBigInt64BE(offset)); offset += 8; return n;
+			case 0xd9: return take(u8()).toString("utf8");
+			case 0xda: n = buffer.readUInt16BE(offset); offset += 2; return take(n).toString("utf8");
+			case 0xdb: n = buffer.readUInt32BE(offset); offset += 4; return take(n).toString("utf8");
+			case 0xdc: n = buffer.readUInt16BE(offset); offset += 2; return array(n);
+			case 0xdd: n = buffer.readUInt32BE(offset); offset += 4; return array(n);
+			case 0xde: n = buffer.readUInt16BE(offset); offset += 2; return map(n);
+			case 0xdf: n = buffer.readUInt32BE(offset); offset += 4; return map(n);
+		}
+		throw new Error(`msgpack: neznámý typ 0x${b.toString(16)}`);
+	}
+	return read();
+}
+
+// ──────────────────────────────────────────────────── Binární model (.rbxm) ──
+// Záchranná cesta pluginu: když ve Studiu nejde přepsat vlastnost (typicky
+// Source skriptu otevřeného v editoru se zapnutým Collaborative Editing), plugin
+// si vyžádá celé instance jako model (/api/serialize) a vymění je. Dřív jsme to
+// odmítali (400) a takové změny se tiše ztratily: ve Studiu zůstal mix starých
+// a nových skriptů. Formát je Roblox Binary Model v0 (rbx-dom, docs/binary.md):
+// složka → ObjectValue pojmenovaná id (Value = kopie) → kopie (Name, Source),
+// přesně jako to dělá `rojo serve`.
+
+// LZ4 blok jen s literály: platný LZ4, jen nic nezmenší (zápis je pak jednoduchý).
+function lz4Literals(data) {
+	const head = [];
+	const length = data.length;
+	head.push((Math.min(length, 15) << 4) & 0xff);
+	if (length >= 15) {
+		let rest = length - 15;
+		while (rest >= 255) {
+			head.push(255);
+			rest -= 255;
+		}
+		head.push(rest);
+	}
+	return Buffer.concat([Buffer.from(head), data]);
+}
+
+function rbxmChunk(name, data, compress) {
+	const header = Buffer.alloc(16);
+	header.write(name, 0, 4, "latin1");
+	const body = compress ? lz4Literals(data) : data;
+	header.writeUInt32LE(compress ? body.length : 0, 4);
+	header.writeUInt32LE(data.length, 8);
+	return Buffer.concat([header, body]);
+}
+
+function rbxmString(text) {
+	const bytes = Buffer.from(text, "utf8");
+	const length = Buffer.alloc(4);
+	length.writeUInt32LE(bytes.length, 0);
+	return Buffer.concat([length, bytes]);
+}
+
+// Pole Int32: zigzag, big-endian, prokládané po bajtech; referenty navíc jako
+// rozdíly od předchozího (čtou se sčítáním).
+function rbxmInt32s(values, accumulate) {
+	const n = values.length;
+	const out = Buffer.alloc(n * 4);
+	let previous = 0;
+	values.forEach((value, i) => {
+		const stored = accumulate ? value - previous : value;
+		previous = value;
+		const zigzag = ((stored << 1) ^ (stored >> 31)) >>> 0;
+		out[i] = (zigzag >>> 24) & 0xff;
+		out[i + n] = (zigzag >>> 16) & 0xff;
+		out[i + 2 * n] = (zigzag >>> 8) & 0xff;
+		out[i + 3 * n] = zigzag & 0xff;
+	});
+	return out;
+}
+
+function uint32LE(value) {
+	const b = Buffer.alloc(4);
+	b.writeUInt32LE(value, 0);
+	return b;
+}
+
+// instances: [{ ref, className, parent (ref nebo -1), props: { jméno: { string } | { ref } } }]
+function writeRbxm(instances) {
+	const classes = [];
+	const byClass = new Map();
+	for (const instance of instances) {
+		if (!byClass.has(instance.className)) {
+			byClass.set(instance.className, []);
+			classes.push(instance.className);
+		}
+		byClass.get(instance.className).push(instance);
+	}
+	const chunks = [];
+	classes.forEach((className, classId) => {
+		const members = byClass.get(className);
+		chunks.push(rbxmChunk("INST", Buffer.concat([
+			uint32LE(classId),
+			rbxmString(className),
+			Buffer.from([0]),
+			uint32LE(members.length),
+			rbxmInt32s(members.map((m) => m.ref), true),
+		]), true));
+	});
+	classes.forEach((className, classId) => {
+		const members = byClass.get(className);
+		const names = [];
+		for (const m of members) {
+			for (const key of Object.keys(m.props)) {
+				if (!names.includes(key)) names.push(key);
+			}
+		}
+		for (const name of names) {
+			const first = members.find((m) => m.props[name]).props[name];
+			let type;
+			let values;
+			if ("ref" in first) {
+				type = 0x13;
+				values = rbxmInt32s(members.map((m) => (m.props[name] ? m.props[name].ref : -1)), true);
+			} else {
+				type = 0x01; // String; Source (ProtectedString) se v souboru ukládá stejně
+				values = Buffer.concat(members.map((m) => rbxmString(m.props[name] ? m.props[name].string : "")));
+			}
+			chunks.push(rbxmChunk("PROP", Buffer.concat([uint32LE(classId), rbxmString(name), Buffer.from([type]), values]), true));
+		}
+	});
+	chunks.push(rbxmChunk("PRNT", Buffer.concat([
+		Buffer.from([0]),
+		uint32LE(instances.length),
+		rbxmInt32s(instances.map((m) => m.ref), true),
+		rbxmInt32s(instances.map((m) => m.parent), true),
+	]), true));
+	chunks.push(rbxmChunk("END\0", Buffer.from("</roblox>", "latin1"), false));
+	const header = Buffer.alloc(32);
+	header.write("<roblox!", 0, 8, "latin1");
+	Buffer.from([0x89, 0xff, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 8);
+	header.writeUInt16LE(0, 14);
+	header.writeInt32LE(classes.length, 16);
+	header.writeInt32LE(instances.length, 20);
+	return Buffer.concat([header, ...chunks]);
+}
+
+// Odpověď na /api/serialize: kopie instancí stromu (bez dětí, ty plugin
+// přestěhuje ze staré instance) pod ObjectValue pojmenovanými jejich id.
+// Pořadí v PRNT je post-order (děti před rodiči), jak to chce Studio.
+function serializeIds(tree, ids) {
+	const instances = [];
+	const root = { ref: 0, className: "Folder", parent: -1, props: { Name: { string: "Folder" } } };
+	let next = 1;
+	for (const id of ids) {
+		const source = tree.instances[id];
+		if (!source) {
+			continue;
+		}
+		const holderRef = next++;
+		const copyRef = next++;
+		const props = { Name: { string: source.Name } };
+		for (const [key, value] of Object.entries(source.Properties || {})) {
+			if (value && typeof value.String === "string") {
+				props[key] = { string: value.String };
+			}
+		}
+		instances.push({ ref: copyRef, className: source.ClassName, parent: holderRef, props });
+		instances.push({ ref: holderRef, className: "ObjectValue", parent: 0, props: { Name: { string: id }, Value: { ref: copyRef } } });
+	}
+	instances.push(root);
+	return instances;
 }
 
 // ─────────────────────────────────────────────────────────── Strom projektu ──
@@ -640,11 +857,29 @@ const server = http.createServer((req, res) => {
 	}
 
 	if (req.method === "POST" && (urlPath === "/api/serialize" || urlPath === "/api/ref-patch")) {
-		// Záchranná cesta pluginu. Když ji odmítneme, plugin to spolkne.
-		req.resume();
-		req.on("end", () =>
-			respond(res, 400, { kind: "BadRequest", details: "Not supported by rojo-sync" })
-		);
+		// Záchranná cesta pluginu (viz writeRbxm): co nešlo ve Studiu přepsat,
+		// pošleme jako nové instance. Ref vlastnosti v našem stromu nejsou, takže
+		// ref-patch je vždy prázdný.
+		const chunks = [];
+		req.on("data", (chunk) => chunks.push(chunk));
+		req.on("end", () => {
+			let ids = [];
+			try {
+				const body = decode(Buffer.concat(chunks));
+				ids = Array.isArray(body && body.ids) ? body.ids.filter((id) => typeof id === "string") : [];
+			} catch (err) {
+				respond(res, 400, { kind: "BadRequest", details: `Bad request body: ${err.message}` });
+				return;
+			}
+			if (urlPath === "/api/ref-patch") {
+				respond(res, 200, { sessionId, patch: { removed: [], added: {}, updated: [] } });
+				return;
+			}
+			const known = ids.filter((id) => tree.instances[id]);
+			respond(res, 200, { sessionId, modelContents: writeRbxm(serializeIds(tree, known)) });
+			const names = known.slice(0, 5).map((id) => tree.instances[id].Name).join(", ");
+			console.log(`↺ Studio nešlo přepsat ${known.length} instancí (${names}${known.length > 5 ? ", …" : ""}) → poslány celé`);
+		});
 		return;
 	}
 
@@ -682,18 +917,21 @@ server.on("upgrade", (req, socket) => {
 
 	console.log("✓ Studio připojeno");
 
-	// Doženeme, co plugin zmeškal.
-	if (Number.isInteger(cursor) && cursor < messages.length) {
-		const missed = messages.slice(cursor);
-		socket.write(
-			frameBinary(
-				encode({
-					sessionId,
-					packetType: "messages",
-					body: { messageCursor: messages.length, messages: missed },
-				})
-			)
-		);
+	// Doženeme, co plugin zmeškal. Každou zprávu zvlášť: plugin zprávy jednoho
+	// paketu aplikuje za sebou bez pcall, takže chyba v jedné by zahodila i
+	// všechny po ní (a s nimi změny skriptů).
+	if (Number.isInteger(cursor) && cursor >= 0 && cursor < messages.length) {
+		for (let index = cursor; index < messages.length; index++) {
+			socket.write(
+				frameBinary(
+					encode({
+						sessionId,
+						packetType: "messages",
+						body: { messageCursor: index + 1, messages: [messages[index]] },
+					})
+				)
+			);
+		}
 	}
 });
 
@@ -701,20 +939,22 @@ server.on("upgrade", (req, socket) => {
 
 let pending = null;
 
+// Vrací false, když se projekt nepodařilo přečíst (typicky uprostřed `git
+// pull`: soubor zmizel mezi výpisem složky a čtením) — pojistka to pak zkusí znovu.
 function rescan() {
 	let next;
 	try {
 		next = buildTree();
 	} catch (err) {
 		console.error(`  ! chyba při čtení projektu: ${err.message}`);
-		return;
+		return false;
 	}
 
 	const patch = diffTrees(tree, next);
 	tree = next;
 
 	if (isEmptyPatch(patch)) {
-		return;
+		return true;
 	}
 
 	const parts = [];
@@ -727,13 +967,21 @@ function rescan() {
 		broadcast(piece);
 	}
 	console.log(`↻ změna (${parts.join(" ")}) → odesláno do Studia${pieces.length > 1 ? ` v ${pieces.length} zprávách` : ""}`);
+	return true;
 }
 
 // Velký patch (git pull změní desítky velkých skriptů naráz) Studio přes
 // WebSocket nemusí převzít celý a tiše ho zahodí — pak ve Studiu zůstane mix
 // starých a nových skriptů. Proto ho posíláme po kouscích: smazání zvlášť,
 // každá změněná instance zvlášť a přidané instance po dávkách do ~256 kB.
-// Přidané jdou v pořadí rodič → dítě (rodič musí přijít dřív).
+//
+// Přidaný PODSTROM (nová složka i se skripty, skript s dětmi, instance znovu
+// vytvořená kvůli změně třídy) ale musí přijít celý v JEDNÉ zprávě: plugin
+// staví novou instanci i s dětmi podle jejího seznamu Children a každé dítě
+// hledá ve stejné zprávě. Dřív se dávky dělily podle hloubky, takže složka
+// mohla přijít bez dětí → "Cannot reify an instance not present in
+// virtualInstances", zpráva spadla, složka ve Studiu chyběla a její děti v další
+// zprávě neměly rodiče (další chyba). Teď se dělí jen mezi celými podstromy.
 const PIECE_BYTES = 256 * 1024;
 
 function sizeOf(value) {
@@ -744,33 +992,61 @@ function sizeOf(value) {
 	}
 }
 
+// Přidané instance seskupené do celých podstromů: [{ ids, size }], každý
+// podstrom od nejvyšší přidané instance (její rodič ve Studiu už je) dolů,
+// rodič vždy před dětmi.
+function addedSubtrees(added) {
+	const units = [];
+	const placed = new Set();
+	for (const id of Object.keys(added)) {
+		let top = id;
+		while (added[added[top].Parent] && added[top].Parent !== top) {
+			top = added[top].Parent;
+		}
+		if (placed.has(top)) {
+			continue;
+		}
+		const ids = [];
+		const visit = (current) => {
+			if (placed.has(current) || !added[current]) {
+				return;
+			}
+			placed.add(current);
+			ids.push(current);
+			for (const child of added[current].Children || []) {
+				visit(child);
+			}
+		};
+		visit(top);
+		units.push({ ids, size: ids.reduce((sum, member) => sum + sizeOf(added[member]), 0) });
+	}
+	// Co by nebylo dosažitelné přes Children (nemělo by se stát), jde samo.
+	for (const id of Object.keys(added)) {
+		if (!placed.has(id)) {
+			placed.add(id);
+			units.push({ ids: [id], size: sizeOf(added[id]) });
+		}
+	}
+	return units;
+}
+
 function splitPatch(patch) {
 	const pieces = [];
 	if (patch.removed.length) {
 		pieces.push({ added: {}, removed: patch.removed, updated: [] });
 	}
-	const addedIds = Object.keys(patch.added);
-	const depth = (id) => {
-		let n = 0;
-		let current = patch.added[id];
-		while (current && patch.added[current.Parent]) {
-			n += 1;
-			current = patch.added[current.Parent];
-		}
-		return n;
-	};
-	addedIds.sort((a, b) => depth(a) - depth(b));
 	let batch = {};
 	let batchSize = 0;
-	for (const id of addedIds) {
-		const size = sizeOf(patch.added[id]);
-		if (batchSize > 0 && batchSize + size > PIECE_BYTES) {
+	for (const unit of addedSubtrees(patch.added)) {
+		if (batchSize > 0 && batchSize + unit.size > PIECE_BYTES) {
 			pieces.push({ added: batch, removed: [], updated: [] });
 			batch = {};
 			batchSize = 0;
 		}
-		batch[id] = patch.added[id];
-		batchSize += size;
+		for (const id of unit.ids) {
+			batch[id] = patch.added[id];
+		}
+		batchSize += unit.size;
 	}
 	if (batchSize > 0) {
 		pieces.push({ added: batch, removed: [], updated: [] });
@@ -893,11 +1169,13 @@ function diskStamp() {
 	return out.join("\n");
 }
 
+// Razítko se zapamatuje, jen když se strom opravdu přečetl: dřív se uložilo
+// předem a po nepovedeném čtení (uprostřed `git pull`) už se k témuž stavu
+// disku pojistka nevrátila — Studio zůstalo se starými skripty.
 function poll() {
 	const stamp = diskStamp();
-	if (stamp !== lastStamp) {
+	if (stamp !== lastStamp && rescan()) {
 		lastStamp = stamp;
-		rescan();
 	}
 }
 

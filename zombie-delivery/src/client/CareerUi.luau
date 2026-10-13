@@ -37,6 +37,8 @@
 -- 6.20, skills for levels (Config.Skills): the right side has two tabs, THE ROAD and SKILLS (client/SkillsView.luau: the
 -- free points, RESET · FREE, the three branches, a skill's details with +1 POINT); the level-up card says "+1 skill
 -- point" with OPEN (the window on SKILLS). CareerUi.openSkills opens it there.
+-- 6.23 (Codex's career pictures, shared/CareerArt.luau): the NEXT LEVEL hero shows what that level opens as its
+-- picture (CareerArt.headline), the 🎖 mark when nothing it opens has one.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -56,6 +58,7 @@ local Gps = require(script.Parent.Gps) -- 6.14: the level-up card's GPS buttons
 local CardKit = require(script.Parent.CardKit) -- 6.18: the UI kit (the next level's hero, the road's rows)
 local SkillsView = require(script.Parent.SkillsView) -- 6.20: the SKILLS tab
 local SkillRules = require(Shared.Skills) -- 6.20: the level-up card's skill points
+local CareerArt = require(Shared.CareerArt) -- 6.23: the next level's picture on its hero
 
 local K = Theme.Contract
 local CareerUi = {}
@@ -252,13 +255,16 @@ local function driverPanel(parent: Instance, road: { Career.Step })
 	local level = Levels.levelFor(xp)
 	local max = Config.Levels.MaxLevel
 	local rank = Levels.rank(level)
-	-- 6.18: the next level as the kit's hero (see the header).
+	-- 6.18: the next level as the kit's hero (see the header). 6.23: its picture is what it opens (shared/CareerArt.luau
+	-- headline: a tier's or a home's picture once uploaded, a special job's business, a chapter's picture, a bag's model),
+	-- else the 🎖 mark.
 	local nextStep = road[level + 1]
+	local art = if nextStep then CareerArt.headline(shownUnlocks(nextStep.unlocks)) else nil
 	local hero: CardKit.Hero = {
 		name = "NextLevel",
 		order = 1,
 		height = 236,
-		picture = { emoji = "🎖" },
+		picture = { image = art and art.image, model = art and art.model, emoji = "🎖" },
 		title = if nextStep then `NEXT: LEVEL {nextStep.level}{if nextStep.newRank then `  ·  {string.upper(nextStep.rank)}` else ""}` else "THE TOP OF THE ROAD",
 		value = "",
 		valueColor = CardKit.Color.gold,
