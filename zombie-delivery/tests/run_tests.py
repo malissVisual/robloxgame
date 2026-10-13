@@ -331,6 +331,14 @@ sys.stdout.write(requires.stdout + requires.stderr)
 if requires.returncode != 0:
     ok = False
 
+# 8.0 sandbox: the Sprinter in the owner's Blender model (server/SprinterMesh.luau): tools/sprinter/mesh-check.py imports
+# design/blender-sprinter/roblox/ZDCSprinterArt.json's pieces (turned, scaled) and dresses sprinters built by the parts
+# model's contract; the model's measured sizes are the contract's.
+sprinter = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "sprinter", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
+print("== sprinter mesh: " + ((sprinter.stdout.strip().splitlines() or ["?"])[-1][:160] if sprinter.returncode == 0 else "FAIL\n" + sprinter.stdout[-1500:] + sprinter.stderr[-1500:]))
+if sprinter.returncode != 0:
+    ok = False
+
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)
 # catches what the type checker does not, e.g. more than 200 locals in one function ("Out of local registers").
 # -O0 -g2 like Roblox Studio: without optimization constants take registers too, so this is the strict check.
