@@ -175,12 +175,13 @@ end
 
 local store: DataStore? = nil
 pcall(function()
-	store = DataStoreService:GetDataStore(Config.DataStoreName)
+	-- 8.0 SANDBOX: its own saves (Config.Sandbox.Store); the city's are never touched there
+	store = DataStoreService:GetDataStore(if Config.Sandbox.On then Config.Sandbox.Store else Config.DataStoreName)
 end)
 
 local function newProfile(): Profile
 	return {
-		money = Config.StartMoney,
+		money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StartMoney, -- (8.0: the sandbox's own)
 		cars = { [Config.CompanyVan.Car] = true }, -- 7.x: every courier's ZDC Van (5.0 – 6.x: on foot, Earl's van at level 4)
 		car = Config.CompanyVan.Car,
 		bike = nil, -- 5.1
@@ -782,7 +783,7 @@ function PlayerData.load(player: Player)
 	-- Never overwrite a save we could not read.
 	canSave[player] = ok and dataStore ~= nil
 	if RunService:IsStudio() and not canSave[player] then
-		profile.money = Config.StudioStartMoney
+		profile.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
 	if player.Parent then
 		profiles[player] = profile
@@ -968,7 +969,7 @@ function PlayerData.resetSave(player: Player)
 	end
 	local fresh = newProfile()
 	if RunService:IsStudio() and not canSave[player] then
-		fresh.money = Config.StudioStartMoney
+		fresh.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
 	profiles[player] = fresh
 	PlayerData.save(player)
