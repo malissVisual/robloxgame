@@ -29,7 +29,7 @@ print(encode({layout=require("./Layout"),caps=caps}))
     source=(ROOT/'src/server/Vehicles.luau').read_text().split('local STYLES',1)[1].split('local CHASSIS_HEIGHT',1)[0]
     # 5.1: the bikes (Style.bike) take no fuel: no filler cap.
     styles={m.group(1) for m in re.finditer(r'^\t(\w+) = \{\n(.*?)^\t\},?$',source,re.S|re.M) if not re.search(r'^\t\tbike = true',m.group(2),re.M)}
-    assert {c['id'] for c in caps}==styles and len(caps)==17,'fleet style coverage'
+    assert {c['id'] for c in caps}==styles and len(caps)==18,'fleet style coverage'
     for cap in caps:assert all(math.isfinite(n) for n in cap['point']['at']) and cap['point']['at'][0]>0
     modelmap={m['id']:m for m in models}
     for component in layout['components']:
@@ -67,5 +67,5 @@ print(encode({layout=require("./Layout"),caps=caps}))
     assert sum(p.get('night',False) for p in modelmap['island']['spec']['pieces'])==2
     station={'id':'station_layout','parts':parts,'layout':layout}
     (a.output/'station.json').write_text(json.dumps([station]))
-    print('Gas handoff PASS: component budgets incl. roots/lamp; 70x50 footprint; lane/post clearance; 17 current fleet styles; separate nozzles and two night lamps')
+    print('Gas handoff PASS: component budgets incl. roots/lamp; 70x50 footprint; lane/post clearance; 18 current fleet styles; separate nozzles and two night lamps')
 if __name__=='__main__':main()
