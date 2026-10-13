@@ -3470,6 +3470,14 @@ local function passBody(car: Car, character: Instance?, seconds: number)
 	end
 	local name = `BoardPass_{character.Name}`
 	local found = car.model:FindFirstChild(name)
+	if found then
+		local first = found:FindFirstChildWhichIsA("NoCollisionConstraint")
+		local part = first and first.Part1
+		if not part or part.Parent ~= character then
+			found:Destroy() -- (made for another body of that name: a respawn, a namesake)
+			found = nil
+		end
+	end
 	local folder: Instance = if found then found else passFolder(car, character, name)
 	local ends = os.clock() + seconds
 	local was = folder:GetAttribute("Ends")
@@ -4163,13 +4171,16 @@ function Vehicles.groundY(x: number, z: number, refY: number?): number
 end
 
 -- 6.26, a vehicle never comes out into something (Config.SpawnSpot, shared/SpawnSpot.luau): `ground` (on the ground
--- under its middle, Drop over it, facing its look) is tried first, then the spots near it, the nearest first. A spot
--- is free when the ground under its four wheels is even (rays) and the room its hull needs over that ground (from Lift
--- up, Pad wider) holds nothing it would collide with (a box query in the collision group "Car": the props, the walls,
--- the other cars, a player's body; never a zombie, a person of the city or a corpse, which do not collide with a car).
+-- under its middle, Drop over it, facing its look) is tried first, then the spots near it in a small spiral. A spot is
+-- free when the ground under its four wheels (`wheels`, its own space: SpawnSpot.wheels / bikeWheels) is one plane no
+-- steeper than Slope (rays; SpawnSpot.plane), nothing stands in the way from the spot asked for at its hull's middle
+-- height (a ray: no car through a wall or a fence), and the room its hull needs over that plane (from Lift up, Pad
+-- wider) holds nothing it would collide with (a box query in the collision group "Car": the props, the walls, the
+-- other cars, a player's body; never a zombie, a person of the city or a corpse, which do not collide with a car).
 -- `ignore`: the vehicle itself, its riders, a body that gets in at once. Returns the spot (Drop over its wheels'
--- ground, facing as asked) and whether it is free; none free: `ground` as asked (a warning in Studio).
-local function findRoom(style: Style, lower: number, ground: CFrame, ignore: { Instance }, what: string): (CFrame, boolean)
+-- ground, tilted to its plane, a bike without the plane's roll, facing as asked) and whether it is free; none free:
+-- the spot asked for (on its plane when it has one; a warning in Studio).
+local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }, ground: CFrame, ignore: { Instance }, what: string): (CFrame, boolean)
 	local cfg = Config.SpawnSpot
 	local flat = Vector3.new(ground.LookVector.X, 0, ground.LookVector.Z)
 	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
@@ -4183,6 +4194,10 @@ local function findRoom(style: Style, lower: number, ground: CFrame, ignore: { I
 	rays.FilterDescendantsInstances = skip
 	rays.IgnoreWater = true
 	rays.RespectCanCollide = true
+	local path = RaycastParams.new() -- (the way there: only what stands, not the people and the cars that move)
+	path.FilterType = Enum.RaycastFilterType.Exclude
+	path.FilterDescendantsInstances = skip
+	path.RespectCanCollide = true
 	local overlap = OverlapParams.new()
 	overlap.FilterType = Enum.RaycastFilterType.Exclude
 	local pass = table.clone(ignore)
@@ -4197,6 +4212,7 @@ local function findRoom(style: Style, lower: number, ground: CFrame, ignore: { I
 	overlap.MaxParts = 1
 	pcall(function()
 		overlap.CollisionGroup = "Car" -- (what a car's hull collides with)
+		path.CollisionGroup = "Car"
 	end)
 	local top = CHASSIS_HEIGHT
 	for _, b in style.boxes do
@@ -4204,47 +4220,76 @@ local function findRoom(style: Style, lower: number, ground: CFrame, ignore: { I
 	end
 	top += style.clearance - lower -- (the hull's top over its wheels' ground)
 	local sx, sy, sz, cy = SpawnSpot.box(style.width, style.length, top, cfg.Lift, cfg.Pad)
-	local wheels = SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
 	local along, across = SpawnSpot.steps(style.width, style.length, cfg.Gap)
-	local why = "no ground"
+	local why = "no ground under a wheel"
+	local asked: CFrame? = nil -- the spot asked for on its ground's plane
+	local from = ground.Position + Vector3.new(0, cy - cfg.Drop, 0) -- (the hull's middle there)
 	for n, step in SpawnSpot.candidates(cfg.Tries, along, across, cfg.Across) do
 		local at = ground.Position + look * step.along + right * step.across
 		local frame = CFrame.lookAt(at, at + look)
-		local heights: { number } = {}
+		local points: { { number } } = {}
 		for _, w in wheels do
 			local spot = frame * Vector3.new(w.x, 0, w.z)
 			local hit = workspace:Raycast(spot + Vector3.new(0, cfg.Probe / 2, 0), Vector3.new(0, -cfg.Probe, 0), rays)
 			if not hit then
 				break
 			end
-			table.insert(heights, hit.Position.Y)
+			table.insert(points, { hit.Position.X, hit.Position.Y, hit.Position.Z })
 		end
-		local even, base = SpawnSpot.level(heights, cfg.Spread)
-		if #heights < #wheels or not even then
-			why = if n == 1 then (if #heights < #wheels then "no ground under a wheel" else "uneven ground") else why
+		local even, whyNot, up, middle = SpawnSpot.plane(points, cfg.Spread, cfg.Slope)
+		if not up or not middle then
+			why = if n == 1 then whyNot else why
 			continue
 		end
-		local middle = Vector3.new(at.X, base + cy, at.Z)
-		local hit = workspace:GetPartBoundsInBox(CFrame.lookAt(middle, middle + look), Vector3.new(sx, sy, sz), overlap)
+		local lookOn, rightOn, upOn = SpawnSpot.frame(up, look.X, look.Z, not style.bike)
+		local origin = Vector3.new(at.X, SpawnSpot.heightAt(up, middle, at.X, at.Z), at.Z)
+		local onPlane = CFrame.fromMatrix(origin, Vector3.new(rightOn[1], rightOn[2], rightOn[3]), Vector3.new(upOn[1], upOn[2], upOn[3]),
+			-Vector3.new(lookOn[1], lookOn[2], lookOn[3]))
+		if n == 1 and up[2] >= math.cos(math.rad(cfg.Steepest)) then
+			asked = onPlane -- (too steep or taken: it stands there on its wheels when nothing is free)
+			from = (onPlane * CFrame.new(0, cy, 0)).Position
+		end
+		if not even then
+			why = if n == 1 then whyNot else why
+			continue
+		elseif n > 1 then
+			local to = (onPlane * CFrame.new(0, cy, 0)).Position
+			local wall = workspace:Raycast(from, to - from, path)
+			if wall then
+				continue -- (a wall, a fence between: not through it)
+			end
+		end
+		local hit = workspace:GetPartBoundsInBox(onPlane * CFrame.new(0, cy, 0), Vector3.new(sx, sy, sz), overlap)
 		if #hit > 0 then
 			why = if n == 1 then `{hit[1]:GetFullName()} in the way` else why
 			continue
 		end
-		local put = Vector3.new(at.X, base + cfg.Drop, at.Z)
 		if n > 1 and RunService:IsStudio() then
 			print(string.format("[Vehicles] %s: %s at the spot asked for; put %.0f studs along the way it faces, %.0f to its right (try %d)", what, why, step.along, step.across, n))
 		end
-		return CFrame.lookAt(put, put + look), true
+		return onPlane * CFrame.new(0, cfg.Drop, 0), true
 	end
 	if RunService:IsStudio() then
 		warn(`[Vehicles] {what}: no free spot in {cfg.Tries} tries ({why} at the spot asked for): put there anyway`)
 	end
-	return ground, false
+	return if asked then asked * CFrame.new(0, cfg.Drop, 0) else ground, false
+end
+
+-- 6.26: where a vehicle about to be built touches the ground with its four wheels (findRoom): a car's colliders, or a
+-- bike's (and the E-Scooter's) four hidden ones under its art's axles (bikeBody's rule).
+local function wheelsOf(def: Config.CarDef, style: Style): { SpawnSpot.Wheel }
+	if not style.bike then
+		return SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
+	end
+	local spec = bikeSpec(bikeArtId(def.id, def.style))
+	local front, rear = artOrigin(spec, "FrontWheel"), artOrigin(spec, "RearWheel")
+	local unscale = if spec.origins.Crank ~= nil then 1 / BikeArt.Scale else 1
+	return SpawnSpot.bikeWheels(style.width, style.wheelWidth, front.Z * unscale, rear.Z * unscale)
 end
 
 -- 6.26: a live vehicle put somewhere new (a chauffeur's car put back on a road, one stood up where it lies) by the same
--- check: `ground` (Drop over the ground under its middle, facing its look) or the nearest free spot (findRoom).
--- Returns the spot, Drop over its wheels' ground.
+-- check: `ground` (Drop over the ground under its middle, facing its look) or the nearest free spot (findRoom), with
+-- its own wheel colliders. Returns the spot, Drop over its wheels' ground, tilted to it.
 function Vehicles.clearFor(car: Car, ground: CFrame): CFrame
 	local ignore: { Instance } = { car.model }
 	local driver = car.seat.Occupant
@@ -4257,15 +4302,23 @@ function Vehicles.clearFor(car: Car, ground: CFrame): CFrame
 			table.insert(ignore, occupant.Parent)
 		end
 	end
-	local spot = findRoom(styleOf(car), car.lower, ground, ignore, car.model.Name)
+	local style = styleOf(car)
+	local wheels: { SpawnSpot.Wheel } = {}
+	for _, contact in Vehicles.wheelContacts(car) do
+		table.insert(wheels, { x = contact.X, z = contact.Z })
+	end
+	if #wheels ~= 4 then
+		wheels = SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
+	end
+	local spot = findRoom(style, car.lower, wheels, ground, ignore, car.model.Name)
 	return spot
 end
 
 -- 6.24: a bike that lay over and did not come up by server/BikeRighting.luau's turn (wedged against something) is
 -- stood up where it lies: on the ground under it, facing `heading` (flat), Lift over its wheels (it drops onto them),
 -- still and with its rider on it. 6.26: any vehicle (server/CarRighting.luau; the kind's Lift, Config.CarUpright), on
--- the ground right under it (no longer a bridge over it), over the ground under its four wheels, nudged to free room
--- when something is where it lies (Vehicles.clearFor: the spawn's check).
+-- the ground right under it (no longer a bridge over it), tilted to the plane of the ground under its four wheels,
+-- nudged to free room when something is where it lies (Vehicles.clearFor: the spawn's check).
 function Vehicles.standUp(car: Car, heading: Vector3)
 	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
 		return
@@ -4284,11 +4337,12 @@ function Vehicles.standUp(car: Car, heading: Vector3)
 	params.RespectCanCollide = true
 	local under = workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -30, 0), params)
 	local asked = Vector3.new(at.X, (if under then under.Position.Y else Vehicles.groundY(at.X, at.Z, at.Y)) + drop, at.Z)
-	local spot = Vehicles.clearFor(car, CFrame.lookAt(asked, asked + look)).Position -- (its wheels' ground + drop)
-	local position = spot + Vector3.new(0, style.clearance - car.lower + CHASSIS_HEIGHT / 2 + kind.Lift - drop, 0)
+	-- (its wheels' ground + drop, tilted to that ground's plane: on a hill road it stands on all four wheels)
+	local spot = Vehicles.clearFor(car, CFrame.lookAt(asked, asked + look))
 	car.chassis.AssemblyLinearVelocity = Vector3.zero
 	car.chassis.AssemblyAngularVelocity = Vector3.zero
-	car.chassis.CFrame = CFrame.lookAt(position, position + look) -- (the whole vehicle follows, its riders with it)
+	-- (the whole vehicle follows, its riders with it)
+	car.chassis.CFrame = spot * CFrame.new(0, style.clearance - car.lower + CHASSIS_HEIGHT / 2 + kind.Lift - drop, 0)
 end
 
 -- Moves a spot along `direction` until no other car stands there (a few tries).
@@ -4322,8 +4376,9 @@ end
 -- Builds the player's car (their equipped one, or carId: a company vehicle lent for a job) standing on `ground`
 -- (its position on the ground, facing its LookVector) and makes it theirs; the old one goes. seat: the player gets
 -- in at once. chauffeured: a chauffeur drives it (server/CarCall.luau): the server owns it and nobody gets in until
--- Vehicles.handOver. Returns nil when the profile is not loaded yet.
-function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?): Car?
+-- Vehicles.handOver. Returns nil when the profile is not loaded yet. 6.26: keep: bodies that are in the car's room
+-- already and no obstacle (the riders of the car it replaces where it stands: rebuild).
+function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?, keep: { Instance }?): Car?
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil
@@ -4359,7 +4414,12 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local boards = def.bike == true or (seat and not chauffeured and humanoid ~= nil and humanoid.Health > 0 and not carrying(character))
-		ground = findRoom(styleFor(def, stage), lower, ground, if boards and character then { character } else {}, `{player.Name}'s {def.name}`)
+		local ignore: { Instance } = if keep then table.clone(keep) else {}
+		if boards and character then
+			table.insert(ignore, character)
+		end
+		local style = styleFor(def, stage)
+		ground = findRoom(style, lower, wheelsOf(def, style), ground, ignore, `{player.Name}'s {def.name}`)
 	end
 	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage, lower)
 	applyPaint(built.paintParts, def, paintId)
@@ -4649,7 +4709,25 @@ local function rebuild(car: Car): boolean
 	local position = frame.Position - Vector3.new(0, base.clearance - car.lower + CHASSIS_HEIGHT / 2, 0)
 	local occupant = car.seat.Occupant
 	local seated = occupant ~= nil and Players:GetPlayerFromCharacter(occupant.Parent) == player
-	return Vehicles.spawnAt(player, car.id, CFrame.lookAt(position, position + look), seated) ~= nil
+	-- 6.26: its riders are in the new body's room (no obstacle: it is built where it stands) and step out through it
+	local riders: { Instance } = {}
+	local function rider(who: Humanoid?)
+		local body = who and who.Parent
+		if body then
+			table.insert(riders, body)
+		end
+	end
+	rider(occupant)
+	for _, seat in car.passengers do
+		rider(seat.Occupant)
+	end
+	local new = Vehicles.spawnAt(player, car.id, CFrame.lookAt(position, position + look), seated, nil, nil, riders)
+	if new then
+		for _, body in riders do
+			passBody(new, body, Config.Cargo.AlightSeconds + 1)
+		end
+	end
+	return new ~= nil
 end
 
 -- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share), and (3.3) its

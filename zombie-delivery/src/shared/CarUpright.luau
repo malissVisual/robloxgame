@@ -7,14 +7,17 @@
 --   * CarUpright.roll(rightY, upY): how far it rolled about its length (degrees, 0 … 180: 90 on its side, 180 on its
 --     back), from its right and up vectors' Y; a climb (pitch) alone is no roll. For the Output's line.
 --   * CarUpright.tipped(upY, limit) / settled(upY, limit): over `limit` degrees off upright / within it.
---   * CarUpright.down(tilt, speed, gap, kind, slow, gapLimit): is it down? Past its side (over 90°) at any speed;
---     slower than `slow`: over the kind's Tilt, or over its Lean with a wheel `gapLimit` or more over the ground under
---     it (`gap`: the most of its four wheels; resting on its nose or a bumper, a wheel in the air).
+--   * CarUpright.down(tilt, speed, gap, missing, kind, slow, gapLimit): is it down? Past its side (over 90°) at any
+--     speed; slower than `slow` and over the kind's Lean: a wheel `gapLimit` or more over the ground under it (`gap`:
+--     the most of its four wheels; resting on its nose, a bumper or its side, a wheel in the air) or no ground under
+--     a wheel at all (`missing`). On all its wheels it is never down, however steep the ground (a hill, a ramp).
 --   * CarUpright.groundUp(points): the up of the ground under its four wheels (the points where their rays hit, front
 --     left, front right, back left, back right, { x, y, z }), a unit { x, y, z } facing up; nil when they are in a line.
 --   * CarUpright.angle(a, b): the degrees between two unit vectors ({ x, y, z }).
---   * CarUpright.facing(hx, hz, up): the way it faces on ground whose up is `up` (its flat heading hx, hz laid onto
---     that ground) and its right side: look, right ({ x, y, z } units), for the turn back's frame.
+--   * CarUpright.facing(hx, hz, up): the way it faces on ground whose up is `up` (along that ground, its flat part the
+--     heading hx, hz: no turn aside) and its right side: look, right ({ x, y, z } units), for the turn back's frame.
+--   * CarUpright.noRoll(up, hx, hz): that ground's up with its roll across the heading taken out (the pitch kept): a
+--     bike's level (its KeepUpright holds its right side level).
 --   * CarUpright.heading(lx, ly, lz, ux, uz): which way it points on the ground (a flat unit x, z) however it lies:
 --     its nose, or for one standing on its nose or its tail the way its top faces.
 --   * CarUpright.step(state, down, settled, now, hold, give): "none" (upright), "wait" (down, not for `hold` seconds
@@ -27,7 +30,7 @@ export type State = {
 	since: number?, -- when it went down (os.clock), nil while it stands
 	righting: number?, -- when the turn back up started, nil when none is running
 }
-export type Kind = { Tilt: number, Lean: number, Hold: number, Settled: number, Give: number }
+export type Kind = { Lean: number, Hold: number, Settled: number, Give: number }
 export type Vec = { number }
 
 function CarUpright.new(): State
@@ -50,14 +53,14 @@ function CarUpright.settled(upY: number, limit: number): boolean
 	return CarUpright.tilt(upY) <= limit
 end
 
-function CarUpright.down(tilt: number, speed: number, gap: number, kind: Kind, slow: number, gapLimit: number): boolean
+function CarUpright.down(tilt: number, speed: number, gap: number, missing: boolean, kind: Kind, slow: number, gapLimit: number): boolean
 	if tilt > 90 then
 		return true -- on its back or past its side: whatever it does
 	end
-	if speed >= slow then
-		return false -- a jump, a stunt, a slide: let it be
+	if speed >= slow or tilt <= kind.Lean then
+		return false -- a jump, a stunt, a slide: let it be; standing about level: on its wheels
 	end
-	return tilt > kind.Tilt or (tilt > kind.Lean and gap >= gapLimit)
+	return missing or gap >= gapLimit -- (on all four wheels on a steep slope: not down)
 end
 
 local function sub(a: Vec, b: Vec): Vec
@@ -90,9 +93,11 @@ function CarUpright.angle(a: Vec, b: Vec): number
 end
 
 function CarUpright.facing(hx: number, hz: number, up: Vec): (Vec, Vec)
-	-- The flat heading with its share along `up` taken off: the heading laid onto the ground.
-	local along = hx * up[1] + hz * up[3]
-	local look: Vec = { hx - up[1] * along, -up[2] * along, hz - up[3] * along }
+	-- The way along that ground whose flat part is the heading: its climb from the plane (up · look = 0), no turn aside.
+	local look: Vec = { hx, 0, hz }
+	if math.abs(up[2]) > 1e-6 then
+		look = { hx, -(hx * up[1] + hz * up[3]) / up[2], hz }
+	end
 	local size = length(look)
 	if size < 1e-6 then
 		look = { 0, 0, -1 }
@@ -102,6 +107,18 @@ function CarUpright.facing(hx: number, hz: number, up: Vec): (Vec, Vec)
 	local right = cross(look, up) -- (look × up: the right side; -Z × Y = +X)
 	local r = math.max(1e-9, length(right))
 	return look, { right[1] / r, right[2] / r, right[3] / r }
+end
+
+function CarUpright.noRoll(up: Vec, hx: number, hz: number): Vec
+	local look = CarUpright.facing(hx, hz, up)
+	local right = cross(look, { 0, 1, 0 }) -- (level: no roll)
+	local r = length(right)
+	if r < 1e-6 then
+		return { 0, 1, 0 }
+	end
+	local level = cross({ right[1] / r, right[2] / r, right[3] / r }, look)
+	local size = math.max(1e-9, length(level))
+	return { level[1] / size, level[2] / size, level[3] / size }
 end
 
 function CarUpright.heading(lx: number, ly: number, lz: number, ux: number, uz: number): (number, number)

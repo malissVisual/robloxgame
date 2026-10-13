@@ -1175,14 +1175,18 @@ tipped a car left it tipped, parked or driven; a bike's KeepUpright only levels 
 **Vehicles come out clear** (`Vehicles.spawnAt` → `findRoom`, `shared/SpawnSpot.luau`, `Config.SpawnSpot`). Every way a
 vehicle comes out goes through it: CAR's chauffeur and a chauffeur's car put back on a road, PLAY and a respawn, the garages
 and the home garage, the admin panel, a job's company vehicle, MY BIKE, a car bought or brought by Earl.
-- Rays under its four wheels find the ground; no more than 0.6 studs between them (two wheels up a curb pass, a crate or a
-  slope does not).
+- Rays under its four wheels (a bike's own four, under its axles) find the ground. It must be one plane (a wheel's ground
+  no more than 0.6 studs off the plane of the other three: a crate under a wheel fails) no steeper than 15° (a hill road, a
+  ramp or two wheels up the curb pass). The vehicle comes out tilted to that plane.
+- From the spot asked for to another one, a ray at its hull's middle height must find nothing standing in the way: no car
+  is put through a wall or a fence.
 - A box query checks the room its hull needs, from 0.6 over that ground (the curb and the road's paint stay under it), 0.3
   wider all round, in the collision group "Car". It finds the props, the crates, the counters, the walls, the other cars and
   a player's body; never a zombie, a person of the city, a corpse, an animal or the loot (they never collide with a car or
   are pushed along). Your own body is no obstacle when you get in at once or onto your own bike.
 - Taken: the next spot in a small spiral, a length along the way it faces and a width to either side, 12 in all. None free:
-  the spot asked for, as before, with a warning in Studio's Output. The ZDC RIDE scooter still comes out of its dock.
+  the spot asked for (on its ground's plane up to 40°), with a warning in Studio's Output. The ZDC RIDE scooter still comes
+  out of its dock. A car rebuilt for a new stage keeps its riders' bodies out of the way and lets them step out through it.
 
 **Getting in and out never shoves the car** (`passBody` in `server/Vehicles.luau`): the server gives the body
 NoCollisionConstraints with the car's hull for the move (a folder `BoardPass_<name>`, gone a second after); a bike keeps its
@@ -1192,13 +1196,16 @@ NoCollisionConstraints with the car's hull for the move (a folder `BoardPass_<na
 `Config.CarUpright` with a kind each: `car` for the cars, vans and trucks, `bike` for the bikes and the E-Scooter). Four
 times a second the server looks at every player's vehicle. It is down when:
 - it is on its back or past its side (at any speed);
-- or, slower than 6 studs/s (a jump, a stunt or a slide go on), its top is more than 35° off straight up (a bike 45°);
-- or it is more than 12° off with a wheel 0.6 studs or more over the ground under it (the owner's case: resting on its nose
-  or a bumper).
+- or, moving slower than 6 studs/s (a jump, a stunt, a slide or a fall go on), its top is more than 12° off straight up
+  and a wheel is 0.6 studs or more over the ground under it, or has no ground under it at all (the owner's case: resting
+  on its nose or a bumper). On all four wheels it is never down, however steep the ground.
 
-Down for 1.5 s (a bike 1 s), its AlignOrientation "Righting" (`Vehicles.righting`) turns it back onto its wheels, level
-with the ground under them, facing where it pointed, and the Steer lets go meanwhile. Within 6° it is the driver's again.
-Still down after 3 s (a bike 2.5 s) it is stood up where it lies, on the ground right under it, nudged to free room when
+Down for 1.5 s (a bike 1 s), its AlignOrientation "Righting" (`Vehicles.righting`) turns it back onto its wheels, facing
+where it pointed, and the Steer lets go meanwhile. It aims at the level of the ground where it will stand: rays straight
+down round where it lies (a car on its back has its wheels high up), looked at again every check while it turns (a car
+that flipped on a hill road lands on all four wheels, not on one axle); straight up when that ground is steeper than 20°;
+a bike without the ground's roll. Within 6° of that level it is the driver's again. Still down after 3 s (a bike 2.5 s) it
+is stood up where it lies, on the ground right under it, tilted to that ground's plane, nudged to free room when
 something is there (`Vehicles.standUp`). Never a car on a repair lift, an anchored one or one a chauffeur drives (it is
 righted after the hand-over). In Studio every vehicle that went down says so in the Output (how far, a wheel's gap, driven
 or parked).
@@ -1208,7 +1215,8 @@ car at every stage with its full kit, every bike and company vehicle, and checks
 - every colliding part but the wheels is at least 0.25 over the wheels' contact plane;
 - everything past the axles leaves 15° (the steepest road's 14° and one more) at the front and the back;
 - nothing that swings or sways collides (the doors, the back, what is welded on them, the body that sways);
-- the ZDC Van rides no lower than the Old Van.
+- the ZDC Van rides no lower than the Old Van;
+- the spawn's rays look under its real wheel colliders (a bike's too).
 
 ## The ZDC Van: the owner's Blender model (6.25)
 

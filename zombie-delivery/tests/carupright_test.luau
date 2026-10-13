@@ -28,11 +28,10 @@ check("the numbers are there", Cfg.Check > 0 and Cfg.Check <= 0.5 and Cfg.Slow >
 	and Cfg.Level > 14 and Config.BikeUpright == nil)
 for name, k in { car = Car, bike = Bike } do
 	check(name .. ": a full set of numbers", k.Hold >= 0.5 and k.Hold <= 2 and k.Give > k.Hold and k.Responsiveness > 0
-		and k.TurnRate > 0 and k.Torque > 12000 and k.Lift >= 0 and k.Settled > 0 and k.Settled < k.Lean and k.Lean < k.Tilt)
+		and k.TurnRate > 0 and k.Torque > 12000 and k.Lift >= 0 and k.Settled > 0 and k.Settled < k.Lean and (k :: any).Tilt == nil)
 	-- The roads climb 14° at most (Map: the curb's grade; the footbridge ramps no steeper): a vehicle on one is up.
-	check(name .. ": on the steepest road (14°) it is down only with a wheel in the air", k.Tilt > 14 + 5 and k.Lean < 14)
+	check(name .. ": the owner's 20° is past Lean, the steepest road's 14° too (then only a wheel in the air decides)", k.Lean < 14)
 end
-check("the bike keeps 6.24's 45°, a car goes at about 35°", Bike.Tilt == 45 and Car.Tilt >= 30 and Car.Tilt <= 40)
 check("the turn back holds a car down by more than its steering does (6000 × the mass)", Car.Torque > 6000 and Bike.Torque > 12000)
 
 -- A frame: roll about its length (degrees, + lifts its right side), then pitch (+ nose up), then the way it points
@@ -73,28 +72,31 @@ check("tilt is clamped (a hair over 1 from the engine)", near(CarUpright.tilt(1.
 check("tipped / settled at a limit", CarUpright.tipped(math.cos(math.rad(50)), 45) and not CarUpright.tipped(math.cos(math.rad(40)), 45)
 	and CarUpright.settled(math.cos(math.rad(5)), 6) and not CarUpright.settled(math.cos(math.rad(8)), 6))
 
--- down: what counts as down, for a car and a bike
+-- down: what counts as down, for a car and a bike (a wheel off the ground decides, not an angle)
 local function tiltOf(roll: number, pitch: number): number
 	local _, u = frame(roll, pitch, 0)
 	return CarUpright.tilt(u[2])
 end
 local slow, fast = Cfg.Slow * 0.5, Cfg.Slow * 3
-local function down(kind: any, roll: number, pitch: number, speed: number, gap: number): boolean
-	return CarUpright.down(tiltOf(roll, pitch), speed, gap, kind, Cfg.Slow, Cfg.Gap)
+local function down(kind: any, roll: number, pitch: number, speed: number, gap: number, missing: boolean?): boolean
+	return CarUpright.down(tiltOf(roll, pitch), speed, gap, missing == true, kind, Cfg.Slow, Cfg.Gap)
 end
 check("standing level: not down", not down(Car, 0, 0, 0, 0) and not down(Bike, 0, 0, 0, 0))
 check("parked on the steepest ramp, on all its wheels: not down", not down(Car, 0, 14, 0, 0) and not down(Car, 4, 14, 0, 0.1))
-check("leaning into a turn (the bike's look's 9°): not down", not down(Bike, 9, 0, slow, 0))
+check("on all four wheels on ground steeper than any road (40°, a hillside): not down", not down(Car, 0, 40, slow, 0.2)
+	and not down(Car, 38, 0, 0, 0.1) and not down(Bike, 0, 50, 0, 0))
+check("leaning into a turn (the bike's look's 9°): not down", not down(Bike, 9, 0, slow, 0, true))
 check("THE OWNER'S CASE: a van 22° nose down, a back wheel 1.9 studs in the air, parked: down",
 	down(Car, 8, -22, 0, 1.9) and down(Car, 0, -20, 0, 1.6))
 check("... the same tilt on all four wheels (a ramp's crest): not down", not down(Car, 8, -22, 0, Cfg.Gap * 0.5))
-check("on its side, slow: down (car and bike)", down(Car, 90, 0, slow, 0) and down(Bike, -80, 0, 0, 0))
-check("half over (40°) slow: a car is down, a bike not yet (45°)", down(Car, 40, 0, slow, 0) and not down(Bike, 40, 0, slow, 0))
-check("on its nose or its tail: down", down(Car, 0, -80, 0, 0) and down(Bike, 0, 80, 0, 0))
-check("on its back: down at any speed", down(Car, 180, 0, fast, 0) and down(Bike, 175, 10, fast, 0))
-check("a jump, a stunt (fast): left alone however it is tilted short of its back", not down(Car, 60, 0, fast, 3)
-	and not down(Car, 0, -30, fast, 2) and not down(Bike, 80, 0, fast, 0))
-check("at exactly Slow it counts as moving", not CarUpright.down(50, Cfg.Slow, 0, Car, Cfg.Slow, Cfg.Gap))
+check("a wheel with no ground under it at all (hanging over a crate, a ledge): down", down(Car, 0, -18, 0, 0, true))
+check("on its side, slow: down (its upper wheels high in the air)", down(Car, 90, 0, slow, 5.8) and down(Bike, -80, 0, 0, 2))
+check("on its nose or its tail: down", down(Car, 0, -80, 0, 9) and down(Bike, 0, 80, 0, 4))
+check("on its back: down at any speed", down(Car, 180, 0, fast, 0) and down(Bike, 175, 10, fast, 0, true))
+check("a jump, a stunt (fast, a fall too): left alone however it is tilted short of its back", not down(Car, 60, 0, fast, 3)
+	and not down(Car, 0, -30, fast, 2, true) and not down(Bike, 80, 0, fast, 0))
+check("at exactly Slow it counts as moving", not CarUpright.down(50, Cfg.Slow, 3, true, Car, Cfg.Slow, Cfg.Gap))
+check("a wheel exactly Gap up counts", CarUpright.down(20, 0, Cfg.Gap, false, Car, Cfg.Slow, Cfg.Gap))
 
 -- the ground's level under four wheels (front left, front right, back left, back right)
 local flat = CarUpright.groundUp({ { -3, 0.4, -5 }, { 3, 0.4, -5 }, { -3, 0.4, 5 }, { 3, 0.4, 5 } })
@@ -121,6 +123,23 @@ if ramp then
 end
 look, side = CarUpright.facing(1, 0, { 0, 1, 0 })
 check("facing +X: right +Z", near(side[3], 1) and near(look[1], 1))
+
+-- noRoll: a bike's level on ground that rolls across its way (KeepUpright holds its right side level)
+if ramp and kerb then
+	local level = CarUpright.noRoll(kerb, 0, -1)
+	check("across a kerb's roll: straight up for a bike facing along it", near(level[1], 0, 1e-9) and near(level[2], 1, 1e-9) and near(level[3], 0, 1e-9))
+	level = CarUpright.noRoll(ramp, 0, -1)
+	check("up a ramp: the ramp's pitch kept", near(CarUpright.angle(level, ramp), 0, 1e-6))
+	local s14, c14 = math.sin(math.rad(14)), math.cos(math.rad(14))
+	local both = { -s14 * 0.5, c14, s14 } -- (a ramp that also leans across)
+	local size = math.sqrt(both[1] ^ 2 + both[2] ^ 2 + both[3] ^ 2)
+	both = { both[1] / size, both[2] / size, both[3] / size }
+	level = CarUpright.noRoll(both, 0, -1)
+	local lookOn = CarUpright.facing(0, -1, level)
+	local rightOn = { -lookOn[3], 0, lookOn[1] } -- (flat: the right side level)
+	check("a ramp that leans too: the roll gone, the climb kept", near(level[1], 0, 1e-9) and level[2] > 0.9
+		and near(level[1] * rightOn[1] + level[3] * rightOn[3], 0, 1e-9) and near(math.deg(math.asin(lookOn[2])), CarUpright.angle(level, { 0, 1, 0 }), 1e-6))
+end
 
 -- heading
 local function headingOf(roll: number, pitch: number, yaw: number): (number, number)

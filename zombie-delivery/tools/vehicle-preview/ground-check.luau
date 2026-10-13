@@ -9,7 +9,8 @@
 --     (approach) and the back (departure), from the wheel's contact under its axle;
 --   * nothing that swings (a cab door, a back door, a tailgate, a ramp, what is welded onto them) and nothing on the
 --     body that sways (the BodyRoot) collides: an open door never props the car up;
---   * the ZDC Van (the Old Van's size and wheels) rides no lower than the Old Van.
+--   * the ZDC Van (the Old Van's size and wheels) rides no lower than the Old Van;
+--   * the spawn's rays (Vehicles' wheelsOf) look under its four wheel colliders (a bike's too).
 -- Run by check_fleet.py.
 local Mock = require("./roblox-mock")
 local Vehicles = require("./Vehicles")
@@ -66,6 +67,25 @@ for _, def in Config.Cars do
 			end
 		end
 		assert(contact < math.huge, `{who} has no wheel colliders`)
+		-- The spawn's rays look under the wheels where the factory puts them (findRoom: wheelsOf; a bike's own spots).
+		local colliders = {}
+		for _, p in parts do
+			if p:IsA("BasePart") and p.Name == "WheelCollider" then
+				table.insert(colliders, p.Position)
+			end
+		end
+		table.sort(colliders, function(a: any, b: any): boolean
+			if math.abs(a.Z - b.Z) > 0.01 then
+				return a.Z < b.Z
+			end
+			return a.X < b.X
+		end)
+		local spots = Vehicles.__testWheels(def, Vehicles.__testStyle(def, stage))
+		assert(#spots == 4 and #colliders == 4, `{who}: {#colliders} wheel colliders, {#spots} spawn spots`)
+		for n, spot in spots do
+			assert(math.abs(spot.x - colliders[n].X) < 1e-6 and math.abs(spot.z - colliders[n].Z) < 1e-6,
+				string.format("%s: the spawn looks under (%.2f, %.2f), the wheel stands at (%.2f, %.2f)", who, spot.x, spot.z, colliders[n].X, colliders[n].Z))
+		end
 		local lowest = math.huge
 		for _, p in parts do
 			if not p:IsA("BasePart") then
@@ -99,5 +119,5 @@ for _, def in Config.Cars do
 end
 assert(lowestOf.zdcvan and lowestOf.van and lowestOf.zdcvan >= lowestOf.van - 1e-6,
 	string.format("the ZDC Van's lowest hull is %.2f over its wheels' ground, the Old Van's %.2f: it rides lower", lowestOf.zdcvan or -1, lowestOf.van or -1))
-print(string.format("Ground PASS: %d builds (every car, stage, bike and company vehicle with its full kit): only the wheels touch the ground (the lowest hull %.2f over it: %s; the ZDC Van %.2f, the Old Van %.2f), %d°+ approach and departure, nothing that swings or sways collides",
+print(string.format("Ground PASS: %d builds (every car, stage, bike and company vehicle with its full kit): only the wheels touch the ground (the lowest hull %.2f over it: %s; the ZDC Van %.2f, the Old Van %.2f), %d°+ approach and departure, nothing that swings or sways collides, the spawn's rays under every wheel",
 	checked, lowestAll, lowestWho, lowestOf.zdcvan, lowestOf.van, CLIMB + ROOM))
