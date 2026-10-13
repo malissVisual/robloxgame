@@ -6,8 +6,8 @@
 --   * the header: ZDC MOVING · PLANNING, the house big, chips (the clock, the horde, the crew n/max), ✕ folds it away
 --     (a pill at the top brings it back: nothing is left);
 --   * the contract (the kit's hero): the house's picture mark, the client and address, UP TO $ big in green, one facts
---     line (★ must-haves, things), DOOR OPEN in its corner (the client greets the crew there); the truck under it (the
---     Moving Truck, SELECTED; bigger ones later);
+--     line (★ must-haves, things), DOOR OPEN in its corner (the client greets the crew there); the van under it (7.x van
+--     moves: the owner's own van, its bay, SELECTED; bigger ones later);
 --   * the crew (the kit's rows): each member with their role's icon, LEADER / YOU, the role, READY (green) / NOT READY
 --     (red); the owner's + INVITE opens the crew panel (MoveLobbyUi.onInvite: client/CrewPanel.luau) and the lobby comes
 --     back when it closes;
@@ -231,18 +231,19 @@ end
 
 local function truckRows(parent: Instance, v: any, order: number)
 	local card = v.card or {}
-	local bed = if type(card.bed) == "table" then card.bed else { Config.Moving.Bed.Width, Config.Moving.Bed.Length }
-	section(parent, "TRUCK", order)
+	local van = Config.Moving.Beds[Config.Moving.Van] -- (7.x van moves: the owner's van's bay)
+	local bed = if type(card.bed) == "table" then card.bed else { van.Width, van.Length }
+	section(parent, "YOUR VAN", order) -- (7.x van moves: the move goes with the owner's own van, trip after trip)
 	CardKit.row(parent, {
 		name = "Truck",
 		order = order + 1,
 		accent = ORANGE,
-		picture = { emoji = "🚚" },
+		picture = { emoji = "🚐" },
 		thumb = KIT.Icon,
 		emojiSize = 26,
-		title = string.upper(tostring(card.truck or "Moving Truck")),
+		title = string.upper(tostring(card.truck or "ZDC Van")),
 		titleColor = C.title,
-		facts = `Bed {bed[1]} × {bed[2]} studs · lent by ZDC`,
+		facts = `Bay {bed[1]} × {bed[2]} studs · as many trips as it takes`,
 		word = "✔ SELECTED",
 		wordInk = K.good,
 		silent = true,
@@ -256,7 +257,7 @@ local function truckRows(parent: Instance, v: any, order: number)
 		thumb = KIT.Icon,
 		emojiSize = 26,
 		shut = true,
-		title = "BIGGER TRUCKS",
+		title = "BIGGER VEHICLES",
 		facts = "Box van, trailer: as ZDC Moving grows",
 		lock = "🔒 SOON",
 		silent = true,

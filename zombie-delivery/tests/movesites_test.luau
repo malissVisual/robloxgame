@@ -233,8 +233,11 @@ check("nothing solid stands in front of the kiosk (the yard side)", #front == 0,
 -- The houses ------------------------------------------------------------------------------------------------------------
 
 for _, contract in Config.Moving.Contracts do
+	if contract.kind ~= "house" then
+		continue -- (7.x farm move: a farm's site is checked below)
+	end
 	local set = byId["house_" .. contract.id]
-	local home = Map.home(contract.home)
+	local home = Map.home(contract.home or "")
 	if not set or not home then
 		check(`{contract.id}: its house on the map`, false)
 		continue
@@ -296,6 +299,147 @@ for _, p in banner.pieces do
 		-- the hall's front: open 72 wide and 14 tall, its canopy's underside at 19.3, DISPATCH / FLEET from |x| 19.5
 		check("the banner hangs over the hall's door (above 14), under its canopy, between its DISPATCH and FLEET boards",
 			y0 - Map.WalkTop >= 14 and y1 - Map.WalkTop + t.Banner.Hang <= 19.3 + 1e-6 and x0 - dx > -19 and x1 - dx < 19)
+	end
+end
+
+-- 7.x farm move: Walt's farm at the Old Farm (Config.Moving.Sites.farm, MoveSiteLooks.farm) -------------------------------
+
+do
+	local contract: any = nil
+	for _, c in Config.Moving.Contracts do
+		if c.kind == "farm" then
+			contract = c
+		end
+	end
+	local set = contract and byId["farm_" .. contract.id]
+	local place = contract and Looks.sitePlace(contract.place)
+	local doors = contract and Looks.siteDoors(contract.kind, contract.place)
+	check("the farm's set at its Map.Places place (its point, its frame)", set ~= nil and place ~= nil and doors ~= nil and #doors == 2 and (function(): boolean
+		for _, p in Map.Places do
+			if p.id == contract.place then
+				return p.x == place.x and p.z == place.z and place.yaw == 0 and place.y == Map.RoadTop
+			end
+		end
+		return false
+	end)())
+	if set and place and doors then
+		local site = Config.Moving.Sites.farm
+		local yard: Map.Area? = nil
+		for _, y in Map.Yards do
+			if y.id == contract.place then
+				yard = y
+			end
+		end
+		-- the World farm's own things round the place (its literal layout: the barn, the silo) and its Map data
+		local spot = Map.CargoSpots[contract.place]
+		local secret: Map.Secret? = nil
+		for _, s in Map.Secrets do
+			if s.id == "secret_" .. contract.place then
+				secret = s
+			end
+		end
+		local board = Map.EmployerSpots[contract.place]
+		local solid, paths, keeps, outside = {}, {}, {}, {}
+		local porch = Config.MoveGreeters.Porch
+		for _, p in set.pieces do
+			local x0, x1, y0, y1, z0, z1 = Looks.box(place, p)
+			if p.solid and p.name ~= "FarmhouseBody" then
+				table.insert(solid, p.name)
+			end
+			if yard and (x0 < yard.x0 or x1 > yard.x1 or z0 < yard.z0 or z1 > yard.z1) then
+				table.insert(outside, p.name)
+			end
+			local low = y0 < place.y + 7.5
+			for n, d in doors do
+				-- the way out of the door to the van's spot (the door's width with room), and the van there (7.4 × 17)
+				local corners = {}
+				for _, x in { x0, x1 } do
+					for _, z in { z0, z1 } do
+						table.insert(corners, { (x - d.x) * d.fx + (z - d.z) * d.fz, (x - d.x) * -d.fz + (z - d.z) * d.fx })
+					end
+				end
+				local out0, out1, side0, side1 = math.huge, -math.huge, math.huge, -math.huge
+				for _, c in corners do
+					out0, out1 = math.min(out0, c[1]), math.max(out1, c[1])
+					side0, side1 = math.min(side0, c[2]), math.max(side1, c[2])
+				end
+				local half = d.width / 2 + 0.4
+				if low and out1 > 0.6 and out0 < site.Curb - 8.5 and side1 > -half and side0 < half then
+					table.insert(paths, `{p.name} on door {n}'s way out`)
+				end
+				if low and out1 > site.Curb - 8.5 and out0 < site.Curb + 8.5 and side1 > -4 and side0 < 4 then
+					table.insert(paths, `{p.name} on door {n}'s van spot`)
+				end
+				-- Walt's spot by the front door (Config.MoveGreeters.Porch in its frame: right of it, out of it)
+				local px, pz = porch[1], -porch[2] -- (server/MoveGreeters.luau porchSpot: right × Porch[1], out × -Porch[2])
+				if n == 1 and low and side1 > px - 1.2 and side0 < px + 1.2 and out1 > pz - 1.2 and out0 < pz + 1.2 then
+					table.insert(paths, `{p.name} on Walt's spot`)
+				end
+			end
+			local mx, mz = (x0 + x1) / 2, (z0 + z1) / 2
+			local reach = math.max(x1 - x0, z1 - z0) / 2
+			local function near(x: number, z: number, r: number): boolean
+				return math.abs(mx - x) < reach + r and math.abs(mz - z) < reach + r
+			end
+			if spot and (near(spot.park.x, spot.park.z, 8) or near(spot.pile.x, spot.pile.z, 6)) then
+				table.insert(keeps, `{p.name} by the Farm Run's cargo spot`)
+			end
+			if secret and near(secret.x, secret.z, 3) then
+				table.insert(keeps, `{p.name} by the lost package`)
+			end
+			if board and near(board.x, board.z, 8) then
+				table.insert(keeps, `{p.name} by the WORK HERE board`)
+			end
+			-- World's barn (40 × 30 round the place + (-60, -80)) and silo (r 7 round + (-20, -90)) at the raw frame
+			local bx, bz = Looks.toWorld(place, -60, -80)
+			local sx, sz = Looks.toWorld(place, -20, -90)
+			if math.abs(mx - bx) < 20 + reach - 0.3 and math.abs(mz - bz) < 15 + reach - 0.3 then
+				table.insert(keeps, `{p.name} in the barn`)
+			end
+			if near(sx, sz, 7) then
+				table.insert(keeps, `{p.name} on the silo`)
+			end
+		end
+		check("the farm: only the farmhouse's body is solid (the dress never)", #solid == 0, table.concat(solid, ", "))
+		check("the farm: nothing on a door's way out to its van spot, on a van spot or on Walt's spot", #paths == 0, table.concat(paths, ", "))
+		check("the farm: clear of the World farm's barn, silo, cargo spot, lost package and board", #keeps == 0, table.concat(keeps, ", "))
+		check("the farm: inside the Old Farm's yard", yard ~= nil and #outside == 0, table.concat(outside, ", "))
+		local front, barn = doors[1], doors[2]
+		local hx, hz = Looks.toWorld(place, site.House.At[1], site.House.At[2] + site.House.Size[3] / 2)
+		check("the farm: the front door on the farmhouse's front, the barn doors on the World barn's (its Kit facade at z +15.15)",
+			math.abs(front.x - hx) < 1e-6 and math.abs(front.z - hz) < 1e-6 and front.fz == 1 and barn.fz == 1 and barn.width >= 10
+			and math.abs(barn.z - (place.z - 80 + 15.6)) < 0.5 and barn.x == place.x - 60)
+		check("the farm: the van's spot Curb studs out of each door, you come out Out studs out",
+			math.abs(front.park.z - front.z - site.Curb) < 1e-6 and math.abs(barn.out.z - barn.z - site.Out) < 1e-6)
+		local sign = false
+		for _, p in set.pieces do
+			if p.name == "YardSign" and p.words then
+				sign = p.words[1].lines[1].text == "ZDC MOVING" and p.words[1].lines[2].text == string.upper(contract.name)
+			end
+		end
+		check(`the farm: the yard sign says ZDC MOVING · {string.upper(contract.name)}`, sign)
+		-- Map step 2 moves the Old Farm and turns it 90° (Map.Relocations): the site follows its place
+		local raw = Map.Places
+		local moved = {}
+		for _, p in raw do
+			table.insert(moved, if p.id == contract.place then { id = p.id, name = p.name, x = -648, z = -1320, nx = 0, nz = 0 } else p)
+		end
+		local M = Map :: any
+		M.Places = moved
+		M.Relocations = { [contract.place] = { from = { place.x, place.z }, to = { -648, -1320 }, turn = 90 } }
+		local turned = Looks.sitePlace(contract.place) :: Looks.Place
+		local after = Looks.siteDoors(contract.kind, contract.place) :: { Looks.SiteDoor }
+		M.Places = raw
+		M.Relocations = nil
+		local ok = turned.x == -648 and turned.z == -1320 and turned.yaw == -90
+		for n, d in after do
+			local before = doors[n]
+			-- new = to + R(90)·(old − from): (dx, dz) → (−dz, dx)
+			local ex, ez = -648 - (before.z - place.z), -1320 + (before.x - place.x)
+			ok = ok and math.abs(d.x - ex) < 1e-6 and math.abs(d.z - ez) < 1e-6 and math.abs(d.fx - -before.fz) < 1e-6 and math.abs(d.fz - before.fx) < 1e-6
+				and math.abs(d.park.x - (d.x + d.fx * site.Curb)) < 1e-6 and math.abs(d.park.z - (d.z + d.fz * site.Curb)) < 1e-6
+		end
+		check("map step 2: the Old Farm moved to (-648, -1320) and turned 90°: its doors and van spots go with it", ok and #after == 2)
 	end
 end
 

@@ -1273,6 +1273,36 @@ drawn without a change to the map's code.
   sign, ALTSTADT; drive to the map's edge and watch the minimap (the ring's slopes, the snow in the north-west) while it
   turns; a job's red route and the GPS over the paper; the fog lifting.
 
+## Walt's Farm and moves in your own ZDC Van (7.x)
+
+**Chapter 1 is playable: Walt's Farm** ("Hold Your Horses", `Config.Moving.Contracts` id `walt`, seed 1921).
+- It opens once you finished the prologue (Marge's House) once. The save remembers it (`profile.story` flag `done:prologue`, set only on a real save).
+- The contract card lists the board's contracts (Marge's House, 🐴 Walt's Farm, 🔒 while locked with the reason). A tap on an open one, or on chapter 1's ▶ PLAY tile in the CHAPTERS road, opens its card. The board opens the next contract you have not done.
+- 14 minutes on the clock, the horde at 3:30 left, the pay × 1.25 (the contract's `time`, `hordeAt`, `pay`).
+- The ★ pieces are Thunder's saddle, the branding iron and Grandma's milk churn, as Walt says in the briefing (`shared/MoveStory.luau` keepsakes; `farmmove_runtime_test` checks them against the plan's ★ pool).
+
+**The farm site** (`server/Moving.luau` farmSite, `server/MoveSites.luau` farm, `shared/MoveSiteLooks.luau` farm, `Config.Moving.Sites.farm`):
+- It stands at the Old Farm place from `shared/Map.luau` (`Map.Places`). Every offset is in the place's own frame, so it follows the place when map step 2 moves or turns it (`Map.Relocations`).
+- Two ways in, each with its own "Enter" prompt: the farmhouse's front door (a small farmhouse built for the move) and the barn doors. The barn doors bring you in by the interior's second exit; Leave brings you out at the door you used.
+- The hay wagon (a bigDoor piece) only goes through the barn doors. At the farmhouse's Leave it says "Too big — use the barn doors" (`shared/HouseLayout.luau` exitsFor).
+- Each door has its own van spot; the Driver's "Call truck to door" picks the nearest door.
+- Walt waits by the farmhouse (rancher's hat, check shirt, moustache: `shared/NpcLooks.luau` walt). He greets you, says "Easy with Thunder's saddle!" when it goes past, shouts at the horde and says goodbye. Private Reyes greets you at the Wall as before.
+- Moving day outside: boxes, a horse trailer, hay bales and a ZDC sign, light and not colliding, never on the paths.
+- Danny takes the nearest way he may use (the barn doors for the hay wagon: `shared/MoveHelperBrain.luau` routeVia).
+
+**Moves in your own ZDC Van** (the owner: "the move should be driven with MY van"):
+- No Moving Truck is lent any more. START brings your own car (your ZDC Van, `Config.Moving.Van`) next to you; a job's or rental's car is not used.
+- The packing bed is the car's cargo bay (`Config.Moving.Beds`: the ZDC Van's 6.2 × 6.4 × 4.3; another car without its own bed uses the van's). The hay wagon does not fit any bed: it rides **hitched** behind the van, one at a time, and Unload takes it off last (`Config.Moving.Hitch`).
+- **Trips.** Driving into the Wall's checkpoint unloads everything in the van and on its hitch (delivered), and the move goes on. The HUD shows `TRIP n · delivered x/y`.
+- The move ends when the clock runs out, or when the owner presses **FINISH** on the move panel (owner only, with a confirm). A load brought in after the clock still counts, at the late share.
+- Pay is everything delivered over all trips: value × condition, ★ × 1.5, the time bonus, × the contract's pay. What is still in the van at the end pays nothing.
+- While the move runs nothing of the old game takes your van's place (CAR, MY BIKE, the phone's CALL CAR, a car job, a garage's or dealer's car) and a respawn does not take it back. If it is wrecked or gone, everything in it is lost (condition 0) and the move goes on; CAR brings it again after 20 s (`Config.Moving.VanAgain`).
+- Driver and Danny work with the van like with the old truck.
+
+**Admin:** MOVES has 🐴 FARM: CONTRACT CARD, ▶ FARM: START NOW, FARM: GO TO THE FARM and 🚐 MOVE: TRIP NOW (`move` args `farmcard`, `farm`, `farmgo`, `trip`).
+
+**Tests:** `vanmove_test` (the hitch, trips, a lost van, the pay over trips, the farm's ways, Walt), `farmmove_runtime_test` (a whole farm move on the real art: in by the barn doors, the hay wagon refused at the farmhouse and out through the barn, hitched, two trips, the van lost, FINISH, the chapter unlocked and saved), and the contract list in `tools/phone-ui/movestory.luau`.
+
 ## MOVES: the moving rework, prototype (7.0)
 
 The owner's rework (`design/rework/NAVRH.md`, the story in `design/rework/PRIBEH.md`): the game turns into **moving**.
@@ -1289,7 +1319,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Marge texts the crew at the start and the end, and the client thanks you on the result card.
 - Code: `shared/MoveStory.luau`, `client/MoveStoryUi.luau`.
 
-**Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and the Moving Truck.
+**Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and your van (7.x: your own ZDC Van, see above).
 - Everyone picks one of three roles (three cards side by side) and LAUNCH starts once all are READY (solo at once):
   - 🚚 **Driver:** no wait at the truck's back, less truck damage at the wheel, "Call truck to door" once.
   - 💪 **Mover:** lifts a two-person piece alone, carries 15% faster, no slowdown on slopes.
@@ -1300,7 +1330,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Hold **T** (💬 on phones) for quick chat: six lines your crew sees as a bubble and a line in the move panel.
 
 **The move** (`server/Moving.luau`, rules `shared/MovingRules.luau`, HUD `client/MovingHud.luau`, `client/Fade.luau`, `Config.Moving`):
-- The Moving Truck is lent next to you. Drive to 155 Willow Ln (GPS).
+- Your own ZDC Van comes next to you (7.x; 7.0 lent a Moving Truck). Drive to 155 Willow Ln (GPS).
 - At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
 - Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
 - **The grip** (like Fisch's reeling): while you carry a 🙌 or 👥 piece, or a fragile ✋ one (gentler), a bar shows right of the middle.
@@ -1313,7 +1343,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
 - At 3:00 left a horde comes to the house.
-- Drive into the Wall's checkpoint at the depot to finish. Pay is Σ value × condition, with ★ × 1.5 and a time bonus, split with the crew at the truck; you also get XP and 1–5 stars.
+- Drive into the Wall's checkpoint at the depot to deliver (7.x: a trip, the move goes on until FINISH or the clock). Pay is Σ value × condition, with ★ × 1.5 and a time bonus, split with the crew at the truck; you also get XP and 1–5 stars.
 
 **Danny from the depot** (`server/MoveHelper.luau`, `shared/MoveHelperBrain.luau`, `Config.MoveHelper`) helps a solo player.
 - He takes the other end of a two-person piece and carries the small ones out on his own, ★ first.
