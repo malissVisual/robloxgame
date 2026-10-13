@@ -24,10 +24,12 @@
 --     drops when its carrier falls from a height, is bitten, dies (it drops), and in the truck when the truck is hit;
 --     its helper too far from it for Grace s, it goes down. Moving faster than the carry allows (a teleport) puts it
 --     down where its carrier was.
---   * The truck: "Load" (E) at its open back puts what you hold onto the bed (MovingRules' packer: first-fit, turned
---     90° when that fits, stacked flat; "No room — unload something or bring a bigger truck"), welded in the box where
---     it is seen through the open back; "Take out" (Z, Unload) takes the last one in that nothing rests on back into
---     your hands: beside the door on its own spot, and only while nobody at the back carries a thing.
+--   * The truck: "Load" (E) at its open back puts what you hold onto the bed (MovingRules' packer: the best scored
+--     place, turned 90°, resting on uneven tops, a both / pair piece lying on its side when it has no place standing,
+--     the bed repacked biggest first when it has no room as it is: the moved models welded anew; "No room" else, and
+--     the prompt says "won't fit" before), welded in the box where it is seen through the open back; "Take out" (Z,
+--     Unload) takes the last one in that nothing rests on back into your hands: beside the door on its own spot, and
+--     only while nobody at the back carries a thing.
 --     The back is the owner's and the crew's (Vehicles.backAllowed, BackCrew); its own prompt waits while Load shows
 --     (one E at a time).
 --   * The clock: Config.Moving.Time; at HordeAt left the horde (Zombies.spawn + Zombies.march to the door, in bursts);
@@ -1001,13 +1003,16 @@ local function rulesBed(truck: Vehicles.Car?): Rules.Bed
 	return { width = bed.Width, length = bed.Length, height = bed.Height, cell = bed.Cell }
 end
 
--- The bed's place in the truck's chassis frame: (its middle at the floor, from MovingRules.where's numbers).
-local function bedFrame(truck: Vehicles.Car, x: number, y: number, z: number, turned: boolean): CFrame
+-- The bed's place in the truck's chassis frame: (its middle at the floor, from MovingRules.where's numbers). A thing
+-- lying on its side (Placement.lying, Config.Moving.Pack.Lie) is rolled first: "x" its height along its width (about
+-- its depth), "z" along its depth (about its width); then turned.
+local function bedFrame(truck: Vehicles.Car, x: number, y: number, z: number, turned: boolean, lying: string?): CFrame
 	local slots = Vehicles.cargoSlots(truck)
 	local floor = if slots[1] then slots[1].Position.Y else 0.6
 	local turn = if turned then CFrame.Angles(0, math.rad(90), 0) else CFrame.identity
+	local lie = if lying == "x" then CFrame.Angles(0, 0, math.rad(90)) elseif lying == "z" then CFrame.Angles(math.rad(90), 0, 0) else CFrame.identity
 	local center = bedOf(truck).Center -- (7.x van moves: the car's own bay)
-	return truck.chassis.CFrame * CFrame.new(center[1] + x, floor + y, center[2] + z) * turn
+	return truck.chassis.CFrame * CFrame.new(center[1] + x, floor + y, center[2] + z) * turn * lie
 end
 
 -- 7.x van moves: a hitched piece behind the car (Config.Moving.Hitch), its wheels on the ground.
@@ -1029,9 +1034,23 @@ local function stow(s: Session, item: Item, at: Rules.Placement)
 		weldTo(item, Vehicles.cargoHolder(truck), hitchFrame(truck, s.move.things[item.spot])) -- (7.x van moves: towed)
 	else
 		local x, y, z = Rules.where(s.move.packing, at)
-		weldTo(item, Vehicles.cargoHolder(truck), bedFrame(truck, x, y, z, at.turned))
+		weldTo(item, Vehicles.cargoHolder(truck), bedFrame(truck, x, y, z, at.turned, at.lying))
 	end
 	rewire(s, item)
+end
+
+-- The packing fix: Load repacked the bed (MovingRules.load's moved spots): their models welded at their new places.
+local function restow(s: Session, moved: { number }?)
+	if not moved then
+		return
+	end
+	for _, spot in moved do
+		local item = s.items[spot]
+		local place = s.move.things[spot].place
+		if item and place then
+			stow(s, item, place)
+		end
+	end
 end
 
 -- Near the truck's open back, on foot, the truck standing: (ok, what to say).
@@ -1099,7 +1118,7 @@ local function onLoad(s: Session, player: Player)
 			return
 		end
 	end
-	local at, refused = Rules.load(s.move, player.UserId)
+	local at, refused, moved = Rules.load(s.move, player.UserId)
 	if not at or not spot or not thing then
 		say(player, Rules.whyText(refused))
 		return
@@ -1110,11 +1129,12 @@ local function onLoad(s: Session, player: Player)
 	if item then
 		stow(s, item, at)
 	end
+	restow(s, moved)
 	local c = Rules.counts(s.move)
 	local fill = math.floor(Rules.fill(s.move.packing) * 100 + 0.5)
 	say(player, if at.hitch
 		then `{labelOf(thing)} hitched behind the van · {c.out} in the van · drive it to the Wall`
-		else `{labelOf(thing)} loaded · {c.out} in the van · van {fill}% full · {c.delivered}/{c.total} delivered`)
+		else `{if moved then "Van repacked: " else ""}{labelOf(thing)} loaded · {c.out} in the van · van {fill}% full · {c.delivered}/{c.total} delivered`)
 	s.dirty = true
 end
 
@@ -1223,7 +1243,12 @@ local function refreshTruck(s: Session)
 	local showLoad, showUnload, showBack = Rules.truckPrompts(open, carriers > 0, out ~= nil)
 	load.Enabled = showLoad
 	load.ActionText = if carriers == 1 and carried then `Load {carried.name}` else "Load"
-	load.ObjectText = `ZDC Van · {fill}% full`
+	-- (the packing fix: the carried thing has no room even repacked: Load says so before it is pressed)
+	local fits = true
+	if carriers == 1 and carried and showLoad then
+		fits = Rules.canLoad(s.move, carried.spot)
+	end
+	load.ObjectText = if fits then `ZDC Van · {fill}% full` else `won't fit · {fill}% full`
 	unload.Enabled = showUnload
 	unload.ActionText = if out then `Take out {s.move.things[out].name}` else "Take out"
 	unload.ObjectText = `ZDC Van · {fill}% full`
@@ -1357,7 +1382,7 @@ function Moving.helperLoad(s: Session, npc: Model): (boolean, string?)
 		s.dirty = true
 		return false, "gone"
 	end
-	local at, refused = Rules.load(s.move, who)
+	local at, refused, moved = Rules.load(s.move, who)
 	if not at or not spot or not thing then
 		return false, refused
 	end
@@ -1365,6 +1390,7 @@ function Moving.helperLoad(s: Session, npc: Model): (boolean, string?)
 	if item then
 		stow(s, item, at)
 	end
+	restow(s, moved)
 	local c = Rules.counts(s.move)
 	say(s.owner, `{npc.Name} loaded {labelOf(thing)} · {c.out}/{c.total} out · truck {math.floor(Rules.fill(s.move.packing) * 100 + 0.5)}% full`)
 	s.dirty = true

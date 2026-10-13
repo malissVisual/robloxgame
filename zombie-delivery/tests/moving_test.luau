@@ -412,7 +412,7 @@ do
 	local function sound(m: Rules.Move): string?
 		for _, spot in m.order do
 			local thing = m.things[spot]
-			if thing.state ~= "truck" and Rules.room(m.packing, thing.size, thing.class ~= "hand") then
+			if thing.state ~= "truck" and Rules.canLoad(m, spot) then
 				return `{thing.name} was refused but has room`
 			elseif thing.state == "truck" and (thing.place == nil or table.find(m.packing.placed, thing.place) == nil) then
 				return `{thing.name} in the truck without its place`
@@ -447,9 +447,9 @@ do
 			planShare, planFill, packed = share, full, m
 		end
 	end
-	check("the truck, the plan's order: over 60% of it things, 80% full when nothing more goes in", planShare >= 0.6 and planFill >= 0.8, `{planShare} {planFill}`)
+	check("the truck, the plan's order: over 60% of it things, 85% full when nothing more goes in", planShare >= 0.6 and planFill >= 0.85, `{planShare} {planFill}`)
 	check("the truck, any order: 80% full on average when nothing more goes in, never under 70%", fills / 7 >= 0.8 and worstFill >= 0.7, `{fills / 7} {worstFill}`)
-	check("the truck, any order: on average 60% of it things (the old flat first-fit: 59%, 67% full)", shares / 7 >= 0.6, shares / 7)
+	check("the truck, any order: on average 60% of it things (the old flat first-fit: 56%, 63% full)", shares / 7 >= 0.6, shares / 7)
 	check("…the biggest first: over 70%", best >= 0.7, best)
 	check("…on average 80% of the best order's things, the worst order 70%", shares / 7 >= 0.8 * best and worst >= 0.7 * best, `{shares / 7} {worst} vs {best}`)
 
@@ -495,28 +495,40 @@ do
 		check("Unload empties it top first, the last free one each time, the heights rebuilt", fine and empty and outs > 0, outs)
 	end
 
-	-- the ZDC Van's bay (6.2 × 6.4 × 4.3; its grid 12 × 12 cells): the same rules, fewer things, the tall ones never
-	local VAN = { width = 6.2, length = 6.4, height = 4.3, cell = 0.5 }
-	local vanShares, vanFills, vanWorst = 0, 0, 1
-	local never = true
-	for n, order in orders(probe) do
-		local m, share, full = pack(VAN, order)
-		report(NAMES[n], VAN, m, share, full)
-		check(`the van, {NAMES[n]}: everything sound`, sound(m) == nil, sound(m))
-		vanShares += share
-		vanFills += full
-		vanWorst = math.min(vanWorst, share)
-		for _, spot in m.order do
-			local thing = m.things[spot]
-			never = never and (thing.size.Y <= 4.3 or thing.state ~= "truck")
+	-- the ZDC Van's bay (6.2 × 6.4 × 4.3; Cell 0.4: its grid 15 × 16 cells, its whole length): the same rules, fewer
+	-- things; a tall both / pair piece lies on its side (Pack.Lie), the bed is repacked when one does not go in as it is
+	-- (Pack.Repack)
+	local VAN = { width = 6.2, length = 6.4, height = 4.3, cell = 0.4 }
+	local function vanRun(label: string?): (number, number, number)
+		local shares, fills, worst = 0, 0, 1
+		for n, order in orders(probe) do
+			local m, share, full = pack(VAN, order)
+			if label then
+				report(NAMES[n], VAN, m, share, full)
+				check(`the van, {NAMES[n]}: everything sound`, sound(m) == nil, sound(m))
+				local upright = true
+				for _, placed in m.packing.placed do
+					local thing = m.things[placed.spot]
+					upright = upright and placed.top <= 4.3 + 1e-6 and (thing.size.Y <= 4.3 + 1e-6 or placed.lying ~= nil)
+				end
+				check(`the van, {NAMES[n]}: a piece over 4.3 tall only lies in it, nothing through the roof`, upright)
+			end
+			shares += share
+			fills += full
+			worst = math.min(worst, share)
 		end
+		return shares / 7, fills / 7, worst
 	end
-	check("the van: nothing over 4.3 tall gets in (standing)", never)
-	check("the van, any order: on average half of it things, 75% full, never under 40% things (the old: 49%, 63% full)", vanShares / 7 >= 0.5 and vanFills / 7 >= 0.75 and vanWorst >= 0.4, `{vanShares / 7} {vanFills / 7} {vanWorst}`)
+	local vanShare, vanFill, vanWorst = vanRun("the van")
+	check("the van, any order: on average 60% of it things, 85% full, never under 45% (the old packer: 49%, 62% full)", vanShare >= 0.6 and vanFill >= 0.85 and vanWorst >= 0.45, `{vanShare} {vanFill} {vanWorst}`)
+	local lie, repack = K.Lie, K.Repack
+	K.Lie, K.Repack = false, false
+	local plainShare = vanRun(nil)
+	K.Lie, K.Repack = lie, repack
+	check("…lying down and repacking take more of Marge's things into the van", vanShare > plainShare, `{vanShare} vs {plainShare}`)
 	-- Pack.Lie: a both / pair piece with no place standing lies on its side (a hand thing never; one that stands, stands)
-	local lie = K.Lie
 	K.Lie = true
-	local bay = Rules.newPacking(6.2, 6.4, 4.3, 0.5)
+	local bay = Rules.newPacking(6.2, 6.4, 4.3, 0.4)
 	local piano = furniture.piano.size
 	local laid = Rules.fit(bay, piano, false, true)
 	check("Lie: the piano (4.6 tall) lies down in the van", laid ~= nil and laid.lying ~= nil and laid.top <= 4.3 + 1e-6 and Rules.room(bay, piano, true) and not Rules.room(bay, piano), laid and laid.lying)
@@ -526,12 +538,45 @@ do
 	K.Lie = false
 	check("…and only with Pack.Lie", Rules.fit(bay, piano, false, true) == nil)
 	K.Lie = lie
-	local lying = Rules.newMove(house, furniture, VAN, 0, 600)
-	K.Lie = true
-	local _, lyingShare = pack(VAN, lying.order)
-	local _, standingShare = pack(VAN, probe.order)
-	K.Lie = lie
-	check("…the van takes more of Marge's things with it", lyingShare >= standingShare - 1e-9, `{lyingShare} vs {standingShare}`)
+	-- Pack.Repack: a box and a lamp in first, then a slab the whole floor wide: no room as the bed is, so the movers
+	-- repack it (the slab first, the box and the lamp on it); Load says which places changed; Take out still the top ones
+	local stack: { [string]: Rules.ItemDef } = {
+		box = { id = "box", name = "Box", icon = "📦", size = { X = 2, Y = 1.5, Z = 2 }, class = "hand", weight = 2, value = 40, fragile = false, room = "attic" },
+		lamp = { id = "lamp", name = "Lamp", icon = "💡", size = { X = 1, Y = 2, Z = 1 }, class = "hand", weight = 1, value = 40, fragile = true, room = "living" },
+		slab = { id = "slab", name = "Slab", icon = "🪨", size = { X = 6, Y = 2, Z = 6.4 }, class = "pair", weight = 9, value = 200, fragile = false, room = "hall" },
+		sofa = { id = "sofa", name = "Sofa", icon = "🛋", size = { X = 6, Y = 3, Z = 2.8 }, class = "pair", weight = 8, value = 300, fragile = false, room = "living" },
+	}
+	local stackSpots: { Rules.Spot } = {
+		{ id = 1, item = "box", room = "attic", star = false },
+		{ id = 2, item = "lamp", room = "living", star = false },
+		{ id = 3, item = "slab", room = "hall", star = false },
+		{ id = 4, item = "sofa", room = "living", star = false },
+	}
+	local function loadOne(m: Rules.Move, spot: number): (Rules.Placement?, string?, { number }?)
+		Rules.pick(m, spot, MOVER)
+		local at, why, moved = Rules.load(m, MOVER)
+		if not at then
+			Rules.release(m, MOVER)
+		end
+		return at, why, moved
+	end
+	local rp = Rules.newMove(stackSpots, stack, VAN, 0, 600)
+	loadOne(rp, 1)
+	loadOne(rp, 2)
+	check("Repack: the slab has no room as the bed is, but Load would take it (canLoad)", not Rules.room(rp.packing, stack.slab.size, true) and Rules.canLoad(rp, 3))
+	local slabAt, _, moved = loadOne(rp, 3)
+	local box, lampAt = rp.things[1].place, rp.things[2].place
+	check("…Load repacks the bed: the slab on the floor, the box and the lamp on it", slabAt ~= nil and slabAt.base == 0 and box ~= nil and lampAt ~= nil and near(box.base, 2) and near(lampAt.base, 2)
+		and table.find(rp.packing.placed, box) ~= nil and audit(rp.packing) == nil, slabAt and slabAt.base)
+	check("…and says which places changed (the box's and the lamp's)", moved ~= nil and #moved == 2 and table.find(moved, 1) ~= nil and table.find(moved, 2) ~= nil)
+	check("…Take out still takes a top one, never the slab under them", Rules.lastOut(rp) ~= 3 and Rules.lastOut(rp) ~= nil and not Rules.free(rp.packing, 3))
+	check("…a sofa has no room even repacked: canLoad says so, Load refuses", not Rules.canLoad(rp, 4) and select(2, loadOne(rp, 4)) == "noroom" and rp.things[4].state == "ground")
+	K.Repack = false
+	local plain = Rules.newMove(stackSpots, stack, VAN, 0, 600)
+	loadOne(plain, 1)
+	loadOne(plain, 2)
+	check("…without Pack.Repack: no room for the slab", not Rules.canLoad(plain, 3) and select(2, loadOne(plain, 3)) == "noroom")
+	K.Repack = repack
 	-- an odd bed (not whole cells, low): still sound
 	local ODD = { width = 5.3, length = 7.9, height = 4.4, cell = 0.5 }
 	local odd, oddShare = pack(ODD, probe.order)

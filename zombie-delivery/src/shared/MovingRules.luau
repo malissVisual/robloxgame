@@ -36,6 +36,9 @@
 --                                              standing (a both / pair piece, Pack.Lie: Placement.lying, laid(size,
 --                                              lying) its size so)
 --   MovingRules.free(packing, spot)            nothing rests on it (it may come out); remove(packing, spot)
+--   MovingRules.canLoad(move, spot)            would Load take it now: on the bed (lying too), after a repack (Load
+--                                              repacks the bed biggest first when a thing does not go in as it is:
+--                                              Pack.Repack; its third value the spots moved), or on the free hitch
 --   MovingRules.fill(packing)                  the share of the bed's room used (0 … 1): up to every top, and to the
 --                                              roof where nothing goes any more (a crack, a sliver under the roof)
 --   MovingRules.where(packing, placement)      its middle in studs from the bed's middle (x across, z toward the door)
@@ -472,6 +475,74 @@ function MovingRules.place(p: Packing, spot: number, size: Size, fragile: boolea
 	return at
 end
 
+-- The movers repack the bed (Pack.Repack): `spots`' things (what is on it and the one that did not go in) packed again
+-- into an empty bed of the same size, the biggest first (by room, else by floor, else by height: the first order that
+-- takes them all); nil when none does.
+type Packed = { spot: number, size: Size, fragile: boolean, lie: boolean }
+local REPACK_ORDERS: { (Packed, Packed) -> boolean } = {
+	function(a: Packed, b: Packed): boolean
+		local va, vb = a.size.X * a.size.Y * a.size.Z, b.size.X * b.size.Y * b.size.Z
+		return va > vb + 1e-9 or (math.abs(va - vb) <= 1e-9 and a.spot < b.spot)
+	end,
+	function(a: Packed, b: Packed): boolean
+		local fa, fb = a.size.X * a.size.Z, b.size.X * b.size.Z
+		return fa > fb + 1e-9 or (math.abs(fa - fb) <= 1e-9 and a.spot < b.spot)
+	end,
+	function(a: Packed, b: Packed): boolean
+		return a.size.Y > b.size.Y + 1e-9 or (math.abs(a.size.Y - b.size.Y) <= 1e-9 and a.spot < b.spot)
+	end,
+}
+local function repacked(p: Packing, list: { Packed }): Packing?
+	for _, order in REPACK_ORDERS do
+		table.sort(list, order)
+		local fresh = MovingRules.newPacking(p.cols * p.cell, p.rows * p.cell, p.height, p.cell)
+		local all = true
+		for _, entry in list do
+			if not MovingRules.place(fresh, entry.spot, entry.size, entry.fragile, entry.lie) then
+				all = false
+				break
+			end
+		end
+		if all then
+			return fresh
+		end
+	end
+	return nil
+end
+
+-- The move's bed repacked with `spot`'s thing in it too (nil: it does not go in even so; never with Pack.Repack off).
+local function repackWith(move: Move, spot: number): Packing?
+	local p = move.packing
+	if not tune().Pack.Repack or #p.placed == 0 then
+		return nil
+	end
+	local list: { Packed } = {}
+	for _, at in p.placed do
+		local other = move.things[at.spot]
+		if not other then
+			return nil
+		end
+		table.insert(list, { spot = at.spot, size = other.size, fragile = other.fragile, lie = other.class ~= "hand" })
+	end
+	local thing = move.things[spot]
+	local lie = thing.class ~= "hand"
+	-- (quick no's first: it never goes into this bed even empty, or the cells' room is short of them all)
+	local empty = MovingRules.newPacking(p.cols * p.cell, p.rows * p.cell, p.height, p.cell)
+	if not MovingRules.room(empty, thing.size, lie) then
+		return nil
+	end
+	local need = 0 -- (their own room, whichever way they stand: never more than the bed's)
+	for _, entry in list do
+		need += entry.size.X * entry.size.Y * entry.size.Z
+	end
+	need += thing.size.X * thing.size.Y * thing.size.Z
+	if need > p.cols * p.rows * p.cell * p.cell * p.height + 1e-6 then
+		return nil
+	end
+	table.insert(list, { spot = spot, size = thing.size, fragile = thing.fragile, lie = lie })
+	return repacked(p, list)
+end
+
 local function overlaps(a: Placement, b: Placement): boolean
 	return a.col < b.col + b.cols and b.col < a.col + a.cols and a.row < b.row + b.rows and b.row < a.row + a.rows
 end
@@ -684,8 +755,10 @@ function MovingRules.release(move: Move, who: number): (number?, boolean)
 	return spot, true
 end
 
--- The carrier puts it into the truck: its place on the bed, or nil and why ("noroom").
-function MovingRules.load(move: Move, who: number): (Placement?, string?)
+-- The carrier puts it into the truck: its place on the bed, or nil and why ("noroom"). When it does not go in as the bed
+-- is, the movers repack it (Pack.Repack: everything biggest first); then the third value lists the spots whose place
+-- changed (their Thing.place is the new one: server/Moving.luau welds their models there again).
+function MovingRules.load(move: Move, who: number): (Placement?, string?, { number }?)
 	if not active(move) then
 		return nil, "over"
 	end
@@ -697,6 +770,25 @@ function MovingRules.load(move: Move, who: number): (Placement?, string?)
 	end
 	local thing = move.things[spot]
 	local at = MovingRules.place(move.packing, spot, thing.size, thing.fragile, thing.class ~= "hand")
+	local moved: { number }? = nil
+	local fresh = if at then nil else repackWith(move, spot)
+	if fresh then
+		local list: { number } = {}
+		for _, placed in fresh.placed do
+			local other = move.things[placed.spot]
+			if placed.spot == spot then
+				at = placed
+			else
+				local was = other.place
+				if not was or was.col ~= placed.col or was.row ~= placed.row or was.base ~= placed.base or was.turned ~= placed.turned or was.lying ~= placed.lying then
+					table.insert(list, placed.spot)
+				end
+				other.place = placed
+			end
+		end
+		move.packing = fresh
+		moved = list
+	end
 	if not at and thing.tow then
 		-- 7.x van moves: too big for the bed: hitched behind the car (one at a time)
 		if move.hitch ~= nil then
@@ -712,7 +804,37 @@ function MovingRules.load(move: Move, who: number): (Placement?, string?)
 	thing.carrier = nil
 	thing.helper = nil
 	thing.place = at
-	return at, nil
+	return at, nil, moved
+end
+
+-- Would Load take `spot`'s thing now (the HUD's Load prompt, Danny's choice): a place on the bed (lying on its side too),
+-- else after a repack, else the free hitch. The repack's answer is kept per bed as it stands.
+local repackSeen: { [Packing]: { key: string, ok: { [number]: boolean } } } = setmetatable({}, { __mode = "k" }) :: any
+function MovingRules.canLoad(move: Move, spot: number): boolean
+	local thing = move.things[spot]
+	if not thing then
+		return false
+	end
+	local p = move.packing
+	if MovingRules.room(p, thing.size, thing.class ~= "hand") or (thing.tow and move.hitch == nil) then
+		return true
+	elseif not tune().Pack.Repack or #p.placed == 0 then
+		return false
+	end
+	local parts: { string } = {}
+	for _, at in p.placed do
+		table.insert(parts, `{at.spot}:{at.col}:{at.row}:{at.base}`)
+	end
+	local key = table.concat(parts, ",")
+	local old = repackSeen[p]
+	local seen: { key: string, ok: { [number]: boolean } } = if old and old.key == key then old else { key = key, ok = {} }
+	repackSeen[p] = seen
+	local known = seen.ok[spot]
+	if known == nil then
+		known = repackWith(move, spot) ~= nil
+		seen.ok[spot] = known
+	end
+	return known
 end
 
 -- The last loaded thing nothing rests on (Unload takes it), nil when the bed is empty.

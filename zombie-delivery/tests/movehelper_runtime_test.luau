@@ -589,7 +589,7 @@ carried = run(40, function()
 	return Rules.holding(danny.s.move, danny.id) == 5
 end)
 check("he goes for the box of memories (★)", carried)
-danny.s.move.packing.height = 1 -- (the room went while he walked: the box is 1.5 high)
+danny.s.move.packing.height = 0.7 -- (the room went while he walked: the box is 1.5 high, the TV 0.8 on its side)
 said = #E.said
 local refused = run(40, function()
 	return E.saidSince("Van's full, boss - drive it to the Wall?", said)
@@ -605,7 +605,7 @@ run(0.2)
 
 -- A third move: a van with no room for anything he carries ------------------------------------------------------------------
 
-T.Beds[E.carId].Height = 1
+T.Beds[E.carId].Height = 0.7 -- (lower than any of his pieces, the TV on its side too: Pack.Lie)
 said = #E.said
 Moving.admin(sol, "start")
 T.Beds[E.carId].Height = bedHeight
