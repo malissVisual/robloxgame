@@ -124,16 +124,20 @@ check("state: sale, owned, wearing, reward", Style.state(style, beanie) == "sale
 style.worn.hat = "cap_red"
 check("state: wearing; worn finds it", Style.state(style, cap) == "wearing" and Style.worn(style, "hat") == cap and Style.worn(style, "jacket") == nil)
 check("key: the worn items of slots", Style.key(style, { "hat", "jacket" }) == "hat=cap_red;jacket=")
-local van, bike, scooter, company
+local van, bike, scooter, company, ambient
 for _, car in Config.Cars do
-	if car.id == "van" then van = car end
+	if car.id == Config.CompanyVan.Car then van = car end -- (7.x: the ZDC Van, the one car)
 	if car.id == "citybike" then bike = car end
 	if car.id == "escooter" then scooter = car end
+end
+for _, car in Config.AmbientCars do -- (7.x: the company vehicles and the old cars are bodies nobody owns)
 	if car.company and not company then company = car end
+	if car.id == "van" then ambient = car end
 end
 check("a wrap and a decal fit a car, not a bike", Style.forVehicle("wrap", van) and Style.forVehicle("decal", van) and not Style.forVehicle("wrap", bike) and not Style.forVehicle("decal", scooter))
 check("bike paint fits the bikes and the E-Scooter, not a car", Style.forVehicle("bikepaint", bike) and Style.forVehicle("bikepaint", scooter) and not Style.forVehicle("bikepaint", van))
 check("never on a company vehicle", company ~= nil and not Style.forVehicle("wrap", company) and not Style.forVehicle("decal", company))
+check("7.x: never on a body nobody owns (the old Old Van)", ambient ~= nil and not Style.forVehicle("wrap", ambient) and not Style.forVehicle("decal", ambient))
 check("the toasts", Style.say("bought", cap) == "Backwards Cap · ZDC Red is yours. You're wearing it." and Style.say("money", wrap) == `Not enough money: Satin Teal costs {Style.money(wrap.price)}.`
 	and Style.say("level", cowboy) == `Cowboy Hat unlocks at level {cowboy.level}.` and string.find(Style.say("off", nil, "hat"), "Hats off", 1, true) ~= nil
 	and Style.say("off", cap, "hat") == "Backwards Cap · ZDC Red is off.")

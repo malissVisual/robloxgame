@@ -116,7 +116,7 @@ end
 -- ── Building ───────────────────────────────────────────────────────────────
 
 local function busDef(): Config.CarDef?
-	for _, def in Config.Cars do
+	for _, def in Config.AmbientCars do -- (7.x: the school bus's body, nobody's car any more)
 		if def.style == "bus" then
 			return def
 		end
@@ -563,7 +563,7 @@ function Buses.start()
 	end
 	local def = busDef()
 	if not def then
-		warn("[Buses] no bus style in Config.Cars: no city buses")
+		warn("[Buses] no bus style in Config.AmbientCars: no city buses")
 		return
 	end
 	local folder = Instance.new("Folder")

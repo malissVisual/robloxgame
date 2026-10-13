@@ -5,6 +5,8 @@
 -- client/ShopView.luau (a hero card, compact rows, the details on a tap):
 --   dealer    Dead End Motors' CARS counter: the cars (a display car's "Look" is the hero: `focus`), YOUR CAR, IN GARAGE,
 --             🔒 SOLD PRIVATELY (Earl's Old Van), 6.19's mission first, the level, a campaign first, 🅿 NEEDS A GARAGE, BUY (the Buy remote)
+--             7.x (one car, Config.CompanyVan): the ZDC Van, yours (YOUR CAR / CALL IT), with what Wrench Garage sells
+--             for it in its details; nothing else is sold here (the bikes are the BIKES counter's)
 --   guns      Lead & Co.'s range: tabs GUNS (EQUIP, IN HAND, STARTER, the earned and the reward guns last), UPGRADES
 --             (the gun tracks: the Upgrade remote) and MELEE (the bat: client/KitShop.luau)
 --   bikes     the BIKES counter: tabs BIKES (client/BikeShop.luau) and GEAR (client/GearShop.luau, the bike gear)
@@ -226,21 +228,24 @@ local function dealer(ctx: Ctx): ({ Item }, string?)
 		if def.role then
 			table.insert(item.lines :: { string }, 2, `Role: {def.role}.`)
 		end
-		-- 5.0: the Old Van is sold privately (Config.VanQuest: Earl, Marge's quest), not here.
-		local private = def.id == Config.VanQuest.Car and not mine
 		local mission = if mine then nil else Career.missionLock(def, state.missions) -- 6.19: a mission, not a level
 		local lock = if mine or Career.missionOf(def) then nil elseif (def.level or 1) > ctx.level then (def.level or 1) else nil
 		local need = needs(state, def, mine)
+		if def.starter then
+			-- 7.x: every courier's ZDC Van: not for sale, what Wrench Garage sells for it instead of "every car builds up"
+			item.forSale = false
+			item.price = nil
+			item.lines = { ShopWindow.carStats(def), def.description, "Every courier drives one: CAR brings it anywhere. Paints, the car tracks, gear and a roof gun for it: Wrench Garage." }
+		end
 		if state.car == def.id then
 			item.act = shut("YOUR CAR")
 			item.fact = `✓ YOUR CAR · {item.fact}`
+		elseif mine and def.starter then
+			item.act = shut("YOURS", "You ride your bike now: CALL CAR on your phone brings your van.")
+			item.fact = `✓ YOURS · {item.fact}`
 		elseif mine then
 			item.act = shut("IN GARAGE", "Switch cars at one of your garages (🅿 GARAGE), or at the depot lot for your starting van.")
 			item.fact = `✓ IN GARAGE · {item.fact}`
-		elseif private then
-			item.forSale = false
-			item.lock = "🔒 EARL"
-			item.act = shut("🔒 SOLD PRIVATELY", `{Config.VanQuest.DealerNote} {Config.VanQuest.Seller} sells it at {Config.VanQuest.Place}, far out west.`)
 		elseif mission then
 			missionLock(item, mission)
 		elseif lock then
@@ -257,7 +262,7 @@ local function dealer(ctx: Ctx): ({ Item }, string?)
 		end
 		table.insert(items, item)
 	end
-	return items, "Bikes: the BIKES counter next door (Kip)."
+	return items, "Paint and upgrades for your van: Wrench Garage. Bikes: the BIKES counter next door (Kip)."
 end
 
 -- One hand gun (6.7: the starter pistol says STARTER; a reward says how to earn it).
@@ -508,7 +513,7 @@ local function mechanic(ctx: Ctx): ({ Item }, string?, string?, { CardKit.Chip }
 	local note: string? = nil
 	if not carOk then
 		-- 5.0: on foot, no vehicle yet
-		note = if carDef then `Your {carDef.name} is a company vehicle: it can't be upgraded.` else `No vehicle yet: the Old Van comes from {Config.VanQuest.Where}.`
+		note = if carDef then `Your {carDef.name} is a company vehicle: it can't be upgraded.` else "Your ZDC Van is not ready yet: try again in a moment."
 	end
 	-- 3.5: the STAGE: the car's next stage (its new look, its room, before → after) or its last one.
 	if carOk and carDef and Economy.maxStage(carDef.id) > 0 then
@@ -542,7 +547,7 @@ local function mechanic(ctx: Ctx): ({ Item }, string?, string?, { CardKit.Chip }
 		else
 			item.value = "MAX"
 			item.valueColor = C.gold
-			item.lines = { `Your {carDef.name} is all it can be. More room needs a bigger vehicle (Dead End Motors).` }
+			item.lines = { `Your {carDef.name} is all it can be. A Roof Rack (GEAR) takes two more light pieces.` }
 			item.act = shut("LAST STAGE")
 		end
 		table.insert(items, item)

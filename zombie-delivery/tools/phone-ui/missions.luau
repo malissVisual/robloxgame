@@ -306,7 +306,8 @@ M.flush()
 check("… GO TO opens that client, the gamepad's selection on its START", named(clients, "clinic"):GetAttribute("Selected") == true and M.focus == named(chapter, "Start"))
 
 -- 6.14 review: the Roof Rack's slots count for light pieces in the window too (the state's gear), as the server counts
--- them: Empty Shelves' first mission takes 3 bags of groceries, the Old Van holds 2.
+-- them: Empty Shelves' first mission takes 3 bags of groceries, the Old Van holds 2. (7.x: the state is made up: every real
+-- load fits the ZDC Van's 4, but the window's sums are the same.)
 do
 	local saved, savedLevel = state.progress, state.level
 	local open = {}

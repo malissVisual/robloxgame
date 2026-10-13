@@ -591,7 +591,8 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 		end
 	end
 	-- 5.1: the next two bikes you do not own (6.12.7: Dead End Motors' BIKES counter, Map.Shops.bikes), then the next two
-	-- vehicles (5.0: the Old Van from Earl, Marge's quest; the others from Dead End Motors).
+	-- vehicles (5.0: the Old Van from Earl, Marge's quest; the others from Dead End Motors). 7.x (one car,
+	-- Config.CompanyVan): the ZDC Van is everybody's and no other car is sold: only the bikes are left to save up for.
 	local cars = if type(state) == "table" and type(state.cars) == "table" then state.cars else {}
 	local bikes, rides = 0, 0
 	for _, def in Config.Cars do
@@ -613,17 +614,12 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 		return a.price < b.price
 	end)
 	for _, def in list2 do
-		if cars[def.id] or rides >= 2 then
+		if cars[def.id] or rides >= 2 or def.starter then
 			continue
 		end
 		rides += 1
-		if def.id == Config.VanQuest.Car then
-			local quest = type(state) == "table" and state.vanQuest == "open"
-			add(def.id, def.name, ShopView.vehicle(def), if quest then `{Config.VanQuest.Seller}, far out west` else "Marge's quest", "earl", def.price, def.level or 1)
-		else
-			local mission = require(Shared.Career).missionLock(def, if type(state) == "table" then state.missions else nil) -- 6.19
-			add(def.id, def.name, ShopView.vehicle(def), "Dead End Motors", "dealer", def.price, if mission then 1 else def.level or 1, nil, mission)
-		end
+		local mission = require(Shared.Career).missionLock(def, if type(state) == "table" then state.missions else nil) -- 6.19
+		add(def.id, def.name, ShopView.vehicle(def), "Dead End Motors", "dealer", def.price, if mission then 1 else def.level or 1, nil, mission)
 	end
 	local chips: { CardKit.Chip } = {
 		{ name = "CashChip", text = Ui.money(money), ink = CardKit.Color.money, face = CardKit.Color.goodFace, static = true },

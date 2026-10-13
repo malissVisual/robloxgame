@@ -156,6 +156,10 @@ def styles_check():
     looks_at = vehicles.index("local LOOKS")
     looks = entries(vehicles[looks_at:vehicles.index("\n}\n", looks_at) + 3])
     cars = config[config.index("Config.Cars = {"):config.index("} :: { CarDef }")]
+    # 7.x (one car): the bodies nobody owns any more (Config.AmbientCars: the traffic's vans at every stage, the buses,
+    # the company vehicles) are checked the same way: the world still builds them
+    ambient_at = config.index("Config.AmbientCars = {")
+    cars += config[ambient_at:config.index("} :: { CarDef }", ambient_at)]
     bad = []
     stages_seen = 0
     for entry in re.findall(r"^\t\{\n(.*?)^\t\},?$", cars, re.S | re.M):

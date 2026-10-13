@@ -152,19 +152,23 @@ check("roam numbers make sense", roam.min >= 1 and roam.min <= roam.max and roam
 	and roam.reserve < Config.Horde.MaxTotal and roam.think >= 0.2 and roam.think <= 0.5)
 
 check("every car has a style and a price", (function()
+	-- 7.x (one car): the ZDC Van is everybody's (free, `starter`); the bodies of Config.AmbientCars keep the prices they
+	-- sold at (the refund of a save that owned one), the dealer's ones rising down the list as before
 	local last = -1
-	for _, car in Config.Cars do
-		if car.style == "" or car.price < 0 then
-			return false
-		end
-		if not car.company and not car.bike then -- (5.1: the bikes are Spoke & Chain's)
-			if car.price <= last then
-				return false -- the dealer's cars get pricier down the list
+	for _, list in { Config.Cars, Config.AmbientCars } do
+		for _, car in list do
+			if car.style == "" or car.price < 0 then
+				return false
 			end
-			last = car.price
+			if list == Config.AmbientCars and not car.company and not car.bike then
+				if car.price <= last then
+					return false -- the old dealer's cars got pricier down the list
+				end
+				last = car.price
+			end
 		end
 	end
-	return Config.Cars[1].price > 0 and Config.Weapons[1].starter == true -- (5.0: the Old Van is bought; 6.7: the pistol is the starter)
+	return Config.Cars[1].price == 0 and Config.Cars[1].starter == true and Config.Weapons[1].starter == true -- (6.7: the pistol is the starter)
 end)())
 
 -- Economy v2 -------------------------------------------------------------------
@@ -349,15 +353,14 @@ check("job types use real cars and places", (function()
 	end
 	return true
 end)())
-check("every employer has a job, a reward car and a board", (function()
+check("every employer has a job, a bonus and a board (7.x: their car before)", (function()
 	for _, e in Config.Employers do
 		local found = false
 		for _, t in Config.JobTypes do
 			found = found or (t.id == e.jobType and t.employer == e.id)
 		end
-		local car = Economy.findCar(e.reward)
 		local spot = Map.EmployerSpots[e.id]
-		if not found or not car or not car.company or car.employer ~= e.id or not spot then
+		if not found or e.reward ~= "bonus" or (e.bonus or 0) <= 0 or Economy.findCar(e.reward) ~= nil or not spot then
 			return false
 		end
 	end
@@ -497,10 +500,10 @@ check("landmark ids are unique", (function()
 	end
 	return seen.ranch == true and seen.gas == true and seen.stables == true and seen.fueldepot == true
 end)())
-check("employer landmarks tell the car and the gun reward", (function()
+check("employer landmarks tell the bonus and the gun reward (7.x: the bonus, their car before)", (function()
 	for _, landmark in Map.Landmarks do
 		if landmark.id == "ranch" then
-			return landmark.description:find("Ranch Revolver", 1, true) ~= nil and landmark.description:find("Livestock", 1, true) ~= nil
+			return landmark.description:find("Ranch Revolver", 1, true) ~= nil and landmark.description:find("bonus", 1, true) ~= nil
 		end
 	end
 	return false
@@ -560,10 +563,10 @@ check("the bank and the clinic are landmarks", (function()
 	end
 	return found.bank == "place" and found.clinic == "employer"
 end)())
-check("the clinic's landmark names the ambulance", (function()
+check("the clinic's landmark names Doctor Ellie and her bonus (7.x: no ambulance any more)", (function()
 	for _, landmark in Map.Landmarks do
 		if landmark.id == "clinic" then
-			return landmark.description:find("Ambulance", 1, true) ~= nil and landmark.description:find("Doctor Ellie", 1, true) ~= nil
+			return landmark.description:find("bonus", 1, true) ~= nil and landmark.description:find("Doctor Ellie", 1, true) ~= nil
 		end
 	end
 	return false

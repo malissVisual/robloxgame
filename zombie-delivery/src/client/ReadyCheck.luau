@@ -7,7 +7,7 @@
 --     (the Tutorial remote). ReadyCheck.current() is the answer, worked out again only when one of them changed.
 --   * The phone's home (client/Phone.luau): the wide NEXT MISSION tile (ReadyCheck.tile / fillTile: the chapter and
 --     n/N, the mission, "2 of 3 ready" in red or "READY · START" in green, the savings goal's bar) and the WORK tile's
---     goal line (ReadyCheck.workLine: "Earn for the Old Van · $1,160 to go"). 6.18: the tile is the home's hero card
+--     goal line (ReadyCheck.workLine: "Earn for the Shotgun · $1,160 to go"). 6.18: the tile is the home's hero card
 --     (client/CardKit.luau hero, client/PhoneHome.luau): the chapter's picture, the mission big, GET READY / ▶ START.
 --   * The READY CHECK (ReadyCheck.draw, the NEXT MISSION tile's app in the phone's popup): the mission, the checklist
 --     (✔ done, ✖ required and missing, ☆ would help) with each row's action (GPS to the shop, INVITE a friend, JOBS to
@@ -17,7 +17,7 @@
 --     a pcall), else the CREW window (ReadyCheck.onCrew: on the crew board for that mission).
 --   * The HUD: the savings line under the cash (client/SavingsLine.luau, mounted by ReadyCheck.start); a one-time toast
 --     and a sting when the next mission becomes READY ("Ready for Paper Trail · open MISSIONS (U)"); the job result's
---     "+$85 · $1,160 to go for the Old Van" (ReadyCheck.resultLine, client/Hud.luau). The toast and the line wait
+--     "+$85 · $1,160 to go for the Shotgun" (ReadyCheck.resultLine, client/Hud.luau). The toast and the line wait
 --     through Marge's first day (Readiness `quiet`).
 -- 6.14 review: what START needs besides the rows comes in too: the night (the workspace's Night attribute, watched),
 -- the mission running, a job of yours (the Job remote, else the Missions state's onJob), a car of yours out and your
@@ -125,7 +125,6 @@ function ReadyCheck.input(): Readiness.Input
 		kit = tableOf(state.kit),
 		weapons = tableOf(state.weapons),
 		items = tableOf(state.items),
-		vanQuest = if type(state.vanQuest) == "string" then state.vanQuest else nil,
 		tutorial = data.tutorial,
 		phone = if data.state == nil then nil else state.phone == true,
 		-- 6.14 review (nil: not known, nothing held back for it)
@@ -230,12 +229,12 @@ end
 
 -- ── The words for the other surfaces ──────────────────────────────────────
 
--- The WORK tile's goal line ("Earn for the Old Van · $1,160 to go"), nil without a goal.
+-- The WORK tile's goal line ("Earn for the Shotgun · $1,160 to go"), nil without a goal.
 function ReadyCheck.workLine(): string?
 	return Readiness.workLine(ReadyCheck.current().goal)
 end
 
--- The job result's line ("+$85 · $1,160 to go for the Old Van"): the pay just earned counted in (the State with it
+-- The job result's line ("+$85 · $1,160 to go for the Shotgun"): the pay just earned counted in (the State with it
 -- comes a moment after the result). nil without a goal or during Marge's first day.
 function ReadyCheck.resultLine(pay: number): string?
 	local result = ReadyCheck.current()
@@ -246,7 +245,7 @@ function ReadyCheck.resultLine(pay: number): string?
 	return Readiness.resultLine(pay, result.goal, (tonumber(state.money) or 0) + pay)
 end
 
--- 6.14 review: the goal's words after a pay, for the DELIVERED toast ("$1,160 to go for the Old Van"); nil without
+-- 6.14 review: the goal's words after a pay, for the DELIVERED toast ("$1,160 to go for the Shotgun"); nil without
 -- a goal, without pay or during Marge's first day.
 function ReadyCheck.goalWords(pay: number): string?
 	local result = ReadyCheck.current()

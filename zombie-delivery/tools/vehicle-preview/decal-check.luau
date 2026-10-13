@@ -69,7 +69,19 @@ end
 local laid, most, builds = 0, 0, 0
 local least: { [string]: number } = {}
 local rows: { string } = {}
-for _, def in Config.Cars do
+-- 7.x (one car): every body the factory builds: the player's (Config.Cars: the ZDC Van, the bikes) and the world's
+-- (Config.AmbientCars: the old cars the traffic and Earl's lot still show, the company vehicles), in the old Config.Cars
+-- order (the ZDC Van after the Pickup, where it stood: the garage snapshots' colours follow the order)
+local ALL = {}
+for _, d in Config.AmbientCars do
+	table.insert(ALL, d)
+	if d.id == "pickup" then
+		for _, c in Config.Cars do
+			table.insert(ALL, c)
+		end
+	end
+end
+for _, def in ALL do
 	if def.company or def.bike then
 		continue
 	end

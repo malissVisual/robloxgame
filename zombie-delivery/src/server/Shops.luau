@@ -35,6 +35,10 @@
 -- 5.0: you start on foot (profile.car nil): everything for "the equipped car" says you have no vehicle yet. The Old
 -- Van is not sold here (Config.VanQuest: Earl sells it, server/VanQuest.luau); a first car bought here anyway is the one
 -- you drive, parked on the road outside the dealer (you get in yourself).
+-- 7.x, one car (Config.CompanyVan): every courier owns the ZDC Van; no car is sold any more. The "Buy" remote's "car"
+-- kind sells only a bike (the BIKES counter); the van says it is yours already, any other car that it is gone. The
+-- showroom shows three ZDC Vans in three of Wrench Garage's paints; Wrench Garage sells the van's paints, stages, car
+-- tracks, gear and roof guns as before.
 --
 -- 5.1, Spoke & Chain (Map.Shops.bikes, Config.BikeShop): the bikes (Config.Cars bike = true: the "Buy" remote's "car"
 -- kind, at the bike shop, no garage slot needed) and the bike gear (Config.Gear bikeOnly: the "Gear" remote for your
@@ -58,7 +62,6 @@ local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local TransportRules = require(Shared.Transport)
-local VanQuestRules = require(Shared.VanQuest)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
@@ -72,7 +75,7 @@ local Shops = {}
 
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
-local NO_CAR = `You don't have a vehicle yet. The Old Van: {Config.VanQuest.Where}.`
+local NO_CAR = "Your ZDC Van is not ready yet: try again in a moment." -- (7.x: every courier has it; a save still loading)
 local ON_BIKE = "That's your bike: bikes take bike gear at Dead End Motors' BIKES counter, no car upgrades, paint or car guns. CALL CAR on your phone for your car."
 
 -- 5.1: the cars of your own (not a company vehicle, not a bike) and the bikes you own, in Config.Cars' order.
@@ -218,9 +221,14 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			buyBike(player, profile, def) -- 5.1: at Spoke & Chain
 			return
 		end
-		if def and VanQuestRules.isQuestCar(id) and not profile.cars[id] then
-			-- 5.0: sold privately (Earl's Used Wheels, Marge's quest), not here.
-			notice:FireClient(player, `The {def.name} is not sold here. {Config.VanQuest.DealerNote}`)
+		if def and def.starter then
+			-- 7.x: the ZDC Van is every courier's (Config.CompanyVan): nothing to buy
+			notice:FireClient(player, `The {def.name} is yours already: every courier drives one. Paint and upgrades: Wrench Garage.`)
+			return
+		end
+		if def and not Economy.isPlayerCar(def.id) then
+			-- 7.x: one car: the others left the game (Config.AmbientCars)
+			notice:FireClient(player, `The {def.name} is not sold any more: the ZDC Van is the company's only car.`)
 			return
 		end
 		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or notYet(player, profile, def) or tooLow(player, def.name, if def.mission then nil else def.level) or noSlot(player) then
@@ -481,7 +489,7 @@ local function buyStage(player: Player, profile: PlayerData.Profile)
 	local stage = Economy.stageOf(carDef.id, levels)
 	local nextStage = Economy.stageDef(carDef.id, stage + 1)
 	if not nextStage then
-		notice:FireClient(player, `Your {Economy.carTitle(carDef.id, levels)} is at its last stage. More room needs a bigger vehicle (Dead End Motors).`)
+		notice:FireClient(player, `Your {Economy.carTitle(carDef.id, levels)} is at its last stage. A Roof Rack (GEAR) takes two more light pieces.`)
 		return
 	end
 	if tooLow(player, nextStage.name, nextStage.level) then
@@ -764,10 +772,12 @@ end
 -- 3.5, the showroom: three cars inside the dealership (World.DealerSlots), not every car on a lot. Each one is shown
 -- at a stage of its own (the Old Van as a Long Cargo Van: what your van becomes), with a tag and a "Look" prompt that
 -- opens the catalog on it. Every car is bought from the catalog (the sales counter, or any display car).
-local SHOWROOM: { { car: string, stage: number } } = {
-	{ car = "van", stage = 3 }, -- 4.0: the Long Cargo Van
-	{ car = "boxtruck", stage = 0 },
-	{ car = "rallyvan", stage = 0 },
+-- 7.x (one car): three ZDC Vans in three of Wrench Garage's paints (`paint`, Config.Paints), the tag says the paint
+-- and its price there; "Look" opens the CARS counter's window on the van.
+local SHOWROOM: { { car: string, stage: number, paint: string } } = {
+	{ car = Config.CompanyVan.Car, stage = 0, paint = "factory" },
+	{ car = Config.CompanyVan.Car, stage = 0, paint = "red" },
+	{ car = Config.CompanyVan.Car, stage = 0, paint = "black" },
 }
 
 local function buildShowroom()
@@ -780,10 +790,11 @@ local function buildShowroom()
 		if not def or not slot then
 			continue
 		end
-		local model = Vehicles.displayModel(def, slot, entry.stage)
+		local paint = Economy.findPaint(entry.paint)
+		local tint = if paint and paint.color then Color3.fromRGB(paint.color[1], paint.color[2], paint.color[3]) else nil
+		local model = Vehicles.displayModel(def, slot, entry.stage, nil, nil, tint)
 		model.Parent = folder
 		local chassis = model.PrimaryPart :: BasePart
-		local stage = Economy.stageDef(def.id, entry.stage)
 		local tag = Instance.new("BillboardGui")
 		tag.Size = UDim2.fromOffset(190, 60)
 		tag.StudsOffset = Vector3.new(0, 10, 0)
@@ -792,12 +803,10 @@ local function buildShowroom()
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
-		local price = if VanQuestRules.isQuestCar(def.id) then "SOLD PRIVATELY · ASK MARGE"
-			elseif def.price > 0 then "$" .. def.price else "BUILD YOURS AT WRENCH GARAGE"
-		local name = if stage and stage.name ~= def.name then `{stage.name} ({def.name}, stage {entry.stage})` else def.name
-		local mission = Career.missionOf(def) -- 6.19: a car a mission unlocks says the mission, not a level
-		label.Text = if mission then `{name}\n{price} · {string.upper(Career.lockText(mission))}`
-			elseif def.level and def.level > 1 then `{name}\n{price} · LEVEL {def.level}+` else `{name}\n{price}`
+		-- 7.x: "ZDC VAN · BLOOD RED" and where that paint is ("YOURS · PAINT $1,000 AT WRENCH GARAGE")
+		local paintName = if paint then paint.name else "Factory"
+		local price = if paint and paint.price > 0 then `PAINT {Career.money(paint.price)} AT WRENCH GARAGE` else "EVERY COURIER DRIVES ONE"
+		label.Text = `{string.upper(def.name)} · {string.upper(paintName)}\nYOURS · {price}`
 		label.TextScaled = true
 		label.Font = Enum.Font.GothamBlack
 		label.TextColor3 = Color3.fromRGB(255, 220, 120)

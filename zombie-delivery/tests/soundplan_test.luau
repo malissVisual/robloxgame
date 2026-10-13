@@ -79,16 +79,18 @@ end
 
 -- ── Horns ───────────────────────────────────────────────────────────────────
 local carsSeen = 0
-for _, def in Config.Cars do
-	carsSeen += 1
-	local name = SoundPlan.horn(def.id, def.bike == true, def.stand == true)
-	check(`{def.id}'s horn {name} has its region`, SoundSheet.Sfx3[name] ~= nil, name)
-	if def.stand then
-		check(`{def.id} beeps`, name == "scooter_beep")
-	elseif def.bike then
-		check(`{def.id} rings`, name == "bike_bell")
-	else
-		check(`{def.id} has a class horn`, S.Horns[def.id] ~= nil and name == S.Horns[def.id])
+for _, list in { Config.Cars, Config.AmbientCars } do -- (7.x: the ZDC Van and the bikes; the bodies nobody owns honk too)
+	for _, def in list do
+		carsSeen += 1
+		local name = SoundPlan.horn(def.id, def.bike == true, def.stand == true)
+		check(`{def.id}'s horn {name} has its region`, SoundSheet.Sfx3[name] ~= nil, name)
+		if def.stand then
+			check(`{def.id} beeps`, name == "scooter_beep")
+		elseif def.bike then
+			check(`{def.id} rings`, name == "bike_bell")
+		else
+			check(`{def.id} has a class horn`, S.Horns[def.id] ~= nil and name == S.Horns[def.id])
+		end
 	end
 end
 check("cars seen", carsSeen > 10)

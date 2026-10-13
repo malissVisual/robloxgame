@@ -26,6 +26,8 @@
 -- TAKE OUT VEHICLE, 🔧 FIND REPAIR BAY for the damaged one you drive, grey else), beside the other cars as compact rows
 -- (the picture, the name, 🔧 condition · ACTIVE / PARKED HERE / ELSEWHERE, 📦 slots big, a round TAKE for one kept
 -- here; a tap shows that car in the hero). The free garage slots and the place are chips; the repairs one short line.
+-- 7.x, one car (Config.CompanyVan): the window shows your ZDC Van (the hero, its paint, slots and upgrades); the slots
+-- chip says THE COMPANY'S ONE CAR while it is the only one, and the foot sends paint and upgrades to Wrench Garage.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -307,7 +309,7 @@ render = function()
 	local used = tonumber(state.used) or 0
 	local place = tostring(state.name or "Garage")
 	chrome.title.Text = if state.depot then "The depot lot" else "Your garage"
-	chrome.subtitle.Text = if state.depot then `{place} · your starting van and the company vehicles` else `{place} · vehicle status and cargo capacity`
+	chrome.subtitle.Text = if state.depot then `{place} · your ZDC Van, the company's car` else `{place} · vehicle status and cargo capacity`
 	-- The footer: the car you drive, your rank and level.
 	local driving = nil
 	for _, car in cars do
@@ -350,10 +352,11 @@ render = function()
 		order = 0,
 		chips = {
 			{ name = "PlaceChip", text = if state.depot then "🅿 THE DEPOT LOT" else `🅿 {string.upper(place)}`, static = true },
-			{ name = "SlotsChip", text = `FREE {math.max(0, slots - used)} / {slots}`, static = true, ink = if slots - used > 0 then CardKit.Color.money else K.secondary },
+			-- 7.x (one car): no slots to count any more, the chip says what the company runs on
+			{ name = "SlotsChip", text = if #cars <= 1 then "🚐 THE COMPANY'S ONE CAR" else `FREE {math.max(0, slots - used)} / {slots}`, static = true, ink = if #cars <= 1 or slots - used > 0 then CardKit.Color.money else K.secondary },
 		},
-		foot = `Repairs: {table.concat(shops, " or ")}. Park in a bay, get out and wait.{if state.depot then " The depot lot keeps your starting van and the company vehicles." else ""}`,
-		empty = "No car here yet.",
+		foot = `Repairs: {table.concat(shops, " or ")}. Park in a bay, get out and wait.{if state.depot then " The depot lot keeps your ZDC Van." else ""} Paint and upgrades: Wrench Garage.`,
+		empty = "Your ZDC Van is on its way: try again in a moment.",
 		redraw = render,
 		toast = Hud.toast,
 		heroArt = function(card: any, item: ShopView.Item)

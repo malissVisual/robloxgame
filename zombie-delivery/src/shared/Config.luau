@@ -10,7 +10,8 @@ Config.Version = "7.0"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
--- (fists only: the pistol is bought at Lead & Co., Config.Arms).
+-- (fists only: the pistol is bought at Lead & Co., Config.Arms). 7.x: every courier has the ZDC Van from the start
+-- (Config.CompanyVan), the only car of the game.
 Config.DataStoreName = "ZombieDelivery_v2"
 Config.StartMoney = 40
 Config.StudioStartMoney = 40 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
@@ -292,6 +293,7 @@ Config.Tutorial = {
 	NpcSpot = { -4, -20 }, -- where she stands, studs from the depot's centre (Map.Shops.depot): by the job board, facing the yard
 	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
 	StartDelay = 2, -- seconds after PLAY before her welcome shows (6.7: on its own; the start screen fades out first)
+	VanDelay = 6, -- 7.x: seconds after her first day ends (delivered or skipped) before her text about your ZDC Van
 	RetryAfter = 1.5, -- a first job gone this long without a result (a special job ended, an admin): back to "board"
 	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
 	-- 6.7: the arrow tour of the screen (client/TutorialArrow.luau; px at the screen's scale)
@@ -348,7 +350,7 @@ export type CarDef = {
 	ramPower: number, -- multiplies the damage of running a zombie over
 	color: { number },
 	description: string,
-	company: boolean?, -- not for sale: an employer lends it for their jobs and gives it to you after a few of them
+	company: boolean?, -- not for sale: an employer lent it for their jobs and gave it to you after a few of them (until 7.x)
 	level: number?, -- the driver level (Config.Levels) needed to buy it
 	mission: string?, -- 6.19: the mission (shared/Missions.luau id) to finish before it is sold (Career.missionLock); `level` is then that mission's level
 	employer: string?, -- who (Config.Employers)
@@ -379,6 +381,12 @@ export type CarDef = {
 	-- Every car has both; a bike has none (no fuel).
 	tank: number?,
 	burn: number?,
+	-- 7.x, one car (Config.CompanyVan): `starter` every courier owns it from the start, never sold (the ZDC Van);
+	-- `refund` what a save that bought it before gets back once (its old price; the 6.19 pass applies the Vehicles knob);
+	-- `ambient` a body only the world builds (Config.AmbientCars: traffic, buses, bandits), never a player's car.
+	starter: boolean?,
+	refund: number?,
+	ambient: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -419,122 +427,28 @@ export type StageDef = {
 -- (server/Vehicles.luau Look.stretch): more room makes the car bigger. The Box Truck's last stage is longer too and
 -- takes a pallet. The Freight Truck (level 9: 12 slots or 3 pallets, a roll-up door, its own pallet jack) is the big
 -- one; the Moving Truck takes a pallet. CarDef.trolley marks the vans and trucks that may take the Hand Trolley.
+-- 7.x, ONE car (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): Config.Cars holds the vehicles a player can
+-- have, the ZDC Van (Config.Cars[1], every courier's from the start: Config.CompanyVan) and the bikes. Every other car
+-- above is history: their bodies moved to Config.AmbientCars (the traffic, the buses and the bandits still drive
+-- them), a save that owned one was paid back once (Economy.carRefund). The notes above tell how they used to work.
 Config.Cars = {
-	{
-		id = "van",
-		mount = true,
-		trolley = true,
-		name = "Old Van",
-		level = 4, -- 5.0: bought from Earl at Earl's Used Wheels (Config.VanQuest: Marge's quest; you start on foot)
-		price = 1800,
-		style = "van",
-		maxSpeed = 42,
-		accel = 11,
-		turn = 1.8,
-		health = 300,
-		capacity = 2,
-		tank = 40, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.0,
-		color = { 214, 196, 160 },
-		role = "Your first vehicle: it grows with you",
-		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
-		stages = {
-			{ name = "Rusty Van", price = 0, capacity = 2, gearSlots = 1, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
-			{ name = "Patched Van", price = 250, level = 4, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
-			{ name = "Work Van", price = 700, level = 5, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
-			{ name = "Long Cargo Van", price = 2200, level = 6, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
-		},
-	},
-	{
-		id = "courier",
-		gearSlots = 2, -- 4.6
-		trolley = true,
-		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "clinic_4", -- 6.19: sold once you finish Code Red 3, Many Hands (Career.missionLock)
-		mount = true,
-		name = "Courier Van",
-		price = 3500,
-		style = "courier",
-		maxSpeed = 70,
-		accel = 31,
-		turn = 2.05,
-		health = 320,
-		capacity = 2,
-		tank = 35, -- 5.4: litres (Config.Fuel)
-		burn = 7, -- litres per 1,000 studs
-		ramPower = 1.0,
-		color = { 232, 170, 40 },
-		role = "Fast and nimble: the rush jobs",
-		description = "Small, low and quick off the line, an amber light bar on the roof. Made for speed, not for big loads (2 slots, 3 as an Express Courier). 1 passenger.",
-		stages = {
-			{ name = "Courier Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Express Courier", price = 1200, level = 6, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
-		},
-	},
-	{
-		id = "highroof",
-		gearSlots = 3, -- 4.6
-		trolley = true,
-		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "clinic_4", -- 6.19: sold once you finish Code Red 3, Many Hands (Career.missionLock)
-		mount = true,
-		name = "High-Roof Van",
-		price = 7000,
-		style = "highroof",
-		maxSpeed = 62,
-		accel = 27,
-		turn = 1.75,
-		health = 450,
-		capacity = 4,
-		tank = 50, -- 5.4: litres (Config.Fuel)
-		burn = 10, -- litres per 1,000 studs
-		ramPower = 1.1,
-		color = { 168, 186, 200 },
-		role = "Tougher, the in-between",
-		description = "Stand up inside: a tall roof, thicker walls and a jump seat for a friend. 4 slots from the start, 5 as a Tall Hauler. 2 passengers.",
-		stages = {
-			{ name = "High-Roof Van", price = 0, capacity = 4, adds = "" },
-			{ name = "Tall Hauler", price = 3000, level = 7, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
-		},
-	},
-	{
-		id = "pickup",
-		gearSlots = 2, -- 4.6
-		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "market_3", -- 6.19: sold once you finish Empty Shelves 3, Farm to Table (Career.missionLock)
-		mount = true,
-		name = "Pickup",
-		price = 12000,
-		style = "pickup",
-		maxSpeed = 72,
-		accel = 32,
-		turn = 2.0,
-		health = 420,
-		capacity = 2,
-		tank = 60, -- 5.4: litres (Config.Fuel)
-		burn = 8, -- litres per 1,000 studs
-		ramPower = 1.15,
-		color = { 196, 60, 50 },
-		role = "The crew car: friends shoot from the bed",
-		description = "An open bed where two friends ride and shoot. Room for 2 pieces beside them (3 as a Ranch Pickup). 3 passengers.",
-		stages = {
-			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
-			{ name = "Ranch Pickup", price = 2500, level = 7, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
-		},
-	},
 	-- 6.25, the ZDC Van (the owner: "connect it to the game so it drives and works"): the owner's own Blender model
 	-- (design/blender-van/, server/VanMesh.luau): the company's van with a bull bar and a loaded roof rack. Until
 	-- ZDCVanArt is imported in Studio it wears the fleet's panelled skin.
+	-- 7.x (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): the one car of the game. Every courier owns it from
+	-- the start and drives it (Config.CompanyVan; `starter`: never sold, CAR and the chauffeur bring it); its paints,
+	-- the car tracks, the gear and a roof gun on its rack are bought for it at Wrench Garage. `refund`: its price at Dead
+	-- End Motors before (× the Vehicles knob): a save that bought it gets it back once (Economy.carRefund).
 	{
 		id = "zdcvan",
+		starter = true,
 		gearSlots = 3,
 		trolley = true,
-		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "market_9", -- sold once you finish Empty Shelves 5, Price War (Career.missionLock)
+		level = 1,
 		mount = true,
 		name = "ZDC Van",
-		price = 16000,
+		price = 0,
+		refund = 16000,
 		style = "zdcvan",
 		maxSpeed = 66,
 		accel = 28,
@@ -545,289 +459,14 @@ Config.Cars = {
 		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.35,
 		color = { 217, 204, 176 },
-		role = "The company van: a bull bar, 4 slots",
-		description = "Zombie Delivery Co.'s own van: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces. 1 passenger.",
+		role = "The company van: every courier drives one",
+		description = "Zombie Delivery Co.'s own van, yours from day one: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces (+2 light ones with the Roof Rack). 1 passenger.",
 		stages = {
 			{ name = "ZDC Van", price = 0, capacity = 4, adds = "" },
 		},
 	},
-	{
-		id = "boxtruck",
-		gearSlots = 3, -- 4.6
-		trolley = true,
-		level = 7, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "market_10", -- 6.19: sold once you finish the Empty Shelves finale (Career.missionLock)
-		mount = true,
-		name = "Box Truck",
-		price = 22000,
-		style = "boxtruck",
-		maxSpeed = 64,
-		accel = 26,
-		turn = 1.6,
-		health = 650,
-		capacity = 6,
-		tank = 80, -- 5.4: litres (Config.Fuel)
-		burn = 10, -- litres per 1,000 studs
-		ramPower = 1.4,
-		color = { 238, 238, 232 },
-		role = "The big one: the only way to 6 and more",
-		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
-		stages = {
-			{ name = "Box Truck", price = 0, capacity = 6, gearSlots = 3, adds = "" },
-			{ name = "Liftgate Truck", price = 7500, level = 9, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
-			{ name = "Freight Hauler", price = 15000, level = 11, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
-		},
-	},
-	{
-		id = "muscle",
-		gearSlots = 1, -- 4.6
-		level = 9, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "firehouse_10", -- 6.19: sold once you finish the Smoke and Sirens finale (Career.missionLock)
-		mount = true,
-		name = "Muscle Car",
-		price = 40000,
-		style = "muscle",
-		maxSpeed = 95,
-		accel = 46,
-		turn = 2.3,
-		health = 340,
-		capacity = 2, -- 6.7: two in the trunk (one was too little for a $40,000 car)
-		tank = 65, -- 5.4: litres (Config.Fuel)
-		burn = 7, -- litres per 1,000 studs
-		ramPower = 1.0,
-		color = { 30, 30, 36 },
-		role = "The getaway car: two pieces, all speed",
-		description = "Outruns every zombie. Two pieces in the trunk (3 as a Street Machine). Do not crash. 1 passenger.",
-		stages = {
-			{ name = "Muscle Car", price = 0, capacity = 2, adds = "" },
-			{ name = "Street Machine", price = 6000, level = 10, capacity = 3, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a wider trunk (3 pieces)" },
-		},
-	},
-	{
-		id = "freight",
-		gearSlots = 4, -- 4.6
-		level = 10, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "army_10", -- 6.19: sold once you finish the Iron Supply finale (Career.missionLock)
-		trolley = true,
-		pallets = 3,
-		name = "Freight Truck",
-		price = 45000,
-		style = "freighttruck",
-		maxSpeed = 45,
-		accel = 12,
-		turn = 1.2,
-		health = 900,
-		capacity = 12,
-		tank = 120, -- 5.4: litres (Config.Fuel)
-		burn = 11, -- litres per 1,000 studs
-		ramPower = 2.0,
-		color = { 46, 88, 150 },
-		role = "Warehouse freight: pallets and 12 slots",
-		description = "A cab-over truck with a long box, a roll-up door and a loading floor at dock height: 12 slots or 3 pallets, its own pallet jack inside. Slow and heavy, no car gun. 1 passenger.",
-		stages = {
-			{ name = "Freight Truck", price = 0, capacity = 12, adds = "" },
-		},
-	},
-	{
-		id = "armorvan",
-		gearSlots = 3, -- 4.6
-		level = 12, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "ranch_10", -- 6.19: sold once you finish the Wild West End finale (Career.missionLock)
-		mount = true,
-		name = "Armored Van",
-		price = 55000,
-		style = "armorvan",
-		maxSpeed = 74,
-		accel = 34,
-		turn = 1.8,
-		health = 900,
-		capacity = 3,
-		tank = 90, -- 5.4: litres (Config.Fuel)
-		burn = 9, -- litres per 1,000 studs
-		ramPower = 1.6,
-		color = { 72, 78, 84 },
-		role = "Very tough: the car-gun platform",
-		description = "Steel plates, grilles on the windows, a roof made for a gun. The bullets knock, nobody answers. 3 slots, 4 as a Fortress Van. 2 passengers.",
-		stages = {
-			{ name = "Armored Van", price = 0, capacity = 3, adds = "" },
-			{ name = "Fortress Van", price = 14000, level = 12, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
-		},
-	},
-	{
-		id = "rallyvan",
-		gearSlots = 2, -- 4.6
-		level = 14, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "underworld_10", -- 6.19: sold once you finish the Dirty Money finale (Career.missionLock)
-		mount = true,
-		name = "Rally Van",
-		price = 80000,
-		style = "rallyvan",
-		maxSpeed = 98,
-		accel = 46,
-		turn = 2.25,
-		health = 420,
-		capacity = 2,
-		tank = 55, -- 5.4: litres (Config.Fuel)
-		burn = 6, -- litres per 1,000 studs
-		ramPower = 1.1,
-		color = { 30, 90, 200 },
-		role = "The fastest van: rush jobs",
-		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
-		stages = {
-			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, health = 100, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps and a welded cage: +100 health (no more room)" }, -- 6.7: + health (a stage's tweaks stay under a quarter of the car's)
-		},
-	},
-	{
-		id = "armored",
-		mount = true,
-		name = "Armored Truck",
-		price = 0,
-		style = "armored",
-		maxSpeed = 66,
-		accel = 26,
-		turn = 1.6,
-		health = 1000,
-		capacity = 8,
-		tank = 90, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.8,
-		color = { 80, 96, 70 },
-		description = "The army's truck. Two gunners on the roof. 3 passengers.",
-		company = true,
-		employer = "army",
-	},
-	{
-		id = "bus",
-		name = "School Bus",
-		price = 0,
-		style = "bus",
-		maxSpeed = 62,
-		accel = 22,
-		turn = 1.4,
-		health = 1300,
-		capacity = 8,
-		tank = 100, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 2.0,
-		color = { 245, 190, 30 },
-		description = "The school's bus. Bring the whole crew. 5 passengers.",
-		company = true,
-		employer = "school",
-	},
-	{
-		id = "monster",
-		mount = true,
-		name = "Monster Truck",
-		price = 0,
-		style = "monster",
-		maxSpeed = 86,
-		accel = 40,
-		turn = 1.9,
-		health = 1400,
-		capacity = 6,
-		tank = 80, -- 5.4: litres (Config.Fuel)
-		burn = 14, -- litres per 1,000 studs
-		ramPower = 2.5,
-		color = { 60, 130, 220 },
-		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
-		company = true,
-		employer = "farm",
-	},
-	-- Company vehicles (the special jobs lend them, Config.JobTypes).
-	{
-		id = "icecream",
-		name = "Ice Cream Truck",
-		price = 0,
-		style = "icecream",
-		maxSpeed = 64,
-		accel = 28,
-		turn = 1.9,
-		health = 650,
-		capacity = 6,
-		tank = 60, -- 5.4: litres (Config.Fuel)
-		burn = 9, -- litres per 1,000 studs
-		ramPower = 1.3,
-		color = { 250, 240, 245 },
-		description = "Frosty's ice cream truck. 1 passenger.",
-		company = true,
-		employer = "icecream",
-	},
-	{
-		id = "movingtruck",
-		pallets = 1,
-		name = "Moving Truck",
-		price = 0,
-		style = "movingtruck",
-		maxSpeed = 58,
-		accel = 22,
-		turn = 1.5,
-		health = 900,
-		capacity = 10,
-		tank = 90, -- 5.4: litres (Config.Fuel)
-		burn = 11, -- litres per 1,000 studs
-		ramPower = 1.6,
-		color = { 230, 120, 40 },
-		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
-		company = true,
-		employer = "movers",
-	},
-	{
-		id = "livestock",
-		name = "Livestock Truck",
-		price = 0,
-		style = "livestock",
-		maxSpeed = 56,
-		accel = 22,
-		turn = 1.5,
-		health = 1000,
-		capacity = 2,
-		tank = 100, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.7,
-		color = { 150, 90, 50 },
-		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
-		company = true,
-		employer = "ranch",
-	},
-	{
-		id = "ambulance",
-		name = "Ambulance",
-		price = 0,
-		style = "ambulance",
-		maxSpeed = 70,
-		accel = 30,
-		turn = 1.8,
-		health = 800,
-		capacity = 1,
-		tank = 70, -- 5.4: litres (Config.Fuel)
-		burn = 9, -- litres per 1,000 studs
-		ramPower = 1.4,
-		color = { 245, 245, 245 },
-		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
-		company = true,
-		employer = "clinic",
-	},
-	{
-		id = "fueltruck",
-		name = "Fuel Truck",
-		price = 0,
-		style = "fueltruck",
-		maxSpeed = 60,
-		accel = 24,
-		turn = 1.6,
-		health = 950,
-		capacity = 6,
-		tank = 100, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.6,
-		color = { 220, 60, 50 },
-		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
-		company = true,
-		employer = "gas",
-	},
 	-- 5.1, the bikes (CarDef.bike): sold at the bike counter from level 2 (6.12.7: Dead End Motors' BIKES counter), after
-	-- the cars (Config.Cars[1] stays the van).
+	-- the van (7.x: Config.Cars[1] is the ZDC Van, the one car).
 	-- server/Vehicles.luau builds them on the styles "bike" (a rear rack: 1 slot) and "cargobike" (a front box: 4) with
 	-- Codex's art (server/BikeArt/Geometry.luau, the art id = the car id). No fuel, no passengers, no car gun, no stages;
 	-- the bike gear (Config.Gear bikeOnly: basket, panniers, trailer) adds light slots. Sprint on foot is 28 for ~6 s,
@@ -931,6 +570,388 @@ Config.Cars = {
 		color = { 153, 49, 43 },
 		role = "The fast one: a battery does half the pedalling",
 		description = "A battery in the frame, a bar display, disc brakes. The fastest thing on two wheels, no fuel needed. A rear rack and two gear slots. Rider only.",
+	},
+} :: { CarDef }
+
+-- 7.x, the cars nobody owns any more (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): every car but the ZDC
+-- Van left the game for the players. Nobody buys, earns, is lent or takes out one of these: the dealer, the garages,
+-- Earl, the career, the missions and the special jobs know only Config.Cars. They stay as BODIES the world still
+-- builds: the traffic (server/Traffic.luau: the vans at random stages, the pickup, the box truck, the muscle car, the
+-- moving truck and the bus), the city buses (server/Buses.luau), the bandits' cars, Earl's old van on his lot
+-- (server/VanQuest.luau) and the fleet checks (tools/vehicle-preview). Economy.findCar still finds them (their stats,
+-- stages and looks for those bodies; Config sets `ambient` on each), Economy.isPlayerCar does not. Their `price` and
+-- stage prices are what they sold for before (× the 6.19 knobs): a save that owned one is paid them back once
+-- (Economy.carRefund, Config.CompanyVan). The company vehicles were free (an employer's): nothing to pay back.
+Config.AmbientCars = {
+	{
+		id = "van",
+		mount = true,
+		trolley = true,
+		name = "Old Van",
+		level = 4, -- 5.0 – 6.x: bought from Earl at Earl's Used Wheels (7.x: his lot keeps one for show, server/VanQuest.luau)
+		price = 1800,
+		style = "van",
+		maxSpeed = 42,
+		accel = 11,
+		turn = 1.8,
+		health = 300,
+		capacity = 2,
+		tank = 40, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.0,
+		color = { 214, 196, 160 },
+		role = "Your first vehicle: it grows with you",
+		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
+		stages = {
+			{ name = "Rusty Van", price = 0, capacity = 2, gearSlots = 1, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
+			{ name = "Patched Van", price = 250, level = 4, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
+			{ name = "Work Van", price = 700, level = 5, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
+			{ name = "Long Cargo Van", price = 2200, level = 6, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
+		},
+	},
+	{
+		id = "courier",
+		gearSlots = 2, -- 4.6
+		trolley = true,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Courier Van",
+		price = 3500,
+		style = "courier",
+		maxSpeed = 70,
+		accel = 31,
+		turn = 2.05,
+		health = 320,
+		capacity = 2,
+		tank = 35, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
+		ramPower = 1.0,
+		color = { 232, 170, 40 },
+		role = "Fast and nimble: the rush jobs",
+		description = "Small, low and quick off the line, an amber light bar on the roof. Made for speed, not for big loads (2 slots, 3 as an Express Courier). 1 passenger.",
+		stages = {
+			{ name = "Courier Van", price = 0, capacity = 2, adds = "" },
+			{ name = "Express Courier", price = 1200, level = 6, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
+		},
+	},
+	{
+		id = "highroof",
+		gearSlots = 3, -- 4.6
+		trolley = true,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "High-Roof Van",
+		price = 7000,
+		style = "highroof",
+		maxSpeed = 62,
+		accel = 27,
+		turn = 1.75,
+		health = 450,
+		capacity = 4,
+		tank = 50, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
+		ramPower = 1.1,
+		color = { 168, 186, 200 },
+		role = "Tougher, the in-between",
+		description = "Stand up inside: a tall roof, thicker walls and a jump seat for a friend. 4 slots from the start, 5 as a Tall Hauler. 2 passengers.",
+		stages = {
+			{ name = "High-Roof Van", price = 0, capacity = 4, adds = "" },
+			{ name = "Tall Hauler", price = 3000, level = 7, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
+		},
+	},
+	{
+		id = "pickup",
+		gearSlots = 2, -- 4.6
+		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Pickup",
+		price = 12000,
+		style = "pickup",
+		maxSpeed = 72,
+		accel = 32,
+		turn = 2.0,
+		health = 420,
+		capacity = 2,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 8, -- litres per 1,000 studs
+		ramPower = 1.15,
+		color = { 196, 60, 50 },
+		role = "The crew car: friends shoot from the bed",
+		description = "An open bed where two friends ride and shoot. Room for 2 pieces beside them (3 as a Ranch Pickup). 3 passengers.",
+		stages = {
+			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
+			{ name = "Ranch Pickup", price = 2500, level = 7, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
+		},
+	},
+	{
+		id = "boxtruck",
+		gearSlots = 3, -- 4.6
+		trolley = true,
+		level = 7, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Box Truck",
+		price = 22000,
+		style = "boxtruck",
+		maxSpeed = 64,
+		accel = 26,
+		turn = 1.6,
+		health = 650,
+		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
+		ramPower = 1.4,
+		color = { 238, 238, 232 },
+		role = "The big one: the only way to 6 and more",
+		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
+		stages = {
+			{ name = "Box Truck", price = 0, capacity = 6, gearSlots = 3, adds = "" },
+			{ name = "Liftgate Truck", price = 7500, level = 9, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
+			{ name = "Freight Hauler", price = 15000, level = 11, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
+		},
+	},
+	{
+		id = "muscle",
+		gearSlots = 1, -- 4.6
+		level = 9, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Muscle Car",
+		price = 40000,
+		style = "muscle",
+		maxSpeed = 95,
+		accel = 46,
+		turn = 2.3,
+		health = 340,
+		capacity = 2, -- 6.7: two in the trunk (one was too little for a $40,000 car)
+		tank = 65, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
+		ramPower = 1.0,
+		color = { 30, 30, 36 },
+		role = "The getaway car: two pieces, all speed",
+		description = "Outruns every zombie. Two pieces in the trunk (3 as a Street Machine). Do not crash. 1 passenger.",
+		stages = {
+			{ name = "Muscle Car", price = 0, capacity = 2, adds = "" },
+			{ name = "Street Machine", price = 6000, level = 10, capacity = 3, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a wider trunk (3 pieces)" },
+		},
+	},
+	{
+		id = "freight",
+		gearSlots = 4, -- 4.6
+		level = 10, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		trolley = true,
+		pallets = 3,
+		name = "Freight Truck",
+		price = 45000,
+		style = "freighttruck",
+		maxSpeed = 45,
+		accel = 12,
+		turn = 1.2,
+		health = 900,
+		capacity = 12,
+		tank = 120, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
+		ramPower = 2.0,
+		color = { 46, 88, 150 },
+		role = "Warehouse freight: pallets and 12 slots",
+		description = "A cab-over truck with a long box, a roll-up door and a loading floor at dock height: 12 slots or 3 pallets, its own pallet jack inside. Slow and heavy, no car gun. 1 passenger.",
+		stages = {
+			{ name = "Freight Truck", price = 0, capacity = 12, adds = "" },
+		},
+	},
+	{
+		id = "armorvan",
+		gearSlots = 3, -- 4.6
+		level = 12, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Armored Van",
+		price = 55000,
+		style = "armorvan",
+		maxSpeed = 74,
+		accel = 34,
+		turn = 1.8,
+		health = 900,
+		capacity = 3,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.6,
+		color = { 72, 78, 84 },
+		role = "Very tough: the car-gun platform",
+		description = "Steel plates, grilles on the windows, a roof made for a gun. The bullets knock, nobody answers. 3 slots, 4 as a Fortress Van. 2 passengers.",
+		stages = {
+			{ name = "Armored Van", price = 0, capacity = 3, adds = "" },
+			{ name = "Fortress Van", price = 14000, level = 12, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
+		},
+	},
+	{
+		id = "rallyvan",
+		gearSlots = 2, -- 4.6
+		level = 14, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Rally Van",
+		price = 80000,
+		style = "rallyvan",
+		maxSpeed = 98,
+		accel = 46,
+		turn = 2.25,
+		health = 420,
+		capacity = 2,
+		tank = 55, -- 5.4: litres (Config.Fuel)
+		burn = 6, -- litres per 1,000 studs
+		ramPower = 1.1,
+		color = { 30, 90, 200 },
+		role = "The fastest van: rush jobs",
+		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
+		stages = {
+			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
+			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, health = 100, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps and a welded cage: +100 health (no more room)" }, -- 6.7: + health (a stage's tweaks stay under a quarter of the car's)
+		},
+	},
+	{
+		id = "armored",
+		mount = true,
+		name = "Armored Truck",
+		price = 0,
+		style = "armored",
+		maxSpeed = 66,
+		accel = 26,
+		turn = 1.6,
+		health = 1000,
+		capacity = 8,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.8,
+		color = { 80, 96, 70 },
+		description = "The army's truck. Two gunners on the roof. 3 passengers.",
+		company = true,
+		employer = "army",
+	},
+	{
+		id = "bus",
+		name = "School Bus",
+		price = 0,
+		style = "bus",
+		maxSpeed = 62,
+		accel = 22,
+		turn = 1.4,
+		health = 1300,
+		capacity = 8,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 2.0,
+		color = { 245, 190, 30 },
+		description = "The school's bus. Bring the whole crew. 5 passengers.",
+		company = true,
+		employer = "school",
+	},
+	{
+		id = "monster",
+		mount = true,
+		name = "Monster Truck",
+		price = 0,
+		style = "monster",
+		maxSpeed = 86,
+		accel = 40,
+		turn = 1.9,
+		health = 1400,
+		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 14, -- litres per 1,000 studs
+		ramPower = 2.5,
+		color = { 60, 130, 220 },
+		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
+		company = true,
+		employer = "farm",
+	},
+	-- Company vehicles (the special jobs lent them until 7.x; the traffic still drives the moving truck and the bus).
+	{
+		id = "icecream",
+		name = "Ice Cream Truck",
+		price = 0,
+		style = "icecream",
+		maxSpeed = 64,
+		accel = 28,
+		turn = 1.9,
+		health = 650,
+		capacity = 6,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.3,
+		color = { 250, 240, 245 },
+		description = "Frosty's ice cream truck. 1 passenger.",
+		company = true,
+		employer = "icecream",
+	},
+	{
+		id = "movingtruck",
+		pallets = 1,
+		name = "Moving Truck",
+		price = 0,
+		style = "movingtruck",
+		maxSpeed = 58,
+		accel = 22,
+		turn = 1.5,
+		health = 900,
+		capacity = 10,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
+		ramPower = 1.6,
+		color = { 230, 120, 40 },
+		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
+		company = true,
+		employer = "movers",
+	},
+	{
+		id = "livestock",
+		name = "Livestock Truck",
+		price = 0,
+		style = "livestock",
+		maxSpeed = 56,
+		accel = 22,
+		turn = 1.5,
+		health = 1000,
+		capacity = 2,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.7,
+		color = { 150, 90, 50 },
+		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
+		company = true,
+		employer = "ranch",
+	},
+	{
+		id = "ambulance",
+		name = "Ambulance",
+		price = 0,
+		style = "ambulance",
+		maxSpeed = 70,
+		accel = 30,
+		turn = 1.8,
+		health = 800,
+		capacity = 1,
+		tank = 70, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.4,
+		color = { 245, 245, 245 },
+		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
+		company = true,
+		employer = "clinic",
+	},
+	{
+		id = "fueltruck",
+		name = "Fuel Truck",
+		price = 0,
+		style = "fueltruck",
+		maxSpeed = 60,
+		accel = 24,
+		turn = 1.6,
+		health = 950,
+		capacity = 6,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.6,
+		color = { 220, 60, 50 },
+		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
+		company = true,
+		employer = "gas",
 	},
 } :: { CarDef }
 
@@ -1499,25 +1520,53 @@ Config.BagShop = {
 	ForGame = "FOR THIS GAME",
 }
 
--- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
--- you reach the van's level (Config.Cars "van" level) without one, Marge texts you about a guy out west; Earl sells his
--- old van at Earl's Used Wheels (Map.VanSeller, far out on the West Highway) for the van's price. Its stages are
--- bought at Wrench Garage as usual. Range: studs from Earl the purchase is allowed within (the prompt reaches 10).
+-- 5.0 – 6.x, Earl's van: the first vehicle was bought second-hand from Earl at Earl's Used Wheels (Map.VanSeller, far
+-- out on the West Highway) after Marge's text at level 4. 7.x (one car, Config.CompanyVan): retired. Every courier has
+-- the ZDC Van from the start, so Earl sells nothing any more: his lot (built by server/World.luau) keeps his old van for
+-- show with a SOLD tag (server/VanQuest.luau), his prompt is a chat (Prompt: shared/VanQuest.luau promptText) and he
+-- says one of his Lines. Sign: what follows "FOR SALE" on his lot's plate (VanQuest.priceText); Tag: the old van's tag.
 Config.VanQuest = {
-	Car = "van",
 	Seller = "Earl",
 	Place = "Earl's Used Wheels",
-	Range = 16,
-	-- The words (the dealer's card, the board, the missions, the career road, the tutorial, Marge's and Earl's lines).
-	Where = "Earl's Used Wheels (Marge's quest at level 4)",
-	DealerNote = "Sold privately — Marge knows a guy (level 4).",
-	MissionsNeed = "Missions need a vehicle — the Old Van at level 4 (Earl's Used Wheels, Marge's quest).",
-	Unlock = "A guy out west is selling his old van. Cheap-ish. Go see Earl — I put him on your GPS.",
-	Reminder = "Earl still has that van for you, out west on the West Highway. He's on your GPS.",
-	Bought = "Nice. Now you can take ★ car jobs — and don't forget fuel later.",
-	Keys = "Here are the keys, kid. She's ugly but she runs.",
-	TooYoung = "You're green, kid. Come back when Marge sends you.",
-	Sold = "Already sold you one, kid. Treat her right.",
+	Prompt = "Talk",
+	Sign = "· SOLD",
+	Tag = "SOLD · Earl's own, not for sale",
+	Lines = {
+		"Sold my last van years ago, kid. Your company hands every courier a ZDC Van now.",
+		"She ain't for sale. Thirty years on the road: she's earned her rest.",
+		"Treat that ZDC Van right, kid. They don't build 'em like my old girl any more.",
+	} :: { string },
+}
+
+-- 7.x, one car (the owner: "dej pryč auta, ostatní, nech ve hře jen van": take the other cars away, leave only the
+-- van): the ZDC Van (Config.Cars[1], the owner's Blender model) is the only car of the game. Every courier owns it from
+-- the start (server/PlayerData.luau: a new profile and every save on load) and drives it: CAR and the chauffeur bring
+-- it, it is never sold. Earl's quest is retired (Config.VanQuest); Dead End Motors' CARS counter shows the van (its
+-- paints, upgrades, gear and roof guns are Wrench Garage's); the special jobs and the missions all go in it (no company
+-- vehicle is lent any more), and no job or mission carries more pieces than its four slots.
+--   Car       the van's Config.Cars id
+--   Flag      the save's mark that its other cars were paid back (only a real save without it, once; every save is
+--             written with it)
+--   Refunded  Marge's text and the notice ({money}) after a save got money back for the cars it owned
+--             (Economy.carRefund: each car's price as sold, Config.AmbientCars × the Vehicles knob, and the stages it
+--             had bought, × the Stages knob; the ZDC Van's own `refund` when it was bought; nothing for an employer's
+--             free vehicle). The van takes over the best of the old cars (Economy.vanCarry: every car track at its
+--             highest level, their gear, the paint and the roof gun of the car you drove)
+--   Kept      her text when cars went but nothing was paid (only an employer's free ones)
+--             (the money's reason: "CarRefund", shared/AnalyticsPlan.luau)
+--   Bonus     an employer's thanks after `needed` jobs (Config.Employers bonus: the money that replaced their car;
+--             server/Jobs.luau): {employer}, {money} (the money's reason: "EmployerBonus")
+--   MissionsNeed  a mission's refusal (and the MISSIONS window's line) while your van is not what you drive
+--   Hello     Marge's text when her first day ends ({level}: the ★ car jobs'; server/Tutorial.luau): the van waited while
+--             she showed you the job on foot (Main's PLAY puts it out only once her first day is behind you)
+Config.CompanyVan = {
+	Car = "zdcvan",
+	Flag = "vanOnly",
+	Refunded = "The company runs on one car now: your ZDC Van. {money} paid back for your other cars, and the van took over their best upgrades.",
+	Kept = "The company runs on one car now: your ZDC Van. It took over the best upgrades of your other cars.",
+	Bonus = "{employer} pays you a {money} bonus for your work!",
+	Hello = "One more thing: the company's ZDC Van is yours. Press CAR and it comes to you. The ★ car jobs open at level {level}.",
+	MissionsNeed = "Missions need your ZDC Van: press CAR and it comes to you.",
 }
 
 -- 5.1, the bikes (Config.Cars with bike = true) and the bike gear (Config.Gear bikeOnly), sold at Spoke & Chain Cycles
@@ -2700,7 +2749,7 @@ Config.Levels = {
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "Your first bike: the BIKES counter at Dead End Motors" }, -- (6.12.7: Spoke & Chain before)
 		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
-		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "Old Van: Earl's Used Wheels (Marge's quest)" }, -- (6.12.2: the shoes before)
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "The ★ car jobs, in your ZDC Van" }, -- (6.12.2: the shoes before; 7.x: Earl's Old Van before)
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
@@ -3501,7 +3550,7 @@ Config.Missions = {
 	TwoStarCondition = 0.75,
 	ThreeStarTime = 0.3,
 	StarBonus = 150, -- paid once for every new star (best rating goes up)
-	FirstClearXp = 2.5, -- the XP of the first clear × this (6.8: 1.5 before; six missions a chapter carry the same road)
+	FirstClearXp = 2.55, -- the XP of the first clear × this (6.8: 1.5 before; six missions a chapter carry the same road; 7.x: 2.5 before, the loads capped at the ZDC Van's four slots give fewer pieces: the story still carries you to level 15)
 	-- 6.8, replays (shared/Missions.luau replayPay / replayXp, server/Jobs.luau): a mission you have done before pays
 	-- this share of the job's pay and of its XP, and nothing else (the first clear's reward, the chapter's reward and
 	-- the unlocks come once). A crew member's share follows their own record.
@@ -3675,8 +3724,9 @@ Config.Jobs = {
 		StrayMax = 1,
 		StrayDistance = { 60, 110 } :: { number },
 		-- A car job (the board's ★ … ★★★★, a special in your own car) while you have no vehicle: locked with these words.
-		NeedsVehicle = "Needs a vehicle (Old Van at level 4): until then you deliver on foot.",
-		NeedsVehicleButton = "🚐 NEEDS A VEHICLE",
+		-- (7.x: every courier has the ZDC Van, so only a save still loading sees them.)
+		NeedsVehicle = "Needs your ZDC Van: press CAR and it comes to you.",
+		NeedsVehicleButton = "🚐 CALL YOUR VAN",
 		TutorialDrop = 220,
 		TutorialCargo = { cargo = "Letters", kind = "crate", look = "mail", piece = "letter bundle", plural = "letter bundles" },
 	},
@@ -3717,8 +3767,8 @@ Config.Jobs = {
 		NeedsBikeButton = "🚲 NEEDS A BIKE",
 		RideBike = "Bike jobs are ridden: MY BIKE on your phone brings your bike (your car stays where it is).",
 		RideBikeButton = "🚲 RIDE YOUR BIKE",
-		NeedsCar = "You're on your bike: car jobs need your car. CALL CAR on your phone.",
-		NeedsCarButton = "🚐 CALL YOUR CAR",
+		NeedsCar = "You're on your bike: car jobs need your ZDC Van. CALL CAR on your phone.",
+		NeedsCarButton = "🚐 CALL YOUR VAN",
 	},
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
@@ -3842,9 +3892,11 @@ Config.Jobs = {
 	-- 3.5 (the stages): ★ never, and at most EasyMaxPieces (the Rusty Van's 2 slots); ★★ (3 at most: the Work Van)
 	-- rarely 4 (the Long Cargo Van); ★★★ up to 5 (a Tall Hauler or a Box Truck); ★★★★ up to 8 (a Freight Hauler).
 	-- 4.0: pallets are the Freight Run's (Config.JobTypes "freightrun"), never an ordinary delivery's.
+	-- 7.x (one car): never more pieces than the ZDC Van's slots (server/Jobs.luau caps every car job at
+	-- Economy.maxCapacity of Config.CompanyVan.Car: 4); ★★★★'s bulk is +1 – 2 now. The Freight Run is retired.
 	EasyMaxPieces = 2,
 	BulkChance = { 0, 0.2, 0.45, 0.6 } :: { number },
-	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 3, 6 } } :: { { number } },
+	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 1, 2 } } :: { { number } },
 	-- 4.7, a choice on the board (server/Jobs.luau makeBoard, shared/JobRules.luau): every danger level you may take
 	-- offers Offers ordinary deliveries, each with its own trade-off (a role, JobRules.roles: the short one always,
 	-- then two of the other three):
@@ -5022,14 +5074,17 @@ export type JobTypeDef = {
 }
 
 -- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.
+-- 7.x (one car, Config.CompanyVan): no job lends a company vehicle any more (no `vehicle`): every one goes in your ZDC
+-- Van and its pieces fit its four slots. The School Run, the Ice Cream Route and the Ambulance Run board their people
+-- or sell from it (no slots); the Horse Transport became Feed and Tack (horses do not fit a van: carried sacks); the
+-- Freight Run (pallets: the ZDC Van takes none) is retired.
 Config.JobTypes = {
 	{
 		id = "schoolrun",
 		name = "School Run",
-		description = "Pick the kids up at three homes and bring them to Sunny Hill School in the school bus.",
-		vehicle = "bus",
+		description = "Pick the kids up at three homes and bring them to Sunny Hill School in your ZDC Van.",
 		employer = "school",
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 3,
 		pickupAt = nil,
 		drops = 1,
@@ -5051,9 +5106,8 @@ Config.JobTypes = {
 	{
 		id = "armysupply",
 		name = "Army Supply",
-		description = "Load ammo at the Harbor Docks and drive it in the army's armored truck through the tunnel to the base.",
-		vehicle = "armored",
-		level = 7, -- 3.2: the armored truck it earns can carry a car gun
+		description = "Load ammo at the Harbor Docks and drive it in your ZDC Van through the tunnel to the base.",
+		level = 7, -- (3.2: the armored truck it earned could carry a car gun; 7.x: the army's bonus)
 		employer = "army",
 		pickups = 1,
 		pickupAt = "docks",
@@ -5076,8 +5130,7 @@ Config.JobTypes = {
 	{
 		id = "icecream",
 		name = "Ice Cream Route",
-		description = "Load up at Frosty's and sell ice cream at 4 stops. Hold still while the kids buy.",
-		vehicle = "icecream",
+		description = "Load up at Frosty's and sell ice cream from your ZDC Van at 4 stops. Hold still while the kids buy.",
 		employer = "icecream",
 		pickups = 1,
 		pickupAt = "frosty",
@@ -5087,7 +5140,7 @@ Config.JobTypes = {
 		unloadTime = 3,
 		payPerStop = 60,
 		tier = 2,
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		cargo = "Ice Cream",
 		pickupLabel = "LOAD THE ICE CREAM",
 		dropLabel = "SELL ICE CREAM AT",
@@ -5101,10 +5154,9 @@ Config.JobTypes = {
 	{
 		id = "moving",
 		name = "Moving Day",
-		description = "Load a family's furniture at their house and unload it at their new home.",
-		vehicle = "movingtruck",
+		description = "Load a family's furniture into your ZDC Van at their house and unload it at their new home.",
 		employer = "movers",
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -5126,10 +5178,9 @@ Config.JobTypes = {
 	{
 		id = "farmrun",
 		name = "Farm Run",
-		description = "Load fresh food at the Old Farm and bring it to two markets in the city.",
-		vehicle = "monster",
+		description = "Load fresh food into your ZDC Van at the Old Farm and bring it to two markets in the city.",
 		employer = "farm",
-		level = 9, -- 5.0: the Muscle Car's level (4.x: 8)
+		level = 9, -- 5.0: the Muscle Car's level then (4.x: 8)
 		pickups = 1,
 		pickupAt = "farm",
 		drops = 2,
@@ -5173,10 +5224,9 @@ Config.JobTypes = {
 		receiver = "Ingrid, the lodge keeper",
 	},
 	{
-		id = "horses",
-		name = "Horse Transport",
-		description = "Lead two horses from Silver Spur Ranch into the livestock truck and bring them to the Riverside Riding School.",
-		vehicle = "livestock",
+		id = "horses", -- (the id stays: 7.x turned the Horse Transport into Feed and Tack, horses do not fit a van)
+		name = "Feed and Tack",
+		description = "Walt's mares went to the Riverside Riding School. Load their feed sacks and saddles at Silver Spur Ranch into your ZDC Van and bring them over.",
 		employer = "ranch",
 		level = 5,
 		pickups = 1,
@@ -5187,21 +5237,20 @@ Config.JobTypes = {
 		unloadTime = 3,
 		payPerStop = 180,
 		tier = 2,
-		cargo = "Horses",
-		pickupLabel = "LEAD THE HORSES IN AT",
-		dropLabel = "LEAD THE HORSES OUT AT",
-		load = "lead",
-		unload = "lead",
-		items = 2,
-		itemKind = "horse",
+		cargo = "Feed and Tack",
+		pickupLabel = "LOAD THE FEED AT",
+		dropLabel = "DELIVER THE FEED TO",
+		load = "carry",
+		unload = "carry",
+		items = 4,
+		itemKind = "sack",
 		giver = "Jesse, the ranch hand",
 		receiver = "Emma, the riding instructor",
 	},
 	{
 		id = "fuelrun",
 		name = "Fuel Run",
-		description = "Load fuel barrels at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
-		vehicle = "fueltruck",
+		description = "Load fuel barrels into your ZDC Van at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
 		employer = "gas",
 		level = 4,
 		pickups = 1,
@@ -5225,8 +5274,7 @@ Config.JobTypes = {
 	{
 		id = "cashrun",
 		name = "Cash Transport",
-		description = "Load sacks of cash at the First Zombie Bank into the army's armored truck and bring them to the Military Base vault. Every bandit in town wants this cargo.",
-		vehicle = "armored",
+		description = "Load sacks of cash at the First Zombie Bank into your ZDC Van and bring them to the Military Base vault. Every bandit in town wants this cargo.",
 		employer = nil,
 		board = true,
 		level = 5,
@@ -5252,10 +5300,9 @@ Config.JobTypes = {
 	{
 		id = "ambulance",
 		name = "Ambulance Run",
-		description = "A patient is waiting at their home. Pick them up in the clinic's ambulance and rush them to the City Clinic before it is too late.",
-		vehicle = "ambulance",
+		description = "A patient is waiting at their home. Pick them up in your ZDC Van and rush them to the City Clinic before it is too late.",
 		employer = "clinic",
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -5282,7 +5329,7 @@ Config.JobTypes = {
 		vehicle = nil,
 		employer = nil,
 		board = true,
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -5302,37 +5349,6 @@ Config.JobTypes = {
 		receiver = "A hungry customer",
 		timeLimit = 180,
 	},
-	-- 4.0, freight: pallets from the Harbor Warehouse's loading docks to a receiving dock. A pallet moves only with a
-	-- pallet jack (one waits at every dock and every receiving dock, the Freight Truck carries its own) and goes only
-	-- into a vehicle that takes pallets (Economy.palletsOf): the board shows it locked "NEEDS N PALLETS" for any other.
-	-- On the board (sorted by its stars) from its level, every time (server/Jobs.luau makeBoard); 1 … items pallets.
-	{
-		id = "freightrun",
-		name = "Freight Run",
-		description = "Pallets from the Harbor Warehouse's loading docks to a receiving dock. Back up to the dock, lift each pallet with a pallet jack and push it into your truck.",
-		vehicle = nil,
-		employer = nil,
-		board = true,
-		level = 6,
-		pickups = 1,
-		pickupAt = "warehouse",
-		drops = 1,
-		dropAt = nil,
-		dropChoices = { "market", "movers", "powerplant" },
-		loadTime = 6,
-		unloadTime = 6,
-		payPerStop = 220,
-		tier = 3,
-		cargo = "Freight",
-		pickupLabel = "LOAD THE PALLETS AT",
-		dropLabel = "DELIVER THE PALLETS TO",
-		load = "pallet",
-		unload = "pallet",
-		items = 3,
-		itemKind = "pallet",
-		giver = "Gus, the dock foreman",
-		receiver = "The stock room",
-	},
 } :: { JobTypeDef }
 
 export type EmployerDef = {
@@ -5340,24 +5356,26 @@ export type EmployerDef = {
 	name: string,
 	icon: string,
 	jobType: string,
-	reward: string, -- the car you get to keep
+	reward: string, -- what you get after `needed` jobs, in words (7.x: "bonus"; 2.x – 6.x their vehicle, gone with the cars)
 	needed: number, -- jobs done for them before they give it to you
+	bonus: number?, -- 7.x: the money of that bonus (once; Config.CompanyVan.Bonus, server/Jobs.luau)
 	pitch: string,
 	weapon: string?, -- a gun they give you (Config.Weapons, earned = this employer) …
 	weaponAt: number?, -- … after this many jobs
 	person: string, -- who runs it (the R15 NPC at their board)
 }
 
--- People who run something in the world. Work for them: after a few jobs their vehicle is yours.
+-- People who run something in the world. Work for them: after a few jobs their vehicle was yours (until 7.x); now they
+-- pay a bonus once (`bonus`), and the army and the ranch still give their gun.
 Config.Employers = {
-	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, person = "Principal Helen", pitch = "Our bus driver ran away. Drive the kids to school!" },
-	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Maria", pitch = "We need ammo from the docks. Bring it through the tunnel." },
-	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "icecream", needed = 3, person = "Frosty", pitch = "People still want ice cream. Sell it for us!" },
-	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
-	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jed", pitch = "The city is hungry. Take my monster truck to the markets." },
-	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "livestock", needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My horses are sold to the riding school. Lead them into the truck gently, and keep the bandits off them." },
-	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Doctor Ellie", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
-	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Dolly, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
+	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bonus", bonus = 1500, needed = 3, person = "Principal Helen", pitch = "Our bus driver ran away. Drive the kids to school!" },
+	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "bonus", bonus = 3000, needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Maria", pitch = "We need ammo from the docks. Bring it through the tunnel." },
+	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "bonus", bonus = 1500, needed = 3, person = "Frosty", pitch = "People still want ice cream. Sell it for us!" },
+	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "bonus", bonus = 1500, needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
+	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "bonus", bonus = 2500, needed = 3, person = "Old Man Jed", pitch = "The city is hungry. Take my food to the markets." },
+	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "bonus", bonus = 2000, needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My mares went to the riding school. Their feed and saddles still need hauling: keep the bandits off them." },
+	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "bonus", bonus = 1500, needed = 3, person = "Doctor Ellie", pitch = "The phones never stop ringing. Your van is our ambulance now: bring the patients in alive." },
+	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "bonus", bonus = 2000, needed = 3, person = "Dolly, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 
 -- 5.5, people in every building (shared/Residents.luau, shared/Deliveries.luau): every home has residents, made up
@@ -6336,6 +6354,8 @@ Config.MoveGreeters = {
 -- reward-only things stay unsold. Kept as they were (×1): the real estate and the company (the endgame already),
 -- the old backpacks' payback (Config.RetiredKit), fuel, the repair shop's fee and the board's reroll fee.
 --   Vehicles  the dealer's cars and Earl's Old Van      Bikes    the bikes and the E-Scooter
+--             (7.x: no car is sold any more; the pass still prices Config.AmbientCars and the ZDC Van's `refund`: what
+--             a save that owned one gets back, Economy.carRefund)
 --   Stages    Wrench Garage's stages                    Upgrades Wrench Garage's tracks (baseCost)
 --   Guns      Lead & Co.'s guns                         CarGuns  the car guns
 --   Gear      the car and bike gear                     Kit      the vests, the bat (6.23: a bag's price is set
@@ -6372,14 +6392,22 @@ end
 
 do -- 6.19: the one pass over the tables (see Config.Prices)
 	local P, priced = Config.Prices, Config.priced
-	for _, def in Config.Cars do
-		def.price = priced(def.price, if def.bike then P.Bikes else P.Vehicles)
-		local stages = def.stages
-		if stages then
-			for _, stage in stages do
-				stage.price = priced(stage.price, P.Stages)
+	for _, list in { Config.Cars, Config.AmbientCars } do
+		for _, def in list do
+			def.price = priced(def.price, if def.bike then P.Bikes else P.Vehicles)
+			if def.refund then
+				def.refund = priced(def.refund, P.Vehicles) -- 7.x: the ZDC Van's old price (Economy.carRefund)
+			end
+			local stages = def.stages
+			if stages then
+				for _, stage in stages do
+					stage.price = priced(stage.price, P.Stages)
+				end
 			end
 		end
+	end
+	for _, def in Config.AmbientCars do
+		def.ambient = true -- 7.x: a body for the world, never a player's car (Economy.isPlayerCar)
 	end
 	for _, def in Config.Upgrades do
 		def.baseCost = priced(def.baseCost, P.Upgrades)

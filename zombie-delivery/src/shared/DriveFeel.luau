@@ -78,10 +78,13 @@ function DriveFeel.crash(drop: number): number
 	return math.max(0.05, ramp(drop, crash.From, crash.Full))
 end
 
--- The Config.Cars style of a car id (nil: not found).
+-- The Config.Cars style of a car id (nil: not found). 7.x: and of the bodies nobody owns (Config.AmbientCars: a
+-- company vehicle lent by id still sounds like itself).
 local styles: { [string]: string } = {}
-for _, def in Config.Cars do
-	styles[def.id] = def.style
+for _, list in { Config.Cars, Config.AmbientCars } do
+	for _, def in list do
+		styles[def.id] = def.style
+	end
 end
 function DriveFeel.styleOf(carId: string?): string?
 	return if carId then styles[carId] else nil

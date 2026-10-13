@@ -16,7 +16,9 @@
 --     asks for):
 --       level     its driver level (Missions.levelOf; a replay plays at any level)
 --       vehicle   a car of your own, driven (a bike won't do; the server asks for it even when the mission lends its
---                 vehicle): Earl's Old Van first (Config.VanQuest), shown below its level too: save up early
+--                 vehicle): Earl's Old Van first (Config.VanQuest), shown below its level too: save up early. 7.x (one
+--                 car, Config.CompanyVan): everybody owns the ZDC Van, so this row is done while you drive it and asks
+--                 for it (CALL CAR) while you ride a bike; it never asks you to buy a car
 --       cargo     room for its pieces in that car at its stage (Economy.capacity, the Roof Rack's slots for light
 --                 pieces too), unless the mission lends a vehicle: another car of yours that holds them, else the
 --                 car's next stage that does (Wrench Garage), else the cheapest dealer car that does
@@ -28,8 +30,9 @@
 -- The words every surface uses are here too (Readiness.status, badge, goalLine, workLine, resultLine, readyToast …).
 -- 6.14 review:
 --   * A car of your own is never a company vehicle the employers gave you (they wait at the depot lot, CALL CAR does
---     not bring them): with only those, the row asks for Earl's van as before. (One taken out at the depot lot is the
---     equipped car, state.car: the server lets it do the mission, and so does the row.)
+--     not bring them): with only those, the row asked for Earl's van. (One taken out at the depot lot is the
+--     equipped car, state.car: the server lets it do the mission, and so does the row.) 7.x (one car): no employer lends
+--     one any more and every courier owns the ZDC Van; with none, the row says to press CAR.
 --   * The goal says `afford` only when the money AND the level are there (Earl, the dealer, Wrench Garage, the gear
 --     stall and the range all refuse below the level): with the money saved and the level not yet, "level 4 to buy".
 --   * night     a NIGHT ONLY mission (its "night" twist; server/Jobs.luau startMission refuses by day): a required row,
@@ -42,13 +45,14 @@
 --               mission lends none: server/Jobs.luau "Call your car first"). The tile and the READY CHECK say it.
 -- 6.19: the guns and the cars a mission unlocks (Config `mission`) are only suggested once that mission is done: a row
 -- never asks you to save up for something the shop would refuse (the cheapest car or gun open to you instead).
+-- 7.x, one car: no mission carries more than the ZDC Van's four slots, so the cargo row is done in it; a car that left
+-- the game (Config.AmbientCars) is never a row, a buy or a savings goal (only Config.Cars is read).
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
 local Levels = require(script.Parent.Levels)
 local Map = require(script.Parent.Map)
 local Missions = require(script.Parent.Missions)
-local VanQuest = require(script.Parent.VanQuest)
 local Armour = require(script.Parent.Armour)
 local Transport = require(script.Parent.Transport)
 
@@ -69,7 +73,6 @@ export type Input = {
 	kit: { [string]: boolean }?, -- personal gear (the vests)
 	weapons: { [string]: boolean }?, -- the guns you own
 	items: { [string]: number }?, -- medkits, repair kits …
-	vanQuest: string?, -- Earl's van: nil, "open" or "done" (state.vanQuest)
 	tutorial: string?, -- Marge's first day: her phase while it runs (nil, or "done", when it is over)
 	phone: boolean?, -- the phone is yours (false: her first day has not given it yet)
 	mission: string?, -- a mission id to check instead of the next one (the tests; a window's pick)
@@ -314,24 +317,14 @@ local function dealerFor(input: Input, need: number): (Config.CarDef?, Config.St
 	return best, bestStage, if best then bestCost else 0, bestLevel
 end
 
--- The vehicle to buy when you own no car: Earl's Old Van while his quest is not done, else the dealer's cheapest.
-local function firstCar(input: Input, level: number): Config.CarDef
-	local van = VanQuest.def()
-	local cars = input.cars or {}
-	if VanQuest.status(input.vanQuest, cars[van.id] == true, level) ~= "done" then
-		return van
-	end
-	local cheapest: Config.CarDef? = nil
-	for _, def in Config.Cars do
-		if not def.company and not def.bike and def.id ~= van.id and unlocked(input, def) and (cheapest == nil or def.price < (cheapest :: Config.CarDef).price) then
-			cheapest = def
-		end
-	end
-	return cheapest or van
+-- The car you would drive with none of your own: 5.0 – 6.x Earl's Old Van or the dealer's cheapest; 7.x (one car) the
+-- ZDC Van, every courier's (Config.Cars[1]: CAR brings it).
+local function firstCar(): Config.CarDef
+	return Economy.findCar(Config.CompanyVan.Car) or Config.Cars[1]
 end
 
-local function placeOf(carId: string): string
-	return if VanQuest.isQuestCar(carId) then "earl" else "dealer"
+local function placeOf(_carId: string): string
+	return "dealer"
 end
 
 -- " · level 5" when you are below it, else "".
@@ -385,23 +378,16 @@ local function vehicleCheck(input: Input, level: number): Check
 			action = "garage",
 		}
 	end
-	local def = firstCar(input, level)
-	local cash = math.max(0, input.money or 0)
-	local quest = VanQuest.isQuestCar(def.id)
+	-- 7.x: every courier owns the ZDC Van (a save still loading has none yet): CAR brings it, nothing to buy
+	local def = firstCar()
 	return {
 		id = "vehicle",
 		icon = "🚐",
-		text = if quest then "A van of your own" else "A vehicle of your own",
-		detail = `{def.name} at {PLACES[placeOf(def.id)]} · {money(def.price)}{levelNote(def.level, level)}`,
+		text = `Your {def.name}`,
+		detail = `Press CAR: your {def.name} comes to you`,
 		done = false,
 		required = true,
-		have = cash,
-		need = def.price,
-		cost = def.price,
-		name = def.name,
-		place = placeOf(def.id),
-		action = "gps",
-		level = def.level,
+		action = "garage",
 	}
 end
 
@@ -420,7 +406,7 @@ local function cargoCheck(input: Input, def: Missions.MissionDef, level: number)
 	local text = `Room for {need} pieces`
 	if not carId then
 		-- No car yet: the vehicle row buys one; this row only when that one would still be too small.
-		local first = firstCar(input, level)
+		local first = firstCar()
 		if first.capacity >= need then
 			return nil
 		end

@@ -266,7 +266,7 @@ check("the drop-off (the Wall) is in the safe zone", Map.isSafe(dx, dz))
 check("the board is in the safe zone", Map.isSafe(Map.Depot.x + T.Board[1], Map.Depot.z + T.Board[2]))
 check("the drop-off reaches the road in front of the depot", T.DropRadius >= 15 and T.DropOff[2] + T.DropRadius > Map.BlockSize / 2 + 4)
 local truck = nil
-for _, def in Config.Cars do
+for _, def in Config.AmbientCars do -- (7.x: the company vehicles are bodies nobody owns, Config.AmbientCars)
 	if def.id == T.Truck then
 		truck = def
 	end
