@@ -6296,7 +6296,8 @@ Config.MoveRoles = {
 --                      620, was 600: the chalet's beams, Kachelofen, corner bench and shelf, lace, painted front door,
 --                      antlers and pictures add about 30 parts, the one plank floor, the tiled bathroom walls, the one sink
 --                      run and the handle-less cabinets win back about 16; seeds 1-1000: the busiest 614 (was 599), on
---                      average 558 (was 539))
+--                      average 558 (was 539)); 8.0 SANDBOX: 700 (the farm's), was 620: a house's 2-4 collectibles add
+--                      about 48 parts (seeds 1-1000: the busiest 688, seed 174; on average 606)
 --   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom); 7.x alpine:
 --                      a warmer Color
 --   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
@@ -6331,7 +6332,7 @@ Config.Furniture = {
 	Grid = 0.5,
 	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
 	Ground = { Margin = 24, Depth = 4 },
-	InteriorMaxParts = 620,
+	InteriorMaxParts = 700,
 	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 218, 168 } :: { number } },
 	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
 	Alpine = {
@@ -6344,6 +6345,18 @@ Config.Furniture = {
 		Antlers = { 2.6, 2.0, 0.6 } :: { number },
 		Beam = 0.9,
 		BeamRows = 2,
+	},
+	-- 8.0 SANDBOX collectibles (design/sandbox/KONTRAKT.md): the rare pieces (shared/FurnitureLooks.luau's with a
+	-- rarity) a house (HouseLayout.plan(seed, "house")) holds besides its Spots, after them and on their own dice (the
+	-- seed + Salt), so the house's own pieces and its ★ stay as they were; never ★ themselves:
+	--   Count       how many (at least, at most)
+	--   Legendary   the chance a house holds a legendary one (one at most: about one house in eight)
+	--   Odds        the others' rarities, by weight (a piece that finds no place gives way to one of the rarity below)
+	Collectibles = {
+		Count = { 2, 4 } :: { number },
+		Legendary = 0.125,
+		Odds = { uncommon = 60, rare = 30, epic = 10 } :: { [string]: number },
+		Salt = 8017,
 	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
 	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:

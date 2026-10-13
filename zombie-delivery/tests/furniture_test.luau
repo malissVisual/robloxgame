@@ -5,7 +5,8 @@
 -- part that collides, every other part welded to it, massless, not colliding or queried, nothing anchored, the look
 -- inside the box, standing on its floor and filling it (the box is honest), the attributes set; 7.x: the eight alpine
 -- pieces as asked and lean. 7.x farm pieces: Walt's farm's block (a bigDoor piece only through the barn doors), every
--- piece fits the moving truck's bed.
+-- piece fits the moving truck's bed. 8.0 SANDBOX: the collectibles (a rarity each, dearer the rarer) and every piece
+-- into the Sprinter's bay.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -289,6 +290,117 @@ do
 			and def.sentimental == w[4] and def.room == w[5])
 		local parts = if def then FurnitureLooks.parts(id) else 0
 		check(`alpine {id}: lean ({parts} parts, at most {ALPINE_PARTS})`, parts >= 6 and parts <= ALPINE_PARTS)
+	end
+end
+
+-- 8.0 SANDBOX collectibles (design/sandbox/KONTRAKT.md): the rare pieces (FurnitureLooks.Collectibles, one block at the
+-- catalogue's end) are the only ones with a rarity, every rarity a valid one (FurnitureLooks.Rarities); each in a house
+-- room, never a ★ candidate, dearer than every ordinary piece of its class, the rarer the dearer (a rarity's cheapest
+-- over the dearest of the one below), its model marked with its rarity; the pieces asked for as asked. And every piece of
+-- the catalogue fits the Sprinter's bay (the sprinter worker's: 6.6 wide, 7.6 tall, 14.0 long) the way the packing
+-- puts it in (shared/MovingRules.luau): standing, turned 90° about Y at most, or a two-hands or two-person piece lying on
+-- either side (Config.Moving.Pack.Lie: MovingRules.laid); with the moves worker's Config.Moving.Beds.sprinter, that bed
+-- too.
+do
+	local Rarities = FurnitureLooks.Rarities
+	local rank: { [string]: number } = {}
+	for n, r in Rarities do
+		rank[r] = n
+	end
+	check("the rarities, commonest first", table.concat(Rarities, ",") == "uncommon,rare,epic,legendary")
+	local list = FurnitureLooks.Collectibles
+	local first = table.find(Order, list[1]) or 0
+	local block = #list >= 8 and #list <= 12 and first > 0 and first + #list - 1 == #Order
+	for n, id in list do
+		block = block and Order[first + n - 1] == id
+	end
+	check(`the collectibles ({#list}): 8 to 12, one block at the catalogue's end`, block)
+	local houseRooms: { [string]: boolean } = {}
+	for _, r in FurnitureLooks.Rooms do
+		houseRooms[r] = true
+	end
+	local dearest: { [string]: number } = {} -- an ordinary piece's dearest, by class
+	local invalid, marked = {}, {}
+	for _, id in Order do
+		local def = Items[id]
+		local r = def.rarity
+		if r == nil then
+			dearest[def.class] = math.max(dearest[def.class] or 0, def.value)
+		elseif rank[r] == nil then
+			table.insert(invalid, `{id}: {r}`)
+		end
+		if (r ~= nil) ~= (table.find(list, id) ~= nil) then
+			table.insert(marked, id)
+		end
+	end
+	check("every rarity set is a valid one", #invalid == 0, table.concat(invalid, ", "))
+	check("a piece has a rarity exactly when it is a collectible", #marked == 0, table.concat(marked, ", "))
+	local count, lo, hi = {}, {}, {}
+	for _, id in list do
+		local def = Items[id]
+		local r = def.rarity :: string
+		check(`collectible {id} ({r}): in a house room ({def.room}), no ★ candidate, dearer than every ordinary {def.class} piece (${def.value} > ${dearest[def.class]})`,
+			houseRooms[def.room] == true and not def.sentimental and not def.bigDoor and def.value > (dearest[def.class] or 0))
+		count[r] = (count[r] or 0) + 1
+		lo[r] = math.min(lo[r] or math.huge, def.value)
+		hi[r] = math.max(hi[r] or 0, def.value)
+		local model = FurnitureLooks.build(id, 3)
+		check(`collectible {id}: its model carries its rarity`, model:GetAttribute("Rarity") == r)
+		model:Destroy()
+	end
+	for n, r in Rarities do
+		check(`{r}: {count[r] or 0} pieces (at least 2)`, (count[r] or 0) >= 2)
+		local below = Rarities[n - 1]
+		if below then
+			check(`{r} is dearer than {below} (from ${lo[r]}; {below} up to ${hi[below]})`, (lo[r] or 0) > (hi[below] or math.huge))
+		end
+	end
+	check("an ordinary piece has no Rarity on its model", FurnitureLooks.build("sofa", 1):GetAttribute("Rarity") == nil)
+	-- the pieces asked for: class, fragile, room
+	local want: { { any } } = {
+		--  id                 class   fragile room
+		{ "gold_record", "hand", true, "hall" },
+		{ "antique_vase", "hand", true, "living" },
+		{ "oil_painting", "both", true, "living" },
+		{ "bowling_trophy", "hand", false, "living" },
+		{ "vintage_radio", "hand", false, "kitchen" },
+		{ "jukebox", "pair", false, "garage" },
+		{ "knight_armour", "both", false, "living" },
+		{ "old_globe", "hand", false, "bedroom" },
+		{ "jewellery_box", "hand", true, "bedroom" },
+		{ "ship_bottle", "hand", true, "kids" },
+		{ "arcade_cabinet", "pair", false, "kids" },
+		{ "stag_head", "both", false, "hall" },
+	}
+	for _, w in want do
+		local def = Items[w[1]]
+		check(`collectible {w[1]}: {w[2]}, fragile {w[3]}, in the {w[4]}`, def ~= nil and def.rarity ~= nil and def.class == w[2] and def.fragile == w[3] and def.room == w[4])
+	end
+	check("the jukebox is heavy, the knight's armour tall, both legendary pieces among the dearest of all",
+		Items.jukebox.weight >= 8 and Items.knight_armour.size.Y >= 6 and Items.oil_painting.rarity == "legendary" and Items.knight_armour.rarity == "legendary")
+
+	-- every piece into the Sprinter (and the moves worker's bed for it, once there)
+	local function fitsIn(bed: { Width: number, Height: number, Length: number }, def: any): boolean
+		local s = def.size
+		local function upright(x: number, y: number, z: number): boolean -- (turned 90° about Y at most)
+			return y <= bed.Height and ((x <= bed.Width and z <= bed.Length) or (z <= bed.Width and x <= bed.Length))
+		end
+		if upright(s.X, s.Y, s.Z) then
+			return true
+		end
+		-- lying on a side (a both / pair piece): its height along its width ("x"), or along its depth ("z")
+		return def.class ~= "hand" and (upright(s.Y, s.X, s.Z) or upright(s.X, s.Z, s.Y))
+	end
+	local bay = { Width = 6.6, Height = 7.6, Length = 14.0 }
+	local beds = Config.Moving.Beds :: any
+	local sprinterBed = beds.sprinter
+	for _, id in Order do
+		local def = Items[id]
+		local s = def.size
+		check(`{id}: into the Sprinter's bay ({s.X} × {s.Y} × {s.Z}, {def.class})`, fitsIn(bay, def))
+		if sprinterBed and table.find(list, id) then
+			check(`collectible {id}: onto Config.Moving.Beds.sprinter`, fitsIn(sprinterBed, def))
+		end
 	end
 end
 
