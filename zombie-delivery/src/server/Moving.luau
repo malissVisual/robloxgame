@@ -39,6 +39,22 @@
 --   * The edges: whoever leaves, dies, sits down or leaves the crew drops what they hold where they are (inside: on the
 --     floor); somebody inside an interior that goes is brought out to the door; every prompt and request is checked
 --     here (who, how far, the state), the remote is rate limited (Config.Robust.Limits.Moving).
+--   * 7.0 planning (NAVRH.md §2–3; shared/MoveRoles.luau's rules, Config.MoveRoles' numbers): START on the contract
+--     card opens the planning lobby (server/MoveLobby.luau: the crew picks roles, gets READY; the owner's LAUNCH starts
+--     the move with them: startMove's `roles`; the admin's "start" skips it). On the move everybody has a role (the
+--     player attribute MoveRole; a newcomer the first free one; the list's SWITCH, the Moving remote's "role", every
+--     Switch s, to a role nobody else has: solo you switch to do everything). The roles' blocks below ("7.0 planning"):
+--       Driver      no wait at Load / Unload (their prompts' MoveQuick: client/MovingHud.luau), the truck (and its load)
+--                   takes Driver.TruckDamage of a hit while a Driver is at its wheel (Vehicles.damage wrapped), "Call
+--                   truck to door" once a move (the remote's "call": to the house's curb with a fade, unless somebody
+--                   sits in it);
+--       Mover       a pair thing alone at Mover.Alone of the walk, held up (not dragged), × Mover.Carry on the rest; the
+--                   others go up stairs and slopes slower with a thing (× Mover.Climb), a Mover not;
+--       Guard       × Guard.Damage on the zombies (Zombies.damage wrapped), plank barricades outside ("barricade": they
+--                   stop the zombies, which wear them down), the outline through walls (client/EnemyOutline.luau);
+--       Technician  the front door is locked (no keys): "Pick lock" (the Technician, quiet) or "Kick door" (the rest:
+--                   loud, Tech.KickZombies come); "Enter house" hides for the crew meanwhile (the prompt's MoveDoor, the
+--                   players' MoveLocked); the interior's lights stay off until the Technician fixes the fuse box.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.admin(player, arg) the admin panel's MOVES buttons: "card" | "start" | "house" | "horde" | "time" | "deliver"
 --                             | "end"; returns what to say
@@ -55,7 +71,9 @@ local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
+local MoveRoles = require(Shared.MoveRoles) -- 7.0 planning: the roles' rules
 local Crew = require(script.Parent.Crew)
+local MoveLobby = require(script.Parent.MoveLobby) -- 7.0 planning: the lobby before a move
 local PlayerData = require(script.Parent.PlayerData)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
@@ -99,6 +117,27 @@ type Item = {
 	fallFrom: number?, -- its carrier is falling from this high
 }
 
+-- 7.0 planning: the roles on a move (shared/MoveRoles.luau) and what they did.
+type Barricade = { model: Model, at: Vector3, hp: number, endsAt: number, by: Player }
+type Climb = { at: Vector3, time: number, upUntil: number, slow: boolean, who: number? }
+type Team = {
+	of: { [number]: string }, -- user id → role id (the player attribute MoveRole)
+	switched: { [number]: number }, -- user id → the server time of their last switch
+	called: boolean, -- the Driver called the truck to the door (once a move)
+	placed: { [number]: number }, -- user id → barricades put up
+	barricades: { Barricade },
+	door: MoveRoles.Door, -- the front door: locked unless the contract has keys
+	pick: ProximityPrompt?, -- "Pick lock" (the Technician)
+	kick: ProximityPrompt?, -- "Kick door" (the rest)
+	lit: boolean, -- the interior's lights (the fuse box)
+	fuse: BasePart?,
+	fusePrompt: ProximityPrompt?,
+	lights: { Light },
+	lamps: { [BasePart]: Enum.Material }, -- the glowing lamps' material (off: plain)
+	climb: { [number]: Climb }, -- by spot: a carried thing going up stairs or a slope
+	lastTick: number,
+}
+
 type Session = {
 	id: number,
 	owner: Player,
@@ -125,13 +164,14 @@ type Session = {
 	sentAt: number,
 	ended: boolean,
 	emptyWarned: number,
+	team: Team, -- 7.0 planning: the roles and what they did
 }
 
 local art: Art? = nil
 local sessions: { [Player]: Session } = {} -- by owner
 local slots: { [number]: Session } = {}
 local sites: { [string]: Site } = {}
-local armed: { [Player]: { at: number, admin: boolean } } = {} -- the contract card was opened (START is good a while)
+local armed: { [Player]: { at: number, admin: boolean, card: { [string]: any }? } } = {} -- the contract card was opened (START is good a while; 7.0 planning: the card itself, for the lobby)
 local traveling: { [Player]: boolean } = {}
 local folder: Folder? = nil
 local boardPart: BasePart? = nil
@@ -364,6 +404,55 @@ local function words(part: BasePart, lines: { { text: string, color: Color3, siz
 	end
 end
 
+-- ── 7.0 planning: the roles (shared/MoveRoles.luau; their abilities further down) ──
+
+local function newTeam(contract: Contract): Team
+	return {
+		of = {},
+		switched = {},
+		called = false,
+		placed = {},
+		barricades = {},
+		door = MoveRoles.newDoor((contract :: any).keys == true),
+		pick = nil,
+		kick = nil,
+		lit = true,
+		fuse = nil,
+		fusePrompt = nil,
+		lights = {},
+		lamps = {},
+		climb = {},
+		lastTick = 0,
+	}
+end
+
+-- This player's role on the move (nil: none).
+local function roleOf(s: Session, player: Player?): string?
+	return if player then s.team.of[player.UserId] else nil
+end
+
+-- The carry's walk for this thing: its carrier's role's (a Mover lifts a pair thing alone, carries faster).
+local function speedOf(s: Session, thing: Rules.Thing): number
+	local mode = Rules.mode(thing)
+	local role = s.team.of[thing.carrier or 0]
+	return Config.Movement.Walk * MoveRoles.speedFactor(role, mode, Rules.speedFactor(mode, thing.weight))
+end
+
+-- How it is held: a Mover holds a pair thing alone up in front ("pair"), anybody else drags it low.
+local function heldMode(s: Session, thing: Rules.Thing): string
+	return MoveRoles.holdMode(s.team.of[thing.carrier or 0], Rules.mode(thing))
+end
+
+-- × the carry's walk now: going up stairs or a slope (the climb watch in watchCarried), unless a Mover carries it.
+local function climbOf(s: Session, spot: number): number
+	local c = s.team.climb[spot]
+	local thing = s.move.things[spot]
+	if not c or not c.slow or not thing then
+		return 1
+	end
+	return MoveRoles.climbFactor(s.team.of[thing.carrier or 0], Rules.mode(thing))
+end
+
 -- ── The places: the board, the drop-off, the houses' doors ─────────────────
 
 local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (the Moving Truck's)
@@ -528,8 +617,8 @@ end
 -- The holders' attributes for the thing now (its mode: the walk, the hands).
 local function setHands(s: Session, item: Item)
 	local thing = s.move.things[item.spot]
-	local mode = Rules.mode(thing)
-	local speed = Rules.carrySpeed(Config.Movement.Walk, mode, thing.weight)
+	local mode = heldMode(s, thing) -- 7.0 planning: a Mover holds a pair thing alone up …
+	local speed = speedOf(s, thing) * climbOf(s, item.spot) -- … and carries faster; the others slower up stairs
 	local carrier = playerById(thing.carrier)
 	local _, humanoid, root = bodyOrNil(carrier)
 	local character = carrier and carrier.Character
@@ -646,7 +735,7 @@ local function carry(s: Session, item: Item)
 	if not carrier or not humanoid or not root then
 		return
 	end
-	local mode = Rules.mode(thing)
+	local mode = heldMode(s, thing) -- (7.0 planning: a Mover's pair thing alone is held up, not dragged)
 	item.model.Parent = folder -- (out of the interior's model: it goes where its carrier goes)
 	weldTo(item, root, root.CFrame * holdOffset(thing, mode, root, humanoid))
 	item.lastAt, item.lastTime, item.apartSince, item.fallFrom = nil, 0, nil, nil
@@ -977,6 +1066,10 @@ onEnter = function(player: Player, contractId: string)
 	if traveling[player] or s.ended then
 		return
 	end
+	if s.team.door.locked then -- 7.0 planning: the Technician picks it, anybody kicks it in
+		say(player, "🔒 The front door is locked. The Technician picks the lock (hold E), or kick it in: LOUD.")
+		return
+	end
 	local _, humanoid, root = bodyOf(player)
 	if not humanoid or not root then
 		return
@@ -1123,6 +1216,570 @@ local function setupItem(s: Session, spot: number, model: Model)
 	}
 end
 
+-- ── 7.0 planning: the roles' abilities ─────────────────────────────────────
+
+local R = Config.MoveRoles
+
+local function setAttr(player: Player, name: string, value: any)
+	if player.Parent and player:GetAttribute(name) ~= value then
+		player:SetAttribute(name, value)
+	end
+end
+
+local function memberIds(s: Session): { number }
+	local ids: { number } = {}
+	for _, player in membersOf(s) do
+		table.insert(ids, player.UserId)
+	end
+	return ids
+end
+
+-- The one member with `role` (nil: nobody, or several: then everybody sees its prompts and the server checks).
+local function onlyWith(s: Session, role: string): (Player?, number)
+	local found: Player? = nil
+	local count = 0
+	for _, player in membersOf(s) do
+		if s.team.of[player.UserId] == role then
+			found = player
+			count += 1
+		end
+	end
+	return if count == 1 then found else nil, count
+end
+
+-- The lock's and the fuse box's prompts for the roles now: "Pick lock" and "Fix fuse box" for the Technician only
+-- (MoveOnly; no Technician in the crew: hidden, a switch brings them), "Kick door" for the rest (MoveSkip the
+-- Technician); the crew's MoveLocked while the door is locked (client/MovingHud.luau hides "Enter house" then).
+local function refreshTeamPrompts(s: Session)
+	local team = s.team
+	local tech, techs = onlyWith(s, "tech")
+	local pick, fuse, kick = team.pick, team.fusePrompt, team.kick
+	if pick then
+		pick:SetAttribute("MoveOnly", if tech then tech.UserId else nil)
+		pick.Enabled = team.door.locked and techs > 0
+	end
+	if fuse then
+		fuse:SetAttribute("MoveOnly", if tech then tech.UserId else nil)
+		fuse.Enabled = not team.lit and techs > 0
+	end
+	if kick then
+		kick:SetAttribute("MoveSkip", if tech then tech.UserId else nil)
+		kick.Enabled = team.door.locked
+	end
+	for _, player in membersOf(s) do
+		setAttr(player, "MoveLocked", if team.door.locked then true else nil)
+	end
+end
+
+local function setLights(s: Session, on: boolean)
+	local team = s.team
+	team.lit = on
+	for _, light in team.lights do
+		light.Enabled = on
+	end
+	for lamp, material in team.lamps do
+		lamp.Material = if on then material else Enum.Material.SmoothPlastic
+	end
+end
+
+-- Gives `player` the role: their attribute, what they hold at that role's walk and hold, the prompts.
+local function setRole(s: Session, player: Player, role: string)
+	s.team.of[player.UserId] = role
+	setAttr(player, "MoveRole", role)
+	local spot, as = Rules.holding(s.move, player.UserId)
+	local item = if spot then s.items[spot] else nil
+	if item and as == "carrier" then
+		carry(s, item)
+	end
+	refreshTeamPrompts(s)
+	s.dirty = true
+end
+
+-- The front door: "pick" (the Technician, quiet) or "kick" (anybody, loud: zombies come).
+local function openFront(s: Session, player: Player, how: string)
+	if s.ended or sessionOf(player) ~= s or traveling[player] then
+		return
+	end
+	local _, humanoid, root = bodyOf(player)
+	if not humanoid or not root or humanoid.SeatPart or flat(root.Position, s.site.door) > T.Reach.Door + 4 then
+		return
+	end
+	local ok, why, loud = MoveRoles.openDoor(s.team.door, roleOf(s, player), how)
+	if not ok then
+		say(player, MoveRoles.whyText(why))
+		return
+	end
+	if loud then
+		tellAll(s, `💥 {player.DisplayName} kicked the front door in. That was LOUD: zombies are coming!`)
+		local door = s.site.door
+		pcall(Zombies.noise, player, door)
+		for _ = 1, R.Tech.KickZombies do
+			local spot = Zombies.findSpot(door, nil, R.Tech.Near, R.Tech.Far)
+			local z = if spot then Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot, s.owner), spot, s.owner) else nil
+			if z then
+				Zombies.march(z, door, "move")
+				table.insert(s.horde, z)
+			end
+		end
+	else
+		tellAll(s, `🔓 {player.DisplayName} picked the front door's lock. Quietly.`)
+	end
+	refreshTeamPrompts(s)
+	s.dirty = true
+end
+
+-- "Pick lock" and "Kick door" at the house's front door (this move's crew only); "Enter house" there learns to hide
+-- for a crew whose door is locked.
+local function doorPrompts(s: Session)
+	local team = s.team
+	local spot = s.site.model:FindFirstChild("EnterDoor")
+	if not spot or not spot:IsA("BasePart") then
+		return
+	end
+	for _, child in spot:GetChildren() do
+		if child:IsA("ProximityPrompt") and child.ActionText == "Enter house" and child:GetAttribute("MoveDoor") ~= true then
+			child:SetAttribute("MoveDoor", true)
+			CollectionService:AddTag(child, TAG)
+		end
+	end
+	if not team.door.locked then
+		return
+	end
+	local pick = newPrompt(spot, "Pick lock", "🔒 Front door · quiet", Enum.KeyCode.E, R.Tech.Pick, T.Reach.Door)
+	local kick = newPrompt(spot, "Kick door", "🔒 Front door · LOUD", Enum.KeyCode.E, R.Tech.Kick, T.Reach.Door)
+	tag(pick, s.owner)
+	tag(kick, s.owner)
+	pick.Triggered:Connect(function(player: Player)
+		openFront(s, player, "pick")
+	end)
+	kick.Triggered:Connect(function(player: Player)
+		openFront(s, player, "kick")
+	end)
+	team.pick, team.kick = pick, kick
+end
+
+local function fixFuse(s: Session, player: Player)
+	local box = s.team.fuse
+	local _, humanoid, root = bodyOf(player)
+	if s.ended or sessionOf(player) ~= s or traveling[player] or not box or not humanoid or not root then
+		return
+	end
+	if (root.Position - box.Position).Magnitude > 14 then
+		return
+	end
+	local ok, why = MoveRoles.canFuse(roleOf(s, player), s.team.lit)
+	if not ok then
+		say(player, MoveRoles.whyText(why))
+		return
+	end
+	setLights(s, true)
+	refreshTeamPrompts(s)
+	tellAll(s, `💡 {player.DisplayName} fixed the fuse box: the lights are on in {s.contract.name}.`)
+	s.dirty = true
+end
+
+-- The interior's lights (whatever Light the art put in it, but the porch's daylight) go off; a fuse box on the garage's
+-- back wall (no garage in the plan: by the entry) brings them back. No lights in the art: nothing to fix.
+local function fuseBox(s: Session)
+	local interior = s.interior
+	if not interior then
+		return
+	end
+	local team = s.team
+	for _, d in interior:GetDescendants() do -- (once, when the move starts)
+		if d:IsA("Light") and d.Enabled then
+			local lamp = d.Parent
+			if lamp and lamp:IsA("BasePart") and string.find(lamp.Name, "Daylight", 1, true) then
+				continue
+			end
+			table.insert(team.lights, d)
+			if lamp and lamp:IsA("BasePart") and lamp.Material == Enum.Material.Neon then
+				team.lamps[lamp] = lamp.Material
+			end
+		end
+	end
+	if #team.lights == 0 then
+		return
+	end
+	local frame: CFrame? = nil
+	local rooms = if type(s.plan.rooms) == "table" then s.plan.rooms else {}
+	for _, room in rooms :: { any } do
+		if (room.id == "garage" or room.kind == "garage") and typeof(room.min) == "Vector3" and typeof(room.max) == "Vector3" then
+			frame = s.origin * CFrame.new(room.min.X + 1.6, room.min.Y + 4.4, room.max.Z - 0.3)
+		end
+	end
+	local at = frame or s.origin * (s.plan.entry :: CFrame) * CFrame.new(3, 4.4, 0)
+	local box = solid("FuseBox", Vector3.new(1.8, 2.4, 0.5), at, Color3.fromRGB(96, 100, 104), Enum.Material.DiamondPlate, interior)
+	box.CanCollide = false
+	words(box, { { text = "⚡ FUSES", color = Color3.fromRGB(242, 201, 76), size = 22 } })
+	local prompt = newPrompt(box, "Fix fuse box", "⚡ Fuse box · the lights", Enum.KeyCode.E, R.Tech.Fuse, 8)
+	tag(prompt, s.owner)
+	prompt.Triggered:Connect(function(player: Player)
+		fixFuse(s, player)
+	end)
+	team.fuse, team.fusePrompt = box, prompt
+	setLights(s, false)
+end
+
+-- Is a Driver of the crew at the truck's wheel?
+local function driverAtWheel(s: Session): boolean
+	local truck = s.truck
+	if not truck then
+		return false
+	end
+	for _, player in membersOf(s) do
+		if s.team.of[player.UserId] == "driver" then
+			local car, driving = Vehicles.seatedIn(player)
+			if car == truck and driving then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- The Driver's "Call truck to door" (once a move): the empty truck to the house's curb, with a fade for the caller.
+local function callTruck(s: Session, player: Player)
+	local ok, why = MoveRoles.canCall(roleOf(s, player), s.team.called)
+	if not ok then
+		say(player, MoveRoles.whyText(why))
+		return
+	end
+	local truck = truckOk(s)
+	if not truck then
+		return
+	end
+	for _, other in Players:GetPlayers() do
+		if Vehicles.seatedIn(other) == truck then
+			say(player, "Somebody sits in the truck: it can't drive itself.")
+			return
+		end
+	end
+	local park = s.site.home.park
+	local x, z, dx, dz, width = Map.nearestRoad(park.x, park.z)
+	local side = Vector3.new(park.x - x, 0, park.z - z)
+	local lane = if side.Magnitude > 0.1 then side.Unit * math.max(0, width / 2 - R.Driver.Curb) else Vector3.zero
+	local spot = Vector3.new(x, 0, z) + lane
+	if flat(truck.chassis.Position, spot) <= R.Driver.Near then
+		say(player, "The truck is at the door already.")
+		return
+	end
+	s.team.called = true
+	local heading = Vector3.new(dx, 0, dz)
+	remote:FireClient(player, "fade", "out", T.Fade)
+	task.delay(T.Fade, function()
+		if not s.ended and truckOk(s) == truck then
+			local ground = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z) + 4, spot.Z)
+			truck.chassis.AssemblyLinearVelocity = Vector3.zero
+			truck.chassis.AssemblyAngularVelocity = Vector3.zero
+			truck.model:PivotTo(CFrame.lookAt(ground, ground + heading))
+			pcall(Vehicles.standUp, truck, heading) -- (on its wheels, on free ground: Vehicles.clearFor)
+			tellAll(s, `🚚 {player.DisplayName} called the truck: it waits at {s.contract.name}'s curb.`)
+			s.dirty = true
+		end
+		remote:FireClient(player, "fade", "in", T.Fade)
+	end)
+end
+
+local function barricadeModel(frame: CFrame): Model
+	local model = Instance.new("Model")
+	model.Name = "MoveBarricade"
+	local wood = Color3.fromRGB(128, 96, 64)
+	local dark = Color3.fromRGB(84, 62, 42)
+	local post = solid("Post", Vector3.new(0.7, 5.2, 0.7), frame * CFrame.new(-3.8, 2.6, 0), dark, Enum.Material.Wood, model)
+	solid("Post", Vector3.new(0.7, 5.2, 0.7), frame * CFrame.new(3.8, 2.6, 0), dark, Enum.Material.Wood, model)
+	for index, height in { 1.1, 2.5, 3.9 } do
+		local tilt = math.rad(if index == 2 then -6 else 4)
+		solid("Plank", Vector3.new(8.6, 0.9, 0.35), frame * CFrame.new(0, height, -0.5) * CFrame.Angles(0, 0, tilt), wood, Enum.Material.WoodPlanks, model)
+	end
+	solid("Brace", Vector3.new(9.2, 0.6, 0.3), frame * CFrame.new(0, 2.5, -0.85) * CFrame.Angles(0, 0, math.rad(27)), dark, Enum.Material.Wood, model)
+	model.PrimaryPart = post
+	return model
+end
+
+-- The Guard's barricade: across the way in front of them, outside, near the house's door or the truck.
+local function putBarricade(s: Session, player: Player)
+	local team = s.team
+	local id = player.UserId
+	local ok, why = MoveRoles.canBarricade(roleOf(s, player), team.placed[id] or 0)
+	if not ok then
+		say(player, MoveRoles.whyText(why))
+		return
+	end
+	local _, humanoid, root = bodyOf(player)
+	if not humanoid or not root or traveling[player] then
+		return
+	elseif humanoid.SeatPart then
+		say(player, "Get out first.")
+		return
+	elseif s.inside[player] then
+		say(player, "Barricades go up outside: across the path, by the door or round the truck.")
+		return
+	end
+	local truck = truckOk(s)
+	local near = flat(root.Position, s.site.door) <= R.Guard.Near or (truck ~= nil and flat(root.Position, truck.chassis.Position) <= R.Guard.Near)
+	if not near then
+		say(player, "Too far from the house and the truck: put it up by the door or the truck.")
+		return
+	end
+	local look = root.CFrame.LookVector
+	local ahead = Vector3.new(look.X, 0, look.Z)
+	ahead = if ahead.Magnitude > 0.1 then ahead.Unit else s.site.facing
+	local at = root.Position + ahead * 4
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local ignore: { Instance } = {}
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(ignore, other.Character)
+		end
+	end
+	params.FilterDescendantsInstances = ignore
+	local hit = workspace:Raycast(at + Vector3.new(0, 4, 0), Vector3.new(0, -24, 0), params)
+	local ground = if hit then hit.Position.Y else root.Position.Y - humanoid.HipHeight - root.Size.Y / 2
+	local base = Vector3.new(at.X, ground, at.Z)
+	local model = barricadeModel(CFrame.lookAt(base, base + ahead))
+	model:SetAttribute("Hp", R.Guard.Hp)
+	model.Parent = folder or workspace
+	team.placed[id] = (team.placed[id] or 0) + 1
+	table.insert(team.barricades, { model = model, at = base, hp = R.Guard.Hp, endsAt = now() + R.Guard.Life, by = player })
+	local left = R.Guard.Barricades - team.placed[id]
+	tellAll(s, `🪵 {player.DisplayName} put up a barricade{if left > 0 then ` ({left} left)` else " (the last one)"}.`)
+	s.dirty = true
+end
+
+-- A role switch from the list (Tab): to a role nobody else has, Switch s after the last one.
+local function switchRole(s: Session, player: Player, role: any)
+	local team = s.team
+	local id = player.UserId
+	local ok, why, wait = MoveRoles.canSwitch(team.of, memberIds(s), id, role, team.switched[id], now())
+	if not ok then
+		say(player, if why == "cooldown" then `{MoveRoles.whyText(why)} Wait {wait} s.` else MoveRoles.whyText(why))
+		return
+	end
+	team.switched[id] = now()
+	setRole(s, player, role)
+	local def = MoveRoles.get(role)
+	if def then
+		tellAll(s, `{def.icon} {player.DisplayName} is the {def.name} now.`)
+	end
+end
+
+-- The Moving remote's role requests on a move: ("role", id) a switch, ("call") the truck, ("barricade").
+local function teamRequest(s: Session, player: Player, action: string, arg: any)
+	if s.ended or sessionOf(player) ~= s then
+		return
+	end
+	if action == "role" then
+		switchRole(s, player, arg)
+	elseif action == "call" then
+		callTruck(s, player)
+	elseif action == "barricade" then
+		putBarricade(s, player)
+	end
+end
+
+-- A carried thing going up stairs or a slope (its carrier rose Mover.Rise a stud along, held Hold s): its walk ×
+-- Mover.Climb (not a Mover's, nor a thing in one hand); watchCarried calls it every tick.
+local function climbStep(s: Session, spot: number, holder: Player, root: BasePart, clock: number)
+	local thing = s.move.things[spot]
+	local c = s.team.climb[spot]
+	local at = root.Position
+	if not c or c.who ~= thing.carrier or clock - c.time > 1 or traveling[holder] then
+		s.team.climb[spot] = { at = at, time = clock, upUntil = 0, slow = false, who = thing.carrier }
+		if c and c.slow then
+			local item = s.items[spot]
+			if item then
+				setHands(s, item)
+			end
+		end
+		return
+	end
+	if clock - c.time >= 0.15 then
+		if MoveRoles.climbing(at.Y - c.at.Y, flat(at, c.at)) then
+			c.upUntil = clock + R.Mover.Hold
+		end
+		c.at, c.time = at, clock
+	end
+	local slow = clock < c.upUntil and MoveRoles.climbFactor(s.team.of[thing.carrier or 0], Rules.mode(thing)) < 1
+	if slow ~= c.slow then
+		c.slow = slow
+		local item = s.items[spot]
+		if item then
+			setHands(s, item)
+		end
+	end
+end
+
+-- The barricades: the zombies at one wear it down (Bite hp a second each); broken or old, it goes.
+local function teamTick(s: Session)
+	local team = s.team
+	local t = now()
+	local dt = if team.lastTick > 0 then math.clamp(t - team.lastTick, 0, 1) else 0
+	team.lastTick = t
+	for index = #team.barricades, 1, -1 do
+		local b = team.barricades[index]
+		local count = 0
+		for _, list in { s.horde, s.roam } do
+			for _, z in list do
+				local zroot = z.root
+				if not z.dead and zroot and flat(zroot.Position, b.at) <= R.Guard.Reach then
+					count += 1
+				end
+			end
+		end
+		b.hp = MoveRoles.wear(b.hp, count, dt)
+		local hp = math.ceil(b.hp)
+		if b.model:GetAttribute("Hp") ~= hp then
+			b.model:SetAttribute("Hp", hp)
+		end
+		if b.hp <= 0 or t >= b.endsAt then
+			b.model:Destroy()
+			table.remove(team.barricades, index)
+			say(b.by, if b.hp <= 0 then "🪵 The zombies broke a barricade down." else "🪵 A barricade fell apart (its time was up).")
+			s.dirty = true
+		end
+	end
+end
+
+-- Everybody on the move has a role: the lobby's at the start, a newcomer the first free one; a leaver's goes.
+local function teamSync(s: Session)
+	local team = s.team
+	local ids = memberIds(s)
+	local changed = false
+	for id in team.of do
+		if not table.find(ids, id) then
+			team.of[id] = nil
+			local gone = playerById(id)
+			if gone then
+				setAttr(gone, "MoveRole", nil)
+				setAttr(gone, "MoveLocked", nil)
+			end
+			changed = true
+		end
+	end
+	for _, player in membersOf(s) do
+		local id = player.UserId
+		local role = team.of[id]
+		if not MoveRoles.get(role) then
+			role = MoveRoles.freeRole(team.of, ids, id)
+			team.of[id] = role
+			changed = true
+		end
+		if player:GetAttribute("MoveRole") ~= role then
+			setAttr(player, "MoveRole", role)
+			local def = MoveRoles.get(role)
+			if def then
+				say(player, `{def.icon} You are the {def.name}: {def.hint}.`)
+			end
+		end
+	end
+	if changed then
+		refreshTeamPrompts(s)
+		s.dirty = true
+	end
+end
+
+-- The move starts: the lobby's roles (by user id; nil: the admin's start, everybody gets a free one), the door, the
+-- fuse box, the Driver's no-wait truck prompts.
+local function teamSetup(s: Session, roles: { [number]: string }?)
+	for _, id in memberIds(s) do
+		local role = if roles then roles[id] else nil
+		if MoveRoles.get(role) then
+			s.team.of[id] = role :: string
+		end
+	end
+	doorPrompts(s)
+	fuseBox(s)
+	for _, prompt in { s.load, s.unload } do
+		if prompt then
+			prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver)
+		end
+	end
+	teamSync(s)
+	refreshTeamPrompts(s)
+end
+
+local function teamCleanup(s: Session)
+	local team = s.team
+	for _, b in team.barricades do
+		b.model:Destroy()
+	end
+	table.clear(team.barricades)
+	for _, prompt in { team.pick, team.kick } do
+		if prompt then
+			prompt:Destroy()
+		end
+	end
+	team.pick, team.kick = nil, nil
+	for id in team.of do
+		local player = playerById(id)
+		if player then
+			setAttr(player, "MoveRole", nil)
+			setAttr(player, "MoveLocked", nil)
+		end
+	end
+	for _, player in everyone(s) do
+		setAttr(player, "MoveRole", nil)
+		setAttr(player, "MoveLocked", nil)
+	end
+end
+
+-- What one player sees of the roles (client/MovingHud.luau).
+local function teamView(s: Session, player: Player): { [string]: any }
+	local team = s.team
+	local id = player.UserId
+	local ids = memberIds(s)
+	local crew = {}
+	for _, member in membersOf(s) do
+		table.insert(crew, { name = member.DisplayName, role = team.of[member.UserId], you = member == player })
+	end
+	local free: { string } = {}
+	for _, role in MoveRoles.Order do
+		if MoveRoles.canSwitch(team.of, ids, id, role, nil, 0) then
+			table.insert(free, role)
+		end
+	end
+	local last = team.switched[id]
+	return {
+		role = team.of[id],
+		crew = crew,
+		free = free,
+		switchAt = if last then last + R.Switch else 0,
+		locked = team.door.locked,
+		how = team.door.how,
+		lit = team.lit,
+		fuse = team.fuse ~= nil,
+		called = team.called,
+		barricades = if team.of[id] == "guard" then math.max(0, R.Guard.Barricades - (team.placed[id] or 0)) else 0,
+		up = #team.barricades,
+	}
+end
+
+-- The hooks for the roles (wireHooks): the Guard's hits, the Driver's truck.
+local function teamHooks()
+	local damage = Zombies.damage
+	Zombies.damage = function(z: any, amount: number, by: Player?, info: any): boolean
+		if by and amount < math.huge then
+			local s = sessionOf(by)
+			if s and not s.ended then
+				amount *= MoveRoles.weaponFactor(roleOf(s, by), if type(info) == "table" then info.cause else nil)
+			end
+		end
+		return damage(z, amount, by, info)
+	end
+	local hurtCar = Vehicles.damage
+	Vehicles.damage = function(car: Vehicles.Car, amount: number, reason: string?, cause: string?): number
+		if amount > 0 and amount < math.huge then
+			local s = sessions[car.owner]
+			if s and not s.ended and s.truck == car then
+				amount *= MoveRoles.truckFactor(driverAtWheel(s)) -- (its load: onCarDamaged gets what it took)
+			end
+		end
+		return hurtCar(car, amount, reason, cause)
+	end
+end
+
 -- ── The state for the clients ──────────────────────────────────────────────
 
 local function viewFor(s: Session, player: Player): { [string]: any }
@@ -1170,6 +1827,7 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 		door = { x = s.site.door.X, z = s.site.door.Z },
 		dropOff = { x = drop.X, z = drop.Z },
 		inside = s.inside[player] == true,
+		team = teamView(s, player), -- 7.0 planning: your role, the crew's, the door, the lights, the abilities
 	}
 end
 
@@ -1251,6 +1909,7 @@ local function cleanup(s: Session)
 	end
 	letGoZombies(s.horde)
 	letGoZombies(s.roam)
+	teamCleanup(s) -- 7.0 planning: the barricades, the lock's prompts, the roles' attributes
 	for member in s.members do
 		if member:GetAttribute("MoveWith") == s.owner.UserId then
 			member:SetAttribute("MoveWith", nil)
@@ -1401,8 +2060,7 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 	end
 	local site = sites[contract.id]
 	local truck = Economy.findCar(T.Truck)
-	armed[player] = { at = now(), admin = admin }
-	remote:FireClient(player, "contract", {
+	local card: { [string]: any } = {
 		id = contract.id,
 		name = contract.name,
 		client = contract.client,
@@ -1417,10 +2075,13 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 		truck = if truck then truck.name else "Moving Truck",
 		crew = #Crew.members(player),
 		busy = cantStart(player),
-	})
+	}
+	armed[player] = { at = now(), admin = admin, card = card } -- (7.0 planning: the lobby shows this card)
+	remote:FireClient(player, "contract", card)
 end
 
-local function startMove(owner: Player, contractId: any, admin: boolean): string?
+-- `roles` (7.0 planning): the lobby's, by user id (nil: the admin's start, everybody gets a free role).
+local function startMove(owner: Player, contractId: any, admin: boolean, roles: { [number]: string }?): string?
 	local contract = contractById(contractId)
 	local site = contract and sites[contract.id]
 	if not contract or not site then
@@ -1490,6 +2151,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean): string
 		sentAt = 0,
 		ended = false,
 		emptyWarned = 0,
+		team = newTeam(contract), -- 7.0 planning
 	}
 	sessions[owner] = s
 	slots[slot] = s
@@ -1508,6 +2170,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean): string
 	s.exit = exit
 	truckPrompts(s)
 	tellAll(s, `🚚 Move started: {contract.name}, {site.home.address}. Drive the truck there (GPS), carry the things out, load them and drive them to the Wall at the depot. {Rules.counts(s.move).stars} ★ things are a must!`)
+	teamSetup(s, roles) -- 7.0 planning: the roles, the locked door, the fuse box
 	return nil
 end
 
@@ -1604,6 +2267,7 @@ local function syncMembers(s: Session)
 		end
 	end
 	s.members = current
+	teamSync(s) -- 7.0 planning: a newcomer's role, a leaver's gone
 end
 
 -- The carried things: a helper too far for Grace s, a carrier faster than the carry (a teleport), a fall's top.
@@ -1620,13 +2284,14 @@ local function watchCarried(s: Session, clock: number)
 			continue
 		end
 		local holder: Player = carrier
+		climbStep(s, spot, holder, root, clock) -- 7.0 planning: slower up stairs and slopes (not a Mover)
 		if item.fallFrom then
 			item.fallFrom = math.max(item.fallFrom, root.Position.Y)
 		end
 		if not traveling[holder] then
 			local last = item.lastAt
 			if last and item.lastTime > 0 then
-				local walk = Rules.carrySpeed(Config.Movement.Walk, Rules.mode(thing), thing.weight)
+				local walk = speedOf(s, thing) -- (7.0 planning: the carrier's role's walk)
 				local admin = holder:GetAttribute("AdminSpeed")
 				local kit = character:GetAttribute("KitSpeed")
 				local boost = (if type(admin) == "number" then math.clamp(admin, 1, 4) else 1) * (if type(kit) == "number" then math.clamp(kit, 1, 2) else 1)
@@ -1671,6 +2336,7 @@ local function tick(s: Session)
 	syncMembers(s)
 	watchCarried(s, clock)
 	keepRoam(s, clock)
+	teamTick(s) -- 7.0 planning: the barricades
 	if s.move.phase == "horde" then
 		hordeBurst(s, clock)
 	end
@@ -1698,6 +2364,7 @@ function Moving.admin(player: Player, arg: any): string
 		Moving.openCard(player, nil, true)
 		return "ADMIN: the moving contract card is open (START begins Marge's House)."
 	elseif arg == "start" then
+		MoveLobby.close(player, nil) -- (7.0 planning: the admin's start skips the planning)
 		local err = startMove(player, T.Contracts[1].id, true)
 		return if err then `ADMIN: {err}` else `ADMIN: {T.Contracts[1].name} started; the truck is yours.`
 	elseif arg == "house" then
@@ -1752,14 +2419,49 @@ local function onPutDown(player: Player)
 	end
 end
 
+-- 7.0 planning: START on the contract card opens the planning lobby (server/MoveLobby.luau) on that card, checked as
+-- START was (the card opened a moment ago at the board, free to start); its LAUNCH starts the move (Moving.start wires
+-- MoveLobby.onLaunch: startMove with the lobby's roles).
+local function planMove(owner: Player, contractId: any): string?
+	local contract = contractById(contractId)
+	if not contract or not sites[contract.id] then
+		return "No such moving contract."
+	end
+	local busy = cantStart(owner)
+	if busy then
+		return busy
+	end
+	local armedCard = armed[owner]
+	local card = if armedCard then armedCard.card else nil
+	local _, _, root = bodyOf(owner)
+	local board = boardPart
+	if not armedCard or not card or card.id ~= contract.id or now() - armedCard.at > T.CardFor then
+		return "Open the contract at the depot's board first."
+	end
+	if not armedCard.admin and (not root or not board or flat(root.Position, board.Position) > T.Reach.Board + 12) then
+		return "Take the contract at the depot's board (ZDC Moving)."
+	end
+	armed[owner] = nil
+	local summary = table.clone(card)
+	summary.busy = nil
+	summary.keys = (contract :: any).keys == true
+	summary.bed = { T.Bed.Width, T.Bed.Length }
+	return MoveLobby.open(owner, summary)
+end
+
 local function onRequest(player: Player, action: any, arg: any)
 	if not Net.limit(player, "Moving", Config.Robust.Limits.Moving) then
 		return
 	end
 	if action == "start" then
-		local err = startMove(player, arg, false)
+		local err = planMove(player, arg) -- 7.0 planning: the lobby first (its LAUNCH starts the move)
 		if err then
 			say(player, err)
+		end
+	elseif action == "role" or action == "call" or action == "barricade" then -- 7.0 planning: the roles on a move
+		local s = sessionOf(player)
+		if s then
+			teamRequest(s, player, action, arg)
 		end
 	elseif action == "giveup" then
 		local s = sessions[player]
@@ -1823,6 +2525,7 @@ local function wireHooks()
 		end
 		return returnLent(player)
 	end
+	teamHooks() -- 7.0 planning: the Guard's hits, the Driver's truck
 	local callCar = Vehicles.callCar
 	if callCar then
 		local call: (Player, string?) -> string? = callCar
@@ -1850,6 +2553,16 @@ function Moving.start()
 	buildBoard(made)
 	buildDropOff(made)
 	wireHooks()
+	-- 7.0 planning: the lobby before a move (its LAUNCH starts it with the roles; the quick chat reaches the move's crew)
+	MoveLobby.onLaunch = function(owner: Player, contractId: string, roles: { [number]: string }): string?
+		return startMove(owner, contractId, true, roles)
+	end
+	MoveLobby.canStart = cantStart
+	MoveLobby.moveCrew = function(player: Player): { Player }?
+		local s = sessionOf(player)
+		return if s then membersOf(s) else nil
+	end
+	MoveLobby.start()
 	remote.OnServerEvent:Connect(onRequest)
 	Net.get("PutDown").OnServerEvent:Connect(onPutDown)
 	Players.PlayerRemoving:Connect(function(player: Player)

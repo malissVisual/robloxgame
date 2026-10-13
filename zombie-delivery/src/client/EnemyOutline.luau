@@ -17,6 +17,9 @@
 --     outline off before the next pick, so the falling corpses and the burning wrecks never wear one. (An enemy in the
 --     safe zone dies there: server/Zombies.luau.)
 --   * The phone's SETTINGS turns it off and on for this session (EnemyOutline.toggle, Main wires it; like the sound).
+--   * 7.0 planning: a Guard on a move sees the zombies through walls (EnemyOutline.setXray(studs), client/MovingHud.luau
+--     sets Config.MoveRoles.Guard.XRay for the role): an outlined zombie within that of the camera is drawn
+--     AlwaysOnTop; 0 (everybody else) keeps the rule above.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -51,6 +54,7 @@ local folder: Folder? = nil
 local on = true
 local started = false
 local nextPick = 0
+local xray = 0 -- 7.0 planning: the Guard's sight through walls (studs; 0: none)
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -209,6 +213,14 @@ local function pick()
 		if not enemy.slot then
 			assign(enemy)
 		end
+		-- 7.0 planning: the Guard's zombies through walls
+		local slot = enemy.slot
+		if slot then
+			local depth = if xray > 0 and not enemy.entry.human and enemy.entry.distance <= xray then Enum.HighlightDepthMode.AlwaysOnTop else Enum.HighlightDepthMode.Occluded
+			if slot.highlight.DepthMode ~= depth then
+				slot.highlight.DepthMode = depth
+			end
+		end
 	end
 end
 
@@ -285,6 +297,15 @@ local function watch(name: string, car: boolean)
 end
 
 -- ── On and off ─────────────────────────────────────────────────────────────
+
+-- 7.0 planning: the zombies outlined through walls within `range` studs (a Guard on a move); 0: never.
+function EnemyOutline.setXray(range: number)
+	local value = if range == range then math.max(0, range) else 0
+	if value ~= xray then
+		xray = value
+		nextPick = 0
+	end
+end
 
 function EnemyOutline.isOn(): boolean
 	return on

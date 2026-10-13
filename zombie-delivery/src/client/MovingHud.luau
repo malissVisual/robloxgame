@@ -15,6 +15,13 @@
 --     attribute MoveWith is theirs; MoveOnly = for that player alone; MoveSkip = not for that player), hidden by
 --     their reach like client/CargoPrompts.luau.
 -- On a touch screen the list ends over the touch buttons (client/TouchLayout.luau), the panel is a button.
+-- 7.0 planning (shared/MoveRoles.luau; the lobby is client/MoveLobbyUi.luau): the panel's last line is your role and
+-- what only it does; what to do next knows the locked door and the dark house; the list (Tab) starts with YOUR ROLE:
+-- its ability (the Driver's CALL TRUCK TO DOOR, the Guard's BARRICADE; the Moving remote's "call" / "barricade") and
+-- SWITCH to a free role (the remote's "role", every Config.MoveRoles.Switch s). The prompts: "Enter house" hides while
+-- your crew's door is locked (the prompt's MoveDoor, your attribute MoveLocked), a prompt for one role (MoveQuick: the
+-- truck's Load / Unload for the Driver) holds no time for it; a Guard sees the zombies through walls
+-- (client/EnemyOutline.luau setXray). The contract card's START opens the planning.
 -- Presentation only.
 
 local CollectionService = game:GetService("CollectionService")
@@ -26,12 +33,15 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
 local Map = require(Shared.Map)
+local Config = require(Shared.Config)
+local MoveRoles = require(Shared.MoveRoles) -- 7.0 planning
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
 local Fade = require(script.Parent.Fade)
 local MapView = require(script.Parent.MapView)
 local TouchLayout = require(script.Parent.TouchLayout)
+local EnemyOutline = require(script.Parent.EnemyOutline) -- 7.0 planning: the Guard's sight
 
 local MovingHud = {}
 
@@ -41,6 +51,7 @@ local C = CardKit.Color
 local TAG = "MovePrompt"
 local ORANGE = Color3.fromRGB(240, 132, 44)
 local PANEL_W = 380
+local PANEL_H = 118 -- (7.0 planning: + the role's line)
 local LIST_W = 320
 local CARD_W = 440
 
@@ -53,6 +64,7 @@ local listOpen = false
 local cardFrame: any = nil -- the contract card or the result (one at a time)
 local gpsAt: Vector3? = nil -- the waypoint set here (cleared here)
 local hidden: { [ProximityPrompt]: number } = {} -- the move prompts hidden for you, with their reach
+local holds: { [ProximityPrompt]: number } = {} -- 7.0 planning: a MoveQuick prompt's own hold (yours may be none)
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -103,6 +115,9 @@ local STATE_TEXT: { [string]: string } = { home = "IN THE HOUSE", carried = "CAR
 -- ── The prompts of your move only ──────────────────────────────────────────
 
 local function shows(prompt: ProximityPrompt): boolean
+	if prompt:GetAttribute("MoveDoor") == true and player:GetAttribute("MoveLocked") == true then
+		return false -- (7.0 planning: your crew's front door is locked: pick it or kick it first)
+	end
 	local only = prompt:GetAttribute("MoveOnly")
 	if type(only) == "number" then
 		return only == player.UserId
@@ -114,7 +129,25 @@ local function shows(prompt: ProximityPrompt): boolean
 	return type(owner) ~= "number" or owner == player.UserId or player:GetAttribute("MoveWith") == owner
 end
 
+-- 7.0 planning: a prompt for one role (MoveQuick = its id) holds no time for that role (the Driver's Load / Unload).
+local function quick(prompt: ProximityPrompt)
+	local role = prompt:GetAttribute("MoveQuick")
+	if type(role) ~= "string" then
+		return
+	end
+	local base = holds[prompt]
+	if not base then
+		base = prompt.HoldDuration
+		holds[prompt] = base
+	end
+	local hold = if player:GetAttribute("MoveRole") == role then 0 else base
+	if prompt.HoldDuration ~= hold then
+		prompt.HoldDuration = hold
+	end
+end
+
 local function apply(prompt: ProximityPrompt)
+	quick(prompt)
 	if shows(prompt) then
 		local reach = hidden[prompt]
 		if reach then
@@ -150,6 +183,7 @@ local function watchPrompts()
 	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(instance: Instance)
 		if instance:IsA("ProximityPrompt") then
 			hidden[instance] = nil
+			holds[instance] = nil
 		end
 	end)
 	for _, instance in CollectionService:GetTagged(TAG) do
@@ -161,6 +195,8 @@ local function watchPrompts()
 		end
 	end
 	player:GetAttributeChangedSignal("MoveWith"):Connect(applyAll)
+	player:GetAttributeChangedSignal("MoveLocked"):Connect(applyAll) -- 7.0 planning
+	player:GetAttributeChangedSignal("MoveRole"):Connect(applyAll)
 	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 		if CollectionService:HasTag(prompt, TAG) and not shows(prompt) then
 			hidden[prompt] = nil
@@ -222,7 +258,7 @@ local toggleList: () -> ()
 local function buildPanel(root: ScreenGui)
 	local panel = Ui.make("TextButton", {
 		Name = "MovePanel",
-		Size = UDim2.fromOffset(PANEL_W, 98),
+		Size = UDim2.fromOffset(PANEL_W, PANEL_H),
 		Position = UDim2.new(0.5, 0, 0, 8),
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundColor3 = K.charcoal,
@@ -254,6 +290,7 @@ local function buildPanel(root: ScreenGui)
 	refs.fill = Ui.make("Frame", { Name = "Fill", Size = UDim2.fromScale(0, 1), BackgroundColor3 = ORANGE, BorderSizePixel = 0 }, track)
 	Ui.corner(refs.fill, 4)
 	refs.next = text(panel, "", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(12, 74), TextSize = 13, TextColor3 = K.text })
+	refs.role = text(panel, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 96), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary }) -- 7.0 planning
 	panel.Activated:Connect(function()
 		toggleList()
 	end)
@@ -267,6 +304,10 @@ local function nextStep(s: any): string
 	if s.horde == true then
 		return if out > 0 then "🧟 THE HORDE! Drive the truck to the Wall NOW" else "🧟 THE HORDE! Load something and get out"
 	end
+	local team = if type(s.team) == "table" then s.team else {} -- 7.0 planning: the dark house
+	if s.inside == true and team.fuse == true and team.lit ~= true and carried == 0 then
+		return if team.role == "tech" then "💡 Dark: fix the fuse box in the garage (hold E)" else "💡 Dark: the Technician fixes the fuse box (garage)"
+	end
 	if s.inside == true then
 		return if carried > 0 then "Carry it out: \"Leave house\" by the front door" else "Pick up the things (E) · ★ first"
 	end
@@ -279,7 +320,26 @@ local function nextStep(s: any): string
 	if seated() then
 		return if out > 0 then "Drive to the Wall (GPS), or back for more" else `Drive to {s.name} (GPS)`
 	end
+	if team.locked == true then -- 7.0 planning: the front door is locked
+		return if team.role == "tech" then "🔒 Pick the front door's lock (hold E): quiet" else "🔒 Locked: the Technician picks it, or kick it in (LOUD)"
+	end
 	return `"Enter house" at {s.name}'s front door`
+end
+
+-- 7.0 planning: your role and what only it does (the panel's last line).
+local function roleLine(s: any): string
+	local team = if type(s.team) == "table" then s.team else {}
+	local def = MoveRoles.get(team.role)
+	if not def then
+		return ""
+	end
+	local hint = def.hint
+	if def.id == "driver" and team.called == true then
+		hint = "No wait at the truck's back · the truck was called"
+	elseif def.id == "guard" then
+		hint = `{hint} · 🪵 {tonumber(team.barricades) or 0} left`
+	end
+	return `{def.icon} {string.upper(def.name)} · {hint}`
 end
 
 local function refreshPanel()
@@ -307,6 +367,7 @@ local function refreshPanel()
 	refs.fill.BackgroundColor3 = if fill > 0.9 then K.red elseif fill > 0.7 then K.warn else ORANGE
 	refs.next.Text = nextStep(s)
 	refs.next.TextColor3 = if s.horde == true then K.red else K.text
+	refs.role.Text = roleLine(s) -- 7.0 planning
 	if refs.edge then
 		refs.edge.Color = if s.horde == true then K.red else ORANGE
 	end
@@ -318,7 +379,7 @@ end
 local function listBox(): (number, number)
 	local size = Ui.screenSize()
 	local s = Ui.screenScale()
-	local top = 8 + 98 * s + 10
+	local top = 8 + PANEL_H * s + 10
 	local bottom = size.Y - 120
 	if Ui.touchLayout() then
 		local cluster = TouchLayout.cluster(size.X, size.Y, s)
@@ -365,6 +426,76 @@ local function itemRow(parent: Instance, item: any, order: number)
 		TextColor3 = if item.broken == true then K.red elseif condition < 60 then K.warn else K.text,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
+end
+
+-- 7.0 planning: YOUR ROLE at the list's top: the role, its ability's button (the Driver's call, the Guard's barricade)
+-- and SWITCH to a free role (a chip each; a while after a switch: when).
+local function roleCard(parent: Instance, s: any)
+	local team = if type(s.team) == "table" then s.team else {}
+	local def = MoveRoles.get(team.role)
+	if not def then
+		return
+	end
+	local card = Ui.make("Frame", { Name = "Role", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.card, BorderSizePixel = 0, LayoutOrder = 0 }, parent)
+	Ui.corner(card, 6)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, card)
+	Ui.list(card, true, 6)
+	local color = Color3.fromRGB(def.color[1], def.color[2], def.color[3])
+	text(card, `YOUR ROLE · {def.icon} {string.upper(def.name)}`, UDim2.new(1, 0, 0, 18), { LayoutOrder = 1, Font = Theme.HeadingFont, TextSize = 14, TextColor3 = color })
+	text(card, def.hint, UDim2.new(1, 0, 0, 0), {
+		LayoutOrder = 2,
+		TextSize = 12,
+		TextColor3 = C.faint,
+		TextWrapped = true,
+		TextTruncate = Enum.TextTruncate.None,
+		AutomaticSize = Enum.AutomaticSize.Y,
+	})
+	local ability: { text: string, action: string, on: boolean }? = nil
+	if def.id == "driver" then
+		ability = { text = if team.called == true then "🚚 TRUCK CALLED (ONCE A MOVE)" else "📍 CALL TRUCK TO DOOR", action = "call", on = team.called ~= true }
+	elseif def.id == "guard" then
+		local left = tonumber(team.barricades) or 0
+		ability = { text = if left > 0 then `🪵 PUT UP A BARRICADE · {left} LEFT` else "🪵 NO BARRICADES LEFT", action = "barricade", on = left > 0 }
+	end
+	if ability then
+		local holder = Ui.make("Frame", { Name = "Ability", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 3 }, card)
+		local act = ability
+		CardKit.bigButton(holder, {
+			name = "Ability",
+			text = act.text,
+			kind = if act.on then "warn" else "shut",
+			height = 36,
+			textSize = 13,
+			onClick = function()
+				if act.on then
+					remote:FireServer(act.action)
+				end
+			end,
+		})
+	end
+	local wait = math.ceil((tonumber(team.switchAt) or 0) - workspace:GetServerTimeNow())
+	local free = if type(team.free) == "table" then team.free else {}
+	if wait > 0 then
+		text(card, `SWITCH ROLE IN {wait} S`, UDim2.new(1, 0, 0, 16), { LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
+	elseif #free > 0 then
+		text(card, "SWITCH ROLE", UDim2.new(1, 0, 0, 14), { LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
+		local strip = Ui.make("Frame", { Name = "Switch", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 5 }, card)
+		Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(96, 26), CellPadding = UDim2.fromOffset(4, 4), SortOrder = Enum.SortOrder.LayoutOrder }, strip)
+		for index, id in free do
+			local other = MoveRoles.get(id)
+			if other then
+				CardKit.chip(strip, {
+					name = `Switch_{id}`,
+					text = `{other.icon} {if id == "tech" then "TECH" else string.upper(other.name)}`,
+					order = index,
+					stroke = K.rule,
+					onClick = function()
+						remote:FireServer("role", id)
+					end,
+				})
+			end
+		end
+	end
 end
 
 local function closeList()
@@ -420,6 +551,7 @@ local function drawList()
 		CanvasSize = UDim2.new(),
 	}, frame)
 	Ui.list(rows, true, 6)
+	roleCard(rows, s) -- 7.0 planning: YOUR ROLE first
 	local list = s.items or {}
 	-- ★ first, then what is still in the house, then the rest
 	local ordered = table.clone(list)
@@ -572,13 +704,13 @@ local function showContract(card: any)
 	local holder = Ui.make("Frame", { Name = "Start", Size = UDim2.new(1, 0, 0, 48), BackgroundTransparency = 1, LayoutOrder = 10, ZIndex = 22 }, body)
 	local start = CardKit.bigButton(holder, {
 		name = "StartMove",
-		text = if type(busy) == "string" then "CAN'T START YET" else "▶ START THE MOVE",
+		text = if type(busy) == "string" then "CAN'T START YET" else "▶ START · PLAN THE MOVE",
 		kind = if type(busy) == "string" then "shut" else "primary",
 		height = 48,
 		z = 23,
 		onClick = function()
 			if type(busy) ~= "string" then
-				remote:FireServer("start", card.id)
+				remote:FireServer("start", card.id) -- (7.0 planning: the planning lobby opens: client/MoveLobbyUi.luau)
 				closeCard()
 			end
 		end,
@@ -631,6 +763,9 @@ end
 
 local function setState(view: any)
 	state = if type(view) == "table" then view else nil
+	-- 7.0 planning: a Guard sees the zombies through walls
+	local team = if state and type(state.team) == "table" then state.team else nil
+	pcall(EnemyOutline.setXray, if team and team.role == "guard" then Config.MoveRoles.Guard.XRay else 0)
 	refreshPanel()
 	updateGps()
 	if listOpen then

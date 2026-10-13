@@ -4,6 +4,10 @@
 -- interior), the crew, the door in and out with its fades, picking up, dragging and lifting in two, the truck's back,
 -- loading and the no-room refusal, unloading, the damage, a death, a helper too far, a teleport with a thing, the horde,
 -- the delivery's pay split, and the edges: a stranger, the owner leaving, the truck lost, the admin's commands.
+-- 7.0 planning: START opens the lobby (the real server/MoveLobby.luau: roles, READY, LAUNCH, the quick chat, a solo
+-- lobby, CANCEL, the owner leaving), and the roles on the move: the Driver's call and truck, the locked door (the
+-- Technician's pick, a kick), the fuse box, a role switch and its cooldown, the Mover's pair thing alone, the climb, the
+-- Guard's hits and barricades.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -20,6 +24,8 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local T = Config.Moving
+local R = Config.MoveRoles
+local Lobby = require("./MoveLobbyServer")
 local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
@@ -56,6 +62,19 @@ end
 local function trigger(prompt: any, player: any)
 	prompt.Triggered:Fire(player)
 end
+local function lobbyRequest(player: any, ...: any)
+	E.Net.get("MoveLobby").OnServerEvent:Fire(player, ...)
+end
+-- Did `player` get a notice with `text` (since message number `since`)?
+local function heard(player: any, text: string, since: number?): boolean
+	for index = since or 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then
+			return true
+		end
+	end
+	return false
+end
 
 -- The contract card ------------------------------------------------------------------------------------------------------
 
@@ -75,25 +94,98 @@ check("START without the card: refused", string.find(E.lastNotice(cid), "board",
 E.request(bob, "start", "marge")
 check("a crew member does not take it (their owner does)", string.find(E.lastNotice(bob), "crew", 1, true) ~= nil, E.lastNotice(bob))
 
--- START ------------------------------------------------------------------------------------------------------------------
+-- START: the planning lobby (7.0 planning) ----------------------------------------------------------------------------
 
 E.request(ann, "start", "marge")
+local lobbyAnn = E.last(ann, "MoveLobby", "lobby")
+check("START opens the planning lobby (no truck yet)", lobbyAnn ~= nil and lobbyAnn.a ~= nil and E.cars[ann] == nil and E.built == 0, E.lastNotice(ann))
+local lobbyBob = E.last(bob, "MoveLobby", "lobby")
+check("…for the crew too, each with a free role", lobbyBob ~= nil and lobbyBob.a ~= nil and lobbyAnn.a.role == "driver" and lobbyBob.a.role == "mover"
+	and bob:GetAttribute("MoveLobby") == 11 and ann:GetAttribute("MoveLobby") == 11)
+check("the card's summary in it", lobbyAnn.a.card.name == "Marge's House" and lobbyAnn.a.card.estimate > 0 and lobbyAnn.a.mine == true and lobbyBob.a.mine == false
+	and #lobbyAnn.a.members == 2 and lobbyAnn.a.canLaunch == false and lobbyAnn.a.waiting == 1)
+lobbyRequest(ann, "launch")
+check("LAUNCH waits for the crew's READY", E.cars[ann] == nil and string.find(E.lastNotice(ann), "READY", 1, true) ~= nil, E.lastNotice(ann))
+lobbyRequest(bob, "role", "driver")
+check("one role each: Bob can't take Ann's", string.find(E.lastNotice(bob), "crew mate", 1, true) ~= nil and E.last(bob, "MoveLobby", "lobby").a.role == "mover")
+lobbyRequest(bob, "role", "tech")
+lobbyRequest(bob, "ready", true)
+check("Bob: the Technician, READY; LAUNCH may go", E.last(bob, "MoveLobby", "lobby").a.role == "tech" and E.last(bob, "MoveLobby", "lobby").a.ready == true
+	and E.last(ann, "MoveLobby", "lobby").a.canLaunch == true)
+lobbyRequest(bob, "launch")
+check("only the owner launches", E.cars[ann] == nil and E.cars[bob] == nil)
+lobbyRequest(cid, "role", "guard")
+check("a stranger is not in it", E.last(cid, "MoveLobby", "lobby") == nil)
+lobbyRequest(bob, "chat", 3)
+local said = E.last(ann, "MoveLobby", "chat")
+check("the quick chat in the lobby: the crew hears it, a stranger not", said ~= nil and said.a.index == 3 and said.a.from == 22 and E.last(bob, "MoveLobby", "chat") ~= nil
+	and E.last(cid, "MoveLobby", "chat") == nil)
+lobbyRequest(cid, "chat", 2)
+lobbyRequest(ann, "chat", 9)
+check("…not from a stranger, nor a line it doesn't have", E.last(ann, "MoveLobby", "chat") == said)
+local launchedAt = #E.messages
+lobbyRequest(ann, "launch")
 local truck = E.cars[ann]
-check("START: the truck is lent", truck ~= nil and truck.id == T.Truck, E.lastNotice(ann))
+check("LAUNCH: the truck is lent", truck ~= nil and truck.id == T.Truck, E.lastNotice(ann))
 check("…and the interior is built", E.built == 1 and #E.interiors == 1)
-check("everybody of the crew hears it", string.find(E.lastNotice(bob), "Move started", 1, true) ~= nil)
+check("everybody of the crew hears it", heard(bob, "Move started", launchedAt))
+check("the lobby closes for everybody", E.last(ann, "MoveLobby", "lobby").a == nil and E.last(bob, "MoveLobby", "lobby").a == nil and bob:GetAttribute("MoveLobby") == nil)
+check("the lobby's roles on the move (MoveRole), each told", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "tech" and heard(bob, "Technician", launchedAt))
 Moving.step()
 check("the crew is on the move (MoveWith)", ann:GetAttribute("MoveWith") == 11 and bob:GetAttribute("MoveWith") == 11 and cid:GetAttribute("MoveWith") == nil)
 local view = E.last(ann, "Moving", "state")
 check("the state: 6 things, 3 ★, the clock", view ~= nil and view.a ~= nil and #view.a.items == 6 and view.a.counts.stars == 3 and view.a.endsAt == E.now + T.Time and view.a.mine == true)
 check("…and Bob's says it is Ann's", E.last(bob, "Moving", "state") ~= nil and E.last(bob, "Moving", "state").a.mine == false)
+check("the state: the roles", view.a.team.role == "driver" and E.last(bob, "Moving", "state").a.team.role == "tech" and #view.a.team.crew == 2 and view.a.team.locked == true)
 E.request(ann, "start", "marge")
 check("no second move at once", string.find(E.lastNotice(ann), "already", 1, true) ~= nil, E.lastNotice(ann))
+lobbyRequest(ann, "chat", 1)
+check("the quick chat on a move: the crew hears it", E.last(bob, "MoveLobby", "chat").a.index == 1 and E.last(bob, "MoveLobby", "chat").a.from == 11 and E.last(cid, "MoveLobby", "chat") == nil)
+
+-- The Driver: the call, the truck (7.0 planning) ---------------------------------------------------------------------------
+
+truck.chassis.CFrame = M.CFrame.new(depot.X + 40, 2, depot.Z)
+E.request(bob, "call")
+check("only the Driver calls the truck", string.find(E.lastNotice(bob), "Driver", 1, true) ~= nil and (truck.chassis.Position - depot).Magnitude < 60, E.lastNotice(bob))
+E.seated[bob] = truck
+E.request(ann, "call")
+check("not with somebody in it", string.find(E.lastNotice(ann), "sits in the truck", 1, true) ~= nil, E.lastNotice(ann))
+E.seated[bob] = nil
+E.request(ann, "call")
+check("Call truck to door: at the house's curb, stood up, with a fade", V3(truck.chassis.Position.X - door.X, 0, truck.chassis.Position.Z - door.Z).Magnitude < 45 and E.stoodUp == 1
+	and E.last(ann, "Moving", "fade") ~= nil and E.last(bob, "Moving", "fade") == nil, truck.chassis.Position)
+E.request(ann, "call")
+check("…once a move", string.find(E.lastNotice(ann), "once", 1, true) ~= nil, E.lastNotice(ann))
+E.Vehicles.damage(truck, 100)
+E.seated[ann] = truck
+E.Vehicles.damage(truck, 100)
+E.seated[ann] = nil
+check("the truck takes less with a Driver at its wheel", E.carHits[#E.carHits - 1].amount == 100 and math.abs(E.carHits[#E.carHits].amount - 100 * R.Driver.TruckDamage) < 1e-6)
+check("no wait at the truck's back for a Driver (the prompts' MoveQuick)", promptIn(truck.model, "Load"):GetAttribute("MoveQuick") == "driver"
+	and promptIn(truck.model, "Unload"):GetAttribute("MoveQuick") == "driver")
 
 -- The door ---------------------------------------------------------------------------------------------------------------
 
 local site = moves:FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
+-- 7.0 planning: the door is locked (no keys): the Technician picks it
+local pickLock = promptIn(site, "Pick lock")
+local kickDoor = promptIn(site, "Kick door")
+check("locked: Pick lock for the Technician (3 s), Kick door for the rest", pickLock ~= nil and kickDoor ~= nil and pickLock:GetAttribute("MoveOnly") == 22
+	and kickDoor:GetAttribute("MoveSkip") == 22 and pickLock.Enabled and kickDoor.Enabled and pickLock.HoldDuration == R.Tech.Pick and pickLock:GetAttribute("MoveOwner") == 11)
+check("…and Enter house hides for the crew (MoveDoor, MoveLocked)", enter:GetAttribute("MoveDoor") == true and ann:GetAttribute("MoveLocked") == true and bob:GetAttribute("MoveLocked") == true
+	and cid:GetAttribute("MoveLocked") == nil)
+E.place(ann, outside)
+trigger(enter, ann)
+check("Enter house refused while it is locked", string.find(E.lastNotice(ann), "locked", 1, true) ~= nil and (E.rootOf(ann).Position - outside).Magnitude < 1, E.lastNotice(ann))
+trigger(pickLock, ann)
+check("only the Technician picks it", string.find(E.lastNotice(ann), "Technician", 1, true) ~= nil and pickLock.Enabled, E.lastNotice(ann))
+local zombiesBefore = #E.zombies
+local pickedAt = #E.messages
+E.place(bob, outside)
+trigger(pickLock, bob)
+check("the Technician picks it: open and quiet (no zombies)", not pickLock.Enabled and not kickDoor.Enabled and ann:GetAttribute("MoveLocked") == nil and #E.zombies == zombiesBefore
+	and heard(ann, "picked", pickedAt))
 E.place(cid, outside)
 trigger(enter, cid)
 check("a stranger's door is locked", string.find(E.lastNotice(cid), "Locked", 1, true) ~= nil and (E.rootOf(cid).Position - outside).Magnitude < 1)
@@ -113,6 +205,23 @@ check("…with a fade out and in", fades == 2)
 E.place(bob, door + facing * 30)
 trigger(enter, bob)
 check("not from the street", (E.rootOf(bob).Position - door).Magnitude > 20)
+-- 7.0 planning: the lights stay off until the Technician fixes the fuse box in the garage
+local interior = workspace:FindFirstChild("Interior")
+local lamp0 = interior:FindFirstChild("Lamp")
+local fuse = interior:FindFirstChild("FuseBox")
+local fixFuse = fuse and promptIn(fuse, "Fix fuse box")
+check("dark inside: the lights off, the porch's daylight on", lamp0:FindFirstChildOfClass("PointLight").Enabled == false and lamp0.Material == "SmoothPlastic"
+	and interior:FindFirstChild("Daylight"):FindFirstChildOfClass("SpotLight").Enabled == true)
+check("a fuse box on the garage's back wall, for the Technician", fuse ~= nil and fixFuse ~= nil and fixFuse:GetAttribute("MoveOnly") == 22 and fixFuse.Enabled
+	and math.abs(fuse.Position.Z - (origin.Position.Z + 26 - 0.3)) < 1e-6 and fixFuse.HoldDuration == R.Tech.Fuse)
+E.place(ann, fuse.Position + V3(2, 0, 0))
+trigger(fixFuse, ann)
+check("only the Technician fixes it", lamp0:FindFirstChildOfClass("PointLight").Enabled == false and string.find(E.lastNotice(ann), "Technician", 1, true) ~= nil)
+E.place(bob, fuse.Position + V3(2, 0, 0))
+trigger(fixFuse, bob)
+check("fixed: the lights come on", lamp0:FindFirstChildOfClass("PointLight").Enabled == true and lamp0.Material == "Neon" and not fixFuse.Enabled)
+E.place(ann, outside)
+trigger(enter, ann)
 
 -- Pick up, carry, the truck ------------------------------------------------------------------------------------------------
 
@@ -242,6 +351,43 @@ check("the helper doesn't load", string.find(E.lastNotice(ann), "front", 1, true
 trigger(load, bob)
 check("the carrier loads it; both hands free", bobBody:GetAttribute("MoveCarry") == nil and character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(bob), "Sofa", 1, true) ~= nil, E.lastNotice(bob))
 
+-- A role switch, the Mover, the climb (7.0 planning) ---------------------------------------------------------------------
+
+E.request(bob, "role", "driver")
+check("a switch to a crew mate's role: refused", string.find(E.lastNotice(bob), "crew mate", 1, true) ~= nil and bob:GetAttribute("MoveRole") == "tech", E.lastNotice(bob))
+E.request(bob, "role", "mover")
+check("a switch to a free role: Bob is the Mover", bob:GetAttribute("MoveRole") == "mover" and heard(ann, "Mover now"))
+E.request(bob, "role", "guard")
+check("…not again within the cooldown", string.find(E.lastNotice(bob), "Wait", 1, true) ~= nil and bob:GetAttribute("MoveRole") == "mover", E.lastNotice(bob))
+check("no Technician now: the fuse box's prompt is nobody's", fixFuse:GetAttribute("MoveOnly") == nil)
+E.place(bob, outside)
+trigger(enter, bob)
+local slab0 = itemModel(6)
+E.place(bob, slab0.PrimaryPart.Position + V3(2, 0, 0))
+trigger(promptIn(slab0, "Lift"), bob)
+check("the Mover lifts a pair thing alone at 0.6 (not dragged at 0.35)", bobBody:GetAttribute("MoveCarry") == 6 and math.abs((bobBody:GetAttribute("CarrySpeed") or 0) - 14 * R.Mover.Alone) < 1e-6,
+	bobBody:GetAttribute("CarrySpeed"))
+check("…held up in front, not low", math.abs(((bobBody:GetAttribute("CarryAt") :: any) or V3()).Y - (Config.Cargo.CarryLow + 3.6 / 2)) < 1e-6)
+E.Net.get("PutDown").OnServerEvent:Fire(bob)
+-- the others go up stairs slower with a thing in both hands: the TV up a step
+E.place(ann, outside)
+trigger(enter, ann)
+local tv0 = itemModel(2)
+E.place(ann, tv0.PrimaryPart.Position + V3(1, 0, 0))
+trigger(promptIn(tv0, "Pick up"), ann)
+local flatWalk = 14 * T.Speed.Both
+check("the TV in both hands", math.abs((character:GetAttribute("CarrySpeed") or 0) - flatWalk) < 1e-6, character:GetAttribute("CarrySpeed"))
+E.clock += 0.2
+Moving.step()
+E.place(ann, E.rootOf(ann).Position + V3(2, 3, 0))
+E.clock += 0.2
+Moving.step()
+check("up the stairs with it: slower (× Climb)", math.abs((character:GetAttribute("CarrySpeed") or 0) - flatWalk * R.Mover.Climb) < 1e-6, character:GetAttribute("CarrySpeed"))
+E.clock += R.Mover.Hold + 0.2
+Moving.step()
+check("…and back to its walk on the flat", math.abs((character:GetAttribute("CarrySpeed") or 0) - flatWalk) < 1e-6, character:GetAttribute("CarrySpeed"))
+E.Net.get("PutDown").OnServerEvent:Fire(ann)
+
 -- Damage, a death, a teleport, no room -------------------------------------------------------------------------------------
 
 E.place(ann, outside)
@@ -313,6 +459,40 @@ load = promptIn(truck.model, "Load")
 Moving.step()
 E.place(ann, outside)
 enter = promptIn(site, "Enter house")
+-- 7.0 planning: the admin's start gives free roles; the door kicked in; the Guard
+check("the admin's start: free roles", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "mover")
+kickDoor = promptIn(site, "Kick door")
+zombiesBefore = #E.zombies
+pickedAt = #E.messages
+local noisesBefore = E.noises
+trigger(kickDoor, ann)
+check("Kick door: open, LOUD, zombies come at the door", #E.zombies - zombiesBefore == R.Tech.KickZombies and E.noises > noisesBefore and heard(bob, "LOUD", pickedAt)
+	and ann:GetAttribute("MoveLocked") == nil and E.zombies[#E.zombies].march ~= nil)
+E.request(ann, "role", "guard")
+check("Ann switches to the Guard", ann:GetAttribute("MoveRole") == "guard")
+local z0 = E.zombies[#E.zombies]
+E.Zombies.damage(z0, 10, ann, {})
+local hitGun = E.zombieHits[#E.zombieHits].amount
+E.Zombies.damage(z0, 10, ann, { cause = "car" })
+local hitCar = E.zombieHits[#E.zombieHits].amount
+E.Zombies.damage(z0, 10, bob, {})
+check("the Guard hits harder (not with the car); the others as ever", math.abs(hitGun - 10 * R.Guard.Damage) < 1e-6 and hitCar == 10 and E.zombieHits[#E.zombieHits].amount == 10)
+E.request(bob, "barricade")
+check("only the Guard puts up barricades", string.find(E.lastNotice(bob), "Guard", 1, true) ~= nil and moves:FindFirstChild("MoveBarricade") == nil, E.lastNotice(bob))
+E.request(ann, "barricade")
+local barricade = moves:FindFirstChild("MoveBarricade")
+check("a plank barricade by the door", barricade ~= nil and barricade:GetAttribute("Hp") == R.Guard.Hp and #barricade:GetChildren() == 6
+	and E.last(ann, "Moving", "state") ~= nil)
+z0.root.CFrame = barricade.PrimaryPart.CFrame
+for _ = 1, math.ceil(R.Guard.Hp / R.Guard.Bite) + 1 do
+	E.now += 1
+	E.clock += 1
+	Moving.step()
+end
+check("a zombie at it wears it down", barricade.Parent == nil and heard(ann, "broke a barricade"))
+E.request(ann, "barricade")
+E.request(ann, "barricade")
+check("…two at most", string.find(E.lastNotice(ann), "No barricades left", 1, true) ~= nil, E.lastNotice(ann))
 trigger(enter, ann)
 items = workspace:FindFirstChild("Interior") -- (the new interior: the first is gone)
 local function newItem(spot: number): any
@@ -346,7 +526,7 @@ check("the truck's knocks knock its load", knocked ~= nil and math.abs(knocked.c
 E.now += T.Time - T.HordeAt + 1
 E.clock += 1
 Moving.step()
-check("the horde at HordeAt left: zombies march on the house", E.marched > 0 and string.find(E.lastNotice(ann), "HORDE", 1, true) ~= nil and E.last(ann, "Moving", "state").a.horde == true)
+check("the horde at HordeAt left: zombies march on the house", E.marched > 0 and heard(ann, "HORDE") and E.last(ann, "Moving", "state").a.horde == true) -- (7.0 planning: a barricade's end may be the last word)
 local roamers = 0
 for _, z in E.zombies do
 	if z.roamer then
@@ -392,6 +572,39 @@ check("the horde let go", (function()
 	end
 	return true
 end)())
+
+-- A solo lobby, CANCEL, the owner leaving the planning (7.0 planning) --------------------------------------------------------
+
+local dan = E.player(44, "Dan", board + V3(-3, 0, 1))
+check("the barricades went with the move", moves:FindFirstChild("MoveBarricade") == nil and ann:GetAttribute("MoveRole") == nil and bob:GetAttribute("MoveRole") == nil)
+E.place(cid, board + V3(-3, 0, -1))
+trigger(boardPrompt, cid)
+E.request(cid, "start", "marge")
+local solo = E.last(cid, "MoveLobby", "lobby")
+check("a solo lobby: READY is LAUNCH", solo ~= nil and solo.a ~= nil and solo.a.canLaunch == true and #solo.a.members == 1 and solo.a.role == "driver")
+lobbyRequest(cid, "cancel")
+check("CANCEL closes it", E.last(cid, "MoveLobby", "lobby").a == nil and cid:GetAttribute("MoveLobby") == nil and E.cars[cid] == nil)
+trigger(boardPrompt, cid)
+E.request(cid, "start", "marge")
+lobbyRequest(cid, "role", "tech")
+lobbyRequest(cid, "launch")
+check("solo LAUNCH starts the move at once, with the role picked", E.cars[cid] ~= nil and cid:GetAttribute("MoveRole") == "tech")
+E.request(cid, "giveup")
+check("…given up: no role any more", cid:GetAttribute("MoveRole") == nil)
+E.crew[cid] = { dan }
+trigger(boardPrompt, cid)
+E.request(cid, "start", "marge")
+check("Dan is in Cid's lobby", E.last(dan, "MoveLobby", "lobby") ~= nil and E.last(dan, "MoveLobby", "lobby").a ~= nil and dan:GetAttribute("MoveLobby") == 33)
+E.crew[cid] = {}
+Lobby.step()
+check("a member who leaves the crew leaves the lobby", E.last(dan, "MoveLobby", "lobby").a == nil and dan:GetAttribute("MoveLobby") == nil
+	and #E.last(cid, "MoveLobby", "lobby").a.members == 1)
+E.crew[cid] = { dan }
+Lobby.step()
+check("…and comes back with the crew, NOT READY", E.last(dan, "MoveLobby", "lobby").a ~= nil and E.last(dan, "MoveLobby", "lobby").a.ready == false
+	and E.last(cid, "MoveLobby", "lobby").a.canLaunch == false)
+E.leave(cid)
+check("the owner left: the planning closes for the crew", E.last(dan, "MoveLobby", "lobby").a == nil and dan:GetAttribute("MoveLobby") == nil and heard(dan, "left"))
 
 -- The owner leaves; the truck lost; the admin's other commands ---------------------------------------------------------------
 

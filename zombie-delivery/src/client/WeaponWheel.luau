@@ -13,6 +13,8 @@
 -- 4.2, touch: a tap on the HUD's weapon line opens the wheel (WeaponWheel.openTouch, Main sets Hud.onWeaponWheel);
 -- a tap on a gun takes it, a tap anywhere else closes it. A gamepad's d-pad up takes the next gun (like a tap of Q).
 -- 6.0: no gun at all (a new courier: fists only): the wheel stays shut and says where the pistol is sold.
+-- 7.0 planning: on a move or in its planning a held T is the crew's quick chat (client/QuickChat.luau): the wheel
+-- gives way while WeaponWheel.yields() says so (Main sets it); a tap of T still takes the next gun.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +35,8 @@ local WeaponWheel = {}
 
 -- Set by Main: a short message (no second gun yet).
 WeaponWheel.notify = nil :: ((text: string) -> ())?
+-- Set by Main (7.0 planning): a held T is somebody else's now (the quick chat on a move): the wheel does not open.
+WeaponWheel.yields = nil :: (() -> boolean)?
 
 local C = Ui.Colors
 local HOLD = 0.18 -- seconds Q is held before the wheel opens (shorter: a tap, the next gun)
@@ -584,7 +588,8 @@ function WeaponWheel.start()
 	-- Held Q opens it; while open the slot under the mouse is lit (the mouse's way); death closes it (both ways).
 	RunService.RenderStepped:Connect(function()
 		local since = pressedAt
-		if not open and since and os.clock() - since >= HOLD then
+		local yields = WeaponWheel.yields
+		if not open and since and os.clock() - since >= HOLD and not (yields and yields()) then
 			touchMode = false
 			openWheel()
 		end

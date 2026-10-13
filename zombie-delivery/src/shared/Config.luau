@@ -5276,6 +5276,8 @@ Config.Robust = {
 		CrateDown = 4, -- 6.15: the PutDown remote (the touch PUT DOWN) while you carry a supply drop's crate (server/LiveEvents.luau)
 		Skills = 4, -- 6.20: the SKILLS tab's +1 POINT and RESET (server/Skills.luau)
 		Moving = 6, -- 7.0: the Moving remote: the contract card's START, GIVE UP, the item list (server/Moving.luau)
+		MoveLobby = 6, -- 7.0 planning: the MoveLobby remote's role, READY, LAUNCH, CANCEL (server/MoveLobby.luau)
+		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 	},
 }
 
@@ -5819,6 +5821,39 @@ Config.Moving = {
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
 	Slots = 6,
 	Tick = 0.2,
+}
+
+-- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the four roles.
+-- shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
+-- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
+-- show them.
+--   Order             the roles, in the lobby's order (a newcomer gets the first free one)
+--   Switch            s between two role switches on a move (solo: switch to do everything; a crew: a free role)
+--   Lobby             Timeout: s the planning stays open; Tick: its loop (the crew joining and leaving); TouchScale:
+--                     the lobby window at least this big on a touch screen (it scrolls there; Ui.screenScale may be 0.55)
+--   Driver            TruckDamage: × a hit on the truck (and so on its load) while a Driver is at its wheel; the
+--                     truck's Load / Unload wait nothing for a Driver (client/MovingHud.luau); "Call truck to door"
+--                     once a move: to the house's curb (Curb studs from the road's middle) unless somebody sits in it
+--                     or it stands within Near of it already
+--   Mover             Alone: × the walk with a pair thing ALONE (carried, not dragged at Moving.Speed.Drag); Carry: ×
+--                     the carry's walk on everything else (never over the walk); the others go up stairs and slopes
+--                     (Rise studs up a stud along, held Hold s) at × Climb with anything not one-handed, a Mover not
+--   Guard             Damage: × weapon damage on the move; Barricades a move, each Hp (Bite hp a second off it for
+--                     every zombie within Reach) for Life s, put up outside within Near of the door or the truck; XRay:
+--                     the zombies outlined through walls within this (client/EnemyOutline.luau)
+--   Tech              the front door is locked (a contract with keys = true: not): Pick s to pick it (quiet), Kick s
+--                     for anybody to kick it in (loud: KickZombies come, Near … Far from the door); Fuse s at the fuse
+--                     box (the garage) and the interior's lights come on
+--   Chat              the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
+Config.MoveRoles = {
+	Order = { "driver", "mover", "guard", "tech" } :: { string },
+	Switch = 30,
+	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
+	Driver = { TruckDamage = 0.6, Curb = 5, Near = 25 },
+	Mover = { Alone = 0.6, Carry = 1.15, Climb = 0.75, Rise = 0.35, Hold = 0.8 },
+	Guard = { Damage = 1.5, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 80, XRay = 60 },
+	Tech = { Pick = 3, Kick = 1.2, KickZombies = 4, Near = 40, Far = 90, Fuse = 5 },
+	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

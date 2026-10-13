@@ -111,6 +111,11 @@ safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyr
 safely("CrashFx", require(Client.CrashFx).start) -- 6.16: sparks and a kick on a hard hit, sparks scraping a wall
 safely("SpeedLines", require(Client.SpeedLines).start) -- 6.16: streaks at the screen's edges near the top speed
 safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract card, the move's panel and list (Tab), the fade, the result
+safely("MoveLobbyUi", require(Client.MoveLobbyUi).start) -- 7.0 planning: the move's planning lobby (roles, READY, LAUNCH)
+safely("QuickChat", require(Client.QuickChat).start) -- 7.0 planning: the crew's quick chat (hold T on a move or in its planning)
+require(Client.MoveLobbyUi).onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
+require(Client.MoveLobbyUi).crewOpen = CrewPanel.isOpen
+WeaponWheel.yields = require(Client.QuickChat).active -- (a held T is the quick chat on a move; a tap still takes the next gun)
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast
@@ -130,6 +135,7 @@ Hud.onCloseWindows = function()
 	GarageUi.close()
 	DispatchUi.close()
 	CareerUi.close()
+	require(Client.MoveLobbyUi).minimize() -- 7.0 planning: the lobby folds away to its pill at the top
 	if not (Hud.escaping and Phone.appOpen()) then
 		Phone.close() -- (6.0.1 review: ESC with an app open goes back to the phone's home, the phone handles it)
 	end
@@ -246,6 +252,7 @@ end
 CameraRig.windowOpen = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
 		or CareerUi.isOpen() or CareerUi.cardOpen() or require(Client.MovingHud).isOpen() -- (7.0: the move's card, its list)
+		or require(Client.MoveLobbyUi).isOpen() or require(Client.QuickChat).isOpen() -- (7.0 planning: the lobby, the quick chat's ring)
 end
 -- 6.0.1: not while an app is open in the phone's popup (the mouse is needed there).
 CameraRig.freeLook = function(): boolean

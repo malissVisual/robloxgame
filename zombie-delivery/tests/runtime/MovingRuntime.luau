@@ -1,5 +1,6 @@
 --!strict
--- 7.0: the few services and server modules the real server/Moving.luau needs in the Luau CLI
+-- 7.0: the few services and server modules the real server/Moving.luau needs in the Luau CLI (7.0 planning: and the
+-- real server/MoveLobby.luau, MoveLobbyServer.luau; the driver's seat, the truck's and the zombies' damage, a garage)
 -- (tests/moving_runtime_test.luau through tests/run_tests.py, which builds MovingServer.luau from src/server/Moving.luau
 -- with these in place of its requires; Config, Economy, Map and MovingRules are the real ones). The instances are
 -- tools/fixtures/item-mock.luau's recorder with signals a test fires (Triggered, Died, HealthChanged …), players and
@@ -21,6 +22,12 @@ local Runtime: any = {
 	tags = {},
 	holstered = 0,
 	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them)
+	-- 7.0 planning
+	seated = {}, -- player → the car they drive (Vehicles.seatedIn)
+	carHits = {}, -- { { car, amount, cause } } what Vehicles.damage took
+	zombieHits = {}, -- { { z, amount, by, info } } what Zombies.damage was asked
+	noises = 0,
+	stoodUp = 0,
 }
 
 local O = getmetatable(Mock.Instance.new("Model"))
@@ -425,8 +432,19 @@ Runtime.Vehicles = stub("Vehicles", {
 	cargoHolder = function(car: any): any
 		return car.chassis
 	end,
-	seatedIn = function(): any
-		return nil
+	seatedIn = function(player: any): (any, boolean, any)
+		local car = Runtime.seated[player]
+		if car then
+			return car, true, car.chassis
+		end
+		return nil, false, nil
+	end,
+	damage = function(car: any, amount: number, _reason: any, cause: any): number
+		table.insert(Runtime.carHits, { car = car, amount = amount, cause = cause })
+		return amount
+	end,
+	standUp = function(_car: any, _heading: any)
+		Runtime.stoodUp += 1
 	end,
 	groundY = function()
 		return 0
@@ -453,7 +471,11 @@ Runtime.Zombies = stub("Zombies", {
 	spawn = function(kind: string, at: any, owner: any, guard: any, resident: any, roamer: any): any
 		local model = Mock.Instance.new("Model")
 		model.Parent = workspace
-		local z = { kind = kind, at = at, owner = owner, roamer = roamer == true, dead = false, model = model }
+		local root = Mock.Instance.new("Part")
+		root.Name = "HumanoidRootPart"
+		root.CFrame = Mock.CFrame.new(at.X, at.Y, at.Z)
+		root.Parent = model
+		local z = { kind = kind, at = at, owner = owner, roamer = roamer == true, dead = false, model = model, root = root }
 		table.insert(Runtime.zombies, z)
 		local _ = guard and resident
 		return z
@@ -463,6 +485,13 @@ Runtime.Zombies = stub("Zombies", {
 		if at then
 			Runtime.marched += 1
 		end
+	end,
+	damage = function(z: any, amount: number, by: any, info: any): boolean
+		table.insert(Runtime.zombieHits, { z = z, amount = amount, by = by, info = info })
+		return false
+	end,
+	noise = function()
+		Runtime.noises += 1
 	end,
 })
 
@@ -548,11 +577,11 @@ Runtime.art = {
 				kind = kind,
 				seed = seed,
 				size = V3(30, 12, 30),
-				rooms = {},
 				doors = {},
 				entry = Mock.CFrame.new(0, 0, 1),
 				exit = V3(0, 0, 0.5),
 				spots = SPOTS,
+				rooms = { { id = "garage", kind = "garage", min = V3(-12, 0, 14), max = V3(-2, 10, 26) } }, -- (7.0 planning: the fuse box)
 			}
 		end,
 	},
@@ -582,6 +611,20 @@ Runtime.art = {
 				made.Parent = items
 				byspot[spot.id] = made
 			end
+			-- the lights (7.0 planning: off until the fuse box is fixed; the porch's daylight stays)
+			local lamp = Mock.Instance.new("Part")
+			lamp.Name = "Lamp"
+			lamp.Material = "Neon"
+			lamp.Parent = model
+			local light = Mock.Instance.new("PointLight")
+			light.Enabled = true
+			light.Parent = lamp
+			local porch = Mock.Instance.new("Part")
+			porch.Name = "Daylight"
+			porch.Parent = model
+			local daylight = Mock.Instance.new("SpotLight")
+			daylight.Enabled = true
+			daylight.Parent = porch
 			model.Parent = workspace
 			return model, byspot
 		end,

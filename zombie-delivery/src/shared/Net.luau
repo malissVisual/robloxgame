@@ -70,6 +70,7 @@ local NAMES = {
 	"Skills", -- 6.20: client → server: ("buy", skill id) a rank more, ("reset") every point back (free; never during a job or a mission); the ranks reach the client in the state (skills) and the player attribute Skills (server/Skills.luau, shared/Skills.luau)
 	"Knock", -- 6.24: server → client: (velocity Vector3) a brute's blow or a bloater's blast throws you (client/ZombieFx.luau pushes your body; server/Zombies.luau, at most every Config.ZombieTypes.KnockEvery s)
 	"Moving", -- 7.0, MOVES: client → server: ("start", contract id) the contract card's START, ("giveup") the owner calls the move off, ("state") send me the move again; server → client: ("contract", card) open the contract card, ("state", view | nil) your move (client/MovingHud.luau), ("fade", "out" | "in", seconds) the fade at a door (client/Fade.luau), ("result", card) the move's end (server/Moving.luau; Config.Robust.Limits.Moving)
+	"MoveLobby", -- 7.0 planning: client → server: ("role", role id) | ("ready", on) | ("launch") | ("cancel") the planning lobby (the owner's LAUNCH and CANCEL), ("state") send it again, ("chat", 1 … 6) a quick chat line (shared/MoveRoles.luau Chat); server → client: ("lobby", view | nil) the lobby (client/MoveLobbyUi.luau), ("chat", { from, name, index }) a crew mate's quick chat (client/QuickChat.luau) (server/MoveLobby.luau; Config.Robust.Limits.MoveLobby, QuickChat)
 }
 
 local folder: Folder
