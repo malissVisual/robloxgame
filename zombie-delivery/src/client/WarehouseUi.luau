@@ -13,7 +13,8 @@
 -- tile: the piece's picture (its 3D model, FurnitureLooks.build, in a ViewportFrame: only the tiles on screen get one,
 -- at most Config.SandboxHud.MaxViews, each model built once a piece and variant; its emoji until then and as the
 -- fallback), its rarity's colour (a bar under the picture, the word, the tile's edge), its condition, its name, the big
--- "+$X/min" and "Sell $Y"; DISPLAY sends { kind = "display", uid, stand } (the picker closes), SELL asks
+-- "+$X/min" (WarehouseUi.rate: as the stands' tags, to a tenth under $10, "+$0.2/min") and "Sell $Y"; DISPLAY sends
+-- { kind = "display", uid, stand } (the picker closes), SELL asks
 -- "SELL FOR $Y?" first (CANCEL / SELL), then sends { kind = "sell", uid }.
 -- THE STOCK LIST (WarehouseUi.openStock: the HUD's stock chip and its key, client/SandboxHud.luau): the same grid of
 -- everything you own, a piece on show marked ON STAND n, with TAKE DOWN ({ kind = "undisplay", uid }) and SELL.
@@ -25,7 +26,9 @@
 --   WarehouseUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
 --   WarehouseUi.openPicker(stand) / openStock() / toggleStock() / close() / isOpen() / showing() ("picker", "stock")
 --   WarehouseUi.state()                  the last state (nil: none yet); WarehouseUi.onState(fn(state, previous))
---   WarehouseUi.values(entry)            { rarity, perMinute, sell } of a stock entry
+--   WarehouseUi.values(entry)            { rarity, perMinute, sell } of a stock entry (perMinute as it is: the
+--                                        best earners are sorted on it; sell a whole number)
+--   WarehouseUi.rate(perMinute)          "+$0.2/min", "+$36/min" (shared/WarehouseLayout.luau's money: the tags')
 --   WarehouseUi.layout(W, H, touch)      the card and its grid on a W × H screen (px under Roblox's top bar)
 --   WarehouseUi.views()                  the 3D pictures alive now
 --   WarehouseUi.notify / onOpen          hooks: the toasts (client/SandboxHud.luau sets it), the window opened
@@ -43,6 +46,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local FurnitureLooks = require(Shared.FurnitureLooks)
 local ItemLooks = require(Shared.ItemLooks) -- (the 3/4 camera on a model's box: bounds, frame)
+local WarehouseLayout = require(Shared.WarehouseLayout) -- (8.0.1: the $/min as the stands' tags write it)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
@@ -217,7 +221,13 @@ function WarehouseUi.values(entry: Entry): Values
 	-- (8.0 merge: the server's state entries carry `income` and `price`: server/Collection.luau, CollectionRules.view)
 	local perMinute = amount(e.perMinute) or amount(e.income) or ask(RULES.perMinute, entry, amount) or fallen().perMinute
 	local sell = amount(e.sell) or amount(e.price) or ask(RULES.sell, entry, amount) or fallen().sell
-	return { rarity = rarity, perMinute = math.floor(perMinute + 0.5), sell = math.floor(sell + 0.5) }
+	-- (8.0.1: the $/min as it is: a cheap piece's $0.2 no longer rounded to $0, and the best earners sorted on it)
+	return { rarity = rarity, perMinute = perMinute, sell = math.floor(sell + 0.5) }
+end
+
+-- "+$0.2/min": a piece's (or the stock's) $ a minute as the stands' tags write it (a tenth under $10).
+function WarehouseUi.rate(perMinute: number): string
+	return `+{WarehouseLayout.money(perMinute)}/min`
 end
 
 local function nameOf(entry: Entry): string
@@ -569,7 +579,7 @@ local function askSell(row: Row)
 	local values = row.values
 	Ui.label(box, `SELL FOR {Ui.money(values.sell)}?`, UDim2.new(1, -32, 0, 26), { Name = "Question", Position = UDim2.fromOffset(16, 16), Font = Theme.HeadingFont, TextSize = 20, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
 	Ui.label(box, `{nameOf(row.entry)} · {string.upper(values.rarity)} · {percent(row.entry)}`, UDim2.new(1, -32, 0, 18), { Name = "What", Position = UDim2.fromOffset(16, 46), TextSize = 13, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
-	Ui.label(box, if row.entry.stand then "It comes off its stand." else `On show it would earn +{Ui.money(values.perMinute)}/min.`, UDim2.new(1, -32, 0, 16), { Name = "Hint", Position = UDim2.fromOffset(16, 66), TextSize = 12, TextColor3 = C.faint, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
+	Ui.label(box, if row.entry.stand then "It comes off its stand." else `On show it would earn {WarehouseUi.rate(values.perMinute)}.`, UDim2.new(1, -32, 0, 16), { Name = "Hint", Position = UDim2.fromOffset(16, 66), TextSize = 12, TextColor3 = C.faint, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
 	local half = math.floor((boxW - 32 - 8) / 2)
 	local cancel = CardKit.bigButton(box, { name = "Cancel", text = "CANCEL", kind = "shut", height = layout.button, textSize = 14, z = 22, onClick = closeQuestion })
 	cancel.Size = UDim2.fromOffset(half, layout.button)
@@ -654,7 +664,7 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	Ui.label(frame, nameOf(entry), UDim2.fromOffset(inner, 18), { Name = "PieceName", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 20
 	-- the one big number: what it earns a minute on show; the price under it
-	Ui.label(frame, `+{Ui.money(values.perMinute)}/min`, UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = C.money, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, WarehouseUi.rate(values.perMinute), UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = C.money, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 22
 	Ui.label(frame, `Sell {Ui.money(values.sell)}`, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	-- the buttons: DISPLAY / SELL (the picker), TAKE DOWN / SELL (a piece on show), SELL (the stock list)
@@ -847,7 +857,7 @@ draw = function(keepScroll: boolean)
 	local earning = if state then state.income else 0
 	local subtitle = if not state then "Loading your stock…"
 		elseif stand then "On show it earns money every minute you play."
-		else `{#all} {if #all == 1 then "piece" else "pieces"} · {onShow} on show{if earning > 0 then ` · +{Ui.money(earning)}/min` else ""}`
+		else `{#all} {if #all == 1 then "piece" else "pieces"} · {onShow} on show{if earning > 0 then ` · {WarehouseUi.rate(earning)}` else ""}`
 	Ui.label(frame, subtitle, UDim2.new(1, -(layout.pad * 2 + layout.close + 8), 0, 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, 33), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	local close = Ui.closeButton(frame, WarehouseUi.close)
 	close.Size = UDim2.fromOffset(layout.close, layout.close)

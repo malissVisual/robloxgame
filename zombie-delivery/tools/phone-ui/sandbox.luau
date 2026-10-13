@@ -19,6 +19,7 @@
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
 local Config = require("./Config")
+local WarehouseLayout = require("./WarehouseLayout")
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
 
@@ -404,7 +405,7 @@ check("… a tile for each piece not on show (7; the painting on stand 2 is not 
 local rates = {}
 local sorted = true
 for index, tile in tiles do
-	local rate = tonumber((string.gsub(named(tile, "PerMinute").Text, "[^%d]", "")))
+	local rate = tonumber((string.gsub(string.match(named(tile, "PerMinute").Text, "%$([%d,%.]+)") or "", ",", ""))) -- (8.0.1: "+$0.2/min" too)
 	rates[index] = rate
 	if index > 1 and rate > rates[index - 1] then
 		sorted = false
@@ -417,7 +418,7 @@ check("… its rarity's colour bar and word (legendary gold)", named(gold, "Rari
 check("… its condition and its price", named(gold, "Condition").Text == "100%" and named(gold, "SellPrice").Text == "Sell $2,400", named(gold, "SellPrice").Text)
 local clock = named(grid, "Tile_a1")
 local clockValues = WarehouseUi.values(STOCK[1])
-check("the clock's tile: 87%, its values (WarehouseUi.values)", named(clock, "Condition").Text == "87%" and named(clock, "PerMinute").Text == `+{M.MUi.money(clockValues.perMinute)}/min` and named(clock, "SellPrice").Text == `Sell {M.MUi.money(clockValues.sell)}`)
+check("the clock's tile: 87%, its values (WarehouseUi.values)", named(clock, "Condition").Text == "87%" and named(clock, "PerMinute").Text == `+{WarehouseLayout.money(clockValues.perMinute)}/min` and named(clock, "SellPrice").Text == `Sell {M.MUi.money(clockValues.sell)}`)
 check("… its rarity colour (WarehouseUi.Rarity)", named(clock, "RarityBar").BackgroundColor3 == WarehouseUi.Rarity[clockValues.rarity])
 check("… DISPLAY and SELL", named(clock, "Display") ~= nil and named(clock, "Sell") ~= nil and named(clock, "Display").Text == "DISPLAY" and named(clock, "Sell").Text == "SELL")
 
@@ -628,6 +629,46 @@ WarehouseUi.Rules = kept
 if M.rulesFound then
 	check("shared/CollectionRules.luau is there: found by WarehouseUi.start()", WarehouseUi.Rules ~= nil)
 end
+
+-- ── 8.0.1: cheap pieces (under $1 a minute) ─────────────────────────────────
+-- Their $/min to a tenth, as the stands' tags write it (shared/WarehouseLayout.luau's money): never "+$0/min" for a
+-- piece that earns, and the best earners sorted on the exact numbers (rounded to whole dollars the radio's $0.44 and
+-- the mirror's $0.2 tied, and the uncommon mirror went first).
+local CHEAP = {
+	{ uid = "c1", item = "mirror", variant = 1, condition = 0.9, name = "Brass Mirror", got = 11, rarity = "uncommon", perMinute = 0.2, sell = 30 },
+	{ uid = "c2", item = "radio", variant = 1, condition = 0.6, name = "Old Radio", got = 12, rarity = "common", perMinute = 0.44, sell = 12 },
+	{ uid = "c3", item = "toy_box", variant = 1, condition = 0.3, name = "Toy Box", got = 13, rarity = "common", perMinute = 0.06, sell = 3 },
+	{ uid = "c4", item = "tv", variant = 1, condition = 1, name = "Old TV", got = 14, rarity = "rare", perMinute = 1, sell = 90, stand = 1 },
+}
+collection.OnClientEvent:Fire(state(CHEAP, 1))
+collection.OnClientEvent:Fire({ kind = "pick", stand = 4 })
+M.flush()
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+local cheap = tilesOf()
+local cheapRates = {}
+for index, tile in cheap do
+	cheapRates[index] = `{tile.Name} {named(tile, "PerMinute").Text}`
+end
+check("8.0.1: cheap pieces' $/min to a tenth, as the stands' tags: +$0.4/min, +$0.2/min, +$0.1/min (never +$0/min)", #cheap == 3
+	and named(cheap[1], "PerMinute").Text == "+$0.4/min" and named(cheap[2], "PerMinute").Text == "+$0.2/min" and named(cheap[3], "PerMinute").Text == "+$0.1/min", table.concat(cheapRates, ", "))
+check("… sorted on the exact numbers: the radio's $0.44 before the (uncommon) mirror's $0.2", cheap[1].Name == "Tile_c2" and cheap[2].Name == "Tile_c1" and cheap[3].Name == "Tile_c3", table.concat(cheapRates, ", "))
+check("… WarehouseUi.values keeps the exact $/min, WarehouseUi.rate writes it", WarehouseUi.values(CHEAP[1]).perMinute == 0.2 and WarehouseUi.rate(0.2) == "+$0.2/min" and WarehouseUi.rate(36) == "+$36/min" and WarehouseUi.rate(1234.4) == "+$1,234/min")
+check("… its texts fit", #badTexts(picker) == 0, badTexts(picker)[1])
+press(named(cheap[2], "Sell"))
+local cheapHint = named(named(picker, "Confirm"), "Hint")
+check("… SELL's question: \"On show it would earn +$0.2/min.\"", cheapHint ~= nil and cheapHint.Text == "On show it would earn +$0.2/min.", cheapHint and cheapHint.Text)
+key("Escape")
+key("Escape")
+check("… ESC twice: the question, then the picker", not WarehouseUi.isOpen())
+collection.OnClientEvent:Fire(state(CHEAP, 0.64))
+M.flush()
+check("… the HUD's line: \"+$0.6/min\" (not +$0/min)", incomeLabel.Visible and incomeLabel.Text == "+$0.6/min", incomeLabel.Text)
+WarehouseUi.openStock()
+check("… the STOCK list's subtitle: 4 pieces · 1 on show · +$0.6/min", named(named(gui, "Picker"), "Subtitle").Text == "4 pieces · 1 on show · +$0.6/min", named(named(gui, "Picker"), "Subtitle").Text)
+WarehouseUi.close()
+collection.OnClientEvent:Fire(state(STOCK, 36))
+M.flush()
 
 -- ── A computer (1280 × 800) and a big screen (1920 × 1080) ─────────────────
 for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" }, { 1280, 764, "chat" } } do

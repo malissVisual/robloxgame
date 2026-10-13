@@ -163,6 +163,12 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
+    # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
+    # the real SandboxMap copy above).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxPlots.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "SandboxPlotsServer.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, task: any, require: any)\n" + source + "\nend\n")
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")

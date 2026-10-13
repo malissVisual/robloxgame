@@ -1,6 +1,8 @@
 -- 6.12, what the world sounds like where you are (shared/SoundPlan.luau): the footsteps' surface by the material and
 -- the place (the park's lawns, the pond, the river), the horns by vehicle, the back's sounds, the ambience by the
--- clock and the height; every name it gives has its region in SoundSheet.Sfx3. In the standalone Luau CLI.
+-- clock and the height; every name it gives has its region in SoundSheet.Sfx3. 8.0.1: in the sandbox
+-- (Config.Sandbox.On) none of the city's places (no pond, river, sea or park lawn; client/SoundScape.luau's fountain
+-- asks SoundPlan.cityPlaces too). In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -20,6 +22,9 @@ end
 
 local S = Config.Soundscape
 local park = Map.Park
+local sandboxOn = Config.Sandbox.On
+Config.Sandbox.On = false -- (the city's places first; the sandbox's at the end)
+check("the city: its places are there (SoundPlan.cityPlaces)", SoundPlan.cityPlaces())
 
 -- ── Surfaces ────────────────────────────────────────────────────────────────
 check("asphalt is concrete", SoundPlan.surface("Asphalt", 300, 0.4, 300) == "concrete")
@@ -242,6 +247,18 @@ check("lost or called off: no gate", SoundPlan.resultCue({ how = "failed" }) == 
 for key, value in MV do
 	check(`Config.Soundscape.Move.{key} is a sane number`, type(value) == "number" and value >= 0 and value <= 60, value)
 end
+
+-- ── 8.0.1: the sandbox has none of the city's places ────────────────────────
+-- Its Main Street runs over the park's (0, 0): no pond to wade or splash in there (nor a river or a sea), no park lawn
+-- under its concrete pads, no fountain (SoundScape plays it only when SoundPlan.cityPlaces says so).
+Config.Sandbox.On = true
+check("the sandbox: no city places (no fountain at Map.Park)", not SoundPlan.cityPlaces())
+check("… no pond's water at the park's middle (the sandbox's Main Street)", SoundPlan.waterTop(park.x + 10, park.z) == nil and not SoundPlan.inWater(park.x + 18.5, -0.1, park.z))
+check("… steps where the pond was (the meadow by Main Street, its asphalt): grass and concrete, not water", SoundPlan.surface("Grass", park.x + 18.5, 0, park.z) == "grass" and SoundPlan.surface("Asphalt", park.x + 12, -3.5, park.z) == "concrete")
+check("… no river, no sea", SoundPlan.waterTop(riverX, 0) == nil and SoundPlan.waterTop(Map.Sea.x0 + 50, 0) == nil)
+check("… a plot's concrete where the park's lawn was: concrete", not SoundPlan.parkLawn(lawnX, lawnZ) and SoundPlan.surface("Concrete", -65, 0, -85) == "concrete")
+check("… the materials still say their surface (terrain water, grass, planks)", SoundPlan.surface("Water", 0, 0, 0) == "water" and SoundPlan.surface("Grass", 0, 0, 0) == "grass" and SoundPlan.surface("WoodPlanks", 0, 0, 0) == "wood")
+Config.Sandbox.On = sandboxOn
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

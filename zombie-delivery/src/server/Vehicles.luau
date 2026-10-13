@@ -4552,9 +4552,12 @@ local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }
 	local overlap = OverlapParams.new()
 	overlap.FilterType = Enum.RaycastFilterType.Exclude
 	local pass = table.clone(ignore)
-	for _, name in { "Loot", "Animals" } do -- (pushed along like the zombies)
-		local folder = workspace:FindFirstChild(name)
-		if folder then
+	for _, where in cfg.Pass do -- (the loot and the animals: pushed along like the zombies; 8.0.1: the sandbox's ground)
+		local folder: Instance? = workspace
+		for name in string.gmatch(where, "[^%.]+") do
+			folder = if folder then folder:FindFirstChild(name) else nil
+		end
+		if folder and folder ~= workspace then
 			table.insert(pass, folder)
 		end
 	end
