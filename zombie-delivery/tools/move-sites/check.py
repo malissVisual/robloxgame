@@ -12,6 +12,9 @@ it) and checks what comes out, in the world's own coordinates.
     the banner Persistent, each spot Atomic
   * 7.x farm move: each farm site (Walt's farmhouse and the dress at its Map.Places place): only the farmhouse's body
     solid, nothing on a door's way out to its van spot, on the van spot or on Walt's spot by the front door
+  * 8.0 SANDBOX: the kiosk on every plot (MoveSites.plotBoard): Persistent, its corkboard "Board" (the prompt's part,
+    solid, its attribute Plot) within a stud of the plot's board spot, every piece built with the city's flags, and
+    nothing of it in the warehouse's roller door's way or where the van backs in to unload (the unload circle)
   * no blocking: nothing but paint in the truck's lane from Bone St into the drop-off's bay below the gantry's sign
     (Config.MoveSites.Clear), nothing of the checkpoint off the depot's block (the road), nothing solid at a house and
     nothing on the strip from its door out to the truck's kerb spot (Map.Home park) a body's height
@@ -125,6 +128,29 @@ def check(records: list) -> list:
             bx, bz = summary["board"]
             need(math.hypot(p["position"][0] - bx, p["position"][2] - bz) < 1 and p["collide"], "the corkboard off Config.Moving.Board (or not solid)")
 
+    # 8.0 SANDBOX: the plots' kiosks.
+    sandbox = [r for r in records if r["kind"] == "sandbox"]
+    boards = summary.get("plotBoards", [])
+    need(len(boards) == summary.get("plots") and len(boards) > 0, f"{len(boards)} plot kiosks for {summary.get('plots')} plots")
+    for b in boards:
+        where = b["name"]
+        need(b["mode"] == "Persistent" and b["primary"] == "Board" and b["corkboard"] == "Board" and b["plot"] == b["id"],
+             f"{where}: streaming {b['mode']}, primary {b['primary']}, Plot {b['plot']}")
+        mine = [p for p in sandbox if p["set"] == f"plotboard{int(b['id'])}"]
+        need(len(mine) == summary["boardPieces"], f"{where}: {len(mine)} parts for {summary['boardPieces']} pieces")
+        (sx, sz), (dx, dz), (ux, uz, ur), (vx, vz) = b["spot"], b["door"], b["unload"], b["vanSpot"]
+        for p in mine:
+            name = f"{where}.{p['name']}"
+            need(p["anchored"] and not p["touch"] and p["query"] == p["collide"], name + ": flags")
+            x0, x1, y0, y1, z0, z1 = box(p)
+            if p["name"] == "Board":
+                need(math.hypot(p["position"][0] - sx, p["position"][2] - sz) < 1 and p["collide"], name + ": off the plot's board spot (or not solid)")
+            # the roller door's opening (its width, from the wall out past the van's spot) and the unload circle stay clear
+            half = summary["doorWidth"] / 2
+            need(not (x1 > dx - half and x0 < dx + half and z1 > min(dz, vz) - 1 and z0 < max(dz, vz) + 1), name + ": in the roller door's way")
+            cx, cz = min(max(ux, x0), x1), min(max(uz, z0), z1)
+            need(math.hypot(cx - ux, cz - uz) > ur or y0 > summary["groundTop"] + 12, name + ": in the unload circle")
+
     # No blocking at the checkpoint: the lane in from Bone St (the bay and its kerb) under the sign; on the depot's block.
     walk, clear = summary["walk"], summary["clear"]
     (cx, cz), (w, d) = summary["dropOff"], summary["bay"]
@@ -214,6 +240,7 @@ def main():
             print("  " + line)
         raise SystemExit(1)
     print(f"Move sites PASS: {int(summary['parts'])} parts (budget {int(summary['budget'])}): " + ", ".join(f"{k} {v}" for k, v in counts.items()))
+    print(f"8.0 SANDBOX: {len(summary.get('plotBoards', []))} plot kiosks checked (their spot, flags, the roller door and the unload circle clear)")
     print("Flags, lights, text, streaming, the prompt's part, the truck's lane, the depot's walk line and the houses' paths checked")
 
 

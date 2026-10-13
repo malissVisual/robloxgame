@@ -37,6 +37,9 @@
 --   moustache); a ★ piece has its own line when the chapter gives one (MoveStory.starLine: "Easy with Thunder's
 --   saddle!"); the van counts as by the house at any of the site's doors (a farm's barn doors too).
 --   7.x van moves: MoveGreeters.delivered(s)   a trip delivered at the Wall: the soldier's welcome (every trip)
+--   8.0 SANDBOX (design/sandbox/KONTRAKT.md): MoveGreeters.start(nil, false): no Wall, so no soldier (his body is never
+--   made, no welcome), no kiosk (no board given: the plots' boards have no Marge); the sandbox house has no chapter, so
+--   nobody waits on its porch either (MoveStory.greeterOf: nil). Kept light: nothing of the greeters runs there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -86,6 +89,7 @@ local kioskAt: { [Player]: number } = {} -- the player's last kiosk greeting (os
 local kioskCount = 0
 local notice = Net.get("Notice")
 local started = false
+local wall = true -- 8.0 SANDBOX: false: no Wall, no soldier (MoveGreeters.start's second argument)
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -332,7 +336,7 @@ end
 
 -- His body, made (again) when there is none, at most every Respawn s.
 local function keepSoldier(clock: number)
-	if alive(soldierBody) or clock - soldierTried < G.Respawn then
+	if not wall or alive(soldierBody) or clock - soldierTried < G.Respawn then
 		return
 	end
 	soldierTried = clock
@@ -485,8 +489,10 @@ function MoveGreeters.soldier(): Model?
 	return soldierBody
 end
 
-function MoveGreeters.start(board: BasePart?)
+-- `withWall` false (8.0 SANDBOX): no soldier at the Wall (nil: the city's, he stands there).
+function MoveGreeters.start(board: BasePart?, withWall: boolean?)
 	kioskPart = board
+	wall = withWall ~= false
 	if started then
 		return
 	end

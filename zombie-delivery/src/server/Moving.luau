@@ -88,10 +88,28 @@
 --     bring what is in the van, delivered late at LateShare, then the end). The pay is what was delivered over every
 --     trip. A van lost mid-move (wrecked, gone) loses what is in it (condition 0), the move goes on: CAR brings it back
 --     after VanAgain s and the move takes it over (its Load / Unload prompts made again on it).
+--   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
+--     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
+--     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
+--     Chalet"): its "Enter house" on the map's front door (the part with the attribute SandboxDoor, server/
+--     SandboxWorld.luau's; else an invisible one at House.door), "Call truck to door" to House.curb, out at its door;
+--     refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
+--     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
+--     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
+--     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
+--     placed at their plot's vanSpot when none is out), its bed Config.Moving.Beds' (the Sprinter's WalkIn: a carrier
+--     inside the bay Loads there, the bay's own Load prompt; the truckPrompts rules as ever). No Wall: the drop-off is
+--     the move owner's plot (server/SandboxPlots.luau: the van's back inside its unload circle): every piece in the van
+--     goes into their warehouse's stock (server/Collection.luau Collection.add: item, variant, condition, name), a trip;
+--     the move goes on until FINISH or the clock; what is still in the van at the end is lost. No pay per piece, no XP
+--     (the warehouse earns): the result card says what came home (its pieces, their value, the trips). The clock and
+--     the zombies are Config.Moving.Sandbox's (Time, HordeAt, Horde, Roam: no horde and no roamers by default, nobody
+--     has a gun there; hordeAt 0 is "never"); Danny comes to a crew of one as ever.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.admin(player, arg) the admin panel's MOVES buttons: "card" | "start" | "house" | "horde" | "time" | "deliver"
---                             | "end"; returns what to say
+--                             | "end"; returns what to say (8.0 SANDBOX: the house's; "refill": a new house for your
+--                             next move)
 --   Moving.useArt(art)        the art modules given (a test or a fallback), instead of finding them by name
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
@@ -111,6 +129,7 @@ local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
 local MoveRoles = require(Shared.MoveRoles) -- 7.0 planning: the roles' rules
+local SandboxMap = require(Shared.SandboxMap) -- 8.0 SANDBOX: the test world's house and plots
 local Crew = require(script.Parent.Crew)
 local MoveLobby = require(script.Parent.MoveLobby) -- 7.0 planning: the lobby before a move
 local MoveHelper = require(script.Parent.MoveHelper) -- 7.0: the depot's helper (Danny) for a crew of one
@@ -206,6 +225,7 @@ type Session = {
 	truck: Vehicles.Car?,
 	load: ProximityPrompt?,
 	unload: ProximityPrompt?,
+	loadIn: ProximityPrompt?, -- 8.0 SANDBOX: the walk-in bay's own Load (Beds' WalkIn: the Sprinter's), inside it
 	horde: { Zombies.Zombie },
 	roam: { Zombies.Zombie },
 	nextRoam: number,
@@ -234,7 +254,90 @@ local traveling: { [Player]: boolean } = {}
 local folder: Folder? = nil
 local boardPart: BasePart? = nil
 local nextId = 0
-local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active)
+local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active; 8.0 SANDBOX: none, no jobs there)
+
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the mode, its state and its helpers in one table (this chunk's registers
+-- are few: the -O0 limit). Its functions come where what they use is (the blocks marked "8.0 SANDBOX").
+--   on        Config.Sandbox.On when Moving.start ran (false: the city's game, as it was)
+--   contract  the one house's contract (SandboxMap.House, Config.Moving.Sandbox); a move's is a copy with its seed
+--   boards    every plot's Moving contracts corkboard (server/MoveSites.luau plotBoard)
+--   seeds     player → the seed of the house their card shows, kept until their move starts with it (a new one then)
+--   last      the last seed handed out (never twice in a row)
+--   door      the map's front door (the part with the attribute SandboxDoor), once found
+--   how       the result card's words for an end (HOW_TEXT's)
+local SB = {
+	on = false,
+	contract = nil :: Contract?,
+	boards = {} :: { BasePart },
+	seeds = {} :: { [Player]: number },
+	last = 0,
+	door = nil :: BasePart?,
+	how = {
+		done = "Brought home to your warehouse",
+		late = "Time's up: what reached your warehouse is yours",
+		cancelled = "Called off: what came home is yours",
+		failed = "Lost: nothing came home",
+	} :: { [string]: string },
+}
+
+-- The drop-off in a sentence: "the Wall" (the city), "your warehouse" (8.0 SANDBOX).
+function SB.wall(): string
+	return if SB.on then "your warehouse" else "the Wall"
+end
+
+-- MovingRules' words for a refusal (whyText), the drop-off's name in them (8.0 SANDBOX: "your warehouse").
+function SB.why(code: string?): string
+	local text = Rules.whyText(code)
+	return if SB.on then (string.gsub(text, "the Wall", "your warehouse")) else text
+end
+
+-- The board's contracts: the city's (Config.Moving.Contracts), or the sandbox's one house.
+function SB.list(): { Contract }
+	local house = SB.contract
+	return if SB.on and house then { house } else T.Contracts
+end
+
+-- The move owner's plot (server/SandboxPlots.luau), nil without one.
+function SB.plotOf(player: Player): SandboxMap.Plot?
+	return require(script.Parent.SandboxPlots).of(player)
+end
+
+-- The house's contract with the seed of `player`'s next move: their card's, else a new one (never the last one handed
+-- out): every move refills the house; its clock and horde Config.Moving.Sandbox's as they are now (Horde false: hordeAt
+-- 0, never). nil before Moving.start made it.
+function SB.contractFor(player: Player): Contract?
+	local base = SB.contract
+	if not base then
+		return nil
+	end
+	local seed = SB.seeds[player]
+	if not seed then
+		local fresh = math.random(1, 1073741823)
+		while fresh == SB.last do
+			fresh = math.random(1, 1073741823)
+		end
+		SB.last = fresh
+		SB.seeds[player] = fresh
+		seed = fresh
+	end
+	local S = T.Sandbox
+	local made = table.clone(base)
+	made.seed = seed
+	made.time = S.Time
+	made.hordeAt = if S.Horde then S.HordeAt else 0
+	return made
+end
+
+-- `player`'s card seed is spent (their move started with it) or they left: their next card shows a new house; that
+-- house's plan facts go (factsOf keeps one per seed in the sandbox).
+function SB.forget(player: Player)
+	local seed = SB.seeds[player]
+	local house = SB.contract
+	SB.seeds[player] = nil
+	if seed and house then
+		contractFacts[`{house.id}#{seed}`] = nil
+	end
+end
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -272,7 +375,7 @@ local function bodyOrNil(player: Player?): (Model?, Humanoid?, BasePart?)
 end
 
 local function contractById(id: any): Contract?
-	for _, contract in T.Contracts do
+	for _, contract in SB.list() do -- (8.0 SANDBOX: the one house)
 		if contract.id == id then
 			return contract
 		end
@@ -503,10 +606,27 @@ local function dropOffAt(): Vector3
 	return Vector3.new(Map.Depot.x + T.DropOff[1], Map.WalkTop, Map.Depot.z + T.DropOff[2])
 end
 
-local function buildBoard(parent: Instance)
-	-- the "MovingBoard" kiosk (server/MoveSites.luau, Persistent, facing the yard: the corkboard with the houses' photos
-	-- and the notices, its lamp, the ZDC logo); the prompt hangs on its corkboard
-	local _, board = require(script.Parent.MoveSites).board(parent)
+-- A move's drop-off: the Wall (the city's); 8.0 SANDBOX: the middle of its owner's plot's unload circle (no plot: the
+-- Wall's spot, never reached).
+function SB.dropAt(s: Session): Vector3
+	local plot = if SB.on then SB.plotOf(s.owner) else nil
+	return if plot then Vector3.new(plot.unload.x, SandboxMap.GroundTop, plot.unload.z) else dropOffAt()
+end
+
+-- Is the van at the move's drop-off? The city: within DropRadius of the Wall; 8.0 SANDBOX: its back (the CargoDoor)
+-- inside its owner's plot's unload circle.
+function SB.atDrop(s: Session, truck: Vehicles.Car): boolean
+	if not SB.on then
+		return flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius
+	end
+	local plot = SB.plotOf(s.owner)
+	local door = Vehicles.cargoDoor(truck)
+	local back = if door then door.WorldPosition else truck.chassis.Position
+	return plot ~= nil and flat(back, Vector3.new(plot.unload.x, back.Y, plot.unload.z)) <= plot.unload.r
+end
+
+-- The "Moving contracts" prompt on a board's corkboard: the contract card (8.0 SANDBOX: on every plot's board).
+local function boardPrompt(board: BasePart)
 	local prompt = newPrompt(board, "Moving contracts", "ZDC Moving", Enum.KeyCode.E, 0, T.Reach.Board)
 	prompt.Triggered:Connect(function(player: Player)
 		if not Net.limit(player, "MovingBoard", Config.Robust.Limits.MovingBoard) then
@@ -517,7 +637,36 @@ local function buildBoard(parent: Instance)
 			Moving.openCard(player, nil, false)
 		end
 	end)
+end
+
+local function buildBoard(parent: Instance)
+	-- the "MovingBoard" kiosk (server/MoveSites.luau, Persistent, facing the yard: the corkboard with the houses' photos
+	-- and the notices, its lamp, the ZDC logo); the prompt hangs on its corkboard
+	local _, board = require(script.Parent.MoveSites).board(parent)
+	boardPrompt(board)
 	boardPart = board
+end
+
+-- 8.0 SANDBOX: a Moving contracts kiosk on every plot (server/MoveSites.luau plotBoard at SandboxMap plot.board, by the
+-- warehouse's roller door); any of them opens the card and LAUNCHes (the van is the player's own: it waits at their plot).
+function SB.buildBoards(parent: Instance)
+	local sites = require(script.Parent.MoveSites)
+	for _, plot in SandboxMap.Plots do
+		local _, board = sites.plotBoard(parent, plot)
+		boardPrompt(board)
+		table.insert(SB.boards, board)
+	end
+end
+
+-- Is `root` within `reach` studs (flat) of a Moving contracts board: the depot's (8.0 SANDBOX: any plot's)?
+local function nearBoard(root: BasePart?, reach: number): boolean
+	local list: { BasePart } = if SB.on then SB.boards elseif boardPart then { boardPart } else {}
+	for _, board in list do
+		if root and flat(root.Position, board.Position) <= reach then
+			return true
+		end
+	end
+	return false
 end
 
 -- The drop-off at the depot ("the Wall"): the army's checkpoint round its bay (server/MoveSites.luau, Persistent: the
@@ -627,6 +776,84 @@ farmSite = function(contract: Contract, parent: Instance): Site?
 		pile = { x = front.outside.Position.X, z = front.outside.Position.Z },
 	}
 	return { contract = contract, home = home, door = front.door, facing = front.facing, outside = front.outside, model = model, doors = doors }
+end
+
+-- ── 8.0 SANDBOX: the house's site (shared/SandboxMap.luau House) ─────────────────────────────────────────────────────
+-- Its front door (the spot outside it, looking out to the road), the van's curb (its pivot: the nose to the road, the
+-- back to the door: "Call truck to door"), out where you came in (a step out of the door). Its "Enter house" part is an
+-- invisible one at the door until the map's front door is found (SB.frontDoor: the prompt goes onto that). No
+-- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is.
+local function yawLook(yaw: number): Vector3
+	local r = math.rad(yaw)
+	return Vector3.new(-math.sin(r), 0, -math.cos(r))
+end
+
+function SB.site(contract: Contract, parent: Instance): Site
+	local h = SandboxMap.House
+	local facing = yawLook(h.door.yaw)
+	local door = Vector3.new(h.door.x, h.door.y, h.door.z)
+	local park = Vector3.new(h.curb.x, 0, h.curb.z)
+	local model = Instance.new("Model")
+	model.Name = `Move_{contract.id}`
+	local up = Vector3.new(0, 3.5, 0)
+	local enter = invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
+	model.PrimaryPart = enter
+	model.Parent = parent
+	local out = door + facing * 2 + Vector3.new(0, 0.1, 0)
+	local outside = CFrame.lookAt(out, out + facing)
+	local home: Map.Home = {
+		id = contract.id,
+		kind = "house",
+		name = contract.name,
+		address = T.Sandbox.Address,
+		street = "Main Street",
+		district = "sandbox",
+		x = door.X,
+		z = door.Z,
+		facing = { x = facing.X, z = facing.Z },
+		door = { x = door.X, z = door.Z },
+		park = { x = park.X, z = park.Z },
+		pile = { x = out.X, z = out.Z },
+	}
+	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = 4, part = enter }
+	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front } }
+end
+
+-- The map's front door (server/SandboxWorld.luau's FrontDoor: the part with the attribute SandboxDoor), looked for when
+-- a move starts (kept while it stands); nil while the map has none.
+function SB.frontDoor(): BasePart?
+	local known = SB.door
+	if known and known:IsDescendantOf(workspace) then
+		return known
+	end
+	SB.door = nil
+	for _, d in workspace:GetDescendants() do
+		local mark = d:GetAttribute("SandboxDoor")
+		if mark ~= nil and mark ~= false and d:IsA("BasePart") then
+			SB.door = d
+			return d
+		end
+	end
+	return nil
+end
+
+-- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words.
+function SB.newContract(): Contract
+	local S = T.Sandbox
+	local h = SandboxMap.House
+	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = "house", blurb = S.Blurb, time = S.Time, hordeAt = 0 }
+end
+
+-- Is a point on the test world's asphalt (SandboxMap.Roads and the turnaround, 2 studs of slack)? (The Guard's
+-- barricades stay off it, as off the city's roads.)
+function SB.onRoad(at: Vector3): boolean
+	for _, road in SandboxMap.Roads do
+		if at.X >= road.x0 - 2 and at.X <= road.x1 + 2 and at.Z >= road.z0 - 2 and at.Z <= road.z1 + 2 then
+			return true
+		end
+	end
+	local turn = SandboxMap.Turnaround
+	return flat(at, Vector3.new(turn.x, at.Y, turn.z)) <= turn.r + 2
 end
 
 -- ── The carry ──────────────────────────────────────────────────────────────
@@ -994,8 +1221,60 @@ local function truckOk(s: Session): Vehicles.Car?
 end
 
 -- 7.x van moves: a car's bed (Config.Moving.Beds by its id, else the ZDC Van's) and as MovingRules' numbers.
-local function bedOf(truck: Vehicles.Car?): { Width: number, Length: number, Height: number, Cell: number, Center: { number } }
+type BedDef = { Width: number, Length: number, Height: number, Cell: number, Center: { number }, Back: number?, WalkIn: boolean? }
+local function bedOf(truck: Vehicles.Car?): BedDef
 	return (if truck then T.Beds[truck.id] else nil) or T.Beds[T.Van]
+end
+
+-- A bed's middle in the chassis' frame (x, z): its Center, or (Beds' Back, 8.0 SANDBOX: the Sprinter's) its back end
+-- Back studs in front of the car's CargoDoor: the bay follows the body's length.
+function SB.center(truck: Vehicles.Car, bed: BedDef): (number, number)
+	local back = bed.Back
+	local door = if back then Vehicles.cargoDoor(truck) else nil
+	if back and door then
+		return bed.Center[1], door.Position.Z - back - bed.Length / 2
+	end
+	return bed.Center[1], bed.Center[2]
+end
+
+-- The floor of the car's bed over the chassis' middle (its first cargo slot's height).
+local function bedFloor(truck: Vehicles.Car): number
+	local slots = Vehicles.cargoSlots(truck)
+	return if slots[1] then slots[1].Position.Y else 0.6
+end
+
+-- 8.0 SANDBOX: is `at` inside the car's walk-in bay (Beds' WalkIn: the Sprinter's)? Its box over the floor, the bed's
+-- width and length (half a stud of slack round it), up to its roof; in the chassis' frame as bedFrame places the load
+-- (the cargoHolder's at rest). Never for a bed you can't walk into.
+function SB.inBay(truck: Vehicles.Car, at: Vector3): boolean
+	local bed = bedOf(truck)
+	if not bed.WalkIn then
+		return false
+	end
+	local cx, cz = SB.center(truck, bed)
+	local floor = bedFloor(truck)
+	local p = truck.chassis.CFrame:PointToObjectSpace(at)
+	return math.abs(p.X - cx) <= bed.Width / 2 + 0.5 and math.abs(p.Z - cz) <= bed.Length / 2 + 0.5 and p.Y >= floor - 1 and p.Y <= floor + bed.Height + 2
+end
+
+-- 8.0 SANDBOX: the player's own van when none is out (a move's START): Config.Sandbox.Van (the Sprinter; the ZDC Van
+-- while the place has no such car) at their plot's vanSpot, its back to the warehouse (no plot: next to them). nil, or
+-- why it could not come.
+function SB.bringVan(owner: Player): string?
+	local id = if Economy.findCar(Config.Sandbox.Van) then Config.Sandbox.Van else T.Van
+	local plot = SB.plotOf(owner)
+	if not plot then
+		return Vehicles.placeNear(owner, id)
+	end
+	local spot = plot.vanSpot -- (SandboxMap.cframe's frame: its look by yaw)
+	local car = Vehicles.spawnAt(owner, id, CFrame.new(spot.x, spot.y, spot.z) * CFrame.Angles(0, math.rad(spot.yaw), 0), false)
+	return if car then nil else "Your van could not come: try again."
+end
+
+-- The van's name on its prompts: "ZDC Van" (the city), the car's own (8.0 SANDBOX: "Sprinter").
+function SB.vanLabel(truck: Vehicles.Car): string
+	local def = if SB.on then Economy.findCar(truck.id) else nil
+	return if def then def.name else "ZDC Van"
 end
 
 local function rulesBed(truck: Vehicles.Car?): Rules.Bed
@@ -1007,12 +1286,11 @@ end
 -- lying on its side (Placement.lying, Config.Moving.Pack.Lie) is rolled first: "x" its height along its width (about
 -- its depth), "z" along its depth (about its width); then turned.
 local function bedFrame(truck: Vehicles.Car, x: number, y: number, z: number, turned: boolean, lying: string?): CFrame
-	local slots = Vehicles.cargoSlots(truck)
-	local floor = if slots[1] then slots[1].Position.Y else 0.6
+	local floor = bedFloor(truck)
 	local turn = if turned then CFrame.Angles(0, math.rad(90), 0) else CFrame.identity
 	local lie = if lying == "x" then CFrame.Angles(0, 0, math.rad(90)) elseif lying == "z" then CFrame.Angles(math.rad(90), 0, 0) else CFrame.identity
-	local center = bedOf(truck).Center -- (7.x van moves: the car's own bay)
-	return truck.chassis.CFrame * CFrame.new(center[1] + x, floor + y, center[2] + z) * turn * lie
+	local cx, cz = SB.center(truck, bedOf(truck)) -- (7.x van moves: the car's own bay; 8.0 SANDBOX: from its back doors)
+	return truck.chassis.CFrame * CFrame.new(cx + x, floor + y, cz + z) * turn * lie
 end
 
 -- 7.x van moves: a hitched piece behind the car (Config.Moving.Hitch), its wheels on the ground.
@@ -1053,7 +1331,8 @@ local function restow(s: Session, moved: { number }?)
 	end
 end
 
--- Near the truck's open back, on foot, the truck standing: (ok, what to say).
+-- Near the truck's open back, on foot, the truck standing: (ok, what to say). 8.0 SANDBOX: or inside its walk-in bay
+-- (the back open or not: you are in already).
 local function atBack(s: Session, player: Player): (boolean, string?)
 	local truck = truckOk(s)
 	local door = truck and Vehicles.cargoDoor(truck)
@@ -1061,11 +1340,12 @@ local function atBack(s: Session, player: Player): (boolean, string?)
 	if not truck or not door or not humanoid or not root then
 		return false, nil
 	end
+	local inBay = SB.inBay(truck, root.Position)
 	if humanoid.SeatPart then
 		return false, "Get out first."
-	elseif flat(root.Position, door.WorldPosition) > T.Reach.Truck + 3 then
+	elseif not inBay and flat(root.Position, door.WorldPosition) > T.Reach.Truck + 3 then
 		return false, nil
-	elseif not Vehicles.backOpen(truck) then
+	elseif not inBay and not Vehicles.backOpen(truck) then
 		return false, `Open the back first (E): {Vehicles.backVerb(truck, true)}.`
 	elseif Vehicles.speed(truck) > Config.Cargo.MaxCarSpeed then
 		return false, "Stop the van first."
@@ -1108,7 +1388,7 @@ local function onLoad(s: Session, player: Player)
 			Rules.release(s.move, player.UserId)
 			clearHands(player)
 			clearHands(helper)
-			say(player, Rules.whyText("gone"))
+			say(player, SB.why("gone"))
 			s.dirty = true
 			return
 		end
@@ -1120,7 +1400,7 @@ local function onLoad(s: Session, player: Player)
 	end
 	local at, refused, moved = Rules.load(s.move, player.UserId)
 	if not at or not spot or not thing then
-		say(player, Rules.whyText(refused))
+		say(player, SB.why(refused))
 		return
 	end
 	clearHands(player)
@@ -1133,8 +1413,8 @@ local function onLoad(s: Session, player: Player)
 	local c = Rules.counts(s.move)
 	local fill = math.floor(Rules.fill(s.move.packing) * 100 + 0.5)
 	say(player, if at.hitch
-		then `{labelOf(thing)} hitched behind the van · {c.out} in the van · drive it to the Wall`
-		else `{if moved then "Van repacked: " else ""}{labelOf(thing)} loaded · {c.out} in the van · van {fill}% full · {c.delivered}/{c.total} delivered`)
+		then `{labelOf(thing)} hitched behind the van · {c.out} in the van · drive it to {SB.wall()}`
+		else `{if moved then "Van repacked: " else ""}{labelOf(thing)} loaded · {c.out} in the van · van {fill}% full · {c.delivered}/{c.total} {if SB.on then "home" else "delivered"}`)
 	s.dirty = true
 end
 
@@ -1156,7 +1436,7 @@ local function onUnload(s: Session, player: Player)
 	end
 	local spot, refused = Rules.unload(s.move, player.UserId)
 	if not spot then
-		say(player, Rules.whyText(refused))
+		say(player, SB.why(refused))
 		return
 	end
 	local item = s.items[spot]
@@ -1172,23 +1452,25 @@ local function truckPrompts(s: Session)
 	if not truck or not door then
 		return
 	end
-	for _, old in { s.load, s.unload } do
+	for _, old in { s.load, s.unload, s.loadIn } do
 		if old then
 			local spot = old.Parent
 			old:Destroy() -- (7.x van moves: a van called again after the last was lost: its prompts on the new one)
-			if spot and spot.Name == "MoveTakeOut" then
+			if spot and (spot.Name == "MoveTakeOut" or spot.Name == "MoveLoadBay") then
 				spot:Destroy()
 			end
 		end
 	end
-	local load = newPrompt(door, "Load", "ZDC Van", Enum.KeyCode.E, 0.25, T.Reach.Truck)
+	s.loadIn = nil
+	local label = SB.vanLabel(truck)
+	local load = newPrompt(door, "Load", label, Enum.KeyCode.E, 0.25, T.Reach.Truck)
 	-- (the owner's report: on the door's own attachment Unload stacked with Load and the back's E: its own spot, 2.5
 	-- studs aside from the door's middle, toward the bed's edge; destroyed with the prompts at the end)
 	local side = Instance.new("Attachment")
 	side.Name = "MoveTakeOut"
 	side.Position = door.Position + Vector3.new(2.5, 0, 0)
 	side.Parent = door.Parent
-	local unload = newPrompt(side, "Take out", "ZDC Van", Enum.KeyCode.Z, 0.4, T.Reach.Truck)
+	local unload = newPrompt(side, "Take out", label, Enum.KeyCode.Z, 0.4, T.Reach.Truck)
 	unload.GamepadKeyCode = Enum.KeyCode.ButtonY
 	load.Enabled, unload.Enabled = false, false
 	tag(load, s.owner)
@@ -1200,6 +1482,24 @@ local function truckPrompts(s: Session)
 		onUnload(s, player)
 	end)
 	s.load, s.unload = load, unload
+	-- 8.0 SANDBOX: a walk-in bay (Beds' WalkIn: the Sprinter's) has its own Load in its middle, for a carrier inside it
+	-- (refreshTruck shows it; atBack lets them load from there); destroyed with the others
+	local bed = bedOf(truck)
+	if bed.WalkIn then
+		local cx, cz = SB.center(truck, bed)
+		local middle = Instance.new("Attachment")
+		middle.Name = "MoveLoadBay"
+		middle.Position = Vector3.new(cx, bedFloor(truck) + 3, cz)
+		middle.Parent = door.Parent
+		local inside = newPrompt(middle, "Load", label, Enum.KeyCode.E, 0.25, math.max(bed.Length, bed.Width) / 2 + 3)
+		inside.Enabled = false
+		tag(inside, s.owner)
+		inside.Triggered:Connect(function(player: Player)
+			onLoad(s, player)
+		end)
+		inside:SetAttribute("MoveQuick", "driver")
+		s.loadIn = inside
+	end
 	for _, prompt in { load, unload } do
 		prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver; a new van's too)
 	end
@@ -1218,7 +1518,9 @@ end
 
 -- The truck's prompts as things stand (MovingRules.truckPrompts): Load while somebody of the crew at the back carries
 -- a thing (the back's own E and Unload wait then), Unload ("Take out") while one may come out and nobody there
--- carries one; the back for the crew too (BackCrew).
+-- carries one; the back for the crew too (BackCrew). 8.0 SANDBOX: a carrier inside the walk-in bay counts as at the
+-- back (the back's E never shuts on them, Take out waits) and gets the bay's own Load (the back open or not); the
+-- door's Load then only for a carrier outside at the doors.
 local function refreshTruck(s: Session)
 	local truck = truckOk(s)
 	local load, unload = s.load, s.unload
@@ -1228,30 +1530,43 @@ local function refreshTruck(s: Session)
 	local open = Vehicles.backOpen(truck)
 	local carried: Rules.Thing? = nil
 	local carriers = 0
+	local inBay: Rules.Thing? = nil -- (8.0 SANDBOX: carried inside the walk-in bay)
+	local insiders = 0
 	local door = Vehicles.cargoDoor(truck)
 	for _, spot in s.move.order do
 		local thing = s.move.things[spot]
 		local _, _, carrierRoot = bodyOrNil(playerById(thing.carrier)) -- (7.0 helper: not what Danny carries)
 		-- (7.0 review: only a carrier at the back: one in the house does not keep the back from closing)
-		if thing.state == "carried" and carrierRoot and door and flat(carrierRoot.Position, door.WorldPosition) <= T.Reach.Truck + 3 then
+		if thing.state == "carried" and carrierRoot and SB.inBay(truck, carrierRoot.Position) then
+			insiders += 1
+			inBay = thing
+		elseif thing.state == "carried" and carrierRoot and door and flat(carrierRoot.Position, door.WorldPosition) <= T.Reach.Truck + 3 then
 			carriers += 1
 			carried = thing
 		end
 	end
 	local fill = math.floor(Rules.fill(s.move.packing) * 100 + 0.5)
 	local out = Rules.lastOut(s.move)
-	local showLoad, showUnload, showBack = Rules.truckPrompts(open, carriers > 0, out ~= nil)
-	load.Enabled = showLoad
+	local label = SB.vanLabel(truck)
+	local showLoad, showUnload, showBack = Rules.truckPrompts(open, carriers + insiders > 0, out ~= nil)
+	load.Enabled = showLoad and (carriers > 0 or insiders == 0)
 	load.ActionText = if carriers == 1 and carried then `Load {carried.name}` else "Load"
 	-- (the packing fix: the carried thing has no room even repacked: Load says so before it is pressed)
 	local fits = true
 	if carriers == 1 and carried and showLoad then
 		fits = Rules.canLoad(s.move, carried.spot)
 	end
-	load.ObjectText = if fits then `ZDC Van · {fill}% full` else `won't fit · {fill}% full`
+	load.ObjectText = if fits then `{label} · {fill}% full` else `won't fit · {fill}% full`
+	local bay = s.loadIn
+	if bay then
+		local fitsIn = not (insiders == 1 and inBay) or Rules.canLoad(s.move, (inBay :: Rules.Thing).spot)
+		bay.Enabled = insiders > 0
+		bay.ActionText = if insiders == 1 and inBay then `Load {inBay.name}` else "Load"
+		bay.ObjectText = if fitsIn then `{label} · {fill}% full` else `won't fit · {fill}% full`
+	end
 	unload.Enabled = showUnload
 	unload.ActionText = if out then `Take out {s.move.things[out].name}` else "Take out"
-	unload.ObjectText = `ZDC Van · {fill}% full`
+	unload.ObjectText = `{label} · {fill}% full`
 	local back = Vehicles.backPrompt(truck)
 	if back then
 		back.Enabled = showBack
@@ -1535,7 +1850,7 @@ end
 onEnter = function(player: Player, contractId: string, index: number?)
 	local s = sessionOf(player)
 	if not s or s.contract.id ~= contractId then
-		say(player, "Locked. Take this moving contract at the depot's board first (ZDC Moving).")
+		say(player, if SB.on then "Locked. Take the moving contract at a Moving contracts board first (by your warehouse)." else "Locked. Take this moving contract at the depot's board first (ZDC Moving).")
 		return
 	end
 	if traveling[player] or s.ended then
@@ -1615,7 +1930,7 @@ local function onPick(s: Session, spot: number, player: Player)
 	end
 	local ok, why = Rules.pick(s.move, spot, player.UserId)
 	if not ok then
-		say(player, Rules.whyText(why))
+		say(player, SB.why(why))
 		return
 	end
 	carry(s, item)
@@ -1639,7 +1954,7 @@ local function onHelp(s: Session, spot: number, player: Player)
 		return
 	end
 	if thing.carrier == player.UserId then
-		say(player, Rules.whyText("yours"))
+		say(player, SB.why("yours"))
 		return
 	end
 	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
@@ -1648,7 +1963,7 @@ local function onHelp(s: Session, spot: number, player: Player)
 	end
 	local ok, why = Rules.help(s.move, spot, player.UserId)
 	if not ok then
-		say(player, Rules.whyText(why))
+		say(player, SB.why(why))
 		return
 	end
 	pcall(function()
@@ -1735,6 +2050,10 @@ end
 -- 7.x farm move: one at every door of the site (a farm's: "Enter house" at the farmhouse, "Enter barn" at the barn
 -- doors), each to its own way in (onEnter's index); the front door's is team.enter, the others team.doors.
 local function enterPrompt(s: Session)
+	local front = if SB.on then SB.frontDoor() else nil -- 8.0 SANDBOX: on the map's front door once it has one
+	if front then
+		s.site.doors[1].part = front
+	end
 	for index, door in s.site.doors do
 		local spot = door.part
 		if not spot then
@@ -1900,7 +2219,7 @@ local function putBarricade(s: Session, player: Player)
 	local base = Vector3.new(at.X, ground, at.Z)
 	-- (7.0 review: never on the road's driving lane, never in a car's way (the truck's too) or on a player)
 	local rx, rz, _, _, width = Map.nearestRoad(base.X, base.Z)
-	if flat(base, Vector3.new(rx, base.Y, rz)) < width / 2 + 2 then
+	if if SB.on then SB.onRoad(base) else flat(base, Vector3.new(rx, base.Y, rz)) < width / 2 + 2 then
 		say(player, "Not on the road: put it up on the path or in the yard.")
 		return
 	end
@@ -2072,7 +2391,7 @@ local function teamSetup(s: Session, roles: { [number]: string }?)
 		end
 	end
 	enterPrompt(s)
-	for _, prompt in { s.load, s.unload } do
+	for _, prompt in { s.load, s.unload, s.loadIn } do
 		if prompt then
 			prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver)
 		end
@@ -2185,7 +2504,8 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 		})
 	end
 	local truck = truckOk(s)
-	local drop = dropOffAt()
+	local drop = SB.dropAt(s) -- (8.0 SANDBOX: the owner's plot's unload circle)
+	local hordeAt = s.move.hordeAt or T.HordeAt -- (7.x farm move: the contract's own; 8.0 SANDBOX: 0, none)
 	return {
 		id = s.id,
 		contract = s.contract.id,
@@ -2195,7 +2515,7 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 		owner = s.owner.DisplayName,
 		mine = player == s.owner,
 		endsAt = s.move.endsAt,
-		hordeAt = s.move.endsAt - (s.move.hordeAt or T.HordeAt), -- (7.x farm move: the contract's own)
+		hordeAt = if hordeAt > 0 then s.move.endsAt - hordeAt else nil,
 		seconds = s.move.seconds,
 		horde = s.move.phase == "horde",
 		items = items,
@@ -2206,6 +2526,7 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 		house = { x = s.site.home.park.x, z = s.site.home.park.z },
 		door = { x = s.site.door.X, z = s.site.door.Z },
 		dropOff = { x = drop.X, z = drop.Z },
+		drop = if SB.on then SB.wall() else nil, -- 8.0 SANDBOX: the drop-off in the HUD's words (nil: the Wall's)
 		inside = s.inside[player] == true,
 		team = teamView(s, player), -- 7.0 planning: your role, the crew's, the door, the lights, the abilities
 		graceEndsAt = if s.late then s.move.endsAt + T.LateGrace else nil, -- 7.0 review: late: the Wall by then
@@ -2281,13 +2602,17 @@ local function cleanup(s: Session)
 		end
 	end)
 	local takeOut = if s.unload then s.unload.Parent else nil -- (Unload's own attachment on the truck)
-	for _, prompt in { s.load, s.unload } do
+	local bay = if s.loadIn then s.loadIn.Parent else nil -- (8.0 SANDBOX: the walk-in bay's Load's own)
+	for _, prompt in { s.load, s.unload, s.loadIn } do
 		if prompt then
 			prompt:Destroy()
 		end
 	end
 	if takeOut and takeOut.Name == "MoveTakeOut" then
 		takeOut:Destroy()
+	end
+	if bay and bay.Name == "MoveLoadBay" then
+		bay:Destroy()
 	end
 	releaseBack(s.truck) -- (7.x van moves: the owner's van's back as it was)
 	letGoZombies(s.horde)
@@ -2360,6 +2685,10 @@ payOut = function(s: Session, phase: string, why: string?)
 		end
 	end
 	local result = Rules.result(s.move, phase, now())
+	if SB.on then
+		SB.result(s, phase, why, result) -- 8.0 SANDBOX: no pay, no XP, no story: what came home
+		return
+	end
 	-- the crew near the truck (or near the owner without one) shares the pay
 	local truck = truckOk(s)
 	local _, _, ownerRoot = bodyOf(s.owner)
@@ -2420,6 +2749,52 @@ payOut = function(s: Session, phase: string, why: string?)
 	end
 end
 
+-- 8.0 SANDBOX: the end without pay (the warehouse earns: no MovePay, no XP, no story): the crew's result card says what
+-- came home over every trip (home: its pieces, their value at their condition; delivered: the same pieces, also when
+-- it was called off: they are in the warehouse already), the trips and the rating; the analytics' MoveDone.
+function SB.result(s: Session, phase: string, why: string?, result: Rules.Result)
+	local c = Rules.counts(s.move)
+	local pieces, value = 0, 0
+	for _, spot in s.move.order do
+		local thing = s.move.things[spot]
+		if thing.state == "delivered" then
+			pieces += 1
+			value += thing.value * thing.condition
+		end
+	end
+	local crew = everyone(s)
+	for _, member in crew do
+		remote:FireClient(member, "result", {
+			name = s.contract.name,
+			icon = s.contract.icon,
+			how = phase,
+			howText = why or SB.how[phase] or phase,
+			delivered = pieces,
+			left = c.total - pieces,
+			broken = result.broken,
+			total = c.total,
+			starsOut = c.starsDelivered,
+			starsTotal = c.stars,
+			stars = result.stars,
+			pay = 0,
+			money = 0,
+			xp = 0,
+			base = 0,
+			starBonus = 0,
+			timeBonus = 0,
+			fine = 0,
+			crew = #crew,
+			trips = s.move.trips or 0,
+			home = { pieces = pieces, value = math.floor(value + 0.5) },
+		})
+		remote:FireClient(member, "state", nil)
+	end
+	if phase == "done" or phase == "late" then
+		local owner = s.owner
+		PlayerData.track("event", owner, "MoveDone", result.stars, s.contract.id, if #crew > 1 then "crew" else "solo")
+	end
+end
+
 -- ── Starting ───────────────────────────────────────────────────────────────
 
 local function freeSlot(): number?
@@ -2449,6 +2824,9 @@ local function cantStart(owner: Player): string?
 	if not freeSlot() then
 		return "Every moving crew is out right now: try again in a minute."
 	end
+	if SB.on and not SB.plotOf(owner) then
+		return "You have no warehouse here (every plot is taken): nowhere to bring the things." -- (8.0 SANDBOX)
+	end
 	return nil
 end
 
@@ -2457,7 +2835,8 @@ end
 type Facts = { plan: any, defs: { [string]: Rules.ItemDef }, spots: { Rules.Spot }, stars: { string }, count: number, estimate: number }
 
 local function factsOf(contract: Contract, a: Art): Facts?
-	local known = contractFacts[contract.id]
+	local key = if SB.on then `{contract.id}#{contract.seed}` else contract.id -- (8.0 SANDBOX: a house per seed)
+	local known = contractFacts[key]
 	if known then
 		return known
 	end
@@ -2471,18 +2850,20 @@ local function factsOf(contract: Contract, a: Art): Facts?
 	local defs = defsOf(a)
 	local spots = spotsOf(plan)
 	local stars: { string } = {}
-	local count = 0
+	local count, worth = 0, 0
 	for _, spot in spots do
 		local def = defs[spot.item]
 		if def then
 			count += 1
+			worth += def.value
 			if spot.star then
 				table.insert(stars, `{def.icon} {def.name}`)
 			end
 		end
 	end
-	local made: Facts = { plan = plan, defs = defs, spots = spots, stars = stars, count = count, estimate = Rules.estimate(spots, defs, contract.pay) }
-	contractFacts[contract.id] = made
+	-- (8.0 SANDBOX: no pay per piece: the card shows what the house holds, every piece's value)
+	local made: Facts = { plan = plan, defs = defs, spots = spots, stars = stars, count = count, estimate = if SB.on then worth else Rules.estimate(spots, defs, contract.pay) }
+	contractFacts[key] = made
 	return made
 end
 
@@ -2522,7 +2903,7 @@ end
 -- The card's list of contracts (open, or 🔒 and why; the admin's all open).
 local function contractList(player: Player, admin: boolean): { { [string]: any } }
 	local list = {}
-	for _, contract in T.Contracts do
+	for _, contract in SB.list() do -- (8.0 SANDBOX: the one house)
 		local why = if admin then nil else lockedFor(player, contract)
 		local chapter = MoveStory.forContract(contract.id)
 		table.insert(list, {
@@ -2540,6 +2921,11 @@ end
 
 -- 7.x van moves: the name of the car a move of this player goes with (theirs; the ZDC Van when the save has none).
 local function vanName(player: Player): string
+	if SB.on then -- 8.0 SANDBOX: the van out (else the one that comes: Config.Sandbox.Van, or the ZDC Van)
+		local out = Vehicles.get(player)
+		local def = Economy.findCar(if out then out.id else Config.Sandbox.Van) or Economy.findCar(T.Van)
+		return if def then def.name else "Sprinter"
+	end
 	local profile = PlayerData.get(player)
 	local def = Economy.findCar(if profile and type((profile :: any).car) == "string" then (profile :: any).car else T.Van)
 	return if def then def.name else "ZDC Van"
@@ -2549,7 +2935,8 @@ end
 -- 7.x farm move: `contractId` nil: the board's next contract for the player; the card lists every contract (open or
 -- 🔒) and a locked one's START waits (busy: why).
 function Moving.openCard(player: Player, contractId: string?, admin: boolean)
-	local contract = contractById(contractId) or nextContract(player)
+	-- (8.0 SANDBOX: the one house, with the seed of the player's next move: a new house every move)
+	local contract = if SB.on then SB.contractFor(player) else contractById(contractId) or nextContract(player)
 	local a = artNow()
 	if not contract or not a then
 		say(player, "Moving is not ready in this place yet (the house art is missing).")
@@ -2557,6 +2944,9 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 	end
 	local known = factsOf(contract, a)
 	if not known then
+		if SB.on then
+			SB.forget(player) -- (8.0 SANDBOX: the next card tries another house)
+		end
 		say(player, "Moving is not ready in this place yet (the house plan failed).")
 		return
 	end
@@ -2579,6 +2969,10 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 		busy = cantStart(player) or (if admin then nil else lockedFor(player, contract)),
 		contracts = contractList(player, admin), -- 7.x farm move: the board's contracts
 	}
+	if SB.on then -- 8.0 SANDBOX: no story (client/MovingHud.luau: no intro, no CHAPTERS), no pay per piece (the note)
+		card.story = false
+		card.note = "Everything you bring home goes into your warehouse: put it on show on a stand (it earns every minute you play) or sell it. No pay per piece."
+	end
 	armed[player] = { at = now(), admin = admin, card = card } -- (7.0 planning: the lobby shows this card)
 	remote:FireClient(player, "contract", card)
 end
@@ -2586,6 +2980,9 @@ end
 -- `roles` (7.0 planning): the lobby's, by user id (nil: the admin's start, everybody gets a free role).
 local function startMove(owner: Player, contractId: any, admin: boolean, roles: { [number]: string }?): string?
 	local contract = contractById(contractId)
+	if SB.on and contract then
+		contract = SB.contractFor(owner) -- 8.0 SANDBOX: the house with the seed of the owner's card (or a new one)
+	end
 	local site = contract and sites[contract.id]
 	if not contract or not site then
 		return "No such moving contract."
@@ -2597,12 +2994,11 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	local card = armed[owner]
 	if not admin then
 		local _, _, root = bodyOf(owner)
-		local board = boardPart
 		if not card or now() - card.at > T.CardFor then
-			return "Open the contract at the depot's board first."
+			return if SB.on then "Open the contract at a Moving contracts board first." else "Open the contract at the depot's board first."
 		end
-		if not card.admin and (not root or not board or flat(root.Position, board.Position) > T.Reach.Board + 12) then
-			return "Take the contract at the depot's board (ZDC Moving)."
+		if not card.admin and not nearBoard(root, T.Reach.Board + 12) then
+			return if SB.on then "Take the contract at a Moving contracts board (by your warehouse)." else "Take the contract at the depot's board (ZDC Moving)."
 		end
 	end
 	armed[owner] = nil
@@ -2610,6 +3006,9 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	local slot = freeSlot() :: number
 	local known = factsOf(contract, a)
 	if not known then
+		if SB.on then
+			SB.forget(owner) -- (8.0 SANDBOX: the next try plans another house)
+		end
 		return "The house could not be planned: try again."
 	end
 	local plan = known.plan
@@ -2628,7 +3027,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	-- rental's lent car is not theirs: their own comes instead
 	local truck = Vehicles.get(owner)
 	if not truck or truck.wrecked or truck.lent or truck.rental then
-		local err = Vehicles.placeNear(owner, nil)
+		local err = if SB.on then SB.bringVan(owner) else Vehicles.placeNear(owner, nil) -- (8.0 SANDBOX: at their plot)
 		truck = Vehicles.get(owner)
 		if err or not truck then
 			pcall(function()
@@ -2699,7 +3098,12 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 		table.insert(s.ways, { exit = index, part = part, inside = exitAt.Position, entry = origin * (entries[index] or plan.entry), door = door })
 	end
 	truckPrompts(s)
-	tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them to the Wall at the depot: as many trips as it takes, then FINISH. {Rules.counts(s.move).stars} ★ things are a must!`)
+	if SB.on then -- 8.0 SANDBOX: this house is spent: the owner's next card shows a new one
+		SB.forget(owner)
+		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them home to your warehouse: as many trips as it takes, then FINISH.`)
+	else
+		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them to the Wall at the depot: as many trips as it takes, then FINISH. {Rules.counts(s.move).stars} ★ things are a must!`)
+	end
 	storyText(s) -- MoveStory hook: Marge's text at the start
 	teamSetup(s, roles) -- 7.0 planning: the roles, the house's Enter prompt
 	return nil
@@ -2715,7 +3119,7 @@ local function startHorde(s: Session)
 	s.move.phase = phase
 	s.bursts = T.Horde.Bursts
 	s.nextBurst = 0
-	tellAll(s, `🧟 A HORDE is coming to {s.contract.name}! Load what you can and drive to the Wall!`)
+	tellAll(s, `🧟 A HORDE is coming to {s.contract.name}! Load what you can and drive to {SB.wall()}!`)
 	s.dirty = true
 end
 
@@ -2759,7 +3163,7 @@ local function keepRoam(s: Session, clock: number)
 	if not near then
 		return
 	end
-	for _ = 1, T.Roam.Count - #s.roam do
+	for _ = 1, (if SB.on then T.Sandbox.Roam else T.Roam.Count) - #s.roam do -- (8.0 SANDBOX: the test world's few)
 		local spot = Zombies.findSpot(s.site.door, nil, T.Roam.Near, T.Roam.Far)
 		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Roam.Kinds, spot, s.owner), spot, s.owner, false, false, true) else nil
 		if z then
@@ -2862,6 +3266,7 @@ local function deliverTrip(s: Session, clock: number)
 		end
 	end
 	local spots = Rules.deliver(s.move, now())
+	local stored = if SB.on then SB.store(s, spots) else #spots -- 8.0 SANDBOX: into the owner's warehouse's stock
 	for _, spot in spots do
 		local item = s.items[spot]
 		if item then
@@ -2885,18 +3290,46 @@ local function deliverTrip(s: Session, clock: number)
 		finish(s, "timeout") -- (late: what came now pays LateShare)
 		return
 	elseif c.delivered + c.lost >= c.total then
-		finish(s, "deliver", "Everything delivered to the Wall")
+		finish(s, "deliver", if SB.on then "Everything is home in your warehouse" else "Everything delivered to the Wall")
+		return
+	end
+	if SB.on then
+		local refused = if stored < #spots then ` · ⚠ {#spots - stored} could not be stored` else ""
+		tellAll(s, `🏠 Trip {trips} home: {#spots} into {s.owner.DisplayName}'s warehouse{refused} · {c.delivered}/{c.total} in all · ★ {c.starsDelivered}/{c.stars}. Back for more, or FINISH.`)
 		return
 	end
 	tellAll(s, `🧱 Trip {trips} at the Wall: {#spots} delivered · {c.delivered}/{c.total} in all · ★ {c.starsDelivered}/{c.stars}. Back for more, or FINISH.`)
 end
 
+-- 8.0 SANDBOX: a trip's pieces into the move owner's warehouse stock (server/Collection.luau Collection.add, one a piece:
+-- its item, its colours' variant from the plan, its condition, its name); how many it took (refused: no save yet).
+function SB.store(s: Session, spots: { number }): number
+	local Collection = require(script.Parent.Collection)
+	local took = 0
+	for _, spot in spots do
+		local thing = s.move.things[spot]
+		local variant = 1
+		for _, planned in (s.plan.spots :: { any }) do
+			if planned.id == spot and type(planned.variant) == "number" then
+				variant = planned.variant
+			end
+		end
+		local ok, uid = pcall(Collection.add, s.owner, { item = thing.item, variant = variant, condition = thing.condition, name = thing.name })
+		if ok and uid ~= nil then
+			took += 1
+		elseif not ok then
+			warn(`[Moving] Collection.add of {thing.item}: {uid}`)
+		end
+	end
+	return took
+end
+
 -- 0:00 and the grace over (or nothing in the van to bring): the end, paid for what was delivered (nothing: lost).
 local function timeUp(s: Session)
 	if Rules.counts(s.move).delivered > 0 then
-		finish(s, "timeout", "Time's up: the Wall paid what reached it")
+		finish(s, "timeout", if SB.on then "Time's up: what reached your warehouse is yours" else "Time's up: the Wall paid what reached it")
 	else
-		finish(s, "lose", "Time's up: nothing reached the Wall")
+		finish(s, "lose", `Time's up: nothing reached {SB.wall()}`)
 	end
 end
 
@@ -2909,10 +3342,11 @@ local function finishMove(player: Player)
 	end
 	local c = Rules.counts(s.move)
 	if c.delivered == 0 then
-		say(player, "Nothing delivered yet: bring a load to the Wall first (or GIVE UP in the move's list, O).")
+		say(player, `Nothing delivered yet: bring a load to {SB.wall()} first (or GIVE UP in the move's list, O).`)
 		return
 	end
-	finish(s, if s.late then "timeout" else "deliver", if c.out > 0 then "Finished: what was still in the van stayed behind" else "Finished: everything at the Wall is paid")
+	local done = if SB.on then "Finished: what came home is in your warehouse" else "Finished: everything at the Wall is paid" -- (8.0 SANDBOX)
+	finish(s, if s.late then "timeout" else "deliver", if c.out > 0 then "Finished: what was still in the van stayed behind" else done)
 end
 
 -- The van lost mid-move (wrecked, gone, not the owner's car any more): what was in it is lost (condition 0, its models
@@ -2934,12 +3368,16 @@ local function keepVan(s: Session, t: number)
 				item.model:Destroy()
 			end
 		end
-		for _, prompt in { s.load, s.unload } do
+		local bay = if s.loadIn then s.loadIn.Parent else nil -- (8.0 SANDBOX: the walk-in bay's Load's own)
+		for _, prompt in { s.load, s.unload, s.loadIn } do
 			if prompt then
 				prompt:Destroy()
 			end
 		end
-		s.load, s.unload = nil, nil
+		if bay and bay.Name == "MoveLoadBay" then
+			bay:Destroy()
+		end
+		s.load, s.unload, s.loadIn = nil, nil, nil
 		releaseBack(truck)
 		s.truck, s.lostAt, s.dirty = nil, t, true
 		local why = if truck.wrecked then "wrecked" else "gone"
@@ -2968,7 +3406,10 @@ local function tick(s: Session)
 		elseif not s.late then
 			s.late = true
 			s.dirty = true
-			tellAll(s, `⏱ Time's up! Drive what's in the van to the Wall within {math.floor(T.LateGrace / 60 + 0.5)} minutes: it pays {math.floor(T.Pay.LateShare * 100 + 0.5)}%.`)
+			local minutes = math.floor(T.LateGrace / 60 + 0.5)
+			tellAll(s, if SB.on -- (8.0 SANDBOX: no pay: what is still in the van then is lost)
+				then `⏱ Time's up! Drive what's in the van home within {minutes} minutes, or it is lost.`
+				else `⏱ Time's up! Drive what's in the van to the Wall within {minutes} minutes: it pays {math.floor(T.Pay.LateShare * 100 + 0.5)}%.`)
 		end
 	elseif due == "horde" then
 		startHorde(s)
@@ -2993,13 +3434,13 @@ local function tick(s: Session)
 	end
 	refreshTruck(s)
 	local truck = truckOk(s) -- (7.x van moves: none while it is lost)
-	if truck and flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius then
+	if truck and SB.atDrop(s, truck) then -- (8.0 SANDBOX: its back in the owner's plot's unload circle)
 		if Rules.counts(s.move).out > 0 then
 			deliverTrip(s, clock) -- 7.x van moves: a trip: its load delivered, the move goes on (late: then it ends)
 			if s.ended then
 				return
 			end
-		elseif clock - s.emptyWarned > 15 then
+		elseif not SB.on and clock - s.emptyWarned > 15 then -- (8.0 SANDBOX: the van lives at home: no nag)
 			s.emptyWarned = clock
 			say(s.owner, "The van is empty: load the things at the house first.")
 		end
@@ -3013,9 +3454,21 @@ end
 
 function Moving.admin(player: Player, arg: any): string
 	local s = sessions[player]
-	-- (7.x farm move: "farm…" is Walt's Farm's: farmcard, farm (start), farmgo; the rest Marge's House)
+	-- (7.x farm move: "farm…" is Walt's Farm's: farmcard, farm (start), farmgo; the rest Marge's House; 8.0 SANDBOX: the
+	-- one house's, every one)
 	local contract = if type(arg) == "string" and string.sub(arg, 1, 4) == "farm" then contractById("walt") or T.Contracts[1] else T.Contracts[1]
-	if arg == "card" or arg == "farmcard" then
+	local house = SB.contract
+	if SB.on and house then
+		contract = house
+	end
+	if SB.on and arg == "refill" then -- 8.0 SANDBOX: a new house for your next move (its card shows it)
+		if s then
+			return "ADMIN: the house is refilled for your next move (FINISH or end this one first)."
+		end
+		SB.forget(player)
+		Moving.openCard(player, nil, true)
+		return "ADMIN: the house is refilled (a new layout): its card is open."
+	elseif arg == "card" or arg == "farmcard" then
 		Moving.openCard(player, if arg == "card" then nil else contract.id, true)
 		return `ADMIN: the moving contract card is open (every contract open for the admin).`
 	elseif arg == "start" or arg == "farm" then
@@ -3047,7 +3500,10 @@ function Moving.admin(player: Player, arg: any): string
 	end
 	if arg == "horde" then
 		if s.move.phase == "running" then
-			s.move.endsAt = math.min(s.move.endsAt, now() + (s.move.hordeAt or T.HordeAt))
+			local at = s.move.hordeAt or T.HordeAt
+			if at > 0 then -- (8.0 SANDBOX: a house without a horde keeps its clock)
+				s.move.endsAt = math.min(s.move.endsAt, now() + at)
+			end
 			startHorde(s)
 		end
 		return "ADMIN: the horde comes now."
@@ -3066,7 +3522,7 @@ function Moving.admin(player: Player, arg: any): string
 		finish(s, "cancel", "Called off by the admin")
 		return "ADMIN: the move is called off."
 	end
-	return "ADMIN: card | start | house | farmcard | farm | farmgo | horde | time | trip | deliver | end."
+	return `ADMIN: card | start | house | {if SB.on then "refill" else "farmcard | farm | farmgo"} | horde | time | trip | deliver | end.`
 end
 
 -- ── 7.0 grip: a slip, the wear (the Moving remote's "slip" and "grip"; the hook: setHands' gripHands) ─────────────────
@@ -3162,8 +3618,7 @@ local function cardRequest(player: Player, contractId: any)
 		return
 	end
 	local _, _, root = bodyOf(player)
-	local board = boardPart
-	if not armedCard.admin and (not root or not board or flat(root.Position, board.Position) > T.Reach.Board + 12) then
+	if not armedCard.admin and not nearBoard(root, T.Reach.Board + 12) then
 		return
 	end
 	Moving.openCard(player, contract.id, armedCard.admin)
@@ -3188,12 +3643,11 @@ local function planMove(owner: Player, contractId: any): string?
 	end
 	local card = if armedCard then armedCard.card else nil
 	local _, _, root = bodyOf(owner)
-	local board = boardPart
 	if not armedCard or not card or card.id ~= contract.id or now() - armedCard.at > T.CardFor then
-		return "Open the contract at the depot's board first."
+		return if SB.on then "Open the contract at a Moving contracts board first." else "Open the contract at the depot's board first."
 	end
-	if not armedCard.admin and (not root or not board or flat(root.Position, board.Position) > T.Reach.Board + 12) then
-		return "Take the contract at the depot's board (ZDC Moving)."
+	if not armedCard.admin and not nearBoard(root, T.Reach.Board + 12) then
+		return if SB.on then "Take the contract at a Moving contracts board (by your warehouse)." else "Take the contract at the depot's board (ZDC Moving)."
 	end
 	armed[owner] = nil
 	local summary = table.clone(card)
@@ -3264,7 +3718,9 @@ function Moving.busy(player: Player): string?
 end
 
 local function wireHooks()
-	jobs = require(script.Parent.Jobs)
+	if not SB.on then -- (8.0 SANDBOX: no jobs, no bandit cars in the test world: neither is loaded)
+		jobs = require(script.Parent.Jobs)
+	end
 	-- a crew on a move is "hunted" like a job's: no ordinary roamers round them (the move brings its own), none inside
 	local hunts = Zombies.hunts
 	Zombies.hunts = function(player: Player): boolean
@@ -3288,11 +3744,13 @@ local function wireHooks()
 		zombieHit(player, amount)
 		truckHit(player, amount)
 	end
-	local BanditCars = require(script.Parent.BanditCars)
-	local banditHit = BanditCars.onCarDamaged
-	BanditCars.onCarDamaged = function(player: Player, amount: number)
-		banditHit(player, amount)
-		truckHit(player, amount)
+	if not SB.on then
+		local BanditCars = require(script.Parent.BanditCars)
+		local banditHit = BanditCars.onCarDamaged
+		BanditCars.onCarDamaged = function(player: Player, amount: number)
+			banditHit(player, amount)
+			truckHit(player, amount)
+		end
 	end
 	-- the crew opens and closes the truck's back too
 	local backAllowed = Vehicles.backAllowed
@@ -3304,13 +3762,16 @@ local function wireHooks()
 		return s ~= nil and not s.ended and s.truck == car and sessionOf(player) == s
 	end
 	-- the truck stays while the move runs: CAR does not swap it, a respawn does not take it back
-	local returnLent = jobs.returnLent
-	jobs.returnLent = function(player: Player): boolean
-		local s = sessions[player]
-		if s and not s.ended and truckOk(s) then
-			return false
+	local lender = jobs
+	if lender then
+		local returnLent = lender.returnLent
+		lender.returnLent = function(player: Player): boolean
+			local s = sessions[player]
+			if s and not s.ended and truckOk(s) then
+				return false
+			end
+			return returnLent(player)
 		end
-		return returnLent(player)
 	end
 	teamHooks() -- 7.0 planning: the Guard's hits, the Driver's truck
 	-- 7.0 review: while your move's truck is out nothing of yours takes its place (each of these would remove it first:
@@ -3366,27 +3827,37 @@ local function wireHooks()
 end
 
 function Moving.start()
+	SB.on = Config.Sandbox ~= nil and Config.Sandbox.On == true -- 8.0 SANDBOX: the test world (else the city's game)
 	local made = Instance.new("Folder")
 	made.Name = "Moves"
 	made.Parent = workspace
 	folder = made
-	for _, contract in T.Contracts do
-		local site = buildSite(contract, made)
-		if site then
-			sites[contract.id] = site
+	if SB.on then
+		-- 8.0 SANDBOX: the one house (no Marge, no Walt), a board on every plot, no Wall, no dressing, no soldier
+		local house = SB.newContract()
+		SB.contract = house
+		sites[house.id] = SB.site(house, made)
+		SB.buildBoards(made)
+		MoveGreeters.start(nil, false)
+	else
+		for _, contract in T.Contracts do
+			local site = buildSite(contract, made)
+			if site then
+				sites[contract.id] = site
+			end
 		end
+		buildBoard(made)
+		buildDropOff(made)
+		MoveGreeters.start(boardPart) -- 7.0 greeters: the soldier at the Wall, Marge's word at the kiosk (their own loop)
 	end
-	buildBoard(made)
-	buildDropOff(made)
-	MoveGreeters.start(boardPart) -- 7.0 greeters: the soldier at the Wall, Marge's word at the kiosk (their own loop)
 	wireHooks()
 	-- 7.0 planning: the lobby before a move (its LAUNCH starts it with the roles; the quick chat reaches the move's crew)
 	MoveLobby.onLaunch = function(owner: Player, contractId: string, roles: { [number]: string }): string?
-		-- (7.0 review: the truck comes where you stand: LAUNCH at the depot's board, not at the house)
+		-- (7.0 review: the truck comes where you stand: LAUNCH at the depot's board, not at the house; 8.0 SANDBOX: at a
+		-- plot's board)
 		local _, _, root = bodyOf(owner)
-		local board = boardPart
-		if not root or not board or flat(root.Position, board.Position) > T.Reach.Board + 24 then
-			return "LAUNCH at the depot's board (ZDC Moving): the truck comes there."
+		if not nearBoard(root, T.Reach.Board + 24) then
+			return if SB.on then "LAUNCH at a Moving contracts board (by your warehouse)." else "LAUNCH at the depot's board (ZDC Moving): the truck comes there."
 		end
 		return startMove(owner, contractId, true, roles)
 	end
@@ -3424,6 +3895,7 @@ function Moving.start()
 		end
 		armed[player] = nil
 		traveling[player] = nil
+		SB.forget(player) -- (8.0 SANDBOX: their card's house)
 	end)
 	-- a new body is never inside (a death inside respawns you at the depot)
 	local function onPlayer(player: Player)

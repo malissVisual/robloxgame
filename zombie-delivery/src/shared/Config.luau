@@ -6094,7 +6094,15 @@ Config.CarryGrip = {
 --                     who still drives one. Hitch: a piece too big for any bed that may be towed (FurnitureLooks bigDoor:
 --                     the hay wagon) rides hitched behind the car, Gap studs behind its back (Back: the back's z), its
 --                     wheels on the ground (Drop: the chassis' middle over the ground). VanAgain: s after the van was
---                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again
+--                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again.
+--                     8.0 SANDBOX: sprinter, the walk-in Sprinter's bay (Config.Sandbox.Van: the sprinter's body is
+--                     Config.Sprinter's): 6.6 wide (13 cells of 0.5: 6.5 of it packed, in its middle), 7.6 tall, 14 long:
+--                     every house piece stands in it (the Grandfather Clock's 7.2 too; tests/vanmove_test.luau). Cell 0.5,
+--                     not the ZDC Van's 0.4: the packer's cost grows with the cells (a 14-long bay at 0.4: a Load up to
+--                     about 60 ms with its repack, 0.5 about 15 ms, and only about 2% fewer pieces packed). WalkIn:
+--                     a carrier standing inside the bay (its box over the floor) may Load from there too (the bay's own
+--                     Load prompt), not only at the back doors. Back: the bay's back end this far in front of the car's
+--                     CargoDoor (its z from the door: it follows the body's length; Center's z only without a door)
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
 --                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
 --                     trip; the move goes on until the owner's FINISH or the clock)
@@ -6135,6 +6143,16 @@ Config.CarryGrip = {
 --                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
 --                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
 --                     depth; its front door is Doors[1])
+--   Sandbox           8.0 SANDBOX (Config.Sandbox.On; design/sandbox/KONTRAKT.md): in place of Contracts the one house of
+--                     shared/SandboxMap.luau (House: its id, name, front door, the van's curb), refilled every move (a new
+--                     HouseLayout seed), on the Moving contracts board of every player's plot (SandboxMap plot.board); the
+--                     move goes with the player's own van (Config.Sandbox.Van, else Van). No Wall: the drop-off is the
+--                     move owner's plot (plot.unload: the van's back inside its circle), where every piece in the van goes
+--                     into their warehouse's stock (server/Collection.luau Collection.add: a trip). No pay per piece (the
+--                     warehouse earns), no XP; no story. Client / Icon / Address / Blurb: the card's; Time / HordeAt: the
+--                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
+--                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
+--                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6182,7 +6200,8 @@ Config.Moving = {
 	Beds = {
 		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.4, Center = { 0, 2.98 } :: { number } }, -- (Cell 0.4: its whole 6.4 length, 15 × 16 cells)
 		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
-	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number } } },
+		sprinter = { Width = 6.6, Length = 14, Height = 7.6, Cell = 0.5, Center = { 0, 2.7 } :: { number }, Back = 0.9, WalkIn = true }, -- 8.0 SANDBOX
+	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number }, Back: number?, WalkIn: boolean? } },
 	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
 	VanAgain = 20,
 	Board = { 44, 12 } :: { number },
@@ -6209,6 +6228,16 @@ Config.Moving = {
 	Slots = 6,
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
+	Sandbox = {
+		Client = "The Hubers",
+		Icon = "🏡",
+		Address = "the end of Main Street",
+		Blurb = "An old alpine chalet full of things. Bring them home to your warehouse and put them on show.",
+		Time = 20 * 60,
+		HordeAt = 3 * 60,
+		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
+		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
+	},
 }
 
 -- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the
