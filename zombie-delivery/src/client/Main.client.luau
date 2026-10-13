@@ -111,6 +111,7 @@ safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyr
 safely("CrashFx", require(Client.CrashFx).start) -- 6.16: sparks and a kick on a hard hit, sparks scraping a wall
 safely("SpeedLines", require(Client.SpeedLines).start) -- 6.16: streaks at the screen's edges near the top speed
 safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract card, the move's panel and list (Tab), the fade, the result
+safely("MoveHelperHud", require(Client.MoveHelperHud).start) -- 7.0: the depot's helper's orders under the move's panel (Danny)
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast

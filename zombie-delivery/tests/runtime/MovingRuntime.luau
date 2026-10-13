@@ -6,6 +6,8 @@
 -- their bodies, a truck, zombies and the house art (fake FurnitureLooks / HouseLayout / HouseInterior shaped like the
 -- art branch's interface). No physics: a weld is a record, a teleport sets the root's CFrame. os.clock and the server
 -- time are the test's (Runtime.clock, Runtime.now); task.delay runs at once.
+-- 7.0, the depot's helper: the real server/MoveHelper.luau (MoveHelperServer.luau, tests/movehelper_runtime_test.luau)
+-- runs on these too: its body from the fake Npcs (Runtime.said: what he says), the zombies' roots and Zombies.all.
 local Mock = require("./ItemMock") :: any
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
@@ -453,7 +455,11 @@ Runtime.Zombies = stub("Zombies", {
 	spawn = function(kind: string, at: any, owner: any, guard: any, resident: any, roamer: any): any
 		local model = Mock.Instance.new("Model")
 		model.Parent = workspace
-		local z = { kind = kind, at = at, owner = owner, roamer = roamer == true, dead = false, model = model }
+		local root = Mock.Instance.new("Part") -- (7.0 helper: where it stands, for Danny's running away)
+		root.Name = "HumanoidRootPart"
+		root.CFrame = Mock.CFrame.new(at.X, at.Y, at.Z)
+		root.Parent = model
+		local z = { kind = kind, at = at, owner = owner, roamer = roamer == true, dead = false, model = model, root = root }
 		table.insert(Runtime.zombies, z)
 		local _ = guard and resident
 		return z
@@ -464,7 +470,58 @@ Runtime.Zombies = stub("Zombies", {
 			Runtime.marched += 1
 		end
 	end,
+	-- 7.0, the depot's helper (server/MoveHelper.luau): every zombie, and the buddies' targets he adds himself to
+	all = function(): any
+		return Runtime.zombies
+	end,
+	extraTargets = function(): any
+		return {}
+	end,
 })
+
+-- 7.0, the depot's helper's body (server/Npcs.luau): a model with a root and a humanoid where it is put; what he says.
+Runtime.said = {} -- { text } every Npcs.say
+Runtime.Npcs = stub("Npcs", {
+	look = function(role: string, name: string, title: string?): any
+		return { name = name, title = title, role = role }
+	end,
+	spawn = function(look: any, at: any): any
+		local model = Mock.Instance.new("Model")
+		model.Name = look.name
+		local root = Mock.Instance.new("Part")
+		root.Name = "HumanoidRootPart"
+		root.Size = Mock.Vector3.new(2, 2, 1)
+		root.CFrame = at + Mock.Vector3.new(0, 3, 0)
+		root.Parent = model
+		model.PrimaryPart = root
+		local humanoid = Mock.Instance.new("Humanoid")
+		humanoid.Name = "Humanoid"
+		humanoid.HipHeight = 2
+		humanoid.MaxHealth = 1e6
+		humanoid.Health = 1e6
+		humanoid.Parent = model
+		model.Parent = workspace
+		return model
+	end,
+	say = function(_npc: any, text: string)
+		table.insert(Runtime.said, text)
+	end,
+	remove = function(npc: any)
+		npc:Destroy()
+	end,
+	stop = noop,
+	pace = noop,
+	walkTo = noop,
+})
+-- Did he say `text` (since message `from`)?
+function Runtime.saidSince(text: string, from: number?): boolean
+	for index = (from or 0) + 1, #Runtime.said do
+		if Runtime.said[index] == text then
+			return true
+		end
+	end
+	return false
+end
 
 Runtime.Jobs = stub("Jobs", {
 	active = function(player: any): boolean
