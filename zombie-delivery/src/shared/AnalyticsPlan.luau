@@ -158,6 +158,10 @@ AnalyticsPlan.Events = {
 	"HordeBeaten", -- a share of the horde's reward paid (value: the player's kills; field: "beaten" or "time")
 	-- 7.0, MOVES (server/Moving.luau)
 	"MoveDone", -- a house move ended and paid (value: its stars; fields: the contract, "solo" or "crew")
+	-- 8.0 SANDBOX, the collection (server/Collection.luau; field: the rarity)
+	"CollectionAdded", -- pieces came home into the warehouse's stock (value: how many at once; field: the rarest)
+	"CollectionDisplayed", -- a piece put on show on a display stand (value: its $ a minute)
+	"CollectionSold", -- a piece sold (value: its price)
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -223,6 +227,8 @@ AnalyticsPlan.Sources = {
 	SupplyDrop = "Gameplay", -- 6.15: a live event's supply drop brought to the depot (server/LiveEvents.luau)
 	HordeReward = "Gameplay", -- 6.15: a share of the horde at the gates' reward (server/LiveEvents.luau)
 	MovePay = "Gameplay", -- 7.0: a house move's pay (the owner's and each crew mate's share: server/Moving.luau)
+	CollectionIncome = "Gameplay", -- 8.0: the warehouse's display stands earn every minute you play (server/Collection.luau)
+	CollectionSale = "Sale", -- 8.0: a piece of your collection sold (server/Collection.luau; the item SKU its furniture id)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
 	BagRefund = "Refund", -- 6.23: an old save's bags, owned for good before, paid back once (bags are bought each game now)
@@ -256,7 +262,7 @@ AnalyticsPlan.Sinks = {
 }
 
 -- The frequent small ones: summed a player and sent every Config.Analytics.BatchSeconds (and when they leave).
-AnalyticsPlan.Batched = { KillReward = true, Fuel = true, Tip = true }
+AnalyticsPlan.Batched = { KillReward = true, Fuel = true, Tip = true, CollectionIncome = true } -- (8.0: the stands pay every Config.Collection.Tick s)
 
 export type MoneyRule = { reason: string, flow: string, kind: string, batch: boolean }
 
