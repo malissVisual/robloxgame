@@ -34,7 +34,7 @@
 --   MoveHelper.nameOf(id)      his name by his id in a move's rules (nil: not a helper's id)
 --   MoveHelper.find(player)    the helper on this player's move (his state: tests, the admin)
 --   MoveHelper.order(p, mode)  7.0 planning: an order as the Moving remote's ("helper", mode) (server/Moving.luau: the
---                              quick chat's "Need a hand here" is HELP ME); a locked front door: he waits outside it
+--                              quick chat's "Need a hand here" is HELP ME)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -473,11 +473,6 @@ local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, nea
 	if inside ~= goalInside then
 		local out: CFrame = h.s.site.outside
 		local door = if inside then h.exitIn else out.Position
-		local team = h.s.team -- 7.0 planning: a locked front door (server/Moving.luau): he waits outside it
-		if not inside and team and team.door and team.door.locked and flat(here, door) <= cfg.DoorReach then
-			mover.halt(body)
-			return false
-		end
 		if flat(here, door) <= cfg.DoorReach and clock - h.doorAt > 1 then
 			transfer(h, not inside, clock)
 			return false

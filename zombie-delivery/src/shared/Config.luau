@@ -5826,8 +5826,9 @@ Config.Moving = {
 	Tick = 0.2,
 }
 
--- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the four roles.
--- shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
+-- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the
+-- owner took the Technician out: no locked front door, no fuse box, the house is lit from the start; the client greets
+-- the crew at the door instead: Config.MoveGreeters). shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
 -- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
 -- show them.
 --   Order             the roles, in the lobby's order (a newcomer gets the first free one)
@@ -5845,18 +5846,14 @@ Config.Moving = {
 --                     Barricades a move, each Hp (Bite hp a second off it for every zombie within Reach) for Life s, put
 --                     up outside within Near of the house's door (off the road, clear of cars and players); XRay: the
 --                     zombies outlined through walls within this (client/EnemyOutline.luau)
---   Tech              the front door is locked (a contract with keys = true: not): Pick s to pick it (quiet), Kick s
---                     for anybody to kick it in (loud: KickZombies come, Near … Far from the door); Fuse s at the fuse
---                     box (the garage) and the interior's lights come on
---   Chat              the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
+--   Chat             the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
 Config.MoveRoles = {
-	Order = { "driver", "mover", "guard", "tech" } :: { string },
+	Order = { "driver", "mover", "guard" } :: { string },
 	Switch = 30,
 	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
 	Driver = { TruckDamage = 0.6, Curb = 5, Near = 25 },
 	Mover = { Alone = 0.6, Carry = 1.15, Climb = 0.75, Rise = 0.35, Hold = 0.8 },
 	Guard = { Damage = 1.5, Range = 150, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 40, XRay = 60 },
-	Tech = { Pick = 3, Kick = 1.2, KickZombies = 4, Near = 40, Far = 90, Fuse = 5 },
 	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
 }
 
@@ -5916,12 +5913,13 @@ Config.Furniture = {
 -- out from server/Moving.luau's MoveStory hook). The limits keep every text inside its card (movestory_test.luau):
 --   Limits      characters at most: a chapter's Title, Place and Client name, its Hook (the CHAPTERS detail), the
 --               client's Blurb, a story card's Line (the intro, a briefing, the radio's Taunt), a Keepsake's story,
---               Marge's phone Text (the dispatch at START, the debrief at the end) and the result card's Quote (thanks)
+--               Marge's phone Text (the dispatch at START, the debrief at the end), the result card's Quote (thanks)
+--               and a greeter's Bubble (the speech bubbles of server/MoveGreeters.luau: MoveStory's greeter section)
 --   Briefing    a briefing's lines (at least, at most); Intro: Marge's intro cards (at least, at most)
 --   Great       a move done with this many stars or more is "great" (its debrief and thanks), with fewer "ok"
 --   Guard       s after a story card opens before Space / Enter / A turn it (client/DialogKeys.luau)
 Config.MoveStory = {
-	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110 },
+	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110, Bubble = 60 },
 	Briefing = { 3, 5 } :: { number },
 	Intro = { 3, 4 } :: { number },
 	Great = 4,
@@ -6014,6 +6012,40 @@ Config.MoveSites = {
 	Budget = 400,
 	Lights = 4,
 	TextRange = 90,
+}
+
+-- 7.0, the greeters (the owner: "there will be NPCs who sort of welcome you"): server/MoveGreeters.luau's people, their
+-- words shared/MoveStory.luau's greeter section (tests/movegreeters_runtime_test.luau). Studs and seconds.
+--   Porch      where a move's client stands from its start: { x, z } in the house door's frame (shared/MoveSiteLooks.luau
+--              doorPlace: +X right, -Z out to the street): beside the door, off the path (its ±2.4 studs), clear of
+--              the packed boxes and the yard sign
+--   Hello      the first crew member this near her: she turns to them, waves and says her hello lines LineGap s apart,
+--              then holds a hand out to the open door (once a move)
+--   Star       a ★ thing carried this near her: her "Careful with that!" (each ★ thing once, StarAgain s at least apart)
+--   Leave      the truck stood within Near of the house's door, then drove past Far with a load: her thanks (LeaveAgain s
+--              at least apart)
+--   Gap        s at least between two lines of hers (a reaction waits behind her hello)
+--   Soldier    the soldier at the Wall's checkpoint, always there: Name, Title, At { x, z } from the drop-off's middle
+--              (Config.Moving.DropOff: north of the booth's sandbags, off the bay and the people's walk line), facing the
+--              bay; a move delivered with its truck within Greet of the drop-off: he turns to it, waves and welcomes it
+--   Kiosk      Marge at the Moving contracts kiosk (server/Tutorial.luau's dispatcher at the depot: never a second Marge):
+--              a player on foot and on no move who comes within Near of its corkboard: her line, her bubble seen from
+--              Hear studs (she stands by the job board) and the player's notice; once per player every Again s
+--   Tick       s between two steps of the greeters' loop (the kiosk, the soldier's body); Respawn: s between two looks
+--              for a body that went (the soldier's, the dispatcher's)
+Config.MoveGreeters = {
+	Porch = { -4.4, -3.0 } :: { number },
+	Hello = 25,
+	LineGap = 2.6,
+	Star = 30,
+	StarAgain = 20,
+	Leave = { Near = 60, Far = 110 },
+	LeaveAgain = 90,
+	Gap = 2,
+	Soldier = { Name = "Private Reyes", Title = "The Wall · Checkpoint 01", At = { 13.3, -3.4 } :: { number }, Greet = 32 },
+	Kiosk = { Near = 14, Hear = 120, Again = 180 },
+	Tick = 0.4,
+	Respawn = 5,
 }
 
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:

@@ -538,7 +538,7 @@ Runtime.Zombies = stub("Zombies", {
 			Runtime.marched += 1
 		end
 	end,
-	-- 7.0 planning: the Guard's hits (Zombies.damage wrapped), a kicked door's noise
+	-- 7.0 planning: the Guard's hits (Zombies.damage wrapped); a noise (nothing on a move makes one now)
 	damage = function(z: any, amount: number, by: any, info: any): boolean
 		table.insert(Runtime.zombieHits, { z = z, amount = amount, by = by, info = info })
 		return false
@@ -556,7 +556,11 @@ Runtime.Zombies = stub("Zombies", {
 })
 
 -- 7.0, the depot's helper's body (server/Npcs.luau): a model with a root and a humanoid where it is put; what he says.
+-- 7.0 greeters (server/MoveGreeters.luau): who said what (and seen from how far), the gestures, the glances.
 Runtime.said = {} -- { text } every Npcs.say
+Runtime.saidBy = {} -- { { npc, text, range } } every Npcs.say
+Runtime.acts = {} -- { { npc, kind } } every Npcs.act
+Runtime.glances = {} -- { { npc, at } } every Npcs.glance
 Runtime.Npcs = stub("Npcs", {
 	look = function(role: string, name: string, title: string?): any
 		return { name = name, title = title, role = role }
@@ -564,6 +568,7 @@ Runtime.Npcs = stub("Npcs", {
 	spawn = function(look: any, at: any): any
 		local model = Mock.Instance.new("Model")
 		model.Name = look.name
+		model:SetAttribute("Title", look.title) -- (7.0 greeters: the name tag's second line)
 		local root = Mock.Instance.new("Part")
 		root.Name = "HumanoidRootPart"
 		root.Size = Mock.Vector3.new(2, 2, 1)
@@ -579,8 +584,15 @@ Runtime.Npcs = stub("Npcs", {
 		model.Parent = workspace
 		return model
 	end,
-	say = function(_npc: any, text: string)
+	say = function(npc: any, text: string, _seconds: number?, range: number?)
 		table.insert(Runtime.said, text)
+		table.insert(Runtime.saidBy, { npc = npc, text = text, range = range })
+	end,
+	act = function(npc: any, kind: string)
+		table.insert(Runtime.acts, { npc = npc, kind = kind })
+	end,
+	glance = function(npc: any, at: any)
+		table.insert(Runtime.glances, { npc = npc, at = at })
 	end,
 	remove = function(npc: any)
 		npc:Destroy()
@@ -685,7 +697,7 @@ Runtime.art = {
 				entry = Mock.CFrame.new(0, 0, 1),
 				exit = V3(0, 0, 0.5),
 				spots = SPOTS,
-				rooms = { { id = "garage", kind = "garage", min = V3(-12, 0, 14), max = V3(-2, 10, 26) } }, -- (7.0 planning: the fuse box)
+				rooms = { { id = "garage", kind = "garage", min = V3(-12, 0, 14), max = V3(-2, 10, 26) } },
 			}
 		end,
 	},
@@ -715,7 +727,7 @@ Runtime.art = {
 				made.Parent = items
 				byspot[spot.id] = made
 			end
-			-- the lights (7.0 planning: off until the fuse box is fixed; the porch's daylight stays)
+			-- the lights (on from the start: no fuse box any more) and the porch's daylight
 			local lamp = Mock.Instance.new("Part")
 			lamp.Name = "Lamp"
 			lamp.Material = "Neon"

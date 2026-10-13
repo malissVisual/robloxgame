@@ -1,6 +1,7 @@
 --!strict
--- 7.0 planning (the owner's rework, design/rework/NAVRH.md §2–3: "the planning, a lobby like GTA's", the four roles):
--- the roles of a move and the planning lobby's rules, pure (no Roblox at the top level: tests/moveroles_test.luau).
+-- 7.0 planning (the owner's rework, design/rework/NAVRH.md §2–3: "the planning, a lobby like GTA's", the roles; the
+-- owner took the Technician out, so three): the roles of a move and the planning lobby's rules, pure (no Roblox at the
+-- top level: tests/moveroles_test.luau).
 -- server/MoveLobby.luau runs the lobby with these, server/Moving.luau the roles' abilities on a move, client/
 -- MoveLobbyUi.luau and client/MovingHud.luau show them, client/QuickChat.luau sends MoveRoles.Chat. The numbers are
 -- Config.MoveRoles'.
@@ -12,9 +13,8 @@
 --                 (never over the walk); no slowdown up stairs and slopes (the others: × Mover.Climb)
 --     🛡️ guard    × Guard.Damage weapon damage on the move; Guard.Barricades plank barricades outside; the zombies
 --                 outlined through walls within Guard.XRay studs
---     🔧 tech     picks the front door's lock quietly (anybody may kick it in: loud); fixes the garage's fuse box (the
---                 interior's lights come on)
---   The lobby (plain data by user id, so the tests run it with numbers; the owner is members[1])
+--   The lobby (plain data by user id, so the tests run it with numbers; the owner is members[1]): one role each while
+--   there are no more players than roles (three), doubles beyond that
 --     MoveRoles.newLobby(owner, contract, now)     a lobby with its owner in it (and their role)
 --     MoveRoles.sync(lobby, ids) -> changed        the members now (the owner first): newcomers get a free role, NOT
 --                                                  READY; leavers go; a doubled role (no room for doubles) is fixed
@@ -35,9 +35,7 @@
 --     MoveRoles.climbFactor(role, mode)            × the walk going up with it (1: a Mover, a thing in one hand)
 --     MoveRoles.weaponFactor(role, cause)          × a hit's damage (a Guard's guns and fists; not the car, the others)
 --     MoveRoles.truckFactor(driverAtWheel)         × a hit on the truck
---     MoveRoles.canCall(role, used) / canBarricade(role, placed) / canFuse(role, lit) -> ok, why
---     MoveRoles.newDoor(keys) / openDoor(door, role, how) -> ok, why, loud   the front door: "pick" (a Technician,
---                                                  quiet) or "kick" (anybody, loud)
+--     MoveRoles.canCall(role, used) / canBarricade(role, placed) -> ok, why
 --     MoveRoles.wear(hp, zombies, seconds)         a barricade's hp after `zombies` bit it for `seconds`
 --   MoveRoles.Chat                                 the quick chat's six lines (an id, an icon, the words)
 --   MoveRoles.whyText(why)                         what the player is told
@@ -62,7 +60,6 @@ export type Lobby = {
 	ready: { [number]: boolean },
 	openedAt: number,
 }
-export type Door = { locked: boolean, how: string? }
 
 local function tune(): any
 	return (Config :: any).MoveRoles
@@ -95,14 +92,6 @@ MoveRoles.Roles = {
 		blurb = "Holds the door, fights the dead",
 		hint = "Tab: PUT UP A BARRICADE · zombies seen through walls",
 	},
-	tech = {
-		id = "tech",
-		name = "Technician",
-		icon = "🔧",
-		color = { 106, 168, 230 },
-		blurb = "Opens locks, fixes the power",
-		hint = "Pick the front door's lock · fix the fuse box in the garage",
-	},
 } :: { [string]: Role }
 
 -- The quick chat (client/QuickChat.luau: hold T): six lines, by number.
@@ -132,8 +121,6 @@ function MoveRoles.loadout(id: string): string
 		return `🧤 Straps · 🛋 Lifts pairs alone · +{percent(t.Mover.Carry)} carry speed · 🪜 Stairs`
 	elseif id == "guard" then
 		return `🔫 +{percent(t.Guard.Damage)} damage · 🪵 {t.Guard.Barricades} barricades · 👁 Zombies through walls`
-	elseif id == "tech" then
-		return `🔧 Lock pick (quiet) · 💡 Fuse kit`
 	end
 	return ""
 end
@@ -379,36 +366,6 @@ function MoveRoles.canBarricade(role: string?, placed: number): (boolean, string
 	return true, nil
 end
 
-function MoveRoles.canFuse(role: string?, lit: boolean): (boolean, string?)
-	if lit then
-		return false, "lit"
-	elseif role ~= "tech" then
-		return false, "tech"
-	end
-	return true, nil
-end
-
--- The front door: locked unless the crew has the keys.
-function MoveRoles.newDoor(keys: boolean): Door
-	return { locked = not keys, how = if keys then "keys" else nil }
-end
-
--- Opens it: "pick" (a Technician only, quiet) or "kick" (anybody, loud). Returns ok, why and whether it was loud.
-function MoveRoles.openDoor(door: Door, role: string?, how: string): (boolean, string?, boolean)
-	if not door.locked then
-		return false, "open", false
-	elseif how == "pick" then
-		if role ~= "tech" then
-			return false, "picker", false
-		end
-	elseif how ~= "kick" then
-		return false, "how", false
-	end
-	door.locked = false
-	door.how = how
-	return true, nil, how == "kick"
-end
-
 -- A barricade's hp after `zombies` bit it for `seconds`.
 function MoveRoles.wear(hp: number, zombies: number, seconds: number): number
 	if zombies <= 0 or seconds <= 0 or seconds ~= seconds then
@@ -430,11 +387,6 @@ local WHY: { [string]: string } = {
 	called = "The truck was called once already this move.",
 	guard = "Only the Guard puts up barricades.",
 	nomore = "No barricades left.",
-	picker = "Only the Technician picks locks: kick the door in (loud), or switch role.",
-	tech = "Only the Technician fixes the fuse box.",
-	lit = "The lights are on already.",
-	open = "The door is open.",
-	how = "Pick the lock, or kick the door in.",
 }
 
 function MoveRoles.whyText(why: string?): string
