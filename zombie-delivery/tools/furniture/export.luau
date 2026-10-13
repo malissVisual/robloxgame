@@ -2,13 +2,21 @@
 -- (shared/HouseLayout.luau + server/HouseInterior.luau) built by the real builders on the recorder
 -- (tools/fixtures/item-mock.luau), written as JSON lines for render.mjs: each part's class, shape, size, place, turn,
 -- colour, material and opacity, the pieces' catalogue entries, the house's rooms, spots, entry and lights.
--- Run by tools/furniture/render.py:  luau export.luau -a <seed>
+-- 7.x the farm: with a second seed also Walt's farm (HouseLayout.plan(seed, "farm"), layout "farm"); a piece of the
+-- farm's block (FurnitureLooks.FarmPieces) is marked farm.
+-- Run by tools/furniture/render.py:  luau export.luau -a <seed> [<farm seed>]
 local M = require("./ItemMock")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 
-local seed = tonumber((...)) or 1
+local args = { ... }
+local seed = tonumber(args[1]) or 1
+local farmSeed = tonumber(args[2])
+local farmPieces: { [string]: boolean } = {}
+for _, id in FurnitureLooks.FarmPieces do
+	farmPieces[id] = true
+end
 
 local function encode(v: any): string
 	local kind = type(v)
@@ -85,58 +93,73 @@ for index, id in FurnitureLooks.Order do
 			room = def.room,
 			size = vec(def.size),
 			parts = #parts + 1,
+			farm = farmPieces[id] == true,
+			bigDoor = def.bigDoor == true,
 		},
 		parts = parts,
 	}))
 	model:Destroy()
 end
 
--- One house, built at the origin.
-local plan = HouseLayout.plan(seed, "house")
-local origin = M.CFrame.new(0, 0, 0)
-local model, pieces = HouseInterior.build(plan, origin)
-local spotOf: { [any]: any } = {}
-for id, piece in pieces do
-	for _, p in piece:GetDescendants() do
-		spotOf[p] = plan.spots[id]
-	end
-end
-local parts, lights = {}, {}
-local count = 0
-for _, p in model:GetDescendants() do
-	if p.ClassName == "PointLight" or p.ClassName == "SurfaceLight" then
-		local c = p.Color
-		table.insert(lights, { position = vec(p.Parent.CFrame.Position), color = { c.R, c.G, c.B }, range = p.Range, brightness = p.Brightness, kind = p.ClassName })
-	end
-	if p:IsA("BasePart") then
-		count += 1
-		if p.Transparency < 1 then
-			local spot = spotOf[p]
-			table.insert(parts, record(p, { group = if spot then "item" else p.Parent.Name, star = spot ~= nil and spot.star }))
+-- One house (or the farm), built at the origin.
+local function scene(kind: string, at: number)
+	local plan = HouseLayout.plan(at, kind)
+	local origin = M.CFrame.new(0, 0, 0)
+	local model, pieces = HouseInterior.build(plan, origin)
+	local spotOf: { [any]: any } = {}
+	for id, piece in pieces do
+		for _, p in piece:GetDescendants() do
+			spotOf[p] = plan.spots[id]
 		end
 	end
+	local parts, lights = {}, {}
+	local count = 0
+	for _, p in model:GetDescendants() do
+		if p.ClassName == "PointLight" or p.ClassName == "SurfaceLight" then
+			local c = p.Color
+			table.insert(lights, { position = vec(p.Parent.CFrame.Position), color = { c.R, c.G, c.B }, range = p.Range, brightness = p.Brightness, kind = p.ClassName })
+		end
+		if p:IsA("BasePart") then
+			count += 1
+			if p.Transparency < 1 then
+				local spot = spotOf[p]
+				table.insert(parts, record(p, { group = if spot then "item" else p.Parent.Name, star = spot ~= nil and spot.star }))
+			end
+		end
+	end
+	local rooms, spots = {}, {}
+	for _, r in plan.rooms do
+		table.insert(rooms, { id = r.id, kind = r.kind, min = vec(r.min), max = vec(r.max) })
+	end
+	for _, s in plan.spots do
+		local def = FurnitureLooks.Items[s.item]
+		table.insert(spots, { id = s.id, item = s.item, room = s.room, star = s.star, position = vec(s.at.Position), label = def.name, bigDoor = def.bigDoor == true })
+	end
+	local exits = {}
+	for _, e in (plan :: any).exits or { plan.exit } do
+		table.insert(exits, vec(e))
+	end
+	print(encode({
+		kind = "house",
+		layout = kind,
+		name = string.format("%s-%d", kind, at),
+		info = {
+			seed = at,
+			mirrored = plan.mirrored,
+			min = vec(plan.min),
+			max = vec(plan.max),
+			rooms = rooms,
+			spots = spots,
+			entry = vec(plan.entry.Position),
+			exits = exits,
+			parts = count,
+			lights = lights,
+			ceiling = plan.ceiling,
+		},
+		parts = parts,
+	}))
 end
-local rooms, spots = {}, {}
-for _, r in plan.rooms do
-	table.insert(rooms, { id = r.id, kind = r.kind, min = vec(r.min), max = vec(r.max) })
+scene("house", seed)
+if farmSeed then
+	scene("farm", farmSeed)
 end
-for _, s in plan.spots do
-	table.insert(spots, { id = s.id, item = s.item, room = s.room, star = s.star, position = vec(s.at.Position), label = FurnitureLooks.Items[s.item].name })
-end
-print(encode({
-	kind = "house",
-	name = string.format("house-%d", seed),
-	info = {
-		seed = seed,
-		mirrored = plan.mirrored,
-		min = vec(plan.min),
-		max = vec(plan.max),
-		rooms = rooms,
-		spots = spots,
-		entry = vec(plan.entry.Position),
-		parts = count,
-		lights = lights,
-		ceiling = plan.ceiling,
-	},
-	parts = parts,
-}))

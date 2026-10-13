@@ -3,10 +3,10 @@
 -- deterministic (the same seed and kind give the same plan on every server); it makes no instances.
 -- server/HouseInterior.luau builds a plan, the moving job (server/Moving.luau) carries its pieces out of it.
 --
---   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": Marge's family house in the suburbs, one storey; the
---                                  only kind so far, an unknown kind is a house too). Every position is LOCAL to the
---                                  house's origin: the ground (the floor's top) at the front door's middle, +Z into the
---                                  house, +Y up.
+--   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": Marge's family house in the suburbs, one storey; 7.x
+--                                  "farm": Walt's alpine farm, shared/Layouts/Farm.luau, its plan adds `exits`; an
+--                                  unknown kind is a house). Every position is LOCAL to the house's origin: the ground
+--                                  (the floor's top) at the front door's middle, +Z into the house, +Y up.
 --   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "farm", "hotel") is a function
 --                                  seed's dice → Plan added to KINDS below)
 --   HouseLayout.Recipes            what each room holds: its pieces, how each is placed, the musts and the ★ ones
@@ -39,6 +39,7 @@
 
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
+local Farm = require(script.Parent.Layouts.Farm) -- 7.x the farm
 
 local T = Config.Furniture
 local HouseLayout = {}
@@ -1302,8 +1303,9 @@ end
 
 local KINDS: { [string]: (number) -> Plan } = {
 	house = planHouse,
+	farm = Farm.plan,
 }
-HouseLayout.Kinds = { "house" }
+HouseLayout.Kinds = { "house", "farm" }
 
 function HouseLayout.plan(seed: number, kind: string): Plan
 	local make = KINDS[kind] or KINDS.house
@@ -1312,6 +1314,9 @@ end
 
 -- The spots of a plan whose piece cannot be carried out of the front door (with every other piece in place).
 function HouseLayout.stuck(plan: Plan): { number }
+	if plan.kind == "farm" then -- 7.x the farm: its exits (the barn doors too)
+		return Farm.stuck(plan :: any)
+	end
 	local half = plan.wall / 2
 	local walls: { Rect } = {}
 	for _, f in plan.faces do

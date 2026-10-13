@@ -40,8 +40,15 @@ with tempfile.TemporaryDirectory() as tmp:
     # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
     for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
+        source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # 7.x: the farm's layout
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 7.x: shared/Layouts (Farm.luau: Walt's farm, HouseLayout's kind "farm"; tests/farmlayout_test.luau) next to them,
+    # on the same recorder, their script.Parent.Parent.X requires the copies above
+    for path in sorted(glob.glob(os.path.join(SHARED, "Layouts", "*.luau"))):
+        source = open(path, encoding="utf-8").read()
+        source = re.sub(r"require\(script\.Parent\.Parent\.(\w+)\)", r'require("./\1")', source)
+        open(os.path.join(tmp, os.path.basename(path)), "w", encoding="utf-8").write(prefix + source)
     # 7.0 (the moving prototype): the real server/HouseInterior.luau (tests/houseinterior_test.luau) on the recorder,
     # its shared modules the copies above, the recorder's `game`.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseInterior.luau"), encoding="utf-8").read()

@@ -5909,6 +5909,61 @@ Config.Furniture = {
 	InteriorMaxParts = 600,
 	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 236, 204 } :: { number } },
 	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
+	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
+	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:
+	--   HouseWidth / HouseDepth   the farmhouse (an even width); Hall: its mud room, a hall straight through it from the
+	--                             front door to the BackDoor (that wide) into the yard; Kitchen / Pantry: those rooms'
+	--                             depth behind the Stube and the bedroom
+	--   StoveClear                the Stube's door to the kitchen stays this far from the Stube's outer wall (its
+	--                             tiled stove, the Kachelofen, stands in that corner)
+	--   Yard                      the yard's depth (open to the sky; its fences Fence high, an invisible wall over them
+	--                             up to Barrier)
+	--   BarnDepth / Threshing / Stable / Workshop   the barn's depth and its three rooms' widths (the threshing floor in
+	--                             the middle, an even width); BarnCeiling: its rooms' height
+	--   BarnDoor / BarnDoorHeight the barn doors (the second exit, in the threshing floor's back wall: a bigDoor piece
+	--                             leaves only there); BarnOpening: the doorways from the yard and inside the barn
+	--   Stalls / Stall / StallWall   the stable's horse stalls along its back wall: how many, { width, depth }, the
+	--                             partitions' height; Loft: the hay loft's floor over the stable (decor); Beam: the tie
+	--                             beams' underside
+	--   BarnWindow / BarnSill     the barn's small windows (width, height) and their sill
+	--   Spots / Stars             the farm's pieces (at least, at most) and its ★ ones (the sentimental first)
+	--   InteriorMaxParts / Lights an interior's parts and lights at most (tests/farminterior_test.luau)
+	--   Lantern                   the barn's hanging lanterns' light; BarnLight: the daylight through the barn doors;
+	--                             Apron: the ground outside them (like the porch)
+	Farm = {
+		HouseWidth = { 40, 44 } :: { number },
+		HouseDepth = { 28, 32 } :: { number },
+		Hall = 10,
+		Kitchen = { 12, 14 } :: { number },
+		Pantry = { 9, 11 } :: { number },
+		BackDoor = 6,
+		StoveClear = 8.5,
+		Yard = { 14, 18 } :: { number },
+		Fence = 7,
+		Barrier = 24,
+		BarnDepth = { 32, 35 } :: { number },
+		Threshing = { 20, 24 } :: { number },
+		Stable = { 21, 23 } :: { number },
+		Workshop = { 15, 18 } :: { number },
+		BarnCeiling = 20,
+		BarnDoor = 12,
+		BarnDoorHeight = 13,
+		BarnOpening = 10,
+		Stalls = 3,
+		Stall = { 6.5, 9 } :: { number },
+		StallWall = 5,
+		Loft = 11,
+		Beam = 14,
+		BarnWindow = { 3, 2.5 } :: { number },
+		BarnSill = 7,
+		Spots = { 22, 30 } :: { number },
+		Stars = 3,
+		InteriorMaxParts = 700,
+		Lights = 12,
+		Lantern = { Brightness = 1.1, Range = 30, Color = { 255, 206, 140 } :: { number } },
+		BarnLight = { Brightness = 1.6, Range = 22, Color = { 255, 246, 226 } :: { number } },
+		Apron = 6,
+	},
 }
 
 -- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
