@@ -16,7 +16,7 @@ local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild
 
 local SandboxPlots = {}
 
-local owners: { [number]: Player } = {}
+local owners: { [number]: Player? } = {}
 local listeners: { (number, Player?) -> () } = {}
 
 local function fire(id: number, player: Player?)
