@@ -39,7 +39,8 @@
 --     no vehicle (state.car nil) the car card is an ON FOOT card (your room, your pace, when the first vehicle comes),
 --     the car tiers' headers say "NEEDS A VEHICLE · Old Van at level 4" (no REROLL) and every job that needs your own
 --     vehicle is locked "🚐 NEEDS A VEHICLE" with that remedy (a job that lends a company vehicle is not). The server
---     refuses them anyway.
+--     refuses them anyway. 7.x (one car, Config.CompanyVan): every courier has the ZDC Van, so state.car is set once
+--     the save is in; the words say "NEEDS YOUR ZDC VAN · PRESS CAR" for the rare moment before.
 --   * 5.1, the bikes: the offers with mode = "bike" come next in a BIKE section (from Config.Jobs.Bike.Level): a header
 --     with your bike and what it holds (the Offers info's `bike`), each row with a 🚲 BIKE chip and "fits your bike
 --     (3 / 4)" on its CARGO line; without a bike they are locked "🚲 NEEDS A BIKE" (the BIKES counter), while your car is
@@ -299,19 +300,14 @@ local function firstVehicle(): Config.CarDef?
 end
 
 -- "Old Van at level 4" (the headers, the car card) and the remedy of a job that needs a vehicle (the row's note).
+-- 7.x (one car, Config.CompanyVan): "your ZDC Van", everybody's from the start: CAR brings it (only a state that is
+-- still loading has no car).
 local function vehicleShort(): string
 	local van = firstVehicle()
-	return if van then `{van.name} at level {van.level or 1}` else "a vehicle"
+	return if van then `your {van.name}` else "a vehicle"
 end
 local function vehicleNote(): string
-	local van = firstVehicle()
-	if not van then
-		return "Car jobs need a vehicle of your own. Until then the ON FOOT runs pay."
-	end
-	local level = van.level or 1
-	local when = if myLevel() >= level then "now" else `from level {level}`
-	local where = if van.id == Config.VanQuest.Car then `from {Config.VanQuest.Seller} at {Config.VanQuest.Place} (Marge's quest)` else "at Dead End Motors"
-	return `No vehicle yet: this job needs one. The {van.name} is for sale {when} {where} ({Ui.money(van.price)}). Until then the ON FOOT runs pay.`
+	return `This job needs {vehicleShort()}: press CAR and it comes to you. Until then the ON FOOT runs pay.`
 end
 
 local function carLevels(id: string): any
@@ -609,7 +605,7 @@ local function refreshChrome()
 		refs.carStats.Text = `🛍 {room}`
 		refs.carHealth.Text = if speed > 1.001 then `👟 pace ×{string.format("%.2g", speed)} · light cargo` else "Light cargo only"
 		refs.carHealth.TextColor3 = K.secondary
-		refs.carNote.Text = `No vehicle yet: the {vehicleShort()}. A bigger bag carries more ({Config.BagShop.Name}).`
+		refs.carNote.Text = `On foot: press CAR for {vehicleShort()}. A bigger bag carries more ({Config.BagShop.Name}).`
 		refs.capacity.Text = `YOUR ROOM · {room}`
 		refs.context.Text = `ON FOOT · {room}  ·  {Levels.rank(level)} / level {level}`
 	elseif onBike then
@@ -1005,7 +1001,7 @@ local function offerTicket(offer: any, number: number, order: number?)
 		elseif lockLevel == nil and noVehicle then vehicleNote()
 		elseif lockLevel == nil and offer.tooBig == true then (if type(offer.lockText) == "string" then offer.lockText else roomRemedy(offer))
 		else nil
-	local note = if lockLevel then `Unlocks at LEVEL {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.{if noVehicle then ` It needs a vehicle too: the {vehicleShort()}.` else ""}` else why
+	local note = if lockLevel then `Unlocks at LEVEL {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.{if noVehicle then ` It needs a vehicle too: {vehicleShort()}.` else ""}` else why
 	-- The slot in the list gets its height once the body is built (the row fills it).
 	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundTransparency = 1, LayoutOrder = order or number }, refs.list)
 	local card: any, body: any, stub: any = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB)
@@ -1082,7 +1078,7 @@ local function tierHeader(index: number, info: any, order: number)
 	local walking = onFoot() or onBike -- 5.0: no vehicle yet: the car tiers need one
 	local sub = if onBike then `NEEDS YOUR CAR · CALL CAR on your phone{if myLevel() < level then ` · LEVEL {level}` else ""}`
 		elseif walking and myLevel() < level then `LOCKED · LEVEL {level} · needs a vehicle ({vehicleShort()})`
-		elseif walking then `NEEDS A VEHICLE · {vehicleShort()}, {if firstVehicle() and (firstVehicle() :: Config.CarDef).id == Config.VanQuest.Car then Config.VanQuest.Place else "Dead End Motors"}`
+		elseif walking then `NEEDS {string.upper(vehicleShort())} · PRESS CAR`
 		elseif info.open == true then "Pick one: each run has its own trade-off"
 		elseif myLevel() < level then `LOCKED · LEVEL {level}{if licence then ` and the {licence.stars} licence` else ""}`
 		elseif licence then `LOCKED · LICENCE {licence.have or 0} / {licence.need or 0} · jobs rated ★★+ at {licence.atStars}`

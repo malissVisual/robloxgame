@@ -6,9 +6,10 @@
 -- Cast.luau); the villains are Big Move Movers (Config.Employers "movers": Dana, the boss), movers turned thieves.
 -- Pure data and helpers (no Roblox at the top level: tests/movestory_test.luau); the numbers are Config.MoveStory's.
 --
---   MoveStory.Chapters        the story road in its unlock order: the prologue (Marge's house, the one playable now:
---                             its `contract` is Config.Moving.Contracts' "marge"), six chapters and the finale, the
---                             others `soon = true`. A chapter: id, number (0 … 7), title, its client (a Cast id, a
+--   MoveStory.Chapters        the story road in its unlock order: the prologue (Marge's house: its `contract` is
+--                             Config.Moving.Contracts' "marge"), six chapters and the finale; 7.x farm move: chapter 1
+--                             plays Walt's Farm ("walt"), the others `soon = true`. A chapter: id, number (0 … 7), title,
+--                             its client (a Cast id, a
 --                             partner's for two faces), place, icon, colour, requires (the chapters before it), hook
 --                             (two or three sentences), blurb (the client's line on the contract card), keepsakes (the
 --                             ★ sentimental things and their stories: FurnitureLooks ids where the furniture exists),
@@ -19,6 +20,10 @@
 --   MoveStory.Intro           Marge's cards the first time somebody opens the Moving contracts board (the evacuation,
 --                             the Wall, the new name); seen once a save: the "intro" seen key (server/PlayerData.luau
 --                             profile.story, the player attribute MoveStory)
+--   7.x farm move, the chapters done (the same save flags: MoveStory.doneKey(id) = "done:<chapter id>", set by
+--   server/Moving.luau for the crew that delivered a chapter's move, read only from a real save):
+--     MoveStory.doneKey(id) / unlocked(chapter, seen) / blocker(chapter, seen) / lockText(chapter, seen)
+--     MoveStory.status(chapter, seen?)   "play" | "locked" (a chapter before it not done yet; only with `seen`) | "soon"
 --   MoveStory.Villain         Dana of Big Move Movers as a Cast-shaped person (a portrait like the world's NPC)
 --   MoveStory.find(id) / forContract(id or name) / label(chapter) / status(chapter) / speaker(who) / roleOf(person)
 --   MoveStory.outcome(how, stars)   the move's end (MovingRules phase: done | late | cancelled | failed) and its stars
@@ -26,8 +31,18 @@
 --   MoveStory.dispatchText(contract) / debriefText(contract, how, stars)   Marge's phone texts (server/Moving.luau's
 --                             MoveStory hook sends them through the Tutorial remote's "message")
 --   MoveStory.thanksLine(contract, how, stars)   the client's line for the result card (client/MoveStoryUi.luau)
---   MoveStory.isSeenKey(key) / cleanSeen(saved) / encodeSeen(seen) / decodeSeen(text)   the seen flags in the save
---                             and on the player attribute (a sorted, comma-separated list of keys)
+--   MoveStory.isSeenKey(key) / cleanSeen(saved, rewards?) / encodeSeen(seen) / decodeSeen(text)   the seen flags in the
+--                             save and on the player attribute (a sorted, comma-separated list of keys); 7.2 review:
+--                             isCardKey(key), the keys a client may mark (CardKeys: "intro", never a chapter done)
+--   The greeters (7.0: the people who welcome a crew; server/MoveGreeters.luau says these in speech bubbles, each at
+--   most Config.MoveStory.Limits.Bubble characters):
+--     a chapter's `greeter`   its client on the porch of the house: hello (2 – 3 lines when the crew comes), star (a ★
+--                             thing carried out past them; 7.x farm move: `stars`, a line of its own for a ★ piece by its
+--                             FurnitureLooks id, else `star`), horde (the horde comes), leave (the loaded truck drives off)
+--     MoveStory.starLine(greeter, item)   the line for this ★ piece
+--     MoveStory.Wall          the soldier at the Wall's checkpoint: welcome (a move's truck delivered at the drop-off)
+--     MoveStory.Kiosk         Marge at the depot's Moving contracts kiosk: her lines, one each time (kioskLine)
+--     MoveStory.greeterOf(contract) / kioskLine(n)
 
 local Config = require(script.Parent.Config)
 local Cast = require(script.Parent.Cast)
@@ -40,6 +55,8 @@ export type Line = { who: string, text: string }
 -- in the story and why it matters.
 export type Keepsake = { item: string, name: string, story: string }
 export type Outcomes = { great: string, ok: string, late: string, failed: string }
+-- 7.0 greeters: what a chapter's client says on the porch (server/MoveGreeters.luau).
+export type Greeter = { hello: { string }, star: string, stars: { [string]: string }?, horde: string, leave: string }
 export type Chapter = {
 	id: string,
 	number: number, -- 0: the prologue, 1 … 6, 7: the finale
@@ -61,6 +78,7 @@ export type Chapter = {
 	dispatch: string,
 	debrief: Outcomes,
 	thanks: Outcomes,
+	greeter: Greeter?, -- 7.0 greeters: the client on the porch (a playable chapter's)
 }
 
 MoveStory.Outcomes = { "great", "ok", "late", "failed" }
@@ -79,8 +97,12 @@ MoveStory.Villain = {
 	color = { 120, 40, 36 },
 }
 
--- Seen once a save (server/PlayerData.luau profile.story): only these keys are kept.
+-- Seen once a save (server/PlayerData.luau profile.story): only these keys are kept (7.x farm move: and a chapter done,
+-- "done:<chapter id>", added after the chapters below).
 MoveStory.SeenKeys = { "intro" }
+-- 7.2 review: the cards a client marks seen itself (the Tutorial remote's ("story", key): server/Tutorial.luau asks
+-- isCardKey). A chapter done is never one: only server/Moving.luau marks it.
+MoveStory.CardKeys = { "intro" }
 
 -- Marge's intro: the first time the Moving contracts board opens.
 MoveStory.Intro = {
@@ -135,6 +157,13 @@ MoveStory.Chapters = {
 			late = "Half my house is behind the Wall, half is somebody's dinner table. Better than nothing.",
 			failed = "My whole life is out there with the dead. Go back. I'll make coffee. Strong.",
 		},
+		-- 7.0 greeters: Marge on her porch (server/MoveGreeters.luau)
+		greeter = {
+			hello = { "Oh thank heavens, ZDC!", "The door's open. Everything inside goes.", "And mind Grandpa's clock!" },
+			star = "Careful with that!",
+			horde = "They're coming! Hurry!",
+			leave = "Thank you… see you behind the Wall.",
+		},
 	},
 	{
 		id = "ranch",
@@ -142,26 +171,29 @@ MoveStory.Chapters = {
 		title = "Hold Your Horses",
 		clientId = "walt",
 		client = "Walt",
-		place = "Silver Spur Ranch",
+		place = "Walt's farm, the Old Farm",
 		icon = "🐴",
 		color = { 200, 150, 90 },
-		soon = true,
+		contract = "walt", -- 7.x farm move: Walt's Farm (Config.Moving.Contracts), open once the prologue is done
 		requires = { "prologue" },
-		hook = "The Wall stops a mile short of the Silver Spur Ranch, and Walt isn't leaving a single horse behind. Saddles, a tractor, a barn full of feed and animals that kick. Heavy, loud and down a dirt road.",
+		hook = "The Wall stops a mile short of Walt's farm, and Walt isn't leaving a single saddle behind. A farmhouse, a barn full of feed and a hay wagon too wide for any door but the barn's. Heavy, loud and down a dirt road.",
 		blurb = "Fifty years on this land, partner. The land stays. Everything that breathes or bucks comes with me.",
+		-- (Walt's Farm, seed 1921 of shared/Layouts/Farm.luau's plan: its ★ pieces are Thunder's saddle, the
+		-- branding iron and Grandma's milk churn; the cowbells are the fourth sentimental piece another seed may pick)
 		keepsakes = {
-			{ item = "saddle", name = "Thunder's saddle", story = "Walt's old stallion won't take a rider without it. Or with it, some days." },
+			{ item = "thunders_saddle", name = "Thunder's saddle", story = "Walt's old stallion won't take a rider without it. Or with it, some days." },
 			{ item = "branding_iron", name = "The branding iron", story = "The Silver Spur's mark since 1921. Walt's grandpa forged it in the barn." },
-			{ item = "guitar", name = "Walt's guitar", story = "Three strings, one song. He swears it's the only one that matters." },
+			{ item = "grandmas_churn", name = "Grandma's milk churn", story = "Grandma churned butter in it every morning for sixty years. Walt still can't." },
+			{ item = "cowbells", name = "The cowbells", story = "One bell for every cow Walt ever named. He named all of them." },
 		},
 		briefing = {
-			{ who = "walt", text = "Howdy, partner. Maria's Wall stops a mile short of my fence. So the ranch goes to the Wall instead." },
-			{ who = "walt", text = "Horses ride in the trailer, the tractor rides behind the truck, the saddles ride with me. Nobody rides the cows." },
-			{ who = "marge", text = "A heavy one, rookie. Two people on the feed troughs, or one person and a lot of regret." },
+			{ who = "walt", text = "Howdy, partner. Maria's Wall stops a mile short of my fence. So the farm goes to the Wall instead." },
+			{ who = "walt", text = "The ★ things ride with me: Thunder's saddle, the branding iron and Grandma's milk churn. The rest rides with you." },
+			{ who = "marge", text = "Two ways in, rookie: house and barn. The hay wagon only fits through the barn doors, and it rides hitched behind your van." },
 			{ who = "walt", text = "Rust Riders are sniffing round the barn, and an outfit in orange trucks calls itself 'movers'. Keep your eyes open." },
 		},
 		taunt = "Nice horses, cowboy. We take anything with legs and a price tag.",
-		dispatch = "Walt's saddles are in the barn and the horses are in a mood. Load the animals last, they hate waiting.",
+		dispatch = "Thunder's saddle is in the stable, the iron in the workshop. The hay wagon goes out the barn doors and rides on your van's hitch.",
 		debrief = {
 			great = "Walt says the horses rode better than his last wife. I don't want to know. Ellie called: the clinic can't wait.",
 			ok = "Most of the herd made it, the tractor didn't. Walt is holding a funeral for it. Ellie needs us next.",
@@ -173,6 +205,19 @@ MoveStory.Chapters = {
 			ok = "Lost a few things, kept what counts. Thunder's eating hay behind a wall. That'll do.",
 			late = "Half my barn's on the wrong side now. The cows are the zombies' problem.",
 			failed = "Fifty years, gone with the dust. Don't you dare quit on me now, partner.",
+		},
+		-- 7.x farm move: Walt at his farmhouse's door (server/MoveGreeters.luau)
+		greeter = {
+			hello = { "Howdy, ZDC! About time.", "House and barn are open. Take it all.", "The wagon goes out the barn doors!" },
+			star = "Easy with that, partner!",
+			stars = {
+				thunders_saddle = "Easy with Thunder's saddle!",
+				branding_iron = "Mind Grandpa's iron, it still bites!",
+				grandmas_churn = "Gentle! That's Grandma's churn!",
+				cowbells = "Don't ring 'em, the cows still listen!",
+			},
+			horde = "Here they come! Saddle up!",
+			leave = "Much obliged. See you behind the Wall.",
 		},
 	},
 	{
@@ -420,6 +465,14 @@ for _, chapter in MoveStory.Chapters do
 	byId[chapter.id] = chapter
 end
 
+-- 7.x farm move: a chapter done is a seen key of the save ("done:prologue"), in the story road's order.
+function MoveStory.doneKey(id: string): string
+	return `done:{id}`
+end
+for _, chapter in MoveStory.Chapters do
+	table.insert(MoveStory.SeenKeys, MoveStory.doneKey(chapter.id))
+end
+
 function MoveStory.find(id: any): Chapter?
 	return if type(id) == "string" then byId[id] else nil
 end
@@ -454,9 +507,36 @@ function MoveStory.label(chapter: Chapter): string
 	return `CHAPTER {chapter.number}`
 end
 
--- "play": its contract is on the board; "soon": not built yet.
-function MoveStory.status(chapter: Chapter): string
-	return if chapter.soon ~= true and chapter.contract ~= nil then "play" else "soon"
+-- 7.x farm move: every chapter before it done (`seen`: the save's flags, MoveStory.decodeSeen / cleanSeen)?
+function MoveStory.unlocked(chapter: Chapter, seen: { [string]: boolean }?): boolean
+	return MoveStory.blocker(chapter, seen) == nil
+end
+
+-- The first chapter before it that is not done yet (nil: none, it is open).
+function MoveStory.blocker(chapter: Chapter, seen: { [string]: boolean }?): Chapter?
+	for _, id in chapter.requires do
+		if not (seen and seen[MoveStory.doneKey(id)] == true) then
+			return byId[id]
+		end
+	end
+	return nil
+end
+
+-- What a locked chapter's card says: "🔒 Finish the PROLOGUE, Everything Must Go, first." (nil: it is open).
+function MoveStory.lockText(chapter: Chapter, seen: { [string]: boolean }?): string?
+	local first = MoveStory.blocker(chapter, seen)
+	return if first then `🔒 Finish the {MoveStory.label(first)}, {first.title}, first.` else nil
+end
+
+-- "play": its contract is on the board (with `seen`: and every chapter before it is done); "locked": a chapter before it
+-- is not done yet (only with `seen`); "soon": not built yet.
+function MoveStory.status(chapter: Chapter, seen: { [string]: boolean }?): string
+	if chapter.soon == true or chapter.contract == nil then
+		return "soon"
+	elseif seen and not MoveStory.unlocked(chapter, seen) then
+		return "locked"
+	end
+	return "play"
 end
 
 -- Who says a line: a Cast person or the villain (nil for an unknown id).
@@ -503,20 +583,58 @@ function MoveStory.thanksLine(contract: any, how: string?, stars: number?): stri
 	return if chapter then (chapter.thanks :: any)[MoveStory.outcome(how, stars)] else nil
 end
 
+-- ── The greeters (7.0: server/MoveGreeters.luau) ──────────────────────────────────────────────────────────────────
+
+-- The soldier at the Wall's checkpoint, when a move's truck is delivered at the drop-off.
+MoveStory.Wall = {
+	welcome = "Welcome to the safe zone. Unload over there.",
+}
+
+-- Marge at the depot's Moving contracts kiosk, to a player who walks up to it (one line each time, in turn).
+MoveStory.Kiosk = {
+	"New contract, sweetie?",
+	"Back for more, sweetie? Pick a house.",
+	"Trucks are fuelled. New contract, sweetie?",
+} :: { string }
+
+-- The client's lines on the porch of this contract's house (nil: nobody greets there).
+function MoveStory.greeterOf(contract: any): Greeter?
+	local chapter = MoveStory.forContract(contract)
+	return if chapter then chapter.greeter else nil
+end
+
+-- 7.x farm move: the client's line for a ★ piece carried past (its own, else the greeter's `star`).
+function MoveStory.starLine(greeter: Greeter, item: string?): string
+	local own = greeter.stars
+	return if own and item and own[item] then own[item] else greeter.star
+end
+
+-- Marge's kiosk line number `n` (1, 2, … round the list).
+function MoveStory.kioskLine(n: number): string
+	local count = #MoveStory.Kiosk
+	return MoveStory.Kiosk[((math.max(1, math.floor(n)) - 1) % count) + 1]
+end
+
 -- ── The seen flags (the save, the player attribute MoveStory) ───────────────
 
 function MoveStory.isSeenKey(key: any): boolean
 	return type(key) == "string" and table.find(MoveStory.SeenKeys, key) ~= nil
 end
 
--- A saved table checked: only known keys set to true (anything else: an empty table).
-function MoveStory.cleanSeen(saved: any): { [string]: boolean }
+-- 7.2 review: may a client mark this key (a card it was shown: CardKeys)?
+function MoveStory.isCardKey(key: any): boolean
+	return type(key) == "string" and table.find(MoveStory.CardKeys, key) ~= nil
+end
+
+-- A saved table checked: only known keys set to true (anything else: an empty table). 7.2 review: `rewards` (the save's
+-- rewards) adds the chapters done kept there: an older server keeps only "intro" of the story but every short key of
+-- the rewards (server/PlayerData.luau writes them to both).
+function MoveStory.cleanSeen(saved: any, rewards: any?): { [string]: boolean }
 	local seen: { [string]: boolean } = {}
-	if type(saved) == "table" then
-		for _, key in MoveStory.SeenKeys do
-			if saved[key] == true then
-				seen[key] = true
-			end
+	for _, key in MoveStory.SeenKeys do
+		local done = string.sub(key, 1, 5) == "done:"
+		if (type(saved) == "table" and saved[key] == true) or (done and type(rewards) == "table" and rewards[key] == true) then
+			seen[key] = true
 		end
 	end
 	return seen

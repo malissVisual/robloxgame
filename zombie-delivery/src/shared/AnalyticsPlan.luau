@@ -226,6 +226,8 @@ AnalyticsPlan.Sources = {
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
 	BagRefund = "Refund", -- 6.23: an old save's bags, owned for good before, paid back once (bags are bought each game now)
+	CarRefund = "Refund", -- 7.x: an old save's cars (all but the ZDC Van left the game), paid back once (Config.CompanyVan); 7.2 review: with what the van could not take over and the employers' bonuses for vehicles it had earned
+	EmployerBonus = "Gameplay", -- 7.x: an employer's bonus after their jobs (Config.Employers bonus: their vehicle before)
 	PropertySale = "Sale", -- real estate sold
 	Admin = "Admin", -- the admin panel
 }

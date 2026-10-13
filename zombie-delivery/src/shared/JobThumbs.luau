@@ -114,7 +114,7 @@ JobThumbs.Special = {
 	cashrun = "bank",
 	ambulance = "clinic",
 	pizzarush = "pizzeria",
-	freightrun = "warehouse",
+	-- (7.x: the Freight Run, "warehouse", is retired: the ZDC Van takes no pallets)
 } :: { [string]: string }
 
 JobThumbs.Round = "news" -- the newspaper round: The Daily Undead

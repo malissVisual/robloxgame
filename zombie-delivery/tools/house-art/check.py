@@ -32,12 +32,12 @@ PREFIX = ('local M = require("./ItemMock")\n'
           'local Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n')
 # World's buildHouse lines the harness copies (if World changes them, change the harness with it).
 WORLD_LINES = (
-    'part(house, "House", Vector3.new(w, h, d), body * CFrame.new(0, h / 2, 0), color, Enum.Material.WoodPlanks)',
-    'gableRoof(house, body * CFrame.new(0, h, 0), w + 2, d + 2, 6,',
-    'part(house, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -0.2)',
-    'deco(part(house, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -0.15)',
+    # (7.x merge: since 7.1 a Suburbs house is a chalet, server/Chalets.luau on the same w × h × d "House" box; the
+    # harness still builds the box house HouseMesh dresses: the box, the model, the dress call are what it relies on)
+    'house.Name = "House_" .. home.id',
+    'house:SetAttribute("Home", home.id)',
+    'require(script.Parent.Chalets).house(house, frame, {',
     'HouseMesh.dress(house, home.id)',
-    'local body = frame * CFrame.new(0, 0, d / 2)',
 )
 ROOF_LINES = (
     'part(parent, "Roof", Vector3.new(w, h, half), frame * CFrame.new(0, h / 2, -half / 2), color, Enum.Material.Slate).Shape = Enum.PartType.Wedge',

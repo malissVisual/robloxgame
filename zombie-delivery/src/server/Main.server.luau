@@ -72,7 +72,13 @@ PhysicsService:CollisionGroupSetCollidable("Bullet", "Corpse", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
+-- 7.2: the maps' Alps for every client (shared/MapStyle.luau, client/MapView.luau): the ring and the forest worked out
+-- once here (World.build's Alpine piece then reuses them) and packed in ReplicatedStorage.MapStyle.
+require(Shared.MapStyle).publish(ReplicatedStorage)
 World.build()
+-- 7.1 review: the Alps' terrain fills and forests (thousands of fills) once the server is wired: PLAY and the lighting
+-- never wait for them (the far silhouettes and the pass stand already).
+task.defer(World.buildLate)
 
 local notice = Net.get("Notice")
 local stateRemote = Net.get("State")
@@ -116,7 +122,6 @@ local function sendState(player: Player)
 		regulars = profile.regulars, -- 6.14: the deliveries for each business (the REGULARS app, the job lists' badges)
 		skills = profile.skills, -- 6.20: the skills' ranks (CAREER's SKILLS tab; the points are the level's)
 		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
-		vanQuest = profile.vanQuest, -- 5.0: Earl's van (nil, "open", "done"; the phone's SHOP, the career road)
 	})
 end
 
@@ -263,7 +268,7 @@ safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the charact
 require(Server.Skills).involved = Jobs.involved -- 6.20: no RESET during a job or a mission; its charges fill when one starts
 require(Server.Skills).jobKey = Jobs.jobKey -- 6.20 review: the charges fill once a new job (not a respawn, not a cancelled one)
 safely("Skills", require(Server.Skills).start) -- 6.20: the skill tree (+1 POINT, RESET), the max health, the healing
-safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
+safely("VanQuest", VanQuest.start) -- 5.0: Earl's van (7.x: retired: his lot keeps his old van for show, he only talks)
 safely("KitWear", KitWear.start) -- 5.0: the kit you own worn on your character, the phone in your hand
 safely("Fuel", Fuel.start) -- 5.4: the tanks, the burn, the pumps, the jerry cans, the tow
 safely("StyleWear", require(Server.StyleWear).start) -- 6.12: the cosmetics (the STYLE app), after KitWear and Vehicles
@@ -295,8 +300,10 @@ local function giveCar(player: Player)
 	local profile = PlayerData.get(player)
 	local carId = Jobs.vehicleFor(player)
 	Jobs.returnLent(player) -- 5.0: a company vehicle of a job that is over does not stay with you
-	-- 5.0: nobody to give a car to while you are on foot (no vehicle yet).
-	if player.Parent and playing[player] and not Vehicles.get(player) and profile and (carId or profile.car) then
+	-- 5.0: nobody to give a car to while you are on foot (no vehicle yet). 7.x: everybody has the ZDC Van, but Marge's
+	-- first day runs on foot: while it is ahead the van waits (CAR brings it; she texts about it when the day ends).
+	local onFoot = carId == nil and Tutorial.ahead(player)
+	if player.Parent and playing[player] and not Vehicles.get(player) and profile and (carId or profile.car) and not onFoot then
 		Vehicles.spawn(player, true, carId)
 	end
 end
@@ -486,7 +493,6 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 	step("Estate", Estate.onPlay)
 	step("the car", giveCar)
 	step("Tutorial", Tutorial.onPlay) -- 3.7: a new player's welcome (after StartDelay)
-	step("VanQuest", VanQuest.onPlay) -- 5.0: Marge's text about Earl's van, when it is due
 	if failed and player.Parent then
 		playing[player] = nil
 	end

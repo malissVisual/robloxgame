@@ -276,7 +276,7 @@ R.player = function()
 		end)
 	end
 
-	heading("Spawn a car", "It comes right now on the road next to the target (yellow = an employer's company vehicle).")
+	heading("Spawn a car", "It comes right now on the road next to the target (7.x: the ZDC Van and the bikes, the only vehicles a player has).")
 	local cars = grid(150)
 	for _, def in Config.Cars do
 		action(cars, def.name, if def.company then C.yellow else C.blue, function()
@@ -284,7 +284,13 @@ R.player = function()
 		end)
 	end
 
-	heading("Car stages", "The car at that stage (given first if the target lacks it). The equipped car is rebuilt now, during a job after it.")
+	local staged = false -- (7.x: the ZDC Van has one stage: no rows, no heading)
+	for _, def in Config.Cars do
+		staged = staged or Economy.maxStage(def.id) > 0
+	end
+	if staged then
+		heading("Car stages", "The car at that stage (given first if the target lacks it). The equipped car is rebuilt now, during a job after it.")
+	end
 	for _, def in Config.Cars do
 		local top = Economy.maxStage(def.id)
 		if top > 0 then
@@ -535,7 +541,7 @@ R.events = function()
 		send("liveEvent", "end")
 	end)
 	-- 7.0, MOVES (server/Moving.luau admin): your own house move, the prologue's (Marge's House)
-	heading("Moves · 7.0 prototype", "Your own move: the contract card (as the depot's board opens it), or START at once with the truck; HOUSE takes you (and the car you drive) to its door; HORDE now, 1 MIN left, DELIVER (paid with the truck's load) or END (called off).")
+	heading("Moves · 7.0 prototype", "Your own move in your ZDC Van: the contract card (as the depot's board opens it), or START at once; HOUSE takes you (and the car you drive) to its door; the FARM row is Walt's Farm's (chapter 1). HORDE now, 1 MIN left, TRIP (the van's load delivered, as at the Wall), DELIVER (that and finished) or END (called off).")
 	local moves = grid(200)
 	action(moves, "🏠 MOVE: CONTRACT CARD", P.gold, function()
 		send("move", "card")
@@ -557,6 +563,19 @@ R.events = function()
 	end)
 	action(moves, "MOVE: END", C.grey, function()
 		send("move", "end")
+	end)
+	-- 7.x farm move: Walt's Farm (chapter 1) and a van trip
+	action(moves, "🐴 FARM: CONTRACT CARD", P.gold, function()
+		send("move", "farmcard")
+	end)
+	action(moves, "▶ FARM: START NOW", C.yellow, function()
+		send("move", "farm")
+	end)
+	action(moves, "FARM: GO TO THE FARM", C.blue, function()
+		send("move", "farmgo")
+	end)
+	action(moves, "🚐 MOVE: TRIP NOW", C.green, function()
+		send("move", "trip")
 	end)
 end
 

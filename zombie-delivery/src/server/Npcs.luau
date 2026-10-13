@@ -15,6 +15,8 @@
 -- makes no progress (`stuck`) instead of pushing against a wall.
 -- 5.7: Npcs.act names a short arm gesture (a wave, holding a piece out, reaching for it, a knock) on a person or a
 -- courier; the clients play it (client/ArmPose.luau, shared/Gestures.luau).
+-- 7.x: Npcs.carried / Npcs.stride: a person moved by constraints (Danny at the far end of a piece you carry together,
+-- server/MoveHelper.luau): its own walk off, the legs stepping with the speed it moves at.
 
 -- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
 -- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
@@ -24,6 +26,7 @@
 -- 6.9 (the owner: "everybody blocky R15, like Roblox"): the people are Roblox's own classic blocky R15 again, the
 -- couriers' body (shared/AvatarLook.luau's Body; a kid smaller), dressed as before 6.7. The realistic body's paint
 -- groups, head sizes and stride stay for a body that carries CharacterArt (none is built here any more).
+-- 7.x farm move: a moustache and a check shirt (NpcLooks moustache, plaid: Walt at his farm) from a few welded parts.
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -251,6 +254,16 @@ local function dress(model: Model, look: Look)
 			end
 			wear(model, torso, "Pocket", Vector3.new(s.X * 0.18, s.Y * 0.16, 0.04), CFrame.new(-s.X * 0.32, s.Y * 0.16, -s.Z * 0.6), Color3.fromRGB(60, 120, 200), Enum.Material.SmoothPlastic)
 		end
+		if look.plaid then
+			-- 7.x farm move: a check shirt (Walt): two bands across and two down, round the torso
+			local band = rgb(look.plaid, shirt)
+			for _, y in { 0.18, -0.22 } do
+				wear(model, torso, "Plaid", Vector3.new(s.X * 1.02, s.Y * 0.09, s.Z * 1.04), CFrame.new(0, s.Y * y, 0), band)
+			end
+			for _, x in { -0.22, 0.22 } do
+				wear(model, torso, "Plaid", Vector3.new(s.X * 0.09, s.Y * 0.98, s.Z * 1.04), CFrame.new(s.X * x, 0, 0), band)
+			end
+		end
 		-- A collar.
 		wear(model, torso, "Collar", Vector3.new(s.X * 0.42, s.Y * 0.08, s.Z * 0.9), CFrame.new(0, s.Y * 0.48, 0), shirt:Lerp(Color3.new(0, 0, 0), 0.15))
 	end
@@ -288,6 +301,14 @@ local function dress(model: Model, look: Look)
 		-- Hair: an ellipsoid over the top and the back of the head.
 		wear(model, head, "Hair", Vector3.new(h.X * 1.04, h.Y * 0.62, h.Z * 1.06), CFrame.new(0, h.Y * 0.24, h.Z * 0.06), rgb(look.hair, Color3.new(0, 0, 0)), Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
 	end
+	if look.moustache then
+		-- 7.x farm move: a moustache under the nose (Walt's), its ends drooping a little
+		local tache = rgb(look.moustache, Color3.fromRGB(120, 110, 100))
+		wear(model, head, "Moustache", Vector3.new(h.X * 0.46, h.Y * 0.1, h.Z * 0.12), CFrame.new(0, -h.Y * 0.14, -h.Z * 0.5), tache, Enum.Material.SmoothPlastic)
+		for _, side in { -1, 1 } do
+			wear(model, head, "Moustache", Vector3.new(h.X * 0.09, h.Y * 0.16, h.Z * 0.1), CFrame.new(side * h.X * 0.23, -h.Y * 0.2, -h.Z * 0.49), tache, Enum.Material.SmoothPlastic)
+		end
+	end
 	if look.bandage then
 		-- A white band round the forehead, a plaster on the cheek.
 		wear(model, head, "Bandage", Vector3.new(h.Y * 0.24, h.X * 1.08, h.Z * 1.1), CFrame.new(0, h.Y * 0.2, 0) * UPRIGHT, Color3.fromRGB(246, 244, 238), Enum.Material.Fabric, nil, Enum.PartType.Cylinder)
@@ -320,7 +341,7 @@ local function lookKey(look: Look): string
 	return table.concat({
 		c(look.skin), c(look.shirt), c(look.pants), c(look.hatColor), c(look.hair), c(look.vest), c(look.apron), c(look.shoes),
 		look.hat or "none", tostring(look.child == true), tostring(look.boots == true), tostring(look.shortSleeves == true),
-		c(look.coat), c(look.tie), tostring(look.bandage == true),
+		c(look.coat), c(look.tie), tostring(look.bandage == true), c(look.moustache), c(look.plaid), -- (7.x farm move: Walt's)
 	}, "|")
 end
 
@@ -448,8 +469,9 @@ local function nameTag(head: BasePart, look: Look)
 	end
 end
 
--- A line in a speech bubble over the head for a few seconds.
-function Npcs.say(npc: Model, text: string, seconds: number?)
+-- A line in a speech bubble over the head for a few seconds; `range`: studs it is seen from (7.0 greeters: Marge's
+-- word at the Moving contracts kiosk from the job board; nil: the name tag's NAME_RANGE).
+function Npcs.say(npc: Model, text: string, seconds: number?, range: number?)
 	local state = states[npc]
 	local head = if state then state.head or state.root else nil
 	if not state or not head then
@@ -476,7 +498,7 @@ function Npcs.say(npc: Model, text: string, seconds: number?)
 	gui.Size = UDim2.fromOffset(width, height + 10)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y * 0.5 + 0.9, 0)
 	gui.SizeOffset = Vector2.new(0, 0.5)
-	gui.MaxDistance = NAME_RANGE
+	gui.MaxDistance = range or NAME_RANGE
 	gui.LightInfluence = 0
 	gui.Parent = head
 	local bubble = Instance.new("Frame")
@@ -724,6 +746,57 @@ function Npcs.gesture(npc: Model)
 	local tween = TweenService:Create(root, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), { CFrame = goal })
 	state.turn = tween
 	tween:Play()
+end
+
+-- 7.x Danny's two-person carry (server/MoveHelper.luau): a body moved by something else (constraints on its root at
+-- the far end of a piece a player carries), not by its own walk. Npcs.carried(npc, true): any walk stops, the root is
+-- free (unanchored) and the humanoid stands still on it (PlatformStand: no forces of its own, no turns); false: it
+-- stands again (anchored, upright, idle). Npcs.stride(npc, speed) meanwhile: the legs for `speed` studs/s along its
+-- facing (negative: backwards, the walk played in reverse), idle under half a stud a second.
+function Npcs.carried(npc: Model, on: boolean)
+	local state = states[npc]
+	if not state then
+		return
+	end
+	state.walkToken += 1
+	if state.turn then
+		state.turn:Cancel()
+		state.turn = nil
+	end
+	local humanoid = state.humanoid
+	if on then
+		state.root.Anchored = false
+		if humanoid then
+			humanoid:Move(Vector3.zero)
+			humanoid.PlatformStand = true
+		end
+		return
+	end
+	if humanoid then
+		humanoid.PlatformStand = false
+	end
+	stand(state)
+end
+
+function Npcs.stride(npc: Model, speed: number)
+	local state = states[npc]
+	if not state or not state.humanoid then
+		return
+	end
+	local pace = math.abs(speed)
+	if pace < 0.5 then
+		if state.moving then
+			play(state, false)
+		end
+		return
+	end
+	state.gait = state.walk -- (a carry's steps: never the run)
+	state.walkRate = pace / (STRIDE * state.scale)
+	play(state, true)
+	local gait = state.gait
+	if gait then
+		gait:AdjustSpeed(if speed < 0 then -state.walkRate else state.walkRate)
+	end
 end
 
 -- 5.7: a short arm gesture (shared/Gestures.luau: "wave", "give", "take", "knock") on a person or a player's

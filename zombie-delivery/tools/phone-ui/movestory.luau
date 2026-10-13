@@ -3,7 +3,7 @@
 -- remote's messages: the contract card without an intro (the profile not loaded, or the intro seen), Marge's intro the
 -- first time (her portrait, the pages, NEXT by the keys and by a tap, the server told it was seen, then the card), the
 -- card's CHAPTERS (the story road: the prologue ▶ PLAY, six chapters and the finale 🔒 SOON, a tap shows a chapter's
--- hook), START through the briefing (✕ back to the card, Big Move Movers on the radio as its last card, SKIP starts),
+-- hook; 7.x farm move: chapter 1 🔒 LOCKED until the prologue is done, then ▶ PLAY; the card's list of contracts), START through the briefing (✕ back to the card, Big Move Movers on the radio as its last card, SKIP starts),
 -- a briefed chapter starting at once, the client's thanks on the result card by the outcome, and the story card on a
 -- phone (in the middle, never wider than the screen, a finger's buttons). Behaviour, not looks: Studio shows those.
 local M = require("./missions_mock")
@@ -118,7 +118,7 @@ local card = {
 	estimate = 9000,
 	time = Config.Moving.Time,
 	hordeAt = Config.Moving.HordeAt,
-	truck = "Moving Truck",
+	truck = "ZDC Van",
 	crew = 0,
 }
 local function story()
@@ -206,20 +206,66 @@ local first = named(road, "Chapter_prologue")
 check("the prologue: ▶ PLAY, its title, Marge, her portrait, lit (it is this contract)", has(first, "▶ PLAY") and has(first, prologue.title) and has(first, "Marge") and has(first, "PROLOGUE")
 	and named(first, "PortraitBack") ~= nil and named(first, "Lit").Transparency == 0)
 local soon = 0
-for index = 2, #MoveStory.Chapters do
+for index = 3, #MoveStory.Chapters do
 	local chapter = MoveStory.Chapters[index]
 	local made = named(road, `Chapter_{chapter.id}`)
 	if made and has(made, "🔒 SOON") and has(made, chapter.title) and has(made, chapter.client) and has(made, MoveStory.label(chapter)) then
 		soon += 1
 	end
 end
-check("the six chapters and the finale: 🔒 SOON with their title, client and label", soon == #MoveStory.Chapters - 1, soon)
+check("chapters 2 – 6 and the finale: 🔒 SOON with their title, client and label", soon == #MoveStory.Chapters - 2, soon)
+local ranch = MoveStory.Chapters[2]
+local ranchTile = named(road, "Chapter_ranch")
+check("7.x farm move: chapter 1 (Walt's Farm) 🔒 LOCKED while the prologue is not done (the save's flags)", has(ranchTile, "🔒 LOCKED") and has(ranchTile, ranch.title)
+	and has(ranchTile, "Walt") and has(ranchTile, "CHAPTER 1"))
 local detail = named(chaptersBox, "Detail")
 check("under the road: Marge's blurb for this contract", string.find(detail.Text, prologue.blurb, 1, true) ~= nil)
-press(named(road, "Chapter_ranch"))
-local ranch = MoveStory.Chapters[2]
-check("a tap on Walt's chapter: its hook, SOON, its tile lit (the prologue's not)", string.find(detail.Text, ranch.hook, 1, true) ~= nil and string.find(detail.Text, "SOON", 1, true) ~= nil
-	and named(named(road, "Chapter_ranch"), "Lit").Transparency == 0 and named(first, "Lit").Transparency > 0.5)
+local asked = #sentOn("Moving")
+press(ranchTile)
+check("a tap on Walt's chapter: what to finish first and its hook, its tile lit (the prologue's not), no card asked",
+	string.find(detail.Text, "Finish the PROLOGUE", 1, true) ~= nil and string.find(detail.Text, ranch.hook, 1, true) ~= nil
+	and named(ranchTile, "Lit").Transparency == 0 and named(first, "Lit").Transparency > 0.5 and #sentOn("Moving") == asked)
+
+-- 7.x farm move: the board's contracts on the card ---------------------------------------------------------------------
+
+local locked = table.clone(card)
+locked.contracts = {
+	{ id = "marge", name = "Marge's House", icon = "🏠", client = "Marge", chapter = "prologue", open = true },
+	{ id = "walt", name = "Walt's Farm", icon = "🐴", client = "Walt", chapter = "ranch", open = false, why = "🔒 Finish the PROLOGUE, Everything Must Go, first." },
+}
+remote.OnClientEvent:Fire("contract", locked)
+local strip = named(contractCard(), "Contracts")
+check("the card lists the board's contracts: Marge's House (this one), Walt's Farm 🔒", strip ~= nil and has(named(strip, "Contract_marge"), "MARGE'S HOUSE")
+	and has(named(strip, "Contract_walt"), "🔒 WALT'S FARM") and named(contractCard(), "ContractWhy").Visible == false)
+press(named(strip, "Contract_walt"))
+check("…a tap on the locked one says why, asks nothing", named(contractCard(), "ContractWhy").Visible == true
+	and has(named(contractCard(), "ContractWhy"), "Finish the PROLOGUE") and #sentOn("Moving") == asked)
+press(named(strip, "Contract_marge"))
+check("…a tap on this one does nothing", #sentOn("Moving") == asked)
+M.player:SetAttribute("MoveStory", "intro,done:prologue")
+local opened = table.clone(locked)
+opened.contracts = table.clone(locked.contracts)
+opened.contracts[2] = table.clone(locked.contracts[2])
+opened.contracts[2].open, opened.contracts[2].why = true, nil
+remote.OnClientEvent:Fire("contract", opened)
+check("the prologue done: Walt's Farm open on the card, chapter 1 ▶ PLAY, 2 OF 8 OPEN", has(named(named(contractCard(), "Contracts"), "Contract_walt"), "🐴 WALT'S FARM")
+	and has(named(contractCard(), "Chapter_ranch"), "▶ PLAY") and has(named(contractCard(), "MoveStoryChapters"), "2 OF 8 OPEN"))
+press(named(named(contractCard(), "Contracts"), "Contract_walt"))
+local sent = sentOn("Moving")
+check("…its chip asks the server for its card (Moving: card, walt)", #sent == asked + 1 and sent[#sent][1] == "card" and sent[#sent][2] == "walt")
+press(named(contractCard(), "Chapter_ranch"))
+sent = sentOn("Moving")
+check("…and so does a tap on its ▶ PLAY tile", #sent == asked + 2 and sent[#sent][1] == "card" and sent[#sent][2] == "walt"
+	and string.find(named(contractCard(), "Detail").Text, ranch.blurb, 1, true) ~= nil)
+local farm = table.clone(opened)
+farm.id, farm.name, farm.client, farm.icon, farm.address = "walt", "Walt's Farm", "Walt", "🐴", "Old Farm"
+farm.time, farm.hordeAt = 14 * 60, 210
+remote.OnClientEvent:Fire("contract", farm)
+check("Walt's Farm's card: its name, 14 MIN, the horde at 3:30, its chapter lit, Walt's blurb under the road", has(contractCard(), "WALT'S FARM") and has(contractCard(), "14 MIN")
+	and has(contractCard(), "3:30") and named(named(contractCard(), "Chapter_ranch"), "Lit").Transparency == 0
+	and string.find(named(contractCard(), "Detail").Text, ranch.blurb, 1, true) ~= nil and #sentOn("Moving") == asked + 2)
+M.player:SetAttribute("MoveStory", "intro")
+remote.OnClientEvent:Fire("contract", card)
 
 -- START through the briefing ------------------------------------------------------------------------------------------
 

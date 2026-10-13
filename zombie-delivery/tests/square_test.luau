@@ -1,8 +1,8 @@
--- 6.12.15, the Lantern Garden and the footbridge (shared/Map.luau Map.Garden, Map.Footbridge): the garden on Last Stop's
--- old block (0, -1) north of the Central Park, in the safe zone, a landmark; the footbridge over Bone St mid-block,
--- far from the junctions, their lights and crosswalks, no bus stop, street prop or zip line by it; nothing of the garden
--- or the footbridge on the sidewalk band (the people's walk line) or on a road below the clearance, nothing of the
--- garden under the ramps or in its paths.
+-- 7.1, the Hauptplatz and the footbridge (shared/Map.luau Map.Square, Map.Footbridge; 6.12.15's garden_test): the square
+-- on Last Stop's old block (0, -1) north of the Central Park, in the safe zone, a landmark, nothing Japanese left; the
+-- footbridge over Bone St mid-block, far from the junctions, their lights and crosswalks, no bus stop, street prop or
+-- zip line by it; nothing of the square or the footbridge on the sidewalk band (the people's walk line) or on a road
+-- below the clearance, nothing of the square under the ramps, every thing of it on its cobbles and apart.
 -- 6.12.16, the footbridge wider, curved and clear to walk: every piece it is built of (shared/FootbridgeShape.luau) is
 -- scanned. The walkway 10 wide between the railings, the railings all along both edges; nothing at all in the walking
 -- space (the walkway up to 9 studs over it) but the walking surface; every turn 12 studs and wider on the centre line;
@@ -33,12 +33,12 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local CELL, HALF = Map.Cell, Map.BlockSize / 2
-local G, P, F = Map.Garden, Map.Park, Map.Footbridge
+local G, P, F = Map.Square, Map.Park, Map.Footbridge
 local lawn = HALF - G.walk
 
--- ── The garden on its block ────────────────────────────────────────────────
+-- ── The square on its block ────────────────────────────────────────────────
 
-check("the garden is Last Stop's old block (0, -1), north of the park across Bone St", Map.special("downtown", G.i, G.j) == "garden" and G.i == 0 and G.j == -1
+check("the square is Last Stop's old block (0, -1), north of the park across Bone St", Map.special("downtown", G.i, G.j) == "square" and G.i == 0 and G.j == -1
 	and G.x == G.i * CELL and G.z == G.j * CELL and G.x == P.x and G.z == P.z - CELL)
 local d, bi, bj = Map.blockAt(G.x, G.z)
 check("its middle is on its block", d ~= nil and d.id == "downtown" and bi == G.i and bj == G.j)
@@ -57,16 +57,23 @@ for _, l in Map.Landmarks do
 		landmark = l
 	end
 end
-check("a landmark (the map, the GPS, the location tag): Lantern Garden, a place", landmark ~= nil and landmark.name == "Lantern Garden" and landmark.kind == "place"
-	and landmark.x == G.x and landmark.z == G.z)
+check("a landmark (the map, the GPS, the location tag): Hauptplatz, a place with the fountain's icon", landmark ~= nil and landmark.name == "Hauptplatz" and landmark.kind == "place"
+	and landmark.icon == "⛲" and landmark.x == G.x and landmark.z == G.z)
 local tag = nil
 for _, t in LocationTags.build() do
 	if t.id == G.id then
 		tag = t
 	end
 end
-check("its location tag: LANTERN GARDEN · SAFE ZONE", tag ~= nil and tag.sub == "SAFE ZONE")
-check("the pond is shallow (not deeper than a step: nobody swims or sinks in it)", G.water > 0 and G.water <= 0.6 and not Map.inPond(G.x + G.pond[1].u, Map.WalkTop, G.z + G.pond[1].v))
+check("its location tag: HAUPTPLATZ · SAFE ZONE", tag ~= nil and tag.sub == "SAFE ZONE")
+check("the fountain is no pond (a solid rim, nobody swims or sinks)", G.fountain.rim >= 1 and not Map.inPond(G.x + G.fountain.u, Map.WalkTop, G.z + G.fountain.v))
+-- 7.1 (the Alps, step 1: "only the Japanese part goes"): nothing Japanese left in its words
+local words = string.lower(G.name .. " " .. G.gasthof.name .. " " .. (if landmark then landmark.description else ""))
+local japanese = false
+for _, word in { "japan", "torii", "lantern garden", "sakura", "cherry", "koi", "pagoda", "pavilion", "shrine", "zen", "bonsai" } do
+	japanese = japanese or string.find(words, word, 1, true) ~= nil
+end
+check("nothing Japanese in its name, its Gasthof's or its line on the map's list", not japanese and not (landmark and string.find(landmark.icon, "🏮", 1, true)))
 
 -- ── The footbridge over Bone St ────────────────────────────────────────────
 
@@ -102,7 +109,7 @@ end
 print(string.format("  over the street from x %.1f to %.1f: %.1f studs from the cross streets' edges", spanX0, spanX1, nearestCross))
 check("mid-block: over the street 30 studs and more from the cross streets' edges", nearestCross >= 30, nearestCross)
 check("its ends on the lawns: only the span (between Map.Footbridge.street) reaches off them, at the deck's height and more", streetOk and onLawn(F.feet.park.x, F.feet.park.z, half)
-	and onLawn(F.feet.garden.x, F.feet.garden.z, half))
+	and onLawn(F.feet.square.x, F.feet.square.z, half))
 local farFromCrossings = true
 for _, c in Crossings.crosswalks() do
 	if Map.footbridgeGap(c.x, c.z) < 25 then
@@ -124,7 +131,7 @@ for _, stop in BusLines.allStops() do
 		stopsClear = false
 	end
 end
-check("no bus stop under it, by it or by the garden's kerb", stopsClear)
+check("no bus stop under it, by it or by the square's kerb", stopsClear)
 local propsClear = true
 for _, block in StreetProps.blocks() do
 	for _, prop in block.props do
@@ -163,14 +170,14 @@ for _, line in ZipLines.lines() do
 		end
 	end
 end
-check("no zip line through it or on the garden", zipsClear)
+check("no zip line through it or on the square", zipsClear)
 local docksClear = true
 for _, dock in RentalDocks.docks() do
 	if Map.footbridgeGap(dock.x, dock.z) < 8 or (math.abs(dock.x - G.x) <= HALF and math.abs(dock.z - G.z) <= HALF) then
 		docksClear = false
 	end
 end
-check("no rental dock under it or on the garden", docksClear)
+check("no rental dock under it or on the square", docksClear)
 local solidOk, lights = true, 0
 local SOLID = { Deck = true, KickBoard = true, Railing = true, RailPost = true, BedHedge = true } -- (and the hedges round the beds under the low ramps)
 for _, piece in pieces do
@@ -209,7 +216,7 @@ for i = 2, #F.line do
 end
 local _, crest = Map.footbridgeAt(F.middle)
 print(string.format("  the walking surface: %.2f at the street's edges, %.2f in the middle (a hump of %.2f)", F.deck, crest, F.hump))
-check("a taiko-bridge hump: up all the way to the middle over the road, down all the way after it", rising and F.hump > 1 and math.abs(crest - F.deck - F.hump) < 1e-6)
+check("a hump: up all the way to the middle over the road, down all the way after it", rising and F.hump > 1 and math.abs(crest - F.deck - F.hump) < 1e-6)
 
 -- ── The walkway: wide, curved, not too steep ───────────────────────────────
 
@@ -248,7 +255,7 @@ for i = 3, #F.line - 2, 2 do
 		end
 	end
 end
-check("vermilion railings all along both edges: a kick board and a hand rail just outside the walkway everywhere", railed)
+check("timber railings all along both edges: a kick board and a hand rail just outside the walkway everywhere", railed)
 
 -- Nothing at all in the walking space: from the walking surface up to Map.Footbridge.headroom over it, across the whole
 -- walkway, no piece (decorative or not) but the walking surface itself; every piece sampled through its box.
@@ -310,7 +317,7 @@ end
 if #intruders > 0 then
 	print("  in the walkway: " .. table.concat(intruders, "; ", 1, math.min(#intruders, 8)))
 end
-check(`the walking space empty: nothing at all within the walkway up to {F.headroom} over it (the arch's timbers gone; the gates' beams above it, their posts outside the railings)`, #intruders == 0, #intruders)
+check(`the walking space empty: nothing at all within the walkway up to {F.headroom} over it (the arch's timbers gone; the portals' beams and roofs above it, their posts outside the railings)`, #intruders == 0, #intruders)
 local gateOk = true
 for _, s in F.gates do
 	gateOk = gateOk and (math.abs(s - F.street[1]) < 1e-6 or math.abs(s - F.street[2]) < 1e-6)
@@ -418,13 +425,13 @@ check("continuous: no gap, no bump, no step over 0.1 between the planks (the joi
 
 -- ── The ramps' feet ─────────────────────────────────────────────────────────
 
-local pf, gf = F.feet.park, F.feet.garden
+local pf, gf = F.feet.park, F.feet.square
 local _, footY = Map.footbridgeAt(0)
-local _, gardenY = Map.footbridgeAt(F.length)
-check("both feet on the ground (Map.WalkTop)", math.abs(footY - Map.WalkTop) < 1e-6 and math.abs(gardenY - Map.WalkTop) < 1e-6)
+local _, squareY = Map.footbridgeAt(F.length)
+check("both feet on the ground (Map.WalkTop)", math.abs(footY - Map.WalkTop) < 1e-6 and math.abs(squareY - Map.WalkTop) < 1e-6)
 check("the park's foot comes down onto the park's east path (from the ring to the sidewalk), the way down onto it", pf.x - half > P.x + P.pond + 1.5 + P.ring and pf.x + half <= P.x + lawn
 	and math.abs(math.abs(pf.z - P.z) - 2.5) <= 0.2 and pf.dz * (P.z - pf.z) > 0)
-check("the garden's half is the park's turned half round the middle (one design)", math.abs(gf.x - (2 * F.x - pf.x)) < 1e-6 and math.abs(gf.z - (2 * F.z - pf.z)) < 1e-6)
+check("the square's half is the park's turned half round the middle (one design)", math.abs(gf.x - (2 * F.x - pf.x)) < 1e-6 and math.abs(gf.z - (2 * F.z - pf.z)) < 1e-6)
 local reached = false
 for _, box in G.paths do
 	local u, v = gf.x - G.x, gf.z - G.z
@@ -432,14 +439,14 @@ for _, box in G.paths do
 		reached = true
 	end
 end
-check("the garden's foot comes down onto a path", reached)
+check("the square's foot comes down onto its cobbles", reached)
 local postsOk = true
 for _, piece in pieces do
 	if piece.name == "Post" then
 		postsOk = postsOk and FootbridgeShape.clear(piece.at[1], piece.at[3], 0.35)
 	end
 end
-check("the ramps' posts on the lawns, off every path, pond and lantern", postsOk)
+check("the ramps' posts on the lawns, off every path, the pond, the square's cobbles, lamps, trees and planters", postsOk)
 -- Under the walkway where the ramp is lower than Map.Footbridge.low (9) over the ground: no path and no open ground. A
 -- path runs under it only where it is higher (the park's north path under its north run); the park's path to its
 -- north-east corner ends before the ramp's turn there. The low ground is a planted bed, closed by solid clipped hedges
@@ -502,7 +509,7 @@ check(`no path and no open ground under the walkway where it is lower than {F.lo
 
 -- ── Nothing in the way ─────────────────────────────────────────────────────
 
--- A thing of the garden at (u, v) reaching r around: inside the lawn (off the sidewalk band), off the roads, clear of
+-- A thing of the square at (u, v) reaching r around: inside the lawn (off the sidewalk band), off the roads, clear of
 -- the footbridge's ramps by `clear`.
 local function placed(name: string, u: number, v: number, r: number, clear: number): boolean
 	local x, z = G.x + u, G.z + v
@@ -512,73 +519,134 @@ local function placed(name: string, u: number, v: number, r: number, clear: numb
 	end
 	return ok
 end
-local function onPath(u: number, v: number, r: number): boolean
+-- (u, v) on the cobbles with r of them around it (inside one of Map.Square.paths)
+local function onCobbles(u: number, v: number, r: number): boolean
 	for _, box in G.paths do
-		if u + r > box.u0 and u - r < box.u1 and v + r > box.v0 and v - r < box.v1 then
+		if u - r >= box.u0 and u + r <= box.u1 and v - r >= box.v0 and v + r <= box.v1 then
 			return true
 		end
 	end
 	return false
 end
-local function inPond(u: number, v: number, r: number): boolean
-	for _, disc in G.pond do
-		if math.sqrt((u - disc.u) ^ 2 + (v - disc.v) ^ 2) < disc.r + r then
+local function inBox(u: number, v: number, list: { Map.SquareBox }): boolean
+	for _, box in list do
+		if u > box.u0 and u < box.u1 and v > box.v0 and v < box.v1 then
 			return true
 		end
 	end
 	return false
 end
-local ok = true
-for _, disc in G.pond do
-	ok = placed("the pond", disc.u, disc.v, disc.r + 1.6, 1) and ok
+-- The cobbles and the green strip tile the lawn: every spot in one of them and never in both.
+local tiled, overlap = true, false
+for u = -lawn + 0.5, lawn - 0.5, 1 do
+	for v = -lawn + 0.5, lawn - 0.5, 1 do
+		local a, b = inBox(u, v, G.paths), inBox(u, v, G.greens)
+		tiled = tiled and (a or b)
+		overlap = overlap or (a and b)
+	end
 end
-ok = placed("the waterfall", G.waterfall.u, G.waterfall.v - 2.6, 4.2, 1) and ok
-ok = placed("the pavilion", G.pavilion.u, G.pavilion.v, G.pavilion.size / 2 + 2, 1) and ok
-local R = G.gravel
-for _, corner in { { R.u0, R.v0 }, { R.u1, R.v0 }, { R.u0, R.v1 }, { R.u1, R.v1 } } do
-	ok = placed("the raked gravel", corner[1], corner[2], 0.4, 1) and ok
+check("the cobbles and the green strip under the ramp tile the lawn (every spot one or the other, never both)", tiled and not overlap)
+local underRamp = true
+for _, p in F.line do
+	local x, z = p.x - G.x, p.z - G.z
+	if math.abs(x) < lawn - 0.5 and math.abs(z) < lawn - 0.5 and p.y - FootbridgeShape.Slab - Map.WalkTop < F.low and p.s < F.length - 3 and p.s > 3 then
+		underRamp = underRamp and inBox(x, z, G.greens)
+	end
 end
-for _, stone in G.rocks do
-	local reach = (stone.size or 2) * 1.3 -- (its outer raked ring)
-	ok = stone.u - reach >= R.u0 and stone.u + reach <= R.u1 and stone.v - reach >= R.v0 and stone.v + reach <= R.v1 and ok
-end
-for _, l in G.lanterns do
-	ok = placed("a lantern", l.u, l.v, 1.7, 0.5) and not onPath(l.u, l.v, 1.1) and not inPond(l.u, l.v, 2) and ok
-end
-for _, c in G.cherries do
-	ok = placed("a cherry tree", c.u, c.v, 5.5, 0) and not onPath(c.u, c.v, 0.6) and not inPond(c.u, c.v, 1.5) and ok
-end
-for _, b in G.bamboo do
-	ok = placed("a bamboo clump", b.u, b.v, 2, 0.5) and not onPath(b.u, b.v, 2) and ok
-end
-for _, s in G.shrubs do
-	ok = placed("an azalea", s.u, s.v, (s.size or 2.4) / 2, 0.5) and not onPath(s.u, s.v, (s.size or 2.4) / 2) and not inPond(s.u, s.v, 1) and ok
+check("the ramp's low part runs over the green strip only (its bed there), never over the cobbles", underRamp)
+
+-- Every thing of the square: where it stands, how far it reaches (in plan) and whether it stands on the cobbles.
+type Thing = { name: string, u: number, v: number, r: number, cobbles: boolean }
+local things: { Thing } = {}
+local Fo, M, Gh = G.fountain, G.maypole, G.gasthof
+table.insert(things, { name = "the fountain", u = Fo.u, v = Fo.v, r = Fo.r + 0.8, cobbles = true })
+table.insert(things, { name = "the maypole", u = M.u, v = M.v, r = 2.6, cobbles = true })
+for _, t in G.tables do
+	table.insert(things, { name = "a café table", u = t.u, v = t.v, r = 3.3, cobbles = true })
 end
 for _, b in G.benches do
-	ok = placed("a bench", b.u, b.v, 3, 0.5) and not onPath(b.u, b.v, 1) and not inPond(b.u, b.v, 2) and ok
+	table.insert(things, { name = "a bench", u = b.u + b.du * 0.4, v = b.v + b.dv * 0.4, r = 3, cobbles = true })
 end
-ok = placed("the wash basin", G.basin.u, G.basin.v, 1.6, 0.5) and not onPath(G.basin.u, G.basin.v, 1) and ok
-for _, box in G.paths do
-	ok = math.max(math.abs(box.u0), math.abs(box.u1), math.abs(box.v0), math.abs(box.v1)) <= lawn and ok
+for _, l in G.lamps do
+	table.insert(things, { name = "a lamp", u = l.u, v = l.v, r = 0.9, cobbles = true })
 end
-check("everything of the garden inside its lawn (off the sidewalk band and the roads), clear of the footbridge's ramps, off its paths and out of its pond", ok)
-local gatesOk = #G.gates == 4
-for _, gate in G.gates do
-	local onLine = math.abs(math.abs(if gate.nu ~= 0 then gate.u else gate.v) - (lawn - G.hedge)) < 1e-6 and (if gate.nu ~= 0 then gate.u * gate.nu else gate.v * gate.nv) > 0
-	local reachedGate = false
-	for _, box in G.paths do
-		if gate.u >= box.u0 - 0.1 and gate.u <= box.u1 + 0.1 and gate.v >= box.v0 - 0.1 and gate.v <= box.v1 + 0.1 then
-			reachedGate = true
+for _, p in G.planters do
+	table.insert(things, { name = "a planter", u = p.u, v = p.v, r = p.length / 2 + 0.2, cobbles = true })
+end
+for _, t in G.trees do
+	table.insert(things, { name = "a linden", u = t.u, v = t.v, r = (t.size or 8) / 2, cobbles = true })
+end
+local ok = true
+for _, t in things do
+	ok = placed(t.name, t.u, t.v, t.r, 0.5) and (not t.cobbles or onCobbles(t.u, t.v, math.min(t.r, 1))) and ok
+end
+-- the signs by the lawn's edge: their board (6.4 wide, its posts 3.2 either side) along it, all of it on the lawn
+for _, s in G.signs do
+	local along = if s.nu ~= 0 then s.v else s.u
+	local out = if s.nu ~= 0 then s.u else s.v
+	ok = math.abs(along) + 3.6 <= lawn and math.abs(out) + 0.5 <= lawn and Map.footbridgeGap(G.x + s.u, G.z + s.v) > 6 and ok
+	table.insert(things, { name = "a sign", u = s.u - s.nu * 0.3, v = s.v - s.nv * 0.3, r = 0.8, cobbles = false })
+end
+-- the Gasthof: its walls and its eaves on the cobbles inside the lawn, clear of the footbridge
+local eave = 1.8
+ok = Gh.u0 - eave >= -lawn and Gh.u1 + eave <= lawn and Gh.v0 - eave >= -lawn and Gh.v1 + eave <= lawn and onCobbles((Gh.u0 + Gh.u1) / 2, (Gh.v0 + Gh.v1) / 2, 0)
+	and Map.footbridgeGap(G.x + (Gh.u0 + Gh.u1) / 2, G.z + Gh.v1) > 30 and ok
+check("every thing of the square inside its lawn (off the sidewalk band and the roads), clear of the footbridge's ramps, on its cobbles", ok)
+-- apart: no two of them reach into each other, and none into the Gasthof or its door's way out
+local apart = true
+local doorU = (Gh.u0 + Gh.u1) / 2
+for n, a in things do
+	for m = n + 1, #things do
+		local b = things[m]
+		if math.sqrt((a.u - b.u) ^ 2 + (a.v - b.v) ^ 2) < a.r + b.r - 0.6 then
+			apart = false
+			print(`  {a.name} at ({a.u}, {a.v}) and {b.name} at ({b.u}, {b.v}) too close`)
 		end
 	end
-	gatesOk = gatesOk and onLine and reachedGate and Map.footbridgeGap(G.x + gate.u, G.z + gate.v) > 6
+	local nu = math.clamp(a.u, Gh.u0 - eave, Gh.u1 + eave)
+	local nv = math.clamp(a.v, Gh.v0 - eave, Gh.v1 + eave)
+	if math.sqrt((a.u - nu) ^ 2 + (a.v - nv) ^ 2) < a.r - 0.6 and a.name ~= "a sign" then
+		apart = false
+		print(`  {a.name} at ({a.u}, {a.v}) under the Gasthof`)
+	end
+	if math.abs(a.u - doorU) < 2.6 + a.r and a.v - a.r < Gh.v1 + 8 and a.v + a.r > Gh.v1 then
+		apart = false
+		print(`  {a.name} at ({a.u}, {a.v}) in the Gasthof's door's way out`)
+	end
 end
-check("a gate on each side (on the hedge's line, a path to it, away from the ramp): entrances from every sidewalk", gatesOk)
-check("the hedge inside the lawn", G.hedge >= 0.6 and lawn - G.hedge + 0.6 <= lawn)
+check("apart: nothing reaches into anything else, the Gasthof or the way out of its door", apart)
+-- the café tables in front of the Gasthof (its Schanigarten), the fountain in the open middle
+local terrace = #G.tables >= 3
+for _, t in G.tables do
+	terrace = terrace and t.u > Gh.u0 and t.u < Gh.u1 and t.v - Gh.v1 >= 4 and t.v - Gh.v1 <= 10
+end
+check("the café tables under their umbrellas in front of the Gasthof (4 to 10 studs out from its front)", terrace)
+-- a way in from every sidewalk: a spot on the lawn's edge on the cobbles, away from the ramp and the Gasthof
+local entrances = 0
+for _, side in { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } } do
+	local found = false
+	for t = -lawn + 3, lawn - 3, 1 do
+		local u, v = if side[1] ~= 0 then side[1] * (lawn - 0.5) else t, if side[2] ~= 0 then side[2] * (lawn - 0.5) else t
+		local inGasthof = u > Gh.u0 - eave and u < Gh.u1 + eave and v > Gh.v0 - eave and v < Gh.v1 + eave
+		if inBox(u, v, G.paths) and not inGasthof and Map.footbridgeGap(G.x + u, G.z + v) > 6 then
+			found = true
+		end
+	end
+	entrances += if found then 1 else 0
+end
+check("a way in onto the cobbles from every sidewalk (no hedge, no gate: an open square)", entrances == 4, entrances)
 local lit = 0
-for _, l in G.lanterns do
+for _, l in G.lamps do
 	lit += if l.lit then 1 else 0
 end
-check("stone lanterns all round, a few real lights among them (the light budget)", #G.lanterns >= 8 and lit >= 2 and lit <= 4, lit)
+check("gas lamps all round, a few real lights among them (the light budget)", #G.lamps >= 4 and lit >= 2 and lit <= 4, lit)
+check("a HAUPTPLATZ · SAFE ZONE board by every sidewalk, facing out", #G.signs == 4 and (function()
+	for _, s in G.signs do
+		if math.abs(s.nu) + math.abs(s.nv) ~= 1 or (s.u * s.nu + s.v * s.nv) < lawn - 2 then
+			return false
+		end
+	end
+	return true
+end)())
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

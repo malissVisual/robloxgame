@@ -42,6 +42,15 @@
 -- moving intro at the first contracts board), read only from a real save (an older one has none: the empty table, so
 -- everybody sees the intro once); PlayerData.markStory sets one (client/MoveStoryUi.luau asks through server/
 -- Tutorial.luau) and the player attribute MoveStory carries them to the client (MoveStory.encodeSeen).
+-- 7.x, one car (Config.CompanyVan): every courier owns the ZDC Van (a new profile, and every save on load: cars and
+-- car hold only Config.Cars ids, the ZDC Van and the bikes; a car that is gone falls back to the van). A real save from
+-- before (no vanOnly flag) is paid back once for the cars it owned (Economy.carRefund: their price and the stages it
+-- bought, as sold; profile.carRefund, never saved, tells server/Tutorial.luau to say so; the money's reason
+-- "CarRefund") and the van takes over their best car tracks, gear, paint and roof gun (Economy.vanCarry). Earl's
+-- quest (vanQuest) is no longer read or saved. 7.2 review: the refund also pays what the van could not take over
+-- (VanCarry.lost) and the bonus of every employer whose vehicle the save had earned (Economy.employerBonus), never the
+-- ZDC Van itself; the flag is written into `rewards` too (an older server drops unknown fields but keeps that table's
+-- short keys: Economy.vanMigrated reads either), and so are the chapters done (its story keeps only "intro").
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -117,7 +126,7 @@ export type Profile = {
 	shoeRefund: number?, -- 6.12.2: … and for the retired Running Shoes (the same way)
 	style: Style.Wardrobe, -- 6.12: the cosmetics owned (id → true) and worn (slot → id); server/StyleWear.luau
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
-	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
+	carRefund: number?, -- 7.x: what this load paid back for the cars that are gone (0: only free ones went; never saved)
 	-- 6.12: the daily and weekly tasks (shared/Tasks.luau: the day, the level, the picks' ids, progress, claims; the
 	-- week the same). nil until server/Tasks.luau starts them (a new courier, a save from before 6.12)
 	tasks: TaskData.Saved?,
@@ -175,8 +184,8 @@ end)
 local function newProfile(): Profile
 	return {
 		money = Config.StartMoney,
-		cars = {}, -- 5.0: you start on foot (the Old Van is bought at level 4)
-		car = nil,
+		cars = { [Config.CompanyVan.Car] = true }, -- 7.x: every courier's ZDC Van (5.0 – 6.x: on foot, Earl's van at level 4)
+		car = Config.CompanyVan.Car,
 		bike = nil, -- 5.1
 		lastCar = nil, -- 5.1
 		weapons = { [Config.Arms.Starter] = true }, -- 6.0.2: the start: the phone (Marge), a pistol and the plastic bag
@@ -220,7 +229,7 @@ local function newProfile(): Profile
 		shoeRefund = nil, -- 6.12.2
 		style = Style.empty(), -- 6.12: no cosmetics yet
 		phone = false,
-		vanQuest = nil,
+		carRefund = nil, -- 7.x
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
 		onboarding = 0, -- 6.13: a new courier, no step yet
 		regulars = {}, -- 6.14: no business knows you yet
@@ -378,6 +387,50 @@ local function applyGear(profile: Profile, saved: { [any]: any })
 	end
 end
 
+-- 7.x, one car: the ZDC Van takes over the best of a save's old cars, once (Economy.vanCarry): every car track at
+-- the highest level, their gear (installed while the van has a free gear slot, else owned), the paint (one the save
+-- owns) and the roof gun of the car it drove. (After the cars, their levels, gear, paints and guns are read.)
+local function takeOver(profile: Profile, carry: Economy.VanCarry)
+	local van = Config.CompanyVan.Car
+	local levels = profile.carUpgrades[van] or {}
+	for id, level in carry.levels do
+		levels[id] = math.max(levels[id] or 0, level)
+	end
+	if next(levels) ~= nil then
+		profile.carUpgrades[van] = levels
+	end
+	local gear: { [string]: string } = profile.carGear[van] or {}
+	local slots = Economy.gearSlots(van, Economy.stageOf(van, levels))
+	local used = 0
+	for _, value in gear do
+		if value == "installed" then
+			used += 1
+		end
+	end
+	for _, def in Config.Gear do
+		local value = carry.gear[def.id]
+		if value and gear[def.id] ~= "installed" then
+			if value == "installed" and used < slots then
+				gear[def.id] = "installed"
+				used += 1
+			else
+				gear[def.id] = "owned"
+			end
+		end
+	end
+	if next(gear) ~= nil then
+		profile.carGear[van] = gear
+	end
+	local paint = carry.paint
+	if paint and profile.paints[paint] then
+		profile.carPaint[van] = paint
+	end
+	local gun = carry.gun
+	if gun and Economy.canMount(van) then
+		profile.carGuns[van] = gun
+	end
+end
+
 -- 4.6, the career rewards given (the levels 2 … MaxLevel as strings). A save from before 4.6 (no levelRewards) has had
 -- the levels it reached: they count as given (Career.reached), nothing is paid back. (After the XP is read.)
 local function applyLevelRewards(profile: Profile, saved: { [any]: any })
@@ -432,7 +485,6 @@ local function applySaved(profile: Profile, saved: any)
 	profile.tutorial = saved.tutorial == true or profile.deliveries > 0 -- 3.7: a player who delivered before needs no tutorial
 	profile.explored = if type(saved.explored) == "string" and #saved.explored <= 65536 then saved.explored else ""
 	profile.phone = saved.phone == true -- 5.0
-	profile.vanQuest = if saved.vanQuest == "open" or saved.vanQuest == "done" then saved.vanQuest else nil -- 5.0
 	-- 6.6: the backpacks are gone (Config.RetiredKit): a real save from before (no noPacks flag; not a lock-only record
 	-- of a new player) gets their price back, once (the kit below no longer knows them, so they are dropped). 6.7: the
 	-- Thermal Jacket too, by its own noJacket flag (a 6.6 save has noPacks already): Transport.retiredRefunds, by flag;
@@ -487,19 +539,34 @@ local function applySaved(profile: Profile, saved: any)
 	-- 7.0: the moves' story cards seen, checked (known keys only), only from a real save (not a lock-only record of a
 	-- new player); a save from before 7.0 has none: the empty table (Marge's moving intro shows once for it too).
 	if saved.money ~= nil then
-		profile.story = MoveStory.cleanSeen(saved.story)
+		profile.story = MoveStory.cleanSeen(saved.story, saved.rewards) -- (7.2 review: + the chapters done kept in rewards)
 	end
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
 	end
+	-- 7.x, one car: only the vehicles a player may have (Economy.isPlayerCar: the ZDC Van, the bikes); a real save from
+	-- before (no vanOnly flag) is paid back once for the other cars it owned (Economy.carRefund) and its van takes over
+	-- their best (Economy.vanCarry, below once the cars' tables are read). 7.2 review: + what the van could not take
+	-- over (VanCarry.lost: track levels, roof guns, gear, as sold) and the bonus of every employer whose vehicle it had
+	-- earned (Economy.employerBonus); a save put right already counts by its flag or the same mark in its rewards
+	-- (Economy.vanMigrated: an older server drops the flag)
+	local carry = Economy.vanCarry(saved)
+	local carRefund = Economy.carRefund(saved) + (if carry then carry.lost else 0) + Economy.employerBonus(saved)
+	if carRefund > 0 then
+		profile.money = math.min(profile.money + carRefund, 2 ^ 50)
+	end
+	if carRefund > 0 or (carry and carry.retired > 0) then
+		profile.carRefund = carRefund
+	end
 	if type(saved.cars) == "table" then
 		for id, owned in saved.cars do
-			if owned == true and type(id) == "string" and Economy.findCar(id) then
+			if owned == true and type(id) == "string" and Economy.isPlayerCar(id) then
 				profile.cars[id] = true
 			end
 		end
 	end
+	profile.cars[Config.CompanyVan.Car] = true
 	if type(saved.weapons) == "table" then
 		for id, owned in saved.weapons do
 			if owned == true and type(id) == "string" and Economy.findWeapon(id) then
@@ -602,7 +669,7 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	if type(saved.carPaint) == "table" then
 		for carId, paintId in saved.carPaint do
-			if type(carId) == "string" and type(paintId) == "string" and Economy.findCar(carId) and profile.paints[paintId] then
+			if type(carId) == "string" and type(paintId) == "string" and profile.cars[carId] and profile.paints[paintId] then
 				profile.carPaint[carId] = paintId
 			end
 		end
@@ -621,6 +688,9 @@ local function applySaved(profile: Profile, saved: any)
 		end
 	end
 	applyGear(profile, saved)
+	if carry then
+		takeOver(profile, carry) -- 7.x
+	end
 	applyLevelRewards(profile, saved)
 	applyLicences(profile, saved) -- 4.7
 	profile.skills = SkillRules.clean(saved.skills, Levels.levelFor(profile.xp)) -- 6.20 (none saved: an empty table)
@@ -742,6 +812,7 @@ function PlayerData.load(player: Player)
 		-- 6.13: the retired kit's money back (applySaved), for the economy's numbers
 		tellMoney(player, (profile.packRefund or 0) + (profile.jacketRefund or 0) + (profile.shoeRefund or 0), "Refund", "RetiredKit")
 		tellMoney(player, profile.bagRefund or 0, "BagRefund", "Bags") -- 6.23: the bags owned for good, paid back
+		tellMoney(player, profile.carRefund or 0, "CarRefund", "Cars") -- 7.x: the cars that are gone, paid back
 	end
 end
 
@@ -801,6 +872,15 @@ function PlayerData.save(player: Player, final: boolean?)
 	if final then
 		finished[player] = true
 	end
+	-- 7.2 review: an older server (main before 7.x) keeps the fields it knows only, but every short key of `rewards`:
+	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
+	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
+	profile.rewards[Config.CompanyVan.Flag] = true
+	for key in profile.story do
+		if string.sub(key, 1, 5) == "done:" then
+			profile.rewards[key] = true
+		end
+	end
 	local data = {
 		money = profile.money,
 		cars = profile.cars,
@@ -833,6 +913,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		noJacket = true, -- 6.7: the Thermal Jacket is gone (applySaved pays it back once)
 		noShoes = true, -- 6.12.2: the Running Shoes are gone (applySaved pays them back once)
 		perGameBags = true, -- 6.23: the bags are bought for each game (applySaved pays an older save's bags back once)
+		vanOnly = true, -- 7.x: Config.CompanyVan.Flag: one car (applySaved pays an older save's other cars back once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,
@@ -850,7 +931,6 @@ function PlayerData.save(player: Player, final: boolean?)
 		kit = profile.kit, -- 5.0 (6.23: no bag: profile.bags and profile.activeBag are per game, never saved)
 		style = profile.style, -- 6.12: the cosmetics owned and worn
 		phone = profile.phone, -- 5.0
-		vanQuest = profile.vanQuest, -- 5.0
 		tasks = profile.tasks, -- 6.12
 		onboarding = profile.onboarding, -- 6.13
 		regulars = profile.regulars, -- 6.14
@@ -1002,10 +1082,11 @@ function PlayerData.giveWeapon(player: Player, id: string, equip: boolean?): boo
 	return new
 end
 
--- Gives a car (an employer's reward, the admin tools); true when it is new.
+-- Gives a vehicle (the admin tools); true when it is new. 7.x: only one a player may have (Economy.isPlayerCar: the ZDC
+-- Van, a bike); the employers give no car any more.
 function PlayerData.giveCar(player: Player, id: string): boolean
 	local profile = profiles[player]
-	if not profile or not Economy.findCar(id) then
+	if not profile or not Economy.isPlayerCar(id) then
 		return false
 	end
 	local def = Economy.findCar(id)
@@ -1016,9 +1097,6 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 	end
 	if def and def.bike and profile.bike == nil then
 		profile.bike = id -- 5.1: your first bike is your bike of choice
-	end
-	if id == Config.VanQuest.Car then
-		profile.vanQuest = "done" -- 5.0: Earl's van (bought from him, or given)
 	end
 	changed:Fire(player)
 	return new

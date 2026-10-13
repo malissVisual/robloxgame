@@ -131,8 +131,19 @@ check("the lock says what it needs", string.find(lock, "takes 2 pallets", 1, tru
 
 -- The Freight Run ----------------------------------------------------------------------
 
+-- 7.x (one car, Config.CompanyVan): the Freight Run is retired: the ZDC Van, the only car, takes no pallets. (The
+-- docks, the jacks and the pallets' rules stay as the world has them: checked below.)
 local job = Economy.findJobType("freightrun")
-check("the Freight Run is a job type", job ~= nil)
+check("7.x: the Freight Run is retired (no job type)", job == nil)
+check("7.x: no car a player has takes a pallet", (function()
+	for _, def in Config.Cars do
+		if Freight.maxPallets(def.id) > 0 then
+			return false
+		end
+	end
+	return true
+end)())
+local DOCK_PALLETS = 3 -- the most a Freight Run took (the docks' floor still has room for them)
 if job then
 	check("pallets on a jack both ways", job.load == "pallet" and job.unload == "pallet" and job.itemKind == "pallet")
 	check("1 – 3 pallets", job.items == 3)
@@ -171,7 +182,7 @@ if hub then
 		check(`dock {n}: its bay on the block, off the road`, pd == d and pi == bi and pj == bj)
 		check(`dock {n}: the truck backs up to the dock edge`, dist(dock.park.x, dock.park.z, dock.edge.x, dock.edge.z) >= 12 and dist(dock.park.x, dock.park.z, dock.edge.x, dock.edge.z) <= Config.Jobs.DeliverRadius
 			and math.abs(dock.edge.x - hub.platform.x0) < 0.01)
-		check(`dock {n}: room for the job's pallets on the dock floor`, #dock.staging >= job.items and (function()
+		check(`dock {n}: room for the job's pallets on the dock floor`, #dock.staging >= DOCK_PALLETS and (function()
 			for _, s in dock.staging do
 				if not inside(s.x, s.z, hub.platform, 2) then
 					return false

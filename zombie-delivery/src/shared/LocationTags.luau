@@ -63,7 +63,7 @@ local SHOP_SUB: { [string]: string } = {
 }
 local PLACE_SUB: { [string]: string } = {
 	park = "SAFE ZONE", -- 6.11: the Central Park in the middle of it (Map.Park)
-	garden = "SAFE ZONE", -- 6.12.15: the Lantern Garden north of the park (Map.Garden)
+	square = "SAFE ZONE", -- 7.1: the Hauptplatz north of the park (Map.Square)
 	dispatchtower = "OFFICES",
 	harborpoint = "OFFICES",
 	sunsethills = "HILLTOP MANSION",

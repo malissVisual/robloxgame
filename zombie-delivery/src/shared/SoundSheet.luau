@@ -6,7 +6,11 @@
 -- Sfx or stay silent (client/Sounds.luau).
 -- 6.12: art/audio/sfx3.ogg holds the doors, the horns, the footsteps by surface, the splash, the ambience loops and
 -- the UI stings (Sfx3); until its id is pasted, those play a stand-in from Sfx / Sfx2 or stay silent
--- (client/Sounds.luau FALLBACK; art/audio/NAHRAT-SFX3.md says how to upload it).
+-- (Fallback below; art/audio/NAHRAT-SFX3.md says how to upload it).
+-- 7.1: art/audio/sfx4.ogg holds the moves' sounds (the furniture, the truck, the grip, the move's stings, the
+-- horde's siren, the Wall's gate) and the mountains' (a cuckoo clock, a cowbell, birdsong, the peaks' wind, a
+-- brook) (Sfx4); until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX4.md says how
+-- to upload it).
 
 local SoundSheet = {}
 
@@ -14,6 +18,7 @@ SoundSheet.SfxId = "rbxassetid://108821829330157" -- "rbxassetid://…" of art/a
 SoundSheet.MusicId = "rbxassetid://71392718953355" -- "rbxassetid://…" of art/audio/music.ogg
 SoundSheet.Sfx2Id = "rbxassetid://86322785000784" -- "rbxassetid://…" of art/audio/sfx2.ogg
 SoundSheet.Sfx3Id = "rbxassetid://86357789297571" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)
+SoundSheet.Sfx4Id = "" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)
 
 SoundSheet.Sfx = {
 	gun_light = { 0.0, 0.349977 },
@@ -99,7 +104,83 @@ SoundSheet.Sfx3 = {
 	event_end = { 61.04, 1.2 },
 } :: { [string]: { number } }
 
+SoundSheet.Sfx4 = {
+	furniture_pickup = { 0.0, 0.5 },
+	furniture_putdown = { 0.8, 0.45 },
+	heavy_drop = { 1.55, 1.0 },
+	glass_break = { 2.85, 1.1 },
+	wood_scrape_loop = { 4.25, 2.0 },
+	cardboard_box = { 6.55, 0.62 },
+	truck_ramp = { 7.47, 1.149977 },
+	truck_load = { 8.919977, 0.75 },
+	strap_tighten = { 9.969977, 0.85 },
+	house_door_creak = { 11.119977, 1.3 },
+	grip_tick = { 12.719977, 0.06 },
+	grip_warning = { 13.079977, 0.65 },
+	grip_slip = { 14.029977, 0.75 },
+	move_start = { 15.079977, 0.95 },
+	move_success = { 16.329977, 1.5 },
+	move_fail = { 18.129977, 1.399977 },
+	horde_siren = { 19.829955, 3.6 },
+	checkpoint_gate = { 23.729955, 1.399977 },
+	cuckoo = { 25.429932, 1.45 },
+	cowbell = { 27.179932, 1.6 },
+	birds_alpine_loop = { 29.079932, 6.0 },
+	wind_peaks_loop = { 35.379932, 8.0 },
+	stream_loop = { 43.679932, 6.0 },
+} :: { [string]: { number } }
+
 -- Sounds that loop (their region repeats seamlessly).
-SoundSheet.Looped = { amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, ambience = true, engine = true, freewheel = true, scooter = true, wind = true, zip = true } :: { [string]: boolean }
+SoundSheet.Looped = { amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, ambience = true, birds_alpine_loop = true, engine = true, freewheel = true, scooter = true, stream_loop = true, wind = true, wind_peaks_loop = true, wood_scrape_loop = true, zip = true } :: { [string]: boolean }
+
+-- Stand-ins while a sheet is not uploaded (its id empty): a sound of an older sheet (a stand-in's stand-in too);
+-- a sound not here stays silent until its sheet is up (client/Sounds.luau).
+SoundSheet.Fallback = {
+	coin = "cash",
+	phone_buzz = "notify",
+	knock = "putdown",
+	car_door_close = "putdown",
+	horn_car = "horn",
+	horn_van = "horn",
+	horn_truck = "horn",
+	bike_bell = "coin",
+	scooter_beep = "notify",
+	task_done = "job_done",
+	purchase = "cash",
+	event_start = "wave",
+	event_end = "notify",
+	step_concrete_a = "step_a",
+	step_concrete_b = "step_b",
+	step_grass_a = "step_a",
+	step_grass_b = "step_b",
+	step_wood_a = "step_a",
+	step_wood_b = "step_b",
+	step_metal_a = "step_a",
+	step_metal_b = "step_b",
+	step_water_a = "step_a",
+	step_water_b = "step_b",
+	furniture_pickup = "pickup",
+	furniture_putdown = "putdown",
+	heavy_drop = "car_door_close",
+	glass_break = "heavy_drop",
+	cardboard_box = "step_grass_a",
+	truck_ramp = "van_back_open",
+	truck_load = "load",
+	strap_tighten = "freewheel",
+	house_door_creak = "door_creak",
+	grip_tick = "ui_click",
+	grip_warning = "phone_buzz",
+	grip_slip = "putdown",
+	move_start = "task_done",
+	move_success = "job_done",
+	move_fail = "job_fail",
+	horde_siren = "event_start",
+	checkpoint_gate = "bus_door",
+	wind_peaks_loop = "amb_roof",
+	stream_loop = "amb_fountain",
+} :: { [string]: string }
+
+-- Every sheet's length in seconds (its regions lie inside).
+SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 49.979932 } :: { [string]: number }
 
 return SoundSheet

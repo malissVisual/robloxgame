@@ -23,7 +23,7 @@ for _,p in staged:GetDescendants() do
 end
 assert(painted>20,'purchased paint missing')
 local cars=Mock.Instance.new('Folder');cars.Name='Cars';cars.Parent=Mock.workspace
-local live=Vehicles.displayModel(Config.Cars[1],Mock.CFrame.new(50,0,90),3,{engine=5,handling=5,armor=5,plow=5},{trolley=true,straps=true,cooler=true,roofrack=true})
+local live=Vehicles.displayModel((function() for _,d in Config.AmbientCars do if d.id=='van' then return d end end return Config.Cars[1] end)(),Mock.CFrame.new(50,0,90),3,{engine=5,handling=5,armor=5,plow=5},{trolley=true,straps=true,cooler=true,roofrack=true})
 live:SetAttribute('OwnerId',1);live:SetAttribute('CarId','van');live.Parent=cars
 car.out=true;car.upgrades='max kit'
 assert(Preview.show(holder,car))

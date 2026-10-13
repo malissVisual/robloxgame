@@ -23,9 +23,11 @@ local function near(a: number, b: number, eps: number?): boolean
 	return math.abs(a - b) <= (eps or 1e-6)
 end
 local function car(id: string): Config.CarDef
-	for _, def in Config.Cars do
-		if def.id == id then
-			return def
+	for _, list in { Config.Cars, Config.AmbientCars } do -- (7.x: the old cars are bodies of the world, Config.AmbientCars)
+		for _, def in list do
+			if def.id == id then
+				return def
+			end
 		end
 	end
 	error("no car " .. id)
@@ -35,7 +37,11 @@ local F = Config.Fuel
 -- ── The tanks ──────────────────────────────────────────────────────────────
 
 local tankProblem: string? = nil
-for _, def in Config.Cars do
+local every: { Config.CarDef } = table.clone(Config.Cars)
+for _, def in Config.AmbientCars do
+	table.insert(every, def)
+end
+for _, def in every do
 	if def.bike then
 		if def.tank or def.burn or FuelMath.hasFuel(def) or FuelMath.tank(def) ~= 0 then
 			tankProblem = `{def.id}: a bike with fuel`
@@ -112,7 +118,7 @@ for index in Config.Jobs.Tiers do
 end
 check("a typical job grows with the danger level", growing)
 local jobsProblem: string? = nil
-for _, def in Config.Cars do
+for _, def in Config.AmbientCars do -- (7.x: the old dealer cars, their numbers kept for the traffic)
 	if def.bike or def.company then
 		continue
 	end
@@ -125,6 +131,12 @@ for _, def in Config.Cars do
 end
 check("every dealer car: a full tank lasts 3 – 5 jobs of the tier it opens at, times Lasts (6.12.7: 15 – 25)", Config.Fuel.Lasts >= 1 and jobsProblem == nil, jobsProblem)
 check("the Old Van is meant for ★ jobs, the Rally Van for ★★★★", FuelMath.tierFor(van) == 1 and FuelMath.tierFor(car("rallyvan")) == 4)
+-- 7.x (one car): the ZDC Van does every tier: a full tank lasts 3 – 5 jobs × Lasts at ★★★ (where it used to open, the
+-- middle), more on the short ★ runs, never under 2 × Lasts on the long ★★★★ ones.
+local zdc = car(Config.CompanyVan.Car)
+local mid, long = FuelMath.jobsPerTank(zdc, 3), FuelMath.jobsPerTank(zdc, 4)
+check("7.x: the ZDC Van's tank: 3 – 5 ★★★ jobs × Lasts, at least 2 × Lasts at ★★★★", mid >= 3 * Config.Fuel.Lasts and mid <= 5 * Config.Fuel.Lasts
+	and long >= 2 * Config.Fuel.Lasts and FuelMath.jobsPerTank(zdc, 1) > mid, `{mid} {long}`)
 
 -- ── The gas stations ───────────────────────────────────────────────────────
 

@@ -21,6 +21,10 @@
 --                                     piece's two ends of its long side, a "both" piece's two sides, a "hand" piece's
 --                                     front
 --   FurnitureLooks.parts(id)          how many parts its model has (Root included)
+-- 7.x farm pieces: Walt's farm's (shared/Layouts/Farm.luau) catalogue follows the house's (FurnitureLooks.FarmPieces
+-- their ids, FurnitureLooks.FarmRooms the farm's own room kinds). An item with bigDoor = true is wider than a house's
+-- doorway (Config.Furniture.Door) and leaves only by a wide one (the farm's barn doors, Config.Furniture.Farm.BarnDoor:
+-- Farm.exitsFor), so a move must route it there.
 --   FurnitureLooks.Palettes           the colour lists the builders pick from (fabric, wood, paint, accent, appliance)
 
 local Config = require(script.Parent.Config)
@@ -39,6 +43,7 @@ export type ItemDef = {
 	fragile: boolean,
 	room: string,
 	sentimental: boolean,
+	bigDoor: boolean?, -- 7.x farm pieces: only through a wide doorway (the barn doors), see the header
 }
 
 local FurnitureLooks = {}
@@ -103,6 +108,37 @@ item("bicycle", "Bicycle", "🚲", 5.4, 3.1, 1.2, "both", 3, 180, false, "garage
 item("toolbox", "Toolbox", "🧰", 2.0, 1.25, 1.0, "hand", 3, 90, false, "garage")
 item("lawn_mower", "Lawn Mower", "🌱", 2.2, 3.2, 4.2, "both", 5, 150, false, "garage")
 item("box", "Moving Box", "📦", 2.0, 1.8, 2.0, "hand", 2, 40, false, "garage")
+
+-- 7.x farm pieces ---------------------------------------------------------------------------------------------------
+-- Walt's farm (shared/Layouts/Farm.luau): the mud room, the Stube (a "living" room) and the kitchen, the pantry, the
+-- yard, the stable, the threshing floor ("barn") and the workshop. The four ★ ones are the chapter's keepsakes
+-- (shared/MoveStory.luau: Thunder's saddle, the branding iron; the cowbells and Grandma's churn). The hay wagon is the
+-- one bigDoor piece: too wide for a house's doorway, it goes out by the barn doors.
+local farmFrom = #Order + 1
+--   id                  name                     icon  X    Y    Z    class   wt  value fragile room       ★
+item("hay_bale", "Hay Bale", "🌾", 3.2, 1.7, 1.8, "both", 3, 25, false, "barn")
+item("milk_churn", "Milk Churn", "🥛", 1.4, 2.7, 1.4, "hand", 3, 60, false, "pantry")
+item("grandmas_churn", "Grandma's Milk Churn", "🌼", 1.4, 2.7, 1.4, "hand", 3, 450, false, "kitchen", true)
+item("saddle", "Saddle", "🐎", 3.0, 3.3, 2.0, "both", 3, 280, false, "stable")
+item("thunders_saddle", "Thunder's Saddle", "🏇", 3.0, 3.3, 2.0, "both", 3, 800, false, "stable", true)
+item("tack_rack", "Tack Rack", "🪢", 3.6, 5.4, 1.2, "both", 4, 140, false, "stable")
+item("wheelbarrow", "Wheelbarrow", "🛒", 2.4, 2.2, 5.0, "both", 4, 70, false, "yard")
+item("feed_sacks", "Feed Sacks", "🌽", 2.4, 1.8, 1.6, "hand", 3, 35, false, "stable")
+item("tool_chest", "Tool Chest", "🗃️", 4.4, 2.8, 2.2, "pair", 8, 240, false, "workshop")
+item("anvil", "Anvil", "⚒️", 3.2, 2.95, 1.6, "pair", 10, 380, false, "workshop")
+item("cheese_crate", "Cheese Wheels", "🧀", 2.2, 1.7, 2.0, "hand", 3, 160, false, "pantry")
+item("apple_crate", "Apple Crate", "🍎", 2.2, 1.5, 1.6, "hand", 2, 30, false, "pantry")
+item("butter_churn", "Butter Churn", "🧈", 1.6, 3.9, 1.6, "both", 3, 120, false, "kitchen")
+item("farm_bench", "Farmhouse Bench", "🪑", 6.4, 3.4, 1.8, "pair", 5, 170, false, "living")
+item("sled", "Wooden Sled", "🛷", 1.9, 1.6, 4.8, "both", 2, 90, false, "barn")
+item("beehive", "Beehive", "🐝", 2.2, 3.1, 2.2, "both", 4, 200, true, "yard")
+item("cowbells", "Cowbell Collection", "🔔", 2.6, 2.2, 1.2, "hand", 3, 500, false, "living", true)
+item("ladder", "Stepladder", "🪜", 2.0, 6.6, 2.4, "both", 3, 60, false, "barn")
+item("branding_iron", "Branding Iron", "🔥", 3.4, 1.45, 1.0, "hand", 2, 550, false, "workshop", true)
+item("hay_wagon", "Hay Wagon", "🛞", 6.4, 4.8, 9.6, "pair", 9, 650, false, "barn")
+Items.hay_wagon.bigDoor = true
+FurnitureLooks.FarmPieces = table.move(Order, farmFrom, #Order, 1, {}) :: { string }
+FurnitureLooks.FarmRooms = { "stable", "barn", "workshop", "yard", "pantry" }
 
 FurnitureLooks.Items = Items
 FurnitureLooks.Order = Order
@@ -845,6 +881,548 @@ BUILDERS.box = function(c: Ctx)
 	local tag = box(c, "Tag", 0.9, 0.5, 0.02, 0.45, 0.95, -0.99, rgb(245, 245, 240), SMOOTH)
 	label(tag, pick({ "BOOKS", "KITCHEN", "TOYS", "WINTER", "MISC" }, c.v), rgb(40, 40, 44), Enum.NormalId.Front, Enum.Font.PermanentMarker)
 	label(body, "THIS SIDE UP ↑", shade(CARDBOARD, 0.5), Enum.NormalId.Back)
+end
+
+-- 7.x farm pieces ---------------------------------------------------------------------------------------------------
+-- Walt's farm's things (their catalogue above). Wood, straw, galvanized steel and leather; the ★ ones dressed up.
+
+local GRASS = Enum.Material.Grass
+local STRAWS = { rgb(226, 194, 104), rgb(208, 176, 92), rgb(198, 188, 112), rgb(234, 208, 132) }
+local GALVANIZED = { rgb(184, 190, 192), rgb(160, 166, 170), rgb(204, 204, 196), rgb(146, 148, 146) }
+local ENAMELS = { rgb(176, 46, 42), rgb(44, 92, 140), rgb(52, 112, 72), rgb(224, 214, 188) }
+local LEATHERS = { rgb(120, 70, 38), rgb(150, 92, 50), rgb(84, 50, 30), rgb(170, 112, 64) }
+local BURLAP = { rgb(196, 168, 116), rgb(182, 152, 104), rgb(210, 186, 140), rgb(168, 140, 96) }
+local BLANKETS = { rgb(170, 40, 44), rgb(40, 96, 150), rgb(214, 160, 50), rgb(60, 120, 90) }
+local SILVER = rgb(214, 218, 222)
+local IRON = rgb(52, 52, 56)
+
+-- A square rod `thick` thick from a to b, in the piece's frame (any way but straight up: a sawhorse's legs, a ladder's
+-- rails, a sled's horns).
+local function strut(ctx: Ctx, name: string, a: Vector3, b: Vector3, thick: number, color: Color3, material: Enum.Material?): BasePart
+	local length = (b - a).Magnitude
+	return finish(ctx, Instance.new("Part"), name, Vector3.new(thick, thick, length), CFrame.lookAt((a + b) / 2, b), color, material or WOOD)
+end
+
+BUILDERS.hay_bale = function(c: Ctx)
+	local straw = pick(STRAWS, c.v)
+	box(c, "Bale", 3.1, 1.55, 1.7, 0, 0.775, 0, straw, GRASS)
+	for _, s in { -1, 1 } do
+		box(c, "End", 0.06, 1.45, 1.6, s * 1.57, 0.75, 0, shade(straw, 0.14), GRASS)
+		box(c, "Twine", 0.08, 1.6, 1.76, s * 0.8, 0.8, 0, pick({ rgb(200, 60, 50), rgb(40, 110, 170), rgb(236, 226, 196) }, c.v), FABRIC)
+	end
+	wedge(c, "Tuft", 0.6, 0.15, 0.5, 0.5, 1.625, -0.3, tint(straw, 0.15), GRASS, CFrame.Angles(0, 0.5, 0))
+	wedge(c, "Tuft", 0.5, 0.15, 0.4, -0.9, 1.625, 0.35, tint(straw, 0.15), GRASS, CFrame.Angles(0, math.pi - 0.4, 0))
+end
+
+-- A milk churn: galvanized, or Grandma's painted one with a garland of edelweiss and alpine roses round its belly.
+local function churn(c: Ctx, painted: boolean)
+	local body = if painted then pick(ENAMELS, c.v) else pick(GALVANIZED, c.v)
+	local look = if painted then SMOOTH else METAL
+	local trim = if painted then BRASS else shade(body, 0.18)
+	cyl(c, "Foot", 0.14, 1.34, 0, 0.07, 0, "y", shade(body, 0.25), METAL)
+	cyl(c, "Body", 1.7, 1.28, 0, 0.98, 0, "y", body, look)
+	for _, y in { 0.55, 1.45 } do
+		cyl(c, "Band", 0.14, 1.36, 0, y, 0, "y", trim, METAL)
+	end
+	cyl(c, "Shoulder", 0.3, 1.02, 0, 1.98, 0, "y", body, look)
+	cyl(c, "Neck", 0.34, 0.74, 0, 2.3, 0, "y", body, look)
+	cyl(c, "Lid", 0.12, 0.88, 0, 2.53, 0, "y", trim, METAL)
+	ball(c, "Knob", 0.24, 0, 2.6, 0, DARK, METAL)
+	for _, s in { -1, 1 } do
+		box(c, "Handle", 0.1, 0.32, 0.46, s * 0.6, 1.98, 0, trim, METAL)
+	end
+	if painted then
+		cyl(c, "Garland", 0.42, 1.31, 0, 1.0, 0, "y", rgb(246, 242, 230), SMOOTH)
+		for n, a in { -0.5, 0, 0.5 } do
+			ball(c, "Flower", 0.22, math.sin(a) * 0.62, 1.0, -math.cos(a) * 0.62, if n == 2 then rgb(250, 250, 246) else rgb(214, 50, 60))
+		end
+	end
+end
+BUILDERS.milk_churn = function(c: Ctx)
+	churn(c, false)
+end
+BUILDERS.grandmas_churn = function(c: Ctx)
+	churn(c, true)
+end
+
+-- A western saddle on its sawhorse (along X): the blanket, the skirts, the fenders and stirrups, the horn. Thunder's
+-- is dark tooled leather with silver conchos and silver stirrups.
+local function saddle(c: Ctx, thunder: boolean)
+	local wood = pick(WOODS, c.v, 2)
+	local leather = if thunder then pick({ rgb(70, 40, 26), rgb(96, 52, 30), rgb(54, 34, 26), rgb(110, 62, 36) }, c.v) else pick(LEATHERS, c.v)
+	box(c, "Beam", 2.9, 0.3, 0.45, 0, 2.05, 0, wood, WOOD)
+	for _, x in { -1.2, 1.2 } do
+		box(c, "Trestle", 0.2, 1.9, 1.3, x, 0.95, 0, shade(wood, 0.15), WOOD)
+	end
+	local blanket = pick(BLANKETS, c.v, if thunder then 2 else 0)
+	box(c, "Blanket", 1.9, 0.1, 1.62, 0.1, 2.25, 0, blanket, FABRIC)
+	for _, s in { -1, 1 } do
+		box(c, "Skirt", 1.6, 0.8, 0.1, 0.1, 2.0, s * 0.86, shade(leather, 0.1), LEATHER)
+		box(c, "Fender", 0.5, 1.3, 0.08, -0.05, 1.3, s * 0.93, leather, LEATHER)
+		box(c, "Stirrup", 0.55, 0.35, 0.12, -0.05, 0.5, s * 0.92, if thunder then SILVER else shade(wood, 0.3), if thunder then METAL else WOOD)
+		if thunder then
+			cyl(c, "Concho", 0.05, 0.34, 0.1, 2.05, s * 0.935, "z", SILVER, METAL)
+		end
+	end
+	box(c, "Seat", 1.6, 0.35, 1.25, 0.1, 2.47, 0, leather, LEATHER)
+	box(c, "Fork", 0.5, 0.45, 1.3, -0.65, 2.75, 0, leather, LEATHER)
+	cyl(c, "Horn", 0.3, 0.22, -0.75, 3.1, 0, "y", shade(leather, 0.2), LEATHER)
+	cyl(c, "HornCap", 0.06, 0.4, -0.75, 3.27, 0, "y", if thunder then SILVER else shade(leather, 0.25), if thunder then METAL else LEATHER)
+	box(c, "Cantle", 0.3, 0.7, 1.2, 0.95, 2.8, 0, leather, LEATHER, CFrame.Angles(0, 0, -0.35))
+end
+BUILDERS.saddle = function(c: Ctx)
+	saddle(c, false)
+end
+BUILDERS.thunders_saddle = function(c: Ctx)
+	saddle(c, true)
+end
+
+BUILDERS.tack_rack = function(c: Ctx)
+	local wood = pick(WOODS, c.v, 1)
+	for _, x in { -1.55, 1.55 } do
+		box(c, "Foot", 0.4, 0.25, 1.2, x, 0.125, 0, shade(wood, 0.15), WOOD)
+		box(c, "Upright", 0.3, 5.0, 0.3, x, 2.75, 0.2, wood, WOOD)
+	end
+	box(c, "Top", 3.6, 0.25, 0.45, 0, 5.275, 0.2, wood, WOOD)
+	box(c, "Board", 2.8, 3.2, 0.12, 0, 3.4, 0.3, tint(wood, 0.08), PLANKS)
+	local straps = { pick(LEATHERS, c.v), pick(LEATHERS, c.v, 2), pick(BLANKETS, c.v, 1) }
+	for n, x in { -0.9, 0, 0.9 } do
+		cyl(c, "Peg", 0.55, 0.14, x, 4.6, 0, "z", shade(wood, 0.2), WOOD)
+		box(c, "Bridle", 0.45, 1.5, 0.08, x, 3.75, -0.22, straps[n], LEATHER)
+	end
+	local rope = pick({ rgb(206, 180, 120), rgb(186, 160, 110), rgb(220, 200, 150), rgb(170, 60, 50) }, c.v)
+	cyl(c, "Lariat", 0.16, 1.1, 0, 2.35, -0.1, "z", rope, FABRIC)
+	cyl(c, "Bucket", 0.75, 0.8, 0.75, 0.375, -0.1, "y", pick(GALVANIZED, c.v), METAL)
+end
+
+BUILDERS.wheelbarrow = function(c: Ctx)
+	-- the wheel to the front (-Z), the handles to the back
+	local paint = pick({ rgb(200, 60, 46), rgb(60, 110, 70), rgb(70, 110, 160), rgb(120, 110, 96) }, c.v)
+	local wood = pick(WOODS, c.v, 3)
+	cyl(c, "Wheel", 0.32, 1.3, 0, 0.65, -1.85, "x", DARK, RUBBER)
+	box(c, "Bottom", 1.7, 0.12, 2.3, 0, 1.25, -0.1, paint, METAL)
+	wedge(c, "Front", 1.9, 0.85, 0.75, 0, 1.68, -1.6, paint, METAL, CFrame.Angles(0, math.pi, 0))
+	for _, s in { -1, 1 } do
+		box(c, "Side", 0.1, 0.85, 3.0, s * 1.02, 1.66, -0.45, paint, METAL, CFrame.Angles(0, 0, s * 0.18))
+		strut(c, "Handle", Vector3.new(s * 0.78, 0.95, -1.85), Vector3.new(s * 0.9, 1.45, 2.45), 0.14, wood, WOOD)
+		cyl(c, "Grip", 0.5, 0.2, s * 0.9, 1.47, 2.25, "z", DARK, RUBBER)
+		box(c, "Leg", 0.14, 1.05, 0.14, s * 0.8, 0.525, 0.9, shade(wood, 0.2), WOOD)
+	end
+	box(c, "Back", 1.9, 0.75, 0.1, 0, 1.68, 1.05, paint, METAL)
+	local load = pick({ rgb(96, 70, 48), rgb(226, 194, 104), rgb(140, 100, 66), rgb(90, 84, 80) }, c.v)
+	box(c, "Load", 1.75, 0.3, 2.6, 0, 1.98, -0.4, load, if c.v % 2 == 0 then GRASS else Enum.Material.Ground)
+end
+
+BUILDERS.feed_sacks = function(c: Ctx)
+	local cloth = pick(BURLAP, c.v)
+	local low = box(c, "Sack", 2.3, 0.85, 1.5, 0, 0.425, 0, cloth, FABRIC)
+	for _, s in { -1, 1 } do
+		cyl(c, "SackEnd", 0.2, 0.85, s * 1.1, 0.425, 0, "x", shade(cloth, 0.08), FABRIC)
+	end
+	local high = box(c, "Sack", 2.0, 0.8, 1.3, 0.05, 1.25, 0.02, tint(cloth, 0.06), FABRIC, CFrame.Angles(0, 0.12, 0))
+	box(c, "Tie", 0.25, 0.3, 0.3, 1.1, 1.3, 0.1, shade(cloth, 0.3), FABRIC)
+	box(c, "Scoop", 0.5, 0.15, 0.35, -0.5, 1.72, -0.2, pick(GALVANIZED, c.v), METAL)
+	label(low, pick({ "FEED", "OATS", "BARLEY", "CORN" }, c.v), pick({ rgb(160, 40, 36), rgb(40, 70, 130), rgb(40, 100, 60) }, c.v), Enum.NormalId.Front)
+	label(high, pick({ "OATS", "FEED", "CORN", "BARLEY" }, c.v), rgb(60, 40, 30), Enum.NormalId.Front)
+end
+
+BUILDERS.tool_chest = function(c: Ctx)
+	local wood = pick(WOODS, c.v, 2)
+	local iron = pick({ IRON, rgb(70, 76, 84), rgb(96, 70, 50), rgb(40, 60, 50) }, c.v)
+	for _, z in { -0.85, 0.85 } do
+		box(c, "Skid", 4.3, 0.18, 0.35, 0, 0.09, z, shade(wood, 0.25), WOOD)
+	end
+	local body = box(c, "Body", 4.2, 2.15, 2.0, 0, 1.255, 0, wood, PLANKS)
+	box(c, "Lid", 4.4, 0.35, 2.2, 0, 2.505, 0, shade(wood, 0.08), PLANKS)
+	for _, x in { -2.08, 2.08 } do
+		for _, z in { -0.98, 0.98 } do
+			box(c, "Corner", 0.26, 2.5, 0.26, x, 1.43, z, iron, METAL)
+		end
+		box(c, "Handle", 0.14, 0.28, 0.9, x * 1.05, 1.6, 0, iron, METAL)
+	end
+	box(c, "Hasp", 0.35, 0.5, 0.08, 0, 2.2, -1.08, iron, METAL)
+	box(c, "Padlock", 0.38, 0.42, 0.14, 0, 1.85, -1.08, BRASS, METAL)
+	box(c, "Saw", 1.7, 0.06, 0.55, -0.6, 2.71, 0.2, STEEL, METAL, CFrame.Angles(0, 0.2, 0))
+	box(c, "SawHandle", 0.5, 0.12, 0.35, 0.45, 2.74, 0.4, shade(wood, 0.3), WOOD, CFrame.Angles(0, 0.2, 0))
+	label(body, "RANCH TOOLS", rgb(240, 232, 210), Enum.NormalId.Front)
+end
+
+BUILDERS.anvil = function(c: Ctx)
+	-- on its stump (the horn toward -X), a hammer on the face, the tongs leaning on the stump
+	local bark = pick({ rgb(110, 80, 56), rgb(92, 70, 52), rgb(130, 96, 64), rgb(80, 60, 46) }, c.v)
+	cyl(c, "Stump", 1.4, 1.56, 0.1, 0.7, 0, "y", bark, WOOD)
+	cyl(c, "Cut", 0.04, 1.44, 0.1, 1.42, 0, "y", tint(bark, 0.3), WOOD)
+	local iron = pick({ rgb(52, 52, 56), rgb(64, 62, 60), rgb(46, 48, 54), rgb(72, 66, 62) }, c.v)
+	box(c, "Base", 1.3, 0.35, 1.0, 0.1, 1.615, 0, iron, METAL)
+	box(c, "Waist", 0.75, 0.45, 0.6, 0.1, 2.015, 0, iron, METAL)
+	box(c, "Face", 2.05, 0.45, 0.85, 0.425, 2.465, 0, tint(iron, 0.08), METAL)
+	cyl(c, "Horn", 0.75, 0.45, -0.975, 2.5, 0, "x", iron, METAL)
+	ball(c, "Tip", 0.28, -1.38, 2.52, 0, iron, METAL)
+	box(c, "HammerHead", 0.55, 0.25, 0.26, 1.0, 2.815, 0.15, rgb(90, 92, 96), METAL)
+	box(c, "HammerHandle", 1.0, 0.12, 0.12, 0.25, 2.75, 0.15, rgb(160, 120, 76), WOOD)
+	strut(c, "Tongs", Vector3.new(1.3, 0.05, -0.55), Vector3.new(0.92, 1.35, -0.35), 0.1, IRON, METAL)
+end
+
+-- A crate of a few boards round a bottom (the cheese's, the apples'): its front board.
+local function crate(c: Ctx, w: number, h: number, d: number, wood: Color3): BasePart
+	box(c, "Bottom", w, 0.14, d, 0, 0.07, 0, shade(wood, 0.1), PLANKS)
+	local front = box(c, "Front", w, h, 0.12, 0, 0.14 + h / 2, -d / 2 + 0.06, wood, PLANKS)
+	box(c, "Back", w, h, 0.12, 0, 0.14 + h / 2, d / 2 - 0.06, wood, PLANKS)
+	for _, s in { -1, 1 } do
+		box(c, "Side", 0.12, h, d - 0.24, s * (w / 2 - 0.06), 0.14 + h / 2, 0, wood, PLANKS)
+	end
+	return front
+end
+
+BUILDERS.cheese_crate = function(c: Ctx)
+	crate(c, 2.2, 0.86, 2.0, pick(WOODS, c.v, 3))
+	local rind = pick({ rgb(226, 170, 70), rgb(204, 140, 60), rgb(236, 200, 120), rgb(170, 110, 60) }, c.v)
+	cyl(c, "Wheel", 0.55, 1.75, 0, 0.75, 0, "y", rind, SMOOTH)
+	cyl(c, "Wheel", 0.5, 1.6, 0.05, 1.28, 0.02, "y", tint(rind, 0.06), SMOOTH)
+	wedge(c, "Slice", 0.6, 0.17, 0.7, -0.2, 1.615, -0.1, rgb(250, 226, 150), SMOOTH)
+	local tag = box(c, "Tag", 1.1, 0.45, 0.03, 0, 0.6, -1.015, rgb(244, 240, 226), SMOOTH)
+	label(tag, "MOUNTAIN CHEESE", rgb(90, 50, 30), Enum.NormalId.Front)
+end
+
+BUILDERS.apple_crate = function(c: Ctx)
+	local front = crate(c, 2.2, 0.84, 1.6, pick(WOODS, c.v, 1))
+	local apples = { rgb(196, 40, 36), rgb(120, 180, 60), rgb(230, 190, 60), rgb(176, 30, 40) }
+	for n, p in { { -0.6, -0.3 }, { 0, -0.35 }, { 0.6, -0.3 }, { -0.3, 0.3 }, { 0.35, 0.3 } } do
+		ball(c, "Apple", 0.5, p[1], 1.05, p[2], pick(apples, c.v, if n % 3 == 0 then 1 else 0))
+	end
+	ball(c, "Apple", 0.5, 0.05, 1.27, 0, pick(apples, c.v, 2))
+	label(front, "APPLES", rgb(250, 244, 230), Enum.NormalId.Front, Enum.Font.PermanentMarker)
+end
+
+BUILDERS.butter_churn = function(c: Ctx)
+	local wood = pick(WOODS, c.v, 2)
+	local hoop = pick({ IRON, BRASS, rgb(110, 70, 40), STEEL }, c.v)
+	cyl(c, "Foot", 0.12, 1.56, 0, 0.06, 0, "y", shade(wood, 0.2), WOOD)
+	cyl(c, "Barrel", 1.3, 1.48, 0, 0.77, 0, "y", wood, WOOD)
+	cyl(c, "Upper", 1.05, 1.26, 0, 1.945, 0, "y", wood, WOOD)
+	cyl(c, "Hoop", 0.12, 1.54, 0, 0.4, 0, "y", hoop, METAL)
+	cyl(c, "Hoop", 0.12, 1.32, 0, 2.2, 0, "y", hoop, METAL)
+	cyl(c, "Lid", 0.14, 1.1, 0, 2.54, 0, "y", shade(wood, 0.12), WOOD)
+	cyl(c, "Dasher", 1.2, 0.14, 0, 3.2, 0, "y", tint(wood, 0.15), WOOD)
+	ball(c, "Knob", 0.24, 0, 3.78, 0, tint(wood, 0.15), WOOD)
+end
+
+BUILDERS.farm_bench = function(c: Ctx)
+	-- a long bench with a back, hearts cut in its top board (the farmhouse way)
+	local wood = pick(WOODS, c.v, 4)
+	box(c, "Seat", 6.4, 0.3, 1.5, 0, 1.65, -0.15, wood, WOOD)
+	for _, s in { -1, 1 } do
+		box(c, "Slab", 0.3, 1.5, 1.35, s * 2.7, 0.75, -0.15, shade(wood, 0.1), WOOD)
+		box(c, "Post", 0.3, 1.6, 0.26, s * 3.0, 2.6, 0.72, shade(wood, 0.1), WOOD)
+	end
+	box(c, "Stretcher", 5.1, 0.25, 0.25, 0, 0.45, -0.15, shade(wood, 0.1), WOOD)
+	box(c, "BackRail", 5.7, 0.55, 0.14, 0, 2.35, 0.75, wood, WOOD)
+	box(c, "BackTop", 6.2, 0.45, 0.16, 0, 3.12, 0.75, wood, WOOD)
+	for _, x in { -1.8, 0, 1.8 } do
+		box(c, "Heart", 0.28, 0.28, 0.04, x, 3.1, 0.66, shade(wood, 0.6), WOOD, CFrame.Angles(0, 0, math.pi / 4))
+	end
+	local cushion = pick({ rgb(176, 46, 50), rgb(60, 110, 70), rgb(50, 90, 150), rgb(214, 170, 70) }, c.v)
+	for _, x in { -1.5, 1.5 } do
+		box(c, "Cushion", 2.6, 0.18, 1.2, x, 1.89, -0.2, cushion, FABRIC)
+	end
+end
+
+BUILDERS.sled = function(c: Ctx)
+	-- a wooden mountain sled, its horns curling up at the front (-Z)
+	local wood = pick(WOODS, c.v, 3)
+	local runner = shade(wood, 0.15)
+	for _, s in { -1, 1 } do
+		local x = s * 0.82
+		box(c, "Runner", 0.16, 0.22, 3.9, x, 0.11, 0.45, runner, WOOD)
+		strut(c, "Horn", Vector3.new(x, 0.12, -1.45), Vector3.new(x, 1.45, -2.3), 0.16, runner, WOOD)
+		box(c, "Strut", 0.14, 0.75, 0.14, x * 0.92, 0.58, 0.4, shade(wood, 0.1), WOOD)
+		box(c, "Rail", 0.14, 0.14, 3.0, x * 0.92, 0.98, 0.4, wood, WOOD)
+	end
+	for _, z in { -0.5, 0.45, 1.4 } do
+		box(c, "Slat", 1.55, 0.1, 0.62, 0, 1.08, z, tint(wood, 0.08), WOOD)
+	end
+	box(c, "Bar", 1.8, 0.14, 0.14, 0, 1.4, -2.25, wood, WOOD)
+end
+
+BUILDERS.beehive = function(c: Ctx)
+	-- three painted hive boxes on a stand, the roof, the entrance and its landing board, two bees
+	local wood = pick(WOODS, c.v, 2)
+	for _, z in { -0.7, 0.7 } do
+		box(c, "Rail", 2.0, 0.55, 0.3, 0, 0.275, z, shade(wood, 0.2), WOOD)
+	end
+	local paints = { rgb(240, 214, 110), rgb(120, 170, 210), rgb(236, 236, 226), rgb(150, 190, 130), rgb(214, 120, 90) }
+	for n = 0, 2 do
+		box(c, "Box", 1.9, 0.72, 1.8, 0, 0.92 + n * 0.74, 0, pick(paints, c.v, n), PLANKS)
+	end
+	box(c, "Roof", 2.2, 0.25, 2.2, 0, 2.885, 0, pick({ rgb(120, 60, 44), STEEL, rgb(60, 90, 70), rgb(80, 80, 86) }, c.v), METAL)
+	box(c, "Ridge", 2.2, 0.09, 0.4, 0, 3.05, 0, rgb(70, 70, 74), METAL)
+	box(c, "Slot", 0.8, 0.12, 0.05, 0, 0.66, -0.91, DARK, SMOOTH)
+	box(c, "Landing", 1.0, 0.06, 0.3, 0, 0.6, -1.0, shade(wood, 0.1), WOOD)
+	for _, p in { { 0.3, 0.9, -1.0 }, { -0.4, 1.2, -1.02 } } do
+		ball(c, "Bee", 0.12, p[1], p[2], p[3], rgb(240, 190, 40))
+	end
+end
+
+BUILDERS.cowbells = function(c: Ctx)
+	-- three great alpine cowbells on embroidered straps, hung on a wooden rack
+	local wood = pick(WOODS, c.v, 4)
+	box(c, "Base", 2.6, 0.2, 1.2, 0, 0.1, 0, shade(wood, 0.1), WOOD)
+	for _, s in { -1, 1 } do
+		box(c, "Post", 0.2, 2.0, 0.22, s * 1.2, 1.2, 0, wood, WOOD)
+	end
+	cyl(c, "Bar", 2.4, 0.18, 0, 2.0, 0, "x", wood, WOOD)
+	local straps = { rgb(176, 36, 44), rgb(40, 70, 130), rgb(30, 90, 60), rgb(20, 20, 24) }
+	local metals = { BRASS, rgb(176, 120, 60), rgb(200, 200, 196), rgb(150, 110, 60) }
+	for n, b in { { -0.72, 0.62, 1.15 }, { 0, 0.72, 1.0 }, { 0.72, 0.52, 1.25 } } do
+		local x, d, bottom = b[1], b[2], b[3]
+		local h = d * 1.05
+		box(c, "Strap", 0.3, 2.0 - bottom - h + 0.05, 0.06, x, (2.0 + bottom + h) / 2, 0, pick(straps, c.v, n), FABRIC)
+		cyl(c, "Bell", h, d, x, bottom + h / 2, 0, "y", pick(metals, c.v, n), METAL)
+	end
+end
+
+BUILDERS.ladder = function(c: Ctx)
+	-- a stepladder: the front with its rungs, the back legs, the top
+	local wood = pick({ rgb(208, 170, 120), rgb(176, 128, 82), rgb(150, 156, 160), rgb(196, 150, 96) }, c.v)
+	local material = if c.v % 4 == 3 then METAL else WOOD
+	for _, s in { -1, 1 } do
+		strut(c, "Rail", Vector3.new(s * 0.85, 0.06, -1.1), Vector3.new(s * 0.85, 6.3, -0.12), 0.18, wood, material)
+		strut(c, "Leg", Vector3.new(s * 0.85, 0.06, 1.1), Vector3.new(s * 0.85, 6.3, 0.12), 0.16, shade(wood, 0.1), material)
+		box(c, "Spreader", 0.06, 0.08, 1.3, s * 0.95, 2.6, 0, STEEL, METAL)
+	end
+	for n = 1, 5 do
+		local y = n * 1.05
+		local z = -1.1 + (y - 0.06) / 6.24 * 0.98
+		cyl(c, "Rung", 1.6, 0.15, 0, y, z, "x", tint(wood, 0.06), material)
+	end
+	box(c, "Top", 2.0, 0.25, 0.7, 0, 6.45, 0, shade(wood, 0.08), material)
+end
+
+BUILDERS.branding_iron = function(c: Ctx)
+	-- the Silver Spur's iron on a plaque, its brass plate in front
+	local wood = pick(WOODS, c.v, 4)
+	box(c, "Plaque", 3.4, 0.2, 1.0, 0, 0.1, 0, wood, WOOD)
+	for _, x in { -0.75, 0.9 } do
+		box(c, "Rest", 0.2, 0.8, 0.3, x, 0.6, 0, shade(wood, 0.15), WOOD)
+	end
+	local iron = pick({ rgb(60, 56, 54), rgb(84, 62, 50), rgb(48, 50, 56), rgb(100, 70, 56) }, c.v)
+	cyl(c, "Rod", 2.7, 0.14, 0.1, 1.07, 0, "x", iron, METAL)
+	cyl(c, "Handle", 0.75, 0.18, 1.5, 1.07, 0, "z", iron, METAL)
+	local brand = box(c, "Brand", 0.14, 0.7, 0.62, -1.32, 1.07, 0, iron, METAL)
+	label(brand, "SS", rgb(250, 140, 60), Enum.NormalId.Left)
+	local plate = box(c, "Plate", 1.5, 0.14, 0.04, 0, 0.12, -0.52, BRASS, METAL)
+	label(plate, "SILVER SPUR · 1921", rgb(70, 50, 20), Enum.NormalId.Front)
+end
+
+BUILDERS.hay_wagon = function(c: Ctx)
+	-- an alpine ladder wagon piled with hay, its drawbar to the front (-Z)
+	local wood = pick(WOODS, c.v, 1)
+	local dark = shade(wood, 0.2)
+	local wheel = pick({ rgb(160, 50, 40), rgb(110, 76, 50), rgb(60, 90, 60), rgb(200, 160, 70) }, c.v)
+	for _, z in { -3.1, 3.1 } do
+		for _, s in { -1, 1 } do
+			cyl(c, "Wheel", 0.4, 2.6, s * 3.0, 1.3, z, "x", wheel, WOOD)
+		end
+		box(c, "Axle", 5.6, 0.3, 0.3, 0, 1.3, z, IRON, METAL)
+	end
+	box(c, "Bed", 4.6, 0.3, 8.6, 0, 2.0, 0, wood, PLANKS)
+	for _, s in { -1, 1 } do
+		box(c, "TopRail", 0.2, 0.2, 8.8, s * 2.75, 3.95, 0, dark, WOOD)
+		for _, z in { -2.2, 2.2 } do
+			strut(c, "Rung", Vector3.new(s * 2.35, 2.25, z), Vector3.new(s * 2.75, 3.95, z), 0.16, wood, WOOD)
+		end
+	end
+	for _, z in { -4.35, 4.35 } do
+		box(c, "Gate", 4.5, 0.8, 0.14, 0, 2.55, z, dark, PLANKS)
+	end
+	box(c, "Drawbar", 0.3, 0.3, 1.5, 0, 1.3, -4.05, dark, WOOD)
+	local straw = pick(STRAWS, c.v)
+	box(c, "Hay", 4.4, 1.5, 7.8, 0, 3.0, 0, straw, GRASS)
+	box(c, "HayTop", 3.8, 1.0, 6.9, 0, 4.25, 0.1, tint(straw, 0.08), GRASS)
+end
+
+-- ── 7.x alpine pieces ─────────────────────────────────────────────────────────
+-- The map turns into an Austrian alpine valley and Marge's house inside into a chalet (server/HouseInterior.luau):
+-- the things of a chalet, in the catalogue after the others (Order) and in the house's recipes (shared/HouseLayout.luau).
+-- The cuckoo clock and the accordion are sentimental (★ candidates: a house's ★ are its recipes' star entries, these
+-- come in as extras, ★ only when a house is short of its star pieces).
+--   id                  name                     icon  X    Y    Z    class   wt  value fragile room       ★
+item("cuckoo_clock", "Cuckoo Clock", "🐦", 1.4, 2.8, 0.8, "hand", 1, 420, true, "living", true)
+item("accordion", "Accordion", "🪗", 1.8, 1.7, 1.1, "both", 2, 520, true, "living", true)
+item("heart_chair", "Alpine Armchair", "🪑", 2.2, 4.2, 2.2, "both", 3, 140, false, "living")
+item("stein_crate", "Crate of Steins", "🍺", 2.2, 1.5, 1.6, "hand", 3, 140, true, "kitchen")
+item("painted_cupboard", "Painted Cupboard", "🌷", 4.2, 7.0, 2.0, "pair", 9, 650, false, "bedroom")
+item("carved_chest", "Carved Chest", "🗝️", 4.4, 2.6, 2.2, "pair", 7, 380, false, "bedroom")
+item("edelweiss_frame", "Edelweiss Frame", "🌼", 2.0, 2.4, 0.4, "hand", 1, 180, true, "bedroom")
+item("ski_bundle", "Skis & Poles", "🎿", 1.4, 6.4, 0.8, "both", 3, 160, false, "hall")
+
+-- The chalet's palette: pine to old larch, the painted grounds of farmhouse furniture (blue-green, ox red, sage,
+-- cream), the painted flowers, iron and pewter.
+local PINES = { rgb(196, 146, 92), rgb(160, 110, 66), rgb(214, 172, 118), rgb(128, 86, 54) }
+local PAINTED = { rgb(64, 108, 124), rgb(150, 62, 52), rgb(96, 124, 88), rgb(226, 212, 180) }
+local BLOOMS = { rgb(206, 56, 52), rgb(244, 240, 228), rgb(236, 178, 60), rgb(72, 110, 172) }
+local LEAF = rgb(70, 118, 66)
+local WROUGHT_IRON = rgb(56, 50, 46)
+local PEWTER = rgb(150, 156, 160)
+
+BUILDERS.cuckoo_clock = function(c: Ctx)
+	-- The carved house clock taken off the wall, stood on its pine-cone weights: the chains, the pendulum, the case
+	-- under its gable roof, the dial, and the bird looking out of its little door.
+	local wood = pick(PINES, c.v, 1)
+	local dark = shade(wood, 0.35)
+	for _, s in { -1, 1 } do
+		cyl(c, "Weight", 0.55, 0.26, s * 0.3, 0.275, 0.05, "y", WROUGHT_IRON, METAL)
+		box(c, "Chain", 0.04, 1.0, 0.04, s * 0.3, 1.05, 0.05, BRASS, METAL)
+	end
+	box(c, "Pendulum", 0.05, 0.6, 0.03, 0, 1.25, -0.1, BRASS, METAL)
+	cyl(c, "Bob", 0.04, 0.32, 0, 0.95, -0.1, "z", dark, WOOD)
+	box(c, "Case", 1.0, 0.85, 0.62, 0, 1.975, 0.07, wood, WOOD)
+	box(c, "Gable", 0.36, 0.36, 0.5, 0, 2.4, 0.07, wood, WOOD, CFrame.Angles(0, 0, math.pi / 4))
+	for _, s in { -1, 1 } do
+		box(c, "Roof", 0.8, 0.09, 0.8, s * 0.33, 2.544, 0, dark, WOOD, CFrame.Angles(0, 0, -s * 0.5))
+	end
+	box(c, "Door", 0.2, 0.2, 0.04, 0, 2.48, -0.2, shade(wood, 0.5), WOOD)
+	ball(c, "Cuckoo", 0.16, 0, 2.48, -0.27, pick({ rgb(120, 84, 50), rgb(236, 200, 70), rgb(70, 60, 54), rgb(200, 80, 60) }, c.v))
+	cyl(c, "Dial", 0.05, 0.6, 0, 1.95, -0.265, "z", CREAM)
+	box(c, "Hand", 0.05, 0.22, 0.02, 0.05, 2.02, -0.3, DARK, SMOOTH, CFrame.Angles(0, 0, -0.6))
+	box(c, "Hand", 0.04, 0.28, 0.02, -0.06, 2.05, -0.3, DARK, SMOOTH, CFrame.Angles(0, 0, 0.4))
+end
+
+BUILDERS.accordion = function(c: Ctx)
+	-- Grandad's accordion stood on its end: the treble side's keyboard (+X), the folded bellows, the bass side's
+	-- buttons (-X), the shoulder strap at the back.
+	local body = pick({ rgb(176, 36, 40), rgb(32, 32, 36), rgb(236, 228, 206), rgb(30, 96, 90) }, c.v)
+	local fold = shade(body, 0.45)
+	box(c, "Treble", 0.5, 1.65, 1.05, 0.65, 0.825, 0, body, SMOOTH)
+	box(c, "Keys", 0.32, 1.35, 0.06, 0.62, 0.85, -0.54, rgb(246, 244, 236), SMOOTH)
+	box(c, "Sharps", 0.14, 1.25, 0.05, 0.53, 0.86, -0.58, rgb(24, 24, 26), SMOOTH)
+	box(c, "Bass", 0.45, 1.65, 1.05, -0.675, 0.825, 0, body, SMOOTH)
+	box(c, "Buttons", 0.3, 0.8, 0.05, -0.66, 1.0, -0.55, rgb(232, 226, 214), SMOOTH)
+	for n = 0, 3 do
+		box(c, "Bellows", 0.2, 1.5, 0.95, -0.34 + n * 0.21, 0.8, 0, if n % 2 == 0 then fold else tint(body, 0.25), FABRIC)
+	end
+	box(c, "Strap", 0.12, 1.3, 0.05, 0.65, 0.85, 0.55, rgb(110, 70, 44), LEATHER)
+end
+
+BUILDERS.heart_chair = function(c: Ctx)
+	-- A Stube's plank armchair: splayed legs, board arms, a cushion, and the tall back board with its heart cut out.
+	local wood = pick(PINES, c.v, 2)
+	local dark = shade(wood, 0.15)
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			box(c, "Leg", 0.22, 1.6, 0.22, sx * 0.72, 0.8, sz * 0.62, dark, WOOD, CFrame.Angles(-sz * 0.12, 0, sx * 0.12))
+		end
+	end
+	box(c, "Seat", 2.0, 0.25, 1.9, 0, 1.72, -0.05, wood, WOOD)
+	box(c, "Cushion", 1.6, 0.15, 1.5, 0, 1.92, -0.15, pick(FABRICS, c.v, 2), FABRIC)
+	for _, s in { -1, 1 } do
+		box(c, "Arm", 0.22, 1.05, 1.8, s * 0.95, 2.35, -0.05, wood, WOOD)
+	end
+	-- the back board leans back a little; the heart (a turned square and two round lobes) cut through it
+	local lean = 0.1
+	local back = CFrame.new(0, 3.0, 0.88) * CFrame.Angles(lean, 0, 0)
+	box(c, "Back", 1.7, 2.3, 0.2, 0, 3.0, 0.88, wood, WOOD, CFrame.Angles(lean, 0, 0))
+	local hole = shade(wood, 0.75)
+	local function onBack(name: string, part: BasePart, x: number, y: number, turn: CFrame)
+		finish(c, part, name, part.Size, back * CFrame.new(x, y, -0.11) * turn, hole, WOOD)
+	end
+	local diamond = Instance.new("Part")
+	diamond.Size = Vector3.new(0.5, 0.5, 0.04)
+	onBack("Heart", diamond, 0, 0.2, CFrame.Angles(0, 0, math.pi / 4))
+	for _, s in { -1, 1 } do
+		local lobe = Instance.new("Part")
+		lobe.Shape = Enum.PartType.Cylinder
+		lobe.Size = Vector3.new(0.04, 0.5, 0.5)
+		onBack("Heart", lobe, s * 0.177, 0.377, CFrame.Angles(0, math.pi / 2, 0))
+	end
+end
+
+BUILDERS.stein_crate = function(c: Ctx)
+	-- A beer crate of four stoneware steins with pewter lids, packed for the move.
+	local wood = pick(PINES, c.v, 3)
+	local glaze = pick({ rgb(150, 156, 170), rgb(226, 216, 190), rgb(120, 86, 60), rgb(70, 96, 140) }, c.v)
+	local crate = box(c, "Crate", 2.16, 0.85, 1.56, 0, 0.425, 0, wood, PLANKS)
+	box(c, "Rim", 2.2, 0.16, 1.6, 0, 0.8, 0, shade(wood, 0.2), WOOD)
+	for _, x in { -0.5, 0.5 } do
+		for _, z in { -0.37, 0.37 } do
+			cyl(c, "Stein", 1.15, 0.62, x, 0.725, z, "y", glaze, SMOOTH)
+			cyl(c, "Lid", 0.12, 0.66, x, 1.36, z, "y", PEWTER, METAL)
+		end
+	end
+	label(crate, "PROST!", shade(wood, 0.6), Enum.NormalId.Front, Enum.Font.PermanentMarker)
+end
+
+BUILDERS.painted_cupboard = function(c: Ctx)
+	-- A Bauernschrank: the farmhouse cupboard painted on a coloured ground, a flower on each door, its year on the
+	-- cornice.
+	local ground = pick(PAINTED, c.v)
+	box(c, "Plinth", 4.2, 0.4, 2.0, 0, 0.2, 0, shade(ground, 0.3), WOOD)
+	box(c, "Body", 3.95, 6.1, 1.85, 0, 3.45, 0.075, ground, WOOD)
+	local cornice = box(c, "Cornice", 4.2, 0.5, 2.0, 0, 6.75, 0, shade(ground, 0.25), WOOD)
+	for n, s in { -1, 1 } do
+		box(c, "Door", 1.85, 5.7, 0.08, s * 0.96, 3.45, -0.88, tint(ground, 0.06), WOOD)
+		box(c, "Panel", 1.3, 2.6, 0.04, s * 0.96, 4.1, -0.94, tint(ground, 0.55), SMOOTH)
+		box(c, "Stem", 0.1, 1.2, 0.03, s * 0.96, 3.95, -0.97, LEAF, SMOOTH)
+		box(c, "Leaves", 0.75, 0.14, 0.03, s * 0.96, 3.85, -0.975, LEAF, SMOOTH, CFrame.Angles(0, 0, s * 0.45))
+		cyl(c, "Bloom", 0.04, 0.6, s * 0.96, 4.75, -0.98, "z", pick(BLOOMS, c.v, n))
+	end
+	box(c, "Keyhole", 0.14, 0.4, 0.05, 0, 3.45, -0.95, BRASS, METAL)
+	label(cornice, pick({ "ANNO 1897", "ANNO 1902", "ANNO 1874", "ANNO 1911" }, c.v), tint(ground, 0.7), Enum.NormalId.Front, Enum.Font.Garamond)
+end
+
+BUILDERS.carved_chest = function(c: Ctx)
+	-- The dowry chest from the foot of the bed: bun feet, three carved panels with painted rosettes, an iron hasp and
+	-- rings to lift it by.
+	local wood = pick(PINES, c.v, 4)
+	legs(c, 1.85, 0.8, 0.35, 0.45, shade(wood, 0.3))
+	box(c, "Body", 4.2, 1.85, 2.0, 0, 1.275, 0, wood, WOOD)
+	box(c, "Lid", 4.4, 0.35, 2.2, 0, 2.375, 0, shade(wood, 0.12), WOOD)
+	for n = -1, 1 do
+		box(c, "Panel", 1.15, 1.2, 0.05, n * 1.33, 1.25, -1.02, shade(wood, 0.18), WOOD)
+		cyl(c, "Rosette", 0.04, 0.62, n * 1.33, 1.25, -1.06, "z", pick(BLOOMS, c.v, n + 2))
+	end
+	box(c, "Hasp", 0.3, 0.55, 0.06, 0, 2.05, -1.1, WROUGHT_IRON, METAL)
+	for _, s in { -1, 1 } do
+		cyl(c, "Ring", 0.06, 0.45, s * 2.13, 1.6, 0, "x", WROUGHT_IRON, METAL)
+	end
+end
+
+BUILDERS.edelweiss_frame = function(c: Ctx)
+	-- Pressed edelweiss under glass in a pine frame, a handwritten label; cardboard corners for the move.
+	local wood = pick(PINES, c.v, 2)
+	local paper = pick({ rgb(120, 140, 112), rgb(104, 122, 146), rgb(170, 148, 112), rgb(112, 86, 76) }, c.v) -- (the mount)
+	box(c, "Frame", 2.0, 2.4, 0.2, 0, 1.2, 0, wood, WOOD)
+	box(c, "Paper", 1.6, 2.0, 0.04, 0, 1.2, -0.115, paper, SMOOTH)
+	-- two flowers: a felt star of two squares, its yellow heart
+	for n, at in { { -0.3, 1.6 }, { 0.32, 1.05 } } do
+		local size = if n == 1 then 0.55 else 0.45
+		box(c, "Petals", size, size, 0.02, at[1], at[2], -0.145, rgb(238, 238, 230), FABRIC, CFrame.Angles(0, 0, math.pi / 4))
+		box(c, "Petals", size, size, 0.02, at[1], at[2], -0.15, rgb(226, 228, 220), FABRIC)
+		ball(c, "Heart", 0.12, at[1], at[2], -0.16, rgb(206, 196, 110))
+	end
+	local tag = box(c, "Label", 0.8, 0.22, 0.02, 0.25, 0.42, -0.145, rgb(250, 248, 240), SMOOTH)
+	label(tag, "Edelweiss", rgb(60, 50, 40), Enum.NormalId.Front, Enum.Font.Garamond)
+	local glass = box(c, "Glass", 1.6, 2.0, 0.03, 0, 1.2, -0.235, rgb(220, 232, 236), GLASS)
+	glass.Transparency = 0.8
+	box(c, "Strut", 0.3, 2.0, 0.12, 0, 1.0, 0.13, shade(CARDBOARD, 0.2), CARD, CFrame.Angles(-0.04, 0, 0))
+	for _, s in { -1, 1 } do
+		box(c, "Corner", 0.45, 0.45, 0.36, s * 0.8, 0.225, 0, CARDBOARD, CARD)
+	end
+end
+
+BUILDERS.ski_bundle = function(c: Ctx)
+	-- Grandad's wooden skis strapped together on end, the tips curled, the bamboo poles beside them.
+	local wood = pick({ rgb(176, 120, 66), rgb(150, 44, 40), rgb(206, 166, 108), rgb(60, 86, 120) }, c.v)
+	local cane = rgb(214, 190, 130)
+	local curl = 0.6
+	for _, s in { -1, 1 } do
+		box(c, "Ski", 0.36, 5.7, 0.1, s * 0.21, 2.85, 0.05, wood, WOOD)
+		box(c, "Tip", 0.36, 0.75, 0.1, s * 0.21, 5.7 + 0.375 * math.cos(curl), 0.05 - 0.375 * math.sin(curl), wood, WOOD, CFrame.Angles(-curl, 0, 0))
+		box(c, "Binding", 0.42, 0.5, 0.22, s * 0.21, 2.4, -0.07, rgb(60, 50, 44), LEATHER)
+		cyl(c, "Pole", 5.6, 0.09, s * 0.56, 2.9, 0.24, "y", cane, WOOD)
+		cyl(c, "Basket", 0.05, 0.36, s * 0.56, 0.5, 0.24, "y", rgb(60, 50, 44), LEATHER)
+	end
+	box(c, "Strap", 1.3, 0.22, 0.62, 0, 3.6, 0.1, rgb(120, 70, 40), LEATHER)
 end
 
 -- ── The model ────────────────────────────────────────────────────────────────

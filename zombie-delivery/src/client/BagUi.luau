@@ -529,7 +529,8 @@ local function bags(ctx: Ctx): ({ Item }, number)
 	return out, missing
 end
 
--- CARS (the I window): your vehicles, the employers' still to earn.
+-- CARS (the I window): your vehicles, the employers' still to earn. (7.x, one car: the ZDC Van and your bikes; no
+-- employer gives a vehicle any more.)
 local function cars(ctx: Ctx): { Item }
 	local state = ctx.state
 	local ShopWindow = require(script.Parent.ShopWindow) :: any -- (the stats words; the I window only)
@@ -558,7 +559,8 @@ local function cars(ctx: Ctx): { Item }
 				owned = true,
 				current = state.car == def.id,
 				act = if state.car == def.id then { text = "DRIVING", on = false } else nil,
-				lines = { ShopWindow.carStats(def, levels), def.description, "Switch cars at one of your garages (🅿 GARAGE), the starting van at the depot lot. Repairs: Wrench Garage and Rust Bridge Repairs." },
+				lines = { ShopWindow.carStats(def, levels), def.description, if def.starter then "CAR brings it anywhere. Paint, upgrades, gear and a roof gun: Wrench Garage. Repairs: Wrench Garage and Rust Bridge Repairs."
+					else "Switch cars at one of your garages (🅿 GARAGE), the starting van at the depot lot. Repairs: Wrench Garage and Rust Bridge Repairs." },
 			})
 		end
 	end

@@ -15,7 +15,7 @@ every stop …); the co-op ones pay more and get harder with every crew mate. **
 mission to the next, a crew board finds you mates, and 15 new places (an airfield, a prison, a lighthouse, a power
 plant …) wait at the end of new roads (see **Missions**). Version 3.0.1 made the **night readable** (a brighter moon,
 the town glowing back, your own soft light). Version 3.1 gives every place and every mission **a reason to keep
-playing**: **42 challenges**, **30 lost packages** hidden at the places, and rewards nobody can buy: every campaign
+playing**: **41 challenges**, **30 lost packages** hidden at the places, and rewards nobody can buy: every campaign
 gives a **title** and an **exclusive gun or paint**, every package found the Phantom paint, and every challenge done
 **Dead End**, the gun nobody else has (see **Challenges, secrets and rewards**). Version 3.2 is about **progression**:
 a real level curve where the cars, guns, campaigns and real estate open one after another and the mansions, the
@@ -319,31 +319,32 @@ until then:
 
 | Level | Rank | XP | Opens | Reward |
 |---|---|---|---|---|
-| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Plastic Bag (kit, ZDC Bags), Running Shoes (kit), Thermal Jacket (kit), Pistol | – |
-| 2 | Courier | 575 | **Rusty Bike at Spoke & Chain** ($300), **Courier Bike at Spoke & Chain** ($1,100), Front Basket (gear), Canvas Tote (kit), Rented Lockup | $500, 2 Medkits |
-| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), Thermal Delivery Bag (kit), SMG | $750, 2 Medkits, the Canvas Tote (6.6) |
-| 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, **Old Van: Earl's Used Wheels (Marge's quest at level 4)** ($1,800), **E-Scooter at Spoke & Chain** ($2,800), the Patched Van stage, Hand Trolley (gear), Ratchet Straps (gear), Bike Trailer (gear), Padded Messenger Bag (kit), Shotgun, First Shift (campaign), Southside Garage | $1,000, 2 Medkits, the Running Shoes |
-| 5 | Road Warrior | 3,087 | ★★ Risky jobs, Horse Transport (Silver Spur Ranch), Cash Transport, **Courier Van** ($3,500), **High-Roof Van** ($7,000), **E-Bike at Spoke & Chain** ($6,500), the Work Van stage, Cooler Box (gear), Roof Machine Gun, Code Red (campaign), Harbor Lockup | $1,500, 2 Repair Kits, Hi-Vis Orange paint |
-| 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Freight Run, **Pickup** ($12,000), the Long Cargo Van stage, the Express Courier stage, Big Delivery Duffel (kit), Hunting Rifle, Empty Shelves (campaign), Partners in Crime (campaign), Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
-| 7 | Veteran Driver | 5,710 | Army Supply (Military Base), **Box Truck** ($22,000), the Tall Hauler stage, the Ranch Pickup stage, Roof Rack (gear), Smoke and Sirens (campaign), Downtown Parking, Birch Cottage | $2,500, 2 Landmines |
+| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Plastic Bag, Courier Vest, Baseball Bat, **the ZDC Van: yours from day one (7.x)**, Pistol | – |
+| 2 | Courier | 575 | Canvas Tote, Rusty Bike at Dead End Motors, Courier Bike at Dead End Motors, Front Basket, Rented Lockup | $500, 2 Medkits |
+| 3 | Runner | 1,265 | Thermal Delivery Bag, Kevlar Vest, E-Scooter at Dead End Motors, Cargo Bike at Dead End Motors, Hand Trolley, Panniers | $750, 2 Medkits, the Canvas Tote (6.6) |
+| 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, Padded Messenger Bag, Ratchet Straps, Bike Trailer, First Shift, Southside Garage | $1,000, 2 Medkits, the Running Shoes |
+| 5 | Road Warrior | 3,087 | ★★ Risky jobs, Feed and Tack (Silver Spur Ranch), Cash Transport, Heavy Armour, E-Bike at Dead End Motors, Cooler Box, Roof Machine Gun, Code Red, Harbor Lockup | $1,500, 2 Repair Kits, Hi-Vis Orange paint |
+| 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Big Delivery Duffel, Empty Shelves, Partners in Crime, Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
+| 7 | Veteran Driver | 5,710 | Army Supply (Military Base), Roof Rack, Smoke and Sirens, Downtown Parking, Birch Cottage | $2,500, 2 Landmines |
 | 8 | Wasteland Trucker | 7,427 | 7 Oak Lane | $3,500, 3 Nitros |
-| 9 | Wasteland Trucker | 9,487 | ★★★★ INSANE jobs (licence: 10 jobs rated ★★+ at ★★★), Farm Run (Old Farm), Winter Run, **Muscle Car** ($40,000), the Liftgate Truck stage, Iron Supply (campaign), 12 Maple Street | $4,500, 3 Repair Kits |
-| 10 | Convoy Captain | 11,959 | **Freight Truck** ($45,000), the Street Machine stage, Minigun, Roof Minigun, Lights Out (campaign), Sunset Villa | $6,000, the title “Iron Courier” |
-| 11 | Convoy Captain | 14,926 | **Armored Van** ($55,000), the Freight Hauler stage, Wild West End (campaign), Lakeside Villa | $7,000, 3 Medkits |
-| 12 | Dead End Legend | 18,486 | the Fortress Van stage, Grenade Launcher, Roof Grenade Launcher, Patient Zero (campaign), Harbor Point Office | $8,500, 3 Nitros, 4 Molotovs |
-| 13 | Dead End Legend | 22,758 | **Rally Van** ($80,000), Dirty Money (campaign), Pinecrest Mansion | $10,000, 3 Landmines |
-| 14 | Dead End Legend | 27,885 | the Works Rally stage, Last Convoy (campaign), Ocean View Mansion, Dispatch Tower, 8th floor | $12,000, 3 Repair Kits, 3 Medkits |
+| 9 | Wasteland Trucker | 9,487 | ★★★★ INSANE jobs (licence: 10 jobs rated ★★+ at ★★★), Farm Run (Old Farm), Winter Run, Iron Supply, 12 Maple Street | $4,500, 3 Repair Kits |
+| 10 | Convoy Captain | 11,959 | Lights Out, Sunset Villa | $6,000, the title “Iron Courier” |
+| 11 | Convoy Captain | 14,926 | Wild West End, Lakeside Villa | $7,000, 3 Medkits |
+| 12 | Dead End Legend | 18,486 | Patient Zero, Harbor Point Office | $8,500, 3 Nitros, 4 Molotovs |
+| 13 | Dead End Legend | 22,758 | Dirty Money, Pinecrest Mansion | $10,000, 3 Landmines |
+| 14 | Dead End Legend | 27,885 | Last Convoy, Ocean View Mansion, Dispatch Tower, 8th floor | $12,000, 3 Repair Kits, 3 Medkits |
 | 15 | King of the Road | 34,037 | Hilltop Mansion, Dispatch Tower Penthouse | $15,000, Legend Chrome paint, the title “Legend of the Last Road” |
 
 (5.7: the table is `Career.road()` as the CAREER window shows it: every unlock from Config, the reward from
 `Config.Levels.Rewards`. A car's gear, the Hand Trolley, shows with the first car at level 4.)
 (6.19: the dealer's cars after the Old Van, the guns from the SMG to the Grenade Launcher and the Roof Minigun and the
 Roof Grenade Launcher have left this table. Each one now comes with a mission: see "Guns and cars unlocked by
-missions (6.19)".)
+missions (6.19)". 7.x: the ZDC Van is the only car, every courier's from level 1; the other cars, their stages and
+Earl's Old Van are gone: see "One car: the ZDC Van (7.x)".)
 
-* **Cars** (5.0): you start on foot; bikes from level 2 at Spoke & Chain, Earl's Old Van at 4, then the dealer's cars
-  (level and price rise together). The company vehicles come with their employer's job level; the **stages** open by
-  level too (see **Stages and the cars' roles**).
+* **Cars** (7.x): one car, **the ZDC Van**, every courier's from the start (Marge's first day is still on foot; CAR
+  brings the van after it); the ★ car jobs open at level 4. Bikes and scooters from level 2 at Dead End Motors. No
+  company vehicles any more: every employer's job goes in your van (see **One car: the ZDC Van (7.x)**).
 * **Rewards** (5.7): levels 2 – 4 give what a courier on foot or on a bike uses (medkits, the Canvas Tote (6.6: no
   backpacks), the Running Shoes; a kit you own already pays its price instead); the car's items (repair kits, nitro, mines) start at
   level 5, once you drive.
@@ -819,10 +820,10 @@ give a title, and 4 are **hidden** (??? until done):
 |---|---|
 | ⚔️ Combat | First Blood (10 kills · $200), Sharpshooter (25 headshots · $500), The Bigger They Are (10 brutes · $800), Bandit Bounty (25 bandits on foot · $1,500), Demolition Crew (50 explosion kills · $1,500), Horde Breaker (500 kills · $2,000), Headhunter (250 headshots · $4,000 · Headhunter), Giant Slayer (100 brutes · $6,000 · Giant Slayer), The Undertaker (5,000 kills · $15,000 · The Undertaker) |
 | 🚗 Driving | Sunday Driver (25,000 studs · $300), Speed Bump (run over 50 · $600), Highway Patrol (10 bandit cars · $2,000), Mounted Mayhem (100 car gun kills · $2,500), Long Haul (250,000 studs · $3,000), Road Warrior (1,000,000 studs · $12,000 · Road Warrior) |
-| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 60 story missions · $15,000 · Legendary Courier), Saviour of the City (all 10 story chapters · $20,000), Three-Star General (all 180 story stars · $20,000 · Three-Star General; 6.8: the "all" ones count the story, not the DUO chapter); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Horse Whisperer (25 horses · $2,500 · Horse Whisperer), Against the Clock (10 timed missions · $3,000) |
+| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 60 story missions · $15,000 · Legendary Courier), Saviour of the City (all 10 story chapters · $20,000), Three-Star General (all 180 story stars · $20,000 · Three-Star General; 6.8: the "all" ones count the story, not the DUO chapter); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Against the Clock (10 timed missions · $3,000) |
 | 🧭 Explorer | Sightseer (5 places · $300), Lost and Found (1 package · $300), Package Sniffer (10 packages · $2,500), Cartographer (all 29 places · $5,000 · Cartographer), Every Last Box (all 30 packages · $10,000) |
 | 🤝 Co-op | Better Together (1 mission with a crew mate · $300), Riding Shotgun (50 kills from a passenger seat · $1,500), Crew Chief (25 missions with a crew mate · $4,000 · Crew Chief) |
-| 💰 Wealth | First Paycheck (earn $10,000 · $300), Home Sweet Home (1 property · $1,000), Car Collector (5 cars · $2,000); hidden: Millionaire (earn $1,000,000 · $10,000 · Millionaire) |
+| 💰 Wealth | First Paycheck (earn $10,000 · $300), Home Sweet Home (1 property · $1,000), Car Collector (5 vehicles: the ZDC Van and bikes · $2,000); hidden: Millionaire (earn $1,000,000 · $10,000 · Millionaire) |
 
 How they count (`Challenges.Counters` in the save, the rest read from the profile): a **car gun kill** is a kill by
 the roof gun, a **passenger seat kill** one by a passenger's gun out of the window (a mine or a fire is neither, and
@@ -1124,7 +1125,7 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
   10 twists, 32 co-op missions, 15 new places, the story's people in `shared/Cast.luau`;
   new cargo (water, generators, batteries, TNT, documents, electronics, weapons, paintings, mail, tyres, plants) and
   survivors who walk aboard by themselves.
-* **Challenges, secrets, rewards** (3.1): 42 challenges (`shared/Challenges.luau`), 30 lost packages (`Map.Secrets`),
+* **Challenges, secrets, rewards** (3.1): 41 challenges (`shared/Challenges.luau`; 7.x: Horse Whisperer retired), 30 lost packages (`Map.Secrets`),
   11 campaign rewards (3.2: the DUO one), the Phantom and Dead End rewards, 11 + 13 titles (`Config.Rewards`).
 
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
@@ -1144,10 +1145,246 @@ Backpack (3), the Big Backpack (4), Running Shoes (+10% speed), a Thermal Jacket
 (Codex's models, `server/KitWear.luau`; a parcel sticks out of the backpack while it holds cargo), and the phone shows
 in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau` say what you carry (on foot or by car).
 
-**Earl's van** (`shared/VanQuest.luau`): at level 4 Marge texts you about a guy out west. Earl's Used Wheels (on the
+**Earl's van** (`shared/VanQuest.luau`; 7.x: retired, every courier owns the ZDC Van): at level 4 Marge texts you about a guy out west. Earl's Used Wheels (on the
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## One car: the ZDC Van (7.x)
+
+The owner: "dej pryč auta, ostatní, nech ve hře jen van". The ZDC Van (the owner's Blender model, 6.25) is the only car a
+player drives. Bikes and scooters stay; the traffic, the bandits and the world's parked bodies keep the old cars.
+
+**Every courier owns it.** `Config.Cars` is the ZDC Van (`starter = true`, $0, the first entry) and the bikes; a new
+profile owns and equips `zdcvan`. CAR (and the chauffeur) bring it like before. Marge's first day is still on foot: the
+van is not put out at PLAY while the tutorial is ahead (`Tutorial.ahead`), and `Config.Tutorial.VanDelay` (6 s) after her
+first day ends (delivered or skipped) she texts `Config.CompanyVan.Hello` ("the company's ZDC Van is yours. Press CAR … the
+★ car jobs open at level 4"). The van's single stage holds 4; the Roof Rack (Wrench Garage) takes two more light pieces.
+
+**The other cars are bodies of the world.** They moved to `Config.AmbientCars` (`ambient = true`, priced by the 6.19 pass
+like before, so the traffic and the looks keep their numbers). `Economy.findCar` looks in both lists (traffic, the
+buses, the stage looks, Moving's lent `movingtruck`); `Economy.isPlayerCar` is true only for `Config.Cars`. The dealer,
+the garages, CAR, the admin car commands, the server's buy and stage checks, `Style.forVehicle` and `Vehicles.spawnAt`
+refuse ambient ids (a save that had one equipped falls back to `zdcvan`). Dead End Motors' showroom shows three ZDC Vans
+in their paints ("YOURS · PAINT … AT WRENCH GARAGE"), its BIKES counter is as before.
+
+**Earl's quest is retired.** `Config.VanQuest` keeps Earl's lot: his Old Van stands there with a "SOLD · Earl's own, not
+for sale" tag and he talks (`server/VanQuest.luau`, `shared/VanQuest.luau` for World's sign and prompt). Level 4's reward
+line is "The ★ car jobs, in your ZDC Van".
+
+**Jobs.** No job lends a vehicle any more (`vehicle` is gone from `Config.Jobs.Types`): every employer's job goes in
+your van. An ordinary offer carries at most the van's 4 pieces (`Economy.maxCapacity`). Per job type:
+
+| Job type | Lent before | Now |
+|---|---|---|
+| School Run | School Bus | the kids board your van (6, people take no slots) |
+| Army Supply | Armored Truck | 4 ammo crates in your van |
+| Ice Cream Route | Ice Cream Truck | sold from your van |
+| Moving Day | Moving Truck | 4 pieces of furniture |
+| Farm Run | Monster Truck | in your van |
+| Horse Transport | Livestock Truck | **Feed and Tack**: 4 sacks carried (a horse does not fit a van) |
+| Fuel Run | Fuel Truck | the barrels in your van |
+| Cash Transport | Armored Truck | in your van |
+| Ambulance Run | Ambulance | the patient boards your van |
+| Winter Run, Pizza Rush | – | unchanged |
+| Freight Run | (pallets) | **retired**: the van takes no pallets |
+
+The employers pay a cash bonus instead of their vehicle, once, at their `needed` jobs (`reward = "bonus"`, `bonus`:
+school $1,500, army $3,000, ice cream $1,500, movers $1,500, farm $2,500, ranch $2,000, clinic $1,500, gas $2,000;
+analytics reason `EmployerBonus`). The carbine and the revolver are still theirs.
+
+**Missions.** No mission needs a vehicle of its own (`vehicle` cleared on all 30 that had one; MISSIONS asks for your
+ZDC Van: `Config.CompanyVan.MissionsNeed`). Thirteen carried loads over 4 came down to 4 (market 2/3/10, duo 10,
+firehouse 9, army 2/10, power 8, ranch 2, lab 10, underworld 5/10, exodus 3); the four ranch missions that led horses
+carry saddles, medicine or feed. The people who board keep their counts. `Config.Missions.FirstClearXp` 2.5 → 2.55
+keeps the story's level curve (level 15 by the last chapter).
+
+**Old saves** (one time, real saves only: the save's `vanOnly` flag). `server/PlayerData.luau` uses the pure helpers
+`Economy.carRefund` and `Economy.vanCarry`:
+- the money paid back at today's prices (6.19's table, like 6.23's bag refund): each removed dealer car's price and the
+  stages bought on it; nothing for employer cars (they were free), the bikes or the ZDC Van (7.2 review: everybody's
+  for free now). Old Van $5,400 (all stages $13,350; 7.2 review: its price only if it was bought from Earl, `vanQuest`
+  "done", its stages always), Courier Van $10,500, High-Roof $21,000, Pickup $36,000, Box Truck $66,000, Muscle Car
+  $120,000, Freight Truck $135,000, Armored Van $165,000, Rally Van $240,000 (plus their stages);
+- 7.2 review: also paid back, at today's prices, what the van cannot take over (`VanCarry.lost`: the car track levels
+  over the best ones it keeps, every roof gun but the one it gets, every extra copy of a gear), and each employer's
+  bonus where the save had earned the employer's vehicle (`Economy.employerBonus`: rep at `needed` or more);
+- 7.2 review: the flag is saved as `rewards.vanOnly` too: an older server drops unknown fields but keeps that table's
+  short keys, so a save that went through one is never paid twice (`Economy.vanMigrated`); the chapters done
+  (`done:<chapter>`) are kept there too, as an older server's story keeps only `intro`;
+- the van takes over the best car track levels any car had, the car gear (installed first, up to its 3 slots), and the
+  paint and roof gun of the car you drove (else the van's own, else the first car that had one);
+- the other cars are cleared, `car = "zdcvan"`, and Marge texts it at PLAY (`Config.CompanyVan.Refunded` with the money,
+  or `.Kept`) with the GPS to Wrench Garage; analytics reason `CarRefund`.
+
+**Text.** GarageUi ("your ZDC Van, the company's car", "🚐 THE COMPANY'S ONE CAR"), the dealer page (the van not for
+sale, what Wrench Garage sells for it), SHOP, CAREER (`Career.unlocksAt`: "ZDC Van: yours from day one" at level 1),
+READY CHECK and SAVE UP (no car is ever a goal), DISPATCH ("NEEDS YOUR ZDC VAN · PRESS CAR"), the admin panel. The
+Horse Whisperer challenge (25 horses) is retired; Car Collector is "Own 5 vehicles: the ZDC Van and bikes."
+
+**Checks.** `tests/vanonly_test.luau` (the one car, the ambient bodies, the refund sums, the carry-over, the flag, a
+removed car equipped, no lending, the bonuses, the analytics reasons, Marge's words); capacity, career, cargun, freight,
+fuel, jobs25, levels, logic, missions, readiness, style, transport and vanquest tests updated; `run_tests.py`'s styles
+check reads both lists; the fleet tools (`tools/vehicle-preview/`) build every body from both lists in the old order.
+
+## The Alps, step 1 (7.1)
+
+The owner: the map becomes a smaller Austrian valley, step by step, a summer valley under snowy peaks; "keep everything,
+only the Japanese part goes … Austria, mountains, and lovely little houses where the players live, a little village".
+Step 1A changes looks only: every address, home, door, venue, road, job, mission and move stays where it was.
+
+- **The Japanese part is gone.** The Lantern Garden (`server/LanternGarden.luau`: the cherry trees, the koi pond, the
+  waterfall, the stone lanterns, the tea pavilion, the raked gravel) and the torii and paper lanterns on the footbridge.
+- **The Hauptplatz** (`Map.Square`, `server/Hauptplatz.luau`) stands on block (0, −1), north of the Central Park, in the
+  safe zone. It is on the map's list as **Hauptplatz** ⛲, with GPS and a HAUPTPLATZ · SAFE ZONE location tag. It has:
+  - cobbles with granite bands, a stone fountain under a column with a gilded figure;
+  - a red and white maypole with its wreath, ribbons, guild boards and fir crown;
+  - the **Gasthof Edelweiss** on the north side: white render, green shutters, geraniums, an arched door between two
+    lamps, a steep shingle roof, café tables under umbrellas in front of it;
+  - wooden benches, gas-style street lamps, long geranium planters, linden trees and a board by every sidewalk.
+  - About 200 parts and four lights (the garden had about 430 parts and five lights).
+- **The footbridge** over Bone St keeps its walkway, ramps and clearance. It is an alpine timber bridge now: larch
+  railings with wooden caps, iron lanterns, and a roofed timber portal at each end of the span. Its square-side ramp
+  comes down over a green strip with its planted bed.
+- **The Suburbs houses are chalets** (`shared/ChaletLooks.luau`, `server/Chalets.luau`; all 44 of `Map.Homes`):
+  - the same box, door (Cargo still swings it), path, mailbox and number as before;
+  - a white or pastel render, a stone plinth and dark timber (or silver shingles) upstairs;
+  - shutters and geranium boxes, a steep gable to the street with wide eaves;
+  - a carved balcony with a geranium box in the gable, stacked firewood and a low wooden front fence.
+  - Three looks from the lot's own dice (tyrol, salzburg with painted corners, bregenz with a carved sun). The world's
+    dice are rolled as before, so nothing else in the city moves.
+  - Nothing stands on the path to the kerb or in the door's swing, and the chalets stay clear of a moving day's dress.
+- **The four houses for sale** on the Suburbs lots (Maple, Oak, Elm, Birch) wear a chalet's render and shingles with a
+  timber band, shutters, geraniums and firewood. 12 Maple Street gets a timber upper floor and a balcony.
+- **Parts:** the whole city goes from 22,851 to 24,385 parts (+6.7 %, `tools/perf/world_count.py`). The Suburbs piece
+  goes from 1,127 to 2,875 parts; a chalet has at most 48 parts (`ChaletLooks.Budget` 50).
+  - 7.1 review: what stood together is one piece now (the plinth all round, a fence with its rail, the firewood, a
+    flower box with its geraniums, the balcony's box with its flowers) and the purlin ends are gone: 13 parts fewer a
+    chalet (at most 35, `ChaletLooks.Budget` 36; 31.6 on average), the Suburbs piece 2,289 parts. The house's box, its
+    door, its windows and its roof are the same.
+- **Tests:**
+  - `tests/square_test.luau` (6.12.15's garden_test) holds every footbridge check, plus the square: tiled by cobbles
+    and the green strip, everything on its cobbles and apart, a way in from every sidewalk, nothing Japanese.
+  - `tests/chalet_test.luau` checks every house's box, door, windows and path, its lot, the moving day's dress and
+    the budget.
+- Street names stay for now (step 3 renames them).
+## The Alps: mountains and forests (7.1)
+
+The owner: "make the map a smaller alpine valley, step by step". Step 1B puts the valley round the city; **nothing you
+play on moves** (the roads, addresses, places, lots and zones keep their coordinates). The layout is pure numbers in
+`shared/AlpineLayout.luau` (tuning in `Config.Alpine`), `server/Alpine.luau` builds it once, in two steps (7.1 review):
+the last piece of `World.build` (after the lighting) puts up the far silhouettes and the pass at once, and
+`World.buildLate` (deferred by `Main.server.luau` right after `World.build`) fills the terrain and plants the forests
+with breaths in between. A new server answers PLAY and has its lighting at once; the thousands of terrain fills (10 to
+40 s on a live server) come after.
+
+- **A ring of snowy mountains** just outside the world's walls (`Config.Alpine.Box`, today `Map.Bounds`; step 2 pulls
+  the box in and the ring follows). Terrain only (`Terrain:FillCylinder` layers): a front row of foothills (250–420
+  studs) whose feet stand 40 studs out, a row of big peaks (480–700) behind them with lower shoulders. Every peak leans
+  a little (a steep face one side, a long ridge the other) and its layers are a little rough (crags); grass at the foot,
+  rock above (Rock or Limestone, bands of the other), snow over 300–360; glacier tongues on a few tall peaks, scree at
+  the foothills' feet; north-west of the river (the winter) everything snowy with rock bands. The crest between two
+  neighbours never drops under 70 studs: no gap to drive or swim through. The river leaves through a gorge north and
+  south, each closed by a big peak (a waterfall where it comes out in the north); the old sea is an **alpine lake**
+  whose far shore rises out of the water.
+- **The West Pass:** the West Highway past the Old Farm runs on to a tunnel in a cliff, closed with a steel shutter, and
+  a **ROAD CLOSED — EVACUATION ZONE** barrier right at the world's wall. No other road reaches the edge (they all end
+  at their yards); the Mount Rot tunnel is untouched.
+- **Far mountains with streaming on:** a client only gets the terrain near it, so every big peak also has a
+  *silhouette*, a square pyramid of corner wedges (with a snow cap) inside it, in a Persistent model. Far away you see
+  the silhouettes; up close they hide in the terrain. They stand before the terrain does (the first step).
+- **Forests:** up to 2,500 spruce and fir (two parts each since the 7.1 review: a trunk that collides and one slim
+  needle spire that does not, three greens, frosted in the winter, 34–66 studs tall), in patches: denser toward the
+  mountains and up their lower slopes (a quarter of them), thinner near town (a few copses), meadows left open with
+  **wildflowers** (36 patches) and **4 hay barns and huts**. Never on a road (nor over it), within 60 studs of a junction or a road's bend (the drivers' view),
+  in a district, on a lot, a home, a storefront, a yard, a place, the water, the ice or the ski lift's line. Every tree
+  lands on what a ray finds under it of World's own parts and the terrain, and is left out if something World built
+  stands there (7.1 review: never a car, a zombie, a courier or a later rental dock, so the forests are the same on
+  every server however late they are built; `tests/alpinebuild_test.luau`). One Atomic model per 128-stud square (a
+  coarse far look), shadows only near the roads.
+- **The valley's look:** the open ground lush grass, the terrain's colours alpine (`Config.Alpine.Colors`); the day
+  looks (`Config.Atmosphere`: morning, noon, afternoon) a crisp blue air that hazes the far ring, fewer and brighter
+  clouds. The night, the dawn, the dusk and the Blood Moon as before.
+- **Budgets:** 133 terrain cones in 6,703 fills (9.1 billion studs³ counted with the overlaps; the budget is 10), 115
+  silhouettes, about 5,900 parts in all (budget 6,500); in Studio the build log prints `[Alpine] …` with the time
+  it took. 7.1 review: every layer is exactly two rows of the terrain's 4-stud voxels on their grid (`Floor` −12,
+  `WetFloor` −32; before, every layer wrote a sliver of the next row too), a layer wholly inside a bigger neighbour's
+  is left out (584 of 7,205: the same terrain), and the tunnel's air is cut in whole voxels from the road's row up (no
+  skin of rock on its road). Before the review: 7,251 fills, 10.2 billion studs³, 10,894 parts; the whole city
+  35,279 parts, now 29,705 (`tools/perf/world_count.py`). Checks: `tests/alpine_test.luau` (the ring holds the box by
+  car and swimming, nothing in the box, the silhouettes inside, the pass, every tree rule, the budgets, the voxel grid,
+  a tighter box for step 2) and `tests/alpinebuild_test.luau` (the real builder: the same forests with cars and zombies
+  around, SkipInStudio). Preview without Roblox: `tools/alpine-preview/render.py` (a top-down map and a 3/4 three.js
+  view).
+- **Faster Studio tests:** `Config.Alpine.SkipInStudio = true` (off by default) leaves the terrain's fills out of a
+  Studio Play test: the silhouettes, the pass and the forests still stand (the slope trees on the flat ground under
+  where the mountains would be). A live server always builds everything (`RunService:IsStudio()`).
+- **Test in Studio:** Play, fly (admin) to the map's edges: the walls stand in front of the mountains; the West Pass
+  past the Old Farm; the north gorge's waterfall; the forests along the West Highway; noon and dusk (the haze); with
+  streaming on, the far silhouettes from Downtown. The Output shows `[Alpine] … silhouettes and the pass` from
+  `World.build`, then (PLAY works by then) `[Alpine] … terrain fills … trees` when the mountains are done.
+
+## The Alps on the maps (7.2)
+
+The big map (M) and the minimap are a **paper map** now (`client/MapView.luau`; what to draw is worked out by
+`shared/MapStyle.luau` from `Map` and `AlpineLayout`, the numbers and colours in `Config.MapStyle`): the valley green on
+cream, **the mountain ring round it** (on the big map a shaded peak with its snow cap for every cone, the far ones
+paler; on the minimap the same cones from above: grassy feet, rock and snow), the **forests** as rounded bands of tree
+dots (one TextLabel a row's run; 7.2 review: plain bands on the minimap), the wildflower meadows lighter (a disc with its
+flower on it), the huts, the river (on through the gorges) and the
+lakes blue, the snowfield white, the roads light on a brown edge and the highways amber, the Hauptplatz's ⛲, the
+**ALTSTADT** over Downtown (a placeholder until `Map.Villages` names the villages: then Sankt Alm, Bergdorf and
+Seewinkel are labelled where Map puts them), and the **West Pass**'s road running into the cliff with a red ROAD
+CLOSED sign. The routes, the GPS, the markers, the icons, the fog and the minimap's turning work as before; the fog
+is a slate grey over the paper. Everything follows the data: step 2's bounds, its alpine lake and its snowfield are
+drawn without a change to the map's code.
+
+- **Cost:** the flat map is built at the start as before; the ring, the forests, the meadows, the huts and the pass
+  come a moment later, once, on the start screen, into layers made for them under the fog: about 530 GuiObjects on
+  the big map and 360 on the minimap (`Config.MapStyle.Budget`; 7.2 review: no TextScaled label in the minimap's
+  CanvasGroup, which draws everything again on every move). The server works the ring and the forest out once
+  (before `World.build`, whose Alpine piece reuses them) and publishes what the maps draw as a summary of about 7,000
+  characters in `ReplicatedStorage.MapStyle` (a StringValue: `MapStyle.publish`); every client unpacks it in a few
+  milliseconds. A client without one (it never came within `Config.MapStyle.Wait` seconds, or it was made for other
+  bounds) works `AlpineLayout.ring()` and `.forest()` out itself, a frame apart (about 0.2 s and 0.3 s on a
+  computer). Nothing of it is touched again: the frame loop is as before and makes nothing new.
+- **Checks:** `tools/phone-ui/mapview.luau` (run by `tools/phone-ui/check.py`): the real MapView on a recorder: built
+  once, within the budgets, everything there in its order, step 2's data read, the frame loop leaves it alone.
+  Preview: `NODE_PATH=… python3 tools/phone-ui/mapview_preview.py <luau> <sheet.png>` (the big map and the minimap at
+  1280 × 800 and 844 × 390, drawn in headless Chromium).
+- **Test in Studio:** open the big map (M) and the phone's MAP: the peaks round the edge, the forests, the West Pass's
+  sign, ALTSTADT; drive to the map's edge and watch the minimap (the ring's slopes, the snow in the north-west) while it
+  turns; a job's red route and the GPS over the paper; the fog lifting.
+
+## Walt's Farm and moves in your own ZDC Van (7.x)
+
+**Chapter 1 is playable: Walt's Farm** ("Hold Your Horses", `Config.Moving.Contracts` id `walt`, seed 1921).
+- It opens once you finished the prologue (Marge's House) once. The save remembers it (`profile.story` flag `done:prologue`, set only on a real save). 7.2 review: a chapter counts as done only with every ★ piece a van can take at the Wall whole (`MovingRules.starsHome`; Marge's Grandfather Clock fits no van and is not asked for), and only for the crew who had it open; a client can mark only the story cards (`MoveStory.CardKeys`), never a chapter.
+- The contract card lists the board's contracts (Marge's House, 🐴 Walt's Farm, 🔒 while locked with the reason). A tap on an open one, or on chapter 1's ▶ PLAY tile in the CHAPTERS road, opens its card. The board opens the next contract you have not done.
+- 14 minutes on the clock, the horde at 3:30 left, the pay × 1.25 (the contract's `time`, `hordeAt`, `pay`).
+- The ★ pieces are Thunder's saddle, the branding iron and Grandma's milk churn, as Walt says in the briefing (`shared/MoveStory.luau` keepsakes; `farmmove_runtime_test` checks them against the plan's ★ pool).
+
+**The farm site** (`server/Moving.luau` farmSite, `server/MoveSites.luau` farm, `shared/MoveSiteLooks.luau` farm, `Config.Moving.Sites.farm`):
+- It stands at the Old Farm place from `shared/Map.luau` (`Map.Places`). Every offset is in the place's own frame, so it follows the place when map step 2 moves or turns it (`Map.Relocations`).
+- Two ways in, each with its own "Enter" prompt: the farmhouse's front door (a small farmhouse built for the move) and the barn doors. The barn doors bring you in by the interior's second exit; Leave brings you out at the door you used.
+- The hay wagon (a bigDoor piece) only goes through the barn doors. At the farmhouse's Leave it says "Too big — use the barn doors" (`shared/HouseLayout.luau` exitsFor).
+- Each door has its own van spot; the Driver's "Call truck to door" picks the nearest door.
+- Walt waits by the farmhouse (rancher's hat, check shirt, moustache: `shared/NpcLooks.luau` walt). He greets you, says "Easy with Thunder's saddle!" when it goes past, shouts at the horde and says goodbye. Private Reyes greets you at the Wall as before.
+- Moving day outside: boxes, a horse trailer, hay bales and a ZDC sign, light and not colliding, never on the paths.
+- Danny takes the nearest way he may use (the barn doors for the hay wagon: `shared/MoveHelperBrain.luau` routeVia).
+
+**Moves in your own ZDC Van** (the owner: "the move should be driven with MY van"):
+- No Moving Truck is lent any more. START brings your own car (your ZDC Van, `Config.Moving.Van`) next to you; a job's or rental's car is not used.
+- The packing bed is the car's cargo bay (`Config.Moving.Beds`: the ZDC Van's 6.2 × 6.4 × 4.3; another car without its own bed uses the van's). The hay wagon does not fit any bed: it rides **hitched** behind the van, one at a time, and Unload takes it off last (`Config.Moving.Hitch`).
+- **Trips.** Driving into the Wall's checkpoint unloads everything in the van and on its hitch (delivered), and the move goes on. The HUD shows `TRIP n · delivered x/y`.
+- The move ends when the clock runs out, or when the owner presses **FINISH** on the move panel (owner only, with a confirm). A load brought in after the clock still counts, at the late share. 7.2 review: GIVE UP, or the owner leaving, after a trip pays what reached the Wall like FINISH (the crew there shares it); a move is rated late only when something reached the Wall late.
+- Pay is everything delivered over all trips: value × condition, ★ × 1.5, the time bonus, × the contract's pay. What is still in the van at the end pays nothing.
+- While the move runs nothing of the old game takes your van's place (CAR, MY BIKE, the phone's CALL CAR, a car job, a garage's or dealer's car) and a respawn does not take it back. If it is wrecked or gone, everything in it is lost (condition 0) and the move goes on; CAR brings it again after 20 s (`Config.Moving.VanAgain`; 7.2 review: the garage's TAKE OUT and ZDC RIDE wait too). 7.2 review: a bike is never the move's van: START on a bike brings the van and makes it CAR's car again, and a bike out after a loss is not taken over.
+- Driver and Danny work with the van like with the old truck.
+
+**Admin:** MOVES has 🐴 FARM: CONTRACT CARD, ▶ FARM: START NOW, FARM: GO TO THE FARM and 🚐 MOVE: TRIP NOW (`move` args `farmcard`, `farm`, `farmgo`, `trip`).
+
+**Tests:** `vanmove_test` (the hitch, trips, a lost van, the pay over trips, the farm's ways, Walt), `farmmove_runtime_test` (a whole farm move on the real art: in by the barn doors, the hay wagon refused at the farmhouse and out through the barn, hitched, three trips, the van lost, FINISH, the chapter unlocked and saved (7.2 review: one piece and FINISH unlocks nothing; a crew mate without the prologue does not get chapter 1)), and the contract list in `tools/phone-ui/movestory.luau`.
 
 ## MOVES: the moving rework, prototype (7.0)
 
@@ -1165,28 +1402,54 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Marge texts the crew at the start and the end, and the client thanks you on the result card.
 - Code: `shared/MoveStory.luau`, `client/MoveStoryUi.luau`.
 
-**Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and the Moving Truck.
-- Everyone picks one of four roles and LAUNCH starts once all are READY (solo at once):
+**Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and your van (7.x: your own ZDC Van, see above).
+- Everyone picks one of three roles (three cards side by side) and LAUNCH starts once all are READY (solo at once):
   - 🚚 **Driver:** no wait at the truck's back, less truck damage at the wheel, "Call truck to door" once.
   - 💪 **Mover:** lifts a two-person piece alone, carries 15% faster, no slowdown on slopes.
   - 🛡️ **Guard:** +50% damage, two plank barricades, sees zombies through walls.
-  - 🔧 **Technician:** picks the locked front door quietly (anyone else kicks it in and the noise brings zombies), and fixes the garage fuse box so the lights come back.
+- One role each while there are three players or fewer; a fourth player may double one.
+- The owner took the Technician out: the front door is never locked and the house is lit from the start.
 - Solo players switch roles from the item list (O or a tap on the panel, every 30 s).
 - Hold **T** (💬 on phones) for quick chat: six lines your crew sees as a bubble and a line in the move panel.
 
 **The move** (`server/Moving.luau`, rules `shared/MovingRules.luau`, HUD `client/MovingHud.luau`, `client/Fade.luau`, `Config.Moving`):
-- The Moving Truck is lent next to you. Drive to 155 Willow Ln (GPS).
+- Your own ZDC Van comes next to you (7.x; 7.0 lent a Moving Truck). Drive to 155 Willow Ln (GPS).
 - At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
 - Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
+- **The grip** (like Fisch's reeling): while you carry a 🙌 or 👥 piece, or a fragile ✋ one (gentler), a bar shows right of the middle.
+  - The piece (its icon) darts up and down: wilder when heavy or fragile, when you walk fast, turn, go up or down, jump or get bitten; calmer standing still.
+  - Hold the left mouse button or F (gamepad R2; on a phone the round HOLD button over FIRE) and the grip box rises; let go and it falls (momentum, a little bounce).
+  - The piece inside the box fills the meter (full: STEADY, +10% walk), outside drains it (standing still never under a third). SLIPPING! warns; at 0 it slips: dropped, with damage (fragile more), and a shaky carry wears it a little.
+  - Two carriers each have their own bar (either slip drops it); a Mover's box is 35% bigger, a Mover lifting a 👥 piece alone gets a harder bar; a heavy lift starts at 60%; Danny never slips.
+  - The server checks the bar (7.1 review): no slip sooner than any bar can run out (about 1.9 s after the lift; the client asks again each second, so a real slip lands), STEADY only once a meter could have filled and only while the reports keep coming (none for 2 s: the +10% goes), STEADY +10% on the bar only when the server gives it (at most 10% of the last second outside the box), a 👥 piece carried by two worn half by each one's reports, nothing from either carrier during a door's fade. A piece that slipped and is picked up again at once gets a new bar.
+  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, Moving's grip hook and grip block (the Moving remote's "slip" and "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau`.
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
 - At 3:00 left a horde comes to the house.
-- Drive into the Wall's checkpoint at the depot to finish. Pay is Σ value × condition, with ★ × 1.5 and a time bonus, split with the crew at the truck; you also get XP and 1–5 stars.
+- Drive into the Wall's checkpoint at the depot to deliver (7.x: a trip, the move goes on until FINISH or the clock). Pay is Σ value × condition, with ★ × 1.5 and a time bonus, split with the crew at the truck; you also get XP and 1–5 stars.
 
 **Danny from the depot** (`server/MoveHelper.luau`, `shared/MoveHelperBrain.luau`, `Config.MoveHelper`) helps a solo player.
-- He takes the other end of a two-person piece and carries the small ones out on his own, ★ first.
-- He runs from zombies and is back at the truck 15 s after he goes down.
-- Orders: HELP ME, SMALL STUFF, WAIT AT TRUCK; the quick chat "Need a hand here" calls him too.
+7.x (the owner: "he helps weirdly, mainly we don't carry anything together") made him a partner with a clear priority list each step:
+- **Carrying together just works.** You Lift a 👥 piece and he sprints to its far end (from far away, or when his path fails, or not there in 1.6 s: a quick fade-over) and takes it within ~2 s: "Got the other end!", then "On three... lift!".
+  - Then he moves WITH the piece: his own walk is off and constraints on his root (AlignPosition / AlignOrientation to an attachment at the far end, turned to you) hold him there, on the floor under that end (stairs, steps), through door frames like the piece itself and through the front door's fade with you. No "too far apart" drop any more.
+  - His arms hold its edge (client/ArmPose.luau from his Carrying / CarryAt / CarrySize), his legs step with his speed (backwards too: `Npcs.carried`, `Npcs.stride`), and your grip bar's box is 1.3× bigger while he steadies it (the character attribute GripSteady, `Config.CarryGrip.Steadied`).
+  - On the way: "Watch the doorframe!" at a doorway; by the van he opens its back for the two of you, else "That's going in the van."
+- **He carries more.** 🙌 pieces too (slower), not only ✋ ones: ★ first, then the most value a second of the trip. He opens the van's back himself (`OpenBack`; not allowed: "Open the back, boss!"), and says "Van's full, boss - drive it to the Wall?" and waits when it is.
+- **Your lift wins.** A piece you stand by with free hands (within 8 studs, nearer than he is) is yours: he drops his plan ("All yours, boss.").
+- **A heavy 🙌 piece you carry alone** (weight 4+): he takes its other side, so both walk at the pair's 0.8 (`MovingRules.help`'s `both`).
+- **The van's back for you:** you come with a piece, the back shut, he is near: "I'll get the doors!"
+- **Every door:** on Walt's farm he takes the nearest door he may (the barn doors with the hay wagon: `MoveHelperBrain.routeVia`) and holds your piece's far end out of either door, to the van's bed or its hitch (`farmmove_runtime_test`).
+- He flees zombies only when he is not carrying with you; stuck 2 s, a new path; 4 s, a nudge to the next waypoint; where he stands still he keeps out of doorways.
+- He is back at the van 15 s after he goes down.
+- Orders: HELP ME, SMALL STUFF, WAIT AT VAN; the quick chat "Need a hand here" calls him too. The strip under the move's panel says what he does.
+
+**The greeters** (`server/MoveGreeters.luau`, the words in `shared/MoveStory.luau`, `Config.MoveGreeters`): people who welcome you.
+- **Marge on her porch.** She stands beside the front door of 155 Willow Ln from the move's start, off the path.
+  - When the first crew member comes within 25 studs, she turns, waves and says her hello in a speech bubble: "Oh thank heavens, ZDC!", then points you to the open door.
+  - She reacts during the move: a ★ piece carried past her ("Careful with that!"), the horde ("They're coming! Hurry!"), and the loaded truck driving off ("Thank you… see you behind the Wall.", also as a notice to the crew).
+  - Zombies ignore her. She leaves when the move ends.
+- **The soldier at the Wall.** Private Reyes stands by the checkpoint's booth. When a truck is delivered, he waves: "Welcome to the safe zone. Unload over there."
+- **Marge at the Moving contracts kiosk.** This is the tutorial's Marge by the job board, not a second one. When you walk up to the kiosk on foot and not on a move, she turns to you and says "New contract, sweetie?" (a bubble and a notice). She greets each player once every 3 minutes. She never cuts into her first day: not to a player whose tutorial is still on, and not while her own tutorial bubble or a talk with her is going (the line waits till it is over).
 
 **The world** (`server/MoveSites.luau`, `shared/MoveSiteLooks.luau`):
 - the Wall's evacuation checkpoint at the depot is the drop-off;
@@ -1198,8 +1461,8 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 **Tests:**
 - the rules: `moving_test`, `moveroles_test`, `movehelper_test`, `movestory_test`;
 - the art: `furniture_test`, `houselayout_test`, `houseinterior_test`, `movesites_test`;
-- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`;
-- an end-to-end move with the real house art: `moving_art_runtime_test`.
+- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`, `movegreeters_runtime_test`;
+- an end-to-end move with the real house art: `moving_art_runtime_test`; Danny carrying the real sofa out with you: `movehelper_art_runtime_test`.
 
 ## Cars spawn clear and stand back up (6.26)
 
@@ -1981,6 +2244,8 @@ Roblox's AnalyticsService; it is off in Studio, where events are only counted. T
 
 ## The footbridge wider, curved and clear to walk (6.12.16)
 
+7.1: the torii are roofed timber portals now, and the checks are in `tests/square_test.luau` (see **The Alps, step 1**).
+
 The owner, on the bridge in Studio: "good for walking, only I walk through this [a timber]; make it wider for two
 people, and don't be afraid to make it curve".
 
@@ -2001,6 +2266,8 @@ people, and don't be afraid to make it curve".
   - that the ground under every low part is closed.
 
 ## The Lantern Garden and a wooden footbridge (6.12.15)
+
+7.1: the garden is gone. The Hauptplatz stands on its block (see **The Alps, step 1**).
 
 The owner: "a bit bigger park, a wooden bridge to another park, its own style".
 
@@ -3236,7 +3503,7 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               mission levels levelOf, the DUO campaign; 6.8: 11 chapters of 6, only the next one starts, nextUp /
               statusOf / chapterState, creditFor (first time / replay), replayPay / replayXp, the retired ids), Cast
               (6.8: the story's people: name, title line, role line, place, NPC look), NpcLooks (6.8: the NPCs'
-              clothes per role, moved from server/Npcs; the portraits use it too), Challenges (3.1: the 42 challenges, the
+              clothes per role, moved from server/Npcs; the portraits use it too), Challenges (3.1: the 41 challenges, the
               counters, value / progress / doneCount / allTitles), Melee (3.9: punch or strike, the cone in front of
               you, the arm's swing curve), Boarding (3.10: getting in and out: the timing, the curve, the hand's
               reach, the doors' swing, the Boarding attribute), Freight (4.0: who takes what on a trolley or a jack, the
@@ -3321,7 +3588,8 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               capacity is its body's slot count (3.5: and every stage's its look's), levels the early garages, logic the cheap first levels;
               3.9: melee (the punch and the strike, the reach cone, the swing curve); 3.10: boarding (the move's timing,
               a late start, the curve, the hand, the doors' swing); 4.0: freight (the trolley and jack rules, pallet
-              places, the Freight Run, the warehouse and receiving docks)
+              places, the Freight Run, the warehouse and receiving docks); 7.x: vanonly (one car: the ZDC Van, the
+              ambient bodies, the old saves' refund and carry-over, the employers' bonuses)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -3352,7 +3620,8 @@ roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, m
 and DUO campaign, 6.8's missions_story (the chapters' order and locks, first time and replays, the saves, the cast)
 and missions_layout (the window on a monitor and a phone), challenges, gear, the 3.4 capacity test, the 3.9 melee test, the 4.0 vehicles40 test: the slow
 van and its stages, the torque curve, the van's save migration, the pallets, the Hand Trolley, the Freight Truck, and
-the 4.2 touchlayout test: the touch buttons on phones and tablets, clear of each other and of the HUD) and
+the 4.2 touchlayout test: the touch buttons on phones and tablets, clear of each other and of the HUD, and 7.x's
+vanonly test: the ZDC Van as the one car and the old saves' refund) and
 compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
 function, as Studio compiles). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).

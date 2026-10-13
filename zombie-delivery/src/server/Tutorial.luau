@@ -25,18 +25,29 @@
 -- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.reward (done),
 -- data.text / data.board (say); (nil) = over (skipped). Client → server: ("tour") her welcome's SHOW ME (6.5's "go"
 -- counts the same), ("board") the tour's TAKE A JOB, ("skip"). 7.0: ("story", key) a story card of Marge's seen
--- (client/MoveStoryUi.luau: her moving intro; PlayerData.markStory, shared/MoveStory.luau SeenKeys), at any time.
+-- (client/MoveStoryUi.luau: her moving intro; PlayerData.markStory, shared/MoveStory.luau SeenKeys), at any time
+-- (7.2 review: only a card's key, MoveStory.CardKeys; a chapter done is the server's).
 -- 5.0, the phone: profile.phone = true at SHOW ME (6.7; or when the tutorial ends, delivered or skipped; a player
 -- without the tutorial gets it at once), and the message ("phone", { npc }): client/Phone.luau shows its "NEW PHONE"
 -- moment (TutorialUi ignores it: not a phase; 6.7: the tour opens the phone itself, the moment's pop-up waits for it).
 -- 5.1, Spoke & Chain (6.12.7: Dead End Motors' BIKES counter): when a player reaches Career.BIKE_LEVEL while playing
 -- and owns no bike, Marge texts them (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's
--- "message" with the GPS to the shop, client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
--- (the phone's messages are not saved).
+-- "message" with the GPS to the shop, client/Phone.luau, and a toast). On PLAY between that level and the car jobs'
+-- (Config.Jobs.Tiers[1]: 7.x, the van is yours from the start), still without a bike: her reminder (the phone's messages
+-- are not saved).
+-- 7.x, one car (Config.CompanyVan): every courier owns the ZDC Van from the start, so nothing of her first day waits
+-- for a vehicle (5.0 – 6.x: Earl's van at level 4, server/VanQuest.luau). Her first day stays on foot: Main's PLAY
+-- does not put the van out while it is ahead (CAR still brings it), and when it ends (delivered or skipped) she texts
+-- that the van is yours (Config.CompanyVan.Hello). A save whose other cars were paid back (profile.carRefund) hears
+-- that from her on PLAY, once (Refunded / Kept).
 -- 6.13: her welcome showing (on its own, or when you talk to her first) is the onboarding funnel's WelcomeSeen
 -- (server/Analytics.luau).
 -- 6.0, Lead & Co.: no free gun; Marge texted a player with the pistol's price and no gun. 6.7: gone: every profile has
 -- the pistol since 6.0.2 (server/PlayerData.luau newProfile, the starterKit flag), so that text could never come.
+-- 7.1 review, for her Moving kiosk line (server/MoveGreeters.luau: it never cuts into her first day): the player
+-- attribute TutorialPhase is the phase while a player's first day is ahead (nil when there is none, it ended or it was
+-- skipped), and her model's attribute TutorialTalk the os.clock her tutorial talk lasts until (a bubble of hers for its
+-- time, a Talk for Config.Tutorial.TalkQuiet s at least).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,8 +59,8 @@ local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local TransportRules = require(Shared.Transport)
-local VanQuestRules = require(Shared.VanQuest)
 local Net = require(Shared.Net)
+local NpcLooks = require(Shared.NpcLooks) -- 7.0: Marge's look (the porch of her house on moving day wears it too)
 local TutorialSteps = require(Shared.TutorialSteps)
 local PlayerData = require(script.Parent.PlayerData)
 local Jobs = require(script.Parent.Jobs)
@@ -83,16 +94,40 @@ local function pending(player: Player): boolean
 		and if RunService:IsStudio() then Tuning.InStudio else PlayerData.loaded(player)
 end
 
+-- 7.x: is Marge's first day still ahead of this player? (Main's PLAY leaves the ZDC Van parked meanwhile: on foot.)
+function Tutorial.ahead(player: Player): boolean
+	return pending(player)
+end
+
 local function send(player: Player, phase: string?, data: { [string]: any }?)
 	local out: { [string]: any } = data or {}
 	out.npc = marge
 	remote:FireClient(player, phase, if phase then out else nil)
 end
 
+-- 7.1 review: her tutorial talk goes on for `seconds` more (TutorialTalk: her kiosk line waits).
+local function quiet(seconds: number)
+	local npc = marge
+	if npc and npc.Parent then
+		local endsAt = os.clock() + seconds
+		if (tonumber(npc:GetAttribute("TutorialTalk")) or 0) < endsAt then
+			npc:SetAttribute("TutorialTalk", endsAt)
+		end
+	end
+end
+
 local function bubble(text: string)
 	local npc = marge
 	if npc and npc.Parent then
 		Npcs.say(npc, text)
+		quiet(math.clamp(2.5 + #text / 18, 3, 9)) -- (the bubble's own time: server/Npcs.luau say's)
+	end
+end
+
+-- 7.1 review: the player attribute TutorialPhase (their first day's phase; nil: none ahead).
+local function markPhase(player: Player, phase: string?)
+	if player:GetAttribute("TutorialPhase") ~= phase then
+		player:SetAttribute("TutorialPhase", phase)
 	end
 end
 
@@ -111,11 +146,20 @@ end
 local function finish(player: Player, delivered: boolean)
 	local profile = PlayerData.get(player)
 	sessions[player] = nil
+	markPhase(player, nil)
 	if not profile or profile.tutorial then
 		return
 	end
 	profile.tutorial = true
 	givePhone(player) -- 5.0: the phone all the same (6.7: also after a first job taken before her welcome)
+	-- 7.x: the company's van is yours (it waited while her first day ran on foot): her text, a moment after the toast
+	task.delay(Tuning.VanDelay, function()
+		if player.Parent and remote then
+			local words = string.gsub(Config.CompanyVan.Hello, "{level}", tostring(Config.Jobs.Tiers[1].level))
+			remote:FireClient(player, "message", { from = Tuning.NpcName, text = words })
+			notice:FireClient(player, `📱 {Tuning.NpcName}: {words}`)
+		end
+	end)
 	if delivered then
 		PlayerData.addMoney(player, Tuning.Reward, "TutorialReward") -- (fires PlayerData.Changed: the HUD's money)
 		-- 6.7: a toast, no page (the delivery's own result shows); "done" ends the phase on the client
@@ -154,6 +198,7 @@ local function onTalk(player: Player)
 		return
 	end
 	talked[player] = now
+	quiet(Tuning.TalkQuiet) -- 7.1 review: a talk with her (her kiosk line waits)
 	local npc = marge
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -190,9 +235,10 @@ local function onRemote(player: Player, action: any, arg: any)
 		return
 	end
 	-- 7.0: a story card of Marge's seen (client/MoveStoryUi.luau: her moving intro), kept in the save. Any time, with
-	-- or without the first day: PlayerData.markStory takes only a known key, once.
+	-- or without the first day: PlayerData.markStory takes only a known key, once. 7.2 review: and from a client only a
+	-- card's key (MoveStory.isCardKey): a chapter done ("done:<chapter>") is server/Moving.luau's alone.
 	if action == "story" then
-		if Net.limit(player, "TutorialStory", 2) then
+		if Net.limit(player, "TutorialStory", 2) and require(Shared.MoveStory).isCardKey(arg) then
 			PlayerData.markStory(player, arg)
 		end
 		return
@@ -238,11 +284,9 @@ local function spawnMarge()
 	local depot = Map.Shops.depot
 	local spot = Tuning.NpcSpot
 	local feet = Vector3.new(depot.x + spot[1], Map.WalkTop, depot.z + spot[2])
-	-- A dispatcher: a clerk's shirt, the company's yellow cap and vest, grey hair.
-	local look = Npcs.look("clerk", Tuning.NpcName, Tuning.NpcTitle)
-	look.hat, look.hatColor = "cap", { 255, 190, 60 }
-	look.shirt, look.vest, look.pants = { 236, 236, 240 }, { 240, 170, 50 }, { 52, 56, 70 }
-	look.hair, look.skin = { 160, 156, 150 }, { 241, 194, 160 }
+	-- A dispatcher: a clerk's shirt, the company's yellow cap and vest, grey hair (7.0: shared/NpcLooks.luau marge, the
+	-- same look on the porch of her house on moving day).
+	local look = NpcLooks.marge(Tuning.NpcName, Tuning.NpcTitle)
 	local ok, model = pcall(Npcs.spawn, look, CFrame.lookAt(feet, feet + Vector3.new(0, 0, 1)))
 	if not ok or not model then
 		warn(`[Tutorial] {Tuning.NpcName} could not be built: {model}`)
@@ -316,8 +360,10 @@ local function update()
 		elseif PlayerData.get(player) then
 			if pending(player) then
 				check(player, session, now)
+				markPhase(player, if sessions[player] then session.phase else nil)
 			else
 				sessions[player] = nil -- done (an older save, an admin, skipped): never shown
+				markPhase(player, nil)
 				givePhone(player) -- 5.0: no tutorial ahead (a Studio test without it, a save not read): the phone at once
 			end
 		end
@@ -441,15 +487,19 @@ function Tutorial.onPlay(player: Player)
 		{ money = if profile then profile.shoeRefund else nil, text = Config.Courier.ShoeRefund, shop = "supplies" },
 		-- 6.23: the bags owned for good before (bags are bought for each game now: profile.bagRefund, never saved)
 		{ money = if profile then profile.bagRefund else nil, text = Config.BagShop.Refunded, shop = "bags" },
+		-- 7.x: the cars that are gone (one car: profile.carRefund, never saved; the ZDC Van took over their best), Wrench
+		-- Garage on the GPS (the van's upgrades); 0: only free cars went, her other words
+		{ money = if profile then profile.carRefund else nil, text = Config.CompanyVan.Refunded, shop = "mechanic", zero = Config.CompanyVan.Kept },
 	} do
 		local refund = retired.money
-		if profile and refund and refund > 0 then
+		local zero = (retired :: any).zero
+		if profile and refund and (refund > 0 or (refund == 0 and zero)) then
 			task.delay(BIKE_DELAY, function()
 				if not player.Parent or not remote then
 					return
 				end
 				local shop = Map.Shops[retired.shop]
-				local words = string.gsub(retired.text, "{money}", `${refund}`)
+				local words = if refund > 0 then string.gsub(retired.text, "{money}", Career.money(refund)) else zero
 				remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = retired.shop } else nil })
 				notice:FireClient(player, `📱 Marge: {words}`)
 			end)
@@ -460,9 +510,10 @@ function Tutorial.onPlay(player: Player)
 		profile.jacketRefund = nil
 		profile.shoeRefund = nil
 		profile.bagRefund = nil -- (6.23 review: a PLAY again says it once)
+		profile.carRefund = nil -- 7.x
 	end
 	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0.1: the vest's price in your pocket, not owned: her text
-	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
+	if level >= Career.BIKE_LEVEL and level < Config.Jobs.Tiers[1].level and remote then
 		task.delay(BIKE_DELAY, function()
 			if player.Parent and not ownsBike(player) then
 				tellBikes(player, Config.BikeShop.Reminder)

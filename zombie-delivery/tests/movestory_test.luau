@@ -2,7 +2,8 @@
 -- the place, the hook, the keepsakes, the briefing, the taunt, Marge's texts and the client's thanks for every
 -- outcome), unique ids and titles, every text non-empty and inside its card's limit, a valid unlock order, the prologue
 -- the one playable chapter (its contract on the board), the speakers real people (shared/Cast.luau, Dana of Big Move
--- Movers), the outcomes, the phone texts, the seen flags of the save; then the real server/Moving.luau (MovingServer
+-- Movers), the outcomes, the phone texts, the greeters' lines (the porch, the Wall, the kiosk: each inside its bubble),
+-- the seen flags of the save; then the real server/Moving.luau (MovingServer
 -- on tests/runtime/MovingRuntime.luau's fakes) sends Marge's texts through its MoveStory hook at START and at the end.
 local MoveStory = require("./MoveStory")
 local Config = require("./Config")
@@ -135,14 +136,29 @@ for index, chapter in chapters do
 end
 check("the finale needs every chapter", #chapters[8].requires == 7)
 
--- Playable now: the prologue only -------------------------------------------------------------------------------------
+-- Playable now: the prologue and chapter 1 (7.x farm move: Walt's Farm, open once the prologue is done) ----------------
 
 local prologue = chapters[1]
 local contract = Config.Moving.Contracts[1]
 check("the prologue plays Marge's House (Config.Moving.Contracts)", MoveStory.status(prologue) == "play" and prologue.contract == contract.id and prologue.soon ~= true)
-for index = 2, #chapters do
+local ranch = chapters[2]
+check("chapter 1 plays Walt's Farm (Config.Moving.Contracts walt, a farm)", ranch.contract == "walt" and ranch.soon ~= true and MoveStory.forContract("walt") == ranch
+	and MoveStory.forContract("Walt's Farm") == ranch and (function()
+		for _, c in Config.Moving.Contracts do
+			if c.id == "walt" then
+				return c.kind == "farm"
+			end
+		end
+		return false
+	end)())
+check("7.x farm move: chapter 1 locked until the prologue is done (the save's flags)", MoveStory.status(ranch, {}) == "locked" and MoveStory.status(ranch, { intro = true }) == "locked"
+	and MoveStory.status(ranch, { [MoveStory.doneKey("prologue")] = true }) == "play" and MoveStory.status(ranch) == "play"
+	and MoveStory.status(prologue, {}) == "play")
+check("…its lock says what to finish first", MoveStory.lockText(ranch, {}) == "🔒 Finish the PROLOGUE, Everything Must Go, first."
+	and MoveStory.lockText(ranch, { ["done:prologue"] = true }) == nil and MoveStory.blocker(ranch, {}) == prologue and MoveStory.unlocked(prologue, {}))
+for index = 3, #chapters do
 	local chapter = chapters[index]
-	check(`{chapter.id}: 🔒 SOON (no contract yet)`, chapter.soon == true and MoveStory.status(chapter) == "soon")
+	check(`{chapter.id}: 🔒 SOON (no contract yet)`, chapter.soon == true and MoveStory.status(chapter) == "soon" and MoveStory.status(chapter, {}) == "soon")
 end
 check("the contract by its id and by its name (the result card's)", MoveStory.forContract("marge") == prologue and MoveStory.forContract(contract.name) == prologue
 	and MoveStory.forContract("nobody") == nil and MoveStory.forContract(nil) == nil and MoveStory.forContract("") == nil)
@@ -209,15 +225,63 @@ check("Marge's debrief and the client's thanks follow the outcome", MoveStory.de
 check("no chapter, no text", MoveStory.dispatchText("nowhere") == nil and MoveStory.debriefText("nowhere", "done", 5) == nil and MoveStory.thanksLine(nil, "done", 5) == nil)
 check("the phone's sender is Marge (a Cast name)", Cast.named(MoveStory.Sender) ~= nil)
 
+-- The greeters (7.0: server/MoveGreeters.luau's speech bubbles) -------------------------------------------------------
+
+local greeter = prologue.greeter
+check("the prologue's client greets the crew on the porch: 2 – 3 hello lines and the three reactions", greeter ~= nil and #greeter.hello >= 2 and #greeter.hello <= 3
+	and MoveStory.greeterOf("marge") == greeter and MoveStory.greeterOf("Marge's House") == greeter and MoveStory.greeterOf("nowhere") == nil and MoveStory.greeterOf(nil) == nil)
+if greeter then
+	for index, text in greeter.hello do
+		checkText(`the porch hello {index} fits its bubble`, text, L.Bubble)
+	end
+	for _, key in { "star", "horde", "leave" } do
+		checkText(`the porch's {key} line fits its bubble`, (greeter :: any)[key], L.Bubble)
+	end
+	check("her first word is for ZDC, the last one for Grandpa's clock (the door is open)", string.find(greeter.hello[1], "ZDC", 1, true) ~= nil
+		and string.find(table.concat(greeter.hello, " "), "door's open", 1, true) ~= nil and string.find(greeter.hello[#greeter.hello], "clock", 1, true) ~= nil)
+end
+for _, chapter in chapters do
+	if chapter.greeter and chapter.soon then
+		check(`{chapter.id}: a greeter only on a playable chapter`, false)
+	end
+end
+checkText("the soldier's welcome at the Wall fits its bubble", MoveStory.Wall.welcome, L.Bubble)
+check("…and it says where to unload", string.find(MoveStory.Wall.welcome, "safe zone", 1, true) ~= nil and string.find(MoveStory.Wall.welcome, "Unload", 1, true) ~= nil)
+check("Marge's kiosk lines: two or more, the first the owner's", #MoveStory.Kiosk >= 2 and MoveStory.Kiosk[1] == "New contract, sweetie?")
+for index, text in MoveStory.Kiosk do
+	checkText(`the kiosk line {index} fits its bubble`, text, L.Bubble)
+end
+check("the kiosk lines in turn, round the list", MoveStory.kioskLine(1) == MoveStory.Kiosk[1] and MoveStory.kioskLine(2) == MoveStory.Kiosk[2]
+	and MoveStory.kioskLine(#MoveStory.Kiosk + 1) == MoveStory.Kiosk[1] and MoveStory.kioskLine(0) == MoveStory.Kiosk[1])
+
 -- The seen flags (the save, the attribute) ----------------------------------------------------------------------------
 
 check("the intro is a seen key, nothing else is", MoveStory.isSeenKey("intro") and not MoveStory.isSeenKey("money") and not MoveStory.isSeenKey(1) and not MoveStory.isSeenKey(nil))
+-- 7.x farm move: a chapter done is a seen key too (the save keeps it: the next chapter's unlock)
+check("7.x farm move: done:<chapter> for every chapter, nothing else", MoveStory.isSeenKey("done:prologue") and MoveStory.isSeenKey("done:ranch") and MoveStory.isSeenKey("done:finale")
+	and not MoveStory.isSeenKey("done:nowhere") and not MoveStory.isSeenKey("done:") and MoveStory.doneKey("ranch") == "done:ranch")
+local kept = MoveStory.cleanSeen({ intro = true, ["done:prologue"] = true, ["done:nowhere"] = true })
+check("…kept by the save, the intro's way", kept.intro == true and kept["done:prologue"] == true and kept["done:nowhere"] == nil
+	and MoveStory.encodeSeen(kept) == "intro,done:prologue" and MoveStory.decodeSeen("intro,done:prologue")["done:prologue"] == true
+	and MoveStory.status(ranch, MoveStory.decodeSeen(MoveStory.encodeSeen(kept))) == "play")
 local cleaned = MoveStory.cleanSeen({ intro = true, money = true, [1] = true })
 check("a saved table keeps only known keys set to true", cleaned.intro == true and (cleaned :: any).money == nil and next(MoveStory.cleanSeen({ intro = "yes" })) == nil
 	and next(MoveStory.cleanSeen(nil)) == nil and next(MoveStory.cleanSeen("intro")) == nil)
 check("encoded for the attribute and back", MoveStory.encodeSeen({ intro = true }) == "intro" and MoveStory.encodeSeen({}) == "" and MoveStory.encodeSeen(nil) == ""
 	and MoveStory.decodeSeen("intro").intro == true and next(MoveStory.decodeSeen("")) == nil and next(MoveStory.decodeSeen("bogus,,x")) == nil
 	and next(MoveStory.decodeSeen(nil)) == nil)
+-- 7.2 review: the client marks only a card it was shown (the Tutorial remote's ("story", key): server/Tutorial.luau
+-- asks MoveStory.isCardKey); a chapter done is the server's alone (server/Moving.luau), never the client's
+check("7.2 review: the client's story keys are the cards' (intro), never a chapter done", MoveStory.isCardKey("intro") and not MoveStory.isCardKey("done:prologue")
+	and not MoveStory.isCardKey("done:ranch") and not MoveStory.isCardKey("money") and not MoveStory.isCardKey(nil) and table.find(MoveStory.CardKeys, "intro") ~= nil
+	and #MoveStory.CardKeys == 1)
+-- 7.2 review: an older server (main before 7.x) keeps only "intro" of the story (its cleanSeen) but keeps short keys in
+-- `rewards`: the chapters done are written there too (server/PlayerData.luau save) and read back from there
+local back = MoveStory.cleanSeen({ intro = true }, { ["done:prologue"] = true, ["done:ranch"] = true, intro = true, secrets = true, ["done:nowhere"] = true })
+check("7.2 review: the chapters done come back from the save's rewards (a save that went through an older server)", back.intro == true and back["done:prologue"] == true
+	and back["done:ranch"] == true and back["done:nowhere"] == nil and (back :: any).secrets == nil)
+check("…only the chapters done from there: never a card (intro) the story does not have", MoveStory.cleanSeen({}, { intro = true }).intro == nil
+	and next(MoveStory.cleanSeen(nil, { ["done:prologue"] = "yes" })) == nil and next(MoveStory.cleanSeen(nil, "done:prologue")) == nil)
 
 -- The real server/Moving.luau: Marge's texts through the MoveStory hook -----------------------------------------------
 
@@ -266,12 +330,50 @@ annTexts = texts(ann)
 local result = E.last(ann, "Moving", "result")
 local delivered = MoveStory.outcome(result and result.a.how, result and result.a.stars)
 check("delivered: her debrief for the outcome, after the result card", #annTexts == 2 and annTexts[2].text == (prologue.debrief :: any)[delivered] and #texts(bob) == 2, delivered)
+-- (7.x van moves: the clock runs out with a lamp in the van, which reaches the Wall in the grace: the end, late. 7.2
+-- review: a lamp there in time and then 0:00 with an empty van is no late end: tests/moving_runtime_test.luau)
+local function trigger(prompt: any, player: any)
+	prompt.Triggered:Fire(player)
+end
+local function promptIn(model: any, action: string): any
+	for _, d in model:GetDescendants() do
+		if d.ClassName == "ProximityPrompt" and d.ActionText ~= nil and string.find(tostring(d.ActionText), action, 1, true) == 1 then
+			return d
+		end
+	end
+	return nil
+end
+local function spotModel(spot: number): any
+	for _, d in E.Mock.workspace:GetDescendants() do
+		if d.ClassName == "Model" and d:GetAttribute("MoveSpot") == spot and not d.destroyed then
+			return d
+		end
+	end
+	return nil
+end
 Moving.admin(ann, "start")
 Moving.step()
+do
+	local outside = V3(home.door.x, 3, home.door.z) + V3(home.facing.x, 0, home.facing.z) * 3
+	E.place(ann, outside)
+	trigger(promptIn(E.Mock.workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), ann)
+	local lamp = spotModel(1)
+	E.place(ann, lamp.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(lamp, "Pick up"), ann)
+	E.place(ann, E.interiors[#E.interiors].Position + V3(0, 3, 1))
+	trigger(promptIn(E.Mock.workspace, "Leave house"), ann)
+	local van = E.cars[ann]
+	van.model:SetAttribute("BackOpen", true)
+	E.place(ann, van.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
+	E.clock += 0.3
+	Moving.step()
+	trigger(promptIn(van.model, "Load"), ann)
+end
 Moving.admin(ann, "time")
 E.now += 61
+E.clock += 0.3
 Moving.step()
-Moving.admin(ann, "deliver") -- (7.0 review: past 0:00 the truck has LateGrace s to reach the Wall: delivered late)
+Moving.admin(ann, "trip") -- (the lamp at the Wall in the grace: late)
 annTexts = texts(ann)
 check("the clock ran out: the late debrief", #annTexts == 4 and annTexts[3].text == prologue.dispatch and annTexts[4].text == prologue.debrief.late, #annTexts)
 Moving.admin(ann, "start")

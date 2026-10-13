@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -40,8 +40,15 @@ with tempfile.TemporaryDirectory() as tmp:
     # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
     for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
+        source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # 7.x: the farm's layout
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 7.x: shared/Layouts (Farm.luau: Walt's farm, HouseLayout's kind "farm"; tests/farmlayout_test.luau) next to them,
+    # on the same recorder, their script.Parent.Parent.X requires the copies above
+    for path in sorted(glob.glob(os.path.join(SHARED, "Layouts", "*.luau"))):
+        source = open(path, encoding="utf-8").read()
+        source = re.sub(r"require\(script\.Parent\.Parent\.(\w+)\)", r'require("./\1")', source)
+        open(os.path.join(tmp, os.path.basename(path)), "w", encoding="utf-8").write(prefix + source)
     # 7.0 (the moving prototype): the real server/HouseInterior.luau (tests/houseinterior_test.luau) on the recorder,
     # its shared modules the copies above, the recorder's `game`.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseInterior.luau"), encoding="utf-8").read()
@@ -75,8 +82,10 @@ with tempfile.TemporaryDirectory() as tmp:
             'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
             'local RaycastParams, OverlapParams, UDim2, UDim, typeof = M.RaycastParams, M.OverlapParams, M.UDim2, M.UDim, M.typeof\n'
             'local warn = function(...) print("WARN", ...) end\n')
-    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer"}
-    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer")):
+    # 7.0 greeters: the real server/MoveGreeters.luau as MoveGreetersServer.luau the same way (the client on the porch, the
+    # soldier at the Wall, Marge at the kiosk; Moving requires it; tests/movegreeters_runtime_test.luau drives it).
+    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer"}
+    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer")):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
@@ -91,6 +100,12 @@ with tempfile.TemporaryDirectory() as tmp:
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
     open(os.path.join(tmp, "MoveSitesServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 7.1 review: the real server/Alpine.luau as AlpineServer.luau on tools/perf/world-mock.luau (WorldMock.luau) for
+    # tests/alpinebuild_test.luau (the forests stand on World's parts only; SkipInStudio), its shared modules the copies.
+    shutil.copy(os.path.join(tools, "perf", "world-mock.luau"), os.path.join(tmp, "WorldMock.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Alpine.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "AlpineServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
@@ -152,6 +167,10 @@ def styles_check():
     looks_at = vehicles.index("local LOOKS")
     looks = entries(vehicles[looks_at:vehicles.index("\n}\n", looks_at) + 3])
     cars = config[config.index("Config.Cars = {"):config.index("} :: { CarDef }")]
+    # 7.x (one car): the bodies nobody owns any more (Config.AmbientCars: the traffic's vans at every stage, the buses,
+    # the company vehicles) are checked the same way: the world still builds them
+    ambient_at = config.index("Config.AmbientCars = {")
+    cars += config[ambient_at:config.index("} :: { CarDef }", ambient_at)]
     bad = []
     stages_seen = 0
     for entry in re.findall(r"^\t\{\n(.*?)^\t\},?$", cars, re.S | re.M):
@@ -279,6 +298,52 @@ def analytics_check():
     return not bad
 
 if not analytics_check():
+    ok = False
+
+# 7.1 review: a new server answers PLAY and has its lighting before the Alps' terrain is built. World.build lights the
+# world before its last piece starts the Alps (the cheap part only: Alpine.start), and Main.server.luau defers
+# World.buildLate (the terrain's fills, the forests) right after World.build, before the PLAY listener.
+def alps_order_check():
+    root = os.path.dirname(HERE)
+    world = open(os.path.join(root, "src", "server", "World.luau"), encoding="utf-8").read()
+    main = open(os.path.join(root, "src", "server", "Main.server.luau"), encoding="utf-8").read()
+    bad = []
+    start, late = world.find("function World.build()"), world.find("function World.buildLate()")
+    build = world[start:late] if 0 <= start < late else ""
+    light, alps = build.find('piece("lighting"'), build.find("Alpine).start(")
+    if "Alpine).build(" in world:
+        bad.append("World.luau builds all of the Alps at once (Alpine.build)")
+    if light < 0 or alps < 0 or light > alps:
+        bad.append("World.build: the lighting before the Alps' start")
+    built, deferred, play = main.find("World.build()"), main.find("task.defer(World.buildLate)"), main.find('Net.get("Play").OnServerEvent')
+    if min(built, deferred, play) < 0 or not built < deferred < play:
+        bad.append("Main.server.luau: task.defer(World.buildLate) right after World.build(), before the PLAY listener")
+    print("== alps order: " + ("the lighting before the Alps, their terrain and forests deferred past PLAY" if not bad else "; ".join(bad)))
+    return not bad
+
+if not alps_order_check():
+    ok = False
+
+# 7.2 review: two server wirings the Luau tests cannot run. PlayerData.save writes the one-car flag into `rewards` too
+# (an older server drops unknown fields but keeps that table's short keys: Economy.vanMigrated reads either mark), and
+# the Tutorial remote's ("story", key) marks only a card's key (MoveStory.isCardKey): a chapter done is the server's.
+def review72_check():
+    root = os.path.dirname(HERE)
+    data = open(os.path.join(root, "src", "server", "PlayerData.luau"), encoding="utf-8").read()
+    tutorial = open(os.path.join(root, "src", "server", "Tutorial.luau"), encoding="utf-8").read()
+    bad = []
+    start = data.find("function PlayerData.save(")
+    save = data[start:data.find("\nend\n", start)] if start >= 0 else ""
+    if "profile.rewards[Config.CompanyVan.Flag] = true" not in save:
+        bad.append("PlayerData.save: the one-car flag into rewards too")
+    start = tutorial.find('if action == "story" then')
+    story = tutorial[start:tutorial.find("return", start)] if start >= 0 else ""
+    if "isCardKey(arg)" not in story or "PlayerData.markStory(player, arg)" not in story:
+        bad.append("Tutorial: the story action marks only MoveStory.isCardKey keys")
+    print("== 7.2 review: " + ("the one-car flag saved into rewards too; the client marks only story cards" if not bad else "; ".join(bad)))
+    return not bad
+
+if not review72_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

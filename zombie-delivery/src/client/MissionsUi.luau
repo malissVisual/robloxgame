@@ -549,7 +549,7 @@ function Extras.slotsText(need: number, def: MissionDef): string
 end
 
 -- 5.0: no vehicle of my own (you start on foot) and not in somebody else's crew: no mission can start (the server's
--- words: Config.VanQuest.MissionsNeed).
+-- words: Config.CompanyVan.MissionsNeed).
 function Extras.noCar(): boolean
 	return not Extras.hasCar and crewOwner == nil
 end
@@ -1255,7 +1255,7 @@ function Page.blocker(def: MissionDef): string?
 	elseif ownJob then
 		return "Finish your current delivery first."
 	elseif Extras.noCar() then
-		return `🚐 {Config.VanQuest.MissionsNeed}`
+		return `🚐 {Config.CompanyVan.MissionsNeed}`
 	elseif Extras.needsCrew(def) then
 		return `🤝 {Extras.DUO_REFUSAL}`
 	elseif Extras.slotsShort(def) then
@@ -2546,7 +2546,7 @@ function MissionsUi.startMission(id: string)
 		return
 	end
 	if Extras.noCar() then
-		say(Config.VanQuest.MissionsNeed, P.danger) -- 5.0: on foot
+		say(Config.CompanyVan.MissionsNeed, P.danger) -- 5.0: on foot
 		return
 	end
 	-- 3.2: a DUO mission without a crew: why, and FIND CREW is next to START (the server checks the range too).

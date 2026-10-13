@@ -335,7 +335,7 @@ do
 		kinds[jobType.itemKind] = true
 	end
 	for kind in Config.Cargo.Kinds do
-		if not kinds[kind] and kind ~= "pallet" then -- (4.0: the pallets are the Freight Run's, not a mission's)
+		if not kinds[kind] and kind ~= "pallet" and kind ~= "horse" then -- (4.0: the pallets were the Freight Run's; 7.x: no horse fits a van)
 			table.insert(unused, kind)
 		end
 	end
@@ -344,8 +344,8 @@ do
 	for _ in vehicles do
 		vehicleCount += 1
 	end
-	check("every lendable vehicle and your own car", vehicleCount == 9, vehicleCount)
-	check("all four load modes", modes.carry and modes.lead and modes.board and modes.serve or false)
+	check("7.x: every mission goes in your own car (the ZDC Van: nothing lent)", vehicleCount == 1 and vehicles.own == true, vehicleCount)
+	check("three unload modes (7.x: no horse led: carry, board, serve)", modes.carry and modes.board and modes.serve and not modes.lead or false)
 	check("rushes", rushes >= 4, rushes)
 	check("a vehicle that starts loaded, but rarely", loaded >= 1 and loaded <= 4, loaded)
 	check("cargo the bandits want", boosted >= 3, boosted)

@@ -156,7 +156,7 @@ check("the muscle car costs real money", car("muscle").price >= 3 * car("pickup"
 -- (6.19: their level is now the level of the mission that unlocks them: the Armored Van 11 → 12, the Rally Van 13 → 14)
 for _, want in { { "courier", 5 }, { "highroof", 5 }, { "boxtruck", 7 }, { "armorvan", 12 }, { "rallyvan", 14 } } do
 	local def = Economy.findCar(want[1] :: string)
-	check(`the {want[1]} is at the dealer from level {want[2]}`, def ~= nil and not def.company and def.level == want[2] and def.mount == true, def and def.level)
+	check(`the {want[1]} kept its old level {want[2]} (7.x: a body of the traffic, no longer sold)`, def ~= nil and not def.company and def.level == want[2] and def.mount == true, def and def.level)
 end
 local dealer = 0
 for _, def in Config.Cars do
@@ -164,7 +164,7 @@ for _, def in Config.Cars do
 		dealer += 1
 	end
 end
-check("ten cars at the dealer (4.0: the Freight Truck; 6.25: the ZDC Van)", dealer == 10, dealer)
+check("one car at the dealer: the ZDC Van, everybody's (7.x: the other nine left the game)", dealer == 1 and Config.Cars[1].id == Config.CompanyVan.Car, dealer)
 check("the courier van is cheap, a few missions' money", car("courier").price <= rewardsUpTo(car("courier").level :: number) and car("courier").price > rewardsUpTo(car("van").level :: number - 1), car("courier").price)
 check("the rally van is the dealer's last and dearest", car("rallyvan").price >= 2 * car("muscle").price, car("rallyvan").price)
 check("the armored van is tough, the rally van fast", car("armorvan").health >= 2 * car("van").health and car("rallyvan").maxSpeed > car("pickup").maxSpeed)

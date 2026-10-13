@@ -6,11 +6,12 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "7.2"
+Config.Version = "7.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
--- (fists only: the pistol is bought at Lead & Co., Config.Arms).
+-- (fists only: the pistol is bought at Lead & Co., Config.Arms). 7.x: every courier has the ZDC Van from the start
+-- (Config.CompanyVan), the only car of the game.
 Config.DataStoreName = "ZombieDelivery_v2"
 Config.StartMoney = 40
 Config.StudioStartMoney = 40 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
@@ -292,7 +293,9 @@ Config.Tutorial = {
 	NpcSpot = { -4, -20 }, -- where she stands, studs from the depot's centre (Map.Shops.depot): by the job board, facing the yard
 	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
 	StartDelay = 2, -- seconds after PLAY before her welcome shows (6.7: on its own; the start screen fades out first)
+	VanDelay = 6, -- 7.x: seconds after her first day ends (delivered or skipped) before her text about your ZDC Van
 	RetryAfter = 1.5, -- a first job gone this long without a result (a special job ended, an admin): back to "board"
+	TalkQuiet = 6, -- 7.1 review: s after a Talk with her in which her Moving kiosk line waits (server/MoveGreeters.luau; her bubbles: their own time)
 	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
 	-- 6.7: the arrow tour of the screen (client/TutorialArrow.luau; px at the screen's scale)
 	TourBounce = 10, -- how far the arrow bounces back from its target
@@ -348,7 +351,7 @@ export type CarDef = {
 	ramPower: number, -- multiplies the damage of running a zombie over
 	color: { number },
 	description: string,
-	company: boolean?, -- not for sale: an employer lends it for their jobs and gives it to you after a few of them
+	company: boolean?, -- not for sale: an employer lent it for their jobs and gave it to you after a few of them (until 7.x)
 	level: number?, -- the driver level (Config.Levels) needed to buy it
 	mission: string?, -- 6.19: the mission (shared/Missions.luau id) to finish before it is sold (Career.missionLock); `level` is then that mission's level
 	employer: string?, -- who (Config.Employers)
@@ -379,6 +382,10 @@ export type CarDef = {
 	-- Every car has both; a bike has none (no fuel).
 	tank: number?,
 	burn: number?,
+	-- 7.x, one car (Config.CompanyVan): `starter` every courier owns it from the start, never sold (the ZDC Van);
+	-- `ambient` a body only the world builds (Config.AmbientCars: traffic, buses, bandits), never a player's car.
+	starter: boolean?,
+	ambient: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -419,122 +426,27 @@ export type StageDef = {
 -- (server/Vehicles.luau Look.stretch): more room makes the car bigger. The Box Truck's last stage is longer too and
 -- takes a pallet. The Freight Truck (level 9: 12 slots or 3 pallets, a roll-up door, its own pallet jack) is the big
 -- one; the Moving Truck takes a pallet. CarDef.trolley marks the vans and trucks that may take the Hand Trolley.
+-- 7.x, ONE car (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): Config.Cars holds the vehicles a player can
+-- have, the ZDC Van (Config.Cars[1], every courier's from the start: Config.CompanyVan) and the bikes. Every other car
+-- above is history: their bodies moved to Config.AmbientCars (the traffic, the buses and the bandits still drive
+-- them), a save that owned one was paid back once (Economy.carRefund). The notes above tell how they used to work.
 Config.Cars = {
-	{
-		id = "van",
-		mount = true,
-		trolley = true,
-		name = "Old Van",
-		level = 4, -- 5.0: bought from Earl at Earl's Used Wheels (Config.VanQuest: Marge's quest; you start on foot)
-		price = 1800,
-		style = "van",
-		maxSpeed = 42,
-		accel = 11,
-		turn = 1.8,
-		health = 300,
-		capacity = 2,
-		tank = 40, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.0,
-		color = { 214, 196, 160 },
-		role = "Your first vehicle: it grows with you",
-		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
-		stages = {
-			{ name = "Rusty Van", price = 0, capacity = 2, gearSlots = 1, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
-			{ name = "Patched Van", price = 250, level = 4, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
-			{ name = "Work Van", price = 700, level = 5, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
-			{ name = "Long Cargo Van", price = 2200, level = 6, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
-		},
-	},
-	{
-		id = "courier",
-		gearSlots = 2, -- 4.6
-		trolley = true,
-		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "clinic_4", -- 6.19: sold once you finish Code Red 3, Many Hands (Career.missionLock)
-		mount = true,
-		name = "Courier Van",
-		price = 3500,
-		style = "courier",
-		maxSpeed = 70,
-		accel = 31,
-		turn = 2.05,
-		health = 320,
-		capacity = 2,
-		tank = 35, -- 5.4: litres (Config.Fuel)
-		burn = 7, -- litres per 1,000 studs
-		ramPower = 1.0,
-		color = { 232, 170, 40 },
-		role = "Fast and nimble: the rush jobs",
-		description = "Small, low and quick off the line, an amber light bar on the roof. Made for speed, not for big loads (2 slots, 3 as an Express Courier). 1 passenger.",
-		stages = {
-			{ name = "Courier Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Express Courier", price = 1200, level = 6, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
-		},
-	},
-	{
-		id = "highroof",
-		gearSlots = 3, -- 4.6
-		trolley = true,
-		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "clinic_4", -- 6.19: sold once you finish Code Red 3, Many Hands (Career.missionLock)
-		mount = true,
-		name = "High-Roof Van",
-		price = 7000,
-		style = "highroof",
-		maxSpeed = 62,
-		accel = 27,
-		turn = 1.75,
-		health = 450,
-		capacity = 4,
-		tank = 50, -- 5.4: litres (Config.Fuel)
-		burn = 10, -- litres per 1,000 studs
-		ramPower = 1.1,
-		color = { 168, 186, 200 },
-		role = "Tougher, the in-between",
-		description = "Stand up inside: a tall roof, thicker walls and a jump seat for a friend. 4 slots from the start, 5 as a Tall Hauler. 2 passengers.",
-		stages = {
-			{ name = "High-Roof Van", price = 0, capacity = 4, adds = "" },
-			{ name = "Tall Hauler", price = 3000, level = 7, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
-		},
-	},
-	{
-		id = "pickup",
-		gearSlots = 2, -- 4.6
-		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "market_3", -- 6.19: sold once you finish Empty Shelves 3, Farm to Table (Career.missionLock)
-		mount = true,
-		name = "Pickup",
-		price = 12000,
-		style = "pickup",
-		maxSpeed = 72,
-		accel = 32,
-		turn = 2.0,
-		health = 420,
-		capacity = 2,
-		tank = 60, -- 5.4: litres (Config.Fuel)
-		burn = 8, -- litres per 1,000 studs
-		ramPower = 1.15,
-		color = { 196, 60, 50 },
-		role = "The crew car: friends shoot from the bed",
-		description = "An open bed where two friends ride and shoot. Room for 2 pieces beside them (3 as a Ranch Pickup). 3 passengers.",
-		stages = {
-			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
-			{ name = "Ranch Pickup", price = 2500, level = 7, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
-		},
-	},
 	-- 6.25, the ZDC Van (the owner: "connect it to the game so it drives and works"): the owner's own Blender model
 	-- (design/blender-van/, server/VanMesh.luau): the company's van with a bull bar and a loaded roof rack. Until
 	-- ZDCVanArt is imported in Studio it wears the fleet's panelled skin.
+	-- 7.x (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): the one car of the game. Every courier owns it from
+	-- the start and drives it (Config.CompanyVan; `starter`: never sold, CAR and the chauffeur bring it); its paints,
+	-- the car tracks, the gear and a roof gun on its rack are bought for it at Wrench Garage. (7.2 review: never paid
+	-- back, bought before 7.x or not: every save owns it for free now; Economy.carRefund.)
 	{
 		id = "zdcvan",
+		starter = true,
 		gearSlots = 3,
 		trolley = true,
-		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "market_9", -- sold once you finish Empty Shelves 5, Price War (Career.missionLock)
+		level = 1,
 		mount = true,
 		name = "ZDC Van",
-		price = 16000,
+		price = 0,
 		style = "zdcvan",
 		maxSpeed = 66,
 		accel = 28,
@@ -545,289 +457,14 @@ Config.Cars = {
 		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.35,
 		color = { 217, 204, 176 },
-		role = "The company van: a bull bar, 4 slots",
-		description = "Zombie Delivery Co.'s own van: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces. 1 passenger.",
+		role = "The company van: every courier drives one",
+		description = "Zombie Delivery Co.'s own van, yours from day one: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces (+2 light ones with the Roof Rack). 1 passenger.",
 		stages = {
 			{ name = "ZDC Van", price = 0, capacity = 4, adds = "" },
 		},
 	},
-	{
-		id = "boxtruck",
-		gearSlots = 3, -- 4.6
-		trolley = true,
-		level = 7, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "market_10", -- 6.19: sold once you finish the Empty Shelves finale (Career.missionLock)
-		mount = true,
-		name = "Box Truck",
-		price = 22000,
-		style = "boxtruck",
-		maxSpeed = 64,
-		accel = 26,
-		turn = 1.6,
-		health = 650,
-		capacity = 6,
-		tank = 80, -- 5.4: litres (Config.Fuel)
-		burn = 10, -- litres per 1,000 studs
-		ramPower = 1.4,
-		color = { 238, 238, 232 },
-		role = "The big one: the only way to 6 and more",
-		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
-		stages = {
-			{ name = "Box Truck", price = 0, capacity = 6, gearSlots = 3, adds = "" },
-			{ name = "Liftgate Truck", price = 7500, level = 9, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
-			{ name = "Freight Hauler", price = 15000, level = 11, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
-		},
-	},
-	{
-		id = "muscle",
-		gearSlots = 1, -- 4.6
-		level = 9, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "firehouse_10", -- 6.19: sold once you finish the Smoke and Sirens finale (Career.missionLock)
-		mount = true,
-		name = "Muscle Car",
-		price = 40000,
-		style = "muscle",
-		maxSpeed = 95,
-		accel = 46,
-		turn = 2.3,
-		health = 340,
-		capacity = 2, -- 6.7: two in the trunk (one was too little for a $40,000 car)
-		tank = 65, -- 5.4: litres (Config.Fuel)
-		burn = 7, -- litres per 1,000 studs
-		ramPower = 1.0,
-		color = { 30, 30, 36 },
-		role = "The getaway car: two pieces, all speed",
-		description = "Outruns every zombie. Two pieces in the trunk (3 as a Street Machine). Do not crash. 1 passenger.",
-		stages = {
-			{ name = "Muscle Car", price = 0, capacity = 2, adds = "" },
-			{ name = "Street Machine", price = 6000, level = 10, capacity = 3, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a wider trunk (3 pieces)" },
-		},
-	},
-	{
-		id = "freight",
-		gearSlots = 4, -- 4.6
-		level = 10, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "army_10", -- 6.19: sold once you finish the Iron Supply finale (Career.missionLock)
-		trolley = true,
-		pallets = 3,
-		name = "Freight Truck",
-		price = 45000,
-		style = "freighttruck",
-		maxSpeed = 45,
-		accel = 12,
-		turn = 1.2,
-		health = 900,
-		capacity = 12,
-		tank = 120, -- 5.4: litres (Config.Fuel)
-		burn = 11, -- litres per 1,000 studs
-		ramPower = 2.0,
-		color = { 46, 88, 150 },
-		role = "Warehouse freight: pallets and 12 slots",
-		description = "A cab-over truck with a long box, a roll-up door and a loading floor at dock height: 12 slots or 3 pallets, its own pallet jack inside. Slow and heavy, no car gun. 1 passenger.",
-		stages = {
-			{ name = "Freight Truck", price = 0, capacity = 12, adds = "" },
-		},
-	},
-	{
-		id = "armorvan",
-		gearSlots = 3, -- 4.6
-		level = 12, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "ranch_10", -- 6.19: sold once you finish the Wild West End finale (Career.missionLock)
-		mount = true,
-		name = "Armored Van",
-		price = 55000,
-		style = "armorvan",
-		maxSpeed = 74,
-		accel = 34,
-		turn = 1.8,
-		health = 900,
-		capacity = 3,
-		tank = 90, -- 5.4: litres (Config.Fuel)
-		burn = 9, -- litres per 1,000 studs
-		ramPower = 1.6,
-		color = { 72, 78, 84 },
-		role = "Very tough: the car-gun platform",
-		description = "Steel plates, grilles on the windows, a roof made for a gun. The bullets knock, nobody answers. 3 slots, 4 as a Fortress Van. 2 passengers.",
-		stages = {
-			{ name = "Armored Van", price = 0, capacity = 3, adds = "" },
-			{ name = "Fortress Van", price = 14000, level = 12, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
-		},
-	},
-	{
-		id = "rallyvan",
-		gearSlots = 2, -- 4.6
-		level = 14, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
-		mission = "underworld_10", -- 6.19: sold once you finish the Dirty Money finale (Career.missionLock)
-		mount = true,
-		name = "Rally Van",
-		price = 80000,
-		style = "rallyvan",
-		maxSpeed = 98,
-		accel = 46,
-		turn = 2.25,
-		health = 420,
-		capacity = 2,
-		tank = 55, -- 5.4: litres (Config.Fuel)
-		burn = 6, -- litres per 1,000 studs
-		ramPower = 1.1,
-		color = { 30, 90, 200 },
-		role = "The fastest van: rush jobs",
-		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
-		stages = {
-			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, health = 100, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps and a welded cage: +100 health (no more room)" }, -- 6.7: + health (a stage's tweaks stay under a quarter of the car's)
-		},
-	},
-	{
-		id = "armored",
-		mount = true,
-		name = "Armored Truck",
-		price = 0,
-		style = "armored",
-		maxSpeed = 66,
-		accel = 26,
-		turn = 1.6,
-		health = 1000,
-		capacity = 8,
-		tank = 90, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.8,
-		color = { 80, 96, 70 },
-		description = "The army's truck. Two gunners on the roof. 3 passengers.",
-		company = true,
-		employer = "army",
-	},
-	{
-		id = "bus",
-		name = "School Bus",
-		price = 0,
-		style = "bus",
-		maxSpeed = 62,
-		accel = 22,
-		turn = 1.4,
-		health = 1300,
-		capacity = 8,
-		tank = 100, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 2.0,
-		color = { 245, 190, 30 },
-		description = "The school's bus. Bring the whole crew. 5 passengers.",
-		company = true,
-		employer = "school",
-	},
-	{
-		id = "monster",
-		mount = true,
-		name = "Monster Truck",
-		price = 0,
-		style = "monster",
-		maxSpeed = 86,
-		accel = 40,
-		turn = 1.9,
-		health = 1400,
-		capacity = 6,
-		tank = 80, -- 5.4: litres (Config.Fuel)
-		burn = 14, -- litres per 1,000 studs
-		ramPower = 2.5,
-		color = { 60, 130, 220 },
-		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
-		company = true,
-		employer = "farm",
-	},
-	-- Company vehicles (the special jobs lend them, Config.JobTypes).
-	{
-		id = "icecream",
-		name = "Ice Cream Truck",
-		price = 0,
-		style = "icecream",
-		maxSpeed = 64,
-		accel = 28,
-		turn = 1.9,
-		health = 650,
-		capacity = 6,
-		tank = 60, -- 5.4: litres (Config.Fuel)
-		burn = 9, -- litres per 1,000 studs
-		ramPower = 1.3,
-		color = { 250, 240, 245 },
-		description = "Frosty's ice cream truck. 1 passenger.",
-		company = true,
-		employer = "icecream",
-	},
-	{
-		id = "movingtruck",
-		pallets = 1,
-		name = "Moving Truck",
-		price = 0,
-		style = "movingtruck",
-		maxSpeed = 58,
-		accel = 22,
-		turn = 1.5,
-		health = 900,
-		capacity = 10,
-		tank = 90, -- 5.4: litres (Config.Fuel)
-		burn = 11, -- litres per 1,000 studs
-		ramPower = 1.6,
-		color = { 230, 120, 40 },
-		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
-		company = true,
-		employer = "movers",
-	},
-	{
-		id = "livestock",
-		name = "Livestock Truck",
-		price = 0,
-		style = "livestock",
-		maxSpeed = 56,
-		accel = 22,
-		turn = 1.5,
-		health = 1000,
-		capacity = 2,
-		tank = 100, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.7,
-		color = { 150, 90, 50 },
-		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
-		company = true,
-		employer = "ranch",
-	},
-	{
-		id = "ambulance",
-		name = "Ambulance",
-		price = 0,
-		style = "ambulance",
-		maxSpeed = 70,
-		accel = 30,
-		turn = 1.8,
-		health = 800,
-		capacity = 1,
-		tank = 70, -- 5.4: litres (Config.Fuel)
-		burn = 9, -- litres per 1,000 studs
-		ramPower = 1.4,
-		color = { 245, 245, 245 },
-		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
-		company = true,
-		employer = "clinic",
-	},
-	{
-		id = "fueltruck",
-		name = "Fuel Truck",
-		price = 0,
-		style = "fueltruck",
-		maxSpeed = 60,
-		accel = 24,
-		turn = 1.6,
-		health = 950,
-		capacity = 6,
-		tank = 100, -- 5.4: litres (Config.Fuel)
-		burn = 12, -- litres per 1,000 studs
-		ramPower = 1.6,
-		color = { 220, 60, 50 },
-		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
-		company = true,
-		employer = "gas",
-	},
 	-- 5.1, the bikes (CarDef.bike): sold at the bike counter from level 2 (6.12.7: Dead End Motors' BIKES counter), after
-	-- the cars (Config.Cars[1] stays the van).
+	-- the van (7.x: Config.Cars[1] is the ZDC Van, the one car).
 	-- server/Vehicles.luau builds them on the styles "bike" (a rear rack: 1 slot) and "cargobike" (a front box: 4) with
 	-- Codex's art (server/BikeArt/Geometry.luau, the art id = the car id). No fuel, no passengers, no car gun, no stages;
 	-- the bike gear (Config.Gear bikeOnly: basket, panniers, trailer) adds light slots. Sprint on foot is 28 for ~6 s,
@@ -931,6 +568,388 @@ Config.Cars = {
 		color = { 153, 49, 43 },
 		role = "The fast one: a battery does half the pedalling",
 		description = "A battery in the frame, a bar display, disc brakes. The fastest thing on two wheels, no fuel needed. A rear rack and two gear slots. Rider only.",
+	},
+} :: { CarDef }
+
+-- 7.x, the cars nobody owns any more (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): every car but the ZDC
+-- Van left the game for the players. Nobody buys, earns, is lent or takes out one of these: the dealer, the garages,
+-- Earl, the career, the missions and the special jobs know only Config.Cars. They stay as BODIES the world still
+-- builds: the traffic (server/Traffic.luau: the vans at random stages, the pickup, the box truck, the muscle car, the
+-- moving truck and the bus), the city buses (server/Buses.luau), the bandits' cars, Earl's old van on his lot
+-- (server/VanQuest.luau) and the fleet checks (tools/vehicle-preview). Economy.findCar still finds them (their stats,
+-- stages and looks for those bodies; Config sets `ambient` on each), Economy.isPlayerCar does not. Their `price` and
+-- stage prices are what they sold for before (× the 6.19 knobs): a save that owned one is paid them back once
+-- (Economy.carRefund, Config.CompanyVan). The company vehicles were free (an employer's): nothing to pay back.
+Config.AmbientCars = {
+	{
+		id = "van",
+		mount = true,
+		trolley = true,
+		name = "Old Van",
+		level = 4, -- 5.0 – 6.x: bought from Earl at Earl's Used Wheels (7.x: his lot keeps one for show, server/VanQuest.luau)
+		price = 1800,
+		style = "van",
+		maxSpeed = 42,
+		accel = 11,
+		turn = 1.8,
+		health = 300,
+		capacity = 2,
+		tank = 40, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.0,
+		color = { 214, 196, 160 },
+		role = "Your first vehicle: it grows with you",
+		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
+		stages = {
+			{ name = "Rusty Van", price = 0, capacity = 2, gearSlots = 1, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
+			{ name = "Patched Van", price = 250, level = 4, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
+			{ name = "Work Van", price = 700, level = 5, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
+			{ name = "Long Cargo Van", price = 2200, level = 6, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
+		},
+	},
+	{
+		id = "courier",
+		gearSlots = 2, -- 4.6
+		trolley = true,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Courier Van",
+		price = 3500,
+		style = "courier",
+		maxSpeed = 70,
+		accel = 31,
+		turn = 2.05,
+		health = 320,
+		capacity = 2,
+		tank = 35, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
+		ramPower = 1.0,
+		color = { 232, 170, 40 },
+		role = "Fast and nimble: the rush jobs",
+		description = "Small, low and quick off the line, an amber light bar on the roof. Made for speed, not for big loads (2 slots, 3 as an Express Courier). 1 passenger.",
+		stages = {
+			{ name = "Courier Van", price = 0, capacity = 2, adds = "" },
+			{ name = "Express Courier", price = 1200, level = 6, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
+		},
+	},
+	{
+		id = "highroof",
+		gearSlots = 3, -- 4.6
+		trolley = true,
+		level = 5, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "High-Roof Van",
+		price = 7000,
+		style = "highroof",
+		maxSpeed = 62,
+		accel = 27,
+		turn = 1.75,
+		health = 450,
+		capacity = 4,
+		tank = 50, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
+		ramPower = 1.1,
+		color = { 168, 186, 200 },
+		role = "Tougher, the in-between",
+		description = "Stand up inside: a tall roof, thicker walls and a jump seat for a friend. 4 slots from the start, 5 as a Tall Hauler. 2 passengers.",
+		stages = {
+			{ name = "High-Roof Van", price = 0, capacity = 4, adds = "" },
+			{ name = "Tall Hauler", price = 3000, level = 7, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
+		},
+	},
+	{
+		id = "pickup",
+		gearSlots = 2, -- 4.6
+		level = 6, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Pickup",
+		price = 12000,
+		style = "pickup",
+		maxSpeed = 72,
+		accel = 32,
+		turn = 2.0,
+		health = 420,
+		capacity = 2,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 8, -- litres per 1,000 studs
+		ramPower = 1.15,
+		color = { 196, 60, 50 },
+		role = "The crew car: friends shoot from the bed",
+		description = "An open bed where two friends ride and shoot. Room for 2 pieces beside them (3 as a Ranch Pickup). 3 passengers.",
+		stages = {
+			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
+			{ name = "Ranch Pickup", price = 2500, level = 7, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
+		},
+	},
+	{
+		id = "boxtruck",
+		gearSlots = 3, -- 4.6
+		trolley = true,
+		level = 7, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Box Truck",
+		price = 22000,
+		style = "boxtruck",
+		maxSpeed = 64,
+		accel = 26,
+		turn = 1.6,
+		health = 650,
+		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
+		ramPower = 1.4,
+		color = { 238, 238, 232 },
+		role = "The big one: the only way to 6 and more",
+		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
+		stages = {
+			{ name = "Box Truck", price = 0, capacity = 6, gearSlots = 3, adds = "" },
+			{ name = "Liftgate Truck", price = 7500, level = 9, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
+			{ name = "Freight Hauler", price = 15000, level = 11, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
+		},
+	},
+	{
+		id = "muscle",
+		gearSlots = 1, -- 4.6
+		level = 9, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Muscle Car",
+		price = 40000,
+		style = "muscle",
+		maxSpeed = 95,
+		accel = 46,
+		turn = 2.3,
+		health = 340,
+		capacity = 2, -- 6.7: two in the trunk (one was too little for a $40,000 car)
+		tank = 65, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
+		ramPower = 1.0,
+		color = { 30, 30, 36 },
+		role = "The getaway car: two pieces, all speed",
+		description = "Outruns every zombie. Two pieces in the trunk (3 as a Street Machine). Do not crash. 1 passenger.",
+		stages = {
+			{ name = "Muscle Car", price = 0, capacity = 2, adds = "" },
+			{ name = "Street Machine", price = 6000, level = 10, capacity = 3, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a wider trunk (3 pieces)" },
+		},
+	},
+	{
+		id = "freight",
+		gearSlots = 4, -- 4.6
+		level = 10, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		trolley = true,
+		pallets = 3,
+		name = "Freight Truck",
+		price = 45000,
+		style = "freighttruck",
+		maxSpeed = 45,
+		accel = 12,
+		turn = 1.2,
+		health = 900,
+		capacity = 12,
+		tank = 120, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
+		ramPower = 2.0,
+		color = { 46, 88, 150 },
+		role = "Warehouse freight: pallets and 12 slots",
+		description = "A cab-over truck with a long box, a roll-up door and a loading floor at dock height: 12 slots or 3 pallets, its own pallet jack inside. Slow and heavy, no car gun. 1 passenger.",
+		stages = {
+			{ name = "Freight Truck", price = 0, capacity = 12, adds = "" },
+		},
+	},
+	{
+		id = "armorvan",
+		gearSlots = 3, -- 4.6
+		level = 12, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Armored Van",
+		price = 55000,
+		style = "armorvan",
+		maxSpeed = 74,
+		accel = 34,
+		turn = 1.8,
+		health = 900,
+		capacity = 3,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.6,
+		color = { 72, 78, 84 },
+		role = "Very tough: the car-gun platform",
+		description = "Steel plates, grilles on the windows, a roof made for a gun. The bullets knock, nobody answers. 3 slots, 4 as a Fortress Van. 2 passengers.",
+		stages = {
+			{ name = "Armored Van", price = 0, capacity = 3, adds = "" },
+			{ name = "Fortress Van", price = 14000, level = 12, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
+		},
+	},
+	{
+		id = "rallyvan",
+		gearSlots = 2, -- 4.6
+		level = 14, -- 6.19: the level its mission is played at (the order, the fuel tier); the gate is the mission
+		mount = true,
+		name = "Rally Van",
+		price = 80000,
+		style = "rallyvan",
+		maxSpeed = 98,
+		accel = 46,
+		turn = 2.25,
+		health = 420,
+		capacity = 2,
+		tank = 55, -- 5.4: litres (Config.Fuel)
+		burn = 6, -- litres per 1,000 studs
+		ramPower = 1.1,
+		color = { 30, 90, 200 },
+		role = "The fastest van: rush jobs",
+		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
+		stages = {
+			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
+			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, health = 100, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps and a welded cage: +100 health (no more room)" }, -- 6.7: + health (a stage's tweaks stay under a quarter of the car's)
+		},
+	},
+	{
+		id = "armored",
+		mount = true,
+		name = "Armored Truck",
+		price = 0,
+		style = "armored",
+		maxSpeed = 66,
+		accel = 26,
+		turn = 1.6,
+		health = 1000,
+		capacity = 8,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.8,
+		color = { 80, 96, 70 },
+		description = "The army's truck. Two gunners on the roof. 3 passengers.",
+		company = true,
+		employer = "army",
+	},
+	{
+		id = "bus",
+		name = "School Bus",
+		price = 0,
+		style = "bus",
+		maxSpeed = 62,
+		accel = 22,
+		turn = 1.4,
+		health = 1300,
+		capacity = 8,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 2.0,
+		color = { 245, 190, 30 },
+		description = "The school's bus. Bring the whole crew. 5 passengers.",
+		company = true,
+		employer = "school",
+	},
+	{
+		id = "monster",
+		mount = true,
+		name = "Monster Truck",
+		price = 0,
+		style = "monster",
+		maxSpeed = 86,
+		accel = 40,
+		turn = 1.9,
+		health = 1400,
+		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 14, -- litres per 1,000 studs
+		ramPower = 2.5,
+		color = { 60, 130, 220 },
+		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
+		company = true,
+		employer = "farm",
+	},
+	-- Company vehicles (the special jobs lent them until 7.x; the traffic still drives the moving truck and the bus).
+	{
+		id = "icecream",
+		name = "Ice Cream Truck",
+		price = 0,
+		style = "icecream",
+		maxSpeed = 64,
+		accel = 28,
+		turn = 1.9,
+		health = 650,
+		capacity = 6,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.3,
+		color = { 250, 240, 245 },
+		description = "Frosty's ice cream truck. 1 passenger.",
+		company = true,
+		employer = "icecream",
+	},
+	{
+		id = "movingtruck",
+		pallets = 1,
+		name = "Moving Truck",
+		price = 0,
+		style = "movingtruck",
+		maxSpeed = 58,
+		accel = 22,
+		turn = 1.5,
+		health = 900,
+		capacity = 10,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
+		ramPower = 1.6,
+		color = { 230, 120, 40 },
+		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
+		company = true,
+		employer = "movers",
+	},
+	{
+		id = "livestock",
+		name = "Livestock Truck",
+		price = 0,
+		style = "livestock",
+		maxSpeed = 56,
+		accel = 22,
+		turn = 1.5,
+		health = 1000,
+		capacity = 2,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.7,
+		color = { 150, 90, 50 },
+		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
+		company = true,
+		employer = "ranch",
+	},
+	{
+		id = "ambulance",
+		name = "Ambulance",
+		price = 0,
+		style = "ambulance",
+		maxSpeed = 70,
+		accel = 30,
+		turn = 1.8,
+		health = 800,
+		capacity = 1,
+		tank = 70, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
+		ramPower = 1.4,
+		color = { 245, 245, 245 },
+		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
+		company = true,
+		employer = "clinic",
+	},
+	{
+		id = "fueltruck",
+		name = "Fuel Truck",
+		price = 0,
+		style = "fueltruck",
+		maxSpeed = 60,
+		accel = 24,
+		turn = 1.6,
+		health = 950,
+		capacity = 6,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
+		ramPower = 1.6,
+		color = { 220, 60, 50 },
+		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
+		company = true,
+		employer = "gas",
 	},
 } :: { CarDef }
 
@@ -1499,25 +1518,55 @@ Config.BagShop = {
 	ForGame = "FOR THIS GAME",
 }
 
--- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
--- you reach the van's level (Config.Cars "van" level) without one, Marge texts you about a guy out west; Earl sells his
--- old van at Earl's Used Wheels (Map.VanSeller, far out on the West Highway) for the van's price. Its stages are
--- bought at Wrench Garage as usual. Range: studs from Earl the purchase is allowed within (the prompt reaches 10).
+-- 5.0 – 6.x, Earl's van: the first vehicle was bought second-hand from Earl at Earl's Used Wheels (Map.VanSeller, far
+-- out on the West Highway) after Marge's text at level 4. 7.x (one car, Config.CompanyVan): retired. Every courier has
+-- the ZDC Van from the start, so Earl sells nothing any more: his lot (built by server/World.luau) keeps his old van for
+-- show with a SOLD tag (server/VanQuest.luau), his prompt is a chat (Prompt: shared/VanQuest.luau promptText) and he
+-- says one of his Lines. Sign: what follows "FOR SALE" on his lot's plate (VanQuest.priceText); Tag: the old van's tag.
 Config.VanQuest = {
-	Car = "van",
 	Seller = "Earl",
 	Place = "Earl's Used Wheels",
-	Range = 16,
-	-- The words (the dealer's card, the board, the missions, the career road, the tutorial, Marge's and Earl's lines).
-	Where = "Earl's Used Wheels (Marge's quest at level 4)",
-	DealerNote = "Sold privately — Marge knows a guy (level 4).",
-	MissionsNeed = "Missions need a vehicle — the Old Van at level 4 (Earl's Used Wheels, Marge's quest).",
-	Unlock = "A guy out west is selling his old van. Cheap-ish. Go see Earl — I put him on your GPS.",
-	Reminder = "Earl still has that van for you, out west on the West Highway. He's on your GPS.",
-	Bought = "Nice. Now you can take ★ car jobs — and don't forget fuel later.",
-	Keys = "Here are the keys, kid. She's ugly but she runs.",
-	TooYoung = "You're green, kid. Come back when Marge sends you.",
-	Sold = "Already sold you one, kid. Treat her right.",
+	Prompt = "Talk",
+	Sign = "· SOLD",
+	Tag = "SOLD · Earl's own, not for sale",
+	Lines = {
+		"Sold my last van years ago, kid. Your company hands every courier a ZDC Van now.",
+		"She ain't for sale. Thirty years on the road: she's earned her rest.",
+		"Treat that ZDC Van right, kid. They don't build 'em like my old girl any more.",
+	} :: { string },
+}
+
+-- 7.x, one car (the owner: "dej pryč auta, ostatní, nech ve hře jen van": take the other cars away, leave only the
+-- van): the ZDC Van (Config.Cars[1], the owner's Blender model) is the only car of the game. Every courier owns it from
+-- the start (server/PlayerData.luau: a new profile and every save on load) and drives it: CAR and the chauffeur bring
+-- it, it is never sold. Earl's quest is retired (Config.VanQuest); Dead End Motors' CARS counter shows the van (its
+-- paints, upgrades, gear and roof guns are Wrench Garage's); the special jobs and the missions all go in it (no company
+-- vehicle is lent any more), and no job or mission carries more pieces than its four slots.
+--   Car       the van's Config.Cars id
+--   Flag      the save's mark that its other cars were paid back (only a real save without it, once; every save is
+--             written with it)
+--   Refunded  Marge's text and the notice ({money}) after a save got money back for the cars it owned
+--             (Economy.carRefund: each car's price as sold, Config.AmbientCars × the Vehicles knob, and the stages it
+--             had bought, × the Stages knob; nothing for an employer's free vehicle; 7.2 review: never the ZDC Van, the
+--             Old Van's price only when bought from Earl). The van takes over the best of the old cars (Economy.vanCarry:
+--             every car track at its highest level, their gear, the paint and the roof gun of the car you drove); 7.2
+--             review: what it could not take over is paid back too (VanCarry.lost), and so is the bonus of an employer
+--             whose vehicle the save had earned (Economy.employerBonus)
+--   Kept      her text when cars went but nothing was paid (only an employer's free ones)
+--             (the money's reason: "CarRefund", shared/AnalyticsPlan.luau)
+--   Bonus     an employer's thanks after `needed` jobs (Config.Employers bonus: the money that replaced their car;
+--             server/Jobs.luau): {employer}, {money} (the money's reason: "EmployerBonus")
+--   MissionsNeed  a mission's refusal (and the MISSIONS window's line) while your van is not what you drive
+--   Hello     Marge's text when her first day ends ({level}: the ★ car jobs'; server/Tutorial.luau): the van waited while
+--             she showed you the job on foot (Main's PLAY puts it out only once her first day is behind you)
+Config.CompanyVan = {
+	Car = "zdcvan",
+	Flag = "vanOnly",
+	Refunded = "The company runs on one car now: your ZDC Van. {money} paid back for your other cars, and the van took over their best upgrades.",
+	Kept = "The company runs on one car now: your ZDC Van. It took over the best upgrades of your other cars.",
+	Bonus = "{employer} pays you a {money} bonus for your work!",
+	Hello = "One more thing: the company's ZDC Van is yours. Press CAR and it comes to you. The ★ car jobs open at level {level}.",
+	MissionsNeed = "Missions need your ZDC Van: press CAR and it comes to you.",
 }
 
 -- 5.1, the bikes (Config.Cars with bike = true) and the bike gear (Config.Gear bikeOnly), sold at Spoke & Chain Cycles
@@ -2445,32 +2494,33 @@ Config.Atmosphere = {
 			air = { 214, 152, 114 }, decay = { 150, 98, 82 }, density = 0.33, offset = 0.08, glare = 1.6, haze = 1.8,
 			clouds = { 255, 208, 172 }, blur = 1, dust = 1,
 		},
-		-- Morning: fresh and clear, a touch warm.
+		-- Morning: fresh and clear. 7.1, the Alps: a cool, crisp blue air (the far mountains fade blue), lush colours.
 		morning = {
-			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 104, 106, 114 },
+			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 106, 110, 120 },
 			top = { 36, 26, 12 }, bottom = { 10, 10, 10 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 246, 245, 236 }, saturation = -0.06, contrast = 0.12, lift = 0,
+			tint = { 246, 248, 248 }, saturation = -0.01, contrast = 0.12, lift = 0,
 			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 168, 180, 184 }, decay = { 102, 112, 118 }, density = 0.3, offset = 0.15, glare = 0.5, haze = 1.5,
+			air = { 182, 202, 226 }, decay = { 116, 138, 172 }, density = 0.26, offset = 0.15, glare = 0.5, haze = 1.25,
 			clouds = { 255, 255, 255 }, blur = 0.8, dust = 0.7,
 		},
-		-- Noon: clean and crisp, truer colours (a little grit left), sharp shadows, the least haze.
+		-- Noon: clean and crisp, true colours, sharp shadows, the least haze. 7.1: the alpine noon: a clear blue air,
+		-- lush, a touch cool.
 		noon = {
-			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 104, 104, 112 },
+			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 106, 110, 120 },
 			top = { 14, 12, 6 }, bottom = { 8, 8, 8 }, diffuse = 0.6, specular = 0.7, soft = 0.2,
-			tint = { 250, 250, 244 }, saturation = -0.08, contrast = 0.14, lift = 0,
+			tint = { 247, 251, 255 }, saturation = 0.02, contrast = 0.14, lift = 0,
 			bloom = 0.3, bloomSize = 20, threshold = 1.5, rays = 0.03,
-			air = { 166, 178, 176 }, decay = { 104, 114, 116 }, density = 0.28, offset = 0.15, glare = 0.2, haze = 1.3,
+			air = { 178, 200, 228 }, decay = { 118, 142, 178 }, density = 0.24, offset = 0.15, glare = 0.2, haze = 1,
 			clouds = { 255, 255, 255 }, blur = 0.7, dust = 0.5,
 		},
-		-- Afternoon: warming up.
+		-- Afternoon: warming up (7.1: still the clear alpine air, a little warmer).
 		afternoon = {
-			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 104, 106 },
+			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 106, 110 },
 			top = { 50, 34, 14 }, bottom = { 12, 10, 8 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 252, 242, 224 }, saturation = -0.04, contrast = 0.13, lift = 0,
+			tint = { 252, 246, 234 }, saturation = 0.02, contrast = 0.13, lift = 0,
 			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 182, 170, 150 }, decay = { 116, 104, 90 }, density = 0.3, offset = 0.12, glare = 0.6, haze = 1.5,
-			clouds = { 255, 246, 232 }, blur = 0.8, dust = 0.7,
+			air = { 196, 204, 214 }, decay = { 128, 136, 150 }, density = 0.26, offset = 0.12, glare = 0.6, haze = 1.25,
+			clouds = { 255, 250, 242 }, blur = 0.8, dust = 0.7,
 		},
 		-- Sunset, the golden hour: the warmest look, an orange haze and the sun's glare, rays and dust in the light.
 		golden = {
@@ -2517,8 +2567,8 @@ Config.Atmosphere = {
 	},
 	-- Roblox's moving clouds (Terrain.Clouds, made on every client): Cover and Density in clear weather, in the rain and
 	-- in a fog (blended with the weather); their colour is the look's. Lite: on a phone or a tablet too (false: none
-	-- there, unless the place has its own).
-	Clouds = { Cover = 0.5, Density = 0.55, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
+	-- there, unless the place has its own). 7.1: fewer, brighter fair-weather clouds over the Alps.
+	Clouds = { Cover = 0.42, Density = 0.45, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
 	-- The soft blur far away (a DepthOfFieldEffect): sharp out to Focus + Radius studs, beyond that Far × the look's blur
 	-- (half of it in the rain or the fog: the air blurs already). Never on a phone or a tablet, below graphics quality
 	-- Quality (1 … 10), or while you aim (it fades out over Fade seconds).
@@ -2530,6 +2580,219 @@ Config.Atmosphere = {
 	-- A soft haze around the street lamps at night: the Count nearest lamps that shine (the 6.13.1 light budget) within
 	-- Range of the camera get a faint glow Size studs across (a phone or a tablet: Lite of them).
 	Halo = { Count = 12, Lite = 0, Range = 160, Size = 7, Transparency = 0.9 },
+}
+
+-- 7.1, the Alps (the owner: "make the map a smaller alpine valley, step by step"; step 1B: mountains and forests, nothing
+-- you play on moves): shared/AlpineLayout.luau lays it out as plain numbers (tests/alpine_test.luau checks it),
+-- server/Alpine.luau builds it once from World.build (tools/alpine-preview draws it).
+--   Box          the ring of mountains stands round this box (Map.Bounds today: the world's walls); step 2 pulls it in
+--   Gap          studs from the box to the front row's foot (the mountains never reach into the box)
+--   Layer        a mountain is a stack of terrain cylinders this many studs thick (a cone: its radius at height y is
+--                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit);
+--                7.1 review: exactly two rows of the terrain's 4-stud voxels (a layer never writes a row of the next)
+--   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed (both on the
+--                4-stud voxel grid, so every layer covers whole voxel rows)
+--   Front / Back the two rows: Height (summits, studs), Spread (the base's radius = the height × this), Profile; the back
+--                row's feet Behind studs behind the front row's, each back peak with up to two lower Shoulders (chance)
+--   Lean         a peak leans one way (a steep face on that side, a long ridge on the other): each layer's middle moves
+--                this share (a range) of what its radius shrinks, so every layer stays inside the one under it
+--   Spacing      two cones next to each other stand at most this × the sum of their radii at Seal height apart, so the
+--                ring's crest between them never drops under Seal (studs): no gap a car could drive through
+--   Gorge        the river leaves the valley through a gorge this deep (studs past Gap); a back peak closes it
+--   Green / Snow the slopes are grass up to Green (a height between the two; the forests climb it), rock above, snow
+--                over Snow (summer); north of Map.WinterZ, west of the river, the mountains are all snow with rock bands
+--   Strata       this share of a peak's rock layers is the other stone (a peak is Rock or Limestone): bands at random
+--                heights; Rough: each layer's radius ± half this share (the flanks' crags; still inside the one under it)
+--   Glaciers     tongues of glacier ice down the inner flanks of the tallest summer peaks: Width at the top and at the
+--                snout, Thick studs (Protrude of it out of the slope)
+--   Scree        light stone fans at the front row's foot: Count a peak (summer), Radius
+--   Silhouettes  a far look of every peak of MinHeight or more (Persistent parts inside the terrain: with streaming the
+--                terrain far away is not sent, these are): a square pyramid Lower × the summit high, Margin studs inside
+--                the slopes everywhere, its snow cap from the peak's snow line
+--   Portals      where a road would leave the valley: the mountains open into a cliff with a tunnel mouth (Depth deep,
+--                Height high, the rock over it Cliff high) and a ROAD CLOSED barrier at the box's edge; the road runs
+--                there along x from `from` (a yard's edge) at z (the West Highway past the Old Farm)
+--   Waterfall    a waterfall where the river comes out of the north gorge
+--   Colors       the terrain's material colours (Terrain:SetMaterialColor), Valley the open ground's colour and material
+--   Budget       Volume: studs³ the fills may hold at most (overlaps counted twice); Fills: terrain calls; Parts: the
+--                parts of it all (the trees, the flowers, the huts, the silhouettes, the portal, the waterfall)
+--   SkipInStudio a dev toggle (default off): in a Studio Play test the terrain's fills are left out (the slowest part of
+--                the build); the silhouettes, the pass and the forests still stand (the slope trees on the flat ground
+--                under where the mountains would be). Never on a live server (RunService:IsStudio())
+--   Trees        the forests: at most Max trees of Parts parts (7.1 review: a trunk and one needle spire; spruce and
+--                fir), on a grid Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the
+--                Treeline), Height (studs);
+--                never within RoadClear of a road's edge (nor its canopy over it), JunctionClear of a road's end or bend
+--                (the drivers' view at the junctions), TownClear of a district's edge roads, YardClear of a yard,
+--                LotClear of a home's lot, PlaceClear of a place, WaterClear of the water, nor in Keep (the ski lift);
+--                thinner near town (TownFade studs; Copses of the valley's trees stand there in small copses), denser
+--                within Edge of the box's edge; Noise: the forests' and the
+--                meadows' patch sizes; ShadowNear: only trees this close to a road throw shadows; Chunk: one Atomic
+--                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter's
+--                frost on them
+--   Meadows      open meadows with wildflowers: Patches of Flowers small parts, Gap apart, Road studs from a road's edge
+--   Huts         Count wooden hay barns and huts in the meadows, Gap apart, Road studs from a road's edge
+Config.Alpine = {
+	Box = { x0 = -2150, z0 = -2950, x1 = 1900, z1 = 1500 },
+	Gap = 40,
+	Seed = 4711,
+	Layer = 8,
+	Floor = -12,
+	WetFloor = -32,
+	Front = { Height = { 250, 420 } :: { number }, Spread = { 1.0, 1.25 } :: { number }, Profile = 1.3 },
+	Back = { Height = { 480, 700 } :: { number }, Spread = { 0.85, 1.05 } :: { number }, Profile = 1.5, Behind = 170, Shoulders = 0.6 },
+	Lean = { 0.1, 0.5 } :: { number },
+	Spacing = 0.8,
+	Seal = 70,
+	Gorge = 170,
+	Green = { 110, 160 } :: { number },
+	Snow = { 300, 360 } :: { number },
+	Strata = 0.12,
+	Rough = 0.1,
+	Glaciers = { Count = 7, Width = { 110, 46 } :: { number }, Thick = 14, Protrude = 3 },
+	Scree = { Count = 2, Radius = { 20, 34 } :: { number } },
+	Silhouettes = { MinHeight = 300, Lower = 0.86, Margin = 6 },
+	Portals = {
+		{ id = "westpass", name = "WEST PASS", x = -2150, z = 520, nx = -1, nz = 0, from = -2030, width = 40 },
+	} :: { { id: string, name: string, x: number, z: number, nx: number, nz: number, from: number, width: number } },
+	Portal = { Depth = 36, Height = 26, Cliff = 60, Text = "ROAD CLOSED — EVACUATION ZONE" },
+	Waterfall = true,
+	Colors = {
+		Grass = { 92, 134, 58 },
+		LeafyGrass = { 84, 124, 54 },
+		Ground = { 112, 98, 74 },
+		Rock = { 120, 118, 114 },
+		Limestone = { 158, 154, 146 },
+		Snow = { 240, 244, 248 },
+		Glacier = { 176, 214, 232 },
+	} :: { [string]: { number } },
+	Valley = { Color = { 96, 138, 60 } :: { number }, Material = "Grass" },
+	Budget = { Volume = 1.0e10, Fills = 7500, Parts = 6500 },
+	SkipInStudio = false,
+	Trees = {
+		Max = 2500,
+		Parts = 2,
+		Spacing = 25,
+		Jitter = 7,
+		Slope = 0.25,
+		Copses = 0.12,
+		Height = { 34, 66 } :: { number },
+		Treeline = { 130, 180 } :: { number },
+		RoadClear = 20,
+		JunctionClear = 60,
+		TownClear = 50,
+		TownFade = 700,
+		Edge = 700,
+		YardClear = 30,
+		LotClear = 16,
+		PlaceClear = 55,
+		WaterClear = 14,
+		Keep = { { x0 = -1140, z0 = -2270, x1 = -790, z1 = -2180 } } :: { { x0: number, z0: number, x1: number, z1: number } },
+		Noise = { Big = 420, Small = 140 },
+		ShadowNear = 110,
+		Chunk = 128,
+		Colors = { { 34, 58, 40 }, { 44, 72, 46 }, { 58, 86, 50 } } :: { { number } },
+		Trunk = { 86, 62, 44 } :: { number },
+		Snowy = { 236, 240, 244 } :: { number },
+	},
+	Meadows = {
+		Patches = 36,
+		Flowers = 8,
+		Gap = 160,
+		Road = { 24, 150 } :: { number },
+		Colors = { { 245, 245, 238 }, { 250, 208, 60 }, { 170, 110, 210 }, { 222, 64, 72 }, { 92, 140, 230 } } :: { { number } },
+	},
+	Huts = { Count = 4, Gap = 600, Road = { 34, 110 } :: { number } },
+}
+
+-- 7.2, the Alps on the maps (client/MapView.luau draws the minimap and the big map, shared/MapStyle.luau works out
+-- what from Map and AlpineLayout, tools/phone-ui/mapview.luau checks it): a paper map, the valley green on cream, grey
+-- rock and white snow round it, the roads light with a brown edge, the highways amber.
+--   Margin     studs of the mountain ring drawn round Map.Bounds on both maps (the minimap sees at most about 300
+--              studs from you, and you stay inside the bounds)
+--   Colors     { r, g, b }: Paper (round the valley on the big map), Valley, Meadow (the wildflower meadows), Slope
+--              (the ring's grass on the minimap), Forest and Trees (a forest band and its tree dots; SnowForest and
+--              SnowTrees in the winter), Winter (the snowfield), Rock, Snow, Shadow (the peaks' shadow side), Water,
+--              Shore, Ice, Yard, Blocks (by district style), Special, Park, Square, Footbridge, Road, RoadEdge,
+--              Highway, Bridge, IceRoad, Fog, Ink / InkSoft / Halo (the captions), Closed (the ROAD CLOSED sign), Hut
+--   Peaks      the big map's mountains: a shaded peak with its snow cap for every cone of the ring (the shoulders
+--              only east and west), pulled into the margin. Base: where a peak's foot line stands, a share of Margin
+--              out from the bounds { front row, back row }: north (the peaks rise up the map, away from the valley),
+--              south (up the map, toward it, never into it), side (east and west, at most Side × Margin high, wide
+--              enough to overlap into one range, their inner feet at most Into × Margin over the valley's edge);
+--              Height: the lowest … the tallest cone's peak, a share of Margin; Cap: a snow cap's share of its peak
+--              { least, most } (the winter's peaks: Winter); Shade: the shadow side's transparency; Haze: how far the
+--              back row's rock fades toward the paper
+--   Relief     the minimap's mountains seen from above: a cone's grassy foot, its rock (from its grass line up) and
+--              its snow (from its snow line up) as discs lit from the north-west, each that reaches within Reach
+--              studs of the bounds (the minimap sees about 290 from you at its widest); a snow disc smaller than
+--              MinSnow studs is left out; Light: the far side of a disc is its colour × (1 - 2 × Light)
+--   Forest     the valley's trees (AlpineLayout.forest) binned in Cell × Cell squares; a square with Min trees or
+--              more is forest; a row's run of forest squares is one rounded band Overlap × Cell high (the rows melt
+--              into each other) with PerCell tree dots a square
+--   Meadows    a lighter disc Radius studs round every wildflower patch (AlpineLayout's meadows; Soft its
+--              transparency), a flower's dot Flower studs round in it
+--   Foothills  the soft green edge round the valley on the big map: studs out from the bounds
+--   Altstadt   the old town's label (a placeholder until Map names its villages: Map.Villages) over District's name
+--   Wait       seconds a client waits for the server's summary of the ring and the forest (MapStyle.publish, before
+--              World.build) before it works them out itself
+--   Budget     the most GuiObjects a layer may make on one map (tools/phone-ui/mapview.luau holds them): Peaks (big),
+--              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map), Mini (7.2
+--              review: all of them on the minimap, whose CanvasGroup draws them again on every move); Summary:
+--              the most characters the server's summary may have (a StringValue holds 200,000)
+Config.MapStyle = {
+	Margin = 420,
+	Colors = {
+		Paper = { 236, 228, 208 },
+		Valley = { 186, 206, 150 },
+		Meadow = { 208, 224, 166 },
+		Slope = { 146, 164, 114 },
+		Forest = { 118, 152, 98 },
+		Trees = { 70, 108, 64 },
+		SnowForest = { 164, 182, 172 },
+		SnowTrees = { 92, 118, 104 },
+		Winter = { 236, 241, 243 },
+		Rock = { 164, 158, 148 },
+		Snow = { 252, 252, 250 },
+		Shadow = { 52, 56, 66 },
+		Water = { 146, 194, 222 },
+		Shore = { 98, 150, 188 },
+		Ice = { 208, 228, 238 },
+		Yard = { 216, 206, 182 },
+		Blocks = { downtown = { 216, 200, 180 }, harbor = { 204, 198, 188 }, suburbs = { 224, 210, 186 } } :: { [string]: { number } },
+		Special = { 202, 180, 152 },
+		Park = { 150, 192, 118 },
+		Square = { 210, 190, 154 },
+		Footbridge = { 150, 108, 72 },
+		Road = { 252, 250, 244 },
+		RoadEdge = { 136, 122, 104 },
+		Highway = { 244, 198, 96 },
+		Bridge = { 214, 210, 200 },
+		IceRoad = { 226, 238, 244 },
+		Fog = { 92, 100, 112 },
+		Ink = { 62, 54, 44 },
+		InkSoft = { 106, 96, 82 },
+		Halo = { 246, 240, 224 },
+		Closed = { 196, 58, 46 },
+		Hut = { 128, 86, 54 },
+	} :: { [string]: any },
+	Peaks = {
+		Base = { north = { 0.12, 0.4 } :: { number }, south = { 0.62, 0.98 } :: { number }, side = { 0.42, 0.62 } :: { number } },
+		Height = { 0.48, 0.84 } :: { number },
+		Side = 0.6,
+		Into = 0.12,
+		Cap = { 0.2, 0.42 } :: { number },
+		Winter = 0.6,
+		Shade = 0.72,
+		Haze = 0.4,
+	},
+	Relief = { Reach = 300, MinSnow = 10, Light = 0.12 },
+	Forest = { Cell = 48, Min = 2, Overlap = 1.3, PerCell = 2 },
+	Meadows = { Radius = 80, Flower = 10, Soft = 0.3 },
+	Foothills = 120,
+	Altstadt = { Name = "Altstadt", District = "downtown" },
+	Wait = 10,
+	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 50, Alpine = 600, Mini = 380, Summary = 20000 },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
@@ -2584,7 +2847,7 @@ Config.Levels = {
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "Your first bike: the BIKES counter at Dead End Motors" }, -- (6.12.7: Spoke & Chain before)
 		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
-		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "Old Van: Earl's Used Wheels (Marge's quest)" }, -- (6.12.2: the shoes before)
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "The ★ car jobs, in your ZDC Van" }, -- (6.12.2: the shoes before; 7.x: Earl's Old Van before)
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
@@ -3345,6 +3608,35 @@ Config.Soundscape = {
 	FountainHeight = 4, -- studs over the walk (the basin and the jet)
 	-- The UI stings (client/Sounds.luau play: "task_done", "purchase", "event_start", "event_end").
 	PurchaseVolume = 0.75, -- money that went down outside a job (a purchase; up: the old cash sound)
+	-- 7.1, the move's sounds (art/audio/sfx4.ogg): client/MoveSounds.luau hears them from the move's state, its result
+	-- and your MoveCarry (shared/SoundPlan.luau moveCues, carryCue, dragged, resultCue). Volumes 0 … 1.
+	Move = {
+		StartWithin = 20, -- a move's first state plays move_start only this many seconds into it (not on a rejoin)
+		Start = 0.7, -- move_start
+		Siren = 0.6, -- the horde's air-raid siren, far off
+		Ramp = 0.75, -- the truck's back opening …
+		RampShut = 0.88, -- … and shutting (this pitch)
+		Door = 0.6, -- the house's front door: going in …
+		DoorOut = 1.08, -- … and out (this pitch)
+		Load = 0.8, -- a piece you carried into the truck …
+		LoadCrew = 0.35, -- … a crew mate's
+		Break = 0.85, -- a piece of yours broken (glass_break if fragile, else heavy_drop) …
+		BreakCrew = 0.45, -- … a crew mate's
+		Jolt = 0.12, -- a piece in your hands losing this share of its condition at once (a fall, a hard knock) …
+		JoltVolume = 0.6, -- … thuds (heavy_drop)
+		Pickup = 0.7, -- furniture_pickup
+		PutDown = 0.7, -- furniture_putdown
+		Box = 0.6, -- a box picked up / put down (cardboard_box)
+		PutDownWait = 0.6, -- your hands empty: the move's next state says where it went (into the truck: truck_load, else
+		-- the put-down), at most this many seconds later (the server sends it 0.25 – 0.45 s after a change)
+		Gate = 0.7, -- the Wall's gate opening as the move is delivered (the result card plays its jingle)
+		Slip = 0.8, -- a heavy piece slipping from your hands (MoveSounds.slipped, for the grip's UI) …
+		SlipQuiet = 1.5, -- … and no put-down and no heavy_drop (the slip's damage) for this many seconds after (grip_slip has its thud)
+		Scrape = 0.5, -- a two-person piece dragged alone (wood_scrape_loop), while you move faster than …
+		ScrapeFrom = 1.2, -- … studs a second
+		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick
+		Tick = 0.1, -- seconds between the looks at the drag
+	},
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
@@ -3356,7 +3648,7 @@ Config.Missions = {
 	TwoStarCondition = 0.75,
 	ThreeStarTime = 0.3,
 	StarBonus = 150, -- paid once for every new star (best rating goes up)
-	FirstClearXp = 2.5, -- the XP of the first clear × this (6.8: 1.5 before; six missions a chapter carry the same road)
+	FirstClearXp = 2.55, -- the XP of the first clear × this (6.8: 1.5 before; six missions a chapter carry the same road; 7.x: 2.5 before, the loads capped at the ZDC Van's four slots give fewer pieces: the story still carries you to level 15)
 	-- 6.8, replays (shared/Missions.luau replayPay / replayXp, server/Jobs.luau): a mission you have done before pays
 	-- this share of the job's pay and of its XP, and nothing else (the first clear's reward, the chapter's reward and
 	-- the unlocks come once). A crew member's share follows their own record.
@@ -3530,8 +3822,9 @@ Config.Jobs = {
 		StrayMax = 1,
 		StrayDistance = { 60, 110 } :: { number },
 		-- A car job (the board's ★ … ★★★★, a special in your own car) while you have no vehicle: locked with these words.
-		NeedsVehicle = "Needs a vehicle (Old Van at level 4): until then you deliver on foot.",
-		NeedsVehicleButton = "🚐 NEEDS A VEHICLE",
+		-- (7.x: every courier has the ZDC Van, so only a save still loading sees them.)
+		NeedsVehicle = "Needs your ZDC Van: press CAR and it comes to you.",
+		NeedsVehicleButton = "🚐 CALL YOUR VAN",
 		TutorialDrop = 220,
 		TutorialCargo = { cargo = "Letters", kind = "crate", look = "mail", piece = "letter bundle", plural = "letter bundles" },
 	},
@@ -3572,8 +3865,8 @@ Config.Jobs = {
 		NeedsBikeButton = "🚲 NEEDS A BIKE",
 		RideBike = "Bike jobs are ridden: MY BIKE on your phone brings your bike (your car stays where it is).",
 		RideBikeButton = "🚲 RIDE YOUR BIKE",
-		NeedsCar = "You're on your bike: car jobs need your car. CALL CAR on your phone.",
-		NeedsCarButton = "🚐 CALL YOUR CAR",
+		NeedsCar = "You're on your bike: car jobs need your ZDC Van. CALL CAR on your phone.",
+		NeedsCarButton = "🚐 CALL YOUR VAN",
 	},
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
@@ -3697,9 +3990,11 @@ Config.Jobs = {
 	-- 3.5 (the stages): ★ never, and at most EasyMaxPieces (the Rusty Van's 2 slots); ★★ (3 at most: the Work Van)
 	-- rarely 4 (the Long Cargo Van); ★★★ up to 5 (a Tall Hauler or a Box Truck); ★★★★ up to 8 (a Freight Hauler).
 	-- 4.0: pallets are the Freight Run's (Config.JobTypes "freightrun"), never an ordinary delivery's.
+	-- 7.x (one car): never more pieces than the ZDC Van's slots (server/Jobs.luau caps every car job at
+	-- Economy.maxCapacity of Config.CompanyVan.Car: 4); ★★★★'s bulk is +1 – 2 now. The Freight Run is retired.
 	EasyMaxPieces = 2,
 	BulkChance = { 0, 0.2, 0.45, 0.6 } :: { number },
-	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 3, 6 } } :: { { number } },
+	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 1, 2 } } :: { { number } },
 	-- 4.7, a choice on the board (server/Jobs.luau makeBoard, shared/JobRules.luau): every danger level you may take
 	-- offers Offers ordinary deliveries, each with its own trade-off (a role, JobRules.roles: the short one always,
 	-- then two of the other three):
@@ -4877,14 +5172,17 @@ export type JobTypeDef = {
 }
 
 -- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.
+-- 7.x (one car, Config.CompanyVan): no job lends a company vehicle any more (no `vehicle`): every one goes in your ZDC
+-- Van and its pieces fit its four slots. The School Run, the Ice Cream Route and the Ambulance Run board their people
+-- or sell from it (no slots); the Horse Transport became Feed and Tack (horses do not fit a van: carried sacks); the
+-- Freight Run (pallets: the ZDC Van takes none) is retired.
 Config.JobTypes = {
 	{
 		id = "schoolrun",
 		name = "School Run",
-		description = "Pick the kids up at three homes and bring them to Sunny Hill School in the school bus.",
-		vehicle = "bus",
+		description = "Pick the kids up at three homes and bring them to Sunny Hill School in your ZDC Van.",
 		employer = "school",
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 3,
 		pickupAt = nil,
 		drops = 1,
@@ -4906,9 +5204,8 @@ Config.JobTypes = {
 	{
 		id = "armysupply",
 		name = "Army Supply",
-		description = "Load ammo at the Harbor Docks and drive it in the army's armored truck through the tunnel to the base.",
-		vehicle = "armored",
-		level = 7, -- 3.2: the armored truck it earns can carry a car gun
+		description = "Load ammo at the Harbor Docks and drive it in your ZDC Van through the tunnel to the base.",
+		level = 7, -- (3.2: the armored truck it earned could carry a car gun; 7.x: the army's bonus)
 		employer = "army",
 		pickups = 1,
 		pickupAt = "docks",
@@ -4931,8 +5228,7 @@ Config.JobTypes = {
 	{
 		id = "icecream",
 		name = "Ice Cream Route",
-		description = "Load up at Frosty's and sell ice cream at 4 stops. Hold still while the kids buy.",
-		vehicle = "icecream",
+		description = "Load up at Frosty's and sell ice cream from your ZDC Van at 4 stops. Hold still while the kids buy.",
 		employer = "icecream",
 		pickups = 1,
 		pickupAt = "frosty",
@@ -4942,7 +5238,7 @@ Config.JobTypes = {
 		unloadTime = 3,
 		payPerStop = 60,
 		tier = 2,
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		cargo = "Ice Cream",
 		pickupLabel = "LOAD THE ICE CREAM",
 		dropLabel = "SELL ICE CREAM AT",
@@ -4956,10 +5252,9 @@ Config.JobTypes = {
 	{
 		id = "moving",
 		name = "Moving Day",
-		description = "Load a family's furniture at their house and unload it at their new home.",
-		vehicle = "movingtruck",
+		description = "Load a family's furniture into your ZDC Van at their house and unload it at their new home.",
 		employer = "movers",
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -4981,10 +5276,9 @@ Config.JobTypes = {
 	{
 		id = "farmrun",
 		name = "Farm Run",
-		description = "Load fresh food at the Old Farm and bring it to two markets in the city.",
-		vehicle = "monster",
+		description = "Load fresh food into your ZDC Van at the Old Farm and bring it to two markets in the city.",
 		employer = "farm",
-		level = 9, -- 5.0: the Muscle Car's level (4.x: 8)
+		level = 9, -- 5.0: the Muscle Car's level then (4.x: 8)
 		pickups = 1,
 		pickupAt = "farm",
 		drops = 2,
@@ -5028,10 +5322,9 @@ Config.JobTypes = {
 		receiver = "Ingrid, the lodge keeper",
 	},
 	{
-		id = "horses",
-		name = "Horse Transport",
-		description = "Lead two horses from Silver Spur Ranch into the livestock truck and bring them to the Riverside Riding School.",
-		vehicle = "livestock",
+		id = "horses", -- (the id stays: 7.x turned the Horse Transport into Feed and Tack, horses do not fit a van)
+		name = "Feed and Tack",
+		description = "Walt's mares went to the Riverside Riding School. Load their feed sacks and saddles at Silver Spur Ranch into your ZDC Van and bring them over.",
 		employer = "ranch",
 		level = 5,
 		pickups = 1,
@@ -5042,21 +5335,20 @@ Config.JobTypes = {
 		unloadTime = 3,
 		payPerStop = 180,
 		tier = 2,
-		cargo = "Horses",
-		pickupLabel = "LEAD THE HORSES IN AT",
-		dropLabel = "LEAD THE HORSES OUT AT",
-		load = "lead",
-		unload = "lead",
-		items = 2,
-		itemKind = "horse",
+		cargo = "Feed and Tack",
+		pickupLabel = "LOAD THE FEED AT",
+		dropLabel = "DELIVER THE FEED TO",
+		load = "carry",
+		unload = "carry",
+		items = 4,
+		itemKind = "sack",
 		giver = "Jesse, the ranch hand",
 		receiver = "Emma, the riding instructor",
 	},
 	{
 		id = "fuelrun",
 		name = "Fuel Run",
-		description = "Load fuel barrels at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
-		vehicle = "fueltruck",
+		description = "Load fuel barrels into your ZDC Van at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
 		employer = "gas",
 		level = 4,
 		pickups = 1,
@@ -5080,8 +5372,7 @@ Config.JobTypes = {
 	{
 		id = "cashrun",
 		name = "Cash Transport",
-		description = "Load sacks of cash at the First Zombie Bank into the army's armored truck and bring them to the Military Base vault. Every bandit in town wants this cargo.",
-		vehicle = "armored",
+		description = "Load sacks of cash at the First Zombie Bank into your ZDC Van and bring them to the Military Base vault. Every bandit in town wants this cargo.",
 		employer = nil,
 		board = true,
 		level = 5,
@@ -5107,10 +5398,9 @@ Config.JobTypes = {
 	{
 		id = "ambulance",
 		name = "Ambulance Run",
-		description = "A patient is waiting at their home. Pick them up in the clinic's ambulance and rush them to the City Clinic before it is too late.",
-		vehicle = "ambulance",
+		description = "A patient is waiting at their home. Pick them up in your ZDC Van and rush them to the City Clinic before it is too late.",
 		employer = "clinic",
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -5137,7 +5427,7 @@ Config.JobTypes = {
 		vehicle = nil,
 		employer = nil,
 		board = true,
-		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -5157,37 +5447,6 @@ Config.JobTypes = {
 		receiver = "A hungry customer",
 		timeLimit = 180,
 	},
-	-- 4.0, freight: pallets from the Harbor Warehouse's loading docks to a receiving dock. A pallet moves only with a
-	-- pallet jack (one waits at every dock and every receiving dock, the Freight Truck carries its own) and goes only
-	-- into a vehicle that takes pallets (Economy.palletsOf): the board shows it locked "NEEDS N PALLETS" for any other.
-	-- On the board (sorted by its stars) from its level, every time (server/Jobs.luau makeBoard); 1 … items pallets.
-	{
-		id = "freightrun",
-		name = "Freight Run",
-		description = "Pallets from the Harbor Warehouse's loading docks to a receiving dock. Back up to the dock, lift each pallet with a pallet jack and push it into your truck.",
-		vehicle = nil,
-		employer = nil,
-		board = true,
-		level = 6,
-		pickups = 1,
-		pickupAt = "warehouse",
-		drops = 1,
-		dropAt = nil,
-		dropChoices = { "market", "movers", "powerplant" },
-		loadTime = 6,
-		unloadTime = 6,
-		payPerStop = 220,
-		tier = 3,
-		cargo = "Freight",
-		pickupLabel = "LOAD THE PALLETS AT",
-		dropLabel = "DELIVER THE PALLETS TO",
-		load = "pallet",
-		unload = "pallet",
-		items = 3,
-		itemKind = "pallet",
-		giver = "Gus, the dock foreman",
-		receiver = "The stock room",
-	},
 } :: { JobTypeDef }
 
 export type EmployerDef = {
@@ -5195,24 +5454,26 @@ export type EmployerDef = {
 	name: string,
 	icon: string,
 	jobType: string,
-	reward: string, -- the car you get to keep
+	reward: string, -- what you get after `needed` jobs, in words (7.x: "bonus"; 2.x – 6.x their vehicle, gone with the cars)
 	needed: number, -- jobs done for them before they give it to you
+	bonus: number?, -- 7.x: the money of that bonus (once; Config.CompanyVan.Bonus, server/Jobs.luau)
 	pitch: string,
 	weapon: string?, -- a gun they give you (Config.Weapons, earned = this employer) …
 	weaponAt: number?, -- … after this many jobs
 	person: string, -- who runs it (the R15 NPC at their board)
 }
 
--- People who run something in the world. Work for them: after a few jobs their vehicle is yours.
+-- People who run something in the world. Work for them: after a few jobs their vehicle was yours (until 7.x); now they
+-- pay a bonus once (`bonus`), and the army and the ranch still give their gun.
 Config.Employers = {
-	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, person = "Principal Helen", pitch = "Our bus driver ran away. Drive the kids to school!" },
-	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Maria", pitch = "We need ammo from the docks. Bring it through the tunnel." },
-	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "icecream", needed = 3, person = "Frosty", pitch = "People still want ice cream. Sell it for us!" },
-	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
-	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jed", pitch = "The city is hungry. Take my monster truck to the markets." },
-	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "livestock", needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My horses are sold to the riding school. Lead them into the truck gently, and keep the bandits off them." },
-	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Doctor Ellie", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
-	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Dolly, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
+	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bonus", bonus = 1500, needed = 3, person = "Principal Helen", pitch = "Our bus driver ran away. Drive the kids to school!" },
+	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "bonus", bonus = 3000, needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Maria", pitch = "We need ammo from the docks. Bring it through the tunnel." },
+	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "bonus", bonus = 1500, needed = 3, person = "Frosty", pitch = "People still want ice cream. Sell it for us!" },
+	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "bonus", bonus = 1500, needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
+	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "bonus", bonus = 2500, needed = 3, person = "Old Man Jed", pitch = "The city is hungry. Take my food to the markets." },
+	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "bonus", bonus = 2000, needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My mares went to the riding school. Their feed and saddles still need hauling: keep the bandits off them." },
+	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "bonus", bonus = 1500, needed = 3, person = "Doctor Ellie", pitch = "The phones never stop ringing. Your van is our ambulance now: bring the patients in alive." },
+	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "bonus", bonus = 2000, needed = 3, person = "Dolly, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 
 -- 5.5, people in every building (shared/Residents.luau, shared/Deliveries.luau): every home has residents, made up
@@ -5759,16 +6020,84 @@ Config.ItemModel = {
 	Shut = 0.35,
 }
 
+-- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
+-- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): shared/
+-- CarryGrip.luau runs the bar (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows it and reads the presses,
+-- server/Moving.luau's grip block (the character attribute CarryGrip; the Moving remote's "slip" and "grip") drops a
+-- thing that slipped and wears one that shook. The bar runs from 0 (its bottom) to 1 (its top).
+--   Kinds      the carries with a bar (a one-hand thing that is not fragile has none): Zone, the grip box's share of
+--              the bar; Load, the load's own wildness; Gravity, × the box's fall. "hand": a fragile one-hand thing
+--              (gentler); "both"; "pair": two carry it (each their own bar; either slips: it drops); "solo": a Mover
+--              lifts a pair thing alone (harder); "drag": a pair thing dragged alone, low (calmer)
+--   Mover      × the zone for a Mover (every kind)
+--   Steadied   × the zone while Danny holds the other end of your piece (7.x: he steadies it; the character attribute
+--              GripSteady, server/MoveHelper.luau)
+--   Weight     + the load's wildness a weight point (1 … 10); Fragile: + when fragile
+--   Motion     × the wildness: Still standing still (under StillAt studs/s); + Speed × your speed / the walk (at most
+--              SpeedMax × it); + Turn turning at TurnFull rad/s or more; + Slope going up or down at SlopeFull studs/s
+--              or more; + Air in the air (a jump); + a bite's jolt (Bite at BiteFull hp or more, ShockMax at most, Fade
+--              a second off it)
+--   Grip       the box: Lift (/s² up while held), Gravity (/s² down when let go), Rise / Fall (the fastest, /s), Bounce
+--              (× its speed back up off the bottom when it hits faster than BounceMin)
+--   Marker     the load (the thing's icon): a new aim every Dart[1] s (wild, at WildAt) … Dart[2] s (calm), up to Reach
+--              × (Base + the wildness) away; pulled to it by Spring × (Base + the wildness), Damp a second, Jitter ×
+--              the wildness; never nearer the ends than Edge
+--   Meter      Fill a second inside the box, Drain outside; standing still it drains no lower than Floor; Start at the
+--              lift (HeavyStart from HeavyAt weight on: the first seconds matter); full: steady (× SteadySpeed on the
+--              carry's walk, the server's at most) until it is under SteadyOff; SLIPPING! at Warn or under; 0: it slips
+--   Step       the longest step the bar takes at once (a slow frame takes several); MaxDt: the most time one frame counts
+--   Report     s between the client's ("grip", spot, quality, steady) reports (quality: the share of the time outside)
+--   Server     Wear: the condition a second fully outside the box (× WearFragile when fragile), WearCap a second at most;
+--              Gap: the most s one report counts; Every: the least s between two reports that count; SteadyOutside: a
+--              report this much outside or less may be steady; Slip: the condition a slip takes (× Moving.Damage.Fragile
+--              when fragile)
+--   Ui         Tutorial: the carries with the "Hold to keep it steady!" tip (the key's hint on the first one only);
+--              Shake: px at SLIPPING! (ReducedShake with Reduced Motion); Hold: the touch HOLD button's side (px, at
+--              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere; the sounds (7.1,
+--              art/audio/sfx4.ogg): grip_tick at Tick's volume each TickNotches-th of the meter it moves, TickEvery s
+--              apart at least, grip_warning at Warning's on each entry into SLIPPING! (the slip: MoveSounds.slipped)
+Config.CarryGrip = {
+	Kinds = {
+		hand = { Zone = 0.36, Load = 0.35, Gravity = 1 },
+		both = { Zone = 0.3, Load = 0.55, Gravity = 1 },
+		pair = { Zone = 0.3, Load = 0.6, Gravity = 1 },
+		solo = { Zone = 0.21, Load = 0.9, Gravity = 1.2 },
+		drag = { Zone = 0.34, Load = 0.4, Gravity = 1 },
+	} :: { [string]: { Zone: number, Load: number, Gravity: number } },
+	Mover = 1.35,
+	Steadied = 1.3,
+	Weight = 0.04,
+	Fragile = 0.2,
+	Motion = { StillAt = 1.5, Still = 0.3, Speed = 0.7, SpeedMax = 2, Turn = 0.35, TurnFull = 3, Slope = 0.4, SlopeFull = 6, Air = 0.8, Bite = 1.2, BiteFull = 20, ShockMax = 2, Fade = 1 },
+	Grip = { Lift = 4, Gravity = 3.2, Rise = 1.6, Fall = 2, Bounce = 0.35, BounceMin = 0.12 },
+	Marker = { Dart = { 0.5, 1.6 } :: { number }, WildAt = 1.4, Reach = 0.38, Base = 0.3, Spring = 3.5, Damp = 2.6, Jitter = 0.8, Edge = 0.06 },
+	Meter = { Fill = 0.45, Drain = 0.28, Floor = 0.35, Start = 0.85, HeavyStart = 0.6, HeavyAt = 6, SteadySpeed = 1.1, SteadyOff = 0.85, Warn = 0.3 },
+	Step = 1 / 60,
+	MaxDt = 0.25,
+	Report = 1,
+	Server = { Wear = 0.008, WearFragile = 1.5, WearCap = 0.015, Gap = 1.5, Every = 0.7, SteadyOutside = 0.1, Slip = 0.06 },
+	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55, Tick = 0.5, TickEvery = 0.08, TickNotches = 50, Warning = 0.7 },
+}
+
 -- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside
 -- it): server/Moving.luau runs a move, shared/MovingRules.luau has its rules (tests/moving_test.luau), client/
 -- MovingHud.luau shows it. The art is shared/FurnitureLooks.luau, shared/HouseLayout.luau and server/HouseInterior.luau.
 --   Time / HordeAt    the move's clock (s) and when the horde comes (s left); Fade: the fade at a door (s)
 --   Contracts         the moves on the depot's board (home: a Map.Homes id, the house whose front door leads inside;
 --                     seed: shared/HouseLayout.luau plan's)
---   Truck             the company vehicle lent for a move (Config.Cars); Bed: its box inside (studs from the chassis'
---                     top middle: Center x / z, the floor at the chassis' top), the packing grid's Cell
+--   Van / Beds        7.x van moves (the owner: "the move should be driven with MY van"): no truck is lent any more, a
+--                     move uses its owner's own car (the ZDC Van, Van); Beds: the packing bed of a car by its id (its
+--                     cargo bay: studs from the chassis' middle, Center x / z its middle, the floor at the chassis' top,
+--                     the grid's Cell), a car without one the Van's. The ZDC Van's bay (server/Vehicles.luau
+--                     STYLES.zdcvan: the cargo box 6.6 wide, 4.5 tall, from the bulkhead at z -0.35 to the back doors at
+--                     z 6.3) less its walls: 6.2 × 6.4 × 4.3 round z 2.98; the old Moving Truck's box stays for a player
+--                     who still drives one. Hitch: a piece too big for any bed that may be towed (FurnitureLooks bigDoor:
+--                     the hay wagon) rides hitched behind the car, Gap studs behind its back (Back: the back's z), its
+--                     wheels on the ground (Drop: the chassis' middle over the ground). VanAgain: s after the van was
+--                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
---                     drop-off ("the Wall"); a truck within DropRadius of it with a load ends the move
+--                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
+--                     trip; the move goes on until the owner's FINISH or the clock)
 --   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair, drag
 --   Damage            shares of a thing's condition: a fall over SafeDrop studs (over a jump's top, about 7) PerStud a
 --                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
@@ -5782,6 +6111,30 @@ Config.ItemModel = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
+--                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
+--                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
+--                     sides against the walls and the things beside it − Flush × the share of its edge level with its
+--                     neighbours' tops + Waste × the air left under it (a share of its own room) + Base × its base +
+--                     Side × its distance from the nearer side wall + Depth × its middle's distance from the cab
+--                     (studs) + Dead × a sliver over it under Headroom studs (nothing goes there) + High × all the room
+--                     over a fragile thing (it rides on top), both a share of its height. The fill counts a cell up to
+--                     the roof when no flat Probe-stud square with Headroom over it covers it (Headroom 1.1: the
+--                     smallest thing, the kitchen radio, is 1.1 tall). Lie: a both / pair piece with no place standing
+--                     lies on its side (Placement.lying; server/Moving.luau's bedFrame rolls its model). Repack: a thing
+--                     with no room as the bed is: the movers pack everything again, the biggest first (Load welds the
+--                     moved models anew; the Load prompt says "won't fit" only when even that fails)
+--   7.x farm move (chapter 1, Walt's Farm): a contract may have its own clock (time, hordeAt: s, over Time / HordeAt)
+--                     and pay (pay: × the move's pay); a contract of kind "farm" stands at a Map.Places place (place,
+--                     its site in Sites) instead of a Map.Homes house (home). It opens once its chapter's (shared/
+--                     MoveStory.luau) chapters before it are done (the save's story flags "done:<chapter>")
+--   Sites             a place's site (studs in the place's own frame from its Map.Places point: +X east, +Z south as
+--                     the place stood before map step 2, Map.Relocations' turn turns them with it): Doors, in the plan's
+--                     exits' order (exits[1] the farmhouse's front door, exits[2] the barn doors): At the door's foot
+--                     outside, Facing out of it, Width, Name (the hints'); Curb: studs out of a door to the truck's
+--                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
+--                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
+--                     depth; its front door is Doors[1])
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -5798,9 +6151,40 @@ Config.Moving = {
 			kind = "house",
 			blurb = "Prologue: Marge's family house on Willow Lane. Get her things out before the Wall closes.",
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string, seed: number, kind: string, blurb: string } },
-	Truck = "movingtruck",
-	Bed = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+		-- 7.x farm move: chapter 1 "Hold Your Horses" (seed 1921: the Silver Spur's mark; its ★ pieces are Thunder's
+		-- saddle, the branding iron and Grandma's milk churn, as shared/MoveStory.luau's keepsakes say)
+		{
+			id = "walt",
+			name = "Walt's Farm",
+			client = "Walt",
+			icon = "🐴",
+			place = "farm", -- Map.Places: the Old Farm (its site: Sites.farm)
+			seed = 1921,
+			kind = "farm",
+			blurb = "Chapter 1: Walt's farm, the house and the barn. The hay wagon only fits through the barn doors.",
+			time = 14 * 60,
+			hordeAt = 3.5 * 60,
+			pay = 1.25,
+		},
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? } },
+	Sites = {
+		farm = {
+			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
+			Doors = {
+				{ Id = "house", Name = "front door", At = { 45, -76 } :: { number }, Facing = { 0, 1 } :: { number }, Width = 4 },
+				{ Id = "barn", Name = "barn doors", At = { -60, -64.4 } :: { number }, Facing = { 0, 1 } :: { number }, Width = 12 }, -- (World's barn: its doors' face)
+			},
+			Curb = 16,
+			Out = 4,
+		},
+	} :: { [string]: { House: { At: { number }, Size: { number } }, Doors: { { Id: string, Name: string, At: { number }, Facing: { number }, Width: number } }, Curb: number, Out: number } },
+	Van = "zdcvan",
+	Beds = {
+		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.4, Center = { 0, 2.98 } :: { number } }, -- (Cell 0.4: its whole 6.4 length, 15 × 16 cells)
+		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
+	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number } } },
+	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
+	VanAgain = 20,
 	Board = { 44, 12 } :: { number },
 	DropOff = { 34, 46 } :: { number },
 	DropRadius = 20,
@@ -5824,10 +6208,12 @@ Config.Moving = {
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
 	Slots = 6,
 	Tick = 0.2,
+	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 }
 
--- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the four roles.
--- shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
+-- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the
+-- owner took the Technician out: no locked front door, no fuse box, the house is lit from the start; the client greets
+-- the crew at the door instead: Config.MoveGreeters). shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
 -- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
 -- show them.
 --   Order             the roles, in the lobby's order (a newcomer gets the first free one)
@@ -5845,18 +6231,14 @@ Config.Moving = {
 --                     Barricades a move, each Hp (Bite hp a second off it for every zombie within Reach) for Life s, put
 --                     up outside within Near of the house's door (off the road, clear of cars and players); XRay: the
 --                     zombies outlined through walls within this (client/EnemyOutline.luau)
---   Tech              the front door is locked (a contract with keys = true: not): Pick s to pick it (quiet), Kick s
---                     for anybody to kick it in (loud: KickZombies come, Near … Far from the door); Fuse s at the fuse
---                     box (the garage) and the interior's lights come on
---   Chat              the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
+--   Chat             the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
 Config.MoveRoles = {
-	Order = { "driver", "mover", "guard", "tech" } :: { string },
+	Order = { "driver", "mover", "guard" } :: { string },
 	Switch = 30,
 	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
 	Driver = { TruckDamage = 0.6, Curb = 5, Near = 25 },
 	Mover = { Alone = 0.6, Carry = 1.15, Climb = 0.75, Rise = 0.35, Hold = 0.8 },
 	Guard = { Damage = 1.5, Range = 150, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 40, XRay = 60 },
-	Tech = { Pick = 3, Kick = 1.2, KickZombies = 4, Near = 40, Far = 90, Fuse = 5 },
 	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
 }
 
@@ -5879,9 +6261,21 @@ Config.MoveRoles = {
 --   Grid               the reachability check's step (every piece must get out of the front door, carried)
 --   Slot               the interiors' places, far off the map (Map.Bounds): Origin { x, y, z }, Spacing along X
 --   Ground             the safety floor under an interior: this far round the house, this deep under its floor
---   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau)
---   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom)
+--   InteriorMaxParts   an interior's parts at most, its furniture included (tests/houseinterior_test.luau; 7.x alpine:
+--                      620, was 600: the chalet's beams, Kachelofen, corner bench and shelf, lace, painted front door,
+--                      antlers and pictures add about 30 parts, the one plank floor, the tiled bathroom walls, the one sink
+--                      run and the handle-less cabinets win back about 16; seeds 1-1000: the busiest 614 (was 599), on
+--                      average 558 (was 539))
+--   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom); 7.x alpine:
+--                      a warmer Color
 --   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
+--   Alpine             7.x, a house's inside as a chalet's (shared/HouseLayout.luau places, server/HouseInterior.luau draws):
+--                      Stove the living room's Kachelofen (along its wall, tall, deep: its bench in front included); Bench
+--                      the kitchen's corner bench (its long leg on the outer wall, its short leg on the back wall, deep,
+--                      tall with its back); Shelf the Herrgottswinkel's corner shelf over it (its legs, its height over the
+--                      floor); Wainscot the wood panelling's height on the walls; Decor the wall decor's bottom over the
+--                      floor (over every piece), Picture and Antlers their size (wide, tall, deep); Beam a ceiling beam's
+--                      thickness, BeamRows the beams across a row of rooms
 Config.Furniture = {
 	MaxParts = 30,
 	Ceiling = 12,
@@ -5906,9 +6300,75 @@ Config.Furniture = {
 	Grid = 0.5,
 	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
 	Ground = { Margin = 24, Depth = 4 },
-	InteriorMaxParts = 600,
-	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 236, 204 } :: { number } },
+	InteriorMaxParts = 620,
+	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 218, 168 } :: { number } },
 	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
+	Alpine = {
+		Stove = { 6, 6.6, 3.2 } :: { number },
+		Bench = { 7, 2.4, 1.6, 3.4 } :: { number },
+		Shelf = { 2.2, 4.9 } :: { number },
+		Wainscot = 3.8,
+		Decor = 7.6,
+		Picture = { 2.6, 2.0, 0.2 } :: { number },
+		Antlers = { 2.6, 2.0, 0.6 } :: { number },
+		Beam = 0.9,
+		BeamRows = 2,
+	},
+	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
+	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:
+	--   HouseWidth / HouseDepth   the farmhouse (an even width); Hall: its mud room, a hall straight through it from the
+	--                             front door to the BackDoor (that wide) into the yard; Kitchen / Pantry: those rooms'
+	--                             depth behind the Stube and the bedroom
+	--   StoveClear                the Stube's door to the kitchen stays this far from the Stube's outer wall (its
+	--                             tiled stove, the Kachelofen, stands in that corner)
+	--   Yard                      the yard's depth (open to the sky; its fences Fence high, an invisible wall over them
+	--                             up to Barrier)
+	--   BarnDepth / Threshing / Stable / Workshop   the barn's depth and its three rooms' widths (the threshing floor in
+	--                             the middle, an even width); BarnCeiling: its rooms' height
+	--   BarnDoor / BarnDoorHeight the barn doors (the second exit, in the threshing floor's back wall: a bigDoor piece
+	--                             leaves only there); BarnOpening: the doorways from the yard and inside the barn
+	--   Stalls / Stall / StallWall   the stable's horse stalls along its back wall: how many, { width, depth }, the
+	--                             partitions' height; Loft: the hay loft's floor over the stable (decor); Beam: the tie
+	--                             beams' underside
+	--   BarnWindow / BarnSill     the barn's small windows (width, height) and their sill
+	--   Spots / Stars             the farm's pieces (at least, at most) and its ★ ones (the sentimental first)
+	--   InteriorMaxParts / Lights an interior's parts and lights at most (tests/farminterior_test.luau)
+	--   Lantern                   the barn's hanging lanterns' light; BarnLight: the daylight through the barn doors;
+	--                             Apron: the ground outside them (like the porch)
+	Farm = {
+		HouseWidth = { 40, 44 } :: { number },
+		HouseDepth = { 28, 32 } :: { number },
+		Hall = 10,
+		Kitchen = { 12, 14 } :: { number },
+		Pantry = { 9, 11 } :: { number },
+		BackDoor = 6,
+		StoveClear = 8.5,
+		Yard = { 14, 18 } :: { number },
+		Fence = 7,
+		Barrier = 24,
+		BarnDepth = { 32, 35 } :: { number },
+		Threshing = { 20, 24 } :: { number },
+		Stable = { 21, 23 } :: { number },
+		Workshop = { 15, 18 } :: { number },
+		BarnCeiling = 20,
+		BarnDoor = 12,
+		BarnDoorHeight = 13,
+		BarnOpening = 10,
+		Stalls = 3,
+		Stall = { 6.5, 9 } :: { number },
+		StallWall = 5,
+		Loft = 11,
+		Beam = 14,
+		BarnWindow = { 3, 2.5 } :: { number },
+		BarnSill = 7,
+		Spots = { 22, 30 } :: { number },
+		Stars = 3,
+		InteriorMaxParts = 700,
+		Lights = 12,
+		Lantern = { Brightness = 1.1, Range = 30, Color = { 255, 206, 140 } :: { number } },
+		BarnLight = { Brightness = 1.6, Range = 22, Color = { 255, 246, 226 } :: { number } },
+		Apron = 6,
+	},
 }
 
 -- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
@@ -5916,12 +6376,13 @@ Config.Furniture = {
 -- out from server/Moving.luau's MoveStory hook). The limits keep every text inside its card (movestory_test.luau):
 --   Limits      characters at most: a chapter's Title, Place and Client name, its Hook (the CHAPTERS detail), the
 --               client's Blurb, a story card's Line (the intro, a briefing, the radio's Taunt), a Keepsake's story,
---               Marge's phone Text (the dispatch at START, the debrief at the end) and the result card's Quote (thanks)
+--               Marge's phone Text (the dispatch at START, the debrief at the end), the result card's Quote (thanks)
+--               and a greeter's Bubble (the speech bubbles of server/MoveGreeters.luau: MoveStory's greeter section)
 --   Briefing    a briefing's lines (at least, at most); Intro: Marge's intro cards (at least, at most)
 --   Great       a move done with this many stars or more is "great" (its debrief and thanks), with fewer "ok"
 --   Guard       s after a story card opens before Space / Enter / A turn it (client/DialogKeys.luau)
 Config.MoveStory = {
-	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110 },
+	Limits = { Title = 24, Place = 32, Client = 24, Hook = 240, Blurb = 120, Line = 130, Keepsake = 90, Text = 130, Quote = 110, Bubble = 60 },
 	Briefing = { 3, 5 } :: { number },
 	Intro = { 3, 4 } :: { number },
 	Great = 4,
@@ -5930,23 +6391,47 @@ Config.MoveStory = {
 
 -- 7.0, the depot's helper ("Danny from the depot": server/MoveHelper.luau, his decisions shared/MoveHelperBrain.luau,
 -- tests/movehelper_test.luau; the owner: solo play is allowed with an AI helper). An NPC mover who joins a move whose
--- crew is one player: he carries the one-hand things to the truck and takes the other end of a two-person thing.
+-- crew is one player: he takes the other end of your two-person piece (and the other side of a heavy two-hands one),
+-- carries the one-hand and two-hands pieces to the van on his own and opens its back. 7.x (the owner: "he helps
+-- weirdly, mainly we don't carry anything together"): a partner who carries with you.
 --   Solo / Duo         a crew of one / of two players gets him (Duo: off)
 --   Name / Title       his name tag
---   Health / Respawn   his health; at 0 he drops what he holds and is back at the truck Respawn s later
---   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a thing:
---                      slower than a player
---   KeepUp / Flee      × the pair's carry speed he may walk holding his end (to keep up); × the walk running away
---   Tick / Think / Repath   s between his steps / his looks for the next thing / two paths (PathfindingService)
---   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpWait: s stuck on the way,
---                      or too far from his end while carrying, before the player drags it alone; HelpRetry: s before he
---                      tries that lift again
---   HelpReach / PickReach   studs from a thing's edge he takes its end / picks it up; LoadReach: from the truck's back
---                      he loads; DoorReach: from a door he goes through it
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
+--   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
+--                      slower than a player; Sprint: × the walk on his way to your lift (or the other side of your piece)
+--   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
+--   Tick / Think / Repath   s between his steps / his looks for the next piece / two paths (PathfindingService)
+--   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpRetry: s before he tries
+--                      a lift again whose take failed
+--   BlinkFar / HelpBlink   your lift farther than BlinkFar studs on foot, his path failing, or not there HelpBlink s after
+--                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it
+--   Standoff / HoldStep / HoldSnap   his root stands Standoff studs past your piece's far face, turned to you, on the
+--                      floor there within HoldStep studs of your root's height (stairs, steps); farther than HoldSnap
+--                      from that place (a door's fade): put there at once
+--   HoldSpeed / HoldResponse   the constraints that keep him there (AlignPosition / AlignOrientation on his root):
+--                      the most studs/s, their Responsiveness; his own walk is off meanwhile (Npcs.carried)
+--   ThreeAfter         s after "Got the other end!" he says "On three... lift!"
+--   DoorWarn / VanSay  carrying with you: the piece this near a doorway: "Watch the doorframe!"; this near the van's
+--                      back: "That's going in the van." (its back shut: he opens it for the two of you, OpenBack)
+--   HelpReach / PickReach   studs from your piece's far end he takes it / from a piece's edge he picks it up; LoadReach:
+--                      from the van's back he loads; DoorReach: from a door he goes through it
+--   Reserve            studs: a crew player with free hands this near a piece (and nearer than he is) is about to lift
+--                      it: he leaves it to them ("All yours, boss.")
+--   TripBase           studs added to every trip when he ranks the pieces (★ first, then the value a second of the trip)
+--   AssistWeight / AssistFar / AssistBack   a two-hands piece this heavy or heavier that a crew player carries alone
+--                      within AssistFar studs (not within AssistBack of the van's back): he takes its other side (the
+--                      pair's walk for both)
+--   OpenBack / OpenNear / OpenFar   may he open the van's back himself (else he asks); somebody of the crew coming with
+--                      a piece within OpenNear studs of the shut back while he is within OpenFar of it: he opens it
 --   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
---   WaitShut           s he waits with a thing at the truck's shut back before he sets it down beside it
---   StuckSnap / Far    s without progress before he appears at his way's next point; studs away he appears at once
---   TruckFar           studs from the house: a truck farther away is driving off (he waits at the house's door)
+--                      (never while he holds the other end of your piece)
+--   WaitShut           s he waits with a piece at the van's shut back (when he may not open it) before he sets it down
+--   StuckRepath / StuckSnap / Far   s without progress before a new path / before he appears at his way's next point;
+--                      studs away he appears at once
+--   Aside              doorways he keeps clear of when he stands somewhere: within the door's half width + Margin
+--                      along its wall and Depth (FrontDepth at the front door outside) through it, his place moves Step
+--                      past its edge, Off at least from the wall
+--   TruckFar           studs from the house: a van farther away is driving off (he waits at the house's door)
 --   TalkGap / TalkRepeat   s at least between two lines / before the same line again
 --   Follow / Orders    studs behind you on "Help me"; the orders (the Moving remote's "helper") a player may send a second
 Config.MoveHelper = {
@@ -5957,24 +6442,44 @@ Config.MoveHelper = {
 	Health = 100,
 	Respawn = 15,
 	Speed = 0.7,
+	Sprint = 1.5,
 	KeepUp = 1.2,
 	Flee = 1,
 	Tick = 0.1,
-	Think = 0.5,
+	Think = 0.25,
 	Repath = 1,
 	HelpFar = 140,
-	HelpWait = 3,
 	HelpRetry = 8,
-	HelpReach = 3,
+	BlinkFar = 40,
+	HelpBlink = 1.6,
+	Standoff = 0.6,
+	HoldStep = 2.5,
+	HoldSnap = 6,
+	HoldSpeed = 60,
+	HoldResponse = 200,
+	ThreeAfter = 1.2,
+	DoorWarn = 4,
+	VanSay = 12,
+	HelpReach = 2.5,
 	PickReach = 3,
 	LoadReach = 5,
 	DoorReach = 3.5,
+	Reserve = 8,
+	TripBase = 30,
+	AssistWeight = 4,
+	AssistFar = 45,
+	AssistBack = 10,
+	OpenBack = true,
+	OpenNear = 30,
+	OpenFar = 30,
 	FleeRange = 14,
 	SafeRange = 24,
 	FleeStep = 18,
 	WaitShut = 8,
+	StuckRepath = 2,
 	StuckSnap = 4,
 	Far = 120,
+	Aside = { Margin = 1, Depth = 2.5, FrontDepth = 6, Step = 2.4, Off = 1.2 },
 	TruckFar = 150,
 	TalkGap = 3,
 	TalkRepeat = 12,
@@ -6016,6 +6521,40 @@ Config.MoveSites = {
 	TextRange = 90,
 }
 
+-- 7.0, the greeters (the owner: "there will be NPCs who sort of welcome you"): server/MoveGreeters.luau's people, their
+-- words shared/MoveStory.luau's greeter section (tests/movegreeters_runtime_test.luau). Studs and seconds.
+--   Porch      where a move's client stands from its start: { x, z } in the house door's frame (shared/MoveSiteLooks.luau
+--              doorPlace: +X right, -Z out to the street): beside the door, off the path (its ±2.4 studs), clear of
+--              the packed boxes and the yard sign
+--   Hello      the first crew member this near her: she turns to them, waves and says her hello lines LineGap s apart,
+--              then holds a hand out to the open door (once a move)
+--   Star       a ★ thing carried this near her: her "Careful with that!" (each ★ thing once, StarAgain s at least apart)
+--   Leave      the truck stood within Near of the house's door, then drove past Far with a load: her thanks (LeaveAgain s
+--              at least apart)
+--   Gap        s at least between two lines of hers (a reaction waits behind her hello)
+--   Soldier    the soldier at the Wall's checkpoint, always there: Name, Title, At { x, z } from the drop-off's middle
+--              (Config.Moving.DropOff: north of the booth's sandbags, off the bay and the people's walk line), facing the
+--              bay; a move delivered with its truck within Greet of the drop-off: he turns to it, waves and welcomes it
+--   Kiosk      Marge at the Moving contracts kiosk (server/Tutorial.luau's dispatcher at the depot: never a second Marge):
+--              a player on foot and on no move who comes within Near of its corkboard: her line, her bubble seen from
+--              Hear studs (she stands by the job board) and the player's notice; once per player every Again s
+--   Tick       s between two steps of the greeters' loop (the kiosk, the soldier's body); Respawn: s between two looks
+--              for a body that went (the soldier's, the dispatcher's)
+Config.MoveGreeters = {
+	Porch = { -4.4, -3.0 } :: { number },
+	Hello = 25,
+	LineGap = 2.6,
+	Star = 30,
+	StarAgain = 20,
+	Leave = { Near = 60, Far = 110 },
+	LeaveAgain = 90,
+	Gap = 2,
+	Soldier = { Name = "Private Reyes", Title = "The Wall · Checkpoint 01", At = { 13.3, -3.4 } :: { number }, Greet = 32 },
+	Kiosk = { Near = 14, Hear = 120, Again = 180 },
+	Tick = 0.4,
+	Respawn = 5,
+}
+
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:
 -- jobs are the grind, you save up for something, then progress in the missions). The tables above keep the old base
 -- prices; this one pass, run once here, multiplies every `price` (and the upgrade tracks' baseCost) by its kind's
@@ -6025,6 +6564,8 @@ Config.MoveSites = {
 -- reward-only things stay unsold. Kept as they were (×1): the real estate and the company (the endgame already),
 -- the old backpacks' payback (Config.RetiredKit), fuel, the repair shop's fee and the board's reroll fee.
 --   Vehicles  the dealer's cars and Earl's Old Van      Bikes    the bikes and the E-Scooter
+--             (7.x: no car is sold any more; the pass still prices Config.AmbientCars: what a save that owned one gets
+--             back, Economy.carRefund)
 --   Stages    Wrench Garage's stages                    Upgrades Wrench Garage's tracks (baseCost)
 --   Guns      Lead & Co.'s guns                         CarGuns  the car guns
 --   Gear      the car and bike gear                     Kit      the vests, the bat (6.23: a bag's price is set
@@ -6061,14 +6602,19 @@ end
 
 do -- 6.19: the one pass over the tables (see Config.Prices)
 	local P, priced = Config.Prices, Config.priced
-	for _, def in Config.Cars do
-		def.price = priced(def.price, if def.bike then P.Bikes else P.Vehicles)
-		local stages = def.stages
-		if stages then
-			for _, stage in stages do
-				stage.price = priced(stage.price, P.Stages)
+	for _, list in { Config.Cars, Config.AmbientCars } do
+		for _, def in list do
+			def.price = priced(def.price, if def.bike then P.Bikes else P.Vehicles)
+			local stages = def.stages
+			if stages then
+				for _, stage in stages do
+					stage.price = priced(stage.price, P.Stages)
+				end
 			end
 		end
+	end
+	for _, def in Config.AmbientCars do
+		def.ambient = true -- 7.x: a body for the world, never a player's car (Economy.isPlayerCar)
 	end
 	for _, def in Config.Upgrades do
 		def.baseCost = priced(def.baseCost, P.Upgrades)

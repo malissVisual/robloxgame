@@ -38,13 +38,32 @@ export type Payout = {
 	total: number,
 }
 
+-- A vehicle's def: a player's (Config.Cars: 7.x the ZDC Van and the bikes) or a body the world builds (7.x:
+-- Config.AmbientCars, the cars nobody owns any more: the traffic, the buses, the bandits). Economy.isPlayerCar tells them
+-- apart.
 function Economy.findCar(id: string): Config.CarDef?
-	for _, car in Config.Cars do
-		if car.id == id then
-			return car
+	for _, list in { Config.Cars, Config.AmbientCars } do
+		for _, car in list do
+			if car.id == id then
+				return car
+			end
 		end
 	end
 	return nil
+end
+
+-- 7.x, one car: may a player have this vehicle (Config.Cars: the ZDC Van and the bikes), not a body of
+-- Config.AmbientCars? Owning, buying, equipping and calling all ask this.
+function Economy.isPlayerCar(id: string?): boolean
+	if type(id) ~= "string" then
+		return false
+	end
+	for _, car in Config.Cars do
+		if car.id == id then
+			return true
+		end
+	end
+	return false
 end
 
 -- (6.0: nil = no gun, a new courier's fists: nil)
@@ -517,7 +536,7 @@ function Economy.roomAdvice(carId: string, stage: number, need: number): string
 		end
 	end
 	if #names == 0 then
-		return "None of the dealer's cars holds that much."
+		return "No car holds more (7.x: the ZDC Van is the only one): a Roof Rack at Wrench Garage takes two more light pieces."
 	end
 	return `That needs a bigger vehicle: the {table.concat(names, " or the ")} (your garage, or Dead End Motors).`
 end
@@ -581,7 +600,7 @@ function Economy.ramGuard(upgrades: Upgrades): number
 end
 
 -- 6.7: do you own a car (any vehicle in `cars` that is not a bike: your own or an employer's)? The car-only items
--- (Config.Items car) need one.
+-- (Config.Items car) need one. (7.x: everybody owns the ZDC Van, so they show for everybody.)
 function Economy.ownsCar(cars: { [string]: boolean }?): boolean
 	if type(cars) ~= "table" then
 		return false
@@ -609,6 +628,161 @@ function Economy.itemsFor(cars: { [string]: boolean }?): { Config.ItemDef }
 		end
 	end
 	return list
+end
+
+-- ── 7.x, one car (Config.CompanyVan) ───────────────────────────────────────────
+-- Every courier owns the ZDC Van; every other car left the game (Config.AmbientCars). A real save from before (its money
+-- is set, no Config.CompanyVan.Flag) is put right once by server/PlayerData.luau with these:
+
+-- 7.2 review: was this save put right already? Its Config.CompanyVan.Flag, or the same mark in its `rewards`: an older
+-- build (main before 7.x) drops the fields it does not know when it saves, but keeps a short key there, so a save that
+-- went through an older server is not paid again (server/PlayerData.luau writes both).
+function Economy.vanMigrated(saved: any): boolean
+	local flag = Config.CompanyVan.Flag
+	return type(saved) == "table" and (saved[flag] == true or (type(saved.rewards) == "table" and saved.rewards[flag] == true))
+end
+
+-- The money a save gets back for the cars it owned, and their names (in Config order): every car of Config.AmbientCars
+-- it owned at its price as sold (`price`: the 6.19 knob in it) plus the stages it had bought on it (stage 1 up to its
+-- saved carUpgrades[id].stage, at today's prices). An employer's free vehicle (price 0) pays nothing. 7.2 review: the
+-- ZDC Van never (every courier's for free now), and Earl's Old Van its price only when it was bought from him
+-- (vanQuest "done"; before 5.0 it was the free starter), its stages always. Anything else (a new profile, a save put
+-- right already: vanMigrated): 0, none.
+function Economy.carRefund(saved: any): (number, { string })
+	local names: { string } = {}
+	if type(saved) ~= "table" or saved.money == nil or Economy.vanMigrated(saved) or type(saved.cars) ~= "table" then
+		return 0, names
+	end
+	local money = 0
+	for _, def in Config.AmbientCars do
+		if saved.cars[def.id] ~= true or def.bike or def.price <= 0 then
+			continue -- (not owned, or an employer's free vehicle)
+		end
+		local paid = if def.id == "van" and saved.vanQuest ~= "done" then 0 else math.floor(def.price)
+		local levels = if type(saved.carUpgrades) == "table" then saved.carUpgrades[def.id] else nil
+		local stage = if type(levels) == "table" then levels.stage else nil
+		local bought = if type(stage) == "number" and stage == stage then math.clamp(math.floor(stage), 0, Economy.maxStage(def.id)) else 0
+		for n = 1, bought do
+			local stageDef = Economy.stageDef(def.id, n)
+			paid += if stageDef then math.max(0, stageDef.price) else 0
+		end
+		if paid > 0 then
+			money += paid
+			table.insert(names, def.name)
+		end
+	end
+	return money, names
+end
+
+-- 7.2 review: an employer gave their vehicle after `needed` jobs (until 7.x; gone with the cars). A save that had earned
+-- one (rep there at `needed` or more) gets that employer's bonus instead, once (server/Jobs.luau pays it only at the job
+-- that reaches `needed`). Anything else (a new profile, a save put right already: vanMigrated): 0.
+function Economy.employerBonus(saved: any): number
+	if type(saved) ~= "table" or saved.money == nil or Economy.vanMigrated(saved) or type(saved.rep) ~= "table" then
+		return 0
+	end
+	local money = 0
+	for _, employer in Config.Employers do
+		local done = saved.rep[employer.id]
+		if type(done) == "number" and done == done and done >= employer.needed then
+			money += math.max(0, math.floor(employer.bonus or 0))
+		end
+	end
+	return money
+end
+
+-- What the ZDC Van takes over from the cars of the same save (nil for a save carRefund skips): every car track
+-- (Config.Upgrades car) at the highest level any car it owned had; every piece of car gear one of them had that fits the
+-- van ("installed" when it was installed on one; server/PlayerData.luau installs no more than the van's slots); the
+-- paint and the roof gun of the car it drove (`car`, else `lastCar`), else the van's own, else the first car in Config
+-- order that had one. `retired`: how many cars it owned that are gone (bikes and the van not counted). 7.2 review:
+-- `lost`, what the van could not take over, as sold (today's prices), paid back with the cars: the car tracks' levels
+-- over the ones it keeps (a track's highest on one car), every roof gun but the one it gets, every copy of a piece of
+-- gear but one and gear it cannot take (only what the car it was on could hold: what an older load kept).
+export type VanCarry = { levels: Upgrades, gear: { [string]: string }, paint: string?, gun: string?, retired: number, lost: number }
+
+function Economy.vanCarry(saved: any): VanCarry?
+	if type(saved) ~= "table" or saved.money == nil or Economy.vanMigrated(saved) or type(saved.cars) ~= "table" then
+		return nil
+	end
+	local van = Config.CompanyVan.Car
+	local order: { string } = {}
+	local seen: { [string]: boolean } = {}
+	local out: VanCarry = { levels = {}, gear = {}, paint = nil, gun = nil, retired = 0, lost = 0 }
+	-- (7.2 review: the money `level` levels of a track cost, as sold today)
+	local function track(id: string, level: number): number
+		local cost = 0
+		for n = 0, level - 1 do
+			cost += Economy.upgradeCost(id, n) or 0
+		end
+		return cost
+	end
+	local function push(id: any)
+		local def = if type(id) == "string" and saved.cars[id] == true then Economy.findCar(id) else nil
+		if def and not def.bike and not seen[def.id] then
+			seen[def.id] = true
+			table.insert(order, def.id)
+			if def.id ~= van then
+				out.retired += 1
+			end
+		end
+	end
+	push(saved.car)
+	push(saved.lastCar)
+	push(van)
+	for _, list in { Config.Cars, Config.AmbientCars } do
+		for _, def in list do
+			push(def.id)
+		end
+	end
+	local function field(name: string, id: string): any
+		local list = saved[name]
+		return if type(list) == "table" then list[id] else nil
+	end
+	for _, id in order do
+		local levels = field("carUpgrades", id)
+		if type(levels) == "table" then
+			for _, def in Config.Upgrades do
+				local level = levels[def.id]
+				if def.car and type(level) == "number" and level == level and level >= 1 then
+					local bought = math.min(math.floor(level), def.maxLevel)
+					out.levels[def.id] = math.max(out.levels[def.id] or 0, bought)
+					out.lost += if Economy.canUpgrade(id) then track(def.id, bought) else 0 -- (the van's own taken off below)
+				end
+			end
+		end
+		local gear = field("carGear", id)
+		if type(gear) == "table" then
+			for _, def in Config.Gear do
+				local value = gear[def.id]
+				if value == "installed" or value == "owned" then
+					local takes = Economy.gearFits(van, def.id)
+					if (not takes or out.gear[def.id] ~= nil) and Economy.gearFits(id, def.id) then
+						out.lost += math.max(0, def.price) -- (7.2 review: a second copy, or gear the van cannot take)
+					end
+					if takes and out.gear[def.id] ~= "installed" then
+						out.gear[def.id] = value
+					end
+				end
+			end
+		end
+		local paint = field("carPaint", id)
+		if out.paint == nil and type(paint) == "string" and Economy.findPaint(paint) then
+			out.paint = paint
+		end
+		local gun = field("carGuns", id)
+		local gunDef = if type(gun) == "string" then Economy.findCarGun(gun) else nil
+		if gunDef and out.gun == nil then
+			out.gun = gunDef.id
+		elseif gunDef and Economy.canMount(id) then
+			out.lost += math.max(0, gunDef.price) -- (7.2 review: a roof gun the van does not get)
+		end
+	end
+	for id, level in out.levels do
+		out.lost -= track(id, level) -- (7.2 review: what the van keeps is no loss)
+	end
+	out.lost = math.max(0, math.floor(out.lost + 0.5))
+	return out
 end
 
 -- 6.7: is a Config.Weapons gun a reward only (an employer's, a campaign's, the secrets' or the challenges'), never sold?

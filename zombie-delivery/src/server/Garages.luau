@@ -12,6 +12,9 @@
 -- car anywhere.
 -- 5.1.1: no bikes here (CarDef.bike: the bikes and the E-Scooter need no garage slot; you switch them at the BIKES counter
 -- or with the phone's MY BIKE): the window leaves them out and "take" refuses one.
+-- 7.x, one car (Config.CompanyVan): the window lists the ZDC Van, kept at the depot lot and at every garage of yours
+-- (Config.Cars[1], the starting van); TAKE OUT puts it at the door there. The cars that are gone are never listed
+-- (Config.Cars holds only the van and the bikes).
 --
 -- The "Garage" remote (shared/Net.luau):
 --   client → server  ("take", car id)  take that car out here
