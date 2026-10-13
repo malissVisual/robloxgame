@@ -46,7 +46,12 @@ with tempfile.TemporaryDirectory() as tmp:
     # its shared modules the copies above, the recorder's `game`.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseInterior.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
     open(os.path.join(tmp, "HouseInterior.luau"), "w", encoding="utf-8").write(prefix + "local game = M.game\n" + source)
+    # Its server/FurnitureMesh.luau (the owner's Blender furniture: no import in the recorder, so FurnitureLooks' look).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "FurnitureMesh.luau"), encoding="utf-8").read()
+    source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
+    open(os.path.join(tmp, "FurnitureMesh.luau"), "w", encoding="utf-8").write(prefix + "local game, workspace = M.game, M.workspace\n" + source)
     # 6.23 (Codex's codex/cargo-missions-fix): the real server/Cargo.luau as CargoServer.luau for
     # tests/cargo_runtime_test.luau: its server modules, Net and services from tests/runtime/CargoRuntime.luau (on the
     # same recorder as CargoLooks), its shared modules the copies above.

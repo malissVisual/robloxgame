@@ -22,12 +22,15 @@
 -- 7.0 review: the windows' panes and the porch's daylight wall are the hour's: their daylight glow by day, a dark night
 -- sky (no glow, the porch's light dim and moon blue) while the server's workspace attribute Night is on (read at the
 -- build, then one listener for every interior standing: a few dozen parts, only when it turns).
+-- The owner's Blender furniture (design/blender-furniture/): once ZDCFurnitureArt is imported, server/FurnitureMesh.luau
+-- dresses each piece in its models (the Root, its welds and its labels stay; without the import FurnitureLooks' look).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local FurnitureLooks = require(Shared.FurnitureLooks)
+local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
 
 local T = Config.Furniture
@@ -491,6 +494,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	local pieces: { [number]: Model } = {}
 	for _, spot in plan.spots do
 		local piece = FurnitureLooks.build(spot.item, spot.variant)
+		FurnitureMesh.dress(piece, spot.item, spot.variant) -- (the owner's Blender models, once imported)
 		piece:PivotTo(origin * spot.at)
 		local root = piece.PrimaryPart
 		if root then
