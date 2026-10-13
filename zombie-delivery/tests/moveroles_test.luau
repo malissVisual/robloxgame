@@ -155,7 +155,7 @@ for _, line in MoveRoles.Chat do
 		break
 	end
 end
-check("the quick chat's six lines", #MoveRoles.Chat == 6 and lines[1] == "Hold the door" and lines[2] == "Need a hand here" and lines[3] == "Zombies!" and lines[4] == "Truck's here"
+check("the quick chat's six lines (\"hand\" calls Danny over)", #MoveRoles.Chat == 6 and MoveRoles.Chat[2].id == "hand" and lines[1] == "Hold the door" and lines[2] == "Need a hand here" and lines[3] == "Zombies!" and lines[4] == "Truck's here"
 	and lines[5] == "I'll come pick you up" and lines[6] == "Done — let's go")
 local worded = true
 for _, code in { "member", "role", "taken", "owner", "norole", "notready", "same", "cooldown", "driver", "called", "guard", "nomore", "tech", "picker", "lit", "open", "how" } do

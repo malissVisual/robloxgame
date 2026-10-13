@@ -387,6 +387,9 @@ end)
 check("…through the door too", inside)
 E.request(sol, "helper", "carry")
 check("SMALL STUFF again", danny.mode == "carry" and sol:GetAttribute("MoveHelper") == "carry")
+E.Net.get("MoveLobby").OnServerEvent:Fire(sol, "chat", 2)
+check("7.0 planning: \"Need a hand here\" in the quick chat calls him over (HELP ME)", danny.mode == "help" and sol:GetAttribute("MoveHelper") == "help")
+E.request(sol, "helper", "carry")
 
 -- The truck parked far off (driven somewhere else), then back by the house -------------------------------------------------------
 

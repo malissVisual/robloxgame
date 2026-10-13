@@ -39,7 +39,7 @@
 --     MoveRoles.newDoor(keys) / openDoor(door, role, how) -> ok, why, loud   the front door: "pick" (a Technician,
 --                                                  quiet) or "kick" (anybody, loud)
 --     MoveRoles.wear(hp, zombies, seconds)         a barricade's hp after `zombies` bit it for `seconds`
---   MoveRoles.Chat                                 the quick chat's six lines (an icon, the words)
+--   MoveRoles.Chat                                 the quick chat's six lines (an id, an icon, the words)
 --   MoveRoles.whyText(why)                         what the player is told
 
 local Config = require(script.Parent.Config)
@@ -107,13 +107,13 @@ MoveRoles.Roles = {
 
 -- The quick chat (client/QuickChat.luau: hold T): six lines, by number.
 MoveRoles.Chat = {
-	{ icon = "✋", text = "Hold the door" },
-	{ icon = "🙏", text = "Need a hand here" },
-	{ icon = "🧟", text = "Zombies!" },
-	{ icon = "🚚", text = "Truck's here" },
-	{ icon = "🏃", text = "I'll come pick you up" },
-	{ icon = "✅", text = "Done — let's go" },
-} :: { { icon: string, text: string } }
+	{ id = "door", icon = "✋", text = "Hold the door" },
+	{ id = "hand", icon = "🙏", text = "Need a hand here" }, -- (on a solo move: Danny, the depot's helper, comes: HELP ME)
+	{ id = "zombies", icon = "🧟", text = "Zombies!" },
+	{ id = "truck", icon = "🚚", text = "Truck's here" },
+	{ id = "pickup", icon = "🏃", text = "I'll come pick you up" },
+	{ id = "done", icon = "✅", text = "Done — let's go" },
+} :: { { id: string, icon: string, text: string } }
 
 function MoveRoles.get(id: any): Role?
 	return if type(id) == "string" then MoveRoles.Roles[id] else nil

@@ -5978,6 +5978,40 @@ Config.MoveHelper = {
 	Orders = 4,
 }
 
+-- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the
+-- safe zone, ZDC is ZDC Moving & Evacuation now): server/MoveSites.luau builds shared/MoveSiteLooks.luau's set pieces
+-- (tests/movesites_test.luau, tools/move-sites/check.py check them; tools/move-sites/render.py previews them): the
+-- Wall's checkpoint round the drop-off (Config.Moving.DropOff), the Moving contracts kiosk (Config.Moving.Board), each
+-- contract's house dressed for moving day, the depot's banner and a few evacuation spots in the city.
+--   Bay        the drop-off bay painted on the yard (width along X, depth along Z, round Config.Moving.DropOff): the truck
+--              drives in from Bone St, nothing stands in it
+--   Clear      studs over the walk the checkpoint's gantry sign hangs (the trucks pass under it)
+--   Truck      the army truck's middle (x, z from the drop-off's middle), parked west of the gate, its nose to the Wall
+--              (off the bay, the scooters' way out and the people's walk line round the block)
+--   Banner     the ZDC MOVING & EVACUATION banner under the depot's front canopy: its middle (X, Z studs from the depot's
+--              middle, Y over the walk), Width × Height, Hang (its ties up to the canopy)
+--   Spots      the evacuation spots (a poster board, abandoned moving boxes) on a block's kerb: the block (district, i,
+--              j), its side (n | e | s | w), studs along it from its middle (StreetProps' way: n, s along X, e, w along Z
+--              with the side's turn), Depth in from the curb; clear of the street props (tests/movesites_test.luau)
+--   Budget     parts in all of it at most; Lights the PointLights (the kiosk's lamp, the two floodlights)
+--   TextRange  studs the small text is drawn at least (SurfaceGui.MaxDistance: a big sign SignPerStud × its height,
+--              Config.Performance)
+Config.MoveSites = {
+	Bay = { 22, 18 } :: { number },
+	Clear = 13.5,
+	Truck = { -17.5, -4.9 } :: { number },
+	Banner = { X = 0, Y = 16.1, Z = -7.3, Width = 34, Height = 3.2, Hang = 1.6 },
+	Spots = {
+		{ district = "downtown", i = 2, j = -1, side = "s", along = 28 }, -- Bone St, across the avenue from the checkpoint
+		{ district = "downtown", i = 2, j = 2, side = "w", along = -24 }, -- the avenue south, just out of the safe zone
+		{ district = "suburbs", i = 2, j = 0, side = "n", along = 2 }, -- Willow Ln, next to Marge's
+	} :: { { district: string, i: number, j: number, side: string, along: number } },
+	Depth = 1.8,
+	Budget = 400,
+	Lights = 4,
+	TextRange = 90,
+}
+
 -- 6.19, prices as milestones (the owner: "make everything more expensive so they're real milestones"; the 6.14 design:
 -- jobs are the grind, you save up for something, then progress in the missions). The tables above keep the old base
 -- prices; this one pass, run once here, multiplies every `price` (and the upgrade tracks' baseCost) by its kind's

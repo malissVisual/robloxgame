@@ -33,6 +33,8 @@
 --   MoveHelper.useMover(m)     how he walks (a test's: the Luau CLI has no physics and no pathfinding)
 --   MoveHelper.nameOf(id)      his name by his id in a move's rules (nil: not a helper's id)
 --   MoveHelper.find(player)    the helper on this player's move (his state: tests, the admin)
+--   MoveHelper.order(p, mode)  7.0 planning: an order as the Moving remote's ("helper", mode) (server/Moving.luau: the
+--                              quick chat's "Need a hand here" is HELP ME); a locked front door: he waits outside it
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -972,6 +974,11 @@ local function onOrder(player: Player, action: any, mode: any)
 		say(h, `{mode}Mode`, clock, true)
 		tellCrew(h)
 	end
+end
+
+-- 7.0 planning: an order from elsewhere (server/Moving.luau: the quick chat's "Need a hand here" is HELP ME).
+function MoveHelper.order(player: Player, mode: string)
+	onOrder(player, "helper", mode)
 end
 
 -- Once: the zombies go after him too (Zombies.extraTargets, after server/Buddy.luau's), the orders, his loop.

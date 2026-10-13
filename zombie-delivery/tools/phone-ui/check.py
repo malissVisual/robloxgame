@@ -100,6 +100,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
     (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
+    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")  # 7.0 planning: the Guard's sight (MovingHud)
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "movestory.luau"):

@@ -381,7 +381,11 @@ local function invisible(name: string, size: Vector3, frame: CFrame, parent: Ins
 	return part
 end
 
-local function solid(name: string, size: Vector3, frame: CFrame, color: Color3, material: Enum.Material, parent: Instance): Part
+-- ── 7.0 planning: the roles (shared/MoveRoles.luau; their abilities further down) ──
+
+-- A plain anchored part (the roles' own things: the fuse box, the barricades' planks; the places' art is
+-- server/MoveSites.luau's).
+local function rolePart(name: string, size: Vector3, frame: CFrame, color: Color3, material: Enum.Material, parent: Instance): Part
 	local part = Instance.new("Part")
 	part.Name = name
 	part.Size = size
@@ -395,34 +399,24 @@ local function solid(name: string, size: Vector3, frame: CFrame, color: Color3, 
 	return part
 end
 
--- Words on a part's front face (-Z).
-local function words(part: BasePart, lines: { { text: string, color: Color3, size: number } })
+-- One line of words on a part's front face (-Z).
+local function roleSign(part: BasePart, text: string, color: Color3)
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 40
 	gui.LightInfluence = 0
 	gui.Parent = part
-	local list = Instance.new("UIListLayout")
-	list.FillDirection = Enum.FillDirection.Vertical
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	list.Padding = UDim.new(0, 6)
-	list.Parent = gui
-	for index, line in lines do
-		local label = Instance.new("TextLabel")
-		label.LayoutOrder = index
-		label.Size = UDim2.new(1, -20, 0, line.size + 8)
-		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.GothamBold
-		label.TextScaled = true
-		label.Text = line.text
-		label.TextColor3 = line.color
-		label.Parent = gui
-	end
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 0.4)
+	label.Position = UDim2.fromScale(0, 0.1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.Text = text
+	label.TextColor3 = color
+	label.Parent = gui
 end
-
--- ── 7.0 planning: the roles (shared/MoveRoles.luau; their abilities further down) ──
 
 local function newTeam(contract: Contract): Team
 	return {
@@ -472,29 +466,16 @@ local function climbOf(s: Session, spot: number): number
 end
 
 -- ── The places: the board, the drop-off, the houses' doors ─────────────────
-
-local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (the Moving Truck's)
-local INK = Color3.fromRGB(242, 242, 240)
+-- (their art: server/MoveSites.luau, shared/MoveSiteLooks.luau; the prompts and the rules stay here)
 
 local function dropOffAt(): Vector3
 	return Vector3.new(Map.Depot.x + T.DropOff[1], Map.WalkTop, Map.Depot.z + T.DropOff[2])
 end
 
 local function buildBoard(parent: Instance)
-	local model = Instance.new("Model")
-	model.Name = "MovingBoard"
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- (by the spawn, like the depot's own counters)
-	local base = Vector3.new(Map.Depot.x + T.Board[1], Map.WalkTop, Map.Depot.z + T.Board[2])
-	local frame = CFrame.lookAt(base, base + Vector3.new(-1, 0, 0)) -- facing the yard (-X)
-	for _, side in { -1, 1 } do
-		solid("Post", Vector3.new(0.4, 7, 0.4), frame * CFrame.new(side * 3.2, 3.5, 0.3), Color3.fromRGB(60, 62, 66), Enum.Material.Metal, model)
-	end
-	local board = solid("Board", Vector3.new(7, 4, 0.3), frame * CFrame.new(0, 5, 0), Color3.fromRGB(28, 30, 34), Enum.Material.SmoothPlastic, model)
-	words(board, {
-		{ text = "ZDC MOVING & EVACUATION", color = ORANGE, size = 40 },
-		{ text = "MOVING CONTRACTS", color = INK, size = 56 },
-		{ text = "We move your life. The rest they eat.", color = Color3.fromRGB(196, 199, 203), size = 26 },
-	})
+	-- the "MovingBoard" kiosk (server/MoveSites.luau, Persistent, facing the yard: the corkboard with the houses' photos
+	-- and the notices, its lamp, the ZDC logo); the prompt hangs on its corkboard
+	local _, board = require(script.Parent.MoveSites).board(parent)
 	local prompt = newPrompt(board, "Moving contracts", "ZDC Moving", Enum.KeyCode.E, 0, T.Reach.Board)
 	prompt.Triggered:Connect(function(player: Player)
 		local _, _, root = bodyOf(player)
@@ -502,44 +483,23 @@ local function buildBoard(parent: Instance)
 			Moving.openCard(player, nil, false)
 		end
 	end)
-	model.PrimaryPart = board
-	model.Parent = parent
 	boardPart = board
 end
 
--- The drop-off at the depot ("the Wall"): an orange outline on the yard and its sign.
+-- The drop-off at the depot ("the Wall"): the army's checkpoint round its bay (server/MoveSites.luau, Persistent: the
+-- bay's orange outline as before, the gantry's SAFE ZONE sign, the Wall's stubs, the booth, the raised barrier, the
+-- floodlights, the army truck; nothing in the truck's way in from Bone St), and with it the rework's dressing (the
+-- depot's ZDC MOVING & EVACUATION banner, the evacuation spots in the city).
 local function buildDropOff(parent: Instance)
-	local model = Instance.new("Model")
-	model.Name = "MovingDropOff"
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-	local at = dropOffAt()
-	local w, d = 22, 18
-	local function strip(size: Vector3, offset: Vector3)
-		local part = solid("Line", size, CFrame.new(at + offset + Vector3.new(0, 0.05, 0)), ORANGE, Enum.Material.Neon, model)
-		part.CanCollide = false
-		part.CanQuery = false
-		part.CanTouch = false
-	end
-	strip(Vector3.new(w, 0.1, 0.6), Vector3.new(0, 0, -d / 2))
-	strip(Vector3.new(w, 0.1, 0.6), Vector3.new(0, 0, d / 2))
-	strip(Vector3.new(0.6, 0.1, d), Vector3.new(-w / 2, 0, 0))
-	strip(Vector3.new(0.6, 0.1, d), Vector3.new(w / 2, 0, 0))
-	local signAt = at + Vector3.new(w / 2 + 1.5, 0, -d / 2)
-	local frame = CFrame.lookAt(signAt, signAt + Vector3.new(-1, 0, 1).Unit)
-	solid("Post", Vector3.new(0.4, 8, 0.4), frame * CFrame.new(0, 4, 0.3), Color3.fromRGB(60, 62, 66), Enum.Material.Metal, model)
-	local sign = solid("Sign", Vector3.new(6, 2.6, 0.25), frame * CFrame.new(0, 6.6, 0), Color3.fromRGB(28, 30, 34), Enum.Material.SmoothPlastic, model)
-	words(sign, {
-		{ text = "THE WALL", color = ORANGE, size = 50 },
-		{ text = "MOVING DROP-OFF · DRIVE THE TRUCK IN", color = INK, size = 24 },
-	})
-	model.PrimaryPart = sign
-	model.Parent = parent
+	local sites = require(script.Parent.MoveSites)
+	sites.dropOff(parent)
+	sites.dressing(parent)
 end
 
 local onEnter: (Player, string) -> ()
 
--- A contract's house: the "Enter house" prompt at its front door and a ZDC MOVING sign in its front yard (the rest of
--- the house stays as server/World.luau built it).
+-- A contract's house: the "Enter house" prompt at its front door and its moving-day dress-up outside (the rest of the
+-- house stays as server/World.luau built it).
 local function buildSite(contract: Contract, parent: Instance): Site?
 	local home = Map.home(contract.home)
 	if not home then
@@ -556,13 +516,9 @@ local function buildSite(contract: Contract, parent: Instance): Site?
 	prompt.Triggered:Connect(function(player: Player)
 		onEnter(player, contract.id)
 	end)
-	local right = Vector3.new(-facing.Z, 0, facing.X)
-	local signAt = door + facing * 4.5 - right * 5 -- (left of the path: the mailbox stands on its right)
-	local frame = CFrame.lookAt(signAt, signAt + facing)
-	solid("SignPost", Vector3.new(0.3, 4, 0.3), frame * CFrame.new(0, 2, 0.2), Color3.fromRGB(70, 60, 50), Enum.Material.Wood, model)
-	local sign = solid("Sign", Vector3.new(3.4, 1.8, 0.2), frame * CFrame.new(0, 3.6, 0), Color3.fromRGB(28, 30, 34), Enum.Material.SmoothPlastic, model)
-	words(sign, { { text = "ZDC MOVING", color = ORANGE, size = 40 }, { text = string.upper(contract.name), color = INK, size = 28 } })
-	model.PrimaryPart = sign
+	-- (server/MoveSites.luau: the ZDC MOVING yard sign left of the path, boxes by the door, MOVING DAY over it, cones at
+	-- the truck's kerb, the EVACUATED realtor's sign; nothing solid, nothing on the path to the kerb)
+	model.PrimaryPart = require(script.Parent.MoveSites).house(model, contract.name, home)
 	model.Parent = parent
 	local out = door + facing * 4 + Vector3.new(0, 0.1, 0)
 	return {
@@ -1529,6 +1485,48 @@ local function fixFuse(s: Session, player: Player)
 	s.dirty = true
 end
 
+-- Where the fuse box goes (the plan's frame: the floor at the front door, +Z into the house): on the garage's back wall
+-- (max Z, shared/HouseLayout.luau's "N") at head height, where no fixture stands (its workbench and shelves are there
+-- too), the first free place from its corner; nil: no garage in the plan.
+local function fuseSpot(plan: any): Vector3?
+	local rooms = if type(plan.rooms) == "table" then plan.rooms else {}
+	local garage: any = nil
+	for _, room in rooms :: { any } do
+		if (room.id == "garage" or room.kind == "garage") and typeof(room.min) == "Vector3" and typeof(room.max) == "Vector3" then
+			garage = room
+		end
+	end
+	if not garage then
+		return nil
+	end
+	local lo, hi = garage.min :: Vector3, garage.max :: Vector3
+	local y0, y1 = lo.Y + 3.2, lo.Y + 5.6 -- (the box: 1.8 wide, 2.4 tall, against the wall)
+	local z0, z1 = hi.Z - 0.6, hi.Z
+	local fixtures = if type(plan.fixtures) == "table" then plan.fixtures else {}
+	local function free(x: number): boolean
+		for _, f in fixtures :: { any } do
+			if f.room ~= garage.id or typeof(f.at) ~= "CFrame" or typeof(f.size) ~= "Vector3" then
+				continue
+			end
+			local p, size = (f.at :: CFrame).Position, f.size :: Vector3
+			local sideways = (math.floor((tonumber(f.turn) or 0) / 90 + 0.5) % 2) == 1
+			local hx, hz = if sideways then size.Z / 2 else size.X / 2, if sideways then size.X / 2 else size.Z / 2
+			if x + 0.9 > p.X - hx and x - 0.9 < p.X + hx and z1 > p.Z - hz and z0 < p.Z + hz and y1 > p.Y and y0 < p.Y + size.Y then
+				return false
+			end
+		end
+		return true
+	end
+	local x = lo.X + 1.6
+	while x <= hi.X - 1.6 do
+		if free(x) then
+			return Vector3.new(x, lo.Y + 4.4, hi.Z - 0.3)
+		end
+		x += 0.5
+	end
+	return Vector3.new(lo.X + 1.6, lo.Y + 4.4, hi.Z - 0.3)
+end
+
 -- The interior's lights (whatever Light the art put in it, but the porch's daylight) go off; a fuse box on the garage's
 -- back wall (no garage in the plan: by the entry) brings them back. No lights in the art: nothing to fix.
 local function fuseBox(s: Session)
@@ -1538,7 +1536,7 @@ local function fuseBox(s: Session)
 	end
 	local team = s.team
 	for _, d in interior:GetDescendants() do -- (once, when the move starts)
-		if d:IsA("Light") and d.Enabled then
+		if d:IsA("Light") and d.Enabled ~= false then
 			local lamp = d.Parent
 			if lamp and lamp:IsA("BasePart") and string.find(lamp.Name, "Daylight", 1, true) then
 				continue
@@ -1552,17 +1550,12 @@ local function fuseBox(s: Session)
 	if #team.lights == 0 then
 		return
 	end
-	local frame: CFrame? = nil
-	local rooms = if type(s.plan.rooms) == "table" then s.plan.rooms else {}
-	for _, room in rooms :: { any } do
-		if (room.id == "garage" or room.kind == "garage") and typeof(room.min) == "Vector3" and typeof(room.max) == "Vector3" then
-			frame = s.origin * CFrame.new(room.min.X + 1.6, room.min.Y + 4.4, room.max.Z - 0.3)
-		end
-	end
-	local at = frame or s.origin * (s.plan.entry :: CFrame) * CFrame.new(3, 4.4, 0)
-	local box = solid("FuseBox", Vector3.new(1.8, 2.4, 0.5), at, Color3.fromRGB(96, 100, 104), Enum.Material.DiamondPlate, interior)
+	local spot: Vector3? = fuseSpot(s.plan)
+	local entry: CFrame = s.plan.entry
+	local at = s.origin * CFrame.new(spot or Vector3.new(entry.X + 3, 4.4, entry.Z))
+	local box = rolePart("FuseBox", Vector3.new(1.8, 2.4, 0.5), at, Color3.fromRGB(96, 100, 104), Enum.Material.DiamondPlate, interior)
 	box.CanCollide = false
-	words(box, { { text = "⚡ FUSES", color = Color3.fromRGB(242, 201, 76), size = 22 } })
+	roleSign(box, "⚡ FUSES", Color3.fromRGB(242, 201, 76))
 	local prompt = newPrompt(box, "Fix fuse box", "⚡ Fuse box · the lights", Enum.KeyCode.E, R.Tech.Fuse, 8)
 	tag(prompt, s.owner)
 	prompt.Triggered:Connect(function(player: Player)
@@ -1637,13 +1630,13 @@ local function barricadeModel(frame: CFrame): Model
 	model.Name = "MoveBarricade"
 	local wood = Color3.fromRGB(128, 96, 64)
 	local dark = Color3.fromRGB(84, 62, 42)
-	local post = solid("Post", Vector3.new(0.7, 5.2, 0.7), frame * CFrame.new(-3.8, 2.6, 0), dark, Enum.Material.Wood, model)
-	solid("Post", Vector3.new(0.7, 5.2, 0.7), frame * CFrame.new(3.8, 2.6, 0), dark, Enum.Material.Wood, model)
+	local post = rolePart("Post", Vector3.new(0.7, 5.2, 0.7), frame * CFrame.new(-3.8, 2.6, 0), dark, Enum.Material.Wood, model)
+	rolePart("Post", Vector3.new(0.7, 5.2, 0.7), frame * CFrame.new(3.8, 2.6, 0), dark, Enum.Material.Wood, model)
 	for index, height in { 1.1, 2.5, 3.9 } do
 		local tilt = math.rad(if index == 2 then -6 else 4)
-		solid("Plank", Vector3.new(8.6, 0.9, 0.35), frame * CFrame.new(0, height, -0.5) * CFrame.Angles(0, 0, tilt), wood, Enum.Material.WoodPlanks, model)
+		rolePart("Plank", Vector3.new(8.6, 0.9, 0.35), frame * CFrame.new(0, height, -0.5) * CFrame.Angles(0, 0, tilt), wood, Enum.Material.WoodPlanks, model)
 	end
-	solid("Brace", Vector3.new(9.2, 0.6, 0.3), frame * CFrame.new(0, 2.5, -0.85) * CFrame.Angles(0, 0, math.rad(27)), dark, Enum.Material.Wood, model)
+	rolePart("Brace", Vector3.new(9.2, 0.6, 0.3), frame * CFrame.new(0, 2.5, -0.85) * CFrame.Angles(0, 0, math.rad(27)), dark, Enum.Material.Wood, model)
 	model.PrimaryPart = post
 	return model
 end
@@ -2266,6 +2259,9 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 		warn(`[Moving] the interior of {contract.id} failed: {interior}`)
 		return "The house could not be built: try again."
 	end
+	if not (interior :: Model).Parent then
+		(interior :: Model).Parent = folder or workspace -- (server/HouseInterior.luau builds it unparented)
+	end
 	-- the truck: lent right next to you, you in the driver's seat (your own car is parked as it is)
 	local err = Vehicles.placeNear(owner, T.Truck)
 	local truck = Vehicles.get(owner)
@@ -2715,6 +2711,13 @@ function Moving.start()
 	MoveLobby.moveCrew = function(player: Player): { Player }?
 		local s = sessionOf(player)
 		return if s then membersOf(s) else nil
+	end
+	-- (the quick chat's "Need a hand here" on a move calls the depot's helper over: HELP ME)
+	MoveLobby.onQuickChat = function(player: Player, index: number)
+		local line = MoveRoles.Chat[index]
+		if line and line.id == "hand" and sessionOf(player) then
+			MoveHelper.order(player, "help")
+		end
 	end
 	MoveLobby.start()
 	remote.OnServerEvent:Connect(onRequest)
