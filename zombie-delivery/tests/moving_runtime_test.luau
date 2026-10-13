@@ -479,7 +479,7 @@ E.clock += 0.2
 Moving.step()
 check("too fast with it (a teleport): down where you were", character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "Too fast", 1, true) ~= nil and (clock.PrimaryPart.Position - E.rootOf(ann).Position).Magnitude > 200,
 	E.lastNotice(ann))
--- the big slab: no room after the sofa
+-- the big slab: no room after the sofa (the movers' repack off: Config.Moving.Pack.Repack)
 local slab = itemModel(6)
 E.place(ann, slab.PrimaryPart.Position + V3(2, 0, 0))
 trigger(promptIn(slab, "Lift"), ann)
@@ -487,11 +487,35 @@ E.place(ann, origin.Position + V3(0, 3, 1))
 trigger(leave, ann)
 E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
 E.clock += 0.2
+T.Pack.Repack = false
 Moving.step()
+check("the packing fix: Load shows the carried slab won't fit before it is pressed", load.Enabled and load.ActionText == "Load Marble slab"
+	and string.find(load.ObjectText, "won't fit", 1, true) == 1, load.ObjectText)
 trigger(load, ann)
 check("no room: it stays in your hands, the words say so", character:GetAttribute("MoveCarry") == 6 and string.find(E.lastNotice(ann), "No room", 1, true) ~= nil, E.lastNotice(ann))
 E.Net.get("PutDown").OnServerEvent:Fire(ann)
 check("the touch PUT DOWN (the PutDown remote) sets it down", character:GetAttribute("MoveCarry") == nil and slab.PrimaryPart.Anchored)
+-- the packing fix: with the repack on, the slab goes in: the movers pack it first (the whole floor), the lamp and the
+-- sofa welded again on its top
+T.Pack.Repack = true
+E.place(ann, slab.PrimaryPart.Position + V3(2, 0, 0))
+trigger(promptIn(slab, "Lift"), ann)
+E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
+E.clock += 0.2
+Moving.step()
+check("…repacked, it would go in: Load says nothing of \"won't fit\"", load.Enabled and string.find(load.ObjectText, "won't fit", 1, true) == nil, load.ObjectText)
+trigger(load, ann)
+local function bottomOf(model: any): number -- (over the chassis, its root unturned)
+	return (truck.chassis.CFrame:Inverse() * model.PrimaryPart.Position).Y - model.PrimaryPart.Size.Y / 2
+end
+local lampIn, sofaIn = itemModel(1), itemModel(3)
+check("…Load repacks the van: the slab in, the words say so", character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "Van repacked", 1, true) == 1, E.lastNotice(ann))
+check("…the lamp and the sofa welded again on the slab's top", math.abs(bottomOf(lampIn) - bottomOf(slab) - E.items.slab.size.Y) < 1e-6
+	and math.abs(bottomOf(sofaIn) - bottomOf(slab) - E.items.slab.size.Y) < 1e-6 and lampIn.PrimaryPart:FindFirstChildOfClass("WeldConstraint") ~= nil
+	and sofaIn.PrimaryPart:FindFirstChildOfClass("WeldConstraint") ~= nil, `{bottomOf(lampIn)} {bottomOf(sofaIn)} {bottomOf(slab)}`)
+E.clock += 0.2
+Moving.step()
+check("…Take out offers a top one, not the slab under them", unload.ActionText ~= "Take out Marble slab" and string.find(unload.ActionText, "Take out ", 1, true) == 1, unload.ActionText)
 E.request(bob, "giveup")
 check("only the owner gives up", E.last(bob, "Moving", "result") == nil)
 E.request(ann, "giveup")

@@ -6089,6 +6089,19 @@ Config.CarryGrip = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
+--                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
+--                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
+--                     sides against the walls and the things beside it − Flush × the share of its edge level with its
+--                     neighbours' tops + Waste × the air left under it (a share of its own room) + Base × its base +
+--                     Side × its distance from the nearer side wall + Depth × its middle's distance from the cab
+--                     (studs) + Dead × a sliver over it under Headroom studs (nothing goes there) + High × all the room
+--                     over a fragile thing (it rides on top), both a share of its height. The fill counts a cell up to
+--                     the roof when no flat Probe-stud square with Headroom over it covers it (Headroom 1.1: the
+--                     smallest thing, the kitchen radio, is 1.1 tall). Lie: a both / pair piece with no place standing
+--                     lies on its side (Placement.lying; server/Moving.luau's bedFrame rolls its model). Repack: a thing
+--                     with no room as the bed is: the movers pack everything again, the biggest first (Load welds the
+--                     moved models anew; the Load prompt says "won't fit" only when even that fails)
 --   7.x farm move (chapter 1, Walt's Farm): a contract may have its own clock (time, hordeAt: s, over Time / HordeAt)
 --                     and pay (pay: × the move's pay); a contract of kind "farm" stands at a Map.Places place (place,
 --                     its site in Sites) instead of a Map.Homes house (home). It opens once its chapter's (shared/
@@ -6145,7 +6158,7 @@ Config.Moving = {
 	} :: { [string]: { House: { At: { number }, Size: { number } }, Doors: { { Id: string, Name: string, At: { number }, Facing: { number }, Width: number } }, Curb: number, Out: number } },
 	Van = "zdcvan",
 	Beds = {
-		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.5, Center = { 0, 2.98 } :: { number } },
+		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.4, Center = { 0, 2.98 } :: { number } }, -- (Cell 0.4: its whole 6.4 length, 15 × 16 cells)
 		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
 	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number } } },
 	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
@@ -6173,6 +6186,7 @@ Config.Moving = {
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
 	Slots = 6,
 	Tick = 0.2,
+	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 }
 
 -- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the

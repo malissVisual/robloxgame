@@ -994,7 +994,7 @@ local function think(h: Helper, body: Body, clock: number)
 		if (thing.class == "hand" or thing.class == "both") and (thing.state == "home" or thing.state == "ground") then
 			local fits = h.fits[spot]
 			if fits == nil then
-				fits = Rules.fit(move.packing, thing.size) ~= nil
+				fits = Rules.canLoad(move, spot) -- (the packing fix: lying on its side, after a repack too)
 				h.fits[spot] = fits
 			end
 			local n = #h.candidates + 1
