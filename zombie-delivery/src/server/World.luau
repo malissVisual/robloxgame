@@ -6210,6 +6210,7 @@ function World.build()
 	piece("Earl's Used Wheels", function()
 		buildVanLot(world) -- 5.0
 	end)
+	piece("alps", function() require(script.Parent.Alpine).build(world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight }) end) -- 7.1: the mountains, the forests
 	piece("lighting", setLighting)
 	task.wait()
 	counting:Disconnect()

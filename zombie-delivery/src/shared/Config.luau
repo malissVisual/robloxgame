@@ -2445,32 +2445,33 @@ Config.Atmosphere = {
 			air = { 214, 152, 114 }, decay = { 150, 98, 82 }, density = 0.33, offset = 0.08, glare = 1.6, haze = 1.8,
 			clouds = { 255, 208, 172 }, blur = 1, dust = 1,
 		},
-		-- Morning: fresh and clear, a touch warm.
+		-- Morning: fresh and clear. 7.1, the Alps: a cool, crisp blue air (the far mountains fade blue), lush colours.
 		morning = {
-			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 104, 106, 114 },
+			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 106, 110, 120 },
 			top = { 36, 26, 12 }, bottom = { 10, 10, 10 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 246, 245, 236 }, saturation = -0.06, contrast = 0.12, lift = 0,
+			tint = { 246, 248, 248 }, saturation = -0.01, contrast = 0.12, lift = 0,
 			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 168, 180, 184 }, decay = { 102, 112, 118 }, density = 0.3, offset = 0.15, glare = 0.5, haze = 1.5,
+			air = { 182, 202, 226 }, decay = { 116, 138, 172 }, density = 0.26, offset = 0.15, glare = 0.5, haze = 1.25,
 			clouds = { 255, 255, 255 }, blur = 0.8, dust = 0.7,
 		},
-		-- Noon: clean and crisp, truer colours (a little grit left), sharp shadows, the least haze.
+		-- Noon: clean and crisp, true colours, sharp shadows, the least haze. 7.1: the alpine noon: a clear blue air,
+		-- lush, a touch cool.
 		noon = {
-			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 104, 104, 112 },
+			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 106, 110, 120 },
 			top = { 14, 12, 6 }, bottom = { 8, 8, 8 }, diffuse = 0.6, specular = 0.7, soft = 0.2,
-			tint = { 250, 250, 244 }, saturation = -0.08, contrast = 0.14, lift = 0,
+			tint = { 247, 251, 255 }, saturation = 0.02, contrast = 0.14, lift = 0,
 			bloom = 0.3, bloomSize = 20, threshold = 1.5, rays = 0.03,
-			air = { 166, 178, 176 }, decay = { 104, 114, 116 }, density = 0.28, offset = 0.15, glare = 0.2, haze = 1.3,
+			air = { 178, 200, 228 }, decay = { 118, 142, 178 }, density = 0.24, offset = 0.15, glare = 0.2, haze = 1,
 			clouds = { 255, 255, 255 }, blur = 0.7, dust = 0.5,
 		},
-		-- Afternoon: warming up.
+		-- Afternoon: warming up (7.1: still the clear alpine air, a little warmer).
 		afternoon = {
-			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 104, 106 },
+			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 106, 110 },
 			top = { 50, 34, 14 }, bottom = { 12, 10, 8 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 252, 242, 224 }, saturation = -0.04, contrast = 0.13, lift = 0,
+			tint = { 252, 246, 234 }, saturation = 0.02, contrast = 0.13, lift = 0,
 			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 182, 170, 150 }, decay = { 116, 104, 90 }, density = 0.3, offset = 0.12, glare = 0.6, haze = 1.5,
-			clouds = { 255, 246, 232 }, blur = 0.8, dust = 0.7,
+			air = { 196, 204, 214 }, decay = { 128, 136, 150 }, density = 0.26, offset = 0.12, glare = 0.6, haze = 1.25,
+			clouds = { 255, 250, 242 }, blur = 0.8, dust = 0.7,
 		},
 		-- Sunset, the golden hour: the warmest look, an orange haze and the sun's glare, rays and dust in the light.
 		golden = {
@@ -2517,8 +2518,8 @@ Config.Atmosphere = {
 	},
 	-- Roblox's moving clouds (Terrain.Clouds, made on every client): Cover and Density in clear weather, in the rain and
 	-- in a fog (blended with the weather); their colour is the look's. Lite: on a phone or a tablet too (false: none
-	-- there, unless the place has its own).
-	Clouds = { Cover = 0.5, Density = 0.55, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
+	-- there, unless the place has its own). 7.1: fewer, brighter fair-weather clouds over the Alps.
+	Clouds = { Cover = 0.42, Density = 0.45, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
 	-- The soft blur far away (a DepthOfFieldEffect): sharp out to Focus + Radius studs, beyond that Far × the look's blur
 	-- (half of it in the rain or the fog: the air blurs already). Never on a phone or a tablet, below graphics quality
 	-- Quality (1 … 10), or while you aim (it fades out over Fade seconds).
@@ -2530,6 +2531,121 @@ Config.Atmosphere = {
 	-- A soft haze around the street lamps at night: the Count nearest lamps that shine (the 6.13.1 light budget) within
 	-- Range of the camera get a faint glow Size studs across (a phone or a tablet: Lite of them).
 	Halo = { Count = 12, Lite = 0, Range = 160, Size = 7, Transparency = 0.9 },
+}
+
+-- 7.1, the Alps (the owner: "make the map a smaller alpine valley, step by step"; step 1B: mountains and forests, nothing
+-- you play on moves): shared/AlpineLayout.luau lays it out as plain numbers (tests/alpine_test.luau checks it),
+-- server/Alpine.luau builds it once from World.build (tools/alpine-preview draws it).
+--   Box          the ring of mountains stands round this box (Map.Bounds today: the world's walls); step 2 pulls it in
+--   Gap          studs from the box to the front row's foot (the mountains never reach into the box)
+--   Layer        a mountain is a stack of terrain cylinders this many studs thick (a cone: its radius at height y is
+--                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit)
+--   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed
+--   Front / Back the two rows: Height (summits, studs), Spread (the base's radius = the height × this), Profile; the back
+--                row's feet Behind studs behind the front row's, each back peak with up to two lower Shoulders (chance)
+--   Lean         a peak leans one way (a steep face on that side, a long ridge on the other): each layer's middle moves
+--                this share (a range) of what its radius shrinks, so every layer stays inside the one under it
+--   Spacing      two cones next to each other stand at most this × the sum of their radii at Seal height apart, so the
+--                ring's crest between them never drops under Seal (studs): no gap a car could drive through
+--   Gorge        the river leaves the valley through a gorge this deep (studs past Gap); a back peak closes it
+--   Green / Snow the slopes are grass up to Green (a height between the two; the forests climb it), rock above, snow
+--                over Snow (summer); north of Map.WinterZ, west of the river, the mountains are all snow with rock bands
+--   Strata       this share of a peak's rock layers is the other stone (a peak is Rock or Limestone): bands at random
+--                heights; Rough: each layer's radius ± half this share (the flanks' crags; still inside the one under it)
+--   Glaciers     tongues of glacier ice down the inner flanks of the tallest summer peaks: Width at the top and at the
+--                snout, Thick studs (Protrude of it out of the slope)
+--   Scree        light stone fans at the front row's foot: Count a peak (summer), Radius
+--   Silhouettes  a far look of every peak of MinHeight or more (Persistent parts inside the terrain: with streaming the
+--                terrain far away is not sent, these are): a square pyramid Lower × the summit high, Margin studs inside
+--                the slopes everywhere, its snow cap from the peak's snow line
+--   Portals      where a road would leave the valley: the mountains open into a cliff with a tunnel mouth (Depth deep,
+--                Height high, the rock over it Cliff high) and a ROAD CLOSED barrier at the box's edge; the road runs
+--                there along x from `from` (a yard's edge) at z (the West Highway past the Old Farm)
+--   Waterfall    a waterfall where the river comes out of the north gorge
+--   Colors       the terrain's material colours (Terrain:SetMaterialColor), Valley the open ground's colour and material
+--   Budget       Volume: studs³ the fills may hold at most (overlaps counted twice); Fills: terrain calls; Parts: the
+--                parts of it all (the trees, the flowers, the huts, the silhouettes, the portal, the waterfall)
+--   Trees        the forests: at most Max trees of Parts parts (a trunk and three tiers: spruce and fir), on a grid
+--                Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the Treeline), Height (studs);
+--                never within RoadClear of a road's edge (nor its canopy over it), JunctionClear of a road's end or bend
+--                (the drivers' view at the junctions), TownClear of a district's edge roads, YardClear of a yard,
+--                LotClear of a home's lot, PlaceClear of a place, WaterClear of the water, nor in Keep (the ski lift);
+--                thinner near town (TownFade studs; Copses of the valley's trees stand there in small copses), denser
+--                within Edge of the box's edge; Noise: the forests' and the
+--                meadows' patch sizes; ShadowNear: only trees this close to a road throw shadows; Chunk: one Atomic
+--                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter tops
+--   Meadows      open meadows with wildflowers: Patches of Flowers small parts, Gap apart, Road studs from a road's edge
+--   Huts         Count wooden hay barns and huts in the meadows, Gap apart, Road studs from a road's edge
+Config.Alpine = {
+	Box = { x0 = -2150, z0 = -2950, x1 = 1900, z1 = 1500 },
+	Gap = 40,
+	Seed = 4711,
+	Layer = 8,
+	Floor = -10,
+	WetFloor = -30,
+	Front = { Height = { 250, 420 } :: { number }, Spread = { 1.0, 1.25 } :: { number }, Profile = 1.3 },
+	Back = { Height = { 480, 700 } :: { number }, Spread = { 0.85, 1.05 } :: { number }, Profile = 1.5, Behind = 170, Shoulders = 0.6 },
+	Lean = { 0.1, 0.5 } :: { number },
+	Spacing = 0.8,
+	Seal = 70,
+	Gorge = 170,
+	Green = { 110, 160 } :: { number },
+	Snow = { 300, 360 } :: { number },
+	Strata = 0.12,
+	Rough = 0.1,
+	Glaciers = { Count = 7, Width = { 110, 46 } :: { number }, Thick = 14, Protrude = 3 },
+	Scree = { Count = 2, Radius = { 20, 34 } :: { number } },
+	Silhouettes = { MinHeight = 300, Lower = 0.86, Margin = 6 },
+	Portals = {
+		{ id = "westpass", name = "WEST PASS", x = -2150, z = 520, nx = -1, nz = 0, from = -2030, width = 40 },
+	} :: { { id: string, name: string, x: number, z: number, nx: number, nz: number, from: number, width: number } },
+	Portal = { Depth = 36, Height = 26, Cliff = 60, Text = "ROAD CLOSED — EVACUATION ZONE" },
+	Waterfall = true,
+	Colors = {
+		Grass = { 92, 134, 58 },
+		LeafyGrass = { 84, 124, 54 },
+		Ground = { 112, 98, 74 },
+		Rock = { 120, 118, 114 },
+		Limestone = { 158, 154, 146 },
+		Snow = { 240, 244, 248 },
+		Glacier = { 176, 214, 232 },
+	} :: { [string]: { number } },
+	Valley = { Color = { 96, 138, 60 } :: { number }, Material = "Grass" },
+	Budget = { Volume = 1.2e10, Fills = 9000, Parts = 11500 },
+	Trees = {
+		Max = 2500,
+		Parts = 4,
+		Spacing = 25,
+		Jitter = 7,
+		Slope = 0.25,
+		Copses = 0.12,
+		Height = { 34, 66 } :: { number },
+		Treeline = { 130, 180 } :: { number },
+		RoadClear = 20,
+		JunctionClear = 60,
+		TownClear = 50,
+		TownFade = 700,
+		Edge = 700,
+		YardClear = 30,
+		LotClear = 16,
+		PlaceClear = 55,
+		WaterClear = 14,
+		Keep = { { x0 = -1140, z0 = -2270, x1 = -790, z1 = -2180 } } :: { { x0: number, z0: number, x1: number, z1: number } },
+		Noise = { Big = 420, Small = 140 },
+		ShadowNear = 110,
+		Chunk = 256,
+		Colors = { { 34, 58, 40 }, { 44, 72, 46 }, { 58, 86, 50 } } :: { { number } },
+		Trunk = { 86, 62, 44 } :: { number },
+		Snowy = { 236, 240, 244 } :: { number },
+	},
+	Meadows = {
+		Patches = 36,
+		Flowers = 8,
+		Gap = 160,
+		Road = { 24, 150 } :: { number },
+		Colors = { { 245, 245, 238 }, { 250, 208, 60 }, { 170, 110, 210 }, { 222, 64, 72 }, { 92, 140, 230 } } :: { { number } },
+	},
+	Huts = { Count = 4, Gap = 600, Road = { 34, 110 } :: { number } },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).

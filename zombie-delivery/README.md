@@ -1149,6 +1149,47 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The Alps: mountains and forests (7.1)
+
+The owner: "make the map a smaller alpine valley, step by step". Step 1B puts the valley round the city; **nothing you
+play on moves** (the roads, addresses, places, lots and zones keep their coordinates). The layout is pure numbers in
+`shared/AlpineLayout.luau` (tuning in `Config.Alpine`), `server/Alpine.luau` builds it once (one piece of `World.build`,
+after everything else).
+
+- **A ring of snowy mountains** just outside the world's walls (`Config.Alpine.Box`, today `Map.Bounds`; step 2 pulls
+  the box in and the ring follows). Terrain only (`Terrain:FillCylinder` layers): a front row of foothills (250–420
+  studs) whose feet stand 40 studs out, a row of big peaks (480–700) behind them with lower shoulders. Every peak leans
+  a little (a steep face one side, a long ridge the other) and its layers are a little rough (crags); grass at the foot,
+  rock above (Rock or Limestone, bands of the other), snow over 300–360; glacier tongues on a few tall peaks, scree at
+  the foothills' feet; north-west of the river (the winter) everything snowy with rock bands. The crest between two
+  neighbours never drops under 70 studs: no gap to drive or swim through. The river leaves through a gorge north and
+  south, each closed by a big peak (a waterfall where it comes out in the north); the old sea is an **alpine lake**
+  whose far shore rises out of the water.
+- **The West Pass:** the West Highway past the Old Farm runs on to a tunnel in a cliff, closed with a steel shutter, and
+  a **ROAD CLOSED — EVACUATION ZONE** barrier right at the world's wall. No other road reaches the edge (they all end
+  at their yards); the Mount Rot tunnel is untouched.
+- **Far mountains with streaming on:** a client only gets the terrain near it, so every big peak also has a
+  *silhouette*, a square pyramid of corner wedges (with a snow cap) inside it, in a Persistent model. Far away you see
+  the silhouettes; up close they hide in the terrain.
+- **Forests:** up to 2,500 spruce and fir (a trunk that collides and three ellipsoid tiers that do not, three greens,
+  snowy tops in the winter, 34–66 studs tall), in patches: denser toward the mountains and up their lower slopes (a
+  quarter of them), thinner near town (a few copses), meadows left open with **wildflowers** (36 patches) and **4 hay
+  barns and huts**. Never on a road (nor over it), within 60 studs of a junction or a road's bend (the drivers' view),
+  in a district, on a lot, a home, a storefront, a yard, a place, the water, the ice or the ski lift's line. Every tree
+  lands on what a ray finds under it and is left out if something already stands there. One Atomic model per 256-stud
+  square (a coarse far look), shadows only near the roads.
+- **The valley's look:** the open ground lush grass, the terrain's colours alpine (`Config.Alpine.Colors`); the day
+  looks (`Config.Atmosphere`: morning, noon, afternoon) a crisp blue air that hazes the far ring, fewer and brighter
+  clouds. The night, the dawn, the dusk and the Blood Moon as before.
+- **Budgets:** 133 terrain cones in 7,251 fills (10.2 billion studs³ counted with the overlaps; the budget is 12), 112
+  silhouettes, about 10,900 parts in all (budget 11,500); in Studio the build log prints `[Alpine] …` with the time
+  it took. Checks: `tests/alpine_test.luau` (the ring holds the box by car and swimming, nothing in the box, the
+  silhouettes inside, the pass, every tree rule, the budgets, a tighter box for step 2). Preview without Roblox:
+  `tools/alpine-preview/render.py` (a top-down map and a 3/4 three.js view).
+- **Test in Studio:** Play, fly (admin) to the map's edges: the walls stand in front of the mountains; the West Pass
+  past the Old Farm; the north gorge's waterfall; the forests along the West Highway; noon and dusk (the haze); with
+  streaming on, the far silhouettes from Downtown.
+
 ## MOVES: the moving rework, prototype (7.0)
 
 The owner's rework (`design/rework/NAVRH.md`, the story in `design/rework/PRIBEH.md`): the game turns into **moving**.
