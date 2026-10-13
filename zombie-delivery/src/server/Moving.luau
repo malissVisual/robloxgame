@@ -2633,14 +2633,19 @@ local payOut: (Session, string, string?) -> ()
 
 -- 7.x farm move: a chapter's move delivered (done or late, something at the Wall): the chapter done in the save of
 -- everybody who shares the pay (PlayerData.markStory "done:<chapter>": the next chapter opens; real saves only, as
--- every story flag).
+-- every story flag). 7.2 review: only with every ★ thing a van can take at the Wall whole (MovingRules.starsHome: one
+-- thing and FINISH is no chapter), and only for those who had the chapter open (no skipping ahead on another's move).
 local function chapterDone(s: Session, phase: string, delivered: number, present: { Player })
 	local chapter = MoveStory.forContract(s.contract.id)
-	if not chapter or delivered <= 0 or (phase ~= "done" and phase ~= "late") then
+	if not chapter or delivered <= 0 or (phase ~= "done" and phase ~= "late") or not Rules.starsHome(s.move) then
 		return
 	end
 	for _, player in present do
-		pcall(PlayerData.markStory, player, MoveStory.doneKey(chapter.id))
+		local profile = PlayerData.get(player)
+		local story = if profile then (profile :: any).story else nil
+		if MoveStory.unlocked(chapter, if type(story) == "table" then story else nil) then
+			pcall(PlayerData.markStory, player, MoveStory.doneKey(chapter.id))
+		end
 	end
 end
 
@@ -2919,7 +2924,8 @@ local function contractList(player: Player, admin: boolean): { { [string]: any }
 	return list
 end
 
--- 7.x van moves: the name of the car a move of this player goes with (theirs; the ZDC Van when the save has none).
+-- 7.x van moves: the name of the car a move of this player goes with (theirs; the ZDC Van when the save has none; 7.2
+-- review: or rides a bike: startMove puts the van out then).
 local function vanName(player: Player): string
 	if SB.on then -- 8.0 SANDBOX: the van out (else the one that comes: Config.Sandbox.Van, or the ZDC Van)
 		local out = Vehicles.get(player)
@@ -2928,7 +2934,7 @@ local function vanName(player: Player): string
 	end
 	local profile = PlayerData.get(player)
 	local def = Economy.findCar(if profile and type((profile :: any).car) == "string" then (profile :: any).car else T.Van)
-	return if def then def.name else "ZDC Van"
+	return if def and not def.bike then def.name else "ZDC Van"
 end
 
 -- The contract card (the board, the admin): the house, its ★ things, the pay, the time; arms START.
@@ -3024,10 +3030,27 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 		(interior :: Model).Parent = folder or workspace -- (server/HouseInterior.luau builds it unparented)
 	end
 	-- 7.x van moves: the owner's own van (out already, else right next to them, they in the driver's seat); a job's or a
-	-- rental's lent car is not theirs: their own comes instead
+	-- rental's lent car is not theirs: their own comes instead. 7.2 review: never a bike (no back: nothing could be
+	-- loaded, and CAR, MY BIKE and the garage stay shut while it is out): the van comes, and CAR brings the van from now
+	-- on (the phone's CALL CAR way: the bike stays the bike of choice)
 	local truck = Vehicles.get(owner)
-	if not truck or truck.wrecked or truck.lent or truck.rental then
-		local err = if SB.on then SB.bringVan(owner) else Vehicles.placeNear(owner, nil) -- (8.0 SANDBOX: at their plot)
+	if not truck or truck.wrecked or truck.lent or truck.rental or Vehicles.isBike(truck) or not (truck.id == T.Van or Vehicles.hasBack(truck)) then
+		local err: string? = nil
+		if SB.on then
+			err = SB.bringVan(owner) -- (8.0 SANDBOX: at their plot)
+		else
+			local profile = PlayerData.get(owner)
+			local own = if profile and type(profile.car) == "string" then Economy.findCar(profile.car) else nil
+			if profile and (own == nil or own.bike == true) then
+				if own then
+					profile.bike = own.id
+				end
+				profile.car, profile.lastCar = T.Van, T.Van
+				own = nil
+				PlayerData.notify(owner)
+			end
+			err = Vehicles.placeNear(owner, if own then own.id else T.Van)
+		end
 		truck = Vehicles.get(owner)
 		if err or not truck then
 			pcall(function()
@@ -3324,10 +3347,12 @@ function SB.store(s: Session, spots: { number }): number
 	return took
 end
 
--- 0:00 and the grace over (or nothing in the van to bring): the end, paid for what was delivered (nothing: lost).
+-- 0:00 and the grace over (or nothing in the van to bring): the end, paid for what was delivered (nothing: lost). 7.2
+-- review: late only when something reached the Wall late (else the trips came in time: delivered).
 local function timeUp(s: Session)
-	if Rules.counts(s.move).delivered > 0 then
-		finish(s, "timeout", if SB.on then "Time's up: what reached your warehouse is yours" else "Time's up: the Wall paid what reached it")
+	local c = Rules.counts(s.move)
+	if c.delivered > 0 then
+		finish(s, if c.late > 0 then "timeout" else "deliver", if SB.on then "Time's up: what reached your warehouse is yours" else "Time's up: the Wall paid what reached it")
 	else
 		finish(s, "lose", `Time's up: nothing reached {SB.wall()}`)
 	end
@@ -3346,7 +3371,8 @@ local function finishMove(player: Player)
 		return
 	end
 	local done = if SB.on then "Finished: what came home is in your warehouse" else "Finished: everything at the Wall is paid" -- (8.0 SANDBOX)
-	finish(s, if s.late then "timeout" else "deliver", if c.out > 0 then "Finished: what was still in the van stayed behind" else done)
+	-- (7.2 review: late only when something reached the Wall late: FINISH in the grace after 0:00 brings nothing late)
+	finish(s, if c.late > 0 then "timeout" else "deliver", if c.out > 0 then "Finished: what was still in the van stayed behind" else done)
 end
 
 -- The van lost mid-move (wrecked, gone, not the owner's car any more): what was in it is lost (condition 0, its models
@@ -3380,12 +3406,20 @@ local function keepVan(s: Session, t: number)
 		s.load, s.unload, s.loadIn = nil, nil, nil
 		releaseBack(truck)
 		s.truck, s.lostAt, s.dirty = nil, t, true
+		-- (7.2 review: CAR brings the van: a MY BIKE while it was out was refused but made the bike the profile's car)
+		local profile = PlayerData.get(s.owner)
+		local own = if profile and type(profile.car) == "string" then Economy.findCar(profile.car) else nil
+		if profile and own and own.bike then
+			profile.bike, profile.car, profile.lastCar = own.id, T.Van, T.Van
+			PlayerData.notify(s.owner)
+		end
 		local why = if truck.wrecked then "wrecked" else "gone"
 		tellAll(s, `💥 The van is {why}{if #lost > 0 then `: the {#lost} things in it are lost` else ""}. The move goes on: CAR brings it back in {T.VanAgain} s.`)
 		return
 	end
 	local car = Vehicles.get(s.owner)
-	if car and not car.wrecked and car.model.Parent and not car.lent and not car.rental then
+	-- (7.2 review: never a bike: no back to load; the phone's CALL CAR or CAR brings the van)
+	if car and not car.wrecked and car.model.Parent and not car.lent and not car.rental and not Vehicles.isBike(car) and (car.id == T.Van or Vehicles.hasBack(car)) then
 		s.truck, s.lostAt, s.dirty = car, nil, true
 		Rules.setBed(s.move, rulesBed(car))
 		truckPrompts(s)
@@ -3677,7 +3711,13 @@ local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3:
 	elseif action == "giveup" then
 		local s = sessions[player]
 		if s then
-			finish(s, "cancel", "You called it off")
+			-- 7.2 review: after a trip, what reached the Wall is paid (FINISH's end: the crew there shares it)
+			local c = Rules.counts(s.move)
+			if c.delivered > 0 then
+				finish(s, if c.late > 0 then "timeout" else "deliver", "You called it off: the Wall paid what reached it")
+			else
+				finish(s, "cancel", "You called it off")
+			end
 		end
 	elseif action == "state" then
 		local s = sessionOf(player)
@@ -3791,18 +3831,21 @@ local function wireHooks()
 		end
 		return vanWait(player) or placeNear(player, carId)
 	end
+	-- (7.2 review: these wait for a lost van's VanAgain s too: the garage's TAKE OUT is placeAt)
 	local placeAt = Vehicles.placeAt
 	Vehicles.placeAt = function(player: Player, carId: string?, spot: CFrame, seat: boolean?): Vehicles.Car?
-		if truckOut(player) then
-			say(player, TRUCK_OUT)
+		local refused = if truckOut(player) then TRUCK_OUT else vanWait(player)
+		if refused then
+			say(player, refused)
 			return nil
 		end
 		return placeAt(player, carId, spot, seat)
 	end
 	local spawnAt = Vehicles.spawnAt
 	Vehicles.spawnAt = function(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?, keep: { Instance }?): Vehicles.Car?
-		if truckOut(player) then
-			say(player, TRUCK_OUT)
+		local refused = if truckOut(player) then TRUCK_OUT else vanWait(player)
+		if refused then
+			say(player, refused)
 			return nil
 		end
 		return spawnAt(player, carId, ground, seat, chauffeured, rental, keep)
@@ -3879,12 +3922,18 @@ function Moving.start()
 	Players.PlayerRemoving:Connect(function(player: Player)
 		local own = sessions[player]
 		if own then
+			-- 7.2 review: after a trip, what reached the Wall pays the crew there (not called off for nothing)
+			local c = Rules.counts(own.move)
 			for _, member in everyone(own) do
 				if member ~= player then
-					say(member, `The move was called off: {player.DisplayName} left.`)
+					say(member, if c.delivered > 0 then `The move ended: {player.DisplayName} left. The Wall paid what reached it.` else `The move was called off: {player.DisplayName} left.`)
 				end
 			end
-			finish(own, "cancel", `{player.DisplayName} left the game`)
+			if c.delivered > 0 then
+				finish(own, if c.late > 0 then "timeout" else "deliver", `{player.DisplayName} left the game: the Wall paid what reached it`)
+			else
+				finish(own, "cancel", `{player.DisplayName} left the game`)
+			end
 		end
 		for _, session in sessions do
 			if session.members[player] then

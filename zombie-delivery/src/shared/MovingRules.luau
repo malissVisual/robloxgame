@@ -61,6 +61,8 @@
 --                                              ones' fine; late: × LateShare; the stars 1 … 5 and the XP (Xp + the
 --                                              value delivered / XpPerValue + XpPerStar × the stars, at most XpMax)
 --   MovingRules.estimate(spots, defs, pay?)    the contract card's pay: everything out whole, in time (× pay)
+--   MovingRules.starsHome(move)                7.2 review: every ★ thing a van of the move can take at the Wall whole
+--                                              (at least one): a chapter's move done (server/Moving.luau)
 --   MovingRules.whyText(why)                   what the player is told
 --   7.x van moves (the owner: the move is driven with the owner's own van; several trips to the Wall):
 --   MovingRules.deliver(move, now) -> spots    at the Wall: everything in the van (and on its hitch) is delivered
@@ -145,7 +147,7 @@ export type Move = {
 	hitch: number?, -- 7.x van moves: the spot hitched behind the car (nil: none)
 	trips: number?, -- 7.x van moves: the trips delivered at the Wall
 }
-export type Counts = { total: number, out: number, stars: number, starsOut: number, broken: number, carried: number, home: number, delivered: number, starsDelivered: number, lost: number }
+export type Counts = { total: number, out: number, stars: number, starsOut: number, broken: number, carried: number, home: number, delivered: number, starsDelivered: number, lost: number, late: number } -- (7.2 review: late, the delivered ones that came late)
 export type Result = {
 	how: string,
 	delivered: number,
@@ -885,7 +887,7 @@ function MovingRules.unload(move: Move, who: number, spot: number?): (number?, s
 end
 
 function MovingRules.counts(move: Move): Counts
-	local c: Counts = { total = 0, out = 0, stars = 0, starsOut = 0, broken = 0, carried = 0, home = 0, delivered = 0, starsDelivered = 0, lost = 0 }
+	local c: Counts = { total = 0, out = 0, stars = 0, starsOut = 0, broken = 0, carried = 0, home = 0, delivered = 0, starsDelivered = 0, lost = 0, late = 0 }
 	for _, spot in move.order do
 		local thing = move.things[spot]
 		c.total += 1
@@ -905,6 +907,9 @@ function MovingRules.counts(move: Move): Counts
 			c.delivered += 1
 			if thing.star then
 				c.starsDelivered += 1
+			end
+			if thing.late then
+				c.late += 1 -- 7.2 review
 			end
 		elseif thing.state == "lost" then
 			c.lost += 1
@@ -1008,6 +1013,25 @@ function MovingRules.result(move: Move, how: string, now: number): Result
 	-- (7.0 review: the XP grows with the value brought whole: a one-lamp move is no full move)
 	r.xp = math.min(pay.XpMax, math.floor(pay.Xp + got / pay.XpPerValue + pay.XpPerStar * rating + 0.5))
 	return r
+end
+
+-- 7.2 review: a chapter's move done (server/Moving.luau chapterDone): every ★ thing at the Wall whole, at least one.
+-- A ★ thing no van of the move can take at all (too big for its empty bed, lying down too, and not one that rides the
+-- hitch: Marge's Grandfather Clock in the ZDC Van) is not asked for.
+function MovingRules.starsHome(move: Move): boolean
+	local home = 0
+	local bed = move.bed
+	for _, spot in move.order do
+		local thing = move.things[spot]
+		if not thing.star then
+			continue
+		elseif thing.state == "delivered" and not MovingRules.broken(thing) then
+			home += 1
+		elseif thing.tow or not bed or MovingRules.room(MovingRules.newPacking(bed.width, bed.length, bed.height, bed.cell), thing.size, thing.class ~= "hand") then
+			return false
+		end
+	end
+	return home > 0
 end
 
 -- The contract card's pay: every thing out whole, ★ ones with their bonus (no time bonus).

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "7.1"
+Config.Version = "7.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -383,10 +383,8 @@ export type CarDef = {
 	tank: number?,
 	burn: number?,
 	-- 7.x, one car (Config.CompanyVan): `starter` every courier owns it from the start, never sold (the ZDC Van);
-	-- `refund` what a save that bought it before gets back once (its old price; the 6.19 pass applies the Vehicles knob);
 	-- `ambient` a body only the world builds (Config.AmbientCars: traffic, buses, bandits), never a player's car.
 	starter: boolean?,
-	refund: number?,
 	ambient: boolean?,
 }
 
@@ -438,8 +436,8 @@ Config.Cars = {
 	-- ZDCVanArt is imported in Studio it wears the fleet's panelled skin.
 	-- 7.x (the owner: "dej pryč auta, ostatní, nech ve hře jen van"): the one car of the game. Every courier owns it from
 	-- the start and drives it (Config.CompanyVan; `starter`: never sold, CAR and the chauffeur bring it); its paints,
-	-- the car tracks, the gear and a roof gun on its rack are bought for it at Wrench Garage. `refund`: its price at Dead
-	-- End Motors before (× the Vehicles knob): a save that bought it gets it back once (Economy.carRefund).
+	-- the car tracks, the gear and a roof gun on its rack are bought for it at Wrench Garage. (7.2 review: never paid
+	-- back, bought before 7.x or not: every save owns it for free now; Economy.carRefund.)
 	{
 		id = "zdcvan",
 		starter = true,
@@ -449,7 +447,6 @@ Config.Cars = {
 		mount = true,
 		name = "ZDC Van",
 		price = 0,
-		refund = 16000,
 		style = "zdcvan",
 		maxSpeed = 66,
 		accel = 28,
@@ -1550,9 +1547,11 @@ Config.VanQuest = {
 --             written with it)
 --   Refunded  Marge's text and the notice ({money}) after a save got money back for the cars it owned
 --             (Economy.carRefund: each car's price as sold, Config.AmbientCars × the Vehicles knob, and the stages it
---             had bought, × the Stages knob; the ZDC Van's own `refund` when it was bought; nothing for an employer's
---             free vehicle). The van takes over the best of the old cars (Economy.vanCarry: every car track at its
---             highest level, their gear, the paint and the roof gun of the car you drove)
+--             had bought, × the Stages knob; nothing for an employer's free vehicle; 7.2 review: never the ZDC Van, the
+--             Old Van's price only when bought from Earl). The van takes over the best of the old cars (Economy.vanCarry:
+--             every car track at its highest level, their gear, the paint and the roof gun of the car you drove); 7.2
+--             review: what it could not take over is paid back too (VanCarry.lost), and so is the bonus of an employer
+--             whose vehicle the save had earned (Economy.employerBonus)
 --   Kept      her text when cars went but nothing was paid (only an employer's free ones)
 --             (the money's reason: "CarRefund", shared/AnalyticsPlan.luau)
 --   Bonus     an employer's thanks after `needed` jobs (Config.Employers bonus: the money that replaced their car;
@@ -2738,7 +2737,8 @@ Config.Alpine = {
 --   Wait       seconds a client waits for the server's summary of the ring and the forest (MapStyle.publish, before
 --              World.build) before it works them out itself
 --   Budget     the most GuiObjects a layer may make on one map (tools/phone-ui/mapview.luau holds them): Peaks (big),
---              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map); Summary:
+--              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map), Mini (7.2
+--              review: all of them on the minimap, whose CanvasGroup draws them again on every move); Summary:
 --              the most characters the server's summary may have (a StringValue holds 200,000)
 Config.MapStyle = {
 	Margin = 420,
@@ -2792,7 +2792,7 @@ Config.MapStyle = {
 	Foothills = 120,
 	Altstadt = { Name = "Altstadt", District = "downtown" },
 	Wait = 10,
-	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 90, Alpine = 640, Summary = 20000 },
+	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 50, Alpine = 600, Mini = 380, Summary = 20000 },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
@@ -6608,8 +6608,8 @@ Config.MoveGreeters = {
 -- reward-only things stay unsold. Kept as they were (×1): the real estate and the company (the endgame already),
 -- the old backpacks' payback (Config.RetiredKit), fuel, the repair shop's fee and the board's reroll fee.
 --   Vehicles  the dealer's cars and Earl's Old Van      Bikes    the bikes and the E-Scooter
---             (7.x: no car is sold any more; the pass still prices Config.AmbientCars and the ZDC Van's `refund`: what
---             a save that owned one gets back, Economy.carRefund)
+--             (7.x: no car is sold any more; the pass still prices Config.AmbientCars: what a save that owned one gets
+--             back, Economy.carRefund)
 --   Stages    Wrench Garage's stages                    Upgrades Wrench Garage's tracks (baseCost)
 --   Guns      Lead & Co.'s guns                         CarGuns  the car guns
 --   Gear      the car and bike gear                     Kit      the vests, the bat (6.23: a bag's price is set
@@ -6649,9 +6649,6 @@ do -- 6.19: the one pass over the tables (see Config.Prices)
 	for _, list in { Config.Cars, Config.AmbientCars } do
 		for _, def in list do
 			def.price = priced(def.price, if def.bike then P.Bikes else P.Vehicles)
-			if def.refund then
-				def.refund = priced(def.refund, P.Vehicles) -- 7.x: the ZDC Van's old price (Economy.carRefund)
-			end
 			local stages = def.stages
 			if stages then
 				for _, stage in stages do

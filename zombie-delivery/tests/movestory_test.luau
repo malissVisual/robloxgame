@@ -270,6 +270,18 @@ check("a saved table keeps only known keys set to true", cleaned.intro == true a
 check("encoded for the attribute and back", MoveStory.encodeSeen({ intro = true }) == "intro" and MoveStory.encodeSeen({}) == "" and MoveStory.encodeSeen(nil) == ""
 	and MoveStory.decodeSeen("intro").intro == true and next(MoveStory.decodeSeen("")) == nil and next(MoveStory.decodeSeen("bogus,,x")) == nil
 	and next(MoveStory.decodeSeen(nil)) == nil)
+-- 7.2 review: the client marks only a card it was shown (the Tutorial remote's ("story", key): server/Tutorial.luau
+-- asks MoveStory.isCardKey); a chapter done is the server's alone (server/Moving.luau), never the client's
+check("7.2 review: the client's story keys are the cards' (intro), never a chapter done", MoveStory.isCardKey("intro") and not MoveStory.isCardKey("done:prologue")
+	and not MoveStory.isCardKey("done:ranch") and not MoveStory.isCardKey("money") and not MoveStory.isCardKey(nil) and table.find(MoveStory.CardKeys, "intro") ~= nil
+	and #MoveStory.CardKeys == 1)
+-- 7.2 review: an older server (main before 7.x) keeps only "intro" of the story (its cleanSeen) but keeps short keys in
+-- `rewards`: the chapters done are written there too (server/PlayerData.luau save) and read back from there
+local back = MoveStory.cleanSeen({ intro = true }, { ["done:prologue"] = true, ["done:ranch"] = true, intro = true, secrets = true, ["done:nowhere"] = true })
+check("7.2 review: the chapters done come back from the save's rewards (a save that went through an older server)", back.intro == true and back["done:prologue"] == true
+	and back["done:ranch"] == true and back["done:nowhere"] == nil and (back :: any).secrets == nil)
+check("…only the chapters done from there: never a card (intro) the story does not have", MoveStory.cleanSeen({}, { intro = true }).intro == nil
+	and next(MoveStory.cleanSeen(nil, { ["done:prologue"] = "yes" })) == nil and next(MoveStory.cleanSeen(nil, "done:prologue")) == nil)
 
 -- The real server/Moving.luau: Marge's texts through the MoveStory hook -----------------------------------------------
 
@@ -318,7 +330,8 @@ annTexts = texts(ann)
 local result = E.last(ann, "Moving", "result")
 local delivered = MoveStory.outcome(result and result.a.how, result and result.a.stars)
 check("delivered: her debrief for the outcome, after the result card", #annTexts == 2 and annTexts[2].text == (prologue.debrief :: any)[delivered] and #texts(bob) == 2, delivered)
--- (7.x van moves: a lamp to the Wall on time, then the clock runs out with an empty van: the end, late)
+-- (7.x van moves: the clock runs out with a lamp in the van, which reaches the Wall in the grace: the end, late. 7.2
+-- review: a lamp there in time and then 0:00 with an empty van is no late end: tests/moving_runtime_test.luau)
 local function trigger(prompt: any, player: any)
 	prompt.Triggered:Fire(player)
 end
@@ -355,12 +368,12 @@ do
 	E.clock += 0.3
 	Moving.step()
 	trigger(promptIn(van.model, "Load"), ann)
-	Moving.admin(ann, "trip")
 end
 Moving.admin(ann, "time")
 E.now += 61
 E.clock += 0.3
 Moving.step()
+Moving.admin(ann, "trip") -- (the lamp at the Wall in the grace: late)
 annTexts = texts(ann)
 check("the clock ran out: the late debrief", #annTexts == 4 and annTexts[3].text == prologue.dispatch and annTexts[4].text == prologue.debrief.late, #annTexts)
 Moving.admin(ann, "start")

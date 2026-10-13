@@ -31,8 +31,9 @@
 --   MoveStory.dispatchText(contract) / debriefText(contract, how, stars)   Marge's phone texts (server/Moving.luau's
 --                             MoveStory hook sends them through the Tutorial remote's "message")
 --   MoveStory.thanksLine(contract, how, stars)   the client's line for the result card (client/MoveStoryUi.luau)
---   MoveStory.isSeenKey(key) / cleanSeen(saved) / encodeSeen(seen) / decodeSeen(text)   the seen flags in the save
---                             and on the player attribute (a sorted, comma-separated list of keys)
+--   MoveStory.isSeenKey(key) / cleanSeen(saved, rewards?) / encodeSeen(seen) / decodeSeen(text)   the seen flags in the
+--                             save and on the player attribute (a sorted, comma-separated list of keys); 7.2 review:
+--                             isCardKey(key), the keys a client may mark (CardKeys: "intro", never a chapter done)
 --   The greeters (7.0: the people who welcome a crew; server/MoveGreeters.luau says these in speech bubbles, each at
 --   most Config.MoveStory.Limits.Bubble characters):
 --     a chapter's `greeter`   its client on the porch of the house: hello (2 – 3 lines when the crew comes), star (a ★
@@ -99,6 +100,9 @@ MoveStory.Villain = {
 -- Seen once a save (server/PlayerData.luau profile.story): only these keys are kept (7.x farm move: and a chapter done,
 -- "done:<chapter id>", added after the chapters below).
 MoveStory.SeenKeys = { "intro" }
+-- 7.2 review: the cards a client marks seen itself (the Tutorial remote's ("story", key): server/Tutorial.luau asks
+-- isCardKey). A chapter done is never one: only server/Moving.luau marks it.
+MoveStory.CardKeys = { "intro" }
 
 -- Marge's intro: the first time the Moving contracts board opens.
 MoveStory.Intro = {
@@ -617,14 +621,20 @@ function MoveStory.isSeenKey(key: any): boolean
 	return type(key) == "string" and table.find(MoveStory.SeenKeys, key) ~= nil
 end
 
--- A saved table checked: only known keys set to true (anything else: an empty table).
-function MoveStory.cleanSeen(saved: any): { [string]: boolean }
+-- 7.2 review: may a client mark this key (a card it was shown: CardKeys)?
+function MoveStory.isCardKey(key: any): boolean
+	return type(key) == "string" and table.find(MoveStory.CardKeys, key) ~= nil
+end
+
+-- A saved table checked: only known keys set to true (anything else: an empty table). 7.2 review: `rewards` (the save's
+-- rewards) adds the chapters done kept there: an older server keeps only "intro" of the story but every short key of
+-- the rewards (server/PlayerData.luau writes them to both).
+function MoveStory.cleanSeen(saved: any, rewards: any?): { [string]: boolean }
 	local seen: { [string]: boolean } = {}
-	if type(saved) == "table" then
-		for _, key in MoveStory.SeenKeys do
-			if saved[key] == true then
-				seen[key] = true
-			end
+	for _, key in MoveStory.SeenKeys do
+		local done = string.sub(key, 1, 5) == "done:"
+		if (type(saved) == "table" and saved[key] == true) or (done and type(rewards) == "table" and rewards[key] == true) then
+			seen[key] = true
 		end
 	end
 	return seen

@@ -2,20 +2,23 @@
 -- MoveLobby, MoveGreeters, MoveHelper and MoveSites with the real shared/FurnitureLooks.luau, shared/HouseLayout.luau
 -- (shared/Layouts/Farm.luau) and server/HouseInterior.luau (tests/run_tests.py builds them on the recorder
 -- tests/runtime/MovingRuntime.luau's fakes stand on), the owner's car a ZDC Van (Config.Moving.Beds.zdcvan).
---   * Chapter 1 opens with the prologue done: the board's card lists Walt's Farm 🔒 (why, START refused), the prologue
---     delivered (FINISH) keeps "done:prologue" in the crew's saves (PlayerData.markStory; MoveStory.cleanSeen keeps it
---     for the next load), then the board opens on Walt's Farm: its clock (14 min, the horde at 3:30), its ★ pieces the
---     chapter's keepsakes (seed 1921 of the farm's plan), the lobby's van bay.
+--   * Chapter 1 opens with the prologue done: the board's card lists Walt's Farm 🔒 (why, START refused); 7.2 review:
+--     one piece of the prologue and FINISH is no chapter done; its ★ pieces a van can take (the record player, the
+--     rocking horse: Grandpa's clock fits none) delivered and FINISH keep "done:prologue" in the crew's saves
+--     (PlayerData.markStory; MoveStory.cleanSeen keeps it for the next load), then the board opens on Walt's Farm: its
+--     clock (14 min, the horde at 3:30), its ★ pieces the chapter's keepsakes (seed 1921 of the farm's plan), the
+--     lobby's van bay.
 --   * The farm at the Old Farm (its Map.Places place): "Enter house" and "Enter barn"; Walt on his porch in his own look
 --     (the hat, the check shirt, the moustache). In by the barn doors (by the plan's exits[2]); the hay wagon (bigDoor,
 --     a pair piece) lifted with Bob: the farmhouse's Leave refuses it ("Too big — use the barn doors"), the barn's lets
 --     it out at the barn doors; the Driver calls the van to the nearest door (the barn's, its back to it); too big for
 --     the van's bay, the wagon rides on its hitch. Thunder's saddle carried out by the farmhouse past Walt ("Easy with
 --     Thunder's saddle!") into the bed.
---   * Two trips to the Wall (each unloads the van, the soldier welcomes it, the move goes on), the van wrecked with
---     Grandma's churn in it (lost, the move goes on; CAR after VanAgain s, the new van taken over), FINISH: paid for the
---     two trips at the farm's pay (× its pay), chapter 1 done in the crew's saves, the interior gone, the van's back
---     its own again.
+--   * Three trips to the Wall (each unloads the van, the soldier welcomes it, the move goes on; the third Grandma's
+--     churn, the last ★ keepsake), the van wrecked with the milk churn in it (lost, the move goes on; CAR after VanAgain
+--     s, the new van taken over), FINISH: paid for the three trips at the farm's pay (× its pay), chapter 1 done in the
+--     crew's saves (7.2 review: not for Cy, who joined without the prologue), the interior gone, the van's back its own
+--     again.
 --   * Danny on a solo farm move: two ways; with the van at the barn he goes in and out by the barn doors for the
 --     branding iron (★ first, the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
 --     and comes out of the farmhouse's front door with Sol, then the hay wagon's (bigDoor) out of the barn doors to the
@@ -203,7 +206,56 @@ E.place(bob, wall + V3(3, 1, 0))
 tick()
 E.request(ann, "finish")
 local result = E.last(ann, "Moving", "result")
-check("the prologue delivered (a trip, FINISH)", result ~= nil and result.a.how == "done" and result.a.delivered == 1)
+check("the prologue's move delivered (a trip, FINISH)", result ~= nil and result.a.how == "done" and result.a.delivered == 1)
+-- 7.2 review: one piece and FINISH is no chapter done: every ★ piece at the Wall whole (MovingRules.starsHome)
+check("7.2 review: …one piece and FINISH: the prologue not done (its ★ pieces still at Marge's)", (E.story[ann] or {})["done:prologue"] ~= true
+	and (E.story[bob] or {})["done:prologue"] ~= true)
+-- The prologue again, its ★ pieces to the Wall this time: the record player and the rocking horse, a trip each. (Grandpa's
+-- clock, 7.2 tall and never towed, fits no van, not even lying down: MovingRules.starsHome does not ask for it.)
+Moving.admin(ann, "start")
+Moving.step()
+prologueBuild = built[#built]
+local starred: { any } = {}
+for _, s in prologueBuild.plan.spots do
+	if s.star then
+		table.insert(starred, s)
+	end
+end
+local carried = 0
+for _, s in starred do
+	local item = FurnitureLooks.Items[s.item]
+	if item.size.Y > 7 then
+		continue -- (the clock)
+	end
+	van.chassis.CFrame = M.CFrame.new(home.park.x, 2, home.park.z)
+	E.clock += 30
+	E.place(ann, outside)
+	tick()
+	trigger(promptIn(moves:FindFirstChild("Move_marge"), "Enter house"), ann)
+	local model = prologueBuild.pieces[s.id]
+	E.place(ann, model.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(model, "Pick up"), ann)
+	E.clock += 12
+	E.place(ann, (prologueBuild.origin * M.CFrame.new(prologueBuild.plan.exit)).Position + V3(0, 3, 0))
+	follow(model, ann)
+	tick()
+	trigger(promptIn(workspace, "Leave house"), ann)
+	E.clock += 5
+	van.model:SetAttribute("BackOpen", true)
+	E.place(ann, van.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
+	follow(model, ann)
+	tick()
+	trigger(promptIn(van.model, "Load"), ann)
+	van.chassis.CFrame = M.CFrame.new(wall.X + 4, wall.Y, wall.Z)
+	E.place(ann, wall + V3(0, 1, 0))
+	E.place(bob, wall + V3(3, 1, 0))
+	tick()
+	carried += if model.destroyed then 1 else 0
+end
+E.request(ann, "finish")
+result = E.last(ann, "Moving", "result")
+check("the prologue again: its ★ pieces a van can take (the record player, the rocking horse) to the Wall whole, FINISH", #starred == 3 and carried == 2
+	and result ~= nil and result.a.how == "done" and result.a.starsOut == 2, result and `{carried} carried, {result.a.how}, ★ {result.a.starsOut}`)
 check("…chapter done in the crew's saves: \"done:prologue\" (PlayerData.markStory)", E.story[ann]["done:prologue"] == true and E.story[bob]["done:prologue"] == true)
 check("…kept by the save: the next load still has it (MoveStory.cleanSeen, real saves only)", MoveStory.cleanSeen(E.story[ann])["done:prologue"] == true
 	and string.find(MoveStory.encodeSeen(MoveStory.cleanSeen(E.story[ann])), "done:prologue", 1, true) ~= nil)
@@ -312,7 +364,7 @@ local barnEntry = (origin * entries[2]).Position
 local barnExit = (origin * M.CFrame.new(build.plan.exits[2])).Position
 check("Enter barn: in by the barn doors (near the plan's exits[2], not the front door)", (E.rootOf(ann).Position - barnEntry).Magnitude < 6
 	and (E.rootOf(ann).Position - barnExit).Magnitude < 8 and (E.rootOf(ann).Position - (origin * build.plan.entry).Position).Magnitude > 30, E.rootOf(ann).Position)
-local wagonSpot: any, saddleSpot: any, ironSpot: any, churnSpot: any = nil, nil, nil, nil
+local wagonSpot: any, saddleSpot: any, ironSpot: any, churnSpot: any, milkSpot: any = nil, nil, nil, nil, nil
 for _, s in build.plan.spots do
 	if s.item == "hay_wagon" then
 		wagonSpot = s
@@ -322,6 +374,8 @@ for _, s in build.plan.spots do
 		ironSpot = s
 	elseif s.item == "grandmas_churn" then
 		churnSpot = s
+	elseif s.item == "milk_churn" then -- (7.2 review: a piece that is no ★, lost with the van)
+		milkSpot = s
 	end
 end
 check("the farm has the hay wagon (bigDoor), Thunder's saddle, the branding iron, Grandma's churn", wagonSpot and saddleSpot and ironSpot and churnSpot
@@ -440,32 +494,44 @@ E.place(bob, wall + V3(3, 1, 0))
 tick()
 check("trip 2: the branding iron delivered", heard(ann, "Trip 2") and stateOf(ann, ironSpot.id).state == "delivered" and E.last(ann, "Moving", "state").a.trips == 2)
 
--- The van wrecked with Grandma's churn in it ------------------------------------------------------------------------------------
+-- Trip 3: Grandma's churn; then the van wrecked with the milk churn in it --------------------------------------------------------
 
-van.chassis.CFrame = M.CFrame.new(front.park.x, 2, front.park.z) * M.CFrame.Angles(0, math.pi, 0)
-E.clock += 30
-E.place(ann, frontOut)
-tick()
-trigger(enterHouse, ann)
-local churn = build.pieces[churnSpot.id]
-E.place(ann, churn.PrimaryPart.Position + V3(1, 0, 0))
-trigger(promptIn(churn, "Pick up"), ann)
-E.clock += 12
-E.place(ann, houseExit + V3(0, 3, 0))
-follow(churn, ann)
-tick()
-trigger(promptIn(workspace, "Leave house"), ann)
-E.clock += 5
-E.place(ann, cargoDoor.WorldPosition + V3(1, 0, 0))
-follow(churn, ann)
-tick()
-trigger(promptIn(van.model, "Load"), ann)
-tick()
+-- A piece of the farmhouse carried out by its front door into the van parked there.
+local function fromHouse(spot: any): any
+	van.chassis.CFrame = M.CFrame.new(front.park.x, 2, front.park.z) * M.CFrame.Angles(0, math.pi, 0)
+	E.clock += 30
+	E.place(ann, frontOut)
+	tick()
+	trigger(enterHouse, ann)
+	local piece = build.pieces[spot.id]
+	E.place(ann, piece.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(piece, "Pick up"), ann)
+	E.clock += 12
+	E.place(ann, houseExit + V3(0, 3, 0))
+	follow(piece, ann)
+	tick()
+	trigger(promptIn(workspace, "Leave house"), ann)
+	E.clock += 5
+	E.place(ann, cargoDoor.WorldPosition + V3(1, 0, 0))
+	follow(piece, ann)
+	tick()
+	trigger(promptIn(van.model, "Load"), ann)
+	tick()
+	return piece
+end
+local churn = fromHouse(churnSpot)
 check("Grandma's churn in the van", stateOf(ann, churnSpot.id).state == "truck", stateOf(ann, churnSpot.id) and stateOf(ann, churnSpot.id).state)
+van.chassis.CFrame = M.CFrame.new(wall.X + 4, wall.Y, wall.Z)
+E.place(ann, wall + V3(0, 1, 0))
+E.place(bob, wall + V3(3, 1, 0))
+tick()
+check("trip 3: Grandma's churn delivered (every ★ keepsake at the Wall)", heard(ann, "Trip 3") and stateOf(ann, churnSpot.id).state == "delivered" and churn.destroyed == true)
+local milk = fromHouse(milkSpot)
+check("the milk churn in the van", stateOf(ann, milkSpot.id).state == "truck", stateOf(ann, milkSpot.id) and stateOf(ann, milkSpot.id).state)
 van.wrecked = true
 tick()
-check("7.x van moves: the van wrecked: the churn in it lost (condition 0), the move goes on", heard(ann, "The van is wrecked") and stateOf(ann, churnSpot.id).state == "lost"
-	and stateOf(ann, churnSpot.id).condition == 0 and churn.destroyed == true and E.last(ann, "Moving", "result") == result and E.last(ann, "Moving", "state").a.truck == false)
+check("7.x van moves: the van wrecked: the milk churn in it lost (condition 0), the move goes on", heard(ann, "The van is wrecked") and stateOf(ann, milkSpot.id).state == "lost"
+	and stateOf(ann, milkSpot.id).condition == 0 and milk.destroyed == true and E.last(ann, "Moving", "result") == result and E.last(ann, "Moving", "state").a.truck == false)
 check("…CAR waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) or "", "comes back", 1, true) ~= nil)
 E.now += T.VanAgain
 E.truckAt = park
@@ -479,6 +545,10 @@ check("…then CAR brings a van and the move takes it over (an empty bed, its pr
 
 E.place(bob, park + V3(3, 3, 0))
 E.place(ann, park + V3(0, 3, 3))
+-- 7.2 review: Cy joins Ann's crew for the end, the prologue not done: chapter 1 is not his (no skipping ahead)
+local cy = E.player(66, "Cy", park + V3(-3, 3, 0))
+E.crew[ann] = { bob, cy }
+tick()
 local view = E.last(ann, "Moving", "state").a
 local expected = 0
 for _, item in view.items do
@@ -488,10 +558,12 @@ for _, item in view.items do
 end
 E.request(ann, "finish")
 result = E.last(ann, "Moving", "result")
-check("FINISH: done, paid for the two trips (3 delivered, 2 ★)", result ~= nil and result.a.how == "done" and result.a.delivered == 3 and result.a.trips == 2
-	and result.a.starsOut == 2 and result.a.pay > 0, result and `{result.a.how} {result.a.delivered} {result.a.trips}`)
+check("FINISH: done, paid for the three trips (4 delivered, every ★)", result ~= nil and result.a.how == "done" and result.a.delivered == 4 and result.a.trips == 3
+	and result.a.starsOut == 3 and result.a.pay > 0 and result.a.crew == 3, result and `{result.a.how} {result.a.delivered} {result.a.trips} {result.a.crew}`)
 check("…at the farm's pay (× its pay, ★ × Star)", math.abs(result.a.base + result.a.starBonus - expected) < 5, `{result.a.base + result.a.starBonus} vs {expected}`)
 check("…chapter 1 done in the crew's saves (\"done:ranch\")", E.story[ann]["done:ranch"] == true and E.story[bob]["done:ranch"] == true)
+check("7.2 review: …not for Cy, who joined without the prologue (paid, but no chapter skipped)", (E.story[cy] or {})["done:ranch"] ~= true
+	and (E.story[cy] or {})["done:prologue"] ~= true)
 check("…the farm's interior gone, the van's back its own again", build.model.Parent == nil and van2.model:GetAttribute("BackCrew") == nil
 	and van2.chassis:FindFirstChild("CargoDoor"):FindFirstChild("BackPrompt").Enabled == true and ann:GetAttribute("MoveWith") == nil)
 
