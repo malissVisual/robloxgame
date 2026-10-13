@@ -32,17 +32,20 @@ Lupiči ve hře už jsou, dostanou tak příběh.
    a výbavu, vybere se auto (dodávka, nákladák, s přívěsem) a postup. Až jsou všichni **READY**, akce začíná.
 3. **Přípravné mise (nepovinné, dávají bonus):**
    - **Průzkum:** projet kolem domu a vyfotit ho: odhalí seznam věcí a vchody.
-   - **Klíče:** vyzvednout klíče od majitele. Bez nich se musí vypáčit dveře, což dělá hluk a láká zombíky.
    - **Výbava:** koupit deky, popruhy, krabice, rudl nebo plošinu.
    - **Cesta:** odklidit vrak nebo barikádu na trase.
-4. **Akce:** parta přijede k objektu. U dveří se obrazovka **ztmaví a hráč se objeví uvnitř** (interiér je zvlášť,
-   proto může být velký a detailní). Uvnitř je **seznam věcí** se značkou, co klient chce nutně (★) a co je navíc.
+4. **Akce:** parta přijede k objektu. Na verandě čeká **klient** (u prologu Marge): jakmile k domu dojdete,
+   otočí se k vám, zamává, v bublině vás přivítá a ukáže na otevřené dveře. Dveře nejsou nikdy zamčené. U dveří se
+   obrazovka **ztmaví a hráč se objeví uvnitř** (interiér je zvlášť, proto může být velký a detailní). Uvnitř je
+   **seznam věcí** se značkou, co klient chce nutně (★) a co je navíc. Klient během stěhování občas něco řekne (★ věc
+   v rukou: „Careful with that!“, horda, odjezd náklaďáku) a zombíci si ho nevšímají.
 5. **Vynášení:** věci se nosí ven do auta. Malé do ruky nebo do krabice, větší oběma rukama, velké ve dvou nebo
    na rudlu. Ze zahrady se dá nakládat oknem, z vyšších pater spouštět na laně.
 6. **Nakládání:** v autě je mřížka a věci se skládají jako Tetris. Dobře naložené a přivázané věci se nerozbijí,
    špatně naložené ano.
 7. **Čas běží:** v posledních minutách přichází horda. Odjet se dá kdykoli i s tím, co je naložené.
-8. **Odvoz a vyložení** za Zeď do nového bytu klienta. Za postavení postele do ložnice a podobně je bonus.
+8. **Odvoz a vyložení** za Zeď do nového bytu klienta. U kontrolního stanoviště na Zdi stojí voják, který
+   náklaďák přivítá („Welcome to the safe zone. Unload over there.“). Za postavení postele do ložnice a podobně je bonus.
 9. **Výplata:** podle ceny věcí, jejich stavu, času a spokojenosti klienta (hvězdy). Dělí se mezi partu.
 
 ## 3. Role (každá má svůj nástroj a úkol)
@@ -51,12 +54,15 @@ Lupiči ve hře už jsou, dostanou tak příběh.
 | 🚚 **Řidič** | vozí partu, couvá autem až ke dveřím, skládá náklad v autě | rychlé nakládání (Tetris bonus), rampa, vyzvednutí parťáků („pro tebe přijedu“) |
 | 💪 **Nosič** | nosí těžké věci, rudl, popruhy | sám unese těžké kusy, dvakrát rychlejší po schodech |
 | 🛡️ **Strážce** | hlídá vchod a auto, barikády, pasti | těžké zbraně během akce, barikáda ke dveřím, odhalí zloděje |
-| 🔧 **Technik** | otevírá zamčené dveře, opravuje proud, výtah | páčidlo bez hluku, pojistková skříň (rozjede výtah), vypne alarm |
+
+Role jsou **tři**. Technika majitel ze hry vyřadil: dveře nejsou zamčené (u domu vás přivítá klient a dveře
+otevře), v domě se svítí od začátku a pojistková skříň ani páčení zámku ve hře nejsou. Dokud je hráčů nejvýš tři,
+má každý jinou roli; čtvrtý hráč si může vzít roli, kterou už někdo má.
 
 **Spolupráce, kterou hra vyžaduje:**
 - **Dveře se samy zavírají**, někdo je musí podržet, když se nese gauč.
 - **Gauč, piano, lednice, skříň** unesou jen dva hráči najednou (nebo jeden Nosič s rudlem).
-- **Výtah v hotelu** jede jen tehdy, když Technik ve sklepě nahodí proud. Do té doby se chodí po schodech.
+- **Výtah v hotelu** jede jen tehdy, když někdo z party ve sklepě nahodí proud. Do té doby se chodí po schodech.
 - **Okno a lano:** jeden spouští věc z patra, druhý ji dole chytá.
 - **Auto u dveří:** čím blíž Řidič zacouvá, tím kratší cesta. Pak ale musí odjet, když přijde horda.
 - **Rychlé zprávy** (kolečko): „Podrž dveře“, „Potřebuju pomoct“, „Zombíci!“, „Auto je tady“, „Přijedu pro tebe“.
@@ -76,7 +82,7 @@ Interiéry se skládají z **místností (moduly)** a nábytek se pokaždé rozm
 ## 5. Postup hrou
 - **Firma roste:** větší auta (dodávka → nákladák → kamion s přívěsem), lepší výbava (hydraulická plošina,
   elektrický rudl, deky, které chrání víc), nové čtvrti a typy zakázek.
-- **Dovednosti** (ty z 6.20) se přestaví na role: větev Nosič, Řidič, Strážce, Technik.
+- **Dovednosti** (ty z 6.20) se přestaví na role: větev Nosič, Řidič, Strážce.
 - **Hodnocení klientů** (hvězdy) odemyká lépe placené zakázky.
 - **Základna:** vlastní sklad, kam se ukládá sbírka vzácných věcí a vystavují trofeje.
 
@@ -101,5 +107,6 @@ nejdřív jen vypne, aby se dalo cokoli vrátit, a smaže se až po odzkoušení
 ## 8. Co je potřeba rozhodnout
 - Zůstanou zombíci hlavní hrozbou (doporučuji ano, název hry)?
 - Hraní o samotě: přepínání rolí + AI pomocník (doporučuji), nebo jen parta?
-- Čtyři role (Řidič, Nosič, Strážce, Technik), nebo i pátá (Balič: balí křehké věci)?
+- ~~Čtyři role, nebo i pátá?~~ Rozhodnuto: tři role (Řidič, Nosič, Strážce), Technik ze hry zmizel a místo něj
+  vás u domu vítají postavy. Přidat později čtvrtou roli (Balič: balí křehké věci)?
 - Začít prototypem jednoho domu (doporučuji), nebo rovnou všechno?

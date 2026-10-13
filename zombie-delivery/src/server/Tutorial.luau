@@ -50,6 +50,7 @@ local Map = require(Shared.Map)
 local TransportRules = require(Shared.Transport)
 local VanQuestRules = require(Shared.VanQuest)
 local Net = require(Shared.Net)
+local NpcLooks = require(Shared.NpcLooks) -- 7.0: Marge's look (the porch of her house on moving day wears it too)
 local TutorialSteps = require(Shared.TutorialSteps)
 local PlayerData = require(script.Parent.PlayerData)
 local Jobs = require(script.Parent.Jobs)
@@ -238,11 +239,9 @@ local function spawnMarge()
 	local depot = Map.Shops.depot
 	local spot = Tuning.NpcSpot
 	local feet = Vector3.new(depot.x + spot[1], Map.WalkTop, depot.z + spot[2])
-	-- A dispatcher: a clerk's shirt, the company's yellow cap and vest, grey hair.
-	local look = Npcs.look("clerk", Tuning.NpcName, Tuning.NpcTitle)
-	look.hat, look.hatColor = "cap", { 255, 190, 60 }
-	look.shirt, look.vest, look.pants = { 236, 236, 240 }, { 240, 170, 50 }, { 52, 56, 70 }
-	look.hair, look.skin = { 160, 156, 150 }, { 241, 194, 160 }
+	-- A dispatcher: a clerk's shirt, the company's yellow cap and vest, grey hair (7.0: shared/NpcLooks.luau marge, the
+	-- same look on the porch of her house on moving day).
+	local look = NpcLooks.marge(Tuning.NpcName, Tuning.NpcTitle)
 	local ok, model = pcall(Npcs.spawn, look, CFrame.lookAt(feet, feet + Vector3.new(0, 0, 1)))
 	if not ok or not model then
 		warn(`[Tutorial] {Tuning.NpcName} could not be built: {model}`)

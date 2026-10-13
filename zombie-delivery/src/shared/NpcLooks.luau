@@ -154,4 +154,15 @@ function NpcLooks.look(role: string, name: string, title: string?): Look
 	return look
 end
 
+-- 7.0: Marge as everybody knows her, the depot's dispatcher (server/Tutorial.luau at the job board, server/
+-- MoveGreeters.luau on the porch of her house on moving day): a clerk's shirt, the company's yellow cap and vest, grey
+-- hair.
+function NpcLooks.marge(name: string, title: string?): Look
+	local look = NpcLooks.look("clerk", name, title)
+	look.hat, look.hatColor = "cap", { 255, 190, 60 }
+	look.shirt, look.vest, look.pants = { 236, 236, 240 }, { 240, 170, 50 }, { 52, 56, 70 }
+	look.hair, look.skin = { 160, 156, 150 }, { 241, 194, 160 }
+	return look
+end
+
 return NpcLooks

@@ -1166,11 +1166,12 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Code: `shared/MoveStory.luau`, `client/MoveStoryUi.luau`.
 
 **Planning.** After the briefing a GTA-style planning window opens (`server/MoveLobby.luau`, `client/MoveLobbyUi.luau`, `shared/MoveRoles.luau`). It shows the contract, your crew (K invites) and the Moving Truck.
-- Everyone picks one of four roles and LAUNCH starts once all are READY (solo at once):
+- Everyone picks one of three roles (three cards side by side) and LAUNCH starts once all are READY (solo at once):
   - 🚚 **Driver:** no wait at the truck's back, less truck damage at the wheel, "Call truck to door" once.
   - 💪 **Mover:** lifts a two-person piece alone, carries 15% faster, no slowdown on slopes.
   - 🛡️ **Guard:** +50% damage, two plank barricades, sees zombies through walls.
-  - 🔧 **Technician:** picks the locked front door quietly (anyone else kicks it in and the noise brings zombies), and fixes the garage fuse box so the lights come back.
+- One role each while there are three players or fewer; a fourth player may double one.
+- The owner took the Technician out: the front door is never locked and the house is lit from the start.
 - Solo players switch roles from the item list (O or a tap on the panel, every 30 s).
 - Hold **T** (💬 on phones) for quick chat: six lines your crew sees as a bubble and a line in the move panel.
 
@@ -1194,6 +1195,14 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - He runs from zombies and is back at the truck 15 s after he goes down.
 - Orders: HELP ME, SMALL STUFF, WAIT AT TRUCK; the quick chat "Need a hand here" calls him too.
 
+**The greeters** (`server/MoveGreeters.luau`, the words in `shared/MoveStory.luau`, `Config.MoveGreeters`): people who welcome you.
+- **Marge on her porch.** She stands beside the front door of 155 Willow Ln from the move's start, off the path.
+  - When the first crew member comes within 25 studs, she turns, waves and says her hello in a speech bubble: "Oh thank heavens, ZDC!", then points you to the open door.
+  - She reacts during the move: a ★ piece carried past her ("Careful with that!"), the horde ("They're coming! Hurry!"), and the loaded truck driving off ("Thank you… see you behind the Wall.", also as a notice to the crew).
+  - Zombies ignore her. She leaves when the move ends.
+- **The soldier at the Wall.** Private Reyes stands by the checkpoint's booth. When a truck is delivered, he waves: "Welcome to the safe zone. Unload over there."
+- **Marge at the Moving contracts kiosk.** This is the tutorial's Marge by the job board, not a second one. When you walk up to the kiosk on foot and not on a move, she turns to you and says "New contract, sweetie?" (a bubble and a notice). She greets each player once every 3 minutes.
+
 **The world** (`server/MoveSites.luau`, `shared/MoveSiteLooks.luau`):
 - the Wall's evacuation checkpoint at the depot is the drop-off;
 - the Moving contracts kiosk;
@@ -1204,7 +1213,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 **Tests:**
 - the rules: `moving_test`, `moveroles_test`, `movehelper_test`, `movestory_test`;
 - the art: `furniture_test`, `houselayout_test`, `houseinterior_test`, `movesites_test`;
-- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`;
+- the real server modules on fakes: `moving_runtime_test`, `movehelper_runtime_test`, `movegreeters_runtime_test`;
 - an end-to-end move with the real house art: `moving_art_runtime_test`.
 
 ## Cars spawn clear and stand back up (6.26)
