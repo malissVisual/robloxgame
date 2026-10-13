@@ -3,7 +3,7 @@
 -- (tools/fixtures/item-mock.luau), written as JSON lines for render.mjs: each part's class, shape, size, place, turn,
 -- colour, material and opacity, the pieces' catalogue entries, the house's rooms, spots, fixtures, entry and lights.
 -- 7.x the farm: with a second seed also Walt's farm (HouseLayout.plan(seed, "farm"), layout "farm"); a piece of the
--- farm's block (FurnitureLooks.FarmPieces) is marked farm.
+-- farm's block (FurnitureLooks.FarmPieces) is marked farm. 8.0: a collectible's rarity with its entry and its spots.
 -- Run by tools/furniture/render.py:  luau export.luau -a <seed> [<farm seed>]
 local M = require("./ItemMock")
 local FurnitureLooks = require("./FurnitureLooks")
@@ -95,6 +95,7 @@ for index, id in FurnitureLooks.Order do
 			parts = #parts + 1,
 			farm = farmPieces[id] == true,
 			bigDoor = def.bigDoor == true,
+			rarity = def.rarity, -- (8.0 collectibles; nil for an ordinary piece)
 		},
 		parts = parts,
 	}))
@@ -133,7 +134,7 @@ local function scene(kind: string, at: number)
 	end
 	for _, s in plan.spots do
 		local def = FurnitureLooks.Items[s.item]
-		table.insert(spots, { id = s.id, item = s.item, room = s.room, star = s.star, position = vec(s.at.Position), label = def.name, bigDoor = def.bigDoor == true })
+		table.insert(spots, { id = s.id, item = s.item, room = s.room, star = s.star, position = vec(s.at.Position), label = def.name, bigDoor = def.bigDoor == true, rarity = def.rarity })
 	end
 	-- 7.x alpine: the fixtures too (render.py's eye-level views aim at the Kachelofen, the corner bench, the wall decor)
 	local fixtures = {}

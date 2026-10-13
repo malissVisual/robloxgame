@@ -7,7 +7,7 @@ HERE=Path(__file__).resolve().parent
 
 def prepare_modules(tmp, vehicles_source=None):
     prefix='local Mock = require("./roblox-mock")\nlocal game, workspace, Instance, Vector3, Vector2, Color3, CFrame, Enum, PhysicalProperties, UDim2, typeof = Mock.game, Mock.workspace, Mock.Instance, Mock.Vector3, Mock.Vector2, Mock.Color3, Mock.CFrame, Mock.Enum, Mock.PhysicalProperties, Mock.UDim2, Mock.typeof\n'
-    for name in ['Config','Economy','Map','Boarding','RenderBudget','CarUpright','SpawnSpot']: # (6.13.1: RenderBudget, the cars' shadows; 6.26: SpawnSpot, the spawn's room, and its CarUpright)
+    for name in ['Config','Economy','Map','Boarding','RenderBudget','CarUpright','SpawnSpot','SprinterLooks']: # (6.13.1: RenderBudget, the cars' shadows; 6.26: SpawnSpot, the spawn's room, and its CarUpright; 8.0: SprinterLooks, the ZDC Sprinter's look)
         s=(ROOT/'src/shared'/f'{name}.luau').read_text()
         s=re.sub(r'require\(script.Parent.(\w+)\)',r'require("./\1")',s)
         (tmp/f'{name}.luau').write_text(s)
@@ -30,7 +30,7 @@ def export(luau,output,vehicles_source=None):
         result=subprocess.run([str(Path(luau).resolve()),'export.luau'],cwd=tmp,text=True,capture_output=True)
         if result.returncode:raise RuntimeError(result.stdout+result.stderr)
     models=[json.loads(line) for line in result.stdout.splitlines()]
-    assert len({m['id'] for m in models})==10 # (6.25: + the ZDC Van)
+    assert len({m['id'] for m in models})==11 # (6.25: + the ZDC Van; 8.0: + the ZDC Sprinter)
     output.mkdir(parents=True,exist_ok=True)
     (output/'fleet.json').write_text(json.dumps(models))
     print(f'Actual factory PASS: {len(models)} display builds; moving joints, weld targets, display anchoring and nonblocking skins verified')

@@ -603,7 +603,7 @@ function PhoneApps.shop(list: Instance, look: OrdersUi.Kit, host: Host, wide: bo
 	end
 	local list2: { Config.CarDef } = {}
 	for _, def in Config.Cars do
-		if not def.company and not def.bike then
+		if not def.company and not def.bike and not def.sandboxOnly then -- (8.0: never the sandbox's ZDC Sprinter)
 			table.insert(list2, def)
 		end
 	end

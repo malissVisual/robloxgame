@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "7.3"
+Config.Version = "8.0"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -386,6 +386,9 @@ export type CarDef = {
 	-- `ambient` a body only the world builds (Config.AmbientCars: traffic, buses, bandits), never a player's car.
 	starter: boolean?,
 	ambient: boolean?,
+	-- 8.0 SANDBOX: a car of the sandbox only (the ZDC Sprinter): never listed in the city, a player's car only while
+	-- Config.Sandbox.On (Economy.isPlayerCar)
+	sandboxOnly: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -568,6 +571,31 @@ Config.Cars = {
 		color = { 153, 49, 43 },
 		role = "The fast one: a battery does half the pedalling",
 		description = "A battery in the frame, a bar display, disc brakes. The fastest thing on two wheels, no fuel needed. A rear rack and two gear slots. Rider only.",
+	},
+	-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the ZDC Sprinter, every player's van in the sandbox (Config.Sandbox.Van):
+	-- a Mercedes-Sprinter-like high-roof panel van in the company's livery that you walk into (its measures:
+	-- Config.Sprinter; its look and walk-in bay: shared/SprinterLooks.luau and server/Vehicles.luau STYLES.sprinter). A
+	-- bit heavier than the ZDC Van (slower, slower off the line, a wider turn), a big tank (the sandbox has no pumps).
+	-- `sandboxOnly`: never sold or listed in the city (the dealer, the phone, the career road, the room advice skip it)
+	-- and a player's car only while Config.Sandbox.On (Economy.isPlayerCar). No stages, upgrades, gear or roof gun.
+	{
+		id = "sprinter",
+		sandboxOnly = true,
+		level = 1,
+		name = "ZDC Sprinter",
+		price = 0,
+		style = "sprinter",
+		maxSpeed = 58,
+		accel = 22,
+		turn = 1.55,
+		health = 720,
+		capacity = 8,
+		tank = 160, -- litres (Config.Fuel): about 130,000 studs at its burn × Config.Fuel.Lasts
+		burn = 6,
+		ramPower = 1.5,
+		color = { 232, 226, 210 },
+		role = "The sandbox's walk-in van",
+		description = "Zombie Delivery Co.'s high-roof van: walk into its cargo bay through the back doors or the sliding side door. 1 passenger.",
 	},
 } :: { CarDef }
 
@@ -3584,7 +3612,7 @@ Config.Soundscape = {
 	-- CarId → its horn (else horn_car; a pedal bike rings bike_bell, a stand-up scooter beeps scooter_beep).
 	Horns = {
 		van = "horn_van", zdcvan = "horn_van", courier = "horn_van", highroof = "horn_van", armorvan = "horn_van", rallyvan = "horn_van",
-		icecream = "horn_van", ambulance = "horn_van",
+		icecream = "horn_van", ambulance = "horn_van", sprinter = "horn_van", -- (8.0: the sandbox's ZDC Sprinter)
 		pickup = "horn_car", muscle = "horn_car",
 		boxtruck = "horn_truck", freight = "horn_truck", armored = "horn_truck", bus = "horn_truck", monster = "horn_truck",
 		movingtruck = "horn_truck", livestock = "horn_truck", fueltruck = "horn_truck",
@@ -5529,6 +5557,7 @@ Config.Robust = {
 		Gear = 5,
 		Kit = 4,
 		Aiming = 12,
+		AdminSandbox = 4, -- 8.0 SANDBOX: the admin panel's SANDBOX buttons (server/Admin.luau "sandbox", shared/SandboxAdmin.luau)
 		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
 		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
@@ -5540,6 +5569,7 @@ Config.Robust = {
 		MoveLobby = 6, -- 7.0 planning: the MoveLobby remote's role, READY, LAUNCH, CANCEL (server/MoveLobby.luau)
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
+		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
 	},
 }
 
@@ -6094,7 +6124,15 @@ Config.CarryGrip = {
 --                     who still drives one. Hitch: a piece too big for any bed that may be towed (FurnitureLooks bigDoor:
 --                     the hay wagon) rides hitched behind the car, Gap studs behind its back (Back: the back's z), its
 --                     wheels on the ground (Drop: the chassis' middle over the ground). VanAgain: s after the van was
---                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again
+--                     lost (wrecked or gone mid-move: what was in it is lost) before CAR brings it again.
+--                     8.0 SANDBOX: sprinter, the walk-in Sprinter's bay (Config.Sandbox.Van: the sprinter's body is
+--                     Config.Sprinter's): 6.6 wide (13 cells of 0.5: 6.5 of it packed, in its middle), 7.6 tall, 14 long:
+--                     every house piece stands in it (the Grandfather Clock's 7.2 too; tests/vanmove_test.luau). Cell 0.5,
+--                     not the ZDC Van's 0.4: the packer's cost grows with the cells (a 14-long bay at 0.4: a Load up to
+--                     about 60 ms with its repack, 0.5 about 15 ms, and only about 2% fewer pieces packed). WalkIn:
+--                     a carrier standing inside the bay (its box over the floor) may Load from there too (the bay's own
+--                     Load prompt), not only at the back doors. Back: the bay's back end this far in front of the car's
+--                     CargoDoor (its z from the door: it follows the body's length; Center's z only without a door)
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
 --                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
 --                     trip; the move goes on until the owner's FINISH or the clock)
@@ -6135,6 +6173,16 @@ Config.CarryGrip = {
 --                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
 --                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
 --                     depth; its front door is Doors[1])
+--   Sandbox           8.0 SANDBOX (Config.Sandbox.On; design/sandbox/KONTRAKT.md): in place of Contracts the one house of
+--                     shared/SandboxMap.luau (House: its id, name, front door, the van's curb), refilled every move (a new
+--                     HouseLayout seed), on the Moving contracts board of every player's plot (SandboxMap plot.board); the
+--                     move goes with the player's own van (Config.Sandbox.Van, else Van). No Wall: the drop-off is the
+--                     move owner's plot (plot.unload: the van's back inside its circle), where every piece in the van goes
+--                     into their warehouse's stock (server/Collection.luau Collection.add: a trip). No pay per piece (the
+--                     warehouse earns), no XP; no story. Client / Icon / Address / Blurb: the card's; Time / HordeAt: the
+--                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
+--                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
+--                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6182,7 +6230,8 @@ Config.Moving = {
 	Beds = {
 		zdcvan = { Width = 6.2, Length = 6.4, Height = 4.3, Cell = 0.4, Center = { 0, 2.98 } :: { number } }, -- (Cell 0.4: its whole 6.4 length, 15 × 16 cells)
 		movingtruck = { Width = 7, Length = 10, Height = 7.4, Cell = 0.5, Center = { 0, 2.9 } :: { number } },
-	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number } } },
+		sprinter = { Width = 6.6, Length = 13.7, Height = 7.6, Cell = 0.5, Center = { 0, 2.7 } :: { number }, Back = 0.9, WalkIn = true }, -- 8.0 SANDBOX
+	} :: { [string]: { Width: number, Length: number, Height: number, Cell: number, Center: { number }, Back: number?, WalkIn: boolean? } },
 	Hitch = { Gap = 1.2, Back = 7, Drop = 1.5 },
 	VanAgain = 20,
 	Board = { 44, 12 } :: { number },
@@ -6209,6 +6258,16 @@ Config.Moving = {
 	Slots = 6,
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
+	Sandbox = {
+		Client = "The Hubers",
+		Icon = "🏡",
+		Address = "the end of Main Street",
+		Blurb = "An old alpine chalet full of things. Bring them home to your warehouse and put them on show.",
+		Time = 20 * 60,
+		HordeAt = 3 * 60,
+		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
+		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
+	},
 }
 
 -- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the
@@ -6265,7 +6324,8 @@ Config.MoveRoles = {
 --                      620, was 600: the chalet's beams, Kachelofen, corner bench and shelf, lace, painted front door,
 --                      antlers and pictures add about 30 parts, the one plank floor, the tiled bathroom walls, the one sink
 --                      run and the handle-less cabinets win back about 16; seeds 1-1000: the busiest 614 (was 599), on
---                      average 558 (was 539))
+--                      average 558 (was 539)); 8.0 SANDBOX: 700 (the farm's), was 620: a house's 2-4 collectibles add
+--                      about 48 parts (seeds 1-1000: the busiest 688, seed 174; on average 606)
 --   Light              the ceiling lights: Brightness, Range (a long corridor gets a second one past LongRoom); 7.x alpine:
 --                      a warmer Color
 --   DoorLight          the daylight through the front door (a SurfaceLight on the porch's glow)
@@ -6300,7 +6360,7 @@ Config.Furniture = {
 	Grid = 0.5,
 	Slot = { Origin = { 9000, 400, 9000 } :: { number }, Spacing = 600 },
 	Ground = { Margin = 24, Depth = 4 },
-	InteriorMaxParts = 620,
+	InteriorMaxParts = 700,
 	Light = { Brightness = 0.9, Range = 30, LongRoom = 40, Color = { 255, 218, 168 } :: { number } },
 	DoorLight = { Brightness = 1.6, Range = 18, Color = { 255, 246, 226 } :: { number } },
 	Alpine = {
@@ -6313,6 +6373,18 @@ Config.Furniture = {
 		Antlers = { 2.6, 2.0, 0.6 } :: { number },
 		Beam = 0.9,
 		BeamRows = 2,
+	},
+	-- 8.0 SANDBOX collectibles (design/sandbox/KONTRAKT.md): the rare pieces (shared/FurnitureLooks.luau's with a
+	-- rarity) a house (HouseLayout.plan(seed, "house")) holds besides its Spots, after them and on their own dice (the
+	-- seed + Salt), so the house's own pieces and its ★ stay as they were; never ★ themselves:
+	--   Count       how many (at least, at most)
+	--   Legendary   the chance a house holds a legendary one (one at most: about one house in eight)
+	--   Odds        the others' rarities, by weight (a piece that finds no place gives way to one of the rarity below)
+	Collectibles = {
+		Count = { 2, 4 } :: { number },
+		Legendary = 0.125,
+		Odds = { uncommon = 60, rare = 30, epic = 10 } :: { [string]: number },
+		Salt = 8017,
 	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
 	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:
@@ -6647,5 +6719,233 @@ do -- 6.19: the one pass over the tables (see Config.Prices)
 		end
 	end
 end
+
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the owner's small test world (shared/SandboxMap.luau) in place of the
+-- city: one house to empty, your walk-in Sprinter van, your ZDC warehouse where what you bring is put on show (it earns
+-- while it stands there) or sold. On = false builds the old city as before (until it is deleted).
+--   On          the sandbox world instead of the city (server/Main.server.luau, client/Main.client.luau)
+--   Van         the car every player has in the sandbox (Config.Cars id; parked at their plot's vanSpot at PLAY; the
+--               ZDC Van, Config.CompanyVan.Car, while this one is not in Config.Cars yet: server/SandboxBoot.luau)
+--   MaxPlayers  the plots (SandboxMap.Plots): one player each (set the place's max players to this)
+--   Store       the sandbox's own DataStore (server/PlayerData.luau): the city's saves (DataStoreName) are never read
+--               or written while On
+--   StartMoney  a new sandbox save's money (in Studio without saves too)
+Config.Sandbox = {
+	On = true,
+	Van = "sprinter",
+	MaxPlayers = 4,
+	Store = Config.DataStoreName .. "_Sandbox",
+	StartMoney = 500,
+}
+
+-- 8.0 SANDBOX, the collection (design/sandbox/KONTRAKT.md "Collection"): everything a move brings home is yours. It
+-- waits in your warehouse's stock, stands on show on a display stand (it earns money every minute you play) or is sold
+-- (any time). shared/CollectionRules.luau has the rules (tests/collection_test.luau), server/Collection.luau keeps
+-- profile.collection, pays and answers the "Collection" remote (tests/collection_runtime_test.luau). A piece's worth
+-- is its furniture's value (shared/FurnitureLooks.luau Items: the moves' `value`) × its condition (0 … 1).
+--   Tiers      the rarities by id: name, colour (RGB), rank (1 common … 5 legendary), min (a piece without a `rarity`
+--              of its own is the rarest tier whose min its value reaches), income (× the worth a minute on show) and
+--              sell (× the worth when sold: about ten minutes of showing it)
+--   Order      the tiers' ids, common first
+--   BrokenAt   a condition at or under it is broken (the moves' own, Config.Moving.Damage.BrokenAt): it earns nothing
+--              on show and sells for scrap, Scrap × its value (at least $1)
+--   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why)
+--   Stands     the display stands when Config.Warehouse.Stands is missing (CollectionRules.standsFor)
+--   Tick       s between two payouts of the stands' income (exact: the fractions carry over to the next one)
+-- The tuning: a house's haul (HouseLayout's 40 first seeds: 18 – 24 pieces worth $4,800 – 7,800) at 90 % condition,
+-- its best 12 on the 12 stands, earns $88 – 140 a minute (median $100); selling all of it pays $850 – 1,470, 9.6 –
+-- 10.9 minutes of that (tests/collection_test.luau checks a sample haul). A legendary piece (none in a house by
+-- itself: the collectibles' own `rarity`) earns 4 % of its value a minute: one at $1,500 out-earns a haul's best three.
+export type CollectionTier = { name: string, rank: number, color: { number }, min: number, income: number, sell: number }
+Config.Collection = {
+	Tiers = {
+		common = { name = "Common", rank = 1, color = { 178, 182, 188 }, min = 0, income = 0.015, sell = 0.14 },
+		uncommon = { name = "Uncommon", rank = 2, color = { 92, 196, 104 }, min = 100, income = 0.018, sell = 0.17 },
+		rare = { name = "Rare", rank = 3, color = { 70, 144, 240 }, min = 300, income = 0.022, sell = 0.2 },
+		epic = { name = "Epic", rank = 4, color = { 178, 96, 236 }, min = 600, income = 0.026, sell = 0.24 },
+		legendary = { name = "Legendary", rank = 5, color = { 255, 178, 36 }, min = 1500, income = 0.04, sell = 0.4 },
+	} :: { [string]: CollectionTier },
+	Order = { "common", "uncommon", "rare", "epic", "legendary" } :: { string },
+	BrokenAt = Config.Moving.Damage.BrokenAt,
+	Scrap = 0.03,
+	MaxStock = 300,
+	Stands = 12,
+	Tick = 10,
+}
+
+-- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
+-- the middle and a 3D guide (a soft glowing path on the ground along the roads, a floating chevron over the target with
+-- its distance) to what to do next. Each step goes quiet once done (per session); the arrow to the house and home
+-- stays while you drive. Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
+-- it back.
+--   Every         s between two looks: the step, the path, the distance (nothing is done frame by frame)
+--   Fade          s the hint line takes to fade in or out
+--   HideHold      s G is held to hide the guide or bring it back
+--   OffNote       s the "Guide off" line stays before it fades
+--   InfoSeconds   s a step that only says something (the pieces earn money) shows before it counts as done
+--   HouseMargin   studs round the house's lot (SandboxMap.House.lot) that count as "at the house"
+--   Direct        studs: a target closer than this gets a straight path, a farther one goes along the roads
+--   Near          studs: closer than this the path hides (the chevron stays)
+--   ChevronHeight studs over the target the chevron floats
+--   PathLift      studs over the ground the path glows
+--   PathWidth     studs: the path's width
+--   PathAlpha     the path's transparency (0 solid … 1 gone)
+--   Color         the guide's colour (the path, the chevron, the hint's edge): a warm ZDC orange
+--   HintWidth     px at scale 1: the widest the hint line gets (its words wrap beyond)
+--   TextSize      px at scale 1: the hint's words
+--   TouchScale    the hint's smallest scale on a touch screen (readable on a phone held sideways)
+--   SideClear     px at scale 1 kept free at the top's left and right (the money, Roblox's own buttons)
+--   Top           px from the top when nothing else holds the top's middle; Gap: px under what does
+Config.SandboxGuide = {
+	Every = 0.2,
+	Fade = 0.5,
+	HideHold = 0.8,
+	OffNote = 3,
+	InfoSeconds = 12,
+	HouseMargin = 40,
+	Direct = 70,
+	Near = 8,
+	ChevronHeight = 7,
+	PathLift = 0.45,
+	PathWidth = 1.3,
+	PathAlpha = 0.45,
+	Color = { 255, 168, 60 },
+	HintWidth = 460,
+	TextSize = 15,
+	TouchScale = 0.8,
+	SideClear = 200,
+	Top = 8,
+	Gap = 6,
+}
+
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
+-- shared/WarehouseLayout.luau lays it out, server/Warehouse.luau builds it) and its display stands, where the pieces of
+-- your collection stand on show (and earn every minute you play).
+--   Stands          how many display stands (Collection.display's stand: 1 … Stands; 1 nearest the door, west to east)
+--   Columns         the stands across the hall (even: half each side of the middle aisle); the rows go back from the door
+--   StandSize       a stand's podium (square, studs): every piece fits on it unturned (the biggest, the hay wagon, 6.4 × 9.6)
+--   StandHeight     the podium's top over the floor
+--   Aisle           the least walk between two stands and between the stands and the side walls (a player with a sofa)
+--   MiddleAisle     the walk from the roller door to the back wall, between the two halves
+--   Receiving       the receiving zone's depth inside the roller door (its width the door's, SandboxMap.DoorWidth)
+--   DoorHeight      the roller door's opening (kept open)
+--   Ridge           the gable roof's ridge (north-south) over the walls' top
+--   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length } (the van parks in it)
+--   PromptDistance  the stands' prompts' reach; SellHold the Sell prompt's hold (s)
+--   Rebuild         s: the changes to one collection this close together rebuild its shown pieces once
+--   MaxParts        one warehouse's part budget (the building, its stands and its bay; not the pieces on show)
+--   Lamp            the hall's lights (PointLights, always on)
+--   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
+Config.Warehouse = {
+	Stands = 12,
+	Columns = 4,
+	StandSize = 10,
+	StandHeight = 1,
+	Aisle = 6,
+	MiddleAisle = 14,
+	Receiving = 9,
+	DoorHeight = 16,
+	Ridge = 8,
+	Bay = { 14, 26 } :: { number },
+	PromptDistance = 8,
+	SellHold = 1,
+	Rebuild = 0.15,
+	MaxParts = 400,
+	Lamp = { Range = 40, Brightness = 1.3, Color = { 255, 238, 214 } :: { number } },
+	Rarity = {
+		common = { 222, 224, 228 },
+		uncommon = { 104, 214, 120 },
+		rare = { 86, 164, 255 },
+		epic = { 192, 120, 255 },
+		legendary = { 255, 196, 64 },
+	} :: { [string]: { number } },
+}
+
+-- 8.0 SANDBOX, the HUD and the warehouse picker (client/SandboxHud.luau, client/WarehouseUi.luau; the "Collection"
+-- remote). Px at the HUD's scale 1 unless said.
+--   MoneySize / IncomeSize   the money's text (money green, counting up) and the "+$X/min" line under it (green)
+--   Chip / ChipText          the "📦 N in stock" chip under them (on a touch screen at least Ui.MinTouch screen px high)
+--   TouchScale               the money block's smallest scale on a touch screen (it is never smaller than this)
+--   StockKey                 the key that opens / closes the STOCK list (a computer)
+--   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
+--   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
+--                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
+--                            height over the tile's width, PictureTouch on a touch screen), Gap between them, Button:
+--                            a tile's buttons (a touch screen: Ui.MinTouch screen px at least)
+--   MaxViews                 3D pictures (ViewportFrames) alive at once in the grid: only the tiles on screen get one,
+--                            the others show the piece's emoji
+--   MaxModels                the pieces' models kept built for the pictures (one a piece and variant), the oldest go
+--   Models                   false: emoji only (no ViewportFrames at all)
+--   Fallback                 only until shared/CollectionRules.luau answers (the server decides what is paid): Rarity
+--                            the value from which a piece is uncommon, rare, epic, legendary; Sell the price's share of
+--                            the piece's value at condition 0 and 1; IncomeShare the price's share it earns a minute
+Config.SandboxHud = {
+	MoneySize = 34,
+	IncomeSize = 15,
+	Chip = 32,
+	ChipText = 14,
+	TouchScale = 0.8,
+	StockKey = "B",
+	Toast = 3,
+	MaxToasts = 3,
+	Picker = {
+		Width = 900,
+		Height = 620,
+		Margin = 16,
+		TouchMargin = 8,
+		Tile = 160,
+		TileTouch = 180,
+		Picture = 0.6,
+		PictureTouch = 0.42,
+		Gap = 10,
+		Button = 32,
+	},
+	MaxViews = 12,
+	MaxModels = 24,
+	Models = true,
+	Fallback = { Rarity = { 120, 260, 520, 1000 } :: { number }, Sell = { 0.5, 1 } :: { number }, IncomeShare = 0.02 },
+}
+
+-- 8.0 SANDBOX: the ZDC Sprinter (Config.Cars sprinter, Config.Sandbox.Van), a high-roof panel van you walk into. Its
+-- measures in studs; the parts look (shared/SprinterLooks.luau, server/Vehicles.luau STYLES.sprinter), the Blender
+-- model (design/blender-sprinter/, server/SprinterMesh.luau) and the moves' bed (Config.Moving.Beds.sprinter) use the
+-- same. The van's frame: from the ground under its middle, -z its front, +x its right (the kerb side), +y up.
+--   Width / Height / Length   the body (the mirrors stick out Mirror more on each side), ground to roof, bumper to
+--                             bumper: x -4 … 4, y 0 … 10.4, z -11 … 11
+--   Wheelbase                 between the axles, centred on the van's middle (z ±6.5: Vehicles builds every car's
+--                             wheels round its middle); Track: the wheels' middles ±Track across
+--   Clearance                 the chassis' bottom over the ground (Vehicles' style clearance); Wheel the radius
+--   Cab                       the cab: the front Cab studs (z -11 … -4); its back wall (the bulkhead) Bay.Gap thick
+--   Bay                       the cargo bay INSIDE: Width × Height × Length, its floor Floor over the ground (= Clearance
+--                             + the 1.2 chassis: you stand on the chassis' top), from Gap behind the cab's back wall to
+--                             the back doors at the van's back: x -3.3 … 3.3, y 2.4 … 10.0, z -3 … 11 (the closed doors'
+--                             inner face at z 10.8). Moves' bed (from the chassis' middle, its floor at the chassis' top):
+--                             Center { 0, 3.9 }, the room 6.6 × 7.6 × 13.8 less what the packing keeps off the walls
+--   Doors                     the two back doors: they swing out Swing degrees round the body's back corners and lie
+--                             flat against the sides (the walk-in way)
+--   Slider                    the sliding door on the right: its opening from z Front, Width long, Height over the floor;
+--                             it moves Out from the side and Back along it in Seconds; its prompt reaches Reach. It
+--                             shuts itself when somebody takes the wheel
+--   Step                      the fold-out step behind the back (out while the back is open): Top over the ground, Depth
+--                             out, Width across; ground → Top → the floor: two rises of 1.2 a body walks up. SideStep: the
+--                             same under the open sliding door (Depth out from the side)
+--   Light                     the bay's ceiling light (on while the back or the side door is open)
+Config.Sprinter = {
+	Width = 8.0,
+	Height = 10.4,
+	Length = 22.0,
+	Mirror = 0.8,
+	Wheelbase = 13.0,
+	Track = 3.45,
+	Clearance = 1.2,
+	Wheel = 1.2,
+	Cab = 7.0,
+	Bay = { Width = 6.6, Height = 7.6, Length = 14.0, Floor = 2.4, Gap = 1.0 },
+	Doors = { Swing = 270 },
+	Slider = { Front = -2.85, Width = 5.0, Height = 6.9, Out = 0.35, Back = 5.0, Seconds = 0.5, Reach = 8 },
+	Step = { Top = 1.2, Depth = 1.4, Width = 4.6 },
+	SideStep = { Top = 1.2, Depth = 1.2 },
+	Light = { Range = 13, Brightness = 1.4, Color = { 255, 244, 222 } :: { number } },
+}
 
 return Config

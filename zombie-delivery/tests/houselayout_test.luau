@@ -6,7 +6,9 @@
 -- out of the front door (a grid walk of this test's own, the piece's narrow side wide, past everything else); the
 -- seeds give different houses (mirrored, other room orders, other pieces and places). 7.x alpine: the Kachelofen on the
 -- living room's outer wall, the kitchen's corner bench and its corner shelf, the antlers and pictures high on the walls
--- clear of windows and doorways, the alpine pieces drawn, and Marge's House (seed 1955) keeping its story's ★.
+-- clear of windows and doorways, the alpine pieces drawn, and Marge's House (seed 1955) keeping its story's ★. 8.0
+-- SANDBOX: 2-4 collectibles a house besides its pieces (over 200 seeds: the legendary rate, no overlaps, reachable, the
+-- house's own pieces unchanged).
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -211,6 +213,13 @@ for room, entries in HouseLayout.Recipes do
 		recipeHas[room][e.item] = true
 	end
 end
+for _, e in HouseLayout.Collectibles do -- (8.0: a collectible in the room its catalogue entry names)
+	local room = Items[e.item].room
+	recipeHas[room] = recipeHas[room] or { box = true }
+	recipeHas[room][e.item] = true
+end
+local C = T.Collectibles
+local plans: { [number]: any } = {} -- (8.0: the collectibles' 200 seeds reuse these)
 
 local mirrors, orders, itemSets, places = {}, {}, {}, {}
 local slowest, totalTime = 0, 0
@@ -220,6 +229,7 @@ for seed = 1, SEEDS do
 	local took = os.clock() - started
 	slowest, totalTime = math.max(slowest, took), totalTime + took
 	local again = HouseLayout.plan(seed, "house")
+	plans[seed] = plan
 	local tag = `seed {seed}`
 	check(`{tag}: the same seed, the same plan`, signature(plan) == signature(again))
 	check(`{tag}: a house, its box (size {math.floor(plan.size.X)} × {math.floor(plan.size.Z)})`, plan.kind == "house" and plan.seed == seed
@@ -329,7 +339,14 @@ for seed = 1, SEEDS do
 
 	-- spots
 	local n = #plan.spots
-	check(`{tag}: {n} pieces ({T.Spots[1]}-{T.Spots[2]})`, n >= T.Spots[1] and n <= T.Spots[2])
+	local rare = 0 -- (8.0: the collectibles come besides the house's Spots)
+	for _, s in plan.spots do
+		if Items[s.item] and Items[s.item].rarity then
+			rare += 1
+		end
+	end
+	check(`{tag}: {n - rare} pieces ({T.Spots[1]}-{T.Spots[2]}) and {rare} collectibles ({C.Count[1]}-{C.Count[2]})`, n - rare >= T.Spots[1]
+		and n - rare <= T.Spots[2] and rare >= C.Count[1] and rare <= C.Count[2])
 	local badSpots, stars, sentimentalPlaced, starredSentimental = {}, 0, 0, 0
 	local set = {}
 	for index, s in plan.spots do
@@ -568,6 +585,154 @@ do
 	end
 	table.sort(stars)
 	check(`Marge's House (seed {marge.seed}): its ★ are the story's ({table.concat(stars, ", ")})`, table.concat(stars, ",") == "grandfather_clock,record_player,rocking_horse")
+end
+
+-- 8.0 SANDBOX collectibles (HouseLayout.Collectibles, Config.Furniture.Collectibles) over 200 seeds: every house holds
+-- Count of them (2-4), none twice, each in the room its catalogue entry names, never ★; a legendary one in about one
+-- house of eight (one at most), every rarity and every collectible turning up somewhere, the commoner the oftener; none
+-- overlapping a piece or a solid fixture or standing in a doorway's way; every piece still gets out (HouseLayout.stuck on
+-- all of them, this test's own grid walk on a few with a big one); and the house's own pieces and its ★ are exactly
+-- those of the same house without any collectible (their own dice change nothing else).
+do
+	local SEEDS2 = 200
+	local function doorZones(plan: any): { Rect }
+		local byId: { [string]: any } = {}
+		for _, r in plan.rooms do
+			byId[r.id] = r
+		end
+		local zones: { Rect } = {}
+		for _, d in plan.doors do
+			for _, id in d.rooms do
+				local room = byId[id]
+				if room then
+					local w = d.width / 2
+					if d.axis == "X" then
+						local into = if room.min.Z > d.at.Z then 1 else -1
+						table.insert(zones, rect(d.at.X - w, d.at.Z, d.at.X + w, d.at.Z + into * (plan.wall / 2 + 4)))
+					else
+						local into = if room.min.X > d.at.X then 1 else -1
+						table.insert(zones, rect(d.at.X, d.at.Z - w, d.at.X + into * (plan.wall / 2 + 4), d.at.Z + w))
+					end
+				end
+			end
+		end
+		return zones
+	end
+	local legendary, total = 0, 0
+	local perRarity: { [string]: number } = {}
+	local perItem: { [string]: number } = {}
+	local bad, overlaps, stuckOnes, walkBad = {}, {}, {}, {}
+	local walkSeeds: { number } = {} -- (a few houses with a big collectible: the grid walk, below)
+	for seed = 1, SEEDS2 do
+		local plan = plans[seed] or HouseLayout.plan(seed, "house")
+		plans[seed] = plan
+		local tag = `seed {seed}`
+		local found, legends, big = 0, 0, false
+		local seen: { [string]: boolean } = {}
+		local zones = doorZones(plan)
+		for index, s in plan.spots do
+			local def = Items[s.item]
+			if not def.rarity then
+				continue
+			end
+			found += 1
+			perRarity[def.rarity] = (perRarity[def.rarity] or 0) + 1
+			perItem[s.item] = (perItem[s.item] or 0) + 1
+			legends += if def.rarity == "legendary" then 1 else 0
+			big = big or def.class == "pair" or def.size.Y > 6
+			if seen[s.item] or s.room ~= def.room or s.star then
+				table.insert(bad, `{tag}: {s.item} in the {s.room}{if s.star then " ★" else ""}`)
+			end
+			seen[s.item] = true
+			local fp = footprint(s)
+			for other, o in plan.spots do
+				if other ~= index and apart(fp, footprint(o)) < 0.25 then
+					table.insert(overlaps, `{tag}: {s.item}/{o.item}`)
+				end
+			end
+			for _, f in plan.fixtures do
+				if f.solid and apart(fp, fixtureRect(f)) < 0.2 then
+					table.insert(overlaps, `{tag}: {s.item}/{f.kind}`)
+				end
+			end
+			for _, z in zones do
+				if apart(z, fp) < 0 then
+					table.insert(overlaps, `{tag}: {s.item} in a doorway's way`)
+				end
+			end
+		end
+		total += found
+		if found < C.Count[1] or found > C.Count[2] or legends > 1 then
+			table.insert(bad, `{tag}: {found} collectibles, {legends} legendary`)
+		end
+		legendary += if legends > 0 then 1 else 0
+		local stuck = HouseLayout.stuck(plan)
+		if #stuck > 0 then
+			table.insert(stuckOnes, `{tag}: {table.concat(stuck, ",")}`)
+		end
+		if big and #walkSeeds < 6 then
+			table.insert(walkSeeds, seed)
+		end
+	end
+	local rate = legendary / SEEDS2
+	check(`the collectibles over {SEEDS2} seeds ({string.format("%.2f", total / SEEDS2)} a house): {C.Count[1]}-{C.Count[2]} each, none twice, in its own room, never ★`,
+		#bad == 0, table.concat(bad, "; "))
+	check(`a legendary one in {legendary} houses of {SEEDS2} ({string.format("%.3f", rate)}): about one in eight`, rate >= 0.07 and rate <= 0.2)
+	local u, r, e, l = perRarity.uncommon or 0, perRarity.rare or 0, perRarity.epic or 0, perRarity.legendary or 0
+	check(`every rarity turns up, the commoner the oftener ({u} uncommon, {r} rare, {e} epic, {l} legendary)`, u > r and r > e and e > l and l > 0)
+	local never = {}
+	for _, id in FurnitureLooks.Collectibles do
+		if not perItem[id] then
+			table.insert(never, id)
+		end
+	end
+	check(`every collectible turns up in some house`, #never == 0, table.concat(never, ", "))
+	check("no collectible overlaps a piece or a solid fixture or stands in a doorway's way", #overlaps == 0, table.concat(overlaps, "; "))
+	check(`every piece still gets out (HouseLayout.stuck, {SEEDS2} seeds)`, #stuckOnes == 0, table.concat(stuckOnes, "; "))
+	-- the same houses without any collectible: their own pieces where they were (colours, turns), the same ★; and the
+	-- grid walk finds no piece stuck that the house without them lets out (the walk is stricter than the layout's own
+	-- check by a stud's lattice: a few thin pieces at a wall stick in it with or without the collectibles)
+	local count0, legendary0 = C.Count, C.Legendary
+	C.Count, C.Legendary = { 0, 0 }, 0
+	local changed = {}
+	local function stuckSet(plan: any): { [string]: boolean }
+		local set: { [string]: boolean } = {}
+		for _, line in walkOut(plan) do
+			set[(string.gsub(line, "^%d+ ", ""))] = true -- (the spot's number differs between the two)
+		end
+		return set
+	end
+	for _, seed in walkSeeds do
+		local before = stuckSet(HouseLayout.plan(seed, "house"))
+		for line in stuckSet(plans[seed]) do
+			if not before[line] then
+				table.insert(walkBad, `seed {seed}: {line}`)
+			end
+		end
+	end
+	local function own(plan: any): (string, number)
+		local out, rare = {}, 0
+		for _, s in plan.spots do
+			if Items[s.item].rarity then
+				rare += 1
+			else
+				local p = s.at.Position
+				table.insert(out, string.format("%s %s %.2f %.2f %d %s %d", s.item, s.room, p.X, p.Z, s.turn, tostring(s.star), s.variant))
+			end
+		end
+		return table.concat(out, "\n"), rare
+	end
+	for seed = 1, 12 do
+		local bare, none = own(HouseLayout.plan(seed, "house"))
+		local with = own(plans[seed])
+		if bare ~= with or none > 0 then
+			table.insert(changed, `seed {seed}`)
+		end
+	end
+	C.Count, C.Legendary = count0, legendary0
+	check("the house's own pieces and ★ are those of the same house without its collectibles", #changed == 0, table.concat(changed, ", "))
+	check(`the grid walk: nothing stuck by the collectibles ({#walkSeeds} houses with a big one: {table.concat(walkSeeds, ", ")})`, #walkSeeds >= 4
+		and #walkBad == 0, table.concat(walkBad, "; "))
 end
 
 local function count(t: { [any]: boolean }): number

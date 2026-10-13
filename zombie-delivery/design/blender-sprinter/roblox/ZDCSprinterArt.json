@@ -1,0 +1,804 @@
+{
+ "dimensions": {
+  "back": 11.0,
+  "bay": {
+   "end": 11.0,
+   "height": 7.6,
+   "length": 14.0,
+   "lengthDoorsClosed": 13.75,
+   "start": -3.0,
+   "width": 6.6
+  },
+  "cab": 7.0,
+  "cabWall": -4.0,
+  "clearance": 1.2,
+  "floor": 2.4,
+  "front": -11.0,
+  "ground": 0.0,
+  "overall": [
+   8.0,
+   10.4,
+   22.0
+  ],
+  "overallWithMirrors": [
+   9.1,
+   10.4,
+   22.0
+  ],
+  "wheelRadius": 1.2,
+  "wheelbase": 13.0
+ },
+ "groups": {
+  "BackDoorL": {
+   "move": "hinge, vertical axis, the outer edge",
+   "pivot": [
+    -3.6,
+    6.235,
+    11.0
+   ]
+  },
+  "BackDoorR": {
+   "move": "hinge, vertical axis, the outer edge",
+   "pivot": [
+    3.6,
+    6.235,
+    11.0
+   ]
+  },
+  "Body": {
+   "on": "the body (BodyRoot, else the chassis)"
+  },
+  "CabDoorL": {
+   "move": "hinge, vertical axis, the front edge",
+   "pivot": [
+    -3.9,
+    3.6,
+    -8.55
+   ]
+  },
+  "CabDoorR": {
+   "move": "hinge, vertical axis, the front edge",
+   "pivot": [
+    3.9,
+    3.6,
+    -8.55
+   ]
+  },
+  "SideDoor": {
+   "move": "slides 0.35 out (+x) and 5.0 back (+z)",
+   "pivot": [
+    3.9,
+    5.76,
+    -2.85
+   ]
+  },
+  "Wheel": {
+   "move": "the front left wheel; the game puts it on every tyre",
+   "pivot": [
+    -3.45,
+    1.2,
+    -6.5
+   ],
+   "radius": 1.2
+  }
+ },
+ "markers": {
+  "SprinterMark_o": [
+   -0.0,
+   0.0,
+   0.0
+  ],
+  "SprinterMark_w": [
+   -3.45,
+   1.2,
+   -6.5
+  ],
+  "SprinterMark_x": [
+   10.0,
+   0.0,
+   0.0
+  ],
+  "SprinterMark_y": [
+   -0.0,
+   10.0,
+   0.0
+  ],
+  "SprinterMark_z": [
+   -0.0,
+   0.0,
+   10.0
+  ]
+ },
+ "pieces": {
+  "BackDoorL_glass": {
+   "center": [
+    -1.735,
+    8.4,
+    10.885
+   ],
+   "size": [
+    2.73,
+    2.26,
+    0.03
+   ],
+   "triangles": 76
+  },
+  "BackDoorL_paint": {
+   "center": [
+    -1.81,
+    6.235,
+    10.895
+   ],
+   "size": [
+    3.58,
+    7.63,
+    0.19
+   ],
+   "triangles": 250
+  },
+  "BackDoorL_ply": {
+   "center": [
+    -1.75,
+    4.75,
+    10.775
+   ],
+   "size": [
+    3.1,
+    4.3,
+    0.05
+   ],
+   "triangles": 12
+  },
+  "BackDoorL_rail": {
+   "center": [
+    -1.75,
+    7.025,
+    10.76
+   ],
+   "size": [
+    3.0,
+    0.15,
+    0.08
+   ],
+   "triangles": 12
+  },
+  "BackDoorL_stripe": {
+   "center": [
+    -1.775,
+    5.452,
+    10.989
+   ],
+   "size": [
+    3.35,
+    2.204,
+    0.018
+   ],
+   "triangles": 60
+  },
+  "BackDoorR_chrome": {
+   "center": [
+    0.65,
+    5.18,
+    10.97
+   ],
+   "size": [
+    0.5,
+    0.12,
+    0.02
+   ],
+   "triangles": 12
+  },
+  "BackDoorR_glass": {
+   "center": [
+    1.735,
+    8.4,
+    10.885
+   ],
+   "size": [
+    2.73,
+    2.26,
+    0.03
+   ],
+   "triangles": 76
+  },
+  "BackDoorR_paint": {
+   "center": [
+    1.81,
+    6.235,
+    10.895
+   ],
+   "size": [
+    3.58,
+    7.63,
+    0.19
+   ],
+   "triangles": 300
+  },
+  "BackDoorR_ply": {
+   "center": [
+    1.75,
+    4.75,
+    10.775
+   ],
+   "size": [
+    3.1,
+    4.3,
+    0.05
+   ],
+   "triangles": 12
+  },
+  "BackDoorR_rail": {
+   "center": [
+    1.75,
+    7.025,
+    10.76
+   ],
+   "size": [
+    3.0,
+    0.15,
+    0.08
+   ],
+   "triangles": 12
+  },
+  "BackDoorR_stripe": {
+   "center": [
+    1.775,
+    4.665,
+    10.9885
+   ],
+   "size": [
+    3.35,
+    0.63,
+    0.017
+   ],
+   "triangles": 24
+  },
+  "BackDoorR_trim": {
+   "center": [
+    1.7086,
+    5.7105,
+    10.839
+   ],
+   "size": [
+    2.7172,
+    1.4209,
+    0.318
+   ],
+   "triangles": 195
+  },
+  "Body_amber": {
+   "center": [
+    -0.0,
+    6.45,
+    0.2247
+   ],
+   "size": [
+    7.8505,
+    7.7,
+    21.5505
+   ],
+   "triangles": 216
+  },
+  "Body_chrome": {
+   "center": [
+    0.0,
+    2.33,
+    -10.8075
+   ],
+   "size": [
+    6.5121,
+    1.94,
+    0.335
+   ],
+   "triangles": 528
+  },
+  "Body_floor": {
+   "center": [
+    0.0,
+    2.35,
+    4.0
+   ],
+   "size": [
+    6.6,
+    0.1,
+    14.0
+   ],
+   "triangles": 12
+  },
+  "Body_glass": {
+   "center": [
+    0.0,
+    7.1085,
+    -7.9986
+   ],
+   "size": [
+    5.94,
+    3.8433,
+    1.621
+   ],
+   "triangles": 44
+  },
+  "Body_head": {
+   "center": [
+    0.0,
+    2.52,
+    -10.7504
+   ],
+   "size": [
+    6.9,
+    2.2,
+    0.4891
+   ],
+   "triangles": 250
+  },
+  "Body_inner": {
+   "center": [
+    0.0,
+    6.15,
+    3.94
+   ],
+   "size": [
+    6.84,
+    7.7,
+    14.12
+   ],
+   "triangles": 232
+  },
+  "Body_inside": {
+   "center": [
+    0.0,
+    5.97,
+    -3.335
+   ],
+   "size": [
+    7.8,
+    8.06,
+    11.43
+   ],
+   "triangles": 1119
+  },
+  "Body_lamp": {
+   "center": [
+    0.0,
+    9.905,
+    3.9
+   ],
+   "size": [
+    0.5,
+    0.03,
+    8.46
+   ],
+   "triangles": 24
+  },
+  "Body_paint": {
+   "center": [
+    0.0,
+    5.8,
+    0.175
+   ],
+   "size": [
+    7.8,
+    9.2,
+    21.65
+   ],
+   "triangles": 1043
+  },
+  "Body_plate": {
+   "center": [
+    0.0,
+    2.3167,
+    0.0
+   ],
+   "size": [
+    1.6,
+    1.5333,
+    21.99
+   ],
+   "triangles": 60
+  },
+  "Body_ply": {
+   "center": [
+    0.0,
+    6.05,
+    3.84
+   ],
+   "size": [
+    6.84,
+    7.3,
+    13.92
+   ],
+   "triangles": 132
+  },
+  "Body_rail": {
+   "center": [
+    0.29,
+    4.46,
+    3.9
+   ],
+   "size": [
+    7.18,
+    5.04,
+    13.6
+   ],
+   "triangles": 204
+  },
+  "Body_red": {
+   "center": [
+    0.0,
+    5.915,
+    10.98
+   ],
+   "size": [
+    7.6471,
+    8.51,
+    0.04
+   ],
+   "triangles": 95
+  },
+  "Body_rubber": {
+   "center": [
+    0.0,
+    5.73,
+    0.015
+   ],
+   "size": [
+    7.26,
+    8.7,
+    21.97
+   ],
+   "triangles": 166
+  },
+  "Body_seat": {
+   "center": [
+    0.0,
+    5.325,
+    -5.4865
+   ],
+   "size": [
+    5.1,
+    3.75,
+    2.2271
+   ],
+   "triangles": 648
+  },
+  "Body_stripe": {
+   "center": [
+    0.0,
+    5.8128,
+    0.015
+   ],
+   "size": [
+    7.824,
+    6.1055,
+    21.57
+   ],
+   "triangles": 260
+  },
+  "Body_trim": {
+   "center": [
+    0.0,
+    5.6,
+    0.0
+   ],
+   "size": [
+    8.0,
+    8.8,
+    22.0
+   ],
+   "triangles": 5137
+  },
+  "Body_under": {
+   "center": [
+    0.0,
+    1.975,
+    0.1737
+   ],
+   "size": [
+    7.8,
+    1.55,
+    21.635
+   ],
+   "triangles": 430
+  },
+  "CabDoorL_chrome": {
+   "center": [
+    -4.42,
+    7.05,
+    -7.72
+   ],
+   "size": [
+    0.17,
+    1.35,
+    0.02
+   ],
+   "triangles": 12
+  },
+  "CabDoorL_glass": {
+   "center": [
+    -3.6666,
+    6.8927,
+    -6.1886
+   ],
+   "size": [
+    0.2271,
+    3.8021,
+    3.4772
+   ],
+   "triangles": 20
+  },
+  "CabDoorL_inside": {
+   "center": [
+    -3.675,
+    6.04,
+    -6.35
+   ],
+   "size": [
+    0.45,
+    6.06,
+    4.34
+   ],
+   "triangles": 59
+  },
+  "CabDoorL_paint": {
+   "center": [
+    -3.7994,
+    6.04,
+    -6.35
+   ],
+   "size": [
+    0.2012,
+    6.06,
+    4.34
+   ],
+   "triangles": 47
+  },
+  "CabDoorL_stripe": {
+   "center": [
+    -3.901,
+    4.665,
+    -6.3231
+   ],
+   "size": [
+    0.022,
+    0.63,
+    4.2862
+   ],
+   "triangles": 24
+  },
+  "CabDoorL_trim": {
+   "center": [
+    -4.1197,
+    6.155,
+    -6.375
+   ],
+   "size": [
+    0.8606,
+    3.34,
+    3.8
+   ],
+   "triangles": 260
+  },
+  "CabDoorR_chrome": {
+   "center": [
+    4.42,
+    7.05,
+    -7.72
+   ],
+   "size": [
+    0.17,
+    1.35,
+    0.02
+   ],
+   "triangles": 12
+  },
+  "CabDoorR_glass": {
+   "center": [
+    3.6666,
+    6.8927,
+    -6.1886
+   ],
+   "size": [
+    0.2271,
+    3.8021,
+    3.4772
+   ],
+   "triangles": 20
+  },
+  "CabDoorR_inside": {
+   "center": [
+    3.675,
+    6.04,
+    -6.35
+   ],
+   "size": [
+    0.45,
+    6.06,
+    4.34
+   ],
+   "triangles": 60
+  },
+  "CabDoorR_paint": {
+   "center": [
+    3.7994,
+    6.04,
+    -6.35
+   ],
+   "size": [
+    0.2012,
+    6.06,
+    4.34
+   ],
+   "triangles": 48
+  },
+  "CabDoorR_stripe": {
+   "center": [
+    3.901,
+    4.665,
+    -6.3231
+   ],
+   "size": [
+    0.022,
+    0.63,
+    4.2862
+   ],
+   "triangles": 24
+  },
+  "CabDoorR_trim": {
+   "center": [
+    4.1197,
+    6.155,
+    -6.375
+   ],
+   "size": [
+    0.8606,
+    3.34,
+    3.8
+   ],
+   "triangles": 260
+  },
+  "SideDoor_inner": {
+   "center": [
+    3.41,
+    5.91,
+    -0.25
+   ],
+   "size": [
+    0.02,
+    7.22,
+    5.14
+   ],
+   "triangles": 14
+  },
+  "SideDoor_inside": {
+   "center": [
+    3.65,
+    5.76,
+    -0.25
+   ],
+   "size": [
+    0.5,
+    7.52,
+    5.14
+   ],
+   "triangles": 58
+  },
+  "SideDoor_paint": {
+   "center": [
+    3.7877,
+    5.76,
+    -0.25
+   ],
+   "size": [
+    0.2246,
+    7.52,
+    5.14
+   ],
+   "triangles": 20
+  },
+  "SideDoor_ply": {
+   "center": [
+    3.36,
+    4.925,
+    -0.25
+   ],
+   "size": [
+    0.12,
+    4.95,
+    5.0
+   ],
+   "triangles": 12
+  },
+  "SideDoor_rail": {
+   "center": [
+    3.27,
+    5.6,
+    -0.25
+   ],
+   "size": [
+    0.06,
+    2.76,
+    4.9
+   ],
+   "triangles": 24
+  },
+  "SideDoor_stripe": {
+   "center": [
+    3.901,
+    4.665,
+    -0.25
+   ],
+   "size": [
+    0.022,
+    0.63,
+    5.14
+   ],
+   "triangles": 24
+  },
+  "SideDoor_trim": {
+   "center": [
+    3.6,
+    3.975,
+    -0.25
+   ],
+   "size": [
+    0.8,
+    3.85,
+    5.14
+   ],
+   "triangles": 324
+  },
+  "Wheel_chrome": {
+   "center": [
+    -3.6808,
+    1.2,
+    -6.5
+   ],
+   "size": [
+    0.1108,
+    0.7035,
+    0.8123
+   ],
+   "triangles": 192
+  },
+  "Wheel_rim": {
+   "center": [
+    -3.45,
+    1.2,
+    -6.5
+   ],
+   "size": [
+    0.6646,
+    1.7354,
+    1.7354
+   ],
+   "triangles": 600
+  },
+  "Wheel_rubber": {
+   "center": [
+    -3.45,
+    1.2,
+    -6.5
+   ],
+   "size": [
+    0.9231,
+    2.4,
+    2.4
+   ],
+   "triangles": 768
+  }
+ },
+ "seats": {
+  "driver": [
+   -1.7,
+   3.9,
+   -5.75
+  ],
+  "passenger": [
+   1.7,
+   3.9,
+   -5.75
+  ]
+ },
+ "triangles": 14523,
+ "wheelTriangles": 1560
+}

@@ -25,6 +25,10 @@
 --                    hour to the morning), END EVENT, and what runs now with its time left
 --   ESTATE           properties, the home, teleport to a property, the company's safe
 --   BUDDIES          NPC companions (server/Buddy.luau): + ADD, FOLLOW / STAY / GUARD, DISMISS, how many
+--   SANDBOX          8.0, only in the sandbox world (Config.Sandbox.On; then the first tab, open by default): the
+--                    owner's quick test tools (shared/SandboxAdmin.luau's buttons, each ("sandbox", id) to the TARGET:
+--                    money, the house's move, the warehouse's stock and stands, the van and the teleports) and
+--                    🔍 SHOW ZONES (client/SandboxZones.luau: debug marks on your screen only)
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -40,8 +44,10 @@ local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local MissionData = require(Shared.Missions)
 local ChallengeData = require(Shared.Challenges)
+local SandboxAdmin = require(Shared.SandboxAdmin) -- 8.0 SANDBOX
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
+local SandboxZones = require(script.Parent.SandboxZones) -- 8.0 SANDBOX: SHOW ZONES
 
 local C = Ui.Colors
 local P = Theme.Postage
@@ -56,7 +62,7 @@ local remote: RemoteEvent? = nil
 -- The window's parts (one table: the 200-register limit).
 local parts: { [string]: any } = {}
 local tabButtons: { [string]: any } = {}
-local section = "player"
+local section = if Config.Sandbox.On then "sandbox" else "player" -- (8.0: the sandbox's tools first)
 local targetId = player.UserId -- 4.5: who the commands go to (a player in this server)
 local spawnCount = 1
 local missionProgress: { [string]: number } = {} -- your best ratings (the Missions remote's "state"), for the colours
@@ -182,7 +188,8 @@ end
 
 -- ── Sections ───────────────────────────────────────────────────────────────
 
-local SECTIONS = {
+-- (8.0: SANDBOX first, only in the sandbox world)
+local SECTIONS = SandboxAdmin.tabs({
 	{ "player", "PLAYER" },
 	{ "op", "OP" },
 	{ "world", "WORLD" },
@@ -190,7 +197,7 @@ local SECTIONS = {
 	{ "events", "EVENTS" }, -- 6.15
 	{ "estate", "ESTATE" },
 	{ "buddies", "BUDDIES" },
-}
+}, Config.Sandbox.On)
 
 local render: (keepScroll: boolean?) -> ()
 local R: { [string]: () -> () } = {} -- the sections' renderers
@@ -803,6 +810,35 @@ R.buddies = function()
 	end
 end
 
+-- 8.0 SANDBOX: the owner's quick test tools in the sandbox world (shared/SandboxAdmin.luau's groups and buttons; the
+-- server, server/Admin.luau's "sandbox", checks each again). Every button goes to the TARGET; SHOW ZONES is yours.
+R.sandbox = function()
+	local plot = target():GetAttribute("Plot")
+	heading(
+		`Sandbox · {whom()}{if type(plot) == "number" then ` · plot {plot}` else " · no plot"}`,
+		"Quick tools for the sandbox world. Every button goes to the TARGET picked at the top; the answer comes in the footer."
+	)
+	local colors: { [string]: Color3 } = { green = C.green, grey = C.grey, yellow = C.yellow, red = C.red, blue = C.blue, gold = P.gold, violet = P.violet }
+	for _, group in SandboxAdmin.Groups do
+		heading(group.name, group.hint)
+		local cells = grid(200)
+		for _, def in SandboxAdmin.Actions do
+			if def.group == group.id then
+				local id = def.id
+				action(cells, def.label, colors[def.color] or C.grey, function()
+					send("sandbox", id)
+				end)
+			end
+		end
+		if group.id == "debug" then
+			toggle(cells, "🔍 SHOW ZONES", SandboxZones.isOn(), function()
+				SandboxZones.toggle()
+				render(true)
+			end)
+		end
+	end
+end
+
 render = function(keepScroll: boolean?)
 	local content = parts.content
 	if not content then
@@ -1071,6 +1107,7 @@ local WATCHED: { [string]: boolean } = {
 	Estates = true,
 	Home = true,
 	CarSlots = true,
+	Plot = true, -- 8.0 SANDBOX (server/SandboxPlots.luau)
 }
 
 local function watchPlayer(other: Player)

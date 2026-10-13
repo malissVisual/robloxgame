@@ -209,8 +209,8 @@ local function dealer(ctx: Ctx): ({ Item }, string?)
 	local full = owned >= (tonumber(Players.LocalPlayer:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots)
 	local items: { Item } = {}
 	for _, def in Config.Cars do
-		if def.company or def.bike then
-			continue -- (5.1: the bikes are the BIKES counter's)
+		if def.company or def.bike or def.sandboxOnly then
+			continue -- (5.1: the bikes are the BIKES counter's; 8.0: the sandbox's ZDC Sprinter is never sold)
 		end
 		local mine = state.cars[def.id] == true
 		local most = Economy.maxCapacity(def.id)

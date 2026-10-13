@@ -4,6 +4,8 @@
 -- lights, its text) and a few for the world round it (the depot's block and hall, Marge's house and street, a tower by
 -- each evacuation spot: context, drawn grey-ish, never checked), then a summary. check.py writes MoveSitesServer.luau and
 -- the shared modules next to it, checks the lines; render.py draws them.
+-- 8.0 SANDBOX: the kiosk on every plot of shared/SandboxMap.luau (MoveSites.plotBoard, as Moving.start builds it in the
+-- sandbox) as lines of their own kind "sandbox" (not the city's budget, never drawn), the plots' facts in the summary.
 local M = require("./ItemMock")
 local MoveSites = require("./MoveSitesServer")
 local Looks = require("./MoveSiteLooks")
@@ -74,7 +76,7 @@ local function wordsOf(p: any): { any }
 end
 
 local count = 0
-local function exportPart(set: string, model: string, p: any)
+local function exportPart(set: string, model: string, p: any, kind: string?)
 	local lights = {}
 	for _, child in p:GetChildren() do
 		if child.ClassName == "PointLight" then
@@ -83,7 +85,7 @@ local function exportPart(set: string, model: string, p: any)
 	end
 	local lit = p:GetAttribute("LitColor")
 	print(encode({
-		kind = "part",
+		kind = kind or "part",
 		set = set,
 		model = model,
 		name = p.Name,
@@ -105,7 +107,9 @@ local function exportPart(set: string, model: string, p: any)
 		lights = lights,
 		words = wordsOf(p),
 	}))
-	count += 1
+	if kind == nil then
+		count += 1
+	end
 end
 
 local function exportModel(set: string, model: any)
@@ -158,6 +162,32 @@ for _, f in farms do
 end
 for _, model in dressing:GetChildren() do
 	exportModel(if model.Name == "DepotBanner" then "banner" else model.Name, model)
+end
+
+-- 8.0 SANDBOX: the plots' kiosks (their own folder: the sandbox's world, not the city's)
+local SandboxMap = require("./SandboxMap")
+local sandboxWorld = M.Instance.new("Folder")
+sandboxWorld.Name = "Moves"
+local plotBoards = {}
+for _, plot in SandboxMap.Plots do
+	local model, corkboard = MoveSites.plotBoard(sandboxWorld, plot)
+	for _, p in model:GetDescendants() do
+		if p:IsA("BasePart") then
+			exportPart(`plotboard{plot.id}`, model.Name, p, "sandbox")
+		end
+	end
+	table.insert(plotBoards, {
+		id = plot.id,
+		name = model.Name,
+		mode = model.ModelStreamingMode,
+		primary = model.PrimaryPart and model.PrimaryPart.Name,
+		corkboard = corkboard.Name,
+		plot = corkboard:GetAttribute("Plot"),
+		spot = { plot.board.x, plot.board.z },
+		door = { plot.door.x, plot.door.z },
+		unload = { plot.unload.x, plot.unload.z, plot.unload.r },
+		vanSpot = { plot.vanSpot.x, plot.vanSpot.z },
+	})
 end
 
 -- ── The world round them (context) ──────────────────────────────────────────
@@ -319,4 +349,9 @@ print(encode({ kind = "summary", parts = count, budget = Config.MoveSites.Budget
 		end
 		return n
 	end)(),
+	plotBoards = plotBoards, -- 8.0 SANDBOX
+	plots = #SandboxMap.Plots,
+	boardPieces = #Looks.board(),
+	doorWidth = SandboxMap.DoorWidth,
+	groundTop = SandboxMap.GroundTop,
 }))

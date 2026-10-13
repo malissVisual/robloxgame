@@ -56,7 +56,8 @@ end
 local mostParts, mostLights = 0, 0
 local A = T.Alpine
 -- (7.x alpine: seeds 4, 174 and 647 are the busiest of the first 1000: 614, 613 and 612 parts; the average is about
--- 558 (it was 539 before the chalet); 409 was the busiest before)
+-- 558 (it was 539 before the chalet); 409 was the busiest before. 8.0 SANDBOX, with the collectibles: 174, 757 and 151
+-- the busiest, 688, 682 and 681 parts; on average 606)
 for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 174, 409, 647, 1955 } do -- (7.0 review: 1955 is Marge's House, Config.Moving.Contracts)
 	local plan = HouseLayout.plan(seed, "house")
 	local origin = HouseInterior.slot(seed)

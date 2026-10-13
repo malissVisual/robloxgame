@@ -51,6 +51,8 @@
 -- (VanCarry.lost) and the bonus of every employer whose vehicle the save had earned (Economy.employerBonus), never the
 -- ZDC Van itself; the flag is written into `rewards` too (an older server drops unknown fields but keeps that table's
 -- short keys: Economy.vanMigrated reads either), and so are the chapters done (its story keeps only "intro").
+-- 8.0 SANDBOX: the collection (collection: the pieces the moves brought home, shared/CollectionRules.luau; kept by
+-- server/Collection.luau), read only from a real save written with its flag (collectionKept); older saves: empty.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -73,6 +75,7 @@ local Style = require(Shared.Style) -- 6.12: the cosmetics' wardrobe
 local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funnel's steps in the save
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
+local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
 
 export type Profile = {
 	money: number,
@@ -139,6 +142,9 @@ export type Profile = {
 	skills: { [string]: number },
 	-- 7.0: the moves' story cards seen (shared/MoveStory.luau SeenKeys: "intro"); none before 7.0 (the empty table)
 	story: { [string]: boolean },
+	-- 8.0 SANDBOX: the pieces the moves brought home (shared/CollectionRules.luau; server/Collection.luau keeps it): read
+	-- only from a real save written with its flag (CollectionRules.fromSave); an older one starts with the empty one
+	collection: CollectionRules.Saved,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -178,12 +184,13 @@ end
 
 local store: DataStore? = nil
 pcall(function()
-	store = DataStoreService:GetDataStore(Config.DataStoreName)
+	-- 8.0 SANDBOX: its own saves (Config.Sandbox.Store); the city's are never touched there
+	store = DataStoreService:GetDataStore(if Config.Sandbox.On then Config.Sandbox.Store else Config.DataStoreName)
 end)
 
 local function newProfile(): Profile
 	return {
-		money = Config.StartMoney,
+		money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StartMoney, -- (8.0: the sandbox's own)
 		cars = { [Config.CompanyVan.Car] = true }, -- 7.x: every courier's ZDC Van (5.0 – 6.x: on foot, Earl's van at level 4)
 		car = Config.CompanyVan.Car,
 		bike = nil, -- 5.1
@@ -235,6 +242,7 @@ local function newProfile(): Profile
 		regulars = {}, -- 6.14: no business knows you yet
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		story = {}, -- 7.0: no story card seen yet
+		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -541,6 +549,9 @@ local function applySaved(profile: Profile, saved: any)
 	if saved.money ~= nil then
 		profile.story = MoveStory.cleanSeen(saved.story, saved.rewards) -- (7.2 review: + the chapters done kept in rewards)
 	end
+	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); a save from before
+	-- 8.0 (or a lock-only record of a new player) starts with the empty one (CollectionRules.fromSave)
+	profile.collection = CollectionRules.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -788,7 +799,7 @@ function PlayerData.load(player: Player)
 	-- Never overwrite a save we could not read.
 	canSave[player] = ok and dataStore ~= nil
 	if RunService:IsStudio() and not canSave[player] then
-		profile.money = Config.StudioStartMoney
+		profile.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
 	if player.Parent then
 		profiles[player] = profile
@@ -936,6 +947,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		regulars = profile.regulars, -- 6.14
 		skills = profile.skills, -- 6.20
 		story = profile.story, -- 7.0
+		collection = profile.collection, -- 8.0
+		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -983,7 +996,7 @@ function PlayerData.resetSave(player: Player)
 	end
 	local fresh = newProfile()
 	if RunService:IsStudio() and not canSave[player] then
-		fresh.money = Config.StudioStartMoney
+		fresh.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
 	profiles[player] = fresh
 	PlayerData.save(player)

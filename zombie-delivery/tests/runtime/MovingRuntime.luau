@@ -9,7 +9,12 @@
 -- time are the test's (Runtime.clock, Runtime.now); task.delay runs at once.
 -- 7.0, the depot's helper: the real server/MoveHelper.luau (MoveHelperServer.luau, tests/movehelper_runtime_test.luau)
 -- runs on these too: its body from the fake Npcs (Runtime.said: what he says), the zombies' roots and Zombies.all.
+-- 8.0 SANDBOX: the city's game by default (Config.Sandbox.On false: Moving.start reads it); a sandbox test sets it true
+-- before Moving.start (tests/sandboxmove_runtime_test.luau). Its fakes: SandboxPlots (Runtime.plots: player → a
+-- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse).
 local Mock = require("./ItemMock") :: any
+local CityConfig = require("./Config") :: any
+CityConfig.Sandbox.On = false
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()
@@ -523,8 +528,11 @@ Runtime.Vehicles = stub("Vehicles", {
 		local _ = carId
 		return Runtime.cars[player]
 	end,
-	spawnAt = function(player: any): any
+	spawnAt = function(player: any, carId: any, ground: any): any
 		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
+		if Runtime.cars[player] == nil and type(carId) == "string" and ground then -- (8.0 SANDBOX: the van at the plot)
+			Runtime.cars[player] = makeCar(player, carId, ground.Position)
+		end
 		return Runtime.cars[player]
 	end,
 	seatedIn = function(player: any): (any, boolean, any)
@@ -663,6 +671,34 @@ Runtime.Jobs = stub("Jobs", {
 	end,
 })
 Runtime.BanditCars = stub("BanditCars", { onCarDamaged = noop })
+-- 8.0 SANDBOX: the plots (server/SandboxPlots.luau) and the collection (server/Collection.luau)
+Runtime.plots = {} -- player → their SandboxMap plot
+Runtime.collected = {} -- { { player, entry, uid } } every Collection.add
+Runtime.refuse = false -- Collection.add says nil (no save yet)
+Runtime.SandboxPlots = stub("SandboxPlots", {
+	of = function(player: any): any
+		return Runtime.plots[player]
+	end,
+	owner = function(id: number): any
+		for player, plot in Runtime.plots do
+			if plot.id == id then
+				return player
+			end
+		end
+		return nil
+	end,
+	onChanged = noop,
+})
+Runtime.Collection = stub("Collection", {
+	add = function(player: any, entry: any): string?
+		if Runtime.refuse then
+			return nil
+		end
+		local uid = `uid{#Runtime.collected + 1}`
+		table.insert(Runtime.collected, { player = player, entry = entry, uid = uid })
+		return uid
+	end,
+})
 Runtime.Hand = stub("Hand", {
 	holster = function()
 		Runtime.holstered += 1

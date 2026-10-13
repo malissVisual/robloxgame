@@ -140,7 +140,7 @@ for _, mission in require("./Missions").List do
 end
 local everywhere = true
 for _, def in Config.Cars do
-	if not def.company and seen[`{if def.bike then "bike" else "car"}:{def.id}`] ~= 1 then -- (5.1: a bike's kind is "bike")
+	if not def.company and not def.sandboxOnly and seen[`{if def.bike then "bike" else "car"}:{def.id}`] ~= 1 then -- (5.1: a bike's kind is "bike"; 8.0: the sandbox's van is on no road)
 		everywhere = false
 		print(`  missing car {def.id}`)
 	end

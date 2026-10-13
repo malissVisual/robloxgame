@@ -13,7 +13,8 @@
 --                                     invisible box of exactly `size` (Transparency 1, the only part that collides),
 --                                     the box's middle its pivot (the bottom at Root.Position.Y - size.Y / 2); every
 --                                     other part is welded to Root (WeldConstraint) and is CanCollide / CanQuery /
---                                     CanTouch false and Massless. Attributes FurnitureId, Class, Weight, Fragile.
+--                                     CanTouch false and Massless. Attributes FurnitureId, Class, Weight, Fragile (and
+--                                     8.0: Rarity, a collectible's).
 --                                     Unanchored as built (the caller anchors Root when it places it; the welds hold
 --                                     the rest). `variant` (a whole number, default 1) picks its colours. An unknown id
 --                                     is a moving box (FurnitureId still the id asked for).
@@ -26,12 +27,17 @@
 -- doorway (Config.Furniture.Door) and leaves only by a wide one (the farm's barn doors, Config.Furniture.Farm.BarnDoor:
 -- Farm.exitsFor), so a move must route it there.
 --   FurnitureLooks.Palettes           the colour lists the builders pick from (fabric, wood, paint, accent, appliance)
+-- 8.0 SANDBOX collectibles (design/sandbox/KONTRAKT.md): the rare pieces a house may hold besides its furniture follow
+-- the alpine pieces in the catalogue (FurnitureLooks.Collectibles their ids). Each has a `rarity` (one of
+-- FurnitureLooks.Rarities, commonest first); an ordinary piece has none (server/Collection.luau rates it by its value).
+-- Their model carries the attribute Rarity. shared/HouseLayout.luau puts a few of them into every house.
 
 local Config = require(script.Parent.Config)
 
 local Tuning = Config.Furniture
 
 export type Class = "hand" | "both" | "pair"
+export type Rarity = "uncommon" | "rare" | "epic" | "legendary"
 export type ItemDef = {
 	id: string,
 	name: string,
@@ -44,6 +50,7 @@ export type ItemDef = {
 	room: string,
 	sentimental: boolean,
 	bigDoor: boolean?, -- 7.x farm pieces: only through a wide doorway (the barn doors), see the header
+	rarity: Rarity?, -- 8.0 collectibles: a collector's piece (see the header); nil: an ordinary one
 }
 
 local FurnitureLooks = {}
@@ -139,6 +146,7 @@ item("hay_wagon", "Hay Wagon", "🛞", 6.4, 4.8, 9.6, "pair", 9, 650, false, "ba
 Items.hay_wagon.bigDoor = true
 FurnitureLooks.FarmPieces = table.move(Order, farmFrom, #Order, 1, {}) :: { string }
 FurnitureLooks.FarmRooms = { "stable", "barn", "workshop", "yard", "pantry" }
+FurnitureLooks.Rarities = { "uncommon", "rare", "epic", "legendary" } :: { Rarity } -- (8.0 collectibles, commonest first)
 
 FurnitureLooks.Items = Items
 FurnitureLooks.Order = Order
@@ -1425,6 +1433,400 @@ BUILDERS.ski_bundle = function(c: Ctx)
 	box(c, "Strap", 1.3, 0.22, 0.62, 0, 3.6, 0.1, rgb(120, 70, 40), LEATHER)
 end
 
+-- ── 8.0 collectibles ─────────────────────────────────────────────────────────
+-- A collector's things that turn up in a house besides its furniture (shared/HouseLayout.luau places 2-4 a house, a
+-- legendary one in about one house of eight: Config.Furniture.Collectibles), each worth clearly more than an ordinary
+-- piece of its class and dearer the rarer it is (tests/furniture_test.luau). No Blender model yet: server/FurnitureMesh.luau
+-- dresses only what its import has, so these keep the looks below.
+local collectFrom = #Order + 1
+local function collectible(id: string, name: string, icon: string, x: number, y: number, z: number, class: Class, weight: number, value: number, fragile: boolean, room: string, rarity: Rarity)
+	item(id, name, icon, x, y, z, class, weight, value, fragile, room)
+	Items[id].rarity = rarity
+end
+--          id                  name                       icon  X    Y     Z    class   wt  value fragile room       rarity
+collectible("bowling_trophy", "Bowling Trophy", "🏆", 1.4, 2.8, 1.0, "hand", 2, 900, false, "living", "uncommon")
+collectible("vintage_radio", "Vintage Radio", "📻", 1.8, 2.0, 1.2, "hand", 3, 950, false, "kitchen", "uncommon")
+collectible("old_globe", "Old Globe", "🌍", 1.6, 2.6, 1.6, "hand", 2, 850, false, "bedroom", "uncommon")
+collectible("stag_head", "Mounted Stag Head", "🦌", 3.2, 3.4, 1.7, "both", 3, 1000, false, "hall", "uncommon")
+collectible("gold_record", "Gold Record", "💿", 2.2, 2.6, 0.4, "hand", 1, 1600, true, "hall", "rare")
+collectible("ship_bottle", "Ship in a Bottle", "⛵", 2.2, 1.35, 0.9, "hand", 1, 1500, true, "kids", "rare")
+collectible("jewellery_box", "Grandma's Jewellery Box", "💎", 1.7, 1.2, 1.1, "hand", 1, 1900, true, "bedroom", "rare")
+collectible("antique_vase", "Antique Vase", "🏺", 1.4, 2.8, 1.4, "hand", 2, 3000, true, "living", "epic")
+collectible("arcade_cabinet", "Arcade Cabinet", "🕹️", 2.8, 6.0, 3.0, "pair", 8, 2800, false, "kids", "epic")
+collectible("jukebox", "Jukebox", "🎵", 3.4, 5.4, 2.5, "pair", 9, 3400, false, "garage", "epic")
+collectible("oil_painting", "Oil Painting", "🎨", 4.8, 3.8, 0.6, "both", 3, 6000, true, "living", "legendary")
+collectible("knight_armour", "Knight's Armour", "🛡️", 2.6, 6.8, 1.8, "both", 6, 5500, false, "living", "legendary")
+FurnitureLooks.Collectibles = table.move(Order, collectFrom, #Order, 1, {}) :: { string }
+
+-- Their palette: gold and gilt, old porcelain's glazes, lacquers and velvets, polished plate, the bone of antlers, a
+-- stag's coat, and the neon of the jukebox's tubes and the arcade's marquee.
+local GOLD = rgb(222, 178, 72)
+local GILT = { rgb(214, 170, 78), rgb(190, 146, 64), rgb(226, 190, 104), rgb(176, 128, 58) }
+local LACQUERS = { rgb(30, 28, 30), rgb(120, 30, 40), rgb(96, 60, 40), rgb(36, 80, 64) }
+local VELVETS = { rgb(150, 28, 44), rgb(36, 54, 120), rgb(40, 100, 70), rgb(96, 40, 110) }
+local NEONS = { rgb(255, 140, 60), rgb(255, 70, 110), rgb(80, 200, 255), rgb(120, 255, 140) }
+local PLATE = rgb(196, 202, 208)
+local BONE = rgb(232, 220, 192)
+local FURS = { rgb(128, 84, 52), rgb(150, 100, 60), rgb(100, 66, 42), rgb(160, 112, 72) }
+
+-- A little shine: a glaze, polished metal, glass.
+local function shine(p: BasePart, reflectance: number): BasePart
+	p.Reflectance = reflectance
+	return p
+end
+
+BUILDERS.bowling_trophy = function(c: Ctx)
+	-- A league champion's trophy: the marble base and the wooden step with its plate, the gold column and cup, a pin on
+	-- top, and the champion's own ball resting on the step.
+	local marble = pick({ rgb(236, 234, 228), rgb(40, 40, 44), rgb(70, 110, 90), rgb(150, 60, 56) }, c.v)
+	box(c, "Base", 1.4, 0.35, 1.0, 0, 0.175, 0, marble, Enum.Material.Marble)
+	box(c, "Step", 1.1, 0.3, 0.8, 0, 0.5, 0, shade(pick(WOODS, c.v, 2), 0.2), WOOD)
+	local plate = box(c, "Plate", 0.8, 0.2, 0.02, 0, 0.5, -0.41, BRASS, METAL)
+	label(plate, "LEAGUE CHAMPION", DARK, Enum.NormalId.Front)
+	shine(cyl(c, "Column", 0.95, 0.22, 0, 1.125, 0, "y", GOLD, METAL), 0.2)
+	for _, y in { 0.72, 1.55 } do
+		cyl(c, "Collar", 0.08, 0.34, 0, y, 0, "y", shade(GOLD, 0.15), METAL)
+	end
+	ball(c, "CupFoot", 0.5, 0, 1.7, 0, GOLD, METAL)
+	shine(cyl(c, "Cup", 0.5, 0.82, 0, 1.95, 0, "y", GOLD, METAL), 0.25)
+	for _, s in { -1, 1 } do
+		cyl(c, "Handle", 0.07, 0.42, s * 0.46, 1.95, 0, "z", GOLD, METAL)
+	end
+	ball(c, "Pin", 0.32, 0, 2.34, 0, CREAM)
+	cyl(c, "PinStripe", 0.06, 0.2, 0, 2.5, 0, "y", rgb(200, 40, 40))
+	cyl(c, "PinNeck", 0.24, 0.16, 0, 2.6, 0, "y", CREAM)
+	ball(c, "PinHead", 0.2, 0, 2.7, 0, CREAM)
+	shine(ball(c, "Ball", 0.46, 0.36, 0.88, -0.12, pick({ rgb(40, 70, 170), rgb(170, 30, 40), rgb(30, 30, 34), rgb(110, 50, 150) }, c.v)), 0.2)
+end
+
+BUILDERS.vintage_radio = function(c: Ctx)
+	-- A 1930s cathedral radio: the wooden case under its gothic arch, the grille cloth behind the fretwork, the dial
+	-- that glows when it plays, three bakelite knobs.
+	local wood = pick({ rgb(120, 70, 40), rgb(150, 92, 52), rgb(90, 52, 34), rgb(176, 120, 70) }, c.v)
+	local dark = shade(wood, 0.3)
+	box(c, "Plinth", 1.8, 0.15, 1.2, 0, 0.075, 0, shade(wood, 0.25), WOOD)
+	box(c, "Case", 1.6, 1.05, 1.0, 0, 0.675, 0, wood, WOOD)
+	cyl(c, "Arch", 1.0, 1.6, 0, 1.2, 0, "z", wood, WOOD)
+	cyl(c, "Trim", 0.04, 1.3, 0, 1.25, -0.52, "z", dark, WOOD)
+	cyl(c, "Cloth", 0.04, 1.1, 0, 1.25, -0.54, "z", pick({ rgb(206, 176, 120), rgb(180, 150, 104), rgb(214, 196, 150), rgb(150, 112, 76) }, c.v, 1), FABRIC)
+	box(c, "Fret", 0.06, 1.05, 0.04, 0, 1.2, -0.57, dark, WOOD)
+	for _, s in { -1, 1 } do
+		box(c, "Fret", 0.06, 0.85, 0.04, s * 0.24, 1.2, -0.57, dark, WOOD, CFrame.Angles(0, 0, s * 0.25))
+	end
+	box(c, "DialFrame", 0.62, 0.26, 0.03, 0, 0.5, -0.515, BRASS, METAL)
+	box(c, "Dial", 0.5, 0.17, 0.03, 0, 0.5, -0.53, rgb(255, 210, 140), NEON)
+	for _, x in { -0.5, 0, 0.5 } do
+		cyl(c, "Knob", 0.1, 0.2, x, 0.28, -0.55, "z", rgb(44, 32, 26))
+	end
+end
+
+BUILDERS.old_globe = function(c: Ctx)
+	-- A library globe on its turned stand: three splayed feet, the column and cup, the globe and its continents, the
+	-- wooden horizon ring round its middle and the brass meridian, tilted like the earth's axis.
+	local wood = pick(WOODS, c.v, 4)
+	local sea = pick({ rgb(214, 196, 150), rgb(70, 110, 150), rgb(120, 150, 130), rgb(196, 170, 120) }, c.v)
+	local land = pick({ rgb(160, 110, 66), rgb(214, 196, 140), rgb(226, 206, 160), rgb(110, 132, 76) }, c.v)
+	for n = 0, 2 do
+		local a = math.rad(90 + n * 120)
+		strut(c, "Foot", Vector3.new(math.cos(a) * 0.15, 0.42, math.sin(a) * 0.15), Vector3.new(math.cos(a) * 0.72, 0.05, math.sin(a) * 0.72), 0.1, shade(wood, 0.15), WOOD)
+	end
+	cyl(c, "Column", 0.8, 0.16, 0, 0.75, 0, "y", wood, WOOD)
+	cyl(c, "Cup", 0.12, 0.42, 0, 1.12, 0, "y", shade(wood, 0.1), WOOD)
+	local centre = Vector3.new(0, 1.85, 0)
+	shine(ball(c, "Globe", 1.3, centre.X, centre.Y, centre.Z, sea), 0.1)
+	-- the continents: patches of land just out of the sea (the caps of balls inside it)
+	for _, at in { { -0.5, 0.3, -0.6, 0.8 }, { 0.45, 0.05, -0.6, 0.7 }, { 0.6, 0.35, 0.4, 0.6 } } do
+		local dir = Vector3.new(at[1], at[2], at[3]).Unit
+		local p = centre + dir * (0.65 - at[4] / 2 + 0.05)
+		ball(c, "Land", at[4], p.X, p.Y, p.Z, land)
+	end
+	cyl(c, "Horizon", 0.08, 1.6, 0, centre.Y, 0, "y", wood, WOOD)
+	local tilt = CFrame.Angles(0, 0, 0.41)
+	cyl(c, "Meridian", 0.05, 1.42, 0, centre.Y, 0, "x", BRASS, METAL, tilt)
+	cyl(c, "Pin", 0.2, 0.07, -0.7 * math.sin(0.41), centre.Y + 0.7 * math.cos(0.41), 0, "y", BRASS, METAL, tilt)
+end
+
+BUILDERS.stag_head = function(c: Ctx)
+	-- A hunting lodge's stag on its oak shield, taken off the wall and stood on its foot board: the shield and its
+	-- brass plate, the neck, the round skull and the long snout looking down, glass eyes, and the two antlers, each a
+	-- curving beam with a brow tine and a middle tine.
+	local wood = pick(WOODS, c.v, 2)
+	local fur = pick(FURS, c.v)
+	box(c, "Foot", 1.2, 0.12, 0.95, 0, 0.06, 0.37, shade(wood, 0.25), WOOD)
+	box(c, "Shield", 1.3, 1.6, 0.15, 0, 0.92, 0.77, wood, WOOD)
+	cyl(c, "ShieldTop", 0.15, 1.3, 0, 1.72, 0.77, "z", wood, WOOD)
+	local plate = box(c, "Plate", 0.7, 0.18, 0.02, 0, 0.45, 0.685, BRASS, METAL)
+	label(plate, "ALPSPITZE 1931", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	cyl(c, "Neck", 0.75, 0.85, 0, 1.45, 0.32, "z", fur, FABRIC)
+	ball(c, "Skull", 0.64, 0, 1.8, -0.05, fur, FABRIC)
+	cyl(c, "Snout", 0.6, 0.4, 0, 1.656, -0.347, "z", fur, FABRIC, CFrame.Angles(-0.45, 0, 0))
+	ball(c, "Muzzle", 0.42, 0, 1.52, -0.6, shade(fur, 0.2), FABRIC)
+	ball(c, "Nose", 0.2, 0, 1.5, -0.74, rgb(30, 26, 24))
+	for _, s in { -1, 1 } do
+		shine(ball(c, "Eye", 0.11, s * 0.27, 1.82, -0.2, rgb(20, 16, 14)), 0.4)
+		box(c, "Ear", 0.12, 0.38, 0.22, s * 0.36, 2.05, 0.05, fur, FABRIC, CFrame.Angles(0, 0, -s * 0.8))
+		-- the beam out and up in two bends, a brow tine to the front, a middle tine
+		local bend = Vector3.new(s * 0.7, 2.62, 0.1)
+		strut(c, "Antler", Vector3.new(s * 0.16, 2.02, 0), bend, 0.14, BONE, WOOD)
+		strut(c, "Antler", bend, Vector3.new(s * 1.42, 3.28, -0.05), 0.12, BONE, WOOD)
+		strut(c, "Tine", Vector3.new(s * 0.3, 2.18, 0.03), Vector3.new(s * 0.42, 2.42, -0.4), 0.09, BONE, WOOD)
+		strut(c, "Tine", bend, Vector3.new(s * 0.82, 3.2, -0.2), 0.09, BONE, WOOD)
+	end
+end
+
+BUILDERS.gold_record = function(c: Ctx)
+	-- A gold disc award under glass: the frame, the velvet mount, the gold record and its label, the engraved plate;
+	-- cardboard corners and a strut for the move, like the paintings.
+	local frame = pick({ rgb(30, 30, 34), rgb(110, 70, 44), rgb(236, 232, 222), rgb(60, 40, 30) }, c.v)
+	box(c, "Frame", 2.2, 2.6, 0.2, 0, 1.3, 0, frame, WOOD)
+	box(c, "Mount", 1.9, 2.3, 0.04, 0, 1.3, -0.115, pick(VELVETS, c.v, 1), FABRIC)
+	shine(cyl(c, "Record", 0.03, 1.5, 0, 1.5, -0.135, "z", GOLD, METAL), 0.35)
+	cyl(c, "Grooves", 0.03, 1.0, 0, 1.5, -0.14, "z", shade(GOLD, 0.12), METAL)
+	cyl(c, "Label", 0.03, 0.42, 0, 1.5, -0.145, "z", pick(ACCENTS, c.v, 2))
+	local plate = box(c, "Plate", 1.2, 0.3, 0.03, 0, 0.45, -0.145, BRASS, METAL)
+	label(plate, "1,000,000 SOLD", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	local glass = box(c, "Glass", 1.9, 2.3, 0.03, 0, 1.3, -0.185, rgb(220, 232, 236), GLASS)
+	glass.Transparency = 0.8
+	box(c, "Strut", 0.3, 2.0, 0.12, 0, 1.0, 0.13, shade(CARDBOARD, 0.2), CARD, CFrame.Angles(-0.04, 0, 0))
+	for _, s in { -1, 1 } do
+		box(c, "Corner", 0.45, 0.45, 0.36, s * 0.875, 0.225, 0, CARDBOARD, CARD)
+	end
+end
+
+BUILDERS.ship_bottle = function(c: Ctx)
+	-- Grandad's ship in a bottle on its cradle stand (the bottle along X, the cork to +X): a three-master under sail on
+	-- a putty sea.
+	local wood = pick(WOODS, c.v, 3)
+	local hull = pick({ rgb(70, 44, 30), rgb(40, 40, 46), rgb(110, 40, 34), rgb(30, 60, 90) }, c.v)
+	local sail = pick({ rgb(244, 238, 222), rgb(236, 226, 200), rgb(250, 248, 240), rgb(226, 214, 190) }, c.v, 2)
+	local tint_ = pick({ rgb(206, 232, 214), rgb(212, 228, 238), rgb(184, 214, 176), rgb(226, 216, 190) }, c.v)
+	box(c, "Base", 1.8, 0.12, 0.7, 0, 0.06, 0, wood, WOOD)
+	for _, x in { -0.55, 0.4 } do
+		box(c, "Cradle", 0.14, 0.32, 0.6, x, 0.28, 0, shade(wood, 0.2), WOOD)
+	end
+	local y = 0.85
+	box(c, "Sea", 1.2, 0.12, 0.46, -0.25, 0.58, 0, rgb(40, 90, 140))
+	box(c, "Hull", 0.8, 0.14, 0.2, -0.25, 0.69, 0, hull, WOOD)
+	rod(c, "Bowsprit", 0.12, 0.72, 0.42, 0.84, 0, 0.03, hull, WOOD)
+	for n, x in { -0.5, -0.25, 0 } do
+		local tall = if n == 2 then 0.46 else 0.38
+		cyl(c, "Mast", tall, 0.03, x, 0.76 + tall / 2, 0, "y", hull, WOOD)
+		box(c, "Sail", 0.03, tall * 0.62, 0.24, x, 0.8 + tall / 2, 0, sail, FABRIC, CFrame.Angles(0, 0.6, 0))
+	end
+	box(c, "Pennant", 0.14, 0.06, 0.01, -0.18, 1.2, 0, rgb(200, 40, 40))
+	-- the bottle: its body, the round shoulder, the neck and the cork
+	for _, part in {
+		cyl(c, "Bottle", 1.5, 0.84, -0.2, y, 0, "x", tint_, GLASS),
+		ball(c, "Shoulder", 0.84, 0.55, y, 0, tint_, GLASS),
+		cyl(c, "Neck", 0.3, 0.34, 0.9, y, 0, "x", tint_, GLASS),
+	} do
+		part.Transparency = 0.6
+		part.Reflectance = 0.15
+	end
+	cyl(c, "Cork", 0.14, 0.3, 1.03, y, 0, "x", rgb(176, 130, 80), WOOD)
+end
+
+BUILDERS.jewellery_box = function(c: Ctx)
+	-- Grandma's jewellery box, its lid up: the lacquered case on a brass plinth, a drawer, the mother-of-pearl inlay,
+	-- the velvet tray with her pearls spilling over the front and her ring, the mirror in the lid, the music box's key.
+	local lacquer = pick(LACQUERS, c.v)
+	box(c, "Plinth", 1.6, 0.08, 0.85, 0, 0.04, -0.1, BRASS, METAL)
+	shine(box(c, "Case", 1.5, 0.42, 0.75, 0, 0.29, -0.1, lacquer, WOOD), 0.1)
+	box(c, "Drawer", 1.2, 0.16, 0.03, 0, 0.2, -0.49, shade(lacquer, 0.15), WOOD)
+	ball(c, "Knob", 0.08, 0, 0.2, -0.52, BRASS, METAL)
+	box(c, "Inlay", 0.7, 0.1, 0.02, 0, 0.4, -0.485, rgb(236, 230, 214))
+	box(c, "Tray", 1.38, 0.03, 0.64, 0, 0.51, -0.1, pick(VELVETS, c.v, 2), FABRIC)
+	-- the lid, open on its hinge (the case's back top edge) and leaning back, the mirror on its inside
+	local hinge = CFrame.new(0, 0.5, 0.275) * CFrame.Angles(0.2, 0, 0)
+	shine(finish(c, Instance.new("Part"), "Lid", Vector3.new(1.5, 0.7, 0.07), hinge * CFrame.new(0, 0.35, 0.035), lacquer, WOOD), 0.1)
+	shine(finish(c, Instance.new("Part"), "Mirror", Vector3.new(1.2, 0.46, 0.02), hinge * CFrame.new(0, 0.37, -0.008), rgb(200, 216, 226), GLASS), 0.5)
+	for _, from in { -0.4, 0.55 } do
+		shine(strut(c, "Pearls", Vector3.new(from, 0.53, -0.44), Vector3.new(0.1, 0.42, -0.5), 0.06, rgb(246, 242, 232), SMOOTH), 0.3)
+	end
+	local gem = shine(ball(c, "Pendant", 0.13, 0.1, 0.37, -0.5, pick({ rgb(200, 30, 50), rgb(40, 120, 200), rgb(40, 160, 90), rgb(150, 60, 190) }, c.v, 1), GLASS), 0.3)
+	gem.Transparency = 0.15
+	cyl(c, "Ring", 0.05, 0.2, -0.45, 0.62, -0.15, "x", GOLD, METAL)
+	shine(ball(c, "Diamond", 0.09, -0.45, 0.74, -0.15, rgb(236, 244, 250), GLASS), 0.5)
+	cyl(c, "Key", 0.1, 0.14, 0.79, 0.3, -0.1, "x", BRASS, METAL)
+end
+
+BUILDERS.antique_vase = function(c: Ctx)
+	-- A porcelain baluster vase on its carved rosewood stand: the foot, the round belly with its painted band and
+	-- flowers, the shoulder, the neck, the gilt rim and two little ring handles; glazed, so it shines a little.
+	local glaze = pick({
+		{ rgb(244, 244, 238), rgb(36, 66, 150) },
+		{ rgb(170, 204, 176), rgb(54, 96, 76) },
+		{ rgb(236, 196, 82), rgb(40, 60, 126) },
+		{ rgb(140, 36, 38), rgb(222, 180, 80) },
+	}, c.v)
+	local body, pattern = glaze[1], glaze[2]
+	cyl(c, "Stand", 0.18, 1.1, 0, 0.09, 0, "y", rgb(70, 36, 28), WOOD)
+	shine(cyl(c, "Foot", 0.22, 0.8, 0, 0.29, 0, "y", pattern), 0.15)
+	shine(ball(c, "Belly", 1.36, 0, 1.06, 0, body), 0.15)
+	cyl(c, "Band", 0.26, 1.38, 0, 1.06, 0, "y", pattern)
+	shine(ball(c, "Shoulder", 1.1, 0, 1.62, 0, body), 0.15)
+	shine(cyl(c, "Neck", 0.7, 0.55, 0, 2.2, 0, "y", body), 0.15)
+	cyl(c, "NeckBand", 0.1, 0.59, 0, 2.32, 0, "y", pattern)
+	cyl(c, "Lip", 0.14, 0.78, 0, 2.6, 0, "y", body)
+	shine(cyl(c, "Rim", 0.12, 0.86, 0, 2.72, 0, "y", GOLD, METAL), 0.2)
+	cyl(c, "Mouth", 0.02, 0.62, 0, 2.785, 0, "y", shade(body, 0.6))
+	for n, a in { -0.7, 0, 0.7 } do
+		ball(c, "Flower", if n == 2 then 0.3 else 0.24, math.sin(a) * 0.56, 1.36, -math.cos(a) * 0.56, pattern)
+	end
+	for _, s in { -1, 1 } do
+		cyl(c, "Handle", 0.07, 0.3, s * 0.33, 2.05, 0, "x", GOLD, METAL)
+	end
+end
+
+BUILDERS.arcade_cabinet = function(c: Ctx)
+	-- An eighties upright arcade machine: the painted side panels, the black cabinet, the lit marquee, the screen with a
+	-- game on it, the control panel's stick and buttons, the coin door and its lit slots.
+	local paint = pick({ rgb(190, 40, 50), rgb(40, 90, 190), rgb(236, 180, 40), rgb(120, 60, 170) }, c.v)
+	local glow = pick(NEONS, c.v, 1)
+	local black = rgb(26, 26, 30)
+	for _, s in { -1, 1 } do
+		box(c, "Side", 0.15, 3.3, 2.6, s * 1.325, 1.65, 0.2, paint, WOOD)
+		box(c, "SideTop", 0.15, 2.7, 2.2, s * 1.325, 4.65, 0.4, paint, WOOD)
+	end
+	box(c, "Body", 2.5, 2.8, 2.4, 0, 1.4, 0.3, black)
+	box(c, "Head", 2.5, 3.1, 2.1, 0, 4.35, 0.45, black)
+	box(c, "Top", 2.8, 0.1, 2.2, 0, 5.95, 0.4, shade(paint, 0.2), WOOD)
+	local marquee = box(c, "Marquee", 2.5, 0.6, 0.12, 0, 5.5, -0.66, glow, NEON)
+	label(marquee, pick({ "GALAXY RAID", "ZOMBIE PANIC", "ALPINE RACER", "SPACE MOVERS" }, c.v), black, Enum.NormalId.Front, Enum.Font.Arcade)
+	-- the control panel slopes to the player: the stick and three buttons on it
+	box(c, "Panel", 2.5, 0.35, 0.75, 0, 3.0, -1.1, rgb(46, 46, 52), SMOOTH, CFrame.Angles(-0.2, 0, 0))
+	cyl(c, "Stick", 0.32, 0.07, -0.6, 3.32, -1.15, "y", black)
+	ball(c, "StickBall", 0.2, -0.6, 3.52, -1.15, rgb(210, 40, 40))
+	for n, colour in { rgb(220, 50, 50), rgb(240, 200, 50), rgb(60, 130, 230) } do
+		cyl(c, "Button", 0.08, 0.18, 0.1 + n * 0.3, 3.19, -1.15, "y", colour)
+	end
+	-- the screen, tilted back in its bezel, a game on it
+	local tilt = CFrame.new(0, 4.25, -0.62) * CFrame.Angles(0.12, 0, 0)
+	finish(c, Instance.new("Part"), "Bezel", Vector3.new(2.2, 1.9, 0.1), tilt, rgb(40, 40, 46), SMOOTH)
+	shine(finish(c, Instance.new("Part"), "Screen", Vector3.new(1.8, 1.45, 0.04), tilt * CFrame.new(0, 0, -0.07), rgb(16, 22, 40), GLASS), 0.15)
+	finish(c, Instance.new("Part"), "Invader", Vector3.new(0.3, 0.2, 0.02), tilt * CFrame.new(-0.35, 0.3, -0.1), rgb(120, 255, 140), NEON)
+	finish(c, Instance.new("Part"), "Ship", Vector3.new(0.26, 0.14, 0.02), tilt * CFrame.new(0.2, -0.45, -0.1), glow, NEON)
+	box(c, "CoinDoor", 0.9, 1.0, 0.05, 0, 1.4, -0.925, rgb(60, 62, 66), METAL)
+	box(c, "CoinSlots", 0.5, 0.12, 0.03, 0, 1.65, -0.955, rgb(255, 90, 60), NEON)
+end
+
+BUILDERS.jukebox = function(c: Ctx)
+	-- A forties jukebox: the wooden cabinet under its round top, the bubble tubes glowing round the arch and down the
+	-- sides, the record behind the glass, the title strip and the selector keys, the speaker grille, the coin slot.
+	local wood = pick({ rgb(120, 62, 36), rgb(150, 90, 50), rgb(90, 46, 30), rgb(176, 112, 60) }, c.v)
+	local glow = pick(NEONS, c.v)
+	box(c, "Plinth", 3.4, 0.3, 2.4, 0, 0.15, 0, shade(wood, 0.35), WOOD)
+	shine(box(c, "Body", 3.0, 3.6, 2.2, 0, 2.1, 0, wood, WOOD), 0.08)
+	shine(cyl(c, "Top", 2.2, 3.0, 0, 3.9, 0, "z", wood, WOOD), 0.08)
+	for _, s in { -1, 1 } do
+		box(c, "Pilaster", 0.2, 3.6, 2.4, s * 1.6, 2.1, 0, shade(wood, 0.2), WOOD)
+		box(c, "Tube", 0.2, 2.6, 0.08, s * 1.25, 2.6, -1.14, glow, NEON)
+	end
+	cyl(c, "Arch", 0.08, 2.8, 0, 3.9, -1.13, "z", glow, NEON)
+	cyl(c, "Inner", 0.06, 2.4, 0, 3.9, -1.16, "z", shade(wood, 0.15), WOOD)
+	cyl(c, "Window", 0.03, 1.7, 0, 4.0, -1.205, "z", rgb(26, 22, 20))
+	shine(cyl(c, "Record", 0.02, 1.0, 0, 3.95, -1.225, "z", rgb(18, 18, 20)), 0.3)
+	cyl(c, "Label", 0.02, 0.32, 0, 3.95, -1.235, "z", pick(ACCENTS, c.v, 1))
+	local glass = shine(cyl(c, "Glass", 0.02, 1.7, 0, 4.0, -1.245, "z", rgb(220, 232, 236), GLASS), 0.2)
+	glass.Transparency = 0.7
+	local titles = box(c, "Titles", 2.2, 0.4, 0.1, 0, 2.95, -1.15, CREAM)
+	label(titles, "HIT PARADE", rgb(150, 40, 40), Enum.NormalId.Front, Enum.Font.Garamond)
+	box(c, "Keys", 1.9, 0.14, 0.06, 0, 2.62, -1.18, rgb(240, 236, 224))
+	box(c, "Coin", 0.16, 0.28, 0.04, 1.0, 2.25, -1.2, STEEL, METAL)
+	box(c, "Grille", 2.2, 1.3, 0.06, 0, 1.55, -1.13, rgb(200, 186, 150), FABRIC)
+	for _, y in { 1.15, 1.95 } do
+		shine(box(c, "Bar", 2.3, 0.08, 0.06, 0, y, -1.17, rgb(214, 218, 222), METAL), 0.3)
+	end
+end
+
+BUILDERS.oil_painting = function(c: Ctx)
+	-- An old master's alpine landscape in a gilded frame: the evening sky and its glow, two mountains (snow on the near
+	-- one), the lake, a meadow and a tree, the setting sun; the gallery's brass picture light over it, its title plate
+	-- under it; cardboard corners and a strut for the move. (The paint in layers a hundredth of a stud apart, the
+	-- nearest in front.)
+	local gilt = pick(GILT, c.v)
+	local sky = pick({
+		{ rgb(236, 150, 90), rgb(250, 206, 130) },
+		{ rgb(120, 96, 160), rgb(236, 150, 120) },
+		{ rgb(110, 150, 200), rgb(240, 220, 170) },
+		{ rgb(70, 76, 110), rgb(200, 120, 90) },
+	}, c.v)
+	shine(box(c, "Frame", 4.8, 3.5, 0.3, 0, 1.85, 0, gilt, METAL), 0.12)
+	box(c, "Moulding", 4.3, 3.0, 0.06, 0, 1.85, -0.18, shade(gilt, 0.25), METAL)
+	box(c, "Canvas", 3.8, 2.5, 0.03, 0, 1.85, -0.225, sky[1])
+	box(c, "Glow", 3.8, 0.45, 0.01, 0, 2.08, -0.248, sky[2])
+	cyl(c, "Sun", 0.01, 0.36, 1.35, 2.3, -0.258, "z", rgb(255, 214, 140), NEON)
+	-- two peaks, each two wedges back to back (their high sides meeting): x, height, half the width, depth (the far one
+	-- paler, behind); snow on the near one's top
+	local rock = { rgb(150, 160, 184), rgb(84, 96, 120) }
+	for n, peak in { { 0.9, 0.7, 0.9, -0.266 }, { -0.6, 0.85, 0.95, -0.276 }, { -0.6, 0.25, 0.28, -0.286 } } do
+		local x, h, w = peak[1], peak[2], peak[3]
+		local colour = rock[n] or rgb(244, 244, 240)
+		local y = 1.85 + (if n == 3 then 0.85 - h / 2 else h / 2)
+		wedge(c, if n == 3 then "Snow" else "Mountain", 0.01, h, w, x - w / 2, y, peak[4], colour, SMOOTH, CFrame.Angles(0, math.pi / 2, 0))
+		wedge(c, if n == 3 then "Snow" else "Mountain", 0.01, h, w, x + w / 2, y, peak[4], colour, SMOOTH, CFrame.Angles(0, -math.pi / 2, 0))
+	end
+	shine(box(c, "Lake", 3.8, 0.4, 0.02, 0, 1.65, -0.26, rgb(70, 110, 150)), 0.2)
+	box(c, "Meadow", 3.8, 0.85, 0.02, 0, 1.025, -0.26, rgb(70, 104, 56))
+	box(c, "Trunk", 0.08, 0.7, 0.02, -1.35, 1.25, -0.28, rgb(60, 44, 30))
+	cyl(c, "Tree", 0.02, 0.65, -1.35, 1.75, -0.29, "z", rgb(44, 76, 46))
+	local plate = box(c, "Plate", 0.9, 0.18, 0.03, 0, 0.24, -0.165, BRASS, METAL)
+	label(plate, "ALPINE GLOW, 1886", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	-- the picture light: its arm off the frame's top, the brass lamp, its warm strip
+	box(c, "LampArm", 0.08, 0.08, 0.25, 0, 3.66, -0.08, BRASS, METAL)
+	shine(cyl(c, "Lamp", 1.6, 0.16, 0, 3.72, -0.2, "x", BRASS, METAL), 0.2)
+	box(c, "LampGlow", 1.4, 0.03, 0.06, 0, 3.63, -0.22, rgb(255, 226, 170), NEON)
+	box(c, "Strut", 0.4, 3.0, 0.12, 0, 1.6, 0.2, shade(CARDBOARD, 0.2), CARD, CFrame.Angles(-0.04, 0, 0))
+	for _, s in { -1, 1 } do
+		box(c, "Corner", 0.6, 0.6, 0.6, s * 2.1, 0.3, 0, CARDBOARD, CARD)
+	end
+end
+
+BUILDERS.knight_armour = function(c: Ctx)
+	-- A suit of plate armour on its oak plinth, its gauntlets on a longsword stood point down and its shield leaning on
+	-- the plinth: the sabatons and the legs, the tassets, the breastplate under a tabard in its house's colours, the
+	-- gorget, the pauldrons and the arms, the helm with its beaked visor and a plume.
+	local wood = pick(WOODS, c.v, 4)
+	local colours = pick({
+		{ rgb(150, 30, 40), rgb(222, 178, 72) },
+		{ rgb(36, 60, 130), rgb(236, 232, 220) },
+		{ rgb(40, 100, 60), rgb(222, 178, 72) },
+		{ rgb(30, 30, 34), rgb(200, 40, 44) },
+	}, c.v)
+	local house, charge = colours[1], colours[2] -- (the tabard and shield, the emblem and the plume)
+	local steel = shade(PLATE, 0.12)
+	local dark = shade(PLATE, 0.3)
+	box(c, "Plinth", 2.0, 0.35, 1.6, 0, 0.175, 0, shade(wood, 0.25), WOOD)
+	for _, s in { -1, 1 } do
+		box(c, "Sabaton", 0.42, 0.22, 0.75, s * 0.32, 0.46, -0.12, dark, METAL)
+		shine(cyl(c, "Leg", 2.65, 0.46, s * 0.32, 1.875, 0, "y", steel, METAL), 0.2)
+		shine(ball(c, "Pauldron", 0.84, s * 0.83, 4.85, 0, PLATE, METAL), 0.3)
+		cyl(c, "Arm", 0.75, 0.36, s * 0.85, 4.1, 0, "y", steel, METAL)
+		strut(c, "Forearm", Vector3.new(s * 0.85, 3.75, -0.05), Vector3.new(s * 0.24, 3.42, -0.62), 0.32, steel, METAL)
+		ball(c, "Gauntlet", 0.36, s * 0.17, 3.42, -0.64, dark, METAL)
+	end
+	box(c, "Tassets", 1.25, 0.65, 0.82, 0, 3.25, 0, dark, METAL)
+	shine(box(c, "Breastplate", 1.4, 1.5, 0.84, 0, 4.25, 0, PLATE, METAL), 0.3)
+	box(c, "Tabard", 0.9, 1.75, 0.04, 0, 3.95, -0.44, house, FABRIC)
+	cyl(c, "Gorget", 0.3, 0.62, 0, 5.1, 0, "y", dark, METAL)
+	-- the sword: its grip in the gauntlets, the cross guard, the blade down to the plinth
+	cyl(c, "Grip", 0.5, 0.1, 0, 3.5, -0.64, "y", rgb(70, 44, 30), LEATHER)
+	box(c, "Guard", 0.8, 0.08, 0.1, 0, 3.2, -0.64, BRASS, METAL)
+	shine(box(c, "Blade", 0.2, 2.8, 0.04, 0, 1.76, -0.66, rgb(232, 238, 244), METAL), 0.4)
+	-- the helm: its barrel and dome, the beaked visor with its slit, the plume
+	shine(cyl(c, "Helm", 0.75, 0.66, 0, 5.6, 0, "y", PLATE, METAL), 0.3)
+	shine(ball(c, "Dome", 0.66, 0, 5.95, 0, PLATE, METAL), 0.3)
+	box(c, "Visor", 0.46, 0.34, 0.2, 0, 5.62, -0.3, steel, METAL)
+	box(c, "Slit", 0.4, 0.05, 0.02, 0, 5.7, -0.405, rgb(20, 20, 24))
+	ball(c, "Plume", 0.55, 0, 6.5, 0.1, charge, FABRIC)
+	-- the shield, leaning back against the plinth's front: its field and the emblem on it
+	local lean = CFrame.new(-0.6, 0.62, -0.78) * CFrame.Angles(0.15, 0, 0)
+	finish(c, Instance.new("Part"), "Shield", Vector3.new(0.9, 1.2, 0.08), lean, house, WOOD)
+	local emblem = Instance.new("Part")
+	emblem.Shape = Enum.PartType.Cylinder
+	finish(c, emblem, "Emblem", Vector3.new(0.03, 0.46, 0.46), lean * CFrame.new(0, 0.08, -0.05) * CFrame.Angles(0, math.pi / 2, 0), charge, METAL)
+end
+
 -- ── The model ────────────────────────────────────────────────────────────────
 
 function FurnitureLooks.build(id: string, variant: number?): Model
@@ -1457,6 +1859,9 @@ function FurnitureLooks.build(id: string, variant: number?): Model
 	model:SetAttribute("Class", def.class)
 	model:SetAttribute("Weight", def.weight)
 	model:SetAttribute("Fragile", def.fragile)
+	if def.rarity then
+		model:SetAttribute("Rarity", def.rarity) -- (8.0 collectibles)
+	end
 	return model
 end
 

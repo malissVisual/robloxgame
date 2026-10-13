@@ -8,6 +8,9 @@
 -- 5.8 (the courier phone's look, design/phone-ui/): the card carries the ZDC mark (the red square, the wordmark, a
 -- thin rule, COURIER TERMINAL), PLAY is the phone's red primary action, the company line and the controls are slim
 -- hairline rows (no corners), and the controls card has the ZDC heading.
+-- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
+-- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
+-- (shared/SandboxMap.luau: the chalet, Main Street, your plot), never over the old city. PLAY does what the city's does.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -15,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- 8.0 SANDBOX
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 
@@ -36,9 +40,32 @@ local SHOTS = {
 	{ Vector3.new(-420, 40, -200), Vector3.new(-200, 5, 0) },
 }
 
+local shots = SHOTS -- (8.0 SANDBOX: sandboxShots instead)
+local shotSeconds = 9 -- one camera move
+
 local function shot(n: number): CFrame
-	local s = SHOTS[(n - 1) % #SHOTS + 1]
+	local s = shots[(n - 1) % #shots + 1]
 	return CFrame.lookAt(s[1], s[2])
+end
+
+-- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
+-- from its other side, up Main Street toward the plots, your plot's warehouse (the player's Plot attribute; the first
+-- plot before the server gave you one), your van's spot at its roller door, back down the street.
+local function sandboxShots(): { { Vector3 } }
+	local house = SandboxMap.House.house
+	local door = SandboxMap.House.door
+	local turn = SandboxMap.Turnaround
+	local plot = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 1] or SandboxMap.Plots[1]
+	local w, van = plot.warehouse, plot.vanSpot
+	local chalet = Vector3.new(house.x, house.y + house.sy * 0.45, house.z)
+	return {
+		{ Vector3.new(house.x + 64, 30, door.z - 70), chalet },
+		{ Vector3.new(house.x - 70, 44, door.z - 110), chalet },
+		{ Vector3.new(turn.x + 40, 70, turn.z - 30), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
+		{ Vector3.new(w.x + 60, 40, van.z + 70), Vector3.new(w.x, w.sy * 0.4, w.z + w.sz / 2) },
+		{ Vector3.new(w.x - 50, 26, van.z + 40), Vector3.new(van.x, van.y + 4, van.z) },
+		{ Vector3.new(turn.x - 30, 60, van.z + 90), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
+	}
 end
 
 local function fly()
@@ -53,10 +80,10 @@ local function fly()
 		camera.CFrame = shot(n)
 		while flying do
 			camera.CameraType = Enum.CameraType.Scriptable
-			local tween = TweenService:Create(camera, TweenInfo.new(9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = shot(n + 1) })
+			local tween = TweenService:Create(camera, TweenInfo.new(shotSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = shot(n + 1) })
 			tween:Play()
 			local started = os.clock()
-			while flying and os.clock() - started < 9 do
+			while flying and os.clock() - started < shotSeconds do
 				task.wait(0.1)
 			end
 			tween:Cancel()
@@ -91,7 +118,149 @@ function Menu.setState(state: any)
 	end
 end
 
+-- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the ZDC mark, ZDC MOVES · SANDBOX, PLAY
+-- (ENTER, a gamepad's A) and the version; PLAY fades out the same way and runs onPlay (the server's Play).
+local function showSandbox(onPlay: () -> ())
+	gui = Ui.make("ScreenGui", {
+		Name = "StartScreen",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = false,
+		DisplayOrder = 20,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	}, player:WaitForChild("PlayerGui"))
+	local C = Theme.Colors
+	local P = Theme.Postage
+	local K = Theme.Contract
+	local veil = Ui.make("Frame", {
+		Size = UDim2.fromScale(1, 1), BackgroundColor3 = K.charcoal,
+		BackgroundTransparency = 0.45, BorderSizePixel = 0, Active = false, ZIndex = 2,
+	}, gui)
+	Ui.make("UIGradient", {
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.8) }),
+	}, veil)
+	local W, H = 520, 292
+	local center = Ui.make("Frame", {
+		Name = "SandboxMenu", Size = UDim2.fromOffset(W, H),
+		Position = UDim2.new(0.08, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundTransparency = 1, ZIndex = 5,
+	}, gui)
+	local menuScale = Ui.make("UIScale", {}, center)
+	local face = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
+	face.BackgroundColor3 = K.charcoal
+	face.BackgroundTransparency = 0.06
+	face.Parent.Name = "ShiftCard"
+	face.Parent.ZIndex = 5
+	local brand = Ui.brand(face, 24, { Position = UDim2.fromOffset(24, 16), ZIndex = 6 })
+	for _, part in brand:GetChildren() do
+		if part:IsA("GuiObject") then
+			part.ZIndex = 6
+		end
+	end
+	local title = Ui.label(face, "ZDC MOVES · SANDBOX", UDim2.fromOffset(W - 48, 56), {
+		Name = "Title", Position = UDim2.fromOffset(24, 62), TextSize = 42, TextScaled = true, Font = Theme.DisplayFont, ZIndex = 6,
+	})
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 42 }, title)
+	local play = Ui.button(face, "PLAY", UDim2.fromOffset(W - 48, 72), K.red, function() end)
+	play.Position = UDim2.fromOffset(24, 136)
+	play.TextSize = 26
+	play.ZIndex = 7
+	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(W - 48, 36), {
+		Position = UDim2.fromOffset(24, 224), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
+	})
+	local version = Ui.make("TextLabel", {
+		Name = "Version", Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1),
+		BackgroundTransparency = 0, BackgroundColor3 = P.pill, Text = `version {Config.Version}`,
+		TextSize = 14, Font = Theme.MonoFont, TextColor3 = C.dim, ZIndex = 6,
+	}, gui)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, version)
+
+	-- The card follows the screen (centred on a narrow one, at the left on a wide one).
+	local viewportConnection: RBXScriptConnection? = nil
+	local function fitMenu()
+		local camera = workspace.CurrentCamera
+		local v = if camera then camera.ViewportSize else Vector2.new(1280, 720)
+		menuScale.Scale = math.max(0.35, math.min((v.X - 32) / W, (v.Y - 64) / H, 1.05))
+		center.Position = if v.X < 900 then UDim2.fromScale(0.5, 0.5) else UDim2.new(0.08, 0, 0.5, 0)
+		center.AnchorPoint = if v.X < 900 then Vector2.new(0.5, 0.5) else Vector2.new(0, 0.5)
+	end
+	local function watchCamera()
+		if viewportConnection then viewportConnection:Disconnect() end
+		local camera = workspace.CurrentCamera
+		viewportConnection = if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMenu) else nil
+		fitMenu()
+	end
+	local cameraConnection = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+	watchCamera()
+
+	local fade = Ui.make("Frame", {
+		Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.veil, BackgroundTransparency = 1,
+		Visible = false, Active = false, ZIndex = 50,
+	}, gui)
+	local pressed = false
+	local keyConnection: RBXScriptConnection? = nil
+	local function start()
+		if pressed then
+			return
+		end
+		pressed = true
+		if viewportConnection then viewportConnection:Disconnect() end
+		cameraConnection:Disconnect()
+		if keyConnection then
+			keyConnection:Disconnect()
+		end
+		fade.Visible = true
+		TweenService:Create(fade, TweenInfo.new(0.4), { BackgroundTransparency = 0 }):Play()
+		task.wait(0.45)
+		flying = false
+		for _, child in gui:GetChildren() do
+			if child ~= fade then
+				child:Destroy()
+			end
+		end
+		local cam = workspace.CurrentCamera
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if cam then
+			cam.CameraType = Enum.CameraType.Custom
+			if humanoid then
+				cam.CameraSubject = humanoid
+			end
+		end
+		task.spawn(controls, true)
+		local ok, err = pcall(function()
+			onPlay()
+		end)
+		if not ok then
+			warn("[Menu] starting the game failed: " .. tostring(err))
+		end
+		task.wait(0.6)
+		TweenService:Create(fade, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+		task.wait(0.65)
+		gui:Destroy()
+		gui = nil
+	end
+	play.Activated:Connect(start)
+	keyConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		if processed or UserInputService:GetFocusedTextBox() then
+			return
+		end
+		local key = input.KeyCode
+		if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.ButtonA then
+			task.spawn(start)
+		end
+	end)
+
+	task.spawn(controls, false)
+	shots, shotSeconds = sandboxShots(), 12
+	fly()
+end
+
 function Menu.show(onPlay: () -> ())
+	if Config.Sandbox.On then
+		showSandbox(onPlay)
+		return
+	end
 	gui = Ui.make("ScreenGui", {
 		Name = "StartScreen",
 		ResetOnSpawn = false,
