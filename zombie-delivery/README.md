@@ -1333,6 +1333,43 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
+## Marge's house: the owner's Blender model (7.2)
+
+The owner: "udělej mi 3D model toho baráku aby vypadal klasicky evropsky barák" (a 3D model of that house, so it looks
+like a classic European house). That house is Marge's, 155 Willow Ln (`home_suburbs_2_0_00`), the moves' prologue.
+
+**The model.** `design/blender-house/house.py` builds it in Blender (or with `pip install bpy`) on the house's exact box
+on the map (20.36 × 12.60 × 17.57 studs: Map's lot; its front, the door's wall, −Y):
+- cream plaster over a stone plinth, quoins, white bands between the floors and under the eaves;
+- white-framed windows with a cross, surrounds, stone sills and net curtains, geranium planters upstairs and on the sides;
+- a green double door in a stone portal with a step and a lantern;
+- a steep (42°) pantile roof with a dormer, ridge tiles, a chimney, gutters and downpipes.
+
+Booleans cut the openings. The moving day's things (MOVING DAY over the door, the boxes and the rug by it, the signs) keep their places, so the street side has no ground-floor planters and its windows sit over the rug. `house.blend`, the render (`house-preview.png`) and the owner's Czech guide (`NAVOD.md`) are next to it.
+
+**The look.** `server/World.luau`'s `buildHouse` now puts each Suburbs house's own parts (the House box, the two Roof
+wedges, the Door, two Windows) in a Model `House_<home id>` (attribute Home) and hands it to `server/HouseMesh.luau`:
+- the houses of `HouseMesh.Homes` (Marge's) whose box is the model's (`mark_box`) wear the imported `ZDCHouseArt`'s MeshParts: 20 `house_<finish>` pieces, about 46,500 triangles, anchored, not colliding, not queried, the lantern a night light (DayNight);
+- their own parts turn invisible and shadowless but still collide: the model's walls stand on the box's faces, its roof covers the wedges;
+- the markers (`mark_o/x/y/z`) undo the importer's turn and scale;
+- no import, another house, or one of another size: World's look (the world's part count is unchanged; `tools/perf/world_count.py`);
+- `Main.server.luau` calls `HouseMesh.start`, so the import leaves the world at once.
+
+**What the owner does once in Studio** (meshes have to be uploaded under the owner's account): File → Import 3D →
+`design/blender-house/roblox/ZDCHouseArt.fbx` (the defaults), Insert, save and publish. Rebuilding: `python house.py --
+--export roblox` (or `EXPORT = True` in Blender), then import the new FBX again (delete the old `ZDCHouseArt` first). The
+game's colours are `HouseMesh.Looks`, not the FBX's.
+
+**Checks.** `tools/house-art/check.py <luau>` simulates the import from `roblox/ZDCHouseArt.json` (a quarter turn,
+3 × the size) on a house built from World's own `buildHouse` lines (it fails if they change). It checks that:
+- house.py's box is the map's and every finish has a look;
+- each piece is in place, anchored and not physical;
+- the house's own parts are hidden and keep their collision;
+- the walls stand on the box and the roof is over the wedges;
+- no detail of the model touches the moving day's 30 things or the door's Enter house box;
+- each piece has at most 10,000 triangles;
+- another house, one of another size and no import stay unchanged.
+
 ## New zombies, a real walk, the bike on its wheels (6.24)
 
 The owner: "noví zombíci", "lepší animace jak chodí a různě", and fix what is broken.
