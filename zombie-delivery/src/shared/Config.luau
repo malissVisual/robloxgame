@@ -3367,6 +3367,8 @@ Config.Soundscape = {
 		PutDownWait = 0.6, -- your hands empty: the move's next state says where it went (into the truck: truck_load, else
 		-- the put-down), at most this many seconds later (the server sends it 0.25 – 0.45 s after a change)
 		Gate = 0.7, -- the Wall's gate opening as the move is delivered (the result card plays its jingle)
+		Slip = 0.8, -- a heavy piece slipping from your hands (MoveSounds.slipped, for the grip's UI) …
+		SlipQuiet = 1.5, -- … and no put-down for this many seconds after (grip_slip has its thud)
 		Scrape = 0.5, -- a two-person piece dragged alone (wood_scrape_loop), while you move faster than …
 		ScrapeFrom = 1.2, -- … studs a second
 		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick

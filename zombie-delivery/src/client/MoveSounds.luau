@@ -11,6 +11,8 @@
 --             you move (a loop in your root, followed every Tick)
 -- Started by client/Sounds.luau (MoveSounds.start(api)), which hands over how to play: its regions, its stand-ins
 -- (SoundSheet.Fallback) while sfx4.ogg is not uploaded, the SOUND setting.
+-- MoveSounds.slipped(): for the grip's UI, the piece slipped from your hands: grip_slip (a whoosh and a thud) now,
+-- and the put-down its MoveCarry clearing would play is left out.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +36,7 @@ local player = Players.LocalPlayer
 local api: Api? = nil
 local view: any = nil -- the move's last state (nil: no move)
 local pending: { spot: number }? = nil -- your hands just went empty: where did the piece go (the next state says)
+local slipAt = -math.huge -- MoveSounds.slipped (its thud is the put-down)
 local scrape: Sound? = nil
 
 local function cue(c: SoundPlan.Cue)
@@ -52,7 +55,15 @@ local function settle()
 	if not item or item.state == "truck" or (item.state == "carried" and item.mine ~= true) then
 		return
 	end
+	if os.clock() - slipAt < M.SlipQuiet then
+		return -- (it slipped: grip_slip had its thud)
+	end
 	cue(SoundPlan.carryCue(item, false))
+end
+
+function MoveSounds.slipped()
+	slipAt = os.clock()
+	cue({ name = "grip_slip", volume = M.Slip, pitch = 1 })
 end
 
 local function onState(state: any)
