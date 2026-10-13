@@ -5560,12 +5560,15 @@ defineMissionPlaces()
 --                  recessed), the steps, a buzzer panel with the flats, the house number on the canopy, a lamp that
 --                  glows at night. Eight parts.
 --   A house        (the Suburbs) its front door faces its street (the front wall Map.HouseFront forward of the lot's
---                  middle), a short path to the sidewalk, a mailbox with its number, a tree in the back yard.
+--                  middle), a short path to the sidewalk, a mailbox with its number, a tree in the back yard. 7.2: its
+--                  box, roof, door and windows in a Model "House_<home id>" (attribute Home); server/HouseMesh.luau
+--                  dresses the ones it has a Blender model for (Marge's, 155 Willow Ln) and hides their own look.
 -- Nothing here has a prompt (the jobs give and take at the piles); every part stays inside its lot. Like the real
 -- estate and the missions' places, the builders live in their own function (Luau allows 200 locals per function).
 
 local function defineVenuesAndHomes()
 	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local HouseMesh = require(script.Parent.HouseMesh) -- 7.2: Marge's house in the owner's Blender model
 	local context = { part = part, deco = deco, nightLight = DayNight.nightLight }
 	-- The kinds' walls and their looks.
 	local STYLES: { [string]: { wall: Color3, material: Enum.Material, look: Kit.Blueprint } } = {
@@ -5658,15 +5661,21 @@ local function defineVenuesAndHomes()
 		local w, d, h = lot.w, lot.d, lot.h
 		local body = frame * CFrame.new(0, 0, d / 2) -- the house's middle on the ground
 		local color = HOUSE_COLORS[rng:NextInteger(1, #HOUSE_COLORS)]
-		part(parent, "House", Vector3.new(w, h, d), body * CFrame.new(0, h / 2, 0), color, Enum.Material.WoodPlanks)
-		gableRoof(parent, body * CFrame.new(0, h, 0), w + 2, d + 2, 6, Color3.fromRGB(100 + rng:NextInteger(-30, 30), 60, 50))
-		part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -0.2), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
+		-- 7.2: the house's own parts in one Model (server/HouseMesh.luau may dress it in the owner's Blender house)
+		local house = Instance.new("Model")
+		house.Name = "House_" .. home.id
+		house:SetAttribute("Home", home.id)
+		house.Parent = parent
+		part(house, "House", Vector3.new(w, h, d), body * CFrame.new(0, h / 2, 0), color, Enum.Material.WoodPlanks)
+		gableRoof(house, body * CFrame.new(0, h, 0), w + 2, d + 2, 6, Color3.fromRGB(100 + rng:NextInteger(-30, 30), 60, 50))
+		part(house, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -0.2), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
 		for _, x in { -w / 3, w / 3 } do
-			local window = deco(part(parent, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -0.15), Color3.fromRGB(40, 50, 60), Enum.Material.Glass))
+			local window = deco(part(house, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -0.15), Color3.fromRGB(40, 50, 60), Enum.Material.Glass))
 			if rng:NextNumber() < 0.3 then
 				nightWindow(window)
 			end
 		end
+		HouseMesh.dress(house, home.id)
 		-- The path from the door over the front lawn to the sidewalk, the mailbox beside it with the number.
 		local yard = lot.size / 2 - Map.HouseFront
 		deco(part(parent, "Path", Vector3.new(3, 0.1, yard), frame * CFrame.new(0, 0.12, -yard / 2), Color3.fromRGB(176, 172, 164), Enum.Material.Concrete))

@@ -1,0 +1,8657 @@
+{
+ "box": [
+  20.3572,
+  12.598,
+  17.5669
+ ],
+ "details": [
+  {
+   "center": [
+    0.0,
+    6.749,
+    0.0
+   ],
+   "finish": "plaster",
+   "name": "Zdi",
+   "size": [
+    20.3572,
+    13.498,
+    17.5669
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.5,
+    0.0
+   ],
+   "finish": "stone",
+   "name": "Sokl",
+   "size": [
+    20.4772,
+    1.0,
+    17.6869
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.3175,
+    0.0
+   ],
+   "finish": "plaster",
+   "name": "\u0160t\u00edty",
+   "size": [
+    20.3572,
+    7.6391,
+    16.9681
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    7.6,
+    -8.7935
+   ],
+   "finish": "trim",
+   "name": "Kordonov\u00e1 \u0159\u00edmsa",
+   "size": [
+    20.5972,
+    0.3,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    7.6,
+    8.7935
+   ],
+   "finish": "trim",
+   "name": "Kordonov\u00e1 \u0159\u00edmsa.001",
+   "size": [
+    20.5972,
+    0.3,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    -10.1886,
+    7.6,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "Kordonov\u00e1 \u0159\u00edmsa.002",
+   "size": [
+    0.22,
+    0.3,
+    17.8069
+   ]
+  },
+  {
+   "center": [
+    10.1886,
+    7.6,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "Kordonov\u00e1 \u0159\u00edmsa.003",
+   "size": [
+    0.22,
+    0.3,
+    17.8069
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.673,
+    -8.8335
+   ],
+   "finish": "trim",
+   "name": "Hlavn\u00ed \u0159\u00edmsa",
+   "size": [
+    20.7572,
+    0.55,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.673,
+    8.8335
+   ],
+   "finish": "trim",
+   "name": "Hlavn\u00ed \u0159\u00edmsa.001",
+   "size": [
+    20.7572,
+    0.55,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    -10.1886,
+    12.748,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "\u0158\u00edmsa \u0161t\u00edtu",
+   "size": [
+    0.22,
+    0.3,
+    17.8069
+   ]
+  },
+  {
+   "center": [
+    10.1886,
+    12.748,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "\u0158\u00edmsa \u0161t\u00edtu.001",
+   "size": [
+    0.22,
+    0.3,
+    17.8069
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    1.45,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    1.45,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.001",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    2.31,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.002",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    2.31,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.003",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    3.17,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.004",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    3.17,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.005",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    4.03,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.006",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    4.03,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.007",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    4.89,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.008",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    4.89,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.009",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    5.75,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.010",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    5.75,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.011",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    6.61,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.012",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    6.61,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.013",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    8.35,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.014",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    8.35,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.015",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    9.21,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.016",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    9.21,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.017",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    10.07,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.018",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    10.07,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.019",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    10.93,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.020",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    10.93,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.021",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    11.79,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.022",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    11.79,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.023",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    1.45,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.024",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    1.45,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.025",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    2.31,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.026",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    2.31,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.027",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    3.17,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.028",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    3.17,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.029",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    4.03,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.030",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    4.03,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.031",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    4.89,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.032",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    4.89,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.033",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    5.75,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.034",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    5.75,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.035",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    6.61,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.036",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    6.61,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.037",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    8.35,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.038",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    8.35,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.039",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    9.21,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.040",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    9.21,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.041",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    10.07,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.042",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    10.07,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.043",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    10.93,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.044",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    10.93,
+    -8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.045",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    11.79,
+    -8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.046",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    11.79,
+    -8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.047",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    1.45,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.048",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    1.45,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.049",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    2.31,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.050",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    2.31,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.051",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    3.17,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.052",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    3.17,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.053",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    4.03,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.054",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    4.03,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.055",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    4.89,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.056",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    4.89,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.057",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    5.75,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.058",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    5.75,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.059",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    6.61,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.060",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    6.61,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.061",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    8.35,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.062",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    8.35,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.063",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    9.21,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.064",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    9.21,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.065",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    10.07,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.066",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    10.07,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.067",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    9.7786,
+    10.93,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.068",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    10.93,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.069",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    9.9286,
+    11.79,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.070",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    10.1086,
+    11.79,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.071",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    1.45,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.072",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    1.45,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.073",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    2.31,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.074",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    2.31,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.075",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    3.17,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.076",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    3.17,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.077",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    4.03,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.078",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    4.03,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.079",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    4.89,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.080",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    4.89,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.081",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    5.75,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.082",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    5.75,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.083",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    6.61,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.084",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    6.61,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.085",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    8.35,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.086",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    8.35,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.087",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    9.21,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.088",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    9.21,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.089",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    10.07,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.090",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    10.07,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.091",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    -9.7786,
+    10.93,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.092",
+   "size": [
+    0.8,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    10.93,
+    8.5335
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.093",
+   "size": [
+    0.26,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -9.9286,
+    11.79,
+    8.7135
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.094",
+   "size": [
+    0.5,
+    0.8,
+    0.26
+   ]
+  },
+  {
+   "center": [
+    -10.1086,
+    11.79,
+    8.3834
+   ],
+   "finish": "stone2",
+   "name": "Rohov\u00fd kv\u00e1dr.095",
+   "size": [
+    0.26,
+    0.8,
+    0.8
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    3.575,
+    -8.5035
+   ],
+   "finish": "door",
+   "name": "K\u0159\u00eddlo dve\u0159\u00ed",
+   "size": [
+    1.96,
+    6.82,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    1.95,
+    -8.5835
+   ],
+   "finish": "door",
+   "name": "Kazeta",
+   "size": [
+    1.4,
+    2.3,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    6.25,
+    -8.5835
+   ],
+   "finish": "door",
+   "name": "Kazeta.001",
+   "size": [
+    1.4,
+    0.8,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    4.5,
+    -8.5684
+   ],
+   "finish": "glass",
+   "name": "Sklo dve\u0159\u00ed",
+   "size": [
+    1.25,
+    1.9,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    4.5,
+    -8.5984
+   ],
+   "finish": "door",
+   "name": "M\u0159\u00ed\u017eka",
+   "size": [
+    0.08,
+    1.9,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    4.5,
+    -8.5984
+   ],
+   "finish": "door",
+   "name": "M\u0159\u00ed\u017eka.001",
+   "size": [
+    1.25,
+    0.08,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    0.3,
+    3.25,
+    -8.6735
+   ],
+   "finish": "brass",
+   "name": "Klika",
+   "size": [
+    0.14,
+    0.14,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    0.42,
+    3.25,
+    -8.7334
+   ],
+   "finish": "brass",
+   "name": "Klika.001",
+   "size": [
+    0.38,
+    0.07,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    3.575,
+    -8.5035
+   ],
+   "finish": "door",
+   "name": "K\u0159\u00eddlo dve\u0159\u00ed.001",
+   "size": [
+    1.96,
+    6.82,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    1.95,
+    -8.5835
+   ],
+   "finish": "door",
+   "name": "Kazeta.002",
+   "size": [
+    1.4,
+    2.3,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    6.25,
+    -8.5835
+   ],
+   "finish": "door",
+   "name": "Kazeta.003",
+   "size": [
+    1.4,
+    0.8,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    4.5,
+    -8.5684
+   ],
+   "finish": "glass",
+   "name": "Sklo dve\u0159\u00ed.001",
+   "size": [
+    1.25,
+    1.9,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    4.5,
+    -8.5984
+   ],
+   "finish": "door",
+   "name": "M\u0159\u00ed\u017eka.002",
+   "size": [
+    0.08,
+    1.9,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    4.5,
+    -8.5984
+   ],
+   "finish": "door",
+   "name": "M\u0159\u00ed\u017eka.003",
+   "size": [
+    1.25,
+    0.08,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -0.3,
+    3.25,
+    -8.6735
+   ],
+   "finish": "brass",
+   "name": "Klika.002",
+   "size": [
+    0.14,
+    0.14,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    -0.42,
+    3.25,
+    -8.7334
+   ],
+   "finish": "brass",
+   "name": "Klika.003",
+   "size": [
+    0.38,
+    0.07,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    2.225,
+    3.5,
+    -8.7985
+   ],
+   "finish": "stone2",
+   "name": "Port\u00e1l",
+   "size": [
+    0.45,
+    7.0,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    -2.225,
+    3.5,
+    -8.7985
+   ],
+   "finish": "stone2",
+   "name": "Port\u00e1l.001",
+   "size": [
+    0.45,
+    7.0,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    7.2,
+    -8.7985
+   ],
+   "finish": "stone2",
+   "name": "Port\u00e1l.002",
+   "size": [
+    4.9,
+    0.4,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.09,
+    -9.1084
+   ],
+   "finish": "stone",
+   "name": "Schod",
+   "size": [
+    5.0,
+    0.18,
+    1.35
+   ]
+  },
+  {
+   "center": [
+    7.72,
+    5.0,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    5.08,
+    5.0,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.001",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    3.28,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.002",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    6.72,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.003",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    5.0,
+    -8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo",
+   "size": [
+    2.5,
+    3.3,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    7.392,
+    5.0,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    5.408,
+    5.0,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.001",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    5.0,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    5.504,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.001",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    7.9,
+    5.15,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    4.9,
+    5.15,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.001",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    6.93,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.002",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    7.0,
+    -8.8134
+   ],
+   "finish": "stone2",
+   "name": "Okno klen\u00e1k",
+   "size": [
+    0.42,
+    0.5,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    3.13,
+    -8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    7.72,
+    10.1,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.004",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    5.08,
+    10.1,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.005",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    8.68,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.006",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    11.52,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.007",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    10.1,
+    -8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.001",
+   "size": [
+    2.5,
+    2.7,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    7.392,
+    10.1,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.002",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    5.408,
+    10.1,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.003",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    10.1,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.002",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    10.52,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.003",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    7.9,
+    10.25,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.003",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    4.9,
+    10.25,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.004",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    11.73,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.005",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    8.53,
+    -8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.001",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    8.18,
+    -9.0835
+   ],
+   "finish": "wood2",
+   "name": "Okno truhl\u00edk",
+   "size": [
+    2.9,
+    0.42,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    7.6,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    7.48,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    7.2,
+    8.47,
+    -9.1434
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.001",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    7.08,
+    8.67,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.001",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    6.8,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.002",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    6.68,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.002",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    8.47,
+    -9.1434
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.003",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    6.28,
+    8.67,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.003",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    6.0,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.004",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    5.88,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.004",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    5.6,
+    8.47,
+    -9.1434
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.005",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    5.48,
+    8.67,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.005",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    5.2,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.006",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    5.08,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.006",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -5.08,
+    5.0,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.008",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -7.72,
+    5.0,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.009",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    3.28,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.010",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    6.72,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.011",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    5.0,
+    -8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.002",
+   "size": [
+    2.5,
+    3.3,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -5.408,
+    5.0,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.004",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -7.392,
+    5.0,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.005",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    5.0,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.004",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    5.504,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.005",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -4.9,
+    5.15,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.006",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -7.9,
+    5.15,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.007",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    6.93,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.008",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    7.0,
+    -8.8134
+   ],
+   "finish": "stone2",
+   "name": "Okno klen\u00e1k.001",
+   "size": [
+    0.42,
+    0.5,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    3.13,
+    -8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.002",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -5.08,
+    10.1,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.012",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -7.72,
+    10.1,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.013",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    8.68,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.014",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    11.52,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.015",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    10.1,
+    -8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.003",
+   "size": [
+    2.5,
+    2.7,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -5.408,
+    10.1,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.006",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -7.392,
+    10.1,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.007",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    10.1,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.006",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    10.52,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.007",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -4.9,
+    10.25,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.009",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -7.9,
+    10.25,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.010",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    11.73,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.011",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    8.53,
+    -8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.003",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    8.18,
+    -9.0835
+   ],
+   "finish": "wood2",
+   "name": "Okno truhl\u00edk.001",
+   "size": [
+    2.9,
+    0.42,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -5.2,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.007",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -5.32,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.007",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -5.6,
+    8.47,
+    -9.1434
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.008",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -5.72,
+    8.67,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.008",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -6.0,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.009",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -6.12,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.009",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    8.47,
+    -9.1434
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.010",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -6.52,
+    8.67,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.010",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -6.8,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.011",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -6.92,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.011",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -7.2,
+    8.47,
+    -9.1434
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.012",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -7.32,
+    8.67,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.012",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -7.6,
+    8.47,
+    -9.0435
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.013",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -7.72,
+    8.62,
+    -9.1235
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.013",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    0.72,
+    10.7,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko r\u00e1m",
+   "size": [
+    0.16,
+    1.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -0.72,
+    10.7,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko r\u00e1m.001",
+   "size": [
+    0.16,
+    1.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    9.98,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko r\u00e1m.002",
+   "size": [
+    1.28,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    11.42,
+    -8.5134
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko r\u00e1m.003",
+   "size": [
+    1.28,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    10.7,
+    -8.4535
+   ],
+   "finish": "glass",
+   "name": "Ok\u00e9nko sklo",
+   "size": [
+    1.3,
+    1.3,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.512,
+    10.7,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Ok\u00e9nko z\u00e1clona",
+   "size": [
+    0.256,
+    1.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -0.512,
+    10.7,
+    -8.466
+   ],
+   "finish": "curtain",
+   "name": "Ok\u00e9nko z\u00e1clona.001",
+   "size": [
+    0.256,
+    1.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    10.7,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko p\u0159\u00ed\u010dka",
+   "size": [
+    0.1,
+    1.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    10.924,
+    -8.5234
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko p\u0159\u00ed\u010dka.001",
+   "size": [
+    1.28,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.9,
+    10.85,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko \u0161ambr\u00e1na",
+   "size": [
+    0.24,
+    1.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -0.9,
+    10.85,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko \u0161ambr\u00e1na.001",
+   "size": [
+    0.24,
+    1.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    11.63,
+    -8.7885
+   ],
+   "finish": "trim",
+   "name": "Ok\u00e9nko \u0161ambr\u00e1na.002",
+   "size": [
+    2.04,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    9.83,
+    -8.9035
+   ],
+   "finish": "stone",
+   "name": "Ok\u00e9nko parapet",
+   "size": [
+    2.1,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -3.1,
+    6.15,
+    -9.0584
+   ],
+   "finish": "black",
+   "name": "Lucerna dr\u017e\u00e1k",
+   "size": [
+    0.14,
+    0.14,
+    0.55
+   ]
+  },
+  {
+   "center": [
+    -3.1,
+    5.6,
+    -9.5084
+   ],
+   "finish": "black",
+   "name": "Lucerna",
+   "size": [
+    0.55,
+    0.95,
+    0.55
+   ]
+  },
+  {
+   "center": [
+    -3.1,
+    5.6,
+    -9.5084
+   ],
+   "finish": "glow",
+   "name": "Lucerna sv\u011btlo",
+   "size": [
+    0.43,
+    0.72,
+    0.43
+   ]
+  },
+  {
+   "center": [
+    -3.1,
+    6.22,
+    -9.5035
+   ],
+   "finish": "black",
+   "name": "Lucerna st\u0159\u00ed\u0161ka",
+   "size": [
+    0.6223,
+    0.3,
+    0.6223
+   ]
+  },
+  {
+   "center": [
+    8.6,
+    0.7,
+    -9.7334
+   ],
+   "finish": "shrub",
+   "name": "Ke\u0159",
+   "size": [
+    1.955,
+    1.445,
+    1.7
+   ]
+  },
+  {
+   "center": [
+    -8.6,
+    0.7,
+    -9.7334
+   ],
+   "finish": "shrub",
+   "name": "Ke\u0159.001",
+   "size": [
+    1.955,
+    1.445,
+    1.7
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.55,
+    8.5035
+   ],
+   "finish": "door",
+   "name": "K\u0159\u00eddlo dve\u0159\u00ed.002",
+   "size": [
+    2.96,
+    6.77,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.95,
+    8.5835
+   ],
+   "finish": "door",
+   "name": "Kazeta.004",
+   "size": [
+    2.4,
+    2.3,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    6.2,
+    8.5835
+   ],
+   "finish": "door",
+   "name": "Kazeta.005",
+   "size": [
+    2.4,
+    0.8,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.5,
+    8.5684
+   ],
+   "finish": "glass",
+   "name": "Sklo dve\u0159\u00ed.002",
+   "size": [
+    2.25,
+    1.9,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.5,
+    8.5984
+   ],
+   "finish": "door",
+   "name": "M\u0159\u00ed\u017eka.004",
+   "size": [
+    0.08,
+    1.9,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.5,
+    8.5984
+   ],
+   "finish": "door",
+   "name": "M\u0159\u00ed\u017eka.005",
+   "size": [
+    2.25,
+    0.08,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -1.2,
+    3.25,
+    8.6735
+   ],
+   "finish": "brass",
+   "name": "Klika.004",
+   "size": [
+    0.14,
+    0.14,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    -1.08,
+    3.25,
+    8.7334
+   ],
+   "finish": "brass",
+   "name": "Klika.005",
+   "size": [
+    0.38,
+    0.07,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -1.725,
+    3.475,
+    8.7985
+   ],
+   "finish": "stone2",
+   "name": "Port\u00e1l.003",
+   "size": [
+    0.45,
+    6.95,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    1.725,
+    3.475,
+    8.7985
+   ],
+   "finish": "stone2",
+   "name": "Port\u00e1l.004",
+   "size": [
+    0.45,
+    6.95,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    7.15,
+    8.7985
+   ],
+   "finish": "stone2",
+   "name": "Port\u00e1l.005",
+   "size": [
+    3.9,
+    0.4,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.09,
+    9.1084
+   ],
+   "finish": "stone",
+   "name": "Schod.001",
+   "size": [
+    4.0,
+    0.18,
+    1.35
+   ]
+  },
+  {
+   "center": [
+    -7.72,
+    5.0,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.016",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -5.08,
+    5.0,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.017",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    3.28,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.018",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    6.72,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.019",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    5.0,
+    8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.004",
+   "size": [
+    2.5,
+    3.3,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -7.392,
+    5.0,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.008",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -5.408,
+    5.0,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.009",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    5.0,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.008",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    5.504,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.009",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -7.9,
+    5.15,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.012",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -4.9,
+    5.15,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.013",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    6.93,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.014",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    3.13,
+    8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.004",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    5.08,
+    5.0,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.020",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    7.72,
+    5.0,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.021",
+   "size": [
+    0.16,
+    3.6,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    3.28,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.022",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    6.72,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.023",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    5.0,
+    8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.005",
+   "size": [
+    2.5,
+    3.3,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    5.408,
+    5.0,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.010",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    7.392,
+    5.0,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.011",
+   "size": [
+    0.496,
+    3.28,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    5.0,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.010",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    5.504,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.011",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    4.9,
+    5.15,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.015",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    7.9,
+    5.15,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.016",
+   "size": [
+    0.24,
+    3.9,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    6.93,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.017",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    3.13,
+    8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.005",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -7.72,
+    10.1,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.024",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -5.08,
+    10.1,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.025",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    8.68,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.026",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    11.52,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.027",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    10.1,
+    8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.006",
+   "size": [
+    2.5,
+    2.7,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -7.392,
+    10.1,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.012",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -5.408,
+    10.1,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.013",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    10.1,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.012",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    10.52,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.013",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -7.9,
+    10.25,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.018",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -4.9,
+    10.25,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.019",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    11.73,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.020",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -6.4,
+    8.53,
+    8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.006",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -1.32,
+    10.1,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.028",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    1.32,
+    10.1,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.029",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    8.68,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.030",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    11.52,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.031",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    10.1,
+    8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.007",
+   "size": [
+    2.5,
+    2.7,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -0.992,
+    10.1,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.014",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    0.992,
+    10.1,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.015",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    10.1,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.014",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    10.52,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.015",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -1.5,
+    10.25,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.021",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    1.5,
+    10.25,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.022",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    11.73,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.023",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    8.53,
+    8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.007",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    5.08,
+    10.1,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.032",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    7.72,
+    10.1,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.033",
+   "size": [
+    0.16,
+    3.0,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    8.68,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.034",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    11.52,
+    8.5134
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.035",
+   "size": [
+    2.48,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    10.1,
+    8.4535
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.008",
+   "size": [
+    2.5,
+    2.7,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    5.408,
+    10.1,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.016",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    7.392,
+    10.1,
+    8.466
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.017",
+   "size": [
+    0.496,
+    2.68,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    10.1,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.016",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    10.52,
+    8.5234
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.017",
+   "size": [
+    2.48,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    4.9,
+    10.25,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.024",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    7.9,
+    10.25,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.025",
+   "size": [
+    0.24,
+    3.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    11.73,
+    8.7885
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.026",
+   "size": [
+    3.24,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    6.4,
+    8.53,
+    8.9035
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.008",
+   "size": [
+    3.3,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    5.0,
+    -5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.036",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    5.0,
+    -2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.037",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    3.28,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.038",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    6.72,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.039",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.8486,
+    5.0,
+    -4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.009",
+   "size": [
+    0.02,
+    3.3,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    5.0,
+    -5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.018",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    5.0,
+    -3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.019",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    5.0,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.018",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    5.504,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.019",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    5.15,
+    -5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.027",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    5.15,
+    -2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.028",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    6.93,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.029",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    -10.2086,
+    7.0,
+    -4.2
+   ],
+   "finish": "stone2",
+   "name": "Okno klen\u00e1k.002",
+   "size": [
+    0.14,
+    0.5,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.2986,
+    3.13,
+    -4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.009",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    -10.4786,
+    2.78,
+    -4.2
+   ],
+   "finish": "wood2",
+   "name": "Okno truhl\u00edk.002",
+   "size": [
+    0.5,
+    0.42,
+    2.9
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    -5.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.014",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    -5.28
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.014",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.5386,
+    3.07,
+    -5.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.015",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.27,
+    -4.88
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.015",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    -4.6
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.016",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    -4.48
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.016",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.5386,
+    3.07,
+    -4.2
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.017",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.27,
+    -4.08
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.017",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    -3.8
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.018",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    -3.68
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.018",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.5386,
+    3.07,
+    -3.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.019",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.27,
+    -3.28
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.019",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    -3.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.020",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    -2.88
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.020",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    10.1,
+    -5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.040",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    10.1,
+    -2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.041",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    8.68,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.042",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    11.52,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.043",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.8486,
+    10.1,
+    -4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.010",
+   "size": [
+    0.02,
+    2.7,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    10.1,
+    -5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.020",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    10.1,
+    -3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.021",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    10.1,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.020",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    10.52,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.021",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    10.25,
+    -5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.030",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    10.25,
+    -2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.031",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    11.73,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.032",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    -10.2986,
+    8.53,
+    -4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.010",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    5.0,
+    2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.044",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    5.0,
+    5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.045",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    3.28,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.046",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    6.72,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.047",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.8486,
+    5.0,
+    4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.011",
+   "size": [
+    0.02,
+    3.3,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    5.0,
+    3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.022",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    5.0,
+    5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.023",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    5.0,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.022",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    5.504,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.023",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    5.15,
+    2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.033",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    5.15,
+    5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.034",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    6.93,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.035",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    -10.2086,
+    7.0,
+    4.2
+   ],
+   "finish": "stone2",
+   "name": "Okno klen\u00e1k.003",
+   "size": [
+    0.14,
+    0.5,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.2986,
+    3.13,
+    4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.011",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    -10.4786,
+    2.78,
+    4.2
+   ],
+   "finish": "wood2",
+   "name": "Okno truhl\u00edk.003",
+   "size": [
+    0.5,
+    0.42,
+    2.9
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    3.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.021",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    3.12
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.021",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.5386,
+    3.07,
+    3.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.022",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.27,
+    3.52
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.022",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    3.8
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.023",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    3.92
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.023",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.5386,
+    3.07,
+    4.2
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.024",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.27,
+    4.32
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.024",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    4.6
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.025",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    4.72
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.025",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.5386,
+    3.07,
+    5.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.026",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.27,
+    5.12
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.026",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -10.4386,
+    3.07,
+    5.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.027",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    -10.5186,
+    3.22,
+    5.52
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.027",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    10.1,
+    2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.048",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    10.1,
+    5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.049",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    8.68,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.050",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    11.52,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.051",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -9.8486,
+    10.1,
+    4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.012",
+   "size": [
+    0.02,
+    2.7,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    10.1,
+    3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.024",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    10.1,
+    5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.025",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    10.1,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.024",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    10.52,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.025",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    10.25,
+    2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.036",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    10.25,
+    5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.037",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    11.73,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.038",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    -10.2986,
+    8.53,
+    4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.012",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    16.298,
+    -0.82
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m",
+   "size": [
+    0.14,
+    2.2,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    16.298,
+    0.82
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.001",
+   "size": [
+    0.14,
+    2.2,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    15.278,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.002",
+   "size": [
+    0.14,
+    0.16,
+    1.48
+   ]
+  },
+  {
+   "center": [
+    -9.9086,
+    17.318,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.003",
+   "size": [
+    0.14,
+    0.16,
+    1.48
+   ]
+  },
+  {
+   "center": [
+    -9.8486,
+    16.298,
+    0.0
+   ],
+   "finish": "glass",
+   "name": "P\u016fdn\u00ed okno sklo",
+   "size": [
+    0.02,
+    1.9,
+    1.5
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    16.298,
+    -0.592
+   ],
+   "finish": "curtain",
+   "name": "P\u016fdn\u00ed okno z\u00e1clona",
+   "size": [
+    0.005,
+    1.88,
+    0.296
+   ]
+  },
+  {
+   "center": [
+    -9.8611,
+    16.298,
+    0.592
+   ],
+   "finish": "curtain",
+   "name": "P\u016fdn\u00ed okno z\u00e1clona.001",
+   "size": [
+    0.005,
+    1.88,
+    0.296
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    16.298,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno p\u0159\u00ed\u010dka",
+   "size": [
+    0.1,
+    1.88,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -9.9186,
+    16.606,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno p\u0159\u00ed\u010dka.001",
+   "size": [
+    0.1,
+    0.1,
+    1.48
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    16.448,
+    -1.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno \u0161ambr\u00e1na",
+   "size": [
+    0.09,
+    2.5,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    16.448,
+    1.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno \u0161ambr\u00e1na.001",
+   "size": [
+    0.09,
+    2.5,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -10.1836,
+    17.528,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno \u0161ambr\u00e1na.002",
+   "size": [
+    0.09,
+    0.3,
+    2.24
+   ]
+  },
+  {
+   "center": [
+    -10.2986,
+    15.128,
+    0.0
+   ],
+   "finish": "stone",
+   "name": "P\u016fdn\u00ed okno parapet",
+   "size": [
+    0.4,
+    0.14,
+    2.3
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    5.0,
+    5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.052",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    5.0,
+    2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.053",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    3.28,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.054",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    6.72,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.055",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.8486,
+    5.0,
+    4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.013",
+   "size": [
+    0.02,
+    3.3,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    5.0,
+    5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.026",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    5.0,
+    3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.027",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    5.0,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.026",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    5.504,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.027",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    5.15,
+    5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.039",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    5.15,
+    2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.040",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    6.93,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.041",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    10.2086,
+    7.0,
+    4.2
+   ],
+   "finish": "stone2",
+   "name": "Okno klen\u00e1k.004",
+   "size": [
+    0.14,
+    0.5,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.2986,
+    3.13,
+    4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.013",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    10.4786,
+    2.78,
+    4.2
+   ],
+   "finish": "wood2",
+   "name": "Okno truhl\u00edk.004",
+   "size": [
+    0.5,
+    0.42,
+    2.9
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    5.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.028",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    5.28
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.028",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.5386,
+    3.07,
+    5.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.029",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.27,
+    4.88
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.029",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    4.6
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.030",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    4.48
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.030",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.5386,
+    3.07,
+    4.2
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.031",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.27,
+    4.08
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.031",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    3.8
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.032",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    3.68
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.032",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.5386,
+    3.07,
+    3.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.033",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.27,
+    3.28
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.033",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    3.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.034",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    2.88
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.034",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    10.1,
+    5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.056",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    10.1,
+    2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.057",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    8.68,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.058",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    11.52,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.059",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.8486,
+    10.1,
+    4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.014",
+   "size": [
+    0.02,
+    2.7,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    10.1,
+    5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.028",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    10.1,
+    3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.029",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    10.1,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.028",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    10.52,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.029",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    10.25,
+    5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.042",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    10.25,
+    2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.043",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    11.73,
+    4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.044",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    10.2986,
+    8.53,
+    4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.014",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    5.0,
+    -2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.060",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    5.0,
+    -5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.061",
+   "size": [
+    0.14,
+    3.6,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    3.28,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.062",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    6.72,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.063",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.8486,
+    5.0,
+    -4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.015",
+   "size": [
+    0.02,
+    3.3,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    5.0,
+    -3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.030",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    5.0,
+    -5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.031",
+   "size": [
+    0.005,
+    3.28,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    5.0,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.030",
+   "size": [
+    0.1,
+    3.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    5.504,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.031",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    5.15,
+    -2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.045",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    5.15,
+    -5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.046",
+   "size": [
+    0.09,
+    3.9,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    6.93,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.047",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    10.2086,
+    7.0,
+    -4.2
+   ],
+   "finish": "stone2",
+   "name": "Okno klen\u00e1k.005",
+   "size": [
+    0.14,
+    0.5,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.2986,
+    3.13,
+    -4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.015",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    10.4786,
+    2.78,
+    -4.2
+   ],
+   "finish": "wood2",
+   "name": "Okno truhl\u00edk.005",
+   "size": [
+    0.5,
+    0.42,
+    2.9
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    -3.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.035",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    -3.12
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.035",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.5386,
+    3.07,
+    -3.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.036",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.27,
+    -3.52
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.036",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    -3.8
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.037",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    -3.92
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.037",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.5386,
+    3.07,
+    -4.2
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.038",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.27,
+    -4.32
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.038",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    -4.6
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.039",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    -4.72
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.039",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.5386,
+    3.07,
+    -5.0
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.040",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.27,
+    -5.12
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.040",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    10.4386,
+    3.07,
+    -5.4
+   ],
+   "finish": "leaf",
+   "name": "Okno list\u00ed.041",
+   "size": [
+    0.462,
+    0.336,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    10.5186,
+    3.22,
+    -5.52
+   ],
+   "finish": "red",
+   "name": "Okno mu\u0161k\u00e1t.041",
+   "size": [
+    0.28,
+    0.28,
+    0.28
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    10.1,
+    -2.88
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.064",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    10.1,
+    -5.52
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.065",
+   "size": [
+    0.14,
+    3.0,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    8.68,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.066",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    11.52,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno r\u00e1m.067",
+   "size": [
+    0.14,
+    0.16,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    9.8486,
+    10.1,
+    -4.2
+   ],
+   "finish": "glass",
+   "name": "Okno sklo.016",
+   "size": [
+    0.02,
+    2.7,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    10.1,
+    -3.208
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.032",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    10.1,
+    -5.192
+   ],
+   "finish": "curtain",
+   "name": "Okno z\u00e1clona.033",
+   "size": [
+    0.005,
+    2.68,
+    0.496
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    10.1,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.032",
+   "size": [
+    0.1,
+    2.68,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    10.52,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno p\u0159\u00ed\u010dka.033",
+   "size": [
+    0.1,
+    0.1,
+    2.48
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    10.25,
+    -2.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.048",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    10.25,
+    -5.7
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.049",
+   "size": [
+    0.09,
+    3.3,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    11.73,
+    -4.2
+   ],
+   "finish": "trim",
+   "name": "Okno \u0161ambr\u00e1na.050",
+   "size": [
+    0.09,
+    0.3,
+    3.24
+   ]
+  },
+  {
+   "center": [
+    10.2986,
+    8.53,
+    -4.2
+   ],
+   "finish": "stone",
+   "name": "Okno parapet.016",
+   "size": [
+    0.4,
+    0.14,
+    3.3
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    16.298,
+    0.82
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.004",
+   "size": [
+    0.14,
+    2.2,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    16.298,
+    -0.82
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.005",
+   "size": [
+    0.14,
+    2.2,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    15.278,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.006",
+   "size": [
+    0.14,
+    0.16,
+    1.48
+   ]
+  },
+  {
+   "center": [
+    9.9086,
+    17.318,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno r\u00e1m.007",
+   "size": [
+    0.14,
+    0.16,
+    1.48
+   ]
+  },
+  {
+   "center": [
+    9.8486,
+    16.298,
+    0.0
+   ],
+   "finish": "glass",
+   "name": "P\u016fdn\u00ed okno sklo.001",
+   "size": [
+    0.02,
+    1.9,
+    1.5
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    16.298,
+    0.592
+   ],
+   "finish": "curtain",
+   "name": "P\u016fdn\u00ed okno z\u00e1clona.002",
+   "size": [
+    0.005,
+    1.88,
+    0.296
+   ]
+  },
+  {
+   "center": [
+    9.8611,
+    16.298,
+    -0.592
+   ],
+   "finish": "curtain",
+   "name": "P\u016fdn\u00ed okno z\u00e1clona.003",
+   "size": [
+    0.005,
+    1.88,
+    0.296
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    16.298,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno p\u0159\u00ed\u010dka.002",
+   "size": [
+    0.1,
+    1.88,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    9.9186,
+    16.606,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno p\u0159\u00ed\u010dka.003",
+   "size": [
+    0.1,
+    0.1,
+    1.48
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    16.448,
+    1.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno \u0161ambr\u00e1na.003",
+   "size": [
+    0.09,
+    2.5,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    16.448,
+    -1.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno \u0161ambr\u00e1na.004",
+   "size": [
+    0.09,
+    2.5,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    10.1836,
+    17.528,
+    0.0
+   ],
+   "finish": "trim",
+   "name": "P\u016fdn\u00ed okno \u0161ambr\u00e1na.005",
+   "size": [
+    0.09,
+    0.3,
+    2.24
+   ]
+  },
+  {
+   "center": [
+    10.2986,
+    15.128,
+    0.0
+   ],
+   "finish": "stone",
+   "name": "P\u016fdn\u00ed okno parapet.001",
+   "size": [
+    0.4,
+    0.14,
+    2.3
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.9458,
+    -4.8639
+   ],
+   "finish": "soffit",
+   "name": "Bedn\u011bn\u00ed",
+   "size": [
+    21.9572,
+    9.1956,
+    10.1737
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.849,
+    -9.7297
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    13.3174,
+    -9.2095
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.001",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    13.7858,
+    -8.6893
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.002",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    14.2542,
+    -8.1691
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.003",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    14.7226,
+    -7.6489
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.004",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    15.191,
+    -7.1287
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.005",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    15.6594,
+    -6.6085
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.006",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.1277,
+    -6.0883
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.007",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.5961,
+    -5.5681
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.008",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.0645,
+    -5.0479
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.009",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.5329,
+    -4.5277
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.010",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.0013,
+    -4.0075
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.011",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.4697,
+    -3.4873
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.012",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.9381,
+    -2.9671
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.013",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    19.4065,
+    -2.4469
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.014",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    19.8749,
+    -1.9267
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.015",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    20.3433,
+    -1.4065
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.016",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    20.8117,
+    -0.8863
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.017",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    21.2114,
+    -0.4423
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.018",
+   "size": [
+    21.9572,
+    0.4932,
+    0.5975
+   ]
+  },
+  {
+   "center": [
+    11.0386,
+    17.0164,
+    -4.9275
+   ],
+   "finish": "soffit",
+   "name": "\u0160t\u00edtov\u00e9 prkno",
+   "size": [
+    0.12,
+    9.4438,
+    10.3945
+   ]
+  },
+  {
+   "center": [
+    -11.0386,
+    17.0164,
+    -4.9275
+   ],
+   "finish": "soffit",
+   "name": "\u0160t\u00edtov\u00e9 prkno.001",
+   "size": [
+    0.12,
+    9.4438,
+    10.3945
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.398,
+    -9.9135
+   ],
+   "finish": "trim",
+   "name": "\u010celn\u00ed prkno",
+   "size": [
+    22.1972,
+    0.5,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.228,
+    -10.0835
+   ],
+   "finish": "zinc",
+   "name": "Okap",
+   "size": [
+    22.2572,
+    0.34,
+    0.34
+   ]
+  },
+  {
+   "center": [
+    -9.8286,
+    5.924,
+    -9.0035
+   ],
+   "finish": "zinc",
+   "name": "Svod",
+   "size": [
+    0.2092,
+    11.348,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    -9.8286,
+    11.823,
+    -9.5435
+   ],
+   "finish": "zinc",
+   "name": "Svod.001",
+   "size": [
+    0.2092,
+    0.6531,
+    1.1646
+   ]
+  },
+  {
+   "center": [
+    -9.8286,
+    0.185,
+    -9.1685
+   ],
+   "finish": "zinc",
+   "name": "Svod.002",
+   "size": [
+    0.2092,
+    0.3347,
+    0.4106
+   ]
+  },
+  {
+   "center": [
+    9.8286,
+    5.924,
+    -9.0035
+   ],
+   "finish": "zinc",
+   "name": "Svod.003",
+   "size": [
+    0.2092,
+    11.348,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    9.8286,
+    11.823,
+    -9.5435
+   ],
+   "finish": "zinc",
+   "name": "Svod.004",
+   "size": [
+    0.2092,
+    0.6531,
+    1.1646
+   ]
+  },
+  {
+   "center": [
+    9.8286,
+    0.185,
+    -9.1685
+   ],
+   "finish": "zinc",
+   "name": "Svod.005",
+   "size": [
+    0.2092,
+    0.3347,
+    0.4106
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.9458,
+    4.8639
+   ],
+   "finish": "soffit",
+   "name": "Bedn\u011bn\u00ed.001",
+   "size": [
+    21.9572,
+    9.1956,
+    10.1737
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.849,
+    9.7297
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.019",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    13.3174,
+    9.2095
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.020",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    13.7858,
+    8.6893
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.021",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    14.2542,
+    8.1691
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.022",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    14.7226,
+    7.6489
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.023",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    15.191,
+    7.1287
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.024",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    15.6594,
+    6.6085
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.025",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.1277,
+    6.0883
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.026",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.5961,
+    5.5681
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.027",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.0645,
+    5.0479
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.028",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.5329,
+    4.5277
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.029",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.0013,
+    4.0075
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.030",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.4697,
+    3.4873
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.031",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.9381,
+    2.9671
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.032",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    19.4065,
+    2.4469
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.033",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    19.8749,
+    1.9267
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.034",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    20.3433,
+    1.4065
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.035",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    20.8117,
+    0.8863
+   ],
+   "finish": "tile2",
+   "name": "Ta\u0161ky.036",
+   "size": [
+    21.9572,
+    0.6304,
+    0.7499
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    21.2114,
+    0.4423
+   ],
+   "finish": "tile",
+   "name": "Ta\u0161ky.037",
+   "size": [
+    21.9572,
+    0.4932,
+    0.5975
+   ]
+  },
+  {
+   "center": [
+    11.0386,
+    17.0164,
+    4.9275
+   ],
+   "finish": "soffit",
+   "name": "\u0160t\u00edtov\u00e9 prkno.002",
+   "size": [
+    0.12,
+    9.4438,
+    10.3945
+   ]
+  },
+  {
+   "center": [
+    -11.0386,
+    17.0164,
+    4.9275
+   ],
+   "finish": "soffit",
+   "name": "\u0160t\u00edtov\u00e9 prkno.003",
+   "size": [
+    0.12,
+    9.4438,
+    10.3945
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.398,
+    9.9135
+   ],
+   "finish": "trim",
+   "name": "\u010celn\u00ed prkno.001",
+   "size": [
+    22.1972,
+    0.5,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    12.228,
+    10.0835
+   ],
+   "finish": "zinc",
+   "name": "Okap.001",
+   "size": [
+    22.2572,
+    0.34,
+    0.34
+   ]
+  },
+  {
+   "center": [
+    -9.8286,
+    5.924,
+    9.0035
+   ],
+   "finish": "zinc",
+   "name": "Svod.006",
+   "size": [
+    0.2092,
+    11.348,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    -9.8286,
+    11.823,
+    9.5435
+   ],
+   "finish": "zinc",
+   "name": "Svod.007",
+   "size": [
+    0.2092,
+    0.6531,
+    1.1646
+   ]
+  },
+  {
+   "center": [
+    -9.8286,
+    0.185,
+    9.1685
+   ],
+   "finish": "zinc",
+   "name": "Svod.008",
+   "size": [
+    0.2092,
+    0.3347,
+    0.4106
+   ]
+  },
+  {
+   "center": [
+    9.8286,
+    5.924,
+    9.0035
+   ],
+   "finish": "zinc",
+   "name": "Svod.009",
+   "size": [
+    0.2092,
+    11.348,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    9.8286,
+    11.823,
+    9.5435
+   ],
+   "finish": "zinc",
+   "name": "Svod.010",
+   "size": [
+    0.2092,
+    0.6531,
+    1.1646
+   ]
+  },
+  {
+   "center": [
+    9.8286,
+    0.185,
+    9.1685
+   ],
+   "finish": "zinc",
+   "name": "Svod.011",
+   "size": [
+    0.2092,
+    0.3347,
+    0.4106
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    21.5935,
+    0.0
+   ],
+   "finish": "tile3",
+   "name": "H\u0159eben\u00e1\u010d",
+   "size": [
+    22.0772,
+    0.68,
+    0.68
+   ]
+  },
+  {
+   "center": [
+    11.0386,
+    21.5935,
+    0.0
+   ],
+   "finish": "tile3",
+   "name": "H\u0159eben\u00e1\u010d konec",
+   "size": [
+    0.68,
+    0.68,
+    0.68
+   ]
+  },
+  {
+   "center": [
+    -11.0386,
+    21.5935,
+    0.0
+   ],
+   "finish": "tile3",
+   "name": "H\u0159eben\u00e1\u010d konec.001",
+   "size": [
+    0.68,
+    0.68,
+    0.68
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.298,
+    -4.2835
+   ],
+   "finish": "plaster",
+   "name": "Vik\u00fd\u0159",
+   "size": [
+    3.4,
+    3.4,
+    5.0
+   ]
+  },
+  {
+   "center": [
+    0.72,
+    16.648,
+    -6.5135
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno r\u00e1m",
+   "size": [
+    0.16,
+    1.7,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    -0.72,
+    16.648,
+    -6.5135
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno r\u00e1m.001",
+   "size": [
+    0.16,
+    1.7,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    15.878,
+    -6.5135
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno r\u00e1m.002",
+   "size": [
+    1.28,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.418,
+    -6.5135
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno r\u00e1m.003",
+   "size": [
+    1.28,
+    0.16,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.648,
+    -6.4535
+   ],
+   "finish": "glass",
+   "name": "Vik\u00fd\u0159 okno sklo",
+   "size": [
+    1.3,
+    1.4,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.512,
+    16.648,
+    -6.466
+   ],
+   "finish": "curtain",
+   "name": "Vik\u00fd\u0159 okno z\u00e1clona",
+   "size": [
+    0.256,
+    1.38,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    -0.512,
+    16.648,
+    -6.466
+   ],
+   "finish": "curtain",
+   "name": "Vik\u00fd\u0159 okno z\u00e1clona.001",
+   "size": [
+    0.256,
+    1.38,
+    0.005
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.648,
+    -6.5234
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno p\u0159\u00ed\u010dka",
+   "size": [
+    0.1,
+    1.38,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    16.886,
+    -6.5234
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno p\u0159\u00ed\u010dka.001",
+   "size": [
+    1.28,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.9,
+    16.798,
+    -6.7884
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno \u0161ambr\u00e1na",
+   "size": [
+    0.24,
+    2.0,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -0.9,
+    16.798,
+    -6.7884
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno \u0161ambr\u00e1na.001",
+   "size": [
+    0.24,
+    2.0,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.628,
+    -6.7884
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 okno \u0161ambr\u00e1na.002",
+   "size": [
+    2.04,
+    0.3,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    15.728,
+    -6.9035
+   ],
+   "finish": "stone",
+   "name": "Vik\u00fd\u0159 okno parapet",
+   "size": [
+    2.1,
+    0.14,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    17.898,
+    -6.7934
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 \u0159\u00edmsa",
+   "size": [
+    3.7,
+    0.25,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    18.823,
+    -4.2835
+   ],
+   "finish": "plaster",
+   "name": "Vik\u00fd\u0159 \u0161t\u00edt",
+   "size": [
+    3.4,
+    1.65,
+    5.0
+   ]
+  },
+  {
+   "center": [
+    1.0778,
+    18.7258,
+    -4.4834
+   ],
+   "finish": "tile2",
+   "name": "Vik\u00fd\u0159 st\u0159echa",
+   "size": [
+    2.1273,
+    2.1273,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    0.45,
+    19.5391,
+    -4.4834
+   ],
+   "finish": "tile",
+   "name": "Vik\u00fd\u0159 ta\u0161ky",
+   "size": [
+    0.1414,
+    0.1414,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    1.0,
+    18.9891,
+    -4.4834
+   ],
+   "finish": "tile",
+   "name": "Vik\u00fd\u0159 ta\u0161ky.001",
+   "size": [
+    0.1414,
+    0.1414,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    1.55,
+    18.4391,
+    -4.4834
+   ],
+   "finish": "tile",
+   "name": "Vik\u00fd\u0159 ta\u0161ky.002",
+   "size": [
+    0.1414,
+    0.1414,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    1.0778,
+    18.6958,
+    -7.2035
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 prkno",
+   "size": [
+    2.2121,
+    2.2121,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -1.0778,
+    18.7258,
+    -4.4834
+   ],
+   "finish": "tile2",
+   "name": "Vik\u00fd\u0159 st\u0159echa.001",
+   "size": [
+    2.1273,
+    2.1273,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    -0.45,
+    19.5391,
+    -4.4834
+   ],
+   "finish": "tile",
+   "name": "Vik\u00fd\u0159 ta\u0161ky.003",
+   "size": [
+    0.1414,
+    0.1414,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    18.9891,
+    -4.4834
+   ],
+   "finish": "tile",
+   "name": "Vik\u00fd\u0159 ta\u0161ky.004",
+   "size": [
+    0.1414,
+    0.1414,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    -1.55,
+    18.4391,
+    -4.4834
+   ],
+   "finish": "tile",
+   "name": "Vik\u00fd\u0159 ta\u0161ky.005",
+   "size": [
+    0.1414,
+    0.1414,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    -1.0778,
+    18.6958,
+    -7.2035
+   ],
+   "finish": "trim",
+   "name": "Vik\u00fd\u0159 prkno.001",
+   "size": [
+    2.2121,
+    2.2121,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    19.9391,
+    -4.4835
+   ],
+   "finish": "tile3",
+   "name": "Vik\u00fd\u0159 h\u0159eben\u00e1\u010d",
+   "size": [
+    0.32,
+    0.32,
+    5.4
+   ]
+  },
+  {
+   "center": [
+    -4.6,
+    20.7957,
+    1.4
+   ],
+   "finish": "plaster",
+   "name": "Kom\u00edn",
+   "size": [
+    1.3,
+    6.3955,
+    1.3
+   ]
+  },
+  {
+   "center": [
+    -4.6,
+    23.5835,
+    1.4
+   ],
+   "finish": "stone2",
+   "name": "Kom\u00edn \u0159\u00edmsa",
+   "size": [
+    1.46,
+    0.28,
+    1.46
+   ]
+  },
+  {
+   "center": [
+    -4.6,
+    24.0635,
+    1.4
+   ],
+   "finish": "stone2",
+   "name": "Kom\u00edn hlava",
+   "size": [
+    1.42,
+    0.14,
+    1.42
+   ]
+  },
+  {
+   "center": [
+    -4.1,
+    24.3335,
+    0.9
+   ],
+   "finish": "stone2",
+   "name": "Kom\u00edn sloupek",
+   "size": [
+    0.15,
+    0.4,
+    0.15
+   ]
+  },
+  {
+   "center": [
+    -4.1,
+    24.3335,
+    1.9
+   ],
+   "finish": "stone2",
+   "name": "Kom\u00edn sloupek.001",
+   "size": [
+    0.15,
+    0.4,
+    0.15
+   ]
+  },
+  {
+   "center": [
+    -5.1,
+    24.3335,
+    0.9
+   ],
+   "finish": "stone2",
+   "name": "Kom\u00edn sloupek.002",
+   "size": [
+    0.15,
+    0.4,
+    0.15
+   ]
+  },
+  {
+   "center": [
+    -5.1,
+    24.3335,
+    1.9
+   ],
+   "finish": "stone2",
+   "name": "Kom\u00edn sloupek.003",
+   "size": [
+    0.15,
+    0.4,
+    0.15
+   ]
+  },
+  {
+   "center": [
+    -4.6,
+    24.5935,
+    1.4
+   ],
+   "finish": "tile3",
+   "name": "Kom\u00edn st\u0159\u00ed\u0161ka",
+   "size": [
+    1.7,
+    0.14,
+    1.7
+   ]
+  }
+ ],
+ "pieces": {
+  "house2_tile": {
+   "center": [
+    0.0,
+    19.9132,
+    -2.701
+   ],
+   "size": [
+    21.9572,
+    3.0896,
+    8.9649
+   ],
+   "triangles": 1320
+  },
+  "house_black": {
+   "center": [
+    -3.1,
+    5.7475,
+    -9.299
+   ],
+   "size": [
+    0.6223,
+    1.245,
+    1.0311
+   ],
+   "triangles": 100
+  },
+  "house_brass": {
+   "center": [
+    -0.33,
+    3.25,
+    0.0
+   ],
+   "size": [
+    1.88,
+    0.14,
+    17.5669
+   ],
+   "triangles": 216
+  },
+  "house_curtain": {
+   "center": [
+    0.0,
+    10.349,
+    0.0
+   ],
+   "size": [
+    19.7272,
+    13.978,
+    16.9369
+   ],
+   "triangles": 504
+  },
+  "house_door": {
+   "center": [
+    0.0,
+    3.575,
+    0.0
+   ],
+   "size": [
+    3.96,
+    6.82,
+    17.2269
+   ],
+   "triangles": 1044
+  },
+  "house_glass": {
+   "center": [
+    0.0,
+    10.349,
+    0.0
+   ],
+   "size": [
+    19.7172,
+    13.998,
+    17.1669
+   ],
+   "triangles": 288
+  },
+  "house_glow": {
+   "center": [
+    -3.1,
+    5.6,
+    -9.5084
+   ],
+   "size": [
+    0.43,
+    0.72,
+    0.43
+   ],
+   "triangles": 12
+  },
+  "house_leaf": {
+   "center": [
+    0.0,
+    5.77,
+    -1.8717
+   ],
+   "size": [
+    21.5392,
+    5.736,
+    14.9634
+   ],
+   "triangles": 3360
+  },
+  "house_plaster": {
+   "center": [
+    0.0,
+    11.9967,
+    0.0
+   ],
+   "size": [
+    20.3572,
+    23.9935,
+    17.5669
+   ],
+   "triangles": 470
+  },
+  "house_red": {
+   "center": [
+    0.0,
+    5.945,
+    -1.8017
+   ],
+   "size": [
+    21.3172,
+    5.73,
+    14.9235
+   ],
+   "triangles": 3360
+  },
+  "house_shrub": {
+   "center": [
+    0.0,
+    0.7,
+    -9.7334
+   ],
+   "size": [
+    19.155,
+    1.445,
+    1.7
+   ],
+   "triangles": 240
+  },
+  "house_soffit": {
+   "center": [
+    0.0,
+    17.0164,
+    0.0
+   ],
+   "size": [
+    22.1972,
+    9.4438,
+    20.2494
+   ],
+   "triangles": 200
+  },
+  "house_stone": {
+   "center": [
+    0.0,
+    7.899,
+    0.0
+   ],
+   "size": [
+    20.9972,
+    15.798,
+    19.5669
+   ],
+   "triangles": 1096
+  },
+  "house_stone2": {
+   "center": [
+    0.0,
+    12.2667,
+    -0.01
+   ],
+   "size": [
+    20.5572,
+    24.5335,
+    17.7469
+   ],
+   "triangles": 5016
+  },
+  "house_tile": {
+   "center": [
+    0.0,
+    16.9959,
+    0.0
+   ],
+   "size": [
+    21.9572,
+    8.9243,
+    20.2093
+   ],
+   "triangles": 9504
+  },
+  "house_tile2": {
+   "center": [
+    0.0,
+    17.0645,
+    0.0
+   ],
+   "size": [
+    21.9572,
+    8.1247,
+    19.1689
+   ],
+   "triangles": 9592
+  },
+  "house_tile3": {
+   "center": [
+    0.0,
+    22.2213,
+    -2.4667
+   ],
+   "size": [
+    22.7572,
+    4.8843,
+    9.4334
+   ],
+   "triangles": 388
+  },
+  "house_trim": {
+   "center": [
+    0.0,
+    11.5009,
+    0.0
+   ],
+   "size": [
+    22.1972,
+    16.6018,
+    19.9469
+   ],
+   "triangles": 9016
+  },
+  "house_wood2": {
+   "center": [
+    0.0,
+    5.48,
+    -1.8417
+   ],
+   "size": [
+    21.4572,
+    5.82,
+    14.9834
+   ],
+   "triangles": 264
+  },
+  "house_zinc": {
+   "center": [
+    0.0,
+    6.2078,
+    0.0
+   ],
+   "size": [
+    22.2572,
+    12.3803,
+    20.5069
+   ],
+   "triangles": 520
+  }
+ }
+}
