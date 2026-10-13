@@ -373,7 +373,7 @@ E.advance(T - 1) -- $31.20 × 9/60 = $4.68 counted, not paid yet
 check("before leaving: nothing paid yet", paid(C, "CollectionIncome") == 0)
 E.leave(C)
 check("leaving pays the whole dollars counted ($4)", paid(C, "CollectionIncome") == 4, paid(C, "CollectionIncome"))
-check("… before the leave save (it holds the money)", E.saves.Player_404.money == Config.StartMoney + 4, E.saves.Player_404.money)
+check("… before the leave save (it holds the money)", E.saves.Player_404.money == (if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StartMoney) + 4, E.saves.Player_404.money)
 
 -- ── The save ───────────────────────────────────────────────────────────────
 local saved = E.saves.Player_404
