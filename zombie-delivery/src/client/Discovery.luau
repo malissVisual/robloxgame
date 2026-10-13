@@ -19,6 +19,7 @@ local Grid = require(Shared.Explore)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review: the banner goes under the move's top-centre blocks
 local Theme = require(script.Parent.Theme)
 local Sounds = require(script.Parent.Sounds)
 
@@ -197,10 +198,17 @@ local function showNext()
 	bannerName.Text = string.upper(name)
 	banner.Visible = true
 	banner.GroupTransparency = 1
-	banner.Position = UDim2.new(0.5, 0, 0.27, -10)
+	-- 7.0 review: under the move's panel (and Danny's strip) when they reach down to it (a phone)
+	local drop = 0
+	local holder = banner:FindFirstAncestorWhichIsA("ScreenGui")
+	local bottom = if holder then TopBlocks.bottom(holder.AbsolutePosition) else nil
+	if holder and bottom then
+		drop = math.max(0, bottom + 8 - 0.27 * holder.AbsoluteSize.Y)
+	end
+	banner.Position = UDim2.new(0.5, 0, 0.27, drop - 10)
 	TweenService:Create(banner, TweenInfo.new(FADE_IN, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		GroupTransparency = 0,
-		Position = UDim2.new(0.5, 0, 0.27, 0),
+		Position = UDim2.new(0.5, 0, 0.27, drop),
 	}):Play()
 	pcall(Sounds.play, "notify", 0.7)
 	-- Shorter while more wait (a burst of places shows them all, not for half a minute).
@@ -208,7 +216,7 @@ local function showNext()
 	task.delay(FADE_IN + stay, function()
 		local out = TweenService:Create(banner, TweenInfo.new(FADE_OUT, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 			GroupTransparency = 1,
-			Position = UDim2.new(0.5, 0, 0.27, -6),
+			Position = UDim2.new(0.5, 0, 0.27, drop - 6),
 		})
 		out:Play()
 		task.delay(FADE_OUT + 0.15, function()

@@ -33,6 +33,7 @@ local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review: the folded planning's pill holds the top's middle
 
 local MoveLobbyUi = {}
 
@@ -288,6 +289,7 @@ local function drawPill()
 			CardKit.click()
 			MoveLobbyUi.unfold()
 		end)
+		TopBlocks.set("PlanningPill", pill)
 	end
 	local members = v.members or {}
 	local ready = 0
@@ -319,6 +321,9 @@ local function draw()
 	local card = v.card or {}
 	local scale = if Ui.touchLayout() then math.max(Ui.screenScale(), Config.MoveRoles.Lobby.TouchScale) else Ui.screenScale() -- (a phone: bigger, it scrolls)
 	local area = Ui.screenSize() / scale
+	-- 7.0 review: a touch screen's footer buttons a finger's height after the card's scale (Ui.MinTouch screen px)
+	local button = if Ui.touchLayout() then math.max(48, math.ceil(Ui.MinTouch / scale)) else 48
+	local footH = FOOT_H + (button - 48)
 	local W = math.floor(math.min(CARD_W, area.X - 24))
 	local H = math.floor(math.min(CARD_H, area.Y - 16))
 	local wide = W >= KIT.SplitMin + 40
@@ -381,7 +386,7 @@ local function draw()
 	local top = if wide then HEAD_H + 8 else HEAD_H + KIT.Chip + 6
 	local body = Ui.make("ScrollingFrame", {
 		Name = "Body",
-		Size = UDim2.new(1, -24, 1, -(top + FOOT_H)),
+		Size = UDim2.new(1, -24, 1, -(top + footH)),
 		Position = UDim2.fromOffset(12, top),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -455,14 +460,14 @@ local function draw()
 	body.CanvasPosition = keep
 
 	-- the footer: CANCEL / LEAVE CREW, and the one primary button
-	local foot = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -36, 0, 48), Position = UDim2.new(0, 18, 1, -60), BackgroundTransparency = 1 }, frame)
+	local foot = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -36, 0, button), Position = UDim2.new(0, 18, 1, -(button + 12)), BackgroundTransparency = 1 }, frame)
 	local quietW = if W >= 420 then 150 else 110
 	local quiet = Ui.make("Frame", { Name = "Quiet", Size = UDim2.new(0, quietW, 1, 0), BackgroundTransparency = 1 }, foot)
 	local quietButton = CardKit.bigButton(quiet, {
 		name = if owner then "Cancel" else "Leave",
 		text = if owner then "CANCEL" else "LEAVE CREW",
 		kind = "shut",
-		height = 48,
+		height = button,
 		textSize = 14,
 		onClick = function()
 			if owner then
@@ -482,7 +487,7 @@ local function draw()
 			name = "Launch",
 			text = if go then (if #members <= 1 then "▶ LAUNCH · SOLO" else "▶ LAUNCH THE MOVE") else `WAITING FOR {waiting} · READY`,
 			kind = if go then "good" else "shut",
-			height = 48,
+			height = button,
 			onClick = function()
 				remote:FireServer("launch")
 			end,
@@ -493,7 +498,7 @@ local function draw()
 			name = "Ready",
 			text = if ready then "READY ✔ · TAP: NOT READY" else "✔ I'M READY",
 			kind = if ready then "shut" else "good",
-			height = 48,
+			height = button,
 			onClick = function()
 				remote:FireServer("ready", not ready)
 			end,

@@ -21,6 +21,10 @@ with tempfile.TemporaryDirectory() as tmp:
     # 3.7: the client's pure modules (no Roblox at their top level) that a test requires.
     for name in ("Stamina", "TouchLayout", "PhoneLayout", "MissionsLayout"):
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
+    # 7.0 review: client/MoveLayout.luau (pure, it requires TouchLayout: tests/movelayout_test.luau)
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "MoveLayout.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "MoveLayout.luau"), "w", encoding="utf-8").write(source)
     shutil.copy(os.path.join(SHARED, "CourierMotion.luau"), os.path.join(tmp, "CourierMotion.luau"))
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "CharacterArt", "Geometry.luau"), os.path.join(tmp, "CharacterGeometry.luau"))
     # 6.4: the kit art (pure: the bags' pieces, tests/bags_test.luau)

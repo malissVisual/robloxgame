@@ -110,13 +110,17 @@ safely("CarSway", require(Client.CarSway).start) -- 6.16: the cars' bodies roll 
 safely("TyreFx", require(Client.TyreFx).start) -- 6.16: dust, snow spray and tyre smoke from the wheels, skid marks (after CarSway)
 safely("CrashFx", require(Client.CrashFx).start) -- 6.16: sparks and a kick on a hard hit, sparks scraping a wall
 safely("SpeedLines", require(Client.SpeedLines).start) -- 6.16: streaks at the screen's edges near the top speed
-safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract card, the move's panel and list (Tab), the fade, the result
+safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract card, the move's panel and list (O), the fade, the result
 safely("MoveHelperHud", require(Client.MoveHelperHud).start) -- 7.0: the depot's helper's orders under the move's panel (Danny)
 safely("MoveLobbyUi", require(Client.MoveLobbyUi).start) -- 7.0 planning: the move's planning lobby (roles, READY, LAUNCH)
 safely("QuickChat", require(Client.QuickChat).start) -- 7.0 planning: the crew's quick chat (hold T on a move or in its planning)
 require(Client.MoveLobbyUi).onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
 require(Client.MoveLobbyUi).crewOpen = CrewPanel.isOpen
 WeaponWheel.yields = require(Client.QuickChat).active -- (a held T is the quick chat on a move; a tap still takes the next gun)
+-- 7.0 review: the quick chat's touch button hides while a card, the move's list or the planning covers the screen
+require(Client.QuickChat).covered = function(): boolean
+	return require(Client.MovingHud).isOpen() or require(Client.MoveLobbyUi).isOpen() or require(Client.MoveStoryUi).isOpen()
+end
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast
@@ -137,6 +141,8 @@ Hud.onCloseWindows = function()
 	DispatchUi.close()
 	CareerUi.close()
 	require(Client.MoveLobbyUi).minimize() -- 7.0 planning: the lobby folds away to its pill at the top
+	require(Client.MovingHud).closeAll() -- 7.0 review: ESC closes the move's cards and its list …
+	require(Client.QuickChat).close(false) -- … and the quick chat's ring
 	if not (Hud.escaping and Phone.appOpen()) then
 		Phone.close() -- (6.0.1 review: ESC with an app open goes back to the phone's home, the phone handles it)
 	end

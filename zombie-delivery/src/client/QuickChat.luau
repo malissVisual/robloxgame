@@ -7,9 +7,16 @@
 -- your crew only; every crew mate sees a short bubble over the sender's head (Config.MoveRoles.Chat.Bubble s) and a line
 -- under the move's panel (Chat.Feed s; in the planning, at the top). Active while your player attribute MoveWith (a
 -- move) or MoveLobby (a planning) is set. Presentation only: the server checks who may hear what.
+-- 7.0 review: the lines coming in start under the lowest of the move's top-centre blocks (client/TopBlocks.luau: the
+-- move's panel, Danny's strip, the planning's pill), measured; the touch button (client/MoveLayout.luau chatButton)
+-- sits beside the panel clear of the touch buttons and the HUD's groups, and hides while a card or the planning covers
+-- the screen (QuickChat.covered, set by Main); on a touch screen the ring's lines are a finger's size (MoveLayout.ring);
+-- a ring shut while T is still held stays shut (the hold starts again on the next press).
 --   QuickChat.start()    the key, the touch button, the lines coming in
 --   QuickChat.active()   on a move or in its planning (Main: WeaponWheel.yields)
 --   QuickChat.isOpen()   the ring is open (Main: the mouse is free while it is)
+--   QuickChat.close(say) shut the ring (Main: ESC)
+--   QuickChat.covered    set by Main: is a card, the move's list or the planning over the screen (the button hides)
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -23,6 +30,9 @@ local MoveRoles = require(Shared.MoveRoles)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
+local TouchLayout = require(script.Parent.TouchLayout) -- 7.0 review
+local MoveLayout = require(script.Parent.MoveLayout) -- 7.0 review
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review
 
 local QuickChat = {}
 
@@ -31,8 +41,11 @@ local K = Theme.Contract
 local T = Config.MoveRoles.Chat
 local RADIUS = 150 -- px (unscaled): the lines' ring
 local PILL = Vector2.new(210, 44)
-local MOVE_PANEL_W = 380 -- client/MovingHud.luau's panel (the touch button sits left of it)
 local FEED_MAX = 3
+-- the HUD's groups (client/Hud.luau's panels, Hotbar's bar, KeyHints) the touch button keeps clear of
+local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "KeyHints" }
+
+QuickChat.covered = nil :: (() -> boolean)?
 
 local remote = Net.get("MoveLobby")
 local gui: ScreenGui? = nil
@@ -207,9 +220,21 @@ local function openRing(touch: boolean)
 	if not ring then
 		build(root)
 	end
+	-- 7.0 review: a touch screen's lines a finger's height, the ring shrunk to stay on a short screen
+	local size = Ui.screenSize()
+	local ringScale, radius, width = MoveLayout.ring(size.X, size.Y, Ui.screenScale(), Ui.touchLayout(), RADIUS, PILL.X, PILL.Y)
 	local scale = centre and centre:FindFirstChild("Scale")
 	if scale then
-		scale.Scale = Ui.screenScale()
+		scale.Scale = ringScale
+	end
+	if centre then
+		centre.Size = UDim2.fromOffset(2 * radius + width, 2 * radius + PILL.Y)
+		for index, pill in pills do
+			local angle = math.rad(-90 + (index - 1) * 60)
+			pill.Position = UDim2.new(0.5, math.cos(angle) * radius, 0.5, math.sin(angle) * radius)
+			pill.Size = UDim2.fromOffset(width, PILL.Y)
+			pill.TextWrapped = width < PILL.X -- (a phone upright: two lines of words)
+		end
 	end
 	touchMode = touch
 	open = true
@@ -226,6 +251,7 @@ function QuickChat.close(say: boolean)
 		return
 	end
 	open = false
+	pressedAt = nil -- (7.0 review: a ring shut while T is still held does not open again)
 	if ring then
 		ring.Visible = false
 		Ui.gamepadRelease(ring)
@@ -253,15 +279,19 @@ end
 
 -- ── The lines coming in ────────────────────────────────────────────────────
 
--- The move's panel's foot (client/MovingHud.luau), else the screen's top: where the feed starts (px in this gui).
+-- Under the lowest of the move's top-centre blocks (the panel, Danny's strip, the planning's pill: client/TopBlocks.luau,
+-- measured), else the screen's top: where the feed starts (px in this gui).
 local function feedTop(): number
-	local playerGui = player:FindFirstChildOfClass("PlayerGui")
-	local hud = playerGui and playerGui:FindFirstChild("MovingHud")
-	local panel = hud and hud:FindFirstChild("MovePanel")
-	if panel and panel:IsA("GuiObject") and panel.Visible then
-		return panel.AbsolutePosition.Y + panel.AbsoluteSize.Y + 6
+	local root = gui
+	local bottom = TopBlocks.bottom(if root then root.AbsolutePosition else nil)
+	return if bottom then bottom + 6 else 8
+end
+
+local function placeFeed()
+	local made = feed
+	if made and made.Parent then
+		made.Position = UDim2.new(0.5, 0, 0, feedTop())
 	end
-	return 8
 end
 
 local function feedLine(text: string)
@@ -384,17 +414,61 @@ end
 
 -- ── The touch button ───────────────────────────────────────────────────────
 
+-- 7.0 review: the button's place: beside the move's panel (or where the panel would be), clear of the touch buttons, the
+-- HUD's groups and the other top-centre blocks (client/MoveLayout.luau chatButton).
+local function placeButton(button: any, root: ScreenGui)
+	local size = root.AbsoluteSize
+	local W, H = size.X, size.Y
+	if W < 2 or H < 2 then
+		size = Ui.screenSize()
+		W, H = size.X, size.Y
+	end
+	local origin = root.AbsolutePosition
+	local S = Ui.screenScale()
+	local blocks: { TouchLayout.Box } = {}
+	local cluster = TouchLayout.cluster(W, H, S)
+	for _, b in TouchLayout.buttons(cluster) do
+		table.insert(blocks, b)
+	end
+	table.insert(blocks, cluster.thumb)
+	table.insert(blocks, cluster.jump)
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	local hud = playerGui and playerGui:FindFirstChild("ZombieDeliveryHud")
+	if hud then
+		for _, name in HUD_GROUPS do
+			local group = hud:FindFirstChild(name)
+			if group and group:IsA("GuiObject") and group.Visible and group.AbsoluteSize.X > 1 and group.AbsoluteSize.Y > 1 then
+				local p, s = group.AbsolutePosition - origin, group.AbsoluteSize
+				table.insert(blocks, TouchLayout.box(p.X, p.Y, p.X + s.X, p.Y + s.Y))
+			end
+		end
+	end
+	local panel = MoveLayout.panel(W, S)
+	local found = TopBlocks.get("MovePanel")
+	for _, r in TopBlocks.rects(origin) do
+		table.insert(blocks, r)
+	end
+	if found and found.Visible and found.AbsoluteSize.X > 1 then
+		local p, s = found.AbsolutePosition - origin, found.AbsoluteSize
+		panel = TouchLayout.box(p.X, p.Y, p.X + s.X, p.Y + s.Y)
+	end
+	local at = MoveLayout.chatButton(W, H, S, panel, blocks)
+	button.Size = UDim2.fromOffset(at.x1 - at.x0, at.y1 - at.y0)
+	button.AnchorPoint = Vector2.new(0, 0)
+	button.Position = UDim2.fromOffset(at.x0, at.y0)
+end
+
 local function refreshButton()
 	local root = screen()
 	if not root then
 		return
 	end
-	local show = Ui.touchLayout() and QuickChat.active()
+	local covered = QuickChat.covered
+	local show = Ui.touchLayout() and QuickChat.active() and not (covered ~= nil and covered())
 	if show and not touchButton then
 		touchButton = Ui.make("TextButton", {
 			Name = "QuickChatButton",
-			Size = UDim2.fromOffset(48, 48),
-			AnchorPoint = Vector2.new(1, 0),
+			Size = UDim2.fromOffset(MoveLayout.CHAT, MoveLayout.CHAT),
 			BackgroundColor3 = K.charcoal,
 			BackgroundTransparency = Theme.PanelTransparency,
 			BorderSizePixel = 0,
@@ -417,7 +491,9 @@ local function refreshButton()
 	end
 	if touchButton then
 		touchButton.Visible = show
-		touchButton.Position = UDim2.new(0.5, -(MOVE_PANEL_W / 2) * Ui.screenScale() - 8, 0, 8)
+		if show then
+			placeButton(touchButton, root)
+		end
 	end
 	if open and not QuickChat.active() then
 		QuickChat.close(false)
@@ -434,6 +510,22 @@ function QuickChat.start()
 	player:GetAttributeChangedSignal("MoveWith"):Connect(refreshButton)
 	player:GetAttributeChangedSignal("MoveLobby"):Connect(refreshButton)
 	refreshButton()
+	-- 7.0 review: the top-centre blocks moved (the feed and the button follow); the cards and the planning come and go
+	-- (the button hides under them): a light look four times a second while on a move or in its planning
+	TopBlocks.onChanged(function()
+		placeFeed()
+		if touchButton and touchButton.Visible then
+			refreshButton()
+		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(0.25)
+			if QuickChat.active() or (touchButton and touchButton.Visible) then
+				pcall(refreshButton)
+			end
+		end
+	end)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		if processed or UserInputService:GetFocusedTextBox() or input.KeyCode ~= Enum.KeyCode.T then
 			return

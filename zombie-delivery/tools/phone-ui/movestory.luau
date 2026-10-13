@@ -53,6 +53,9 @@ M.MKeys = {
 	end,
 }
 M.MFade = { out = function() end, into = function() end }
+M.MapView.waypointAt = function() -- (7.0 review: the move clears only its own waypoint)
+	return M.waypoint
+end
 
 local MoveStory = require("./MoveStory")
 local Config = require("./Config")

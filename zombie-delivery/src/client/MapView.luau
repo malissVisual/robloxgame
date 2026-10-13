@@ -183,6 +183,11 @@ function MapView.setWaypoint(position: Vector3?)
 	setGoal(gpsRoute, position)
 end
 
+-- 7.0 review: the GPS's waypoint now (nil: none), so a module clears only its own (client/MovingHud.luau).
+function MapView.waypointAt(): Vector3?
+	return waypoint
+end
+
 -- ── Drawing ────────────────────────────────────────────────────────────────
 
 local function point(x: number, z: number, scale: number): UDim2

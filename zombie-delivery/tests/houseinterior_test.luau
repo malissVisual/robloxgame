@@ -53,7 +53,7 @@ end
 -- ── Every interior ─────────────────────────────────────────────────────────────
 local mostParts, mostLights = 0, 0
 -- (seeds 5 and 409 are the busiest of the first 800: 591 and 599 parts; the average is about 540)
-for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 409 } do
+for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 409, 1955 } do -- (7.0 review: 1955 is Marge's House, Config.Moving.Contracts)
 	local plan = HouseLayout.plan(seed, "house")
 	local origin = HouseInterior.slot(seed)
 	local ok, model, pieces = pcall(HouseInterior.build, plan, origin)

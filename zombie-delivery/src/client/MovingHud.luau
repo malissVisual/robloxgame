@@ -5,23 +5,32 @@
 --     it again) or why it can't start;
 --   * the move's panel at the top in the middle while a move runs ("state"): the house, the clock (amber with the
 --     horde, red in the last minute), the checklist (things out x/y, ★ x/3, broken), the truck's room as a bar and what
---     to do next; a tap on it (or Tab) opens the list;
---   * the list (Tab): every thing with its picture, ★, how it is carried (✋ one hand, 🙌 both, 👥 two), fragile, where
---     it is (in the house, carried by …, on the ground, in the truck) and its condition; the owner's GIVE UP;
+--     to do next; a tap on it (or O) opens the list;
+--   * the list (O): every thing with its picture, ★, how it is carried (✋ one hand, 🙌 both, 👥 two), fragile, where
+--     it is (in the house, carried by …, on the ground, in the truck) and its condition; the owner's GIVE UP (twice);
 --   * the result card ("result"): delivered / left / broken, the stars 1 … 5, the pay's lines, your share and XP;
 --   * the fade at a door ("fade": client/Fade.luau);
 --   * the GPS: the house, or the Wall (the depot's drop-off) while you drive with a load;
 --   * the move's prompts only for its crew (the tag MovePrompt: MoveOwner = the move's owner, shown when your player
 --     attribute MoveWith is theirs; MoveOnly = for that player alone; MoveSkip = not for that player), hidden by
 --     their reach like client/CargoPrompts.luau.
--- On a touch screen the list ends over the touch buttons (client/TouchLayout.luau), the panel is a button.
+-- 7.0 review: after 0:00 (the state's graceEndsAt) the panel counts down "TIME'S UP · REACH THE WALL · m:ss" in red.
+-- Where it all sits is client/MoveLayout.luau's (pure). The panel is a top-centre block (client/
+-- TopBlocks.luau: the chips, the banners, the location caption, the helper's strip and the quick chat's lines keep clear
+-- of it) and follows the screen's size. The list is drawn again only when what it shows changed (a cheap key; the
+-- role's countdown ticks in place); on a computer it sits at the right under the panel and under Roblox's player list,
+-- on a touch screen it is a sheet over the whole height (its GIVE UP at the end of what scrolls). The key is O (Tab is
+-- Roblox's player list), a key another thing took is left alone. ESC closes the cards and the list
+-- (MovingHud.closeAll, Main's Hud.onCloseWindows); the move's end clears only the GPS it set.
+--   MovingHud.start(), isOpen(), active(), closeAll(), panel()
 -- 7.0 planning (shared/MoveRoles.luau; the lobby is client/MoveLobbyUi.luau): the panel's last line is your role and
 -- what only it does; what to do next knows the locked door and the dark house; the list (Tab) starts with YOUR ROLE:
 -- its ability (the Driver's CALL TRUCK TO DOOR, the Guard's BARRICADE; the Moving remote's "call" / "barricade") and
--- SWITCH to a free role (the remote's "role", every Config.MoveRoles.Switch s). The prompts: "Enter house" hides while
--- your crew's door is locked (the prompt's MoveDoor, your attribute MoveLocked), a prompt for one role (MoveQuick: the
+-- SWITCH to a free role (the remote's "role", every Config.MoveRoles.Switch s). The prompts: "Enter house" is each
+-- move's own (the server shuts it while the door is locked), a prompt for one role (MoveQuick: the
 -- truck's Load / Unload for the Driver) holds no time for it; a Guard sees the zombies through walls
 -- (client/EnemyOutline.luau setXray). The contract card's START opens the planning.
+-- (the list's YOUR ROLE comes first; its countdown "SWITCH ROLE IN n S" is kept up to date every second)
 -- Presentation only.
 
 local CollectionService = game:GetService("CollectionService")
@@ -41,6 +50,8 @@ local CardKit = require(script.Parent.CardKit)
 local Fade = require(script.Parent.Fade)
 local MapView = require(script.Parent.MapView)
 local TouchLayout = require(script.Parent.TouchLayout)
+local MoveLayout = require(script.Parent.MoveLayout) -- 7.0 review: where the panel and the list sit
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review: the panel holds the top's middle
 local EnemyOutline = require(script.Parent.EnemyOutline) -- 7.0 planning: the Guard's sight
 local MoveStoryUi = require(script.Parent.MoveStoryUi) -- MoveStory hook (7.0 story): the intro, the briefing, CHAPTERS, the thanks
 
@@ -51,10 +62,11 @@ local K = Theme.Contract
 local C = CardKit.Color
 local TAG = "MovePrompt"
 local ORANGE = Color3.fromRGB(240, 132, 44)
-local PANEL_W = 380
-local PANEL_H = 118 -- (7.0 planning: + the role's line)
-local LIST_W = 320
+local PANEL_W = MoveLayout.PANEL_W
+local PANEL_H = MoveLayout.PANEL_H -- (7.0 planning: + the role's line)
 local CARD_W = 440
+local LIST_KEY = Enum.KeyCode.O -- 7.0 review: Tab is Roblox's player list (L the leaderboard)
+local GIVE_UP_SURE = 3 -- s: a second tap of GIVE UP within this gives the move up
 
 local remote = Net.get("Moving")
 local gui: ScreenGui? = nil
@@ -62,6 +74,8 @@ local state: any = nil -- the server's view of your move (nil: none)
 local refs: { [string]: any } = {} -- the panel's labels and bars
 local listFrame: any = nil
 local listOpen = false
+local listKey = "" -- 7.0 review: what the open list shows (drawn again only when this changes)
+local giveUpAt = 0 -- 7.0 review: the first tap of GIVE UP (os.clock)
 local cardFrame: any = nil -- the contract card or the result (one at a time)
 local gpsAt: Vector3? = nil -- the waypoint set here (cleared here)
 local hidden: { [ProximityPrompt]: number } = {} -- the move prompts hidden for you, with their reach
@@ -116,9 +130,7 @@ local STATE_TEXT: { [string]: string } = { home = "IN THE HOUSE", carried = "CAR
 -- ── The prompts of your move only ──────────────────────────────────────────
 
 local function shows(prompt: ProximityPrompt): boolean
-	if prompt:GetAttribute("MoveDoor") == true and player:GetAttribute("MoveLocked") == true then
-		return false -- (7.0 planning: your crew's front door is locked: pick it or kick it first)
-	end
+	-- (7.0 review: "Enter house" is each move's own and the server shuts it while the door is locked: no MoveDoor here)
 	local only = prompt:GetAttribute("MoveOnly")
 	if type(only) == "number" then
 		return only == player.UserId
@@ -196,7 +208,6 @@ local function watchPrompts()
 		end
 	end
 	player:GetAttributeChangedSignal("MoveWith"):Connect(applyAll)
-	player:GetAttributeChangedSignal("MoveLocked"):Connect(applyAll) -- 7.0 planning
 	player:GetAttributeChangedSignal("MoveRole"):Connect(applyAll)
 	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 		if CollectionService:HasTag(prompt, TAG) and not shows(prompt) then
@@ -210,12 +221,17 @@ end
 
 local function setGps(at: Vector3?, name: string?, icon: string?)
 	if at == nil then
-		if gpsAt then
+		local mine = gpsAt
+		if mine then
 			gpsAt = nil
-			MapView.setWaypoint(nil)
-			pcall(function()
-				MapView.onWaypoint(nil)
-			end)
+			-- (7.0 review: a waypoint the player set since is theirs: it stays)
+			local now = MapView.waypointAt()
+			if now and (now - mine).Magnitude < 1 then
+				MapView.setWaypoint(nil)
+				pcall(function()
+					MapView.onWaypoint(nil)
+				end)
+			end
 		end
 		return
 	end
@@ -245,7 +261,7 @@ local function updateGps()
 	end
 	local counts = s.counts or {}
 	local out = tonumber(counts.out) or 0
-	if out > 0 and (seated() or s.horde == true) then
+	if out > 0 and (seated() or s.horde == true or s.graceEndsAt ~= nil) then -- (7.0 review: late: the Wall)
 		setGps(Vector3.new(s.dropOff.x, Map.RoadTop, s.dropOff.z), "The Wall (drop-off)", "🧱")
 	else
 		setGps(Vector3.new(s.house.x, Map.RoadTop, s.house.z), s.name, s.icon)
@@ -273,11 +289,13 @@ local function buildPanel(root: ScreenGui)
 	Ui.corner(panel, 8)
 	Ui.make("UIStroke", { Name = "Edge", Color = ORANGE, Thickness = 1, Transparency = 0.4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, panel)
 	refs.panel = panel
+	refs.panelScale = panel:FindFirstChild("Scale")
+	TopBlocks.set("MovePanel", panel) -- 7.0 review: the top's middle is the panel's
 	refs.edge = panel:FindFirstChild("Edge")
 	refs.title = text(panel, "", UDim2.new(1, -120, 0, 20), { Position = UDim2.fromOffset(12, 8), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = C.title })
 	refs.timer = text(panel, "", UDim2.fromOffset(100, 24), { Position = UDim2.new(1, -12, 0, 6), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Right })
 	refs.check = text(panel, "", UDim2.new(1, -110, 0, 18), { Position = UDim2.fromOffset(12, 32), TextColor3 = K.secondary })
-	refs.hint = text(panel, Ui.touchLayout() and "TAP: LIST" or "LIST [TAB]", UDim2.fromOffset(96, 16), {
+	refs.hint = text(panel, Ui.touchLayout() and "TAP: LIST" or "LIST [O]", UDim2.fromOffset(96, 16), {
 		Position = UDim2.new(1, -12, 0, 34),
 		AnchorPoint = Vector2.new(1, 0),
 		Font = Theme.HeadingFont,
@@ -358,7 +376,10 @@ local function refreshPanel()
 	local hordeIn = (tonumber(s.hordeAt) or nowAt) - nowAt
 	local counts = s.counts or {}
 	refs.title.Text = `{s.icon or "🏠"} {string.upper(s.name or "MOVE")}{if s.mine == true then "" else ` · {s.owner}'s move`}`
-	refs.timer.Text = `⏱ {clock(left)}`
+	-- 7.0 review: after 0:00 the truck has a grace to reach the Wall (the state's graceEndsAt): its countdown, red
+	local grace = tonumber(s.graceEndsAt)
+	local late = grace ~= nil and left <= 0
+	refs.timer.Text = if late and grace then `⏱ {clock(grace - nowAt)}` else `⏱ {clock(left)}`
 	refs.timer.TextColor3 = if left <= 60 then K.red elseif s.horde == true then K.warn else K.text
 	local broken = tonumber(counts.broken) or 0
 	refs.check.Text = `📦 {counts.out or 0}/{counts.total or 0} out · ★ {counts.starsOut or 0}/{counts.stars or 0}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 in {clock(hordeIn)}` else ""}`
@@ -366,27 +387,41 @@ local function refreshPanel()
 	refs.truckLabel.Text = `🚚 TRUCK {math.floor(fill * 100 + 0.5)}%`
 	refs.fill.Size = UDim2.fromScale(fill, 1)
 	refs.fill.BackgroundColor3 = if fill > 0.9 then K.red elseif fill > 0.7 then K.warn else ORANGE
-	refs.next.Text = nextStep(s)
-	refs.next.TextColor3 = if s.horde == true then K.red else K.text
+	refs.next.Text = if late and grace then `⏱ TIME'S UP · REACH THE WALL · {clock(grace - nowAt)}` else nextStep(s)
+	refs.next.TextColor3 = if s.horde == true or late then K.red else K.text
 	refs.role.Text = roleLine(s) -- 7.0 planning
 	if refs.edge then
 		refs.edge.Color = if s.horde == true then K.red else ORANGE
 	end
 end
 
--- ── The list (Tab) ─────────────────────────────────────────────────────────
+-- ── The list (O) ───────────────────────────────────────────────────────────
 
--- The list's top and height (unscaled px): under the panel, over the touch buttons on a touch screen.
-local function listBox(): (number, number)
-	local size = Ui.screenSize()
-	local s = Ui.screenScale()
-	local top = 8 + PANEL_H * s + 10
-	local bottom = size.Y - 120
+-- Roblox's player list on a computer (top right), nil when it is off or on a touch screen.
+local function playerListBox(W: number, H: number): TouchLayout.Box?
 	if Ui.touchLayout() then
-		local cluster = TouchLayout.cluster(size.X, size.Y, s)
-		bottom = math.min(bottom, cluster.top - TouchLayout.GAP)
+		return nil
 	end
-	return top, math.max(160, (bottom - top) / s)
+	local ok, on = pcall(function(): boolean
+		return game:GetService("StarterGui"):GetCoreGuiEnabled(Enum.CoreGuiType.PlayerList)
+	end)
+	if ok and on == false then
+		return nil
+	end
+	local count = 1
+	pcall(function()
+		count = #Players:GetPlayers()
+	end)
+	return TouchLayout.box(W - 16 - MoveLayout.PLAYER_LIST_W, 0, W, math.min(H * 0.45, 52 + 40 * count))
+end
+
+-- Where the list goes (px in this gui) and its scale; `sheet`: a touch screen's sheet over the whole height.
+local function listBox(): (TouchLayout.Box, number, boolean)
+	local size = Ui.screenSize()
+	local S = Ui.screenScale()
+	local root = gui
+	local under = TopBlocks.bottom(if root then root.AbsolutePosition else nil) or MoveLayout.panel(size.X, S).y1
+	return MoveLayout.list(size.X, size.Y, S, Ui.touchLayout(), under, playerListBox(size.X, size.Y))
 end
 
 local function itemRow(parent: Instance, item: any, order: number)
@@ -430,8 +465,8 @@ local function itemRow(parent: Instance, item: any, order: number)
 end
 
 -- 7.0 planning: YOUR ROLE at the list's top: the role, its ability's button (the Driver's call, the Guard's barricade)
--- and SWITCH to a free role (a chip each; a while after a switch: when).
-local function roleCard(parent: Instance, s: any)
+-- and SWITCH to a free role (a chip each; a while after a switch: when, counted down in place: refs.switchWait).
+local function roleCard(parent: Instance, s: any, finger: number)
 	local team = if type(s.team) == "table" then s.team else {}
 	local def = MoveRoles.get(team.role)
 	if not def then
@@ -459,13 +494,13 @@ local function roleCard(parent: Instance, s: any)
 		ability = { text = if left > 0 then `🪵 PUT UP A BARRICADE · {left} LEFT` else "🪵 NO BARRICADES LEFT", action = "barricade", on = left > 0 }
 	end
 	if ability then
-		local holder = Ui.make("Frame", { Name = "Ability", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 3 }, card)
+		local holder = Ui.make("Frame", { Name = "Ability", Size = UDim2.new(1, 0, 0, math.max(36, finger)), BackgroundTransparency = 1, LayoutOrder = 3 }, card)
 		local act = ability
 		CardKit.bigButton(holder, {
 			name = "Ability",
 			text = act.text,
 			kind = if act.on then "warn" else "shut",
-			height = 36,
+			height = math.max(36, finger),
 			textSize = 13,
 			onClick = function()
 				if act.on then
@@ -477,11 +512,11 @@ local function roleCard(parent: Instance, s: any)
 	local wait = math.ceil((tonumber(team.switchAt) or 0) - workspace:GetServerTimeNow())
 	local free = if type(team.free) == "table" then team.free else {}
 	if wait > 0 then
-		text(card, `SWITCH ROLE IN {wait} S`, UDim2.new(1, 0, 0, 16), { LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
+		refs.switchWait = text(card, `SWITCH ROLE IN {wait} S`, UDim2.new(1, 0, 0, 16), { Name = "SwitchWait", LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
 	elseif #free > 0 then
 		text(card, "SWITCH ROLE", UDim2.new(1, 0, 0, 14), { LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
 		local strip = Ui.make("Frame", { Name = "Switch", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 5 }, card)
-		Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(96, 26), CellPadding = UDim2.fromOffset(4, 4), SortOrder = Enum.SortOrder.LayoutOrder }, strip)
+		Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(96, math.max(26, finger)), CellPadding = UDim2.fromOffset(4, 4), SortOrder = Enum.SortOrder.LayoutOrder }, strip)
 		for index, id in free do
 			local other = MoveRoles.get(id)
 			if other then
@@ -501,10 +536,63 @@ end
 
 local function closeList()
 	listOpen = false
+	listKey = ""
+	refs.switchWait = nil
 	if listFrame then
 		listFrame:Destroy()
 		listFrame = nil
 	end
+end
+
+-- 7.0 review: what the list shows, as one cheap string (the state comes up to 4 times a second: an unchanged list is
+-- not drawn again, so a tap on its buttons is never lost under a rebuild).
+local function keyOf(s: any): string
+	local parts: { string } = {}
+	for _, item in s.items or {} do
+		table.insert(parts, `{item.spot}:{item.state}:{item.condition}:{item.broken}:{item.by}:{item.mine}`)
+	end
+	local team = if type(s.team) == "table" then s.team else {}
+	local free = if type(team.free) == "table" then table.concat(team.free, ",") else ""
+	local waiting = (tonumber(team.switchAt) or 0) > workspace:GetServerTimeNow()
+	local counts = s.counts or {}
+	local size = Ui.screenSize()
+	return table.concat(parts, ";")
+		.. `|{team.role}|{team.called}|{team.barricades}|{free}|{waiting}|{s.mine}|{counts.out}/{counts.total}|{s.name}`
+		.. `|{size.X}x{size.Y}|{Ui.screenScale()}|{Ui.touchLayout()}`
+end
+
+-- GIVE UP: the first tap asks (the button says so for GIVE_UP_SURE s), a second one within that gives the move up.
+local function giveUpButton(holder: Instance, height: number)
+	local sure = os.clock() - giveUpAt <= GIVE_UP_SURE
+	local button = CardKit.bigButton(holder, {
+		name = "GiveUp",
+		text = if sure then "TAP AGAIN TO GIVE UP" else "GIVE UP THE MOVE",
+		kind = if sure then "primary" else "shut",
+		height = height,
+		textSize = 14,
+		onClick = function()
+			if os.clock() - giveUpAt <= GIVE_UP_SURE then
+				giveUpAt = 0
+				remote:FireServer("giveup")
+				return
+			end
+			giveUpAt = os.clock()
+			local mine = giveUpAt
+			local made: any = holder:FindFirstChild("GiveUp")
+			if made then
+				made.Text = "TAP AGAIN TO GIVE UP"
+				CardKit.paint(made, "primary")
+			end
+			task.delay(GIVE_UP_SURE, function()
+				local still: any = holder:FindFirstChild("GiveUp")
+				if giveUpAt == mine and still then
+					still.Text = "GIVE UP THE MOVE"
+					CardKit.paint(still, "shut")
+				end
+			end)
+		end,
+	})
+	return button
 end
 
 local function drawList()
@@ -514,33 +602,56 @@ local function drawList()
 		closeList()
 		return
 	end
-	local scroll = listFrame and listFrame:FindFirstChild("Rows")
+	local scroll = listFrame and listFrame:FindFirstChild("Rows", true)
 	local keep = if scroll then scroll.CanvasPosition else Vector2.zero
 	if listFrame then
 		listFrame:Destroy()
 	end
-	local top, height = listBox()
+	listKey = keyOf(s)
+	refs.switchWait = nil
+	local area, scale, sheet = listBox()
+	local width, height = (area.x1 - area.x0) / scale, (area.y1 - area.y0) / scale
+	local holder: any = root
+	if sheet then
+		-- a touch screen: a sheet in front of everything (the touch buttons too); a tap beside it closes it
+		local shade = Ui.make("TextButton", {
+			Name = "MoveListShade",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundTransparency = 0.45,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = "",
+			Selectable = false,
+			ZIndex = 10,
+		}, root)
+		shade.Activated:Connect(function()
+			closeList()
+		end)
+		holder = shade
+	end
 	local frame = Ui.make("Frame", {
 		Name = "MoveList",
-		Size = UDim2.fromOffset(LIST_W, height),
-		Position = UDim2.new(1, -16, 0, top),
-		AnchorPoint = Vector2.new(1, 0),
+		Size = UDim2.fromOffset(width, height),
+		Position = UDim2.fromOffset(area.x0, area.y0),
 		BackgroundColor3 = K.charcoal,
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
-	}, root)
-	scaled(frame)
+		ZIndex = if sheet then 11 else 1,
+	}, holder)
+	Ui.make("UIScale", { Name = "Scale", Scale = scale }, frame)
 	Ui.corner(frame, 8)
 	Ui.make("UIStroke", { Color = K.rule, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
-	listFrame = frame
+	listFrame = if sheet then holder else frame
 	text(frame, `{s.icon or "🏠"} {string.upper(s.name or "")} · THINGS`, UDim2.new(1, -60, 0, 22), { Position = UDim2.fromOffset(12, 10), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = C.title })
 	local counts = s.counts or {}
 	text(frame, `★ must-haves first · {counts.out or 0} of {counts.total or 0} in the truck`, UDim2.new(1, -60, 0, 16), { Position = UDim2.fromOffset(12, 32), TextSize = 12, TextColor3 = C.faint })
 	Ui.closeButton(frame, function()
 		closeList()
 	end)
-	local footer = if s.mine == true then 52 else 0
+	-- (a computer: GIVE UP under the rows; a touch sheet: at the end of what scrolls)
+	local footer = if s.mine == true and not sheet then 52 else 0
 	local rows = Ui.make("ScrollingFrame", {
 		Name = "Rows",
 		Size = UDim2.new(1, -16, 1, -(58 + footer)),
@@ -552,7 +663,9 @@ local function drawList()
 		CanvasSize = UDim2.new(),
 	}, frame)
 	Ui.list(rows, true, 6)
-	roleCard(rows, s) -- 7.0 planning: YOUR ROLE first
+	-- (7.0 review: a touch sheet's buttons a finger's height after its scale: Ui.MinTouch screen px)
+	local finger = if sheet then math.ceil(MoveLayout.MIN_TOUCH / scale) else 0
+	roleCard(rows, s, finger) -- 7.0 planning: YOUR ROLE first
 	local list = s.items or {}
 	-- ★ first, then what is still in the house, then the rest
 	local ordered = table.clone(list)
@@ -572,17 +685,31 @@ local function drawList()
 	end
 	rows.CanvasPosition = keep
 	if s.mine == true then
-		local holder = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 1, -46), BackgroundTransparency = 1 }, frame)
-		CardKit.bigButton(holder, {
-			name = "GiveUp",
-			text = "GIVE UP THE MOVE",
-			kind = "shut",
-			height = 40,
-			textSize = 14,
-			onClick = function()
-				remote:FireServer("giveup")
-			end,
-		})
+		if sheet then
+			local foot = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, finger), BackgroundTransparency = 1, LayoutOrder = #ordered + 10 }, rows)
+			giveUpButton(foot, finger)
+		else
+			local foot = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 1, -46), BackgroundTransparency = 1 }, frame)
+			giveUpButton(foot, 40)
+		end
+	end
+end
+
+-- Every second while the list is open: the role's countdown in place (a new list only when what it shows changed).
+local function tickList()
+	local s = state
+	if not listOpen or type(s) ~= "table" then
+		return
+	end
+	if keyOf(s) ~= listKey then
+		drawList()
+		return
+	end
+	local label = refs.switchWait
+	local team = if type(s.team) == "table" then s.team else {}
+	if label and label.Parent then
+		local wait = math.ceil((tonumber(team.switchAt) or 0) - workspace:GetServerTimeNow())
+		label.Text = `SWITCH ROLE IN {math.max(1, wait)} S`
 	end
 end
 
@@ -784,12 +911,44 @@ local function setState(view: any)
 	refreshPanel()
 	updateGps()
 	if listOpen then
+		if state == nil then
+			closeList()
+		elseif keyOf(state) ~= listKey then
+			drawList() -- (7.0 review: only when what it shows changed)
+		end
+	end
+end
+
+-- 7.0 review: the screen changed size (a window resized, a phone turned): the panel's scale, the list and a card's.
+local function rescale()
+	local S = Ui.screenScale()
+	local scaler = refs.panelScale
+	if scaler and math.abs(scaler.Scale - S) > 0.001 then
+		scaler.Scale = S
+	end
+	local card = cardFrame and cardFrame:FindFirstChild("Card")
+	local cardScale = card and card:FindFirstChild("Scale")
+	if cardScale then
+		cardScale.Scale = S
+	end
+	if listOpen then
 		drawList()
 	end
 end
 
 function MovingHud.isOpen(): boolean
 	return cardFrame ~= nil or listOpen or MoveStoryUi.isOpen() -- (MoveStory hook: a story card frees the mouse too)
+end
+
+-- 7.0 review: ESC (Main's Hud.onCloseWindows) closes the contract or result card and the list.
+function MovingHud.closeAll()
+	closeCard()
+	closeList()
+end
+
+-- 7.0 review: the move's panel (a top-centre block, client/TopBlocks.luau "MovePanel").
+function MovingHud.panel(): GuiObject?
+	return refs.panel
 end
 
 function MovingHud.active(): boolean
@@ -818,22 +977,37 @@ function MovingHud.start()
 			end
 		end
 	end)
-	-- Tab: the list (Roblox's own player list may take Tab as well: not waited for)
-	UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
-		if UserInputService:GetFocusedTextBox() then
+	-- O: the list (7.0 review: not Tab, Roblox's player list; a key something else took is left alone)
+	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+		if processed or UserInputService:GetFocusedTextBox() then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.Tab and state ~= nil then
+		if input.KeyCode == LIST_KEY and state ~= nil then
 			toggleList()
 		end
 	end)
-	-- the clock and the GPS once a second; the panel's words with them
+	-- 7.0 review: the panel, the list and a card follow the screen's size
+	local function watchCamera()
+		local camera = workspace.CurrentCamera
+		if camera then
+			camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+				pcall(rescale)
+			end)
+		end
+	end
+	watchCamera()
+	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+		watchCamera()
+		pcall(rescale)
+	end)
+	-- the clock and the GPS once a second; the panel's words with them; the list's countdown in place
 	task.spawn(function()
 		while true do
 			task.wait(1)
 			if state ~= nil then
 				pcall(refreshPanel)
 				pcall(updateGps)
+				pcall(tickList)
 			end
 		end
 	end)

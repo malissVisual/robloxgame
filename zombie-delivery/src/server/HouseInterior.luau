@@ -19,6 +19,9 @@
 --
 -- StreamingEnabled: ask the client to stream the place in (player:RequestStreamAroundAsync(origin.Position)) before
 -- a player is moved there.
+-- 7.0 review: the windows' panes and the porch's daylight wall are the hour's: their daylight glow by day, a dark night
+-- sky (no glow, the porch's light dim and moon blue) while the server's workspace attribute Night is on (read at the
+-- build, then one listener for every interior standing: a few dozen parts, only when it turns).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -62,6 +65,52 @@ local FLOORS: { [string]: { Floor } } = {
 local TRIM = rgb(240, 236, 228)
 local CEILING = rgb(242, 240, 234)
 local DAYLIGHT = rgb(126, 156, 178) -- the windows' dim glow (Neon)
+-- 7.0 review: the same at night (no glow): the panes, the bathroom's, the porch's wall; the porch light's share and hue
+local NIGHT = { pane = rgb(28, 36, 58), bath = rgb(36, 44, 62), porch = rgb(24, 30, 48), light = 0.25, lightColor = rgb(150, 170, 220) }
+type Daylit = { day: Color3, night: Color3, light: SurfaceLight?, brightness: number, color: Color3 }
+local daylit: { [BasePart]: Daylit } = setmetatable({}, { __mode = "k" }) :: any
+local watchingNight = false
+
+-- Is it night now (the server's Night attribute: server/DayNight.luau)? Off the game (a recorder): day.
+local function nightNow(): boolean
+	local ok, night = pcall(function(): boolean
+		return workspace:GetAttribute("Night") == true
+	end)
+	return ok and night == true
+end
+
+local function shade(p: BasePart, d: Daylit, night: boolean)
+	p.Color = if night then d.night else d.day
+	p.Material = if night then Enum.Material.SmoothPlastic else Enum.Material.Neon
+	local light = d.light
+	if light then
+		light.Brightness = d.brightness * (if night then NIGHT.light else 1)
+		light.Color = if night then NIGHT.lightColor else d.color
+	end
+end
+
+-- A part that shows the daylight (and its light): shaded for the hour now, and again whenever the night turns.
+local function daylight(p: BasePart, night: Color3, light: SurfaceLight?)
+	local d: Daylit = { day = p.Color, night = night, light = light, brightness = if light then light.Brightness else 0, color = if light then light.Color else p.Color }
+	daylit[p] = d
+	shade(p, d, nightNow())
+	if watchingNight then
+		return
+	end
+	watchingNight = true
+	pcall(function()
+		workspace:GetAttributeChangedSignal("Night"):Connect(function()
+			local night = nightNow()
+			for part, info in daylit do
+				if part.Parent then
+					shade(part, info, night)
+				else
+					daylit[part] = nil
+				end
+			end
+		end)
+	end)
+end
 local RUGS = { rgb(170, 60, 56), rgb(52, 86, 140), rgb(196, 160, 70), rgb(90, 130, 100), rgb(150, 110, 160), rgb(220, 210, 190) }
 local CABINETS = { rgb(236, 234, 226), rgb(150, 180, 160), rgb(170, 128, 86), rgb(110, 140, 170) }
 
@@ -378,6 +427,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		light.Angle = 70
 		light.Color = color(T.DoorLight.Color)
 		light.Parent = glow
+		daylight(glow, NIGHT.porch, light) -- 7.0 review: dark at night
 		local mat = part(decor, "WelcomeMat", Vector3.new(4, 0.06, 2.2), at(x, 0.03, z - 1.6), rgb(150, 110, 70), Enum.Material.Fabric)
 		sign(mat, "WELCOME", Enum.NormalId.Top, rgb(60, 40, 24))
 		local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), at(x, plan.doorHeight + 1.05, front.at.Z + half + 0.15), rgb(250, 250, 248), SMOOTH)
@@ -392,6 +442,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		part(decor, "WindowFrame", Vector3.new(w.width + 0.5, w.height + 0.5, 0.16), frame * CFrame.new(0, 0, -0.08), TRIM, SMOOTH)
 		local pane = part(decor, "Window", Vector3.new(w.width, w.height, 0.06), frame * CFrame.new(0, 0, -0.19), if kind == "bath" then rgb(170, 190, 200) else DAYLIGHT, Enum.Material.Neon)
 		pane:SetAttribute("InteriorWindow", true)
+		daylight(pane, if kind == "bath" then NIGHT.bath else NIGHT.pane) -- 7.0 review: a night sky at night
 		if not small then
 			part(decor, "Sill", Vector3.new(w.width + 1, 0.2, 0.6), frame * CFrame.new(0, -w.height / 2 - 0.1, -0.3), TRIM, SMOOTH)
 		end
