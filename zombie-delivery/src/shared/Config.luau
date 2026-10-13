@@ -6651,4 +6651,16 @@ do -- 6.19: the one pass over the tables (see Config.Prices)
 	end
 end
 
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the owner's small test world (shared/SandboxMap.luau) in place of the
+-- city: one house to empty, your walk-in Sprinter van, your ZDC warehouse where what you bring is put on show (it earns
+-- while it stands there) or sold. On = false builds the old city as before (until it is deleted).
+--   On          the sandbox world instead of the city (server/Main.server.luau, client/Main.client.luau)
+--   Van         the car every player has in the sandbox (Config.Cars id; parked at their plot's vanSpot at PLAY)
+--   MaxPlayers  the plots (SandboxMap.Plots): one player each (set the place's max players to this)
+Config.Sandbox = {
+	On = true,
+	Van = "sprinter",
+	MaxPlayers = 4,
+}
+
 return Config
