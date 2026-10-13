@@ -21,6 +21,7 @@
 --                                     piece's two ends of its long side, a "both" piece's two sides, a "hand" piece's
 --                                     front
 --   FurnitureLooks.parts(id)          how many parts its model has (Root included)
+--   FurnitureLooks.Palettes           the colour lists the builders pick from (fabric, wood, paint, accent, appliance)
 
 local Config = require(script.Parent.Config)
 
@@ -912,5 +913,7 @@ function FurnitureLooks.parts(id: string): number
 end
 
 FurnitureLooks.MaxParts = Tuning.MaxParts
+-- The builders' colour lists by finish (server/FurnitureMesh.luau colours the Blender models' pieces from them).
+FurnitureLooks.Palettes = { fabric = FABRICS, wood = WOODS, paint = PAINTS, accent = ACCENTS, appliance = APPLIANCES }
 
 return FurnitureLooks

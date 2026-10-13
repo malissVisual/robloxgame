@@ -273,6 +273,8 @@ safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental
 safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between the rooftops (the ladders, the rides)
 -- 7.0 prototype, MOVES (design/rework/NAVRH.md): the depot's moving contracts, one house move with its crew. Last: it
 -- wraps the hooks set above (Zombies.hunts, Vehicles.backAllowed, Jobs.returnLent, Vehicles.callCar, the car damage).
+-- 7.0: the moves' furniture in the owner's Blender models: the imported ZDCFurnitureArt leaves the world at once.
+safely("FurnitureMesh", require(Server.FurnitureMesh).start)
 safely("Moving", require(Server.Moving).start)
 print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
 -- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.
