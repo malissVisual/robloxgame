@@ -8,21 +8,23 @@
 --   The ring      two rows of mountains round Config.Alpine.Box (Map.Bounds today), just outside it: a front row of
 --                 foothills (250 – 420 studs) whose feet stand Gap outside the box and overlap so the crest between
 --                 two never drops under Seal, and a row of big peaks (480 – 700) behind it with lower shoulders. A
---                 mountain is a cone of terrain layers (Terrain:FillCylinder): grass at the foot (the forests climb
---                 it), rock above (striped with the other stone), snow over the snow line; north-west of the river, in
---                 the winter, snow with rock bands. Glacier tongues run down the tallest summer peaks, light scree
---                 fans lie at the foothills' feet. Where the river leaves the valley (north, south) the front row
---                 opens into a gorge that a big peak closes behind; the lake's far shore (east) rises out of the
---                 water. Where a road would leave the valley (Config.Alpine.Portals: the West Highway past the Old Farm)
---                 a cliff with a closed tunnel mouth.
+--                 mountain is a cone of terrain layers (Terrain:FillCylinder, each exactly two rows of the terrain's
+--                 4-stud voxels; a layer wholly inside a bigger neighbour's over the same rows is left out: it would
+--                 write nothing new): grass at the foot (the forests climb it), rock above (striped with the other
+--                 stone), snow over the snow line; north-west of the river, in the winter, snow with rock bands.
+--                 Glacier tongues run down the tallest summer peaks, light scree fans lie at the foothills' feet. Where
+--                 the river leaves the valley (north, south) the front row opens into a gorge that a big peak closes
+--                 behind; the lake's far shore (east) rises out of the water. Where a road would leave the valley
+--                 (Config.Alpine.Portals: the West Highway past the Old Farm) a cliff with a closed tunnel mouth (the
+--                 mouth's air on the voxel grid: no terrain skin on its road).
 --   Silhouettes   a square pyramid inside every big peak (Persistent parts): with streaming on, the client is sent
 --                 the terrain near it only; the silhouettes stand in for the far mountains and hide inside the terrain
 --                 when it is there.
---   The forests   alpine spruce and fir (a trunk and three tiers, three greens, snowy tops in the winter) on the open
---                 land between the districts and up the ring's lower slopes: in patches (two sizes of value noise),
---                 thinner near town, denser toward the mountains, meadows left open with wildflowers and a few hay
---                 barns and huts; never on a road (nor near a junction: the drivers' view), a district, a lot, a
---                 yard, a place, the water or a zone.
+--   The forests   alpine spruce and fir (7.1 review: two parts, a trunk and one needle spire; three greens, frosted in
+--                 the winter) on the open land between the districts and up the ring's lower slopes: in patches (two
+--                 sizes of value noise), thinner near town, denser toward the mountains, meadows left open with
+--                 wildflowers and a few hay barns and huts; never on a road (nor near a junction: the drivers' view), a
+--                 district, a lot, a yard, a place, the water or a zone.
 --
 --   AlpineLayout.ring(box?)              the ring for this box (Config.Alpine.Box; cached for the default box)
 --   AlpineLayout.layerAt(cone, i)        the middle of a cone's layer i (the lean moves it)
@@ -34,7 +36,7 @@
 --   AlpineLayout.forest(ring?)           the trees, the flower patches and the huts (cached for the default ring)
 --   AlpineLayout.treeRule(x, z, canopy)  why a tree may not stand there in the valley (nil: it may)
 --   AlpineLayout.roadEdge(x, z)          the distance to the nearest road's edge
---   AlpineLayout.treeParts(tree)         its parts (a trunk cylinder, three ellipsoid tiers) as plain numbers
+--   AlpineLayout.treeParts(tree)         its parts (a trunk cylinder, one ellipsoid spire) as plain numbers
 --   AlpineLayout.hutParts(hut)           a hut's or a hay barn's parts as plain numbers
 --   AlpineLayout.portalParts(portal)     a portal's parts and boards (the road, the barrier, the tunnel's portal)
 --   AlpineLayout.waterfallParts(ring)    the waterfall's parts
@@ -49,6 +51,7 @@ local AlpineLayout = {}
 
 local A = Config.Alpine
 local LAYER = A.Layer
+local VOXEL = 4 -- the terrain's voxels (studs): the layers and the cuts lie on their grid
 local TURN = 300 -- studs of the ring's parameter a corner of the box turns over (the edge point stays at the corner)
 local CELL = 500 -- the cones' lookup grid
 
@@ -91,6 +94,8 @@ export type Fill = {
 	yaw: number, -- turned about Y, then …
 	pitch: number, -- … about its own X (CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0))
 	material: string,
+	cone: string?, -- a cone's layer: which cone, which layer (1 at the floor)
+	layer: number?,
 }
 
 -- A far look of a peak: a square pyramid (four corner wedges) Height high over Base, its corners Half × √2 from the
@@ -655,11 +660,22 @@ function AlpineLayout.ring(boxIn: Box?): Ring
 		local width = p.width + 40
 		local fx, fz = p.x + p.nx * p.face, p.z + p.nz * p.face
 		table.insert(ring.solids, { x = fx, z = fz, nx = p.nx, nz = p.nz, width = width, depth = depth, height = P.Cliff })
+		-- (7.1 review: out to whole voxels, from the voxel row under the road's top: a partly cut voxel keeps a skin of
+		-- rock, and from RoadTop up one did, over the tunnel's road)
+		local function cut(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number): Cut
+			local function down(v: number): number
+				return math.floor(v / VOXEL) * VOXEL
+			end
+			local function up(v: number): number
+				return math.ceil(v / VOXEL) * VOXEL
+			end
+			return { x0 = down(x0), z0 = down(z0), x1 = up(x1), z1 = up(z1), y0 = down(y0), y1 = up(y1) }
+		end
 		local x0, z0, x1, z1 = portalBox(p, 2, p.face + P.Depth)
-		table.insert(ring.cuts, { x0 = x0, z0 = z0, x1 = x1, z1 = z1, y0 = Map.RoadTop, y1 = P.Height + 2 })
+		table.insert(ring.cuts, cut(x0, z0, x1, z1, Map.RoadTop, P.Height + 2))
 		-- (the road's way up to the mouth, wider, in case a foot reaches it)
 		local ax0, az0, ax1, az1 = portalBox(p, 12, p.face + 2)
-		table.insert(ring.cuts, { x0 = ax0, z0 = az0, x1 = ax1, z1 = az1, y0 = Map.RoadTop, y1 = 60 })
+		table.insert(ring.cuts, cut(ax0, az0, ax1, az1, Map.RoadTop, 60))
 	end
 
 	-- ── The fills ──
@@ -672,11 +688,38 @@ function AlpineLayout.ring(boxIn: Box?): Ring
 		end
 		return a.id < b.id
 	end)
+	-- (7.1 review: a layer is exactly LAYER studs, two voxel rows, its floor on the grid. A layer wholly inside a bigger
+	-- layer of another cone over the same rows is left out: the neighbour's voxels hold it already, the terrain is the
+	-- same and the server writes them once; mostly the shoulders' layers inside their peaks.)
+	local function covered(c: Cone, i: number): boolean
+		local r = c.radii[i]
+		local x, z = layerAt(c, i)
+		local y0 = c.floor + (i - 1) * LAYER
+		local near: { Cone } = grid[`{math.floor(x / CELL)},{math.floor(z / CELL)}`] or {}
+		for _, o in near do
+			if o == c or o.floor > y0 then
+				continue
+			end
+			-- o's layer over this layer's upper row (its lower row: that one or the one under it, which holds it)
+			local j = math.floor((y0 + VOXEL - o.floor) / LAYER) + 1
+			local big = o.radii[j]
+			if big and big > r then
+				local ox, oz = layerAt(o, j)
+				if math.sqrt((x - ox) ^ 2 + (z - oz) ^ 2) + r <= big - 0.5 then
+					return true
+				end
+			end
+		end
+		return false
+	end
 	for _, c in sorted do
 		for i, r in c.radii do
+			if covered(c, i) then
+				continue
+			end
 			local y = c.floor + (i - 0.5) * LAYER
 			local x, z = layerAt(c, i)
-			table.insert(fills, { shape = "cylinder", x = x, y = y, z = z, a = r, b = LAYER + 0.5, c = 0, yaw = 0, pitch = 0, material = AlpineLayout.layerMaterial(c, i, y) })
+			table.insert(fills, { shape = "cylinder", x = x, y = y, z = z, a = r, b = LAYER, c = 0, yaw = 0, pitch = 0, material = AlpineLayout.layerMaterial(c, i, y), cone = c.id, layer = i })
 		end
 	end
 
@@ -1192,43 +1235,36 @@ end
 
 -- ── The trees' and the huts' looks ─────────────────────────────────────────
 
--- A spruce or a fir: a trunk and three tiers, each a squashed ellipsoid, narrower and taller toward the top.
+-- A spruce or a fir: a trunk and its needles, one tall, slim ellipsoid spire (7.1 review: two parts a tree, it was a
+-- trunk and three tiers). The spire stays inside the canopy (Tree.canopy, the room every rule keeps) and reaches from
+-- a tenth of the height to the crown, the trunk's foot showing under it; in the winter frosted (Snow).
 function AlpineLayout.treeParts(t: Tree): { PartSpec }
 	local T = A.Trees
 	local h = t.height
 	local green = T.Colors[t.variant] or T.Colors[1]
-	local function shade(f: number): { number }
-		return { math.floor(green[1] * f), math.floor(green[2] * f), math.floor(green[3] * f) }
+	local color = { green[1], green[2], green[3] }
+	if t.snowy then
+		color = { math.floor(lerp(green[1], T.Snowy[1], 0.5)), math.floor(lerp(green[2], T.Snowy[2], 0.5)), math.floor(lerp(green[3], T.Snowy[3], 0.5)) }
 	end
 	local trunk = 1.3 + h * 0.024
-	local parts: { PartSpec } = {
+	local w = h * 0.32 -- (inside the canopy, Tree.canopy = height × 0.19: the rules keep its room)
+	return {
 		{ name = "Trunk", shape = "cylinder", x = t.x, y = t.y + h * 0.27 - 1, z = t.z, sx = trunk, sy = h * 0.54 + 2, sz = trunk, yaw = 0, color = T.Trunk, material = "Wood", collide = true },
-	}
-	local tiers = { { 0.36, 0.38, 0.42, 0.86 }, { 0.58, 0.28, 0.36, 1.0 }, { 0.80, 0.16, 0.40, 1.12 } } -- middle, width, height, shade
-	for n, tier in tiers do
-		local color = shade(tier[4])
-		if t.snowy and n == 3 then
-			color = T.Snowy
-		elseif t.snowy then
-			color = { math.floor(lerp(color[1], T.Snowy[1], 0.22)), math.floor(lerp(color[2], T.Snowy[2], 0.22)), math.floor(lerp(color[3], T.Snowy[3], 0.22)) }
-		end
-		local w = h * tier[2]
-		table.insert(parts, {
+		{
 			name = "Needles",
 			shape = "ellipsoid",
 			x = t.x,
-			y = t.y + h * tier[1],
+			y = t.y + h * 0.55,
 			z = t.z,
 			sx = w,
-			sy = h * tier[3],
+			sy = h * 0.9,
 			sz = w * 0.94,
 			yaw = t.yaw,
 			color = color,
-			material = if t.snowy and n == 3 then "Snow" else "Grass",
+			material = if t.snowy then "Snow" else "Grass",
 			collide = false,
-		})
-	end
-	return parts
+		},
+	}
 end
 
 -- A hay barn (an open front with hay) or a hut (a door and a window): dark weathered wood, a gable roof.
@@ -1646,8 +1682,8 @@ function AlpineLayout.waterfallParts(ring: Ring): { PartSpec }
 	return parts
 end
 
--- The parts the builder makes: the trees, the flowers, the huts, the silhouettes (4 corner wedges, 4 more for a
--- cap), the portals (their parts and boards) and the waterfall.
+-- The parts the builder makes: the trees (Trees.Parts each), the flowers, the huts, the silhouettes (4 corner wedges,
+-- 4 more for a cap), the portals (their parts and boards) and the waterfall.
 function AlpineLayout.parts(ring: Ring, forest: Forest): number
 	local n = #forest.trees * A.Trees.Parts
 	for _, p in forest.patches do

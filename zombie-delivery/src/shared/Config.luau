@@ -2539,8 +2539,10 @@ Config.Atmosphere = {
 --   Box          the ring of mountains stands round this box (Map.Bounds today: the world's walls); step 2 pulls it in
 --   Gap          studs from the box to the front row's foot (the mountains never reach into the box)
 --   Layer        a mountain is a stack of terrain cylinders this many studs thick (a cone: its radius at height y is
---                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit)
---   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed
+--                its base × ((height − y) / (height − floor)) ^ Profile; > 1: the flanks steepen toward the summit);
+--                7.1 review: exactly two rows of the terrain's 4-stud voxels (a layer never writes a row of the next)
+--   Floor / WetFloor   the bottom layer's foot under the ground's 0; in the river or the lake from its bed (both on the
+--                4-stud voxel grid, so every layer covers whole voxel rows)
 --   Front / Back the two rows: Height (summits, studs), Spread (the base's radius = the height × this), Profile; the back
 --                row's feet Behind studs behind the front row's, each back peak with up to two lower Shoulders (chance)
 --   Lean         a peak leans one way (a steep face on that side, a long ridge on the other): each layer's middle moves
@@ -2565,15 +2567,20 @@ Config.Atmosphere = {
 --   Colors       the terrain's material colours (Terrain:SetMaterialColor), Valley the open ground's colour and material
 --   Budget       Volume: studs³ the fills may hold at most (overlaps counted twice); Fills: terrain calls; Parts: the
 --                parts of it all (the trees, the flowers, the huts, the silhouettes, the portal, the waterfall)
---   Trees        the forests: at most Max trees of Parts parts (a trunk and three tiers: spruce and fir), on a grid
---                Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the Treeline), Height (studs);
+--   SkipInStudio a dev toggle (default off): in a Studio Play test the terrain's fills are left out (the slowest part of
+--                the build); the silhouettes, the pass and the forests still stand (the slope trees on the flat ground
+--                under where the mountains would be). Never on a live server (RunService:IsStudio())
+--   Trees        the forests: at most Max trees of Parts parts (7.1 review: a trunk and one needle spire; spruce and
+--                fir), on a grid Spacing apart (± Jitter), Slope of them on the ring's lower slopes (under the
+--                Treeline), Height (studs);
 --                never within RoadClear of a road's edge (nor its canopy over it), JunctionClear of a road's end or bend
 --                (the drivers' view at the junctions), TownClear of a district's edge roads, YardClear of a yard,
 --                LotClear of a home's lot, PlaceClear of a place, WaterClear of the water, nor in Keep (the ski lift);
 --                thinner near town (TownFade studs; Copses of the valley's trees stand there in small copses), denser
 --                within Edge of the box's edge; Noise: the forests' and the
 --                meadows' patch sizes; ShadowNear: only trees this close to a road throw shadows; Chunk: one Atomic
---                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter tops
+--                model (streamed together) per Chunk × Chunk studs; Colors: the needles' variants, Snowy the winter's
+--                frost on them
 --   Meadows      open meadows with wildflowers: Patches of Flowers small parts, Gap apart, Road studs from a road's edge
 --   Huts         Count wooden hay barns and huts in the meadows, Gap apart, Road studs from a road's edge
 Config.Alpine = {
@@ -2581,8 +2588,8 @@ Config.Alpine = {
 	Gap = 40,
 	Seed = 4711,
 	Layer = 8,
-	Floor = -10,
-	WetFloor = -30,
+	Floor = -12,
+	WetFloor = -32,
 	Front = { Height = { 250, 420 } :: { number }, Spread = { 1.0, 1.25 } :: { number }, Profile = 1.3 },
 	Back = { Height = { 480, 700 } :: { number }, Spread = { 0.85, 1.05 } :: { number }, Profile = 1.5, Behind = 170, Shoulders = 0.6 },
 	Lean = { 0.1, 0.5 } :: { number },
@@ -2611,10 +2618,11 @@ Config.Alpine = {
 		Glacier = { 176, 214, 232 },
 	} :: { [string]: { number } },
 	Valley = { Color = { 96, 138, 60 } :: { number }, Material = "Grass" },
-	Budget = { Volume = 1.2e10, Fills = 9000, Parts = 11500 },
+	Budget = { Volume = 1.0e10, Fills = 7500, Parts = 6500 },
+	SkipInStudio = false,
 	Trees = {
 		Max = 2500,
-		Parts = 4,
+		Parts = 2,
 		Spacing = 25,
 		Jitter = 7,
 		Slope = 0.25,
@@ -2633,7 +2641,7 @@ Config.Alpine = {
 		Keep = { { x0 = -1140, z0 = -2270, x1 = -790, z1 = -2180 } } :: { { x0: number, z0: number, x1: number, z1: number } },
 		Noise = { Big = 420, Small = 140 },
 		ShadowNear = 110,
-		Chunk = 256,
+		Chunk = 128,
 		Colors = { { 34, 58, 40 }, { 44, 72, 46 }, { 58, 86, 50 } } :: { { number } },
 		Trunk = { 86, 62, 44 } :: { number },
 		Snowy = { 236, 240, 244 } :: { number },

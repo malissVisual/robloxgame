@@ -5,6 +5,7 @@ local Mock = require("./mock")
 local World = require("./server/World")
 local started = os.clock()
 World.build()
+World.buildLate() -- 7.1 review: the Alps' terrain and forests (the server defers them; counted here all the same)
 print(string.format("build ran in %.1f s", os.clock() - started))
 
 local ws = Mock.workspace

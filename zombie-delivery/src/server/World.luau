@@ -6237,11 +6237,27 @@ function World.build()
 	piece("Earl's Used Wheels", function()
 		buildVanLot(world) -- 5.0
 	end)
-	piece("alps", function() require(script.Parent.Alpine).build(world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight }) end) -- 7.1: the mountains, the forests
 	piece("lighting", setLighting)
+	-- 7.1: the mountains and the forests (server/Alpine.luau). 7.1 review: here only the cheap part (the silhouettes,
+	-- the pass); the terrain's thousands of fills and the forests come in World.buildLate, after the server is wired.
+	piece("alps", function() require(script.Parent.Alpine).start(world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight }) end)
 	task.wait()
 	counting:Disconnect()
 	print(`[World] {parts} parts in all`)
+end
+
+-- 7.1 review: what World.build leaves for later, so a new server answers PLAY and has its lighting at once: the Alps'
+-- terrain fills (the slowest part of the build: 10 – 40 s on a live server) and forests (server/Alpine.luau finish,
+-- breathing as it goes). Main.server.luau defers it right after World.build; it runs once.
+function World.buildLate()
+	local started = os.clock()
+	local ok, err = pcall(function()
+		require(script.Parent.Alpine).finish()
+	end)
+	if not ok then
+		warn(`[World] the alps' terrain and forests failed: {err}`)
+	end
+	print(`[World] the alps' terrain and forests built in {math.floor((os.clock() - started) * 1000)} ms`)
 end
 
 function World.isSafe(position: Vector3): boolean

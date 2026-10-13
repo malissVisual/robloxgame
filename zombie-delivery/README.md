@@ -1171,7 +1171,7 @@ Step 1A changes looks only: every address, home, door, venue, road, job, mission
 - **The Suburbs houses are chalets** (`shared/ChaletLooks.luau`, `server/Chalets.luau`; all 44 of `Map.Homes`):
   - the same box, door (Cargo still swings it), path, mailbox and number as before;
   - a white or pastel render, a stone plinth and dark timber (or silver shingles) upstairs;
-  - shutters and geranium boxes, a steep gable to the street with wide eaves and purlin ends;
+  - shutters and geranium boxes, a steep gable to the street with wide eaves;
   - a carved balcony with a geranium box in the gable, stacked firewood and a low wooden front fence.
   - Three looks from the lot's own dice (tyrol, salzburg with painted corners, bregenz with a carved sun). The world's
     dice are rolled as before, so nothing else in the city moves.
@@ -1180,6 +1180,10 @@ Step 1A changes looks only: every address, home, door, venue, road, job, mission
   timber band, shutters, geraniums and firewood. 12 Maple Street gets a timber upper floor and a balcony.
 - **Parts:** the whole city goes from 22,851 to 24,385 parts (+6.7 %, `tools/perf/world_count.py`). The Suburbs piece
   goes from 1,127 to 2,875 parts; a chalet has at most 48 parts (`ChaletLooks.Budget` 50).
+  - 7.1 review: what stood together is one piece now (the plinth all round, a fence with its rail, the firewood, a
+    flower box with its geraniums, the balcony's box with its flowers) and the purlin ends are gone: 13 parts fewer a
+    chalet (at most 35, `ChaletLooks.Budget` 36; 31.6 on average), the Suburbs piece 2,289 parts. The house's box, its
+    door, its windows and its roof are the same.
 - **Tests:**
   - `tests/square_test.luau` (6.12.15's garden_test) holds every footbridge check, plus the square: tiled by cobbles
     and the green strip, everything on its cobbles and apart, a way in from every sidewalk, nothing Japanese.
@@ -1190,8 +1194,11 @@ Step 1A changes looks only: every address, home, door, venue, road, job, mission
 
 The owner: "make the map a smaller alpine valley, step by step". Step 1B puts the valley round the city; **nothing you
 play on moves** (the roads, addresses, places, lots and zones keep their coordinates). The layout is pure numbers in
-`shared/AlpineLayout.luau` (tuning in `Config.Alpine`), `server/Alpine.luau` builds it once (one piece of `World.build`,
-after everything else).
+`shared/AlpineLayout.luau` (tuning in `Config.Alpine`), `server/Alpine.luau` builds it once, in two steps (7.1 review):
+the last piece of `World.build` (after the lighting) puts up the far silhouettes and the pass at once, and
+`World.buildLate` (deferred by `Main.server.luau` right after `World.build`) fills the terrain and plants the forests
+with breaths in between. A new server answers PLAY and has its lighting at once; the thousands of terrain fills (10 to
+40 s on a live server) come after.
 
 - **A ring of snowy mountains** just outside the world's walls (`Config.Alpine.Box`, today `Map.Bounds`; step 2 pulls
   the box in and the ring follows). Terrain only (`Terrain:FillCylinder` layers): a front row of foothills (250–420
@@ -1207,25 +1214,37 @@ after everything else).
   at their yards); the Mount Rot tunnel is untouched.
 - **Far mountains with streaming on:** a client only gets the terrain near it, so every big peak also has a
   *silhouette*, a square pyramid of corner wedges (with a snow cap) inside it, in a Persistent model. Far away you see
-  the silhouettes; up close they hide in the terrain.
-- **Forests:** up to 2,500 spruce and fir (a trunk that collides and three ellipsoid tiers that do not, three greens,
-  snowy tops in the winter, 34–66 studs tall), in patches: denser toward the mountains and up their lower slopes (a
-  quarter of them), thinner near town (a few copses), meadows left open with **wildflowers** (36 patches) and **4 hay
-  barns and huts**. Never on a road (nor over it), within 60 studs of a junction or a road's bend (the drivers' view),
+  the silhouettes; up close they hide in the terrain. They stand before the terrain does (the first step).
+- **Forests:** up to 2,500 spruce and fir (two parts each since the 7.1 review: a trunk that collides and one slim
+  needle spire that does not, three greens, frosted in the winter, 34–66 studs tall), in patches: denser toward the
+  mountains and up their lower slopes (a quarter of them), thinner near town (a few copses), meadows left open with
+  **wildflowers** (36 patches) and **4 hay barns and huts**. Never on a road (nor over it), within 60 studs of a junction or a road's bend (the drivers' view),
   in a district, on a lot, a home, a storefront, a yard, a place, the water, the ice or the ski lift's line. Every tree
-  lands on what a ray finds under it and is left out if something already stands there. One Atomic model per 256-stud
-  square (a coarse far look), shadows only near the roads.
+  lands on what a ray finds under it of World's own parts and the terrain, and is left out if something World built
+  stands there (7.1 review: never a car, a zombie, a courier or a later rental dock, so the forests are the same on
+  every server however late they are built; `tests/alpinebuild_test.luau`). One Atomic model per 128-stud square (a
+  coarse far look), shadows only near the roads.
 - **The valley's look:** the open ground lush grass, the terrain's colours alpine (`Config.Alpine.Colors`); the day
   looks (`Config.Atmosphere`: morning, noon, afternoon) a crisp blue air that hazes the far ring, fewer and brighter
   clouds. The night, the dawn, the dusk and the Blood Moon as before.
-- **Budgets:** 133 terrain cones in 7,251 fills (10.2 billion studs³ counted with the overlaps; the budget is 12), 112
-  silhouettes, about 10,900 parts in all (budget 11,500); in Studio the build log prints `[Alpine] …` with the time
-  it took. Checks: `tests/alpine_test.luau` (the ring holds the box by car and swimming, nothing in the box, the
-  silhouettes inside, the pass, every tree rule, the budgets, a tighter box for step 2). Preview without Roblox:
-  `tools/alpine-preview/render.py` (a top-down map and a 3/4 three.js view).
+- **Budgets:** 133 terrain cones in 6,703 fills (9.1 billion studs³ counted with the overlaps; the budget is 10), 115
+  silhouettes, about 5,900 parts in all (budget 6,500); in Studio the build log prints `[Alpine] …` with the time
+  it took. 7.1 review: every layer is exactly two rows of the terrain's 4-stud voxels on their grid (`Floor` −12,
+  `WetFloor` −32; before, every layer wrote a sliver of the next row too), a layer wholly inside a bigger neighbour's
+  is left out (584 of 7,205: the same terrain), and the tunnel's air is cut in whole voxels from the road's row up (no
+  skin of rock on its road). Before the review: 7,251 fills, 10.2 billion studs³, 10,894 parts; the whole city
+  35,279 parts, now 29,705 (`tools/perf/world_count.py`). Checks: `tests/alpine_test.luau` (the ring holds the box by
+  car and swimming, nothing in the box, the silhouettes inside, the pass, every tree rule, the budgets, the voxel grid,
+  a tighter box for step 2) and `tests/alpinebuild_test.luau` (the real builder: the same forests with cars and zombies
+  around, SkipInStudio). Preview without Roblox: `tools/alpine-preview/render.py` (a top-down map and a 3/4 three.js
+  view).
+- **Faster Studio tests:** `Config.Alpine.SkipInStudio = true` (off by default) leaves the terrain's fills out of a
+  Studio Play test: the silhouettes, the pass and the forests still stand (the slope trees on the flat ground under
+  where the mountains would be). A live server always builds everything (`RunService:IsStudio()`).
 - **Test in Studio:** Play, fly (admin) to the map's edges: the walls stand in front of the mountains; the West Pass
   past the Old Farm; the north gorge's waterfall; the forests along the West Highway; noon and dusk (the haze); with
-  streaming on, the far silhouettes from Downtown.
+  streaming on, the far silhouettes from Downtown. The Output shows `[Alpine] … silhouettes and the pass` from
+  `World.build`, then (PLAY works by then) `[Alpine] … terrain fills … trees` when the mountains are done.
 
 ## MOVES: the moving rework, prototype (7.0)
 

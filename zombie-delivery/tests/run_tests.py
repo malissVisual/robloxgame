@@ -95,6 +95,12 @@ with tempfile.TemporaryDirectory() as tmp:
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
     open(os.path.join(tmp, "MoveSitesServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 7.1 review: the real server/Alpine.luau as AlpineServer.luau on tools/perf/world-mock.luau (WorldMock.luau) for
+    # tests/alpinebuild_test.luau (the forests stand on World's parts only; SkipInStudio), its shared modules the copies.
+    shutil.copy(os.path.join(tools, "perf", "world-mock.luau"), os.path.join(tmp, "WorldMock.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Alpine.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "AlpineServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
@@ -283,6 +289,30 @@ def analytics_check():
     return not bad
 
 if not analytics_check():
+    ok = False
+
+# 7.1 review: a new server answers PLAY and has its lighting before the Alps' terrain is built. World.build lights the
+# world before its last piece starts the Alps (the cheap part only: Alpine.start), and Main.server.luau defers
+# World.buildLate (the terrain's fills, the forests) right after World.build, before the PLAY listener.
+def alps_order_check():
+    root = os.path.dirname(HERE)
+    world = open(os.path.join(root, "src", "server", "World.luau"), encoding="utf-8").read()
+    main = open(os.path.join(root, "src", "server", "Main.server.luau"), encoding="utf-8").read()
+    bad = []
+    start, late = world.find("function World.build()"), world.find("function World.buildLate()")
+    build = world[start:late] if 0 <= start < late else ""
+    light, alps = build.find('piece("lighting"'), build.find("Alpine).start(")
+    if "Alpine).build(" in world:
+        bad.append("World.luau builds all of the Alps at once (Alpine.build)")
+    if light < 0 or alps < 0 or light > alps:
+        bad.append("World.build: the lighting before the Alps' start")
+    built, deferred, play = main.find("World.build()"), main.find("task.defer(World.buildLate)"), main.find('Net.get("Play").OnServerEvent')
+    if min(built, deferred, play) < 0 or not built < deferred < play:
+        bad.append("Main.server.luau: task.defer(World.buildLate) right after World.build(), before the PLAY listener")
+    print("== alps order: " + ("the lighting before the Alps, their terrain and forests deferred past PLAY" if not bad else "; ".join(bad)))
+    return not bad
+
+if not alps_order_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that
