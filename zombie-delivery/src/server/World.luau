@@ -5581,12 +5581,15 @@ defineMissionPlaces()
 --                  glows at night. Eight parts.
 --   A house        (the Suburbs) its front door faces its street (the front wall Map.HouseFront forward of the lot's
 --                  middle), a short path to the sidewalk, a mailbox with its number, a tree in the back yard. 7.1 (the
---                  Alps): an Austrian chalet on the same box, door and windows (server/Chalets.luau, ChaletLooks).
+--                  Alps): an Austrian chalet on the same box, door and windows (server/Chalets.luau, ChaletLooks). 7.2:
+--                  its parts in a Model "House_<home id>" (attribute Home); server/HouseMesh.luau dresses the ones it
+--                  has a Blender model for (Marge's, 155 Willow Ln) and hides their own look.
 -- Nothing here has a prompt (the jobs give and take at the piles); every part stays inside its lot. Like the real
 -- estate and the missions' places, the builders live in their own function (Luau allows 200 locals per function).
 
 local function defineVenuesAndHomes()
 	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local HouseMesh = require(script.Parent.HouseMesh) -- 7.2: Marge's house in the owner's Blender model
 	local context = { part = part, deco = deco, nightLight = DayNight.nightLight }
 	-- The kinds' walls and their looks.
 	local STYLES: { [string]: { wall: Color3, material: Enum.Material, look: Kit.Blueprint } } = {
@@ -5684,7 +5687,12 @@ local function defineVenuesAndHomes()
 		local colorDie = rng:NextInteger(1, #HOUSE_COLORS)
 		local shadeDie = rng:NextInteger(-30, 30)
 		local lit = { rng:NextNumber() < 0.3, rng:NextNumber() < 0.3 }
-		require(script.Parent.Chalets).house(parent, frame, {
+		-- 7.2: the house's own parts in one Model (server/HouseMesh.luau may dress it in the owner's Blender house)
+		local house = Instance.new("Model")
+		house.Name = "House_" .. home.id
+		house:SetAttribute("Home", home.id)
+		house.Parent = parent
+		require(script.Parent.Chalets).house(house, frame, {
 			w = lot.w,
 			d = d,
 			h = lot.h,
@@ -5694,6 +5702,7 @@ local function defineVenuesAndHomes()
 			render = colorDie,
 			shade = shadeDie,
 		}, lit, { part = part, deco = deco, nightLight = DayNight.nightLight })
+		HouseMesh.dress(house, home.id)
 		-- The path from the door over the front lawn to the sidewalk, the mailbox beside it with the number.
 		local yard = lot.size / 2 - Map.HouseFront
 		deco(part(parent, "Path", Vector3.new(3, 0.1, yard), frame * CFrame.new(0, 0.12, -yard / 2), Color3.fromRGB(178, 168, 148), Enum.Material.Pebble))

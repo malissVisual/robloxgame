@@ -280,6 +280,7 @@ safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between
 -- wraps the hooks set above (Zombies.hunts, Vehicles.backAllowed, Jobs.returnLent, Vehicles.callCar, the car damage).
 -- 7.1: the moves' furniture in the owner's Blender models: the imported ZDCFurnitureArt leaves the world at once.
 safely("FurnitureMesh", require(Server.FurnitureMesh).start)
+safely("HouseMesh", require(Server.HouseMesh).start) -- 7.2: Marge's house in the owner's Blender model (World dresses it)
 safely("Moving", require(Server.Moving).start)
 print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
 -- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.
