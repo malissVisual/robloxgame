@@ -62,6 +62,12 @@ def main():
         result=subprocess.run([str(Path(args.luau).resolve()),'clearance-check.luau'],cwd=temp,text=True,capture_output=True)
         assert result.returncode==0,result.stdout+result.stderr
         print(result.stdout,end='')
+        # 6.26: only the wheels touch the ground: no colliding hull, kit or door lower than the wheels' contact plane +
+        # a margin, room for the steepest road at both ends, nothing that swings or sways collides (ground-check.luau).
+        (temp/'ground-check.luau').write_text((HERE/'ground-check.luau').read_text())
+        result=subprocess.run([str(Path(args.luau).resolve()),'ground-check.luau'],cwd=temp,text=True,capture_output=True)
+        assert result.returncode==0,result.stdout+result.stderr
+        print(result.stdout,end='')
     # 6.25: the ZDC Van in the owner's Blender model (server/VanMesh.luau) from a simulated import (mesh-check.py).
     result=subprocess.run(['python3',str(HERE/'mesh-check.py'),args.luau],text=True,capture_output=True)
     assert result.returncode==0,result.stdout+result.stderr
