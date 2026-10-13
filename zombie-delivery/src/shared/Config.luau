@@ -6008,6 +6008,8 @@ Config.ItemModel = {
 --              (gentler); "both"; "pair": two carry it (each their own bar; either slips: it drops); "solo": a Mover
 --              lifts a pair thing alone (harder); "drag": a pair thing dragged alone, low (calmer)
 --   Mover      × the zone for a Mover (every kind)
+--   Steadied   × the zone while Danny holds the other end of your piece (7.x: he steadies it; the character attribute
+--              GripSteady, server/MoveHelper.luau)
 --   Weight     + the load's wildness a weight point (1 … 10); Fragile: + when fragile
 --   Motion     × the wildness: Still standing still (under StillAt studs/s); + Speed × your speed / the walk (at most
 --              SpeedMax × it); + Turn turning at TurnFull rad/s or more; + Slope going up or down at SlopeFull studs/s
@@ -6041,6 +6043,7 @@ Config.CarryGrip = {
 		drag = { Zone = 0.34, Load = 0.4, Gravity = 1 },
 	} :: { [string]: { Zone: number, Load: number, Gravity: number } },
 	Mover = 1.35,
+	Steadied = 1.3,
 	Weight = 0.04,
 	Fragile = 0.2,
 	Motion = { StillAt = 1.5, Still = 0.3, Speed = 0.7, SpeedMax = 2, Turn = 0.35, TurnFull = 3, Slope = 0.4, SlopeFull = 6, Air = 0.8, Bite = 1.2, BiteFull = 20, ShockMax = 2, Fade = 1 },
@@ -6352,23 +6355,47 @@ Config.MoveStory = {
 
 -- 7.0, the depot's helper ("Danny from the depot": server/MoveHelper.luau, his decisions shared/MoveHelperBrain.luau,
 -- tests/movehelper_test.luau; the owner: solo play is allowed with an AI helper). An NPC mover who joins a move whose
--- crew is one player: he carries the one-hand things to the truck and takes the other end of a two-person thing.
+-- crew is one player: he takes the other end of your two-person piece (and the other side of a heavy two-hands one),
+-- carries the one-hand and two-hands pieces to the van on his own and opens its back. 7.x (the owner: "he helps
+-- weirdly, mainly we don't carry anything together"): a partner who carries with you.
 --   Solo / Duo         a crew of one / of two players gets him (Duo: off)
 --   Name / Title       his name tag
---   Health / Respawn   his health; at 0 he drops what he holds and is back at the truck Respawn s later
---   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a thing:
---                      slower than a player
---   KeepUp / Flee      × the pair's carry speed he may walk holding his end (to keep up); × the walk running away
---   Tick / Think / Repath   s between his steps / his looks for the next thing / two paths (PathfindingService)
---   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpWait: s stuck on the way,
---                      or too far from his end while carrying, before the player drags it alone; HelpRetry: s before he
---                      tries that lift again
---   HelpReach / PickReach   studs from a thing's edge he takes its end / picks it up; LoadReach: from the truck's back
---                      he loads; DoorReach: from a door he goes through it
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
+--   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
+--                      slower than a player; Sprint: × the walk on his way to your lift (or the other side of your piece)
+--   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
+--   Tick / Think / Repath   s between his steps / his looks for the next piece / two paths (PathfindingService)
+--   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpRetry: s before he tries
+--                      a lift again whose take failed
+--   BlinkFar / HelpBlink   your lift farther than BlinkFar studs on foot, his path failing, or not there HelpBlink s after
+--                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it
+--   Standoff / HoldStep / HoldSnap   his root stands Standoff studs past your piece's far face, turned to you, on the
+--                      floor there within HoldStep studs of your root's height (stairs, steps); farther than HoldSnap
+--                      from that place (a door's fade): put there at once
+--   HoldSpeed / HoldResponse   the constraints that keep him there (AlignPosition / AlignOrientation on his root):
+--                      the most studs/s, their Responsiveness; his own walk is off meanwhile (Npcs.carried)
+--   ThreeAfter         s after "Got the other end!" he says "On three... lift!"
+--   DoorWarn / VanSay  carrying with you: the piece this near a doorway: "Watch the doorframe!"; this near the van's
+--                      back: "That's going in the van." (its back shut: he opens it for the two of you, OpenBack)
+--   HelpReach / PickReach   studs from your piece's far end he takes it / from a piece's edge he picks it up; LoadReach:
+--                      from the van's back he loads; DoorReach: from a door he goes through it
+--   Reserve            studs: a crew player with free hands this near a piece (and nearer than he is) is about to lift
+--                      it: he leaves it to them ("All yours, boss.")
+--   TripBase           studs added to every trip when he ranks the pieces (★ first, then the value a second of the trip)
+--   AssistWeight / AssistFar / AssistBack   a two-hands piece this heavy or heavier that a crew player carries alone
+--                      within AssistFar studs (not within AssistBack of the van's back): he takes its other side (the
+--                      pair's walk for both)
+--   OpenBack / OpenNear / OpenFar   may he open the van's back himself (else he asks); somebody of the crew coming with
+--                      a piece within OpenNear studs of the shut back while he is within OpenFar of it: he opens it
 --   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
---   WaitShut           s he waits with a thing at the truck's shut back before he sets it down beside it
---   StuckSnap / Far    s without progress before he appears at his way's next point; studs away he appears at once
---   TruckFar           studs from the house: a truck farther away is driving off (he waits at the house's door)
+--                      (never while he holds the other end of your piece)
+--   WaitShut           s he waits with a piece at the van's shut back (when he may not open it) before he sets it down
+--   StuckRepath / StuckSnap / Far   s without progress before a new path / before he appears at his way's next point;
+--                      studs away he appears at once
+--   Aside              doorways he keeps clear of when he stands somewhere: within the door's half width + Margin
+--                      along its wall and Depth (FrontDepth at the front door outside) through it, his place moves Step
+--                      past its edge, Off at least from the wall
+--   TruckFar           studs from the house: a van farther away is driving off (he waits at the house's door)
 --   TalkGap / TalkRepeat   s at least between two lines / before the same line again
 --   Follow / Orders    studs behind you on "Help me"; the orders (the Moving remote's "helper") a player may send a second
 Config.MoveHelper = {
@@ -6379,24 +6406,44 @@ Config.MoveHelper = {
 	Health = 100,
 	Respawn = 15,
 	Speed = 0.7,
+	Sprint = 1.5,
 	KeepUp = 1.2,
 	Flee = 1,
 	Tick = 0.1,
-	Think = 0.5,
+	Think = 0.25,
 	Repath = 1,
 	HelpFar = 140,
-	HelpWait = 3,
 	HelpRetry = 8,
-	HelpReach = 3,
+	BlinkFar = 40,
+	HelpBlink = 1.6,
+	Standoff = 0.6,
+	HoldStep = 2.5,
+	HoldSnap = 6,
+	HoldSpeed = 60,
+	HoldResponse = 200,
+	ThreeAfter = 1.2,
+	DoorWarn = 4,
+	VanSay = 12,
+	HelpReach = 2.5,
 	PickReach = 3,
 	LoadReach = 5,
 	DoorReach = 3.5,
+	Reserve = 8,
+	TripBase = 30,
+	AssistWeight = 4,
+	AssistFar = 45,
+	AssistBack = 10,
+	OpenBack = true,
+	OpenNear = 30,
+	OpenFar = 30,
 	FleeRange = 14,
 	SafeRange = 24,
 	FleeStep = 18,
 	WaitShut = 8,
+	StuckRepath = 2,
 	StuckSnap = 4,
 	Far = 120,
+	Aside = { Margin = 1, Depth = 2.5, FrontDepth = 6, Step = 2.4, Off = 1.2 },
 	TruckFar = 150,
 	TalkGap = 3,
 	TalkRepeat = 12,

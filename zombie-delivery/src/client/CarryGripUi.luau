@@ -4,6 +4,8 @@
 -- this client. shared/CarryGrip.luau runs it (pure), server/Moving.luau decides: its grip hook gives the character the
 -- attribute CarryGrip (the carry's kind, weight, fragile) next to MoveCarry (the spot) while you carry a thing with a
 -- bar (a "both" or a "pair" thing, a fragile one-hand thing; Danny never has one); the bar shows while both are there.
+-- 7.x: while Danny holds the other end of your piece (the character attribute GripSteady, server/MoveHelper.luau) the
+-- grip box is Config.CarryGrip.Steadied × bigger (he steadies it).
 --   * The panel right of the screen's middle (client/MoveLayout.luau grip: clear of the HUD's groups, the move's top
 --     blocks, the quick chat's button and the touch buttons), in the UI kit's look: a charcoal panel, the bar (its
 --     track), the grip box (green steady, amber, red slipping), the LOAD as the thing's icon (from the Moving remote's
@@ -89,6 +91,7 @@ type Run = {
 	bite: number,
 	warned: boolean,
 	wasSteady: boolean,
+	steadied: boolean, -- 7.x Danny holds the other end (the character attribute GripSteady: a bigger box)
 	notch: number, -- the meter's notch at the last grip_tick (Ui.TickNotches a meter)
 	tickAt: number, -- the bar's time (sim.time) of the last grip_tick
 	hooks: { RBXScriptConnection },
@@ -491,12 +494,12 @@ local function current(): (string?, number?)
 	return code, spot
 end
 
-local function profileOf(code: string, mover: boolean): CarryGrip.Profile?
+local function profileOf(code: string, mover: boolean, steadied: boolean): CarryGrip.Profile?
 	local kind, weight, fragile = CarryGrip.decode(code)
 	if not kind then
 		return nil
 	end
-	return CarryGrip.profile(kind, weight, fragile, mover)
+	return CarryGrip.profile(kind, weight, fragile, mover, steadied)
 end
 
 local function bodyOf(): (BasePart?, Humanoid?)
@@ -650,6 +653,7 @@ local function begin(code: string, spot: number, profile: CarryGrip.Profile, mov
 		bite = 0,
 		warned = false,
 		wasSteady = false,
+		steadied = false,
 		notch = math.floor(profile.start * G.Ui.TickNotches),
 		tickAt = -math.huge,
 		hooks = {},
@@ -671,6 +675,8 @@ local function refresh()
 	local code, spot = current()
 	local r = run
 	local mover = player:GetAttribute("MoveRole") == "mover"
+	local character = player.Character
+	local steadied = character ~= nil and character:GetAttribute("GripSteady") == true -- 7.x Danny steadies it
 	if not code or not spot then
 		if r and r.sim.slipped and os.clock() < r.linger then
 			r.slipSent = 0 -- (the server dropped it: never asked again)
@@ -682,23 +688,28 @@ local function refresh()
 	-- the same carry (a slipped bar still in your hands: the server has not dropped it yet, "slip" asked again each
 	-- second). 7.1 review: a slipped bar the server dropped (its slipSent 0 since the attributes went) is over: the same
 	-- piece picked up again inside DROPPED!'s moment is a new bar, not the old one (DROPPED! and a second "slip").
+	-- 7.x: Danny took or let go of the other end (GripSteady): the same bar, its profile changed.
 	if r and r.spot == spot and not (r.sim.slipped and r.slipSent == 0) then
-		if r.code ~= code or r.mover ~= mover then
-			local profile = profileOf(code, mover)
+		if r.code ~= code or r.mover ~= mover or r.steadied ~= steadied then
+			local profile = profileOf(code, mover, steadied)
 			if profile then
 				CarryGrip.setProfile(r.sim, profile)
 				if r.code ~= code then
 					r.honoured = false -- (another kind: the server's steady starts over)
 				end
-				r.code, r.mover = code, mover
+				r.code, r.mover, r.steadied = code, mover, steadied
 			end
 		end
 		return
 	end
 	stop()
-	local profile = profileOf(code, mover)
+	local profile = profileOf(code, mover, steadied)
 	if profile then
 		begin(code, spot, profile, mover)
+		local started = run
+		if started then
+			started.steadied = steadied
+		end
 	end
 end
 
@@ -774,6 +785,7 @@ function CarryGripUi.start()
 			watched = character
 			character:GetAttributeChangedSignal("MoveCarry"):Connect(refresh)
 			character:GetAttributeChangedSignal("CarryGrip"):Connect(refresh)
+			character:GetAttributeChangedSignal("GripSteady"):Connect(refresh) -- 7.x Danny took the other end
 		end
 	end
 	player.CharacterAdded:Connect(function()

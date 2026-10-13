@@ -19,6 +19,7 @@
 --                                         second carrier; role: its carrier's (a Mover alone with it: "solo")
 --   CarryGrip.encode(kind, weight, fragile) / decode(text)   the character attribute CarryGrip ("both 4 fragile")
 --   CarryGrip.profile(kind, weight, fragile, mover)   the bar for one carry (its zone, load, gravity and start)
+--                                         7.x steadied: Danny holds the other end (the zone × Steadied)
 --   CarryGrip.new(profile, seed)          a bar at the lift: the load in the middle in the box, the meter at its start
 --   CarryGrip.setProfile(sim, profile)    the same carry, another kind (a helper took the other end): the meter kept
 --   CarryGrip.newInput()                  the body's state for a step (the client fills one table and reuses it)
@@ -129,7 +130,7 @@ end
 
 -- ── The bar ────────────────────────────────────────────────────────────────
 
-function CarryGrip.profile(kind: string, weight: number, fragile: boolean, mover: boolean): Profile
+function CarryGrip.profile(kind: string, weight: number, fragile: boolean, mover: boolean, steadied: boolean?): Profile
 	local t = tune()
 	local k = t.Kinds[kind] or t.Kinds.both
 	local w = math.clamp(finite(weight), 0, 10)
@@ -138,7 +139,7 @@ function CarryGrip.profile(kind: string, weight: number, fragile: boolean, mover
 		weight = w,
 		fragile = fragile,
 		mover = mover,
-		zone = math.clamp(k.Zone * (if mover then t.Mover else 1), 0.05, 0.9),
+		zone = math.clamp(k.Zone * (if mover then t.Mover else 1) * (if steadied then t.Steadied else 1), 0.05, 0.9),
 		load = k.Load + w * t.Weight + (if fragile then t.Fragile else 0),
 		gravity = k.Gravity,
 		start = if w >= t.Meter.HeavyAt then t.Meter.HeavyStart else t.Meter.Start,

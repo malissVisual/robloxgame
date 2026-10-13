@@ -9,7 +9,8 @@
 -- tests run it with plain numbers.
 --
 --   The carry
---   MovingRules.mode(thing)                    "hand" | "both" | "pair" (two lift it) | "drag" (a pair thing alone)
+--   MovingRules.mode(thing)                    "hand" | "both" | "pair" (two lift it; 7.x: a "both" thing with
+--                                              Danny on its other side too) | "drag" (a pair thing alone)
 --   MovingRules.speedFactor(mode, weight)      × the walk: hand 1 − weight × HandPerWeight (not under MinHand), both
 --                                              Both, pair Pair, drag Drag
 --   MovingRules.carrySpeed(walk, mode, weight) the walk speed with it (the character's CarrySpeed attribute)
@@ -34,8 +35,10 @@
 --   MovingRules.newMove(spots, defs, bed, now, seconds, hordeAt?, pay?)   from the plan's spots and the furniture defs
 --                                              (7.x farm move: a contract's own horde time, s left, and × on its pay)
 --   MovingRules.holding(move, who) -> (spot?, "carrier" | "helper" | nil)
---   MovingRules.pick(move, spot, who) / help(move, spot, who) / release(move, who) / load(move, who) /
---   unload(move, who, spot?) -> (ok / spot / placement, why?)   the carry's steps (why: a short code, whyText)
+--   MovingRules.pick(move, spot, who) / help(move, spot, who, both?) / release(move, who) / load(move, who) /
+--   unload(move, who, spot?) -> (ok / spot / placement, why?)   the carry's steps (why: a short code, whyText; 7.x
+--                                              help's both: the other side of a "both" thing too, the depot's
+--                                              helper's: server/MoveHelper.luau)
 --   MovingRules.lastOut(move)                  the thing Unload takes: the last loaded one nothing rests on
 --   MovingRules.truckPrompts(open, carrying, inside) -> (load, unload, back)   which of the truck's prompts show:
 --                                              Load (E) or Unload (Z, Take out), never both; the back's own E
@@ -156,7 +159,7 @@ function MovingRules.mode(thing: Thing): string
 	if thing.class == "hand" then
 		return "hand"
 	elseif thing.class == "both" then
-		return "both"
+		return if thing.helper ~= nil then "pair" else "both" -- (7.x: Danny on its other side: the pair's walk)
 	end
 	return if thing.helper ~= nil then "pair" else "drag"
 end
@@ -451,14 +454,14 @@ function MovingRules.pick(move: Move, spot: number, who: number): (boolean, stri
 	return true, nil
 end
 
--- `who` takes the other end of a pair thing somebody lifted.
-function MovingRules.help(move: Move, spot: number, who: number): (boolean, string?)
+-- `who` takes the other end of a pair thing somebody lifted (7.x `both`: or the other side of a "both" thing).
+function MovingRules.help(move: Move, spot: number, who: number, both: boolean?): (boolean, string?)
 	local thing = move.things[spot]
 	if not active(move) then
 		return false, "over"
 	elseif not thing or thing.state ~= "carried" then
 		return false, "gone"
-	elseif thing.class ~= "pair" then
+	elseif thing.class ~= "pair" and not (both and thing.class == "both") then
 		return false, "single"
 	elseif thing.carrier == who then
 		return false, "yours"

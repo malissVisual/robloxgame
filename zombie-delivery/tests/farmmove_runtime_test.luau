@@ -17,7 +17,9 @@
 --     two trips at the farm's pay (× its pay), chapter 1 done in the crew's saves, the interior gone, the van's back
 --     its own again.
 --   * Danny on a solo farm move: two ways; with the van at the barn he goes in and out by the barn doors for the
---     branding iron (★ first, the nearest way he may take).
+--     branding iron (★ first, the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
+--     and comes out of the farmhouse's front door with Sol, then the hay wagon's (bigDoor) out of the barn doors to the
+--     van's hitch.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -557,6 +559,120 @@ end
 check("Danny goes in by the barn doors (the nearest way to the branding iron, ★ first)", cameIn ~= nil and (cameIn - solBarnEntry).Magnitude < 6 and (cameIn - solFrontEntry).Magnitude > 30,
 	cameIn)
 check("…comes out by them with it and loads it into the van at the barn", cameOut ~= nil and flat(cameOut, barnOut) < 6 and ironIn, cameOut)
+
+-- 7.x Danny carries with you on the farm: a pair piece out of the farmhouse's front door, the hay wagon (bigDoor) out of
+-- the barn doors and onto the van's hitch; he holds the far end through either door (no keep in this walker: his root is
+-- put at the far end each step, as his constraints hold him in Roblox).
+local H = Config.MoveHelper
+local s = danny.s
+local function hold(model: any) -- (Sol's weld, the root set straight)
+	model.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + 1))
+end
+local function steps(seconds: number, done: (() -> boolean)?, carried: any?): boolean
+	for index = 1, math.ceil(seconds / 0.1 - 1e-9) do
+		E.clock += 0.1
+		if carried then
+			hold(carried)
+		end
+		MoveHelper.step(0.1)
+		local spot, role = Rules.holding(s.move, danny.id)
+		local own = if spot and role == "carrier" then spotModel(spot) else nil
+		if own and danny.body then
+			own.PrimaryPart.CFrame = danny.body.root.CFrame * M.CFrame.new(0, 0, -1.5)
+		end
+		if index % 2 == 0 then
+			Moving.step()
+		end
+		if done and done() then
+			return true
+		end
+	end
+	return done == nil
+end
+local function farEndOf(model: any): any
+	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
+end
+local function heldBy(spot: number): boolean
+	local held, role = Rules.holding(s.move, danny.id)
+	return held == spot and role == "helper"
+end
+-- a pair piece the farmhouse's front door lets out (not the hay wagon)
+local benchSpot: any = nil
+for _, sp in solBuild.plan.spots do
+	local def = FurnitureLooks.Items[sp.item]
+	if not benchSpot and def and def.class == "pair" and not def.bigDoor and table.find(Moving.helperExits(s, sp.id), 1) then
+		benchSpot = sp
+	end
+end
+check("the farm has a pair piece that leaves by the farmhouse's front door", benchSpot ~= nil, benchSpot and benchSpot.item)
+local bench = solBuild.pieces[benchSpot.id]
+E.place(sol, bench.PrimaryPart.Position + V3(0, 0, 4))
+trigger(promptIn(bench, "Lift"), sol)
+local took = 0
+local helped = steps(4, function()
+	took += 0.1
+	return heldBy(benchSpot.id)
+end, bench)
+check(`Danny takes the far end of the {benchSpot.item} on the farm within 2 s`, helped and took <= 2.2, took)
+local solFrontExit = (solOrigin * M.CFrame.new(solBuild.plan.exits[1])).Position
+E.clock += 12 -- (the pace check's allowance: the test jumps)
+E.place(sol, solFrontExit + V3(0, 3, 0))
+steps(0.2, nil, bench)
+trigger(promptIn(workspace, "Leave house"), sol)
+steps(0.3, nil, bench)
+check("…out of the farmhouse's front door together: Sol at its outside, Danny at the far end", flat(E.rootOf(sol).Position, V3(front.out.x, 0, front.out.z)) < 4
+	and heldBy(benchSpot.id) and flat(danny.body.root.Position, farEndOf(bench)) < 0.05, flat(danny.body.root.Position, farEndOf(bench)))
+E.Net.get("PutDown").OnServerEvent:Fire(sol)
+steps(0.3)
+check("…set down outside: his hands free, his arms down, Sol's grip as before", Rules.holding(s.move, danny.id) == nil and danny.body.model:GetAttribute("Carrying") == nil
+	and sol.Character:GetAttribute("GripSteady") == nil)
+-- the hay wagon: only the barn doors let it out; he holds the far end through them and to the hitch
+local wagonId: any = nil
+for _, sp in solBuild.plan.spots do
+	if sp.item == "hay_wagon" then
+		wagonId = sp.id
+	end
+end
+local solWagon = solBuild.pieces[wagonId]
+check("…the hay wagon may leave by the barn doors only", wagonId ~= nil and #Moving.helperExits(s, wagonId) == 1 and Moving.helperExits(s, wagonId)[1] == 2)
+E.clock += 12
+E.place(sol, solWagon.PrimaryPart.Position + V3(0, 0, 7))
+trigger(promptIn(solWagon, "Lift"), sol)
+took = 0
+helped = steps(4, function()
+	took += 0.1
+	return heldBy(wagonId)
+end, solWagon)
+check("Danny takes the hay wagon's far end within 2 s", helped and took <= 2.2, took)
+local solBarnExit = (solOrigin * M.CFrame.new(solBuild.plan.exits[2])).Position
+E.clock += 12
+E.place(sol, solBarnExit + V3(0, 3, 0))
+steps(0.2, nil, solWagon)
+trigger(promptIn(workspace, "Leave by the barn doors"), sol)
+steps(0.3, nil, solWagon)
+check("…out of the barn doors together: Sol at the barn's outside, Danny at the far end", flat(E.rootOf(sol).Position, barnOut) < 4 and heldBy(wagonId)
+	and flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05, flat(danny.body.root.Position, farEndOf(solWagon)))
+local solVan = E.cars[sol]
+local solBack = solVan.chassis:FindFirstChild("CargoDoor").WorldPosition
+E.clock += 12
+E.place(sol, V3(solBack.X, 3, solBack.Z) + (V3(solBack.X, 0, solBack.Z) - V3(solVan.chassis.Position.X, 0, solVan.chassis.Position.Z)).Unit * 3)
+steps(0.4, nil, solWagon)
+check("…to the van at the barn together, its back open", heldBy(wagonId) and flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
+	and solVan.model:GetAttribute("BackOpen") == true)
+trigger(promptIn(solVan.model, "Load"), sol)
+steps(0.3)
+check("…Sol loads it: on the van's hitch, Danny's hands free", s.move.things[wagonId].state == "truck" and s.move.hitch == wagonId
+	and Rules.holding(s.move, danny.id) == nil, E.lastNotice(sol))
+-- the ZDC Van's back shut: he opens it himself when he comes with his next piece, and it goes in (helperLoad)
+solVan.model:SetAttribute("BackOpen", false)
+E.place(sol, barnOut + V3(-20, 0, 0)) -- (out of the way, hands free)
+local saidBefore = #E.said
+local loadedBefore = Rules.counts(s.move).out
+local opened = steps(90, function()
+	return solVan.model:GetAttribute("BackOpen") == true and Rules.counts(s.move).out > loadedBefore
+end)
+check("the ZDC Van's back shut: Danny opens it himself (\"I'll get the doors!\") and loads his piece", opened and E.saidSince("I'll get the doors!", saidBefore),
+	Rules.counts(s.move).out)
 Moving.admin(sol, "end")
 
 if failures == 0 then
