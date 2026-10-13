@@ -239,7 +239,7 @@ end
 local function vehicles(): { Config.CarDef }
 	local list: { Config.CarDef } = {}
 	for _, def in Config.Cars do
-		if not def.company and not def.bike then
+		if not def.company and not def.bike and not def.sandboxOnly then -- (8.0: never the sandbox's ZDC Sprinter)
 			table.insert(list, def)
 		end
 	end

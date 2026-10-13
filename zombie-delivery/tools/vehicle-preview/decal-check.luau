@@ -82,8 +82,8 @@ for _, d in Config.AmbientCars do
 	end
 end
 for _, def in ALL do
-	if def.company or def.bike then
-		continue
+	if def.company or def.bike or def.sandboxOnly then
+		continue -- (8.0: the sandbox's ZDC Sprinter wears no STYLE decal: server/StyleWear.luau lays them on the fleet's skin only)
 	end
 	for stage = 0, Economy.maxStage(def.id) do
 		for _, full in { false, true } do

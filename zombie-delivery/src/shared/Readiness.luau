@@ -299,7 +299,7 @@ local function dealerFor(input: Input, need: number): (Config.CarDef?, Config.St
 	local cars = input.cars or {}
 	local best: Config.CarDef?, bestStage: Config.StageDef?, bestCost, bestLevel = nil, nil, math.huge, 1
 	for _, def in Config.Cars do
-		if def.company or def.bike or cars[def.id] or not unlocked(input, def) then
+		if def.company or def.bike or def.sandboxOnly or cars[def.id] or not unlocked(input, def) then -- (8.0: never the sandbox's)
 			continue
 		end
 		local cost, level, stage = def.price, def.level or 1, nil

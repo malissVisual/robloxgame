@@ -53,14 +53,15 @@ function Economy.findCar(id: string): Config.CarDef?
 end
 
 -- 7.x, one car: may a player have this vehicle (Config.Cars: the ZDC Van and the bikes), not a body of
--- Config.AmbientCars? Owning, buying, equipping and calling all ask this.
+-- Config.AmbientCars? Owning, buying, equipping and calling all ask this. 8.0: a sandbox-only car (the ZDC Sprinter)
+-- only while Config.Sandbox.On (a save keeps it no further: the city drops it, server/PlayerData.luau).
 function Economy.isPlayerCar(id: string?): boolean
 	if type(id) ~= "string" then
 		return false
 	end
 	for _, car in Config.Cars do
 		if car.id == id then
-			return true
+			return not car.sandboxOnly or Config.Sandbox.On
 		end
 	end
 	return false
@@ -531,7 +532,7 @@ function Economy.roomAdvice(carId: string, stage: number, need: number): string
 	end
 	local names: { string } = {}
 	for _, def in Config.Cars do
-		if not def.company and not def.bike and def.id ~= carId and Economy.maxCapacity(def.id) >= need then -- (5.1: no bike)
+		if not def.company and not def.bike and not def.sandboxOnly and def.id ~= carId and Economy.maxCapacity(def.id) >= need then -- (5.1: no bike; 8.0: nor the sandbox's)
 			table.insert(names, def.name)
 		end
 	end

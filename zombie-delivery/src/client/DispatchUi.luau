@@ -288,7 +288,7 @@ end
 local function firstVehicle(): Config.CarDef?
 	local best: Config.CarDef? = nil
 	for _, def in Config.Cars do
-		if def.company or def.bike then
+		if def.company or def.bike or def.sandboxOnly then -- (8.0: never the sandbox's ZDC Sprinter)
 			continue
 		end
 		local b = best

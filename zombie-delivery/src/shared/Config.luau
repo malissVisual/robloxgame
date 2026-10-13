@@ -388,6 +388,9 @@ export type CarDef = {
 	starter: boolean?,
 	refund: number?,
 	ambient: boolean?,
+	-- 8.0 SANDBOX: a car of the sandbox only (the ZDC Sprinter): never listed in the city, a player's car only while
+	-- Config.Sandbox.On (Economy.isPlayerCar)
+	sandboxOnly: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -571,6 +574,31 @@ Config.Cars = {
 		color = { 153, 49, 43 },
 		role = "The fast one: a battery does half the pedalling",
 		description = "A battery in the frame, a bar display, disc brakes. The fastest thing on two wheels, no fuel needed. A rear rack and two gear slots. Rider only.",
+	},
+	-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the ZDC Sprinter, every player's van in the sandbox (Config.Sandbox.Van):
+	-- a Mercedes-Sprinter-like high-roof panel van in the company's livery that you walk into (its measures:
+	-- Config.Sprinter; its look and walk-in bay: shared/SprinterLooks.luau and server/Vehicles.luau STYLES.sprinter). A
+	-- bit heavier than the ZDC Van (slower, slower off the line, a wider turn), a big tank (the sandbox has no pumps).
+	-- `sandboxOnly`: never sold or listed in the city (the dealer, the phone, the career road, the room advice skip it)
+	-- and a player's car only while Config.Sandbox.On (Economy.isPlayerCar). No stages, upgrades, gear or roof gun.
+	{
+		id = "sprinter",
+		sandboxOnly = true,
+		level = 1,
+		name = "ZDC Sprinter",
+		price = 0,
+		style = "sprinter",
+		maxSpeed = 58,
+		accel = 22,
+		turn = 1.55,
+		health = 720,
+		capacity = 8,
+		tank = 160, -- litres (Config.Fuel): about 130,000 studs at its burn × Config.Fuel.Lasts
+		burn = 6,
+		ramPower = 1.5,
+		color = { 232, 226, 210 },
+		role = "The sandbox's walk-in van",
+		description = "Zombie Delivery Co.'s high-roof van: walk into its cargo bay through the back doors or the sliding side door. 1 passenger.",
 	},
 } :: { CarDef }
 
@@ -3584,7 +3612,7 @@ Config.Soundscape = {
 	-- CarId → its horn (else horn_car; a pedal bike rings bike_bell, a stand-up scooter beeps scooter_beep).
 	Horns = {
 		van = "horn_van", zdcvan = "horn_van", courier = "horn_van", highroof = "horn_van", armorvan = "horn_van", rallyvan = "horn_van",
-		icecream = "horn_van", ambulance = "horn_van",
+		icecream = "horn_van", ambulance = "horn_van", sprinter = "horn_van", -- (8.0: the sandbox's ZDC Sprinter)
 		pickup = "horn_car", muscle = "horn_car",
 		boxtruck = "horn_truck", freight = "horn_truck", armored = "horn_truck", bus = "horn_truck", monster = "horn_truck",
 		movingtruck = "horn_truck", livestock = "horn_truck", fueltruck = "horn_truck",
@@ -6661,6 +6689,48 @@ Config.Sandbox = {
 	On = true,
 	Van = "sprinter",
 	MaxPlayers = 4,
+}
+
+-- 8.0 SANDBOX: the ZDC Sprinter (Config.Cars sprinter, Config.Sandbox.Van), a high-roof panel van you walk into. Its
+-- measures in studs; the parts look (shared/SprinterLooks.luau, server/Vehicles.luau STYLES.sprinter), the Blender
+-- model (design/blender-sprinter/, server/SprinterMesh.luau) and the moves' bed (Config.Moving.Beds.sprinter) use the
+-- same. The van's frame: from the ground under its middle, -z its front, +x its right (the kerb side), +y up.
+--   Width / Height / Length   the body (the mirrors stick out Mirror more on each side), ground to roof, bumper to
+--                             bumper: x -4 … 4, y 0 … 10.4, z -11 … 11
+--   Wheelbase                 between the axles, centred on the van's middle (z ±6.5: Vehicles builds every car's
+--                             wheels round its middle); Track: the wheels' middles ±Track across
+--   Clearance                 the chassis' bottom over the ground (Vehicles' style clearance); Wheel the radius
+--   Cab                       the cab: the front Cab studs (z -11 … -4); its back wall (the bulkhead) Bay.Gap thick
+--   Bay                       the cargo bay INSIDE: Width × Height × Length, its floor Floor over the ground (= Clearance
+--                             + the 1.2 chassis: you stand on the chassis' top), from Gap behind the cab's back wall to
+--                             the back doors at the van's back: x -3.3 … 3.3, y 2.4 … 10.0, z -3 … 11 (the closed doors'
+--                             inner face at z 10.8). Moves' bed (from the chassis' middle, its floor at the chassis' top):
+--                             Center { 0, 3.9 }, the room 6.6 × 7.6 × 13.8 less what the packing keeps off the walls
+--   Doors                     the two back doors: they swing out Swing degrees round the body's back corners and lie
+--                             flat against the sides (the walk-in way)
+--   Slider                    the sliding door on the right: its opening from z Front, Width long, Height over the floor;
+--                             it moves Out from the side and Back along it in Seconds; its prompt reaches Reach. It
+--                             shuts itself when somebody takes the wheel
+--   Step                      the fold-out step behind the back (out while the back is open): Top over the ground, Depth
+--                             out, Width across; ground → Top → the floor: two rises of 1.2 a body walks up. SideStep: the
+--                             same under the open sliding door (Depth out from the side)
+--   Light                     the bay's ceiling light (on while the back or the side door is open)
+Config.Sprinter = {
+	Width = 8.0,
+	Height = 10.4,
+	Length = 22.0,
+	Mirror = 0.8,
+	Wheelbase = 13.0,
+	Track = 3.45,
+	Clearance = 1.2,
+	Wheel = 1.2,
+	Cab = 7.0,
+	Bay = { Width = 6.6, Height = 7.6, Length = 14.0, Floor = 2.4, Gap = 1.0 },
+	Doors = { Swing = 270 },
+	Slider = { Front = -2.85, Width = 5.0, Height = 6.9, Out = 0.35, Back = 5.0, Seconds = 0.5, Reach = 8 },
+	Step = { Top = 1.2, Depth = 1.4, Width = 4.6 },
+	SideStep = { Top = 1.2, Depth = 1.2 },
+	Light = { Range = 13, Brightness = 1.4, Color = { 255, 244, 222 } :: { number } },
 }
 
 return Config
