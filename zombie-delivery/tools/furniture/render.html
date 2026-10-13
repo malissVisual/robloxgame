@@ -1,0 +1,222 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Furniture preview</title>
+<style>html,body{margin:0;background:#14171c;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<script type="module">
+// 7.0, the moving prototype: draws export.luau's scenes with three.js (render.mjs drives it). renderItem: one piece
+// at a 3/4 angle from its front right; renderHouse: a house from straight above (a floor plan: the walls cut at
+// CutTop, their cut drawn dark) or a 3/4 cutaway (the ceiling off, the walls cut at CutIso), with its ceiling lights,
+// a stand-in player at the entry for scale. Plain colours on the parts, simple canvas textures on the floors.
+import * as THREE from './three.module.min.js';
+
+const CutTop = 7.6, CutIso = 6.2;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 40).rotateZ(-Math.PI / 2); // Roblox: the axis along X
+const unitBall = new THREE.SphereGeometry(0.5, 32, 20);
+const unitWedge = (() => {
+  const v = { bfl: [-.5, -.5, -.5], bfr: [.5, -.5, -.5], bbl: [-.5, -.5, .5], bbr: [.5, -.5, .5], tbl: [-.5, .5, .5], tbr: [.5, .5, .5] };
+  const tris = [['bfl', 'bbr', 'bfr'], ['bfl', 'bbl', 'bbr'], ['bbl', 'tbr', 'bbr'], ['bbl', 'tbl', 'tbr'], ['bfl', 'bfr', 'tbr'], ['bfl', 'tbr', 'tbl'], ['bfl', 'tbl', 'bbl'], ['bfr', 'bbr', 'tbr']];
+  const pos = [];
+  for (const t of tris) for (const k of t) pos.push(...v[k]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+})();
+const ROUGH = { SmoothPlastic: 0.45, Plastic: 0.6, Metal: 0.35, Glass: 0.08, Fabric: 0.95, Rubber: 0.9, Leather: 0.6, Wood: 0.75, WoodPlanks: 0.7, Cardboard: 0.9, Neon: 1, Plaster: 0.9, Carpet: 1, CeramicTiles: 0.35, Concrete: 0.9, Brick: 0.9, Marble: 0.25, Slate: 0.8, Grass: 1, Ground: 1 };
+const METAL = { Metal: 0.5, DiamondPlate: 0.5 };
+const srgb = c => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+const rgb255 = c => new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
+
+// Floor textures (light patterns the part's colour multiplies): planks, tiles, carpet, concrete, brick.
+function canvasTexture(draw) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  draw(g);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+let seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function noise(g, base, spread, n) {
+  g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < n; i++) { const v = Math.floor(255 - rnd() * spread); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * 256, rnd() * 256, 2, 2); }
+}
+const TEXTURES = {
+  WoodPlanks: [8, canvasTexture(g => {
+    for (let row = 0; row < 8; row++) {
+      for (let k = 0; k < 3; k++) {
+        const v = Math.floor(222 + rnd() * 33);
+        g.fillStyle = `rgb(${v},${v},${v})`;
+        const off = (row % 3) * 70 + k * 120;
+        g.fillRect(off % 256, row * 32, 120, 32); g.fillRect((off % 256) - 256, row * 32, 120, 32);
+      }
+      g.fillStyle = 'rgb(150,150,150)'; g.fillRect(0, row * 32, 256, 2);
+    }
+  })],
+  CeramicTiles: [6, canvasTexture(g => {
+    g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#b8b8b8';
+    for (let i = 0; i < 4; i++) { g.fillRect(i * 64, 0, 3, 256); g.fillRect(0, i * 64, 256, 3); }
+  })],
+  Carpet: [6, canvasTexture(g => noise(g, '#efefef', 40, 9000))],
+  Concrete: [12, canvasTexture(g => noise(g, '#e8e8e8', 50, 5000))],
+  Brick: [4, canvasTexture(g => {
+    g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, 256, 256);
+    for (let row = 0; row < 8; row++) for (let k = -1; k < 4; k++) {
+      const v = Math.floor(225 + rnd() * 30); g.fillStyle = `rgb(${v},${v},${v})`;
+      g.fillRect(k * 80 + (row % 2) * 40 + 3, row * 32 + 3, 74, 26);
+    }
+  })],
+};
+
+// One part as a mesh; `cut`: clipped above that height (a wall in a cutaway).
+function mesh(p, cut) {
+  const geom = p.class === 'WedgePart' ? unitWedge : p.shape === 'Cylinder' ? unitCyl : p.shape === 'Ball' ? unitBall : unitBox;
+  const neon = p.material === 'Neon';
+  const opts = { color: srgb(p.color), roughness: ROUGH[p.material] ?? 0.6, metalness: METAL[p.material] ?? 0 };
+  if (neon) { opts.emissive = srgb(p.color); opts.emissiveIntensity = 1.1; }
+  if (p.opacity < 0.99) { opts.transparent = true; opts.opacity = Math.max(0.2, p.opacity); opts.depthWrite = false; }
+  const tex = TEXTURES[p.material];
+  if (tex && p.shape !== 'Cylinder' && p.shape !== 'Ball') {
+    const t = tex[1].clone();
+    const flat = p.size[1] < 0.6;
+    t.repeat.set(p.size[0] / tex[0], (flat ? p.size[2] : p.size[1]) / tex[0]);
+    t.needsUpdate = true;
+    opts.map = t;
+  }
+  if (cut !== undefined) { opts.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), cut)]; opts.side = THREE.DoubleSide; }
+  const m = new THREE.Mesh(geom, new THREE.MeshStandardMaterial(opts));
+  const r = p.rotation, q = p.position, s = p.size;
+  const sz = p.shape === 'Ball' ? [Math.min(...s), Math.min(...s), Math.min(...s)] : p.shape === 'Cylinder' ? [s[0], Math.min(s[1], s[2]), Math.min(s[1], s[2])] : s;
+  const mtx = new THREE.Matrix4().set(r[0], r[1], r[2], q[0], r[3], r[4], r[5], q[1], r[6], r[7], r[8], q[2], 0, 0, 0, 1);
+  mtx.multiply(new THREE.Matrix4().makeScale(sz[0], sz[1], sz[2]));
+  m.matrixAutoUpdate = false;
+  m.matrix.copy(mtx);
+  m.renderOrder = p.opacity < 0.99 ? 1 : 0;
+  return m;
+}
+
+// The dark cut face of a wall at height y (a floor plan's wall).
+function cap(p, y) {
+  const r = p.rotation, q = p.position, s = p.size;
+  const m = new THREE.Mesh(unitBox, new THREE.MeshBasicMaterial({ color: 0x2b2e33 }));
+  const mtx = new THREE.Matrix4().set(r[0], r[1], r[2], q[0], r[3], r[4], r[5], y - 0.05, r[6], r[7], r[8], q[2], 0, 0, 0, 1);
+  mtx.multiply(new THREE.Matrix4().makeScale(s[0], 0.1, s[2]));
+  m.matrixAutoUpdate = false;
+  m.matrix.copy(mtx);
+  return m;
+}
+
+// A stand-in player (5.2 studs, the R15 proportions) for scale.
+function dummy(scene, x, z) {
+  const parts = [
+    [[0.95, 2.1, 1.0], [-0.5, 1.05, 0], [44, 52, 78]], [[0.95, 2.1, 1.0], [0.5, 1.05, 0], [44, 52, 78]],
+    [[2.0, 2.0, 1.05], [0, 3.1, 0], [232, 122, 40]], [[0.9, 1.95, 0.95], [-1.5, 3.15, 0], [232, 122, 40]],
+    [[0.9, 1.95, 0.95], [1.5, 3.15, 0], [232, 122, 40]], [[1.15, 1.15, 1.15], [0, 4.7, 0], [242, 200, 160]],
+  ];
+  for (const [s, pos, c] of parts) {
+    const m = new THREE.Mesh(unitBox, new THREE.MeshStandardMaterial({ color: rgb255(c), roughness: 0.6 }));
+    m.scale.set(...s); m.position.set(x + pos[0], pos[1], z + pos[2]);
+    scene.add(m);
+  }
+}
+
+window.renderItem = function (scene0, px) {
+  renderer.setSize(px, px);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1b1f26);
+  for (const p of scene0.parts) scene.add(mesh(p));
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a3039, roughness: 1 }));
+  const s = scene0.info.size;
+  const radius = Math.hypot(s[0], s[2]) * 0.62 + 0.4;
+  floor.scale.set(radius, 1, radius); floor.position.y = -s[1] / 2 - 0.01;
+  scene.add(floor);
+  scene.add(new THREE.HemisphereLight(0xe9eef5, 0x3a3530, 1.6));
+  const key = new THREE.DirectionalLight(0xfff2e0, 2.4); key.position.set(-6, 10, -8); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xc8d8ff, 0.8); rim.position.set(8, 6, 6); scene.add(rim);
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.05, 500);
+  // 3/4 from the front right, a little above; far enough for the whole box
+  const span = Math.max(s[0], s[1], s[2], 1.2) * 0.55 + Math.hypot(s[0], s[2]) * 0.3;
+  const dist = span / Math.tan(THREE.MathUtils.degToRad(14)) * 0.95;
+  const dir = new THREE.Vector3(0.62, 0.42, -0.66).normalize();
+  camera.position.copy(dir.multiplyScalar(dist));
+  camera.lookAt(new THREE.Vector3(0, -s[1] * 0.05, 0));
+  renderer.render(scene, camera);
+  return true;
+};
+
+window.renderHouse = function (scene0, view, width, height) {
+  renderer.setSize(width, height);
+  const info = scene0.info;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14171c);
+  const cutAt = view === 'top' ? CutTop : CutIso;
+  const HIDE = new Set(['Ceiling', 'PorchRoof', 'Lamp', 'Tube']);
+  const CAP = new Set(['Wall', 'PorchWall', 'Chimney', 'GarageDoor', 'Daylight', 'Header']);
+  for (const p of scene0.parts) {
+    if (HIDE.has(p.name)) continue;
+    const top = p.position[1] + p.size[1] / 2;
+    if (p.group !== 'item' && p.position[1] - p.size[1] / 2 > cutAt) continue;
+    const clipped = p.group !== 'item' && top > cutAt;
+    scene.add(mesh(p, clipped ? cutAt : undefined));
+    if (view === 'top' && clipped && CAP.has(p.name)) scene.add(cap(p, cutAt));
+  }
+  dummy(scene, info.entry[0], info.entry[2] + 1.5);
+  scene.add(new THREE.HemisphereLight(0xf0f2f6, 0x5a5048, view === 'top' ? 1.9 : 1.5));
+  const sun = new THREE.DirectionalLight(0xfff4e6, view === 'top' ? 1.0 : 1.4);
+  sun.position.set(-30, 80, -50); scene.add(sun);
+  for (const l of info.lights) {
+    if (l.kind !== 'PointLight') continue;
+    const light = new THREE.PointLight(srgb(l.color), l.brightness * 90, l.range * 1.3, 2);
+    light.position.set(l.position[0], Math.min(l.position[1] - 1.5, cutAt + 2), l.position[2]);
+    scene.add(light);
+  }
+  const min = info.min, max = info.max;
+  const cx = (min[0] + max[0]) / 2, cz = (min[2] + max[2]) / 2;
+  let camera;
+  if (view === 'top') {
+    const margin = 4;
+    const w = max[0] - min[0] + 2 * margin, d = max[2] - min[2] + 2 * margin + 8;
+    const aspect = width / height;
+    const halfW = Math.max(w / 2, d / 2 * aspect), halfH = halfW / aspect;
+    camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 400);
+    camera.up.set(0, 0, 1); // the back of the house up, the front door at the bottom
+    camera.position.set(cx, 200, cz - 4);
+    camera.lookAt(cx, 0, cz - 4);
+  } else {
+    camera = new THREE.PerspectiveCamera(34, width / height, 1, 1000);
+    const span = Math.max(max[0] - min[0], max[2] - min[2]);
+    camera.position.set(cx + span * 0.42, span * 0.95, min[2] - span * 0.72);
+    camera.lookAt(cx, -2, cz + 2);
+  }
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  // where the rooms and the pieces land on the picture (render.py writes their names)
+  const project = (x, y, z) => {
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    return [(v.x + 1) / 2 * width, (1 - v.y) / 2 * height];
+  };
+  return {
+    rooms: info.rooms.map(r => ({ id: r.id, at: project((r.min[0] + r.max[0]) / 2, 0.2, (r.min[2] + r.max[2]) / 2) })),
+    spots: info.spots.map(s => ({ id: s.id, item: s.item, label: s.label, star: s.star, at: project(s.position[0], s.position[1], s.position[2]) })),
+  };
+};
+window.ready = true;
+</script>
+</body>
+</html>

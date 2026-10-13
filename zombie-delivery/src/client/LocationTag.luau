@@ -26,6 +26,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Discovery = require(script.Parent.Discovery)
 local TouchLayout = require(script.Parent.TouchLayout)
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review: the move's top-centre blocks are obstacles too
 
 local LocationTag = {}
 
@@ -163,6 +164,9 @@ local function placeFor(w: number, wc: number, h: number, S: number): (number, n
 				table.insert(obstacles, rectOf(group, origin))
 			end
 		end
+	end
+	for _, r in TopBlocks.rects(origin) do
+		table.insert(obstacles, r) -- 7.0 review: the move's panel, Danny's strip, the planning's pill
 	end
 	local candidates: { LocationTags.Rect } = {}
 	local function add(x: number, bottom: number, width: number)

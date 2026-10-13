@@ -30,6 +30,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
 local TouchLayout = require(script.Parent.TouchLayout)
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review: the move's top-centre blocks are kept clear of
 local PhoneMotion = require(script.Parent.PhoneMotion)
 local Hotbar = require(script.Parent.Hotbar)
 
@@ -373,6 +374,9 @@ local function place(p: Parts)
 		table.insert(blocks, c.jump)
 	elseif playerListOn() then
 		table.insert(blocks, TouchLayout.box(W - TouchLayout.MARGIN - PLAYER_LIST_W, 0, W, math.min(H * 0.45, 52 + 40 * #Players:GetPlayers())))
+	end
+	for _, r in TopBlocks.rects(origin) do
+		table.insert(blocks, r) -- 7.0 review: the move's panel, Danny's strip, the planning's pill (client/TopBlocks.luau)
 	end
 	local chips = hud:FindFirstChild("GrindChips")
 	local chipsBox = if chips and chips:IsA("GuiObject") and chips.Visible then rectOf(chips, origin) else nil

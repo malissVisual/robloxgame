@@ -45,6 +45,7 @@ local Interact = require(script.Parent.Interact)
 local Bodies = require(script.Parent.Bodies)
 local Hud = require(script.Parent.Hud)
 local Ui = require(script.Parent.Ui)
+local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review: the banner goes under the move's top-centre blocks
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
 local Sounds = require(script.Parent.Sounds)
@@ -273,6 +274,13 @@ local function updateBanner(now: number)
 	view.banner.Visible = current ~= nil
 	if not current then
 		return
+	end
+	-- 7.0 review: under the move's panel (and Danny's strip) while they show
+	local holder = view.banner:FindFirstAncestorWhichIsA("ScreenGui")
+	local bottom = if holder then TopBlocks.bottom(holder.AbsolutePosition) else nil
+	local top = if bottom then math.max(10, math.floor(bottom + 6)) else 10
+	if view.banner.Position.Y.Offset ~= top then
+		view.banner.Position = UDim2.new(0.5, 0, 0, top)
 	end
 	local line = current.line
 	local _, _, _, _, at, nextStop, leaveIn = BusLines.position(line, current.index, now)

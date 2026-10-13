@@ -16,6 +16,7 @@
 --     and greys, or a fog closes in; it all blends in and out over Config.LivingCity.Weather Fade seconds. A mist rises
 --     over the river at night, at dawn and in the fog; sun rays at dawn under a clear sky. And it starts
 --     client/WorldFx.luau (the night lights, the clock, the lighthouse and the beacon, the broken lamps).
+--   * 7.0 review: no rain or snow off the map (the moves' house interiors) or under a roof (a ray up, 4 times a second).
 --   * 5.9.2, cheaper: the rain (and the snow) follow your graphics quality (Roblox's quality slider, read now and
 --     then): the rain at most RAIN_ALIVE drops alive at the top quality, fewer below; the river's mist and the sun
 --     rays only from MEDIUM_QUALITY up. The wet roads have two looks (dry / wet) and only the ones within WET_RANGE of
@@ -179,6 +180,34 @@ local function flash(beat: number)
 			lens.Color = if lit then LENS_LIT[kind] else LENS_DIM[kind]
 		end
 	end
+end
+
+-- 7.0 review: no rain or snow where the sky can't be seen: off the map (the moves' house interiors stand far off it:
+-- server/HouseInterior.luau's slots) or under a roof (a ray straight up from the camera, colliding parts only, every
+-- SHELTER_EVERY s).
+type Shelter = { at: number, under: boolean, params: RaycastParams?, every: number }
+local shelter: Shelter = { at = -math.huge, under = false, params = nil, every = 0.25 }
+local function sheltered(position: Vector3): boolean
+	local b = Map.Bounds
+	if position.X < b.x0 or position.X > b.x1 or position.Z < b.z0 or position.Z > b.z1 then
+		return true
+	end
+	local now = os.clock()
+	if now - shelter.at < shelter.every then
+		return shelter.under
+	end
+	shelter.at = now
+	local params: RaycastParams = shelter.params or RaycastParams.new()
+	if not shelter.params then
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.RespectCanCollide = true
+		params.IgnoreWater = true
+		shelter.params = params
+	end
+	local character = Players.LocalPlayer.Character
+	params.FilterDescendantsInstances = if character then { character } else {}
+	shelter.under = workspace:Raycast(position, Vector3.new(0, 80, 0), params) ~= nil
+	return shelter.under
 end
 
 -- ── Start ──────────────────────────────────────────────────────────────────
@@ -423,6 +452,9 @@ function Weather.start()
 		local scale = math.clamp(quality / 8, 0.3, 1)
 		local snowRate = if inWinter then (400 + 500 * wet.rain) * scale else 0
 		local rainRate = if inWinter then 0 else math.min(tuning.RainRate * wet.rain, RAIN_ALIVE / 0.8) * scale
+		if sheltered(position) then
+			snowRate, rainRate = 0, 0 -- (7.0 review: inside, off the map or under a roof)
+		end
 		if snow.Rate ~= snowRate then
 			snow.Rate = snowRate
 		end

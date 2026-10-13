@@ -45,7 +45,7 @@ local NAMES = {
 	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 	"Garage", -- 3.4: client → server: ("take", car id) or ("refresh"); server → client: the garage window (server/Garages.luau)
 	"Repair", -- 3.4: server → client: a repair started ({ car, shop, seconds, total, fee }) or ended (nil) (server/Repair.luau)
-	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / tour (6.7) / board / job / done / say, or nil (5.0: also "phone", Marge gave it, and "message", { from, text, gps? } a text for the phone: server/VanQuest.luau); client → server: ("tour"; 6.5's "go"), ("board") or ("skip") (server/Tutorial.luau)
+	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / tour (6.7) / board / job / done / say, or nil (5.0: also "phone", Marge gave it, and "message", { from, text, gps? } a text for the phone: server/VanQuest.luau); client → server: ("tour"; 6.5's "go"), ("board") or ("skip") (server/Tutorial.luau); 7.0: ("story", key) a story card seen (client/MoveStoryUi.luau, shared/MoveStory.luau)
 	"Explore", -- 3.7: server → client: ("state", cells string, places list) on joining, ("cells", list) newly uncovered, ("place", id) discovered
 	"Holster", -- 3.9: client → server: (holstered boolean) the gun away (B) or in the hand; the server sets the character's Holstered attribute (server/CloseCombat.luau)
 	"Melee", -- 3.9: client → server: (the swing's direction, a unit Vector3, or nil) a punch (holstered) or a strike with the gun (V); checked on the server
@@ -69,6 +69,8 @@ local NAMES = {
 	"ClientError", -- 6.13: client → server: (script name, line) a script error on this client, counted by script (client/Unstuck.luau sends it, a few a minute at most; server/Analytics.luau; Roblox's Error Report keeps the message)
 	"Skills", -- 6.20: client → server: ("buy", skill id) a rank more, ("reset") every point back (free; never during a job or a mission); the ranks reach the client in the state (skills) and the player attribute Skills (server/Skills.luau, shared/Skills.luau)
 	"Knock", -- 6.24: server → client: (velocity Vector3) a brute's blow or a bloater's blast throws you (client/ZombieFx.luau pushes your body; server/Zombies.luau, at most every Config.ZombieTypes.KnockEvery s)
+	"Moving", -- 7.0, MOVES: client → server: ("start", contract id) the contract card's START, ("giveup") the owner calls the move off, ("state") send me the move again; server → client: ("contract", card) open the contract card, ("state", view | nil) your move (client/MovingHud.luau), ("fade", "out" | "in", seconds) the fade at a door (client/Fade.luau), ("result", card) the move's end (server/Moving.luau; Config.Robust.Limits.Moving)
+	"MoveLobby", -- 7.0 planning: client → server: ("role", role id) | ("ready", on) | ("launch") | ("cancel") the planning lobby (the owner's LAUNCH and CANCEL), ("state") send it again, ("chat", 1 … 6) a quick chat line (shared/MoveRoles.luau Chat); server → client: ("lobby", view | nil) the lobby (client/MoveLobbyUi.luau), ("chat", { from, name, index }) a crew mate's quick chat (client/QuickChat.luau) (server/MoveLobby.luau; Config.Robust.Limits.MoveLobby, QuickChat)
 }
 
 local folder: Folder

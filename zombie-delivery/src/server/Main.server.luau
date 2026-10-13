@@ -271,6 +271,9 @@ safely("Horn", require(Server.Horn).start) -- 6.12: H in the driver's seat, chec
 safely("Buses", require(Server.Buses).start) -- 5.5: the city buses (their stops: World's build list)
 safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental scooters and their docks
 safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between the rooftops (the ladders, the rides)
+-- 7.0 prototype, MOVES (design/rework/NAVRH.md): the depot's moving contracts, one house move with its crew. Last: it
+-- wraps the hooks set above (Zombies.hunts, Vehicles.backAllowed, Jobs.returnLent, Vehicles.callCar, the car damage).
+safely("Moving", require(Server.Moving).start)
 print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
 -- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.
 if not workspace.StreamingEnabled then

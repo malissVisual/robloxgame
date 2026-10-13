@@ -38,6 +38,10 @@
 -- first game). The saved kit holds no bag any more: a real save from before (no perGameBags flag) is paid back once for
 -- the bags it owned (Transport.bagRefund, at the price they were sold at; profile.bagRefund, never saved, tells
 -- server/Tutorial.luau to say so; the money's reason "BagRefund"). PlayerData.giveKit puts a bag into profile.bags.
+-- 7.0, the moves' story (shared/MoveStory.luau): the story cards seen (story: MoveStory.SeenKeys, "intro" = Marge's
+-- moving intro at the first contracts board), read only from a real save (an older one has none: the empty table, so
+-- everybody sees the intro once); PlayerData.markStory sets one (client/MoveStoryUi.luau asks through server/
+-- Tutorial.luau) and the player attribute MoveStory carries them to the client (MoveStory.encodeSeen).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -59,6 +63,7 @@ local TaskData = require(Shared.Tasks) -- 6.12: the daily and weekly tasks (prof
 local Style = require(Shared.Style) -- 6.12: the cosmetics' wardrobe
 local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funnel's steps in the save
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
+local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
 
 export type Profile = {
 	money: number,
@@ -123,6 +128,8 @@ export type Profile = {
 	regulars: { [string]: number },
 	-- 6.20: the skills bought (Config.Skills ids → rank); the points are the level's (shared/Skills.luau points)
 	skills: { [string]: number },
+	-- 7.0: the moves' story cards seen (shared/MoveStory.luau SeenKeys: "intro"); none before 7.0 (the empty table)
+	story: { [string]: boolean },
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -218,6 +225,7 @@ local function newProfile(): Profile
 		onboarding = 0, -- 6.13: a new courier, no step yet
 		regulars = {}, -- 6.14: no business knows you yet
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
+		story = {}, -- 7.0: no story card seen yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -476,6 +484,11 @@ local function applySaved(profile: Profile, saved: any)
 	profile.onboarding = AnalyticsPlan.onboardingFrom(saved)
 	-- 6.14: the regulars, checked (known businesses, whole counts up to Config.Regulars.Cap); none before 6.14: empty.
 	profile.regulars = require(Shared.Regulars).clean(saved.regulars)
+	-- 7.0: the moves' story cards seen, checked (known keys only), only from a real save (not a lock-only record of a
+	-- new player); a save from before 7.0 has none: the empty table (Marge's moving intro shows once for it too).
+	if saved.money ~= nil then
+		profile.story = MoveStory.cleanSeen(saved.story)
+	end
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -751,6 +764,11 @@ local function updateLeaderstats(player: Player)
 	if player:GetAttribute("Skills") ~= skills then
 		player:SetAttribute("Skills", skills)
 	end
+	-- 7.0: the moves' story cards seen, for client/MoveStoryUi.luau ("" = none yet)
+	local story = MoveStory.encodeSeen(profile.story)
+	if player:GetAttribute("MoveStory") ~= story then
+		player:SetAttribute("MoveStory", story)
+	end
 	local stats = player:FindFirstChild("leaderstats")
 	if not stats then
 		return
@@ -837,6 +855,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		onboarding = profile.onboarding, -- 6.13
 		regulars = profile.regulars, -- 6.14
 		skills = profile.skills, -- 6.20
+		story = profile.story, -- 7.0
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -909,6 +928,18 @@ end
 
 function PlayerData.get(player: Player): Profile?
 	return profiles[player]
+end
+
+-- 7.0: a story card seen (shared/MoveStory.luau SeenKeys: "intro"), kept in the save; the attribute MoveStory follows
+-- (Changed). True when it was new; an unknown key or a profile not loaded yet changes nothing.
+function PlayerData.markStory(player: Player, key: any): boolean
+	local profile = profiles[player]
+	if not profile or not MoveStory.isSeenKey(key) or profile.story[key] == true then
+		return false
+	end
+	profile.story[key] = true
+	changed:Fire(player)
+	return true
 end
 
 -- A real, finite number: NaN or ±inf from a remote would poison the money and the items for good.

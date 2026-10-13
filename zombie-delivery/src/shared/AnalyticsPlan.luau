@@ -156,6 +156,8 @@ AnalyticsPlan.Events = {
 	"EventStarted", -- a live event started (value: the players in the server; field: its id); logged with one of them
 	"SupplyDelivered", -- a supply drop brought to the depot (value: seconds since it landed; field: the driver level)
 	"HordeBeaten", -- a share of the horde's reward paid (value: the player's kills; field: "beaten" or "time")
+	-- 7.0, MOVES (server/Moving.luau)
+	"MoveDone", -- a house move ended and paid (value: its stars; fields: the contract, "solo" or "crew")
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -220,6 +222,7 @@ AnalyticsPlan.Sources = {
 	ShiftBonus = "Gameplay", -- 6.14: a shift's pay (Config.Jobs.Shift: its deliveries in one go, server/Shift.luau)
 	SupplyDrop = "Gameplay", -- 6.15: a live event's supply drop brought to the depot (server/LiveEvents.luau)
 	HordeReward = "Gameplay", -- 6.15: a share of the horde at the gates' reward (server/LiveEvents.luau)
+	MovePay = "Gameplay", -- 7.0: a house move's pay (the owner's and each crew mate's share: server/Moving.luau)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
 	BagRefund = "Refund", -- 6.23: an old save's bags, owned for good before, paid back once (bags are bought each game now)
