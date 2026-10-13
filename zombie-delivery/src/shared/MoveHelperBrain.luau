@@ -51,6 +51,8 @@
 --   MoveHelperBrain.followSpot(x, z, lookX, lookZ)       his place behind you ("Help me")
 --   MoveHelperBrain.doing(action, name, full)  what he does, in words (client/MoveHelperHud.luau's line)
 --   MoveHelperBrain.Lines                      what he says (a speech bubble over his head; plain text)
+--   MoveHelperBrain.line(key, sandbox)         his line for `key` (8.0 SANDBOX: SandboxLines' where the test world has
+--                                              no Wall and no depot)
 
 local Config = require(script.Parent.Config)
 local Rules = require(script.Parent.MovingRules)
@@ -408,5 +410,15 @@ MoveHelperBrain.Lines = {
 	carryMode = "On the small stuff.",
 	waitMode = "Waiting at the van.",
 } :: { [string]: string }
+
+-- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.
+MoveHelperBrain.SandboxLines = {
+	hello = "Danny from ZDC. Got your back!",
+	full = "Van's full, boss - drive it home?",
+} :: { [string]: string }
+
+function MoveHelperBrain.line(key: string, sandbox: boolean?): string?
+	return (if sandbox then MoveHelperBrain.SandboxLines[key] else nil) or MoveHelperBrain.Lines[key]
+end
 
 return MoveHelperBrain

@@ -5,12 +5,14 @@
 -- kept open) in the middle of the south wall, which looks at the van's spot. Inside: a concrete floor with painted
 -- lines, the receiving zone just inside the door, the display stands in rows behind it with aisles between them, the
 -- hall's lights under the tie beams and the STOCK board on the back wall. Outside: the ZDC sign in the front gable, the
--- owner's sign over the door and the UNLOAD HERE bay painted where the van parks (the unloading itself is the moves'
--- work: the plot's unload circle).
+-- owner's sign over the door and the UNLOAD HERE bay painted round the van at its spot (the unloading itself is the
+-- moves' work: the plot's unload circle). 8.0.1: the plot's concrete is at SandboxMap.GroundTop (flush with the
+-- meadow; the asphalt's RoadTop is only the roads'): the bay's paint and the bollards stand on it, the hall's floor a
+-- hair over it (no step at the door).
 --
 -- World coordinates (studs) of one plot. Every warehouse looks south, so its own frame is only moved: x across (east
 -- +), z to the door (south +), y up from the ground.
---   WarehouseLayout.FloorTop               the hall floor's top (a hair over the plot's concrete, SandboxMap.RoadTop)
+--   WarehouseLayout.FloorTop               the hall floor's top (a hair over the plot's concrete, SandboxMap.GroundTop)
 --   WarehouseLayout.outline(plot)          the building's outer box { x0, x1, z0, z1, top } (top: the ridge's)
 --   WarehouseLayout.inside(plot)           the floor inside the walls (Rect)
 --   WarehouseLayout.door(plot)             the roller door's opening { x, z (the wall's outer face), width, height }
@@ -25,7 +27,8 @@
 --   WarehouseLayout.stands(plot)           every stand of the plot (a Plot or its id), in stand-number order: the
 --                                          spots above (x, y, z plain numbers; {} for no such plot)
 --   WarehouseLayout.standAt(plot, x, z)    the stand whose podium holds the point (nil: none)
---   WarehouseLayout.bay(plot)              the UNLOAD HERE box in front of the door (Rect)
+--   WarehouseLayout.bay(plot)              the UNLOAD HERE box in front of the door (Rect): Config.Warehouse.Bay, its
+--                                          middle the van's (the plot's vanSpot: the van is centred on it)
 --   WarehouseLayout.pieces(plot)           every part of the building as a Piece (below)
 --   WarehouseLayout.bounds(piece)          a piece's box in the world, turned: x0, x1, y0, y1, z0, z1
 --   WarehouseLayout.ownerLines(name?, id)  the owner's sign: "<Name>'s Warehouse" (nil: FOR RENT) and its small line
@@ -75,7 +78,9 @@ export type Piece = {
 local WALL = 1 -- the walls' thickness
 local RIB = 2.5 -- the cladding's ribs apart
 local PLINTH = 1.4 -- the concrete base course's height
-local FLOOR_TOP = SandboxMap.RoadTop + 0.1
+local GROUND = SandboxMap.GroundTop -- the plot's concrete pad (server/SandboxWorld.luau): flush with the meadow
+local PAINT_LIFT = 0.01 -- the bay's paint this far over the pad (no flicker)
+local FLOOR_TOP = GROUND + 0.05 -- the hall's floor: a hair over the pad (a 0.05 lip at the door, nothing to trip on)
 WarehouseLayout.FloorTop = FLOOR_TOP
 WarehouseLayout.Wall = WALL
 
@@ -175,9 +180,9 @@ function WarehouseLayout.standAt(plot: SandboxMap.Plot, x: number, z: number): n
 end
 
 function WarehouseLayout.bay(plot: SandboxMap.Plot): Rect
-	local d = WarehouseLayout.door(plot)
+	local v = plot.vanSpot
 	local width, length = T.Bay[1], T.Bay[2]
-	return { x0 = d.x - width / 2, x1 = d.x + width / 2, z0 = d.z + 1.5, z1 = d.z + 1.5 + length }
+	return { x0 = v.x - width / 2, x1 = v.x + width / 2, z0 = v.z - length / 2, z1 = v.z + length / 2 }
 end
 
 -- ── Texts ────────────────────────────────────────────────────────────────────
@@ -292,8 +297,8 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	local section = hx - door / 2 -- the front wall's width each side of the door
 	local ridge = T.Ridge
 
-	-- the floor: one slab under the whole building (and its doorway)
-	solid(add("Floor", "inside", { 2 * hx, FLOOR_TOP, 2 * hz }, { 0, FLOOR_TOP / 2, 0 }, FLOOR, "Concrete"))
+	-- the floor: one slab under the whole building (and its doorway), from the pad up to a hair over it
+	solid(add("Floor", "inside", { 2 * hx, FLOOR_TOP - GROUND, 2 * hz }, { 0, (GROUND + FLOOR_TOP) / 2, 0 }, FLOOR, "Concrete"))
 
 	-- the walls: the back, the sides, the front each side of the door and the header over it
 	solid(add("WallBack", "shell", { 2 * hx, h, WALL }, { 0, h / 2, -hz + WALL / 2 }, CLAD, "Metal"), true)
@@ -381,7 +386,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "West" else "East"
 		add("DoorRail" .. tag, "door", { 0.7, doorHigh, 0.6 }, { side * (door / 2 + 0.35), doorHigh / 2, hz + 0.3 }, STEEL, "Metal")
-		local bollard = solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), SandboxMap.RoadTop + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic"))
+		local bollard = solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), GROUND + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic"))
 		bollard.shape, bollard.roll = "Cylinder", 90
 	end
 	add("DoorCurtain", "door", { door, 1.6, 0.3 }, { 0, doorHigh - 0.8, hz - WALL / 2 }, ORANGE, "Metal")
@@ -451,17 +456,21 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		plate.words = { { face = "Front", lines = { line(tostring(i), INK, 0.9, "Black") } } }
 	end
 
-	-- outside: the UNLOAD HERE bay where the van parks, its back to the door
+	-- outside: the UNLOAD HERE bay round the van at its spot, its back to the door (the words in the room between the
+	-- van's back and the bay's door end: seen with the van parked)
 	local bay = WarehouseLayout.bay(plot)
 	local bw, bl = bay.x1 - bay.x0, bay.z1 - bay.z0
-	local bz = (bay.z0 + bay.z1) / 2 - oz
-	local bayY = SandboxMap.RoadTop + 0.03
+	local bx, bz = (bay.x0 + bay.x1) / 2 - ox, (bay.z0 + bay.z1) / 2 - oz
+	local bayY = GROUND + PAINT_LIFT + 0.03 -- (the lines 0.06 thick: their underside a hair over the pad)
 	for _, side in { -1, 1 } do
-		add("Bay" .. (if side < 0 then "West" else "East"), "bay", { 0.5, 0.06, bl }, { side * (bw / 2 - 0.25), bayY, bz }, PAINT, "SmoothPlastic")
+		add("Bay" .. (if side < 0 then "West" else "East"), "bay", { 0.5, 0.06, bl }, { bx + side * (bw / 2 - 0.25), bayY, bz }, PAINT, "SmoothPlastic")
 	end
-	add("BayNorth", "bay", { bw, 0.06, 0.5 }, { 0, bayY, bay.z0 - oz + 0.25 }, PAINT, "SmoothPlastic")
-	add("BaySouth", "bay", { bw, 0.06, 0.5 }, { 0, bayY, bay.z1 - oz - 0.25 }, PAINT, "SmoothPlastic")
-	local unload = add("BayText", "bay", { bw - 3, 3, 0.05 }, { 0, bayY + 0.01, bay.z0 - oz + 3.5 }, PAINT, "SmoothPlastic")
+	add("BayNorth", "bay", { bw, 0.06, 0.5 }, { bx, bayY, bay.z0 - oz + 0.25 }, PAINT, "SmoothPlastic")
+	add("BaySouth", "bay", { bw, 0.06, 0.5 }, { bx, bayY, bay.z1 - oz - 0.25 }, PAINT, "SmoothPlastic")
+	-- (the words between the north line and the parked van's back: Config.Sprinter.Length long, centred on vanSpot)
+	local from, back = bay.z0 + 0.5, plot.vanSpot.z - Config.Sprinter.Length / 2
+	local words = math.clamp(back - from - 0.4, 0.5, 3) -- (how deep the words are)
+	local unload = add("BayText", "bay", { bw - 3, words, 0.05 }, { bx, bayY + 0.01, (from + back) / 2 - oz }, PAINT, "SmoothPlastic")
 	unload.pitch, unload.transparency = -90, 1
 	unload.words = { { face = "Back", lines = { line("UNLOAD HERE", PAINT, 0.9, "Black") } } }
 

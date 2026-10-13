@@ -24,7 +24,8 @@
 --   8.0 SANDBOX (design/sandbox/KONTRAKT.md): no Wall, no dressing, no city house; a kiosk on every player's plot:
 --   MoveSites.plotBoard(parent, plot)    the "MovingBoard<id>" kiosk (Persistent) at the plot's board spot
 --                                     (shared/SandboxMap.luau plot.board: by the warehouse's roller door, on its wall's
---                                     outside, facing out), half a stud farther out (its plinth against the wall);
+--                                     outside, facing out), half a stud farther out (its plinth against the wall), its
+--                                     corkboard the sandbox's (MoveSiteLooks.board(true): the chalet, no Wall);
 --                                     returns the model and its corkboard ("Board", the part Moving hangs its prompt
 --                                     on; its attribute Plot = the plot's id)
 --   MoveSites.plotBoardPlace(plot)    where that kiosk's foot stands (tools/move-sites/check.py checks it there)
@@ -173,7 +174,7 @@ function MoveSites.plotBoardPlace(plot: SandboxMap.Plot): Looks.Place
 end
 
 function MoveSites.plotBoard(parent: Instance, plot: SandboxMap.Plot): (Model, BasePart)
-	local model = MoveSites.build(parent, MoveSites.plotBoardPlace(plot), Looks.board(), `MovingBoard{plot.id}`, Enum.ModelStreamingMode.Persistent)
+	local model = MoveSites.build(parent, MoveSites.plotBoardPlace(plot), Looks.board(true), `MovingBoard{plot.id}`, Enum.ModelStreamingMode.Persistent)
 	local board = named(model, "Board")
 	board:SetAttribute("Plot", plot.id)
 	model.PrimaryPart = board

@@ -68,6 +68,17 @@ check("the Moves folder: the board, the drop-off, the house's door", moves ~= ni
 	and moves:FindFirstChild("Move_marge") ~= nil)
 check("8.0 SANDBOX off: the city's world (no plot kiosks, no sandbox house)", Config.Sandbox.On == false and moves:FindFirstChild("MovingBoard1") == nil
 	and moves:FindFirstChild("Move_sandbox_house") == nil and moves:FindFirstChild("MoveDressing") ~= nil)
+-- 8.0.1, the city unchanged: the depot's corkboard (Marge's, Walt's, Go to the Wall), not the sandbox's chalet
+local cityWords: { string } = {}
+for _, d in moves:FindFirstChild("MovingBoard"):GetDescendants() do
+	if d.ClassName == "TextLabel" then
+		table.insert(cityWords, tostring(d.Text))
+	end
+end
+local cityBoard = table.concat(cityWords, " | ")
+check("8.0.1: the city's kiosk keeps its corkboard (MARGE, WALT'S RANCH, Go to the Wall, ZDC MOVING & EVACUATION; no chalet)",
+	string.find(cityBoard, "MARGE", 1, true) ~= nil and string.find(cityBoard, "WALT'S RANCH", 1, true) ~= nil and string.find(cityBoard, "Go to the Wall", 1, true) ~= nil
+	and string.find(cityBoard, "ZDC MOVING & EVACUATION", 1, true) ~= nil and string.find(cityBoard, "CHALET", 1, true) == nil, cityBoard)
 Greeters.step() -- (the greeters' loop: the soldier at the Wall)
 check("7.0 greeters: the soldier stands at the Wall", Greeters.soldier() ~= nil and Greeters.soldier().Parent ~= nil)
 -- The porch greeter of `owner`'s move (her body in the world), or nil.
@@ -862,6 +873,8 @@ do
 	end
 	check("7.2 review: GIVE UP after a trip: the trip is paid (not called off)", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and paid > 0
 		and result.a.money == paid, result and `{result.a.how} {paid}`)
+	check("8.0.1, the city unchanged: its words (the Wall paid what reached it)", result ~= nil and result.a.howText == "You called it off: the Wall paid what reached it",
+		result and result.a.howText)
 end
 -- A bike is never the move's van (7.2 review: no back, nothing could be loaded; CAR, MY BIKE and the garage were shut)
 do
@@ -908,7 +921,9 @@ do
 	loadOne(ann, 1)
 	Moving.admin(ann, "trip")
 	E.place(bob, E.cars[ann].chassis.Position + V3(4, 1, 0))
+	check("8.0.1, the city unchanged: a respawn mid-move goes where it always did (no Moving.respawnAt spot)", Moving.respawnAt(ann) == nil and Moving.respawnAt(bob) == nil)
 	local paidBefore = #E.money
+	local leftAt = #E.messages
 	E.leave(ann)
 	result = E.last(bob, "Moving", "result")
 	local paid = 0
@@ -917,6 +932,8 @@ do
 	end
 	check("7.2 review: the owner left after a trip: the trip pays the crew there", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and paid > 0
 		and string.find(E.lastNotice(bob), "Ann left", 1, true) ~= nil, result and `{result.a.how} {paid} {E.lastNotice(bob)}`)
+	check("8.0.1, the city unchanged: its words (The Wall paid what reached it)", heard(bob, "The move ended: Ann left. The Wall paid what reached it.", leftAt)
+		and result.a.howText == "Ann left the game: the Wall paid what reached it", result and result.a.howText)
 end
 do
 	local fay = E.player(66, "Fay", board + V3(-3, 0, -3))
@@ -927,6 +944,17 @@ do
 	E.leave(fay)
 	result = E.last(gus, "Moving", "result")
 	check("the owner left with nothing delivered: called off for the crew", result ~= nil and result.a.how == "cancelled" and string.find(E.lastNotice(gus), "Fay left", 1, true) ~= nil)
+end
+-- 8.0.1, the city unchanged: the planning left open too long sends you back to the depot's board
+do
+	local hal = E.player(99, "Hal", board + V3(-2, 0, 2))
+	trigger(boardPrompt, hal)
+	E.request(hal, "start", "marge")
+	check("(Hal's planning open)", E.last(hal, "MoveLobby", "lobby") ~= nil and E.last(hal, "MoveLobby", "lobby").a ~= nil, E.lastNotice(hal))
+	E.now += R.Lobby.Timeout + 1
+	local since = #E.messages
+	Lobby.step()
+	check("8.0.1, the city unchanged: the planning's timeout says the depot's board", heard(hal, "take the contract again at the depot's board", since), E.lastNotice(hal))
 end
 check("every interior went (slots free again)", E.destroyed == E.built, `{E.destroyed} of {E.built}`)
 

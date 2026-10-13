@@ -10,7 +10,8 @@
 --     it is (in the house, carried by …, on the ground, in the truck) and its condition; the owner's GIVE UP (twice);
 --   * the result card ("result"): delivered / left / broken, the stars 1 … 5, the pay's lines, your share and XP;
 --   * the fade at a door ("fade": client/Fade.luau);
---   * the GPS: the house, or the Wall (the depot's drop-off) while you drive with a load;
+--   * the GPS: the house, or the Wall (the depot's drop-off) while you drive with a load (8.0 SANDBOX: none: the guide's
+--     chevron and path, client/SandboxGuide.luau, point the way; one arrow, not two);
 --   * the move's prompts only for its crew (the tag MovePrompt: MoveOwner = the move's owner, shown when your player
 --     attribute MoveWith is theirs; MoveOnly = for that player alone; MoveSkip = not for that player), hidden by
 --     their reach like client/CargoPrompts.luau.
@@ -268,10 +269,11 @@ local function seated(): boolean
 	return humanoid ~= nil and humanoid.SeatPart ~= nil
 end
 
--- The house, or the Wall while you drive with a load (or the horde is on and something is in).
+-- The house, or the Wall while you drive with a load (or the horde is on and something is in). 8.0 SANDBOX: never (no
+-- waypoint, no GPS ring, beacon or toasts: client/SandboxGuide.luau's chevron and path point at the same spot).
 local function updateGps()
 	local s = state
-	if type(s) ~= "table" then
+	if type(s) ~= "table" or Config.Sandbox.On then
 		setGps(nil)
 		return
 	end
@@ -381,7 +383,8 @@ local function nextStep(s: any): string
 		return if s.drop then `Everything is in: drive to {wallOf(s)}` else "Everything is in: drive to the Wall at the depot"
 	end
 	if seated() then
-		return if out > 0 then `Drive to {wallOf(s)} (GPS), or back for more` elseif delivered > 0 then `Back to {s.name} for more, or FINISH` else `Drive to {s.name} (GPS)`
+		local gps = if Config.Sandbox.On then "" else " (GPS)" -- (8.0 SANDBOX: no GPS, the guide's arrow)
+		return if out > 0 then `Drive to {wallOf(s)}{gps}, or back for more` elseif delivered > 0 then `Back to {s.name} for more, or FINISH` else `Drive to {s.name}{gps}`
 	end
 	return `"Enter" at {s.name}'s door`
 end

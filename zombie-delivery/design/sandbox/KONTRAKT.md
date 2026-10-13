@@ -33,7 +33,7 @@ Everything below is for the workers (agents). **Keep the names and shapes here.*
 2. **Contract.** The Moving contracts board at `board` offers one contract: "The Old Chalet" (`SandboxMap.House`). Each move gets a new seed, so the house is refilled.
 3. **Drive.** Drive down Main Street to the house. Its front door at `House.door` has "Enter house", which fades you into `HouseInterior`, the existing system.
 4. **Carry.** Carry the pieces out (grip, Danny, two-person lifts all as now) and load them into the van. You can walk inside the van; the load and packing work as now.
-5. **Unload.** Drive back. With the van's back inside your plot's `unload` circle, the van's contents go into your warehouse's stock: `Collection.add` for each piece, to the move's owner. This is a "trip". You can do more trips until you press FINISH or the clock runs out.
+5. **Unload.** Drive back. With the van's back or middle (or the line between them; 8.0.1) inside your plot's `unload` circle, the van's contents go into your warehouse's stock: `Collection.add` for each piece, to the move's owner. This is a "trip". You can do more trips until you press FINISH or the clock runs out.
 6. **Warehouse.** It has `Config.Warehouse.Stands` display stands. An empty stand's prompt opens the picker (`Collection.openPicker`), and you choose a piece from your stock. It stands there (its 3D model) and earns money every minute you play. A shown piece's prompt can take it down or sell it.
 
 ## Who owns what

@@ -19,8 +19,11 @@
 --                                       the walk, -Z north into the depot's yard, +Z out to Bone St): the bay painted on
 --                                       the yard, the gantry with the SAFE ZONE sign, the Wall's stubs and jersey
 --                                       barriers, the booth, the raised barrier, the floodlights, sandbags, the army truck
---   MoveSiteLooks.board()               the Moving contracts kiosk (frame: its foot, -Z toward the yard); Moving hangs its
---                                       prompt on the piece named "Board" (the corkboard)
+--   MoveSiteLooks.board(sandbox?)       the Moving contracts kiosk (frame: its foot, -Z toward the yard); Moving hangs its
+--                                       prompt on the piece named "Board" (the corkboard). 8.0 SANDBOX (sandbox true: the
+--                                       plots' kiosks, server/MoveSites.luau plotBoard): no evacuation, no Wall, no city
+--                                       houses on it: the chalet's photo and notices about bringing it home to your
+--                                       warehouse, the same kiosk round them
 --   MoveSiteLooks.house(title, park)    a contract's house dressed for moving day (frame: its front door's foot, -Z out
 --                                       to the street; park: studs from the door to the truck's kerb spot, Map.Home park)
 --   MoveSiteLooks.banner()              the depot's ZDC MOVING & EVACUATION banner (frame: its middle, -Z to the yard)
@@ -46,6 +49,7 @@
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
 local RenderBudget = require(script.Parent.RenderBudget)
+local SandboxMap = require(script.Parent.SandboxMap)
 
 local MoveSiteLooks = {}
 
@@ -335,7 +339,32 @@ local function photo(emoji: string, caption: string, sky: { number }): { Words }
 	return { { face = "Front", back = sky, inset = 0.07, lines = { line(emoji, INK, 0.6), line(caption, CHARCOAL, 0.2, "Bold") } } }
 end
 
-function MoveSiteLooks.board(): { Piece }
+-- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the one house, what to do with it.
+local function sandboxPins(p: { Piece }, top: number, low: number)
+	local house = string.upper(SandboxMap.House.name)
+	pinned(p, "PhotoChalet", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", house, { 148, 196, 228 }), RED)
+	pinned(p, "FlyerChalet", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
+		line(house, RED, 0.16, "Black"),
+		line("END OF MAIN STREET", CHARCOAL, 0.12, "Bold"),
+		line("Bring it home to your warehouse.", CHARCOAL, 0.1),
+	} } }, YELLOW)
+	pinned(p, "PhotoStand", { 1.3, 1.15 }, 0.85, top, -4, PAPER, photo("🏺", "PUT IT ON SHOW", { 170, 206, 140 }), { 60, 110, 200 })
+	add(p, "Logo", { 1.4, 1.4, 0.06 }, { 2.55, top, 0.42 }, CHARCOAL, "SmoothPlastic", { words = {
+		{ face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.5, "Black"), line("MOVING", INK, 0.2, "Bold") } },
+	} })
+	pinned(p, "FlyerRare", { 1.3, 1.1 }, -2.55, low, 4, { 255, 236, 150 }, { { face = "Front", lines = {
+		line("RARE FINDS", RED, 0.26, "Black"),
+		line("OLD HOUSES HIDE TREASURES", CHARCOAL, 0.2, "Bold"),
+	} } }, RED)
+	pinned(p, "PhotoWarehouse", { 1.3, 1.15 }, -0.85, low, 2, PAPER, photo("🏭", "YOUR WAREHOUSE", { 196, 180, 220 }), YELLOW)
+	pinned(p, "FlyerRefill", { 1.2, 1.2 }, 0.85, low, -3, PAPER, { { face = "Front", lines = {
+		line("NEW EVERY MOVE", CHARCOAL, 0.24, "Black"),
+		line("The chalet is filled again", CHARCOAL, 0.15),
+	} } }, { 60, 150, 80 })
+	pinned(p, "PhotoEarn", { 1.3, 1.15 }, 2.55, low, -2, PAPER, photo("💰", "EARNS EVERY MINUTE", { 210, 226, 236 }), RED)
+end
+
+function MoveSiteLooks.board(sandbox: boolean?): { Piece }
 	local p: { Piece } = {}
 	add(p, "Plinth", { 7.8, 0.5, 2.0 }, { 0, 0.25, 0.5 }, CONCRETE, "Concrete", { solid = true })
 	for _, side in { -1, 1 } do
@@ -344,19 +373,23 @@ function MoveSiteLooks.board(): { Piece }
 	add(p, "Backing", { 7.4, 5.4, 0.3 }, { 0, 4.9, 0.8 }, { 44, 52, 50 }, "Metal", { solid = true })
 	add(p, "Board", { 6.8, 3.6, 0.2 }, { 0, 4.9, 0.55 }, CORK, "Fabric", { solid = true })
 	add(p, "Header", { 7.4, 1.1, 0.3 }, { 0, 8.15, 0.8 }, ORANGE, "Metal", { words = {
-		{ face = "Front", lit = true, lines = { line("MOVING CONTRACTS", CHARCOAL, 0.54, "Black"), line("ZDC MOVING & EVACUATION", CHARCOAL, 0.28, "Bold") } },
+		{ face = "Front", lit = true, lines = { line("MOVING CONTRACTS", CHARCOAL, 0.54, "Black"), line(if sandbox then "ZDC MOVING" else "ZDC MOVING & EVACUATION", CHARCOAL, 0.28, "Bold") } },
 	} })
 	add(p, "Canopy", { 8.4, 0.25, 2.4 }, { 0, 9.0, 0.4 }, CHARCOAL, "Metal", { rotation = { -6, 0, 0 } })
 	add(p, "LampArm", { 0.12, 0.12, 1.4 }, { 0, 8.82, -0.95 }, CHARCOAL, "Metal")
 	add(p, "LampShade", { 1.6, 0.35, 0.6 }, { 0, 8.6, -1.75 }, CHARCOAL, "Metal")
 	add(p, "LampGlass", { 1.4, 0.06, 0.45 }, { 0, 8.4, -1.75 }, PAPER, "Glass", { glow = WARM, light = 16 })
 	add(p, "Slogan", { 6.8, 0.42, 0.05 }, { 0, 2.55, 0.62 }, CHARCOAL, "SmoothPlastic", { words = {
-		{ face = "Front", lines = { line("We move your life. They eat everything else.", GREY, 0.8, "Bold") } },
+		{ face = "Front", lines = { line(if sandbox then "We move it. You keep it." else "We move your life. They eat everything else.", GREY, 0.8, "Bold") } },
 	} })
 	add(p, "Ledge", { 6.4, 0.12, 0.6 }, { 0, 2.15, 0.35 }, CHARCOAL, "Metal")
 	add(p, "Folders", { 1.0, 0.2, 0.45 }, { -1.8, 2.31, 0.35 }, { 226, 196, 128 }, "SmoothPlastic", { yaw = 6 }) -- (contracts to take)
 	-- The corkboard: four columns, two rows. The houses on the list (Marge's first), the notices, the ZDC logo.
 	local top, low = 5.75, 3.95
+	if sandbox then
+		sandboxPins(p, top, low)
+		return p
+	end
 	pinned(p, "PhotoMarge", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏠", "MARGE · WILLOW LN", { 148, 196, 228 }), RED)
 	pinned(p, "FlyerEvac", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
 		line("EVACUATION NOTICE", RED, 0.16, "Black"),

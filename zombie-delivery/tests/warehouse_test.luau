@@ -9,6 +9,10 @@
 --   * WarehouseLayout.standAt finds every stand at its middle and its corners, none in the aisles (a round trip)
 --   * the building: within its part budget, unique names, finite sizes, on the plot, over the ground; the lamps few;
 --     the UNLOAD HERE bay round the van's spot, in front of the door, off the building
+--   * 8.0.1: everything outside on the plot's concrete (SandboxMap.GroundTop, flush with the meadow; not the asphalt's
+--     RoadTop): the bay's lines and words a hair over it, the bollards' feet on it, the hall's floor at most 0.1 over it
+--     (no step at the door); the bay centred on the parked van (Config.Sprinter.Length at vanSpot), its words in the
+--     room between the van's back and the bay's door end
 --   * the signs' and the tags' texts
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
@@ -57,6 +61,8 @@ local standsOk, aislesOk, wallsOk, zoneOk, pathOk, plotOk, facingOk, topOk = tru
 local worst, wallWorst = math.huge, math.huge
 local roundOk, aisleNil, outsideNil = true, true, true
 local budgetOk, namesOk, finiteOk, groundOk, onPlotOk, solidPathOk, lampsOk, signsOk, bayOk = true, true, true, true, true, true, true, true, true
+local GROUND = SandboxMap.GroundTop
+local floorOk, paintOk, bollardsOk, bayMiddleOk, wordsOk = true, true, 0, true, true
 local doorOk, standPartsOk, receivingOk = true, true, true
 local most, lampCount = 0, 0
 local detail: { string } = {}
@@ -151,12 +157,28 @@ for _, plot in SandboxMap.Plots do
 			table.insert(detail, `{p.name} solid on the way in`)
 		end
 		-- the door's opening itself: nothing under 14 studs across it (a carried wardrobe, a tall player)
-		if y1 > SandboxMap.RoadTop + 0.1 and y0 < 14 and x1 > door.x - door.width / 2 + 0.01 and x0 < door.x + door.width / 2 - 0.01 and z1 > door.z - 1.5 and z0 < door.z + 0.5 and p.group ~= "paint" and p.name ~= "Floor" then
+		if y1 > GROUND + 0.1 and y0 < 14 and x1 > door.x - door.width / 2 + 0.01 and x0 < door.x + door.width / 2 - 0.01 and z1 > door.z - 1.5 and z0 < door.z + 0.5 and p.group ~= "paint" and p.name ~= "Floor" then
 			doorOk = false
 			table.insert(detail, `{p.name} in the door's opening`)
 		end
 		if p.light then
 			lamps += 1
+		end
+		-- 8.0.1: on the plot's concrete (GroundTop), not the asphalt's RoadTop
+		if p.name == "Floor" then
+			floorOk = floorOk and math.abs(y0 - GROUND) < 1e-6 and math.abs(y1 - WarehouseLayout.FloorTop) < 1e-6
+		elseif p.group == "bay" then
+			-- (the words' part lies flat: its face up at y1)
+			if not (y0 > GROUND and y0 <= GROUND + 0.05 and y1 <= GROUND + 0.1) then
+				paintOk = false
+				table.insert(detail, `{p.name} at {y0} … {y1}`)
+			end
+		elseif string.sub(p.name, 1, 7) == "Bollard" then
+			if math.abs(y0 - GROUND) < 1e-6 and y1 > GROUND + 3 then
+				bollardsOk += 1
+			else
+				table.insert(detail, `{p.name}'s foot at {y0}`)
+			end
 		end
 		if p.stand then
 			standParts += 1
@@ -181,6 +203,18 @@ for _, plot in SandboxMap.Plots do
 		and (bay.x1 - bay.x0) == T.Bay[1] and (bay.z1 - bay.z0) == T.Bay[2]
 	local spawn = plot.spawn
 	bayOk = bayOk and not (spawn.x > bay.x0 and spawn.x < bay.x1 and spawn.z > bay.z0 and spawn.z < bay.z1)
+	-- 8.0.1: centred on the parked van (yaw 180: its nose south, its back to the door), the van inside it with room at
+	-- both ends, the words between the bay's north line and the van's back (seen with the van parked)
+	local van = { x0 = v.x - Config.Sprinter.Width / 2, x1 = v.x + Config.Sprinter.Width / 2, z0 = v.z - Config.Sprinter.Length / 2, z1 = v.z + Config.Sprinter.Length / 2 }
+	bayMiddleOk = bayMiddleOk and v.yaw == 180
+		and math.abs((bay.x0 + bay.x1) / 2 - v.x) < 1e-6 and math.abs((bay.z0 + bay.z1) / 2 - v.z) < 1e-6
+		and within(van, bay, 1)
+	for _, p in pieces do
+		if p.name == "BayText" then
+			local x0, x1, _, _, z0, z1 = WarehouseLayout.bounds(p)
+			wordsOk = wordsOk and z0 >= bay.z0 + 0.5 - 1e-6 and z1 <= van.z0 + 1e-6 and z1 - z0 >= 2 and x0 >= bay.x0 and x1 <= bay.x1
+		end
+	end
 end
 check(`every stand is inside its building, the way its piece looks (south, to its aisle) and its top at the floor + {T.StandHeight}`, standsOk and facingOk and topOk)
 check(`aisles of at least {T.Aisle} studs between any two stands (the least: {worst})`, aislesOk, worst)
@@ -199,6 +233,11 @@ check("nothing solid on the way in under the door's top (the floor apart)", soli
 check(`the hall's lamps: {lampCount} (4 … 8 PointLights)`, lampsOk, lampCount)
 check("the signs (ZDC, the owner's, STOCK, RECEIVING, UNLOAD HERE) and every stand's podium, top and plate", signsOk and standPartsOk)
 check("the UNLOAD HERE bay: round the van's spot and the unload circle, in front of the door, off the spawn, on the plot", bayOk)
+check("8.0.1: the bay centred on the parked Sprinter (vanSpot), the van inside it with a stud to spare all round", bayMiddleOk)
+check("8.0.1: UNLOAD HERE between the bay's door end and the parked van's back (not under it)", wordsOk)
+check(`8.0.1: the hall's floor from the plot's concrete (GroundTop) to FloorTop, a lip of at most 0.1 at the door ({WarehouseLayout.FloorTop - GROUND})`, floorOk and WarehouseLayout.FloorTop > GROUND and WarehouseLayout.FloorTop - GROUND <= 0.1 + 1e-9)
+check("8.0.1: the bay's lines and words a hair over the plot's concrete (GroundTop), not floating at RoadTop", paintOk, table.concat(detail, "; "))
+check(`8.0.1: every bollard's foot on the plot's concrete ({bollardsOk} of {2 * #SandboxMap.Plots})`, bollardsOk == 2 * #SandboxMap.Plots, table.concat(detail, "; "))
 
 -- WarehouseLayout.stands (the guide's arrow): a plot or its id, every stand in stand-number order
 local listOk = true

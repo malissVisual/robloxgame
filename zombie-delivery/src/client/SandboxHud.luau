@@ -9,7 +9,8 @@
 --   * your money, big, in the money green, counting up (client/Juice.luau countMoney): the player's State (the State
 --     remote's table, SandboxHud.setState from client/Main.client.luau, as the old HUD gets it), the player list's
 --     leaderstats Money until then (boot-client hides the old money line, its level and XP in the sandbox)
---   * "+$X/min" in green under it while pieces are on show (the "Collection" remote's state: income)
+--   * "+$X/min" in green under it while pieces are on show (the "Collection" remote's state: income; WarehouseUi.rate:
+--     a tenth under $10, "+$0.4/min")
 --   * the chip "📦 N in stock" (the pieces not on show): a tap, or the key Config.SandboxHud.StockKey (B), opens the
 --     STOCK list (client/WarehouseUi.luau; the key again closes it)
 --   * toasts: a piece sold ("Sold Grandpa's Clock · +$420", client/WarehouseUi.luau's "sold") and pieces brought home
@@ -104,7 +105,7 @@ local function arrange()
 	-- the money card: the money (as wide as its target) over "+$X/min"
 	local moneyText = Ui.money(money)
 	local moneyW = CardKit.width(moneyText, HUD.MoneySize, Theme.DisplayFont)
-	local incomeText = `+{Ui.money(income)}/min`
+	local incomeText = WarehouseUi.rate(income)
 	local incomeW = if income > 0 then CardKit.width(incomeText, HUD.IncomeSize, Theme.HeadingFont) else 0
 	local cardW = math.ceil(math.max(moneyW, incomeW, 90)) + 2 * PAD_X
 	local moneyH = HUD.MoneySize + 4

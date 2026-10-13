@@ -7,7 +7,8 @@
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
 > from inside. Take the contract at the kiosk by your warehouse, carry the house out (the grip, Danny and two-person
-> lifts as before), drive home: with the van's back in your plot's unload circle the load goes into your **stock**
+> lifts as before), drive home: with the van's back or middle in your plot's unload circle (nose-in works too; parked elsewhere on
+> your plot, you are told to back up) the load goes into your **stock**
 > (`server/Collection.luau`). In the warehouse put pieces **on show** on its 12 stands (E at a stand → the picker):
 > they **earn money every minute you play** (`shared/CollectionRules.luau`, `Config.Collection`), or sell them any time.
 > The HUD shows the money, "+$X/min" and the stock (`client/SandboxHud.luau`, `client/WarehouseUi.luau`), a guide line
@@ -15,7 +16,10 @@
 > test tools. The sandbox saves in its own DataStore (`Config.Sandbox.Store`), so the city's saves are untouched; no
 > weapons, no day and night, the horde off (`Config.Moving.Sandbox`). `Config.Sandbox.On = false` boots the city as
 > before (it stays in the code until the owner says it may go). The contract between the parts:
-> `design/sandbox/KONTRAKT.md`.
+> `design/sandbox/KONTRAKT.md`. 8.0.1 (the review): vans find room at the warehouse and the chalet again
+> (`Config.SpawnSpot.Pass`), the warehouse stands on its concrete, cheap pieces show "+$0.2/min", no city sounds, a
+> freed plot goes to a waiting player, START brings the van repaired, dying on a move puts you by the van, one arrow
+> (the guide, no GPS), the sandbox's own words everywhere (no Wall, no pay, no XP).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

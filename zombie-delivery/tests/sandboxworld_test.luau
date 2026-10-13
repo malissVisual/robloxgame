@@ -4,15 +4,21 @@
 -- and the turnaround with a shoulder down to the meadow on every edge (no step a wheel would catch), nothing that
 -- collides on the roads, the turnaround, the plots (but their pads), the path from the curb to the house's door or in
 -- the door's way, the trees off all of that and off the vans' ways, the part budget, the shadows only on bigger
--- parts, the chalet in its box with its FrontDoor at House.door, the signpost's and the mailbox's words, the light.
+-- parts, the chalet in its box with its FrontDoor at House.door, the signpost's and the mailbox's words, the light;
+-- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
+-- box query, Config.SpawnSpot.Pass leaving out the ground's mounds), and not where a player stands.
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
 local G = Mock.globals
 local Enum = G.Enum
 local workspace, game = Mock.workspace, Mock.game
+local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
 local SandboxScenery = require("./SandboxScenery")
 local SandboxWorld = require("./SandboxWorldServer")
+local SpawnSpot = require("./SpawnSpot")
+local SprinterLooks = require("./SprinterLooks")
+local WarehouseLayout = require("./WarehouseLayout")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -532,6 +538,154 @@ do
 		end
 	end
 	check(`shadows only from the bigger parts ({casting} of {#boxes})`, small == nil and casting < #boxes / 2, small)
+end
+
+-- 8.0.1 review: a van finds room at its spots. server/Vehicles.luau findRoom asks GetPartBoundsInBox for the room the
+-- van's hull needs (Config.SpawnSpot: from Lift over its wheels' ground up to its roof, Pad wider all round; only what
+-- collides), leaving out the folders of Config.SpawnSpot.Pass. That query sees a part's whole box: a mound's buried
+-- ball is a cube some 480 studs wide whose top stands over the meadow, so without the pass every van's spot was
+-- "taken" and the van went down anyway, onto a player too. Here the built world and every plot's warehouse
+-- (WarehouseLayout.pieces, its solid ones) stand in for the workspace, the wheels' rays find the ground (a ball's
+-- cap, a disc, else a part's box), and the Sprinter (SprinterLooks: its hull, its wheels) at every plot's vanSpot and
+-- at the house's curb has its four wheels on one plane and its room free on the first try; a player standing there
+-- takes it.
+do
+	local Cfg = Config.SpawnSpot
+	type Solid = { name: string, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, passed: boolean, ball: { number }?, disc: { number }? }
+	local passes: { any } = {}
+	for _, path in Cfg.Pass do
+		local found: any = workspace
+		for name in string.gmatch(path, "[^%.]+") do
+			found = if found then found:FindFirstChild(name) else nil
+		end
+		if found and found ~= workspace then
+			table.insert(passes, found)
+		end
+	end
+	check("Config.SpawnSpot.Pass finds the sandbox's ground (workspace.Sandbox.Ground)", table.find(passes, world:FindFirstChild("Ground")) ~= nil and table.find(Cfg.Pass, "Loot") ~= nil and table.find(Cfg.Pass, "Animals") ~= nil)
+	local solids: { Solid } = {}
+	for _, d in world:GetDescendants() do
+		if d:IsA("BasePart") and d.CanCollide then
+			local size = d.Size
+			local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = d.CFrame:GetComponents()
+			local hx = (math.abs(r00) * size.X + math.abs(r01) * size.Y + math.abs(r02) * size.Z) / 2
+			local hy = (math.abs(r10) * size.X + math.abs(r11) * size.Y + math.abs(r12) * size.Z) / 2
+			local hz = (math.abs(r20) * size.X + math.abs(r21) * size.Y + math.abs(r22) * size.Z) / 2
+			local passed = false
+			for _, folder in passes do
+				passed = passed or d:IsDescendantOf(folder)
+			end
+			local solid: Solid = { name = d.Name, x0 = x - hx, x1 = x + hx, y0 = y - hy, y1 = y + hy, z0 = z - hz, z1 = z + hz, passed = passed }
+			if d.Shape == Enum.PartType.Ball then
+				solid.ball = { x, y, z, size.X / 2 }
+			elseif d.Shape == Enum.PartType.Cylinder and math.abs(r10) > 0.999 then
+				solid.disc = { x, z, size.Y / 2, y + hy } -- (its axis, the part's X, standing up)
+			end
+			table.insert(solids, solid)
+		end
+	end
+	for _, plot in SandboxMap.Plots do
+		for _, p in WarehouseLayout.pieces(plot) do
+			if p.solid then
+				local x0, x1, y0, y1, z0, z1 = WarehouseLayout.bounds(p)
+				table.insert(solids, { name = `warehouse {plot.id}'s {p.name}`, x0 = x0, x1 = x1, y0 = y0, y1 = y1, z0 = z0, z1 = z1, passed = false })
+			end
+		end
+	end
+	-- a wheel's ray from `from` down Probe studs: the highest top it meets (nil: none)
+	local function ray(x: number, z: number, from: number): number?
+		local best: number? = nil
+		for _, s in solids do
+			local top: number? = nil
+			local ball, disc = s.ball, s.disc
+			if ball then
+				local d2 = (x - ball[1]) ^ 2 + (z - ball[3]) ^ 2
+				if d2 < ball[4] ^ 2 then
+					top = ball[2] + math.sqrt(ball[4] ^ 2 - d2)
+				end
+			elseif disc then
+				if (x - disc[1]) ^ 2 + (z - disc[2]) ^ 2 <= disc[3] ^ 2 then
+					top = disc[4]
+				end
+			elseif x >= s.x0 and x <= s.x1 and z >= s.z0 and z <= s.z1 then
+				top = s.y1
+			end
+			if top and top <= from and top >= from - Cfg.Probe and (best == nil or top > (best :: number)) then
+				best = top
+			end
+		end
+		return best
+	end
+	local hullTop = 0
+	for _, b in SprinterLooks.hull() do
+		hullTop = math.max(hullTop, b.at[2] + b.size[2] / 2)
+	end
+	local sx, sy, sz, cy = SpawnSpot.box(SprinterLooks.Width, SprinterLooks.Length, hullTop, Cfg.Lift, Cfg.Pad)
+	local wheels = { { -SprinterLooks.Track, -SprinterLooks.Axle }, { SprinterLooks.Track, -SprinterLooks.Axle }, { -SprinterLooks.Track, SprinterLooks.Axle }, { SprinterLooks.Track, SprinterLooks.Axle } }
+	-- findRoom's first try at a spot: the ground's plane under the wheels, then what takes the room over it
+	local function firstTry(spot: SandboxMap.Spot, extra: { Solid }?, pass: boolean): (boolean, string)
+		local turn = math.rad(spot.yaw)
+		local c, s = math.cos(turn), math.sin(turn)
+		local points: { { number } } = {}
+		for _, w in wheels do
+			-- (CFrame.Angles(0, yaw, 0) * (x, 0, z))
+			local x, z = spot.x + c * w[1] + s * w[2], spot.z - s * w[1] + c * w[2]
+			local top = ray(x, z, spot.y + Cfg.Probe / 2)
+			if not top then
+				return false, `no ground under a wheel at {x}, {z}`
+			end
+			table.insert(points, { x, top, z })
+		end
+		local even, why, up, middle = SpawnSpot.plane(points, Cfg.Spread, Cfg.Slope)
+		if not even or not up or not middle then
+			return false, why
+		end
+		if math.abs(up[2] - 1) > 1e-6 then
+			return false, "the ground under it is not level"
+		end
+		local ground = SpawnSpot.heightAt(up, middle, spot.x, spot.z)
+		-- (yaw 0 or 180: the room's box lies along the axes)
+		local hx, hz = sx / 2, sz / 2
+		if math.abs(s) > 1e-6 then
+			hx, hz = sz / 2, sx / 2
+		end
+		local bx0, bx1, by0, by1, bz0, bz1 = spot.x - hx, spot.x + hx, ground + cy - sy / 2, ground + cy + sy / 2, spot.z - hz, spot.z + hz
+		local all = table.clone(solids)
+		for _, e in extra or {} do
+			table.insert(all, e)
+		end
+		for _, b in all do
+			if (pass and b.passed) then
+				continue
+			end
+			if b.x0 < bx1 and b.x1 > bx0 and b.y0 < by1 and b.y1 > by0 and b.z0 < bz1 and b.z1 > bz0 then
+				return false, `{b.name} in the way`
+			end
+		end
+		return true, string.format("its wheels at %.2f", ground)
+	end
+	local spots: { { name: string, spot: SandboxMap.Spot } } = {}
+	for _, plot in SandboxMap.Plots do
+		table.insert(spots, { name = `plot {plot.id}'s vanSpot`, spot = plot.vanSpot })
+	end
+	table.insert(spots, { name = "the house's curb", spot = HOUSE.curb })
+	local mounded = 0
+	for _, at in spots do
+		local spot = at.spot
+		local free, why = firstTry(spot, nil, true)
+		check(`a van at {at.name} finds room on the first try ({why})`, free, why)
+		-- the mounds' boxes (left out by the pass) would take it
+		local _, unpassed = firstTry(spot, nil, false)
+		if string.find(unpassed, "Mound", 1, true) then
+			mounded += 1
+		end
+		-- a player standing there (their body's box: 2 wide, 1 deep, 5 tall on the ground)
+		local feet = if spot == HOUSE.curb then SandboxScenery.TurnaroundTop else GROUND
+		local body: Solid = { name = "a player", x0 = spot.x - 1, x1 = spot.x + 1, y0 = feet, y1 = feet + 5, z0 = spot.z - 0.5, z1 = spot.z + 0.5, passed = false }
+		local taken, whyTaken = firstTry(spot, { body }, true)
+		check(`… a player standing at {at.name} takes it`, not taken and whyTaken == "a player in the way", whyTaken)
+	end
+	check(`without the pass the mounds' boxes take every spot (here: {mounded} of {#spots})`, mounded == #spots, mounded)
 end
 
 -- the light: a fixed warm afternoon
