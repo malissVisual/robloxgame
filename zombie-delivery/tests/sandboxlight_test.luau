@@ -174,10 +174,10 @@ check("the sky: the sun at most 2, the shade's light under the open air's, no li
 
 -- A hall's lights (WarehouseLayout.pieces: its PointLights) and the measure of its floor at the floor and a face's height.
 type Measure = { peak: number, floor: number, load: number, count: number, strongest: number, longest: number }
-local function hall(plot: SandboxMap.Plot, lamp: { Brightness: number, Range: number }?): Measure
+local function hall(plot: SandboxMap.Plot, lamp: { Brightness: number, Range: number }?, level: number): Measure
 	local lights: { Rules.Light } = {}
 	local strongest, longest = 0, 0
-	for _, p in WarehouseLayout.pieces(plot) do
+	for _, p in WarehouseLayout.pieces(plot, level) do
 		local l = p.light
 		if l then
 			local b = if lamp then lamp.Brightness else l.brightness
@@ -186,7 +186,7 @@ local function hall(plot: SandboxMap.Plot, lamp: { Brightness: number, Range: nu
 			strongest, longest = math.max(strongest, b), math.max(longest, r)
 		end
 	end
-	local inside = WarehouseLayout.inside(plot)
+	local inside = WarehouseLayout.inside(plot, level)
 	local peak, sum, n = 0, 0, 0
 	for i = 0, 16 do
 		for j = 0, 16 do
@@ -203,34 +203,65 @@ end
 do
 	local seen = 0
 	local eyes = 2 ^ L.Places.warehouse.Exposure
-	for _, plot in SandboxMap.Plots do
-		local m = hall(plot)
-		seen += 1
-		local tag = `plot {plot.id}'s hall`
-		check(`{tag}: {m.count} lamps, each at most {CAP.Brightness} bright and {CAP.Range} long`, m.count > 0 and m.strongest <= CAP.Brightness and m.longest <= CAP.Range)
-		check(`{tag}: Σ brightness × range {m.load} ≤ {CAP.HallLoad}`, m.load <= CAP.HallLoad, m.load)
-		check(`{tag}: at a face's height at most {CAP.Peak} on screen ({string.format("%.2f", m.peak * eyes)})`, m.peak * eyes <= CAP.Peak, m.peak * eyes)
-		check(`{tag}: its floor not dark (a mean of {string.format("%.2f", m.floor)})`, m.floor >= CAP.Floor, m.floor)
+	-- 8.3: every warehouse level's hall (Config.WarehouseLevels: the Garage's 1 lamp … the Logistics centre's 12, where
+	-- the owner's Blender lamps hang; Config.SandboxLight.Warehouse.Levels their light). The Caps are level 4's hall's
+	-- (6 lamps hanging `hang` over the floor): a level's load cap is HallLoad × its lamps / level 4's, and a hall whose
+	-- lamps hang higher gets their reach in proportion (Range and the load × its hang / level 4's: they must reach its
+	-- floor); its lamps no denser on its floor than level 4's × LAMP_DENSITY (one lamp at least). A bigger hall is no
+	-- brighter: the peak at a face's height and the floor are held to the same Caps on every level.
+	local LEVELS = Config.WarehouseLevels.List
+	local LAMP_DENSITY = 1.4 -- (tests/warehouse_test.luau's bound: the Workshop's 2 and the Warehouse's 4 a third denser)
+	local function lampsOf(n: number): (number, number)
+		local count, hang = 0, 0
+		for _, p in WarehouseLayout.pieces(SandboxMap.Plots[1], n) do
+			if p.light then
+				count += 1
+				hang = math.max(hang, p.at[2] - WarehouseLayout.FloorTop)
+			end
+		end
+		return count, hang
 	end
-	check("every plot's hall measured", seen == #SandboxMap.Plots and seen > 0)
+	local fourLamps, fourHang = lampsOf(4)
+	local fourArea = LEVELS[4].size[1] * LEVELS[4].size[3]
+	for n, def in LEVELS do
+		local lamps, hang = lampsOf(n)
+		local higher = math.max(1, hang / fourHang)
+		local cap, reach = CAP.HallLoad * lamps / fourLamps * higher, CAP.Range * higher
+		local area = def.size[1] * def.size[3]
+		check(`level {n} ({def.name}): {lamps} lamps {string.format("%.1f", hang)} over the floor, at most {LAMP_DENSITY} × level 4's per floor (one a {math.floor(fourArea / fourLamps)} studs²) or one`,
+			lamps >= 1 and lamps <= math.max(1, LAMP_DENSITY * area * fourLamps / fourArea), lamps / area * fourArea / fourLamps)
+		for _, plot in SandboxMap.Plots do
+			local m = hall(plot, nil, n)
+			seen += 1
+			local tag = `plot {plot.id}'s hall at level {n}`
+			check(`{tag}: {m.count} lamps, each at most {CAP.Brightness} bright and {string.format("%.1f", reach)} long ({m.longest})`, m.count > 0 and m.strongest <= CAP.Brightness and m.longest <= reach)
+			check(`{tag}: Σ brightness × range {string.format("%.1f", m.load)} ≤ {string.format("%.1f", cap)} (HallLoad × {m.count} / {fourLamps}{if higher > 1 then string.format(" × %.2f", higher) else ""})`, m.load <= cap + 1e-9, m.load)
+			check(`{tag}: at a face's height at most {CAP.Peak} on screen ({string.format("%.2f", m.peak * eyes)})`, m.peak * eyes <= CAP.Peak, m.peak * eyes)
+			check(`{tag}: its floor not dark (a mean of {string.format("%.2f", m.floor)})`, m.floor >= CAP.Floor, m.floor)
+		end
+	end
+	check("every plot's hall measured at every level", seen == #SandboxMap.Plots * #LEVELS and seen > 0)
+	check("level 4's hall is the one HallLoad was measured on (6 lamps)", fourLamps == 6)
 	-- 8.2's hall (6 lamps of 1.3 out to 40, never shadowed): the flashbang the caps now stop
-	local old = hall(SandboxMap.Plots[1], { Brightness = 1.3, Range = 40 })
+	local old = hall(SandboxMap.Plots[1], { Brightness = 1.3, Range = 40 }, 4)
 	check(`8.2's hall breaks the caps (peak {string.format("%.2f", old.peak)}, load {old.load}): they bite`, old.peak > CAP.Peak and old.load > CAP.HallLoad)
 
-	-- the hall's Neon: its lamps' discs face the floor, small and not white; nothing bigger glows bright
+	-- the hall's Neon (8.3: every level's): its lamps' discs face the floor, small and not white; nothing bigger glows bright
 	local bad: { string } = {}
-	for _, p in WarehouseLayout.pieces(SandboxMap.Plots[1]) do
-		if p.material == "Neon" then
-			local s = p.size
-			local down = if p.shape == "Cylinder" then math.pi * (math.min(s[2], s[3]) / 2) ^ 2 else math.max(s[1] * s[3], s[1] * s[2], s[2] * s[3])
-			if down > CAP.NeonArea and Rules.luma(p.color) > CAP.NeonLuma then
-				table.insert(bad, `{p.name} {math.floor(down)} studs²`)
-			elseif Rules.luma(p.color) > CAP.GlowLuma then
-				table.insert(bad, `{p.name} luma {math.floor(Rules.luma(p.color))}`)
+	for n in LEVELS do
+		for _, p in WarehouseLayout.pieces(SandboxMap.Plots[1], n) do
+			if p.material == "Neon" then
+				local s = p.size
+				local down = if p.shape == "Cylinder" then math.pi * (math.min(s[2], s[3]) / 2) ^ 2 else math.max(s[1] * s[3], s[1] * s[2], s[2] * s[3])
+				if down > CAP.NeonArea and Rules.luma(p.color) > CAP.NeonLuma then
+					table.insert(bad, `{p.name}@{n} {math.floor(down)} studs²`)
+				elseif Rules.luma(p.color) > CAP.GlowLuma then
+					table.insert(bad, `{p.name}@{n} luma {math.floor(Rules.luma(p.color))}`)
+				end
 			end
 		end
 	end
-	check("the hall's Neon: no face over NeonArea bright, no lamp glow whiter than GlowLuma", #bad == 0, table.concat(bad, ", "))
+	check("every level's hall Neon: no face over NeonArea bright, no lamp glow whiter than GlowLuma", #bad == 0, table.concat(bad, ", "))
 	check("the lamps' own Neon (the house's discs and tube, the hall's discs, the Blender hall's lamps) under GlowLuma; 8.2's over it",
 		Rules.luma(L.House.Glow) <= CAP.GlowLuma and Rules.luma(L.House.Tube) <= CAP.GlowLuma and Rules.luma(L.Warehouse.Glow) <= CAP.GlowLuma
 			and Rules.luma(L.Warehouse.MeshGlow) <= CAP.GlowLuma and Rules.luma({ 255, 244, 224 }) > CAP.GlowLuma and Rules.luma({ 255, 241, 214 }) > CAP.GlowLuma)

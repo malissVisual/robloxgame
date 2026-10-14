@@ -8,7 +8,8 @@
 --   SandboxLightRules.place(x, y, z, inside, inVan)   where you are for the eyes: "van" in a Sprinter's walk-in bay, else
 --                                             what the sandbox's sounds say (shared/SoundPlan.luau sandboxPlace: inside
 --                                             the move's house, far off the map where the interiors stand, in a plot's
---                                             warehouse, else outdoors)
+--                                             warehouse, else outdoors; 8.3: levelOf, optional, passed on: the plot's
+--                                             warehouse level, so its own level's walls)
 --   SandboxLightRules.look(place, lite?)      the place's whole look (Config.SandboxLight.Places over Sky.Exposure; an
 --                                             unknown place outdoors'): exposure, bloom, size, threshold, brightness,
 --                                             contrast, saturation, tint { r, g, b }, rays. lite: a phone's bloom
@@ -54,11 +55,11 @@ local SLACK = 0.5 -- studs round the bay's box that still count as in it (a body
 
 -- ── Where you are ─────────────────────────────────────────────────────────────
 
-function SandboxLightRules.place(x: number, y: number, z: number, inside: boolean, inVan: boolean): string
+function SandboxLightRules.place(x: number, y: number, z: number, inside: boolean, inVan: boolean, levelOf: ((plotId: number) -> number?)?): string
 	if inVan and not inside then
 		return "van"
 	end
-	return SoundPlan.sandboxPlace(x, y, z, inside)
+	return SoundPlan.sandboxPlace(x, y, z, inside, levelOf)
 end
 
 function SandboxLightRules.inBay(dx: number, dy: number, dz: number): boolean

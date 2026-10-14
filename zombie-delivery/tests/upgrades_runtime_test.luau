@@ -1,13 +1,15 @@
 -- 8.1 SANDBOX, the upgrades on the server: the real server/Upgrades.luau with the real server/PlayerData.luau and
 -- server/Collection.luau (UpgradesServer.luau, PlayerDataServer.luau, CollectionServer.luau through tests/run_tests.py)
 -- on tests/runtime/CollectionRuntime.luau's players, DataStore, clock, Net, workspace and plots. Joining (an 8.0 save
--- gets none, the state goes out once), buying (the money taken with the reason "Upgrade", the level, the analytics, the
--- "bought" message, the stands and the lights through the collection), refusals (no save, no warehouse of your own, not
--- enough money, the top level, a second click on one card, garbage on the remote, the rate limit), the lights' income
--- exact (what the stands earned before is paid at the old rate), a small upgrade stand refusing a bed, the van's engine
--- (a van there and one that comes later; another player's untouched), Danny's attribute, the window's "open", the
--- admin's MAX / RESET (the pieces on the stands lost back to the stock), the save round trip (the flag, twice) and the
--- migration (an old save, a garbled one). Run: python3 tests/run_tests.py [path to the luau binary]
+-- gets none but its warehouse's level, 8.3: the Big warehouse it had; a new player the Garage; the state goes out
+-- once), buying (the money taken with the reason "Upgrade", the level, the analytics, the "bought" message, the
+-- warehouse's stands and the lights through the collection), refusals (no save, no warehouse of your own, not enough
+-- money, the top level, a second click on one card, garbage on the remote, 8.1's More stands that is no more, the rate
+-- limit), the lights' income exact (what the stands earned before is paid at the old rate), the Garage's stands
+-- refusing Walt's hay wagon and a stand it hasn't, the van's engine (a van there and one that comes later; another
+-- player's untouched), Danny's attribute, the warehouse level's attribute, the window's "open", the admin's MAX / RESET
+-- / 🏗 LEVEL n (the pieces on the stands lost back to the stock), the save round trip (the flags, twice) and the
+-- migration (an old save, an 8.1 save with More stands, a garbled one). Run: python3 tests/run_tests.py [path to the luau binary]
 
 local E = require("./CollectionRuntime")
 local Config = require("./Config")
@@ -90,6 +92,7 @@ local function save80(cash: number): any
 		noPacks = true, noJacket = true, noShoes = true, perGameBags = true, vanOnly = true, carStages = true,
 		vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
 		collectionKept = true, collection = { entries = {}, nextUid = 1 }, sandboxUpgrades = { stands = 4, lights = 5 },
+		-- (8.3: no warehouseLevelKept: its warehouse gets its level once)
 	}
 end
 
@@ -99,52 +102,57 @@ Upgrades.start()
 local U = Config.SandboxUpgrades
 
 -- ── Joining ────────────────────────────────────────────────────────────────
-E.saves.Player_101 = save80(5000)
+E.saves.Player_101 = save80(35000)
 local mark = #E.sent
 local A = E.join(101, "Ann")
 local profileA = PlayerData.get(A) :: any
-check("an 8.0 save loads without upgrades (its sandboxUpgrades without the flag is not read)", profileA ~= nil and profileA.money == 5000 and same(profileA.sandboxUpgrades, {}))
+check("an 8.0 save loads without upgrades (its sandboxUpgrades without the flag is not read) but its warehouse's level (8.3: the Big warehouse it had)",
+	profileA ~= nil and profileA.money == 35000 and same(profileA.sandboxUpgrades, { warehouse = 4 }))
 E.flush()
 local states = kinds(E.received(A, "Upgrades", mark), "state")
-check("joining: the state goes out once (no levels, the money)", #states == 1 and same(states[1].levels, {}) and states[1].money == 5000, #states)
-check("… Danny's attribute: level 0; Collection.stands 12, boost 1", A:GetAttribute(U.Danny) == 0 and Collection.stands(A) == 12 and Collection.boost(A) == 1)
+check("joining: the state goes out once (its levels, the money)", #states == 1 and same(states[1].levels, { warehouse = 4 }) and states[1].money == 35000, #states)
+check("… Danny's attribute: level 0; the warehouse level's: 4; Collection.stands 12, boost 1", A:GetAttribute(U.Danny) == 0 and A:GetAttribute(Config.WarehouseLevels.Attribute) == 4
+	and Upgrades.warehouseLevel(A) == 4 and Collection.stands(A) == 12 and Collection.boost(A) == 1)
 local B = E.join(202, "Ben") -- a new player
-check("a new player: none", same((PlayerData.get(B) :: any).sandboxUpgrades, {}))
+check("a new player: none (8.3: the Garage, 2 stands)", same((PlayerData.get(B) :: any).sandboxUpgrades, {}) and Upgrades.warehouseLevel(B) == 1 and Collection.stands(B) == 2
+	and B:GetAttribute(Config.WarehouseLevels.Attribute) == 1)
 
 -- ── Refusals before buying ──────────────────────────────────────────────────
-local ok, why = Upgrades.buy(A, "stands")
-check("no warehouse of your own (no plot): refused, says why; no money taken", ok == false and type(why) == "string" and string.find(why :: string, "warehouse of your own", 1, true) ~= nil and profileA.money == 5000, why)
+local ok, why = Upgrades.buy(A, "warehouse")
+check("no warehouse of your own (no plot): refused, says why; no money taken", ok == false and type(why) == "string" and string.find(why :: string, "warehouse of your own", 1, true) ~= nil and profileA.money == 35000, why)
 E.plotOf[A] = 1
 local stranger = E.player(303) -- here, but their save never loaded
 E.plotOf[stranger] = 3
-ok, why = Upgrades.buy(stranger, "stands")
+ok, why = Upgrades.buy(stranger, "warehouse")
 check("no save loaded: refused", ok == false and why == "Your save isn't loaded yet.", why)
 local junkOk = true
-for _, id in { "nitro", 5, {}, nil, "", "STANDS" } do
+for _, id in { "nitro", 5, {}, nil, "", "WAREHOUSE", "stands" } do
 	local yes, said = Upgrades.buy(A, id :: any)
 	junkOk = junkOk and yes == false and said == "That's no upgrade."
 end
-check("no such upgrade (an unknown id, a number, a table, nil, \"\", the wrong case): refused", junkOk and profileA.money == 5000)
+check("no such upgrade (an unknown id, a number, a table, nil, \"\", the wrong case, 8.1's More stands): refused", junkOk and profileA.money == 35000)
 
 -- ── Buying ──────────────────────────────────────────────────────────────────
+Upgrades.admin(A, "level3") -- (8.3: the Warehouse, a level under the one she buys)
+E.flush()
 local moneyAt, eventsAt, heardAt = #money, #events, #heard
 mark = #E.sent
-ok, why = Upgrades.buy(A, "stands", 1)
+ok, why = Upgrades.buy(A, "warehouse", 4)
 E.flush()
-check("More stands level 1: bought for $1,000 (the money taken)", ok == true and why == nil and profileA.money == 4000 and same(profileA.sandboxUpgrades, { stands = 1 }), why)
+check("8.3: the Warehouse card's level 4 (the Big warehouse): bought for $12,000 (the money taken)", ok == true and why == nil and profileA.money == 23000 and same(profileA.sandboxUpgrades, { warehouse = 4 }), why)
 local spent = money[moneyAt + 1]
-check("… PlayerData.spend: -$1,000, the reason \"Upgrade\", the SKU its id", spent ~= nil and spent.delta == -1000 and spent.reason == "Upgrade" and spent.sku == "stands" and #money == moneyAt + 1)
+check("… PlayerData.spend: -$12,000, the reason \"Upgrade\", the SKU its id", spent ~= nil and spent.delta == -12000 and spent.reason == "Upgrade" and spent.sku == "warehouse" and #money == moneyAt + 1)
 local bought = events[eventsAt + 1]
-check("… analytics: UpgradeBought (the level, the id)", bought ~= nil and bought.name == "UpgradeBought" and bought.value == 1 and bought.a == "stands")
+check("… analytics: UpgradeBought (the level, the id)", bought ~= nil and bought.name == "UpgradeBought" and bought.value == 4 and bought.a == "warehouse")
 local msgs = E.received(A, "Upgrades", mark)
-check("… the client: \"bought\" and one new state", #kinds(msgs, "bought") == 1 and kinds(msgs, "bought")[1].id == "stands" and kinds(msgs, "bought")[1].level == 1
-	and #kinds(msgs, "state") == 1 and same(kinds(msgs, "state")[1].levels, { stands = 1 }) and kinds(msgs, "state")[1].money == 4000)
-check("… 14 stands now: the collection's state says so, the listeners heard", Collection.stands(A) == 14 and #heard == heardAt + 1
-	and kinds(E.received(A, "Collection", mark), "state")[1].stands == 14)
+check("… the client: \"bought\" and one new state", #kinds(msgs, "bought") == 1 and kinds(msgs, "bought")[1].id == "warehouse" and kinds(msgs, "bought")[1].level == 4
+	and #kinds(msgs, "state") == 1 and same(kinds(msgs, "state")[1].levels, { warehouse = 4 }) and kinds(msgs, "state")[1].money == 23000)
+check("… 12 stands now (8 before): the collection's state says so, the listeners heard, the attribute 4", Collection.stands(A) == 12 and #heard == heardAt + 1
+	and kinds(E.received(A, "Collection", mark), "state")[1].stands == 12 and A:GetAttribute(Config.WarehouseLevels.Attribute) == 4)
 mark = #E.sent
-ok = Upgrades.buy(A, "stands", 1)
+ok = Upgrades.buy(A, "warehouse", 4)
 E.flush()
-check("a second click on the same card (the level it offered is bought): nothing bought, the state again", ok == false and profileA.money == 4000 and Rules.level(profileA.sandboxUpgrades, "stands") == 1
+check("a second click on the same card (the level it offered is bought): nothing bought, the state again", ok == false and profileA.money == 23000 and Rules.level(profileA.sandboxUpgrades, "warehouse") == 4
 	and #kinds(E.received(A, "Upgrades", mark), "state") == 1 and lastNotice(A, mark) == "")
 profileA.money = 100
 mark = #E.sent
@@ -156,7 +164,7 @@ check("not enough money: refused, the notice says the price and the money", prof
 profileA.money = 100000
 E.advance(2)
 local before = table.clone(profileA.sandboxUpgrades)
-for _, message in { nil, "buy", 5, true, { kind = "buy" }, { kind = "buy", id = {} }, { kind = "buy", id = "stands", level = "x" }, { kind = "sell", id = "stands" }, { kind = 7 } } :: { any } do
+for _, message in { nil, "buy", 5, true, { kind = "buy" }, { kind = "buy", id = {} }, { kind = "buy", id = "lights", level = "x" }, { kind = "sell", id = "lights" }, { kind = 7 } } :: { any } do
 	E.advance(1)
 	E.fire(A, "Upgrades", message)
 end
@@ -204,12 +212,20 @@ end
 check("… the picker's and the HUD's numbers: the state's income and the piece's view × 1.1", pianoView ~= nil and near(view.income, math.floor(rate1 * 100 + 0.5) / 100)
 	and near(pianoView.income, math.floor(CollectionRules.income({ item = "piano", condition = 1 }, 1.1) * 100 + 0.5) / 100))
 
--- ── A small upgrade stand ────────────────────────────────────────────────────
+-- ── 8.3: the levels' stands ─────────────────────────────────────────────────
 local bed = Collection.add(A, { item = "bed", condition = 1 }) :: string
-ok, why = Collection.display(A, bed, 13)
-check("upgrade stand 13 (small): the double bed is too big, says where it goes", ok == false and type(why) == "string" and string.find(why :: string, "too big", 1, true) ~= nil and string.find(why :: string, "1 – 12", 1, true) ~= nil, why)
+check("8.3: the Big warehouse has no stand 13", not Collection.display(A, radio, 13))
+E.advance(1)
+E.fire(A, "Upgrades", { kind = "buy", id = "warehouse", level = 5 })
+check("8.3: the Logistics centre bought through the remote ($30,000): 20 stands", Rules.level(profileA.sandboxUpgrades, "warehouse") == 5 and Collection.stands(A) == 20)
 ok = Collection.display(A, radio, 13)
-check("… the kitchen radio goes on it; stand 15 (not bought yet) refused", ok == true and not Collection.display(A, bed, 15) and Collection.display(A, bed, 2))
+check("8.3: the Logistics centre's stand 13 takes the kitchen radio; stand 21 (none there) refused; the bed on 2", ok == true and not Collection.display(A, bed, 21) and Collection.display(A, bed, 2))
+local wagon = Collection.add(B, { item = "hay_wagon", condition = 1 }) :: string
+local boxB = Collection.add(B, { item = "box", condition = 1 }) :: string
+ok, why = Collection.display(B, wagon, 1)
+check("8.3: the Garage's stand (8 × 8): Walt's hay wagon is too big, says a bigger warehouse has bigger stands", ok == false and type(why) == "string" and string.find(why :: string, "too big", 1, true) ~= nil
+	and string.find(why :: string, "bigger warehouse", 1, true) ~= nil, why)
+check("… its stand 3 (the Garage has 2) refused; a box on stand 2", not Collection.display(B, boxB, 3) and Collection.display(B, boxB, 2))
 
 -- ── The van's engine and Danny ──────────────────────────────────────────────
 local vanA = E.addCar(101)
@@ -228,14 +244,10 @@ E.fire(A, "Upgrades", { kind = "buy", id = "danny", level = 1 })
 check("Danny's training level 1: Ann's attribute 1 (Danny walks 10 % faster: shared/MoveHelperBrain.luau trained)", A:GetAttribute(U.Danny) == 1)
 
 -- ── The top level ────────────────────────────────────────────────────────────
-for level = 2, 4 do
-	E.advance(1)
-	E.fire(A, "Upgrades", { kind = "buy", id = "stands", level = level })
-end
-check("More stands to its top: 20 stands", Rules.level(profileA.sandboxUpgrades, "stands") == 4 and Collection.stands(A) == 20)
+check("the Warehouse at its top: 20 stands", Rules.level(profileA.sandboxUpgrades, "warehouse") == 5 and Collection.stands(A) == 20)
 local cash = profileA.money
-ok, why = Upgrades.buy(A, "stands")
-check("… at its top: refused, says so, nothing taken", ok == false and why == "More stands is at its top level." and profileA.money == cash, why)
+ok, why = Upgrades.buy(A, "warehouse")
+check("… at its top: refused, says so, nothing taken", ok == false and why == "Warehouse is at its top level." and profileA.money == cash, why)
 
 -- ── The window ──────────────────────────────────────────────────────────────
 mark = #E.sent
@@ -251,13 +263,14 @@ local levels = table.clone(profileA.sandboxUpgrades)
 check("Upgrades.levels: a copy", same(Upgrades.levels(A), levels) and Upgrades.levels(A) ~= profileA.sandboxUpgrades)
 E.leave(A)
 local stored = E.saves.Player_101
-check("leaving saves the levels with the flag", stored ~= nil and stored.sandboxUpgradesKept == true and same(stored.sandboxUpgrades, levels) and stored[Rules.Flag] == true)
+check("leaving saves the levels with the flags (8.3: the warehouse's too)", stored ~= nil and stored.sandboxUpgradesKept == true and same(stored.sandboxUpgrades, levels) and stored[Rules.Flag] == true
+	and stored[Rules.WarehouseFlag] == true)
 A = E.join(101, "Ann")
 E.plotOf[A] = 1
 profileA = PlayerData.get(A) :: any
 E.flush()
 check("rejoining: the same levels, 20 stands, the lights, Danny's attribute", same(profileA.sandboxUpgrades, levels) and Collection.stands(A) == 20 and near(Collection.boost(A), 1.1) and A:GetAttribute(U.Danny) == 1)
-check("… the radio still on upgrade stand 13", (function()
+check("… the radio still on stand 13", (function()
 	for _, entry in Collection.stock(A) do
 		if entry.uid == radio then
 			return entry.stand == 13
@@ -286,17 +299,25 @@ for _, entry in Collection.stock(A) do
 		Collection.display(A, entry.uid, 16 + onTop)
 	end
 end
-local shownHigh = 0
-for _, entry in Collection.stock(A) do
-	shownHigh += if entry.stand and entry.stand > 12 then 1 else 0
+local function shownPast(n: number): number
+	local count = 0
+	for _, entry in Collection.stock(A) do
+		count += if entry.stand and entry.stand > n then 1 else 0
+	end
+	return count
 end
+local pastEight = shownPast(8)
+said = Upgrades.admin(A, "level3")
+check("8.3: 🏗 LEVEL 3: the warehouse at the Warehouse (8 stands) for free; the pieces past 8 back to the stock, said", Rules.level(profileA.sandboxUpgrades, "warehouse") == 3
+	and Collection.stands(A) == 8 and pastEight >= 3 and shownPast(8) == 0 and string.find(said, "Level 3 · Warehouse · 8 stands", 1, true) ~= nil
+	and string.find(said, `{pastEight} pieces went back`, 1, true) ~= nil and A:GetAttribute(Config.WarehouseLevels.Attribute) == 3 and same(profileA.sandboxUpgrades.lights, 5), said)
+check("8.3: … junk levels clamped (level9: 5, level0: 1)", string.find(Upgrades.admin(A, "level9"), "Level 5", 1, true) ~= nil and Collection.stands(A) == 20
+	and string.find(Upgrades.admin(A, "level0"), "Level 1", 1, true) ~= nil and Collection.stands(A) == 2)
+Upgrades.admin(A, "level5")
+local pastTwo = shownPast(2)
 said = Upgrades.admin(A, "reset")
-local stillHigh = 0
-for _, entry in Collection.stock(A) do
-	stillHigh += if entry.stand and entry.stand > 12 then 1 else 0
-end
-check("↺ RESET UPGRADES: none, 12 stands; the pieces on 13 – 20 back to the stock, said", same(profileA.sandboxUpgrades, {}) and Collection.stands(A) == 12 and shownHigh >= 2 and stillHigh == 0
-	and string.find(said, `{shownHigh} pieces went back`, 1, true) ~= nil and A:GetAttribute(U.Danny) == 0, said)
+check("↺ RESET UPGRADES: none (the Garage, 2 stands); the pieces past 2 back to the stock, said", same(profileA.sandboxUpgrades, {}) and Collection.stands(A) == 2 and shownPast(2) == 0
+	and string.find(said, "(2 stands)", 1, true) ~= nil and A:GetAttribute(U.Danny) == 0 and (pastTwo == 0 or string.find(said, "went back", 1, true) ~= nil), said)
 check("… the admin on a player without a save: says so", string.find(Upgrades.admin(stranger, "max"), "no save", 1, true) ~= nil)
 
 -- ── The migration ───────────────────────────────────────────────────────────
@@ -304,7 +325,20 @@ E.saves.Player_404 = save80(50)
 E.saves.Player_404.sandboxUpgradesKept = true
 E.saves.Player_404.sandboxUpgrades = { stands = 99, lights = "x", engine = 2.5, junk = 3 }
 local D = E.join(404, "Dee")
-check("a garbled save with the flag: cleaned (the top for too much, a fraction down, junk dropped)", same((PlayerData.get(D) :: any).sandboxUpgrades, { stands = 4, engine = 2 }))
+check("a garbled 8.1 save with the flag: cleaned (a fraction down, junk dropped); its More stands (99: the top) gone into the warehouse's level 5",
+	same((PlayerData.get(D) :: any).sandboxUpgrades, { warehouse = 5, engine = 2 }) and Collection.stands(D) == 20)
+E.saves.Player_505 = save80(50)
+E.saves.Player_505.sandboxUpgradesKept = true
+E.saves.Player_505.sandboxUpgrades = { stands = 0, lights = 2 }
+E.saves.Player_505.collection = { entries = { { uid = "505-1", item = "box", variant = 1, condition = 1, name = "Box", stand = 11, got = 0 } }, nextUid = 2 }
+local F = E.join(505, "Fay")
+check("8.3: an 8.1 save without More stands, a piece on stand 11: the Big warehouse (4), the piece still on 11", same((PlayerData.get(F) :: any).sandboxUpgrades, { warehouse = 4, lights = 2 })
+	and Collection.stands(F) == 12 and Collection.stock(F)[1].stand == 11)
+E.leave(F)
+check("8.3: … saved with the warehouse's flag; back: not migrated again (the level as it was)", E.saves.Player_505[Rules.WarehouseFlag] == true and (function()
+	local again = E.join(505, "Fay")
+	return same((PlayerData.get(again) :: any).sandboxUpgrades, { warehouse = 4, lights = 2 })
+end)())
 check("no warnings", #E.warnings == 0, E.warnings[1])
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

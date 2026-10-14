@@ -78,9 +78,12 @@ end
 table.sort(pieces, function(a, b)
 	return if a.n == b.n then a.id < b.id else a.n > b.n
 end)
-local stands = WarehouseLayout.capacity()
--- 8.3: each piece where it may stand (WarehouseLayout.fits: a big piece only on a big stand), the heaviest first, each on
--- the smallest free stand it fits (so the big stands stay free for the big pieces): the heaviest the hall can show
+-- 8.3: the Logistics centre's stands (the top level: the stand-in Upgrades gives every owner level 5)
+local LEVEL = #Config.WarehouseLevels.List
+local stands = WarehouseLayout.count(LEVEL)
+-- 8.3: each piece where it may stand (WarehouseLayout.fits at that level: a piece only on a stand it fits), the heaviest
+-- first, each on the smallest free stand it fits (so the big stands stay free for the big pieces): the heaviest the hall
+-- can show
 local onStand: { [number]: { id: string, n: number } } = {}
 local shownParts, placed, lightest = 0, 0, nil :: { id: string, n: number }?
 for _, piece in pieces do
@@ -90,8 +93,8 @@ for _, piece in pieces do
 	local size = FurnitureLooks.Items[piece.id].size
 	local best, bestArea = nil :: number?, math.huge
 	for i = 1, stands do
-		local sx, sz = WarehouseLayout.standSize(i)
-		if not onStand[i] and sx and sz and WarehouseLayout.fits(i, size) and sx * sz < bestArea then
+		local sx, sz = WarehouseLayout.standSize(i, LEVEL)
+		if not onStand[i] and sx and sz and WarehouseLayout.fits(i, size, LEVEL) and sx * sz < bestArea then
 			best, bestArea = i, sx * sz
 		end
 	end

@@ -5,10 +5,13 @@
 --   { kind = "state", levels, money }   kept; an open window is drawn again only when what it shows changed
 --   { kind = "open" }                   the desk's prompt: THE WINDOW
 --   { kind = "bought", id, level }      a toast "Showroom lights: level 2 · Income ×1.21" (UpgradeUi.notify, else
---                                       client/Hud.luau's toast)
+--                                       client/Hud.luau's toast); 8.3, the warehouse's: "🏗 Your warehouse grew:
+--                                       Workshop (4 stands)" (shared/WarehouseLevels.luau grew)
 -- THE WINDOW: a modal card "ZDC UPGRADES" (your money under it, ✕) over one card an upgrade (shared/UpgradeRules.luau
 -- rows, Config.SandboxUpgrades' order): its picture (the emoji), its name and level (a segmented bar, "LV 1/4"), what
--- it gives now and what the next level gives, the next price (money green when you have it) and BUY. BUY sends
+-- it gives now and what the next level gives, the next price (money green when you have it) and BUY. 8.3: the first card
+-- is the WAREHOUSE track (🏗️ Warehouse, "LV 2/5", "Level 2 · Workshop · 4 stands", "Next: Level 3 · Warehouse · 58×42
+-- · 8 stands"; its level 1 is the start, lit from the first). BUY sends
 -- { kind = "buy", id, level } (the level it offers: a second click buys once); without the money the button is grey,
 -- says how much is missing and a tap only says so; at the top level a gold MAX. Your money follows the State remote
 -- (a sale, the stands' income) so the buttons light up while it is open.
@@ -30,6 +33,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local UpgradeRules = require(Shared.UpgradeRules)
+local WarehouseLevels = require(Shared.WarehouseLevels) -- 8.3: the warehouse card's toast
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
@@ -235,7 +239,7 @@ end
 
 -- What follows the money on an open window without a rebuild: the money's line and each NEED's amount.
 local function subtitleOf(state: State?): string
-	return if state then `Your money {UpgradeRules.money(state.money)} · more stands, brighter lights, a faster van and Danny` else "Loading your upgrades…"
+	return if state then `Your money {UpgradeRules.money(state.money)} · a bigger warehouse, brighter lights, a faster van and Danny` else "Loading your upgrades…"
 end
 
 local function followMoney()
@@ -486,7 +490,9 @@ local function onEvent(message: any)
 	elseif kind == "bought" then
 		local def = UpgradeRules.def(message.id)
 		local level = amount(message.level)
-		if def and level then
+		if def and level and message.id == "warehouse" then
+			toast(WarehouseLevels.grew(level)) -- (8.3: "🏗 Your warehouse grew: Workshop (4 stands)")
+		elseif def and level then
 			toast(`{def.name}: level {math.floor(level)} · {UpgradeRules.effect(message.id, level)}`)
 		end
 	end
