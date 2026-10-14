@@ -381,7 +381,7 @@ check("8.0.1: the bay centred on the parked Sprinter (vanSpot), the van inside i
 check("8.0.1: UNLOAD HERE between the bay's door end and the parked van's back (not under it)", wordsOk)
 check(`8.0.1: the hall's floor from the plot's concrete (GroundTop) to FloorTop, a lip of at most 0.1 at the door ({WarehouseLayout.FloorTop - GROUND})`, floorOk and WarehouseLayout.FloorTop > GROUND and WarehouseLayout.FloorTop - GROUND <= 0.1 + 1e-9)
 check("8.0.1: the bay's lines and words a hair over the plot's concrete (GroundTop), not floating at RoadTop", paintOk, table.concat(detail, "; "))
-check(`8.0.1: every bollard's foot on the plot's concrete ({bollardsOk} of {2 * #SandboxMap.Plots * WarehouseLayout.Levels}, every level)`, bollardsOk == 2 * #SandboxMap.Plots * WarehouseLayout.Levels, table.concat(detail, "; "))
+check(`8.0.1: every bollard's foot on the plot's concrete ({bollardsOk} of {2 * #SandboxMap.Plots * 3}: 8.3, from level 3, where the Blender model has its posts)`, bollardsOk == 2 * #SandboxMap.Plots * 3, table.concat(detail, "; "))
 
 -- WarehouseLayout.stands (the guide's arrow): a plot or its id, every stand in stand-number order
 local listOk = true
@@ -415,7 +415,12 @@ do
 		site ~= base and site.level == 1 and site.id == 2 and site.warehouse.sx == 26 and base.warehouse.sx == 80 and (base :: any).level == nil
 			and (WarehouseLayout.site(2, 5) :: any).warehouse.sx == 104 and (WarehouseLayout.site(base, 9) :: any).level == 4 and (WarehouseLayout.site(base, 0 / 0) :: any).level == 4
 			and (WarehouseLayout.site(base) :: any).level == 4 and WarehouseLayout.site(99, 1) == nil)
-	check("8.3: levelOf: a site's level, a plain plot's 4", WarehouseLayout.levelOf(site) == 1 and WarehouseLayout.levelOf(base) == 4 and WarehouseLayout.levelOf(WarehouseLayout.site(1, 3) :: any) == 3)
+	local shedSite = WarehouseLayout.site(1, 1) :: any
+local front, backZ = shedSite.warehouse.z + shedSite.warehouse.sz / 2, shedSite.warehouse.z - shedSite.warehouse.sz / 2
+check("8.3: ceiling: a gable's walls' top anywhere; a Garage's from its back wall (9.5) up its slope to its front wall (12)",
+	WarehouseLayout.ceiling(SandboxMap.Plots[1], -150) == 24 and WarehouseLayout.ceiling(shedSite, backZ) == 9.5 and WarehouseLayout.ceiling(shedSite, front) == 12
+		and math.abs(WarehouseLayout.ceiling(shedSite, (front + backZ) / 2) - 10.75) < 1e-9 and WarehouseLayout.ceiling(shedSite, backZ - 50) == 9.5)
+check("8.3: levelOf: a site's level, a plain plot's 4", WarehouseLayout.levelOf(site) == 1 and WarehouseLayout.levelOf(base) == 4 and WarehouseLayout.levelOf(WarehouseLayout.site(1, 3) :: any) == 3)
 	local same = true
 	local plain, four = WarehouseLayout.pieces(base), WarehouseLayout.pieces(WarehouseLayout.site(base, 4) :: any)
 	same = #plain == #four

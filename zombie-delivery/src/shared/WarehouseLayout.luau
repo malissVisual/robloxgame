@@ -64,6 +64,7 @@
 --                                          count()), in stand-number order: the spots above (x, y, z plain numbers;
 --                                          {} for no such plot)
 --   WarehouseLayout.standAt(plot, x, z)    the stand whose podium holds the point (nil: none; any of the hall's)
+--   WarehouseLayout.ceiling(plot, z)       8.3: the hall's height at z (a gable's walls' top; a shed's slope)
 --   WarehouseLayout.standSize(i, level?)   8.1: stand i's podium (sx, sz), nil for no such stand (the same on every plot;
 --                                          8.3: of that level, nil: 4)
 --   WarehouseLayout.fits(i, size, level?)  8.1: a piece of that size (its X × Z, a Vector3 or { X, Z }) stands on stand
@@ -419,6 +420,19 @@ function WarehouseLayout.terminal(plot: SandboxMap.Plot): { x: number, y: number
 	return { x = x, y = FLOOR_TOP + desk[2], z = inside.z0 + desk[3] / 2, sx = desk[1], sz = desk[3], yaw = 180 }
 end
 
+-- 8.3: how high the hall is at z (the world's; under its roof: a gable's walls' top, a shed's slope from its back wall
+-- up to its front wall): what a stand's tag stays under (server/Warehouse.luau).
+function WarehouseLayout.ceiling(plot: SandboxMap.Plot, z: number): number
+	local _, oz, _, hz, h = frame(plot)
+	local def = WarehouseLayout.level(WarehouseLayout.levelOf(plot))
+	if def.roof ~= "shed" then
+		return h
+	end
+	local back = h - def.rise
+	local t = math.clamp((z - oz + hz) / (2 * hz), 0, 1)
+	return back + (h - back) * t
+end
+
 function WarehouseLayout.standAt(plot: SandboxMap.Plot, x: number, z: number): number?
 	for i = 1, WarehouseLayout.capacity(WarehouseLayout.levelOf(plot)) do
 		local s = WarehouseLayout.stand(plot, i)
@@ -602,10 +616,10 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	local deep = 2 * hz + 2
 	if shed then
 		-- 8.3: the shed's roof: one slab just under the walls' slope (its top on their top: the Blender roof lies on
-		-- it), overhanging a stud all round as the model's does, a gutter along its low back edge and its downpipes at
-		-- the back corners
+		-- it), overhanging 0.9 all round (inside the model's stud: tools/warehouse/mesh-check.py), a gutter along its low
+		-- back edge and its downpipes at the back corners
 		local fall = math.atan((h - back) / (2 * hz))
-		local eaves = 1
+		local eaves = 0.9
 		local length = math.sqrt(4 * hz * hz + (h - back) * (h - back)) + 2 * eaves
 		local roof = look(solid(add("Roof", "roof", { 2 * hx + 2 * eaves, thick, length }, { 0, (h + back) / 2 - math.cos(fall) * thick / 2, math.sin(fall) * thick / 2 }, ROOF, "Metal"), true))
 		roof.pitch = -math.deg(fall) -- (its front, +Z, up)
@@ -616,7 +630,14 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 			pipe.shape, pipe.roll = "Cylinder", 90
 		end
 	else
-		-- the gables (two wedges each, their tall side at the ridge) and the roof's two slopes, the ridge's cap
+		-- the gables (two wedges each, their tall side at the ridge) and the roof's two slopes, the ridge's cap. 8.3: the
+		-- slopes' top on the gables' slope (the Blender roof lies just over it), overhanging 0.9 (inside the model's
+		-- stud); under a barrel (the Logistics Center) not past the walls, and only as deep as the barrel
+		local barrel = def.roof == "barrel"
+		overhang = if barrel then 0 else 0.9
+		if barrel then
+			deep = 2 * hz + 1.2
+		end
 		local slope = math.atan(ridge / hx)
 		local length = math.sqrt(hx * hx + ridge * ridge) + overhang
 		for _, front in { -1, 1 } do
@@ -629,9 +650,9 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		end
 		for _, side in { -1, 1 } do
 			local tag = if side < 0 then "West" else "East"
-			-- the slab's underside on the gables' slope (from the ridge down), its middle half its length down
-			local cx = side * (math.cos(slope) * length / 2 + math.sin(slope) * thick / 2)
-			local cy = h + ridge - math.sin(slope) * length / 2 + math.cos(slope) * thick / 2
+			-- the slab's top on the gables' slope (from the ridge down), its middle half its length down
+			local cx = side * (math.cos(slope) * length / 2 - math.sin(slope) * thick / 2)
+			local cy = h + ridge - math.sin(slope) * length / 2 - math.cos(slope) * thick / 2
 			local roof = look(solid(add("Roof" .. tag, "roof", { length, thick, deep }, { cx, cy, 0 }, ROOF, "Metal"), true))
 			roof.roll = -side * math.deg(slope)
 			-- the barge boards along the gables' edges
@@ -691,11 +712,14 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 
 	-- the roller door: rolled up (its bottom slats and bar in the opening's top), its rails, the drum's hood inside
 	-- (8.3: under a low header, a lower hood), a bollard each side outside
+	-- (8.3: the bollards from level 3, where the Blender model has its posts; a Garage and a Workshop have none)
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "West" else "East"
 		look(add("DoorRail" .. tag, "door", { 0.7, doorHigh, 0.6 }, { side * (door / 2 + 0.35), doorHigh / 2, hz + 0.3 }, STEEL, "Metal"))
-		local bollard = look(solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), GROUND + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic")))
-		bollard.shape, bollard.roll = "Cylinder", 90
+		if level >= 3 then
+			local bollard = look(solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), GROUND + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic")))
+			bollard.shape, bollard.roll = "Cylinder", 90
+		end
 	end
 	look(add("DoorCurtain", "door", { door, 1.6, 0.3 }, { 0, doorHigh - 0.8, hz - WALL / 2 }, ORANGE, "Metal"))
 	look(add("DoorBar", "door", { door, 0.3, 0.45 }, { 0, doorHigh - 1.75, hz - WALL / 2 }, INK, "Rubber"))
@@ -711,10 +735,11 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		zdc.yaw = 180
 		zdc.words = { { face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.6, "Black"), line("ZOMBIE DELIVERY CO.", WHITE, 0.24, "Bold") } } }
 	end
-	-- (8.3: its bottom clear of the door's frame, 0.4 over the opening, under a low header a lower one)
+	-- (8.3: its bottom 0.4 over the opening, under a low header a lower one, in front of the Blender door's frame, its
+	-- letters and its lamps: 0.6 out, at most 1.4 wider than the door each side; a Garage's covers its ZDC plate)
 	local ownerHigh = math.min(3.6, h - doorHigh - 0.8)
 	local ownerY = math.max(doorHigh + (h - doorHigh) / 2, doorHigh + 0.4 + ownerHigh / 2)
-	local owner = add("OwnerSign", "sign", { math.min(24, door + 4), ownerHigh, 0.4 }, { 0, ownerY, hz + 0.5 }, TRIM, "SmoothPlastic")
+	local owner = add("OwnerSign", "sign", { math.min(24, door + 2.8), ownerHigh, 0.4 }, { 0, ownerY, hz + 0.6 }, TRIM, "SmoothPlastic")
 	owner.yaw = 180
 	owner.words = { { face = "Front", lit = true, lines = WarehouseLayout.ownerLines(nil, plot.id) } }
 	local inner = hz - WALL
