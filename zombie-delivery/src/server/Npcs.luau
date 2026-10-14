@@ -16,7 +16,8 @@
 -- 5.7: Npcs.act names a short arm gesture (a wave, holding a piece out, reaching for it, a knock) on a person or a
 -- courier; the clients play it (client/ArmPose.luau, shared/Gestures.luau).
 -- 7.x: Npcs.carried / Npcs.stride: a person moved by constraints (Danny at the far end of a piece you carry together,
--- server/MoveHelper.luau): its own walk off, the legs stepping with the speed it moves at.
+-- server/MoveHelper.luau): its own walk off, the legs stepping with the speed it moves at. 8.3: carried in the Physics
+-- state (the clients' gait poses its legs like a player's; no jump, no get-up spring after it); walkTo's `jump = false`.
 
 -- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
 -- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
@@ -70,6 +71,7 @@ type State = {
 	lastGreet: number,
 	greeting: boolean,
 	scale: number,
+	held: { autoRotate: boolean, jumping: boolean }?, -- 8.3 carried (Npcs.carried): what its humanoid had, given back
 }
 
 local states: { [Model]: State } = {}
@@ -631,7 +633,8 @@ end
 --   stuck     seconds without getting closer (half a stud) before it gives up (`arrived(false)`), instead of
 --             pushing against a wall until the timeout
 --   near      how close counts as there (default 1.6)
-export type WalkOptions = { through: boolean?, stuck: number?, near: number? }
+--   jump      8.3 false: never a jump (its Jumping state off from then on, Jump cleared: Danny's walks)
+export type WalkOptions = { through: boolean?, stuck: number?, near: number?, jump: boolean? }
 
 -- Walk to a point (walk animation), then call `arrived` (false if it could not get there within `timeout` s).
 function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, timeout: number?, options: WalkOptions?)
@@ -671,6 +674,12 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 	pcall(function()
 		root:SetNetworkOwner(nil)
 	end)
+	if options and options.jump == false then
+		humanoid.Jump = false
+		if humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) then
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+		end
+	end
 	play(state, true)
 	local near = if options and options.near then options.near else 1.6
 	local stuck = if options then options.stuck else nil
@@ -750,9 +759,15 @@ end
 
 -- 7.x Danny's two-person carry (server/MoveHelper.luau): a body moved by something else (constraints on its root at
 -- the far end of a piece a player carries), not by its own walk. Npcs.carried(npc, true): any walk stops, the root is
--- free (unanchored) and the humanoid stands still on it (PlatformStand: no forces of its own, no turns); false: it
--- stands again (anchored, upright, idle). Npcs.stride(npc, speed) meanwhile: the legs for `speed` studs/s along its
--- facing (negative: backwards, the walk played in reverse), idle under half a stud a second.
+-- free (unanchored, the server's) and the humanoid applies no forces of its own (the Physics state: no walk, no turn,
+-- no jump); false: it stands again (anchored, upright, idle, Running). Npcs.stride(npc, speed) meanwhile: the legs for
+-- `speed` studs/s (negative: backwards, the walk played in reverse at that rate; 0: idle).
+-- 8.3 (the owner: "he just jumps weirdly … I don't know how to make him walk like me, backwards too"): the Physics state
+-- in place of 7.x's PlatformStand. PlatformStand made the clients' gait (client/GaitPose.luau) and BodyLife let go of
+-- the body, so it walked on the stock walk alone, and turning it off again sent the Humanoid through GettingUp: a spring
+-- up, his first steps after a carry a hop. In the Physics state the gait poses his legs from his real velocity like a
+-- player's (planted feet, backwards, sideways; the stock walk under it for a far body), Jump stays off (the Jumping
+-- state too) and AutoRotate is off; both are given back when he lets go, straight into Running (GettingUp off).
 function Npcs.carried(npc: Model, on: boolean)
 	local state = states[npc]
 	if not state then
@@ -766,16 +781,36 @@ function Npcs.carried(npc: Model, on: boolean)
 	local humanoid = state.humanoid
 	if on then
 		state.root.Anchored = false
+		pcall(function()
+			state.root:SetNetworkOwner(nil) -- (the server's: the Physics state below is set by the body's owner)
+		end)
 		if humanoid then
+			if not state.held then
+				state.held = { autoRotate = humanoid.AutoRotate, jumping = humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) }
+			end
 			humanoid:Move(Vector3.zero)
-			humanoid.PlatformStand = true
+			humanoid.Jump = false
+			humanoid.AutoRotate = false
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false) -- (never the get-up spring on the way out)
+			humanoid.PlatformStand = false
+			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 		end
 		return
 	end
-	if humanoid then
-		humanoid.PlatformStand = false
-	end
+	local held = state.held
+	state.held = nil
 	stand(state)
+	if humanoid then
+		humanoid.Jump = false
+		if held then
+			humanoid.AutoRotate = held.autoRotate
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, held.jumping)
+		end
+		pcall(function()
+			humanoid:ChangeState(Enum.HumanoidStateType.Running) -- (on his feet at once: no GettingUp, no fall)
+		end)
+	end
 end
 
 function Npcs.stride(npc: Model, speed: number)
@@ -784,7 +819,7 @@ function Npcs.stride(npc: Model, speed: number)
 		return
 	end
 	local pace = math.abs(speed)
-	if pace < 0.5 then
+	if pace < 0.05 then
 		if state.moving then
 			play(state, false)
 		end
@@ -794,8 +829,9 @@ function Npcs.stride(npc: Model, speed: number)
 	state.walkRate = pace / (STRIDE * state.scale)
 	play(state, true)
 	local gait = state.gait
-	if gait then
-		gait:AdjustSpeed(if speed < 0 then -state.walkRate else state.walkRate)
+	local want = if speed < 0 then -state.walkRate else state.walkRate
+	if gait and math.abs(gait.Speed - want) > 0.02 then -- (8.3: changed only when it changes)
+		gait:AdjustSpeed(want)
 	end
 end
 

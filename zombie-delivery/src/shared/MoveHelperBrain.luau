@@ -46,7 +46,8 @@
 --   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does: "walk" | "repath" (StuckRepath s) | "nudge"
 --                                              (StuckSnap s: he appears at his way's next point)
 --   MoveHelperBrain.endRise(floorRise, carrierRise)   his root's height at your piece's far end over its middle: the
---                                              floor's there (stairs, steps), within HoldStep of the carrier's
+--                                              floor's there (stairs, steps) when within HoldStep of the floor under
+--                                              the carrier (8.3: else the carrier's floor: never a roof, never a pop)
 --   MoveHelperBrain.farEnd(depth)              how far in front of the piece's middle his root stands (its far face
 --                                              and Standoff)
 --   8.1 carrying in two (the owner: "when I turn around he teleports"; the leader's steering: shared/PairCarry.luau):
@@ -60,6 +61,14 @@
 --                                              other world (`crossed`: a door's fade) → (top speed now, snap): snap
 --                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
 --                                              ease of HoldEase s (the gap / HoldEase a second); else `speed`
+--   8.3 (the owner: "he just jumps weirdly … make him walk like me, backwards too"):
+--   MoveHelperBrain.holdClimb(trail, height, dt, snap)   his root's height now: toward `height` at HoldClimb studs a
+--                                              second at most (a step stepped, never popped; at once on a new hold or a
+--                                              door's fade)
+--   MoveHelperBrain.holdLegs(trail, forward, side, dt)   the speed his legs step at (negative: backwards, 0: standing)
+--                                              from his root's own velocity in his frame: his whole speed along the
+--                                              ground, from HoldLegs.From, under HoldLegs.To standing, backwards past
+--                                              Band behind him, forwards past Band ahead, sideways as they went
 --   MoveHelperBrain.aside(x, z, door)          a place in a doorway (Aside's zone): the place beside it, along the wall
 --                                              (he never stands where you walk through); else the place itself
 --   MoveHelperBrain.followSpot(x, z, lookX, lookZ)       his place behind you ("Help me")
@@ -225,14 +234,16 @@ function MoveHelperBrain.farEnd(depth: number): number
 	return depth / 2 + cfg().Standoff
 end
 
--- His root's height over the piece's middle: the floor's under the far end (`floorRise`, his stand height on it), within
--- HoldStep of the carrier's root (`carrierRise`): up and down stairs and steps, never off his hands' reach.
+-- His root's height over the piece's middle: the floor's under the far end (`floorRise`, his stand height on it) when it
+-- is within HoldStep of the carrier's floor (`carrierRise`: his stand height on the floor under the carrier's feet):
+-- up and down stairs and steps. 8.3 (the owner: "he just jumps weirdly"): a floor farther off is not his (a porch's
+-- roof, a ceiling, a door's header the ray found; it was clamped HoldStep over you: a 2.5-stud hop), nor is none: level
+-- with you.
 function MoveHelperBrain.endRise(floorRise: number, carrierRise: number): number
-	local step = cfg().HoldStep
-	if floorRise ~= floorRise then
+	if floorRise ~= floorRise or math.abs(floorRise - carrierRise) > cfg().HoldStep then
 		return carrierRise
 	end
-	return math.clamp(floorRise, carrierRise - step, carrierRise + step)
+	return floorRise
 end
 
 -- 8.1 his top speed holding the far end: the leader's walk and a margin (the far end swings round a turn at PairTurn
@@ -247,10 +258,51 @@ function MoveHelperBrain.holdTurn(): number
 	return math.rad(c.PairTurn) * c.HoldTurn
 end
 
-export type Trail = { behind: number, ease: number, easeSpeed: number }
+-- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards)
+export type Trail = { behind: number, ease: number, easeSpeed: number, height: number?, walking: boolean, back: boolean }
 
 function MoveHelperBrain.newTrail(): Trail
-	return { behind = 0, ease = 0, easeSpeed = 0 }
+	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false }
+end
+
+-- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
+-- most: a step or a kerb stepped up or down, never popped. At once on a new hold (none yet) and through a door's fade
+-- (`snap`: the piece in the other world).
+function MoveHelperBrain.holdClimb(trail: Trail, height: number, dt: number, snap: boolean): number
+	local was = trail.height
+	if snap or was == nil or height ~= height then
+		trail.height = height
+		return height
+	end
+	local most = cfg().HoldClimb * math.max(dt, 0)
+	local now = was + math.clamp(height - was, -most, most)
+	trail.height = now
+	return now
+end
+
+-- 8.3 his legs holding the far end (the owner: "walk like me and backwards"): the speed they step at (studs a second:
+-- negative backwards, 0 standing) from his root's own velocity in his frame (`forward` along his facing, `side` across
+-- it): his whole speed along the ground (a step to the side steps too, never a slide on still legs); walking from
+-- HoldLegs.From, standing under HoldLegs.To; backwards once the way is more than Band of it behind him (you walk toward
+-- him: he backs away facing you), forwards once more than Band ahead, sideways the way they went (no flicker).
+function MoveHelperBrain.holdLegs(trail: Trail, forward: number, side: number, _dt: number): number
+	local legs = cfg().HoldLegs
+	local speed = math.sqrt(forward * forward + side * side)
+	if trail.walking then
+		trail.walking = speed >= legs.To
+	else
+		trail.walking = speed >= legs.From
+	end
+	if not trail.walking then
+		return 0
+	end
+	local along = forward / speed
+	if trail.back and along > legs.Band then
+		trail.back = false
+	elseif not trail.back and along < -legs.Band then
+		trail.back = true
+	end
+	return if trail.back then -speed else speed
 end
 
 function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, speed: number, dt: number): (number, boolean)

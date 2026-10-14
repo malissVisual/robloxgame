@@ -27,6 +27,9 @@
 --     PairHold.luau) walk him there at the pair's walk and a margin (MoveHelperBrain.holdSpeed of your CarrySpeed), his
 --     body turning to you at holdTurn; only a door's fade puts him there (the piece in the other world). More than
 --     HoldBehind studs off his place for HoldStuck s: eased back over HoldEase s (MoveHelperBrain.holdTrack).
+--   * 8.3 (the owner: "he just jumps weirdly"): his feet on the floor under his end (endOffset: a ray within a step of
+--     the floor under your feet, never a roof or your jump; his height by PairHold's lift at HoldClimb at most), his
+--     legs the clients' gait (Npcs.carried's Physics state) and holdLegs' stride; his paths never jump (Path* numbers).
 --   * A heavy two-hands piece you carry alone (AssistWeight or more, within AssistFar): he takes its other side (the
 --     pair's walk for both: MovingRules.mode), the same way.
 --   * On his own: the one-hand and two-hands pieces nobody holds (★ first, then the most value a second of the trip;
@@ -200,7 +203,7 @@ local ID_BASE = -2000000000 -- (no player's id is this low; Studio's test player
 local FALL = 3 -- s he lies there before his body goes
 local INSIDE = 400 -- studs from a move's interior origin that count as inside it
 local NUDGE = 8 -- studs at most a stuck nudge puts him on (his way's next point)
-local WALK = { through = true, near = 0.6 } -- Npcs.walkTo's options: he walks on into the next order
+local WALK = { through = true, near = 0.6, jump = false } -- Npcs.walkTo's options: he walks on into the next order (8.3: no jump)
 local HANDS = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize" } -- 7.x his arms (client/ArmPose.luau)
 local EDGE = { Width = 2.4, Depth = 0.6 } -- 7.x the piece's near edge his hands hold at its far end (studs)
 
@@ -223,7 +226,9 @@ end
 local function computeRoute(body: Body, from: Vector3, to: Vector3): { Vector3 }?
 	local path = body.path
 	if not path then
-		local made = game:GetService("PathfindingService"):CreatePath({ AgentRadius = 1.5, AgentHeight = 5, AgentCanJump = false, WaypointSpacing = 4 })
+		-- (8.3: never a jump, never a climb; Config.MoveHelper's Path* numbers)
+		local made = game:GetService("PathfindingService"):CreatePath({ AgentRadius = cfg.PathRadius, AgentHeight = cfg.PathHeight, AgentCanJump = false,
+			AgentCanClimb = false, WaypointSpacing = cfg.PathSpacing })
 		body.path = made
 		path = made
 	end
@@ -236,7 +241,9 @@ local function computeRoute(body: Body, from: Vector3, to: Vector3): { Vector3 }
 	end
 	local points: { Vector3 } = {}
 	for _, waypoint in p:GetWaypoints() do
-		table.insert(points, waypoint.Position)
+		if waypoint.Action ~= Enum.PathWaypointAction.Jump then -- (8.3: he never jumps; walks only)
+			table.insert(points, waypoint.Position)
+		end
 	end
 	return points
 end
@@ -261,7 +268,7 @@ local function gripOn(body: Body, anchor: BasePart, offset: CFrame, limit: numbe
 	gripOff(body)
 	Npcs.carried(body.model, true)
 	body.walking, body.ordered = false, nil
-	body.grip = PairHold.make(body.model, body.root, anchor, offset, limit, { ghost = true, flat = false, owner = nil })
+	body.grip = PairHold.make(body.model, body.root, anchor, offset, limit, { ghost = true, flat = false, owner = nil, lift = true }) -- (8.3 lift)
 end
 
 local mover: Mover = {
@@ -380,12 +387,14 @@ local function byTruck(truck: Vehicles.Car, side: number, out: number): Vector3?
 	return Vector3.new(at.X, chassis.Y, at.Z) + dir * out + right * side
 end
 
+local NOT_FLOOR = { "Npcs", "Zombies", "Cars", "Traffic", "BanditCars", "Animals", "Moves" } -- (outside: never a floor)
+
 -- The ground under (x, z) near refY (outside), else refY.
 local function groundAt(x: number, z: number, refY: number): number
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local ignore: { Instance } = {}
-	for _, name in { "Npcs", "Zombies", "Cars", "Traffic", "BanditCars", "Animals", "Moves" } do
+	for _, name in NOT_FLOOR do
 		local folder = workspace:FindFirstChild(name)
 		if folder then
 			table.insert(ignore, folder)
@@ -418,6 +427,42 @@ local function interiorFloorAt(h: Helper, x: number, z: number, refY: number): n
 		end
 	end
 	return origin.Position.Y
+end
+
+-- 8.3 the floor under (at.X, at.Z) a ray finds from `top` down `reach` studs (inside: the interior's shell only;
+-- outside: not the pieces, the bodies, the cars: NOT_FLOOR and the players' characters), nil when it finds none. The
+-- hold's (MoveHelperBrain.endRise): from the leader's root down (their floor, whatever their jump), and under his end
+-- from a step over that floor down to a step under it: never the porch's roof, a ceiling, a door's header or an eave
+-- over it (the ray from 6 studs over the piece's middle found the porch's roof with a 3.3-stud Dining Table: his end out
+-- of the front door, he popped HoldStep up).
+local function floorDown(h: Helper, at: Vector3, top: number, reach: number): number?
+	local params = RaycastParams.new()
+	params.RespectCanCollide = true
+	if insideAt(h, at) then
+		local interior: Instance? = h.s.interior
+		if not interior or not interior.Parent then
+			return nil
+		end
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { interior:FindFirstChild("Shell") or interior }
+	else
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local ignore: { Instance } = {}
+		for _, name in NOT_FLOOR do
+			local folder = workspace:FindFirstChild(name)
+			if folder then
+				table.insert(ignore, folder)
+			end
+		end
+		for _, player in Players:GetPlayers() do
+			if player.Character then
+				table.insert(ignore, player.Character)
+			end
+		end
+		params.FilterDescendantsInstances = ignore
+	end
+	local hit = workspace:Raycast(Vector3.new(at.X, top, at.Z), Vector3.new(0, -reach, 0), params)
+	return if hit then hit.Position.Y else nil
 end
 
 local function clearPath(h: Helper)
@@ -782,7 +827,7 @@ end
 local function wayTo(h: Helper, body: Body, here: Vector3, target: Vector3, clock: number): Vector3
 	local route = mover.route
 	local goal = h.pathGoal
-	if route and not h.pathing and clock - h.pathAt >= cfg.Repath and (goal == nil or flat(goal, target) > 3) then
+	if route and not h.pathing and clock - h.pathAt >= cfg.Repath and (goal == nil or flat(goal, target) > cfg.PathAgain) then
 		h.pathAt, h.pathing = clock, true
 		task.spawn(function()
 			local ok, points = pcall(route, body, here, target)
@@ -803,7 +848,7 @@ local function wayTo(h: Helper, body: Body, here: Vector3, target: Vector3, cloc
 		end)
 	end
 	goal = h.pathGoal
-	if goal and flat(goal, target) <= 3 then
+	if goal and flat(goal, target) <= cfg.PathDrift then -- (8.3: on along it while the new one is worked out)
 		local path = h.path
 		while h.pathIndex <= #path and flat(path[h.pathIndex], here) < 2 do
 			h.pathIndex += 1
@@ -1035,14 +1080,30 @@ local function loadHere(h: Helper, body: Body): boolean
 end
 
 -- 7.x his place at the far end of your piece, in its frame: Standoff past its far face, turned to you, on the floor
--- under it (within HoldStep of your root's height).
-local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: BasePart, carrierRoot: BasePart?): CFrame
+-- under it (within HoldStep of the floor under you). 8.3: that floor from a ray down from your root (your jump never
+-- lifts him), his end's from a step over it to a step under it (MoveHelperBrain.endRise: a floor farther off is not
+-- his); holding it (`trail`), his height follows it at HoldClimb studs a second at most (MoveHelperBrain.holdClimb: at
+-- once on a new hold and through a door's fade).
+local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: BasePart, carrierRoot: BasePart?, trail: Brain.Trail?, dt: number?): CFrame
 	local frame = anchor.CFrame
 	local ahead = Brain.farEnd(thing.size.Z)
 	local far = frame * Vector3.new(0, 0, -ahead)
 	local stand = body.humanoid.HipHeight + body.root.Size.Y / 2
-	local carrierRise = if carrierRoot then carrierRoot.Position.Y - frame.Position.Y else -(thing.size.Y / 2 + Config.Cargo.CarryLow)
-	local rise = Brain.endRise(floorAt(h, far) + stand - frame.Position.Y, carrierRise)
+	local step = cfg.HoldStep
+	local base: number
+	if carrierRoot then
+		local at = carrierRoot.Position
+		base = floorDown(h, at, at.Y, 40) or (at.Y - stand)
+	else
+		base = frame.Position.Y - thing.size.Y / 2 - Config.Cargo.CarryLow - stand
+	end
+	local found = floorDown(h, far, base + step, 2 * step + 1)
+	local carrierRise = base + stand - frame.Position.Y
+	local rise = Brain.endRise(if found then found + stand - frame.Position.Y else 0 / 0, carrierRise)
+	if trail then
+		local crossed = insideAt(h, body.root.Position) ~= insideAt(h, far) -- (a door's fade: there at once)
+		rise = Brain.holdClimb(trail, frame.Position.Y + rise, dt or 0, crossed) - frame.Position.Y
+	end
 	return CFrame.new(0, rise, -ahead) * CFrame.Angles(0, math.pi, 0)
 end
 
@@ -1065,8 +1126,10 @@ local function keepAt(body: Body, anchor: BasePart, offset: CFrame, dt: number, 
 	end
 end
 
--- 8.1 his legs holding the far end: his real speed along his facing since the last step (negative: backwards; the walk
--- played in reverse, Npcs.stride); none across a door's fade.
+-- 8.1 his legs holding the far end: his root's real velocity since the last step, in his frame (8.3 MoveHelperBrain.
+-- holdLegs: his whole speed along the ground, backwards when the way is behind him, sideways as they went; Npcs.stride:
+-- the walk played in reverse backwards); none across a door's fade. (Near players the clients' gait poses his legs from
+-- the same velocity: Npcs.carried's Physics state.)
 local function strideOf(h: Helper, body: Body, dt: number, snap: boolean)
 	local here = body.root.Position
 	local last = h.holdAt
@@ -1076,7 +1139,8 @@ local function strideOf(h: Helper, body: Body, dt: number, snap: boolean)
 		return
 	end
 	local look = body.root.CFrame.LookVector
-	Npcs.stride(body.model, ((here.X - last.X) * look.X + (here.Z - last.Z) * look.Z) / dt)
+	local vx, vz = (here.X - last.X) / dt, (here.Z - last.Z) / dt
+	Npcs.stride(body.model, Brain.holdLegs(h.trail, vx * look.X + vz * look.Z, vz * look.X - vx * look.Z, dt))
 end
 
 -- 7.x the far end of your piece (or the other side of your two-hands piece): he moves with it, glued there; the words.
@@ -1090,10 +1154,10 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 		return
 	end
 	local carrierRoot = playerRoot(thing.carrier)
-	local offset = endOffset(h, body, thing, item.root, carrierRoot)
 	if h.gripped ~= item.root then
 		h.trail, h.holdAt = Brain.newTrail(), nil -- (8.1 a new hold)
 	end
+	local offset = endOffset(h, body, thing, item.root, carrierRoot, h.trail, dt) -- (8.3 his height: holdClimb's)
 	h.holdOffset, h.gripped = offset, item.root
 	-- 8.1 never put there while holding (a door's fade only: the piece in the other world); eased back when stuck behind
 	local goal = (item.root.CFrame * offset).Position
