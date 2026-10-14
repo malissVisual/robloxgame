@@ -290,7 +290,7 @@ safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract
 safely("MoveHelperHud", require(Client.MoveHelperHud).start) -- 7.0: the depot's helper's orders under the move's panel (Danny)
 safely("MoveLobbyUi", require(Client.MoveLobbyUi).start) -- 7.0 planning: the move's planning lobby (roles, READY, LAUNCH)
 safely("QuickChat", require(Client.QuickChat).start) -- 7.0 planning: the crew's quick chat (hold T on a move or in its planning)
-safely("CarryGripUi", require(Client.CarryGripUi).start) -- 7.0 grip: the grip bar while you carry a heavy or fragile thing
+safely("CarryGripUi", require(Client.CarryGripUi).start) -- 8.1 grip: the timing checks as you lift and carry a heavy or fragile thing
 require(Client.MoveLobbyUi).onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
 require(Client.MoveLobbyUi).crewOpen = CrewPanel.isOpen
 WeaponWheel.yields = require(Client.QuickChat).active -- (a held T is the quick chat on a move; a tap still takes the next gun)
