@@ -12,7 +12,10 @@ borrowed. Writes five files for Roblox (one upload each, the game plays regions 
   sfx4.ogg   7.1: the moves: the furniture (a lift, a put-down, a crash, glass breaking, a drag, a box), the truck (its
              ramp, a piece sliding in, a strap), a house's door, the grip (tick, warning, slip), the move's stings (start,
              success, fail), the horde's siren, the Wall's gate, and the mountains (a cuckoo clock, a cowbell, birdsong,
-             the peaks' wind, a brook); every sound fitted to a loudness for its kind (fit)
+             the peaks' wind, a brook); every sound fitted to a loudness for its kind (fit). 8.1, at its end: the
+             sandbox's (the alpine meadow's calm day and a cowbell far off, the warehouse's hall, the chalet's quiet
+             room, a piece put on a stand, taken down, sold at the till, a trip's pieces home, the ZDC Sprinter's back
+             doors, its sliding door and its step)
 and regions.json + src/shared/SoundSheet.luau (the regions, the stand-ins (FALLBACK), the sheets' lengths; the asset ids
 stay to be filled in).
 Run: python3 art/audio/make_audio.py   (from zombie-delivery/)
@@ -770,6 +773,234 @@ plops = render_loop([(rng4.uniform(0, 6.0), bubble(rng4.uniform(280, 1300), rng4
 put4("stream_loop", lowpass(norm(babble, 1.0) + norm(band4(6.0, 700, 6000), 1.0) * 0.14 + norm(plops, 1.0) * 0.5, 7000, circular=True), -19)
 LOOPED |= {"wood_scrape_loop", "birds_alpine_loop", "wind_peaks_loop", "stream_loop"}
 
+# ── 8.1: the sandbox's sounds (sfx4.ogg: not uploaded yet, so they go on at its end) ─────────────────────────────────
+# The owner: "make the sandbox sound right". The alpine meadow's calm day (a breeze, birds; a cowbell far off now and
+# then), the warehouse's hall (its lights' hum, its air, the roof ticking) and the Old Chalet's quiet room (a clock),
+# the collection (a piece put on a stand, taken down, sold at the till; a trip's pieces home: a small fanfare) and the
+# walk-in ZDC Sprinter (its back doors swinging round to its sides and its step folding out, the sliding door, a foot on
+# its step). Their own random generator (as 5.7's): every sound above comes out as before, sfx4's 7.1 part too. Fitted
+# like 7.1's (fit): the stings -14, the till -14, the stands -18 / -20, the doors -16 … -20, the step -22, the far
+# cowbell -21, the loops -21 (the warehouse's hall -24, the room -28).
+rng5 = np.random.default_rng(8100)
+def noise5(sec): return rng5.standard_normal(samples(sec))
+def tick5(sec=0.015, lo=1800, hi=7000, decay=0.0025):
+    return bandpass(noise5(sec), lo, hi) * env(samples(sec), 0.0003, decay)
+def modes5(parts, sec):
+    """A struck body (as modes above, its own phases): decaying sines (freq, amp, decay s)."""
+    x = t(sec); s = np.zeros_like(x)
+    for f, a, d in parts:
+        s += a * np.sin(2 * np.pi * f * x + rng5.uniform(0, 2 * np.pi)) * np.exp(-x / d)
+    return s * env(len(x), 0.0005, 10)
+def band5(sec, lo, hi):
+    """Band-passed noise, filtered round its length (circular): seamless as a loop."""
+    return bandpass(noise5(sec), lo, hi)
+def swell5(sec, lo, hi):
+    """A slow random swell 0 … 1 (noise band-passed under a few Hz, circular): seamless as a loop."""
+    w = bandpass(noise5(sec), lo, hi)
+    return np.clip(0.5 + 0.5 * w / (2.2 * np.std(w) or 1), 0, 1)
+def room5(sig, tail, wet):
+    """A room round a sound: a decaying tail of noise, circular (a loop's tail wraps to its start; pad a one-shot)."""
+    n = len(sig); m = min(samples(tail), n); ir = np.zeros(n)
+    ir[:m] = rng5.standard_normal(m) * np.exp(-np.arange(m) / (m / 4)) * wet
+    ir[0] = 1.0
+    return np.fft.irfft(np.fft.rfft(sig) * np.fft.rfft(ir), n)
+def oneshot_room(sig, tail, wet, sec):
+    """room5 for a one-shot: padded, so its tail does not wrap; cut to sec with a short fade."""
+    y = room5(np.concatenate([sig, np.zeros(samples(tail))]), tail, wet)[:samples(sec)]
+    return y * np.clip((sec - t(sec)) / 0.08, 0, 1)
+def thud5(f, sec=0.4):
+    """A soft thud (a piece set down): the body, its scuff, a little ring."""
+    return (thump(f, f * 0.45, sec, 0.07) + lowpass(noise5(sec), 700) * env(samples(sec), 0.002, 0.03) * 0.5
+            + modes5(((f * 1.6, 0.25, 0.04), (f * 3.1, 0.12, 0.025)), sec))
+def slam5(f, amp, sec=0.4):
+    """A van's door slammed: the panel's body and its ring, the hit."""
+    body = thump(f, f * 0.4, sec, 0.1) + modes5(((f * 1.05, 0.5, 0.1), (f * 1.9, 0.35, 0.08), (f * 3.1, 0.2, 0.06), (f * 6.4, 0.08, 0.04)), sec)
+    return (body + lowpass(noise5(sec), 1200) * env(samples(sec), 0.001, 0.03) * 0.7) * amp
+def latch5(amp=1.0):
+    """A handle pulled and its latch letting go."""
+    return mix(tick5(0.02, 1200, 5000, 0.005), thump(310, 190, 0.08, 0.02) * 0.4, modes5(((1900, 0.12, 0.015), (2900, 0.08, 0.01)), 0.03)) * amp
+def squeak5(sec, f0, f1, amp):
+    """A spring or a joint giving: a short stick-slip squeak gliding f0 → f1."""
+    x = t(sec); f = f0 + (f1 - f0) * x / sec
+    grain = 0.55 + 0.45 * np.sign(np.sin(2 * np.pi * np.cumsum(48 + 20 * x / sec) / SR))
+    return bandpass(np.sin(2 * np.pi * np.cumsum(f) / SR) * grain + 0.1 * noise5(sec), 300, 3000) * hump(len(x), 0.25, 0.5) * amp
+
+# The collection. A piece put on a display stand: its weight settling on the podium (a soft wooden thunk, its other
+# end a moment later), then a sparkle (five glints running up a major chord, a breath of shimmer under them).
+def glint(f, amp, sec=0.5):
+    return modes5(((f, amp, 0.16), (f * 2.76, amp * 0.22, 0.05), (f * 5.4, amp * 0.07, 0.02)), sec)
+sparkle = np.zeros(samples(0.75))
+for i, m in enumerate((91, 95, 98, 103, 107)):
+    sparkle += at(glint(note(m), 0.5 + 0.1 * i), i * 0.045, 0.75)
+put4("stand_display", mix(
+    at(thud5(118, 0.4) * 0.9 + modes5(((236, 0.3, 0.05), (505, 0.15, 0.03)), 0.4), 0, 0.95),
+    at(thud5(146, 0.3) * 0.35, 0.05, 0.95),
+    at(lowpass(sparkle, 11000) * 0.42 + band5(0.75, 5000, 11000) * hump(samples(0.75), 0.3, 0.6) * 0.04, 0.13, 0.95)), -18)
+# Taken down: hands lifting it off (a soft whoosh up), the podium's hollow tap as it comes free, two soft notes down.
+put4("stand_takedown", mix(
+    at(band5(0.3, 700, 4000) * hump(samples(0.3), 0.6, 0.35) * 0.25, 0, 0.6),
+    at(thud5(170, 0.25) * 0.5 + modes5(((330, 0.25, 0.04), (690, 0.12, 0.025)), 0.25), 0.16, 0.6),
+    at(pluck(note(79), 0.35, 0.12) * 0.2, 0.2, 0.6),
+    at(pluck(note(74), 0.38, 0.15) * 0.2, 0.29, 0.6)), -20)
+# Sold: the till's ka-ching: a key pressed (the clack), the drawer's lever ratcheting, the bell ringing bright as the
+# drawer rolls out to its stop, the coins in it jingling.
+def till_bell(sec):
+    f0 = 2490
+    parts = ((1.0, 1.0, 0.5), (1.006, 0.7, 0.5), (2.13, 0.45, 0.3), (2.98, 0.3, 0.2), (4.1, 0.2, 0.12), (5.6, 0.1, 0.07))
+    return modes5(tuple((f0 * m, a, d) for m, a, d in parts), sec)
+def coin5(f, amp):
+    return mix(modes5(((f, amp, 0.09), (f * 1.52, amp * 0.6, 0.06), (f * 2.4, amp * 0.3, 0.04)), 0.25), tick5(0.008, 3000, 9000, 0.0012) * amp * 0.3)
+till = mix(
+    at(mix(tick5(0.03, 1200, 5000, 0.006), thump(420, 220, 0.08, 0.02) * 0.5, modes5(((1350, 0.2, 0.02), (2100, 0.12, 0.015)), 0.05)) * 1.8, 0, 1.2),
+    *[at(tick5(0.01, 2000, 8000, 0.0015) * (0.45 + 0.1 * i), 0.04 + i * 0.022, 1.2) for i in range(4)],
+    at(till_bell(0.95) * 0.75, 0.13, 1.2),
+    at(band5(0.22, 150, 1400) * hump(samples(0.22), 0.25, 0.3) * 0.35, 0.16, 1.2),
+    at(mix(thump(130, 60, 0.2, 0.04) * 0.55, tick5(0.02, 800, 3000, 0.004) * 0.4), 0.38, 1.2))
+for start, f, amp in ((0.42, 3900, 0.25), (0.47, 4600, 0.2), (0.55, 4200, 0.15), (0.66, 5100, 0.1)):
+    till += at(coin5(f, amp), start, 1.2)
+put4("sale_register", till, -14)
+# A trip's pieces home in your warehouse: a small fanfare (soft brass running up the major chord, ta-da-da-daa, a warm
+# chord and a soft drum under the last note, a bell over it).
+def brass(freq, sec, release=0.08):
+    x = t(sec); s = np.zeros_like(x)
+    lips = 1 - np.exp(-x / 0.045) # (the brightness swells in as the note speaks)
+    for k in range(1, 14):
+        if freq * k > 9000:
+            break
+        s += np.sin(2 * np.pi * freq * k * x + 0.3 * k) * 0.82 ** (k - 1) * np.clip(lips * 3.2 - (k - 1) * 0.3, 0, 1)
+    vibrato = 1 + 0.004 * np.sin(2 * np.pi * 5.2 * x) * np.clip((x - 0.15) / 0.2, 0, 1)
+    s = s * vibrato
+    return s * np.clip(x / 0.015, 0, 1) * np.clip((sec - x) / release, 0, 1) * (0.78 + 0.22 * np.exp(-x / 0.07))
+put4("stored_fanfare", mix(
+    at(brass(note(67), 0.1, 0.03), 0, 1.5),
+    at(brass(note(72), 0.1, 0.03), 0.11, 1.5),
+    at(brass(note(76), 0.1, 0.03), 0.22, 1.5),
+    at(brass(note(79), 0.85, 0.3), 0.34, 1.5),
+    *[at(brass(note(m), 0.9, 0.35) * 0.32, 0.34, 1.5) for m in (60, 64, 67)],
+    at(thump(92, 44, 0.6, 0.14) * 0.55 + band5(0.6, 80, 600) * env(samples(0.6), 0.003, 0.08) * 0.2, 0.34, 1.5),
+    at(bell(note(91), 0.8, 0.35) * 0.18, 0.38, 1.5)), -14)
+
+# The ZDC Sprinter. Its sliding door: the handle pulled and the latch letting go, the door rolling back along its rail
+# (the rollers' rumble and their ticks) to its stop at the end (a firm clunk, made to its 0.5 s) …
+def rail5(sec, rate0, rate1):
+    out = np.zeros(samples(sec)); pos = 0.0
+    while pos < sec - 0.015:
+        rate = rate0 + (rate1 - rate0) * pos / sec
+        r = tick5(0.01, 900, 4000, 0.002) * rng5.uniform(0.2, 0.6)
+        k = samples(pos); out[k:k + len(r)] += r[:len(out) - k]
+        pos += (1 / rate) * rng5.uniform(0.7, 1.3)
+    return out + band5(sec, 90, 700) * hump(samples(sec), 0.25, 0.25) * 0.8
+put4("van_slide_open", mix(
+    at(latch5(), 0, 0.75),
+    at(tick5(0.015, 1600, 6000, 0.003) * 0.5, 0.05, 0.75),
+    at(rail5(0.42, 30, 45), 0.07, 0.75),
+    at(thump(160, 80, 0.25, 0.05) * 0.8 + modes5(((240, 0.35, 0.07), (610, 0.2, 0.05), (1380, 0.08, 0.03)), 0.25), 0.5, 0.75)), -19)
+# … and shut: rolling forward (faster), the slam into the frame, the latch catching.
+put4("van_slide_close", mix(
+    at(rail5(0.4, 40, 60), 0, 0.85),
+    at(slam5(150, 1.0), 0.42, 0.85),
+    at(tick5(0.015, 2000, 7000, 0.003) * 0.35, 0.44, 0.85)), -16)
+# Its back doors (made to client/CarVisuals.luau's 0.45 s swing): the handle and the latch, the second door's catch, the
+# two swinging wide round to the van's sides (a breath of air, new hinges: no squeak) and caught there by their
+# magnets (two muted thocks), then the step folding out behind the bumper (a sprung clank) …
+def thock5(f, amp):
+    return mix(thump(f, f * 0.6, 0.18, 0.025), modes5(((f * 2.3, 0.3, 0.03), (f * 4.7, 0.12, 0.02)), 0.18), tick5(0.01, 800, 3000, 0.002) * 0.3) * amp
+def step_clank(amp, pitch=1.0):
+    return mix(modes5(((420 * pitch, 0.5, 0.08), (1030 * pitch, 0.35, 0.06), (1870 * pitch, 0.2, 0.04), (2950 * pitch, 0.1, 0.03)), 0.35),
+               thump(200 * pitch, 110 * pitch, 0.35, 0.04) * 0.5, tick5(0.015, 1500, 6000, 0.003) * 0.5) * amp
+put4("sprinter_back_open", mix(
+    at(latch5(), 0, 0.95),
+    at(tick5(0.015, 1400, 6000, 0.004) * 0.5, 0.06, 0.95),
+    at(band5(0.34, 200, 1400) * hump(samples(0.34), 0.5, 0.4) * 0.18, 0.08, 0.95),
+    at(thock5(190, 0.6), 0.42, 0.95),
+    at(thock5(205, 0.5), 0.47, 0.95),
+    at(mix(step_clank(0.5), squeak5(0.16, 820, 640, 0.06)), 0.56, 0.95)), -20)
+# … and shut: the step folding up, the magnets letting go, the air the doors push and two slams (the second door
+# latches over the first).
+put4("sprinter_back_close", mix(
+    at(step_clank(0.35, 1.12), 0, 1.0),
+    at(tick5(0.012, 1500, 5000, 0.003) * 0.3, 0.07, 1.0),
+    at(tick5(0.012, 1500, 5000, 0.003) * 0.25, 0.1, 1.0),
+    at(band5(0.3, 150, 900) * hump(samples(0.3), 0.8, 0.05) * 0.22, 0.1, 1.0),
+    at(slam5(140, 1.0), 0.4, 1.0),
+    at(mix(slam5(165, 0.8), tick5(0.015, 2000, 7000, 0.003) * 0.3), 0.49, 1.0)), -17)
+# A foot onto its step (the walk-in): the diamond plate's hollow clonk, the van's body booming low under it and its
+# springs giving a little.
+put4("van_step_up", mix(
+    at(mix(tick5(0.02, 1200, 5000, 0.004) * 0.6, modes5(((330, 0.45, 0.06), (780, 0.3, 0.05), (1460, 0.15, 0.03), (2600, 0.08, 0.02)), 0.3)), 0, 0.5),
+    at(thump(88, 46, 0.4, 0.09) * 0.9, 0.005, 0.5),
+    at(squeak5(0.18, 760, 610, 0.08), 0.06, 0.5)), -22)
+
+# The meadow. A cowbell far off (client/SoundScape.luau plays it now and then, somewhere round you): the forged bell's
+# clank (as 7.1's) three times as the cow grazes on, dulled by the distance, the valley answering it softly.
+def cowbell5(amp, sec):
+    parts = ((1.0, 1.0, 0.3), (1.011, 0.6, 0.3), (1.52, 0.55, 0.22), (2.43, 0.45, 0.16), (3.31, 0.3, 0.11), (4.18, 0.2, 0.08))
+    return mix(modes5(tuple((452 * m, a, d) for m, a, d in parts), sec), tick5(0.02, 500, 3000, 0.004) * 0.3) * amp
+far_bells = lowpass(mix(at(cowbell5(1.0, 0.9), 0, 3.0), at(cowbell5(0.65, 0.8), 0.46, 3.0), at(cowbell5(0.8, 0.8), 1.02, 3.0)), 2200)
+valley = lowpass(np.concatenate([np.zeros(samples(0.42)), far_bells])[:samples(3.0)], 1300) * 0.25
+put4("cowbell_far", oneshot_room(far_bells + valley, 1.4, 0.03, 3.0), -21)
+# The alpine meadow's calm day (24 s, seamless; outdoors in the sandbox in place of the city's traffic): a soft breeze
+# swelling and falling (the grass hissing a little at its top), birds (two finches' falling trills, a tit's "tee-chu",
+# a chiffchaff's even notes farther off, a robin's warble, a lark up high) and the meadow's grasshoppers, quiet.
+AL = 24.0
+x24 = t(AL)
+breeze_swell = np.clip(0.55 + 0.25 * np.sin(2 * np.pi * x24 / AL + 0.6) + 0.12 * np.sin(2 * np.pi * 3 * x24 / AL + 2.0)
+                       + 0.25 * (swell5(AL, 0.15, 1.2) - 0.5), 0.15, 1)
+breeze = norm(band5(AL, 120, 800), 1.0) * breeze_swell + norm(band5(AL, 1800, 6000), 1.0) * 0.16 * breeze_swell ** 3
+meadow_ev = []
+def finch5(start, f0, loud):
+    pos = start
+    for k in range(9 + int(rng5.integers(0, 3))):
+        sec = 0.045 - k * 0.0018
+        f = f0 * (1 - 0.035 * k)
+        meadow_ev.append((pos, chirp(f * 1.08, f * 0.9, sec, 60) * (0.55 + 0.04 * k) * loud))
+        pos += sec + 0.022 - k * 0.0012
+    meadow_ev.append((pos + 0.03, chirp(f0 * 0.75, f0 * 1.05, 0.09) * 0.8 * loud))
+    meadow_ev.append((pos + 0.13, chirp(f0 * 1.1, f0 * 0.6, 0.14, 40) * 0.9 * loud))
+finch5(1.2, 4600, 1.0)
+finch5(13.7, 4350, 0.8)
+for i in range(3): # a tit's "tee-chu"
+    meadow_ev.append((6.1 + i * 0.32, chirp(5200, 5000, 0.07) * 0.45))
+    meadow_ev.append((6.1 + i * 0.32 + 0.1, chirp(4000, 3700, 0.09) * 0.45))
+for i in range(8): # a chiffchaff farther off
+    hi = i % 2 == 0
+    meadow_ev.append((9.0 + i * 0.36 + rng5.uniform(-0.02, 0.02), chirp(5300 if hi else 4500, 4700 if hi else 4100, 0.06) * 0.22))
+pos = 17.2 # a robin's warble
+for _ in range(14):
+    sec = rng5.uniform(0.04, 0.12); f = rng5.uniform(2600, 6200)
+    meadow_ev.append((pos, chirp(f * rng5.uniform(0.8, 1.2), f, sec, rng5.uniform(0, 140)) * rng5.uniform(0.25, 0.5)))
+    pos += sec + rng5.uniform(0.03, 0.11)
+pos = 3.3 # a lark up high (quiet, a long tumbling run)
+for _ in range(22):
+    sec = rng5.uniform(0.03, 0.07); f = rng5.uniform(3800, 6800)
+    meadow_ev.append((pos, chirp(f, f * rng5.uniform(0.85, 1.15), sec, 90) * rng5.uniform(0.06, 0.13)))
+    pos += sec + rng5.uniform(0.015, 0.05)
+for start in np.arange(0.0, AL, 0.5): # grasshoppers: a soft buzzing pulse now and then
+    if rng5.random() < 0.35:
+        x = t(0.18)
+        pulse = np.sin(2 * np.pi * 7200 * x) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 55 * x))) * np.sin(np.pi * x / 0.18) ** 2
+        meadow_ev.append((start + rng5.uniform(0, 0.4), pulse * 0.012))
+birds5 = lowpass(render_loop(meadow_ev, AL), 9000, circular=True)
+put4("amb_alpine", norm(breeze, 1.0) + norm(birds5, 1.0) * 0.55, -21)
+# A warehouse's hall (12 s, seamless): its lights' mains hum (100 Hz and its overtones, beating slowly), the hall's air (a
+# low room tone, a vent breathing softly) and the metal roof ticking in the sun now and then, all in the hall's echo.
+WL = 12.0
+x12w = t(WL)
+hum5 = sum(a * np.sin(2 * np.pi * f * x12w + p) for f, a, p in ((100, 1.0, 0.0), (100.25, 0.35, 0.5), (200, 0.45, 0.7), (300, 0.2, 1.4), (400, 0.1, 2.0)))
+hum5 = hum5 * (1 + 0.06 * np.sin(2 * np.pi * 2 * x12w / WL))
+air5 = norm(band5(WL, 40, 300), 1.0) * 0.7 + norm(band5(WL, 300, 2500), 1.0) * 0.16 * (0.75 + 0.25 * np.sin(2 * np.pi * x12w / WL + 1.0))
+roof5 = render_loop([(rng5.uniform(0, WL), (modes5(((rng5.uniform(1800, 3400), 0.3, 0.03), (rng5.uniform(4200, 6000), 0.12, 0.015)), 0.15)
+                                              + thump(140, 90, 0.15, 0.02) * 0.2) * rng5.uniform(0.4, 1)) for _ in range(5)], WL)
+put4("amb_warehouse", room5(norm(hum5, 1.0) * 0.3 + norm(air5, 1.0) + norm(roof5, 1.0) * 0.25, 1.2, 0.05), -24)
+# The Old Chalet's room (10 s, seamless): a quiet room tone (the air, low), a wall clock's soft tick-tock (once a
+# second, the tock lower), its old timber creaking once.
+RL = 10.0
+clock5 = render_loop([(i * 1.0, mix(modes5((((2600 if i % 2 == 0 else 2050), 0.3, 0.012), ((5200 if i % 2 == 0 else 4300), 0.1, 0.006)), 0.05),
+                                     tick5(0.01, 2000, 7000, 0.0015) * 0.2)) for i in range(10)], RL)
+creak5 = render_loop([(6.3, squeak5(0.55, 190, 250, 1.0) * 0.6)], RL)
+put4("amb_room", room5(norm(band5(RL, 50, 250), 1.0) + norm(band5(RL, 800, 4000), 1.0) * 0.05 + norm(clock5, 1.0) * 0.1 + norm(creak5, 1.0) * 0.06, 0.4, 0.04), -28)
+LOOPED |= {"amb_alpine", "amb_warehouse", "amb_room"}
+
 # ── Write the sheets ──────────────────────────────────────────────────────────
 REGIONS_PATH = os.path.join(HERE, "regions.json")
 OLD = json.load(open(REGIONS_PATH)) if os.path.exists(REGIONS_PATH) else {}
@@ -803,6 +1034,11 @@ FALLBACK = {
     "house_door_creak": "door_creak", "grip_tick": "ui_click", "grip_warning": "phone_buzz", "grip_slip": "putdown",
     "move_start": "task_done", "move_success": "job_done", "move_fail": "job_fail", "horde_siren": "event_start",
     "checkpoint_gate": "bus_door", "wind_peaks_loop": "amb_roof", "stream_loop": "amb_fountain",
+    # 8.1 (sfx4, the sandbox's): the meadow's stand-in is sfx2's breeze (never the city's traffic), the hall's sfx2's
+    # hum; silent until it is up: the room's tone and the far cowbell
+    "stand_display": "putdown", "stand_takedown": "pickup", "sale_register": "purchase", "stored_fanfare": "task_done",
+    "van_slide_open": "car_door_open", "van_slide_close": "car_door_close", "sprinter_back_open": "van_back_open",
+    "sprinter_back_close": "van_back_close", "van_step_up": "step_metal_a", "amb_alpine": "wind", "amb_warehouse": "ambience",
 }
 built ={name: build_sheet(items, gap) for name, items, gap in SHEETS}
 # 6.12: an uploaded sheet keeps its .ogg byte for byte unless it is named (--sheets): check first, write nothing on a
@@ -861,7 +1097,8 @@ lua = ["--!strict",
        "-- 7.1: art/audio/sfx4.ogg holds the moves' sounds (the furniture, the truck, the grip, the move's stings, the",
        "-- horde's siren, the Wall's gate) and the mountains' (a cuckoo clock, a cowbell, birdsong, the peaks' wind, a",
        "-- brook) (Sfx4); until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX4.md says how",
-       "-- to upload it).",
+       "-- to upload it). 8.1: and the sandbox's, at its end (the meadow, the warehouse's hall and the chalet's room, the",
+       "-- stands, the till, the trip home's fanfare, the ZDC Sprinter's doors and step).",
        "", "local SoundSheet = {}", "",
        f'SoundSheet.SfxId = "{old_ids["SfxId"]}" -- "rbxassetid://…" of art/audio/sfx.ogg',
        f'SoundSheet.MusicId = "{old_ids["MusicId"]}" -- "rbxassetid://…" of art/audio/music.ogg',

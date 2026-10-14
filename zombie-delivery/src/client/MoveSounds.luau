@@ -14,6 +14,9 @@
 -- MoveSounds.slipped(): for the grip's UI, the piece slipped from your hands: grip_slip (a whoosh and a thud) now,
 -- and the put-down its MoveCarry clearing would play is left out, and so is the state's heavy_drop for the slip's
 -- damage (7.1 review: one thud, not two; both for Config.Soundscape.Move.SlipQuiet s).
+-- MoveSounds.inside(): 8.1, are you inside the move's house (its state's inside: the interior its door takes you to)?
+-- client/SoundScape.luau's sandbox ambience asks (the chalet's quiet room). 8.1, in the sandbox the state's back plays no
+-- ramp and the result no Wall's gate (shared/SoundPlan.luau moveCues, resultCue).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -65,6 +68,10 @@ end
 function MoveSounds.slipped()
 	slipAt = os.clock()
 	cue({ name = "grip_slip", volume = M.Slip, pitch = 1 })
+end
+
+function MoveSounds.inside(): boolean
+	return type(view) == "table" and view.inside == true
 end
 
 local function onState(state: any)

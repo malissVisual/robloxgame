@@ -115,6 +115,7 @@ if Config.Sandbox.On then
 			safely(entry.name, start)
 		end
 	end
+	safely("SandboxSounds", function() require(Client.SandboxSounds).start() end) -- 8.1: the stands, the till, the van's doors
 
 	-- The hooks (the city's, less what the sandbox does not run).
 	Drive.notify = Hud.toast

@@ -2,13 +2,17 @@
 -- the place (the park's lawns, the pond, the river), the horns by vehicle, the back's sounds, the ambience by the
 -- clock and the height; every name it gives has its region in SoundSheet.Sfx3. 8.0.1: in the sandbox
 -- (Config.Sandbox.On) none of the city's places (no pond, river, sea or park lawn; client/SoundScape.luau's fountain
--- asks SoundPlan.cityPlaces too). In the standalone Luau CLI.
+-- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (the meadow, a warehouse, the chalet), its
+-- ambience (a calm alpine day, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the far
+-- cowbell, the collection's cues (on a stand, taken down, home), the income's clink (soft, not too often), the
+-- Sprinter's sliding door, step and back doors, no ramp and no Wall's gate on a sandbox move. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local Map = require("./Map")
 local SoundSheet = require("./SoundSheet")
 local SoundPlan = require("./SoundPlan")
+local SandboxMap = require("./SandboxMap") -- (8.1: the sandbox's places)
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -258,6 +262,144 @@ check("… steps where the pond was (the meadow by Main Street, its asphalt): gr
 check("… no river, no sea", SoundPlan.waterTop(riverX, 0) == nil and SoundPlan.waterTop(Map.Sea.x0 + 50, 0) == nil)
 check("… a plot's concrete where the park's lawn was: concrete", not SoundPlan.parkLawn(lawnX, lawnZ) and SoundPlan.surface("Concrete", -65, 0, -85) == "concrete")
 check("… the materials still say their surface (terrain water, grass, planks)", SoundPlan.surface("Water", 0, 0, 0) == "water" and SoundPlan.surface("Grass", 0, 0, 0) == "grass" and SoundPlan.surface("WoodPlanks", 0, 0, 0) == "wood")
+
+-- ── 8.1: the sandbox's own sounds ───────────────────────────────────────────
+local SB = S.Sandbox
+local function sfx4(name: string): boolean
+	return SoundSheet.Sfx4[name] ~= nil
+end
+-- Where you are.
+local plot = SandboxMap.Plots[1]
+local w = plot.warehouse
+local h = SandboxMap.House
+check("the meadow is outdoors", SoundPlan.sandboxPlace(150, 2, 300, false) == "outdoors")
+check("Main Street is outdoors", SoundPlan.sandboxPlace(0, 1, 200, false) == "outdoors")
+check("in a warehouse's hall", SoundPlan.sandboxPlace(w.x + 10, 1, w.z, false) == "warehouse")
+check("every plot's warehouse", (function(): boolean
+	for _, p in SandboxMap.Plots do
+		if SoundPlan.sandboxPlace(p.warehouse.x, 1, p.warehouse.z + 5, false) ~= "warehouse" then
+			return false
+		end
+	end
+	return true
+end)())
+check("the van's spot before the roller door is outdoors", SoundPlan.sandboxPlace(plot.vanSpot.x, 2, plot.vanSpot.z, false) == "outdoors")
+check("a plot's yard beside the hall is outdoors", SoundPlan.sandboxPlace(plot.spawn.x, 3, plot.spawn.z, false) == "outdoors")
+check("in the move's house (its state's inside): the house", SoundPlan.sandboxPlace(150, 2, 300, true) == "house")
+check("a move's interior far off the map: the house", SoundPlan.sandboxPlace(9000, 400, 9000, false) == "house")
+check("in the chalet's own box: the house", SoundPlan.sandboxPlace(h.house.x, 3, h.house.z, false) == "house")
+check("at the chalet's front door (where you come out): outdoors", SoundPlan.sandboxPlace(h.door.x, 1, h.door.z, false) == "outdoors")
+-- The ambience: a calm alpine day outdoors, never the city's traffic.
+local L = SoundPlan.SandboxLoops
+check("the sandbox's outdoor loop is the meadow, not the city's traffic (amb_day) or night", L.alpine == "amb_alpine" and L.alpine ~= "amb_day" and L.alpine ~= "amb_night")
+for part, name in L do
+	check(`the sandbox's {part} loop {name} is in sfx4 and loops`, sfx4(name) and SoundSheet.Looped[name] == true)
+end
+-- (a stand-in's stand-in too: none on the way is the city's day or night)
+local standIn: string? = L.alpine
+local chain = {}
+while standIn do
+	table.insert(chain, standIn)
+	check(`the meadow's stand-in chain: {standIn} is no city loop`, standIn ~= "amb_day" and standIn ~= "amb_night" and standIn ~= "ambience")
+	standIn = SoundSheet.Fallback[standIn]
+	if #chain > 4 then
+		break
+	end
+end
+check("the meadow stands in with a breeze until sfx4 is up", SoundSheet.Fallback[L.alpine] == "wind")
+local out4, out3 = SoundPlan.sandboxAmbience("outdoors", true), SoundPlan.sandboxAmbience("outdoors", false)
+check("outdoors: the meadow only", out4.alpine == SB.Alpine and out4.warehouse == 0 and out4.room == 0)
+check("outdoors before sfx4: its breeze, quieter", out3.alpine == SB.AlpineStandIn and out3.alpine > 0 and out3.alpine < out4.alpine)
+local hall = SoundPlan.sandboxAmbience("warehouse", true)
+check("in a warehouse: its hall, the meadow faint through the door", hall.warehouse == SB.Warehouse and hall.alpine > 0 and hall.alpine < out4.alpine and hall.room == 0)
+check("in a warehouse before sfx4: the hum's stand-in", SoundPlan.sandboxAmbience("warehouse", false).warehouse == SB.WarehouseStandIn)
+local room = SoundPlan.sandboxAmbience("house", true)
+check("in the house: the quiet room only", room.room == SB.Room and room.alpine == 0 and room.warehouse == 0)
+check("in the house before sfx4: silence (no stand-in)", SoundPlan.sandboxAmbience("house", false).room == 0 and SoundSheet.Fallback[L.room] == nil)
+for _, mix in { out4, out3, hall, room } do
+	for key, value in mix :: any do
+		check(`sandbox ambience {key} in 0 … 1`, value >= 0 and value <= 1, value)
+	end
+end
+check("the warehouse's echo, none outdoors or in the house", SoundPlan.reverb("warehouse") == SB.Reverb.warehouse and SoundPlan.reverb("outdoors") == "NoReverb" and SoundPlan.reverb("house") == (SB.Reverb.house or "NoReverb"))
+-- The far cowbell.
+check("the cowbell's gaps", SoundPlan.cowbellGap(0) == SB.CowbellGap[1] and SoundPlan.cowbellGap(1) == SB.CowbellGap[2] and SoundPlan.cowbellGap(2) == SB.CowbellGap[2])
+check("the cowbell rings now and then (20 s at least between two)", SB.CowbellGap[1] >= 20 and SB.CowbellGap[2] > SB.CowbellGap[1])
+for _, r in { { 0, 0 }, { 0.3, 1 }, { 0.77, 0.5 } } do
+	local x, z = SoundPlan.cowbellSpot(10, 20, r[1], r[2])
+	local d = math.sqrt((x - 10) ^ 2 + (z - 20) ^ 2)
+	check(`the cowbell far off ({math.floor(d)} studs)`, d >= SB.CowbellFar[1] - 1e-6 and d <= SB.CowbellFar[2] + 1e-6)
+end
+check("the far cowbell is in sfx4, short, not a loop", sfx4("cowbell_far") and SoundSheet.Looped.cowbell_far == nil and SoundSheet.Sfx4.cowbell_far[2] <= 4)
+-- The collection's cues (the "Collection" remote's states, one after the other).
+local function stock(list: { { any } }): { [string]: any }
+	local out = {}
+	for _, e in list do
+		table.insert(out, { uid = e[1], item = "chair", stand = e[2] })
+	end
+	return { kind = "state", stock = out, income = 1, stands = 12 }
+end
+local function cueNames(cues: { SoundPlan.Cue }): string
+	local list = {}
+	for _, c in cues do
+		check(`collection cue {c.name} has its region`, sfx4(c.name))
+		check(`collection cue {c.name}: volume and pitch`, c.volume > 0 and c.volume <= 1 and c.pitch == 1)
+		table.insert(list, c.name)
+	end
+	return table.concat(list, ",")
+end
+local s0 = stock({ { "1-1" }, { "1-2" } })
+check("the first state: nothing", cueNames(SoundPlan.collectionCues(nil, s0)) == "")
+check("nothing changed: nothing", cueNames(SoundPlan.collectionCues(s0, stock({ { "1-1" }, { "1-2" } }))) == "")
+local shown = stock({ { "1-1", 3 }, { "1-2" } })
+check("a piece put on a stand: the thunk and the sparkle", cueNames(SoundPlan.collectionCues(s0, shown)) == "stand_display")
+check("moved to another stand: the same", cueNames(SoundPlan.collectionCues(shown, stock({ { "1-1", 7 }, { "1-2" } }))) == "stand_display")
+check("taken down", cueNames(SoundPlan.collectionCues(shown, s0)) == "stand_takedown")
+local home = stock({ { "1-1" }, { "1-2" }, { "1-3" }, { "1-4" } })
+check("pieces came home: the fanfare (once)", cueNames(SoundPlan.collectionCues(s0, home)) == "stored_fanfare")
+check("… not right after the move's result card (its own jingle)", cueNames(SoundPlan.collectionCues(s0, home, SB.StoredQuiet / 2)) == "")
+check("… but a while after it", cueNames(SoundPlan.collectionCues(s0, home, SB.StoredQuiet + 1)) == "stored_fanfare")
+check("sold (gone from the stock): nothing here (the till plays from \"sold\")", cueNames(SoundPlan.collectionCues(shown, stock({ { "1-2" } }))) == "")
+check("a uid as a number", cueNames(SoundPlan.collectionCues(stock({ { 5 } }), stock({ { 5, 1 } }))) == "stand_display")
+check("junk is skipped", cueNames(SoundPlan.collectionCues({ stock = { 1, "x", { uid = {} } } }, { stock = "nope" })) == "" and cueNames(SoundPlan.collectionCues(5, s0)) == "")
+-- The income's clink: the stands' money coming in, softly, not too often.
+local G = SB.IncomeGap
+check("the income clinks", SoundPlan.incomeClink(12, 100, 100 - G, -math.huge, false, true))
+check("… at most once every IncomeGap s", not SoundPlan.incomeClink(12, 100, 100 - G + 0.5, -math.huge, false, true) and G >= 10)
+check("… not with the warehouse's window open", not SoundPlan.incomeClink(12, 100, -math.huge, -math.huge, true, true))
+check("… not right after a sale (its money)", not SoundPlan.incomeClink(300, 100, -math.huge, 100 - SB.SoldQuiet / 2, false, true))
+check("… nor with nothing on show", not SoundPlan.incomeClink(12, 100, -math.huge, -math.huge, false, false))
+check("… nor money going down", not SoundPlan.incomeClink(-40, 100, -math.huge, -math.huge, false, true) and not SoundPlan.incomeClink(0, 100, -math.huge, -math.huge, false, true))
+check("the income's clink is soft (sfx2's coin, quiet)", SoundSheet.Sfx2.coin ~= nil and SB.Income > 0 and SB.Income <= 0.25)
+check("the sale's till and the income's coin", sfx4("sale_register") and SoundSheet.Fallback.sale_register ~= nil)
+-- The Sprinter: its sliding door, its step, its back doors.
+check("the sliding door rolls open", SoundPlan.slideSound(true) == "van_slide_open" and sfx4("van_slide_open"))
+check("… and slams shut", SoundPlan.slideSound(false) == "van_slide_close" and sfx4("van_slide_close"))
+check("the rear and side steps are steps", SoundPlan.isStep("RearStep") and SoundPlan.isStep("SideStep"))
+check("the bay's floor and the bumper are not", not SoundPlan.isStep("BayFloor") and not SoundPlan.isStep("RearBumper") and not SoundPlan.isStep("StepFolded"))
+check("the step's clonk", sfx4("van_step_up") and SoundSheet.Fallback.van_step_up == "step_metal_a")
+local open, openPitch = SoundPlan.swingSound("swing", "opening", "sprinter")
+local close = SoundPlan.swingSound("swing", "closing", "sprinter")
+check("the Sprinter's back doors swing round with their own sound", open == "sprinter_back_open" and openPitch == 1 and sfx4(open :: string))
+check("… and shut with their own", close == "sprinter_back_close" and sfx4(close :: string))
+check("… its cabin doors as any car's", SoundPlan.swingSound("door", "opening", "sprinter") == "car_door_open" and SoundPlan.swingSound("door", "shut", "sprinter") == "car_door_close")
+check("another van's back as before", SoundPlan.swingSound("swing", "opening", "van") == "van_back_open" and SoundPlan.swingSound("swing", "opening") == "van_back_open")
+-- The moves in the sandbox: no ramp (the Sprinter's doors are heard), no Wall's gate (the trip home's fanfare).
+check("the sandbox: the Sprinter's back plays no truck ramp", names(SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)) == "" and names(SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)) == "")
+check("… the house's door still creaks", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+check("… and no Wall's gate at the end", SoundPlan.resultCue({ how = "done" }) == nil and SoundPlan.resultCue({ how = "late" }) == nil)
+for key, value in SB do
+	if type(value) == "number" then
+		local most = if string.find(key, "Range", 1, true) then 200 else 60 -- (a range in studs)
+		check(`Config.Soundscape.Sandbox.{key} is a sane number`, value >= 0 and value <= most, value)
+	elseif key ~= "Reverb" then
+		local list = value :: { number }
+		check(`Config.Soundscape.Sandbox.{key} is a range`, #list == 2 and list[1] > 0 and list[2] >= list[1], key)
+	end
+end
+for key, value in { "Alpine", "AlpineStandIn", "Warehouse", "WarehouseStandIn", "Room", "Display", "TakeDown", "Sold", "Stored", "Slide", "Step" } do
+	check(`Config.Soundscape.Sandbox.{value} is a volume (0 … 1)`, SB[value] > 0 and SB[value] <= 1, key)
+end
 Config.Sandbox.On = sandboxOn
 
 if failures == 0 then
