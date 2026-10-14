@@ -2015,7 +2015,9 @@ local function actWait(h: Helper, body: Body, dt: number, clock: number)
 	if not spot then
 		local out: CFrame = h.s.site.outside
 		spot = out.Position
-	elseif truck and not truckAtHouse(h.s, truck) and flat(body.root.Position, spot) > cfg.Far then
+	elseif truck and (h.hirer == nil or not truckAtHouse(h.s, truck)) and flat(body.root.Position, spot) > cfg.Far then
+		-- (8.4, the owner: "Danny always has to be hired, he isn't free": not hired, he stays where the van left him, at
+		-- the warehouse, and never turns up at the house; hired, he rides along or comes to the van at the house)
 		mover.halt(body)
 		return
 	end
