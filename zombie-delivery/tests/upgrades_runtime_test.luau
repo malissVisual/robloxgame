@@ -263,7 +263,7 @@ local levels = table.clone(profileA.sandboxUpgrades)
 check("Upgrades.levels: a copy", same(Upgrades.levels(A), levels) and Upgrades.levels(A) ~= profileA.sandboxUpgrades)
 E.leave(A)
 local stored = E.saves.Player_101
-check("leaving saves the levels with the flags (8.3: the warehouse's too)", stored ~= nil and stored.sandboxUpgradesKept == true and same(stored.sandboxUpgrades, levels) and stored[Rules.Flag] == true
+check("leaving saves the levels with the flags (8.3: the warehouse's too)", stored ~= nil and stored.sandboxUpgradesKept == true and same(stored.sandboxUpgrades, Rules.forSave(levels)) and stored[Rules.Flag] == true
 	and stored[Rules.WarehouseFlag] == true)
 A = E.join(101, "Ann")
 E.plotOf[A] = 1

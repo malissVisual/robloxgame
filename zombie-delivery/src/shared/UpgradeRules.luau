@@ -206,6 +206,14 @@ function UpgradeRules.empty(): Levels
 	return {}
 end
 
+-- 8.3 review: the levels as saved: a copy, plus `stands` (an older 8.2 server's More stands count for this warehouse
+-- level, WarehouseLevels.oldStands), so a visit there shows every stand. clean ignores that key.
+function UpgradeRules.forSave(levels: Levels): { [string]: number }
+	local out: { [string]: number } = table.clone(levels) :: any
+	out.stands = WarehouseLevels.oldStands(UpgradeRules.warehouseLevel(levels))
+	return out
+end
+
 function UpgradeRules.full(): Levels
 	local out: Levels = {}
 	for _, id in UpgradeRules.Order do

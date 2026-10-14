@@ -94,6 +94,11 @@ function PadGlyph.pressed(input: InputObject, processed: boolean, id: string): b
 	if not chip or processed or input.KeyCode.Name ~= chip.pad or UserInputService:GetFocusedTextBox() then
 		return false
 	end
+	-- (8.3 review: not while carrying: B puts the piece down there, so a window's B would put it down too)
+	local character = game:GetService("Players").LocalPlayer.Character
+	if character and character:GetAttribute("Carrying") ~= nil then
+		return false
+	end
 	return GuiService.SelectedObject == nil
 end
 

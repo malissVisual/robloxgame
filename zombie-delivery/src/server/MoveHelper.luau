@@ -2377,7 +2377,7 @@ function MoveHelper.call(s: any, player: Player, spot: number): string?
 	h.call = { player = player, spot = spot, since = clock, ready = false, readyAt = 0, approach = Brain.newApproach() }
 	h.thinkAt = 0
 	shout(player.Character, "Danny, give me a hand!")
-	notice:FireClient(player, `🙋 "Danny, give me a hand!" Wait at your end of the {thing.name}: he's coming. (Lift again or G: stop)`)
+	notice:FireClient(player, `🙋 "Danny, give me a hand!" Wait at your end of the {thing.name}: he's coming. Lift again or press STOP to call it off.`) -- (8.3 review: no key named: every device)
 	if player:GetAttribute("MoveHelperCall") ~= thing.name then
 		player:SetAttribute("MoveHelperCall", thing.name)
 	end

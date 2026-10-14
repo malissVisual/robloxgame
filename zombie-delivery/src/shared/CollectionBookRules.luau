@@ -311,7 +311,15 @@ function CollectionBookRules.fromSave(saved: any, collection: any): (Book, Paid)
 		return CollectionBookRules.empty(), {}
 	end
 	if saved[CollectionBookRules.Flag] == true then
-		return CollectionBookRules.clean(saved.collectionBook), CollectionBookRules.cleanPaid(saved.collectionBookPaid)
+		local book = CollectionBookRules.clean(saved.collectionBook)
+		-- (8.3 review: a piece in the stock is always found: an older server's save may have dropped newer kinds from
+		-- the book while the stock kept them)
+		for item, page in CollectionBookRules.backfill(if type(collection) == "table" then collection.entries else nil) do
+			if book[item] == nil then
+				book[item] = page
+			end
+		end
+		return book, CollectionBookRules.cleanPaid(saved.collectionBookPaid)
 	end
 	return CollectionBookRules.backfill(if type(collection) == "table" then collection.entries else nil), {}
 end
