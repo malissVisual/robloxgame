@@ -9,6 +9,8 @@
 --   warehouses/shown     the pieces on show in them: every stand full, the heaviest pieces (FurnitureLooks' part count)
 --   interior             the house's inside while a move runs (server/HouseInterior.luau): the largest of SEEDS plans
 --   danny                Danny's body (server/Npcs.luau on the stand-in's classic R15)
+--   visitors             8.3: the showroom's visitors at the server's cap (Config.Visitors.Cap; server/Visitors.luau's
+--                        bodies, every kind's look in turn, each with the box of a sale: the most it can be)
 setfenv(1, require("./mock").env)
 local Census = require("./census")
 local Config = require("./shared/Config")
@@ -135,3 +137,19 @@ local helper = Config.MoveHelper
 local danny = Npcs.spawn(Npcs.look("mover", helper.Name, helper.Title), CFrame.new(0, 0, 0))
 emit("danny", Census.under(danny))
 detail("danny", Census.list(danny))
+
+-- ── 8.3: the showroom's visitors (the server's cap, each with a sale's box) ─────────────────────────────────────
+local Visitors = require("./server/Visitors")
+local VisitorRules = require("./shared/Visitors")
+local crowd = {}
+local kinds = VisitorRules.kinds()
+for index = 1, Config.Visitors.Cap do
+	local kind = kinds[(index - 1) % #kinds + 1]
+	local body = Visitors.body(kind, kind.names[1], CFrame.new(index * 5, 0, 40))
+	Visitors.carry(body)
+	for _, d in Census.list(body) do
+		table.insert(crowd, d)
+	end
+end
+emit("visitors", Census.of(crowd))
+detail("visitors", crowd)

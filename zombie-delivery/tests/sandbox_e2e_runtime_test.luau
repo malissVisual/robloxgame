@@ -88,7 +88,7 @@ do
 	local chosen: number? = nil
 	for score = 3, 1, -1 do
 		for day = first, first + 3000 do
-			local saved = TaskRules.fresh(11, day * 86400 + 43200, nil)
+			local saved = TaskRules.fresh(11, day * 86400 + 43200, { offer = true }) -- (8.3: the visitors are off here: never their task)
 			local has: { [string]: number } = {}
 			for _, slot in saved.daily do
 				has[slot.id] = slot.target
@@ -124,6 +124,7 @@ local Vehicles = E.fakes.Vehicles
 MoveHelper.useMover(E.mover) -- (no pathfinding in the CLI: Danny walks straight)
 
 local queued: { any } = {}
+Config.Visitors.On = false -- (8.3: the showroom's visitors off here: tests/visitors_runtime_test.luau drives them)
 Boot.start(function(player: any)
 	table.insert(queued, player)
 end)

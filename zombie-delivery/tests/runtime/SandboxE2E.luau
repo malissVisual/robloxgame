@@ -1556,6 +1556,7 @@ E.real = {
 	MoveHelper = true, MoveGreeters = true, PairHold = true, MoveSites = true, SandboxBoot = true, SandboxWorld = true,
 	HouseMesh = true, HouseInterior = true, FurnitureMesh = true, Analytics = true, SandboxAnalytics = true, CollectionBook = true,
 	SandboxTasks = true, SandboxLeaders = true, WarehouseMesh = true,
+	Visitors = true, VisitorOffers = true, -- 8.3: the showroom's visitors (tests/visitors_runtime_test.luau; off in the e2e)
 }
 E.fakes = {}
 
@@ -1754,6 +1755,7 @@ E.fakes.Npcs = stub("Npcs", {
 	end,
 	act = noop,
 	glance = noop,
+	face = noop, -- (8.3: a visitor turns to the piece it looks at)
 	remove = function(npc: any)
 		npc:Destroy()
 	end,

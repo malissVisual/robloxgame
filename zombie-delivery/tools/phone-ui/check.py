@@ -30,6 +30,9 @@ on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920
 panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.
 8.3 SANDBOX: every device's way to the chips (the keys, the gamepad's D-pad glyphs and routes), the gamepad in every
 sandbox window, the notices in the device's words and the first-time hints (sandboxpad.luau on sandbox_mock.luau).
+8.3 SANDBOX: a showroom visitor's offer card (the real OfferCard: offercard.luau on sandbox_mock.luau) at 844 x 390,
+1280 x 800 and 1920 x 1080: its words, clear of the chips and the touch controls, ACCEPT / DECLINE's requests (the id
+only), the gamepad's selection on DECLINE and B, waiting under another window, the clock running out.
 """
 import argparse
 from pathlib import Path
@@ -292,3 +295,11 @@ from dannycardenv import dannycard_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     dannycard_env(Path(folder))
     subprocess.run([args.luau, "dannycard.luau"], cwd=folder, check=True)
+# 8.3 the showroom's visitors: a visitor's offer card (client/OfferCard.luau) beside the real SandboxHud and
+# SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/offercard.luau on a phone (844 x 390), a
+# computer (1280 x 800) and 1920 x 1080 (offercardenv.py builds the folder; offercard_preview.py draws the same scenes).
+from offercardenv import offercard_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    offercard_env(Path(folder))
+    subprocess.run([args.luau, "offercard.luau"], cwd=folder, check=True)

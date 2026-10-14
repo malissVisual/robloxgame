@@ -5634,6 +5634,7 @@ Config.Robust = {
 		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		MoveHelper = 4, -- 8.3: Danny's orders and STOP (the Moving remote's "helper": server/MoveHelper.luau)
+		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 	},
 }
 
@@ -7254,6 +7255,7 @@ Config.CollectionBook = {
 --   danny     Danny holds the other end of your `item` (the sofa) while you carry it
 --   hotsell   8.3: pieces of today's hot kinds you sold (Config.Market)
 --   hotincome 8.3: $ your hot pieces on show earned (their share of what the stands paid)
+--   offer     8.3: offers of the showroom's visitors you accepted (Config.Visitors; never picked while they are off)
 -- `text` is the title ({n} the target; `one` when it is 1), `target` the range it is picked from (in `step`s), `money`
 -- the reward at the range's low end (its high end pays TopShare more, rounded to $10), `icon` its emoji.
 --   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
@@ -7304,6 +7306,7 @@ Config.SandboxTasks = {
 		-- 8.3, the market (Config.Market): one of these a day at most
 		{ id = "hotsell", group = "market", event = "hotsell", icon = "🔥", text = "Sell {n} hot items", one = "Sell a hot item", target = { 1, 2 }, money = 250 },
 		{ id = "hotincome", group = "market", event = "hotincome", icon = "🔥", text = "Earn ${n} from hot items on show", target = { 100, 250 }, step = 50, money = 250 },
+		{ id = "offer", event = "offer", icon = "🤝", text = "Accept {n} offers from visitors", one = "Accept an offer from a visitor", target = { 1, 1 }, money = 250 }, -- 8.3: Config.Visitors
 	} :: { SandboxTaskDef },
 	WeeklyPool = {
 		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
@@ -7384,6 +7387,89 @@ Config.Market = {
 	Recover = 1200,
 	Salt = 8303,
 	Flag = "marketKept",
+}
+
+-- 8.3 SANDBOX, the showroom's visitors (the owner: the warehouse should feel alive). A few customers walk in through the
+-- roller door, stroll between the stands with pieces on show, stop at a piece ("Ooh, a gramophone!") and leave; now and
+-- then one offers to buy a piece on show for more than its market price, and you ACCEPT or DECLINE on a small card.
+-- shared/Visitors.luau has the rules (tests/visitors_test.luau), server/Visitors.luau walks them (server/Npcs.luau's
+-- bodies; one loop for them all), server/VisitorOffers.luau prices and checks the offers (tests/visitoroffers_runtime_test.luau),
+-- client/OfferCard.luau is the card.
+--   On          false: no visitors (and the daily task "offer" is never picked)
+--   Cap         visitors in the whole server at once; PerHall: in one warehouse at once
+--   Group       the chances a group is 1, 2 or 3 visitors (they walk in Stagger s apart)
+--   Near        studs round a warehouse's walls that count as its owner being at their warehouse
+--   NearEvery   s between two groups while the owner is at their warehouse; AwayEvery: while away (at most every few
+--               minutes); FirstWait: s from the owner coming (or the first piece going on show) to a group
+--   Tick        s between two looks of the one loop (every hall, every visitor, the offers' clocks)
+--   Stops       the pieces a visitor stops at (a range); Look: s at one; Talk: the chance it says something there
+--   Walk        a visitor's pace (studs / s); Stuck: s without getting closer before a walk gives up; Life: s a visitor
+--               stays at most
+--   Clear       studs a standing visitor keeps from a player (one closer: it moves on; never a spot that close)
+--   Cell        studs: the hall's walking grid (shared/Visitors.luau hall); Margin: studs a visitor's middle keeps from
+--               the walls, the podiums and the desk; View: studs from a podium's edge it stands to look; DeskClear: studs
+--               round the UPGRADES desk where no visitor stops (the player's spot at it)
+--   DoorSide    studs from the door's middle a visitor walks in and out (beside the van's back, off the unloading lane;
+--               at most the door's half less DoorEdge); Outside: { across, out } studs from the door's middle where it
+--               comes from and goes (beside the van); Threshold: studs outside the door's face it steps through
+--   Offer       Chance: a visitor's chance (× its kind's chance) to offer at a piece it looks at, once each, only while
+--               the owner is in the hall on foot within Reach studs; Every: s at least between two offers to one player;
+--               Expire: s an offer stays open; the price: the piece's market price now × Min … Max, + Rare for each
+--               rarity rank over common, + Hot for a hot kind (its market price is × HotSell already), + the kind's
+--               pay, Top at most, rounded up to $5 (from $100) or $10 (from $1,000)
+--   Kinds       who comes: id, title (the name tag's line and the toast's "The collector"), weight (how often), chance
+--               (× Offer.Chance), pay (+ the offer's ×), names, look (shared/NpcLooks.luau's fields over a townsperson's)
+-- The tuning: a piece sells for about ten minutes of showing it (Config.Collection); an offer pays 10 – 50 % more (a
+-- legendary up to 70 %, a collector's 10 % more again), so accepting one is worth it when another piece waits for the
+-- stand. At the warehouse a group comes about every minute and an offer about every two (Every s apart at least).
+export type VisitorKind = { id: string, title: string, weight: number, chance: number, pay: number, names: { string }, look: { [string]: any } }
+Config.Visitors = {
+	On = true,
+	Cap = 6,
+	PerHall = 3,
+	Group = { 0.5, 0.35, 0.15 } :: { number },
+	Stagger = 1.6,
+	Near = 30,
+	NearEvery = { 35, 70 } :: { number },
+	AwayEvery = { 180, 300 } :: { number },
+	FirstWait = { 4, 9 } :: { number },
+	Tick = 0.25,
+	Stops = { 2, 4 } :: { number },
+	Look = { 3, 6 } :: { number },
+	Talk = 0.6,
+	Walk = 6,
+	Stuck = 2.5,
+	Life = 180,
+	Clear = 3,
+	Cell = 2,
+	Margin = 1.6,
+	View = 2.2,
+	DeskClear = 6,
+	DoorSide = 9,
+	DoorEdge = 2.5,
+	Outside = { 12, 34 } :: { number },
+	Threshold = 1.5,
+	Offer = {
+		Chance = 0.25,
+		Reach = 45,
+		Every = 90,
+		Expire = 30,
+		Min = 1.1,
+		Max = 1.5,
+		Rare = 0.05,
+		Hot = 0.1,
+		Top = 2,
+	},
+	Kinds = {
+		{ id = "tourist", title = "Tourist", weight = 4, chance = 0.6, pay = 0, names = { "Greta", "Hans", "Yuki", "Pierre", "Lena", "Marco" },
+			look = { hat = "cap", hatColor = { 236, 92, 72 }, pants = { 196, 178, 140 }, shortSleeves = true, shoes = { 236, 236, 230 } } },
+		{ id = "hiker", title = "Hiker", weight = 3, chance = 0.7, pay = 0, names = { "Sepp", "Anna", "Toni", "Heidi" },
+			look = { hat = "beanie", hatColor = { 196, 58, 48 }, shirt = { 64, 120, 84 }, pants = { 120, 104, 78 }, boots = true, shoes = { 92, 62, 40 } } },
+		{ id = "collector", title = "Collector", weight = 2, chance = 1.6, pay = 0.1, names = { "Mr. Whitcombe", "Mrs. Ashford", "Dr. Lindqvist" },
+			look = { hat = "none", shirt = { 138, 106, 72 }, vest = { 112, 86, 58 }, tie = { 124, 36, 42 }, pants = { 84, 74, 62 }, hair = { 172, 172, 168 } } },
+		{ id = "dealer", title = "Antique dealer", weight = 1, chance = 1.3, pay = 0.05, names = { "Mrs. Moretti", "Mr. Okafor" },
+			look = { hat = "none", coat = { 52, 66, 58 }, shirt = { 226, 220, 204 }, tie = { 40, 40, 46 }, pants = { 50, 50, 56 } } },
+	} :: { VisitorKind },
 }
 
 return Config

@@ -19,6 +19,7 @@ PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_te
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
 PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
 PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
+PURE += ("Visitors",)  # 8.3 sandbox, the showroom's visitors: who, when, where they walk, the offers' prices (tests/visitors_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -229,6 +230,15 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace(f"require(script.Parent.{module})", f'require("./SandboxTasksRuntime").{module}')
     assert "script.Parent" not in source, "server/SandboxTasks.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "SandboxTasksServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the showroom visitors' offers: the real server/VisitorOffers.luau as VisitorOffersServer.luau for
+    # tests/visitoroffers_runtime_test.luau on the same runtime (its PlayerData, Collection and SandboxTasks the real ones
+    # above).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "VisitorOffers.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("SandboxTasks", '"./SandboxTasksServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    assert "script.Parent" not in source, "server/VisitorOffers.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "VisitorOffersServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.2 SANDBOX, showing off: the real server/SandboxLeaders.luau as SandboxLeadersServer.luau for
     # tests/sandboxleaders_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above) and
     # tests/runtime/LeadersRuntime.luau's few additions (an OrderedDataStore, UDim2 / UDim / Vector2, a game giving it).

@@ -68,6 +68,7 @@ Collection.sell(player, uid, expect?)   8.3: at the market's price (shared/Marke
 Collection.market(player) -> View?      8.3: today's hot and cold kinds and the player's demand
 Collection.marketIncome(item) -> number 8.3: today's × on a piece's income (the stands' tags)
 Collection.onPaid(fn(player, kind, money, paid))   8.3: paid = { hot } (the hot kinds' share)
+Collection.sellAt(player, uid, price, reason) -> money?, why   8.3 visitors: sold at a price the server set (a visitor's offer, server/VisitorOffers.luau), paid as `reason`
 ```
 
 **The remote `"Collection"`:**

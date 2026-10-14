@@ -17,6 +17,8 @@
 --   Collection.sell(player, uid, expect?)      sell it (on show or not) at the market's price (8.3) → the money paid
 --                                              (nil: refused), why; `expect` (the price the client asked with): only at
 --                                              that price, else refused (the prices moved) and the state sent again
+--   Collection.sellAt(player, uid, price, reason)   8.3 visitors: sell it at a price the server set (a visitor's offer,
+--                                              server/VisitorOffers.luau), paid as `reason`; else as sell → money?, why
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
 --   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: the start's
 --                                              and the More stands you bought)
@@ -441,6 +443,34 @@ function Collection.sell(player: Player, uid: string, expect: number?): (number?
 	local tag = Market.tag(market, entry.item)
 	PlayerData.addMoney(player, price, "CollectionSale", entry.item)
 	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end -- 8.2: Collection.onPaid
+	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
+	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
+	changed(player)
+	return price, nil
+end
+
+-- 8.3 visitors: a piece sold at a price the server set elsewhere (server/VisitorOffers.luau: a visitor's offer), paid
+-- for `reason` (AnalyticsPlan's Sources: "VisitorOffer"). As Collection.sell: on show or not, what it earned up to now
+-- counts, the market's demand weighs one more of its kind, onPaid "sale", "sold", CollectionSold. → money?, why
+function Collection.sellAt(player: Player, uid: string, price: number, reason: string): (number?, string?)
+	local collection = collectionOf(player)
+	local profile = PlayerData.get(player)
+	if not collection or not profile then
+		return nil, "Your save isn't loaded yet."
+	end
+	local entry, index = find(collection, uid)
+	if not entry or not index then
+		return nil, "That piece isn't in your stock."
+	end
+	if not finite(price) or price ~= math.floor(price) or price < 1 or price >= 2 ^ 40 or type(reason) ~= "string" then
+		return nil, "That's no price."
+	end
+	local tag = Market.tag(marketOf(player), entry.item)
+	settle(player)
+	table.remove(collection.entries, index)
+	Market.note(profile.market, entry.item, marketDay, os.time())
+	PlayerData.addMoney(player, price, reason, entry.item)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
 	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
 	changed(player)

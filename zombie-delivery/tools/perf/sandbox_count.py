@@ -6,15 +6,17 @@ Two runs of the real server code on the Luau CLI:
     server/SandboxWorld.luau's map, the four Moving contracts kiosks (server/MoveSites.luau), the four warehouses
     (server/Warehouse.luau: four owners, every display stand open and full of the heaviest pieces; Collection,
     SandboxPlots and Upgrades are stand-ins written here), the house's inside while a move runs (server/HouseInterior.luau:
-    the largest of 24 plans) and Danny (server/Npcs.luau on the stand-in's classic R15);
+    the largest of 24 plans), Danny (server/Npcs.luau on the stand-in's classic R15) and 8.3's showroom visitors
+    (server/Visitors.luau's bodies: Config.Visitors.Cap of them, every kind's look, each with the box of a sale);
   * tools/perf/van-count.luau on tools/vehicle-preview/roblox-mock.luau (export_fleet.py's preparation): the sandbox's
     van (Config.Sandbox.Van, the ZDC Sprinter's parts model) at every stage, by day (its night lights out).
 Each piece's row (tools/perf/census.luau): parts, MeshParts, visible / see-through / invisible parts, shadow casters
 (and the small ones under RenderBudget's size rule), lights (and those with Shadows on), SurfaceGuis and BillboardGuis
 (and those drawn at any distance), ParticleEmitters, Beams, fire / smoke / sparkles, decals, ProximityPrompts;
 the client's own 3D (client/SandboxGuide.luau's path and marker) read from its source. Then the worst case: 4 players,
-every warehouse's 20 stands full, 4 vans, a move running with the inside and Danny. The players' own avatars, the
-greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it.
+every warehouse's 20 stands full, 4 vans, a move running with the inside and Danny, the server's cap of visitors. The
+players' own avatars, the greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet)
+are not in it.
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]
 
@@ -48,6 +50,7 @@ function C.stock(player) return stock[player] or {} end
 function C.stands(player) return stands[player] or 12 end
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
+function C.marketIncome() return 1 end -- (8.3: the market's × on a tag: none here)
 function C.onChanged() end
 function C.openPicker() end
 function C.undisplay() return true end
@@ -160,6 +163,7 @@ def main():
         ("a van (Sprinter, stage 0)", van),
         ("the house's inside (largest plan)", rows["interior"]),
         ("Danny", rows["danny"]),
+        ("8.3 visitors (the server's cap, each with a sale's box)", rows["visitors"]),
         ("client: SandboxGuide", rows["client/SandboxGuide"]),
     ]
     worst = {}
@@ -170,8 +174,9 @@ def main():
     add(worst, van, PLAYERS)
     add(worst, rows["interior"])
     add(worst, rows["danny"])
+    add(worst, rows["visitors"])
     add(worst, rows["client/SandboxGuide"])
-    entries.append((f"**worst case** ({PLAYERS} players, every stand full, {PLAYERS} vans, a move with the inside and Danny)", worst))
+    entries.append((f"**worst case** ({PLAYERS} players, every stand full, {PLAYERS} vans, a move with the inside and Danny, the visitors)", worst))
     print(table(entries))
     print()
     for label, row in rows.items():
