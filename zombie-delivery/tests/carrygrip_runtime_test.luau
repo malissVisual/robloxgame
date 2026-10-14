@@ -402,9 +402,51 @@ state()
 check("…its answer during the trip does nothing, no wobble opens on the way", thingOf(4).condition == clock0 and carrying(ann) == 4 and countGrip(ann, "open", since) == 0)
 table.remove(queued, 1)()
 E.task.delay = runAtOnce
+since = #E.messages
+state()
+local owed = lastGrip(ann, "open")
+check("8.1 review: the trip done, the wobble the fade took off opens again (no dodging it through a door)", countGrip(ann, "open", since) == 1
+	and owed.what == "wobble" and owed.id ~= onDoor.id)
+hit(ann, owed)
 check("the trip done: checks again", Moving.gripCheck(ann))
 hit(ann, lastGrip(ann, "open"))
 putDown(ann)
+
+-- 8.1 review: a miss cannot be dodged by putting the piece down (or loading it) with a wobble open ---------------------
+
+E.now += 1
+pick(ann, 3, "Lift")
+hit(ann, lastGrip(ann, "open"))
+check("(Ann drags the sofa again, balanced)", carrying(ann) == 3 and grip(ann) == "drag 8")
+Moving.gripCheck(ann)
+local dodge1 = lastGrip(ann, "open")
+check("(a sturdy piece's first wobble: no drop)", dodge1.drop == false)
+local sofaA = thingOf(3).condition
+since = #E.messages
+putDown(ann)
+local sofaAfter = thingOf(3)
+local forfeit1 = lastGrip(ann, "result")
+check("8.1 review: put down with a wobble open: a miss all the same (the stagger's knock)", carrying(ann) == nil and sofaAfter.state == "ground"
+	and forfeit1 ~= nil and forfeit1.id == dodge1.id and forfeit1.outcome == "stagger" and near(sofaAfter.condition, sofaA - G.Miss.Knock, 0.006),
+	`{sofaA} → {sofaAfter.condition}`)
+check("…told it wobbled as it went down", heard(ann, "wobbled as it went down", since))
+pick(ann, 3, "Lift")
+hit(ann, lastGrip(ann, "open"))
+Moving.gripCheck(ann)
+local dodge2 = lastGrip(ann, "open")
+check("…lifted again at once: its miss came with it (this wobble's miss drops it)", carrying(ann) == 3 and dodge2.drop == true)
+local sofaB = thingOf(3).condition
+putDown(ann)
+local sofaGone = thingOf(3)
+check("…put down with that one open too: the drop's damage (the slip)", lastGrip(ann, "result").id == dodge2.id and lastGrip(ann, "result").outcome == "drop"
+	and near(sofaGone.condition, sofaB - CarryGrip.slipDamage(false), 0.006), `{sofaB} → {sofaGone.condition}`)
+pick(ann, 3, "Lift")
+hit(ann, lastGrip(ann, "open"))
+Moving.gripCheck(ann)
+check("…the drop spent the misses: the next lift starts fresh", carrying(ann) == 3 and lastGrip(ann, "open").drop == false)
+hit(ann, lastGrip(ann, "open"))
+putDown(ann)
+E.now += G.Miss.Remember + 1
 
 -- Off: the carry as before ------------------------------------------------------------------------------------------------
 

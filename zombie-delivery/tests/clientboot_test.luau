@@ -324,6 +324,16 @@ do
 		close()
 	end
 	check("ESC closes the crew panel, folds the planning, closes the move's cards, the quick chat and the warehouse's picker", called(run, "CrewPanel.close") and called(run, "MoveLobbyUi.minimize") and called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
+	check("… and the UPGRADES window (8.1 review)", called(run, "UpgradeUi.close"))
+	-- 8.1 review: opening a sandbox window closes the others, never itself (its onOpen runs once it counts as open)
+	local onOpen = run.modules.UpgradeUi.onOpen
+	check("the UPGRADES window has an onOpen", type(onOpen) == "function" and type(run.modules.WarehouseUi.onOpen) == "function")
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = close -- (the real Hud.closeWindows ends in Hud.onCloseWindows)
+		onOpen()
+		check("… which closes the picker and the crew panel but not itself", called(run, "WarehouseUi.close") and called(run, "CrewPanel.close") and not called(run, "UpgradeUi.close"))
+	end
 	local windowOpen = run.modules.CameraRig.windowOpen
 	check("the warehouse's open picker frees the mouse (CameraRig.windowOpen)", type(windowOpen) == "function" and windowOpen() == true)
 	check("… and so does every window the camera's mouseNeeded asks about", run.modules.CameraRig.mouseNeeded == windowOpen)
@@ -334,6 +344,11 @@ end
 do
 	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok" }, false)
 	check("with the picker shut the mouse stays the camera's", run.modules.CameraRig.windowOpen() == false)
+end
+
+do -- 8.1 review: the UPGRADES window alone frees the mouse too (on PC the camera no longer holds it)
+	local run = boot(true, { UpgradeUi = "ok" }, true)
+	check("the open UPGRADES window frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
 end
 
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)

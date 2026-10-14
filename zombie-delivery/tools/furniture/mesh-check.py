@@ -9,8 +9,10 @@ the item's box, welded to the Root and not physical, the Root untouched, the lab
 builders' other parts gone, within Config.Furniture.MaxParts, the palette finishes in the variant's colours. Then a
 whole house (HouseInterior.build) dressed within Config.Furniture.InteriorMaxParts, and without the import every piece
 left as FurnitureLooks makes it. Also: furniture.py's sizes are the catalogue's, every finish has a look. 8.0: the
-catalogue's pieces the import lacks (the 7.x farm and alpine pieces, the 8.0 collectibles: no Blender model yet) keep
-FurnitureLooks' parts look exactly, with the import too; the house counts only the pieces the import has as dressed.
+catalogue's pieces the import lacks (the 7.x farm and alpine pieces: no Blender model yet) keep FurnitureLooks' parts
+look exactly, with the import too; the house counts only the pieces the import has as dressed. 8.1: the 12 collectibles
+(FurnitureLooks.Collectibles) are in the import and dressed like the furniture, their Rarity attribute kept; no item of
+the import over 10,000 triangles.
 
     python3 zombie-delivery/tools/furniture/mesh-check.py <luau>
 """
@@ -38,6 +40,12 @@ local F = getmetatable(M.CFrame.identity)
 F.__add = function(a, v) return setmetatable({ Position = a.Position + v, R = a.R }, F) end
 F.__sub = function(a, v) return setmetatable({ Position = a.Position - v, R = a.R }, F) end
 M.CFrame.fromMatrix = function(p, x, y, z) return setmetatable({ Position = p, R = { x.X, y.X, z.X, x.Y, y.Y, z.Y, x.Z, y.Z, z.Z } }, F) end
+local V3 = M.Vector3.new
+F.__index = function(cf, k)
+	if k == "RightVector" then local r = cf.R; return V3(r[1], r[4], r[7]) end
+	if k == "UpVector" then local r = cf.R; return V3(r[2], r[5], r[8]) end
+	return rawget(F, k)
+end
 local O = getmetatable(M.Instance.new("Part"))
 local isA = O.IsA
 O.IsA = function(self, c) if c == "BasePart" and self.ClassName == "MeshPart" then return true end return isA(self, c) end
@@ -73,6 +81,9 @@ local function c(col) return string.format("[%d,%d,%d]", math.floor(col.R * 255 
 for name, look in FurnitureMesh.Looks do
 	print(string.format('LOOK {"finish":"%s","color":%s}', name, if look.color then c(look.color) else "null"))
 end
+for _, id in FurnitureLooks.Collectibles do
+	print(string.format('COLLECT {"id":"%s","rarity":"%s"}', id, tostring(FurnitureLooks.Items[id].rarity)))
+end
 for _, id in FurnitureLooks.Order do
 	print(string.format('ITEM {"id":"%s","size":[%g,%g,%g]}', id, FurnitureLooks.Items[id].size.X, FurnitureLooks.Items[id].size.Y, FurnitureLooks.Items[id].size.Z))
 	for variant = 1, 3 do
@@ -83,8 +94,8 @@ for _, id in FurnitureLooks.Order do
 		for _, d in model:GetDescendants() do
 			if d.ClassName == "WeldConstraint" then weldOf[d.Part1] = d.Part0 end
 		end
-		print(string.format('PIECE {"id":"%s","v":%d,"dressed":%s,"attr":%s,"root":{"cf":%s,"size":[%g,%g,%g],"t":%g,"collide":%s}}',
-			id, variant, tostring(dressed), tostring(model:GetAttribute("MeshArt") == true), f(root.CFrame),
+		print(string.format('PIECE {"id":"%s","v":%d,"dressed":%s,"attr":%s,"rarity":"%s","root":{"cf":%s,"size":[%g,%g,%g],"t":%g,"collide":%s}}',
+			id, variant, tostring(dressed), tostring(model:GetAttribute("MeshArt") == true), tostring(model:GetAttribute("Rarity") or ""), f(root.CFrame),
 			root.Size.X, root.Size.Y, root.Size.Z, root.Transparency, tostring(root.CanCollide)))
 		for _, d in model:GetDescendants() do
 			if d:IsA("BasePart") and d ~= root then
@@ -151,7 +162,7 @@ def stage(tmp: Path, manifest: dict):
 def run(luau: str, tmp: Path, mode: str):
     r = subprocess.run([luau, "harness.luau", "-a", mode], cwd=tmp, capture_output=True, text=True)
     assert r.returncode == 0 and "ALL DONE" in r.stdout, r.stdout[-3000:] + r.stderr[-3000:]
-    out = {"PIECE": [], "PART": [], "LOOK": [], "ITEM": []}
+    out = {"PIECE": [], "PART": [], "LOOK": [], "ITEM": [], "COLLECT": []}
     for line in r.stdout.splitlines():
         kind, _, rest = line.partition(" ")
         if kind in out:
@@ -192,6 +203,17 @@ def main():
     for fid in manifest["items"]:
         size = catalogue[fid]
         assert all(abs(a - b) < 1e-6 for a, b in zip(size, manifest["items"][fid]["size"])), (fid, size, manifest["items"][fid]["size"], "the sizes differ")
+    # 8.1: the collectibles are in the import (none falls back to its parts look), each within the triangle budget.
+    rarity = {c["id"]: c["rarity"] for c in art["COLLECT"]}
+    assert len(rarity) == 12 and all(r != "nil" for r in rarity.values()), rarity
+    lacking = sorted(set(rarity) - set(manifest["items"]))
+    assert not lacking, (lacking, "collectibles without a Blender model in ZDCFurnitureArt.json")
+    tris_of = {}
+    for name, p in manifest["pieces"].items():
+        assert p["triangles"] <= 10000, (name, p["triangles"], "triangles in one piece over 10,000")
+        tris_of[name.rsplit("_", 1)[0]] = tris_of.get(name.rsplit("_", 1)[0], 0) + p["triangles"]
+    over = {fid: t for fid, t in tris_of.items() if t > 10000}
+    assert not over, (over, "items over 10,000 triangles")
     # Without the import nothing changes.
     for piece in plain["PIECE"]:
         assert not piece["dressed"] and not piece["attr"], (piece["id"], "dressed without an import")
@@ -221,6 +243,7 @@ def main():
             continue
         want = by_item[fid]
         assert piece["dressed"] and piece["attr"], (fid, v, "not dressed")
+        assert piece["rarity"] == rarity.get(fid, ""), (fid, v, piece["rarity"], "the Rarity attribute lost or wrong")
         assert root["cf"][:3] == [0, 0, 0] and root["cf"][3:] == [1, 0, 0, 0, 1, 0, 0, 0, 1], (fid, "the Root moved")
         assert all(abs(a - b) < 1e-6 for a, b in zip(root["size"], size)) and root["t"] == 1 and root["collide"], (fid, "the Root changed")
         parts = parts_of.get((fid, v), [])
@@ -284,7 +307,9 @@ def main():
           f"{max(p['triangles'] for p in manifest['pieces'].values())}) from a turned, scaled import on 3 variants each: in place "
           f"(at most {worst:.3f} out of a box), welded, not physical, {labels} labels kept readable, {len(palette_colours)} palette finishes in the "
           f"variant's colours; a house {house['parts']} parts dressed ({house['dressed']} of its {house['pieces']} pieces; FurnitureLooks' "
-          f"{plain['HOUSE']['parts']}); no import: unchanged; {len(parts_look)} items without a model keep their parts look exactly")
+          f"{plain['HOUSE']['parts']}); no import: unchanged; the {len(rarity)} collectibles from the import (each "
+          f"{min(tris_of[fid] for fid in rarity)}-{max(tris_of[fid] for fid in rarity)} triangles, Rarity kept); "
+          f"{len(parts_look)} items without a model keep their parts look exactly")
 
 
 if __name__ == "__main__":

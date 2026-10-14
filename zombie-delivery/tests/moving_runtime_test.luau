@@ -1196,11 +1196,18 @@ do
 	wait(D.Rearm)
 	wait(0.2)
 	since = #E.messages
-	stand(ivy, front, facing) -- (her back to the door)
+	stand(ivy, front, facing) -- (her back to the door, standing: a drift back to it)
+	E.rootOf(ivy).AssemblyLinearVelocity = V3(0, 0, 0)
+	wait(0.1)
+	wait(D.Dwell + 0.1)
+	check("8.1 review: the leader standing in the zone, her back to the door, is not taken through (only walking into it)",
+		not isIn(ivy) and not isIn(jo) and fades(ivy, since) == 0)
+	E.rootOf(ivy).AssemblyLinearVelocity = -facing * (D.PairWalk + 2) -- (backing into it)
 	wait(0.1)
 	wait(D.Dwell + 0.1)
 	check("8.1 the leader of a pair piece backs through the door (her back to it): both in with the sofa", isIn(ivy) and isIn(jo)
 		and ivy.Character:GetAttribute("MoveCarry") == 3 and jo.Character:GetAttribute("MoveCarry") == 3 and fades(ivy, since) == 2)
+	E.rootOf(ivy).AssemblyLinearVelocity = V3(0, 0, 0)
 	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
 	-- …nobody else goes through backwards: Jo, hands free, her back to the doorway inside
 	wait(D.Rearm)

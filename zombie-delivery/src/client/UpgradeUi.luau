@@ -188,8 +188,11 @@ local function stateKey(state: State?, layout: Layout): string
 		for _, id in UpgradeRules.Order do
 			table.insert(parts, `{id}={UpgradeRules.level(state.levels, id)}`)
 		end
-		-- (only what changes a card: which prices the money reaches, and the money's line)
-		table.insert(parts, tostring(math.floor(state.money)))
+		-- (only what changes a card: which prices the money reaches; the money's line and a NEED's amount follow the
+		-- money in place, so a payout never rebuilds the window under a tap or a gamepad's selection)
+		for _, row in UpgradeRules.rows(state.levels, state.money) do
+			table.insert(parts, if row.can then "1" else "0")
+		end
 	else
 		table.insert(parts, "none")
 	end
@@ -214,6 +217,48 @@ local function levelBar(parent: any, row: UpgradeRules.Row, x: number, y: number
 	local text = `LV {row.level}/{row.max}`
 	Ui.label(parent, text, UDim2.fromOffset(CardKit.width(text, 11, Theme.HeadingFont) + 4, 16), { Name = "Level", Position = UDim2.fromOffset(after, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = if row.level >= row.max then C.gold else K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
 	return after + CardKit.width(text, 11, Theme.HeadingFont) + 4
+end
+
+-- The row `id` for the money and the levels now (nil: no state yet).
+local function liveRow(id: string): UpgradeRules.Row?
+	local state = current
+	if not state then
+		return nil
+	end
+	for _, row in UpgradeRules.rows(state.levels, state.money) do
+		if row.id == id then
+			return row
+		end
+	end
+	return nil
+end
+
+-- What follows the money on an open window without a rebuild: the money's line and each NEED's amount.
+local function subtitleOf(state: State?): string
+	return if state then `Your money {UpgradeRules.money(state.money)} · more stands, brighter lights, a faster van and Danny` else "Loading your upgrades…"
+end
+
+local function followMoney()
+	local state = current
+	local frame = card and card:FindFirstChild("Upgrades")
+	if not (state and frame) then
+		return
+	end
+	local subtitle = frame:FindFirstChild("Subtitle")
+	if subtitle then
+		subtitle.Text = subtitleOf(state)
+	end
+	local list = frame:FindFirstChild("List")
+	if not list then
+		return
+	end
+	for _, row in UpgradeRules.rows(state.levels, state.money) do
+		local made = list:FindFirstChild(`Upgrade_{row.id}`)
+		local buy = made and made:FindFirstChild("Buy")
+		if buy and not row.can and row.price then
+			buy.Text = `NEED {UpgradeRules.money(row.short)}`
+		end
+	end
 end
 
 local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout: Layout, rowW: number)
@@ -270,7 +315,8 @@ local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout
 			textSize = if row.can then 15 elseif layout.touch then 12 else 11,
 			onClick = function()
 				if not row.can then
-					toast(`{row.name}: you need {UpgradeRules.money(row.short)} more.`)
+					local live = liveRow(row.id) -- (the money moved since the card was drawn)
+					toast(`{row.name}: you need {UpgradeRules.money(if live then live.short else row.short)} more.`)
 					return
 				end
 				if send({ kind = "buy", id = row.id, level = row.level + 1 }) then
@@ -304,11 +350,14 @@ draw = function(keepScroll: boolean)
 	local layout = UpgradeUi.layout(size.X, size.Y, Ui.touchLayout())
 	local key = stateKey(current, layout)
 	if card and key == shownKey then
-		return -- (nothing it shows changed: no redraw, a tap is never lost)
+		followMoney()
+		return -- (nothing else it shows changed: no redraw, a tap is never lost)
 	end
 	shownKey = key
 	local list = card and card:FindFirstChild("Upgrades") and card:FindFirstChild("Upgrades"):FindFirstChild("List")
 	local scroll = if keepScroll and list then list.CanvasPosition else Vector2.zero
+	local selected = Ui.gamepadSelection()
+	local heldInside = card ~= nil and selected ~= nil and selected:IsDescendantOf(card)
 	if card then
 		card:Destroy()
 	end
@@ -342,7 +391,7 @@ draw = function(keepScroll: boolean)
 	local state = current
 	local wide = layout.w - (layout.pad * 2 + layout.close + 8)
 	Ui.label(frame, "⬆ ZDC UPGRADES", UDim2.fromOffset(wide, 24), { Name = "Title", Position = UDim2.fromOffset(layout.pad, 10), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	local subtitle = if state then `Your money {UpgradeRules.money(state.money)} · more stands, brighter lights, a faster van and Danny` else "Loading your upgrades…"
+	local subtitle = subtitleOf(state)
 	Ui.label(frame, subtitle, UDim2.fromOffset(wide, 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, 33), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	local close = Ui.closeButton(frame, UpgradeUi.close)
 	close.Size = UDim2.fromOffset(layout.close, layout.close)
@@ -377,7 +426,9 @@ draw = function(keepScroll: boolean)
 			break
 		end
 	end
-	Ui.gamepadFocus(first or close)
+	if not keepScroll or heldInside then
+		Ui.gamepadFocus(first or close) -- (a redraw while open moves the gamepad only when its selection went with it)
+	end
 end
 
 local function amount(value: any): number?

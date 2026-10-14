@@ -188,17 +188,30 @@ end
 
 -- The server's verdict on an answer (verdict "ok" | "miss", the press `pressed` s into the check by the client's
 -- clock, `elapsed` s since the server opened it): a hit only for an "ok" whose press can be true and whose needle was
--- in the zone (Server.Slack wider each side); anything else a miss.
-function CarryGrip.judge(check: Check, verdict: any, pressed: any, elapsed: number): boolean
+-- in the zone (Server.Slack wider each side); anything else a miss. `lag`: the most this player's press may be older
+-- than the server's clock (CarryGrip.lagFor: their ping; nil: Server.Lag), never more than Server.Lag.
+function CarryGrip.judge(check: Check, verdict: any, pressed: any, elapsed: number, lag: number?): boolean
 	if verdict ~= "ok" or not isFinite(pressed) then
 		return false
 	end
 	local s = tune().Server
 	local p = pressed :: number
-	if p < 0 or p > check.window + s.Ahead or p > elapsed + s.Ahead or p < elapsed - s.Lag then
+	local most = if lag and isFinite(lag) and lag >= 0 then math.min(lag, s.Lag) else s.Lag
+	if p < 0 or p > check.window + s.Ahead or p > elapsed + s.Ahead or p < elapsed - most then
 		return false
 	end
 	return CarryGrip.inZone(check, CarryGrip.needle(check, p), s.Slack)
+end
+
+-- 8.1 review: how much older than the server's clock a press of a player with this round trip (`ping` s, the
+-- server's Player:GetNetworkPing; nil: unknown) may be: Server.LagPing × it + Server.LagMin, never more than Server.Lag
+-- (a press claimed long ago no longer passes for one in time).
+function CarryGrip.lagFor(ping: number?): number
+	local s = tune().Server
+	if not ping or not isFinite(ping) or ping < 0 then
+		return s.Lag
+	end
+	return math.min(s.Lag, ping * s.LagPing + s.LagMin)
 end
 
 -- A check as the Moving remote sends it ("grip", "open", wire): its numbers, plus the server's own fields (`extra`: the

@@ -20,6 +20,20 @@
 > (`Config.SpawnSpot.Pass`), the warehouse stands on its concrete, cheap pieces show "+$0.2/min", no city sounds, a
 > freed plot goes to a waiting player, START brings the van repaired, dying on a move puts you by the van, one arrow
 > (the guide, no GPS), the sandbox's own words everywhere (no Wall, no pay, no XP).
+>
+> **8.1** (the owner's feedback): **carrying in two** is slow and physical: the leader's heading turns at most 60° a
+> second (`client/PairSteer.luau`, `shared/PairCarry.luau`), a way behind is walked backwards (backing through doors
+> too), and the far end (Danny or a crew mate) is held there by the server (`server/PairHold.luau`), never teleported.
+> **No E at the house**: walk into a door and the fade takes you through (`Config.Moving.Doors`, doormats "▲ IN" /
+> "▲ OUT"). **The grip** is timing checks now (`shared/CarryGrip.luau`, `client/CarryGripUi.luau`): lifting a piece is
+> a lift check ("feeling for the grip": a hit lifts it balanced, a miss knocks it), and while you carry, a WOBBLE! now
+> and then (a hit: steady; a miss staggers a sturdy piece and the next drops it; a fragile piece drops at once). Every
+> miss does something: putting the piece down, loading it or walking through a door with a wobble open still counts,
+> and the misses stay with the piece a moment. Easy by default; `Config.CarryGrip.Difficulty` makes it harder later.
+> The warehouse's **UPGRADES desk** (`server/Upgrades.luau`, `client/UpgradeUi.luau`, `Config.SandboxUpgrades`): more
+> stands (12 → 20), showroom lights (more income), the van's engine and Danny's training. The sandbox **sounds like the
+> Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Chalet wears the owner's **Blender
+> house** once imported, and the 12 collectibles have their **Blender look** (`ZDCFurnitureArt`, re-import it).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1616,6 +1630,43 @@ Blender), then import the new FBX again (delete the old `ZDCFurnitureArt` first)
 look, and on three variants of every piece each model piece is in place inside the box, welded and not physical, the Root
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
+
+## The warehouse's five levels in Blender (8.0.4, design only)
+
+The owner: "a model of my own warehouse … levels 1 to 5, each bigger, starting as a garage". The game has no warehouse
+levels yet, and these models are not wired in. `design/blender-warehouse/warehouse.py` builds five buildings, each with
+its roller door in the middle of the front wall (where the plot's door is) and a clear floor inside:
+
+| Level | Building | W × H × D (walls) | Door | Stands (suggested) |
+| --- | --- | --- | --- | --- |
+| 1 | a plastered garage with a shed roof and an open sectional door | 26 × 12 × 22 | 14 × 9.5 | 2 |
+| 2 | a corrugated workshop under a low gable | 40 × 15 × 30 | 18 × 12 | 4 |
+| 3 | a warehouse on a concrete plinth, with skylights | 58 × 19 × 42 | 22 × 14 | 8 |
+| 4 | the big warehouse: today's size (SandboxMap's plot warehouse, `DoorWidth`, `Config.Warehouse.DoorHeight`), two-tone, an office annex | 80 × 24 × 60 | 26 × 16 | 12 |
+| 5 | a logistics centre: a vaulted roof with solar panels, two docks, a glazed corner | 104 × 28 × 84 | 26 × 18 | 20 |
+
+`roblox/ZDCWarehouseArt.fbx` has `lvl<N>_<finish>` pieces and `mark_lvl<N>` markers (each level's origin: the door's
+middle on the ground). `ZDCWarehouseArt.json` lists each level's size, door, suggested stands, the wall boxes a game
+would collide with and every detail.
+
+`tools/warehouse-art/check.py <luau>` checks the levels against plot 1 (SandboxMap, Config.Warehouse):
+- level 4 is today's warehouse and each level is bigger;
+- every level is inside the plot;
+- none of them covers the van's UNLOAD HERE bay, the way in, the Moving contracts board, the spawn or the floor the
+  stands need.
+
+## The Blender dressers refuse an import that moved (8.0.3)
+
+The owner's screenshot: in the sandbox the imported `ZDCHouseArt` lay in pieces over the road. Studio's Import 3D leaves
+a model in Workspace with its MeshParts loose and overlapping, and the sandbox builds no Marge's house, so nothing took
+it away and physics threw the pieces about. 8.0.2 moves the imports out of the Workspace first thing in
+`Main.server.luau`.
+
+VanMesh, FurnitureMesh and HouseMesh also check that their markers still form a square frame (three equal, square
+arms) and that every piece is turned alike (the importer turns them all the same). An import that moved anyway, for
+example renamed and left in the Workspace, is refused with a warning ("put it in ServerStorage and save"), and the car,
+furniture or house keeps its own look instead of dressing from scattered pieces. `tools/house-art/check.py` tests it
+with a thrown piece.
 
 ## Marge's house: the owner's Blender model (7.2)
 
