@@ -429,7 +429,7 @@ local function blocks(withStrip)
 	list["the money block"] = box(SandboxHud.block())
 	list["the TASKS chip"] = box(chip)
 	list["the move's panel"] = box(panel)
-	if withStrip then
+	if withStrip and shown(strip) then -- (8.4: hidden while his card stands in for it on a small phone)
 		list["Danny's status line"] = box(strip)
 	end
 	return list
@@ -456,12 +456,16 @@ local function clearOfAll(b, withStrip)
 	end)
 	return hit == nil, hit
 end
-local function stripChecks(label)
+local function stripChecks(label, middle)
 	local s = box(strip)
 	local p = box(panel)
 	check(`{label}: the status line right under the move's panel, on the screen`, s.y0 >= p.y1 - 0.5 and s.y0 - p.y1 < 12 and inside(s), `{show(p)} / {show(s)}`)
 	local clear, why = clearOfAll(s, false)
 	check(`{label}: … clear of the touch controls, Hud's groups and the chips`, clear, why)
+	if middle then
+		check(`{label}: … 8.4: in the middle under the panel as before (nothing in its way)`, math.abs((s.x0 + s.x1) / 2 - M.width / 2) < 1
+			and math.abs(s.x0 - p.x0) < 1 and math.abs(s.x1 - p.x1) < 1, `{show(p)} / {show(s)}`)
+	end
 	check(`{label}: … its words fit (what he does may be cut with "…")`, #badTexts(strip) == 0, badTexts(strip)[1])
 	if M.touch then
 		check(`{label}: … its button a finger's size`, #smallButtons(strip) == 0, smallButtons(strip)[1])
@@ -502,7 +506,7 @@ local function cardChecks(label, head, hired)
 end
 
 -- ── The phone: for hire ─────────────────────────────────────────────────────
-stripChecks("844 x 390, for hire")
+stripChecks("844 x 390, for hire", true)
 scene("danny-status-hire-phone", nil)
 local before = #sentOn("Moving")
 press(named(strip, "Action"))
@@ -512,6 +516,7 @@ check("HIRE $170 on the line opens his card (\"MoveHelperCard\", over the HUD), 
 check("… \"🧑‍🔧 DANNY\" and his status (for hire, the price)", named(MoveHelperCard.card(), "Title").Text == "🧑‍🔧 DANNY"
 	and named(MoveHelperCard.card(), "Doing").Text == "For hire · $170 this move")
 cardChecks("844 x 390, for hire (his head off the screen)", nil, false)
+check("8.4: … his status line stays with the card open (nothing in its way at 844 px: in the middle as before)", shown(strip))
 MoveHelperCard.close()
 local heads = { { x = 422, y = 170 }, { x = 760, y = 120 }, { x = 200, y = 120 }, { x = 560, y = 250 } }
 for index, head in heads do
@@ -545,7 +550,7 @@ M.flush()
 check("the server's answer (MoveHelper = hired): \"🧑‍🔧 DANNY · 2 pieces to carry\" over what he does, LIST", named(strip, "Title").Text == "🧑‍🔧 DANNY · 2 pieces to carry"
 	and named(strip, "Doing").Text == "Carrying the Lamp to the van" and named(strip, "Action").Text == "LIST")
 check("… the gamepad's prompt on him: \"Talk to Danny\"", talk.ActionText == "Talk to Danny")
-stripChecks("844 x 390, hired")
+stripChecks("844 x 390, hired", true)
 scene("danny-status-hired-phone", nil)
 press(named(strip, "Action"))
 M.flush()
@@ -711,12 +716,12 @@ M.flush()
 check("8.3 you wait for him: the line orange, \"⏳ WAITING FOR DANNY…\", STOP (8.3 review: a touch screen's words, \"tap STOP\")", strip.BackgroundColor3.R > 0.9
 	and named(strip, "Title").Text == "⏳ WAITING FOR DANNY…" and named(strip, "Doing").Text == "Stay at your end of the Sofa · tap STOP" and named(strip, "Action").Text == "STOP",
 	named(strip, "Doing").Text)
-stripChecks("844 x 390, waiting")
+stripChecks("844 x 390, waiting", true)
 scene("danny-waiting-phone", nil)
 attribute("MoveHelperReady", true)
 check("… he is at its other end (MoveHelperReady: your lift check open): \"💪 ON THREE… LIFT!\", STOP still", named(strip, "Title").Text == "💪 ON THREE… LIFT!"
 	and named(strip, "Doing").Text == "Danny is at the other end of the Sofa · tap STOP" and named(strip, "Action").Text == "STOP", named(strip, "Doing").Text)
-stripChecks("844 x 390, ready")
+stripChecks("844 x 390, ready", true)
 -- 8.3 review: the words of the device used now, again when it changes (a gamepad picked up, the keys)
 gamepad = true
 UIS.LastInputTypeChanged:Fire()
@@ -759,6 +764,23 @@ for _, size in { { 667, 339, "667" }, { 740, 324, "740" }, { 780, 324, "780" } }
 		attribute("MoveHelperPrice", if hired then nil else 170)
 		attribute("MoveHelper", if hired then "hired" else "offer")
 		local state = if hired then "hired" else "for hire"
+		-- 8.4: Danny's status line itself (it lay on the TASKS chip and the money block at 667 × 375)
+		M.flush()
+		stripChecks(`{label}, {state}`)
+		local sb, p = box(strip), box(panel)
+		check(`{label}, {state}: … 8.4 off the 📋 TASKS chip and the money block, shifted right just past them (still under the panel)`,
+			not overlap(sb, box(chip)) and not overlap(sb, box(SandboxHud.block())) and sb.x0 > p.x0 and sb.x0 < p.x1 and sb.x1 <= M.width - 8 + 0.5,
+			`{show(sb)} / {show(box(chip))} / {show(box(SandboxHud.block()))}`)
+		if hired then
+			scene(`danny-status-hired-{size[3]}`, nil)
+		end
+		MoveHelperCard.open({ x = math.floor(size[1] * 0.5), y = math.floor(size[2] * 0.6) })
+		M.flush()
+		check(`{label}, {state}: … 8.4 his card open: the line, moved off the middle, gives it its room (hidden, no top block)`, not shown(strip)
+			and not overlap(box(MoveHelperCard.card()), box(chip)))
+		MoveHelperCard.close()
+		M.flush()
+		check(`{label}, {state}: … the card shut: the line back where it was`, shown(strip) and show(box(strip)) == show(sb))
 		local spots, bad = 0, nil
 		for fx = 0.2, 0.86, 0.05 do
 			for fy = 0.2, 0.86, 0.05 do
@@ -802,7 +824,7 @@ for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" } } do
 		attribute("MoveHelperPrice", if hired then nil else 170)
 		attribute("MoveHelper", if hired then "hired" else "offer")
 		local state = if hired then "hired" else "for hire"
-		stripChecks(`{label}, {state}`)
+		stripChecks(`{label}, {state}`, true)
 		if not hired then
 			check(`{label}: a computer's words on the line: "Carries what you click"`, named(strip, "Doing").Text == "Carries what you click · $170 this move", named(strip, "Doing").Text)
 			gamepad = true

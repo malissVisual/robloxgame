@@ -20,8 +20,15 @@
 --   tap on the line too): its HIRE spends the money, its CLEAR QUEUE empties his list. Without it (the city: client/
 --   Main.client.luau starts the card only in the sandbox) HIRE sends ("helper", "hire") itself and LIST is CLEAR
 --   (("helper", "clear")). Presentation only.
+-- 8.4 (a small phone, 667 × 375: the strip's left end lay on the sandbox's money block and its 📋 TASKS chip): under
+-- the panel it keeps clear of the HUD's chips at the top left (client/SandboxHud.luau's MoneyBlock, client/
+-- SandboxTasksUi.luau's chip in its ScreenGui "SandboxTasksChip": the shown ones) and the touch controls
+-- (MoveLayout.stripClear: shifted right just past the chips, else under them). Moved so, it hides while his card is
+-- open (the card shows his status and its button too; on 667 px the shifted strip would take the card's room right of
+-- the panel). 844 × 390 and wider: in the middle as before (nothing in its way), shown with the card too.
 --   MoveHelperHud.start(), MoveHelperHud.strip()   the strip (nil before Danny first comes)
 --   MoveHelperHud.useCard(open)                    8.3 HIRE and LIST open his card (open: the card's opener)
+--   MoveHelperHud.cardOpen(open)                   8.4 his card opened or closed (client/MoveHelperCard.luau)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,6 +44,7 @@ local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 review: the device used 
 local Theme = require(script.Parent.Theme)
 local MoveLayout = require(script.Parent.MoveLayout) -- 7.0 review
 local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review
+local TouchLayout = require(script.Parent.TouchLayout) -- 8.4: the touch controls the strip keeps clear of
 
 local MoveHelperHud = {}
 
@@ -47,6 +55,7 @@ local WIDTH, GAP = MoveLayout.PANEL_W, 6
 local STATUS_ROW = 32 -- 8.3 the status line's row (its two lines of words, its button)
 local ACTION_W = 92 -- 8.3 HIRE / LIST / STOP
 local PAD = 6
+local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "" } -- 8.4: the HUD's chips (a ScreenGui: its piece, "" every piece)
 
 local remote = Net.get("Moving")
 local gui: ScreenGui? = nil
@@ -54,6 +63,8 @@ local strip: Frame? = nil
 local scale: UIScale? = nil
 local status: { [string]: any } = {} -- 8.3 the status line's pieces: tap (the line), title, doing, action
 local openCard: (() -> ())? = nil -- 8.3 his card's opener (useCard)
+local cardShown = false -- 8.4 his card is open (MoveHelperHud.cardOpen)
+local moved = false -- 8.4 the strip stands off its place in the middle (MoveLayout.stripClear: a small phone)
 
 local function waiting(): string?
 	local call = player:GetAttribute("MoveHelperCall")
@@ -175,10 +186,47 @@ local function rowHeight(base: number, s: number): number
 	return if Ui.touchLayout() then math.max(base, math.ceil(Ui.MinTouch / s)) else base
 end
 
--- Under the move's panel, where it really is (else where it would be), its row a finger's height on a touch screen.
+-- 8.4: what the strip keeps clear of, in its ScreenGui's px: the HUD's shown chips at the top left and, on a touch
+-- screen, the touch controls (the buttons, the thumbstick's corner, the jump button).
+local function inTheWay(origin: Vector2, W: number, H: number, s: number): ({ TouchLayout.Box }, { TouchLayout.Box })
+	local chips: { TouchLayout.Box } = {}
+	local function add(object: Instance?)
+		if object and object:IsA("GuiObject") and object.Visible and object.AbsoluteSize.X > 1 and object.AbsoluteSize.Y > 1 then
+			local at, size = object.AbsolutePosition - origin, object.AbsoluteSize
+			table.insert(chips, TouchLayout.box(at.X, at.Y, at.X + size.X, at.Y + size.Y))
+		end
+	end
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	for guiName, piece in CHIP_GUIS do
+		local holder = playerGui and playerGui:FindFirstChild(guiName)
+		if holder and (holder :: any).Enabled ~= false then
+			if piece ~= "" then
+				add(holder:FindFirstChild(piece, true))
+			else
+				for _, child in holder:GetChildren() do
+					add(child)
+				end
+			end
+		end
+	end
+	local keep: { TouchLayout.Box } = {}
+	if Ui.touchLayout() then
+		local cluster = TouchLayout.cluster(W, H, s)
+		for _, b in TouchLayout.buttons(cluster) do
+			table.insert(keep, b)
+		end
+		table.insert(keep, cluster.thumb)
+		table.insert(keep, cluster.jump)
+	end
+	return chips, keep
+end
+
+-- Under the move's panel, where it really is (else where it would be), its row a finger's height on a touch screen;
+-- 8.4: clear of the HUD's chips (a small phone: MoveLayout.stripClear), and shown unless his card, open, stands in for
+-- it there (MoveHelperHud.cardOpen).
 local function place()
 	local frame = strip
-	if not frame or not frame.Visible then
+	if not frame or type(player:GetAttribute("MoveHelper")) ~= "string" then
 		return
 	end
 	local s = Ui.screenScale()
@@ -202,16 +250,29 @@ local function place()
 	if frame.Size ~= size then
 		frame.Size = size
 	end
-	local bottom = MoveLayout.panel(Ui.screenSize().X, s).y1
+	local screen = Ui.screenSize()
+	local bottom = MoveLayout.panel(screen.X, s).y1
 	local panel = TopBlocks.get("MovePanel")
 	local root = gui
+	local origin = if root then root.AbsolutePosition else Vector2.new(0, 0)
 	if panel and panel.Visible and panel.AbsoluteSize.Y > 1 then
-		local origin = if root then root.AbsolutePosition.Y else 0
-		bottom = panel.AbsolutePosition.Y - origin + panel.AbsoluteSize.Y
+		bottom = panel.AbsolutePosition.Y - origin.Y + panel.AbsoluteSize.Y
 	end
-	local position = UDim2.new(0.5, 0, 0, math.floor(bottom + MoveLayout.STRIP_GAP * s + 0.5))
+	local y = math.floor(bottom + MoveLayout.STRIP_GAP * s + 0.5)
+	local w, h = WIDTH * s, (high + 2 * PAD) * s
+	local wanted = TouchLayout.box(screen.X / 2 - w / 2, y, screen.X / 2 + w / 2, y + h)
+	local chips, keep = inTheWay(origin, screen.X, screen.Y, s)
+	local clear = MoveLayout.stripClear(wanted, screen.X, screen.Y, chips, keep)
+	moved = clear ~= wanted
+	local position = if moved then UDim2.new(0.5, math.floor(clear.x0 - wanted.x0 + 0.5), 0, math.floor(clear.y0 + 0.5)) else UDim2.new(0.5, 0, 0, y)
 	if frame.Position ~= position then
 		frame.Position = position
+	end
+	-- 8.4: moved off its place (a small phone, 667 px wide: shifted right it takes the room his card has there), it
+	-- gives his open card that room: the card shows his status and its button too
+	local shown = not (cardShown and moved)
+	if frame.Visible ~= shown then
+		frame.Visible = shown
 	end
 end
 
@@ -251,11 +312,11 @@ local function refresh()
 	if not frame then
 		return
 	end
-	frame.Visible = on
 	if not on then
+		frame.Visible = false
 		return
 	end
-	place()
+	place() -- (it shows it: 8.4, unless his card stands in for it)
 	local name = string.upper(Config.MoveHelper.Name)
 	local doing = player:GetAttribute("MoveHelperDoing")
 	local piece = waiting()
@@ -281,6 +342,15 @@ end
 function MoveHelperHud.useCard(open: () -> ())
 	openCard = open
 	refresh()
+end
+
+-- 8.4 his card opened or closed (client/MoveHelperCard.luau): where the strip had to move off its place in the middle
+-- (a small phone) it hides while the card is open, the card in its room.
+function MoveHelperHud.cardOpen(open: boolean)
+	if cardShown ~= open then
+		cardShown = open
+		place()
+	end
 end
 
 function MoveHelperHud.start()

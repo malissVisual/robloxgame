@@ -31,7 +31,9 @@
 --     HUD's scale, until a place within BESIDE px of his head is clear (none: the clear place nearest him; only its
 --     button and its ✕ stay Ui.MinTouch tall), and never reaches down over the touch controls at the right (FIRE,
 --     SPRINT, the hand button, DRAW, the jump button): such a place goes left of them. Placed again on a resize or
---     when the top blocks move.
+--     when the top blocks move. 8.4: on a small phone where his status line had to move off the middle (clear of the
+--     money block and the TASKS chip), the line hides while the card is open (MoveHelperHud.cardOpen): its room is
+--     the card's.
 --   * One window at a time (client/Main.client.luau registers it: onOpen, ESC); ✕, ESC, the gamepad's B, a click or a
 --     tap beside it, walking away from him, a seat, him gone close it. A tap beside it is only that: its own
 --     TouchTapInWorld (as the finger lifts) is swallowed SWALLOW s, never a piece given or his card again. Walking away:
@@ -633,6 +635,7 @@ function MoveHelperCard.close()
 		letGo(card)
 		card.Visible = false
 	end
+	MoveHelperHud.cardOpen(false) -- 8.4 (his status line back where it gave the card its room)
 end
 
 -- How far apart you and he are now (studs; nil: a body not there).
@@ -654,6 +657,7 @@ function MoveHelperCard.open(at: { x: number, y: number }?)
 	openToken += 1
 	local token = openToken
 	card.Visible = true
+	MoveHelperHud.cardOpen(true) -- 8.4 (a small phone: his status line, moved off the middle, gives it its room)
 	paint()
 	place()
 	local hook = MoveHelperCard.onOpen
