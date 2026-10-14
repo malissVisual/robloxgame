@@ -6,7 +6,7 @@
 -- pieces, moving one), the income over 60 s and 10 minutes paid in whole dollars every 10 s and exact to the cent
 -- (a piece put up between two payouts, manual payouts at odd times), sell (the price, its reason, the sold message,
 -- one on show, scrap), the remote (every kind, garbage, the rate limit, the client never names a price), openPicker,
--- Config.Warehouse's stands, leaving (the income counted is paid), the save round trip (the flag, rejoining twice
+-- the warehouse level's stands (8.3), leaving (the income counted is paid), the save round trip (the flag, rejoining twice
 -- gives the same, the uids go on) and the migration (an old save twice, a new player, a garbled save cleaned).
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 

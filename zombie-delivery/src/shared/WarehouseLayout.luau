@@ -574,6 +574,11 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
 			slab.pitch = -math.deg(slope) -- (its front end up)
 		end
 		look(add("Parapet", "roof", { 2 * hx + 2.2, 0.7, 0.3 }, { 0, h + 0.4, hz + 1 }, WHITE, "SmoothPlastic"))
+		-- a garage's window in its west wall and its side door in the east one (warehouse.py's places)
+		look(add("WindowFrame", "shell", { 0.2, 3.9, 4.4 }, { -hx - 0.1, 5.75, depth(11) }, WHITE, "SmoothPlastic"))
+		look(add("Window", "shell", { 0.1, 3.5, 4 }, { -hx - 0.25, 5.75, depth(11) }, { 47, 66, 82 }, "Glass"))
+		look(add("SideDoorFrame", "shell", { 0.1, 7.25, 3.8 }, { hx + 0.05, 3.775, depth(6.7) }, WHITE, "SmoothPlastic"))
+		look(add("SideDoor", "shell", { 0.14, 7.05, 3.4 }, { hx + 0.12, 3.675, depth(6.7) }, GREY, "Metal"))
 		look(add("Cornice", "shell", { 2 * hx + 0.4, 0.5, 0.5 }, { 0, h - 0.25, hz + 0.05 }, WHITE, "SmoothPlastic"))
 		look(add("GutterBack", "roof", { 2 * hx + 2.2, 0.35, 0.35 }, { 0, back - 0.25, -hz - 1.2 }, TRIM, "Metal"))
 		for _, side in { -1, 1 } do

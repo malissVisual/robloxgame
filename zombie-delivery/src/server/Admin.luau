@@ -113,7 +113,7 @@
 --                             start / time / horde); "fill" 10 random pieces in random condition into the stock
 --                             (Collection.add), "clear" the stock emptied ($0 for it: Collection.clear, else every piece
 --                             sold and the money put back), "stands" the stock's pieces on the free display stands
---                             (Collection.display, Config.Warehouse.Stands); "van" the sandbox van (Config.Sandbox.Van)
+--                             (Collection.display, Collection.stands: 8.3, the warehouse level's); "van" the sandbox van (Config.Sandbox.Van)
 --                             to the plot's vanSpot (the live van moved with its load, else a new one), "house" to the
 --                             house's front door, "warehouse" to the plot's spawn (driving your van: it goes with you,
 --                             to the house's curb / the vanSpot); 8.1: "upmax" / "upreset" every upgrade at its top

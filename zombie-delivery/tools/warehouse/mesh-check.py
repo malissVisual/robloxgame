@@ -53,7 +53,7 @@ VISUAL = re.compile(r"^(Floor|WallBack|WallWest|WallEast|WallFrontWest|WallFront
                     r"Downpipe(West|East|BackWest|BackEast)|RidgeCap|Parapet(West|East|Front|Back)?|Cornice|"
                     r"Rib(Back|Front|Header|West|East)\d+|(Plinth|Stripe)(Back|West|East|FrontWest|FrontEast)|"
                     r"Corner(Front|Back)(West|East)|DoorRail(West|East)|Bollard(West|East)|DoorCurtain|DoorBar|DoorHood|DoorPanel|"
-                    r"ZdcSign|Beam\d+|Post\d+(West|East)|Lamp\d+|LampGlow\d+)$")
+                    r"ZdcSign|Beam\d+|Post\d+(West|East)|Lamp\d+|LampGlow\d+|WindowFrame|Window|SideDoorFrame|SideDoor)$")
 KEEP = re.compile(r"^(OwnerSign|StockBoard|UpgradeSign|Stand\d+|StandTop\d+|Plate\d+|Terminal\w+|"
                   r"Receiving\w+|AisleLine\w+|Bay\w+)$")
 WALLS = ("WallBack", "WallWest", "WallEast", "WallFrontWest", "WallFrontEast", "Header")

@@ -246,8 +246,10 @@ function UpgradeRules.fromSave(saved: any): Levels
 	end
 	local levels = if saved[UpgradeRules.Flag] == true then UpgradeRules.clean(saved.sandboxUpgrades) else UpgradeRules.empty()
 	local migrated = WarehouseLevels.migrate(saved)
-	if migrated then
-		levels.warehouse = if migrated > WarehouseLevels.Start then migrated else nil
+	if migrated and migrated > WarehouseLevels.Start then
+		levels.warehouse = migrated
+	elseif migrated then
+		levels.warehouse = nil :: any -- (the start: not kept)
 	end
 	return levels
 end

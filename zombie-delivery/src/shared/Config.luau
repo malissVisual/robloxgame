@@ -6909,7 +6909,7 @@ Config.Sandbox = {
 --   BrokenAt   a condition at or under it is broken (the moves' own, Config.Moving.Damage.BrokenAt): it earns nothing
 --              on show and sells for scrap, Scrap × its value (at least $1)
 --   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why)
---   Stands     the display stands when Config.Warehouse.Stands is missing (CollectionRules.standsFor)
+--   Stands     8.3: no longer read (the stands are the warehouse level's: Config.WarehouseLevels, CollectionRules.standsFor)
 --   Tick       s between two payouts of the stands' income (exact: the fractions carry over to the next one)
 -- The tuning: a house's haul (HouseLayout's 40 first seeds: 18 – 24 pieces worth $4,800 – 7,800) at 90 % condition,
 -- its best 12 on the 12 stands, earns $88 – 140 a minute (median $100); selling all of it pays $850 – 1,470, 9.6 –
