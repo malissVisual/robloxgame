@@ -87,8 +87,9 @@ SandboxScenery.FencePost = 16 -- studs between two posts
 SandboxScenery.WallHeight = 300
 -- the chalet on House.house (its walls the box's height), its dice: "tyrol". 8.1: Pitch is the owner's Blender house's roof
 -- (design/blender-house/house.py PITCH): dressed in it (server/HouseMesh.luau), the chalet's gable wedges are re-cut to
--- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model)
-SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 42 }
+-- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model). 8.2.1:
+-- the big house's 31° (house.py TARGET "sandbox", the manifest's "pitch")
+SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }

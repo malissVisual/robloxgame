@@ -24,9 +24,13 @@ tools/perf/world-mock.luau) with the same import in the Workspace. Checks:
   - the gable, re-cut across the house (SandboxScenery.Chalet.Pitch), under the model's roof at every point;
   - the FrontDoor on the model's door (across it, as wide and tall, just in front of its leaves); nothing of the model
     in the door's "Enter house" box (server/Moving.luau SB.site), the doorway's way out or on the path but its step
-    (the path runs under it); the garden (the fence, the gate, the mailbox, the flower boxes) clear of the model.
+    (the path runs under it); the garden (the fence, the gate, the mailbox, the flower boxes) and the greeter's spot
+    (server/MoveGreeters.luau, Config.MoveGreeters.Porch) clear of the model.
+8.2.1: house.py's TARGET says which house the export is for (the manifest's "target"): "sandbox", the owner's big
+house on The Old Chalet (the sandbox checks above; Marge's then another size: left as World builds it), or "city",
+Marge's (the checks above it; the sandbox's then another size: the chalet as it is).
 
-    python3 zombie-delivery/tools/house-art/check.py <luau>
+    python3 zombie-delivery/tools/house-art/check.py <luau> [another export's ZDCHouseArt.json]
 """
 import json
 import re
@@ -206,6 +210,7 @@ if MODE == "art" then
 end
 local SandboxMap = require("./SandboxMap")
 local SandboxScenery = require("./SandboxScenery")
+local Config = require("./Config")
 local world = require("./SandboxWorldServer").build()
 local H = SandboxMap.House
 local h = H.house
@@ -235,6 +240,9 @@ end
 -- the door's "Enter house" box as server/Moving.luau SB.site makes it: 4 × 6 × 1, 0.9 out of House.door, 3.5 up
 local out = G.CFrame.new(H.door.x, H.door.y, H.door.z) * G.CFrame.Angles(0, math.rad(H.door.yaw), 0)
 print(string.format('ENTER {"cf":%s,"size":[4,6,1]}', f(inverse * out * G.CFrame.new(0, 3.5, -0.9))))
+-- where the move's greeter stands (server/MoveGreeters.luau: Porch in the door's frame, +X right, -Z out), a body
+local porch = Config.MoveGreeters.Porch
+print(string.format('GREETER {"cf":%s,"size":[2.4,6,2.4]}', f(inverse * out * G.CFrame.new(porch[1], 3, porch[2]))))
 -- the path kept clear from the curb to the door (SandboxScenery.Path), in the house's frame (yaw 0: only moved)
 local P = SandboxScenery.Path
 print(string.format('PATH {"x0":%.17g,"x1":%.17g,"z0":%.17g,"z1":%.17g,"yaw":%g}', P.x0 - h.x, P.x1 - h.x, P.z0 - h.z, P.z1 - h.z, H.door.yaw))
@@ -278,7 +286,7 @@ def stage(tmp: Path, manifest: dict):
 def run(luau: str, tmp: Path, mode: str, harness: str = "harness.luau"):
     r = subprocess.run([luau, harness, "-a", mode], cwd=tmp, capture_output=True, text=True)
     assert r.returncode == 0 and "ALL DONE" in r.stdout, r.stdout[-3000:] + r.stderr[-3000:]
-    out = {"HOUSE": [], "PART": [], "DRESS": [], "LOOK": [], "HOME": [], "ENTER": [], "PATH": []}
+    out = {"HOUSE": [], "PART": [], "DRESS": [], "LOOK": [], "HOME": [], "ENTER": [], "PATH": [], "GREETER": []}
     for line in r.stdout.splitlines():
         kind, _, rest = line.partition(" ")
         if kind in out:
@@ -309,7 +317,8 @@ def main():
     world = (ROOT / "src/server/World.luau").read_text()
     for line in WORLD_LINES + ROOF_LINES:
         assert line in world, f"server/World.luau's buildHouse changed ({line!r}): change this check's harness with it"
-    manifest = json.loads(MANIFEST.read_text())
+    manifest = json.loads((Path(sys.argv[2]) if len(sys.argv) > 2 else MANIFEST).read_text())  # (another export: its JSON)
+    target = manifest.get("target", "city")
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         stage(tmp, manifest)
@@ -327,8 +336,6 @@ def main():
     houses = {h["tag"]: h for h in art["HOUSE"]}
     main_house = houses["main"]
     W, H, D = manifest["box"]
-    assert all(abs(a - b) < 1e-3 for a, b in zip(main_house["box"], (W, H, D))), \
-        (main_house["box"], manifest["box"], "house.py's W, H, D are not the house's on the map: change them in house.py and export again")
     # Without the import, a house not listed, a house of another size: World's look.
     for h in plain["HOUSE"] + [houses["other"], houses["size"]]:
         assert not h["dressed"] and not h["attr"], (h, "dressed")
@@ -337,6 +344,17 @@ def main():
     for h in scattered["HOUSE"]:
         assert not h["dressed"], (h, "dressed from an import physics had thrown about")
     assert art["META"]["moved"], "the imported model was not moved to ServerStorage"
+    if target == "sandbox":
+        # The sandbox's big house: Marge's is another size and keeps World's look.
+        assert not main_house["dressed"] and not main_house["attr"], (main_house, "Marge's dressed with the sandbox's house")
+        for p in art["PART"]:
+            assert p["class"] != "MeshPart" and p["t"] == 0, (p["tag"], p["name"], "changed")
+        print(f"Mesh house ({target}): Marge's house ({main_house['box'][0]:.2f} × {main_house['box'][1]:.2f} × "
+              f"{main_house['box'][2]:.2f}) and the other city houses keep World's look; no import, a scattered one: unchanged")
+        print(sandbox_check(manifest, sandbox_plain, sandbox_art))
+        return
+    assert all(abs(a - b) < 1e-3 for a, b in zip(main_house["box"], (W, H, D))), \
+        (main_house["box"], manifest["box"], "house.py's city box is not the house's on the map: change it in house.py and export again")
     assert main_house["dressed"] and main_house["attr"], main_house
     parts = [p for p in art["PART"] if p["tag"] == "main"]
     own = [p for p in parts if p["class"] != "MeshPart"]
@@ -383,7 +401,12 @@ def main():
           f"the map's) from a turned, scaled import: every piece in place, anchored, not physical; the house's own parts "
           f"hidden and still colliding; the walls on its box, the roof over its wedges; clear of the {len(art['DRESS'])} moving-day "
           f"things and the door; other houses and no import: unchanged")
-    print(sandbox_check(manifest, sandbox_plain, sandbox_art))
+    # The sandbox's house is another size: the chalet as it is.
+    for result in (sandbox_plain, sandbox_art):
+        assert not result["HOUSE"][0]["dressed"], "the sandbox's house dressed with Marge's"
+        for p in result["PART"]:
+            assert p["class"] != "MeshPart" and p["t"] == 0, (p["name"], "changed")
+    print("Sandbox house: another size (house.py TARGET \"sandbox\" exports its own), the chalet as it is")
 
 
 def corners(part):
@@ -486,6 +509,7 @@ def sandbox_check(manifest, plain, art):
         ("the Enter house box", aabb(art["ENTER"][0])),
         ("the doorway's way out", ([l_lo[0], 0.3, skin - 6], [l_hi[0], l_hi[1], skin])),
         ("the path", ([path["x0"], 0.3, path["z0"]], [path["x1"], 5, min(path["z1"], skin)])),
+        ("the greeter's spot", aabb(art["GREETER"][0])),
     ]
     for name, area in keep:
         clash = [d["name"] for d in details if overlap(area, box_of(d))]
@@ -501,7 +525,7 @@ def sandbox_check(manifest, plain, art):
             f"without the import the chalet; dressed, all {len(meshes)} pieces in place on House_sandbox_house, anchored, not "
             f"physical; the chalet's {len(own)} parts hidden, the House box and the gable still solid, the gable "
             f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door; the Enter "
-            f"house box, the way out and the path clear (the path under the step); the garden's {len(garden)} parts clear of the model")
+            f"house box, the way out, the path (under the step) and the greeter's spot clear; the garden's {len(garden)} parts clear of the model")
 
 
 if __name__ == "__main__":
