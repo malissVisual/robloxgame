@@ -28,7 +28,10 @@
 -- TwoWheels).
 -- 6.16: every shot kicks the aiming camera up and a headshot punches it in (client/ShotKick.luau, one call a frame).
 -- 8.1 carrying in two (client/PairSteer.luau, started here): the body no longer turns where it walks (AutoRotate stays
--- off while it steers), and the carry's walk is slower while the heading turns (PairSteer.walk).
+-- off while it steers), and the carry's walk is slower while the heading turns (PairSteer.walk). 8.3 (the owner: "when I
+-- run, he just goes behind me"): a move's piece in the hands, PairSteer holds the walk at its CarrySpeed every step
+-- before the physics (the sprint's bleed-off too); in two, Shift, the stick click and the touch SPRINT do nothing and
+-- say so once a carry (PairSteer.refuseRun).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -658,6 +661,7 @@ local function touchSpeed()
 	UserInputService.InputBegan:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.ButtonL3 then
 			padSprint = true
+			PairSteer.refuseRun() -- (8.3: a piece in two: no run, said once)
 		end
 	end)
 	RunService.Heartbeat:Connect(function(dt: number)
@@ -756,8 +760,12 @@ function CameraRig.start()
 			altHeld = true
 		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
 			shiftHeld = true
+			if not processed then
+				PairSteer.refuseRun() -- (8.3: a piece in two: no run, said once; not a capital typed in the chat)
+			end
 		elseif input.KeyCode == Enum.KeyCode.ButtonL3 then
 			padSprint = true
+			PairSteer.refuseRun()
 		elseif processed then
 			return
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -799,6 +807,11 @@ end
 -- 4.2: the touch SPRINT toggle (client/TouchControls.luau): on, you sprint whenever you move and have breath (the
 -- same breath, Stamina.update); it turns itself off when the breath runs dry, in a seat or on death.
 function CameraRig.setTouchSprint(on: boolean)
+	if on and PairSteer.holding() then
+		PairSteer.refuseRun() -- (8.3: a piece in two: no run, said once)
+		touchSprint = false
+		return
+	end
 	touchSprint = on and Stamina.canSprintNow()
 end
 

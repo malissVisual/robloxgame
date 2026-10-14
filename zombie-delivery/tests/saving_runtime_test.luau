@@ -466,6 +466,7 @@ future.badges = { first = 3 }
 future.bike = "old-bike" -- (keys this version knows: its own value, never the old one)
 future.title = "Boss"
 future.rewards = { ["visit:sofa"] = true, ["wh:2"] = true }
+future.sandboxMoves, future.sandboxMovesKept = 4, true -- (a field this version knows: the badges' moves)
 E.saves.Player_212 = future
 local M = E.join(212, "Max")
 E.plotOf[M] = SandboxMap.Plots[2]
@@ -473,7 +474,8 @@ PlayerData.addMoney(M, 1, "Admin")
 PlayerData.save(M)
 local m1 = E.saves.Player_212
 check("a newer server's keys: written back as they were", same(m1.dannyHire, future.dannyHire) and m1.dannyHireKept == true and same(m1.badges, future.badges))
-check("… the keys this version knows are its own (bike, title: the profile's nil, not the old save's)", m1.bike == nil and m1.title == nil and m1.money == 5001)
+check("… the keys this version knows are its own (bike, title: the profile's nil, not the old save's; the badges' moves read and written)", m1.bike == nil and m1.title == nil
+	and m1.money == 5001 and m1.sandboxMoves == 4 and m1.sandboxMovesKept == true)
 check("… the newer server's `rewards` keys kept too, the level's \"wh:\" key this one's", m1.rewards["visit:sofa"] == true and m1.rewards["wh:2"] == true)
 from = #E.storeCalls
 Upgrades.buy(M, "warehouse")

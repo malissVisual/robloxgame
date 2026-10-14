@@ -69,6 +69,30 @@ check("the elbow points toward the pole", poleSide)
 local a, b, c, d, e, f, bend = BodyMotion.reach(0, 0, -9, 1, 1, 0, -1, 0)
 local tx, ty, tz = tip(a, b, c, d, e, f, bend, 1, 1)
 check("out of reach: straight toward it", near(tx, 0, 1e-3) and near(ty, 0, 1e-3) and near(tz, -2, 2e-3) and math.abs(bend) < 0.1, `{tx} {ty} {tz}`)
+-- 8.3 (the owner: "he goes behind me with his arms stretched out"): a carry's hand never stretches the arm out: a spot
+-- out of reach (the piece's edge far ahead of Danny's place) is reached CarryReach of the arm's length, the elbow bent
+do
+	local cx, cy, cz = BodyMotion.capReach(0, 0.3, -9, 1, 1)
+	local capped = math.sqrt(cx * cx + cy * cy + cz * cz)
+	local ca, cb, cc, cd, ce, cf, cbend = BodyMotion.reach(cx, cy, cz, 1, 1, 0, -1, 0)
+	local hx, hy, hz = tip(ca, cb, cc, cd, ce, cf, cbend, 1, 1)
+	check("8.3 the arm's reach capped: a spot 9 studs off is reached CarryReach of the arm (2 studs) out, the same way",
+		B.CarryReach > 0.8 and B.CarryReach < 1 and near(capped, 2 * B.CarryReach, 1e-9) and near(cy / cz, 0.3 / -9, 1e-9) and cz < 0, capped)
+	check("…the hand lands there, the elbow still bent (never straight)", near(hx, cx, 1e-4) and near(hy, cy, 1e-4) and near(hz, cz, 1e-4)
+		and cbend > math.rad(30), math.deg(cbend))
+	local wx, wy, wz = BodyMotion.capReach(0.4, 0.2, -0.9, 1, 1)
+	check("…a spot within it: untouched (the box's sides reached as before)", wx == 0.4 and wy == 0.2 and wz == -0.9)
+	local reachWorst = 0
+	for _ = 1, 200 do
+		local upper, lower = 0.6 + random(), 0.6 + random()
+		local far = (upper + lower) * (0.2 + random() * 4)
+		local dx, dy, dz = random() * 2 - 1, random() * 2 - 1, random() * 2 - 1
+		local m = math.max(math.sqrt(dx * dx + dy * dy + dz * dz), 1e-6)
+		local qx, qy, qz = BodyMotion.capReach(dx / m * far, dy / m * far, dz / m * far, upper, lower)
+		reachWorst = math.max(reachWorst, math.sqrt(qx * qx + qy * qy + qz * qz) - (upper + lower) * B.CarryReach)
+	end
+	check("…never more than CarryReach of any arm's length", reachWorst <= 1e-9, reachWorst)
+end
 -- A knee: the pole forward, the hinge the other way round (a negative bend), the thigh not twisted about itself.
 local ka, kb, kc, kd, ke, kf, knee = BodyMotion.reach(0, -2.2, -0.3, 1.25, 1.25, 0, 0, -1, true)
 local kx, ky, kz = tip(ka, kb, kc, kd, ke, kf, knee, 1.25, 1.25)

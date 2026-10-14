@@ -67,6 +67,8 @@
 -- save written with its flag (sandboxOnboardingKept: AnalyticsPlan.sandboxFrom); an older real save is past every step.
 -- 8.2 SANDBOX: the daily tasks (sandboxTasks: shared/SandboxTasks.luau's save, kept by server/SandboxTasks.luau), read
 -- only from a real save written with their flag (sandboxTasksKept); older saves: none (the server starts them fresh).
+-- 8.3 SANDBOX: the moves finished (sandboxMoves: server/SandboxBadges.luau counts them for the badges, shared/
+-- SandboxBadgeRules.luau), read only from a real save written with its flag (sandboxMovesKept); older saves: 0.
 -- 8.3 SANDBOX: the market's demand (market: shared/Market.luau's save, what each kind sold today weighs on its price;
 -- kept by server/Collection.luau), read only from a real save written with its flag (marketKept); older saves: none.
 -- 8.3 SANDBOX: the van's paint (vanPaint: { owned, worn }, shared/VanPaintRules.luau; the PAINT shop, server/VanPaint.luau),
@@ -193,6 +195,9 @@ export type Profile = {
 	-- 8.2 SANDBOX: the daily tasks (shared/SandboxTasks.luau: the day's picks and progress, the week's): read only from a
 	-- real save written with its flag (SandboxTasks.fromSave); nil until server/SandboxTasks.luau starts them
 	sandboxTasks: SandboxTaskRules.Saved?,
+	-- 8.3 SANDBOX: the moves finished, done or late with pieces home (server/SandboxBadges.luau: the badges): read only
+	-- from a real save written with its flag (SandboxBadgeRules.movesFromSave); an older one starts at 0
+	sandboxMoves: number,
 	-- 8.3 SANDBOX: the market's demand (shared/Market.luau: the kinds sold today, what each weighs on its price): read only
 	-- from a real save written with its flag (Market.fromSave); an older one starts with the empty one
 	market: Market.Saved,
@@ -315,6 +320,7 @@ local function newProfile(): Profile
 		collectionBookPaid = {}, -- 8.2: no milestone paid yet
 		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
 		sandboxTasks = nil, -- 8.2: server/SandboxTasks.luau starts them (it knows the UserId and the day)
+		sandboxMoves = 0, -- 8.3: no move finished yet (the badges)
 		market = Market.empty(), -- 8.3: nothing sold yet
 		vanPaint = VanPaintRules.empty(), -- 8.3: nothing bought, the factory's look
 		deliveries = 0,
@@ -652,6 +658,8 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
 	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
 	profile.sandboxTasks = SandboxTaskRules.fromSave(saved)
+	-- 8.3: the moves finished (the badges), only from a real save written with their flag (sandboxMovesKept); else 0
+	profile.sandboxMoves = require(Shared.SandboxBadgeRules).movesFromSave(saved)
 	-- 8.3: the market's demand, checked, only from a real save written with its flag (marketKept); a save from before 8.3
 	-- (or a lock-only record) starts with the empty one (Market.fromSave)
 	profile.market = Market.fromSave(saved)
@@ -1072,6 +1080,8 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		warehouseLevelKept = true, -- 8.3: UpgradeRules.WarehouseFlag (a real save without it is migrated to its warehouse level once)
 		sandboxTasks = profile.sandboxTasks, -- 8.2
 		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
+		sandboxMoves = profile.sandboxMoves, -- 8.3
+		sandboxMovesKept = true, -- 8.3: SandboxBadgeRules.Flag (applySaved reads the moves finished only with it)
 		market = profile.market, -- 8.3
 		marketKept = true, -- 8.3: Market.Flag (applySaved reads the market's demand only with it)
 		vanPaint = profile.vanPaint, -- 8.3

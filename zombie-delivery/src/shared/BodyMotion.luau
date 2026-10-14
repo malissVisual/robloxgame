@@ -10,6 +10,9 @@
 --        on the client: the bone's rest "down" turns onto the upper bone) and the middle joint's bend about its own X
 --        (positive bends an elbow; `negative` for a knee: the hinge the other way round, the bend negative). A point out
 --        of reach is reached as far as the limb goes, straight toward it.
+--   BodyMotion.capReach(dx, dy, dz, upper, lower)  8.3 (the owner: "he goes behind me with his arms stretched out"):
+--        the point (dx, dy, dz) from the joint, pulled in to Config.Body.CarryReach of the limb's whole length at most
+--        (the same way: a carry's hand toward a spot out of reach stops there, the elbow still bent)
 --   BodyMotion.crouch(drop, back, thigh, shin)  the legs bent for hips `drop` studs lower and `back` studs further back
 --        with the feet where they stood: the hip's swing (X, + forward), the knee (X, negative) and the ankle (X, the
 --        foot kept flat).
@@ -87,6 +90,17 @@ function BodyMotion.reach(dx: number, dy: number, dz: number, upper: number, low
 		return -nx, -ny, -nz, -ux, -uy, -uz, -bend
 	end
 	return nx, ny, nz, -ux, -uy, -uz, bend
+end
+
+function BodyMotion.capReach(dx: number, dy: number, dz: number, upper: number, lower: number): (number, number, number)
+	local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+	local most = math.max(upper, 0) + math.max(lower, 0)
+	local reach = most * math.clamp(B.CarryReach, 0, 1)
+	if d <= reach or d < 1e-9 or most <= 0 then
+		return dx, dy, dz
+	end
+	local k = reach / d
+	return dx * k, dy * k, dz * k
 end
 
 function BodyMotion.crouch(drop: number, back: number, thigh: number, shin: number): (number, number, number)

@@ -314,6 +314,7 @@ end
 -- its size) where it really is under the root weld; each arm a two-bone reach (shared/BodyMotion.luau) from its shoulder
 -- on the torso to the palm's spot against the box's side (CarryLow of its height under the middle), the elbows out,
 -- down and back, the palms against it. Nil without the box (the trolley, the phone, the lead: the fixed shapes then).
+-- 8.3: CarryReach of the arm out at most (BodyMotion.capReach: a spot out of reach, never a stretched-out arm).
 local B = Config.Body
 local SIDES = { 1, -1 }
 local function reachGoals(character: Model, rig: Rig, kind: string): ArmGoals?
@@ -333,7 +334,9 @@ local function reachGoals(character: Model, rig: Rig, kind: string): ArmGoals?
 	for _, side in SIDES do
 		local spot = root.CFrame:PointToWorldSpace(Vector3.new(at.X + side * (size.X / 2 + rig.palm), at.Y - size.Y * B.CarryLow, at.Z))
 		local d = torso.CFrame:PointToObjectSpace(spot) - (if side > 0 then rightAt else leftAt)
-		local xx, xy, xz, yx, yy, yz, bend = BodyMotion.reach(d.X, d.Y, d.Z, rig.upperArm, rig.lowerArm, side * 0.6, -1, 0.7)
+		-- (8.3: a spot out of reach, the hand stops CarryReach of the arm out, the elbow bent: never a stretched-out arm)
+		local dx, dy, dz = BodyMotion.capReach(d.X, d.Y, d.Z, rig.upperArm, rig.lowerArm)
+		local xx, xy, xz, yx, yy, yz, bend = BodyMotion.reach(dx, dy, dz, rig.upperArm, rig.lowerArm, side * 0.6, -1, 0.7)
 		local turn = CFrame.fromMatrix(Vector3.zero, Vector3.new(xx, xy, xz), Vector3.new(yx, yy, yz))
 		if side > 0 then
 			goals.rs, goals.re, goals.rw = turn, CFrame.Angles(bend, 0, 0), CFrame.identity
