@@ -188,7 +188,7 @@ local asked = kinds(E.received(B, "CollectionBook", mark), "state")
 check("state on request: sent at once (nothing new in it)", #asked == 1 and #asked[1].new == 0 and same(asked[1].book, Book.book(B)) and same(asked[1].paid, { "found10", "found20" }))
 local bookBefore, moneyBefore = Book.book(B), (PlayerData.get(B) :: any).money
 mark = #E.sent
-for _, message in { nil, "x", 5, true, {}, { kind = 7 }, { kind = "fill" }, { kind = "milestone", id = "collectibles" }, { kind = "record", item = "jukebox" }, { kind = "state", book = { jukebox = { n = 1, best = 1 } } } } do
+for _, message in { nil, "x", 5, true, {}, { kind = 7 }, { kind = "fill" }, { kind = "milestone", id = "collectibles24" }, { kind = "record", item = "jukebox" }, { kind = "state", book = { jukebox = { n = 1, best = 1 } } } } do
 	E.advance(1)
 	E.fire(B, "CollectionBook", message)
 end
@@ -233,7 +233,9 @@ local ids = {}
 for _, m in kinds(got, "milestone") do
 	table.insert(ids, m.id)
 end
-check("… the milestones it reached pay (all the furniture, every collectible, a legendary)", table.concat(ids, ",") == "furniture,collectibles,legendary" and select(2, paid(B2, "collectibles")) == 1, table.concat(ids, ","))
+check("… the milestones it reached pay (all the furniture, every collectible, a legendary)", table.concat(ids, ",") == "furniture,collectibles24,legendary" and select(2, paid(B2, "collectibles24")) == 1, table.concat(ids, ","))
+check("8.4 review: the 24's payment marks 8.2's retired \"collectibles\" paid too (an older server never pays it), never paid itself here", (PlayerData.get(B2) :: any).collectionBookPaid.collectibles == true
+	and select(2, paid(B2, "collectibles")) == 0 and table.find(Book.paid(B2), "collectibles") == nil)
 mark = #E.sent
 said = Book.admin(B2, "clear")
 E.flush()
@@ -261,6 +263,35 @@ annSave.collectionBook, annSave.collectionBookPaid, annSave.collectionBookKept =
 local A4 = E.join(101, "Ann")
 check("… through an older server's save: the book from the stock again, its milestones still paid, nothing paid again",
 	same(Book.paid(A4), { "found10", "legendary" }) and paid(A4) == 0, `{table.concat(Book.paid(A4), ",")} paid {paid(A4)}: {select(2, paid(A4, "found10"))} {select(2, paid(A4, "legendary"))}`)
+
+-- 8.4 review: an 8.2 server paid its own "collectibles" ($2,500 for its 12 collectibles) and wrote "book:collectibles".
+-- Here it stays paid (kept in the save: that server never pays it again), but it is not the 24-piece milestone:
+-- Collector gold stays locked and the $5,000 pays once the 24 are found.
+local twelve = {}
+for index = 1, 12 do
+	twelve[Rules.Collectibles[index]] = { n = 1, best = 0.8 }
+end
+local via82 = oldSave(400, {})
+via82.collectionBookKept, via82.collectionBook, via82.collectionBookPaid = true, twelve, { collectibles = true }
+via82.rewards = { ["book:collectibles"] = true }
+E.saves.Player_303 = via82
+local Z = E.join(303, "Zed")
+E.flush()
+local pz = PlayerData.get(Z) :: any
+local gold = require("./VanPaintRules").find("gold") :: any
+check("8.4 review: 8.2's \"collectibles\" paid: kept as paid (never paid here), the 24 not paid on joining, Collector gold locked", pz.collectionBookPaid.collectibles == true
+	and pz.collectionBookPaid.collectibles24 == nil and select(2, paid(Z, "collectibles")) == 0 and select(2, paid(Z, "collectibles24")) == 0
+	and not require("./VanPaintRules").unlocked(gold, pz.collectionBookPaid) and table.find(Book.paid(Z), "collectibles") == nil)
+mark = #E.sent
+for index = 13, #Rules.Collectibles do
+	Book.record(Z, Rules.Collectibles[index], 1)
+end
+E.flush()
+check("… the 24 found: \"Found every collectible\" pays its $5,000 once, Collector gold opens", select(2, paid(Z, "collectibles24")) == 1 and paid(Z, "collectibles24") == 5000
+	and require("./VanPaintRules").unlocked(gold, pz.collectionBookPaid) and select(2, paid(Z, "collectibles")) == 0)
+E.leave(Z)
+check("… the save keeps both (an 8.2 server reads its own as paid)", E.saves.Player_303.collectionBookPaid.collectibles == true and E.saves.Player_303.collectionBookPaid.collectibles24 == true
+	and E.saves.Player_303.rewards["book:collectibles"] == true and E.saves.Player_303.rewards["book:collectibles24"] == true)
 
 check("no warnings (no failed save)", #E.warnings == 0, E.warnings[1])
 

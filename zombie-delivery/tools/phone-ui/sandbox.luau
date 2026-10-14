@@ -806,7 +806,15 @@ press(named(picker, "SellMenu"))
 press(named(named(picker, "Menu"), "Sell_duplicates"))
 press(named(named(picker, "Confirm"), "ConfirmSell"))
 sent = sentOn("Collection")
-check("… SELL: { kind = \"sellmany\", filter = \"duplicates\" } and nothing else (the server picks the pieces)", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "duplicates" and sent[#sent][1].uid == nil and sent[#sent][1].uids == nil)
+do -- (8.4 review: + the uids of the pieces it listed: the server sells exactly those, or nothing if the stock changed)
+	local listed = {}
+	for _, piece in StockPlan.toSell(pieces, "duplicates") do
+		table.insert(listed, piece.uid)
+	end
+	local uids = sent[#sent][1].uids
+	check("… SELL: { kind = \"sellmany\", filter = \"duplicates\", uids = the pieces it listed }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "duplicates"
+		and sent[#sent][1].uid == nil and type(uids) == "table" and #listed > 0 and table.concat(uids, ",") == table.concat(listed, ","), type(uids) == "table" and table.concat(uids, ","))
+end
 check("… 💰 SELL… waits (…)", named(picker, "SellMenu").Text == "…")
 
 -- ⭐ FILL BEST and ↩ TAKE ALL DOWN
@@ -1248,7 +1256,8 @@ do
 	before = #sentOn("Collection")
 	press(named(ask, "ConfirmSell"))
 	sent = sentOn("Collection")
-	check("… SELL: { kind = \"sellmany\", filter, expect = that total }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "common" and sent[#sent][1].expect == total)
+	check("… SELL: { kind = \"sellmany\", filter, expect = that total, uids = its pieces }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "common" and sent[#sent][1].expect == total
+		and type(sent[#sent][1].uids) == "table" and #sent[#sent][1].uids == #commons)
 	WarehouseUi.close()
 
 	-- a guessed price is never expected (only the server's)

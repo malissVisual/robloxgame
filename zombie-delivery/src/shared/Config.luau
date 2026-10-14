@@ -7000,7 +7000,8 @@ Config.Sandbox = {
 --   Order      the tiers' ids, common first
 --   BrokenAt   a condition at or under it is broken (the moves' own, Config.Moving.Damage.BrokenAt): it earns nothing
 --              on show and sells for scrap, Scrap × its value (at least $1)
---   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why)
+--   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why); 8.4 review: also the most
+--              uids a SELL… request may list (server/Collection.luau: a longer list is refused)
 --   Stands     8.3: no longer read (the stands are the warehouse level's: Config.WarehouseLevels, CollectionRules.standsFor)
 --   Tick       s between two payouts of the stands' income (exact: the fractions carry over to the next one)
 -- The tuning: a house's haul (HouseLayout's 40 first seeds: 18 – 24 pieces worth $4,800 – 7,800) at 90 % condition,
@@ -7244,6 +7245,10 @@ Config.SandboxUpgrades = {
 --   Milestones   in the book's order: id, name, kind ("found": `need` pieces found; "furniture": every ordinary piece;
 --                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
 --                by the server, "BookMilestone")
+--   Retired      8.4 review: a milestone's id an older server knows with another meaning → the milestone that took its
+--                place ("collectibles": 8.2's $2,500 for its 12 collectibles; "collectibles24": the 24 now, $5,000). Paid
+--                there, it stays paid in the save (an older server never pays it again) but is never paid or shown here;
+--                paying the one that took its place marks it paid too (its pieces are in it)
 --   Key          the key that opens and closes the book (a computer)
 --   Pad          8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's →; shared/SandboxPad.luau)
 --   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
@@ -7262,9 +7267,10 @@ Config.CollectionBook = {
 		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
 		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
 		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
-		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 5000 }, -- (8.3: 24 collectibles now, was $2,500 for 12)
+		{ id = "collectibles24", name = "Found every collectible", kind = "collectibles", reward = 5000 }, -- (8.3: 24 collectibles now, was $2,500 for 12; 8.4 review: so a new id, Retired)
 		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
 	} :: { BookMilestone },
+	Retired = { collectibles = "collectibles24" } :: { [string]: string }, -- 8.4 review
 	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
 	Pad = "DPadRight", -- 8.3: the gamepad's way to the book (shared/SandboxPad.luau)
 	Flag = "collectionBookKept",
@@ -7648,7 +7654,7 @@ Config.VanPaint = {
 		{ id = "forest", name = "Forest green", color = { 44, 98, 64 }, price = 600 },
 		{ id = "glacier", name = "Glacier blue", color = { 118, 168, 212 }, price = 500 },
 		{ id = "navy", name = "Navy blue", color = { 30, 50, 92 }, price = 600 },
-		{ id = "gold", name = "Collector gold", color = { 214, 170, 62 }, material = "Metal", price = 2500, unlock = "collectibles", premium = true },
+		{ id = "gold", name = "Collector gold", color = { 214, 170, 62 }, material = "Metal", price = 2500, unlock = "collectibles24", premium = true },
 		{ id = "chrome", name = "Mirror chrome", color = { 206, 212, 218 }, material = "Foil", price = 20000, premium = true },
 	} :: { VanPaintDef },
 	Liveries = {
@@ -7863,7 +7869,11 @@ Config.SandboxBadges = {
 --   Backoff    s before the next try: First × 2^(try − 1), at most Most
 --   Reserve    UpdateAsync requests of the server's budget (DataStoreService:GetRequestBudgetForRequestType) kept for
 --              the loads and the last saves: a save that can wait waits for the next round while the budget is under it
---   LeaveWait  s a join waits for this server's own leave save of the same player (a rejoin within seconds)
+--   LeaveWait  a join waits for this server's own leave save of the same player (a rejoin within seconds) as long as
+--              that save runs (8.4 review: in an outage it outlasts a fixed wait, and a join that stops waiting reads the
+--              save from before it): at most the leave save's worst case (FinalTries tries, the Backoff between them, each
+--              UpdateAsync up to Call s) and LeaveWait s more (a store that never answers)
+--   Call       s one UpdateAsync may take in an outage (only that worst case counts it)
 --   CloseWait  s the shutdown (game:BindToClose) waits for every save in flight (Roblox gives 30)
 --   WarnBytes  a save this big (its JSON, SaveGuard's estimate) warns in the output; MaxBytes: a DataStore key's 4 MB
 --              less a margin (the unknown keys kept from the loaded save are left out past it)
@@ -7875,7 +7885,8 @@ Config.Saving = {
 	LoadTries = 4,
 	Backoff = { First = 1, Most = 4 },
 	Reserve = 8,
-	LeaveWait = 20,
+	LeaveWait = 10, -- (8.4 review: + the leave save's worst case, 1 + 2 + 4 + 4 + 5 × Call = 41 s: 51 s at most)
+	Call = 6,
 	CloseWait = 25,
 	WarnBytes = 1_000_000,
 	MaxBytes = 4_000_000,

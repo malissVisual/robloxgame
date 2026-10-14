@@ -73,7 +73,7 @@
 --                                                      CollectionDisplayed (their $ a minute, the rarest); then
 --                                                      { kind = "bulk", action = "fillbest", count, income } (the $ a
 --                                                      minute they add)
---                     { kind = "sellmany", filter, expect? }   💰 SELL…: every piece in the stock the filter takes
+--                     { kind = "sellmany", filter, uids, expect? }   💰 SELL…: every piece in the stock the filter takes
 --                                                      ("common", "broken", "duplicates": all but the best of each item;
 --                                                      never a piece on show), sold at the server's prices (8.3: the
 --                                                      market's, one after the other in StockPlan.toSell's order:
@@ -82,7 +82,11 @@
 --                                                      market), { kind = "sold", name = "N pieces", money, count }. The
 --                                                      client's confirm shows the same total and sends it as `expect`:
 --                                                      another total (the prices moved) sells nothing, says so and sends
---                                                      the state again
+--                                                      the state again. 8.4 review: `uids`, the pieces the confirm listed
+--                                                      (each once, Config.Collection.MaxStock at most), is a must and
+--                                                      exactly what is sold: when the filter takes other pieces now (one
+--                                                      came home since, a better copy made the best one a duplicate)
+--                                                      nothing is sold, the Notice says so and the state goes out again
 --                     { kind = "undisplayall" }        ↩ TAKE ALL DOWN: every piece on show back to the stock (what they
 --                                                      earned up to now counts); { kind = "bulk", action =
 --                                                      "undisplayall", count }
@@ -671,10 +675,32 @@ local function fillBest(player: Player): (number?, string?)
 	return count, nil
 end
 
+-- 8.4 review: the uids a SELL… confirm listed (a list of uid strings, each once, Config.Collection.MaxStock at most: a
+-- sale never holds more than the stock) → the set and how many (nil: no such list).
+local function listed(raw: any): ({ [string]: boolean }?, number)
+	if type(raw) ~= "table" then
+		return nil, 0
+	end
+	local set: { [string]: boolean } = {}
+	local count = 0
+	for key, uid in raw do
+		count += 1
+		if count > Config.Collection.MaxStock or type(key) ~= "number" or type(uid) ~= "string" or #uid == 0 or #uid > MAX_UID or set[uid] then
+			return nil, 0
+		end
+		set[uid] = true
+	end
+	if count == 0 or count ~= #raw then
+		return nil, 0
+	end
+	return set, count
+end
+
 -- 💰 SELL… → the money paid (nil: nothing sold), how many, why. 8.3: at the market's prices, the pieces one after the
 -- other (StockPlan.price: each next piece of a kind under the demand of the ones before it); `expect`, the total the
--- client's confirm showed: another total sells nothing (the state goes out again).
-local function sellMany(player: Player, filter: any, expect: number?): (number?, number, string?)
+-- client's confirm showed: another total sells nothing (the state goes out again). 8.4 review: `uids`, the pieces it
+-- listed: sold only while the filter takes exactly those, else nothing (the state goes out again).
+local function sellMany(player: Player, filter: any, expect: number?, uids: any): (number?, number, string?)
 	local collection = collectionOf(player)
 	local profile = PlayerData.get(player)
 	if not collection or not profile then
@@ -687,6 +713,15 @@ local function sellMany(player: Player, filter: any, expect: number?): (number?,
 	local list = StockPlan.toSell(piecesOf(player, collection, market), filter)
 	if #list == 0 then
 		return nil, 0, NOTHING_TO_SELL[filter]
+	end
+	local asked, many = listed(uids)
+	local same = asked ~= nil and many == #list
+	for _, piece in list do
+		same = same and (asked :: { [string]: boolean })[piece.uid] == true
+	end
+	if not same then -- (8.4 review: never a piece the confirm did not list, never fewer than it said)
+		sendState(player)
+		return nil, 0, `Your stock changed since you asked: {StockPlan.filterName(filter)} would sell other pieces now ({#list}). Nothing was sold: look again.`
 	end
 	local total = StockPlan.price(list, market)
 	if expect ~= nil and total < expect then -- (8.3 review: only a total that fell)
@@ -815,7 +850,7 @@ local function onRemote(player: Player, message: any)
 		ok = count ~= nil
 	elseif kind == "sellmany" then
 		local money: number?, sold: number = nil, 0
-		money, sold, why = sellMany(player, message.filter, expected(message.expect))
+		money, sold, why = sellMany(player, message.filter, expected(message.expect), message.uids)
 		ok = money ~= nil and sold > 0
 	elseif kind == "undisplayall" then
 		local count: number? = nil

@@ -847,7 +847,12 @@ local function sellMenu()
 				what = someNames(chosen, byUid),
 				hint = hint,
 				onYes = function()
-					if send({ kind = "sellmany", filter = id, expect = expect }) then
+					-- (8.4 review: + the pieces it listed: the server sells exactly those, or nothing if the stock changed)
+					local uids = table.create(#chosen)
+					for _, piece in chosen do
+						table.insert(uids, piece.uid)
+					end
+					if send({ kind = "sellmany", filter = id, expect = expect, uids = uids }) then
 						waiting("SellMenu")
 					end
 				end,

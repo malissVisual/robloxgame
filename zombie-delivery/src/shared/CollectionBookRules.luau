@@ -22,7 +22,10 @@
 --   CollectionBookRules.counts(book)        { found, total, furniture, furnitureTotal, collectibles, collectiblesTotal,
 --                                           legendary } (found: pieces of the book in it; legendary: legendary ones)
 --   CollectionBookRules.Milestones          Config.CollectionBook.Milestones
---   CollectionBookRules.milestone(id)       the milestone with that id, nil for anything else
+--   CollectionBookRules.Retired             8.4 review: Config.CollectionBook.Retired (a retired milestone's id → the one
+--                                           that took its place): kept as paid, never due, never in paidList
+--   CollectionBookRules.milestone(id)       the milestone with that id, nil for anything else (a retired id too)
+--   CollectionBookRules.pay(paid, id)       8.4 review: a milestone paid, and every retired one it took the place of
 --   CollectionBookRules.progress(book, milestone)   have, need (have never over need)
 --   CollectionBookRules.reached(book, milestone)
 --   CollectionBookRules.due(book, paid)     the milestones reached and not paid yet, in order (what the server pays)
@@ -34,7 +37,8 @@
 --   CollectionBookRules.empty()             a new player's book
 --   CollectionBookRules.clean(raw)          a saved book checked, never trusted: only the book's pieces, n a whole
 --                                           number 1 … MaxCount (none: 1; under 1: not found), best 0 … 1
---   CollectionBookRules.cleanPaid(raw)      the known milestones' ids marked true, nothing else (a list of ids too)
+--   CollectionBookRules.cleanPaid(raw)      the known milestones' ids marked true, nothing else (a list of ids too); 8.4
+--                                           review: a retired one too (an older server paid it: never paid there again)
 --   CollectionBookRules.backfill(entries)   a book from a collection's pieces (shared/CollectionRules.luau Entry: item,
 --                                           condition): each piece of the book in it counted, its best condition
 --   CollectionBookRules.fromSave(saved, collection)   the migration (server/PlayerData.luau applySaved) → book, paid:
@@ -71,6 +75,7 @@ end
 -- The save's mark (server/PlayerData.luau writes it with every save).
 CollectionBookRules.Flag = tune().Flag
 CollectionBookRules.Milestones = tune().Milestones
+CollectionBookRules.Retired = ((tune() :: any).Retired or {}) :: { [string]: string } -- 8.4 review
 
 local function finite(n: any): boolean
 	return type(n) == "number" and n == n and n > -math.huge and n < math.huge
@@ -290,7 +295,22 @@ function CollectionBookRules.cleanPaid(raw: any): Paid
 			out[milestone.id] = true
 		end
 	end
+	for id in CollectionBookRules.Retired do -- (8.4 review: an older server's milestone, paid there: kept so)
+		if raw[id] == true or table.find(raw, id) ~= nil then
+			out[id] = true
+		end
+	end
 	return out
+end
+
+-- 8.4 review: the retired milestones a milestone took the place of are paid with it (an older server never pays them).
+function CollectionBookRules.pay(paid: Paid, id: string)
+	paid[id] = true
+	for old, by in CollectionBookRules.Retired do
+		if by == id then
+			paid[old] = true
+		end
+	end
 end
 
 function CollectionBookRules.backfill(entries: any): Book

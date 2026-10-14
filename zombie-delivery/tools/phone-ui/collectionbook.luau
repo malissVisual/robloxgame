@@ -365,7 +365,7 @@ check("… the counts: Furniture 20 / 44, Collectibles 3 / 24", named(window, "F
 local rowFound10, rowFurniture = named(window, "Milestone_found10"), named(window, "Milestone_furniture")
 check("the milestones: a paid one ✔ \"Paid · +$250\"", named(rowFound10, "Check").Text == "✔" and named(rowFound10, "Reward").Text == "Paid · +$250" and named(rowFound10, "MilestoneName").Text == "Found 10 pieces")
 check("… an open one: how far and its reward (\"20 / 44 · +$1,500\")", named(rowFurniture, "Check").Text == "○" and named(rowFurniture, "Reward").Text == "20 / 44 · +$1,500", named(rowFurniture, "Reward").Text)
-check("… every collectible: 3 / 24 · +$5,000; A legendary! ✔", named(named(window, "Milestone_collectibles"), "Reward").Text == "3 / 24 · +$5,000" and named(named(window, "Milestone_legendary"), "Check").Text == "✔")
+check("… every collectible: 3 / 24 · +$5,000; A legendary! ✔", named(named(window, "Milestone_collectibles24"), "Reward").Text == "3 / 24 · +$5,000" and named(named(window, "Milestone_legendary"), "Check").Text == "✔")
 check("the tabs: ALL 23/68 (lit), COLLECTIBLES 3/24, FURNITURE 20/44", named(window, "Tab_all").Text == "ALL 23/68" and named(window, "Tab_collectibles").Text == "COLLECTIBLES 3/24" and named(window, "Tab_furniture").Text == "FURNITURE 20/44"
 	and named(window, "Tab_all"):FindFirstChild("Underline") ~= nil and named(window, "Tab_furniture"):FindFirstChild("Underline") == nil)
 local cards = cardsOf()
@@ -515,7 +515,7 @@ M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
 key("C")
 check("the HUD hidden (the start screen): C does nothing", not ownGui.Enabled and not Book.isOpen())
 toastsBefore = #M.toasts
-remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles", name = "Found every collectible", money = 5000 })
+remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles24", name = "Found every collectible", money = 5000 })
 check("… a milestone's toast waits", #M.toasts == toastsBefore)
 M.hudGui.Enabled = true
 M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()

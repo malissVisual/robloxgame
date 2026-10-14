@@ -273,11 +273,11 @@ E.fire(A, "VanPaint", { kind = "wear", id = "racing" })
 -- ── The premium: Collector gold, the collection book's milestone ─────────
 E.advance(2)
 mark = #E.sent
-profileA.collectionBookPaid.collectibles = true -- (server/CollectionBook.luau pays it: the money moves, PlayerData.Changed fires)
-PlayerData.addMoney(A, 2500, "BookMilestone", "collectibles")
+profileA.collectionBookPaid.collectibles24 = true -- (server/CollectionBook.luau pays it: the money moves, PlayerData.Changed fires)
+PlayerData.addMoney(A, 2500, "BookMilestone", "collectibles24")
 E.flush()
 local after = kinds(E.received(A, "VanPaint", mark), "state")
-check("the book paid \"Found every collectible\": a state with the paid milestone (the window's lock opens)", #after == 1 and table.find(after[1].paid, "collectibles") ~= nil, #after)
+check("the book paid \"Found every collectible\": a state with the paid milestone (the window's lock opens)", #after == 1 and table.find(after[1].paid, "collectibles24") ~= nil, #after)
 mark = #E.sent
 PlayerData.addMoney(A, 10, "Admin")
 E.flush()

@@ -1202,9 +1202,18 @@ do
 		table.insert(pieces, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition, base = v.base })
 	end
 	local plan = StockPlan.toSell(pieces, "duplicates")
+	local planUids = {} -- (8.4 review: the confirm sends the pieces it listed; the server sells exactly those)
+	for _, piece in plan do
+		table.insert(planUids, piece.uid)
+	end
+	local staleAt = #E.sent
+	E.advance(1.1)
+	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates", uids = { annStock[1].uid } })
+	check("NEG. 8.4 review: SELL… listing a piece its filter does not take now (the best one, kept): refused, nothing sold", E.heard(ann, "stock changed", staleAt)
+		and H.byUid(Collection.stock(ann), twin) ~= nil and H.byUid(Collection.stock(ann), annStock[1].uid) ~= nil)
 	local saleAt2, sentAt2 = #money, #E.sent
 	E.advance(1.1)
-	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates" })
+	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates", uids = planUids })
 	local soldMany = E.lastKind(ann, "Collection", "sold", sentAt2)
 	check("8.2 bulk: SELL… duplicates sells the worse twin only, at the price the window shows (StockPlan)", #plan == 1 and plan[1].uid == twin
 		and soldMany ~= nil and soldMany.count == 1 and soldMany.money == StockPlan.price(plan, market) and H.paid(ann, "CollectionSale", saleAt2) == StockPlan.price(plan, market)

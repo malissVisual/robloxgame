@@ -564,8 +564,19 @@ check("… again with nothing on show: refused, \"Nothing is on show.\"", E.rece
 check("the sofa (0.9, the better one) and a Common filler on show", Collection.display(H, hs, 1) and Collection.display(H, fillers[2], 2))
 local commonFiller = Rules.rarityOf(Rules.defOf(stockOf(H)[fillers[2]].item)) == "common"
 E.flush()
+-- 8.4 review: the uids SELL…'s confirm lists for a filter (as client/WarehouseUi.luau: StockPlan.toSell on the stock of the
+-- last state the server sent); a sellmany sends them and sells only exactly those
+local StockPlanH = require("./StockPlan")
+local function listedFor(player: any, filter: string): { string }
+	local states = kinds(E.received(player, "Collection", 0), "state")
+	local out = {}
+	for _, piece in StockPlanH.toSell(states[#states].stock, filter) do
+		table.insert(out, piece.uid)
+	end
+	return out
+end
 local function sellCase(filter: string, extra: { [string]: any }?): (number, { any }, { Money }, { any })
-	local message: { [string]: any } = { kind = "sellmany", filter = filter }
+	local message: { [string]: any } = { kind = "sellmany", filter = filter, uids = listedFor(H, filter) }
 	for k, v in extra or {} do
 		message[k] = v
 	end
@@ -589,13 +600,13 @@ local function priceOf(list: { any }): number
 	end
 	return sum
 end
-local n, gone, sales, sent = sellCase("duplicates", { uids = { hp, hs }, money = 1e9 })
+local n, gone, sales, sent = sellCase("duplicates", { money = 1e9 })
 local goneIds = {}
 for _, entry in gone do
 	goneIds[entry.uid] = true
 end
 check("sellmany duplicates: the worse sofa and the worse chair sold (the sofa on show is the best of its item and stays)", n == 2 and goneIds[hs2] and goneIds[hch2] and stockOf(H)[hs] ~= nil and stockOf(H)[hch] ~= nil, n)
-check("… the client's uids and money ignored (the server takes only the filter)", stockOf(H)[hp] ~= nil and #sales == 1 and sales[1].delta == priceOf(gone), sales[1] and sales[1].delta)
+check("… exactly the pieces the confirm listed (its uids); the client's money ignored", stockOf(H)[hp] ~= nil and #sales == 1 and sales[1].delta == priceOf(gone), sales[1] and sales[1].delta)
 check("… one payment as CollectionSale (two items: no SKU), one sold message (2 pieces, its money), one state push", #sales == 1 and sales[1].reason == "CollectionSale" and sales[1].sku == nil
 	and #kinds(sent, "sold") == 1 and kinds(sent, "sold")[1].name == "2 pieces" and kinds(sent, "sold")[1].money == priceOf(gone) and kinds(sent, "sold")[1].count == 2 and #kinds(sent, "state") == 1 and count(heard, H, heardAt) == 1)
 check("… one CollectionSold (the money, the rarest: rare)", #eventsNamed("CollectionSold", eventsAt) == 1 and eventsNamed("CollectionSold", eventsAt)[1].value == priceOf(gone) and eventsNamed("CollectionSold", eventsAt)[1].a == "rare")
@@ -625,6 +636,77 @@ mark = #E.sent
 local moneyH = profileH.money
 bulk(H, { kind = "sellmany", filter = "common" })
 check("… again: nothing left to sell, refused with why, no money", E.received(H, "Notice", mark)[1] == "There's no Common piece in your stock to sell." and profileH.money == moneyH, E.received(H, "Notice", mark)[1])
+
+-- 8.4 review: SELL… sells only the pieces its confirm listed. The confirm said 2 Common radios; 2 more came home before
+-- the click: nothing is sold (never the 2 it did not show), the Notice says why, the state goes out again.
+do
+local r1 = Collection.add(H, { item = "radio", condition = 0.9 }) :: string
+local r2 = Collection.add(H, { item = "radio", condition = 0.7 }) :: string
+E.flush()
+local shown = listedFor(H, "common")
+local r3 = Collection.add(H, { item = "radio", condition = 0.6 }) :: string
+local r4 = Collection.add(H, { item = "radio", condition = 0.5 }) :: string
+E.flush()
+local salesAt = #money
+mark = #E.sent
+bulk(H, { kind = "sellmany", filter = "common", uids = shown })
+local why = E.received(H, "Notice", mark)[1]
+check("8.4 review: SELL… listed 2 Common pieces, 2 more came home before the click: nothing sold, the Notice says the stock changed, the state again", #shown == 2
+	and stockOf(H)[r1] and stockOf(H)[r2] and stockOf(H)[r3] and stockOf(H)[r4] and #moneyFrom(salesAt, "CollectionSale") == 0 and tostring(why):find("stock changed", 1, true) ~= nil
+	and #kinds(E.received(H, "Collection", mark), "state") == 1, why)
+n, gone = sellCase("common")
+check("… asked again (the 4 listed): exactly those 4 sold", n == 4 and stockOf(H)[r1] == nil and stockOf(H)[r4] == nil, n)
+-- DUPLICATES: a better copy came home, so the best one kept before is a duplicate now: never sold unlisted
+local twin: string? = nil
+local present: { [string]: boolean } = {}
+for _, entry in Collection.stock(H) do
+	present[entry.item] = true
+end
+for _, id in FurnitureLooks.Order do
+	local def = Rules.defOf(id)
+	if not twin and def and Rules.rarityOf(def) ~= "common" and Rules.valueOf({ item = id }) > 0 and not mine[id] and not present[id] then
+		twin = id
+	end
+end
+local k1 = Collection.add(H, { item = twin, condition = 0.8 }) :: string
+local k2 = Collection.add(H, { item = twin, condition = 0.5 }) :: string
+E.flush()
+shown = listedFor(H, "duplicates")
+local k3 = Collection.add(H, { item = twin, condition = 1 }) :: string
+E.flush()
+salesAt, mark = #money, #E.sent
+bulk(H, { kind = "sellmany", filter = "duplicates", uids = shown })
+check(`… DUPLICATES listed the worse {twin}; a better one came home (the kept best a duplicate now): nothing sold, the kept one too`, table.find(shown, k2) ~= nil
+	and table.find(shown, k1) == nil and stockOf(H)[k1] and stockOf(H)[k2] and stockOf(H)[k3] and #moneyFrom(salesAt, "CollectionSale") == 0
+	and tostring(E.received(H, "Notice", mark)[1]):find("stock changed", 1, true) ~= nil, E.received(H, "Notice", mark)[1])
+Collection.sell(H, k2) -- (the listed one sold alone: as many to sell as listed, but another piece)
+E.flush()
+salesAt, mark = #money, #E.sent
+bulk(H, { kind = "sellmany", filter = "duplicates", uids = shown })
+check("… as many pieces as it listed but another one: still nothing sold", stockOf(H)[k1] and stockOf(H)[k3] and #moneyFrom(salesAt, "CollectionSale") == 0
+	and tostring(E.received(H, "Notice", mark)[1]):find("stock changed", 1, true) ~= nil)
+local now = listedFor(H, "duplicates")
+n = sellCase("duplicates")
+check("… asked again: what it lists now sold (the worse one; the best kept)", n == #now and table.find(now, k1) ~= nil and stockOf(H)[k1] == nil and stockOf(H)[k3] ~= nil, n)
+-- the uids checked: a must, a list of uid strings, each once, MaxStock at most (nothing sold, no error)
+local k4 = Collection.add(H, { item = twin, condition = 0.4 }) :: string
+E.flush()
+local good = listedFor(H, "duplicates")
+local long: { string } = {}
+for index = 1, Config.Collection.MaxStock + 1 do
+	long[index] = if index == 1 then good[1] else `x-{index}`
+end
+local stockJunk = deepCopy(Collection.stock(H))
+salesAt, mark = #money, #E.sent
+for _, uids in { false, "x", 5, {}, { 5 }, { good[1], good[1] }, { [1] = good[1], [3] = "y" }, { a = good[1] }, { string.rep("u", 65) }, long, { good[1], "not-mine" }, { true } } do
+	bulk(H, { kind = "sellmany", filter = "duplicates", uids = uids })
+end
+bulk(H, { kind = "sellmany", filter = "duplicates" })
+check("… junk uids (none, not a list, numbers, twice, gaps, keys, too long, more than MaxStock, one too many): nothing sold, no error, refused each time", same(Collection.stock(H), stockJunk)
+	and #moneyFrom(salesAt, "CollectionSale") == 0 and #E.received(H, "Notice", mark) == 13 and stockOf(H)[k4] ~= nil, #E.received(H, "Notice", mark))
+n = sellCase("duplicates")
+check("… the right list: sold", n == #good and stockOf(H)[k4] == nil, n)
+end
 
 -- garbage on the new kinds
 local stockGarbage = deepCopy(Collection.stock(H))
@@ -747,12 +829,16 @@ do
 	E.advance(1.01)
 	mark2 = #E.sent
 	moneyK = (PlayerData.get(K) :: any).money
-	E.fire(K, "Collection", { kind = "sellmany", filter = "duplicates", expect = total + 5 })
+	local dupeUids = {}
+	for _, piece in dupes do
+		table.insert(dupeUids, piece.uid)
+	end
+	E.fire(K, "Collection", { kind = "sellmany", filter = "duplicates", uids = dupeUids, expect = total + 5 })
 	check("sellmany with another expected total: refused (\"The market moved…\"), nothing sold, the state again", #Collection.stock(K) == 4 and (PlayerData.get(K) :: any).money - moneyK < 1
 		and tostring(E.received(K, "Notice", mark2)[1]):find("market moved", 1, true) ~= nil and #kinds(E.received(K, "Collection", mark2), "state") == 1, E.received(K, "Notice", mark2)[1])
 	E.advance(1.01)
 	mark2 = #E.sent
-	E.fire(K, "Collection", { kind = "sellmany", filter = "duplicates", expect = total })
+	E.fire(K, "Collection", { kind = "sellmany", filter = "duplicates", uids = dupeUids, expect = total })
 	local soldMany = kinds(E.received(K, "Collection", mark2), "sold")[1]
 	demand = (Collection.market(K) :: any).demand[plainKind]
 	check("… at the total it showed: sold for exactly that; the demand 4 now", soldMany ~= nil and soldMany.money == total and soldMany.count == 2 and #Collection.stock(K) == 2 and demand.n == 4 and demand.sold == 4)

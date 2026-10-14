@@ -271,6 +271,48 @@ check("a store down for good: Tries tries, then it waits for the next save (each
 	and warned(`save failed ({S.Tries}/{S.Tries})`, wmark))
 E.storeFault = nil
 
+-- 8.4 review: a leave save in an outage (every try 3 s, the first FinalTries − 1 failing: 26 s) outlasts the old fixed
+-- 20 s wait; the rejoin keeps waiting while it runs, at most its worst case (Call s a try) and LeaveWait s more
+local backoffs = 0
+for try = 1, S.FinalTries - 1 do
+	backoffs += SaveGuard.backoff(try, S.Backoff)
+end
+E.saves.Player_215 = save83(500)
+local W = E.join(215, "Wes")
+PlayerData.addMoney(W, 77, "Admin")
+E.storeFault = failing("Player_215", S.FinalTries - 1)
+E.storeLatency = 3
+from = #E.storeCalls
+E.leave(W)
+local slow = S.FinalTries * 3 + backoffs
+local W2 = joinWaiting(215, "Wes", slow - 1)
+check(`a leave save slower than 20 s ({slow} s: FinalTries tries of 3 s, the backoffs): the rejoin still waits for it`, W2 == nil and Players_byId(215) == nil
+	and E.saves.Player_215.money == 500, Players_byId(215) and (PlayerData.get(Players_byId(215)) :: any).money)
+E.storeLatency = 0
+E.advance(1.5)
+W2 = Players_byId(215)
+check("… then reads what its last try wrote", W2 ~= nil and (PlayerData.get(W2) :: any).money == 577 and writesOf("Player_215", from) >= 2, W2 and (PlayerData.get(W2) :: any).money)
+E.storeFault = nil
+E.leave(W2)
+E.saves.Player_216 = save83(300)
+local Y = E.join(216, "Yan")
+PlayerData.addMoney(Y, 5, "Admin")
+local most = S.LeaveWait + S.FinalTries * S.Call + backoffs
+E.storeLatency = most + 30 -- (a store that never answers the leave save)
+E.leave(Y)
+E.storeLatency = 0
+local Y2 = joinWaiting(216, "Yan", most - 1)
+check(`a leave save that hangs: the rejoin waits up to the leave save's worst case and LeaveWait s more ({most} s)`, Y2 == nil and Players_byId(216) == nil)
+E.advance(1.5)
+Y2 = Players_byId(216)
+check("… then plays the save from before it", Y2 ~= nil and (PlayerData.get(Y2) :: any).money == 300)
+wmark = #E.warnings
+E.advance(31)
+local y2Money = (PlayerData.get(Y2) :: any).money -- (300 and what its stand earned meanwhile; the hung save holds 305)
+check("… the hung leave save, answered at last, never lands over the new session's save (refused: \"held by another server\")", warned("held by another server", wmark)
+	and E.saves.Player_216.money <= y2Money and y2Money < 305 and type(E.saves.Player_216.lock) == "table" and PlayerData.loaded(Y2), E.saves.Player_216.money)
+E.leave(Y2)
+
 -- ── Saves soon: purchases, milestones, pieces home ────────────────────────
 E.saves.Player_207 = save83(100000)
 local H = E.join(207, "Hal")
@@ -300,11 +342,11 @@ pastAutosave(S.Gap + 1)
 from = #E.storeCalls
 Book.admin(H, "fill")
 E.flush()
-check("the book filled: its milestones paid", ph.collectionBookPaid.found10 == true and ph.collectionBookPaid.collectibles == true)
+check("the book filled: its milestones paid", ph.collectionBookPaid.found10 == true and ph.collectionBookPaid.collectibles24 == true)
 E.advance(S.Soon + 0.1)
 saved = E.saves.Player_207
 check("… saved Soon s later (the milestones and their \"book:\" keys)", writesOf("Player_207", from) == 1 and saved.collectionBookPaid.found10 == true
-	and saved.rewards["book:found10"] == true and saved.rewards["book:collectibles"] == true)
+	and saved.rewards["book:found10"] == true and saved.rewards["book:collectibles24"] == true and saved.rewards["book:collectibles"] == true)
 
 pastAutosave(S.Gap + 1)
 from = #E.storeCalls
@@ -502,6 +544,41 @@ E.saves.Player_213 = { lock = { job = "another-server", at = 0 } } -- (a lock-on
 local N = E.join(213, "Ned")
 E.leave(N)
 check("a lock-only record: no key kept from it but its own (a new player's save)", E.saves.Player_213.money == Config.Sandbox.StartMoney and E.saves.Player_213.lock == nil)
+
+-- ── 8.4 review: through an older (8.2) server, the paint and the moves come back from `rewards` ───────────
+local paintSave = save83(2000)
+paintSave.vanPaint = { owned = { red = true, racing = true }, worn = { paint = "red", livery = "racing" } }
+paintSave.sandboxMovesKept, paintSave.sandboxMoves = true, 12
+E.saves.Player_217 = paintSave
+local T = E.join(217, "Tia")
+VanPaint.buy(T, "black") -- (bought and worn here: the red one stays owned)
+E.leave(T)
+local wrote217 = deepCopy(E.saves.Player_217)
+local r = wrote217.rewards or {}
+check("the save: the paint bought and worn in `rewards` too (\"paint:\", \"paintOn:\"; the stale worn one gone)", r["paint:red"] == true and r["paint:racing"] == true
+	and r["paint:black"] == true and r["paintOn:black"] == true and r["paintOn:racing"] == true and r["paintOn:red"] == nil)
+check("… and the moves, capped at the badges' count (\"mv:<n>\")", r[`mv:{Config.SandboxBadges.Moves}`] == true and r["mv:12"] == nil)
+local through = deepCopy(wrote217) -- an 8.2 server writes it again: the fields it does not know dropped, `rewards` kept
+for _, field in { "vanPaint", "vanPaintKept", "sandboxMoves", "sandboxMovesKept", "market", "marketKept" } do
+	through[field] = nil
+end
+E.saves.Player_217 = through
+local T2 = E.join(217, "Tia")
+local pt = PlayerData.get(T2) :: any
+check("back here: the paint rebuilt from `rewards` (owned and worn)", pt ~= nil and same(pt.vanPaint, { owned = { red = true, racing = true, black = true }, worn = { paint = "black", livery = "racing" } }))
+check("… the moves: the badges' count (tenMoves holds)", pt.sandboxMoves == Config.SandboxBadges.Moves)
+check("… the market's demand: lost, the empty one (not mirrored: a day's worth at most)", same(pt.market, Market.empty()))
+E.leave(T2)
+local again = E.saves.Player_217
+check("… written again with the flags, the same paint and the same keys", again.vanPaintKept == true and same(again.vanPaint, pt.vanPaint) and again.sandboxMovesKept == true
+	and again.sandboxMoves == Config.SandboxBadges.Moves and again.rewards["paint:black"] == true and again.rewards[`mv:{Config.SandboxBadges.Moves}`] == true)
+local fresh = E.join(218, "Uma") -- (a new player: nothing bought, no move yet: no key)
+E.leave(fresh)
+local none = true
+for key in E.saves.Player_218.rewards or {} do
+	none = none and string.sub(key, 1, 6) ~= "paint:" and string.sub(key, 1, 8) ~= "paintOn:" and string.sub(key, 1, 3) ~= "mv:"
+end
+check("a new player's save: no paint key, no \"mv:\" key", none)
 
 -- ── Size: the biggest realistic sandbox save ───────────────────────────────
 local O = E.join(214, "Oz")

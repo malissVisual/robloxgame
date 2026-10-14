@@ -361,7 +361,7 @@ check("the money follows the State remote: BUY $1,500 lights up, the subtitle sa
 -- a milestone paid: Collector gold opens
 press(named(window, "Tab_paint"))
 M.flush()
-remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "collectibles" } })
+remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "collectibles24" } })
 M.flush()
 window = named(gui, "VanPaint")
 press(swatch("gold"))
@@ -389,7 +389,7 @@ M.gamepad = true
 PaintUi.open()
 check("a gamepad: the selection lands on the swatch you wear", M.focus == swatch("red"), M.focus and M.focus.Name)
 M.focus = swatch("navy")
-remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white", "navy" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "collectibles" } })
+remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white", "navy" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "collectibles24" } })
 M.flush()
 check("… a redraw keeps it where it was (inside the window)", M.focus ~= nil and M.focus.Name == "Swatch_navy" and M.focus.Parent ~= nil)
 check("… the window keeps the selection inside (a selection group)", named(gui, "VanPaint").SelectionGroup == true)
