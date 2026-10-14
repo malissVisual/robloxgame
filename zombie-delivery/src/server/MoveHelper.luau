@@ -39,14 +39,25 @@
 --     check (helperCalled; no grip: the lift at once); its hit lifts it with him at its far end (joinLift: his hold
 --     starts where he stands). Lift again, G, STOP, walking away (callKept) or his fall end it.
 --   * Riding with you: while he is hired and you sit at the move's van's wheel he walks to its passenger door (Sprint,
---     from the house too: through its door; CallGain / CallBlink the last resort, a fade into the seat) and sits
---     (Seat:Sit: his body welded in, massless, Roblox's sit pose; never his hold, never Npcs.carried); the van may go
---     meanwhile, he gets in as soon as he reaches it. Nobody at the wheel and the van standing (at the house's curb, at
---     your plot), he gets out on his side and goes on with his list. The van wrecked or gone: out at once (8.3 review:
---     at that seat's door, where the van stands or stood: never in its shell). Its seat taken by a crew mate (8.3
---     review: or reserved by their boarding, its Reserved): he follows it on foot (by its back; parked far off, he
---     appears there as ever). 8.3 review: a crew mate's Ride along at his door: he gets out for them
---     (Vehicles.yieldSeat; SeatAside studs aside, out of their way) and takes no seat for SeatYield s.
+--     from the house too: through its door) and sits (Seat:Sit: his body welded in, massless, Roblox's sit pose; never
+--     his hold, never Npcs.carried). 8.5 (the owner: "when I got into the car, Danny got a bit stuck under the car and
+--     then appeared in the car already"): his spot at that door is RideStand studs out of the van's side, on the
+--     ground, clear of the cars (the old one, 1.5 studs out, lay within the pathfinding's reach of the hull: no path
+--     came, he walked straight at it, into the van, which his collision group passes through, and a stuck nudge put him
+--     on the ground under its body); his way there goes round the van (MoveHelperBrain.roundVan: RideMargin off its
+--     footprint, never through it). There he gets in as a player does (client/CarBoarding.luau's move, shared/
+--     Boarding.luau's curves, Config.Cargo's times; posed here in the van's own frame, every frame): the seat his (its
+--     Reserved), a step to the handle facing the van, its door swung open for everybody (Vehicles.swingDoor), the
+--     slide in through it, ducking; BoardSeconds later he sits and the door shuts. Called off (the van faster than
+--     BoardMaxSpeed, the seat taken, a zombie, you out of the seat, his death, the move's end): the door shut, he stands
+--     at his spot and goes on (after the van on foot). A fade into the seat only as the last resort (no closer for
+--     RideBlink s, RideFar studs to go). Nobody at the wheel and the van standing (at the house's curb, at your plot),
+--     he gets out the same way back (the door open, the slide out to his spot in AlightSeconds, the door shut) and goes
+--     on with his list. The van wrecked or gone: out at once (8.3 review: at that seat's door, where the van stands or
+--     stood: never in its shell). Its seat taken by a crew mate (8.3 review: or reserved by their boarding, its
+--     Reserved): he follows it on foot (by its back, round the van; parked far off, he appears there as ever). 8.3
+--     review: a crew mate's Ride along at his door: he gets out for them at once (Vehicles.yieldSeat; SeatAside studs
+--     aside, out of their way) and takes no seat for SeatYield s.
 --   * Carrying together: he moves WITH the piece: his own walk is off (Npcs.carried), constraints on his root
 --     (AlignPosition / AlignOrientation to an attachment at the piece's far end, turned to you) hold him there every
 --     physics step, on the floor under that end (stairs, steps: within HoldStep of you), through walls and door frames
@@ -89,7 +100,8 @@
 -- Performance: one helper per move, one loop for all of them, a path at most every Repath s (computed in the background,
 -- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), his list's room in the van
 -- worked out only when the load changes (every Think s); carrying together the physics engine moves him (the loop only
--- re-aims the far end's attachment and his top speed, a ray down a step); seated, the van carries him (nothing to do).
+-- re-aims the far end's attachment and his top speed, a ray down a step); seated, the van carries him (nothing to do);
+-- 8.5 getting in or out, his pose every frame for that half second only (RunService.Heartbeat, unhooked after).
 --   MoveHelper.sync(s, port)   Moving's tick: the move's crew (he comes or goes; a hirer who left ends the hire) and his
 --                              hands (Moving's helper hooks)
 --   MoveHelper.step(dt)        one step of every helper (his loop's; the runtime test calls it)
@@ -112,6 +124,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Boarding = require(Shared.Boarding) -- 8.5: getting in and out of the van as a player does (the curves)
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
@@ -180,6 +193,28 @@ export type Mover = {
 -- 8.3 a crew player's call: their two-person piece, since when, he is in place (their lift check open) since readyAt,
 -- his walk there (MoveHelperBrain.approach: the last resort's clock).
 type Call = { player: Player, spot: number, since: number, ready: boolean, readyAt: number, approach: Brain.Approach }
+
+-- 8.5 his move into the van's seat or out of it (a player's: client/CarBoarding.luau), in the van's own frame (a van
+-- that rolls a little carries it along): out or in, the seat, its van and door (index, side: -1 left, 1 right, the
+-- body's outer face there), a doorless climb; where his root starts, stands at the handle (in) and ends (the seat; out:
+-- his spot at the door), each with its heading (radians about Y, 0: the van's front); since when (os.clock), how long.
+type Board = {
+	out: boolean,
+	seat: Seat,
+	car: Vehicles.Car,
+	door: number?,
+	side: number,
+	outside: number,
+	climb: boolean,
+	from: Vector3,
+	fromYaw: number,
+	stand: Vector3,
+	standYaw: number,
+	to: Vector3,
+	toYaw: number,
+	at: number,
+	total: number,
+}
 
 type Helper = {
 	s: any, -- server/Moving.luau's Session (read here: move, site, origin, plan, items, truck, owner, members, ended, id)
@@ -261,6 +296,7 @@ type Helper = {
 	seatCar: Vehicles.Car?, -- 8.3 review: the van that seat is in (he gets out at its door, whatever became of it)
 	yieldAt: number, -- 8.3 review: he gave his seat up to a crew mate: no seat for him until then (os.clock)
 	rideWalk: Brain.Approach?, -- his walk to the van to ride (the last resort's clock)
+	board: Board?, -- 8.5 getting in or out of the van's seat now
 }
 
 local ID_BASE = -2000000000 -- (no player's id is this low; Studio's test players are -1, -2 …)
@@ -1038,18 +1074,46 @@ local function freeSeat(truck: Vehicles.Car): Seat?
 	return if index then seats[index] else nil
 end
 
--- Outside a seat's door (Vehicles' doors: its side, its place along the van), a step out of the van's side.
-local function seatDoor(truck: Vehicles.Car, seat: Seat): Vector3
+-- 8.3 review: a spot clear of every car's parts (workspace.Cars: the ground's ray never finds them, he would stand in
+-- one): on along `out`, 2 studs at a time, 3 times at most.
+local function outOfCars(at: Vector3, out: Vector3?): Vector3
+	local cars = workspace:FindFirstChild("Cars")
+	if not cars or not out or out.Magnitude < 0.05 then
+		return at
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { cars }
+	for _ = 1, 3 do
+		if #workspace:GetPartBoundsInBox(CFrame.new(at), Vector3.new(2, 8, 2), params) == 0 then
+			break
+		end
+		at += out.Unit * 2
+	end
+	return at
+end
+
+-- Outside a seat's door (Vehicles' doors: its side, its place along the van). 8.5 his spot there, where he gets in
+-- and out: RideStand studs out of the van's side (out of the RideMargin round the van he walks by; the old spot, 1.5
+-- studs out, lay within the pathfinding's reach of the hull: no path came and he walked straight at it, into the van),
+-- clear of the cars (outOfCars), at the van's middle's height (a ray finds the ground under it). Also the door's index
+-- (nil: none), its side (-1 left, 1 right) and its place along the van (z in the van's frame).
+local function seatDoor(truck: Vehicles.Car, seat: Seat): (Vector3, number?, number, number)
 	local doors = (truck :: any).doors
-	local index = seat:GetAttribute("Door")
+	local index: any = seat:GetAttribute("Door")
 	local door = if type(doors) == "table" and type(index) == "number" then doors[index] else nil
 	local size: Vector3 = (truck :: any).size or Vector3.new(6, 6, 12)
 	local frame = truck.chassis.CFrame
+	local side, z = 1, 0
 	if door then
-		return (frame * CFrame.new(door.side * (size.X / 2 + 1.5), 0, door.z)).Position
+		side, z = door.side, door.z
+	else
+		local rel = frame:PointToObjectSpace(seat.Position)
+		side, z = if rel.X < 0 then -1 else 1, rel.Z
 	end
-	local rel = frame:PointToObjectSpace(seat.Position)
-	return (frame * CFrame.new((if rel.X < 0 then -1 else 1) * (size.X / 2 + 1.5), 0, rel.Z)).Position
+	local at = (frame * CFrame.new(side * (size.X / 2 + cfg.RideStand), 0, z)).Position
+	local base = (frame * CFrame.new(0, 0, z)).Position
+	return outOfCars(at, Vector3.new(at.X - base.X, 0, at.Z - base.Z)), if door then index :: number else nil, side, z
 end
 
 -- Does the move's owner sit at the van's wheel (only the owner drives their van)?
@@ -1111,54 +1175,33 @@ local function sitTrack(body: Body): AnimationTrack?
 end
 
 -- Into the seat (of `truck`): his walk over, his body free (welded to the seat by Seat:Sit, massless: the van drives as
--- ever), the sit pose. Never his hold (he holds nothing), never Npcs.carried.
+-- ever), the sit pose. Never his hold (he holds nothing), never Npcs.carried. (8.5 put where a move in ends, a
+-- player's seated root: BoardSitLift over the seat's top.)
 local function sitIn(h: Helper, body: Body, seat: Seat, truck: Vehicles.Car)
 	Npcs.stop(body.model)
 	body.walking, body.ordered = false, nil
 	clearPath(h)
 	setMassless(body, true)
 	body.root.Anchored = false
-	body.model:PivotTo(seat.CFrame * CFrame.new(0, body.humanoid.HipHeight + body.root.Size.Y / 2, 0))
+	body.model:PivotTo(seat.CFrame * CFrame.new(0, seat.Size.Y / 2 + Config.Cargo.BoardSitLift, 0))
 	seat:Sit(body.humanoid)
 	h.seat, h.seatCar = seat, truck
 	h.stuckFor, h.lastPos, h.repathed, h.rideWalk = 0, nil, false, nil
 	local track = sitTrack(body)
-	if track then
+	if track and not track.IsPlaying then -- (8.5 on already: his move in bent his legs)
 		track:Play(0.15)
 	end
 	h.thinkAt = 0
 end
 
--- 8.3 review: a spot clear of every car's parts (workspace.Cars: the ground's ray never finds them, he would stand in
--- one): on along `out`, 2 studs at a time, 3 times at most.
-local function outOfCars(at: Vector3, out: Vector3?): Vector3
-	local cars = workspace:FindFirstChild("Cars")
-	if not cars or not out or out.Magnitude < 0.05 then
-		return at
-	end
-	local params = OverlapParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = { cars }
-	for _ = 1, 3 do
-		if #workspace:GetPartBoundsInBox(CFrame.new(at), Vector3.new(2, 8, 2), params) == 0 then
-			break
-		end
-		at += out.Unit * 2
-	end
-	return at
-end
-
--- Out of the seat: out at its door, standing on the ground. 8.3 review: always the door of the seat he sat in, of the
--- van he got into (h.seatCar; else `truck`): wrecked, ejected, on a repair lift, taken away, its door where the van
--- stands or stood (a seat or a van gone keeps its last place), never where he sits, in its shell; clear of the cars;
--- `aside` studs farther out (out of the way of whoever gets in there).
-local function unseat(h: Helper, body: Body, truck: Vehicles.Car?, aside: number?)
-	local seat = h.seat
-	local car = h.seatCar or truck
+-- 8.5 out of the seat, not on his feet yet: the sit pose going (over `fade` s), its weld gone (first: never anchored
+-- while welded to the van), his weights back. The seat he sat in and its van (nil: none).
+local function leaveSeat(h: Helper, body: Body, fade: number): (Seat?, Vehicles.Car?)
+	local seat, car = h.seat, h.seatCar
 	h.seat, h.seatCar = nil, nil
 	local track = body.sit
 	if track then
-		track:Stop(0.15)
+		track:Stop(fade)
 	end
 	if seat then
 		local weld = seat:FindFirstChild("SeatWeld")
@@ -1168,6 +1211,17 @@ local function unseat(h: Helper, body: Body, truck: Vehicles.Car?, aside: number
 	end
 	body.humanoid.Sit = false
 	setMassless(body, false)
+	return seat, car
+end
+
+-- Out of the seat at once (8.5: the van wrecked or gone, his death, the move's end, a crew mate's Ride along; else he
+-- gets out as a player does, boardOut): out at its door, standing on the ground. 8.3 review: always the door of the seat
+-- he sat in, of the van he got into (h.seatCar; else `truck`): wrecked, ejected, on a repair lift, taken away, its door
+-- where the van stands or stood (a seat or a van gone keeps its last place), never where he sits, in its shell; clear of
+-- the cars; `aside` studs farther out (out of the way of whoever gets in there).
+local function unseat(h: Helper, body: Body, truck: Vehicles.Car?, aside: number?)
+	local seat, seatCar = leaveSeat(h, body, 0.15)
+	local car = seatCar or truck
 	local at = body.root.Position
 	local face: Vector3? = nil
 	if car and seat then
@@ -1186,6 +1240,119 @@ local function unseat(h: Helper, body: Body, truck: Vehicles.Car?, aside: number
 	Npcs.stop(body.model) -- (stands again, anchored)
 	placeAt(h, at, face)
 	h.thinkAt = 0
+end
+
+-- ── 8.5 into the van and out of it like a player ─────────────────────────
+
+-- The next point of his way to `goal` by the van (outside): round it, never through it (MoveHelperBrain.roundVan in
+-- the van's own frame: RideMargin off its footprint); and the way's length in studs.
+local function roundVan(truck: Vehicles.Car, here: Vector3, goal: Vector3): (Vector3, number)
+	local frame = truck.chassis.CFrame
+	local size: Vector3 = (truck :: any).size or Vector3.new(6, 6, 12)
+	local a = frame:PointToObjectSpace(here)
+	local b = frame:PointToObjectSpace(goal)
+	local x, z, length = Brain.roundVan(a.X, a.Z, b.X, b.Z, size.X / 2, size.Z / 2, cfg.RideCorner)
+	local point = frame * Vector3.new(x, b.Y, z)
+	return Vector3.new(point.X, goal.Y, point.Z), length
+end
+
+-- A door's handle side (Vehicles' door attachment "Door{n}", where a player stands to get in: Config.Cargo.DoorStandOut
+-- out of the body; X in the van's frame) and whether the seat has no door panel (a climb in an arc).
+local function handleOf(truck: Vehicles.Car, index: number?, side: number): (number, boolean)
+	local size: Vector3 = (truck :: any).size or Vector3.new(6, 6, 12)
+	local spot = if index then truck.chassis:FindFirstChild(`Door{index}`) else nil
+	local doors = (truck :: any).doors
+	local door = if index and type(doors) == "table" then doors[index] else nil
+	local x = if spot and spot:IsA("Attachment") then spot.Position.X else side * (size.X / 2 + Config.Cargo.DoorStandOut)
+	return x, not (door and door.panel ~= nil)
+end
+
+-- His pose `clock` into his move (client/CarBoarding.luau's boardPose / alightPose, shared/Boarding.luau's curves): in,
+-- a step from where he stood to the handle (BoardStepSeconds, turning to the van), then the slide through the door to
+-- the seat (over the body's outer face there, ducking, turning to the front); out, the slide from the seat through the
+-- door to his spot (AlightSeconds), turning away from the van. His root in the van's own frame (anchored: his body
+-- follows it).
+local function poseBoard(h: Helper, body: Body, clock: number)
+	local b = h.board
+	if not b or not b.car.chassis.Parent then
+		return
+	end
+	local t = math.clamp(clock - b.at, 0, b.total)
+	local a, c, ya, yc = b.stand, b.to, b.standYaw, b.toYaw
+	local u, duck = 0, 0
+	local arc = true
+	if b.out then
+		a, ya = b.from, b.fromYaw
+		u = Boarding.ease(t / math.max(1e-3, b.total))
+	else
+		local phase, k = Boarding.boardPhase(t)
+		u = k
+		if phase == "step" then
+			a, c, ya, yc, arc = b.from, b.stand, b.fromYaw, b.standYaw, false
+		end
+	end
+	local position = a + (c - a) * u
+	if arc then
+		local mx, my, mz = Boarding.through(b.side, b.outside, a.Y, if b.out then c.Z else a.Z, c.Y, b.climb)
+		position = Vector3.new(Boarding.bezier(a.X, mx, c.X, u), Boarding.bezier(a.Y, my, c.Y, u), Boarding.bezier(a.Z, mz, c.Z, u))
+		duck = Boarding.duck(u)
+	end
+	local yaw = ya + ((yc - ya + math.pi) % (2 * math.pi) - math.pi) * u
+	body.root.CFrame = b.car.chassis.CFrame * CFrame.new(position) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(-duck, 0, 0)
+end
+
+-- His pose every frame while he gets in or out (the loop's steps are Tick apart: half a second's slide would jump), the
+-- hook gone again once nobody does.
+local boardHook: RBXScriptConnection? = nil
+local function boardFrames()
+	local busy = false
+	for _, h in helpers do
+		if h.board then
+			busy = true
+			break
+		end
+	end
+	if busy and not boardHook then
+		boardHook = game:GetService("RunService").Heartbeat:Connect(function()
+			local clock = os.clock()
+			for _, h in helpers do
+				local body = h.body
+				if h.board and body then
+					pcall(poseBoard :: any, h, body, clock)
+				end
+			end
+		end)
+	elseif not busy and boardHook then
+		boardHook:Disconnect()
+		boardHook = nil
+	end
+end
+
+-- His move in or out over: the seat no longer his (its Reserved). `place` (called off, or out at its end): on his feet
+-- at his spot at the door, facing away from the van; a move in called off shuts its door from now (Vehicles.swingDoor;
+-- not when a player's boarding took the seat: theirs uses the door now).
+local function boardEnd(h: Helper, body: Body?, place: boolean)
+	local b = h.board
+	if not b then
+		return
+	end
+	h.board = nil
+	local seat = b.seat
+	local holder = seat:GetAttribute("Reserved")
+	if holder == h.id then
+		seat:SetAttribute("Reserved", nil)
+	end
+	local door = b.door
+	if place and door and not b.out and (holder == nil or holder == h.id) then
+		Vehicles.swingDoor(b.car, door, nil, workspace:GetServerTimeNow())
+	end
+	boardFrames()
+	if place and body then
+		local at = seatDoor(b.car, seat)
+		local base = b.car.chassis.Position
+		placeAt(h, at, Vector3.new(at.X - base.X, 0, at.Z - base.Z))
+		h.thinkAt = 0
+	end
 end
 
 local function spawnBody(h: Helper, at: Vector3): boolean
@@ -1230,6 +1397,7 @@ local function removeBody(h: Helper)
 		hook:Disconnect()
 	end
 	table.clear(h.hooks)
+	boardEnd(h, nil, false) -- (8.5 his move in or out with him: the seat free again)
 	local body = h.body
 	local seat = h.seat
 	h.seat, h.seatCar = nil, nil
@@ -1263,6 +1431,7 @@ end
 local function fall(h: Helper, body: Body, clock: number)
 	endCall(h, "down", clock) -- 8.3
 	endNeeds(h)
+	boardEnd(h, body, true) -- (8.5 halfway in or out of the van: at his spot at its door first)
 	if h.seat then
 		unseat(h, body, nil) -- (8.3 out of the van's seat first)
 	end
@@ -2025,9 +2194,134 @@ local function actWait(h: Helper, body: Body, dt: number, clock: number)
 	go(h, body, clearOf(h, spot :: Vector3, false), false, 1.5, speed, dt, clock)
 end
 
--- 8.3 you sit at the van's wheel: to its passenger door and in (a fade into the seat only as the last resort); the
--- seat taken by a crew mate (8.3 review: or reserved by their boarding; or he gave it up to them SeatYield s ago at
--- most): after the van on foot (by its back; parked far off, he appears there as ever).
+-- 8.5 (the owner: "I'd like that fine-tuned so he gets in normally") at his spot by the passenger door: into the
+-- seat as a player gets in (client/CarBoarding.luau's move, Vehicles' startBoarding): the seat his (its Reserved: his
+-- id; a crew mate's boarding that takes it calls his off), its door swung open as his hand would reach the handle and
+-- shut as he sits (Vehicles.swingDoor: every client swings it), his root posed from where he stands (poseBoard: every
+-- frame, boardFrames, and every step), the sit pose coming on over the slide; BoardSeconds later he sits (boardStep).
+local function boardIn(h: Helper, body: Body, seat: Seat, truck: Vehicles.Car, clock: number)
+	local cargo = Config.Cargo
+	local frame = truck.chassis.CFrame
+	local _, index, side, z = seatDoor(truck, seat)
+	local handleX, climb = handleOf(truck, index, side)
+	local handle = frame * Vector3.new(handleX, 0, z)
+	local stand = frame:PointToObjectSpace(Vector3.new(handle.X, groundAt(handle.X, handle.Z, frame.Position.Y) + body.humanoid.HipHeight + body.root.Size.Y / 2, handle.Z))
+	local here = frame:ToObjectSpace(body.root.CFrame)
+	local seated = frame:ToObjectSpace(seat.CFrame * CFrame.new(0, seat.Size.Y / 2 + cargo.BoardSitLift, 0))
+	mover.halt(body)
+	Npcs.stop(body.model) -- (anchored: the move puts him; the van's parts never stop him, his group passes through them)
+	clearPath(h)
+	h.stuckFor, h.lastPos, h.repathed = 0, nil, false
+	seat:SetAttribute("Reserved", h.id)
+	local now = workspace:GetServerTimeNow()
+	if index then
+		Vehicles.swingDoor(truck, index, now + cargo.BoardStepSeconds * 0.7, now + cargo.BoardSeconds)
+	end
+	h.board = {
+		out = false,
+		seat = seat,
+		car = truck,
+		door = index,
+		side = side,
+		outside = math.max(0, math.abs(handleX) - cargo.DoorStandOut),
+		climb = climb,
+		from = here.Position,
+		fromYaw = math.atan2(-here.LookVector.X, -here.LookVector.Z),
+		stand = stand,
+		standYaw = side * math.pi / 2, -- (facing the van)
+		to = seated.Position,
+		toYaw = math.atan2(-seated.LookVector.X, -seated.LookVector.Z),
+		at = clock,
+		total = cargo.BoardSeconds,
+	}
+	local track = sitTrack(body)
+	if track then
+		track:Play(cargo.BoardSeconds) -- (his legs bend as he slides in)
+	end
+	poseBoard(h, body, clock)
+	boardFrames()
+end
+
+-- 8.5 out of the seat as a player gets out (client/CarBoarding.luau's alightPose, Vehicles' watchSeat): out of it
+-- (leaveSeat), its door open from now and shut AlightSeconds later, the slide out through it to his spot at the door,
+-- turning away from the van (poseBoard); at its end on his feet there (boardStep).
+local function boardOut(h: Helper, body: Body, truck: Vehicles.Car, clock: number)
+	local cargo = Config.Cargo
+	local seat = h.seat
+	if not seat then
+		return
+	end
+	local frame = truck.chassis.CFrame
+	local at, index, side = seatDoor(truck, seat)
+	local handleX, climb = handleOf(truck, index, side)
+	leaveSeat(h, body, cargo.AlightSeconds)
+	Npcs.stop(body.model) -- (anchored, never while welded in: the move puts him)
+	clearPath(h)
+	local here = frame:ToObjectSpace(body.root.CFrame)
+	local spot = frame:PointToObjectSpace(Vector3.new(at.X, groundAt(at.X, at.Z, frame.Position.Y) + body.humanoid.HipHeight + body.root.Size.Y / 2, at.Z))
+	local now = workspace:GetServerTimeNow()
+	if index then
+		Vehicles.swingDoor(truck, index, now, now + cargo.AlightSeconds + 0.05)
+	end
+	h.board = {
+		out = true,
+		seat = seat,
+		car = truck,
+		door = index,
+		side = side,
+		outside = math.max(0, math.abs(handleX) - cargo.DoorStandOut),
+		climb = climb,
+		from = here.Position,
+		fromYaw = math.atan2(-here.LookVector.X, -here.LookVector.Z),
+		stand = spot,
+		standYaw = 0,
+		to = spot,
+		toYaw = math.atan2(-spot.X, -spot.Z), -- (away from the van's middle, as he stands there after: boardEnd)
+		at = clock,
+		total = cargo.AlightSeconds,
+	}
+	poseBoard(h, body, clock)
+	boardFrames()
+end
+
+-- 8.5 one step of his move in or out. Called off when something is wrong (in: the van not the move's any more or
+-- gone, faster than BoardMaxSpeed, the seat gone, taken or reserved by somebody else's boarding, something else for
+-- him to do now (`action`: you out of the seat, a zombie, a call); out: the van gone or wrecked, faster than
+-- AlightSlideMaxSpeed): on his feet at his spot by the door (in: its door shut; after the van on foot). Its time over:
+-- in, he sits (sitIn; the door shuts as he does), out, he stands at his spot. Nothing else for him in its steps, nor
+-- in the step it ends (he sits, or stands at his spot).
+local function boardStep(h: Helper, body: Body, action: string, clock: number)
+	local b = h.board
+	if not b then
+		return
+	end
+	local car, seat = b.car, b.seat
+	local fine = truckOf(h.s) == car and car.chassis.Parent ~= nil
+	if b.out then
+		fine = fine and Vehicles.speed(car) <= Config.Cargo.AlightSlideMaxSpeed
+	else
+		fine = fine and action == "ride" and seat.Parent ~= nil and seat:IsDescendantOf(car.model) and seat.Occupant == nil
+			and seat:GetAttribute("Reserved") == h.id and Vehicles.speed(car) <= Config.Cargo.BoardMaxSpeed
+	end
+	if not fine then
+		boardEnd(h, body, true)
+		return
+	end
+	poseBoard(h, body, clock)
+	if clock - b.at < b.total then
+		return
+	end
+	boardEnd(h, body, b.out)
+	if not b.out then
+		sitIn(h, body, seat, car)
+	end
+end
+
+-- 8.3 you sit at the van's wheel: to its passenger door and in; the seat taken by a crew mate (8.3 review: or reserved
+-- by their boarding; or he gave it up to them SeatYield s ago at most): after the van on foot (by its back; parked far
+-- off, he appears there as ever). 8.5 outside, his way goes round the van (roundVan); at his spot (RideReach) and the
+-- van standing (BoardMaxSpeed) he gets in as a player does (boardIn); a fade into the seat only as the last resort
+-- (MoveHelperBrain.rideBlink: RideFar studs to go, or no closer for RideBlink s).
 local function actRide(h: Helper, body: Body, dt: number, clock: number)
 	local truck = truckOf(h.s)
 	if not truck then
@@ -2039,41 +2333,52 @@ local function actRide(h: Helper, body: Body, dt: number, clock: number)
 	end
 	local speed = Brain.speed(walkSpeed(), "ride", nil, 0)
 	local seat = if clock >= h.yieldAt then freeSeat(truck) else nil
+	local here = body.root.Position
+	local hereInside = insideAt(h, here)
 	if not seat then
-		local spot = byTruck(truck, -4, 3) or truck.chassis.Position
-		go(h, body, clearOf(h, spot, false), false, 1.5, speed, dt, clock, not truckStill(truck))
+		local spot = clearOf(h, byTruck(truck, -4, 3) or truck.chassis.Position, false)
+		local way = if hereInside then spot else (roundVan(truck, here, spot))
+		go(h, body, way, false, if flat(way, spot) < 0.05 then 1.5 else 0.5, speed, dt, clock, not truckStill(truck)) -- (a corner: on round it)
 		return
 	end
 	local at = seatDoor(truck, seat)
-	local here = body.root.Position
-	local hereInside = insideAt(h, here)
-	if not hereInside and flat(here, at) <= cfg.RideReach then
-		sitIn(h, body, seat, truck)
+	if not hereInside and flat(here, at) <= cfg.RideReach and Vehicles.speed(truck) <= Config.Cargo.BoardMaxSpeed then
+		boardIn(h, body, seat, truck, clock)
 		return
 	end
 	local walkTo = h.rideWalk or Brain.newApproach()
 	h.rideWalk = walkTo
-	local cost = (Brain.routeVia(hereInside, here.X, here.Z, false, at.X, at.Z, h.wayDoors))
-	if Brain.approach(walkTo, cost, dt) then
-		sitIn(h, body, seat, truck) -- (the last resort: his path fails, the van drove off: he fades into the seat)
+	local way, cost = at, 0
+	if hereInside then
+		cost = (Brain.routeVia(true, here.X, here.Z, false, at.X, at.Z, h.wayDoors))
+	else
+		way, cost = roundVan(truck, here, at)
+	end
+	if Brain.rideBlink(walkTo, cost, dt) then
+		sitIn(h, body, seat, truck) -- (the last resort: the van far off, or his way blocked a long while: he fades in)
 		local appear = mover.appear
 		if appear then
 			appear(body)
 		end
 		return
 	end
-	go(h, body, at, false, 0.5, speed, dt, clock, true)
+	go(h, body, way, false, 0.5, speed, dt, clock, true)
 end
 
--- 8.3 in the van's seat: out when nobody drives it and it stands (on his side, on with his list), at once when it is
--- wrecked or gone (8.3 review: at its seat's door all the same, unseat's h.seatCar); else the van carries him.
+-- 8.3 in the van's seat: out when nobody drives it and it stands (on his side, on with his list; 8.5 the way a
+-- player gets out, boardOut), at once when it is wrecked or gone (8.3 review: at its seat's door all the same,
+-- unseat's h.seatCar); else the van carries him.
 local function actSeat(h: Helper, body: Body, clock: number)
 	local s = h.s
 	local truck = truckOf(s)
 	local seat = h.seat
 	local carOk = truck ~= nil and seat ~= nil and seat.Parent ~= nil and seat:IsDescendantOf(truck.model) and body.humanoid.SeatPart == seat
 	if Brain.getOut(driven(s, truck), truck == nil or truckStill(truck), carOk) then
-		unseat(h, body, if carOk then truck else nil)
+		if carOk and truck then
+			boardOut(h, body, truck, clock)
+		else
+			unseat(h, body, nil)
+		end
 		if h.hirer and #h.queue > 0 then
 			say(h, "out", clock)
 		end
@@ -2166,6 +2471,15 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	if action ~= "flee" then
 		h.fleeAt = nil
 	end
+	local board = h.board
+	if board then
+		-- 8.5 getting in or out of the van (or just in the seat, or just on his feet by its door): nothing else this step
+		boardStep(h, body, action, clock)
+		local doing = if h.seat then "seat" elseif board.out then "alight" else "ride"
+		h.action, h.spot = if doing == "ride" then "ride" else "seat", nil
+		setDoing(h, doing, nil)
+		return
+	end
 	if action == "hold" and spot then
 		actHold(h, body, spot, dt, clock)
 	elseif action == "seat" then
@@ -2205,7 +2519,8 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	end
 	-- (8.3 your call: lifted together in this step already, or him in place)
 	local now = h.call
-	local doing = if action == "come" and nowRole == "helper" then "hold" elseif action == "come" and now and now.ready then "ready" else action
+	local doing = if action == "come" and nowRole == "helper" then "hold" elseif action == "come" and now and now.ready then "ready"
+		elseif action == "seat" and h.board then "alight" else action -- (8.5 his way out begun: boardOut)
 	h.action, h.spot = if doing == "hold" then "hold" else action, target or spot
 	setDoing(h, doing, target or spot)
 end
@@ -2683,6 +2998,7 @@ local function create(s: any, port: Port): Helper
 		seatCar = nil,
 		yieldAt = 0,
 		rideWalk = nil,
+		board = nil,
 	}
 	helpers[s] = h
 	byId[id] = h
