@@ -80,6 +80,10 @@ Dům Marge na adrese 155 Willow Ln (nejbližší dům u depa v Suburbs) dostane 
 do Roblox Studia. Udělat to musíš ty: Roblox zobrazí 3D model jen tehdy, když je nahraný pod tvým účtem, a k tvému
 účtu se nepřihlásím. Do té doby má dům starý vzhled z kostiček.
 
+**Od verze 8.1 i v testovacím světě (SANDBOX):** jediný dům k vystěhování, **The Old Chalet**, má teď přesně rozměry
+domu Marge, takže na něj stejný model sedí. Dveře, cesta od auta i místo „Enter house“ zůstaly, kde byly. Bez
+importu tam stojí dřevěná chata jako dřív, jen menší (na stejné krabici).
+
 Jednou ve Studiu (s hrou otevřenou jako obvykle):
 1. *File → Import 3D* (nebo karta *Home → Import 3D*) a vyber `design/blender-house/roblox/ZDCHouseArt.fbx`.
 2. Nastavení nech, jak je, a dej **Insert / Import**. Ve Workspace se objeví model `ZDCHouseArt`. Může zůstat, kde
@@ -87,7 +91,8 @@ Jednou ve Studiu (s hrou otevřenou jako obvykle):
 3. Ulož místo (*File → Save*) a *File → Publish to Roblox*, ať ho má i hra na Robloxu.
 
 Vyzkoušení: dej **Play**, zmáčkni **P** (admin panel) → záložka **EVENTS** → sjeď dolů na **Moves** → **MOVE: GO
-TO THE HOUSE**. Hra tě přenese přede dveře domu Marge.
+TO THE HOUSE**. Hra tě přenese přede dveře domu Marge. V sandboxu (výchozí nastavení): **P** → záložka **SANDBOX** →
+**📍 TO HOUSE**. Stojíš přede dveřmi The Old Chalet.
 
 Když dům v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + S) a spusť skript. Pak ve Studiu smaž starý
 `ZDCHouseArt` a naimportuj nový `roblox/ZDCHouseArt.fbx` (krok 1 až 3).
@@ -100,8 +105,11 @@ Když dům v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + 
   `mark_box` velikost domu, pro který je model udělaný. Proto na nastavení importu nezáleží.
 - Původní dům z kostiček (`src/server/World.luau`) ve hře zůstává, jen je neviditelný. Pořád do něj narážíš, takže
   kolize jsou stejné jako dřív. Zdi modelu stojí přesně na jeho stěnách a střecha ho celý přikryje.
-- Vzhled z Blenderu má zatím jen dům Marge (`HouseMesh.Homes`). Ostatní domy v Suburbs mají jiné rozměry. Kdybys chtěl
-  takhle i další domy, řekni Claudovi.
+- Vzhled z Blenderu má dům Marge a v sandboxu The Old Chalet (`HouseMesh.Homes`). Ostatní domy v Suburbs mají jiné
+  rozměry. Kdybys chtěl takhle i další domy, řekni Claudovi.
+- V sandboxu má chata pod modelem i svou neviditelnou střechu otočenou podle střechy z Blenderu (hřeben zleva doprava,
+  sklon `PITCH`). Když v `house.py` změníš `PITCH`, řekni Claudovi: musí ho přepsat i v `SandboxScenery.Chalet.Pitch`
+  (kontrola `check.py` to pozná).
 
 ## Bez Blenderu (pro AI pomocníky)
 `pip install bpy` (Python 3.13) a z této složky:
