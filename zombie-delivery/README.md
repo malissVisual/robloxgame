@@ -1617,6 +1617,30 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
+## The sandbox's house in the owner's Blender model (8.0.5)
+
+The owner: "předělej ten dům na chatu v sandboxu" (make the European house the sandbox's chalet). `design/blender-house/house.py` now has a `TARGET`:
+- `"sandbox"` (the export now): The Old Chalet's box (SandboxMap.House.house 44 × 34, SandboxScenery.Chalet.Walls 14.5), its roof under the box's height of 26 (the steepest pitch that fits: 31°);
+- `"city"`: Marge's 155 Willow Ln, as in 7.2.
+
+The house is the same classic European house, with these sandbox changes:
+- six windows a floor at the front and the back, four on each gable side, two attic windows;
+- three dormers, two chimneys on the back slope;
+- planters under the ground-floor windows too (nothing hangs on the sandbox's front wall);
+- coarser tiles, flowers and frames for the bigger house: 21 pieces, about 65,000 triangles.
+
+`server/SandboxWorld.luau`'s house() hands its finished chalet to `server/HouseMesh.luau` (`Homes.sandbox_house`), if
+the module is in the place. The chalet's own parts stay, unseen: its House box still collides and its FrontDoor (SandboxDoor) still holds the "Enter house". Since 8.0.5 HouseMesh also stops whatever a house has over its walls from colliding (the chalet's gable wedges would stand through the model's roof; in the city the same for the roof's wedges).
+
+`tools/house-art/check.py` reads the export's `"target"`. For the sandbox it builds the chalet as SandboxWorld does (its source lines are checked), with its garden (the four flower boxes, the gate, the mailbox), the greeter (Config.MoveGreeters.Porch) and the Enter house box, and checks that:
+- every piece is in place;
+- the House box and the FrontDoor are kept, and nothing over the walls collides;
+- the walls stand on the box and the roof stays under SandboxMap.House.house's height;
+- nothing of the model touches the garden things, the greeter or the door;
+- Marge's city house (another size) and an unlisted house stay unchanged.
+
+A city export (`TARGET = "city"`) passes its 7.2 checks, given as a second argument.
+
 ## The warehouse's five levels in Blender (8.0.4, design only)
 
 The owner: "a model of my own warehouse … levels 1 to 5, each bigger, starting as a garage". The game has no warehouse

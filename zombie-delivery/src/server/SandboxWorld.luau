@@ -14,6 +14,7 @@
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
 --             server/Moving.luau puts its "Enter house" prompt there) at House.door; the path from the curb to it, the
 --             garden's fence and gate (THE OLD CHALET over it), the mailbox, the flower boxes (all decoration)
+--             8.0.5: dressed in the owner's Blender house once ZDCHouseArt is imported (server/HouseMesh.luau)
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -313,6 +314,12 @@ local function house(world: Instance): Model
 	for n, spot in { { gx - 10.5, gz + 2.2 }, { gx + 10.5, gz + 2.2 }, { gx - 5.8, door.z - 2.4 }, { gx + 5.8, door.z - 2.4 } } do
 		deco(block(garden, "FlowerBox", Vector3.new(2.8, 1, 1.2), CFrame.new(spot[1], 0.5, spot[2]), Color3.fromRGB(132, 92, 58), Enum.Material.WoodPlanks))
 		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
+	end
+	-- 8.0.5: the owner's Blender house (server/HouseMesh.luau) over the chalet, once ZDCHouseArt is imported: the
+	-- chalet's own parts stay, unseen (its body still collides, its FrontDoor still holds the "Enter house")
+	local mesh = if script then script.Parent:FindFirstChild("HouseMesh") else nil
+	if mesh and mesh:IsA("ModuleScript") then
+		(require(mesh) :: any).dress(model, H.id)
 	end
 	model.Parent = world
 	return model
