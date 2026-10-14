@@ -8,7 +8,8 @@
 -- the test's: the modules' own loops run (the moves' tick, the doors, Danny, the lobby, the payouts, the tasks, the
 -- autosave).
 --   0. The real boot (SandboxBoot.start): the map, the services, the plots, the warehouses, the moves; no Baseplate.
---   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states.
+--   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states; 8.3: their
+--      warehouses are garages (level 1: 2 stands).
 --   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
 --   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
 --      Danny for each (told to wait at the van). Bob at Ann's kiosk gets only his own card.
@@ -23,12 +24,15 @@
 --   8. The warehouse: Display opens the picker, the client's display, the stand's model and tag; a move to another
 --      stand, Take down; the refusals (a stand you haven't got, junk, a taken stand, another player's piece).
 --   9. 60 s on the clock: the income (CollectionIncome). The player list's $ / $/min / collection, the TOP MOVERS board.
---  10. UPGRADES: without the money refused; More stands (14), the new stand 13 shows a piece; Showroom lights (× 1.1).
+--  10. UPGRADES: More stands locked in the garage, the ZDC Warehouse without the money refused; 8.3: the warehouse
+--      bought to the Big Warehouse (each level a rebuild, her pieces kept on their stands, the new desk's prompt); More
+--      stands (14), the new stand 13 shows a piece; Showroom lights (× 1.1).
 --  11. Sell at the stand (hold F); the bulk buttons: TAKE ALL DOWN, SELL… (duplicates; nothing else to sell), FILL BEST.
 --  12. FINISH: the result card says what came home; the daily tasks counted the trips, the sales and the income (a done
 --      one claimed); the analytics' funnel steps fired once each, the moves' events.
 --  13. Ann leaves and comes back: the collection on its stands, the upgrades, the book, the tasks, every dollar; the
---      engine on her van and on one CAR brings later; Danny's training.
+--      engine on her van and on one CAR brings later; Danny's training; 8.3: her warehouse level kept, then the
+--      Logistics Center (level 5) with every piece still on its stand.
 --  14. Bob cannot use Ann's stands or desk; her kiosk opens only his own move.
 --  15. A full server: the fifth player waits for a plot, gets Bob's when he leaves.
 --  16. A full warehouse at a trip.
