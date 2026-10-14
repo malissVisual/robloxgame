@@ -5611,6 +5611,7 @@ Config.Robust = {
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
 		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
+		MoveHelper = 4, -- 8.3: Danny's orders and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 	},
 }
 
@@ -6557,7 +6558,8 @@ Config.MoveStory = {
 --   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpRetry: s before he tries
 --                      a lift again whose take failed
 --   BlinkFar / HelpBlink   your lift farther than BlinkFar studs on foot, his path failing, or not there HelpBlink s after
---                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it
+--                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it (8.3:
+--                      only with WaitForHelper false; with it he walks, CallGain / CallBlink the last resort)
 --   Standoff / HoldStep   his root stands Standoff studs past your piece's far face, turned to you, on the floor there
 --                      within HoldStep studs of your root's height (stairs, steps)
 --   HoldResponse       the Responsiveness of the constraints that keep him there (AlignPosition / AlignOrientation on
@@ -6599,7 +6601,27 @@ Config.MoveStory = {
 --                      past its edge, Off at least from the wall
 --   TruckFar           studs from the house: a van farther away is driving off (he waits at the house's door)
 --   TalkGap / TalkRepeat   s at least between two lines / before the same line again
---   Follow / Orders    studs behind you on "Help me"; the orders (the Moving remote's "helper") a player may send a second
+--   Follow             studs behind you on "Help me" (8.3: his orders' rate limit is Config.Robust.Limits.MoveHelper)
+--   8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes; I'd like to
+--   click on him any time and tell him what to do, or an auto mode where he carries only light things and calls for
+--   help with a heavy one"; shared/MoveHelperBrain.luau's order, pickAsk, inPlace, approach, callKept; server/
+--   MoveHelper.luau's call and ask; client/MoveHelperCard.luau, his command card):
+--   WaitForHelper      Danny on the move (his body up, his hands not on another piece): a two-person Lift calls him
+--                      ("Danny, give me a hand!"), you wait at your end while he walks to its other end, and its lift
+--                      check opens once he is there (false: today's rules, you drag it alone and he comes to it)
+--   CallReady / CallClose / CallStuck   in place for your call: within CallReady studs of his place at its far end, or
+--                      within CallClose and blocked CallStuck s (the hold walks him the rest: no snap)
+--   CallGain / CallBlink   his walk to your call (or your dragged piece): no closer by CallGain studs for CallBlink s,
+--                      the last resort, he fades over (a door's own walk-through is not a fade-over)
+--   CallLeave / CallIdle   your call ends when you walk CallLeave studs past the Lift's reach, or he stood ready
+--                      CallIdle s and you never lifted (Lift again, G or the STOP button end it too)
+--   LightWeight        AUTO: the two-hands pieces under this weight he carries alone (a pair piece, or a two-hands one
+--                      this heavy or heavier, is one he asks a hand for)
+--   AskFar / AskWait   AUTO: a heavy piece within AskFar studs (on foot) that nobody handles: he goes to it, says "give
+--                      me a hand!" (the crew's toast, a 🙋 marker over it) and waits AskWait s for somebody to lift it
+--   AskAgain / AskGap  s before he asks again after nobody came / after somebody came (no nagging)
+--   CardReach / ClickReach / TapSlop   the client's: his command card closes when you are CardReach studs from him;
+--                      a click or tap reaches him from ClickReach studs, TapSlop studs beside his body counts
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -6658,7 +6680,23 @@ Config.MoveHelper = {
 	TalkGap = 3,
 	TalkRepeat = 12,
 	Follow = 5,
-	Orders = 4,
+	-- 8.3 Danny's orders
+	WaitForHelper = true,
+	CallReady = 3,
+	CallClose = 6,
+	CallStuck = 1.5,
+	CallGain = 1,
+	CallBlink = 15,
+	CallLeave = 4,
+	CallIdle = 25,
+	LightWeight = 5,
+	AskFar = 140,
+	AskWait = 20,
+	AskAgain = 45,
+	AskGap = 6,
+	CardReach = 40,
+	ClickReach = 90,
+	TapSlop = 2.5,
 }
 
 -- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the

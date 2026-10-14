@@ -21,6 +21,7 @@
 -- the doorway inside, no ping-pong (shut until you left the zone you came out in and Rearm s went by, whichever later),
 -- in and out with a piece in your hands, a pair piece's back end does not lead (said once), its front end takes it along;
 -- the doormats (▲ IN outside while a move uses the house, ▲ OUT inside).
+-- 8.3 Danny's orders: a crew of players has no Danny, so a two-person Lift is today's (dragged alone, Help lift).
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -385,6 +386,8 @@ E.place(bob, sofaRoot.Position + V3(0, 0, -3))
 trigger(lift, bob)
 local bobBody = bob.Character
 check("alone: dragged at 0.35", bobBody:GetAttribute("MoveCarry") == 3 and math.abs((bobBody:GetAttribute("CarrySpeed") or 0) - 14 * 0.35) < 1e-6)
+check("8.3 a crew of players (no Danny on the move): today's rules, no call, nobody waits (Config.MoveHelper.WaitForHelper on)",
+	Config.MoveHelper.WaitForHelper == true and bob:GetAttribute("MoveHelperCall") == nil and lift.ActionText == "Lift")
 local help = promptIn(sofa, "Help lift")
 check("Help lift shows for the others, not the carrier", help ~= nil and help.Enabled and help:GetAttribute("MoveSkip") == 22)
 trigger(help, bob)
