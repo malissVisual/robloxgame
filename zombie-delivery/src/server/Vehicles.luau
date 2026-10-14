@@ -3580,6 +3580,25 @@ local function swingDoor(car: Car, index: number, openAt: number, closeAt: numbe
 	end
 end
 
+-- 8.5: a cabin door swung for a body the server moves itself (Danny getting in and out of the van: server/
+-- MoveHelper.luau, as a player's own client moves theirs): open from `openAt` to `closeAt` (server times, shared with
+-- whoever else uses that door: swingDoor above), or, `openAt` nil, shut from `closeAt` on (his move in called off, as
+-- cancelBoarding shuts a player's). Every client swings it (client/CarVisuals.luau), its latch and thunk too.
+function Vehicles.swingDoor(car: Car, index: number, openAt: number?, closeAt: number)
+	if car.wrecked or not car.chassis.Parent then
+		return
+	end
+	if openAt then
+		swingDoor(car, index, openAt, closeAt)
+		return
+	end
+	for _, child in car.chassis:GetChildren() do
+		if child.Name == "DoorHinge" and child:GetAttribute("Door") == index then
+			child:SetAttribute("DoorCloseAt", closeAt)
+		end
+	end
+end
+
 -- 3.10, getting in (see the top): who is on the way into which seat. A reserved seat takes nobody else meanwhile.
 type Boarder = { car: Car, seat: Seat | VehicleSeat, door: number, humanoid: Humanoid, character: Model, at: number }
 local boarders: { [Player]: Boarder } = {}

@@ -11,6 +11,8 @@
 --     mate's Ride along at his door (Vehicles.yieldSeat): he gets out for them ("All yours, boss."), not for a stranger,
 --     and takes no seat SeatYield s
 --   * the seat lost (the van wrecked, his death in it): out at that seat's door, never put down in the van's shell
+--   * 8.5 getting in like a player, called off halfway: a crew mate's boarding takes the seat (it stays theirs, the
+--     door left to them), the owner leaves the wheel (the door shut); he stands at his spot by the door, outside the van
 --   * the move's end with the crew inside: the interior goes only after the trip out (FadeOut + Margin + Stream + 0.5 s
 --     at least: the floor never vanishes under somebody still in the dark)
 -- (Each fix taken back on its own, its checks here fail.)
@@ -129,10 +131,21 @@ end
 local function inVan(truck: any): any
 	return truck.chassis.CFrame:PointToObjectSpace(danny.body.root.Position)
 end
--- Out at the passenger seat's door (1.5 studs out of the van's right side, along it where the seat is; `aside` more).
+-- Out at the passenger seat's door (8.5 his spot there: RideStand studs out of the van's right side, along it where
+-- the seat is; `aside` more).
 local function atSeatDoor(truck: any, aside: number?): boolean
 	local rel = inVan(truck)
-	return math.abs(rel.X - (truck.size.X / 2 + 1.5 + (aside or 0))) < 0.6 and math.abs(rel.Z - -3) < 0.6
+	return math.abs(rel.X - (truck.size.X / 2 + H.RideStand + (aside or 0))) < 0.6 and math.abs(rel.Z - -3) < 0.6
+end
+-- 8.5 the passenger door shut (Vehicles.swingDoor, openAt nil) since `from`?
+local function shutSince(truck: any, from: number): boolean
+	for index = from + 1, #E.doorSwings do
+		local swing = E.doorSwings[index]
+		if swing.car == truck and swing.door == 2 and swing.openAt == nil then
+			return true
+		end
+	end
+	return false
 end
 
 -- The move, Danny hired --------------------------------------------------------------------------------------------------------
@@ -251,6 +264,30 @@ end)
 check("3. the seat reserved by Player2's boarding: Danny never takes it (after the van on foot)", not sat and danny.seat == nil
 	and seat.Occupant == nil and danny.action == "ride")
 seat:SetAttribute("Reserved", nil)
+-- 8.5 called off halfway in: Player2's boarding takes the seat (Vehicles' startBoarding reserves it), or Player1
+-- leaves the wheel
+local swingsAt = #E.doorSwings
+local began = run(10, function()
+	return danny.board ~= nil
+end)
+run(0.2)
+seat:SetAttribute("Reserved", two.UserId)
+run(0.1)
+check("8.5 3. Player2's boarding takes the seat while Danny gets in: his move called off (on his feet at the door, outside the van), the seat Player2's, its door left to their boarding",
+	began and danny.board == nil and danny.seat == nil and seat.Occupant == nil and seat:GetAttribute("Reserved") == two.UserId and atSeatDoor(truck)
+	and not shutSince(truck, swingsAt), inVan(truck))
+run(1)
+check("…after the van on foot meanwhile (no seat for him)", danny.seat == nil and danny.board == nil and danny.action == "ride")
+seat:SetAttribute("Reserved", nil)
+began = run(10, function()
+	return danny.board ~= nil
+end)
+swingsAt = #E.doorSwings
+E.seated[one] = nil
+run(0.1)
+check("8.5 …Player1 out of the seat while Danny gets in: called off too (at the door, the seat free, its door shut from then)", began and danny.board == nil
+	and danny.seat == nil and seat.Occupant == nil and seat:GetAttribute("Reserved") == nil and atSeatDoor(truck) and shutSince(truck, swingsAt), inVan(truck))
+E.seated[one] = truck
 sat = run(10, function()
 	return danny.seat ~= nil
 end)

@@ -6746,9 +6746,26 @@ Config.MoveStory = {
 --                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
 --   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
 --                      the order they were clicked, the rest is yours
---   RideReach          studs from the van's passenger door he gets in (your seat at its wheel: he walks there at the
---                      Sprint, CallGain / CallBlink his last resort; the seat taken by a crew mate: he follows the van
---                      on foot; 8.3 review: a seat somebody is getting into, its Reserved, is taken too)
+--   RideReach          studs from his spot at the van's passenger door (RideStand) where he starts getting in (your seat
+--                      at its wheel: he walks there at the Sprint, RideBlink / RideFar his last resort; the seat taken
+--                      by a crew mate: he follows the van on foot; 8.3 review: a seat somebody is getting into, its
+--                      Reserved, is taken too)
+--   8.5 getting in like a player (the owner: "when I got into the car, Danny got a bit stuck under the car and then
+--   appeared in the car already"; server/MoveHelper.luau's ride, MoveHelperBrain.roundVan / rideBlink):
+--   RideStand          studs out of the van's side his spot at a seat's door is (where he gets in and where he gets out):
+--                      out of the RideMargin he walks by and out of PathRadius round the van's hull (the old spot, 1.5
+--                      studs out, was inside it: no path came, he walked straight at it, into the van, whose parts his
+--                      collision group passes through), on the ground, clear of the cars
+--   RideMargin         studs he keeps off the van's footprint on his way to its door: the straight way when it keeps this
+--                      off, else round the footprint's corners this far out (the shorter way round)
+--   RideCorner         a corner of that way within this many studs: he walks on to the next point (no stop at it)
+--   RideBlink / RideFar   the last resort, a fade into the seat: no closer by CallGain studs for RideBlink s, or RideFar
+--                      studs or more to go on foot (the van driven off without him: more than from deep in the biggest
+--                      house to the van at its curb, so by the house or the warehouse he always walks). At his spot he
+--                      gets in as a player does (Config.Cargo: a step to the handle facing the van, its door swung open
+--                      for everybody, the slide in through it over BoardSeconds, seated, the door shut) and gets out
+--                      the same way back (AlightSeconds); a van faster than BoardMaxSpeed calls the move in off (he
+--                      stands at his spot and goes after it on foot), as does the seat taken, a zombie, your getting out
 --   SeatYield / SeatAside   8.3 review: a crew mate's Ride along at the door of the seat he sits in: he gets out for
 --                      them (Vehicles.yieldSeat), SeatAside studs past where he gets out otherwise (out of their way),
 --                      and takes no seat for SeatYield s (their boarding reserves it meanwhile)
@@ -6832,7 +6849,12 @@ Config.MoveHelper = {
 	-- 8.3 for hire
 	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
 	Queue = 6,
-	RideReach = 3,
+	RideReach = 1.2,
+	RideStand = 2.8, -- 8.5 getting in like a player
+	RideMargin = 2.4,
+	RideCorner = 1.2,
+	RideBlink = 20,
+	RideFar = 200,
 	SeatYield = 2, -- 8.3 review
 	SeatAside = 2.5,
 	CardReach = 90,
