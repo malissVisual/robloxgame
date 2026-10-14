@@ -114,7 +114,7 @@ local function look(player: Player)
 		return
 	end
 	local character = player.Character
-	if character ~= was.character or not (can(player)) then
+	if not character or character ~= was.character or not (can(player)) then
 		takeOff(player)
 	elseif handOf(character) ~= was.hand then
 		takeOff(player)
@@ -202,12 +202,15 @@ end
 
 local function forget(player: Player)
 	takeOff(player)
-	for _, connection in bodies[player] or {} do
-		connection:Disconnect()
+	local function cut(list: { RBXScriptConnection }?)
+		if list then
+			for _, connection in list do
+				connection:Disconnect()
+			end
+		end
 	end
-	for _, connection in own[player] or {} do
-		connection:Disconnect()
-	end
+	cut(bodies[player])
+	cut(own[player])
 	bodies[player], own[player] = nil, nil
 end
 

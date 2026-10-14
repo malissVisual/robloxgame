@@ -58,6 +58,8 @@
 --   MoveHelperCard.giveTarget()                    8.5 the piece the gamepad's "Give to Danny" is on (nil: none)
 --   MoveHelperCard.tapped() -> (Model?, number)    8.5 the piece a click or a tap last gave or took back, and when
 --                                                  (os.clock())
+--   MoveHelperCard.justClosed()                    8.5 it closed a moment ago (the gamepad's B that closed it is not
+--                                                  client/DannyOrders.luau's B too, whichever hears it first)
 
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
@@ -120,6 +122,7 @@ local give: ProximityPrompt? = nil -- the gamepad's "Give to Danny" on the neare
 local giveTo: Model? = nil -- …that piece
 local tappedPiece: Model? = nil -- 8.5 the piece a click or a tap last gave (client/DannyOrders.luau outlines it a moment)
 local tappedAt = 0
+local closedAt = -math.huge -- 8.5 os.clock() it last closed (the B that closed it puts no clipboard away)
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
@@ -314,6 +317,10 @@ end
 
 function MoveHelperCard.tapped(): (Model?, number)
 	return tappedPiece, tappedAt
+end
+
+function MoveHelperCard.justClosed(): boolean
+	return os.clock() - closedAt < 0.1
 end
 
 -- The piece of your move a ray hits first (its model: the attribute MoveSpot), nil: none, or another move's.
@@ -684,6 +691,7 @@ function MoveHelperCard.close()
 	end
 	opened = false
 	openToken += 1
+	closedAt = os.clock()
 	local card = parts.card
 	if card then
 		letGo(card)

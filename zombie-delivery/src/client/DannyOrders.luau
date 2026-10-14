@@ -372,6 +372,7 @@ local function build(): boolean
 	}, folder)
 	local tag = Ui.make("BillboardGui", {
 		Name = "DannyOrdersTag",
+		ResetOnSpawn = false, -- (kept over a respawn, as its ScreenGui)
 		Enabled = false,
 		AlwaysOnTop = true,
 		LightInfluence = 0,
@@ -506,11 +507,11 @@ local function mark(piece: Model?, text: string?, tone: string)
 		litPiece, litWords = nil, nil
 		if highlight.Enabled then
 			highlight.Enabled = false
-			highlight.Adornee = nil
+			(highlight :: any).Adornee = nil
 		end
 		if tag.Enabled then
 			tag.Enabled = false
-			tag.Adornee = nil
+			(tag :: any).Adornee = nil
 		end
 		return
 	end
@@ -539,7 +540,7 @@ local function step()
 	MoveHelperHud.setOrders(on)
 	local hide = covered()
 	local showHint = on and hired() and not hide
-	local showButton = Ui.touchLayout() and hired() and not hide and (on or mayTake())
+	local showButton = Ui.touchLayout() and not Ui.gamepadActive() and hired() and not hide and (on or mayTake())
 	if showHint or showButton then
 		setWords()
 		place(false)
@@ -550,9 +551,12 @@ local function step()
 	if parts.button.Visible ~= showButton then
 		parts.button.Visible = showButton
 	end
-	parts.button.BackgroundColor3 = if on then ORANGE else K.charcoal
-	parts.button.TextColor3 = if on then K.charcoal else K.text
-	parts.word.TextColor3 = if on then K.charcoal else K.text
+	if parts.lit ~= on then -- (orange while it is out)
+		parts.lit = on
+		parts.button.BackgroundColor3 = if on then ORANGE else K.charcoal
+		parts.button.TextColor3 = if on then K.charcoal else K.text
+		parts.word.TextColor3 = if on then K.charcoal else K.text
+	end
 	if showHint then
 		local piece = pointed()
 		local text, tone = nil, "no"
@@ -584,8 +588,8 @@ function DannyOrders.start()
 			DannyOrders.toggle(not on)
 		elseif key == OUT_PAD and not on and not covered() then
 			DannyOrders.toggle(true) -- (out: R1 by a piece gives it to him, MoveHelperCard's "Give to Danny")
-		elseif key == AWAY_PAD and on and not covered() and Ui.gamepadSelection() == nil then
-			DannyOrders.toggle(false)
+		elseif key == AWAY_PAD and on and not covered() and not MoveHelperCard.justClosed() and Ui.gamepadSelection() == nil then
+			DannyOrders.toggle(false) -- (a window's B is the window's: his card's even when it heard it first)
 		end
 	end)
 	for _, name in { "MoveHelper", "MoveHelperQueue" } do
@@ -608,7 +612,7 @@ function DannyOrders.start()
 	-- the look (Clipboard.Look s): cheap while Danny is not hired (nothing shown)
 	task.spawn(function()
 		while true do
-			local ok, err = pcall(step)
+			local ok, err = pcall(step :: any)
 			if not ok then
 				warn(`[DannyOrders] {err}`)
 			end
