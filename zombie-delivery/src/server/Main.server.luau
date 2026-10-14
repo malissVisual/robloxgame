@@ -5,9 +5,9 @@
 -- 8.0.2: the owner's Blender imports (Import 3D leaves each in the Workspace, its parts loose: the sandbox builds no
 -- Marge's house, so nothing took ZDCHouseArt away and its pieces fell apart over the plots) leave the world first
 -- thing, before physics can move a piece; their dressers find them in ServerStorage (FurnitureMesh, HouseMesh,
--- VanMesh, SprinterMesh read the pieces where the importer put them, against their markers).
+-- VanMesh, SprinterMesh, 8.2: WarehouseMesh read the pieces where the importer put them, against their markers).
 pcall(function()
-	for _, name in { "ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt" } do
+	for _, name in { "ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt" } do
 		local art = workspace:FindFirstChild(name)
 		if art then
 			art.Parent = game:GetService("ServerStorage")

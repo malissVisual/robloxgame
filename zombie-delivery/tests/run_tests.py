@@ -132,11 +132,19 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(HERE, "runtime", "WarehouseRuntime.luau"), os.path.join(tmp, "WarehouseRuntime.luau"))
     source = open(os.path.join(os.path.dirname(SHARED), "server", "Warehouse.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "W.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
-    source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: 'require("./FurnitureMesh")' if m[1] == "FurnitureMesh" else f"W.{m[1]}", source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{m[1]}")' if m[1] in ("FurnitureMesh", "WarehouseMesh") else f"W.{m[1]}", source)
     warehouse_head = ('local W = require("./WarehouseRuntime")\nlocal M = W.Mock\nlocal game, workspace, task, os = W.game, M.workspace, W.task, W.os\n'
                       'local Instance, Vector3, Color3, CFrame, Enum, UDim2, UDim = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum, M.UDim2, M.UDim\n'
                       'local warn = function(...) print("WARN", ...) end\n')
     open(os.path.join(tmp, "WarehouseServer.luau"), "w", encoding="utf-8").write(warehouse_head + source)
+    # 8.2: its server/WarehouseMesh.luau (the owner's Blender warehouse) on the same recorder: no import there, so every
+    # warehouse stays as built (tools/warehouse/mesh-check.py dresses them with one).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "WarehouseMesh.luau"), encoding="utf-8").read()
+    source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
+    storage = ('local storage = M.Instance.new("Folder")\n'
+               'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
+               'local workspace = M.workspace\n')
+    open(os.path.join(tmp, "WarehouseMesh.luau"), "w", encoding="utf-8").write(prefix + storage + source)
     # 7.1 review: the real server/Alpine.luau as AlpineServer.luau on tools/perf/world-mock.luau (WorldMock.luau) for
     # tests/alpinebuild_test.luau (the forests stand on World's parts only; SkipInStudio), its shared modules the copies.
     shutil.copy(os.path.join(tools, "perf", "world-mock.luau"), os.path.join(tmp, "WorldMock.luau"))
@@ -548,7 +556,7 @@ if not review72_check():
 # the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
 def imports_first_check():
     main = open(os.path.join(os.path.dirname(HERE), "src", "server", "Main.server.luau"), encoding="utf-8").read()
-    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt")
+    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt")
     first = main.find("ServerStorage")
     wait = main.find(":WaitForChild(")
     good = first >= 0 and wait >= 0 and first < wait and all(main.find(f'"{n}"') < wait for n in names)
@@ -584,6 +592,14 @@ if requires.returncode != 0:
 sprinter = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "sprinter", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
 print("== sprinter mesh: " + ((sprinter.stdout.strip().splitlines() or ["?"])[-1][:160] if sprinter.returncode == 0 else "FAIL\n" + sprinter.stdout[-1500:] + sprinter.stderr[-1500:]))
 if sprinter.returncode != 0:
+    ok = False
+
+# 8.2 sandbox: the ZDC warehouse in the owner's Blender model (server/WarehouseMesh.luau): tools/warehouse/mesh-check.py
+# imports design/blender-warehouse/roblox/ZDCWarehouseArt.json's pieces (turned, scaled) and dresses the warehouses the
+# real server/Warehouse.luau builds; the model's sizes are the layout's, its visual parts hidden, the rest untouched.
+warehouse = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "warehouse", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
+print("== warehouse mesh: " + ((warehouse.stdout.strip().splitlines() or ["?"])[-1][:160] if warehouse.returncode == 0 else "FAIL\n" + warehouse.stdout[-1500:] + warehouse.stderr[-1500:]))
+if warehouse.returncode != 0:
     ok = False
 
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)

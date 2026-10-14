@@ -6947,6 +6947,8 @@ Config.SandboxGuide = {
 --                   pieces on show)
 --   Lamp            the hall's lights (PointLights, always on)
 --   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
+--   ArtLevel        8.2: the level (1 … 5) of the owner's Blender warehouse (design/blender-warehouse) the warehouses wear
+--                   once ZDCWarehouseArt is imported (server/WarehouseMesh.luau; 4: the size the warehouse is)
 Config.Warehouse = {
 	Stands = 12,
 	MaxStands = 20,
@@ -6964,6 +6966,7 @@ Config.Warehouse = {
 	SellHold = 1,
 	Rebuild = 0.15,
 	MaxParts = 400,
+	ArtLevel = 4,
 	Lamp = { Range = 40, Brightness = 1.3, Color = { 255, 238, 214 } :: { number } },
 	Rarity = {
 		common = { 222, 224, 228 },
