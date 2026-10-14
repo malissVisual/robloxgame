@@ -461,6 +461,11 @@ Runtime.PlayerData = stub("PlayerData", {
 		end
 		return { story = Runtime.story[player], car = Runtime.carId, money = moneyOf(player) }
 	end,
+	-- 8.4: was the player's save read? A test's own Runtime.profiles[player] stands for one (its sandboxHouseSeed the
+	-- save's, kept there as Moving sets it); without one: a fresh profile, never saved (Moving's own memory counts)
+	loaded = function(player: any): boolean
+		return Runtime.profiles[player] ~= nil
+	end,
 	notify = noop, -- (7.2 review: the profile's car changed)
 	markStory = function(player: any, key: string): boolean
 		Runtime.story[player] = Runtime.story[player] or {}

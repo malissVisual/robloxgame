@@ -99,7 +99,7 @@
 --     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
 --     truck to door" to House.curb, out at its door; refilled once a move brought something home (a new HouseLayout
 --     seed: the card's own, SB.seeds, kept until then; 8.3 economy: a move called off with nothing home keeps it, no
---     reroll). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts
+--     reroll; 8.4: kept in the player's save too, so another server shows the same house). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts
 --     board
 --     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
 --     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
@@ -311,7 +311,9 @@ local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active; 8.0 S
 --   boards    every plot's Moving contracts corkboard (server/MoveSites.luau plotBoard)
 --   seeds     user id → the seed of the house their card shows, kept until a move of theirs brings something home
 --             (SB.store; a new one then). 8.3 economy: a move called off with nothing home (GIVE UP, the owner leaving)
---             keeps it, so starting, peeking and calling off never rerolls the house; the admin's REFILL forgets it
+--             keeps it, so starting, peeking and calling off never rerolls the house; the admin's REFILL forgets it.
+--             8.4: kept in their save too (PlayerData's sandboxHouseSeed: SB.keepSeed sets and drops both), and their
+--             save's is the one while it is loaded (SB.seedOf): leaving and joining another server shows the same house
 --   last      the last seed handed out (never twice in a row)
 --   door      the map's front door (the part with the attribute SandboxDoor), once found
 --   how       the result card's words for an end (HOW_TEXT's)
@@ -378,22 +380,51 @@ function SB.plotOf(player: Player): SandboxMap.Plot?
 	return require(script.Parent.SandboxPlots).of(player)
 end
 
+-- 8.4: `player`'s card seed set (a number) or dropped (nil), here and in their profile (their next save keeps it).
+function SB.keepSeed(player: Player, seed: number?)
+	if seed then
+		SB.seeds[player.UserId] = seed
+	else
+		SB.seeds[player.UserId] = nil
+	end
+	local profile = PlayerData.get(player)
+	if profile then
+		profile.sandboxHouseSeed = seed
+	end
+end
+
+-- 8.4: `player`'s card seed: their save's while it is loaded (PlayerData's sandboxHouseSeed, as their join read it: a
+-- house rolled on another server is the same here, and one a trip spent there is spent here too, whatever this server
+-- remembered of them), else this server's (SB.seeds: a save not read, Studio without a DataStore). nil: none yet.
+function SB.seedOf(player: Player): number?
+	local profile = PlayerData.get(player)
+	if profile and PlayerData.loaded(player) then
+		SB.keepSeed(player, profile.sandboxHouseSeed)
+	end
+	return SB.seeds[player.UserId]
+end
+
 -- The house's contract with the seed of `player`'s next move: their card's, else a new one (never the last one handed
 -- out): every move refills the house; its clock and horde Config.Moving.Sandbox's as they are now (Horde false: hordeAt
--- 0, never). nil before Moving.start made it.
+-- 0, never). nil before Moving.start made it; 8.4: nil while their save still loads (no house rolled before it says
+-- which one they have).
 function SB.contractFor(player: Player): Contract?
 	local base = SB.contract
 	if not base then
 		return nil
 	end
-	local seed = SB.seeds[player.UserId]
-	if not seed then
-		local fresh = math.random(1, 1073741823)
+	local seed: number = SB.seedOf(player) or 0 -- (0: none yet; a seed is 1 or more)
+	if seed < 1 then
+		if not PlayerData.get(player) then
+			return nil
+		end
+		local most = T.Sandbox.Seeds
+		local fresh = math.random(1, most)
 		while fresh == SB.last do
-			fresh = math.random(1, 1073741823)
+			fresh = math.random(1, most)
 		end
 		SB.last = fresh
-		SB.seeds[player.UserId] = fresh
+		SB.keepSeed(player, fresh)
 		seed = fresh
 	end
 	local S = T.Sandbox
@@ -406,12 +437,13 @@ end
 
 -- `player`'s card seed is spent (8.3 economy: a move of theirs brought something home, SB.store; the admin's REFILL; a
 -- plan that failed): their next card shows a new house; that house's plan facts go (factsOf keeps one per seed in the
--- sandbox). `keep` (they left): only the facts go, the seed stays theirs (by user id) for when they come back.
+-- sandbox). `keep` (they left): only the facts go, the seed stays theirs (by user id) for when they come back (8.4: and
+-- in their save, written as they leave, for another server).
 function SB.forget(player: Player, keep: boolean?)
 	local seed = SB.seeds[player.UserId]
 	local house = SB.contract
 	if not keep then
-		SB.seeds[player.UserId] = nil
+		SB.keepSeed(player, nil) -- (8.4: their save's too)
 	end
 	if seed and house then
 		contractFacts[`{house.id}#{seed}`] = nil
@@ -3755,7 +3787,8 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 	local contract = if SB.on then SB.contractFor(player) else contractById(contractId) or nextContract(player)
 	local a = artNow()
 	if not contract or not a then
-		say(player, "Moving is not ready in this place yet (the house art is missing).")
+		say(player, if SB.on and a then "Your save is still loading: try the board again in a moment." -- (8.4: SB.contractFor)
+			else "Moving is not ready in this place yet (the house art is missing).")
 		return
 	end
 	local known = factsOf(contract, a, player)

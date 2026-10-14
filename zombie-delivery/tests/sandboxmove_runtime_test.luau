@@ -33,6 +33,9 @@
 -- facing the road, no way straight back, its doormat over the garden path while a move runs. 8.3 the big move: its plan
 -- HouseLayout's kind "big" (Config.Moving.Sandbox.Kind); its back door (House.back) a second way in, its own doormat
 -- and walk-in zone.
+-- 8.4: the house kept across servers: a player with a save has the seed of their card's house in it (rolled, kept
+-- through GIVE UP and leaving); another server with that save shows the same house (a loaded save's seed counts over
+-- the server's memory); a trip home drops it and the next card rolls a new one into it.
 -- 8.2 analytics: Moving's listeners (onStart, onEnterHouse, onLoad, onTrip, onFinish; server/SandboxAnalytics.luau's)
 -- hear each moment with its numbers, and every real end's words come out as AnalyticsPlan.moveHow's word (FINISH, the
 -- admin's end, GIVE UP after a trip, the owner leaving).
@@ -845,6 +848,86 @@ do
 	check("…the next move built with the new one", string.find(Moving.admin(bob2, "start"), "started", 1, true) ~= nil and built[#built] == seeds[#seeds]
 		and built[#built] ~= bobSeed)
 	Moving.admin(bob2, "end")
+end
+
+-- 8.4: the house kept across servers (server/Moving.luau SB.seedOf / SB.keepSeed; server/PlayerData.luau's
+-- sandboxHouseSeed, which tests/saving_runtime_test.luau writes to and reads from the DataStore). Dee has a save (a
+-- test's own profile, E.profiles: PlayerData.loaded): the seed of the house her card shows goes into it as it is rolled
+-- and stays through GIVE UP and her leaving. Joining another server with that save shows the same house: Moving takes a
+-- loaded save's seed over anything the server remembers of her, so a join here with the save another server wrote is
+-- the join there (a save with another house in it: that house; one a trip spent there: a new house, never the one this
+-- server remembered). A trip home drops it from the save; the next card rolls a new one into it.
+do
+	local function join(save: any): any
+		local player = E.player(44, "Dee", V3(plot1.spawn.x, 3, plot1.spawn.z))
+		E.plots[player] = plot1 -- (Ann's, free: she left)
+		E.profiles[player] = save
+		return player
+	end
+	local function started(player: any): boolean
+		return string.find(Moving.admin(player, "start"), "started", 1, true) ~= nil
+	end
+	local dee = join({ money = 5000 }) -- (a save without a house yet)
+	local save = E.profiles[dee]
+	E.place(dee, moves:FindFirstChild("MovingBoard1"):FindFirstChild("Board").Position + V3(0, 0, 4))
+	trigger(board1, dee)
+	local first = seeds[#seeds]
+	check("8.4 Dee's card (her save read, no house in it): a house rolled, its seed in her save (her next save writes it)",
+		E.last(dee, "Moving", "contract") ~= nil and save.sandboxHouseSeed == first and first >= 1 and first <= S.Seeds and first == math.floor(first))
+	check("…her move built in it", started(dee) and built[#built] == first)
+	E.request(dee, "giveup")
+	check("…GIVE UP with nothing home: called off, the seed still in her save", Moving.busy(dee) == nil and E.last(dee, "Moving", "result").a.delivered == 0
+		and save.sandboxHouseSeed == first)
+	E.leave(dee)
+	local wrote = table.clone(save) -- (what her leave save writes)
+	check("…she leaves: her save keeps it", wrote.sandboxHouseSeed == first)
+	-- another server, the same save
+	local dee2 = join(table.clone(wrote))
+	check("8.4 she joins another server with that save: the same house (the save's seed)", started(dee2) and built[#built] == first)
+	Moving.admin(dee2, "end")
+	E.leave(dee2)
+	-- the save as another server left it: there she rolled a new house into it, or a trip spent hers
+	local other = if first == S.Seeds then first - 1 else first + 1
+	local dee3 = join({ money = 5000, sandboxHouseSeed = other })
+	check("…a save with another house in it (rolled on another server): that house, not the one this server remembered", started(dee3) and built[#built] == other)
+	Moving.admin(dee3, "end")
+	E.leave(dee3)
+	local dee4 = join({ money = 5000 })
+	local spent = E.profiles[dee4]
+	check("…a save whose house a trip spent on another server (none in it): a new house, never the one this server remembered",
+		started(dee4) and built[#built] ~= first and built[#built] ~= other and spent.sandboxHouseSeed == built[#built])
+	-- a trip home here spends it: out of the save, a new house next
+	local spentSeed = built[#built]
+	local car = E.cars[dee4]
+	step()
+	park(car, { x = House.curb.x, z = House.curb.z, yaw = 0 })
+	E.place(dee4, outside)
+	trigger(promptIn(frontDoor, "Enter house"), dee4)
+	local piece = newItem(1)
+	E.place(dee4, piece.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(piece, "Pick up"), dee4)
+	step()
+	E.place(dee4, E.interiors[#E.interiors].Position + V3(0, 3, 1))
+	trigger(promptIn(workspace, "Leave house"), dee4)
+	car.model:SetAttribute("BackOpen", true)
+	E.place(dee4, car.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
+	step()
+	trigger(promptIn(car.model, "Load"), dee4)
+	step()
+	park(car, plot1.vanSpot)
+	step()
+	check("8.4 a trip home brings a piece into her warehouse: the house spent, its seed out of her save", E.last(dee4, "Moving", "state").a.trips == 1
+		and spent.sandboxHouseSeed == nil, `{E.last(dee4, "Moving", "state").a.trips} {spent.sandboxHouseSeed}`)
+	E.request(dee4, "finish")
+	check("…her next move: a new house, its seed in her save", started(dee4) and built[#built] ~= spentSeed and spent.sandboxHouseSeed == built[#built])
+	Moving.admin(dee4, "end")
+	E.leave(dee4)
+	-- a save not read (a fresh profile, never saved: Studio without a DataStore): this server's memory of her as before
+	local dee5 = join(nil)
+	local remembered = spent.sandboxHouseSeed
+	check("…without a save read: this server's own memory of her (8.3 economy: the same house on a rejoin here)", started(dee5) and built[#built] == remembered)
+	Moving.admin(dee5, "end")
+	E.leave(dee5)
 end
 
 -- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or

@@ -6403,6 +6403,10 @@ Config.Moving = {
 		HordeAt = 3 * 60,
 		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
+		-- 8.4: a house's seed is a whole number 1 … this (server/Moving.luau rolls it); the one a player's card shows is
+		-- kept in their save until a trip brings something home (server/PlayerData.luau's sandboxHouseSeed: another
+		-- number there is none)
+		Seeds = 1073741823,
 	},
 }
 
