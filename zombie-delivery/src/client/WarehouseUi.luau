@@ -48,6 +48,9 @@
 --     the rarity chips as before and, on a computer, a 🔍 search box (every word in the piece's name; typing redraws
 --     only the grid, the box keeps its focus; closing the window clears it).
 --   WarehouseUi.sorting() / search()     the order and the search the windows use now
+-- 8.3 (design/warehouse-levels/KONTRAKT.md): which stands are small depends on your warehouse's level (the player
+-- attribute Config.SandboxUpgrades.WarehouseAttribute, 1 … 5, server/Upgrades.luau; 4 until the server sets it, as a
+-- plain Plot): WarehouseLayout.fits and count ask with it, so TOO BIG and its words follow a level up.
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -537,15 +540,23 @@ function WarehouseUi.showing(): string?
 	return if not open then nil elseif open.stand then "picker" else "stock"
 end
 
+-- 8.3: your warehouse's level (the player attribute, 1 … 5); 4 until the server sets it (a plain Plot's: the stands
+-- of before 8.3).
+local function warehouseLevel(): number
+	local level = Players.LocalPlayer:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute)
+	return if type(level) == "number" then level else 4
+end
+
 -- 8.2: does a piece of this item stand on stand i (an upgrade's small stand holds no bed)? As the server's
--- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once.
+-- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once (8.3: a level).
 local fitsKnown: { [string]: boolean } = {}
 local function fitsStand(stand: number, item: string): boolean
-	local key = `{stand}|{item}`
+	local level = warehouseLevel()
+	local key = `{level}|{stand}|{item}`
 	local known = fitsKnown[key]
 	if known == nil then
 		local def = catalogue(item)
-		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil)
+		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil, level)
 		known = def == nil or (ok and yes == true)
 		fitsKnown[key] = known
 	end
@@ -965,7 +976,7 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	if stand and tooBig then
 		-- 8.2: TOO BIG instead of DISPLAY, grey; a tap says where it goes
 		first = tileButton(frame, "Display", "TOO BIG", "shut", layout, function()
-			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`)
+			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count(warehouseLevel())}.`)
 		end)
 		first.AutoButtonColor = false
 		first.TextTransparency = 0.3
