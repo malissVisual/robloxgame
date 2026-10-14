@@ -53,11 +53,43 @@
 >
 > **8.3** (the warehouse's five levels): the owner's five Blender buildings are the warehouse's levels, bought at the
 > UPGRADES desk's new **ZDC Warehouse** card (`Config.Warehouse.Levels`, `Config.SandboxUpgrades`). A new player starts
-> in the **Garage** (level 1, 2 stands); then the Workshop ($1,500, 4 stands), the Storehouse ($5,000, 8), the Big
-> Warehouse ($12,000, 12) and the Logistics Center ($30,000, 24). A save from before 8.3 starts at level 4, the
-> warehouse it had. Every level is its own building on the plot (`WarehouseLayout.site`), rebuilt at once when bought
-> (the pieces on show stay on their stands), and wears its own level of `ZDCWarehouseArt` (the import already holds all
-> five: nothing to re-import). More stands opens from the Big Warehouse on (see **The warehouse's five levels (8.3)**).
+> in the **Garage** (level 1, 2 stands); then the Workshop ($1,000, 4 stands), the Storehouse ($7,500, 8), the Big
+> Warehouse ($30,000, 12) and the Logistics Center ($100,000, 24): 8.4's slower economy re-priced them (8.3 sold them
+> for $1,500 / $5,000 / $12,000 / $30,000). A save from before 8.3 starts at level 4, the warehouse it had. Every level
+> is its own building on the plot (`WarehouseLayout.site`), rebuilt at once when bought (the pieces on show stay on
+> their stands), and wears its own level of `ZDCWarehouseArt` (the import already holds all five: nothing to
+> re-import). More stands opens from the Big Warehouse on (see **The warehouse's five levels (8.3)**).
+>
+> **8.4** (everything Claude's branch built since 8.2.1 except the levels; the code's comments call most of it "8.3",
+> its working name before main released the levels as 8.3): **Danny for hire** (`server/MoveHelper.luau`,
+> `client/MoveHelperCard.luau`, `Config.MoveHelper`): he waits by the van, HIRE costs $50 + $5 a piece of the house
+> ($100 – 400, `Hire`; $230 – 270 for the big house) for one move, a click or a tap on a piece puts it on his list (6
+> at most, `Queue`) and you carry the rest; a two-person Lift calls him and you wait while he walks to its far end,
+> then you carry it together, backwards too, never a hop; he rides in the van's passenger seat and gives it up to a
+> crew mate (`SeatYield`, `SeatAside`). **Pair-carry keep-up**: nobody runs with a piece for two ("Too heavy to run
+> with", `client/PairSteer.luau`) and Danny follows your real speed (`HoldCap`, `HoldPace`, `HoldLead`). **Swinging
+> doors** (`shared/DoorSwing.luau`, `client/WalkDoors.luau`, `Config.Moving.Doors`): The Old Chalet's leaves swing open
+> (0.35 s) as you walk up, and the trip through is a smooth fade (0.25 s out, in once you are there). **The big move**
+> (`Config.Moving.Sandbox` Kind "big", `Config.Furniture.Big`): 25 minutes, 34 – 40 pieces and 2 – 3 collectibles in
+> ten rooms, a **back door** as a second way in and out. **The market** (`shared/Market.luau`, `Config.Market`): every
+> UTC day 3 kinds are 🔥 hot (sell × 1.4, earn × 1.2 on show) and 1 is ❄ cold (sell × 0.7); selling many of a kind
+> lowers its price for you (5 % a piece, 40 % at most). **Showroom visitors** (`server/Visitors.luau`,
+> `server/VisitorOffers.luau`, `client/OfferCard.luau`, `Config.Visitors`) walk among your stands and offer 10 – 50 % over
+> the market price for a piece on show (ACCEPT / DECLINE within 30 s). **The van PAINT shop** (`server/VanPaint.luau`,
+> `client/VanPaintUi.luau`, `Config.VanPaint`): 13 colours and 4 liveries at your parked van, cosmetic only. **24
+> collectibles** (12 new; the book holds 68 pieces; re-import `ZDCFurnitureArt`). **Light** (`Config.SandboxLight`,
+> `client/SandboxLight.luau`): no "flashbang" indoors any more, and the eyes adapt to each place over 0.6 s. **Key and
+> gamepad hints** (`shared/SandboxPad.luau`, `client/KeyHints.luau`, `shared/SandboxHints.luau`): every hint in the
+> words of the device you use, the D-pad opens 📦 📖 📋, first-time hints. **The guide's soft steps**
+> (`shared/SandboxSteps.luau`, `Config.SandboxGuide`): grow the warehouse, a hot piece, an upgrade in reach, the PAINT
+> shop; Danny's steps are being added. **12 Roblox badges** (`server/SandboxBadges.luau`, `Config.SandboxBadges`): an id
+> of 0 is off, and every id is 0 until the owner sets it up (`design/sandbox/BADGES.md`). **Safer saves**
+> (`shared/SaveGuard.luau`, `server/PlayerData.luau`, `Config.Saving`): a guard on every write, the session lock,
+> `saveSoon` after a purchase, retries, a newer server's keys kept, the paints and the moves mirrored into `rewards`
+> for 8.2 servers. **A slower economy** (`Config.Collection`, `Config.SandboxUpgrades`, `Config.Furniture.Collectibles`):
+> legendaries are rare (one house in 25, the big house one in 17), the upgrades cost $1,000 – 100,000, the stands pay
+> a quarter after 10 idle minutes, and the house stays the same until a move brings something home. And the reviews'
+> fixes. The details: **Danny for hire (8.4)** to **The reviews' fixes (8.4)** below.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1501,6 +1533,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - He flees zombies only when he is not carrying with you; stuck 2 s, a new path; 4 s, a nudge to the next waypoint; where he stands still he keeps out of doorways.
 - He is back at the van 15 s after he goes down.
 - Orders: HELP ME, SMALL STUFF, WAIT AT VAN; the quick chat "Need a hand here" calls him too. The strip under the move's panel says what he does.
+- 8.4: the orders are gone, and the quick chat's "Need a hand here" no longer calls him. You hire him for a move and click the pieces he carries; he no longer picks his own (see **Danny for hire (8.4)**).
 
 **The greeters** (`server/MoveGreeters.luau`, the words in `shared/MoveStory.luau`, `Config.MoveGreeters`): people who welcome you.
 - **Marge on her porch.** She stands beside the front door of 155 Willow Ln from the move's start, off the path.
@@ -1685,10 +1718,13 @@ player's own and buyable (the contract: `design/warehouse-levels/KONTRAKT.md`):
 | Level | Name | W × H × D (H: the front wall) | Door | Roof | Big stands | Price |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Garage | 26 × 12 × 22 | 14 × 9.5 | shed (front 12, back 9.5) | 2 | (the start) |
-| 2 | Workshop | 40 × 15 × 30 | 18 × 12 | gable (4.5 over the walls) | 4 | $1,500 |
-| 3 | Storehouse | 58 × 19 × 42 | 22 × 14 | gable (6) | 8 | $5,000 |
-| 4 | Big Warehouse | 80 × 24 × 60 | 26 × 16 | gable (8) | 12 | $12,000 |
-| 5 | Logistics Center | 104 × 28 × 84 | 26 × 18 | barrel (10; the game's parts: a gable of 10 under it) | 24 | $30,000 |
+| 2 | Workshop | 40 × 15 × 30 | 18 × 12 | gable (4.5 over the walls) | 4 | $1,000 |
+| 3 | Storehouse | 58 × 19 × 42 | 22 × 14 | gable (6) | 8 | $7,500 |
+| 4 | Big Warehouse | 80 × 24 × 60 | 26 × 16 | gable (8) | 12 | $30,000 |
+| 5 | Logistics Center | 104 × 28 × 84 | 26 × 18 | barrel (10; the game's parts: a gable of 10 under it) | 24 | $100,000 |
+
+The prices are 8.4's (`Config.SandboxUpgrades.List.warehouse`): 8.3 sold the levels for $1,500 / $5,000 / $12,000 /
+$30,000 and More stands for $1,000 / $2,500 / $5,000 / $10,000 (see **A slower economy (8.4)**).
 
 - **Who starts where:** a new player in the Garage; a real save from before 8.3 (one without `warehouseLevelKept`) at
   level 4, what it had (`UpgradeRules.fromSave`). A free plot shows the Garage, FOR RENT (`Config.Warehouse.FreeLevel`).
@@ -1702,7 +1738,9 @@ player's own and buyable (the contract: `design/warehouse-levels/KONTRAKT.md`):
 - **Stands:** a level's big stands (10 × 10, every piece fits) and, from level 4 on, **More stands**' small ones (8 × 5,
   +2 a level, +8 at the top): `base(level) + (level ≥ 4 ? 2 × More stands : 0)`, so 2, 4, 8, 12 … 20, 24 … 32. Below
   level 4 the More stands card is locked ("Needs the Big Warehouse"). The admin's ⬆ MAX UPGRADES gives level 5 and
-  ↺ RESET UPGRADES level 1 (the pieces on stands that are gone go back to the stock).
+  ↺ RESET UPGRADES level 1 (the pieces on stands that are gone go back to the stock). 8.4: 🏗 LV 1 … 🏗 LV 5 set the
+  warehouse to that level for free, the other upgrades as they are; a level down also sends a piece too big for its
+  stand at the new level back to the stock (`CollectionRules.fitStands`).
 - **The building:** every level stands where today's warehouse stands: its front wall and door on the plot's front
   (SandboxMap's `WALL_Z`), the van's spot, the unload circle, the spawn, the kiosk and the UNLOAD HERE bay do not move;
   the building goes back (north) from there. `WarehouseLayout.site(plot, level)` is a Plot with that level's box, and
@@ -1729,6 +1767,354 @@ builds it:
 - every lamp's light just under one of the model's lamps;
 - the stands, the desk, the signs' fronts, the floor's paint, the bay, the doorway and the way in clear of the model's
   details.
+
+## Danny for hire (8.4)
+
+The owner: "make it so I click on the helper, but I have to PAY for him when I want help … you go into the house, click
+on something, and that assigns it to him, and the rest you carry yourself", and "mainly, he must sit in my car with
+me". His orders (7.x's HELP ME, SMALL STUFF and WAIT AT VAN, then the branch's AUTO / HELP ME / WAIT HERE / WAIT AT VAN
+card) gave way to a hire, and he no longer picks pieces by himself.
+`server/MoveHelper.luau` decides everything, `shared/MoveHelperBrain.luau` has his rules and words,
+`client/MoveHelperCard.luau` is his card and the clicks on the pieces, `client/MoveHelperHud.luau` his status line under
+the move's panel; the numbers are `Config.MoveHelper`'s.
+
+- **Hiring.** He comes with a crew of one (`Solo`; `Duo` is off) and touches nothing until hired. He waits by the van
+  (at the house's curb once the van is there) with "🧑‍🔧 Hire Danny · $X" over his head. A click on him (a tap on a
+  touch screen; with a gamepad the "Hire Danny" prompt on L1) opens his card; its HIRE pays $50 + $5 for every piece
+  of the house, rounded to $10, $100 – 400 (`Hire`): $230 – 270 for the big house's 36 – 43 pieces. He works for that
+  move until it ends, with no refund. Whoever paid owns the hire: a crew mate who joins later finds him working, and
+  if the hirer leaves the move he is for hire again. Danny's training at the UPGRADES desk makes him faster, not
+  cheaper.
+- **His list.** Hired, a click or a tap on a piece of the move puts it on his list (a gamepad: R1, "Give to Danny" on
+  the nearest piece), 6 at most (`Queue`); a numbered marker ("🧑‍🔧 Danny · 2") shows over it, and a second click takes
+  it back. He carries them in that order the way he always did (a path, a door, the van's back opened, the packing),
+  and the rest is yours. A piece of his list you pick up yourself leaves it ("All yours, boss."); CLEAR QUEUE on his
+  card empties it, and with nothing left he waits by the van.
+- **A heavy piece.** A two-person piece on his list: he goes to it and waits ("🙋 Danny needs you" over it, its prompt
+  "Lift with Danny"). Your Lift on a two-person piece calls him (`WaitForHelper`): you say "Danny, give me a hand!" and
+  wait at your end ("⏳ WAITING FOR DANNY…"; STOP, G or Lift again end it) while he walks to its far end through the
+  doors his own way, faded over only as the last resort (no closer by `CallGain` studs in `CallBlink` s). There he
+  says "On three... lift!" and your lift check opens; its hit lifts the piece with him at the other end. A crew mate's
+  Lift on a piece somebody waits at with him is refused and names who waits.
+- **Walking together.** He no longer hops: the floor under his end is found within a step of the floor under your feet
+  (never a roof, a ceiling or your jump), his height follows at `HoldClimb` studs a second at most, and his paths
+  never jump. His legs step at his own speed, backwards when the way is behind him and sideways as you go (`HoldLegs`).
+- **Keeping up** (the owner: "when I run, he just goes behind me with his arms stretched out"): his top speed follows
+  your real speed along the ground (`HoldPace`; `HoldCap`, 40 studs a second, at most), and he is aimed a little ahead
+  of his place (`HoldLead`: 0.06 s plus your ping, 0.25 s at most), so your screen, which shows his body that late,
+  shows him at his end. A crew mate at the far end follows your speed the same way (`server/PairHold.luau`), unled.
+  **Nobody runs with a piece for two:** both holders get the attribute CarryPair, `client/PairSteer.luau` holds the
+  walk at the carry's speed every step, and Shift, the stick's click and SPRINT only say "Too heavy to run with" (once
+  a carry). A carrying hand reaches `Config.Body.CarryReach` of the arm at most: no stretched-out arm.
+- **Riding along.** Hired, when you sit at the move's van's wheel he walks to its passenger door (at his sprint) and
+  sits; the van may leave, and he gets in when he reaches it. Nobody at the wheel and the van standing: he gets out on
+  his side and goes on with his list. A crew mate's Ride along at his door makes him get out for them ("All yours,
+  boss.", `SeatAside` 2.5 studs out of their way), and he takes no seat for `SeatYield` 2 s; a seat a crew mate is
+  getting into is never his. The van wrecked or gone: he is out at that seat's door, never in the van's shell.
+- **The doors.** He opens the swinging doors he walks through, the front door and the back door.
+
+**Tests:** `movehelper_test`, `movehelper_runtime_test`, `movehelper_hop_runtime_test`, `movehelper_keepup_runtime_test`,
+`movehelper_review_runtime_test` (Studio's test players' negative ids, the seat, the waiting refusal),
+`bigdanny_runtime_test` (a hired Danny on the big plan, by either door), `npcs_runtime_test`, `pairsteer_test`;
+`tools/phone-ui/dannycard.luau` (the card from 667 × 375 to 1920 × 1080, with a gamepad and on touch).
+
+## The doors swing (8.4)
+
+The owner: "when I go into the house, the door should open, and then it teleports me smoothly". 8.1's walk-in doors
+(no E at the house) keep their zones; the doors now really open (`shared/DoorSwing.luau`, `client/WalkDoors.luau`,
+server/Moving.luau's WalkIn and travel; the numbers in `Config.Moving.Doors`).
+
+- **The leaves.** Walk up to a door facing it and its leaf swings open 95° (`Angle`) in 0.35 s (`Open`) for everyone
+  nearby, with a creak; once its doorway has been empty 1.2 s (`Shut`) it swings shut in 0.45 s (`Close`) with a soft
+  thud. Every client swings the leaves itself: the server's parts never move or collide, so a leaf never pushes or
+  blocks anyone. A leaf is any part or model with the DoorSwing attributes (DoorLeaf, DoorSwing, DoorAngle, DoorDark),
+  one convention for every door.
+- **The trip.** Keep walking: after `Dwell` (0.15 s) in the zone and the leaf's swing, the screen fades out (0.25 s,
+  `FadeOut`) while you walk into the doorway; the server streams the other side in and moves you `FadeOut` + `Margin`
+  s after the fade was sent. You arrive a step past the door, still walking, the camera behind you; the screen stays
+  black until your client sees you there (`Arrive`, `Wait`), then `Dark` (0.15 s) more and the fade in (0.35 s). The
+  crew mate at the other end of a piece for two comes along in the same dark moment, lined up with it, and a hired
+  Danny opens the doors he walks through. The eyes (`client/SandboxLight.luau`) take the new place at once behind the
+  black: no second change after the fade.
+- **Which doors.** Both doors of The Old Chalet swing, outside and inside. Outside, the chalet's two front leaves and
+  its back leaf (dressed in the owner's Blender house: copies of the model's own front and back doors,
+  `SandboxScenery.frontLeaves` / `backLeaves`); inside, the front door's leaves and the back door's leaf, which swing
+  out onto their porches (each with a PathfindingModifier PassThrough).
+
+**Tests:** `doorswing_test`, `sandboxworld_test`, `sandboxmove_runtime_test`, `bigdanny_runtime_test` (his way out's
+leaves open), the e2e's steps 4 and 20; `tools/house-art/check.py` checks the leaves and their dressed copies.
+
+## The big move (8.4)
+
+8.2.1 made The Old Chalet the owner's big Blender house (44 × 14.5 × 34). Its move is a big one now: the contract card
+at your kiosk still says **The Old Chalet** (for The Hubers: "A big old house packed full of things. Too much for one
+van: plan several trips home to your warehouse."), and the house is laid out as HouseLayout's kind **"big"**
+(`Config.Moving.Sandbox.Kind`, `Config.Furniture.Big`).
+
+- **The plan:** ten rooms on one floor: the living room, the hall and the kitchen at the front, a corridor, and six
+  rooms behind it (the bedroom, the bathroom, the kids' room, the garage, a guest room and a study). 34 – 40 pieces
+  (`Big.Spots`), 4 of them ★ (`Big.Stars`), and 2 – 3 collectibles (`Big.Collectibles`) from the whole pool, with more
+  pieces for two than a house has; 1,100 parts at most inside (`Big.InteriorMaxParts`). A house's plans (Marge's, the
+  city's) are unchanged.
+- **The back door:** a second way in and out, at the corridor's east end inside (`Big.BackDoor`, 6 wide) and the
+  model's back door on the map (`SandboxMap.House.back`, the garden side). Outside it is a walk-in door like the front
+  one. Every piece gets out by either door, and the van still parks at the curb in front, so a piece out of the back
+  door goes round the house. Danny takes the nearer way he may.
+- **25 minutes** on the clock (`Config.Moving.Sandbox.Time`, was 20): the Sprinter's bed takes it home in several trips.
+- **The same house until a move brings something home** (8.4's economy): the server keeps the house's seed by your
+  user id, so GIVE UP, a move called off or leaving with nothing home gives you the same house again. The admin's
+  🏠 REFILL HOUSE gives a new one.
+- Its inside is lit like every house's (`Config.SandboxLight.House`), the light budget checked on the big plans.
+
+**Tests:** `biglayout_test` (every piece out by both doors on many seeds), `bigdanny_runtime_test`,
+`sandboxmove_runtime_test`, `vanmove_test`, the e2e's step 20 (round the house to its back door, in, a piece out by its
+doorway inside, loaded, home).
+
+## The market (8.4)
+
+The owner: selling should be a decision, not a reflex. `shared/Market.luau` has the rules, `server/Collection.luau`
+prices every sale and the stands' income with it; the numbers are `Config.Market`'s.
+
+- **Hot and cold.** Every UTC day, picked from the day's number alone (the same on every server for everybody), 3 kinds
+  are 🔥 **hot** (`Hot`: two kinds of furniture and one collectible, `HotCollectibles`): they sell for × 1.4
+  (`HotSell`) and earn × 1.2 on show (`HotIncome`). One kind of furniture is ❄ **cold** (`Cold`): it sells for × 0.7
+  (`ColdSell`). The market picks among the sandbox house's kinds worth $100 or more (`MinValue`).
+- **Demand.** Every piece of a kind you sell lowers that kind's price for you by 5 % (`Drop`), 40 % at most
+  (`MaxDrop`; a bulk sale's pieces one after the other); one step comes back every 20 minutes (`Recover`), all of it
+  at 00:00 UTC. It is per player and saved (`profile.market`, read only from a save written with `marketKept`).
+- **What you see.** The STOCK list and the picker have a line "Today's market: 🔥 … · ❄ … · new in 5 h", tags on the
+  pieces ("🔥 HOT ×1.4", "❄ COLD", "📉 −10%"), the reasons in SELL's question and the market's totals in SELL…; the HUD
+  shows a one-time "🔥 Hot today: …" toast. A sale is refused only when the price fell below what your screen showed
+  (a price that rose is paid). Two daily tasks belong to it: "Sell a hot item" and "Earn $N from hot items on show".
+
+**Tests:** `market_test`, `collection_test`, `collection_runtime_test`, the e2e's step 18 (every price the steps
+expect is the market's, so any day passes).
+
+## The showroom's visitors (8.4)
+
+The owner: the warehouse should feel alive. A few customers walk in through the roller door, stroll between the stands
+with pieces on show, stop at a piece ("Ooh, a gramophone!") and leave. Now and then one offers to buy a piece on show
+for more than its market price. `shared/Visitors.luau` has the rules, `server/Visitors.luau` walks them (one loop for
+them all), `server/VisitorOffers.luau` prices and checks the offers, `client/OfferCard.luau` is the card; the numbers
+are `Config.Visitors`'.
+
+- **Who and when.** Tourists, hikers, a collector and an antique dealer (`Kinds`), in groups of 1 – 3, only to a
+  warehouse with pieces on show: about every 35 – 70 s while you are at your warehouse (`NearEvery`), every 3 – 5
+  minutes while you are away (`AwayEvery`). At most 6 in the server (`Cap`), and per hall by its level: 1 in the
+  Garage, 2 in the Workshop, 3 from the Storehouse on (`PerHall`). They walk a grid of the hall round the podiums
+  and the UPGRADES desk, in and out beside the van, and keep 3 studs from a player (`Clear`).
+- **The offer.** A visitor looking at your piece may offer for it (`Offer.Chance` × its kind's chance, once for each
+  piece it looks at) while you are in the hall on foot within 45 studs (`Offer.Reach`), at most every 90 s
+  (`Offer.Every`). The price is the piece's market price now × 1.1 – 1.5, + 5 % for each rarity step over common,
+  + 10 % for a hot kind, + the kind's own (the collector's 10 %, the dealer's 5 %), 1.5 × at most (`Offer.Top`),
+  rounded up. A toast says "🤝 The collector offers $340 for your Gramophone", and the card shows the offer, the market
+  price, the share over it and a 30 s clock (`Offer.Expire`) with DECLINE and ACCEPT. ACCEPT sells the piece at the
+  offer (the money's reason VisitorOffer; the daily task "Accept an offer from a visitor" counts it, and so does the
+  First Sale badge). The server always has the price: the client sends only the offer's id, and the piece taken down,
+  moved, sold or gone closes the offer.
+- **The card.** Another window opening (📦 STOCK, the 📖 BOOK to compare prices) only hides it: the offer keeps
+  waiting with its clock running, and the card comes back once nothing covers the screen. Esc, the Roblox menu, the
+  gamepad's B and DECLINE decline it. A gamepad's selection starts on DECLINE (an A pressed by habit never sells); on
+  a small touch screen the card shrinks until a place is clear, its buttons still `Ui.MinTouch` tall.
+
+**Tests:** `visitors_test`, `visitors_runtime_test`, `visitoroffers_runtime_test`, `clientboot_test` (hide against
+Esc); `tools/phone-ui/offercard.luau` (667 × 375 to 1920 × 1080).
+
+## The van's PAINT shop (8.4)
+
+The owner: give players a way to make their van their own. A **🎨 Paint van** prompt (PAINT SHOP) on your own Sprinter,
+while it stands at your plot's van spot, opens the shop (`client/VanPaintUi.luau`, your van in 3D by
+`client/VanPaintPreview.luau`). `server/VanPaint.luau` sells and paints, `shared/VanPaintRules.luau` has the rules,
+`shared/VanLook.luau` paints a van model (the parts look and the Blender look alike); the numbers are `Config.VanPaint`'s.
+
+- **13 body colours:** ZDC cream (free, the factory's), Arctic white $300, Silver grey $400, Graphite $500, Midnight
+  black $600, Fire red, Sunset orange, Taxi yellow and Glacier blue $500 each, Forest green and Navy blue $600 each,
+  **Collector gold** $5,000 (metal; locked until the collection book's "A legendary!" milestone has paid) and **Mirror
+  chrome** $50,000 (foil).
+- **4 liveries** (the ZDC band, the logo, the nose badge and the back doors' stripes, and a roof decoration): ZDC
+  classic (free), Alpine $1,200 (green, a snow-white roof), Racing stripes $1,500 (a stripe that contrasts with the
+  body, two along the roof) and Gold line $3,000 (metal, pinstripes on the roof). Everything costs $65,700.
+- Each item is bought once and kept for good; wearing one you own is free (BUY $X, NEED $X without the money, WEAR,
+  ✓ ON YOUR VAN, 🔒 LOCKED). Every van of yours comes out painted (PLAY, START, CAR), for everybody to see. Cosmetic
+  only: the van's collision, bay, doors and speed never change.
+- The save: `profile.vanPaint` ({ owned, worn }, read only from a save written with `vanPaintKept`), mirrored into
+  `rewards` as `paint:<id>` / `paintOn:<id>` so a visit to an 8.2 server keeps it. The admin's 🎨 UNLOCK PAINTS / 🎨
+  RESET PAINTS are in the SANDBOX tab's Upgrades group.
+
+**Tests:** `vanpaint_test`, `vanpaint_runtime_test`, the e2e's step 19; `tools/phone-ui/vanpaint.luau`.
+
+## 24 collectibles (8.4)
+
+Twelve more collectibles for The Old Chalet, three of each rarity, so the house holds **24** and the collection book
+**68 pieces** (44 furniture, 24 collectibles; `shared/FurnitureLooks.luau`):
+
+| Rarity | 8.0's twelve | 8.4's twelve |
+| --- | --- | --- |
+| Uncommon | Bowling Trophy, Vintage Radio, Old Globe, Mounted Stag Head | Antique Typewriter, Vintage Camera, Carved Wooden Bear |
+| Rare | Gold Record, Ship in a Bottle, Grandma's Jewellery Box | Gramophone, Grandpa's Pocket Watch, Golden Horseshoe |
+| Epic | Antique Vase, Arcade Cabinet, Jukebox | Crystal Chandelier, Alphorn, Signed Guitar |
+| Legendary | Oil Painting, Knight's Armour | Golden Ski Trophy, T. Rex Skull, Zombie-Proof Safe |
+
+- A house draws them from the whole pool (`HouseLayout.Collectibles`), each in the room its catalogue entry names.
+- The owner's Blender look has them all (`design/blender-furniture/furniture.py`, 3,000 – 6,000 triangles each, the T.
+  rex skull's "fossil" finish; `collectibles-83-preview.png`): **re-import `ZDCFurnitureArt`** (delete the old one
+  first).
+- The book's milestone for every collectible is **`collectibles24`** ($10,000). 8.2's `collectibles` (its 12, $2,500)
+  is retired (`Config.CollectionBook.Retired`): paid on an older server it stays paid in the save, but it is never paid
+  or shown here, and paying `collectibles24` marks it paid too.
+
+**Tests:** `collectionbook_test`, `collectionbook_runtime_test`, `furniture_test`, `houselayout_test`;
+`tools/furniture/mesh-check.py`.
+
+## The sandbox's light (8.4)
+
+The owner: "it is too bright: in the house I cannot see my own character, and walking into the warehouse is a
+flashbang". Every light number of the sandbox is in one place, `Config.SandboxLight` (`shared/SandboxLightRules.luau`
+has the rules; `tests/sandboxlight_test.luau` and `tests/sandboxlight_runtime_test.luau` hold every light to `Caps`).
+
+- **Calmer indoors.** The house's ceiling lamps shine 0.5 out to 24 studs (were 0.9 out to 30; a room longer than 28
+  gets two), the porch's daylight 0.45 out to 12 (was 1.6 / 18), a soft daylight instead of a wall of white Neon,
+  dimmer panes, lamp discs and garage tube, and a warm off-white plaster (`House`). The warehouse's lamps go by level
+  (`Warehouse.Levels`: the Garage 0.45 / 22, the Workshop 0.3 / 26, the Storehouse 0.6 / 28, the Big Warehouse
+  0.8 / 34, the Logistics Center 0.8 / 38; 8.2's hall had 1.3 / 40), hung under the owner's Blender lamps, their Neon
+  dimmer. The van's bay light is 0.6 / 10 (was 1.4 / 13). The sun is 1.8 (was 2), with a little less shine and glare
+  (`Sky`).
+- **Eyes that adapt.** `client/SandboxLight.luau` eases the exposure, one bloom and a colour grade to the place you are
+  in (`Places`: outdoors, the house, a hall, a Sprinter's bay) over 0.6 s (`Ease`), never at once; a bloom or sun rays
+  from the place template are switched off on the screen, and a phone or a tablet blooms less (`LiteBloom`). Behind a
+  door's black the new place comes in at once.
+- Lighting → **Technology = Future** is still set by hand in Studio (scripts cannot set it).
+
+## Key hints, first-time hints and the guide's soft steps (8.4)
+
+The 8.2 review found that no gamepad button opened 📖 BOOK, 📋 TASKS or 📦 STOCK and that texts naming a key read wrong
+on a phone. One place now decides how an action is shown on each device: `shared/SandboxPad.luau` (a device is "keys",
+"pad" for a gamepad used last, or "touch").
+
+- **The gamepad's map:** X the prompts (Use, Pick up, Load, Display, out of a seat), Y held Sell and the van's Take out,
+  R2 the grip, B put down and close (held: the guide off and on, as a held G), L1 "Hire Danny" / "Talk to Danny", R1
+  "Give to Danny", R2 / L2 and the left stick Roblox's driving. The D-pad opens the chips: ← 📦 STOCK, → 📖 BOOK,
+  ↓ 📋 TASKS (`Config.SandboxHud.StockPad`, `Config.CollectionBook.Pad`, `Config.SandboxTasks.Pad`; ↑ stays Roblox's
+  emote wheel), and the chips show the D-pad's glyph while a gamepad is used. Every sandbox window keeps the gamepad's
+  selection inside it and lands on its main action; the D-pad's chips do nothing while you carry.
+- **Key hints** (`client/KeyHints.luau`): on a computer the keys as before; with a gamepad used last the buttons'
+  glyphs (or "[R2]"), only what a button does; none on a touch screen (its buttons say what they do). The strip
+  changes at once when the input does. The grip check says "Press LMB / F", "Press R2" (its glyph) or "Tap GRIP", the
+  move's next step "(E)" or "(X)", the guide "X at the back" and "Guide off · hold G / hold B / tap 💡", the UPGRADES
+  desk's monitor "WALK UP TO OPEN". The sandbox's notices drop a key in brackets on a phone and a gamepad
+  (`SandboxHud.notice`).
+- **First-time hints** (`shared/SandboxHints.luau`, `client/SandboxHintsUi.luau`, `Config.SandboxHud.Hints`): the
+  first piece in the book, the first task done, ⭐ FILL BEST worth it (5 pieces that would earn wait beside a free
+  stand); once each, one at a time, never over a grip check, the move's cards, a window or a visitor's offer. Small
+  sounds join them: the book's chime and milestone fanfare, a task done and claimed, FILL BEST's clicks, SELL…'s till.
+- **The guide's soft steps** (`shared/SandboxSteps.luau` choose, `Config.SandboxGuide`): once the core loop has nothing
+  urgent (no move, no planning, the core steps done), the guide's line points at one new thing at a time: **grow**
+  ("Your warehouse is full: grow it at the UPGRADES desk ($1,000)", the chevron over the desk), **hot** ("🔥 Your
+  Jukebox is hot today: sell it or show it", once a market day), **upgrade** (the cheapest other upgrade the money
+  buys) and **paint** ("🎨 Make your van your own", once a warehouse level is bought or with $2,000, `PaintMoney`).
+  Each shows 40 s at most (`SoftSeconds`), 15 s apart (`SoftGap`), never while something covers the screen or a
+  first-time hint talks; doing it marks it done, and its ✕ dismisses that step alone for the session. Danny's steps
+  (hire him, give him pieces) are being added in the same place (the "HOOK Danny" points).
+
+**Tests:** `sandboxpad_test`, `sandboxhints_test`, `sandboxsteps_test`, `clientboot_test`; `tools/phone-ui/keyhints.luau`,
+`carrygrip.luau`, `sandboxguide.luau`, `movehud.luau` and `sandboxpad.luau` on a phone, a computer and a gamepad;
+`run_tests.py` checks that the sandbox's modules leave the D-pad to the chips.
+
+## Roblox badges (8.4)
+
+Twelve Roblox badges for the sandbox's milestones (`Config.SandboxBadges`): First Move, Seasoned Mover (10 moves),
+Handle With Care (a move with nothing broken), On Display, First Sale, Hot Seller, Legendary Find, Completionist (the
+whole book), Upgraded, Logistics Tycoon (warehouse level 5), Fresh Paint and Top Mover (alone at the top of the TOP
+MOVERS board on a full server). **Every badge is off until the owner sets it up**: an id of 0 is never awarded, and
+nothing errors. The owner's guide to creating them and pasting the ids is `design/sandbox/BADGES.md`.
+
+- `server/SandboxBadges.luau` only listens (the moves' results, the collection, the upgrades, the save, the board) and
+  awards on the server: once a session a badge, `UserHasBadgeAsync` first, then `AwardBadgeAsync` (an error tried
+  again 2 s later, 3 tries in all: `Tries`, `Wait`), every call in a pcall. Nothing is awarded in Studio unless
+  `Studio = true`. Milestones reached before are awarded on the next join (but not First Sale, Hot Seller and Handle
+  With Care: they happen at a moment).
+- The moves finished are counted from 8.4 on (`profile.sandboxMoves`, flag `sandboxMovesKept`; mirrored into
+  `rewards` as `mv:<n>` for 8.2 servers). `shared/SandboxBadgeRules.luau` has the rules.
+- The admin panel's SANDBOX tab shows a read-only **Badges** line: how many are set up, which still have id 0, whether
+  this server awards them and how many it has awarded.
+
+**Tests:** `sandboxbadges_test`, `sandboxbadges_runtime_test` (a fake BadgeService: ids of 0 never call, each badge
+once, errors swallowed, Studio off, the save).
+
+## Saving (8.4)
+
+`server/PlayerData.luau` writes every save with UpdateAsync, and only while the stored save is still this server's
+session (its lock holds the JobId, a session id and the save's number), so it never writes over another server or over
+a newer snapshot. Every save passes through `shared/SaveGuard.luau` first: a NaN, an infinity, a function, a table with
+holes or a string that is not UTF-8 is mended and named in the output instead of failing the whole write, and a bad
+money keeps the stored one. Top-level keys of a loaded save that this version does not know (a newer server's fields)
+are written back unchanged.
+
+- **When:** every 60 s (`Config.AutosaveSeconds`; a player saved in the last 7 s waits for the next round), 3 s after
+  a purchase, a book milestone or pieces brought home (`PlayerData.saveSoon`: one save for a burst, never within 7 s of
+  the last write), when a player leaves, and for everyone at once on shutdown (BindToClose waits up to 25 s).
+- **When it fails:** a failed write is tried again 1 s later, then 2 s, then 4 s at most between tries (`Backoff`): 3
+  tries for a save that can wait, 5 for the leave and shutdown saves. While the DataStore request budget is low, the
+  saves that can wait wait (`Reserve`). A load that fails (4 tries), or a save that throws while it is read, never gets
+  a fresh profile that could be saved over the real one: the player is kicked with a message to rejoin.
+- **A rejoin** to the same server waits for its own leave save as long as that save runs: at most that save's worst
+  case (5 tries, the backoffs between them, each UpdateAsync up to `Call`, 6 s: 41 s) and `LeaveWait` (10 s) more, 51 s
+  in all. A join that stopped waiting sooner would read the save from before it.
+- **Through an 8.2 server:** an 8.2 server keeps only the fields it knows, but every short key of `rewards`. So the
+  warehouse level (`warehouse:<k>`), the book's paid milestones (`book:<id>`), the van's paints (`paint:<id>`,
+  `paintOn:<id>`) and the moves finished (`mv:<n>`) are mirrored there, and a save such a server wrote again gets them
+  back. The market's demand is not mirrored: a day's worth at most is lost there.
+
+The numbers are in `Config.Saving`; `tests/saveguard_test.luau` and `tests/saving_runtime_test.luau` (a failing, slow and
+throttled DataStore) cover it.
+
+## A slower economy (8.4)
+
+The owner: "I want it to take longer, much longer: you must save up, or have more luck to find a rare piece of
+furniture." The sandbox now asks you to save up, or to be lucky.
+
+- **Income and sales** (`Config.Collection`): pieces on show earn 0.5 – 1.5 % of their worth a minute (common 0.5 % …
+  legendary 1.5 %) and sell for about a quarter of an hour of that (8 – 20 % of the worth); a broken piece is scrap at
+  1.5 %. A first haul from the big house on 12 stands earns about $40 – 50 a minute and sells for $900 – 2,600 in all;
+  a new player's Garage shows its best two, about $10 a minute.
+- **Rarity:** ordinary furniture is at most Rare (rare from $800). Epic and Legendary pieces are collectibles only. A
+  house holds 1 – 2 collectibles and the big house 2 – 3 (`Config.Furniture.Collectibles`, `Big.Collectibles`); only
+  about one house in 25 has a legendary (one in 17 for the big house). When one turns up, it is one your collection
+  book still lacks, if there is one (`HouseLayout.plan`'s `found`).
+- **Prices** (`Config.SandboxUpgrades`): the warehouse's levels $1,000 / $7,500 / $30,000 / $100,000, More stands
+  $4,000 / $8,000 / $15,000 / $25,000, Showroom lights $1,500 / $4,000 / $12,000 / $30,000 / $75,000, the Van engine
+  $1,500 / $5,000 / $15,000 and Danny's training $1,500 / $4,000 / $12,000: $352,000 for everything. Collector gold
+  unlocks with your first legendary ($5,000), and Mirror chrome costs $50,000.
+- **Rewards:** the book's milestones pay $250 and $500 (10 and 20 found), $2,000 (all the furniture), $10,000 (every
+  collectible, `collectibles24`) and $1,500 (a legendary); the daily tasks pay about 0.6× what they did (the bonus for
+  all three is $300, `Config.SandboxTasks.AllDaily`); a visitor's offer is at most 50 % over the market price.
+- **No house reroll:** a house stays the same until a move brings something home, so calling a move off, GIVE UP or
+  leaving no longer rerolls it (the admin's REFILL HOUSE does).
+- **Idle:** your stands pay in full while you play. After 10 minutes without doing anything (`IdleAfter`; what counts is
+  walking or driving 4 studs, `IdleMove`, or a request of the sandbox's windows and moves, `IdleRemotes`; a jump in
+  place does not) they pay a quarter (`IdleShare`), and the money line says "+$X/min · idle".
+
+**Tests** read Config where they can: `collection_test` (a sample haul's totals), `collection_runtime_test` (the idle
+share), `houselayout_test` and `biglayout_test` (the legendary's odds and the book's bias), `sandboxmove_runtime_test`
+(no reroll), `upgrades_test`.
+
+## The reviews' fixes (8.4)
+
+- **Danny and the moves:** out of the van's seat at that seat's door, never in its shell; the move's end waits for the
+  crew's door trips out of the house; a seat a crew mate is boarding is never Danny's, and a crew mate's Ride along
+  makes him get out; Studio's test players (negative ids) count as players, so piece clicks and calls work in a Local
+  Server test; a crew mate's Lift on a piece somebody waits at with Danny is refused; the lift check his arrival opens,
+  left unanswered, closes without a knock.
+- **The client:** a tap beside Danny's card only closes it; the card is a gamepad selection group and shrinks on a
+  small phone; another window only hides a visitor's offer; the hints wait for the offer card; Danny's status line
+  speaks the device's words.
+- **Saves and money:** the van's paints and the moves finished survive a visit to an 8.2 server; the 24-piece milestone
+  has its own id (`collectibles24`); SELL… sells exactly the pieces its question listed (another list now: nothing is
+  sold, and the state goes out again); a rejoin waits for a slow leave save; the warehouse level and the book survive an
+  older server; a sale is refused only when the price fell below the one shown.
+- **On the way:** a save from before 8.3 gets the Big Warehouse for free, so it no longer counts as the Upgraded badge's
+  first upgrade; a level down sends a piece too big for its new stand back to the stock; the gamepad's D-pad chips do
+  nothing while carrying (B would put the piece down too); Danny's call names no key.
 
 ## The warehouse's five levels in Blender (8.0.4, design only)
 

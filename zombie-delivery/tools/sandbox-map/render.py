@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""8.3: the sandbox's map from above for the owner's guide (design/sandbox/GUIDE.md, design/sandbox/map.png).
+"""8.3: the sandbox's map from above (design/sandbox/map.png; 8.4: the player guide that showed it is withdrawn for now).
 
 The real server code builds the world on tools/perf/world-mock.luau (world_count.py's preparation; export.luau):
 server/SandboxWorld.luau's map, the four kiosks (server/MoveSites.luau plotBoard), the four warehouses (server/Warehouse.luau;

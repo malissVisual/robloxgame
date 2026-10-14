@@ -1,4 +1,4 @@
-# 8.3 SANDBOX: Roblox badges, the setup guide
+# 8.4 SANDBOX: Roblox badges, the setup guide
 
 The sandbox can award twelve Roblox badges for its milestones, such as the first move, the first sale or a full
 collection book. The code is ready, but every badge is **off** until you create it on Roblox and paste its id into the
@@ -13,7 +13,7 @@ Type the **name** and the **description** into Roblox's form exactly as written 
 | Key in Config | Name | Description | When the game awards it |
 | --- | --- | --- | --- |
 | `firstMove` | First Move | Finish your first move. | A move ends as done or late with at least one piece brought home. Everyone in the crew gets it. |
-| `tenMoves` | Seasoned Mover | Finish 10 moves. | The tenth finished move. The game counts finished moves in the save from version 8.3 on. |
+| `tenMoves` | Seasoned Mover | Finish 10 moves. | The tenth finished move. The game counts finished moves in the save from version 8.4 on. |
 | `cleanMove` | Handle With Care | Finish a move with nothing broken. | A finished move in which no piece broke. |
 | `firstShow` | On Display | Put a piece on a display stand in your warehouse. | A piece of yours stands on one of your display stands. |
 | `firstSale` | First Sale | Sell a piece from your collection. | Any sale: one piece, SELL… for many, or a visitor's offer accepted. |
@@ -107,7 +107,7 @@ account, not on a player.
 - **Turning a badge off.** Set its id back to `0`, or disable the badge on create.roblox.com. A disabled badge is simply
   not awarded.
 - **Changing a badge's picture or text** on create.roblox.com needs no change in the game. Only the id matters.
-- **Finished moves before 8.3** were never counted, so Seasoned Mover counts from this version on. First Move is
+- **Finished moves before 8.4** were never counted, so Seasoned Mover counts from this version on. First Move is
   awarded by the next finished move, or on joining once the count is at least 1.
 - **Errors** show in the server's Output as `[SandboxBadges] …`, once for each badge. A badge id typed wrong (a badge of
   another game, or a deleted badge) shows there as well, as an error or as "Roblox did not award it".

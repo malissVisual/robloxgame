@@ -39,14 +39,14 @@
 --                                      nil for none
 --   Market.readView(raw)               a View from the remote, checked (nil for anything else; the client's)
 -- The words (the client's):
---   Market.factor(x)                   "×1.6", "×1.25"; Market.percent(view?, item): how much under its price a kind sells
+--   Market.factor(x)                   "×1.4", "×1.2"; Market.percent(view?, item): how much under its price a kind sells
 --                                      for now because of the demand (0 … MaxDrop × 100, whole)
 --   Market.wait(s)                     "5 h", "40 min", "1 min"; Market.money(n): "$1,234" (the server's notices)
 --   Market.nameOf(item)                its catalogue name (else the id)
 --   Market.line(view, left?)           "Today's market: 🔥 Old Globe, Jukebox, Sofa · ❄ Wardrobe · new in 5 h"
---   Market.badge(view?, item)          "🔥 HOT ×1.6", "❄ COLD" or nil
+--   Market.badge(view?, item)          "🔥 HOT ×1.4", "❄ COLD" or nil
 --   Market.demandLine(view?, item, name?)   "Market: Vintage Radio −10% (you sold 2 today)" (nil: its price is whole)
---   Market.hotToast(view)              "🔥 Hot today: Old Globe, Jukebox, Sofa (sell ×1.6, on show ×1.25)"
+--   Market.hotToast(view)              "🔥 Hot today: Old Globe, Jukebox, Sofa (sell ×1.4, on show ×1.2)"
 
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)

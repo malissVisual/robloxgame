@@ -417,5 +417,22 @@ E.flush()
 local fromLock = profileOf(D).sandboxTasks
 check("a lock-only record (no money): not read, today's picks fresh", fromLock ~= nil and fromLock.day == Rules.dayOf(E.now) and #fromLock.daily == T.Daily)
 
+-- 8.4: a new player's Garage (2 stands) never gets "Have {n} pieces on show" (its targets need more stands than it has)
+local Eve = E.join(505, "Eve")
+E.flush()
+local shownSeen, shownDrawn = false, false
+for _ = 1, 40 do
+	E.now += DAY
+	E.advance(T.CheckEvery + 0.5)
+	local picks = profileOf(Eve).sandboxTasks
+	for _, pick in (if picks then picks.daily else {}) do
+		shownSeen = shownSeen or pick.id == "shown"
+	end
+	for _, pick in Rules.pickDaily(Rules.dayOf(E.now), 505, nil) do
+		shownDrawn = shownDrawn or pick.id == "shown"
+	end
+end
+check("8.4: 40 days in the Garage: \"shown\" never picked (the same days without the skip draw it)", not shownSeen and shownDrawn)
+
 check("no warnings", #E.warnings == 0, E.warnings[1])
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)
