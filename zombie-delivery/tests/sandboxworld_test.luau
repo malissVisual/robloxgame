@@ -466,7 +466,8 @@ end
 -- the chalet: in House.house's box, facing north, its FrontDoor at House.door. 8.1: its parts in the Model
 -- "House_sandbox_house" (attribute Home) that server/HouseMesh.luau dresses, on the owner's Blender house's box (HouseMesh
 -- dresses only a house of that size; HouseArt: design/blender-house's manifest, tests/run_tests.py), the FrontDoor on the
--- model's front door; no import here, so the chalet as it is (tools/house-art/check.py dresses it).
+-- model's front door; no import here, so the chalet as it is (tools/house-art/check.py dresses it). 8.3 the big move:
+-- its doors' leaves and its back door (House.back) on the model's back door.
 do
 	local chalet = world:FindFirstChild("TheOldChalet")
 	check("the chalet is a model with its house's id", chalet ~= nil and chalet:IsA("Model") and chalet:GetAttribute("SandboxHouse") == HOUSE.id)
@@ -592,6 +593,44 @@ do
 	end
 	check("…dressed in the Blender house: two FrontDoorLeaf models in it (DoorLeaf ±1, DoorSwing 1, DoorDark; the model's finishes), never colliding",
 		builtOk, #built)
+	-- 8.3 the big move: the FrontDoor unseen behind its two leaves; the back door at House.back on the Blender house's back
+	-- door (BackDoor: SandboxBackDoor, unseen, no collision; across it, as wide and tall, just outside its leaf) with its
+	-- leaf; each leaf shut in its doorway, hinged at a jamb (DoorLeaf, Hinge), not solid, seen; all the house's own parts
+	local backs = named("BackDoor")
+	local back = backs[1]
+	local B = HouseArt.back
+	local blo, bhi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+	for _, x in { B.x0, B.x1 } do
+		for _, y in { B.y0, B.y1 } do
+			for _, z in { B.z0, B.z1 } do
+				local p = frame * G.Vector3.new(x, y, z)
+				blo = { math.min(blo[1], p.X), math.min(blo[2], p.Y), math.min(blo[3], p.Z) }
+				bhi = { math.max(bhi[1], p.X), math.max(bhi[2], p.Y), math.max(bhi[3], p.Z) }
+			end
+		end
+	end
+	local hb = HOUSE.back
+	check("8.3: one BackDoor (SandboxBackDoor = true, unseen, no collision) at House.back, on the back wall, the house's own", #backs == 1
+		and back.part:GetAttribute("SandboxBackDoor") == true and not back.part.CanCollide and back.part.Transparency == 1 and back.part.Parent == own
+		and math.abs((back.x0 + back.x1) / 2 - hb.x) < 0.1 and math.abs(back.z1 - hb.z) < 0.5 and back.z0 >= body.z1 - EPS and hb.yaw == 180,
+		back and string.format("%.2f, %.2f, %.2f", (back.x0 + back.x1) / 2, back.y0, back.z0))
+	check("8.3: …on the Blender house's back door: across it, as wide and tall, just outside its leaf", back ~= nil
+		and math.abs((back.x0 + back.x1) / 2 - (blo[1] + bhi[1]) / 2) < 0.1 and math.abs((back.x1 - back.x0) - (bhi[1] - blo[1])) < 0.25
+		and math.abs(back.y0 - blo[2]) < 0.3 and math.abs(back.y1 - bhi[2]) < 0.3 and back.z0 >= bhi[3] - EPS and back.z0 - bhi[3] < 0.5,
+		back and string.format("BackDoor %.2f … %.2f, %.2f … %.2f, %.2f … %.2f; leaf %.2f … %.2f, %.2f … %.2f, %.2f … %.2f",
+			back.x0, back.x1, back.y0, back.y1, back.z0, back.z1, blo[1], bhi[1], blo[2], bhi[2], blo[3], bhi[3]))
+	local leavesOk, count = true, 0
+	for _, want in { { "FrontLeafWest", "front", "west", door }, { "FrontLeafEast", "front", "east", door }, { "BackLeaf", "back", "west", back } } do
+		local list = named(want[1])
+		local leaf, way = list[1], want[4]
+		count += #list
+		leavesOk = leavesOk and #list == 1 and way ~= nil and leaf.part:GetAttribute("DoorLeaf") == want[2] and leaf.part:GetAttribute("Hinge") == want[3]
+			and not leaf.part.CanCollide and leaf.part.Transparency == 0 and leaf.part.Parent == own
+			and leaf.x0 >= way.x0 - 0.05 and leaf.x1 <= way.x1 + 0.05 and leaf.y0 >= way.y0 - 0.05 and leaf.y1 <= way.y1 + 0.05
+			and (if want[3] == "west" then math.abs(leaf.x0 - way.x0) < 0.1 else math.abs(leaf.x1 - way.x1) < 0.1)
+	end
+	check("8.3: the doors' leaves shut in their doorways (FrontLeafWest west, FrontLeafEast east, BackLeaf west), the FrontDoor unseen behind them",
+		leavesOk and count == 3 and door ~= nil and door.part.Transparency == 1)
 	local garden = chalet and chalet:FindFirstChild("Garden")
 	local gardenSolid: string? = if garden then nil else "no garden"
 	local gardenParts = 0

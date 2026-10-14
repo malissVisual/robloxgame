@@ -93,6 +93,7 @@ SandboxScenery.WallHeight = 300
 SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
+SandboxScenery.BackDoor = { Width = 3 } -- 8.3: the back door at House.back (the owner's model's: house.py), its width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }
 SandboxScenery.Trees = { Height = { 28, 50 } :: { number }, Edge = { 24, 34 } :: { number }, Canopy = 0.19, Chunk = 128, Max = 120 }
 SandboxScenery.Light = Config.SandboxLight.Sky -- 8.3: the afternoon's light lives in Config with the rest of the light

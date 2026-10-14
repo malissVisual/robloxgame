@@ -29,7 +29,8 @@
 -- strip, client/CarryGripUi.luau's grip check, client/MovingHud.luau's next step, client/SandboxGuide.luau's line).
 -- The gamepad's map: X the prompts (Use, Pick up, Load, Display; out of a seat), Y held for Sell and the van's Take out,
 -- R2 the grip, B Put down and closing (held: the guide on and off, as a held G), L1 "Talk to Danny" (reserved for
--- him), R2 / L2 and the left stick Roblox's driving. A word names a gamepad button as Roblox does ("X", "R2").
+-- him; 8.3 Danny for hire: R1 his "Give to Danny" at a piece), R2 / L2 and the left stick Roblox's driving. A word names
+-- a gamepad button as Roblox does ("X", "R2").
 --   SandboxPad.Actions                      the actions (id → { key, pad, tap?, hold? }): key the keyboard's ("E"),
 --                                           pad the gamepad's buttons (Enum.KeyCode names, never the D-pad: the chips'),
 --                                           tap a touch screen's button for it ("GRIP", "💡"; nil: the thing itself, a
@@ -66,6 +67,7 @@ SandboxPad.Actions = {
 	takeout = { key = "Z", pad = { "ButtonY" }, hold = true }, -- the van's Take out
 	grip = { key = "LMB / F", pad = { "ButtonR2" }, tap = "GRIP" }, -- the grip check's one press (a phone: its GRIP button)
 	danny = { key = "E", pad = { "ButtonL1" } }, -- "Talk to Danny" (L1 his)
+	dannygive = { key = "LMB", pad = { "ButtonR1" } }, -- 8.3 Danny for hire: a piece onto his list or off it (a click, a tap, R1 at it)
 	drive = { key = "W/S", pad = { "ButtonR2", "ButtonL2" } }, -- Roblox's driving: R2 on, L2 back
 	steer = { key = "A/D", pad = { "Thumbstick1" } },
 	horn = { key = "H", pad = {} }, -- (no button: the keyboard's H only)

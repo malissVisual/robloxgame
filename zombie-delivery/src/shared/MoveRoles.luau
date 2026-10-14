@@ -97,7 +97,7 @@ MoveRoles.Roles = {
 -- The quick chat (client/QuickChat.luau: hold T): six lines, by number.
 MoveRoles.Chat = {
 	{ id = "door", icon = "✋", text = "Hold the door" },
-	{ id = "hand", icon = "🙏", text = "Need a hand here" }, -- (on a solo move: Danny, the depot's helper, comes: HELP ME)
+	{ id = "hand", icon = "🙏", text = "Need a hand here" }, -- (the crew hears it; 8.3: Danny is hired and given pieces, never called by it)
 	{ id = "zombies", icon = "🧟", text = "Zombies!" },
 	{ id = "truck", icon = "🚚", text = "Truck's here" },
 	{ id = "pickup", icon = "🏃", text = "I'll come pick you up" },

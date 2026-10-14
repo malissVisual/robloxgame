@@ -21,7 +21,8 @@
 -- the doorway inside, no ping-pong (shut until you left the zone you came out in and Rearm s went by, whichever later),
 -- in and out with a piece in your hands, a pair piece's back end does not lead (said once), its front end takes it along;
 -- the doormats (▲ IN outside while a move uses the house, ▲ OUT inside).
--- 8.3 Danny's orders: a crew of players has no Danny, so a two-person Lift is today's (dragged alone, Help lift).
+-- 8.3 Danny for hire: a crew of players has no Danny (an unhired one is never called either), so a two-person Lift is today's
+-- (dragged alone, Help lift).
 -- 8.3 the doors swing (Config.Moving.Doors, shared/DoorSwing.luau): the leaves found and tagged at the start, shut;
 -- walking up facing a door opens its leaf before its zone, the trip waits until it has been open Open s; the fade out's
 -- FadeOut, the move FadeOut + Margin s later, the fade in's arrival (where you are, the way you face, Dark, Wait), the

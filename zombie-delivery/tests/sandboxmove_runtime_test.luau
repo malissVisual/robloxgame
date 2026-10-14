@@ -3,13 +3,13 @@
 -- them; the fake art's plan records its seeds and gives each piece a colour variant).
 --   * Moving.start in the sandbox: a Moving contracts kiosk on every plot (SandboxMap plot.board), no depot board, no
 --     Wall, no dressing, no soldier, no Marge or Walt: one contract, "The Old Chalet" (SandboxMap.House).
---   * The card (any plot's board, not from afar): the house, its pieces' worth, 20 minutes, no horde by default, no
+--   * The card (any plot's board, not from afar): the house, its pieces' worth, 8.3 25 minutes, no horde by default, no
 --     story, the note; its seed a new one each move. START → the solo lobby → LAUNCH at a board: the owner's own van
 --     (the Sprinter, its walk-in bay Config.Moving.Beds.sprinter), the house built with the card's seed.
 --   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the Driver's
 --     call parks the van at House.curb (its nose to the road, its back to the door).
 --   * Load at the back doors, and from inside the walk-in bay (its own Load, the back shut), every piece inside the
---     bay; Danny on a solo move.
+--     bay; Danny on a solo move (8.3: for hire, not hired: a two-person Lift is dragged alone).
 --   * The drop-off: not another player's plot; the van's back in the owner's plot's unload circle: a trip, every piece
 --     in the van into the owner's stock (Collection.add with its item, variant, condition, name), no pay; a second
 --     trip; FINISH: the result card says what came home (pieces, value, trips), no money, no XP.
@@ -29,7 +29,9 @@
 --     chalet, no Marge, Walt or Wall), Danny's lines; nothing a crew hears or reads at the end mentions the Wall, pay
 --     or XP.
 -- 8.1 walk-in doors: the chalet's front door walked through both ways (no E: its Enter house off), out 4 studs from it
--- facing the road, no way straight back, its doormat over the garden path while a move runs.
+-- facing the road, no way straight back, its doormat over the garden path while a move runs. 8.3 the big move: its plan
+-- HouseLayout's kind "big" (Config.Moving.Sandbox.Kind); its back door (House.back) a second way in, its own doormat
+-- and walk-in zone.
 -- 8.2 analytics: Moving's listeners (onStart, onEnterHouse, onLoad, onTrip, onFinish; server/SandboxAnalytics.luau's)
 -- hear each moment with its numbers, and every real end's words come out as AnalyticsPlan.moveHow's word (FINISH, the
 -- admin's end, GIVE UP after a trip, the owner leaving).
@@ -121,9 +123,11 @@ end
 
 -- the fake art's plan: its seeds kept, every piece a colour variant (its spot + 2)
 local seeds: { number } = {}
+local kinds: { string } = {} -- (8.3: the kind of every plan asked for)
 local planOf = E.art.layout.plan
 E.art.layout.plan = function(seed: number, kind: string): any
 	table.insert(seeds, seed)
+	table.insert(kinds, kind)
 	local plan = planOf(seed, kind)
 	local spots = {}
 	for _, spot in plan.spots do
@@ -257,12 +261,12 @@ local worth = 0
 for _, item in E.items do
 	worth += item.value
 end
-check("the board's card: The Old Chalet, its pieces' worth, 20 minutes", card ~= nil and card.a.id == House.id and card.a.name == House.name and card.a.items == 6
-	and card.a.estimate == worth and card.a.time == 20 * 60 and card.a.busy == nil and card.a.address == S.Address, card and card.a.busy)
+check("the board's card: The Old Chalet, its pieces' worth, 8.3: 25 minutes (several trips)", card ~= nil and card.a.id == House.id and card.a.name == House.name and card.a.items == 6
+	and card.a.estimate == worth and S.Time == 25 * 60 and card.a.time == S.Time and card.a.busy == nil and card.a.address == S.Address, card and card.a.busy)
 check("…no horde by default (no guns in the sandbox), no roamers", S.Horde == false and S.Roam == 0 and card.a.hordeAt == 0)
 check("…no story, the note (no pay per piece), one contract", card.a.story == false and type(card.a.note) == "string" and #card.a.contracts == 1
 	and card.a.contracts[1].id == House.id and E.last(ann, "Tutorial", "message") == nil)
-check("…its house planned with a seed (a kind house)", #seeds == 1 and seeds[1] > 0)
+check("…its house planned with a seed, 8.3: the big house's plan (kind big)", #seeds == 1 and seeds[1] > 0 and kinds[1] == "big" and S.Kind == "big")
 trigger(board1, ann)
 check("the same card again: the same house (no new plan)", #seeds == 1)
 E.place(ann, moves:FindFirstChild("MovingBoard2"):FindFirstChild("Board").Position + V3(0, 0, 4))
@@ -302,7 +306,7 @@ check("…the house built with the card's seed (planned once)", #built == 1 and 
 step()
 local view = E.last(ann, "Moving", "state")
 check("the state: the drop-off is the owner's plot's unload circle, in the HUD's words; no horde", view.a.drop == "your warehouse" and view.a.dropOff.x == plot1.unload.x
-	and view.a.dropOff.z == plot1.unload.z and view.a.hordeAt == nil and view.a.endsAt == E.now + 20 * 60 and view.a.mine == true)
+	and view.a.dropOff.z == plot1.unload.z and view.a.hordeAt == nil and view.a.endsAt == E.now + S.Time and view.a.mine == true)
 check("the GPS's house: the van's curb", view.a.house.x == House.curb.x and view.a.house.z == House.curb.z)
 local porch = false
 for _, child in workspace:GetChildren() do
@@ -313,6 +317,9 @@ end
 check("nobody on the porch, no Marge's text (no story)", not porch and E.last(ann, "Tutorial", "message") == nil)
 local danny = MoveHelper.find(ann)
 check("Danny joins a crew of one", danny ~= nil and danny.body ~= nil)
+check("8.3 …for hire (nobody hired him: he waits by the van, his price on the status line; the sandbox's words: click him)", danny.hirer == nil
+	and ann:GetAttribute("MoveHelper") == "offer" and ann:GetAttribute("MoveHelperPrice") == danny.price
+	and string.find(E.lastNotice(ann), "click him to hire him", 1, true) ~= nil, E.lastNotice(ann))
 check("8.0.1: Danny says hello without the city's depot; his full van's line names no Wall", E.saidSince(Brain.line("hello", true) :: string, 0)
 	and not E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.line("full", true) :: string, "Wall", 1, true) == nil)
 
@@ -417,10 +424,8 @@ E.place(ann, outside)
 trigger(enter, ann)
 local sofa = newItem(3)
 E.place(ann, sofa.PrimaryPart.Position + V3(1, 0, 0))
-Config.MoveHelper.WaitForHelper = false -- (8.3 the switch off: today's rule, the sofa dragged alone; Danny's call is movehelper_runtime_test's)
-trigger(promptIn(sofa, "Lift"), ann)
-Config.MoveHelper.WaitForHelper = true
-check("8.3 WaitForHelper off: a two-person Lift is a drag alone as before (no call)", ann.Character:GetAttribute("MoveCarry") == 3
+trigger(promptIn(sofa, "Lift"), ann) -- (8.3 Danny not hired: today's rule, the sofa dragged alone; his call is movehelper_runtime_test's)
+check("8.3 Danny not hired: a two-person Lift is a drag alone as before (no call, WaitForHelper or not)", Config.MoveHelper.WaitForHelper and ann.Character:GetAttribute("MoveCarry") == 3
 	and ann:GetAttribute("MoveHelperCall") == nil and MoveHelper.find(ann).call == nil)
 step()
 E.place(ann, origin.Position + V3(0, 3, 1))
@@ -616,7 +621,7 @@ check("8.0.1: …the sandbox's way (SandboxBoot.parkVan, the hook Moving.parkVan
 	#parked == parkedBefore + 1 and how.player == bob and how.spot == plot2.vanSpot and how.seat == false and how.carId == nil and van.health == 1, van.health)
 check("…never a bare spawnAt / placeAt / placeNear (they would skip the repair)", (E.vehicleCalls or 0) == callsBefore, E.vehicleCalls)
 step()
-check("…its clock 20 minutes, the horde switched on at HordeAt", E.last(bob, "Moving", "state").a.hordeAt == E.last(bob, "Moving", "state").a.endsAt - S.HordeAt)
+check("…its clock 25 minutes, the horde switched on at HordeAt", E.last(bob, "Moving", "state").a.hordeAt == E.last(bob, "Moving", "state").a.endsAt - S.HordeAt)
 local zombies = #E.zombies
 E.place(bob, outside)
 step(T.Roam.Every + 0.1)
@@ -627,7 +632,7 @@ for index = zombies + 1, #E.zombies do
 	end
 end
 check("…a few roamers round the house (Roam)", roamers > 0 and roamers <= S.Roam, roamers)
-E.now += 20 * 60 - S.HordeAt + 1
+E.now += S.Time - S.HordeAt + 1
 step()
 check("…the horde comes", E.last(bob, "Moving", "state").a.horde == true and heard(bob, "HORDE"))
 S.Horde, S.Roam = false, 0
@@ -696,9 +701,10 @@ check("8.2: …onFinish: Ann's, \"left\", the crew of two", (lastTold("finish"))
 
 -- 8.1 walk-in doors in the sandbox (the owner: "no E at the house, neither in nor out"): the chalet's front door (the map's
 -- SandboxDoor part) walked through both ways, after the dwell, facing it; out 4 studs from the door facing the road; no
--- way straight back; its doormat on the garden path in front of it; the E prompts off. 8.3: its leaf (the map's door,
--- DoorLeaf) found and tagged at the move's start, shut; swung open as Bob walks up to it, the trip after it has been
--- open Open s; shut again Shut s after its zone emptied.
+-- way straight back; its doormat on the garden path in front of it; the E prompts off. 8.3 the big move: its back door
+-- (House.back, in the back wall) a second way in, its own doormat (the fake plan has one way out: in to its entry). 8.3
+-- the doors swing: the house's leaves (the map's, DoorLeaf) found and tagged at the move's start, shut; swung open as
+-- Bob walks up to a door, the trip after it has been open Open s; shut again Shut s after its zone emptied.
 do
 	local D = T.Doors
 	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
@@ -716,10 +722,16 @@ do
 		return (E.rootOf(player).Position - o.Position).Magnitude < 100
 	end
 	local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{House.id}`)
-	local mat: any = nil
+	local back = V3(House.back.x, House.back.y, House.back.z)
+	local backFacing = V3(0, 0, 1) -- (House.back yaw 180: out to the south, the garden)
+	local mat, backMat: any, any = nil, nil
 	for _, d in site:GetDescendants() do
 		if d.Name == "WalkInMat" then
-			mat = d
+			if flatDistance(d.Position, foot) < 5 then
+				mat = d
+			elseif flatDistance(d.Position, back) < 5 then
+				backMat = d
+			end
 		end
 	end
 	local label = mat and mat:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
@@ -751,8 +763,29 @@ do
 	step(D.Rearm)
 	step(THROUGH)
 	check("…then in again", isIn(bob))
+	-- 8.3 the big move's back door: out by the front, round the house to the back wall, in by the back door
+	local backLabel = backMat and backMat:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
+	local backPrompt = promptIn(site, "Enter by the back door")
+	check("8.3: the back door's doormat (▲ IN) in front of it, south of the back wall, shown; its Enter prompt there, off", backMat ~= nil
+		and backLabel.Text == "▲ IN" and backMat.Transparency == 0 and (backMat.Position - back):Dot(backFacing) > 0.5
+		and (backMat.Position - back):Dot(backFacing) < D.Depth and backPrompt ~= nil and not backPrompt.Enabled)
+	stand(bob, exitAt + into * 8, -into)
+	step(0.1)
+	step(D.Rearm)
+	stand(bob, exitAt + into * 1, -into)
+	step(0.1)
+	step(D.Dwell)
+	check("(out by the front door again)", not isIn(bob))
+	step(D.Rearm)
+	stand(bob, back + up + backFacing * 6, -backFacing)
+	step(0.1)
+	check("…at the back door, not in before the dwell", not isIn(bob))
+	stand(bob, back + up + backFacing * 2, -backFacing)
+	step(0.1)
+	step(D.Dwell)
+	check("…walked into the back door's zone facing it: in (no E)", isIn(bob))
 	Moving.admin(bob, "end")
-	check("the move over: the doormat hidden again (no move at the house)", mat.Transparency == 1)
+	check("the move over: both doormats hidden again (no move at the house)", mat.Transparency == 1 and backMat.Transparency == 1)
 end
 
 -- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or

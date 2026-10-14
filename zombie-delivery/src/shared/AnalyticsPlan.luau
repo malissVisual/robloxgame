@@ -219,6 +219,7 @@ AnalyticsPlan.Events = {
 	"MoveGaveUp", -- a move ended with nothing home (value: its minutes; fields: how, how far it got, "solo" / "crew")
 	"GripCheck", -- a grip check's outcome, one in GripEvery a player (value: GripEvery; fields: outcome, lift / wobble, fragile)
 	"CollectibleFound", -- a collectible came home into the stock (value: its worth, $; fields: the rarity, its id)
+	"VisitorOffer", -- 8.3: a showroom visitor's offer (server/VisitorOffers.luau; value: its $; fields: "made", "sold", "declined", "expired", "gone" or "left", the piece's rarity)
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -287,6 +288,7 @@ AnalyticsPlan.Sources = {
 	MovePay = "Gameplay", -- 7.0: a house move's pay (the owner's and each crew mate's share: server/Moving.luau)
 	CollectionIncome = "Gameplay", -- 8.0: the warehouse's display stands earn every minute you play (server/Collection.luau)
 	CollectionSale = "Sale", -- 8.0: a piece of your collection sold (server/Collection.luau; the item SKU its furniture id)
+	VisitorOffer = "Sale", -- 8.3: a showroom visitor's offer accepted: the piece sold at it (server/VisitorOffers.luau → Collection.sellAt; the SKU its furniture id)
 	BookMilestone = "Gameplay", -- 8.2: a collection book milestone, paid once (server/CollectionBook.luau; the SKU its id)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
@@ -310,6 +312,7 @@ AnalyticsPlan.Sinks = {
 	Paint = "Shop",
 	Stage = "Shop",
 	Upgrade = "Shop", -- a city upgrade track; 8.1 SANDBOX: a warehouse upgrade at the UPGRADES desk (server/Upgrades.luau; the SKU its id)
+	VanPaint = "Shop", -- 8.3 SANDBOX: a paint or a livery for your van at the PAINT shop (server/VanPaint.luau; the SKU its id)
 	Style = "Shop",
 	RealEstate = "Shop",
 	Company = "Shop", -- a courier hired, an upgrade of your company
@@ -318,6 +321,7 @@ AnalyticsPlan.Sinks = {
 	Repair = "ContextualPurchase",
 	Reroll = "ContextualPurchase",
 	Rental = "ContextualPurchase",
+	HelperHire = "ContextualPurchase", -- 8.3: Danny hired for a move (server/MoveHelper.luau; the SKU the move's contract id)
 }
 
 -- The frequent small ones: summed a player and sent every Config.Analytics.BatchSeconds (and when they leave).

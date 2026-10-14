@@ -269,9 +269,8 @@ local plan = built[1].plan
 local origin = built[1].origin
 local truck = E.cars[ann]
 
--- (Help me: he follows Ann across the yard by his paths)
-E.place(ann, outside + facing * 26)
-MoveHelper.order(ann, "help")
+-- (8.3: across the yard by his paths, back to his place by the van)
+danny.body.root.CFrame = M.CFrame.new(outside + facing * 26 + V3(0, 3, 0))
 run(6)
 local made = created[1]
 check("8.3 his Path: never a jump, never a climb (AgentCanJump, AgentCanClimb false), Config.MoveHelper's Path* numbers", made ~= nil
@@ -299,7 +298,8 @@ end
 check("8.3 …a Jump waypoint in his way is never his: not in his path, never walked to (he walks the rest of it)", computed > 0 and #walks > 0
 	and not hopped and not walkedToHop and #danny.path > 0, `{computed} paths, {#walks} walks`)
 check("8.3 …every walk of his asks Npcs.walkTo for no jump (jump = false)", #walks > 0 and jumpy == 0, jumpy)
-MoveHelper.order(ann, "auto") -- (8.3 Danny's orders: AUTO, the default)
+E.request(ann, "helper", "hire") -- (8.3 Danny for hire: a two-person Lift calls him once he is hired)
+check("8.3 Ann hires him (her Lift calls him from now on)", danny.hirer == ann)
 
 -- The real Dining Table, lifted together ---------------------------------------------------------------------------------------
 
@@ -324,9 +324,10 @@ local tableAt = V3(exitAt.X, ground + carried.PrimaryPart.Size.Y / 2, exitAt.Z +
 carried:PivotTo(M.CFrame.lookAt(tableAt, tableAt + V3(0, 0, -1)))
 local inHall = V3(exitAt.X, ground + 3, exitAt.Z + 14 + carried.PrimaryPart.Size.Z / 2 + 1.5)
 E.rootOf(ann).CFrame = M.CFrame.lookAt(inHall, inHall + V3(0, 0, -1)) -- (facing the table and the front door beyond it)
+danny.body.root.CFrame = M.CFrame.new(inHall + V3(0, 0, 5)) -- (in the hall behind her, as he was before 8.3's hire)
 trigger(promptIn(carried, "Lift"), ann)
 hold()
--- (8.3 Danny's orders: Ann's Lift calls him and she waits; his walk goes nowhere here, so CallBlink s later he fades
+-- (8.3 Danny hired: Ann's Lift calls him and she waits; his walk goes nowhere here, so CallBlink s later he fades
 -- over as the last resort, and up it goes together)
 local lifted = run(H.CallBlink + 3, function()
 	hold()

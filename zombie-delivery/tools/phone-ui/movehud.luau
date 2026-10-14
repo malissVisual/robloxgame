@@ -257,12 +257,12 @@ local panelBox = box(panel)
 check("the panel shows at the top in the middle, on the screen", panel.Visible and inside(panelBox) and math.abs((panelBox.x0 + panelBox.x1) / 2 - M.width / 2) < 1, show(panelBox))
 check("… clear of the touch buttons, the thumbstick and the jump", clearOfTouch(panelBox))
 check("… the GPS on the house", M.waypoint ~= nil and M.waypoint.X == 263)
-attribute("MoveHelper", "carry")
+attribute("MoveHelper", "hired") -- (8.3: Danny hired)
 local strip = MoveHelperHud.strip()
 local stripBox = box(strip)
 check("Danny's strip right under the panel's real foot (its role line not covered)", strip.Visible and stripBox.y0 >= panelBox.y1 and stripBox.y0 - panelBox.y1 < 12 and not overlap(stripBox, panelBox),
 	`{show(panelBox)} / {show(stripBox)}`)
-check("… on the screen, clear of the touch buttons, a finger's buttons", inside(stripBox) and clearOfTouch(stripBox) and named(strip, "help").Size.Y.Offset * M.scale >= 44 - 0.01)
+check("… on the screen, clear of the touch buttons, a finger's button (8.3: its one button)", inside(stripBox) and clearOfTouch(stripBox) and named(strip, "Action").Size.Y.Offset * M.scale >= 44 - 0.01)
 
 -- ── The quick chat ──────────────────────────────────────────────────────────
 attribute("MoveWith", 14)

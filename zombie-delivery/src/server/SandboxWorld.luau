@@ -17,7 +17,10 @@
 --             chalet's parts in the Model "House_sandbox_house" (attribute Home) on the owner's Blender house's box:
 --             once ZDCHouseArt is imported, server/HouseMesh.luau dresses it (the chalet's parts hidden but still
 --             colliding, its gable re-cut under the model's roof; the FrontDoor where the model's door is), the garden
---             beside it in "Garden"; no import: the chalet. 8.2: Atomic (with StreamingEnabled it streams whole)
+--             beside it in "Garden"; no import: the chalet. 8.2: Atomic (with StreamingEnabled it streams whole). 8.3
+--             the big move: the FrontDoor unseen behind its two leaves (FrontLeafWest, FrontLeafEast: DoorLeaf "front",
+--             Hinge "west" / "east"), the back door at House.back ("BackDoor": SandboxBackDoor, unseen, no collision; its
+--             leaf "BackLeaf": DoorLeaf "back", Hinge "west"); dressed, all hidden with the chalet
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -359,6 +362,35 @@ local function house(world: Instance): Model
 		elseif not piece.solid then
 			deco(p)
 		end
+	end
+	-- 8.3 the big move: the doors' leaves (shut, each a part of its own hinged at a jamb: the attributes DoorLeaf and
+	-- Hinge, the doors' swing is the client's) and the back door. The front door's two leaves in the FrontDoor's place
+	-- (it stays the doorway, the moves' front door, unseen: the leaves show the door); the back door at House.back (the
+	-- owner's model's, in the middle of its back wall): its doorway "BackDoor" (attribute SandboxBackDoor, unseen, no
+	-- collision: server/Moving.luau's second way in) as the FrontDoor is to the front, S.BackDoor.Width wide, and its
+	-- leaf. All of them the house's own parts: dressed in the owner's model they are hidden with the chalet (the model's
+	-- own leaves show its doors).
+	local front = body:FindFirstChild("FrontDoor") :: BasePart?
+	if front then
+		local size = front.Size
+		front.Transparency = 1
+		front.CastShadow = false
+		for _, side in { -1, 1 } do
+			local leaf = deco(block(body, if side < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(size.X / 2 - 0.04, size.Y, size.Z + 0.04),
+				front.CFrame * CFrame.new(side * size.X / 4, 0, 0), front.Color, front.Material))
+			leaf:SetAttribute("DoorLeaf", "front")
+			leaf:SetAttribute("Hinge", if side < 0 then "west" else "east")
+		end
+		local back = H.back
+		local width = S.BackDoor.Width
+		local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0) * frame:ToObjectSpace(front.CFrame)
+		local doorway = deco(block(body, "BackDoor", Vector3.new(width, size.Y, size.Z), backFrame, front.Color, front.Material))
+		doorway:SetAttribute("SandboxBackDoor", true)
+		doorway.Transparency = 1
+		doorway.CastShadow = false
+		local leaf = deco(block(body, "BackLeaf", Vector3.new(width - 0.04, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
+		leaf:SetAttribute("DoorLeaf", "back")
+		leaf:SetAttribute("Hinge", "west")
 	end
 	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
 	-- part, where the model's door is); else the chalet as it is

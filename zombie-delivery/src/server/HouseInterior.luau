@@ -32,6 +32,10 @@
 -- barn doors a second way out with their own daylight. The farmhouse is a chalet inside like a house (its planks,
 -- panelling, beams, lace, the front door's leaves); the barn and the yard keep their own (no chalet beams there), and a
 -- fixture kind both have (the Stube's kachelofen) takes the farm's own look (FARM_LOOKS).
+-- 8.3 the big house: a plan of kind "big" (shared/HouseLayout.luau: the sandbox's big house, a house's plan made
+-- bigger, its guest room a bedroom's kind, its study a living room's) builds as a house, its lights and Neon as every
+-- house's (Config.SandboxLight.House), its front door's two leaves shut in the doorway (doorLeaf), and its back door (a
+-- second doorway to the outside, in a side wall) gets a porch of daylight like the front door's (sidePorch).
 -- The owner's Blender furniture (design/blender-furniture/): once ZDCFurnitureArt is imported, server/FurnitureMesh.luau
 -- dresses each piece in its models (the Root, its welds and its labels stay; without the import FurnitureLooks' look).
 -- 8.3 walk-in doors (the sandbox, Config.Moving.Doors Swing): the front door's two leaves stand shut across the doorway,
@@ -612,6 +616,61 @@ LOOKS.barn_doors = function(parent, at, s)
 	sign(exit, "EXIT", Enum.NormalId.Front, rgb(255, 255, 255), rgb(30, 160, 80))
 end
 
+-- 8.3 the big house: a door's leaf, shut in its doorway (a part of its own, apart from the wall, no collision): its name,
+-- its door ("front", "back": the attribute DoorLeaf) and the side of the doorway it hangs on (Hinge: "west", "east",
+-- "south", "north", the interior's axes as the map's). The doors' swing is the client's (it reads these).
+local function doorLeaf(parent: Instance, name: string, size: Vector3, cf: CFrame, c: Color3, door: string, hinge: string): Part
+	local p = part(parent, name, size, cf, c, Enum.Material.Wood)
+	p:SetAttribute("DoorLeaf", door)
+	p:SetAttribute("Hinge", hinge)
+	-- (Danny's paths go through it, whatever its swing does with it: a door, not a wall)
+	local through = Instance.new("PathfindingModifier")
+	through.PassThrough = true
+	through.Parent = p
+	return p
+end
+
+-- The daylight through a doorway to the outside: the porch's outer wall (Neon, LIT.Daylight) and a SurfaceLight on it
+-- shining into the house (+Z, its Back: LIT.Porch), dark at night (7.0 review).
+local function porchLight(glow: BasePart)
+	local light = Instance.new("SurfaceLight")
+	light.Face = Enum.NormalId.Back -- (+Z: into the house)
+	light.Brightness = LIT.Porch.Brightness
+	light.Range = LIT.Porch.Range
+	light.Angle = 70
+	light.Color = color(LIT.Porch.Color)
+	light.Parent = glow
+	daylight(glow, NIGHT.porch, light) -- 7.0 review: dark at night
+end
+
+-- 8.3 the big house: a way out that is not the front door (the back door, in the corridor's east wall: HouseLayout's
+-- kind "big") gets a porch as the front door's (its floor, larch sides and roof, the outer wall of daylight that stops a
+-- walk out, porchLight's), the door's lintel, its leaf and the EXIT sign over it inside. The frame: the doorway's middle
+-- on its wall's centre line, -Z out of the house.
+local function sidePorch(shell: Instance, decor: Instance, plan: HouseLayout.Plan, origin: CFrame, door: HouseLayout.Door)
+	local half = plan.wall / 2
+	local mid = (plan.min + plan.max) / 2
+	local out = if door.axis == "Z" then Vector3.new(if door.at.X > mid.X then 1 else -1, 0, 0) else Vector3.new(0, 0, if door.at.Z > mid.Z then 1 else -1)
+	local frame = origin * CFrame.lookAt(door.at, door.at + out)
+	local w, porch, h = door.width / 2 + 1, 6, plan.doorHeight
+	local larch = rgb(156, 112, 72)
+	part(shell, "BackPorch", Vector3.new(2 * w, 0.2, porch), frame * CFrame.new(0, -0.1, -(half + porch / 2)), rgb(150, 146, 140), Enum.Material.WoodPlanks, true)
+	for _, s in { -1, 1 } do
+		part(shell, "BackPorchWall", Vector3.new(0.5, plan.ceiling, porch), frame * CFrame.new(s * (w + 0.25), plan.ceiling / 2, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
+	end
+	part(shell, "BackPorchRoof", Vector3.new(2 * w + 1, 0.5, porch), frame * CFrame.new(0, h + 1.25, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
+	part(decor, "Lintel", Vector3.new(door.width + 0.8, 0.4, plan.wall + 0.3), frame * CFrame.new(0, h + 0.2, 0), rgb(110, 76, 50), Enum.Material.Wood)
+	-- its leaf, shut in the doorway, hinged at the frame's +X jamb (the east wall's door: its south side)
+	local right = Vector3.new(-out.Z, 0, out.X) -- (the frame's +X: its RightVector)
+	local hinge = if math.abs(right.X) > math.abs(right.Z) then (if right.X > 0 then "east" else "west") else (if right.Z > 0 then "south" else "north")
+	doorLeaf(decor, "BackLeaf", Vector3.new(door.width - 0.06, h - 0.15, 0.24), frame * CFrame.new(0, (h - 0.15) / 2, 0), rgb(96, 64, 40), "back", hinge)
+	local glow = part(shell, "BackDaylight", Vector3.new(2 * w, h + 1.5, 0.4), frame * CFrame.new(0, (h + 1.5) / 2, -(half + porch + 0.2)), color(LIT.Daylight), Enum.Material.Neon, true)
+	glow.CastShadow = false
+	porchLight(glow)
+	local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), frame * CFrame.new(0, h + 1.05, half + 0.15), rgb(250, 250, 248), SMOOTH)
+	sign(exit, "EXIT", Enum.NormalId.Back, rgb(255, 255, 255), rgb(30, 160, 80))
+end
+
 -- The farm's own shell (see the block's header): the roofs, the barn's and the yard's floors and walls, the yard's
 -- dressing.
 local function farmShell(shell: Instance, decor: Instance, plan: HouseLayout.Plan, origin: CFrame, roll: (number) -> number)
@@ -955,18 +1014,19 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		frontLeaves(decor, at, x, z, front.width / 2, plan.doorHeight - 0.15, paint, bloom)
 		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), color(LIT.Daylight), Enum.Material.Neon, true)
 		glow.CastShadow = false
-		local light = Instance.new("SurfaceLight")
-		light.Face = Enum.NormalId.Back -- (+Z: into the house)
-		light.Brightness = LIT.Porch.Brightness
-		light.Range = LIT.Porch.Range
-		light.Angle = 70
-		light.Color = color(LIT.Porch.Color)
-		light.Parent = glow
-		daylight(glow, NIGHT.porch, light) -- 7.0 review: dark at night
+		porchLight(glow) -- (its light into the house: Config.SandboxLight.House.Porch, dark at night)
 		local mat = part(decor, "WelcomeMat", Vector3.new(4, 0.06, 2.2), at(x, 0.03, z - 1.6), rgb(150, 110, 70), Enum.Material.Fabric)
 		sign(mat, "WELCOME", Enum.NormalId.Top, rgb(60, 40, 24))
 		local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), at(x, plan.doorHeight + 1.05, front.at.Z + half + 0.15), rgb(250, 250, 248), SMOOTH)
 		sign(exit, "EXIT", Enum.NormalId.Back, rgb(255, 255, 255), rgb(30, 160, 80))
+	end
+	-- 8.3 the big house: its other way out (the back door) gets its own porch of daylight (a farm's barn doors have theirs)
+	if plan.kind ~= "farm" then
+		for index, door in plan.doors do
+			if index > 1 and door.rooms[2] == "outside" then
+				sidePorch(shell, decor, plan, origin, door)
+			end
+		end
 	end
 
 	-- the windows: a wooden frame, the glowing pane and a deep sill (a small one no sill); a lace curtain over the lower

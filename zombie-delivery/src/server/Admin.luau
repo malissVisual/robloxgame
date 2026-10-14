@@ -120,6 +120,8 @@
 --                             for free / none (server/Upgrades.luau admin; FILL STANDS fills the player's own stands,
 --                             Collection.stands); 8.2: "bookfill" / "bookclear" every piece of the collection book found
 --                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin);
+--                             8.3: "paintall" / "paintreset" every paint and livery of the PAINT shop owned for free /
+--                             none, the van in the factory's look (server/VanPaint.luau admin);
 --                             8.3: "level1" … "level5" the warehouse at that level for free (Upgrades.admin: its
 --                             building rebuilt, the pieces on stands it hasn't back to the stock)
 
@@ -1561,6 +1563,28 @@ end
 
 Sandbox.run.bookclear = function(player: Player)
 	Sandbox.book(player, "clear")
+end
+
+-- 8.3, the PAINT shop (server/VanPaint.luau's admin: every paint and livery owned, or none) ---------------------------
+
+function Sandbox.paints(player: Player, what: string)
+	local ok, text = pcall(function()
+		return (require(Server.VanPaint) :: any).admin(player, what)
+	end)
+	if ok and type(text) == "string" then
+		say(player, text)
+		return
+	end
+	warn(`[Admin] sandbox: VanPaint.admin {what} failed: {text}`)
+	say(player, `ADMIN: the paints' {what} failed (see the server Output).`)
+end
+
+Sandbox.run.paintall = function(player: Player)
+	Sandbox.paints(player, "all")
+end
+
+Sandbox.run.paintreset = function(player: Player)
+	Sandbox.paints(player, "reset")
 end
 
 -- Travel and the van (shared/SandboxMap.luau's spots) -----------------------------------------------------------------

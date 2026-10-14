@@ -6,38 +6,48 @@
 -- MovingRules'.
 -- 7.x Danny, a partner (the owner: "he helps weirdly, only some things, and mainly we don't carry anything together"):
 -- a clear priority list each step (decide): his end of your piece; zombies (never while he holds your piece's other
--- end); your two-person lift (he sprints over, or fades over from far; 8.3: your call, he walks over); the piece in his
--- arms to the van; the van's back for whoever comes with a piece; the order; the other side of a heavy two-hands piece
--- you carry alone; the next piece (★ first, then the most value a second of the trip, one-hand and two-hands ones; never
--- one you are about to lift).
+-- end); your two-person lift (8.3: your call, he walks over); the piece in his arms to the van; the van's back for
+-- whoever comes with a piece; the next piece of his list.
 --
--- 8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes; I'd like to
--- click on him any time and tell him what to do, or an auto mode where he carries only light things and calls for help
--- with a heavy one"): four orders (Modes), each given from his command card (client/MoveHelperCard.luau) by his move's
--- crew only (order); a two-person Lift calls him on every order and you wait at your end while he WALKS to its other
--- end (decide's "come"; inPlace; approach: a fade-over only as the last resort); on AUTO he carries the light pieces
--- alone (light) and asks for a hand with a heavy one (pickAsk, askKept), never nagging (Config AskAgain).
+-- 8.3 Danny for hire (the owner: "make it so I click on the helper, but I have to PAY for him when I want help. It
+-- doesn't work well when he does 4 things. Instead: you go into the house, click on something, and that assigns it to
+-- him, and the rest you carry yourself"; and "he must sit in my car with me"): at a move's start he waits by the van,
+-- not working; a crew player hires him for that move (hireCheck, hirePrice: Config.MoveHelper.Hire, the money's
+-- PlayerData.spend on the server); then the crew clicks pieces into his list (assignCheck: a click again takes one
+-- back; Config.MoveHelper.Queue at most) and he carries them in order (nextQueued): a light one to the van alone, a
+-- two-person one he waits at for you ("needs"); everything else is yours. A two-person Lift calls him while he is hired
+-- (decide's "come"; inPlace; approach: a fade-over only as the last resort). When you sit at the van's wheel he walks
+-- to its passenger door and rides with you (pickSeat, "ride", "seat"), out again when you get out (getOut).
 --
---   MoveHelperBrain.wanted(players)            does a crew of this many players get him (Solo, Duo)?
---   MoveHelperBrain.Modes                      8.3 the orders in the card's order: "auto" (AUTO, the default) | "help"
---                                              (HELP ME: behind you, lifts with you) | "stay" (WAIT HERE) | "van"
---                                              (WAIT AT VAN)
---   MoveHelperBrain.validMode(mode)            one of Modes?
---   MoveHelperBrain.order(mode, current, crew) 8.3 a command checked: (the new order, nil) or (nil, why: "crew" not his
---                                              move's crew, "mode" no such order, "same" in force already)
---   MoveHelperBrain.modeName(mode)             8.3 its name on the card and the status line ("AUTO", "HELP ME" ...)
---   MoveHelperBrain.status(mode, doing)        8.3 the status line: "AUTO · Carrying the Lamp to the van"
---   MoveHelperBrain.light(class, weight)       8.3 a piece he carries alone on AUTO: one-hand, or two-hands under
---                                              LightWeight (heavy: a pair one, or two-hands at LightWeight or more)
---   MoveHelperBrain.pickAsk(list)              8.3 AUTO: the heavy piece he asks a hand for (★ first, then the best
---                                              worth; home or on the ground, not broken, not one you are about to
---                                              lift, one that still fits the van, within AskFar), nil: none
---   MoveHelperBrain.askKept(asked, waited, fits, free)   8.3 does his ask go on: "on", "timeout" (nobody came within
---                                              AskWait s of his "give me a hand!"), "gone" (somebody holds it, no room)
+--   MoveHelperBrain.wanted(players, hired)     does a crew of this many players have him (Solo, Duo; a hired Danny stays
+--                                              with any crew of one or more)
+--   MoveHelperBrain.hirePrice(pieces)          8.3 the hire for a move of a house with this many pieces: Hire.Base +
+--                                              Hire.PerPiece each, to Hire.Round dollars, Hire.Min … Hire.Max
+--   MoveHelperBrain.hireCheck(crew, hired, money, price)   8.3 a HIRE checked: (true, nil) or (false, why: "crew" not
+--                                              the move's crew, "hired" he works for this move already, "money" not enough)
+--   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, hired, mine, state, held,
+--                                              his, queued, count, near): "add" | "remove" | why: "crew" | "hire" |
+--                                              "piece" (not this move's) | "far" | "van" (in the van) | "gone" (home
+--                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full"
+--   MoveHelperBrain.keepQueued(state, held)    8.3 is a piece of his list still his to carry (home or on the ground,
+--                                              nobody holding it)?
+--   MoveHelperBrain.nextQueued(list)           8.3 the piece of his list he goes for now (Queued: in his list's order, the
+--                                              first that still fits the van; a two-person one too: he waits at it for
+--                                              you): (spot?, pair, full: some left, none fits)
+--   MoveHelperBrain.queueText(count)           8.3 "Nothing to carry" | "1 piece to carry" | "3 pieces to carry"
+--   MoveHelperBrain.status(hired, price, count, doing)   8.3 his status in a line: "For hire · $170 this move", or "2
+--                                              pieces to carry · Carrying the Lamp to the van"
+--   MoveHelperBrain.money(n)                   8.3 "$1,234" (shared/UpgradeRules.luau's: the hire's words)
+--   MoveHelperBrain.markText(index, needs)     8.3 the marker over a piece of his list: "🧑‍🔧 Danny · 2", "🙋 Danny needs you"
+--   MoveHelperBrain.pickSeat(taken)            8.3 the van's passenger seat he takes: the first one nobody sits in (nil:
+--                                              all taken, he follows the van on foot)
+--   MoveHelperBrain.getOut(driving, still, carOk)   8.3 seated in the van: out when nobody drives it and it stands, or at
+--                                              once when it is wrecked or gone
 --   MoveHelperBrain.inPlace(gap, stuckFor)     8.3 at the other end of your call: within CallReady studs of his place,
 --                                              or within CallClose and blocked CallStuck s (the hold walks him the rest)
---   MoveHelperBrain.newApproach() / approach(a, gap, dt)   8.3 his walk to your call: true once he has come no closer
---                                              than CallGain studs for CallBlink s (the last resort: a fade-over)
+--   MoveHelperBrain.newApproach() / approach(a, gap, dt)   8.3 his walk to your call (or to the van to ride): true once
+--                                              he has come no closer than CallGain studs for CallBlink s (the last
+--                                              resort: a fade-over)
 --   MoveHelperBrain.callKept(fromPiece, reach, ready, readyFor)   8.3 does your call go on: "on", "away" (you walked
 --                                              CallLeave studs past the Lift's reach), "idle" (he was in place CallIdle s
 --                                              and you never lifted)
@@ -45,29 +55,19 @@
 --                                              they are in different worlds
 --   MoveHelperBrain.routeVia(..., list, allowed?)   7.x farm move: the same through the best of several doors (a farm's
 --                                              front door, its barn doors; only the `allowed` indexes): (studs, index)
---   MoveHelperBrain.reserved(playerCost, myCost)   a piece a crew player with free hands is about to lift: within
---                                              Reserve studs of it and nearer than he is (the player's lift wins)
---   MoveHelperBrain.worth(c)                   a piece's rank for a trip: its value a second of the trip (TripBase
---                                              studs added, the way back to the van at the carry's walk)
---   MoveHelperBrain.pickItem(list, backOpen)   the next piece he carries out alone (★ first, then the best worth; a
---                                              one-hand or (8.3) a light two-hands piece, never a pair one, a broken
---                                              one, a reserved one, one that no longer fits the van or one lying by the
---                                              van while its back is shut) and whether the van is full for the ones left
---   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to: a pair piece a crew player
---                                              drags alone, the nearest within HelpFar, not one he gave up on
---   MoveHelperBrain.pickAssist(list)           a heavy two-hands piece (AssistWeight or more) a crew player carries
---                                              alone within AssistFar, not by the van's back already: he takes its
---                                              other side (the pair's walk for both)
+--   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to (hired): a pair piece a crew
+--                                              player drags alone, the nearest within HelpFar, not one he gave up on
 --   MoveHelperBrain.shouldFlee(threat, fleeing, holding)   a zombie near: run (never while holding the other end of
 --                                              your piece: the player leads); on until none is within SafeRange
 --   MoveHelperBrain.fleeTo(x, z, zx, zz)       where he runs: FleeStep studs straight away from the zombie
---   MoveHelperBrain.decide(input)              what he does now and the piece's spot: "down" | "hold" | "flee" |
---                                              "come" (8.3 your call) | "help" | "deliver" | "open" | "stay" | "wait" |
---                                              "assist" | "follow" | "ask" (8.3) | "fetch"
+--   MoveHelperBrain.decide(input)              what he does now and the piece's spot: "down" | "hold" | "seat" (8.3
+--                                              in the van) | "flee" | "come" (your call) | "help" | "deliver" | "ride"
+--                                              (8.3 to the van's passenger door) | "open" | "needs" (8.3 at a two-person
+--                                              piece of his list) | "fetch" | "wait"
 --   MoveHelperBrain.atTruck(open, still, waited, mayOpen)   a piece in his arms at the van's back: "load" | "open" |
 --                                              "wait" | "drop"
 --   MoveHelperBrain.speed(walk, action, carry, weight)   his walk now: × Speed (× the carry's alone: "hand" | "both"),
---                                              Sprint × to a lift (8.3: and to your call), Flee × running away
+--                                              Sprint × to a lift, to your call and to the van to ride, Flee × running away
 --   MoveHelperBrain.trained(owner)             8.1 SANDBOX: his walk x this for the move's owner (Danny's training,
 --                                              the level in their player attribute Config.SandboxUpgrades.Danny,
 --                                              shared/UpgradeRules.luau dannySpeed; 1 without one)
@@ -100,7 +100,6 @@
 --                                              Band behind him, forwards past Band ahead, sideways as they went
 --   MoveHelperBrain.aside(x, z, door)          a place in a doorway (Aside's zone): the place beside it, along the wall
 --                                              (he never stands where you walk through); else the place itself
---   MoveHelperBrain.followSpot(x, z, lookX, lookZ)       his place behind you ("Help me")
 --   MoveHelperBrain.doing(action, name, full)  what he does, in words (client/MoveHelperHud.luau's line)
 --   MoveHelperBrain.Lines                      what he says (a speech bubble over his head; plain text)
 --   MoveHelperBrain.line(key, sandbox)         his line for `key` (8.0 SANDBOX: SandboxLines' where the test world has
@@ -108,39 +107,37 @@
 
 local Config = require(script.Parent.Config)
 local Rules = require(script.Parent.MovingRules)
-local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: Danny's training
+local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: Danny's training; 8.3: the money's words
 
 local MoveHelperBrain = {}
 
-export type Mode = "auto" | "help" | "stay" | "van"
-
--- A piece he might carry out alone.
-export type Candidate = {
-	spot: number,
-	class: string, -- hand | both | pair
-	state: string, -- home | carried | ground | truck
-	star: boolean,
-	broken: boolean,
-	cost: number, -- studs to it (routeCost)
-	haul: number, -- studs from it to the van's back (routeCost)
-	value: number, -- what it pays (its value × its condition)
-	weight: number,
-	fits: boolean, -- room for it in the van now
-	byTruck: boolean, -- it lies by the van already (set down there)
-	reserved: boolean, -- a crew player is about to lift it (reserved)
-}
+MoveHelperBrain.money = UpgradeRules.money
 
 -- A piece somebody carries alone that he might take the other end of.
 export type Lift = {
 	spot: number,
-	class: string, -- pair (a two-person lift) | both (a heavy two-hands piece: assist)
+	class: string, -- pair (a two-person lift)
 	state: string,
 	helped: boolean, -- somebody holds its other end already
 	crew: boolean, -- its carrier is a player of the move
 	cost: number, -- studs to it (routeCost)
 	gaveUp: boolean, -- he gave up on it a while (a take that failed)
-	weight: number,
-	byBack: boolean, -- it is by the van's back already (about to be loaded)
+}
+
+-- 8.3 a piece of his list, in its order: its class, and whether it still fits the van (MovingRules.canLoad).
+export type Queued = { spot: number, class: string, fits: boolean }
+
+-- 8.3 a click on a piece, as the server sees it (assignCheck).
+export type Assign = {
+	crew: boolean, -- the player is of the move's crew
+	hired: boolean, -- Danny works for this move
+	mine: boolean, -- the piece is this move's (its model is the move's own)
+	state: string, -- the piece's: home | carried | ground | truck | delivered | lost
+	held: boolean, -- somebody holds it (a player, or Danny)
+	his: boolean, -- Danny holds it
+	queued: boolean, -- it is on his list already
+	count: number, -- the pieces on his list
+	near: boolean, -- the player is near enough to it to see it (ClickReach)
 }
 
 export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- the front door outside, the exit inside
@@ -150,18 +147,19 @@ export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- 
 export type Doorway = { x: number, z: number, half: number, dirX: number, dirZ: number, depth: number }
 
 export type Input = {
-	mode: Mode,
+	hired: boolean, -- 8.3 somebody of the crew hired him for this move
 	dead: boolean,
 	holding: string?, -- nil, "hand" (a piece in his arms alone: one-hand or two-hands) or "pair" (the other end of yours)
+	seated: boolean, -- 8.3 he sits in the van (a passenger)
+	ride: boolean, -- 8.3 somebody of the crew sits at the van's wheel: he gets in
 	threat: number?, -- studs to the nearest zombie (nil: none near)
 	fleeing: boolean, -- he ran at the last step
 	lift: number?, -- pickLift's
-	assist: number?, -- pickAssist's
-	pick: number?, -- pickItem's
+	queued: number?, -- 8.3 nextQueued's: the piece of his list he goes for
+	pair: boolean, -- 8.3 … a two-person one (he waits at it for you)
 	open: boolean, -- the van's back is shut, somebody comes with a piece and he may open it (Config OpenBack)
 	atHouse: boolean, -- the van stands by the house (he carries pieces out only then)
 	call: number?, -- 8.3 a crew player's call: the two-person piece they wait at (Moving's Lift, MoveHelper.call)
-	ask: number?, -- 8.3 AUTO: the heavy piece he asks a hand for (pickAsk, kept while askKept says "on")
 }
 
 local function cfg(): any
@@ -173,50 +171,121 @@ local function dist(ax: number, az: number, bx: number, bz: number): number
 	return math.sqrt(dx * dx + dz * dz)
 end
 
--- ── Who gets him ───────────────────────────────────────────────────────────
+local function finite(n: any): boolean
+	return type(n) == "number" and n == n and n > -math.huge and n < math.huge
+end
 
-function MoveHelperBrain.wanted(players: number): boolean
+-- ── Who has him ────────────────────────────────────────────────────────────
+
+function MoveHelperBrain.wanted(players: number, hired: boolean?): boolean
 	local c = cfg()
+	if hired then
+		return players >= 1 -- (8.3 paid for the move: he stays whoever joins)
+	end
 	return (players == 1 and c.Solo == true) or (players == 2 and c.Duo == true)
 end
 
-MoveHelperBrain.Modes = { "auto", "help", "stay", "van" } :: { Mode }
+-- ── 8.3 the hire ───────────────────────────────────────────────────────────
 
-local MODE_NAMES: { [string]: string } = { auto = "AUTO", help = "HELP ME", stay = "WAIT HERE", van = "WAIT AT VAN" }
-
-function MoveHelperBrain.validMode(mode: any): boolean
-	return type(mode) == "string" and MODE_NAMES[mode] ~= nil
+function MoveHelperBrain.hirePrice(pieces: any): number
+	local h = cfg().Hire
+	local n = if finite(pieces) then math.max(0, math.floor(pieces)) else 0
+	local raw = h.Base + h.PerPiece * n
+	local step = math.max(1, h.Round)
+	return math.clamp(math.floor(raw / step + 0.5) * step, h.Min, h.Max)
 end
 
--- 8.3 a command from a player (the Moving remote's ("helper", mode), after the server's rate limit): only his move's
--- crew may give one, only one of the orders, and not the one in force already.
-function MoveHelperBrain.order(mode: any, current: Mode, crew: boolean): (Mode?, string?)
+function MoveHelperBrain.hireCheck(crew: boolean, hired: boolean, money: any, price: number): (boolean, string?)
 	if not crew then
-		return nil, "crew"
-	elseif not MoveHelperBrain.validMode(mode) then
-		return nil, "mode"
-	elseif mode == current then
-		return nil, "same"
+		return false, "crew"
+	elseif hired then
+		return false, "hired"
+	elseif not finite(money) or money < price then
+		return false, "money"
 	end
-	return mode :: Mode, nil
+	return true, nil
 end
 
-function MoveHelperBrain.modeName(mode: any): string
-	return MODE_NAMES[mode] or "AUTO"
+-- ── 8.3 his list ───────────────────────────────────────────────────────────
+
+function MoveHelperBrain.keepQueued(state: string, held: boolean): boolean
+	return not held and (state == "home" or state == "ground")
 end
 
--- 8.3 the status line under the move's panel (client/MoveHelperHud.luau): the order and what he does.
-function MoveHelperBrain.status(mode: any, doing: string?): string
-	local name = MoveHelperBrain.modeName(mode)
+function MoveHelperBrain.assignCheck(a: Assign): string
+	if not a.crew then
+		return "crew"
+	elseif not a.mine then
+		return "piece"
+	elseif not a.hired then
+		return "hire"
+	elseif a.queued then
+		return "remove" -- (a click on a piece of his list takes it back, wherever it is now)
+	elseif not a.near then
+		return "far"
+	elseif a.his then
+		return "his"
+	elseif a.state == "truck" then
+		return "van"
+	elseif a.state ~= "home" and a.state ~= "ground" and a.state ~= "carried" then
+		return "gone"
+	elseif a.held or a.state == "carried" then
+		return "held"
+	elseif a.count >= cfg().Queue then
+		return "full"
+	end
+	return "add"
+end
+
+function MoveHelperBrain.nextQueued(list: { Queued }): (number?, boolean, boolean)
+	for _, q in list do
+		if q.fits then
+			return q.spot, q.class == "pair", false
+		end
+	end
+	return nil, false, #list > 0
+end
+
+function MoveHelperBrain.queueText(count: any): string
+	local n = if finite(count) then math.max(0, math.floor(count)) else 0
+	if n == 0 then
+		return "Nothing to carry"
+	end
+	return if n == 1 then "1 piece to carry" else `{n} pieces to carry`
+end
+
+function MoveHelperBrain.status(hired: boolean, price: any, count: any, doing: string?): string
+	if not hired then
+		return `For hire · {UpgradeRules.money(price)} this move`
+	end
+	local list = MoveHelperBrain.queueText(count)
 	if type(doing) ~= "string" or doing == "" then
-		return name
+		return list
 	end
-	return `{name} · {doing}`
+	return `{list} · {doing}`
 end
 
--- 8.3 a piece he carries alone on AUTO: one-hand, or two-hands under LightWeight.
-function MoveHelperBrain.light(class: string, weight: number): boolean
-	return class == "hand" or (class == "both" and weight < cfg().LightWeight)
+function MoveHelperBrain.markText(index: number, needs: boolean?): string
+	local name = cfg().Name
+	if needs then
+		return `🙋 {name} needs you`
+	end
+	return `🧑‍🔧 {name} · {index}`
+end
+
+-- ── 8.3 riding with you ────────────────────────────────────────────────────
+
+function MoveHelperBrain.pickSeat(taken: { boolean }): number?
+	for index, busy in taken do
+		if not busy then
+			return index
+		end
+	end
+	return nil
+end
+
+function MoveHelperBrain.getOut(driving: boolean, still: boolean, carOk: boolean): boolean
+	return not carOk or (not driving and still)
 end
 
 -- ── The way ────────────────────────────────────────────────────────────────
@@ -262,17 +331,6 @@ function MoveHelperBrain.unstuck(stuckFor: number): string
 		return "repath"
 	end
 	return "walk"
-end
-
--- His place `Follow` studs behind somebody at (x, z) looking along (lookX, lookZ).
-function MoveHelperBrain.followSpot(x: number, z: number, lookX: number, lookZ: number): (number, number)
-	local d = cfg().Follow
-	local len = math.sqrt(lookX * lookX + lookZ * lookZ)
-	local fx, fz = 0, 1
-	if len > 0.01 then
-		fx, fz = lookX / len, lookZ / len
-	end
-	return x - fx * d, z - fz * d
 end
 
 -- A place inside a doorway's zone (along the wall within its half width + Margin, through it within its depth) moved
@@ -397,75 +455,7 @@ function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, 
 	return math.max(speed, trail.easeSpeed), false
 end
 
--- ── What next ──────────────────────────────────────────────────────────────
-
-function MoveHelperBrain.reserved(playerCost: number?, myCost: number): boolean
-	return playerCost ~= nil and playerCost <= cfg().Reserve and playerCost < myCost
-end
-
--- Its value a second of the trip there and back to the van (the carry's walk on the way back; TripBase studs on top so
--- a near cheap piece does not always win).
-function MoveHelperBrain.worth(c: Candidate): number
-	local mode = if c.class == "both" then "both" elseif c.class == "pair" then "pair" else "hand" -- (8.3: two carry it)
-	local factor = math.max(Rules.speedFactor(mode, c.weight), 0.1)
-	return c.value / (cfg().TripBase + c.cost + c.haul / factor)
-end
-
-function MoveHelperBrain.pickItem(list: { Candidate }, backOpen: boolean): (number?, boolean)
-	local best: Candidate? = nil
-	local bestWorth = -math.huge
-	local left = false
-	for _, c in list do
-		if not MoveHelperBrain.light(c.class, c.weight) or c.broken or (c.state ~= "home" and c.state ~= "ground") or c.reserved then
-			continue -- (8.3: a heavy two-hands piece is one he asks a hand for)
-		end
-		if c.byTruck and not backOpen then
-			continue -- (it waits by the van for the back to open)
-		end
-		left = true
-		if not c.fits then
-			continue
-		end
-		local w = MoveHelperBrain.worth(c)
-		local b = best
-		if b == nil or (c.star and not b.star) or (c.star == b.star and (w > bestWorth + 1e-9 or (math.abs(w - bestWorth) <= 1e-9 and c.cost < b.cost))) then
-			best, bestWorth = c, w
-		end
-	end
-	if best then
-		return best.spot, false
-	end
-	return nil, left
-end
-
--- 8.3 AUTO: the heavy piece nobody handles that he asks a hand for (★ first, then its worth for a trip of two).
-function MoveHelperBrain.pickAsk(list: { Candidate }): number?
-	local best: Candidate? = nil
-	local bestWorth = -math.huge
-	for _, c in list do
-		if MoveHelperBrain.light(c.class, c.weight) or (c.class ~= "pair" and c.class ~= "both") or c.broken
-			or (c.state ~= "home" and c.state ~= "ground") or c.reserved or not c.fits or c.cost > cfg().AskFar then
-			continue
-		end
-		local w = MoveHelperBrain.worth(c)
-		local b = best
-		if b == nil or (c.star and not b.star) or (c.star == b.star and (w > bestWorth + 1e-9 or (math.abs(w - bestWorth) <= 1e-9 and c.cost < b.cost))) then
-			best, bestWorth = c, w
-		end
-	end
-	return if best then best.spot else nil
-end
-
--- 8.3 his ask for a hand (`asked`: he is there and said so, `waited` s ago; `fits`: it still fits the van; `free`: home
--- or on the ground, nobody holds it).
-function MoveHelperBrain.askKept(asked: boolean, waited: number, fits: boolean, free: boolean): string
-	if not free or not fits then
-		return "gone"
-	elseif asked and waited >= cfg().AskWait then
-		return "timeout"
-	end
-	return "on"
-end
+-- ── 8.3 your call ──────────────────────────────────────────────────────────
 
 -- 8.3 your call: at the other end of your piece (within CallReady studs of his place there), or near it and blocked
 -- (a wall, the piece itself: within CallClose studs, no progress for CallStuck s; the hold walks him the rest).
@@ -504,25 +494,12 @@ function MoveHelperBrain.callKept(fromPiece: number, reach: number, ready: boole
 	return "on"
 end
 
+-- ── What next ──────────────────────────────────────────────────────────────
+
 function MoveHelperBrain.pickLift(list: { Lift }): number?
 	local best: Lift? = nil
 	for _, l in list do
 		if l.class ~= "pair" or l.state ~= "carried" or l.helped or not l.crew or l.gaveUp or l.cost > cfg().HelpFar then
-			continue
-		end
-		local b = best
-		if b == nil or l.cost < b.cost then
-			best = l
-		end
-	end
-	return if best then best.spot else nil
-end
-
-function MoveHelperBrain.pickAssist(list: { Lift }): number?
-	local c = cfg()
-	local best: Lift? = nil
-	for _, l in list do
-		if l.class ~= "both" or l.state ~= "carried" or l.helped or not l.crew or l.gaveUp or l.byBack or l.weight < c.AssistWeight or l.cost > c.AssistFar then
 			continue
 		end
 		local b = best
@@ -551,38 +528,34 @@ function MoveHelperBrain.fleeTo(x: number, z: number, zx: number, zz: number): (
 	return x + dx / len * step, z + dz / len * step
 end
 
--- The priorities, in order: down; the other end of your piece (zombies or not: you lead); running from a zombie; 8.3
--- your call (a two-person Lift: on every order; his own piece set down or loaded first); your two-person piece dragged
--- alone (every order); the piece in his arms to the van; the van's back for whoever comes with a piece (not on WAIT
--- HERE); WAIT HERE; WAIT AT VAN; the other side of your heavy two-hands piece; HELP ME (behind you); on AUTO his ask for
--- a hand with a heavy piece, then the next light piece, while the van stands by the house; waiting at the van.
+-- The priorities, in order: down; the other end of your piece (zombies or not: you lead); 8.3 in the van's seat (he
+-- rides; out when you get out); running from a zombie; hired: your call (a two-person Lift; his own piece set down or
+-- loaded first), your two-person piece dragged alone; the piece in his arms to the van; hired: into the van when you
+-- sit at its wheel; not hired: waiting by the van (for hire); the van's back for whoever comes with a piece; the next
+-- piece of his list (a two-person one: he waits at it for you) while the van stands by the house; waiting at the van.
 function MoveHelperBrain.decide(i: Input): (string, number?)
 	if i.dead then
 		return "down", nil
 	elseif i.holding == "pair" then
 		return "hold", nil
+	elseif i.seated then
+		return "seat", nil
 	elseif MoveHelperBrain.shouldFlee(i.threat, i.fleeing, i.holding) then
 		return "flee", nil
-	elseif i.call ~= nil then
+	elseif i.hired and i.call ~= nil then
 		return "come", i.call
-	elseif i.lift ~= nil then
+	elseif i.hired and i.lift ~= nil then
 		return "help", i.lift
 	elseif i.holding == "hand" then
 		return "deliver", nil
-	elseif i.open and i.mode ~= "stay" then
-		return "open", nil
-	elseif i.mode == "stay" then
-		return "stay", nil
-	elseif i.mode == "van" then
+	elseif i.hired and i.ride then
+		return "ride", nil
+	elseif not i.hired then
 		return "wait", nil
-	elseif i.assist ~= nil then
-		return "assist", i.assist
-	elseif i.mode == "help" then
-		return "follow", nil
-	elseif i.ask ~= nil and i.atHouse then
-		return "ask", i.ask
-	elseif i.pick ~= nil and i.atHouse then
-		return "fetch", i.pick
+	elseif i.open then
+		return "open", nil
+	elseif i.queued ~= nil and i.atHouse then
+		return if i.pair then "needs" else "fetch", i.queued
 	end
 	return "wait", nil
 end
@@ -605,7 +578,7 @@ function MoveHelperBrain.speed(walk: number, action: string, carry: string?, wei
 	local c = cfg()
 	if action == "flee" then
 		return walk * c.Flee
-	elseif action == "help" or action == "assist" or action == "come" then
+	elseif action == "help" or action == "come" or action == "ride" then
 		return walk * c.Sprint
 	elseif action == "hold" then
 		return Rules.carrySpeed(walk, "pair", weight) * c.KeepUp
@@ -629,16 +602,16 @@ local DOING: { [string]: string } = {
 	hold = "Carrying the %s with you",
 	flee = "Running from the zombies",
 	help = "Coming to lift the %s",
-	assist = "Taking the other side of the %s",
 	deliver = "Carrying the %s to the van",
 	open = "Opening the van's back",
-	follow = "Right behind you",
 	fetch = "Going for the %s",
 	wait = "Waiting at the van",
 	come = "Coming to lift the %s with you", -- 8.3 your call
 	ready = "At the %s: on three!",
-	ask = "Needs a hand with the %s",
-	stay = "Waiting here",
+	needs = "Waiting for you at the %s", -- 8.3 a two-person piece of his list
+	offer = "Waiting by the van for hire",
+	ride = "Getting in the van",
+	seat = "Riding in the van",
 }
 
 function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string
@@ -653,9 +626,12 @@ function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): s
 end
 
 MoveHelperBrain.Lines = {
-	hello = "Danny from the depot. Got your back!",
+	hello = "Danny from the depot. Need a hand? Hire me!",
+	hired = "You got it, boss! Show me what to carry.", -- 8.3 the hire
+	queued = "Got it, I'll take that one.",
+	cleared = "Okay, my list is empty.",
+	empty = "All done. Anything else, boss?",
 	help = "Hold it, I'll get the other end!",
-	assist = "Here, let me take the other side.",
 	lift = "Got the other end!",
 	three = "On three... lift!",
 	door = "Watch the doorframe!",
@@ -664,22 +640,19 @@ MoveHelperBrain.Lines = {
 	full = "Van's full, boss - drive it to the Wall?",
 	shut = "Open the back, boss!",
 	open = "I'll get the doors!",
-	mine = "All yours, boss.",
+	mine = "All yours, boss.", -- 8.3 a piece of his list you picked up yourself
 	flee = "Zombies! I'm staying out of this one!",
 	down = "Ugh... I'll be back!",
 	back = "Back on my feet!",
-	autoMode = "On it! Small stuff's mine, I'll shout for the big ones.", -- 8.3 the orders
-	helpMode = "Right behind you.",
-	stayMode = "I'll wait right here.",
-	vanMode = "Waiting at the van.",
-	ask = "This one's too heavy for me alone, give me a hand!", -- 8.3 AUTO's ask
-	askOff = "No takers? I'll grab the small stuff.",
+	ask = "This one's too heavy for me alone, give me a hand!", -- 8.3 a two-person piece of his list
 	callOff = "No problem, boss.", -- 8.3 a call you called off
+	ride = "Wait up, I'm riding with you!", -- 8.3 riding with you
+	out = "Back to work!",
 } :: { [string]: string }
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.
 MoveHelperBrain.SandboxLines = {
-	hello = "Danny from ZDC. Got your back!",
+	hello = "Danny from ZDC. Need a hand? Hire me!",
 	full = "Van's full, boss - drive it home?",
 } :: { [string]: string }
 

@@ -198,7 +198,7 @@ end
 local function onMoney(player: Player, delta: number, reason: string?)
 	if reason == "CollectionIncome" and delta > 0 then
 		reach(player, "FirstIncome")
-	elseif reason == "CollectionSale" and delta > 0 then
+	elseif (reason == "CollectionSale" or reason == "VisitorOffer") and delta > 0 then -- (8.3: a visitor's offer accepted too)
 		reach(player, "FirstSale")
 	elseif reason == "Upgrade" and delta < 0 then
 		reach(player, "FirstUpgrade")

@@ -83,15 +83,18 @@ local function saveSoon(player: Player)
 	end)
 end
 
--- The kinds that can't be done now: "upgrade" once every upgrade is at its top.
+-- The kinds that can't be done now: "upgrade" once every upgrade is at its top; 8.3: "offer" while the visitors are off.
 local function skipFor(profile: PlayerData.Profile): { [string]: boolean }?
+	local skip: { [string]: boolean }? = if Config.Visitors.On then nil else { offer = true }
 	for _, id in UpgradeRules.Order do
 		local def = UpgradeRules.def(id)
 		if def and UpgradeRules.level(profile.sandboxUpgrades, id) < def.max then
-			return nil
+			return skip
 		end
 	end
-	return { upgrade = true }
+	local all: { [string]: boolean } = skip or {}
+	all.upgrade = true
+	return all
 end
 
 -- The upgrade levels in all.

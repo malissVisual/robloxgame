@@ -13,6 +13,10 @@
 --   SprinterMesh.ready()       is the import there and complete?
 --   SprinterMesh.dress(model)  dresses one sprinter car model (once: again is a no-op); false: left as it was
 --   SprinterMesh.Looks         each finish's colour and material
+-- 8.3, the PAINT shop (server/VanPaint.luau, shared/VanLook.luau): the paint and stripe finishes (Config.VanPaint.Finishes)
+-- take the van's paint: a dressed piece of one keeps its own look in its attributes FactoryColor / FactoryMaterial and
+-- wears the car model's <prefix>Color / <prefix>Material / <prefix>Reflectance when it has them (paintPiece; VanLook
+-- repaints the pieces when the van is painted again).
 --
 -- The contract with the parts model (design/blender-sprinter/NAVOD.md, its numbers in design/blender-sprinter/roblox/
 -- ZDCSprinterArt.json; the axes are the car's: x right, y up, z back, from the ground under the van's middle):
@@ -89,6 +93,36 @@ local LOOKS: { [string]: Look } = {
 SprinterMesh.Looks = LOOKS
 
 type Piece = { finish: string, part: BasePart, cf: CFrame, size: Vector3 }
+
+-- 8.3, the PAINT shop: a piece of a painted finish (Config.VanPaint.Finishes: finish → the attributes' prefix) keeps its
+-- own look (FactoryColor, FactoryMaterial) and wears the van's paint when the model has one (nil: its own look).
+local function paintPiece(model: Model, part: BasePart, finish: string)
+	local paint = (Config :: any).VanPaint
+	local prefix = if type(paint) == "table" and type(paint.Finishes) == "table" then paint.Finishes[finish] else nil
+	local look = LOOKS[finish]
+	if type(prefix) ~= "string" or not look then
+		return
+	end
+	part:SetAttribute("FactoryColor", look.color)
+	part:SetAttribute("FactoryMaterial", look.material.Name)
+	local color = model:GetAttribute(`{prefix}Color`)
+	if typeof(color) == "Color3" then
+		part.Color = color
+	end
+	local name = model:GetAttribute(`{prefix}Material`)
+	if type(name) == "string" then
+		local ok, found = pcall(function(): any
+			return (Enum.Material :: any)[name]
+		end)
+		if ok and found ~= nil then
+			part.Material = found
+		end
+	end
+	local reflectance = model:GetAttribute(`{prefix}Reflectance`)
+	if type(reflectance) == "number" then
+		part.Reflectance = reflectance
+	end
+end
 
 local groups: { [string]: { Piece } }? = nil
 local wheelAt = Vector3.zero -- the front left wheel's centre (the car's axes, from the ground under its middle)
@@ -333,6 +367,7 @@ function SprinterMesh.dress(model: Model): boolean
 		if look.lit then
 			DayNight.nightLight(p, look.lit, look.color, look.material.Name)
 		end
+		paintPiece(model, p, piece.finish) -- 8.3: the van's paint (the PAINT shop)
 	end
 
 	-- The body (with its lamps, the cab and the cargo bay) on the body that sways.
