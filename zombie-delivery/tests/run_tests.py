@@ -14,6 +14,7 @@ PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.lua
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
 PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/collectionbook_test.luau)
+PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True

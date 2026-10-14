@@ -34,6 +34,20 @@
 --   WarehouseUi.notify / onOpen          hooks: the toasts (client/SandboxHud.luau sets it), the window opened
 --   WarehouseUi.Rarity / Rarities        the rarities' colours (common grey, uncommon green, rare blue, epic purple,
 --                                        legendary gold) and their order
+-- 8.2, the warehouse's quality of life (which pieces: shared/StockPlan.luau, the rules server/Collection.luau decides
+-- with, so what a button offers before it asks is what happens):
+--   * THE PICKER greys a piece too big for this stand (an upgrade's small stand, WarehouseLayout.fits: the beds, the hay
+--     wagon, the wheelbarrow): "Too big for this stand" over its picture, its DISPLAY a grey TOO BIG that says which
+--     stands take it; the pieces that fit come first.
+--   * THE STOCK LIST's header: ⭐ FILL BEST ({ kind = "fillbest" }: the best earners onto every free stand you have,
+--     each where it fits), 💰 SELL… (a small menu: ALL COMMON, ALL BROKEN, DUPLICATES (keeps the best of each item),
+--     each with how many and their price; each asks "SELL N PIECES FOR $Y?" first, then sends { kind = "sellmany",
+--     filter }; nothing on show is sold) and ↩ TAKE ALL DOWN ({ kind = "undisplayall" }). A button with nothing to do
+--     is grey; a tap says why. The server's { kind = "bulk", action, count, income? } and a sellmany's "sold" are toasts.
+--   * Both windows: a sort toggle (SORT · $/MIN → VALUE → NEWEST → RARITY; kept while you play) at the chips' right,
+--     the rarity chips as before and, on a computer, a 🔍 search box (every word in the piece's name; typing redraws
+--     only the grid, the box keeps its focus; closing the window clears it).
+--   WarehouseUi.sorting() / search()     the order and the search the windows use now
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -46,7 +60,8 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local FurnitureLooks = require(Shared.FurnitureLooks)
 local ItemLooks = require(Shared.ItemLooks) -- (the 3/4 camera on a model's box: bounds, frame)
-local WarehouseLayout = require(Shared.WarehouseLayout) -- (8.0.1: the $/min as the stands' tags write it)
+local WarehouseLayout = require(Shared.WarehouseLayout) -- (8.0.1: the $/min as the stands' tags write it; 8.2: fits)
+local StockPlan = require(Shared.StockPlan) -- 8.2: FILL BEST, SELL…, the sorts, the search
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
@@ -77,7 +92,7 @@ export type Layout = {
 	w: number, -- the card's size (unscaled)
 	h: number,
 	pad: number,
-	header: number,
+	header: number, -- (8.2: on a touch screen high enough for the STOCK list's finger-sized buttons)
 	chips: number, -- the filter chips' height
 	close: number, -- the ✕'s side
 	gridX: number,
@@ -114,6 +129,8 @@ WarehouseUi.Rules = nil :: any -- shared/CollectionRules.luau once found (start)
 
 local TILE_TEXT = 100 -- a tile's height besides its picture and buttons (unscaled px)
 local HEADER = 52
+local SEARCH_W = 170 -- 8.2: the search box (a computer)
+local MAX_SEARCH = 40 -- its longest words
 local SCROLLBAR = 6
 local TILE_CORNER = Config.UiKit.RowCorner
 
@@ -124,12 +141,16 @@ local listeners: { (State, State?) -> () } = {}
 local gui: any = nil
 local mode: { stand: number? }? = nil -- nil: closed; { stand = n } the picker; { stand = nil } the stock list
 local filter = "all"
+local sortBy = "income" -- 8.2: the sort toggle's order (StockPlan.Sorts), kept while you play
+local search = "" -- 8.2: the search box's words (a computer)
 local shownKey = ""
 local card: any = nil -- the shade over the screen (the window: card's Picker)
 local panel: any = nil -- the card itself (Picker)
 local question: any = nil
 local grid: any = nil
 local plan: Layout? = nil
+local listed: Listed? = nil -- 8.2: what the grid lists (draw keeps it, fillGrid reads it)
+local actionButtons: { [string]: any } = {} -- 8.2: the open STOCK list's FILL BEST, SELL… and TAKE ALL DOWN
 
 type Tile = { entry: Entry, index: number, picture: any, emoji: any, view: any, buttons: { any } }
 local tiles: { Tile } = {}
@@ -260,14 +281,15 @@ function WarehouseUi.layout(W: number, H: number, touch: boolean): Layout
 	local finger = math.ceil(Ui.MinTouch / scale)
 	local chips = if touch then finger else 30
 	local gap = PICK.Gap
-	local gridY = HEADER + chips + 8
+	local button = if touch then math.max(PICK.Button, finger) else PICK.Button
+	local header = if touch then math.max(HEADER, button + 8) else HEADER -- (8.2: FILL BEST & co. a finger's size)
+	local gridY = header + chips + 8
 	local gridW = w - 2 * pad
 	local area = gridW - SCROLLBAR - 2
 	local least = if touch then PICK.TileTouch else PICK.Tile
 	local cols = math.max(1, math.floor((area + gap) / (least + gap)))
 	local tileW = math.floor((area - (cols - 1) * gap) / cols)
 	local picture = math.floor(tileW * (if touch then PICK.PictureTouch else PICK.Picture))
-	local button = if touch then math.max(PICK.Button, finger) else PICK.Button
 	return {
 		touch = touch,
 		scale = scale,
@@ -276,7 +298,7 @@ function WarehouseUi.layout(W: number, H: number, touch: boolean): Layout
 		w = w,
 		h = h,
 		pad = pad,
-		header = HEADER,
+		header = header,
 		chips = chips,
 		close = if touch then math.max(40, finger) else 40,
 		gridX = pad,
@@ -455,6 +477,8 @@ end
 -- ── The window ──────────────────────────────────────────────────────────────
 
 local draw: (keepScroll: boolean) -> ()
+local fillGrid: (scrollY: number) -> () -- 8.2: the grid alone (draw's last step)
+local refill: () -> () -- 8.2: only the grid again (the search box's typing)
 
 local function screen(): (number, number)
 	local size = Ui.screenSize()
@@ -498,7 +522,9 @@ function WarehouseUi.close()
 		card:Destroy()
 		card = nil
 	end
-	grid, plan, panel = nil, nil, nil
+	grid, plan, panel, listed = nil, nil, nil, nil
+	table.clear(actionButtons)
+	search = "" -- (8.2: the search ends with the window; the sort stays)
 	shownKey = ""
 end
 
@@ -511,47 +537,69 @@ function WarehouseUi.showing(): string?
 	return if not open then nil elseif open.stand then "picker" else "stock"
 end
 
--- What the open window lists: the pieces (the picker: not on show), each with its values, the best earners first.
-type Row = { entry: Entry, values: Values }
+-- 8.2: does a piece of this item stand on stand i (an upgrade's small stand holds no bed)? As the server's
+-- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once.
+local fitsKnown: { [string]: boolean } = {}
+local function fitsStand(stand: number, item: string): boolean
+	local key = `{stand}|{item}`
+	local known = fitsKnown[key]
+	if known == nil then
+		local def = catalogue(item)
+		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil)
+		known = def == nil or (ok and yes == true)
+		fitsKnown[key] = known
+	end
+	return known :: boolean
+end
+
+-- 8.2: a stock entry as shared/StockPlan.luau reads it (its values: the server's, else the rules', else the guess).
+local function pieceOf(entry: Entry, values: Values): StockPlan.Piece
+	local e: any = entry
+	local condition = math.clamp(tonumber(entry.condition) or 1, 0, 1)
+	local broken = if type(e.broken) == "boolean" then e.broken else condition <= Config.Collection.BrokenAt + 1e-6
+	return { uid = entry.uid, item = entry.item, stand = entry.stand, got = tonumber(entry.got) or 0, rarity = values.rarity, income = values.perMinute, price = values.sell, broken = broken, condition = condition }
+end
+
+-- What the open window lists: the pieces (the picker: not on show), each with its values; in the sort toggle's order
+-- (8.2; the best earners first unless you chose another), in the picker the pieces too big for its stand last.
+type Row = { entry: Entry, values: Values, piece: StockPlan.Piece, fits: boolean }
+-- What the open window's grid lists (draw keeps it for fillGrid): the rows, the picker's stand, the empty words' counts.
+type Listed = { rows: { Row }, stand: number?, total: number, onShow: number, loaded: boolean }
 local function rows(state: State, stand: number?): { Row }
 	local list: { Row } = {}
 	for _, entry in state.stock do
 		if not (stand and entry.stand) then
-			table.insert(list, { entry = entry, values = WarehouseUi.values(entry) })
+			local values = WarehouseUi.values(entry)
+			table.insert(list, { entry = entry, values = values, piece = pieceOf(entry, values), fits = stand == nil or fitsStand(stand, entry.item) })
 		end
 	end
-	local order: { [string]: number } = {}
-	for index, name in WarehouseUi.Rarities do
-		order[name] = index
-	end
+	local order = StockPlan.order(sortBy)
 	table.sort(list, function(a: Row, b: Row): boolean
-		if a.values.perMinute ~= b.values.perMinute then
-			return a.values.perMinute > b.values.perMinute
+		if a.fits ~= b.fits then
+			return a.fits
 		end
-		if a.values.rarity ~= b.values.rarity then
-			return (order[a.values.rarity] or 0) > (order[b.values.rarity] or 0)
-		end
-		if a.values.sell ~= b.values.sell then
-			return a.values.sell > b.values.sell
-		end
-		local an, bn = nameOf(a.entry), nameOf(b.entry)
-		if an ~= bn then
-			return an < bn
-		end
-		return tostring(a.entry.uid) < tostring(b.entry.uid)
+		return order(a.piece, b.piece)
 	end)
 	return list
 end
 
--- SELL's question over the card: "SELL FOR $Y?", the piece, CANCEL and SELL.
-local function askSell(row: Row)
-	closeQuestion()
-	local layout = plan
-	if not (panel and layout) then
-		return
+-- The pieces of a list (StockPlan's).
+local function piecesOf(list: { Row }): { StockPlan.Piece }
+	local out: { StockPlan.Piece } = table.create(#list)
+	for _, row in list do
+		table.insert(out, row.piece)
 	end
+	return out
+end
+
+local function pieces(n: number): string
+	return `{n} {if n == 1 then "piece" else "pieces"}`
+end
+
+-- A question's shade over the card (a tap on it closes the question) and its box in the middle (boxW × boxH).
+local function questionBox(name: string, boxW: number, boxH: number): (any, any)
 	local shade = Ui.make("TextButton", {
-		Name = "Confirm",
+		Name = name,
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
 		BackgroundTransparency = 0.4,
@@ -563,9 +611,8 @@ local function askSell(row: Row)
 	}, panel)
 	Ui.corner(shade, Config.UiKit.Corner)
 	shade.Activated:Connect(closeQuestion)
-	local boxW, boxH = math.min(360, layout.w - 2 * layout.pad), 108 + layout.button
 	local box = Ui.make("Frame", {
-		Name = "ConfirmBox",
+		Name = `{name}Box`,
 		Size = UDim2.fromOffset(boxW, boxH),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -576,32 +623,260 @@ local function askSell(row: Row)
 	}, shade)
 	Ui.corner(box, 12)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, box)
-	local values = row.values
-	Ui.label(box, `SELL FOR {Ui.money(values.sell)}?`, UDim2.new(1, -32, 0, 26), { Name = "Question", Position = UDim2.fromOffset(16, 16), Font = Theme.HeadingFont, TextSize = 20, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
-	Ui.label(box, `{nameOf(row.entry)} · {string.upper(values.rarity)} · {percent(row.entry)}`, UDim2.new(1, -32, 0, 18), { Name = "What", Position = UDim2.fromOffset(16, 46), TextSize = 13, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
-	Ui.label(box, if row.entry.stand then "It comes off its stand." else `On show it would earn {WarehouseUi.rate(values.perMinute)}.`, UDim2.new(1, -32, 0, 16), { Name = "Hint", Position = UDim2.fromOffset(16, 66), TextSize = 12, TextColor3 = C.faint, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
+	question = shade
+	return shade, box
+end
+
+-- A SELL question over the card: the question ("SELL FOR $Y?"), what (one line), a hint, CANCEL and SELL (onYes).
+type Ask = { question: string, what: string, hint: string, onYes: () -> () }
+local function confirm(ask: Ask)
+	closeQuestion()
+	local layout = plan
+	if not (panel and layout) then
+		return
+	end
+	local boxW = math.min(400, layout.w - 2 * layout.pad)
+	local _, box = questionBox("Confirm", boxW, 108 + layout.button)
+	Ui.label(box, ask.question, UDim2.new(1, -32, 0, 26), { Name = "Question", Position = UDim2.fromOffset(16, 16), Font = Theme.HeadingFont, TextSize = 20, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
+	Ui.label(box, ask.what, UDim2.new(1, -32, 0, 18), { Name = "What", Position = UDim2.fromOffset(16, 46), TextSize = 13, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
+	Ui.label(box, ask.hint, UDim2.new(1, -32, 0, 16), { Name = "Hint", Position = UDim2.fromOffset(16, 66), TextSize = 12, TextColor3 = C.faint, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
 	local half = math.floor((boxW - 32 - 8) / 2)
 	local cancel = CardKit.bigButton(box, { name = "Cancel", text = "CANCEL", kind = "shut", height = layout.button, textSize = 14, z = 22, onClick = closeQuestion })
 	cancel.Size = UDim2.fromOffset(half, layout.button)
 	cancel.Position = UDim2.new(0, 16, 1, -(16 + layout.button))
-	local entry = row.entry
+	local onYes = ask.onYes
 	local sell = CardKit.bigButton(box, { name = "ConfirmSell", text = "SELL", kind = "primary", height = layout.button, textSize = 14, z = 22, onClick = function()
 		closeQuestion()
-		send({ kind = "sell", uid = entry.uid })
-		for _, tile in tiles do
-			if tile.entry == entry then
-				for _, button in tile.buttons do
-					button.Text = "…"
-					button.Active = false
-					button.AutoButtonColor = false
-				end
-			end
-		end
+		onYes()
 	end })
 	sell.Size = UDim2.fromOffset(half, layout.button)
 	sell.Position = UDim2.new(0, 24 + half, 1, -(16 + layout.button))
-	question = shade
 	Ui.gamepadFocus(sell)
+end
+
+-- SELL's question for one piece: "SELL FOR $Y?", the piece, CANCEL and SELL.
+local function askSell(row: Row)
+	local values, entry = row.values, row.entry
+	confirm({
+		question = `SELL FOR {Ui.money(values.sell)}?`,
+		what = `{nameOf(entry)} · {string.upper(values.rarity)} · {percent(entry)}`,
+		hint = if entry.stand then "It comes off its stand." else `On show it would earn {WarehouseUi.rate(values.perMinute)}.`,
+		onYes = function()
+			send({ kind = "sell", uid = entry.uid })
+			for _, tile in tiles do
+				if tile.entry == entry then
+					for _, button in tile.buttons do
+						button.Text = "…"
+						button.Active = false
+						button.AutoButtonColor = false
+					end
+				end
+			end
+		end,
+	})
+end
+
+-- ── 8.2: the STOCK list's bulk buttons ──────────────────────────────────────
+
+local FILTER_WORDS: { [string]: { line: string, none: string, hint: string } } = {
+	common = { line = "every Common piece", none = "No Common piece in your stock", hint = "Pieces on show stay on their stands." },
+	broken = { line = "they earn nothing on show", none = "No broken piece in your stock", hint = "Broken pieces sell for scrap. Pieces on show stay." },
+	duplicates = { line = "keeps the best of each item", none = "One of each: no duplicates", hint = "The best of each item stays. Pieces on show stay." },
+}
+
+-- A bulk button waits for the server's answer (the next state draws it again).
+local function waiting(name: string)
+	local button = actionButtons[name]
+	if button then
+		button.Text = "…"
+		button.Active = false
+		button.AutoButtonColor = false
+	end
+end
+
+-- The names of a few pieces ("Chair, Kitchen Radio +3 more") for a question's line.
+local function someNames(list: { StockPlan.Piece }, byUid: { [any]: Entry }): string
+	local names: { string } = {}
+	for index, piece in list do
+		if index > 3 then
+			break
+		end
+		local entry = byUid[piece.uid]
+		table.insert(names, if entry then nameOf(entry) else tostring(piece.item))
+	end
+	local more = #list - #names
+	return table.concat(names, ", ") .. (if more > 0 then ` +{more} more` else "")
+end
+
+-- 💰 SELL…'s menu over the card: ALL COMMON, ALL BROKEN, DUPLICATES (how many, their price), CANCEL; each asks first.
+local function sellMenu()
+	closeQuestion()
+	local layout, state = plan, current
+	if not (panel and layout and state) then
+		return
+	end
+	local all = rows(state, nil)
+	local list = piecesOf(all)
+	local byUid: { [any]: Entry } = {}
+	for _, row in all do
+		byUid[row.entry.uid] = row.entry
+	end
+	local optionH = math.max(layout.button, 40) + 8
+	local boxW = math.min(420, layout.w - 2 * layout.pad)
+	local boxH = 16 + 26 + 24 + #StockPlan.Filters * (optionH + 8) + layout.button + 16
+	local _, box = questionBox("Menu", boxW, boxH)
+	Ui.label(box, "SELL…", UDim2.new(1, -32, 0, 26), { Name = "Question", Position = UDim2.fromOffset(16, 16), Font = Theme.HeadingFont, TextSize = 20, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
+	Ui.label(box, "Many pieces at once. Pieces on show stay.", UDim2.new(1, -32, 0, 16), { Name = "Hint", Position = UDim2.fromOffset(16, 44), TextSize = 12, TextColor3 = C.faint, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 })
+	local y = 16 + 26 + 24
+	local first: any = nil
+	for _, id in StockPlan.Filters do
+		local chosen = StockPlan.toSell(list, id)
+		local total = StockPlan.price(chosen)
+		local words = FILTER_WORDS[id]
+		local some = #chosen > 0
+		local option = Ui.make("TextButton", {
+			Name = `Sell_{id}`,
+			Size = UDim2.fromOffset(boxW - 32, optionH),
+			Position = UDim2.fromOffset(16, y),
+			BackgroundColor3 = K.row,
+			BackgroundTransparency = if some then 0 else 0.5, -- (nothing to sell: faint)
+			BorderSizePixel = 0,
+			AutoButtonColor = some,
+			Text = "",
+			ZIndex = 22,
+		}, box)
+		Ui.corner(option, TILE_CORNER)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, option)
+		local inner = boxW - 32 - 24
+		local priceText = if some then Ui.money(total) else ""
+		local priceW = if some then CardKit.width(priceText, 16, Theme.DisplayFont) + 4 else 0
+		Ui.label(option, StockPlan.filterName(id), UDim2.fromOffset(inner - priceW - 8, 18), { Name = "What", Position = UDim2.new(0, 12, 0.5, -18), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = if some then K.text else K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 })
+		Ui.label(option, if some then `{pieces(#chosen)} · {words.line}` else words.none, UDim2.fromOffset(inner - priceW - 8, 16), { Name = "Count", Position = UDim2.new(0, 12, 0.5, 2), TextSize = 12, TextColor3 = if some then K.secondary else C.faint, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 })
+		if some then
+			Ui.label(option, priceText, UDim2.fromOffset(priceW, 22), { Name = "Price", Position = UDim2.new(1, -12, 0.5, -11), AnchorPoint = Vector2.new(1, 0), Font = Theme.DisplayFont, TextSize = 16, TextColor3 = C.money, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 23 })
+			first = first or option
+		end
+		option.Activated:Connect(function()
+			if not some then
+				return
+			end
+			CardKit.click()
+			confirm({
+				question = `SELL {string.upper(pieces(#chosen))} FOR {Ui.money(total)}?`,
+				what = someNames(chosen, byUid),
+				hint = words.hint,
+				onYes = function()
+					if send({ kind = "sellmany", filter = id }) then
+						waiting("SellMenu")
+					end
+				end,
+			})
+		end)
+		y += optionH + 8
+	end
+	local cancel = CardKit.bigButton(box, { name = "Cancel", text = "CANCEL", kind = "shut", height = layout.button, textSize = 14, z = 22, onClick = closeQuestion })
+	cancel.Size = UDim2.fromOffset(boxW - 32, layout.button)
+	cancel.Position = UDim2.new(0, 16, 1, -(16 + layout.button))
+	Ui.gamepadFocus(first or cancel)
+end
+
+-- Why ⭐ FILL BEST has nothing to do (the server would say the same).
+local function fillWhy(list: { StockPlan.Piece }, stands: number): string
+	if #StockPlan.free(list, stands) == 0 then
+		return "Every display stand you have already shows a piece."
+	end
+	for _, piece in list do
+		if piece.stand == nil and piece.broken ~= true and piece.income > 0 then
+			return "What's in your stock is too big for your free small stands."
+		end
+	end
+	return "Nothing in your stock would earn on a stand. Bring more home from a move!"
+end
+
+-- The STOCK list's header buttons, right of the title (left of ✕): ⭐ FILL BEST, 💰 SELL…, ↩ TAKE ALL DOWN; grey with
+-- nothing to do (a tap says why). Returns the left edge they leave the title.
+local ACTIONS = {
+	{ name = "FillBest", text = "⭐ FILL BEST", short = "⭐ BEST" },
+	{ name = "SellMenu", text = "💰 SELL…", short = "💰 SELL…" },
+	{ name = "TakeAllDown", text = "↩ TAKE ALL DOWN", short = "↩ ALL DOWN" },
+}
+local TITLE_ROOM = 200 -- px the title keeps at least (else the buttons' short words)
+local function drawActions(frame: any, layout: Layout, state: State, all: { Row }): number
+	local list = piecesOf(all)
+	local shown, inStock = 0, 0
+	for _, piece in list do
+		if piece.stand ~= nil then
+			shown += 1
+		else
+			inStock += 1
+		end
+	end
+	local canFill = #StockPlan.fill(list, state.stands, fitsStand) > 0
+	local live: { [string]: boolean } = { FillBest = canFill, SellMenu = inStock > 0, TakeAllDown = shown > 0 }
+	local why: { [string]: string } = {
+		FillBest = fillWhy(list, state.stands),
+		SellMenu = "Your stock is empty: nothing to sell.",
+		TakeAllDown = "Nothing is on show.",
+	}
+	local size = if layout.touch then 13 else 12
+	local right = layout.w - 6 - layout.close - 8
+	local function widths(short: boolean): ({ number }, number)
+		local out: { number } = {}
+		local total = 0
+		for index, action in ACTIONS do
+			local w = CardKit.width(if short then action.short else action.text, size, Theme.HeadingFont) + 20
+			if layout.touch then
+				w = math.max(w, layout.button)
+			end
+			out[index] = w
+			total += w + (if index > 1 then 6 else 0)
+		end
+		return out, total
+	end
+	local short = false
+	local sizes, total = widths(false)
+	if right - total < layout.pad + TITLE_ROOM then
+		short = true
+		sizes, total = widths(true)
+	end
+	local x = right - total
+	local y = math.max(4, 6 + (layout.close - layout.button) / 2)
+	for index, action in ACTIONS do
+		local name = action.name
+		local on = live[name]
+		local button = CardKit.bigButton(frame, {
+			name = name,
+			text = if short then action.short else action.text,
+			kind = if on and name == "FillBest" then "good" else "shut",
+			height = layout.button,
+			textSize = size,
+			onClick = function()
+				if not on then
+					toast(why[name])
+				elseif name == "FillBest" then
+					if send({ kind = "fillbest" }) then
+						waiting(name)
+					end
+				elseif name == "SellMenu" then
+					sellMenu()
+				elseif send({ kind = "undisplayall" }) then
+					waiting(name)
+				end
+			end,
+		})
+		button.Size = UDim2.fromOffset(sizes[index], layout.button)
+		button.Position = UDim2.fromOffset(x, y)
+		button.AutoButtonColor = on
+		if on and name ~= "FillBest" then
+			button.TextColor3 = K.text -- (quiet: raised, white words)
+		elseif not on then
+			button.TextTransparency = 0.45 -- (nothing to do: grey, a tap says why)
+		end
+		button:SetAttribute("Live", on)
+		actionButtons[name] = button
+		x += sizes[index] + 6
+	end
+	return right - total
 end
 
 -- A tile's button: kind a CardKit face ("good": DISPLAY), or "quiet" (SELL, TAKE DOWN: raised, white words).
@@ -616,6 +891,8 @@ end
 
 local function drawTile(parent: any, row: Row, index: number, layout: Layout, stand: number?)
 	local entry, values = row.entry, row.values
+	local tooBig = stand ~= nil and not row.fits -- 8.2: greyed, "Too big for this stand"
+	local dim = if tooBig then 0.45 else 0 -- (its words' transparency)
 	local col, line = (index - 1) % layout.cols, (index - 1) // layout.cols
 	local accent = WarehouseUi.Rarity[values.rarity] or WarehouseUi.Rarity.common
 	local w = layout.tileW
@@ -624,11 +901,13 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 		Size = UDim2.fromOffset(w, layout.tileH),
 		Position = UDim2.fromOffset(col * (w + layout.gap), line * (layout.tileH + layout.gap)),
 		BackgroundColor3 = K.row,
+		BackgroundTransparency = if tooBig then 0.5 else 0,
 		BorderSizePixel = 0,
 	}, parent)
 	frame:SetAttribute("Uid", tostring(entry.uid))
+	frame:SetAttribute("TooBig", tooBig)
 	Ui.corner(frame, TILE_CORNER)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = accent, Thickness = 1, Transparency = if values.rarity == "common" then 0.8 else 0.45 }, frame)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if tooBig then K.line else accent, Thickness = 1, Transparency = if tooBig or values.rarity == "common" then 0.8 else 0.45 }, frame)
 	local picture = Ui.make("Frame", {
 		Name = "Picture",
 		Size = UDim2.fromOffset(w - 12, layout.picture),
@@ -657,21 +936,33 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 		Ui.corner(ribbon, 10)
 	end
 	local inner = w - 20
+	if tooBig then
+		-- 8.2: a veil over its picture and the words (wrapped: they fit a narrow tile too)
+		local veil = Ui.make("Frame", { Name = "TooBig", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 5 }, picture)
+		Ui.label(veil, "Too big for this stand", UDim2.new(1, -16, 1, -12), { Name = "TooBigWords", Position = UDim2.fromOffset(8, 6), Font = Theme.HeadingFont, TextSize = 13, TextColor3 = K.text, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 6 })
+	end
 	local y = 6 + layout.picture + 6
-	Ui.label(frame, string.upper(values.rarity), UDim2.fromOffset(math.floor(inner * 0.55), 14), { Name = "Rarity", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = accent, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.label(frame, percent(entry), UDim2.fromOffset(math.floor(inner * 0.45), 14), { Name = "Condition", Position = UDim2.new(1, -10, 0, y), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
+	Ui.label(frame, string.upper(values.rarity), UDim2.fromOffset(math.floor(inner * 0.55), 14), { Name = "Rarity", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = accent, TextTransparency = dim, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, percent(entry), UDim2.fromOffset(math.floor(inner * 0.45), 14), { Name = "Condition", Position = UDim2.new(1, -10, 0, y), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary, TextTransparency = dim, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
 	y += 16
-	Ui.label(frame, nameOf(entry), UDim2.fromOffset(inner, 18), { Name = "PieceName", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, nameOf(entry), UDim2.fromOffset(inner, 18), { Name = "PieceName", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = K.text, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 20
 	-- the one big number: what it earns a minute on show; the price under it
-	Ui.label(frame, WarehouseUi.rate(values.perMinute), UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = C.money, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, WarehouseUi.rate(values.perMinute), UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = if tooBig then K.secondary else C.money, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 22
-	Ui.label(frame, `Sell {Ui.money(values.sell)}`, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, `Sell {Ui.money(values.sell)}`, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	-- the buttons: DISPLAY / SELL (the picker), TAKE DOWN / SELL (a piece on show), SELL (the stock list)
 	local buttons: { any } = {}
 	local first: any = nil
 	local by = layout.tileH - 8 - layout.button
-	if stand then
+	if stand and tooBig then
+		-- 8.2: TOO BIG instead of DISPLAY, grey; a tap says where it goes
+		first = tileButton(frame, "Display", "TOO BIG", "shut", layout, function()
+			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`)
+		end)
+		first.AutoButtonColor = false
+		first.TextTransparency = 0.3
+	elseif stand then
 		first = tileButton(frame, "Display", "DISPLAY", "good", layout, function()
 			if send({ kind = "display", uid = entry.uid, stand = stand }) then
 				WarehouseUi.close()
@@ -741,22 +1032,75 @@ local function drawChips(parent: any, list: { Row }, layout: Layout)
 		})
 		local chipW = chip.Size.X.Offset + 10
 		chip.Size = UDim2.fromOffset(if layout.touch then math.max(chipW, layout.chips) else chipW, layout.chips)
-		chip.Position = UDim2.fromOffset(x, HEADER)
+		chip.Position = UDim2.fromOffset(x, layout.header)
 		chip.TextSize = if layout.touch then 13 else 12
 		if on then
 			Ui.make("Frame", { Name = "Underline", Size = UDim2.new(1, -16, 0, 2), Position = UDim2.new(0, 8, 1, -2), BackgroundColor3 = K.red, BorderSizePixel = 0 }, chip)
 		end
 		x += chip.Size.X.Offset + 6
 	end
-	local sorted = "BEST $/MIN FIRST"
-	local sortW = CardKit.width(sorted, 11, Theme.HeadingFont) + 4
-	if x + sortW + 8 <= layout.w - layout.pad then
-		Ui.label(parent, sorted, UDim2.fromOffset(sortW, layout.chips), { Name = "Sort", Position = UDim2.new(1, -layout.pad, 0, HEADER), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
+	-- 8.2: the sort toggle at the right ($/MIN → VALUE → NEWEST → RARITY), the search box left of it (a computer)
+	local textSize = if layout.touch then 13 else 12
+	local sortText = `SORT · {StockPlan.sortLabel(sortBy)}`
+	local sortW = math.max(CardKit.width(`SORT · {StockPlan.sortLabel("rarity")}`, textSize, Theme.HeadingFont), CardKit.width(sortText, textSize, Theme.HeadingFont)) + 20
+	if layout.touch then
+		sortW = math.max(sortW, layout.chips)
+	end
+	local right = layout.w - layout.pad
+	local sort = CardKit.chip(parent, {
+		name = "Sort",
+		text = sortText,
+		face = K.row,
+		ink = K.text,
+		stroke = K.line,
+		faint = 0.6,
+		onClick = function()
+			sortBy = StockPlan.nextSort(sortBy)
+			draw(false)
+		end,
+	})
+	sort.Size = UDim2.fromOffset(sortW, layout.chips)
+	sort.Position = UDim2.fromOffset(right - sortW, layout.header)
+	sort.TextSize = textSize
+	right -= sortW + 8
+	if not layout.touch and right - SEARCH_W >= x + 2 then
+		local box = Ui.make("TextBox", {
+			Name = "Search",
+			Size = UDim2.fromOffset(SEARCH_W, layout.chips),
+			Position = UDim2.fromOffset(right - SEARCH_W, layout.header),
+			BackgroundColor3 = K.row,
+			BorderSizePixel = 0,
+			ClearTextOnFocus = false,
+			Text = search,
+			PlaceholderText = "🔍 Search",
+			PlaceholderColor3 = C.faint,
+			Font = Theme.Font,
+			TextSize = 13,
+			TextColor3 = K.text,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ClipsDescendants = true,
+		}, parent)
+		Ui.corner(box, layout.chips // 2)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, box)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, box)
+		box:GetPropertyChangedSignal("Text"):Connect(function()
+			local text = box.Text
+			if #text > MAX_SEARCH then
+				box.Text = string.sub(text, 1, MAX_SEARCH)
+				return
+			end
+			if text ~= search then
+				search = text
+				refill()
+			end
+		end)
 	end
 end
 
 local function emptyWords(stand: number?, total: number, shown: number): string
-	if filter ~= "all" then
+	if string.match(search, "%S") then
+		return `No piece here matches "{search}".`
+	elseif filter ~= "all" then
 		return `No {string.upper(filter)} pieces here.`
 	elseif total == 0 then
 		return "Your stock is empty. Bring things home from a move: unload your van at your warehouse."
@@ -767,7 +1111,7 @@ local function emptyWords(stand: number?, total: number, shown: number): string
 end
 
 local function stateKey(state: State?, layout: Layout): string
-	local parts = { `{layout.w}x{layout.h}@{layout.scale}`, filter }
+	local parts = { `{layout.w}x{layout.h}@{layout.scale}`, filter, sortBy, search }
 	local open = mode
 	table.insert(parts, if open then tostring(open.stand) else "-")
 	if state then
@@ -775,6 +1119,7 @@ local function stateKey(state: State?, layout: Layout): string
 			table.insert(parts, `{tostring(entry.uid)}:{entry.item}:{tostring(entry.variant)}:{tostring(entry.condition)}:{tostring(entry.stand)}:{tostring(entry.name)}`)
 		end
 		table.insert(parts, tostring(state.income))
+		table.insert(parts, tostring(state.stands)) -- (8.2: FILL BEST's free stands)
 	else
 		table.insert(parts, "none")
 	end
@@ -814,6 +1159,7 @@ draw = function(keepScroll: boolean)
 	if card then
 		card:Destroy()
 	end
+	grid = nil
 	local root = ensureGui()
 	plan = layout
 	-- a shade over the world (the touch buttons too): a tap beside the card closes it; Modal frees the mouse
@@ -863,17 +1209,54 @@ draw = function(keepScroll: boolean)
 	close.Size = UDim2.fromOffset(layout.close, layout.close)
 	close.Position = UDim2.new(1, -6, 0, 6)
 	close.AnchorPoint = Vector2.new(1, 0)
+	-- 8.2: the STOCK list's bulk buttons in the header (the title and its line keep the room left of them)
+	table.clear(actionButtons)
+	if state and not stand then
+		local left = drawActions(frame, layout, state, all)
+		local room = math.max(40, left - 8 - layout.pad)
+		for _, name in { "Title", "Subtitle" } do
+			local label = frame:FindFirstChild(name)
+			if label then
+				label.Size = UDim2.fromOffset(room, label.Size.Y.Offset)
+			end
+		end
+	end
 	-- the pieces, the chips over them, the grid
 	local list: { Row } = if state and stand then rows(state, stand) else all
+	listed = { rows = list, stand = stand, total = #all, onShow = onShow, loaded = state ~= nil }
 	drawChips(frame, list, layout)
+	fillGrid(scroll.Y)
+	local firstTile = tiles[1]
+	Ui.gamepadFocus(if firstTile then firstTile.buttons[1] else close)
+end
+
+-- The grid (and its empty words) for what the window lists now: the rarity chip's, the search's (8.2: typing in the
+-- search box draws only this again, so the box keeps its focus).
+fillGrid = function(scrollY: number)
+	local layout, frame, now = plan, panel, listed
+	if not (layout and frame and now) then
+		return
+	end
+	for _, tile in tiles do
+		unmount(tile)
+	end
+	table.clear(tiles)
+	if grid then
+		grid:Destroy()
+		grid = nil
+	end
+	local empty = frame:FindFirstChild("Empty")
+	if empty then
+		empty:Destroy()
+	end
 	local shown: { Row } = {}
-	for _, row in list do
-		if filter == "all" or row.values.rarity == filter then
+	for _, row in now.rows do
+		if (filter == "all" or row.values.rarity == filter) and StockPlan.matches(nameOf(row.entry), search) then
 			table.insert(shown, row)
 		end
 	end
 	local lines = math.ceil(#shown / layout.cols)
-	grid = Ui.make("ScrollingFrame", {
+	local made = Ui.make("ScrollingFrame", {
 		Name = "Grid",
 		Size = UDim2.fromOffset(layout.gridW, layout.gridH),
 		Position = UDim2.fromOffset(layout.gridX, layout.gridY),
@@ -883,18 +1266,25 @@ draw = function(keepScroll: boolean)
 		ScrollBarImageColor3 = K.line,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		CanvasSize = UDim2.fromOffset(0, math.max(0, lines * (layout.tileH + layout.gap) - layout.gap)),
-		CanvasPosition = Vector2.new(0, math.clamp(scroll.Y, 0, math.max(0, lines * (layout.tileH + layout.gap) - layout.gap - layout.gridH))),
+		CanvasPosition = Vector2.new(0, math.clamp(scrollY, 0, math.max(0, lines * (layout.tileH + layout.gap) - layout.gap - layout.gridH))),
 	}, frame)
+	grid = made
 	for index, row in shown do
-		drawTile(grid, row, index, layout, stand)
+		drawTile(made, row, index, layout, now.stand)
 	end
-	if state and #shown == 0 then
-		Ui.label(frame, emptyWords(stand, #all, onShow), UDim2.fromOffset(layout.gridW - 40, 60), { Name = "Empty", Position = UDim2.fromOffset(layout.gridX + 20, layout.gridY + 30), TextSize = 15, TextColor3 = K.secondary, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center })
+	if now.loaded and #shown == 0 then
+		Ui.label(frame, emptyWords(now.stand, now.total, now.onShow), UDim2.fromOffset(layout.gridW - 40, 60), { Name = "Empty", Position = UDim2.fromOffset(layout.gridX + 20, layout.gridY + 30), TextSize = 15, TextColor3 = K.secondary, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center })
 	end
-	grid:GetPropertyChangedSignal("CanvasPosition"):Connect(queueRefresh)
+	made:GetPropertyChangedSignal("CanvasPosition"):Connect(queueRefresh)
 	refreshViews()
-	local firstTile = tiles[1]
-	Ui.gamepadFocus(if firstTile then firstTile.buttons[1] else close)
+end
+
+refill = function()
+	if not (mode and plan) then
+		return
+	end
+	shownKey = stateKey(current, plan :: Layout) -- (what it shows now: a state that changes nothing draws nothing)
+	fillGrid(0)
 end
 
 local function setState(raw: any)
@@ -957,6 +1347,14 @@ function WarehouseUi.state(): State?
 	return current
 end
 
+function WarehouseUi.sorting(): string
+	return sortBy
+end
+
+function WarehouseUi.search(): string
+	return search
+end
+
 function WarehouseUi.onState(fn: (State, State?) -> ())
 	table.insert(listeners, fn)
 end
@@ -976,6 +1374,15 @@ local function onEvent(message: any)
 	elseif kind == "sold" then
 		local money = amount(message.money) or 0
 		toast(`Sold {if type(message.name) == "string" then message.name else "a piece"} · +{Ui.money(money)}`)
+	elseif kind == "bulk" then
+		-- 8.2: FILL BEST's and TAKE ALL DOWN's answer
+		local n = math.floor(amount(message.count) or 0)
+		if message.action == "fillbest" and n > 0 then
+			local income = amount(message.income)
+			toast(`⭐ {pieces(n)} put on show{if income and income > 0 then ` · {WarehouseUi.rate(income)}` else ""}`)
+		elseif message.action == "undisplayall" and n > 0 then
+			toast(`↩ {pieces(n)} back in your stock`)
+		end
 	end
 end
 

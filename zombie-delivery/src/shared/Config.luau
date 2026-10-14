@@ -5607,6 +5607,7 @@ Config.Robust = {
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
+		CollectionBulk = 1, -- 8.2: and its bulk buttons (fillbest / sellmany / undisplayall): one a second, on top
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
 		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
 	},

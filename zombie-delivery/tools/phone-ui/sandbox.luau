@@ -16,6 +16,15 @@
 -- their room and a phone's buttons a finger's size (44 px); a second
 -- SandboxHud without client/Hud.luau (its own column and toasts). `luau sandbox.luau -a dump` prints the preview's scenes
 -- as JSON instead (sandbox_preview.py).
+-- 8.2 (the warehouse's quality of life): the STOCK list's header buttons (⭐ FILL BEST, 💰 SELL…, ↩ TAKE ALL DOWN) on each
+-- screen: inside the card, clear of the title, the ✕, the chips and the grid, a finger's size on a phone; their requests
+-- (fillbest, undisplayall, a double tap one request), grey with nothing to do (a tap says why, nothing sent); SELL…'s menu
+-- (each filter's count and price as shared/StockPlan.luau picks them, its texts fitting, asked first: CANCEL sends
+-- nothing, SELL only { kind = "sellmany", filter }); the server's bulk and sold answers as toasts; the sort toggle
+-- ($/MIN → VALUE → NEWEST → RARITY, kept for the picker); the search box on a computer only (every word, any case, the
+-- card and the box not drawn again while typing, 40 letters at most, cleared with the window); THE PICKER at a small
+-- upgrade stand (the bed, the hay wagon and the wheelbarrow greyed with "Too big for this stand" and TOO BIG, last;
+-- TOO BIG sends nothing and says where it goes) and at a big one (nothing greyed).
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -208,7 +217,13 @@ local function node(n)
 	out.z, out.order = p.ZIndex, p.LayoutOrder
 	out.bg, out.bgT = color(p.BackgroundColor3), p.BackgroundTransparency
 	out.clip = p.ClipsDescendants
-	if p.Text and p.Text ~= "" then
+	if p.ClassName == "TextBox" and (p.Text == nil or p.Text == "") and p.PlaceholderText then
+		-- 8.2: an empty search box shows its placeholder
+		out.text, out.ts = p.PlaceholderText, p.TextSize
+		out.tc = color(p.PlaceholderColor3 or p.TextColor3)
+		out.xa = if p.TextXAlignment then p.TextXAlignment.Name else nil
+		out.font = if p.Font then p.Font.Name else nil
+	elseif p.Text and p.Text ~= "" then
 		out.text, out.ts = p.Text, p.TextSize
 		out.tc, out.tt = color(p.TextColor3), p.TextTransparency
 		out.xa = if p.TextXAlignment then p.TextXAlignment.Name else nil
@@ -670,6 +685,267 @@ WarehouseUi.close()
 collection.OnClientEvent:Fire(state(STOCK, 36))
 M.flush()
 
+-- ── 8.2: the warehouse's quality of life ────────────────────────────────────
+local StockPlan = require("./StockPlan")
+local function withStands(stock, income, stands)
+	return { kind = "state", stock = stock, income = income, stands = stands }
+end
+-- (the pieces as the window hands them to shared/StockPlan.luau: its values, broken from the condition)
+local function piecesFor(stock)
+	local list = {}
+	for _, entry in stock do
+		local v = WarehouseUi.values(entry)
+		local condition = entry.condition or 1
+		table.insert(list, { uid = entry.uid, item = entry.item, stand = entry.stand, got = entry.got or 0, rarity = v.rarity, income = v.perMinute, price = v.sell, broken = if entry.broken ~= nil then entry.broken else condition <= Config.Collection.BrokenAt + 1e-6, condition = condition })
+	end
+	return list
+end
+local function within(inner, outer)
+	return inner.x0 >= outer.x0 - 0.5 and inner.y0 >= outer.y0 - 0.5 and inner.x1 <= outer.x1 + 0.5 and inner.y1 <= outer.y1 + 0.5
+end
+-- The STOCK list's header buttons: there, inside the card, clear of each other, the title, its line, the ✕, the chips
+-- (the sort toggle, the search box) and the grid.
+local function headerChecks(label)
+	picker = named(gui, "Picker")
+	local buttons = { named(picker, "FillBest"), named(picker, "SellMenu"), named(picker, "TakeAllDown") }
+	check(`{label}: the STOCK list's header: ⭐ FILL BEST, 💰 SELL…, ↩ TAKE ALL DOWN`, buttons[1] ~= nil and buttons[2] ~= nil and buttons[3] ~= nil
+		and string.find(buttons[1].Text, "BEST", 1, true) ~= nil and string.find(buttons[2].Text, "SELL", 1, true) ~= nil and string.find(buttons[3].Text, "DOWN", 1, true) ~= nil)
+	local cardBox = box(picker)
+	local others = { named(picker, "Title"), named(picker, "Subtitle"), named(picker, "Close"), named(picker, "Grid"), named(picker, "Sort"), named(picker, "Filter_all") }
+	if named(picker, "Search") then
+		table.insert(others, named(picker, "Search"))
+	end
+	local clear, hit = true, nil
+	for i, button in buttons do
+		local b = box(button)
+		if not within(b, cardBox) then
+			clear, hit = false, `{button.Name} outside the card`
+		end
+		for _, other in others do
+			if overlap(b, box(other)) then
+				clear, hit = false, `{button.Name} on {other.Name}`
+			end
+		end
+		for j = i + 1, #buttons do
+			if overlap(b, box(buttons[j])) then
+				clear, hit = false, `{button.Name} on {buttons[j].Name}`
+			end
+		end
+	end
+	check(`{label}: … inside the card, clear of the title, its line, the ✕, the chips, the sort toggle and the grid`, clear, hit)
+	local sortBox, chipBox = box(named(picker, "Sort")), box(named(picker, "Filter_all"))
+	check(`{label}: … the sort toggle on the chips' row at its right, inside the card`, within(sortBox, cardBox) and math.abs(sortBox.y0 - chipBox.y0) < 1 and sortBox.x0 > chipBox.x1)
+end
+
+-- the phone: the STOCK list with pieces of every kind to sell
+local SELLS = table.clone(STOCK)
+for _, extra in {
+	{ uid = "d1", item = "dining_chair", variant = 1, condition = 0.9, name = "Chair", got = 20 },
+	{ uid = "d2", item = "dining_chair", variant = 2, condition = 0.7, name = "Chair", got = 21 },
+	{ uid = "d3", item = "tv", variant = 1, condition = 0.05, name = "Old TV", got = 22, broken = true },
+	{ uid = "d4", item = "box", variant = 1, condition = 1, name = "Moving Box", got = 23 },
+} do
+	table.insert(SELLS, extra)
+end
+collection.OnClientEvent:Fire(withStands(SELLS, 36, 6))
+WarehouseUi.openStock()
+picker = named(gui, "Picker")
+check("8.2, the STOCK list (844 x 390): drawn with the header buttons", WarehouseUi.showing() == "stock" and named(picker, "FillBest") ~= nil)
+headerChecks("844 x 390")
+pickerChecks("844 x 390, the STOCK list with its header (8.2)")
+check("… no search box on a touch screen", named(picker, "Search") == nil)
+check("… FILL BEST green (free stands, pieces that earn), SELL… and TAKE ALL DOWN quiet: all live", named(picker, "FillBest"):GetAttribute("Live") == true and named(picker, "SellMenu"):GetAttribute("Live") == true and named(picker, "TakeAllDown"):GetAttribute("Live") == true
+	and named(picker, "FillBest").BackgroundColor3 == require("./CardKit").Buttons.good.face)
+scene("phone-stock-tools")
+
+-- 💰 SELL…: the menu, each filter's count and price (shared/StockPlan.luau on the window's values), asked first
+before = #sentOn("Collection")
+press(named(picker, "SellMenu"))
+local menu = named(picker, "Menu")
+local menuBox = menu and named(menu, "MenuBox")
+check("💰 SELL… opens its menu over the card (nothing sent)", menu ~= nil and menuBox ~= nil and #sentOn("Collection") == before)
+local pieces = piecesFor(SELLS)
+local menuRight = true
+local menuDetail = nil
+for _, id in StockPlan.Filters do
+	local option = named(menuBox, `Sell_{id}`)
+	local chosen = StockPlan.toSell(pieces, id)
+	local count = named(option, "Count")
+	local price = named(option, "Price")
+	local want = `{#chosen} {if #chosen == 1 then "piece" else "pieces"} · `
+	if not (option and named(option, "What").Text == StockPlan.filterName(id) and #chosen > 0 and string.sub(count.Text, 1, #want) == want and price and price.Text == M.MUi.money(StockPlan.price(chosen))) then
+		menuRight = false
+		menuDetail = `{id}: {count and count.Text} {price and price.Text}`
+	end
+end
+check("… ALL COMMON, ALL BROKEN, DUPLICATES: each with how many and their price (as the server picks them)", menuRight, menuDetail)
+check("… its texts fit, its options and CANCEL a finger's size, the menu inside the card", #badTexts(menu) == 0 and #smallButtons(menuBox) == 0 and within(box(menuBox), box(picker)), badTexts(menu)[1] or smallButtons(menuBox)[1])
+scene("phone-sellmenu")
+key("Escape")
+check("… ESC closes the menu first (the list stays)", named(picker, "Menu") == nil and WarehouseUi.isOpen())
+press(named(picker, "SellMenu"))
+local commons = StockPlan.toSell(pieces, "common")
+press(named(named(picker, "Menu"), "Sell_common"))
+local ask = named(picker, "Confirm")
+local commonTotal = M.MUi.money(StockPlan.price(commons))
+check(`ALL COMMON asks first: "SELL {#commons} PIECES FOR {commonTotal}?" (the menu gone, nothing sent)`, ask ~= nil and named(picker, "Menu") == nil and named(ask, "Question").Text == `SELL {#commons} PIECES FOR {commonTotal}?` and #sentOn("Collection") == before, ask and named(ask, "Question").Text)
+check("… the pieces named, the hint: pieces on show stay; texts fit, buttons a finger's size", string.find(named(ask, "What").Text, ",", 1, true) ~= nil and string.find(named(ask, "Hint").Text, "on show", 1, true) ~= nil and #badTexts(ask) == 0 and #smallButtons(named(ask, "ConfirmBox")) == 0, badTexts(ask)[1])
+scene("phone-sellconfirm")
+press(named(ask, "Cancel"))
+check("… CANCEL: nothing sent", named(picker, "Confirm") == nil and #sentOn("Collection") == before)
+press(named(picker, "SellMenu"))
+press(named(named(picker, "Menu"), "Sell_duplicates"))
+press(named(named(picker, "Confirm"), "ConfirmSell"))
+sent = sentOn("Collection")
+check("… SELL: { kind = \"sellmany\", filter = \"duplicates\" } and nothing else (the server picks the pieces)", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "duplicates" and sent[#sent][1].uid == nil and sent[#sent][1].uids == nil)
+check("… 💰 SELL… waits (…)", named(picker, "SellMenu").Text == "…")
+
+-- ⭐ FILL BEST and ↩ TAKE ALL DOWN
+before = #sentOn("Collection")
+press(named(picker, "FillBest"))
+press(named(picker, "FillBest"))
+sent = sentOn("Collection")
+check("⭐ FILL BEST: { kind = \"fillbest\" } once (a double tap is one request), it waits (…)", #sent == before + 1 and sent[#sent][1].kind == "fillbest" and named(picker, "FillBest").Text == "…")
+press(named(picker, "TakeAllDown"))
+sent = sentOn("Collection")
+check("↩ TAKE ALL DOWN: { kind = \"undisplayall\" }", #sent == before + 2 and sent[#sent][1].kind == "undisplayall")
+-- the server's answers: toasts
+collection.OnClientEvent:Fire({ kind = "bulk", action = "fillbest", count = 3, income = 42.5 })
+check("the server's fillbest: \"⭐ 3 pieces put on show · +$X/min\"", M.toasts[#M.toasts] == `⭐ 3 pieces put on show · {WarehouseUi.rate(42.5)}`, M.toasts[#M.toasts])
+collection.OnClientEvent:Fire({ kind = "bulk", action = "undisplayall", count = 1 })
+check("… undisplayall: \"↩ 1 piece back in your stock\"", M.toasts[#M.toasts] == "↩ 1 piece back in your stock", M.toasts[#M.toasts])
+collection.OnClientEvent:Fire({ kind = "sold", name = "4 pieces", money = 120, count = 4 })
+check("… a sellmany's sold: \"Sold 4 pieces · +$120\"", M.toasts[#M.toasts] == "Sold 4 pieces · +$120", M.toasts[#M.toasts])
+local toastCount = #M.toasts
+collection.OnClientEvent:Fire({ kind = "bulk", action = "nope", count = 3 })
+collection.OnClientEvent:Fire({ kind = "bulk", action = "fillbest", count = "x" })
+check("… junk: no toast", #M.toasts == toastCount)
+
+-- nothing to do: grey, a tap says why and sends nothing
+local FULL = {
+	{ uid = "f1", item = "painting", variant = 1, condition = 0.95, name = "Painting", got = 5, stand = 1 },
+	{ uid = "f2", item = "sofa", variant = 2, condition = 0.64, name = "Sofa", got = 2, stand = 2 },
+}
+collection.OnClientEvent:Fire(withStands(FULL, 12, 2))
+picker = named(gui, "Picker")
+before = #sentOn("Collection")
+check("every stand full, nothing in the stock: FILL BEST and SELL… grey, TAKE ALL DOWN live", named(picker, "FillBest"):GetAttribute("Live") == false and named(picker, "SellMenu"):GetAttribute("Live") == false and named(picker, "TakeAllDown"):GetAttribute("Live") == true)
+press(named(picker, "FillBest"))
+check("… FILL BEST's tap: \"Every display stand you have already shows a piece.\", nothing sent", M.toasts[#M.toasts] == "Every display stand you have already shows a piece." and #sentOn("Collection") == before, M.toasts[#M.toasts])
+press(named(picker, "SellMenu"))
+check("… SELL…'s tap: \"Your stock is empty: nothing to sell.\" (no menu)", M.toasts[#M.toasts] == "Your stock is empty: nothing to sell." and named(picker, "Menu") == nil)
+-- (14 stands, the 12 big ones taken: only small 13 and 14 free; a bed and a broken TV in the stock)
+local BIGFULL = {}
+for i = 1, 12 do
+	table.insert(BIGFULL, { uid = `k{i}`, item = "radio", variant = 1, condition = 1, name = "Kitchen Radio", got = i, stand = i })
+end
+table.insert(BIGFULL, { uid = "k13", item = "bed", variant = 1, condition = 1, name = "Double Bed", got = 13 })
+table.insert(BIGFULL, { uid = "k14", item = "tv", variant = 1, condition = 0, name = "Old TV", got = 14 })
+collection.OnClientEvent:Fire(withStands(BIGFULL, 12, 14))
+picker = named(gui, "Picker")
+press(named(picker, "FillBest"))
+check("only small stands free and a bed: FILL BEST grey, \"What's in your stock is too big for your free small stands.\"", named(picker, "FillBest"):GetAttribute("Live") == false and M.toasts[#M.toasts] == "What's in your stock is too big for your free small stands.", M.toasts[#M.toasts])
+collection.OnClientEvent:Fire(withStands({}, 0, 12))
+picker = named(gui, "Picker")
+press(named(picker, "TakeAllDown"))
+check("an empty stock: all three grey; TAKE ALL DOWN's tap: \"Nothing is on show.\"", named(picker, "TakeAllDown"):GetAttribute("Live") == false and named(picker, "FillBest"):GetAttribute("Live") == false and M.toasts[#M.toasts] == "Nothing is on show." and #sentOn("Collection") == before)
+pickerChecks("844 x 390, an empty STOCK list")
+WarehouseUi.close()
+
+-- the sort toggle: $/MIN → VALUE → NEWEST → RARITY → $/MIN, kept while you play
+collection.OnClientEvent:Fire(withStands(SELLS, 36, 6))
+WarehouseUi.openStock()
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+local function firstTile()
+	return tilesOf()[1].Name
+end
+local function best(by)
+	local list = piecesFor(SELLS)
+	table.sort(list, StockPlan.order(by))
+	return `Tile_{list[1].uid}`
+end
+check("the sort toggle: \"SORT · $/MIN\", the best earners first", named(picker, "Sort").Text == "SORT · $/MIN" and WarehouseUi.sorting() == "income" and firstTile() == best("income"), firstTile())
+local orderOk, orderDetail = true, nil
+for _, by in { "value", "newest", "rarity", "income" } do
+	press(named(picker, "Sort"))
+	picker = named(gui, "Picker")
+	grid = named(picker, "Grid")
+	if not (named(picker, "Sort").Text == `SORT · {StockPlan.sortLabel(by)}` and WarehouseUi.sorting() == by and firstTile() == best(by)) then
+		orderOk, orderDetail = false, `{by}: {named(picker, "Sort").Text} {firstTile()} vs {best(by)}`
+	end
+	if by == "value" then
+		scene("phone-sort-value")
+	end
+end
+check("… a tap goes on: VALUE (the dearest first), NEWEST (came home last), RARITY (the rarest), back to $/MIN", orderOk, orderDetail)
+press(named(picker, "Sort"))
+WarehouseUi.close()
+collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+check("… kept: the picker opens sorted by VALUE too", named(picker, "Sort").Text == "SORT · VALUE" and firstTile() == (function()
+	local list = {}
+	for _, p in piecesFor(SELLS) do
+		if not p.stand then
+			table.insert(list, p)
+		end
+	end
+	table.sort(list, StockPlan.order("value"))
+	return `Tile_{list[1].uid}`
+end)())
+for _ = 1, 3 do
+	press(named(named(gui, "Picker"), "Sort"))
+end
+check("… round to $/MIN again", WarehouseUi.sorting() == "income")
+WarehouseUi.close()
+
+-- THE PICKER at a small upgrade stand: the pieces too big for it greyed, "Too big for this stand", last
+local SMALL = {
+	{ uid = "s1", item = "bed", variant = 1, condition = 1, name = "Double Bed", got = 1, rarity = "rare", perMinute = 9.9, sell = 90 },
+	{ uid = "s2", item = "hay_wagon", variant = 1, condition = 1, name = "Hay Wagon", got = 2, rarity = "epic", perMinute = 16.9, sell = 156 },
+	{ uid = "s3", item = "radio", variant = 1, condition = 1, name = "Kitchen Radio", got = 3, rarity = "common", perMinute = 0.9, sell = 8 },
+	{ uid = "s4", item = "piano", variant = 1, condition = 1, name = "Upright Piano", got = 4, rarity = "epic", perMinute = 31.2, sell = 288 },
+	{ uid = "s5", item = "wheelbarrow", variant = 1, condition = 1, name = "Wheelbarrow", got = 5, rarity = "common", perMinute = 1, sell = 10 },
+}
+collection.OnClientEvent:Fire(withStands(SMALL, 0, 14))
+collection.OnClientEvent:Fire({ kind = "pick", stand = 13 })
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+local order = {}
+for _, tile in tilesOf() do
+	table.insert(order, tile.Name)
+end
+check("small stand 13: the pieces that fit first (the piano, the radio), the bed, the hay wagon and the wheelbarrow last", table.concat(order, ",") == "Tile_s4,Tile_s3,Tile_s2,Tile_s1,Tile_s5", table.concat(order, ","))
+local bed = named(grid, "Tile_s1")
+check("… a bed's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for DISPLAY", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Display").Text == "TOO BIG"
+	and named(bed, "PieceName").TextTransparency > 0 and bed.BackgroundTransparency > 0)
+check("… the piano's not: DISPLAY", named(named(grid, "Tile_s4"), "Display").Text == "DISPLAY" and named(grid, "Tile_s4"):GetAttribute("TooBig") == false and named(named(grid, "Tile_s4"), "TooBig") == nil)
+pickerChecks("844 x 390, small stand 13")
+scene("phone-toobig")
+before = #sentOn("Collection")
+press(named(bed, "Display"))
+check("… TOO BIG sends nothing, says where it goes (stands 1 – 12), the picker stays", #sentOn("Collection") == before and WarehouseUi.isOpen() and M.toasts[#M.toasts] == "Your Double Bed is too big for small stand 13: show it on stands 1 – 12.", M.toasts[#M.toasts])
+press(named(bed, "Sell"))
+check("… its SELL still asks", named(picker, "Confirm") ~= nil)
+key("Escape")
+press(named(named(grid, "Tile_s4"), "Display"))
+sent = sentOn("Collection")
+check("… DISPLAY on a piece that fits: { kind = \"display\", uid, stand = 13 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 13)
+collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+local greyed = 0
+for _, tile in tilesOf() do
+	if tile:GetAttribute("TooBig") then
+		greyed += 1
+	end
+end
+check("big stand 3: nothing greyed (every piece fits)", greyed == 0 and #tilesOf() == 5)
+WarehouseUi.close()
+collection.OnClientEvent:Fire(state(STOCK, 36))
+M.flush()
+
 -- ── A computer (1280 × 800) and a big screen (1920 × 1080) ─────────────────
 for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" }, { 1280, 764, "chat" } } do
 	M.chatOpen = size[3] == "chat"
@@ -689,9 +965,75 @@ for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" }, { 1280, 764, 
 	WarehouseUi.openStock()
 	pickerChecks(`{label}, the STOCK list`)
 	scene(`{size[3]}-stock`)
+	-- 8.2: the header's buttons, the sort toggle, the search box (a computer), the SELL… menu
+	headerChecks(label)
+	picker = named(gui, "Picker")
+	local search = named(picker, "Search")
+	check(`{label}: … the 🔍 search box on the chips' row (a computer), left of the sort toggle, clear of the chips`, search ~= nil and search.ClassName == "TextBox" and search.PlaceholderText == "🔍 Search" and search.ClearTextOnFocus == false
+		and box(search).x1 <= box(named(picker, "Sort")).x0 and not overlap(box(search), box(named(picker, "Filter_all"))) and within(box(search), box(picker)))
+	press(named(picker, "SellMenu"))
+	local menu2 = named(picker, "Menu")
+	check(`{label}: … SELL…'s menu: its texts fit, inside the card`, menu2 ~= nil and #badTexts(menu2) == 0 and within(box(named(menu2, "MenuBox")), box(picker)), menu2 and badTexts(menu2)[1])
+	if size[3] ~= "chat" then
+		scene(`{size[3]}-sellmenu`)
+	end
+	key("Escape")
 	key("Escape")
 	check(`{label}: ESC closes it`, not WarehouseUi.isOpen())
 end
+
+-- 8.2, the search box (a computer): typing redraws only the grid (the box keeps its focus), every word in the name
+collection.OnClientEvent:Fire(withStands(SELLS, 36, 6))
+WarehouseUi.openStock()
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+local searchBox = named(picker, "Search")
+local function typeIn(text)
+	searchBox.Text = text
+	searchBox:GetPropertyChangedSignal("Text"):Fire()
+	grid = named(picker, "Grid")
+end
+local tilesBefore = #tilesOf()
+typeIn("clock")
+check("search \"clock\": only Grandpa's Clock; the card and the box not drawn again (the focus kept)", #tilesOf() == 1 and tilesOf()[1].Name == "Tile_a1" and named(gui, "Picker") == picker and named(picker, "Search") == searchBox and WarehouseUi.search() == "clock", #tilesOf())
+typeIn("CHAIR")
+check("… any case: \"CHAIR\" finds the two chairs and the armchair", #tilesOf() == 3, #tilesOf())
+typeIn("rec")
+check("… a word anywhere in the name: \"rec\" finds the Gold Record and the Old Record Player", #tilesOf() == 2, #tilesOf())
+typeIn("record pla")
+check("… every word: \"record pla\" only the Old Record Player", #tilesOf() == 1 and tilesOf()[1].Name == "Tile_a7", #tilesOf())
+scene("computer-search")
+typeIn("zzz")
+check("… nothing matches: no tile, \"No piece here matches \\\"zzz\\\".\"", #tilesOf() == 0 and named(picker, "Empty") ~= nil and named(picker, "Empty").Text == "No piece here matches \"zzz\".")
+typeIn(string.rep("x", 60))
+check("… at most 40 letters", #searchBox.Text == 40)
+collection.OnClientEvent:Fire(withStands(SELLS, 36, 6))
+check("… the same state again: nothing drawn again (the search box keeps its words and focus)", named(gui, "Picker") == picker)
+typeIn("")
+check("… emptied: every piece again", #tilesOf() == tilesBefore and named(picker, "Empty") == nil, #tilesOf())
+press(named(picker, "Filter_common"))
+picker = named(gui, "Picker")
+searchBox = named(picker, "Search")
+grid = named(picker, "Grid")
+typeIn("chair")
+local commonChairs = true
+for _, tile in tilesOf() do
+	commonChairs = commonChairs and named(tile, "Rarity").Text == "COMMON"
+end
+check("… with a rarity chip: both (COMMON and \"chair\")", commonChairs and #tilesOf() >= 1, #tilesOf())
+typeIn("")
+press(named(picker, "Filter_all"))
+picker = named(gui, "Picker")
+searchBox = named(picker, "Search")
+typeIn("clock")
+WarehouseUi.close()
+collection.OnClientEvent:Fire({ kind = "pick", stand = 4 })
+picker = named(gui, "Picker")
+grid = named(picker, "Grid")
+check("… closing the window clears the search (a picker opened next lists every piece)", WarehouseUi.search() == "" and named(picker, "Search").Text == "" and #tilesOf() > 1, #tilesOf())
+WarehouseUi.close()
+collection.OnClientEvent:Fire(state(STOCK, 36))
+M.flush()
 M.chatOpen = false
 
 -- ── A resize while it is open ───────────────────────────────────────────────
