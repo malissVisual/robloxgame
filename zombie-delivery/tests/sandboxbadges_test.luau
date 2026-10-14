@@ -8,7 +8,6 @@ local Rules = require("./SandboxBadgeRules")
 local CollectionBookRules = require("./CollectionBookRules")
 local UpgradeRules = require("./UpgradeRules")
 local VanPaintRules = require("./VanPaintRules")
-local WarehouseLevels = require("./WarehouseLevels")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -61,7 +60,7 @@ end
 check("States: badge keys (the state's: not cleanMove, the sales or the board)", statesOk and table.find(Rules.States, "cleanMove") == nil
 	and table.find(Rules.States, "firstSale") == nil and table.find(Rules.States, "topMover") == nil)
 check("the numbers: 10 moves, level 5 (the Logistics centre, the top), a full server's players, retries", B.Moves == 10
-	and B.Level == WarehouseLevels.Count and B.TopPlayers == Config.Sandbox.MaxPlayers and B.TopEvery > 0 and B.Tries >= 2 and B.Wait > 0
+	and B.Level == #Config.Warehouse.Levels and B.TopPlayers == Config.Sandbox.MaxPlayers and B.TopEvery > 0 and B.Tries >= 2 and B.Wait > 0
 	and B.Studio == false and B.Flag == "sandboxMovesKept" and Rules.Flag == B.Flag)
 
 -- ── The ids ────────────────────────────────────────────────────────────────
@@ -128,9 +127,17 @@ check("fromAdded: a legendary piece came home", legendaryItem ~= nil and list(Ru
 check("fromAdded: a common one, an unknown one, junk: nothing", plainItem ~= nil and #Rules.fromAdded(plainItem) == 0 and #Rules.fromAdded("no_such_piece") == 0 and #Rules.fromAdded(nil) == 0)
 
 -- ── The state ──────────────────────────────────────────────────────────────
-check("upgraded: none bought, the warehouse at its start, junk: no", not Rules.upgraded(UpgradeRules.empty()) and not Rules.upgraded({ warehouse = WarehouseLevels.Start })
+check("upgraded: none bought, the warehouse at its start, junk: no", not Rules.upgraded(UpgradeRules.empty()) and not Rules.upgraded({ warehouse = 0 })
 	and not Rules.upgraded(nil) and not Rules.upgraded({ lights = "x" }))
-check("upgraded: a level of the lights, the warehouse grown: yes", Rules.upgraded({ lights = 1 }) and Rules.upgraded({ warehouse = WarehouseLevels.Start + 1 }))
+check("upgraded: a level of the lights, More stands: yes", Rules.upgraded({ lights = 1 }) and Rules.upgraded({ warehouse = 3, stands = 1 }))
+-- 8.3: a save from before 8.3 gets the Big Warehouse (the ZDC Warehouse's level 3) for free (UpgradeRules.fromSave): a
+-- veteran who bought nothing is not "Upgraded"; the levels under it count by their purchase's moment (fromBought)
+local veteran = UpgradeRules.fromSave({ money = 500 })
+check("8.3: upgraded: a veteran's free Big Warehouse (nothing bought): no; the Workshop … the Big Warehouse alone: no (their moment says it)",
+	veteran.warehouse == 3 and not Rules.upgraded(veteran) and not Rules.upgraded({ warehouse = 1 }) and not Rules.upgraded({ warehouse = 3 }))
+check("8.3: upgraded: the Logistics Center (only ever bought): yes", Rules.upgraded({ warehouse = 4 }))
+check("8.3: fromBought: a level bought at the desk (the warehouse's too) earns firstUpgrade; junk: nothing", list(Rules.fromBought("warehouse", 1)) == "firstUpgrade"
+	and list(Rules.fromBought("lights", 2)) == "firstUpgrade" and #Rules.fromBought("nope", 1) == 0 and #Rules.fromBought("lights", 0) == 0 and #Rules.fromBought(nil, nil) == 0)
 local paint = VanPaintRules.empty()
 check("painted: the factory's look, nothing bought: no", not Rules.painted(paint) and not Rules.painted(nil) and not Rules.painted({ owned = "x", worn = 5 }))
 VanPaintRules.buy(paint, "white")
@@ -140,20 +147,20 @@ check("painted: a free item 'owned' or an unknown one: no", not Rules.painted({ 
 
 local empty = Rules.stateOf({}, false)
 check("stateOf: a new profile: nothing (level 1, the book empty)", empty.moves == 0 and not empty.shown and empty.legendary == 0 and empty.found == 0
-	and empty.total == #CollectionBookRules.Pieces and empty.warehouse == WarehouseLevels.Start and not empty.upgraded and not empty.painted)
+	and empty.total == #CollectionBookRules.Pieces and empty.warehouse == 1 and not empty.upgraded and not empty.painted)
 check("fromState: a new profile earns nothing", #Rules.fromState(empty) == 0 and #Rules.fromState(Rules.stateOf(nil, nil)) == 0)
 local book = CollectionBookRules.empty()
 CollectionBookRules.record(book, legendaryItem :: string, 0.8)
 local state = Rules.stateOf({ sandboxMoves = 3, collectionBook = book, sandboxUpgrades = { lights = 2 }, vanPaint = paint }, true)
 check("stateOf: the counter, a piece on show, the book's legendary, the upgrades, the paint", state.moves == 3 and state.shown and state.legendary == 1
-	and state.found == 1 and state.upgraded and state.painted and state.warehouse == WarehouseLevels.Start)
+	and state.found == 1 and state.upgraded and state.painted and state.warehouse == 1)
 check("fromState: firstMove, firstShow, legendary, firstUpgrade, painted", list(Rules.fromState(state)) == "firstMove,firstShow,legendary,firstUpgrade,painted",
 	list(Rules.fromState(state)))
 CollectionBookRules.fill(book)
-local full = Rules.stateOf({ sandboxMoves = 12, collectionBook = book, sandboxUpgrades = { warehouse = 5 } }, false)
-check("fromState: ten moves, the book full, the warehouse at level 5 (grown: an upgrade too)", list(Rules.fromState(full)) == "firstMove,tenMoves,legendary,fullBook,firstUpgrade,warehouse5",
-	list(Rules.fromState(full)))
-local four = Rules.fromState(Rules.stateOf({ sandboxUpgrades = { warehouse = 4 } }, false))
+local full = Rules.stateOf({ sandboxMoves = 12, collectionBook = book, sandboxUpgrades = { warehouse = 4 } }, false)
+check("fromState: ten moves, the book full, the warehouse at level 5 (the ZDC Warehouse's 4: bought, an upgrade too)", full.warehouse == 5
+	and list(Rules.fromState(full)) == "firstMove,tenMoves,legendary,fullBook,firstUpgrade,warehouse5", list(Rules.fromState(full)))
+local four = Rules.fromState(Rules.stateOf({ sandboxUpgrades = { warehouse = 3, lights = 1 } }, false))
 check("fromState: level 4 is not level 5", list(four) == "firstUpgrade", list(four))
 local onlyStates = true
 for _, key in Rules.fromState(full) do

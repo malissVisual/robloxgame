@@ -3,46 +3,46 @@
 -- and migrated, and the window's cards. Pure (no Roblox at its top level; tests/upgrades_test.luau): the server
 -- (server/Upgrades.luau) decides every purchase with it, shared/CollectionRules.luau reads the stands and the lights
 -- from it, shared/MoveHelperBrain.luau Danny's walk, client/UpgradeUi.luau draws its cards.
--- 8.3: the first card is the warehouse's level ("warehouse": shared/WarehouseLevels.luau, Config.WarehouseLevels): its
--- level is the warehouse level itself (Start … 5: a level of its own start, `start`, instead of 0); 8.1's More stands
--- (+2 small stands a level) is gone into it.
 --
--- The levels (profile.sandboxUpgrades) are { [id]: level }: a known id, a whole level over its start … its max (the
--- start is not kept: 0, the warehouse's Start).
+-- The levels (profile.sandboxUpgrades) are { [id]: level }: a known id, a whole level 1 … its max (0 is not kept).
 --   UpgradeRules.Order                  the ids in the window's order (Config.SandboxUpgrades.Order)
---   UpgradeRules.def(id)                its Config entry (nil: no such upgrade; any type; "warehouse":
---                                       WarehouseLevels.card())
---   UpgradeRules.level(levels, id)      its level in these levels: its start (0; the warehouse's Start) … its max (the
---                                       start for junk)
+--   UpgradeRules.def(id)                its Config entry (nil: no such upgrade; any type)
+--   UpgradeRules.level(levels, id)      its level in these levels: 0 … its max (0 for junk)
 --   UpgradeRules.price(id, level)       what the level after `level` costs (nil: at the top, or no such upgrade)
---   UpgradeRules.warehouseLevel(levels) 8.3: the warehouse's level (1 … 5)
---   UpgradeRules.stands(levels)         8.3: the display stands that level has (2 … 20)
+--   UpgradeRules.warehouseLevel(levels) 8.3: the warehouse's level (1 … 5: the ZDC Warehouse upgrade's level + 1,
+--                                       Config.Warehouse.Levels; design/warehouse-levels/KONTRAKT.md)
+--   UpgradeRules.totalStands(levels)    8.3: the display stands the player has: their level's big stands + the More
+--                                       stands' small ones (from Config.Warehouse.MoreFrom on)
+--   UpgradeRules.locked(levels, id)     8.3: why it can't be bought now (More stands below MoreFrom: "Needs the Big
+--                                       Warehouse"), nil: it can
+--   UpgradeRules.extraStands(levels)    the display stands More stands adds (2 a level; 8.3: counted from MoreFrom on)
+--   UpgradeRules.mostStands()           the stands More stands adds at its top
 --   UpgradeRules.incomeBoost(levels)    the stands' income × this (Showroom lights: 1.1 a level, compounding)
 --   UpgradeRules.vanSpeed(levels)       the van's top speed × this (Van engine: + 5 % a level)
 --   UpgradeRules.dannySpeed(level)      Danny's walk × this for a training level (any type: junk is 0)
---   UpgradeRules.effect(id, level)      what that level gives, in words ("Level 2 · Workshop · 4 stands", "Income ×1.21",
---                                       "Top speed +10%", "Walks 20% faster"; level 0: the start)
+--   UpgradeRules.effect(id, level, levels?)   what that level gives, in words ("Workshop · 4 stands", "14 display
+--                                       stands" (with levels' warehouse), "Income ×1.21", "Top speed +10%", "Walks 20%
+--                                       faster"; level 0: the start)
 --   UpgradeRules.rows(levels, money)    the window's cards ({ Row }, in Order): the level, its top, now and next in
---                                       words (the warehouse's next with its size: "Level 3 · Warehouse · 58×42 · 8
---                                       stands"), the next price, whether the money buys it (and if not, how much is
---                                       missing)
+--                                       words, the next price, whether the money buys it (and if not, how much is
+--                                       missing); 8.3: locked (its reason; can is false then)
 --   UpgradeRules.money(n)               "$1,234"
 --   The save:
 --   UpgradeRules.empty()                a new player's (none bought)
 --   UpgradeRules.full()                 every upgrade at its top (the admin's MAX UPGRADES)
---   UpgradeRules.clean(raw)             saved levels checked, never trusted: known ids, whole levels over the start …
---                                       max
+--   UpgradeRules.clean(raw)             saved levels checked, never trusted: known ids, whole levels 1 … max
 --   UpgradeRules.fromSave(saved)        the migration (server/PlayerData.luau applySaved): only a real save (money in
 --                                       it) written with the flag (Config.SandboxUpgrades.Flag) has upgrades; an
 --                                       older one, a new player or a lock-only record start with none. 8.3: a real
---                                       save without the warehouse's flag (WarehouseLevels.Flag, written with every
---                                       save from now on) is from before the levels: its warehouse starts at
---                                       WarehouseLevels.migrate's level (every stand it had, every piece on show; at
---                                       least level 4), once
---   UpgradeRules.Flag                   that flag; UpgradeRules.WarehouseFlag the warehouse's
+--                                       save without WarehouseFlag (from before 8.3) had today's warehouse: level 4
+--   UpgradeRules.Flag                   that flag
+--   UpgradeRules.WarehouseFlag          8.3: the warehouse level's (Config.SandboxUpgrades.WarehouseFlag)
+--   UpgradeRules.warehouseKey(levels)   8.3: the short key of `rewards` keeping the level through an older server
+--                                       ("warehouse:<k>"; server/PlayerData.luau writes it, fromSave reads it back
+--                                       when the flag is gone: keptWarehouse(rewards))
+--   UpgradeRules.WarehouseAttribute     8.3: the player attribute with their warehouse level (server/Upgrades.luau)
 
 local Config = require(script.Parent.Config)
-local WarehouseLevels = require(script.Parent.WarehouseLevels) -- 8.3: the warehouse's levels (the "warehouse" card)
 
 local UpgradeRules = {}
 
@@ -56,8 +56,9 @@ export type Row = {
 	now: string, -- what the level you have gives
 	next: string?, -- what the next level gives (nil: at the top)
 	price: number?, -- the next level's price (nil: at the top)
-	can: boolean, -- the money buys the next level
+	can: boolean, -- the money buys the next level (and it is not locked)
 	short: number, -- the money missing for it (0: none)
+	locked: string?, -- 8.3: why it can't be bought now (nil: it can)
 }
 
 local function tune(): any
@@ -66,7 +67,8 @@ end
 
 UpgradeRules.Order = tune().Order :: { string }
 UpgradeRules.Flag = tune().Flag :: string
-UpgradeRules.WarehouseFlag = WarehouseLevels.Flag
+UpgradeRules.WarehouseFlag = (tune().WarehouseFlag or "warehouseLevelKept") :: string
+UpgradeRules.WarehouseAttribute = (tune().WarehouseAttribute or "WarehouseLevel") :: string
 
 local function finite(n: any): boolean
 	return type(n) == "number" and n == n and n > -math.huge and n < math.huge
@@ -76,27 +78,22 @@ function UpgradeRules.def(id: any): Config.SandboxUpgradeDef?
 	if type(id) ~= "string" or #id > 32 then
 		return nil
 	end
-	if id == "warehouse" then
-		return WarehouseLevels.card()
-	end
 	return tune().List[id]
 end
 
--- A level of this upgrade: its start (0; the warehouse's Start) … its max, junk its start.
 local function clamp(def: Config.SandboxUpgradeDef, level: any): number
-	local start = def.start or 0
 	if not finite(level) then
-		return start
+		return 0
 	end
-	return math.clamp(math.floor(level), start, def.max)
+	return math.clamp(math.floor(level), 0, def.max)
 end
 
 function UpgradeRules.level(levels: any, id: string): number
 	local def = UpgradeRules.def(id)
-	if not def then
+	if not def or type(levels) ~= "table" then
 		return 0
 	end
-	return clamp(def, if type(levels) == "table" then levels[id] else nil)
+	return clamp(def, levels[id])
 end
 
 function UpgradeRules.price(id: string, level: number): number?
@@ -118,13 +115,53 @@ local function step(id: string): number
 	return if def then def.step else 0
 end
 
--- 8.3: the warehouse's level (Start … 5) and the display stands it has.
-function UpgradeRules.warehouseLevel(levels: any): number
-	return UpgradeRules.level(levels, "warehouse")
+-- 8.3: the warehouse's levels (Config.Warehouse.Levels) and the first with the small stands (MoreFrom).
+local function warehouseDefs(): { Config.WarehouseLevelDef }
+	local warehouse = (Config :: any).Warehouse
+	local list = if type(warehouse) == "table" then warehouse.Levels else nil
+	return if type(list) == "table" then list else {}
 end
 
-function UpgradeRules.stands(levels: any): number
-	return WarehouseLevels.stands(UpgradeRules.warehouseLevel(levels))
+local function moreFrom(): number
+	local warehouse = (Config :: any).Warehouse
+	local from = if type(warehouse) == "table" then warehouse.MoreFrom else nil
+	return if finite(from) then math.floor(from) else 1
+end
+
+function UpgradeRules.warehouseLevel(levels: any): number
+	local most = math.max(1, #warehouseDefs())
+	return math.clamp(1 + UpgradeRules.level(levels, "warehouse"), 1, most)
+end
+
+-- The display stands a warehouse level has of its own (its big ones; nil level or none listed: the start's,
+-- Config.Warehouse.Stands, else Config.Collection.Stands).
+local baseStands: (level: number?) -> number
+
+function UpgradeRules.extraStands(levels: any): number
+	if UpgradeRules.warehouseLevel(levels) < moreFrom() then
+		return 0
+	end
+	return math.floor(UpgradeRules.level(levels, "stands") * step("stands"))
+end
+
+function UpgradeRules.totalStands(levels: any): number
+	return baseStands(UpgradeRules.warehouseLevel(levels)) + UpgradeRules.extraStands(levels)
+end
+
+function UpgradeRules.locked(levels: any, id: string): string?
+	if id == "stands" then
+		local from = moreFrom()
+		if UpgradeRules.warehouseLevel(levels) < from then
+			local def = warehouseDefs()[from]
+			return `Needs the {if def then def.name else `level {from} warehouse`}`
+		end
+	end
+	return nil
+end
+
+function UpgradeRules.mostStands(): number
+	local def = UpgradeRules.def("stands")
+	return if def then math.floor(def.max * def.step) else 0
 end
 
 function UpgradeRules.incomeBoost(levels: any): number
@@ -143,6 +180,19 @@ function UpgradeRules.dannySpeed(level: any): number
 	return 1 + def.step * clamp(def, level)
 end
 
+baseStands = function(level: number?): number
+	local def = if level then warehouseDefs()[level] else nil
+	if def and finite(def.stands) and def.stands >= 1 then
+		return math.floor(def.stands)
+	end
+	local warehouse = (Config :: any).Warehouse
+	local stands = if type(warehouse) == "table" then warehouse.Stands else nil
+	if not finite(stands) or stands < 1 then
+		stands = Config.Collection.Stands
+	end
+	return math.floor(stands)
+end
+
 -- "$1,234" (whole dollars; the window's prices and the server's refusals).
 function UpgradeRules.money(n: any): string
 	local amount = if finite(n) then math.max(0, math.floor(n + 0.5)) else 0
@@ -157,14 +207,25 @@ local function percent(share: number): string
 	return `{math.floor(share * 100 + 0.5)}%`
 end
 
-function UpgradeRules.effect(id: string, level: number): string
+function UpgradeRules.effect(id: string, level: number, levels: any?): string
 	local def = UpgradeRules.def(id)
 	if not def then
 		return ""
 	end
 	local at = clamp(def, level)
 	if id == "warehouse" then
-		return WarehouseLevels.summary(at)
+		local n = math.clamp(1 + at, 1, math.max(1, #warehouseDefs()))
+		local building = warehouseDefs()[n]
+		local stands = baseStands(n)
+		return `{if building then building.name else `Level {n}`} · {stands} {if stands == 1 then "stand" else "stands"}`
+	elseif id == "stands" then
+		-- (the More stands' small stands on the warehouse's own: the levels' warehouse; none given, the start's)
+		local warehouse = if type(levels) == "table" then UpgradeRules.warehouseLevel(levels) else nil
+		local base = baseStands(warehouse)
+		if warehouse and warehouse < moreFrom() then
+			return `{base} display stands`
+		end
+		return `{base + math.floor(at * def.step)} display stands`
 	elseif id == "lights" then
 		return if at == 0 then "Income ×1.00" else string.format("Income ×%.2f", (1 + def.step) ^ at)
 	elseif id == "engine" then
@@ -183,17 +244,19 @@ function UpgradeRules.rows(levels: any, money: number?): { Row }
 		if def then
 			local level = UpgradeRules.level(levels, id)
 			local price = UpgradeRules.price(id, level)
+			local locked = if price then UpgradeRules.locked(levels, id) else nil
 			table.insert(list, {
 				id = id,
 				name = def.name,
 				icon = def.icon,
 				level = level,
 				max = def.max,
-				now = UpgradeRules.effect(id, level),
-				next = if not price then nil elseif id == "warehouse" then WarehouseLevels.summary(level + 1, true) else UpgradeRules.effect(id, level + 1),
+				now = UpgradeRules.effect(id, level, levels),
+				next = if price then UpgradeRules.effect(id, level + 1, levels) else nil,
 				price = price,
-				can = price ~= nil and cash >= price,
+				can = price ~= nil and locked == nil and cash >= price,
 				short = if price and cash < price then math.ceil(price - cash) else 0,
+				locked = locked,
 			})
 		end
 	end
@@ -204,14 +267,6 @@ end
 
 function UpgradeRules.empty(): Levels
 	return {}
-end
-
--- 8.3 review: the levels as saved: a copy, plus `stands` (an older 8.2 server's More stands count for this warehouse
--- level, WarehouseLevels.oldStands), so a visit there shows every stand. clean ignores that key.
-function UpgradeRules.forSave(levels: Levels): { [string]: number }
-	local out: { [string]: number } = table.clone(levels) :: any
-	out.stands = WarehouseLevels.oldStands(UpgradeRules.warehouseLevel(levels))
-	return out
 end
 
 function UpgradeRules.full(): Levels
@@ -225,8 +280,8 @@ function UpgradeRules.full(): Levels
 	return out
 end
 
--- Saved levels, checked: only known ids with a whole level over the start … max (a fraction rounds down, more than max
--- is max; the start, under it, NaN, a string or an unknown id is dropped). Never an error.
+-- Saved levels, checked: only known ids with a whole level 1 … max (a fraction rounds down, more than max is max; 0,
+-- a negative, NaN, a string or an unknown id is dropped). Never an error.
 function UpgradeRules.clean(raw: any): Levels
 	local out: Levels = {}
 	if type(raw) ~= "table" then
@@ -236,7 +291,7 @@ function UpgradeRules.clean(raw: any): Levels
 		local def = UpgradeRules.def(id)
 		if def then
 			local level = clamp(def, raw[id])
-			if level > (def.start or 0) then
+			if level > 0 then
 				out[id] = level
 			end
 		end
@@ -245,21 +300,54 @@ function UpgradeRules.clean(raw: any): Levels
 end
 
 -- The migration: a real save (money in it) written with the flag keeps its levels (cleaned); every other one (from
--- before 8.1, a new player's nil, a lock-only record) starts with none. 8.3: a real save without the warehouse's flag
--- (from before the levels, whatever else it has) gets its warehouse's level once: WarehouseLevels.migrate (its More
--- stands are gone into it). Running it again on what it gave (saved again with both flags) gives the same.
+-- before 8.1, a new player's nil, a lock-only record) starts with none. 8.3: a real save written without the warehouse
+-- level's flag (from before 8.3) had today's warehouse: its warehouse is level 4 (the upgrade's level 3), whatever else
+-- it kept; one written with it keeps its own (none saved: the Garage). Running it again on what it gave gives the same.
 function UpgradeRules.fromSave(saved: any): Levels
 	if type(saved) ~= "table" or saved.money == nil then
 		return UpgradeRules.empty()
 	end
-	local levels = if saved[UpgradeRules.Flag] == true then UpgradeRules.clean(saved.sandboxUpgrades) else UpgradeRules.empty()
-	local migrated = WarehouseLevels.migrate(saved)
-	if migrated and migrated > WarehouseLevels.Start then
-		levels.warehouse = migrated
-	elseif migrated then
-		levels.warehouse = nil :: any -- (the start: not kept)
+	local out = if saved[UpgradeRules.Flag] == true then UpgradeRules.clean(saved.sandboxUpgrades) else UpgradeRules.empty()
+	if saved[UpgradeRules.WarehouseFlag] ~= true then
+		local def = UpgradeRules.def("warehouse")
+		if def then
+			-- (a save an older server wrote again lost the level and its flag, but kept `rewards`' short keys: the level
+			-- PlayerData writes there too, "warehouse:<k>", is its own; none: a save from before 8.3, level 4)
+			local kept = UpgradeRules.keptWarehouse(saved.rewards)
+			if kept and kept > 0 then
+				out.warehouse = kept
+			elseif kept then
+				(out :: any).warehouse = nil -- (the Garage: none saved)
+			else
+				out.warehouse = math.max(out.warehouse or 0, math.min(3, def.max))
+			end
+		end
 	end
-	return levels
+	return out
+end
+
+-- 8.3: the warehouse level an older server kept in a save's `rewards` ("warehouse:<k>", PlayerData's save: its upgrade
+-- level k, 0 the Garage); nil: none there.
+function UpgradeRules.keptWarehouse(rewards: any): number?
+	if type(rewards) ~= "table" then
+		return nil
+	end
+	local def = UpgradeRules.def("warehouse")
+	local best: number? = nil
+	for key, on in rewards do
+		if on == true and type(key) == "string" and string.sub(key, 1, 10) == "warehouse:" then
+			local k = tonumber(string.sub(key, 11))
+			if k and k == math.floor(k) and k >= 0 and (def == nil or k <= def.max) then
+				best = math.max(best or 0, k)
+			end
+		end
+	end
+	return best
+end
+
+-- 8.3: the `rewards` key that keeps a warehouse level through an older server ("warehouse:<k>", k its upgrade level).
+function UpgradeRules.warehouseKey(levels: any): string
+	return `warehouse:{UpgradeRules.level(levels, "warehouse")}`
 end
 
 return UpgradeRules

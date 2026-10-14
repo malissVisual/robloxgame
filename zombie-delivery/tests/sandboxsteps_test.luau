@@ -267,8 +267,7 @@ end
 -- ── 8.3: the soft steps (the UPGRADES desk, the market, the PAINT shop) ──────
 do
 	local Steps = SandboxSteps.Steps
-	local UpgradeRules = require("./UpgradeRules")
-	local WarehouseLevels = require("./WarehouseLevels")
+	local UpgradeRules = require("./UpgradeRules") -- (8.3: the ZDC Warehouse's upgrade level k is warehouse level k + 1)
 	local G = Config.SandboxGuide
 	local nothing: { [string]: boolean } = {}
 	local NONE = {} -- (a field given as NONE is left out: not known)
@@ -316,11 +315,11 @@ do
 	local step = chosen(rich())
 	check("the warehouse full, the next level affordable: \"Your warehouse is full: grow it at the UPGRADES desk ($1,500)\" (the desk)",
 		step.id == "grow" and SandboxSteps.words(step, rich()) == "Your warehouse is full: grow it at the UPGRADES desk ($1,500)" and step.target == "desk", show(step))
-	check("… its price the next level's (WarehouseLevels: level 2 costs $1,500)", SandboxSteps.growPrice(rich()) == WarehouseLevels.price(2) and WarehouseLevels.price(2) == 1500)
-	check("… at level 2 the next one's ($5,000) when the money reaches it", SandboxSteps.growPrice(rich({ levels = { warehouse = 2 }, money = 5000 })) == 5000
-		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 2 }, money = 5000 })) == "Your warehouse is full: grow it at the UPGRADES desk ($5,000)")
+	check("… its price the next level's (the ZDC Warehouse: level 2 costs $1,500)", SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0) and UpgradeRules.price("warehouse", 0) == 1500)
+	check("… at level 2 (the Workshop) the next one's ($5,000) when the money reaches it", SandboxSteps.growPrice(rich({ levels = { warehouse = 1 }, money = 5000 })) == 5000
+		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 1 }, money = 5000 })) == "Your warehouse is full: grow it at the UPGRADES desk ($5,000)")
 	check("… not short of the money", SandboxSteps.growPrice(rich({ money = 1499 })) == nil)
-	check("… not at the top level", SandboxSteps.growPrice(rich({ levels = { warehouse = WarehouseLevels.Count }, money = 1e9 })) == nil)
+	check("… not at the top level", SandboxSteps.growPrice(rich({ levels = { warehouse = (UpgradeRules.def("warehouse") :: any).max }, money = 1e9 })) == nil)
 	check("… stock as many as the free stands: full", SandboxSteps.growPrice(rich({ stock = 2, freeStands = 2 })) == 1500)
 	check("… every stand taken, nothing waiting: full", SandboxSteps.growPrice(rich({ stock = 0, shown = 2, freeStands = 0 })) == 1500)
 	check("… fewer waiting than free stands: not full", SandboxSteps.growPrice(rich({ stock = 1, freeStands = 2 })) == nil)
@@ -339,7 +338,8 @@ do
 		and SandboxSteps.words(step, rich()) == "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)", SandboxSteps.words(step, rich()))
 	check("… the engine at its top: the next cheapest (Danny's training $600 before the lights' $750)", SandboxSteps.upgradeFor(rich({ levels = { engine = 3 } })) == "danny")
 	check("… $700: no lights ($750)", select(2, SandboxSteps.upgradeFor(rich({ money = 700, levels = { engine = 3, danny = 3 } }))) == nil)
-	check("… never the warehouse (grow's)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { lights = 5, engine = 3, danny = 3 } })) == nil)
+	check("… never the warehouse (grow's), nor a locked card (More stands below the Big Warehouse)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { lights = 5, engine = 3, danny = 3 } })) == nil)
+	check("… More stands once the warehouse is the Big Warehouse (level 4)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { warehouse = 3, lights = 5, engine = 3, danny = 3 } })) == "stands")
 	step = chosen(rich(), { show = true, grow = true, hot = true, upgrade = true })
 	check("then the PAINT shop: \"🎨 Make your van your own: E at its side opens the PAINT SHOP\" (the van's prompt)", step.id == "paint" and step.target == "paint"
 		and SandboxSteps.words(step, rich()) == "🎨 Make your van your own: E at its side opens the PAINT SHOP", show(step))
@@ -348,7 +348,7 @@ do
 	local afterAll = { show = true, grow = true, hot = true, upgrade = true }
 	check(`… at {G.PaintMoney} or more in your pocket`, chosen(rich({ money = G.PaintMoney }), afterAll).id == "paint")
 	check("… not under it at the first level", chosen(rich({ money = G.PaintMoney - 1 }), afterAll).id ~= "paint")
-	check("… after the first warehouse level bought, whatever the money", chosen(rich({ money = 0, levels = { warehouse = WarehouseLevels.Start + 1 } }), afterAll).id == "paint")
+	check("… after the first warehouse level bought (past the Garage), whatever the money", chosen(rich({ money = 0, levels = { warehouse = 1 } }), afterAll).id == "paint")
 	check("… not with something bought there already, nor before its state came (not known)", chosen(rich({ painted = true }), afterAll).id ~= "paint"
 		and chosen(rich({ painted = NONE }), afterAll).id ~= "paint")
 	check("… not while the van is away from home (its 🎨 prompt is off)", chosen(rich({ vanHome = false }), afterAll).id ~= "paint")
@@ -381,9 +381,9 @@ do
 	local bought: { [string]: boolean } = {}
 	local boughtLast: SandboxSteps.Last = {}
 	SandboxSteps.doneBy(rich(), bought, boughtLast)
-	SandboxSteps.doneBy(rich({ levels = { warehouse = 2 } }), bought, boughtLast)
+	SandboxSteps.doneBy(rich({ levels = { warehouse = 1 } }), bought, boughtLast)
 	check("the warehouse grown while you play: grow done", bought.grow == true and bought.upgrade == nil)
-	SandboxSteps.doneBy(rich({ levels = { warehouse = 2, lights = 1 } }), bought, boughtLast)
+	SandboxSteps.doneBy(rich({ levels = { warehouse = 1, lights = 1 } }), bought, boughtLast)
 	check("another upgrade bought: upgrade done", bought.upgrade == true)
 	local saved: { [string]: boolean } = {}
 	SandboxSteps.doneBy(rich({ levels = { warehouse = 3, engine = 2 } }), saved, {})
@@ -435,10 +435,10 @@ do
 	a, b = SandboxSteps.detail(Steps.show, rich())
 	check("… a core step none (its words its own)", a == nil and b == nil and SandboxSteps.words(Steps.show, rich()) == Steps.show.hint)
 	for _, id in SandboxSteps.Soft do
-		local words = SandboxSteps.words(Steps[id], rich({ levels = { warehouse = 4 }, money = 30000, hot = "Grandfather Clock" }))
+		local words = SandboxSteps.words(Steps[id], rich({ levels = { warehouse = 3 }, money = 30000, hot = "Grandfather Clock" }))
 		check(`{id}'s words with their price or piece: one line or two (≤ 80 characters)`, utf8.len(words) ~= nil and (utf8.len(words) :: number) <= 80, words)
 	end
-	check("UpgradeRules' order has the warehouse first and three others", UpgradeRules.Order[1] == "warehouse" and #UpgradeRules.Order == 4)
+	check("UpgradeRules' order has the warehouse first and four others", UpgradeRules.Order[1] == "warehouse" and #UpgradeRules.Order == 5)
 
 	-- the collection's market
 	local summary = SandboxSteps.collection({ kind = "state", stock = {
@@ -468,7 +468,7 @@ do
 	check("the colour an RGB triple", #G.Color == 3 and G.Color[1] <= 255 and G.Color[2] <= 255 and G.Color[3] <= 255)
 	check("the hint readable on a phone", G.TouchScale >= 0.75 and G.TextSize >= 14)
 	check("8.3: a soft step shows long enough to walk to it, not for ever; the gap between two; the paint's money", G.SoftSeconds >= 20 and G.SoftSeconds <= 90
-		and G.SoftGap >= 5 and G.SoftGap <= 60 and G.PaintMoney > 0 and G.PaintMoney < Config.WarehouseLevels.List[3].price)
+		and G.SoftGap >= 5 and G.SoftGap <= 60 and G.PaintMoney > 0 and G.PaintMoney < Config.SandboxUpgrades.List.warehouse.prices[2])
 end
 
 if failures == 0 then

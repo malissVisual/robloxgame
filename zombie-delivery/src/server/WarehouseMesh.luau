@@ -4,23 +4,26 @@
 -- Roblox Studio (File → Import 3D, the defaults) and publishes. server/Main.server.luau takes the import out of the
 -- Workspace first thing (into ServerStorage); this finds it there (or still in the Workspace: a top-level child named
 -- ZDCWarehouseArt, or one holding its markers), learns from its markers how the importer turned and scaled it and
--- dresses every plot's warehouse with its level's clones: server/Warehouse.luau hands each warehouse Model here once it
--- has built it (8.3: again after every rebuild at another level). The level is WarehouseMesh.level(model): the Model's
--- attribute Level (its owner's warehouse level, Config.WarehouseLevels; the layout built it that size), else the start's.
+-- dresses every plot's warehouse with one level's clones: server/Warehouse.luau hands each warehouse Model here once it
+-- has built it. 8.3 (design/warehouse-levels/KONTRAKT.md): the level is the plot's own, WarehouseMesh.level(model):
+-- the Model's attribute Level (server/Warehouse.luau sets it before the dress: its owner's ZDC Warehouse upgrade, a free
+-- plot's Config.Warehouse.FreeLevel); Config.Warehouse.ArtLevel only for a model without one. The warehouse built on
+-- the plot is that level's (WarehouseLayout.site(plot, level)): its box, door and top are what the level's markers
+-- are checked against. A level change builds a new Model (server/Warehouse.luau), which is dressed anew.
 -- The parts warehouse (shared/WarehouseLayout.luau) stays as the fallback and as the collision. Only its parts that are
 -- just looks (the attribute WarehouseVisual: the layout's `visual` pieces, i.e. the shell's walls, gables, roof, ribs,
 -- bands, trims, gutters and downpipes, the roller door and its bollards, the ZDC sign, the floor, the hall's beams, posts,
 -- lamp housings and lamp glows) are hidden: the solid ones still collide where they did, the glows' lights still shine.
 -- Everything else keeps working and is seen: the owner's sign over the door and the STOCK board (their words are
 -- rewritten), the stands, the UPGRADES desk and its sign, the floor's paint, the bay, the prompts. The level's things
--- outside the walls that one bumps into (level 2: the pallets and barrels; level 4: the office annex; level 5: the
--- docks' ramps) get an unseen solid block each. No import, a level the import lacks, or a warehouse of another size than
--- the level: nothing changes at all.
+-- outside the walls that one bumps into (level 4: the office annex) get an unseen solid block each. No import, a level
+-- the import lacks, or a warehouse of another size than the level: nothing changes at all.
 --
 --   WarehouseMesh.ready()        is the import there (any level complete)? (the first call looks, out of the world)
---   WarehouseMesh.level(model)   the level a warehouse Model wears (1 … 5: its attribute Level)
---   WarehouseMesh.dress(model)   dresses one plot's warehouse (Warehouse's Model, its attribute Plot); again: true and
---                                nothing more; false: left as it was
+--   WarehouseMesh.level(model)   the level a plot's warehouse wears (1 … 5): its Model's attribute Level (8.3; a plot id:
+--                                workspace.Warehouses' Level<id>), else Config.Warehouse.ArtLevel
+--   WarehouseMesh.dress(model)   dresses one plot's warehouse (Warehouse's Model, its attributes Plot and Level) in its
+--                                level; again: true and nothing more; false: left as it was
 --   WarehouseMesh.Looks          each finish's colour and material
 --   WarehouseMesh.Attribute      the attribute of a part that is only looks ("WarehouseVisual")
 --
@@ -36,7 +39,6 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared").Config) -- (8.3: the lamps' glow, Config.SandboxLight)
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared").SandboxMap)
 local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared").WarehouseLayout)
-local WarehouseLevels = require(ReplicatedStorage:WaitForChild("Shared").WarehouseLevels) -- 8.3
 
 local WarehouseMesh = {}
 
@@ -227,10 +229,27 @@ function WarehouseMesh.ready(): boolean
 	return next(levels) ~= nil
 end
 
--- The level a warehouse wears: 8.3, its Model's attribute Level (server/Warehouse.luau sets it: the owner's level, the
--- size the layout built it), else the start's.
-function WarehouseMesh.level(model: Instance): number
-	return math.clamp(WarehouseLevels.clamp(model:GetAttribute("Level")), 1, LEVELS)
+-- The level a plot's warehouse wears (8.3): the Model's attribute Level (server/Warehouse.luau: its owner's, a free
+-- plot's); given a plot id, workspace.Warehouses' attribute Level<id> (the same, as the clients read it). Without one
+-- (a model built before 8.3, no warehouses yet): Config.Warehouse.ArtLevel, else 4. Never throws.
+function WarehouseMesh.level(of: any): number
+	local want: any = nil
+	if type(of) == "number" then
+		local folder = workspace:FindFirstChild("Warehouses")
+		want = if folder then folder:GetAttribute(`Level{of}`) else nil
+	elseif of ~= nil then
+		local ok, level = pcall(function(): any
+			return of:GetAttribute("Level")
+		end)
+		want = if ok then level else nil
+	end
+	if type(want) ~= "number" or want ~= want then
+		want = (Config.Warehouse :: any).ArtLevel
+	end
+	if type(want) ~= "number" or want ~= want then
+		return 4
+	end
+	return math.clamp(math.floor(want), 1, LEVELS)
 end
 
 -- A part that is only looks, hidden (it still collides and is queried if it did; its lights keep shining).
@@ -262,14 +281,15 @@ local function dressNow(model: Model): boolean
 		say(`plot {plot.id}: the import has no level {n}; it keeps its own look`)
 		return false
 	end
-	-- the warehouse as the layout builds it on this plot (its door looks south: only moved) against the level
-	local outline = WarehouseLayout.outline(plot, n)
-	local door = WarehouseLayout.door(plot, n)
-	local walls = WarehouseLayout.box(plot, n).sy
+	-- the warehouse as the layout builds it on this plot at that level (8.3: WarehouseLayout.site; its door looks
+	-- south: only moved) against the level's markers
+	local site = WarehouseLayout.site(plot, n) :: SandboxMap.Plot
+	local outline = WarehouseLayout.outline(site)
+	local door = WarehouseLayout.door(site)
 	local box, gap, top = lv.box :: Vector3, lv.door :: Vector3, lv.top :: Vector3
-	if not (close(math.abs(box.X) * 2, outline.x1 - outline.x0) and close(box.Y, walls) and close(box.Z, outline.z1 - outline.z0)
+	if not (close(math.abs(box.X) * 2, outline.x1 - outline.x0) and close(box.Y, site.warehouse.sy) and close(box.Z, outline.z1 - outline.z0)
 		and close(math.abs(gap.X) * 2, door.width) and close(gap.Y, door.height) and close(top.Y, outline.top)) then
-		say(`plot {plot.id}: the warehouse is {outline.x1 - outline.x0} × {walls} × {outline.z1 - outline.z0} (door {door.width} × {door.height}, ridge {outline.top}), level {n} is {math.abs(box.X) * 2} × {box.Y} × {box.Z} (door {math.abs(gap.X) * 2} × {gap.Y}, top {top.Y}); it keeps its own look`)
+		say(`plot {plot.id}: the level {n} warehouse is {outline.x1 - outline.x0} × {site.warehouse.sy} × {outline.z1 - outline.z0} (door {door.width} × {door.height}, top {outline.top}), the import's level {n} is {math.abs(box.X) * 2} × {box.Y} × {box.Z} (door {math.abs(gap.X) * 2} × {gap.Y}, top {top.Y}); it keeps its own look`)
 		return false
 	end
 	-- the level's origin on the door's middle, on the ground; its z into the building (north)

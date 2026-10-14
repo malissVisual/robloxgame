@@ -55,12 +55,17 @@ function P.of(player) for id, p in owners do if p == player then return id end e
 function P.onChanged() end
 return P
 """
-UPGRADES = """-- (tools/sandbox-map/render.py: server/Upgrades.luau's stand-in: each owner's warehouse level)
+UPGRADES = """-- (tools/sandbox-map/render.py: server/Upgrades.luau's stand-in: each owner's warehouse level, the ZDC Warehouse
+-- upgrade's level k = warehouse level k + 1)
 local U = {}
 local levels = {}
 function U.__own(player, level) levels[player] = level end
 function U.open() end
 function U.onChanged() end
+function U.levels(player)
+	local level = levels[player] or 1
+	return if level > 1 then { warehouse = level - 1 } else {}
+end
 function U.warehouseLevel(player) return levels[player] or 1 end
 return U
 """

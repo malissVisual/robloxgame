@@ -21,7 +21,7 @@ Type the **name** and the **description** into Roblox's form exactly as written 
 | `legendary` | Legendary Find | Bring home a legendary piece. | A legendary piece comes home, or the collection book already holds one. |
 | `fullBook` | Completionist | Find every piece in the collection book. | Every piece of the book is found. |
 | `firstUpgrade` | Upgraded | Buy your first upgrade. | Anything bought at the UPGRADES desk, including a bigger warehouse. |
-| `warehouse5` | Logistics Tycoon | Grow your warehouse to level 5. | The warehouse reaches level 5, the Logistics centre. |
+| `warehouse5` | Logistics Tycoon | Grow your warehouse to level 5. | The warehouse reaches level 5, the Logistics Center. |
 | `painted` | Fresh Paint | Paint your van at the PAINT shop. | Anything bought at the PAINT shop. |
 | `topMover` | Top Mover | Top the TOP MOVERS board on a full server. | At least 4 players are on the server, and one of them is alone at the top of the board with a collection worth more than $0. |
 

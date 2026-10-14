@@ -46,13 +46,14 @@
 --   SoundPlan.SandboxLoops                        the sandbox's loops by their part of the mix: alpine (amb_alpine, a
 --                                                 calm alpine day: never the city's traffic, amb_day), warehouse
 --                                                 (amb_warehouse), room (amb_room)
---   SoundPlan.sandboxPlace(x, y, z, inside)       where you are: "house" (inside: the move's state says you are in its
---                                                 house; or far off the sandbox's map, where the moves build their
---                                                 interiors; or in the chalet's own box), "warehouse" (in a plot's
---                                                 warehouse building) or "outdoors". 8.3: levelOf(plotId) (optional)
---                                                 the plot's warehouse level (the client: the "Level" attribute of
---                                                 workspace.Warehouses.Warehouse<id>): that level's building; none
---                                                 (nil): SandboxMap's plot.warehouse (level 4's)
+--   SoundPlan.sandboxPlace(x, y, z, inside, levelOf?)   where you are: "house" (inside: the move's state says you
+--                                                 are in its house; or far off the sandbox's map, where the moves build
+--                                                 their interiors; or in the chalet's own box), "warehouse" (in a plot's
+--                                                 warehouse building) or "outdoors". 8.3: every plot's warehouse is the
+--                                                 building of its level (WarehouseLayout.site: 1 the Garage … 5 the
+--                                                 Logistics Center, up to its roof's top); levelOf(plot id) → its level
+--                                                 (the caller reads workspace.Warehouses' Level<id>; nil, or no levelOf:
+--                                                 4, the building of before 8.3)
 --   SoundPlan.sandboxAmbience(place, sheet4)      the loops' volumes there { alpine, warehouse, room } (sheet4: is
 --                                                 sfx4.ogg up; else the stand-ins' own volumes and no room tone)
 --   SoundPlan.reverb(place)                       SoundService.AmbientReverb's name there ("NoReverb" outdoors)
@@ -97,7 +98,7 @@ local Map = require(script.Parent.Map)
 local SoundSheet = require(script.Parent.SoundSheet) -- (8.3: how long a sound plays)
 local MoveRoles = require(script.Parent.MoveRoles)
 local SandboxMap = require(script.Parent.SandboxMap)
-local WarehouseLayout = require(script.Parent.WarehouseLayout) -- (8.3: a plot's warehouse is its level's)
+local WarehouseLayout = require(script.Parent.WarehouseLayout) -- 8.3: a plot's warehouse at its level
 
 local SoundPlan = {}
 
@@ -390,10 +391,30 @@ end
 SoundPlan.SandboxLoops = { alpine = "amb_alpine", warehouse = "amb_warehouse", room = "amb_room" }
 
 local OFF_MAP = 1000 -- studs past SandboxMap.Bounds: a move's interior (server/HouseInterior.luau builds them far off)
-local ROOF = 8 -- studs over a warehouse's walls that still count as in it (its gable roof)
 local INSET = 2 -- studs inside the chalet's box (its front door's step, where you come out, is outdoors)
 
-function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean, levelOf: ((plotId: number) -> number?)?): string
+-- 8.3: a plot's warehouse at a level: its box and its roof's top (WarehouseLayout.site, outline), found once a plot and
+-- level (the ambience asks every Tick: nothing made then).
+type Hall = { x: number, y: number, z: number, sx: number, sz: number, top: number }
+local halls: { [number]: { [number]: Hall } } = {}
+local function hallOf(plot: SandboxMap.Plot, level: any): Hall
+	local n = if type(level) == "number" and level == level then math.clamp(math.floor(level), 1, WarehouseLayout.Levels) else 4
+	local byLevel = halls[plot.id]
+	if not byLevel then
+		byLevel = {}
+		halls[plot.id] = byLevel
+	end
+	local known = byLevel[n]
+	if not known then
+		local site = WarehouseLayout.site(plot, n) or plot
+		local w = site.warehouse
+		known = { x = w.x, y = w.y, z = w.z, sx = w.sx, sz = w.sz, top = WarehouseLayout.outline(site).top }
+		byLevel[n] = known
+	end
+	return known :: Hall
+end
+
+function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean, levelOf: ((plot: number) -> number?)?): string
 	if inside then
 		return "house"
 	end
@@ -407,12 +428,8 @@ function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean
 		return "house"
 	end
 	local plot = SandboxMap.plotAt(x, z)
-	local w = plot and plot.warehouse
-	local level = if plot and levelOf then levelOf(plot.id) else nil
-	if plot and type(level) == "number" then
-		w = WarehouseLayout.box(plot, level) -- 8.3: the plot's own level's building
-	end
-	if w and math.abs(x - w.x) <= w.sx / 2 and math.abs(z - w.z) <= w.sz / 2 and y >= w.y - 2 and y <= w.y + w.sy + ROOF then
+	local w = if plot then hallOf(plot, if levelOf then levelOf(plot.id) else nil) else nil
+	if w and math.abs(x - w.x) <= w.sx / 2 and math.abs(z - w.z) <= w.sz / 2 and y >= w.y - 2 and y <= w.y + w.top then
 		return "warehouse"
 	end
 	return "outdoors"

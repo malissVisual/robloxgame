@@ -93,22 +93,38 @@ do
 end
 
 -- the most in Ann's hall at each warehouse level and in the server, looked at every second of the run; and whether a
--- visitor ever stood inside her hall's walls, on a podium or at the desk (WarehouseLayout.freeSpot at its level)
+-- visitor ever stood inside her hall's walls, on a podium or at the desk (her plot's Site at its level: 8.3,
+-- WarehouseLayout.site)
 local Warehouse = E.module("Warehouse")
 local Upgrades = E.module("Upgrades")
 local ann: any = nil -- (she joins below)
 local mostAt: { [number]: number } = {}
 local mostAll = 0
 local walled: string? = nil
+local function siteAt(level: number): any
+	return WarehouseLayout.site(plot1, level)
+end
+-- Is a point of Ann's warehouse at `level` in its walls, on one of her podiums or at the UPGRADES desk?
+local function caughtAt(level: number, x: number, z: number): boolean
+	local site = siteAt(level)
+	local inside = WarehouseLayout.inside(site)
+	if x <= inside.x0 or x >= inside.x1 or z <= inside.z0 or z >= inside.z1 then
+		local box = WarehouseLayout.outline(site)
+		return x > box.x0 and x < box.x1 and z > box.z0 and z < box.z1 -- (in its walls)
+	end
+	local stand = WarehouseLayout.standAt(site, x, z)
+	local desk = WarehouseLayout.terminal(site)
+	return (stand ~= nil and ann ~= nil and stand <= Collection.stands(ann)) or (math.abs(x - desk.x) <= desk.sx / 2 and math.abs(z - desk.z) <= desk.sz / 2)
+end
 local function look()
 	local level = Warehouse.level(1)
 	mostAt[level] = math.max(mostAt[level] or 0, Visitors.count(1))
 	mostAll = math.max(mostAll, Visitors.count())
-	local inside = WarehouseLayout.inside(plot1, level)
+	local inside = WarehouseLayout.inside(siteAt(level))
 	for _, v in Visitors.list() do
 		local p = v.model.PrimaryPart.Position
 		if v.plot == 1 and p.X > inside.x0 and p.X < inside.x1 and p.Z > inside.z0 and p.Z < inside.z1
-			and WarehouseLayout.freeSpot(plot1, level, p.X, p.Z) ~= nil and v.state ~= "in" and v.state ~= "out" then
+			and caughtAt(level, p.X, p.Z) and v.state ~= "in" and v.state ~= "out" then
 			walled = walled or `{v.state} at {math.floor(p.X)},{math.floor(p.Z)} (level {level})`
 		end
 	end
@@ -133,7 +149,7 @@ local function visitorsIn(id: number): { any }
 	return out
 end
 local function standIn(level: number)
-	local zone = WarehouseLayout.receiving(plot1, level)
+	local zone = WarehouseLayout.receiving(siteAt(level))
 	return V3((zone.x0 + zone.x1) / 2 + 3, 3, (zone.z0 + zone.z1) / 2)
 end
 local function setLevel(level: number)
@@ -144,8 +160,8 @@ local function setLevel(level: number)
 end
 -- What a visitor that stops (looks, offers) must never stand in: the door path, the desk's spot, a podium.
 local function stopsBad(level: number): string?
-	local path = WarehouseLayout.doorPath(plot1, level)
-	local desk = WarehouseLayout.terminal(plot1, level)
+	local path = WarehouseLayout.doorPath(siteAt(level))
+	local desk = WarehouseLayout.terminal(siteAt(level))
 	for _, v in visitorsIn(1) do
 		if v.state == "look" or v.state == "offer" then
 			local p = v.model.PrimaryPart.Position
@@ -155,7 +171,7 @@ local function stopsBad(level: number): string?
 			if math.abs(p.X - desk.x) < desk.sx / 2 + T.DeskClear - 0.5 and math.abs(p.Z - desk.z) < desk.sz / 2 + T.DeskClear - 0.5 then
 				return "at the desk"
 			end
-			if WarehouseLayout.standAt(plot1, p.X, p.Z, level) ~= nil then
+			if WarehouseLayout.standAt(siteAt(level), p.X, p.Z) ~= nil then
 				return "on a podium"
 			end
 		end
@@ -214,7 +230,7 @@ check(`pieces on show, Ann at her Garage: a visitor within FirstWait s ({math.fl
 check("… its body in workspace.Npcs with its kind (attribute Visitor)", bodies[1].Parent ~= nil and Rules.kind(bodies[1]:GetAttribute("Visitor")) ~= nil)
 local function entryChecks(level: number, body: any, label: string)
 	local bay = WarehouseLayout.bay(plot1)
-	local door = WarehouseLayout.door(plot1, level)
+	local door = WarehouseLayout.door(siteAt(level))
 	local legs = {}
 	run(20, function()
 		table.clear(legs)
@@ -435,11 +451,11 @@ for _, v in visitorsIn(1) do
 	end
 end
 setLevel(1)
-local garage = WarehouseLayout.outline(plot1, 1)
+local garage = WarehouseLayout.outline(siteAt(1))
 local stillInside = false
 for _, v in visitorsIn(1) do
 	local p = v.model.PrimaryPart.Position
-	if p.X > garage.x0 and p.X < garage.x1 and p.Z > garage.z0 and p.Z < garage.z1 and WarehouseLayout.freeSpot(plot1, 1, p.X, p.Z) ~= nil then
+	if p.X > garage.x0 and p.X < garage.x1 and p.Z > garage.z0 and p.Z < garage.z1 and caughtAt(1, p.X, p.Z) then
 		stillInside = true
 	end
 end

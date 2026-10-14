@@ -34,7 +34,7 @@ Everything below is for the workers (agents). **Keep the names and shapes here.*
 3. **Drive.** Drive down Main Street to the house. Its front door at `House.door` has "Enter house", which fades you into `HouseInterior`, the existing system.
 4. **Carry.** Carry the pieces out (grip, Danny, two-person lifts all as now) and load them into the van. You can walk inside the van; the load and packing work as now.
 5. **Unload.** Drive back. With the van's back or middle (or the line between them; 8.0.1) inside your plot's `unload` circle, the van's contents go into your warehouse's stock: `Collection.add` for each piece, to the move's owner. This is a "trip". You can do more trips until you press FINISH or the clock runs out.
-6. **Warehouse.** It has its level's display stands (8.3: `Config.WarehouseLevels`, the Garage's 2 … the Logistics centre's 20; bought at its UPGRADES desk). An empty stand's prompt opens the picker (`Collection.openPicker`), and you choose a piece from your stock. It stands there (its 3D model) and earns money every minute you play. A shown piece's prompt can take it down or sell it.
+6. **Warehouse.** It has its level's display stands (8.3: `Config.Warehouse.Levels`, the Garage's 2 … the Logistics Center's 24, and More stands' small ones from the Big Warehouse on; bought at its UPGRADES desk: design/warehouse-levels/KONTRAKT.md). An empty stand's prompt opens the picker (`Collection.openPicker`), and you choose a piece from your stock. It stands there (its 3D model) and earns money every minute you play. A shown piece's prompt can take it down or sell it.
 
 ## Who owns what
 These are the workers and their files. Don't edit another worker's files except for a one-line hook, and report any hook you add.
@@ -82,7 +82,7 @@ Collection.sellAt(player, uid, price, reason) -> money?, why   8.3 visitors: sol
 ## Config tables
 Each worker appends its own table at the end of `shared/Config.luau`, just before `return Config`:
 - `Config.Sprinter`;
-- `Config.Warehouse` (what every level shares) and, 8.3, `Config.WarehouseLevels` (each level's size, stands and price);
+- `Config.Warehouse` (`Stands`, …; 8.3: `Levels`, each level's size and stands);
 - `Config.Collection` (`Tiers`, …);
 - `Config.SandboxHud`.
 

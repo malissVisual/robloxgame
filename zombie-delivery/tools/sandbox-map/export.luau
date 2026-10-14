@@ -3,14 +3,14 @@
 -- the TOP MOVERS board, then prints every BasePart as a "PART" JSON line (where, its turn, size, colour, material, shape,
 -- the folders it is in) and the labels' spots as one "FACTS" line.
 setfenv(1, require("./mock").env)
-local Config = require("./shared/Config")
 local SandboxMap = require("./shared/SandboxMap")
 local SandboxLeadersRules = require("./shared/SandboxLeadersRules")
+local WarehouseLayout = require("./shared/WarehouseLayout") -- (8.3: each level's stands and building)
 local SandboxWorld = require("./server/SandboxWorld")
 local MoveSites = require("./server/MoveSites")
 local Collection = require("./server/Collection") -- (the stand-in)
 local SandboxPlots = require("./server/SandboxPlots") -- (the stand-in)
-local Upgrades = require("./server/Upgrades") -- (the stand-in: plot n at level LEVELS[n])
+local Upgrades = require("./server/Upgrades") -- (the stand-in: plot n at warehouse level n)
 
 local world = SandboxWorld.build()
 
@@ -30,7 +30,7 @@ for _, plot in SandboxMap.Plots do
 			{ uid = "b", item = "knight_armour", variant = 1, condition = 1, name = "Knight's Armour", stand = 2 },
 		}
 	end
-	Collection.__own(owner, entries, Config.WarehouseLevels.List[plot.id].stands)
+	Collection.__own(owner, entries, WarehouseLayout.count(plot.id)) -- (level n's big stands)
 	SandboxPlots.__own(plot.id, owner)
 	Upgrades.__own(owner, plot.id)
 end
@@ -78,7 +78,7 @@ end
 local facts = { plots = {}, house = SandboxMap.House, roads = SandboxMap.Roads, turnaround = SandboxMap.Turnaround, bounds = SandboxMap.Bounds }
 for _, plot in SandboxMap.Plots do
 	local level = Warehouse.level(plot.id)
-	local def = Config.WarehouseLevels.List[level]
+	local def = WarehouseLayout.level(level) -- (Config.Warehouse.Levels')
 	table.insert(facts.plots, {
 		id = plot.id,
 		rect = plot.rect,
@@ -90,7 +90,7 @@ for _, plot in SandboxMap.Plots do
 		level = level,
 		levelName = def.name,
 		size = def.size,
-		stands = def.stands,
+		stands = WarehouseLayout.count(level),
 	})
 end
 facts.leaders = SandboxLeadersRules.spot()

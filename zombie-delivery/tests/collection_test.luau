@@ -4,7 +4,7 @@
 -- broken pieces (no income, scrap), an unknown item, the sample haul's totals (a first house on 12 stands earns $50 –
 -- 150 a minute; selling all of it pays about ten minutes of that), a legendary piece clearly special, standsFor, the
 -- view for the client, and the save: clean (garbage never trusted), fromSave (the migration: only a real save with the
--- flag; running it twice gives the same), fitStands and the uids.
+-- flag; running it twice gives the same), fitStands (8.3: with a fits check) and the uids.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -162,12 +162,17 @@ do
 	for index, row in haul do
 		table.insert(entries, { uid = `1-{index}`, item = row[1], variant = 1, condition = row[2], name = Items[row[1]].name, got = 0 })
 	end
-	-- the best 12 go on show
+	-- the best 12 go on show (8.3: the Big Warehouse's 12 stands, today's)
 	local order = table.clone(entries)
 	table.sort(order, function(a, b)
 		return Rules.income(a) > Rules.income(b)
 	end)
-	for stand = 1, 12 do -- (8.3: the Big warehouse's 12 stands, the tuning's)
+	-- 8.3: a new player's Garage shows the best 2 (Config.SandboxUpgrades' tuning: about $20 a minute)
+	local garage = Rules.standsFor(nil)
+	local first = Rules.income(order[1]) + Rules.income(order[2])
+	print(`      8.3: a Garage's {garage} stands show the haul's best two: ${math.floor(first * 10 + 0.5) / 10} a minute`)
+	check("8.3: a new player's Garage: 2 stands, the haul's best two earn $15 – 40 a minute", garage == 2 and first >= 15 and first <= 40, first)
+	for stand = 1, Rules.standsFor({ sandboxUpgrades = { warehouse = 3 } }) do
 		order[stand].stand = stand
 	end
 	local t = Rules.totals(entries)
@@ -183,17 +188,27 @@ do
 	check("a legendary at its lowest value out-earns the haul's three best pieces together", legendary > Rules.income(order[1]) + Rules.income(order[2]) + Rules.income(order[3]), legendary)
 end
 
--- ── standsFor (8.3: the warehouse level's, Config.WarehouseLevels) ─────────
+-- ── standsFor ─────────────────────────────────────────────────────────────
+-- (8.3: with Config.Warehouse.Levels, the player's warehouse level's: tests/upgrades_test.luau; without them, as before)
 do
-	check("no profile, none bought: the start's garage, 2 stands", Rules.standsFor(nil) == 2 and Rules.standsFor({}) == 2 and Rules.standsFor({ sandboxUpgrades = {} }) == 2)
-	check("the warehouse at 4 (the Big warehouse): 12; at 5: 20", Rules.standsFor({ sandboxUpgrades = { warehouse = 4 } }) == 12 and Rules.standsFor({ sandboxUpgrades = { warehouse = 5 } }) == 20)
+	local C2: any = Config
+	local before = C2.Warehouse
+	C2.Warehouse = nil
+	check("no Config.Warehouse: Config.Collection.Stands (12)", Rules.standsFor(nil) == 12 and Rules.standsFor({}) == 12)
+	C2.Warehouse = { Stands = 16 }
+	check("Config.Warehouse.Stands (16)", Rules.standsFor({}) == 16)
+	C2.Warehouse = { Stands = 13.7 }
+	check("a fraction: whole stands (13)", Rules.standsFor(nil) == 13)
 	local garbage = true
 	for _, bad in { 0, -3, "x", 0 / 0, math.huge } do
-		if Rules.standsFor({ sandboxUpgrades = { warehouse = bad } }) ~= 2 then
+		C2.Warehouse = { Stands = bad }
+		if Rules.standsFor(nil) ~= 12 then
 			garbage = false
 		end
 	end
-	check("garbage (0, -3, a string, NaN, inf, no table): the start's 2", garbage and Rules.standsFor({ sandboxUpgrades = "nope" }) == 2)
+	C2.Warehouse = "nope"
+	check("garbage (0, -3, a string, NaN, inf, no table): 12", garbage and Rules.standsFor(nil) == 12)
+	C2.Warehouse = before
 end
 
 -- ── The view (what the client gets) ───────────────────────────────────────
@@ -271,6 +286,19 @@ do
 	local moved = Rules.fitStands(fit, 12)
 	check("fitStands: the pieces past the stands back to the stock", moved == 2 and fit.entries[1].stand == 3 and fit.entries[2].stand == 12 and fit.entries[3].stand == nil and fit.entries[4].stand == nil)
 	check("… and again: none", Rules.fitStands(fit, 12) == 0)
+	-- 8.3: with fits(stand, item) (a warehouse level down: a small stand where a big one stood), a piece too big for
+	-- its stand goes back too; one that fits stays
+	local small = { entries = {
+		{ uid = "1-1", item = "hay_wagon", variant = 1, condition = 1, name = "Hay Wagon", stand = 13, got = 1 },
+		{ uid = "1-2", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 14, got = 2 },
+		{ uid = "1-3", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 2, got = 3 },
+	}, nextUid = 4 }
+	local function fits(stand: number, item: string): boolean
+		return not (stand > 12 and item == "hay_wagon")
+	end
+	check("8.3: fitStands with fits: a piece too big for its stand back to the stock too, the others stay",
+		Rules.fitStands(small, 20, fits) == 1 and small.entries[1].stand == nil and small.entries[2].stand == 14 and small.entries[3].stand == 2
+		and Rules.fitStands(small, 20, fits) == 0)
 end
 
 if failures == 0 then

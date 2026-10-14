@@ -8,7 +8,8 @@
 -- the test's: the modules' own loops run (the moves' tick, the doors, Danny, the lobby, the payouts, the tasks, the
 -- autosave).
 --   0. The real boot (SandboxBoot.start): the map, the services, the plots, the warehouses, the moves; no Baseplate.
---   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states.
+--   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states; 8.3: their
+--      warehouses are garages (level 1: 2 stands).
 --   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
 --   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
 --      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
@@ -25,13 +26,15 @@
 --   8. The warehouse: Display opens the picker, the client's display, the stand's model and tag; a move to another
 --      stand, Take down; the refusals (a stand you haven't got, junk, a taken stand, another player's piece).
 --   9. 60 s on the clock: the income (CollectionIncome). The player list's $ / $/min / collection, the TOP MOVERS board.
---  10. UPGRADES: without the money refused; 8.3: the Warehouse's level 2 (the Workshop: its warehouse rebuilt in place,
---      4 stands, her pieces on their stands, nobody trapped), the new stand 3 shows a piece; Showroom lights (× 1.1).
+--  10. UPGRADES: More stands locked in the garage, the ZDC Warehouse without the money refused; 8.3: the warehouse
+--      bought to the Big Warehouse (each level a rebuild, her pieces kept on their stands, the new desk's prompt); More
+--      stands (14), the new stand 13 shows a piece; Showroom lights (× 1.1).
 --  11. Sell at the stand (hold F); the bulk buttons: TAKE ALL DOWN, SELL… (duplicates; nothing else to sell), FILL BEST.
 --  12. FINISH: the result card says what came home; the daily tasks counted the trips, the sales and the income (a done
 --      one claimed); the analytics' funnel steps fired once each, the moves' events.
 --  13. Ann leaves and comes back: the collection on its stands, the upgrades, the book, the tasks, every dollar; the
---      engine on her van and on one CAR brings later; Danny's training.
+--      engine on her van and on one CAR brings later; Danny's training; 8.3: her warehouse level kept, then the
+--      Logistics Center (level 5) with every piece still on its stand.
 --  14. Bob cannot use Ann's stands or desk; her kiosk opens only his own move.
 --  15. A full server: the fifth player waits for a plot, gets Bob's when he leaves.
 --  16. A full warehouse at a trip.
@@ -39,7 +42,8 @@
 --  18. 8.3 the market: the state carries the day's hot and cold kinds; a hot piece on a stand: its tag shows the hot
 --      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
 --      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
---  19. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
+--  19. 8.3 the PAINT shop: the van's 🎨 Paint van prompt at home, the window, a paint bought and worn.
+--  20. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
 --      piece out by its doorway inside (the real plan's second way out), loaded, home. 8.3 walk-in doors: the back
 --      door's leaves (the map's, the interior's) swing open as she walks up to them, the fade as the front door's.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
@@ -559,8 +563,12 @@ function H.standPrompt(plotId: number, index: number, action: string): (any, any
 	local anchor = podium and podium:FindFirstChild("Prompts")
 	return anchor and anchor:FindFirstChild(action), anchor
 end
+-- 8.3: the plot at the level its warehouse is built at now (WarehouseLayout.site: that level's stands)
+function H.siteOf(plotId: number): any
+	return WarehouseLayout.site(plots[plotId], Warehouse.level(plotId))
+end
 function H.toStand(player: any, plot: any, index: number)
-	local spot = WarehouseLayout.stand(plot, index, Warehouse.level(plot.id)) -- (8.3: the plot's warehouse level's)
+	local spot = WarehouseLayout.stand(H.siteOf(plot.id), index)
 	local _, anchor = H.standPrompt(plot.id, index, "Display")
 	local front = anchor.WorldPosition + H.yawLook(spot.yaw) * 3
 	local floor = WarehouseLayout.FloorTop + 3
@@ -603,11 +611,15 @@ do
 	check("…their warehouses' signs say whose they are; the others FOR RENT", H.anyText(Warehouse.model(1), "Ann") and H.anyText(Warehouse.model(2), "Bob")
 		and H.anyText(Warehouse.model(3), "FOR RENT"))
 	local state = E.lastKind(ann, "Collection", "state")
-	check("…the collection's state (an empty stock, 8.3: the Garage's 2 stands, no income) and the upgrades' (the money)", state ~= nil and #state.stock == 0
-		and state.stands == Config.WarehouseLevels.List[1].stands and state.income == 0 and E.lastKind(ann, "Upgrades", "state") ~= nil
+	check("…the collection's state (an empty stock, 8.3: the garage's 2 stands, no income) and the upgrades' (the money)", state ~= nil and #state.stock == 0
+		and state.stands == WarehouseLayout.count(1) and state.income == 0 and E.lastKind(ann, "Upgrades", "state") ~= nil
 		and E.lastKind(ann, "Upgrades", "state").money == Config.Sandbox.StartMoney)
-	check("8.3: …a new player's warehouse is the Garage (level 1): the plot's Model, the player attribute", Warehouse.level(1) == 1 and Warehouse.level(2) == 1
-		and Warehouse.model(1):GetAttribute("Level") == 1 and ann:GetAttribute(Config.WarehouseLevels.Attribute) == 1 and Warehouse.model(1):FindFirstChild("Stand3") == nil)
+	local folder = workspace:FindFirstChild("Warehouses")
+	check("8.3: new players, so their warehouses are garages (level 1: the Model's Level, workspace.Warehouses' Level1 / Level2, the player attribute WarehouseLevel); a free plot too",
+		Warehouse.level(1) == 1 and Warehouse.level(2) == 1 and Warehouse.model(1):GetAttribute("Level") == 1 and folder:GetAttribute("Level1") == 1
+			and folder:GetAttribute("Level2") == 1 and ann:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 1
+			and bob:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 1 and Warehouse.level(3) == Config.Warehouse.FreeLevel
+			and Warehouse.model(1):FindFirstChild("Stand2") ~= nil and Warehouse.model(1):FindFirstChild("Stand3") == nil)
 	local book = E.lastKind(ann, "CollectionBook", "state")
 	local tasks = E.lastKind(ann, "SandboxTasks", "state")
 	check("…the book's state (nothing found) and the day's tasks (3 dailies, a weekly)", book ~= nil and next(book.book) == nil and tasks ~= nil
@@ -970,7 +982,7 @@ do
 	E.fire(ann, "Collection", { kind = "display", uid = annStock[1].uid, stand = 1 })
 	H.rebuilt()
 	local shown = Warehouse.shown(1, 1)
-	local spot = WarehouseLayout.stand(plots[1], 1, Warehouse.level(1))
+	local spot = WarehouseLayout.stand(H.siteOf(1), 1) -- (8.3: the garage's stand 1)
 	check("…the picker's DISPLAY (the remote): the piece's model stands on stand 1", shown ~= nil and shown:GetAttribute("Uid") == annStock[1].uid
 		and H.flat(shown:GetPivot().Position, V3(spot.x, 0, spot.z)) < 0.1 and shown:IsDescendantOf(workspace), shown and shown:GetPivot().Position)
 	local tag = Warehouse.model(1):FindFirstChild("Stand1"):FindFirstChild("Tag")
@@ -986,8 +998,9 @@ do
 	check("…each stand shows the very piece that came out of the house (its look: the house's variant)",
 		H.lookOk(annStock[1].item, H.signature(Warehouse.shown(1, 1))) and H.lookOk(annStock[2].item, H.signature(Warehouse.shown(1, 2))))
 	check("…the analytics: FirstPieceOnShow once, CollectionDisplayed for each", H.steps(11).FirstPieceOnShow == 1 and #H.events("CollectionDisplayed", ann) == 2)
-	-- Take down (its prompt) sends a piece back to the stock; a piece on show put on another stand moves there
-	E.advance(0.5) -- (a moment after her Display there: a double press does one thing)
+	-- Take down (its prompt) sends a piece back to the stock; a piece on show put on another stand moves there (8.3: the
+	-- garage has two stands, so the move goes to the one Take down emptied)
+	E.advance(0.5) -- (Warehouse's double-press guard after her Display there)
 	local downAt = #E.sent
 	local down = E.trigger(H.standPrompt(1, 2, "TakeDown"), ann)
 	H.rebuilt()
@@ -1003,11 +1016,12 @@ do
 	H.rebuilt()
 	H.request(ann, { kind = "display", uid = annStock[2].uid, stand = 2 })
 	H.rebuilt()
-	check("(on stand 2 again)", Warehouse.shown(1, 2) ~= nil and Warehouse.shown(1, 2):GetAttribute("Uid") == annStock[2].uid)
+	check("(on stands 1 and 2 again)", Warehouse.shown(1, 1) ~= nil and Warehouse.shown(1, 1):GetAttribute("Uid") == annStock[1].uid
+		and Warehouse.shown(1, 2) ~= nil and Warehouse.shown(1, 2):GetAttribute("Uid") == annStock[2].uid)
 
 	-- the refusals (the remote is the client's: anything can come)
 	local third = annStock[3]
-	check("NEG. display on a stand she doesn't have (3 of the Garage's 2): refused", H.request(ann, { kind = "display", uid = third.uid, stand = 3 }) == "There's no such display stand."
+	check("NEG. display on a stand she doesn't have (8.3: 3, the garage has 2): refused", H.request(ann, { kind = "display", uid = third.uid, stand = 3 }) == "There's no such display stand."
 		and H.byUid(Collection.stock(ann), third.uid).stand == nil)
 	local junk = true
 	for _, stand in { 0, -1, 21, 1.5, "1", 0 / 0, math.huge } do
@@ -1100,51 +1114,75 @@ do
 		and E.lastKind(ann, "Upgrades", "state", openAt) ~= nil, why)
 	local poor = H.profileOf(ann).money
 	local poorAt = #money
-	local said = H.buy(ann, "warehouse", 2)
-	check("NEG. the Warehouse's level 2 (the Workshop) without the money: refused, nothing taken, nothing changed", poor < 1500 and string.find(said, "costs $1,500", 1, true) ~= nil
-		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).warehouse == nil and Collection.stands(ann) == 2, said)
-	PlayerData.addMoney(ann, 20000, "Admin") -- (the admin panel's money button: PlayerData.addMoney)
+	local said = H.buy(ann, "stands", 1)
+	check("NEG. 8.3: More stands in her garage: refused with the lock's reason (\"Needs the Big Warehouse\"), nothing taken, nothing changed", said == "Needs the Big Warehouse"
+		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).stands == nil and Collection.stands(ann) == WarehouseLayout.count(1), said)
+	said = H.buy(ann, "warehouse", 1)
+	check("NEG. the ZDC Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < 1500 and string.find(said, "costs $1,500", 1, true) ~= nil
+		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).warehouse == nil and Warehouse.level(1) == 1, said)
+	PlayerData.addMoney(ann, 80000, "Admin") -- (the admin panel's money button: PlayerData.addMoney)
 	local rich = H.profileOf(ann).money
 	local spentAt = #money
 	local garage = Warehouse.model(1)
-	local annAt = E.rootOf(ann).Position
-	H.buy(ann, "warehouse", 2)
-	check("…with the money: the Workshop bought ($1,500, the reason Upgrade): 4 stands", Upgrades.levels(ann).warehouse == 2 and Collection.stands(ann) == 4
-		and H.profileOf(ann).money - rich == -1500 + H.paid(ann, "CollectionIncome", spentAt) and H.paid(ann, "Upgrade", spentAt) == -1500 and E.lastKind(ann, "Upgrades", "bought") ~= nil
-		and E.lastKind(ann, "Upgrades", "bought").id == "warehouse")
+	H.buy(ann, "warehouse", 1)
+	H.rebuilt()
+	local function onTheirStands(): boolean -- (her two pieces on stands 1 and 2, at the spots of the level built now)
+		local site = H.siteOf(1)
+		for index = 1, 2 do
+			local model = Warehouse.shown(1, index)
+			local where = WarehouseLayout.stand(site, index)
+			if not (model and model:GetAttribute("Uid") == annStock[index].uid and model:IsDescendantOf(Warehouse.model(1))
+				and H.flat(model:GetPivot().Position, V3(where.x, 0, where.z)) < 0.1 and H.byUid(Collection.stock(ann), annStock[index].uid).stand == index) then
+				return false
+			end
+		end
+		return true
+	end
+	check("8.3: …with the money: the Workshop bought ($1,500, the reason Upgrade): her plot rebuilt (a new Model at Level 2, the garage gone), 4 stands, WarehouseLevel 2",
+		Upgrades.levels(ann).warehouse == 1 and H.paid(ann, "Upgrade", spentAt) == -1500 and E.lastKind(ann, "Upgrades", "bought") ~= nil and Warehouse.model(1) ~= garage
+			and not garage:IsDescendantOf(workspace) and Warehouse.model(1):IsDescendantOf(workspace) and Warehouse.level(1) == 2 and Warehouse.model(1):GetAttribute("Level") == 2
+			and workspace:FindFirstChild("Warehouses"):GetAttribute("Level1") == 2 and Collection.stands(ann) == 4 and Warehouse.isOpen(1, 4)
+			and ann:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 2 and E.lastKind(ann, "Collection", "state").stands == 4)
+	check("8.3: …her two pieces still on stands 1 and 2, standing at the Workshop's spots; the income the same", onTheirStands() and math.abs(Collection.incomePerMinute(ann) - S.rate) < 1e-9)
 	E.advance(0.1)
 	check("…the window's state shows the money left; the analytics' UpgradeBought; FirstUpgrade (step 10) waits for FirstSale (9): the funnel is in order",
 		E.lastKind(ann, "Upgrades", "state").money == rich - 1500 + H.paid(ann, "CollectionIncome", spentAt) and #H.events("UpgradeBought", ann) == 1 and H.steps(11).FirstUpgrade == nil)
+	H.buy(ann, "warehouse", 2)
+	H.buy(ann, "warehouse", 3)
 	H.rebuilt()
-	local workshop = Warehouse.model(1)
-	check("8.3: …her warehouse grows in place: the Workshop (a new Model, Level 2; the Garage gone), its stands 3 and 4 there; the collection's state says 4",
-		workshop ~= garage and garage.Parent == nil and Warehouse.level(1) == 2 and workshop:GetAttribute("Level") == 2 and Warehouse.isOpen(1, 3) and Warehouse.isOpen(1, 4)
-		and not Warehouse.isOpen(1, 5) and E.lastKind(ann, "Collection", "state").stands == 4 and ann:GetAttribute(Config.WarehouseLevels.Attribute) == 2)
-	local back = 0
-	for _, entry in Collection.stock(ann) do
-		if entry.stand and Warehouse.shown(1, entry.stand) and Warehouse.shown(1, entry.stand):GetAttribute("Uid") == entry.uid then
-			back += 1
-		end
-	end
-	local at = E.rootOf(ann).Position
-	check("8.3: …her pieces on their stands again (the new stands' places), she at the desk not caught (free where she stood), Bob's warehouse untouched",
-		back == 2 and WarehouseLayout.freeSpot(plots[1], 2, at.X, at.Z) == nil and H.flat(at, annAt) < 0.5 and Warehouse.level(2) == 1, `{back} {at}`)
+	check("8.3: …the Storehouse, then the Big Warehouse (level 4, the warehouse of 8.0 – 8.2): 12 stands, her pieces on 1 and 2 at its spots",
+		Upgrades.levels(ann).warehouse == 3 and Warehouse.level(1) == 4 and Collection.stands(ann) == 12 and Warehouse.isOpen(1, 12) and not Warehouse.isOpen(1, 13)
+			and onTheirStands() and ann:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 4 and H.paid(ann, "Upgrade", spentAt) == -18500)
+	local deskNow = Warehouse.terminal(1):FindFirstChild("Prompts")
+	E.walk(ann, V3(deskNow.WorldPosition.X, WarehouseLayout.FloorTop + 3, deskNow.WorldPosition.Z + 3))
+	local againAt = #E.sent
+	local deskOk, deskWhy = E.trigger(deskNow:FindFirstChild("Upgrades"), ann)
+	check("8.3: …the rebuilt warehouse's UPGRADES desk: her prompt (the old desk's gone), it opens her window", deskOk and deskNow ~= deskAt and not deskAt:IsDescendantOf(workspace)
+		and E.lastKind(ann, "Upgrades", "open", againAt) ~= nil, deskWhy)
+	rich = H.profileOf(ann).money
+	spentAt = #money
+	H.buy(ann, "stands", 1)
+	check("…with the money: More stands 1 bought ($1,000, the reason Upgrade): 14 stands", Upgrades.levels(ann).stands == 1 and Collection.stands(ann) == 14
+		and H.profileOf(ann).money - rich == -1000 + H.paid(ann, "CollectionIncome", spentAt) and H.paid(ann, "Upgrade", spentAt) == -1000 and E.lastKind(ann, "Upgrades", "bought") ~= nil)
+	H.rebuilt()
+	check("…the warehouse opens stands 13 and 14 (15 still a painted spot); the collection's state says 14", Warehouse.isOpen(1, 13) and Warehouse.isOpen(1, 14)
+		and not Warehouse.isOpen(1, 15) and E.lastKind(ann, "Collection", "state").stands == 14)
 	check("…the income unchanged by stands alone", math.abs(Collection.incomePerMinute(ann) - S.rate) < 1e-9)
 	local secondAt = #money
-	H.buy(ann, "warehouse", 2)
-	check("…a second click on the same card buys once", Upgrades.levels(ann).warehouse == 2 and H.paid(ann, "Upgrade", secondAt) == 0)
+	H.buy(ann, "stands", 1)
+	check("…a second click on the same card buys once", Upgrades.levels(ann).stands == 1 and H.paid(ann, "Upgrade", secondAt) == 0)
 	local third = annStock[3]
-	local fits = WarehouseLayout.fits(3, (FurnitureLooks.Items[third.item] :: any).size, 2)
-	S.thirdOn3 = fits
+	local fits = WarehouseLayout.fits(13, (FurnitureLooks.Items[third.item] :: any).size, 4) -- (the Big Warehouse's small 13)
+	S.thirdOn13 = fits
 	if fits then
-		check("…the new stand 3 takes her third piece, its model there", H.request(ann, { kind = "display", uid = third.uid, stand = 3 }) == ""
+		check("…the new stand 13 takes her third piece, its model there", H.request(ann, { kind = "display", uid = third.uid, stand = 13 }) == ""
 			and (function(): boolean
 				H.rebuilt()
-				return Warehouse.shown(1, 3) ~= nil and Warehouse.shown(1, 3):GetAttribute("Uid") == third.uid
+				return Warehouse.shown(1, 13) ~= nil and Warehouse.shown(1, 13):GetAttribute("Uid") == third.uid
 			end)())
 	else
-		check("…the Workshop's stand 3 refuses her too-big third piece (Collection says a bigger warehouse has bigger stands)",
-			string.find(H.request(ann, { kind = "display", uid = third.uid, stand = 3 }), "too big", 1, true) ~= nil)
+		check("…the new small stand 13 refuses her too-big third piece (Collection says which stands)",
+			string.find(H.request(ann, { kind = "display", uid = third.uid, stand = 13 }), "too big", 1, true) ~= nil)
 	end
 	local before = Collection.incomePerMinute(ann)
 	H.buy(ann, "lights", 1)
@@ -1232,8 +1270,8 @@ do
 	E.advance(1.1)
 	E.fire(ann, "Collection", { kind = "fillbest" })
 	check("…again: nothing left to put up (refused, why)", E.lastKind(ann, "Collection", "bulk", againAt) == nil and E.lastNotice(ann, againAt) ~= "")
-	if S.thirdOn3 then
-		H.request(ann, { kind = "display", uid = annStock[3].uid, stand = 3 }) -- (back to the new stand: the rejoin checks it)
+	if S.thirdOn13 then
+		H.request(ann, { kind = "display", uid = annStock[3].uid, stand = 13 }) -- (back to the upgrade stand: the rejoin checks it)
 		H.rebuilt()
 	end
 end
@@ -1322,11 +1360,12 @@ do
 	local save = E.saves["Player_11"]
 	check("13. Ann leaves: her save written (the collection, the upgrades, the book, the tasks, each with its flag; the lock released)", save ~= nil
 		and save.collectionKept == true and save.sandboxUpgradesKept == true and type(save.collection) == "table" and #save.collection.entries == #kept
-		and save.lock == nil and save.sandboxUpgrades.warehouse == 2 and save.warehouseLevelKept == true and type(save.collectionBook) == "table" and type(save.sandboxTasks) == "table")
+		and save.lock == nil and save.sandboxUpgrades.stands == 1 and type(save.collectionBook) == "table" and type(save.sandboxTasks) == "table"
+		and save.warehouseLevelKept == true and save.sandboxUpgrades.warehouse == 3) -- (8.3: her warehouse level with its flag)
 	check("…with every dollar: what her stands earned up to the moment she left (Collection's leave payout before the leave save)",
 		save ~= nil and save.money == keptMoney + H.paid(ann, "CollectionIncome", keptAt), save and `{save.money} vs {keptMoney} + {H.paid(ann, "CollectionIncome", keptAt)}`)
-	check("…her plot is free (FOR RENT, 8.3: the start's Garage again), her pieces leave the warehouse with her", SandboxPlots.owner(1) == nil and H.anyText(Warehouse.model(1), "FOR RENT")
-		and Warehouse.shown(1, 1) == nil and Warehouse.level(1) == 1)
+	check("…her plot is free (FOR RENT), her pieces leave the warehouse with her; 8.3: the garage again (FreeLevel)", SandboxPlots.owner(1) == nil and H.anyText(Warehouse.model(1), "FOR RENT")
+		and Warehouse.shown(1, 1) == nil and Warehouse.level(1) == Config.Warehouse.FreeLevel)
 	local joinAt = #money
 	ann2 = E.join(11, "Ann")
 	E.clients[ann2] = H.client(ann2)
@@ -1337,11 +1376,13 @@ do
 		local b = H.byUid(back, entry.uid)
 		same = same and b ~= nil and b.item == entry.item and b.stand == entry.stand and math.abs(b.condition - entry.condition) < 1e-9
 	end
-	check("…back: plot 1 again, her collection as it was (every uid, item, condition, stand: the Workshop's new stand too)", ann2:GetAttribute("Plot") == 1 and same,
+	check("…back: plot 1 again, her collection as it was (every uid, item, condition, stand: the upgrade stand too)", ann2:GetAttribute("Plot") == 1 and same,
 		`{#back} vs {#kept}`)
-	check("…her upgrades (the Workshop's 4 stands: her plot's warehouse at level 2 again, the lights) and her money", Upgrades.levels(ann2).warehouse == levels.warehouse
-		and Upgrades.levels(ann2).lights == levels.lights and Collection.stands(ann2) == 4 and Warehouse.level(1) == 2 and Collection.boost(ann2) > 1.09
-		and H.profileOf(ann2).money - save.money == H.paid(ann2, "CollectionIncome", joinAt))
+	check("…her upgrades (14 stands, the lights) and her money", Upgrades.levels(ann2).stands == levels.stands and Upgrades.levels(ann2).lights == levels.lights
+		and Collection.stands(ann2) == 14 and Collection.boost(ann2) > 1.09 and H.profileOf(ann2).money - save.money == H.paid(ann2, "CollectionIncome", joinAt))
+	check("8.3: …her Big Warehouse again (her plot rebuilt at her saved level once the save loaded; no migration: the flag), WarehouseLevel 4",
+		Upgrades.levels(ann2).warehouse == 3 and Warehouse.level(1) == 4 and Warehouse.model(1):GetAttribute("Level") == 4
+			and ann2:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 4 and H.anyText(Warehouse.model(1), "Ann"))
 	local shownAll = true
 	for _, entry in back do
 		if entry.stand then
@@ -1351,7 +1392,7 @@ do
 	end
 	check("…her pieces on their stands again", shownAll)
 	local stateBack = E.lastKind(ann2, "Collection", "state")
-	check("…her client hears it all again (4 stands, every piece)", stateBack ~= nil and stateBack.stands == 4 and #stateBack.stock == #kept)
+	check("…her client hears it all again (14 stands, every piece)", stateBack ~= nil and stateBack.stands == 14 and #stateBack.stock == #kept)
 	local bookBack = Book.book(ann2)
 	local sameBook = bookBack ~= nil
 	for item, found in keptBook do
@@ -1391,6 +1432,34 @@ do
 		and math.abs((again.model:GetAttribute("SpeedMult") or 0) - 1.05) < 1e-9 and H.flat(again.chassis.Position, V3(plots[1].vanSpot.x, 0, plots[1].vanSpot.z)) < 0.5,
 		again and again.model:GetAttribute("SpeedMult"))
 	S.annVan2 = again
+end
+
+-- 8.3: the Logistics Center (the warehouse's top level): her plot rebuilt once more, every piece on its stand
+do
+	local before = Warehouse.model(1)
+	local placed = {}
+	for _, entry in Collection.stock(ann2) do
+		if entry.stand then
+			placed[entry.uid] = entry.stand
+		end
+	end
+	local spentAt = #money
+	local said = H.buy(ann2, "warehouse", 4)
+	H.rebuilt()
+	local site = H.siteOf(1)
+	local kept, shown = next(placed) ~= nil, true
+	for uid, at in placed do
+		local model = Warehouse.shown(1, at)
+		local where = WarehouseLayout.stand(site, at)
+		kept = kept and H.byUid(Collection.stock(ann2), uid).stand == at
+		shown = shown and model ~= nil and model:GetAttribute("Uid") == uid and H.flat(model:GetPivot().Position, V3(where.x, 0, where.z)) < 0.1
+	end
+	check("8.3: the Logistics Center bought ($30,000): a new Model at Level 5, 24 big stands + her More stands' 2, WarehouseLevel 5", said == ""
+		and H.paid(ann2, "Upgrade", spentAt) == -30000 and Warehouse.model(1) ~= before and not before:IsDescendantOf(workspace) and Warehouse.level(1) == 5
+		and Collection.stands(ann2) == 26 and Warehouse.isOpen(1, 26) and not Warehouse.isOpen(1, 27) and ann2:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 5, said)
+	check("8.3: …every piece still on its stand (the one on stand 13 too: a big stand there now), standing at the level's spots", kept and shown)
+	local top = H.buy(ann2, "warehouse", 5)
+	check("8.3: …the ZDC Warehouse at its top: refused, says so", top == "ZDC Warehouse is at its top level." and Warehouse.level(1) == 5, top)
 end
 
 -- ── 14. Bob cannot use Ann's stands or desk; her kiosk opens his own move ─
@@ -1434,7 +1503,7 @@ do
 	E.trigger(desk:FindFirstChild("Upgrades"), bob)
 	E.advance(0.5)
 	check("…her UPGRADES desk: no window for him, her levels untouched", E.heard(bob, "This is Ann's warehouse.", heardAt)
-		and E.lastKind(bob, "Upgrades", "open", heardAt) == nil and Upgrades.levels(ann2).warehouse == 2)
+		and E.lastKind(bob, "Upgrades", "open", heardAt) == nil and Upgrades.levels(ann2).stands == 1)
 	-- the kiosks are everybody's (KONTRAKT: any of them opens YOUR contract): Bob's LAUNCH at Ann's is his own move
 	E.advance(1.1)
 	local card = H.takeContract(bob, plots[1])

@@ -21,11 +21,15 @@
 --   SandboxBadgeRules.fromSale(kind, money, hot)   Collection.onPaid: a "sale" for money → firstSale, with a hot piece
 --                                         in it (paid.hot) → hotSale
 --   SandboxBadgeRules.fromAdded(item)     Collection.onAdded: a legendary piece came home → legendary
+--   SandboxBadgeRules.fromBought(id, level)   8.3: Upgrades.onBought: a level bought at the UPGRADES desk → firstUpgrade
 --   SandboxBadgeRules.stateOf(profile, shown)   a player's State from their profile (the moves' counter, the collection
 --                                         book, the upgrades, the van's paint) and whether a piece of theirs is on show
 --   SandboxBadgeRules.fromState(state)    firstMove, tenMoves, firstShow, legendary, fullBook, firstUpgrade, warehouse5,
 --                                         painted (only keys of States)
---   SandboxBadgeRules.upgraded(levels)    anything bought at the UPGRADES desk (a level over its start)
+--   SandboxBadgeRules.upgraded(levels)    anything bought at the UPGRADES desk (a level over its start; the ZDC
+--                                         Warehouse's only past the Big Warehouse: a save from before 8.3 gets that one
+--                                         for free, UpgradeRules.fromSave, so a level under it says nothing here and its
+--                                         purchase counts by its moment, fromBought)
 --   SandboxBadgeRules.painted(vanPaint)   anything bought at the PAINT shop, or the van wearing other than the factory's
 --   SandboxBadgeRules.topOf(rows, players)   the TOP MOVERS board's leader (SandboxLeaders.rows: ranked) when it has at
 --                                         least `players` rows: alone at the top, with a collection worth more than $0
@@ -180,12 +184,23 @@ function SandboxBadgeRules.fromAdded(item: any): { string }
 	return {}
 end
 
+function SandboxBadgeRules.fromBought(id: any, level: any): { string }
+	if UpgradeRules.def(id) ~= nil and finite(level) and level >= 1 then
+		return { "firstUpgrade" }
+	end
+	return {}
+end
+
 -- ── The state ──────────────────────────────────────────────────────────────
+
+-- (8.3: the ZDC Warehouse's upgrade level a real save from before 8.3 gets without buying anything: the Big Warehouse)
+local GIVEN = UpgradeRules.level(UpgradeRules.fromSave({ money = 0 }), "warehouse")
 
 function SandboxBadgeRules.upgraded(levels: any): boolean
 	local none = UpgradeRules.empty()
 	for _, id in UpgradeRules.Order do
-		if UpgradeRules.level(levels, id) > UpgradeRules.level(none, id) then
+		local start = if id == "warehouse" then math.max(GIVEN, UpgradeRules.level(none, id)) else UpgradeRules.level(none, id)
+		if UpgradeRules.level(levels, id) > start then
 			return true
 		end
 	end

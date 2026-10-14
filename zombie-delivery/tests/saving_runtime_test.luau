@@ -9,7 +9,8 @@
 --   * Saves soon: a purchase (the warehouse's level, the lights, the paint) is saved Soon s later, one save for a burst;
 --     right after a write, not before Gap s; a book milestone and pieces brought home the same; the autosave skips a
 --     player written a moment ago; under the request budget's reserve the saves that can wait wait (the leave save
---     never). The warehouse's "wh:<level>" key goes along (one key, the level after a purchase).
+--     never). The warehouse level's "warehouse:<k>" key goes along (UpgradeRules.warehouseKey: one key, the level after
+--     a purchase; an older server keeps it while it drops the level).
 --   * The lock: another server's fresh lock is waited for; a save taken over (another server, a newer session here)
 --     is never written again from here; an older snapshot never lands over a newer one.
 --   * Garbage in a save is cleaned on load (every sandbox field: wrong types, negatives, huge counts, 5000 pieces) and
@@ -138,7 +139,7 @@ local function save83(cash: number): any
 		vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
 		collectionKept = true, collection = { entries = { { uid = "1-1", item = "sofa", variant = 1, condition = 0.9, name = "Sofa", stand = 1, got = 1 } }, nextUid = 2 },
 		collectionBookKept = true, collectionBook = { sofa = { n = 1, best = 0.9 } }, collectionBookPaid = {},
-		sandboxUpgradesKept = true, warehouseLevelKept = true, sandboxUpgrades = { warehouse = 2, lights = 1 },
+		sandboxUpgradesKept = true, warehouseLevelKept = true, sandboxUpgrades = { warehouse = 1, lights = 1 }, -- (level 2: the Workshop)
 		marketKept = true, market = { day = 0, kinds = {} },
 		vanPaintKept = true, vanPaint = { owned = { red = true }, worn = { paint = "red", livery = "zdc" } },
 		sandboxOnboardingKept = true, sandboxOnboarding = 0,
@@ -287,8 +288,8 @@ VanPaint.buy(H, "black")
 E.advance(0.4)
 local saved = E.saves.Player_207
 check("… one save Soon s after the first purchase, the burst's three in it (the level, the lights, the paint)", writesOf("Player_207", from) == 1
-	and saved.sandboxUpgrades.warehouse == 3 and saved.sandboxUpgrades.lights == 2 and saved.vanPaint.owned.black == true and saved.money == ph.money, writesOf("Player_207", from))
-check("… the warehouse's level in `rewards` too: one \"wh:\" key, the new level's", saved.rewards["wh:3"] == true and saved.rewards["wh:2"] == nil)
+	and saved.sandboxUpgrades.warehouse == 2 and saved.sandboxUpgrades.lights == 2 and saved.vanPaint.owned.black == true and saved.money == ph.money, writesOf("Player_207", from))
+check("… the warehouse's level in `rewards` too: one \"warehouse:\" key, the new level's", saved.rewards["warehouse:2"] == true and saved.rewards["warehouse:1"] == nil)
 from = #E.storeCalls
 Upgrades.buy(H, "danny")
 E.advance(S.Soon + 0.1)
@@ -420,7 +421,7 @@ check("… the book: only its pieces, counts 1 … MaxCount, best 0 … 1 (the s
 	and pl.collectionBook.bed == nil and pl.collectionBook.tv.n == Config.CollectionBook.MaxCount and pl.collectionBook.tv.best == 0
 	and pl.collectionBook.sofa.n == Config.Collection.MaxStock and pl.collectionBook.sofa.best == 0)
 check("… the milestones: only `true` and known (+ the \"book:\" keys of rewards)", same(pl.collectionBookPaid, { legendary = true, found20 = true }))
-check("… the upgrades clamped (the warehouse at its top, junk dropped)", UpgradeRules.warehouseLevel(pl.sandboxUpgrades) == #Config.WarehouseLevels.List
+check("… the upgrades clamped (the warehouse at its top, junk dropped)", UpgradeRules.warehouseLevel(pl.sandboxUpgrades) == #Config.Warehouse.Levels
 	and pl.sandboxUpgrades.lights == nil and pl.sandboxUpgrades.engine == nil and pl.sandboxUpgrades.danny == 2 and pl.sandboxUpgrades.junk == nil)
 check("… the tasks: none (started fresh), the onboarding 0", pl.sandboxTasks == nil and pl.sandboxOnboarding == 0)
 check("… the market: whole, capped, known kinds only", pl.market.kinds.nope == nil and (pl.market.kinds.sofa == nil or (pl.market.kinds.sofa.n >= 0 and pl.market.kinds.sofa.at >= 0)))
@@ -465,7 +466,7 @@ future.dannyHireKept = true
 future.badges = { first = 3 }
 future.bike = "old-bike" -- (keys this version knows: its own value, never the old one)
 future.title = "Boss"
-future.rewards = { ["visit:sofa"] = true, ["wh:2"] = true }
+future.rewards = { ["visit:sofa"] = true, ["warehouse:1"] = true }
 future.sandboxMoves, future.sandboxMovesKept = 4, true -- (a field this version knows: the badges' moves)
 E.saves.Player_212 = future
 local M = E.join(212, "Max")
@@ -476,25 +477,25 @@ local m1 = E.saves.Player_212
 check("a newer server's keys: written back as they were", same(m1.dannyHire, future.dannyHire) and m1.dannyHireKept == true and same(m1.badges, future.badges))
 check("… the keys this version knows are its own (bike, title: the profile's nil, not the old save's; the badges' moves read and written)", m1.bike == nil and m1.title == nil
 	and m1.money == 5001 and m1.sandboxMoves == 4 and m1.sandboxMovesKept == true)
-check("… the newer server's `rewards` keys kept too, the level's \"wh:\" key this one's", m1.rewards["visit:sofa"] == true and m1.rewards["wh:2"] == true)
+check("… the newer server's `rewards` keys kept too, the level's \"warehouse:\" key this one's", m1.rewards["visit:sofa"] == true and m1.rewards["warehouse:1"] == true)
 from = #E.storeCalls
 Upgrades.buy(M, "warehouse")
 E.advance(S.Gap + 1)
 local m2 = E.saves.Player_212
-check("… a purchase's save soon: the unknown keys still there, one \"wh:\" key (the new level)", writesOf("Player_212", from) == 1 and same(m2.dannyHire, future.dannyHire)
-	and m2.rewards["wh:3"] == true and m2.rewards["wh:2"] == nil and m2.rewards["visit:sofa"] == true)
+check("… a purchase's save soon: the unknown keys still there, one \"warehouse:\" key (the new level)", writesOf("Player_212", from) == 1 and same(m2.dannyHire, future.dannyHire)
+	and m2.rewards["warehouse:2"] == true and m2.rewards["warehouse:1"] == nil and m2.rewards["visit:sofa"] == true)
 E.leave(M)
 check("… the leave save keeps them, the lock released (never kept from the loaded save)", same(E.saves.Player_212.badges, future.badges) and E.saves.Player_212.lock == nil)
 local M2 = E.join(212, "Max")
 E.leave(M2)
 check("… a second round trip: still there", same(E.saves.Player_212.dannyHire, future.dannyHire) and E.saves.Player_212.dannyHireKept == true)
--- a save that went through an older (8.2) server written without these keys: the level comes back from "wh:"
+-- a save that went through an older (8.2) server written without these keys: the level comes back from "warehouse:"
 local old = deepCopy(E.saves.Player_212)
 old.warehouseLevelKept, old.vanPaint, old.vanPaintKept, old.market, old.marketKept = nil, nil, nil, nil, nil
 old.sandboxUpgrades.warehouse = nil
 E.saves.Player_212 = old
 local M3 = E.join(212, "Max")
-check("… through an older server (its level dropped, \"wh:3\" kept): the level back", UpgradeRules.warehouseLevel((PlayerData.get(M3) :: any).sandboxUpgrades) == 3)
+check("… through an older server (its level dropped, \"warehouse:2\" kept): the level back (3)", UpgradeRules.warehouseLevel((PlayerData.get(M3) :: any).sandboxUpgrades) == 3)
 PlayerData.resetSave(M3)
 check("RESET MY SAVE: a fresh start drops the newer server's keys too", E.saves.Player_212.dannyHire == nil and E.saves.Player_212.badges == nil)
 E.leave(M3)

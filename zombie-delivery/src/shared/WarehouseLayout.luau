@@ -1,88 +1,107 @@
 --!strict
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on a player's plot as plain numbers (the pure
--- tests run it outside Roblox; server/Warehouse.luau builds it). 8.3: the building is its level's (Config.WarehouseLevels,
--- shared/WarehouseLevels.luau: the owner's five Blender levels, design/blender-warehouse): 1 the plastered Garage under
--- a shed roof falling to the back, 2 the corrugated Workshop, 3 the Warehouse on its concrete plinth, 4 the Big
--- warehouse (8.0's: 80 × 24 × 60, the ZDC stripe) and 5 the Logistics centre under its barrel roof. Every level's
--- roller door (kept open) is where the plot's door is (SandboxMap's plot.door: the middle of the south wall, which looks
--- at the van's spot); a bigger level grows back (north) and to the sides from it, so the van's bay, the unload circle,
--- the kiosk and the spawn never move. Inside: a concrete floor with painted lines, the receiving zone just inside the
--- door (the door's width), the display stands in rows behind it (or beside it: the Workshop's two columns stand either
--- side of a middle aisle wider than its door) with aisles between them, the hall's lights under the tie beams (where
--- warehouse.py hangs its own: the Blender model's lamps over them), the UPGRADES desk at the back wall's middle under
--- its sign and the STOCK board. Outside: the ZDC sign (the front gable; the garage's plate over its door), the owner's
--- sign over the door (the garage's beside it: its header is the shed roof's), the bollards (from level 3) and the
--- UNLOAD HERE bay painted round the van at its spot (the unloading itself is the moves' work: the plot's unload circle).
--- 8.0.1: the plot's concrete is at SandboxMap.GroundTop (flush with the meadow): the bay's paint and the bollards stand
--- on it, the hall's floor a hair over it (no step at the door).
--- 8.1, the UPGRADES desk: a desk with a monitor (its prompt is server/Warehouse.luau's) and an UPGRADES sign over it.
--- (8.1's small upgrade stands are gone: the levels hold their stands, all of one size a level.)
+-- tests run it outside Roblox; server/Warehouse.luau builds it). The building is SandboxMap's plot.warehouse: 80 × 24
+-- × 60 of corrugated metal under a low gable roof (its ridge north-south), its roller door (SandboxMap.DoorWidth wide,
+-- kept open) in the middle of the south wall, which looks at the van's spot. Inside: a concrete floor with painted
+-- lines, the receiving zone just inside the door, the display stands in rows behind it with aisles between them, the
+-- hall's lights under the tie beams and the STOCK board on the back wall. Outside: the ZDC sign in the front gable, the
+-- owner's sign over the door and the UNLOAD HERE bay painted round the van at its spot (the unloading itself is the
+-- moves' work: the plot's unload circle). 8.0.1: the plot's concrete is at SandboxMap.GroundTop (flush with the
+-- meadow; the asphalt's RoadTop is only the roads'): the bay's paint and the bollards stand on it, the hall's floor a
+-- hair over it (no step at the door).
+-- 8.1 (the upgrades): the hall holds Config.Warehouse.MaxStands stands (20). 1 … Stands (12) are the big grid; the
+-- More stands upgrade opens the others two at a time, smaller podiums (Config.Warehouse.SmallStand) where the grid
+-- leaves room: 13 – 16 in the front corners beside the receiving zone (the inner pair, then the outer pair; they look
+-- north at the front row's aisle), 17 – 20 down the middle aisle from the front (looking south at the door). Until
+-- one is bought its spot is painted on the floor ("STAND 13 · 🔒 UPGRADES": the podium covers the paint once it is
+-- built). The UPGRADES desk stands at the back wall's middle under the STOCK board: a desk with a monitor (its prompt
+-- is server/Warehouse.luau's) and an UPGRADES sign over it.
+--
+-- 8.3 (design/warehouse-levels/KONTRAKT.md): the warehouse has five levels (Config.Warehouse.Levels, the owner's
+-- Blender ones: a Garage, a Workshop, a Storehouse, the Big Warehouse above, a Logistics Center), each its own building
+-- on the plot: its front wall where every level's is (the door, the van's spot and the bay never move), going back
+-- from it. A Site is a plot at a level (WarehouseLayout.site): its `warehouse` that level's box, its `level`; every
+-- function below takes a Plot or a Site, and a plain Plot is level 4 (the building of 8.0 – 8.2). A level has its big
+-- stands in a grid of its own (a Garage's 2 against its back wall … the Logistics Center's 24 in four rows), the More
+-- stands' small spots from Config.Warehouse.MoreFrom on (level 4's and level 5's), its own door, its roof (the
+-- Garage's shed: the front wall H, the back wall rise lower; the Logistics Center's barrel: a gable of rise under it),
+-- its lamps and tie beams where the Blender model has its lamps and trusses (the model hides these; their lights
+-- shine from just under the model's lamps), its STOCK board and UPGRADES sign where its walls have room (a Garage's
+-- board on its west wall, over nothing). The lamps' light (the sandbox's light, 8.3) is Config.SandboxLight.Warehouse's:
+-- its Lamp's colour, each level's brightness and reach (its Levels).
 --
 -- World coordinates (studs) of one plot. Every warehouse looks south, so its own frame is only moved: x across (east
--- +), z to the door (south +), y up from the ground. `level` is a warehouse level (1 … WarehouseLevels.Count; nil or junk:
--- WarehouseLevels.Start).
---   WarehouseLayout.FloorTop                    the hall floor's top (a hair over the plot's concrete, SandboxMap.GroundTop)
---   WarehouseLayout.level(level)                the level, checked (1 … Count)
---   WarehouseLayout.box(plot, level)            the building as SandboxMap's plot.warehouse is (its middle on the ground,
---                                               sx, sy (the walls), sz): the level's, its door on the plot's
---   WarehouseLayout.outline(plot, level)        the building's outer box { x0, x1, z0, z1, top } (top: the roof's over the
---                                               door: a gable's ridge, a barrel's crown, a shed's front wall)
---   WarehouseLayout.inside(plot, level)         the floor inside the walls (Rect)
---   WarehouseLayout.door(plot, level)           the roller door's opening { x, z (the wall's outer face), width, height }
---   WarehouseLayout.receiving(plot, level)      the receiving zone (Rect): the door's width, the level's receiving deep
---   WarehouseLayout.doorPath(plot, level)       the way in that stays clear (Rect): from the van's back through the door
---                                               and the receiving zone to an aisle's width past it
---   WarehouseLayout.count(level)                the level's display stands
---   WarehouseLayout.most()                      the most stands a level has (the last's)
---   WarehouseLayout.stand(plot, i, level)       stand i's podium: { index, x, z (its middle), y (its top: where a piece
---                                               stands), sx, sz, yaw (the way a piece on it looks: 180, south to its
---                                               aisle and the door) } (nil: no such stand at that level). 1 … columns
---                                               are the front row (nearest the door) west to east, the next row behind
---                                               them, and so on; a short last row stands in the columns nearest the
---                                               middle aisle
---   WarehouseLayout.stands(plot, level)         the plot's (a Plot or its id) stands at that level, in stand-number order:
---                                               the spots above (x, y, z plain numbers; {} for no such plot)
---   WarehouseLayout.standAt(plot, x, z, level)  the stand whose podium holds the point (nil: none)
---   WarehouseLayout.standSize(i, level)         stand i's podium (sx, sz), nil for no such stand (the same on every plot)
---   WarehouseLayout.fits(i, size, level)        a piece of that size (its X × Z, a Vector3 or { X, Z }) stands on stand
---                                               i unturned (Fit studs to spare)
---   WarehouseLayout.terminal(plot, level)       the UPGRADES desk: { x, z (its middle), y (its top), sx, sz, yaw (the way
---                                               it faces: 180, south into the hall) }
---   WarehouseLayout.headroom(level)             the height over the ground a piece on show and its tag stay under (the
---                                               hall's lamps, beams and roof above it)
---   WarehouseLayout.freeSpot(plot, level, x, z) 8.3: is a player standing at (x, z) caught by that level's walls, a stand
---                                               or the desk (as the warehouse is rebuilt round them)? nil: free; else a
---                                               free spot { x, y, z, yaw } in the receiving zone, looking into the hall
---   WarehouseLayout.bay(plot)                   the UNLOAD HERE box in front of the door (Rect): Config.Warehouse.Bay, its
---                                               middle the van's (the plot's vanSpot: the van is centred on it)
---   WarehouseLayout.pieces(plot, level)         every part of the building as a Piece (below)
---   WarehouseLayout.bounds(piece)               a piece's box in the world, turned: x0, x1, y0, y1, z0, z1
---   WarehouseLayout.ownerLines(name?, id)       the owner's sign: "<Name>'s Warehouse" (nil: FOR RENT) and its small line
+-- +), z to the door (south +), y up from the ground.
+--   WarehouseLayout.FloorTop               the hall floor's top (a hair over the plot's concrete, SandboxMap.GroundTop)
+--   WarehouseLayout.Levels                 8.3: how many levels there are (5)
+--   WarehouseLayout.site(plot, level?)     8.3: the plot (a Plot or its id) at that level: a copy, its `warehouse` the
+--                                          level's box (the front wall where it always is), its `level` (nil or out of
+--                                          range: 4); nil for no such plot
+--   WarehouseLayout.levelOf(plot)          8.3: a Plot's or a Site's level (a plain Plot: 4)
+--   WarehouseLayout.level(n)               8.3: level n's Config entry (Config.Warehouse.Levels; out of range: clamped)
+--   WarehouseLayout.grid(n)                8.3: level n's stand grid { columns, middle, aisle, side, front, gap,
+--                                          receiving, walk }: the middle aisle's width, the walk between a half's
+--                                          columns, the room kept along the side walls, the front row's front edge from
+--                                          the front wall's inside, the walk between rows, the receiving zone's depth
+--                                          and the least walk in front of a stand (and past the receiving zone)
+--   WarehouseLayout.outline(plot)          the building's outer box { x0, x1, z0, z1, top } (top: the ridge's; a shed's
+--                                          top is its front wall's)
+--   WarehouseLayout.inside(plot)           the floor inside the walls (Rect)
+--   WarehouseLayout.door(plot)             the roller door's opening { x, z (the wall's outer face), width, height } (8.3:
+--                                          the level's door)
+--   WarehouseLayout.receiving(plot)        the receiving zone (Rect): the door's width, Config.Warehouse.Receiving deep
+--   WarehouseLayout.doorPath(plot)         the way in that stays clear (Rect): from the van's back through the door and
+--                                          the receiving zone to an aisle's width past it
+--   WarehouseLayout.count(level?)          how many big stands a warehouse has (Config.Warehouse.Stands; 8.3: the
+--                                          level's, nil: level 4's 12)
+--   WarehouseLayout.capacity(level?)       8.1: how many the hall holds (Config.Warehouse.MaxStands; the upgrades'; 8.3:
+--                                          the level's big ones + the small spots from MoreFrom on: 2 … 20 … 32)
+--   WarehouseLayout.stand(plot, i)         stand i's podium: { index, x, z (its middle), y (its top: where a piece
+--                                          stands), sx, sz, yaw (the way a piece on it looks: 180, south to its aisle
+--                                          and the door; 0 north), small (8.1: an upgrade's smaller podium) } (nil: no
+--                                          such stand: 1 … capacity(level)). 1 … columns are the front row (nearest the
+--                                          door) west to east, the next row behind them, and so on
+--   WarehouseLayout.stands(plot, count?)   the plot's (a Plot or its id) first `count` stands (default: the start's,
+--                                          count()), in stand-number order: the spots above (x, y, z plain numbers;
+--                                          {} for no such plot)
+--   WarehouseLayout.standAt(plot, x, z)    the stand whose podium holds the point (nil: none; any of the hall's)
+--   WarehouseLayout.ceiling(plot, z)       8.3: the hall's height at z (a gable's walls' top; a shed's slope)
+--   WarehouseLayout.standSize(i, level?)   8.1: stand i's podium (sx, sz), nil for no such stand (the same on every plot;
+--                                          8.3: of that level, nil: 4)
+--   WarehouseLayout.fits(i, size, level?)  8.1: a piece of that size (its X × Z, a Vector3 or { X, Z }) stands on stand
+--                                          i unturned (Fit studs to spare; 8.3: that level's stand i, nil: 4)
+--   WarehouseLayout.terminal(plot)         8.1: the UPGRADES desk: { x, z (its middle), y (its top), sx, sz, yaw (the
+--                                          way it faces: 180, south into the hall) }: against the back wall's middle on
+--                                          every level (8.3: a Garage's a smaller one, between its two stands)
+--   WarehouseLayout.bay(plot)              the UNLOAD HERE box in front of the door (Rect): Config.Warehouse.Bay, its
+--                                          middle the van's (the plot's vanSpot: the van is centred on it)
+--   WarehouseLayout.pieces(plot)           every part of the building as a Piece (below)
+--   WarehouseLayout.bounds(piece)          a piece's box in the world, turned: x0, x1, y0, y1, z0, z1
+--   WarehouseLayout.ownerLines(name?, id)  the owner's sign: "<Name>'s Warehouse" (nil: FOR RENT) and its small line
 --   WarehouseLayout.stockLines(stock, perMinute, shown, stands)   the STOCK board's lines
 --   WarehouseLayout.tagLines(name, rarity, perMinute)             a shown piece's tag: its name, "RARE · +$3/min"
---   WarehouseLayout.money(n)                    "$1,234" (to a tenth under ten: "$2.5")
---   WarehouseLayout.rarityColor(rarity?)        a rarity's colour (Config.Warehouse.Rarity; unknown: common's)
+--   WarehouseLayout.money(n)               "$1,234" (to a tenth under ten: "$2.5")
+--   WarehouseLayout.rarityColor(rarity?)   a rarity's colour (Config.Warehouse.Rarity; unknown: common's)
 --
 -- A Piece: name (unique in a warehouse), group ("shell", "roof", "door", "inside", "paint", "sign", "stand", "bay",
--- 8.1: "terminal"), at (its middle) and size (x, y, z), yaw / pitch / roll in degrees (its CFrame: CFrame.new(at) *
--- Angles(0, yaw, 0) * Angles(pitch, 0, roll)), color, material (an Enum.Material name), shape ("Wedge" | "Cylinder" |
--- nil: a block), solid (collides and is queried; the rest is decoration), shadow (casts one: the big parts only),
--- transparency, words (SurfaceGui text: face, lines { text, color, size (share of the face's height), font }, back (a
--- panel colour), lit), light (a PointLight: range, brightness, color) and stand (the stand it belongs to). 8.2: visual
--- (only looks: the owner's Blender model ZDCWarehouseArt draws it, so server/WarehouseMesh.luau hides it once imported;
--- a solid one still collides, a lamp's glow still has its light).
+-- 8.1: "terminal"),
+-- at (its middle) and size (x, y, z), yaw / pitch / roll in degrees (its CFrame: CFrame.new(at) * Angles(0, yaw, 0) *
+-- Angles(pitch, 0, roll)), color, material (an Enum.Material name), shape ("Wedge" | "Cylinder" | nil: a block), solid
+-- (collides and is queried; the rest is decoration), shadow (casts one: the big parts only), transparency, words
+-- (SurfaceGui text: face, lines { text, color, size (share of the face's height), font }, back (a panel colour), lit), light
+-- (a PointLight: range, brightness, color) and stand (the stand it belongs to). 8.2: visual (only looks: the owner's
+-- Blender model ZDCWarehouseArt draws it, so server/WarehouseMesh.luau hides it once imported; a solid one still collides,
+-- a lamp's glow still has its light).
 
 local Config = require(script.Parent.Config)
 local SandboxMap = require(script.Parent.SandboxMap)
-local WarehouseLevels = require(script.Parent.WarehouseLevels)
 
 local T = Config.Warehouse
-local LEVELS = Config.WarehouseLevels.List
 
 local WarehouseLayout = {}
 
 export type Rect = SandboxMap.Rect
-export type Stand = { index: number, x: number, y: number, z: number, sx: number, sz: number, yaw: number }
+export type Stand = { index: number, x: number, y: number, z: number, sx: number, sz: number, yaw: number, small: boolean? }
 export type Line = { text: string, color: { number }, size: number, font: string? }
 export type Words = { face: string, lines: { Line }, back: { number }?, lit: boolean? }
 export type Light = { range: number, brightness: number, color: { number } }
@@ -108,27 +127,28 @@ export type Piece = {
 
 local WALL = 1 -- the walls' thickness
 local RIB = 2.5 -- the cladding's ribs apart
+local PLINTH = 1.4 -- the concrete base course's height
 local GROUND = SandboxMap.GroundTop -- the plot's concrete pad (server/SandboxWorld.luau): flush with the meadow
 local PAINT_LIFT = 0.01 -- the bay's paint this far over the pad (no flicker)
 local FLOOR_TOP = GROUND + 0.05 -- the hall's floor: a hair over the pad (a 0.05 lip at the door, nothing to trip on)
+local SMALL_SPOTS = 8 -- 8.1: the upgrade stands' spots the hall has (4 in the front corners, 4 down the middle aisle)
 local FIT = 0.2 -- studs a piece keeps from its podium's edges
 local DESK = { 6.4, 3.2, 2.8 } -- 8.1: the UPGRADES desk (its top included): across, high, deep
-local BODY = 0.8 -- 8.3: how close a player's middle may be to a wall, a stand or the desk (freeSpot)
-local ARC = 5 -- 8.3: a barrel roof's slabs each side
+local LEVELS = 5 -- 8.3: Config.Warehouse.Levels
+local PLAIN = 4 -- 8.3: a plain Plot's level (SandboxMap's plot.warehouse is its box)
 WarehouseLayout.FloorTop = FLOOR_TOP
 WarehouseLayout.Wall = WALL
 WarehouseLayout.Fit = FIT
+WarehouseLayout.Levels = LEVELS
 
 local CLAD = { 188, 194, 200 }
 local RIBS = { 160, 167, 175 }
-local PLASTER = { 216, 212, 204 }
 local TRIM = { 42, 45, 50 }
 local ORANGE = { 240, 132, 44 }
 local CONCRETE = { 168, 166, 158 }
 local FLOOR = { 150, 152, 150 }
 local ROOF = { 118, 124, 132 }
 local STEEL = { 74, 78, 86 }
-local WOOD = { 154, 117, 80 }
 local WHITE = { 238, 238, 232 }
 local GREY = { 176, 180, 186 }
 local INK = { 26, 27, 29 }
@@ -137,208 +157,249 @@ local FELT = { 202, 196, 184 }
 local PAINT = { 242, 198, 42 }
 local GLOW = Config.SandboxLight.Warehouse.Glow -- 8.3: the lamps' discs (Config.SandboxLight)
 
--- 8.3: each level's looks, mirroring design/blender-warehouse/warehouse.py (depths: studs in from the front wall's
--- outer face; x across from the door's middle):
---   plinth (the base course's height), stripe (the ZDC band), ribs (the corrugated cladding), trusses (the tie beams:
---   warehouse.py's), posts (their posts along the side walls), lamps ({ x, depth }: under warehouse.py's lights; 8.3
---   review, the owner's "flashbang": about one a level 4's floor per lamp, 800 square studs, so a bigger hall is no
---   brighter: the Garage 1, the Workshop 2, the Warehouse 4, the Big warehouse 6, the Logistics centre 12; their
---   colour is Config.SandboxLight.Warehouse.Lamp's, their brightness and reach its Levels' (a lower hall's dimmer and
---   shorter), their discs' Glow; tests/sandboxlight_test.luau measures every level's hall),
---   lampTop (a lamp's top: warehouse.py's light's underside), owner / board / sign ({ width, height, x, y } of the
---   owner's sign, the STOCK board, the UPGRADES sign; the last two on the back wall's middle), zdc ({ width, height, y }:
---   the ZDC sign in the front gable, the garage's plate over its door), bollards (warehouse.py's posts by the door)
-type Looks = {
-	plinth: number,
-	stripe: boolean,
-	ribs: boolean,
-	trusses: { number },
-	posts: boolean,
+-- 8.3: each level's hall, fitted to the owner's Blender building (Config.Warehouse.Levels: its size and door). The
+-- stands' grid (WarehouseLayout.grid; level 4's from Config, the warehouse of 8.0 – 8.2); `beams` and `lamps` are the
+-- model's trusses and (some of) its lamps, in studs from the front wall's outer face (`lamps`: { x, in }); `board` and
+-- `sign` the STOCK board and the UPGRADES sign ({ across, high, y (their middle) }, on the back wall's middle; `wall =
+-- "west"`: on the west wall, `at` studs in from the front wall's inside); `desk` the UPGRADES desk's size.
+type Hall = {
+	columns: number,
+	middle: number,
+	aisle: number,
+	side: number,
+	front: number,
+	gap: number,
+	receiving: number,
+	walk: number,
+	beams: { number },
 	lamps: { { number } },
-	lampTop: number,
-	owner: { number },
 	board: { number },
+	boardWall: string?,
+	boardAt: number?,
 	sign: { number },
-	zdc: { number },
-	bollards: boolean,
+	desk: { number },
 }
-local LOOKS: { Looks } = {
-	{ -- the Garage (its owner's sign beside the door: the shed roof's box comes down over the header)
-		plinth = 0.9, stripe = false, ribs = false, trusses = { 11 }, posts = false, lamps = { { 0, 11 } }, lampTop = 8.65,
-		owner = { 4.2, 2, 10.1, 5.4 }, board = { 11, 1.7, 0, 8.45 }, sign = { 6.4, 1.1, 0, 6.95 }, zdc = { 6, 1, 10.6 }, bollards = false,
+local HALLS: { [number]: Hall } = {
+	{ -- Garage (26 × 22): its 2 stands against the back wall, either side of a narrow aisle with the small desk
+		columns = 2, middle = 4, aisle = 0, side = 0, front = 10, gap = 0, receiving = 5, walk = 4,
+		beams = { 11 }, lamps = { { 0, 11 } },
+		board = { 6.4, 2.8, 6.2 }, boardWall = "west", boardAt = 4.2, sign = { 3.8, 1.3, 8.4 }, desk = { 3.6, 3.2, 2.4 },
 	},
-	{ -- the Workshop
-		plinth = 0.6, stripe = false, ribs = true, trusses = { 10, 20 }, posts = true, lamps = { { -5, 10 }, { 5, 20 } }, lampTop = 14,
-		owner = { 17, 1.9, 0, 13.65 }, board = { 16, 4, 0, 11.2 }, sign = { 10, 2, 0, 7.8 }, zdc = { 8, 2.6, 17 }, bollards = false,
+	{ -- Workshop (40 × 30): 2 × 2 against the side walls and the back wall, the door's width between them
+		columns = 2, middle = 18, aisle = 0, side = 0, front = 4, gap = 4, receiving = 3, walk = 4,
+		beams = { 10, 20 }, lamps = { { -5, 10 }, { 5, 10 }, { -5, 20 }, { 5, 20 } },
+		board = { 14, 3.6, 12.4 }, sign = { 12, 2.4, 9 }, desk = DESK,
 	},
-	{ -- the Warehouse
-		plinth = 3, stripe = false, ribs = true, trusses = { 10.5, 21, 31.5 }, posts = true,
-		lamps = { { -7.25, 10.5 }, { 7.25, 10.5 }, { -7.25, 31.5 }, { 7.25, 31.5 } }, lampTop = 18,
-		owner = { 22, 3.2, 0, 16.4 }, board = { 18, 5, 0, 13.7 }, sign = { 12, 2.4, 0, 9 }, zdc = { 11, 4.4, 21.3 }, bollards = true,
+	{ -- Storehouse (58 × 42): 4 × 2, the outer columns against the side walls
+		columns = 4, middle = 8, aisle = 4, side = 0, front = 9, gap = 5, receiving = 5, walk = 4,
+		beams = { 10.5, 21, 31.5 }, lamps = { { -7.25, 10.5 }, { 7.25, 10.5 }, { -21.75, 21 }, { 21.75, 21 }, { -7.25, 31.5 }, { 7.25, 31.5 } },
+		board = { 22, 6, 13.5 }, sign = { 12, 2.4, 9 }, desk = DESK,
 	},
-	{ -- the Big warehouse (8.0's)
-		plinth = 1.4, stripe = true, ribs = true, trusses = { 11, 22, 33, 44, 55 }, posts = true,
-		lamps = { { -21.5, 22 }, { 0, 22 }, { 21.5, 22 }, { -21.5, 44 }, { 0, 44 }, { 21.5, 44 } }, lampTop = 23,
-		owner = { 24, 3.6, 0, 20 }, board = { 22, 6, 0, 13.5 }, sign = { 12, 2.4, 0, 9 }, zdc = { 20, 5, 27 }, bollards = true,
+	{ -- Big Warehouse (80 × 60): the warehouse of 8.0 – 8.2 (its grid from Config)
+		columns = T.Columns, middle = T.MiddleAisle, aisle = T.Aisle, side = T.Aisle, front = T.Receiving + T.Aisle, gap = T.Aisle, receiving = T.Receiving, walk = T.Aisle,
+		beams = { 11, 22, 33, 44, 55 }, lamps = { { -21.5, 22 }, { 0, 22 }, { 21.5, 22 }, { -21.5, 44 }, { 0, 44 }, { 21.5, 44 } },
+		board = { 22, 6, 13.5 }, sign = { 12, 2.4, 9 }, desk = DESK,
 	},
-	{ -- the Logistics centre
-		plinth = 1.4, stripe = true, ribs = true, trusses = { 10.5, 21, 31.5, 42, 52.5, 63, 73.5 }, posts = true,
+	{ -- Logistics Center (104 × 84): 6 × 4
+		columns = 6, middle = 18, aisle = 4, side = 4, front = 14, gap = 5, receiving = 9, walk = 4,
+		beams = { 10.5, 21, 31.5, 42, 52.5, 63, 73.5 },
 		lamps = { { -39, 21 }, { -13, 21 }, { 13, 21 }, { 39, 21 }, { -39, 42 }, { -13, 42 }, { 13, 42 }, { 39, 42 }, { -39, 63 }, { -13, 63 }, { 13, 63 }, { 39, 63 } },
-		lampTop = 27,
-		owner = { 24, 3.6, 0, 22.5 }, board = { 26, 7, 0, 15 }, sign = { 14, 2.8, 0, 9.4 }, zdc = { 16, 5, 32.5 }, bollards = true,
+		board = { 22, 6, 13.5 }, sign = { 12, 2.4, 9 }, desk = DESK,
 	},
 }
 
--- A level without its own looks (one the owner adds to Config): ones made from its size.
-local function looksOf(n: number): Looks
-	local known = LOOKS[n]
-	if known then
-		return known
+local function clampLevel(n: any): number
+	if type(n) ~= "number" or n ~= n then
+		return PLAIN
 	end
-	local def = LEVELS[n]
-	local W, H, D = def.size[1], def.size[2], def.size[3]
-	local trusses: { number } = {}
-	for k = 1, math.max(1, math.floor(D / 11) - 1) do
-		table.insert(trusses, k * D / (math.max(1, math.floor(D / 11) - 1) + 1))
+	local whole = math.floor(n)
+	if whole < 1 or whole > LEVELS then
+		return PLAIN
 	end
-	local lampTop = if def.roof == "shed" then H - def.rise - 0.85 else H - 1
-	return {
-		plinth = 1.4, stripe = def.wall == "twotone", ribs = def.wall ~= "plaster", trusses = trusses, posts = def.roof ~= "shed",
-		lamps = { { 0, trusses[1] } }, lampTop = lampTop,
-		owner = { math.min(24, def.door[1] - 2), math.min(3.6, H - def.door[2] - 1), 0, def.door[2] + (H - def.door[2]) / 2 },
-		board = { math.min(22, W / 3), 4, 0, math.min(lampTop - 3, def.door[2]) }, sign = { 10, 2, 0, DESK[2] + 4.5 },
-		zdc = { math.min(20, W / 4), 3, H + def.rise / 3 }, bollards = W >= 58,
-	}
+	return whole
 end
 
--- ── The level's building on a plot ───────────────────────────────────────────
-
-function WarehouseLayout.level(level: any): number
-	return WarehouseLevels.clamp(if level == nil then WarehouseLevels.Start else level)
-end
-
--- The building's middle (on the ground), half sizes, the front walls' height, the back wall's (a shed's lower) and the
--- level's def.
-type Frame = { x: number, z: number, hx: number, hz: number, h: number, back: number, def: Config.WarehouseLevelDef, n: number }
-local function frame(plot: SandboxMap.Plot, level: any): Frame
-	local n = WarehouseLayout.level(level)
-	local def = LEVELS[n]
-	local W, H, D = def.size[1], def.size[2], def.size[3]
-	return {
-		x = plot.door.x,
-		z = plot.door.z - D / 2,
-		hx = W / 2,
-		hz = D / 2,
-		h = H,
-		back = if def.roof == "shed" then H - def.rise else H,
-		def = def,
-		n = n,
-	}
-end
-
-function WarehouseLayout.box(plot: SandboxMap.Plot, level: any): { x: number, y: number, z: number, sx: number, sy: number, sz: number }
-	local f = frame(plot, level)
-	return { x = f.x, y = 0, z = f.z, sx = 2 * f.hx, sy = f.h, sz = 2 * f.hz }
-end
-
-function WarehouseLayout.outline(plot: SandboxMap.Plot, level: any): { x0: number, x1: number, z0: number, z1: number, top: number }
-	local f = frame(plot, level)
-	return { x0 = f.x - f.hx, x1 = f.x + f.hx, z0 = f.z - f.hz, z1 = f.z + f.hz, top = if f.def.roof == "shed" then f.h else f.h + f.def.rise }
-end
-
-function WarehouseLayout.inside(plot: SandboxMap.Plot, level: any): Rect
-	local f = frame(plot, level)
-	return { x0 = f.x - f.hx + WALL, x1 = f.x + f.hx - WALL, z0 = f.z - f.hz + WALL, z1 = f.z + f.hz - WALL }
-end
-
-function WarehouseLayout.door(plot: SandboxMap.Plot, level: any): { x: number, z: number, width: number, height: number }
-	local f = frame(plot, level)
-	return { x = f.x, z = f.z + f.hz, width = f.def.door[1], height = f.def.door[2] }
-end
-
-function WarehouseLayout.receiving(plot: SandboxMap.Plot, level: any): Rect
-	local f = frame(plot, level)
-	local half = f.def.door[1] / 2
-	local back = f.z + f.hz - WALL
-	return { x0 = f.x - half, x1 = f.x + half, z0 = back - f.def.receiving, z1 = back }
-end
-
-function WarehouseLayout.doorPath(plot: SandboxMap.Plot, level: any): Rect
-	local r = WarehouseLayout.receiving(plot, level)
-	local d = WarehouseLayout.door(plot, level)
-	return { x0 = r.x0, x1 = r.x1, z0 = r.z0 - LEVELS[WarehouseLayout.level(level)].aisle, z1 = d.z + SandboxMap.VanGap }
-end
-
-function WarehouseLayout.count(level: any): number
-	return WarehouseLevels.stands(WarehouseLayout.level(level))
-end
-
-function WarehouseLayout.most(): number
-	local most = 0
-	for _, def in LEVELS do
-		most = math.max(most, def.stands)
+-- Level n's Config entry (Config.Warehouse.Levels; a level missing there: level 4's numbers of 8.0 – 8.2).
+function WarehouseLayout.level(n: number?): Config.WarehouseLevelDef
+	local at = clampLevel(n)
+	local list = (T :: any).Levels
+	local def = if type(list) == "table" then list[at] else nil
+	if type(def) == "table" then
+		return def
 	end
-	return most
+	return { name = "Warehouse", size = { 80, 24, 60 }, door = { SandboxMap.DoorWidth, T.DoorHeight }, roof = "gable", rise = T.Ridge, stands = T.Stands }
 end
 
-function WarehouseLayout.headroom(level: any): number
-	local n = WarehouseLayout.level(level)
-	local def = LEVELS[n]
-	local looks = looksOf(n)
-	-- (under the lamps and the tie beams: a shed's beam hangs lower than its lamp's top)
-	local beams = if def.roof == "shed" then def.size[2] - def.rise - 0.6 else def.size[2] - 0.6
-	return math.min(looks.lampTop, beams) - 0.05
+function WarehouseLayout.levelOf(plot: SandboxMap.Plot): number
+	return clampLevel((plot :: any).level)
 end
 
-function WarehouseLayout.stand(plot: SandboxMap.Plot, i: number, level: any): Stand?
-	local n = WarehouseLayout.level(level)
-	local def = LEVELS[n]
-	if type(i) ~= "number" or i ~= math.floor(i) or i < 1 or i > def.stands then
+function WarehouseLayout.grid(n: number?): Hall
+	return HALLS[clampLevel(n)]
+end
+
+function WarehouseLayout.site(plot: SandboxMap.Plot | number, level: number?): SandboxMap.Plot?
+	local found: SandboxMap.Plot? = if type(plot) == "number" then SandboxMap.Plots[plot] else plot
+	if not found then
 		return nil
 	end
-	local columns = def.columns
+	local n = clampLevel(level)
+	local def = WarehouseLayout.level(n)
+	local w = found.warehouse
+	local front = w.z + w.sz / 2 -- (the front wall's outer face: every level's)
+	local copy: any = table.clone(found)
+	copy.warehouse = { x = w.x, y = w.y, z = front - def.size[3] / 2, sx = def.size[1], sy = def.size[2], sz = def.size[3] }
+	copy.level = n
+	return copy :: SandboxMap.Plot
+end
+
+-- The building's middle, half sizes and wall height (a shed's: its front wall's).
+local function frame(plot: SandboxMap.Plot): (number, number, number, number, number)
+	local w = plot.warehouse
+	return w.x, w.z, w.sx / 2, w.sz / 2, w.sy
+end
+
+-- The roof over the walls' top (a shed's top is its front wall's: 0).
+local function ridgeOf(def: Config.WarehouseLevelDef): number
+	return if def.roof == "shed" then 0 else def.rise
+end
+
+function WarehouseLayout.outline(plot: SandboxMap.Plot): { x0: number, x1: number, z0: number, z1: number, top: number }
+	local x, z, hx, hz, h = frame(plot)
+	return { x0 = x - hx, x1 = x + hx, z0 = z - hz, z1 = z + hz, top = h + ridgeOf(WarehouseLayout.level(WarehouseLayout.levelOf(plot))) }
+end
+
+function WarehouseLayout.inside(plot: SandboxMap.Plot): Rect
+	local x, z, hx, hz = frame(plot)
+	return { x0 = x - hx + WALL, x1 = x + hx - WALL, z0 = z - hz + WALL, z1 = z + hz - WALL }
+end
+
+function WarehouseLayout.door(plot: SandboxMap.Plot): { x: number, z: number, width: number, height: number }
+	local x, z, _, hz = frame(plot)
+	local def = WarehouseLayout.level(WarehouseLayout.levelOf(plot))
+	return { x = x, z = z + hz, width = def.door[1], height = def.door[2] }
+end
+
+function WarehouseLayout.receiving(plot: SandboxMap.Plot): Rect
+	local x, z, _, hz = frame(plot)
+	local half = WarehouseLayout.door(plot).width / 2
+	local back = z + hz - WALL
+	return { x0 = x - half, x1 = x + half, z0 = back - WarehouseLayout.grid(WarehouseLayout.levelOf(plot)).receiving, z1 = back }
+end
+
+function WarehouseLayout.doorPath(plot: SandboxMap.Plot): Rect
+	local r = WarehouseLayout.receiving(plot)
+	local d = WarehouseLayout.door(plot)
+	return { x0 = r.x0, x1 = r.x1, z0 = r.z0 - WarehouseLayout.grid(WarehouseLayout.levelOf(plot)).walk, z1 = d.z + SandboxMap.VanGap }
+end
+
+-- The big stands of a level (8.3: Config.Warehouse.Levels; nil: level 4's, Config.Warehouse.Stands).
+function WarehouseLayout.count(level: number?): number
+	if level == nil then
+		return T.Stands
+	end
+	local stands = WarehouseLayout.level(level).stands
+	return if type(stands) == "number" and stands >= 1 then math.floor(stands) else T.Stands
+end
+
+-- The upgrade stands' spots a level has (from Config.Warehouse.MoreFrom on: Config.Warehouse.MaxStands's room over the
+-- start's, never more than the hall's SMALL_SPOTS).
+local function smallSpots(level: number): number
+	local from = (T :: any).MoreFrom
+	if type(from) == "number" and level < from then
+		return 0
+	end
+	local most = (T :: any).MaxStands
+	if type(most) ~= "number" or most ~= most then
+		return 0
+	end
+	return math.clamp(math.floor(most) - T.Stands, 0, SMALL_SPOTS)
+end
+
+-- 8.1: the stands the hall holds (the start's and the upgrades'): Config.Warehouse.MaxStands, never fewer than the
+-- start's nor more than the hall has spots for. 8.3: a level's big stands and its small spots.
+function WarehouseLayout.capacity(level: number?): number
+	local n = clampLevel(level)
+	return WarehouseLayout.count(if level == nil then nil else n) + smallSpots(n)
+end
+
+-- An upgrade stand's podium: { across, deep } (Config.Warehouse.SmallStand).
+local function smallSize(): (number, number)
+	local small = (T :: any).SmallStand
+	if type(small) == "table" and type(small[1]) == "number" and type(small[2]) == "number" then
+		return small[1], small[2]
+	end
+	return T.StandSize, T.StandSize
+end
+
+function WarehouseLayout.stand(plot: SandboxMap.Plot, i: number): Stand?
+	local level = WarehouseLayout.levelOf(plot)
+	local base = WarehouseLayout.count(level)
+	if i ~= math.floor(i) or i < 1 or i > WarehouseLayout.capacity(level) then
+		return nil
+	end
+	local hall = WarehouseLayout.grid(level)
+	local x = frame(plot)
+	local top = FLOOR_TOP + T.StandHeight
+	local front = WarehouseLayout.inside(plot).z1 - hall.front -- the front row's front edge
+	if i > base then
+		-- 8.1, an upgrade stand: the front corners beside the receiving zone (the inner pair west and east, then the
+		-- outer pair; looking north at the front row's aisle), then down the middle aisle from the front (looking south)
+		local k = i - base
+		local sw, sd = smallSize()
+		if k <= 4 then
+			local zone = WarehouseLayout.receiving(plot)
+			local side = if k % 2 == 1 then -1 else 1
+			local out = (k - 1) // 2
+			local across = side * ((zone.x1 - zone.x0) / 2 + sw / 2 + out * (sw + T.Aisle))
+			return { index = i, x = x + across, y = top, z = (zone.z0 + zone.z1) / 2, sx = sw, sz = sd, yaw = 0, small = true }
+		end
+		local z = front - sd / 2 - (k - 5) * (sd + T.Aisle)
+		return { index = i, x = x, y = top, z = z, sx = sw, sz = sd, yaw = 180, small = true }
+	end
+	local columns = hall.columns
 	local half = columns // 2
-	local size = def.stand
-	local full = def.stands // columns -- the full rows
+	local size = T.StandSize
 	local row = (i - 1) // columns
 	local column = (i - 1) % columns
-	if row >= full then
-		-- the short last row: its k stands in the columns nearest the middle aisle (the odd one west)
-		local k = def.stands - full * columns
-		column = half - (k + 1) // 2 + (i - 1 - full * columns)
-	end
 	-- out from the middle aisle: the west half's columns from the middle out, the east half's likewise
 	local side = if column < half then -1 else 1
 	local out = if column < half then half - 1 - column else column - half
-	local across = side * (def.middle / 2 + size / 2 + out * (size + def.aisle))
-	local z = plot.door.z - def.front - size / 2 - row * (size + def.aisle)
-	return { index = i, x = plot.door.x + across, y = FLOOR_TOP + T.StandHeight, z = z, sx = size, sz = size, yaw = 180 }
+	local across = side * (hall.middle / 2 + size / 2 + out * (size + hall.aisle))
+	local z = front - size / 2 - row * (size + hall.gap)
+	return { index = i, x = x + across, y = top, z = z, sx = size, sz = size, yaw = 180 }
 end
 
--- A plot's (the Plot or its id) stands at that level, in stand-number order (Collection entries' `stand`); {} for no
--- such plot.
-function WarehouseLayout.stands(plot: SandboxMap.Plot | number, level: any): { Stand }
+-- A plot's (the Plot or its id; 8.3: or a Site) first `count` stands (default: the start's, Config.Warehouse.Stands;
+-- 8.3: the level's big ones; at most the hall's), in stand-number order (Collection entries' `stand`); {} for no such
+-- plot.
+function WarehouseLayout.stands(plot: SandboxMap.Plot | number, count: number?): { Stand }
 	local found: SandboxMap.Plot? = if type(plot) == "number" then SandboxMap.Plots[plot] else plot
 	local list: { Stand } = {}
-	if found then
-		for i = 1, WarehouseLayout.count(level) do
-			list[i] = WarehouseLayout.stand(found, i, level) :: Stand
-		end
+	if not found then
+		return list
+	end
+	local level = WarehouseLayout.levelOf(found)
+	local most = if type(count) == "number" and count == count then math.clamp(math.floor(count), 0, WarehouseLayout.capacity(level)) else WarehouseLayout.count(level)
+	for i = 1, most do
+		list[i] = WarehouseLayout.stand(found, i) :: Stand
 	end
 	return list
 end
 
--- Stand i's podium at that level (the same on every plot), nil for no such stand.
-function WarehouseLayout.standSize(i: number, level: any): (number?, number?)
-	local s = WarehouseLayout.stand(SandboxMap.Plots[1], i, level)
+-- 8.1: stand i's podium (the same on every plot), nil for no such stand. 8.3: that level's (nil: 4).
+function WarehouseLayout.standSize(i: number, level: number?): (number?, number?)
+	local site = WarehouseLayout.site(1, level)
+	local s = if site then WarehouseLayout.stand(site, i) else nil
 	if not s then
 		return nil, nil
 	end
 	return s.sx, s.sz
 end
 
--- Does a piece of `size` (its X across, its Z deep: a Vector3 or a table with X and Z) stand on stand i unturned?
-function WarehouseLayout.fits(i: number, size: any, level: any): boolean
+-- 8.1: does a piece of `size` (its X across, its Z deep: a Vector3 or a table with X and Z) stand on stand i unturned?
+-- 8.3: on that level's stand i (nil: 4).
+function WarehouseLayout.fits(i: number, size: any, level: number?): boolean
 	local sx, sz = WarehouseLayout.standSize(i, level)
 	if not sx or not sz then
 		return false
@@ -352,47 +413,32 @@ function WarehouseLayout.fits(i: number, size: any, level: any): boolean
 	return x <= sx - FIT + 1e-9 and z <= sz - FIT + 1e-9
 end
 
--- 8.1: the UPGRADES desk at the back wall's middle, facing the hall.
-function WarehouseLayout.terminal(plot: SandboxMap.Plot, level: any): { x: number, y: number, z: number, sx: number, sz: number, yaw: number }
-	local inside = WarehouseLayout.inside(plot, level)
-	return { x = plot.door.x, y = FLOOR_TOP + DESK[2], z = inside.z0 + DESK[3] / 2, sx = DESK[1], sz = DESK[3], yaw = 180 }
+-- 8.1: the UPGRADES desk at the back wall's middle, facing the hall (8.3: the level's desk).
+function WarehouseLayout.terminal(plot: SandboxMap.Plot): { x: number, y: number, z: number, sx: number, sz: number, yaw: number }
+	local x = frame(plot)
+	local inside = WarehouseLayout.inside(plot)
+	local desk = WarehouseLayout.grid(WarehouseLayout.levelOf(plot)).desk
+	return { x = x, y = FLOOR_TOP + desk[2], z = inside.z0 + desk[3] / 2, sx = desk[1], sz = desk[3], yaw = 180 }
 end
 
-function WarehouseLayout.standAt(plot: SandboxMap.Plot, x: number, z: number, level: any): number?
-	for i = 1, WarehouseLayout.count(level) do
-		local s = WarehouseLayout.stand(plot, i, level)
+-- 8.3: how high the hall is at z (the world's; under its roof: a gable's walls' top, a shed's slope from its back wall
+-- up to its front wall): what a stand's tag stays under (server/Warehouse.luau).
+function WarehouseLayout.ceiling(plot: SandboxMap.Plot, z: number): number
+	local _, oz, _, hz, h = frame(plot)
+	local def = WarehouseLayout.level(WarehouseLayout.levelOf(plot))
+	if def.roof ~= "shed" then
+		return h
+	end
+	local back = h - def.rise
+	local t = math.clamp((z - oz + hz) / (2 * hz), 0, 1)
+	return back + (h - back) * t
+end
+
+function WarehouseLayout.standAt(plot: SandboxMap.Plot, x: number, z: number): number?
+	for i = 1, WarehouseLayout.capacity(WarehouseLayout.levelOf(plot)) do
+		local s = WarehouseLayout.stand(plot, i)
 		if s and math.abs(x - s.x) <= s.sx / 2 and math.abs(z - s.z) <= s.sz / 2 then
 			return i
-		end
-	end
-	return nil
-end
-
--- 8.3: what a player standing at (x, z) could be caught in at that level: its walls (the door's opening apart), its
--- stands and its desk (each a footprint Rect).
-local function blockers(plot: SandboxMap.Plot, level: any): { Rect }
-	local f = frame(plot, level)
-	local list: { Rect } = {}
-	local x0, x1, z0, z1 = f.x - f.hx, f.x + f.hx, f.z - f.hz, f.z + f.hz
-	local half = f.def.door[1] / 2
-	table.insert(list, { x0 = x0, x1 = x1, z0 = z0, z1 = z0 + WALL }) -- the back
-	table.insert(list, { x0 = x0, x1 = x0 + WALL, z0 = z0, z1 = z1 }) -- the sides
-	table.insert(list, { x0 = x1 - WALL, x1 = x1, z0 = z0, z1 = z1 })
-	table.insert(list, { x0 = x0, x1 = f.x - half, z0 = z1 - WALL, z1 = z1 }) -- the front each side of the door
-	table.insert(list, { x0 = f.x + half, x1 = x1, z0 = z1 - WALL, z1 = z1 })
-	for _, s in WarehouseLayout.stands(plot, level) do
-		table.insert(list, { x0 = s.x - s.sx / 2, x1 = s.x + s.sx / 2, z0 = s.z - s.sz / 2, z1 = s.z + s.sz / 2 })
-	end
-	local desk = WarehouseLayout.terminal(plot, level)
-	table.insert(list, { x0 = desk.x - desk.sx / 2, x1 = desk.x + desk.sx / 2, z0 = desk.z - desk.sz / 2, z1 = desk.z + desk.sz / 2 })
-	return list
-end
-
-function WarehouseLayout.freeSpot(plot: SandboxMap.Plot, level: any, x: number, z: number): { x: number, y: number, z: number, yaw: number }?
-	for _, r in blockers(plot, level) do
-		if x > r.x0 - BODY and x < r.x1 + BODY and z > r.z0 - BODY and z < r.z1 + BODY then
-			local zone = WarehouseLayout.receiving(plot, level)
-			return { x = (zone.x0 + zone.x1) / 2, y = FLOOR_TOP + 3, z = (zone.z0 + zone.z1) / 2, yaw = 0 }
 		end
 	end
 	return nil
@@ -452,11 +498,19 @@ function WarehouseLayout.stockLines(stock: number, perMinute: number, shown: num
 	}
 end
 
+-- 8.1: an upgrade stand's painted spot until it is bought.
+function WarehouseLayout.spotLines(i: number): { Line }
+	return {
+		line(`STAND {i}`, PAINT, 0.42, "Black"),
+		line("🔒 UPGRADES", PAINT, 0.3, "Bold"),
+	}
+end
+
 -- 8.1: the UPGRADES desk's monitor.
 function WarehouseLayout.terminalLines(): { Line }
 	return {
 		line("ZDC UPGRADES", ORANGE, 0.36, "Black"),
-		line("Warehouse · Lights · Van · Danny", WHITE, 0.2, "Bold"),
+		line("Warehouse · Stands · Lights · Van", WHITE, 0.2, "Bold"),
 		line("WALK UP TO OPEN", GREY, 0.18, "Medium"), -- (8.3 keys: no key, a phone and a gamepad read it too)
 	}
 end
@@ -507,11 +561,12 @@ end
 
 -- ── The building ─────────────────────────────────────────────────────────────
 
-function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
-	local f = frame(plot, level)
-	local def, looks = f.def, looksOf(f.n)
-	local ox, oz, hx, hz, h, back = f.x, f.z, f.hx, f.hz, f.h, f.back
-	local roofKind = def.roof
+function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
+	local ox, oz, hx, hz, h = frame(plot)
+	local level = WarehouseLayout.levelOf(plot)
+	local def = WarehouseLayout.level(level)
+	local hall = WarehouseLayout.grid(level)
+	local base = WarehouseLayout.count(level)
 	local list: { Piece } = {}
 	-- one piece, `at` in the building's own frame (its middle on the ground)
 	local function add(name: string, group: string, size: { number }, at: { number }, color: { number }, material: string): Piece
@@ -529,167 +584,113 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
 		p.visual = true
 		return p
 	end
-	-- a depth (studs in from the front wall's outer face) as the building's z
-	local function depth(d: number): number
-		return hz - d
-	end
-	local door, doorHigh = def.door[1], def.door[2]
+	local doorInfo = WarehouseLayout.door(plot)
+	local door, doorHigh = doorInfo.width, doorInfo.height
 	local section = hx - door / 2 -- the front wall's width each side of the door
-	local plaster = def.wall == "plaster"
-	local clad = if plaster then PLASTER else CLAD
-	local cladMaterial = if plaster then "Concrete" else "Metal"
+	-- 8.3: the roof. A shed (the Garage) slopes from the front wall (h) down to the back wall (back); a gable (and the
+	-- game's own gable under a barrel) rises `ridge` over the walls to its ridge (north-south).
+	local shed = def.roof == "shed"
+	local ridge = if shed then 0 else def.rise
+	local back = if shed then h - def.rise else h -- the back wall's height (and the side walls' at the back)
+	local function wallTop(z: number): number -- the side walls' top at z (the building's frame)
+		return back + (h - back) * (z + hz) / (2 * hz)
+	end
 
 	-- the floor: one slab under the whole building (and its doorway), from the pad up to a hair over it
 	look(solid(add("Floor", "inside", { 2 * hx, FLOOR_TOP - GROUND, 2 * hz }, { 0, (GROUND + FLOOR_TOP) / 2, 0 }, FLOOR, "Concrete")))
 
-	-- the walls: the back, the sides, the front each side of the door and the header over it (a shed's back and sides
-	-- as high as its back wall: the side gables over them rise to the front)
-	look(solid(add("WallBack", "shell", { 2 * hx, back, WALL }, { 0, back / 2, -hz + WALL / 2 }, clad, cladMaterial), true))
+	-- the walls: the back, the sides, the front each side of the door and the header over it (8.3: a shed's side walls
+	-- under their slope: a block to the back wall's height and a wedge over it, its tall side at the front)
+	look(solid(add("WallBack", "shell", { 2 * hx, back, WALL }, { 0, back / 2, -hz + WALL / 2 }, CLAD, "Metal"), true))
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "West" else "East"
-		look(solid(add("Wall" .. tag, "shell", { WALL, back, 2 * hz - 2 * WALL }, { side * (hx - WALL / 2), back / 2, 0 }, clad, cladMaterial), true))
-		look(solid(add("WallFront" .. tag, "shell", { section, h, WALL }, { side * (door / 2 + section / 2), h / 2, hz - WALL / 2 }, clad, cladMaterial), true))
+		look(solid(add("Wall" .. tag, "shell", { WALL, back, 2 * hz - 2 * WALL }, { side * (hx - WALL / 2), back / 2, 0 }, CLAD, "Metal"), true))
+		if shed then
+			local slope = look(solid(add("WallSlope" .. tag, "shell", { WALL, h - back, 2 * hz }, { side * (hx - WALL / 2), back + (h - back) / 2, 0 }, CLAD, "Metal"), true))
+			slope.shape = "Wedge" -- (a wedge's tall side is its +Z: the front, south)
+		end
+		look(solid(add("WallFront" .. tag, "shell", { section, h, WALL }, { side * (door / 2 + section / 2), h / 2, hz - WALL / 2 }, CLAD, "Metal"), true))
 	end
-	look(solid(add("Header", "shell", { door, h - doorHigh, WALL }, { 0, doorHigh + (h - doorHigh) / 2, hz - WALL / 2 }, clad, cladMaterial), true))
+	look(solid(add("Header", "shell", { door, h - doorHigh, WALL }, { 0, doorHigh + (h - doorHigh) / 2, hz - WALL / 2 }, CLAD, "Metal"), true))
 
-	-- the roof
-	local thick = 0.6
-	local eaves: { { number } } = {} -- the gutters: { x (its side), y (under the eave), along z } (gable roofs)
-	if roofKind == "shed" then
-		-- one slope from the front wall's top down to the back's; a side gable (a wedge, tall at the front) on each side
-		-- wall; the parapet over the front, the cornice under it, the gutter and its downpipes at the back
-		local rise = def.rise
+	local overhang, thick = 1.2, 0.6
+	local deep = 2 * hz + 2
+	if shed then
+		-- 8.3: the shed's roof: one slab just under the walls' slope (its top on their top: the Blender roof lies on
+		-- it), overhanging 0.9 all round (inside the model's stud: tools/warehouse/mesh-check.py), a gutter along its low
+		-- back edge and its downpipes at the back corners
+		local fall = math.atan((h - back) / (2 * hz))
+		local eaves = 0.9
+		local length = math.sqrt(4 * hz * hz + (h - back) * (h - back)) + 2 * eaves
+		local roof = look(solid(add("Roof", "roof", { 2 * hx + 2 * eaves, thick, length }, { 0, (h + back) / 2 - math.cos(fall) * thick / 2, math.sin(fall) * thick / 2 }, ROOF, "Metal"), true))
+		roof.pitch = -math.deg(fall) -- (its front, +Z, up)
+		local eave = back - math.sin(fall) * eaves
+		look(add("GutterBack", "roof", { 2 * hx + 2 * eaves, 0.8, 0.8 }, { 0, eave - 0.6, -hz - eaves + 0.3 }, TRIM, "Metal"))
 		for _, side in { -1, 1 } do
-			local tag = if side < 0 then "West" else "East"
-			local wedge = look(solid(add("Gable" .. tag, "shell", { WALL, rise, 2 * hz }, { side * (hx - WALL / 2), back + rise / 2, 0 }, clad, cladMaterial), true))
-			wedge.shape = "Wedge" -- (its tall side is its +Z: the front, south)
-		end
-		local slope = math.atan(rise / (2 * hz))
-		local run = 2 * hz + 2 -- (a stud over each end)
-		local length = run / math.cos(slope)
-		local sheet = 0.4 -- (warehouse.py's: the model's roof over the slabs)
-		for _, side in { -1, 1 } do
-			local tag = if side < 0 then "West" else "East"
-			local cx = side * (hx + 1) / 2
-			local slab = look(solid(add("Roof" .. tag, "roof", { hx + 1, sheet, length }, { cx, (h + back) / 2 + sheet / 2, 0 }, ROOF, "Metal"), true))
-			slab.pitch = -math.deg(slope) -- (its front end up)
-		end
-		look(add("Parapet", "roof", { 2 * hx + 2.2, 0.7, 0.3 }, { 0, h + 0.4, hz + 1 }, WHITE, "SmoothPlastic"))
-		-- a garage's window in its west wall and its side door in the east one (warehouse.py's places)
-		look(add("WindowFrame", "shell", { 0.2, 3.9, 4.4 }, { -hx - 0.1, 5.75, depth(11) }, WHITE, "SmoothPlastic"))
-		look(add("Window", "shell", { 0.1, 3.5, 4 }, { -hx - 0.25, 5.75, depth(11) }, { 47, 66, 82 }, "Glass"))
-		look(add("SideDoorFrame", "shell", { 0.1, 7.25, 3.8 }, { hx + 0.05, 3.775, depth(6.7) }, WHITE, "SmoothPlastic"))
-		look(add("SideDoor", "shell", { 0.14, 7.05, 3.4 }, { hx + 0.12, 3.675, depth(6.7) }, GREY, "Metal"))
-		look(add("Cornice", "shell", { 2 * hx + 0.4, 0.5, 0.5 }, { 0, h - 0.25, hz + 0.05 }, WHITE, "SmoothPlastic"))
-		look(add("GutterBack", "roof", { 2 * hx + 2.2, 0.35, 0.35 }, { 0, back - 0.25, -hz - 1.2 }, TRIM, "Metal"))
-		for _, side in { -1, 1 } do
-			local pipe = look(add("DownpipeBack" .. (if side < 0 then "West" else "East"), "shell", { back - 0.7, 0.25, 0.25 }, { side * (hx - 0.5), (back - 0.7) / 2 + 0.3, -hz - 0.25 }, TRIM, "Metal"))
+			local pipe = look(add("Downpipe" .. (if side < 0 then "West" else "East"), "shell", { eave - 0.6, 0.6, 0.6 }, { side * (hx - 1.4), (eave - 0.6) / 2, -hz - 0.5 }, TRIM, "Metal"))
 			pipe.shape, pipe.roll = "Cylinder", 90
 		end
-	elseif roofKind == "barrel" then
-		-- a vault across the width (an arc through the walls' tops and the crown), its slabs ARC a side; the front and
-		-- back gables filled up to it (a block and a wedge under each slab); the parapet round the walls' tops
-		local rise = def.rise
-		local r = (hx * hx + rise * rise) / (2 * rise)
-		local cz = h + rise - r
-		local a0 = math.asin(hx / r)
-		local points: { { number } } = {}
-		for k = 0, 2 * ARC do
-			local a = -a0 + 2 * a0 * k / (2 * ARC)
-			points[k + 1] = { r * math.sin(a), cz + r * math.cos(a) }
-		end
-		for k = 1, 2 * ARC do
-			local p0, p1 = points[k], points[k + 1]
-			local dx, dy = p1[1] - p0[1], p1[2] - p0[2]
-			local angle = math.atan2(dy, dx)
-			local west = k <= ARC
-			local j = if west then k else 2 * ARC + 1 - k -- (1: at the eave, ARC: at the crown)
-			local tag = `{if west then "West" else "East"}{j}`
-			local mx, my = (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2
-			local slab = look(solid(add("Roof" .. tag, "roof", { math.sqrt(dx * dx + dy * dy) + 0.3, thick, 2 * hz + 1.2 }, { mx - math.sin(angle) * thick / 2, my + math.cos(angle) * thick / 2, 0 }, ROOF, "Metal"), true))
-			slab.roll = math.deg(angle)
-			local low, high = math.min(p0[2], p1[2]), math.max(p0[2], p1[2])
-			for _, front in { -1, 1 } do
-				local z = front * (hz - WALL / 2)
-				local where = if front > 0 then "Front" else "Back"
-				if low - h > 0.01 then
-					look(solid(add(`GableBlock{where}{tag}`, "shell", { math.abs(dx), low - h, WALL }, { mx, h + (low - h) / 2, z }, clad, cladMaterial)))  -- (no shadow: the vault's slabs cast it; perf)
-				end
-				local wedge = look(solid(add(`Gable{where}{tag}`, "shell", { WALL, math.max(high - low, 0.01), math.abs(dx) }, { mx, low + (high - low) / 2, z }, clad, cladMaterial)))
-				wedge.shape = "Wedge"
-				wedge.yaw = if west then 90 else -90 -- (a wedge's tall side is its +Z: turned to the crown)
-			end
-		end
-		for _, side in { -1, 1 } do
-			local tag = if side < 0 then "West" else "East"
-			look(add("Parapet" .. tag, "roof", { 0.8, 1.2, 2 * hz + 0.8 }, { side * hx, h + 0.6, 0 }, WHITE, "SmoothPlastic"))
-		end
-		for _, front in { -1, 1 } do
-			look(add("Parapet" .. (if front > 0 then "Front" else "Back"), "roof", { 2 * hx + 0.8, 1.2, 0.4 }, { 0, h + 0.6, front * (hz + 0.2) }, WHITE, "SmoothPlastic"))
-		end
 	else
-		-- a gable roof: the gables (two wedges each, their tall side at the ridge), the two slopes, the barge boards, the
-		-- ridge's cap
-		local ridge = def.rise
+		-- the gables (two wedges each, their tall side at the ridge) and the roof's two slopes, the ridge's cap. 8.3: the
+		-- slopes' top on the gables' slope (the Blender roof lies just over it), overhanging 0.9 (inside the model's
+		-- stud); under a barrel (the Logistics Center) not past the walls, and only as deep as the barrel
+		local barrel = def.roof == "barrel"
+		overhang = if barrel then 0 else 0.9
+		if barrel then
+			deep = 2 * hz + 1.2
+		end
 		local slope = math.atan(ridge / hx)
-		local overhang = 1.2
 		local length = math.sqrt(hx * hx + ridge * ridge) + overhang
-		local deep = 2 * hz + 2
 		for _, front in { -1, 1 } do
 			local tag = if front > 0 then "Front" else "Back"
 			for _, side in { -1, 1 } do
-				local wedge = look(solid(add(`Gable{tag}{if side < 0 then "West" else "East"}`, "shell", { WALL, ridge, hx }, { side * hx / 2, h + ridge / 2, front * (hz - WALL / 2) }, clad, cladMaterial), true))
+				local wedge = look(solid(add(`Gable{tag}{if side < 0 then "West" else "East"}`, "shell", { WALL, ridge, hx }, { side * hx / 2, h + ridge / 2, front * (hz - WALL / 2) }, CLAD, "Metal"), true))
 				wedge.shape = "Wedge"
 				wedge.yaw = if side > 0 then -90 else 90 -- (a wedge's tall side is its +Z: turned to the ridge)
 			end
 		end
 		for _, side in { -1, 1 } do
 			local tag = if side < 0 then "West" else "East"
-			-- the slab's underside on the gables' slope (from the ridge down), its middle half its length down
-			local cx = side * (math.cos(slope) * length / 2 + math.sin(slope) * thick / 2)
-			local cy = h + ridge - math.sin(slope) * length / 2 + math.cos(slope) * thick / 2
+			-- the slab's top on the gables' slope (from the ridge down), its middle half its length down
+			local cx = side * (math.cos(slope) * length / 2 - math.sin(slope) * thick / 2)
+			local cy = h + ridge - math.sin(slope) * length / 2 - math.cos(slope) * thick / 2
 			local roof = look(solid(add("Roof" .. tag, "roof", { length, thick, deep }, { cx, cy, 0 }, ROOF, "Metal"), true))
 			roof.roll = -side * math.deg(slope)
+			-- the barge boards along the gables' edges
 			for _, front in { -1, 1 } do
 				local barge = look(add(`Barge{if front > 0 then "Front" else "Back"}{tag}`, "roof", { length, 0.9, 0.3 }, { cx, cy - 0.15, front * (deep / 2 + 0.15) }, TRIM, "Metal"))
 				barge.roll = roof.roll
 			end
-			table.insert(eaves, { side, h + ridge - math.sin(slope) * (length - overhang / 2), deep })
+			-- the gutter under the eave and its downpipe at the front corner
+			local eave = h + ridge - math.sin(slope) * (length - overhang / 2) -- (about the walls' top)
+			look(add("Gutter" .. tag, "roof", { 0.8, 0.8, deep }, { side * (hx + 0.9), eave - 0.6, 0 }, TRIM, "Metal"))
+			local pipe = look(add("Downpipe" .. tag, "shell", { eave - 0.6, 0.6, 0.6 }, { side * (hx + 0.5), (eave - 0.6) / 2, hz - 1.4 }, TRIM, "Metal"))
+			pipe.shape, pipe.roll = "Cylinder", 90
 		end
 		look(add("RidgeCap", "roof", { 2, 0.4, deep }, { 0, h + ridge + thick + 0.15, 0 }, TRIM, "Metal"))
 	end
-	-- the gutters under a gable roof's eaves and their downpipes at the front corners
-	for _, eave in eaves do
-		local side, y, deep = eave[1], eave[2], eave[3]
-		local tag = if side < 0 then "West" else "East"
-		look(add("Gutter" .. tag, "roof", { 0.8, 0.8, deep }, { side * (hx + 0.9), y - 0.6, 0 }, TRIM, "Metal"))
-		local pipe = look(add("Downpipe" .. tag, "shell", { y - 0.6, 0.6, 0.6 }, { side * (hx + 0.5), (y - 0.6) / 2, hz - 1.4 }, TRIM, "Metal"))
-		pipe.shape, pipe.roll = "Cylinder", 90
-	end
 
-	-- the cladding's ribs (outside, from the base course up; over the door only on the header)
-	local plinth = looks.plinth
-	if looks.ribs then
-		local function rib(name: string, x: number, z: number, bottom: number, top: number, alongX: boolean)
-			local tall = top - bottom
-			look(add(name, "shell", if alongX then { 0.5, tall, 0.3 } else { 0.3, tall, 0.5 }, { x, bottom + tall / 2, z }, RIBS, "Metal"))
+	-- the cladding's ribs (outside, from the base course up to the wall's top; over the door only on the header)
+	local function rib(name: string, x: number, z: number, bottom: number, top: number, alongX: boolean)
+		local tall = top - bottom
+		look(add(name, "shell", if alongX then { 0.5, tall, 0.3 } else { 0.3, tall, 0.5 }, { x, bottom + tall / 2, z }, RIBS, "Metal"))
+	end
+	local count = math.floor((2 * hx) / RIB)
+	for k = 0, count - 1 do
+		local x = -hx + RIB / 2 + k * RIB
+		rib(`RibBack{k}`, x, -hz - 0.15, PLINTH, back, true)
+		if math.abs(x) - 0.25 > door / 2 + 0.7 then
+			rib(`RibFront{k}`, x, hz + 0.15, PLINTH, h, true)
+		elseif math.abs(x) + 0.25 < door / 2 and h - doorHigh > 1.2 then
+			rib(`RibHeader{k}`, x, hz + 0.15, doorHigh + 0.4, h, true)
 		end
-		local count = math.floor((2 * hx) / RIB)
-		for k = 0, count - 1 do
-			local x = -hx + RIB / 2 + k * RIB
-			rib(`RibBack{k}`, x, -hz - 0.15, plinth, back, true)
-			if math.abs(x) - 0.25 > door / 2 + 0.7 then
-				rib(`RibFront{k}`, x, hz + 0.15, plinth, h, true)
-			elseif math.abs(x) + 0.25 < door / 2 and h - doorHigh > 1.4 then
-				rib(`RibHeader{k}`, x, hz + 0.15, doorHigh + 0.4, h, true)
-			end
-		end
-		local along = math.floor((2 * hz) / RIB)
-		for k = 0, along - 1 do
-			local z = -hz + RIB / 2 + k * RIB
-			rib(`RibWest{k}`, -hx - 0.15, z, plinth, back, false)
-			rib(`RibEast{k}`, hx + 0.15, z, plinth, back, false)
-		end
+	end
+	local along = math.floor((2 * hz) / RIB)
+	for k = 0, along - 1 do
+		local z = -hz + RIB / 2 + k * RIB
+		local top = math.min(wallTop(z - 0.25), h) -- (under a shed's slope: its lower edge)
+		rib(`RibWest{k}`, -hx - 0.15, z, PLINTH, top, false)
+		rib(`RibEast{k}`, hx + 0.15, z, PLINTH, top, false)
 	end
 
 	-- the base course, the ZDC stripe and the corners' trims
@@ -701,123 +702,149 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
 			look(add(name .. "Front" .. tag, "shell", { section, tall, out }, { side * (door / 2 + section / 2), y, hz + out / 2 }, color, material))
 		end
 	end
-	band("Plinth", plinth / 2, plinth, 0.4, CONCRETE, "Concrete")
-	if looks.stripe then
-		band("Stripe", 5.6, 0.8, 0.45, ORANGE, "SmoothPlastic")
-	end
+	band("Plinth", PLINTH / 2, PLINTH, 0.4, CONCRETE, "Concrete")
+	band("Stripe", 5.6, 0.8, 0.45, ORANGE, "SmoothPlastic")
 	for _, sx in { -1, 1 } do
 		for _, sz in { -1, 1 } do
 			local tall = if sz > 0 then h else back
-			look(add(`Corner{if sz > 0 then "Front" else "Back"}{if sx < 0 then "West" else "East"}`, "shell", { 1.1, tall, 1.1 }, { sx * hx, tall / 2, sz * hz }, if plaster then WHITE else TRIM, if plaster then "SmoothPlastic" else "Metal"))
+			look(add(`Corner{if sz > 0 then "Front" else "Back"}{if sx < 0 then "West" else "East"}`, "shell", { 1.1, tall, 1.1 }, { sx * hx, tall / 2, sz * hz }, TRIM, "Metal"))
 		end
 	end
 
-	-- the roller door: rolled up (its bottom slats and bar in the opening's top), its rails, the drum's hood inside (a
-	-- garage's sectional door lies open under its ceiling instead); from level 3 a bollard each side outside
+	-- the roller door: rolled up (its bottom slats and bar in the opening's top), its rails, the drum's hood inside
+	-- (8.3: under a low header, a lower hood), a bollard each side outside
+	-- (8.3: the bollards from level 3, where the Blender model has its posts; a Garage and a Workshop have none)
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "West" else "East"
 		look(add("DoorRail" .. tag, "door", { 0.7, doorHigh, 0.6 }, { side * (door / 2 + 0.35), doorHigh / 2, hz + 0.3 }, STEEL, "Metal"))
-		if looks.bollards then
+		if level >= 3 then
 			local bollard = look(solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), GROUND + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic")))
 			bollard.shape, bollard.roll = "Cylinder", 90
 		end
 	end
-	if roofKind == "shed" then
-		look(add("DoorPanel", "door", { door - 0.4, 0.25, doorHigh }, { 0, doorHigh + 0.32, hz - WALL - 0.3 - doorHigh / 2 }, GREY, "Metal"))
-	else
-		look(add("DoorCurtain", "door", { door, 1.6, 0.3 }, { 0, doorHigh - 0.8, hz - WALL / 2 }, ORANGE, "Metal"))
-		look(add("DoorBar", "door", { door, 0.3, 0.45 }, { 0, doorHigh - 1.75, hz - WALL / 2 }, INK, "Rubber"))
-		look(add("DoorHood", "door", { door + 1.6, 2.6, 2.6 }, { 0, doorHigh + 1.5, hz - WALL - 1.3 }, STEEL, "Metal"))
-	end
+	look(add("DoorCurtain", "door", { door, 1.6, 0.3 }, { 0, doorHigh - 0.8, hz - WALL / 2 }, ORANGE, "Metal"))
+	look(add("DoorBar", "door", { door, 0.3, 0.45 }, { 0, doorHigh - 1.75, hz - WALL / 2 }, INK, "Rubber"))
+	local hood = if shed then math.min(2.6, h - doorHigh - 0.4) else 2.6
+	look(add("DoorHood", "door", { door + 1.6, hood, 2.6 }, { 0, doorHigh + 0.2 + hood / 2, hz - WALL - 1.3 }, STEEL, "Metal"))
 
-	-- the signs: ZDC in the front gable (the garage's plate over its door), the owner's over the door (the garage's
-	-- beside it; server/Warehouse.luau writes it), STOCK inside on the back wall
-	local zdc = looks.zdc
-	local zdcSign = look(add("ZdcSign", "sign", { zdc[1], zdc[2], 0.4 }, { 0, zdc[3], hz + 0.3 }, if plaster then ORANGE else TRIM, "SmoothPlastic"))
-	zdcSign.yaw = 180
-	zdcSign.words = { { face = "Front", lit = true, lines = if zdc[2] < 2 then { line("ZDC", WHITE, 0.8, "Black") } else { line("ZDC", ORANGE, 0.6, "Black"), line("ZOMBIE DELIVERY CO.", WHITE, 0.24, "Bold") } } }
-	local o = looks.owner
-	local owner = add("OwnerSign", "sign", { o[1], o[2], 0.4 }, { o[3], o[4], hz + 0.5 }, TRIM, "SmoothPlastic")
+	-- the signs: ZDC in the front gable (8.3: as big as the gable holds; a shed has none), the owner's over the door
+	-- (server/Warehouse.luau writes it; under a low header a lower one), STOCK inside
+	if not shed then
+		local zh = math.min(5, ridge * 0.625)
+		local zw = math.min(20, 2 * hx * (1 - (zh + 0.5) / ridge) * 0.95)
+		local zdc = look(add("ZdcSign", "sign", { zw, zh, 0.4 }, { 0, h + 0.5 + zh / 2, hz + 0.3 }, TRIM, "SmoothPlastic"))
+		zdc.yaw = 180
+		zdc.words = { { face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.6, "Black"), line("ZOMBIE DELIVERY CO.", WHITE, 0.24, "Bold") } } }
+	end
+	-- (8.3: its bottom 0.4 over the opening, under a low header a lower one, in front of the Blender door's frame, its
+	-- letters and its lamps: 0.6 out, at most 1.4 wider than the door each side; a Garage's covers its ZDC plate)
+	local ownerHigh = math.min(3.6, h - doorHigh - 0.8)
+	local ownerY = math.max(doorHigh + (h - doorHigh) / 2, doorHigh + 0.4 + ownerHigh / 2)
+	local owner = add("OwnerSign", "sign", { math.min(24, door + 2.8), ownerHigh, 0.4 }, { 0, ownerY, hz + 0.6 }, TRIM, "SmoothPlastic")
 	owner.yaw = 180
 	owner.words = { { face = "Front", lit = true, lines = WarehouseLayout.ownerLines(nil, plot.id) } }
-	local b = looks.board
-	local board = add("StockBoard", "sign", { b[1], b[2], 0.3 }, { b[3], b[4], -hz + WALL + 0.15 }, TRIM, "SmoothPlastic")
-	board.yaw = 180 -- (its front into the hall)
-	board.words = { { face = "Front", lit = true, lines = WarehouseLayout.stockLines(0, 0, 0, def.stands) } }
-
-	-- inside: the tie beams (on posts along the side walls), the lamps hung under them (warehouse.py's places)
-	for n, d in looks.trusses do
-		local z = depth(d)
-		if roofKind == "shed" then
-			look(add(`Beam{n}`, "inside", { 2 * hx - 2 * WALL, 0.5, 0.6 }, { 0, back - 0.35, z }, WOOD, "Wood"))
-		else
-			look(add(`Beam{n}`, "inside", { 2 * hx - 2 * WALL, 0.8, 0.8 }, { 0, h - 0.6, z }, STEEL, "Metal"))
+	local inner = hz - WALL
+	local function wallSign(name: string, size: { number }, wall: string?, at: number?): Piece
+		if wall == "west" then
+			-- (on the west wall's inside, its words to the east; `at` studs in from the front wall's inside)
+			local p = add(name, "sign", { size[1], size[2], 0.3 }, { -hx + WALL + 0.15, size[3], inner - (at or 0) }, TRIM, "SmoothPlastic")
+			p.yaw = -90
+			return p
 		end
-		if looks.posts then
-			for _, side in { -1, 1 } do
-				local tall = h - 1 - FLOOR_TOP
-				look(add(`Post{n}{if side < 0 then "West" else "East"}`, "inside", { 0.8, tall, 0.8 }, { side * (hx - WALL - 0.4), FLOOR_TOP + tall / 2, z }, STEEL, "Metal"))
-			end
+		local p = add(name, "sign", { size[1], size[2], 0.3 }, { 0, size[3], -hz + WALL + 0.15 }, TRIM, "SmoothPlastic")
+		p.yaw = 180 -- (its front into the hall)
+		return p
+	end
+	local board = wallSign("StockBoard", hall.board, hall.boardWall, hall.boardAt)
+	board.words = { { face = "Front", lit = true, lines = WarehouseLayout.stockLines(0, 0, 0, base) } }
+
+	-- inside: the tie beams on posts along the side walls (8.3: the Blender model's trusses: `beams`, from the front
+	-- wall's outer face), the lamps hung under them (the model's lamps: `lamps`); under a shed at its back wall's height
+	local hallTop = back -- (the hall's lowest ceiling: a gable's walls' top, a shed's back wall)
+	local beamY = if shed then back - 0.35 else hallTop - 0.6 -- (a shed's beam: the model's wooden one)
+	for n, y in hall.beams do
+		local z = hz - y
+		look(add(`Beam{n}`, "inside", { 2 * hx - 2 * WALL, 0.8, 0.8 }, { 0, beamY, z }, STEEL, "Metal"))
+		for _, side in { -1, 1 } do
+			local tall = hallTop - 1 - FLOOR_TOP
+			look(add(`Post{n}{if side < 0 then "West" else "East"}`, "inside", { 0.8, tall, 0.8 }, { side * (hx - WALL - 0.4), FLOOR_TOP + tall / 2, z }, STEEL, "Metal"))
 		end
 	end
-	local wide = if roofKind == "shed" then 2.2 else 3.2 -- (a lamp's housing across)
-	-- (8.3: the lamps' light is Config.SandboxLight's: its Lamp's colour, this level's brightness and reach)
+	-- (the model's lamps hang a stud under the walls' top, a shed's 0.85 under its back wall: the game's glow 0.77
+	-- under theirs, its light shining from just under them)
+	local glowY = if shed then back - 0.85 - 0.77 else h - 1.77
+	-- (8.3, the light: Config.SandboxLight's, its Lamp's colour and this level's brightness and reach: a lower hall's
+	-- dimmer and shorter, the Logistics Center's longer to its floor)
 	local lit = Config.SandboxLight.Warehouse
-	local lamp = lit.Levels[f.n] or lit.Lamp
-	for k, spot in looks.lamps do
-		local housing = look(add(`Lamp{k}`, "inside", { 0.7, wide, wide }, { spot[1], looks.lampTop - 0.35, depth(spot[2]) }, TRIM, "Metal"))
+	local shine = lit.Levels[level] or lit.Lamp
+	for lamps, at in hall.lamps do
+		local x, z = at[1], hz - at[2]
+		local housing = look(add(`Lamp{lamps}`, "inside", { 0.7, 3.2, 3.2 }, { x, glowY + 0.42, z }, TRIM, "Metal"))
 		housing.shape, housing.roll = "Cylinder", 90
-		local glow = look(add(`LampGlow{k}`, "inside", { 0.14, wide - 0.6, wide - 0.6 }, { spot[1], looks.lampTop - 0.77, depth(spot[2]) }, GLOW, "Neon")) -- (its light stays)
+		local glow = look(add(`LampGlow{lamps}`, "inside", { 0.14, 2.6, 2.6 }, { x, glowY, z }, GLOW, "Neon")) -- (its light stays)
 		glow.shape, glow.roll = "Cylinder", 90
-		glow.light = { range = lamp.Range, brightness = lamp.Brightness, color = lit.Lamp.Color }
+		glow.light = { range = shine.Range, brightness = shine.Brightness, color = lit.Lamp.Color }
 	end
 
 	-- the floor's paint: the receiving zone's box and name, the middle aisle's edges
-	local inner = hz - WALL
-	local zone = def.receiving
+	local zone = hall.receiving
 	local paintY = FLOOR_TOP + 0.02
 	add("ReceivingBack", "paint", { door, 0.04, 0.4 }, { 0, paintY, inner - zone + 0.2 }, PAINT, "SmoothPlastic")
 	add("ReceivingFront", "paint", { door, 0.04, 0.4 }, { 0, paintY, inner - 0.2 }, PAINT, "SmoothPlastic")
 	for _, side in { -1, 1 } do
 		add("Receiving" .. (if side < 0 then "West" else "East"), "paint", { 0.4, 0.04, zone }, { side * (door / 2 - 0.2), paintY, inner - zone / 2 }, PAINT, "SmoothPlastic")
 		local run = inner - zone - (-inner)
-		add("AisleLine" .. (if side < 0 then "West" else "East"), "paint", { 0.3, 0.04, run }, { side * (def.middle / 2 - 0.5), paintY, -inner + run / 2 }, PAINT, "SmoothPlastic")
+		add("AisleLine" .. (if side < 0 then "West" else "East"), "paint", { 0.3, 0.04, run }, { side * (hall.middle / 2 - 0.5), paintY, -inner + run / 2 }, PAINT, "SmoothPlastic")
 	end
 	-- (lying flat: its Back face up, its text's top to the north: read from the door)
-	local receiving = add("ReceivingText", "paint", { math.min(14, door - 2), math.min(2.6, zone - 1.2), 0.05 }, { 0, FLOOR_TOP + 0.03, inner - zone / 2 }, PAINT, "SmoothPlastic")
+	local receiving = add("ReceivingText", "paint", { math.min(14, door - 2), math.min(2.6, zone - 0.9), 0.05 }, { 0, FLOOR_TOP + 0.03, inner - zone / 2 }, PAINT, "SmoothPlastic")
 	receiving.pitch, receiving.transparency = -90, 1
 	receiving.words = { { face = "Back", lines = { line("RECEIVING", PAINT, 0.9, "Black") } } }
 
-	-- the display stands: a dark podium, its felt top and its number plate at the front (to the aisle: south)
-	for i = 1, def.stands do
-		local s = WarehouseLayout.stand(plot, i, f.n) :: Stand
+	-- the display stands: a dark podium, its felt top and its number plate at the front (to the aisle: south, or north
+	-- for the upgrade stands in the front corners). 8.1: an upgrade stand's spot is painted on the floor under it too
+	-- (its outline and "STAND 13 · 🔒 UPGRADES", read from its aisle): server/Warehouse.luau shows its podium once it is
+	-- bought, and the podium covers the paint.
+	for i = 1, WarehouseLayout.capacity(level) do
+		local s = WarehouseLayout.stand(plot, i) :: Stand
 		local x, z = s.x - ox, s.z - oz
-		local base = T.StandHeight - 0.1
-		local podium = solid(add(`Stand{i}`, "stand", { s.sx, base, s.sz }, { x, FLOOR_TOP + base / 2, z }, PODIUM, "SmoothPlastic"))
+		local podiumHigh = T.StandHeight - 0.1
+		local podium = solid(add(`Stand{i}`, "stand", { s.sx, podiumHigh, s.sz }, { x, FLOOR_TOP + podiumHigh / 2, z }, PODIUM, "SmoothPlastic"))
 		podium.stand = i
 		local top = solid(add(`StandTop{i}`, "stand", { s.sx - 0.6, 0.1, s.sz - 0.6 }, { x, s.y - 0.05, z }, FELT, "Fabric"))
 		top.stand = i
-		local plate = add(`Plate{i}`, "stand", { 1.6, 0.6, 0.1 }, { x, FLOOR_TOP + base / 2, z + s.sz / 2 + 0.05 }, WHITE, "SmoothPlastic")
+		local facing = if s.yaw == 0 then -1 else 1 -- (+z: south)
+		local plate = add(`Plate{i}`, "stand", { 1.6, 0.6, 0.1 }, { x, FLOOR_TOP + podiumHigh / 2, z + facing * (s.sz / 2 + 0.05) }, WHITE, "SmoothPlastic")
 		plate.yaw, plate.stand = s.yaw, i
 		plate.words = { { face = "Front", lines = { line(tostring(i), INK, 0.9, "Black") } } }
+		if i > base then
+			local edge, y = 0.3, FLOOR_TOP + 0.02
+			add(`Spot{i}North`, "paint", { s.sx, 0.04, edge }, { x, y, z - s.sz / 2 + edge / 2 }, PAINT, "SmoothPlastic")
+			add(`Spot{i}South`, "paint", { s.sx, 0.04, edge }, { x, y, z + s.sz / 2 - edge / 2 }, PAINT, "SmoothPlastic")
+			add(`Spot{i}West`, "paint", { edge, 0.04, s.sz - 2 * edge }, { x - s.sx / 2 + edge / 2, y, z }, PAINT, "SmoothPlastic")
+			add(`Spot{i}East`, "paint", { edge, 0.04, s.sz - 2 * edge }, { x + s.sx / 2 - edge / 2, y, z }, PAINT, "SmoothPlastic")
+			-- (lying flat like RECEIVING: its Back face up, its words' top away from the aisle it looks at)
+			local words = add(`SpotText{i}`, "paint", { s.sx - 1.2, s.sz - 1.2, 0.05 }, { x, FLOOR_TOP + 0.03, z }, PAINT, "SmoothPlastic")
+			words.pitch, words.transparency = -90, 1
+			words.yaw = if s.yaw == 0 then 180 else 0
+			words.words = { { face = "Back", lines = WarehouseLayout.spotLines(i) } }
+		end
 	end
 
 	-- 8.1: the UPGRADES desk at the back wall's middle (its prompt: server/Warehouse.luau), its monitor facing the
-	-- hall, an UPGRADES sign on the wall over it (under the STOCK board)
-	local desk = WarehouseLayout.terminal(plot, f.n)
+	-- hall, an UPGRADES sign on the wall over it (under the STOCK board; 8.3: the level's desk and sign)
+	local desk = WarehouseLayout.terminal(plot)
 	local dx, dz = desk.x - ox, desk.z - oz
-	local body = DESK[2] - 0.2
+	local body = desk.y - FLOOR_TOP - 0.2
 	solid(add("TerminalDesk", "terminal", { desk.sx - 0.4, body, desk.sz - 0.4 }, { dx, FLOOR_TOP + body / 2, dz - 0.2 }, TRIM, "Metal"), true)
 	solid(add("TerminalTop", "terminal", { desk.sx, 0.2, desk.sz }, { dx, desk.y - 0.1, dz }, GREY, "SmoothPlastic"))
 	add("TerminalStripe", "terminal", { desk.sx - 0.4, 0.5, 0.06 }, { dx, FLOOR_TOP + body - 0.6, dz - 0.2 + (desk.sz - 0.4) / 2 + 0.03 }, ORANGE, "SmoothPlastic")
 	add("TerminalNeck", "terminal", { 0.4, 0.7, 0.3 }, { dx, desk.y + 0.35, dz - 0.5 }, STEEL, "Metal")
-	local screen = add("TerminalScreen", "terminal", { 3.8, 2.3, 0.3 }, { dx, desk.y + 0.7 + 1.15, dz - 0.35 }, INK, "SmoothPlastic")
+	local screen = add("TerminalScreen", "terminal", { math.min(3.8, desk.sx - 0.4), 2.3, 0.3 }, { dx, desk.y + 0.7 + 1.15, dz - 0.35 }, INK, "SmoothPlastic")
 	screen.yaw = 180 -- (its front into the hall)
 	screen.words = { { face = "Front", lit = true, lines = WarehouseLayout.terminalLines() } }
-	local g = looks.sign
-	local sign = add("UpgradeSign", "sign", { g[1], g[2], 0.3 }, { g[3], g[4], -hz + WALL + 0.15 }, TRIM, "SmoothPlastic")
-	sign.yaw = 180
-	sign.words = { { face = "Front", lit = true, lines = { line("⬆ UPGRADES", ORANGE, 0.62, "Black"), line("BIGGER WAREHOUSE · LIGHTS · VAN · DANNY", WHITE, 0.26, "Bold") } } }
+	local sign = wallSign("UpgradeSign", hall.sign, nil, nil)
+	sign.words = { { face = "Front", lit = true, lines = { line("⬆ UPGRADES", ORANGE, 0.62, "Black"), line("WAREHOUSE · STANDS · LIGHTS · VAN · DANNY", WHITE, 0.26, "Bold") } } }
 
 	-- outside: the UNLOAD HERE bay round the van at its spot, its back to the door (the words in the room between the
 	-- van's back and the bay's door end: seen with the van parked)

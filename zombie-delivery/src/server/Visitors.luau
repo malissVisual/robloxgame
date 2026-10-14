@@ -10,10 +10,11 @@
 --   * The bodies are server/Npcs.luau's (Npcs.spawn, its walk, its speech bubbles; the kinds' looks from
 --     shared/Visitors.luau), in workspace.Npcs. The walk goes leg by leg (Npcs.walkTo, `through` between legs, giving
 --     up when stuck) along shared/Visitors.luau's routes on the hall's grid: no PathfindingService. The hall is read
---     through shared/WarehouseLayout.luau (its floor, door, door path, stands and desk; the warehouse's level where the
---     layout and server/Warehouse.luau know levels) and built again only when its level or its stands change: a hall
---     built again in place (a level bought) sends its visitors out on the new hall's ways, and one that the new walls, a
---     podium or the desk would catch (WarehouseLayout.freeSpot, the new grid) is gone at once: never inside a wall.
+--     through shared/WarehouseLayout.luau at the plot's warehouse level (WarehouseLayout.site: its floor, door, door
+--     path, stands and desk; the level server/Warehouse.luau built, Warehouse.level) and built again only when its level
+--     or its stands change: a hall built again in place (a level bought) sends its visitors out on the new hall's ways,
+--     and one that the new walls, a podium or the desk would catch (inside the new building's outline but on no free
+--     cell of the new grid) is gone at once: never inside a wall.
 --     In and out beside the van: from the street's side, turning in behind the van's back (past the bollards), through
 --     the door's side.
 --   * Never in the way: a visitor never stops in the door path, at the UPGRADES desk or within Clear studs of a player,
@@ -52,8 +53,6 @@ local Offers = require(script.Parent.VisitorOffers)
 local Visitors = {}
 
 local T = Config.Visitors
--- (8.3 levels: the layout's calls get the warehouse's level as one more argument; a layout without levels ignores it)
-local Layout: any = WarehouseLayout
 local FLOOR = WarehouseLayout.FloorTop
 
 type Visitor = {
@@ -139,19 +138,25 @@ local function levelOf(id: number): number?
 	return if ok and type(level) == "number" then level else nil
 end
 
+-- 8.3: the plot at its warehouse's level (WarehouseLayout.site: that level's building; nil level: a plain Plot, 4).
+local function siteOf(plot: SandboxMap.Plot, level: number?): SandboxMap.Plot
+	return if level then WarehouseLayout.site(plot, level) or plot else plot
+end
+
 -- The hall's numbers (WarehouseLayout's, at the warehouse's level) with its first `stands` podiums.
 local function hallOf(plot: SandboxMap.Plot, stands: number, level: number?): Rules.Hall
-	local inside = Layout.inside(plot, level)
-	local door = Layout.door(plot, level)
+	local site = siteOf(plot, level)
+	local inside = WarehouseLayout.inside(site)
+	local door = WarehouseLayout.door(site)
 	local podiums: { Rules.Podium } = {}
 	for i = 1, stands do
-		local s = Layout.stand(plot, i, level)
+		local s = WarehouseLayout.stand(site, i)
 		if s then
 			table.insert(podiums, { index = i, x = s.x, z = s.z, sx = s.sx, sz = s.sz, yaw = s.yaw })
 		end
 	end
-	local deskOk, desk = pcall(Layout.terminal, plot, level)
-	local path = Layout.doorPath(plot, level)
+	local deskOk, desk = pcall(WarehouseLayout.terminal, site)
+	local path = WarehouseLayout.doorPath(site)
 	return Rules.hall({
 		inside = { x0 = inside.x0, x1 = inside.x1, z0 = inside.z0, z1 = inside.z1 },
 		door = { x = door.x, z = door.z, width = door.width },
@@ -193,7 +198,7 @@ local function ownerNear(owner: Player, plot: SandboxMap.Plot, level: number?): 
 	if not root then
 		return false
 	end
-	local box = Layout.outline(plot, level)
+	local box = WarehouseLayout.outline(siteOf(plot, level))
 	local p = root.Position
 	return p.X >= box.x0 - T.Near and p.X <= box.x1 + T.Near and p.Z >= box.z0 - T.Near and p.Z <= box.z1 + T.Near
 end
@@ -303,14 +308,12 @@ local function rebuilt(plot: SandboxMap.Plot, plan: Plan)
 	if not hall or not key then
 		return
 	end
+	local box = WarehouseLayout.outline(siteOf(plot, plan.level)) -- (the new building's walls round its floor)
 	for _, v in visitors do
 		if v.plot == plot.id and v.state ~= "done" and v.key ~= key then
 			local here = where(v)
-			local r = hall.input.inside
-			local within = here.x >= r.x0 - 1 and here.x <= r.x1 + 1 and here.z >= r.z0 - 1 and here.z <= r.z1 + 1
-			local free = Layout.freeSpot
-			local caught = type(free) == "function" and free(plot, plan.level, here.x, here.z) ~= nil
-			if within and (caught or not Rules.free(hall, here.x, here.z)) then
+			local within = here.x >= box.x0 - 1 and here.x <= box.x1 + 1 and here.z >= box.z0 - 1 and here.z <= box.z1 + 1
+			if within and not Rules.free(hall, here.x, here.z) then -- (in its walls, on a podium, at the desk: caught)
 				remove(v)
 			else
 				v.hall, v.key = hall, key

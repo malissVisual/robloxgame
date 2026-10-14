@@ -177,7 +177,8 @@ type Measure = { peak: number, floor: number, load: number, count: number, stron
 local function hall(plot: SandboxMap.Plot, lamp: { Brightness: number, Range: number }?, level: number): Measure
 	local lights: { Rules.Light } = {}
 	local strongest, longest = 0, 0
-	for _, p in WarehouseLayout.pieces(plot, level) do
+	local site = WarehouseLayout.site(plot, level) :: SandboxMap.Plot -- (8.3: the plot at that level)
+	for _, p in WarehouseLayout.pieces(site) do
 		local l = p.light
 		if l then
 			local b = if lamp then lamp.Brightness else l.brightness
@@ -186,7 +187,7 @@ local function hall(plot: SandboxMap.Plot, lamp: { Brightness: number, Range: nu
 			strongest, longest = math.max(strongest, b), math.max(longest, r)
 		end
 	end
-	local inside = WarehouseLayout.inside(plot, level)
+	local inside = WarehouseLayout.inside(site)
 	local peak, sum, n = 0, 0, 0
 	for i = 0, 16 do
 		for j = 0, 16 do
@@ -203,17 +204,17 @@ end
 do
 	local seen = 0
 	local eyes = 2 ^ L.Places.warehouse.Exposure
-	-- 8.3: every warehouse level's hall (Config.WarehouseLevels: the Garage's 1 lamp … the Logistics centre's 12, where
+	-- 8.3: every warehouse level's hall (Config.Warehouse.Levels: the Garage's 1 lamp … the Logistics Center's 12, where
 	-- the owner's Blender lamps hang; Config.SandboxLight.Warehouse.Levels their light). The Caps are level 4's hall's
 	-- (6 lamps hanging `hang` over the floor): a level's load cap is HallLoad × its lamps / level 4's, and a hall whose
 	-- lamps hang higher gets their reach in proportion (Range and the load × its hang / level 4's: they must reach its
 	-- floor); its lamps no denser on its floor than level 4's × LAMP_DENSITY (one lamp at least). A bigger hall is no
 	-- brighter: the peak at a face's height and the floor are held to the same Caps on every level.
-	local LEVELS = Config.WarehouseLevels.List
-	local LAMP_DENSITY = 1.4 -- (tests/warehouse_test.luau's bound: the Workshop's 2 and the Warehouse's 4 a third denser)
+	local LEVELS = Config.Warehouse.Levels
+	local LAMP_DENSITY = 2.8 -- (the Workshop's 4 lamps under its two trusses: 2.7 × level 4's; the Storehouse's 6: 2)
 	local function lampsOf(n: number): (number, number)
 		local count, hang = 0, 0
-		for _, p in WarehouseLayout.pieces(SandboxMap.Plots[1], n) do
+		for _, p in WarehouseLayout.pieces(WarehouseLayout.site(SandboxMap.Plots[1], n) :: SandboxMap.Plot) do
 			if p.light then
 				count += 1
 				hang = math.max(hang, p.at[2] - WarehouseLayout.FloorTop)
@@ -249,7 +250,7 @@ do
 	-- the hall's Neon (8.3: every level's): its lamps' discs face the floor, small and not white; nothing bigger glows bright
 	local bad: { string } = {}
 	for n in LEVELS do
-		for _, p in WarehouseLayout.pieces(SandboxMap.Plots[1], n) do
+		for _, p in WarehouseLayout.pieces(WarehouseLayout.site(SandboxMap.Plots[1], n) :: SandboxMap.Plot) do
 			if p.material == "Neon" then
 				local s = p.size
 				local down = if p.shape == "Cylinder" then math.pi * (math.min(s[2], s[3]) / 2) ^ 2 else math.max(s[1] * s[3], s[1] * s[2], s[2] * s[3])

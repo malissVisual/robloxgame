@@ -1,4 +1,4 @@
-# 8.2 SANDBOX: kontrola v Roblox Studiu
+# 8.3 SANDBOX: kontrola v Roblox Studiu
 
 Automatický test `tests/sandbox_e2e_runtime_test.luau` projde celou smyčku se skutečnými moduly hry, jen bez Robloxu
 a bez fyziky. Spouští se spolu s ostatními testy (`python3 tests/run_tests.py <cesta k luau>`). Tento seznam je to,
@@ -6,6 +6,8 @@ co test ověřit nedokáže: jak hra vypadá a jak se hraje ve Studiu.
 
 **Příprava**
 - Studio → karta **Test** → **Clients and Servers**: *Local Server* a **2 hráči** (body 1–14). Pro bod 15 pět hráčů.
+- Od 8.3 začíná nový hráč v garáži (level 1, 2 stojany). Body 8 a 10 proto zkoušejte na levelu 4: admin → SANDBOX →
+  **💰 +$10K** a u pultu UPGRADES kupte **ZDC Warehouse** až do levelu 4 (nebo **⬆ MAX UPGRADES**). Úrovně skladu: bod 18.
 - Okno serveru nechte otevřené. Do jeho Output se píšou chyby. Na konci v něm nesmí být žádná červená chyba.
 - Hráče níže jmenujeme **A** (první okno) a **B** (druhé okno).
 - Pro bod 13 (ukládání): Game Settings → Security → **Enable Studio Access to API Services** zapnuto, jinak se nic
@@ -63,7 +65,7 @@ Zaškrtněte, co sedí. Když něco nesedí, poznamenejte číslo bodu a co jste
 
 ## 10. UPGRADES
 - [ ] Pult **Upgrades** vzadu ve skladu. Bez peněz koupě nejde (hláška „costs …“).
-- [ ] S penězi (admin → SANDBOX → peníze): **More stands** → přibude stojan 13 a jde na něj vystavit.
+- [ ] S penězi (admin → SANDBOX → peníze) na levelu 4: **More stands** → přibude stojan 13 a jde na něj vystavit.
 - [ ] **Showroom lights**: cedulky $/min ukazují víc (× 1,1).
 
 ## 11. Prodej
@@ -100,6 +102,36 @@ Zaškrtněte, co sedí. Když něco nesedí, poznamenejte číslo bodu a co jste
 ## 17. Odchod uprostřed zakázky
 - [ ] Hráč s kusem ve vanu odejde. Jeho dům zmizí. Po návratu má jen to, co už bylo doma; kus z vanu je pryč. Zakázka
       neběží.
+
+## 18. Úrovně skladu (8.3)
+Pro tento bod stačí jeden hráč. Uložení začněte jako nový hráč: buď s vypnutým *Enable Studio Access to API Services*
+(nic se nenačte), nebo admin → SANDBOX → **↺ RESET UPGRADES**.
+- [ ] **Nový hráč je v garáži** (level 1): malá omítnutá budova s pultovou střechou a vraty uprostřed přední zdi,
+      uvnitř **2 stojany** u zadní zdi. Mezi nimi stojí menší pult UPGRADES (jde na něj E), nad ním cedule UPGRADES.
+      Tabule STOCK visí na levé (západní) zdi. Volné pozemky 3 a 4 jsou také garáže s **FOR RENT**.
+- [ ] Van, kruh na vykládání, UNLOAD HERE, kiosk a místo, kde se objevíte, jsou tam, kde byly. Vrata garáže míří na van.
+- [ ] Okno UPGRADES: první karta **ZDC Warehouse** 🏭 (Garage · 2 stands → Workshop · 4 stands, **$1,500**).
+      **More stands** je zamčená, šedá, s nápisem „Needs the Big Warehouse“, a koupit nejde.
+- [ ] Bez peněz koupě nejde. Admin → SANDBOX → **💰 +$10K** (několikrát) a kupujte level po levelu. Po každé koupi se
+      sklad hned přestaví na větší budovu a přibudou stojany:
+  - [ ] level 2 **Workshop** ($1,500): plechová dílna se sedlovou střechou, palety a sudy venku, **4 stojany**;
+  - [ ] level 3 **Storehouse** ($5,000): betonový sokl, světlíky ve střeše, žluté sloupky u vrat, **8 stojanů**;
+  - [ ] level 4 **Big Warehouse** ($12,000): dnešní velký sklad s kanceláří na boku, **12 stojanů**. **More stands** jde
+        koupit (po dvou malých stojanech, nejvýš 20);
+  - [ ] level 5 **Logistics Center** ($30,000): klenutá střecha se solárními panely, rampy, **24 stojanů** (s More stands
+        až 32). Karta ZDC Warehouse je na maximu.
+- [ ] Kus vystavený před koupí zůstane po přestavbě na stejném stojanu (číslo i cedulka $/min sedí). Tabule STOCK
+      ukazuje správný počet stojanů.
+- [ ] V každém levelu: projděte vraty (nic neviditelného nepřekáží, hlavou nenarazíte do střechy), obejděte budovu zvenku
+      (žádná neviditelná zeď mimo budovu, do popelnice / palet / kanceláře / ramp narazíte). Světla v hale svítí
+      z lamp modelu. Stojany, pult, tabule STOCK a cedule nad vraty nejsou zarostlé do modelu.
+- [ ] Bez naimportovaného `ZDCWarehouseArt` stojí každý level z kostiček, stejně velký a se stejnými stojany.
+- [ ] Admin → SANDBOX → **⬆ MAX UPGRADES**: level 5 a všechno naplno. **↺ RESET UPGRADES**: zpět garáž se 2 stojany.
+      Kusy ze stojanů, které zmizely, jsou zpět ve STOCK (seznam B).
+- [ ] **Staré uložení** (hráč, který hrál před 8.3, s penězi v uložení): po připojení má **level 4** (Big Warehouse,
+      12 stojanů a své malé stojany z More stands), kusy na stejných stojanech. Zkouška: místo uložené ve verzi 8.2
+      (s API Services zapnutými), pak tato verze.
+- [ ] Odejít a vrátit se (bod 13): level skladu zůstane, jaký byl.
 
 ## Na konci
 - [ ] V Output serveru není žádná červená chyba ani „failed to start“.

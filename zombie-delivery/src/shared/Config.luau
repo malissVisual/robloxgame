@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.2.1"
+Config.Version = "8.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -7001,7 +7001,7 @@ Config.Sandbox = {
 --   BrokenAt   a condition at or under it is broken (the moves' own, Config.Moving.Damage.BrokenAt): it earns nothing
 --              on show and sells for scrap, Scrap × its value (at least $1)
 --   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why)
---   Stands     8.3: no longer read (the stands are the warehouse level's: Config.WarehouseLevels, CollectionRules.standsFor)
+--   Stands     the display stands when Config.Warehouse.Stands is missing (CollectionRules.standsFor)
 --   Tick       s between two payouts of the stands' income (exact: the fractions carry over to the next one)
 -- The tuning: a house's haul (HouseLayout's 40 first seeds: 18 – 24 pieces worth $4,800 – 7,800) at 90 % condition,
 -- its best 12 on the 12 stands, earns $88 – 140 a minute (median $100); selling all of it pays $850 – 1,470, 9.6 –
@@ -7077,26 +7077,73 @@ Config.SandboxGuide = {
 	PaintMoney = 1000,
 }
 
--- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (shared/WarehouseLayout.luau
--- lays it out, server/Warehouse.luau builds it) and its display stands, where the pieces of your collection stand on show
--- (and earn every minute you play). 8.3: the building, its stands and how they stand are its level's
--- (Config.WarehouseLevels: the garage 1 … the logistics centre 5); here only what every level shares.
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
+-- shared/WarehouseLayout.luau lays it out, server/Warehouse.luau builds it) and its display stands, where the pieces of
+-- your collection stand on show (and earn every minute you play).
+--   Stands          how many display stands a warehouse starts with (Collection.display's stand: 1 … Stands; 1 nearest
+--                   the door, west to east); 8.1: the upgrades' More stands open more (Config.SandboxUpgrades), up to
+--   MaxStands       the stands the hall holds (8.1): Stands big ones in the grid, the rest smaller (SmallStand) in the
+--                   middle aisle and beside the receiving zone, each shown as a painted spot until it is bought
+--   Columns         the stands across the hall (even: half each side of the middle aisle); the rows go back from the door
+--   StandSize       a stand's podium (square, studs): every piece fits on it unturned (the biggest, the hay wagon, 6.4 × 9.6)
+--   SmallStand      8.1: an upgrade stand's podium { across, deep } (studs): every piece but the beds, the hay wagon and
+--                   the wheelbarrow fits on it unturned (Collection.display says which stand to use)
 --   StandHeight     the podium's top over the floor
+--   Aisle           the least walk between two stands and between the stands and the side walls (8.1: 5, room for the
+--                   upgrade stands; the pieces come home with the van's unloading, nobody carries them in)
+--   MiddleAisle     the walk from the roller door to the back wall, between the two halves (8.1: the upgrade stands'
+--                   column down its middle, an Aisle each side of it)
+--   Receiving       the receiving zone's depth inside the roller door (its width the door's, SandboxMap.DoorWidth)
+--   DoorHeight      the roller door's opening (kept open)
+--   Ridge           the gable roof's ridge (north-south) over the walls' top
 --   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length }, centred on the plot's
 --                   vanSpot (the parked Sprinter's middle: 4 studs to spare at each end, its words at the door's end)
 --   PromptDistance  the stands' prompts' reach (8.1: the UPGRADES desk's too); SellHold the Sell prompt's hold (s)
 --   Rebuild         s: the changes to one collection this close together rebuild its shown pieces once
---   MaxParts        one warehouse's part budget at any level (the building, its stands, the UPGRADES desk and its bay;
---                   not the pieces on show)
---   (8.3: the hall's lights are Config.SandboxLight.Warehouse's)
---   Rarity         a rarity's colour on a stand's tag (an unknown rarity: common's)
+--   MaxParts        one warehouse's part budget (the building, its stands, the UPGRADES desk and its bay; not the
+--                   pieces on show)
+--   (8.3: the hall's lights are Config.SandboxLight.Warehouse's: each level's lamps there)
+--   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
+--   ArtLevel        8.2: the level (1 … 5) of the owner's Blender warehouse (design/blender-warehouse) the warehouses wear
+--                   once ZDCWarehouseArt is imported (server/WarehouseMesh.luau; 4: the size the warehouse is). 8.3: only
+--                   the fallback of a warehouse built without a level (each plot is its owner's level now)
+--   Levels          8.3 (design/warehouse-levels/KONTRAKT.md): the warehouse's five levels, the owner's Blender ones
+--                   (design/blender-warehouse, ZDCWarehouseArt: the same sizes, doors and roofs): name (in the game),
+--                   size { W across, H the front wall, D deep }, door { width, height }, roof ("shed": its back wall
+--                   rise lower; "gable"; "barrel": the game's own parts a gable of rise under it), rise (the roof over
+--                   H; a shed's top is H) and stands (its big stands: StandSize podiums). Level 4 is the warehouse of
+--                   8.0 – 8.2 (Stands, Ridge, DoorHeight above, SandboxMap's plot.warehouse). The UPGRADES desk sells
+--                   the levels (Config.SandboxUpgrades.List.warehouse); the More stands' small stands from MoreFrom on
+--   MoreFrom        8.3: the first level with the More stands upgrade's small stands (below it the card is locked)
+--   FreeLevel       8.3: the level a plot nobody has shows (FOR RENT)
+export type WarehouseLevelDef = { name: string, size: { number }, door: { number }, roof: string, rise: number, stands: number }
 Config.Warehouse = {
+	Stands = 12,
+	MaxStands = 20,
+	Columns = 4,
+	StandSize = 10,
+	SmallStand = { 8, 5 } :: { number },
 	StandHeight = 1,
+	Aisle = 5,
+	MiddleAisle = 18,
+	Receiving = 9,
+	DoorHeight = 16,
+	Ridge = 8,
 	Bay = { 14, 30 } :: { number },
 	PromptDistance = 8,
 	SellHold = 1,
 	Rebuild = 0.15,
 	MaxParts = 400,
+	ArtLevel = 4,
+	Levels = {
+		{ name = "Garage", size = { 26, 12, 22 }, door = { 14, 9.5 }, roof = "shed", rise = 2.5, stands = 2 },
+		{ name = "Workshop", size = { 40, 15, 30 }, door = { 18, 12 }, roof = "gable", rise = 4.5, stands = 4 },
+		{ name = "Storehouse", size = { 58, 19, 42 }, door = { 22, 14 }, roof = "gable", rise = 6, stands = 8 },
+		{ name = "Big Warehouse", size = { 80, 24, 60 }, door = { 26, 16 }, roof = "gable", rise = 8, stands = 12 },
+		{ name = "Logistics Center", size = { 104, 28, 84 }, door = { 26, 18 }, roof = "barrel", rise = 10, stands = 24 },
+	} :: { WarehouseLevelDef },
+	MoreFrom = 4,
+	FreeLevel = 1,
 	Rarity = {
 		common = { 222, 224, 228 },
 		uncommon = { 104, 214, 120 },
@@ -7208,30 +7255,38 @@ Config.Sprinter = {
 -- the city's gun and car tracks). Each upgrade:
 --   name, icon     its card's title and picture (an emoji)
 --   max            its top level; prices: the price of each level (prices[n] buys level n)
---   step           what one level gives: lights the income × (1 + step) a level (compounding: CollectionRules' income,
---                  so the HUD, the stands' tags and the picker show it); engine the van's top speed + step a level (its
---                  SpeedMult attribute, client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau
---                  trained)
--- 8.3: the first card is the WAREHOUSE track (its levels, names, stands and prices: Config.WarehouseLevels). It took the
--- place of 8.1's More stands (12 → 20, small stands): level 5 holds its 20 stands, all of them big.
+--   step           what one level gives: warehouse (8.3) the next warehouse level (Config.Warehouse.Levels: its upgrade
+--                  level k is warehouse level k + 1, a new player's Garage is 0); stands +step small display stands
+--                  (from Config.Warehouse.MoreFrom: the level's big stands + these); lights the
+--                  income × (1 + step) a level (compounding: CollectionRules' income, so the HUD, the stands' tags and
+--                  the picker show it); engine the van's top speed + step a level (its SpeedMult attribute,
+--                  client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau trained)
 -- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
 -- are one size; the engine is the safe van upgrade.)
--- The tuning: a first haul on show earns about $100 a minute on 12 stands (Config.Collection), so the first level of
--- each comes after a few minutes of play, the last ones after hours; everything here costs $35,750, the warehouse's
--- levels $48,500 more.
---   Order          the cards' order in the window ("warehouse": Config.WarehouseLevels, shared/WarehouseLevels.luau)
+-- The tuning: a first haul on show earns about $100 a minute (Config.Collection), so the first level of each comes
+-- after a few minutes of play, the last ones after hours; everything bought costs $102,750. 8.3: the warehouse's levels
+-- $48,500 of it: a Garage's 2 stands earn about $20 a minute and a first haul sold about $1,000, so the Workshop comes
+-- with the first move or two, the Storehouse after a few, the Big Warehouse (today's) in the first hour or so.
+--   Order          the cards' order in the window
 --   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
 --   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
-export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number }, start: number? }
+--   WarehouseFlag  8.3: the save's mark of the warehouse level: a real save without it (from before 8.3) had today's
+--                  warehouse, so it gets warehouse level 4 (UpgradeRules.fromSave); WarehouseAttribute the player
+--                  attribute server/Upgrades.luau keeps their warehouse level (1 … 5) in (the client reads it)
+export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number } }
 Config.SandboxUpgrades = {
-	Order = { "warehouse", "lights", "engine", "danny" } :: { string },
+	Order = { "warehouse", "stands", "lights", "engine", "danny" } :: { string },
 	List = {
+		warehouse = { name = "ZDC Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1500, 5000, 12000, 30000 } },
+		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 1000, 2500, 5000, 10000 } },
 		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 750, 1500, 3000, 6000, 12000 } },
 		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 600, 1800, 4500 } },
 		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 600, 1500, 3500 } },
 	} :: { [string]: SandboxUpgradeDef },
 	Flag = "sandboxUpgradesKept",
 	Danny = "DannyTraining",
+	WarehouseFlag = "warehouseLevelKept",
+	WarehouseAttribute = "WarehouseLevel",
 }
 
 -- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out
@@ -7408,71 +7463,6 @@ Config.SandboxLeaders = {
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
 }
 
--- 8.3 SANDBOX, the warehouse's levels (the owner: "the warehouse can be upgraded from level 1 to level 5, and with each
--- upgrade it is bigger: more room for stands and other things"). The five buildings are the owner's Blender levels
--- (design/blender-warehouse/warehouse.py, 8.0.4; tools/warehouse-art/check.py checks them against this list and the
--- plot): each one's roller door where the plot's door is, growing back and to the sides from it, on the plot and clear
--- of the van's bay, the way in, the kiosk and the spawn. shared/WarehouseLevels.luau has the rules
--- (tests/warehouselevels_test.luau), shared/WarehouseLayout.luau lays each level out (tests/warehouse_test.luau),
--- server/Warehouse.luau builds the owner's level on their plot and rebuilds it when it grows (the pieces stay on their
--- stands), server/WarehouseMesh.luau dresses it with that level of the import. Bought at the UPGRADES desk: the window's
--- first card (Config.SandboxUpgrades' "warehouse"; profile.sandboxUpgrades.warehouse is the level itself, 2 … 5; none
--- kept: the start). It took the place of 8.1's More stands: its top, 20 stands, is level 5's.
---   Start       the level a new player's warehouse is (and a free plot's)
---   Flag        the save's mark: a real save without it is from before the levels and is migrated once (Old)
---   Attribute   the player attribute server/Upgrades.luau keeps the level in (the client's guide and picker read it)
---   Icon        the card's picture
---   Old         the migration: every warehouse had Stands (12) stands, More stands added Step (2) a level for at most
---               Bought levels; an older real save starts at the least level with every stand it had (and every piece it
---               has on show), and at Least (4: the building it had) at the least
---   List        the levels, 1 … 5: name; size (W across × H the walls × D deep, studs: the Blender level's) and door
---               (width × height); roof ("shed" falling to the back, "gable", "barrel") and rise (over the walls; a
---               shed's: its front wall over its back); wall (the parts building's cladding: "plaster", "metal",
---               "plinth", "twotone"); stands (how many) and price ($ to grow into it; the start's 0); how the stands
---               stand: stand (a podium's side, square), columns (across, even: half each side of the middle aisle; a
---               short last row from the middle out), aisle (between two stands, in front of each and past the
---               receiving zone), middle (the middle aisle: from the door to the UPGRADES desk at the back wall),
---               receiving (the receiving zone's depth inside the door, the door's width) and front (the front row's
---               front edge, studs in from the front wall's outer face)
--- The tuning (Config.Collection: a first haul's best 2 earn about $45 a minute, its best 12 about $100; the rest of a
--- haul sells for $850 – 1,470): the Workshop after the first move or two, the Warehouse within the first hour, the Big
--- warehouse in the second or third, the Logistics centre after hours (everything: $48,500).
-export type WarehouseLevelDef = {
-	name: string,
-	size: { number },
-	door: { number },
-	roof: string,
-	rise: number,
-	wall: string,
-	stands: number,
-	price: number,
-	stand: number,
-	columns: number,
-	aisle: number,
-	middle: number,
-	receiving: number,
-	front: number,
-}
-Config.WarehouseLevels = {
-	Start = 1,
-	Flag = "warehouseLevelKept",
-	Attribute = "WarehouseLevel",
-	Icon = "🏗️",
-	Old = { Stands = 12, Step = 2, Bought = 4, Least = 4 },
-	List = {
-		{ name = "Garage", size = { 26, 12, 22 }, door = { 14, 9.5 }, roof = "shed", rise = 2.5, wall = "plaster", stands = 2, price = 0,
-			stand = 8, columns = 2, aisle = 3, middle = 7, receiving = 5, front = 9 },
-		{ name = "Workshop", size = { 40, 15, 30 }, door = { 18, 12 }, roof = "gable", rise = 4.5, wall = "metal", stands = 4, price = 1500,
-			stand = 9, columns = 2, aisle = 4, middle = 18, receiving = 6, front = 5 },
-		{ name = "Warehouse", size = { 58, 19, 42 }, door = { 22, 14 }, roof = "gable", rise = 6, wall = "plinth", stands = 8, price = 5000,
-			stand = 10, columns = 4, aisle = 3.5, middle = 7, receiving = 8, front = 13 },
-		{ name = "Big warehouse", size = { 80, 24, 60 }, door = { 26, 16 }, roof = "gable", rise = 8, wall = "twotone", stands = 12, price = 12000,
-			stand = 10, columns = 4, aisle = 5, middle = 18, receiving = 9, front = 15 },
-		{ name = "Logistics centre", size = { 104, 28, 84 }, door = { 26, 18 }, roof = "barrel", rise = 10, wall = "twotone", stands = 20, price = 30000,
-			stand = 10, columns = 6, aisle = 5, middle = 12, receiving = 9, front = 15 },
-	} :: { WarehouseLevelDef },
-}
-
 -- 8.3 SANDBOX, the market (the owner: selling should be a decision, not a reflex). shared/Market.luau has the rules
 -- (tests/market_test.luau), server/Collection.luau prices every sale and the stands' income with it, the STOCK list and
 -- the picker show it (client/WarehouseUi.luau: the 🔥 / ❄ tags, the header's line, prices with the market in them).
@@ -7512,7 +7502,7 @@ Config.Market = {
 -- bodies; one loop for them all), server/VisitorOffers.luau prices and checks the offers (tests/visitoroffers_runtime_test.luau),
 -- client/OfferCard.luau is the card.
 --   On          false: no visitors (and the daily task "offer" is never picked)
---   Cap         visitors in the whole server at once; PerHall: in one warehouse at once, by its level (Config.WarehouseLevels:
+--   Cap         visitors in the whole server at once; PerHall: in one warehouse at once, by its level (Config.Warehouse.Levels:
 --               the Garage's one, the Workshop's two, three from the Warehouse on)
 --   Group       the chances a group is 1, 2 or 3 visitors (they walk in Stagger s apart)
 --   Near        studs round a warehouse's walls that count as its owner being at their warehouse
@@ -7698,7 +7688,7 @@ Config.VanPaint = {
 --              Tube (the garage's), Window / BathWindow (the panes' daylight), Daylight (the porch's wall of daylight)
 --   Warehouse  the hall (shared/WarehouseLayout.luau, server/WarehouseMesh.luau): Lamp (each of its hall lights, a
 --              PointLight), Glow (their Neon discs), MeshGlow (the owner's Blender lamps, the finish "glow"); 8.3,
---              Levels: each warehouse level's lamps (Config.WarehouseLevels: 1 the Garage … 5 the Logistics centre),
+--              Levels: each warehouse level's lamps (Config.Warehouse.Levels: 1 the Garage … 5 the Logistics Center),
 --              Brightness and Range over Lamp's (its Color): the lamps hang where the owner's Blender lamps do, lower
 --              and closer together in a smaller hall (dimmer, shorter), higher in the Logistics centre (a longer reach
 --              to its floor); level 4 is Lamp itself. tests/sandboxlight_test.luau holds every level to the Caps
@@ -7787,7 +7777,7 @@ Config.SandboxLight = {
 		MeshGlow = { 232, 216, 188 } :: { number },
 		Levels = {
 			{ Brightness = 0.45, Range = 22 },
-			{ Brightness = 0.5, Range = 30 },
+			{ Brightness = 0.3, Range = 26 }, -- (8.3: the Workshop's 4 lamps, 10 apart under its trusses)
 			{ Brightness = 0.6, Range = 28 },
 			{ Brightness = 0.8, Range = 34 },
 			{ Brightness = 0.8, Range = 38 },
@@ -7821,7 +7811,7 @@ Config.SandboxLight = {
 --               are what the owner types into Roblox's form (the admin panel's SANDBOX tab lists them)
 --   Studio      true: awarded in Studio too (a test with real ids); false: nothing is awarded in Studio
 --   Moves       the finished moves tenMoves wants (a move finished: done or late with pieces home, the crew's too)
---   Level       the warehouse level warehouse5 wants (Config.WarehouseLevels: 5 the Logistics centre)
+--   Level       the warehouse level warehouse5 wants (Config.Warehouse.Levels: 5 the Logistics Center)
 --   TopPlayers  the players topMover wants on the server (their saves loaded: a full server, Config.Sandbox.MaxPlayers)
 --   TopEvery    s between two looks at the TOP MOVERS board (SandboxLeaders.rows)
 --   Tries, Wait an award that errors is tried again Wait s later, Tries times in all

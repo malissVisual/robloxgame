@@ -80,9 +80,10 @@ end
 table.sort(pieces, function(a, b)
 	return if a.n == b.n then a.id < b.id else a.n > b.n
 end)
--- 8.3: the Logistics centre's stands (the top level: the stand-in Upgrades gives every owner level 5)
-local LEVEL = #Config.WarehouseLevels.List
-local stands = WarehouseLayout.count(LEVEL)
+-- 8.3: the Logistics Center's stands, its 24 big ones and More stands' 8 small ones (the top level with every upgrade:
+-- the stand-in Upgrades gives every owner that)
+local LEVEL = WarehouseLayout.Levels
+local stands = WarehouseLayout.capacity(LEVEL)
 -- 8.3: each piece where it may stand (WarehouseLayout.fits at that level: a piece only on a stand it fits), the heaviest
 -- first, each on the smallest free stand it fits (so the big stands stay free for the big pieces): the heaviest the hall
 -- can show

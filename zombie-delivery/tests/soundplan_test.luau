@@ -16,6 +16,7 @@ local Map = require("./Map")
 local SoundSheet = require("./SoundSheet")
 local SoundPlan = require("./SoundPlan")
 local SandboxMap = require("./SandboxMap") -- (8.1: the sandbox's places)
+local WarehouseLayout = require("./WarehouseLayout") -- (8.3: a warehouse at its level)
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -286,26 +287,30 @@ check("every plot's warehouse", (function(): boolean
 	end
 	return true
 end)())
--- 8.3: a plot's warehouse is its level's (levelOf: the client's model attribute); none: plot.warehouse (level 4's)
-do
-	local WarehouseLayout = require("./WarehouseLayout")
-	local garage, top = WarehouseLayout.box(plot, 1), WarehouseLayout.box(plot, 5)
-	local function at(level: number): (number) -> number?
-		return function(id: number): number?
-			return if id == plot.id then level else nil
-		end
-	end
-	local deep = garage.z - garage.sz / 2 - 6 -- (behind the garage, inside the big warehouse)
-	local side = top.x + top.sx / 2 - 3 -- (inside the logistics centre, past the big warehouse's side wall)
-	check("8.3: behind a garage (level 1) is outdoors, there in a big warehouse (level 4) the warehouse",
-		SoundPlan.sandboxPlace(garage.x, 2, deep, false, at(1)) == "outdoors" and SoundPlan.sandboxPlace(garage.x, 2, deep, false, at(4)) == "warehouse"
-			and SoundPlan.sandboxPlace(garage.x, 2, garage.z, false, at(1)) == "warehouse")
-	check("8.3: by the logistics centre's side wall (level 5) the warehouse, past level 4's walls: outdoors without a level",
-		SoundPlan.sandboxPlace(side, 2, top.z, false, at(5)) == "warehouse" and SoundPlan.sandboxPlace(side, 2, top.z, false) == "outdoors"
-			and SandboxMap.plotAt(side, top.z) == plot)
-	check("8.3: no level known (the model not there yet): plot.warehouse", SoundPlan.sandboxPlace(garage.x, 2, deep, false, function(): number? return nil end) == "warehouse")
-end
 check("the van's spot before the roller door is outdoors", SoundPlan.sandboxPlace(plot.vanSpot.x, 2, plot.vanSpot.z, false) == "outdoors")
+-- 8.3: a plot's warehouse is the building of its level (levelOf: the client's workspace.Warehouses' Level<id>; nil, or
+-- no levelOf: level 4, the building of before 8.3)
+local garage = WarehouseLayout.site(plot, 1).warehouse
+local centre = WarehouseLayout.site(plot, 5).warehouse
+local function levelIs(n: number?): (number) -> number?
+	return function(id: number): number?
+		return if id == plot.id then n else nil
+	end
+end
+local backZ = w.z - w.sz / 2 + 4 -- inside level 4's hall, near its back wall
+local pastZ = w.z - w.sz / 2 - 6 -- behind level 4's back wall
+check("8.3: the levels' halls: the garage inside level 4's, level 5's past its back wall", garage.sz < w.sz and centre.z - centre.sz / 2 < pastZ and backZ < garage.z - garage.sz / 2)
+check("8.3: in a garage (level 1): the warehouse", SoundPlan.sandboxPlace(garage.x, 1, garage.z, false, levelIs(1)) == "warehouse")
+check("… level 4's back of the hall, with a garage there: outdoors", SoundPlan.sandboxPlace(w.x, 1, backZ, false, levelIs(1)) == "outdoors")
+check("… the same spot at level 4 (its level, nil, or no levelOf): the warehouse", SoundPlan.sandboxPlace(w.x, 1, backZ, false, levelIs(4)) == "warehouse"
+	and SoundPlan.sandboxPlace(w.x, 1, backZ, false, levelIs(nil)) == "warehouse" and SoundPlan.sandboxPlace(w.x, 1, backZ, false) == "warehouse")
+check("… behind level 4's back wall, in a Logistics Center (level 5): the warehouse; at level 4: outdoors", SoundPlan.sandboxPlace(w.x, 1, pastZ, false, levelIs(5)) == "warehouse"
+	and SoundPlan.sandboxPlace(w.x, 1, pastZ, false) == "outdoors")
+check("… over the garage's roof: outdoors (its top, not level 4's)", SoundPlan.sandboxPlace(garage.x, 1, garage.z, false, levelIs(1)) == "warehouse"
+	and SoundPlan.sandboxPlace(garage.x, WarehouseLayout.outline(WarehouseLayout.site(plot, 1)).top + 3, garage.z, false, levelIs(1)) == "outdoors")
+check("… another plot's level is its own (plot 1 a garage, plot 2 at level 4)", SoundPlan.sandboxPlace(SandboxMap.Plots[2].warehouse.x, 1, backZ, false, levelIs(1)) == "warehouse")
+check("… a junk level (0, 9, NaN) is clamped or 4: never an error", SoundPlan.sandboxPlace(w.x, 1, backZ, false, levelIs(0)) == "outdoors"
+	and SoundPlan.sandboxPlace(w.x, 1, pastZ, false, levelIs(9)) == "warehouse" and SoundPlan.sandboxPlace(w.x, 1, backZ, false, levelIs(0 / 0)) == "warehouse")
 check("a plot's yard beside the hall is outdoors", SoundPlan.sandboxPlace(plot.spawn.x, 3, plot.spawn.z, false) == "outdoors")
 check("in the move's house (its state's inside): the house", SoundPlan.sandboxPlace(150, 2, 300, true) == "house")
 check("a move's interior far off the map: the house", SoundPlan.sandboxPlace(9000, 400, 9000, false) == "house")

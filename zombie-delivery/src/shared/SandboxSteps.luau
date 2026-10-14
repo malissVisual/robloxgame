@@ -68,10 +68,11 @@
 --            "Your warehouse is full: grow it at the UPGRADES desk ($1,500)"              the desk (its level's spot)
 --   hot      a hot piece of today's market in the stock, none of the hot kinds sold today
 --            "🔥 Your Jukebox is hot today: sell it or show it"                           a free stand, else the 📦 chip
---   upgrade  another upgrade the money buys now (the cheapest; the window's order breaks a tie)
+--   upgrade  another upgrade the money buys now (the cheapest; the window's order breaks a tie; never a locked one:
+--            UpgradeRules.locked, More stands below the Big Warehouse)
 --            "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)"            the desk
---   paint    nothing bought at the PAINT shop yet, the van parked at home (its 🎨 prompt on), and a warehouse level
---            bought or Config.SandboxGuide.PaintMoney ($1,000) in your pocket
+--   paint    nothing bought at the PAINT shop yet, the van parked at home (its 🎨 prompt on), and a warehouse past the
+--            Garage (UpgradeRules.warehouseLevel) or Config.SandboxGuide.PaintMoney ($1,000) in your pocket
 --            "🎨 Make your van your own: E at its side opens the PAINT SHOP"              the van's 🎨 prompt
 -- (The collection book and the TASKS have their first-time hints, shared/SandboxHints.luau "book" and "tasks": no step
 -- here.) A soft step is done for the session by what the player did (its window opened while it fits, a level bought, a
@@ -93,7 +94,6 @@
 local SandboxMap = require(script.Parent.SandboxMap)
 local Config = require(script.Parent.Config)
 local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.3: the UPGRADES desk's prices (the soft steps)
-local WarehouseLevels = require(script.Parent.WarehouseLevels) -- 8.3: the warehouse's start level
 
 local SandboxSteps = {}
 
@@ -330,7 +330,7 @@ function SandboxSteps.growPrice(s: State): number?
 	if levels == nil or money == nil or free == nil or s.stock < free or s.stock + s.shown <= 0 then
 		return nil
 	end
-	local price = UpgradeRules.price("warehouse", UpgradeRules.warehouseLevel(levels))
+	local price = UpgradeRules.price("warehouse", UpgradeRules.level(levels, "warehouse")) -- (its upgrade level: warehouse level - 1)
 	return if price and money >= price then price else nil
 end
 
@@ -341,7 +341,7 @@ function SandboxSteps.upgradeFor(s: State): (string?, number?)
 	end
 	local best: string?, bestPrice: number? = nil, nil
 	for _, id in UpgradeRules.Order do
-		if id ~= "warehouse" then
+		if id ~= "warehouse" and UpgradeRules.locked(levels, id) == nil then -- (8.3: never a locked one: More stands in a garage)
 			local price = UpgradeRules.price(id, UpgradeRules.level(levels, id))
 			if price and money >= price and (bestPrice == nil or price < bestPrice) then
 				best, bestPrice = id, price
@@ -356,7 +356,7 @@ local function paintFits(s: State): boolean
 		return false
 	end
 	local levels, money = s.levels, s.money
-	return (levels ~= nil and UpgradeRules.warehouseLevel(levels) > WarehouseLevels.Start) or (money ~= nil and money >= G.PaintMoney)
+	return (levels ~= nil and UpgradeRules.warehouseLevel(levels) > 1) or (money ~= nil and money >= G.PaintMoney) -- (past the Garage)
 end
 
 local function fits(id: string, s: State): boolean

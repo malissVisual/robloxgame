@@ -129,7 +129,9 @@ terrain.Parent = M.workspace
 M.workspace.Terrain = terrain
 local cars = M.make("Folder", { Name = "Cars" }, M.workspace)
 local humanoid = M.make("Humanoid", { Name = "Humanoid" }, M.player.Character)
--- shared/WarehouseLayout.luau (written alongside): a stand-in with three stands on plot 2, in the world's coordinates
+-- shared/WarehouseLayout.luau (written alongside): a stand-in with three stands on plot 2, in the world's coordinates.
+-- 8.3: a Site (the plot at the level asked: WarehouseLayout.site), its spots (level 4's, the WarehouseLevel attribute
+-- unset; level 5's further back in the hall), its capacity; each plot and level's spots asked for counted.
 local SandboxMap = require("./SandboxMap")
 local plot = SandboxMap.Plots[2]
 local standsGiven = {
@@ -137,10 +139,38 @@ local standsGiven = {
 	{ x = plot.warehouse.x, y = 0, z = plot.warehouse.z },
 	{ x = plot.warehouse.x + 20, y = 0, z = plot.warehouse.z },
 }
-M.warehouseLayout = { stands = function(id)
-	return if id == 2 then standsGiven else {}
-end }
-M.warehouseLayout.terminal = require("./WarehouseLayout").terminal -- 8.3: the UPGRADES desk, the real one's spot a level
+local standsLevel5 = {
+	{ x = plot.warehouse.x - 30, y = 0, z = plot.warehouse.z - 20 },
+	{ x = plot.warehouse.x, y = 0, z = plot.warehouse.z - 20 },
+	{ x = plot.warehouse.x + 30, y = 0, z = plot.warehouse.z - 20 },
+}
+local standsAsked = {} -- "<plot>@<level>" → how many times its spots were asked for
+M.warehouseLayout = {
+	site = function(id, level)
+		local found = SandboxMap.Plots[id]
+		if not found then
+			return nil
+		end
+		local site = table.clone(found)
+		site.level = if type(level) == "number" and level >= 1 and level <= 5 then level else 4
+		return site
+	end,
+	capacity = function(level)
+		return 3
+	end,
+	stands = function(site, count)
+		local key = `{site.id}@{site.level}`
+		standsAsked[key] = (standsAsked[key] or 0) + 1
+		if site.id ~= 2 or count ~= 3 then
+			return {}
+		end
+		return if site.level == 5 then standsLevel5 else standsGiven
+	end,
+}
+M.warehouseLayout.terminal = function(site) -- 8.3: the UPGRADES desk, the real one's spot at the Site's level
+	local real = require("./WarehouseLayout")
+	return real.terminal(real.site(site.id, site.level) or site)
+end
 rawset(M.services.ReplicatedStorage.Shared, "FindFirstChild", function(_, name)
 	if name == "WarehouseLayout" then
 		return { fakeModule = M.warehouseLayout, IsA = function(_, class)
@@ -548,6 +578,18 @@ tick()
 local nearest = SandboxSteps.nearestFree(plot.door.x, plot.door.z + 6, standsGiven, { [2] = true })
 check("… the chevron over the nearest empty stand (shared/WarehouseLayout.luau's; the taken one skipped)", nearest ~= nil and nearest ~= 2
 	and at(standsGiven[nearest].x, standsGiven[nearest].z) and string.find(tag.Text, "EMPTY STAND", 1, true) ~= nil, tag.Text)
+-- 8.3: a level up (the WarehouseLevel attribute): the new building's spots, each plot and level's asked for once
+attribute("WarehouseLevel", 5)
+tick()
+local nearest5 = SandboxSteps.nearestFree(plot.door.x, plot.door.z + 6, standsLevel5, { [2] = true })
+check("8.3: a level up (WarehouseLevel 5): the chevron over the nearest empty stand of level 5's building", nearest5 ~= nil and nearest5 ~= 2
+	and at(standsLevel5[nearest5].x, standsLevel5[nearest5].z) and string.find(tag.Text, "EMPTY STAND", 1, true) ~= nil, tag.Text)
+tick()
+attribute("WarehouseLevel", 4)
+tick()
+check("… back at level 4: its stands again; each plot and level's spots asked for once (WarehouseLayout.site, capacity)", at(standsGiven[nearest].x, standsGiven[nearest].z)
+	and standsAsked["2@4"] == 1 and standsAsked["2@5"] == 1, `{standsAsked["2@4"]} {standsAsked["2@5"]}`)
+M.player:SetAttribute("WarehouseLevel", nil)
 collection.OnClientEvent:Fire({ kind = "state", stock = {
 	{ uid = "a", item = "sofa", stand = 1 }, { uid = "b", item = "lamp", stand = 3 }, { uid = "c", item = "vase", stand = 2 },
 }, income = 9, stands = 3 })
@@ -679,8 +721,8 @@ end
 moving.OnClientEvent:Fire("state", nil)
 lobby.OnClientEvent:Fire("lobby", nil)
 stand(plot.door.x, plot.door.z + 6)
-attribute(Config.WarehouseLevels.Attribute, 2)
-M.remotes.Upgrades.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 2 }, money = 5200 })
+attribute(Config.SandboxUpgrades.WarehouseAttribute, 2)
+M.remotes.Upgrades.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 1 }, money = 5200 }) -- (level 2: the Workshop)
 M.remotes.State.OnClientEvent:Fire({ money = 5200 })
 local market = { day = 20375, hot = { "jukebox" }, cold = { "sofa" }, left = 4000, demand = {} }
 local function hotState(free)
@@ -702,8 +744,8 @@ check("8.3: the guide asks for the UPGRADES' and the PAINT shop's states too", (
 	end
 	return asked.Upgrades == true and asked.VanPaint == true
 end)())
-local desk2 = WarehouseLayout.terminal(plot, 2)
-local desk1 = WarehouseLayout.terminal(plot, 1)
+local desk2 = WarehouseLayout.terminal(WarehouseLayout.site(plot, 2))
+local desk1 = WarehouseLayout.terminal(WarehouseLayout.site(plot, 1))
 for _, size in SIZES do
 	screen(size[1], size[2], size[3])
 	tick()

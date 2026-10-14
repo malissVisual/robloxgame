@@ -10,11 +10,14 @@
 --                          firstMove, tenMoves (Config.SandboxBadges.Moves) and cleanMove (nothing of it broken)
 --   Collection.onPaid      a "sale": firstSale; a hot piece in it (8.3's market, paid.hot): hotSale
 --   Collection.onAdded     a legendary piece came home: legendary
+--   Upgrades.onBought      8.3: a level bought at the UPGRADES desk: firstUpgrade (the warehouse's levels too: a save
+--                          from before 8.3 has the Big Warehouse for free, so its state says nothing of them)
 --   the player's state     (SandboxBadgeRules.stateOf, at the frame's end after Collection.onChanged / onAdded,
 --                          Upgrades.onChanged and PlayerData.Changed, and when the save has loaded: a milestone reached
 --                          before its badge was set up is awarded on the next join) firstMove / tenMoves (the counter),
 --                          firstShow (a piece of theirs on one of their stands), legendary and fullBook (the collection
---                          book), firstUpgrade (anything bought at the UPGRADES desk), warehouse5 (the warehouse at
+--                          book), firstUpgrade (anything bought at the UPGRADES desk but the warehouse's free levels:
+--                          SandboxBadgeRules.upgraded), warehouse5 (the warehouse at
 --                          Config.SandboxBadges.Level), painted (anything bought at the PAINT shop)
 --   the TOP MOVERS board   at most every TopEvery s after a collection changed or somebody's save loaded: with at least
 --                          TopPlayers players ranked (server/SandboxLeaders.luau rows), the one alone at the top
@@ -309,6 +312,13 @@ end
 local function hookUpgrades()
 	local Upgrades = require(script.Parent.Upgrades) :: any
 	Upgrades.onChanged(look)
+	if type(Upgrades.onBought) == "function" then
+		Upgrades.onBought(function(player: Player, id: string, level: number)
+			for _, key in Rules.fromBought(id, level) do
+				SandboxBadges.give(player, key)
+			end
+		end)
+	end
 end
 
 -- PlayerData.Changed: the save loaded (the admins' line, the board), the money moved (a PAINT shop purchase), …

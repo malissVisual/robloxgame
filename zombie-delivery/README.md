@@ -50,6 +50,14 @@
 > (`tests/sandbox_e2e_runtime_test.luau`; the Studio checklist `design/sandbox/TEST-STUDIO.md`). Fixed on the way: a
 > player without a plot shows nothing and earns nothing; a piece a full warehouse refuses is lost, not "home"; the
 > book's paid milestones survive a save through an older server (`rewards`' "book:" keys).
+>
+> **8.3** (the warehouse's five levels): the owner's five Blender buildings are the warehouse's levels, bought at the
+> UPGRADES desk's new **ZDC Warehouse** card (`Config.Warehouse.Levels`, `Config.SandboxUpgrades`). A new player starts
+> in the **Garage** (level 1, 2 stands); then the Workshop ($1,500, 4 stands), the Storehouse ($5,000, 8), the Big
+> Warehouse ($12,000, 12) and the Logistics Center ($30,000, 24). A save from before 8.3 starts at level 4, the
+> warehouse it had. Every level is its own building on the plot (`WarehouseLayout.site`), rebuilt at once when bought
+> (the pieces on show stay on their stands), and wears its own level of `ZDCWarehouseArt` (the import already holds all
+> five: nothing to re-import). More stands opens from the Big Warehouse on (see **The warehouse's five levels (8.3)**).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1668,10 +1676,64 @@ The house is the same classic European house, with these sandbox changes:
 - **sandbox:** 8.1's sandbox checks, with the greeter's spot (Config.MoveGreeters.Porch) added to what must stay clear. Marge's house, another size, keeps World's look.
 - **city:** the 7.2 checks, and the sandbox's house keeps its chalet. Give a city export's manifest as a second argument.
 
+## The warehouse's five levels (8.3)
+
+The owner: "a model of my own warehouse … level 1 to level 5, each upgrade a bigger warehouse with more room, starting
+as a garage". 8.0.4 built the five levels in Blender and 8.2 dressed every warehouse in level 4. 8.3 makes the level a
+player's own and buyable (the contract: `design/warehouse-levels/KONTRAKT.md`):
+
+| Level | Name | W × H × D (H: the front wall) | Door | Roof | Big stands | Price |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Garage | 26 × 12 × 22 | 14 × 9.5 | shed (front 12, back 9.5) | 2 | (the start) |
+| 2 | Workshop | 40 × 15 × 30 | 18 × 12 | gable (4.5 over the walls) | 4 | $1,500 |
+| 3 | Storehouse | 58 × 19 × 42 | 22 × 14 | gable (6) | 8 | $5,000 |
+| 4 | Big Warehouse | 80 × 24 × 60 | 26 × 16 | gable (8) | 12 | $12,000 |
+| 5 | Logistics Center | 104 × 28 × 84 | 26 × 18 | barrel (10; the game's parts: a gable of 10 under it) | 24 | $30,000 |
+
+- **Who starts where:** a new player in the Garage; a real save from before 8.3 (one without `warehouseLevelKept`) at
+  level 4, what it had (`UpgradeRules.fromSave`). A free plot shows the Garage, FOR RENT (`Config.Warehouse.FreeLevel`).
+  The level is saved in `sandboxUpgrades.warehouse` and, as a short key of `rewards` (`warehouse:<k>`), which an older
+  server keeps: a save such a server wrote again (the level and its flag dropped) gets its own level back, not 4.
+- **Buying:** the UPGRADES desk's first card, **ZDC Warehouse** 🏭 (`Config.SandboxUpgrades.List.warehouse`: upgrade
+  level k is warehouse level k + 1). The server rebuilds the owner's warehouse at the new level at once
+  (`server/Warehouse.luau` listens to `Upgrades.onChanged`); the pieces on show stay on their stands (a level up never
+  makes a stand smaller). The player's level is the attribute `WarehouseLevel` (the client reads it); the Model has
+  `Level`, `workspace.Warehouses` has `Level<plot id>`.
+- **Stands:** a level's big stands (10 × 10, every piece fits) and, from level 4 on, **More stands**' small ones (8 × 5,
+  +2 a level, +8 at the top): `base(level) + (level ≥ 4 ? 2 × More stands : 0)`, so 2, 4, 8, 12 … 20, 24 … 32. Below
+  level 4 the More stands card is locked ("Needs the Big Warehouse"). The admin's ⬆ MAX UPGRADES gives level 5 and
+  ↺ RESET UPGRADES level 1 (the pieces on stands that are gone go back to the stock).
+- **The building:** every level stands where today's warehouse stands: its front wall and door on the plot's front
+  (SandboxMap's `WALL_Z`), the van's spot, the unload circle, the spawn, the kiosk and the UNLOAD HERE bay do not move;
+  the building goes back (north) from there. `WarehouseLayout.site(plot, level)` is a Plot with that level's box, and
+  every layout function takes it (a plain Plot is level 4): its walls (the Garage's shed roof, gables for 2 – 4, a
+  gable of 10 under level 5's barrel), its lamps under the Blender model's lamps, its beams at the model's trusses, its
+  stands (`WarehouseLayout.grid(n)`), the UPGRADES desk at the back wall's middle (the Garage's a smaller one between
+  its two stands), the STOCK board and the UPGRADES sign (the Garage's board on its west wall). A stand's tag stays
+  under the hall's roof where it reaches back (`WarehouseLayout.ceiling`: the Garage's low back slope lowers a tall
+  piece's tag).
+- **The Blender look:** `server/WarehouseMesh.luau` dresses each warehouse with its own level of the owner's
+  `ZDCWarehouseArt` import (the Model's `Level`), checked against that level's Site. The FBX was not exported again:
+  the import the owner has already holds all five levels.
+
+**Checks.** `tools/warehouse/mesh-check.py <luau>` (run by `tests/run_tests.py`) simulates the import (a quarter turn,
+3 × the size, moved, half of it nested) and, besides 8.2's checks on the warehouses the real `server/Warehouse.luau`
+builds, dresses **every level 1 … 5** on its Site, built from `WarehouseLayout.pieces` as `server/Warehouse.luau`
+builds it:
+- the level's markers (its box, door and roof top) are the Site's outline, door and wall height, so WarehouseMesh
+  dresses it; every piece of the level in place, anchored and not physical, the props' unseen solid blocks;
+- the visual parts hidden, the solid ones still solid, nothing else changed;
+- the game's solid walls inside the model's walls, its gables inside the model's gables and its roof under the model's
+  roof at every point (the model's roof, gables and the Garage's sloping side walls rebuilt exactly from
+  `warehouse.py`, checked against the export's boxes);
+- every lamp's light just under one of the model's lamps;
+- the stands, the desk, the signs' fronts, the floor's paint, the bay, the doorway and the way in clear of the model's
+  details.
+
 ## The warehouse's five levels in Blender (8.0.4, design only)
 
-The owner: "a model of my own warehouse … levels 1 to 5, each bigger, starting as a garage". The game has no warehouse
-levels yet, and these models are not wired in. `design/blender-warehouse/warehouse.py` builds five buildings, each with
+The owner: "a model of my own warehouse … levels 1 to 5, each bigger, starting as a garage". (8.0.4 only designed them;
+8.2 dresses the warehouse in level 4 and 8.3 makes all five the game's levels: see above.) `design/blender-warehouse/warehouse.py` builds five buildings, each with
 its roller door in the middle of the front wall (where the plot's door is) and a clear floor inside:
 
 | Level | Building | W × H × D (walls) | Door | Stands (suggested) |

@@ -7,7 +7,7 @@
 --     line says nothing is set up;
 --   * each badge from its moment (a move finished, clean, the tenth, the crew's; a sale, a hot one; a legendary home; a
 --     piece on show; an upgrade, the warehouse at level 5; the PAINT shop; the book full; the TOP MOVERS board on a full
---     server) awarded once: UserHasBadgeAsync once, then AwardBadgeAsync once, never again this session; one already
+--     server) awarded once (8.3: a veteran's free Big Warehouse is no upgrade; a warehouse level bought is, its moment): UserHasBadgeAsync once, then AwardBadgeAsync once, never again this session; one already
 --     owned is never awarded; a badge whose id is 0 among the others is never asked about;
 --   * errors swallowed: UserHasBadgeAsync failing (the award tried anyway), AwardBadgeAsync failing (tried again Wait s
 --     later, Tries times, then given up for the session), Roblox saying no (never asked again); nothing reaches the
@@ -290,6 +290,26 @@ for _, key in Rules.Order do
 	once = once and calls("has", Bea, key) <= 1 and calls("award", Bea, key) <= 1
 end
 check("once a session: never two checks or two awards of one badge", once)
+
+-- ── 8.3: a save from before 8.3 (the Big Warehouse for free); a warehouse level bought ─────────────────
+E.saves.Player_120 = {
+	money = 50000, xp = 0, deliveries = 3, tutorial = true, phone = true, starterKit = true, vestKit = true,
+	noPacks = true, noJacket = true, noShoes = true, perGameBags = true, vanOnly = true, carStages = true,
+	vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
+}
+local Vet = E.join(120, "Vet")
+E.plotOf[Vet] = 3
+E.flush()
+check("8.3: a veteran's save (from before 8.3: the warehouse at level 4 for free), nothing bought: no firstUpgrade", Upgrades.warehouseLevel(Vet) == 4
+	and calls(nil, Vet, "firstUpgrade") == 0 and Badges.session(Vet).firstUpgrade == nil)
+local Neo = E.join(121, "Neo")
+E.plotOf[Neo] = 4
+PlayerData.addMoney(Neo, 5000, "Admin")
+E.flush()
+local grew = Upgrades.buy(Neo, "warehouse")
+E.flush()
+check("8.3: a new player buys the Workshop (the ZDC Warehouse's first level): firstUpgrade, from the purchase's moment (Upgrades.onBought)", grew
+	and Upgrades.warehouseLevel(Neo) == 2 and Badges.session(Neo).firstUpgrade == "awarded" and calls("award", Neo, "firstUpgrade") == 1)
 
 -- ── A badge already owned ──────────────────────────────────────────────────
 local Dot = E.join(104, "Dot")
