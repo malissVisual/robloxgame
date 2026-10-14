@@ -131,6 +131,12 @@
 --     door's leaf (DoorLeaf: shared/DoorSwing.luau) swings open as you walk up to it (its DoorOpen; client/WalkDoors.luau
 --     on every client), the trip waits until it is open, then the fade out, the move in the dark (FadeOut + Margin s
 --     later: the other end of a pair piece with you, Danny too), the client's dark held until it sees you there.
+--     8.5 walking through (the owner: "so it doesn't feel like I bumped into the door, but I keep walking smoothly"):
+--     the leaf opens as you come at its door (WalkIn.coming: near it facing it or walking at it, or a run at its
+--     doorway from farther), and walking into the doorway is the trip: your root across its threshold (Doors.Cross,
+--     looked Ahead s along your walk) starts the fade at once while you walk on into the house's dark hall (the
+--     sandbox house's doorways are walkable: server/SandboxWorld.luau), no dwell; standing at a door facing it, the
+--     8.3 dwell as before.
 --   * 8.3 Danny for hire (the owner: "when you want to take a heavy thing you must wait until the helper comes";
 --     "I have to PAY for him … you click on something, and that assigns it to him"; Config.MoveHelper.WaitForHelper;
 --     server/MoveHelper.luau's call): Lift on a two-person piece with Danny hired for the move calls him (onPick asks
@@ -344,7 +350,8 @@ local SB = {
 --           DoorLeaf at its doorway, tagged DoorLeaf for the clients), found once (WalkIn.leavesOf; weak keys)
 --   want    a leaf → the os.clock somebody last wanted it open (in its approach facing it, Danny hired near it, a
 --           trip through it); its DoorOpen is true from then until Shut s after (WalkIn.sweep)
---   opened  a leaf → when it opened (the trip waits until it has been open Open s: WalkIn.ready)
+--   opened  a leaf → when it opened (the dwell's trip waits until it has been open Open s: WalkIn.ready; 8.5 walking
+--           through it waits for nothing)
 --   send    the move's state to its crew now (send's: a trip sends where you are before its fade in, so the client's
 --           eyes, client/SandboxLight.luau, adapt while the screen is still black)
 local WalkIn = {
@@ -2037,8 +2044,9 @@ end
 -- within its width of the site door's foot, the map's house's; inside: the move's interior's, at the way out), found
 -- once a move (WalkIn.ways forgets the site's) and tagged DoorLeaf: every client swings a tagged leaf open while its
 -- DoorOpen is true (client/WalkDoors.luau). The server only says when: somebody wants it open (a crew member in its
--- approach facing it, Danny near it, a trip through it: WalkIn.open), and it shuts Shut s after the last of that
--- (WalkIn.sweep). The leaves never collide (the builders' parts don't, the clients move only their own view).
+-- approach facing it, Danny near it, a trip through it: WalkIn.open; 8.5 a crew member walking at it, from farther at
+-- a run: WalkIn.coming), and it shuts Shut s after the last of that (WalkIn.sweep). The leaves never collide (the
+-- builders' parts don't, the clients move only their own view).
 
 -- The door (a site door outside, a way inside) nearest `at` on that side, within its approach's reach; nil: none.
 function WalkIn.doorNear(s: Session, at: Vector3, inside: boolean): any
@@ -2431,8 +2439,9 @@ end
 -- ── 8.1 walk-in doors: through a door by walking into it (Config.Moving.Doors) ─────────────────────────────────────
 -- The zones are boxes at the doorways: outside one in front of every door of the site (at its foot, out of it along
 -- its facing), inside one at every way out (at its exit, a body's height over the floor, into the room toward where
--- you come in by it). A crew member on foot standing in one Dwell s facing its door goes through it: onEnter /
--- onLeave, their checks, words and fade (what they carry and a pair piece's other end come along).
+-- you come in by it). A crew member on foot standing in one Dwell s facing its door goes through it (8.5: or walking
+-- on into its doorway, at once): onEnter / onLeave, their checks, words and fade (what they carry and a pair piece's
+-- other end come along).
 
 -- Is `at` in a doorway's zone: `mid` its threshold at a body's middle, `out` the flat way out of it on the side you
 -- stand (outside: the door's facing; inside: into the room), `width` the doorway's? Depth in front of it, Through
@@ -2446,25 +2455,85 @@ function WalkIn.inZone(at: Vector3, mid: Vector3, out: Vector3, width: number, d
 		and math.abs(at.Y - mid.Y) <= D.Height / 2
 end
 
+-- 8.5: door `index`'s doorway on that side (inside: way `index`'s; outside: the site's door `index`'s) as the zones
+-- see it: its threshold at a body's middle (outside: the door's foot a root's height up; inside: its exit), the flat
+-- way out of it on that side and its width; nil: none (a way without its zone yet).
+function WalkIn.frame(s: Session, index: number, inside: boolean): (Vector3?, Vector3?, number)
+	if inside then
+		local way = s.ways[index]
+		if not way or not way.into then
+			return nil, nil, 0
+		end
+		return way.inside, way.into, way.width or way.part.Size.X
+	end
+	local door = s.site.doors[index]
+	if not door then
+		return nil, nil, 0
+	end
+	return door.door + Vector3.new(0, Config.Furniture.EntryUp, 0), door.facing, door.width -- (the door's foot is on the ground)
+end
+
 -- The zone a body at `at` stands in (inside: the ways out's; outside: the site's doors'): its index and its flat way
 -- out of the doorway on that side, or nil. 8.3: `depth` / `side` given: the door's approach (WalkIn.inZone).
 function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean, depth: number?, side: number?): (number?, Vector3?)
-	if inside then
-		for index, way in s.ways do
-			local into = way.into
-			if into and WalkIn.inZone(at, way.inside, into, way.width or way.part.Size.X, depth, side) then
-				return index, into
-			end
-		end
-		return nil, nil
-	end
-	local up = Vector3.new(0, Config.Furniture.EntryUp, 0) -- (a root's height over the ground: the door's foot is on it)
-	for index, door in s.site.doors do
-		if WalkIn.inZone(at, door.door + up, door.facing, door.width, depth, side) then
-			return index, door.facing
+	for index in (if inside then s.ways else s.site.doors) :: { any } do
+		local mid, out, width = WalkIn.frame(s, index, inside)
+		if mid and out and WalkIn.inZone(at, mid, out, width, depth, side) then
+			return index, out
 		end
 	end
 	return nil, nil
+end
+
+-- 8.5 walking through: how fast a body walks into a doorway (`out`: its flat way out on the side it stands): its flat
+-- walk's share toward it, studs/s, when it heads at it (within Face of straight at it); 0 when it walks along it, away
+-- from it or stands.
+function WalkIn.into(root: BasePart, out: Vector3): number
+	local v: Vector3? = root.AssemblyLinearVelocity
+	if not v then
+		return 0
+	end
+	local speed = math.sqrt(v.X * v.X + v.Z * v.Z)
+	local into = -(v.X * out.X + v.Z * out.Z)
+	return if speed > 1e-3 and into >= T.Doors.Face * speed then into else 0
+end
+
+-- 8.5: the door a body comes at on its side (its index; nil: none), the one whose leaf opens for it: in the door's
+-- approach (Approach deep, ApproachSide wider than its zone) facing it or walking at it (PairWalk studs/s or more), or
+-- farther out walking at its doorway: its walk crosses the doorway's face within the approach's width in Lead s (a run
+-- finds the leaf open).
+function WalkIn.coming(s: Session, character: Model?, root: BasePart, inside: boolean): number?
+	local D = T.Doors
+	local at = root.Position
+	for index in (if inside then s.ways else s.site.doors) :: { any } do
+		local mid, out, width = WalkIn.frame(s, index, inside)
+		if not mid or not out then
+			continue
+		end
+		local speed = WalkIn.into(root, out)
+		if WalkIn.inZone(at, mid, out, width, D.Approach, D.ApproachSide) and (speed >= D.PairWalk or WalkIn.toward(character, root, out) >= D.Face) then
+			return index
+		end
+		local dx, dz = at.X - mid.X, at.Z - mid.Z
+		local along = dx * out.X + dz * out.Z
+		local v: Vector3? = root.AssemblyLinearVelocity
+		if v and speed >= D.PairWalk and along > 0 and along <= speed * D.Lead and math.abs(at.Y - mid.Y) <= D.Height / 2 then
+			local t = along / speed -- (when it reaches the doorway's face, and where across it)
+			if math.abs((dx + v.X * t) * out.Z - (dz + v.Z * t) * out.X) <= width / 2 + D.Side + D.ApproachSide then
+				return index
+			end
+		end
+	end
+	return nil
+end
+
+-- Through door `index` on that side: out by a way inside (onLeave), in by a site door outside (onEnter).
+function WalkIn.go(s: Session, player: Player, index: number, inside: boolean)
+	if inside then
+		onLeave(player, s, index)
+	else
+		onEnter(player, s.contract.id, index)
+	end
 end
 
 -- How much a body faces the way through a door (`out`: its flat way out on the side they stand): the root's look ·
@@ -2486,13 +2555,19 @@ end
 -- visit (a refusal is said once; out of the zone and in again tries again). 8.1 carrying in two (PairTurn): the back
 -- to the door counts too (the leader walks backwards through it, facing the piece and the partner). After a trip nothing until they have left
 -- the zone they came out in and Rearm s have gone by (WalkIn.held, set by travel). 8.3: walking up to a door facing it
--- (its approach) opens its leaf, and the trip waits until it has been open Open s (WalkIn.ready).
+-- (its approach) opens its leaf, and the trip waits until it has been open Open s (WalkIn.ready). 8.5 walking through
+-- (the owner: "I keep walking smoothly, and then the transition"): the leaf opens as they come at it (WalkIn.coming),
+-- and walking into the doorway is the trip: their walk at it (PairWalk studs/s or more, within Face of straight at it)
+-- takes their root across its threshold (Cross studs out of its face) now or within Ahead s (the server sees them a
+-- moment late, its looks Every s apart): through at once, no dwell, no wait for the leaf (open long before). The dwell
+-- stays for standing at a door.
 function WalkIn.check(s: Session, player: Player, clock: number)
 	local character, humanoid, root = bodyOf(player)
 	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
 		WalkIn.at[player] = nil
 		return
 	end
+	local D = T.Doors
 	local inside = s.inside[player] == true
 	local index, out = WalkIn.zoneOf(s, root.Position, inside)
 	local hold = WalkIn.held[player]
@@ -2508,9 +2583,10 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		end
 		WalkIn.held[player] = nil
 	end
-	-- 8.3 the leaf swings open as they walk up to the door facing it (its approach: the zone, deeper and wider)
-	local near, nearOut = WalkIn.zoneOf(s, root.Position, inside, T.Doors.Approach, T.Doors.ApproachSide)
-	if near and nearOut and WalkIn.toward(character, root, nearOut) >= T.Doors.Face then
+	-- 8.3 the leaf swings open as they walk up to the door facing it (its approach: the zone, deeper and wider); 8.5 as
+	-- they come at it (walking at it too, from farther at a run: WalkIn.coming)
+	local near = WalkIn.coming(s, character, root, inside)
+	if near then
 		WalkIn.open(WalkIn.leavesOf(s, if inside then s.ways[near] else s.site.doors[near], inside), clock)
 	end
 	if not index or not out then
@@ -2524,7 +2600,16 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		WalkIn.at[player] = fresh
 		visit = fresh
 	end
-	if WalkIn.toward(character, root, out) < T.Doors.Face then
+	-- 8.5 walking through: their walk into the doorway takes their root across its threshold (now, or within Ahead s)
+	local mid = WalkIn.frame(s, index, inside)
+	local speed = WalkIn.into(root, out)
+	if mid and not visit.tried and speed >= D.PairWalk
+		and (root.Position.X - mid.X) * out.X + (root.Position.Z - mid.Z) * out.Z - speed * D.Ahead <= D.Cross then
+		visit.tried = true
+		WalkIn.go(s, player, index, inside)
+		return
+	end
+	if WalkIn.toward(character, root, out) < D.Face then
 		visit.since = nil -- (facing away, or walking past it: the dwell starts when they turn to the door)
 		return
 	end
@@ -2533,11 +2618,7 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		visit.since = clock
 	elseif not visit.tried and WalkIn.ready(WalkIn.leavesOf(s, if inside then s.ways[index] else s.site.doors[index], inside), clock, since) then
 		visit.tried = true
-		if inside then
-			onLeave(player, s, index)
-		else
-			onEnter(player, s.contract.id, index)
-		end
+		WalkIn.go(s, player, index, inside)
 	end
 end
 
