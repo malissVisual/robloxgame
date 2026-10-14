@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """8.3 SANDBOX: a preview sheet of the warehouse's five levels as the game builds them WITHOUT the owner's Blender import
-(the parts buildings: shared/WarehouseLayout.luau's pieces at each level, Config.WarehouseLevels), each on a plot with
+(the parts buildings: shared/WarehouseLayout.luau's pieces of each level's Site, Config.Warehouse.Levels), each on a plot with
 its display stands full of pieces (boxes of the real furniture sizes, coloured by rarity), from outside (the door, the
 owner's sign) and from above with the roof off (the stands, the receiving zone, the UPGRADES desk). Drawn with three.js
 in headless Chromium by tools/move-sites/render.mjs and render.html, laid out with PIL.
@@ -41,8 +41,9 @@ local out = {}
 local function num(n) return string.format("%.5f", n) end
 local function list(t) local s = {} for i, v in t do s[i] = num(v) end return "[" .. table.concat(s, ",") .. "]" end
 local function str(s) return '"' .. string.gsub(s, '[%c"\\]', function(c) return string.format("\\u%04x", string.byte(c)) end) .. '"' end
-for n, def in Config.WarehouseLevels.List do
-	for _, p in WarehouseLayout.pieces(plot, n) do
+for n, def in Config.Warehouse.Levels do
+	local site = WarehouseLayout.site(plot, n)
+	for _, p in WarehouseLayout.pieces(site) do
 		local words = {}
 		local faces = p.words
 		if p.name == "OwnerSign" then
@@ -62,13 +63,13 @@ for n, def in Config.WarehouseLevels.List do
 			str(p.shape or "Block"), num(p.transparency or 0), table.concat(words, ",")))
 	end
 	local stands = {}
-	for _, s in WarehouseLayout.stands(plot, n) do
+	for _, s in WarehouseLayout.stands(site) do
 		table.insert(stands, string.format('{"x":%s,"y":%s,"z":%s}', num(s.x), num(s.y), num(s.z)))
 	end
-	local box = WarehouseLayout.box(plot, n)
-	local o = WarehouseLayout.outline(plot, n)
+	local box = site.warehouse
+	local o = WarehouseLayout.outline(site)
 	table.insert(out, string.format('{"level":%d,"meta":true,"name":%s,"stands":[%s],"box":%s,"top":%s,"parts":%d}', n, str(def.name), table.concat(stands, ","),
-		list({ box.x, box.z, box.sx, box.sy, box.sz }), num(o.top), #WarehouseLayout.pieces(plot, n)))
+		list({ box.x, box.z, box.sx, box.sy, box.sz }), num(o.top), #WarehouseLayout.pieces(site)))
 end
 local p = plot
 print(string.format('{"plot":{"door":[%s,%s],"rect":[%s,%s,%s,%s],"van":[%s,%s]},"rows":[%s]}', num(p.door.x), num(p.door.z), num(p.rect.x0), num(p.rect.x1), num(p.rect.z0), num(p.rect.z1),

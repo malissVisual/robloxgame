@@ -142,19 +142,20 @@ check("SandboxTasks.state: the same view", Tasks.state(A) ~= nil and #(Tasks.sta
 setTasks(A, { { "home", 8 }, { "shown", 6 }, { "sell", 150 } }, { "w_rare", 20 })
 mark = #E.sent
 for _ = 1, 2 do
-	Collection.add(A, { item = "sofa", condition = 1 }) -- (rare: $350)
+	Collection.add(A, { item = "grandfather_clock", condition = 1 }) -- (rare: $900; 8.3 economy: the sofa is uncommon now)
 end
 for _ = 1, 3 do
 	Collection.add(A, { item = "plant", condition = 0.9 }) -- (common)
 end
 E.flush()
 check("five pieces home (a van unloaded): home 5/8; the stock the save had never counts", slot(A, 1).progress == 5, slot(A, 1).progress)
-check("… two of them rare or better: the weekly 2/20", slot(A, "weekly").progress == 2 and CollectionRules.tierOf({ item = "sofa" }).rank >= T.RareRank)
+check("… two of them rare or better: the weekly 2/20", slot(A, "weekly").progress == 2 and CollectionRules.tierOf({ item = "grandfather_clock" }).rank >= T.RareRank
+	and CollectionRules.tierOf({ item = "sofa" }).rank < T.RareRank)
 check("… no task done yet: no \"done\"", #kinds(E.received(A, "SandboxTasks", mark), "done") == 0)
 E.advance(1)
 local stateNow = kinds(E.received(A, "SandboxTasks", mark), "state")
 check("… the state followed (once for the burst)", #stateNow == 1 and stateNow[1].daily[1].progress == 5, #stateNow)
-Collection.add(A, { item = "piano", condition = 1 }) -- (epic)
+Collection.add(A, { item = "piano", condition = 1 }) -- (rare)
 Collection.add(A, { item = "plant", condition = 1 })
 Collection.add(A, { item = "plant", condition = 1 })
 mark = #E.sent
@@ -163,12 +164,12 @@ E.flush()
 local dones = kinds(E.received(A, "SandboxTasks", mark), "done")
 check("eight home: the task done, \"done\" with its title and reward", slot(A, 1).progress == 8 and #dones == 1 and dones[1].title == "Bring 8 pieces home"
 	and dones[1].money == Rules.rewardOf(Rules.def("home") :: Rules.Def, 8) and dones[1].weekly == false and slot(A, "weekly").progress == 3)
-Collection.display(A, uidOf(A, "sofa") :: string, 1)
+Collection.display(A, uidOf(A, "grandfather_clock") :: string, 1)
 Collection.display(A, uidOf(A, "piano") :: string, 2)
-Collection.display(A, uidOf(A, "sofa", 2) :: string, 3)
+Collection.display(A, uidOf(A, "grandfather_clock", 2) :: string, 3)
 E.flush()
 check("three on show: shown 3/6", slot(A, 2).progress == 3, slot(A, 2).progress)
-Collection.undisplay(A, uidOf(A, "sofa", 2) :: string)
+Collection.undisplay(A, uidOf(A, "grandfather_clock", 2) :: string)
 E.flush()
 check("… one taken down: still 3 (the most at once)", slot(A, 2).progress == 3)
 local moneyAt = #money
@@ -200,7 +201,7 @@ do
 	check(`… a hot piece ({hotKind}) sold: hotsell 1/2`, hotPrice ~= nil and slot(A, 1).progress == 1, slot(A, 1).progress)
 	Collection.display(A, uidOf(A, hotKind) :: string, 4)
 	moneyAt = #money
-	E.advance(Config.Collection.Tick * 6 + 0.5)
+	E.advance(Config.Collection.Tick * 18 + 0.5) -- (8.3 economy: a cheap hot piece earns under $1 a minute)
 	local paidNow = paid(A, "CollectionIncome", moneyAt)
 	check("… a hot piece on show: hotincome counts its part of what the stands paid (never more)", slot(A, 2).progress > 0 and slot(A, 2).progress < paidNow, `{slot(A, 2).progress} of {paidNow}`)
 	Collection.undisplay(A, uidOf(A, hotKind) :: string)
@@ -307,7 +308,7 @@ slot(A, "weekly").progress = 5
 E.advance(1)
 E.fire(A, "SandboxTasks", { kind = "claim", slot = "weekly" })
 got, _, sku = paid(A, "SandboxTask", moneyAt)
-check("the weekly done: its own claim, its bigger reward (SKU w_moves)", got == Rules.rewardOf(Rules.def("w_moves") :: Rules.Def, 5) and got >= 2000 and sku == "w_moves")
+check("the weekly done: its own claim, its bigger reward (SKU w_moves)", got == Rules.rewardOf(Rules.def("w_moves") :: Rules.Def, 5) and got >= 1000 and sku == "w_moves")
 E.advance(5)
 check("the claims saved a moment later (SaveDelay)", (E.saves.Player_101 :: any).sandboxTasks ~= nil and (E.saves.Player_101 :: any).sandboxTasks.bonus == true)
 

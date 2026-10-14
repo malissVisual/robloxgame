@@ -78,7 +78,8 @@ local function paint(side: string): any
 	local gui = panel and panel:FindFirstChild(side)
 	return gui and gui:FindFirstChild("Paint")
 end
--- The board's rows as one line ("1 Ben $11.5K +$460 ★ 2 $11.5K | 2 Ann …"), the visible ones only.
+-- The board's rows as one line ("1 Ben $11.5K +$173 ★ 2 $11.5K | 2 Ann …"), the visible ones only. (8.3 economy: the rates
+-- of Config.Collection: the sofa $2.10 a minute, the knight's armour $82.50, the oil painting $90, the vase $30.)
 local function boardText(side: string?): string
 	local p = paint(side or "BoardFront")
 	local out = {}
@@ -117,7 +118,7 @@ check("start: the list waits for the frame's end", statNames(A) == "Level, Money
 E.flush()
 check("a player here before the start: the sandbox's columns in their order, the city's gone", statNames(A) == table.concat(STATS, ", "), statNames(A))
 local ok, detail = listRight(A)
-check("… their values: $1,500, the sofa's $7.7 a minute, the collection $6,350", ok and stat(A, STATS[1]) == 1500 and stat(A, STATS[2]) == 7.7 and stat(A, STATS[3]) == 6350, detail)
+check("… their values: $1,500, the sofa's $2.1 a minute, the collection $6,350", ok and stat(A, STATS[1]) == 1500 and stat(A, STATS[2]) == 2.1 and stat(A, STATS[3]) == 6350, detail)
 check("the all-time best read once for Ann (the store's $9,000)", L.gets == 1 and Leaders.best(101) == 9000, Leaders.best(101))
 check("…and nothing written (her $6,350 is under it)", L.updates == 0)
 
@@ -168,7 +169,7 @@ end
 
 check("before the first draw: no row shown", boardText() == "")
 E.advance(0)
-check("the board: Ann first, $6.3K, +$7.7, ★ 1, her all-time $9K", boardText() == "1 Ann $6.3K +$7.7 ★ 1 $9K", boardText())
+check("the board: Ann first, $6.3K, +$2.1, ★ 1, her all-time $9K", boardText() == "1 Ann $6.3K +$2.1 ★ 1 $9K", boardText())
 check("…the other rows hidden, no empty-server line", not paint("BoardFront"):FindFirstChild("Row2").Visible and not paint("BoardFront"):FindFirstChild("Empty").Visible)
 
 -- ── A player joins ─────────────────────────────────────────────────────────
@@ -176,12 +177,12 @@ E.advance(3)
 E.saves.Player_202 = save(202, 800, { { "knight_armour", 1 }, { "oil_painting", 2 } })
 local B = E.join(202, "Ben")
 local updatesAt = L.updates
-check("a player who joins: the sandbox's columns at the frame's end, their values", statNames(B) == table.concat(STATS, ", ") and (listRight(B)) and stat(B, STATS[3]) == 11500 and stat(B, STATS[2]) == 460, statNames(B))
+check("a player who joins: the sandbox's columns at the frame's end, their values", statNames(B) == table.concat(STATS, ", ") and (listRight(B)) and stat(B, STATS[3]) == 11500 and stat(B, STATS[2]) == 172.5, statNames(B))
 check("…their all-time best read (none stored)", L.gets == 2 and Leaders.best(202) == 11500)
 E.advance(0)
 check("…and their first best written at once (UpdateAsync, a whole number)", L.updates == updatesAt + 1 and L.ordered[STORE]["202"] == 11500, L.updates)
 local firstBest = E.clock
-check("the board at once (its last draw was BoardEvery s ago): Ben first ($11.5K, +$460, ★ 2), Ann second", boardText() == "1 Ben $11.5K +$460 ★ 2 $11.5K | 2 Ann $6.3K +$7.7 ★ 1 $9K", boardText())
+check("the board at once (its last draw was BoardEvery s ago): Ben first ($11.5K, +$173, ★ 2), Ann second", boardText() == "1 Ben $11.5K +$173 ★ 2 $11.5K | 2 Ann $6.3K +$2.1 ★ 1 $9K", boardText())
 check("…both faces the same", boardText("BoardBack") == boardText("BoardFront"))
 local row1 = paint("BoardFront"):FindFirstChild("Row1")
 local row2 = paint("BoardFront"):FindFirstChild("Row2")
@@ -233,10 +234,10 @@ do
 	local uid = Collection.add(A, { item = "knight_armour", condition = 1 })
 	check("a piece comes home: the columns and the board follow", uid ~= nil)
 	E.advance(S.Every)
-	check("…the collection column: $11,850 (the armour in the stock earns nothing yet)", stat(A, STATS[3]) == 11850 and stat(A, STATS[2]) == 7.7, stat(A, STATS[3]))
+	check("…the collection column: $11,850 (the armour in the stock earns nothing yet)", stat(A, STATS[3]) == 11850 and stat(A, STATS[2]) == 2.1, stat(A, STATS[3]))
 	Collection.display(A, uid :: string, 2)
 	E.advance(S.Every)
-	check("…put on show: $ a minute $227.7", stat(A, STATS[2]) == 227.7, stat(A, STATS[2]))
+	check("…put on show: $ a minute $84.6", stat(A, STATS[2]) == 84.6, stat(A, STATS[2]))
 	E.advance(S.BoardEvery)
 	check("the board: Ann's $11.9K passes Ben's $11.5K", string.sub(boardText(), 1, 8) == "1 Ann $1" and string.find(boardText(), "2 Ben", 1, true) ~= nil, boardText())
 	-- a change with the board idle: drawn at once; more within BoardEvery s of that draw: one draw when it is up
@@ -279,7 +280,7 @@ do
 	E.advance(S.Every + 0.1)
 	check("a higher best from another server stays (the write does nothing, the board shows it)", L.updates == updates + 1 and L.ordered[STORE]["202"] == 50000 and Leaders.best(202) == 50000, L.ordered[STORE]["202"])
 	E.advance(S.BoardEvery)
-	check("…the board's ALL-TIME: $50K", string.find(boardText(), "1 Ben $16K +$460 ★ 2 $50K", 1, true) ~= nil, boardText())
+	check("…the board's ALL-TIME: $50K", string.find(boardText(), "1 Ben $16K +$173 ★ 2 $50K", 1, true) ~= nil, boardText())
 end
 
 -- ── A player leaves ────────────────────────────────────────────────────────
@@ -292,7 +293,7 @@ do
 	E.leave(A)
 	check("Ann leaves: nothing errors (her waiting writes find her gone)", true)
 	E.advance(S.BoardEvery + 0.1)
-	check("…her row goes; Ben alone, first", boardText() == "1 Ben $16K +$460 ★ 2 $50K", boardText())
+	check("…her row goes; Ben alone, first", boardText() == "1 Ben $16K +$173 ★ 2 $50K", boardText())
 	check("…SandboxLeaders.rows: only Ben", #Leaders.rows() == 1 and Leaders.rows()[1].name == "Ben")
 	E.advance(S.AllTime.Every)
 	check("…her last best still written when her 2 minutes are up ($19,140)", stored == 17940 and L.ordered[STORE]["101"] == 19140, `{stored} {L.ordered[STORE]["101"]}`)
@@ -309,7 +310,7 @@ do
 	check("the store down: Cy's read fails, his first write too, nothing errors, one warning", L.gets == gets + 1 and L.updates == updates + 1 and #E.warnings == warnings + 1 and string.find(E.warnings[#E.warnings], "[SandboxLeaders]", 1, true) ~= nil, #E.warnings - warnings)
 	check("…his columns and his row all the same", (listRight(C)) and stat(C, STATS[3]) == 3000)
 	E.advance(S.BoardEvery)
-	check("…the board shows his best here ($3K)", string.find(boardText(), "Cy $3K +$78 – $3K", 1, true) ~= nil, boardText())
+	check("…the board shows his best here ($3K)", string.find(boardText(), "Cy $3K +$30 – $3K", 1, true) ~= nil, boardText())
 	E.advance(S.AllTime.Every - S.BoardEvery - 1)
 	check("…no second try before 2 minutes", L.updates == updates + 1)
 	L.down = false

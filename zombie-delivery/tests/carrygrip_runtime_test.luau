@@ -8,7 +8,8 @@
 -- 7 – 12 s of walking (seldom standing); a hit keeps it steady; a sturdy piece's first miss staggers it (a knock, the
 -- walk × 0.6 a moment, the next wobble sooner), the second in a row drops it; a fragile piece drops at once; no answer
 -- is a miss. A pair piece: each carrier their own checks (a Help lift too), a stagger's knock half each, either one's
--- drop drops it whole. Danny's GripSteady and the Mover: bigger zones. A door trip takes the check off. The CarryGrip
+-- drop drops it whole. Danny's GripSteady and the Mover: bigger zones. A door trip takes the check off (8.3: the move
+-- FadeOut + Margin s after the fade out, its stream first). The CarryGrip
 -- attribute with the carry, gone with it.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
@@ -390,7 +391,9 @@ local onDoor = lastGrip(ann, "open")
 local leave = promptIn(workspace, "Leave house")
 local queued: { () -> () } = {}
 local runAtOnce = E.task.delay
-E.task.delay = function(_: any, callback: any, ...: any) -- (the fade's delay waits: the trip is on until run)
+local delays: { number } = {}
+E.task.delay = function(seconds: any, callback: any, ...: any) -- (the fade's delay waits: the trip is on until run)
+	table.insert(delays, seconds)
 	local args = table.pack(...)
 	table.insert(queued, function()
 		callback(table.unpack(args, 1, args.n))
@@ -407,7 +410,11 @@ answer(ann, onDoor, 0.01, "miss")
 E.now += 10
 state()
 check("…its answer during the trip does nothing, no wobble opens on the way", thingOf(4).condition == clock0 and carrying(ann) == 4 and countGrip(ann, "open", since) == 0)
-table.remove(queued, 1)()
+check("8.3: the trip waits in the dark: the other side streamed in meanwhile, the move FadeOut + Margin s after the fade out", #queued == 2
+	and delays[1] == 0 and delays[2] == Config.Moving.Doors.FadeOut + Config.Moving.Doors.Margin, table.concat(delays, ", "))
+while #queued > 0 do -- (the stream's request, then the trip)
+	table.remove(queued, 1)()
+end
 E.task.delay = runAtOnce
 since = #E.messages
 state()

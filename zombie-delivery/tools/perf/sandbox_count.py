@@ -16,7 +16,8 @@ Each piece's row (tools/perf/census.luau): parts, MeshParts, visible / see-throu
 (and the small ones under RenderBudget's size rule), lights (and those with Shadows on), SurfaceGuis and BillboardGuis
 (and those drawn at any distance), ParticleEmitters, Beams, fire / smoke / sparkles, decals, ProximityPrompts;
 the client's own 3D (client/SandboxGuide.luau's path and marker) read from its source. Then the worst case: 4 players,
-every warehouse a Logistics centre (8.3: level 5, the biggest) with its 20 stands full, 4 vans, a move running with the inside and Danny, the server's cap of visitors. The players' own avatars, the
+every warehouse a Logistics Center (8.3: level 5, the biggest, More stands at its top) with its 32 stands full, 4 vans, a
+move running with the inside and Danny, the server's cap of visitors. The players' own avatars, the
 greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it. 8.3 the
 big move: its inside is counted for every player at once too (4 moves running: a worst case past the one move's).
 
@@ -49,7 +50,7 @@ function C.__own(player, entries, count)
 	stands[player] = count
 end
 function C.stock(player) return stock[player] or {} end
-function C.stands(player) return stands[player] or 20 end
+function C.stands(player) return stands[player] or 32 end
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
 function C.marketIncome() return 1 end -- (8.3: the market's hot kinds, server/Warehouse.luau's tags)
@@ -67,7 +68,9 @@ function P.owner(id) return owners[id] end
 function P.onChanged() end
 return P
 """
-UPGRADES = "local U = {}\nfunction U.open() end\nfunction U.warehouseLevel() return 5 end -- (8.3: the worst case, the Logistics centre)\nreturn U\n"
+UPGRADES = ("local U = {}\nfunction U.open() end\nfunction U.onChanged() end\n"
+            "function U.levels() return { warehouse = 4, stands = 4 } end -- (8.3: the worst case, the Logistics Center, More stands at its top)\n"
+            "return U\n")
 
 COLUMNS = [
     ("parts", "parts"), ("meshParts", "MeshParts"), ("visible", "visible"), ("seeThrough", "see-through"),
@@ -160,8 +163,8 @@ def main():
     entries.append(("**the map (SandboxWorld)**", world))
     entries += [
         ("kiosks (4)", rows["kiosks"]),
-        ("warehouses (4): the halls, level 5, 20 stands each", rows["warehouses/building"]),
-        ("warehouses (4): 20 pieces on show each", rows["warehouses/shown"]),
+        ("warehouses (4): the halls, level 5, 32 stands each", rows["warehouses/building"]),
+        ("warehouses (4): every stand full (32 pieces on show each)", rows["warehouses/shown"]),
         ("a van (Sprinter, stage 0)", van),
         ("the house's inside (largest plan)", rows["interior"]),
         ("Danny", rows["danny"]),

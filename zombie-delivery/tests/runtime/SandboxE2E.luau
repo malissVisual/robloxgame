@@ -1558,6 +1558,7 @@ E.real = {
 	HouseMesh = true, HouseInterior = true, FurnitureMesh = true, Analytics = true, SandboxAnalytics = true, CollectionBook = true,
 	SandboxTasks = true, SandboxLeaders = true, WarehouseMesh = true, VanPaint = true,
 	Visitors = true, VisitorOffers = true, -- 8.3: the showroom's visitors (tests/visitors_runtime_test.luau; off in the e2e)
+	SandboxBadges = true, -- 8.3: the Roblox badges (every id 0 here: it listens and counts the moves, it never calls BadgeService)
 }
 E.fakes = {}
 

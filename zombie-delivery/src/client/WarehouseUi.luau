@@ -4,7 +4,8 @@
 -- or sold any time. The server decides every value; this window only shows them and asks through the "Collection"
 -- remote:
 --   { kind = "state", stock, income, stands }   kept (WarehouseUi.state, WarehouseUi.onState); an open window is drawn
---                                               again only when what it shows changed (its scroll kept)
+--                                               again only when what it shows changed (its scroll kept); 8.3 economy:
+--                                               `idle` the share the stands pay while you are idle (else none)
 --   { kind = "pick", stand }                    an empty display stand's prompt (Collection.openPicker): THE PICKER
 --   { kind = "sold", name, money }              a toast "Sold Grandpa's Clock · +$420" (WarehouseUi.notify, else
 --                                               client/Hud.luau's toast)
@@ -36,9 +37,9 @@
 --                                        legendary gold) and their order
 -- 8.2, the warehouse's quality of life (which pieces: shared/StockPlan.luau, the rules server/Collection.luau decides
 -- with, so what a button offers before it asks is what happens):
---   * THE PICKER greys a piece too big for this stand (WarehouseLayout.fits at your warehouse level, 8.3: the Garage's
---     and the Workshop's stands hold no hay wagon): "Too big for this stand" over its picture, its DISPLAY a grey TOO
---     BIG that says a bigger warehouse has bigger stands; the pieces that fit come first.
+--   * THE PICKER greys a piece too big for this stand (an upgrade's small stand, WarehouseLayout.fits: the beds, the hay
+--     wagon, the wheelbarrow): "Too big for this stand" over its picture, its DISPLAY a grey TOO BIG that says which
+--     stands take it; the pieces that fit come first.
 --   * THE STOCK LIST's header: ⭐ FILL BEST ({ kind = "fillbest" }: the best earners onto every free stand you have,
 --     each where it fits), 💰 SELL… (a small menu: ALL COMMON, ALL BROKEN, DUPLICATES (keeps the best of each item),
 --     each with how many and their price; each asks "SELL N PIECES FOR $Y?" first, then sends { kind = "sellmany",
@@ -58,6 +59,9 @@
 --     each next piece of a kind under the demand of the ones before it) and its SELL sends the total it showed
 --     ({ kind = "sellmany", filter, expect }): the server sells only at that total (the prices moved: it says so and
 --     sends the state again). Only prices the server sent are expected (a guessed one is never sent).
+-- 8.3 (design/warehouse-levels/KONTRAKT.md): which stands are small depends on your warehouse's level (the player
+-- attribute Config.SandboxUpgrades.WarehouseAttribute, 1 … 5, server/Upgrades.luau; 4 until the server sets it, as a
+-- plain Plot): WarehouseLayout.fits and count ask with it, so TOO BIG and its words follow a level up.
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -99,6 +103,7 @@ export type State = {
 	stands: number,
 	market: Market.View?, -- 8.3: the player's market (nil: none sent)
 	marketAt: number, -- 8.3: os.clock() it came (its `left` counts from then)
+	idle: number?, -- 8.3 economy: idle, the share of `income` the stands pay (nil: active, all of it)
 }
 export type Values = { rarity: string, perMinute: number, sell: number }
 export type Layout = {
@@ -566,11 +571,18 @@ function WarehouseUi.showing(): string?
 	return if not open then nil elseif open.stand then "picker" else "stock"
 end
 
+-- 8.3: your warehouse's level (the player attribute, 1 … 5); 4 until the server sets it (a plain Plot's: the stands
+-- of before 8.3).
+local function warehouseLevel(): number
+	local level = Players.LocalPlayer:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute)
+	return if type(level) == "number" then level else 4
+end
+
 -- 8.2: does a piece of this item stand on stand i (an upgrade's small stand holds no bed)? As the server's
--- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once.
+-- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once (8.3: a level).
 local fitsKnown: { [string]: boolean } = {}
 local function fitsStand(stand: number, item: string): boolean
-	local level = Players.LocalPlayer:GetAttribute(Config.WarehouseLevels.Attribute) -- 8.3: the stands' size is the level's
+	local level = warehouseLevel()
 	local key = `{level}|{stand}|{item}`
 	local known = fitsKnown[key]
 	if known == nil then
@@ -847,7 +859,12 @@ local function sellMenu()
 				what = someNames(chosen, byUid),
 				hint = hint,
 				onYes = function()
-					if send({ kind = "sellmany", filter = id, expect = expect }) then
+					-- (8.4 review: + the pieces it listed: the server sells exactly those, or nothing if the stock changed)
+					local uids = table.create(#chosen)
+					for _, piece in chosen do
+						table.insert(uids, piece.uid)
+					end
+					if send({ kind = "sellmany", filter = id, expect = expect, uids = uids }) then
 						waiting("SellMenu")
 					end
 				end,
@@ -868,7 +885,7 @@ local function fillWhy(list: { StockPlan.Piece }, stands: number): string
 	end
 	for _, piece in list do
 		if piece.stand == nil and piece.broken ~= true and piece.income > 0 then
-			return "What's in your stock is too big for your free stands: a bigger warehouse has bigger ones."
+			return "What's in your stock is too big for your free small stands."
 		end
 	end
 	return "Nothing in your stock would earn on a stand. Bring more home from a move!"
@@ -1068,7 +1085,7 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	if stand and tooBig then
 		-- 8.2: TOO BIG instead of DISPLAY, grey; a tap says where it goes
 		first = tileButton(frame, "Display", "TOO BIG", "shut", layout, function()
-			toast(`Your {nameOf(entry)} is too big for stand {stand}: a bigger warehouse has bigger stands (UPGRADES).`)
+			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count(warehouseLevel())}.`)
 		end)
 		first.AutoButtonColor = false
 		first.TextTransparency = 0.3
@@ -1441,7 +1458,8 @@ local function setState(raw: any)
 		end
 	end
 	local previous = current
-	local state: State = { stock = stock, income = amount(raw.income) or 0, stands = amount(raw.stands) or 0, market = Market.readView(raw.market), marketAt = os.clock() }
+	local idle = amount(raw.idle) -- (8.3 economy: idle, the stands' share)
+	local state: State = { stock = stock, income = amount(raw.income) or 0, stands = amount(raw.stands) or 0, market = Market.readView(raw.market), marketAt = os.clock(), idle = if idle and idle < 1 then idle else nil }
 	current = state
 	for _, fn in listeners do
 		task.spawn(fn, state, previous)

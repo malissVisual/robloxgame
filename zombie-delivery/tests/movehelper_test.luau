@@ -80,6 +80,8 @@ check("…not of the move's crew: refused first (crew)", assign({ crew = false, 
 check("…not this move's piece (another move's model): refused (piece)", assign({ mine = false }) == "piece")
 check("…not hired: hire him first (hire)", assign({ hired = false }) == "hire" and assign({ hired = false, queued = true }) == "hire")
 check("…too far to see it (ClickReach): refused (far)", assign({ near = false }) == "far")
+check("8.3 review: his card's reach (CardReach) at least a click's (ClickReach), a little slack past where it opened (CardSlack): a click on him from afar never opens a card that shuts at once",
+	H.CardReach >= H.ClickReach and H.CardSlack > 0)
 check("…in his arms already: (his)", assign({ his = true, state = "carried", held = true }) == "his")
 check("…in the van: (van); home or lost: (gone)", assign({ state = "truck" }) == "van" and assign({ state = "delivered" }) == "gone" and assign({ state = "lost" }) == "gone")
 check("…somebody holds it: (held)", assign({ state = "carried", held = true }) == "held" and assign({ held = true }) == "held")
@@ -304,6 +306,66 @@ check("8.1 his top speed holding it: the pair's walk × HoldMargin + HoldExtra (
 check("…faster with a faster leader (a steady grip, a Mover, the admin's speed), never under HoldExtra", Brain.holdSpeed(pairWalk * 2) > Brain.holdSpeed(pairWalk)
 	and near(Brain.holdSpeed(-3), H.HoldExtra))
 check("8.1 his body turns to you at HoldTurn × PairTurn at most", near(Brain.holdTurn(), math.rad(H.PairTurn) * H.HoldTurn))
+
+-- 8.3 keeping up (the owner: "when I run, he just goes behind me with his arms stretched out") ---------------------------
+
+check("8.3 his top speed follows your real speed (pace) when it is more than the carry's walk: × HoldMargin + HoldExtra",
+	near(Brain.holdSpeed(pairWalk, pairWalk * 1.2), pairWalk * 1.2 * H.HoldMargin + H.HoldExtra) and Brain.holdSpeed(pairWalk, pairWalk * 1.2) > pairWalk * 1.2)
+check("…never under the carry's own (a slower pace, none, a NaN)", near(Brain.holdSpeed(pairWalk, 2), Brain.holdSpeed(pairWalk))
+	and near(Brain.holdSpeed(pairWalk, nil), Brain.holdSpeed(pairWalk)) and near(Brain.holdSpeed(pairWalk, 0 / 0), Brain.holdSpeed(pairWalk)))
+check("…a sprint (28) kept up with: more than 28, at most HoldCap", Brain.holdSpeed(pairWalk, Config.Movement.Sprint) > Config.Movement.Sprint
+	and Brain.holdSpeed(pairWalk, Config.Movement.Sprint) <= H.HoldCap and near(Brain.holdSpeed(pairWalk, 500), H.HoldCap))
+check("…an admin's boosted walk over HoldCap is never cut", near(Brain.holdSpeed(pairWalk * 4, pairWalk * 5), pairWalk * 4 * H.HoldMargin + H.HoldExtra)
+	and Brain.holdSpeed(pairWalk * 4) > H.HoldCap)
+do
+	local trail = Brain.newTrail()
+	check("8.3 your real speed: nothing measured at the first look", Brain.holdPace(trail, 0, 0, 0.1, false) == 0)
+	local x = 0
+	for _ = 1, 10 do
+		x += pairWalk * 0.1
+		Brain.holdPace(trail, x, 0, 0.1, false)
+	end
+	check("…walking at the pair's walk: that", near(trail.pace, pairWalk, 1e-6), trail.pace)
+	x += pairWalk * 1.2 * 0.1
+	check("…a rise taken at once (20% faster: a lag spike, a slope)", near(Brain.holdPace(trail, x, 0, 0.1, false), pairWalk * 1.2, 1e-6))
+	x += pairWalk * 0.5 * 0.1
+	local after = Brain.holdPace(trail, x, 0, 0.1, false)
+	check("…a fall over HoldPace.Fall s (one slow look never slows him at once)", after > pairWalk and after < pairWalk * 1.2, after)
+	for _ = 1, 30 do
+		Brain.holdPace(trail, x, 0, 0.1, false)
+	end
+	check("…standing a while: none", trail.pace < 0.05 and math.abs(trail.vx) < 0.01, trail.pace)
+	check("…a burst (8 studs in a look): HoldCap at most", near(Brain.holdPace(trail, x + 8, 0, 0.1, false), H.HoldCap))
+	check("…put there at once (past HoldPace.Jump: a door's fade): nothing measured", Brain.holdPace(trail, x + 8 + H.HoldPace.Jump + 1, 0, 0.1, false) == 0
+		and trail.vx == 0)
+	Brain.holdPace(trail, 0, 0, 0.1, false)
+	check("…a reset (a new hold, the other world): nothing measured", Brain.holdPace(trail, 0.5, 0, 0.1, true) == 0 and trail.fromX == 0.5)
+	Brain.holdPace(trail, 0 / 0, 0 / 0, 0.1, true) -- (no root to look at: never kept)
+	local again = Brain.holdPace(trail, 1, 0, 0.1, false)
+	Brain.holdPace(trail, 2, 0, 0.1, false)
+	local lnx, lnz = Brain.holdLead(trail, 0.1)
+	check("…no root a look (NaN): never kept; the next looks measure again (no NaN speed, no NaN lead)", again == 0 and near(trail.pace, 10)
+		and lnx == lnx and lnz == lnz and lnx > 0, trail.pace)
+	-- the lead
+	check("8.3 Danny's lead: HoldLead.Base + your ping × Ping, 0 … Most", near(Brain.leadTime(0), H.HoldLead.Base) and near(Brain.leadTime(0.1), H.HoldLead.Base + 0.1 * H.HoldLead.Ping)
+		and near(Brain.leadTime(5), H.HoldLead.Most) and near(Brain.leadTime(nil), H.HoldLead.Base) and near(Brain.leadTime(0 / 0), H.HoldLead.Base)
+		and H.HoldLead.Base > 0 and H.HoldLead.Most < 0.5)
+	trail = Brain.newTrail()
+	local z = 0
+	for _ = 1, 20 do
+		z -= pairWalk * 0.1
+		Brain.holdPace(trail, 0, z, 0.1, false)
+	end
+	local lx, lz = Brain.holdLead(trail, 0.1)
+	check("…your velocity × the lead, your way (walking -Z at the pair's walk: a stud ahead in 0.1 s)", near(lx, 0, 1e-6) and near(lz, -pairWalk * 0.1, 1e-3), lz)
+	lx, lz = Brain.holdLead(trail, 10)
+	check("…HoldLead.Far studs at most", near(math.sqrt(lx * lx + lz * lz), H.HoldLead.Far, 1e-6))
+	for _ = 1, 10 do
+		Brain.holdPace(trail, 0, z, 0.1, false)
+	end
+	lx, lz = Brain.holdLead(trail, 0.1)
+	check("…you stop: the lead is gone within a second (smoothed over HoldLead.Smooth s)", math.abs(lz) < 0.01, lz)
+end
 do
 	local top = Brain.holdSpeed(pairWalk)
 	local trail = Brain.newTrail()

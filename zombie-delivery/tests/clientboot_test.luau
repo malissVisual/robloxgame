@@ -10,7 +10,8 @@
 --     them; PLAY still fires the server's Play; the State reaches the HUD, the start screen, the key hints and
 --     SandboxHud.setState; ESC closes the warehouse's picker; the picker frees the mouse; 8.3: the server's notices go
 --     through SandboxHud.notice (in this device's words) when it has one, else straight to the HUD's toasts; 8.3:
---     SandboxLight (the eyes) starts after SandboxSounds. Run with tests/run_tests.py.
+--     SandboxLight (the eyes) starts after SandboxSounds; 8.3 review: another window opening only hides a visitor's
+--     offer card (OfferCard.hide), ESC declines it (OfferCard.close). Run with tests/run_tests.py.
 
 local Config = require("./Config")
 local ClientMain = require("./ClientMain")
@@ -38,12 +39,13 @@ local CITY = {
 }
 
 -- The sandbox's client: walking, the camera and the body, the cars, the sounds, the admin, the move's horde, the moves
--- (with the crew panel for the planning's + INVITE), the HUD and the key hints; then its own modules.
+-- (with the crew panel for the planning's + INVITE; 8.3 the walk-in doors' leaves and arrival: WalkDoors), the HUD and
+-- the key hints; then its own modules.
 local SANDBOX = {
 	"Drive", "ZombieAnimator", "CarVisuals", "Hud", "CameraRig", "ArmPose", "AdminPanel", "AdminFly", "CrewPanel",
 	"Sounds", "Stamina", "CarBoarding", "GaitPose", "BodyLife", "KeyHints", "Unstuck", "CurbRide", "PerfOverlay",
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
-	"QuickChat", "CarryGripUi", "CargoPrompts",
+	"QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera)
 }
 local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "OfferCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)
@@ -133,6 +135,9 @@ local function boot(sandbox: boolean, own: { [string]: string }, warehouseOpen: 
 				close = function()
 					table.insert(run.calls, name .. ".close")
 				end,
+				hide = if name == "OfferCard" then function() -- (8.3 review: hidden, the offer still waiting)
+					table.insert(run.calls, name .. ".hide")
+				end else nil,
 				notice = if name == "SandboxHud" then function(_text: any) -- (8.3: the notices in this device's words)
 					table.insert(run.calls, "SandboxHud.notice")
 				end else nil,
@@ -276,6 +281,7 @@ do
 	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil
 		and run.required.MoveHelperCard == nil and run.required.VanPaintUi == nil and run.required.OfferCard == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
+	check("8.3: the city never requires the sandbox's walk-in doors' client (WalkDoors)", run.required.WalkDoors == nil)
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
 
@@ -383,6 +389,17 @@ do -- 8.3 a visitor's offer card alone: open, it frees the mouse (ACCEPT / DECLI
 		onOpen()
 	end
 	check("… opening it closes the picker but not itself", type(onOpen) == "function" and called(run, "WarehouseUi.close") and not called(run, "OfferCard.close"))
+	-- 8.3 review: another window opening (no escape) only hides the offer, which keeps waiting; ESC declines it
+	local close = run.modules.Hud.onCloseWindows
+	run.modules.Hud.escaping = false
+	table.clear(run.calls)
+	close()
+	check("8.3 review: another window opening (Hud.escaping false) only hides the offer card (OfferCard.hide: it waits), no DECLINE",
+		called(run, "OfferCard.hide") and not called(run, "OfferCard.close") and called(run, "WarehouseUi.close"))
+	run.modules.Hud.escaping = true
+	table.clear(run.calls)
+	close()
+	check("… ESC or the Roblox menu (Hud.escaping) closes it: a DECLINE (OfferCard.close)", called(run, "OfferCard.close") and not called(run, "OfferCard.hide"))
 end
 
 do -- 8.3 the PAINT shop's window alone: open, it frees the mouse (its swatches are clicked); it closes the other windows

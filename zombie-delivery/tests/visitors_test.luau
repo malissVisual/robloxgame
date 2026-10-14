@@ -1,8 +1,8 @@
 -- 8.3 SANDBOX, the showroom's visitors (shared/Visitors.luau, Config.Visitors): the kinds (weights, names, looks: the
 -- collector's tweed, the hiker's beanie), the groups and the gaps (near: about a minute, away: every few minutes), the
 -- offer's price (always over the market price, × Min … Max, more for a rarer piece, a hot kind, a keen kind, Top at most,
--- round), the hall of every plot at every warehouse level as the layout builds it (8.3 levels: the Garage's 2 stands to
--- the Logistics centre's 20): a spot at every stand (never on a podium, in the door's way or at the desk, inside the
+-- round), the hall of every plot at every warehouse level as the layout builds it (8.3 levels, WarehouseLayout.site: the
+-- Garage's 2 stands to the Logistics Center's 32): a spot at every stand (never on a podium, in the door's way or at the desk, inside the
 -- walls, looking at its piece), a way from the door to every spot and between them whose every leg keeps clear of the
 -- podiums and the desk, the doorway beside the van (off its bay, behind its back, past the bollards), a few visitors a
 -- hall by its level (the Garage: one), a hall of another shape works the same, the routes are cheap; the words ("Ooh, a
@@ -115,6 +115,7 @@ do
 	check("more for a rarer piece, a hot kind, a keen kind (the collector's pay)", Visitors.offerFactor(5, false, 0, 0.5) > Visitors.offerFactor(3, false, 0, 0.5)
 		and Visitors.offerFactor(3, false, 0, 0.5) > Visitors.offerFactor(1, false, 0, 0.5) and Visitors.offerFactor(1, true, 0, 0.5) > Visitors.offerFactor(1, false, 0, 0.5)
 		and Visitors.offerFactor(1, false, 0.1, 0.5) > Visitors.offerFactor(1, false, 0, 0.5) and Visitors.offerFactor(5, true, 0.5, 0.99) == O.Top)
+	check("8.3 economy: 50 % over the market price at most (Top 1.5, was 2), never under Min", O.Top == 1.5 and O.Top >= O.Max and Visitors.offerFactor(5, true, 0.5, 0.99) == 1.5 and O.Min > 1)
 	check("the example: $230 × 1.478 = $339.94, up to $340", Visitors.offerPrice(230, 1, false, 0, (1.478 - O.Min) / (O.Max - O.Min)) == 340, Visitors.offerPrice(230, 1, false, 0, (1.478 - O.Min) / (O.Max - O.Min)))
 	check("the chance: Offer.Chance × the kind's, at most 1", Visitors.offerChance(Visitors.kind("collector") :: Visitors.Kind) == math.min(1, O.Chance * 1.6)
 		and Visitors.offerChance(Visitors.kind("tourist") :: Visitors.Kind) < Visitors.offerChance(Visitors.kind("collector") :: Visitors.Kind))
@@ -123,21 +124,23 @@ end
 
 -- ── The hall ────────────────────────────────────────────────────────────────
 
--- The layout's hall at a level as server/Visitors.luau reads it.
+-- The layout's hall at a level as server/Visitors.luau reads it (8.3: the plot's Site at that level, WarehouseLayout.site;
+-- every stand the level has, the More stands' small ones too).
 local function inputOf(plot: SandboxMap.Plot, level: number): Visitors.HallInput
+	local site = WarehouseLayout.site(plot, level) :: SandboxMap.Plot
 	local podiums: { Visitors.Podium } = {}
-	for i = 1, WarehouseLayout.count(level) do
-		local s = WarehouseLayout.stand(plot, i, level)
+	for i = 1, WarehouseLayout.capacity(level) do
+		local s = WarehouseLayout.stand(site, i)
 		if s then
 			table.insert(podiums, { index = i, x = s.x, z = s.z, sx = s.sx, sz = s.sz, yaw = s.yaw })
 		end
 	end
-	local desk = WarehouseLayout.terminal(plot, level)
-	local door = WarehouseLayout.door(plot, level)
+	local desk = WarehouseLayout.terminal(site)
+	local door = WarehouseLayout.door(site)
 	return {
-		inside = WarehouseLayout.inside(plot, level),
+		inside = WarehouseLayout.inside(site),
 		door = { x = door.x, z = door.z, width = door.width },
-		doorPath = WarehouseLayout.doorPath(plot, level),
+		doorPath = WarehouseLayout.doorPath(site),
 		desk = { index = 0, x = desk.x, z = desk.z, sx = desk.sx, sz = desk.sz, yaw = desk.yaw },
 		stands = podiums,
 	}
@@ -251,7 +254,7 @@ end
 -- the bollards by the door (from the Warehouse level on): the way in keeps a body's width off them
 local function bollardsClear(plot: SandboxMap.Plot, level: number, door: Visitors.Doorway): (boolean, string?)
 	local posts = {}
-	for _, piece in WarehouseLayout.pieces(plot, level) do
+	for _, piece in WarehouseLayout.pieces(WarehouseLayout.site(plot, level) :: SandboxMap.Plot) do
 		if string.sub(piece.name, 1, 7) == "Bollard" then
 			table.insert(posts, piece)
 		end
@@ -271,9 +274,9 @@ local function bollardsClear(plot: SandboxMap.Plot, level: number, door: Visitor
 end
 
 for _, plot in SandboxMap.Plots do
-	for level = 1, #Config.WarehouseLevels.List do
-		local name = Config.WarehouseLevels.List[level].name
-		local label = `plot {plot.id}, level {level} ({name}, {WarehouseLayout.count(level)} stands)`
+	for level = 1, #Config.Warehouse.Levels do
+		local name = Config.Warehouse.Levels[level].name
+		local label = `plot {plot.id}, level {level} ({name}, {WarehouseLayout.capacity(level)} stands)`
 		local _, door = hallChecks(label, inputOf(plot, level), if (plot.id + level) % 2 == 0 then 1 else -1)
 		local bay = WarehouseLayout.bay(plot)
 		local clear, why = bollardsClear(plot, level, door)
@@ -297,13 +300,13 @@ hallChecks("a garage's hall (two stands, a narrow door)", garage, -1)
 
 -- the routes are cheap: a hundred in the biggest hall
 do
-	local biggest = #Config.WarehouseLevels.List
+	local biggest = #Config.Warehouse.Levels
 	local hall = Visitors.hall(inputOf(SandboxMap.Plots[3], biggest))
 	local door = Visitors.doorway(hall, 1)
 	local started = os.clock()
 	local found = 0
 	for n = 1, 100 do
-		local stand = (n - 1) % WarehouseLayout.count(biggest) + 1
+		local stand = (n - 1) % WarehouseLayout.capacity(biggest) + 1
 		local spot = Visitors.spot(hall, stand, n / 100)
 		if spot and Visitors.route(hall, door.inside, { x = spot.x, z = spot.z }) then
 			found += 1

@@ -7,7 +7,8 @@
 -- attributes DoorOpenAt to DoorCloseAt (server times, server/Vehicles.luau), open in Config.Cargo.DoorSwingSeconds,
 -- shut in DoorShutSeconds (shared/Boarding.luau); getting out, your own door opens at once (Drive.doorHeld). No door
 -- prompts while a chauffeur drives the car (Chauffeured), your hands are full (the Carrying attribute: you could not
--- get in anyway), you sit in a car or are getting in (3.10: E gets you out there), or the seat is taken or reserved.
+-- get in anyway), you sit in a car or are getting in (3.10: E gets you out there), or the seat is taken or reserved
+-- (8.3 review: a seat Danny of your move sits in is not taken for you: he gets out for you).
 -- 3.2: swings the back that opens (rear doors, a tailgate, a trunk lid, a ramp: the Motor6Ds "BackHinge" on the
 -- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
 -- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
@@ -284,9 +285,15 @@ local function nameTag(car: Model, chassis: BasePart)
 	padding.Parent = label
 end
 
+-- (8.3 review: a seat Danny of your move sits in counts as free: he gets out for you, server/MoveHelper.luau's
+-- Vehicles.yieldSeat; his body's MoveHelper is his id, your MoveHelperId the same while you are of his move's crew)
 local function freeSeat(seats: { Seat }): boolean
+	local danny = player:GetAttribute("MoveHelperId")
 	for _, seat in seats do
-		if seat.Occupant == nil and seat:GetAttribute("Reserved") == nil then
+		local occupant = seat.Occupant
+		local body = if occupant then occupant.Parent else nil
+		local yields = danny ~= nil and body ~= nil and body:GetAttribute("MoveHelper") == danny
+		if (occupant == nil or yields) and seat:GetAttribute("Reserved") == nil then
 			return true
 		end
 	end

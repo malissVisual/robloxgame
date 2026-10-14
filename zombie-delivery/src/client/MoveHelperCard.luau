@@ -13,7 +13,10 @@
 --   * The card: "🧑‍🔧 DANNY", his status (MoveHelperBrain.status), ✕; for hire: "Hire Danny for this move · $170", what
 --     he does for you, and HIRE · $170 (the Moving remote's ("helper", "hire"): the server checks the crew and the
 --     money and takes it); hired: "2 pieces to carry", how to give him pieces, and CLEAR QUEUE (("helper", "clear")).
---     A tap on its button sends once and the card closes. A gamepad's selection starts on its button.
+--     A tap on its button sends once and the card closes. A gamepad's selection starts on HIRE for hire, on ✕ once he
+--     is hired (8.3 review: an A pressed by habit never clears his list) and stays inside the card (a SelectionGroup);
+--     as it closes it is let go when it sits in the card or in no window (the HUD's groups, the chips, nothing shown:
+--     client/PadGlyph.luau's chips need no selection).
 --   * His list (hired): a click on a piece of your move (a tap on a touch screen) sends ("helper", "assign", its model):
 --     onto his list, or off it again (the server checks and says so in a toast; its marker over the piece is the
 --     server's). On a gamepad the prompt "Give to Danny" ("Take back from Danny" for a piece of his list) on the nearest
@@ -24,9 +27,17 @@
 --     money block, client/SandboxTasksUi.luau's TASKS chip), the move's top blocks (its panel, Danny's status line, the
 --     guide's line: client/TopBlocks.luau), the quick chat's button, the move's list and on a touch screen the touch
 --     controls (client/TouchLayout.luau); none clear, the place that covers the least. On a touch screen its button and
---     its ✕ are at least Ui.MinTouch. Placed again on a resize or when the top blocks move.
+--     its ✕ are at least Ui.MinTouch; 8.3 review: on a small one (667 × 375) it shrinks, SHRINK at a time down to the
+--     HUD's scale, until a place within BESIDE px of his head is clear (none: the clear place nearest him; only its
+--     button and its ✕ stay Ui.MinTouch tall), and never reaches down over the touch controls at the right (FIRE,
+--     SPRINT, the hand button, DRAW, the jump button): such a place goes left of them. Placed again on a resize or
+--     when the top blocks move.
 --   * One window at a time (client/Main.client.luau registers it: onOpen, ESC); ✕, ESC, the gamepad's B, a click or a
---     tap beside it, walking Config.MoveHelper.CardReach studs from him, a seat, him gone close it.
+--     tap beside it, walking away from him, a seat, him gone close it. A tap beside it is only that: its own
+--     TouchTapInWorld (as the finger lifts) is swallowed SWALLOW s, never a piece given or his card again. Walking away:
+--     8.3 review: past Config.MoveHelper.CardReach studs (at least ClickReach: a click on him never opens a card that
+--     shuts at once), or CardSlack studs farther than you were when it opened (the status line's HIRE / LIST open it
+--     from anywhere).
 -- Presentation only.
 --   MoveHelperCard.start()                         listens (nothing outside the sandbox)
 --   MoveHelperCard.open(at?)                       opens it beside the screen point `at` (nil: his head's now)
@@ -70,6 +81,9 @@ local TITLE_H, DOING_H, CLOSE = 18, 16, 28
 local LINE_H, HINT_H, BUTTON_H = 20, 30, 56
 local MARGIN = 8 -- from the screen's edges and what it keeps clear of
 local SIDE = 36 -- px between his head's point and the card beside it
+local SHRINK = 0.05 -- 8.3 review: a small touch screen's card tries this much smaller each time (down to the HUD's scale)
+local BESIDE = 3 * SIDE -- px: 8.3 review: a place this near his head counts as beside him (farther: a smaller card first)
+local SWALLOW = 0.5 -- s: 8.3 review: a tap that closed the card is not a tap in the world too (its TouchTapInWorld)
 local PIECE_REACH = 12 -- studs: the gamepad's "Give to Danny" on the nearest piece this near
 local TALK_PAD = SandboxPad.pads("danny")[1] or "ButtonL1" -- (shared/SandboxPad.luau: L1 his)
 local GIVE_PAD = SandboxPad.pads("dannygive")[1] or "ButtonR1"
@@ -84,6 +98,7 @@ local gui: ScreenGui? = nil
 local parts: { [string]: any } = {} -- the card's pieces (built once)
 local opened = false
 local openToken = 0
+local swallowUntil = 0 -- 8.3 review: os.clock() until which a tap in the world is the tap that closed the card
 local anchorAt: { x: number, y: number }? = nil -- his head's point when it opened
 local found: Model? = nil -- his body (found by MoveHelperId)
 local prompt: ProximityPrompt? = nil -- the gamepad's "Hire Danny" / "Talk to Danny" on him
@@ -92,10 +107,28 @@ local giveTo: Model? = nil -- …that piece
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
-local function cardHeight(touch: boolean, scale: number): (number, number)
-	local close = if touch then math.max(CLOSE, math.ceil(Ui.MinTouch / scale)) else CLOSE
+-- Its height at a scale, its ✕'s and its button's (a touch screen: at least Ui.MinTouch screen px each).
+local function cardHeight(touch: boolean, scale: number): (number, number, number)
+	local least = if touch then math.ceil(Ui.MinTouch / scale - 1e-6) else 0
+	local close, button = math.max(CLOSE, least), math.max(BUTTON_H, least)
 	local head = math.max(TITLE_H + DOING_H, close)
-	return PAD + head + GAP + LINE_H + HINT_H + GAP + BUTTON_H + PAD, close
+	return PAD + head + GAP + LINE_H + HINT_H + GAP + button + PAD, close, button
+end
+
+-- 8.3 review: the scales it tries, the biggest first: on a touch screen its button a finger's height as drawn, then
+-- SHRINK smaller down to the HUD's scale S (a small phone); elsewhere S.
+local function scalesFor(S: number, touch: boolean): { number }
+	local big = if touch then math.max(S, Ui.MinTouch / BUTTON_H) else S
+	local list = { big }
+	local s = big - SHRINK
+	while s > S + 1e-6 do
+		table.insert(list, s)
+		s -= SHRINK
+	end
+	if big > S + 1e-6 then
+		table.insert(list, S)
+	end
+	return list
 end
 
 local function clearOf(b: TouchLayout.Box, W: number, H: number, blocks: { TouchLayout.Box }): boolean
@@ -111,10 +144,9 @@ local function clearOf(b: TouchLayout.Box, W: number, H: number, blocks: { Touch
 end
 
 function MoveHelperCard.layout(W: number, H: number, S: number, touch: boolean, anchor: { x: number, y: number }?, blocks: { TouchLayout.Box }): (TouchLayout.Box, number)
-	local scale = if touch then math.max(S, Ui.MinTouch / BUTTON_H) else S
-	local tall = cardHeight(touch, scale)
-	local w, h = CARD_W * scale, tall * scale
 	local avoid = table.clone(blocks)
+	-- (a touch screen: the right-hand controls' corner, from the column's left edge and the highest one's top)
+	local cornerX, cornerY = math.huge, math.huge
 	if touch then
 		local c = TouchLayout.cluster(W, H, S)
 		for _, b in TouchLayout.buttons(c) do
@@ -122,43 +154,66 @@ function MoveHelperCard.layout(W: number, H: number, S: number, touch: boolean, 
 		end
 		table.insert(avoid, c.thumb)
 		table.insert(avoid, c.jump)
+		cornerX, cornerY = c.left - MARGIN, c.top - MARGIN
 	end
 	local ax = if anchor then anchor.x else W / 2
 	local ay = if anchor then anchor.y else H * 0.45
 	if anchor then
 		table.insert(avoid, TouchLayout.box(ax - 26 * S, ay - 30 * S, ax + 26 * S, ay + 90 * S)) -- (never on him: his head, his body)
 	end
-	-- the preferred place: right of his head, level with it; then left of it, over it, under it; and every place flush
-	-- against an edge of what is there
-	local px, py = ax + SIDE, ay - h / 2
-	local xs = { px, ax - SIDE - w, ax - w / 2 }
-	local ys = { py, ay - SIDE - h, ay + SIDE }
-	for _, b in avoid do
-		table.insert(xs, b.x1 + MARGIN)
-		table.insert(xs, b.x0 - MARGIN - w)
-		table.insert(ys, b.y1 + MARGIN)
-		table.insert(ys, b.y0 - MARGIN - h)
-	end
-	local best: TouchLayout.Box? = nil
-	local bestNear = math.huge
+	-- (a clear place but farther from his head than BESIDE: the nearest of them, if no scale has one beside him)
+	local far: TouchLayout.Box? = nil
+	local farScale, farGap = S, math.huge
 	local fallback: TouchLayout.Box? = nil
+	local fallbackScale = S
 	local fallbackCost = math.huge
-	for _, y in ys do
-		local y0 = math.floor(math.clamp(y, MARGIN, math.max(MARGIN, H - MARGIN - h)) + 0.5) -- (whole px: where it is put)
-		for _, x in xs do
-			local x0 = math.floor(math.clamp(x, MARGIN, math.max(MARGIN, W - MARGIN - w)) + 0.5)
-			local b = TouchLayout.box(x0, y0, x0 + w, y0 + h)
-			local near = math.abs(x0 - px) + math.abs(y0 - py)
-			if near < bestNear and clearOf(b, W, H, avoid) then
-				best, bestNear = b, near
-			end
-			local bad = MoveLayout.clash(b, W, H, avoid) + 1e-3 * near
-			if bad < fallbackCost then
-				fallback, fallbackCost = b, bad
+	for _, scale in scalesFor(S, touch) do
+		local tall = cardHeight(touch, scale)
+		local w, h = CARD_W * scale, tall * scale
+		-- the preferred place: right of his head, level with it; then left of it, over it, under it; and every place
+		-- flush against an edge of what is there
+		local px, py = ax + SIDE, ay - h / 2
+		local xs = { px, ax - SIDE - w, ax - w / 2 }
+		local ys = { py, ay - SIDE - h, ay + SIDE }
+		for _, b in avoid do
+			table.insert(xs, b.x1 + MARGIN)
+			table.insert(xs, b.x0 - MARGIN - w)
+			table.insert(ys, b.y1 + MARGIN)
+			table.insert(ys, b.y0 - MARGIN - h)
+		end
+		local best: TouchLayout.Box? = nil
+		local bestNear = math.huge
+		for _, y in ys do
+			local y0 = math.floor(math.clamp(y, MARGIN, math.max(MARGIN, H - MARGIN - h)) + 0.5) -- (whole px: where it is put)
+			for _, x in xs do
+				local x0 = math.floor(math.clamp(x, MARGIN, math.max(MARGIN, W - MARGIN - w)) + 0.5)
+				if y0 + h > cornerY and x0 + w > cornerX then
+					x0 = math.floor(math.max(MARGIN, cornerX - w)) -- (down beside the touch controls: left of them)
+				end
+				local b = TouchLayout.box(x0, y0, x0 + w, y0 + h)
+				local near = math.abs(x0 - px) + math.abs(y0 - py)
+				if near < bestNear and clearOf(b, W, H, avoid) then
+					local gap = if anchor then math.max(x0 - ax, ax - b.x1, y0 - ay, ay - b.y1, 0) else 0
+					if gap <= BESIDE then
+						best, bestNear = b, near
+					elseif gap < farGap then
+						far, farScale, farGap = b, scale, gap
+					end
+				end
+				local bad = MoveLayout.clash(b, W, H, avoid) + 1e-3 * near
+				if bad < fallbackCost then
+					fallback, fallbackScale, fallbackCost = b, scale, bad
+				end
 			end
 		end
+		if best then
+			return best, scale -- (the biggest scale with a clear place beside him)
+		end
 	end
-	return (best or fallback or TouchLayout.box(MARGIN, MARGIN, MARGIN + w, MARGIN + h)) :: TouchLayout.Box, scale
+	if far then
+		return far, farScale
+	end
+	return (fallback or TouchLayout.box(MARGIN, MARGIN, MARGIN + CARD_W * S, MARGIN + cardHeight(touch, S) * S)) :: TouchLayout.Box, fallbackScale
 end
 
 -- ── His body, the pieces ───────────────────────────────────────────────────
@@ -332,6 +387,11 @@ local function build(): Frame?
 		BorderSizePixel = 0,
 		Visible = false,
 		Active = true,
+		SelectionGroup = true, -- (8.3 review: the gamepad's selection stays in the card, never onto a HUD chip)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, screen)
 	Ui.corner(card, 10)
 	Ui.make("UIStroke", { Name = "Edge", Color = ORANGE, Thickness = 2 }, card)
@@ -501,8 +561,9 @@ local function place()
 	end
 	local touch = Ui.touchLayout()
 	local b, scale = MoveHelperCard.layout(W, Hh, Ui.screenScale(), touch, anchorAt, blocksNow(screen.AbsolutePosition))
-	local tall, close = cardHeight(touch, scale)
+	local tall, close, button = cardHeight(touch, scale)
 	card.Size = UDim2.fromOffset(CARD_W, tall)
+	parts.main.Size = UDim2.fromOffset(CARD_W - 2 * PAD, button)
 	card.Position = UDim2.fromOffset(math.floor(b.x0 + 0.5), math.floor(b.y0 + 0.5))
 	parts.scale.Scale = scale
 	local head = math.max(TITLE_H + DOING_H, close)
@@ -524,6 +585,43 @@ function MoveHelperCard.card(): Frame?
 	return parts.card
 end
 
+-- 8.3 review: as it closes, the gamepad's selection is let go when it sits in the card or in no window (the HUD's
+-- groups and the sandbox's chips, where it could drift; nothing shown any more): client/PadGlyph.luau's chips need none.
+-- One in another window (it opened over this card) is that window's.
+local function letGo(card: Frame)
+	Ui.gamepadRelease(card)
+	local selected = Ui.gamepadSelection()
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if not selected or not playerGui then
+		return
+	end
+	local hud = playerGui:FindFirstChild("ZombieDeliveryHud")
+	for _, name in HUD_GROUPS do
+		local group = hud and hud:FindFirstChild(name)
+		if group and selected:IsDescendantOf(group) then
+			Ui.gamepadRelease(group)
+			return
+		end
+	end
+	for guiName in CHIP_GUIS do
+		local holder = playerGui:FindFirstChild(guiName)
+		if holder and selected:IsDescendantOf(holder) then
+			Ui.gamepadRelease(holder)
+			return
+		end
+	end
+	local node: Instance? = selected
+	while node and node ~= playerGui do
+		if (node:IsA("GuiObject") and not (node :: GuiObject).Visible) or (node:IsA("ScreenGui") and not (node :: ScreenGui).Enabled) then
+			break -- (hidden)
+		end
+		node = node.Parent
+	end
+	if node ~= playerGui then
+		Ui.gamepadRelease(playerGui)
+	end
+end
+
 function MoveHelperCard.close()
 	if not opened then
 		return
@@ -532,9 +630,15 @@ function MoveHelperCard.close()
 	openToken += 1
 	local card = parts.card
 	if card then
-		Ui.gamepadRelease(card)
+		letGo(card)
 		card.Visible = false
 	end
+end
+
+-- How far apart you and he are now (studs; nil: a body not there).
+local function apart(): number?
+	local mine, his = myRoot(), rootOf(MoveHelperCard.body())
+	return if mine and his then (mine.Position - his.Position).Magnitude else nil
 end
 
 function MoveHelperCard.open(at: { x: number, y: number }?)
@@ -556,16 +660,22 @@ function MoveHelperCard.open(at: { x: number, y: number }?)
 	if hook then
 		hook() -- (client/Main.client.luau: the other windows close)
 	end
-	Ui.gamepadFocus(parts.main)
-	-- walking away from him, a seat, him gone: it closes (a look every quarter second while it is open)
+	Ui.gamepadFocus(if hired() then parts.close else parts.main) -- (8.3 review: hired, ✕ first: an A by habit never clears his list)
+	-- walking away from him (8.3 review: past CardReach, or CardSlack studs farther than you were as it opened: the
+	-- status line opens it from anywhere), a seat, him gone: it closes (a look every quarter second while it is open)
+	local from = apart()
 	task.spawn(function()
 		while opened and openToken == token do
 			task.wait(0.25)
 			if not opened or openToken ~= token then
 				return
 			end
-			local mine, his = myRoot(), rootOf(MoveHelperCard.body())
-			if type(player:GetAttribute("MoveHelper")) ~= "string" or seated() or (mine and his and (mine.Position - his.Position).Magnitude > H.CardReach) then
+			local now = apart()
+			if now and not from then
+				from = now -- (a body streamed in since it opened)
+			end
+			local reach = math.max(H.CardReach, (from or 0) + H.CardSlack)
+			if type(player:GetAttribute("MoveHelper")) ~= "string" or seated() or (now and now > reach) then
 				MoveHelperCard.close()
 				return
 			end
@@ -749,6 +859,9 @@ function MoveHelperCard.start()
 			end
 			if not processed and (kind == Enum.UserInputType.MouseButton1 or kind == Enum.UserInputType.Touch) and not onCard(input.Position.X, input.Position.Y) then
 				MoveHelperCard.close() -- (a click or a tap beside it)
+				if kind == Enum.UserInputType.Touch then
+					swallowUntil = os.clock() + SWALLOW -- (8.3 review: its TouchTapInWorld as the finger lifts is not a tap on a piece)
+				end
 			end
 			return
 		end
@@ -766,7 +879,7 @@ function MoveHelperCard.start()
 	end)
 	-- a tap on him or on a piece (a touch screen)
 	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processed: boolean)
-		if processed or opened or not mayAct() then
+		if processed or opened or os.clock() < swallowUntil or not mayAct() then
 			return
 		end
 		local camera = workspace.CurrentCamera

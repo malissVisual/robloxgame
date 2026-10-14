@@ -22,20 +22,18 @@
 -- (each filter's count and price as shared/StockPlan.luau picks them, its texts fitting, asked first: CANCEL sends
 -- nothing, SELL only { kind = "sellmany", filter }); the server's bulk and sold answers as toasts; the sort toggle
 -- ($/MIN → VALUE → NEWEST → RARITY, kept for the picker); the search box on a computer only (every word, any case, the
--- card and the box not drawn again while typing, 40 letters at most, cleared with the window); THE PICKER in the
--- Workshop (8.3: level 2, the player attribute; its stands hold no hay wagon: greyed with "Too big for this stand" and
--- TOO BIG, last; TOO BIG sends nothing and says a bigger warehouse has bigger stands) and in the Big warehouse (level 4:
--- nothing greyed).
+-- card and the box not drawn again while typing, 40 letters at most, cleared with the window); THE PICKER at a small
+-- upgrade stand (the bed, the hay wagon and the wheelbarrow greyed with "Too big for this stand" and TOO BIG, last;
+-- TOO BIG sends nothing and says where it goes) and at a big one (nothing greyed); 8.3: in the Big Warehouse (level 4,
+-- the player attribute WarehouseLevel unset: 4).
 -- 8.3 (the market, shared/Market.luau): on each screen the STOCK list's and the picker's line "Today's market: 🔥 … ·
 -- ❄ … · new in 5 h" (whole, clear of the header's buttons, the chips and the grid), the tags on the pieces' pictures
--- (🔥 HOT ×1.6, ❄ COLD, 📉 −10%; under ON STAND n), the prices the server's (the market's); SELL's question says why
+-- (🔥 HOT ×1.4, ❄ COLD, 📉 −10%; under ON STAND n), the prices the server's (the market's); SELL's question says why
 -- (the demand's line, hot, cold) and sends the price it showed (expect), SELL…'s totals one piece after the other with
 -- the demand's hint and the total sent (expect), never a guessed price; the HUD's "🔥 Hot today: …" toast once a day,
 -- held back while the HUD is hidden.
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
-local WAREHOUSE_LEVEL = require("./Config").WarehouseLevels.Attribute -- 8.3: the player's warehouse level (the stands' size)
-M.player:SetAttribute(WAREHOUSE_LEVEL, 4) -- (the Big warehouse: 12 big stands)
 local Config = require("./Config")
 local WarehouseLayout = require("./WarehouseLayout")
 local TouchLayout = require("./TouchLayout")
@@ -353,6 +351,19 @@ check("the first state: no toast", #M.toasts == 0)
 collection.OnClientEvent:Fire(state(STOCK, 36))
 M.flush()
 check("pieces on show: \"+$36/min\" in green under the money", incomeLabel.Visible and incomeLabel.Text == "+$36/min" and incomeLabel.TextColor3 == M.MTheme.Contract.good, incomeLabel.Text)
+-- 8.3 economy, AFK (server/Collection.luau): idle, the state's `idle` share: what the stands pay then, greyed, "· idle"
+local idleState = state(STOCK, 36)
+idleState.idle = 0.25
+collection.OnClientEvent:Fire(idleState)
+M.flush()
+check("8.3 economy: idle: \"+$9/min · idle\" (a quarter), greyed", incomeLabel.Visible and incomeLabel.Text == "+$9/min · idle" and incomeLabel.TextColor3 == M.MTheme.Contract.secondary, incomeLabel.Text)
+idleState.idle = 0
+collection.OnClientEvent:Fire(idleState)
+M.flush()
+check("… IdleShare 0: \"+$0/min · idle\" (the line stays: why nothing comes)", incomeLabel.Visible and incomeLabel.Text == "+$0/min · idle", incomeLabel.Text)
+collection.OnClientEvent:Fire(state(STOCK, 36))
+M.flush()
+check("… active again: \"+$36/min\" in green", incomeLabel.Text == "+$36/min" and incomeLabel.TextColor3 == M.MTheme.Contract.good, incomeLabel.Text)
 local chip = named(block, "StockChip")
 check("the chip: \"📦 7 in stock\" (the pieces not on show)", chip.Text == "📦 7 in stock", chip.Text)
 check("… no key chip on a touch screen", not named(chip, "Key").Visible)
@@ -806,7 +817,15 @@ press(named(picker, "SellMenu"))
 press(named(named(picker, "Menu"), "Sell_duplicates"))
 press(named(named(picker, "Confirm"), "ConfirmSell"))
 sent = sentOn("Collection")
-check("… SELL: { kind = \"sellmany\", filter = \"duplicates\" } and nothing else (the server picks the pieces)", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "duplicates" and sent[#sent][1].uid == nil and sent[#sent][1].uids == nil)
+do -- (8.4 review: + the uids of the pieces it listed: the server sells exactly those, or nothing if the stock changed)
+	local listed = {}
+	for _, piece in StockPlan.toSell(pieces, "duplicates") do
+		table.insert(listed, piece.uid)
+	end
+	local uids = sent[#sent][1].uids
+	check("… SELL: { kind = \"sellmany\", filter = \"duplicates\", uids = the pieces it listed }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "duplicates"
+		and sent[#sent][1].uid == nil and type(uids) == "table" and #listed > 0 and table.concat(uids, ",") == table.concat(listed, ","), type(uids) == "table" and table.concat(uids, ","))
+end
 check("… 💰 SELL… waits (…)", named(picker, "SellMenu").Text == "…")
 
 -- ⭐ FILL BEST and ↩ TAKE ALL DOWN
@@ -843,20 +862,17 @@ press(named(picker, "FillBest"))
 check("… FILL BEST's tap: \"Every display stand you have already shows a piece.\", nothing sent", M.toasts[#M.toasts] == "Every display stand you have already shows a piece." and #sentOn("Collection") == before, M.toasts[#M.toasts])
 press(named(picker, "SellMenu"))
 check("… SELL…'s tap: \"Your stock is empty: nothing to sell.\" (no menu)", M.toasts[#M.toasts] == "Your stock is empty: nothing to sell." and named(picker, "Menu") == nil)
--- (8.3: the Workshop, 4 stands of 9 × 9, 3 taken: stand 4 free; a hay wagon and a broken TV in the stock)
-M.player:SetAttribute(WAREHOUSE_LEVEL, 2)
+-- (14 stands, the 12 big ones taken: only small 13 and 14 free; a bed and a broken TV in the stock)
 local BIGFULL = {}
-for i = 1, 3 do
+for i = 1, 12 do
 	table.insert(BIGFULL, { uid = `k{i}`, item = "radio", variant = 1, condition = 1, name = "Kitchen Radio", got = i, stand = i })
 end
-table.insert(BIGFULL, { uid = "k13", item = "hay_wagon", variant = 1, condition = 1, name = "Hay Wagon", got = 13 })
+table.insert(BIGFULL, { uid = "k13", item = "bed", variant = 1, condition = 1, name = "Double Bed", got = 13 })
 table.insert(BIGFULL, { uid = "k14", item = "tv", variant = 1, condition = 0, name = "Old TV", got = 14 })
-collection.OnClientEvent:Fire(withStands(BIGFULL, 3, 4))
+collection.OnClientEvent:Fire(withStands(BIGFULL, 12, 14))
 picker = named(gui, "Picker")
 press(named(picker, "FillBest"))
-check("the Workshop's free stand and a hay wagon: FILL BEST grey, \"What's in your stock is too big for your free stands: a bigger warehouse has bigger ones.\"", named(picker, "FillBest"):GetAttribute("Live") == false
-	and M.toasts[#M.toasts] == "What's in your stock is too big for your free stands: a bigger warehouse has bigger ones.", M.toasts[#M.toasts])
-M.player:SetAttribute(WAREHOUSE_LEVEL, 4)
+check("only small stands free and a bed: FILL BEST grey, \"What's in your stock is too big for your free small stands.\"", named(picker, "FillBest"):GetAttribute("Live") == false and M.toasts[#M.toasts] == "What's in your stock is too big for your free small stands.", M.toasts[#M.toasts])
 collection.OnClientEvent:Fire(withStands({}, 0, 12))
 picker = named(gui, "Picker")
 press(named(picker, "TakeAllDown"))
@@ -912,8 +928,7 @@ end
 check("… round to $/MIN again", WarehouseUi.sorting() == "income")
 WarehouseUi.close()
 
--- THE PICKER in the Workshop (8.3: level 2): the pieces too big for its stands greyed, "Too big for this stand", last
-M.player:SetAttribute(WAREHOUSE_LEVEL, 2)
+-- THE PICKER at a small upgrade stand: the pieces too big for it greyed, "Too big for this stand", last
 local SMALL = {
 	{ uid = "s1", item = "bed", variant = 1, condition = 1, name = "Double Bed", got = 1, rarity = "rare", perMinute = 9.9, sell = 90 },
 	{ uid = "s2", item = "hay_wagon", variant = 1, condition = 1, name = "Hay Wagon", got = 2, rarity = "epic", perMinute = 16.9, sell = 156 },
@@ -921,32 +936,30 @@ local SMALL = {
 	{ uid = "s4", item = "piano", variant = 1, condition = 1, name = "Upright Piano", got = 4, rarity = "epic", perMinute = 31.2, sell = 288 },
 	{ uid = "s5", item = "wheelbarrow", variant = 1, condition = 1, name = "Wheelbarrow", got = 5, rarity = "common", perMinute = 1, sell = 10 },
 }
-collection.OnClientEvent:Fire(withStands(SMALL, 0, 4))
-collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
+collection.OnClientEvent:Fire(withStands(SMALL, 0, 14))
+collection.OnClientEvent:Fire({ kind = "pick", stand = 13 })
 picker = named(gui, "Picker")
 grid = named(picker, "Grid")
 local order = {}
 for _, tile in tilesOf() do
 	table.insert(order, tile.Name)
 end
-check("the Workshop's stand 3: the pieces that fit first (the piano, the bed, the wheelbarrow, the radio), the hay wagon last", table.concat(order, ",") == "Tile_s4,Tile_s1,Tile_s5,Tile_s3,Tile_s2", table.concat(order, ","))
-local bed = named(grid, "Tile_s2") -- (8.3: the hay wagon, the one piece the Workshop's stands don't hold)
-check("… the hay wagon's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for DISPLAY", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Display").Text == "TOO BIG"
+check("small stand 13: the pieces that fit first (the piano, the radio), the bed, the hay wagon and the wheelbarrow last", table.concat(order, ",") == "Tile_s4,Tile_s3,Tile_s2,Tile_s1,Tile_s5", table.concat(order, ","))
+local bed = named(grid, "Tile_s1")
+check("… a bed's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for DISPLAY", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Display").Text == "TOO BIG"
 	and named(bed, "PieceName").TextTransparency > 0 and bed.BackgroundTransparency > 0)
 check("… the piano's not: DISPLAY", named(named(grid, "Tile_s4"), "Display").Text == "DISPLAY" and named(grid, "Tile_s4"):GetAttribute("TooBig") == false and named(named(grid, "Tile_s4"), "TooBig") == nil)
-pickerChecks("844 x 390, the Workshop's stand 3")
+pickerChecks("844 x 390, small stand 13")
 scene("phone-toobig")
 before = #sentOn("Collection")
 press(named(bed, "Display"))
-check("… TOO BIG sends nothing, says a bigger warehouse has bigger stands, the picker stays", #sentOn("Collection") == before and WarehouseUi.isOpen()
-	and M.toasts[#M.toasts] == "Your Hay Wagon is too big for stand 3: a bigger warehouse has bigger stands (UPGRADES).", M.toasts[#M.toasts])
+check("… TOO BIG sends nothing, says where it goes (stands 1 – 12), the picker stays", #sentOn("Collection") == before and WarehouseUi.isOpen() and M.toasts[#M.toasts] == "Your Double Bed is too big for small stand 13: show it on stands 1 – 12.", M.toasts[#M.toasts])
 press(named(bed, "Sell"))
 check("… its SELL still asks", named(picker, "Confirm") ~= nil)
 key("Escape")
 press(named(named(grid, "Tile_s4"), "Display"))
 sent = sentOn("Collection")
-check("… DISPLAY on a piece that fits: { kind = \"display\", uid, stand = 3 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 3)
-M.player:SetAttribute(WAREHOUSE_LEVEL, 4) -- (the Big warehouse)
+check("… DISPLAY on a piece that fits: { kind = \"display\", uid, stand = 13 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 13)
 collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
 picker = named(gui, "Picker")
 grid = named(picker, "Grid")
@@ -1067,15 +1080,15 @@ do
 	local CollectionRules = require("./CollectionRules")
 	local MK = Config.Market
 	local view = { day = 20375, hot = { "record_player", "old_globe", "jukebox" }, cold = { "wardrobe" }, left = 5 * 3600 + 600,
-		demand = { vintage_radio = { n = 2, sold = 2, back = 600 }, dining_chair = { n = 1, sold = 1, back = 300 } } }
+		demand = { vintage_radio = { n = 2, sold = 2, back = 600 }, coffee_table = { n = 1, sold = 1, back = 300 } } }
 	local raw = {
 		{ uid = "m1", item = "record_player", variant = 1, condition = 0.92, name = "Old Record Player", got = 31 },
 		{ uid = "m2", item = "old_globe", variant = 1, condition = 1, name = "Old Globe", got = 32, stand = 1 },
 		{ uid = "m3", item = "wardrobe", variant = 2, condition = 0.85, name = "Wardrobe", got = 33 },
 		{ uid = "m4", item = "vintage_radio", variant = 1, condition = 0.9, name = "Vintage Radio", got = 34 },
-		{ uid = "m5", item = "dining_chair", variant = 1, condition = 0.9, name = "Chair", got = 35 },
-		{ uid = "m6", item = "dining_chair", variant = 2, condition = 0.8, name = "Chair", got = 36 },
-		{ uid = "m7", item = "dining_chair", variant = 3, condition = 0.7, name = "Chair", got = 37 },
+		{ uid = "m5", item = "coffee_table", variant = 1, condition = 0.9, name = "Coffee Table", got = 35 }, -- (8.3 economy: common pieces dear enough
+		{ uid = "m6", item = "coffee_table", variant = 2, condition = 0.8, name = "Coffee Table", got = 36 }, -- for the 5 % steps to show: a chair
+		{ uid = "m7", item = "coffee_table", variant = 3, condition = 0.7, name = "Coffee Table", got = 37 }, -- sells for $3 now)
 		{ uid = "m8", item = "jukebox", variant = 1, condition = 0.95, name = "Jukebox", got = 38, stand = 12 },
 		{ uid = "m9", item = "sofa", variant = 1, condition = 0.9, name = "Sofa", got = 39 },
 	}
@@ -1090,7 +1103,7 @@ do
 	local function marketState(market)
 		return { kind = "state", stock = stock, income = 64.2, stands = 12, market = market }
 	end
-	check("8.3: the server's views carry the market (a hot piece × 1.6, the cold one × 0.7, the radio −10 %)", byUid.m1.market == "hot" and byUid.m1.price == math.floor(byUid.m1.base * MK.HotSell + 0.5)
+	check("8.3: the server's views carry the market (a hot piece × HotSell, the cold one × 0.7, the radio −10 %)", byUid.m1.market == "hot" and byUid.m1.price == math.floor(byUid.m1.base * MK.HotSell + 0.5)
 		and byUid.m3.market == "cold" and byUid.m3.price == math.floor(byUid.m3.base * MK.ColdSell + 0.5) and byUid.m4.price == math.floor(byUid.m4.base * 0.9 + 0.5))
 
 	-- the toast: once after joining (for the day), held while the HUD is hidden
@@ -1107,8 +1120,8 @@ do
 	end
 	collection.OnClientEvent:Fire(marketState(view))
 	M.flush()
-	local hotToast = "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.6, on show ×1.25)"
-	check("the first state with a market: the toast \"🔥 Hot today: … (sell ×1.6, on show ×1.25)\"", #hotToasts() == 1 and hotToasts()[1] == hotToast and Market.hotToast(view :: any) == hotToast, hotToasts()[1])
+	local hotToast = "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.4, on show ×1.2)" -- (8.3 economy)
+	check("the first state with a market: the toast \"🔥 Hot today: … (sell ×1.4, on show ×1.2)\"", #hotToasts() == 1 and hotToasts()[1] == hotToast and Market.hotToast(view :: any) == hotToast, hotToasts()[1])
 	collection.OnClientEvent:Fire(marketState(view))
 	M.flush()
 	check("… the same day's next states: no toast again", #hotToasts() == 1)
@@ -1162,14 +1175,14 @@ do
 		local coldTag = tag("m3", "MarketTag")
 		local dropTag = tag("m4", "DemandTag")
 		local plainTag = tag("m9", "MarketTag")
-		check(`{label}: the tags: "🔥 HOT ×1.6" on a hot kind, "❄ COLD" on the cold one, "📉 −10%" on the radio, none on the sofa`, hotTag ~= nil and hotTag.Text == "🔥 HOT ×1.6" and coldTag ~= nil and coldTag.Text == "❄ COLD"
+		check(`{label}: the tags: "🔥 HOT ×1.4" on a hot kind, "❄ COLD" on the cold one, "📉 −10%" on the radio, none on the sofa`, hotTag ~= nil and hotTag.Text == "🔥 HOT ×1.4" and coldTag ~= nil and coldTag.Text == "❄ COLD"
 			and dropTag ~= nil and dropTag.Text == "📉 −10%" and plainTag == nil and tag("m9", "DemandTag") == nil)
 		check(`{label}: … each on its piece's picture, its words fitting`, within(box(hotTag), box(named(hotTile, "Picture"))) and #badTexts(hotTile) == 0 and #badTexts(named(grid, "Tile_m4")) == 0, badTexts(hotTile)[1])
 		local onStand = named(grid, "Tile_m8")
 		local ribbon, juke = named(onStand, "OnStand"), named(onStand, "MarketTag")
 		check(`{label}: … on a piece on show: under ON STAND n, not on it`, ribbon ~= nil and juke ~= nil and not overlap(box(ribbon), box(juke)) and box(juke).y0 >= box(ribbon).y1 - 0.5
 			and within(box(juke), box(named(onStand, "Picture"))))
-		local chairs = named(grid, "Tile_m5")
+		local chairs = named(grid, "Tile_m5") -- (the coffee tables)
 		check(`{label}: … the prices are the market's (the server's): the record player's "Sell {M.MUi.money(byUid.m1.price)}"`, named(hotTile, "SellPrice").Text == `Sell {M.MUi.money(byUid.m1.price)}`
 			and named(chairs, "SellPrice").Text == `Sell {M.MUi.money(byUid.m5.price)}`)
 	end
@@ -1215,7 +1228,7 @@ do
 	picker = named(gui, "Picker")
 	grid = named(picker, "Grid")
 	press(named(named(grid, "Tile_m1"), "Sell"))
-	check("… a hot piece's hint: \"🔥 Hot today: it sells for ×1.6, earns ×1.25 on show.\"", named(named(picker, "Confirm"), "Hint").Text == "🔥 Hot today: it sells for ×1.6, earns ×1.25 on show.", named(named(picker, "Confirm"), "Hint").Text)
+	check("… a hot piece's hint: \"🔥 Hot today: it sells for ×1.4, earns ×1.2 on show.\"", named(named(picker, "Confirm"), "Hint").Text == "🔥 Hot today: it sells for ×1.4, earns ×1.2 on show.", named(named(picker, "Confirm"), "Hint").Text)
 	key("Escape")
 	press(named(named(grid, "Tile_m3"), "Sell"))
 	check("… the cold one's: \"❄ Cold today: it sells for ×0.7. Keep it on show till tomorrow?\"", named(named(picker, "Confirm"), "Hint").Text == "❄ Cold today: it sells for ×0.7. Keep it on show till tomorrow?", named(named(picker, "Confirm"), "Hint").Text)
@@ -1224,7 +1237,7 @@ do
 	check("… a piece the market doesn't touch: the hint as before", named(named(picker, "Confirm"), "Hint").Text == `On show it would earn {WarehouseUi.rate(byUid.m9.income)}.`)
 	key("Escape")
 
-	-- 💰 SELL…: the market's totals, one piece after the other (the chairs: −5 %, −10 %, −15 %), the total expected
+	-- 💰 SELL…: the market's totals, one piece after the other (the coffee tables: −5 %, −10 %, −15 %), the total expected
 	press(named(picker, "SellMenu"))
 	local menuBox = named(named(picker, "Menu"), "MenuBox")
 	local pieces = {}
@@ -1233,7 +1246,7 @@ do
 	end
 	local commons = StockPlan.toSell(pieces, "common")
 	local total = StockPlan.price(commons, view :: any)
-	check("SELL…'s ALL COMMON: the three chairs at the market's total (each next one 5 % lower: under their single prices)", #commons == 3 and total < StockPlan.price(commons)
+	check("SELL…'s ALL COMMON: the three coffee tables at the market's total (each next one 5 % lower: under their single prices)", #commons == 3 and total < StockPlan.price(commons)
 		and named(named(menuBox, "Sell_common"), "Price").Text == M.MUi.money(total), named(named(menuBox, "Sell_common"), "Price").Text)
 	press(named(menuBox, "Sell_common"))
 	ask = named(picker, "Confirm")
@@ -1248,7 +1261,8 @@ do
 	before = #sentOn("Collection")
 	press(named(ask, "ConfirmSell"))
 	sent = sentOn("Collection")
-	check("… SELL: { kind = \"sellmany\", filter, expect = that total }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "common" and sent[#sent][1].expect == total)
+	check("… SELL: { kind = \"sellmany\", filter, expect = that total, uids = its pieces }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "common" and sent[#sent][1].expect == total
+		and type(sent[#sent][1].uids) == "table" and #sent[#sent][1].uids == #commons)
 	WarehouseUi.close()
 
 	-- a guessed price is never expected (only the server's)

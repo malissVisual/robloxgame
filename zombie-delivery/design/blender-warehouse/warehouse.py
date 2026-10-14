@@ -8,7 +8,7 @@ Míry jsou ve studech (1 jednotka = 1 stud). Předek budovy míří na -Y, poč�
 (vnější líc přední zdi). Level 4 má přesně míry dnešního skladu ve hře (80 × 24 × 60, vrata 26 × 16) a level 5 se
 ještě vejde na pozemek (120 × 152).
 
-8.2: hra (server/WarehouseMesh.luau) obléká sklad z dílů na každém pozemku do jeho levelu (8.3: level skladu, Config.WarehouseLevels).
+8.2: hra (server/WarehouseMesh.luau) obléká do levelu 4 sklad z dílů na každém pozemku (Config.Warehouse.ArtLevel).
 Proto sedí na díly hry: zdi tlusté 1 stud jako ve hře, podlaha nahoře ve výšce 0,05 (pod nápisy na podlaze), vazníky
 a světla v hale tam, kde jsou lampy hry, sloupky u vrat tam, kde jsou sloupky hry. Kontrola
 tools/warehouse/mesh-check.py to hlídá.

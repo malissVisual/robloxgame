@@ -23,10 +23,16 @@ CityConfig.Sandbox.On = false
 -- 8.1 grip: no timing checks by default (a pick lifts at once, no wobbles: the moves' other tests carry as before);
 -- tests/carrygrip_runtime_test.luau turns them on (the server reads Config.CarryGrip.On at every lift and carry).
 CityConfig.CarryGrip.On = false
+-- 8.3 keeping up: Danny not aimed ahead of his place by default (the moves' tests check him right at the far end: this
+-- runtime has no network delay to make up for); tests/movehelper_keepup_runtime_test.luau turns HoldLead on again
+-- (Runtime.gameLead: the game's numbers).
+local gameLead = table.clone(CityConfig.MoveHelper.HoldLead)
+CityConfig.MoveHelper.HoldLead.Base = 0
+CityConfig.MoveHelper.HoldLead.Ping = 0
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()
-	messages = {}, -- { { player, kind, a, b } } every FireClient
+	messages = {}, -- { { player, kind, a, b, c } } every FireClient (8.3: c, a door trip's fade in's arrival)
 	money = {}, -- { { player, amount, reason } }
 	xp = {}, -- { { player, amount } }
 	tracked = {}, -- { { name, ... } }
@@ -43,6 +49,7 @@ local Runtime: any = {
 	zombieHits = {}, -- { { z, amount, by, info } } what Zombies.damage was asked
 	noises = 0,
 	stoodUp = 0,
+	gameLead = gameLead, -- 8.3 Config.MoveHelper.HoldLead as the game has it
 }
 
 local O = getmetatable(Mock.Instance.new("Model"))
@@ -352,8 +359,8 @@ Runtime.Net = {
 			remote = {
 				name = name,
 				OnServerEvent = signal(),
-				FireClient = function(_, player: any, kind: any, a: any, b: any)
-					table.insert(Runtime.messages, { player = player, remote = name, kind = kind, a = a, b = b })
+				FireClient = function(_, player: any, kind: any, a: any, b: any, c: any)
+					table.insert(Runtime.messages, { player = player, remote = name, kind = kind, a = a, b = b, c = c })
 				end,
 				FireAllClients = function() end,
 			}
@@ -632,6 +639,11 @@ Runtime.Vehicles = stub("Vehicles", {
 	end,
 	callCar = function()
 		return "called"
+	end,
+	-- 8.3 review: the hook a passenger door's Ride along asks (server/Buddy.luau's: no buddy here; server/MoveHelper.luau
+	-- wraps it: Danny gets out for his crew; a test calls it as the door's prompt would)
+	yieldSeat = function(_seat: any, _player: any): boolean
+		return false
 	end,
 })
 

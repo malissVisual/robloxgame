@@ -118,6 +118,7 @@ if Config.Sandbox.On then
 	safely("MoveLobbyUi", MoveLobbyUi.start)
 	safely("QuickChat", QuickChat.start)
 	safely("CarryGripUi", require(Client.CarryGripUi).start)
+	safely("WalkDoors", require(Client.WalkDoors).start) -- 8.3: the doors' leaves swing, the trip's camera behind you
 	-- (8.0 merge: the moves' and the warehouse stands' prompts are their owner's: the others' hidden, as in the city)
 	safely("CargoPrompts", require(Client.CargoPrompts).start)
 	for _, entry in own do
@@ -158,6 +159,8 @@ if Config.Sandbox.On then
 	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book, the TASKS panel,
 	-- 8.3: Danny's command card). `keep`: the sandbox window opening now
 	-- (its onOpen runs once it counts as open, so it must not close itself).
+	-- 8.3 review: a visitor's offer is declined only by ESC (the Roblox menu: Hud.escaping); another window opening (STOCK,
+	-- the BOOK to compare prices …) only hides it (OfferCard.hide): it waits and comes back once nothing covers the screen.
 	local keep: any = nil
 	Hud.onCloseWindows = function()
 		CrewPanel.close()
@@ -165,7 +168,13 @@ if Config.Sandbox.On then
 		MovingHud.closeAll()
 		QuickChat.close(false)
 		for _, module in windows do
-			if module ~= keep then
+			if module == keep then
+				continue
+			end
+			local hide = if module == OfferCard and not Hud.escaping then module.hide else nil
+			if type(hide) == "function" then
+				pcall(hide)
+			else
 				ownClose(module)
 			end
 		end

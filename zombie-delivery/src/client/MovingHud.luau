@@ -1105,7 +1105,7 @@ function MovingHud.start()
 		buildPanel(root)
 	end
 	watchPrompts()
-	remote.OnClientEvent:Connect(function(kind: any, a: any, b: any)
+	remote.OnClientEvent:Connect(function(kind: any, a: any, b: any, c: any)
 		if kind == "state" then
 			setState(a)
 		elseif kind == "contract" then
@@ -1117,7 +1117,7 @@ function MovingHud.start()
 			if a == "out" then
 				Fade.out(seconds)
 			else
-				Fade.into(seconds)
+				Fade.into(seconds, Fade.arrival(c)) -- (8.3 a door's trip: dark until you are there, client/Fade.luau)
 			end
 		end
 	end)

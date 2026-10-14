@@ -2,7 +2,8 @@
 -- 8.3 SANDBOX, the eyes (the owner: "in the house I cannot see my own character, it is so bright; walking into the
 -- warehouse is a flashbang"): the screen eases to the place you are in, the way eyes adapt. Where you are is what the
 -- sandbox's sounds already use (shared/SoundPlan.luau sandboxPlace: client/MoveSounds.luau inside, the interiors far
--- off the map, a plot's warehouse: its own level's walls, the model's "Level") and any Sprinter's walk-in bay (its BayLight: shared/SandboxLightRules.luau inBay).
+-- off the map, a plot's warehouse: its own level's walls, workspace.Warehouses' Level<id>) and any Sprinter's walk-in
+-- bay (its BayLight: shared/SandboxLightRules.luau inBay).
 -- Each place's look is Config.SandboxLight.Places' (shared/SandboxLightRules.luau look):
 --   * Lighting.ExposureCompensation: the map's (Config.SandboxLight.Sky.Exposure) plus the place's;
 --   * one bloom, SandboxBloom (any other BloomEffect in Lighting, e.g. the place template's "Bloom", is switched off on
@@ -11,7 +12,8 @@
 --   * the sun rays, SandboxSunRays (none indoors; the template's SunRays off the same way).
 -- A new place's look comes in over Config.SandboxLight.Ease s (95 %), never at once (SandboxLightRules.ease, one step
 -- at most Step s long): walking into a hall never flashes. Where you are is looked at every Every s; the easing writes
--- only while it moves. A phone or a tablet (client/DeviceBudget.luau lite) blooms LiteBloom as much. Everything here is
+-- only while it moves. 8.3: while a door's trip keeps the screen black (client/Fade.luau isDark; the server sends where
+-- you are before the fade in) a new place comes in at once: the fade in shows it as it stays, no second change after. A phone or a tablet (client/DeviceBudget.luau lite) blooms LiteBloom as much. Everything here is
 -- this screen's own (made on the client, never sent anywhere).
 --
 --   SandboxLight.start()   once (client/Main.client.luau, the sandbox's list); nothing outside the sandbox
@@ -27,6 +29,7 @@ local Config = require(Shared.Config)
 local SandboxLightRules = require(Shared.SandboxLightRules)
 
 local DeviceBudget = require(script.Parent.DeviceBudget)
+local Fade = require(script.Parent.Fade) -- (8.3: a door's trip's black: the eyes adapt at once behind it)
 local MoveSounds = require(script.Parent.MoveSounds) -- (8.1: are you in the move's house)
 
 local SandboxLight = {}
@@ -140,11 +143,20 @@ local function where(): Vector3?
 	return if camera then camera.Focus.Position else nil
 end
 
--- 8.3: a plot's warehouse level (server/Warehouse.luau's model, its "Level" attribute; nil: not there yet).
+-- 8.3: a plot's warehouse level, 1 … 5 (server/Warehouse.luau's attribute Level<id> on workspace.Warehouses; nil: not
+-- there yet, SoundPlan takes 4): its hall is that level's building. The keys made once a plot.
+local levelKeys: { [number]: string } = {}
 local function warehouseLevel(plotId: number): number?
 	local halls = workspace:FindFirstChild("Warehouses")
-	local hall = halls and halls:FindFirstChild(`Warehouse{plotId}`)
-	local level = hall and hall:GetAttribute("Level")
+	if not halls then
+		return nil
+	end
+	local key = levelKeys[plotId]
+	if not key then
+		key = `Level{plotId}`
+		levelKeys[plotId] = key
+	end
+	local level = halls:GetAttribute(key)
 	return if type(level) == "number" then level else nil
 end
 
@@ -200,6 +212,14 @@ function SandboxLight.start()
 			end
 		end
 		if settled then
+			return
+		end
+		if Fade.isDark() then
+			-- (8.3 a door's trip, client/Fade.luau: the screen black, the eyes are there at once: the fade in shows the
+			-- new place as it will stay, no second change after it)
+			shown = SandboxLightRules.copy(target)
+			settled = true
+			write(effects, shown)
 			return
 		end
 		shown = SandboxLightRules.ease(shown, target, dt)

@@ -3,6 +3,10 @@
 -- character carries a piece in two (PairTurn) no jump (Humanoid.Jump cleared every step before the physics: a jump
 -- lifted the piece and Danny with it), AutoRotate off and the heading PairTurn degrees a second at most (8.1); let go,
 -- AutoRotate back on (8.1) and your jumps your own again (nothing switched off: a bus ride's own jump lock untouched).
+-- 8.3 (the owner: "when I run, he just goes behind me with his arms stretched out"): nobody runs with a move's piece:
+-- its walk held at the server's CarrySpeed (× the admin's boost) every step before the physics whatever wrote
+-- Humanoid.WalkSpeed (a sprint's 28, client/CameraRig.luau's bleed-off); in two (CarryPair: the leader and the far end's
+-- crew mate) the run key says Config.MoveHelper.RunHint once a carry; let go, your walk is yours again.
 local E = require("./MovingRuntime") -- (the recorder with a CFrame's LookVector)
 local PairCarry = require("./PairCarry")
 local Config = require("./Config")
@@ -35,9 +39,13 @@ humanoid.MoveDirection = V3(0, 0, 0)
 humanoid.SeatPart = nil
 humanoid.Health = 100
 humanoid.Parent = character
+local playerAttributes: { [string]: any } = {}
+local localPlayer = { Character = character, GetAttribute = function(_: any, name: string): any
+	return playerAttributes[name]
+end }
 local game = { GetService = function(_: any, name: string): any
 	if name == "Players" then
-		return { LocalPlayer = { Character = character } }
+		return { LocalPlayer = localPlayer }
 	elseif name == "RunService" then
 		return { PreSimulation = { Connect = function() end } }
 	end
@@ -87,6 +95,67 @@ humanoid.Jump = true
 PairSteer.step(1 / 60)
 check("8.1 let go: AutoRotate on again; 8.3 your jump yours again (nothing was switched off)", humanoid.AutoRotate == true and humanoid.Jump == true
 	and not PairSteer.steering() and PairSteer.walk() == 1)
+
+-- 8.3 nobody runs with a move's piece --------------------------------------------------------------------------------------
+
+local hints: { string } = {}
+PairSteer.notify = function(text: string)
+	table.insert(hints, text)
+end
+humanoid.WalkSpeed = 28
+character:SetAttribute("MoveCarry", 3) -- (a move's piece in your hands alone: the server's CarrySpeed)
+character:SetAttribute("CarrySpeed", 10.5)
+PairSteer.step(1 / 60)
+check("8.3 a move's piece in your hands: the walk held at its CarrySpeed before the physics (a sprint's 28 cut to 10.5)",
+	humanoid.WalkSpeed == 10.5 and PairSteer.cap() == 10.5 and not PairSteer.holding(), humanoid.WalkSpeed)
+humanoid.WalkSpeed = 6
+PairSteer.step(1 / 60)
+PairSteer.refuseRun()
+check("…a slower walk (a turn, a stagger) left as it is; alone, the run key says nothing", humanoid.WalkSpeed == 6 and #hints == 0)
+-- the leader of a piece carried in two (Danny or a crew mate at its far end): Shift held, the sprint asked every frame
+character:SetAttribute("PairTurn", Config.MoveHelper.PairTurn)
+character:SetAttribute("CarryPair", true)
+local fastest = 0
+for _ = 1, 120 do
+	humanoid.WalkSpeed = 28 -- (the sprint's speed, written before every physics step: Shift, the stick click, a script)
+	humanoid.MoveDirection = V3(0, 0, -1)
+	PairSteer.step(1 / 60)
+	fastest = math.max(fastest, humanoid.WalkSpeed)
+end
+check("8.3 the leader sprints while carrying in two: the walk stays at CarrySpeed every step (2 s of Shift)", fastest == 10.5 and PairSteer.holding(), fastest)
+PairSteer.refuseRun()
+PairSteer.refuseRun()
+PairSteer.refuseRun()
+check(`…the run key says "{Config.MoveHelper.RunHint}" once a carry`, #hints == 1 and hints[1] == Config.MoveHelper.RunHint
+	and Config.MoveHelper.RunHint == "Too heavy to run with", #hints)
+playerAttributes.AdminSpeed = 2 -- (the admin's walk × 2: the carry's too, the server's walkOf the same)
+humanoid.WalkSpeed = 50
+PairSteer.step(1 / 60)
+check("…an admin's walk × 2: held at CarrySpeed × 2", humanoid.WalkSpeed == 21 and PairSteer.cap() == 21, humanoid.WalkSpeed)
+playerAttributes.AdminSpeed = nil
+-- let go: your walk is yours again, and the next carry in two says it again
+for _, name in { "MoveCarry", "CarrySpeed", "PairTurn", "CarryPair" } do
+	character:SetAttribute(name, nil)
+end
+humanoid.MoveDirection = V3(0, 0, 0)
+humanoid.WalkSpeed = 28
+PairSteer.step(1 / 60)
+PairSteer.refuseRun()
+check("8.3 let go: the sprint yours again (nothing held), no hint", humanoid.WalkSpeed == 28 and PairSteer.cap() == nil and #hints == 1)
+-- the far end's crew mate (CarryPair, no PairTurn: the server holds their body; their walk held too)
+character:SetAttribute("MoveCarry", 3)
+character:SetAttribute("CarrySpeed", 9.8)
+character:SetAttribute("CarryPair", true)
+humanoid.AutoRotate = true
+PairSteer.step(1 / 60)
+PairSteer.refuseRun()
+PairSteer.refuseRun()
+check("8.3 a crew mate at the far end: the same rule (walk held at CarrySpeed, the hint once this carry), their body not steered",
+	humanoid.WalkSpeed == 9.8 and #hints == 2 and humanoid.AutoRotate == true and not PairSteer.steering() and PairSteer.holding(), humanoid.WalkSpeed)
+for _, name in { "MoveCarry", "CarrySpeed", "CarryPair" } do
+	character:SetAttribute(name, nil)
+end
+PairSteer.step(1 / 60)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

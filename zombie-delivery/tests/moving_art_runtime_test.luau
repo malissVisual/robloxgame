@@ -157,14 +157,14 @@ do
 	stand(ann, exitAt0 + into * 1 + side * (plan.doors[1].width / 2 - 0.5), -into)
 	E.clock += 0.1
 	Moving.step()
-	E.clock += D.Dwell
+	E.clock += math.max(D.Dwell, D.Open) + 0.01 -- (8.3: the dwell, the leaf open Open s)
 	Moving.step()
 	check("…out by walking into the real front doorway near its jamb", not isIn(ann) and (E.rootOf(ann).Position - outside).Magnitude < 6, E.rootOf(ann).Position)
 	E.clock += D.Rearm
 	stand(ann, door + facing * 2, -facing)
 	E.clock += 0.1
 	Moving.step()
-	E.clock += D.Dwell
+	E.clock += math.max(D.Dwell, D.Open) + 0.01 -- (8.3: the dwell, the leaf open Open s)
 	Moving.step()
 	check("…and in again by walking up to the front door", isIn(ann) and (E.rootOf(ann).Position - entry).Magnitude < 6, E.rootOf(ann).Position)
 end

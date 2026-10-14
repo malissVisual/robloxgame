@@ -17,12 +17,14 @@ PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/coll
 PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
 PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
-PURE += ("WarehouseLevels",)  # 8.3 sandbox, the warehouse's levels (tests/warehouselevels_test.luau)
 PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
 PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
 PURE += ("Visitors",)  # 8.3 sandbox, the showroom's visitors: who, when, where they walk, the offers' prices (tests/visitors_test.luau)
 PURE += ("VanPaintRules",)  # 8.3 sandbox, the PAINT shop: the catalogue, the prices, the looks, the save (tests/vanpaint_test.luau)
 PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_test.luau, tests/sandboxlight_runtime_test.luau)
+PURE += ("DoorSwing",)  # 8.3 walk-in doors: a door leaf's swing (tests/doorswing_test.luau)
+PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxbadges_test.luau, tests/sandboxbadges_runtime_test.luau)
+PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -191,7 +193,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # modules the copies above (shared/CollectionRules.luau on FurnitureLooks' recorder copy).
     shutil.copy(os.path.join(HERE, "runtime", "CollectionRuntime.luau"), os.path.join(tmp, "CollectionRuntime.luau"))
     head = ('local E = require("./CollectionRuntime")\n'
-            'local game, task, os, Instance, warn = E.game, E.task, E.os, E.Instance, E.warn\n')
+            'local game, task, os, Instance, warn, Enum = E.game, E.task, E.os, E.Instance, E.warn, E.Enum\n')
     for module in ("PlayerData", "Collection"):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
@@ -261,6 +263,18 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace(f"require(script.Parent.{module})", f"require({built})")
     assert "script.Parent" not in source, "server/VisitorOffers.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "VisitorOffersServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the Roblox badges: the real server/SandboxBadges.luau as SandboxBadgesServer.luau for
+    # tests/sandboxbadges_runtime_test.luau on the same runtime: its PlayerData, Collection and Upgrades the real ones
+    # above, Moving and SandboxLeaders the test's stand-ins (E.Moving: its onResult; E.SandboxLeaders: the board's rows),
+    # BadgeService the test's fake (through E.game's GetService).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxBadges.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("Upgrades", '"./UpgradesServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    for module in ("Moving", "SandboxLeaders"):
+        source = source.replace(f"require(script.Parent.{module})", f"E.{module}")
+    assert "script.Parent" not in source, "server/SandboxBadges.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SandboxBadgesServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.2 SANDBOX, showing off: the real server/SandboxLeaders.luau as SandboxLeadersServer.luau for
     # tests/sandboxleaders_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above) and
     # tests/runtime/LeadersRuntime.luau's few additions (an OrderedDataStore, UDim2 / UDim / Vector2, a game giving it).
@@ -295,10 +309,12 @@ with tempfile.TemporaryDirectory() as tmp:
     backs = [d for d in art["details"] if d["name"].startswith("Křídlo dveří") and d["center"][2] > 0] or leaves
     b_lo = [min(d["center"][i] - d["size"][i] / 2 for d in backs) for i in range(3)]
     b_hi = [max(d["center"][i] + d["size"][i] / 2 for d in backs) for i in range(3)]
+    # (8.3 walk-in doors: where its back door's handle is across it, its knob's X: the leaf hangs on the other side)
+    knobs = [d["center"][0] for d in art["details"] if d["name"].startswith("Klika") and d["center"][2] > 0] or [0]
     open(os.path.join(tmp, "HouseArt.luau"), "w", encoding="utf-8").write(
         "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r, "
-        "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r } }\n"
-        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2]))
+        "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, backKnob = %r }\n"
+        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2], sum(knobs) / len(knobs)))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).

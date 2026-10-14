@@ -31,9 +31,14 @@ house on The Old Chalet (the sandbox checks above; Marge's then another size: le
 Marge's (the checks above it; the sandbox's then another size: the chalet as it is).
 8.3 the big move: the chalet's doors' leaves and its back door (server/SandboxWorld.luau): without the import the
 doorways (FrontDoor, BackDoor) unseen behind their leaves and nothing else changed; the FrontDoor's two leaves
-(FrontLeafWest, FrontLeafEast) and the BackLeaf in their doorways, hinged at a jamb (DoorLeaf, Hinge), not solid; the
-BackDoor (attribute SandboxBackDoor, the moves' second way in at SandboxMap's House.back) on the model's back door
-(across it, as wide and tall, just outside its leaf), nothing of the model in its way out.
+(FrontLeafWest, FrontLeafEast) and the BackLeaf in their doorways, door leaves that swing (shared/DoorSwing.luau:
+DoorLeaf -1 / 1 / -1, each hinged at a jamb; DoorSwing 1, DoorDark), not solid; the BackDoor (attribute
+SandboxBackDoor, the moves' second way in at SandboxMap's House.back) on the model's back door (across it, as wide and
+tall, just outside its leaf), nothing of the model in its way out. 8.3 walk-in doors, dressed: the chalet's leaves
+hidden with it, no door leaves; the model's doors copied as the leaves that swing (SandboxWorld.doorLeaves: the models
+FrontDoorLeaf ×2, BackDoorLeaf) just in front of its doors' leaves, covering them, their backs on the wall's face,
+hinged at the opening's sides (the back door's away from its handle), within its doorways (nothing of the model in
+their way but the step under their foot and what runs across the doorway, its opening cut out).
 
     python3 zombie-delivery/tools/house-art/check.py <luau> [another export's ZDCHouseArt.json]
 """
@@ -233,14 +238,26 @@ local function f(cf)
 end
 print(string.format('HOUSE {"dressed":%s,"model":%s,"box":[%.17g,%.17g,%.17g],"pitch":%.17g}', tostring(own ~= nil and own:GetAttribute("MeshArt") == true),
 	tostring(own ~= nil and own:IsA("Model") and own:GetAttribute("Home") == H.id and own.Parent == chalet), h.sx, h.sy, h.sz, SandboxScenery.Chalet.Pitch))
+-- 8.3 walk-in doors: a part's door leaf (its own attributes, or its model's: a copy of the model's door)
+local function leafOf(d)
+	local holder = d
+	local parent = d.Parent
+	if d:GetAttribute("DoorLeaf") == nil and parent and parent.ClassName == "Model" and parent:GetAttribute("DoorLeaf") ~= nil then
+		holder = parent
+	end
+	local hinge = holder:GetAttribute("DoorLeaf")
+	return if hinge == nil then "null" else string.format("%g", hinge), string.format("%g", holder:GetAttribute("DoorSwing") or 0),
+		tostring(holder:GetAttribute("DoorDark") == true), if holder ~= d then holder.Name else ""
+end
 for _, d in (if chalet then chalet:GetDescendants() else {}) do
 	if d:IsA("BasePart") then
 		local shape = d.Shape
-		print(string.format('PART {"class":"%s","name":"%s","own":%s,"shape":"%s","cf":%s,"size":[%.17g,%.17g,%.17g],"t":%g,"shadow":%s,"collide":%s,"query":%s,"touch":%s,"anchored":%s,"night":%s,"door":%s,"skin":%s,"back":%s,"leaf":"%s","hinge":"%s"}',
+		local hinge, swing, dark, copy = leafOf(d)
+		print(string.format('PART {"class":"%s","name":"%s","own":%s,"shape":"%s","cf":%s,"size":[%.17g,%.17g,%.17g],"t":%g,"shadow":%s,"collide":%s,"query":%s,"touch":%s,"anchored":%s,"night":%s,"door":%s,"skin":%s,"back":%s,"leaf":%s,"swing":%s,"dark":%s,"copy":"%s"}',
 			d.ClassName, d.Name, tostring(own ~= nil and d.Parent == own), if shape then shape.Name else "", f(inverse * d.CFrame), d.Size.X, d.Size.Y, d.Size.Z,
 			d.Transparency or 0, tostring(d.CastShadow), tostring(d.CanCollide), tostring(d.CanQuery), tostring(d.CanTouch), tostring(d.Anchored),
 			tostring(d:GetAttribute("NightLight") == true), tostring(d:GetAttribute("SandboxDoor") == true), tostring(d:FindFirstChildWhichIsA("SurfaceAppearance") ~= nil),
-			tostring(d:GetAttribute("SandboxBackDoor") == true), tostring(d:GetAttribute("DoorLeaf") or ""), tostring(d:GetAttribute("Hinge") or "")))
+			tostring(d:GetAttribute("SandboxBackDoor") == true), hinge, swing, dark, copy))
 	end
 end
 -- the door's "Enter house" box as server/Moving.luau SB.site makes it: 4 × 6 × 1, 0.9 out of House.door, 3.5 up
@@ -312,6 +329,12 @@ def aabb(part):
 def box_of(detail):
     c, s = detail["center"], detail["size"]
     return [c[i] - s[i] / 2 for i in range(3)], [c[i] + s[i] / 2 for i in range(3)]
+
+
+def hinge_x(part):
+    """8.3 walk-in doors: a door leaf's hinge, its end DoorLeaf (±1) along its own X: that end's x (the house's frame)."""
+    c, r, s = part["cf"][:3], part["cf"][3:], part["size"]
+    return c[0] + r[0] * part["leaf"] * s[0] / 2
 
 
 def overlap(a, b, margin=0.005):
@@ -458,7 +481,7 @@ def sandbox_check(manifest, plain, art):
     assert house["dressed"] and art["META"]["moved"], (house, art["META"], "not dressed, or the import left in the world")
     own = [p for p in art["PART"] if p["own"] and p["class"] != "MeshPart"]
     meshes = [p for p in art["PART"] if p["class"] == "MeshPart"]
-    garden = [p for p in art["PART"] if not p["own"]]
+    garden = [p for p in art["PART"] if not p["own"] and not p["copy"]]  # (8.3: the doors' copies checked on their own)
     assert all(p["own"] for p in meshes), "a piece of the model outside House_sandbox_house"
     assert sorted(p["name"] for p in meshes) == sorted(manifest["pieces"]), sorted(set(p["name"] for p in meshes) ^ set(manifest["pieces"]))
     for p in meshes:
@@ -515,16 +538,50 @@ def sandbox_check(manifest, plain, art):
     assert abs((b_lo[0] + b_hi[0]) / 2 - (k_lo[0] + k_hi[0]) / 2) < 0.1 and abs((b_hi[0] - b_lo[0]) - (k_hi[0] - k_lo[0])) < 0.25 \
         and abs(b_lo[1] - k_lo[1]) < 0.3 and abs(b_hi[1] - k_hi[1]) < 0.3 and b_lo[2] >= k_hi[2] - 1e-3 and b_lo[2] - k_hi[2] < 0.5, \
         ("the BackDoor is not on the model's back door", b_lo, b_hi, k_lo, k_hi)
-    leaf_parts = {p["name"]: p for p in plain["PART"] if p["leaf"]}
+    # (8.3 walk-in doors: door leaves of shared/DoorSwing.luau, hinged at a jamb: DoorLeaf ±1 at that end of its own X)
+    leaf_parts = {p["name"]: p for p in plain["PART"] if p["leaf"] is not None}
     assert sorted(leaf_parts) == ["BackLeaf", "FrontLeafEast", "FrontLeafWest"], sorted(leaf_parts)
-    for name, door, hinge, way in (("FrontLeafWest", "front", "west", doors[0]), ("FrontLeafEast", "front", "east", doors[0]), ("BackLeaf", "back", "west", backs[0])):
+    plain_ways = {p["name"]: p for p in plain["PART"] if p["name"] in ("FrontDoor", "BackDoor")}
+    for name, jamb, way in (("FrontLeafWest", 0, "FrontDoor"), ("FrontLeafEast", 1, "FrontDoor"), ("BackLeaf", 1, "BackDoor")):
         p = leaf_parts[name]
         lo_, hi_ = aabb(p)
-        w_lo, w_hi = aabb(way)
-        assert p["leaf"] == door and p["hinge"] == hinge and p["own"] and not p["collide"] and p["t"] == 0, (name, p["leaf"], p["hinge"])
+        w_lo, w_hi = aabb(plain_ways[way])
+        assert p["leaf"] in (-1, 1) and p["swing"] == 1 and p["dark"] and not p["copy"] and p["own"] and not p["collide"] and p["t"] == 0, \
+            (name, p["leaf"], p["swing"], p["dark"])
         assert all(lo_[i] >= w_lo[i] - 0.05 and hi_[i] <= w_hi[i] + 0.05 for i in range(3)), (name, "not in its doorway", lo_, hi_, w_lo, w_hi)
-        jamb = 0 if hinge == "west" else 1
-        assert abs((lo_, hi_)[jamb][0] - (w_lo, w_hi)[jamb][0]) < 0.1, (name, "not at its hinge's jamb")
+        assert abs(hinge_x(p) - (w_lo, w_hi)[jamb][0]) < 0.1, (name, "not hinged at its jamb (west, east, the back door's east)", hinge_x(p))
+    # Dressed: the chalet's leaves no door leaves (hidden with it); the model's doors copied as the leaves that swing,
+    # in front of its doors' leaves (covering them, their backs on the wall's face), within the doorways, hinged at the
+    # opening's sides (the back door's away from its handle), nothing of the model in their way but the step under their
+    # foot and what runs across the doorway (its opening cut out).
+    assert not [p["name"] for p in art["PART"] if p["own"] and p["leaf"] is not None], "a hidden chalet leaf still a door leaf"
+    knobs = [box_of(d) for d in details if d["name"].startswith("Klika") and d["center"][2] > 0]
+    knob_x = sum((b[0][0] + b[1][0]) / 2 for b in knobs) / len(knobs)
+    copies = [p for p in art["PART"] if p["copy"]]
+    for model, want, (m_lo, m_hi), face in (("FrontDoorLeaf", [-1, 1], (l_lo, l_hi), -D / 2), ("BackDoorLeaf", [-1], (k_lo, k_hi), D / 2)):
+        parts = [p for p in copies if p["copy"] == model]
+        bodies = sorted((p for p in parts if p["name"] == "DoorLeaf"), key=lambda p: p["leaf"])
+        assert len(parts) == 8 * len(want) and [p["leaf"] for p in bodies] == want, (model, len(parts), [p["leaf"] for p in bodies])
+        c_lo = [min(aabb(p)[0][i] for p in bodies) for i in range(3)]
+        c_hi = [max(aabb(p)[1][i] for p in bodies) for i in range(3)]
+        outward = -1 if face < 0 else 1
+        near, far = (c_hi, c_lo) if face < 0 else (c_lo, c_hi)
+        assert c_lo[0] <= m_lo[0] + 1e-3 and c_hi[0] >= m_hi[0] - 1e-3 and abs(c_lo[1] - m_lo[1]) < 0.05 and abs(c_hi[1] - m_hi[1]) < 0.05 \
+            and abs(near[2] - face) < 0.01 and (near[2] - (m_lo if face < 0 else m_hi)[2]) * outward >= -1e-3 and (far[2] - face) * outward > 0, \
+            (model, "not just in front of the model's door, covering it", c_lo, c_hi, m_lo, m_hi)
+        for p in parts:
+            lo_, hi_ = aabb(p)
+            assert p["swing"] == 1 and p["dark"] and not (p["collide"] or p["query"] or p["touch"]) and p["anchored"] and p["t"] == 0 and not p["own"], (model, p["name"])
+            assert lo_[0] >= c_lo[0] - 1e-3 and hi_[0] <= c_hi[0] + 1e-3 and lo_[1] >= c_lo[1] - 1e-3 and hi_[1] <= c_hi[1] + 1e-3, (model, p["name"], "outside its leaf")
+            clash = [d["name"] for d in details if overlap((lo_, hi_), box_of(d)) and not d["name"].startswith("Schod")
+                     and not (box_of(d)[0][0] <= m_lo[0] and box_of(d)[1][0] >= m_hi[0])]
+            assert not clash, (model, p["name"], "in the model", clash[:8])
+        for p in bodies:
+            side = c_lo[0] if p["leaf"] * (p["cf"][3]) < 0 else c_hi[0]  # (its hinge end: its own +X, turned or not)
+            assert abs(hinge_x(p) - side) < 1e-3 and abs(hinge_x(p)) > 0.5, (model, "not hinged at the opening's side", hinge_x(p))
+        if model == "BackDoorLeaf":
+            assert (hinge_x(bodies[0]) - (c_lo[0] + c_hi[0]) / 2) * (knob_x - (c_lo[0] + c_hi[0]) / 2) < 0, \
+                ("the back door's leaf hung on its handle's side", hinge_x(bodies[0]), knob_x)
     # Nothing of the model in the door's Enter house box, the doorway's way out (6 studs, over the step) or on the path
     # (the path runs under the step); the garden clear of the model.
     path = art["PATH"][0]
@@ -554,7 +611,8 @@ def sandbox_check(manifest, plain, art):
             f"without the import the chalet; dressed, all {len(meshes)} pieces in place on House_sandbox_house, anchored, not "
             f"physical; the chalet's {len(own)} parts hidden, the House box and the gable still solid, the gable "
             f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door, 8.3 the "
-            f"BackDoor on its back door, their three leaves shut in them hinged at a jamb; the Enter house box, both ways out, "
+            f"BackDoor on its back door, their three leaves shut in them hinged at a jamb (dressed: the model's doors copied as "
+            f"{len(copies)} parts of three leaves in front of them); the Enter house box, both ways out, "
             f"the path (under the step) and the greeter's spot clear; the garden's {len(garden)} parts clear of the model")
 
 
