@@ -17,6 +17,7 @@ PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/coll
 PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
 PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
+PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -592,6 +593,42 @@ def upgrades_hooks_check():
     return good
 
 if not upgrades_hooks_check():
+    ok = False
+
+# 8.3 SANDBOX: the gamepad's D-pad (← the STOCK list, → the book, ↓ the TASKS panel: Config's StockPad / Pad,
+# shared/SandboxPad.luau) is free in the sandbox: no module the sandbox's client starts (client/Main.client.luau's
+# sandbox block: what it requires, its own modules) reads a D-pad button itself, none of the city's D-pad users (the
+# weapon wheel ↑, the phone ↓, the hands ← →) is started there, no prompt of the server's (GamepadKeyCode) is on the
+# D-pad, and the three chips are on three different D-pad buttons, never ↑ (Roblox's emote wheel).
+def pad_check():
+    root = os.path.dirname(HERE)
+    client = os.path.join(root, "src", "client")
+    main = open(os.path.join(client, "Main.client.luau"), encoding="utf-8").read()
+    start = main.index("if Config.Sandbox.On then")
+    block = main[start:main.index("\nend\n", start)]
+    started = set(re.findall(r"require\(Client\.(\w+)\)", block))
+    own = re.search(r"for _, name in \{([^}]*)\} do", block)
+    started |= set(re.findall(r'"(\w+)"', own.group(1))) if own else set()
+    bad = []
+    for name in sorted(started):
+        path = os.path.join(client, name + ".luau")
+        if os.path.exists(path) and re.search(r"KeyCode\.DPad\w+", open(path, encoding="utf-8").read()):
+            bad.append(f"client/{name}.luau reads the D-pad")
+    for city in ("Holster", "WeaponWheel", "Phone"):
+        if city in started:
+            bad.append(f"the sandbox starts {city} (a D-pad user of the city's)")
+    for folder, _, files in os.walk(os.path.join(root, "src", "server")):
+        for name in files:
+            if name.endswith(".luau") and re.search(r"GamepadKeyCode\s*=\s*Enum\.KeyCode\.DPad", open(os.path.join(folder, name), encoding="utf-8").read()):
+                bad.append(f"server/{name}: a prompt on the D-pad")
+    config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
+    pads = re.findall(r'^\t(?:StockPad|Pad) = "(\w+)"', config, re.M)
+    if len(pads) != 3 or len(set(pads)) != 3 or any(not p.startswith("DPad") or p == "DPadUp" for p in pads):
+        bad.append(f"the chips' pads {pads}: three different D-pad buttons, never DPadUp")
+    print("== sandbox D-pad: " + (f"free for the chips ({', '.join(pads)}): none of the {len(started)} modules the sandbox starts reads it, no prompt on it" if not bad else "; ".join(bad)))
+    return not bad
+
+if not pad_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

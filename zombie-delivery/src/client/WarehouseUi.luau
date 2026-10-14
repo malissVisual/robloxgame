@@ -147,6 +147,7 @@ local shownKey = ""
 local card: any = nil -- the shade over the screen (the window: card's Picker)
 local panel: any = nil -- the card itself (Picker)
 local question: any = nil
+local questionFrom: any = nil -- 8.3: what the gamepad had selected when the question opened (selected again after it)
 local grid: any = nil
 local plan: Layout? = nil
 local listed: Listed? = nil -- 8.2: what the grid lists (draw keeps it, fillGrid reads it)
@@ -504,6 +505,11 @@ local function closeQuestion()
 	if question then
 		question:Destroy()
 		question = nil
+		local from = questionFrom -- (8.3: the gamepad's selection back on what asked, not lost with the question)
+		questionFrom = nil
+		if from and from.Parent and not Ui.gamepadSelection() then
+			Ui.gamepadFocus(from)
+		end
 	end
 end
 
@@ -620,7 +626,13 @@ local function questionBox(name: string, boxW: number, boxH: number): (any, any)
 		BorderSizePixel = 0,
 		Active = true,
 		ZIndex = 21,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the question)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, shade)
+	questionFrom = Ui.gamepadSelection()
 	Ui.corner(box, 12)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, box)
 	question = shade
@@ -1158,6 +1170,13 @@ draw = function(keepScroll: boolean)
 	end
 	shownKey = key
 	local scroll = if keepScroll and grid then grid.CanvasPosition else Vector2.zero
+	local selected = Ui.gamepadSelection() -- (8.3: the gamepad's selection, selected again once drawn)
+	local heldName, heldTile = nil, nil
+	if card and selected and selected:IsDescendantOf(card) then
+		local parent = selected.Parent
+		heldName = selected.Name
+		heldTile = if parent and string.sub(parent.Name, 1, 5) == "Tile_" then parent.Name else nil
+	end
 	closeQuestion()
 	for _, tile in tiles do
 		unmount(tile)
@@ -1190,6 +1209,11 @@ draw = function(keepScroll: boolean)
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the window)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, card)
 	panel = frame
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, frame)
@@ -1234,7 +1258,12 @@ draw = function(keepScroll: boolean)
 	drawChips(frame, list, layout)
 	fillGrid(scroll.Y)
 	local firstTile = tiles[1]
-	Ui.gamepadFocus(if firstTile then firstTile.buttons[1] else close)
+	local again: any = nil -- (8.3: the same tile's button, or the header's, chip or sort)
+	if heldName then
+		local tile = if heldTile then grid and grid:FindFirstChild(heldTile) else nil
+		again = if heldTile then (if tile then tile:FindFirstChild(heldName) else nil) else frame:FindFirstChild(heldName)
+	end
+	Ui.gamepadFocus(again or (if firstTile then firstTile.buttons[1] else close))
 end
 
 -- The grid (and its empty words) for what the window lists now: the rarity chip's, the search's (8.2: typing in the

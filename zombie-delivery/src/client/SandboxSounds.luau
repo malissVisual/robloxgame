@@ -14,6 +14,16 @@
 --                door rolling open and slammed shut, 3D at the door (SoundPlan.slideSound)
 --   the walk-in step: your feet onto a Sprinter's rear or side step (your Humanoid's floor changed: a ray down, solid
 --                parts only, SoundPlan.isStep): a hollow clonk and the van's springs, at most every StepGap s
+-- 8.3, the 8.2 features' feedback (SoundPlan.feedbackOf / feedbackCues / slot: the existing sheets' sounds; the stings
+-- one after the other in one lane, never over each other, a burst of one kind is one):
+--   the "CollectionBook" remote   a state with pieces new in the book: the discovery chime (after the trip home's
+--                fanfare); a milestone paid: a fanfare (after the chime)
+--   the "SandboxTasks" remote     a task done; a reward claimed (client/SandboxTasksUi.luau plays nothing itself now)
+--   the "Collection" remote       ⭐ FILL BEST's answer ("bulk", "fillbest"): a few soft stand clicks (the state after it
+--                then plays no stand_display); 💰 SELL…'s sale (a "sold" of 2 pieces or more): the till once, louder,
+--                with the old ka-ching on top (one piece's sale: the till as before)
+--   the money a claim, a milestone or a sale brought plays no income clink (SoldQuiet s); the move's result card's
+--                jingle holds the lane too (SoundPlan.hold: the chime waits for it)
 -- The rest of the sandbox's sound is client/SoundScape.luau's (the meadow, the warehouse's hall, the chalet's room, the
 -- far cowbells, the room's echo, the Sprinter's back doors); client/Sounds.luau leaves the sandbox's money to this
 -- module and plays everything (Sounds.play / playAt: the SOUND setting, the stand-ins).
@@ -38,9 +48,11 @@ local started = false
 local collection: any = nil -- the last "Collection" state (nil: none yet)
 local earning = false -- pieces on show earn (its income over 0)
 local money: number? = nil -- the last State's money (nil: none yet)
-local soldAt = -math.huge
+local soldAt = -math.huge -- (8.3: a sale's, a claim's or a milestone's money: no income clink for it)
 local resultAt = -math.huge
 local clinkAt = -math.huge
+local fillAt = -math.huge -- 8.3: ⭐ FILL BEST's answer (its clicks)
+local lane = SoundPlan.lane() -- 8.3: the stings one after the other
 
 -- Is the warehouse's window open (client/WarehouseUi.luau, when it is there)?
 local function windowOpen(): boolean
@@ -54,6 +66,25 @@ local function windowOpen(): boolean
 	return ok and open == true
 end
 
+-- ── 8.3: the feedback's lane ────────────────────────────────────────────────
+
+-- A kind's cues (SoundPlan.feedbackCues), when the lane lets it (SoundPlan.slot: never over a sting, a burst is one).
+local function feedback(kind: string, count: number?)
+	local now = os.clock()
+	local at = SoundPlan.slot(lane, kind, now, count)
+	if not at then
+		return
+	end
+	for _, cue in SoundPlan.feedbackCues(kind, count) do
+		local wait = at - now + cue.at
+		if wait > 0.02 then
+			task.delay(wait, Sounds.play, cue.name, cue.volume, cue.pitch)
+		else
+			Sounds.play(cue.name, cue.volume, cue.pitch)
+		end
+	end
+end
+
 -- ── The collection, a sale, the income ──────────────────────────────────────
 
 local function onCollection(message: any)
@@ -64,12 +95,48 @@ local function onCollection(message: any)
 		local was = collection
 		collection = message
 		earning = (tonumber(message.income) or 0) > 0
-		for _, c in SoundPlan.collectionCues(was, message, os.clock() - resultAt) do
-			Sounds.play(c.name, c.volume, c.pitch)
+		for _, c in SoundPlan.collectionCues(was, message, os.clock() - resultAt, os.clock() - fillAt) do
+			if c.name == "stored_fanfare" then
+				feedback("stored") -- (8.3: in the lane, the book's chime after it)
+			else
+				Sounds.play(c.name, c.volume, c.pitch)
+			end
 		end
 	elseif message.kind == "sold" then
 		soldAt = os.clock()
-		Sounds.play("sale_register", B.Sold)
+		local kind, count = SoundPlan.feedbackOf("Collection", message)
+		if kind then
+			feedback(kind, count) -- (8.3: 💰 SELL…'s sale: the till once, a bigger ka-ching)
+		else
+			Sounds.play("sale_register", B.Sold)
+		end
+	elseif message.kind == "bulk" then
+		local kind, count = SoundPlan.feedbackOf("Collection", message)
+		if kind then
+			fillAt = os.clock()
+			feedback(kind, count) -- (8.3: ⭐ FILL BEST's clicks)
+		end
+	end
+end
+
+-- 8.3: the collection book's discoveries and milestones, the tasks done and claimed.
+local function onBook(message: any)
+	local kind, count = SoundPlan.feedbackOf("CollectionBook", message)
+	if kind == "milestone" then
+		soldAt = os.clock() -- (its money comes in: no income clink)
+	end
+	if kind then
+		feedback(kind, count)
+	end
+end
+
+local function onTasks(message: any)
+	local kind, count = SoundPlan.feedbackOf("SandboxTasks", message)
+	if kind == "claimed" then
+		soldAt = os.clock()
+	end
+	if kind then
+		feedback(kind, count)
 	end
 end
 
@@ -158,18 +225,22 @@ function SandboxSounds.start()
 		return
 	end
 	started = true
-	task.spawn(function()
-		local ok, remote = pcall(Net.get, "Collection")
-		if ok then
-			remote.OnClientEvent:Connect(onCollection)
-		else
-			warn(`[SandboxSounds] no Collection remote: {remote}`)
-		end
-	end)
+	local listeners: { [string]: (any) -> () } = { Collection = onCollection, CollectionBook = onBook, SandboxTasks = onTasks } -- (8.3: the book, the tasks)
+	for name, listener in listeners do
+		task.spawn(function()
+			local ok, remote = pcall(Net.get, name)
+			if ok then
+				remote.OnClientEvent:Connect(listener)
+			else
+				warn(`[SandboxSounds] no {name} remote: {remote}`)
+			end
+		end)
+	end
 	Net.get("State").OnClientEvent:Connect(onState)
 	Net.get("Moving").OnClientEvent:Connect(function(kind: any)
 		if kind == "result" then
 			resultAt = os.clock() -- (its card plays its jingle: no fanfare for the pieces that came with it)
+			SoundPlan.hold(lane, resultAt, SoundPlan.seconds("job_done")) -- (8.3: the book's chime waits for the jingle)
 		end
 	end)
 	task.spawn(watchCars)

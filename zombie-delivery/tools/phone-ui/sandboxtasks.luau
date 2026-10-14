@@ -8,7 +8,8 @@
 -- in Hud's column (the toasts under it), clear of the touch buttons, the thumbstick, the left column and the move's
 -- panel, a finger's size on a phone; THE PANEL on J, on the chip (a key the game took does nothing), the three dailies,
 -- the bonus and the weekly with their progress ("3 / 10", "$120 / $250"), bars, rewards and CLAIM on a done one only;
--- CLAIM's request ({ kind = "claim", slot }) once for a double tap; "done" and "claimed" toasts and sounds; no redraw
+-- CLAIM's request ({ kind = "claim", slot }) once for a double tap; "done" and "claimed" toasts (8.3: their sounds are
+-- client/SandboxSounds.luau's, the panel plays none); no redraw
 -- for the same state; the countdown; ✕, J, ESC, the gamepad's B, the menu and a tap beside it close it; on each screen
 -- the panel on the screen, every row shown whole inside it, the texts fitting, a phone's buttons a finger's size (44
 -- px), a computer's panel under the chip, a phone's beside (two columns); a resize while open; garbage states.
@@ -370,8 +371,9 @@ remote.OnClientEvent:Fire(FIRST)
 M.flush()
 check("the same state again: no redraw (a tap is never lost)", named(panelGui, "Tasks") == same)
 local toastsAt = #M.toasts
+local playedAt = #M.played
 remote.OnClientEvent:Fire({ kind = "claimed", title = "Bring 12 pieces home", money = 270 })
-check("\"claimed\": a toast and the money's sound", M.toasts[#M.toasts] == "💰 Bring 12 pieces home: +$270" and M.played[#M.played] == "cash" and #M.toasts == toastsAt + 1, M.toasts[#M.toasts])
+check("\"claimed\": a toast (8.3: its sound is SandboxSounds', the panel plays none)", M.toasts[#M.toasts] == "💰 Bring 12 pieces home: +$270" and #M.played == playedAt and #M.toasts == toastsAt + 1, M.toasts[#M.toasts])
 local CLAIMED = viewOf({ { "home", 12, 12, true }, { "trips", 3, 3 }, { "sell", 250, 250 } }, { "w_income", 4500, 4500 })
 remote.OnClientEvent:Fire(CLAIMED)
 M.flush()
@@ -390,7 +392,7 @@ press(named(named(panel, "Task_weekly"), "Claim"))
 sent = sentOn("SandboxTasks")
 check("the weekly's CLAIM sends slot \"weekly\"", sent[#sent][1].slot == "weekly")
 remote.OnClientEvent:Fire({ kind = "done", title = "Make 3 trips home in one move", money = 380, weekly = false })
-check("\"done\": a toast (claim it in TASKS) and the task's sound", M.toasts[#M.toasts] == "✅ Task done: Make 3 trips home in one move · claim $380 in TASKS" and M.played[#M.played] == "task_done", M.toasts[#M.toasts])
+check("\"done\": a toast (claim it in TASKS; 8.3: its sound is SandboxSounds')", M.toasts[#M.toasts] == "✅ Task done: Make 3 trips home in one move · claim $380 in TASKS" and #M.played == playedAt, M.toasts[#M.toasts])
 remote.OnClientEvent:Fire({ kind = "done", title = "Earn $4,500 from your stands", money = 2630, weekly = true })
 check("… a weekly one says so", string.find(M.toasts[#M.toasts], "Weekly task done", 1, true) ~= nil)
 
