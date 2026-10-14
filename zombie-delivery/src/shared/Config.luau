@@ -7766,4 +7766,44 @@ Config.SandboxLight = {
 	},
 }
 
+-- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).
+-- server/SandboxBadges.luau only listens (the moves, the collection, the upgrades, the save, the TOP MOVERS board) and
+-- awards a badge on the server when its milestone is reached; shared/SandboxBadgeRules.luau has the rules
+-- (tests/sandboxbadges_test.luau, tests/sandboxbadges_runtime_test.luau). A badge is off until the owner makes it on
+-- create.roblox.com and pastes its id here: an id of 0 is never awarded, and nothing errors.
+--   Badges      key → { id, name, description }: id the Roblox badge's id (0: not set up yet); name and description
+--               are what the owner types into Roblox's form (the admin panel's SANDBOX tab lists them)
+--   Studio      true: awarded in Studio too (a test with real ids); false: nothing is awarded in Studio
+--   Moves       the finished moves tenMoves wants (a move finished: done or late with pieces home, the crew's too)
+--   Level       the warehouse level warehouse5 wants (Config.WarehouseLevels: 5 the Logistics centre)
+--   TopPlayers  the players topMover wants on the server (their saves loaded: a full server, Config.Sandbox.MaxPlayers)
+--   TopEvery    s between two looks at the TOP MOVERS board (SandboxLeaders.rows)
+--   Tries, Wait an award that errors is tried again Wait s later, Tries times in all
+--   Flag        the save's mark: profile.sandboxMoves (the moves finished) is read only from a real save written with it
+export type SandboxBadgeDef = { id: number, name: string, description: string }
+Config.SandboxBadges = {
+	Badges = {
+		firstMove = { id = 0, name = "First Move", description = "Finish your first move." },
+		tenMoves = { id = 0, name = "Seasoned Mover", description = "Finish 10 moves." },
+		cleanMove = { id = 0, name = "Handle With Care", description = "Finish a move with nothing broken." },
+		firstShow = { id = 0, name = "On Display", description = "Put a piece on a display stand in your warehouse." },
+		firstSale = { id = 0, name = "First Sale", description = "Sell a piece from your collection." },
+		hotSale = { id = 0, name = "Hot Seller", description = "Sell one of today's hot items." },
+		legendary = { id = 0, name = "Legendary Find", description = "Bring home a legendary piece." },
+		fullBook = { id = 0, name = "Completionist", description = "Find every piece in the collection book." },
+		firstUpgrade = { id = 0, name = "Upgraded", description = "Buy your first upgrade." },
+		warehouse5 = { id = 0, name = "Logistics Tycoon", description = "Grow your warehouse to level 5." },
+		painted = { id = 0, name = "Fresh Paint", description = "Paint your van at the PAINT shop." },
+		topMover = { id = 0, name = "Top Mover", description = "Top the TOP MOVERS board on a full server." },
+	} :: { [string]: SandboxBadgeDef },
+	Studio = false,
+	Moves = 10,
+	Level = 5,
+	TopPlayers = Config.Sandbox.MaxPlayers,
+	TopEvery = 5,
+	Tries = 3,
+	Wait = 2,
+	Flag = "sandboxMovesKept",
+}
+
 return Config
