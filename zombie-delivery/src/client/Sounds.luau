@@ -41,6 +41,12 @@
 -- client/MoveSounds.luau plays the ones the move already tells (its state, its result, your MoveCarry); a move's carry
 -- no longer plays the old pickup / putdown under them. The stand-ins of every sheet not uploaded yet are
 -- SoundSheet.Fallback (written by make_audio.py; the sfx2 / sfx3 ones moved there from here).
+--
+-- 8.1 SANDBOX, the sandbox's sounds (sfx4.ogg's 8.1 part, Config.Soundscape.Sandbox): the meadow, the warehouse's hall
+-- and the chalet's room are client/SoundScape.luau's (it is told whether sfx4 is up: sheet4); the stands, the till,
+-- the trip home's fanfare, the stands' income, the Sprinter's sliding door and its step are client/SandboxSounds.luau's
+-- (through Sounds.play / playAt). Money that went up outside a job plays nothing here in the sandbox (its money is a
+-- sale or the stands' income: SandboxSounds plays those).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -405,7 +411,7 @@ local function listenGame()
 			if money and state.money ~= money and os.clock() - lastPayout > 1.5 then
 				if state.money < money then
 					play("purchase", Config.Soundscape.PurchaseVolume)
-				else
+				elseif not Config.Sandbox.On then -- (8.1: the sandbox's money is client/SandboxSounds.luau's)
 					play("cash", 0.6)
 				end
 			end
@@ -794,6 +800,7 @@ function Sounds.start()
 			return inGame
 		end,
 		sheet3 = enabled and sheet3,
+		sheet4 = enabled and sheet4, -- 8.1: the sandbox's loops or their stand-ins
 	})
 	-- 7.1: the move's sounds from what the move already sends (client/MoveSounds.luau)
 	MoveSounds.start({

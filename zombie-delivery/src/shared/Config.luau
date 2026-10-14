@@ -3670,6 +3670,38 @@ Config.Soundscape = {
 		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick
 		Tick = 0.1, -- seconds between the looks at the drag
 	},
+	-- 8.1 SANDBOX, the sandbox's own sounds (art/audio/sfx4.ogg's 8.1 part; until it is up their stand-ins, SoundSheet
+	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" on the meadow, in a "warehouse" (its
+	-- building's box, SandboxMap's plot.warehouse) or in the "house" (inside the Old Chalet: the move's interior, its
+	-- state's inside, or the chalet's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience: the
+	-- city's day and night never play here), plays a cowbell far off now and then and sets the room's echo;
+	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.
+	Sandbox = {
+		Alpine = 0.24, -- amb_alpine outdoors: a calm alpine day (a soft breeze, birds) …
+		AlpineStandIn = 0.09, -- … until sfx4 is up its stand-in, sfx2's wind: a breeze only
+		AlpineIndoors = 0.3, -- … × this in a warehouse (through its open roller door)
+		Warehouse = 0.22, -- amb_warehouse in a warehouse: the lights' hum, the hall's air, the roof ticking …
+		WarehouseStandIn = 0.12, -- … until sfx4 is up its stand-in, sfx2's hum
+		Room = 0.4, -- amb_room in the house: a quiet room tone and a clock (no stand-in: silent until sfx4 is up)
+		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
+		-- in the game and SOUND is not all off
+		Reverb = { warehouse = "Room" } :: { [string]: string },
+		CowbellGap = { 25, 60 } :: { number }, -- seconds between two cowbells far off outdoors (cowbell_far: random) …
+		CowbellFar = { 70, 130 } :: { number }, -- … studs away, a random way round you (3D: you hear where)
+		Cowbell = 1.5, -- (a 3D sound that far off is quiet: its falloff)
+		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
+		TakeDown = 0.6, -- … taken down (stand_takedown)
+		Sold = 0.7, -- a sale (sale_register: the till's ka-ching)
+		Stored = 0.65, -- a trip's pieces into your warehouse (stored_fanfare: a small fanfare) …
+		StoredQuiet = 2.5, -- … not this many seconds after the move's result card (it plays its own jingle)
+		Income = 0.14, -- the stands' income coming in (coin, sfx2's: a soft clink) …
+		IncomeGap = 10, -- … at most once every this many seconds, not while the warehouse's window is open and not …
+		SoldQuiet = 2, -- … this many seconds after a sale (its money comes in too)
+		Slide = 0.75, -- the ZDC Sprinter's sliding door rolling open and slammed shut (van_slide_open / _close) …
+		SlideRange = 90, -- … heard this many studs from the camera
+		Step = 0.55, -- your foot onto a Sprinter's rear or side step (van_step_up) …
+		StepGap = 0.8, -- … at most every this many seconds
+	},
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
