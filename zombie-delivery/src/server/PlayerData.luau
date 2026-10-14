@@ -56,6 +56,8 @@
 -- 8.1 SANDBOX: the upgrades bought at the warehouse's UPGRADES desk (sandboxUpgrades: { [id]: level },
 -- shared/UpgradeRules.luau; server/Upgrades.luau sells them), read only from a real save written with its flag
 -- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.)
+-- 8.2 SANDBOX: the daily tasks (sandboxTasks: shared/SandboxTasks.luau's save, kept by server/SandboxTasks.luau), read
+-- only from a real save written with their flag (sandboxTasksKept); older saves: none (the server starts them fresh).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -80,6 +82,7 @@ local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.sk
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
 local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
 local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
+local SandboxTaskRules = require(Shared.SandboxTasks) -- 8.2: the sandbox's daily tasks (profile.sandboxTasks)
 
 export type Profile = {
 	money: number,
@@ -152,6 +155,9 @@ export type Profile = {
 	-- 8.1 SANDBOX: the upgrades bought ({ [id]: level }, shared/UpgradeRules.luau; server/Upgrades.luau): read only from a
 	-- real save written with its flag (UpgradeRules.fromSave); an older one has none
 	sandboxUpgrades: UpgradeRules.Levels,
+	-- 8.2 SANDBOX: the daily tasks (shared/SandboxTasks.luau: the day's picks and progress, the week's): read only from a
+	-- real save written with its flag (SandboxTasks.fromSave); nil until server/SandboxTasks.luau starts them
+	sandboxTasks: SandboxTaskRules.Saved?,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -251,6 +257,7 @@ local function newProfile(): Profile
 		story = {}, -- 7.0: no story card seen yet
 		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
 		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
+		sandboxTasks = nil, -- 8.2: server/SandboxTasks.luau starts them (it knows the UserId and the day)
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -563,6 +570,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.1: the sandbox's upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); a save
 	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave)
 	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
+	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
+	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
+	profile.sandboxTasks = SandboxTaskRules.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -962,6 +972,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
 		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
 		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
+		sandboxTasks = profile.sandboxTasks, -- 8.2
+		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

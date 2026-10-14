@@ -298,6 +298,7 @@ local SB = {
 	seeds = {} :: { [Player]: number },
 	last = 0,
 	door = nil :: BasePart?,
+	listeners = { trip = {}, finish = {} } :: { [string]: { any } }, -- 8.2: Moving.onTrip / onFinish's fns
 	how = {
 		done = "Brought home to your warehouse",
 		late = "Time's up: what reached your warehouse is yours",
@@ -3117,6 +3118,7 @@ function SB.result(s: Session, phase: string, why: string?, result: Rules.Result
 		local owner = s.owner
 		PlayerData.track("event", owner, "MoveDone", result.stars, s.contract.id, if #crew > 1 then "crew" else "solo")
 	end
+	for _, fn in SB.listeners.finish do task.spawn(fn, s.owner, s.move, result, crew) end -- 8.2: Moving.onFinish
 end
 
 -- ── Starting ───────────────────────────────────────────────────────────────
@@ -3670,6 +3672,7 @@ function SB.store(s: Session, spots: { number }): number
 			warn(`[Moving] Collection.add of {thing.item}: {uid}`)
 		end
 	end
+	if #spots > 0 then for _, fn in SB.listeners.trip do task.spawn(fn, s.owner, s.move, spots) end end -- 8.2: Moving.onTrip
 	return took
 end
 
@@ -4298,6 +4301,11 @@ function Moving.busy(player: Player): string?
 	end
 	return nil
 end
+
+-- 8.2 SANDBOX (server/SandboxTasks.luau, the analytics): fn(owner, move, spots) after a trip home (SB.store),
+-- fn(owner, move, result, crew) at a move's end (SB.result).
+function Moving.onTrip(fn: (Player, Rules.Move, { number }) -> ()) table.insert(SB.listeners.trip, fn) end
+function Moving.onFinish(fn: (Player, Rules.Move, Rules.Result, { Player }) -> ()) table.insert(SB.listeners.finish, fn) end
 
 -- 8.0 SANDBOX (server/SandboxBoot.luau: every spawn): where a new body of a player on a move (its owner or its crew)
 -- stands, never stranded at home while the van is out: by the move's van when it is out and not wrecked (beside its

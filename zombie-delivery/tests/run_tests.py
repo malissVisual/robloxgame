@@ -13,6 +13,7 @@ PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore",
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
+PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -171,6 +172,18 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
     source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
     open(os.path.join(tmp, "UpgradesServer.luau"), "w", encoding="utf-8").write(head + "local workspace = E.workspace\n" + source)
+    # 8.2 SANDBOX, the daily tasks: the real server/SandboxTasks.luau as SandboxTasksServer.luau for
+    # tests/sandboxtasks_runtime_test.luau on the same runtime: its PlayerData, Collection and Upgrades the real ones
+    # above, Moving and MoveHelper tests/runtime/SandboxTasksRuntime.luau's stand-ins (their hooks, Danny's find).
+    shutil.copy(os.path.join(HERE, "runtime", "SandboxTasksRuntime.luau"), os.path.join(tmp, "SandboxTasksRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxTasks.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("Upgrades", '"./UpgradesServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    for module in ("Moving", "MoveHelper"):
+        source = source.replace(f"require(script.Parent.{module})", f'require("./SandboxTasksRuntime").{module}')
+    assert "script.Parent" not in source, "server/SandboxTasks.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SandboxTasksServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.0 sandbox, the map: the real server/SandboxWorld.luau as SandboxWorldServer.luau on the same mock for
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()

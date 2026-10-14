@@ -20,6 +20,9 @@ sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stoc
 740 x 360, 1024 x 768 and 1280 x 800: the widget and the GRIP button clear of everything, one press, the outcomes.
 8.1 SANDBOX: the UPGRADES desk's window (the real UpgradeUi: upgrades.luau on sandbox_mock.luau) on the same screens:
 the cards, BUY's request, NEED without the money, MAX, the money from the State, closing, a phone's finger sizes.
+8.2 SANDBOX: the daily tasks' TASKS chip and panel (the real SandboxTasksUi beside the real SandboxHud: sandboxtasks.luau
+on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920 x 1080: the chip under the money, the
+panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.
 """
 import argparse
 from pathlib import Path
@@ -251,3 +254,9 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "upgrades.luau"], cwd=folder, check=True)
+# 8.2 SANDBOX: the daily tasks' TASKS chip and panel (client/SandboxTasksUi.luau beside client/SandboxHud.luau,
+# shared/SandboxTasks.luau's views) in the same folder: tools/phone-ui/sandboxtasks.luau on a phone (844 x 390), a
+# computer (1280 x 800, the chat shut and open) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "sandboxtasks.luau"], cwd=folder, check=True)
