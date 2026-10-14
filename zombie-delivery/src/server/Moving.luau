@@ -2028,10 +2028,11 @@ function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean): (number?, Vect
 end
 
 -- One look at a crew member (WalkIn.look): on foot in a zone, facing its door (Face) for Dwell s: through it, once a
--- visit (a refusal is said once; out of the zone and in again tries again). After a trip nothing until they have left
+-- visit (a refusal is said once; out of the zone and in again tries again). 8.1 carrying in two (PairTurn): the back
+-- to the door counts too (the leader walks backwards through it, facing the piece and the partner). After a trip nothing until they have left
 -- the zone they came out in and Rearm s have gone by (WalkIn.held, set by travel).
 function WalkIn.check(s: Session, player: Player, clock: number)
-	local _, humanoid, root = bodyOf(player)
+	local character, humanoid, root = bodyOf(player)
 	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
 		WalkIn.at[player] = nil
 		return
@@ -2063,7 +2064,11 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		visit = fresh
 	end
 	local look = root.CFrame.LookVector
-	if -(look.X * out.X + look.Z * out.Z) < T.Doors.Face then
+	local toward = -(look.X * out.X + look.Z * out.Z)
+	if character and character:GetAttribute("PairTurn") ~= nil then
+		toward = math.abs(toward) -- (8.1 carrying in two: the leader backs through it too, facing the piece and the partner)
+	end
+	if toward < T.Doors.Face then
 		visit.since = nil -- (facing away, or walking past it: the dwell starts when they turn to the door)
 		return
 	end

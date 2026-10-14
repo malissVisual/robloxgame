@@ -303,7 +303,9 @@ said = #E.said
 run(H.ThreeAfter + 0.2)
 check("7.x …\"On three... lift!\" a moment later", E.saidSince("On three... lift!", said))
 check("…the strip: carrying the Sofa with you", sol:GetAttribute("MoveHelperDoing") == "Carrying the Sofa with you", sol:GetAttribute("MoveHelperDoing"))
--- walking and turning together: he moves with it, every step at its far end
+-- walking and turning together: he moves with it, every step at its far end (8.1 walk-in doors off meanwhile: these
+-- walks turn round by the house's door; it is the Leave prompt's below)
+T.Doors.Walk = false
 local worst = walk(sofa, origin.Position + V3(6, 3, 8))
 worst = math.max(worst, walk(sofa, origin.Position + V3(0, 3, 2)))
 check("7.x walking and turning together: he stays at its far end", worst < 0.05 and helped(), worst)
@@ -394,6 +396,7 @@ caught = run(3, function()
 end)
 check("…free to move again: he walks back to the far end", caught and helped())
 -- out of the door with it: he comes through with Sol
+T.Doors.Walk = true
 local leave = promptIn(workspace, "Leave house")
 E.place(sol, origin.Position + V3(0, 3, 1))
 follow(sofa, sol)

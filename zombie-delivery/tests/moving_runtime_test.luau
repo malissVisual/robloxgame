@@ -1187,6 +1187,35 @@ do
 	wait(D.Dwell)
 	check("the front end walks out: both out with the sofa, side by side", not isIn(ivy) and not isIn(jo) and ivy.Character:GetAttribute("MoveCarry") == 3
 		and jo.Character:GetAttribute("MoveCarry") == 3 and (E.rootOf(jo).Position - E.rootOf(ivy).Position).Magnitude < 5)
+	-- 8.1 carrying in two (client/PairSteer.luau): the leader walks backwards, facing the sofa and Jo: she backs through
+	-- the door, her back to it
+	check("8.1 (Ivy leads the sofa in two: PairTurn on her, none on Jo)", ivy.Character:GetAttribute("PairTurn") == Config.MoveHelper.PairTurn
+		and jo.Character:GetAttribute("PairTurn") == nil)
+	stand(jo, foot + up + facing * 10, -facing)
+	stand(ivy, foot + up + facing * 7, facing)
+	wait(D.Rearm)
+	wait(0.2)
+	since = #E.messages
+	stand(ivy, front, facing) -- (her back to the door)
+	wait(0.1)
+	wait(D.Dwell + 0.1)
+	check("8.1 the leader of a pair piece backs through the door (her back to it): both in with the sofa", isIn(ivy) and isIn(jo)
+		and ivy.Character:GetAttribute("MoveCarry") == 3 and jo.Character:GetAttribute("MoveCarry") == 3 and fades(ivy, since) == 2)
+	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
+	-- …nobody else goes through backwards: Jo, hands free, her back to the doorway inside
+	wait(D.Rearm)
+	stand(jo, exitAt + into * 12, into)
+	wait(0.2)
+	since = #E.messages
+	stand(jo, exitAt + into * 1, into)
+	wait(0.1)
+	wait(D.Dwell + 0.2)
+	check("…but hands free, the back to the door is no way through (facing it, as ever)", isIn(jo) and fades(jo, since) == 0)
+	stand(jo, exitAt + into * 1, -into)
+	wait(0.1)
+	wait(D.Dwell + 0.1)
+	check("…turned to it: out", not isIn(jo))
+	E.place(ivy, foot + up + facing * 12)
 	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
 
 	Moving.admin(ivy, "end")

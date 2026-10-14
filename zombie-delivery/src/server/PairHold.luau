@@ -236,7 +236,7 @@ function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, depth
 		return false
 	end
 	local clock = os.clock()
-	local mate = mates[player]
+	local mate: Mate? = mates[player]
 	if mate and (mate.hold.root ~= root or not PairHold.alive(mate.hold, anchor)) then
 		PairHold.free(player)
 		mate = nil
