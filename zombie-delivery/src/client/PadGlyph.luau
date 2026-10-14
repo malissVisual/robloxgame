@@ -13,6 +13,8 @@
 --                                           taking it: not typing, not taken by a GUI (processed) and no gamepad
 --                                           selection in a window (the D-pad moves that selection then; B closes it)
 --   PadGlyph.words(text) -> string          a server's words for this device (SandboxPad.notice)
+--   PadGlyph.image(pad) -> string           8.3 keys: the platform's picture of a gamepad button (an Enum.KeyCode name,
+--                                           "ButtonR2"), "" when it gives none (then its word: SandboxPad.button)
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -97,6 +99,10 @@ end
 
 function PadGlyph.words(text: string): string
 	return SandboxPad.notice(text, PadGlyph.device())
+end
+
+function PadGlyph.image(pad: string): string
+	return imageOf(pad)
 end
 
 return PadGlyph

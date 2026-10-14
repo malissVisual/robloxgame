@@ -337,7 +337,7 @@ function WarehouseLayout.terminalLines(): { Line }
 	return {
 		line("ZDC UPGRADES", ORANGE, 0.36, "Black"),
 		line("Stands · Lights · Van · Danny", WHITE, 0.2, "Bold"),
-		line("[E] OPEN", GREY, 0.18, "Medium"),
+		line("WALK UP TO OPEN", GREY, 0.18, "Medium"), -- (8.3 keys: no key, a phone and a gamepad read it too)
 	}
 end
 

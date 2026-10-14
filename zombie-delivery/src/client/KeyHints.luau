@@ -17,6 +17,13 @@
 -- buttons, the bottom bar's numbers and the phone say them.
 -- 8.0 SANDBOX (Config.Sandbox.On): only the move's keys and the car's (sandboxLines): no hands, guns, throws or bags
 -- there (client/Main.client.luau does not start them).
+-- 8.3 keys (the sandbox; shared/SandboxPad.luau's actions, client/PadGlyph.luau): the strip is for the device used now.
+-- A computer: the keys as before. A gamepad used last (a computer's or a console's): its buttons' glyphs (the
+-- platform's pictures, UserInputService:GetImageForKeyCode; else the button's word in brackets, "[R2]") before each
+-- word, in rows of their own, only what a button does (X Use, B Put down, R2 Grip; in a seat R2/L2 Drive, the left
+-- stick Steer, X Get out; the horn, the list and the chat have none), the KEYS chip without its F1. A touch screen:
+-- none (its buttons say what they do). It changes at once when the last input's type does (PadGlyph.watch) and at
+-- the next look anyway. The city's strip as before (a keyboard only).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,11 +32,13 @@ local TextService = game:GetService("TextService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local SandboxPad = require(Shared.SandboxPad) -- 8.3 keys
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
 local Holster = require(script.Parent.Holster)
 local Drive = require(script.Parent.Drive)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 keys: the device, the gamepad's glyphs
 
 local KeyHints = {}
 
@@ -49,6 +58,12 @@ local lines: { any } = {}
 local MAX_LINES = 5 -- (narrow: the chips flow onto more, shorter lines; more than this folds the strip)
 local chip: any = nil
 local shown = ""
+local device: SandboxPad.Device = "keys" -- 8.3 keys: what the strip is drawn for now (the city's: the keys)
+local padRows: { any } = {} -- 8.3 keys: a gamepad's rows of glyphs and words
+local padShown = false -- (a gamepad's rows drawn: cleared when the keys come back)
+local glyphs: { [string]: string } = {} -- 8.3 keys: a button's picture (asked once a device)
+local GLYPH = K.TextSize + 6 -- 8.3 keys: a glyph's size (px)
+local PAD_GAP = 10 -- 8.3 keys: px between a gamepad's chips
 
 local function hex(color: Color3): string
 	return "#" .. color:ToHex()
@@ -57,11 +72,26 @@ end
 local KEY = hex(P.ink)
 local WORD = hex(P.ink2)
 
-type Chip = { rich: string, plain: string }
+type Chip = { rich: string, plain: string, word: string, on: boolean?, pads: { string }? }
 
--- One chip: the key bright, its word muted (`on`: the word bright too, the hand you hold).
-local function chipText(key: string, word: string, on: boolean?): Chip
-	return { rich = `<font color="{KEY}">[{key}]</font> <font color="{if on then KEY else WORD}">{word}</font>`, plain = `[{key}] {word}` }
+-- One chip: the key bright, its word muted (`on`: the word bright too, the hand you hold). 8.3 keys: `action` (the
+-- sandbox's, shared/SandboxPad.luau) gives it the gamepad's buttons for when one is used.
+local function chipText(key: string, word: string, on: boolean?, action: string?): Chip
+	return {
+		rich = `<font color="{KEY}">[{key}]</font> <font color="{if on then KEY else WORD}">{word}</font>`,
+		plain = `[{key}] {word}`,
+		word = word,
+		on = on,
+		pads = if action then SandboxPad.pads(action) else nil,
+	}
+end
+
+-- 8.3 keys: a chip for the device drawn now (with a gamepad only one a button does: the horn, the list and the chat
+-- have none).
+local function add(list: { Chip }, item: Chip)
+	if device ~= "pad" or (item.pads ~= nil and #item.pads > 0) then
+		table.insert(list, item)
+	end
 end
 
 local function keyboard(): boolean
@@ -77,32 +107,33 @@ end
 --               timing check shows, a piece with a grip: the character's CarryGrip; client/CarryGripUi.luau) · [O] List
 --               (on a move: the player's MoveWith; client/MovingHud.luau) · [T] Chat (hold: on a move or in its
 --               planning, MoveLobby; client/QuickChat.luau)
+-- (8.3 keys: each with its action, shared/SandboxPad.luau: with a gamepad its buttons, or no chip)
 local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 	local first: { Chip } = {}
 	if humanoid.SeatPart ~= nil then
 		local car, driving = Drive.seatedCar()
 		if car and driving then
-			table.insert(first, chipText("W/S", "Drive"))
-			table.insert(first, chipText("A/D", "Steer"))
-			table.insert(first, chipText("H", "Horn"))
+			add(first, chipText("W/S", "Drive", nil, "drive"))
+			add(first, chipText("A/D", "Steer", nil, "steer"))
+			add(first, chipText("H", "Horn", nil, "horn"))
 		end
-		table.insert(first, chipText("E", "Get out"))
+		add(first, chipText("E", "Get out", nil, "getout"))
 		return { first }
 	end
-	table.insert(first, chipText("E", "Use"))
+	add(first, chipText("E", "Use", nil, "use"))
 	if character:GetAttribute("Carrying") ~= nil then
-		table.insert(first, chipText("G", "Put down"))
+		add(first, chipText("G", "Put down", nil, "putdown"))
 	end
 	if type(character:GetAttribute("CarryGrip")) == "string" then
-		table.insert(first, chipText("LMB/F", "Grip"))
+		add(first, chipText("LMB/F", "Grip", nil, "grip"))
 	end
 	local second: { Chip } = {}
 	local onMove = player:GetAttribute("MoveWith") ~= nil
 	if onMove then
-		table.insert(second, chipText("O", "List"))
+		add(second, chipText("O", "List", nil, "list"))
 	end
 	if onMove or player:GetAttribute("MoveLobby") ~= nil then
-		table.insert(second, chipText("T", "Chat (hold)"))
+		add(second, chipText("T", "Chat (hold)", nil, "chat"))
 	end
 	return if #second > 0 then { first, second } else { first }
 end
@@ -200,6 +231,127 @@ local function flow(groups: { { Chip } }, room: number): { string }?
 	return out
 end
 
+-- 8.3 keys: a button's picture (the platform's; "" none: its word in brackets), asked once a device.
+local function glyphOf(pad: string): string
+	local image = glyphs[pad]
+	if image == nil then
+		image = PadGlyph.image(pad)
+		glyphs[pad] = image
+	end
+	return image
+end
+
+-- 8.3 keys: a gamepad's chip's width (px): its glyphs (or their words in brackets) and its word.
+local function padWidth(item: Chip): number
+	local w = width(item.word)
+	local pads = item.pads
+	if pads then
+		for _, pad in pads do
+			w += 3 + (if glyphOf(pad) ~= "" then GLYPH else width(`[{SandboxPad.button(pad)}]`))
+		end
+	end
+	return w
+end
+
+-- 8.3 keys: a gamepad's chips in rows no wider than `room` px (as flow). Nil when more than MAX_LINES.
+local function padFlow(groups: { { Chip } }, room: number): { { Chip } }?
+	local out: { { Chip } } = {}
+	for _, group in groups do
+		local row: { Chip } = {}
+		local used = 0
+		for _, item in group do
+			local w = padWidth(item)
+			if #row > 0 and used + PAD_GAP + w > room then
+				table.insert(out, row)
+				row, used = {}, 0
+			end
+			used += (if #row > 0 then PAD_GAP else 0) + w
+			table.insert(row, item)
+		end
+		if #row > 0 then
+			table.insert(out, row)
+		end
+	end
+	if #out > MAX_LINES then
+		return nil
+	end
+	return out
+end
+
+-- 8.3 keys: what a gamepad's rows show (the look's key: drawn again only when it changes).
+local function padKey(rows: { { Chip } }): string
+	local parts: { string } = {}
+	for _, row in rows do
+		for _, item in row do
+			table.insert(parts, `{item.word}:{table.concat(item.pads or {}, "/")}:{item.on == true}`)
+		end
+		table.insert(parts, "\n")
+	end
+	return table.concat(parts, ",")
+end
+
+-- 8.3 keys: one row of a gamepad's chips, right-aligned like the keys' lines: each its buttons' glyphs (else their
+-- words in brackets) and its word (nil: the row hidden and emptied).
+local function drawPadRow(row: any, chips: { Chip }?)
+	for _, child in row:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	row.Visible = chips ~= nil
+	if not chips then
+		return
+	end
+	for index, item in chips do
+		local holder = Ui.make("Frame", {
+			Name = `Chip{index}`,
+			Size = UDim2.fromOffset(0, GLYPH),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			LayoutOrder = index,
+		}, row)
+		Ui.make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 3),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, holder)
+		local pads: { string } = item.pads or {}
+		for order, pad in pads do
+			local image = glyphOf(pad)
+			if image ~= "" then
+				Ui.make("ImageLabel", {
+					Name = "Pad",
+					Size = UDim2.fromOffset(GLYPH, GLYPH),
+					BackgroundTransparency = 1,
+					ScaleType = Enum.ScaleType.Fit,
+					Image = image,
+					LayoutOrder = order,
+				}, holder)
+			else
+				P.text(holder, `[{SandboxPad.button(pad)}]`, UDim2.fromOffset(0, GLYPH), {
+					Name = "Key",
+					AutomaticSize = Enum.AutomaticSize.X,
+					Font = Theme.Font,
+					TextSize = K.TextSize,
+					TextColor3 = P.ink,
+					TextStrokeTransparency = 0.75,
+					LayoutOrder = order,
+				})
+			end
+		end
+		P.text(holder, item.word, UDim2.fromOffset(0, GLYPH), {
+			Name = "Word",
+			AutomaticSize = Enum.AutomaticSize.X,
+			Font = Theme.Font,
+			TextSize = K.TextSize,
+			TextColor3 = if item.on then P.ink else P.ink2,
+			TextStrokeTransparency = 0.75,
+			LayoutOrder = 100,
+		})
+	end
+end
+
 -- The room left of the strip's right edge: up to the contract column (client/Hud.luau's TopStack) when it reaches
 -- down beside the strip (6.1 review: on a narrower window the long first line ran over it).
 local function roomFor(gui: any): number
@@ -288,11 +440,38 @@ local function build(gui: Instance)
 	for index = 1, MAX_LINES do
 		lines[index] = line(root, index)
 	end
+	-- 8.3 keys: a gamepad's rows (hidden until one is used in the sandbox)
+	for index = 1, MAX_LINES do
+		local row = Ui.make("Frame", {
+			Name = `PadLine{index}`,
+			Size = UDim2.fromOffset(0, GLYPH),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			Visible = false,
+			LayoutOrder = MAX_LINES + index,
+		}, root)
+		Ui.make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, PAD_GAP),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, row)
+		padRows[index] = row
+	end
 end
 
 local function update(gui: any)
 	local covered = KeyHints.covered
-	local hide = not gui.Enabled or not keyboard()
+	-- 8.3 keys: the sandbox's strip is for the device used now (a gamepad used last: its glyphs, on a computer or a
+	-- console; a touch screen: none); the city's for a keyboard only, as before
+	local now: SandboxPad.Device = if Config.Sandbox.On then PadGlyph.device() else "keys"
+	if now ~= device then
+		device = now
+		table.clear(glyphs) -- (another device: its pictures asked again)
+	end
+	local pad = device == "pad"
+	local hide = not gui.Enabled or (not pad and not keyboard())
 	if not hide and covered then
 		local ok, value = pcall(covered)
 		hide = ok and value == true
@@ -307,20 +486,34 @@ local function update(gui: any)
 	end
 	place(gui)
 	local unfolded = isOpen()
-	local texts = if unfolded then flow(groups, roomFor(gui)) else {}
+	local texts: { string }? = {}
+	local rows: { { Chip } }? = nil
+	if unfolded and pad then
+		rows = padFlow(groups, roomFor(gui)) -- 8.3 keys
+		texts = if rows then {} else nil
+	elseif unfolded then
+		texts = flow(groups, roomFor(gui))
+	end
 	local squeezed = texts == nil -- (no room even on MAX_LINES lines: only the KEYS chip)
 	local shownTexts: { string } = texts or {}
-	local key = `{unfolded}|{squeezed}|{table.concat(shownTexts, "\n")}`
+	local key = `{unfolded}|{squeezed}|{device}|{if rows then padKey(rows) else table.concat(shownTexts, "\n")}`
 	if key == shown then
 		return
 	end
 	shown = key
-	-- (6.4.1: plain text: the game font has no "▴", it showed as a missing-glyph box)
-	chip.Text = if unfolded and not squeezed then "KEYS · HIDE  [F1]" else "? KEYS  [F1]"
+	-- (6.4.1: plain text: the game font has no "▴", it showed as a missing-glyph box; 8.3 keys: a gamepad has no F1)
+	local f1 = if pad then "" else "  [F1]"
+	chip.Text = if unfolded and not squeezed then `KEYS · HIDE{f1}` else `? KEYS{f1}`
 	for index, label in lines do
 		local text = shownTexts[index]
 		label.Visible = text ~= nil and text ~= ""
 		label.Text = text or ""
+	end
+	if rows or padShown then -- 8.3 keys: a gamepad's rows (emptied when the keys come back)
+		for index, row in padRows do
+			drawPadRow(row, if rows then rows[index] else nil)
+		end
+		padShown = rows ~= nil
 	end
 end
 
@@ -348,6 +541,11 @@ function KeyHints.start()
 		end
 		open = not isOpen()
 		shown = ""
+	end)
+	-- 8.3 keys: a gamepad picked up or put down: the strip for it at once
+	PadGlyph.watch(function()
+		shown = ""
+		pcall(update, gui)
 	end)
 	task.spawn(function()
 		while root and root.Parent do
