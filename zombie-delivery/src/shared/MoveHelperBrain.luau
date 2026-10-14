@@ -6,13 +6,41 @@
 -- MovingRules'.
 -- 7.x Danny, a partner (the owner: "he helps weirdly, only some things, and mainly we don't carry anything together"):
 -- a clear priority list each step (decide): his end of your piece; zombies (never while he holds your piece's other
--- end); your two-person lift (he sprints over, or fades over from far); the piece in his arms to the van; the van's back
--- for whoever comes with a piece; the order; the other side of a heavy two-hands piece you carry alone; the next piece
--- (★ first, then the most value a second of the trip, one-hand and two-hands ones; never one you are about to lift).
+-- end); your two-person lift (he sprints over, or fades over from far; 8.3: your call, he walks over); the piece in his
+-- arms to the van; the van's back for whoever comes with a piece; the order; the other side of a heavy two-hands piece
+-- you carry alone; the next piece (★ first, then the most value a second of the trip, one-hand and two-hands ones; never
+-- one you are about to lift).
+--
+-- 8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes; I'd like to
+-- click on him any time and tell him what to do, or an auto mode where he carries only light things and calls for help
+-- with a heavy one"): four orders (Modes), each given from his command card (client/MoveHelperCard.luau) by his move's
+-- crew only (order); a two-person Lift calls him on every order and you wait at your end while he WALKS to its other
+-- end (decide's "come"; inPlace; approach: a fade-over only as the last resort); on AUTO he carries the light pieces
+-- alone (light) and asks for a hand with a heavy one (pickAsk, askKept), never nagging (Config AskAgain).
 --
 --   MoveHelperBrain.wanted(players)            does a crew of this many players get him (Solo, Duo)?
---   MoveHelperBrain.validMode(mode)            "help" (Help me) | "carry" (Carry small stuff, the default) | "wait"
---                                              (Wait at the van)
+--   MoveHelperBrain.Modes                      8.3 the orders in the card's order: "auto" (AUTO, the default) | "help"
+--                                              (HELP ME: behind you, lifts with you) | "stay" (WAIT HERE) | "van"
+--                                              (WAIT AT VAN)
+--   MoveHelperBrain.validMode(mode)            one of Modes?
+--   MoveHelperBrain.order(mode, current, crew) 8.3 a command checked: (the new order, nil) or (nil, why: "crew" not his
+--                                              move's crew, "mode" no such order, "same" in force already)
+--   MoveHelperBrain.modeName(mode)             8.3 its name on the card and the status line ("AUTO", "HELP ME" ...)
+--   MoveHelperBrain.status(mode, doing)        8.3 the status line: "AUTO · Carrying the Lamp to the van"
+--   MoveHelperBrain.light(class, weight)       8.3 a piece he carries alone on AUTO: one-hand, or two-hands under
+--                                              LightWeight (heavy: a pair one, or two-hands at LightWeight or more)
+--   MoveHelperBrain.pickAsk(list)              8.3 AUTO: the heavy piece he asks a hand for (★ first, then the best
+--                                              worth; home or on the ground, not broken, not one you are about to
+--                                              lift, one that still fits the van, within AskFar), nil: none
+--   MoveHelperBrain.askKept(asked, waited, fits, free)   8.3 does his ask go on: "on", "timeout" (nobody came within
+--                                              AskWait s of his "give me a hand!"), "gone" (somebody holds it, no room)
+--   MoveHelperBrain.inPlace(gap, stuckFor)     8.3 at the other end of your call: within CallReady studs of his place,
+--                                              or within CallClose and blocked CallStuck s (the hold walks him the rest)
+--   MoveHelperBrain.newApproach() / approach(a, gap, dt)   8.3 his walk to your call: true once he has come no closer
+--                                              than CallGain studs for CallBlink s (the last resort: a fade-over)
+--   MoveHelperBrain.callKept(fromPiece, reach, ready, readyFor)   8.3 does your call go on: "on", "away" (you walked
+--                                              CallLeave studs past the Lift's reach), "idle" (he was in place CallIdle s
+--                                              and you never lifted)
 --   MoveHelperBrain.routeCost(...)             studs on foot from one point to another, through the front door when
 --                                              they are in different worlds
 --   MoveHelperBrain.routeVia(..., list, allowed?)   7.x farm move: the same through the best of several doors (a farm's
@@ -22,9 +50,9 @@
 --   MoveHelperBrain.worth(c)                   a piece's rank for a trip: its value a second of the trip (TripBase
 --                                              studs added, the way back to the van at the carry's walk)
 --   MoveHelperBrain.pickItem(list, backOpen)   the next piece he carries out alone (★ first, then the best worth; a
---                                              one-hand or a two-hands piece, never a pair one, a broken one, a
---                                              reserved one, one that no longer fits the van or one lying by the van
---                                              while its back is shut) and whether the van is full for the ones left
+--                                              one-hand or (8.3) a light two-hands piece, never a pair one, a broken
+--                                              one, a reserved one, one that no longer fits the van or one lying by the
+--                                              van while its back is shut) and whether the van is full for the ones left
 --   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to: a pair piece a crew player
 --                                              drags alone, the nearest within HelpFar, not one he gave up on
 --   MoveHelperBrain.pickAssist(list)           a heavy two-hands piece (AssistWeight or more) a crew player carries
@@ -34,11 +62,12 @@
 --                                              your piece: the player leads); on until none is within SafeRange
 --   MoveHelperBrain.fleeTo(x, z, zx, zz)       where he runs: FleeStep studs straight away from the zombie
 --   MoveHelperBrain.decide(input)              what he does now and the piece's spot: "down" | "hold" | "flee" |
---                                              "help" | "deliver" | "open" | "wait" | "assist" | "follow" | "fetch"
+--                                              "come" (8.3 your call) | "help" | "deliver" | "open" | "stay" | "wait" |
+--                                              "assist" | "follow" | "ask" (8.3) | "fetch"
 --   MoveHelperBrain.atTruck(open, still, waited, mayOpen)   a piece in his arms at the van's back: "load" | "open" |
 --                                              "wait" | "drop"
 --   MoveHelperBrain.speed(walk, action, carry, weight)   his walk now: × Speed (× the carry's alone: "hand" | "both"),
---                                              Sprint × to a lift, Flee × running away
+--                                              Sprint × to a lift (8.3: and to your call), Flee × running away
 --   MoveHelperBrain.trained(owner)             8.1 SANDBOX: his walk x this for the move's owner (Danny's training,
 --                                              the level in their player attribute Config.SandboxUpgrades.Danny,
 --                                              shared/UpgradeRules.luau dannySpeed; 1 without one)
@@ -46,7 +75,8 @@
 --   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does: "walk" | "repath" (StuckRepath s) | "nudge"
 --                                              (StuckSnap s: he appears at his way's next point)
 --   MoveHelperBrain.endRise(floorRise, carrierRise)   his root's height at your piece's far end over its middle: the
---                                              floor's there (stairs, steps), within HoldStep of the carrier's
+--                                              floor's there (stairs, steps) when within HoldStep of the floor under
+--                                              the carrier (8.3: else the carrier's floor: never a roof, never a pop)
 --   MoveHelperBrain.farEnd(depth)              how far in front of the piece's middle his root stands (its far face
 --                                              and Standoff)
 --   8.1 carrying in two (the owner: "when I turn around he teleports"; the leader's steering: shared/PairCarry.luau):
@@ -60,6 +90,14 @@
 --                                              other world (`crossed`: a door's fade) → (top speed now, snap): snap
 --                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
 --                                              ease of HoldEase s (the gap / HoldEase a second); else `speed`
+--   8.3 (the owner: "he just jumps weirdly … make him walk like me, backwards too"):
+--   MoveHelperBrain.holdClimb(trail, height, dt, snap)   his root's height now: toward `height` at HoldClimb studs a
+--                                              second at most (a step stepped, never popped; at once on a new hold or a
+--                                              door's fade)
+--   MoveHelperBrain.holdLegs(trail, forward, side, dt)   the speed his legs step at (negative: backwards, 0: standing)
+--                                              from his root's own velocity in his frame: his whole speed along the
+--                                              ground, from HoldLegs.From, under HoldLegs.To standing, backwards past
+--                                              Band behind him, forwards past Band ahead, sideways as they went
 --   MoveHelperBrain.aside(x, z, door)          a place in a doorway (Aside's zone): the place beside it, along the wall
 --                                              (he never stands where you walk through); else the place itself
 --   MoveHelperBrain.followSpot(x, z, lookX, lookZ)       his place behind you ("Help me")
@@ -74,7 +112,7 @@ local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: Danny's trainin
 
 local MoveHelperBrain = {}
 
-export type Mode = "help" | "carry" | "wait"
+export type Mode = "auto" | "help" | "stay" | "van"
 
 -- A piece he might carry out alone.
 export type Candidate = {
@@ -122,6 +160,8 @@ export type Input = {
 	pick: number?, -- pickItem's
 	open: boolean, -- the van's back is shut, somebody comes with a piece and he may open it (Config OpenBack)
 	atHouse: boolean, -- the van stands by the house (he carries pieces out only then)
+	call: number?, -- 8.3 a crew player's call: the two-person piece they wait at (Moving's Lift, MoveHelper.call)
+	ask: number?, -- 8.3 AUTO: the heavy piece he asks a hand for (pickAsk, kept while askKept says "on")
 }
 
 local function cfg(): any
@@ -140,8 +180,43 @@ function MoveHelperBrain.wanted(players: number): boolean
 	return (players == 1 and c.Solo == true) or (players == 2 and c.Duo == true)
 end
 
+MoveHelperBrain.Modes = { "auto", "help", "stay", "van" } :: { Mode }
+
+local MODE_NAMES: { [string]: string } = { auto = "AUTO", help = "HELP ME", stay = "WAIT HERE", van = "WAIT AT VAN" }
+
 function MoveHelperBrain.validMode(mode: any): boolean
-	return mode == "help" or mode == "carry" or mode == "wait"
+	return type(mode) == "string" and MODE_NAMES[mode] ~= nil
+end
+
+-- 8.3 a command from a player (the Moving remote's ("helper", mode), after the server's rate limit): only his move's
+-- crew may give one, only one of the orders, and not the one in force already.
+function MoveHelperBrain.order(mode: any, current: Mode, crew: boolean): (Mode?, string?)
+	if not crew then
+		return nil, "crew"
+	elseif not MoveHelperBrain.validMode(mode) then
+		return nil, "mode"
+	elseif mode == current then
+		return nil, "same"
+	end
+	return mode :: Mode, nil
+end
+
+function MoveHelperBrain.modeName(mode: any): string
+	return MODE_NAMES[mode] or "AUTO"
+end
+
+-- 8.3 the status line under the move's panel (client/MoveHelperHud.luau): the order and what he does.
+function MoveHelperBrain.status(mode: any, doing: string?): string
+	local name = MoveHelperBrain.modeName(mode)
+	if type(doing) ~= "string" or doing == "" then
+		return name
+	end
+	return `{name} · {doing}`
+end
+
+-- 8.3 a piece he carries alone on AUTO: one-hand, or two-hands under LightWeight.
+function MoveHelperBrain.light(class: string, weight: number): boolean
+	return class == "hand" or (class == "both" and weight < cfg().LightWeight)
 end
 
 -- ── The way ────────────────────────────────────────────────────────────────
@@ -225,14 +300,16 @@ function MoveHelperBrain.farEnd(depth: number): number
 	return depth / 2 + cfg().Standoff
 end
 
--- His root's height over the piece's middle: the floor's under the far end (`floorRise`, his stand height on it), within
--- HoldStep of the carrier's root (`carrierRise`): up and down stairs and steps, never off his hands' reach.
+-- His root's height over the piece's middle: the floor's under the far end (`floorRise`, his stand height on it) when it
+-- is within HoldStep of the carrier's floor (`carrierRise`: his stand height on the floor under the carrier's feet):
+-- up and down stairs and steps. 8.3 (the owner: "he just jumps weirdly"): a floor farther off is not his (a porch's
+-- roof, a ceiling, a door's header the ray found; it was clamped HoldStep over you: a 2.5-stud hop), nor is none: level
+-- with you.
 function MoveHelperBrain.endRise(floorRise: number, carrierRise: number): number
-	local step = cfg().HoldStep
-	if floorRise ~= floorRise then
+	if floorRise ~= floorRise or math.abs(floorRise - carrierRise) > cfg().HoldStep then
 		return carrierRise
 	end
-	return math.clamp(floorRise, carrierRise - step, carrierRise + step)
+	return floorRise
 end
 
 -- 8.1 his top speed holding the far end: the leader's walk and a margin (the far end swings round a turn at PairTurn
@@ -247,10 +324,51 @@ function MoveHelperBrain.holdTurn(): number
 	return math.rad(c.PairTurn) * c.HoldTurn
 end
 
-export type Trail = { behind: number, ease: number, easeSpeed: number }
+-- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards)
+export type Trail = { behind: number, ease: number, easeSpeed: number, height: number?, walking: boolean, back: boolean }
 
 function MoveHelperBrain.newTrail(): Trail
-	return { behind = 0, ease = 0, easeSpeed = 0 }
+	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false }
+end
+
+-- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
+-- most: a step or a kerb stepped up or down, never popped. At once on a new hold (none yet) and through a door's fade
+-- (`snap`: the piece in the other world).
+function MoveHelperBrain.holdClimb(trail: Trail, height: number, dt: number, snap: boolean): number
+	local was = trail.height
+	if snap or was == nil or height ~= height then
+		trail.height = height
+		return height
+	end
+	local most = cfg().HoldClimb * math.max(dt, 0)
+	local now = was + math.clamp(height - was, -most, most)
+	trail.height = now
+	return now
+end
+
+-- 8.3 his legs holding the far end (the owner: "walk like me and backwards"): the speed they step at (studs a second:
+-- negative backwards, 0 standing) from his root's own velocity in his frame (`forward` along his facing, `side` across
+-- it): his whole speed along the ground (a step to the side steps too, never a slide on still legs); walking from
+-- HoldLegs.From, standing under HoldLegs.To; backwards once the way is more than Band of it behind him (you walk toward
+-- him: he backs away facing you), forwards once more than Band ahead, sideways the way they went (no flicker).
+function MoveHelperBrain.holdLegs(trail: Trail, forward: number, side: number, _dt: number): number
+	local legs = cfg().HoldLegs
+	local speed = math.sqrt(forward * forward + side * side)
+	if trail.walking then
+		trail.walking = speed >= legs.To
+	else
+		trail.walking = speed >= legs.From
+	end
+	if not trail.walking then
+		return 0
+	end
+	local along = forward / speed
+	if trail.back and along > legs.Band then
+		trail.back = false
+	elseif not trail.back and along < -legs.Band then
+		trail.back = true
+	end
+	return if trail.back then -speed else speed
 end
 
 function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, speed: number, dt: number): (number, boolean)
@@ -288,7 +406,7 @@ end
 -- Its value a second of the trip there and back to the van (the carry's walk on the way back; TripBase studs on top so
 -- a near cheap piece does not always win).
 function MoveHelperBrain.worth(c: Candidate): number
-	local mode = if c.class == "both" then "both" else "hand"
+	local mode = if c.class == "both" then "both" elseif c.class == "pair" then "pair" else "hand" -- (8.3: two carry it)
 	local factor = math.max(Rules.speedFactor(mode, c.weight), 0.1)
 	return c.value / (cfg().TripBase + c.cost + c.haul / factor)
 end
@@ -298,8 +416,8 @@ function MoveHelperBrain.pickItem(list: { Candidate }, backOpen: boolean): (numb
 	local bestWorth = -math.huge
 	local left = false
 	for _, c in list do
-		if (c.class ~= "hand" and c.class ~= "both") or c.broken or (c.state ~= "home" and c.state ~= "ground") or c.reserved then
-			continue
+		if not MoveHelperBrain.light(c.class, c.weight) or c.broken or (c.state ~= "home" and c.state ~= "ground") or c.reserved then
+			continue -- (8.3: a heavy two-hands piece is one he asks a hand for)
 		end
 		if c.byTruck and not backOpen then
 			continue -- (it waits by the van for the back to open)
@@ -318,6 +436,72 @@ function MoveHelperBrain.pickItem(list: { Candidate }, backOpen: boolean): (numb
 		return best.spot, false
 	end
 	return nil, left
+end
+
+-- 8.3 AUTO: the heavy piece nobody handles that he asks a hand for (★ first, then its worth for a trip of two).
+function MoveHelperBrain.pickAsk(list: { Candidate }): number?
+	local best: Candidate? = nil
+	local bestWorth = -math.huge
+	for _, c in list do
+		if MoveHelperBrain.light(c.class, c.weight) or (c.class ~= "pair" and c.class ~= "both") or c.broken
+			or (c.state ~= "home" and c.state ~= "ground") or c.reserved or not c.fits or c.cost > cfg().AskFar then
+			continue
+		end
+		local w = MoveHelperBrain.worth(c)
+		local b = best
+		if b == nil or (c.star and not b.star) or (c.star == b.star and (w > bestWorth + 1e-9 or (math.abs(w - bestWorth) <= 1e-9 and c.cost < b.cost))) then
+			best, bestWorth = c, w
+		end
+	end
+	return if best then best.spot else nil
+end
+
+-- 8.3 his ask for a hand (`asked`: he is there and said so, `waited` s ago; `fits`: it still fits the van; `free`: home
+-- or on the ground, nobody holds it).
+function MoveHelperBrain.askKept(asked: boolean, waited: number, fits: boolean, free: boolean): string
+	if not free or not fits then
+		return "gone"
+	elseif asked and waited >= cfg().AskWait then
+		return "timeout"
+	end
+	return "on"
+end
+
+-- 8.3 your call: at the other end of your piece (within CallReady studs of his place there), or near it and blocked
+-- (a wall, the piece itself: within CallClose studs, no progress for CallStuck s; the hold walks him the rest).
+function MoveHelperBrain.inPlace(gap: number, stuckFor: number): boolean
+	local c = cfg()
+	return gap <= c.CallReady or (gap <= c.CallClose and stuckFor >= c.CallStuck)
+end
+
+export type Approach = { best: number, idle: number }
+
+function MoveHelperBrain.newApproach(): Approach
+	return { best = math.huge, idle = 0 }
+end
+
+-- 8.3 one look at his walk to your call (`gap`: studs to his place on foot): true when he came no closer than CallGain
+-- studs for CallBlink s (his path fails, a wall: the last resort, a fade-over).
+function MoveHelperBrain.approach(a: Approach, gap: number, dt: number): boolean
+	local c = cfg()
+	if gap < a.best - c.CallGain then
+		a.best, a.idle = gap, 0
+		return false
+	end
+	a.idle += dt
+	return a.idle >= c.CallBlink
+end
+
+-- 8.3 does your call go on: you within the Lift's `reach` of the piece (and CallLeave more) and, once he is in place,
+-- your lift within CallIdle s.
+function MoveHelperBrain.callKept(fromPiece: number, reach: number, ready: boolean, readyFor: number): string
+	local c = cfg()
+	if fromPiece > reach + c.CallLeave then
+		return "away"
+	elseif ready and readyFor >= c.CallIdle then
+		return "idle"
+	end
+	return "on"
 end
 
 function MoveHelperBrain.pickLift(list: { Lift }): number?
@@ -367,10 +551,11 @@ function MoveHelperBrain.fleeTo(x: number, z: number, zx: number, zz: number): (
 	return x + dx / len * step, z + dz / len * step
 end
 
--- The priorities, in order: down; the other end of your piece (zombies or not: you lead); running from a zombie; your
--- two-person lift (his own piece set down or loaded first); the piece in his arms to the van; the van's back for whoever
--- comes with a piece; Wait at the van; the other side of your heavy two-hands piece; Help me (behind you); the next
--- piece while the van stands by the house; waiting at the van.
+-- The priorities, in order: down; the other end of your piece (zombies or not: you lead); running from a zombie; 8.3
+-- your call (a two-person Lift: on every order; his own piece set down or loaded first); your two-person piece dragged
+-- alone (every order); the piece in his arms to the van; the van's back for whoever comes with a piece (not on WAIT
+-- HERE); WAIT HERE; WAIT AT VAN; the other side of your heavy two-hands piece; HELP ME (behind you); on AUTO his ask for
+-- a hand with a heavy piece, then the next light piece, while the van stands by the house; waiting at the van.
 function MoveHelperBrain.decide(i: Input): (string, number?)
 	if i.dead then
 		return "down", nil
@@ -378,18 +563,24 @@ function MoveHelperBrain.decide(i: Input): (string, number?)
 		return "hold", nil
 	elseif MoveHelperBrain.shouldFlee(i.threat, i.fleeing, i.holding) then
 		return "flee", nil
-	elseif i.lift ~= nil and i.mode ~= "wait" then
+	elseif i.call ~= nil then
+		return "come", i.call
+	elseif i.lift ~= nil then
 		return "help", i.lift
 	elseif i.holding == "hand" then
 		return "deliver", nil
-	elseif i.open then
+	elseif i.open and i.mode ~= "stay" then
 		return "open", nil
-	elseif i.mode == "wait" then
+	elseif i.mode == "stay" then
+		return "stay", nil
+	elseif i.mode == "van" then
 		return "wait", nil
 	elseif i.assist ~= nil then
 		return "assist", i.assist
 	elseif i.mode == "help" then
 		return "follow", nil
+	elseif i.ask ~= nil and i.atHouse then
+		return "ask", i.ask
 	elseif i.pick ~= nil and i.atHouse then
 		return "fetch", i.pick
 	end
@@ -414,7 +605,7 @@ function MoveHelperBrain.speed(walk: number, action: string, carry: string?, wei
 	local c = cfg()
 	if action == "flee" then
 		return walk * c.Flee
-	elseif action == "help" or action == "assist" then
+	elseif action == "help" or action == "assist" or action == "come" then
 		return walk * c.Sprint
 	elseif action == "hold" then
 		return Rules.carrySpeed(walk, "pair", weight) * c.KeepUp
@@ -444,6 +635,10 @@ local DOING: { [string]: string } = {
 	follow = "Right behind you",
 	fetch = "Going for the %s",
 	wait = "Waiting at the van",
+	come = "Coming to lift the %s with you", -- 8.3 your call
+	ready = "At the %s: on three!",
+	ask = "Needs a hand with the %s",
+	stay = "Waiting here",
 }
 
 function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string
@@ -473,9 +668,13 @@ MoveHelperBrain.Lines = {
 	flee = "Zombies! I'm staying out of this one!",
 	down = "Ugh... I'll be back!",
 	back = "Back on my feet!",
+	autoMode = "On it! Small stuff's mine, I'll shout for the big ones.", -- 8.3 the orders
 	helpMode = "Right behind you.",
-	carryMode = "On the small stuff.",
-	waitMode = "Waiting at the van.",
+	stayMode = "I'll wait right here.",
+	vanMode = "Waiting at the van.",
+	ask = "This one's too heavy for me alone, give me a hand!", -- 8.3 AUTO's ask
+	askOff = "No takers? I'll grab the small stuff.",
+	callOff = "No problem, boss.", -- 8.3 a call you called off
 } :: { [string]: string }
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.

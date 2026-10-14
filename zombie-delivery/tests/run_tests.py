@@ -117,6 +117,18 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{built_as[m[1]]}")' if m[1] in built_as else f"E.{m[1]}", source)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 (Danny's hops): the real server/Npcs.luau as NpcsServer.luau for tests/npcs_runtime_test.luau, one line on
+    # top: setfenv to tests/runtime/NpcsRuntime.luau's environment (its services, a person's body on the item recorder,
+    # a require that gives the Shared copies above for ReplicatedStorage.Shared's modules).
+    shutil.copy(os.path.join(HERE, "runtime", "NpcsRuntime.luau"), os.path.join(tmp, "NpcsRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Npcs.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "NpcsServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./NpcsRuntime").env)\n' + source)
+    # 8.3: the real client/PairSteer.luau (the leader's side of carrying in two) as PairSteerClient.luau for
+    # tests/pairsteer_test.luau: a function of the globals it reads (the test's game, a require that gives the PairCarry
+    # copy above, the recorder's CFrame).
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, require: any, CFrame: any)\n" + source + "\nend\n")
     # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
     # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
     # and for tests/movesites_test.luau.
