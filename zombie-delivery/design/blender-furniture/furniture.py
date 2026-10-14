@@ -1,11 +1,13 @@
 """Zombie Delivery: nábytek pro stěhování (7.0 MOVES) v Blenderu.
 
 Spuštění v Blenderu: záložka Scripting → Open → furniture.py → Run Script (▶, nebo Alt+P). Skript postaví všech 36 kusů
-nábytku ze hry (shared/FurnitureLooks.luau) v mřížce do kolekce "Furniture" a vedle zařízený obývák (scéna "Room").
+nábytku ze hry (shared/FurnitureLooks.luau) a 12 sběratelských kousků z 8.0 SANDBOXu (FurnitureLooks.Collectibles: trofej,
+rádio, glóbus … rytířská zbroj) v mřížce do kolekce "Furniture" a vedle zařízený obývák (scéna "Room").
 Každý kus má přesně rozměry ze hry (Root box): 1 jednotka = 1 stud, předek míří na -Y, spodek kusu je na zemi.
 
 Bez Blenderu, jen s modulem bpy (pip install bpy):
     python furniture.py -- --save furniture.blend --render složka --export složka
+    (--only id,id: render jen těchto kusů; --only collectibles: 12 sběratelských kousků pro collectibles-preview.png)
 """
 import bpy, bmesh, json, math, os, sys
 from mathutils import Vector, Matrix
@@ -31,7 +33,16 @@ ITEMS = [
     ("washing_machine", "Washing Machine", 2.8, 3.4, 2.8), ("laundry_basket", "Laundry Basket", 1.8, 1.6, 1.4),
     ("coat_rack", "Coat Rack", 1.5, 5.6, 1.5), ("shoe_cabinet", "Shoe Cabinet", 3.2, 2.9, 1.4), ("bicycle", "Bicycle", 5.4, 3.1, 1.2),
     ("toolbox", "Toolbox", 2.0, 1.25, 1.0), ("lawn_mower", "Lawn Mower", 2.2, 3.2, 4.2), ("box", "Moving Box", 2.0, 1.8, 2.0),
+    # 8.0 SANDBOX: sběratelské kousky (FurnitureLooks.Collectibles; vzácnost v komentáři)
+    ("bowling_trophy", "Bowling Trophy", 1.4, 2.8, 1.0), ("vintage_radio", "Vintage Radio", 1.8, 2.0, 1.2),  # uncommon
+    ("old_globe", "Old Globe", 1.6, 2.6, 1.6), ("stag_head", "Mounted Stag Head", 3.2, 3.4, 1.7),  # uncommon
+    ("gold_record", "Gold Record", 2.2, 2.6, 0.4), ("ship_bottle", "Ship in a Bottle", 2.2, 1.35, 0.9),  # rare
+    ("jewellery_box", "Grandma's Jewellery Box", 1.7, 1.2, 1.1),  # rare
+    ("antique_vase", "Antique Vase", 1.4, 2.8, 1.4), ("arcade_cabinet", "Arcade Cabinet", 2.8, 6.0, 3.0),  # epic
+    ("jukebox", "Jukebox", 3.4, 5.4, 2.5),  # epic
+    ("oil_painting", "Oil Painting", 4.8, 3.8, 0.6), ("knight_armour", "Knight's Armour", 2.6, 6.8, 1.8),  # legendary
 ]
+COLLECTIBLES = [fid for fid, *_ in ITEMS[36:]]
 
 # Povrchy: jméno → (barva #RRGGBB, drsnost, kov, záře). Hra (server/FurnitureMesh.luau) dá každému povrchu barvu
 # a materiál; fabric, fabric2, wood, wood2, paint, accent a appliance mění barvu podle varianty kusu (jako ve hře).
@@ -48,6 +59,22 @@ FINISHES = {
     "sun": ("#FAD26E", 0.6, 0, 0), "book1": ("#AA3430", 0.7, 0, 0), "book2": ("#34568C", 0.7, 0, 0),
     "book3": ("#3C784C", 0.7, 0, 0), "book4": ("#D6AA3C", 0.7, 0, 0), "glow": ("#FFECC8", 0.5, 0, 3.0),
     "red": ("#C8322E", 0.45, 0, 0), "wicker": ("#BE9664", 0.9, 0, 0), "black": ("#141416", 0.4, 0, 0),
+    # 8.0 sběratelské kousky: leštěné zlato (gilt), samet, lak, neon, srst, paroží, mramor, porcelán a kobalt, žhavé trubice
+    # jukeboxu (amber, ember), čiré sklo (crystal), moře a pergamen glóbu, barvy obrazu (peach, rock, slate).
+    # gilt, velvet, lacquer, neon a fur mění ve hře barvu podle varianty (FurnitureLooks.Palettes).
+    "gilt": ("#D9AD52", 0.16, 1, 0), "velvet": ("#8E1C2E", 1.0, 0, 0), "lacquer": ("#6E1820", 0.12, 0, 0),
+    "neon": ("#50C8FF", 0.4, 0, 0.7), "fur": ("#80543A", 1.0, 0, 0), "bone": ("#DCCDA8", 0.5, 0, 0),
+    "marble": ("#E8E4DC", 0.15, 0, 0), "porcelain": ("#F4F2EA", 0.08, 0, 0), "cobalt": ("#27448F", 0.12, 0, 0),
+    "amber": ("#FF9A3C", 0.4, 0, 0.7), "ember": ("#FF4A32", 0.4, 0, 0.7), "crystal": ("#EEF6F4", 0.02, 0, 0),
+    "ocean": ("#5E8FA8", 0.3, 0, 0), "parchment": ("#E6D3A3", 0.7, 0, 0), "peach": ("#F2B48C", 0.8, 0, 0),
+    "rock": ("#8A8DAE", 0.8, 0, 0), "slate": ("#5E6682", 0.8, 0, 0),
+}
+# Navíc k povrchům: lesk laku a glazury (Coat), sklo, které propouští světlo (Transmission), sametový lesk (Sheen).
+SPECIAL = {
+    "crystal": {"Transmission Weight": 1.0, "IOR": 1.45, "Thin Wall": True},  # (a pane or a bottle's wall: no lens) "lacquer": {"Coat Weight": 1.0, "Coat Roughness": 0.04},
+    "porcelain": {"Coat Weight": 0.8, "Coat Roughness": 0.03}, "cobalt": {"Coat Weight": 0.8, "Coat Roughness": 0.03},
+    "marble": {"Coat Weight": 0.6, "Coat Roughness": 0.05}, "ocean": {"Coat Weight": 0.5, "Coat Roughness": 0.08},
+    "velvet": {"Sheen Weight": 1.0, "Sheen Roughness": 0.35}, "fur": {"Sheen Weight": 0.6, "Sheen Roughness": 0.5},
 }
 
 M = {}
@@ -78,16 +105,21 @@ def materials():
         glow = p.inputs.get("Emission Color") or p.inputs.get("Emission")
         glow.default_value = rgba if emit else (0, 0, 0, 1)
         p.inputs["Emission Strength"].default_value = emit
+        for key, value in SPECIAL.get(name, {}).items():
+            if p.inputs.get(key) is not None:
+                p.inputs[key].default_value = value
         m["finish"] = name
         M[name] = m
 
 
 # ───────────────────────────────────────────────────────────── stavební kameny (souřadnice od spodku středu kusu)
 def obj(name, bm, finish, smooth=True):
+    """`finish`: one finish, or a list (the faces' material_index picks one: the globe's sea and land)."""
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
-    me.materials.append(M[finish])
+    for f in ([finish] if isinstance(finish, str) else finish):
+        me.materials.append(M[f])
     for p in me.polygons:
         p.use_smooth = smooth
     o = bpy.data.objects.new(name, me)
@@ -119,6 +151,8 @@ def box(name, size, at, finish, r=0.04, rot=None, seg=2):
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bmesh.ops.scale(bm, vec=Vector(size), verts=bm.verts)
+    if r <= 0:
+        sharpen(bm)  # (no bevel: flat faces, not a box shaded round like a pebble; a thin pane of glass stays flat)
     o = obj(name, bm, finish)
     o.matrix_world = Matrix.Translation(CUR + Vector(at)) @ (rot or Matrix())
     return bevel(o, min(r, min(size) * 0.45), seg)
@@ -149,9 +183,9 @@ def tube(name, a, b, r, finish, seg=12):
     return o
 
 
-def ball(name, r, at, finish, scale=(1, 1, 1), rot=None, seg=16):
+def ball(name, r, at, finish, scale=(1, 1, 1), rot=None, seg=16, rings=None):
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=max(6, seg // 2), radius=r)
+    bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=rings or max(6, seg // 2), radius=r)
     bmesh.ops.scale(bm, vec=Vector(scale), verts=bm.verts)
     o = obj(name, bm, finish)
     o.matrix_world = Matrix.Translation(CUR + Vector(at)) @ (rot or Matrix())
@@ -210,6 +244,144 @@ def books(name, x0, x1, y, z, depth, height, n_seed=0):
         box(name, (w - 0.02, depth, hgt), (x + w / 2, y + depth / 2, z + hgt / 2), f"book{k % 4 + 1}", r=0.015, rot=lean)
         x += w + (0.12 if lean else 0)
         k += 1
+
+
+
+# Další stavební kameny (8.0 sběratelské kousky): křivky, trubky po křivce, vytažené tvary, rámy obrazů, pixelová grafika.
+def bezier(p0, p1, p2, p3, n=12):
+    """Points along a cubic Bézier curve (a handle's ear, a cabriole leg's S)."""
+    P = [Vector(p) for p in (p0, p1, p2, p3)]
+    return [tuple(P[0] * (1 - t) ** 3 + P[1] * 3 * (1 - t) ** 2 * t + P[2] * 3 * (1 - t) * t * t + P[3] * t ** 3)
+            for t in (k / n for k in range(n + 1))]
+
+
+def spline(points, n=4):
+    """A smooth path through `points` (Catmull-Rom, `n` steps from one to the next)."""
+    P = [Vector(p) for p in points]
+    out = []
+    for i in range(len(P) - 1):
+        a, b, c, d = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
+        for k in range(n):
+            t = k / n
+            out.append(tuple(0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t ** 3)))
+    out.append(tuple(P[-1]))
+    return out
+
+
+def arc(cx, cz, r, a0, a1, n, rz=None):
+    """Points (x, z) of the front view on an arc (angles in radians, 0: +x, π/2: up); `rz` an ellipse's height."""
+    rz = r if rz is None else rz
+    return [(cx + r * math.cos(a0 + (a1 - a0) * k / n), cz + rz * math.sin(a0 + (a1 - a0) * k / n)) for k in range(n + 1)]
+
+
+def sweep(name, pts, r, finish, seg=10, r1=None, scale=(1.0, 1.0), closed=False, smooth=True):
+    """A tube along a path (a handle, an antler, a bubble tube): `r` one radius, or a list (one per point), or tapering
+    to `r1`; `scale` (across, up) makes its section an oval; `closed` joins its ends into a ring."""
+    P = [CUR + Vector(p) for p in pts]
+    n = len(P)
+    if isinstance(r, (list, tuple)):
+        R = list(r)
+    elif r1 is not None:
+        R = [r + (r1 - r) * i / max(1, n - 1) for i in range(n)]
+    else:
+        R = [r] * n
+    T = []
+    for i in range(n):
+        t = (P[(i + 1) % n] - P[i - 1]) if closed else (P[min(i + 1, n - 1)] - P[max(i - 1, 0)])
+        T.append(t.normalized())
+    ref = Vector((0, 0, 1)) if abs(T[0].z) < 0.9 else Vector((0, -1, 0))
+    normal = (ref - T[0] * ref.dot(T[0])).normalized()
+    bm = bmesh.new()
+    rings = []
+    for i in range(n):
+        if i:
+            normal = T[i - 1].rotation_difference(T[i]) @ normal
+            normal = (normal - T[i] * normal.dot(T[i])).normalized()
+        side = T[i].cross(normal)
+        rings.append([bm.verts.new(P[i] + (normal * math.cos(a) * scale[1] + side * math.sin(a) * scale[0]) * R[i])
+                      for a in (2 * math.pi * k / seg for k in range(seg))])
+    for i in range(n if closed else n - 1):
+        a, b = rings[i], rings[(i + 1) % n]
+        for k in range(seg):
+            bm.faces.new((a[k], a[(k + 1) % seg], b[(k + 1) % seg], b[k]))
+    if not closed:
+        bm.faces.new(list(reversed(rings[0])))
+        bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    sharpen(bm, 50)
+    return obj(name, bm, finish, smooth)
+
+
+def prism(name, outline, y0, y1, finish, r=0.03, seg=2, at=(0, 0, 0), rot=None):
+    """A flat shape drawn in the front view (x, z points round its edge) and pushed back from y0 to y1: a radio's arch, a
+    shield, a cabinet's side (turned with `rot`)."""
+    pts = []
+    for p in outline:
+        if not pts or (Vector(p) - Vector(pts[-1])).length > 1e-5:
+            pts.append(p)
+    if (Vector(pts[0]) - Vector(pts[-1])).length < 1e-5:
+        pts.pop()
+    bm = bmesh.new()
+    front = [bm.verts.new((x, y0, z)) for x, z in pts]
+    back = [bm.verts.new((x, y1, z)) for x, z in pts]
+    caps = [bm.faces.new(front), bm.faces.new(list(reversed(back)))]
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bm.faces.new((front[i], front[j], back[j], back[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bmesh.ops.triangulate(bm, faces=caps, quad_method="BEAUTY", ngon_method="EAR_CLIP")
+    sharpen(bm)
+    o = obj(name, bm, finish)
+    o.matrix_world = Matrix.Translation(CUR + Vector(at)) @ (rot or Matrix())
+    return bevel(o, r, seg)
+
+
+def layer(name, outline, y, finish, depth=0.003):
+    """A layer of paint on a canvas: a flat shape `depth` thick, its face at y."""
+    return prism(name, outline, y - depth, y, finish, r=0)
+
+
+def rect_frame(name, hw, hh, profile, finish, place=None):
+    """A picture frame's moulding round a rectangle (half width hw, half height hh, in the front view round `place`'s
+    origin): `profile` (inset from the outer edge, y) points round its section, mitred at the corners."""
+    place = Matrix.Translation(CUR) @ (place or Matrix())
+    bm = bmesh.new()
+    rings = []
+    for inset, y in profile:
+        w, h = hw - inset, hh - inset
+        rings.append([bm.verts.new(place @ Vector((x, y, z))) for x, z in ((-w, -h), (w, -h), (w, h), (-w, h))])
+    for i in range(len(rings)):
+        a, b = rings[i], rings[(i + 1) % len(rings)]
+        for k in range(4):
+            bm.faces.new((a[k], a[(k + 1) % 4], b[(k + 1) % 4], b[k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    sharpen(bm, 35)
+    return obj(name, bm, finish)
+
+
+def sprite(name, rows, px, finish, place):
+    """Pixel art (rows of "#"): each run of pixels one flat quad facing -Y, drawn round `place`'s origin."""
+    place = Matrix.Translation(CUR) @ place
+    bm = bmesh.new()
+    w, h = max(len(row) for row in rows), len(rows)
+    for j, row in enumerate(rows):
+        i = 0
+        while i < len(row):
+            if row[i] != "#":
+                i += 1
+                continue
+            k = i
+            while k < len(row) and row[k] == "#":
+                k += 1
+            x0, x1, z0, z1 = (i - w / 2) * px, (k - w / 2) * px, (h / 2 - j - 1) * px, (h / 2 - j) * px
+            bm.faces.new([bm.verts.new(place @ Vector(v)) for v in ((x0, 0, z0), (x1, 0, z0), (x1, 0, z1), (x0, 0, z1))])
+            i = k
+    return obj(name, bm, finish, smooth=False)
+
+
+def towards(direction):
+    """A turn that points +Z along `direction`."""
+    return Vector(direction).normalized().to_track_quat("Z", "Y").to_matrix().to_4x4()
 
 
 # ───────────────────────────────────────────────────────────── kusy nábytku
@@ -782,6 +954,650 @@ def moving_box(W, H, D):
     box("Tag", (0.88, 0.01, 0.48), (-0.45, -0.985, 0.95), "white", r=0)  # (the game's +x: the label FurnitureLooks prints on it)
 
 
+# ───────────────────────────────────────────────────────────── 8.0 sběratelské kousky (FurnitureLooks.Collectibles)
+# Vzácné kusy, které se objeví v domě vedle nábytku: zlato se leskne (gilt), sklo je čiré (crystal), jukebox žhne.
+# Nápisy (LEAGUE CHAMPION, 1,000,000 SOLD, HIT PARADE, název hry na automatu …) tiskne hra na štítky; pod každým je díl
+# modelu v barvě štítku (mosaz, krémová, neon) a před ním nic (tools/furniture/mesh-check.py to hlídá).
+def bowling_trophy(W, H, D):
+    """A league champion's trophy: the marble base, the wooden step with its plate, the gold loving cup and its lid,
+    a bowling pin on top, the champion's own ball beside it."""
+    box("Base", (1.4, 1.0, 0.2), (0, 0, 0.1), "marble", r=0.05, seg=3)
+    box("Base top", (1.24, 0.88, 0.12), (0, 0, 0.26), "marble", r=0.04, seg=3)
+    box("Step", (1.1, 0.8, 0.3), (0, 0, 0.47), "wood2", r=0.05, seg=3)
+    box("Plate", (0.8, 0.02, 0.2), (0, -0.41, 0.5), "brass", r=0.006)  # (the game prints LEAGUE CHAMPION on it)
+    lathe("Stem", [(0.001, 0.62), (0.25, 0.62), (0.25, 0.655), (0.2, 0.69), (0.11, 0.76), (0.07, 0.84), (0.065, 0.93),
+                   (0.12, 0.98), (0.12, 1.03), (0.065, 1.08), (0.055, 1.28), (0.09, 1.36), (0.16, 1.42), (0.001, 1.44)],
+          (0, 0, 0), "gilt", seg=20)
+    lathe("Cup", [(0.001, 1.4), (0.2, 1.42), (0.31, 1.5), (0.4, 1.63), (0.43, 1.8), (0.42, 1.95), (0.405, 2.02),
+                  (0.445, 2.06), (0.445, 2.09), (0.001, 2.09)], (0, 0, 0), "gilt", seg=28)
+    torus("Cup bead", 0.41, 0.018, (0, 0, 1.68), "gilt", seg=28, ring_seg=4)
+    lathe("Lid", [(0.001, 2.09), (0.42, 2.09), (0.42, 2.115), (0.37, 2.15), (0.26, 2.21), (0.12, 2.255), (0.07, 2.3),
+                  (0.001, 2.3)], (0, 0, 0), "gilt", seg=24)
+    for s in (-1, 1):
+        sweep("Handle", bezier((s * 0.4, 0, 1.96), (s * 0.7, 0, 2.02), (s * 0.68, 0, 1.56), (s * 0.33, 0, 1.53), 14), 0.032, "gilt", seg=6)
+    lathe("Pin", [(0.001, 2.3), (0.055, 2.3), (0.085, 2.36), (0.105, 2.44), (0.1, 2.52), (0.072, 2.6), (0.046, 2.65),
+                  (0.048, 2.69), (0.064, 2.73), (0.06, 2.77), (0.035, 2.795), (0.001, 2.8)], (0, 0, 0), "white", seg=16)
+    for z, R in ((2.612, 0.065), (2.642, 0.05)):
+        torus("Pin stripe", R, 0.011, (0, 0, z), "red", seg=16, ring_seg=4)
+    centre = Vector((0.4, -0.15, 0.62 + 0.23))
+    ball("Ball", 0.23, tuple(centre), "lacquer", seg=20)
+    for d in ((-0.25, -0.75, 0.6), (0.05, -0.8, 0.6), (-0.1, -0.55, 0.83)):
+        n = Vector(d).normalized()
+        cyl("Finger hole", 0.032, 0.012, tuple(centre + n * 0.226), "black", seg=8, edge=0, rot=towards(n))
+
+
+def vintage_radio(W, H, D):
+    """A 1930s cathedral radio: the dark wooden case under its arch with a lighter veneered face, half columns at its
+    corners, the grille cloth behind gothic fretwork, the dial that glows amber, three bakelite knobs."""
+    box("Plinth", (1.8, 1.2, 0.15), (0, 0, 0.075), "wood2", r=0.04, seg=3)
+    prism("Case", [(-0.8, 0.15), (0.8, 0.15)] + arc(0, 1.1, 0.8, 0, math.pi, 28, rz=0.86), -0.5, 0.5, "wood2", r=0.06, seg=3)
+    prism("Face", [(-0.69, 0.22), (0.69, 0.22)] + arc(0, 1.1, 0.69, 0, math.pi, 24, rz=0.76), -0.508, -0.496, "wood", r=0.008, seg=1)
+    window = arc(0.42, 1.0, 0.08, -math.pi / 2, 0, 4) + arc(0, 1.22, 0.5, 0, math.pi, 22, rz=0.6) + arc(-0.42, 1.0, 0.08, math.pi, 1.5 * math.pi, 4)
+    prism("Grille cloth", window, -0.515, -0.49, "wicker", r=0)
+    sweep("Trim", [(x, -0.522, z) for x, z in window], 0.03, "wood2", seg=6, closed=True)
+    y = -0.54
+    for x in (-0.25, 0, 0.25):
+        top = 1.22 + 0.6 * math.sqrt(max(0.0, 1 - (x / 0.5) ** 2)) - 0.03
+        sweep("Fret", [(x, y, 0.95), (x, y, top)], 0.02, "wood2", seg=6)
+    for x0, x1, peak in ((-0.5, -0.25, 1.46), (-0.25, 0, 1.56), (0, 0.25, 1.56), (0.25, 0.5, 1.46)):
+        m = (x0 + x1) / 2
+        sweep("Fret arch", [(x0, y, 1.3), (x0 + 0.02, y, 1.38), (m - 0.05, y, peak - 0.04), (m, y, peak), (m + 0.05, y, peak - 0.04),
+                            (x1 - 0.02, y, 1.38), (x1, y, 1.3)], 0.018, "wood2", seg=6)
+    torus("Rose", 0.09, 0.018, (0, y, 1.68), "wood2", axis="Y", seg=16, ring_seg=4)
+    torus("Dial bezel", 0.15, 0.025, (0, -0.522, 0.66), "brass", axis="Y", seg=24, ring_seg=4)
+    cyl("Dial", 0.135, 0.03, (0, -0.51, 0.66), "amber", axis="Y", seg=28, edge=0)
+    box("Needle", (0.012, 0.01, 0.12), (0.03, -0.53, 0.69), "black", r=0, rot=euler(ry=-0.4))
+    for x in (-0.48, 0, 0.48):
+        lathe("Knob", [(0.001, 0), (0.09, 0), (0.1, 0.025), (0.085, 0.065), (0.06, 0.08), (0.001, 0.085)], (x, -0.5, 0.34),
+              "black", seg=12, rot=euler(rx=math.pi / 2))
+    for s in (-1, 1):
+        cyl("Column", 0.06, 0.9, (s * 0.8, -0.5, 0.15 + 0.45), "wood", seg=10, edge=0)
+        ball("Capital", 0.075, (s * 0.8, -0.5, 1.1), "wood", seg=10, rings=6)
+
+
+LAND = [  # the old globe's continents (longitude, latitude), roughly
+    [(-165, 68), (-140, 70), (-115, 72), (-95, 73), (-80, 68), (-65, 60), (-55, 50), (-68, 44), (-76, 38), (-81, 31), (-80, 25),
+     (-90, 29), (-97, 26), (-97, 20), (-90, 16), (-83, 9), (-78, 8), (-86, 14), (-95, 16), (-105, 21), (-112, 29), (-118, 34),
+     (-124, 42), (-125, 49), (-135, 57), (-150, 60), (-165, 60)],
+    [(-80, 9), (-72, 12), (-62, 10), (-50, 0), (-35, -5), (-38, -15), (-42, -23), (-48, -28), (-58, -38), (-65, -42), (-68, -52),
+     (-74, -50), (-73, -38), (-71, -25), (-70, -18), (-76, -14), (-81, -5)],
+    [(-17, 21), (-16, 28), (-9, 35), (10, 37), (20, 32), (32, 31), (35, 28), (43, 12), (51, 11), (42, -2), (40, -15), (35, -24),
+     (32, -29), (20, -35), (17, -29), (13, -17), (12, -6), (9, 4), (-5, 5), (-12, 7), (-17, 14)],
+    [(-10, 36), (-9, 43), (-2, 44), (-4, 48), (2, 51), (8, 54), (10, 58), (5, 62), (15, 69), (25, 71), (40, 67), (60, 70), (75, 73),
+     (100, 77), (130, 72), (160, 70), (180, 68), (178, 62), (163, 57), (156, 51), (142, 54), (135, 44), (128, 35), (122, 31),
+     (120, 23), (108, 18), (106, 10), (100, 13), (99, 7), (95, 16), (90, 22), (80, 12), (77, 8), (72, 21), (66, 25), (57, 26),
+     (52, 18), (44, 12), (35, 28), (34, 36), (27, 37), (23, 37), (20, 40), (12, 44), (15, 38), (8, 44), (3, 43), (-5, 36)],
+    [(114, -22), (122, -17), (130, -12), (137, -12), (142, -11), (146, -19), (153, -26), (150, -37), (141, -38), (131, -31), (115, -34)],
+    [(-55, 60), (-43, 60), (-22, 70), (-20, 80), (-35, 83), (-60, 82), (-72, 77), (-60, 70)],
+    [(43, -12), (50, -15), (47, -25), (44, -24)], [(-6, 50), (2, 51), (-2, 58), (-6, 58)],
+    [(130, 31), (140, 35), (142, 42), (141, 45), (139, 40), (132, 34)], [(109, 1), (118, 7), (119, 0), (116, -4), (110, -3)],
+    [(95, 5), (104, -2), (106, -6), (100, -3)],
+]
+
+
+def globe_land(radius, turn):
+    """The continents as smooth shapes lying on the globe (LAND's outlines cut into small triangles, each corner put on
+    a sphere of `radius`; `turn` degrees of longitude to the camera)."""
+    bm = bmesh.new()
+    for poly in LAND:
+        pts = []
+        for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]):
+            n = max(1, int(math.hypot(x1 - x0, y1 - y0) / 8))
+            pts += [(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n) for k in range(n)]
+        bm.faces.new([bm.verts.new((lon, lat, 0)) for lon, lat in pts])
+    bmesh.ops.triangulate(bm, faces=list(bm.faces), quad_method="BEAUTY", ngon_method="EAR_CLIP")
+    for _ in range(8):  # (no long edge: a long one would cut under the sea)
+        long = [e for e in bm.edges if e.calc_length() > 15.0]
+        if not long:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=long, cuts=1)
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3], quad_method="BEAUTY", ngon_method="BEAUTY")
+    for v in bm.verts:
+        lon, lat = math.radians(v.co.x - turn), math.radians(v.co.y)
+        v.co = Vector((math.cos(lat) * math.cos(lon), math.cos(lat) * math.sin(lon), math.sin(lat))) * radius
+    bm.normal_update()
+    bmesh.ops.reverse_faces(bm, faces=[f for f in bm.faces if f.normal.dot(f.calc_center_median()) < 0])
+    return bm
+
+
+def old_globe(W, H, D):
+    """A library globe: the turned stand on three cabriole legs, the horizon ring and its paper band on three arms,
+    the brass meridian and its pivots, the globe tilted like the earth (Europe and Africa to the front)."""
+    lathe("Column", [(0.001, 0.36), (0.14, 0.36), (0.16, 0.41), (0.13, 0.49), (0.075, 0.57), (0.06, 0.7), (0.09, 0.78),
+                     (0.11, 0.82), (0.08, 0.88), (0.06, 0.98), (0.085, 1.04), (0.15, 1.08), (0.15, 1.12), (0.001, 1.12)],
+          (0, 0, 0), "wood", seg=16)
+    lathe("Cradle", [(0.001, 1.12), (0.07, 1.12), (0.08, 1.17), (0.06, 1.17), (0.05, 1.14), (0.001, 1.14)], (0, 0, 0), "brass", seg=12)
+    for k in range(3):
+        a = math.pi / 2 + k * 2 * math.pi / 3
+        c, s = math.cos(a), math.sin(a)
+        sweep("Leg", bezier((0.08 * c, 0.08 * s, 0.46), (0.42 * c, 0.42 * s, 0.56), (0.5 * c, 0.5 * s, 0.06), (0.68 * c, 0.68 * s, 0.05), 10),
+              0.065, "wood", seg=6, r1=0.04)
+        ball("Toe", 0.05, (0.7 * c, 0.7 * s, 0.05), "brass", seg=8, rings=5)
+        b = a + math.pi / 3
+        c, s = math.cos(b), math.sin(b)
+        sweep("Arm", bezier((0.1 * c, 0.1 * s, 1.1), (0.5 * c, 0.5 * s, 1.1), (0.78 * c, 0.78 * s, 1.4), (0.74 * c, 0.74 * s, 1.83), 10),
+              0.03, "wood", seg=5)
+    lathe("Horizon", [(0.68, 1.83), (0.8, 1.83), (0.8, 1.865), (0.68, 1.865)], (0, 0, 0), "wood", seg=32)
+    lathe("Horizon paper", [(0.695, 1.865), (0.785, 1.865), (0.785, 1.869), (0.695, 1.869)], (0, 0, 0), "parchment", seg=32)
+    for k in range(12):
+        a = k * math.pi / 6
+        box("Tick", (0.04, 0.008, 0.003), (math.cos(a) * 0.765, math.sin(a) * 0.765, 1.8695), "black", r=0, rot=euler(rz=a))
+    tilt = Matrix.Translation(CUR + Vector((0, 0, 1.85))) @ euler(ry=0.41)  # (the earth's tilt, to the side)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=0.65)
+    for f in bm.faces:  # (Antarctica: the sphere's own bottom rings)
+        f.material_index = 1 if f.calc_center_median().z < -0.6 else 0
+    obj("Globe", bm, ["ocean", "parchment"]).matrix_world = tilt
+    obj("Continents", globe_land(0.66, GLOBE_TURN), "parchment").matrix_world = tilt
+    torus("Meridian", 0.695, 0.022, (0, 0, 1.85), "brass", axis="Y", seg=32, ring_seg=5)
+    axis = Vector((math.sin(0.41), 0, math.cos(0.41)))
+    for s in (-1, 1):
+        cyl("Pivot", 0.028, 0.07, tuple(Vector((0, 0, 1.85)) + axis * s * 0.675), "brass", seg=10, edge=0, rot=towards(axis))
+        ball("Pivot cap", 0.035, tuple(Vector((0, 0, 1.85)) + axis * s * 0.725), "brass", seg=8, rings=5)
+
+
+GLOBE_TURN = 136  # (degrees: which longitude faces the catalogue's camera)
+
+
+def stag_head(W, H, D):
+    """A hunting lodge's stag on its oak shield, stood on its foot board: the neck and the head looking a little down,
+    glass eyes, the ears, the antlers (a beam with brow, bez and trez tines and a crown fork), the brass plate."""
+    box("Foot", (1.2, 0.95, 0.12), (0, 0.37, 0.06), "wood2", r=0.03)
+    right = spline([(0, 0.13), (0.3, 0.19), (0.52, 0.38), (0.63, 0.7), (0.65, 1.1), (0.63, 1.45), (0.56, 1.7), (0.42, 1.88),
+                    (0.22, 1.97), (0, 2.0)], 3)
+    shield = right + [(-x, z) for x, z in reversed(right[1:-1])]
+    prism("Shield", shield, 0.695, 0.845, "wood", r=0.035, seg=2)
+    sweep("Moulding", [(x * 0.9, 0.702, 1.065 + (z - 1.065) * 0.92) for x, z in shield[::2]], 0.025, "wood", seg=6, closed=True)
+    box("Plate", (0.7, 0.02, 0.18), (0, 0.685, 0.45), "brass", r=0.005)  # (the game prints ALPSPITZE 1931 on it)
+    sweep("Neck", bezier((0, 0.72, 1.22), (0, 0.4, 1.25), (0, 0.12, 1.5), (0, -0.04, 1.8), 8), 0.4, "fur", seg=16, r1=0.29, scale=(0.85, 1.12))
+    ball("Skull", 0.3, (0, -0.06, 1.95), "fur", scale=(0.95, 1.1, 0.9), seg=16)
+    sweep("Snout", bezier((0, -0.16, 1.93), (0, -0.4, 1.86), (0, -0.55, 1.7), (0, -0.66, 1.56), 8), 0.22, "fur", seg=14, r1=0.12, scale=(0.78, 1.0))
+    ball("Muzzle", 0.135, (0, -0.68, 1.55), "fur", scale=(0.9, 1.0, 0.85), seg=12)
+    ball("Nose", 0.075, (0, -0.775, 1.55), "black", scale=(1.2, 0.7, 0.8), seg=10, rings=6)
+    for s in (-1, 1):
+        ball("Eye", 0.05, (s * 0.23, -0.27, 1.9), "black", seg=10, rings=6)
+        ball("Ear", 0.2, (s * 0.36, 0.0, 2.12), "fur", scale=(0.5, 0.22, 1.0), rot=euler(ry=s * 0.9), seg=10, rings=6)
+        ball("Inner ear", 0.15, (s * 0.37, -0.035, 2.12), "bone", scale=(0.4, 0.1, 0.9), rot=euler(ry=s * 0.9), seg=8, rings=5)
+        beam = spline([(s * 0.13, 0.0, 2.16), (s * 0.35, 0.05, 2.33), (s * 0.62, 0.1, 2.5), (s * 0.92, 0.16, 2.72), (s * 1.15, 0.2, 2.98),
+                       (s * 1.28, 0.2, 3.22)], 3)
+        sweep("Antler", beam, 0.075, "bone", seg=7, r1=0.032)
+        torus("Burr", 0.075, 0.025, beam[0], "bone", seg=10, ring_seg=4, rot=towards(Vector(beam[1]) - Vector(beam[0])))
+        for k, mid, tip in ((2, (s * 0.08, -0.22, 0.15), (s * 0.12, -0.38, 0.32)), (6, (s * 0.02, -0.2, 0.22), (s * 0.0, -0.28, 0.42)),
+                            (10, (s * -0.02, -0.12, 0.25), (s * -0.05, -0.15, 0.43)), (12, (s * 0.12, 0.05, 0.12), (s * 0.18, 0.08, 0.2))):
+            base = Vector(beam[k])
+            sweep("Tine", spline([tuple(base), tuple(base + Vector(mid)), tuple(base + Vector(tip))], 3), 0.045, "bone", seg=5, r1=0.012)
+
+
+def gold_record(W, H, D):
+    """A gold disc award in its lacquered shadow box: the velvet mount, the gold record with its grooves and label (open,
+    no glass dulling the gold), the gilt fillet; the engraved plate on the frame's wide base; cardboard corners and a
+    strut for the move."""
+    rect_frame("Frame", 1.07, 1.285, [(0, 0.1), (0, -0.08), (0.015, -0.115), (0.05, -0.13), (0.1, -0.125), (0.14, -0.105),
+                                      (0.17, -0.085), (0.17, 0.1)], "lacquer", place=Matrix.Translation((0, 0, 1.315)))
+    box("Base panel", (1.82, 0.23, 0.48), (0, -0.015, 0.44), "lacquer", r=0.01)
+    rect_frame("Fillet", 0.9, 0.885, [(0, 0.04), (0, -0.1), (0.02, -0.11), (0.04, -0.1), (0.04, 0.04)], "gilt",
+               place=Matrix.Translation((0, 0, 1.545)))
+    box("Mount", (1.8, 0.02, 1.77), (0, 0.05, 1.545), "velvet", r=0)
+    grooves = []
+    for k in range(7):
+        r = 0.66 - k * 0.06
+        grooves += [(r, 0.026), (r - 0.03, 0.021)]
+    lathe("Record", [(0.001, 0.0), (0.7, 0.0), (0.7, 0.018), (0.69, 0.026)] + grooves + [(0.235, 0.024), (0.001, 0.024)],
+          (0, 0.04, 1.545), "gilt", seg=32, rot=euler(rx=math.pi / 2))
+    cyl("Label", 0.215, 0.008, (0, 0.009, 1.545), "accent", axis="Y", seg=28, edge=0)
+    cyl("Hole", 0.025, 0.004, (0, 0.003, 1.545), "black", axis="Y", seg=12, edge=0)
+    box("Plate", (1.2, 0.03, 0.3), (0, -0.145, 0.45), "brass", r=0.008)  # (the game prints 1,000,000 SOLD on it)
+    for s in (-1, 1):
+        box("Corner", (0.3, 0.29, 0.3), (s * 0.95, -0.005, 0.15), "card", r=0.02)
+    box("Strut", (0.3, 0.04, 2.0), (0, 0.135, 1.0), "card", r=0.01, rot=euler(rx=0.045))
+
+
+def ship_bottle(W, H, D):
+    """Grandad's ship in a bottle on its cradle stand: a three-master under sail on a putty sea, the cork sealed in red
+    wax, the brass plaque on the stand."""
+    box("Base", (1.8, 0.7, 0.12), (0, 0, 0.06), "wood", r=0.035, seg=3)
+    box("Plaque", (0.5, 0.012, 0.07), (0, -0.355, 0.06), "brass", r=0.004)
+    side = Matrix.Rotation(math.pi / 2, 4, "Z")  # (an outline drawn as y, z and pushed along x)
+    for x in (-0.55, 0.42):
+        prism("Cradle", [(-0.3, 0.12), (0.3, 0.12)] + arc(0, 0.85, 0.42, -0.775, -math.pi + 0.775, 10), -0.06, 0.06, "wood2",
+              r=0.015, seg=1, at=(x, 0, 0), rot=side)
+    along = euler(ry=math.pi / 2)
+    lathe("Bottle", [(0.001, 0.07), (0.15, 0.035), (0.34, 0.0), (0.39, 0.02), (0.4, 0.08), (0.4, 1.22), (0.385, 1.33), (0.33, 1.44),
+                     (0.22, 1.54), (0.155, 1.62), (0.14, 1.72), (0.142, 1.8), (0.158, 1.82), (0.158, 1.86), (0.14, 1.875),
+                     (0.118, 1.875), (0.118, 1.64), (0.18, 1.55), (0.3, 1.44), (0.36, 1.33), (0.378, 1.22), (0.378, 0.08),
+                     (0.36, 0.04), (0.15, 0.06), (0.001, 0.095)], (-0.92, 0, 0.85), "crystal", seg=24, rot=along)
+    lathe("Cork", [(0.001, 1.7), (0.112, 1.7), (0.122, 1.88), (0.118, 1.95), (0.001, 1.95)], (-0.92, 0, 0.85), "wicker", seg=16, rot=along)
+    lathe("Seal", [(0.001, 1.93), (0.13, 1.93), (0.14, 1.96), (0.12, 2.0), (0.001, 2.0)], (-0.92, 0, 0.85), "red", seg=16, rot=along)
+    prism("Sea", arc(0, 0.85, 0.365, -0.75, -math.pi + 0.75, 14), -0.3, 0.82, "ocean", r=0.02, rot=side)
+    for x, y in ((-0.75, 0.1), (-0.05, -0.15), (0.2, 0.12), (-0.6, -0.16), (0.12, -0.02)):
+        ball("Wave", 0.09, (x, y, 0.6), "ocean", scale=(1.6, 1, 0.35), seg=8, rings=4)
+    ball("Hull", 0.4, (-0.27, 0, 0.6), "lacquer", scale=(1, 0.24, 0.3), seg=16)
+    box("Deck", (0.62, 0.15, 0.02), (-0.25, 0, 0.71), "wood2", r=0.005)
+    box("Stern castle", (0.16, 0.12, 0.08), (-0.56, 0, 0.74), "lacquer", r=0.01)
+    tube("Bowsprit", (0.08, 0, 0.72), (0.32, 0, 0.82), 0.01, "wood2", 6)
+    for x, h in ((0.0, 0.42), (-0.25, 0.48), (-0.5, 0.38)):
+        cyl("Mast", 0.011, h, (x, 0, 0.72 + h / 2), "wood2", seg=6, edge=0)
+        for z0, z1, hw in ((0.76, 0.72 + h * 0.5, 0.13), (0.72 + h * 0.56, 0.72 + h * 0.88, 0.1)):
+            sail(x, z0, z1, hw, 0.05)
+            for z in (z0, z1):
+                cyl("Yard", 0.006, 2 * hw + 0.04, (x + 0.01, 0, z), "wood2", axis="Y", seg=5, edge=0)
+        box("Pennant", (0.08, 0.004, 0.03), (x - 0.04, 0, 0.72 + h - 0.02), "red", r=0)
+    bm = bmesh.new()
+    for off in (-0.002, 0.002):
+        vs = [bm.verts.new(CUR + Vector(v)) for v in ((0.01, off, 1.05), (0.3, off, 0.82), (0.04, off, 0.79))]
+        bm.faces.new(vs if off < 0 else list(reversed(vs)))
+    obj("Jib", bm, "cream", smooth=False)
+
+
+def sail(x, z0, z1, hw, bulge):
+    """A square sail billowing to the bow (+x): two thin sheets (both sides show)."""
+    bm = bmesh.new()
+    for off, flip in ((0.0, False), (-0.004, True)):
+        grid = [[bm.verts.new(CUR + Vector((x + off + 0.012 + bulge * (1 - (u / hw) ** 2) * math.sin(math.pi * v), u, z0 + (z1 - z0) * v)))
+                 for u in (-hw, -hw / 2, 0, hw / 2, hw)] for v in (0, 0.5, 1)]
+        for i in range(2):
+            for j in range(4):
+                f = [grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]]
+                bm.faces.new(list(reversed(f)) if flip else f)
+    obj("Sail", bm, "cream")
+
+
+def jewellery_box(W, H, D):
+    """Grandma's jewellery box, its lid open: the lacquered case on gilt ball feet, its gilt bands, a drawer and a
+    mother-of-pearl inlay, the velvet tray with ring rolls and two rings, her pearls spilling over the front, the oval
+    mirror in the lid, the music box's ballerina and its key."""
+    for sx in (-1, 1):
+        for sy in (-0.42, 0.22):
+            ball("Foot", 0.05, (sx * 0.68, sy, 0.05), "gilt", seg=8, rings=5)
+    box("Case", (1.5, 0.75, 0.42), (0, -0.1, 0.29), "lacquer", r=0.035, seg=3)
+    for z in (0.1, 0.482):
+        box("Band", (1.53, 0.78, 0.035), (0, -0.1, z), "gilt", r=0.012)
+    box("Drawer", (1.1, 0.02, 0.15), (0, -0.48, 0.22), "lacquer", r=0.008)
+    ball("Pull", 0.04, (0, -0.505, 0.22), "gilt", seg=8, rings=5)
+    cyl("Inlay", 0.06, 0.008, (0, -0.477, 0.37), "ceramic", axis="Y", seg=20, edge=0, rot=Matrix.Diagonal((3.2, 1, 1, 1)))
+    sweep("Inlay rim", [(0.205 * math.cos(a), -0.48, 0.37 + 0.072 * math.sin(a)) for a in (2 * math.pi * k / 24 for k in range(24))],
+          0.01, "gilt", seg=4, closed=True)
+    box("Tray", (1.42, 0.68, 0.03), (0, -0.1, 0.505), "velvet", r=0.01)
+    for y in (-0.32, -0.22):
+        cyl("Ring roll", 0.045, 0.6, (-0.33, y, 0.545), "velvet", axis="X", seg=12, edge=0)
+    for x, stone in ((-0.45, "crystal"), (-0.2, "red")):
+        torus("Ring", 0.055, 0.011, (x, -0.27, 0.6), "gilt", axis="Y", seg=16, ring_seg=4)
+        ball("Stone", 0.03, (x, -0.27, 0.665), stone, seg=8, rings=4, scale=(1, 1, 1.25))
+    hinge = Matrix.Translation((0, 0.275, 0.5)) @ euler(rx=-0.2)  # the lid open on the case's back top edge, leaning back
+    lid = box("Lid", (1.5, 0.07, 0.68), (0, 0, 0), "lacquer", r=0.03, seg=3)
+    lid.matrix_world = Matrix.Translation(CUR) @ hinge @ Matrix.Translation((0, 0.035, 0.34))
+    band = box("Lid band", (1.53, 0.075, 0.035), (0, 0, 0), "gilt", r=0.012)
+    band.matrix_world = Matrix.Translation(CUR) @ hinge @ Matrix.Translation((0, 0.035, 0.66))
+    glass = cyl("Mirror", 0.24, 0.006, (0, 0, 0), "mirror", seg=40, edge=0)
+    glass.matrix_world = Matrix.Translation(CUR) @ hinge @ Matrix.Translation((0, -0.003, 0.36)) @ Matrix.Diagonal((1.9, 1, 1, 1)) @ euler(rx=math.pi / 2)
+    sweep("Mirror frame", [tuple(hinge @ Vector((0.47 * math.cos(a), -0.008, 0.36 + 0.252 * math.sin(a)))) for a in (2 * math.pi * k / 32 for k in range(32))],
+          0.018, "gilt", seg=5, closed=True)
+    pearls = spline([(0.55, -0.2, 0.535), (0.47, -0.4, 0.535), (0.44, -0.475, 0.5), (0.44, -0.505, 0.4), (0.4, -0.51, 0.31),
+                     (0.32, -0.505, 0.36), (0.28, -0.5, 0.45), (0.26, -0.47, 0.515), (0.3, -0.33, 0.54), (0.45, -0.25, 0.54)], 6)
+    path = [Vector(p) for p in pearls]
+    left, step = 0.0, 0.054
+    for a, b in zip(path, path[1:]):
+        seg_len = (b - a).length
+        while left <= seg_len:
+            ball("Pearl", 0.026, tuple(a + (b - a) * (left / seg_len)), "ceramic", seg=6, rings=4)
+            left += step
+        left -= seg_len
+    ball("Pendant", 0.035, (0.4, -0.508, 0.255), "red", scale=(1, 0.7, 1.25), seg=8, rings=5)
+    bx, by = 0.15, 0.0  # the ballerina on her spindle, in front of the mirror
+    cyl("Spindle base", 0.06, 0.012, (bx, by, 0.526), "gilt", seg=16, edge=0)
+    cyl("Spindle", 0.012, 0.06, (bx, by, 0.55), "gilt", seg=8, edge=0)
+    tube("Leg", (bx, by, 0.58), (bx, by, 0.705), 0.011, "ceramic", 6)
+    tube("Thigh", (bx + 0.01, by, 0.7), (bx + 0.06, by, 0.655), 0.011, "ceramic", 6)
+    tube("Shin", (bx + 0.06, by, 0.655), (bx + 0.012, by, 0.62), 0.009, "ceramic", 6)
+    lathe("Tutu", [(0.025, 0.695), (0.09, 0.688), (0.1, 0.698), (0.085, 0.712), (0.025, 0.725)], (bx, by, 0), "accent", seg=14)
+    ball("Bodice", 0.03, (bx, by, 0.75), "accent", scale=(0.9, 0.7, 1.4), seg=8, rings=5)
+    ball("Head", 0.022, (bx, by, 0.815), "ceramic", seg=8, rings=5)
+    for s in (-1, 1):
+        sweep("Arm", spline([(bx + s * 0.025, by, 0.775), (bx + s * 0.05, by, 0.82), (bx + s * 0.02, by, 0.86)], 3), 0.006, "ceramic", seg=5)
+    cyl("Key", 0.012, 0.06, (0.78, -0.1, 0.3), "brass", axis="X", seg=8, edge=0)
+    for s in (-1, 1):
+        torus("Key bow", 0.028, 0.007, (0.815, -0.1, 0.3 + s * 0.032), "brass", axis="X", seg=12, ring_seg=4)
+
+
+VASE = [(0.001, 0.24), (0.3, 0.24), (0.312, 0.26), (0.3, 0.3), (0.285, 0.32), (0.33, 0.4), (0.45, 0.6), (0.58, 0.85),
+        (0.645, 1.1), (0.65, 1.25), (0.62, 1.42), (0.53, 1.6), (0.4, 1.76), (0.27, 1.9), (0.205, 2.02), (0.19, 2.15), (0.2, 2.3),
+        (0.24, 2.45), (0.3, 2.57), (0.33, 2.64), (0.335, 2.675)]  # the vase's outside (radius, height); then its mouth inside
+VASE_MOUTH = [(0.3, 2.685), (0.28, 2.66), (0.22, 2.55), (0.17, 2.42), (0.001, 2.38)]
+
+
+def vase_radius(z):
+    for (r0, z0), (r1, z1) in zip(VASE[4:], VASE[5:]):
+        if z0 <= z <= z1:
+            return r0 + (r1 - r0) * (z - z0) / (z1 - z0)
+    return VASE[-1][0]
+
+
+def antique_vase(W, H, D):
+    """A blue-and-white porcelain baluster vase on its carved rosewood stand: lotus petals round the foot, peonies on a
+    scrolling vine round the belly, a cloud collar on the shoulder, banana leaves up the neck, cobalt bands between,
+    the gilt rim and two gilt mask-and-ring handles."""
+    lathe("Stand top", [(0.001, 0.18), (0.5, 0.18), (0.53, 0.2), (0.52, 0.235), (0.48, 0.24), (0.001, 0.24)], (0, 0, 0), "wood2", seg=24)
+    lathe("Apron", [(0.44, 0.1), (0.48, 0.1), (0.5, 0.18), (0.44, 0.18)], (0, 0, 0), "wood2", seg=24)
+    torus("Base ring", 0.55, 0.03, (0, 0, 0.03), "wood2", seg=24, ring_seg=4)
+    for k in range(5):
+        a = math.pi / 2 + k * 2 * math.pi / 5
+        c, s = math.cos(a), math.sin(a)
+        sweep("Foot", bezier((0.46 * c, 0.46 * s, 0.15), (0.57 * c, 0.57 * s, 0.15), (0.61 * c, 0.61 * s, 0.07), (0.55 * c, 0.55 * s, 0.03), 6),
+              0.042, "wood2", seg=5, r1=0.03)
+    lathe("Body", VASE + VASE_MOUTH, (0, 0, 0), "porcelain", seg=24)
+    paint, white = bmesh.new(), bmesh.new()
+
+    def on(bm, theta, z, off=0.005):
+        r = vase_radius(z) + off
+        return bm.verts.new(CUR + Vector((r * math.cos(theta), r * math.sin(theta), z)))
+
+    def patch(theta, z0, z1, width, shape, rows=4, cols=2):
+        """A painted shape on the porcelain: rows from z0 to z1 (down when z1 < z0), `width` × shape(v) to each side."""
+        grid = []
+        for i in range(rows + 1):
+            v = i / rows
+            z = z0 + (z1 - z0) * v
+            w = width * max(0.03, shape(v))
+            grid.append([on(paint, theta + (-1 + 2 * j / cols) * w / vase_radius(z), z) for j in range(cols + 1)])
+        for i in range(rows):
+            for j in range(cols):
+                f = [grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]]
+                paint.faces.new(f if z1 > z0 else list(reversed(f)))
+
+    def band(za, zb, n=32):
+        lo = [on(paint, 2 * math.pi * k / n, za) for k in range(n)]
+        hi = [on(paint, 2 * math.pi * k / n, zb) for k in range(n)]
+        for k in range(n):
+            paint.faces.new((lo[k], lo[(k + 1) % n], hi[(k + 1) % n], hi[k]))
+
+    def flower(bm, theta, zc, size, lobes, off):
+        centre = on(bm, theta, zc, off)
+        ring = []
+        for k in range(30):
+            phi = 2 * math.pi * k / 30
+            rho = size * (0.74 + 0.26 * math.cos(lobes * phi))
+            dz = rho * math.sin(phi)
+            ring.append(on(bm, theta + rho * math.cos(phi) / vase_radius(zc + dz), zc + dz, off))
+        for k in range(30):
+            bm.faces.new((centre, ring[k], ring[(k + 1) % 30]))
+
+    for za, zb in ((0.335, 0.355), (0.665, 0.69), (1.5, 1.525), (1.985, 2.015), (2.47, 2.495)):
+        band(za, zb)
+    for k in range(12):  # lotus petals round the foot
+        patch(2 * math.pi * k / 12, 0.37, 0.64, 0.085, lambda v: (1 - v * v) * (0.7 + 0.3 * math.sin(math.pi * v)))
+    for k in range(8):  # the cloud collar hanging from the shoulder
+        patch(2 * math.pi * (k + 0.5) / 8, 1.49, 1.3, 0.16, lambda v: (1 - v ** 3) * (0.55 + 0.45 * math.sin(math.pi * v)))
+    for k in range(8):  # banana leaves up the neck
+        patch(2 * math.pi * k / 8, 2.03, 2.44, 0.07, lambda v: math.sin(math.pi * (0.15 + 0.85 * v)) ** 0.8 * (1 - v ** 3), rows=5)
+    front = -2.1  # (the peony that faces the catalogue's camera)
+    for k in range(4):
+        theta = front + k * math.pi / 2
+        flower(paint, theta, 1.08, 0.17, 5, 0.006)
+        flower(white, theta, 1.08, 0.06, 5, 0.009)
+        flower(paint, theta, 1.08, 0.022, 1, 0.011)
+    obj("Pattern", paint, "cobalt")
+    obj("Flower hearts", white, "porcelain")
+    vine = []
+    for k in range(40):
+        theta = front + 2 * math.pi * k / 40
+        z = 1.08 + 0.16 * math.sin(4 * (theta - front))  # (through every peony's heart, up and down between them)
+        r = vase_radius(z) + 0.004
+        vine.append((r * math.cos(theta), r * math.sin(theta), z))
+    sweep("Vine", vine, 0.012, "cobalt", seg=4, closed=True)
+    torus("Rim", 0.318, 0.016, (0, 0, 2.678), "gilt", seg=28, ring_seg=4)
+    for s in (-1, 1):
+        ball("Mask", 0.045, (s * 0.2, 0, 2.21), "gilt", scale=(0.6, 1, 1.1), seg=8, rings=6)
+        torus("Ring", 0.065, 0.012, (s * 0.232, 0, 2.135), "gilt", axis="X", seg=12, ring_seg=4)
+
+
+CRAB = ["..#.....#..", "...#...#...", "..#######..", ".##.###.##.", "###########", "#.#######.#", "#.#.....#.#", "...##.##..."]
+SQUID = ["...##...", "..####..", ".######.", "##.##.##", "########", "..#..#..", ".#.##.#.", "#.#..#.#"]
+OCTOPUS = ["....####....", ".##########.", "############", "###..##..###", "############", "...##..##...", "..##.##.##..", "##........##"]
+SHIP = [".....#.....", "....###....", ".#########.", "###########", "###########"]
+UFO = ["....######....", "..##########..", ".############.", "##.##.##.##.##", "##############", "..###..##..###"]
+BUNKER = ["...######...", "..########..", ".##########.", "############", "####....####", "###......###"]
+
+
+def arcade_cabinet(W, H, D):
+    """An eighties upright arcade machine: painted side panels with white stripes, the black cabinet, the control panel
+    jutting out with its stick and six buttons, the coin door and its lit slots, the screen tilted back in its bezel with
+    a game of space invaders on it, the lit marquee (the game prints the game's name on it)."""
+    turn = Matrix.Rotation(math.pi / 2, 4, "Z")  # (side-view outlines: y, z, pushed along x)
+    side = [(1.45, 0.0), (1.45, 5.72), (1.18, 5.99), (-0.715, 5.99), (-0.715, 5.12), (-0.5, 5.05), (-0.69, 3.36), (-0.715, 3.3), (-0.715, 0.0)]
+    for s in (-1, 1):
+        y0, y1 = sorted((-s * 1.39, -s * 1.29))
+        prism("Side", side, y0, y1, "accent", r=0.03, rot=turn)
+        a, b = sorted((-s * 1.4, -s * 1.39))
+        prism("Stripe", [(1.42, 0.85), (1.42, 1.25), (-0.6, 3.15), (-0.6, 2.75)], a, b, "white", r=0, rot=turn)
+        prism("Stripe", [(1.42, 1.45), (1.42, 1.65), (-0.55, 3.5), (-0.55, 3.3)], a, b, "white", r=0, rot=turn)
+    box("Body", (2.58, 2.1, 2.9), (0, 0.37, 1.45), "black", r=0.02)
+    box("Kick plate", (2.4, 0.02, 0.25), (0, -0.69, 0.16), "steel", r=0.01)
+    box("Coin door", (0.9, 0.03, 1.0), (0, -0.695, 1.45), "steel", r=0.02)
+    for x in (-0.18, 0.18):
+        box("Coin slot", (0.14, 0.012, 0.22), (x, -0.712, 1.7), "neon", r=0.004)
+        box("Coin return", (0.16, 0.02, 0.1), (x, -0.715, 1.3), "red", r=0.01, seg=1)
+    prism("Control panel", [(-0.68, 2.86), (-1.4, 2.86), (-1.45, 2.91), (-1.45, 3.07), (-1.41, 3.12), (-0.68, 3.33)], -1.4, 1.4,
+          "black", r=0.025, rot=turn)
+    box("Panel trim", (2.8, 0.03, 0.17), (0, -1.46, 2.99), "steel", r=0.01)
+    slope = euler(rx=0.28)
+
+    def deck(x, y):  # a point on the control panel's sloping top, and the turn to stand on it
+        return Vector((x, y, 3.12 + (y + 1.41) * 0.21 / 0.73))
+
+    up = Vector((0, -math.sin(0.28), math.cos(0.28)))
+    base = deck(-0.6, -1.08)
+    cyl("Stick base", 0.1, 0.02, tuple(base), "steel", seg=16, edge=0.005, rot=slope)
+    cyl("Stick", 0.022, 0.28, tuple(base + up * 0.14), "steel", seg=8, edge=0, rot=slope)
+    ball("Stick top", 0.08, tuple(base + up * 0.3), "red", seg=10)
+    for i, y in enumerate((-1.16, -0.94)):
+        for j, colour in enumerate(("red", "sun", "cobalt")):
+            lathe("Button", [(0.001, 0), (0.075, 0), (0.07, 0.035), (0.001, 0.045)], tuple(deck(0.05 + j * 0.24 + i * 0.06, y)), colour, seg=12, rot=slope)
+    for x in (-0.28, -0.08):
+        box("Start", (0.12, 0.08, 0.03), tuple(deck(x, -0.8)), "white", r=0.01, rot=slope)
+    prism("Head", [(-0.665, 3.3), (-0.485, 5.06), (-0.6, 5.12), (-0.6, 5.95), (1.42, 5.95), (1.42, 3.3)], -1.29, 1.29, "dark", r=0.02, rot=turn)
+    box("Top", (2.8, 1.91, 0.05), (0, 0.245, 5.975), "dark", r=0.015)
+    box("Marquee lip", (2.58, 0.1, 0.06), (0, -0.66, 5.17), "dark", r=0.01)
+    box("Marquee", (2.5, 0.12, 0.6), (0, -0.66, 5.5), "neon", r=0.015)  # (the game prints the game's name on it)
+    tilt = math.atan2(0.18, 1.76)
+    normal = Vector((0, -math.cos(tilt), math.sin(tilt)))
+    screen = Matrix.Translation(Vector((0, -0.573, 4.2)) + normal * 0.012) @ euler(rx=-tilt)
+    rect_frame("Bezel", 1.08, 0.86, [(0, 0.0), (0, -0.03), (0.04, -0.04), (0.12, -0.02), (0.12, 0.0)], "dark", place=screen)
+    box("Screen", (1.9, 0.02, 1.45), (0, 0, 0), "glass", r=0.03).matrix_world = Matrix.Translation(CUR) @ screen
+    for row, (rows, z) in enumerate(((SQUID, 0.5), (CRAB, 0.3), (OCTOPUS, 0.1))):
+        for col in range(5):
+            sprite("Invader", rows, 0.018, "neon", screen @ Matrix.Translation((-0.62 + col * 0.31 + (row % 2) * 0.05, -0.012, z)))
+    sprite("Ufo", UFO, 0.016, "red", screen @ Matrix.Translation((0.45, -0.012, 0.66)))
+    for x in (-0.55, 0.0, 0.55):
+        sprite("Bunker", BUNKER, 0.016, "leaf2", screen @ Matrix.Translation((x, -0.012, -0.36)))
+    sprite("Ship", SHIP, 0.018, "glow", screen @ Matrix.Translation((-0.2, -0.012, -0.58)))
+    sprite("Shot", ["#", "#", "#", "#"], 0.016, "glow", screen @ Matrix.Translation((-0.2, -0.012, -0.2)))
+
+
+def jukebox(W, H, D):
+    """A forties jukebox: the wooden cabinet under its round top, the bubble tubes glowing amber and red up the sides and
+    round the arch, the dome window over the record rack and the turntable (lit warm from behind), the title strip (the
+    game prints HIT PARADE on it) and the selector keys, the lit medallion and the chrome grille, the coin slot."""
+    box("Plinth", (3.4, 2.36, 0.3), (0, 0.06, 0.15), "wood2", r=0.05, seg=2)
+    box("Body", (2.9, 2.1, 3.05), (0, 0.05, 0.3 + 1.525), "wood", r=0.04, seg=2)
+    prism("Crown", [(-1.45, 3.3), (1.45, 3.3)] + arc(0, 3.85, 1.45, 0, math.pi, 24), 0.3, 1.1, "wood", r=0.04, seg=1)
+    ro, ri, cz = 1.7, 1.3, 3.7
+    prism("Frame", [(ri, 0.3), (ro, 0.3)] + arc(0, cz, ro, 0, math.pi, 28) + [(-ro, 0.3), (-ri, 0.3)] + arc(0, cz, ri, math.pi, 0, 24),
+          -1.1, 1.0, "wood2", r=0.05, seg=2)
+    for rho, finish in ((1.42, "amber"), (1.58, "ember")):
+        path = [(rho, -1.12, 0.42), (rho, -1.12, 1.6), (rho, -1.12, 2.8)]
+        path += [(rho * math.cos(a), -1.12, cz + rho * math.sin(a)) for a in (math.pi * k / 26 for k in range(27))]
+        path += [(-rho, -1.12, 2.8), (-rho, -1.12, 1.6), (-rho, -1.12, 0.42)]
+        sweep("Bubble tube", path, 0.065, finish, seg=8)
+        for s in (-1, 1):
+            cyl("Ferrule", 0.075, 0.12, (s * rho, -1.12, 0.42), "chrome", seg=10, edge=0)
+    window = [(-1.25, 3.35), (1.25, 3.35)] + arc(0, cz, 1.25, 0, math.pi, 30)
+    prism("Window", window, -1.06, -1.04, "crystal", r=0)
+    prism("Backlight", window, 0.3, 0.32, "glow", r=0)
+    sweep("Window light", [(1.27, -1.0, 3.38)] + [(1.27 * math.cos(a), -1.0, cz + 1.27 * math.sin(a)) for a in (math.pi * k / 24 for k in range(25))]
+          + [(-1.27, -1.0, 3.38)], 0.03, "glow", seg=6)
+    for k in range(5):
+        x = -0.3 + k * 0.15
+        cyl("Record", 0.42, 0.012, (x, -0.25, 4.15), "black", axis="X", seg=18, edge=0)
+        cyl("Label", 0.13, 0.016, (x, -0.25, 4.15), "accent", axis="X", seg=10, edge=0)
+    cyl("Rack", 0.03, 0.8, (0, -0.25, 4.15), "chrome", axis="X", seg=8, edge=0)
+    cyl("Platter", 0.38, 0.04, (0, -0.6, 3.37), "chrome", seg=24, edge=0)
+    cyl("Record", 0.37, 0.015, (0, -0.6, 3.398), "black", seg=24, edge=0)
+    cyl("Label", 0.12, 0.017, (0, -0.6, 3.4), "accent", seg=16, edge=0)
+    cyl("Arm base", 0.06, 0.12, (0.62, -0.35, 3.41), "chrome", seg=10, edge=0)
+    sweep("Tone arm", spline([(0.62, -0.35, 3.47), (0.5, -0.66, 3.47), (0.24, -0.8, 3.44)], 3), 0.016, "chrome", seg=6)
+    box("Trim", (2.6, 0.06, 0.08), (0, -1.12, 3.3), "chrome", r=0.02, seg=1)
+    box("Titles", (2.2, 0.1, 0.4), (0, -1.15, 2.95), "cream", r=0.01)  # (the game prints HIT PARADE on it)
+    rect_frame("Title bezel", 1.14, 0.24, [(0, 0.0), (0, -0.04), (0.02, -0.045), (0.04, -0.035), (0.04, 0.0)], "chrome",
+               place=Matrix.Translation((0, -1.15, 2.95)))
+    box("Key bank", (2.2, 0.04, 0.24), (0, -1.12, 2.58), "chrome", r=0.01, seg=1)
+    for k in range(10):
+        box("Key", (0.15, 0.08, 0.13), (-0.9 + k * 0.2, -1.18, 2.58), "white", r=0)
+    grille = [(-1.0, 0.55), (1.0, 0.55)] + arc(0, 1.95, 1.0, 0, math.pi, 24, rz=0.45)
+    prism("Grille", grille, -1.02, -1.0, "wicker", r=0)
+    for k in range(7):
+        x = -0.75 + k * 0.25
+        top = 1.95 + 0.45 * math.sqrt(1 - x * x) - 0.03
+        sweep("Grille bar", [(x, -1.05, 0.58), (x, -1.05, top)], 0.02, "chrome", seg=6)
+    cyl("Medallion", 0.24, 0.04, (0, -1.07, 1.45), "amber", axis="Y", seg=24, edge=0)
+    torus("Medallion ring", 0.25, 0.03, (0, -1.08, 1.45), "chrome", axis="Y", seg=24, ring_seg=4)
+    box("Base trim", (3.0, 0.04, 0.05), (0, -1.12, 0.33), "chrome", r=0.01, seg=1)
+    box("Coin plate", (0.18, 0.04, 0.35), (1.5, -1.12, 2.5), "chrome", r=0.02, seg=1)
+    box("Coin slot", (0.02, 0.01, 0.12), (1.5, -1.145, 2.55), "black", r=0)
+
+
+def oil_painting(W, H, D):
+    """An old master's alpine sunset in a carved, gilded frame with a linen liner: the evening sky glowing peach and
+    gold, the low sun, two ranges with snow on their peaks, the lake and its reflection, the far shore's forest, a meadow,
+    fir trees, a chalet with lit windows; the gallery's brass picture light over it (glowing), the title plate on the
+    frame (the game prints ALPINE GLOW, 1886 on it), cardboard corners and a strut for the move."""
+    place = Matrix.Translation((0, 0, 1.85))
+    rect_frame("Frame", 2.4, 1.75, [(0, 0.12), (0, -0.06), (0.02, -0.1), (0.05, -0.13), (0.09, -0.14), (0.13, -0.13), (0.16, -0.1),
+                                    (0.24, -0.065), (0.3, -0.07), (0.34, -0.1), (0.37, -0.11), (0.4, -0.09), (0.43, -0.05),
+                                    (0.45, -0.035), (0.45, 0.12)], "gilt", place=place)
+    rect_frame("Liner", 1.96, 1.31, [(0, 0.04), (0, -0.03), (0.12, -0.012), (0.12, 0.04)], "cream", place=place)
+    box("Canvas", (3.7, 0.02, 2.4), (0, 0.03, 1.85), "sky", r=0)
+    layer("Glow", [(-1.84, 1.55), (1.84, 1.55), (1.84, 2.25), (1.0, 2.38), (0.0, 2.3), (-1.0, 2.4), (-1.84, 2.22)], 0.018, "peach")
+    layer("Glow", [(-1.84, 1.55), (1.84, 1.55), (1.84, 1.95), (0.9, 2.05), (-0.2, 1.98), (-1.84, 1.9)], 0.016, "sun")
+    layer("Sun", arc(-0.45, 2.42, 0.15, 0, 2 * math.pi, 24)[:-1], 0.015, "glow")
+    far = [(-1.84, 1.55), (1.84, 1.55), (1.84, 1.95), (1.6, 2.05), (1.35, 2.3), (1.15, 2.15), (0.95, 2.4), (0.72, 2.62), (0.5, 2.38),
+           (0.3, 2.45), (0.1, 2.25), (-0.15, 2.33), (-0.4, 2.1), (-0.7, 2.2), (-1.0, 2.05), (-1.3, 2.12), (-1.6, 1.98), (-1.84, 2.02)]
+    layer("Range", far, 0.013, "rock")
+    near = [(-1.84, 1.55), (0.2, 1.55), (-0.1, 1.75), (-0.35, 1.95), (-0.55, 2.05), (-0.8, 2.32), (-0.95, 2.45), (-1.15, 2.3),
+            (-1.4, 2.18), (-1.6, 2.0), (-1.84, 1.9)]
+    layer("Mountain", near, 0.01, "slate")
+    for peak, a, b, y in (((0.72, 2.62), (0.5, 2.38), (0.95, 2.4), 0.012), ((1.35, 2.3), (1.15, 2.15), (1.6, 2.05), 0.012),
+                          ((0.3, 2.45), (0.1, 2.25), (0.5, 2.38), 0.012), ((-0.95, 2.45), (-1.15, 2.3), (-0.8, 2.32), 0.009)):
+        P, A, B = Vector(peak), Vector(a), Vector(b)
+        L, R = P + (A - P) * 0.4, P + (B - P) * 0.4
+        cap = [tuple(P), tuple(L), tuple(L.lerp(R, 0.25) + Vector((0, 0.03))), tuple(L.lerp(R, 0.5) - Vector((0, 0.02))),
+               tuple(L.lerp(R, 0.75) + Vector((0, 0.03))), tuple(R)]
+        layer("Snow", cap, y, "white")
+        layer("Alpenglow", [tuple(P), tuple(P.lerp(B, 0.25)), tuple(P.lerp(B, 0.25) - Vector((0.05, 0.03)))], y - 0.0005, "peach", depth=0.002)
+    layer("Lake", [(-1.84, 1.25), (1.84, 1.25), (1.84, 1.58), (-1.84, 1.58)], 0.008, "ocean")
+    layer("Reflection", [(-0.52, 1.3), (-0.38, 1.3), (-0.41, 1.565), (-0.49, 1.565)], 0.0075, "sun")
+    layer("Shore", [(0.3, 1.56), (1.84, 1.56), (1.84, 1.66), (1.5, 1.7), (1.2, 1.64), (0.9, 1.69), (0.6, 1.63), (0.3, 1.6)], 0.007, "leaf")
+    layer("Meadow", [(-1.84, 0.66), (1.84, 0.66), (1.84, 1.2), (1.3, 1.32), (0.7, 1.26), (0.1, 1.15), (-0.6, 1.22), (-1.2, 1.35),
+                     (-1.84, 1.3)], 0.006, "grass")
+    layer("Shade", [(-1.84, 0.66), (0.2, 0.66), (-0.3, 0.85), (-1.0, 0.95), (-1.84, 1.0)], 0.0055, "leaf")
+    for x, b, h in ((1.15, 1.15, 0.62), (1.42, 1.1, 0.82), (1.66, 1.12, 0.7), (1.3, 0.95, 0.5)):
+        layer("Fir", [(x - 0.15, b), (x + 0.15, b), (x + 0.06, b + 0.38 * h), (x + 0.11, b + 0.38 * h), (x, b + h),
+                      (x - 0.11, b + 0.38 * h), (x - 0.06, b + 0.38 * h)], 0.005, "leaf")
+    layer("Chalet", [(-0.85, 1.12), (-0.55, 1.12), (-0.55, 1.3), (-0.85, 1.3)], 0.005, "wood2")
+    layer("Roof", [(-0.92, 1.28), (-0.48, 1.28), (-0.7, 1.43)], 0.0045, "red")
+    for x in (-0.79, -0.61):
+        layer("Window", [(x - 0.03, 1.18), (x + 0.03, 1.18), (x + 0.03, 1.24), (x - 0.03, 1.24)], 0.0045, "glow", depth=0.001)
+    for cx, cz, out in ((-2.175, 3.375, (1, -1)), (2.175, 3.375, (-1, -1)), (-2.175, 1.85, (1, 0)), (2.175, 1.85, (-1, 0))):
+        ornament(cx, cz, out)
+    box("Plate", (0.9, 0.08, 0.18), (0, -0.14, 0.24), "brass", r=0.01)  # (the game prints ALPINE GLOW, 1886 on it)
+    for s in (-1, 1):
+        box("Corner", (0.46, 0.358, 0.5), (s * 2.17, 0, 0.25), "card", r=0.02)
+    box("Strut", (0.4, 0.05, 3.0), (0, 0.2, 1.6), "card", r=0.01, rot=euler(rx=0.0467))
+    sweep("Lamp arm", spline([(0, 0.06, 3.56), (0, 0.04, 3.68), (0, -0.06, 3.74), (0, -0.17, 3.72)], 3), 0.022, "gold", seg=6)
+    cyl("Lamp", 0.075, 1.5, (0, -0.22, 3.7), "gold", axis="X", seg=16)
+    for s in (-1, 1):
+        cyl("Lamp end", 0.085, 0.03, (s * 0.76, -0.22, 3.7), "gold", axis="X", seg=16, edge=0)
+    box("Lamp glow", (1.36, 0.06, 0.012), (0, -0.23, 3.619), "glow", r=0)
+
+
+def ornament(cx, cz, out):
+    """A carved shell on the gilded frame: a boss and three lobes fanning towards `out` (x, z)."""
+    centre = Vector((cx, -0.14, cz))
+    ball("Boss", 0.06, tuple(centre), "gilt", scale=(1, 0.55, 1), seg=8, rings=5)
+    base = math.atan2(out[1], out[0])
+    for k in (-1, 0, 1):
+        a = base + k * 0.6
+        d = Vector((math.cos(a), 0, math.sin(a)))
+        ball("Lobe", 0.085, tuple(centre + d * 0.09), "gilt", scale=(1, 0.38, 0.42), rot=euler(ry=-a), seg=8, rings=5)
+
+
+def knight_armour(W, H, D):
+    """A suit of polished plate armour on its oak plinth: sabatons, greaves, knee cops, cuisses, the fauld and tassets, a
+    belt, the breastplate with its gilt ridge and edges, the gorget, the pauldrons, the arms, the gauntlets resting on a
+    longsword stood point down; the bascinet with its beaked visor and a velvet plume; a shield in the house's colours
+    with a gilt chevron leaning on the plinth."""
+    box("Plinth", (2.0, 1.6, 0.25), (0, 0, 0.125), "wood2", r=0.05, seg=2)
+    box("Plinth top", (1.8, 1.4, 0.1), (0, 0, 0.3), "wood2", r=0.03, seg=1)
+    for s in (-1, 1):
+        x = s * 0.3
+        sweep("Sabaton", spline([(x, 0.14, 0.47), (x, -0.05, 0.47), (x * 1.08, -0.3, 0.44), (x * 1.1, -0.47, 0.4)], 3), 0.14, "steel",
+              seg=8, r1=0.04, scale=(1.0, 0.75))
+        lathe("Greave", [(0.001, 0.5), (0.13, 0.5), (0.145, 0.62), (0.15, 0.82), (0.18, 1.12), (0.17, 1.38), (0.14, 1.62), (0.13, 1.74),
+                         (0.001, 1.74)], (x, 0, 0), "chrome", seg=12, scale=(1, 0.95))
+        ball("Poleyn", 0.165, (x, -0.04, 1.8), "chrome", scale=(1, 1.1, 0.85), seg=12, rings=7)
+        ball("Poleyn wing", 0.12, (x + s * 0.14, -0.06, 1.8), "chrome", scale=(0.35, 1, 1), seg=8, rings=5)
+        lathe("Cuisse", [(0.001, 1.86), (0.17, 1.86), (0.2, 2.15), (0.23, 2.55), (0.24, 2.8), (0.001, 2.8)], (x, 0, 0), "chrome",
+              seg=12, scale=(1, 0.95))
+        box("Tasset", (0.44, 0.06, 0.3), (s * 0.3, -0.43, 2.62), "chrome", r=0.025, seg=1, rot=euler(rx=0.15))
+        box("Tasset", (0.4, 0.06, 0.26), (s * 0.31, -0.46, 2.38), "chrome", r=0.025, seg=1, rot=euler(rx=0.2))
+    lathe("Fauld", [(0.001, 2.74), (0.56, 2.74), (0.6, 2.8), (0.555, 2.85), (0.555, 2.89), (0.585, 2.95), (0.535, 2.99), (0.535, 3.03),
+                    (0.555, 3.09), (0.5, 3.14), (0.001, 3.14)], (0, 0, 0), "chrome", seg=16, scale=(1, 0.72))
+    lathe("Breastplate", [(0.001, 3.1), (0.5, 3.1), (0.52, 3.3), (0.6, 3.7), (0.63, 4.0), (0.62, 4.3), (0.55, 4.6), (0.42, 4.8),
+                          (0.28, 4.9), (0.001, 4.9)], (0, 0, 0), "chrome", seg=18, scale=(1, 0.7))
+    sweep("Ridge", spline([(0, -0.357, 3.2), (0, -0.406, 3.6), (0, -0.441, 4.0), (0, -0.42, 4.4), (0, -0.336, 4.75)], 3), 0.018, "gilt", seg=5)
+    oval = Matrix.Diagonal((1, 0.72, 1, 1))
+    torus("Belt", 0.53, 0.035, (0, 0, 3.2), "leather", seg=18, ring_seg=4, rot=oval)
+    box("Buckle", (0.14, 0.03, 0.1), (0, -0.39, 3.2), "gilt", r=0.01, seg=1)
+    torus("Neck edge", 0.3, 0.02, (0, 0, 4.88), "gilt", seg=16, ring_seg=4, rot=Matrix.Diagonal((1, 0.75, 1, 1)))
+    lathe("Gorget", [(0.22, 4.85), (0.34, 4.86), (0.33, 4.93), (0.29, 4.95), (0.3, 5.0), (0.26, 5.08), (0.22, 5.1)], (0, 0, 0), "steel", seg=14)
+    for s in (-1, 1):
+        shoulder = euler(ry=s * 0.5)
+        lathe("Pauldron", [(0.001, 0.3), (0.16, 0.28), (0.27, 0.2), (0.34, 0.08), (0.36, -0.02), (0.33, -0.03), (0.345, -0.12),
+                           (0.31, -0.13), (0.32, -0.22), (0.27, -0.23), (0.25, -0.1), (0.001, 0.0)], (s * 0.62, 0, 4.66), "chrome",
+              seg=14, scale=(1, 1.05), rot=shoulder)
+        torus("Pauldron edge", 0.3, 0.018, (s * 0.62, 0, 4.66), "gilt", seg=14, ring_seg=4,
+              rot=shoulder @ Matrix.Translation((0, 0, -0.222)) @ Matrix.Diagonal((1, 1.05, 1, 1)))
+        shoulder_pt, elbow, wrist = Vector((s * 0.84, 0.0, 4.4)), Vector((s * 0.9, -0.1, 3.75)), Vector((s * 0.22, -0.55, 3.5))
+        sweep("Rerebrace", [tuple(shoulder_pt), tuple(elbow)], 0.14, "chrome", seg=10, r1=0.12)
+        ball("Couter", 0.15, tuple(elbow), "chrome", seg=10, rings=6)
+        ball("Couter wing", 0.12, (s * 1.02, -0.12, 3.75), "chrome", scale=(0.3, 1, 1), seg=8, rings=5)
+        sweep("Vambrace", spline([tuple(elbow), (s * 0.6, -0.42, 3.6), tuple(wrist)], 2), 0.12, "chrome", seg=10, r1=0.085)
+        sweep("Cuff", [tuple(wrist), tuple(wrist + (elbow - wrist) * 0.2)], 0.09, "steel", seg=10, r1=0.135)
+        ball("Gauntlet", 0.11, (s * 0.11, -0.62, 3.55), "steel", scale=(1.1, 1.0, 0.85), seg=10, rings=6)
+    ball("Pommel", 0.075, (0, -0.62, 3.75), "gilt", scale=(1, 0.6, 1), seg=10, rings=6)
+    cyl("Grip", 0.04, 0.45, (0, -0.62, 3.47), "leather", seg=8, edge=0)
+    sweep("Guard", spline([(-0.38, -0.62, 3.12), (-0.3, -0.62, 3.2), (0, -0.62, 3.22), (0.3, -0.62, 3.2), (0.38, -0.62, 3.12)], 2),
+          0.03, "gilt", seg=5)
+    lathe("Blade", [(0.001, 0.36), (0.07, 0.62), (0.085, 1.4), (0.09, 3.16), (0.001, 3.18)], (0, -0.62, 0), "chrome", seg=4, scale=(1, 0.22))
+    lathe("Helm", [(0.001, 5.1), (0.25, 5.1), (0.3, 5.25), (0.32, 5.5), (0.3, 5.72), (0.22, 5.9), (0.1, 5.98), (0.001, 6.0)],
+          (0, 0.03, 0), "chrome", seg=16)
+    sweep("Visor", [(0, -0.12, 5.56), (0, -0.33, 5.52), (0, -0.5, 5.47)], [0.25, 0.17, 0.04], "chrome", seg=12, scale=(1.0, 1.15))
+    for s in (-1, 1):
+        box("Eye slit", (0.15, 0.03, 0.022), (s * 0.1, -0.235, 5.73), "black", r=0, rot=euler(rx=-0.55, ry=s * 0.25))
+        for k in range(3):
+            ball("Breath", 0.014, (s * 0.07, -0.36 - k * 0.04, 5.41 + k * 0.005), "black", seg=6, rings=4)
+    sweep("Crest", spline([(0, -0.2, 5.88), (0, -0.05, 5.99), (0, 0.15, 5.97), (0, 0.3, 5.85)], 3), 0.022, "gilt", seg=5)
+    for dx, top in ((0.0, 6.5), (-0.1, 6.36), (0.1, 6.36)):
+        path = spline([(dx * 0.3, 0.08, 5.96), (dx * 0.8, 0.22, 6.25), (dx * 1.3, 0.42, top - 0.05), (dx * 1.6, 0.6, top), (dx * 1.8, 0.72, top - 0.12)], 2)
+        radii = [0.035 + 0.11 * math.sin(math.pi * min(0.95, 0.08 + i / (len(path) - 1))) * (1 if dx == 0 else 0.75) for i in range(len(path))]
+        sweep("Plume", path, radii, "velvet", seg=8, scale=(0.75, 1.0))
+    right = [(0, 0.01), (0.18, 0.13), (0.33, 0.36), (0.42, 0.66), (0.45, 0.96), (0.45, 1.21)]
+    shield = right + [(-x, z) for x, z in reversed(right[1:])]
+    lean = Matrix.Translation((0.62, -0.855, 0.0)) @ euler(rz=-0.2) @ euler(rx=-0.2)
+    prism("Shield", shield, -0.04, 0.04, "velvet", r=0.015, rot=lean)
+    prism("Chevron", [(-0.33, 0.58), (0, 0.92), (0.33, 0.58), (0.33, 0.45), (0, 0.79), (-0.33, 0.45)], -0.048, -0.038, "gilt", r=0, rot=lean)
+    sweep("Shield edge", [tuple(lean @ Vector((x * 0.9, -0.045, 0.62 + (z - 0.62) * 0.92))) for x, z in shield], 0.022, "gilt", seg=5, closed=True)
+
+
 BUILD = {
     "sofa": sofa, "armchair": lambda W, H, D: sofa(W, H, D, True), "tv": tv, "coffee_table": coffee_table,
     "floor_lamp": floor_lamp, "bookshelf": bookshelf, "painting": painting, "plant": plant, "piano": piano,
@@ -791,6 +1607,9 @@ BUILD = {
     "kids_bed": lambda W, H, D: bed(W, H, D, True), "rocking_horse": rocking_horse, "toy_box": toy_box, "desk": desk,
     "guitar": guitar, "washing_machine": washing_machine, "laundry_basket": laundry_basket, "coat_rack": coat_rack,
     "shoe_cabinet": shoe_cabinet, "bicycle": bicycle, "toolbox": toolbox, "lawn_mower": lawn_mower, "box": moving_box,
+    "bowling_trophy": bowling_trophy, "vintage_radio": vintage_radio, "old_globe": old_globe, "stag_head": stag_head,
+    "gold_record": gold_record, "ship_bottle": ship_bottle, "jewellery_box": jewellery_box, "antique_vase": antique_vase,
+    "arcade_cabinet": arcade_cabinet, "jukebox": jukebox, "oil_painting": oil_painting, "knight_armour": knight_armour,
 }
 
 
@@ -1036,7 +1855,9 @@ def studio():
     me.materials.append(floor)
     o = bpy.data.objects.new("Floor", me)
     col.objects.link(o)
-    o.location = (CELL * (COLUMNS - 1) / 2, -CELL * 2.5, -0.001)
+    rows = -(-len(ITEMS) // COLUMNS)
+    o.location = (CELL * (COLUMNS - 1) / 2, -CELL * (rows - 1) / 2, -0.001)
+    o.scale = (1.0, rows / 5, 1.0)
     sun = bpy.data.objects.new("Studio sun", bpy.data.lights.new("Studio sun", "SUN"))
     col.objects.link(sun)
     sun.data.energy, sun.data.angle = 3.0, math.radians(8)
@@ -1056,7 +1877,7 @@ def studio():
         scene.view_settings.look = "AgX - Medium High Contrast"
     except TypeError:
         pass
-    aim(cam, Vector((CELL * 2.5, -CELL * 2.5, 2)), Vector((-1, -1.4, 1.0)), 70)
+    aim(cam, Vector((CELL * 2.5, -CELL * (rows - 1) / 2, 2)), Vector((-1, -1.4, 1.0)), 70 * rows / 6)
     return cam
 
 
@@ -1069,7 +1890,27 @@ def aim(cam, target, direction, distance, ortho=None):
         cam.data.type, cam.data.lens = "PERSP", 35
 
 
-def render_all(folder, samples=48):
+def showcase_lights():
+    """A soft key light from the front left and a rim light from behind (each piece's own, moved with the camera), so
+    gold, chrome and glass catch highlights; not seen by the camera."""
+    lights = []
+    for name, energy, size in (("Key light", 1.0, 1.0), ("Rim light", 0.7, 0.6)):
+        o = bpy.data.objects.get(name)
+        if not o:
+            o = bpy.data.objects.new(name, bpy.data.lights.new(name, "AREA"))
+            bpy.data.collections["Furniture"].objects.link(o)
+            o.data.color = (1.0, 0.98, 0.95) if name == "Key light" else (0.9, 0.95, 1.0)
+            for ray in ("visible_camera", "visible_transmission"):  # (not seen, nor through glass)
+                try:
+                    setattr(o, ray, False)
+                except AttributeError:
+                    pass
+        lights.append((o, energy, size))
+    return lights
+
+
+def render_all(folder, samples=48, only=None):
+    """Renders every piece (`only`: just these ids, and no living room) as item-NN-<id>.png, then the living room."""
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.samples, scene.cycles.use_denoising = samples, True
@@ -1077,19 +1918,33 @@ def render_all(folder, samples=48):
     cam = scene.camera
     cats = bpy.data.collections["Furniture"].children
     room = bpy.data.collections.get("Room")
+    lights = showcase_lights()
     # The catalogue: one piece at a time, the others hidden.
     scene.render.resolution_x, scene.render.resolution_y = 520, 520
     if room:
         room.hide_render = True
     for i, (fid, name, w, h, d) in enumerate(ITEMS):
+        if only and fid not in only:
+            continue
         for c in cats:
             c.hide_render = c.name != "F_" + fid
         size = max(w, h, d)
-        aim(cam, cell(i) + Vector((0, 0, h / 2)), Vector((-0.75, -1.25, 0.7)), 40, ortho=size * 1.45)
+        target = cell(i) + Vector((0, 0, h / 2))
+        aim(cam, target, Vector((-0.75, -1.25, 0.7)), 40, ortho=size * 1.45)
+        for (lamp, energy, scale), way in zip(lights, (Vector((-1.3, -1.2, 1.6)), Vector((1.4, 1.6, 1.2)))):
+            lamp.location = target + way.normalized() * size * 2.2
+            lamp.rotation_euler = (target - lamp.location).to_track_quat("-Z", "Y").to_euler()
+            lamp.data.size = size * 1.2 * scale
+            lamp.data.energy = 28 * energy * size * size
+            lamp.hide_render = False
         scene.render.filepath = os.path.join(folder, f"item-{i:02d}-{fid}.png")
         bpy.ops.render.render(write_still=True)
+    for lamp, *_ in lights:
+        lamp.hide_render = True
     for c in cats:
         c.hide_render = False
+    if only:
+        return
     # The furnished living room.
     if room:
         room.hide_render = False
@@ -1221,7 +2076,10 @@ def main():
     if arg("--save"):
         bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(arg("--save")))
     if arg("--render"):
-        render_all(arg("--render"), int(arg("--samples") or 48))
+        only = set(arg("--only").split(",")) if arg("--only") else None
+        if only and "collectibles" in only:  # (--only collectibles: the 12 for collectibles-preview.png)
+            only |= set(COLLECTIBLES)
+        render_all(arg("--render"), int(arg("--samples") or 48), only)
     folder = arg("--export") or (EXPORT and os.path.join(os.path.dirname(bpy.data.filepath) or os.path.expanduser("~"), "roblox"))
     if folder:
         manifest = export_game(folder)
