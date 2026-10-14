@@ -13,6 +13,8 @@
 --     a tenth under $10, "+$0.4/min")
 --   * the chip "📦 N in stock" (the pieces not on show): a tap, or the key Config.SandboxHud.StockKey (B), opens the
 --     STOCK list (client/WarehouseUi.luau; the key again closes it)
+--   * 8.2: the chip "📖 BOOK" beside it (when client/CollectionBookUi.luau is there): a tap opens and closes the
+--     collection book (its own key, Config.CollectionBook.Key: K, is the book's; shown on the chip on a computer)
 --   * toasts: a piece sold ("Sold Grandpa's Clock · +$420", client/WarehouseUi.luau's "sold") and pieces brought home
 --     ("+5 pieces in your warehouse", when a state's stock grew): Hud.toast; without client/Hud.luau a column of its own
 --     at the top left with its own toasts in the same look
@@ -131,7 +133,22 @@ local function arrange()
 	chip.Size = UDim2.fromOffset(chipW, chipH)
 	chip.Position = UDim2.fromOffset(0, cardH + GAP)
 	parts.chipCorner.CornerRadius = UDim.new(0, math.floor(chipH / 2))
-	local blockW, blockH = math.max(cardW, chipW), cardH + GAP + chipH
+	-- 8.2: the "📖 BOOK" chip beside it, as tall (its key on a computer)
+	local rowW = chipW
+	local book = parts.book
+	if book then
+		parts.bookKey.Visible = not touch
+		local bookW = CardKit.width(book.Text, HUD.ChipText, Theme.HeadingFont) + 24 + (if touch then 0 else 28)
+		if touch then
+			bookW = math.max(bookW, math.ceil(Ui.MinTouch / scale))
+		end
+		bookW = math.ceil(bookW)
+		book.Size = UDim2.fromOffset(bookW, chipH)
+		book.Position = UDim2.fromOffset(chipW + GAP, cardH + GAP)
+		parts.bookCorner.CornerRadius = UDim.new(0, math.floor(chipH / 2))
+		rowW = chipW + GAP + bookW
+	end
+	local blockW, blockH = math.max(cardW, rowW), cardH + GAP + chipH
 	block.Size = UDim2.fromOffset(blockW, blockH)
 	block.Position = UDim2.fromOffset(math.floor(x + 0.5), math.floor(y + 0.5))
 	if parts.spacer then
@@ -258,6 +275,53 @@ local function holder(): any
 	return gui
 end
 
+-- A chip under the money's card (the stock's, 8.2: the book's): a pill with its key in a small outline at its right
+-- (shown on a computer), raised under the mouse. → the chip, its corner, its key's label.
+local function chipButton(block: any, name: string, key: string): (any, any, any)
+	local chip = Ui.make("TextButton", {
+		Name = name,
+		BackgroundColor3 = K.row,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		Font = Theme.HeadingFont,
+		TextSize = HUD.ChipText,
+		TextColor3 = K.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, block)
+	local corner = Ui.make("UICorner", { CornerRadius = UDim.new(0, 16) }, chip)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, chip)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12) }, chip)
+	local keyLabel = Ui.label(chip, key, UDim2.fromOffset(20, 20), {
+		Name = "Key",
+		Position = UDim2.new(1, -8, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Font = Theme.HeadingFont,
+		TextSize = 11,
+		TextColor3 = K.secondary,
+		TextWrapped = false,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	})
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.4 }, keyLabel)
+	Ui.corner(keyLabel, 4)
+	chip.MouseEnter:Connect(function()
+		chip.BackgroundColor3 = K.raised
+	end)
+	chip.MouseLeave:Connect(function()
+		chip.BackgroundColor3 = K.row
+	end)
+	return chip, corner, keyLabel
+end
+
+-- 8.2: the collection book (client/CollectionBookUi.luau), nil while it is not in this build.
+local function bookUi(): any
+	local ok, found = pcall(function(): any
+		return require(script.Parent.CollectionBookUi)
+	end)
+	return if ok and type(found) == "table" and type(found.toggle) == "function" then found else nil
+end
+
 local function build(parent: any)
 	local block = Ui.make("Frame", { Name = "MoneyBlock", Size = UDim2.fromOffset(200, 90), Position = UDim2.fromOffset(16, 14), BackgroundTransparency = 1 }, parent)
 	parts.block = block
@@ -284,44 +348,25 @@ local function build(parent: any)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Visible = false,
 	})
-	local chip = Ui.make("TextButton", {
-		Name = "StockChip",
-		BackgroundColor3 = K.row,
-		BackgroundTransparency = 0.1,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		Font = Theme.HeadingFont,
-		TextSize = HUD.ChipText,
-		TextColor3 = K.text,
-		TextXAlignment = Enum.TextXAlignment.Left,
-	}, block)
-	parts.chipCorner = Ui.make("UICorner", { CornerRadius = UDim.new(0, 16) }, chip)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, chip)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12) }, chip)
-	parts.key = Ui.label(chip, HUD.StockKey, UDim2.fromOffset(20, 20), {
-		Name = "Key",
-		Position = UDim2.new(1, -8, 0.5, 0),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Font = Theme.HeadingFont,
-		TextSize = 11,
-		TextColor3 = K.secondary,
-		TextWrapped = false,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.4 }, parts.key)
-	Ui.corner(parts.key, 4)
-	chip.MouseEnter:Connect(function()
-		chip.BackgroundColor3 = K.raised
-	end)
-	chip.MouseLeave:Connect(function()
-		chip.BackgroundColor3 = K.row
-	end)
+	local chip, chipCorner, key = chipButton(block, "StockChip", HUD.StockKey)
+	parts.chipCorner, parts.key = chipCorner, key
 	chip.Activated:Connect(function()
 		CardKit.click()
 		WarehouseUi.openStock()
 	end)
 	parts.chip = chip
+	-- 8.2: the 📖 BOOK chip beside it (the collection book), when the book is in this build
+	local book = bookUi()
+	if book then
+		local bookChip, bookCorner, bookKey = chipButton(block, "BookChip", Config.CollectionBook.Key)
+		bookChip.Text = "📖 BOOK"
+		parts.bookCorner, parts.bookKey, parts.bookUi = bookCorner, bookKey, book
+		bookChip.Activated:Connect(function()
+			CardKit.click()
+			book.toggle()
+		end)
+		parts.book = bookChip
+	end
 end
 
 -- ── Updates ─────────────────────────────────────────────────────────────────
@@ -391,6 +436,9 @@ function SandboxHud.start()
 	stockKey = if ok then key else nil
 	build(holder())
 	WarehouseUi.notify = SandboxHud.toast
+	if parts.bookUi then
+		parts.bookUi.notify = SandboxHud.toast -- (8.2: the collection book's toasts)
+	end
 	WarehouseUi.onState(onState)
 	WarehouseUi.start()
 	task.spawn(watchLeaderstats)

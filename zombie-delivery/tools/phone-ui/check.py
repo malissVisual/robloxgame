@@ -20,6 +20,9 @@ sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stoc
 740 x 360, 1024 x 768 and 1280 x 800: the widget and the GRIP button clear of everything, one press, the outcomes.
 8.1 SANDBOX: the UPGRADES desk's window (the real UpgradeUi: upgrades.luau on sandbox_mock.luau) on the same screens:
 the cards, BUY's request, NEED without the money, MAX, the money from the State, closing, a phone's finger sizes.
+8.2 SANDBOX: the collection book (the real CollectionBookUi and SandboxHud's 📖 BOOK chip: collectionbook.luau on
+sandbox_mock.luau) on the same screens: the chip, the progress and the milestones, the tabs, found and unknown cards,
+the 3D pictures capped (the silhouettes tinted), the toasts, K, closing, a phone's finger sizes.
 """
 import argparse
 from pathlib import Path
@@ -251,3 +254,9 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "upgrades.luau"], cwd=folder, check=True)
+# 8.2 SANDBOX: the collection book (client/CollectionBookUi.luau, shared/CollectionBookRules.luau) and its 📖 BOOK chip
+# in client/SandboxHud.luau, in the same folder: tools/phone-ui/collectionbook.luau on a phone (844 x 390, 667 x 375),
+# a tablet (1024 x 768), a computer (1280 x 800) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "collectionbook.luau"], cwd=folder, check=True)

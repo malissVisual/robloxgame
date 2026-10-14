@@ -5608,6 +5608,7 @@ Config.Robust = {
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
+		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
 	},
 }
 
@@ -7077,6 +7078,57 @@ Config.SandboxUpgrades = {
 	} :: { [string]: SandboxUpgradeDef },
 	Flag = "sandboxUpgradesKept",
 	Danny = "DannyTraining",
+}
+
+-- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out
+-- there). Every piece of the sandbox house's catalogue (shared/FurnitureLooks.luau Order without Walt's farm pieces: the
+-- ordinary furniture and the collectibles) is unknown (a dark silhouette, "???") until a move brings one home
+-- (Collection.add), then found: its name, its rarity's colour, how many came home, the best condition, its value.
+-- shared/CollectionBookRules.luau has the rules (tests/collectionbook_test.luau), server/CollectionBook.luau keeps the
+-- save (profile.collectionBook) and pays the milestones (tests/collectionbook_runtime_test.luau), client/CollectionBookUi.luau
+-- is the book (the HUD's 📖 BOOK chip, the key).
+--   Milestones   in the book's order: id, name, kind ("found": `need` pieces found; "furniture": every ordinary piece;
+--                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
+--                by the server, "BookMilestone")
+--   Key          the key that opens and closes the book (a computer)
+--   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
+--                save fills the book from its stock, and its milestones pay on the first join)
+--   MaxCount     the most "brought home" a piece counts
+--   Window       the book's card: Width × Height at most, Margin / TouchMargin from the screen's edges, Side its left
+--                column (the progress and the milestones; SideTouch on a touch screen), Tile / TileTouch a card's
+--                narrowest, Picture / PictureTouch the picture's height over a card's width, Gap between the cards
+--   MaxViews     3D pictures (ViewportFrames) alive at once: only the cards on screen get one (a found piece in its
+--                colours, an unknown one as a dark silhouette), the others show the emoji or "?"
+--   MaxModels    the pieces' models kept built for the pictures (the oldest go)
+--   Silhouette   an unknown piece's colour (RGB): its 3D picture tinted to it
+export type BookMilestone = { id: string, name: string, kind: string, need: number?, reward: number }
+Config.CollectionBook = {
+	Milestones = {
+		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
+		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
+		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
+		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
+		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
+	} :: { BookMilestone },
+	Key = "K",
+	Flag = "collectionBookKept",
+	MaxCount = 1_000_000,
+	Window = {
+		Width = 980,
+		Height = 640,
+		Margin = 16,
+		TouchMargin = 8,
+		Side = 220,
+		SideTouch = 196,
+		Tile = 120,
+		TileTouch = 128,
+		Picture = 0.62,
+		PictureTouch = 0.5,
+		Gap = 8,
+	},
+	MaxViews = 16,
+	MaxModels = 32,
+	Silhouette = { 14, 15, 18 } :: { number },
 }
 
 return Config

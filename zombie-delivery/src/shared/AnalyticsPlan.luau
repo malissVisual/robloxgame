@@ -231,6 +231,7 @@ AnalyticsPlan.Sources = {
 	MovePay = "Gameplay", -- 7.0: a house move's pay (the owner's and each crew mate's share: server/Moving.luau)
 	CollectionIncome = "Gameplay", -- 8.0: the warehouse's display stands earn every minute you play (server/Collection.luau)
 	CollectionSale = "Sale", -- 8.0: a piece of your collection sold (server/Collection.luau; the item SKU its furniture id)
+	BookMilestone = "Gameplay", -- 8.2: a collection book milestone, paid once (server/CollectionBook.luau; the SKU its id)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
 	BagRefund = "Refund", -- 6.23: an old save's bags, owned for good before, paid back once (bags are bought each game now)

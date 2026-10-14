@@ -219,6 +219,23 @@ mark = click(owner, "upmax")
 check("8.1: an Upgrades that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
 E.Upgrades.admin = admin
 
+-- ── 8.2: the collection book (CollectionBook.admin) ─────────────────────────
+
+table.clear(E.books)
+mark = click(owner, "bookfill")
+check("8.2: 📖 FILL BOOK: CollectionBook.admin fill for the target, its answer said", #E.books == 1 and E.books[1].what == "fill" and E.books[1].player == owner and string.find(E.said(owner, mark), "full", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "bookclear", guest.UserId)
+check("8.2: 📖 CLEAR BOOK aimed at the guest: theirs emptied", #E.books == 2 and E.books[2].what == "clear" and E.books[2].player == guest and string.find(E.said(guest, mark), "empty", 1, true) ~= nil, E.said(guest, mark))
+local bookAdmin = E.CollectionBook.admin
+E.CollectionBook.admin = function()
+	error("the book is mid-change")
+end
+mark = click(owner, "bookfill")
+check("8.2: a CollectionBook that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
+E.CollectionBook.admin = bookAdmin
+click(guest, "bookfill")
+check("8.2: a non-admin's FILL BOOK does nothing", #E.books == 2)
+
 -- ── Travel and the van ───────────────────────────────────────────────────────
 
 local plot = SandboxMap.Plots[1]

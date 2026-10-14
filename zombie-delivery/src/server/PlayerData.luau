@@ -53,6 +53,10 @@
 -- short keys: Economy.vanMigrated reads either), and so are the chapters done (its story keeps only "intro").
 -- 8.0 SANDBOX: the collection (collection: the pieces the moves brought home, shared/CollectionRules.luau; kept by
 -- server/Collection.luau), read only from a real save written with its flag (collectionKept); older saves: empty.
+-- 8.2 SANDBOX: the collection book (collectionBook: { [item]: { n, best } } the pieces ever brought home,
+-- collectionBookPaid: { [milestone id]: true } its milestones paid; shared/CollectionBookRules.luau, kept by
+-- server/CollectionBook.luau), read only from a real save written with its flag (collectionBookKept); an older real save
+-- fills the book from its stock (its milestones pay on joining); a new player: empty.
 -- 8.1 SANDBOX: the upgrades bought at the warehouse's UPGRADES desk (sandboxUpgrades: { [id]: level },
 -- shared/UpgradeRules.luau; server/Upgrades.luau sells them), read only from a real save written with its flag
 -- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.)
@@ -79,6 +83,7 @@ local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funn
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
 local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
+local CollectionBookRules = require(Shared.CollectionBookRules) -- 8.2: the collection book (profile.collectionBook)
 local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
 
 export type Profile = {
@@ -149,6 +154,11 @@ export type Profile = {
 	-- 8.0 SANDBOX: the pieces the moves brought home (shared/CollectionRules.luau; server/Collection.luau keeps it): read
 	-- only from a real save written with its flag (CollectionRules.fromSave); an older one starts with the empty one
 	collection: CollectionRules.Saved,
+	-- 8.2 SANDBOX: the collection book (shared/CollectionBookRules.luau; server/CollectionBook.luau keeps it): every piece
+	-- ever brought home ({ n, best }) and the milestones paid; read only from a real save written with its flag
+	-- (CollectionBookRules.fromSave); an older real save's is its stock's
+	collectionBook: CollectionBookRules.Book,
+	collectionBookPaid: CollectionBookRules.Paid,
 	-- 8.1 SANDBOX: the upgrades bought ({ [id]: level }, shared/UpgradeRules.luau; server/Upgrades.luau): read only from a
 	-- real save written with its flag (UpgradeRules.fromSave); an older one has none
 	sandboxUpgrades: UpgradeRules.Levels,
@@ -250,6 +260,8 @@ local function newProfile(): Profile
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		story = {}, -- 7.0: no story card seen yet
 		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
+		collectionBook = CollectionBookRules.empty(), -- 8.2: nothing found yet
+		collectionBookPaid = {}, -- 8.2: no milestone paid yet
 		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
 		deliveries = 0,
 		kills = 0,
@@ -560,6 +572,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); a save from before
 	-- 8.0 (or a lock-only record of a new player) starts with the empty one (CollectionRules.fromSave)
 	profile.collection = CollectionRules.fromSave(saved)
+	-- 8.2: the collection book, checked, only from a real save: written with its flag (collectionBookKept) its own; an
+	-- older real save the book of its stock (just read above), no milestone paid yet (CollectionBookRules.fromSave)
+	profile.collectionBook, profile.collectionBookPaid = CollectionBookRules.fromSave(saved, profile.collection)
 	-- 8.1: the sandbox's upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); a save
 	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave)
 	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
@@ -960,6 +975,9 @@ function PlayerData.save(player: Player, final: boolean?)
 		story = profile.story, -- 7.0
 		collection = profile.collection, -- 8.0
 		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
+		collectionBook = profile.collectionBook, -- 8.2
+		collectionBookPaid = profile.collectionBookPaid, -- 8.2
+		collectionBookKept = true, -- 8.2: CollectionBookRules.Flag (applySaved reads the book only with it)
 		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
 		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
 		deliveries = profile.deliveries,
