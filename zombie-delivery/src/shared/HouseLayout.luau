@@ -451,6 +451,19 @@ local COLLECTIBLES: { Entry } = {
 	{ item = "jukebox", how = "wall" },
 	{ item = "oil_painting", how = "wall" },
 	{ item = "knight_armour", how = "corner" },
+	-- 8.3: twelve more (the same Count a house: a bigger pool to draw from)
+	{ item = "antique_typewriter", how = "wall" },
+	{ item = "vintage_camera", how = "corner" },
+	{ item = "carved_bear", how = "corner" },
+	{ item = "gramophone", how = "wall" },
+	{ item = "pocket_watch", how = "beside", ref = "nightstand" },
+	{ item = "golden_horseshoe", how = "wall" },
+	{ item = "crystal_chandelier", how = "corner" },
+	{ item = "alphorn", how = "wall" },
+	{ item = "signed_guitar", how = "corner" },
+	{ item = "ski_trophy", how = "wall" },
+	{ item = "trex_skull", how = "wall" },
+	{ item = "zombie_safe", how = "corner" },
 }
 HouseLayout.Collectibles = COLLECTIBLES
 -- the rooms in the order they are furnished (and their spots numbered)

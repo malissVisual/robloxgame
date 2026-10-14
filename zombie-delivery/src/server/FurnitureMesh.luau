@@ -16,7 +16,8 @@
 -- item's box, mark_o / mark_x / mark_y / mark_z the origin and 10 studs to the right, up and back (the game's axes: the
 -- front of a piece is -Z). The finish is the look below; fabric, fabric2, wood, wood2, paint, accent and appliance take
 -- the piece's variant colour (FurnitureLooks.Palettes, the builders' own lists), and so do 8.1's gilt, velvet, lacquer,
--- neon and fur (the 12 collectibles, FurnitureLooks.Collectibles, are in the import since 8.1).
+-- neon and fur (the 12 collectibles, FurnitureLooks.Collectibles, are in the import since 8.1; 8.3: 24, the T. rex skull's
+-- fossil bone their one new finish).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
@@ -89,6 +90,8 @@ local LOOKS: { [string]: Look } = {
 	peach = { color = hex("F2B48C"), material = M.SmoothPlastic },
 	rock = { color = hex("8A8DAE"), material = M.SmoothPlastic },
 	slate = { color = hex("5E6682"), material = M.SmoothPlastic },
+	-- 8.3: the T. rex skull's fossil bone (a stone's grain)
+	fossil = { color = hex("B49A72"), material = M.Slate },
 }
 -- The finishes light passes through: they cast no shadow.
 local CLEAR: { [string]: boolean } = { glass = true, glow = true, crystal = true }

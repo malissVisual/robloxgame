@@ -8,7 +8,9 @@
 -- faces, its roof over the wedges). No import, a house not listed or of another size: the house as World builds it.
 -- 8.1 SANDBOX: the sandbox's one house wears it too (The Old Chalet: server/SandboxWorld.luau puts its chalet's parts
 -- in a Model "House_sandbox_house" on a box of the model's size, shared/SandboxMap.luau House, and hands it here; the
--- import is in ServerStorage from the server's first line, server/Main.server.luau, and dress loads it).
+-- import is in ServerStorage from the server's first line, server/Main.server.luau, and dress loads it). 8.2.1: the
+-- import is the owner's big house for it (house.py TARGET "sandbox", 44 × 14.5 × 34); Marge's is then another size and
+-- keeps its chalet (house.py TARGET "city" exports one for her).
 --
 --   HouseMesh.start()               at the server's start: finds the import and takes it out of the world
 --   HouseMesh.dress(model, homeId)  dresses one house (World's buildHouse, SandboxWorld's house); false: left as it was

@@ -211,6 +211,11 @@ mark = click(owner, "upmax")
 check("8.1: ⬆ MAX UPGRADES: Upgrades.admin max for the target, its answer said", #E.upgrades == 1 and E.upgrades[1].what == "max" and E.upgrades[1].player == owner and string.find(E.said(owner, mark), "at its top", 1, true) ~= nil, E.said(owner, mark))
 mark = click(owner, "upreset", guest.UserId)
 check("8.1: ↺ RESET UPGRADES aimed at the guest: theirs reset", #E.upgrades == 2 and E.upgrades[2].what == "reset" and E.upgrades[2].player == guest and string.find(E.said(guest, mark), "reset", 1, true) ~= nil, E.said(guest, mark))
+mark = click(owner, "level3", guest.UserId)
+check("8.3: 🏗 LV 3 aimed at the guest: Upgrades.admin level3 for them, its answer said", #E.upgrades == 3 and E.upgrades[3].what == "level3" and E.upgrades[3].player == guest
+	and string.find(E.said(guest, mark), "Level 3", 1, true) ~= nil, E.said(guest, mark))
+mark = click(owner, "level5")
+check("8.3: 🏗 LV 5: level5 for the owner", #E.upgrades == 4 and E.upgrades[4].what == "level5" and E.upgrades[4].player == owner)
 local admin = E.Upgrades.admin
 E.Upgrades.admin = function()
 	error("the upgrades are mid-change")

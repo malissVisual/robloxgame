@@ -1,18 +1,18 @@
-# Dům Marge v Blenderu a ve hře
+# Evropský dům místo chaty (Blender a hra)
 
-![Dům Marge](house-preview.png)
+![Evropský dům v sandboxu](house-preview.png)
 
-Dům na adrese **155 Willow Ln**, ze kterého se stěhuje v prvním stěhování (Marge's House), jako **klasický evropský
-rodinný dům**:
+Dům, ze kterého se stěhuje, jako **klasický evropský rodinný dům**. V testovacím světě (sandbox) nahradí starou alpskou
+chatu **The Old Chalet** (rodina Huberových na konci Main Street):
 - krémová omítka, šedý sokl, světlé rohové kvádry a bílé římsy mezi patry a pod střechou;
-- okna s bílým křížem, šambránami, kamennými parapety a záclonkami, v patře a na bocích truhlíky s červenými
-  muškáty;
-- dvoukřídlé zelené dveře v kamenném portálu se schodem a lucernou, která v noci svítí;
-- strmá sedlová střecha z pálených tašek (esovky) s vikýřem, hřebenáči a komínem, okapy a svody, dva keře u vchodu.
+- dvě patra oken s bílým křížem, šambránami, kamennými parapety a záclonkami;
+- truhlíky s červenými muškáty pod okny;
+- dvoukřídlé zelené dveře v kamenném portálu se schodem a lucernou;
+- sedlová střecha z pálených tašek (esovky) se třemi vikýři, hřebenáči a dvěma komíny, okapy a svody, keře u rohů.
 
-Dům má **přesně rozměry domu ve hře** (20,4 × 12,6 × 17,6 studu, střecha je vyšší). Kolize, dveře i cesta k autu
-zůstávají stejné, mění se jen vzhled. Na přední zdi hra při stěhování věší transparent MOVING DAY a staví krabice,
-srolovaný koberec a cedule. Okna, truhlíky i lucerna jsou proto rozmístěné tak, aby se s nimi nepotkaly.
+Dům má **přesně rozměry chaty ve hře** (44 × 14,5 × 34 studu) a střecha nepřesahuje výšku 26, jako chata. Kolize,
+dveře s nápisem *Enter house* i zahrada zůstávají stejné, mění se jen vzhled. Před dveřmi stojí vítající postava a
+zahradní truhlíky, okna i lucerna jsou rozmístěné tak, aby se s nimi nepotkaly.
 
 | Soubor | Co to je |
 | --- | --- |
@@ -39,7 +39,7 @@ V Outlineru je kolekce **House** a v ní všechny díly s českými jmény: `Zdi
 `Okno šambrána`, `Tašky`, `Hřebenáč`, `Vikýř`, `Komín`, `Svod` …
 
 Okna a dveře jsou do zdí **vyříznuté**: schovaná kolekce **House cutters** obsahuje kvádry, které modifikátor
-**Boolean** odečte ze zdí, soklu, štítů a vikýře.
+**Boolean** odečte ze zdí, soklu, štítů a vikýřů.
 
 Na čem se dá učit:
 1. Klikni na `Zdi` a otevři panel **Modifiers** (ikona klíče). Vypni Boolean ikonou monitoru a okna zmizí.
@@ -51,65 +51,60 @@ Na čem se dá učit:
    (`H plaster` = omítka, `H tile` = tašky, `H door` = dveře …) a změna přebarví všechno s tím povrchem.
 
 ## 3. Změň ho skriptem a postav znovu
-Nahoře klikni na záložku **Scripting** a v textovém editoru vyber `house.py` (nebo *Open* a soubor `house.py`). Nahoře
-je **NASTAVENÍ**:
+Nahoře klikni na záložku **Scripting** a v textovém editoru vyber `house.py`. Nahoře je **NASTAVENÍ**:
 
 ```python
-EXPORT = False   # True = uloží ZDCHouseArt.fbx pro hru do složky "roblox"
-W, H, D = 20.3572, 12.5980, 17.5669   # rozměry domu ve hře: neměň
-PITCH = 42        # sklon střechy (stupně)
-FINISHES = {
-    "plaster": ("#E8D3A2", 0.85, 0, 0),   # omítka: barva, drsnost, kov, záře
-    "tile": ("#B5502E", 0.7, 0, 0),       # tašky
-    "door": ("#2F5E45", 0.5, 0, 0),       # dveře
-    ...
+TARGET = "sandbox"   # "sandbox" = The Old Chalet v sandboxu, "city" = dům Marge ve městě
+TARGETS = {
+    "sandbox": {"box": (44.0, 14.5, 34.0), ..., "front": [-19.0, -13.0, -7.0, 7.0, 13.0, 19.0],
+                "dormers": [-13.0, 0.0, 13.0], "chimneys": [(-15.0, 6.0), (12.0, 6.0)], ...},
+    "city": {...},
+}
+FINISHES = {"plaster": ("#E8D3A2", 0.85, 0, 0), ...}   # barvy povrchů
 ```
 
-Změň, co chceš, třeba omítku na bílou `"#F2F0EA"` nebo dveře na modré `"#2E4A78"`, a zmáčkni **Run Script** (▶ nebo
-Alt + P). Starý dům se smaže a postaví se nový. Každá část domu má v skriptu svou funkci: `walls` (zdi, rohy, římsy),
-`fronts` (okna a dveře na každé straně), `window` (jedno okno), `door`, `roof` (střecha), `dormer` (vikýř),
-`chimney` (komín).
+- `front`, `back`, `side` = kde podél zdi jsou okna, `dormers` = vikýře, `chimneys` = komíny, `bushes` = keře;
+- `FINISHES` = barvy, třeba omítku na bílou `"#F2F0EA"` nebo dveře na modré `"#2E4A78"`;
+- `TARGET = "city"` postaví menší dům Marge pro město (pro dobu, kdy se sandbox vypne).
+
+Pak zmáčkni **Run Script** (▶ nebo Alt + P). Starý dům se smaže a postaví se nový.
 
 Pozor na dvě věci:
-- `W, H, D` neměň, jsou to rozměry domu ve hře. Kontrola ve hře by dům odmítla a zůstal by starý.
-- **Barvy ve hře** nastavuje tabulka `LOOKS` v `src/server/HouseMesh.luau`, ne Blender, protože Roblox si barvy ze
-  souboru nebere. Když změníš barvu v Blenderu a chceš ji i ve hře, řekni Claudovi.
+- `box` (rozměry) neměň: jsou to rozměry domu ve hře. Hra by dům odmítla a zůstala by chata. Když změníš výšku
+  střechy (`top`), změní se i její sklon: řekni Claudovi, musí ho přepsat i v `SandboxScenery.Chalet.Pitch`
+  (kontrola `check.py` to pozná).
+- **Barvy ve hře** nastavuje tabulka `LOOKS` v `src/server/HouseMesh.luau`, ne Blender (Roblox si barvy ze souboru
+  nebere). Když změníš barvu v Blenderu a chceš ji i ve hře, řekni Claudovi.
 
 ## 4. Dům ve hře
-Dům Marge na adrese 155 Willow Ln (nejbližší dům u depa v Suburbs) dostane vzhled z Blenderu, až model jednou nahraješ
-do Roblox Studia. Udělat to musíš ty: Roblox zobrazí 3D model jen tehdy, když je nahraný pod tvým účtem, a k tvému
-účtu se nepřihlásím. Do té doby má dům starý vzhled z kostiček.
+Chata dostane vzhled z Blenderu, až model jednou nahraješ do Roblox Studia. Udělat to musíš ty: Roblox zobrazí 3D
+model jen tehdy, když je nahraný pod tvým účtem, a k tvému účtu se nepřihlásím.
 
-**Od verze 8.1 i v testovacím světě (SANDBOX):** jediný dům k vystěhování, **The Old Chalet**, má teď přesně rozměry
-domu Marge, takže na něj stejný model sedí. Dveře, cesta od auta i místo „Enter house“ zůstaly, kde byly. Bez
-importu tam stojí dřevěná chata jako dřív, jen menší (na stejné krabici).
+**Máš už ve Studiu starý `ZDCHouseArt` (malý dům Marge z verze 8.1)?** Smaž ho (v Exploreru ho najdeš ve Workspace
+nebo v ServerStorage). Sandbox má teď zase velký dům, takže malý model by hra nepoužila.
 
 Jednou ve Studiu (s hrou otevřenou jako obvykle):
 1. *File → Import 3D* (nebo karta *Home → Import 3D*) a vyber `design/blender-house/roblox/ZDCHouseArt.fbx`.
-2. Nastavení nech, jak je, a dej **Insert / Import**. Ve Workspace se objeví model `ZDCHouseArt`. Může zůstat, kde
-   je (hra si ho při spuštění schová), nebo ho v Exploreru přetáhni do **ServerStorage**.
+2. Nastavení nech, jak je, a dej **Insert / Import**. V Exploreru přetáhni nový model `ZDCHouseArt` do
+   **ServerStorage**. Hra by si ho schovala i sama, ale takhle je to jistota.
 3. Ulož místo (*File → Save*) a *File → Publish to Roblox*, ať ho má i hra na Robloxu.
 
-Vyzkoušení: dej **Play**, zmáčkni **P** (admin panel) → záložka **EVENTS** → sjeď dolů na **Moves** → **MOVE: GO
-TO THE HOUSE**. Hra tě přenese přede dveře domu Marge. V sandboxu (výchozí nastavení): **P** → záložka **SANDBOX** →
-**📍 TO HOUSE**. Stojíš přede dveřmi The Old Chalet.
-
-Když dům v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + S) a spusť skript. Pak ve Studiu smaž starý
-`ZDCHouseArt` a naimportuj nový `roblox/ZDCHouseArt.fbx` (krok 1 až 3).
+Vyzkoušení: **Play**, dej **PLAY** a dojeď dodávkou po Main Street na jih až na konec, k domu za otočkou (nebo
+rovnou **P** → záložka **SANDBOX** → **📍 TO HOUSE**). Místo chaty tam stojí evropský dům. Dveře, *Enter house*,
+vítající postava i zahrada fungují jako dřív.
 
 ### Jak to funguje (pro zvědavé)
-- Dům je rozdělený podle povrchu: díl `house_plaster` je všechna omítka, `house_tile` a `house_tile2` tašky (každá
-  druhá řada je o kousek tmavší) a tak dál. Hra (`src/server/HouseMesh.luau`) dá každému dílu barvu a materiál.
-  Dvacet dílů má dohromady asi 46 000 trojúhelníků.
+- Dům je rozdělený podle povrchu (díl `house_plaster` je všechna omítka, `house_tile` a `house_tile2` tašky …).
+  Hra (`src/server/HouseMesh.luau`) dá každému dílu barvu a materiál. Dílů je 21, dohromady asi 65 000 trojúhelníků.
 - Malé kostičky `mark_o`, `mark_x`, `mark_y`, `mark_z` ukazují hře, jak Roblox model při importu otočil a zvětšil,
   `mark_box` velikost domu, pro který je model udělaný. Proto na nastavení importu nezáleží.
-- Původní dům z kostiček (`src/server/World.luau`) ve hře zůstává, jen je neviditelný. Pořád do něj narážíš, takže
-  kolize jsou stejné jako dřív. Zdi modelu stojí přesně na jeho stěnách a střecha ho celý přikryje.
-- Vzhled z Blenderu má dům Marge a v sandboxu The Old Chalet (`HouseMesh.Homes`). Ostatní domy v Suburbs mají jiné
-  rozměry. Kdybys chtěl takhle i další domy, řekni Claudovi.
-- V sandboxu má chata pod modelem i svou neviditelnou střechu otočenou podle střechy z Blenderu (hřeben zleva doprava,
-  sklon `PITCH`). Když v `house.py` změníš `PITCH`, řekni Claudovi: musí ho přepsat i v `SandboxScenery.Chalet.Pitch`
-  (kontrola `check.py` to pozná).
+- Chatu staví `src/server/SandboxWorld.luau` a hned ji oblékne do modelu z Blenderu. Původní chata zůstává
+  neviditelná: do jejích zdí pořád narážíš a její dveře drží *Enter house*. Její neviditelná střecha se otočí podle
+  střechy z Blenderu (hřeben zleva doprava, sklon 31°, `SandboxScenery.Chalet.Pitch`), takže netrčí skrz novou střechu.
+- Když se model nehodí (jiné rozměry, chybí značky, rozházené díly), hra ho nepoužije, napíše proč do Outputu a chata
+  zůstane, jak byla.
+- Dům Marge ve městě má jiné rozměry, takže tenhle model nosí jen chata v sandboxu. Pro město by se exportoval
+  `TARGET = "city"` (hra má jen jeden `ZDCHouseArt`).
 
 ## Bez Blenderu (pro AI pomocníky)
 `pip install bpy` (Python 3.13) a z této složky:
@@ -117,6 +112,10 @@ Když dům v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + 
 python house.py -- --save house.blend --export roblox --render /tmp/house-renders --samples 96
 ```
 Render udělá `house-34.png` (ze strany) a `house-front.png` (z ulice), náhled `house-preview.png` je z nich složený.
-Po změně modelu spusť z kořene repozitáře `python3 zombie-delivery/tools/house-art/check.py <luau>` (simuluje import do
-hry na domě postaveném jako ve `World.luau` a ověří, že díly sedí, zdi stojí na kolizích a nic nepřekáží věcem ze
-stěhování).
+
+Po změně modelu spusť z kořene repozitáře `python3 zombie-delivery/tools/house-art/check.py <luau>`. Podle
+`"target"` v manifestu simuluje import do hry na chatě postavené jako ve `SandboxWorld.luau`, nebo na domě Marge jako
+ve `World.luau`. Ověří, že:
+- díly sedí a zdi stojí na kolizích;
+- neviditelná střecha chaty je celá pod střechou z Blenderu;
+- nic nepřekáží zahradě, vítající postavě, dveřím ani věcem ze stěhování.

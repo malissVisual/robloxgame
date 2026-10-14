@@ -248,7 +248,7 @@ end
 -- ── The collection ─────────────────────────────────────────────────────────
 
 -- The Collection remote's { kind = "state", stock = { Entry }, stands = n }: the pieces in the stock (no stand) and on
--- show (a stand), the stands taken and the empty ones out of `total` (Config.Warehouse.Stands or the layout's count;
+-- show (a stand), the stands taken and the empty ones out of `total` (the warehouse level's, the layout's count;
 -- else the message's `stands` when it says more than are shown; nil: not known).
 function SandboxSteps.collection(msg: any, total: number?): Summary
 	local summary: Summary = { stock = 0, shown = 0, free = nil, taken = {} }
