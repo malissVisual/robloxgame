@@ -7216,4 +7216,43 @@ Config.SandboxTasks = {
 	} :: { SandboxTaskDef },
 }
 
+-- 8.2 SANDBOX, showing off (server/SandboxLeaders.luau; its rules shared/SandboxLeadersRules.luau, checked by
+-- tests/sandboxleaders_test.luau and tests/sandboxleaders_runtime_test.luau). Roblox's player list shows every player's
+-- money, income a minute and collection (the city's Level, Money and Deliveries columns go in the sandbox), and the
+-- TOP MOVERS board at the crossroads ranks the server's players by what their collection is worth.
+--   Every        s: a player's list columns are written at most this often (the changes in between wait for it)
+--   BoardEvery   s: the board's rows are written at most this often
+--   Rows         players on the board (the best ones)
+--   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
+--   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
+--                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
+--   Board        the signboard: Corner studs east of Main Street's east edge and south of Depot Row's south edge (the
+--                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
+--                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
+--                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
+--                ridge, Rise high; PixelsPerStud and Range (studs) of its SurfaceGuis (one on each face)
+--   AllTime      the best collection worth each player ever had, kept in the OrderedDataStore Store (key: the user
+--                id): read when they join, written (UpdateAsync, only ever up) at most every Every s a player, never
+--                from Studio unless Studio is true; every call in a pcall (no API access: the column shows this
+--                session's best). On = false: no store, no ALL-TIME column
+Config.SandboxLeaders = {
+	Every = 1,
+	BoardEvery = 2,
+	Rows = 5,
+	Legendary = "legendary",
+	Stats = { Money = "💰 $", Income = "📈 $/min", Collection = "⭐ Collection" },
+	Board = {
+		Corner = { 26, 24 } :: { number },
+		Yaw = 45,
+		Width = 20,
+		Height = 11.5,
+		Lift = 2.6,
+		Thick = 0.6,
+		Roof = { Over = 2, Run = 2.2, Rise = 1.7 },
+		PixelsPerStud = 40,
+		Range = 260,
+	},
+	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
+}
+
 return Config

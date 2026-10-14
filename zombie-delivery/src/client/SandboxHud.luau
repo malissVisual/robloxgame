@@ -403,11 +403,14 @@ local function onState(state: WarehouseUi.State, previous: WarehouseUi.State?)
 	arrange()
 end
 
--- The money until the first State: the player list's (leaderstats Money).
+-- The money until the first State: the player list's (leaderstats "💰 $", 8.2 server/SandboxLeaders.luau's column;
+-- the city's Money before it).
 local function watchLeaderstats()
 	local player = Players.LocalPlayer
 	local stats = player:WaitForChild("leaderstats", 30)
-	local value = if stats then stats:FindFirstChild("Money") else nil
+	local leaders = (Config :: any).SandboxLeaders
+	local name = if type(leaders) == "table" and type(leaders.Stats) == "table" and type(leaders.Stats.Money) == "string" then leaders.Stats.Money else "Money"
+	local value = if stats then stats:FindFirstChild(name) or stats:FindFirstChild("Money") else nil
 	if value and value:IsA("IntValue") then
 		local intValue = value :: IntValue
 		setMoney(intValue.Value)

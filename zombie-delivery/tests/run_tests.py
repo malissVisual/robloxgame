@@ -16,6 +16,7 @@ PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau
 PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/collectionbook_test.luau)
 PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
 PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
+PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -206,6 +207,18 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace(f"require(script.Parent.{module})", f'require("./SandboxTasksRuntime").{module}')
     assert "script.Parent" not in source, "server/SandboxTasks.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "SandboxTasksServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.2 SANDBOX, showing off: the real server/SandboxLeaders.luau as SandboxLeadersServer.luau for
+    # tests/sandboxleaders_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above) and
+    # tests/runtime/LeadersRuntime.luau's few additions (an OrderedDataStore, UDim2 / UDim / Vector2, a game giving it).
+    shutil.copy(os.path.join(HERE, "runtime", "LeadersRuntime.luau"), os.path.join(tmp, "LeadersRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxLeaders.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+    leaders_head = ('local L = require("./LeadersRuntime")\nlocal E, M = L.E, L.E.Mock\n'
+                    'local game, task, os, warn, workspace = L.game, E.task, E.os, E.warn, E.workspace\n'
+                    'local Instance, Vector3, Vector2, CFrame, Color3, Enum, UDim2, UDim = E.Instance, M.Vector3, M.Vector2, M.CFrame, M.Color3, M.Enum, L.UDim2, L.UDim\n')
+    open(os.path.join(tmp, "SandboxLeadersServer.luau"), "w", encoding="utf-8").write(leaders_head + source)
     # 8.0 sandbox, the map: the real server/SandboxWorld.luau as SandboxWorldServer.luau on the same mock for
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
