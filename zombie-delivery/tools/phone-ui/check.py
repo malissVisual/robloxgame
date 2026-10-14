@@ -36,6 +36,8 @@ only), the gamepad's selection on DECLINE and B, waiting under another window, t
 8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
 keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
 words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad.
+8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
+and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
 """
 import argparse
 from pathlib import Path
@@ -289,10 +291,16 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "sandboxpad.luau"], cwd=folder, check=True)
-# 8.3 Danny's orders: his command card (client/MoveHelperCard.luau) and his status line (client/MoveHelperHud.luau with
-# the card), beside the real SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/
-# dannycard.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder;
-# dannycard_preview.py draws the same scenes).
+# 8.3 SANDBOX: the PAINT shop's window (client/VanPaintUi.luau, shared/VanPaintRules.luau; its 3D picture recorded) in the
+# same folder: tools/phone-ui/vanpaint.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "vanpaint.luau"], cwd=folder, check=True)
+# 8.3 Danny for hire: his card (client/MoveHelperCard.luau: HIRE, CLEAR QUEUE, the clicks and taps on him and on the
+# pieces, the gamepad's prompts) and his status line (client/MoveHelperHud.luau with the card), beside the real
+# SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone
+# (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder; dannycard_preview.py draws
+# the same scenes).
 from dannycardenv import dannycard_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:

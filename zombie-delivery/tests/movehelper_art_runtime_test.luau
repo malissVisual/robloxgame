@@ -5,8 +5,9 @@
 -- each step, as the constraints hold him in Roblox), a carried piece goes where its carrier is (the test moves it).
 -- A solo move into Marge's real house: Ann lifts the real sofa, Danny takes the far end within 2 s; they carry it out
 -- of the living room through its doorway ("Watch the doorframe!"), out of the front door and across the yard to the van
--- without a drop, he opens the van's back for the two of them, Ann loads it; Danny carries a real two-hands piece (★ one
--- first) to the van at his slower walk; on HELP ME, Ann stopped just past a doorway: he stands beside it, not in it.
+-- without a drop, he opens the van's back for the two of them, Ann loads it (8.3: Danny hired first); Danny carries a real
+-- two-hands piece Ann gave him (a click: his list) to the van at his slower walk; a real two-person piece on his list:
+-- he waits at it for her, never in a doorway.
 -- 8.1 carrying in two: Ann's walk is the leader's client's (shared/PairCarry.luau steer, client/PairSteer.luau's: the
 -- heading turns PairTurn degrees a second at most, a way behind walked backwards, the pair's walk slower while it
 -- turns); through the real house Danny is never put at the far end (each of his steps within his top speed: the pair's
@@ -199,6 +200,15 @@ danny = MoveHelper.find(ann)
 local truck = E.cars[ann]
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 check("Danny comes with the van", danny ~= nil and danny.body ~= nil and distance(danny.body.root.Position, cargoDoor.WorldPosition) < 8)
+E.request(ann, "helper", "hire")
+check("8.3 Ann hires him for the move", danny.hirer == ann)
+-- 8.3 a click on a piece: Ann beside it (the server checks she could see it)
+local function give(model: any)
+	local was = E.rootOf(ann).Position
+	E.place(ann, model.PrimaryPart.Position + V3(3, 0, 0))
+	E.request(ann, "helper", "assign", model)
+	E.place(ann, was)
+end
 local plan = built[1].plan
 local origin = built[1].origin
 local frontDoor, livingDoor = nil, nil
@@ -293,44 +303,60 @@ run(0.3)
 check("…both pairs of hands free, his arms down, Ann's grip as before", Rules.holding(danny.s.move, danny.id) == nil and danny.body.model:GetAttribute("Carrying") == nil
 	and ann.Character:GetAttribute("GripSteady") == nil)
 
--- Danny carries a real two-hands piece --------------------------------------------------------------------------------------
+-- Danny carries a real two-hands piece Ann gives him (8.3: his list) --------------------------------------------------------
 
-E.place(ann, back + away * 30) -- (out of the way: nothing of his is "about to be lifted" by Ann)
-local own: any = nil
+local ownSpot: any = nil
+for _, sp in plan.spots do
+	local def = FurnitureLooks.Items[sp.item]
+	local thing = danny.s.move.things[sp.id]
+	if def and def.class == "both" and thing and thing.state == "home" and (ownSpot == nil or (sp.star and not ownSpot.star)) then
+		ownSpot = sp
+	end
+end
+check("the real house has a two-hands piece", ownSpot ~= nil)
+give(pieceOf(ownSpot.id))
+check("8.3 Ann gives it to him: his list", danny.queue[1] == ownSpot.id and #danny.queue == 1)
+E.place(ann, back + away * 30) -- (out of the way)
+local own = ownSpot.id
 local ownSpeed = 0
 local ownArms: any = nil
 local delivered = run(200, function()
 	local spot, role = Rules.holding(danny.s.move, danny.id)
-	if spot and role == "carrier" and danny.s.move.things[spot].class == "both" and danny.action == "deliver" then
-		own = own or spot
-		if spot == own then
-			ownSpeed = lastSpeed
-			ownArms = ownArms or { danny.body.model:GetAttribute("Carrying"), danny.body.model:GetAttribute("CarryHands") }
-		end
+	if spot == own and role == "carrier" and danny.action == "deliver" then
+		ownSpeed = lastSpeed
+		ownArms = ownArms or { danny.body.model:GetAttribute("Carrying"), danny.body.model:GetAttribute("CarryHands") }
 	end
-	return own ~= nil and danny.s.move.things[own].state == "truck"
+	return danny.s.move.things[own].state == "truck"
 end)
-local thing = if own then danny.s.move.things[own] else nil
-check("Danny carries a real two-hands piece to the van and loads it", delivered and thing ~= nil and thing.class == "both", thing and thing.item)
-check("…a ★ one first", thing ~= nil and thing.star, thing and thing.item)
-check("…at 0.7 × a player's two-hands walk, in both arms", thing ~= nil and math.abs(ownSpeed - Rules.carrySpeed(WALK, "both", thing.weight) * H.Speed) < 1e-6
+local thing = danny.s.move.things[own]
+check("Danny carries the real two-hands piece of his list to the van and loads it", delivered and thing.class == "both", thing.item)
+check("…at 0.7 × a player's two-hands walk, in both arms", math.abs(ownSpeed - Rules.carrySpeed(WALK, "both", thing.weight) * H.Speed) < 1e-6
 	and ownArms ~= nil and ownArms[1] == "furniture" and ownArms[2] == 2, ownSpeed)
 
--- HELP ME: Ann just past a doorway, he stands beside it, not in it ---------------------------------------------------------------
+-- 8.3 a real two-person piece of his list: he waits at it for Ann, never in a doorway ------------------------------------------
 
-E.request(ann, "helper", "help")
-E.place(ann, outside)
-trigger(promptIn(site, "Enter house"), ann)
--- 5 studs past the doorway into the living room, her back to it: his place behind her is the doorway itself
-local past = origin * (livingDoor.at + V3(-H.Follow, 3, 0))
-E.rootOf(ann).CFrame = M.CFrame.lookAt(past, past + V3(-1, 0, 0))
-run(12)
+local pairSpot: any = nil
+for _, sp in plan.spots do
+	local def = FurnitureLooks.Items[sp.item]
+	if not pairSpot and def and def.class == "pair" and danny.s.move.things[sp.id].state == "home" then
+		pairSpot = sp
+	end
+end
+check("the real house has another two-person piece", pairSpot ~= nil)
+give(pieceOf(pairSpot.id))
+local waiting = run(60, function()
+	return danny.needs == pairSpot.id and danny.needsAt > 0
+end)
 local at = danny.body.root.Position
-local rel = origin:PointToObjectSpace(at) - livingDoor.at
-local half = livingDoor.width / 2
-local inDoor = math.abs(rel.Z) <= half + H.Aside.Margin and math.abs(rel.X) <= H.Aside.Depth
-check("HELP ME: Ann stops just past a doorway, he stands beside it, out of the way", danny.action == "follow" and not inDoor
-	and distance(at, origin * livingDoor.at) < half + H.Aside.Step + 3, `{rel.X}, {rel.Z}`)
+local inDoor = false
+for _, d in plan.doors do
+	local rel = origin:PointToObjectSpace(at) - d.at
+	local along = if d.axis == "X" then math.abs(rel.X) else math.abs(rel.Z)
+	local through = if d.axis == "X" then math.abs(rel.Z) else math.abs(rel.X)
+	inDoor = inDoor or (along <= (d.width or 4) / 2 + H.Aside.Margin and through <= H.Aside.Depth)
+end
+check("8.3 he goes to it and waits at it for Ann (\"🙋 Danny needs you\"), out of every doorway", waiting and danny.action == "needs" and not inDoor
+	and pieceOf(pairSpot.id):GetAttribute("DannyNeeds") == true, `{at.X}, {at.Z}`)
 
 Moving.admin(ann, "end")
 run(0.2)

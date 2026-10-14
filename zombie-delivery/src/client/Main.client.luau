@@ -35,8 +35,9 @@ end
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
 --                                      SandboxGuide, 8.1's UpgradeUi (the UPGRADES desk's window), 8.2's
 --                                      CollectionBookUi (the collection book), SandboxTasksUi (the TASKS chip and
---                                      panel), 8.3's MoveHelperCard (Danny's command card: a window too) and OfferCard (a
---                                      showroom visitor's offer: a window too): each started only when it is there
+--                                      panel), 8.3's MoveHelperCard (Danny's command card: a window too), OfferCard (a
+--                                      showroom visitor's offer: a window too) and VanPaintUi (the PAINT shop's window):
+--                                      each started only when it is there
 -- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
 -- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
 -- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
@@ -56,7 +57,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "OfferCard" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "OfferCard", "VanPaintUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -83,7 +84,8 @@ if Config.Sandbox.On then
 	local TasksUi = ownModule("SandboxTasksUi")
 	local DannyCard = ownModule("MoveHelperCard") -- (8.3: Danny's command card, a window like the others)
 	local OfferCard = ownModule("OfferCard") -- (8.3: a showroom visitor's offer, a window like the others)
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard }
+	local PaintUi = ownModule("VanPaintUi") -- (8.3: the PAINT shop's window)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -180,7 +182,7 @@ if Config.Sandbox.On then
 	end
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard)
+			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
 			or ownOpen(OfferCard)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen

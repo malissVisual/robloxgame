@@ -93,6 +93,14 @@ check("L1 is Danny's alone (\"Talk to Danny\", client/MoveHelperCard.luau)", (fu
 	end
 	return A.danny.pad[1] == "ButtonL1"
 end)())
+check("8.3 R1 is Danny's too: \"Give to Danny\" at a piece (client/MoveHelperCard.luau), nothing else on it", (function()
+	for id, action in A do
+		if table.find(action.pad, "ButtonR1") and id ~= "dannygive" then
+			return false
+		end
+	end
+	return A.dannygive.pad[1] == "ButtonR1" and #A.dannygive.pad == 1
+end)())
 check("driving: R2 on, L2 back, the left stick steers", table.concat(A.drive.pad, ",") == "ButtonR2,ButtonL2" and A.steer.pad[1] == "Thumbstick1")
 check("no button for the horn, the list or the chat", #A.horn.pad == 0 and #A.list.pad == 0 and #A.chat.pad == 0)
 local onPad, clashes = {}, {}

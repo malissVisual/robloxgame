@@ -4,7 +4,8 @@
 -- environment (setfenv(1, SandboxE2E.env): no module gains a local, the -O0 register limit): SandboxBoot (the real
 -- boot), SandboxWorld and HouseMesh (the map), PlayerData, SandboxPlots, Collection, Warehouse, Upgrades, Moving with
 -- MoveLobby, MoveHelper, MoveGreeters, PairHold and MoveSites, HouseInterior and FurnitureMesh, and shared/Net.luau
--- (E2ENet: its real RemoteEvents and rate limits). The shared modules are the pure copies run_tests.py made
+-- (E2ENet: its real RemoteEvents and rate limits); 8.3: VanPaint (the PAINT shop: it paints the fake vans through its
+-- prompts' loop, shared/VanLook.luau on the recorder). The shared modules are the pure copies run_tests.py made
 -- (FurnitureLooks and HouseLayout on tools/fixtures/item-mock.luau, the recorder this stands on).
 --
 -- What is mocked: Roblox itself, and the server modules that are Roblox through and through (physics, rigs, AI):
@@ -1555,7 +1556,7 @@ E.real = {
 	PlayerData = true, Collection = true, Warehouse = true, SandboxPlots = true, Upgrades = true, Moving = true, MoveLobby = true,
 	MoveHelper = true, MoveGreeters = true, PairHold = true, MoveSites = true, SandboxBoot = true, SandboxWorld = true,
 	HouseMesh = true, HouseInterior = true, FurnitureMesh = true, Analytics = true, SandboxAnalytics = true, CollectionBook = true,
-	SandboxTasks = true, SandboxLeaders = true, WarehouseMesh = true,
+	SandboxTasks = true, SandboxLeaders = true, WarehouseMesh = true, VanPaint = true,
 	Visitors = true, VisitorOffers = true, -- 8.3: the showroom's visitors (tests/visitors_runtime_test.luau; off in the e2e)
 }
 E.fakes = {}

@@ -94,9 +94,10 @@
 --   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
 --     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
 --     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
---     Chalet"): its "Enter house" on the map's front door (the part with the attribute SandboxDoor, server/
---     SandboxWorld.luau's; else an invisible one at House.door), "Call truck to door" to House.curb, out at its door;
---     refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
+--     Chalet", 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big", Config.Moving.Sandbox.Kind,
+--     its back door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the
+--     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
+--     truck to door" to House.curb, out at its door; refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
 --     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
 --     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
 --     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
@@ -124,14 +125,16 @@
 --     stepped out of the one they came out in and Rearm s have gone by; you come out a few studs from the door facing
 --     away (the house's 4, the plan's entry inside). The E prompts stay, disabled (Doors.Walk false: as before). A
 --     doormat on the ground at every door: "▲ IN" outside (shown while a move uses that door), "▲ OUT" inside.
---   * 8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes";
---     Config.MoveHelper.WaitForHelper; server/MoveHelper.luau's call): Lift on a two-person piece with Danny on the move
---     calls him (onPick asks MoveHelper.call): no drag alone, you wait at your end ("Stop waiting" on its prompt; Lift
---     again or G stop it) while he walks to its far end; there he makes your lift (Moving.helperCalled: onPick again,
---     the lift check, or the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift).
---     Moving.helperLiftFrame says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he
---     asks a hand for it on AUTO), Moving.helperCallOff closes its open lift check when the call ends before the lift.
---     Without Danny on the move (a crew of players, him down): today's rules.
+--   * 8.3 Danny for hire (the owner: "when you want to take a heavy thing you must wait until the helper comes";
+--     "I have to PAY for him … you click on something, and that assigns it to him"; Config.MoveHelper.WaitForHelper;
+--     server/MoveHelper.luau's call): Lift on a two-person piece with Danny hired for the move calls him (onPick asks
+--     MoveHelper.call): no drag alone, you wait at your end ("Stop waiting" on its prompt; Lift again or G stop it)
+--     while he walks to its far end; there he makes your lift (Moving.helperCalled: onPick again, the lift check, or
+--     the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift). Moving.helperLiftFrame
+--     says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he waits at a two-person
+--     piece of his list), Moving.helperCallOff closes its open lift check when the call ends before the lift. A piece
+--     you pick up leaves his list (onPick: MoveHelper.taken). Without Danny hired (a crew of players, him for hire, him
+--     down): today's rules.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
@@ -144,7 +147,7 @@
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
---                             Danny joins a crew of one; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
+--                             Danny comes to a crew of one, 8.3 for hire; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
 --                             helperCalled / helperMark / helperCallOff: his side of your call (after onHelp)
 --   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
 --                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
@@ -960,7 +963,9 @@ end
 -- Its front door (the spot outside it, looking out to the road), the van's curb (its pivot: the nose to the road, the
 -- back to the door: "Call truck to door"), out where you came in (4 studs out of the door). Its "Enter house" part is an
 -- invisible one at the door until the map's front door is found (SB.frontDoor: the prompt goes onto that). No
--- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is.
+-- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is. 8.3 the big move: its second
+-- door, the back door (House.back, the owner's model's back door: "Enter" there to the plan's exits[2], out there by
+-- it), as a farm's barn doors; the van's spot for both the curb.
 local function yawLook(yaw: number): Vector3
 	local r = math.rad(yaw)
 	return Vector3.new(-math.sin(r), 0, -math.cos(r))
@@ -976,6 +981,21 @@ function SB.site(contract: Contract, parent: Instance): Site
 	local up = Vector3.new(0, 3.5, 0)
 	local enter = invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
 	model.PrimaryPart = enter
+	-- 8.3 the big move: its back door (House.back, the plan's exits[2]), a second way in and out; the van's spot the curb
+	local backFacing = yawLook(h.back.yaw)
+	local backDoor = Vector3.new(h.back.x, h.back.y, h.back.z)
+	local backOut = backDoor + backFacing * 4 + Vector3.new(0, 0.1, 0)
+	local back: SiteDoor = {
+		exit = 2,
+		name = "back door",
+		door = backDoor,
+		facing = backFacing,
+		outside = CFrame.lookAt(backOut, backOut + backFacing),
+		park = park,
+		heading = yawLook(h.curb.yaw),
+		width = 4,
+		part = invisible("EnterDoor2", Vector3.new(4, 6, 1), CFrame.lookAt(backDoor + backFacing * 0.9 + up, backDoor + backFacing * 3 + up), model),
+	}
 	model.Parent = parent
 	local out = door + facing * 4 + Vector3.new(0, 0.1, 0) -- (8.1 walk-in doors: 4 out, as the city's, clear of its zone)
 	local outside = CFrame.lookAt(out, out + facing)
@@ -994,7 +1014,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 		pile = { x = out.X, z = out.Z },
 	}
 	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = 4, part = enter }
-	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front } }
+	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front, back } }
 end
 
 -- The map's front door (server/SandboxWorld.luau's FrontDoor: the part with the attribute SandboxDoor), looked for when
@@ -1015,11 +1035,12 @@ function SB.frontDoor(): BasePart?
 	return nil
 end
 
--- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words.
+-- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words; 8.3
+-- its plan's kind the big house's (Sandbox.Kind: HouseLayout's "big").
 function SB.newContract(): Contract
 	local S = T.Sandbox
 	local h = SandboxMap.House
-	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = "house", blurb = S.Blurb, time = S.Time, hordeAt = 0 }
+	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = S.Kind, blurb = S.Blurb, time = S.Time, hordeAt = 0 }
 end
 
 -- Is a point on the test world's asphalt (SandboxMap.Roads and the turnaround, 2 studs of slack)? (The Guard's
@@ -2382,6 +2403,7 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		return
 	end
 	carry(s, item)
+	MoveHelper.taken(s, spot, player) -- (8.3: off Danny's list, if it was on it)
 	if thing.class == "pair" and not MoveHelper.joinLift(s, spot, player) then -- (8.3: lifted with Danny at its far end)
 		say(player, `The {thing.name} needs two: you drag it slowly. A crew mate can "Help lift" the other end.`)
 	end
@@ -2448,8 +2470,8 @@ function Moving.helperCalled(s: Session, spot: number, player: Player): boolean
 	return Rules.holding(s.move, player.UserId) == spot or (hold ~= nil and hold.open ~= nil and hold.spot == spot)
 end
 
--- The piece's Lift prompt while a call or his ask is on it: "wait" (E again stops waiting), "ask" ("Lift with Danny"),
--- nil (as it was made).
+-- The piece's Lift prompt while a call is on it or he waits at it for you: "wait" (E again stops waiting), "ask" ("Lift
+-- with Danny"), nil (as it was made).
 function Moving.helperMark(s: Session, spot: number, how: string?)
 	local item = s.items[spot]
 	local thing = s.move.things[spot]
@@ -2553,7 +2575,7 @@ local function enterPrompt(s: Session)
 		if not spot then
 			continue
 		end
-		local action = if index == 1 then "Enter house" else "Enter barn"
+		local action = if index == 1 then "Enter house" elseif SB.on then `Enter by the {door.name}` else "Enter barn" -- (8.3: the big house's back door)
 		local enter = newPrompt(spot, action, `{s.contract.icon} {s.contract.name}`, Enum.KeyCode.E, 0, T.Reach.Door + door.width / 2)
 		enter.Enabled = not T.Doors.Walk -- (8.1 walk-in doors: you walk in; the prompt stays, off)
 		tag(enter, s.owner)
@@ -4484,6 +4506,9 @@ local function planMove(owner: Player, contractId: any): string?
 end
 
 local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3: any)
+	if action == "helper" then
+		return -- (8.3: Danny's own, server/MoveHelper.luau's, at its own rate limits)
+	end
 	if not Net.limit(player, "Moving", Config.Robust.Limits.Moving) then
 		return
 	end
@@ -4734,13 +4759,6 @@ function Moving.start()
 	MoveLobby.moveCrew = function(player: Player): { Player }?
 		local s = sessionOf(player)
 		return if s then membersOf(s) else nil
-	end
-	-- (the quick chat's "Need a hand here" on a move calls the depot's helper over: HELP ME)
-	MoveLobby.onQuickChat = function(player: Player, index: number)
-		local line = MoveRoles.Chat[index]
-		if line and line.id == "hand" and sessionOf(player) then
-			MoveHelper.order(player, "help")
-		end
 	end
 	MoveLobby.start()
 	remote.OnServerEvent:Connect(onRequest)

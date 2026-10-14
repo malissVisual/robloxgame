@@ -426,6 +426,7 @@ local function sandbox()
 	optional("CollectionBook", "start") -- 8.2: the collection book (after the collection: its hook on Collection.add)
 	optional("Warehouse", "start")
 	optional("Upgrades", "start") -- 8.1: the UPGRADES desk's shop (after the collection and the warehouses)
+	optional("VanPaint", "start") -- 8.3: the PAINT shop (its hook on Vehicles.onStyle: before any van)
 	optional("SandboxTasks", "start") -- 8.2: the daily tasks (after the collection and the upgrades: it listens to them)
 	optional("SandboxLeaders", "start") -- 8.2: the player list's $ / $/min / collection and the TOP MOVERS board
 	optional("Visitors", "start") -- 8.3: the showroom's visitors and their offers (after the warehouses and the daily tasks)
