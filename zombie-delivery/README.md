@@ -90,6 +90,11 @@
 > legendaries are rare (one house in 25, the big house one in 17), the upgrades cost $1,000 – 100,000, the stands pay
 > a quarter after 10 idle minutes, and the house stays the same until a move brings something home. And the reviews'
 > fixes. The details: **Danny for hire (8.4)** to **The reviews' fixes (8.4)** below.
+>
+> **8.4.1** (the owner: "Danny always has to be hired, he isn't free"): a Danny nobody hired stays where the van left
+> him (by the van at the warehouse) and never turns up at the house by himself (`server/MoveHelper.luau` actWait);
+> hire him on the status line under the move's panel (HIRE $…) or on his card, and he rides along in the van or comes
+> to it at the house. A hired Danny rides with you as before.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

@@ -345,6 +345,11 @@ check("8.3 HIRE without the money ($50 of $100): refused, nothing taken, still f
 local rex = E.player(66, "Rex", outside)
 E.request(rex, "helper", "hire")
 check("8.3 a player not of the move's crew: nothing (no hire, nothing taken, no word)", danny.hirer == nil and #E.spent == 0 and E.lastNotice(rex) == "")
+-- 8.4 (the owner: "Danny always has to be hired, he isn't free"): not hired and far from the van (left at the warehouse),
+-- he stays there: he never turns up at the house by himself
+body.root.CFrame = body.root.CFrame + V3(0, 0, 400)
+run(3)
+check("8.4 not hired, left far from the van: he stays (no turning up at the house)", distance(body.root.Position, cargoDoor.WorldPosition) > 300)
 E.wallet[sol] = 500
 noticeAt = #E.messages
 local said = #E.said
@@ -357,6 +362,10 @@ check("…the crew hears it, he says so; the status line: hired, nothing to carr
 E.request(sol, "helper", "hire")
 check("8.3 once a move: HIRE again takes nothing more", #E.spent == 1 and E.wallet[sol] == 400 and E.lastNotice(sol) == "Danny works for this move already.", E.lastNotice(sol))
 E.wallet[sol] = 2000 -- (the moves below hire him again)
+run(3, function()
+	return distance(body.root.Position, cargoDoor.WorldPosition) < 8
+end)
+check("8.4 …hired: he comes to the van at the house", distance(body.root.Position, cargoDoor.WorldPosition) < 8)
 
 -- The sofa: lifted together, carried together -------------------------------------------------------------------------------
 
