@@ -335,8 +335,8 @@ local SB = {
 -- 8.3 the doors swing (Config.Moving.Doors Swing …; shared/DoorSwing.luau; client/WalkDoors.luau swings them):
 --   leaves  a door (a site door outside, a way inside: its table) → its leaves (the parts and models with the attribute
 --           DoorLeaf at its doorway, tagged DoorLeaf for the clients), found once (WalkIn.leavesOf; weak keys)
---   want    a leaf → the os.clock somebody last wanted it open (in its approach facing it, Danny near it, a trip
---           through it); its DoorOpen is true from then until Shut s after (WalkIn.sweep)
+--   want    a leaf → the os.clock somebody last wanted it open (in its approach facing it, Danny hired near it, a
+--           trip through it); its DoorOpen is true from then until Shut s after (WalkIn.sweep)
 --   opened  a leaf → when it opened (the trip waits until it has been open Open s: WalkIn.ready)
 --   send    the move's state to its crew now (send's: a trip sends where you are before its fade in, so the client's
 --           eyes, client/SandboxLight.luau, adapt while the screen is still black)
@@ -2092,10 +2092,11 @@ function WalkIn.ready(leaves: { Instance }, clock: number, since: number): boole
 	return clock - since >= T.Doors.Dwell and clock - opened >= T.Doors.Open
 end
 
--- Danny (server/MoveHelper.luau) near a door opens it too, whichever way he faces (he goes through it his own way).
+-- Danny (server/MoveHelper.luau), hired (for hire he touches nothing, by the van), near a door opens it too, whichever
+-- way he faces (he goes through it his own way): the front door, the back door, inside and out.
 function WalkIn.helper(s: Session, clock: number)
 	local h = MoveHelper.find(s.owner)
-	local body = if h then h.body else nil
+	local body = if h and h.hirer then h.body else nil
 	local root = if body then body.root else nil
 	if typeof(root) ~= "Instance" or not root:IsA("BasePart") or root.Parent == nil then
 		return

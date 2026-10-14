@@ -6,7 +6,8 @@
 -- the door's way, the trees off all of that and off the vans' ways, the part budget, the shadows only on bigger
 -- parts, the chalet in its box with its FrontDoor at House.door, the signpost's and the mailbox's words, the light;
 -- 8.1: the house's box the owner's Blender house's, its parts in House_sandbox_house for server/HouseMesh.luau, the
--- FrontDoor on the model's door;
+-- FrontDoor on the model's door; 8.3 the big move and walk-in doors: the back door, the doors' leaves door leaves that
+-- swing (shared/DoorSwing.luau's attributes; dressed, the Blender house's doors copied as leaves in front of them);
 -- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
 -- box query, Config.SpawnSpot.Pass leaving out the ground's mounds), and not where a player stands.
 -- Run with tests/run_tests.py.
@@ -513,8 +514,6 @@ do
 		and door.part:IsDescendantOf(chalet)
 	check("one FrontDoor (SandboxDoor = true, no collision) at House.door", okDoor, door and string.format("%.2f, %.2f, %.2f", (door.x0 + door.x1) / 2, door.y0, door.z0))
 	check("the door is on the north wall, facing the road", door ~= nil and body ~= nil and door.z1 <= body.z0 + EPS)
-	check("8.3 the door is a door leaf (shared/DoorSwing.luau): hinged at its + end (DoorLeaf 1), swinging into the house (DoorSwing 1), a dark hall behind it",
-		door ~= nil and door.part:GetAttribute("DoorLeaf") == 1 and door.part:GetAttribute("DoorSwing") == 1 and door.part:GetAttribute("DoorDark") == true)
 	-- the Blender house's door leaves in the world (the house's frame: its bottom's middle, -Z to the road)
 	local frame = G.CFrame.new(h.x, h.y, h.z) * G.CFrame.Angles(0, math.rad(d.yaw), 0)
 	local a = HouseArt.door
@@ -567,8 +566,10 @@ do
 			and lhi[3] <= d.z + 1e-6 and lhi[3] <= lo[3] and math.abs(edges[1] - edges[2]) < 1e-6,
 		string.format("leaves %.2f … %.2f, %.2f … %.2f, %.2f … %.2f", llo[1], lhi[1], llo[2], lhi[2], llo[3], lhi[3]))
 	local made = if chalet then SandboxWorld.doorLeaves(chalet) else {}
-	check("…the chalet (no import here): its FrontDoor itself is the leaf", #made == 1 and made[1] == door.part)
-	-- a house dressed in the model (as the owner's import does): the two leaves in it, the FrontDoor only the prompt's
+	check("…the chalet (no import here): its own leaves are the door leaves (FrontLeafWest, FrontLeafEast, BackLeaf)", #made == 3
+		and made[1].Name == "FrontLeafWest" and made[2].Name == "FrontLeafEast" and made[3].Name == "BackLeaf" and door.part:GetAttribute("DoorLeaf") == nil)
+	-- a house dressed in the model (as the owner's import does): the three leaves in it (the front door's two, the back
+	-- door's one), the FrontDoor only the prompt's, the chalet's own leaves (hidden with it) no door leaves
 	local dressedHouse = G.Instance.new("Model")
 	local dressedBody = G.Instance.new("Model")
 	dressedBody.Name = "House_" .. HOUSE.id
@@ -577,8 +578,12 @@ do
 	local prompt = G.Instance.new("Part")
 	prompt.Name = "FrontDoor"
 	prompt.Parent = dressedBody
+	local hidden = G.Instance.new("Part")
+	hidden.Name = "BackLeaf"
+	hidden.Parent = dressedBody
 	local built = SandboxWorld.doorLeaves(dressedHouse)
-	local builtOk = #built == 2 and prompt:GetAttribute("DoorLeaf") == nil
+	local backLeaves = SandboxScenery.backLeaves()
+	local builtOk = #built == 3 and prompt:GetAttribute("DoorLeaf") == nil and hidden:GetAttribute("DoorLeaf") == nil
 	for n, leaf in built do
 		local primary = leaf.PrimaryPart
 		local parts = 0
@@ -587,11 +592,12 @@ do
 			parts += 1
 			still = still and part.CanCollide == false and part.CanQuery == false and part.CanTouch == false
 		end
-		builtOk = builtOk and leaf.ClassName == "Model" and leaf.Name == "FrontDoorLeaf" and leaf.Parent == dressedHouse
-			and leaf:GetAttribute("DoorLeaf") == leaves[n].hinge and leaf:GetAttribute("DoorSwing") == 1 and leaf:GetAttribute("DoorDark") == true
+		local want = if n <= 2 then leaves[n] else backLeaves[1]
+		builtOk = builtOk and want ~= nil and leaf.ClassName == "Model" and leaf.Name == (if n <= 2 then "FrontDoorLeaf" else "BackDoorLeaf") and leaf.Parent == dressedHouse
+			and leaf:GetAttribute("DoorLeaf") == want.hinge and leaf:GetAttribute("DoorSwing") == 1 and leaf:GetAttribute("DoorDark") == true
 			and primary ~= nil and primary.Name == "DoorLeaf" and primary.Color == HouseMesh.Looks.door.color and parts == 8 and still
 	end
-	check("…dressed in the Blender house: two FrontDoorLeaf models in it (DoorLeaf ±1, DoorSwing 1, DoorDark; the model's finishes), never colliding",
+	check("…dressed in the Blender house: two FrontDoorLeaf models and a BackDoorLeaf in it (DoorLeaf ±1, DoorSwing 1, DoorDark; the model's finishes), never colliding; the chalet's own leaves none",
 		builtOk, #built)
 	-- 8.3 the big move: the FrontDoor unseen behind its two leaves; the back door at House.back on the Blender house's back
 	-- door (BackDoor: SandboxBackDoor, unseen, no collision; across it, as wide and tall, just outside its leaf) with its
@@ -619,18 +625,49 @@ do
 		and math.abs(back.y0 - blo[2]) < 0.3 and math.abs(back.y1 - bhi[2]) < 0.3 and back.z0 >= bhi[3] - EPS and back.z0 - bhi[3] < 0.5,
 		back and string.format("BackDoor %.2f … %.2f, %.2f … %.2f, %.2f … %.2f; leaf %.2f … %.2f, %.2f … %.2f, %.2f … %.2f",
 			back.x0, back.x1, back.y0, back.y1, back.z0, back.z1, blo[1], bhi[1], blo[2], bhi[2], blo[3], bhi[3]))
+	-- (8.3 walk-in doors: door leaves of shared/DoorSwing.luau, each hinged at its jamb (DoorLeaf ±1 along its own X: the
+	-- front door's frame's, the back door's turned round), swinging into the house (DoorSwing 1), a dark hall behind)
 	local leavesOk, count = true, 0
-	for _, want in { { "FrontLeafWest", "front", "west", door }, { "FrontLeafEast", "front", "east", door }, { "BackLeaf", "back", "west", back } } do
+	for _, want in { { "FrontLeafWest", -1, "west", door }, { "FrontLeafEast", 1, "east", door }, { "BackLeaf", SandboxScenery.BackDoor.Hinge, "east", back } } do
 		local list = named(want[1])
 		local leaf, way = list[1], want[4]
 		count += #list
-		leavesOk = leavesOk and #list == 1 and way ~= nil and leaf.part:GetAttribute("DoorLeaf") == want[2] and leaf.part:GetAttribute("Hinge") == want[3]
-			and not leaf.part.CanCollide and leaf.part.Transparency == 0 and leaf.part.Parent == own
+		leavesOk = leavesOk and #list == 1 and way ~= nil and leaf.part:GetAttribute("DoorLeaf") == want[2] and leaf.part:GetAttribute("DoorSwing") == 1
+			and leaf.part:GetAttribute("DoorDark") == true and not leaf.part.CanCollide and leaf.part.Transparency == 0 and leaf.part.Parent == own
 			and leaf.x0 >= way.x0 - 0.05 and leaf.x1 <= way.x1 + 0.05 and leaf.y0 >= way.y0 - 0.05 and leaf.y1 <= way.y1 + 0.05
 			and (if want[3] == "west" then math.abs(leaf.x0 - way.x0) < 0.1 else math.abs(leaf.x1 - way.x1) < 0.1)
 	end
-	check("8.3: the doors' leaves shut in their doorways (FrontLeafWest west, FrontLeafEast east, BackLeaf west), the FrontDoor unseen behind them",
+	check("8.3: the doors' leaves shut in their doorways, door leaves hinged at a jamb (FrontLeafWest west, FrontLeafEast east, BackLeaf east: DoorLeaf -1 / 1 / -1, DoorSwing 1, DoorDark), the FrontDoor unseen behind them",
 		leavesOk and count == 3 and door ~= nil and door.part.Transparency == 1)
+	-- dressed, the back door's leaf copied (SandboxScenery.backLeaves) the same way in front of the Blender house's back
+	-- door: it covers its leaf from outside, hung on the side away from its handle (house.py's: HouseArt.backKnob)
+	local backCopy = backLeaves[1]
+	local bframe = G.CFrame.new(hb.x, hb.y, hb.z) * G.CFrame.Angles(0, math.rad(hb.yaw), 0)
+	local klo, khi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+	local knobX, knobs = 0, 0
+	local copyOk = #backLeaves == 1 and backCopy.hinge == SandboxScenery.BackDoor.Hinge and #backCopy.parts == 8
+	for n, spec in (if backCopy then backCopy.parts else {}) do
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local p = bframe * G.Vector3.new(spec.at[1] + sx * spec.size[1] / 2, spec.at[2] + sy * spec.size[2] / 2, spec.at[3] + sz * spec.size[3] / 2)
+					if n == 1 then
+						klo = { math.min(klo[1], p.X), math.min(klo[2], p.Y), math.min(klo[3], p.Z) }
+						khi = { math.max(khi[1], p.X), math.max(khi[2], p.Y), math.max(khi[3], p.Z) }
+					end
+				end
+			end
+		end
+		if spec.finish == "brass" then
+			knobX += (bframe * G.Vector3.new(spec.at[1], spec.at[2], spec.at[3])).X
+			knobs += 1
+		end
+	end
+	local modelKnob = (frame * G.Vector3.new(HouseArt.backKnob, 0, 0)).X
+	check("8.3 …and the Blender house's back door copied as one leaf: it covers its leaf from outside, hung on the side away from its handle",
+		copyOk and klo[1] <= blo[1] + 1e-6 and khi[1] >= bhi[1] - 1e-6 and math.abs(klo[2] - blo[2]) < 0.02 and math.abs(khi[2] - bhi[2]) < 0.02
+			and klo[3] >= bhi[3] - 1e-6 and klo[3] - bhi[3] < 0.5 and knobs == 2 and math.abs(knobX / knobs - modelKnob) < 0.05,
+		string.format("copy %.2f … %.2f, %.2f … %.2f, %.2f … %.2f; its handle %.2f, the model's %.2f", klo[1], khi[1], klo[2], khi[2], klo[3], khi[3], knobX / math.max(knobs, 1), modelKnob))
 	local garden = chalet and chalet:FindFirstChild("Garden")
 	local gardenSolid: string? = if garden then nil else "no garden"
 	local gardenParts = 0

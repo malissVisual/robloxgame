@@ -296,10 +296,12 @@ with tempfile.TemporaryDirectory() as tmp:
     backs = [d for d in art["details"] if d["name"].startswith("Křídlo dveří") and d["center"][2] > 0] or leaves
     b_lo = [min(d["center"][i] - d["size"][i] / 2 for d in backs) for i in range(3)]
     b_hi = [max(d["center"][i] + d["size"][i] / 2 for d in backs) for i in range(3)]
+    # (8.3 walk-in doors: where its back door's handle is across it, its knob's X: the leaf hangs on the other side)
+    knobs = [d["center"][0] for d in art["details"] if d["name"].startswith("Klika") and d["center"][2] > 0] or [0]
     open(os.path.join(tmp, "HouseArt.luau"), "w", encoding="utf-8").write(
         "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r, "
-        "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r } }\n"
-        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2]))
+        "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, backKnob = %r }\n"
+        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2], sum(knobs) / len(knobs)))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).

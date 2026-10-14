@@ -93,7 +93,6 @@ SandboxScenery.WallHeight = 300
 SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
-SandboxScenery.BackDoor = { Width = 3 } -- 8.3: the back door at House.back (the owner's model's: house.py), its width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }
 SandboxScenery.Trees = { Height = { 28, 50 } :: { number }, Edge = { 24, 34 } :: { number }, Canopy = 0.19, Chunk = 128, Max = 120 }
 SandboxScenery.Light = Config.SandboxLight.Sky -- 8.3: the afternoon's light lives in Config with the rest of the light
@@ -742,44 +741,56 @@ function SandboxScenery.peaks(): { Peak }
 	return list
 end
 
--- ── 8.3 walk-in doors: the big house's front door as two leaves that swing ───────────────────────────────────────────
--- The owner's Blender house (server/HouseMesh.luau, design/blender-house/house.py door("front")) has its double front
--- door in its model: it cannot move. Copied as two door leaves (shared/DoorSwing.luau; server/SandboxWorld.luau
+-- ── 8.3 walk-in doors: the big house's doors' leaves that swing ──────────────────────────────────────────────────────
+-- The owner's Blender house (server/HouseMesh.luau, design/blender-house/house.py door("front"), door("back")) has its
+-- doors in its model: they cannot move. Copied as door leaves (shared/DoorSwing.luau; server/SandboxWorld.luau
 -- doorLeaves builds them once the house is dressed), standing just in front of the model's door (its leaves sit 0.22 to
--- 0.34 back in their pocket, its brass handles reach the wall's face: the copies' backs on the face cover all of it),
--- each half the opening (they meet in the middle, no seam), hinged at the opening's side, swinging into the house over
--- the model's own door (a dark hall where they stood: DoorDark). Each leaf's parts in the door's frame (its foot on the
--- front wall, +X right of somebody looking out, -Z out to the road), its body first: the body, two cassettes, the glass,
--- the grille's two bars, the brass knob (a cylinder along Z) and lever, as house.py draws them.
---   FrontDoor  the opening: Width × Height from Sill up; the leaf Tall, Thick
+-- 0.34 back in their pocket, its brass handles reach the wall's face: the copies' backs on the face cover all of it):
+-- the front door's two each half the opening (they meet in the middle, no seam), the back door's one the whole of it;
+-- each hinged at the opening's side (the back door's: the side away from its handle, as house.py hangs it), swinging
+-- into the house over the model's own door (a dark hall where they stood: DoorDark). Each leaf's parts in its door's
+-- frame (its foot on the wall: House.door's, House.back's; +X right of somebody looking out, -Z out of the house), its
+-- body first: the body, two cassettes, the glass, the grille's two bars, the brass knob (a cylinder along Z) and lever
+-- (0.3 and 0.42 from its free end), as house.py draws them.
+--   FrontDoor, BackDoor  the opening: Width × Height from Sill up; the leaf Tall, Thick. The back door's Hinge: its one
+--                        leaf's (-1 its -X end); its Width is the back doorway's too (server/SandboxWorld.luau's BackDoor)
 export type LeafPart = { name: string, finish: string, size: { number }, at: { number }, cylinder: boolean? }
 export type FrontLeaf = { hinge: number, parts: { LeafPart } }
+export type Opening = { Width: number, Height: number, Sill: number, Tall: number, Thick: number }
 SandboxScenery.FrontDoor = { Width = 4, Height = 6.85, Sill = 0.15, Tall = 6.82, Thick = 0.12 }
+SandboxScenery.BackDoor = { Width = 3, Height = 6.8, Sill = 0.15, Tall = 6.77, Thick = 0.12, Hinge = -1 }
 
+-- One leaf `w` wide in the door `F`, its middle at `x`, hinged at its end `hinge` (its handle near the other end).
+local function leafOf(F: Opening, x: number, w: number, hinge: number): FrontLeaf
+	local y = F.Sill + F.Height / 2
+	local face = -F.Thick -- (the leaf's front, out of the house)
+	local free = x - hinge * w / 2 -- (its free end: the handle's)
+	return {
+		hinge = hinge,
+		parts = {
+			{ name = "DoorLeaf", finish = "door", size = { w, F.Tall, F.Thick }, at = { x, y, -F.Thick / 2 } },
+			{ name = "Cassette", finish = "door", size = { w - 0.6, 2.3, 0.04 }, at = { x, F.Sill + 1.8, face - 0.02 } },
+			{ name = "Cassette", finish = "door", size = { w - 0.6, 0.8, 0.04 }, at = { x, F.Sill + F.Height - 0.75, face - 0.02 } },
+			{ name = "DoorGlass", finish = "glass", size = { w - 0.75, 1.9, 0.03 }, at = { x, F.Sill + 4.35, face - 0.005 } },
+			{ name = "Grille", finish = "door", size = { 0.08, 1.9, 0.03 }, at = { x, F.Sill + 4.35, face - 0.035 } },
+			{ name = "Grille", finish = "door", size = { w - 0.75, 0.08, 0.03 }, at = { x, F.Sill + 4.35, face - 0.035 } },
+			{ name = "Knob", finish = "brass", size = { 0.22, 0.14, 0.14 }, at = { free + hinge * 0.3, F.Sill + 3.1, face - 0.11 }, cylinder = true },
+			{ name = "Handle", finish = "brass", size = { 0.38, 0.07, 0.06 }, at = { free + hinge * 0.42, F.Sill + 3.1, face - 0.17 } },
+		},
+	}
+end
+
+-- The front door's two leaves (hinged at the opening's sides, their handles in the middle), in House.door's frame.
 function SandboxScenery.frontLeaves(): { FrontLeaf }
 	local F = SandboxScenery.FrontDoor
 	local half = F.Width / 2
-	local y = F.Sill + F.Height / 2
-	local face = -F.Thick -- (the leaf's front, out to the road)
-	local list: { FrontLeaf } = {}
-	for _, k in { -1, 1 } do
-		local x = k * half / 2
-		local inward = -k -- (its handle toward the middle)
-		table.insert(list, {
-			hinge = k, -- (its outer end: the opening's side)
-			parts = {
-				{ name = "DoorLeaf", finish = "door", size = { half, F.Tall, F.Thick }, at = { x, y, -F.Thick / 2 } },
-				{ name = "Cassette", finish = "door", size = { half - 0.6, 2.3, 0.04 }, at = { x, F.Sill + 1.8, face - 0.02 } },
-				{ name = "Cassette", finish = "door", size = { half - 0.6, 0.8, 0.04 }, at = { x, F.Sill + F.Height - 0.75, face - 0.02 } },
-				{ name = "DoorGlass", finish = "glass", size = { half - 0.75, 1.9, 0.03 }, at = { x, F.Sill + 4.35, face - 0.005 } },
-				{ name = "Grille", finish = "door", size = { 0.08, 1.9, 0.03 }, at = { x, F.Sill + 4.35, face - 0.035 } },
-				{ name = "Grille", finish = "door", size = { half - 0.75, 0.08, 0.03 }, at = { x, F.Sill + 4.35, face - 0.035 } },
-				{ name = "Knob", finish = "brass", size = { 0.22, 0.14, 0.14 }, at = { x + inward * 0.7, F.Sill + 3.1, face - 0.11 }, cylinder = true },
-				{ name = "Handle", finish = "brass", size = { 0.38, 0.07, 0.06 }, at = { x + inward * 0.58, F.Sill + 3.1, face - 0.17 } },
-			},
-		})
-	end
-	return list
+	return { leafOf(F, -half / 2, half, -1), leafOf(F, half / 2, half, 1) }
+end
+
+-- The back door's leaf (hinged at BackDoor.Hinge's side), in House.back's frame.
+function SandboxScenery.backLeaves(): { FrontLeaf }
+	local B = SandboxScenery.BackDoor
+	return { leafOf(B, 0, B.Width, B.Hinge) }
 end
 
 return SandboxScenery

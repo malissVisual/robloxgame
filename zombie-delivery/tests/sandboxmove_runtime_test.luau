@@ -176,10 +176,19 @@ frontDoor.Name = "FrontDoor"
 frontDoor.Size = V3(4, 7, 0.4)
 frontDoor.CFrame = CF(House.door.x, 3.5, House.door.z + 0.5)
 frontDoor:SetAttribute("SandboxDoor", true)
-frontDoor:SetAttribute("DoorLeaf", 1) -- (8.3: a leaf swinging into the house, as SandboxWorld's chalet door)
+frontDoor:SetAttribute("DoorLeaf", 1) -- (8.3: a leaf swinging into the house, as SandboxWorld's chalet door's)
 frontDoor:SetAttribute("DoorSwing", 1)
 frontDoor:SetAttribute("DoorDark", true)
 frontDoor.Parent = workspace
+-- 8.3 the back door's leaf (server/SandboxWorld.luau's BackLeaf: a door leaf in the back wall at House.back)
+local backLeaf = M.Instance.new("Part")
+backLeaf.Name = "BackLeaf"
+backLeaf.Size = V3(3, 7, 0.4)
+backLeaf.CFrame = CF(House.back.x, 3.5, House.back.z - 0.2)
+backLeaf:SetAttribute("DoorLeaf", -1)
+backLeaf:SetAttribute("DoorSwing", 1)
+backLeaf:SetAttribute("DoorDark", true)
+backLeaf.Parent = workspace
 
 Moving.useArt(E.art)
 -- 8.2: Moving's listeners (server/SandboxAnalytics.luau's: the funnel's steps, the moves' events), registered before
@@ -774,16 +783,38 @@ do
 	step(D.Rearm)
 	stand(bob, exitAt + into * 1, -into)
 	step(0.1)
-	step(D.Dwell)
+	step(THROUGH)
 	check("(out by the front door again)", not isIn(bob))
 	step(D.Rearm)
+	check("8.3 the back door's leaf (the map's BackLeaf) tagged for the clients at the move's start, shut", backLeaf:GetAttribute("Tag_DoorLeaf") == true
+		and backLeaf:GetAttribute("DoorOpen") ~= true)
 	stand(bob, back + up + backFacing * 6, -backFacing)
 	step(0.1)
-	check("…at the back door, not in before the dwell", not isIn(bob))
+	check("…at the back door, not in before the dwell; walking up to it, its leaf swinging open (DoorOpen)", not isIn(bob)
+		and backLeaf:GetAttribute("DoorOpen") == true)
+	local since = #E.messages
 	stand(bob, back + up + backFacing * 2, -backFacing)
 	step(0.1)
-	step(D.Dwell)
+	step(THROUGH)
 	check("…walked into the back door's zone facing it: in (no E)", isIn(bob))
+	local fadeOut, fadeIn: any, any = nil, nil
+	for index = since + 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == bob and m.kind == "fade" then
+			if m.a == "out" then
+				fadeOut = m
+			else
+				fadeIn = m
+			end
+		end
+	end
+	local arrival = if fadeIn then fadeIn.c else nil
+	check("8.3 …the back door's trip as the front's: the fade out (FadeOut s), the fade in (FadeIn s) with where Bob is and the way he faces there",
+		fadeOut ~= nil and fadeOut.b == D.FadeOut and fadeIn ~= nil and fadeIn.b == D.FadeIn and type(arrival) == "table"
+		and (arrival.at - E.rootOf(bob).Position).Magnitude < 1e-6 and arrival.look:Dot(E.rootOf(bob).CFrame.LookVector) > 0.99 and arrival.dark == D.Dark)
+	stand(bob, exitAt + into * 12, into)
+	step(D.Shut + 0.05)
+	check("…its leaf shut again Shut s after the trip", backLeaf:GetAttribute("DoorOpen") == false)
 	Moving.admin(bob, "end")
 	check("the move over: both doormats hidden again (no move at the house)", mat.Transparency == 1 and backMat.Transparency == 1)
 end

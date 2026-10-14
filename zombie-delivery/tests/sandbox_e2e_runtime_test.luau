@@ -40,7 +40,8 @@
 --      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
 --      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
 --  19. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
---      piece out by its doorway inside (the real plan's second way out), loaded, home.
+--      piece out by its doorway inside (the real plan's second way out), loaded, home. 8.3 walk-in doors: the back
+--      door's leaves (the map's, the interior's) swing open as she walks up to them, the fade as the front door's.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -186,9 +187,24 @@ do
 	check("…8.3: the chalet's back door (SandboxBackDoor) in its back wall where SandboxMap puts it", back ~= nil
 		and V3(back.Position.X - House.back.x, 0, back.Position.Z - House.back.z).Magnitude < 1)
 	check("…the chalet's front door (SandboxDoor) where SandboxMap puts it", door ~= nil and V3(door.Position.X - House.door.x, 0, door.Position.Z - House.door.z).Magnitude < 2)
+	-- 8.3 walk-in doors: the chalet's doors' leaves (server/SandboxWorld.luau doorLeaves: no import here, its own)
+	local leaves: { [string]: any } = {}
+	for _, d in workspace:GetDescendants() do
+		if d:GetAttribute("DoorLeaf") ~= nil and (d.Name == "FrontLeafWest" or d.Name == "FrontLeafEast" or d.Name == "BackLeaf") then
+			leaves[d.Name] = d
+		end
+	end
+	local leavesOk = true
+	for name, hinge in { FrontLeafWest = -1, FrontLeafEast = 1, BackLeaf = -1 } do
+		local leaf = leaves[name]
+		local by = if name == "BackLeaf" then back else door
+		leavesOk = leavesOk and leaf ~= nil and by ~= nil and leaf:GetAttribute("DoorLeaf") == hinge and leaf:GetAttribute("DoorSwing") == 1
+			and leaf:GetAttribute("DoorDark") == true and leaf.CanCollide == false and V3(leaf.Position.X - by.Position.X, 0, leaf.Position.Z - by.Position.Z).Magnitude < 2
+	end
 	S.frontDoor = door
-	check("8.3 …a door leaf (DoorLeaf 1: hinged on the left seen from the path; DoorSwing 1: into the house; DoorDark: a dark hall behind it), never colliding",
-		door ~= nil and door:GetAttribute("DoorLeaf") == 1 and door:GetAttribute("DoorSwing") == 1 and door:GetAttribute("DoorDark") == true and door.CanCollide == false)
+	S.frontLeaf, S.backLeaf = leaves.FrontLeafEast, leaves.BackLeaf
+	check("8.3 …the doors' leaves door leaves (FrontLeafWest, FrontLeafEast, BackLeaf: DoorLeaf -1 / 1 / -1 at their jambs; DoorSwing 1: into the house; DoorDark: a dark hall behind them), never colliding",
+		leavesOk and door ~= nil and door.CanCollide == false and door:GetAttribute("DoorLeaf") == nil)
 	check("…the sandbox's own DataStore (Config.Sandbox.Store); analytics on (a live server)", E.storeName == Config.Sandbox.Store and Config.Analytics.Enabled)
 	check("(a day whose tasks for Ann hold trips, sell and the weekly income)", S.day ~= nil)
 end
@@ -669,7 +685,7 @@ do
 	-- 8.3: what her client sees of the trip, on the clock (the fade's messages, her body then, the leaf), and when the
 	-- chalet's leaf opened
 	local D = Config.Moving.Doors
-	local door = S.frontDoor
+	local door = S.frontLeaf
 	local seen: { any } = {}
 	local openedAt: number? = nil
 	local opening = door:GetAttributeChangedSignal("DoorOpen"):Connect(function()
@@ -1653,11 +1669,29 @@ do
 	local side = V3(House.house.x + House.house.sx / 2 + 8, 3, 0) -- (round the house's east side)
 	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
 	E.walk(ann2, V3(side.X, 3, backAt.Z + 8))
+	-- (8.3 walk-in doors: the back door's leaf, the map's BackLeaf, swings open as she walks up to it, before the fade)
+	local backLeaf = S.backLeaf
+	local backOpenAt: number? = nil
+	local backOpening = backLeaf:GetAttributeChangedSignal("DoorOpen"):Connect(function()
+		if backLeaf:GetAttribute("DoorOpen") == true and backOpenAt == nil then
+			backOpenAt = E.clock
+		end
+	end)
+	local fadeFrom = #E.sent
 	E.walk(ann2, backAt + out * 8)
 	E.walk(ann2, backAt + out * 1.5)
 	local inside = E.waitUntil(function(): boolean
 		return H.isInside(ann2)
 	end, 3)
+	backOpening:Disconnect()
+	local backFades = {}
+	for _, args in E.received(ann2, "Moving", fadeFrom) do
+		if args[1] == "fade" then
+			table.insert(backFades, args[2])
+		end
+	end
+	check("8.3 the back door's leaf (BackLeaf) swung open as she walked up to it, then the fade out and in, as the front door's", backOpenAt ~= nil
+		and backFades[1] == "out" and backFades[2] == "in", table.concat(backFades, ", "))
 	local origin = E.interiorAt(E.rootOf(ann2).Position)
 	local exit2: any = nil
 	for _, d in workspace:FindFirstChild("Moves"):GetChildren() do
@@ -1679,11 +1713,28 @@ do
 	check("(a one-hand piece of the big plan in her hands)", piece ~= nil and H.pickUp(ann2, model), E.lastNotice(ann2))
 	local door = exit2.Position - V3(0, 3.5, 0)
 	local up = V3(0, Config.Furniture.EntryUp, 0)
+	-- (8.3 walk-in doors: the interior's back door leaf, server/HouseInterior.luau's BackLeaf, swings open as she walks
+	-- up to it inside)
+	local innerLeaf: any = nil
+	for _, d in workspace:GetDescendants() do
+		if d.Name == "BackLeaf" and d:GetAttribute("DoorLeaf") ~= nil and H.flat(d.Position, exit2.Position) < 6 then
+			innerLeaf = d
+		end
+	end
+	local innerOpen = false
+	local innerOpening = if innerLeaf then innerLeaf:GetAttributeChangedSignal("DoorOpen"):Connect(function()
+		innerOpen = innerOpen or innerLeaf:GetAttribute("DoorOpen") == true
+	end) else nil
 	E.walk(ann2, door + S.into[ann2] * 5 + up)
 	E.walk(ann2, door + S.into[ann2] * 1.5 + up)
 	local outAgain = E.waitUntil(function(): boolean
 		return not H.isInside(ann2)
 	end, 3)
+	if innerOpening then
+		innerOpening:Disconnect()
+	end
+	check("8.3 …the interior's back door leaf (BackLeaf: DoorLeaf 1, out onto its porch) swung open as she walked up to it", innerLeaf ~= nil and innerOpen
+		and innerLeaf:GetAttribute("DoorLeaf") == 1 and innerLeaf:GetAttribute("DoorSwing") == -1)
 	local at = E.rootOf(ann2).Position
 	check("…carried out by the back door (walked into its doorway's zone inside): out behind the house, 4 south of the door, facing the garden, the piece with her",
 		outAgain and math.abs(H.flat(at, V3(House.back.x, 0, House.back.z)) - 4) < 0.6 and E.rootOf(ann2).CFrame.LookVector.Z > 0.9
