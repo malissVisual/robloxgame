@@ -162,12 +162,17 @@ do
 	for index, row in haul do
 		table.insert(entries, { uid = `1-{index}`, item = row[1], variant = 1, condition = row[2], name = Items[row[1]].name, got = 0 })
 	end
-	-- the best 12 go on show
+	-- the best 12 go on show (8.3: the Big Warehouse's 12 stands, today's)
 	local order = table.clone(entries)
 	table.sort(order, function(a, b)
 		return Rules.income(a) > Rules.income(b)
 	end)
-	for stand = 1, Rules.standsFor(nil) do
+	-- 8.3: a new player's Garage shows the best 2 (Config.SandboxUpgrades' tuning: about $20 a minute)
+	local garage = Rules.standsFor(nil)
+	local first = Rules.income(order[1]) + Rules.income(order[2])
+	print(`      8.3: a Garage's {garage} stands show the haul's best two: ${math.floor(first * 10 + 0.5) / 10} a minute`)
+	check("8.3: a new player's Garage: 2 stands, the haul's best two earn $15 – 40 a minute", garage == 2 and first >= 15 and first <= 40, first)
+	for stand = 1, Rules.standsFor({ sandboxUpgrades = { warehouse = 3 } }) do
 		order[stand].stand = stand
 	end
 	local t = Rules.totals(entries)
@@ -184,6 +189,7 @@ do
 end
 
 -- ── standsFor ─────────────────────────────────────────────────────────────
+-- (8.3: with Config.Warehouse.Levels, the player's warehouse level's: tests/upgrades_test.luau; without them, as before)
 do
 	local C2: any = Config
 	local before = C2.Warehouse

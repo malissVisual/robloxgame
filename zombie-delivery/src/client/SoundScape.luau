@@ -29,6 +29,8 @@
 --              off now and then, a random way round you (3D, every CowbellGap s); in a warehouse the room's echo
 --              (SoundService.AmbientReverb, SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND
 --              all off). The ZDC Sprinter's back doors have their own swing (SoundPlan.swingSound by its CarId).
+--              8.3: a warehouse's hall is the building of its plot's level (workspace.Warehouses' Level<id>, 1 … 5:
+--              the Garage is small, the Logistics Center big; SoundPlan.sandboxPlace's levelOf).
 -- Every look is throttled (Tick, OthersEvery); the steps run on Heartbeat for a handful of bodies.
 
 local Lighting = game:GetService("Lighting")
@@ -416,9 +418,26 @@ local function setReverb(name: string)
 	end
 end
 
+-- 8.3: a plot's warehouse level, 1 … 5 (server/Warehouse.luau's attribute Level<id> on workspace.Warehouses; nil: not
+-- there yet, SoundPlan takes 4): its hall is that level's building.
+local levelKeys: { [number]: string } = {}
+local function warehouseLevel(id: number): number?
+	local folder = workspace:FindFirstChild("Warehouses")
+	if not folder then
+		return nil
+	end
+	local key = levelKeys[id]
+	if not key then
+		key = `Level{id}`
+		levelKeys[id] = key
+	end
+	local level = folder:GetAttribute(key)
+	return if type(level) == "number" then level else nil
+end
+
 local function updateSandbox(playing: boolean)
 	local at = where()
-	local place = SoundPlan.sandboxPlace(at.X, at.Y, at.Z, MoveSounds.inside())
+	local place = SoundPlan.sandboxPlace(at.X, at.Y, at.Z, MoveSounds.inside(), warehouseLevel)
 	local mix = SoundPlan.sandboxAmbience(place, api.sheet4)
 	local on = if playing then 1 else 0
 	for _, name in CITY_LOOPS do

@@ -21,6 +21,10 @@
 --     again, or on a touch screen the 💡 chip left in its place, brings it back. SandboxGuide.setEnabled for a settings row.
 --   * Cheap: one loop every Config.SandboxGuide.Every seconds (no frame-by-frame work, no tables made in it: the state,
 --     the path's points and the instances are made once and reused; a string only when the words or the metres change).
+--   * 8.3 (design/warehouse-levels/KONTRAKT.md): your warehouse has a level (1 Garage … 5 Logistics Center, the player
+--     attribute Config.SandboxUpgrades.WarehouseAttribute; 4 until the server sets it), every level its own building:
+--     the stands' spots are WarehouseLayout.stands(WarehouseLayout.site(plot, level)) (all the level has, the bought
+--     ones pointed at), found once a plot and level, so a level up moves the arrow to the new building's stands.
 -- Everything waits for Config.Sandbox.On (client/Main.client.luau starts it in the sandbox).
 --   SandboxGuide.start()            builds it and starts the loop (once; nothing outside the sandbox)
 --   SandboxGuide.setEnabled(on)     shows or hides the guide (the G hold, the ✕, a settings row)
@@ -99,7 +103,7 @@ local gUsed = false -- (this hold already toggled)
 local path: { number } = table.create(MAX_POINTS * 2, 0) -- the path's x, z pairs (reused)
 local ui: any = {} -- the hint line's instances and what it shows
 local world: any = {} -- the 3D guide's instances and what it shows
-local standSpots: { [number]: { [number]: SandboxSteps.Place } } = {} -- a plot's display stands (found once)
+local standSpots: { [number]: { [number]: { [number]: SandboxSteps.Place } } } = {} -- a plot's display stands, by level (found once)
 
 -- ── What the client sees ───────────────────────────────────────────────────
 
@@ -179,47 +183,65 @@ local function placeOf(value: any, plot: SandboxMap.Plot, depth: number): Sandbo
 	return nil
 end
 
--- A plot's display stands (index = the stand's number, Collection.display's `stand`), found once.
+-- 8.3: your warehouse's level (the player attribute, 1 … 5, server/Upgrades.luau); 4 until the server sets it (a plain
+-- Plot's: the building of before 8.3).
+local function warehouseLevel(): number
+	local level = player:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute)
+	return if type(level) == "number" then level else 4
+end
+
+-- A plot's display stands at your warehouse's level (index = the stand's number, Collection.display's `stand`): every
+-- spot that level's building has (8.3: WarehouseLayout.site, its capacity; targetOf keeps the bought ones), found once a
+-- plot and level.
 local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
-	local known = standSpots[plotId]
+	local level = warehouseLevel()
+	local byLevel = standSpots[plotId]
+	if not byLevel then
+		byLevel = {}
+		standSpots[plotId] = byLevel
+	end
+	local known = byLevel[level]
 	if known then
 		return known
 	end
 	local list: { [number]: SandboxSteps.Place } = {}
 	local plot = SandboxMap.Plots[plotId]
 	local layout = warehouseLayout()
-	if plot and layout then
-		local raw: any = nil
-		for _, name in { "stands", "standSpots", "Stands", "spots" } do
-			local field = layout[name]
-			if type(field) == "function" then
-				local ok, got = pcall(field, plotId)
-				if not (ok and type(got) == "table") then
-					ok, got = pcall(field, plot)
-				end
-				raw = if ok and type(got) == "table" then got else nil
-			elseif type(field) == "table" then
-				raw = field
-			end
-			if raw then
-				break
-			end
+	if plot and layout and type(layout.stands) == "function" then
+		local site: any = plot
+		if type(layout.site) == "function" then
+			local ok, got = pcall(layout.site, plotId, level)
+			site = if ok and type(got) == "table" then got else plot
 		end
-		if type(raw) == "table" then
+		local count: number? = nil
+		if type(layout.capacity) == "function" then
+			local ok, got = pcall(layout.capacity, level)
+			count = if ok and type(got) == "number" then got else nil
+		end
+		local ok, raw = pcall(layout.stands, site, count)
+		if ok and type(raw) == "table" then
 			for index, value in raw do
-				local place = if type(index) == "number" then placeOf(value, plot, 0) else nil
+				local place = if type(index) == "number" then placeOf(value, site, 0) else nil
 				if place then
 					list[index] = place
 				end
 			end
 		end
 	end
-	standSpots[plotId] = list
+	byLevel[level] = list
 	return list
 end
 
--- The display stands a warehouse has (Config.Warehouse.Stands, else the layout's count; nil: not known).
+-- The display stands a warehouse starts with (8.3: its level's, WarehouseLayout.count; else Config.Warehouse.Stands,
+-- else the spots found; nil: not known).
 local function standCount(): number?
+	local layout = warehouseLayout()
+	if layout and type(layout.count) == "function" then
+		local ok, count = pcall(layout.count, warehouseLevel())
+		if ok and type(count) == "number" then
+			return count
+		end
+	end
 	local warehouse = (Config :: any).Warehouse
 	if type(warehouse) == "table" and type(warehouse.Stands) == "number" then
 		return warehouse.Stands
@@ -300,7 +322,9 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	elseif kind == "stand" then
 		if plotId and plot then
 			local spots = standsOf(plotId)
-			local owned = world.ownedStands -- (8.1: only the stands this warehouse has bought: never a locked one)
+			-- (8.1: only the stands this warehouse has bought: never a locked one; 8.3: the server's count, else the
+			-- level's own stands, the spots being all the level has)
+			local owned = if type(world.ownedStands) == "number" then world.ownedStands else standCount()
 			if type(owned) == "number" and owned < #spots then
 				local some = world.someSpots -- (8.2 perf: one table, refilled: a look makes none)
 				table.clear(some)
