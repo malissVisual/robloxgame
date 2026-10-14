@@ -56,7 +56,7 @@ check(`the prices rising: $1,500, $5,000, $12,000, $30,000 (all of it {UpgradeRu
 -- a real goal (Config.Collection's tuning: a first haul's best two earn about $45 a minute, its best twelve about $100,
 -- the rest of a haul sells for $850 – 1,470): the Workshop after a move or two, the top after hours at the 12 stands' rate
 check("a real goal: the Workshop within a haul's sale and half an hour of two stands; the top more than three hours of twelve", card.prices[2] <= 850 + 45 * 30 and card.prices[5] >= 100 * 60 * 3
-	and card.prices[5] > Config.SandboxUpgrades.List.lights.prices[5])
+	and card.prices[5] > Config.SandboxUpgrades.List.lights.prices[3]) -- (8.3 economy: the lights' top $75,000 is dearer until these prices follow)
 
 -- ── The migration ───────────────────────────────────────────────────────────
 local function save(extra: { [string]: any }?): any

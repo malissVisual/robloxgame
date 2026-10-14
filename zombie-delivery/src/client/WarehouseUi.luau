@@ -4,7 +4,8 @@
 -- or sold any time. The server decides every value; this window only shows them and asks through the "Collection"
 -- remote:
 --   { kind = "state", stock, income, stands }   kept (WarehouseUi.state, WarehouseUi.onState); an open window is drawn
---                                               again only when what it shows changed (its scroll kept)
+--                                               again only when what it shows changed (its scroll kept); 8.3 economy:
+--                                               `idle` the share the stands pay while you are idle (else none)
 --   { kind = "pick", stand }                    an empty display stand's prompt (Collection.openPicker): THE PICKER
 --   { kind = "sold", name, money }              a toast "Sold Grandpa's Clock · +$420" (WarehouseUi.notify, else
 --                                               client/Hud.luau's toast)
@@ -99,6 +100,7 @@ export type State = {
 	stands: number,
 	market: Market.View?, -- 8.3: the player's market (nil: none sent)
 	marketAt: number, -- 8.3: os.clock() it came (its `left` counts from then)
+	idle: number?, -- 8.3 economy: idle, the share of `income` the stands pay (nil: active, all of it)
 }
 export type Values = { rarity: string, perMinute: number, sell: number }
 export type Layout = {
@@ -1446,7 +1448,8 @@ local function setState(raw: any)
 		end
 	end
 	local previous = current
-	local state: State = { stock = stock, income = amount(raw.income) or 0, stands = amount(raw.stands) or 0, market = Market.readView(raw.market), marketAt = os.clock() }
+	local idle = amount(raw.idle) -- (8.3 economy: idle, the stands' share)
+	local state: State = { stock = stock, income = amount(raw.income) or 0, stands = amount(raw.stands) or 0, market = Market.readView(raw.market), marketAt = os.clock(), idle = if idle and idle < 1 then idle else nil }
 	current = state
 	for _, fn in listeners do
 		task.spawn(fn, state, previous)

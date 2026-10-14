@@ -190,6 +190,16 @@ do
 		end
 	end
 	check("the weekly is a bigger one: more to do than a daily of its event, more than twice its reward", bigger)
+	-- 8.3 economy (saving up): the dailies and the weekly about 0.6 × what they paid, the rare pieces' targets rarer
+	local sum, n = 0, 0
+	for _, def in T.DailyPool do
+		sum += def.money
+		n += 1
+	end
+	local rare, wRare = SandboxTasks.def("rare") :: SandboxTasks.Def, SandboxTasks.def("w_rare") :: SandboxTasks.Def
+	check(`8.3 economy: the bonus $300, the dailies $120 – 200 (mean {math.floor(sum / n + 0.5)}), the weekly $1,200 – 2,000; rare 1-2 a day, 10-20 a week`,
+		T.AllDaily == 300 and sum / n >= 120 and sum / n <= 160 and rare.target[1] == 1 and rare.target[2] == 2 and wRare.target[1] == 10 and wRare.target[2] == 20
+		and SandboxTasks.def("clean").money == 200 and SandboxTasks.def("w_clean").money == 2000 and SandboxTasks.def("w_sell").money == 1200)
 end
 
 -- ── Rewards and titles ──────────────────────────────────────────────────────
@@ -286,7 +296,7 @@ do
 		SandboxTasks.note(saved, "moves", 1)
 	end
 	money, why = SandboxTasks.claim(saved, "weekly")
-	check("the weekly done: its own claim, a bigger reward, once", money == SandboxTasks.rewardOf(SandboxTasks.def("w_moves") :: SandboxTasks.Def, 5) and (money :: number) >= 2000
+	check("the weekly done: its own claim, a bigger reward, once", money == SandboxTasks.rewardOf(SandboxTasks.def("w_moves") :: SandboxTasks.Def, 5) and (money :: number) >= 1000
 		and why == "Finish 5 moves" and SandboxTasks.claim(saved, "weekly") == nil)
 	local noWeek = made({ { "home", 8 } })
 	check("no weekly: claiming it refused", SandboxTasks.claim(noWeek, "weekly") == nil)

@@ -148,9 +148,10 @@ check("the milestones in order: found 10, found 20, all the furniture, every col
 check("… their names as the owner asked", M[1].name == "Found 10 pieces" and M[2].name == "Found 20 pieces" and M[4].name == "Found every collectible" and M[5].name == "A legendary!")
 local small = true
 for _, milestone in M do
-	small = small and milestone.reward >= 100 and milestone.reward <= 5000 and milestone.reward == math.floor(milestone.reward)
+	small = small and milestone.reward >= 100 and milestone.reward <= 10000 and milestone.reward == math.floor(milestone.reward)
 end
-check("… small whole-dollar rewards ($100 – 5,000), the rarer goals dearer", small and M[1].reward < M[2].reward and M[2].reward < M[3].reward and M[3].reward < M[4].reward)
+check("… whole-dollar rewards ($100 – 10,000), the rarer goals dearer", small and M[1].reward < M[2].reward and M[2].reward < M[3].reward and M[3].reward < M[4].reward)
+check("8.3 economy: $250, $500, $2,000, $10,000 and the legendary $1,500", M[1].reward == 250 and M[2].reward == 500 and M[3].reward == 2000 and M[4].reward == 10000 and M[5].reward == 1500)
 check("milestone(id): the milestone, nil for anything else", Rules.milestone("found10") == M[1] and Rules.milestone("nope") == nil and Rules.milestone(nil) == nil and Rules.milestone(5) == nil)
 local fresh = Rules.empty()
 local have, need = Rules.progress(fresh, M[1])
@@ -186,7 +187,7 @@ check("every collectible: \"Found every collectible\" due", #due == 1 and due[1]
 -- 8.4 review: 8.2's "collectibles" ($2,500 for its 12) is retired: the 24-piece one has its own id
 check("… its own id (collectibles24); 8.2's \"collectibles\" retired in its favour (no milestone of the book)", Config.CollectionBook.Retired.collectibles == "collectibles24"
 	and Rules.Retired.collectibles == "collectibles24" and Rules.milestone("collectibles") == nil and Rules.milestone("collectibles24") == M[4])
-check("… paid by an older server (\"collectibles\"): the 24 still due here (its $5,000 pays)", #Rules.due(fresh, { found10 = true, found20 = true, legendary = true, furniture = true, collectibles = true }) == 1)
+check("… paid by an older server (\"collectibles\"): the 24 still due here (its own reward pays)", #Rules.due(fresh, { found10 = true, found20 = true, legendary = true, furniture = true, collectibles = true }) == 1)
 local paidNow: { [string]: boolean } = {}
 Rules.pay(paidNow, "collectibles24")
 check("pay: the 24 marks the retired one paid too (an older server never pays its 12 again); another milestone only itself", same(paidNow, { collectibles24 = true, collectibles = true }))

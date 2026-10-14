@@ -352,7 +352,7 @@ check("… the bars: full, a third, about half", named(named(home, "Bar"), "Fill
 check("… CLAIM only on the done one (green, its reward); the others their reward in money green", named(home, "Claim") ~= nil and named(home, "Claim").Text == `CLAIM {M.MUi.money(FIRST.daily[1].money)}`
 	and named(trips, "Claim") == nil and named(trips, "Reward").Text == M.MUi.money(FIRST.daily[2].money) and named(trips, "Reward").TextColor3 == CardKit.Color.money)
 local bonus, weekly = named(panel, "Bonus"), named(panel, "Task_weekly")
-check("the bonus: \"⭐ All three done: +$500\", \"1 / 3 done\"", named(bonus, "Words").Text == "⭐ All three done: +$500" and named(bonus, "Count").Text == "1 / 3 done")
+check("the bonus: \"⭐ All three done: +$300\" (8.3 economy), \"1 / 3 done\"", named(bonus, "Words").Text == "⭐ All three done: +$300" and named(bonus, "Count").Text == "1 / 3 done")
 check("the weekly: gold, its title, \"$1,830 / $4,500\", its reward", named(weekly, "Title").Text == "Earn $4,500 from your stands" and named(weekly, "Progress").Text == "$1,830 / $4,500"
 	and named(weekly, "Reward").TextColor3 == CardKit.Color.gold and named(named(weekly, "Bar"), "Fill").BackgroundColor3 == CardKit.Color.gold)
 check("the countdowns: \"New tasks in 5 h 12 min\", \"THIS WEEK · NEW IN 1 D 5 H\"", named(panel, "Subtitle").Text == "New tasks in 5 h 12 min" and named(panel, "WeekLabel").Text == "THIS WEEK · NEW IN 1 D 5 H", named(panel, "WeekLabel").Text)

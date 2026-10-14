@@ -436,10 +436,11 @@ function VanPaintRules.mirror(rewards: { [string]: boolean }, saved: any)
 	for id in paint.owned do
 		want[VanPaintRules.Owned .. id] = true
 	end
-	for slot, id in paint.worn do
-		if id ~= (VanPaintRules.Default :: any)[slot] then
-			want[VanPaintRules.Worn .. id] = true
-		end
+	if paint.worn.paint ~= VanPaintRules.Default.paint then
+		want[VanPaintRules.Worn .. paint.worn.paint] = true
+	end
+	if paint.worn.livery ~= VanPaintRules.Default.livery then
+		want[VanPaintRules.Worn .. paint.worn.livery] = true
 	end
 	for key in rewards do
 		if mirrored(key) and not want[key] then

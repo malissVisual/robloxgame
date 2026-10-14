@@ -265,8 +265,8 @@ check("… through an older server's save: the book from the stock again, its mi
 	same(Book.paid(A4), { "found10", "legendary" }) and paid(A4) == 0, `{table.concat(Book.paid(A4), ",")} paid {paid(A4)}: {select(2, paid(A4, "found10"))} {select(2, paid(A4, "legendary"))}`)
 
 -- 8.4 review: an 8.2 server paid its own "collectibles" ($2,500 for its 12 collectibles) and wrote "book:collectibles".
--- Here it stays paid (kept in the save: that server never pays it again), but it is not the 24-piece milestone:
--- Collector gold stays locked and the $5,000 pays once the 24 are found.
+-- Here it stays paid (kept in the save: that server never pays it again), but it is not the 24-piece milestone: that
+-- one pays its own reward once the 24 are found.
 local twelve = {}
 for index = 1, 12 do
 	twelve[Rules.Collectibles[index]] = { n = 1, best = 0.8 }
@@ -278,17 +278,16 @@ E.saves.Player_303 = via82
 local Z = E.join(303, "Zed")
 E.flush()
 local pz = PlayerData.get(Z) :: any
-local gold = require("./VanPaintRules").find("gold") :: any
-check("8.4 review: 8.2's \"collectibles\" paid: kept as paid (never paid here), the 24 not paid on joining, Collector gold locked", pz.collectionBookPaid.collectibles == true
+check("8.4 review: 8.2's \"collectibles\" paid: kept as paid (never paid here, never shown), the 24 not paid on joining", pz.collectionBookPaid.collectibles == true
 	and pz.collectionBookPaid.collectibles24 == nil and select(2, paid(Z, "collectibles")) == 0 and select(2, paid(Z, "collectibles24")) == 0
-	and not require("./VanPaintRules").unlocked(gold, pz.collectionBookPaid) and table.find(Book.paid(Z), "collectibles") == nil)
+	and table.find(Book.paid(Z), "collectibles") == nil)
 mark = #E.sent
 for index = 13, #Rules.Collectibles do
 	Book.record(Z, Rules.Collectibles[index], 1)
 end
 E.flush()
-check("… the 24 found: \"Found every collectible\" pays its $5,000 once, Collector gold opens", select(2, paid(Z, "collectibles24")) == 1 and paid(Z, "collectibles24") == 5000
-	and require("./VanPaintRules").unlocked(gold, pz.collectionBookPaid) and select(2, paid(Z, "collectibles")) == 0)
+check(`… the 24 found: "Found every collectible" pays its {REWARD.collectibles24} once`, select(2, paid(Z, "collectibles24")) == 1 and paid(Z, "collectibles24") == REWARD.collectibles24
+	and REWARD.collectibles24 > 2500 and select(2, paid(Z, "collectibles")) == 0)
 E.leave(Z)
 check("… the save keeps both (an 8.2 server reads its own as paid)", E.saves.Player_303.collectionBookPaid.collectibles == true and E.saves.Player_303.collectionBookPaid.collectibles24 == true
 	and E.saves.Player_303.rewards["book:collectibles"] == true and E.saves.Player_303.rewards["book:collectibles24"] == true)

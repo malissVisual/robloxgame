@@ -28,7 +28,7 @@
 -- nothing greyed).
 -- 8.3 (the market, shared/Market.luau): on each screen the STOCK list's and the picker's line "Today's market: 🔥 … ·
 -- ❄ … · new in 5 h" (whole, clear of the header's buttons, the chips and the grid), the tags on the pieces' pictures
--- (🔥 HOT ×1.6, ❄ COLD, 📉 −10%; under ON STAND n), the prices the server's (the market's); SELL's question says why
+-- (🔥 HOT ×1.4, ❄ COLD, 📉 −10%; under ON STAND n), the prices the server's (the market's); SELL's question says why
 -- (the demand's line, hot, cold) and sends the price it showed (expect), SELL…'s totals one piece after the other with
 -- the demand's hint and the total sent (expect), never a guessed price; the HUD's "🔥 Hot today: …" toast once a day,
 -- held back while the HUD is hidden.
@@ -353,6 +353,19 @@ check("the first state: no toast", #M.toasts == 0)
 collection.OnClientEvent:Fire(state(STOCK, 36))
 M.flush()
 check("pieces on show: \"+$36/min\" in green under the money", incomeLabel.Visible and incomeLabel.Text == "+$36/min" and incomeLabel.TextColor3 == M.MTheme.Contract.good, incomeLabel.Text)
+-- 8.3 economy, AFK (server/Collection.luau): idle, the state's `idle` share: what the stands pay then, greyed, "· idle"
+local idleState = state(STOCK, 36)
+idleState.idle = 0.25
+collection.OnClientEvent:Fire(idleState)
+M.flush()
+check("8.3 economy: idle: \"+$9/min · idle\" (a quarter), greyed", incomeLabel.Visible and incomeLabel.Text == "+$9/min · idle" and incomeLabel.TextColor3 == M.MTheme.Contract.secondary, incomeLabel.Text)
+idleState.idle = 0
+collection.OnClientEvent:Fire(idleState)
+M.flush()
+check("… IdleShare 0: \"+$0/min · idle\" (the line stays: why nothing comes)", incomeLabel.Visible and incomeLabel.Text == "+$0/min · idle", incomeLabel.Text)
+collection.OnClientEvent:Fire(state(STOCK, 36))
+M.flush()
+check("… active again: \"+$36/min\" in green", incomeLabel.Text == "+$36/min" and incomeLabel.TextColor3 == M.MTheme.Contract.good, incomeLabel.Text)
 local chip = named(block, "StockChip")
 check("the chip: \"📦 7 in stock\" (the pieces not on show)", chip.Text == "📦 7 in stock", chip.Text)
 check("… no key chip on a touch screen", not named(chip, "Key").Visible)
@@ -1075,15 +1088,15 @@ do
 	local CollectionRules = require("./CollectionRules")
 	local MK = Config.Market
 	local view = { day = 20375, hot = { "record_player", "old_globe", "jukebox" }, cold = { "wardrobe" }, left = 5 * 3600 + 600,
-		demand = { vintage_radio = { n = 2, sold = 2, back = 600 }, dining_chair = { n = 1, sold = 1, back = 300 } } }
+		demand = { vintage_radio = { n = 2, sold = 2, back = 600 }, coffee_table = { n = 1, sold = 1, back = 300 } } }
 	local raw = {
 		{ uid = "m1", item = "record_player", variant = 1, condition = 0.92, name = "Old Record Player", got = 31 },
 		{ uid = "m2", item = "old_globe", variant = 1, condition = 1, name = "Old Globe", got = 32, stand = 1 },
 		{ uid = "m3", item = "wardrobe", variant = 2, condition = 0.85, name = "Wardrobe", got = 33 },
 		{ uid = "m4", item = "vintage_radio", variant = 1, condition = 0.9, name = "Vintage Radio", got = 34 },
-		{ uid = "m5", item = "dining_chair", variant = 1, condition = 0.9, name = "Chair", got = 35 },
-		{ uid = "m6", item = "dining_chair", variant = 2, condition = 0.8, name = "Chair", got = 36 },
-		{ uid = "m7", item = "dining_chair", variant = 3, condition = 0.7, name = "Chair", got = 37 },
+		{ uid = "m5", item = "coffee_table", variant = 1, condition = 0.9, name = "Coffee Table", got = 35 }, -- (8.3 economy: common pieces dear enough
+		{ uid = "m6", item = "coffee_table", variant = 2, condition = 0.8, name = "Coffee Table", got = 36 }, -- for the 5 % steps to show: a chair
+		{ uid = "m7", item = "coffee_table", variant = 3, condition = 0.7, name = "Coffee Table", got = 37 }, -- sells for $3 now)
 		{ uid = "m8", item = "jukebox", variant = 1, condition = 0.95, name = "Jukebox", got = 38, stand = 12 },
 		{ uid = "m9", item = "sofa", variant = 1, condition = 0.9, name = "Sofa", got = 39 },
 	}
@@ -1098,7 +1111,7 @@ do
 	local function marketState(market)
 		return { kind = "state", stock = stock, income = 64.2, stands = 12, market = market }
 	end
-	check("8.3: the server's views carry the market (a hot piece × 1.6, the cold one × 0.7, the radio −10 %)", byUid.m1.market == "hot" and byUid.m1.price == math.floor(byUid.m1.base * MK.HotSell + 0.5)
+	check("8.3: the server's views carry the market (a hot piece × HotSell, the cold one × 0.7, the radio −10 %)", byUid.m1.market == "hot" and byUid.m1.price == math.floor(byUid.m1.base * MK.HotSell + 0.5)
 		and byUid.m3.market == "cold" and byUid.m3.price == math.floor(byUid.m3.base * MK.ColdSell + 0.5) and byUid.m4.price == math.floor(byUid.m4.base * 0.9 + 0.5))
 
 	-- the toast: once after joining (for the day), held while the HUD is hidden
@@ -1115,8 +1128,8 @@ do
 	end
 	collection.OnClientEvent:Fire(marketState(view))
 	M.flush()
-	local hotToast = "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.6, on show ×1.25)"
-	check("the first state with a market: the toast \"🔥 Hot today: … (sell ×1.6, on show ×1.25)\"", #hotToasts() == 1 and hotToasts()[1] == hotToast and Market.hotToast(view :: any) == hotToast, hotToasts()[1])
+	local hotToast = "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.4, on show ×1.2)" -- (8.3 economy)
+	check("the first state with a market: the toast \"🔥 Hot today: … (sell ×1.4, on show ×1.2)\"", #hotToasts() == 1 and hotToasts()[1] == hotToast and Market.hotToast(view :: any) == hotToast, hotToasts()[1])
 	collection.OnClientEvent:Fire(marketState(view))
 	M.flush()
 	check("… the same day's next states: no toast again", #hotToasts() == 1)
@@ -1170,14 +1183,14 @@ do
 		local coldTag = tag("m3", "MarketTag")
 		local dropTag = tag("m4", "DemandTag")
 		local plainTag = tag("m9", "MarketTag")
-		check(`{label}: the tags: "🔥 HOT ×1.6" on a hot kind, "❄ COLD" on the cold one, "📉 −10%" on the radio, none on the sofa`, hotTag ~= nil and hotTag.Text == "🔥 HOT ×1.6" and coldTag ~= nil and coldTag.Text == "❄ COLD"
+		check(`{label}: the tags: "🔥 HOT ×1.4" on a hot kind, "❄ COLD" on the cold one, "📉 −10%" on the radio, none on the sofa`, hotTag ~= nil and hotTag.Text == "🔥 HOT ×1.4" and coldTag ~= nil and coldTag.Text == "❄ COLD"
 			and dropTag ~= nil and dropTag.Text == "📉 −10%" and plainTag == nil and tag("m9", "DemandTag") == nil)
 		check(`{label}: … each on its piece's picture, its words fitting`, within(box(hotTag), box(named(hotTile, "Picture"))) and #badTexts(hotTile) == 0 and #badTexts(named(grid, "Tile_m4")) == 0, badTexts(hotTile)[1])
 		local onStand = named(grid, "Tile_m8")
 		local ribbon, juke = named(onStand, "OnStand"), named(onStand, "MarketTag")
 		check(`{label}: … on a piece on show: under ON STAND n, not on it`, ribbon ~= nil and juke ~= nil and not overlap(box(ribbon), box(juke)) and box(juke).y0 >= box(ribbon).y1 - 0.5
 			and within(box(juke), box(named(onStand, "Picture"))))
-		local chairs = named(grid, "Tile_m5")
+		local chairs = named(grid, "Tile_m5") -- (the coffee tables)
 		check(`{label}: … the prices are the market's (the server's): the record player's "Sell {M.MUi.money(byUid.m1.price)}"`, named(hotTile, "SellPrice").Text == `Sell {M.MUi.money(byUid.m1.price)}`
 			and named(chairs, "SellPrice").Text == `Sell {M.MUi.money(byUid.m5.price)}`)
 	end
@@ -1223,7 +1236,7 @@ do
 	picker = named(gui, "Picker")
 	grid = named(picker, "Grid")
 	press(named(named(grid, "Tile_m1"), "Sell"))
-	check("… a hot piece's hint: \"🔥 Hot today: it sells for ×1.6, earns ×1.25 on show.\"", named(named(picker, "Confirm"), "Hint").Text == "🔥 Hot today: it sells for ×1.6, earns ×1.25 on show.", named(named(picker, "Confirm"), "Hint").Text)
+	check("… a hot piece's hint: \"🔥 Hot today: it sells for ×1.4, earns ×1.2 on show.\"", named(named(picker, "Confirm"), "Hint").Text == "🔥 Hot today: it sells for ×1.4, earns ×1.2 on show.", named(named(picker, "Confirm"), "Hint").Text)
 	key("Escape")
 	press(named(named(grid, "Tile_m3"), "Sell"))
 	check("… the cold one's: \"❄ Cold today: it sells for ×0.7. Keep it on show till tomorrow?\"", named(named(picker, "Confirm"), "Hint").Text == "❄ Cold today: it sells for ×0.7. Keep it on show till tomorrow?", named(named(picker, "Confirm"), "Hint").Text)
@@ -1232,7 +1245,7 @@ do
 	check("… a piece the market doesn't touch: the hint as before", named(named(picker, "Confirm"), "Hint").Text == `On show it would earn {WarehouseUi.rate(byUid.m9.income)}.`)
 	key("Escape")
 
-	-- 💰 SELL…: the market's totals, one piece after the other (the chairs: −5 %, −10 %, −15 %), the total expected
+	-- 💰 SELL…: the market's totals, one piece after the other (the coffee tables: −5 %, −10 %, −15 %), the total expected
 	press(named(picker, "SellMenu"))
 	local menuBox = named(named(picker, "Menu"), "MenuBox")
 	local pieces = {}
@@ -1241,7 +1254,7 @@ do
 	end
 	local commons = StockPlan.toSell(pieces, "common")
 	local total = StockPlan.price(commons, view :: any)
-	check("SELL…'s ALL COMMON: the three chairs at the market's total (each next one 5 % lower: under their single prices)", #commons == 3 and total < StockPlan.price(commons)
+	check("SELL…'s ALL COMMON: the three coffee tables at the market's total (each next one 5 % lower: under their single prices)", #commons == 3 and total < StockPlan.price(commons)
 		and named(named(menuBox, "Sell_common"), "Price").Text == M.MUi.money(total), named(named(menuBox, "Sell_common"), "Price").Text)
 	press(named(menuBox, "Sell_common"))
 	ask = named(picker, "Confirm")
