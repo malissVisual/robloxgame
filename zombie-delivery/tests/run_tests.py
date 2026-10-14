@@ -23,6 +23,7 @@ PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (
 PURE += ("Visitors",)  # 8.3 sandbox, the showroom's visitors: who, when, where they walk, the offers' prices (tests/visitors_test.luau)
 PURE += ("VanPaintRules",)  # 8.3 sandbox, the PAINT shop: the catalogue, the prices, the looks, the save (tests/vanpaint_test.luau)
 PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_test.luau, tests/sandboxlight_runtime_test.luau)
+PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxbadges_test.luau, tests/sandboxbadges_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -261,6 +262,18 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace(f"require(script.Parent.{module})", f"require({built})")
     assert "script.Parent" not in source, "server/VisitorOffers.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "VisitorOffersServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the Roblox badges: the real server/SandboxBadges.luau as SandboxBadgesServer.luau for
+    # tests/sandboxbadges_runtime_test.luau on the same runtime: its PlayerData, Collection and Upgrades the real ones
+    # above, Moving and SandboxLeaders the test's stand-ins (E.Moving: its onResult; E.SandboxLeaders: the board's rows),
+    # BadgeService the test's fake (through E.game's GetService).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxBadges.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("Upgrades", '"./UpgradesServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    for module in ("Moving", "SandboxLeaders"):
+        source = source.replace(f"require(script.Parent.{module})", f"E.{module}")
+    assert "script.Parent" not in source, "server/SandboxBadges.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SandboxBadgesServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.2 SANDBOX, showing off: the real server/SandboxLeaders.luau as SandboxLeadersServer.luau for
     # tests/sandboxleaders_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above) and
     # tests/runtime/LeadersRuntime.luau's few additions (an OrderedDataStore, UDim2 / UDim / Vector2, a game giving it).
