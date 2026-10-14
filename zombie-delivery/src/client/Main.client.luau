@@ -115,6 +115,7 @@ if Config.Sandbox.On then
 	safely("MoveLobbyUi", MoveLobbyUi.start)
 	safely("QuickChat", QuickChat.start)
 	safely("CarryGripUi", require(Client.CarryGripUi).start)
+	safely("WalkDoors", require(Client.WalkDoors).start) -- 8.3: the doors' leaves swing, the trip's camera behind you
 	-- (8.0 merge: the moves' and the warehouse stands' prompts are their owner's: the others' hidden, as in the city)
 	safely("CargoPrompts", require(Client.CargoPrompts).start)
 	for _, entry in own do

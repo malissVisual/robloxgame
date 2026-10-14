@@ -386,7 +386,14 @@ check("… its cabin doors as any car's", SoundPlan.swingSound("door", "opening"
 check("another van's back as before", SoundPlan.swingSound("swing", "opening", "van") == "van_back_open" and SoundPlan.swingSound("swing", "opening") == "van_back_open")
 -- The moves in the sandbox: no ramp (the Sprinter's doors are heard), no Wall's gate (the trip home's fanfare).
 check("the sandbox: the Sprinter's back plays no truck ramp", names(SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)) == "" and names(SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)) == "")
-check("… the house's door still creaks", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+check("… 8.3: the house's door creaks at its leaf as it swings (client/WalkDoors.luau), not again from the state", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == ""
+	and names(SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)) == "")
+do
+	local swing = Config.Moving.Doors.Swing
+	Config.Moving.Doors.Swing = false
+	check("… its leaves still (Doors.Swing false): the state's creak as before", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+	Config.Moving.Doors.Swing = swing
+end
 check("… and no Wall's gate at the end", SoundPlan.resultCue({ how = "done" }) == nil and SoundPlan.resultCue({ how = "late" }) == nil)
 for key, value in SB do
 	if type(value) == "number" then

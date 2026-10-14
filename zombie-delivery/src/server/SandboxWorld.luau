@@ -354,6 +354,15 @@ local function house(world: Instance): Model
 		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
 	end
 	model.Parent = world
+	-- 8.3 walk-in doors (shared/DoorSwing.luau's attributes; client/WalkDoors.luau swings it, server/Moving.luau says
+	-- when): the front door is a leaf swinging into the house as you walk up to it, hinged on the left as seen from the
+	-- path, a dark hall behind it (the chalet's body is solid there). The Blender house's own door stays still.
+	local front = body:FindFirstChild("FrontDoor")
+	if front and body:GetAttribute("MeshArt") ~= true then
+		front:SetAttribute("DoorLeaf", 1)
+		front:SetAttribute("DoorSwing", 1)
+		front:SetAttribute("DoorDark", true)
+	end
 	return model
 end
 

@@ -34,11 +34,15 @@
 -- fixture kind both have (the Stube's kachelofen) takes the farm's own look (FARM_LOOKS).
 -- The owner's Blender furniture (design/blender-furniture/): once ZDCFurnitureArt is imported, server/FurnitureMesh.luau
 -- dresses each piece in its models (the Root, its welds and its labels stay; without the import FurnitureLooks' look).
+-- 8.3 walk-in doors (the sandbox, Config.Moving.Doors Swing): the front door's two leaves stand shut across the doorway,
+-- door leaves of shared/DoorSwing.luau (the models "FrontDoorLeaf": DoorLeaf ±1 at the doorway's sides, DoorSwing -1
+-- out onto the porch, DoorAngle 90), swung open by every client as you walk up to them (frontLeaves).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local DoorSwing = require(Shared.DoorSwing) -- 8.3 walk-in doors: the front door's leaves swing
 local FurnitureLooks = require(Shared.FurnitureLooks)
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
@@ -752,6 +756,35 @@ local function farmShell(shell: Instance, decor: Instance, plan: HouseLayout.Pla
 	end
 end
 
+-- The front door's two leaves (7.x alpine: painted, a flower on each) in the doorway, its middle at `x`, the wall's
+-- outer face at `z` (the house's frame: `at`), each `leaf` wide and `tall` high, on the porch's side of the wall. 8.3
+-- walk-in doors (Config.Moving.Doors Swing; shared/DoorSwing.luau's attributes): in the sandbox each a model
+-- "FrontDoorLeaf" (its part "DoorLeaf", its flower) shut across the doorway, hinged at the doorway's side, swinging out
+-- onto the porch as you walk up to it (server/Moving.luau says when, client/WalkDoors.luau swings it, its flower
+-- turned to the porch's middle once open); elsewhere (the city's client swings none) it stands open as it always did.
+local function frontLeaves(decor: Instance, at: (number, number, number) -> CFrame, x: number, z: number, leaf: number, tall: number, paint: Color3, bloom: Color3)
+	local swings = Config.Sandbox.On and Config.Moving.Doors.Swing
+	for _, s in { -1, 1 } do
+		local leafModel = Instance.new("Model")
+		leafModel.Name = "FrontDoorLeaf"
+		local lx, lz = x + s * leaf / 2, z - 0.27
+		local p = part(leafModel, "DoorLeaf", Vector3.new(leaf, tall, 0.24), at(lx, tall / 2, lz), paint, Enum.Material.Wood)
+		local face = lz + 0.14 -- (its side to the house)
+		cylinder(part(leafModel, "Bloom", Vector3.new(0.04, 1.1, 1.1), at(lx, tall * 0.68, face) * CFrame.Angles(0, math.pi / 2, 0), bloom, SMOOTH))
+		part(leafModel, "Leaves", Vector3.new(0.9, 0.9, 0.04), at(lx, tall * 0.5, face) * CFrame.Angles(0, 0, math.pi / 4), LEAF, SMOOTH)
+		leafModel.PrimaryPart = p
+		if swings then
+			leafModel:SetAttribute("DoorLeaf", s) -- (hinged at the doorway's side: its end s)
+			leafModel:SetAttribute("DoorSwing", -1) -- (out, onto the porch: -Z)
+			leafModel:SetAttribute("DoorAngle", 90) -- (flat along the porch)
+		else
+			local swing = DoorSwing.pieces(leaf, 0.24, s, -1, 90)[1]
+			leafModel:PivotTo(p.CFrame * CFrame.new(swing.hx, 0, swing.hz) * CFrame.Angles(0, swing.yaw, 0) * CFrame.new(-swing.hx, 0, -swing.hz))
+		end
+		leafModel.Parent = decor
+	end
+end
+
 -- ── The interior ─────────────────────────────────────────────────────────────
 
 function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { [number]: Model })
@@ -914,20 +947,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 			part(shell, "PorchWall", Vector3.new(0.5, ceiling, porch), at(x + s * (w + 0.25), ceiling / 2, z - porch / 2), larch, Enum.Material.WoodPlanks, true)
 		end
 		part(shell, "PorchRoof", Vector3.new(2 * w + 1, 0.5, porch), at(x, plan.doorHeight + 1.25, z - porch / 2), larch, Enum.Material.WoodPlanks, true)
-		-- 7.x alpine: the front door's two leaves opened out against the porch's sides, a painted flower on each (on the
-		-- side toward the porch's middle): its bloom over a pair of green leaves
-		local leaf = front.width / 2
+		-- 7.x alpine: the front door's two leaves, a painted flower on each: its bloom over a pair of green leaves (8.3:
+		-- shut across the doorway, swinging out onto the porch as you walk up to it: frontLeaves)
 		local paint = DOORS[roll(#DOORS)]
 		local bloom = BLOOMS[roll(#BLOOMS)]
-		for _, s in { -1, 1 } do
-			local lx = x + s * (leaf + 0.12)
-			local lz = z - 0.15 - leaf / 2
-			local tall = plan.doorHeight - 0.15
-			part(decor, "DoorLeaf", Vector3.new(0.24, tall, leaf), at(lx, tall / 2, lz), paint, Enum.Material.Wood)
-			local face = lx - s * 0.14
-			cylinder(part(decor, "Bloom", Vector3.new(0.04, 1.1, 1.1), at(face, tall * 0.68, lz), bloom, SMOOTH))
-			part(decor, "Leaves", Vector3.new(0.04, 0.9, 0.9), at(face, tall * 0.5, lz) * CFrame.Angles(math.pi / 4, 0, 0), LEAF, SMOOTH)
-		end
+		frontLeaves(decor, at, x, z, front.width / 2, plan.doorHeight - 0.15, paint, bloom)
 		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), rgb(236, 240, 228), Enum.Material.Neon, true)
 		glow.CastShadow = false
 		local light = Instance.new("SurfaceLight")

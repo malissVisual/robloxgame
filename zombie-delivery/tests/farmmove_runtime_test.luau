@@ -25,7 +25,8 @@
 --     van's hitch.
 --   * 8.1 walk-in doors (no E): a doormat at both doors; in by walking into the barn doors' zone; the hay wagon walked
 --     into the farmhouse's way out is refused once ("Too big — use the barn doors"), nobody goes; walked into the barn
---     doors' way out, out at the barn with the other end beside, facing away; not straight back in.
+--     doors' way out, out at the barn with the other end at its far end in front (8.3: lined up), facing away; not
+--     straight back in.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -407,7 +408,10 @@ follow(wagon, ann)
 tick()
 trigger(promptIn(workspace, "Leave by the barn doors"), ann)
 follow(wagon, ann)
-check("…out by the barn doors: at the barn's outside, Bob with the other end beside", flat(E.rootOf(ann).Position, barnOut) < 4 and flat(E.rootOf(bob).Position, barnOut) < 6
+local apart = E.rootOf(bob).Position - E.rootOf(ann).Position
+local annLook = E.rootOf(ann).CFrame.LookVector
+check("…out by the barn doors: at the barn's outside, Bob with the other end at its far end, straight in front of her (8.3: lined up)",
+	flat(E.rootOf(ann).Position, barnOut) < 4 and apart.X * annLook.X + apart.Z * annLook.Z > 3 and math.abs(apart.X * annLook.Z - apart.Z * annLook.X) < 1
 	and ann.Character:GetAttribute("MoveCarry") == wagonSpot.id and bob.Character:GetAttribute("MoveCarry") == wagonSpot.id, E.rootOf(ann).Position)
 -- the Driver calls the van to the nearest door: the barn's
 E.request(ann, "call")
@@ -758,9 +762,10 @@ Moving.admin(sol, "end")
 
 -- 8.1 walk-in doors on the farm (no E): a doormat at both doors; Uma and Vic walk in by the barn doors' zone; the hay wagon
 -- (bigDoor) walked into the farmhouse's way out: refused once with the same words, nobody goes; walked into the barn
--- doors' way out: out at the barn, the other end beside, facing away from the doors.
+-- doors' way out: out at the barn, the other end at its far end in front (8.3: lined up), facing away from the doors.
 do
 	local D = T.Doors
+	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
 	local uma = E.player(166, "Uma", board + V3(-2, 0, 5))
 	local vic = E.player(167, "Vic", board + V3(-3, 0, 6))
 	E.crew[uma] = { vic }
@@ -810,7 +815,7 @@ do
 	stand(uma, barnFoot + up + barnFacing * 2, -barnFacing)
 	stand(vic, barnFoot + up + barnFacing * 2 + barnSide * 3, -barnFacing)
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	check("walked into the barn doors' zone: both in by the barn's entry (no E)", isIn(uma) and isIn(vic) and (E.rootOf(uma).Position - (o * entries[2]).Position).Magnitude < 6,
 		E.rootOf(uma).Position)
 
@@ -837,7 +842,7 @@ do
 	follow(wagon, uma)
 	local since = #E.messages
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	tick(0.4)
 	tick(0.4)
 	check("the hay wagon walked into the farmhouse's way out: refused once, \"Too big — use the barn doors\", nobody goes", isIn(uma) and isIn(vic)
@@ -852,11 +857,14 @@ do
 	stand(vic, barnExit + barnInto * 1 + side * 7.5, -barnInto)
 	follow(wagon, uma)
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	follow(wagon, uma)
 	local barnOut = V3(barnDoor.out.x, 0, barnDoor.out.z)
-	check("…walked into the barn doors' way out with it: out at the barn, Vic beside with the other end", not isIn(uma) and not isIn(vic)
-		and flat(E.rootOf(uma).Position, barnOut) < 1 and flat(E.rootOf(vic).Position, barnOut) < 5 and uma.Character:GetAttribute("MoveCarry") == wagonId
+	local apart = E.rootOf(vic).Position - E.rootOf(uma).Position
+	local look = E.rootOf(uma).CFrame.LookVector
+	check("…walked into the barn doors' way out with it: out at the barn, Vic at its far end straight in front of her (8.3: lined up)", not isIn(uma)
+		and not isIn(vic) and flat(E.rootOf(uma).Position, barnOut) < 1 and apart.X * look.X + apart.Z * look.Z > 3
+		and math.abs(apart.X * look.Z - apart.Z * look.X) < 1 and uma.Character:GetAttribute("MoveCarry") == wagonId
 		and vic.Character:GetAttribute("MoveCarry") == wagonId, E.rootOf(uma).Position)
 	check("…facing away from the barn doors, clear of their zone", E.rootOf(uma).CFrame.LookVector:Dot(barnFacing) > 0.99
 		and (E.rootOf(uma).Position - barnFoot):Dot(barnFacing) > D.Depth)
@@ -864,7 +872,7 @@ do
 	stand(uma, barnFoot + up + barnFacing * 2, -barnFacing)
 	follow(wagon, uma)
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	tick(0.3)
 	check("…and not straight back in (Rearm s)", not isIn(uma))
 	E.Net.get("PutDown").OnServerEvent:Fire(uma)

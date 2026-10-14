@@ -512,6 +512,8 @@ do
 		and door.part:IsDescendantOf(chalet)
 	check("one FrontDoor (SandboxDoor = true, no collision) at House.door", okDoor, door and string.format("%.2f, %.2f, %.2f", (door.x0 + door.x1) / 2, door.y0, door.z0))
 	check("the door is on the north wall, facing the road", door ~= nil and body ~= nil and door.z1 <= body.z0 + EPS)
+	check("8.3 the door is a door leaf (shared/DoorSwing.luau): hinged at its + end (DoorLeaf 1), swinging into the house (DoorSwing 1), a dark hall behind it",
+		door ~= nil and door.part:GetAttribute("DoorLeaf") == 1 and door.part:GetAttribute("DoorSwing") == 1 and door.part:GetAttribute("DoorDark") == true)
 	-- the Blender house's door leaves in the world (the house's frame: its bottom's middle, -Z to the road)
 	local frame = G.CFrame.new(h.x, h.y, h.z) * G.CFrame.Angles(0, math.rad(d.yaw), 0)
 	local a = HouseArt.door

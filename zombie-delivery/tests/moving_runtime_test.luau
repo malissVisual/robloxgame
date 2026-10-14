@@ -22,6 +22,11 @@
 -- in and out with a piece in your hands, a pair piece's back end does not lead (said once), its front end takes it along;
 -- the doormats (▲ IN outside while a move uses the house, ▲ OUT inside).
 -- 8.3 Danny's orders: a crew of players has no Danny, so a two-person Lift is today's (dragged alone, Help lift).
+-- 8.3 the doors swing (Config.Moving.Doors, shared/DoorSwing.luau): the leaves found and tagged at the start, shut;
+-- walking up facing a door opens its leaf before its zone, the trip waits until it has been open Open s; the fade out's
+-- FadeOut, the move FadeOut + Margin s later, the fade in's arrival (where you are, the way you face, Dark, Wait), the
+-- walk carried on; the door behind you open, both shut Shut s after their zones emptied; a pair piece's crew mate lands
+-- at its far end in front of the leader in the same moment.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -997,6 +1002,7 @@ end
 -- a piece in your hands and a pair piece's other end come along; only the move's crew on foot; the doormats.
 do
 	local D = T.Doors
+	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
 	local ivy = E.player(111, "Ivy", board + V3(-2, 0, -4))
 	local jo = E.player(112, "Jo", board + V3(-3, 0, -5))
 	local kim = E.player(113, "Kim", depot)
@@ -1097,18 +1103,18 @@ do
 	wait(D.Dwell * 0.5)
 	stand(ivy, front + facing * 4, -facing)
 	wait(0.1)
-	wait(D.Dwell + 0.2)
+	wait(THROUGH + 0.2)
 	check("brushing past (in it facing the door for less than the dwell, then out of it): no way in", not isIn(ivy) and fades(ivy, since) == 0)
 	stand(ivy, front + side * (2 / 2 + D.Side + 1.5), -facing)
 	wait(0.1)
-	wait(D.Dwell + 0.2)
+	wait(THROUGH + 0.2)
 	check("…nor beside the doorway (past its jambs)", not isIn(ivy))
 
 	-- walk in
 	stand(ivy, front, -facing)
 	wait(0.1)
 	check("in the zone facing the door: not before the dwell", not isIn(ivy))
-	wait(D.Dwell)
+	wait(THROUGH)
 	local entry = origin * M.CFrame.new(0, 0, 1)
 	check("walked in after the dwell: in the house at its entry, no E", isIn(ivy) and (E.rootOf(ivy).Position - entry.Position).Magnitude < 4, E.rootOf(ivy).Position)
 	check("…with the fade out and in", fades(ivy, since) == 2, fades(ivy, since))
@@ -1128,7 +1134,7 @@ do
 	stand(ivy, exitAt + into * 1, -into)
 	wait(0.1)
 	check("…out of the zone and back in: not before the dwell", isIn(ivy))
-	wait(D.Dwell)
+	wait(THROUGH)
 	local outside4 = foot + facing * 4
 	check("walked out by the doorway inside: at the house's door, a few studs out", not isIn(ivy) and math.abs(V3(E.rootOf(ivy).Position.X - foot.X, 0, E.rootOf(ivy).Position.Z - foot.Z).Magnitude - 4) < 0.5,
 		E.rootOf(ivy).Position)
@@ -1143,7 +1149,7 @@ do
 	check("…stepped back into the zone at once: shut for Rearm s (whichever is later)", not isIn(ivy))
 	wait(0.2)
 	wait(0.1)
-	wait(D.Dwell)
+	wait(THROUGH)
 	check("…then in again after the dwell", isIn(ivy))
 
 	-- carrying: out with a piece in the hands, in with it
@@ -1154,20 +1160,20 @@ do
 	check("(Ivy holds the TV)", ivy.Character:GetAttribute("MoveCarry") == 2)
 	stand(ivy, exitAt + into * 2, -into)
 	wait(1) -- (no teleport: a second for the way there)
-	wait(D.Dwell)
+	wait(THROUGH)
 	check("carrying: out by the door with the TV in her hands", not isIn(ivy) and ivy.Character:GetAttribute("MoveCarry") == 2 and stateOf(ivy, 2).state == "carried")
 	stand(ivy, foot + up + facing * 9, -facing)
 	wait(D.Rearm)
 	stand(ivy, front, -facing)
 	wait(0.6)
-	wait(D.Dwell)
+	wait(THROUGH)
 	check("…and in again with it", isIn(ivy) and ivy.Character:GetAttribute("MoveCarry") == 2)
 	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
 
 	-- a pair piece: the back end does not lead; the front end walks out and the other end comes along
 	stand(jo, front, -facing)
 	wait(0.1)
-	wait(D.Dwell)
+	wait(THROUGH)
 	check("Jo walks in too", isIn(jo))
 	local sofaModel = newItem(3)
 	local sofaAt = sofaModel.PrimaryPart.Position
@@ -1181,15 +1187,17 @@ do
 	stand(jo, exitAt + into * 1 + V3(1.5, 0, 0), -into)
 	stand(ivy, exitAt + into * 9, -into)
 	wait(1)
-	wait(D.Dwell)
+	wait(THROUGH)
 	wait(0.4)
 	check("the back end in the doorway first: it does not lead (said once), nobody goes", isIn(jo) and isIn(ivy) and said(jo, "front leads", since) == 1)
 	stand(ivy, exitAt + into * 2, -into)
 	stand(jo, exitAt + into * 6, -into)
 	wait(0.6)
-	wait(D.Dwell)
-	check("the front end walks out: both out with the sofa, side by side", not isIn(ivy) and not isIn(jo) and ivy.Character:GetAttribute("MoveCarry") == 3
-		and jo.Character:GetAttribute("MoveCarry") == 3 and (E.rootOf(jo).Position - E.rootOf(ivy).Position).Magnitude < 5)
+	wait(THROUGH)
+	local apart = E.rootOf(jo).Position - E.rootOf(ivy).Position
+	check("the front end walks out: both out with the sofa (8.3: Jo at its far end, straight in front of Ivy)", not isIn(ivy) and not isIn(jo)
+		and ivy.Character:GetAttribute("MoveCarry") == 3 and jo.Character:GetAttribute("MoveCarry") == 3 and V3(apart.X, 0, apart.Z).Magnitude < 8
+		and apart:Dot(E.rootOf(ivy).CFrame.LookVector) > 3, apart)
 	-- 8.1 carrying in two (client/PairSteer.luau): the leader walks backwards, facing the sofa and Jo: she backs through
 	-- the door, her back to it
 	check("8.1 (Ivy leads the sofa in two: PairTurn on her, none on Jo)", ivy.Character:GetAttribute("PairTurn") == Config.MoveHelper.PairTurn
@@ -1202,12 +1210,12 @@ do
 	stand(ivy, front, facing) -- (her back to the door, standing: a drift back to it)
 	E.rootOf(ivy).AssemblyLinearVelocity = V3(0, 0, 0)
 	wait(0.1)
-	wait(D.Dwell + 0.1)
+	wait(THROUGH + 0.1)
 	check("8.1 review: the leader standing in the zone, her back to the door, is not taken through (only walking into it)",
 		not isIn(ivy) and not isIn(jo) and fades(ivy, since) == 0)
 	E.rootOf(ivy).AssemblyLinearVelocity = -facing * (D.PairWalk + 2) -- (backing into it)
 	wait(0.1)
-	wait(D.Dwell + 0.1)
+	wait(THROUGH + 0.1)
 	check("8.1 the leader of a pair piece backs through the door (her back to it): both in with the sofa", isIn(ivy) and isIn(jo)
 		and ivy.Character:GetAttribute("MoveCarry") == 3 and jo.Character:GetAttribute("MoveCarry") == 3 and fades(ivy, since) == 2)
 	E.rootOf(ivy).AssemblyLinearVelocity = V3(0, 0, 0)
@@ -1219,11 +1227,11 @@ do
 	since = #E.messages
 	stand(jo, exitAt + into * 1, into)
 	wait(0.1)
-	wait(D.Dwell + 0.2)
+	wait(THROUGH + 0.2)
 	check("…but hands free, the back to the door is no way through (facing it, as ever)", isIn(jo) and fades(jo, since) == 0)
 	stand(jo, exitAt + into * 1, -into)
 	wait(0.1)
-	wait(D.Dwell + 0.1)
+	wait(THROUGH + 0.1)
 	check("…turned to it: out", not isIn(jo))
 	E.place(ivy, foot + up + facing * 12)
 	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
@@ -1233,6 +1241,165 @@ do
 	E.leave(ivy)
 	E.leave(jo)
 	E.leave(kim)
+end
+-- 8.3 the doors swing and the trip is smooth (Config.Moving.Doors; shared/DoorSwing.luau's attributes): the house's
+-- leaves found at the move's start and tagged for the clients, shut; walking past is no opening, walking up to the door
+-- facing it opens its leaf (DoorOpen) before its zone; the trip waits until it has been open Open s; the fade out
+-- carries FadeOut, the move comes FadeOut + Margin s after it, the fade in carries where you are (a step past the door,
+-- facing into the house) and the black's hold (Dark, Wait); the door behind you opens too, and each shuts Shut s after
+-- its zone emptied (Moving.doors' sweep); out the same way by the interior's leaf; a crew mate at a pair piece's far end
+-- lands at that end in the same moment, lined up in front of the leader, facing them.
+do
+	local D = T.Doors
+	local foot = V3(home.door.x, Map.WalkTop, home.door.z)
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	local side = V3(-facing.Z, 0, facing.X)
+	-- a leaf at Marge's door (the city's house has none: this test's, its -Z out of the door) and one in the interior
+	-- at its way out (a model, as server/HouseInterior.luau's)
+	local outLeaf = M.Instance.new("Part")
+	outLeaf.Name = "TestFrontDoor"
+	outLeaf.Size = V3(4, 7, 0.4)
+	outLeaf.CFrame = M.CFrame.lookAt(foot + V3(0, 3.5, 0), foot + V3(0, 3.5, 0) + facing)
+	outLeaf:SetAttribute("DoorLeaf", 1)
+	outLeaf:SetAttribute("DoorSwing", 1)
+	outLeaf.Parent = workspace
+	local build = E.art.interior.build
+	local inLeaf: any = nil
+	E.art.interior.build = function(plan: any, at: any): (any, any)
+		local model, pieces = build(plan, at)
+		local leaf = M.Instance.new("Model")
+		leaf.Name = "FrontDoorLeaf"
+		local part = M.Instance.new("Part")
+		part.Name = "DoorLeaf"
+		part.Size = V3(3.5, 8.8, 0.24)
+		part.CFrame = at * M.CFrame.new(1.75, 4.4, -0.3)
+		part.Parent = leaf
+		leaf.PrimaryPart = part
+		leaf:SetAttribute("DoorLeaf", 1)
+		leaf:SetAttribute("DoorSwing", -1)
+		leaf.Parent = model
+		inLeaf = leaf
+		return model, pieces
+	end
+	local kit = E.player(121, "Kit", board + V3(-2, 0, -4))
+	local lou = E.player(122, "Lou", board + V3(-3, 0, -5))
+	E.crew[kit] = { lou }
+	Moving.admin(kit, "start")
+	Moving.step()
+	E.art.interior.build = build
+	local origin = E.interiors[#E.interiors]
+	local into = V3(0, 0, 1) -- (the fake plan's +Z)
+	local exitAt = origin * V3(0, 0, 0.5) + up
+	local function stand(player: any, at: any, look: any)
+		E.rootOf(player).CFrame = M.CFrame.lookAt(at, at + look)
+	end
+	local function wait(seconds: number)
+		E.clock += seconds
+		Moving.step()
+	end
+	local function isIn(player: any): boolean
+		return (E.rootOf(player).Position - origin.Position).Magnitude < 100
+	end
+	local function open(leaf: any): boolean
+		return leaf:GetAttribute("DoorOpen") == true
+	end
+	check("8.3 the house's leaves found at the move's start, tagged for the clients (DoorLeaf), shut", outLeaf:GetAttribute("Tag_DoorLeaf") == true
+		and inLeaf ~= nil and inLeaf:GetAttribute("Tag_DoorLeaf") == true and not open(outLeaf) and not open(inLeaf))
+
+	-- walking past in its approach: shut; walking up to it facing it, out of its zone still: open, nobody goes
+	local since = #E.messages
+	stand(kit, foot + up + facing * 6, side)
+	wait(0.1)
+	check("walking past the door in its approach (looking along the wall): its leaf stays shut", not open(outLeaf))
+	stand(kit, foot + up + facing * 6, -facing)
+	wait(0.1)
+	local openedAt = E.clock
+	check("walking up to it facing it (Approach studs: out of its zone still): the leaf swings open, nobody goes yet", open(outLeaf) and not isIn(kit)
+		and D.Approach > 6 and D.Depth < 6)
+	local delays: { number } = {}
+	local runAtOnce = E.task.delay
+	E.task.delay = function(seconds: any, callback: any, ...: any)
+		table.insert(delays, seconds)
+		return runAtOnce(seconds, callback, ...)
+	end
+	stand(kit, foot + up + facing * 2, -facing)
+	E.rootOf(kit).AssemblyLinearVelocity = -facing * 10 -- (walking on into the doorway)
+	wait(0.05)
+	wait(D.Dwell + 0.01)
+	check("…in its zone the dwell done, the leaf open less than Open s: not yet", not isIn(kit) and E.clock - openedAt < D.Open)
+	wait(D.Open - (E.clock - openedAt) + 0.01)
+	E.task.delay = runAtOnce
+	local fadeOut, fadeIn = nil, nil
+	for index = since + 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == kit and m.kind == "fade" then
+			if m.a == "out" then
+				fadeOut = m
+			else
+				fadeIn = m
+			end
+		end
+	end
+	local entry = origin * M.CFrame.new(0, 0, 1)
+	check("…the leaf open Open s: in, at the entry", isIn(kit) and (E.rootOf(kit).Position - entry.Position).Magnitude < 4, E.rootOf(kit).Position)
+	check("the fade out says FadeOut s; the move comes FadeOut + Margin s after it was sent (the client's screen black)", fadeOut ~= nil and fadeOut.b == D.FadeOut
+		and table.find(delays, D.FadeOut + D.Margin) ~= nil, table.concat(delays, ", "))
+	local arrival = if fadeIn then fadeIn.c else nil
+	check("the fade in says FadeIn s and where you are: the client holds the black until it sees you there (Wait), then Dark s", fadeIn ~= nil
+		and fadeIn.b == D.FadeIn and type(arrival) == "table" and (arrival.at - E.rootOf(kit).Position).Magnitude < 1e-6 and arrival.dark == D.Dark
+		and arrival.wait == D.Wait and arrival.near == D.Arrive)
+	check("…and the way you face there: into the house, away from the door (the camera goes behind you)", arrival ~= nil and arrival.look:Dot(into) > 0.99
+		and E.rootOf(kit).CFrame.LookVector:Dot(into) > 0.99)
+	local walking = E.rootOf(kit).AssemblyLinearVelocity
+	check("…still walking: the walk's speed carried on the way you face there (no stop, no turn of the momentum)", walking ~= nil
+		and math.abs(walking:Dot(into) - 10) < 1e-6 and math.abs(walking:Dot(V3(1, 0, 0))) < 1e-6)
+	E.rootOf(kit).AssemblyLinearVelocity = V3(0, 0, 0)
+	check("the door you came in by opens behind you (the interior's leaf), the street's stays open a moment", open(inLeaf) and open(outLeaf))
+	-- their zones empty: both shut Shut s after the last want (the sweep)
+	stand(kit, exitAt + into * 12, into)
+	E.clock += D.Shut + 0.05
+	Moving.doors()
+	check("…both shut Shut s after their zones emptied (Moving.doors' sweep)", not open(outLeaf) and not open(inLeaf))
+
+	-- out by the interior's leaf with a pair piece and Lou at its far end: both out in the same moment, lined up
+	stand(lou, foot + up + facing * 2, -facing)
+	wait(0.1)
+	wait(math.max(D.Dwell, D.Open) + 0.05)
+	check("(Lou walks in too)", isIn(lou))
+	local sofa = newItem(3)
+	local sofaAt = sofa.PrimaryPart.Position
+	E.clock += D.Rearm
+	E.place(kit, sofaAt + V3(0, 0, -3))
+	E.place(lou, sofaAt + V3(0, 0, 3))
+	trigger(promptIn(sofa, "Lift"), kit)
+	trigger(promptIn(sofa, "Help lift"), lou)
+	wait(1)
+	check("(Kit leads the sofa, Lou at its far end)", kit.Character:GetAttribute("MoveCarry") == 3 and lou.Character:GetAttribute("MoveCarry") == 3)
+	since = #E.messages
+	stand(kit, exitAt + into * 6, -into)
+	stand(lou, exitAt + into * 12, -into)
+	wait(0.1)
+	check("the interior's leaf opens as Kit walks up to it", open(inLeaf) and isIn(kit))
+	stand(kit, exitAt + into * 1, -into)
+	wait(0.05)
+	wait(math.max(D.Dwell, D.Open) + 0.05)
+	local kitRoot, louRoot = E.rootOf(kit), E.rootOf(lou)
+	local ahead = (louRoot.Position - kitRoot.Position)
+	local look = kitRoot.CFrame.LookVector
+	local fades = 0
+	for index = since + 1, #E.messages do
+		local m = E.messages[index]
+		fades += if m.kind == "fade" and (m.player == kit or m.player == lou) then 1 else 0
+	end
+	check("out together: Kit a step past the door facing away from it, Lou at the sofa's far end in front of him, facing him", not isIn(kit) and not isIn(lou)
+		and math.abs(V3(kitRoot.Position.X - foot.X, 0, kitRoot.Position.Z - foot.Z).Magnitude - 4) < 0.5 and look:Dot(facing) > 0.99
+		and ahead:Dot(look) > 3 and math.abs(ahead:Dot(V3(-look.Z, 0, look.X))) < 0.5 and louRoot.CFrame.LookVector:Dot(look) < -0.99, ahead)
+	check("…in the same moment: one fade out and one fade in each", fades == 4, fades)
+	E.Net.get("PutDown").OnServerEvent:Fire(kit)
+	Moving.admin(kit, "end")
+	outLeaf:Destroy()
+	E.leave(kit)
+	E.leave(lou)
 end
 check("every interior went (slots free again)", E.destroyed == E.built, `{E.destroyed} of {E.built}`)
 

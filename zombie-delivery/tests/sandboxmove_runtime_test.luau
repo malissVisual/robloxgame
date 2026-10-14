@@ -165,12 +165,16 @@ Moving.parkVan = function(player: any, spot: any, seat: boolean, carId: string?)
 	return nil, car
 end
 
--- the map's front door (server/SandboxWorld.luau's FrontDoor: the attribute SandboxDoor), built before the move
+-- the map's front door (server/SandboxWorld.luau's FrontDoor: the attribute SandboxDoor; 8.3 a door leaf too), built
+-- before the move
 local frontDoor = M.Instance.new("Part")
 frontDoor.Name = "FrontDoor"
 frontDoor.Size = V3(4, 7, 0.4)
 frontDoor.CFrame = CF(House.door.x, 3.5, House.door.z + 0.5)
 frontDoor:SetAttribute("SandboxDoor", true)
+frontDoor:SetAttribute("DoorLeaf", 1) -- (8.3: a leaf swinging into the house, as SandboxWorld's chalet door)
+frontDoor:SetAttribute("DoorSwing", 1)
+frontDoor:SetAttribute("DoorDark", true)
 frontDoor.Parent = workspace
 
 Moving.useArt(E.art)
@@ -692,9 +696,12 @@ check("8.2: …onFinish: Ann's, \"left\", the crew of two", (lastTold("finish"))
 
 -- 8.1 walk-in doors in the sandbox (the owner: "no E at the house, neither in nor out"): the chalet's front door (the map's
 -- SandboxDoor part) walked through both ways, after the dwell, facing it; out 4 studs from the door facing the road; no
--- way straight back; its doormat on the garden path in front of it; the E prompts off.
+-- way straight back; its doormat on the garden path in front of it; the E prompts off. 8.3: its leaf (the map's door,
+-- DoorLeaf) found and tagged at the move's start, shut; swung open as Bob walks up to it, the trip after it has been
+-- open Open s; shut again Shut s after its zone emptied.
 do
 	local D = T.Doors
+	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
 	check("(Bob's move)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
 	step()
 	local o = E.interiors[#E.interiors]
@@ -719,26 +726,30 @@ do
 	check("8.1 walk-in doors: a doormat (▲ IN) in front of the chalet's door, over the garden path (its top 0.08), shown", mat ~= nil and label.Text == "▲ IN"
 		and mat.Transparency == 0 and mat.Position.Y - mat.Size.Y / 2 > 0.08 and (mat.Position - foot):Dot(facing) > 0.5 and (mat.Position - foot):Dot(facing) < D.Depth)
 	check("…Enter house on the map's door there, off", promptIn(frontDoor, "Enter house") ~= nil and not promptIn(frontDoor, "Enter house").Enabled)
+	check("8.3 the map's door is the house's leaf: tagged for the clients (DoorLeaf), shut", frontDoor:GetAttribute("Tag_DoorLeaf") == true
+		and frontDoor:GetAttribute("DoorOpen") ~= true)
 	stand(bob, foot + up + facing * 2, -facing)
 	step(0.1)
-	check("walking up to the chalet's door: not in before the dwell", not isIn(bob))
-	step(D.Dwell)
+	check("walking up to the chalet's door: not in before the dwell, its leaf swinging open (DoorOpen)", not isIn(bob) and frontDoor:GetAttribute("DoorOpen") == true)
+	step(THROUGH)
 	check("…in after it (no E), facing into the house", isIn(bob) and E.rootOf(bob).CFrame.LookVector:Dot(into) > 0.99)
+	step(D.Shut + 0.05)
+	check("8.3 …its leaf shut again Shut s after its zone emptied", frontDoor:GetAttribute("DoorOpen") == false)
 	stand(bob, exitAt + into * 8, -into)
 	step(0.1)
 	step(D.Rearm)
 	stand(bob, exitAt + into * 1, -into)
 	step(0.1)
-	step(D.Dwell)
+	step(THROUGH)
 	check("walked out by the doorway inside: 4 studs out of the chalet's door, facing the road", not isIn(bob)
 		and math.abs(flatDistance(E.rootOf(bob).Position, foot) - 4) < 0.5 and E.rootOf(bob).CFrame.LookVector:Dot(facing) > 0.99, E.rootOf(bob).Position)
 	stand(bob, foot + up + facing * 2, -facing)
 	step(0.1)
-	step(D.Dwell)
+	step(THROUGH)
 	step(0.5)
 	check("…turned straight back to the door: shut for Rearm s (no ping-pong)", not isIn(bob))
 	step(D.Rearm)
-	step(D.Dwell)
+	step(THROUGH)
 	check("…then in again", isIn(bob))
 	Moving.admin(bob, "end")
 	check("the move over: the doormat hidden again (no move at the house)", mat.Transparency == 1)

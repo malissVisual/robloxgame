@@ -18,6 +18,7 @@ PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders 
 PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
 PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
+PURE += ("DoorSwing",)  # 8.3 walk-in doors: a door leaf's swing (tests/doorswing_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
