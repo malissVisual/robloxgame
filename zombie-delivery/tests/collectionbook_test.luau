@@ -1,5 +1,5 @@
 -- 8.2 SANDBOX, the collection book's rules (shared/CollectionBookRules.luau, Config.CollectionBook): the book's pieces
--- (the catalogue without Walt's farm pieces: the ordinary furniture, then the 12 collectibles; exactly what the sandbox
+-- (the catalogue without Walt's farm pieces: the ordinary furniture, then the 24 collectibles; exactly what the sandbox
 -- house can hold), record (a discovery, the count, the best condition, nothing for a piece not in the book), the
 -- counts, the milestones (their order and rewards, progress, reached, due: each once, a legendary, every collectible,
 -- all the furniture), the admin's fill, the view for the remote (what a remote and a DataStore keep), and the save:
@@ -67,8 +67,8 @@ for _, id in FurnitureLooks.FarmPieces do
 	farm[id] = true
 end
 local expected = #FurnitureLooks.Order - #FurnitureLooks.FarmPieces
-check(`the book: the catalogue without the farm's {#FurnitureLooks.FarmPieces} pieces ({expected})`, #Rules.Pieces == expected and expected == 56, #Rules.Pieces)
-check("… the 12 collectibles (FurnitureLooks.Collectibles, in their order)", #Rules.Collectibles == 12 and same(Rules.Collectibles, FurnitureLooks.Collectibles))
+check(`the book: the catalogue without the farm's {#FurnitureLooks.FarmPieces} pieces ({expected})`, #Rules.Pieces == expected and expected == 68, #Rules.Pieces) -- (8.3: 56 + 12 collectibles)
+check("… the 24 collectibles (FurnitureLooks.Collectibles, in their order)", #Rules.Collectibles == 24 and same(Rules.Collectibles, FurnitureLooks.Collectibles))
 check("… and 44 pieces of furniture (no rarity of their own)", #Rules.Furniture == 44 and #Rules.Furniture + #Rules.Collectibles == #Rules.Pieces)
 local inOrder, noFarm, unique = true, true, true
 local seen: { [string]: boolean } = {}
@@ -129,7 +129,7 @@ check("… a worse one: n 3, best stays 0.9", Rules.record(book, "sofa", 0.2) ==
 check("… a condition out of range or garbage: 0 … 1", Rules.record(book, "tv", 7) and book.tv.best == 1 and Rules.record(book, "piano", 0 / 0) and book.piano.best == 0 and Rules.record(book, "radio", "x") and book.radio.best == 0)
 check("… a piece not in the book (a farm piece, junk): nothing", Rules.record(book, "hay_wagon", 1) == false and Rules.record(book, "nope", 1) == false and Rules.record(book, nil, 1) == false and book.hay_wagon == nil and book.nope == nil)
 local counts = Rules.counts(book)
-check("counts: 4 found of 56 (4 furniture of 44, 0 collectibles of 12, no legendary)", counts.found == 4 and counts.total == 56 and counts.furniture == 4 and counts.furnitureTotal == 44 and counts.collectibles == 0 and counts.collectiblesTotal == 12 and counts.legendary == 0)
+check("counts: 4 found of 68 (4 furniture of 44, 0 collectibles of 24, no legendary)", counts.found == 4 and counts.total == 68 and counts.furniture == 4 and counts.furnitureTotal == 44 and counts.collectibles == 0 and counts.collectiblesTotal == 24 and counts.legendary == 0)
 Rules.record(book, "oil_painting", 0.8)
 counts = Rules.counts(book)
 check("… a legendary collectible counts as a collectible and a legendary", counts.found == 5 and counts.collectibles == 1 and counts.legendary == 1)
@@ -177,7 +177,7 @@ for _, id in Rules.Furniture do
 	Rules.record(fresh, id, 1)
 end
 due = Rules.due(fresh, { found10 = true, found20 = true, legendary = true })
-check("every piece of furniture: \"All the furniture\" due (not the collectibles: 2 of 12)", #due == 1 and due[1].id == "furniture" and select(1, Rules.progress(fresh, M[4])) == 2)
+check("every piece of furniture: \"All the furniture\" due (not the collectibles: 2 of 24)", #due == 1 and due[1].id == "furniture" and select(1, Rules.progress(fresh, M[4])) == 2)
 for _, id in Rules.Collectibles do
 	Rules.record(fresh, id, 1)
 end
@@ -193,7 +193,7 @@ local part = Rules.empty()
 Rules.record(part, "sofa", 0.3)
 Rules.record(part, "sofa", 0.3)
 local added = Rules.fill(part)
-check("fill: every piece not found yet once (55 added, in order), the found ones kept", #added == 55 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 56 and same(part.jukebox, { n = 1, best = 1 }))
+check("fill: every piece not found yet once (67 added, in order), the found ones kept", #added == 67 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 68 and same(part.jukebox, { n = 1, best = 1 }))
 check("… a full book: fill adds nothing", #Rules.fill(part) == 0)
 
 -- ── view, paidList ─────────────────────────────────────────────────────────

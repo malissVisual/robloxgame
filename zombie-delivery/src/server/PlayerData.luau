@@ -59,7 +59,9 @@
 -- fills the book from its stock (its milestones pay on joining); a new player: empty.
 -- 8.1 SANDBOX: the upgrades bought at the warehouse's UPGRADES desk (sandboxUpgrades: { [id]: level },
 -- shared/UpgradeRules.luau; server/Upgrades.luau sells them), read only from a real save written with its flag
--- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.)
+-- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.) 8.3: the warehouse's level is
+-- one of them (sandboxUpgrades.warehouse); a real save without warehouseLevelKept is from before the levels and starts
+-- once at the level that keeps every stand it had (at least 4: UpgradeRules.fromSave, shared/WarehouseLevels.luau).
 -- 8.2 SANDBOX, analytics: the sandbox's own onboarding funnel's steps reached (sandboxOnboarding, a bit a step of
 -- shared/AnalyticsPlan.luau's SandboxSteps; server/Analytics.luau marks them on a sandbox server), read only from a real
 -- save written with its flag (sandboxOnboardingKept: AnalyticsPlan.sandboxFrom); an older real save is past every step.
@@ -613,7 +615,8 @@ local function applySaved(profile: Profile, saved: any)
 		profile.collectionBookPaid[id] = true
 	end
 	-- 8.1: the sandbox's upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); a save
-	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave)
+	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave). 8.3: a real save without
+	-- warehouseLevelKept gets its warehouse's level once (every stand it had and every piece on show: at least level 4)
 	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
 	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
 	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
@@ -1028,6 +1031,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		collectionBookKept = true, -- 8.2: CollectionBookRules.Flag (applySaved reads the book only with it)
 		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
 		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
+		warehouseLevelKept = true, -- 8.3: UpgradeRules.WarehouseFlag (a real save without it is migrated to its warehouse level once)
 		sandboxTasks = profile.sandboxTasks, -- 8.2
 		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
 		market = profile.market, -- 8.3

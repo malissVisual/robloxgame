@@ -33,6 +33,9 @@ sandbox window, the notices in the device's words and the first-time hints (sand
 8.3 SANDBOX: a showroom visitor's offer card (the real OfferCard: offercard.luau on sandbox_mock.luau) at 844 x 390,
 1280 x 800 and 1920 x 1080: its words, clear of the chips and the touch controls, ACCEPT / DECLINE's requests (the id
 only), the gamepad's selection on DECLINE and B, waiting under another window, the clock running out.
+8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
+keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
+words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad.
 """
 import argparse
 from pathlib import Path
@@ -120,7 +123,7 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
 local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
 local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
-    for name in ("MovingHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("MovingHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
@@ -148,7 +151,7 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
 local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
 local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
-    for name in ("MovingHud", "MoveHelperHud", "QuickChat", "MoveLobbyUi", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("MovingHud", "MoveHelperHud", "QuickChat", "MoveLobbyUi", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
@@ -238,7 +241,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     found = '''local __require = require
 local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
 '''
-    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
@@ -303,3 +306,12 @@ from offercardenv import offercard_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     offercard_env(Path(folder))
     subprocess.run([args.luau, "offercard.luau"], cwd=folder, check=True)
+# 8.3 keys: the key hints (client/KeyHints.luau with shared/SandboxPad.luau's actions and client/PadGlyph.luau) in
+# sandboxenv.py's folder (keyhintsenv.py: the real KeyHints, its HudContract, Holster and Drive stand-ins):
+# tools/phone-ui/keyhints.luau on a computer (1280 x 800) with its keys and with a gamepad (the platform's glyphs, at
+# once when it is picked up or put down), a console, a phone (none) and a phone with a gamepad; the city's strip as before.
+from keyhintsenv import keyhints_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    keyhints_env(Path(folder))
+    subprocess.run([args.luau, "keyhints.luau"], cwd=folder, check=True)

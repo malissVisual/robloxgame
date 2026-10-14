@@ -1,10 +1,11 @@
 -- 8.3 SANDBOX, the showroom's visitors (shared/Visitors.luau, Config.Visitors): the kinds (weights, names, looks: the
 -- collector's tweed, the hiker's beanie), the groups and the gaps (near: about a minute, away: every few minutes), the
 -- offer's price (always over the market price, × Min … Max, more for a rarer piece, a hot kind, a keen kind, Top at most,
--- round), the hall of every plot as the layout builds it (the start's 12 stands and all 20): a spot at every stand
--- (never on a podium, in the door's way or at the desk, inside the walls, looking at its piece), a way from the door to
--- every spot and between them whose every leg keeps clear of the podiums and the desk, the doorway beside the van (off
--- its bay), a hall of another shape (a garage with two stands) works the same, the routes are cheap; the words ("Ooh, a
+-- round), the hall of every plot at every warehouse level as the layout builds it (8.3 levels: the Garage's 2 stands to
+-- the Logistics centre's 20): a spot at every stand (never on a podium, in the door's way or at the desk, inside the
+-- walls, looking at its piece), a way from the door to every spot and between them whose every leg keeps clear of the
+-- podiums and the desk, the doorway beside the van (off its bay, behind its back, past the bollards), a few visitors a
+-- hall by its level (the Garage: one), a hall of another shape works the same, the routes are cheap; the words ("Ooh, a
 -- gramophone!", the toast "🤝 The collector offers $340 for your Gramophone", the card's lines) and the remote's offer
 -- checked on the client.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
@@ -80,7 +81,12 @@ do
 	check("a group: 1 – 3 by Group's chances", (sizes[1] or 0) == 500 and (sizes[2] or 0) == 350 and (sizes[3] or 0) == 150 and sizes[4] == nil, `{sizes[1]} {sizes[2]} {sizes[3]}`)
 	check("the gaps: near NearEvery (about a minute), away AwayEvery (every few minutes)", Visitors.gap(true, 0) == T.NearEvery[1] and Visitors.gap(true, 1) <= T.NearEvery[2]
 		and Visitors.gap(false, 0) == T.AwayEvery[1] and T.AwayEvery[1] >= 120 and T.NearEvery[2] <= 90)
-	check("the cap: a few a hall, a small number a server", T.PerHall >= 1 and T.PerHall <= 3 and T.Cap >= T.PerHall and T.Cap <= 8)
+	local most = 0
+	for _, n in T.PerHall do
+		most = math.max(most, n)
+	end
+	check("the cap: a few a hall (by its level: the Garage one), a small number a server", Visitors.perHall(1) == 1 and Visitors.perHall(2) >= 1
+		and most <= 3 and T.Cap >= most and T.Cap <= 8 and Visitors.perHall(nil) == T.PerHall[1] and Visitors.perHall(99) == T.PerHall[#T.PerHall])
 end
 
 -- ── The offer ───────────────────────────────────────────────────────────────
@@ -117,21 +123,21 @@ end
 
 -- ── The hall ────────────────────────────────────────────────────────────────
 
--- The layout's hall as server/Visitors.luau reads it (the start's level: no level argument).
-local function inputOf(plot: SandboxMap.Plot, stands: number): Visitors.HallInput
+-- The layout's hall at a level as server/Visitors.luau reads it.
+local function inputOf(plot: SandboxMap.Plot, level: number): Visitors.HallInput
 	local podiums: { Visitors.Podium } = {}
-	for i = 1, stands do
-		local s = WarehouseLayout.stand(plot, i)
+	for i = 1, WarehouseLayout.count(level) do
+		local s = WarehouseLayout.stand(plot, i, level)
 		if s then
 			table.insert(podiums, { index = i, x = s.x, z = s.z, sx = s.sx, sz = s.sz, yaw = s.yaw })
 		end
 	end
-	local desk = WarehouseLayout.terminal(plot)
-	local door = WarehouseLayout.door(plot)
+	local desk = WarehouseLayout.terminal(plot, level)
+	local door = WarehouseLayout.door(plot, level)
 	return {
-		inside = WarehouseLayout.inside(plot),
+		inside = WarehouseLayout.inside(plot, level),
 		door = { x = door.x, z = door.z, width = door.width },
-		doorPath = WarehouseLayout.doorPath(plot),
+		doorPath = WarehouseLayout.doorPath(plot, level),
 		desk = { index = 0, x = desk.x, z = desk.z, sx = desk.sx, sz = desk.sz, yaw = desk.yaw },
 		stands = podiums,
 	}
@@ -235,21 +241,46 @@ local function hallChecks(label: string, input: Visitors.HallInput, side: number
 	check(`{label}: a way in to every spot, on to the next and out, each leg straight and clear of the podiums, the desk and the walls (at most {legsMost} legs)`, #bad == 0 and legsMost <= 8, bad[1] or legsMost)
 	-- the doorway: through the door's side beside the van, in, never in the van's bay
 	local d = input.door
-	check(`{label}: the doorway: outside beside the van, through the door's side (not its middle), inside on the floor`, math.abs(door.threshold.x - d.x) <= d.width / 2
-		and math.abs(door.threshold.x - d.x) >= 2 and door.threshold.z > d.z and door.outside.z > d.z + 5 and Visitors.free(hall, door.inside.x, door.inside.z)
-		and door.inside.z < d.z and math.abs(door.inside.x - door.threshold.x) < 3)
+	check(`{label}: the doorway: outside beside the van, turning in behind its back, through the door's side (not its middle), inside on the floor`,
+		math.abs(door.threshold.x - d.x) <= d.width / 2 - 1 and math.abs(door.threshold.x - d.x) >= 2 and door.threshold.z > d.z and door.outside.z > d.z + 5
+		and door.approach.z > d.z + 1 and door.approach.z < d.z + SandboxMap.VanGap - 1 and door.approach.x == door.outside.x
+		and Visitors.free(hall, door.inside.x, door.inside.z) and door.inside.z < d.z and math.abs(door.inside.x - door.threshold.x) < 3)
 	return hall, door
 end
 
-for _, plot in SandboxMap.Plots do
-	local label = `plot {plot.id}, the start's {WarehouseLayout.count()} stands`
-	local input = inputOf(plot, WarehouseLayout.count())
-	local _, door = hallChecks(label, input, if plot.id % 2 == 0 then 1 else -1)
-	local bay = WarehouseLayout.bay(plot)
-	check(`plot {plot.id}: the visitors come and go off the van's bay (UNLOAD HERE)`, not inRect(bay, door.outside.x, door.outside.z, 1)
-		and not inRect(bay, door.threshold.x, door.threshold.z, 1), `{door.outside.x},{door.outside.z}`)
+-- the bollards by the door (from the Warehouse level on): the way in keeps a body's width off them
+local function bollardsClear(plot: SandboxMap.Plot, level: number, door: Visitors.Doorway): (boolean, string?)
+	local posts = {}
+	for _, piece in WarehouseLayout.pieces(plot, level) do
+		if string.sub(piece.name, 1, 7) == "Bollard" then
+			table.insert(posts, piece)
+		end
+	end
+	for _, post in posts do
+		for _, leg in { { door.outside, door.approach }, { door.approach, door.threshold } } do
+			local a, b = leg[1], leg[2]
+			for k = 0, 40 do
+				local x, z = a.x + (b.x - a.x) * k / 40, a.z + (b.z - a.z) * k / 40
+				if math.sqrt((x - post.at[1]) ^ 2 + (z - post.at[3]) ^ 2) < 1.6 then
+					return false, `{post.name} at {post.at[1]},{post.at[3]}`
+				end
+			end
+		end
+	end
+	return true, `{#posts} bollards`
 end
-hallChecks(`plot 1, all {WarehouseLayout.capacity()} stands (8.1's small ones too)`, inputOf(SandboxMap.Plots[1], WarehouseLayout.capacity()), 1)
+
+for _, plot in SandboxMap.Plots do
+	for level = 1, #Config.WarehouseLevels.List do
+		local name = Config.WarehouseLevels.List[level].name
+		local label = `plot {plot.id}, level {level} ({name}, {WarehouseLayout.count(level)} stands)`
+		local _, door = hallChecks(label, inputOf(plot, level), if (plot.id + level) % 2 == 0 then 1 else -1)
+		local bay = WarehouseLayout.bay(plot)
+		local clear, why = bollardsClear(plot, level, door)
+		check(`{label}: the visitors come and go off the van's bay (UNLOAD HERE: the threshold behind it) and the bollards`, not inRect(bay, door.outside.x, door.outside.z, 1)
+			and not inRect(bay, door.approach.x, door.approach.z, 1) and not inRect(bay, door.threshold.x, door.threshold.z, 0) and clear, why)
+	end
+end
 
 -- a hall of another shape (a level's: a narrow garage, two stands either side of its middle, the desk at the back)
 local garage: Visitors.HallInput = {
@@ -266,12 +297,13 @@ hallChecks("a garage's hall (two stands, a narrow door)", garage, -1)
 
 -- the routes are cheap: a hundred in the biggest hall
 do
-	local hall = Visitors.hall(inputOf(SandboxMap.Plots[3], WarehouseLayout.capacity()))
+	local biggest = #Config.WarehouseLevels.List
+	local hall = Visitors.hall(inputOf(SandboxMap.Plots[3], biggest))
 	local door = Visitors.doorway(hall, 1)
 	local started = os.clock()
 	local found = 0
 	for n = 1, 100 do
-		local stand = (n - 1) % WarehouseLayout.capacity() + 1
+		local stand = (n - 1) % WarehouseLayout.count(biggest) + 1
 		local spot = Visitors.spot(hall, stand, n / 100)
 		if spot and Visitors.route(hall, door.inside, { x = spot.x, z = spot.z }) then
 			found += 1

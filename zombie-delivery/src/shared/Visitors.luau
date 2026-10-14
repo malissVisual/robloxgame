@@ -11,7 +11,8 @@
 --     numbers, from shared/WarehouseLayout.luau for any warehouse level); a spot to look at a stand's piece (Visitors.spot:
 --     in front of the podium, else beside or behind it; never in the door's way, at the desk or on a podium); the way
 --     there round the podiums (Visitors.route: A* on the grid, cut to a few straight legs); in and out through the
---     roller door beside the van (Visitors.doorway).
+--     roller door beside the van (Visitors.doorway); a few in a hall at once by its level (Visitors.perHall: the
+--     Garage's one).
 --   * The offer: the piece's market price now × Min … Max, + Rare a rarity rank over common, + Hot for a hot kind, +
 --     the kind's pay, Top at most, rounded up to a round price, always over the market price (Visitors.offerPrice).
 --   * The words: what a visitor says (Visitors.say), the owner's toast (Visitors.toast), the card's lines
@@ -25,6 +26,8 @@
 --   Visitors.groupSize(roll)                      1 … #Group
 --   Visitors.between(range, roll)                 range[1] … range[2]
 --   Visitors.gap(near, roll)                      s until a warehouse's next group (NearEvery or AwayEvery)
+--   Visitors.perHall(level?)                      the visitors a hall holds at once at that warehouse level (PerHall's;
+--                                                 nil or junk: the first level's, past the list: its last)
 --   Visitors.offerChance(kind)                    Offer.Chance × the kind's chance (at most 1)
 --   Visitors.offerFactor(rank, hot, pay, roll)    the offer's × over the market price (Top at most)
 --   Visitors.offerPrice(market, rank, hot, pay, roll)   $ offered (whole, round, more than `market`)
@@ -37,8 +40,9 @@
 --                                                 faceZ } (nil: no free spot); roll moves it a little to the side
 --   Visitors.route(hall, from, to)                { Point } the legs from `from` to `to` (the last `to`, or the nearest
 --                                                 free point to it), nil: no way
---   Visitors.doorway(hall, side)                  { outside, threshold, inside } the way in and out on that side (−1 west,
---                                                 1 east) of the door: outside beside the van, the threshold, inside
+--   Visitors.doorway(hall, side)                  { outside, approach, threshold, inside } the way in and out on that
+--                                                 side (−1 west, 1 east) of the door: outside beside the van, where it
+--                                                 turns in behind the van's back, the threshold, inside
 --   Visitors.say(event, roll, name?, price?)      a visitor's line ("greet", "look", "offer", "sold", "declined",
 --                                                 "expired", "gone"; nil: it says nothing)
 --   Visitors.toast(who, price, name)             "🤝 The collector offers $340 for your Gramophone"
@@ -71,9 +75,11 @@ export type Hall = {
 	nz: number,
 	blocked: { boolean }, -- by cell number: i + (j - 1) × nx
 	podiums: { [number]: Podium }, -- by stand index
+	paths: { [string]: { number } }, -- the ways found (start and goal cells → the cells between): asked again, not searched
+	cached: number,
 }
 export type Spot = { x: number, z: number, faceX: number, faceZ: number }
-export type Doorway = { outside: Point, threshold: Point, inside: Point }
+export type Doorway = { outside: Point, approach: Point, threshold: Point, inside: Point }
 export type Offer = {
 	id: string,
 	name: string,
@@ -87,6 +93,8 @@ export type Offer = {
 }
 
 local SQRT2 = math.sqrt(2)
+local GREED = 1.15 -- the search's guess × this: a way a hair longer at most, found with far fewer cells looked at
+local MAX_PATHS = 300 -- the ways a hall keeps (then it starts afresh)
 local MAX_ID = 40
 local MAX_NAME = 60
 local MAX_PRICE = 2 ^ 40
@@ -179,6 +187,12 @@ function Visitors.gap(near: boolean, roll: number): number
 	return Visitors.between(if near then tune().NearEvery else tune().AwayEvery, roll)
 end
 
+function Visitors.perHall(level: number?): number
+	local list = tune().PerHall
+	local n = if finite(level) then math.clamp(math.floor(level :: number), 1, #list) else 1
+	return math.max(0, list[n] or 0)
+end
+
 -- ── The offer ───────────────────────────────────────────────────────────────
 
 function Visitors.offerChance(kind: Kind): number
@@ -237,22 +251,44 @@ end
 function Visitors.hall(input: HallInput): Hall
 	local T = tune()
 	local cell = T.Cell
+	local margin = T.Margin
 	local inside = input.inside
 	local nx = math.max(1, math.floor((inside.x1 - inside.x0) / cell))
 	local nz = math.max(1, math.floor((inside.z1 - inside.z0) / cell))
 	local x0 = (inside.x0 + inside.x1) / 2 - nx * cell / 2 -- (the grid centred on the floor)
 	local z0 = (inside.z0 + inside.z1) / 2 - nz * cell / 2
 	local blocked: { boolean } = table.create(nx * nz, false)
-	for j = 1, nz do
-		for i = 1, nx do
-			blocked[i + (j - 1) * nx] = solidAt(input, x0 + (i - 0.5) * cell, z0 + (j - 0.5) * cell, T.Margin)
+	-- every cell whose middle lies in the box (each solid thing grown by the margin): drawn on the grid, not asked of
+	-- every cell (a level 5 hall's 8,000 cells × 20 podiums)
+	local function mark(ax: number, bx: number, az: number, bz: number)
+		local i0 = math.max(1, math.ceil((ax - x0) / cell + 0.5 - 1e-9))
+		local i1 = math.min(nx, math.floor((bx - x0) / cell + 0.5 + 1e-9))
+		local j0 = math.max(1, math.ceil((az - z0) / cell + 0.5 - 1e-9))
+		local j1 = math.min(nz, math.floor((bz - z0) / cell + 0.5 + 1e-9))
+		for j = j0, j1 do
+			for i = i0, i1 do
+				blocked[i + (j - 1) * nx] = true
+			end
 		end
+	end
+	local far = 1e6
+	mark(-far, inside.x0 + margin, -far, far)
+	mark(inside.x1 - margin, far, -far, far)
+	mark(-far, far, -far, inside.z0 + margin)
+	mark(-far, far, inside.z1 - margin, far)
+	local solids: { Podium } = table.clone(input.stands)
+	if input.desk then
+		table.insert(solids, input.desk :: Podium)
+	end
+	for _, p in solids do
+		local hx, hz = extent(p)
+		mark(p.x - hx - margin, p.x + hx + margin, p.z - hz - margin, p.z + hz + margin)
 	end
 	local podiums: { [number]: Podium } = {}
 	for _, p in input.stands do
 		podiums[p.index] = p
 	end
-	return { input = input, cell = cell, x0 = x0, z0 = z0, nx = nx, nz = nz, blocked = blocked, podiums = podiums }
+	return { input = input, cell = cell, x0 = x0, z0 = z0, nx = nx, nz = nz, blocked = blocked, podiums = podiums, paths = {}, cached = 0 }
 end
 
 -- The cell (i, j) under a point, nil off the grid.
@@ -415,7 +451,7 @@ local function search(hall: Hall, si: number, sj: number, gi: number, gj: number
 	end
 	local function guess(i: number, j: number): number
 		local dx, dz = math.abs(i - gi), math.abs(j - gj)
-		return math.max(dx, dz) + (SQRT2 - 1) * math.min(dx, dz)
+		return (math.max(dx, dz) + (SQRT2 - 1) * math.min(dx, dz)) * GREED
 	end
 	push(guess(si, sj), start)
 	while #heapF > 0 do
@@ -455,10 +491,22 @@ function Visitors.route(hall: Hall, from: Point, to: Point): { Point }?
 	if not si or not sj or not gi or not gj then
 		return nil
 	end
-	local cells = search(hall, si, sj, gi, gj)
+	local key = `{si},{sj}>{gi},{gj}`
+	local cells: { number }? = hall.paths[key]
 	if not cells then
-		return nil
+		local found = search(hall, si, sj, gi, gj)
+		if not found then
+			return nil
+		end
+		if hall.cached >= MAX_PATHS then
+			table.clear(hall.paths)
+			hall.cached = 0
+		end
+		hall.paths[key] = found
+		hall.cached += 1
+		cells = found
 	end
+	assert(cells)
 	local goal: Point = if Visitors.free(hall, to.x, to.z) then { x = to.x, z = to.z } else centre(hall, gi, gj)
 	local points: { Point } = {}
 	local startFree = Visitors.free(hall, from.x, from.z)
@@ -497,8 +545,10 @@ function Visitors.doorway(hall: Hall, side: number): Doorway
 	local inner = hall.input.inside.z1 - T.Margin - hall.cell
 	local i, j = nearestOpen(hall, x, inner, 4)
 	local inside: Point = if i and j then centre(hall, i, j) else { x = x, z = inner }
+	local wide = math.max(T.Outside[1], along)
 	return {
-		outside = { x = door.x + s * T.Outside[1], z = door.z + T.Outside[2] },
+		outside = { x = door.x + s * wide, z = door.z + T.Outside[2] },
+		approach = { x = door.x + s * wide, z = door.z + T.Approach },
 		threshold = { x = x, z = door.z + T.Threshold },
 		inside = inside,
 	}

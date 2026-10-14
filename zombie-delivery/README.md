@@ -1647,6 +1647,27 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
+## The sandbox's big house in the owner's Blender model (8.2.1)
+
+The owner asked to make the European house the sandbox's chalet ("předělej ten dům na chatu v sandboxu"). 8.1 had put Marge's small house (20.36 × 12.60 × 17.57) on The Old Chalet. Shown both, the owner chose the big one ("chci ten velký dům"). `design/blender-house/house.py` has a `TARGET`:
+- `"sandbox"` (the export now): The Old Chalet's old footprint, 44 × 14.5 × 34 (the walls), the roof under 26 (the steepest pitch that fits: 31°);
+- `"city"`: Marge's 155 Willow Ln, as in 7.2 (the game has one `ZDCHouseArt`, so only one of them wears it).
+
+The house is the same classic European house, with these sandbox changes:
+- six windows a floor at the front and the back, four on each gable side, two attic windows;
+- three dormers, two chimneys on the back slope;
+- planters under the ground-floor windows too;
+- coarser tiles, flowers and frames for the bigger house: 21 pieces, about 65,000 triangles.
+
+`SandboxMap.House.house` is that box again (z 540: the front wall still at the door, z 523), `SandboxScenery.Chalet.Pitch` is 31, and the start screen's two house shots are as far out as before 8.1. 8.1's dressing is unchanged:
+- SandboxWorld puts the chalet's parts in `House_sandbox_house` and hands them to HouseMesh;
+- the chalet's House box and gable stay solid and unseen, the gable re-cut across the house under the model's roof;
+- the FrontDoor sits on the model's door.
+
+`tools/house-art/check.py` reads the export's `"target"`:
+- **sandbox:** 8.1's sandbox checks, with the greeter's spot (Config.MoveGreeters.Porch) added to what must stay clear. Marge's house, another size, keeps World's look.
+- **city:** the 7.2 checks, and the sandbox's house keeps its chalet. Give a city export's manifest as a second argument.
+
 ## The warehouse's five levels in Blender (8.0.4, design only)
 
 The owner: "a model of my own warehouse … levels 1 to 5, each bigger, starting as a garage". The game has no warehouse

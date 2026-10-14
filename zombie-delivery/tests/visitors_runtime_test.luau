@@ -42,10 +42,12 @@ local Npcs = E.fakes.Npcs
 local walks: { [any]: number } = {}
 local sent: { { npc: any, point: any } } = {} -- every leg a visitor was sent along
 local bodies: { any } = {} -- every visitor's body spawned
+local born: { [any]: any } = {} -- where each came into the world
 local spawn = Npcs.spawn
 Npcs.spawn = function(look: any, at: any): any
 	local model = spawn(look, at)
 	table.insert(bodies, model)
+	born[model] = model.PrimaryPart.Position
 	return model
 end
 Npcs.walkTo = function(npc: any, point: any, arrived: any, _timeout: any, _options: any)
@@ -90,13 +92,31 @@ do
 	check("the boot starts the visitors (no \"failed to start\", no module missing)", #failed == 0 and #E.errors == 0, table.concat(failed, " | ") .. table.concat(E.errors, " | "))
 end
 
--- the most in a hall and in the server, looked at every second of the run
-local most, mostAll = 0, 0
+-- the most in Ann's hall at each warehouse level and in the server, looked at every second of the run; and whether a
+-- visitor ever stood inside her hall's walls, on a podium or at the desk (WarehouseLayout.freeSpot at its level)
+local Warehouse = E.module("Warehouse")
+local Upgrades = E.module("Upgrades")
+local ann: any = nil -- (she joins below)
+local mostAt: { [number]: number } = {}
+local mostAll = 0
+local walled: string? = nil
+local function look()
+	local level = Warehouse.level(1)
+	mostAt[level] = math.max(mostAt[level] or 0, Visitors.count(1))
+	mostAll = math.max(mostAll, Visitors.count())
+	local inside = WarehouseLayout.inside(plot1, level)
+	for _, v in Visitors.list() do
+		local p = v.model.PrimaryPart.Position
+		if v.plot == 1 and p.X > inside.x0 and p.X < inside.x1 and p.Z > inside.z0 and p.Z < inside.z1
+			and WarehouseLayout.freeSpot(plot1, level, p.X, p.Z) ~= nil and v.state ~= "in" and v.state ~= "out" then
+			walled = walled or `{v.state} at {math.floor(p.X)},{math.floor(p.Z)} (level {level})`
+		end
+	end
+end
 local function run(seconds: number, until_: (() -> boolean)?): boolean
 	for _ = 1, math.ceil(seconds) do
 		E.advance(1)
-		most = math.max(most, Visitors.count(1))
-		mostAll = math.max(mostAll, Visitors.count())
+		look()
 		if until_ and until_() then
 			return true
 		end
@@ -112,64 +132,20 @@ local function visitorsIn(id: number): { any }
 	end
 	return out
 end
-
--- ── Ann: her warehouse, nothing on show ───────────────────────────────────
-local ann = E.join(11, "Ann")
-E.advance(2)
-local receiving = WarehouseLayout.receiving(plot1)
-E.place(ann, V3((receiving.x0 + receiving.x1) / 2 + 6, 3, (receiving.z0 + receiving.z1) / 2))
-run(90)
-check("nothing on show: nobody comes, though Ann is in her warehouse", #bodies == 0 and Visitors.count() == 0)
-
--- ── Pieces on show, Ann in her hall: a group comes ────────────────────────
-local items = { "piano", "sofa", "armchair", "grandfather_clock", "bookshelf", "guitar" }
-for index, item in items do
-	Collection.add(ann, { item = item, condition = 1 })
-	E.flush()
-	local stock = Collection.stock(ann)
-	Collection.display(ann, stock[#stock].uid, index)
+local function standIn(level: number)
+	local zone = WarehouseLayout.receiving(plot1, level)
+	return V3((zone.x0 + zone.x1) / 2 + 3, 3, (zone.z0 + zone.z1) / 2)
 end
-E.flush()
-local names: { string } = {}
-for _, entry in Collection.stock(ann) do
-	table.insert(names, string.lower(entry.name))
+local function setLevel(level: number)
+	Upgrades.admin(ann, `level{level}`)
+	run(2, function()
+		return Warehouse.level(1) == level
+	end)
 end
-local spawnedAt = E.clock
-run(T.FirstWait[2] + T.Stagger * 3 + 1, function()
-	return #bodies > 0
-end)
-check(`pieces on show, Ann at her warehouse: visitors within FirstWait s ({math.floor(E.clock - spawnedAt)} s)`, #bodies >= 1 and E.clock - spawnedAt <= T.FirstWait[2] + 1.5)
-run(T.Stagger * 3)
-local group = #bodies
-check(`… a group of 1 – 3 ({group}), the bodies in workspace.Npcs with their kind (attribute Visitor)`, group >= 1 and group <= 3 and bodies[1].Parent ~= nil
-	and Rules.kind(bodies[1]:GetAttribute("Visitor")) ~= nil)
-local bay = WarehouseLayout.bay(plot1)
-local door = WarehouseLayout.door(plot1)
-local firstLeg: any = nil
-for _, s in sent do
-	if s.npc == bodies[1] then
-		firstLeg = s.point
-		break
-	end
-end
-local startAt = bodies[1].PrimaryPart.Position
-check("… it walks in beside the van (off the UNLOAD HERE bay) through the door's side", firstLeg ~= nil and math.abs(firstLeg.X - door.x) <= door.width / 2
-	and math.abs(firstLeg.X - door.x) >= 2 and math.abs(firstLeg.Z - door.z) < 3
-	and not (startAt.X > bay.x0 and startAt.X < bay.x1 and startAt.Z > bay.z0 and startAt.Z < bay.z1))
-
--- they look at pieces: a stop at a stand with a piece, one visitor a stand, a line about it now and then
-local looked = run(60, function()
-	for _, v in visitorsIn(1) do
-		if v.state == "look" then
-			return true
-		end
-	end
-	return false
-end)
-check("a visitor stops at a piece on show and looks at it", looked)
-local path = WarehouseLayout.doorPath(plot1)
-local desk = WarehouseLayout.terminal(plot1)
-local function stopsBad(): string?
+-- What a visitor that stops (looks, offers) must never stand in: the door path, the desk's spot, a podium.
+local function stopsBad(level: number): string?
+	local path = WarehouseLayout.doorPath(plot1, level)
+	local desk = WarehouseLayout.terminal(plot1, level)
 	for _, v in visitorsIn(1) do
 		if v.state == "look" or v.state == "offer" then
 			local p = v.model.PrimaryPart.Position
@@ -179,7 +155,7 @@ local function stopsBad(): string?
 			if math.abs(p.X - desk.x) < desk.sx / 2 + T.DeskClear - 0.5 and math.abs(p.Z - desk.z) < desk.sz / 2 + T.DeskClear - 0.5 then
 				return "at the desk"
 			end
-			if WarehouseLayout.standAt(plot1, p.X, p.Z) ~= nil then
+			if WarehouseLayout.standAt(plot1, p.X, p.Z, level) ~= nil then
 				return "on a podium"
 			end
 		end
@@ -195,9 +171,106 @@ local function stopsBad(): string?
 	end
 	return nil
 end
+local function show(count: number)
+	local shown = 0
+	for _, entry in Collection.stock(ann) do
+		if entry.stand then
+			Collection.undisplay(ann, entry.uid)
+		end
+	end
+	for _, entry in Collection.stock(ann) do
+		if shown < count then
+			shown += 1
+			Collection.display(ann, entry.uid, shown)
+		end
+	end
+	E.flush()
+end
+
+-- ── Ann: her warehouse (a new player's: the Garage), nothing on show ──────
+ann = E.join(11, "Ann")
+E.advance(2)
+check("(Ann's warehouse: the Garage, level 1, 2 stands)", Warehouse.level(1) == 1 and Collection.stands(ann) == 2)
+E.place(ann, standIn(1))
+run(90)
+check("nothing on show: nobody comes, though Ann is in her warehouse", #bodies == 0 and Visitors.count() == 0)
+
+-- ── The Garage: two pieces on show, one visitor at a time ─────────────────
+local items = { "piano", "sofa", "armchair", "grandfather_clock", "bookshelf", "guitar" }
+for _, item in items do
+	Collection.add(ann, { item = item, condition = 1 })
+end
+E.flush()
+show(2)
+local names: { string } = {}
+for _, entry in Collection.stock(ann) do
+	table.insert(names, string.lower(entry.name))
+end
+local spawnedAt = E.clock
+run(T.FirstWait[2] + T.Stagger * 3 + 1, function()
+	return #bodies > 0
+end)
+check(`pieces on show, Ann at her Garage: a visitor within FirstWait s ({math.floor(E.clock - spawnedAt)} s)`, #bodies >= 1 and E.clock - spawnedAt <= T.FirstWait[2] + 1.5)
+check("… its body in workspace.Npcs with its kind (attribute Visitor)", bodies[1].Parent ~= nil and Rules.kind(bodies[1]:GetAttribute("Visitor")) ~= nil)
+local function entryChecks(level: number, body: any, label: string)
+	local bay = WarehouseLayout.bay(plot1)
+	local door = WarehouseLayout.door(plot1, level)
+	local legs = {}
+	run(20, function()
+		table.clear(legs)
+		for _, s in sent do
+			if s.npc == body then
+				table.insert(legs, s.point)
+			end
+		end
+		return #legs >= 2
+	end)
+	local startAt = born[body]
+	local approach, threshold = legs[1], legs[2]
+	check(`{label}: it walks in from beside the van (off the UNLOAD HERE bay), turns in behind its back and through the door's side`, approach ~= nil and threshold ~= nil
+		and approach.Z > door.z and approach.Z < door.z + SandboxMap.VanGap and math.abs(approach.X - door.x) > bay.x1 - plot1.vanSpot.x
+		and math.abs(threshold.X - door.x) <= door.width / 2 and math.abs(threshold.X - door.x) >= 2 and math.abs(threshold.Z - door.z) < 3
+		and not (startAt.X > bay.x0 and startAt.X < bay.x1 and startAt.Z > bay.z0 and startAt.Z < bay.z1))
+end
+entryChecks(1, bodies[1], "the Garage")
 local bad: string? = nil
+local looked = run(120, function()
+	bad = bad or stopsBad(1)
+	return false
+end)
+check(`the Garage: one visitor at a time at most ({mostAt[1]}), stopping clear of the door path, the desk and the podiums`, (mostAt[1] or 0) == Rules.perHall(1)
+	and Rules.perHall(1) == 1 and bad == nil, bad)
+
+-- ── The Big warehouse (level 4): six pieces on show, a group ──────────────
+setLevel(4)
+check("(Ann's warehouse rebuilt at level 4: 12 stands)", Warehouse.level(1) == 4 and Collection.stands(ann) == 12)
+E.place(ann, standIn(4))
+show(6)
+run(T.NearEvery[2] + T.Life, function()
+	return Visitors.count(1) == 0
+end)
+local before = #bodies
+run(T.NearEvery[2] + T.Stagger * 3 + 1, function()
+	return #bodies > before
+end)
+run(T.Stagger * 3)
+local group = #bodies - before
+check(`level 4: a group of 1 – 3 ({group})`, group >= 1 and group <= 3)
+entryChecks(4, bodies[before + 1], "level 4")
+
+-- they look at pieces: a stop at a stand with a piece, one visitor a stand, a line about it now and then
+looked = run(60, function()
+	for _, v in visitorsIn(1) do
+		if v.state == "look" then
+			return true
+		end
+	end
+	return false
+end)
+check("a visitor stops at a piece on show and looks at it", looked)
+bad = nil
 run(40, function()
-	bad = bad or stopsBad()
+	bad = bad or stopsBad(4)
 	return false
 end)
 check("… never stopping in the door path, at the desk or on a podium; one visitor a stand", bad == nil, bad)
@@ -311,9 +384,83 @@ if looker then
 		end
 	end
 	check("… Ann steps up to it: it moves on (never in a player's way)", state ~= "look", state)
-	E.place(ann, V3((receiving.x0 + receiving.x1) / 2 + 6, 3, (receiving.z0 + receiving.z1) / 2))
+	E.place(ann, standIn(4))
 end
-check(`at most PerHall ({T.PerHall}) in her hall, Cap ({T.Cap}) in the server, all along`, most <= T.PerHall and mostAll <= T.Cap and most >= 1, `{most} {mostAll}`)
+check(`at most PerHall in her hall by its level ({mostAt[1]} in the Garage, {mostAt[4]} at level 4), Cap ({T.Cap}) in the server, all along`,
+	(mostAt[1] or 0) <= Rules.perHall(1) and (mostAt[4] or 0) <= Rules.perHall(4) and (mostAt[4] or 0) >= 1 and mostAll <= T.Cap, `{mostAt[4]} {mostAll}`)
+
+-- ── A hall built again with visitors in it: a level bought, a level lost ───
+T.Offer.Chance = 0
+local function lookers(): number
+	local n = 0
+	for _, v in visitorsIn(1) do
+		if v.state == "look" then
+			n += 1
+		end
+	end
+	return n
+end
+check("(visitors looking at pieces in the Big warehouse)", run(T.NearEvery[2] + 60, function()
+	return lookers() > 0
+end))
+local inHall = Visitors.count(1)
+setLevel(5)
+local states: { [string]: boolean } = {}
+for _, v in visitorsIn(1) do
+	states[v.state] = true
+end
+check(`level 5 bought with {inHall} in the hall: rebuilt (the Logistics centre), every visitor on its way out on the new ways`, Warehouse.level(1) == 5
+	and states.look == nil and states["in"] == nil and states.offer == nil)
+run(T.Life, function()
+	return Visitors.count(1) == 0
+end)
+check("… all gone out (none stuck)", Visitors.count(1) == 0)
+for index = 1, 14 do
+	Collection.add(ann, { item = items[(index - 1) % #items + 1], condition = 1 })
+end
+E.flush()
+show(18)
+check("(level 5: visitors at its back stands)", run(T.NearEvery[2] + 120, function()
+	for _, v in visitorsIn(1) do
+		if v.state == "look" and v.stand and v.stand >= 13 then
+			return true
+		end
+	end
+	return false
+end))
+local deep: any = nil
+for _, v in visitorsIn(1) do
+	if v.state == "look" and v.stand and v.stand >= 13 then
+		deep = v.model
+	end
+end
+setLevel(1)
+local garage = WarehouseLayout.outline(plot1, 1)
+local stillInside = false
+for _, v in visitorsIn(1) do
+	local p = v.model.PrimaryPart.Position
+	if p.X > garage.x0 and p.X < garage.x1 and p.Z > garage.z0 and p.Z < garage.z1 and WarehouseLayout.freeSpot(plot1, 1, p.X, p.Z) ~= nil then
+		stillInside = true
+	end
+end
+check("back to the Garage (the admin's level 1) with visitors deep in the hall: none left in its walls, on its podiums or at its desk; the one at a back stand on its way out",
+	Warehouse.level(1) == 1 and not stillInside and deep ~= nil and (deep.Parent == nil or (function()
+		for _, v in visitorsIn(1) do
+			if v.model == deep then
+				return v.state == "out"
+			end
+		end
+		return true
+	end)()))
+run(T.Life, function()
+	return Visitors.count(1) == 0
+end)
+check("… all gone (none stuck)", Visitors.count(1) == 0)
+check("no visitor ever stood inside her hall's walls, on a podium or at the desk (a look every second, every level)", walled == nil, walled)
+setLevel(4)
+show(6)
+E.place(ann, standIn(4))
+T.Offer.Chance = 2
 
 -- ── Ann away: a group every AwayEvery s at most, no offers ────────────────
 T.Offer.Chance = 2
@@ -330,7 +477,7 @@ check(`Ann away ({T.AwayEvery[1] * 2} s): {groups} visitors came (two groups of 
 T.Offer.Chance = 0.35
 
 -- ── Every piece taken down: nobody new ────────────────────────────────────
-E.place(ann, V3((receiving.x0 + receiving.x1) / 2 + 6, 3, (receiving.z0 + receiving.z1) / 2))
+E.place(ann, standIn(4))
 for _, entry in Collection.stock(ann) do
 	if entry.stand then
 		Collection.undisplay(ann, entry.uid)

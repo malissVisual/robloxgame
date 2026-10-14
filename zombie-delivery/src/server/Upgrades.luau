@@ -3,8 +3,11 @@
 -- in your warehouse (server/Warehouse.luau builds it; its prompt, the owner's only, calls Upgrades.open), shown by
 -- client/UpgradeUi.luau; this module decides every purchase. The rules and the numbers: shared/UpgradeRules.luau,
 -- Config.SandboxUpgrades. The levels are in the save (profile.sandboxUpgrades, server/PlayerData.luau: read only from a
--- save written with its flag).
---   More stands       +2 display stands a level (CollectionRules.standsFor: 12 … 20; WarehouseLayout's upgrade stands)
+-- save written with its flag; 8.3: a save from before the warehouse's levels migrated once, UpgradeRules.fromSave).
+--   Warehouse         8.3: the warehouse's level, the Garage 1 … the Logistics centre 5 (Config.WarehouseLevels; it took
+--                     8.1's More stands' place): its stands (CollectionRules.standsFor: 2 … 20), its building
+--                     (server/Warehouse.luau builds it again at the new level, the pieces on their stands); the player
+--                     attribute Config.WarehouseLevels.Attribute holds it (the client's guide and picker)
 --   Showroom lights   the stands' income × 1.1 a level (CollectionRules.boost: the HUD, the stands' tags, the picker)
 --   Van engine        your van's top speed +5 % a level: its SpeedMult attribute (client/Drive.luau), set on every van
 --                     of yours that comes into workspace.Cars and when you buy
@@ -12,14 +15,17 @@
 --                     (shared/MoveHelperBrain.luau trained, server/MoveHelper.luau's walk)
 -- A purchase is checked here: a save loaded, a known upgrade, a warehouse of your own (SandboxPlots: a player without a
 -- plot can't), not at its top, the level the window offered (a second click on one card buys once) and the money
--- (PlayerData.spend, the reason "Upgrade", the upgrade's id its SKU). The stands and the lights change through
+-- (PlayerData.spend, the reason "Upgrade", the upgrade's id its SKU). The warehouse and the lights change through
 -- Collection.upgrade (what the stands earned up to then is paid at the old rates; a stand you lose sends its piece to
 -- the stock). Analytics: UpgradeBought (the level, the id).
 --
 --   Upgrades.levels(player)          { [id]: level } (a copy; {} before the save loads)
+--   Upgrades.warehouseLevel(player)  8.3: the player's warehouse level (the start's before the save loads)
 --   Upgrades.buy(player, id, level?) the next level of `id` (level: the one the window offered) → ok, why
 --   Upgrades.open(player)            the UPGRADES desk's prompt: the state, then { kind = "open" } to the client
---   Upgrades.admin(player, what)     the admin's ⬆ MAX UPGRADES ("max") / ↺ RESET UPGRADES ("reset") → what to say
+--   Upgrades.admin(player, what)     the admin's ⬆ MAX UPGRADES ("max") / ↺ RESET UPGRADES ("reset"); 8.3: 🏗 LEVEL n
+--                                    ("level1" … "level5": the warehouse at that level for free, the pieces on stands
+--                                    it hasn't back to the stock) → what to say
 --   Upgrades.onChanged(fn)           fn(player) after any change to a player's levels
 --   Upgrades.start()                 the remote, joining and leaving, the vans
 --
@@ -35,6 +41,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.UpgradeRules)
+local WarehouseLevels = require(Shared.WarehouseLevels) -- 8.3: the warehouse's levels
 local PlayerData = require(script.Parent.PlayerData)
 local Collection = require(script.Parent.Collection)
 local SandboxPlots = require(script.Parent.SandboxPlots)
@@ -96,6 +103,7 @@ local function applyEffects(player: Player)
 		return
 	end
 	player:SetAttribute(Config.SandboxUpgrades.Danny, Rules.level(levels, "danny"))
+	player:SetAttribute(Config.WarehouseLevels.Attribute, Rules.warehouseLevel(levels)) -- 8.3
 	local cars = workspace:FindFirstChild("Cars")
 	if cars then
 		for _, car in cars:GetChildren() do
@@ -131,6 +139,11 @@ end
 function Upgrades.levels(player: Player): Rules.Levels
 	local levels = levelsOf(player)
 	return if levels then table.clone(levels) else {}
+end
+
+function Upgrades.warehouseLevel(player: Player): number
+	local profile = PlayerData.get(player)
+	return Rules.warehouseLevel(if profile then profile.sandboxUpgrades else nil)
 end
 
 function Upgrades.buy(player: Player, id: any, expect: any): (boolean, string?)
@@ -186,6 +199,15 @@ function Upgrades.admin(player: Player, what: string): string
 			end
 		end)
 		return `ADMIN: every upgrade at its top ({Collection.stands(player)} stands, income ×{string.format("%.2f", Collection.boost(player))}).`
+	end
+	local wanted = tonumber(string.match(what, "^level(%d)$"))
+	if wanted then
+		local level = WarehouseLevels.clamp(wanted)
+		local moved = change(player, function(levels: Rules.Levels)
+			levels.warehouse = level
+		end)
+		local back = if moved == 1 then " 1 piece went back to the stock." elseif moved > 1 then ` {moved} pieces went back to the stock.` else ""
+		return `ADMIN: the warehouse at {WarehouseLevels.summary(level)}.{back}`
 	end
 	local moved = change(player, function(levels: Rules.Levels)
 		table.clear(levels)

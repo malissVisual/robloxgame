@@ -6,13 +6,16 @@
 -- price, the card, ACCEPT / DECLINE) and waits for the owner's answer: sold, it carries a little box out.
 --   * When: only to a warehouse with an owner and pieces on show; a group of 1 – 3 (Config.Visitors.Group) every
 --     NearEvery s while the owner is at their warehouse (FirstWait s after they come), else every AwayEvery s; at most
---     PerHall in one warehouse and Cap in the server.
+--     PerHall in one warehouse by its level (the Garage: one) and Cap in the server.
 --   * The bodies are server/Npcs.luau's (Npcs.spawn, its walk, its speech bubbles; the kinds' looks from
 --     shared/Visitors.luau), in workspace.Npcs. The walk goes leg by leg (Npcs.walkTo, `through` between legs, giving
 --     up when stuck) along shared/Visitors.luau's routes on the hall's grid: no PathfindingService. The hall is read
 --     through shared/WarehouseLayout.luau (its floor, door, door path, stands and desk; the warehouse's level where the
---     layout and server/Warehouse.luau know levels) and built again only when its level or its stands change (the
---     visitors in it then leave).
+--     layout and server/Warehouse.luau know levels) and built again only when its level or its stands change: a hall
+--     built again in place (a level bought) sends its visitors out on the new hall's ways, and one that the new walls, a
+--     podium or the desk would catch (WarehouseLayout.freeSpot, the new grid) is gone at once: never inside a wall.
+--     In and out beside the van: from the street's side, turning in behind the van's back (past the bollards), through
+--     the door's side.
 --   * Never in the way: a visitor never stops in the door path, at the UPGRADES desk or within Clear studs of a player,
 --     and moves on when a player comes that close while it looks (not while it waits for an answer); one visitor a
 --     stand.
@@ -60,6 +63,7 @@ type Visitor = {
 	key: string, -- the hall it came into (its level and stands)
 	hall: Rules.Hall,
 	door: Rules.Doorway,
+	side: number, -- the door's side it uses (−1 west, 1 east)
 	kind: Rules.Kind,
 	model: Model,
 	state: string, -- "in" to a stand, "look" at a piece, "offer" waiting for the answer, "out" on its way out, "done"
@@ -79,6 +83,7 @@ type Visitor = {
 type Plan = {
 	owner: Player?,
 	key: string?,
+	level: number?, -- the warehouse's level its hall was built for
 	hall: Rules.Hall?,
 	due: number?, -- os.clock() the next group comes
 	last: number?, -- os.clock() the last group came
@@ -259,8 +264,10 @@ local function remove(v: Visitor)
 	Npcs.remove(v.model)
 end
 
-local function leave(v: Visitor)
-	if v.state == "out" or v.state == "done" then
+-- Out the way it came (`again`: on new ways, already on its way out): inside the hall to the door, through it and
+-- behind the van's back; from outside the hall straight off.
+local function leave(v: Visitor, again: boolean?)
+	if v.state == "done" or (v.state == "out" and not again) then
 		return
 	end
 	v.model:SetAttribute("Busy", nil)
@@ -269,10 +276,49 @@ local function leave(v: Visitor)
 		Offers.close(v.owner, "left")
 	end
 	v.state, v.stand, v.spot = "out", nil, nil
-	local legs = Rules.route(v.hall, where(v), v.door.inside) or { v.door.inside }
-	table.insert(legs, v.door.threshold)
+	local here = where(v)
+	local r = v.hall.input.inside
+	local legs: { Rules.Point } = {}
+	if here.x >= r.x0 and here.x <= r.x1 and here.z >= r.z0 and here.z <= r.z1 then
+		legs = Rules.route(v.hall, here, v.door.inside) or { v.door.inside }
+		table.insert(legs, v.door.threshold)
+	elseif here.z < v.door.threshold.z then
+		-- (outside the hall but beside or behind it: a smaller one built round where it stood) round its nearer side
+		local side = if here.x < v.hall.input.door.x then -1 else 1
+		local x = if side < 0 then math.min(here.x, r.x0 - 3) else math.max(here.x, r.x1 + 3)
+		v.side, v.door = side, Rules.doorway(v.hall, side)
+		table.insert(legs, { x = x, z = here.z })
+		table.insert(legs, { x = x, z = v.door.approach.z })
+	end
+	table.insert(legs, v.door.approach)
 	table.insert(legs, v.door.outside)
 	walk(v, legs)
+end
+
+-- The plot's hall was built again (a level bought or lost, other stands): every visitor still there goes on the new
+-- hall's ways; one that the new walls, a podium or the desk would catch is gone at once.
+local function rebuilt(plot: SandboxMap.Plot, plan: Plan)
+	local hall = plan.hall
+	local key = plan.key
+	if not hall or not key then
+		return
+	end
+	for _, v in visitors do
+		if v.plot == plot.id and v.state ~= "done" and v.key ~= key then
+			local here = where(v)
+			local r = hall.input.inside
+			local within = here.x >= r.x0 - 1 and here.x <= r.x1 + 1 and here.z >= r.z0 - 1 and here.z <= r.z1 + 1
+			local free = Layout.freeSpot
+			local caught = type(free) == "function" and free(plot, plan.level, here.x, here.z) ~= nil
+			if within and (caught or not Rules.free(hall, here.x, here.z)) then
+				remove(v)
+			else
+				v.hall, v.key = hall, key
+				v.door = Rules.doorway(hall, v.side)
+				leave(v, true)
+			end
+		end
+	end
 end
 
 -- Is a player standing within Clear studs of the point?
@@ -409,7 +455,7 @@ end
 local function spawnOne(plot: SandboxMap.Plot, plan: Plan, owner: Player, now: number, feet: { Vector3 })
 	local hall = plan.hall
 	local key = plan.key
-	if not hall or not key or countIn(plot.id) >= T.PerHall or #visitors >= T.Cap then
+	if not hall or not key or countIn(plot.id) >= Rules.perHall(plan.level) or #visitors >= T.Cap then
 		return
 	end
 	local side = if roll() < 0.5 then -1 else 1
@@ -423,6 +469,7 @@ local function spawnOne(plot: SandboxMap.Plot, plan: Plan, owner: Player, now: n
 		key = key,
 		hall = hall,
 		door = door,
+		side = side,
 		kind = kind,
 		model = (nil :: any), -- (its body once it has a stand to go to)
 		state = "in",
@@ -442,11 +489,11 @@ local function spawnOne(plot: SandboxMap.Plot, plan: Plan, owner: Player, now: n
 		return -- (nothing it could look at: it never comes)
 	end
 	local from = at(door.outside)
-	local model = Visitors.body(kind, name, CFrame.lookAt(Vector3.new(from.X, SandboxMap.GroundTop, from.Z), Vector3.new(door.threshold.x, SandboxMap.GroundTop, door.threshold.z)))
+	local model = Visitors.body(kind, name, CFrame.lookAt(Vector3.new(from.X, SandboxMap.GroundTop, from.Z), Vector3.new(door.approach.x, SandboxMap.GroundTop, door.approach.z)))
 	nextId += 1
 	v.model, v.stand, v.spot = model, stand, spot
 	table.insert(visitors, v)
-	local route = { door.threshold, door.inside }
+	local route = { door.approach, door.threshold, door.inside }
 	for _, p in legs do
 		table.insert(route, p)
 	end
@@ -462,19 +509,20 @@ local function plotStep(plot: SandboxMap.Plot, now: number, feet: { Vector3 })
 	local plan = planOf(plot.id)
 	local owner = SandboxPlots.owner(plot.id)
 	if owner ~= plan.owner then
-		plan.owner, plan.key, plan.hall, plan.due, plan.near, plan.shown = owner, nil, nil, nil, false, nil
+		plan.owner, plan.due, plan.near, plan.shown = owner, nil, false, nil
 		table.clear(plan.queue)
+	end
+	local level = levelOf(plot.id)
+	local stands = if owner and owner.Parent then Collection.stands(owner) else 0
+	local key = `{level or 0}:{stands}`
+	if plan.key ~= key then
+		plan.key, plan.level, plan.shown = key, level, nil
+		plan.hall = hallOf(plot, stands, level)
+		rebuilt(plot, plan) -- (the visitors still there on the new hall's ways)
 	end
 	if not T.On or not owner or not owner.Parent then
 		table.clear(plan.queue)
 		return
-	end
-	local level = levelOf(plot.id)
-	local stands = Collection.stands(owner)
-	local key = `{level or 0}:{stands}`
-	if plan.key ~= key then
-		plan.key, plan.shown = key, nil
-		plan.hall = hallOf(plot, stands, level)
 	end
 	local near = ownerNear(owner, plot, level)
 	if next(shownOf(plan, owner, stands)) == nil then
@@ -493,7 +541,7 @@ local function plotStep(plot: SandboxMap.Plot, now: number, feet: { Vector3 })
 		spawnOne(plot, plan, owner, now, feet)
 	end
 	if now >= (plan.due :: number) and #plan.queue == 0 then
-		local room = math.min(T.PerHall - countIn(plot.id), T.Cap - #visitors)
+		local room = math.min(Rules.perHall(plan.level) - countIn(plot.id), T.Cap - #visitors)
 		for k = 0, math.min(room, Rules.groupSize(roll())) - 1 do
 			table.insert(plan.queue, now + k * T.Stagger)
 		end

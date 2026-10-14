@@ -140,6 +140,9 @@ local A = E.join(301, "Ann")
 local B = E.join(302, "Bob")
 E.flush()
 check("(Ann and Bob in with their saves: the tasks loaded)", profileOf(A) ~= nil and profileOf(A).sandboxTasks ~= nil and Tasks.state(A) ~= nil)
+Upgrades.admin(A, "level5") -- (8.3 levels: Ann's warehouse the Logistics centre, 20 stands; Bob's the Garage, 2)
+E.flush()
+check("(Ann at level 5: 20 stands; Bob at the start's: 2)", Collection.stands(A) == 20 and Collection.stands(B) == 2)
 for _, item in { "piano", "sofa", "sofa", "plant", "armchair" } do
 	Collection.add(A, { item = item, condition = 1 })
 end
