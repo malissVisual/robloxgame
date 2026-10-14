@@ -7,7 +7,6 @@ round, makes it 3 times bigger and moves it; HouseMesh must find the markers, un
 HouseMesh.Homes, built here with server/World.luau's buildHouse parts (the House box, the two Roof wedges, the Door,
 two Windows; World's own lines are checked to be unchanged). Checks:
   - house.py's box is the house's on the map (shared/Map.luau's lot) and every finish has a look;
-  - server/ArtStash.luau (Main's first line) takes the unanchored import out of the world, anchored;
   - every piece once, where the model has it (the import's turn and scale undone), anchored and not physical;
   - the house's own parts invisible and shadowless, still colliding where they did; the lantern a night light;
   - the walls stand on the House box's faces (nothing to walk through, no invisible wall) and the roof covers the
@@ -88,14 +87,6 @@ if MODE == "art" or MODE == "scattered" then
 		p.Parent = art
 	end
 end
--- server/Main.server.luau's first line: the import out of the world, anchored.
-local stashed = require("./ArtStash").stash()
-local anchored = true
-for _, d in art:GetDescendants() do
-	if d:IsA("BasePart") and not d.Anchored then
-		anchored = false
-	end
-end
 local Map = require("./Map")
 local Looks = require("./MoveSiteLooks")
 local HouseMesh = require("./HouseMesh")
@@ -174,7 +165,7 @@ end
 report("other", "home_suburbs_2_0_10") -- (not listed)
 HouseMesh.Homes.home_suburbs_2_0_01 = true -- (listed, another size)
 report("size", "home_suburbs_2_0_01")
-print(string.format('META {"moved":%s,"stashed":%d,"anchored":%s}', tostring(art.Parent == storage and MODE == "art"), stashed, tostring(anchored)))
+print(string.format('META {"moved":%s}', tostring(art.Parent == storage and MODE == "art")))
 print("ALL DONE")
 '''
 
@@ -185,7 +176,6 @@ def stage(tmp: Path, manifest: dict):
     text = (ROOT / "src/server/HouseMesh.luau").read_text()
     text = text.replace("require(script.Parent.DayNight)", '{ nightLight = function(p) p:SetAttribute("NightLight", true) end }')
     (tmp / "HouseMesh.luau").write_text(PREFIX + "local game, workspace = M.game, M.workspace\nlocal warn = print\n" + text)
-    (tmp / "ArtStash.luau").write_text(PREFIX + "local game, workspace = M.game, M.workspace\n" + (ROOT / "src/server/ArtStash.luau").read_text())
     shutil.copy(ROOT / "tools/vehicle-preview/roblox-mock.luau", tmp / "rbxmock.luau")
     shutil.copy(ROOT / "tools/fixtures/item-mock.luau", tmp / "ItemMock.luau")
     # Blender's coordinates of each piece's box (house.py: the game's x = Blender's -x, y = z, z = y).
@@ -260,8 +250,6 @@ def main():
         assert p["class"] != "MeshPart" and p["t"] == 0, (p["tag"], p["name"], "changed")
     for h in scattered["HOUSE"]:
         assert not h["dressed"], (h, "dressed from an import physics had thrown about")
-    assert art["META"]["stashed"] == 1 and art["META"]["anchored"], (art["META"], "ArtStash did not take the import out of the world, anchored")
-    assert plain["META"]["stashed"] == 0, plain["META"]
     assert art["META"]["moved"], "the imported model was not moved to ServerStorage"
     assert main_house["dressed"] and main_house["attr"], main_house
     parts = [p for p in art["PART"] if p["tag"] == "main"]

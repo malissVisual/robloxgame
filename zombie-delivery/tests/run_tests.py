@@ -467,6 +467,20 @@ def review72_check():
 if not review72_check():
     ok = False
 
+# 8.0.2: the owner's Blender imports leave the Workspace before anything can yield (Import 3D leaves their parts loose:
+# the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
+def imports_first_check():
+    main = open(os.path.join(os.path.dirname(HERE), "src", "server", "Main.server.luau"), encoding="utf-8").read()
+    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt")
+    first = main.find("ServerStorage")
+    wait = main.find(":WaitForChild(")
+    good = first >= 0 and wait >= 0 and first < wait and all(main.find(f'"{n}"') < wait for n in names)
+    print("== imports first: " + ("the Blender imports leave the Workspace before the server waits for anything" if good else "Main.server must move the imports out of the Workspace first"))
+    return good
+
+if not imports_first_check():
+    ok = False
+
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that
 # moved, like 6.22's KitArt, or a typo shows here instead of as "X is not a valid member of Folder" in Studio).
 requires = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "check-requires.py")], capture_output=True, text=True)

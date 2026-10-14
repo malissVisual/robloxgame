@@ -2,14 +2,23 @@
 -- Zombie Delivery: the server. Builds the world, then wires the services together. 8.0: in the sandbox
 -- (Config.Sandbox.On) server/SandboxBoot.luau boots the small test world instead of the city.
 
+-- 8.0.2: the owner's Blender imports (Import 3D leaves each in the Workspace, its parts loose: the sandbox builds no
+-- Marge's house, so nothing took ZDCHouseArt away and its pieces fell apart over the plots) leave the world first
+-- thing, before physics can move a piece; their dressers find them in ServerStorage (FurnitureMesh, HouseMesh,
+-- VanMesh, SprinterMesh read the pieces where the importer put them, against their markers).
+pcall(function()
+	for _, name in { "ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt" } do
+		local art = workspace:FindFirstChild(name)
+		if art then
+			art.Parent = game:GetService("ServerStorage")
+		end
+	end
+end)
+
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
-
--- 8.0.2: the owner's imported Blender models (Import 3D leaves them unanchored in Workspace) out of the world before
--- anything simulates them (server/ArtStash.luau), in the city and in the sandbox.
-require(script.Parent.ArtStash).stash()
 
 -- Shift sprints (client/CameraRig.luau): Roblox's own Shift Lock would fight it.
 StarterPlayer.EnableMouseLockOption = false

@@ -1617,19 +1617,18 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
-## The Blender imports leave the world at once (8.0.2)
+## The Blender dressers refuse an import that moved (8.0.3)
 
 The owner's screenshot: in the sandbox the imported `ZDCHouseArt` lay in pieces over the road. Studio's Import 3D leaves
-a model in Workspace with its MeshParts unanchored and overlapping. Nothing in the sandbox dressed (or hid) the house,
-so physics threw the pieces about. The dressers that do run read their markers only after the world's build.
+a model in Workspace with its MeshParts loose and overlapping, and the sandbox builds no Marge's house, so nothing took
+it away and physics threw the pieces about. 8.0.2 moves the imports out of the Workspace first thing in
+`Main.server.luau`.
 
-`server/ArtStash.luau` runs on `Main.server.luau`'s first line, in the city and in the sandbox. It finds every import
-(`ZDCVanArt`, `ZDCFurnitureArt`, `ZDCHouseArt`, `ZDCSprinterArt`, by name or by their markers), anchors it where it was
-put and moves it to ServerStorage, where the dressers look first.
-
-VanMesh, FurnitureMesh and HouseMesh also check that the markers still form a square frame and that every piece is
-turned alike. An import that moved anyway is refused with a warning ("put it in ServerStorage and save") instead of
-dressing from it.
+VanMesh, FurnitureMesh and HouseMesh also check that their markers still form a square frame (three equal, square
+arms) and that every piece is turned alike (the importer turns them all the same). An import that moved anyway, for
+example renamed and left in the Workspace, is refused with a warning ("put it in ServerStorage and save"), and the car,
+furniture or house keeps its own look instead of dressing from scattered pieces. `tools/house-art/check.py` tests it
+with a thrown piece.
 
 ## Marge's house: the owner's Blender model (7.2)
 
