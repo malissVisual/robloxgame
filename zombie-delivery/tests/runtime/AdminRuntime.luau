@@ -344,7 +344,7 @@ Runtime.books = {} -- { { player, what } }
 Runtime.CollectionBook = {
 	admin = function(player: any, what: string): string
 		table.insert(Runtime.books, { player = player, what = what })
-		return if what == "fill" then "ADMIN: the collection book is full (56 new, 56 pieces)." else "ADMIN: the collection book is empty."
+		return if what == "fill" then "ADMIN: the collection book is full (68 new, 68 pieces)." else "ADMIN: the collection book is empty."
 	end,
 }
 

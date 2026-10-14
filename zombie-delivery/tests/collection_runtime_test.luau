@@ -8,6 +8,10 @@
 -- one on show, scrap), the remote (every kind, garbage, the rate limit, the client never names a price), openPicker,
 -- the warehouse level's stands (8.3), leaving (the income counted is paid), the save round trip (the flag, rejoining twice
 -- gives the same, the uids go on) and the migration (an old save twice, a new player, a garbled save cleaned).
+-- 8.3, the market (shared/Market.luau): the state carries it, a hot kind's price and income, a cold kind's price, the
+-- demand (each next piece of a kind 5 % lower, also inside one bulk sale), the client's expected price (another one:
+-- refused, the state again), a step of the demand back (the state again), the save (its flag, rejoining keeps it), the
+-- day's turn at 00:00 UTC (new kinds, the demand gone, every state again), the sale's analytics and onPaid's hot share.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local E = require("./CollectionRuntime")
@@ -61,9 +65,9 @@ local money: { Money } = {}
 PlayerData.onMoney = function(player: Player, delta: number, reason: string?, sku: string?)
 	table.insert(money, { player = player, delta = delta, reason = reason, sku = sku })
 end
-local events: { { player: any, name: string, value: any, a: any } } = {}
-PlayerData.analytics.event = function(player: any, name: any, value: any, a: any)
-	table.insert(events, { player = player, name = name, value = value, a = a })
+local events: { { player: any, name: string, value: any, a: any, b: any } } = {}
+PlayerData.analytics.event = function(player: any, name: any, value: any, a: any, b: any)
+	table.insert(events, { player = player, name = name, value = value, a = a, b = b })
 end
 local heard: { any } = {}
 Collection.onChanged(function(player: Player)
@@ -296,9 +300,11 @@ ask(A, { kind = "undisplay", uid = u6 })
 check("undisplay through the remote", stockOf(A)[u6].stand == nil)
 mark = #E.sent
 local before = (PlayerData.get(A) :: any).money
+local fridgePrice = Rules.sell(stockOf(A)[u6], Collection.market(A)) -- (8.3: the market's: $80, × 0.7 on a day the fridge is cold)
 ask(A, { kind = "sell", uid = u6, money = 1e9, price = 1e9 })
 local soldNow = kinds(E.received(A, "Collection", mark), "sold")
-check("sell through the remote: the server's price ($80), never the client's", #soldNow == 1 and soldNow[1].money == 80 and (PlayerData.get(A) :: any).money == before + 80, soldNow[1] and soldNow[1].money)
+check(`sell through the remote: the server's price (the market's, \${fridgePrice}), never the client's`, #soldNow == 1 and soldNow[1].money == fridgePrice and (PlayerData.get(A) :: any).money == before + fridgePrice
+	and (fridgePrice == 80 or fridgePrice == math.floor(80 * Config.Market.ColdSell + 0.5) or fridgePrice == math.floor(80 * Config.Market.HotSell + 0.5)), soldNow[1] and soldNow[1].money)
 check("… and the state after it", #kinds(E.received(A, "Collection", mark), "state") == 1)
 mark = #E.sent
 local stockBefore = deepCopy(Collection.stock(A))
@@ -636,6 +642,147 @@ E.fire(stranger, "Collection", { kind = "fillbest" })
 E.advance(1.01)
 E.fire(stranger, "Collection", { kind = "sellmany", filter = "common" })
 check("a player whose save isn't loaded: refused, nothing sent but the why", #E.received(stranger, "Collection", mark) == 0)
+
+
+-- ── 8.3: the market (shared/Market.luau, Config.Market) ────────────────────
+do
+	local Market = require("./Market")
+	local StockPlan = require("./StockPlan")
+	local MK = Config.Market
+	local day = Market.dayOf(E.now)
+	local picks = Market.pick(day)
+	local hotKind, coldKind = picks.hot[1], picks.cold[1]
+	local plainKind = "piano"
+	for _, id in { "piano", "sofa", "bed", "tv", "wardrobe", "fridge" } do
+		if not table.find(picks.hot, id) and not table.find(picks.cold, id) then
+			plainKind = id
+			break
+		end
+	end
+	local paidLog: { { player: any, kind: string, money: number, hot: number } } = {}
+	Collection.onPaid(function(player: any, kind: string, amount: number, info: any)
+		table.insert(paidLog, { player = player, kind = kind, money = amount, hot = if type(info) == "table" then info.hot else -1 })
+	end)
+	local K = E.join(909, "Kim")
+	E.flush()
+	local joinState = kinds(E.received(K, "Collection"), "state")
+	local m0 = joinState[1] and joinState[1].market
+	check("8.3: the state carries the market: today's hot and cold kinds, the time to the next one, no demand yet", m0 ~= nil and m0.day == day and same(m0.hot, picks.hot) and same(m0.cold, picks.cold)
+		and m0.left == Market.left(day, math.floor(E.now)) and next(m0.demand) == nil)
+	local kh = Collection.add(K, { item = hotKind, condition = 1 }) :: string
+	local kc = Collection.add(K, { item = coldKind, condition = 1 }) :: string
+	local kp: { string } = {}
+	for i = 1, 5 do
+		kp[i] = Collection.add(K, { item = plainKind, condition = 1 - i / 100 }) :: string
+	end
+	E.flush()
+	local base = Rules.sell(stockOf(K)[kh])
+	local mark2 = #E.sent
+	E.fire(K, "Collection", { kind = "state" })
+	local st = kinds(E.received(K, "Collection", mark2), "state")[1]
+	local views: { [string]: any } = {}
+	for _, v in st.stock do
+		views[v.uid] = v
+	end
+	check(`… a hot kind's view ({hotKind}): the tag, its price × {MK.HotSell}, its price without the market`, views[kh].market == "hot" and views[kh].base == base and views[kh].price == math.floor(base * MK.HotSell + 0.5))
+	check(`… a cold kind's ({coldKind}): × {MK.ColdSell}; a plain one ({plainKind}): no tag, its own price`, views[kc].market == "cold" and views[kc].price == math.floor(views[kc].base * MK.ColdSell + 0.5)
+		and views[kp[1]].market == nil and views[kp[1]].price == views[kp[1]].base)
+	check("Collection.marketIncome: × HotIncome for today's hot kind, × 1 for the others (the stands' tags)", Collection.marketIncome(hotKind) == MK.HotIncome and Collection.marketIncome(plainKind) == 1)
+	Collection.display(K, kh, 1)
+	check("… the hot piece on show earns × HotIncome", near(Collection.incomePerMinute(K), Rules.income(stockOf(K)[kh], 1) * MK.HotIncome))
+	-- the hot share of the stands' pay (Collection.onPaid's last argument)
+	local logAt = #paidLog
+	E.advance(60)
+	local hotShare, incomePaid = 0, 0
+	for index = logAt + 1, #paidLog do
+		local entry = paidLog[index]
+		if entry.player == K and entry.kind == "income" then
+			hotShare += entry.hot
+			incomePaid += entry.money
+		end
+	end
+	check("onPaid \"income\": its hot share (here all of it: only the hot piece earns)", incomePaid > 0 and hotShare >= incomePaid - 1 and hotShare <= incomePaid, `{hotShare} of {incomePaid}`)
+	-- a sale at another price than the client asked: refused, the state again
+	local moneyK = (PlayerData.get(K) :: any).money
+	mark2, eventsAt = #E.sent, #events
+	E.advance(1)
+	E.fire(K, "Collection", { kind = "sell", uid = kh, expect = views[kh].price + 1 })
+	local said = E.received(K, "Notice", mark2)
+	check("sell with another expected price: refused (\"The market moved…\"), the state again, nothing sold", stockOf(K)[kh] ~= nil and (PlayerData.get(K) :: any).money == moneyK
+		and tostring(said[1]):find("market moved", 1, true) ~= nil and #kinds(E.received(K, "Collection", mark2), "state") == 1, said[1])
+	logAt = #paidLog
+	E.advance(1)
+	mark2 = #E.sent
+	local beforeHot = (PlayerData.get(K) :: any).money
+	E.fire(K, "Collection", { kind = "sell", uid = kh, expect = views[kh].price })
+	check("… at the price it showed: sold for it", stockOf(K)[kh] == nil and kinds(E.received(K, "Collection", mark2), "sold")[1].money == views[kh].price
+		and (PlayerData.get(K) :: any).money - beforeHot >= views[kh].price)
+	local soldEvent = eventsNamed("CollectionSold", eventsAt)
+	local saleLog = nil
+	for index = logAt + 1, #paidLog do
+		if paidLog[index].player == K and paidLog[index].kind == "sale" then
+			saleLog = paidLog[index]
+		end
+	end
+	check("… CollectionSold carries the market (\"hot\"); onPaid \"sale\" one hot piece", #soldEvent == 1 and soldEvent[1].b == "hot" and saleLog ~= nil and saleLog.hot == 1)
+	-- the demand: each next piece of a kind 5 % lower
+	local p1 = Rules.sell(stockOf(K)[kp[1]], Collection.market(K))
+	local got1 = Collection.sell(K, kp[1])
+	local p2expect = Market.price(Rules.sell(stockOf(K)[kp[2]]), Collection.market(K), plainKind)
+	local got2 = Collection.sell(K, kp[2])
+	local demand = (Collection.market(K) :: any).demand[plainKind]
+	check(`the demand: two {plainKind}s sold, the second 5 % under its price (the market's view: 2 sold, −10 %)`, got1 == p1 and p1 == Rules.sell({ item = plainKind, condition = 0.99 } :: any)
+		and got2 == p2expect and got2 == math.floor(Rules.sell({ item = plainKind, condition = 0.98 } :: any) * 0.95 + 0.5) and demand ~= nil and demand.n == 2 and demand.sold == 2
+		and Market.percent(Collection.market(K), plainKind) == 10, `{got1} {got2}`)
+	-- a bulk sale: one after the other on top of the demand; the confirm's total expected
+	local market = Collection.market(K)
+	local pieces = {}
+	for _, entry in Collection.stock(K) do
+		local v = Rules.view(entry, 1, market)
+		table.insert(pieces, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition, base = v.base })
+	end
+	local dupes = StockPlan.toSell(pieces, "duplicates")
+	local total = StockPlan.price(dupes, market)
+	check(`… duplicates to sell: two {plainKind}s at −10 % then −15 % (the total under their single prices)`, #dupes == 2 and total < StockPlan.price(dupes) and total == Market.batch({ { item = plainKind, base = dupes[1].base }, { item = plainKind, base = dupes[2].base } }, market), total)
+	E.advance(1.01)
+	mark2 = #E.sent
+	moneyK = (PlayerData.get(K) :: any).money
+	E.fire(K, "Collection", { kind = "sellmany", filter = "duplicates", expect = total + 5 })
+	check("sellmany with another expected total: refused (\"The market moved…\"), nothing sold, the state again", #Collection.stock(K) == 4 and (PlayerData.get(K) :: any).money - moneyK < 1
+		and tostring(E.received(K, "Notice", mark2)[1]):find("market moved", 1, true) ~= nil and #kinds(E.received(K, "Collection", mark2), "state") == 1, E.received(K, "Notice", mark2)[1])
+	E.advance(1.01)
+	mark2 = #E.sent
+	E.fire(K, "Collection", { kind = "sellmany", filter = "duplicates", expect = total })
+	local soldMany = kinds(E.received(K, "Collection", mark2), "sold")[1]
+	demand = (Collection.market(K) :: any).demand[plainKind]
+	check("… at the total it showed: sold for exactly that; the demand 4 now", soldMany ~= nil and soldMany.money == total and soldMany.count == 2 and #Collection.stock(K) == 2 and demand.n == 4 and demand.sold == 4)
+	-- the save
+	PlayerData.save(K)
+	local saveK = E.saves.Player_909
+	check("the save: the market with its flag (marketKept), the day and the kind's demand", saveK.marketKept == true and saveK.market.day == day and saveK.market.kinds[plainKind].n == 4 and saveK.market.kinds[plainKind].sold == 4)
+	E.leave(K)
+	local K2 = E.join(909, "Kim")
+	E.flush()
+	check("… rejoining: the demand kept (the same view)", (Collection.market(K2) :: any).demand[plainKind].n == 4 and (Collection.market(K2) :: any).demand[plainKind].sold == 4)
+	E.saves.Player_910 = oldSave(50)
+	local L = E.join(910, "Lou")
+	check("… an old save (no flag): no demand", next((Collection.market(L) :: any).demand) == nil and same((PlayerData.get(L) :: any).market, Market.empty()))
+	-- a step of the demand back: the state again
+	local wait = (Collection.market(K2) :: any).demand[plainKind].back
+	mark2 = #E.sent
+	E.advance(wait + Config.Collection.Tick + 1)
+	local back = kinds(E.received(K2, "Collection", mark2), "state")
+	check("a step back (Recover s on): the state goes out again with the demand 3", #back >= 1 and back[#back].market.demand[plainKind].n == 3, #back)
+	-- 00:00 UTC: the day turns
+	mark2 = #E.sent
+	E.advance((day + 1) * 86400 - E.now + Config.Collection.Tick + 1)
+	local turned = kinds(E.received(K2, "Collection", mark2), "state")
+	local last = turned[#turned]
+	check("00:00 UTC: every state again with the new day's kinds, yesterday's demand gone", last ~= nil and last.market.day == day + 1 and same(last.market.hot, Market.pick(day + 1).hot)
+		and next(last.market.demand) == nil and #kinds(E.received(A3, "Collection", mark2), "state") >= 1)
+	check("… the hot kinds' income today's (Collection.marketIncome)", Collection.marketIncome(Market.pick(day + 1).hot[1]) == MK.HotIncome)
+	E.leave(L)
+end
 
 check("no warnings (no failed save, no failed payout)", #E.warnings == 0, E.warnings[1])
 

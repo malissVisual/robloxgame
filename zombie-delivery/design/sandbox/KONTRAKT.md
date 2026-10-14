@@ -64,6 +64,10 @@ Collection.incomePerMinute(player) -> number
 Collection.openPicker(player, stand)
 Collection.onChanged(fn(player))
 Collection.onAdded(fn(player, entry))   8.2: after Collection.add took a piece (entry a copy): the collection book
+Collection.sell(player, uid, expect?)   8.3: at the market's price (shared/Market.luau); `expect` given: only at that price
+Collection.market(player) -> View?      8.3: today's hot and cold kinds and the player's demand
+Collection.marketIncome(item) -> number 8.3: today's × on a piece's income (the stands' tags)
+Collection.onPaid(fn(player, kind, money, paid))   8.3: paid = { hot } (the hot kinds' share)
 ```
 
 **The remote `"Collection"`:**
@@ -72,6 +76,7 @@ Collection.onAdded(fn(player, entry))   8.2: after Collection.add took a piece (
   - `{ kind = "state", stock = { Entry }, income = n, stands = n }`, sent after every change and on request;
   - `{ kind = "pick", stand = n }`, which opens the picker;
   - `{ kind = "sold", name, money }`.
+  - 8.3: the state also carries `market` (the player's Market View); a View has `base` (the price without the market) and `market` ("hot", "cold" or nil); `sell` and `sellmany` may carry `expect` (the price the client showed).
 
 ## Config tables
 Each worker appends its own table at the end of `shared/Config.luau`, just before `return Config`:

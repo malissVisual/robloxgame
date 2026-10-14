@@ -388,6 +388,15 @@ end
 print(`      not on every level's stands: {table.concat(misfits, ", ")}`)
 check("every piece of the sandbox house's catalogue fits every level's stands unturned (the bed 5.4 × 7.4, the sofa 7.2)", fitsAll)
 check("the big stands (10: from level 3) take every piece of the catalogue, Walt's hay wagon (6.4 × 9.6) too", fitsBig and LEVELS[3].stand == 10 and LEVELS[5].stand == 10)
+local pairsFit = true
+for _, id in { "alphorn", "trex_skull", "zombie_safe" } do
+	local def = FurnitureLooks.Items[id]
+	pairsFit = pairsFit and def ~= nil and def.class == "pair" and def.rarity ~= nil
+	for n in LEVELS do
+		pairsFit = pairsFit and def ~= nil and WarehouseLayout.fits(1, def.size, n) and WarehouseLayout.fits(LEVELS[n].stands, def.size, n)
+	end
+end
+check("8.3: the two-person collectibles (the alphorn 7.2 × 1.4, the T. rex skull, the safe) stand on every level's stands, the Garage's 8 too", pairsFit)
 local headOk = true
 for n in LEVELS do
 	headOk = headOk and WarehouseLayout.FloorTop + T.StandHeight + tallest < WarehouseLayout.headroom(n) - 0.2

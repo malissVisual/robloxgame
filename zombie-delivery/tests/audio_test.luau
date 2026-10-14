@@ -170,6 +170,26 @@ check("8.1 the meadow's stand-in is sfx2's breeze, a loop, not the city's traffi
 check("8.1 the hall's stand-in is sfx2's hum, a loop", SoundSheet.Fallback.amb_warehouse == "ambience" and SoundSheet.Looped.ambience == true)
 check("8.1 the till stands in with 6.12's purchase, the fanfare with task_done", SoundSheet.Fallback.sale_register == "purchase" and SoundSheet.Fallback.stored_fanfare == "task_done")
 check("8.1 the Sprinter's back doors stand in with a van's", SoundSheet.Fallback.sprinter_back_open == "van_back_open" and SoundSheet.Fallback.sprinter_back_close == "van_back_close")
+-- 8.3: the 8.2 features' feedback (shared/SoundPlan.luau feedbackCues: the book's chime and milestone fanfare, the
+-- tasks' done and claimed, FILL BEST's clicks, SELL…'s till) uses the sheets there are: each sound on sfx, sfx2, sfx3
+-- or sfx4, and plays today (from the sheets whose id is in, or a stand-in from an older one; no new sheet).
+local SoundPlan = require("./SoundPlan")
+local uploaded = { true, SoundSheet.Sfx2Id ~= "", SoundSheet.Sfx3Id ~= "", SoundSheet.Sfx4Id ~= "" }
+local function playsToday(name: string, steps: number): boolean
+	local i = sheetOf(name)
+	if i and uploaded[i] then
+		return true
+	end
+	local standIn = SoundSheet.Fallback[name]
+	return standIn ~= nil and steps < 4 and playsToday(standIn, steps + 1)
+end
+for _, kind in SoundPlan.FeedbackKinds do
+	for _, cue in SoundPlan.feedbackCues(kind, 3) do
+		check(`8.3 {kind}: {cue.name} on an existing sheet`, sheetOf(cue.name) ~= nil, cue.name)
+		check(`8.3 {kind}: {cue.name} plays today (its sheet or a stand-in)`, playsToday(cue.name, 0), cue.name)
+		check(`8.3 {kind}: {cue.name} short feedback (at most 2 s)`, SoundPlan.seconds(cue.name) > 0 and SoundPlan.seconds(cue.name) <= 2, SoundPlan.seconds(cue.name))
+	end
+end
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end

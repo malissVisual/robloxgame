@@ -4,8 +4,9 @@
 Two runs of the real server code on the Luau CLI:
   * tools/perf/sandbox-count.luau on tools/perf/world-mock.luau (world_count.py's preparation, the real server/Npcs):
     server/SandboxWorld.luau's map, the four Moving contracts kiosks (server/MoveSites.luau), the four warehouses
-    (server/Warehouse.luau: four owners, every display stand open and full of the heaviest pieces; Collection,
-    SandboxPlots and Upgrades are stand-ins written here), the house's inside while a move runs (server/HouseInterior.luau:
+    (server/Warehouse.luau: four owners, every display stand open and full of the heaviest pieces, 8.3: each on a stand
+    it fits, WarehouseLayout.fits, so a big piece only on a big stand; Collection, SandboxPlots and Upgrades are
+    stand-ins written here), the house's inside while a move runs (server/HouseInterior.luau:
     the largest of 24 plans) and Danny (server/Npcs.luau on the stand-in's classic R15);
   * tools/perf/van-count.luau on tools/vehicle-preview/roblox-mock.luau (export_fleet.py's preparation): the sandbox's
     van (Config.Sandbox.Van, the ZDC Sprinter's parts model) at every stage, by day (its night lights out).
@@ -48,6 +49,7 @@ function C.stock(player) return stock[player] or {} end
 function C.stands(player) return stands[player] or 20 end
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
+function C.marketIncome() return 1 end -- (8.3: the market's hot kinds, server/Warehouse.luau's tags)
 function C.onChanged() end
 function C.openPicker() end
 function C.undisplay() return true end

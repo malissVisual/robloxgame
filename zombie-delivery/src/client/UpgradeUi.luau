@@ -296,6 +296,7 @@ local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout
 			TextColor3 = C.goldInk,
 			TextWrapped = false,
 			TextXAlignment = Enum.TextXAlignment.Center,
+			Selectable = true, -- (8.3: the gamepad reaches a row at its top level too: the list scrolls to it)
 		})
 		Ui.corner(max, 8)
 	else
@@ -387,6 +388,11 @@ draw = function(keepScroll: boolean)
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the window)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, card)
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, frame)
 	Ui.corner(frame, Config.UiKit.Corner)

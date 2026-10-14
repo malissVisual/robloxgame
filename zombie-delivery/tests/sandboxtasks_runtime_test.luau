@@ -183,6 +183,30 @@ E.advance(Config.Collection.Tick * 3 + 0.5)
 local income = paid(A, "CollectionIncome", moneyAt)
 check("the stands paid (three payouts): income counts what they paid, the weekly too", income > 0 and slot(A, 1).progress == income and slot(A, "weekly").progress == income, income)
 
+-- ── 8.3: the market's tasks (today's hot kinds, shared/Market.luau) ────────
+do
+	local Market = require("./Market")
+	local hotKind = Market.pick(Market.dayOf(E.now)).hot[1]
+	setTasks(A, { { "hotsell", 2 }, { "hotincome", 100 }, { "home", 8 } }, { "w_income", 4000 })
+	Collection.add(A, { item = hotKind, condition = 1 })
+	Collection.add(A, { item = hotKind, condition = 1 })
+	Collection.add(A, { item = "box", condition = 1 }) -- (not hot: its sale counts no hot piece)
+	E.flush()
+	Collection.sell(A, uidOf(A, "box") :: string)
+	E.flush()
+	check(`8.3: a piece that isn't hot sold: hotsell 0/2`, slot(A, 1).progress == 0, slot(A, 1).progress)
+	local hotPrice = Collection.sell(A, uidOf(A, hotKind) :: string)
+	E.flush()
+	check(`… a hot piece ({hotKind}) sold: hotsell 1/2`, hotPrice ~= nil and slot(A, 1).progress == 1, slot(A, 1).progress)
+	Collection.display(A, uidOf(A, hotKind) :: string, 4)
+	moneyAt = #money
+	E.advance(Config.Collection.Tick * 6 + 0.5)
+	local paidNow = paid(A, "CollectionIncome", moneyAt)
+	check("… a hot piece on show: hotincome counts its part of what the stands paid (never more)", slot(A, 2).progress > 0 and slot(A, 2).progress < paidNow, `{slot(A, 2).progress} of {paidNow}`)
+	Collection.undisplay(A, uidOf(A, hotKind) :: string)
+	setTasks(A, { { "income", 300 }, { "trips", 3 }, { "clean", 1 } }, { "w_income", 4000 }) -- (as the moves below find them)
+end
+
 -- ── A move's trips, its end ────────────────────────────────────────────────
 local B = E.join(202, "Ben") -- a new player, Ann's crew mate
 E.flush()
@@ -346,7 +370,9 @@ local skip = { upgrade = true }
 local fresh = Rules.pickDaily(nextDay, 101, skip)
 local same = profileA.sandboxTasks.day == nextDay and #profileA.sandboxTasks.daily == #fresh
 for index, pick in fresh do
-	same = same and profileA.sandboxTasks.daily[index].id == pick.id and profileA.sandboxTasks.daily[index].progress == 0
+	-- (8.3: a kind the stands' payouts count, "income" or "hotincome", may have counted the payout after the reset)
+	local event = (Rules.def(pick.id) :: Rules.Def).event
+	same = same and profileA.sandboxTasks.daily[index].id == pick.id and (profileA.sandboxTasks.daily[index].progress == 0 or event == "income" or event == "hotincome")
 end
 check("… the new day's picks (none \"upgrade\": every upgrade is bought), the state sent", same and #kinds(E.received(A, "SandboxTasks", mark), "state") >= 1)
 check("… the weekly kept (the same week)", profileA.sandboxTasks.weekly ~= nil and profileA.sandboxTasks.weekly.id == "w_home")
