@@ -137,9 +137,10 @@
 --   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
 --                             Danny joins a crew of one; MoveHelper.sync in the tick)
---   7.0 grip: the carry's grip bar (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
---                             character attribute CarryGrip, the steady walk) and the grip block (the remote's "slip",
---                             "grip")
+--   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
+--                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
+--                             a lift check) and the grip block (the checks, the remote's "grip" answers, the wobbles)
+--   Moving.gripCheck(player)  8.1 grip: a wobble check now on what `player` carries (the tests')
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -985,58 +986,84 @@ local function weldTo(item: Item, holder: BasePart, frame: CFrame)
 	setParts(item.model, false, true, item.root)
 end
 
--- ── 7.0 grip hook (shared/CarryGrip.luau; the requests: the grip block before "Start") ───────────────────────────────
--- Where a carry starts or changes (setHands asks first): every player holding a thing with a grip bar gets the
--- character attribute CarryGrip (CarryGrip.encode: the kind, the weight, fragile; client/CarryGripUi.luau shows the bar
--- while it is there), nil without one (a one-hand thing that is not fragile); Danny has none (he never slips). It goes
--- with the other carry attributes (CARRY_ATTRIBUTES). A new carry (MoveCarry not this spot yet) starts the holder's
--- record over (since: when its bar began, 7.1 review); another kind (a helper took the other end, a role switch) starts
--- its steady and its reports over but keeps since (the client's bar goes on: CarryGrip.setProfile keeps its meter).
--- Returns × the carry's walk: CarryGrip.speedFactor while every player holding it is steady (their last report was;
--- 7.1 review: gripLapsed, in the tick, takes it back when their reports stopped).
+-- ── 8.1 grip hook (shared/CarryGrip.luau; the checks and the answers: the grip block before "Start") ─────────────────
+-- The grip's state is one table, Grip (this chunk's registers are few: the -O0 limit): a record per player (a GripHold)
+-- from a lift check on a piece with a grip until its carry ends; its functions come where what they use is (the
+-- hands here, setHands asks them first; the checks in the grip block). Grip.hands, where a carry starts or changes:
+-- every player holding a piece with a grip gets the character attribute CarryGrip (CarryGrip.encode: the kind, the
+-- weight, fragile; client/KeyHints.luau's key chip), nil without one (a one-hand thing that is not fragile, or
+-- Config.CarryGrip.On false); Danny has none (he never wobbles). It goes with the other carry attributes
+-- (CARRY_ATTRIBUTES). The carry a lift check led to starts its wobble clock; the same carry with another kind (a
+-- helper took the other end, Danny steadies it) keeps its clock, its steady and its misses. Returns × the carry's walk:
+-- CarryGrip.speedFactor (steady while every player holding it hit their last check; × Miss.Slow while one of them
+-- staggers).
 local CarryGrip = require(Shared.CarryGrip)
-type GripHold = { session: number, spot: number, kind: string, steady: boolean, last: number, since: number }
-local grips: { [Player]: GripHold } = {}
+type GripOpen = { id: number, check: CarryGrip.Check, spot: number, help: boolean, opened: number }
+type GripHold = {
+	session: number,
+	spot: number, -- the piece (its lift check's, then the carry's)
+	carrying: boolean, -- in their hands (false: a lift check on it, or a miss's moment after one)
+	kind: string, -- the carry's kind (CarryGrip.kind)
+	steady: boolean, -- their last check was a hit (the steady walk)
+	misses: number, -- wobble misses in a row (one or more: shaky)
+	slowUntil: number, -- a stagger's slowdown until (server time; 0: none)
+	clock: CarryGrip.Wobbles?, -- the carry's wobble clock
+	open: GripOpen?, -- the check on now
+	again: number, -- no new lift check before (server time: a moment after a miss)
+	tick: number, -- the server time of the last look (the grip block's Grip.tick)
+	at: Vector3?, -- the body then (the clock's pace) …
+	yaw: number?,
+	health: number?, -- … and its health (a bite moves the clock on)
+}
+local Grip = {
+	holds = {} :: { [Player]: GripHold },
+	nextId = 0,
+}
 Players.PlayerRemoving:Connect(function(player: Player)
-	grips[player] = nil
+	Grip.holds[player] = nil
 end)
 
-local function gripHands(s: Session, item: Item): number
+function Grip.newHold(s: Session, spot: number, carrying: boolean, kind: string): GripHold
+	return { session = s.id, spot = spot, carrying = carrying, kind = kind, steady = false, misses = 0, slowUntil = 0, clock = nil, open = nil, again = 0, tick = now(), at = nil, yaw = nil, health = nil }
+end
+
+-- `player`'s checks on `thing` as a carry of `kind`: a Mover's bigger zone, Danny steadying it (GripSteady on their body).
+function Grip.profile(s: Session, thing: Rules.Thing, kind: string, player: Player): CarryGrip.Profile
+	local character = player.Character
+	local steadied = character ~= nil and character:GetAttribute("GripSteady") == true
+	return CarryGrip.profile(kind, thing.weight, thing.fragile, roleOf(s, player) == "mover", steadied)
+end
+
+function Grip.hands(s: Session, item: Item): number
 	local thing = s.move.things[item.spot]
-	local kind = CarryGrip.kind(thing.class, thing.fragile, thing.helper ~= nil, roleOf(s, playerById(thing.carrier)))
-	local steady = kind ~= nil
+	local kind = if Config.CarryGrip.On then CarryGrip.kind(thing.class, thing.fragile, thing.helper ~= nil, roleOf(s, playerById(thing.carrier))) else nil
+	local steady, staggered = kind ~= nil, false
+	local t = now()
 	for _, id in { thing.carrier, thing.helper } do
 		local player = playerById(id)
 		local character, humanoid = bodyOrNil(player)
 		if not player or not character or not humanoid then
 			continue -- (Danny, or a body that is gone)
 		end
-		local hold = grips[player]
-		if character:GetAttribute("MoveCarry") ~= item.spot or not hold or hold.session ~= s.id or hold.spot ~= item.spot then
-			hold = { session = s.id, spot = item.spot, kind = kind or "", steady = false, last = 0, since = now() }
-			grips[player] = hold
-		elseif hold.kind ~= (kind or "") then
-			hold.kind, hold.steady, hold.last = kind or "", false, 0 -- (the same carry, another kind: since kept)
+		if not kind then
+			character:SetAttribute("CarryGrip", nil)
+			continue
 		end
-		character:SetAttribute("CarryGrip", if kind then CarryGrip.encode(kind, thing.weight, thing.fragile) else nil)
+		local found = Grip.holds[player]
+		local hold: GripHold = if found and found.session == s.id and found.spot == item.spot then found
+			else Grip.newHold(s, item.spot, false, kind) -- (a carry no lift check led to: not balanced)
+		Grip.holds[player] = hold
+		if not hold.carrying then -- (the lift: its wobble clock starts)
+			hold.carrying = true
+			hold.clock = CarryGrip.wobbles(Grip.profile(s, thing, kind, player), math.random())
+			hold.tick, hold.at, hold.yaw, hold.health = t, nil, nil, humanoid.Health
+		end
+		hold.kind = kind
+		character:SetAttribute("CarryGrip", CarryGrip.encode(kind, thing.weight, thing.fragile))
 		steady = steady and hold.steady
+		staggered = staggered or hold.slowUntil > t
 	end
-	return CarryGrip.speedFactor(steady)
-end
-
--- 7.1 review: a steady walk lasts while its reports come: a holder of `thing` steady with no report for more than
--- 2 × Config.CarryGrip.Report s is steady no more (the +10% goes). True when one went: the tick sets the walk again.
-local function gripLapsed(s: Session, thing: Rules.Thing, t: number): boolean
-	local lapsed = false
-	for _, id in { thing.carrier, thing.helper } do
-		local player = playerById(id)
-		local hold = if player then grips[player] else nil
-		if hold and hold.steady and hold.session == s.id and hold.spot == thing.spot and t - hold.last > 2 * Config.CarryGrip.Report then
-			hold.steady = false
-			lapsed = true
-		end
-	end
-	return lapsed
+	return CarryGrip.speedFactor(steady, staggered)
 end
 -- ── (end of the grip hook) ───────────────────────────────────────────────────────────────────────────────────────────
 
@@ -1044,7 +1071,7 @@ end
 local function setHands(s: Session, item: Item)
 	local thing = s.move.things[item.spot]
 	local mode = heldMode(s, thing) -- 7.0 planning: a Mover holds a pair thing alone up …
-	local grip = gripHands(s, item) -- 7.0 grip hook: the bar's kind for its holders, × the steady walk
+	local grip = Grip.hands(s, item) -- 8.1 grip hook: the carry's kind for its holders, × the steady walk (or a stagger)
 	local speed = speedOf(s, thing) * climbOf(s, item.spot) * grip -- … and carries faster; the others slower up stairs
 	local carrier = playerById(thing.carrier)
 	local _, humanoid, root = bodyOrNil(carrier)
@@ -2191,7 +2218,7 @@ end
 
 -- ── The things' prompts ────────────────────────────────────────────────────
 
-local function onPick(s: Session, spot: number, player: Player)
+local function onPick(s: Session, spot: number, player: Player, lifted: boolean?)
 	if s.ended or sessionOf(player) ~= s or traveling[player] then
 		return
 	end
@@ -2212,6 +2239,9 @@ local function onPick(s: Session, spot: number, player: Player)
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
+	if not lifted and Grip.liftStart(s, spot, player, false) then
+		return -- 8.1 grip: a piece with a grip is lifted by its lift check's hit (the grip block calls this again, lifted)
+	end
 	local ok, why = Rules.pick(s.move, spot, player.UserId)
 	if not ok then
 		say(player, SB.why(why))
@@ -2224,7 +2254,7 @@ local function onPick(s: Session, spot: number, player: Player)
 	s.dirty = true
 end
 
-local function onHelp(s: Session, spot: number, player: Player)
+local function onHelp(s: Session, spot: number, player: Player, lifted: boolean?)
 	if s.ended or sessionOf(player) ~= s or traveling[player] then
 		return
 	end
@@ -2244,6 +2274,9 @@ local function onHelp(s: Session, spot: number, player: Player)
 	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
+	end
+	if not lifted and Grip.liftStart(s, spot, player, true) then
+		return -- 8.1 grip: the other end is taken by its lift check's hit (the grip block calls this again, lifted)
 	end
 	local ok, why = Rules.help(s.move, spot, player.UserId)
 	if not ok then
@@ -3518,10 +3551,11 @@ local function syncMembers(s: Session)
 	teamSync(s) -- 7.0 planning: a newcomer's role, a leaver's gone
 end
 
--- The carried things: a helper too far for Grace s, a carrier faster than the carry (a teleport), a fall's top; 7.1
--- review: a steady walk whose grip reports stopped (gripLapsed); 8.1: the helper held at the far end (PairHold.follow).
+-- The carried things: a helper too far for Grace s, a carrier faster than the carry (a teleport), a fall's top; 8.1
+-- grip: the checks' clocks and their timeouts first (Grip.tick, the grip block); 8.1 carrying in two: the helper held
+-- at the far end (PairHold.follow).
 local function watchCarried(s: Session, clock: number)
-	local t = now()
+	Grip.tick(s, now())
 	for _, spot in s.move.order do
 		local thing = s.move.things[spot]
 		local item = s.items[spot]
@@ -3535,9 +3569,6 @@ local function watchCarried(s: Session, clock: number)
 		end
 		local holder: Player = carrier
 		climbStep(s, spot, holder, root, clock) -- 7.0 planning: slower up stairs and slopes (not a Mover)
-		if gripLapsed(s, thing, t) then
-			setHands(s, item) -- (the walk without the steady +10%)
-		end
 		if item.fallFrom then
 			item.fallFrom = math.max(item.fallFrom, root.Position.Y)
 		end
@@ -3857,78 +3888,291 @@ function Moving.admin(player: Player, arg: any): string
 	return `ADMIN: card | start | house | {if SB.on then "refill" else "farmcard | farm | farmgo"} | horde | time | trip | deliver | end.`
 end
 
--- ── 7.0 grip: a slip, the wear (the Moving remote's "slip" and "grip"; the hook: setHands' gripHands) ─────────────────
--- ("slip", spot): the sender's grip bar ran out: what they hold goes down from its carrier's hands (a pair thing whole,
--- both ends: either carrier's slip drops it) and takes CarryGrip.slipDamage (fragile: more). ("grip", spot, quality,
--- steady) about once a Config.CarryGrip.Report s: quality, the share of the time the load was outside the grip box,
--- wears the thing a little (CarryGrip.wear, capped a second; a report sooner than Server.Every after the last one is
--- dropped; a client that never reports wears nothing); a steady report (at most Server.SteadyOutside outside) makes the
--- carry's walk × CarryGrip.speedFactor until one that is not (setHands asks gripHands). Only for what the sender holds
--- now with a bar (its spot, their grip record on this move), never during a door's fade; Danny never slips.
--- 7.1 review (the server trusts the client less):
---   * neither while either end of the thing is on a door trip (its partner's fade comes a moment after: its bar ran on);
---   * a "slip" sooner than Meter.HeavyStart / Meter.Drain × 0.9 s after the bar began (its record's since: no bar runs
---     out faster, from its lowest start at the fastest drain) is refused; the client asks again each second, so a real
---     slip still lands;
---   * steady only after (1 − its profile's start) / Meter.Fill s of carry (no meter fills sooner); a steady whose
---     reports stopped for 2 × Report s goes again (gripLapsed in the tick);
---   * a pair thing held by two players: each one's reports wear it half (their two bars together wear it as one;
---     either one's slip still drops it whole).
-local function gripRequest(player: Player, action: string, spotArg: any, quality: any, steady: any)
-	local s = sessionOf(player)
-	if not s or s.ended or traveling[player] or type(spotArg) ~= "number" then
+-- ── 8.1 grip: the checks (shared/CarryGrip.luau; the hook: setHands' Grip.hands, the lift moment in onPick / onHelp) ──
+-- The server opens every check, judges every answer and applies every outcome; the client (client/CarryGripUi.luau)
+-- only draws a check and says when its player pressed. Config.CarryGrip.On false: no checks (the carry as before).
+--   * The lift ("feeling for the grip"): Pick up / Lift / Help lift on a piece with a grip (CarryGrip.kind) opens a lift
+--     check instead of the pick (Grip.liftStart; the gun goes away, both hands on it). A hit lifts it balanced (onPick /
+--     onHelp again, `lifted`: every check of theirs once more, then the steady walk); a miss knocks it (Lift.Knock,
+--     fragile × FragileKnock, the other end of a piece in a crew mate's hands × Shared), it hops and slips back down
+--     where it stood, and the next try waits Lift.Again s.
+--   * Wobbles: a carry's wobble clock (CarryGrip.rate: the body's speed against the carry's walk, its turn, a jump; a
+--     bite moves it on) opens a WOBBLE! check when it is due. A hit: steady again (the misses in a row back to 0); a
+--     miss: the next one drops it (CarryGrip.outcome: Miss.Drop in a row, a fragile piece at once), else a stagger (a
+--     knock, the walk × Miss.Slow for Miss.SlowFor s, the next wobble × Miss.Sooner). A drop drops the whole piece (a
+--     pair: both ends) with CarryGrip.slipDamage. Two players holding a piece each have their own checks; a stagger's
+--     knock is half each (Shared).
+--   * The Moving remote, server → client: ("grip", "open", CarryGrip.wire(check, { id, spot, name, icon, drop, help })),
+--     ("grip", "result", { id, what, outcome, left, name }), ("grip", "close", id) (a check off without an outcome: put
+--     down, a door trip, the piece gone). Client → server: ("grip", id, "ok" | "miss", pressed s into the check) once a
+--     check (the remote's rate limit, Config.Robust.Limits.Moving, on top).
+--   * Trust: an answer counts only for the sender's own open check (its id); "ok" is a hit only when CarryGrip.judge
+--     finds its press time true (Server.Lag / Ahead of the server's own clock of the check) with the needle in the zone;
+--     no answer by the window + Server.Grace is a miss (Grip.tick). Nothing while either end of the piece is on a door
+--     trip (the check off, the clock waits). Danny never has a check.
+--   Moving.gripCheck(player)  a wobble check now on what `player` carries (tests; true when one opened)
+
+-- The check's outcome to its player (the client shows it; the piece's condition after it).
+function Grip.result(player: Player, open: GripOpen, outcome: string, thing: Rules.Thing)
+	if player.Parent then
+		remote:FireClient(player, "grip", "result", { id = open.id, what = open.check.what, outcome = outcome, left = math.floor(thing.condition * 100 + 0.5), name = thing.name })
+	end
+end
+
+-- The check on `hold` goes without an outcome (the client closes it).
+function Grip.close(player: Player, hold: GripHold)
+	local open = hold.open
+	if open then
+		hold.open = nil
+		if player.Parent then
+			remote:FireClient(player, "grip", "close", open.id)
+		end
+	end
+end
+
+-- Opens a check ("lift" | "wobble") on `hold` for `player` and sends it (a wobble says when its miss drops the piece).
+function Grip.open(s: Session, player: Player, hold: GripHold, thing: Rules.Thing, what: string, help: boolean)
+	local profile = Grip.profile(s, thing, hold.kind, player)
+	local check = CarryGrip.check(profile, what, math.random())
+	Grip.nextId += 1
+	local id = Grip.nextId
+	hold.open = { id = id, check = check, spot = thing.spot, help = help, opened = now() }
+	local drop = what == "wobble" and CarryGrip.outcome(what, false, profile, hold.misses + 1) == "drop"
+	remote:FireClient(player, "grip", "open", CarryGrip.wire(check, { id = id, spot = thing.spot, name = thing.name, icon = thing.icon, drop = drop, help = help }))
+end
+
+-- The hook in onPick (help false) and onHelp (help true), after their own checks: a piece with a grip gets a lift check
+-- first (true: the pick waits for its hit). A check of theirs already on, or a moment after a miss on it: true (the
+-- press does nothing). A piece the pick would refuse anyway (taken, gone, the move over): false (it says why).
+function Grip.liftStart(s: Session, spot: number, player: Player, help: boolean): boolean
+	local thing = s.move.things[spot]
+	if not Config.CarryGrip.On or not thing then
+		return false
+	end
+	local kind = CarryGrip.kind(thing.class, thing.fragile, help, roleOf(s, if help then playerById(thing.carrier) else player))
+	if not kind then
+		return false
+	end
+	local hold = Grip.holds[player]
+	local t = now()
+	if hold and hold.session == s.id and (hold.open or (not hold.carrying and hold.spot == spot and t < hold.again)) then
+		return true
+	end
+	local free = if help then thing.state == "carried" and thing.class == "pair" and thing.helper == nil and thing.carrier ~= player.UserId
+		else thing.state == "home" or thing.state == "ground"
+	if not free or (s.move.phase ~= "running" and s.move.phase ~= "horde") or Rules.holding(s.move, player.UserId) then
+		return false
+	end
+	local fresh = Grip.newHold(s, spot, false, kind)
+	Grip.holds[player] = fresh
+	pcall(function()
+		require(script.Parent.Hand).holster(player, true) -- (both hands on it: no gun)
+	end)
+	Grip.open(s, player, fresh, thing, "lift", help)
+	return true
+end
+
+-- A little hop of a piece on the floor (a lift's miss: it slipped back down).
+function Grip.hop(item: Item, thing: Rules.Thing)
+	if thing.state ~= "home" and thing.state ~= "ground" then
+		return -- (Help lift's miss: the piece is in its carrier's hands)
+	end
+	local base = item.model:GetPivot()
+	item.model:PivotTo(base * CFrame.new(0, 0.3, 0))
+	task.delay(0.12, function()
+		if (thing.state == "home" or thing.state == "ground") and item.model.Parent then
+			item.model:PivotTo(base)
+		end
+	end)
+end
+
+-- The open check on `hold` ends: a hit or a miss, and what it does.
+function Grip.settle(s: Session, player: Player, hold: GripHold, hit: boolean)
+	local open = hold.open
+	if not open then
 		return
 	end
-	local spot = Rules.holding(s.move, player.UserId)
-	local thing = if spot then s.move.things[spot] else nil
-	local item = if spot then s.items[spot] else nil
-	local hold = grips[player]
-	if spot ~= spotArg or not thing or not item or thing.state ~= "carried" or not hold or hold.session ~= s.id or hold.spot ~= spot or hold.kind == "" then
-		return -- (not what the sender holds, or no bar on it)
-	end
-	local carrier = playerById(thing.carrier)
-	local helper = playerById(thing.helper)
-	if (carrier and traveling[carrier]) or (helper and traveling[helper]) then
-		return -- (7.1 review: its other end is on a door trip)
+	hold.open = nil
+	local thing = s.move.things[open.spot]
+	local item = s.items[open.spot]
+	if not thing or not item then
+		return
 	end
 	local G = Config.CarryGrip
-	local t = now()
-	if action == "slip" then
-		if t - hold.since < G.Meter.HeavyStart / G.Meter.Drain * 0.9 then
-			return -- (7.1 review: sooner than any bar runs out)
-		end
-		if not carrier then
+	if open.check.what == "lift" then
+		if hit then
+			hold.steady = true -- (balanced: the steady walk)
+			if open.help then
+				onHelp(s, open.spot, player, true)
+			else
+				onPick(s, open.spot, player, true)
+			end
+			if Rules.holding(s.move, player.UserId) == open.spot then
+				Grip.result(player, open, "balanced", thing)
+			else
+				Grip.holds[player] = nil -- (the pick could not be: it said why)
+				if player.Parent then
+					remote:FireClient(player, "grip", "close", open.id)
+				end
+			end
 			return
 		end
-		release(s, carrier, "slip")
-		hurtThing(s, thing.spot, CarryGrip.slipDamage(thing.fragile))
+		hold.again = now() + G.Lift.Again
+		hurtThing(s, open.spot, CarryGrip.knock("lift", thing.fragile, open.help))
+		Grip.hop(item, thing)
+		Grip.result(player, open, "knock", thing)
+		say(player, `The {thing.name} slipped back down ({math.floor(thing.condition * 100 + 0.5)}% left). Feel for the grip again (E).`)
+		return
+	end
+	-- a wobble
+	local profile = Grip.profile(s, thing, hold.kind, player)
+	if hit then
+		hold.steady, hold.misses = true, 0
+		local clock = hold.clock
+		if clock then
+			CarryGrip.rearm(clock, profile, math.random(), false)
+		end
+		Grip.result(player, open, "steady", thing)
+		setHands(s, item) -- (the walk: steady again)
+		return
+	end
+	hold.misses += 1
+	hold.steady = false
+	local carrier = playerById(thing.carrier)
+	local helper = playerById(thing.helper)
+	if CarryGrip.outcome("wobble", false, profile, hold.misses) == "drop" then
+		if carrier then
+			release(s, carrier, "slip") -- (the whole piece: both ends)
+		end
+		hurtThing(s, open.spot, CarryGrip.slipDamage(thing.fragile))
+		Grip.result(player, open, "drop", thing)
 		local left = math.floor(thing.condition * 100 + 0.5)
 		local holders: { Player? } = { carrier, helper }
 		for _, who in holders do
 			if who and who == player then
-				say(who, `💥 It slipped! The {thing.name} fell: {left}% left. Hold to keep it steady.`)
+				say(who, `💥 It slipped! The {thing.name} fell: {left}% left. Hit the next wobble to keep it.`)
 			elseif who then
 				say(who, `💥 {player.DisplayName} lost their grip: the {thing.name} fell ({left}% left).`)
 			end
 		end
 		return
 	end
-	if hold.last > 0 and t - hold.last < G.Server.Every then
-		return -- (about one a second)
+	hold.slowUntil = now() + G.Miss.SlowFor
+	local clock = hold.clock
+	if clock then
+		CarryGrip.rearm(clock, profile, math.random(), true) -- (shaky: the next wobble sooner)
 	end
-	local dt = if hold.last > 0 then t - hold.last else G.Report
-	hold.last = t
-	local wear = CarryGrip.wear(quality, thing.fragile, dt) * (if carrier and helper then 0.5 else 1) -- (7.1 review: by two: half each)
-	if wear > 0 then
-		hurtThing(s, thing.spot, wear)
+	hurtThing(s, open.spot, CarryGrip.knock("wobble", thing.fragile, carrier ~= nil and helper ~= nil))
+	Grip.result(player, open, "stagger", thing)
+	say(player, `⚠ The {thing.name} wobbled ({math.floor(thing.condition * 100 + 0.5)}% left): miss the next one and it drops.`)
+	setHands(s, item) -- (the stagger's slow walk; Grip.tick takes it back)
+end
+
+-- ("grip", id, verdict, pressed) from the client: its answer to its own open check (anything else does nothing).
+function Grip.answer(player: Player, id: any, verdict: any, pressed: any)
+	local s = sessionOf(player)
+	local hold = Grip.holds[player]
+	local open = if hold then hold.open else nil
+	if not s or s.ended or not hold or not open or hold.session ~= s.id or open.id ~= id or traveling[player] then
+		return
 	end
-	local outside = if type(quality) == "number" and quality == quality then quality else 1
-	local fills = (1 - CarryGrip.profile(hold.kind, thing.weight, thing.fragile, false).start) / G.Meter.Fill
-	local nowSteady = steady == true and outside <= G.Server.SteadyOutside and t - hold.since >= fills -- (7.1 review: not sooner than a meter fills)
-	if nowSteady ~= hold.steady then
-		hold.steady = nowSteady
-		setHands(s, item) -- (the walk: × CarryGrip.speedFactor, or back)
+	Grip.settle(s, player, hold, CarryGrip.judge(open.check, verdict, pressed, now() - open.opened))
+end
+
+-- Every tick (watchCarried): each record on this move: a carry or a lift that ended goes; a door trip turns its check
+-- off; a check with no answer past its window + Server.Grace is a miss; a stagger's slowdown ends; the wobble clock runs
+-- (the body since the last look) and opens a wobble when it is due.
+function Grip.tick(s: Session, t: number)
+	local players: { Player } = {}
+	for player, hold in Grip.holds do
+		if hold.session == s.id then
+			table.insert(players, player)
+		end
 	end
+	local G = Config.CarryGrip
+	for _, player in players do
+		local hold = Grip.holds[player]
+		if not hold or not player.Parent or sessionOf(player) ~= s then
+			Grip.holds[player] = nil -- (gone, or off this move)
+			continue
+		end
+		local dt = math.clamp(t - hold.tick, 0, 1)
+		hold.tick = t
+		local spot, role = Rules.holding(s.move, player.UserId)
+		local thing = s.move.things[hold.spot]
+		local item = s.items[hold.spot]
+		local carrying = hold.carrying and spot == hold.spot
+		if not thing or not item or (hold.carrying and not carrying) or (not hold.carrying and spot ~= nil) then
+			Grip.close(player, hold) -- (the carry ended: put down, loaded, dropped; or their hands took another)
+			Grip.holds[player] = nil
+			continue
+		end
+		local partner = if carrying then playerById(if role == "carrier" then thing.helper else thing.carrier) else nil
+		if traveling[player] or (partner and traveling[partner]) then
+			Grip.close(player, hold) -- (a door's fade: no check, the clock waits)
+			hold.at = nil
+			continue
+		end
+		local open = hold.open
+		if open then
+			local gone = not carrying and not (if open.help then thing.state == "carried" else thing.state == "home" or thing.state == "ground")
+			if gone then
+				Grip.close(player, hold) -- (somebody else took it meanwhile)
+				Grip.holds[player] = nil
+			elseif t - open.opened > open.check.window + G.Server.Grace then
+				Grip.settle(s, player, hold, false) -- (no answer: a miss)
+			end
+			continue
+		end
+		if not carrying then
+			if t >= hold.again then
+				Grip.holds[player] = nil -- (a lift's miss: its moment is over)
+			end
+			continue
+		end
+		if hold.slowUntil > 0 and t >= hold.slowUntil then
+			hold.slowUntil = 0
+			setHands(s, item) -- (the stagger is over: the walk back)
+		end
+		local clock = hold.clock
+		local character, humanoid, root = bodyOf(player)
+		if not clock or not character or not humanoid or not root then
+			continue
+		end
+		local at = root.Position
+		local look = root.CFrame.LookVector
+		local yaw = math.atan2(look.X, look.Z)
+		local speed, turn = 0, 0
+		local lastAt, lastYaw = hold.at, hold.yaw
+		if lastAt and lastYaw and dt > 0 then
+			speed = flat(at, lastAt) / dt
+			turn = ((yaw - lastYaw + math.pi) % (2 * math.pi) - math.pi) / dt
+		end
+		hold.at, hold.yaw = at, yaw
+		local health = humanoid.Health
+		if hold.health and health < hold.health then
+			CarryGrip.bump(clock) -- (a bite jolts it)
+		end
+		hold.health = health
+		local walk = character:GetAttribute("CarrySpeed")
+		local rate = CarryGrip.rate(speed, if type(walk) == "number" then walk else Config.Movement.Walk, turn, humanoid.FloorMaterial == Enum.Material.Air)
+		if CarryGrip.advance(clock, dt, rate) then
+			Grip.open(s, player, hold, thing, "wobble", false)
+		end
+	end
+end
+
+-- A wobble check now on what `player` carries (the tests'); true when one opened.
+function Moving.gripCheck(player: Player): boolean
+	local s = sessionOf(player)
+	local hold = Grip.holds[player]
+	local spot = if s then Rules.holding(s.move, player.UserId) else nil
+	local thing = if s and spot then s.move.things[spot] else nil
+	if not s or not hold or not thing or hold.open or not hold.carrying or hold.spot ~= spot or traveling[player] then
+		return false
+	end
+	Grip.open(s, player, hold, thing, "wobble", false)
+	return true
 end
 -- ── (end of the grip block) ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -3994,8 +4238,8 @@ local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3:
 	if not Net.limit(player, "Moving", Config.Robust.Limits.Moving) then
 		return
 	end
-	if action == "slip" or action == "grip" then -- 7.0 grip: the grip bar ran out / its report (the grip block)
-		gripRequest(player, action, arg, arg2, arg3)
+	if action == "grip" then -- 8.1 grip: the answer to a check (its id, "ok" | "miss", the press's time; the grip block)
+		Grip.answer(player, arg, arg2, arg3)
 	elseif action == "start" then
 		local err = planMove(player, arg) -- 7.0 planning: the lobby first (its LAUNCH starts the move)
 		if err then
