@@ -7163,6 +7163,8 @@ Config.CollectionBook = {
 --   income    $ your display stands paid
 --   upgrade   levels bought at the UPGRADES desk (never picked once every upgrade is at its top)
 --   danny     Danny holds the other end of your `item` (the sofa) while you carry it
+--   hotsell   8.3: pieces of today's hot kinds you sold (Config.Market)
+--   hotincome 8.3: $ your hot pieces on show earned (their share of what the stands paid)
 -- `text` is the title ({n} the target; `one` when it is 1), `target` the range it is picked from (in `step`s), `money`
 -- the reward at the range's low end (its high end pays TopShare more, rounded to $10), `icon` its emoji.
 --   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
@@ -7208,6 +7210,9 @@ Config.SandboxTasks = {
 		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 250 },
 		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 250 },
 		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 200 },
+		-- 8.3, the market (Config.Market): one of these a day at most
+		{ id = "hotsell", group = "market", event = "hotsell", icon = "🔥", text = "Sell {n} hot items", one = "Sell a hot item", target = { 1, 2 }, money = 250 },
+		{ id = "hotincome", group = "market", event = "hotincome", icon = "🔥", text = "Earn ${n} from hot items on show", target = { 100, 250 }, step = 50, money = 250 },
 	} :: { SandboxTaskDef },
 	WeeklyPool = {
 		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
@@ -7256,6 +7261,38 @@ Config.SandboxLeaders = {
 		Range = 260,
 	},
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
+}
+
+-- 8.3 SANDBOX, the market (the owner: selling should be a decision, not a reflex). shared/Market.luau has the rules
+-- (tests/market_test.luau), server/Collection.luau prices every sale and the stands' income with it, the STOCK list and
+-- the picker show it (client/WarehouseUi.luau: the 🔥 / ❄ tags, the header's line, prices with the market in them).
+-- Every UTC day, picked from the day's number alone (the same on every server and for everybody):
+--   Hot               kinds are hot: they sell for × HotSell and earn × HotIncome on show; HotCollectibles of them are
+--                     collectibles (a piece with its own rarity), the rest ordinary furniture
+--   Cold              kinds of furniture are cold: they sell for × ColdSell
+--   MinValue          the cheapest kind ($, its catalogue value) the market picks: the sandbox house's kinds (the
+--                     catalogue without Walt's farm pieces) worth this or more (a new piece joins by itself)
+-- And per player, kept in the save (profile.market, only from a real save written with Flag):
+--   Drop / MaxDrop    every piece of a kind you sell lowers that kind's price for you by Drop, at most MaxDrop (a bulk
+--                     sale's pieces one after the other)
+--   Recover           s for one piece's Drop to come back; at 00:00 UTC all of it comes back
+--   Salt              the picks' dice (a new salt: other days)
+-- The tuning: a piece sells for about ten minutes of showing it (Config.Collection), so a hot one sells for about 16 and
+-- earns a quarter more while it stays; a cold one is better kept on show until tomorrow; selling eight radios at once
+-- pays the last few 40 % less, and 20 minutes later the next sells 5 % dearer again.
+Config.Market = {
+	Hot = 3,
+	HotCollectibles = 1,
+	Cold = 1,
+	HotSell = 1.6,
+	HotIncome = 1.25,
+	ColdSell = 0.7,
+	MinValue = 100,
+	Drop = 0.05,
+	MaxDrop = 0.4,
+	Recover = 1200,
+	Salt = 8303,
+	Flag = "marketKept",
 }
 
 return Config
