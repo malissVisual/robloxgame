@@ -12,17 +12,20 @@
 --   Collection.display(player, uid, stand)     put a piece of your stock on display stand `stand` (an index of your
 --                                              warehouse's stands, CollectionRules.standsFor; one piece a stand; a
 --                                              piece on show elsewhere moves there; 8.1: a piece too big for an
---                                              upgrade's small stand is refused, WarehouseLayout.fits) → ok, why
+--                                              upgrade's small stand is refused, WarehouseLayout.fits; 8.3: the stands
+--                                              of your warehouse's level, UpgradeRules.warehouseLevel) → ok, why
 --   Collection.undisplay(player, uid)          take it down (back to the stock) → ok, why
 --   Collection.sell(player, uid)               sell it (on show or not) → the money paid (nil: refused), why
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
---   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: the start's
---                                              and the More stands you bought)
+--   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: 8.3 your
+--                                              warehouse level's big ones and the More stands you bought)
 --   Collection.boost(player)                   8.1: your income's × (CollectionRules.boost: the Showroom lights)
 --   Collection.upgrade(player, apply)          8.1 (server/Upgrades.luau): an upgrade bought or reset. What the stands
 --                                              earned up to now is counted at the old rates, apply() changes the
 --                                              levels, the pieces on stands you no longer have go back to the stock
---                                              (how many: the return), the state goes out and the listeners hear
+--                                              (how many: the return; 8.3: a warehouse level up keeps every stand, a
+--                                              level down, the admin's RESET, loses some), the state goes out and the
+--                                              listeners hear
 --   Collection.openPicker(player, stand)       (Warehouse: an empty display stand's prompt) ask the player's client to
 --                                              pick a piece for it (the "Collection" remote's { kind = "pick", stand })
 --   Collection.clear(player)                   (the admin's CLEAR STOCK) the whole collection gone for nothing → how many
@@ -50,7 +53,8 @@
 -- shows before it asks). Only through the remote, each also under Config.Robust.Limits.CollectionBulk, each one change
 -- (one state push, one listener call, one analytics event, one payment):
 --   client → server   { kind = "fillbest" }            ⭐ FILL BEST: the best earners of the stock onto every free stand
---                                                      the player has, each where it fits (WarehouseLayout.fits);
+--                                                      the player has, each where it fits (WarehouseLayout.fits at
+--                                                      their warehouse level, 8.3);
 --                                                      CollectionDisplayed (their $ a minute, the rarest); then
 --                                                      { kind = "bulk", action = "fillbest", count, income } (the $ a
 --                                                      minute they add)
@@ -75,6 +79,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.CollectionRules)
 local WarehouseLayout = require(Shared.WarehouseLayout) -- 8.1: the upgrade stands' size (fits)
+local UpgradeRules = require(Shared.UpgradeRules) -- 8.3: the warehouse level (whose stands' sizes)
 local StockPlan = require(Shared.StockPlan) -- 8.2: the STOCK list's bulk buttons
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -126,6 +131,13 @@ end
 -- 8.1: the player's income × (their Showroom lights).
 local function boostOf(player: Player): number
 	return Rules.boost(PlayerData.get(player))
+end
+
+-- 8.3: the player's warehouse level (1 … 5: their ZDC Warehouse upgrade; no save yet: the garage): whose stands are
+-- big and small (WarehouseLayout.fits, count).
+local function levelOf(player: Player): number
+	local profile = PlayerData.get(player)
+	return UpgradeRules.warehouseLevel(if profile then profile.sandboxUpgrades else {})
 end
 
 -- The player's piece with this uid (and its index), nil for anything else.
@@ -336,8 +348,9 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 		return true, nil
 	end
 	local def = Rules.defOf(entry.item)
-	if def and not WarehouseLayout.fits(stand, def.size) then
-		return false, `Your {entry.name} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`
+	local level = levelOf(player)
+	if def and not WarehouseLayout.fits(stand, def.size, level) then
+		return false, `Your {entry.name} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count(level)}.`
 	end
 	for _, other in collection.entries do
 		if other.stand == stand then
@@ -471,10 +484,11 @@ local function rarer(a: string?, b: string): string
 	return if a and Rules.tier(a).rank >= Rules.tier(b).rank then a else b
 end
 
--- Does a piece of this item stand on stand i (as Collection.display: an upgrade's small stand holds no bed)?
-local function fitsStand(stand: number, item: string): boolean
+-- Does a piece of this item stand on stand i of a warehouse of that level (as Collection.display: an upgrade's small
+-- stand holds no bed)?
+local function fitsStand(stand: number, item: string, level: number): boolean
 	local def = Rules.defOf(item)
-	return def == nil or WarehouseLayout.fits(stand, def.size)
+	return def == nil or WarehouseLayout.fits(stand, def.size, level)
 end
 
 -- The collection's pieces as shared/StockPlan.luau reads them (CollectionRules.view: × the player's lights).
@@ -499,8 +513,12 @@ local function fillBest(player: Player): (number?, string?)
 		return nil, NO_WAREHOUSE
 	end
 	local stands = standsOf(player)
+	local level = levelOf(player) -- (8.3: the stands of their warehouse's level)
+	local function fits(stand: number, item: string): boolean
+		return fitsStand(stand, item, level)
+	end
 	local pieces = piecesOf(player, collection)
-	local plan = StockPlan.fill(pieces, stands, fitsStand)
+	local plan = StockPlan.fill(pieces, stands, fits)
 	if #plan == 0 then
 		if #StockPlan.free(pieces, stands) == 0 then
 			return nil, "Every display stand you have already shows a piece."
@@ -526,7 +544,7 @@ local function fillBest(player: Player): (number?, string?)
 	for _, place in plan do
 		-- (the plan is our own; checked all the same, as Collection.display would)
 		local entry = byUid[place.uid]
-		if entry and entry.stand == nil and isStand(place.stand, stands) and not taken[place.stand] and fitsStand(place.stand, entry.item) then
+		if entry and entry.stand == nil and isStand(place.stand, stands) and not taken[place.stand] and fits(place.stand, entry.item) then
 			entry.stand = place.stand
 			taken[place.stand] = true
 			count += 1

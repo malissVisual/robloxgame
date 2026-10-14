@@ -24,7 +24,8 @@
 --   CollectionRules.totals(entries, boost?)   { count, shown, value, income (the pieces on show, × boost), sell (all) }
 --   CollectionRules.standsFor(profile)   the display stands a player has: the warehouse's start (Config.Warehouse.Stands,
 --                                        else Config's Collection.Stands) + 8.1's More stands (profile.sandboxUpgrades,
---                                        shared/UpgradeRules.luau), never past Config.Warehouse.MaxStands
+--                                        shared/UpgradeRules.luau), never past Config.Warehouse.MaxStands; 8.3: their
+--                                        warehouse level's (UpgradeRules.totalStands: 2 in a Garage … 32)
 --   CollectionRules.boost(profile)       8.1: the income's × from the player's Showroom lights (1 without any)
 --   The save (profile.collection = { entries = { Entry }, nextUid = n }):
 --   CollectionRules.empty()              a new player's
@@ -197,9 +198,14 @@ end
 
 -- The display stands a player has: the warehouse's start (Config.Warehouse.Stands), else Config.Collection.Stands;
 -- 8.1: + the More stands bought (profile.sandboxUpgrades), never past the hall's Config.Warehouse.MaxStands (a start
--- over it stays as it is).
+-- over it stays as it is). 8.3: their warehouse level's big stands (Config.Warehouse.Levels: a new player's Garage 2 …
+-- the Logistics Center 24) + the More stands' small ones from Config.Warehouse.MoreFrom on (UpgradeRules.totalStands);
+-- without the levels in Config, as before.
 function CollectionRules.standsFor(profile: any?): number
 	local warehouse = (Config :: any).Warehouse
+	if type(warehouse) == "table" and type(warehouse.Levels) == "table" and #warehouse.Levels > 0 then
+		return UpgradeRules.totalStands(levelsOf(profile))
+	end
 	local stands = if type(warehouse) == "table" then warehouse.Stands else nil
 	if not finite(stands) or stands < 1 then
 		stands = tune().Stands
