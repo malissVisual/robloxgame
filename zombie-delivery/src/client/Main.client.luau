@@ -76,6 +76,7 @@ if Config.Sandbox.On then
 		return nil
 	end
 	local WarehouseUi = ownModule("WarehouseUi")
+	local UpgradeUi = ownModule("UpgradeUi")
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -128,31 +129,49 @@ if Config.Sandbox.On then
 	QuickChat.covered = function(): boolean
 		return MovingHud.isOpen() or MoveLobbyUi.isOpen() or require(Client.MoveStoryUi).isOpen()
 	end
-	-- Is the warehouse's picker open (WarehouseUi.isOpen, when it has one)?
-	local function warehouseOpen(): boolean
-		local isOpen = WarehouseUi and WarehouseUi.isOpen
+	-- Is a sandbox window open (the warehouse's picker, 8.1's UPGRADES desk: module.isOpen, when it has one)?
+	local function ownOpen(module: any): boolean
+		local isOpen = module and module.isOpen
 		if type(isOpen) ~= "function" then
 			return false
 		end
 		local ok, open = pcall(isOpen)
 		return ok and open == true
 	end
+	local function ownClose(module: any)
+		local close = module and module.close
+		if type(close) == "function" then
+			pcall(close)
+		end
+	end
 	-- One window at a time; ESC closes them all (the crew panel, the move's cards and list, the quick chat's ring, the
-	-- planning folds to its pill, the warehouse's picker).
+	-- planning folds to its pill, the warehouse's picker, the UPGRADES window). `keep`: the sandbox window opening now
+	-- (its onOpen runs once it counts as open, so it must not close itself).
+	local keep: any = nil
 	Hud.onCloseWindows = function()
 		CrewPanel.close()
 		MoveLobbyUi.minimize()
 		MovingHud.closeAll()
 		QuickChat.close(false)
-		local close = WarehouseUi and WarehouseUi.close
-		if type(close) == "function" then
-			pcall(close)
+		for _, module in { WarehouseUi, UpgradeUi } do
+			if module ~= keep then
+				ownClose(module)
+			end
 		end
 	end
 	CrewPanel.onOpen = Hud.closeWindows
+	for _, module in { WarehouseUi, UpgradeUi } do -- (8.1 review: opening one closes the others)
+		if type(module) == "table" then
+			module.onOpen = function()
+				keep = module
+				pcall(Hud.closeWindows)
+				keep = nil
+			end
+		end
+	end
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or warehouseOpen()
+			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	KeyHints.covered = function(): boolean

@@ -20,6 +20,20 @@
 > (`Config.SpawnSpot.Pass`), the warehouse stands on its concrete, cheap pieces show "+$0.2/min", no city sounds, a
 > freed plot goes to a waiting player, START brings the van repaired, dying on a move puts you by the van, one arrow
 > (the guide, no GPS), the sandbox's own words everywhere (no Wall, no pay, no XP).
+>
+> **8.1** (the owner's feedback): **carrying in two** is slow and physical: the leader's heading turns at most 60° a
+> second (`client/PairSteer.luau`, `shared/PairCarry.luau`), a way behind is walked backwards (backing through doors
+> too), and the far end (Danny or a crew mate) is held there by the server (`server/PairHold.luau`), never teleported.
+> **No E at the house**: walk into a door and the fade takes you through (`Config.Moving.Doors`, doormats "▲ IN" /
+> "▲ OUT"). **The grip** is timing checks now (`shared/CarryGrip.luau`, `client/CarryGripUi.luau`): lifting a piece is
+> a lift check ("feeling for the grip": a hit lifts it balanced, a miss knocks it), and while you carry, a WOBBLE! now
+> and then (a hit: steady; a miss staggers a sturdy piece and the next drops it; a fragile piece drops at once). Every
+> miss does something: putting the piece down, loading it or walking through a door with a wobble open still counts,
+> and the misses stay with the piece a moment. Easy by default; `Config.CarryGrip.Difficulty` makes it harder later.
+> The warehouse's **UPGRADES desk** (`server/Upgrades.luau`, `client/UpgradeUi.luau`, `Config.SandboxUpgrades`): more
+> stands (12 → 20), showroom lights (more income), the van's engine and Danny's training. The sandbox **sounds like the
+> Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Chalet wears the owner's **Blender
+> house** once imported, and the 12 collectibles have their **Blender look** (`ZDCFurnitureArt`, re-import it).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.0.2"
+Config.Version = "8.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6118,14 +6118,18 @@ Config.ItemModel = {
 --               Two checks are at least Gap s apart
 --   Miss        a wobble missed: Knock of the condition, the walk × Slow for SlowFor s (a stagger), the next wobble ×
 --               Sooner. Drop: the misses in a row that drop the piece (a drop: Slip below): Sturdy, Heavy (from HeavyAt
---               weight on), Fragile (1: a fragile piece drops at its first miss). Every miss does something
+--               weight on), Fragile (1: a fragile piece drops at its first miss). Every miss does something: a carry
+--               put down or loaded with a wobble open takes it as a miss, and the misses stay with the piece Remember s
+--               (a new lift of it picks them up again: 8.1 review)
 --   FragileKnock × a knock when the piece is fragile; Shared: × a knock when two players hold it (each one's checks:
 --               half each, as the 7.1 wear)
 --   Slip        a drop's damage (× Moving.Damage.Fragile when fragile)
 --   SteadySpeed × the carry's walk while every player holding it hit their last check (balanced, steady)
 --   Server      Grace: s past a check's window before the server takes no answer as a miss; Lag: an answer's press may
---               be this many s older than the server's own clock of the check (the way there and back); Ahead: … or
---               this much newer; Slack: the share of the sweep the zone is widened by when the server judges a press
+--               be this many s older than the server's own clock of the check (the way there and back) at most, and
+--               for each player LagPing × their round trip (Player:GetNetworkPing) + LagMin when that is less (8.1
+--               review); Ahead: … or this much newer; Slack: the share of the sweep the zone is widened by when the
+--               server judges a press
 --   Ui          Tutorial: the checks with the longer hint ("… when the needle is in the green"); Shake: px a miss
 --               shakes the widget (ReducedShake with Reduced Motion); Camera: client/CameraRig.luau's shake on a miss
 --               (CameraDrop on a drop); Linger: s the outcome stays; Tap: the touch TAP button's side (px, at least
@@ -6150,12 +6154,12 @@ Config.CarryGrip = {
 	Speed = { Min = 0.2, Max = 2, Sweeps = 1.5 },
 	Lift = { Window = 3, Knock = 0.04, Again = 0.5 },
 	Wobble = { Every = { 7, 12 } :: { number }, Zone = 0.85, Speed = 1.15, Window = 2.4, Still = 0.2, StillAt = 1.5, Rush = 1, Turn = 0.6, TurnFull = 3, Air = 1, Bump = 3, Gap = 3 },
-	Miss = { Knock = 0.03, Slow = 0.6, SlowFor = 1.5, Sooner = 0.5, Drop = { Sturdy = 2, Heavy = 2, HeavyAt = 8, Fragile = 1 } },
+	Miss = { Knock = 0.03, Slow = 0.6, SlowFor = 1.5, Sooner = 0.5, Drop = { Sturdy = 2, Heavy = 2, HeavyAt = 8, Fragile = 1 }, Remember = 8 },
 	FragileKnock = 1.25,
 	Shared = 0.5,
 	Slip = 0.06,
 	SteadySpeed = 1.1,
-	Server = { Grace = 1.5, Lag = 2, Ahead = 0.1, Slack = 0.02 },
+	Server = { Grace = 1.5, Lag = 2, LagPing = 2, LagMin = 0.3, Ahead = 0.1, Slack = 0.02 },
 	Ui = { Tutorial = 3, Shake = 6, ReducedShake = 1, Camera = 0.2, CameraDrop = 0.35, Linger = 1.1, Tap = 96, TapMin = 80, Scale = 0.75, Min = 0.62, Open = 0.55, Tick = 0.3, Hit = 0.35, Knock = 0.6, Warning = 0.6 },
 }
 
@@ -6215,7 +6219,10 @@ Config.CarryGrip = {
 --                     you came out in and Rearm s have gone by (no ping-pong; Danny's own trips wait Rearm s too, his
 --                     arrival out of his door's reach: server/MoveHelper.luau). Walk false: the E prompts as before
 --                     (they stay, disabled, while it is on). Mat: the doormat on the ground at every door (its width at
---                     most, its depth): "▲ IN" outside while a move uses the door, "▲ OUT" inside
+--                     most, its depth): "▲ IN" outside while a move uses the door, "▲ OUT" inside. PairWalk: a leader
+--                     carrying in two may back through it (facing the partner), but their back to it counts only while
+--                     they walk into it at PairWalk studs/s or more (the root's flat velocity · the way through at least
+--                     Face; 8.1 review: a drift back toward the door no longer takes them through)
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6322,7 +6329,7 @@ Config.Moving = {
 	},
 	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
-	Doors = { Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Dwell = 0.25, Rearm = 2, Every = 0.1, Mat = { 6, 2.2 } :: { number } }, -- 8.1 walk-in doors
+	Doors = { Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Dwell = 0.25, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number } }, -- 8.1 walk-in doors
 	Slots = 6,
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },

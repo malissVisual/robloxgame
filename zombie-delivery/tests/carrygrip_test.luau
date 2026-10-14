@@ -156,6 +156,13 @@ do
 	check("\"ok\" with its press in the zone, a moment before the server got it: a hit", CarryGrip.judge(c, "ok", at, at + 0.2))
 	check("…up to Lag s of lag", CarryGrip.judge(c, "ok", at, at + S.Lag - 0.01) and not CarryGrip.judge(c, "ok", at, at + S.Lag + 0.05))
 	check("a press the server's clock has not reached yet (made up): a miss", not CarryGrip.judge(c, "ok", at, at - 0.5))
+	-- 8.1 review: a player's lag follows their round trip (a press claimed 1.9 s ago no longer passes on a 50 ms ping)
+	local lag = CarryGrip.lagFor(0.05)
+	check("lagFor: LagPing × the round trip + LagMin", math.abs(lag - (0.05 * S.LagPing + S.LagMin)) < 1e-9)
+	check("…never more than Lag, and Lag when the ping is unknown or nonsense", CarryGrip.lagFor(5) == S.Lag and CarryGrip.lagFor(nil) == S.Lag
+		and CarryGrip.lagFor(0 / 0) == S.Lag and CarryGrip.lagFor(-1) == S.Lag)
+	check("a press within the player's lag: a hit; older: a miss", CarryGrip.judge(c, "ok", at, at + lag - 0.01, lag) and not CarryGrip.judge(c, "ok", at, at + 1.9, lag))
+	check("…a lag past Lag is held to Lag", not CarryGrip.judge(c, "ok", at, at + S.Lag + 0.05, 10))
 	check("\"ok\" with its press outside the zone (the client's lie): a miss", not CarryGrip.judge(c, "ok", 0.05, 0.2))
 	check("\"miss\", or no press time, NaN, a string: a miss", not CarryGrip.judge(c, "miss", at, at) and not CarryGrip.judge(c, "ok", nil, at)
 		and not CarryGrip.judge(c, "ok", 0 / 0, at) and not CarryGrip.judge(c, "ok", "now", at) and not CarryGrip.judge(c, true, at, at))
