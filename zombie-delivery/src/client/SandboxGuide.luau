@@ -302,7 +302,8 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 			local spots = standsOf(plotId)
 			local owned = world.ownedStands -- (8.1: only the stands this warehouse has bought: never a locked one)
 			if type(owned) == "number" and owned < #spots then
-				local some = table.create(owned)
+				local some = world.someSpots -- (8.2 perf: one table, refilled: a look makes none)
+				table.clear(some)
 				for i = 1, owned do
 					some[i] = spots[i]
 				end
@@ -590,7 +591,9 @@ local function buildWorld()
 	folder.Parent = workspace
 	world.folder = folder
 	world.points = {}
+	world.pointAt = {} -- (8.2 perf: where each point is: only a point that moved is written, the beams redrawn)
 	world.beams = {}
+	world.someSpots = {} -- (the bought stands' spots, refilled by targetOf)
 	for i = 1, MAX_POINTS do
 		world.points[i] = Ui.make("Attachment", { Name = `SandboxGuidePoint{i}` }, terrain)
 	end
@@ -678,7 +681,10 @@ end
 
 -- The chevron over `at` with its tag, the path from the player (px, pz) to it along the roads.
 local function showWorld(at: Vector3, label: string, px: number, pz: number)
-	world.target.WorldPosition = at
+	if at ~= world.targetAt then -- (8.2 perf: the marker moved only when its target did)
+		world.targetAt = at
+		world.target.WorldPosition = at
+	end
 	local marker = world.marker
 	if not marker.Enabled then
 		marker.Enabled = true
@@ -696,7 +702,11 @@ local function showWorld(at: Vector3, label: string, px: number, pz: number)
 	end
 	local y = SandboxMap.RoadTop + G.PathLift
 	for i = 1, count do
-		world.points[i].WorldPosition = Vector3.new(path[i * 2 - 1], y, path[i * 2])
+		local point = Vector3.new(path[i * 2 - 1], y, path[i * 2])
+		if point ~= world.pointAt[i] then
+			world.pointAt[i] = point
+			world.points[i].WorldPosition = point
+		end
 	end
 	local lit = math.max(0, count - 1)
 	for i = 1, MAX_POINTS - 1 do

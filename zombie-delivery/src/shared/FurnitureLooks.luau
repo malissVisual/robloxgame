@@ -276,6 +276,7 @@ local function label(part: BasePart, text: string, color: Color3, face: Enum.Nor
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 40
 	gui.LightInfluence = 1
+	gui.MaxDistance = Config.Performance.SignRange -- 8.2 perf: small text, drawn only near (a phone draws each on its own)
 	local text_ = Instance.new("TextLabel")
 	text_.Size = UDim2.fromScale(0.92, 0.8)
 	text_.Position = UDim2.fromScale(0.04, 0.1)

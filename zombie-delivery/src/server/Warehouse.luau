@@ -302,6 +302,7 @@ local function buildPlot(parent: Instance, plot: SandboxMap.Plot): PlotState
 	deskAnchor.CFrame = CFrame.new(0, 0.6, terminal.Size.Z / 2 + 0.2)
 	deskAnchor.Parent = terminal
 	model.WorldPivot = CFrame.new(plot.warehouse.x, 0, plot.warehouse.z)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- 8.2 perf: with StreamingEnabled the hall streams whole
 	model.Parent = parent
 	return {
 		plot = plot,

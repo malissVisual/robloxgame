@@ -134,13 +134,14 @@ local function watchFeet(character: Model)
 	end
 	local onStep = false
 	local stepAt = -math.huge
+	local skip: { Instance } = { character } -- (8.2 perf: the ray's filter made once a body, not at every floor change)
 	humanoid:GetPropertyChangedSignal("FloorMaterial"):Connect(function()
 		local root = character:FindFirstChild("HumanoidRootPart")
 		if not root or not root:IsA("BasePart") or humanoid.SeatPart ~= nil then
 			onStep = false
 			return
 		end
-		params.FilterDescendantsInstances = { character }
+		params.FilterDescendantsInstances = skip
 		local reach = humanoid.HipHeight + root.Size.Y / 2 + 1
 		local hit = workspace:Raycast(root.Position, Vector3.new(0, -reach, 0), params)
 		local now = hit ~= nil and SoundPlan.isStep(hit.Instance.Name) and hit.Instance:GetAttribute("SprinterDoor") ~= nil

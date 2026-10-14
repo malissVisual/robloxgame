@@ -56,9 +56,16 @@ end
 function PairSteer.step(dt: number)
 	local character = player.Character
 	local rate = rateOf(character)
-	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
-	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	if not rate or not humanoid or not root or not root:IsA("BasePart") or humanoid.SeatPart ~= nil or humanoid.Health <= 0 then
+	if not rate or not character then
+		-- (8.2 perf: the usual frame, nothing carried in two: one attribute read, no lookups)
+		if steered then
+			letGo()
+		end
+		return
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not root or not root:IsA("BasePart") or humanoid.SeatPart ~= nil or humanoid.Health <= 0 then
 		if steered then
 			letGo()
 		end
@@ -69,7 +76,9 @@ function PairSteer.step(dt: number)
 		steered = humanoid
 		state.back = false
 	end
-	humanoid.AutoRotate = false
+	if humanoid.AutoRotate then
+		humanoid.AutoRotate = false
+	end
 	-- (the body is the truth: a door's trip turns it, and the heading goes on from there)
 	local look = root.CFrame.LookVector
 	local facing = PairCarry.yawOf(look.X, look.Z)
