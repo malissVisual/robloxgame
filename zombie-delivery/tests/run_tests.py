@@ -5,7 +5,7 @@ standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS P
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 """
-import glob, os, re, shutil, subprocess, sys, tempfile
+import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
@@ -162,7 +162,23 @@ with tempfile.TemporaryDirectory() as tmp:
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshServer")')
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 8.1: its server/HouseMesh.luau on the same mock as HouseMeshServer.luau (no import there: the chalet stays; DayNight
+    # a stand-in), and the owner's Blender house as numbers for the test (HouseArt.luau, from
+    # design/blender-house/roblox/ZDCHouseArt.json, house.py's manifest: the box it was made for, its front door's
+    # leaves, its top; the house's frame: the bottom's middle, -Z the front). tools/house-art/check.py dresses it.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseMesh.luau"), encoding="utf-8").read()
+    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = function() end }")
+    open(os.path.join(tmp, "HouseMeshServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    art = json.load(open(os.path.join(os.path.dirname(HERE), "design", "blender-house", "roblox", "ZDCHouseArt.json"), encoding="utf-8"))
+    leaves = [d for d in art["details"] if d["name"].startswith("Křídlo dveří") and d["center"][2] < 0]
+    lo = [min(d["center"][i] - d["size"][i] / 2 for d in leaves) for i in range(3)]
+    hi = [max(d["center"][i] + d["size"][i] / 2 for d in leaves) for i in range(3)]
+    top = max(p["center"][1] + p["size"][1] / 2 for p in art["pieces"].values())
+    open(os.path.join(tmp, "HouseArt.luau"), "w", encoding="utf-8").write(
+        "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r }\n"
+        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).

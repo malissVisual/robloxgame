@@ -6168,6 +6168,20 @@ Config.CarryGrip = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   Doors             8.1 walk-in doors (the owner: "no E at the house, neither in nor out"): walk into a door's zone and
+--                     the fade takes you through, as "Enter house" / "Leave house" did (server/Moving.luau's WalkIn, in
+--                     the move's tick and every Every s between two ticks, only for the move's crew on foot). The zone:
+--                     a box at the doorway, its width + Side studs either side, Depth studs in front of it (outside: out
+--                     of the door; inside: into the room) and Through studs through it (the doorway and the porch or
+--                     the apron beyond), Height tall round a body's middle. You stand in it Dwell s facing the door (the
+--                     root's look · the way through at least Face: walking past it is no way in), then through; a
+--                     refusal (a bigDoor piece at a small door: "Too big — use the barn doors"; the back end of a pair
+--                     piece) is said once and you stay. After a trip you come out a few studs from the door facing away
+--                     (Depth is less than that), and the zones stay shut for you until you have stepped out of the one
+--                     you came out in and Rearm s have gone by (no ping-pong; Danny's own trips wait Rearm s too, his
+--                     arrival out of his door's reach: server/MoveHelper.luau). Walk false: the E prompts as before
+--                     (they stay, disabled, while it is on). Mat: the doormat on the ground at every door (its width at
+--                     most, its depth): "▲ IN" outside while a move uses the door, "▲ OUT" inside
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6274,6 +6288,7 @@ Config.Moving = {
 	},
 	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
+	Doors = { Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Dwell = 0.25, Rearm = 2, Every = 0.1, Mat = { 6, 2.2 } :: { number } }, -- 8.1 walk-in doors
 	Slots = 6,
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },

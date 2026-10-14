@@ -840,7 +840,9 @@ local function wayFor(h: Helper, here: Vector3, inside: boolean, goal: Vector3):
 end
 
 -- Through the front door (no fade: he is not a player), to where the players come out or in (7.x farm move: through
--- `way`, the front door's when nil).
+-- `way`, the front door's when nil). 8.1 walk-in doors (the players' rule, Config.Moving.Doors): he comes out facing
+-- away from the door and out of its reach (DoorReach: inside 1.5 past the entry, outside beside the players' spot), and
+-- goes through a door again only Rearm s later (go): no ping-pong.
 local function transfer(h: Helper, inside: boolean, clock: number, way: Way?)
 	h.doorAt = clock
 	local through = way or h.ways[1]
@@ -849,7 +851,7 @@ local function transfer(h: Helper, inside: boolean, clock: number, way: Way?)
 	else
 		local out: CFrame = through.outside
 		local right = Vector3.new(-out.LookVector.Z, 0, out.LookVector.X)
-		placeAt(h, out.Position + right * 2, out.LookVector)
+		placeAt(h, out.Position + right * (cfg.DoorReach + 0.5), out.LookVector)
 	end
 end
 
@@ -903,7 +905,7 @@ local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, nea
 	if inside ~= goalInside then
 		local way = wayFor(h, here, inside, goal) -- (7.x farm move: the nearest way he may take)
 		local door = if inside then way.exitIn else way.outside.Position
-		if flat(here, door) <= cfg.DoorReach and clock - h.doorAt > 1 then
+		if flat(here, door) <= cfg.DoorReach and clock - h.doorAt > Config.Moving.Doors.Rearm then -- (8.1 walk-in doors)
 			transfer(h, not inside, clock, way)
 			return false
 		end

@@ -109,6 +109,18 @@
 --     house (Moving.respawnAt, SandboxBoot's spawn). The clock and the zombies are Config.Moving.Sandbox's (Time,
 --     HordeAt, Horde, Roam: no horde and no roamers by default, nobody has a gun there; hordeAt 0 is "never"); Danny
 --     comes to a crew of one as ever.
+--   * 8.1 walk-in doors (the owner: "no E at the house, neither in nor out"; Config.Moving.Doors; the table WalkIn, the
+--     blocks marked "8.1 walk-in doors"): walking into a door's zone takes you through it, no prompt. Outside, a box in
+--     front of every door of the site (the house's front door, a farm's barn doors too: the site's doors), inside one at
+--     every way out (the move's ways), about the doorway's width and Depth deep, Through into the doorway and beyond:
+--     a crew member on foot standing in one Dwell s facing the door goes through it the way the prompts did (onEnter /
+--     onLeave: the same checks, the same fade, a piece in the hands and a pair piece's other end come along; a bigDoor
+--     piece at a small door is refused with the same words, once a visit, and you stay). The server looks with the
+--     positions (no Touched), in the move's tick and every Doors.Every s between two (Moving.doors: the loop's), only at
+--     the move's members. No ping-pong: after any trip (travel) the zones stay shut for that player until they have
+--     stepped out of the one they came out in and Rearm s have gone by; you come out a few studs from the door facing
+--     away (the house's 4, the plan's entry inside). The E prompts stay, disabled (Doors.Walk false: as before). A
+--     doormat on the ground at every door: "▲ IN" outside (shown while a move uses that door), "▲ OUT" inside.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
@@ -119,6 +131,7 @@
 --                             next move)
 --   Moving.useArt(art)        the art modules given (a test or a fallback), instead of finding them by name
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
+--   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
 --                             Danny joins a crew of one; MoveHelper.sync in the tick)
 --   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
@@ -184,7 +197,8 @@ type Site = {
 }
 
 -- 7.x farm move: a way out of the interior: its exit (the Leave prompt's part), where you come in by it, its door.
-type Way = { exit: number, part: BasePart, inside: Vector3, entry: CFrame, door: SiteDoor }
+-- 8.1 walk-in doors: its doorway's width and the flat way into the room from it (WalkIn.ways sets them).
+type Way = { exit: number, part: BasePart, inside: Vector3, entry: CFrame, door: SiteDoor, width: number?, into: Vector3? }
 
 type Item = {
 	spot: number,
@@ -287,6 +301,19 @@ local SB = {
 		cancelled = "Called off: what came home is yours",
 		failed = "Lost: nothing came home",
 	} :: { [string]: string },
+}
+
+-- 8.1 walk-in doors (Config.Moving.Doors): the state of the doors you walk through, in one table (the registers), its
+-- functions further down (the block "8.1 walk-in doors", after onLeave).
+--   at      player → the zone they stand in (key: 100 + a site door's index outside, a way's inside), since when they
+--           face its door (nil: not facing it), tried: gone for it once this visit (a refusal is said once)
+--   held    player → after a trip: the zones shut for them until they stepped out of the one they came out in (left;
+--           nil: not looked at yet, `from` where they came out) and Rearm s have gone by (untilAt, os.clock)
+--   mats    a site → its doormats outside ("▲ IN"), shown while a move uses that site
+local WalkIn = {
+	at = {} :: { [Player]: { key: number, since: number?, tried: boolean } },
+	held = {} :: { [Player]: { untilAt: number, left: boolean?, from: Vector3? } },
+	mats = {} :: { [Site]: { BasePart } },
 }
 
 -- The drop-off in a sentence: "the Wall" (the city), "your warehouse" (8.0 SANDBOX).
@@ -820,7 +847,7 @@ end
 
 -- ── 8.0 SANDBOX: the house's site (shared/SandboxMap.luau House) ─────────────────────────────────────────────────────
 -- Its front door (the spot outside it, looking out to the road), the van's curb (its pivot: the nose to the road, the
--- back to the door: "Call truck to door"), out where you came in (a step out of the door). Its "Enter house" part is an
+-- back to the door: "Call truck to door"), out where you came in (4 studs out of the door). Its "Enter house" part is an
 -- invisible one at the door until the map's front door is found (SB.frontDoor: the prompt goes onto that). No
 -- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is.
 local function yawLook(yaw: number): Vector3
@@ -839,7 +866,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 	local enter = invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
 	model.PrimaryPart = enter
 	model.Parent = parent
-	local out = door + facing * 2 + Vector3.new(0, 0.1, 0)
+	local out = door + facing * 4 + Vector3.new(0, 0.1, 0) -- (8.1 walk-in doors: 4 out, as the city's, clear of its zone)
 	local outside = CFrame.lookAt(out, out + facing)
 	local home: Map.Home = {
 		id = contract.id,
@@ -1842,6 +1869,11 @@ travel = function(player: Player, target: CFrame, s: Session, inside: boolean, p
 			warn(`[Moving] a door trip failed: {err}`)
 		end
 		traveling[player] = nil
+		-- 8.1 walk-in doors: no way back until they stepped out of the zone here (come out clear of it: out already, judged
+		-- by WalkIn.check from where they came out) and Rearm s went by
+		local _, _, body = bodyOf(player)
+		WalkIn.at[player] = nil
+		WalkIn.held[player] = { untilAt = os.clock() + T.Doors.Rearm, left = nil, from = if body then body.Position else nil }
 		if player.Parent then
 			remote:FireClient(player, "fade", "in", T.Fade)
 		end
@@ -1974,6 +2006,201 @@ local function onLeave(player: Player, s: Session, index: number?)
 		return
 	end
 	travel(player, if way then way.door.outside else s.site.outside, s, false)
+end
+
+-- ── 8.1 walk-in doors: through a door by walking into it (Config.Moving.Doors) ─────────────────────────────────────
+-- The zones are boxes at the doorways: outside one in front of every door of the site (at its foot, out of it along
+-- its facing), inside one at every way out (at its exit, a body's height over the floor, into the room toward where
+-- you come in by it). A crew member on foot standing in one Dwell s facing its door goes through it: onEnter /
+-- onLeave, their checks, words and fade (what they carry and a pair piece's other end come along).
+
+-- Is `at` in a doorway's zone: `mid` its threshold at a body's middle, `out` the flat way out of it on the side you
+-- stand (outside: the door's facing; inside: into the room), `width` the doorway's? Depth in front of it, Through
+-- through it, Side past its jambs, Height round the middle.
+function WalkIn.inZone(at: Vector3, mid: Vector3, out: Vector3, width: number): boolean
+	local D = T.Doors
+	local dx, dz = at.X - mid.X, at.Z - mid.Z
+	local along = dx * out.X + dz * out.Z
+	return along <= D.Depth and along >= -D.Through and math.abs(dx * out.Z - dz * out.X) <= width / 2 + D.Side
+		and math.abs(at.Y - mid.Y) <= D.Height / 2
+end
+
+-- The zone a body at `at` stands in (inside: the ways out's; outside: the site's doors'): its index and its flat way
+-- out of the doorway on that side, or nil.
+function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean): (number?, Vector3?)
+	if inside then
+		for index, way in s.ways do
+			local into = way.into
+			if into and WalkIn.inZone(at, way.inside, into, way.width or way.part.Size.X) then
+				return index, into
+			end
+		end
+		return nil, nil
+	end
+	local up = Vector3.new(0, Config.Furniture.EntryUp, 0) -- (a root's height over the ground: the door's foot is on it)
+	for index, door in s.site.doors do
+		if WalkIn.inZone(at, door.door + up, door.facing, door.width) then
+			return index, door.facing
+		end
+	end
+	return nil, nil
+end
+
+-- One look at a crew member (WalkIn.look): on foot in a zone, facing its door (Face) for Dwell s: through it, once a
+-- visit (a refusal is said once; out of the zone and in again tries again). After a trip nothing until they have left
+-- the zone they came out in and Rearm s have gone by (WalkIn.held, set by travel).
+function WalkIn.check(s: Session, player: Player, clock: number)
+	local _, humanoid, root = bodyOf(player)
+	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
+		WalkIn.at[player] = nil
+		return
+	end
+	local inside = s.inside[player] == true
+	local index, out = WalkIn.zoneOf(s, root.Position, inside)
+	local hold = WalkIn.held[player]
+	if hold then
+		if hold.left == nil then -- (the first look since the trip: did they come out clear of every zone?)
+			local from = hold.from
+			hold.left = from == nil or WalkIn.zoneOf(s, from, inside) == nil
+		end
+		hold.left = hold.left or index == nil
+		if not hold.left or clock < hold.untilAt then
+			WalkIn.at[player] = nil
+			return
+		end
+		WalkIn.held[player] = nil
+	end
+	if not index or not out then
+		WalkIn.at[player] = nil
+		return
+	end
+	local key = if inside then index else 100 + index
+	local visit = WalkIn.at[player]
+	if not visit or visit.key ~= key then
+		local fresh = { key = key, since = nil :: number?, tried = false }
+		WalkIn.at[player] = fresh
+		visit = fresh
+	end
+	local look = root.CFrame.LookVector
+	if -(look.X * out.X + look.Z * out.Z) < T.Doors.Face then
+		visit.since = nil -- (facing away, or walking past it: the dwell starts when they turn to the door)
+		return
+	end
+	local since = visit.since
+	if since == nil then
+		visit.since = clock
+	elseif not visit.tried and clock - since >= T.Doors.Dwell then
+		visit.tried = true
+		if inside then
+			onLeave(player, s, index)
+		else
+			onEnter(player, s.contract.id, index)
+		end
+	end
+end
+
+-- The move's crew at its doors: every member's look (the tick's, and Moving.doors' between two ticks).
+function WalkIn.look(s: Session, clock: number)
+	if not T.Doors.Walk then
+		return
+	end
+	for player in s.members do
+		if s.ended then
+			return
+		end
+		WalkIn.check(s, player, clock)
+	end
+end
+
+-- A doormat on the ground: its middle `at` (on the floor), the door `toward` it (flat), the doorway's `width`; its words
+-- read upright to whoever walks at the door. Light: no collision, no query, no shadow.
+function WalkIn.mat(parent: Instance, at: Vector3, toward: Vector3, width: number, text: string): BasePart
+	local size = T.Doors.Mat
+	local up = Vector3.new(0, 0.12, 0) -- (over a garden path's top or a rug)
+	local part = Instance.new("Part")
+	part.Name = "WalkInMat"
+	part.Size = Vector3.new(math.min(width, size[1]), 0.06, size[2])
+	part.CFrame = CFrame.lookAt(at + up, at + up + Vector3.new(toward.X, 0, toward.Z))
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Color = Color3.fromRGB(96, 72, 50)
+	part.Material = Enum.Material.Fabric
+	part.TopSurface = Enum.SurfaceType.Smooth
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "Words"
+	gui.Face = Enum.NormalId.Top -- (its top edge toward the part's front: the door)
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.LightInfluence = 1
+	gui.MaxDistance = 120
+	gui.Parent = part
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(0.86, 0.6)
+	label.Position = UDim2.fromScale(0.07, 0.2)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(240, 226, 196)
+	label.TextScaled = true
+	label.Font = Enum.Font.GothamBold
+	label.Parent = gui
+	part.Parent = parent
+	return part
+end
+
+-- A site's doormats outside ("▲ IN" just in front of every door), hidden until a move uses the site (WalkIn.show).
+function WalkIn.siteMats(site: Site)
+	local list: { BasePart } = {}
+	for _, door in site.doors do
+		table.insert(list, WalkIn.mat(site.model, door.door + door.facing * (T.Doors.Mat[2] / 2 + 0.3), -door.facing, door.width, "▲ IN"))
+	end
+	WalkIn.mats[site] = list
+end
+
+-- Every site's doormats outside shown while a move that goes on uses it (a move's start and end).
+function WalkIn.show()
+	for site, list in WalkIn.mats do
+		local used = false
+		for _, s in sessions do
+			used = used or (s.site == site and not s.ended)
+		end
+		for _, mat in list do
+			mat.Transparency = if used then 0 else 1
+			local gui = mat:FindFirstChildOfClass("SurfaceGui")
+			if gui then
+				gui.Enabled = used
+			end
+		end
+	end
+end
+
+-- A new move's ways out (startMove): each one's doorway width (the plan's doors to the outside, in the exits' order;
+-- else its Leave part's), its flat way into the room (from its exit to where you come in by it: you come in facing
+-- that way, away from the door, Danny too) and its doormat inside ("▲ OUT" on the floor just inside the doorway, in the
+-- interior: it goes with it).
+function WalkIn.ways(s: Session)
+	local widths: { number } = {}
+	local doors = s.plan.doors
+	for _, d in (if type(doors) == "table" then doors else {}) :: { any } do
+		if type(d) == "table" and type(d.rooms) == "table" and d.rooms[2] == "outside" and type(d.width) == "number" then
+			table.insert(widths, d.width)
+		end
+	end
+	local fallback = (s.origin * Vector3.new(0, 0, 1)) - s.origin.Position -- (the plan's +Z: into the house)
+	for index, way in s.ways do
+		local step = way.entry.Position - way.inside
+		local level = Vector3.new(step.X, 0, step.Z)
+		local into = if level.Magnitude > 1e-3 then level.Unit else fallback
+		local width = widths[index] or way.part.Size.X
+		way.into, way.width = into, width
+		way.entry = CFrame.lookAt(way.entry.Position, way.entry.Position + into)
+		if T.Doors.Walk then
+			local floor = way.inside - Vector3.new(0, Config.Furniture.EntryUp, 0)
+			WalkIn.mat(s.interior or folder or workspace, floor + into * (T.Doors.Mat[2] / 2 + 0.3), -into, width, "▲ OUT")
+		end
+	end
 end
 
 -- ── The things' prompts ────────────────────────────────────────────────────
@@ -2138,6 +2365,7 @@ local function enterPrompt(s: Session)
 		end
 		local action = if index == 1 then "Enter house" else "Enter barn"
 		local enter = newPrompt(spot, action, `{s.contract.icon} {s.contract.name}`, Enum.KeyCode.E, 0, T.Reach.Door + door.width / 2)
+		enter.Enabled = not T.Doors.Walk -- (8.1 walk-in doors: you walk in; the prompt stays, off)
 		tag(enter, s.owner)
 		enter.Triggered:Connect(function(player: Player)
 			onEnter(player, s.contract.id, index)
@@ -2704,6 +2932,7 @@ local function cleanup(s: Session)
 	if sessions[s.owner] == s then
 		sessions[s.owner] = nil
 	end
+	WalkIn.show() -- 8.1 walk-in doors: the doormats outside go with the last move at the house
 end
 
 local payOut: (Session, string, string?) -> ()
@@ -3189,6 +3418,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 		local exitAt = origin * CFrame.new(at)
 		local part = invisible(if index == 1 then "LeaveDoor" else `LeaveDoor{index}`, Vector3.new(width, 6, 1), exitAt + Vector3.new(0, 3.5, 0), folder or workspace)
 		local leave = newPrompt(part, if index == 1 then "Leave house" else `Leave by the {door.name}`, `{contract.icon} {contract.name}`, Enum.KeyCode.E, 0, T.Reach.Exit + (width - 4) / 2)
+		leave.Enabled = not T.Doors.Walk -- (8.1 walk-in doors: you walk out; the prompt stays, off)
 		leave.Triggered:Connect(function(player: Player)
 			onLeave(player, s, index)
 		end)
@@ -3197,6 +3427,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 		end
 		table.insert(s.ways, { exit = index, part = part, inside = exitAt.Position, entry = origin * (entries[index] or plan.entry), door = door })
 	end
+	WalkIn.ways(s) -- 8.1 walk-in doors: the ways' zones and their doormats inside
 	truckPrompts(s)
 	if SB.on then -- 8.0 SANDBOX: this house is spent: the owner's next card shows a new one
 		SB.forget(owner)
@@ -3206,6 +3437,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	end
 	storyText(s) -- MoveStory hook: Marge's text at the start
 	teamSetup(s, roles) -- 7.0 planning: the roles, the house's Enter prompt
+	WalkIn.show() -- 8.1 walk-in doors: the house's doormats outside
 	return nil
 end
 
@@ -3525,6 +3757,7 @@ local function tick(s: Session)
 	keepVan(s, t) -- 7.x van moves: a van lost mid-move loses its load (the move goes on), the owner's next one is taken
 	syncMembers(s)
 	watchCarried(s, clock)
+	WalkIn.look(s, clock) -- 8.1 walk-in doors: the crew walking through the doors
 	keepRoam(s, clock)
 	teamTick(s) -- 7.0 planning: the barricades
 	if s.move.phase == "horde" then
@@ -4205,6 +4438,12 @@ function Moving.start()
 		buildDropOff(made)
 		MoveGreeters.start(boardPart) -- 7.0 greeters: the soldier at the Wall, Marge's word at the kiosk (their own loop)
 	end
+	if T.Doors.Walk then -- 8.1 walk-in doors: a doormat at every door outside (shown while a move uses it)
+		for _, site in sites do
+			WalkIn.siteMats(site)
+		end
+		WalkIn.show()
+	end
 	wireHooks()
 	-- 7.0 planning: the lobby before a move (its LAUNCH starts it with the roles; the quick chat reaches the move's crew)
 	MoveLobby.onLaunch = function(owner: Player, contractId: string, roles: { [number]: string }): string?
@@ -4258,6 +4497,7 @@ function Moving.start()
 		end
 		armed[player] = nil
 		traveling[player] = nil
+		WalkIn.at[player], WalkIn.held[player] = nil, nil -- (8.1 walk-in doors)
 		SB.forget(player) -- (8.0 SANDBOX: their card's house)
 	end)
 	-- a new body is never inside (a death inside respawns you at the depot)
@@ -4273,10 +4513,19 @@ function Moving.start()
 	for _, player in Players:GetPlayers() do
 		onPlayer(player)
 	end
+	-- the moves' tick every Tick s; 8.1 walk-in doors: the loop runs every Doors.Every s, the doors looked at between two
+	-- ticks too (the tick looks at them itself)
 	task.spawn(function()
+		local last = os.clock()
 		while true do
-			task.wait(T.Tick)
-			Moving.step()
+			task.wait(if T.Doors.Walk then math.min(T.Doors.Every, T.Tick) else T.Tick)
+			local clock = os.clock()
+			if clock - last >= T.Tick * 0.9 then
+				last = clock
+				Moving.step()
+			else
+				Moving.doors()
+			end
 		end
 	end)
 end
@@ -4290,6 +4539,21 @@ function Moving.step()
 			end)
 			if not ok then
 				warn(`[Moving] {s.contract.id}: {err}`)
+			end
+		end
+	end
+end
+
+-- 8.1 walk-in doors: one look at every running move's doors (the loop's between two ticks, about every Doors.Every s).
+function Moving.doors()
+	local clock = os.clock()
+	for _, s in sessions do
+		if not s.ended then
+			local ok, err = pcall(function()
+				WalkIn.look(s, clock)
+			end)
+			if not ok then
+				warn(`[Moving] {s.contract.id}'s doors: {err}`)
 			end
 		end
 	end
