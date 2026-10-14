@@ -100,6 +100,7 @@ PlayerData.start()
 Collection.start()
 Upgrades.start()
 local U = Config.SandboxUpgrades
+local P4 = Config.WarehouseLevels.List[4].price -- (the Big warehouse's price; 8.3 economy: the lights' first $1,500)
 
 -- ── Joining ────────────────────────────────────────────────────────────────
 E.saves.Player_101 = save80(35000)
@@ -139,36 +140,36 @@ local moneyAt, eventsAt, heardAt = #money, #events, #heard
 mark = #E.sent
 ok, why = Upgrades.buy(A, "warehouse", 4)
 E.flush()
-check("8.3: the Warehouse card's level 4 (the Big warehouse): bought for $12,000 (the money taken)", ok == true and why == nil and profileA.money == 23000 and same(profileA.sandboxUpgrades, { warehouse = 4 }), why)
+check(`8.3: the Warehouse card's level 4 (the Big warehouse): bought for {Rules.money(P4)} (the money taken)`, ok == true and why == nil and profileA.money == 35000 - P4 and same(profileA.sandboxUpgrades, { warehouse = 4 }), why)
 local spent = money[moneyAt + 1]
-check("… PlayerData.spend: -$12,000, the reason \"Upgrade\", the SKU its id", spent ~= nil and spent.delta == -12000 and spent.reason == "Upgrade" and spent.sku == "warehouse" and #money == moneyAt + 1)
+check(`… PlayerData.spend: -{Rules.money(P4)}, the reason "Upgrade", the SKU its id`, spent ~= nil and spent.delta == -P4 and spent.reason == "Upgrade" and spent.sku == "warehouse" and #money == moneyAt + 1)
 local bought = events[eventsAt + 1]
 check("… analytics: UpgradeBought (the level, the id)", bought ~= nil and bought.name == "UpgradeBought" and bought.value == 4 and bought.a == "warehouse")
 local msgs = E.received(A, "Upgrades", mark)
 check("… the client: \"bought\" and one new state", #kinds(msgs, "bought") == 1 and kinds(msgs, "bought")[1].id == "warehouse" and kinds(msgs, "bought")[1].level == 4
-	and #kinds(msgs, "state") == 1 and same(kinds(msgs, "state")[1].levels, { warehouse = 4 }) and kinds(msgs, "state")[1].money == 23000)
+	and #kinds(msgs, "state") == 1 and same(kinds(msgs, "state")[1].levels, { warehouse = 4 }) and kinds(msgs, "state")[1].money == 35000 - P4)
 check("… 12 stands now (8 before): the collection's state says so, the listeners heard, the attribute 4", Collection.stands(A) == 12 and #heard == heardAt + 1
 	and kinds(E.received(A, "Collection", mark), "state")[1].stands == 12 and A:GetAttribute(Config.WarehouseLevels.Attribute) == 4)
 mark = #E.sent
 ok = Upgrades.buy(A, "warehouse", 4)
 E.flush()
-check("a second click on the same card (the level it offered is bought): nothing bought, the state again", ok == false and profileA.money == 23000 and Rules.level(profileA.sandboxUpgrades, "warehouse") == 4
+check("a second click on the same card (the level it offered is bought): nothing bought, the state again", ok == false and profileA.money == 35000 - P4 and Rules.level(profileA.sandboxUpgrades, "warehouse") == 4
 	and #kinds(E.received(A, "Upgrades", mark), "state") == 1 and lastNotice(A, mark) == "")
 profileA.money = 100
 mark = #E.sent
 E.fire(A, "Upgrades", { kind = "buy", id = "engine", level = 1 })
 check("not enough money: refused, the notice says the price and the money", profileA.money == 100 and Rules.level(profileA.sandboxUpgrades, "engine") == 0
-	and lastNotice(A, mark) == "Van engine costs $600: you have $100.", lastNotice(A, mark))
+	and lastNotice(A, mark) == `Van engine costs {Rules.money(U.List.engine.prices[1])}: you have $100.`, lastNotice(A, mark))
 
 -- the remote: garbage and the rate limit
-profileA.money = 100000
+profileA.money = 250000 -- (enough for every upgrade below: 8.3 economy's prices)
 E.advance(2)
 local before = table.clone(profileA.sandboxUpgrades)
 for _, message in { nil, "buy", 5, true, { kind = "buy" }, { kind = "buy", id = {} }, { kind = "buy", id = "lights", level = "x" }, { kind = "sell", id = "lights" }, { kind = 7 } } :: { any } do
 	E.advance(1)
 	E.fire(A, "Upgrades", message)
 end
-check("the remote: garbage buys nothing (no table, no id, a table id, a junk level, another kind)", same(profileA.sandboxUpgrades, before) and profileA.money == 100000)
+check("the remote: garbage buys nothing (no table, no id, a table id, a junk level, another kind)", same(profileA.sandboxUpgrades, before) and profileA.money == 250000)
 E.advance(2)
 mark = #E.sent
 for _ = 1, 10 do
@@ -192,7 +193,7 @@ local rate0 = Collection.incomePerMinute(A)
 local incomeAt = #money
 E.advance(30)
 E.fire(A, "Upgrades", { kind = "buy", id = "lights", level = 1 })
-check("Showroom lights level 1 bought ($750)", Rules.level(profileA.sandboxUpgrades, "lights") == 1 and profileA.money == 100000 - 750 + paid(A, "CollectionIncome", incomeAt), profileA.money)
+check(`Showroom lights level 1 bought ({Rules.money(U.List.lights.prices[1])})`, Rules.level(profileA.sandboxUpgrades, "lights") == 1 and profileA.money == 250000 - U.List.lights.prices[1] + paid(A, "CollectionIncome", incomeAt), profileA.money)
 local rate1 = Collection.incomePerMinute(A)
 check("… the income × 1.1 (Collection.incomePerMinute, Collection.boost)", near(rate1, rate0 * 1.1) and near(Collection.boost(A), 1.1), `{rate0} {rate1}`)
 E.advance(30)
@@ -217,7 +218,7 @@ local bed = Collection.add(A, { item = "bed", condition = 1 }) :: string
 check("8.3: the Big warehouse has no stand 13", not Collection.display(A, radio, 13))
 E.advance(1)
 E.fire(A, "Upgrades", { kind = "buy", id = "warehouse", level = 5 })
-check("8.3: the Logistics centre bought through the remote ($30,000): 20 stands", Rules.level(profileA.sandboxUpgrades, "warehouse") == 5 and Collection.stands(A) == 20)
+check(`8.3: the Logistics centre bought through the remote ({Rules.money(Config.WarehouseLevels.List[5].price)}): 20 stands`, Rules.level(profileA.sandboxUpgrades, "warehouse") == 5 and Collection.stands(A) == 20)
 ok = Collection.display(A, radio, 13)
 check("8.3: the Logistics centre's stand 13 takes the kitchen radio; stand 21 (none there) refused; the bed on 2", ok == true and not Collection.display(A, bed, 21) and Collection.display(A, bed, 2))
 local wagon = Collection.add(B, { item = "hay_wagon", condition = 1 }) :: string

@@ -1398,9 +1398,10 @@ end
 
 -- Moves (the sandbox house: Moving's admin) ----------------------------------------------------------------------------
 
--- Every move gets a new seed (KONTRAKT: "Each move gets a new seed, so the house is refilled"): a running one ends
--- cleanly (Moving.admin "end", called off), then Moving.admin "refill" forgets the seed your card holds (a card opened
--- before keeps its house until its move starts) and opens the card on a new one: the next START fills the house anew.
+-- A new seed refills the house (KONTRAKT: "Each move gets a new seed, so the house is refilled"; 8.3 economy: once a
+-- move brought something home, a move called off with nothing home keeps it): a running one ends cleanly
+-- (Moving.admin "end", called off), then Moving.admin "refill" forgets the seed your card holds and opens the card on a
+-- new one: the next START fills the house anew.
 Sandbox.run.refill = function(player: Player)
 	local ended = if Sandbox.onMove(player) then string.gsub(Sandbox.moving(player, "end"), "^ADMIN: ", "") .. " " else "No move was running. "
 	Sandbox.moving(player, "refill")

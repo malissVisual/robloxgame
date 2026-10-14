@@ -276,9 +276,9 @@ for _, item in Rules.Paints do
 end
 check("the PAINT tab: a swatch a colour in Config's order", table.concat(order, ",") == table.concat(expected, ","), table.concat(order, ","))
 check("… the tab lit (its underline), LIVERY not", named(named(window, "Tab_paint"), "Underline") ~= nil and named(named(window, "Tab_livery"), "Underline") == nil)
-check("the red's swatch: its chip in the colour, ✓ ON VAN; the cream OWNED (the factory's); white its price in green ($300 of $900); chrome $20,000 grey",
+check("the red's swatch: its chip in the colour, ✓ ON VAN; the cream OWNED (the factory's); white its price in green ($300 of $900); chrome $50,000 grey (8.3 economy)",
 	isRgb(named(swatch("red"), "Chip").BackgroundColor3, { 176, 32, 32 }) and named(swatch("red"), "Status").Text == "✓ ON VAN" and named(swatch("cream"), "Status").Text == "OWNED"
-	and named(swatch("white"), "Status").Text == "$300" and named(swatch("white"), "Status").TextColor3 == CardKit.Color.money and named(swatch("chrome"), "Status").Text == "$20,000"
+	and named(swatch("white"), "Status").Text == "$300" and named(swatch("white"), "Status").TextColor3 == CardKit.Color.money and named(swatch("chrome"), "Status").Text == "$50,000"
 	and named(swatch("chrome"), "Status").TextColor3 == CardKit.Color.dim)
 check("… Collector gold: 🔒 LOCKED, a gold frame (premium)", named(swatch("gold"), "Status").Text == "🔒 LOCKED" and named(swatch("gold"), "Edge").Color == CardKit.Color.gold)
 check("the swatch you wear looked at first: its frame lit, \"Fire red · paint\", on your van, ✓ ON YOUR VAN", PaintUi.view().selected == "red" and named(swatch("red"), "Edge").Thickness == 2
@@ -313,14 +313,15 @@ check("the same state again: no redraw (a tap is never lost)", named(gui, "VanPa
 
 -- NEED, LOCKED, WEAR
 press(swatch("chrome"))
-check("Mirror chrome with $600: a grey NEED $19,400", named(window, "Action").Text == "NEED $19,400" and named(window, "Action").BackgroundColor3 == CardKit.Buttons.shut.face)
+check("Mirror chrome with $600: a grey NEED $49,400 (8.3 economy)", named(window, "Action").Text == "NEED $49,400" and named(window, "Action").BackgroundColor3 == CardKit.Buttons.shut.face)
 sent = #sentOn("VanPaint")
 press(named(window, "Action"))
-check("… a tap sends nothing, it says how much is missing", #sentOn("VanPaint") == sent and M.toasts[#M.toasts] == "Mirror chrome: you need $19,400 more.", M.toasts[#M.toasts])
+check("… a tap sends nothing, it says how much is missing", #sentOn("VanPaint") == sent and M.toasts[#M.toasts] == "Mirror chrome: you need $49,400 more.", M.toasts[#M.toasts])
 press(swatch("gold"))
-check("Collector gold: its line says what unlocks it, 🔒 LOCKED", named(window, "SelInfo").Text == "🔒 Collection book: Found every collectible" and named(window, "Action").Text == "🔒 LOCKED")
+check("Collector gold: its line says what unlocks it, 🔒 LOCKED", named(window, "SelInfo").Text == "🔒 Collection book: A legendary!" and named(window, "Action").Text == "🔒 LOCKED")
 press(named(window, "Action"))
-check("… a tap sends nothing, it says what unlocks it", #sentOn("VanPaint") == sent and string.find(M.toasts[#M.toasts], "found every collectible", 1, true) ~= nil, M.toasts[#M.toasts])
+check("… a tap sends nothing, it says what unlocks it (\"…your collection book: a legendary!\", no \"!.\")", #sentOn("VanPaint") == sent
+	and M.toasts[#M.toasts] == "Collector gold unlocks with your collection book: a legendary!", M.toasts[#M.toasts])
 press(swatch("red"))
 check("the red (yours): WEAR", named(window, "Action").Text == "WEAR" and named(window, "SelInfo").Text == "Yours: wear it for free")
 press(named(window, "Action"))
@@ -361,11 +362,11 @@ check("the money follows the State remote: BUY $1,500 lights up, the subtitle sa
 -- a milestone paid: Collector gold opens
 press(named(window, "Tab_paint"))
 M.flush()
-remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "collectibles" } })
+remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "legendary" } })
 M.flush()
 window = named(gui, "VanPaint")
 press(swatch("gold"))
-check("the book paid \"Found every collectible\": Collector gold BUY $2,500", named(swatch("gold"), "Status").Text == "$2,500" and named(window, "Action").Text == "BUY $2,500")
+check("the book paid \"A legendary!\" (8.3 economy): Collector gold BUY $5,000", named(swatch("gold"), "Status").Text == "$5,000" and named(window, "Action").Text == "BUY $5,000")
 scene("paint-phone-gold")
 
 -- closing
@@ -389,7 +390,7 @@ M.gamepad = true
 PaintUi.open()
 check("a gamepad: the selection lands on the swatch you wear", M.focus == swatch("red"), M.focus and M.focus.Name)
 M.focus = swatch("navy")
-remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white", "navy" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "collectibles" } })
+remote.OnClientEvent:Fire({ kind = "state", owned = { "red", "white", "navy" }, worn = { paint = "red", livery = "zdc" }, money = 5000, paid = { "legendary" } })
 M.flush()
 check("… a redraw keeps it where it was (inside the window)", M.focus ~= nil and M.focus.Name == "Swatch_navy" and M.focus.Parent ~= nil)
 check("… the window keeps the selection inside (a selection group)", named(gui, "VanPaint").SelectionGroup == true)

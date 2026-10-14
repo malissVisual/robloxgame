@@ -4,7 +4,8 @@
 --   * Moving.start in the sandbox: a Moving contracts kiosk on every plot (SandboxMap plot.board), no depot board, no
 --     Wall, no dressing, no soldier, no Marge or Walt: one contract, "The Old Chalet" (SandboxMap.House).
 --   * The card (any plot's board, not from afar): the house, its pieces' worth, 8.3 25 minutes, no horde by default, no
---     story, the note; its seed a new one each move. START → the solo lobby → LAUNCH at a board: the owner's own van
+--     story, the note; its seed a new one once a move brought something home (8.3 economy: no reroll, a move called off
+--     with nothing home keeps its house, the owner leaving too). START → the solo lobby → LAUNCH at a board: the owner's own van
 --     (the Sprinter, its walk-in bay Config.Moving.Beds.sprinter), the house built with the card's seed.
 --   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the Driver's
 --     call parks the van at House.curb (its nose to the road, its back to the door).
@@ -559,7 +560,7 @@ check("…the move is over: the interior gone, the van's prompts gone (the bay's
 E.place(ann, cork1.Position + V3(0, 0, 4))
 local planned = #seeds
 trigger(board1, ann)
-check("the next card: a new seed (the house refilled)", #seeds == planned + 1 and seeds[#seeds] ~= firstSeed)
+check("the next card: a new seed (the house refilled: 8.3 economy, the move brought pieces home)", #seeds == planned + 1 and seeds[#seeds] ~= firstSeed)
 check("admin: start picks the sandbox house (the card's new seed)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil and E.built == 2 and #seeds == planned + 1
 	and built[2] == seeds[#seeds] and Moving.busy(ann) ~= nil)
 step()
@@ -594,7 +595,7 @@ check("FINISH with the clock still in the van: it is lost (never collected)", re
 check("8.2: …onFinish: \"finish\", 1 piece home (the clock still in the van)", howOf((lastTold("finish"))) == "finish" and (lastTold("finish")).facts.home == 1
 	and (lastTold("finish")).facts.out == 1)
 planned = #seeds
-check("admin: start again: a new house (a fresh seed)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil and #seeds == planned + 1
+check("admin: start again: a new house (a fresh seed: a piece came home on the move before)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil and #seeds == planned + 1
 	and built[3] == seeds[#seeds] and built[3] ~= built[2] and built[3] ~= built[1])
 check("admin: time leaves one minute", string.find(Moving.admin(ann, "time"), "minute", 1, true) ~= nil
 	and E.last(ann, "Moving", "state") ~= nil)
@@ -621,6 +622,7 @@ E.carHealth[bob] = 0.2
 S.Horde, S.Roam = true, 2
 local parkedBefore, callsBefore = #parked, E.vehicleCalls or 0
 local said = Moving.admin(bob, "start")
+local bobSeed = built[#built] -- (8.3 economy: Bob's house, kept while his moves bring nothing home)
 local van = E.cars[bob]
 local wanted = if Economy.findCar(Config.Sandbox.Van) then Config.Sandbox.Van else T.Van
 check("no van out: the player's own comes to their plot's vanSpot (the Sprinter, else the ZDC Van)", string.find(said, "started", 1, true) ~= nil and van ~= nil
@@ -676,10 +678,13 @@ check("8.2: the piece the warehouse refused is lost, not home (the result, the f
 check("8.0.1: GIVE UP: \"You called it off\" (no Wall), no pay, no XP", bobResult ~= nil and string.find(bobResult.a.howText, "You called it off", 1, true) == 1
 	and string.find(bobResult.a.howText, "Wall", 1, true) == nil and bobResult.a.money == 0 and bobResult.a.xp == 0, bobResult and bobResult.a.howText)
 check("8.2: …onFinish: Bob's, \"giveup\"", (lastTold("finish")).player == bob and howOf((lastTold("finish"))) == "giveup", howOf((lastTold("finish"))))
+local plansBefore = #seeds
 
 -- the planning left open past Config.MoveRoles.Lobby.Timeout
 E.place(bob, moves:FindFirstChild("MovingBoard2"):FindFirstChild("Board").Position + V3(0, 0, 4))
 trigger(board2, bob)
+check("8.3 economy: no reroll: Bob's GIVE UP with nothing home kept his house: his next card is the same one (no new plan)", #seeds == plansBefore
+	and E.last(bob, "Moving", "contract") ~= nil and E.last(bob, "Moving", "contract").a.id == House.id, #seeds - plansBefore)
 E.request(bob, "start", House.id)
 check("(Bob's planning open)", E.last(bob, "MoveLobby", "lobby") ~= nil and E.last(bob, "MoveLobby", "lobby").a ~= nil, E.lastNotice(bob))
 E.now += Config.MoveRoles.Lobby.Timeout + 1
@@ -718,6 +723,7 @@ do
 	local D = T.Doors
 	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
 	check("(Bob's move)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
+	check("8.3 economy: …and his next move is built in that same house (its seed kept)", built[#built] == bobSeed, `{built[#built]} {bobSeed}`)
 	step()
 	local o = E.interiors[#E.interiors]
 	local foot = V3(House.door.x, House.door.y, House.door.z)
@@ -817,6 +823,28 @@ do
 	check("…its leaf shut again Shut s after the trip", backLeaf:GetAttribute("DoorOpen") == false)
 	Moving.admin(bob, "end")
 	check("the move over: both doormats hidden again (no move at the house)", mat.Transparency == 1 and backMat.Transparency == 1)
+end
+
+-- 8.3 economy: no house reroll (server/Moving.luau SB.seeds, by user id): a move called off with nothing home (GIVE UP,
+-- the admin's end, the owner leaving) keeps its house, so starting, peeking and calling off never fishes for a legendary;
+-- a trip home (Ann's moves above) or the admin's REFILL gives a new one
+do
+	check("Bob's move ended by the admin with nothing home: the next one is the same house again", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil
+		and built[#built] == bobSeed)
+	E.leave(bob)
+	check("…he leaves mid-move with nothing home: called off", Moving.busy(bob) == nil)
+	local bob2 = E.player(22, "Bob", V3(plot2.spawn.x, 3, plot2.spawn.z))
+	E.plots[bob2] = plot2
+	E.place(bob2, moves:FindFirstChild("MovingBoard2"):FindFirstChild("Board").Position + V3(0, 0, 4))
+	trigger(board2, bob2)
+	check("…back on this server (his user id): his card is the same house (planned again: its facts went when he left)", seeds[#seeds] == bobSeed
+		and E.last(bob2, "Moving", "contract") ~= nil, `{seeds[#seeds]} {bobSeed}`)
+	check("…his move built with it", string.find(Moving.admin(bob2, "start"), "started", 1, true) ~= nil and built[#built] == bobSeed)
+	Moving.admin(bob2, "end")
+	check("the admin's REFILL: a new house all the same", string.find(Moving.admin(bob2, "refill"), "refilled", 1, true) ~= nil and seeds[#seeds] ~= bobSeed)
+	check("…the next move built with the new one", string.find(Moving.admin(bob2, "start"), "started", 1, true) ~= nil and built[#built] == seeds[#seeds]
+		and built[#built] ~= bobSeed)
+	Moving.admin(bob2, "end")
 end
 
 -- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or

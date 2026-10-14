@@ -364,8 +364,8 @@ check("the progress: \"23 / 68 found\", its bar 23/68 full", named(window, "Prog
 check("… the counts: Furniture 20 / 44, Collectibles 3 / 24", named(window, "FurnitureCount").Text == "Furniture 20 / 44" and named(window, "CollectibleCount").Text == "Collectibles 3 / 24")
 local rowFound10, rowFurniture = named(window, "Milestone_found10"), named(window, "Milestone_furniture")
 check("the milestones: a paid one ✔ \"Paid · +$250\"", named(rowFound10, "Check").Text == "✔" and named(rowFound10, "Reward").Text == "Paid · +$250" and named(rowFound10, "MilestoneName").Text == "Found 10 pieces")
-check("… an open one: how far and its reward (\"20 / 44 · +$1,500\")", named(rowFurniture, "Check").Text == "○" and named(rowFurniture, "Reward").Text == "20 / 44 · +$1,500", named(rowFurniture, "Reward").Text)
-check("… every collectible: 3 / 24 · +$5,000; A legendary! ✔", named(named(window, "Milestone_collectibles"), "Reward").Text == "3 / 24 · +$5,000" and named(named(window, "Milestone_legendary"), "Check").Text == "✔")
+check("… an open one: how far and its reward (\"20 / 44 · +$2,000\": 8.3 economy)", named(rowFurniture, "Check").Text == "○" and named(rowFurniture, "Reward").Text == "20 / 44 · +$2,000", named(rowFurniture, "Reward").Text)
+check("… every collectible: 3 / 24 · +$10,000; A legendary! ✔", named(named(window, "Milestone_collectibles"), "Reward").Text == "3 / 24 · +$10,000" and named(named(window, "Milestone_legendary"), "Check").Text == "✔")
 check("the tabs: ALL 23/68 (lit), COLLECTIBLES 3/24, FURNITURE 20/44", named(window, "Tab_all").Text == "ALL 23/68" and named(window, "Tab_collectibles").Text == "COLLECTIBLES 3/24" and named(window, "Tab_furniture").Text == "FURNITURE 20/44"
 	and named(window, "Tab_all"):FindFirstChild("Underline") ~= nil and named(window, "Tab_furniture"):FindFirstChild("Underline") == nil)
 local cards = cardsOf()
@@ -468,8 +468,8 @@ more.old_globe = { n = 1, best = 0.5 }
 more.bowling_trophy = { n = 1, best = 0.5 }
 remote.OnClientEvent:Fire(state(more, { "found10", "found20", "legendary" }, { "ship_bottle", "old_globe", "bowling_trophy", "nope" }))
 check("several new pieces: \"📖 3 new pieces in your book\" (an id not in the book ignored)", M.toasts[#M.toasts] == "📖 3 new pieces in your book", M.toasts[#M.toasts])
-remote.OnClientEvent:Fire({ kind = "milestone", id = "furniture", name = "All the furniture", money = 1500 })
-check("a milestone: the toast \"🏆 All the furniture · +$1,500\"", M.toasts[#M.toasts] == "🏆 All the furniture · +$1,500", M.toasts[#M.toasts])
+remote.OnClientEvent:Fire({ kind = "milestone", id = "furniture", name = "All the furniture", money = 2000 })
+check("a milestone: the toast \"🏆 All the furniture · +$2,000\"", M.toasts[#M.toasts] == "🏆 All the furniture · +$2,000", M.toasts[#M.toasts])
 check("… its ✔ at once in the open book", named(named(named(gui, "Book"), "Milestone_furniture"), "Check").Text == "✔")
 local toastsBefore = #M.toasts
 remote.OnClientEvent:Fire({ kind = "milestone", id = "nope", money = 1e9 })
@@ -515,12 +515,12 @@ M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
 key("C")
 check("the HUD hidden (the start screen): C does nothing", not ownGui.Enabled and not Book.isOpen())
 toastsBefore = #M.toasts
-remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles", name = "Found every collectible", money = 5000 })
+remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles", name = "Found every collectible", money = 10000 })
 check("… a milestone's toast waits", #M.toasts == toastsBefore)
 M.hudGui.Enabled = true
 M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
 ownGui:GetPropertyChangedSignal("Enabled"):Fire()
-check("… and comes when the HUD shows", #M.toasts == toastsBefore + 1 and M.toasts[#M.toasts] == "🏆 Found every collectible · +$5,000", M.toasts[#M.toasts])
+check("… and comes when the HUD shows", #M.toasts == toastsBefore + 1 and M.toasts[#M.toasts] == "🏆 Found every collectible · +$10,000", M.toasts[#M.toasts])
 remote.OnClientEvent:Fire(state(FOUND, { "found10", "found20", "legendary" }))
 
 -- ── A computer (1280 × 800) and a big screen (1920 × 1080) ─────────────────

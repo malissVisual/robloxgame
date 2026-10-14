@@ -181,7 +181,9 @@ check("incomeFactor: × HotIncome for a hot kind only", Market.incomeFactor(toda
 check("demandFactor: 1, 0.95 a piece … floored at 0.6", Market.demandFactor(0) == 1 and math.abs(Market.demandFactor(1) - 0.95) < 1e-9 and math.abs(Market.demandFactor(2) - 0.9) < 1e-9
 	and math.abs(Market.demandFactor(8) - 0.6) < 1e-9 and math.abs(Market.demandFactor(30) - 0.6) < 1e-9 and Market.demandFactor(-3) == 1 and Market.demandFactor(0 / 0) == 1)
 check("price: no market, the base (rounded, at least $1)", Market.price(100, nil, hot) == 100 and Market.price(0.2, nil, hot) == 1 and Market.price(0 / 0, nil, hot) == 1)
-check("… hot × 1.6, cold × 0.7, plain × 1", Market.price(100, today, hot) == 160 and Market.price(100, today, cold) == 70 and Market.price(100, today, plainKind) == 100)
+check(`… hot × {M.HotSell}, cold × {M.ColdSell}, plain × 1`, Market.price(100, today, hot) == math.floor(100 * M.HotSell + 0.5) and Market.price(100, today, cold) == math.floor(100 * M.ColdSell + 0.5)
+	and Market.price(100, today, plainKind) == 100)
+check("8.3 economy: hot sells × 1.4 and earns × 1.2 on show (was 1.6 and 1.25)", M.HotSell == 1.4 and M.HotIncome == 1.2 and Market.price(100, today, hot) == 140)
 check("… a cheap scrap piece still $1 at least", Market.price(1, today, cold) == 1)
 
 -- ── The demand ──────────────────────────────────────────────────────────────
@@ -219,7 +221,8 @@ check("note: nothing for 0 pieces or a junk id", saved.kinds.piano.sold == 1 and
 -- ── A bulk sale ─────────────────────────────────────────────────────────────
 local fresh = Market.today(DAY, T)
 local total, prices = Market.batch({ { item = plainKind, base = 100 }, { item = plainKind, base = 100 }, { item = plainKind, base = 100 }, { item = hot, base = 50 }, { item = hot, base = 50 } }, fresh)
-check("batch: one after the other, each next piece of a kind 5 % lower (100, 95, 90; hot 80, 76)", total == 100 + 95 + 90 + 80 + 76 and same(prices, { 100, 95, 90, 80, 76 }), table.concat(prices, ","))
+local hot1, hot2 = math.floor(50 * M.HotSell + 0.5), math.floor(50 * (M.HotSell * 0.95) + 0.5) -- (Market.price: the base × its factors)
+check(`batch: one after the other, each next piece of a kind 5 % lower (100, 95, 90; hot {hot1}, {hot2})`, total == 100 + 95 + 90 + hot1 + hot2 and same(prices, { 100, 95, 90, hot1, hot2 }), table.concat(prices, ","))
 local withDemand = Market.view(nil, DAY, T)
 withDemand.demand[plainKind] = { n = 7, sold = 7, back = 60 }
 total, prices = Market.batch({ { item = plainKind, base = 100 }, { item = plainKind, base = 100 }, { item = plainKind, price = 100 } }, withDemand)
@@ -261,8 +264,9 @@ check("money: $1,234", Market.money(1234) == "$1,234" and Market.money(5) == "$5
 local shown: Market.View = { day = DAY, hot = { "record_player", "old_globe", "jukebox" }, cold = { "wardrobe" }, left = 5 * 3600 + 30, demand = {} }
 check("line: \"Today's market: 🔥 Old Record Player, Old Globe, Jukebox · ❄ Wardrobe · new in 5 h\"", Market.line(shown) == "Today's market: 🔥 Old Record Player, Old Globe, Jukebox · ❄ Wardrobe · new in 5 h", Market.line(shown))
 check("… the time left given: new in 40 min", Market.line(shown, 2400) == "Today's market: 🔥 Old Record Player, Old Globe, Jukebox · ❄ Wardrobe · new in 40 min")
-check("badge: \"🔥 HOT ×1.6\", \"❄ COLD\", nil", Market.badge(shown, "jukebox") == "🔥 HOT ×1.6" and Market.badge(shown, "wardrobe") == "❄ COLD" and Market.badge(shown, "sofa") == nil and Market.badge(nil, "jukebox") == nil)
-check("hotToast: \"🔥 Hot today: … (sell ×1.6, on show ×1.25)\"", Market.hotToast(shown) == "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.6, on show ×1.25)", Market.hotToast(shown))
+check("badge: \"🔥 HOT ×1.4\", \"❄ COLD\", nil", Market.badge(shown, "jukebox") == `🔥 HOT {Market.factor(M.HotSell)}` and Market.badge(shown, "jukebox") == "🔥 HOT ×1.4"
+	and Market.badge(shown, "wardrobe") == "❄ COLD" and Market.badge(shown, "sofa") == nil and Market.badge(nil, "jukebox") == nil)
+check("hotToast: \"🔥 Hot today: … (sell ×1.4, on show ×1.2)\"", Market.hotToast(shown) == "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.4, on show ×1.2)", Market.hotToast(shown))
 check("nameOf: the catalogue's name, else the id", Market.nameOf("vintage_radio") == "Vintage Radio" and Market.nameOf("nope") == "nope")
 
 -- ── The rules that use it ───────────────────────────────────────────────────
