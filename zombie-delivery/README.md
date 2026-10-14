@@ -1617,6 +1617,20 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
+## The Blender imports leave the world at once (8.0.2)
+
+The owner's screenshot: in the sandbox the imported `ZDCHouseArt` lay in pieces over the road. Studio's Import 3D leaves
+a model in Workspace with its MeshParts unanchored and overlapping. Nothing in the sandbox dressed (or hid) the house,
+so physics threw the pieces about. The dressers that do run read their markers only after the world's build.
+
+`server/ArtStash.luau` runs on `Main.server.luau`'s first line, in the city and in the sandbox. It finds every import
+(`ZDCVanArt`, `ZDCFurnitureArt`, `ZDCHouseArt`, `ZDCSprinterArt`, by name or by their markers), anchors it where it was
+put and moves it to ServerStorage, where the dressers look first.
+
+VanMesh, FurnitureMesh and HouseMesh also check that the markers still form a square frame and that every piece is
+turned alike. An import that moved anyway is refused with a warning ("put it in ServerStorage and save") instead of
+dressing from it.
+
 ## Marge's house: the owner's Blender model (7.2)
 
 The owner: "udělej mi 3D model toho baráku aby vypadal klasicky evropsky barák" (a 3D model of that house, so it looks

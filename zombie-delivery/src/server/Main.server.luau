@@ -7,6 +7,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 
+-- 8.0.2: the owner's imported Blender models (Import 3D leaves them unanchored in Workspace) out of the world before
+-- anything simulates them (server/ArtStash.luau), in the city and in the sandbox.
+require(script.Parent.ArtStash).stash()
+
 -- Shift sprints (client/CameraRig.luau): Roblox's own Shift Lock would fight it.
 StarterPlayer.EnableMouseLockOption = false
 

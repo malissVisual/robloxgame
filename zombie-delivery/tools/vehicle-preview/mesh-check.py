@@ -18,6 +18,12 @@ local F = getmetatable(Mock.CFrame.identity)
 F.__add = function(a, v) return setmetatable({ Position = a.Position + v, R = a.R }, F) end
 F.__sub = function(a, v) return setmetatable({ Position = a.Position - v, R = a.R }, F) end
 Mock.CFrame.fromMatrix = function(p, x, y, z) return setmetatable({ Position = p, R = { x.X, y.X, z.X, x.Y, y.Y, z.Y, x.Z, y.Z, z.Z } }, F) end
+local V3 = Mock.Vector3.new
+F.__index = function(cf, k)
+	if k == "RightVector" then local r = cf.R; return V3(r[1], r[4], r[7]) end
+	if k == "UpVector" then local r = cf.R; return V3(r[2], r[5], r[8]) end
+	return rawget(F, k)
+end
 local O = getmetatable(Mock.Instance.new("Part"))
 local isA = O.IsA
 O.IsA = function(self, c) if c == "BasePart" and self.ClassName == "MeshPart" then return true end return isA(self, c) end
