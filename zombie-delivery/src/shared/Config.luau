@@ -6725,7 +6725,10 @@ Config.MoveStory = {
 --                      the order they were clicked, the rest is yours
 --   RideReach          studs from the van's passenger door he gets in (your seat at its wheel: he walks there at the
 --                      Sprint, CallGain / CallBlink his last resort; the seat taken by a crew mate: he follows the van
---                      on foot)
+--                      on foot; 8.3 review: a seat somebody is getting into, its Reserved, is taken too)
+--   SeatYield / SeatAside   8.3 review: a crew mate's Ride along at the door of the seat he sits in: he gets out for
+--                      them (Vehicles.yieldSeat), SeatAside studs past where he gets out otherwise (out of their way),
+--                      and takes no seat for SeatYield s (their boarding reserves it meanwhile)
 --   CardReach / ClickReach / TapSlop   the client's: his card closes when you are CardReach studs from him; a click or
 --                      tap reaches him (or a piece: the server checks ClickReach + 10 studs) from ClickReach studs,
 --                      TapSlop studs beside his body counts
@@ -6805,6 +6808,8 @@ Config.MoveHelper = {
 	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
 	Queue = 6,
 	RideReach = 3,
+	SeatYield = 2, -- 8.3 review
+	SeatAside = 2.5,
 	CardReach = 40,
 	ClickReach = 90,
 	TapSlop = 2.5,
