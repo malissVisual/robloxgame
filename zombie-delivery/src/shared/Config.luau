@@ -7210,7 +7210,7 @@ Config.CollectionBook = {
 		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
 		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
 		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
-		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
+		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 5000 }, -- (8.3: 24 collectibles now, was $2,500 for 12)
 		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
 	} :: { BookMilestone },
 	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
