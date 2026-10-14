@@ -7,6 +7,10 @@
 -- of the living room through its doorway ("Watch the doorframe!"), out of the front door and across the yard to the van
 -- without a drop, he opens the van's back for the two of them, Ann loads it; Danny carries a real two-hands piece (★ one
 -- first) to the van at his slower walk; on HELP ME, Ann stopped just past a doorway: he stands beside it, not in it.
+-- 8.1 carrying in two: Ann's walk is the leader's client's (shared/PairCarry.luau steer, client/PairSteer.luau's: the
+-- heading turns PairTurn degrees a second at most, a way behind walked backwards, the pair's walk slower while it
+-- turns); through the real house Danny is never put at the far end (each of his steps within his top speed: the pair's
+-- walk and a margin), only the front door's fade does; Ann turns round in the hall, the heading slowly.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -16,6 +20,8 @@ local Rules = require("./MovingRules")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
+local PairCarry = require("./PairCarry")
+local Brain = require("./MoveHelperBrain")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -110,6 +116,10 @@ end
 local function pieceOf(spot: number): any
 	return built[#built].pieces[spot]
 end
+-- 8.1 while he holds the far end: the most his root moved in one of his steps over what his top speed allows (a door's
+-- fade aside: the interior is far off the map).
+local jump = { over = 0, steps = 0, slowest = math.huge }
+local lastHeld: any = nil
 local function run(seconds: number, done: (() -> boolean)?): boolean
 	for index = 1, math.ceil(seconds / 0.1 - 1e-9) do
 		E.clock += 0.1
@@ -120,6 +130,13 @@ local function run(seconds: number, done: (() -> boolean)?): boolean
 			if spot and role == "carrier" then
 				pieceOf(spot).PrimaryPart.CFrame = h.body.root.CFrame * M.CFrame.new(0, 0, -1.5)
 			end
+			local at = h.body.root.Position
+			if role == "helper" and lastHeld and (at - lastHeld).Magnitude < 300 then
+				jump.over = math.max(jump.over, (at - lastHeld).Magnitude - h.holdLimit * 0.1)
+				jump.slowest = math.min(jump.slowest, h.holdLimit)
+				jump.steps += 1
+			end
+			lastHeld = if role == "helper" then at else nil
 		end
 		if index % 2 == 0 then
 			Moving.step()
@@ -133,13 +150,20 @@ local function run(seconds: number, done: (() -> boolean)?): boolean
 	return done == nil
 end
 local function helped(): boolean
-	return math.abs((ann.Character:GetAttribute("CarrySpeed") or 0) - WALK * 0.8) < 1e-6
+	return math.abs((ann.Character:GetAttribute("CarrySpeed") or 0) - WALK * T.Speed.Pair) < 1e-6
 end
 local function farEnd(model: any): any
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 end
--- Ann walks to `to` (a stud every 0.1 s, facing the way) with the piece; the most Danny was off its far end, and
--- whether it ever went down.
+-- Ann walks to `to` with the piece (8.1 the leader's client: the heading turns PairTurn degrees a second at most toward
+-- the way, a way behind walked backwards, the pair's walk × the turn's factor); the most Danny was off its far end, and
+-- whether it ever went down. turnedMost: the most the heading turned in one step.
+local steer = PairCarry.newSteer(0)
+local turnedMost = 0
+local function heading(): number
+	local look = E.rootOf(ann).CFrame.LookVector
+	return PairCarry.yawOf(look.X, look.Z)
+end
 local function walk(to: any): (number, boolean)
 	local worst, down = 0, false
 	for _ = 1, 400 do
@@ -148,8 +172,12 @@ local function walk(to: any): (number, boolean)
 		if way.Magnitude < 0.05 then
 			break
 		end
-		local nextAt = here + way.Unit * math.min(1, way.Magnitude)
-		E.rootOf(ann).CFrame = M.CFrame.lookAt(nextAt, nextAt + way.Unit)
+		local before = heading()
+		steer.heading = before
+		local factor = PairCarry.steer(steer, way.X, way.Z, 0.1, math.rad(ann.Character:GetAttribute("PairTurn") or H.PairTurn))
+		turnedMost = math.max(turnedMost, math.abs(PairCarry.wrap(steer.heading - before)))
+		local nextAt = here + way.Unit * math.min((ann.Character:GetAttribute("CarrySpeed") or 0) * factor * 0.1, way.Magnitude)
+		E.rootOf(ann).CFrame = M.CFrame.new(nextAt) * M.CFrame.Angles(0, steer.heading, 0)
 		follow(carried)
 		run(0.1)
 		local _, role = Rules.holding(danny.s.move, danny.id)
@@ -242,6 +270,10 @@ local back = cargoDoor.WorldPosition + V3(0, 0, 0)
 local away = V3(back.X - truck.chassis.Position.X, 0, back.Z - truck.chassis.Position.Z).Unit
 worst, down = walk(back + away * 3)
 check("across the yard to the van's back together, no drop", worst < 0.05 and not down and helped(), worst)
+check("8.1 all the way the heading turned PairTurn degrees a second at most (Ann's PairTurn: the leader's)", turnedMost > 0
+	and turnedMost <= math.rad(H.PairTurn) * 0.1 + 1e-9 and ann.Character:GetAttribute("PairTurn") == H.PairTurn, math.deg(turnedMost) * 10)
+check("8.1 …and Danny was never put at the far end: every step of his within his top speed (the pair's walk and a margin)",
+	jump.steps > 30 and jump.over <= 1e-6 and math.abs(jump.slowest - Brain.holdSpeed(WALK * T.Speed.Pair)) < 1e-6, `{jump.steps} steps, {jump.over} over, {jump.slowest}`)
 check("…the back shut: he opens it for the two of them (\"I'll get the doors!\")", truck.model:GetAttribute("BackOpen") == true and E.saidSince("I'll get the doors!", saidOut))
 run(0.2)
 trigger(promptIn(truck.model, "Load"), ann)

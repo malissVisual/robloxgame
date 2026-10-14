@@ -20,6 +20,20 @@
 > (`Config.SpawnSpot.Pass`), the warehouse stands on its concrete, cheap pieces show "+$0.2/min", no city sounds, a
 > freed plot goes to a waiting player, START brings the van repaired, dying on a move puts you by the van, one arrow
 > (the guide, no GPS), the sandbox's own words everywhere (no Wall, no pay, no XP).
+>
+> **8.1** (the owner's feedback): **carrying in two** is slow and physical: the leader's heading turns at most 60° a
+> second (`client/PairSteer.luau`, `shared/PairCarry.luau`), a way behind is walked backwards (backing through doors
+> too), and the far end (Danny or a crew mate) is held there by the server (`server/PairHold.luau`), never teleported.
+> **No E at the house**: walk into a door and the fade takes you through (`Config.Moving.Doors`, doormats "▲ IN" /
+> "▲ OUT"). **The grip** is timing checks now (`shared/CarryGrip.luau`, `client/CarryGripUi.luau`): lifting a piece is
+> a lift check ("feeling for the grip": a hit lifts it balanced, a miss knocks it), and while you carry, a WOBBLE! now
+> and then (a hit: steady; a miss staggers a sturdy piece and the next drops it; a fragile piece drops at once). Every
+> miss does something: putting the piece down, loading it or walking through a door with a wobble open still counts,
+> and the misses stay with the piece a moment. Easy by default; `Config.CarryGrip.Difficulty` makes it harder later.
+> The warehouse's **UPGRADES desk** (`server/Upgrades.luau`, `client/UpgradeUi.luau`, `Config.SandboxUpgrades`): more
+> stands (12 → 20), showroom lights (more income), the van's engine and Danny's training. The sandbox **sounds like the
+> Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Chalet wears the owner's **Blender
+> house** once imported, and the 12 collectibles have their **Blender look** (`ZDCFurnitureArt`, re-import it).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1437,13 +1451,13 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Your own ZDC Van comes next to you (7.x; 7.0 lent a Moving Truck). Drive to 155 Willow Ln (GPS).
 - At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
 - Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
-- **The grip** (like Fisch's reeling): while you carry a 🙌 or 👥 piece, or a fragile ✋ one (gentler), a bar shows right of the middle.
-  - The piece (its icon) darts up and down: wilder when heavy or fragile, when you walk fast, turn, go up or down, jump or get bitten; calmer standing still.
-  - Hold the left mouse button or F (gamepad R2; on a phone the round HOLD button over FIRE) and the grip box rises; let go and it falls (momentum, a little bounce).
-  - The piece inside the box fills the meter (full: STEADY, +10% walk), outside drains it (standing still never under a third). SLIPPING! warns; at 0 it slips: dropped, with damage (fragile more), and a shaky carry wears it a little.
-  - Two carriers each have their own bar (either slip drops it); a Mover's box is 35% bigger, a Mover lifting a 👥 piece alone gets a harder bar; a heavy lift starts at 60%; Danny never slips.
-  - The server checks the bar (7.1 review): no slip sooner than any bar can run out (about 1.9 s after the lift; the client asks again each second, so a real slip lands), STEADY only once a meter could have filled and only while the reports keep coming (none for 2 s: the +10% goes), STEADY +10% on the bar only when the server gives it (at most 10% of the last second outside the box), a 👥 piece carried by two worn half by each one's reports, nothing from either carrier during a door's fade. A piece that slipped and is picked up again at once gets a new bar.
-  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, Moving's grip hook and grip block (the Moving remote's "slip" and "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau`.
+- **The grip** (8.1, the owner: "when I fail, something must always happen, but make it easier; it can get harder later"): no more holding a button while you walk. A 🙌 or 👥 piece, or a fragile ✋ one, has **timing checks**: a needle sweeps a bar back and forth, a green zone lies on it, and one press (the left mouse button or F, gamepad R2, the round GRIP button on a phone, or a tap on the widget) while the needle is in the zone is a hit; no press within the window is a miss.
+  - **The lift ("feeling for the grip"):** Pick up / Lift / Help lift opens a lift check instead of lifting (3 s). A hit lifts it **balanced** (+10% walk); a miss knocks it (4%, a fragile piece 5%), it hops and slips back down where it stood, and you try again (E).
+  - **Wobbles while you carry:** about every 7–12 s of walking a WOBBLE! check pops up (seldom standing still; sooner when you go faster than the carry's walk, turn hard, jump or get bitten; a drag rarer, a Mover's solo lift more often). A hit: steady again. Every miss does something: a sturdy piece's first miss is a **stagger** (a 3% knock, the walk × 0.6 for 1.5 s, the next wobble twice as soon), the second miss in a row **drops** it (the slip's damage); a fragile piece drops at its first miss (the check then says LAST CHANCE!). Walking needs no button at all.
+  - Easy by default: the green zone is about a third of the sweep (27–40%: smaller for heavy and fragile pieces), the needle slow (about 1.5 s edge to edge), a wobble's zone a little smaller and its needle a little faster. A Mover's zone is 35% bigger, Danny steadying the other end makes it 1.3× bigger, two people on a 👥 piece each get their own checks and each stagger's knock is half. Danny never has a check.
+  - **Harder later is numbers only:** `Config.CarryGrip.Difficulty` (1 today; zones ÷ it, needles × it), the zones, needles, windows, wobble times, knocks and the misses in a row that drop a piece (`Miss.Drop`: sturdy, heavy, fragile) all live in `Config.CarryGrip`; `On = false` turns the checks off.
+  - The server decides everything: it opens every check (the Moving remote's ("grip", "open", …)), judges each answer ("ok" counts only for your own open check, with a press time its own clock could have seen and the needle in the zone by the same maths), takes no answer within the window + 1.5 s as a miss, applies the knock, stagger or drop and sends the outcome; a door's trip takes an open check off. The widget sits in the middle under your character, or as near as is clear of the HUD, the guide line, the move's panel and the touch controls; the outcome (BALANCED!, SLIPPED BACK!, STEADY!, STAGGER!, DROPPED!) shows a moment with a sound and, on a miss, a short shake.
+  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, `client/MoveLayout.luau` `gripCheck`, Moving's grip hook (`Grip.hands` in setHands, the lift moment in onPick / onHelp) and grip block (`Grip.*`, the remote's "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau` (`carrygrip_preview.py` draws its scenes).
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
 - At 3:00 left a horde comes to the house.
@@ -1453,7 +1467,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 7.x (the owner: "he helps weirdly, mainly we don't carry anything together") made him a partner with a clear priority list each step:
 - **Carrying together just works.** You Lift a 👥 piece and he sprints to its far end (from far away, or when his path fails, or not there in 1.6 s: a quick fade-over) and takes it within ~2 s: "Got the other end!", then "On three... lift!".
   - Then he moves WITH the piece: his own walk is off and constraints on his root (AlignPosition / AlignOrientation to an attachment at the far end, turned to you) hold him there, on the floor under that end (stairs, steps), through door frames like the piece itself and through the front door's fade with you. No "too far apart" drop any more.
-  - His arms hold its edge (client/ArmPose.luau from his Carrying / CarryAt / CarrySize), his legs step with his speed (backwards too: `Npcs.carried`, `Npcs.stride`), and your grip bar's box is 1.3× bigger while he steadies it (the character attribute GripSteady, `Config.CarryGrip.Steadied`).
+  - His arms hold its edge (client/ArmPose.luau from his Carrying / CarryAt / CarrySize), his legs step with his speed (backwards too: `Npcs.carried`, `Npcs.stride`), and your grip checks' green zone is 1.3× bigger while he steadies it (the character attribute GripSteady, `Config.CarryGrip.Steadied`).
   - On the way: "Watch the doorframe!" at a doorway; by the van he opens its back for the two of you, else "That's going in the van."
 - **He carries more.** 🙌 pieces too (slower), not only ✋ ones: ★ first, then the most value a second of the trip. He opens the van's back himself (`OpenBack`; not allowed: "Open the back, boss!"), and says "Van's full, boss - drive it to the Wall?" and waits when it is.
 - **Your lift wins.** A piece you stand by with free hands (within 8 studs, nearer than he is) is yours: he drops his plan ("All yours, boss.").

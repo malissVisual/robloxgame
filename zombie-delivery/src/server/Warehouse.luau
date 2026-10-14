@@ -13,7 +13,12 @@
 --     pick a piece of the stock (Collection.openPicker); a full one's "Take down" (E, Collection.undisplay) and "Sell"
 --     (hold F, Collection.sell). The answers go out as Notices (the client's toasts); a sale's own message is the
 --     collection's ("sold");
---   * the STOCK board inside: "📦 N pieces in stock · $X/min" and how many stands are on show.
+--   * the STOCK board inside: "📦 N pieces in stock · $X/min" and how many stands are on show;
+--   * 8.1, the upgrades: the hall has WarehouseLayout.capacity() stands (20); the owner's first Collection.stands of
+--     them stand there (the start's 12 and the More stands bought), the others are only their painted spot (their
+--     podium, top and plate hidden and not solid, no prompts); the tags' $/min are × the owner's Showroom lights
+--     (Collection.boost); the UPGRADES desk at the back wall has the owner's "Upgrades" prompt (E: Upgrades.open, the
+--     window client/UpgradeUi.luau; somebody else's use gets a notice, as at the stands).
 -- A collection's changes (Collection.onChanged) rebuild only the stands whose piece changed, Config.Warehouse.Rebuild
 -- apart at most; an owner who leaves takes their pieces with them (the plot is FOR RENT again). Nothing runs per frame.
 -- The van's unloading is the moves' (the plot's unload circle); here only its bay is painted.
@@ -21,6 +26,8 @@
 --   Warehouse.start()           builds every plot's warehouse (workspace.Warehouses) and follows owners and collections
 --   Warehouse.model(id)         plot `id`'s warehouse Model (nil before start)
 --   Warehouse.shown(id, i)      the Model on show on that plot's stand i (nil: the stand is empty)
+--   Warehouse.terminal(id)      8.1: plot `id`'s UPGRADES desk (its part with the prompt; nil before start)
+--   Warehouse.isOpen(id, i)     8.1: does plot `id`'s stand i stand there (the owner has it)?
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,6 +42,7 @@ local WarehouseLayout = require(Shared.WarehouseLayout)
 local Collection = require(script.Parent.Collection)
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local SandboxPlots = require(script.Parent.SandboxPlots)
+local Upgrades = require(script.Parent.Upgrades) -- 8.1: the UPGRADES desk's window
 
 local T = Config.Warehouse
 
@@ -45,6 +53,9 @@ type Prompts = { display: ProximityPrompt, takeDown: ProximityPrompt, sell: Prox
 type Stand = {
 	index: number,
 	podium: BasePart,
+	parts: { BasePart }, -- 8.1: its podium, top and plate (hidden while the stand is not the owner's)
+	solid: { [BasePart]: boolean }, -- 8.1: which of them collide when it stands there
+	open: boolean, -- 8.1: it stands there (one of the owner's Collection.stands)
 	anchor: Attachment,
 	prompts: Prompts?,
 	tag: BillboardGui,
@@ -56,6 +67,8 @@ type PlotState = {
 	model: Model,
 	pieces: Folder,
 	stands: { Stand },
+	desk: BasePart, -- 8.1: the UPGRADES desk (its prompt's anchor)
+	deskPrompt: ProximityPrompt?,
 	owner: Player?,
 	ownerLabels: { TextLabel },
 	stockLabels: { TextLabel },
@@ -217,37 +230,77 @@ local function makeTag(podium: BasePart): (BillboardGui, { TextLabel })
 	return tag, labels
 end
 
+-- 8.1: a stand the owner has (its podium, top and plate there; the podium and the top solid) or not (only its painted
+-- spot shows: nothing to bump into).
+local function setOpen(stand: Stand, open: boolean)
+	if stand.open == open then
+		return
+	end
+	stand.open = open
+	for _, part in stand.parts do
+		part.Transparency = if open then 0 else 1
+		part.CanCollide = open and stand.solid[part] == true
+		part.CanQuery = part.CanCollide
+		for _, child in part:GetChildren() do
+			if child:IsA("SurfaceGui") then
+				child.Enabled = open
+			end
+		end
+	end
+end
+
 local function buildPlot(parent: Instance, plot: SandboxMap.Plot): PlotState
 	local model = Instance.new("Model")
 	model.Name = `Warehouse{plot.id}`
 	model:SetAttribute("Plot", plot.id)
 	local podiums: { [number]: BasePart } = {}
+	local standParts: { [number]: { BasePart } } = {}
+	local solid: { [BasePart]: boolean } = {}
 	local ownerLabels: { TextLabel } = {}
 	local stockLabels: { TextLabel } = {}
+	local desk: BasePart? = nil
 	for _, d in WarehouseLayout.pieces(plot) do
 		local part, labels = build(model, d)
 		if d.name == "OwnerSign" then
 			ownerLabels = labels
 		elseif d.name == "StockBoard" then
 			stockLabels = labels
-		elseif d.stand and d.name == `Stand{d.stand}` then
-			podiums[d.stand] = part
+		elseif d.name == "TerminalDesk" then
+			desk = part
+		end
+		if d.stand then
+			standParts[d.stand] = standParts[d.stand] or {}
+			table.insert(standParts[d.stand], part)
+			solid[part] = d.solid == true
+			if d.name == `Stand{d.stand}` then
+				podiums[d.stand] = part
+			end
 		end
 	end
 	local pieces = Instance.new("Folder")
 	pieces.Name = "Shown"
 	pieces.Parent = model
 	local stands: { Stand } = {}
-	for i = 1, WarehouseLayout.count() do
+	for i = 1, WarehouseLayout.capacity() do
 		local podium = podiums[i]
-		-- the prompts at the podium's front edge (its +Z: the aisle it looks at), at hand height
+		local spot = WarehouseLayout.stand(plot, i) :: WarehouseLayout.Stand
+		-- the prompts at the podium's front edge (the aisle it looks at: +Z south, -Z north), at hand height
+		local front = if spot.yaw == 0 then -1 else 1
 		local anchor = Instance.new("Attachment")
 		anchor.Name = "Prompts"
-		anchor.Position = Vector3.new(0, 1.6, podium.Size.Z / 2 - 0.3)
+		anchor.CFrame = CFrame.new(0, 1.6, front * (podium.Size.Z / 2 - 0.3)) -- (its offset in the podium)
 		anchor.Parent = podium
 		local tag, tagLabels = makeTag(podium)
-		stands[i] = { index = i, podium = podium, anchor = anchor, prompts = nil, tag = tag, tagLabels = tagLabels, shown = nil }
+		local stand: Stand = { index = i, podium = podium, parts = standParts[i] or { podium }, solid = solid, open = true, anchor = anchor, prompts = nil, tag = tag, tagLabels = tagLabels, shown = nil }
+		setOpen(stand, i <= WarehouseLayout.count()) -- (an upgrade stand: its spot only, until an owner has it)
+		stands[i] = stand
 	end
+	-- 8.1: the UPGRADES desk's prompt at its front edge (south: the hall), at hand height
+	local terminal = desk :: BasePart
+	local deskAnchor = Instance.new("Attachment")
+	deskAnchor.Name = "Prompts"
+	deskAnchor.CFrame = CFrame.new(0, 0.6, terminal.Size.Z / 2 + 0.2)
+	deskAnchor.Parent = terminal
 	model.WorldPivot = CFrame.new(plot.warehouse.x, 0, plot.warehouse.z)
 	model.Parent = parent
 	return {
@@ -255,6 +308,8 @@ local function buildPlot(parent: Instance, plot: SandboxMap.Plot): PlotState
 		model = model,
 		pieces = pieces,
 		stands = stands,
+		desk = terminal,
+		deskPrompt = nil,
 		owner = nil,
 		ownerLabels = ownerLabels,
 		stockLabels = stockLabels,
@@ -270,10 +325,10 @@ local function rarityOf(entry: Collection.Entry): string?
 	return CollectionRules.rarityOf(CollectionRules.defOf(entry.item))
 end
 
-local function ratesOf(onStand: { [number]: Collection.Entry }, _total: number): { [number]: number }
+local function ratesOf(onStand: { [number]: Collection.Entry }, boost: number): { [number]: number }
 	local rates: { [number]: number } = {}
 	for index, entry in onStand do
-		rates[index] = CollectionRules.income(entry :: any)
+		rates[index] = CollectionRules.income(entry :: any, boost)
 	end
 	return rates
 end
@@ -317,9 +372,11 @@ local function refresh(state: PlotState)
 		end
 	end
 	local income = if owner then Collection.incomePerMinute(owner) else 0
-	local rates = ratesOf(onStand, income)
+	local rates = ratesOf(onStand, if owner then Collection.boost(owner) else 1)
+	local count = if owner then Collection.stands(owner) else WarehouseLayout.count()
 	for index, stand in state.stands do
-		local entry = onStand[index]
+		setOpen(stand, index <= count)
+		local entry = if stand.open then onStand[index] else nil
 		local current = stand.shown
 		if current and (entry == nil or current.uid ~= entry.uid or current.item ~= entry.item or current.variant ~= entry.variant) then
 			current.model:Destroy()
@@ -345,7 +402,7 @@ local function refresh(state: PlotState)
 		end
 		local prompts = stand.prompts
 		if prompts then
-			prompts.display.Enabled = entry == nil
+			prompts.display.Enabled = stand.open and entry == nil
 			prompts.takeDown.Enabled = entry ~= nil
 			prompts.sell.Enabled = entry ~= nil
 			prompts.display.ObjectText = `Stand {index}`
@@ -353,7 +410,7 @@ local function refresh(state: PlotState)
 			prompts.sell.ObjectText = if entry then entry.name else ""
 		end
 	end
-	setLines(state.stockLabels, WarehouseLayout.stockLines(stock, income, shown, #state.stands))
+	setLines(state.stockLabels, WarehouseLayout.stockLines(stock, income, shown, math.min(count, #state.stands)))
 end
 
 -- A refresh soon (the changes of one collection this close together: one).
@@ -429,8 +486,46 @@ local function prompt(stand: Stand, name: string, action: string, key: Enum.KeyC
 	return p
 end
 
+-- 8.1: the UPGRADES desk's prompt used: the owner's window (Upgrades.open), anybody else a notice.
+local function useDesk(state: PlotState, by: Player)
+	local owner = state.owner
+	if by ~= owner then
+		notice:FireClient(by, if owner then `This is {owner.DisplayName}'s warehouse.` else "This warehouse is for rent.")
+		return
+	end
+	local now = os.clock()
+	if (busy[by] or 0) > now then
+		return
+	end
+	busy[by] = now + 0.4
+	Upgrades.open(by)
+end
+
 -- New prompts for a new owner (a prompt hidden for a player stays hidden on their client: fresh ones show right).
 local function remakePrompts(state: PlotState, owner: Player?)
+	local oldDesk = state.deskPrompt
+	if oldDesk then
+		oldDesk:Destroy()
+		state.deskPrompt = nil
+	end
+	if owner then
+		local desk = Instance.new("ProximityPrompt")
+		desk.Name = "Upgrades"
+		desk.ActionText = "Upgrades"
+		desk.ObjectText = "ZDC UPGRADES"
+		desk.KeyboardKeyCode = Enum.KeyCode.E
+		desk.GamepadKeyCode = Enum.KeyCode.ButtonX
+		desk.HoldDuration = 0
+		desk.MaxActivationDistance = T.PromptDistance
+		desk.RequiresLineOfSight = false
+		desk:SetAttribute("CargoOwner", owner.UserId) -- (the owner's only: client/CargoPrompts.luau hides it from others)
+		CollectionService:AddTag(desk, Config.Cargo.PromptTag)
+		desk.Parent = state.desk:FindFirstChild("Prompts")
+		desk.Triggered:Connect(function(by: Player)
+			useDesk(state, by)
+		end)
+		state.deskPrompt = desk
+	end
 	for _, stand in state.stands do
 		local old = stand.prompts
 		if old then
@@ -484,6 +579,17 @@ function Warehouse.shown(id: number, index: number): Model?
 	local stand = if state then state.stands[index] else nil
 	local shown = if stand then stand.shown else nil
 	return if shown then shown.model else nil
+end
+
+function Warehouse.terminal(id: number): BasePart?
+	local state = states[id]
+	return if state then state.desk else nil
+end
+
+function Warehouse.isOpen(id: number, index: number): boolean
+	local state = states[id]
+	local stand = if state then state.stands[index] else nil
+	return stand ~= nil and stand.open
 end
 
 function Warehouse.start()

@@ -9,6 +9,13 @@
 -- moves' work: the plot's unload circle). 8.0.1: the plot's concrete is at SandboxMap.GroundTop (flush with the
 -- meadow; the asphalt's RoadTop is only the roads'): the bay's paint and the bollards stand on it, the hall's floor a
 -- hair over it (no step at the door).
+-- 8.1 (the upgrades): the hall holds Config.Warehouse.MaxStands stands (20). 1 … Stands (12) are the big grid; the
+-- More stands upgrade opens the others two at a time, smaller podiums (Config.Warehouse.SmallStand) where the grid
+-- leaves room: 13 – 16 in the front corners beside the receiving zone (the inner pair, then the outer pair; they look
+-- north at the front row's aisle), 17 – 20 down the middle aisle from the front (looking south at the door). Until
+-- one is bought its spot is painted on the floor ("STAND 13 · 🔒 UPGRADES": the podium covers the paint once it is
+-- built). The UPGRADES desk stands at the back wall's middle under the STOCK board: a desk with a monitor (its prompt
+-- is server/Warehouse.luau's) and an UPGRADES sign over it.
 --
 -- World coordinates (studs) of one plot. Every warehouse looks south, so its own frame is only moved: x across (east
 -- +), z to the door (south +), y up from the ground.
@@ -19,14 +26,22 @@
 --   WarehouseLayout.receiving(plot)        the receiving zone (Rect): the door's width, Config.Warehouse.Receiving deep
 --   WarehouseLayout.doorPath(plot)         the way in that stays clear (Rect): from the van's back through the door and
 --                                          the receiving zone to an aisle's width past it
---   WarehouseLayout.count()                how many stands (Config.Warehouse.Stands)
+--   WarehouseLayout.count()                how many stands a warehouse starts with (Config.Warehouse.Stands)
+--   WarehouseLayout.capacity()             8.1: how many the hall holds (Config.Warehouse.MaxStands; the upgrades')
 --   WarehouseLayout.stand(plot, i)         stand i's podium: { index, x, z (its middle), y (its top: where a piece
 --                                          stands), sx, sz, yaw (the way a piece on it looks: 180, south to its aisle
---                                          and the door) } (nil: no such stand). 1 … Columns are the front row (nearest
---                                          the door) west to east, the next row behind them, and so on
---   WarehouseLayout.stands(plot)           every stand of the plot (a Plot or its id), in stand-number order: the
---                                          spots above (x, y, z plain numbers; {} for no such plot)
---   WarehouseLayout.standAt(plot, x, z)    the stand whose podium holds the point (nil: none)
+--                                          and the door; 0 north), small (8.1: an upgrade's smaller podium) } (nil: no
+--                                          such stand: 1 … capacity()). 1 … Columns are the front row (nearest the
+--                                          door) west to east, the next row behind them, and so on
+--   WarehouseLayout.stands(plot, count?)   the plot's (a Plot or its id) first `count` stands (default: the start's,
+--                                          count()), in stand-number order: the spots above (x, y, z plain numbers;
+--                                          {} for no such plot)
+--   WarehouseLayout.standAt(plot, x, z)    the stand whose podium holds the point (nil: none; any of the hall's)
+--   WarehouseLayout.standSize(i)           8.1: stand i's podium (sx, sz), nil for no such stand (the same on every plot)
+--   WarehouseLayout.fits(i, size)          8.1: a piece of that size (its X × Z, a Vector3 or { X, Z }) stands on stand
+--                                          i unturned (Fit studs to spare)
+--   WarehouseLayout.terminal(plot)         8.1: the UPGRADES desk: { x, z (its middle), y (its top), sx, sz, yaw (the
+--                                          way it faces: 180, south into the hall) }
 --   WarehouseLayout.bay(plot)              the UNLOAD HERE box in front of the door (Rect): Config.Warehouse.Bay, its
 --                                          middle the van's (the plot's vanSpot: the van is centred on it)
 --   WarehouseLayout.pieces(plot)           every part of the building as a Piece (below)
@@ -37,7 +52,8 @@
 --   WarehouseLayout.money(n)               "$1,234" (to a tenth under ten: "$2.5")
 --   WarehouseLayout.rarityColor(rarity?)   a rarity's colour (Config.Warehouse.Rarity; unknown: common's)
 --
--- A Piece: name (unique in a warehouse), group ("shell", "roof", "door", "inside", "paint", "sign", "stand", "bay"),
+-- A Piece: name (unique in a warehouse), group ("shell", "roof", "door", "inside", "paint", "sign", "stand", "bay",
+-- 8.1: "terminal"),
 -- at (its middle) and size (x, y, z), yaw / pitch / roll in degrees (its CFrame: CFrame.new(at) * Angles(0, yaw, 0) *
 -- Angles(pitch, 0, roll)), color, material (an Enum.Material name), shape ("Wedge" | "Cylinder" | nil: a block), solid
 -- (collides and is queried; the rest is decoration), shadow (casts one: the big parts only), transparency, words
@@ -52,7 +68,7 @@ local T = Config.Warehouse
 local WarehouseLayout = {}
 
 export type Rect = SandboxMap.Rect
-export type Stand = { index: number, x: number, y: number, z: number, sx: number, sz: number, yaw: number }
+export type Stand = { index: number, x: number, y: number, z: number, sx: number, sz: number, yaw: number, small: boolean? }
 export type Line = { text: string, color: { number }, size: number, font: string? }
 export type Words = { face: string, lines: { Line }, back: { number }?, lit: boolean? }
 export type Light = { range: number, brightness: number, color: { number } }
@@ -81,8 +97,12 @@ local PLINTH = 1.4 -- the concrete base course's height
 local GROUND = SandboxMap.GroundTop -- the plot's concrete pad (server/SandboxWorld.luau): flush with the meadow
 local PAINT_LIFT = 0.01 -- the bay's paint this far over the pad (no flicker)
 local FLOOR_TOP = GROUND + 0.05 -- the hall's floor: a hair over the pad (a 0.05 lip at the door, nothing to trip on)
+local SMALL_SPOTS = 8 -- 8.1: the upgrade stands' spots the hall has (4 in the front corners, 4 down the middle aisle)
+local FIT = 0.2 -- studs a piece keeps from its podium's edges
+local DESK = { 6.4, 3.2, 2.8 } -- 8.1: the UPGRADES desk (its top included): across, high, deep
 WarehouseLayout.FloorTop = FLOOR_TOP
 WarehouseLayout.Wall = WALL
+WarehouseLayout.Fit = FIT
 
 local CLAD = { 188, 194, 200 }
 local RIBS = { 160, 167, 175 }
@@ -138,11 +158,47 @@ function WarehouseLayout.count(): number
 	return T.Stands
 end
 
+-- 8.1: the stands the hall holds (the start's and the upgrades'): Config.Warehouse.MaxStands, never fewer than the
+-- start's nor more than the hall has spots for.
+function WarehouseLayout.capacity(): number
+	local most = (T :: any).MaxStands
+	if type(most) ~= "number" or most ~= most then
+		return T.Stands
+	end
+	return math.clamp(math.floor(most), T.Stands, T.Stands + SMALL_SPOTS)
+end
+
+-- An upgrade stand's podium: { across, deep } (Config.Warehouse.SmallStand).
+local function smallSize(): (number, number)
+	local small = (T :: any).SmallStand
+	if type(small) == "table" and type(small[1]) == "number" and type(small[2]) == "number" then
+		return small[1], small[2]
+	end
+	return T.StandSize, T.StandSize
+end
+
 function WarehouseLayout.stand(plot: SandboxMap.Plot, i: number): Stand?
-	if i ~= math.floor(i) or i < 1 or i > T.Stands then
+	if i ~= math.floor(i) or i < 1 or i > WarehouseLayout.capacity() then
 		return nil
 	end
 	local x = frame(plot)
+	local top = FLOOR_TOP + T.StandHeight
+	local front = WarehouseLayout.receiving(plot).z0 - T.Aisle -- the front row's front edge: an aisle behind the zone
+	if i > T.Stands then
+		-- 8.1, an upgrade stand: the front corners beside the receiving zone (the inner pair west and east, then the
+		-- outer pair; looking north at the front row's aisle), then down the middle aisle from the front (looking south)
+		local k = i - T.Stands
+		local sw, sd = smallSize()
+		if k <= 4 then
+			local zone = WarehouseLayout.receiving(plot)
+			local side = if k % 2 == 1 then -1 else 1
+			local out = (k - 1) // 2
+			local across = side * (SandboxMap.DoorWidth / 2 + sw / 2 + out * (sw + T.Aisle))
+			return { index = i, x = x + across, y = top, z = (zone.z0 + zone.z1) / 2, sx = sw, sz = sd, yaw = 0, small = true }
+		end
+		local z = front - sd / 2 - (k - 5) * (sd + T.Aisle)
+		return { index = i, x = x, y = top, z = z, sx = sw, sz = sd, yaw = 180, small = true }
+	end
 	local columns = T.Columns
 	local half = columns // 2
 	local size = T.StandSize
@@ -152,25 +208,57 @@ function WarehouseLayout.stand(plot: SandboxMap.Plot, i: number): Stand?
 	local side = if column < half then -1 else 1
 	local out = if column < half then half - 1 - column else column - half
 	local across = side * (T.MiddleAisle / 2 + size / 2 + out * (size + T.Aisle))
-	local front = WarehouseLayout.receiving(plot).z0 - T.Aisle -- the front row's front edge: an aisle behind the zone
 	local z = front - size / 2 - row * (size + T.Aisle)
-	return { index = i, x = x + across, y = FLOOR_TOP + T.StandHeight, z = z, sx = size, sz = size, yaw = 180 }
+	return { index = i, x = x + across, y = top, z = z, sx = size, sz = size, yaw = 180 }
 end
 
--- Every stand of a plot (the Plot or its id), in stand-number order (Collection entries' `stand`); {} for no such plot.
-function WarehouseLayout.stands(plot: SandboxMap.Plot | number): { Stand }
+-- A plot's (the Plot or its id) first `count` stands (default: the start's, Config.Warehouse.Stands; at most the
+-- hall's), in stand-number order (Collection entries' `stand`); {} for no such plot.
+function WarehouseLayout.stands(plot: SandboxMap.Plot | number, count: number?): { Stand }
 	local found: SandboxMap.Plot? = if type(plot) == "number" then SandboxMap.Plots[plot] else plot
 	local list: { Stand } = {}
+	local most = if type(count) == "number" and count == count then math.clamp(math.floor(count), 0, WarehouseLayout.capacity()) else T.Stands
 	if found then
-		for i = 1, T.Stands do
+		for i = 1, most do
 			list[i] = WarehouseLayout.stand(found, i) :: Stand
 		end
 	end
 	return list
 end
 
+-- 8.1: stand i's podium (the same on every plot), nil for no such stand.
+function WarehouseLayout.standSize(i: number): (number?, number?)
+	local s = WarehouseLayout.stand(SandboxMap.Plots[1], i)
+	if not s then
+		return nil, nil
+	end
+	return s.sx, s.sz
+end
+
+-- 8.1: does a piece of `size` (its X across, its Z deep: a Vector3 or a table with X and Z) stand on stand i unturned?
+function WarehouseLayout.fits(i: number, size: any): boolean
+	local sx, sz = WarehouseLayout.standSize(i)
+	if not sx or not sz then
+		return false
+	end
+	local ok, x, z = pcall(function(): (any, any)
+		return size.X, size.Z
+	end)
+	if not ok or type(x) ~= "number" or type(z) ~= "number" then
+		return true -- (a piece without a size: nothing to measure)
+	end
+	return x <= sx - FIT + 1e-9 and z <= sz - FIT + 1e-9
+end
+
+-- 8.1: the UPGRADES desk at the back wall's middle, facing the hall.
+function WarehouseLayout.terminal(plot: SandboxMap.Plot): { x: number, y: number, z: number, sx: number, sz: number, yaw: number }
+	local x = frame(plot)
+	local inside = WarehouseLayout.inside(plot)
+	return { x = x, y = FLOOR_TOP + DESK[2], z = inside.z0 + DESK[3] / 2, sx = DESK[1], sz = DESK[3], yaw = 180 }
+end
+
 function WarehouseLayout.standAt(plot: SandboxMap.Plot, x: number, z: number): number?
-	for i = 1, T.Stands do
+	for i = 1, WarehouseLayout.capacity() do
 		local s = WarehouseLayout.stand(plot, i)
 		if s and math.abs(x - s.x) <= s.sx / 2 and math.abs(z - s.z) <= s.sz / 2 then
 			return i
@@ -230,6 +318,23 @@ function WarehouseLayout.stockLines(stock: number, perMinute: number, shown: num
 		line("STOCK", ORANGE, 0.34, "Black"),
 		line(`📦 {stock} {if stock == 1 then "piece" else "pieces"} in stock · {WarehouseLayout.money(perMinute)}/min`, WHITE, 0.24, "Bold"),
 		line(`{shown} of {stands} stands on show`, GREY, 0.17, "Medium"),
+	}
+end
+
+-- 8.1: an upgrade stand's painted spot until it is bought.
+function WarehouseLayout.spotLines(i: number): { Line }
+	return {
+		line(`STAND {i}`, PAINT, 0.42, "Black"),
+		line("🔒 UPGRADES", PAINT, 0.3, "Bold"),
+	}
+end
+
+-- 8.1: the UPGRADES desk's monitor.
+function WarehouseLayout.terminalLines(): { Line }
+	return {
+		line("ZDC UPGRADES", ORANGE, 0.36, "Black"),
+		line("Stands · Lights · Van · Danny", WHITE, 0.2, "Bold"),
+		line("[E] OPEN", GREY, 0.18, "Medium"),
 	}
 end
 
@@ -442,8 +547,11 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	receiving.pitch, receiving.transparency = -90, 1
 	receiving.words = { { face = "Back", lines = { line("RECEIVING", PAINT, 0.9, "Black") } } }
 
-	-- the display stands: a dark podium, its felt top and its number plate at the front (to the aisle)
-	for i = 1, T.Stands do
+	-- the display stands: a dark podium, its felt top and its number plate at the front (to the aisle: south, or north
+	-- for the upgrade stands in the front corners). 8.1: an upgrade stand's spot is painted on the floor under it too
+	-- (its outline and "STAND 13 · 🔒 UPGRADES", read from its aisle): server/Warehouse.luau shows its podium once it is
+	-- bought, and the podium covers the paint.
+	for i = 1, WarehouseLayout.capacity() do
 		local s = WarehouseLayout.stand(plot, i) :: Stand
 		local x, z = s.x - ox, s.z - oz
 		local base = T.StandHeight - 0.1
@@ -451,10 +559,39 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		podium.stand = i
 		local top = solid(add(`StandTop{i}`, "stand", { s.sx - 0.6, 0.1, s.sz - 0.6 }, { x, s.y - 0.05, z }, FELT, "Fabric"))
 		top.stand = i
-		local plate = add(`Plate{i}`, "stand", { 1.6, 0.6, 0.1 }, { x, FLOOR_TOP + base / 2, z + s.sz / 2 + 0.05 }, WHITE, "SmoothPlastic")
-		plate.yaw, plate.stand = 180, i
+		local facing = if s.yaw == 0 then -1 else 1 -- (+z: south)
+		local plate = add(`Plate{i}`, "stand", { 1.6, 0.6, 0.1 }, { x, FLOOR_TOP + base / 2, z + facing * (s.sz / 2 + 0.05) }, WHITE, "SmoothPlastic")
+		plate.yaw, plate.stand = s.yaw, i
 		plate.words = { { face = "Front", lines = { line(tostring(i), INK, 0.9, "Black") } } }
+		if i > T.Stands then
+			local edge, y = 0.3, FLOOR_TOP + 0.02
+			add(`Spot{i}North`, "paint", { s.sx, 0.04, edge }, { x, y, z - s.sz / 2 + edge / 2 }, PAINT, "SmoothPlastic")
+			add(`Spot{i}South`, "paint", { s.sx, 0.04, edge }, { x, y, z + s.sz / 2 - edge / 2 }, PAINT, "SmoothPlastic")
+			add(`Spot{i}West`, "paint", { edge, 0.04, s.sz - 2 * edge }, { x - s.sx / 2 + edge / 2, y, z }, PAINT, "SmoothPlastic")
+			add(`Spot{i}East`, "paint", { edge, 0.04, s.sz - 2 * edge }, { x + s.sx / 2 - edge / 2, y, z }, PAINT, "SmoothPlastic")
+			-- (lying flat like RECEIVING: its Back face up, its words' top away from the aisle it looks at)
+			local words = add(`SpotText{i}`, "paint", { s.sx - 1.2, s.sz - 1.2, 0.05 }, { x, FLOOR_TOP + 0.03, z }, PAINT, "SmoothPlastic")
+			words.pitch, words.transparency = -90, 1
+			words.yaw = if s.yaw == 0 then 180 else 0
+			words.words = { { face = "Back", lines = WarehouseLayout.spotLines(i) } }
+		end
 	end
+
+	-- 8.1: the UPGRADES desk at the back wall's middle (its prompt: server/Warehouse.luau), its monitor facing the
+	-- hall, an UPGRADES sign on the wall over it (under the STOCK board)
+	local desk = WarehouseLayout.terminal(plot)
+	local dx, dz = desk.x - ox, desk.z - oz
+	local body = DESK[2] - 0.2
+	solid(add("TerminalDesk", "terminal", { desk.sx - 0.4, body, desk.sz - 0.4 }, { dx, FLOOR_TOP + body / 2, dz - 0.2 }, TRIM, "Metal"), true)
+	solid(add("TerminalTop", "terminal", { desk.sx, 0.2, desk.sz }, { dx, desk.y - 0.1, dz }, GREY, "SmoothPlastic"))
+	add("TerminalStripe", "terminal", { desk.sx - 0.4, 0.5, 0.06 }, { dx, FLOOR_TOP + body - 0.6, dz - 0.2 + (desk.sz - 0.4) / 2 + 0.03 }, ORANGE, "SmoothPlastic")
+	add("TerminalNeck", "terminal", { 0.4, 0.7, 0.3 }, { dx, desk.y + 0.35, dz - 0.5 }, STEEL, "Metal")
+	local screen = add("TerminalScreen", "terminal", { 3.8, 2.3, 0.3 }, { dx, desk.y + 0.7 + 1.15, dz - 0.35 }, INK, "SmoothPlastic")
+	screen.yaw = 180 -- (its front into the hall)
+	screen.words = { { face = "Front", lit = true, lines = WarehouseLayout.terminalLines() } }
+	local sign = add("UpgradeSign", "sign", { 12, 2.4, 0.3 }, { 0, 9, -hz + WALL + 0.15 }, TRIM, "SmoothPlastic")
+	sign.yaw = 180
+	sign.words = { { face = "Front", lit = true, lines = { line("⬆ UPGRADES", ORANGE, 0.62, "Black"), line("MORE STANDS · LIGHTS · VAN · DANNY", WHITE, 0.26, "Bold") } } }
 
 	-- outside: the UNLOAD HERE bay round the van at its spot, its back to the door (the words in the room between the
 	-- van's back and the bay's door end: seen with the van parked)

@@ -10,7 +10,8 @@
 -- 7.1: art/audio/sfx4.ogg holds the moves' sounds (the furniture, the truck, the grip, the move's stings, the
 -- horde's siren, the Wall's gate) and the mountains' (a cuckoo clock, a cowbell, birdsong, the peaks' wind, a
 -- brook) (Sfx4); until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX4.md says how
--- to upload it).
+-- to upload it). 8.1: and the sandbox's, at its end (the meadow, the warehouse's hall and the chalet's room, the
+-- stands, the till, the trip home's fanfare, the ZDC Sprinter's doors and step).
 
 local SoundSheet = {}
 
@@ -128,10 +129,23 @@ SoundSheet.Sfx4 = {
 	birds_alpine_loop = { 29.079932, 6.0 },
 	wind_peaks_loop = { 35.379932, 8.0 },
 	stream_loop = { 43.679932, 6.0 },
+	stand_display = { 49.979932, 0.95 },
+	stand_takedown = { 51.229932, 0.6 },
+	sale_register = { 52.129932, 1.2 },
+	stored_fanfare = { 53.629932, 1.5 },
+	van_slide_open = { 55.429932, 0.75 },
+	van_slide_close = { 56.479932, 0.85 },
+	sprinter_back_open = { 57.629932, 0.95 },
+	sprinter_back_close = { 58.879932, 1.0 },
+	van_step_up = { 60.179932, 0.5 },
+	cowbell_far = { 60.979932, 3.0 },
+	amb_alpine = { 64.279932, 24.0 },
+	amb_warehouse = { 88.579932, 12.0 },
+	amb_room = { 100.879932, 10.0 },
 } :: { [string]: { number } }
 
 -- Sounds that loop (their region repeats seamlessly).
-SoundSheet.Looped = { amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, ambience = true, birds_alpine_loop = true, engine = true, freewheel = true, scooter = true, stream_loop = true, wind = true, wind_peaks_loop = true, wood_scrape_loop = true, zip = true } :: { [string]: boolean }
+SoundSheet.Looped = { amb_alpine = true, amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, amb_room = true, amb_warehouse = true, ambience = true, birds_alpine_loop = true, engine = true, freewheel = true, scooter = true, stream_loop = true, wind = true, wind_peaks_loop = true, wood_scrape_loop = true, zip = true } :: { [string]: boolean }
 
 -- Stand-ins while a sheet is not uploaded (its id empty): a sound of an older sheet (a stand-in's stand-in too);
 -- a sound not here stays silent until its sheet is up (client/Sounds.luau).
@@ -178,9 +192,20 @@ SoundSheet.Fallback = {
 	checkpoint_gate = "bus_door",
 	wind_peaks_loop = "amb_roof",
 	stream_loop = "amb_fountain",
+	stand_display = "putdown",
+	stand_takedown = "pickup",
+	sale_register = "purchase",
+	stored_fanfare = "task_done",
+	van_slide_open = "car_door_open",
+	van_slide_close = "car_door_close",
+	sprinter_back_open = "van_back_open",
+	sprinter_back_close = "van_back_close",
+	van_step_up = "step_metal_a",
+	amb_alpine = "wind",
+	amb_warehouse = "ambience",
 } :: { [string]: string }
 
 -- Every sheet's length in seconds (its regions lie inside).
-SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 49.979932 } :: { [string]: number }
+SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 111.179932 } :: { [string]: number }
 
 return SoundSheet

@@ -63,13 +63,16 @@ local USED4 = {
 	"truck_ramp", "truck_load", "strap_tighten", "house_door_creak", "grip_tick", "grip_warning", "grip_slip",
 	"move_start", "move_success", "move_fail", "horde_siren", "checkpoint_gate", "cuckoo", "cowbell",
 	"birds_alpine_loop", "wind_peaks_loop", "stream_loop",
+	-- 8.1, at its end: the sandbox's (the stands, the till, the trip home, the Sprinter, the meadow, the hall, the room)
+	"stand_display", "stand_takedown", "sale_register", "stored_fanfare", "van_slide_open", "van_slide_close",
+	"sprinter_back_open", "sprinter_back_close", "van_step_up", "cowbell_far", "amb_alpine", "amb_warehouse", "amb_room",
 }
 local in4 = 0
 for _ in SoundSheet.Sfx4 do
 	in4 += 1
 end
-check("sfx4 holds the 23 sounds", in4 == #USED4, in4)
-local LOOPS4 = { wood_scrape_loop = 2, birds_alpine_loop = 6, wind_peaks_loop = 6, stream_loop = 6 }
+check(`sfx4 holds the {#USED4} sounds (7.1's 23 and 8.1's 13)`, in4 == #USED4, in4)
+local LOOPS4 = { wood_scrape_loop = 2, birds_alpine_loop = 6, wind_peaks_loop = 6, stream_loop = 6, amb_alpine = 20, amb_warehouse = 8, amb_room = 8 }
 for _, name in USED4 do
 	local r = SoundSheet.Sfx4[name]
 	check("sfx4 region " .. name, r ~= nil)
@@ -146,11 +149,27 @@ check("stand-ins listed", fallbacks >= 40, fallbacks)
 check("the 5.7 stand-ins kept", SoundSheet.Fallback.coin == "cash" and SoundSheet.Fallback.knock == "putdown")
 check("the 6.12 stand-ins kept", SoundSheet.Fallback.horn_van == "horn" and SoundSheet.Fallback.step_grass_b == "step_b" and SoundSheet.Fallback.task_done == "job_done")
 -- 7.1: until sfx4.ogg is up every move's sound has a stand-in; the drag's scrape and the mountains' ambience wait.
-local SILENT4 = { wood_scrape_loop = true, cuckoo = true, cowbell = true, birds_alpine_loop = true }
+-- 8.1: the sandbox's too, but for the chalet's room tone and the far cowbell.
+local SILENT4 = { wood_scrape_loop = true, cuckoo = true, cowbell = true, birds_alpine_loop = true, amb_room = true, cowbell_far = true }
 for _, name in USED4 do
 	check(`{name}: {if SILENT4[name] then "silent" else "a stand-in"} until sfx4 is up`, (SoundSheet.Fallback[name] ~= nil) ~= (SILENT4[name] == true))
 end
 check("the house's door creaks like the 5.7 door", SoundSheet.Fallback.house_door_creak == "door_creak")
+-- 8.1: the sandbox's. The 7.1 part of sfx4 stays where it was (its regions as before: the new ones come after it), the
+-- feedback is short, the meadow's stand-in is a breeze (never the city's traffic, amb_day).
+check("sfx4's 7.1 part where it was (furniture_pickup first, stream_loop last of it)", SoundSheet.Sfx4.furniture_pickup[1] == 0 and math.abs(SoundSheet.Sfx4.stream_loop[1] - 43.679932) < 1e-6)
+for _, name in { "stand_display", "stand_takedown", "sale_register", "stored_fanfare", "van_slide_open", "van_slide_close", "sprinter_back_open", "sprinter_back_close", "van_step_up", "cowbell_far", "amb_alpine", "amb_warehouse", "amb_room" } do
+	local r = SoundSheet.Sfx4[name]
+	check(`8.1 {name} after sfx4's 7.1 part`, r ~= nil and r[1] >= SoundSheet.Sfx4.stream_loop[1] + SoundSheet.Sfx4.stream_loop[2])
+end
+for _, name in { "stand_display", "stand_takedown", "sale_register", "stored_fanfare", "van_slide_open", "van_slide_close", "sprinter_back_open", "sprinter_back_close", "van_step_up" } do
+	check(`8.1 {name} is short feedback (at most 1.6 s)`, SoundSheet.Sfx4[name] ~= nil and SoundSheet.Sfx4[name][2] <= 1.6, SoundSheet.Sfx4[name] and SoundSheet.Sfx4[name][2])
+end
+check("8.1 the walk-in step is a step (at most 0.6 s)", SoundSheet.Sfx4.van_step_up[2] <= 0.6)
+check("8.1 the meadow's stand-in is sfx2's breeze, a loop, not the city's traffic", SoundSheet.Fallback.amb_alpine == "wind" and SoundSheet.Looped.wind == true and SoundSheet.Fallback.amb_alpine ~= "amb_day")
+check("8.1 the hall's stand-in is sfx2's hum, a loop", SoundSheet.Fallback.amb_warehouse == "ambience" and SoundSheet.Looped.ambience == true)
+check("8.1 the till stands in with 6.12's purchase, the fanfare with task_done", SoundSheet.Fallback.sale_register == "purchase" and SoundSheet.Fallback.stored_fanfare == "task_done")
+check("8.1 the Sprinter's back doors stand in with a van's", SoundSheet.Fallback.sprinter_back_open == "van_back_open" and SoundSheet.Fallback.sprinter_back_close == "van_back_close")
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end

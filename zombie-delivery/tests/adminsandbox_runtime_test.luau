@@ -185,6 +185,40 @@ end
 mark = click(owner, "fill")
 check("a Collection that errors: the command says so instead of failing", string.find(E.said(owner, mark), "the stock took nothing", 1, true) ~= nil, E.said(owner, mark))
 
+-- 8.1: FILL STANDS fills the player's own stands (Collection.stands: with the More stands bought)
+E.Collection.stands = function(_player: any): number
+	return 6
+end
+config.Warehouse = { Stands = 4 }
+E.collection.stock[owner] = {}
+for i = 1, 7 do
+	table.insert(E.collection.stock[owner], { uid = `s{i}`, item = "box", variant = 1, condition = 1, name = "Box", stand = nil, got = 0 })
+end
+table.clear(E.collection.shown)
+click(owner, "stands")
+local highest = 0
+for _, put in E.collection.shown do
+	highest = math.max(highest, put.stand)
+end
+check("8.1: ⭐ FILL STANDS: the player's own stands (Collection.stands 6, not Config's 4)", #E.collection.shown == 6 and highest == 6, `{#E.collection.shown} {highest}`)
+E.Collection.stands = nil
+config.Warehouse = warehouseConfig
+
+-- ── 8.1: the upgrades (Upgrades.admin) ───────────────────────────────────────
+
+table.clear(E.upgrades)
+mark = click(owner, "upmax")
+check("8.1: ⬆ MAX UPGRADES: Upgrades.admin max for the target, its answer said", #E.upgrades == 1 and E.upgrades[1].what == "max" and E.upgrades[1].player == owner and string.find(E.said(owner, mark), "at its top", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "upreset", guest.UserId)
+check("8.1: ↺ RESET UPGRADES aimed at the guest: theirs reset", #E.upgrades == 2 and E.upgrades[2].what == "reset" and E.upgrades[2].player == guest and string.find(E.said(guest, mark), "reset", 1, true) ~= nil, E.said(guest, mark))
+local admin = E.Upgrades.admin
+E.Upgrades.admin = function()
+	error("the upgrades are mid-change")
+end
+mark = click(owner, "upmax")
+check("8.1: an Upgrades that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
+E.Upgrades.admin = admin
+
 -- ── Travel and the van ───────────────────────────────────────────────────────
 
 local plot = SandboxMap.Plots[1]

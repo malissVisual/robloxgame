@@ -28,6 +28,8 @@
 --   * the words: GIVE UP after a trip, the owner leaving, the planning's timeout, the plot kiosks' corkboard (the
 --     chalet, no Marge, Walt or Wall), Danny's lines; nothing a crew hears or reads at the end mentions the Wall, pay
 --     or XP.
+-- 8.1 walk-in doors: the chalet's front door walked through both ways (no E: its Enter house off), out 4 studs from it
+-- facing the road, no way straight back, its doormat over the garden path while a move runs.
 local E = require("./MovingRuntime")
 local Config = require("./Config")
 Config.Sandbox.On = true -- (before Moving.start: it reads the mode there)
@@ -323,8 +325,8 @@ trigger(promptIn(lamp, "Pick up"), ann)
 step()
 E.place(ann, origin.Position + V3(0, 3, 1))
 trigger(promptIn(workspace, "Leave house"), ann)
-check("Leave house: out at the house's door with the lamp", flatDistance(E.rootOf(ann).Position, V3(House.door.x, 0, House.door.z)) < 4
-	and ann.Character:GetAttribute("MoveCarry") == 1, E.rootOf(ann).Position)
+check("Leave house: out at the house's door with the lamp (8.1 walk-in doors: 4 studs out, facing away from it)", math.abs(flatDistance(E.rootOf(ann).Position, V3(House.door.x, 0, House.door.z)) - 4) < 0.5
+	and E.rootOf(ann).CFrame.LookVector.Z < -0.99 and ann.Character:GetAttribute("MoveCarry") == 1, E.rootOf(ann).Position)
 truck.model:SetAttribute("BackOpen", true)
 E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
 step()
@@ -629,6 +631,60 @@ local cidResult = E.last(cid, "Moving", "result")
 check("8.0.1: the owner left after a trip: the crew hears what came home is in the warehouse (no Wall)", heard(cid, "What came home is in their warehouse", leftAt)
 	and not heard(cid, "Wall", leftAt) and cidResult ~= nil and cidResult.a.how == "done"
 	and cidResult.a.howText == "Ann left the game: what came home is in their warehouse", cidResult and cidResult.a.howText)
+
+-- 8.1 walk-in doors in the sandbox (the owner: "no E at the house, neither in nor out"): the chalet's front door (the map's
+-- SandboxDoor part) walked through both ways, after the dwell, facing it; out 4 studs from the door facing the road; no
+-- way straight back; its doormat on the garden path in front of it; the E prompts off.
+do
+	local D = T.Doors
+	check("(Bob's move)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
+	step()
+	local o = E.interiors[#E.interiors]
+	local foot = V3(House.door.x, House.door.y, House.door.z)
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	local into = V3(0, 0, 1) -- (the fake plan's +Z)
+	local exitAt = o * V3(0, 0, 0.5) + up
+	local function stand(player: any, at: any, look: any)
+		E.rootOf(player).CFrame = M.CFrame.lookAt(at, at + look)
+	end
+	local function isIn(player: any): boolean
+		return (E.rootOf(player).Position - o.Position).Magnitude < 100
+	end
+	local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{House.id}`)
+	local mat: any = nil
+	for _, d in site:GetDescendants() do
+		if d.Name == "WalkInMat" then
+			mat = d
+		end
+	end
+	local label = mat and mat:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
+	check("8.1 walk-in doors: a doormat (▲ IN) in front of the chalet's door, over the garden path (its top 0.08), shown", mat ~= nil and label.Text == "▲ IN"
+		and mat.Transparency == 0 and mat.Position.Y - mat.Size.Y / 2 > 0.08 and (mat.Position - foot):Dot(facing) > 0.5 and (mat.Position - foot):Dot(facing) < D.Depth)
+	check("…Enter house on the map's door there, off", promptIn(frontDoor, "Enter house") ~= nil and not promptIn(frontDoor, "Enter house").Enabled)
+	stand(bob, foot + up + facing * 2, -facing)
+	step(0.1)
+	check("walking up to the chalet's door: not in before the dwell", not isIn(bob))
+	step(D.Dwell)
+	check("…in after it (no E), facing into the house", isIn(bob) and E.rootOf(bob).CFrame.LookVector:Dot(into) > 0.99)
+	stand(bob, exitAt + into * 8, -into)
+	step(0.1)
+	step(D.Rearm)
+	stand(bob, exitAt + into * 1, -into)
+	step(0.1)
+	step(D.Dwell)
+	check("walked out by the doorway inside: 4 studs out of the chalet's door, facing the road", not isIn(bob)
+		and math.abs(flatDistance(E.rootOf(bob).Position, foot) - 4) < 0.5 and E.rootOf(bob).CFrame.LookVector:Dot(facing) > 0.99, E.rootOf(bob).Position)
+	stand(bob, foot + up + facing * 2, -facing)
+	step(0.1)
+	step(D.Dwell)
+	step(0.5)
+	check("…turned straight back to the door: shut for Rearm s (no ping-pong)", not isIn(bob))
+	step(D.Rearm)
+	step(D.Dwell)
+	check("…then in again", isIn(bob))
+	Moving.admin(bob, "end")
+	check("the move over: the doormat hidden again (no move at the house)", mat.Transparency == 1)
+end
 
 -- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or
 -- XP (the contract card's note says "No pay per piece" on purpose: not checked); Danny's lines name no Wall.

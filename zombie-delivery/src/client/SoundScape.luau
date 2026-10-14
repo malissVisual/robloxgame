@@ -21,12 +21,21 @@
 --              loop at it (Map.Park) while the camera is near
 --   8.0.1, the sandbox (Config.Sandbox.On): none of the city's places (SoundPlan.cityPlaces): no fountain (Map.Park's
 --              (0, 0) is on its Main Street), no pond, river or sea to splash or wade in, no park lawn under the feet
+--   8.1, the sandbox's own ambience (Config.Soundscape.Sandbox, art/audio/sfx4.ogg's 8.1 part): never the city's day
+--              (its traffic) or night; where you are (SoundPlan.sandboxPlace: the move's state says when you are in the
+--              chalet, client/MoveSounds.luau inside) blends the meadow's calm alpine day (a breeze, birds; until sfx4
+--              is up its stand-in, sfx2's wind), a warehouse's hall (its lights' hum; a little of the meadow through
+--              its roller door) or the chalet's quiet room (SoundPlan.sandboxAmbience); outdoors a cowbell rings far
+--              off now and then, a random way round you (3D, every CowbellGap s); in a warehouse the room's echo
+--              (SoundService.AmbientReverb, SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND
+--              all off). The ZDC Sprinter's back doors have their own swing (SoundPlan.swingSound by its CarId).
 -- Every look is throttled (Tick, OthersEvery); the steps run on Heartbeat for a handful of bodies.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -36,6 +45,7 @@ local Net = require(Shared.Net)
 local SoundPlan = require(Shared.SoundPlan)
 local CarVisuals = require(script.Parent.CarVisuals)
 local Drive = require(script.Parent.Drive)
+local MoveSounds = require(script.Parent.MoveSounds) -- (8.1: are you in the move's house)
 
 local SoundScape = {}
 
@@ -48,6 +58,7 @@ export type Api = {
 	on: () -> boolean, -- effects can be heard (the sheets uploaded, SOUND not "all off")
 	inGame: () -> boolean, -- past the start screen
 	sheet3: boolean, -- art/audio/sfx3.ogg is uploaded (SoundSheet.Sfx3Id)
+	sheet4: boolean, -- 8.1: art/audio/sfx4.ogg is uploaded (SoundSheet.Sfx4Id)
 }
 
 local S = Config.Soundscape
@@ -312,9 +323,22 @@ end
 
 -- ── The doors ─────────────────────────────────────────────────────────────
 
+-- 8.1: the car's CarId (a leaf may hang in a model of its own under the car's: up to the first that says it).
+local function carIdOf(part: Instance): string?
+	local node = part.Parent
+	while node and node ~= workspace do
+		local id = node:GetAttribute("CarId")
+		if type(id) == "string" then
+			return id
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
 local function listenDoors()
 	CarVisuals.onSwing = function(what: string, moment: string, part: BasePart)
-		local name, pitch = SoundPlan.swingSound(what, moment)
+		local name, pitch = SoundPlan.swingSound(what, moment, carIdOf(part))
 		local camera = workspace.CurrentCamera
 		if not name or not camera or not api.on() or (part.Position - camera.CFrame.Position).Magnitude > S.DoorRange then
 			return
@@ -359,21 +383,72 @@ local function toward(name: string, goal: number, offset: number?)
 	end
 end
 
-local function height(): number
+-- Where you are: your body, else the camera's focus.
+local function where(): Vector3
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
-		return root.Position.Y
+		return root.Position
 	end
 	local camera = workspace.CurrentCamera
-	return if camera then camera.Focus.Position.Y else 0
+	return if camera then camera.Focus.Position else Vector3.zero
+end
+
+-- 8.1 SANDBOX: the meadow, a warehouse's hall or the chalet's room in place of the city's day and night; a cowbell far
+-- off now and then outdoors; the room's echo.
+local SB = S.Sandbox
+local CITY_LOOPS = { "amb_day", "amb_night", "amb_roof", "ambience", "wind" }
+local nextCowbell = 0
+local reverbName = "" -- the AmbientReverb set here ("": none yet; nothing else in the game sets it)
+
+local function setReverb(name: string)
+	if name == reverbName then
+		return
+	end
+	reverbName = name
+	local ok, value = pcall(function(): any
+		return (Enum.ReverbType :: any)[name] -- (a name Roblox does not know: a warning, once)
+	end)
+	if ok and typeof(value) == "EnumItem" then
+		SoundService.AmbientReverb = value
+	else
+		warn(`[SoundScape] Config.Soundscape.Sandbox.Reverb: no Enum.ReverbType "{name}"`)
+	end
+end
+
+local function updateSandbox(playing: boolean)
+	local at = where()
+	local place = SoundPlan.sandboxPlace(at.X, at.Y, at.Z, MoveSounds.inside())
+	local mix = SoundPlan.sandboxAmbience(place, api.sheet4)
+	local on = if playing then 1 else 0
+	for _, name in CITY_LOOPS do
+		toward(name, 0)
+	end
+	local names = SoundPlan.SandboxLoops
+	toward(names.alpine, mix.alpine * on)
+	toward(names.warehouse, mix.warehouse * on, 3) -- (out of step with the meadow)
+	toward(names.room, mix.room * on)
+	setReverb(if playing and api.on() then SoundPlan.reverb(place) else "NoReverb")
+	local now = os.clock()
+	if now >= nextCowbell then
+		local first = nextCowbell == 0
+		nextCowbell = now + SoundPlan.cowbellGap(math.random())
+		if not first and playing and place == "outdoors" and api.on() then
+			local x, z = SoundPlan.cowbellSpot(at.X, at.Z, math.random(), math.random())
+			api.playAt("cowbell_far", Vector3.new(x, at.Y + 2, z), SB.Cowbell, 0.94 + math.random() * 0.12, SB.CowbellFar[2] + 40)
+		end
+	end
 end
 
 local function updateAmbience()
 	local playing = api.inGame()
+	if not SoundPlan.cityPlaces() then
+		updateSandbox(playing)
+		return
+	end
 	local hour = workspace:GetAttribute("ClockHour")
 	local clock = if type(hour) == "number" then hour else Lighting.ClockTime
-	local mix = SoundPlan.ambience(Map.nightFactor(clock), height(), api.sheet3)
+	local mix = SoundPlan.ambience(Map.nightFactor(clock), where().Y, api.sheet3)
 	local on = if playing then 1 else 0
 	toward("amb_day", mix.day * on)
 	toward("amb_night", mix.night * on, 5) -- (the loops out of step with each other)

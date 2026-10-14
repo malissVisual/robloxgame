@@ -14,6 +14,12 @@
 --     (no step at the door); the bay centred on the parked van (Config.Sprinter.Length at vanSpot), its words in the
 --     room between the van's back and the bay's door end
 --   * the signs' and the tags' texts
+--   * 8.1 (the upgrades): the hall holds Config.Warehouse.MaxStands (20): the start's 12 big ones as before and 8
+--     smaller upgrade stands (the front corners beside the receiving zone, the middle aisle), every one of the 20 with
+--     the checks above (aisles, walls, the zone, the way in, the round trip) and the room in front of the side it
+--     looks at; an upgrade stand's painted spot under its podium; the small stands hold most of the catalogue
+--     (WarehouseLayout.fits), the big ones all of it; the UPGRADES desk at the back wall's middle, off every stand
+--     and the way in, with room to stand at it
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
@@ -54,6 +60,8 @@ local function finite(n: number): boolean
 end
 
 check("Config.Warehouse.Stands is 12 (the owner's start), WarehouseLayout.count() says so", T.Stands == 12 and WarehouseLayout.count() == 12, T.Stands)
+local ALL = WarehouseLayout.capacity()
+check("8.1: the hall holds Config.Warehouse.MaxStands (20) stands: WarehouseLayout.capacity()", T.MaxStands == 20 and ALL == 20, ALL)
 check("the stands' grid has an even number of columns (half each side of the middle aisle)", T.Columns % 2 == 0, T.Columns)
 check("the plots are the four of SandboxMap", #SandboxMap.Plots == 4, #SandboxMap.Plots)
 
@@ -64,6 +72,7 @@ local budgetOk, namesOk, finiteOk, groundOk, onPlotOk, solidPathOk, lampsOk, sig
 local GROUND = SandboxMap.GroundTop
 local floorOk, paintOk, bollardsOk, bayMiddleOk, wordsOk = true, true, 0, true, true
 local doorOk, standPartsOk, receivingOk = true, true, true
+local frontOk, spotsOk, deskOk, deskRoomOk = true, true, true, true
 local most, lampCount = 0, 0
 local detail: { string } = {}
 for _, plot in SandboxMap.Plots do
@@ -74,7 +83,7 @@ for _, plot in SandboxMap.Plots do
 	local w = plot.warehouse
 	-- the stands
 	local rects: { Rect } = {}
-	for i = 1, T.Stands do
+	for i = 1, ALL do
 		local s = WarehouseLayout.stand(plot, i)
 		if not s then
 			standsOk = false
@@ -82,8 +91,11 @@ for _, plot in SandboxMap.Plots do
 		end
 		local r = rectOf(s)
 		rects[i] = r
-		standsOk = standsOk and within(r, inside) and s.index == i and s.sx >= T.StandSize and s.sz >= T.StandSize
-		facingOk = facingOk and s.yaw == 180
+		-- the start's 12: the big podium, looking south; 8.1's upgrade stands: the small one, south or north
+		local big = i <= T.Stands
+		local wide, deep = if big then T.StandSize else T.SmallStand[1], if big then T.StandSize else T.SmallStand[2]
+		standsOk = standsOk and within(r, inside) and s.index == i and s.sx >= wide and s.sz >= deep and (s.small == true) == not big
+		facingOk = facingOk and (s.yaw == 180 or (not big and s.yaw == 0))
 		topOk = topOk and math.abs(s.y - (WarehouseLayout.FloorTop + T.StandHeight)) < 1e-6
 		-- the side walls keep an aisle (the back wall may hold the back row)
 		local side = math.min(r.x0 - inside.x0, inside.x1 - r.x1)
@@ -107,8 +119,8 @@ for _, plot in SandboxMap.Plots do
 			end
 		end
 	end
-	for i = 1, T.Stands do
-		for j = i + 1, T.Stands do
+	for i = 1, ALL do
+		for j = i + 1, ALL do
 			local a, b = rects[i], rects[j]
 			if a and b then
 				local g = gap(a, b)
@@ -117,7 +129,39 @@ for _, plot in SandboxMap.Plots do
 			end
 		end
 	end
-	check(`plot {plot.id}: stand 0 and stand {T.Stands + 1} do not exist`, WarehouseLayout.stand(plot, 0) == nil and WarehouseLayout.stand(plot, T.Stands + 1) == nil and WarehouseLayout.stand(plot, 1.5) == nil)
+	-- 8.1: the side a stand looks at (its prompts, its plate): an aisle's depth in front of it, inside the hall, no stand
+	for i = 1, ALL do
+		local s = WarehouseLayout.stand(plot, i)
+		local r = rects[i]
+		if s and r then
+			local strip: Rect = if s.yaw == 0 then { x0 = r.x0, x1 = r.x1, z0 = r.z0 - T.Aisle, z1 = r.z0 } else { x0 = r.x0, x1 = r.x1, z0 = r.z1, z1 = r.z1 + T.Aisle }
+			local clear = within(strip, inside)
+			for j = 1, ALL do
+				if j ~= i and rects[j] and overlaps(strip, rects[j]) then
+					clear = false
+				end
+			end
+			if not clear then
+				frontOk = false
+				table.insert(detail, `plot {plot.id} stand {i}: no room in front`)
+			end
+		end
+	end
+	check(`plot {plot.id}: stand 0 and stand {ALL + 1} do not exist`, WarehouseLayout.stand(plot, 0) == nil and WarehouseLayout.stand(plot, ALL + 1) == nil and WarehouseLayout.stand(plot, 1.5) == nil)
+	-- 8.1: the UPGRADES desk: against the back wall's middle, facing the hall, off every stand, the zone and the way in,
+	-- with an aisle's depth free in front of it
+	local desk = WarehouseLayout.terminal(plot)
+	local deskRect: Rect = { x0 = desk.x - desk.sx / 2, x1 = desk.x + desk.sx / 2, z0 = desk.z - desk.sz / 2, z1 = desk.z + desk.sz / 2 }
+	local room: Rect = { x0 = deskRect.x0, x1 = deskRect.x1, z0 = deskRect.z1, z1 = deskRect.z1 + T.Aisle }
+	deskOk = deskOk and within(deskRect, inside) and math.abs(deskRect.z0 - inside.z0) < 1e-6 and math.abs(desk.x - w.x) < 1e-6 and desk.yaw == 180
+		and not overlaps(deskRect, zone) and not overlaps(deskRect, path) and desk.y > WarehouseLayout.FloorTop + 2.5 and desk.y < WarehouseLayout.FloorTop + 4
+	deskRoomOk = deskRoomOk and within(room, inside) and not overlaps(room, path)
+	for i = 1, ALL do
+		if rects[i] and (overlaps(deskRect, rects[i]) or overlaps(room, rects[i])) then
+			deskRoomOk = false
+			table.insert(detail, `plot {plot.id}: the desk at stand {i}`)
+		end
+	end
 	outsideNil = outsideNil and WarehouseLayout.standAt(plot, door.x, door.z + 3) == nil and WarehouseLayout.standAt(plot, (zone.x0 + zone.x1) / 2, (zone.z0 + zone.z1) / 2) == nil and WarehouseLayout.standAt(plot, w.x, w.z - w.sz) == nil
 	-- the receiving zone: the door's width, just inside the door
 	receivingOk = receivingOk
@@ -186,13 +230,40 @@ for _, plot in SandboxMap.Plots do
 	end
 	lampCount = lamps
 	lampsOk = lampsOk and lamps >= 4 and lamps <= 8
-	standPartsOk = standPartsOk and standParts == 3 * T.Stands
-	for _, name in { "ZdcSign", "OwnerSign", "StockBoard", "Floor", "Header", "RoofWest", "RoofEast", "DoorCurtain", "ReceivingText", "BayText" } do
+	standPartsOk = standPartsOk and standParts == 3 * ALL
+	for _, name in { "ZdcSign", "OwnerSign", "StockBoard", "Floor", "Header", "RoofWest", "RoofEast", "DoorCurtain", "ReceivingText", "BayText", "TerminalDesk", "TerminalTop", "TerminalScreen", "UpgradeSign" } do
 		signsOk = signsOk and names[name] == true
 	end
-	for i = 1, T.Stands do
+	for i = 1, ALL do
 		signsOk = signsOk and names[`Stand{i}`] == true and names[`Plate{i}`] == true and names[`StandTop{i}`] == true
 	end
+	-- 8.1: an upgrade stand's spot painted under its podium (the outline and its words: covered once it is built), the
+	-- start's stands without one; the desk's body solid
+	local byName: { [string]: any } = {}
+	for _, p in pieces do
+		byName[p.name] = p
+	end
+	for i = 1, ALL do
+		local s = WarehouseLayout.stand(plot, i) :: WarehouseLayout.Stand
+		local podium = byName[`Stand{i}`]
+		local _, _, _, podiumTop = WarehouseLayout.bounds(podium)
+		local spot = { byName[`Spot{i}North`], byName[`Spot{i}South`], byName[`Spot{i}West`], byName[`Spot{i}East`], byName[`SpotText{i}`] }
+		if i <= T.Stands then
+			spotsOk = spotsOk and #spot == 0
+		else
+			spotsOk = spotsOk and #spot == 5 and spot[5].words ~= nil and spot[5].words[1].lines[1].text == `STAND {i}`
+			for _, part in spot do
+				local x0, x1, y0, y1, z0, z1 = WarehouseLayout.bounds(part)
+				local under = part.group == "paint" and x0 >= s.x - s.sx / 2 - 1e-6 and x1 <= s.x + s.sx / 2 + 1e-6 and z0 >= s.z - s.sz / 2 - 1e-6 and z1 <= s.z + s.sz / 2 + 1e-6
+					and y0 >= WarehouseLayout.FloorTop - 1e-6 and y1 < podiumTop and not part.solid
+				if not under then
+					spotsOk = false
+					table.insert(detail, `{part.name} not under its podium`)
+				end
+			end
+		end
+	end
+	deskOk = deskOk and byName.TerminalDesk ~= nil and byName.TerminalDesk.solid == true and byName.TerminalDesk.group == "terminal" and byName.TerminalScreen.words ~= nil
 	-- the bay: round the van's spot, in front of the door, off the building, on the plot
 	local bay = WarehouseLayout.bay(plot)
 	local v = plot.vanSpot
@@ -216,7 +287,8 @@ for _, plot in SandboxMap.Plots do
 		end
 	end
 end
-check(`every stand is inside its building, the way its piece looks (south, to its aisle) and its top at the floor + {T.StandHeight}`, standsOk and facingOk and topOk)
+check(`every stand (all {ALL}: the start's 12 big, 8.1's small ones) is inside its building, the way its piece looks (south, to its aisle; an upgrade stand south or north) and its top at the floor + {T.StandHeight}`, standsOk and facingOk and topOk)
+check(`8.1: every stand has an aisle ({T.Aisle}) in front of the side it looks at, inside the hall, no other stand on it`, frontOk, table.concat(detail, "; "))
 check(`aisles of at least {T.Aisle} studs between any two stands (the least: {worst})`, aislesOk, worst)
 check(`an aisle of at least {T.Aisle} studs between the stands and the side walls (the least: {wallWorst})`, wallsOk, wallWorst)
 check("no stand on the receiving zone", zoneOk)
@@ -231,7 +303,10 @@ check("its pieces' names are unique, their sizes finite and positive", namesOk a
 check("its pieces stand on the plot, none under the ground", onPlotOk and groundOk, table.concat(detail, "; "))
 check("nothing solid on the way in under the door's top (the floor apart)", solidPathOk, table.concat(detail, "; "))
 check(`the hall's lamps: {lampCount} (4 … 8 PointLights)`, lampsOk, lampCount)
-check("the signs (ZDC, the owner's, STOCK, RECEIVING, UNLOAD HERE) and every stand's podium, top and plate", signsOk and standPartsOk)
+check("the signs (ZDC, the owner's, STOCK, RECEIVING, UNLOAD HERE, 8.1's UPGRADES desk and sign) and every stand's podium, top and plate", signsOk and standPartsOk)
+check("8.1: an upgrade stand's spot (its outline, \"STAND n\") painted under its podium: covered once it is built; none for the start's", spotsOk, table.concat(detail, "; "))
+check("8.1: the UPGRADES desk at the back wall's middle, facing the hall, its top at counter height, off the zone and the way in; its body solid", deskOk)
+check(`8.1: … no stand on it and an aisle ({T.Aisle}) free in front of it to stand at`, deskRoomOk, table.concat(detail, "; "))
 check("the UNLOAD HERE bay: round the van's spot and the unload circle, in front of the door, off the spawn, on the plot", bayOk)
 check("8.0.1: the bay centred on the parked Sprinter (vanSpot), the van inside it with a stud to spare all round", bayMiddleOk)
 check("8.0.1: UNLOAD HERE between the bay's door end and the parked van's back (not under it)", wordsOk)
@@ -252,6 +327,9 @@ for _, plot in SandboxMap.Plots do
 	end
 end
 check("stands(plot or id): every stand's spot { x, y, z } in stand-number order; {} for no plot", listOk and #WarehouseLayout.stands(99) == 0)
+local counted = #WarehouseLayout.stands(1, 16) == 16 and #WarehouseLayout.stands(1, 99) == ALL and #WarehouseLayout.stands(1, -2) == 0 and #WarehouseLayout.stands(1, 0 / 0) == T.Stands
+local s16, l16 = WarehouseLayout.stand(SandboxMap.Plots[1], 16) :: WarehouseLayout.Stand, WarehouseLayout.stands(1, 16)[16]
+check("8.1: stands(plot, count): the first `count` (at most the hall's; junk: the start's)", counted and l16.x == s16.x and l16.z == s16.z)
 
 -- every piece of the catalogue fits a stand (unturned: it looks south) and stands under the tie beams
 local fits, tallest, biggest = true, 0, ""
@@ -268,6 +346,24 @@ local sofa, wardrobe = FurnitureLooks.Items.sofa.size, FurnitureLooks.Items.ward
 check("the sofa (7.2 × 3.2) and the wardrobe (4.4 × 2.2 × 7.0) fit a stand", sofa.X <= T.StandSize and sofa.Z <= T.StandSize and wardrobe.X <= T.StandSize and wardrobe.Z <= T.StandSize and wardrobe.Y <= 7.01)
 check(`every piece of the catalogue fits a stand ({#FurnitureLooks.Order} pieces, the hay wagon's 9.6 the longest)`, fits, biggest)
 check(`the tallest piece on a stand stays under the tie beams ({tallest} studs)`, WarehouseLayout.FloorTop + T.StandHeight + tallest < beams - 1, tallest)
+
+-- 8.1: the upgrade stands are smaller: WarehouseLayout.fits says which pieces go on them (the big ones take everything)
+local misfits: { string } = {}
+local bigOk, sizeOk = true, true
+for _, id in FurnitureLooks.Order do
+	local size = FurnitureLooks.Items[id].size
+	bigOk = bigOk and WarehouseLayout.fits(1, size) and WarehouseLayout.fits(T.Stands, size)
+	if not WarehouseLayout.fits(ALL, size) then
+		table.insert(misfits, id)
+		sizeOk = sizeOk and (size.X > T.SmallStand[1] - WarehouseLayout.Fit or size.Z > T.SmallStand[2] - WarehouseLayout.Fit)
+	end
+end
+print(`      the small stands hold {#FurnitureLooks.Order - #misfits} of {#FurnitureLooks.Order} pieces; not: {table.concat(misfits, ", ")}`)
+check("8.1: a big stand takes every piece of the catalogue (WarehouseLayout.fits)", bigOk)
+check("8.1: a small stand takes at least 9 in 10 of the catalogue, the sofa, the piano and the dining table among them", #misfits * 10 <= #FurnitureLooks.Order and sizeOk
+	and WarehouseLayout.fits(T.Stands + 1, FurnitureLooks.Items.sofa.size) and WarehouseLayout.fits(ALL, FurnitureLooks.Items.piano.size) and WarehouseLayout.fits(ALL, FurnitureLooks.Items.dining_table.size), #misfits)
+check("8.1: … not the double bed; standSize and fits for no such stand: nil, false; a piece without a size fits", not WarehouseLayout.fits(ALL, FurnitureLooks.Items.bed.size)
+	and WarehouseLayout.standSize(0) == nil and WarehouseLayout.standSize(ALL + 1) == nil and not WarehouseLayout.fits(ALL + 1, FurnitureLooks.Items.box.size) and WarehouseLayout.fits(3, {}) and select(1, WarehouseLayout.standSize(ALL)) == T.SmallStand[1])
 
 -- the texts
 check("the owner's sign: <Name>'s Warehouse", WarehouseLayout.ownerLines("Pavel", 2)[1].text == "Pavel's Warehouse" and WarehouseLayout.ownerLines("Pavel", 2)[2].text == "ZDC STORAGE · PLOT 2")

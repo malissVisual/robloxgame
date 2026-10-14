@@ -5,12 +5,14 @@ standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS P
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 """
-import glob, os, re, shutil, subprocess, sys, tempfile
+import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
 PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
+PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
+PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -102,8 +104,10 @@ with tempfile.TemporaryDirectory() as tmp:
             'local warn = function(...) print("WARN", ...) end\n')
     # 7.0 greeters: the real server/MoveGreeters.luau as MoveGreetersServer.luau the same way (the client on the porch, the
     # soldier at the Wall, Marge at the kiosk; Moving requires it; tests/movegreeters_runtime_test.luau drives it).
-    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer"}
-    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer")):
+    # 8.1 carrying in two: the real server/PairHold.luau as PairHoldServer.luau the same way (Danny's hold and a crew
+    # mate's at a piece's far end; MoveHelper and Moving require it).
+    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer", "PairHold": "PairHoldServer"}
+    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer"), ("PairHold", "PairHoldServer")):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
@@ -158,11 +162,36 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
         open(os.path.join(tmp, module + "Server.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.1 SANDBOX, the upgrades: the real server/Upgrades.luau as UpgradesServer.luau for tests/upgrades_runtime_test.luau
+    # on the same runtime: its PlayerData and Collection the real ones above, SandboxPlots the runtime's fake (its plotOf),
+    # `workspace` the runtime's (a Cars folder whose vans come with Runtime.addCar).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Upgrades.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+    source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
+    open(os.path.join(tmp, "UpgradesServer.luau"), "w", encoding="utf-8").write(head + "local workspace = E.workspace\n" + source)
     # 8.0 sandbox, the map: the real server/SandboxWorld.luau as SandboxWorldServer.luau on the same mock for
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshServer")')
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 8.1: its server/HouseMesh.luau on the same mock as HouseMeshServer.luau (no import there: the chalet stays; DayNight
+    # a stand-in), and the owner's Blender house as numbers for the test (HouseArt.luau, from
+    # design/blender-house/roblox/ZDCHouseArt.json, house.py's manifest: the box it was made for, its front door's
+    # leaves, its top; the house's frame: the bottom's middle, -Z the front). tools/house-art/check.py dresses it.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "HouseMesh.luau"), encoding="utf-8").read()
+    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = function() end }")
+    open(os.path.join(tmp, "HouseMeshServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    art = json.load(open(os.path.join(os.path.dirname(HERE), "design", "blender-house", "roblox", "ZDCHouseArt.json"), encoding="utf-8"))
+    leaves = [d for d in art["details"] if d["name"].startswith("Křídlo dveří") and d["center"][2] < 0]
+    lo = [min(d["center"][i] - d["size"][i] / 2 for d in leaves) for i in range(3)]
+    hi = [max(d["center"][i] + d["size"][i] / 2 for d in leaves) for i in range(3)]
+    top = max(p["center"][1] + p["size"][1] / 2 for p in art["pieces"].values())
+    open(os.path.join(tmp, "HouseArt.luau"), "w", encoding="utf-8").write(
+        "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r }\n"
+        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -479,6 +508,19 @@ def imports_first_check():
     return good
 
 if not imports_first_check():
+    ok = False
+
+# 8.1 SANDBOX, the upgrades: Danny's training is a one-line hook in server/MoveHelper.luau's walk (go: his speed ×
+# MoveHelperBrain.trained of the move's owner; tests/upgrades_test.luau checks trained itself).
+def upgrades_hooks_check():
+    helper = open(os.path.join(os.path.dirname(HERE), "src", "server", "MoveHelper.luau"), encoding="utf-8").read()
+    start = helper.find("local function go(")
+    body = helper[start:helper.find("\nend\n", start)] if start >= 0 else ""
+    good = "speed *= Brain.trained(h.s.owner)" in body
+    print("== upgrades hooks: " + ("Danny walks × his training (MoveHelper's go)" if good else "server/MoveHelper.luau's go lost Danny's training (speed *= Brain.trained(h.s.owner))"))
+    return good
+
+if not upgrades_hooks_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

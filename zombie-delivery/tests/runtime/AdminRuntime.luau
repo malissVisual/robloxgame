@@ -327,6 +327,15 @@ Runtime.Collection = {
 	end,
 }
 
+-- 8.1: server/Upgrades.luau's admin (the SANDBOX tab's ⬆ MAX UPGRADES / ↺ RESET UPGRADES), recorded
+Runtime.upgrades = {} -- { { player, what } }
+Runtime.Upgrades = {
+	admin = function(player: any, what: string): string
+		table.insert(Runtime.upgrades, { player = player, what = what })
+		return if what == "max" then "ADMIN: every upgrade at its top (20 stands)." else "ADMIN: the upgrades reset (12 stands)."
+	end,
+}
+
 -- The rest of Admin's requires: only what Admin.start touches (the others error with their name when a test calls them).
 Runtime.World = { RoadTop = 0.4 }
 Runtime.Zombies = { hunts = function()

@@ -300,6 +300,14 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	elseif kind == "stand" then
 		if plotId and plot then
 			local spots = standsOf(plotId)
+			local owned = world.ownedStands -- (8.1: only the stands this warehouse has bought: never a locked one)
+			if type(owned) == "number" and owned < #spots then
+				local some = table.create(owned)
+				for i = 1, owned do
+					some[i] = spots[i]
+				end
+				spots = some
+			end
 			local index = SandboxSteps.nearestFree(px, pz, spots, summary.taken)
 			local spot = if index then spots[index] else nil
 			if spot then
@@ -828,7 +836,9 @@ function SandboxGuide.start()
 					world.collectionSeen = true
 					last.shown = nil -- (the first state: what the save had on show is not something you did now)
 				end
-				summary = SandboxSteps.collection(body, standCount())
+				-- (8.1 merge: the server's own count, the UPGRADES desk's More stands included; else the warehouse's)
+				world.ownedStands = if type(body.stands) == "number" then body.stands else nil
+				summary = SandboxSteps.collection(body, if type(body.stands) == "number" then body.stands else standCount())
 			end
 		end)
 		collection:FireServer({ kind = "state" })

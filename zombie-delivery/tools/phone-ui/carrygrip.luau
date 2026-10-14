@@ -1,22 +1,23 @@
--- 7.0 grip: the carry's grip bar on a phone held sideways (844 × 390: 844 × 354 under Roblox's top bar) and on a
--- computer, run for real on tools/phone-ui/missions_mock.luau's recorder: client/CarryGripUi.luau (with
--- client/MoveLayout.luau, client/TopBlocks.luau, client/TouchLayout.luau and shared/CarryGrip.luau) beside the move's
--- own pieces (client/MovingHud.luau's panel, client/MoveHelperHud.luau's strip, client/QuickChat.luau's 💬 button) and
--- the HUD's groups where client/Hud.luau puts them on that phone (the actions' row, FIRE, the right column, the bottom
--- bar, the contextual action: TouchLayout's own boxes). Like movehud.luau it lays out what the modules made (Position,
--- Size, AnchorPoint, UIScale) and asserts: the bar and the round HOLD button (72 px and more) on the screen, clear of the
--- touch buttons, the thumbstick's corner, the jump button, the move's panel and strip, the 💬 button, the HUD's groups
--- and each other; the bar shows with the character's CarryGrip and MoveCarry and goes with them; HOLD raises the grip
--- box, letting go drops it; the load is the thing's icon; the report about once a second; SLIPPING! before the slip,
--- the "slip" sent once; the tutorial's tip; a door's fade pauses it; a computer has no HOLD button and the left mouse
--- button or F holds; no warnings.
--- 7.1 review: the slipped bar stays (DROPPED!) till the server drops it, "slip" asked again a second later; dropped and
--- the same piece picked up again inside DROPPED!'s moment: a new bar, no second "slip" (the old bar's would hurt it
--- twice); the real client/MoveSounds.luau: grip_slip at the slip and no heavy_drop for the slip's damage in the state
--- that follows (one thud), a jolt otherwise thuds; the bar and HOLD clear of everything on three touch screens (a phone
--- sideways 844 × 390, a small one 740 × 360, a 1024 × 768 tablet; each under Roblox's top bar). CarryGripUi's and
--- MoveSounds' os.clock is this check's M.clock (check.py gives them mock.os): a frame moves it on by its dt, a wait is
--- M.clock += s, so the bar's seed and every timing are the same each run.
+-- 8.1 grip: the carry's timing check on a phone held sideways (844 × 390: 844 × 354 under Roblox's top bar), two more
+-- touch screens and a computer, run for real on tools/phone-ui/missions_mock.luau's recorder (the folder:
+-- tools/phone-ui/carrygripenv.py): client/CarryGripUi.luau (with client/MoveLayout.luau, client/TopBlocks.luau,
+-- client/TouchLayout.luau and shared/CarryGrip.luau) beside the move's own pieces (client/MovingHud.luau's panel,
+-- client/MoveHelperHud.luau's strip, client/QuickChat.luau's 💬 button), the sandbox's guide line (a stand-in in
+-- TopBlocks, under them) and the HUD's groups where client/Hud.luau puts them (the actions' row, FIRE, the right
+-- column, the bottom bar, the contextual action: TouchLayout's own boxes). Like movehud.luau it lays out what the
+-- modules made (Position, Size, AnchorPoint, UIScale) and asserts: the widget and the round GRIP button (80 px and more)
+-- on the screen, clear of the touch buttons, the thumbstick's corner, the jump button, the move's panel and strip, the
+-- guide line, the 💬 button, the HUD's groups and each other; nothing shows without a check; the server's ("grip",
+-- "open") shows one (GET A GRIP! / WOBBLE! / WOBBLE! MISS = DROP, the piece, the zone where the check has it, the needle
+-- sweeping); one press (the GRIP button, a tap on the widget, the left mouse button, F; not a click the GUI took) sends
+-- ("grip", id, "ok" | "miss", its time) once, the needle stops; no press: ("grip", id, "miss") at the window's end; the
+-- outcomes (BALANCED!, SLIPPED BACK! with furniture_putdown, STAGGER! with grip_warning, DROPPED! with the real
+-- client/MoveSounds.luau's grip_slip and no heavy_drop for the drop's damage), a miss shakes it and the camera; it goes
+-- Ui.Linger s after; a "close" takes it off; a door's fade hides it (no press then); an older check's outcome is
+-- ignored; the first Ui.Tutorial checks say "… when the needle is in the green"; no warnings.
+-- CarryGripUi's and MoveSounds' os.clock is this check's M.clock (mock.os): a frame moves it on by its dt.
+-- `luau carrygrip.luau -a dump` prints the preview's scenes instead (tools/phone-ui/carrygrip_preview.py).
+local dump = select(1, ...) == "dump"
 local M = require("./missions_mock")
 M.clock = 500
 M.os = setmetatable({ clock = function()
@@ -81,6 +82,9 @@ M.MUi.closeButton = M.Ui.closeButton
 M.MUi.screenScale = function()
 	return M.scale
 end
+M.MUi.screenSize = function()
+	return M.Vector2.new(M.width, M.height)
+end
 M.MUi.touchLayout = function()
 	return M.touch
 end
@@ -102,24 +106,20 @@ M.MapView.waypointAt = function()
 end
 M.MapView.onWaypoint = function() end
 M.played = {}
-M.playedAt = {} -- (grip_tick: the frame it played on)
-M.frame = 0
-M.Sounds.play = function(name, volume)
+M.Sounds.play = function(name)
 	table.insert(M.played, name)
-	if name == "grip_tick" then
-		table.insert(M.playedAt, M.frame)
-		M.tickVolume = volume
-	end
 end
+M.shakes = {}
+M.MCamera = { shake = function(amount)
+	table.insert(M.shakes, amount)
+end }
 local camera = M.workspace.CurrentCamera
-
--- the body: a humanoid (its health, the way it walks, the floor) and the root's speed
-local character = M.player.Character
-local humanoid = M.make("Humanoid", { Name = "Humanoid", Health = 100, MoveDirection = M.Vector3.new(0, 0, 0), FloorMaterial = M.Enum.Material.Plastic }, character)
-M.root.AssemblyLinearVelocity = M.Vector3.new(0, 0, 0)
-local function walk(speed)
-	M.root.AssemblyLinearVelocity = M.Vector3.new(0, 0, -speed)
-	humanoid.MoveDirection = if speed > 0 then M.Vector3.new(0, 0, -1) else M.Vector3.new(0, 0, 0)
+local function played(name)
+	local count = 0
+	for _, n in M.played do
+		count += if n == name then 1 else 0
+	end
+	return count
 end
 
 -- ── A layout: where a recorded piece sits (px from the screen's top left) ──
@@ -163,33 +163,28 @@ end
 local function show(b)
 	return string.format("%.0f,%.0f-%.0f,%.0f", b.x0, b.y0, b.x1, b.y1)
 end
-local function shown(object)
-	local node = object
-	while node and node.ClassName ~= "PlayerGui" do
-		if node.Visible == false then
-			return false
-		end
-		node = node.Parent
-	end
-	return true
-end
 
 local Config = require("./Config")
+local CarryGrip = require("./CarryGrip")
 local Inventory = require("./Inventory")
 local Holding = require("./Holding")
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
+local TopBlocks = require("./TopBlocks")
 local MovingHud = require("./MovingHud")
 local MoveHelperHud = require("./MoveHelperHud")
 local QuickChat = require("./QuickChat")
 local CarryGripUi = require("./CarryGripUi")
 local MoveSounds = require("./MoveSounds")
+local G = Config.CarryGrip
 
 local function check(name, condition, detail)
 	if not condition then
 		error(`FAIL {name}{if detail ~= nil then "  (" .. tostring(detail) .. ")" else ""}`)
 	end
-	print("ok    " .. name)
+	if not dump then
+		print("ok    " .. name)
+	end
 end
 local function all(root, predicate)
 	local out = {}
@@ -218,6 +213,15 @@ local function sentOn(remote)
 	end
 	return list
 end
+local function answers()
+	local list = {}
+	for _, args in sentOn("Moving") do
+		if args[1] == "grip" then
+			table.insert(list, args)
+		end
+	end
+	return list
+end
 local function setAttr(object, key, value)
 	object:SetAttribute(key, value)
 	object:GetAttributeChangedSignal(key):Fire()
@@ -229,20 +233,10 @@ local function inside(b)
 	return MoveLayout.inside(b, M.width, M.height)
 end
 local function frames(count, dt)
-	for _ = 1, count do
-		M.frame += 1
+	for _ = 1, count or 1 do
 		M.clock += dt or 1 / 60
 		M.services.RunService.RenderStepped:Fire(dt or 1 / 60)
 	end
-end
-local function slipsSent()
-	local count = 0
-	for _, args in sentOn("Moving") do
-		if args[1] == "slip" then
-			count += 1
-		end
-	end
-	return count
 end
 -- 7.1: the move's sounds as client/MoveSounds.luau asks client/Sounds.luau to play them (its api, recorded)
 M.cues = {}
@@ -256,11 +250,81 @@ local function cues(name)
 	return count
 end
 
+-- ── The preview's scenes (carrygrip_preview.py) ─────────────────────────────
+local scenes = {}
+local function color(c)
+	return if type(c) == "table" and c.R then { math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5) } else nil
+end
+local function udim2(u)
+	return if type(u) == "table" and type(u.X) == "table" then { u.X.Scale, u.X.Offset, u.Y.Scale, u.Y.Offset } else nil
+end
+local function node(n)
+	local p = n._p
+	local out = { c = p.ClassName, n = p.Name }
+	if p.Visible == false then
+		out.vis = false
+	end
+	out.pos, out.size = udim2(p.Position), udim2(p.Size)
+	if p.AnchorPoint then
+		out.anchor = { p.AnchorPoint.X, p.AnchorPoint.Y }
+	end
+	out.z, out.order = p.ZIndex, p.LayoutOrder
+	out.bg, out.bgT = color(p.BackgroundColor3), p.BackgroundTransparency
+	out.clip = p.ClipsDescendants
+	if p.Text and p.Text ~= "" then
+		out.text, out.ts = p.Text, p.TextSize
+		out.tc, out.tt = color(p.TextColor3), p.TextTransparency
+		out.xa = if p.TextXAlignment then p.TextXAlignment.Name else nil
+		out.font = if p.Font then p.Font.Name else nil
+		out.wrap = p.TextWrapped == true
+		out.trunc = p.TextTruncate ~= nil and p.TextTruncate.Name == "AtEnd"
+	end
+	if p.ClassName == "UICorner" then
+		out.radius = { p.CornerRadius.Scale, p.CornerRadius.Offset }
+	elseif p.ClassName == "UIStroke" then
+		out.color, out.thick, out.tr = color(p.Color), p.Thickness, p.Transparency
+	elseif p.ClassName == "UIScale" then
+		out.scale = p.Scale
+	elseif p.ClassName == "UIPadding" then
+		out.pad = { p.PaddingLeft and p.PaddingLeft.Offset or 0, p.PaddingRight and p.PaddingRight.Offset or 0 }
+	elseif p.ClassName == "ScreenGui" then
+		out.display = p.DisplayOrder or 0
+		out.enabled = p.Enabled ~= false
+	end
+	local kids = {}
+	for _, child in n:GetChildren() do
+		table.insert(kids, node(child))
+	end
+	if #kids > 0 then
+		out.kids = kids
+	end
+	return out
+end
+local function scene(name)
+	if not dump then
+		return
+	end
+	local overlay = {}
+	if M.touch then
+		local cluster = TouchLayout.cluster(M.width, M.height, M.scale)
+		table.insert(overlay, { kind = "stick", box = cluster.thumb })
+		table.insert(overlay, { kind = "round", box = cluster.jump, label = "JUMP" })
+		table.insert(overlay, { kind = "pill", box = cluster.sprint, label = "SPRINT" })
+		table.insert(overlay, { kind = "pill", box = cluster.act, label = "PUT DOWN" })
+	else
+		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "MOUSE [ALT]" })
+	end
+	table.insert(scenes, { name = name, width = M.width, height = M.height + 36, inset = 36, touch = M.touch, overlay = overlay, tree = node(M.gui) })
+end
+
 -- ── A phone sideways, with the HUD's groups where client/Hud.luau puts them ──
 local hud = named(M.gui, "ZombieDeliveryHud")
-local HUD_NAMES = { "HudButtons", "Fire", "RightStack", "BottomBar", "Hint" }
--- The HUD's groups on a touch screen of M.width × M.height at M.scale (the old ones go): (the touch cluster, the touch
--- buttons with the thumbstick's corner and the jump button, the groups' boxes, their names)
+local HUD_NAMES = { "HudButtons", "Fire", "RightStack", "BottomBar", "Hint", "LeftStack" }
+local guideGui = M.make("ScreenGui", { Name = "SandboxGuide", DisplayOrder = 2 }, M.gui)
+local guide = M.make("TextLabel", { Name = "GuideLine", Text = "Carry the Old TV to your van", TextSize = 15, TextColor3 = M.MTheme.Contract.text, BackgroundColor3 = M.MTheme.Contract.charcoal, BackgroundTransparency = 0.25 }, guideGui)
+-- The HUD's groups on a screen of M.width × M.height at M.scale (the old ones go): (the touch cluster, the touch
+-- buttons with the thumbstick's corner and the jump button, the groups' boxes, their names); the guide line under the
+-- move's top blocks
 local function layoutHud()
 	for _, name in HUD_NAMES do
 		local old = named(hud, name)
@@ -274,30 +338,46 @@ local function layoutHud()
 	table.insert(blocks, c.thumb)
 	table.insert(blocks, c.jump)
 	local names, boxes = {}, {}
-	local function hudGroup(name, b)
-		M.make("Frame", { Name = name, Position = M.UDim2.fromOffset(b.x0, b.y0), Size = M.UDim2.fromOffset(b.x1 - b.x0, b.y1 - b.y0) }, hud)
+	local function hudGroup(name, b, label)
+		M.make("TextLabel", { Name = name, Text = label or "", TextSize = 11, TextColor3 = M.MTheme.Contract.secondary, BackgroundColor3 = M.MTheme.Contract.charcoal,
+			BackgroundTransparency = 0.55, Position = M.UDim2.fromOffset(b.x0, b.y0), Size = M.UDim2.fromOffset(b.x1 - b.x0, b.y1 - b.y0) }, hud)
 		table.insert(names, name)
 		table.insert(boxes, b)
 	end
-	-- (client/Hud.luau's touch layout: the actions' row 170 × 44 at 0.8 top right, FIRE, the right column 300 × 130,
-	-- the bottom bar (client/Hotbar.luau: the hands and two slots), the contextual action over it)
-	local rowW, rowH = 170 * 0.8, 44 * 0.8
-	hudGroup("HudButtons", TouchLayout.box(W - 16 - rowW, 16, W - 16, 16 + rowH))
-	hudGroup("Fire", c.fire)
 	local barW, barH = Inventory.size(#Holding.Order + 2, true)
-	local barScale = math.max(scale, Inventory.minScale(true))
-	local column, _, bar = TouchLayout.dock(c, W, H, 300 * scale, 130 * scale, 16 + rowH, W - 16 - rowW, barW * barScale, barH * barScale)
-	hudGroup("RightStack", column)
-	hudGroup("BottomBar", bar)
-	local buttons = table.clone(TouchLayout.buttons(c))
-	table.insert(buttons, column)
-	local hintX, hintBottom, hintW = TouchLayout.hint(c, buttons, W, H, scale, bar.y0)
-	hudGroup("Hint", TouchLayout.box(hintX - hintW / 2, hintBottom - 96 * scale, hintX + hintW / 2, hintBottom))
+	local barScale = math.max(scale, Inventory.minScale(M.touch))
+	if M.touch then
+		-- (client/Hud.luau's touch layout: the actions' row 170 × 44 at 0.8 top right, FIRE (hidden in the sandbox,
+		-- kept here: the harder case), the right column 300 × 130, the bottom bar, the contextual action over it)
+		local rowW, rowH = 170 * 0.8, 44 * 0.8
+		hudGroup("HudButtons", TouchLayout.box(W - 16 - rowW, 16, W - 16, 16 + rowH), "≡ ⚙")
+		hudGroup("Fire", c.fire, "FIRE")
+		local column, _, bar = TouchLayout.dock(c, W, H, 300 * scale, 130 * scale, 16 + rowH, W - 16 - rowW, barW * barScale, barH * barScale)
+		hudGroup("RightStack", column, "")
+		hudGroup("BottomBar", bar, "▣ ▣ ▣")
+		local buttons = table.clone(TouchLayout.buttons(c))
+		table.insert(buttons, column)
+		local hintX, hintBottom, hintW = TouchLayout.hint(c, buttons, W, H, scale, bar.y0)
+		hudGroup("Hint", TouchLayout.box(hintX - hintW / 2, hintBottom - 96 * scale, hintX + hintW / 2, hintBottom), "")
+		hudGroup("LeftStack", TouchLayout.box(16, 16, 16 + 200 * scale, 16 + 90 * scale), "$1,240 · +$3/min")
+	else
+		-- (a computer: the money top left, the bottom bar in the middle at the bottom, the key hints top right)
+		local w, h = barW * barScale, barH * barScale
+		hudGroup("BottomBar", TouchLayout.box(W / 2 - w / 2, H - 16 - h, W / 2 + w / 2, H - 16), "▣ ▣ ▣")
+		hudGroup("LeftStack", TouchLayout.box(16, 16, 16 + 200 * scale, 16 + 90 * scale), "$1,240 · +$3/min")
+		hudGroup("RightStack", TouchLayout.box(W - 16 - 300 * scale, 56, W - 16, 56 + 130 * scale), "[E] Use [G] Put down [LMB/F] Grip")
+	end
+	-- the sandbox's guide line under the move's panel and Danny's strip (TopBlocks: the widget keeps clear of it)
+	TopBlocks.set("SandboxGuide", nil)
+	local under = TopBlocks.bottom() or 8
+	local gw = math.min(W - 32, 560 * scale)
+	guide.Position = M.UDim2.fromOffset(W / 2 - gw / 2, under + 6)
+	guide.Size = M.UDim2.fromOffset(gw, 34 * math.max(scale, 0.8))
+	TopBlocks.set("SandboxGuide", guide)
 	return c, blocks, boxes, names
 end
 M.touch, M.width, M.height = true, 844, 354
 M.scale = math.clamp(math.min(M.width / 1150, M.height / 680), 0.55, 1.1)
-local cluster, touchBlocks, hudBoxes, hudNames = layoutHud()
 
 MovingHud.start()
 MoveHelperHud.start()
@@ -306,9 +386,6 @@ CarryGripUi.start()
 MoveSounds.start({
 	play = function(name)
 		table.insert(M.cues, name)
-		if name == "grip_slip" then
-			M.slipped = (M.slipped or 0) + 1
-		end
 	end,
 	make = function()
 		return nil
@@ -340,295 +417,333 @@ local panel = named(M.gui, "MovePanel")
 local strip = MoveHelperHud.strip()
 local chatButton = named(M.gui, "QuickChatButton")
 check("the move's pieces show: the panel, Danny's strip, the 💬 button", panel.Visible and strip.Visible and chatButton.Visible)
+local cluster, touchBlocks, hudBoxes, hudNames = layoutHud()
+local touchNames = { "FIRE", "SPRINT", "PUT DOWN (the hand button)", "DRAW", "the thumbstick's corner", "the jump button" }
 
--- ── No bar without a carry that has one ─────────────────────────────────────
+-- The server's checks: a lift on the TV, a wobble (its miss drops it or not)
+local nextId = 0
+local function open(what, drop, roll, kind, weight, fragile)
+	nextId += 1
+	local check = CarryGrip.check(CarryGrip.profile(kind or "both", weight or 4, if fragile == nil then true else fragile, false), what, roll or 0.5)
+	local wire = CarryGrip.wire(check, { id = nextId, spot = 2, name = "Old TV", icon = "📺", drop = drop == true, help = false })
+	moving.OnClientEvent:Fire("grip", "open", wire)
+	return wire, check
+end
+local function result(id, outcome, left)
+	moving.OnClientEvent:Fire("grip", "result", { id = id, what = "lift", outcome = outcome, left = left or 96, name = "Old TV" })
+end
+-- Frames until the needle is in the zone's middle (± a frame), then nothing more
+local function untilHit(check)
+	local at = M.clock
+	for _ = 1, 600 do
+		local e = M.clock - at
+		if CarryGrip.hits(check, e) and math.abs(CarryGrip.needle(check, e) - (check.zone0 + check.zone / 2)) < check.zone * 0.25 then
+			return
+		end
+		frames(1)
+	end
+end
+
+-- ── No check: nothing ───────────────────────────────────────────────────────
+check("no check: no widget", not CarryGripUi.active() and not CarryGripUi.panel().Visible and not CarryGripUi.tapButton().Visible)
+setAttr(M.player.Character, "MoveCarry", 2)
+setAttr(M.player.Character, "CarryGrip", "both 4 fragile")
+frames(30)
+check("a carry with a grip: still nothing (no holding; walking is free)", not CarryGripUi.active() and not CarryGripUi.panel().Visible)
+
+-- ── The lift check ──────────────────────────────────────────────────────────
+local opensAt = M.clock
+local wire, lift = open("lift")
 local grip = CarryGripUi.panel()
-check("no carry: no bar", not CarryGripUi.active() and (grip == nil or not grip.Visible))
-moving.OnClientEvent:Fire("state", moveState("carried", 0.8))
-check("7.1: a jolt in your hands (its condition down 0.2, no slip): heavy_drop", cues("heavy_drop") == 1, cues("heavy_drop"))
-setAttr(character, "MoveCarry", 5)
-check("a carry without CarryGrip (a plain one-hand thing): no bar", not CarryGripUi.active())
-
--- ── The TV: a bar ───────────────────────────────────────────────────────────
-setAttr(character, "MoveCarry", 2)
-setAttr(character, "CarryGrip", "both 4 fragile")
-grip = CarryGripUi.panel()
-local hold = CarryGripUi.holdButton()
-check("carrying the TV (CarryGrip \"both 4 fragile\"): the bar and the HOLD button show", CarryGripUi.active() and grip.Visible and hold.Visible)
-local gripBox, holdBox = box(grip), box(hold)
-check("the HOLD button: round, 72 px and more, at the right over the touch buttons", holdBox.x1 - holdBox.x0 >= 72 and math.abs((holdBox.x1 - holdBox.x0) - (holdBox.y1 - holdBox.y0)) < 1
-	and holdBox.x0 > M.width / 2 and holdBox.y1 <= cluster.top + 0.5, show(holdBox))
-check("the bar right of the middle, on the screen", inside(gripBox) and (gripBox.x0 + gripBox.x1) / 2 > M.width / 2, show(gripBox))
-local pieces = { ["the move's panel"] = box(panel), ["Danny's strip"] = box(strip), ["the 💬 button"] = box(chatButton) }
+local tap = CarryGripUi.tapButton()
+frames(1)
+check("the server's lift check: the widget and the GRIP button show", CarryGripUi.active() and grip.Visible and tap.Visible)
+local title, piece, hint = named(grip, "Title"), named(grip, "Piece"), named(grip, "Hint")
+check("…GET A GRIP!, the piece's icon (📺), the tutorial's hint (a phone: Tap GRIP in the green)", title.Text == "GET A GRIP!" and piece.Text == "📺"
+	and hint.Text == "Tap GRIP in the green", `{title.Text} / {piece.Text} / {hint.Text}`)
+check("…grip_tick as it opens", played("grip_tick") == 1)
+local gripBox, tapBox = box(grip), box(tap)
+check("the GRIP button: round, 80 px and more, at the right over the touch buttons", tapBox.x1 - tapBox.x0 >= 80 and math.abs((tapBox.x1 - tapBox.x0) - (tapBox.y1 - tapBox.y0)) < 1
+	and tapBox.x0 > M.width / 2 and tapBox.y1 <= cluster.top + 0.5, show(tapBox))
+check("the widget on the screen (a short phone: its middle under the character is the HUD's: beside it), readable (× 0.62 and more)",
+	inside(gripBox) and uiScale(grip) >= G.Ui.Min - 1e-6, show(gripBox))
+local pieces = { ["the move's panel"] = box(panel), ["Danny's strip"] = box(strip), ["the 💬 button"] = box(chatButton), ["the guide line"] = box(guide) }
 for index, b in hudBoxes do
 	pieces[`the HUD's {hudNames[index]}`] = b
 end
-local touchNames = { "FIRE", "SPRINT", "PUT DOWN (the hand button)", "DRAW", "the thumbstick's corner", "the jump button" }
 for index, b in touchBlocks do
 	pieces[touchNames[index]] = b
 end
 for what, b in pieces do
-	check(`the bar and HOLD clear of {what}`, not overlap(gripBox, b) and not overlap(holdBox, b), `{show(gripBox)} {show(holdBox)} / {show(b)}`)
+	check(`the widget and GRIP clear of {what}`, not overlap(gripBox, b) and not overlap(tapBox, b), `{show(gripBox)} {show(tapBox)} / {show(b)}`)
 end
-check("…and of each other", not overlap(gripBox, holdBox) and inside(holdBox))
-local marker = named(grip, "Marker")
-check("the load is the thing's icon (📺, from the move's state)", named(marker, "Icon").Text == "📺")
-local tip = named(grip, "Tip")
-check("the first carry: the tip \"Hold to keep it steady!\" (on a phone the button says HOLD)", tip.Visible and tip.Text == "Hold to keep it steady!")
-local tipBox = box(tip)
-local tipClear = inside(tipBox) and not overlap(tipBox, holdBox)
-for _, b in pieces do
-	tipClear = tipClear and not overlap(tipBox, b)
-end
-check("…on the screen, clear of the move's pieces, the HUD's groups and the touch controls", tipClear, show(tipBox))
-print(`      (844 × 354: the bar {show(gripBox)} at {uiScale(grip)}, HOLD {show(holdBox)}, the tip {show(tipBox)})`)
-
--- ── HOLD raises the grip box, letting go drops it ───────────────────────────
-local zone = named(grip, "Zone")
-local function zoneTop()
-	return zone.Position.Y.Offset
-end
-frames(2)
-local top0 = zoneTop()
-local finger = { UserInputType = M.Enum.UserInputType.Touch } -- (one touch: the same InputObject begins and ends)
-hold.InputBegan:Fire(finger)
+check("…and of each other", not overlap(gripBox, tapBox) and inside(tapBox))
+print(`      (844 × 354: the widget {show(gripBox)} at {uiScale(grip)}, GRIP {show(tapBox)})`)
+local zone, needle = named(grip, "Zone"), named(grip, "Needle")
+local trackW = MoveLayout.CHECK_W - 24
+check("the zone where the check has it", zone.Position.X.Offset == math.floor(lift.zone0 * trackW + 0.5) and zone.Size.X.Offset == math.floor(lift.zone * trackW + 0.5))
+local x0 = needle.Position.X.Offset
 frames(20)
-local top1 = zoneTop()
-check("HOLD pressed: the box rises (up the screen)", top1 < top0, `{top0} → {top1}`)
-local lit = hold.BackgroundColor3
-hold.InputEnded:Fire({ UserInputType = M.Enum.UserInputType.Touch })
-frames(5)
-check("another finger lifting: still held", zoneTop() < top1)
-M.services.UserInputService.InputEnded:Fire(finger) -- (the finger slid off the button and lifted: it lets go too)
-frames(60)
-check("let go: it falls back", zoneTop() > top1, `{top1} → {zoneTop()}`)
-check("…the button lit while held", lit ~= hold.BackgroundColor3)
-local reports = sentOn("Moving")
-local report = reports[#reports]
-check("about once a second: (\"grip\", the spot, the share outside, steady)", report ~= nil and report[1] == "grip" and report[2] == 2 and type(report[3]) == "number"
-	and report[3] >= 0 and report[3] <= 1 and type(report[4]) == "boolean")
+check("the needle sweeps (from the left end, to the right)", needle.Position.X.Offset > x0 and x0 <= 2, `{x0} → {needle.Position.X.Offset}`)
+scene("phone-lift")
+untilHit(lift)
+local elapsed = M.clock - opensAt
+local sent = #answers()
+tap.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch })
+local a = answers()[#answers()]
+check("GRIP in the zone: (\"grip\", id, \"ok\", its time) sent at once", #answers() == sent + 1 and a[2] == wire.id and a[3] == "ok" and math.abs(a[4] - elapsed) < 0.05
+	and CarryGrip.hits(lift, a[4]), a[4])
+frames(1)
+check("…NICE!, ding, the GRIP button goes", title.Text == "NICE!" and played("ding") == 1 and not tap.Visible)
+local stopped = needle.Position.X.Offset
+frames(10)
+check("…the needle stops where it was pressed", needle.Position.X.Offset == stopped)
+tap.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch })
+M.services.UserInputService.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.MouseButton1, KeyCode = M.Enum.KeyCode.Unknown }, false)
+check("…a second press sends nothing more (one answer a check)", #answers() == sent + 1)
+result(wire.id, "balanced", 100)
+frames(1)
+check("the server's BALANCED!: \"Balanced: +10% walk\"", title.Text == "BALANCED!" and hint.Text == "Balanced: +10% walk", title.Text)
+scene("phone-balanced")
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+check(`…gone {G.Ui.Linger} s later`, not CarryGripUi.active() and not grip.Visible)
 
--- ── A door's fade pauses it ─────────────────────────────────────────────────
-moving.OnClientEvent:Fire("fade", "out", 0.35)
-local before = #sentOn("Moving")
-local zoneBefore = zoneTop()
-frames(120)
-check("in a door's fade: paused (no step, no report)", #sentOn("Moving") == before and zoneTop() == zoneBefore)
-moving.OnClientEvent:Fire("fade", "in", 0.35)
-
--- ── Walking without holding: SLIPPING!, then the slip ───────────────────────
-walk(10.5)
-local title = named(grip, "Title")
-local warned, slipAt = false, nil
-for i = 1, 60 * 30 do
-	frames(1)
-	if title.Text == "SLIPPING!" then
-		warned = true
-	end
-	local sent = sentOn("Moving")
-	if sent[#sent][1] == "slip" then
-		slipAt = i
-		break
-	end
-end
-check("walking, never holding: SLIPPING! first, then (\"slip\", the spot) is sent", warned and slipAt ~= nil and sentOn("Moving")[#sentOn("Moving")][2] == 2, slipAt)
-local warnings = 0
-for _, name in M.played do
-	if name == "grip_warning" then
-		warnings += 1
-	end
-end
-check("…grip_warning on entering SLIPPING! (once), MoveSounds.slipped() at the slip (not grip_slip itself)", warnings == 1 and M.slipped == 1
-	and table.find(M.played, "grip_slip") == nil, `{warnings} {M.slipped}`)
-local closest = math.huge
-for i = 2, #M.playedAt do
-	closest = math.min(closest, M.playedAt[i] - M.playedAt[i - 1])
-end
-check("grip_tick as the meter moves, at volume 0.5, never closer than 0.08 s (5 frames at 60 fps)", #M.playedAt > 5 and M.tickVolume == 0.5 and closest >= 5, `{#M.playedAt} {closest}`)
-frames(30)
-check("…once (not every frame)", slipsSent() == 1 and title.Text == "DROPPED!" and M.slipped == 1)
--- 7.1 review: the slip's damage in the move's next state (fragile: 0.15, over the jolt's 0.12): one thud, grip_slip's
-local drops = cues("heavy_drop")
-moving.OnClientEvent:Fire("state", moveState("carried", 0.65))
-check("7.1 review: the state with the slip's damage: no heavy_drop (grip_slip had its thud)", cues("heavy_drop") == drops and cues("grip_slip") == 1,
-	`{cues("heavy_drop")} {cues("grip_slip")}`)
--- 7.1 review: the server has not dropped it yet (the carry's attributes still on): the same slipped bar
-M.resume() -- (the bar's look at the attributes four times a second)
-check("7.1 review: not dropped yet (the attributes still on): the same bar, DROPPED!, no new one", CarryGripUi.active() and title.Text == "DROPPED!" and slipsSent() == 1)
-M.clock += 1.05
+-- ── A miss: SLIPPED BACK! ───────────────────────────────────────────────────
+wire, lift = open("lift")
 frames(2)
-check("…still in your hands a second later: \"slip\" asked again, once", slipsSent() == 2 and title.Text == "DROPPED!", slipsSent())
--- the server drops it: the attributes go, the bar with them (DROPPED!'s moment, 0.8 s from the slip, is over by now;
--- a drop inside it: below)
-setAttr(character, "MoveCarry", nil)
-setAttr(character, "CarryGrip", nil)
-M.now += 1
-M.resume()
-check("the carry ends: the bar and the HOLD button go", not CarryGripUi.active() and not grip.Visible and not hold.Visible)
-M.clock += Config.Soundscape.Move.SlipQuiet
-moving.OnClientEvent:Fire("state", moveState("ground", 0.5))
-check("7.1 review: SlipQuiet s later a jolt thuds again", cues("heavy_drop") == drops + 1, cues("heavy_drop"))
-
--- ── The second carry: the tip again; the third: none ────────────────────────
-walk(0)
-setAttr(character, "MoveCarry", 7)
-setAttr(character, "CarryGrip", "pair 8")
-check("the second carry (the sofa, by two): the tip again", CarryGripUi.active() and tip.Visible and named(marker, "Icon").Text == "🛋️")
-setAttr(character, "MoveCarry", nil)
-M.resume()
-setAttr(character, "MoveCarry", 2)
-setAttr(character, "CarryGrip", "both 4 fragile")
-check("the third: no tip", CarryGripUi.active() and not tip.Visible)
-
--- ── 7.1 review: dropped and picked up again inside DROPPED!'s moment ────────
-walk(10.5)
-local sentBefore = slipsSent()
-for _ = 1, 60 * 30 do
+check("the second check: the tutorial's hint still", hint.Text == "Tap GRIP in the green")
+named(grip, "Press").InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch })
+a = answers()[#answers()]
+check("a tap on the widget at once (the needle short of the zone): (\"grip\", id, \"miss\", its time)", a[2] == wire.id and a[3] == "miss" and type(a[4]) == "number" and a[4] < 0.1)
+frames(1)
+check("…MISSED!", title.Text == "MISSED!")
+local shakes = #M.shakes
+result(wire.id, "knock", 95)
+local restX = math.floor(box(grip).x0 + 0.5)
+local moved = false
+for _ = 1, 12 do
 	frames(1)
-	if slipsSent() > sentBefore then
-		break
-	end
+	moved = moved or math.floor(box(grip).x0 + 0.5) ~= restX
 end
-check("the TV slips again (walking, never holding)", slipsSent() == sentBefore + 1 and title.Text == "DROPPED!", slipsSent())
-setAttr(character, "MoveCarry", nil) -- (the server drops it …)
-setAttr(character, "CarryGrip", nil)
-frames(5)
-check("…dropped at once: DROPPED! stays a moment", CarryGripUi.active() and grip.Visible and title.Text == "DROPPED!")
-setAttr(character, "MoveCarry", 2) -- (… and the TV is picked up again a moment later, inside DROPPED!'s moment)
-setAttr(character, "CarryGrip", "both 4 fragile")
-check("7.1 review: the same piece picked up again inside DROPPED!'s moment: a new bar (GRIP, not DROPPED!)", CarryGripUi.active() and grip.Visible and title.Text == "GRIP",
-	title.Text)
-M.clock += 1.1
-frames(3)
-M.resume()
-check("…and no \"slip\" asked again for the old bar (the server would hurt the new carry with it)", slipsSent() == sentBefore + 1 and title.Text ~= "DROPPED!",
-	`{slipsSent()} {title.Text}`)
--- ── 7.1 review: STEADY +10% only when the server gives it ────────────────────
--- an attentive hold (HOLD while the load is over the box's middle, a quarter second ahead) fills the meter; the title
--- says STEADY +10% only after a report steady as the server takes it (at most Server.SteadyOutside of it outside)
-walk(0)
-local thumb = { UserInputType = M.Enum.UserInputType.Touch }
-local pressed, lastZone = false, zoneTop()
-local reportSteady, seen = false, #sentOn("Moving")
-local shownSteady, shownWrong, steadyReports, badReports = 0, 0, 0, 0
-for _ = 1, 60 * 20 do
-	local top = zoneTop()
-	local ahead = top + zone.Size.Y.Offset / 2 + (top - lastZone) * 15
-	lastZone = top
-	local want = marker.Position.Y.Offset < ahead
-	if want ~= pressed then
-		pressed = want
-		if want then
-			hold.InputBegan:Fire(thumb)
-		else
-			M.services.UserInputService.InputEnded:Fire(thumb)
-		end
-	end
-	frames(1)
-	local sent = sentOn("Moving")
-	for index = seen + 1, #sent do
-		local args = sent[index]
-		if args[1] == "grip" then
-			reportSteady = args[4] == true
-			if reportSteady then
-				steadyReports += 1
-				badReports += if args[3] > Config.CarryGrip.Server.SteadyOutside then 1 else 0
-			end
-		end
-	end
-	seen = #sent
-	if title.Text == "STEADY +10%" then
-		shownSteady += 1
-		shownWrong += if reportSteady then 0 else 1
-	end
-end
-M.services.UserInputService.InputEnded:Fire(thumb)
-check("7.1 review: held attentively, the bar gets steady: STEADY +10% (its reports steady as the server takes them)", shownSteady > 0 and steadyReports > 0 and badReports == 0,
-	`{shownSteady} frames, {steadyReports} steady reports, {badReports} over SteadyOutside`)
-check("…STEADY +10% never shown before a report the server takes as steady (no +10% then)", shownWrong == 0, shownWrong)
-setAttr(character, "MoveCarry", nil)
-setAttr(character, "CarryGrip", nil)
-check("a bar that did not slip goes at once with the carry", not CarryGripUi.active() and not grip.Visible)
+check("the server's knock: SLIPPED BACK!, \"95% left · try again (E)\", furniture_putdown, a shake (the widget and the camera)", title.Text == "SLIPPED BACK!"
+	and hint.Text == "95% left · try again (E)" and played("furniture_putdown") == 1 and moved and #M.shakes == shakes + 1, `{title.Text} / {hint.Text}`)
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+check("…and it goes", not CarryGripUi.active())
 
--- ── 7.1 review: three touch screens: the bar and HOLD clear of everything ─
--- (a small phone has no clear place for the bar at its smallest, Config.CarryGrip.Ui.Min: client/MoveLayout.luau grip
--- takes the one that covers the least, never a touch control, a sliver of the HUD's right column)
-local function area(a, b)
-	return math.max(0, math.min(a.x1, b.x1) - math.max(a.x0, b.x0)) * math.max(0, math.min(a.y1, b.y1) - math.max(a.y0, b.y0))
+-- ── No press: a miss at the window's end ────────────────────────────────────
+wire, lift = open("lift")
+frames(2)
+sent = #answers()
+frames(math.ceil(lift.window * 60) + 2)
+a = answers()[#answers()]
+check("no press: (\"grip\", id, \"miss\") at the window's end, once", #answers() == sent + 1 and a[2] == wire.id and a[3] == "miss" and title.Text == "MISSED!")
+frames(60)
+check("…once (not every frame)", #answers() == sent + 1)
+frames(math.ceil(2.6 * 60))
+check("…no outcome from the server (the move ended meanwhile): it goes anyway", not CarryGripUi.active())
+
+-- ── A wobble: STAGGER!, then one whose miss drops it ────────────────────────
+wire, lift = open("wobble", false)
+frames(2)
+check("a wobble: WOBBLE!, the short hint now (the 4th check)", title.Text == "WOBBLE!" and hint.Text == "Tap GRIP" and played("grip_warning") == 1, `{title.Text} / {hint.Text}`)
+local wobbleZone = zone.Size.X.Offset
+M.services.UserInputService.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch }, false)
+check("…a touch elsewhere on the screen (the camera, the thumbstick): no press", #answers() == sent + 1)
+tap.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch })
+result(wire.id, "stagger", 92)
+frames(1)
+check("…missed: STAGGER!, \"92% left · don't miss again\", grip_warning", title.Text == "STAGGER!" and hint.Text == "92% left · don't miss again"
+	and played("grip_warning") == 2)
+scene("phone-stagger")
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+wire, lift = open("wobble", true)
+frames(30)
+check("a shaky wobble: LAST CHANCE!, \"A miss drops it · Tap GRIP\" (its edge red)", title.Text == "LAST CHANCE!" and hint.Text == "A miss drops it · Tap GRIP" and named(grip, "Edge").Color == M.MTheme.Contract.red and zone.Size.X.Offset == wobbleZone)
+scene("phone-wobble-drop")
+tap.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch })
+local drops, shakes2 = cues("heavy_drop"), #M.shakes
+result(wire.id, "drop", 77)
+moving.OnClientEvent:Fire("state", moveState("ground", 0.77))
+frames(1)
+check("…missed: DROPPED!, \"It fell · 77% left\", grip_slip (client/MoveSounds.luau), no heavy_drop for the drop's damage", title.Text == "DROPPED!"
+	and hint.Text == "It fell · 77% left" and cues("grip_slip") == 1 and cues("heavy_drop") == drops and #M.shakes == shakes2 + 1 and M.shakes[#M.shakes] == G.Ui.CameraDrop)
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+
+-- ── A close, a fade, a stale outcome ────────────────────────────────────────
+wire, lift = open("wobble", false)
+frames(2)
+moving.OnClientEvent:Fire("grip", "close", wire.id)
+frames(1)
+check("(\"grip\", \"close\", id): gone at once, no outcome", not CarryGripUi.active() and not grip.Visible)
+wire, lift = open("wobble", false)
+frames(2)
+sent = #answers()
+moving.OnClientEvent:Fire("fade", "out", 0.35)
+frames(2)
+tap.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Touch })
+check("a door's fade: hidden, a press does nothing", not grip.Visible and #answers() == sent)
+moving.OnClientEvent:Fire("fade", "in", 0.35)
+moving.OnClientEvent:Fire("grip", "close", wire.id)
+local newer = open("lift")
+frames(2)
+result(newer.id - 1, "drop", 50)
+frames(1)
+check("an older check's outcome while a newer one is on: ignored", title.Text == "GET A GRIP!" and CarryGripUi.active())
+moving.OnClientEvent:Fire("grip", "close", newer.id)
+result(newer.id + 5, "knock", 90)
+frames(1)
+check("an outcome with no check on (the server's timeout): it shows anyway", title.Text == "SLIPPED BACK!" and grip.Visible)
+moving.OnClientEvent:Fire("state", nil)
+frames(1)
+check("off the move: gone", not CarryGripUi.active() and not grip.Visible)
+moving.OnClientEvent:Fire("state", moveState("carried", 0.77)) -- (back on it: the move's panel again)
+
+-- ── Three touch screens: the widget and GRIP clear of everything ───────────
+local function area(p, q)
+	return math.max(0, math.min(p.x1, q.x1) - math.max(p.x0, q.x0)) * math.max(0, math.min(p.y1, q.y1) - math.max(p.y0, q.y0))
 end
-for _, screen in { { 844, 390, "a phone sideways", true }, { 740, 360, "a small phone sideways", false }, { 1024, 768, "a tablet", true } } do
+for _, screen in { { 844, 390, "a phone sideways" }, { 740, 360, "a small phone sideways" }, { 1024, 768, "a tablet" } } do
 	M.touch, M.width, M.height = true, screen[1], screen[2] - 36 -- (under Roblox's top bar)
 	M.scale = math.clamp(math.min(M.width / 1150, M.height / 680), 0.55, 1.1)
-	local _, blocks, groups, names = layoutHud()
 	camera:GetPropertyChangedSignal("ViewportSize"):Fire()
-	setAttr(character, "MoveCarry", 2)
-	setAttr(character, "CarryGrip", "both 4 fragile")
-	local g, h = box(grip), box(hold)
-	local pieces = { ["the move's panel"] = box(panel), ["Danny's strip"] = box(strip), ["the 💬 button"] = box(chatButton) }
+	local _, blocks, groups, names = layoutHud()
+	wire = open("wobble", false)
+	frames(1)
+	local g, t = box(grip), box(tap)
+	local stuff = { ["the move's panel"] = box(panel), ["Danny's strip"] = box(strip), ["the 💬 button"] = box(chatButton), ["the guide line"] = box(guide) }
 	for index, b in blocks do
-		pieces[touchNames[index]] = b
+		stuff[touchNames[index]] = b
+	end
+	for index, b in groups do
+		stuff[`the HUD's {names[index]}`] = b
 	end
 	local hit = {}
-	for what, b in pieces do
-		if overlap(g, b) or overlap(h, b) then
-			table.insert(hit, what)
+	for what, b in stuff do
+		if overlap(g, b) or overlap(t, b) then
+			table.insert(hit, `{what} {math.floor(area(g, b) + area(t, b))} px²`)
 		end
 	end
-	local covered = 0 -- (the share of the bar on the HUD's groups)
-	for index, b in groups do
-		if overlap(h, b) then
-			table.insert(hit, `the HUD's {names[index]}`)
-		end
-		covered += area(g, b) / ((g.x1 - g.x0) * (g.y1 - g.y0))
+	check(`{screen[1]} × {screen[2]} ({screen[3]}): the widget and a GRIP of 80 px and more on the screen, clear of the touch controls, the move's pieces, the guide line, the HUD's groups and each other`,
+		grip.Visible and tap.Visible and #hit == 0 and inside(g) and inside(t) and not overlap(g, t) and t.x1 - t.x0 >= 80,
+		`{show(g)} {show(t)} on {table.concat(hit, ", ")}`)
+	print(`      ({M.width} × {M.height}: the widget {show(g)} at {uiScale(grip)}, GRIP {show(t)})`)
+	if screen[1] == 844 then
+		local check2 = CarryGrip.fromWire(wire) :: any
+		untilHit(check2)
+		scene("phone-wobble")
 	end
-	local label = `{screen[1]} × {screen[2]} ({screen[3]}): the bar and a HOLD of 72 px and more on the screen, clear of the touch controls, the move's pieces and each other; HOLD of the HUD's groups`
-	check(label .. (if screen[4] then ", the bar too" else ", the bar at most a sliver of them (no place is clear: the one that covers the least)"),
-		grip.Visible and hold.Visible and #hit == 0 and inside(g) and inside(h) and not overlap(g, h) and h.x1 - h.x0 >= 72
-			and (if screen[4] then covered == 0 else covered < 0.12),
-		`{show(g)} {show(h)} on {table.concat(hit, ", ")}, {math.floor(covered * 100 + 0.5)}% of the bar on the HUD's groups`)
-	print(`      ({M.width} × {M.height}: the bar {show(g)} at {uiScale(grip)}, HOLD {show(h)}, {math.floor(covered * 100 + 0.5)}% of the bar on the HUD's groups)`)
-	setAttr(character, "MoveCarry", nil)
-	setAttr(character, "CarryGrip", nil)
+	moving.OnClientEvent:Fire("grip", "close", wire.id)
+	frames(1)
 end
 check("gone again", not CarryGripUi.active() and not grip.Visible)
 
--- ── A computer: no HOLD button; the left mouse button or F holds ───────────
-M.touch, M.width, M.height = false, 1280, 684
+-- ── A computer: no GRIP button; the left mouse button or F presses ─────────
+M.touch, M.width, M.height = false, 1280, 764
 M.scale = math.clamp(math.min(M.width / 1150, M.height / 680), 0.55, 1.1)
-for _, name in { "HudButtons", "Fire", "RightStack", "BottomBar", "Hint" } do
-	named(hud, name):Destroy()
-end
 camera:GetPropertyChangedSignal("ViewportSize"):Fire()
-setAttr(character, "MoveCarry", 2)
-setAttr(character, "CarryGrip", "both 4 fragile")
+local _, _, pcBoxes, pcNames = layoutHud()
+wire, lift = open("lift", false, 0.3, "pair", 8, false)
+frames(1)
 gripBox = box(grip)
-check("a computer: the bar right of the middle, no HOLD button", grip.Visible and not hold.Visible and (gripBox.x0 + gripBox.x1) / 2 > M.width / 2 and inside(gripBox)
-	and not overlap(gripBox, box(panel)), show(gripBox))
+check("a computer: the widget in the middle under the character, no GRIP button", grip.Visible and not tap.Visible and math.abs((gripBox.x0 + gripBox.x1) / 2 - M.width / 2) < 2
+	and gripBox.y0 > M.height / 2 and inside(gripBox), show(gripBox))
+check("…the hint: Press LMB / F", hint.Text == "Press LMB / F", hint.Text)
+local pcPieces = { ["the move's panel"] = box(panel), ["Danny's strip"] = box(strip), ["the guide line"] = box(guide) }
+for index, b in pcBoxes do
+	pcPieces[`the HUD's {pcNames[index]}`] = b
+end
+for what, b in pcPieces do
+	check(`…clear of {what}`, not overlap(gripBox, b), `{show(gripBox)} / {show(b)}`)
+end
+print(`      ({M.width} × {M.height}: the widget {show(gripBox)} at {uiScale(grip)})`)
 local input = M.services.UserInputService
-frames(2)
-top0 = zoneTop()
-input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.MouseButton1, KeyCode = M.Enum.KeyCode.Unknown }, false)
-frames(20)
-check("the left mouse button held: the box rises", zoneTop() < top0)
-input.InputEnded:Fire({ UserInputType = M.Enum.UserInputType.MouseButton1, KeyCode = M.Enum.KeyCode.Unknown })
-frames(60)
-top0 = zoneTop()
-input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Keyboard, KeyCode = M.Enum.KeyCode.F }, false)
-frames(20)
-check("F held: the box rises", zoneTop() < top0)
-input.InputEnded:Fire({ UserInputType = M.Enum.UserInputType.Keyboard, KeyCode = M.Enum.KeyCode.F })
-frames(60)
-top0 = zoneTop()
+sent = #answers()
+frames(10)
 input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.MouseButton1, KeyCode = M.Enum.KeyCode.Unknown }, true)
-frames(20)
-check("a click on a button (gameProcessed): not a hold", zoneTop() >= top0)
--- the list (O) open at the right: the bar keeps clear of it
+check("a click on a button (gameProcessed): not a press", #answers() == sent)
+scene("pc-lift")
+untilHit(lift)
+input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.MouseButton1, KeyCode = M.Enum.KeyCode.Unknown }, false)
+a = answers()[#answers()]
+check("the left mouse button in the zone: \"ok\"", #answers() == sent + 1 and a[3] == "ok")
+moving.OnClientEvent:Fire("grip", "close", wire.id)
+wire, lift = open("wobble", false)
+frames(2)
+untilHit(lift)
+input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Keyboard, KeyCode = M.Enum.KeyCode.F }, false)
+a = answers()[#answers()]
+check("F in the zone: \"ok\"", #answers() == sent + 2 and a[3] == "ok" and a[2] == wire.id)
+result(wire.id, "steady", 100)
+frames(1)
+check("STEADY!: \"Steady again: +10% walk\"", title.Text == "STEADY!" and hint.Text == "Steady again: +10% walk")
+scene("pc-steady")
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+M.gamepad = true
+wire = open("wobble", false)
+frames(1)
+check("a gamepad: \"Press R2\"", hint.Text == "Press R2")
+input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Gamepad1, KeyCode = M.Enum.KeyCode.ButtonR2 }, false)
+check("…R2 presses", answers()[#answers()][2] == wire.id)
+M.gamepad = false
+moving.OnClientEvent:Fire("grip", "close", wire.id)
+-- the list (O) open at the right: the widget keeps clear of it
 input.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.O, UserInputType = M.Enum.UserInputType.Keyboard }, false)
 M.resume()
 M.resume()
-M.resume()
-M.resume()
+wire = open("wobble", false)
+frames(1)
 local list = named(M.gui, "MoveList")
-check("the list (O) open: the bar clear of it", list ~= nil and shown(list) and not overlap(box(grip), box(list)), `{show(box(grip))} / {show(box(list))}`)
+check("the list (O) open: the widget clear of it", list ~= nil and not overlap(box(grip), box(list)), `{show(box(grip))} / {show(box(list))}`)
 check("no warnings", #M.warnings == 0, M.warnings[1])
-print("ALL CARRYGRIP CHECKS PASSED")
+
+if dump then
+	local function encode(value, out)
+		local t = type(value)
+		if t == "number" then
+			if value ~= value or value == math.huge or value == -math.huge then
+				table.insert(out, "null")
+			elseif value == math.floor(value) and math.abs(value) < 1e15 then
+				table.insert(out, string.format("%d", value))
+			else
+				table.insert(out, string.format("%.3f", value))
+			end
+		elseif t == "string" then
+			table.insert(out, '"' .. string.gsub(value, '[%c"\\]', function(c)
+				return string.format("\\u%04x", string.byte(c))
+			end) .. '"')
+		elseif t == "boolean" then
+			table.insert(out, tostring(value))
+		elseif t == "table" then
+			if #value > 0 or next(value) == nil then
+				table.insert(out, "[")
+				for k, v in value do
+					if k > 1 then
+						table.insert(out, ",")
+					end
+					encode(v, out)
+				end
+				table.insert(out, "]")
+			else
+				table.insert(out, "{")
+				local first = true
+				for k, v in value do
+					if not first then
+						table.insert(out, ",")
+					end
+					first = false
+					encode(tostring(k), out)
+					table.insert(out, ":")
+					encode(v, out)
+				end
+				table.insert(out, "}")
+			end
+		else
+			table.insert(out, "null")
+		end
+	end
+	local out = {}
+	encode(scenes, out)
+	print(table.concat(out))
+else
+	print("ALL CARRYGRIP CHECKS PASSED")
+end

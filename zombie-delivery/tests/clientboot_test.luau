@@ -6,9 +6,9 @@
 --     list below is the 7.x client's);
 --   * the sandbox (On = true): only the sandbox's systems start, none of the city's is even required; the sandbox's
 --     own modules (SandboxHud, WarehouseUi, SandboxGuide: other workers') start only when they are there, one that
---     fails to load or has no start is skipped; PLAY still fires the server's Play; the State reaches the HUD, the
---     start screen, the key hints and SandboxHud.setState; ESC closes the warehouse's picker; the picker frees the
---     mouse. Run with tests/run_tests.py.
+--     fails to load or has no start is skipped; 8.1: SandboxSounds (the sandbox's sounds) starts last, with or without
+--     them; PLAY still fires the server's Play; the State reaches the HUD, the start screen, the key hints and
+--     SandboxHud.setState; ESC closes the warehouse's picker; the picker frees the mouse. Run with tests/run_tests.py.
 
 local Config = require("./Config")
 local ClientMain = require("./ClientMain")
@@ -43,7 +43,8 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
 	"QuickChat", "CarryGripUi", "CargoPrompts",
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide" }
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window)
+local LAST = { "SandboxSounds" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
 -- buses, the rentals, the zips, the guns and the hands, the throw, the chips and banners, the leaderboard, the weather,
@@ -264,10 +265,10 @@ end
 -- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok" })
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok" })
 	local ok, where = same(starts(run), CITY)
 	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
-	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil)
+	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
@@ -275,9 +276,9 @@ end
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
 
 do
-	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok" }, true)
-	local ok, where = same(starts(run), concat(SANDBOX, OWN))
-	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide`, ok, where)
+	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok" }, true)
+	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
+	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, then SandboxSounds`, ok, where)
 	local city: { string } = {}
 	for _, name in CITY_ONLY do
 		if run.required[name] then
@@ -286,7 +287,7 @@ do
 	end
 	check("the sandbox never requires a city system (the phone, the board, the maps, the guns ...)", #city == 0, table.concat(city, ", "))
 	local allowed: { [string]: boolean } = { Menu = true, MoveStoryUi = true }
-	for _, name in concat(SANDBOX, OWN) do
+	for _, name in concat(SANDBOX, OWN, LAST) do
 		allowed[name] = true
 	end
 	local extra: { string } = {}
@@ -323,6 +324,16 @@ do
 		close()
 	end
 	check("ESC closes the crew panel, folds the planning, closes the move's cards, the quick chat and the warehouse's picker", called(run, "CrewPanel.close") and called(run, "MoveLobbyUi.minimize") and called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
+	check("… and the UPGRADES window (8.1 review)", called(run, "UpgradeUi.close"))
+	-- 8.1 review: opening a sandbox window closes the others, never itself (its onOpen runs once it counts as open)
+	local onOpen = run.modules.UpgradeUi.onOpen
+	check("the UPGRADES window has an onOpen", type(onOpen) == "function" and type(run.modules.WarehouseUi.onOpen) == "function")
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = close -- (the real Hud.closeWindows ends in Hud.onCloseWindows)
+		onOpen()
+		check("… which closes the picker and the crew panel but not itself", called(run, "WarehouseUi.close") and called(run, "CrewPanel.close") and not called(run, "UpgradeUi.close"))
+	end
 	local windowOpen = run.modules.CameraRig.windowOpen
 	check("the warehouse's open picker frees the mouse (CameraRig.windowOpen)", type(windowOpen) == "function" and windowOpen() == true)
 	check("… and so does every window the camera's mouseNeeded asks about", run.modules.CameraRig.mouseNeeded == windowOpen)
@@ -335,10 +346,15 @@ do
 	check("with the picker shut the mouse stays the camera's", run.modules.CameraRig.windowOpen() == false)
 end
 
+do -- 8.1 review: the UPGRADES window alone frees the mouse too (on PC the camera no longer holds it)
+	local run = boot(true, { UpgradeUi = "ok" }, true)
+	check("the open UPGRADES window frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
+end
+
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)
 	local run = boot(true, {})
-	local ok, where = same(starts(run), SANDBOX)
-	check("without its own modules the sandbox starts the rest", ok, where)
+	local ok, where = same(starts(run), concat(SANDBOX, LAST))
+	check("without its own modules the sandbox starts the rest (its sounds too)", ok, where)
 	check("… with no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 	local close = run.modules.Hud.onCloseWindows
 	local fine = pcall(close)
@@ -350,7 +366,7 @@ end
 
 do -- one that fails to load, one without a start
 	local run = boot(true, { SandboxHud = "error", WarehouseUi = "bare", SandboxGuide = "ok" })
-	local ok, where = same(starts(run), concat(SANDBOX, { "SandboxGuide" }))
+	local ok, where = same(starts(run), concat(SANDBOX, { "SandboxGuide" }, LAST))
 	check("a broken own module is skipped, one without start is left alone, the others start", ok, where)
 	check("… the broken one says so in the Output", #run.warnings == 1 and string.find(run.warnings[1], "SandboxHud", 1, true) ~= nil, table.concat(run.warnings, " | "))
 end

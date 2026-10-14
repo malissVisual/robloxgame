@@ -162,6 +162,8 @@ AnalyticsPlan.Events = {
 	"CollectionAdded", -- pieces came home into the warehouse's stock (value: how many at once; field: the rarest)
 	"CollectionDisplayed", -- a piece put on show on a display stand (value: its $ a minute)
 	"CollectionSold", -- a piece sold (value: its price)
+	-- 8.1 SANDBOX, the upgrades (server/Upgrades.luau; value: the level bought, field: the upgrade's id)
+	"UpgradeBought",
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -250,7 +252,7 @@ AnalyticsPlan.Sinks = {
 	Gear = "Shop",
 	Paint = "Shop",
 	Stage = "Shop",
-	Upgrade = "Shop",
+	Upgrade = "Shop", -- a city upgrade track; 8.1 SANDBOX: a warehouse upgrade at the UPGRADES desk (server/Upgrades.luau; the SKU its id)
 	Style = "Shop",
 	RealEstate = "Shop",
 	Company = "Shop", -- a courier hired, an upgrade of your company

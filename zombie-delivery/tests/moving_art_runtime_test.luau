@@ -4,7 +4,8 @@
 -- the board's card, START, the planning lobby (Ann, and Bob the Guard READY), LAUNCH, the real interior built and in
 -- the world, in through the front door (open from the start: the owner took the Technician out), the house lit (the real
 -- ceiling lights on, the porch's daylight on, no fuse box); a real one-hand piece picked up, carried out, loaded, driven
--- to the Wall: the pay, and the interior taken down.
+-- to the Wall: the pay, and the interior taken down. 8.1 walk-in doors with the real house: in clear of the doorway's
+-- zone facing the hall, the ▲ OUT doormat, out by walking into the real 7-wide front doorway, in by walking up to the door.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -114,7 +115,7 @@ check("the roles: Ann the Driver, Bob the Guard", ann:GetAttribute("MoveRole") =
 
 local site = moves:FindFirstChild("Move_marge")
 check("the front door open from the start: no Pick lock, no Kick door", promptIn(site, "Pick lock") == nil and promptIn(site, "Kick door") == nil
-	and promptIn(site, "Enter house") ~= nil and promptIn(site, "Enter house").Enabled)
+	and promptIn(site, "Enter house") ~= nil and not promptIn(site, "Enter house").Enabled) -- (8.1 walk-in doors: walked through, the prompt off)
 E.place(ann, outside)
 trigger(promptIn(site, "Enter house"), ann)
 local entry = (origin * plan.entry).Position
@@ -132,6 +133,41 @@ local daylight = named(interior, "Daylight")
 check(`lit inside from the start: the real ceiling lights on ({on}), the porch's daylight on`, on >= 8 and off == 0 and daylight ~= nil
 	and daylight:FindFirstChildOfClass("SurfaceLight") ~= nil and daylight:FindFirstChildOfClass("SurfaceLight").Enabled ~= false, `{on} on, {off} off`)
 check("no fuse box in the house any more", named(interior, "FuseBox") == nil)
+-- 8.1 walk-in doors with the real house: in at the plan's entry clear of the doorway's zone, facing into the hall; the
+-- ▲ OUT doormat on the hall's floor; out by walking into the real front doorway (7 wide: near its jamb too, past the old
+-- Leave part's 4), in again by walking up to the front door outside
+do
+	local D = T.Doors
+	local exitAt0 = (origin * M.CFrame.new(plan.exit)).Position
+	local into = (origin * V3(0, 0, 1)) - origin.Position
+	local side = V3(-into.Z, 0, into.X)
+	local function stand(player: any, at: any, look: any)
+		E.rootOf(player).CFrame = M.CFrame.lookAt(at, at + look)
+	end
+	local function isIn(player: any): boolean
+		return (E.rootOf(player).Position - origin.Position).Magnitude < 200
+	end
+	check("8.1 walk-in doors, the real house: in at the plan's entry, clear of the doorway's zone (Depth), facing into the hall",
+		(E.rootOf(ann).Position - exitAt0):Dot(into) > D.Depth and E.rootOf(ann).CFrame.LookVector:Dot(into) > 0.99, (E.rootOf(ann).Position - exitAt0):Dot(into))
+	local mat = named(interior, "WalkInMat")
+	local words = mat and mat:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
+	check("…the ▲ OUT doormat on the hall's floor just inside the front doorway", mat ~= nil and words.Text == "▲ OUT" and math.abs(mat.Position.Y - origin.Position.Y - 0.12) < 0.05
+		and (mat.Position - exitAt0):Dot(into) > 0 and (mat.Position - exitAt0):Dot(into) < D.Depth and math.abs((mat.Position - exitAt0):Dot(side)) < 0.1)
+	E.clock += D.Rearm
+	stand(ann, exitAt0 + into * 1 + side * (plan.doors[1].width / 2 - 0.5), -into)
+	E.clock += 0.1
+	Moving.step()
+	E.clock += D.Dwell
+	Moving.step()
+	check("…out by walking into the real front doorway near its jamb", not isIn(ann) and (E.rootOf(ann).Position - outside).Magnitude < 6, E.rootOf(ann).Position)
+	E.clock += D.Rearm
+	stand(ann, door + facing * 2, -facing)
+	E.clock += 0.1
+	Moving.step()
+	E.clock += D.Dwell
+	Moving.step()
+	check("…and in again by walking up to the front door", isIn(ann) and (E.rootOf(ann).Position - entry).Magnitude < 6, E.rootOf(ann).Position)
+end
 E.place(bob, outside)
 trigger(promptIn(site, "Enter house"), bob)
 
