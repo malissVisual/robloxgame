@@ -6286,7 +6286,10 @@ Config.CarryGrip = {
 --                     warehouse earns), no XP; no story. Client / Icon / Address / Blurb: the card's; Time / HordeAt: the
 --                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
 --                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
---                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay
+--                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay.
+--                     8.3 the big move: the one house (The Old Chalet, the owner's big Blender house, 44 × 14.5 × 34)
+--                     empties as a big house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms,
+--                     more pieces, a back door), a longer Time (the Sprinter's bed takes it home in several trips)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6367,8 +6370,9 @@ Config.Moving = {
 		Client = "The Hubers",
 		Icon = "🏡",
 		Address = "the end of Main Street",
-		Blurb = "An old alpine chalet full of things. Bring them home to your warehouse and put them on show.",
-		Time = 20 * 60,
+		Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
+		Kind = "big", -- 8.3: the house's plan (shared/HouseLayout.luau's big house, Config.Furniture.Big)
+		Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
 		HordeAt = 3 * 60,
 		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
@@ -6490,6 +6494,24 @@ Config.Furniture = {
 		Legendary = 0.125,
 		Odds = { uncommon = 60, rare = 30, epic = 10 } :: { [string]: number },
 		Salt = 8017,
+	},
+	-- 8.3 the big house (the sandbox's one house, the owner's big Blender house: HouseLayout.plan(seed, "big"), one big
+	-- floor laid out as a house's, bigger): six rooms in the back row (the house's four, a guest room and a study), a
+	-- bigger front row (Front: its depth's least, 2 more a die step; Kitchen: the kitchen's least share of the front row
+	-- beside the hall), and a second way out, the back door (BackDoor wide) at the corridor's east end. Every piece gets
+	-- out by both doors. Its lights and Neon are every house's (Config.SandboxLight.House).
+	--   Spots / Stars          its pieces (at least, at most) and its ★ ones
+	--   Collectibles           its collector's pieces (Count: at least, at most; Legendary: the chance of one), the
+	--                          house's Odds and Salt
+	--   InteriorMaxParts       an interior's parts at most, its furniture included (tests/biglayout_test.luau)
+	Big = {
+		Front = 26,
+		Kitchen = 0.4,
+		BackDoor = 6,
+		Spots = { 34, 40 } :: { number },
+		Stars = 4,
+		Collectibles = { Count = { 4, 6 } :: { number }, Legendary = 0.25 },
+		InteriorMaxParts = 1100,
 	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
 	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:

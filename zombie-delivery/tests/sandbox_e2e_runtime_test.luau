@@ -37,6 +37,8 @@
 --  18. 8.3 the market: the state carries the day's hot and cold kinds; a hot piece on a stand: its tag shows the hot
 --      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
 --      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
+--  19. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
+--      piece out by its doorway inside (the real plan's second way out), loaded, home.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -52,6 +54,7 @@ local TaskRules = require("./SandboxTasks") -- (shared/SandboxTasks.luau, the pu
 local Plan = require("./AnalyticsPlan")
 local StockPlan = require("./StockPlan")
 local Market = require("./Market") -- (8.3: the day's hot and cold kinds)
+local SoundPlan = require("./SoundPlan") -- (8.3: "in the house" for the eyes and the sounds)
 
 local failures = 0
 local todos: { string } = {}
@@ -169,12 +172,16 @@ do
 	check("…the map (workspace.Sandbox), the four warehouses, a kiosk on every plot, the Cars folder; no Baseplate", workspace:FindFirstChild("Sandbox") ~= nil
 		and warehouses ~= nil and #warehouses:GetChildren() == 4 and moves ~= nil and moves:FindFirstChild("MovingBoard1") ~= nil
 		and moves:FindFirstChild("MovingBoard4") ~= nil and workspace:FindFirstChild("Cars") ~= nil and rawget(baseplate, "destroyed") == true)
-	local door: any = nil
+	local door, back: any, any = nil, nil
 	for _, d in workspace:GetDescendants() do
 		if d:GetAttribute("SandboxDoor") then
 			door = d
+		elseif d:GetAttribute("SandboxBackDoor") then
+			back = d
 		end
 	end
+	check("…8.3: the chalet's back door (SandboxBackDoor) in its back wall where SandboxMap puts it", back ~= nil
+		and V3(back.Position.X - House.back.x, 0, back.Position.Z - House.back.z).Magnitude < 1)
 	check("…the chalet's front door (SandboxDoor) where SandboxMap puts it", door ~= nil and V3(door.Position.X - House.door.x, 0, door.Position.Z - House.door.z).Magnitude < 2)
 	check("…the sandbox's own DataStore (Config.Sandbox.Store); analytics on (a live server)", E.storeName == Config.Sandbox.Store and Config.Analytics.Enabled)
 	check("(a day whose tasks for Ann hold trips, sell and the weekly income)", S.day ~= nil)
@@ -1578,6 +1585,76 @@ do
 	local again = Vehicles.get(dee)
 	check("…CAR: the van that comes (a new one) wears it too, with its prompt", again ~= nil and again ~= van and again.model:GetAttribute("VanPaint") == "white"
 		and E.promptIn(again.model, "🎨 Paint van") ~= nil)
+end
+
+-- ── 20. 8.3 the big move: the back door ────────────────────────────────────
+-- Ann (back since step 13) on a new move: the card's big plan (Config.Furniture.Big) with its two ways out; round the
+-- house to its back door (House.back, the back wall: the walk-in zone, the fade) to the corridor's east end inside, a
+-- piece out by that doorway, out behind the house facing the garden, round to the van's back, loaded, home: a trip.
+do
+	local van = S.annVan2
+	E.advance(1.1)
+	local card = H.takeContract(ann2, plots[1])
+	check("20. 8.3: Ann's card: the chalet, 25 minutes, its pieces (the big plan's: Config.Furniture.Big.Spots and collectibles)", card ~= nil
+		and card.id == House.id and card.name == House.name and card.time == 25 * 60 and card.items >= Config.Furniture.Big.Spots[1] and card.busy == nil,
+		card and (card.busy or card.items))
+	H.launch(ann2)
+	check("(her move)", H.stateOf(ann2) ~= nil, E.lastNotice(ann2))
+	H.drive(ann2, van, H.toHouse(plots[1]))
+	check("(at the chalet's curb, the back open)", H.setBack(ann2, van, true), E.lastNotice(ann2))
+	local out = H.yawLook(House.back.yaw)
+	local backAt = V3(House.back.x, House.back.y + 3, House.back.z)
+	local side = V3(House.house.x + House.house.sx / 2 + 8, 3, 0) -- (round the house's east side)
+	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
+	E.walk(ann2, V3(side.X, 3, backAt.Z + 8))
+	E.walk(ann2, backAt + out * 8)
+	E.walk(ann2, backAt + out * 1.5)
+	local inside = E.waitUntil(function(): boolean
+		return H.isInside(ann2)
+	end, 3)
+	local origin = E.interiorAt(E.rootOf(ann2).Position)
+	local exit2: any = nil
+	for _, d in workspace:FindFirstChild("Moves"):GetChildren() do
+		if d.Name == "LeaveDoor2" and origin and (d.Position - origin.Position).Magnitude < 400 then
+			exit2 = d
+		end
+	end
+	local into = E.rootOf(ann2).CFrame.LookVector
+	check("…walked into the back door's zone: inside, by the corridor's east end (the plan's second way in), facing into the house",
+		inside and exit2 ~= nil and H.flat(E.rootOf(ann2).Position, exit2.Position) < Config.Furniture.EntryIn + 1 and into.X < -0.9,
+		E.rootOf(ann2).Position)
+	S.into[ann2] = V3(into.X, 0, into.Z).Unit
+	local here, view = E.rootOf(ann2).Position, H.stateOf(ann2)
+	check("…in the house for her eyes and her sounds (the state's inside: SoundPlan.sandboxPlace \"house\")", view ~= nil and view.inside == true
+		and SoundPlan.sandboxPlace(here.X, here.Y, here.Z, view.inside) == "house")
+	local piece, model = H.choose(ann2, function(_i: any, d: any): boolean
+		return d.class == "hand" and not d.fragile
+	end)
+	check("(a one-hand piece of the big plan in her hands)", piece ~= nil and H.pickUp(ann2, model), E.lastNotice(ann2))
+	local door = exit2.Position - V3(0, 3.5, 0)
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	E.walk(ann2, door + S.into[ann2] * 5 + up)
+	E.walk(ann2, door + S.into[ann2] * 1.5 + up)
+	local outAgain = E.waitUntil(function(): boolean
+		return not H.isInside(ann2)
+	end, 3)
+	local at = E.rootOf(ann2).Position
+	check("…carried out by the back door (walked into its doorway's zone inside): out behind the house, 4 south of the door, facing the garden, the piece with her",
+		outAgain and math.abs(H.flat(at, V3(House.back.x, 0, House.back.z)) - 4) < 0.6 and E.rootOf(ann2).CFrame.LookVector.Z > 0.9
+		and ann2.Character:GetAttribute("MoveCarry") == piece.spot, at)
+	local outView = H.stateOf(ann2)
+	check("…outdoors again for her eyes and her sounds", outView ~= nil and outView.inside ~= true and SoundPlan.sandboxPlace(at.X, at.Y, at.Z, false) == "outdoors")
+	E.walk(ann2, V3(side.X, 3, backAt.Z + 8)) -- (round the house again, to the van)
+	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
+	local loaded, why = H.loadAtBack(ann2, van)
+	check("…loaded at the van's back", loaded and H.itemOf(ann2, piece.spot).state == "truck", why or E.lastNotice(ann2))
+	H.setBack(ann2, van, false)
+	local before = #Collection.stock(ann2)
+	H.drive(ann2, van, H.toPlot(plots[1], false))
+	E.advance(1)
+	check("…home: a trip, the piece in her stock", H.stateOf(ann2).trips == 1 and #Collection.stock(ann2) == before + 1, E.lastNotice(ann2))
+	E.fire(ann2, "Moving", "finish")
+	E.advance(1)
 end
 
 -- ── The run ───────────────────────────────────────────────────────────────

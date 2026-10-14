@@ -29,6 +29,11 @@ tools/perf/world-mock.luau) with the same import in the Workspace. Checks:
 8.2.1: house.py's TARGET says which house the export is for (the manifest's "target"): "sandbox", the owner's big
 house on The Old Chalet (the sandbox checks above; Marge's then another size: left as World builds it), or "city",
 Marge's (the checks above it; the sandbox's then another size: the chalet as it is).
+8.3 the big move: the chalet's doors' leaves and its back door (server/SandboxWorld.luau): without the import the
+doorways (FrontDoor, BackDoor) unseen behind their leaves and nothing else changed; the FrontDoor's two leaves
+(FrontLeafWest, FrontLeafEast) and the BackLeaf in their doorways, hinged at a jamb (DoorLeaf, Hinge), not solid; the
+BackDoor (attribute SandboxBackDoor, the moves' second way in at SandboxMap's House.back) on the model's back door
+(across it, as wide and tall, just outside its leaf), nothing of the model in its way out.
 
     python3 zombie-delivery/tools/house-art/check.py <luau> [another export's ZDCHouseArt.json]
 """
@@ -231,10 +236,11 @@ print(string.format('HOUSE {"dressed":%s,"model":%s,"box":[%.17g,%.17g,%.17g],"p
 for _, d in (if chalet then chalet:GetDescendants() else {}) do
 	if d:IsA("BasePart") then
 		local shape = d.Shape
-		print(string.format('PART {"class":"%s","name":"%s","own":%s,"shape":"%s","cf":%s,"size":[%.17g,%.17g,%.17g],"t":%g,"shadow":%s,"collide":%s,"query":%s,"touch":%s,"anchored":%s,"night":%s,"door":%s,"skin":%s}',
+		print(string.format('PART {"class":"%s","name":"%s","own":%s,"shape":"%s","cf":%s,"size":[%.17g,%.17g,%.17g],"t":%g,"shadow":%s,"collide":%s,"query":%s,"touch":%s,"anchored":%s,"night":%s,"door":%s,"skin":%s,"back":%s,"leaf":"%s","hinge":"%s"}',
 			d.ClassName, d.Name, tostring(own ~= nil and d.Parent == own), if shape then shape.Name else "", f(inverse * d.CFrame), d.Size.X, d.Size.Y, d.Size.Z,
 			d.Transparency or 0, tostring(d.CastShadow), tostring(d.CanCollide), tostring(d.CanQuery), tostring(d.CanTouch), tostring(d.Anchored),
-			tostring(d:GetAttribute("NightLight") == true), tostring(d:GetAttribute("SandboxDoor") == true), tostring(d:FindFirstChildWhichIsA("SurfaceAppearance") ~= nil)))
+			tostring(d:GetAttribute("NightLight") == true), tostring(d:GetAttribute("SandboxDoor") == true), tostring(d:FindFirstChildWhichIsA("SurfaceAppearance") ~= nil),
+			tostring(d:GetAttribute("SandboxBackDoor") == true), tostring(d:GetAttribute("DoorLeaf") or ""), tostring(d:GetAttribute("Hinge") or "")))
 	end
 end
 -- the door's "Enter house" box as server/Moving.luau SB.site makes it: 4 × 6 × 1, 0.9 out of House.door, 3.5 up
@@ -445,7 +451,8 @@ def sandbox_check(manifest, plain, art):
     # No import: the chalet as it is.
     assert not plain["HOUSE"][0]["dressed"], "dressed without an import"
     for p in plain["PART"]:
-        assert p["class"] != "MeshPart" and p["t"] == 0, (p["name"], "changed without an import")
+        # (8.3: the doorways unseen behind their leaves)
+        assert p["class"] != "MeshPart" and p["t"] == (1 if p["name"] in ("FrontDoor", "BackDoor") else 0), (p["name"], "changed without an import")
     # Dressed.
     house = art["HOUSE"][0]
     assert house["dressed"] and art["META"]["moved"], (house, art["META"], "not dressed, or the import left in the world")
@@ -497,6 +504,27 @@ def sandbox_check(manifest, plain, art):
     assert abs((lo[0] + hi[0]) / 2 - (l_lo[0] + l_hi[0]) / 2) < 0.1 and abs((hi[0] - lo[0]) - (l_hi[0] - l_lo[0])) < 0.25 \
         and abs(lo[1] - l_lo[1]) < 0.25 and abs(hi[1] - l_hi[1]) < 0.25 and hi[2] <= l_lo[2] + 1e-3 and l_lo[2] - hi[2] < 0.5, \
         ("the FrontDoor is not on the model's door", lo, hi, l_lo, l_hi)
+    # 8.3 the big move: the back door on the model's back door (across it, as wide and tall, just outside its leaf, out of
+    # the back wall), the leaves in their doorways
+    backs = [p for p in art["PART"] if p["back"]]
+    assert len(backs) == 1 and backs[0]["name"] == "BackDoor" and backs[0]["own"] and not backs[0]["collide"], backs
+    b_lo, b_hi = aabb(backs[0])
+    back_leaf = [box_of(d) for d in details if d["name"].startswith("Křídlo dveří") and d["center"][2] > 0]
+    assert len(back_leaf) == 1, ("the model's back door", len(back_leaf))
+    k_lo, k_hi = back_leaf[0]
+    assert abs((b_lo[0] + b_hi[0]) / 2 - (k_lo[0] + k_hi[0]) / 2) < 0.1 and abs((b_hi[0] - b_lo[0]) - (k_hi[0] - k_lo[0])) < 0.25 \
+        and abs(b_lo[1] - k_lo[1]) < 0.3 and abs(b_hi[1] - k_hi[1]) < 0.3 and b_lo[2] >= k_hi[2] - 1e-3 and b_lo[2] - k_hi[2] < 0.5, \
+        ("the BackDoor is not on the model's back door", b_lo, b_hi, k_lo, k_hi)
+    leaf_parts = {p["name"]: p for p in plain["PART"] if p["leaf"]}
+    assert sorted(leaf_parts) == ["BackLeaf", "FrontLeafEast", "FrontLeafWest"], sorted(leaf_parts)
+    for name, door, hinge, way in (("FrontLeafWest", "front", "west", doors[0]), ("FrontLeafEast", "front", "east", doors[0]), ("BackLeaf", "back", "west", backs[0])):
+        p = leaf_parts[name]
+        lo_, hi_ = aabb(p)
+        w_lo, w_hi = aabb(way)
+        assert p["leaf"] == door and p["hinge"] == hinge and p["own"] and not p["collide"] and p["t"] == 0, (name, p["leaf"], p["hinge"])
+        assert all(lo_[i] >= w_lo[i] - 0.05 and hi_[i] <= w_hi[i] + 0.05 for i in range(3)), (name, "not in its doorway", lo_, hi_, w_lo, w_hi)
+        jamb = 0 if hinge == "west" else 1
+        assert abs((lo_, hi_)[jamb][0] - (w_lo, w_hi)[jamb][0]) < 0.1, (name, "not at its hinge's jamb")
     # Nothing of the model in the door's Enter house box, the doorway's way out (6 studs, over the step) or on the path
     # (the path runs under the step); the garden clear of the model.
     path = art["PATH"][0]
@@ -508,6 +536,7 @@ def sandbox_check(manifest, plain, art):
     keep = [
         ("the Enter house box", aabb(art["ENTER"][0])),
         ("the doorway's way out", ([l_lo[0], 0.3, skin - 6], [l_hi[0], l_hi[1], skin])),
+        ("the back door's way out", ([k_lo[0], 0.3, D / 2 + 0.25], [k_hi[0], k_hi[1], D / 2 + 6.25])),
         ("the path", ([path["x0"], 0.3, path["z0"]], [path["x1"], 5, min(path["z1"], skin)])),
         ("the greeter's spot", aabb(art["GREETER"][0])),
     ]
@@ -524,8 +553,9 @@ def sandbox_check(manifest, plain, art):
     return (f"Sandbox house PASS: The Old Chalet on house.py's box ({W:.2f} × {H:.2f} × {D:.2f}) as SandboxWorld builds it: "
             f"without the import the chalet; dressed, all {len(meshes)} pieces in place on House_sandbox_house, anchored, not "
             f"physical; the chalet's {len(own)} parts hidden, the House box and the gable still solid, the gable "
-            f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door; the Enter "
-            f"house box, the way out, the path (under the step) and the greeter's spot clear; the garden's {len(garden)} parts clear of the model")
+            f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door, 8.3 the "
+            f"BackDoor on its back door, their three leaves shut in them hinged at a jamb; the Enter house box, both ways out, "
+            f"the path (under the step) and the greeter's spot clear; the garden's {len(garden)} parts clear of the model")
 
 
 if __name__ == "__main__":
