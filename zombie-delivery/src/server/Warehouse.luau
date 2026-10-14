@@ -1,35 +1,49 @@
 --!strict
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every player plot. Builds each plot's
--- building once from shared/WarehouseLayout.luau (anchored parts: corrugated metal walls, the gable roof, the open
--- roller door, the hall's lights, the concrete floor's paint, the ZDC sign, the owner's sign, the STOCK board, the
--- display stands and the UNLOAD HERE bay outside) and keeps it in step with its owner (SandboxPlots) and their
--- collection (server/Collection.luau):
+-- building from shared/WarehouseLayout.luau (anchored parts: corrugated metal walls, the roof, the open roller door,
+-- the hall's lights, the concrete floor's paint, the ZDC sign, the owner's sign, the STOCK board, the display stands
+-- and the UNLOAD HERE bay outside) and keeps it in step with its owner (SandboxPlots) and their collection
+-- (server/Collection.luau):
 --   * the owner's sign over the door: "<Name>'s Warehouse", or FOR RENT on a free plot;
 --   * every display stand: its number plate, the piece on show as its 3D model (FurnitureLooks.build, dressed by
---     FurnitureMesh in the owner's Blender look once imported; anchored, in the podium's middle, looking south to its
---     aisle) and a tag over it (its name in its rarity's colour, "+$X/min");
+--     FurnitureMesh in the owner's Blender look once imported; anchored, in the podium's middle, looking along the
+--     stand's yaw to its aisle) and a tag over it (its name in its rarity's colour, "+$X/min");
 --   * the stands' prompts, for the owner only (tagged like a job's prompt: client/CargoPrompts.luau hides them from
 --     everybody else, and the server checks who used one): an empty stand's "Display" (E) asks the owner's client to
 --     pick a piece of the stock (Collection.openPicker); a full one's "Take down" (E, Collection.undisplay) and "Sell"
 --     (hold F, Collection.sell). The answers go out as Notices (the client's toasts); a sale's own message is the
 --     collection's ("sold");
 --   * the STOCK board inside: "📦 N pieces in stock · $X/min" and how many stands are on show;
---   * 8.1, the upgrades: the hall has WarehouseLayout.capacity() stands (20); the owner's first Collection.stands of
---     them stand there (the start's 12 and the More stands bought), the others are only their painted spot (their
---     podium, top and plate hidden and not solid, no prompts); the tags' $/min are × the owner's Showroom lights
---     (Collection.boost); the UPGRADES desk at the back wall has the owner's "Upgrades" prompt (E: Upgrades.open, the
---     window client/UpgradeUi.luau; somebody else's use gets a notice, as at the stands);
+--   * 8.1, the upgrades: the hall has WarehouseLayout.capacity(level) stands; the owner's first Collection.stands of
+--     them stand there (the level's big ones and the More stands bought), the others are only their painted spot
+--     (their podium, top and plate hidden and not solid, no prompts); the tags' $/min are × the owner's Showroom
+--     lights (Collection.boost); the UPGRADES desk has the owner's "Upgrades" prompt (E: Upgrades.open, the window
+--     client/UpgradeUi.luau; somebody else's use gets a notice, as at the stands) on the desk's front, the way the
+--     layout turns it;
 --   * 8.2: the owner's Blender look (server/WarehouseMesh.luau, once ZDCWarehouseArt is imported): the layout's visual
---     pieces carry the attribute WarehouseVisual and are hidden under the model (the solid ones still collide).
+--     pieces carry the attribute WarehouseVisual and are hidden under the model (the solid ones still collide);
+--   * 8.3 (design/warehouse-levels/KONTRAKT.md), the warehouse's five levels: each plot is built at its owner's level
+--     (UpgradeRules.warehouseLevel of Upgrades.levels: 1 Garage … 5 Logistics Center; a free plot at
+--     Config.Warehouse.FreeLevel, the garage FOR RENT) from WarehouseLayout.site(plot, level): that level's own building
+--     and stands. When the level changes (a plot claimed or freed, SandboxPlots.onChanged; the owner's save loaded or
+--     the ZDC Warehouse upgrade bought, Upgrades.onChanged) the plot's Model is built anew: the old one goes with the
+--     pieces it showed, the new one gets the level's stands, desk and signs, the owner's fresh prompts, and refresh puts
+--     the pieces back on their stands (a stand keeps its number: a piece on show stays on it). The plot's state (what
+--     the prompts' handlers hold) is kept, so the API below always answers for the building there now. The Model has
+--     the attribute Level (1 … 5, set before WarehouseMesh dresses it), workspace.Warehouses the attribute
+--     Level<plot id> (the clients' copy: client/SandboxGuide.luau, shared/SoundPlan.luau). A rebuild only on a real
+--     change of level.
 -- A collection's changes (Collection.onChanged) rebuild only the stands whose piece changed, Config.Warehouse.Rebuild
 -- apart at most; an owner who leaves takes their pieces with them (the plot is FOR RENT again). Nothing runs per frame.
 -- The van's unloading is the moves' (the plot's unload circle); here only its bay is painted.
 --
---   Warehouse.start()           builds every plot's warehouse (workspace.Warehouses) and follows owners and collections
---   Warehouse.model(id)         plot `id`'s warehouse Model (nil before start)
+--   Warehouse.start()           builds every plot's warehouse (workspace.Warehouses) and follows owners, their
+--                               collections and their warehouse levels
+--   Warehouse.model(id)         plot `id`'s warehouse Model (nil before start; 8.3: a new one after a level change)
 --   Warehouse.shown(id, i)      the Model on show on that plot's stand i (nil: the stand is empty)
 --   Warehouse.terminal(id)      8.1: plot `id`'s UPGRADES desk (its part with the prompt; nil before start)
 --   Warehouse.isOpen(id, i)     8.1: does plot `id`'s stand i stand there (the owner has it)?
+--   Warehouse.level(id)         8.3: the level plot `id`'s warehouse is built at (1 … 5; nil before start)
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,11 +54,12 @@ local FurnitureLooks = require(Shared.FurnitureLooks)
 local CollectionRules = require(Shared.CollectionRules)
 local Net = require(Shared.Net)
 local SandboxMap = require(Shared.SandboxMap)
+local UpgradeRules = require(Shared.UpgradeRules) -- 8.3: the owner's warehouse level
 local WarehouseLayout = require(Shared.WarehouseLayout)
 local Collection = require(script.Parent.Collection)
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local SandboxPlots = require(script.Parent.SandboxPlots)
-local Upgrades = require(script.Parent.Upgrades) -- 8.1: the UPGRADES desk's window
+local Upgrades = require(script.Parent.Upgrades) -- 8.1: the UPGRADES desk's window; 8.3: the owner's levels
 local WarehouseMesh = require(script.Parent.WarehouseMesh) -- 8.2: the owner's Blender warehouse
 
 local T = Config.Warehouse
@@ -67,6 +82,9 @@ type Stand = {
 }
 type PlotState = {
 	plot: SandboxMap.Plot,
+	site: SandboxMap.Plot, -- 8.3: the plot at the level its building is (WarehouseLayout.site: a Site)
+	level: number, -- 8.3: 1 … 5
+	parent: Instance, -- 8.3: workspace.Warehouses (a rebuilt Model goes there)
 	model: Model,
 	pieces: Folder,
 	stands: { Stand },
@@ -253,31 +271,69 @@ local function setOpen(stand: Stand, open: boolean)
 	end
 end
 
-local function buildPlot(parent: Instance, plot: SandboxMap.Plot): PlotState
+-- 8.3: where on a part a prompt's anchor goes: at its edge on the side the layout's `look` yaw faces (180 south, 0
+-- north, -90 east, 90 west: the way a stand's piece or the desk looks), `out` studs past that face (less than 0:
+-- inside it) and `height` over its middle. The part was built turned by its piece's own yaw, so the side is found in
+-- the part's frame: a podium or a desk the layout turns keeps its prompt on its front.
+local function edge(part: BasePart, partYaw: number, look: number, height: number, out: number): CFrame
+	local turn = math.rad(look - partYaw)
+	local dx, dz = -math.sin(turn), -math.cos(turn) -- (the look in the part's frame: its LookVector there)
+	if math.abs(dx) > math.abs(dz) then
+		return CFrame.new(math.sign(dx) * (part.Size.X / 2 + out), height, 0)
+	end
+	return CFrame.new(0, height, math.sign(dz) * (part.Size.Z / 2 + out))
+end
+
+-- 8.3: the level a free plot shows (Config.Warehouse.FreeLevel: the garage FOR RENT).
+local function freeLevel(): number
+	local want = (T :: any).FreeLevel
+	if type(want) ~= "number" or want ~= want then
+		return 1
+	end
+	return math.clamp(math.floor(want), 1, WarehouseLayout.Levels)
+end
+
+-- 8.3: the level a plot's warehouse is built at: its owner's (their ZDC Warehouse upgrade; none before their save
+-- loads: the garage) or a free plot's.
+local function levelFor(owner: Player?): number
+	if owner then
+		return UpgradeRules.warehouseLevel(Upgrades.levels(owner))
+	end
+	return freeLevel()
+end
+
+-- Builds the plot's building at `level` into its state (8.3: at start, and again whenever the level changes): a new
+-- Model under the state's parent with the level's pieces, every stand of the level (open as a free plot's; refresh
+-- brings them in step with the owner), the desk, the signs' labels. No prompts and nothing on show yet.
+local function buildModel(state: PlotState, level: number)
+	local plot = state.plot
+	local site = WarehouseLayout.site(plot, level) :: SandboxMap.Plot
 	local model = Instance.new("Model")
 	model.Name = `Warehouse{plot.id}`
 	model:SetAttribute("Plot", plot.id)
 	local podiums: { [number]: BasePart } = {}
+	local podiumYaws: { [number]: number } = {}
 	local standParts: { [number]: { BasePart } } = {}
 	local solid: { [BasePart]: boolean } = {}
 	local ownerLabels: { TextLabel } = {}
 	local stockLabels: { TextLabel } = {}
 	local desk: BasePart? = nil
-	for _, d in WarehouseLayout.pieces(plot) do
+	local deskYaw = 0
+	for _, d in WarehouseLayout.pieces(site) do
 		local part, labels = build(model, d)
 		if d.name == "OwnerSign" then
 			ownerLabels = labels
 		elseif d.name == "StockBoard" then
 			stockLabels = labels
 		elseif d.name == "TerminalDesk" then
-			desk = part
+			desk, deskYaw = part, d.yaw or 0
 		end
 		if d.stand then
 			standParts[d.stand] = standParts[d.stand] or {}
 			table.insert(standParts[d.stand], part)
 			solid[part] = d.solid == true
 			if d.name == `Stand{d.stand}` then
-				podiums[d.stand] = part
+				podiums[d.stand], podiumYaws[d.stand] = part, d.yaw or 0
 			end
 		end
 	end
@@ -285,42 +341,54 @@ local function buildPlot(parent: Instance, plot: SandboxMap.Plot): PlotState
 	pieces.Name = "Shown"
 	pieces.Parent = model
 	local stands: { Stand } = {}
-	for i = 1, WarehouseLayout.capacity() do
+	local open = WarehouseLayout.count(level)
+	for i = 1, WarehouseLayout.capacity(level) do
 		local podium = podiums[i]
-		local spot = WarehouseLayout.stand(plot, i) :: WarehouseLayout.Stand
-		-- the prompts at the podium's front edge (the aisle it looks at: +Z south, -Z north), at hand height
-		local front = if spot.yaw == 0 then -1 else 1
+		local spot = WarehouseLayout.stand(site, i) :: WarehouseLayout.Stand
+		-- the prompts at the podium's front edge (the aisle its piece looks at), at hand height
 		local anchor = Instance.new("Attachment")
 		anchor.Name = "Prompts"
-		anchor.CFrame = CFrame.new(0, 1.6, front * (podium.Size.Z / 2 - 0.3)) -- (its offset in the podium)
+		anchor.CFrame = edge(podium, podiumYaws[i] or 0, spot.yaw, 1.6, -0.3) -- (its offset in the podium)
 		anchor.Parent = podium
 		local tag, tagLabels = makeTag(podium)
 		local stand: Stand = { index = i, podium = podium, parts = standParts[i] or { podium }, solid = solid, open = true, anchor = anchor, prompts = nil, tag = tag, tagLabels = tagLabels, shown = nil }
-		setOpen(stand, i <= WarehouseLayout.count()) -- (an upgrade stand: its spot only, until an owner has it)
+		setOpen(stand, i <= open) -- (an upgrade stand: its spot only, until an owner has it)
 		stands[i] = stand
 	end
-	-- 8.1: the UPGRADES desk's prompt at its front edge (south: the hall), at hand height
+	-- 8.1: the UPGRADES desk's prompt at its front edge (the hall it faces: WarehouseLayout.terminal's yaw), at hand height
 	local terminal = desk :: BasePart
 	local deskAnchor = Instance.new("Attachment")
 	deskAnchor.Name = "Prompts"
-	deskAnchor.CFrame = CFrame.new(0, 0.6, terminal.Size.Z / 2 + 0.2)
+	deskAnchor.CFrame = edge(terminal, deskYaw, WarehouseLayout.terminal(site).yaw, 0.6, 0.2)
 	deskAnchor.Parent = terminal
-	model.WorldPivot = CFrame.new(plot.warehouse.x, 0, plot.warehouse.z)
+	model.WorldPivot = CFrame.new(site.warehouse.x, 0, site.warehouse.z)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- 8.2 perf: with StreamingEnabled the hall streams whole
+	model:SetAttribute("Level", level) -- 8.3 (before the dress: WarehouseMesh.level reads it)
 	WarehouseMesh.dress(model) -- 8.2: the owner's Blender look, once imported (no import: as built)
-	model.Parent = parent
-	return {
+	model.Parent = state.parent
+	state.parent:SetAttribute(`Level{plot.id}`, level) -- 8.3: the clients' copy of the level
+	state.site, state.level, state.model, state.pieces, state.stands = site, level, model, pieces, stands
+	state.desk, state.ownerLabels, state.stockLabels = terminal, ownerLabels, stockLabels
+end
+
+local function buildPlot(parent: Instance, plot: SandboxMap.Plot, level: number): PlotState
+	local state: PlotState = {
 		plot = plot,
-		model = model,
-		pieces = pieces,
-		stands = stands,
-		desk = terminal,
+		site = WarehouseLayout.site(plot, level) :: SandboxMap.Plot,
+		level = level,
+		parent = parent,
+		model = nil :: any, -- (buildModel's, below)
+		pieces = nil :: any,
+		stands = {},
+		desk = nil :: any,
 		deskPrompt = nil,
 		owner = nil,
-		ownerLabels = ownerLabels,
-		stockLabels = stockLabels,
+		ownerLabels = {},
+		stockLabels = {},
 		pending = false,
 	}
+	buildModel(state, level)
+	return state
 end
 
 -- ── What a shown piece earns ─────────────────────────────────────────────────
@@ -341,9 +409,10 @@ end
 
 -- ── The stands ───────────────────────────────────────────────────────────────
 
--- The piece on show on a stand: its model at the podium's middle, looking south (anchored, nothing to touch).
+-- The piece on show on a stand: its model at the podium's middle, looking the stand's way (south to its aisle and the
+-- door, or the way the level turns it; anchored, nothing to touch). 8.3: the stand of the level built there now.
 local function place(state: PlotState, stand: Stand, entry: Collection.Entry): (Model, number)
-	local spot = WarehouseLayout.stand(state.plot, stand.index) :: WarehouseLayout.Stand
+	local spot = WarehouseLayout.stand(state.site, stand.index) :: WarehouseLayout.Stand
 	local model = FurnitureLooks.build(entry.item, entry.variant)
 	FurnitureMesh.dress(model, entry.item, entry.variant) -- (the owner's Blender look, once imported)
 	local root = model.PrimaryPart
@@ -379,7 +448,7 @@ local function refresh(state: PlotState)
 	end
 	local income = if owner then Collection.incomePerMinute(owner) else 0
 	local rates = ratesOf(onStand, if owner then Collection.boost(owner) else 1)
-	local count = if owner then Collection.stands(owner) else WarehouseLayout.count()
+	local count = if owner then Collection.stands(owner) else WarehouseLayout.count(state.level) -- (8.3: a free plot's level)
 	for index, stand in state.stands do
 		setOpen(stand, index <= count)
 		local entry = if stand.open then onStand[index] else nil
@@ -560,17 +629,47 @@ local function remakePrompts(state: PlotState, owner: Player?)
 	end
 end
 
--- The plot was claimed (owner) or freed (nil): the sign, the prompts, the pieces.
-local function owned(state: PlotState, owner: Player?)
-	state.owner = owner
+-- The owner's sign, their prompts (fresh ones) and the pieces on the stands, as the plot's owner is now.
+local function dressOwner(state: PlotState)
+	local owner = state.owner
 	setLines(state.ownerLabels, WarehouseLayout.ownerLines(if owner then owner.DisplayName else nil, state.plot.id))
 	remakePrompts(state, owner)
+	refresh(state)
+end
+
+-- 8.3: the plot's warehouse at `level`: nothing when it is built at that level already (→ false); else the old Model
+-- goes (with the pieces it showed and its prompts), the level's is built in the same state (the API and the handlers
+-- the prompts hold answer for it), and the sign, the owner's prompts and the pieces on their stands come back (→ true).
+local function setLevel(state: PlotState, level: number): boolean
+	if level == state.level then
+		return false
+	end
+	for _, stand in state.stands do
+		local shown = stand.shown
+		if shown then
+			shown.model:Destroy()
+			stand.shown = nil
+		end
+	end
+	state.deskPrompt = nil -- (it goes with the old desk)
+	state.model:Destroy()
+	buildModel(state, level)
+	dressOwner(state)
+	return true
+end
+
+-- The plot was claimed (owner) or freed (nil): 8.3: the building at the level that goes with it; the sign, the
+-- prompts, the pieces.
+local function owned(state: PlotState, owner: Player?)
+	state.owner = owner
 	for player in busy do
 		if player.Parent == nil then
 			busy[player] = nil
 		end
 	end
-	refresh(state)
+	if not setLevel(state, levelFor(owner)) then
+		dressOwner(state)
+	end
 end
 
 -- ── The API ──────────────────────────────────────────────────────────────────
@@ -598,6 +697,11 @@ function Warehouse.isOpen(id: number, index: number): boolean
 	return stand ~= nil and stand.open
 end
 
+function Warehouse.level(id: number): number?
+	local state = states[id]
+	return if state then state.level else nil
+end
+
 function Warehouse.start()
 	if started then
 		return
@@ -606,7 +710,7 @@ function Warehouse.start()
 	local folder = Instance.new("Folder")
 	folder.Name = "Warehouses"
 	for _, plot in SandboxMap.Plots do
-		states[plot.id] = buildPlot(folder, plot)
+		states[plot.id] = buildPlot(folder, plot, levelFor(SandboxPlots.owner(plot.id))) -- (8.3: an owner from before: theirs)
 	end
 	folder.Parent = workspace
 	SandboxPlots.onChanged(function(id: number, player: Player?)
@@ -619,6 +723,15 @@ function Warehouse.start()
 		for _, state in states do
 			if state.owner == player then
 				schedule(state)
+			end
+		end
+	end)
+	-- 8.3: the owner's levels changed (their save loaded, the ZDC Warehouse bought, the admin's MAX / RESET): their
+	-- plot rebuilt when its level is another now (the other upgrades: nothing here, the collection's change refreshes)
+	Upgrades.onChanged(function(player: Player)
+		for _, state in states do
+			if state.owner == player then
+				setLevel(state, levelFor(player))
 			end
 		end
 	end)
