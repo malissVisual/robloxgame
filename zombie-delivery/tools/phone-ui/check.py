@@ -16,6 +16,8 @@ within Config.MapStyle.Budget, everything there in its order, nothing made frame
 8.0 SANDBOX: the sandbox's HUD and the warehouse picker (the real SandboxHud and WarehouseUi: sandbox.luau on
 sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stock chip, the toasts, the picker on
 "pick", DISPLAY / SELL / TAKE DOWN's requests, the 3D pictures capped, clear of the touch controls, texts that fit.
+8.1 grip: the carry's timing check (the real CarryGripUi: carrygrip.luau, the folder from carrygripenv.py) at 844 x 390,
+740 x 360, 1024 x 768 and 1280 x 800: the widget and the GRIP button clear of everything, one press, the outcomes.
 """
 import argparse
 from pathlib import Path
@@ -143,41 +145,22 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
     subprocess.run([args.luau, "movehud.luau"], cwd=dest, check=True)
 
-# 7.0 grip: the carry's grip bar (client/CarryGripUi.luau with shared/CarryGrip.luau) on a phone held sideways
-# (844 x 390) and a computer, beside the move's panel, Danny's strip, the quick chat's button and the HUD's groups where
-# client/Hud.luau puts them (tools/phone-ui/carrygrip.luau): the bar and the round HOLD button (72 px and more) clear of
-# the touch buttons and everything else, HOLD raising the grip box, the reports, SLIPPING! and the slip, the tip, the
-# fade, the mouse button and F on a computer. 7.1 review: the slipped bar kept till the server drops it ("slip" asked again
-# each second), a new bar for the same piece picked up again inside DROPPED!'s moment (no second "slip"), the real
-# client/MoveSounds.luau (grip_slip, no heavy_drop for the slip's damage), three touch screens (844 x 390, 740 x 360,
-# a 1024 x 768 tablet).
+# 8.1 grip: the carry's timing check (client/CarryGripUi.luau with shared/CarryGrip.luau) on a phone held sideways
+# (844 x 390), two more touch screens (740 x 360, a 1024 x 768 tablet) and a computer (1280 x 800), beside the move's
+# panel, Danny's strip, the sandbox's guide line, the quick chat's button and the HUD's groups where client/Hud.luau puts
+# them (tools/phone-ui/carrygrip.luau): the widget and the round GRIP button (80 px and more) clear of the touch buttons
+# and everything else, the lift check and the wobble (their words, the needle, the zone), one press (the GRIP button,
+# the widget, the left mouse button, F) sent once with its time, no press: a miss at the window's end, the server's
+# outcomes (BALANCED!, SLIPPED BACK!, STAGGER!, DROPPED! with the real client/MoveSounds.luau's grip_slip and no second
+# thud), a close, a door's fade, a stale outcome ignored, the tutorial's longer hint, no warnings
+# (tools/phone-ui/carrygripenv.py builds the folder; carrygrip_preview.py draws the same scenes).
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from carrygripenv import carrygrip_env  # noqa: E402
+
 with tempfile.TemporaryDirectory() as folder:
-    dest = Path(folder)
-    for source in (ROOT / "src/shared").glob("*.luau"):
-        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
-        (dest / source.name).write_text(text)
-    prefix = '''local mock = require("./missions_mock")
-local game, workspace, task = mock.game, mock.workspace, mock.task
-local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
-local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
-local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
-local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
-'''
-    # 7.1 review: client/MoveSounds.luau for real too (the slip's grip_slip, no second thud: carrygrip.luau starts it
-    # with a recording api); it and CarryGripUi on the check's own clock (mock.os: os.clock is carrygrip.luau's M.clock,
-    # moved on by its frames and waits, so the bar's seed and its timings are the same every run)
-    for name in ("CarryGripUi", "MoveSounds", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
-        text = (ROOT / f"src/client/{name}.luau").read_text()
-        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
-        clock = "local os = mock.os or os\n" if name in ("CarryGripUi", "MoveSounds") else ""
-        (dest / f"{name}.luau").write_text(prefix + clock + text)
-    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
-    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
-    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
-        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
-    for name in ("mock.luau", "missions_mock.luau", "carrygrip.luau"):
-        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
-    subprocess.run([args.luau, "carrygrip.luau"], cwd=dest, check=True)
+    carrygrip_env(Path(folder))
+    subprocess.run([args.luau, "carrygrip.luau"], cwd=folder, check=True)
 
 # 8.0 SANDBOX: the admin panel (client/AdminPanel.luau, its SANDBOX tab with shared/SandboxAdmin.luau;
 # client/SandboxZones.luau recorded) on missions_mock.luau's recorder (tools/phone-ui/adminpanel.luau): the tab only in

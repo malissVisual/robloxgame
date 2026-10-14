@@ -73,9 +73,10 @@ end
 
 -- 8.0 SANDBOX: the move's keys and the car's, nothing of the city's:
 --   in a seat   [W/S] Drive [A/D] Steer [H] Horn [E] Get out (the driver), [E] Get out (anybody else)
---   on foot     [E] Use · [G] Put down (something in your arms: Carrying) · [LMB/F] Grip (hold: a thing with a grip
---               bar, the character's CarryGrip; client/CarryGripUi.luau) · [O] List (on a move: the player's MoveWith;
---               client/MovingHud.luau) · [T] Chat (hold: on a move or in its planning, MoveLobby; client/QuickChat.luau)
+--   on foot     [E] Use · [G] Put down (something in your arms: Carrying) · [LMB/F] Grip (8.1: one press when a
+--               timing check shows, a piece with a grip: the character's CarryGrip; client/CarryGripUi.luau) · [O] List
+--               (on a move: the player's MoveWith; client/MovingHud.luau) · [T] Chat (hold: on a move or in its
+--               planning, MoveLobby; client/QuickChat.luau)
 local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 	local first: { Chip } = {}
 	if humanoid.SeatPart ~= nil then
@@ -93,7 +94,7 @@ local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 		table.insert(first, chipText("G", "Put down"))
 	end
 	if type(character:GetAttribute("CarryGrip")) == "string" then
-		table.insert(first, chipText("LMB/F", "Grip (hold)"))
+		table.insert(first, chipText("LMB/F", "Grip"))
 	end
 	local second: { Chip } = {}
 	local onMove = player:GetAttribute("MoveWith") ~= nil
