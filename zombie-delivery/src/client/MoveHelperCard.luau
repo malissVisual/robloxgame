@@ -6,7 +6,7 @@
 --     the mouse's point), on a touch screen a tap on him (UserInputService.TouchTapInWorld; Config.MoveHelper.TapSlop
 --     studs beside his body count, ClickReach studs at most), on a gamepad the prompt on him ("Hire Danny" while he is
 --     for hire, then "Talk to Danny": a ProximityPrompt this client makes on his root, shown only while a gamepad is in
---     use, on ButtonL1); the button of his status line (client/MoveHelperHud.luau, wired by useCard). Never while your
+--     use, on shared/SandboxPad.luau's "danny" button: L1); the button of his status line (client/MoveHelperHud.luau, wired by useCard). Never while your
 --     hands are full, you wait for him or a grip check shows (a left click is the check's press then:
 --     client/CarryGripUi.luau active). His body is found by your player attribute MoveHelperId (his body's
 --     MoveHelper): only his move's crew has it.
@@ -17,7 +17,8 @@
 --   * His list (hired): a click on a piece of your move (a tap on a touch screen) sends ("helper", "assign", its model):
 --     onto his list, or off it again (the server checks and says so in a toast; its marker over the piece is the
 --     server's). On a gamepad the prompt "Give to Danny" ("Take back from Danny" for a piece of his list) on the nearest
---     piece of your move within reach, on ButtonR1 (free in the sandbox: no throw, no holster there).
+--     piece of your move within reach, on SandboxPad's "dannygive" button (R1: free in the sandbox, no throw or holster
+--     there).
 --   * Where (MoveHelperCard.layout, pure): beside his head as it was on the screen when it opened (right of him, else
 --     left, over, under), clear of the HUD's groups (client/Hud.luau's), the sandbox's chips (client/SandboxHud.luau's
 --     money block, client/SandboxTasksUi.luau's TASKS chip), the move's top blocks (its panel, Danny's status line, the
@@ -46,6 +47,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
+local SandboxPad = require(Shared.SandboxPad) -- (the gamepad's buttons for him: its actions "danny" and "dannygive")
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local TouchLayout = require(script.Parent.TouchLayout)
@@ -69,6 +71,8 @@ local LINE_H, HINT_H, BUTTON_H = 20, 30, 56
 local MARGIN = 8 -- from the screen's edges and what it keeps clear of
 local SIDE = 36 -- px between his head's point and the card beside it
 local PIECE_REACH = 12 -- studs: the gamepad's "Give to Danny" on the nearest piece this near
+local TALK_PAD = SandboxPad.pads("danny")[1] or "ButtonL1" -- (shared/SandboxPad.luau: L1 his)
+local GIVE_PAD = SandboxPad.pads("dannygive")[1] or "ButtonR1"
 local PICK = { ["Pick up"] = true, Lift = true, ["Lift with " .. H.Name] = true, ["Pick up with " .. H.Name] = true } -- (a piece's own prompt)
 -- the HUD's groups (client/CarryGripUi.luau's list) and the sandbox's chips' ScreenGuis
 local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "KeyHints" }
@@ -408,7 +412,8 @@ end
 -- How a piece goes to him with this input (a click, a tap, the gamepad's R1).
 local function giveWords(): (string, string)
 	if Ui.gamepadActive() then
-		return "R1 by a piece gives it to him", "R1 again takes it back"
+		local button = SandboxPad.button(GIVE_PAD)
+		return `{button} by a piece gives it to him`, `{button} again takes it back`
 	elseif Ui.touchLayout() then
 		return "Tap a piece to give it to him", "tap it again to take it back"
 	end
@@ -614,7 +619,7 @@ local function keepPrompt()
 		local fresh = Instance.new("ProximityPrompt")
 		fresh.Name = "TalkToDanny"
 		fresh.ObjectText = ""
-		fresh.GamepadKeyCode = Enum.KeyCode.ButtonL1
+		fresh.GamepadKeyCode = (Enum.KeyCode :: any)[TALK_PAD]
 		fresh.HoldDuration = 0
 		fresh.MaxActivationDistance = 12
 		fresh.RequiresLineOfSight = false
@@ -681,7 +686,7 @@ local function keepGive()
 		end
 		local fresh = Instance.new("ProximityPrompt")
 		fresh.Name = "GiveToDanny"
-		fresh.GamepadKeyCode = Enum.KeyCode.ButtonR1
+		fresh.GamepadKeyCode = (Enum.KeyCode :: any)[GIVE_PAD]
 		fresh.HoldDuration = 0
 		fresh.MaxActivationDistance = PIECE_REACH
 		fresh.RequiresLineOfSight = false

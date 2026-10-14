@@ -36,9 +36,9 @@
 --                                        legendary gold) and their order
 -- 8.2, the warehouse's quality of life (which pieces: shared/StockPlan.luau, the rules server/Collection.luau decides
 -- with, so what a button offers before it asks is what happens):
---   * THE PICKER greys a piece too big for this stand (an upgrade's small stand, WarehouseLayout.fits: the beds, the hay
---     wagon, the wheelbarrow): "Too big for this stand" over its picture, its DISPLAY a grey TOO BIG that says which
---     stands take it; the pieces that fit come first.
+--   * THE PICKER greys a piece too big for this stand (WarehouseLayout.fits at your warehouse level, 8.3: the Garage's
+--     and the Workshop's stands hold no hay wagon): "Too big for this stand" over its picture, its DISPLAY a grey TOO
+--     BIG that says a bigger warehouse has bigger stands; the pieces that fit come first.
 --   * THE STOCK LIST's header: ⭐ FILL BEST ({ kind = "fillbest" }: the best earners onto every free stand you have,
 --     each where it fits), 💰 SELL… (a small menu: ALL COMMON, ALL BROKEN, DUPLICATES (keeps the best of each item),
 --     each with how many and their price; each asks "SELL N PIECES FOR $Y?" first, then sends { kind = "sellmany",
@@ -168,6 +168,7 @@ local shownKey = ""
 local card: any = nil -- the shade over the screen (the window: card's Picker)
 local panel: any = nil -- the card itself (Picker)
 local question: any = nil
+local questionFrom: any = nil -- 8.3: what the gamepad had selected when the question opened (selected again after it)
 local grid: any = nil
 local plan: Layout? = nil
 local listed: Listed? = nil -- 8.2: what the grid lists (draw keeps it, fillGrid reads it)
@@ -527,6 +528,11 @@ local function closeQuestion()
 	if question then
 		question:Destroy()
 		question = nil
+		local from = questionFrom -- (8.3: the gamepad's selection back on what asked, not lost with the question)
+		questionFrom = nil
+		if from and from.Parent and not Ui.gamepadSelection() then
+			Ui.gamepadFocus(from)
+		end
 	end
 end
 
@@ -564,11 +570,12 @@ end
 -- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once.
 local fitsKnown: { [string]: boolean } = {}
 local function fitsStand(stand: number, item: string): boolean
-	local key = `{stand}|{item}`
+	local level = Players.LocalPlayer:GetAttribute(Config.WarehouseLevels.Attribute) -- 8.3: the stands' size is the level's
+	local key = `{level}|{stand}|{item}`
 	local known = fitsKnown[key]
 	if known == nil then
 		local def = catalogue(item)
-		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil)
+		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil, level)
 		known = def == nil or (ok and yes == true)
 		fitsKnown[key] = known
 	end
@@ -655,7 +662,13 @@ local function questionBox(name: string, boxW: number, boxH: number): (any, any)
 		BorderSizePixel = 0,
 		Active = true,
 		ZIndex = 21,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the question)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, shade)
+	questionFrom = Ui.gamepadSelection()
 	Ui.corner(box, 12)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, box)
 	question = shade
@@ -855,7 +868,7 @@ local function fillWhy(list: { StockPlan.Piece }, stands: number): string
 	end
 	for _, piece in list do
 		if piece.stand == nil and piece.broken ~= true and piece.income > 0 then
-			return "What's in your stock is too big for your free small stands."
+			return "What's in your stock is too big for your free stands: a bigger warehouse has bigger ones."
 		end
 	end
 	return "Nothing in your stock would earn on a stand. Bring more home from a move!"
@@ -1055,7 +1068,7 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	if stand and tooBig then
 		-- 8.2: TOO BIG instead of DISPLAY, grey; a tap says where it goes
 		first = tileButton(frame, "Display", "TOO BIG", "shut", layout, function()
-			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`)
+			toast(`Your {nameOf(entry)} is too big for stand {stand}: a bigger warehouse has bigger stands (UPGRADES).`)
 		end)
 		first.AutoButtonColor = false
 		first.TextTransparency = 0.3
@@ -1259,6 +1272,13 @@ draw = function(keepScroll: boolean)
 	end
 	shownKey = key
 	local scroll = if keepScroll and grid then grid.CanvasPosition else Vector2.zero
+	local selected = Ui.gamepadSelection() -- (8.3: the gamepad's selection, selected again once drawn)
+	local heldName, heldTile = nil, nil
+	if card and selected and selected:IsDescendantOf(card) then
+		local parent = selected.Parent
+		heldName = selected.Name
+		heldTile = if parent and string.sub(parent.Name, 1, 5) == "Tile_" then parent.Name else nil
+	end
 	closeQuestion()
 	for _, tile in tiles do
 		unmount(tile)
@@ -1291,6 +1311,11 @@ draw = function(keepScroll: boolean)
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the window)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, card)
 	panel = frame
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, frame)
@@ -1341,7 +1366,12 @@ draw = function(keepScroll: boolean)
 	drawChips(frame, list, layout)
 	fillGrid(scroll.Y)
 	local firstTile = tiles[1]
-	Ui.gamepadFocus(if firstTile then firstTile.buttons[1] else close)
+	local again: any = nil -- (8.3: the same tile's button, or the header's, chip or sort)
+	if heldName then
+		local tile = if heldTile then grid and grid:FindFirstChild(heldTile) else nil
+		again = if heldTile then (if tile then tile:FindFirstChild(heldName) else nil) else frame:FindFirstChild(heldName)
+	end
+	Ui.gamepadFocus(again or (if firstTile then firstTile.buttons[1] else close))
 end
 
 -- The grid (and its empty words) for what the window lists now: the rarity chip's, the search's (8.2: typing in the

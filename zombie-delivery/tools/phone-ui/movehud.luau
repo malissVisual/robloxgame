@@ -80,7 +80,7 @@ M.MUi.touchLayout = function()
 	return M.touch
 end
 M.MUi.gamepadActive = function()
-	return false
+	return M.gamepad == true -- (8.3 keys: a gamepad used last)
 end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
@@ -467,5 +467,46 @@ check("O: a computer's list at the right, under the panel and Roblox's player li
 	and listBox.y0 >= players.y1 and math.abs(listBox.x1 - (M.width - 16)) < 1 and inside(listBox), show(listBox))
 input.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.O }, false)
 check("O again shuts it", not MovingHud.isOpen())
+
+-- ── 8.3 keys: the panel's words for the device used now (the sandbox) ───────
+local function panelSays(pattern)
+	for _, label in all(panel, function(o)
+		return o.ClassName == "TextLabel"
+	end) do
+		if string.find(label.Text, pattern) then
+			return label.Text
+		end
+	end
+	return nil
+end
+local carrying = { total = 2, out = 1, stars = 1, starsOut = 0, broken = 0, carried = 1, home = 0 }
+local wasSandbox = Config.Sandbox.On
+Config.Sandbox.On = true
+moving.OnClientEvent:Fire("state", view({ inside = true, counts = { total = 2, out = 1, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 1 } }))
+check("8.3 keys, a computer: \"Pick up the things (E) · ★ first\", \"LIST [O]\"", panelSays("^Pick up") == "Pick up the things (E) · ★ first"
+	and panelSays("LIST") == "LIST [O]", `{panelSays("^Pick up")} / {panelSays("LIST")}`)
+M.gamepad = true
+moving.OnClientEvent:Fire("state", view({ inside = true, counts = { total = 2, out = 1, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 1 } }))
+check("… a gamepad: \"Pick up the things (X) · ★ first\", no list hint (no button opens it)", panelSays("^Pick up") == "Pick up the things (X) · ★ first" and panelSays("LIST") == nil,
+	`{panelSays("^Pick up")} / {panelSays("LIST")}`)
+moving.OnClientEvent:Fire("state", view({ counts = carrying }))
+check("… \"Open the van's back (X), then Load\"", panelSays("^Open") == "Open the van's back (X), then Load", panelSays("^Open"))
+M.gamepad = false
+M.touch = true
+moving.OnClientEvent:Fire("state", view({ counts = carrying, backOpen = true }))
+check("… a phone: \"Load it at the van's back\" (the prompt is tapped), \"TAP: LIST\"", panelSays("^Load") == "Load it at the van's back" and panelSays("LIST") == "TAP: LIST",
+	`{panelSays("^Load")} / {panelSays("LIST")}`)
+M.touch = false
+moving.OnClientEvent:Fire("state", view({ counts = carrying, backOpen = true }))
+check("… a computer again: \"Load it at the van's back (E)\", \"LIST [O]\"", panelSays("^Load") == "Load it at the van's back (E)" and panelSays("LIST") == "LIST [O]",
+	`{panelSays("^Load")} / {panelSays("LIST")}`)
+moving.OnClientEvent:Fire("state", nil)
+Config.Sandbox.On = false
+M.touch, M.gamepad = true, true
+moving.OnClientEvent:Fire("state", view({ counts = carrying, backOpen = true }))
+check("… the city's words as before (a phone with a gamepad: still \"(E)\")", panelSays("^Load") == "Load it at the van's back (E)", panelSays("^Load"))
+moving.OnClientEvent:Fire("state", nil)
+M.touch, M.gamepad = false, false
+Config.Sandbox.On = wasSandbox
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL MOVEHUD CHECKS PASSED")

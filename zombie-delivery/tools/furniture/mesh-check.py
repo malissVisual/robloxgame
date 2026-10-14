@@ -12,7 +12,7 @@ left as FurnitureLooks makes it. Also: furniture.py's sizes are the catalogue's,
 catalogue's pieces the import lacks (the 7.x farm and alpine pieces: no Blender model yet) keep FurnitureLooks' parts
 look exactly, with the import too; the house counts only the pieces the import has as dressed. 8.1: the 12 collectibles
 (FurnitureLooks.Collectibles) are in the import and dressed like the furniture, their Rarity attribute kept; no item of
-the import over 10,000 triangles.
+the import over 10,000 triangles. 8.3: 24 collectibles (twelve more), all of them in the import.
 
     python3 zombie-delivery/tools/furniture/mesh-check.py <luau>
 """
@@ -205,7 +205,7 @@ def main():
         assert all(abs(a - b) < 1e-6 for a, b in zip(size, manifest["items"][fid]["size"])), (fid, size, manifest["items"][fid]["size"], "the sizes differ")
     # 8.1: the collectibles are in the import (none falls back to its parts look), each within the triangle budget.
     rarity = {c["id"]: c["rarity"] for c in art["COLLECT"]}
-    assert len(rarity) == 12 and all(r != "nil" for r in rarity.values()), rarity
+    assert len(rarity) == 24 and all(r != "nil" for r in rarity.values()), rarity  # (8.3: twelve more)
     lacking = sorted(set(rarity) - set(manifest["items"]))
     assert not lacking, (lacking, "collectibles without a Blender model in ZDCFurnitureArt.json")
     tris_of = {}

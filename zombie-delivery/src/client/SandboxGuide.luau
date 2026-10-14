@@ -19,6 +19,11 @@
 --   * Each step goes quiet once done (per session: SandboxSteps.doneBy); the arrow to the house and home stays while you
 --     drive. Hold G (not while you carry: G puts a piece down) or the ✕ hides the guide ("Guide off" for a moment); hold G
 --     again, or on a touch screen the 💡 chip left in its place, brings it back. SandboxGuide.setEnabled for a settings row.
+--   * 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words are the device's used now, a gamepad
+--     used last first: a prompt's E is the gamepad's X ("X at the back"; a touch screen's "tap at the back"), "Guide off ·
+--     hold G / hold B / tap 💡 to bring it back". With a gamepad B held does what a held G does (B puts a piece down
+--     as G does; not while a window holds the gamepad's selection: B closes it). They follow a gamepad picked up or put
+--     down at the next look.
 --   * Cheap: one loop every Config.SandboxGuide.Every seconds (no frame-by-frame work, no tables made in it: the state,
 --     the path's points and the instances are made once and reused; a string only when the words or the metres change).
 -- Everything waits for Config.Sandbox.On (client/Main.client.luau starts it in the sandbox).
@@ -29,6 +34,7 @@
 --   SandboxGuide.hint()             the hint line (a top block), for the layout checks
 -- Presentation only.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
@@ -41,7 +47,9 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local SandboxMap = require(Shared.SandboxMap)
 local SandboxSteps = require(Shared.SandboxSteps)
+local SandboxPad = require(Shared.SandboxPad) -- 8.3 keys: the device's words
 local Ui = require(script.Parent.Ui)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 keys: the device used now
 local Theme = require(script.Parent.Theme)
 local TopBlocks = require(script.Parent.TopBlocks)
 local MoveLayout = require(script.Parent.MoveLayout) -- (Roblox's player list's width on a computer)
@@ -99,7 +107,7 @@ local gUsed = false -- (this hold already toggled)
 local path: { number } = table.create(MAX_POINTS * 2, 0) -- the path's x, z pairs (reused)
 local ui: any = {} -- the hint line's instances and what it shows
 local world: any = {} -- the 3D guide's instances and what it shows
-local standSpots: { [number]: { [number]: SandboxSteps.Place } } = {} -- a plot's display stands (found once)
+local standSpots: { [number]: { [number]: SandboxSteps.Place } } = {} -- a plot's display stands (found once a level: 8.3)
 
 -- ── What the client sees ───────────────────────────────────────────────────
 
@@ -179,9 +187,12 @@ local function placeOf(value: any, plot: SandboxMap.Plot, depth: number): Sandbo
 	return nil
 end
 
--- A plot's display stands (index = the stand's number, Collection.display's `stand`), found once.
+-- A plot's display stands (index = the stand's number, Collection.display's `stand`), found once a warehouse level
+-- (8.3: the player attribute Config.WarehouseLevels.Attribute, server/Upgrades.luau's: a level's stands stand elsewhere).
 local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
-	local known = standSpots[plotId]
+	local level = player:GetAttribute(Config.WarehouseLevels.Attribute)
+	local key = plotId * 100 + (if type(level) == "number" and level == level then math.clamp(math.floor(level), 0, 99) else 0)
+	local known = standSpots[key]
 	if known then
 		return known
 	end
@@ -193,9 +204,9 @@ local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
 		for _, name in { "stands", "standSpots", "Stands", "spots" } do
 			local field = layout[name]
 			if type(field) == "function" then
-				local ok, got = pcall(field, plotId)
+				local ok, got = pcall(field, plotId, level)
 				if not (ok and type(got) == "table") then
-					ok, got = pcall(field, plot)
+					ok, got = pcall(field, plot, level)
 				end
 				raw = if ok and type(got) == "table" then got else nil
 			elseif type(field) == "table" then
@@ -214,16 +225,12 @@ local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
 			end
 		end
 	end
-	standSpots[plotId] = list
+	standSpots[key] = list
 	return list
 end
 
--- The display stands a warehouse has (Config.Warehouse.Stands, else the layout's count; nil: not known).
+-- The display stands a warehouse has (8.3: its level's, the layout's count; nil: not known).
 local function standCount(): number?
-	local warehouse = (Config :: any).Warehouse
-	if type(warehouse) == "table" and type(warehouse.Stands) == "number" then
-		return warehouse.Stands
-	end
 	local plot = player:GetAttribute("Plot")
 	local count = if type(plot) == "number" then #standsOf(plot) else 0
 	return if count > 0 then count else nil
@@ -753,23 +760,30 @@ local function look()
 			hint, guide = SandboxSteps.visible(step, done, state.seated)
 		end
 	end
-	-- a held G: the guide off or on (once a hold)
+	-- a held G (8.3 keys: or the gamepad's B): the guide off or on (once a hold)
 	if gDownAt and not gUsed and os.clock() - gDownAt >= G.HideHold then
 		gUsed = true
 		SandboxGuide.setEnabled(not on)
 		return
 	end
-	local touch = Ui.touchLayout()
+	local device = PadGlyph.device() -- 8.3 keys: the words of the device used now (a gamepad used last first)
+	local touch = device == "touch"
 	if not on then
 		local note = os.clock() < offUntil
-		setHint(note, if touch then "Guide off · tap 💡 to bring it back" else "Guide off · hold G to bring it back", false)
+		if device ~= ui.offDevice then -- (the words made once a device, not every look)
+			ui.offDevice = device
+			local how = SandboxPad.howTo("guide", device) or "Hold G"
+			ui.offText = `Guide off · {string.lower(string.sub(how, 1, 1))}{string.sub(how, 2)} to bring it back`
+		end
+		setHint(note, ui.offText, false)
 		ui.chip.Visible = touch and not note
 		hideWorld()
 	else
 		ui.chip.Visible = false
-		if step ~= ui.textStep or touch ~= ui.textTouch then -- (the words made once a step, not every look)
-			ui.textStep, ui.textTouch = step, touch
-			ui.stepText = SandboxSteps.text(step, touch)
+		if step ~= ui.textStep or device ~= ui.textDevice then -- (the words made once a step, not every look)
+			ui.textStep, ui.textDevice = step, device
+			-- (8.3 keys: a gamepad's "X at the back", a touch screen's "tap at the back")
+			ui.stepText = if device == "pad" then SandboxPad.say(step.hint, "use", device) else SandboxSteps.text(step, touch)
 		end
 		setHint(hint, ui.stepText, true)
 	end
@@ -856,9 +870,14 @@ function SandboxGuide.start()
 		collection:FireServer({ kind = "state" })
 	end)
 	moving:FireServer("state") -- (a move already running: its state again, for this listener too)
-	-- G held (not while you carry: G puts a piece down; not with a tool in your hand: G sets it down)
+	-- G held (not while you carry: G puts a piece down; not with a tool in your hand: G sets it down); 8.3 keys: the
+	-- gamepad's B the same (shared/SandboxPad.luau "guide"; not while a window holds the selection: B closes it)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if input.KeyCode ~= Enum.KeyCode.G or processed or UserInputService:GetFocusedTextBox() then
+		local pad = input.KeyCode == Enum.KeyCode.ButtonB
+		if (input.KeyCode ~= Enum.KeyCode.G and not pad) or processed or UserInputService:GetFocusedTextBox() then
+			return
+		end
+		if pad and GuiService.SelectedObject ~= nil then
 			return
 		end
 		local character = player.Character
@@ -868,7 +887,7 @@ function SandboxGuide.start()
 		gDownAt, gUsed = os.clock(), false
 	end)
 	UserInputService.InputEnded:Connect(function(input: InputObject)
-		if input.KeyCode == Enum.KeyCode.G then
+		if input.KeyCode == Enum.KeyCode.G or input.KeyCode == Enum.KeyCode.ButtonB then
 			gDownAt = nil
 		end
 	end)

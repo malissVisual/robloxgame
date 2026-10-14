@@ -10,6 +10,10 @@
 -- the roads; a step done once goes quiet, the arrow home stays while driving; the ✕ and a held G; the 💡 chip on a
 -- phone; nothing made loop after loop; no warnings. 8.0.1: one arrow: the move's HUD (client/MovingHud.luau) sets no GPS
 -- in the sandbox (no waypoint, so none of client/Hud.luau's GPS ring, beacon, label or toasts) beside the guide's.
+-- 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words for the device used now: a computer's
+-- "E at the back", a phone's "tap at the back", a gamepad's "X at the back" (a phone's or a computer's, used last);
+-- "Guide off · hold G / tap 💡 / hold B to bring it back"; a gamepad's B held as G (not while carrying, not while a
+-- window holds the gamepad's selection), no 💡 chip while a gamepad is used.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's, as movehud.luau) ────────
@@ -85,7 +89,7 @@ M.MUi.touchLayout = function()
 	return M.touch
 end
 M.MUi.gamepadActive = function()
-	return false
+	return M.gamepad == true -- (8.3 keys: a gamepad used last)
 end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
@@ -376,6 +380,7 @@ closeButton.Activated:Fire()
 tick()
 check("the ✕ hides the guide: \"Guide off\" for a moment, no ✕ on it, no 3D guide", not SandboxGuide.enabled() and shown()
 	and string.find(words.Text, "Guide off", 1, true) ~= nil and not closeButton.Visible and not marker.Enabled and lit() == 0, words.Text)
+check("… a phone's words: \"Guide off · tap 💡 to bring it back\" (8.3 keys)", words.Text == "Guide off · tap 💡 to bring it back", words.Text)
 wait(G.OffNote + 0.02)
 tick()
 local chipBox = box(chip)
@@ -445,6 +450,11 @@ check("… the chevron over the front door", at(SandboxMap.House.door.x, Sandbox
 moving.OnClientEvent:Fire("state", view({ inside = true }))
 tick()
 check("in the house: \"Carry the furniture out to your van (tap to pick up)\"", SandboxGuide.step() == "inside" and words.Text == "Carry the furniture out to your van (tap to pick up)" and shown(), words.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"(X to pick up)\" (8.3 keys)", words.Text == "Carry the furniture out to your van (X to pick up)", words.Text)
+M.gamepad = false
+tick()
 check("… no 3D target inside: no chevron, no path", not marker.Enabled and lit() == 0)
 local vanModel = make("Model", { Name = "Courier's Sprinter" }, cars)
 vanModel:SetAttribute("OwnerId", M.player.UserId)
@@ -459,6 +469,20 @@ moving.OnClientEvent:Fire("state", carried)
 stand(SandboxMap.House.door.x, SandboxMap.House.door.z - 4)
 tick()
 check("out with a piece: \"Load it into the van: walk in or tap at the back\"", SandboxGuide.step() == "load" and words.Text == "Load it into the van: walk in or tap at the back" and shown(), words.Text)
+-- 8.3 keys: the same step's words on a phone with a gamepad used last, on a computer, a computer's gamepad
+M.gamepad = true
+tick()
+check("… a phone with a gamepad used last: \"walk in or X at the back\" (8.3 keys: the prompts' X)", words.Text == "Load it into the van: walk in or X at the back" and shown(), words.Text)
+M.gamepad = false
+screen(false)
+tick()
+check("… a computer: \"walk in or E at the back\"", words.Text == "Load it into the van: walk in or E at the back" and shown(), words.Text)
+M.gamepad = true
+tick()
+check("… a computer's gamepad: \"walk in or X at the back\"", words.Text == "Load it into the van: walk in or X at the back" and shown(), words.Text)
+M.gamepad = false
+screen(true)
+tick()
 check("… the chevron over the van's back (its CargoDoor)", at(vanBack.x, vanBack.z + 10) and string.find(tag.Text, "YOUR VAN", 1, true) ~= nil, tag.Text)
 local held = 0
 M.services.UserInputService.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.G }, false)
@@ -509,6 +533,11 @@ collection.OnClientEvent:Fire({ kind = "state", stock = {
 }, income = 4, stands = 3 })
 tick()
 check("pieces in the stock: \"Put your pieces on show: tap at an empty stand\"", SandboxGuide.step() == "show" and words.Text == "Put your pieces on show: tap at an empty stand" and shown(), words.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"X at an empty stand\" (8.3 keys)", words.Text == "Put your pieces on show: X at an empty stand", words.Text)
+M.gamepad = false
+tick()
 local nearest = SandboxSteps.nearestFree(plot.door.x, plot.door.z + 6, standsGiven, { [2] = true })
 check("… the chevron over the nearest empty stand (shared/WarehouseLayout.luau's; the taken one skipped)", nearest ~= nil and nearest ~= 2
 	and at(standsGiven[nearest].x, standsGiven[nearest].z) and string.find(tag.Text, "EMPTY STAND", 1, true) ~= nil, tag.Text)
@@ -563,6 +592,55 @@ tick()
 check("held again: back on (driving: the arrow to the house again)", SandboxGuide.enabled() and marker.Enabled and lit() > 0)
 humanoid.SeatPart = nil
 M.services.UserInputService.InputEnded:Fire({ KeyCode = M.Enum.KeyCode.G })
+
+-- ── 8.3 keys: a gamepad: B held as G ────────────────────────────────────────
+local input = M.services.UserInputService
+local B = M.Enum.KeyCode.ButtonB
+M.gamepad = true
+input.InputBegan:Fire({ KeyCode = B }, false)
+tick()
+check("a gamepad: a short B: nothing", SandboxGuide.enabled())
+wait(G.HideHold + 0.02)
+tick()
+check("… B held: the guide off, \"Guide off · hold B to bring it back\", no 💡 chip", not SandboxGuide.enabled() and not marker.Enabled
+	and words.Text == "Guide off · hold B to bring it back" and shown() and not chip.Visible, words.Text)
+input.InputEnded:Fire({ KeyCode = B })
+M.services.GuiService.SelectedObject = make("TextButton", { Name = "AWindowsButton" })
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("… B while a window holds the gamepad's selection (B closes it): left alone", not SandboxGuide.enabled())
+input.InputEnded:Fire({ KeyCode = B })
+M.services.GuiService.SelectedObject = nil
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("… B held again: back on", SandboxGuide.enabled())
+input.InputEnded:Fire({ KeyCode = B })
+moving.OnClientEvent:Fire("state", carried)
+tick()
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("… B held while carrying puts the piece down (the server's prompt): the guide stays", SandboxGuide.enabled())
+input.InputEnded:Fire({ KeyCode = B })
+moving.OnClientEvent:Fire("state", nil)
+screen(true)
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("a phone with a gamepad used last: B held: \"hold B\", no 💡 chip", not SandboxGuide.enabled() and words.Text == "Guide off · hold B to bring it back" and not chip.Visible, words.Text)
+input.InputEnded:Fire({ KeyCode = B })
+wait(G.OffNote + 0.02)
+tick()
+check("… the note gone: still no 💡 chip while the gamepad is used", not hint.Visible and not chip.Visible)
+M.gamepad = false
+tick()
+check("… the screen touched (no gamepad used last): the 💡 chip", chip.Visible)
+chip.Activated:Fire()
+tick()
+check("… a tap on it: back on", SandboxGuide.enabled())
+screen(false)
 check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",
 	Config.Sandbox.On == true and gpsSets == 0 and gpsTold == 0 and M.waypoint == nil, `{gpsSets} {gpsTold}`)
 check("no warnings", #M.warnings == 0, M.warnings[1])

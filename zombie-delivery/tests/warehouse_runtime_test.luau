@@ -8,11 +8,14 @@
 --     tag (name, rarity, +$X/min) and swaps the stand's prompts to Take down / Sell; the STOCK board counts
 --   * Take down and Sell go through the Collection and take the model away; two pieces share the income by worth
 --   * the owner leaves: the pieces go, the sign is FOR RENT, the prompts go; a new owner gets fresh prompts
---   * 8.1, the upgrades: every warehouse has all 20 stands; the owner's first Collection.stands stand there, the rest
---     are only their painted spot (podium, top and plate hidden, not solid, no Display); More stands bought opens
---     13 and 14 (a corner stand's piece and prompts look north), the board counts them, losing them hides them again;
---     the tags are × Collection.boost; the UPGRADES desk's prompt is the owner's (Upgrades.open), a stranger's use a
---     notice, a free plot none, a new owner a fresh one
+--   * 8.1, the upgrades: the tags are × Collection.boost; the UPGRADES desk's prompt is the owner's (Upgrades.open), a
+--     stranger's use a notice, a free plot none, a new owner a fresh one
+--   * 8.3, the levels: a free plot's warehouse is the start's Garage, an owner's their level's (Upgrades.warehouseLevel:
+--     the Model's Level, its stands, its parts the layout's); growing (4 → 5) builds a new Model in place (the old one
+--     gone), the pieces on show back on their stands (one past the old level's shows now), the sign, the board and fresh
+--     prompts with it; a player the new stands would catch is moved to the receiving zone, one in the aisle stays; the
+--     same level again builds nothing; shrinking (the admin's) hides what is past the stands; the owner leaving: the
+--     start's level again; a new owner: theirs
 -- Run with tests/run_tests.py.
 local W = require("./WarehouseRuntime")
 local Warehouse = require("./WarehouseServer")
@@ -22,6 +25,7 @@ local WarehouseLayout = require("./WarehouseLayout")
 
 local M = W.Mock
 local T = Config.Warehouse
+local STANDS = Config.WarehouseLevels.List[4].stands -- (Ana's: the Big warehouse's 12)
 local CollectionRules = require("./CollectionRules")
 -- (8.0 merge) a shown piece's tag line as the collection's rules have it: its rarity and its own income a minute
 local function tagOf(entry: any): string
@@ -73,6 +77,7 @@ end
 -- Ana owns plot 2 before the warehouses are built; plot 1 stays free.
 local ana = W.player(101, "Ana", M.Vector3.new(-65, 3, -150))
 local bob = W.player(202, "Bob", M.Vector3.new(-65, 3, -152))
+W.levels[ana] = 4 -- (8.3: her warehouse is the Big warehouse, 12 stands)
 W.claim(2, ana)
 Warehouse.start()
 
@@ -82,7 +87,7 @@ local budgetOk, anchoredOk, most = true, true, 0
 for _, plot in SandboxMap.Plots do
 	local count, anchored = parts(Warehouse.model(plot.id), true)
 	most = math.max(most, count)
-	budgetOk = budgetOk and count <= T.MaxParts and count == #WarehouseLayout.pieces(plot)
+	budgetOk = budgetOk and count <= T.MaxParts and count == #WarehouseLayout.pieces(plot, Warehouse.level(plot.id))
 	anchoredOk = anchoredOk and anchored
 end
 print(`  {most} parts a warehouse (the budget {T.MaxParts})`)
@@ -97,7 +102,7 @@ check("an owner from before the start: Ana's Warehouse", line(sign2, 1) == "Ana'
 local free = stand(1, 1):FindFirstChild("Prompts")
 check("a free plot's stands have no prompts", free ~= nil and #free:GetChildren() == 0)
 local allOk = true
-for i = 1, T.Stands do
+for i = 1, STANDS do
 	local p = promptsOf(2, i)
 	allOk = allOk
 		and p.display and p.takeDown and p.sell
@@ -122,7 +127,7 @@ W.income[ana] = 6
 W.give(ana, { uid = "u1", item = "sofa", variant = 2, condition = 0.8, name = "Sofa", stand = 3, got = 0 })
 W.give(ana, { uid = "u2", item = "lamp_unknown", variant = 1, condition = 1, name = "Box", got = 0 })
 local sofa = Warehouse.shown(2, 3)
-local spot = WarehouseLayout.stand(SandboxMap.Plots[2], 3) :: WarehouseLayout.Stand
+local spot = WarehouseLayout.stand(SandboxMap.Plots[2], 3, 4) :: WarehouseLayout.Stand
 local root = sofa and sofa.PrimaryPart
 local placed = root ~= nil
 	and math.abs(root.Position.X - spot.x) < 1e-6 and math.abs(root.Position.Z - spot.z) < 1e-6
@@ -142,7 +147,7 @@ check("…an empty stand's tag is off", not (tagText(2, 4)))
 p3 = promptsOf(2, 3)
 check("…its prompts: Take down and Sell on, Display off", p3.display.Enabled == false and p3.takeDown.Enabled == true and p3.sell.Enabled == true and p3.sell.ObjectText == "Sofa")
 local board = Warehouse.model(2):FindFirstChild("StockBoard")
-check("the STOCK board: 📦 1 piece in stock · $6/min, 1 of 12 on show", line(board, 2) == "📦 1 piece in stock · $6/min" and line(board, 3) == `1 of {T.Stands} stands on show`, line(board, 2))
+check("the STOCK board: 📦 1 piece in stock · $6/min, 1 of 12 on show", line(board, 2) == "📦 1 piece in stock · $6/min" and line(board, 3) == `1 of {STANDS} stands on show`, line(board, 2))
 
 -- the same change again: the model stays (only changed stands are rebuilt)
 W.changed(ana)
@@ -175,54 +180,47 @@ for _, call in W.calls do
 	sales += if call[1] == "sell" then 1 else 0
 end
 check("the owner's Sell: Collection.sell of that piece, the model gone", sold ~= nil and sold[3] == "u1" and sales == 1 and Warehouse.shown(2, 3) == nil and sofa.destroyed == true)
-check("…the board: 2 pieces in stock, 0 on show", line(board, 2) == "📦 2 pieces in stock · $58/min" and line(board, 3) == `0 of {T.Stands} stands on show`, line(board, 2))
+check("…the board: 2 pieces in stock, 0 on show", line(board, 2) == "📦 2 pieces in stock · $58/min" and line(board, 3) == `0 of {STANDS} stands on show`, line(board, 2))
 
 -- a stand number past the warehouse's: never shown
-W.give(ana, { uid = "u9", item = "box", variant = 1, condition = 1, name = "Box", stand = T.Stands + 1, got = 0 })
+W.give(ana, { uid = "u9", item = "box", variant = 1, condition = 1, name = "Box", stand = STANDS + 1, got = 0 })
 local stray = false
-for i = 1, T.Stands do
+for i = 1, STANDS do
 	stray = stray or Warehouse.shown(2, i) ~= nil
 end
-check("an entry on a stand the warehouse lacks is not shown", not stray)
+check("an entry on a stand the warehouse lacks is not shown", not stray and Warehouse.shown(2, STANDS + 1) == nil)
 
--- ── 8.1: the upgrade stands and the UPGRADES desk ────────────────────────────
-local ALL = WarehouseLayout.capacity()
-local function partsOf(id: number, i: number): (any, any, any)
-	local model = Warehouse.model(id)
-	return model:FindFirstChild(`Stand{i}`), model:FindFirstChild(`StandTop{i}`), model:FindFirstChild(`Plate{i}`)
+-- ── 8.3: the levels ─────────────────────────────────────────────────────────
+local function hasStand(id: number, i: number): boolean
+	return Warehouse.model(id):FindFirstChild(`Stand{i}`) ~= nil
 end
-local function hidden(id: number, i: number): boolean
-	local podium, top, plate = partsOf(id, i)
-	return podium.Transparency == 1 and podium.CanCollide == false and podium.CanQuery == false and top.Transparency == 1 and top.CanCollide == false
-		and plate.Transparency == 1 and plate:FindFirstChild("WordsFront").Enabled == false and not Warehouse.isOpen(id, i)
+local function standsBuilt(id: number): number
+	local n = 0
+	while hasStand(id, n + 1) do
+		n += 1
+	end
+	return n
 end
-local function standing(id: number, i: number): boolean
-	local podium, top, plate = partsOf(id, i)
-	return podium.Transparency == 0 and podium.CanCollide == true and podium.CanQuery == true and top.CanCollide == true
-		and plate.Transparency == 0 and plate:FindFirstChild("WordsFront").Enabled ~= false and Warehouse.isOpen(id, i)
+local function partsOfLevel(id: number): boolean
+	local count = parts(Warehouse.model(id), true)
+	return count == #WarehouseLayout.pieces(SandboxMap.Plots[id], Warehouse.level(id)) and count <= T.MaxParts
 end
-local freeOk, anaOk = true, true
-for i = 1, ALL do
-	freeOk = freeOk and (if i <= T.Stands then standing(1, i) else hidden(1, i))
-	anaOk = anaOk and (if i <= T.Stands then standing(2, i) else hidden(2, i) and promptsOf(2, i).display.Enabled == false)
-end
-check(`8.1: every warehouse has all {ALL} stands; a free plot shows the start's {T.Stands}, the upgrade stands only their painted spot (hidden, not solid)`, ALL == 20 and freeOk and Warehouse.model(1):FindFirstChild("SpotText13") ~= nil)
-check("8.1: the owner with the start's stands: 13 – 20 hidden, no Display on them; the piece on stand 13 not shown", anaOk and Warehouse.shown(2, 13) == nil)
-W.standCount[ana] = T.Stands + 2
-W.changed(ana)
-check("8.1: More stands bought (Collection.stands 14): stands 13 and 14 stand there, 15 still only its spot", standing(2, 13) and standing(2, 14) and hidden(2, 15))
-local corner = Warehouse.shown(2, 13)
-local cornerRoot = corner and corner.PrimaryPart
-check("8.1: … the piece on stand 13 shows now, looking north (a corner stand looks at the front row's aisle)", cornerRoot ~= nil and math.abs(cornerRoot.CFrame.LookVector.Z + 1) < 1e-6)
-check("8.1: … its prompts at its north edge: Take down and Sell on; stand 14's Display on", stand(2, 13):FindFirstChild("Prompts").CFrame.Position.Z < 0 and promptsOf(2, 13).takeDown.Enabled == true
-	and promptsOf(2, 14).display.Enabled == true and promptsOf(2, 15).display.Enabled == false, `{stand(2, 13):FindFirstChild("Prompts").CFrame.Position.Z} {promptsOf(2, 13).takeDown.Enabled} {promptsOf(2, 14).display.Enabled} {promptsOf(2, 15).display.Enabled}`)
-check("8.1: … the board counts 14 stands", line(board, 3) == `1 of {T.Stands + 2} stands on show`, line(board, 3))
+check("8.3: a free plot's warehouse is the start's Garage (level 1: 2 stands, the model's Level 1), FOR RENT", Warehouse.level(1) == 1 and Warehouse.model(1):GetAttribute("Level") == 1
+	and standsBuilt(1) == 2 and line(Warehouse.model(1):FindFirstChild("OwnerSign"), 1) == "FOR RENT" and partsOfLevel(1))
+check("8.3: Ana's (an owner from before the start) is her level's, the Big warehouse (4: 12 stands)", Warehouse.level(2) == 4 and Warehouse.model(2):GetAttribute("Level") == 4
+	and standsBuilt(2) == 12 and partsOfLevel(2))
+
+-- the Showroom lights: the tags × Collection.boost
+W.give(ana, { uid = "u5", item = "tv", variant = 1, condition = 1, name = "Old TV", stand = 2, got = 0 })
+local tvBefore = Warehouse.shown(2, 2)
 W.boosts[ana] = 1.21
 W.changed(ana)
-local _, _, lit = tagText(2, 13)
-local boxEntry = { item = "box", condition = 1 }
-check("8.1: the Showroom lights (Collection.boost 1.21): the tag's $/min × 1.21", lit == WarehouseLayout.tagLines("Box", CollectionRules.rarityOf(CollectionRules.defOf("box")), CollectionRules.income(boxEntry, 1.21))[2].text and lit ~= tagOf(boxEntry), lit)
+local _, _, lit = tagText(2, 2)
+local tvEntry = { item = "tv", condition = 1 }
+check("8.1: the Showroom lights (Collection.boost 1.21): the tag's $/min × 1.21", lit == WarehouseLayout.tagLines("Old TV", CollectionRules.rarityOf(CollectionRules.defOf("tv")), CollectionRules.income(tvEntry, 1.21))[2].text
+	and lit ~= tagOf(tvEntry), lit)
 W.boosts[ana] = nil
+W.changed(ana)
 
 -- the UPGRADES desk: the owner's prompt
 local desk2, desk1 = Warehouse.terminal(2), Warehouse.terminal(1)
@@ -237,23 +235,61 @@ W.later()
 deskPrompt.Triggered:Fire(ana)
 local opened = W.lastCall("openUpgrades")
 check("8.1: … the owner's: Upgrades.open (the window)", opened ~= nil and opened[2] == ana)
-W.standCount[ana] = nil
-W.changed(ana)
-check("8.1: the stands lost again (an admin's RESET): 13 and 14 only their spot, nothing shown on them", hidden(2, 13) and hidden(2, 14) and Warehouse.shown(2, 13) == nil and corner ~= nil and corner.destroyed == true)
 
--- Ana leaves: her pieces go, FOR RENT, no prompts; Bob claims it: fresh prompts for him
-W.give(ana, { uid = "u4", item = "wardrobe", variant = 1, condition = 1, name = "Wardrobe", stand = 5, got = 0 })
-local wardrobe = Warehouse.shown(2, 5)
+-- growing: level 4 → 5 (the UPGRADES desk's Warehouse card; Collection.upgrade tells the warehouse through onChanged)
+local plot2 = SandboxMap.Plots[2]
+local old = Warehouse.model(2)
+local oldSign = old:FindFirstChild("OwnerSign")
+local stand19 = WarehouseLayout.stand(plot2, 19, 5) :: WarehouseLayout.Stand
+local cy = W.player(303, "Cy", M.Vector3.new(stand19.x, 3, stand19.z)) -- (behind the Big warehouse: where stand 19 will stand)
+W.place(bob, M.Vector3.new(plot2.door.x, 3, plot2.door.z - 40)) -- (in the middle aisle at both levels)
+W.levels[ana] = 5
+W.changed(ana)
+local grown = Warehouse.model(2)
+check("8.3: grown to the Logistics centre: a new Model (Level 5) in place of the old one (gone), 20 stands, within the budget", grown ~= old and old.destroyed == true
+	and grown:GetAttribute("Level") == 5 and Warehouse.level(2) == 5 and standsBuilt(2) == 20 and partsOfLevel(2) and grown.Parent == M.workspace:FindFirstChild("Warehouses"))
+local tvAfter = Warehouse.shown(2, 2)
+local spot2 = WarehouseLayout.stand(plot2, 2, 5) :: WarehouseLayout.Stand
+local tvRoot = tvAfter and tvAfter.PrimaryPart
+check("8.3: … the pieces on show stay on their stands: the TV on stand 2 again (its new place), the box on 13 shows now", tvAfter ~= nil and tvAfter ~= tvBefore and tvBefore.destroyed == true
+	and tvRoot ~= nil and math.abs(tvRoot.Position.X - spot2.x) < 1e-6 and math.abs(tvRoot.Position.Z - spot2.z) < 1e-6 and Warehouse.shown(2, 13) ~= nil and tvAfter:GetAttribute("Uid") == "u5")
+check("8.3: … her sign and board on the new building (20 stands), fresh prompts for her on every stand and the desk", oldSign.destroyed == true
+	and line(grown:FindFirstChild("OwnerSign"), 1) == "Ana's Warehouse" and line(grown:FindFirstChild("StockBoard"), 3) == "2 of 20 stands on show"
+	and promptsOf(2, 20).display.Enabled == true and promptsOf(2, 20).display:GetAttribute("CargoOwner") == 101 and promptsOf(2, 2).takeDown.Enabled == true
+	and Warehouse.terminal(2):FindFirstChild("Prompts"):FindFirstChild("Upgrades") ~= nil and deskPrompt.destroyed == true, line(grown:FindFirstChild("StockBoard"), 3))
+local zone = WarehouseLayout.receiving(plot2, 5)
+local cyAt, bobAt = W.rootOf(cy).Position, W.rootOf(bob).Position
+check("8.3: … nobody trapped: Cy (where stand 19 stands now) moved to the receiving zone; Bob in the aisle stays", cyAt.X > zone.x0 and cyAt.X < zone.x1 and cyAt.Z > zone.z0 and cyAt.Z < zone.z1
+	and math.abs(bobAt.Z - (plot2.door.z - 40)) < 1e-6 and math.abs(bobAt.X - plot2.door.x) < 1e-6, `{cyAt} {bobAt}`)
+W.changed(ana)
+check("8.3: a change that leaves the level as it was builds nothing new", Warehouse.model(2) == grown and Warehouse.shown(2, 2) == tvAfter)
+check("8.3: the free plot and the others untouched", Warehouse.level(1) == 1 and Warehouse.level(3) == 1)
+
+-- shrinking (the admin's 🏗 LEVEL 2): the Workshop, 4 stands; a piece past them not shown (the real collection sends it
+-- back to the stock: Collection.upgrade's fitStands)
+W.levels[ana] = 2
+W.changed(ana)
+local small = Warehouse.model(2)
+check("8.3: shrunk to the Workshop (the admin's): Level 2, 4 stands, the TV on stand 2, nothing on 13", small ~= grown and grown.destroyed == true and Warehouse.level(2) == 2
+	and standsBuilt(2) == 4 and Warehouse.shown(2, 2) ~= nil and Warehouse.shown(2, 13) == nil and partsOfLevel(2) and line(small:FindFirstChild("StockBoard"), 3) == "1 of 4 stands on show")
+
+-- Ana leaves: her pieces go, the plot FOR RENT at the start's level, no prompts; Bob claims it at his level: fresh prompts
+W.give(ana, { uid = "u4", item = "wardrobe", variant = 1, condition = 1, name = "Wardrobe", stand = 3, got = 0 })
+local wardrobe = Warehouse.shown(2, 3)
 local oldDisplay = promptsOf(2, 2).display
 W.free(2)
-check("the owner leaves: the pieces on show go", wardrobe ~= nil and wardrobe.destroyed == true and Warehouse.shown(2, 5) == nil)
-check("…FOR RENT, the prompts gone", line(sign2, 1) == "FOR RENT" and #stand(2, 2):FindFirstChild("Prompts"):GetChildren() == 0 and oldDisplay.destroyed == true)
+local rented = Warehouse.model(2)
+check("the owner leaves: the pieces on show go", wardrobe ~= nil and wardrobe.destroyed == true and Warehouse.shown(2, 3) == nil and Warehouse.shown(2, 2) == nil)
+check("…FOR RENT, the prompts gone; 8.3: back to the start's Garage", line(rented:FindFirstChild("OwnerSign"), 1) == "FOR RENT" and #stand(2, 2):FindFirstChild("Prompts"):GetChildren() == 0
+	and oldDisplay.destroyed == true and Warehouse.level(2) == 1 and small.destroyed == true)
 W.changed(ana)
-check("…a change to her collection after she left builds nothing", Warehouse.shown(2, 5) == nil)
+check("…a change to her collection after she left builds nothing", Warehouse.shown(2, 3) == nil and Warehouse.model(2) == rented)
+W.levels[bob] = 3
 W.claim(2, bob)
 local fresh = promptsOf(2, 2)
-check("a new owner: Bob's Warehouse, fresh prompts with his UserId", line(sign2, 1) == "Bob's Warehouse" and fresh.display ~= oldDisplay and fresh.display:GetAttribute("CargoOwner") == 202 and fresh.display.Enabled == true)
+check("a new owner: Bob's Warehouse at his level (8.3: the Warehouse, 3: 8 stands), fresh prompts with his UserId", line(Warehouse.model(2):FindFirstChild("OwnerSign"), 1) == "Bob's Warehouse"
+	and Warehouse.level(2) == 3 and standsBuilt(2) == 8 and fresh.display ~= oldDisplay and fresh.display:GetAttribute("CargoOwner") == 202 and fresh.display.Enabled == true)
 local bobDesk = Warehouse.terminal(2):FindFirstChild("Prompts"):FindFirstChild("Upgrades")
-check("8.1: … and a fresh UPGRADES prompt for him (Ana's gone)", bobDesk ~= nil and bobDesk ~= deskPrompt and deskPrompt.destroyed == true and bobDesk:GetAttribute("CargoOwner") == 202)
+check("8.1: … and a fresh UPGRADES prompt for him", bobDesk ~= nil and bobDesk:GetAttribute("CargoOwner") == 202)
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)
