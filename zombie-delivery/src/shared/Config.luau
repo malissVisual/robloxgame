@@ -98,10 +98,13 @@ Config.Body = {
 	Spread = 50,
 	-- The carry (client/ArmPose.luau): the hands reach the box's sides (server/Cargo.luau's CarryAt / CarrySize on the
 	-- character), CarryLow of its height under its middle; the upper body leans back CarryLean degrees with both hands
-	-- full, CarryHeavy when the load slows you (CarrySpeed).
+	-- full, CarryHeavy when the load slows you (CarrySpeed). 8.3 (the owner: "he goes behind me with his arms stretched
+	-- out"): a hand reaches CarryReach of the arm's whole length at most (shared/BodyMotion.luau capReach): a spot
+	-- farther off is reached that far toward it, the elbow still bent (a natural carry, never a stretched-out arm).
 	CarryLow = 0.15,
 	CarryLean = 4,
 	CarryHeavy = 8,
+	CarryReach = 0.92,
 	-- The phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls it this many degrees, the screen up.
 	PhoneRoll = -90,
 	-- The gestures with the legs (shared/Gestures.luau, posed by client/ArmPose.luau): "pickup" crouches PickupDrop
@@ -6608,6 +6611,23 @@ Config.MoveStory = {
 --   HoldLegs           his legs holding it (Npcs.stride, the far bodies' walk; near ones the clients' gait): stepping from
 --                      From studs/s of his own speed along the ground, standing under To; backwards once the way is more
 --                      than Band of it behind him, forwards once more than Band ahead (sideways: the way they went)
+--   8.3 keeping up (the owner: "when I run, he just goes behind me with his arms stretched out"; MoveHelperBrain.
+--   holdPace / holdSpeed / holdLead, server/MoveHelper.luau's actHold, server/PairHold.luau's follow, client/
+--   PairSteer.luau's walk cap and RunHint):
+--   HoldCap            studs/s: the holder's top speed follows the leader's real speed along the ground (their root's,
+--                      measured at each look: × HoldMargin + HoldExtra on top, never under the carry's own), at most
+--                      this (unless the carry's own walk, an admin's boost, needs more)
+--   HoldPace           the leader's real speed measured: a rise is taken at once (to HoldCap at most), a fall over Fall
+--                      s (one slow look never slows him while you walk on); a root more than Jump studs off its last
+--                      look's place went there at once (a door's fade, a respawn): nothing measured
+--   HoldLead           Danny only (the leader is the only one who sees him): he is aimed this many seconds of the
+--                      leader's velocity ahead of his place (Base + the leader's ping, Player:GetNetworkPing, × Ping;
+--                      Most s, Far studs at most; the velocity smoothed over Smooth s), so on the leader's screen, where
+--                      his body shows that late, he walks at his end (Base 0 and Ping 0: off). A crew mate is not led
+--                      (on their own screen they would walk ahead of the piece)
+--   RunHint            carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
+--                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
+--                      run key or button says this once a carry
 --   PathRadius / PathHeight / PathSpacing   his paths (PathfindingService: never a jump, never a climb); PathAgain:
 --                      studs his goal moves off a path's end before he asks for a new one; PathDrift: studs it may move
 --                      off it while he still follows that path (then on from its end; straight lines only while no path
@@ -6689,6 +6709,10 @@ Config.MoveHelper = {
 	HoldEase = 0.5,
 	HoldClimb = 8, -- 8.3
 	HoldLegs = { From = 0.8, To = 0.4, Band = 0.3 },
+	HoldCap = 40, -- 8.3 keeping up
+	HoldPace = { Fall = 0.5, Jump = 12 },
+	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1 },
+	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
 	PathHeight = 5,
 	PathSpacing = 4,

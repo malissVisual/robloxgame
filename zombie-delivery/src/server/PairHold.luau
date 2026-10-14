@@ -17,6 +17,11 @@
 --     only. Never put there at once (MoveHelperBrain.holdTrack): more than HoldBehind studs off for HoldStuck s, an ease
 --     of HoldEase s (ghost and held in all three axes meanwhile: through whatever is in the way). A door's trip (either
 --     end on it) pauses the hold; the piece in the other world without one: put there.
+--   8.3 keeping up (the owner: "when I run, he just goes behind me with his arms stretched out"): the top speed follows
+--   the leader's real speed along the ground (their root's at each look: MoveHelperBrain.holdPace / holdSpeed, HoldCap at
+--   most), Danny and a crew mate alike; Danny is also aimed a little ahead (server/MoveHelper.luau, HoldLead), a crew mate
+--   not (on their own screen they would walk ahead of the piece). Neither runs meanwhile (the CarryPair attribute,
+--   client/PairSteer.luau holds their walk at CarrySpeed).
 --   PairHold.make(model, root, anchor, offset, limit, options) -> Hold   the hold made (options: ghost, flat, owner;
 --                                            8.3 lift: the height by the lift, the align along the ground)
 --   PairHold.aim(hold, offset, limit, flat?)   its far end's place in the piece's frame, its top speed, along the
@@ -27,6 +32,7 @@
 --   PairHold.alive(hold, anchor) -> boolean  its pieces are all there, on this piece
 --   PairHold.drop(hold)                      let go: the constraints gone, the groups and the body's owner given back
 --   PairHold.walkOf(player, fallback)        a leader's walk now (their CarrySpeed × their boosts), else `fallback`
+--   PairHold.pingOf(player)                  8.3 a leader's ping (Player:GetNetworkPing, s; 0 without one): Danny's lead
 --   PairHold.follow(player, root, anchor, depth, carrierRoot, carrier, away) -> boolean   a crew mate holding the far
 --                                            end of `anchor`'s piece (`depth` its size along the carry): held there,
 --                                            one look of Moving's tick (away: a door's trip is on); true while held
@@ -240,6 +246,16 @@ function PairHold.drop(hold: Hold)
 	end
 end
 
+function PairHold.pingOf(player: Player?): number
+	if not player then
+		return 0
+	end
+	local ok, ping = pcall(function(): any
+		return player:GetNetworkPing()
+	end)
+	return if ok and type(ping) == "number" and ping == ping then ping else 0
+end
+
 function PairHold.walkOf(player: Player?, fallback: number): number
 	local character = player and player.Character
 	if not player or not character then
@@ -299,6 +315,9 @@ function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, depth
 	local goal = anchor.CFrame * offset
 	local here = root.Position
 	local gap = Vector3.new(goal.X - here.X, 0, goal.Z - here.Z).Magnitude
+	-- 8.3 keeping up: the top speed follows the leader's real speed along the ground (their root's)
+	local from = carrierRoot.Position
+	speed = Brain.holdSpeed(PairHold.walkOf(carrier, Config.Movement.Walk), Brain.holdPace(m.trail, from.X, from.Z, dt, gap > WORLD))
 	local limit, snap = Brain.holdTrack(m.trail, gap, gap > WORLD, speed, dt)
 	local easing = m.trail.ease > 0
 	PairHold.ghost(hold, easing) -- (eased back: through whatever was in the way, held in all three axes)

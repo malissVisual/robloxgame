@@ -31,6 +31,11 @@
 --   * 8.3 (the owner: "he just jumps weirdly"): his feet on the floor under his end (endOffset: a ray within a step of
 --     the floor under your feet, never a roof or your jump; his height by PairHold's lift at HoldClimb at most), his
 --     legs the clients' gait (Npcs.carried's Physics state) and holdLegs' stride; his paths never jump (Path* numbers).
+--   * 8.3 keeping up (the owner: "when I run, he just goes behind me with his arms stretched out"): his top speed
+--     follows your real speed along the ground (your root's: MoveHelperBrain.holdPace / holdSpeed, HoldCap at most),
+--     and he is aimed your velocity × MoveHelperBrain.leadTime (HoldLead: a little + your ping) ahead of his place:
+--     your screen shows his body that late, so there he walks at his end (actHold). Nobody runs with a piece in two
+--     (the CarryPair attribute: client/PairSteer.luau).
 --   * A heavy two-hands piece you carry alone (AssistWeight or more, within AssistFar): he takes its other side (the
 --     pair's walk for both: MovingRules.mode), the same way.
 --   * On his own: the one-hand and two-hands pieces nobody holds (★ first, then the most value a second of the trip;
@@ -1342,13 +1347,21 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	local offset = endOffset(h, body, thing, item.root, carrierRoot, h.trail, dt) -- (8.3 his height: holdClimb's)
 	h.holdOffset, h.gripped = offset, item.root
 	-- 8.1 never put there while holding (a door's fade only: the piece in the other world); eased back when stuck behind
-	local goal = (item.root.CFrame * offset).Position
 	local here = body.root.Position
+	local crossed = insideAt(h, here) ~= insideAt(h, (item.root.CFrame * offset).Position)
 	local carrier = if thing.carrier and thing.carrier > 0 then Players:GetPlayerByUserId(thing.carrier) else nil
-	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Rules.carrySpeed(walkSpeed(), "pair", thing.weight)))
-	local limit, snap = Brain.holdTrack(h.trail, (goal - here).Magnitude, insideAt(h, here) ~= insideAt(h, goal), speed, dt)
+	-- 8.3 keeping up (the owner: "when I run, he just goes behind me"): his top speed follows your real speed (your
+	-- root's, MoveHelperBrain.holdPace), and he is aimed your velocity × leadTime ahead (your screen shows his body late)
+	local from = if carrierRoot then carrierRoot.Position else nil
+	local pace = Brain.holdPace(h.trail, if from then from.X else 0 / 0, if from then from.Z else 0 / 0, dt, crossed or from == nil)
+	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Rules.carrySpeed(walkSpeed(), "pair", thing.weight)), pace)
+	local leadX, leadZ = Brain.holdLead(h.trail, Brain.leadTime(PairHold.pingOf(carrier)))
+	local aim = if leadX == 0 and leadZ == 0 then offset
+		else CFrame.new(item.root.CFrame:PointToObjectSpace(item.root.Position + Vector3.new(leadX, 0, leadZ))) * offset
+	local goal = (item.root.CFrame * aim).Position
+	local limit, snap = Brain.holdTrack(h.trail, (goal - here).Magnitude, crossed, speed, dt)
 	h.holdLimit = limit
-	keepAt(body, item.root, offset, dt, limit, snap)
+	keepAt(body, item.root, aim, dt, limit, snap)
 	strideOf(h, body, dt, snap)
 	steady(h, if carrierRoot then carrierRoot.Parent :: Model? else nil)
 	local at = item.root.Position

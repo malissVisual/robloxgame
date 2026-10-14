@@ -415,6 +415,33 @@ check("…at the pair's top speed (never put there), along the ground only (Ann 
 	and math.abs(mateHold.align.MaxVelocity - Brain.holdSpeed(14 * T.Speed.Pair)) < 1e-6 and mateHold.align.MaxAxesForce.Y == 0
 	and mateHold.align.MaxAxesForce.X > 0 and math.abs(mateHold.orient.MaxAngularVelocity - Brain.holdTurn()) < 1e-6)
 check("…the server owns Ann's body meanwhile (its positions, whatever the lag)", annRoot.NetworkOwner == false)
+-- 8.3 keeping up (the owner: "when I run, he just goes behind me"): both carry CarryPair (no run for either:
+-- client/PairSteer.luau), and the far end's top speed follows the leader's real speed (her root held there each look, as
+-- the constraints would)
+check("8.3 two carry it: CarryPair on the leader and on the far end's crew mate (nobody runs)", bobBody:GetAttribute("CarryPair") == true
+	and character:GetAttribute("CarryPair") == true)
+local pairWalk = 14 * T.Speed.Pair
+local bobWas, annWas, sofaWas = E.rootOf(bob).CFrame, annRoot.CFrame, sofaRoot.CFrame
+local function bobWalks(speed: number, looks: number)
+	for _ = 1, looks do
+		local bobRoot = E.rootOf(bob)
+		bobRoot.CFrame = bobRoot.CFrame + V3(0, 0, speed * 0.2)
+		sofaRoot.CFrame = bobRoot.CFrame * M.CFrame.new(0, 0, -3)
+		annRoot.CFrame = sofaRoot.CFrame * mateHold.far.CFrame
+		E.clock += 0.2
+		Moving.step()
+	end
+end
+bobWalks(pairWalk * 1.2, 3)
+check("8.3 the leader 20% faster: the crew mate's top speed follows the leader's real speed (× HoldMargin + HoldExtra)",
+	math.abs(mateHold.align.MaxVelocity - Brain.holdSpeed(pairWalk, pairWalk * 1.2)) < 1e-6 and mateHold.align.MaxVelocity > Brain.holdSpeed(pairWalk),
+	mateHold.align.MaxVelocity)
+bobWalks(28, 3)
+check("8.3 …at a sprint: more than the sprint, HoldCap at most", mateHold.align.MaxVelocity > 28 and mateHold.align.MaxVelocity <= H.HoldCap + 1e-6
+	and bobBody:GetAttribute("MoveCarry") == 3, mateHold.align.MaxVelocity)
+bobWalks(0, 15)
+check("8.3 …standing 3 s: the carry's own top speed again", math.abs(mateHold.align.MaxVelocity - Brain.holdSpeed(pairWalk)) < 0.1, mateHold.align.MaxVelocity)
+E.rootOf(bob).CFrame, annRoot.CFrame, sofaRoot.CFrame = bobWas, annWas, sofaWas -- (back where they stood)
 -- the carrier leaves the house: the helper comes along
 E.place(bob, origin.Position + V3(0, 3, 1))
 trigger(leave, ann)
@@ -439,6 +466,7 @@ check("the pair too far apart: it went down", bobBody:GetAttribute("MoveCarry") 
 	E.lastNotice(bob))
 check("8.1 …the hold let go: its constraints gone, Ann's body hers again, Bob's PairTurn gone", PairHold.of(ann) == nil and mateHold ~= nil and mateHold.align.Parent == nil
 	and mateHold.far.Parent == nil and annRoot.NetworkOwner == ann and bobBody:GetAttribute("PairTurn") == nil)
+check("8.3 …and both CarryPair gone (their walks theirs again)", bobBody:GetAttribute("CarryPair") == nil and character:GetAttribute("CarryPair") == nil)
 -- picked up again and loaded by two
 E.place(ann, sofaRoot.Position + V3(1, 0, 0))
 E.place(bob, sofaRoot.Position + V3(-1, 0, 0))

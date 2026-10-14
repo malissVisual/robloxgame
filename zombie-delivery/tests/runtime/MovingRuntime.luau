@@ -19,6 +19,12 @@ CityConfig.Sandbox.On = false
 -- 8.1 grip: no timing checks by default (a pick lifts at once, no wobbles: the moves' other tests carry as before);
 -- tests/carrygrip_runtime_test.luau turns them on (the server reads Config.CarryGrip.On at every lift and carry).
 CityConfig.CarryGrip.On = false
+-- 8.3 keeping up: Danny not aimed ahead of his place by default (the moves' tests check him right at the far end: this
+-- runtime has no network delay to make up for); tests/movehelper_keepup_runtime_test.luau turns HoldLead on again
+-- (Runtime.gameLead: the game's numbers).
+local gameLead = table.clone(CityConfig.MoveHelper.HoldLead)
+CityConfig.MoveHelper.HoldLead.Base = 0
+CityConfig.MoveHelper.HoldLead.Ping = 0
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()
@@ -39,6 +45,7 @@ local Runtime: any = {
 	zombieHits = {}, -- { { z, amount, by, info } } what Zombies.damage was asked
 	noises = 0,
 	stoodUp = 0,
+	gameLead = gameLead, -- 8.3 Config.MoveHelper.HoldLead as the game has it
 }
 
 local O = getmetatable(Mock.Instance.new("Model"))

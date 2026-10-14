@@ -82,8 +82,18 @@
 --   8.1 carrying in two (the owner: "when I turn around he teleports"; the leader's steering: shared/PairCarry.luau):
 --   the far end's holder (Danny, or a crew mate who helps lift: server/PairHold.luau) is never put there at once while
 --   holding, he walks there at a top speed that fits the pair's walk and the swing of a turn:
---   MoveHelperBrain.holdSpeed(walk)            his top speed (AlignPosition.MaxVelocity) with the leader walking at
---                                              `walk` (the carry's CarrySpeed × PairCarry.boost): × HoldMargin + HoldExtra
+--   MoveHelperBrain.holdSpeed(walk, pace?)     his top speed (AlignPosition.MaxVelocity) with the leader walking at
+--                                              `walk` (the carry's CarrySpeed × PairCarry.boost): × HoldMargin + HoldExtra;
+--                                              8.3 (the owner: "when I run, he just goes behind me"): of the leader's real
+--                                              speed `pace` when that is more (holdPace), at most HoldCap (never under
+--                                              the carry's own)
+--   MoveHelperBrain.holdPace(trail, x, z, dt, reset)   8.3 one look at the leader's root (x, z along the ground): their
+--                                              real speed (a rise taken at once, HoldCap at most; a fall over
+--                                              HoldPace.Fall s) and their velocity smoothed over HoldLead.Smooth s;
+--                                              `reset` (a new hold, a door's fade) or a jump past HoldPace.Jump: none
+--   MoveHelperBrain.leadTime(ping)             8.3 the seconds Danny is aimed ahead: HoldLead.Base + ping × Ping, 0 … Most
+--   MoveHelperBrain.holdLead(trail, seconds)   8.3 how far ahead (x, z studs): the leader's smoothed velocity × seconds,
+--                                              HoldLead.Far at most
 --   MoveHelperBrain.holdTurn()                 his body's top turn (radians a second: HoldTurn × PairTurn)
 --   MoveHelperBrain.newTrail()                 a holder's record of how long he has been behind
 --   MoveHelperBrain.holdTrack(trail, gap, crossed, speed, dt)   one look: `gap` studs off his place, the piece in the
@@ -313,10 +323,18 @@ function MoveHelperBrain.endRise(floorRise: number, carrierRise: number): number
 end
 
 -- 8.1 his top speed holding the far end: the leader's walk and a margin (the far end swings round a turn at PairTurn
--- on top of the walk: HoldExtra).
-function MoveHelperBrain.holdSpeed(walk: number): number
+-- on top of the walk: HoldExtra). 8.3 keeping up (the owner: "when I run, he just goes behind me with his arms
+-- stretched out"): the leader's real speed along the ground (`pace`: holdPace) when it is more than the carry's walk (a
+-- lag spike, a slope, anything that moves them faster), at most HoldCap; the carry's own walk is never cut (an admin's
+-- boost).
+function MoveHelperBrain.holdSpeed(walk: number, pace: number?): number
 	local c = cfg()
-	return math.max(walk, 0) * c.HoldMargin + c.HoldExtra
+	local own = math.max(walk, 0) * c.HoldMargin + c.HoldExtra
+	local real = pace or 0
+	if real ~= real or real <= walk then
+		return own
+	end
+	return math.min(real * c.HoldMargin + c.HoldExtra, math.max(own, c.HoldCap))
 end
 
 function MoveHelperBrain.holdTurn(): number
@@ -324,11 +342,79 @@ function MoveHelperBrain.holdTurn(): number
 	return math.rad(c.PairTurn) * c.HoldTurn
 end
 
--- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards)
-export type Trail = { behind: number, ease: number, easeSpeed: number, height: number?, walking: boolean, back: boolean }
+-- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards; the leader's root at the last
+-- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz))
+export type Trail = {
+	behind: number,
+	ease: number,
+	easeSpeed: number,
+	height: number?,
+	walking: boolean,
+	back: boolean,
+	fromX: number?,
+	fromZ: number?,
+	pace: number,
+	vx: number,
+	vz: number,
+}
 
 function MoveHelperBrain.newTrail(): Trail
-	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false }
+	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0 }
+end
+
+-- 8.3 keeping up: one look at the leader's root (`x`, `z`), `dt` s after the last: their real speed along the ground
+-- (a rise taken at once, at most HoldCap: a lag spike's jump is a burst, not a teleport; a fall over HoldPace.Fall s:
+-- one slow look while they walk on never slows him) and their velocity smoothed over HoldLead.Smooth s (holdLead).
+-- `reset` (a new hold, a door's fade: the other world), or a root more than HoldPace.Jump studs off (put there at
+-- once): nothing measured, all at rest.
+function MoveHelperBrain.holdPace(trail: Trail, x: number, z: number, dt: number, reset: boolean): number
+	local c = cfg()
+	local fromX, fromZ = trail.fromX, trail.fromZ
+	local known = x == x and z == z -- (no root: NaN, never kept)
+	trail.fromX = if known then x else nil
+	trail.fromZ = if known then z else nil
+	if reset or not known or fromX == nil or fromZ == nil or dt ~= dt or dt <= 1e-4 then
+		trail.pace, trail.vx, trail.vz = 0, 0, 0
+		return 0
+	end
+	local vx, vz = (x - fromX) / dt, (z - fromZ) / dt
+	local speed = math.sqrt(vx * vx + vz * vz)
+	if speed * dt > c.HoldPace.Jump then -- (put there at once: a door's fade, a respawn)
+		trail.pace, trail.vx, trail.vz = 0, 0, 0
+		return 0
+	end
+	if speed > c.HoldCap then -- (a burst: its way, at HoldCap)
+		vx, vz, speed = vx / speed * c.HoldCap, vz / speed * c.HoldCap, c.HoldCap
+	end
+	if speed >= trail.pace then
+		trail.pace = speed
+	else
+		trail.pace = speed + (trail.pace - speed) * math.exp(-dt / math.max(c.HoldPace.Fall, 0.01))
+	end
+	local keep = math.exp(-dt / math.max(c.HoldLead.Smooth, 0.01))
+	trail.vx = vx + (trail.vx - vx) * keep
+	trail.vz = vz + (trail.vz - vz) * keep
+	return trail.pace
+end
+
+-- 8.3 the seconds Danny is aimed ahead of his place: HoldLead.Base + the leader's ping (round trip, s) × Ping, 0 … Most.
+function MoveHelperBrain.leadTime(ping: number?): number
+	local lead = cfg().HoldLead
+	local p = if ping and ping == ping then math.max(ping, 0) else 0
+	return math.clamp(lead.Base + p * lead.Ping, 0, math.max(lead.Most, 0))
+end
+
+-- 8.3 how far ahead of his place (x, z studs): the leader's smoothed velocity × `seconds`, HoldLead.Far at most.
+function MoveHelperBrain.holdLead(trail: Trail, seconds: number): (number, number)
+	local dx, dz = trail.vx * math.max(seconds, 0), trail.vz * math.max(seconds, 0)
+	local far = math.sqrt(dx * dx + dz * dz)
+	local most = cfg().HoldLead.Far
+	if far ~= far then
+		return 0, 0
+	elseif far > most and far > 0 then
+		dx, dz = dx / far * most, dz / far * most
+	end
+	return dx, dz
 end
 
 -- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
