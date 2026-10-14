@@ -33,7 +33,8 @@ end
 --   the HUD                            Hud (the city's parts hidden: client/Hud.luau ── Sandbox ──) and KeyHints (the
 --                                      move's keys and the car's only)
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
---                                      SandboxGuide: written by other workers, each started only when it is there
+--                                      SandboxGuide, 8.1's UpgradeUi (the UPGRADES desk's window): each started only
+--                                      when it is there
 -- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
 -- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
 -- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
@@ -53,7 +54,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide" } do
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi" } do -- (8.1: the UPGRADES desk's window)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any

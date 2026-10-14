@@ -25,12 +25,13 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument("luau")
 parser.add_argument("out")
 parser.add_argument("--fonts", help="a folder with montserrat-500.woff2 and montserrat-700.woff2")
+parser.add_argument("--scenes", default="sandbox.luau", help="the scene script (8.1: upgrades.luau, the UPGRADES window)")
 args = parser.parse_args()
 
 with tempfile.TemporaryDirectory() as folder:
     dest = Path(folder)
     sandbox_env(dest)
-    out = subprocess.run([args.luau, "sandbox.luau", "-a", "dump"], cwd=dest, capture_output=True, text=True)
+    out = subprocess.run([args.luau, args.scenes, "-a", "dump"], cwd=dest, capture_output=True, text=True)
     if out.returncode != 0:
         sys.exit(out.stdout + out.stderr)
     scenes = json.loads(out.stdout.strip().splitlines()[-1])

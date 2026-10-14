@@ -5607,6 +5607,7 @@ Config.Robust = {
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
+		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
 	},
 }
 
@@ -6909,29 +6910,39 @@ Config.SandboxGuide = {
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
 -- shared/WarehouseLayout.luau lays it out, server/Warehouse.luau builds it) and its display stands, where the pieces of
 -- your collection stand on show (and earn every minute you play).
---   Stands          how many display stands (Collection.display's stand: 1 … Stands; 1 nearest the door, west to east)
+--   Stands          how many display stands a warehouse starts with (Collection.display's stand: 1 … Stands; 1 nearest
+--                   the door, west to east); 8.1: the upgrades' More stands open more (Config.SandboxUpgrades), up to
+--   MaxStands       the stands the hall holds (8.1): Stands big ones in the grid, the rest smaller (SmallStand) in the
+--                   middle aisle and beside the receiving zone, each shown as a painted spot until it is bought
 --   Columns         the stands across the hall (even: half each side of the middle aisle); the rows go back from the door
 --   StandSize       a stand's podium (square, studs): every piece fits on it unturned (the biggest, the hay wagon, 6.4 × 9.6)
+--   SmallStand      8.1: an upgrade stand's podium { across, deep } (studs): every piece but the beds, the hay wagon and
+--                   the wheelbarrow fits on it unturned (Collection.display says which stand to use)
 --   StandHeight     the podium's top over the floor
---   Aisle           the least walk between two stands and between the stands and the side walls (a player with a sofa)
---   MiddleAisle     the walk from the roller door to the back wall, between the two halves
+--   Aisle           the least walk between two stands and between the stands and the side walls (8.1: 5, room for the
+--                   upgrade stands; the pieces come home with the van's unloading, nobody carries them in)
+--   MiddleAisle     the walk from the roller door to the back wall, between the two halves (8.1: the upgrade stands'
+--                   column down its middle, an Aisle each side of it)
 --   Receiving       the receiving zone's depth inside the roller door (its width the door's, SandboxMap.DoorWidth)
 --   DoorHeight      the roller door's opening (kept open)
 --   Ridge           the gable roof's ridge (north-south) over the walls' top
 --   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length }, centred on the plot's
 --                   vanSpot (the parked Sprinter's middle: 4 studs to spare at each end, its words at the door's end)
---   PromptDistance  the stands' prompts' reach; SellHold the Sell prompt's hold (s)
+--   PromptDistance  the stands' prompts' reach (8.1: the UPGRADES desk's too); SellHold the Sell prompt's hold (s)
 --   Rebuild         s: the changes to one collection this close together rebuild its shown pieces once
---   MaxParts        one warehouse's part budget (the building, its stands and its bay; not the pieces on show)
+--   MaxParts        one warehouse's part budget (the building, its stands, the UPGRADES desk and its bay; not the
+--                   pieces on show)
 --   Lamp            the hall's lights (PointLights, always on)
 --   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
 Config.Warehouse = {
 	Stands = 12,
+	MaxStands = 20,
 	Columns = 4,
 	StandSize = 10,
+	SmallStand = { 8, 5 } :: { number },
 	StandHeight = 1,
-	Aisle = 6,
-	MiddleAisle = 14,
+	Aisle = 5,
+	MiddleAisle = 18,
 	Receiving = 9,
 	DoorHeight = 16,
 	Ridge = 8,
@@ -7035,6 +7046,37 @@ Config.Sprinter = {
 	Step = { Top = 1.2, Depth = 1.4, Width = 4.6 },
 	SideStep = { Top = 1.2, Depth = 1.2 },
 	Light = { Range = 13, Brightness = 1.4, Color = { 255, 244, 222 } :: { number } },
+}
+
+-- 8.1 SANDBOX, the upgrades (the owner: "the money players earn needs something to buy"): bought at the UPGRADES desk
+-- in your warehouse (server/Warehouse.luau builds it, client/UpgradeUi.luau is its window, server/Upgrades.luau decides
+-- every purchase; shared/UpgradeRules.luau has the rules, tests/upgrades_test.luau and tests/upgrades_runtime_test.luau
+-- check them). The levels are per player in the save (profile.sandboxUpgrades: Config.Upgrades and profile.upgrades are
+-- the city's gun and car tracks). Each upgrade:
+--   name, icon     its card's title and picture (an emoji)
+--   max            its top level; prices: the price of each level (prices[n] buys level n)
+--   step           what one level gives: stands +step display stands (Config.Warehouse.Stands … MaxStands); lights the
+--                  income × (1 + step) a level (compounding: CollectionRules' income, so the HUD, the stands' tags and
+--                  the picker show it); engine the van's top speed + step a level (its SpeedMult attribute,
+--                  client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau trained)
+-- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
+-- are one size; the engine is the safe van upgrade.)
+-- The tuning: a first haul on show earns about $100 a minute (Config.Collection), so the first level of each comes
+-- after a few minutes of play, the last ones after hours; everything bought costs $54,250.
+--   Order          the cards' order in the window
+--   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
+--   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
+export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number } }
+Config.SandboxUpgrades = {
+	Order = { "stands", "lights", "engine", "danny" } :: { string },
+	List = {
+		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 1000, 2500, 5000, 10000 } },
+		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 750, 1500, 3000, 6000, 12000 } },
+		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 600, 1800, 4500 } },
+		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 600, 1500, 3500 } },
+	} :: { [string]: SandboxUpgradeDef },
+	Flag = "sandboxUpgradesKept",
+	Danny = "DannyTraining",
 }
 
 return Config

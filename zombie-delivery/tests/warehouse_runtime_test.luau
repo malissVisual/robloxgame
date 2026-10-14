@@ -8,6 +8,11 @@
 --     tag (name, rarity, +$X/min) and swaps the stand's prompts to Take down / Sell; the STOCK board counts
 --   * Take down and Sell go through the Collection and take the model away; two pieces share the income by worth
 --   * the owner leaves: the pieces go, the sign is FOR RENT, the prompts go; a new owner gets fresh prompts
+--   * 8.1, the upgrades: every warehouse has all 20 stands; the owner's first Collection.stands stand there, the rest
+--     are only their painted spot (podium, top and plate hidden, not solid, no Display); More stands bought opens
+--     13 and 14 (a corner stand's piece and prompts look north), the board counts them, losing them hides them again;
+--     the tags are × Collection.boost; the UPGRADES desk's prompt is the owner's (Upgrades.open), a stranger's use a
+--     notice, a free plot none, a new owner a fresh one
 -- Run with tests/run_tests.py.
 local W = require("./WarehouseRuntime")
 local Warehouse = require("./WarehouseServer")
@@ -180,6 +185,62 @@ for i = 1, T.Stands do
 end
 check("an entry on a stand the warehouse lacks is not shown", not stray)
 
+-- ── 8.1: the upgrade stands and the UPGRADES desk ────────────────────────────
+local ALL = WarehouseLayout.capacity()
+local function partsOf(id: number, i: number): (any, any, any)
+	local model = Warehouse.model(id)
+	return model:FindFirstChild(`Stand{i}`), model:FindFirstChild(`StandTop{i}`), model:FindFirstChild(`Plate{i}`)
+end
+local function hidden(id: number, i: number): boolean
+	local podium, top, plate = partsOf(id, i)
+	return podium.Transparency == 1 and podium.CanCollide == false and podium.CanQuery == false and top.Transparency == 1 and top.CanCollide == false
+		and plate.Transparency == 1 and plate:FindFirstChild("WordsFront").Enabled == false and not Warehouse.isOpen(id, i)
+end
+local function standing(id: number, i: number): boolean
+	local podium, top, plate = partsOf(id, i)
+	return podium.Transparency == 0 and podium.CanCollide == true and podium.CanQuery == true and top.CanCollide == true
+		and plate.Transparency == 0 and plate:FindFirstChild("WordsFront").Enabled ~= false and Warehouse.isOpen(id, i)
+end
+local freeOk, anaOk = true, true
+for i = 1, ALL do
+	freeOk = freeOk and (if i <= T.Stands then standing(1, i) else hidden(1, i))
+	anaOk = anaOk and (if i <= T.Stands then standing(2, i) else hidden(2, i) and promptsOf(2, i).display.Enabled == false)
+end
+check(`8.1: every warehouse has all {ALL} stands; a free plot shows the start's {T.Stands}, the upgrade stands only their painted spot (hidden, not solid)`, ALL == 20 and freeOk and Warehouse.model(1):FindFirstChild("SpotText13") ~= nil)
+check("8.1: the owner with the start's stands: 13 – 20 hidden, no Display on them; the piece on stand 13 not shown", anaOk and Warehouse.shown(2, 13) == nil)
+W.standCount[ana] = T.Stands + 2
+W.changed(ana)
+check("8.1: More stands bought (Collection.stands 14): stands 13 and 14 stand there, 15 still only its spot", standing(2, 13) and standing(2, 14) and hidden(2, 15))
+local corner = Warehouse.shown(2, 13)
+local cornerRoot = corner and corner.PrimaryPart
+check("8.1: … the piece on stand 13 shows now, looking north (a corner stand looks at the front row's aisle)", cornerRoot ~= nil and math.abs(cornerRoot.CFrame.LookVector.Z + 1) < 1e-6)
+check("8.1: … its prompts at its north edge: Take down and Sell on; stand 14's Display on", stand(2, 13):FindFirstChild("Prompts").CFrame.Position.Z < 0 and promptsOf(2, 13).takeDown.Enabled == true
+	and promptsOf(2, 14).display.Enabled == true and promptsOf(2, 15).display.Enabled == false, `{stand(2, 13):FindFirstChild("Prompts").CFrame.Position.Z} {promptsOf(2, 13).takeDown.Enabled} {promptsOf(2, 14).display.Enabled} {promptsOf(2, 15).display.Enabled}`)
+check("8.1: … the board counts 14 stands", line(board, 3) == `1 of {T.Stands + 2} stands on show`, line(board, 3))
+W.boosts[ana] = 1.21
+W.changed(ana)
+local _, _, lit = tagText(2, 13)
+local boxEntry = { item = "box", condition = 1 }
+check("8.1: the Showroom lights (Collection.boost 1.21): the tag's $/min × 1.21", lit == WarehouseLayout.tagLines("Box", CollectionRules.rarityOf(CollectionRules.defOf("box")), CollectionRules.income(boxEntry, 1.21))[2].text and lit ~= tagOf(boxEntry), lit)
+W.boosts[ana] = nil
+
+-- the UPGRADES desk: the owner's prompt
+local desk2, desk1 = Warehouse.terminal(2), Warehouse.terminal(1)
+local deskPrompt = desk2 and desk2:FindFirstChild("Prompts") and desk2:FindFirstChild("Prompts"):FindFirstChild("Upgrades")
+check("8.1: the UPGRADES desk: the owner's \"Upgrades\" prompt (E), tagged as Ana's for CargoPrompts; a free plot's desk has none", deskPrompt ~= nil and deskPrompt.ActionText == "Upgrades"
+	and deskPrompt.KeyboardKeyCode == "E" and deskPrompt:GetAttribute("CargoOwner") == 101 and deskPrompt:GetAttribute("Tag_" .. Config.Cargo.PromptTag) == true
+	and desk1 ~= nil and #desk1:FindFirstChild("Prompts"):GetChildren() == 0 and desk2.Name == "TerminalDesk")
+W.later()
+deskPrompt.Triggered:Fire(bob)
+check("8.1: … a stranger's use: no window, a notice", W.lastCall("openUpgrades") == nil and W.lastNotice(bob) == "This is Ana's warehouse.", W.lastNotice(bob))
+W.later()
+deskPrompt.Triggered:Fire(ana)
+local opened = W.lastCall("openUpgrades")
+check("8.1: … the owner's: Upgrades.open (the window)", opened ~= nil and opened[2] == ana)
+W.standCount[ana] = nil
+W.changed(ana)
+check("8.1: the stands lost again (an admin's RESET): 13 and 14 only their spot, nothing shown on them", hidden(2, 13) and hidden(2, 14) and Warehouse.shown(2, 13) == nil and corner ~= nil and corner.destroyed == true)
+
 -- Ana leaves: her pieces go, FOR RENT, no prompts; Bob claims it: fresh prompts for him
 W.give(ana, { uid = "u4", item = "wardrobe", variant = 1, condition = 1, name = "Wardrobe", stand = 5, got = 0 })
 local wardrobe = Warehouse.shown(2, 5)
@@ -192,5 +253,7 @@ check("…a change to her collection after she left builds nothing", Warehouse.s
 W.claim(2, bob)
 local fresh = promptsOf(2, 2)
 check("a new owner: Bob's Warehouse, fresh prompts with his UserId", line(sign2, 1) == "Bob's Warehouse" and fresh.display ~= oldDisplay and fresh.display:GetAttribute("CargoOwner") == 202 and fresh.display.Enabled == true)
+local bobDesk = Warehouse.terminal(2):FindFirstChild("Prompts"):FindFirstChild("Upgrades")
+check("8.1: … and a fresh UPGRADES prompt for him (Ana's gone)", bobDesk ~= nil and bobDesk ~= deskPrompt and deskPrompt.destroyed == true and bobDesk:GetAttribute("CargoOwner") == 202)
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

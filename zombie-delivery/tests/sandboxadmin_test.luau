@@ -34,17 +34,20 @@ for _, action in SandboxAdmin.Actions do
 	ids[action.id] = true
 end
 check("every button: a new id, a group of the tab, a known colour, a short label", #bad == 0, table.concat(bad, ", "))
-local wanted = { "money", "broke", "refill", "start", "clock", "horde", "fill", "clear", "stands", "van", "house", "warehouse" }
+local wanted = { "money", "broke", "refill", "start", "clock", "horde", "fill", "clear", "stands", "van", "house", "warehouse", "upmax", "upreset" } -- (8.1: the upgrades' two)
 local missing: { string } = {}
 for _, id in wanted do
 	if not ids[id] then
 		table.insert(missing, id)
 	end
 end
-check("the owner's twelve server buttons are all there", #missing == 0 and #SandboxAdmin.Actions == #wanted, table.concat(missing, ", "))
+check("the owner's twelve server buttons (8.1: and the upgrades' MAX / RESET) are all there", #missing == 0 and #SandboxAdmin.Actions == #wanted, table.concat(missing, ", "))
 check("the groups in the asked order", SandboxAdmin.Groups[1].id == "money" and SandboxAdmin.Groups[2].id == "moves" and SandboxAdmin.Groups[3].id == "collection" and SandboxAdmin.Groups[4].id == "travel" and SandboxAdmin.Groups[5].id == "debug")
 check("the labels the owner asked for", SandboxAdmin.find("money").label == "💰 +$10K" and SandboxAdmin.find("broke").label == "💸 MONEY 0" and SandboxAdmin.find("clock").label == "⏩ SKIP CLOCK")
 check("+$10K is 10 000", SandboxAdmin.Money == 10_000)
+local maxUp, resetUp = SandboxAdmin.find("upmax"), SandboxAdmin.find("upreset")
+check("8.1: ⬆ MAX UPGRADES / ↺ RESET UPGRADES in the last group, Upgrades", maxUp ~= nil and resetUp ~= nil and maxUp.label == "⬆ MAX UPGRADES" and resetUp.label == "↺ RESET UPGRADES"
+	and maxUp.group == "upgrades" and resetUp.group == "upgrades" and SandboxAdmin.Groups[#SandboxAdmin.Groups].id == "upgrades" and SandboxAdmin.Groups[#SandboxAdmin.Groups].name == "Upgrades")
 
 -- The check (the server's) ------------------------------------------------------------------------------------------
 

@@ -53,6 +53,9 @@
 -- short keys: Economy.vanMigrated reads either), and so are the chapters done (its story keeps only "intro").
 -- 8.0 SANDBOX: the collection (collection: the pieces the moves brought home, shared/CollectionRules.luau; kept by
 -- server/Collection.luau), read only from a real save written with its flag (collectionKept); older saves: empty.
+-- 8.1 SANDBOX: the upgrades bought at the warehouse's UPGRADES desk (sandboxUpgrades: { [id]: level },
+-- shared/UpgradeRules.luau; server/Upgrades.luau sells them), read only from a real save written with its flag
+-- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.)
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -76,6 +79,7 @@ local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funn
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
 local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
+local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
 
 export type Profile = {
 	money: number,
@@ -145,6 +149,9 @@ export type Profile = {
 	-- 8.0 SANDBOX: the pieces the moves brought home (shared/CollectionRules.luau; server/Collection.luau keeps it): read
 	-- only from a real save written with its flag (CollectionRules.fromSave); an older one starts with the empty one
 	collection: CollectionRules.Saved,
+	-- 8.1 SANDBOX: the upgrades bought ({ [id]: level }, shared/UpgradeRules.luau; server/Upgrades.luau): read only from a
+	-- real save written with its flag (UpgradeRules.fromSave); an older one has none
+	sandboxUpgrades: UpgradeRules.Levels,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -243,6 +250,7 @@ local function newProfile(): Profile
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		story = {}, -- 7.0: no story card seen yet
 		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
+		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -552,6 +560,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); a save from before
 	-- 8.0 (or a lock-only record of a new player) starts with the empty one (CollectionRules.fromSave)
 	profile.collection = CollectionRules.fromSave(saved)
+	-- 8.1: the sandbox's upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); a save
+	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave)
+	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -949,6 +960,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		story = profile.story, -- 7.0
 		collection = profile.collection, -- 8.0
 		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
+		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
+		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

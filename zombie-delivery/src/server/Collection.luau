@@ -11,10 +11,18 @@
 --   Collection.stock(player)                   { Entry } everything you own (on show or not; copies)
 --   Collection.display(player, uid, stand)     put a piece of your stock on display stand `stand` (an index of your
 --                                              warehouse's stands, CollectionRules.standsFor; one piece a stand; a
---                                              piece on show elsewhere moves there) → ok, why
+--                                              piece on show elsewhere moves there; 8.1: a piece too big for an
+--                                              upgrade's small stand is refused, WarehouseLayout.fits) → ok, why
 --   Collection.undisplay(player, uid)          take it down (back to the stock) → ok, why
 --   Collection.sell(player, uid)               sell it (on show or not) → the money paid (nil: refused), why
---   Collection.incomePerMinute(player)         what your pieces on show earn a minute now
+--   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
+--   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: the start's
+--                                              and the More stands you bought)
+--   Collection.boost(player)                   8.1: your income's × (CollectionRules.boost: the Showroom lights)
+--   Collection.upgrade(player, apply)          8.1 (server/Upgrades.luau): an upgrade bought or reset. What the stands
+--                                              earned up to now is counted at the old rates, apply() changes the
+--                                              levels, the pieces on stands you no longer have go back to the stock
+--                                              (how many: the return), the state goes out and the listeners hear
 --   Collection.openPicker(player, stand)       (Warehouse: an empty display stand's prompt) ask the player's client to
 --                                              pick a piece for it (the "Collection" remote's { kind = "pick", stand })
 --   Collection.clear(player)                   (the admin's CLEAR STOCK) the whole collection gone for nothing → how many
@@ -42,6 +50,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.CollectionRules)
+local WarehouseLayout = require(Shared.WarehouseLayout) -- 8.1: the upgrade stands' size (fits)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Collection = {}
@@ -81,6 +90,11 @@ local function standsOf(player: Player): number
 	return Rules.standsFor(PlayerData.get(player))
 end
 
+-- 8.1: the player's income × (their Showroom lights).
+local function boostOf(player: Player): number
+	return Rules.boost(PlayerData.get(player))
+end
+
 -- The player's piece with this uid (and its index), nil for anything else.
 local function find(collection: Rules.Saved, uid: any): (Entry?, number?)
 	if type(uid) ~= "string" or #uid > MAX_UID then
@@ -98,14 +112,15 @@ local function isStand(stand: any, count: number): boolean
 	return finite(stand) and stand == math.floor(stand) and stand >= 1 and stand <= count
 end
 
--- What the pieces on show earn a minute (only on the stands the warehouse has).
+-- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights).
 local function rate(player: Player, collection: Rules.Saved): number
 	local stands = standsOf(player)
+	local boost = boostOf(player)
 	local total = 0
 	for _, entry in collection.entries do
 		local stand = entry.stand
 		if stand ~= nil and stand >= 1 and stand <= stands then
-			total += Rules.income(entry)
+			total += Rules.income(entry, boost)
 		end
 	end
 	return total
@@ -144,8 +159,9 @@ local function sendState(player: Player)
 		return
 	end
 	local stock = table.create(#collection.entries)
+	local boost = boostOf(player)
 	for _, entry in collection.entries do
-		table.insert(stock, Rules.view(entry))
+		table.insert(stock, Rules.view(entry, boost))
 	end
 	remote:FireClient(player, { kind = "state", stock = stock, income = cents(rate(player, collection)), stands = standsOf(player) })
 end
@@ -273,6 +289,10 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	if entry.stand == stand then
 		return true, nil
 	end
+	local def = Rules.defOf(entry.item)
+	if def and not WarehouseLayout.fits(stand, def.size) then
+		return false, `Your {entry.name} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`
+	end
 	for _, other in collection.entries do
 		if other.stand == stand then
 			return false, `That stand already shows your {other.name}.`
@@ -280,7 +300,7 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	end
 	settle(player)
 	entry.stand = stand
-	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
+	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player)) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
 	changed(player)
 	return true, nil
 end
@@ -339,6 +359,23 @@ end
 function Collection.incomePerMinute(player: Player): number
 	local collection = collectionOf(player)
 	return if collection then rate(player, collection) else 0
+end
+
+function Collection.stands(player: Player): number
+	return standsOf(player)
+end
+
+function Collection.boost(player: Player): number
+	return boostOf(player)
+end
+
+function Collection.upgrade(player: Player, apply: () -> ()): number
+	settle(player) -- (what the stands earned up to now, at the old rates)
+	apply()
+	local collection = collectionOf(player)
+	local moved = if collection then Rules.fitStands(collection, standsOf(player)) else 0
+	changed(player)
+	return moved
 end
 
 function Collection.openPicker(player: Player, stand: number)

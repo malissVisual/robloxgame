@@ -270,6 +270,41 @@ function Runtime.player(userId: number, name: string?): any
 	return player
 end
 
+-- 8.1 (tests/upgrades_runtime_test.luau, server/Upgrades.luau): Players:GetPlayerByUserId, a workspace with a Cars
+-- folder (Runtime.addCar parks a van there: its ChildAdded fires), the plots (Runtime.plotOf: player → a plot id;
+-- SandboxPlots.of).
+players.GetPlayerByUserId = function(self: any, id: number): any
+	for _, player in self.children do
+		if player.UserId == id then
+			return player
+		end
+	end
+	return nil
+end
+local world = create("Workspace")
+world.ChildAdded = signal()
+local cars = create("Folder")
+cars.Name = "Cars"
+cars.ChildAdded = signal()
+cars.Parent = world
+Runtime.workspace = world
+Runtime.cars = cars
+function Runtime.addCar(ownerId: number): any
+	local car = create("Model")
+	car.Name = "Van"
+	car:SetAttribute("OwnerId", ownerId)
+	car:SetAttribute("SpeedMult", 1) -- (server/Vehicles.luau's spawn: before it is parented)
+	car.Parent = cars
+	cars.ChildAdded:Fire(car)
+	return car
+end
+Runtime.plotOf = {} -- player → a plot id
+Runtime.SandboxPlots = {
+	of = function(player: any): any
+		return Runtime.plotOf[player]
+	end,
+}
+
 -- The player joins (PlayerAdded: PlayerData loads their save at once); the deferred work runs.
 function Runtime.join(userId: number, name: string?): any
 	local player = Runtime.player(userId, name)
