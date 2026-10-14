@@ -3701,6 +3701,28 @@ Config.Soundscape = {
 		SlideRange = 90, -- … heard this many studs from the camera
 		Step = 0.55, -- your foot onto a Sprinter's rear or side step (van_step_up) …
 		StepGap = 0.8, -- … at most every this many seconds
+		-- 8.3, the 8.2 features' feedback (the existing sheets only; shared/SoundPlan.luau feedbackOf / feedbackCues /
+		-- slot, client/SandboxSounds.luau): the stings play one after the other, never over each other (the trip home's
+		-- fanfare, then the book's chime, then a milestone's fanfare); the same one again only after its Gap s; one that
+		-- would wait longer than FeedbackWait s behind the others is left out.
+		Discovery = 0.5, -- a piece new in your collection book (ding: a bright bell, a little higher) …
+		DiscoveryGap = 2,
+		Milestone = 0.6, -- a book milestone paid (level_up: the bells' fanfare) …
+		MilestoneGap = 4,
+		TaskDone = 0.6, -- a task done (task_done) …
+		TaskDoneGap = 1.5,
+		Claimed = 0.55, -- a task's reward claimed (cash: the money's ka-ching) …
+		ClaimedGap = 0.6,
+		Fill = 0.38, -- ⭐ FILL BEST: a few soft stand clicks (stand_display, quieter, each a little higher) …
+		FillClicks = 3, -- … at most this many (fewer when fewer pieces went up) …
+		FillEvery = 0.13, -- … this many seconds apart …
+		FillGap = 2,
+		FillQuiet = 1.5, -- … and the state after it plays no stand_display of its own for this many seconds
+		BulkSold = 0.9, -- 💰 SELL…'s sale: the till once (sale_register), louder than one piece's …
+		BulkKa = 0.5, -- … the old ka-ching (cash) on top of it …
+		BulkKaAt = 0.12, -- … this many seconds in …
+		BulkGap = 1.5,
+		FeedbackWait = 4.5,
 	},
 }
 
@@ -7040,6 +7062,12 @@ Config.Warehouse = {
 --   Chip / ChipText          the "📦 N in stock" chip under them (on a touch screen at least Ui.MinTouch screen px high)
 --   TouchScale               the money block's smallest scale on a touch screen (it is never smaller than this)
 --   StockKey                 the key that opens / closes the STOCK list (a computer)
+--   StockPad                 8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's ←; shared/SandboxPad.luau
+--                            has the sandbox's D-pad map and why ↑ stays Roblox's)
+--   Hints                    8.3, the first-time hints (shared/SandboxHints.luau, client/SandboxHintsUi.luau): a hint shows
+--                            Delay s after what made it matter, at least Gap s after the hint before (one at a time), and
+--                            waits while something covers the screen, looked at every Every s; the ⭐ FILL BEST hint
+--                            once FillStock pieces that would earn wait in the stock beside a free stand
 --   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
 --   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
 --                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
@@ -7059,6 +7087,8 @@ Config.SandboxHud = {
 	ChipText = 14,
 	TouchScale = 0.8,
 	StockKey = "B",
+	StockPad = "DPadLeft", -- 8.3: the gamepad's way to the STOCK list
+	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5 }, -- 8.3: the first-time hints
 	Toast = 3,
 	MaxToasts = 3,
 	Picker = {
@@ -7163,6 +7193,7 @@ Config.SandboxUpgrades = {
 --                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
 --                by the server, "BookMilestone")
 --   Key          the key that opens and closes the book (a computer)
+--   Pad          8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's →; shared/SandboxPad.luau)
 --   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
 --                save fills the book from its stock, and its milestones pay on the first join)
 --   MaxCount     the most "brought home" a piece counts
@@ -7183,6 +7214,7 @@ Config.CollectionBook = {
 		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
 	} :: { BookMilestone },
 	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
+	Pad = "DPadRight", -- 8.3: the gamepad's way to the book (shared/SandboxPad.luau)
 	Flag = "collectionBookKept",
 	MaxCount = 1_000_000,
 	Window = {
@@ -7227,6 +7259,7 @@ Config.CollectionBook = {
 --   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
 --              turns is paid then
 --   Key        the key that opens and closes the panel (a computer)
+--   Pad        8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's ↓; shared/SandboxPad.luau)
 --   StateGap   s between two states to one player; CheckEvery: s between two looks for the reset at 00:00 UTC;
 --              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
 --              Danny holds the other end of your piece (only while a danny task is open)
@@ -7252,6 +7285,7 @@ Config.SandboxTasks = {
 	TopShare = 0.5,
 	RareRank = 3,
 	Key = "J",
+	Pad = "DPadDown", -- 8.3: the gamepad's way to the TASKS panel (shared/SandboxPad.luau)
 	StateGap = 0.5,
 	CheckEvery = 10,
 	SaveDelay = 5,

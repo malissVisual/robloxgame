@@ -20,6 +20,10 @@
 -- start screen) open and close it; ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it. It is
 -- modal: the mouse is free while it is open (a Modal button), a touch screen's buttons are under it. Opening it closes
 -- the warehouse's picker and the UPGRADES window. Toasts wait while the HUD is hidden (the start screen).
+-- 8.3, a gamepad (shared/SandboxPad.luau, client/PadGlyph.luau): the D-pad's → (Config.CollectionBook.Pad) opens and
+-- closes it (not while another window has the gamepad's selection; the HUD's chip shows its glyph); the book keeps the
+-- selection inside it (a selection group), lands on the lit tab, every card can be selected (the D-pad walks the grid
+-- and the grid scrolls to the card: every piece reachable), a redraw keeps what was selected; B closes it.
 --   CollectionBookUi.start()                 listens (once; nothing when Config.Sandbox.On is false)
 --   CollectionBookUi.open() / close() / toggle() / isOpen()
 --   CollectionBookUi.state()                 { book, paid } the last state (nil: none yet)
@@ -43,6 +47,7 @@ local Rules = require(Shared.CollectionBookRules)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3: the gamepad's D-pad →
 
 local CollectionBookUi = {}
 
@@ -530,6 +535,7 @@ local function drawCard(parent: any, item: string, index: number, layout: Layout
 		Position = UDim2.fromOffset(col * (w + layout.gap), line * (layout.tileH + layout.gap)),
 		BackgroundColor3 = if found then K.row else K.recessed,
 		BorderSizePixel = 0,
+		Selectable = true, -- (8.3: the gamepad walks the grid; the grid scrolls to the card selected)
 	}, parent)
 	frame:SetAttribute("Item", item)
 	frame:SetAttribute("Found", found ~= nil)
@@ -591,6 +597,9 @@ draw = function(keepScroll: boolean)
 	end
 	shownKey = key
 	local scroll = if keepScroll and grid then grid.CanvasPosition else Vector2.zero
+	-- 8.3: what the gamepad had selected in it (a card, a tab, ✕), selected again once drawn
+	local selected = Ui.gamepadSelection()
+	local heldName = if card and selected and selected:IsDescendantOf(card) then selected.Name else nil
 	clearCards()
 	if card then
 		card:Destroy()
@@ -618,6 +627,11 @@ draw = function(keepScroll: boolean)
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the book)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, card)
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, frame)
 	Ui.corner(frame, Config.UiKit.Corner)
@@ -654,7 +668,7 @@ draw = function(keepScroll: boolean)
 	end
 	grid:GetPropertyChangedSignal("CanvasPosition"):Connect(queueRefresh)
 	refreshViews()
-	Ui.gamepadFocus(lit or close)
+	Ui.gamepadFocus((if heldName then frame:FindFirstChild(heldName, true) else nil) or lit or close)
 end
 
 -- The window over everything: the warehouse's picker and the UPGRADES window close (one window at a time).
@@ -777,8 +791,8 @@ function CollectionBookUi.start()
 		end
 		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB then
 			CollectionBookUi.close()
-		elseif bookKey and input.KeyCode == bookKey and not processed and not hudHidden() then
-			CollectionBookUi.toggle()
+		elseif ((bookKey and input.KeyCode == bookKey and not processed) or PadGlyph.pressed(input, processed, "book")) and not hudHidden() then
+			CollectionBookUi.toggle() -- (its key; 8.3: the gamepad's D-pad →)
 		end
 	end)
 	GuiService.MenuOpened:Connect(CollectionBookUi.close)
