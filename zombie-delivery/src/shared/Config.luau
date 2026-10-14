@@ -6273,6 +6273,20 @@ Config.CarryGrip = {
 --                     the client keeps it black until it sees itself there (within Arrive studs: Wait s at most), its
 --                     camera behind you looking the way you face there, then Dark s more, then the fade in (FadeIn s).
 --                     The crew mate or Danny at a pair piece's far end comes in the same dark moment, at that end
+--                     8.5 walking through (the owner: "the doors should open when I'm at them, so it doesn't feel like
+--                     I bumped into the door, but I keep walking smoothly, and then the transition"): the leaf opens as
+--                     you come at its door, in its approach facing it or walking at it (your walk toward it at least
+--                     PairWalk studs/s, its heading within Face of straight at it), or farther out walking at its
+--                     doorway (your walk crosses its face within the approach's width in Lead s: a run finds it open);
+--                     Open s quick, swinging out of the house (the sandbox house's leaves, as the interior's: seen
+--                     against its dark doorway). The doorway is walkable: the house's body is solid but for a dark hall
+--                     behind each of its doorways (Hall: Depth studs into the house, the opening's width and height,
+--                     lined in Color: server/SandboxWorld.luau), Through reaching past it. Walking through is the trip:
+--                     walking into the doorway (at PairWalk studs/s or more, mostly at it), your root across its
+--                     threshold (Cross studs out of the doorway's face: outside the wall's, inside the inner one), or
+--                     there within Ahead s at your walk (the server sees you a moment late and looks every Every s):
+--                     the fade out starts at once while you walk on into the hall (onto the porch inside), the move
+--                     behind the black, and you arrive still walking. Dwell stays for standing at a door facing it
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6383,12 +6397,16 @@ Config.Moving = {
 	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
 	Doors = {
-		Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number }, -- 8.1 walk-in doors
-		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first)
+		Walk = true, Depth = 3.5, Through = 11, Side = 0.5, Height = 9, Face = 0.3, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number }, -- 8.1 walk-in doors (8.5: Through 11, was 6: the house's dark hall)
+		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first; 8.5: for standing at a door, walking through needs none)
 		-- 8.3 the leaves and the trip (server/Moving.luau's WalkIn and travel, client/WalkDoors.luau, client/Fade.luau)
-		Swing = true, Approach = 8, ApproachSide = 2, Angle = 95, Open = 0.35, Close = 0.45, Shut = 1.2,
+		-- (8.5: Approach 12 and ApproachSide 3, were 8 and 2; Open 0.25, was 0.35: the leaf open before you get there)
+		Swing = true, Approach = 12, ApproachSide = 3, Angle = 95, Open = 0.25, Close = 0.45, Shut = 1.2,
 		FadeOut = 0.25, Margin = 0.1, Stream = 2, Wait = 1.5, Arrive = 6, Dark = 0.15, FadeIn = 0.35,
 		Sound = { Open = 0.55, Shut = 0.4, ShutPitch = 0.75, Range = 70 },
+		-- 8.5 walking through (server/Moving.luau's WalkIn.coming and check; server/SandboxWorld.luau's door halls)
+		Lead = 0.9, Cross = 0, Ahead = 0.15,
+		Hall = { Depth = 11, Color = { 24, 18, 14 } :: { number } },
 	},
 	Slots = 6,
 	Tick = 0.2,

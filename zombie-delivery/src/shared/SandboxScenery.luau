@@ -748,7 +748,8 @@ end
 -- 0.34 back in their pocket, its brass handles reach the wall's face: the copies' backs on the face cover all of it):
 -- the front door's two each half the opening (they meet in the middle, no seam), the back door's one the whole of it;
 -- each hinged at the opening's side (the back door's: the side away from its handle, as house.py hangs it), swinging
--- into the house over the model's own door (a dark hall where they stood: DoorDark). Each leaf's parts in its door's
+-- out of the house (8.5, was in: seen as they swing, the model's own door behind a dark doorway where they stood:
+-- DoorDark; clear of its portal, lantern and bushes, over its step). Each leaf's parts in its door's
 -- frame (its foot on the wall: House.door's, House.back's; +X right of somebody looking out, -Z out of the house), its
 -- body first: the body, two cassettes, the glass, the grille's two bars, the brass knob (a cylinder along Z) and lever
 -- (0.3 and 0.42 from its free end), as house.py draws them.
