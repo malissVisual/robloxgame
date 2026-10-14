@@ -19,6 +19,8 @@ local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
 local Map = require("./Map")
 local Rules = require("./MovingRules")
+local PairCarry = require("./PairCarry") -- 8.1 carrying in two: the leader's steering (client/PairSteer.luau's)
+local Brain = require("./MoveHelperBrain")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -118,11 +120,37 @@ local function carryAlong()
 		model.PrimaryPart.CFrame = h.body.root.CFrame * M.CFrame.new(0, 0, -1.5)
 	end
 end
+-- 8.1 while he holds the far end: the most his root moved in one of his steps over what his top speed allows then
+-- (never put there: only a door's fade does, the piece in the other world), and his top speed's range.
+local jump = { over = 0, most = 0, fastest = 0, slowest = math.huge, steps = 0 }
+local lastHeld: any = nil
+local function watchJump()
+	local h = danny
+	local role: string? = nil
+	if h and h.body then
+		role = select(2, Rules.holding(h.s.move, h.id))
+	end
+	if role ~= "helper" then
+		lastHeld = nil
+		return
+	end
+	local at = h.body.root.Position
+	if lastHeld and (at - lastHeld).Magnitude < 300 then -- (not a door's fade: the house's interior is far off the map)
+		local moved = (at - lastHeld).Magnitude
+		jump.over = math.max(jump.over, moved - h.holdLimit * 0.1)
+		jump.most = math.max(jump.most, moved)
+		jump.fastest = math.max(jump.fastest, h.holdLimit)
+		jump.slowest = math.min(jump.slowest, h.holdLimit)
+		jump.steps += 1
+	end
+	lastHeld = at
+end
 -- Steps of 0.1 s (his loop's), the move's tick every other one; until `done` (true when it came), or `seconds` long.
 local function run(seconds: number, done: (() -> boolean)?): boolean
 	for index = 1, math.ceil(seconds / 0.1 - 1e-9) do
 		E.clock += 0.1
 		MoveHelper.step(0.1)
+		watchJump()
 		carryAlong()
 		if index % 2 == 0 then
 			Moving.step()
@@ -143,15 +171,26 @@ local function distance(a: any, b: any): number
 	return V3(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
 local function helped(): boolean
-	return math.abs((sol.Character:GetAttribute("CarrySpeed") or 0) - WALK * 0.8) < 1e-6
+	return math.abs((sol.Character:GetAttribute("CarrySpeed") or 0) - WALK * T.Speed.Pair) < 1e-6
 end
 -- Where his root belongs: the far end of the piece (Standoff past its far face).
 local function farEnd(model: any, depth: number): any
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(depth / 2 + H.Standoff))).Position
 end
 
--- Sol walks to `to` with the piece (a stud every 0.1 s: under the pair's walk, the pace check's; facing the way), the
--- run's steps between; returns the most his root was off the piece's far end while he held it.
+-- 8.1 the leader's client (client/PairSteer.luau) while two carry: the heading turns toward the way at PairTurn at most
+-- (shared/PairCarry.luau steer; a way behind is walked backwards), the walk the pair's × the turn's factor. The most
+-- the heading turned in one step, and the steps walked backwards (the velocity against the facing).
+local steer = PairCarry.newSteer(0)
+local steerFor: any = nil
+local turnedMost, backSteps = 0, 0
+local function heading(): number
+	local look = E.rootOf(sol).CFrame.LookVector
+	return PairCarry.yawOf(look.X, look.Z)
+end
+-- Sol walks to `to` with the piece (alone: a stud every 0.1 s, facing the way; 8.1 carried in two: the pair's walk, the
+-- heading the steering's), the run's steps between; returns the most his root was off the piece's far end while he
+-- held it.
 local function walk(model: any, to: any): number
 	local worst = 0
 	local depth = model.PrimaryPart.Size.Z
@@ -161,8 +200,25 @@ local function walk(model: any, to: any): number
 		if way.Magnitude < 0.05 then
 			break
 		end
-		local nextAt = here + way.Unit * math.min(1, way.Magnitude)
-		E.rootOf(sol).CFrame = M.CFrame.lookAt(nextAt, nextAt + way.Unit)
+		local rate = sol.Character:GetAttribute("PairTurn")
+		if type(rate) == "number" then
+			if steerFor ~= model then
+				steerFor, steer.back = model, false
+			end
+			local before = heading()
+			steer.heading = before
+			local factor = PairCarry.steer(steer, way.X, way.Z, 0.1, math.rad(rate))
+			turnedMost = math.max(turnedMost, math.abs(PairCarry.wrap(steer.heading - before)))
+			local stepLength = (sol.Character:GetAttribute("CarrySpeed") or 0) * factor * 0.1
+			local nextAt = here + way.Unit * math.min(stepLength, way.Magnitude)
+			E.rootOf(sol).CFrame = M.CFrame.new(nextAt) * M.CFrame.Angles(0, steer.heading, 0)
+			if way:Dot(E.rootOf(sol).CFrame.LookVector) < 0 then
+				backSteps += 1
+			end
+		else
+			local nextAt = here + way.Unit * math.min(1, way.Magnitude)
+			E.rootOf(sol).CFrame = M.CFrame.lookAt(nextAt, nextAt + way.Unit)
+		end
 		follow(model, sol)
 		run(0.1)
 		local _, role = Rules.holding(danny.s.move, danny.id)
@@ -223,7 +279,7 @@ local lifted = run(5, function()
 	took += 0.1
 	return helped()
 end)
-check("7.x Danny takes the far end within 2 s (from the van: he fades over to it): the two-person walk (0.8)", lifted and took <= 2 + 1e-6, took)
+check("7.x Danny takes the far end within 2 s (from the van: he fades over to it): the two-person walk (8.1: 0.7)", lifted and took <= 2 + 1e-6, took)
 check("…\"Got the other end!\"", E.saidSince("Got the other end!", said))
 follow(sofa, sol)
 run(0.3)
@@ -251,6 +307,92 @@ check("…the strip: carrying the Sofa with you", sol:GetAttribute("MoveHelperDo
 local worst = walk(sofa, origin.Position + V3(6, 3, 8))
 worst = math.max(worst, walk(sofa, origin.Position + V3(0, 3, 2)))
 check("7.x walking and turning together: he stays at its far end", worst < 0.05 and helped(), worst)
+check("8.1 Sol (the leader) gets PairTurn while Danny holds the far end: the heading turns that slowly (client/PairSteer.luau)",
+	character:GetAttribute("PairTurn") == H.PairTurn)
+check("8.1 …walking and turning together the heading turned PairTurn degrees a second at most", turnedMost > 0 and turnedMost <= math.rad(H.PairTurn) * 0.1 + 1e-9,
+	math.deg(turnedMost) * 10)
+-- 8.1 the way behind Sol: walked backwards, facing the sofa and Danny (no swing at all), Danny walking forwards after him
+local function stridesSince(from: number, sign: number): number
+	local n = 0
+	for index = from + 1, #E.strides do
+		if E.strides[index].npc == npc and E.strides[index].speed * sign > 0.5 then
+			n += 1
+		end
+	end
+	return n
+end
+local h0 = heading()
+local strides = #E.strides
+local backBefore = backSteps
+local look0 = E.rootOf(sol).CFrame.LookVector
+worst = walk(sofa, E.rootOf(sol).Position - look0 * 6)
+check("8.1 the way behind: Sol walks backwards, the heading stays (no swing), Danny at the far end walking forwards after him",
+	backSteps - backBefore >= 5 and math.abs(PairCarry.wrap(heading() - h0)) < 1e-6 and worst < 0.05 and stridesSince(strides, 1) >= 4
+	and stridesSince(strides, -1) == 0, `{backSteps - backBefore} back, {stridesSince(strides, 1)} forward strides, {worst}`)
+-- …the way ahead (toward Danny): Sol forwards, Danny walking backwards (his walk played in reverse)
+strides = #E.strides
+backBefore = backSteps
+worst = walk(sofa, E.rootOf(sol).Position + look0 * 4)
+check("8.1 the way ahead: Sol walks forwards, the heading stays, Danny walks backwards", backSteps == backBefore and math.abs(PairCarry.wrap(heading() - h0)) < 1e-6
+	and worst < 0.05 and stridesSince(strides, -1) >= 3, `{stridesSince(strides, -1)} backward strides`)
+-- 8.1 turning round: the way to Sol's right, twice (180° in all): PairTurn degrees a second at most, slower meanwhile
+turnedMost = 0
+local slowest = math.huge
+local turnFrom, turnAt = heading(), E.clock
+for _ = 1, 2 do
+	local look = E.rootOf(sol).CFrame.LookVector
+	local right = V3(-look.Z, 0, look.X)
+	local before = E.rootOf(sol).Position
+	local t = E.clock
+	worst = math.max(worst, walk(sofa, before + right * 14))
+	slowest = math.min(slowest, distance(E.rootOf(sol).Position, before) / (E.clock - t))
+end
+local turned = math.abs(PairCarry.wrap(heading() - turnFrom))
+check("8.1 the player turns 180° holding the sofa: the heading turns PairTurn degrees a second at most (never at once)",
+	turned > math.pi - 0.05 and turnedMost <= math.rad(H.PairTurn) * 0.1 + 1e-9 and E.clock - turnAt >= math.pi / math.rad(H.PairTurn) - 0.05,
+	`{math.deg(turned)}° in {E.clock - turnAt} s, at most {math.deg(turnedMost) * 10}°/s`)
+check("…the pair walks slower while it turns, Danny at the far end all the way", slowest < WALK * T.Speed.Pair * 0.95 and worst < 0.05 and helped(), `{slowest} {worst}`)
+-- 8.1 Sol's body spun round at once (a client without the steering): Danny walks round at his top speed, never put there
+E.rootOf(sol).CFrame = E.rootOf(sol).CFrame * M.CFrame.Angles(0, math.pi, 0)
+follow(sofa, sol)
+local spunFrom = body.root.Position
+run(0.1)
+local firstStep = distance(body.root.Position, spunFrom)
+local caught = run(3, function()
+	return distance(body.root.Position, farEnd(sofa, SOFA.Z)) < 0.05
+end)
+check("8.1 spun round at once: no snap, his first step his top speed's (the pair's walk and a margin), at the far end again within a second",
+	caught and firstStep <= Brain.holdSpeed(WALK * T.Speed.Pair) * 0.1 + 1e-6 and firstStep > 1 and jump.over <= 1e-6, `{firstStep} {jump.over}`)
+-- 8.1 stuck far behind (his constraints can't move him: a mover that keeps nothing): HoldStuck s, then eased back over
+-- HoldEase s at the gap / HoldEase a second, never put there
+local kept: { any } = {}
+MoveHelper.useMover({ move = walker.move, halt = walker.halt, keep = function(b: any, anchor: any, offset: any, _dt: number, limit: number, snap: boolean)
+	table.insert(kept, { at = E.clock, limit = limit, snap = snap, gap = ((anchor.CFrame * offset).Position - b.root.Position).Magnitude })
+end })
+walk(sofa, E.rootOf(sol).Position - E.rootOf(sol).CFrame.LookVector * 15)
+run(H.HoldStuck + H.HoldEase + 0.5)
+local hold = Brain.holdSpeed(WALK * T.Speed.Pair)
+local behindAt, easeAt, eased, snapped, easeLimit, easeGap = nil, nil, 0, false, 0, 0
+for _, k in kept do
+	snapped = snapped or k.snap
+	if not behindAt and k.gap > H.HoldBehind then
+		behindAt = k.at
+	end
+	if k.limit > hold + 1e-6 then
+		eased += 1
+		if not easeAt then
+			easeAt, easeLimit, easeGap = k.at, k.limit, k.gap
+		end
+	end
+end
+check("8.1 stuck far behind: never put there; HoldStuck s behind, then eased back over HoldEase s at the gap / HoldEase", not snapped and behindAt ~= nil
+	and easeAt ~= nil and easeAt - behindAt >= H.HoldStuck - 0.15 and easeAt - behindAt <= H.HoldStuck + 0.25 and math.abs(easeLimit - easeGap / H.HoldEase) < 1e-6
+	and eased == math.floor(H.HoldEase / 0.1 + 0.5), `{behindAt} → {easeAt}, {eased} steps at {easeLimit}`)
+MoveHelper.useMover(walker)
+caught = run(3, function()
+	return distance(body.root.Position, farEnd(sofa, SOFA.Z)) < 0.05
+end)
+check("…free to move again: he walks back to the far end", caught and helped())
 -- out of the door with it: he comes through with Sol
 local leave = promptIn(workspace, "Leave house")
 E.place(sol, origin.Position + V3(0, 3, 1))
@@ -299,6 +441,11 @@ trigger(load, sol)
 check("Sol loads the sofa: in the van, both hands free", character:GetAttribute("MoveCarry") == nil and danny.s.move.things[3].state == "truck", E.lastNotice(sol))
 run(0.3)
 check("…and Danny's hands are free", Rules.holding(danny.s.move, danny.id) == nil and npc:GetAttribute("Carrying") == nil and character:GetAttribute("GripSteady") == nil)
+check("8.1 …and Sol's PairTurn gone with it (his body turns where he walks again)", character:GetAttribute("PairTurn") == nil)
+check("8.1 all the way with the sofa Danny was never put at its far end (only the door's fade did): every step of his within his top speed × 0.1 s",
+	jump.steps > 100 and jump.over <= 1e-6 and jump.most > 1, `{jump.steps} steps, {jump.over} over, the longest {jump.most}`)
+check("8.1 …his top speed: the pair's walk × HoldMargin + HoldExtra (more only while eased back)", math.abs(jump.slowest - Brain.holdSpeed(WALK * T.Speed.Pair)) < 1e-6
+	and math.abs(Brain.holdSpeed(WALK * T.Speed.Pair) - (WALK * T.Speed.Pair * H.HoldMargin + H.HoldExtra)) < 1e-6, jump.slowest)
 
 -- (c) the other side of your heavy two-hands piece ----------------------------------------------------------------------------------
 
@@ -314,7 +461,7 @@ said = #E.said
 local assisted = run(6, function()
 	return Rules.holding(danny.s.move, danny.id) == 2
 end)
-check("7.x Danny takes its other side (\"Here, let me take the other side.\"): the pair's walk for both (0.8)", assisted and helped()
+check("7.x Danny takes its other side (\"Here, let me take the other side.\"): the pair's walk for both (8.1: 0.7)", assisted and helped()
 	and E.saidSince("Here, let me take the other side.", said) and select(2, Rules.holding(danny.s.move, danny.id)) == "helper")
 follow(tv, sol)
 run(0.3)

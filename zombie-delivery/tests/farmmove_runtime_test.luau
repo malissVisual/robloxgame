@@ -728,8 +728,11 @@ local solVan = E.cars[sol]
 local solBack = solVan.chassis:FindFirstChild("CargoDoor").WorldPosition
 E.clock += 12
 E.place(sol, V3(solBack.X, 3, solBack.Z) + (V3(solBack.X, 0, solBack.Z) - V3(solVan.chassis.Position.X, 0, solVan.chassis.Position.Z)).Unit * 3)
-steps(0.4, nil, solWagon)
-check("…to the van at the barn together, its back open", heldBy(wagonId) and flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
+-- (8.1: never put at the far end while he holds it: he walks after Sol's jump there at his top speed)
+local caughtUp = steps(4, function()
+	return flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
+end, solWagon)
+check("…to the van at the barn together, its back open", heldBy(wagonId) and caughtUp and flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
 	and solVan.model:GetAttribute("BackOpen") == true)
 trigger(promptIn(solVan.model, "Load"), sol)
 steps(0.3)

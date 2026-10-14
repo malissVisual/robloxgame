@@ -20,8 +20,8 @@ local function check(name: string, ok: boolean, detail: any?)
 		print("FAIL  " .. name .. (if detail ~= nil then "  (" .. tostring(detail) .. ")" else ""))
 	end
 end
-local function near(a: number, b: number): boolean
-	return math.abs(a - b) < 1e-6
+local function near(a: number, b: number, eps: number?): boolean
+	return math.abs(a - b) < (eps or 1e-6)
 end
 
 local H = Config.MoveHelper
@@ -213,6 +213,52 @@ check("on the floor there: level with you", near(Brain.endRise(-1.75, -1.75), -1
 check("…a step up or down: with the floor", near(Brain.endRise(-1, -1.75), -1) and near(Brain.endRise(-3, -1.75), -3))
 check("…never off his hands' reach (HoldStep at most)", near(Brain.endRise(9, -1.75), -1.75 + H.HoldStep) and near(Brain.endRise(-40, -1.75), -1.75 - H.HoldStep))
 check("…no floor read: level with you", near(Brain.endRise(0 / 0, -1.75), -1.75))
+
+-- 8.1 holding the far end: never put there (the owner: "when I turn around he teleports") ------------------------------
+
+local pairWalk = Rules.carrySpeed(WALK, "pair", 8)
+check("8.1 his top speed holding it: the pair's walk × HoldMargin + HoldExtra (about the pair's walk and a margin)",
+	near(Brain.holdSpeed(pairWalk), pairWalk * H.HoldMargin + H.HoldExtra) and Brain.holdSpeed(pairWalk) > pairWalk and Brain.holdSpeed(pairWalk) < WALK * H.Sprint * 1.2)
+check("…faster with a faster leader (a steady grip, a Mover, the admin's speed), never under HoldExtra", Brain.holdSpeed(pairWalk * 2) > Brain.holdSpeed(pairWalk)
+	and near(Brain.holdSpeed(-3), H.HoldExtra))
+check("8.1 his body turns to you at HoldTurn × PairTurn at most", near(Brain.holdTurn(), math.rad(H.PairTurn) * H.HoldTurn))
+do
+	local top = Brain.holdSpeed(pairWalk)
+	local trail = Brain.newTrail()
+	local snapped, faster = false, false
+	for _ = 1, 20 do -- (2 s a step behind his place: a slow swing)
+		local limit, snap = Brain.holdTrack(trail, 1.5, false, top, 0.1)
+		snapped = snapped or snap
+		faster = faster or limit ~= top
+	end
+	check("8.1 close behind (under HoldBehind studs): his top speed, never put there", not snapped and not faster and trail.behind == 0)
+	snapped, faster = false, false
+	for _ = 1, 600 do -- (a minute 200 studs behind, far off: still never put there)
+		local _, snap = Brain.holdTrack(trail, 200, false, top, 0.1)
+		snapped = snapped or snap
+	end
+	check("…far behind for a minute (200 studs): never put there at once", not snapped)
+	trail = Brain.newTrail()
+	local first: number? = nil
+	local easeSteps, easeSpeed = 0, 0
+	for step = 1, 80 do -- (20 studs off, 8 s: stuck behind a wall)
+		local limit, snap = Brain.holdTrack(trail, 20, false, top, 0.1)
+		snapped = snapped or snap
+		if limit > top + 1e-9 then
+			first = first or step
+			easeSteps += 1
+			easeSpeed = limit
+		end
+	end
+	check("8.1 more than HoldBehind studs off for HoldStuck s: eased back (20 studs over HoldEase s: 40 a second), not put there", not snapped and first ~= nil
+		and near((first :: number) * 0.1, H.HoldStuck, 0.11) and near(easeSpeed, 20 / H.HoldEase) and easeSpeed > top)
+	check("…the ease lasts HoldEase s, then his top speed again (and another ease HoldStuck s later if still stuck)", easeSteps == 2 * math.floor(H.HoldEase / 0.1 + 0.5), easeSteps)
+	trail = Brain.newTrail()
+	local limit, snap = Brain.holdTrack(trail, 4000, true, top, 0.1)
+	check("8.1 only a door's fade puts him there: the piece in the other world", snap and near(limit, top) and trail.behind == 0)
+	local _, again = Brain.holdTrack(trail, 0.2, false, top, 0.1)
+	check("…and holding on from there: never again", not again)
+end
 
 check("7.x your grip bar while he holds the other end: the box Steadied (1.3) × bigger", near(CarryGrip.profile("pair", 8, false, false, true).zone,
 	CarryGrip.profile("pair", 8, false, false).zone * Config.CarryGrip.Steadied) and Config.CarryGrip.Steadied == 1.3
