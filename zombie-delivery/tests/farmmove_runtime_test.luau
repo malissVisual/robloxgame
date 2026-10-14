@@ -19,8 +19,8 @@
 --     s, the new van taken over), FINISH: paid for the three trips at the farm's pay (× its pay), chapter 1 done in the
 --     crew's saves (7.2 review: not for Cy, who joined without the prologue), the interior gone, the van's back its own
 --     again.
---   * Danny on a solo farm move: two ways; with the van at the barn he goes in and out by the barn doors for the
---     branding iron (★ first, the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
+--   * Danny on a solo farm move: two ways; 8.3 hired and given the branding iron, with the van at the barn he goes in
+--     and out by the barn doors for it (the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
 --     and comes out of the farmhouse's front door with Sol, then the hay wagon's (bigDoor) out of the barn doors to the
 --     van's hitch.
 --   * 8.1 walk-in doors (no E): a doormat at both doors; in by walking into the barn doors' zone; the hay wagon walked
@@ -599,6 +599,14 @@ local danny = MoveHelper.find(sol)
 local solBuild = built[#built]
 check("a solo farm move: Danny comes, with both ways (the front door, the barn doors)", danny ~= nil and #danny.ways == 2 and solBuild.plan.kind == "farm")
 E.cars[sol].model:SetAttribute("BackOpen", true)
+-- (8.3 Danny for hire: Sol hires him and gives him the branding iron, from beside it inside, then waits outside)
+E.request(sol, "helper", "hire")
+local solIron = solBuild.pieces[ironSpot.id]
+local outsideSol = E.rootOf(sol).Position
+E.place(sol, solIron.PrimaryPart.Position + V3(3, 0, 0))
+E.request(sol, "helper", "assign", solIron)
+E.place(sol, outsideSol)
+check("8.3 Sol hires Danny and gives him the branding iron", danny.hirer == sol and danny.queue[1] == ironSpot.id, danny.queue[1])
 local solOrigin = solBuild.origin
 local solBarnEntry = (solOrigin * HouseLayout.entries(solBuild.plan)[2]).Position
 local solFrontEntry = (solOrigin * solBuild.plan.entry).Position
@@ -631,7 +639,7 @@ for _ = 1, 2400 do
 		break
 	end
 end
-check("Danny goes in by the barn doors (the nearest way to the branding iron, ★ first)", cameIn ~= nil and (cameIn - solBarnEntry).Magnitude < 6 and (cameIn - solFrontEntry).Magnitude > 30,
+check("Danny goes in by the barn doors (the nearest way to the branding iron, his list's)", cameIn ~= nil and (cameIn - solBarnEntry).Magnitude < 6 and (cameIn - solFrontEntry).Magnitude > 30,
 	cameIn)
 check("…comes out by them with it and loads it into the van at the barn", cameOut ~= nil and flat(cameOut, barnOut) < 6 and ironIn, cameOut)
 
@@ -744,8 +752,19 @@ trigger(promptIn(solVan.model, "Load"), sol)
 steps(0.3)
 check("…Sol loads it: on the van's hitch, Danny's hands free", s.move.things[wagonId].state == "truck" and s.move.hitch == wagonId
 	and Rules.holding(s.move, danny.id) == nil, E.lastNotice(sol))
--- the ZDC Van's back shut: he opens it himself when he comes with his next piece, and it goes in (helperLoad)
+-- the ZDC Van's back shut: he opens it himself when he comes with his next piece (8.3: one Sol gives him), and it
+-- goes in (helperLoad)
 solVan.model:SetAttribute("BackOpen", false)
+local nextPiece: any = nil
+for _, sp in solBuild.plan.spots do
+	local def = FurnitureLooks.Items[sp.item]
+	if not nextPiece and def and def.class == "hand" and s.move.things[sp.id].state == "home" and table.find(Moving.helperExits(s, sp.id), 2) then
+		nextPiece = sp
+	end
+end
+local nextModel = solBuild.pieces[nextPiece.id]
+E.place(sol, nextModel.PrimaryPart.Position + V3(3, 0, 0))
+E.request(sol, "helper", "assign", nextModel)
 E.place(sol, barnOut + V3(-20, 0, 0)) -- (out of the way, hands free)
 local saidBefore = #E.said
 local loadedBefore = Rules.counts(s.move).out

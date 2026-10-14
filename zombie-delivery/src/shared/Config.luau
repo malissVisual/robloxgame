@@ -5633,7 +5633,8 @@ Config.Robust = {
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
 		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
-		MoveHelper = 4, -- 8.3: Danny's orders and STOP (the Moving remote's "helper": server/MoveHelper.luau)
+		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
+		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 	},
 }
@@ -6589,15 +6590,18 @@ Config.MoveStory = {
 }
 
 -- 7.0, the depot's helper ("Danny from the depot": server/MoveHelper.luau, his decisions shared/MoveHelperBrain.luau,
--- tests/movehelper_test.luau; the owner: solo play is allowed with an AI helper). An NPC mover who joins a move whose
--- crew is one player: he takes the other end of your two-person piece (and the other side of a heavy two-hands one),
--- carries the one-hand and two-hands pieces to the van on his own and opens its back. 7.x (the owner: "he helps
--- weirdly, mainly we don't carry anything together"): a partner who carries with you.
---   Solo / Duo         a crew of one / of two players gets him (Duo: off)
+-- tests/movehelper_test.luau; the owner: solo play is allowed with an AI helper). An NPC mover who comes with a move
+-- whose crew is one player. 7.x (the owner: "he helps weirdly, mainly we don't carry anything together"): a partner who
+-- carries with you. 8.3 for hire (the owner: "I have to PAY for him when I want help … you click on something, and that
+-- assigns it to him, and the rest you carry yourself"; "he must sit in my car with me"): he waits by the van until a
+-- crew player hires him for the move (Hire), then carries the pieces the crew clicks (Queue) to the van, lifts the
+-- two-person ones with you and rides in the van's passenger seat.
+--   Solo / Duo         a crew of one / of two players has him by the van for hire (Duo: off); once hired he stays with
+--                      any crew until the move ends (or his hirer leaves it)
 --   Name / Title       his name tag
 --   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
 --   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
---                      slower than a player; Sprint: × the walk on his way to your lift (or the other side of your piece)
+--                      slower than a player; Sprint: × the walk on his way to your lift (8.3: and to the van's seat)
 --   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
 --   Tick / Think / Repath   s between his steps / his looks for the next piece / two paths (PathfindingService)
 --   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpRetry: s before he tries
@@ -6640,12 +6644,6 @@ Config.MoveStory = {
 --                      back: "That's going in the van." (its back shut: he opens it for the two of you, OpenBack)
 --   HelpReach / PickReach   studs from your piece's far end he takes it / from a piece's edge he picks it up; LoadReach:
 --                      from the van's back he loads; DoorReach: from a door he goes through it
---   Reserve            studs: a crew player with free hands this near a piece (and nearer than he is) is about to lift
---                      it: he leaves it to them ("All yours, boss.")
---   TripBase           studs added to every trip when he ranks the pieces (★ first, then the value a second of the trip)
---   AssistWeight / AssistFar / AssistBack   a two-hands piece this heavy or heavier that a crew player carries alone
---                      within AssistFar studs (not within AssistBack of the van's back): he takes its other side (the
---                      pair's walk for both)
 --   OpenBack / OpenNear / OpenFar   may he open the van's back himself (else he asks); somebody of the crew coming with
 --                      a piece within OpenNear studs of the shut back while he is within OpenFar of it: he opens it
 --   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
@@ -6658,12 +6656,9 @@ Config.MoveStory = {
 --                      past its edge, Off at least from the wall
 --   TruckFar           studs from the house: a van farther away is driving off (he waits at the house's door)
 --   TalkGap / TalkRepeat   s at least between two lines / before the same line again
---   Follow             studs behind you on "Help me" (8.3: his orders' rate limit is Config.Robust.Limits.MoveHelper)
---   8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes; I'd like to
---   click on him any time and tell him what to do, or an auto mode where he carries only light things and calls for
---   help with a heavy one"; shared/MoveHelperBrain.luau's order, pickAsk, inPlace, approach, callKept; server/
---   MoveHelper.luau's call and ask; client/MoveHelperCard.luau, his command card):
---   WaitForHelper      Danny on the move (his body up, his hands not on another piece): a two-person Lift calls him
+--   8.3 your call (the owner: "when you want to take a heavy thing you must wait until the helper comes";
+--   shared/MoveHelperBrain.luau's inPlace, approach, callKept; server/MoveHelper.luau's call):
+--   WaitForHelper      Danny hired for the move (his body up, his hands not on another piece): a two-person Lift calls him
 --                      ("Danny, give me a hand!"), you wait at your end while he walks to its other end, and its lift
 --                      check opens once he is there (false: today's rules, you drag it alone and he comes to it)
 --   CallReady / CallClose / CallStuck   in place for your call: within CallReady studs of his place at its far end, or
@@ -6672,13 +6667,25 @@ Config.MoveStory = {
 --                      the last resort, he fades over (a door's own walk-through is not a fade-over)
 --   CallLeave / CallIdle   your call ends when you walk CallLeave studs past the Lift's reach, or he stood ready
 --                      CallIdle s and you never lifted (Lift again, G or the STOP button end it too)
---   LightWeight        AUTO: the two-hands pieces under this weight he carries alone (a pair piece, or a two-hands one
---                      this heavy or heavier, is one he asks a hand for)
---   AskFar / AskWait   AUTO: a heavy piece within AskFar studs (on foot) that nobody handles: he goes to it, says "give
---                      me a hand!" (the crew's toast, a 🙋 marker over it) and waits AskWait s for somebody to lift it
---   AskAgain / AskGap  s before he asks again after nobody came / after somebody came (no nagging)
---   CardReach / ClickReach / TapSlop   the client's: his command card closes when you are CardReach studs from him;
---                      a click or tap reaches him from ClickReach studs, TapSlop studs beside his body counts
+--   8.3 for hire (shared/MoveHelperBrain.luau's hirePrice, hireCheck, assignCheck, nextQueued, pickSeat, getOut;
+--   server/MoveHelper.luau's hire, list and ride; client/MoveHelperCard.luau his card and the clicks on the pieces;
+--   the rate limits Config.Robust.Limits.MoveHelper (HIRE, CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)):
+--   Hire               the hire, for one move, paid by the crew player who hires him (PlayerData.spend, the analytics
+--                      reason HelperHire): Base + PerPiece × the house's pieces (the bigger the house, the more he
+--                      saves you), to Round dollars, Min … Max. The tuning: the sandbox starts you with $500 and a
+--                      first haul on show earns about $100 a minute, so the Old Chalet's 20-28 pieces ($150-$190) are a
+--                      real choice on the first move and two minutes of the warehouse's income later; a bigger house
+--                      (the Alpine Lodge's 40 or so: about $250) costs more, Max at most. Danny's training
+--                      (Config.SandboxUpgrades danny) makes him faster, not cheaper. No refund: a hire lasts the move
+--                      (CLEAR QUEUE stops him working; nothing more is charged)
+--   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
+--                      the order they were clicked, the rest is yours
+--   RideReach          studs from the van's passenger door he gets in (your seat at its wheel: he walks there at the
+--                      Sprint, CallGain / CallBlink his last resort; the seat taken by a crew mate: he follows the van
+--                      on foot)
+--   CardReach / ClickReach / TapSlop   the client's: his card closes when you are CardReach studs from him; a click or
+--                      tap reaches him (or a piece: the server checks ClickReach + 10 studs) from ClickReach studs,
+--                      TapSlop studs beside his body counts
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -6724,11 +6731,6 @@ Config.MoveHelper = {
 	PickReach = 3,
 	LoadReach = 5,
 	DoorReach = 3.5,
-	Reserve = 8,
-	TripBase = 30,
-	AssistWeight = 4,
-	AssistFar = 45,
-	AssistBack = 10,
 	OpenBack = true,
 	OpenNear = 30,
 	OpenFar = 30,
@@ -6743,8 +6745,7 @@ Config.MoveHelper = {
 	TruckFar = 150,
 	TalkGap = 3,
 	TalkRepeat = 12,
-	Follow = 5,
-	-- 8.3 Danny's orders
+	-- 8.3 your call
 	WaitForHelper = true,
 	CallReady = 3,
 	CallClose = 6,
@@ -6753,11 +6754,10 @@ Config.MoveHelper = {
 	CallBlink = 15,
 	CallLeave = 4,
 	CallIdle = 25,
-	LightWeight = 5,
-	AskFar = 140,
-	AskWait = 20,
-	AskAgain = 45,
-	AskGap = 6,
+	-- 8.3 for hire
+	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
+	Queue = 6,
+	RideReach = 3,
 	CardReach = 40,
 	ClickReach = 90,
 	TapSlop = 2.5,

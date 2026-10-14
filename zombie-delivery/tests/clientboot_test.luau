@@ -45,7 +45,7 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
 	"QuickChat", "CarryGripUi", "CargoPrompts",
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's command card; VanPaintUi, the PAINT shop's window)
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
@@ -331,7 +331,7 @@ do
 	end
 	check("ESC closes the crew panel, folds the planning, closes the move's cards, the quick chat and the warehouse's picker", called(run, "CrewPanel.close") and called(run, "MoveLobbyUi.minimize") and called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
 	check("… and the UPGRADES window (8.1 review)", called(run, "UpgradeUi.close"))
-	check("… and 8.3 Danny's command card (a window like the others, with its onOpen)", called(run, "MoveHelperCard.close") and type(run.modules.MoveHelperCard.onOpen) == "function")
+	check("… and 8.3 Danny's card (his hire, his list: a window like the others, with its onOpen)", called(run, "MoveHelperCard.close") and type(run.modules.MoveHelperCard.onOpen) == "function")
 	check("… and 8.3 the PAINT shop's window (a window like the others, with its onOpen)", called(run, "VanPaintUi.close") and type(run.modules.VanPaintUi.onOpen) == "function")
 	-- 8.1 review: opening a sandbox window closes the others, never itself (its onOpen runs once it counts as open)
 	local onOpen = run.modules.UpgradeUi.onOpen
@@ -359,9 +359,9 @@ do -- 8.1 review: the UPGRADES window alone frees the mouse too (on PC the camer
 	check("the open UPGRADES window frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
 end
 
-do -- 8.3 Danny's command card alone: open, it frees the mouse (its buttons are clicked); it closes the other windows
+do -- 8.3 Danny's card (his hire, his list) alone: open, it frees the mouse (its buttons are clicked); it closes the other windows
 	local run = boot(true, { MoveHelperCard = "ok", WarehouseUi = "ok" }, true)
-	check("8.3 Danny's open command card frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
+	check("8.3 Danny's open card frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
 	local onOpen = run.modules.MoveHelperCard.onOpen
 	if type(onOpen) == "function" then
 		table.clear(run.calls)

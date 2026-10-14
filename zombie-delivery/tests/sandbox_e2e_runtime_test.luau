@@ -11,7 +11,7 @@
 --   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states.
 --   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
 --   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
---      Danny for each (told to wait at the van). Bob at Ann's kiosk gets only his own card.
+--      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
 --   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside.
 --   5. A sturdy two-hands piece through the grip lift check: a crew mate's answer does nothing, a forged "ok" is a miss
 --      (a knock), the client's "ok" with a good press time lifts it balanced; a wobble answered (steady), one missed (a
@@ -325,12 +325,11 @@ function H.takeContract(player: any, plot: any): (any, boolean, string?)
 	local card = E.lastOf(player, "Moving", "contract", before)
 	return card and card[2], ok, why
 end
--- START, LAUNCH (solo) and Danny told to wait at the van.
+-- START, LAUNCH (solo); Danny waits by the van for hire (8.3: nobody hires him here, the pieces are the player's).
 function H.launch(player: any)
 	E.fire(player, "Moving", "start", House.id)
 	E.fire(player, "MoveLobby", "launch")
 	E.advance(0.5)
-	E.fire(player, "Moving", "helper", "van") -- (8.3: WAIT AT VAN, his command card's)
 end
 -- The van's middle along the roads: out of the plot, Depot Row, Main Street, round the turnaround to the curb, backed
 -- toward the chalet's door (its nose north).
@@ -633,10 +632,11 @@ do
 	S.annMove = view.id
 	check("…its drop-off is her plot's unload circle; no horde; the clock runs", view.drop == "your warehouse" and view.dropOff.x == plots[1].unload.x
 		and view.dropOff.z == plots[1].unload.z and view.hordeAt == nil and view.endsAt > E.now)
-	check("…Danny joins her crew of one, on AUTO (8.3), his id for his command card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).mode == "auto"
+	check("…Danny comes with her crew of one, for hire (8.3), his id for his card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).hirer == nil
 		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
 	E.fire(ann, "Moving", "helper", "van")
-	check("…told to WAIT AT VAN (8.3: his command card's order): he leaves her pieces to her", ann:GetAttribute("MoveHelper") == "van", ann:GetAttribute("MoveHelper"))
+	check("…the old orders are gone (WAIT AT VAN: nothing): not hired, he leaves her pieces to her, his price on her status line",
+		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	local bobCard = H.takeContract(bob, plots[2])
 	H.launch(bob)
