@@ -160,7 +160,8 @@ do
 	check("…opening fast, easing into the stop; shutting slow, then quicker into the frame", DoorSwing.ease(0.5, true) > 0.8 and DoorSwing.ease(0.5, false) < 0.3)
 	local x, y, z = DoorSwing.dark(4, 7, 0.4)
 	local x2, _, z2 = DoorSwing.dark(0.4, 7, 4)
-	check("the dark doorway: the leaf's face less a hair, thin in its middle plane", x < 4 and x > 3.8 and y < 7 and y > 6.9 and z <= 0.05 and x2 <= 0.05 and z2 > 3.8)
+	check("the dark doorway: the leaf's whole face (two halves meet with no seam), thin in its middle plane", x == 4 and y == 7 and z <= 0.05 and x2 <= 0.05
+		and z2 == 4)
 end
 
 -- ── The timing (Config.Moving.Doors) ───────────────────────────────────────

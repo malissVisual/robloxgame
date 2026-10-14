@@ -29,6 +29,7 @@
 --   SandboxWorld.lighting()   the fixed warm alpine afternoon (in sandbox mode the city's DayNight and Weather do not
 --                             run): the clock, the sun, the ambient light, the Atmosphere's soft far haze, the sky, the
 --                             clouds and the colour grade; the workspace's clock attributes for whatever reads them
+--   SandboxWorld.doorLeaves(house)   8.3 walk-in doors: the house's front door leaves that swing (house's build does it)
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -263,6 +264,49 @@ local function underMeshRoof(body: Model, frame: CFrame)
 	end
 end
 
+-- 8.3 walk-in doors: the house's front door leaves (shared/DoorSwing.luau's attributes; client/WalkDoors.luau swings
+-- them, server/Moving.luau says when). Dressed in the owner's Blender house (its door part of the model: still): two
+-- leaves made like it just in front of it (SandboxScenery.frontLeaves; models "FrontDoorLeaf" in the model's own
+-- finishes, HouseMesh.Looks), each hinged at the opening's side (DoorLeaf ±1), swinging into the house (DoorSwing 1), a
+-- dark hall where they stood (DoorDark); else the chalet's FrontDoor itself is the leaf (hinged on the left seen from
+-- the path). Never colliding, never in a ray's way. Returns the leaves.
+function SandboxWorld.doorLeaves(house: Model): { Instance }
+	local d = MAP.House.door
+	local frame = CFrame.new(d.x, d.y, d.z) * CFrame.Angles(0, math.rad(d.yaw), 0)
+	local body = house:FindFirstChild("House_" .. MAP.House.id)
+	local front = if body then body:FindFirstChild("FrontDoor") else nil
+	local made: { Instance } = {}
+	if body and body:GetAttribute("MeshArt") == true then
+		for _, leaf in S.frontLeaves() do
+			local model = Instance.new("Model")
+			model.Name = "FrontDoorLeaf"
+			for n, spec in leaf.parts do
+				local look = HouseMesh.Looks[spec.finish]
+				local turn = if spec.cylinder then CFrame.Angles(0, math.pi / 2, 0) else CFrame.new()
+				local p = deco(block(model, spec.name, Vector3.new(spec.size[1], spec.size[2], spec.size[3]), frame * CFrame.new(spec.at[1], spec.at[2], spec.at[3]) * turn, look.color, look.material))
+				p.Reflectance = look.reflectance or 0
+				if spec.cylinder then
+					p.Shape = Enum.PartType.Cylinder
+				end
+				if n == 1 then
+					model.PrimaryPart = p
+				end
+			end
+			model:SetAttribute("DoorLeaf", leaf.hinge)
+			model:SetAttribute("DoorSwing", 1)
+			model:SetAttribute("DoorDark", true)
+			model.Parent = house
+			table.insert(made, model)
+		end
+	elseif front then
+		front:SetAttribute("DoorLeaf", 1)
+		front:SetAttribute("DoorSwing", 1)
+		front:SetAttribute("DoorDark", true)
+		table.insert(made, front)
+	end
+	return made
+end
+
 local function house(world: Instance): Model
 	local H = MAP.House
 	local model = Instance.new("Model")
@@ -354,15 +398,7 @@ local function house(world: Instance): Model
 		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
 	end
 	model.Parent = world
-	-- 8.3 walk-in doors (shared/DoorSwing.luau's attributes; client/WalkDoors.luau swings it, server/Moving.luau says
-	-- when): the front door is a leaf swinging into the house as you walk up to it, hinged on the left as seen from the
-	-- path, a dark hall behind it (the chalet's body is solid there). The Blender house's own door stays still.
-	local front = body:FindFirstChild("FrontDoor")
-	if front and body:GetAttribute("MeshArt") ~= true then
-		front:SetAttribute("DoorLeaf", 1)
-		front:SetAttribute("DoorSwing", 1)
-		front:SetAttribute("DoorDark", true)
-	end
+	SandboxWorld.doorLeaves(model) -- 8.3 walk-in doors: its front door's leaves swing (the model's door copied when dressed)
 	return model
 end
 

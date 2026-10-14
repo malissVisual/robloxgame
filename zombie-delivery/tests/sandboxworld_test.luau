@@ -537,6 +537,61 @@ do
 	check("the FrontDoor on the Blender house's door: across it, as wide and tall, just in front of its leaves", onLeaves,
 		door and string.format("FrontDoor %.2f … %.2f, %.2f … %.2f, %.2f … %.2f; leaves %.2f … %.2f, %.2f … %.2f, %.2f … %.2f",
 			door.x0, door.x1, door.y0, door.y1, door.z0, door.z1, lo[1], hi[1], lo[2], hi[2], lo[3], hi[3]))
+	-- 8.3 walk-in doors: the Blender house's front door is part of its model (it cannot move): dressed, two leaves made
+	-- like it (SandboxScenery.frontLeaves) stand just in front of it and swing (SandboxWorld.doorLeaves): together they
+	-- cover its leaves, meet in its middle, their backs on the wall's face (its brass handles reach that), hinged at the
+	-- opening's sides; every detail in front of its leaf
+	local leaves = SandboxScenery.frontLeaves()
+	local llo, lhi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+	local leavesOk = #leaves == 2
+	local edges: { number } = {}
+	for _, leaf in leaves do
+		local parts = leaf.parts
+		local leafBody = parts[1]
+		leavesOk = leavesOk and leafBody.name == "DoorLeaf" and math.abs(leaf.hinge) == 1 and leafBody.at[1] * leaf.hinge > 0 and #parts == 8
+		for i = 1, 3 do
+			local o = ({ d.x, d.y, d.z })[i]
+			llo[i] = math.min(llo[i], o + leafBody.at[i] - leafBody.size[i] / 2)
+			lhi[i] = math.max(lhi[i], o + leafBody.at[i] + leafBody.size[i] / 2)
+		end
+		table.insert(edges, leafBody.at[1] - leaf.hinge * leafBody.size[1] / 2) -- (its free end)
+		for n = 2, #parts do
+			local part = parts[n]
+			leavesOk = leavesOk and part.at[3] + part.size[3] / 2 <= leafBody.at[3] - leafBody.size[3] / 2 + 0.03 + 1e-6
+				and math.abs(part.at[1] - leafBody.at[1]) + part.size[1] / 2 <= leafBody.size[1] / 2 + 1e-6
+		end
+	end
+	check("8.3 the Blender house's door copied as two leaves: they cover its leaves from the front, meet in its middle, hinged at its sides",
+		leavesOk and llo[1] <= lo[1] + 1e-6 and lhi[1] >= hi[1] - 1e-6 and math.abs(llo[2] - lo[2]) < 0.02 and math.abs(lhi[2] - hi[2]) < 0.02
+			and lhi[3] <= d.z + 1e-6 and lhi[3] <= lo[3] and math.abs(edges[1] - edges[2]) < 1e-6,
+		string.format("leaves %.2f … %.2f, %.2f … %.2f, %.2f … %.2f", llo[1], lhi[1], llo[2], lhi[2], llo[3], lhi[3]))
+	local made = if chalet then SandboxWorld.doorLeaves(chalet) else {}
+	check("…the chalet (no import here): its FrontDoor itself is the leaf", #made == 1 and made[1] == door.part)
+	-- a house dressed in the model (as the owner's import does): the two leaves in it, the FrontDoor only the prompt's
+	local dressedHouse = G.Instance.new("Model")
+	local dressedBody = G.Instance.new("Model")
+	dressedBody.Name = "House_" .. HOUSE.id
+	dressedBody:SetAttribute("MeshArt", true)
+	dressedBody.Parent = dressedHouse
+	local prompt = G.Instance.new("Part")
+	prompt.Name = "FrontDoor"
+	prompt.Parent = dressedBody
+	local built = SandboxWorld.doorLeaves(dressedHouse)
+	local builtOk = #built == 2 and prompt:GetAttribute("DoorLeaf") == nil
+	for n, leaf in built do
+		local primary = leaf.PrimaryPart
+		local parts = 0
+		local still = true
+		for _, part in leaf:GetChildren() do
+			parts += 1
+			still = still and part.CanCollide == false and part.CanQuery == false and part.CanTouch == false
+		end
+		builtOk = builtOk and leaf.ClassName == "Model" and leaf.Name == "FrontDoorLeaf" and leaf.Parent == dressedHouse
+			and leaf:GetAttribute("DoorLeaf") == leaves[n].hinge and leaf:GetAttribute("DoorSwing") == 1 and leaf:GetAttribute("DoorDark") == true
+			and primary ~= nil and primary.Name == "DoorLeaf" and primary.Color == HouseMesh.Looks.door.color and parts == 8 and still
+	end
+	check("…dressed in the Blender house: two FrontDoorLeaf models in it (DoorLeaf ±1, DoorSwing 1, DoorDark; the model's finishes), never colliding",
+		builtOk, #built)
 	local garden = chalet and chalet:FindFirstChild("Garden")
 	local gardenSolid: string? = if garden then nil else "no garden"
 	local gardenParts = 0

@@ -1350,6 +1350,15 @@ do
 		and arrival.wait == D.Wait and arrival.near == D.Arrive)
 	check("…and the way you face there: into the house, away from the door (the camera goes behind you)", arrival ~= nil and arrival.look:Dot(into) > 0.99
 		and E.rootOf(kit).CFrame.LookVector:Dot(into) > 0.99)
+	local stateFirst = false
+	for index = since + 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == kit and m.kind == "fade" and m.a == "in" then
+			break
+		end
+		stateFirst = stateFirst or (m.player == kit and m.kind == "state" and type(m.a) == "table" and m.a.inside == true)
+	end
+	check("…the move's state (inside) reaches you before the fade in: the HUD, the sounds and the eyes adapt while it is black", stateFirst)
 	local walking = E.rootOf(kit).AssemblyLinearVelocity
 	check("…still walking: the walk's speed carried on the way you face there (no stop, no turn of the momentum)", walking ~= nil
 		and math.abs(walking:Dot(into) - 10) < 1e-6 and math.abs(walking:Dot(V3(1, 0, 0))) < 1e-6)

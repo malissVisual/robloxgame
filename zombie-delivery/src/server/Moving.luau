@@ -335,6 +335,8 @@ local SB = {
 --   want    a leaf → the os.clock somebody last wanted it open (in its approach facing it, Danny near it, a trip
 --           through it); its DoorOpen is true from then until Shut s after (WalkIn.sweep)
 --   opened  a leaf → when it opened (the trip waits until it has been open Open s: WalkIn.ready)
+--   send    the move's state to its crew now (send's: a trip sends where you are before its fade in, so the client's
+--           eyes, client/SandboxLight.luau, adapt while the screen is still black)
 local WalkIn = {
 	at = {} :: { [Player]: { key: number, since: number?, tried: boolean } },
 	held = {} :: { [Player]: { untilAt: number, left: boolean?, from: Vector3? } },
@@ -343,6 +345,7 @@ local WalkIn = {
 	want = {} :: { [Instance]: number },
 	opened = {} :: { [Instance]: number },
 	none = table.freeze({}) :: { Instance },
+	send = nil :: ((any) -> ())?,
 }
 
 -- The drop-off in a sentence: "the Wall" (the city), "your warehouse" (8.0 SANDBOX).
@@ -2210,6 +2213,10 @@ travel = function(player: Player, target: CFrame, s: Session, inside: boolean)
 		end)
 		if not ok then
 			warn(`[Moving] a door trip failed: {err}`)
+		end
+		local push = WalkIn.send -- (where you are now, before the fade in: the HUD, the sounds and the eyes while black)
+		if push and not s.ended then
+			pcall(push, s)
 		end
 		for _, member in party do
 			traveling[member] = nil
@@ -4955,6 +4962,7 @@ function Moving.start()
 		end
 		WalkIn.show()
 	end
+	WalkIn.send = send -- 8.3 walk-in doors: a trip sends where you are before its fade in (travel)
 	wireHooks()
 	-- 7.0 planning: the lobby before a move (its LAUNCH starts it with the roles; the quick chat reaches the move's crew)
 	MoveLobby.onLaunch = function(owner: Player, contractId: string, roles: { [number]: string }): string?

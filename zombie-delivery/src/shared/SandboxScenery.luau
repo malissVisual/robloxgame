@@ -741,4 +741,44 @@ function SandboxScenery.peaks(): { Peak }
 	return list
 end
 
+-- ── 8.3 walk-in doors: the big house's front door as two leaves that swing ───────────────────────────────────────────
+-- The owner's Blender house (server/HouseMesh.luau, design/blender-house/house.py door("front")) has its double front
+-- door in its model: it cannot move. Copied as two door leaves (shared/DoorSwing.luau; server/SandboxWorld.luau
+-- doorLeaves builds them once the house is dressed), standing just in front of the model's door (its leaves sit 0.22 to
+-- 0.34 back in their pocket, its brass handles reach the wall's face: the copies' backs on the face cover all of it),
+-- each half the opening (they meet in the middle, no seam), hinged at the opening's side, swinging into the house over
+-- the model's own door (a dark hall where they stood: DoorDark). Each leaf's parts in the door's frame (its foot on the
+-- front wall, +X right of somebody looking out, -Z out to the road), its body first: the body, two cassettes, the glass,
+-- the grille's two bars, the brass knob (a cylinder along Z) and lever, as house.py draws them.
+--   FrontDoor  the opening: Width × Height from Sill up; the leaf Tall, Thick
+export type LeafPart = { name: string, finish: string, size: { number }, at: { number }, cylinder: boolean? }
+export type FrontLeaf = { hinge: number, parts: { LeafPart } }
+SandboxScenery.FrontDoor = { Width = 4, Height = 6.85, Sill = 0.15, Tall = 6.82, Thick = 0.12 }
+
+function SandboxScenery.frontLeaves(): { FrontLeaf }
+	local F = SandboxScenery.FrontDoor
+	local half = F.Width / 2
+	local y = F.Sill + F.Height / 2
+	local face = -F.Thick -- (the leaf's front, out to the road)
+	local list: { FrontLeaf } = {}
+	for _, k in { -1, 1 } do
+		local x = k * half / 2
+		local inward = -k -- (its handle toward the middle)
+		table.insert(list, {
+			hinge = k, -- (its outer end: the opening's side)
+			parts = {
+				{ name = "DoorLeaf", finish = "door", size = { half, F.Tall, F.Thick }, at = { x, y, -F.Thick / 2 } },
+				{ name = "Cassette", finish = "door", size = { half - 0.6, 2.3, 0.04 }, at = { x, F.Sill + 1.8, face - 0.02 } },
+				{ name = "Cassette", finish = "door", size = { half - 0.6, 0.8, 0.04 }, at = { x, F.Sill + F.Height - 0.75, face - 0.02 } },
+				{ name = "DoorGlass", finish = "glass", size = { half - 0.75, 1.9, 0.03 }, at = { x, F.Sill + 4.35, face - 0.005 } },
+				{ name = "Grille", finish = "door", size = { 0.08, 1.9, 0.03 }, at = { x, F.Sill + 4.35, face - 0.035 } },
+				{ name = "Grille", finish = "door", size = { half - 0.75, 0.08, 0.03 }, at = { x, F.Sill + 4.35, face - 0.035 } },
+				{ name = "Knob", finish = "brass", size = { 0.22, 0.14, 0.14 }, at = { x + inward * 0.7, F.Sill + 3.1, face - 0.11 }, cylinder = true },
+				{ name = "Handle", finish = "brass", size = { 0.38, 0.07, 0.06 }, at = { x + inward * 0.58, F.Sill + 3.1, face - 0.17 } },
+			},
+		})
+	end
+	return list
+end
+
 return SandboxScenery

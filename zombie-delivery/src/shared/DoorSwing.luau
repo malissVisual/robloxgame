@@ -26,8 +26,9 @@
 --                                     leaf * T(ox + hx, 0, oz + hz) * Ry(yaw * u) * T(-hx, 0, -hz)
 --   DoorSwing.ease(t, opening) -> number   the swing's openness at t (0 … 1 of its time): opening fast then easing
 --                                     into the stop (cubic out), shutting slow then quicker into the frame (quad in)
---   DoorSwing.dark(sx, sy, sz) -> (number, number, number)   the dark doorway's size (DoorDark): the leaf's face less
---                                     a hair round it, thin, in its middle plane
+--   DoorSwing.dark(sx, sy, sz) -> (number, number, number)   the dark doorway's size (DoorDark): the leaf's whole face,
+--                                     thin, in its middle plane (hidden inside the leaf while it is shut; two halves'
+--                                     meet with no seam)
 
 local DoorSwing = {}
 
@@ -87,11 +88,11 @@ function DoorSwing.ease(t: number, opening: boolean): number
 end
 
 function DoorSwing.dark(sx: number, sy: number, sz: number): (number, number, number)
-	local thin = 0.05
+	local thin = math.min(0.05, sx, sz)
 	if sx >= sz then
-		return math.max(sx - 0.1, thin), math.max(sy - 0.05, thin), thin
+		return sx, sy, thin
 	end
-	return thin, math.max(sy - 0.05, thin), math.max(sz - 0.1, thin)
+	return thin, sy, sz
 end
 
 return DoorSwing

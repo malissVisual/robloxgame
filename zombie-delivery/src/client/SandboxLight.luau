@@ -11,7 +11,8 @@
 --   * the sun rays, SandboxSunRays (none indoors; the template's SunRays off the same way).
 -- A new place's look comes in over Config.SandboxLight.Ease s (95 %), never at once (SandboxLightRules.ease, one step
 -- at most Step s long): walking into a hall never flashes. Where you are is looked at every Every s; the easing writes
--- only while it moves. A phone or a tablet (client/DeviceBudget.luau lite) blooms LiteBloom as much. Everything here is
+-- only while it moves. 8.3: while a door's trip keeps the screen black (client/Fade.luau isDark; the server sends where
+-- you are before the fade in) a new place comes in at once: the fade in shows it as it stays, no second change after. A phone or a tablet (client/DeviceBudget.luau lite) blooms LiteBloom as much. Everything here is
 -- this screen's own (made on the client, never sent anywhere).
 --
 --   SandboxLight.start()   once (client/Main.client.luau, the sandbox's list); nothing outside the sandbox
@@ -27,6 +28,7 @@ local Config = require(Shared.Config)
 local SandboxLightRules = require(Shared.SandboxLightRules)
 
 local DeviceBudget = require(script.Parent.DeviceBudget)
+local Fade = require(script.Parent.Fade) -- (8.3: a door's trip's black: the eyes adapt at once behind it)
 local MoveSounds = require(script.Parent.MoveSounds) -- (8.1: are you in the move's house)
 
 local SandboxLight = {}
@@ -200,6 +202,14 @@ function SandboxLight.start()
 			end
 		end
 		if settled then
+			return
+		end
+		if Fade.isDark() then
+			-- (8.3 a door's trip, client/Fade.luau: the screen black, the eyes are there at once: the fade in shows the
+			-- new place as it will stay, no second change after it)
+			shown = SandboxLightRules.copy(target)
+			settled = true
+			write(effects, shown)
 			return
 		end
 		shown = SandboxLightRules.ease(shown, target, dt)
