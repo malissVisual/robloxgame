@@ -19,6 +19,8 @@
 --                                                 nil: none due, the screen covered or the last one too recent; still(id)
 --                                                 false: no longer true (dropped, not shown, not seen)
 --   SandboxHints.seen(q, id) / waiting(q, id)     marked seen; waiting to show
+--   SandboxHints.busy(q, now) -> boolean          a hint waits, or one showed less than Gap s ago: the guide's soft
+--                                                 steps keep quiet meanwhile (shared/SandboxSteps.luau, its `hush`)
 --   SandboxHints.found(q, id)                     the player found it alone while its hint waited (opened the book, the
 --                                                 TASKS panel): not shown, seen
 --   SandboxHints.text(id, device) -> string       its words for the device
@@ -57,6 +59,10 @@ function SandboxHints.waiting(q: Queue, id: string): boolean
 		end
 	end
 	return false
+end
+
+function SandboxHints.busy(q: Queue, now: number): boolean
+	return #q.waiting > 0 or now - q.lastAt < tune().Gap
 end
 
 function SandboxHints.found(q: Queue, id: string)

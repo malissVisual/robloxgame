@@ -8,12 +8,18 @@
 -- A hint is one toast (SandboxHintsUi.notify: client/SandboxHud.luau's), in this device's words (client/PadGlyph.luau),
 -- once a session, one at a time, never while something covers the screen: a grip check (client/CarryGripUi.luau active),
 -- the move's cards with its result (client/MovingHud.luau isOpen), a sandbox window (the warehouse's, the UPGRADES
--- desk's, the book, the TASKS panel, Danny's command card) or the start screen (the ScreenGui "SandboxHud" off). A hint no longer true when
--- its turn comes (the reward claimed, FILL BEST used) is left out; one whose window the player opened alone while it
--- waited (the book, the TASKS panel) is not needed any more. client/SandboxHud.luau starts it.
+-- desk's, the book, the TASKS panel, Danny's command card, 8.3: the PAINT shop's) or the start screen (the ScreenGui
+-- "SandboxHud" off). A hint no longer true when its turn comes (the reward claimed, FILL BEST used) is left out; one
+-- whose window the player opened alone while it waited (the book, the TASKS panel) is not needed any more.
+-- client/SandboxHud.luau starts it.
 --   SandboxHintsUi.start()            listens (once; nothing when Config.Sandbox.On is false)
 --   SandboxHintsUi.step()             looks once: the hint due now (the loop does it every Hints.Every s while one waits)
 --   SandboxHintsUi.queue()            the hints' queue (SandboxHints.Queue: seen, waiting)
+--   SandboxHintsUi.isCovered()        8.3: does something cover the screen now (as the hints wait for it)?
+--   SandboxHintsUi.window()           8.3: the sandbox window open now (its module's name: "WarehouseUi", "UpgradeUi",
+--                                     "VanPaintUi", …; nil: none)
+--   SandboxHintsUi.busy()             8.3: a hint waits or has just shown (SandboxHints.busy)
+--   (8.3: client/SandboxGuide.luau asks these three: its soft steps wait as the hints do, and while a hint talks)
 --   SandboxHintsUi.notify / covered / now   hooks: the toast; what covers the screen (nil: its own look, above); the
 --                                     clock (nil: os.clock)
 -- Presentation only.
@@ -77,6 +83,9 @@ local LOADERS: { [string]: () -> any } = {
 	MoveHelperCard = function(): any
 		return require(script.Parent.MoveHelperCard)
 	end,
+	VanPaintUi = function(): any
+		return require(script.Parent.VanPaintUi)
+	end,
 }
 local modules: { [string]: any } = {}
 local function client(name: string): any
@@ -108,7 +117,7 @@ local function hudHidden(): boolean
 	return hud ~= nil and hud:IsA("ScreenGui") and (hud :: ScreenGui).Enabled == false
 end
 
-local WINDOWS = { "WarehouseUi", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard" } -- (8.3: Danny's card too)
+local WINDOWS = { "WarehouseUi", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "VanPaintUi" } -- (8.3: Danny's card, the PAINT shop too)
 
 local function covered(): boolean
 	local hook = SandboxHintsUi.covered
@@ -125,6 +134,23 @@ local function covered(): boolean
 		end
 	end
 	return false
+end
+
+function SandboxHintsUi.isCovered(): boolean
+	return covered()
+end
+
+function SandboxHintsUi.window(): string?
+	for _, name in WINDOWS do
+		if says(name, "isOpen") then
+			return name
+		end
+	end
+	return nil
+end
+
+function SandboxHintsUi.busy(): boolean
+	return SandboxHints.busy(queue, clock())
 end
 
 -- ── The queue ───────────────────────────────────────────────────────────────

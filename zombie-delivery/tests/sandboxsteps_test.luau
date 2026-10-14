@@ -264,6 +264,201 @@ do
 	check("… all taken: none", SandboxSteps.nearestFree(11, 0, spots, { true, true, true }) == nil)
 end
 
+-- ── 8.3: the soft steps (the UPGRADES desk, the market, the PAINT shop) ──────
+do
+	local Steps = SandboxSteps.Steps
+	local UpgradeRules = require("./UpgradeRules")
+	local WarehouseLevels = require("./WarehouseLevels")
+	local G = Config.SandboxGuide
+	local nothing: { [string]: boolean } = {}
+	local NONE = {} -- (a field given as NONE is left out: not known)
+	-- what makes every soft step fit: the warehouse full (4 waiting, 2 free), $1,600 at level 1, a hot Jukebox, the van
+	-- parked at home and nothing painted
+	local function rich(fields: { [string]: any }?): SandboxSteps.State
+		local s: { [string]: any } = {
+			stock = 4,
+			shown = 0,
+			freeStands = 2,
+			money = 1600,
+			levels = {},
+			hot = "Jukebox",
+			hotCount = 1,
+			hotSold = false,
+			day = 20000,
+			painted = false,
+			vanHome = true,
+		}
+		for key, value in fields or {} do
+			s[key] = value
+		end
+		local made = state(s) :: any
+		for key, value in made do
+			if value == NONE then
+				made[key] = nil
+			end
+		end
+		return made
+	end
+	local doneShow = { show = true }
+	local function chosen(s: SandboxSteps.State, done: { [string]: boolean }?): SandboxSteps.Step
+		return SandboxSteps.choose(s, done or doneShow)
+	end
+
+	-- the order and their words
+	check("the soft steps' order: grow, hot, upgrade, paint", table.concat(SandboxSteps.Soft, ",") == "grow,hot,upgrade,paint")
+	for _, id in SandboxSteps.Soft do
+		local def = Steps[id]
+		check(`{id}: a soft step (its ✕ dismisses it), not a nav or info one`, def ~= nil and def.soft and not def.nav and not def.info)
+	end
+	for id, def in Steps do
+		check(`{id}: soft only if one of the 8.3 steps`, def.soft == (table.find(SandboxSteps.Soft, id) ~= nil))
+	end
+	local step = chosen(rich())
+	check("the warehouse full, the next level affordable: \"Your warehouse is full: grow it at the UPGRADES desk ($1,500)\" (the desk)",
+		step.id == "grow" and SandboxSteps.words(step, rich()) == "Your warehouse is full: grow it at the UPGRADES desk ($1,500)" and step.target == "desk", show(step))
+	check("… its price the next level's (WarehouseLevels: level 2 costs $1,500)", SandboxSteps.growPrice(rich()) == WarehouseLevels.price(2) and WarehouseLevels.price(2) == 1500)
+	check("… at level 2 the next one's ($5,000) when the money reaches it", SandboxSteps.growPrice(rich({ levels = { warehouse = 2 }, money = 5000 })) == 5000
+		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 2 }, money = 5000 })) == "Your warehouse is full: grow it at the UPGRADES desk ($5,000)")
+	check("… not short of the money", SandboxSteps.growPrice(rich({ money = 1499 })) == nil)
+	check("… not at the top level", SandboxSteps.growPrice(rich({ levels = { warehouse = WarehouseLevels.Count }, money = 1e9 })) == nil)
+	check("… stock as many as the free stands: full", SandboxSteps.growPrice(rich({ stock = 2, freeStands = 2 })) == 1500)
+	check("… every stand taken, nothing waiting: full", SandboxSteps.growPrice(rich({ stock = 0, shown = 2, freeStands = 0 })) == 1500)
+	check("… fewer waiting than free stands: not full", SandboxSteps.growPrice(rich({ stock = 1, freeStands = 2 })) == nil)
+	check("… nothing at all in the warehouse: not full", SandboxSteps.growPrice(rich({ stock = 0, shown = 0, freeStands = 2 })) == nil)
+	check("… the free stands, the levels or the money not known: nothing said", SandboxSteps.growPrice(rich({ freeStands = NONE })) == nil
+		and SandboxSteps.growPrice(rich({ levels = NONE })) == nil and SandboxSteps.growPrice(rich({ money = NONE })) == nil)
+	step = chosen(rich(), { show = true, grow = true })
+	check("grow done: the market's hot piece \"🔥 Your Jukebox is hot today: sell it or show it\" (a free stand, else the chip)",
+		step.id == "hot" and SandboxSteps.words(step, rich()) == "🔥 Your Jukebox is hot today: sell it or show it" and step.target == "hot", show(step))
+	check("… not when a hot kind was sold today (the market found)", chosen(rich({ hotSold = true }), { show = true, grow = true }).id ~= "hot")
+	check("… not without a hot piece in the stock", chosen(rich({ hot = NONE, hotCount = 0 }), { show = true, grow = true }).id ~= "hot")
+	step = chosen(rich(), { show = true, grow = true, hot = true })
+	local cheapest, price = SandboxSteps.upgradeFor(rich())
+	check("then another upgrade in reach (the cheapest: the van engine, $600): \"🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)\"",
+		step.id == "upgrade" and step.target == "desk" and cheapest == "engine" and price == 600
+		and SandboxSteps.words(step, rich()) == "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)", SandboxSteps.words(step, rich()))
+	check("… the engine at its top: the next cheapest (Danny's training $600 before the lights' $750)", SandboxSteps.upgradeFor(rich({ levels = { engine = 3 } })) == "danny")
+	check("… $700: no lights ($750)", select(2, SandboxSteps.upgradeFor(rich({ money = 700, levels = { engine = 3, danny = 3 } }))) == nil)
+	check("… never the warehouse (grow's)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { lights = 5, engine = 3, danny = 3 } })) == nil)
+	step = chosen(rich(), { show = true, grow = true, hot = true, upgrade = true })
+	check("then the PAINT shop: \"🎨 Make your van your own: E at its side opens the PAINT SHOP\" (the van's prompt)", step.id == "paint" and step.target == "paint"
+		and SandboxSteps.words(step, rich()) == "🎨 Make your van your own: E at its side opens the PAINT SHOP", show(step))
+	check("… a phone taps it, a computer keeps E", SandboxSteps.text(step, true, SandboxSteps.words(step, rich())) == "🎨 Make your van your own: tap at its side opens the PAINT SHOP"
+		and SandboxSteps.text(step, false, SandboxSteps.words(step, rich())) == step.hint)
+	local afterAll = { show = true, grow = true, hot = true, upgrade = true }
+	check(`… at {G.PaintMoney} or more in your pocket`, chosen(rich({ money = G.PaintMoney }), afterAll).id == "paint")
+	check("… not under it at the first level", chosen(rich({ money = G.PaintMoney - 1 }), afterAll).id ~= "paint")
+	check("… after the first warehouse level bought, whatever the money", chosen(rich({ money = 0, levels = { warehouse = WarehouseLevels.Start + 1 } }), afterAll).id == "paint")
+	check("… not with something bought there already, nor before its state came (not known)", chosen(rich({ painted = true }), afterAll).id ~= "paint"
+		and chosen(rich({ painted = NONE }), afterAll).id ~= "paint")
+	check("… not while the van is away from home (its 🎨 prompt is off)", chosen(rich({ vanHome = false }), afterAll).id ~= "paint")
+	check("all done: the core's step again (quiet)", chosen(rich(), { show = true, grow = true, hot = true, upgrade = true, paint = true }).id == "show")
+
+	-- the priority: the core loop wins
+	check("a move wins over every soft step", chosen(rich({ move = true })).id == "drive" and chosen(rich({ move = true, vanLoad = 3 })).id == "home"
+		and chosen(rich({ move = true, inside = true })).id == "inside" and chosen(rich({ move = true, carrying = true })).id == "load")
+	check("… the planning too", chosen(rich({ planning = true, planningMine = true })).id == "plan")
+	check("… a core step not done yet (putting the pieces on show)", chosen(rich(), nothing).id == "show")
+	check("… taking a contract not done yet (nothing in the warehouse)", chosen(rich({ stock = 0, shown = 0 }), nothing).id == "contract")
+	check("… but `earn`, which only says something, gives way", chosen(rich({ stock = 2, shown = 4, freeStands = 0 }), nothing).id == "grow"
+		and SandboxSteps.decide(rich({ stock = 2, shown = 4, freeStands = 0 })).id == "earn")
+	check("never while something covers the screen (a grip check, a result card, a window)", chosen(rich({ covered = true })).id == "show")
+	check("… nor while something else talks (a first-time hint, a soft step just ended)", chosen(rich({ hush = true })).id == "show")
+	check("a state without the 8.3 fields: no soft step", chosen(state({ stock = 2, freeStands = 0, shown = 3 }), nothing).id == "earn"
+		and chosen(state({ shown = 3 }), { earn = true }).id == "earn")
+
+	-- done by what the player did
+	local done: { [string]: boolean } = { show = true }
+	local last: SandboxSteps.Last = {}
+	SandboxSteps.doneBy(rich(), done, last)
+	check("the first look takes the levels, the hot pieces and the day: nothing done", done.grow == nil and done.upgrade == nil and done.hot == nil
+		and last.level == 1 and last.bought == 0 and last.hot == 1 and last.day == 20000)
+	SandboxSteps.doneBy(rich({ window = "UpgradeUi" }), done, last)
+	check("the UPGRADES window opened while grow and upgrade fit: both found", done.grow == true and done.upgrade == true)
+	local early: { [string]: boolean } = {}
+	SandboxSteps.doneBy(rich({ window = "UpgradeUi", money = 100 }), early, {})
+	check("… opened while nothing is in reach: not (it may say so later)", early.grow == nil and early.upgrade == nil)
+	local bought: { [string]: boolean } = {}
+	local boughtLast: SandboxSteps.Last = {}
+	SandboxSteps.doneBy(rich(), bought, boughtLast)
+	SandboxSteps.doneBy(rich({ levels = { warehouse = 2 } }), bought, boughtLast)
+	check("the warehouse grown while you play: grow done", bought.grow == true and bought.upgrade == nil)
+	SandboxSteps.doneBy(rich({ levels = { warehouse = 2, lights = 1 } }), bought, boughtLast)
+	check("another upgrade bought: upgrade done", bought.upgrade == true)
+	local saved: { [string]: boolean } = {}
+	SandboxSteps.doneBy(rich({ levels = { warehouse = 3, engine = 2 } }), saved, {})
+	check("… levels a save brought along: nothing", saved.grow == nil and saved.upgrade == nil)
+	local market: { [string]: boolean } = {}
+	local marketLast: SandboxSteps.Last = {}
+	SandboxSteps.doneBy(rich({ hotCount = 2 }), market, marketLast)
+	SandboxSteps.doneBy(rich({ hotCount = 1 }), market, marketLast)
+	check("a hot piece sold or put on show (fewer hot in the stock): the market found today", market.hot == true)
+	SandboxSteps.doneBy(rich({ day = 20001, hotCount = 1 }), market, marketLast)
+	check("… a new market day: it may say so again", market.hot == nil and marketLast.day == 20001)
+	SandboxSteps.doneBy(rich({ day = 20001, window = "WarehouseUi" }), market, marketLast)
+	check("… the STOCK list (or the picker) opened with a hot piece in it: found", market.hot == true)
+	local noHot: { [string]: boolean } = {}
+	SandboxSteps.doneBy(rich({ hot = NONE, hotCount = 0, window = "WarehouseUi" }), noHot, {})
+	check("… opened with no hot piece: not", noHot.hot == nil)
+	local turned: { [string]: boolean } = {}
+	local turnedLast: SandboxSteps.Last = {}
+	SandboxSteps.doneBy(rich({ hotCount = 3 }), turned, turnedLast)
+	SandboxSteps.doneBy(rich({ hotCount = 0, day = 20001 }), turned, turnedLast)
+	check("… the day turning (yesterday's hot kinds gone from the stock) is not a sale", turned.hot == nil)
+	local painted: { [string]: boolean } = {}
+	SandboxSteps.doneBy(rich({ window = "VanPaintUi" }), painted, {})
+	check("the PAINT shop opened: paint done", painted.paint == true)
+	local owns: { [string]: boolean } = {}
+	SandboxSteps.doneBy(rich({ painted = true }), owns, {})
+	check("… something bought there: paint done", owns.paint == true)
+
+	-- the ✕
+	local closed: { [string]: boolean } = { show = true }
+	check("the ✕ on a core step is not a dismissal (the guide goes off instead)", not SandboxSteps.dismiss(Steps.contract, closed) and closed.contract == nil)
+	check("the ✕ on a soft step: that step gone", SandboxSteps.dismiss(Steps.grow, closed) and closed.grow == true and chosen(rich(), closed).id == "hot")
+	check("… the hot one: gone for the session", SandboxSteps.dismiss(Steps.hot, closed) and closed.hot == true and closed.hotGone == true)
+	local closedLast: SandboxSteps.Last = { day = 20000, hot = 1 }
+	SandboxSteps.doneBy(rich({ day = 20001 }), closed, closedLast)
+	check("… even on a new market day", closed.hot == true)
+	local hint, guide = SandboxSteps.visible(Steps.grow, closed, false)
+	check("… a dismissed step quiet", not hint and not guide)
+	hint, guide = SandboxSteps.visible(Steps.upgrade, closed, false)
+	check("… the others still to say (hint and the 3D guide)", hint and guide)
+
+	-- the words' details (the client makes the words again only when they change)
+	local a, b = SandboxSteps.detail(Steps.grow, rich())
+	check("details: grow its price", a == nil and b == 1500)
+	a, b = SandboxSteps.detail(Steps.upgrade, rich())
+	check("… upgrade its id and price", a == "engine" and b == 600)
+	a, b = SandboxSteps.detail(Steps.hot, rich())
+	check("… hot the piece's name", a == "Jukebox" and b == nil)
+	a, b = SandboxSteps.detail(Steps.show, rich())
+	check("… a core step none (its words its own)", a == nil and b == nil and SandboxSteps.words(Steps.show, rich()) == Steps.show.hint)
+	for _, id in SandboxSteps.Soft do
+		local words = SandboxSteps.words(Steps[id], rich({ levels = { warehouse = 4 }, money = 30000, hot = "Grandfather Clock" }))
+		check(`{id}'s words with their price or piece: one line or two (≤ 80 characters)`, utf8.len(words) ~= nil and (utf8.len(words) :: number) <= 80, words)
+	end
+	check("UpgradeRules' order has the warehouse first and three others", UpgradeRules.Order[1] == "warehouse" and #UpgradeRules.Order == 4)
+
+	-- the collection's market
+	local summary = SandboxSteps.collection({ kind = "state", stock = {
+		{ uid = "a", item = "jukebox", name = "Jukebox", market = "hot" },
+		{ uid = "b", item = "radio", name = "Vintage Radio", market = "hot", stand = 1 },
+		{ uid = "c", item = "globe", name = "Old Globe", market = "hot", broken = true },
+		{ uid = "d", item = "sofa", name = "Sofa", market = "cold" },
+		{ uid = "e", item = "radio", name = "Vintage Radio", market = "hot" },
+	}, stands = 4, market = { day = 20375, hot = { "jukebox", "radio", "globe" }, cold = { "sofa" }, left = 100,
+		demand = { sofa = { n = 2, sold = 2, back = 10 } } } }, nil)
+	check("the hot pieces in the stock (not on show, not broken), the first one's name, the market's day", summary.hot == 2 and summary.hotName == "Jukebox"
+		and summary.day == 20375 and summary.hotSold == false and summary.stock == 4 and summary.shown == 1, `{summary.hot} {summary.hotName} {summary.day}`)
+	summary = SandboxSteps.collection({ kind = "state", stock = {}, market = { day = 1, hot = { "radio" }, cold = {}, demand = { radio = { n = 1, sold = 1 } } } }, 2)
+	check("… a hot kind sold today: the market found", summary.hotSold == true and summary.hot == 0 and summary.hotName == nil)
+	summary = SandboxSteps.collection({ kind = "state", stock = { { uid = "x", market = "hot", name = string.rep("x", 200) } }, market = "junk" }, 2)
+	check("… a strange name or market: \"piece\", no day", summary.hot == 1 and summary.hotName == "piece" and summary.day == nil and not summary.hotSold)
+	summary = SandboxSteps.collection({ kind = "state", stock = { { uid = "y", item = "lamp" } } }, 2)
+	check("… a state without the market (before 8.3): none hot", summary.hot == 0 and summary.day == nil)
+end
+
 -- ── Config.SandboxGuide ─────────────────────────────────────────────────────
 do
 	local G = Config.SandboxGuide
@@ -272,6 +467,8 @@ do
 	check("the path's numbers sane", G.Direct > G.Near and G.Near > 0 and G.PathWidth > 0.5 and G.PathAlpha > 0 and G.PathAlpha < 1)
 	check("the colour an RGB triple", #G.Color == 3 and G.Color[1] <= 255 and G.Color[2] <= 255 and G.Color[3] <= 255)
 	check("the hint readable on a phone", G.TouchScale >= 0.75 and G.TextSize >= 14)
+	check("8.3: a soft step shows long enough to walk to it, not for ever; the gap between two; the paint's money", G.SoftSeconds >= 20 and G.SoftSeconds <= 90
+		and G.SoftGap >= 5 and G.SoftGap <= 60 and G.PaintMoney > 0 and G.PaintMoney < Config.WarehouseLevels.List[3].price)
 end
 
 if failures == 0 then

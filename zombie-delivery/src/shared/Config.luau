@@ -7001,6 +7001,11 @@ Config.Collection = {
 --   TouchScale    the hint's smallest scale on a touch screen (readable on a phone held sideways)
 --   SideClear     px at scale 1 kept free at the top's left and right (the money, Roblox's own buttons)
 --   Top           px from the top when nothing else holds the top's middle; Gap: px under what does
+--   8.3, the soft steps (shared/SandboxSteps.luau choose: the UPGRADES desk, the market's hot piece, the PAINT shop; only
+--   when nothing more urgent is pending; the ✕ on one dismisses that step alone, for the session, the guide stays on):
+--   SoftSeconds   s a soft step shows before it counts as done (said long enough)
+--   SoftGap       s after a soft step ended (done, dismissed, covered) before the next one may show
+--   PaintMoney    $ from which the PAINT shop's step may show (else once a warehouse level is bought)
 Config.SandboxGuide = {
 	Every = 0.2,
 	Fade = 0.5,
@@ -7021,6 +7026,9 @@ Config.SandboxGuide = {
 	SideClear = 200,
 	Top = 8,
 	Gap = 6,
+	SoftSeconds = 40, -- 8.3: the soft steps
+	SoftGap = 15,
+	PaintMoney = 1000,
 }
 
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (shared/WarehouseLayout.luau

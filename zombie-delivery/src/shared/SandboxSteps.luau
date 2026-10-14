@@ -15,6 +15,17 @@
 --   stock         your pieces in the stock, not on show (the Collection remote's "state")
 --   shown         your pieces on show on a display stand
 --   freeStands    the empty display stands (nil: not known, taken as some)
+--   8.3, for the soft steps (nil or false: not known, nothing said):
+--   money         your money (the State remote's)
+--   levels        the UPGRADES' levels (the Upgrades remote's state: shared/UpgradeRules.luau)
+--   hot           the name of a hot piece (today's market) in your stock; hotCount how many; hotSold a hot kind sold
+--                 today (the market's demand); day the market's day (the Collection remote's state: its market)
+--   painted       something of the PAINT shop is yours (the VanPaint remote's state: owned)
+--   vanHome       your van stands at your plot's van spot (its 🎨 Paint van prompt is on)
+--   window        the sandbox window open now (its client module's name: "UpgradeUi", "WarehouseUi", "VanPaintUi", …)
+--   covered       something covers the screen (client/SandboxHintsUi.luau isCovered: a grip check, the move's cards,
+--                 a sandbox window, the start screen)
+--   hush          something else talks now (a first-time hint waits or just showed; a soft step just ended)
 --
 -- The steps (SandboxSteps.decide, the first that fits; the owner's table):
 --   in the house                        inside    "Carry the furniture out to your van (E to pick up)"   (no target)
@@ -42,10 +53,47 @@
 --   SandboxSteps.route(fx, fz, tx, tz, out, direct) -> n   the path on the ground, along the roads: n points written
 --                                                      into `out` as x1, z1, x2, z2 … (no table made: the guide calls
 --                                                      it five times a second); straight when within `direct` studs
---   SandboxSteps.collection(msg, total?) -> Summary    the Collection remote's "state": stock, shown, free, taken
+--   SandboxSteps.collection(msg, total?) -> Summary    the Collection remote's "state": stock, shown, free, taken (8.3:
+--                                                      the hot pieces in the stock, the first one's name, the market's
+--                                                      day, a hot kind sold today)
 --   SandboxSteps.nearestFree(x, z, spots, taken) -> index?   the nearest empty stand (spots[i] = { x, y, z }, taken[i])
+--
+-- 8.3, the soft steps: what 8.3 added, each said at its moment and never nagging (SandboxSteps.choose). The core loop
+-- always wins: a move (in the house, carrying, the van loaded, the drive home, back), the planning, and a core step not
+-- done yet (take a contract, put your pieces on show); only `earn` (it only says something) gives way. Nothing soft while
+-- something covers the screen (a grip check, the move's result card, a sandbox window, the start screen: `covered`) or
+-- while something else talks (a first-time hint, shared/SandboxHints.luau busy; a soft step just ended: `hush`). The
+-- first that fits, in this order (SandboxSteps.Soft):
+--   grow     the warehouse's next level bought now and the stock fills the free stands (stock ≥ free, some pieces)
+--            "Your warehouse is full: grow it at the UPGRADES desk ($1,500)"              the desk (its level's spot)
+--   hot      a hot piece of today's market in the stock, none of the hot kinds sold today
+--            "🔥 Your Jukebox is hot today: sell it or show it"                           a free stand, else the 📦 chip
+--   upgrade  another upgrade the money buys now (the cheapest; the window's order breaks a tie)
+--            "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)"            the desk
+--   paint    nothing bought at the PAINT shop yet, the van parked at home (its 🎨 prompt on), and a warehouse level
+--            bought or Config.SandboxGuide.PaintMoney ($1,000) in your pocket
+--            "🎨 Make your van your own: E at its side opens the PAINT SHOP"              the van's 🎨 prompt
+-- (The collection book and the TASKS have their first-time hints, shared/SandboxHints.luau "book" and "tasks": no step
+-- here.) A soft step is done for the session by what the player did (its window opened while it fits, a level bought, a
+-- hot piece sold or put on show, a paint bought), after Config.SandboxGuide.SoftSeconds on the screen (the client's) or
+-- by the guide's ✕ (SandboxSteps.dismiss: only that step goes, the guide stays on). `hot` is once a market day: a new
+-- day may say it again, unless it was dismissed (done.hotGone).
+--   SandboxSteps.choose(state, done) -> Step           the step now: the core's (decide) or a soft one
+--   SandboxSteps.dismiss(step, done) -> boolean        the ✕ on a soft step: gone for the session (false: a core step)
+--   SandboxSteps.words(step, state) -> string          its words with the price or the piece in them
+--   SandboxSteps.detail(step, state) -> (string?, number?)   what its words depend on (the client makes them again only
+--                                                      when it changes: no string a look)
+--   SandboxSteps.growPrice(state) -> number?           the next warehouse level's price when `grow` fits (nil: not now)
+--   SandboxSteps.upgradeFor(state) -> (id?, price?)    the upgrade `upgrade` names (nil: none in reach)
+-- HOOK (Danny's hire, 8.3: "hire Danny for the move, click pieces to assign them", server/MoveHelper.luau and
+-- client/MoveHelperCard.luau; not built here): his steps belong to the core loop, in SandboxSteps.decide, at the two
+-- places marked "HOOK Danny" (the planning's, before LAUNCH; the move's, before `inside`), on a State field the guide's
+-- readMove fills from the Moving state (client/SandboxGuide.luau, marked the same), with a done mark in doneBy.
 
 local SandboxMap = require(script.Parent.SandboxMap)
+local Config = require(script.Parent.Config)
+local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.3: the UPGRADES desk's prices (the soft steps)
+local WarehouseLevels = require(script.Parent.WarehouseLevels) -- 8.3: the warehouse's start level
 
 local SandboxSteps = {}
 
@@ -63,25 +111,50 @@ export type State = {
 	stock: number,
 	shown: number,
 	freeStands: number?,
+	-- 8.3, the soft steps (all optional: a state without them has none)
+	money: number?,
+	levels: { [string]: number }?,
+	hot: string?,
+	hotCount: number?,
+	hotSold: boolean?,
+	day: number?,
+	painted: boolean?,
+	vanHome: boolean?,
+	window: string?,
+	covered: boolean?,
+	hush: boolean?,
 }
 
 -- target: what the 3D guide points at (client/SandboxGuide.luau finds it): "board" | "curb" | "door" | "van" |
--- "unload" | "stand" | nil (the hint only). nav: the arrow stays while you drive, done or not. info: it only says
--- something (done after a while on the screen).
-export type Step = { id: string, hint: string, target: string?, nav: boolean, info: boolean }
+-- "unload" | "stand" | 8.3: "desk" (the UPGRADES desk) | "hot" (a free stand, else the 📦 STOCK chip) | "paint" (the
+-- van's 🎨 prompt) | nil (the hint only). nav: the arrow stays while you drive, done or not. info: it only says
+-- something (done after a while on the screen). soft: 8.3, a soft step (SandboxSteps.choose; its ✕ dismisses it).
+export type Step = { id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean }
 
-export type Summary = { stock: number, shown: number, free: number?, taken: { [number]: boolean } }
+-- 8.3: hot the hot pieces in the stock (not on show, not broken), hotName the first one's name, day the market's day,
+-- hotSold a hot kind sold today.
+export type Summary = {
+	stock: number,
+	shown: number,
+	free: number?,
+	taken: { [number]: boolean },
+	hot: number,
+	hotName: string?,
+	day: number?,
+	hotSold: boolean,
+}
 
--- The counts of the look before (SandboxSteps.doneBy): a step is done when its count goes up while you play.
-export type Last = { vanLoad: number?, delivered: number?, shown: number? }
+-- The counts of the look before (SandboxSteps.doneBy): a step is done when its count goes up while you play. 8.3: the
+-- warehouse's level, the other upgrades' levels added up, the hot pieces in the stock and the market's day.
+export type Last = { vanLoad: number?, delivered: number?, shown: number?, level: number?, bought: number?, hot: number?, day: number? }
 
 -- A display stand's place in the world (client/SandboxGuide.luau reads them from shared/WarehouseLayout.luau).
 export type Place = { x: number, y: number, z: number }
 
 local HOUSE = SandboxMap.House.name
 
-local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean): Step
-	return { id = id, hint = hint, target = target, nav = nav, info = info }
+local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?): Step
+	return { id = id, hint = hint, target = target, nav = nav, info = info, soft = soft == true }
 end
 
 SandboxSteps.Steps = {
@@ -96,12 +169,22 @@ SandboxSteps.Steps = {
 	home = step("home", "Drive home to your warehouse to unload (or keep loading)", "unload", true, false),
 	show = step("show", "Put your pieces on show: E at an empty stand", "stand", false, false),
 	earn = step("earn", "Your pieces earn money while you play. Take another contract for more!", "board", false, true),
+	-- 8.3, the soft steps (their words with the price or the piece: SandboxSteps.words)
+	grow = step("grow", "Your warehouse is full: grow it at the UPGRADES desk", "desk", false, false, true),
+	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
+	upgrade = step("upgrade", "New upgrade in reach at the UPGRADES desk", "desk", false, false, true),
+	paint = step("paint", "🎨 Make your van your own: E at its side opens the PAINT SHOP", "paint", false, false, true),
 } :: { [string]: Step }
 
+-- 8.3: the soft steps in their order (the first that fits shows).
+SandboxSteps.Soft = { "grow", "hot", "upgrade", "paint" } :: { string }
+
 local S = SandboxSteps.Steps
+local G = Config.SandboxGuide
 
 function SandboxSteps.decide(s: State): Step
 	if s.move then
+		-- HOOK Danny (8.3 hire, the move's part; see the header): "click a piece to give it to Danny" goes here
 		if s.inside then
 			return S.inside
 		end
@@ -117,6 +200,7 @@ function SandboxSteps.decide(s: State): Step
 		return if s.delivered > 0 then S.back else S.drive
 	end
 	if s.planning then
+		-- HOOK Danny (8.3 hire, the planning's part; see the header): "hire Danny for the move" goes here
 		return if s.planningMine then S.plan else S.planCrew
 	end
 	local free = s.freeStands
@@ -169,6 +253,57 @@ function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
 	last.vanLoad = if s.move then s.vanLoad else 0
 	last.delivered = if s.move then s.delivered else 0
 	last.shown = s.shown
+	-- 8.3, the soft steps: found alone (its window opened while the step fits: the player sees what it would say)
+	local window = s.window
+	if window == "UpgradeUi" then
+		if SandboxSteps.growPrice(s) then
+			done.grow = true
+		end
+		if SandboxSteps.upgradeFor(s) then
+			done.upgrade = true
+		end
+	elseif window == "WarehouseUi" and s.hot ~= nil then
+		done.hot = true -- (the STOCK list or the picker: the 🔥 tags are there)
+	elseif window == "VanPaintUi" then
+		done.paint = true
+	end
+	if s.painted == true then
+		done.paint = true
+	end
+	-- … bought: the warehouse's level, another upgrade's (a count that goes up while you play, as above)
+	local levels = s.levels
+	if levels then
+		local bought = 0
+		for _, id in UpgradeRules.Order do
+			if id ~= "warehouse" then
+				bought += UpgradeRules.level(levels, id)
+			end
+		end
+		local level = UpgradeRules.warehouseLevel(levels)
+		if rose(last.level, level) then
+			done.grow = true
+		end
+		if rose(last.bought, bought) then
+			done.upgrade = true
+		end
+		last.level, last.bought = level, bought
+	end
+	-- … the market: a hot piece sold or put on show (fewer in the stock) says it today; a new day may say it again
+	-- (never after its ✕: done.hotGone)
+	local hot = s.hotCount or 0
+	local day = s.day
+	local newDay = day ~= nil and last.day ~= nil and day ~= last.day
+	if newDay then
+		if done.hotGone ~= true then
+			done.hot = nil :: any
+		end
+	elseif last.hot ~= nil and hot < last.hot then
+		done.hot = true
+	end
+	last.hot = hot
+	if day ~= nil then
+		last.day = day
+	end
 end
 
 -- The hint line and the 3D guide: a step not done yet shows both (the guide when it has a target); a done one is quiet,
@@ -178,12 +313,119 @@ function SandboxSteps.visible(s: Step, done: { [string]: boolean }, seated: bool
 	return fresh, s.target ~= nil and (fresh or (s.nav and seated))
 end
 
--- The words: on a touch screen a prompt is tapped ("E at the back" → "tap at the back").
-function SandboxSteps.text(s: Step, touch: boolean): string
+-- The words: on a touch screen a prompt is tapped ("E at the back" → "tap at the back"). 8.3: `words` (a soft step's,
+-- SandboxSteps.words) instead of the step's own.
+function SandboxSteps.text(s: Step, touch: boolean, words: string?): string
+	local hint = words or s.hint
 	if not touch then
-		return s.hint
+		return hint
 	end
-	return (string.gsub(s.hint, "%f[%w]E%f[%W]", "tap"))
+	return (string.gsub(hint, "%f[%w]E%f[%W]", "tap"))
+end
+
+-- ── 8.3, the soft steps ────────────────────────────────────────────────────
+
+function SandboxSteps.growPrice(s: State): number?
+	local levels, money, free = s.levels, s.money, s.freeStands
+	if levels == nil or money == nil or free == nil or s.stock < free or s.stock + s.shown <= 0 then
+		return nil
+	end
+	local price = UpgradeRules.price("warehouse", UpgradeRules.warehouseLevel(levels))
+	return if price and money >= price then price else nil
+end
+
+function SandboxSteps.upgradeFor(s: State): (string?, number?)
+	local levels, money = s.levels, s.money
+	if levels == nil or money == nil then
+		return nil, nil
+	end
+	local best: string?, bestPrice: number? = nil, nil
+	for _, id in UpgradeRules.Order do
+		if id ~= "warehouse" then
+			local price = UpgradeRules.price(id, UpgradeRules.level(levels, id))
+			if price and money >= price and (bestPrice == nil or price < bestPrice) then
+				best, bestPrice = id, price
+			end
+		end
+	end
+	return best, bestPrice
+end
+
+local function paintFits(s: State): boolean
+	if s.painted ~= false or s.vanHome ~= true then
+		return false
+	end
+	local levels, money = s.levels, s.money
+	return (levels ~= nil and UpgradeRules.warehouseLevel(levels) > WarehouseLevels.Start) or (money ~= nil and money >= G.PaintMoney)
+end
+
+local function fits(id: string, s: State): boolean
+	if id == "grow" then
+		return SandboxSteps.growPrice(s) ~= nil
+	elseif id == "hot" then
+		return s.hot ~= nil and s.hotSold ~= true
+	elseif id == "upgrade" then
+		return (SandboxSteps.upgradeFor(s)) ~= nil
+	elseif id == "paint" then
+		return paintFits(s)
+	end
+	return false
+end
+
+-- The step now: the core loop's while it has something to do (a move, the planning, a core step not done yet; `earn`,
+-- which only says something, gives way), else the first soft step that fits and is not done (none while the screen is
+-- covered or something else talks), else the core's (quiet).
+function SandboxSteps.choose(s: State, done: { [string]: boolean }): Step
+	local core = SandboxSteps.decide(s)
+	if s.move or s.planning or (done[core.id] ~= true and not core.info) or s.covered or s.hush then
+		return core
+	end
+	for _, id in SandboxSteps.Soft do
+		if done[id] ~= true and fits(id, s) then
+			return S[id]
+		end
+	end
+	return core
+end
+
+function SandboxSteps.dismiss(s: Step, done: { [string]: boolean }): boolean
+	if not s.soft then
+		return false
+	end
+	done[s.id] = true
+	if s.id == "hot" then
+		done.hotGone = true -- (not again on a new market day either)
+	end
+	return true
+end
+
+function SandboxSteps.detail(step: Step, s: State): (string?, number?)
+	if step.id == "grow" then
+		return nil, SandboxSteps.growPrice(s)
+	elseif step.id == "upgrade" then
+		return SandboxSteps.upgradeFor(s)
+	elseif step.id == "hot" then
+		return s.hot, nil
+	end
+	return nil, nil
+end
+
+function SandboxSteps.words(step: Step, s: State): string
+	if step.id == "grow" then
+		local price = SandboxSteps.growPrice(s)
+		if price then
+			return `{step.hint} ({UpgradeRules.money(price)})`
+		end
+	elseif step.id == "upgrade" then
+		local id, price = SandboxSteps.upgradeFor(s)
+		local def = if id then UpgradeRules.def(id) else nil
+		if def and price then
+			return `{def.icon} New upgrade in reach: {def.name} at the UPGRADES desk ({UpgradeRules.money(price)})`
+		end
+	elseif step.id == "hot" and s.hot then
+		return `🔥 Your {s.hot} is hot today: sell it or show it`
+	end
+	return step.hint
 end
 
 function SandboxSteps.atHouse(x: number, z: number, margin: number): boolean
@@ -249,9 +491,11 @@ end
 
 -- The Collection remote's { kind = "state", stock = { Entry }, stands = n }: the pieces in the stock (no stand) and on
 -- show (a stand), the stands taken and the empty ones out of `total` (the warehouse level's, the layout's count;
--- else the message's `stands` when it says more than are shown; nil: not known).
+-- else the message's `stands` when it says more than are shown; nil: not known). 8.3: its market (a piece's `market`
+-- "hot", the state's `market` View: its day, its hot kinds and the demand's `sold` today).
+local MAX_NAME = 48 -- (a longer name from the network is no piece of ours: "piece")
 function SandboxSteps.collection(msg: any, total: number?): Summary
-	local summary: Summary = { stock = 0, shown = 0, free = nil, taken = {} }
+	local summary: Summary = { stock = 0, shown = 0, free = nil, taken = {}, hot = 0, hotName = nil, day = nil, hotSold = false }
 	if type(msg) ~= "table" then
 		return summary
 	end
@@ -265,6 +509,29 @@ function SandboxSteps.collection(msg: any, total: number?): Summary
 					summary.taken[stand] = true
 				else
 					summary.stock += 1
+					if entry.market == "hot" and entry.broken ~= true then
+						summary.hot += 1
+						if summary.hotName == nil then
+							local name = entry.name
+							summary.hotName = if type(name) == "string" and #name > 0 and #name <= MAX_NAME then name else "piece"
+						end
+					end
+				end
+			end
+		end
+	end
+	local market = msg.market
+	if type(market) == "table" then
+		local day = market.day
+		if type(day) == "number" and day == day and day > -math.huge and day < math.huge then
+			summary.day = math.floor(day)
+		end
+		local hot, demand = market.hot, market.demand
+		if type(hot) == "table" and type(demand) == "table" then
+			for _, item in hot do
+				local d = if type(item) == "string" then demand[item] else nil
+				if type(d) == "table" and type(d.sold) == "number" and d.sold > 0 then
+					summary.hotSold = true
 				end
 			end
 		end
