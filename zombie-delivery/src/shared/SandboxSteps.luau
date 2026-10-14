@@ -88,7 +88,8 @@
 -- day may say it again, unless it was dismissed (done.hotGone).
 --   SandboxSteps.choose(state, done) -> Step           the step now: the core's (decide) or a soft one
 --   SandboxSteps.dismiss(step, done) -> boolean        the ✕ on a soft step: gone for the session (false: a core step)
---   SandboxSteps.words(step, state) -> string          its words with the price or the piece in them
+--   SandboxSteps.words(step, state) -> string          its words with the price or the piece in them (8.5: give's
+--                                                      once your clipboard is out)
 --   SandboxSteps.detail(step, state) -> (string?, number?)   what its words depend on (the client makes them again only
 --                                                      when it changes: no string a look)
 --   SandboxSteps.growPrice(state) -> number?           the next warehouse level's price when `grow` fits (nil: not now)
@@ -103,7 +104,9 @@
 --   lift   hired, one of the move's two-person pieces near you (heavyNear)
 --          "Heavy piece: press Lift and wait for Danny"                          (the hint only)
 --   give   hired, his list empty, you in the house (where the pieces are)
---          "Pick a piece to give it to Danny" (a gamepad's "(R1)": it points at nothing)   (the hint only)
+--          8.5 (orders mode, shared/ClipboardRules.luau): "Take out your clipboard (Q) and pick a piece for Danny"
+--          (the device's way: "(R1)", "(tap 📋)"); with your clipboard out (`clipboard`) "Pick a piece to give it to
+--          Danny" (a gamepad's "(R1)": it points at nothing)                      (the hint only)
 --   hire   for hire, his price in your money (money ≥ helperPrice)
 --          "Hire Danny to carry with you" (a gamepad's "(L1)")                    Danny (his body)
 -- Done by what the player did (doneBy): hire once he is hired or his card opened while he is for hire (the offer seen);
@@ -112,7 +115,9 @@
 --   SandboxSteps.danny(state, done) -> Step?           Danny's step now (nil: none)
 --   SandboxSteps.onDevice(step, words?, device) -> string   the words for "keys" | "pad" | "touch": a prompt's E a
 --                                                      phone's "tap", a gamepad's X; a Danny step's gamepad button
---                                                      in brackets (SandboxPad's "danny" L1, "dannygive" R1)
+--                                                      in brackets (SandboxPad's "danny" L1, 8.5 "clipboard" R1);
+--                                                      8.5 words that name their step's own key ("(Q)") say it in the
+--                                                      device's way instead ("(R1)", "(tap 📋)": SandboxPad.say)
 
 local SandboxMap = require(script.Parent.SandboxMap)
 local Config = require(script.Parent.Config)
@@ -154,6 +159,7 @@ export type State = {
 	waiting: boolean?,
 	heavy: number?,
 	heavyNear: boolean?,
+	clipboard: boolean?, -- 8.5 your clipboard is out (orders mode: the character attribute ClipboardHeld)
 }
 
 -- target: what the 3D guide points at (client/SandboxGuide.luau finds it): "board" | "curb" | "door" | "van" |
@@ -211,7 +217,8 @@ SandboxSteps.Steps = {
 	paint = step("paint", "🎨 Make your van your own: E at its side opens the PAINT SHOP", "paint", false, false, true),
 	-- 8.4, Danny for hire (soft: said once; their words the same on every device, a gamepad's button added: onDevice)
 	lift = step("lift", `Heavy piece: press Lift and wait for {DANNY}`, nil, false, false, true),
-	give = step("give", `Pick a piece to give it to {DANNY}`, nil, false, false, true, "dannygive"),
+	-- (8.5 orders mode: its words say the clipboard's key, SandboxSteps.words without it out)
+	give = step("give", `Take out your clipboard ({Config.MoveHelper.Clipboard.Key}) and pick a piece for {DANNY}`, nil, false, false, true, "clipboard"),
 	hire = step("hire", `Hire {DANNY} to carry with you`, "danny", false, false, true, "danny"),
 } :: { [string]: Step }
 
@@ -387,11 +394,18 @@ end
 -- (SandboxSteps.text), a gamepad's prompts on X (SandboxPad.say "use") and a Danny step's button after them ("(R1)":
 -- a gamepad points at nothing). `words`: a soft step's (SandboxSteps.words) instead of the step's own.
 function SandboxSteps.onDevice(s: Step, words: string?, device: string): string
-	if device ~= "pad" then
-		return SandboxSteps.text(s, device == "touch", words)
+	local hint = words or s.hint
+	-- 8.5: words that name their step's own key in brackets ("(Q)": the clipboard's) say it in this device's way
+	local action = if s.pad then SandboxPad.Actions[s.pad] else nil
+	local named = action ~= nil and string.find(hint, `({action.key})`, 1, true) ~= nil
+	if named and s.pad then
+		hint = SandboxPad.say(hint, s.pad, device)
 	end
-	local said = SandboxPad.say(words or s.hint, "use", device)
-	return if s.pad then SandboxPad.withKey(said, s.pad, device) else said
+	if device ~= "pad" then
+		return SandboxSteps.text(s, device == "touch", hint)
+	end
+	local said = SandboxPad.say(hint, "use", device)
+	return if s.pad and not named then SandboxPad.withKey(said, s.pad, device) else said
 end
 
 -- ── 8.4, Danny for hire ────────────────────────────────────────────────────
@@ -506,6 +520,8 @@ function SandboxSteps.detail(step: Step, s: State): (string?, number?)
 		return SandboxSteps.upgradeFor(s)
 	elseif step.id == "hot" then
 		return s.hot, nil
+	elseif step.id == "give" and s.clipboard == true then
+		return "clipboard", nil -- (8.5: its words change once the clipboard is out)
 	end
 	return nil, nil
 end
@@ -524,6 +540,8 @@ function SandboxSteps.words(step: Step, s: State): string
 		end
 	elseif step.id == "hot" and s.hot then
 		return `🔥 Your {s.hot} is hot today: sell it or show it`
+	elseif step.id == "give" and s.clipboard == true then
+		return `Pick a piece to give it to {DANNY}` -- (8.5: the clipboard out, orders mode)
 	end
 	return step.hint
 end

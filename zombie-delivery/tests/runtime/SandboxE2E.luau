@@ -1662,7 +1662,7 @@ local function stub(name: string, fields: { [string]: any }): any
 		error(`SandboxE2E: unmocked {name}.{tostring(key)}`, 2)
 	end })
 end
-for _, name in { "CarRighting", "Admin", "Transport", "KitWear", "Horn", "SprinterMesh" } do
+for _, name in { "CarRighting", "Admin", "Transport", "KitWear", "Horn", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
 	E.fakes[name] = stub(name, { start = noop })
 end
 E.fakes.DayNight = stub("DayNight", { nightLight = noop, start = noop, isNight = function()

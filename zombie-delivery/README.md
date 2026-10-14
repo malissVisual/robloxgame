@@ -95,6 +95,23 @@
 > him (by the van at the warehouse) and never turns up at the house by himself (`server/MoveHelper.luau` actWait);
 > hire him on the status line under the move's panel (HIRE $…) or on his card, and he rides along in the van or comes
 > to it at the house. A hired Danny rides with you as before.
+>
+> **8.5** (the owner's feedback on 8.4.1): **Danny gets into the van like a person**: hired, he walks round the van
+> (`MoveHelperBrain.roundVan`, never through it: the old door point lay inside the path buffer round the hull, so he
+> walked straight at it, through the van, and the stuck nudge put him under it) to a spot `RideStand` studs out of the
+> passenger door, steps to the handle, the door swings open for everyone (`Vehicles.swingDoor`), he slides in over
+> `Config.Cargo.BoardSeconds` and the door shuts; out the same way back. The fade into the seat is a last resort only
+> (`RideFar` studs away or no closer for `RideBlink` s). **Danny's clipboard** (orders mode, `server/Clipboard.luau`,
+> `client/DannyOrders.luau`, `shared/ClipboardRules.luau`, `Config.MoveHelper.Clipboard`): with Danny hired, Q (R1 on
+> a gamepad, 📋 on a phone, 📋 ORDERS on his status line, 📋 CLIPBOARD on his card) puts a paper notepad in your right
+> hand; only while you hold it does a click, a tap or R1 on a piece give it to him (again: take it back; the server
+> refuses an assign without it). The piece you point at glows green, orange (on his list) or red with the reason; a
+> line at the bottom says you are giving orders; it goes away when you pick up a piece, sit, die, or the move or his
+> hire ends. **Walking into the house** (`server/SandboxWorld.luau` doorHalls, `Moving` WalkIn.coming / check,
+> `Config.Moving.Doors`): the leaves open as you come at them (12 studs, from farther at a run) and swing out towards
+> you; the invisible House box under the Blender house no longer stops you in the doorway (seven solid pieces round an
+> 11-stud dark hall behind each door replace it); crossing the threshold while walking is the trip itself: the fade
+> runs while you walk, and you arrive inside still walking. The same for the back door and the ways out.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

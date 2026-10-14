@@ -25,6 +25,7 @@ PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_tes
 PURE += ("DoorSwing",)  # 8.3 walk-in doors: a door leaf's swing (tests/doorswing_test.luau)
 PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxbadges_test.luau, tests/sandboxbadges_runtime_test.luau)
 PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
+PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -151,6 +152,15 @@ with tempfile.TemporaryDirectory() as tmp:
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
     open(os.path.join(tmp, "MoveSitesServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.5 Danny's clipboard (orders mode): the real server/Clipboard.luau as ClipboardServer.luau on the same fakes
+    # (tests/clipboard_runtime_test.luau runs it beside the real Moving and MoveHelper), its art built by the real
+    # server/ModelArt/Builder.luau (ClipboardBuilder.luau) on the same recorder, its shared modules the copies above.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "ModelArt", "Builder.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "ClipboardBuilder.luau"), "w", encoding="utf-8").write(head + source)
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Clipboard.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.ModelArt.Builder)", 'require("./ClipboardBuilder")')
+    open(os.path.join(tmp, "ClipboardServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.0 sandbox, the warehouse: the real server/Warehouse.luau as WarehouseServer.luau for
     # tests/warehouse_runtime_test.luau: SandboxPlots, Collection, Net and the services from tests/runtime/WarehouseRuntime.luau
     # (on MovingRuntime's recorder and players), FurnitureMesh the copy above, its shared modules the copies.
@@ -603,7 +613,7 @@ def sandbox_hud_check():
     keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
     at = keys.find("local function sandboxLines(")
     chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
-    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T")]
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q")]  # (8.5: Danny's clipboard, LMB and Q)
     if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
         bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
     print("== sandbox hud: " + (f"the HUD hides its city parts in the sandbox, the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))

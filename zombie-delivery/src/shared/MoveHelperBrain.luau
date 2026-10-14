@@ -17,7 +17,9 @@
 -- back; Config.MoveHelper.Queue at most) and he carries them in order (nextQueued): a light one to the van alone, a
 -- two-person one he waits at for you ("needs"); everything else is yours. A two-person Lift calls him while he is hired
 -- (decide's "come"; inPlace; approach: a fade-over only as the last resort). When you sit at the van's wheel he walks
--- to its passenger door and rides with you (pickSeat, "ride", "seat"), out again when you get out (getOut).
+-- to its passenger door and rides with you (pickSeat, "ride", "seat"), out again when you get out (getOut). 8.5 his
+-- way to that door goes round the van, never through it (roundVan), and he fades into the seat only when the van is
+-- far off or out of his reach a long while (rideBlink).
 --
 --   MoveHelperBrain.wanted(players, hired)     does a crew of this many players have him (Solo, Duo; a hired Danny stays
 --                                              with any crew of one or more)
@@ -28,7 +30,9 @@
 --   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, hired, mine, state, held,
 --                                              his, queued, count, near): "add" | "remove" | why: "crew" | "hire" |
 --                                              "piece" (not this move's) | "far" | "van" (in the van) | "gone" (home
---                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full"
+--                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full";
+--                                              8.5 "clipboard": hired, but the player's clipboard is not out (orders
+--                                              mode: shared/ClipboardRules.luau; a click on his list's piece too)
 --   MoveHelperBrain.keepQueued(state, held)    8.3 is a piece of his list still his to carry (home or on the ground,
 --                                              nobody holding it)?
 --   MoveHelperBrain.nextQueued(list)           8.3 the piece of his list he goes for now (Queued: in his list's order, the
@@ -43,11 +47,19 @@
 --                                              all taken, he follows the van on foot)
 --   MoveHelperBrain.getOut(driving, still, carOk)   8.3 seated in the van: out when nobody drives it and it stands, or at
 --                                              once when it is wrecked or gone
+--   MoveHelperBrain.roundVan(x, z, gx, gz, halfX, halfZ, reach)   8.5 his way to the van's door in the van's own frame
+--                                              (its footprint |x| <= halfX, |z| <= halfZ): the next point (x, z) and the
+--                                              way's length: straight when it keeps RideMargin studs off the footprint,
+--                                              else round its corners (RideMargin out, the shorter way round; a corner
+--                                              within `reach` passed); from within the margin straight out first
+--   MoveHelperBrain.rideBlink(a, gap, dt)      8.5 his walk to the van to ride: true for the last resort (a fade into
+--                                              the seat): RideFar studs or more to go, or no closer by CallGain studs
+--                                              for RideBlink s
 --   MoveHelperBrain.inPlace(gap, stuckFor)     8.3 at the other end of your call: within CallReady studs of his place,
 --                                              or within CallClose and blocked CallStuck s (the hold walks him the rest)
---   MoveHelperBrain.newApproach() / approach(a, gap, dt)   8.3 his walk to your call (or to the van to ride): true once
---                                              he has come no closer than CallGain studs for CallBlink s (the last
---                                              resort: a fade-over)
+--   MoveHelperBrain.newApproach() / approach(a, gap, dt)   8.3 his walk to your call (or to your piece dragged alone):
+--                                              true once he has come no closer than CallGain studs for CallBlink s (the
+--                                              last resort: a fade-over; 8.5 his walk to the van to ride: rideBlink)
 --   MoveHelperBrain.callKept(fromPiece, reach, ready, readyFor)   8.3 does your call go on: "on", "away" (you walked
 --                                              CallLeave studs past the Lift's reach), "idle" (he was in place CallIdle s
 --                                              and you never lifted)
@@ -148,6 +160,7 @@ export type Assign = {
 	queued: boolean, -- it is on his list already
 	count: number, -- the pieces on his list
 	near: boolean, -- the player is near enough to it to see it (ClickReach)
+	clipboard: boolean, -- 8.5 the player's clipboard is out (orders mode: the character attribute ClipboardHeld)
 }
 
 export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- the front door outside, the exit inside
@@ -229,6 +242,8 @@ function MoveHelperBrain.assignCheck(a: Assign): string
 		return "piece"
 	elseif not a.hired then
 		return "hire"
+	elseif not a.clipboard then
+		return "clipboard" -- (8.5: orders only with the clipboard out: never a piece given by a stray click)
 	elseif a.queued then
 		return "remove" -- (a click on a piece of his list takes it back, wherever it is now)
 	elseif not a.near then
@@ -296,6 +311,109 @@ end
 
 function MoveHelperBrain.getOut(driving: boolean, still: boolean, carOk: boolean): boolean
 	return not carOk or (not driving and still)
+end
+
+-- 8.5 (the owner: "when I got into the car, Danny got a bit stuck under the car and then appeared in the car
+-- already"): does the way from (ax, az) to (bx, bz) cross the inside of the box |x| < hx, |z| < hz (its edges are
+-- outside)? The segment clipped to the box (Liang-Barsky): crossing when a piece of it is left.
+local function clip(p: number, q: number, t0: number, t1: number): (number, number)
+	if math.abs(p) < 1e-9 then
+		return if q > 0 then t0 else 1, if q > 0 then t1 else 0 -- (parallel: all in that side's slab, or none)
+	end
+	local t = q / p
+	if p < 0 then
+		return math.max(t0, t), t1
+	end
+	return t0, math.min(t1, t)
+end
+
+local function crosses(ax: number, az: number, bx: number, bz: number, hx: number, hz: number): boolean
+	local dx, dz = bx - ax, bz - az
+	local t0, t1 = clip(-dx, ax + hx, 0, 1)
+	t0, t1 = clip(dx, hx - ax, t0, t1)
+	t0, t1 = clip(-dz, az + hz, t0, t1)
+	t0, t1 = clip(dz, hz - az, t0, t1)
+	return (t1 - t0) * math.sqrt(dx * dx + dz * dz) > 1e-4
+end
+
+-- 8.5 his way to the van's door (`gx`, `gz`), never through the van: in the van's own frame its footprint is |x| <=
+-- halfX, |z| <= halfZ; he keeps RideMargin studs off it. The shortest way among the four corners of the footprint
+-- grown by the margin (a hair farther out: the way along a side stays outside): (x, z) of the next point and the way's
+-- length. A first corner within `reach` studs: the point after it (he walks on round it, no stop there). Within the
+-- margin already (a nudge, the van parked next to him): straight out of its nearer side first.
+function MoveHelperBrain.roundVan(x: number, z: number, gx: number, gz: number, halfX: number, halfZ: number, reach: number): (number, number, number)
+	local m = cfg().RideMargin
+	local hx, hz = halfX + m, halfZ + m
+	local edge = 0.05
+	local before = 0
+	local inX, inZ = hx - math.abs(x), hz - math.abs(z)
+	if inX > 0 and inZ > 0 then
+		local ox, oz = x, z
+		if inX <= inZ then
+			ox = (if x < 0 then -1 else 1) * (hx + edge)
+		else
+			oz = (if z < 0 then -1 else 1) * (hz + edge)
+		end
+		before = dist(x, z, ox, oz)
+		if before > reach then
+			local _, _, rest = MoveHelperBrain.roundVan(ox, oz, gx, gz, halfX, halfZ, reach)
+			return ox, oz, before + rest
+		end
+		x, z = ox, oz -- (a step from its edge: on from there)
+	end
+	local ex, ez = hx + edge, hz + edge
+	local xs = { x, ex, ex, -ex, -ex, gx }
+	local zs = { z, ez, -ez, -ez, ez, gz }
+	local best = { 0, math.huge, math.huge, math.huge, math.huge, math.huge }
+	local from = { 0, 0, 0, 0, 0, 0 }
+	local done = { false, false, false, false, false, false }
+	for _ = 1, 6 do
+		local u, bu = 0, math.huge
+		for i = 1, 6 do
+			if not done[i] and best[i] < bu then
+				u, bu = i, best[i]
+			end
+		end
+		if u == 0 or u == 6 then
+			break
+		end
+		done[u] = true
+		for v = 2, 6 do
+			if not done[v] and not crosses(xs[u], zs[u], xs[v], zs[v], hx, hz) then
+				local d = bu + dist(xs[u], zs[u], xs[v], zs[v])
+				if d < best[v] then
+					best[v], from[v] = d, u
+				end
+			end
+		end
+	end
+	if best[6] == math.huge then
+		return gx, gz, before + dist(x, z, gx, gz) -- (the door's spot itself within the margin: straight to it)
+	end
+	local first, second = 6, 6
+	while from[first] ~= 1 do
+		second = first
+		first = from[first]
+	end
+	if first ~= 6 and dist(x, z, xs[first], zs[first]) <= reach then
+		first = second
+	end
+	return xs[first], zs[first], before + best[6]
+end
+
+-- 8.5 one look at his walk to the van to ride (`gap`: studs on foot to his spot at its door): true for the last
+-- resort, a fade into the seat: the van RideFar studs or more away (driven off without him), or no closer by CallGain
+-- studs for RideBlink s (his way blocked, the van keeps going).
+function MoveHelperBrain.rideBlink(a: Approach, gap: number, dt: number): boolean
+	local c = cfg()
+	if gap >= c.RideFar then
+		return true
+	elseif gap < a.best - c.CallGain then
+		a.best, a.idle = gap, 0
+		return false
+	end
+	a.idle += dt
+	return a.idle >= c.RideBlink
 end
 
 -- ── The way ────────────────────────────────────────────────────────────────
@@ -698,6 +816,7 @@ local DOING: { [string]: string } = {
 	offer = "Waiting by the van for hire",
 	ride = "Getting in the van",
 	seat = "Riding in the van",
+	alight = "Getting out of the van", -- 8.5 (his way out at its door)
 }
 
 function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string

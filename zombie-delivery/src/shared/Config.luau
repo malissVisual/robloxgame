@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.4.1"
+Config.Version = "8.5"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5638,6 +5638,7 @@ Config.Robust = {
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
+		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
 		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 	},
@@ -6273,6 +6274,20 @@ Config.CarryGrip = {
 --                     the client keeps it black until it sees itself there (within Arrive studs: Wait s at most), its
 --                     camera behind you looking the way you face there, then Dark s more, then the fade in (FadeIn s).
 --                     The crew mate or Danny at a pair piece's far end comes in the same dark moment, at that end
+--                     8.5 walking through (the owner: "the doors should open when I'm at them, so it doesn't feel like
+--                     I bumped into the door, but I keep walking smoothly, and then the transition"): the leaf opens as
+--                     you come at its door, in its approach facing it or walking at it (your walk toward it at least
+--                     PairWalk studs/s, its heading within Face of straight at it), or farther out walking at its
+--                     doorway (your walk crosses its face within the approach's width in Lead s: a run finds it open);
+--                     Open s quick, swinging out of the house (the sandbox house's leaves, as the interior's: seen
+--                     against its dark doorway). The doorway is walkable: the house's body is solid but for a dark hall
+--                     behind each of its doorways (Hall: Depth studs into the house, the opening's width and height,
+--                     lined in Color: server/SandboxWorld.luau), Through reaching past it. Walking through is the trip:
+--                     walking into the doorway (at PairWalk studs/s or more, mostly at it), your root across its
+--                     threshold (Cross studs out of the doorway's face: outside the wall's, inside the inner one), or
+--                     there within Ahead s at your walk (the server sees you a moment late and looks every Every s):
+--                     the fade out starts at once while you walk on into the hall (onto the porch inside), the move
+--                     behind the black, and you arrive still walking. Dwell stays for standing at a door facing it
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6383,12 +6398,16 @@ Config.Moving = {
 	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
 	Doors = {
-		Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number }, -- 8.1 walk-in doors
-		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first)
+		Walk = true, Depth = 3.5, Through = 11, Side = 0.5, Height = 9, Face = 0.3, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number }, -- 8.1 walk-in doors (8.5: Through 11, was 6: the house's dark hall)
+		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first; 8.5: for standing at a door, walking through needs none)
 		-- 8.3 the leaves and the trip (server/Moving.luau's WalkIn and travel, client/WalkDoors.luau, client/Fade.luau)
-		Swing = true, Approach = 8, ApproachSide = 2, Angle = 95, Open = 0.35, Close = 0.45, Shut = 1.2,
+		-- (8.5: Approach 12 and ApproachSide 3, were 8 and 2; Open 0.25, was 0.35: the leaf open before you get there)
+		Swing = true, Approach = 12, ApproachSide = 3, Angle = 95, Open = 0.25, Close = 0.45, Shut = 1.2,
 		FadeOut = 0.25, Margin = 0.1, Stream = 2, Wait = 1.5, Arrive = 6, Dark = 0.15, FadeIn = 0.35,
 		Sound = { Open = 0.55, Shut = 0.4, ShutPitch = 0.75, Range = 70 },
+		-- 8.5 walking through (server/Moving.luau's WalkIn.coming and check; server/SandboxWorld.luau's door halls)
+		Lead = 0.9, Cross = 0, Ahead = 0.15,
+		Hall = { Depth = 11, Color = { 24, 18, 14 } :: { number } },
 	},
 	Slots = 6,
 	Tick = 0.2,
@@ -6728,9 +6747,26 @@ Config.MoveStory = {
 --                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
 --   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
 --                      the order they were clicked, the rest is yours
---   RideReach          studs from the van's passenger door he gets in (your seat at its wheel: he walks there at the
---                      Sprint, CallGain / CallBlink his last resort; the seat taken by a crew mate: he follows the van
---                      on foot; 8.3 review: a seat somebody is getting into, its Reserved, is taken too)
+--   RideReach          studs from his spot at the van's passenger door (RideStand) where he starts getting in (your seat
+--                      at its wheel: he walks there at the Sprint, RideBlink / RideFar his last resort; the seat taken
+--                      by a crew mate: he follows the van on foot; 8.3 review: a seat somebody is getting into, its
+--                      Reserved, is taken too)
+--   8.5 getting in like a player (the owner: "when I got into the car, Danny got a bit stuck under the car and then
+--   appeared in the car already"; server/MoveHelper.luau's ride, MoveHelperBrain.roundVan / rideBlink):
+--   RideStand          studs out of the van's side his spot at a seat's door is (where he gets in and where he gets out):
+--                      out of the RideMargin he walks by and out of PathRadius round the van's hull (the old spot, 1.5
+--                      studs out, was inside it: no path came, he walked straight at it, into the van, whose parts his
+--                      collision group passes through), on the ground, clear of the cars
+--   RideMargin         studs he keeps off the van's footprint on his way to its door: the straight way when it keeps this
+--                      off, else round the footprint's corners this far out (the shorter way round)
+--   RideCorner         a corner of that way within this many studs: he walks on to the next point (no stop at it)
+--   RideBlink / RideFar   the last resort, a fade into the seat: no closer by CallGain studs for RideBlink s, or RideFar
+--                      studs or more to go on foot (the van driven off without him: more than from deep in the biggest
+--                      house to the van at its curb, so by the house or the warehouse he always walks). At his spot he
+--                      gets in as a player does (Config.Cargo: a step to the handle facing the van, its door swung open
+--                      for everybody, the slide in through it over BoardSeconds, seated, the door shut) and gets out
+--                      the same way back (AlightSeconds); a van faster than BoardMaxSpeed calls the move in off (he
+--                      stands at his spot and goes after it on foot), as does the seat taken, a zombie, your getting out
 --   SeatYield / SeatAside   8.3 review: a crew mate's Ride along at the door of the seat he sits in: he gets out for
 --                      them (Vehicles.yieldSeat), SeatAside studs past where he gets out otherwise (out of their way),
 --                      and takes no seat for SeatYield s (their boarding reserves it meanwhile)
@@ -6739,6 +6775,17 @@ Config.MoveStory = {
 --                      studs farther than you were as it opened (the status line opens it from anywhere); a click or
 --                      tap reaches him (or a piece: the server checks ClickReach + 10 studs) from ClickReach studs,
 --                      TapSlop studs beside his body counts
+--   8.5 Danny's clipboard, orders mode (the owner: "I'll hold a paper in my hand, like a notepad … a kind of ordering
+--   mode and I click on what he should carry"; shared/ClipboardRules.luau, server/Clipboard.luau, client/DannyOrders.luau;
+--   the rate limit Config.Robust.Limits.Clipboard): only with it out does a click, a tap or R1 give him a piece
+--   Clipboard.Key      the computer's key that takes it out and puts it away (Q: free in the sandbox; the gamepad's R1
+--                      and B are shared/SandboxPad.luau's "clipboard" and "stow")
+--   Clipboard.Look     s between two looks at the piece you point at (its outline and its words)
+--   Clipboard.Flash    s a tapped piece stays outlined (a touch screen has no pointer)
+--   Clipboard.Button / ButtonMin   the touch 📋 button's side at the HUD's scale 1 / at least (px; Ui.MinTouch or more)
+--   Clipboard.Text     the bottom line's text size at scale 1 (Pad: px round its words, Tall: its height)
+--   Clipboard.Give / Back / No   the outline's colours: it can be given (green), on his list (orange: take it back),
+--                      not now (red, with the reason)
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -6814,13 +6861,32 @@ Config.MoveHelper = {
 	-- 8.3 for hire
 	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
 	Queue = 6,
-	RideReach = 3,
+	RideReach = 1.2,
+	RideStand = 2.8, -- 8.5 getting in like a player
+	RideMargin = 2.4,
+	RideCorner = 1.2,
+	RideBlink = 20,
+	RideFar = 200,
 	SeatYield = 2, -- 8.3 review
 	SeatAside = 2.5,
 	CardReach = 90,
 	CardSlack = 20,
 	ClickReach = 90,
 	TapSlop = 2.5,
+	-- 8.5 Danny's clipboard (orders mode)
+	Clipboard = {
+		Key = "Q",
+		Look = 0.1,
+		Flash = 1.5,
+		Button = 64,
+		ButtonMin = 48,
+		Text = 16,
+		Pad = 14,
+		Tall = 34,
+		Give = { 96, 214, 112 } :: { number },
+		Back = { 240, 132, 44 } :: { number },
+		No = { 226, 72, 62 } :: { number },
+	},
 }
 
 -- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the

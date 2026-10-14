@@ -8,6 +8,8 @@
 -- 8.1: the house's box the owner's Blender house's, its parts in House_sandbox_house for server/HouseMesh.luau, the
 -- FrontDoor on the model's door; 8.3 the big move and walk-in doors: the back door, the doors' leaves door leaves that
 -- swing (shared/DoorSwing.luau's attributes; dressed, the Blender house's doors copied as leaves in front of them);
+-- 8.5 walking through: the leaves swing out of the house, the doorways walkable (the House box not solid, HouseSolid
+-- the box less a dark hall behind each doorway, nothing solid in a hall or its way out, the walls round it solid);
 -- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
 -- box query, Config.SpawnSpot.Pass leaving out the ground's mounds), and not where a player stands.
 -- Run with tests/run_tests.py.
@@ -594,10 +596,10 @@ do
 		end
 		local want = if n <= 2 then leaves[n] else backLeaves[1]
 		builtOk = builtOk and want ~= nil and leaf.ClassName == "Model" and leaf.Name == (if n <= 2 then "FrontDoorLeaf" else "BackDoorLeaf") and leaf.Parent == dressedHouse
-			and leaf:GetAttribute("DoorLeaf") == want.hinge and leaf:GetAttribute("DoorSwing") == 1 and leaf:GetAttribute("DoorDark") == true
+			and leaf:GetAttribute("DoorLeaf") == want.hinge and leaf:GetAttribute("DoorSwing") == -1 and leaf:GetAttribute("DoorDark") == true
 			and primary ~= nil and primary.Name == "DoorLeaf" and primary.Color == HouseMesh.Looks.door.color and parts == 8 and still
 	end
-	check("…dressed in the Blender house: two FrontDoorLeaf models and a BackDoorLeaf in it (DoorLeaf ±1, DoorSwing 1, DoorDark; the model's finishes), never colliding; the chalet's own leaves none",
+	check("…dressed in the Blender house: two FrontDoorLeaf models and a BackDoorLeaf in it (DoorLeaf ±1, 8.5 DoorSwing -1: out of the house, DoorDark; the model's finishes), never colliding; the chalet's own leaves none",
 		builtOk, #built)
 	-- 8.3 the big move: the FrontDoor unseen behind its two leaves; the back door at House.back on the Blender house's back
 	-- door (BackDoor: SandboxBackDoor, unseen, no collision; across it, as wide and tall, just outside its leaf) with its
@@ -626,18 +628,19 @@ do
 		back and string.format("BackDoor %.2f … %.2f, %.2f … %.2f, %.2f … %.2f; leaf %.2f … %.2f, %.2f … %.2f, %.2f … %.2f",
 			back.x0, back.x1, back.y0, back.y1, back.z0, back.z1, blo[1], bhi[1], blo[2], bhi[2], blo[3], bhi[3]))
 	-- (8.3 walk-in doors: door leaves of shared/DoorSwing.luau, each hinged at its jamb (DoorLeaf ±1 along its own X: the
-	-- front door's frame's, the back door's turned round), swinging into the house (DoorSwing 1), a dark hall behind)
+	-- front door's frame's, the back door's turned round), 8.5 swinging out of the house (DoorSwing -1, was 1), a dark
+	-- doorway behind)
 	local leavesOk, count = true, 0
 	for _, want in { { "FrontLeafWest", -1, "west", door }, { "FrontLeafEast", 1, "east", door }, { "BackLeaf", SandboxScenery.BackDoor.Hinge, "east", back } } do
 		local list = named(want[1])
 		local leaf, way = list[1], want[4]
 		count += #list
-		leavesOk = leavesOk and #list == 1 and way ~= nil and leaf.part:GetAttribute("DoorLeaf") == want[2] and leaf.part:GetAttribute("DoorSwing") == 1
+		leavesOk = leavesOk and #list == 1 and way ~= nil and leaf.part:GetAttribute("DoorLeaf") == want[2] and leaf.part:GetAttribute("DoorSwing") == -1
 			and leaf.part:GetAttribute("DoorDark") == true and not leaf.part.CanCollide and leaf.part.Transparency == 0 and leaf.part.Parent == own
 			and leaf.x0 >= way.x0 - 0.05 and leaf.x1 <= way.x1 + 0.05 and leaf.y0 >= way.y0 - 0.05 and leaf.y1 <= way.y1 + 0.05
 			and (if want[3] == "west" then math.abs(leaf.x0 - way.x0) < 0.1 else math.abs(leaf.x1 - way.x1) < 0.1)
 	end
-	check("8.3: the doors' leaves shut in their doorways, door leaves hinged at a jamb (FrontLeafWest west, FrontLeafEast east, BackLeaf east: DoorLeaf -1 / 1 / -1, DoorSwing 1, DoorDark), the FrontDoor unseen behind them",
+	check("8.3: the doors' leaves shut in their doorways, door leaves hinged at a jamb (FrontLeafWest west, FrontLeafEast east, BackLeaf east: DoorLeaf -1 / 1 / -1, 8.5 DoorSwing -1, DoorDark), the FrontDoor unseen behind them",
 		leavesOk and count == 3 and door ~= nil and door.part.Transparency == 1)
 	-- dressed, the back door's leaf copied (SandboxScenery.backLeaves) the same way in front of the Blender house's back
 	-- door: it covers its leaf from outside, hung on the side away from its handle (house.py's: HouseArt.backKnob)
@@ -680,6 +683,80 @@ do
 		end
 	end
 	check(`the garden (fence, gate, mailbox, flower boxes, path: {gardenParts} parts) never collides`, gardenSolid == nil and #named("FlowerBox") >= 3 and #named("Mailbox") == 1 and #named("Path") == 1, gardenSolid)
+end
+
+-- 8.5 walking through (the owner: "so it doesn't feel like I bumped into the door, but I keep walking smoothly"): the
+-- doorways walkable. The House box (what stopped you at the door: solid under the Blender house) collides with nothing
+-- and stops no ray; the house's HouseSolid pieces are the box less a hall behind each doorway (Config.Moving.Doors.Hall
+-- Depth deep, the opening's width, the door's height): nothing that collides in a hall or in the door's way out in
+-- front of it (the leaves, the doorways, the model's door, the dark lining included), the walls either side, over the
+-- doorway and past the hall as solid as ever; each hall lined dark (DoorHalls: its back, sides, ceiling, floor),
+-- decoration only.
+do
+	local D = Config.Moving.Doors
+	local h = HOUSE.house
+	local body = named("House")[1]
+	local solids = named("HouseSolid")
+	local volume, inBox = 0, true
+	for _, b in solids do
+		local s = b.part.Size
+		volume += s.X * s.Y * s.Z
+		inBox = inBox and b.x0 >= h.x - h.sx / 2 - EPS and b.x1 <= h.x + h.sx / 2 + EPS and b.z0 >= h.z - h.sz / 2 - EPS and b.z1 <= h.z + h.sz / 2 + EPS
+			and b.y0 >= h.y - EPS and b.y1 <= h.y + h.sy + EPS and b.part.CanCollide and b.part.CanQuery and b.part.Transparency == 1
+	end
+	local top = named("FrontDoor")[1].part.Size.Y
+	local depth = D.Hall.Depth
+	local halls = {
+		{ name = "the front door's hall", x = HOUSE.door.x, half = SandboxScenery.FrontDoor.Width / 2, z0 = HOUSE.door.z, z1 = HOUSE.door.z + depth, out = -1 },
+		{ name = "the back door's hall", x = HOUSE.back.x, half = SandboxScenery.BackDoor.Width / 2, z0 = HOUSE.back.z - depth, z1 = HOUSE.back.z, out = 1 },
+	}
+	local hallVolume = 0
+	for _, hall in halls do
+		hallVolume += 2 * hall.half * top * depth
+	end
+	check(`8.5 the House box collides with nothing and stops no ray; {#solids} HouseSolid pieces, unseen, are the box less a hall behind each doorway`,
+		body ~= nil and body.part.CanCollide == false and body.part.CanQuery == false and #solids == 7 and inBox
+			and math.abs(volume - (h.sx * h.sy * h.sz - hallVolume)) < 0.01 and depth >= 10 and depth < h.sz / 2,
+		`{volume} of {h.sx * h.sy * h.sz - hallVolume}`)
+	-- what collides in a box x0 … x1, y0 … y1, z0 … z1 (the floors under y 0.05: the lawn the hall stands on)
+	local function solidIn(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number): string?
+		for _, b in boxes do
+			if b.part.CanCollide and not b.far and b.x0 < x1 - EPS and b.x1 > x0 + EPS and b.y0 < y1 - EPS and b.y1 > y0 + EPS and b.z0 < z1 - EPS and b.z1 > z0 + EPS then
+				return b.name
+			end
+		end
+		return nil
+	end
+	local blocked: string? = nil
+	local walls = true
+	for _, hall in halls do
+		local x0, x1 = hall.x - hall.half, hall.x + hall.half
+		-- the hall and the door's way out in front of it (5 studs, a body's height)
+		local inHall = solidIn(x0, x1, 0.05, top, hall.z0, hall.z1)
+		local way = if hall.out < 0 then solidIn(x0, x1, 0.05, top, hall.z0 - 5, hall.z0) else solidIn(x0, x1, 0.05, top, hall.z1, hall.z1 + 5)
+		blocked = blocked or (if inHall then `{inHall} in {hall.name}` elseif way then `{way} in front of {hall.name}` else nil)
+		-- the walls either side of it, over the doorway and past the hall's end: solid
+		local zMid = (hall.z0 + hall.z1) / 2
+		local past = if hall.out < 0 then hall.z1 + 0.5 else hall.z0 - 0.5
+		walls = walls and solidIn(x0 - 1, x0 - 0.5, 1, 6, zMid - 0.5, zMid + 0.5) ~= nil and solidIn(x1 + 0.5, x1 + 1, 1, 6, zMid - 0.5, zMid + 0.5) ~= nil
+			and solidIn(x0 + 0.5, x1 - 0.5, top + 0.5, top + 1, zMid - 0.5, zMid + 0.5) ~= nil and solidIn(x0 + 0.5, x1 - 0.5, 1, 6, past - 0.25, past + 0.25) ~= nil
+	end
+	check("8.5 the doorways walkable: nothing that collides in either door's hall or its way out (leaves, doorway, the House box)", blocked == nil, blocked)
+	check("8.5 …the house's walls either side of each hall, over its doorway and past its end still solid", walls)
+	local lining = named("DoorHall")
+	local holder = world:FindFirstChild("TheOldChalet"):FindFirstChild("DoorHalls")
+	local liningOk = #lining == 10 and holder ~= nil
+	for _, b in lining do
+		local c = b.part.Color
+		local inside = false
+		for _, hall in halls do
+			inside = inside or (b.x0 >= hall.x - hall.half - EPS and b.x1 <= hall.x + hall.half + EPS and b.z0 >= hall.z0 - EPS and b.z1 <= hall.z1 + EPS
+				and b.y0 >= -EPS and b.y1 <= top + EPS)
+		end
+		liningOk = liningOk and inside and b.part.Parent == holder and not b.part.CanCollide and not b.part.CanQuery and not b.part.CastShadow
+			and b.part.Transparency == 0 and math.abs(c.R * 255 - D.Hall.Color[1]) < 1 and math.abs(c.G * 255 - D.Hall.Color[2]) < 1 and math.abs(c.B * 255 - D.Hall.Color[3]) < 1
+	end
+	check("8.5 …each hall lined dark (DoorHalls: its back, sides, ceiling and floor, in the hall, seen, never colliding)", liningOk, #lining)
 end
 
 -- the words: the signpost's boards, the gate's and the mailbox's

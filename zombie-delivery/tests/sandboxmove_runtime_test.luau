@@ -32,7 +32,10 @@
 -- 8.1 walk-in doors: the chalet's front door walked through both ways (no E: its Enter house off), out 4 studs from it
 -- facing the road, no way straight back, its doormat over the garden path while a move runs. 8.3 the big move: its plan
 -- HouseLayout's kind "big" (Config.Moving.Sandbox.Kind); its back door (House.back) a second way in, its own doormat
--- and walk-in zone.
+-- and walk-in zone. 8.5 walking through: the leaf opens as you walk at the door (whichever way you look; from farther
+-- out at a run), never as you walk past it; walking into a doorway is the trip at the first look (no dwell, your walk
+-- carried on), in by the front door, out by the doorway inside, in by the back door; walking back out of the hall or
+-- along the doorway goes nowhere; standing at a door facing it, the dwell as before.
 -- 8.4: the house kept across servers: a player with a save has the seed of their card's house in it (rolled, kept
 -- through GIVE UP and leaving); another server with that save shows the same house (a loaded save's seed counts over
 -- the server's memory); a trip home drops it and the next card rolls a new one into it.
@@ -826,6 +829,127 @@ do
 	check("…its leaf shut again Shut s after the trip", backLeaf:GetAttribute("DoorOpen") == false)
 	Moving.admin(bob, "end")
 	check("the move over: both doormats hidden again (no move at the house)", mat.Transparency == 1 and backMat.Transparency == 1)
+end
+
+-- 8.5 walking through (the owner: "the doors should open when I'm at them, so it doesn't feel like I bumped into the
+-- door, but I keep walking smoothly, and then the transition"; Config.Moving.Doors Lead, Cross, Ahead): the leaf opens
+-- as Bob comes at the door, walking at it in its approach whichever way he looks, from farther out only at a run (his
+-- walk through its doorway within Lead s), never as he walks past it; walking into the doorway is the trip at once (one
+-- look, no dwell, his walk carried on), in by the front door, out by the doorway inside, in by the back door; walking
+-- back out of the hall or past the doorway goes nowhere; standing at the door facing it, the 8.3 dwell as before.
+do
+	local D = T.Doors
+	check("(Bob's move for walking through)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
+	step()
+	local o = E.interiors[#E.interiors]
+	local root = E.rootOf(bob)
+	local foot = V3(House.door.x, House.door.y, House.door.z)
+	local back = V3(House.back.x, House.back.y, House.back.z)
+	local backFacing = V3(0, 0, 1) -- (House.back yaw 180: out to the south)
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	local into = V3(0, 0, 1) -- (the fake plan's +Z)
+	local exitAt = o * V3(0, 0, 0.5) + up
+	local side = V3(1, 0, 0)
+	local walk, run = Config.Movement.Walk, Config.Movement.Sprint
+	-- Bob at `at` looking along `look`, walking at `v` (studs/s, flat: as Roblox reports a walking body's root)
+	local function go(at: any, look: any, v: any)
+		root.CFrame = M.CFrame.lookAt(at, at + look)
+		root.AssemblyLinearVelocity = v
+	end
+	local function isIn(): boolean
+		return (root.Position - o.Position).Magnitude < 100
+	end
+	local function shut(leaf: any): boolean
+		go(foot + up + facing * 40, facing, V3(0, 0, 0))
+		step(D.Shut + 0.05)
+		return leaf:GetAttribute("DoorOpen") ~= true
+	end
+	go(foot + up + facing * 40, facing, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm) -- (the last move's end took him out of the house: its re-arm)
+	check("(the front door's leaf shut, Bob far from it)", shut(frontDoor))
+	-- walking at it in its approach, looking along the house (not at the door): open
+	go(foot + up + facing * (D.Approach - 1), side, -facing * walk)
+	step(0.1)
+	check("8.5 walking at the door in its approach looking along the house (not facing it squarely): its leaf opens, not in", frontDoor:GetAttribute("DoorOpen") == true and not isIn())
+	check("(…shut again)", shut(frontDoor))
+	-- walking past it along the house, 2 studs out of the door: nothing
+	go(foot + up + facing * 2 - side * 2, side, side * walk)
+	step(0.01)
+	check("8.5 walking past the door along the house (2 studs out, through its zone): its leaf stays shut, not in", frontDoor:GetAttribute("DoorOpen") ~= true and not isIn())
+	-- farther than its approach: at a walk nothing yet, at a run (through its doorway within Lead s) open
+	local far = D.Approach + 6
+	check("(farther than its approach, within a run's Lead, beyond a walk's)", far > walk * D.Lead and far < run * D.Lead)
+	go(foot + up + facing * far + side * 1.5, -facing, -facing * walk)
+	step(0.01)
+	check("8.5 walking at the door from farther than its approach: not yet open", frontDoor:GetAttribute("DoorOpen") ~= true)
+	go(foot + up + facing * far + side * 1.5, -facing, -facing * run)
+	step(0.01)
+	check("8.5 …running at it from there (through its doorway within Lead s): its leaf opens already", frontDoor:GetAttribute("DoorOpen") == true and not isIn())
+	-- walking through: a stud out of the door, walking in: in at the first look (no dwell), still walking, facing in
+	local since = #E.messages
+	go(foot + up + facing * 1, -facing, -facing * walk)
+	step(0.01)
+	local fadeOut, fadeIn: any, any = nil, nil
+	for index = since + 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == bob and m.kind == "fade" then
+			if m.a == "out" then
+				fadeOut = fadeOut or m
+			else
+				fadeIn = m
+			end
+		end
+	end
+	local v = root.AssemblyLinearVelocity
+	check("8.5 walking into the doorway (a stud out of the door, at a walk): in at the first look, no dwell; the fade out and in as ever",
+		isIn() and fadeOut ~= nil and fadeOut.b == D.FadeOut and fadeIn ~= nil and fadeIn.b == D.FadeIn and frontDoor:GetAttribute("DoorOpen") == true)
+	check("…he comes in still walking at his walk, facing into the house", v ~= nil and math.abs(v:Dot(into) - walk) < 1e-6 and root.CFrame.LookVector:Dot(into) > 0.99,
+		v and v:Dot(into))
+	-- the way out inside, walking through: out of the zone, Rearm, then a stud in front of the doorway walking out
+	go(exitAt + into * 8, -into, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	go(exitAt + into * 1, -into, -into * walk)
+	step(0.01)
+	check("8.5 out by walking through the doorway inside (a stud in front of it, at a walk): out at the first look, 4 studs out of the door, facing the road, still walking",
+		not isIn() and math.abs(flatDistance(root.Position, foot) - 4) < 0.5 and root.CFrame.LookVector:Dot(facing) > 0.99
+		and math.abs(root.AssemblyLinearVelocity:Dot(facing) - walk) < 1e-6, root.Position)
+	-- in its dark hall walking back out (turned round), and walking along the doorway: nowhere
+	go(foot + up + facing * 8, facing, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	go(foot + up - facing * 3, facing, facing * walk)
+	step(0.01)
+	check("8.5 in the door's dark hall walking back out (turned round): not in", not isIn())
+	go(foot + up - facing * 0.5 - side * 1, side, side * walk)
+	step(0.01)
+	check("8.5 …nor walking across the doorway on its threshold", not isIn())
+	-- standing at the door facing it (no walk): the 8.3 dwell as before
+	go(foot + up + facing * 1, -facing, V3(0, 0, 0))
+	step(0.01)
+	check("8.5 standing at the door facing it: not in at the first look (the dwell)", not isIn())
+	step(math.max(D.Dwell, D.Open) + 0.01)
+	check("…in after the dwell (8.3)", isIn())
+	-- the back door, walking through it from outside: out by the doorway inside first (walking), round to the back
+	go(exitAt + into * 8, -into, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	go(exitAt + into * 1, -into, -into * walk)
+	step(0.01)
+	check("(out by the front door again, walking)", not isIn())
+	go(back + up + backFacing * 30, backFacing, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	check("(the back door's leaf shut)", shut(backLeaf))
+	go(back + up + backFacing * 9, -backFacing, -backFacing * walk)
+	step(0.1)
+	check("8.5 walking at the back door: its leaf opens", backLeaf:GetAttribute("DoorOpen") == true and not isIn())
+	go(back + up + backFacing * 1, -backFacing, -backFacing * walk)
+	step(0.01)
+	check("8.5 …walking into its doorway: in at the first look (no dwell), still walking", isIn() and math.abs(root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector) - walk) < 1e-6)
+	root.AssemblyLinearVelocity = V3(0, 0, 0)
+	Moving.admin(bob, "end")
 end
 
 -- 8.3 economy: no house reroll (server/Moving.luau SB.seeds, by user id): a move called off with nothing home (GIVE UP,

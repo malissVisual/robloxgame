@@ -156,6 +156,7 @@ end
 local function give(model: any)
 	local was = E.rootOf(ann).Position
 	E.place(ann, model.PrimaryPart.Position + V3(3, 0, 0))
+	ann.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: her clipboard out, server/Clipboard.luau's)
 	E.request(ann, "helper", "assign", model)
 	E.place(ann, was)
 end
@@ -464,7 +465,7 @@ if pick and backDoor then
 	local exitIn = origin * exits[2]
 	local w1, d1, h1 = walk(V3(inRoom.X, y, inRoom.Z))
 	local w2, d2, h2 = walk(V3(inHall.X, y, inHall.Z))
-	local w3, d3, h3 = walk(V3(exitIn.X - Config.Moving.Doors.Through - 2, y, exitIn.Z))
+	local w3, d3, h3 = walk(V3(exitIn.X - (Config.Moving.Doors.Depth + 4.5), y, exitIn.Z)) -- (8 studs short of it: clear of its zone)
 	check("out of its room by its doorway and along the corridor to the back door together: he never leaves its far end, on the floor",
 		math.max(w1, w2, w3) < 0.05 and not (d1 or d2 or d3) and helped() and math.max(h1, h2, h3) < 0.5 and room ~= nil, `{math.max(w1, w2, w3)} off, {math.max(h1, h2, h3)} up`)
 	-- out of the back door, the door nearer to it (8.1 walk-in doors: into its zone facing it, the dwell): he comes

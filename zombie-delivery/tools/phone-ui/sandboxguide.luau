@@ -22,8 +22,9 @@
 -- a move wins; the ring makes nothing loop after loop.
 -- 8.4, Danny for hire's steps (SandboxSteps.danny) at the same three sizes: "Hire Danny to carry with you" on a move
 -- while he is for hire and the money pays him (the chevron over his body, "(L1)" with a gamepad), never while something
--- covers the screen or his card is open (which shows his offer: done); hired: "Pick a piece to give it to Danny" in the
--- house ("(R1)" with a gamepad) until a piece goes on his list; "Heavy piece: press Lift and wait for Danny" with a
+-- covers the screen or his card is open (which shows his offer: done); hired: 8.5 "Take out your clipboard (Q) and pick a
+-- piece for Danny" in the house ("(tap 📋)" on a phone, "(R1)" with a gamepad; with the clipboard out "Pick a piece to
+-- give it to Danny") until a piece goes on his list; "Heavy piece: press Lift and wait for Danny" with a
 -- two-person piece's Lift near (looked for at most once a second, no more once done) until your Lift calls him; the
 -- line under the move's panel and Danny's strip, clear of the money, the touch buttons and the player list.
 local M = require("./missions_mock")
@@ -915,16 +916,25 @@ wait(G.SoftGap + 0.02)
 for _, size in SIZES do
 	screen(size[1], size[2], size[3])
 	tick()
-	check(`{size[4]}: in the house, his list empty: "Pick a piece to give it to Danny" (every device's words: a click or a tap)`, SandboxGuide.step() == "give"
-		and words.Text == "Pick a piece to give it to Danny" and shown(), words.Text)
+	-- (8.5 orders mode: the clipboard's key in the device's way, Q on a computer, its 📋 button on a phone)
+	local want = if size[1] then "Take out your clipboard (tap 📋) and pick a piece for Danny" else "Take out your clipboard (Q) and pick a piece for Danny"
+	check(`{size[4]}: in the house, his list empty: "{want}" (8.5: orders mode, the device's key)`, SandboxGuide.step() == "give"
+		and words.Text == want and shown(), words.Text)
 	dannyClear(size[4])
 end
 check("… no 3D target in the house", not marker.Enabled and lit() == 0)
 M.gamepad = true
 tick()
-check("… with a gamepad: \"(R1)\" (his \"Give to Danny\" at a piece)", words.Text == "Pick a piece to give it to Danny (R1)", words.Text)
+check("… with a gamepad: \"(R1)\" (8.5: R1 takes the clipboard out)", words.Text == "Take out your clipboard (R1) and pick a piece for Danny", words.Text)
+M.player.Character:SetAttribute("ClipboardHeld", true) -- (8.5: the server's, the clipboard out)
+tick()
+check("8.5 the clipboard out: \"Pick a piece to give it to Danny (R1)\" with a gamepad (R1 at a piece)", words.Text == "Pick a piece to give it to Danny (R1)", words.Text)
 M.gamepad = false
 tick()
+check("… a computer: \"Pick a piece to give it to Danny\" (a click: no key)", words.Text == "Pick a piece to give it to Danny" and shown(), words.Text)
+M.player.Character:SetAttribute("ClipboardHeld", nil)
+tick()
+check("… put away again: the clipboard's words again", words.Text == "Take out your clipboard (Q) and pick a piece for Danny", words.Text)
 attribute("MoveHelperQueue", 1)
 tick()
 check("… a piece given him (his list went up): give done, quiet", SandboxGuide.step() ~= "give" and not hint.Visible)

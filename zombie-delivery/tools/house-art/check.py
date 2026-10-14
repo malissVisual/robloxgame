@@ -39,6 +39,12 @@ hidden with it, no door leaves; the model's doors copied as the leaves that swin
 FrontDoorLeaf ×2, BackDoorLeaf) just in front of its doors' leaves, covering them, their backs on the wall's face,
 hinged at the opening's sides (the back door's away from its handle), within its doorways (nothing of the model in
 their way but the step under their foot and what runs across the doorway, its opening cut out).
+8.5 walking through (Config.Moving.Doors Hall): the leaves (the chalet's and the copies) swing out of the house
+(DoorSwing -1, seen against the dark doorway), and the doorways are walkable, with or without the import: the House box
+collides with nothing and stops no ray, the house's "HouseSolid" pieces (unseen) are the box less a hall behind each
+doorway (Hall Depth deep, the opening's width, the door's height), nothing of the house that collides in either hall
+or its way out (the step, the model's door and the copies included), the walls either side of it, over it and past its
+end solid; each hall lined dark ("DoorHall" parts in "DoorHalls", decoration) inside the house's box, in the hall.
 
     python3 zombie-delivery/tools/house-art/check.py <luau> [another export's ZDCHouseArt.json]
 """
@@ -269,6 +275,23 @@ print(string.format('GREETER {"cf":%s,"size":[2.4,6,2.4]}', f(inverse * out * G.
 -- the path kept clear from the curb to the door (SandboxScenery.Path), in the house's frame (yaw 0: only moved)
 local P = SandboxScenery.Path
 print(string.format('PATH {"x0":%.17g,"x1":%.17g,"z0":%.17g,"z1":%.17g,"yaw":%g}', P.x0 - h.x, P.x1 - h.x, P.z0 - h.z, P.z1 - h.z, H.door.yaw))
+-- 8.5 walking through: the doors' halls' depth (Config.Moving.Doors.Hall); the doors' leaves (a model each: the
+-- model's doors copied) swung open as client/WalkDoors.luau swings a model (whole, about its hinge: shared/DoorSwing.luau)
+print(string.format('HALL {"depth":%.17g}', Config.Moving.Doors.Hall.Depth))
+local DoorSwing = require("./DoorSwing")
+for _, leaf in (if chalet then chalet:GetChildren() else {}) do
+	local hinge, side, angle = DoorSwing.read(leaf:GetAttribute("DoorLeaf"), leaf:GetAttribute("DoorSwing"), leaf:GetAttribute("DoorAngle"), Config.Moving.Doors.Angle)
+	local primary = if leaf.ClassName == "Model" then leaf.PrimaryPart else nil
+	if hinge ~= nil and hinge ~= 0 and primary then
+		local frame = primary.CFrame
+		local s = DoorSwing.pieces(primary.Size.X, primary.Size.Z, hinge, side, angle)[1]
+		local open = frame * G.CFrame.new(s.ox + s.hx, 0, s.oz + s.hz) * G.CFrame.Angles(0, s.yaw, 0) * G.CFrame.new(-s.hx, 0, -s.hz)
+		local move = open * frame:Inverse()
+		for _, d in leaf:GetChildren() do
+			print(string.format('OPEN {"copy":"%s","name":"%s","cf":%s,"size":[%.17g,%.17g,%.17g]}', leaf.Name, d.Name, f(inverse * move * d.CFrame), d.Size.X, d.Size.Y, d.Size.Z))
+		end
+	end
+end
 print(string.format('META {"moved":%s}', tostring(art.Parent == storage and MODE == "art")))
 print("ALL DONE")
 '''
@@ -309,7 +332,7 @@ def stage(tmp: Path, manifest: dict):
 def run(luau: str, tmp: Path, mode: str, harness: str = "harness.luau"):
     r = subprocess.run([luau, harness, "-a", mode], cwd=tmp, capture_output=True, text=True)
     assert r.returncode == 0 and "ALL DONE" in r.stdout, r.stdout[-3000:] + r.stderr[-3000:]
-    out = {"HOUSE": [], "PART": [], "DRESS": [], "LOOK": [], "HOME": [], "ENTER": [], "PATH": [], "GREETER": []}
+    out = {"HOUSE": [], "PART": [], "DRESS": [], "LOOK": [], "HOME": [], "ENTER": [], "PATH": [], "GREETER": [], "HALL": [], "OPEN": []}
     for line in r.stdout.splitlines():
         kind, _, rest = line.partition(" ")
         if kind in out:
@@ -462,6 +485,44 @@ def wedge_top(part, steps=24):
     return out
 
 
+def halls_check(result, W, H, D):
+    """8.5 walking through: the doorways walkable (the House box not solid, its HouseSolid pieces the box less a hall
+    behind each doorway, nothing solid in a hall or its way out, the walls round it solid), each hall lined dark."""
+    depth = result["HALL"][0]["depth"]
+    parts = result["PART"]
+    body = next(p for p in parts if p["own"] and p["name"] == "House")
+    assert not body["collide"] and not body["query"], ("the House box still solid", body["collide"], body["query"])
+    solids = [p for p in parts if p["name"] == "HouseSolid"]
+    assert len(solids) == 7 and all(p["own"] and p["collide"] and p["query"] and p["t"] == 1 for p in solids), \
+        ("the house's solid pieces", len(solids))
+    halls = []
+    for name, side in (("FrontDoor", -1), ("BackDoor", 1)):
+        lo, hi = aabb(next(p for p in parts if p["name"] == name))
+        face = side * D / 2
+        z0, z1 = (face, face + depth) if side < 0 else (face - depth, face)
+        out = ([lo[0], 0.05, face - 5], [hi[0], hi[1], face]) if side < 0 else ([lo[0], 0.05, face], [hi[0], hi[1], face + 5])
+        halls.append((name, [lo[0], 0.05, z0], [hi[0], hi[1], z1], out))
+    volume = sum(p["size"][0] * p["size"][1] * p["size"][2] for p in solids)
+    want = W * H * D - sum((b[0] - a[0]) * b[1] * (b[2] - a[2]) for _, a, b, _ in halls)  # (each hall from the ground up)
+    assert abs(volume - want) < 0.05, ("the solid pieces are not the box less the halls", volume, want)
+    for name, lo, hi, (o_lo, o_hi) in halls:
+        for p in parts:  # (the chalet's and its garden's: the ground is the world's)
+            if p["collide"]:
+                assert not overlap((lo, hi), aabb(p)), (name, "a solid part in its hall", p["name"])
+                assert not overlap((o_lo, o_hi), aabb(p)), (name, "a solid part in its way out", p["name"])
+        z = (lo[2] + hi[2]) / 2
+        far = hi[2] + 0.5 if lo[2] < 0 else lo[2] - 0.5
+        for area in (([lo[0] - 1, 1, z - 0.5], [lo[0] - 0.5, 6, z + 0.5]), ([hi[0] + 0.5, 1, z - 0.5], [hi[0] + 1, 6, z + 0.5]),
+                     ([lo[0] + 0.5, hi[1] + 0.5, z - 0.5], [hi[0] - 0.5, hi[1] + 1, z + 0.5]), ([lo[0] + 0.5, 1, far - 0.25], [hi[0] - 0.5, 6, far + 0.25])):
+            assert any(overlap(area, aabb(p)) for p in solids), (name, "the house not solid round its hall", area)
+    lining = [p for p in parts if p["name"] == "DoorHall"]
+    assert len(lining) == 10, ("the halls' dark lining", len(lining))
+    for p in lining:
+        lo, hi = aabb(p)
+        assert not (p["collide"] or p["query"] or p["shadow"]) and p["t"] == 0 and not p["own"], ("a hall's lining", p["collide"], p["query"])
+        assert any(all(lo[i] >= a[i] - 0.06 and hi[i] <= b[i] + 1e-3 for i in range(3)) for _, a, b, _ in halls), ("a hall's lining outside its hall", lo, hi)
+
+
 def sandbox_check(manifest, plain, art):
     """8.1 SANDBOX: The Old Chalet (server/SandboxWorld.luau) on house.py's box, dressed by HouseMesh once imported."""
     W, H, D = manifest["box"]
@@ -474,14 +535,14 @@ def sandbox_check(manifest, plain, art):
     # No import: the chalet as it is.
     assert not plain["HOUSE"][0]["dressed"], "dressed without an import"
     for p in plain["PART"]:
-        # (8.3: the doorways unseen behind their leaves)
-        assert p["class"] != "MeshPart" and p["t"] == (1 if p["name"] in ("FrontDoor", "BackDoor") else 0), (p["name"], "changed without an import")
+        # (8.3: the doorways unseen behind their leaves; 8.5 the house's solid pieces unseen)
+        assert p["class"] != "MeshPart" and p["t"] == (1 if p["name"] in ("FrontDoor", "BackDoor", "HouseSolid") else 0), (p["name"], "changed without an import")
     # Dressed.
     house = art["HOUSE"][0]
     assert house["dressed"] and art["META"]["moved"], (house, art["META"], "not dressed, or the import left in the world")
     own = [p for p in art["PART"] if p["own"] and p["class"] != "MeshPart"]
     meshes = [p for p in art["PART"] if p["class"] == "MeshPart"]
-    garden = [p for p in art["PART"] if not p["own"] and not p["copy"]]  # (8.3: the doors' copies checked on their own)
+    garden = [p for p in art["PART"] if not p["own"] and not p["copy"] and p["name"] != "DoorHall"]  # (8.3: the doors' copies, 8.5 the halls' lining checked on their own)
     assert all(p["own"] for p in meshes), "a piece of the model outside House_sandbox_house"
     assert sorted(p["name"] for p in meshes) == sorted(manifest["pieces"]), sorted(set(p["name"] for p in meshes) ^ set(manifest["pieces"]))
     for p in meshes:
@@ -497,7 +558,9 @@ def sandbox_check(manifest, plain, art):
     for p in own:
         assert p["t"] == 1 and p["shadow"] is False, (p["name"], "still seen")
     solid = sorted(p["name"] for p in own if p["collide"])
-    assert solid == ["House", "Roof", "Roof"], (solid, "the solid parts: the House box and the gable only")
+    assert solid == ["HouseSolid"] * 7 + ["Roof", "Roof"], (solid, "the solid parts: the house's solid pieces (8.5: the box less its doors' halls) and the gable only")
+    for result in (plain, art):
+        halls_check(result, W, H, D)
     # The walls on the House box's faces.
     body = next(p for p in own if p["name"] == "House")
     lo, hi = aabb(body)
@@ -546,7 +609,7 @@ def sandbox_check(manifest, plain, art):
         p = leaf_parts[name]
         lo_, hi_ = aabb(p)
         w_lo, w_hi = aabb(plain_ways[way])
-        assert p["leaf"] in (-1, 1) and p["swing"] == 1 and p["dark"] and not p["copy"] and p["own"] and not p["collide"] and p["t"] == 0, \
+        assert p["leaf"] in (-1, 1) and p["swing"] == -1 and p["dark"] and not p["copy"] and p["own"] and not p["collide"] and p["t"] == 0, \
             (name, p["leaf"], p["swing"], p["dark"])
         assert all(lo_[i] >= w_lo[i] - 0.05 and hi_[i] <= w_hi[i] + 0.05 for i in range(3)), (name, "not in its doorway", lo_, hi_, w_lo, w_hi)
         assert abs(hinge_x(p) - (w_lo, w_hi)[jamb][0]) < 0.1, (name, "not hinged at its jamb (west, east, the back door's east)", hinge_x(p))
@@ -571,7 +634,7 @@ def sandbox_check(manifest, plain, art):
             (model, "not just in front of the model's door, covering it", c_lo, c_hi, m_lo, m_hi)
         for p in parts:
             lo_, hi_ = aabb(p)
-            assert p["swing"] == 1 and p["dark"] and not (p["collide"] or p["query"] or p["touch"]) and p["anchored"] and p["t"] == 0 and not p["own"], (model, p["name"])
+            assert p["swing"] == -1 and p["dark"] and not (p["collide"] or p["query"] or p["touch"]) and p["anchored"] and p["t"] == 0 and not p["own"], (model, p["name"])
             assert lo_[0] >= c_lo[0] - 1e-3 and hi_[0] <= c_hi[0] + 1e-3 and lo_[1] >= c_lo[1] - 1e-3 and hi_[1] <= c_hi[1] + 1e-3, (model, p["name"], "outside its leaf")
             clash = [d["name"] for d in details if overlap((lo_, hi_), box_of(d)) and not d["name"].startswith("Schod")
                      and not (box_of(d)[0][0] <= m_lo[0] and box_of(d)[1][0] >= m_hi[0])]
@@ -582,6 +645,18 @@ def sandbox_check(manifest, plain, art):
         if model == "BackDoorLeaf":
             assert (hinge_x(bodies[0]) - (c_lo[0] + c_hi[0]) / 2) * (knob_x - (c_lo[0] + c_hi[0]) / 2) < 0, \
                 ("the back door's leaf hung on its handle's side", hinge_x(bodies[0]), knob_x)
+    # 8.5: swung open (as client/WalkDoors.luau swings them: out of the house), every copy wholly in front of its wall,
+    # clear of the model (its portal, lantern, bushes) but the step under its foot, and clear of its doorway
+    opened = art["OPEN"]
+    assert len(opened) == len(copies), ("the copies swung open", len(opened), len(copies))
+    for p in opened:
+        lo_, hi_ = aabb(p)
+        front = p["copy"] == "FrontDoorLeaf"
+        assert (hi_[2] <= -D / 2 + 1e-3) if front else (lo_[2] >= D / 2 - 1e-3), (p["copy"], p["name"], "not out of the house when open", lo_, hi_)
+        clash = [d["name"] for d in details if overlap((lo_, hi_), box_of(d)) and not d["name"].startswith("Schod")]
+        assert not clash, (p["copy"], p["name"], "swung open into the model", clash[:8])
+        m_lo, m_hi = (l_lo, l_hi) if front else (k_lo, k_hi)
+        assert hi_[0] <= m_lo[0] + 0.2 or lo_[0] >= m_hi[0] - 0.2 or p["name"] != "DoorLeaf", (p["copy"], "open but across its doorway", lo_, hi_)
     # Nothing of the model in the door's Enter house box, the doorway's way out (6 studs, over the step) or on the path
     # (the path runs under the step); the garden clear of the model.
     path = art["PATH"][0]
@@ -609,10 +684,11 @@ def sandbox_check(manifest, plain, art):
     assert not clashes, f"the garden in the model: {clashes[:8]}"
     return (f"Sandbox house PASS: The Old Chalet on house.py's box ({W:.2f} × {H:.2f} × {D:.2f}) as SandboxWorld builds it: "
             f"without the import the chalet; dressed, all {len(meshes)} pieces in place on House_sandbox_house, anchored, not "
-            f"physical; the chalet's {len(own)} parts hidden, the House box and the gable still solid, the gable "
+            f"physical; the chalet's {len(own)} parts hidden, the house's solid pieces (8.5: the box less its doors' dark halls, walkable) and the gable solid, the gable "
             f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door, 8.3 the "
             f"BackDoor on its back door, their three leaves shut in them hinged at a jamb (dressed: the model's doors copied as "
-            f"{len(copies)} parts of three leaves in front of them); the Enter house box, both ways out, "
+            f"{len(copies)} parts of three leaves in front of them, 8.5 swung open out of the house clear of the model; "
+            f"both doorways walkable into their dark halls, with or without the import); the Enter house box, both ways out, "
             f"the path (under the step) and the greeter's spot clear; the garden's {len(garden)} parts clear of the model")
 
 

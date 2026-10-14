@@ -16,7 +16,9 @@
 -- 8.3 Danny for hire: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and
 -- records it (Runtime.spent); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
 -- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
--- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it).
+-- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it). 8.5 Danny getting in and out
+-- like a player: Vehicles.swingDoor records each door swing (Runtime.doorSwings); RunService's Heartbeat (his pose every
+-- frame meanwhile) fires only when a test fires it.
 local Mock = require("./ItemMock") :: any
 local CityConfig = require("./Config") :: any
 CityConfig.Sandbox.On = false
@@ -650,7 +652,13 @@ Runtime.Vehicles = stub("Vehicles", {
 	yieldSeat = function(_seat: any, _player: any): boolean
 		return false
 	end,
+	-- 8.5: a cabin door swung for Danny getting in or out (server/MoveHelper.luau): recorded in Runtime.doorSwings
+	-- (the car, the door, openAt, closeAt: openAt nil shuts it from closeAt; the server time and the clock it came at)
+	swingDoor = function(car: any, index: number, openAt: number?, closeAt: number)
+		table.insert(Runtime.doorSwings, { car = car, door = index, openAt = openAt, closeAt = closeAt, now = Runtime.now, clock = Runtime.clock })
+	end,
 })
+Runtime.doorSwings = {} -- 8.5 { { car, door, openAt, closeAt, now, clock } } every Vehicles.swingDoor
 
 Runtime.Zombies = stub("Zombies", {
 	hunts = function()
@@ -816,6 +824,9 @@ local services: { [string]: any } = {
 			obj:SetAttribute("Tag_" .. tag, nil)
 		end,
 	},
+	-- 8.5: Danny's pose every frame while he gets in or out of the van (server/MoveHelper.luau hooks Heartbeat only
+	-- then); nothing fires it but a test
+	RunService = { Heartbeat = signal() },
 }
 Runtime.game = { GetService = function(_, name: string): any
 	assert(services[name], `MovingRuntime: unmocked service {name}`)

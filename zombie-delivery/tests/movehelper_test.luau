@@ -68,7 +68,7 @@ check("8.3 the money's words", Brain.money(170) == "$170" and Brain.money(1234) 
 -- 8.3 a click on a piece: onto his list, off it -----------------------------------------------------------------------------
 
 local function assign(fields: { [string]: any }): string
-	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true }
+	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true, clipboard = true }
 	for key, value in fields do
 		(a :: any)[key] = value
 	end
@@ -86,6 +86,14 @@ check("…in his arms already: (his)", assign({ his = true, state = "carried", h
 check("…in the van: (van); home or lost: (gone)", assign({ state = "truck" }) == "van" and assign({ state = "delivered" }) == "gone" and assign({ state = "lost" }) == "gone")
 check("…somebody holds it: (held)", assign({ state = "carried", held = true }) == "held" and assign({ held = true }) == "held")
 check("…his list full (Queue 6): (full); one less: add", assign({ count = H.Queue }) == "full" and assign({ count = H.Queue - 1 }) == "add" and H.Queue == 6)
+-- 8.5 orders mode (shared/ClipboardRules.luau, server/Clipboard.luau): a piece goes to him only from a player whose
+-- clipboard is out
+check("8.5 the clipboard away: refused (clipboard), never added, never taken back; out: add / remove", assign({ clipboard = false }) == "clipboard"
+	and assign({ clipboard = false, queued = true }) == "clipboard" and assign({ clipboard = true }) == "add" and assign({ clipboard = true, queued = true }) == "remove")
+check("…but the crew, the piece and the hire come first (no clipboard to take out before he is hired)", assign({ clipboard = false, crew = false }) == "crew"
+	and assign({ clipboard = false, mine = false }) == "piece" and assign({ clipboard = false, hired = false }) == "hire")
+check("…and before the rest (far, in the van, full: the clipboard first)", assign({ clipboard = false, near = false }) == "clipboard"
+	and assign({ clipboard = false, state = "truck" }) == "clipboard" and assign({ clipboard = false, count = H.Queue }) == "clipboard")
 check("8.3 a piece of his list stays his while it is home or on the ground and nobody holds it", Brain.keepQueued("home", false) and Brain.keepQueued("ground", false)
 	and not Brain.keepQueued("carried", true) and not Brain.keepQueued("home", true) and not Brain.keepQueued("truck", false) and not Brain.keepQueued("delivered", false))
 
@@ -117,6 +125,69 @@ check("8.3 the first seat nobody sits in; every one taken: none (he follows on f
 check("8.3 seated: out when nobody drives and the van stands", Brain.getOut(false, true, true) and not Brain.getOut(true, true, true) and not Brain.getOut(false, false, true)
 	and not Brain.getOut(true, false, true))
 check("…at once when the van is wrecked or gone (moving or not)", Brain.getOut(true, false, false) and Brain.getOut(false, false, false))
+
+-- 8.5 his way to the van's door: round the van, never through it (the owner: "Danny got a bit stuck under the car") -----
+
+do
+	local m, edge = H.RideMargin, 0.05
+	local hx, hz = 4, 11 -- (the Sprinter's footprint: 8 × 22)
+	local gx, gz = hx + H.RideStand, -5.75 -- (his spot at its passenger door)
+	check("8.5 his spot at the door is out of the margin he keeps (and of the pathfinding's reach round the hull)", H.RideStand > m and m > H.PathRadius)
+	local x, z, length = Brain.roundVan(14, 0, gx, gz, hx, hz, 0)
+	check("8.5 the straight way keeps RideMargin off the van: straight to his spot", near(x, gx) and near(z, gz) and near(length, math.sqrt((14 - gx) ^ 2 + gz ^ 2)),
+		`{x} {z} {length}`)
+	x, z, length = Brain.roundVan(4, 14.6, gx, gz, hx, hz, 0)
+	check("…from behind the van by its back corner (where he waits; the straight way would scrape its side): round that corner first",
+		near(x, hx + m + edge) and near(z, hz + m + edge) and near(length, math.sqrt((hx + m + edge - 4) ^ 2 + (14.6 - hz - m - edge) ^ 2)
+		+ math.sqrt((gx - hx - m - edge) ^ 2 + (gz - hz - m - edge) ^ 2)), `{x} {z} {length}`)
+	x, z = Brain.roundVan(-14, -8, gx, gz, hx, hz, 0)
+	check("…from its other side, toward the front: round the front (the shorter way)", near(x, -(hx + m + edge)) and near(z, -(hz + m + edge)), `{x} {z}`)
+	x, z = Brain.roundVan(-14, 8, gx, gz, hx, hz, 0)
+	check("…toward the back: round the back", near(x, -(hx + m + edge)) and near(z, hz + m + edge), `{x} {z}`)
+	x, z = Brain.roundVan(hx + m - 0.6, hz + m + 0.6, gx, gz, hx, hz, H.RideCorner)
+	check("…a corner within RideCorner: on to the next point (no stop at it)", near(x, gx) and near(z, gz), `{x} {z}`)
+	x, z = Brain.roundVan(hx + 1, 0, gx, gz, hx, hz, 0)
+	check("…within the margin (by its side): straight out of it first", near(x, hx + m + edge) and near(z, 0), `{x} {z}`)
+	x, z = Brain.roundVan(-1, 2, gx, gz, hx, hz, 0)
+	check("…even from inside its footprint: out of the nearer side, never on through it", near(x, -(hx + m + edge)) and near(z, 2), `{x} {z}`)
+	-- walked from all round the van (half a stud a step toward the next point): never within a stud of its footprint (his
+	-- body), always at his spot in the end
+	local worst, arrived = math.huge, 0
+	for angle = 0, 345, 15 do
+		local px, pz = math.cos(math.rad(angle)) * 18, math.sin(math.rad(angle)) * 24
+		for _ = 1, 400 do
+			local nx, nz = Brain.roundVan(px, pz, gx, gz, hx, hz, H.RideCorner)
+			local dx, dz = nx - px, nz - pz
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d < 0.05 then
+				break
+			end
+			local step = math.min(0.5, d)
+			px, pz = px + dx / d * step, pz + dz / d * step
+			worst = math.min(worst, math.max(math.abs(px) - hx, math.abs(pz) - hz))
+		end
+		if math.abs(px - gx) < 0.06 and math.abs(pz - gz) < 0.06 then
+			arrived += 1
+		end
+	end
+	check("…walked to his spot from all round the van: always there, never within a stud of its footprint", arrived == 24 and worst > 1, `{arrived} {worst}`)
+	local a = Brain.newApproach()
+	local fade = false
+	for step = 1, 300 do -- (30 s coming closer, from 120 studs off)
+		fade = fade or Brain.rideBlink(a, 120 - step * 0.4, 0.1)
+	end
+	check("8.5 his walk to the van to ride, coming closer: never the fade into the seat (even a long one)", not fade)
+	a = Brain.newApproach()
+	Brain.rideBlink(a, 10, 0.1)
+	local steps = 0
+	repeat
+		steps += 1
+	until Brain.rideBlink(a, 10 - H.CallGain * 0.5, 0.1) or steps > 1000
+	check("…no closer by CallGain studs for RideBlink s (his way blocked, the van rolling on): the last resort", near(steps * 0.1, H.RideBlink, 0.11), steps * 0.1)
+	check("…RideFar studs or more to go (driven off without him): the last resort at once", Brain.rideBlink(Brain.newApproach(), H.RideFar, 0.1)
+		and not Brain.rideBlink(Brain.newApproach(), H.RideFar - 1, 0.1))
+	check("…more patient than your call's (CallBlink)", H.RideBlink > H.CallBlink)
+end
 -- The way ------------------------------------------------------------------------------------------------------------------
 
 local doors: Brain.Doors = { outX = 100, outZ = 0, inX = 5000, inZ = 0 }

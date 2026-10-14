@@ -236,7 +236,7 @@ local function look(character: Model, w: Walker, mine: boolean, now: number)
 	local gestureAt, gesture = character:GetAttribute("GestureAt"), character:GetAttribute("Gesture")
 	local gesturing = type(gestureAt) == "number" and type(gesture) == "string"
 		and workspace:GetServerTimeNow() - gestureAt < (Gestures.seconds(gesture) or 0)
-	if character:GetAttribute("PhoneHeld") == true or gesturing then
+	if character:GetAttribute("PhoneHeld") == true or character:GetAttribute("ClipboardHeld") == true or gesturing then -- (8.5: Danny's clipboard)
 		w.hands = "busy"
 		return
 	end

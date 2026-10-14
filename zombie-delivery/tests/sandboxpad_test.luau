@@ -93,14 +93,34 @@ check("L1 is Danny's alone (\"Talk to Danny\", client/MoveHelperCard.luau)", (fu
 	end
 	return A.danny.pad[1] == "ButtonL1"
 end)())
-check("8.3 R1 is Danny's too: \"Give to Danny\" at a piece (client/MoveHelperCard.luau), nothing else on it", (function()
+check("8.3 R1 is Danny's too: \"Give to Danny\" at a piece (client/MoveHelperCard.luau), 8.5 his clipboard out (orders mode), nothing else on it", (function()
 	for id, action in A do
-		if table.find(action.pad, "ButtonR1") and id ~= "dannygive" then
+		if table.find(action.pad, "ButtonR1") and id ~= "dannygive" and id ~= "clipboard" then
 			return false
 		end
 	end
-	return A.dannygive.pad[1] == "ButtonR1" and #A.dannygive.pad == 1
+	return A.dannygive.pad[1] == "ButtonR1" and #A.dannygive.pad == 1 and A.clipboard.pad[1] == "ButtonR1" and #A.clipboard.pad == 1
 end)())
+-- 8.5 Danny's clipboard (orders mode: client/DannyOrders.luau): Q out and away on a computer (free in the sandbox: no
+-- other action has it, R stays the city's clerks'), R1 out and B away with a gamepad, the touch 📋 button
+check("8.5 the clipboard: Q (Config.MoveHelper.Clipboard.Key) out and away, R1 out, B away, 📋 on a touch screen", A.clipboard.key == "Q" and A.stow.key == "Q"
+	and A.clipboard.key == Config.MoveHelper.Clipboard.Key and A.stow.pad[1] == "ButtonB" and #A.stow.pad == 1 and A.clipboard.tap == "📋" and A.stow.tap == "📋")
+check("…Q on no other action (E, F, C, J, K, B, G, P, O, T, Z, H are the sandbox's; the chips' keys too), never R", (function()
+	for id, action in A do
+		if action.key == "Q" and id ~= "clipboard" and id ~= "stow" then
+			return false
+		end
+	end
+	for _, id in SandboxPad.Ids do
+		local chip = SandboxPad.chip(id)
+		if chip and chip.key == "Q" then
+			return false
+		end
+	end
+	return A.clipboard.key ~= "R"
+end)())
+check("…its words: \"Press Q\", \"Press R1\", \"Tap 📋\"; away \"Press B\"", SandboxPad.howTo("clipboard", "keys") == "Press Q" and SandboxPad.howTo("clipboard", "pad") == "Press R1"
+	and SandboxPad.howTo("clipboard", "touch") == "Tap 📋" and SandboxPad.howTo("stow", "pad") == "Press B", SandboxPad.howTo("clipboard", "touch"))
 check("driving: R2 on, L2 back, the left stick steers", table.concat(A.drive.pad, ",") == "ButtonR2,ButtonL2" and A.steer.pad[1] == "Thumbstick1")
 check("no button for the horn, the list or the chat", #A.horn.pad == 0 and #A.list.pad == 0 and #A.chat.pad == 0)
 local onPad, clashes = {}, {}

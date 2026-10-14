@@ -47,7 +47,7 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
 	"QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera)
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "OfferCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
@@ -275,11 +275,11 @@ end
 -- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", OfferCard = "ok", VanPaintUi = "ok" })
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok" })
 	local ok, where = same(starts(run), CITY)
 	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
 	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil
-		and run.required.MoveHelperCard == nil and run.required.VanPaintUi == nil and run.required.OfferCard == nil)
+		and run.required.MoveHelperCard == nil and run.required.DannyOrders == nil and run.required.VanPaintUi == nil and run.required.OfferCard == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("8.3: the city never requires the sandbox's walk-in doors' client (WalkDoors)", run.required.WalkDoors == nil)
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
@@ -288,9 +288,9 @@ end
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
 
 do
-	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", OfferCard = "ok", VanPaintUi = "ok" }, true)
+	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok" }, true)
 	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
-	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, MoveHelperCard, OfferCard, VanPaintUi, then SandboxSounds and SandboxLight`, ok, where)
+	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, MoveHelperCard, DannyOrders, OfferCard, VanPaintUi, then SandboxSounds and SandboxLight`, ok, where)
 	local city: { string } = {}
 	for _, name in CITY_ONLY do
 		if run.required[name] then
@@ -341,6 +341,8 @@ do
 	check("… and 8.3 the PAINT shop's window (a window like the others, with its onOpen)", called(run, "VanPaintUi.close") and type(run.modules.VanPaintUi.onOpen) == "function")
 	check("… and 8.3 a visitor's offer card (a window like the others, with its onOpen; it waits while the camera's windowOpen says another is open)", called(run, "OfferCard.close")
 		and type(run.modules.OfferCard.onOpen) == "function" and run.modules.OfferCard.covered == run.modules.CameraRig.windowOpen)
+	check("8.5 Danny's clipboard (orders mode) is no window: ESC never closes it, no onOpen; it steps aside under the camera's windowOpen",
+		not called(run, "DannyOrders.close") and type(run.modules.DannyOrders.onOpen) ~= "function" and run.modules.DannyOrders.covered == run.modules.CameraRig.windowOpen)
 	-- 8.1 review: opening a sandbox window closes the others, never itself (its onOpen runs once it counts as open)
 	local onOpen = run.modules.UpgradeUi.onOpen
 	check("the UPGRADES window has an onOpen", type(onOpen) == "function" and type(run.modules.WarehouseUi.onOpen) == "function")
