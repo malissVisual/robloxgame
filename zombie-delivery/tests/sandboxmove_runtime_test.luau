@@ -30,6 +30,9 @@
 --     or XP.
 -- 8.1 walk-in doors: the chalet's front door walked through both ways (no E: its Enter house off), out 4 studs from it
 -- facing the road, no way straight back, its doormat over the garden path while a move runs.
+-- 8.2 analytics: Moving's listeners (onStart, onEnterHouse, onLoad, onTrip, onFinish; server/SandboxAnalytics.luau's)
+-- hear each moment with its numbers, and every real end's words come out as AnalyticsPlan.moveHow's word (FINISH, the
+-- admin's end, GIVE UP after a trip, the owner leaving).
 local E = require("./MovingRuntime")
 local Config = require("./Config")
 Config.Sandbox.On = true -- (before Moving.start: it reads the mode there)
@@ -171,6 +174,30 @@ frontDoor:SetAttribute("SandboxDoor", true)
 frontDoor.Parent = workspace
 
 Moving.useArt(E.art)
+-- 8.2: Moving's listeners (server/SandboxAnalytics.luau's: the funnel's steps, the moves' events), registered before
+-- Moving.start as SandboxBoot does: what each heard, in order
+local Plan = require("./AnalyticsPlan")
+local told: { { kind: string, player: any, facts: any } } = {}
+for kind, register in { start = Moving.onStart, enter = Moving.onEnterHouse, load = Moving.onLoad, trip = Moving.onTrip, finish = Moving.onFinish } :: { [string]: any } do
+	register(function(player: any, facts: any)
+		table.insert(told, { kind = kind, player = player, facts = facts })
+	end)
+end
+-- The last `kind` a listener heard (since entry `since`), and how many.
+local function lastTold(kind: string, since: number?): (any, number)
+	local found, n = nil, 0
+	for index = (since or 0) + 1, #told do
+		if told[index].kind == kind then
+			found, n = told[index], n + 1
+		end
+	end
+	return found, n
+end
+-- How the last end was put in a word (AnalyticsPlan.moveHow on what Moving.onFinish heard, as SandboxAnalytics does).
+local function howOf(entry: any): string
+	local f = entry.facts
+	return Plan.moveHow(f.phase, f.why, f.left, f.home + f.lost >= f.total)
+end
 Moving.start()
 Greeters.step()
 
@@ -262,6 +289,10 @@ check("LAUNCH away from every board: refused", E.built == 0 and string.find(E.la
 E.place(ann, cork1.Position + V3(0, 0, 4))
 lobbyRequest(ann, "launch")
 check("LAUNCH at the board: the move, with the owner's own Sprinter", E.built == 1 and E.cars[ann] == truck and heard(ann, "Move started") and heard(ann, "warehouse"))
+local began, starts = lastTold("start")
+check("8.2: Moving.onStart: the owner, the house, its 6 pieces, solo, nothing home yet", starts == 1 and began.player == ann and began.facts.owner == ann
+	and began.facts.contract == House.id and began.facts.total == 6 and began.facts.crew == 1 and began.facts.trips == 0 and began.facts.home == 0
+	and began.facts.left > 0 and began.facts.minutes == 0, began and began.facts.crew)
 local firstSeed = seeds[1] -- (Ann's card's: Cid's card planned the second)
 check("…the house built with the card's seed (planned once)", #built == 1 and built[1] == firstSeed and #seeds == 2 and seeds[2] ~= firstSeed, `{built[1]} {firstSeed} {#seeds}`)
 step()
@@ -311,6 +342,8 @@ E.place(ann, outside)
 trigger(enter, ann)
 local origin = E.interiors[1]
 check("…into the interior", (E.rootOf(ann).Position - origin.Position).Magnitude < 6, E.rootOf(ann).Position)
+local cameIn, ins = lastTold("enter")
+check("8.2: Moving.onEnterHouse: Ann came into her move's house", ins == 1 and cameIn.player == ann and cameIn.facts.owner == ann, ins)
 E.request(ann, "call")
 check("Call truck to door: the van at the house's curb, its nose to the road, its back to the door", flatDistance(truck.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 1
 	and truck.chassis.CFrame.LookVector.Z < -0.99, truck.chassis.Position)
@@ -337,6 +370,9 @@ check("at the open back with the lamp: the doors' Load (the bay's waits)", load.
 trigger(load, ann)
 step()
 check("loaded at the back doors", ann.Character:GetAttribute("MoveCarry") == nil and stateOf(ann, 1).state == "truck", E.lastNotice(ann))
+local loaded, loads = lastTold("load")
+check("8.2: Moving.onLoad: Ann loaded the lamp into her move's van (one piece in it)", loads == 1 and loaded.player == ann and loaded.facts.owner == ann
+	and loaded.facts.item == "lamp" and loaded.facts.out == 1, loads)
 local BED = T.Beds.sprinter
 local cz = cargoDoor.Position.Z - BED.Back - BED.Length / 2 -- (the bay's middle: Back in front of the doors)
 check("8.0.1: the Sprinter bed's Center (SHOW ZONES' box without a door) is its bay's middle from the real CargoDoor", BED.Center[1] == 0
@@ -414,6 +450,10 @@ local tripAt = #E.messages
 step()
 check("home: a trip, the move goes on", E.last(ann, "Moving", "result") == nil and E.last(ann, "Moving", "state").a.trips == 1 and heard(ann, "Trip 1 home", tripAt))
 check("…every piece in the van into the owner's stock (Collection.add)", #E.collected == 2 and E.collected[1].player == ann and E.collected[2].player == ann)
+local trip, trips = lastTold("trip")
+check("8.2: Moving.onTrip: the owner's trip 1, its 2 pieces stored, 2 home, the van empty", trips == 1 and trip.player == ann and trip.facts.trips == 1
+	and trip.facts.pieces == 2 and trip.facts.stored == 2 and trip.facts.home == 2 and trip.facts.out == 0 and trip.facts.value > 0, trips)
+check("8.2: …and the move's not over (no onFinish yet)", select(2, lastTold("finish")) == 0)
 local lampIn, tvIn = E.collected[1].entry, E.collected[2].entry
 check("…with its item, variant, condition and name", lampIn.item == "lamp" and lampIn.name == "Lamp" and lampIn.variant == 3 and lampIn.condition == stateOf(ann, 1).condition
 	and tvIn.item == "tv" and tvIn.name == "TV" and tvIn.variant == 4 and type(tvIn.condition) == "number", `{lampIn.item} {lampIn.variant} {lampIn.condition}`)
@@ -477,6 +517,10 @@ local result = E.last(ann, "Moving", "result")
 check("FINISH: the result card says what came home: 3 pieces, their value, 2 trips", result ~= nil and result.a.how == "done" and result.a.home ~= nil
 	and result.a.home.pieces == 3 and result.a.home.value == math.floor(value + 0.5) and result.a.trips == 2 and result.a.delivered == 3, result and result.a.home and result.a.home.value)
 check("…no money, no XP (the warehouse earns)", result.a.money == 0 and result.a.pay == 0 and result.a.xp == 0 and #E.money == 0 and #E.xp == 0)
+local ended, ends = lastTold("finish")
+check("8.2: Moving.onFinish: the owner, done by FINISH (\"finish\"), 2 trips, 3 pieces home worth the result card's value", ends == 1 and ended.player == ann
+	and ended.facts.phase == "done" and ended.facts.event == "deliver" and howOf(ended) == "finish" and ended.facts.trips == 2 and ended.facts.home == 3
+	and ended.facts.value == result.a.home.value and ended.facts.total == 6 and ended.facts.left > 0 and ended.facts.minutes >= 0, ended and howOf(ended))
 check("…the analytics' MoveDone", (function()
 	for _, entry in E.tracked do
 		if entry.name == "event" and entry.args[2] == "MoveDone" and entry.args[4] == House.id then
@@ -525,6 +569,8 @@ E.request(ann, "finish")
 result = E.last(ann, "Moving", "result")
 check("FINISH with the clock still in the van: it is lost (never collected)", result.a.home.pieces == 1 and #E.collected == 4
 	and string.find(result.a.howText, "stayed behind", 1, true) ~= nil, result.a.howText)
+check("8.2: …onFinish: \"finish\", 1 piece home (the clock still in the van)", howOf((lastTold("finish"))) == "finish" and (lastTold("finish")).facts.home == 1
+	and (lastTold("finish")).facts.out == 1)
 planned = #seeds
 check("admin: start again: a new house (a fresh seed)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil and #seeds == planned + 1
 	and built[3] == seeds[#seeds] and built[3] ~= built[2] and built[3] ~= built[1])
@@ -539,6 +585,8 @@ step(T.Horde.Every + 0.1)
 check("…the horde marches on the house", E.marched > marched)
 check("admin: end calls it off cleanly", string.find(Moving.admin(ann, "end"), "called off", 1, true) ~= nil and E.last(ann, "Moving", "result").a.how == "cancelled"
 	and Moving.busy(ann) == nil and E.destroyed == E.built)
+check("8.2: …onFinish: cancelled, nothing home, \"admin\"", (lastTold("finish")).facts.phase == "cancelled" and (lastTold("finish")).facts.home == 0
+	and howOf((lastTold("finish"))) == "admin", howOf((lastTold("finish"))))
 trigger(board1, ann)
 local cardSeed = seeds[#seeds]
 check("admin: refill: a new house for the next move, its card", string.find(Moving.admin(ann, "refill"), "refilled", 1, true) ~= nil and seeds[#seeds] ~= cardSeed
@@ -602,6 +650,7 @@ E.request(bob, "giveup")
 local bobResult = E.last(bob, "Moving", "result")
 check("8.0.1: GIVE UP after a trip: \"what came home is yours\" (no Wall), no pay, no XP", bobResult ~= nil and bobResult.a.how == "done"
 	and bobResult.a.howText == "You called it off: what came home is yours" and bobResult.a.money == 0 and bobResult.a.xp == 0, bobResult and bobResult.a.howText)
+check("8.2: …onFinish: Bob's, \"giveup\"", (lastTold("finish")).player == bob and howOf((lastTold("finish"))) == "giveup", howOf((lastTold("finish"))))
 
 -- the planning left open past Config.MoveRoles.Lobby.Timeout
 E.place(bob, moves:FindFirstChild("MovingBoard2"):FindFirstChild("Board").Position + V3(0, 0, 4))
@@ -631,6 +680,8 @@ local cidResult = E.last(cid, "Moving", "result")
 check("8.0.1: the owner left after a trip: the crew hears what came home is in the warehouse (no Wall)", heard(cid, "What came home is in their warehouse", leftAt)
 	and not heard(cid, "Wall", leftAt) and cidResult ~= nil and cidResult.a.how == "done"
 	and cidResult.a.howText == "Ann left the game: what came home is in their warehouse", cidResult and cidResult.a.howText)
+check("8.2: …onFinish: Ann's, \"left\", the crew of two", (lastTold("finish")).player == ann and howOf((lastTold("finish"))) == "left"
+	and (lastTold("finish")).facts.crew == 2, howOf((lastTold("finish"))))
 
 -- 8.1 walk-in doors in the sandbox (the owner: "no E at the house, neither in nor out"): the chalet's front door (the map's
 -- SandboxDoor part) walked through both ways, after the dwell, facing it; out 4 studs from the door facing the road; no

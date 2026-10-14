@@ -141,6 +141,9 @@
 --                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
 --                             a lift check) and the grip block (the checks, the remote's "grip" answers, the wobbles)
 --   Moving.gripCheck(player)  8.1 grip: a wobble check now on what `player` carries (the tests')
+--   Moving.onStart / onEnterHouse / onLoad / onTrip / onFinish / onGrip(fn)   8.2: plain registration of listeners
+--                             (SB.listeners; server/SandboxAnalytics.luau's): fn(player, facts) in a pcall (the block
+--                             "8.2 SANDBOX: the listeners", after tellAll: SB.tell, SB.facts)
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -523,6 +526,94 @@ end
 local function tellAll(s: Session, text: string)
 	for _, player in everyone(s) do
 		say(player, text)
+	end
+end
+
+-- ── 8.2 SANDBOX: the listeners (server/SandboxAnalytics.luau: the onboarding funnel, the moves' events) ──────────────
+-- Plain registration functions; at the moment each listener runs as fn(player, facts) in a pcall (one that errors never
+-- stops a move). `facts` is a fresh table of the move's numbers (SB.facts) with what the moment adds (SB.tell's
+-- `extra`); a grip check's holds only its own. The moments: startMove's end, a door trip in (travel), Load (onLoad,
+-- Danny's helperLoad), a trip (deliverTrip), the end (finish) and a grip check's outcome (Grip.result).
+SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {} } :: { [string]: { (Player?, { [string]: any }) -> () } }
+
+-- A move started (LAUNCH, the admin's start): fn(owner, facts).
+function Moving.onStart(fn: (Player?, { [string]: any }) -> ())
+	table.insert(SB.listeners.start, fn)
+end
+
+-- A player of a move came into its house (a door trip in): fn(player, facts).
+function Moving.onEnterHouse(fn: (Player?, { [string]: any }) -> ())
+	table.insert(SB.listeners.enter, fn)
+end
+
+-- A piece went into the van: fn(loader, facts) (loader nil: Danny; facts.item).
+function Moving.onLoad(fn: (Player?, { [string]: any }) -> ())
+	table.insert(SB.listeners.load, fn)
+end
+
+-- A trip home (the city: to the Wall): fn(owner, facts) (facts.pieces: this trip's; facts.stored: into the stock).
+function Moving.onTrip(fn: (Player?, { [string]: any }) -> ())
+	table.insert(SB.listeners.trip, fn)
+end
+
+-- The move ended: fn(owner, facts) (facts.phase: done | late | cancelled | failed; facts.event, facts.why: finish's).
+function Moving.onFinish(fn: (Player?, { [string]: any }) -> ())
+	table.insert(SB.listeners.finish, fn)
+end
+
+-- A grip check's outcome: fn(player, { what: lift | wobble, outcome, item, fragile }).
+function Moving.onGrip(fn: (Player?, { [string]: any }) -> ())
+	table.insert(SB.listeners.grip, fn)
+end
+
+-- The move's numbers: its owner and contract, the crew, the trips, what came home (home: pieces; value: their worth at
+-- their condition, $), the pieces in all, in the van and lost, the minutes since the start, the clock's seconds left
+-- (under 0 past it) and the phase.
+function SB.facts(s: Session): { [string]: any }
+	local c = Rules.counts(s.move)
+	local value = 0
+	for _, spot in s.move.order do
+		local thing = s.move.things[spot]
+		if thing.state == "delivered" then
+			value += thing.value * thing.condition
+		end
+	end
+	local t = now()
+	return {
+		owner = s.owner,
+		contract = s.contract.id,
+		crew = #everyone(s),
+		trips = s.move.trips or 0,
+		home = c.delivered,
+		value = math.floor(value + 0.5),
+		total = c.total,
+		out = c.out,
+		lost = c.lost,
+		minutes = math.max(0, t - s.move.startedAt) / 60,
+		left = s.move.endsAt - t,
+		phase = s.move.phase,
+	}
+end
+
+-- Tells the `kind` listeners (none: nothing is worked out) about move `s` (nil: only `extra`).
+function SB.tell(kind: string, s: Session?, player: Player?, extra: { [string]: any }?)
+	local list = SB.listeners[kind]
+	if not list or #list == 0 then
+		return
+	end
+	local facts: { [string]: any } = if s then SB.facts(s) else {}
+	if extra then
+		for key, value in extra do
+			facts[key] = value
+		end
+	end
+	for _, fn in list do
+		local ok, err = pcall(function()
+			fn(player, facts)
+		end)
+		if not ok then
+			warn(`[Moving] a {kind} listener failed: {err}`)
+		end
 	end
 end
 
@@ -1534,6 +1625,7 @@ local function onLoad(s: Session, player: Player)
 		then `{labelOf(thing)} hitched behind the van · {c.out} in the van · drive it to {SB.wall()}`
 		else `{if moved then "Van repacked: " else ""}{labelOf(thing)} loaded · {c.out} in the van · van {fill}% full · {c.delivered}/{c.total} {if SB.on then "home" else "delivered"}`)
 	s.dirty = true
+	SB.tell("load", s, player, { item = thing.item }) -- 8.2: the listeners (Moving.onLoad)
 end
 
 local function onUnload(s: Session, player: Player)
@@ -1827,6 +1919,7 @@ function Moving.helperLoad(s: Session, npc: Model): (boolean, string?)
 	local c = Rules.counts(s.move)
 	say(s.owner, `{npc.Name} loaded {labelOf(thing)} · {c.out}/{c.total} out · truck {math.floor(Rules.fill(s.move.packing) * 100 + 0.5)}% full`)
 	s.dirty = true
+	SB.tell("load", s, nil, { item = thing.item }) -- 8.2: the listeners (Moving.onLoad: Danny's, no player)
 	return true, nil
 end
 
@@ -1867,6 +1960,7 @@ travel = function(player: Player, target: CFrame, s: Session, inside: boolean, p
 				character:PivotTo(goal + Vector3.new(0, lift, 0))
 				if goalInside then
 					s.inside[player] = true
+					SB.tell("enter", s, player) -- 8.2: the listeners (Moving.onEnterHouse)
 				else
 					s.inside[player] = nil
 				end
@@ -3011,6 +3105,7 @@ local function finish(s: Session, event: string, why: string?)
 			remote:FireClient(member, "state", nil)
 		end
 	end
+	SB.tell("finish", s, s.owner, { event = event, why = why }) -- 8.2: the listeners (Moving.onFinish)
 	cleanup(s)
 end
 
@@ -3467,6 +3562,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	storyText(s) -- MoveStory hook: Marge's text at the start
 	teamSetup(s, roles) -- 7.0 planning: the roles, the house's Enter prompt
 	WalkIn.show() -- 8.1 walk-in doors: the house's doormats outside
+	SB.tell("start", s, owner) -- 8.2: the listeners (Moving.onStart)
 	return nil
 end
 
@@ -3649,6 +3745,7 @@ local function deliverTrip(s: Session, clock: number)
 	s.emptyWarned = clock
 	s.dirty = true
 	pcall(MoveGreeters.delivered, s) -- (7.0 greeters: the soldier's welcome at the Wall, every trip)
+	SB.tell("trip", s, s.owner, { pieces = #spots, stored = stored }) -- 8.2: the listeners (Moving.onTrip)
 	local c = Rules.counts(s.move)
 	local trips = s.move.trips or 1
 	if s.late then
@@ -3933,6 +4030,7 @@ function Grip.result(player: Player, open: GripOpen, outcome: string, thing: Rul
 	if player.Parent then
 		remote:FireClient(player, "grip", "result", { id = open.id, what = open.check.what, outcome = outcome, left = math.floor(thing.condition * 100 + 0.5), name = thing.name })
 	end
+	SB.tell("grip", nil, player, { what = open.check.what, outcome = outcome, item = thing.item, fragile = thing.fragile }) -- 8.2 (Moving.onGrip)
 end
 
 -- The check on `hold` goes without an outcome (the client closes it).

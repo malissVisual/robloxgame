@@ -17,6 +17,11 @@
 --     "Other", never dropped.
 --   * the progression (Paths, levelUps): the driver levels and the missions (by their order in the story).
 --   * the errors (errorWhere): a script error's script name and line from its message.
+--   * 8.2 SANDBOX (the blocks marked so; server/SandboxAnalytics.luau): Roblox keeps one onboarding funnel an
+--     experience, so a sandbox server walks the sandbox's own (SandboxSteps: ten steps from joining to the first
+--     upgrade, by the same rules, in its own save field profile.sandboxOnboarding: sandboxFrom reads it, only with its
+--     flag SandboxFlag); the funnel's functions take the steps (nil: the city's Steps). The moves' events (moveHow,
+--     band), the grip checks' sampling (sampler, sample) and the collectibles' event.
 
 local AnalyticsPlan = {}
 
@@ -35,21 +40,44 @@ AnalyticsPlan.Steps = {
 	{ name = "FirstChapter" }, -- 9: a mission chapter finished (its finale)
 } :: { Step }
 
+-- 8.2 SANDBOX: the sandbox's onboarding funnel, in order (server/Analytics.luau logs it in place of Steps on a sandbox
+-- server; server/SandboxAnalytics.luau says when each is reached). Only joining and PLAY are implied by a later step:
+-- the others wait for the ones before them (an upgrade bought before the first move waits for the move, the show, the
+-- income and the sale).
+AnalyticsPlan.SandboxSteps = {
+	{ name = "Joined", implied = true }, -- 1: the save loaded (server/Analytics.luau)
+	{ name = "PressedPlay", implied = true }, -- 2: PLAY on the start screen (server/SandboxBoot.luau's Play)
+	{ name = "FirstContract" }, -- 3: a moving contract taken (their move started: LAUNCH at a plot's board)
+	{ name = "EnteredHouse" }, -- 4: into the house of a move (the chalet's front door)
+	{ name = "FirstPieceInVan" }, -- 5: a piece loaded into the van (by them, or into the van of their move)
+	{ name = "FirstTripHome" }, -- 6: their van home at their warehouse with a load (a trip: the pieces into the stock)
+	{ name = "FirstPieceOnShow" }, -- 7: a piece of their stock on a display stand
+	{ name = "FirstIncome" }, -- 8: the stands paid them ("CollectionIncome")
+	{ name = "FirstSale" }, -- 9: a piece sold ("CollectionSale")
+	{ name = "FirstUpgrade" }, -- 10: an upgrade bought at the UPGRADES desk ("Upgrade")
+} :: { Step }
+
 -- Every step reached (an old save's number).
 AnalyticsPlan.ALL = 2 ^ #AnalyticsPlan.Steps - 1
+
+-- 8.2: every step of `steps` reached (an old sandbox save's number: allOf(SandboxSteps)).
+function AnalyticsPlan.allOf(steps: { Step }): number
+	return 2 ^ #steps - 1
+end
 
 local function bit(step: number): number
 	return bit32.lshift(1, step - 1)
 end
 
--- Was this step reached?
-function AnalyticsPlan.has(mask: number, step: number): boolean
-	return step >= 1 and step <= #AnalyticsPlan.Steps and bit32.btest(mask, bit(step))
+-- Was this step reached? (8.2: of `steps`; nil: the city's Steps. The same for the functions below.)
+function AnalyticsPlan.has(mask: number, step: number, steps: { Step }?): boolean
+	local list = steps or AnalyticsPlan.Steps
+	return step >= 1 and step <= #list and bit32.btest(mask, bit(step))
 end
 
 -- A step's number by its name (nil for a name not in Steps).
-function AnalyticsPlan.stepOf(name: string): number?
-	for index, step in AnalyticsPlan.Steps do
+function AnalyticsPlan.stepOf(name: string, steps: { Step }?): number?
+	for index, step in steps or AnalyticsPlan.Steps do
 		if step.name == name then
 			return index
 		end
@@ -58,36 +86,38 @@ function AnalyticsPlan.stepOf(name: string): number?
 end
 
 -- The number with `step` marked (server/Analytics.luau marks the save's only once Roblox took the step).
-function AnalyticsPlan.mark(mask: number, step: number): number
-	if step < 1 or step > #AnalyticsPlan.Steps or step ~= math.floor(step) then
+function AnalyticsPlan.mark(mask: number, step: number, steps: { Step }?): number
+	if step < 1 or step > #(steps or AnalyticsPlan.Steps) or step ~= math.floor(step) then
 		return mask
 	end
 	return bit32.bor(mask, bit(step))
 end
 
 -- How many steps from the first were reached one after the other: the ones logged.
-function AnalyticsPlan.logged(mask: number): number
+function AnalyticsPlan.logged(mask: number, steps: { Step }?): number
+	local list = steps or AnalyticsPlan.Steps
 	local n = 0
-	while n < #AnalyticsPlan.Steps and AnalyticsPlan.has(mask, n + 1) do
+	while n < #list and AnalyticsPlan.has(mask, n + 1, list) do
 		n += 1
 	end
 	return n
 end
 
 -- `step` reached: the new number and the steps to log now (none, it, or it with the ones that waited for it).
-function AnalyticsPlan.reach(mask: number, step: number): (number, { number })
-	if step < 1 or step > #AnalyticsPlan.Steps or step ~= math.floor(step) then
+function AnalyticsPlan.reach(mask: number, step: number, steps: { Step }?): (number, { number })
+	local all = steps or AnalyticsPlan.Steps
+	if step < 1 or step > #all or step ~= math.floor(step) then
 		return mask, {}
 	end
-	local before = AnalyticsPlan.logged(mask)
+	local before = AnalyticsPlan.logged(mask, all)
 	local after = bit32.bor(mask, bit(step))
 	for earlier = 1, step - 1 do
-		if AnalyticsPlan.Steps[earlier].implied then
+		if all[earlier].implied then
 			after = bit32.bor(after, bit(earlier))
 		end
 	end
 	local list: { number } = {}
-	for n = before + 1, AnalyticsPlan.logged(after) do
+	for n = before + 1, AnalyticsPlan.logged(after, all) do
 		table.insert(list, n)
 	end
 	return after, list
@@ -105,6 +135,24 @@ function AnalyticsPlan.onboardingFrom(saved: any): number
 		return AnalyticsPlan.ALL
 	end
 	return math.clamp(math.floor(value), 0, AnalyticsPlan.ALL)
+end
+
+-- 8.2 SANDBOX: the save's flag of the sandbox's funnel (server/PlayerData.luau writes it with profile.sandboxOnboarding).
+AnalyticsPlan.SandboxFlag = "sandboxOnboardingKept"
+
+-- 8.2 SANDBOX: the sandbox's steps reached as the save says (PlayerData's applySaved): no real save (a new player, or a
+-- lock-only record: no money in it) starts at 0; a real save written with the flag keeps its number (checked); a real
+-- save without it is from before 8.2, a player who knows the sandbox already: every step (nothing is logged for them).
+function AnalyticsPlan.sandboxFrom(saved: any): number
+	if type(saved) ~= "table" or saved.money == nil then
+		return 0
+	end
+	local all = AnalyticsPlan.allOf(AnalyticsPlan.SandboxSteps)
+	local value = saved.sandboxOnboarding
+	if saved[AnalyticsPlan.SandboxFlag] ~= true or type(value) ~= "number" or value ~= value then
+		return all
+	end
+	return math.clamp(math.floor(value), 0, all)
 end
 
 -- ── The funnels ────────────────────────────────────────────────────────────
@@ -164,6 +212,13 @@ AnalyticsPlan.Events = {
 	"CollectionSold", -- a piece sold (value: its price)
 	-- 8.1 SANDBOX, the upgrades (server/Upgrades.luau; value: the level bought, field: the upgrade's id)
 	"UpgradeBought",
+	-- 8.2 SANDBOX, the moves, the grip and the finds (server/SandboxAnalytics.luau; the fields' words: moveHow, band)
+	"MoveStarted", -- a move started (value: the owner's moves this session; field: "solo" or "crew")
+	"MoveFinished", -- a move ended with pieces home (value: its minutes; fields: how, the trips, the pieces home)
+	"MoveFinishedValue", -- that move's haul (value: what came home is worth, $; fields: how, the pieces, "solo" / "crew")
+	"MoveGaveUp", -- a move ended with nothing home (value: its minutes; fields: how, how far it got, "solo" / "crew")
+	"GripCheck", -- a grip check's outcome, one in GripEvery a player (value: GripEvery; fields: outcome, lift / wobble, fragile)
+	"CollectibleFound", -- a collectible came home into the stock (value: its worth, $; fields: the rarity, its id)
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -314,6 +369,71 @@ function AnalyticsPlan.errorWhere(message: any, scriptName: string?): (string, n
 		end
 	end
 	return AnalyticsPlan.scriptName(scriptName), 0
+end
+
+-- ── 8.2 SANDBOX: the moves and the grip checks ────────────────────────────
+
+-- How a move ended, a word (MoveFinished's and MoveGaveUp's field 01), from server/Moving.luau's end (its onFinish
+-- listeners' facts): the phase (done | late | cancelled | failed), the words it said (why: the result card's; nil for
+-- the admin's end), the clock's seconds left and whether every piece is home or lost:
+--   "time"    the clock ran out (also FINISH or GIVE UP in the grace after 0:00, a late trip, nothing home by then)
+--   "all"     everything home (or lost on the way)
+--   "left"    the owner left the game
+--   "admin"   the admin panel's end
+--   "giveup"  GIVE UP
+--   "finish"  FINISH
+function AnalyticsPlan.moveHow(phase: string, why: string?, secondsLeft: number, allDone: boolean): string
+	if phase == "failed" or phase == "late" or secondsLeft <= 0 then
+		return "time"
+	elseif allDone and phase == "done" then
+		return "all"
+	end
+	local text = string.lower(why or "")
+	if string.find(text, "left the game", 1, true) then
+		return "left"
+	elseif why == nil or string.find(text, "admin", 1, true) then
+		return "admin"
+	elseif phase == "cancelled" or string.find(text, "called it off", 1, true) then
+		return "giveup"
+	end
+	return "finish"
+end
+
+-- A count as a field's word: in bands of `size` from 0 ("0-4", "5-9" …; size 1: the number itself), `top` and over
+-- "<top>plus" (a field keeps letters, digits, _ and - only). Not a number: as 0.
+function AnalyticsPlan.band(n: any, size: number, top: number): string
+	local count = if type(n) == "number" and n == n then math.max(0, math.floor(n)) else 0
+	if count >= top then
+		return `{top}plus`
+	end
+	local width = math.max(1, math.floor(size))
+	local low = count - count % width
+	return if width == 1 then tostring(low) else `{low}-{low + width - 1}`
+end
+
+-- One check in `every` (a player's grip checks: Config.Analytics.GripEvery): a window of `every` checks, the ones seen
+-- in it and the one of them that is sent (pick: 1 … every, drawn from a roll, 0 ≤ roll < 1), so what is sent is a fair
+-- sample and never more than one a window.
+export type Sampler = { seen: number, pick: number }
+
+local function pickOf(every: number, roll: number): number
+	local size = math.max(1, math.floor(every))
+	return 1 + math.clamp(math.floor((if roll == roll then roll else 0) * size), 0, size - 1)
+end
+
+function AnalyticsPlan.sampler(every: number, roll: number): Sampler
+	return { seen = 0, pick = pickOf(every, roll) }
+end
+
+-- One more check: true when it is the window's pick (send it); a full window draws the next one's pick from `roll`.
+function AnalyticsPlan.sample(sampler: Sampler, every: number, roll: number): boolean
+	sampler.seen += 1
+	local hit = sampler.seen == sampler.pick
+	if sampler.seen >= math.max(1, math.floor(every)) then
+		sampler.seen = 0
+		sampler.pick = pickOf(every, roll)
+	end
+	return hit
 end
 
 -- ── The rest ───────────────────────────────────────────────────────────────

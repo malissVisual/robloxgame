@@ -5629,6 +5629,9 @@ Config.Analytics = {
 	Budget = { Base = 100, PerPlayer = 15 },
 	ErrorsPerMinute = 6,
 	ClientErrorsMax = 20,
+	-- 8.2 SANDBOX (server/SandboxAnalytics.luau): one grip check's outcome in this many is sent, a random one of each
+	-- window of them, for every player (the GripCheck event: its value says how many it stands for)
+	GripEvery = 10,
 }
 
 -- 6.12, the daily and weekly tasks (the owner: "daily and weekly tasks so players come back"; shared/Tasks.luau picks

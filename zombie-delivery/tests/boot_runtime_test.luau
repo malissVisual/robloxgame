@@ -33,8 +33,8 @@ end
 -- Main's order of the city's services (server/Main.server.luau's `safely` list).
 local CITY = { "PlayerData", "Analytics", "Vehicles", "CarRighting", "Zombies", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Gun", "Items", "Shops", "ShopClerks", "BanditCars", "Npcs", "Animals", "Cargo", "Admin", "DayNight", "Traffic", "Crew", "Ranking", "Estate", "CarCall", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "Hand", "CloseCombat", "Buddy", "Transport", "Skills", "VanQuest", "KitWear", "Fuel", "StyleWear", "Horn", "Buses", "Rental", "ZipLines", "FurnitureMesh", "Moving" }
 -- What the sandbox starts (SandboxWorld: its start or build) and what it never touches.
-local SANDBOX = { "SandboxWorld", "PlayerData", "Analytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "SprinterMesh", "FurnitureMesh", "Moving" }
-local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "SprinterMesh" }
+local SANDBOX = { "SandboxWorld", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "SprinterMesh", "FurnitureMesh", "Moving" }
+local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "SprinterMesh", "SandboxAnalytics" }
 local NEVER = { "World", "MapStyle", "Alpine", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Shops", "ShopClerks", "BanditCars", "Animals", "Traffic", "Buses", "Rental", "ZipLines", "Estate", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "VanQuest", "Fuel", "Buddy", "DayNight", "Gun", "Items", "Cargo", "Ranking", "CarCall", "StyleWear", "Skills", "Hand", "CloseCombat" }
 
 -- Was anything of module `name` called or set this run?
@@ -205,6 +205,9 @@ check("sandbox: the collection after PlayerData (it reads the saves)", started.P
 check("sandbox: the plots, the Blender furniture and the collection before the warehouses", started.SandboxPlots < started.Warehouse and started.FurnitureMesh < started.Warehouse and started.Collection < started.Warehouse)
 check("8.1: the upgrades (Upgrades.start) after the collection and the warehouses", E.called("Upgrades.start") and started.Collection < started.Upgrades and started.Warehouse < started.Upgrades)
 check("8.2: the collection book (CollectionBook.start) right after the collection (its hook on Collection.add)", E.called("CollectionBook.start") and started.Collection < started.CollectionBook and started.CollectionBook < started.Warehouse)
+check("8.2: the sandbox's analytics (SandboxAnalytics.start) right after Analytics (its money hook), before the moves and the collection",
+	E.called("SandboxAnalytics.start") and started.Analytics < started.SandboxAnalytics and started.SandboxAnalytics < started.Vehicles
+	and started.SandboxAnalytics < started.Collection and started.SandboxAnalytics < started.Moving)
 local last = 0
 for _, index in started do
 	last = math.max(last, index)
