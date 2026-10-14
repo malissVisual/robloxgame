@@ -139,6 +139,22 @@ WarehouseLayout.Wall = WALL
 WarehouseLayout.Fit = FIT
 WarehouseLayout.Levels = LEVELS
 
+local CLAD = { 188, 194, 200 }
+local RIBS = { 160, 167, 175 }
+local TRIM = { 42, 45, 50 }
+local ORANGE = { 240, 132, 44 }
+local CONCRETE = { 168, 166, 158 }
+local FLOOR = { 150, 152, 150 }
+local ROOF = { 118, 124, 132 }
+local STEEL = { 74, 78, 86 }
+local WHITE = { 238, 238, 232 }
+local GREY = { 176, 180, 186 }
+local INK = { 26, 27, 29 }
+local PODIUM = { 50, 53, 58 }
+local FELT = { 202, 196, 184 }
+local PAINT = { 242, 198, 42 }
+local GLOW = { 255, 244, 224 }
+
 -- 8.3: each level's hall, fitted to the owner's Blender building (Config.Warehouse.Levels: its size and door). The
 -- stands' grid (WarehouseLayout.grid; level 4's from Config, the warehouse of 8.0 – 8.2); `beams` and `lamps` are the
 -- model's trusses and (some of) its lamps, in studs from the front wall's outer face (`lamps`: { x, in }); `board` and
