@@ -6948,7 +6948,18 @@ Config.SandboxGuide = {
 --   Lamp            the hall's lights (PointLights, always on)
 --   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
 --   ArtLevel        8.2: the level (1 … 5) of the owner's Blender warehouse (design/blender-warehouse) the warehouses wear
---                   once ZDCWarehouseArt is imported (server/WarehouseMesh.luau; 4: the size the warehouse is)
+--                   once ZDCWarehouseArt is imported (server/WarehouseMesh.luau; 4: the size the warehouse is). 8.3: only
+--                   the fallback of a warehouse built without a level (each plot is its owner's level now)
+--   Levels          8.3 (design/warehouse-levels/KONTRAKT.md): the warehouse's five levels, the owner's Blender ones
+--                   (design/blender-warehouse, ZDCWarehouseArt: the same sizes, doors and roofs): name (in the game),
+--                   size { W across, H the front wall, D deep }, door { width, height }, roof ("shed": its back wall
+--                   rise lower; "gable"; "barrel": the game's own parts a gable of rise under it), rise (the roof over
+--                   H; a shed's top is H) and stands (its big stands: StandSize podiums). Level 4 is the warehouse of
+--                   8.0 – 8.2 (Stands, Ridge, DoorHeight above, SandboxMap's plot.warehouse). The UPGRADES desk sells
+--                   the levels (Config.SandboxUpgrades.List.warehouse); the More stands' small stands from MoreFrom on
+--   MoreFrom        8.3: the first level with the More stands upgrade's small stands (below it the card is locked)
+--   FreeLevel       8.3: the level a plot nobody has shows (FOR RENT)
+export type WarehouseLevelDef = { name: string, size: { number }, door: { number }, roof: string, rise: number, stands: number }
 Config.Warehouse = {
 	Stands = 12,
 	MaxStands = 20,
@@ -6967,6 +6978,15 @@ Config.Warehouse = {
 	Rebuild = 0.15,
 	MaxParts = 400,
 	ArtLevel = 4,
+	Levels = {
+		{ name = "Garage", size = { 26, 12, 22 }, door = { 14, 9.5 }, roof = "shed", rise = 2.5, stands = 2 },
+		{ name = "Workshop", size = { 40, 15, 30 }, door = { 18, 12 }, roof = "gable", rise = 4.5, stands = 4 },
+		{ name = "Storehouse", size = { 58, 19, 42 }, door = { 22, 14 }, roof = "gable", rise = 6, stands = 8 },
+		{ name = "Big Warehouse", size = { 80, 24, 60 }, door = { 26, 16 }, roof = "gable", rise = 8, stands = 12 },
+		{ name = "Logistics Center", size = { 104, 28, 84 }, door = { 26, 18 }, roof = "barrel", rise = 10, stands = 24 },
+	} :: { WarehouseLevelDef },
+	MoreFrom = 4,
+	FreeLevel = 1,
 	Lamp = { Range = 40, Brightness = 1.3, Color = { 255, 238, 214 } :: { number } },
 	Rarity = {
 		common = { 222, 224, 228 },
@@ -7071,21 +7091,29 @@ Config.Sprinter = {
 -- the city's gun and car tracks). Each upgrade:
 --   name, icon     its card's title and picture (an emoji)
 --   max            its top level; prices: the price of each level (prices[n] buys level n)
---   step           what one level gives: stands +step display stands (Config.Warehouse.Stands … MaxStands); lights the
+--   step           what one level gives: warehouse (8.3) the next warehouse level (Config.Warehouse.Levels: its upgrade
+--                  level k is warehouse level k + 1, a new player's Garage is 0); stands +step small display stands
+--                  (from Config.Warehouse.MoreFrom: the level's big stands + these); lights the
 --                  income × (1 + step) a level (compounding: CollectionRules' income, so the HUD, the stands' tags and
 --                  the picker show it); engine the van's top speed + step a level (its SpeedMult attribute,
 --                  client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau trained)
 -- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
 -- are one size; the engine is the safe van upgrade.)
 -- The tuning: a first haul on show earns about $100 a minute (Config.Collection), so the first level of each comes
--- after a few minutes of play, the last ones after hours; everything bought costs $54,250.
+-- after a few minutes of play, the last ones after hours; everything bought costs $102,750. 8.3: the warehouse's levels
+-- $48,500 of it: a Garage's 2 stands earn about $20 a minute and a first haul sold about $1,000, so the Workshop comes
+-- with the first move or two, the Storehouse after a few, the Big Warehouse (today's) in the first hour or so.
 --   Order          the cards' order in the window
 --   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
 --   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
+--   WarehouseFlag  8.3: the save's mark of the warehouse level: a real save without it (from before 8.3) had today's
+--                  warehouse, so it gets warehouse level 4 (UpgradeRules.fromSave); WarehouseAttribute the player
+--                  attribute server/Upgrades.luau keeps their warehouse level (1 … 5) in (the client reads it)
 export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number } }
 Config.SandboxUpgrades = {
-	Order = { "stands", "lights", "engine", "danny" } :: { string },
+	Order = { "warehouse", "stands", "lights", "engine", "danny" } :: { string },
 	List = {
+		warehouse = { name = "ZDC Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1500, 5000, 12000, 30000 } },
 		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 1000, 2500, 5000, 10000 } },
 		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 750, 1500, 3000, 6000, 12000 } },
 		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 600, 1800, 4500 } },
@@ -7093,6 +7121,8 @@ Config.SandboxUpgrades = {
 	} :: { [string]: SandboxUpgradeDef },
 	Flag = "sandboxUpgradesKept",
 	Danny = "DannyTraining",
+	WarehouseFlag = "warehouseLevelKept",
+	WarehouseAttribute = "WarehouseLevel",
 }
 
 -- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out

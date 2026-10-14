@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (lead + 3 agents) · 8.3 the warehouse's five levels as an upgrade (`design/warehouse-levels/KONTRAKT.md`) · Config (Warehouse, SandboxUpgrades), WarehouseLayout, UpgradeRules, CollectionRules, Warehouse, WarehouseMesh, Collection, Upgrades, PlayerData, UpgradeUi, WarehouseUi, SandboxGuide, SoundPlan, Menu, tools/warehouse, tests · 2026-10-14
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
