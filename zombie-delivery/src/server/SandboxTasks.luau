@@ -213,6 +213,10 @@ local function lookAtStock(player: Player)
 		return
 	end
 	local stands = Collection.stands(player)
+	local housed = Collection.hasWarehouse -- (8.2 review: no warehouse of their own, nothing of theirs is on show)
+	if housed and not housed(player) then
+		stands = 0
+	end
 	local now: { [string]: boolean } = {}
 	local home, rare, shown = 0, 0, 0
 	for _, entry in Collection.stock(player) do

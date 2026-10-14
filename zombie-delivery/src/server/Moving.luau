@@ -602,7 +602,14 @@ function SB.tell(kind: string, s: Session?, player: Player?, extra: { [string]: 
 	if not list or #list == 0 then
 		return
 	end
-	local facts: { [string]: any } = if s then SB.facts(s) else {}
+	local made, built = pcall(function(): { [string]: any }
+		return if s then SB.facts(s) else {}
+	end)
+	if not made then
+		warn(`[Moving] the {kind} listeners' facts failed: {built}`) -- (8.2 review: never in the way of the move's end)
+		return
+	end
+	local facts: { [string]: any } = built
 	if extra then
 		for key, value in extra do
 			facts[key] = value
@@ -3754,7 +3761,8 @@ local function deliverTrip(s: Session, clock: number)
 		finish(s, "timeout") -- (late: what came now pays LateShare)
 		return
 	elseif c.delivered + c.lost >= c.total then
-		finish(s, "deliver", if SB.on then "Everything is home in your warehouse" else "Everything delivered to the Wall")
+		finish(s, "deliver", if not SB.on then "Everything delivered to the Wall"
+			elseif stored < #spots then "Your warehouse is full: the rest could not be stored" else "Everything is home in your warehouse")
 		return
 	end
 	if SB.on then
@@ -3786,8 +3794,8 @@ function SB.store(s: Session, spots: { number }): number
 				warn(`[Moving] Collection.add of {thing.item}: {uid}`)
 			end
 			-- (8.2 e2e: refused (a full warehouse): it never came home, so the result, the facts and the tasks do not
-			-- count it; its model is gone with the trip)
-			thing.state, thing.place, thing.condition = "lost", nil, 0
+			-- count it; its model is gone with the trip; its condition kept: lost, not broken)
+			thing.state, thing.place = "lost", nil
 			s.dirty = true
 		end
 	end

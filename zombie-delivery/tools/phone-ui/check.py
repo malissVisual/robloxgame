@@ -24,7 +24,7 @@ picker's too-big pieces at a small upgrade stand, on the same screens.
 the cards, BUY's request, NEED without the money, MAX, the money from the State, closing, a phone's finger sizes.
 8.2 SANDBOX: the collection book (the real CollectionBookUi and SandboxHud's 📖 BOOK chip: collectionbook.luau on
 sandbox_mock.luau) on the same screens: the chip, the progress and the milestones, the tabs, found and unknown cards,
-the 3D pictures capped (the silhouettes tinted), the toasts, K, closing, a phone's finger sizes.
+the 3D pictures capped (the silhouettes tinted), the toasts, C, closing, a phone's finger sizes.
 8.2 SANDBOX: the daily tasks' TASKS chip and panel (the real SandboxTasksUi beside the real SandboxHud: sandboxtasks.luau
 on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920 x 1080: the chip under the money, the
 panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.

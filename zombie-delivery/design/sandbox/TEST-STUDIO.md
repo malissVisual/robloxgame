@@ -46,7 +46,7 @@ Zaškrtněte, co sedí. Když něco nesedí, poznamenejte číslo bodu a co jste
 - [ ] Zajeďte na pozemek **hráče B**: nic se nevyloží.
 - [ ] Zacouvejte zádí do kruhu **na svém** pozemku. Zpráva „🏠 Trip 1 home: …“, kusy zmizí z vanu a jsou ve skladu (B =
       seznam STOCK).
-- [ ] Toast „📖 New in your book: …“. V knize (K) je ten kus nalezený.
+- [ ] Toast „📖 New in your book: …“. V knize (C) je ten kus nalezený.
 - [ ] Druhý trip: tentokrát vjeďte do kruhu **čumákem napřed**. Také se vyloží.
 - [ ] B zemře, když nese kus. Objeví se znovu u svého vanu a kus jde zvednout znovu.
 

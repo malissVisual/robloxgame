@@ -244,6 +244,24 @@ Collection.add(B2, { item = "jukebox", condition = 0.5 })
 E.flush()
 check("… the next piece is a discovery again", same(Book.book(B2), { jukebox = { n = 1, best = 0.5 } }))
 
+local copies = 0
+for key in (PlayerData.get(B2) :: any).rewards do
+	copies += if string.sub(key, 1, 5) == "book:" then 1 else 0
+end
+check("8.2 review: CLEAR BOOK clears the paid milestones' copies in rewards too", copies == 0, copies)
+
+-- 8.2 review: a paid milestone is also a short key of `rewards`, which an older server (8.1) keeps while it writes back
+-- only the fields it knows: a save that went through one never pays it again
+PlayerData.save(A3)
+check("8.2 review: the paid milestones are in the save's rewards too (book:<id>)", E.saves.Player_101.rewards ~= nil
+	and E.saves.Player_101.rewards["book:found10"] == true and E.saves.Player_101.rewards["book:legendary"] == true)
+E.leave(A3)
+local annSave = E.saves.Player_101
+annSave.collectionBook, annSave.collectionBookPaid, annSave.collectionBookKept = nil, nil, nil -- (an 8.1 server's write)
+local A4 = E.join(101, "Ann")
+check("… through an older server's save: the book from the stock again, its milestones still paid, nothing paid again",
+	same(Book.paid(A4), { "found10", "legendary" }) and paid(A4) == 0, `{table.concat(Book.paid(A4), ",")} paid {paid(A4)}: {select(2, paid(A4, "found10"))} {select(2, paid(A4, "legendary"))}`)
+
 check("no warnings (no failed save)", #E.warnings == 0, E.warnings[1])
 
 if failures == 0 then

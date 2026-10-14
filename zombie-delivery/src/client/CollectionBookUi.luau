@@ -16,7 +16,7 @@
 -- same model as a dark silhouette (the ViewportFrame tinted Config.CollectionBook.Silhouette) and "???". Only the cards
 -- on screen get a 3D picture, at most Config.CollectionBook.MaxViews at once (client/WarehouseUi.luau's way: each model
 -- built once, the oldest of MaxModels go); the others show the piece's emoji or a "?".
--- The HUD's 📖 BOOK chip (client/SandboxHud.luau) and the key Config.CollectionBook.Key (K, not while typing nor on the
+-- The HUD's 📖 BOOK chip (client/SandboxHud.luau) and the key Config.CollectionBook.Key (C, not while typing nor on the
 -- start screen) open and close it; ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it. It is
 -- modal: the mouse is free while it is open (a Modal button), a touch screen's buttons are under it. Opening it closes
 -- the warehouse's picker and the UPGRADES window. Toasts wait while the HUD is hidden (the start screen).

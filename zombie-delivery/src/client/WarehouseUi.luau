@@ -684,13 +684,20 @@ local FILTER_WORDS: { [string]: { line: string, none: string, hint: string } } =
 	duplicates = { line = "keeps the best of each item", none = "One of each: no duplicates", hint = "The best of each item stays. Pieces on show stay." },
 }
 
--- A bulk button waits for the server's answer (the next state draws it again).
+-- A bulk button waits for the server's answer (the next state draws it again; 8.2 review: no answer in a moment, a
+-- request the remote's limit dropped, and it is drawn again anyway: never stuck at "…").
 local function waiting(name: string)
 	local button = actionButtons[name]
 	if button then
 		button.Text = "…"
 		button.Active = false
 		button.AutoButtonColor = false
+		task.delay(2.5, function()
+			if mode and actionButtons[name] == button and button.Parent and button.Text == "…" then
+				shownKey = ""
+				draw(true)
+			end
+		end)
 	end
 end
 

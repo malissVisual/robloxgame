@@ -3,8 +3,8 @@
 -- real client/SandboxHud.luau, run for real on sandbox_mock.luau's recorder, on a phone held sideways (844 × 390:
 -- 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): nothing
 -- when Config.Sandbox.On is false; the state asked at the start; the chip beside "📦 N in stock" (a finger's size on a
--- phone, its key K on a computer, the HUD's block still clear of the touch buttons) opening and closing the book; the
--- key K (not when something else took it, not on the start screen); the book: "23 / 56 found" and its bar, the counts,
+-- phone, its key C on a computer, the HUD's block still clear of the touch buttons) opening and closing the book; the
+-- key C (not when something else took it, not on the start screen); the book: "23 / 56 found" and its bar, the counts,
 -- the milestones (✔ when paid, else how far, and the reward), the tabs ALL / COLLECTIBLES / FURNITURE with their counts,
 -- a card a piece in the book's order (found: its name, rarity colour, ×n, best condition, value; unknown: "???", a "?"
 -- or its dark silhouette), the 3D pictures only on the cards on screen and never more than Config.CollectionBook.MaxViews
@@ -306,7 +306,7 @@ local function chipChecks(label)
 	if M.touch then
 		check(`{label}: … a finger's size (44 px), no key chip`, b.x1 - b.x0 >= 44 - 0.01 and b.y1 - b.y0 >= 44 - 0.01 and not named(bookChip, "Key").Visible, show(b))
 	else
-		check(`{label}: … its key K shown`, named(bookChip, "Key").Visible and named(bookChip, "Key").Text == "K")
+		check(`{label}: … its key C shown`, named(bookChip, "Key").Visible and named(bookChip, "Key").Text == "C")
 	end
 end
 chipChecks("844 x 390")
@@ -481,12 +481,12 @@ remote.OnClientEvent:Fire(state(FOUND, { "found10", "found20", "legendary" }))
 -- closing
 key("Escape")
 check("ESC closes it", not Book.isOpen() and named(gui, "Book") == nil and Book.views() == 0)
-key("K")
-check("K opens it", Book.isOpen())
-key("K")
-check("K again closes it", not Book.isOpen())
-key("K", true)
-check("K taken by something else (gameProcessed): left alone", not Book.isOpen())
+key("C")
+check("C opens it", Book.isOpen())
+key("C")
+check("C again closes it", not Book.isOpen())
+key("C", true)
+check("C taken by something else (gameProcessed): left alone", not Book.isOpen())
 press(bookChip)
 key("ButtonB")
 check("the gamepad's B closes it", not Book.isOpen())
@@ -504,16 +504,16 @@ press(bookChip)
 check("the BOOK chip again closes it", not Book.isOpen())
 M.remotes.Collection.OnClientEvent:Fire({ kind = "pick", stand = 2 })
 check("(the warehouse's picker open)", WarehouseUi.isOpen())
-key("K")
+key("C")
 check("opening the book closes the warehouse's picker (one window at a time)", Book.isOpen() and not WarehouseUi.isOpen())
 Book.close()
 
--- the start screen: K does nothing, the toasts wait
+-- the start screen: C does nothing, the toasts wait
 local ownGui = SandboxHud.gui()
 M.hudGui.Enabled = false
 M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
-key("K")
-check("the HUD hidden (the start screen): K does nothing", not ownGui.Enabled and not Book.isOpen())
+key("C")
+check("the HUD hidden (the start screen): C does nothing", not ownGui.Enabled and not Book.isOpen())
 toastsBefore = #M.toasts
 remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles", name = "Found every collectible", money = 2500 })
 check("… a milestone's toast waits", #M.toasts == toastsBefore)

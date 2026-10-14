@@ -136,6 +136,14 @@ function CollectionBook.admin(player: Player, what: string): string
 	elseif what == "clear" then
 		table.clear(book)
 		table.clear(paid)
+		local profile = PlayerData.get(player)
+		if profile then
+			for key in profile.rewards do -- (8.2 review: and their copies in `rewards`, or the next join would read them back)
+				if string.sub(key, 1, 5) == "book:" then
+					profile.rewards[key] = nil
+				end
+			end
+		end
 		push(player, nil)
 		return "ADMIN: the collection book is empty (its milestones can pay again)."
 	end

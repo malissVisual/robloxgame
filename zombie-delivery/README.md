@@ -34,6 +34,22 @@
 > stands (12 → 20), showroom lights (more income), the van's engine and Danny's training. The sandbox **sounds like the
 > Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Chalet wears the owner's **Blender
 > house** once imported, and the 12 collectibles have their **Blender look** (`ZDCFurnitureArt`, re-import it).
+>
+> **8.2** (more to do with the money and the collection): the **collection book** (📖 BOOK chip, C on a computer;
+> `server/CollectionBook.luau`, `client/CollectionBookUi.luau`): the 56 pieces the house can hold, the unknown ones dark
+> silhouettes, milestones that pay once (found 10 / 20, all the furniture, every collectible, a legendary). **Daily
+> tasks** (📋 TASKS chip, J; `server/SandboxTasks.luau`, `Config.SandboxTasks`): three a day and one a week, picked by
+> the UTC day, CLAIM pays, a $500 bonus for all three. The STOCK list's **⭐ FILL BEST**, **💰 SELL…** (all Common, all
+> broken, the duplicates; never a piece on show) and **↩ TAKE ALL DOWN**, a sort and a search (`shared/StockPlan.luau`).
+> **Showing off**: the player list's 💰 $ / 📈 $/min / ⭐ Collection and the **TOP MOVERS** board at the crossroads
+> (`server/SandboxLeaders.luau`, the all-time best in the OrderedDataStore `Sandbox_TopCollection`). The warehouse
+> wears the owner's **Blender warehouse** (level 4 of `design/blender-warehouse`'s five, `server/WarehouseMesh.luau`,
+> `Config.Warehouse.ArtLevel`) once `ZDCWarehouseArt` is imported. The sandbox's own **analytics** funnel (10 steps,
+> `server/SandboxAnalytics.luau`) and the moves' events; a **performance** pass for phones (labels drawn only near,
+> the chalet and the halls stream whole). An **end-to-end test** runs the whole loop with the real modules
+> (`tests/sandbox_e2e_runtime_test.luau`; the Studio checklist `design/sandbox/TEST-STUDIO.md`). Fixed on the way: a
+> player without a plot shows nothing and earns nothing; a piece a full warehouse refuses is lost, not "home"; the
+> book's paid milestones survive a save through an older server (`rewards`' "book:" keys).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

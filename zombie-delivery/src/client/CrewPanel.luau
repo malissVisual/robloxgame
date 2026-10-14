@@ -1193,10 +1193,9 @@ function CrewPanel.start()
 		task.defer(changed)
 	end)
 
-	-- K opens and closes the panel (not while typing, e.g. in the chat; 8.2: not in the sandbox, where K is the
-	-- collection book's, client/CollectionBookUi.luau: the planning's + INVITE opens the panel there).
+	-- K opens and closes the panel (not while typing, e.g. in the chat; the sandbox too: the collection book is C there).
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or input.KeyCode ~= Enum.KeyCode.K or UserInputService:GetFocusedTextBox() or not hudOn() or Config.Sandbox.On then
+		if processed or input.KeyCode ~= Enum.KeyCode.K or UserInputService:GetFocusedTextBox() or not hudOn() then
 			return
 		end
 		setOpen(not window.Visible)

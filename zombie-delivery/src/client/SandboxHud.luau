@@ -14,7 +14,7 @@
 --   * the chip "📦 N in stock" (the pieces not on show): a tap, or the key Config.SandboxHud.StockKey (B), opens the
 --     STOCK list (client/WarehouseUi.luau; the key again closes it)
 --   * 8.2: the chip "📖 BOOK" beside it (when client/CollectionBookUi.luau is there): a tap opens and closes the
---     collection book (its own key, Config.CollectionBook.Key: K, is the book's; shown on the chip on a computer)
+--     collection book (its own key, Config.CollectionBook.Key: C, is the book's; shown on the chip on a computer)
 --   * toasts: a piece sold ("Sold Grandpa's Clock · +$420", client/WarehouseUi.luau's "sold") and pieces brought home
 --     ("+5 pieces in your warehouse", when a state's stock grew): Hud.toast; without client/Hud.luau a column of its own
 --     at the top left with its own toasts in the same look

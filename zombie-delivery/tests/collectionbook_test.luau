@@ -265,7 +265,7 @@ check("the flag is Config's", Rules.Flag == Config.CollectionBook.Flag and Rules
 
 -- ── Config ─────────────────────────────────────────────────────────────────
 local W = Config.CollectionBook.Window
-check("Config.CollectionBook: the key K, the window's numbers, the 3D pictures capped", Config.CollectionBook.Key == "K" and W.Width > 0 and W.Height > 0 and W.Side > 0 and W.Tile > 0
+check("Config.CollectionBook: the key C, the window's numbers, the 3D pictures capped", Config.CollectionBook.Key == "C" and W.Width > 0 and W.Height > 0 and W.Side > 0 and W.Tile > 0
 	and Config.CollectionBook.MaxViews >= 1 and Config.CollectionBook.MaxViews <= 24 and Config.CollectionBook.MaxModels >= Config.CollectionBook.MaxViews)
 check("the remote's rate limit (a few a second)", (Config.Robust.Limits :: any).CollectionBook ~= nil and (Config.Robust.Limits :: any).CollectionBook >= 1 and (Config.Robust.Limits :: any).CollectionBook <= 10)
 

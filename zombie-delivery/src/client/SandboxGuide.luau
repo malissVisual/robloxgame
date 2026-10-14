@@ -53,7 +53,7 @@ local K = Theme.Contract
 local player = Players.LocalPlayer
 local COLOR = Color3.fromRGB(G.Color[1], G.Color[2], G.Color[3])
 local ABOVE = { "MovePanel", "MoveHelper", "PlanningPill" } -- the top's middle blocks the line goes under (TopBlocks)
-local SIDE_GUIS = { "SandboxHud" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau)
+local SIDE_GUIS = { "SandboxHud", "SandboxTasksChip" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau; 8.2: client/SandboxTasksUi.luau's chip)
 local MAX_POINTS = 6 -- SandboxSteps.route's most points: a path of five beams
 local PAD_L, PAD_R, PAD_V = 14, 4, 5 -- the line's padding (at scale 1)
 local LINE_H = G.TextSize + 4 -- one line of words
@@ -438,6 +438,8 @@ local function layout()
 	local room = 2 * half
 	if room < MIN_ROOM * hs then -- (a narrow screen: under the sides' HUD, nearly as wide as the screen)
 		top = math.max(top, sideBottom + gap)
+		local _, _, below = sides(origin, W, top + 40 * hs) -- (8.2 review: and under what stands there too, the TASKS chip)
+		top = math.max(top, below + gap)
 		room = W - 32
 	end
 	room = math.min(room, G.HintWidth * hs)

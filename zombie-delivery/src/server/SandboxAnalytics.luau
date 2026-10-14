@@ -174,8 +174,10 @@ local function hookCollection()
 	Collection.onChanged(function(player: Player)
 		local move = moves[player]
 		local shown = false
+		local housed = Collection.hasWarehouse -- (8.2 review: without a warehouse of their own nothing is on show)
+		local has = housed == nil or housed(player)
 		for _, entry in Collection.stock(player) do
-			shown = shown or entry.stand ~= nil
+			shown = shown or (has and entry.stand ~= nil)
 			if move and not move.known[entry.uid] then
 				move.known[entry.uid] = true
 				local def = CollectionRules.defOf(entry.item)

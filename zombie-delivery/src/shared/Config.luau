@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.1"
+Config.Version = "8.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -7125,7 +7125,7 @@ Config.CollectionBook = {
 		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
 		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
 	} :: { BookMilestone },
-	Key = "K",
+	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
 	Flag = "collectionBookKept",
 	MaxCount = 1_000_000,
 	Window = {

@@ -592,6 +592,19 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.2: the collection book, checked, only from a real save: written with its flag (collectionBookKept) its own; an
 	-- older real save the book of its stock (just read above), no milestone paid yet (CollectionBookRules.fromSave)
 	profile.collectionBook, profile.collectionBookPaid = CollectionBookRules.fromSave(saved, profile.collection)
+	-- (8.2 review: the milestones paid are also short keys of `rewards`, "book:<id>", which an older server keeps: a save
+	-- that went through one never pays them again)
+	local carried: { string } = {}
+	if type(saved.rewards) == "table" then -- (the save's own: profile.rewards is read later, applyChallenges)
+		for key, on in saved.rewards do
+			if on == true and type(key) == "string" and string.sub(key, 1, 5) == "book:" then
+				table.insert(carried, string.sub(key, 6))
+			end
+		end
+	end
+	for id in CollectionBookRules.cleanPaid(carried) do
+		profile.collectionBookPaid[id] = true
+	end
 	-- 8.1: the sandbox's upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); a save
 	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave)
 	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
@@ -933,6 +946,9 @@ function PlayerData.save(player: Player, final: boolean?)
 	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
 	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
 	profile.rewards[Config.CompanyVan.Flag] = true
+	for id in profile.collectionBookPaid do
+		profile.rewards["book:" .. id] = true -- (8.2 review: the book's milestones paid, as the chapters done below)
+	end
 	for key in profile.story do
 		if string.sub(key, 1, 5) == "done:" then
 			profile.rewards[key] = true
