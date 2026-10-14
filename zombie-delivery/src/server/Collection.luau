@@ -30,6 +30,8 @@
 --                                              save has loaded)
 --   Collection.onAdded(fn)                     8.2: fn(player, entry) after a piece came home (Collection.add took it;
 --                                              entry a copy): the collection book (server/CollectionBook.luau)
+--   Collection.onPaid(fn)                      8.2: fn(player, "income" | "sale", money) after the stands paid or a piece
+--                                              sold (server/SandboxTasks.luau)
 --   Collection.tick()                          pays everybody here what their stands earned since the last payout (the
 --                                              loop runs it every Config.Collection.Tick s)
 --   Collection.start()                         the remote, joining and leaving, the payout loop
@@ -88,6 +90,7 @@ local notice = Net.get("Notice")
 
 local listeners: { (Player) -> () } = {}
 local addedListeners: { (Player, Entry) -> () } = {} -- 8.2: Collection.onAdded's
+local paidTo: { (Player, string, number) -> () } = {} -- 8.2: Collection.onPaid's fns
 
 -- The income counted for each player here: up to `at` (os.clock), `carry` $ not paid yet.
 type Meter = { at: number, carry: number }
@@ -173,6 +176,7 @@ local function payout(player: Player)
 	if pay >= 1 then
 		meter.carry -= pay
 		PlayerData.addMoney(player, pay, "CollectionIncome")
+		for _, fn in paidTo do task.spawn(fn, player, "income", pay) end -- 8.2: Collection.onPaid
 	end
 end
 
@@ -364,6 +368,7 @@ function Collection.sell(player: Player, uid: string): (number?, string?)
 	local price = Rules.sell(entry)
 	table.remove(collection.entries, index)
 	PlayerData.addMoney(player, price, "CollectionSale", entry.item)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", price) end -- 8.2: Collection.onPaid
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
 	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)))
 	changed(player)
@@ -420,6 +425,10 @@ end
 
 function Collection.onAdded(fn: (Player, Entry) -> ())
 	table.insert(addedListeners, fn)
+end
+
+function Collection.onPaid(fn: (Player, string, number) -> ())
+	table.insert(paidTo, fn)
 end
 
 function Collection.tick()
@@ -549,6 +558,7 @@ local function sellMany(player: Player, filter: any): (number?, number, string?)
 	table.clear(collection.entries)
 	table.move(kept, 1, #kept, 1, collection.entries)
 	PlayerData.addMoney(player, total, "CollectionSale", if mixed then nil else item)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", total) end -- 8.2 merge: Collection.onPaid (a bulk sale counts too)
 	remote:FireClient(player, { kind = "sold", name = `{count} {if count == 1 then "piece" else "pieces"}`, money = total, count = count })
 	PlayerData.track("event", player, "CollectionSold", total, rarest)
 	changed(player)

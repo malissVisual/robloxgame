@@ -34,7 +34,8 @@ end
 --                                      move's keys and the car's only)
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
 --                                      SandboxGuide, 8.1's UpgradeUi (the UPGRADES desk's window), 8.2's
---                                      CollectionBookUi (the collection book): each started only when it is there
+--                                      CollectionBookUi (the collection book), SandboxTasksUi (the TASKS chip and
+--                                      panel): each started only when it is there
 -- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
 -- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
 -- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
@@ -54,7 +55,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -77,8 +78,9 @@ if Config.Sandbox.On then
 	end
 	local WarehouseUi = ownModule("WarehouseUi")
 	local UpgradeUi = ownModule("UpgradeUi")
-	local BookUi = ownModule("CollectionBookUi") -- (8.2: the collection book, a window like the others)
-	local windows = { WarehouseUi, UpgradeUi, BookUi }
+	local BookUi = ownModule("CollectionBookUi") -- (8.2: the collection book and the TASKS panel, windows like the others)
+	local TasksUi = ownModule("SandboxTasksUi")
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -147,7 +149,7 @@ if Config.Sandbox.On then
 		end
 	end
 	-- One window at a time; ESC closes them all (the crew panel, the move's cards and list, the quick chat's ring, the
-	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book). `keep`: the sandbox window opening now
+	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book, the TASKS panel). `keep`: the sandbox window opening now
 	-- (its onOpen runs once it counts as open, so it must not close itself).
 	local keep: any = nil
 	Hud.onCloseWindows = function()
@@ -173,7 +175,7 @@ if Config.Sandbox.On then
 	end
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi)
+			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	KeyHints.covered = function(): boolean

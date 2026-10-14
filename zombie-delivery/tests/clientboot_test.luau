@@ -43,7 +43,7 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
 	"QuickChat", "CarryGripUi", "CargoPrompts",
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book)
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel)
 local LAST = { "SandboxSounds" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
@@ -265,10 +265,10 @@ end
 -- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok" })
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok" })
 	local ok, where = same(starts(run), CITY)
 	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
-	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil)
+	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
@@ -276,9 +276,9 @@ end
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
 
 do
-	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok" }, true)
+	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok" }, true)
 	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
-	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, then SandboxSounds`, ok, where)
+	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, then SandboxSounds`, ok, where)
 	local city: { string } = {}
 	for _, name in CITY_ONLY do
 		if run.required[name] then

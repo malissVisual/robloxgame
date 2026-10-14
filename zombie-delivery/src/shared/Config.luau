@@ -5610,6 +5610,7 @@ Config.Robust = {
 		CollectionBulk = 1, -- 8.2: and its bulk buttons (fillbest / sellmany / undisplayall): one a second, on top
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
 		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
+		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 	},
 }
 
@@ -7140,6 +7141,79 @@ Config.CollectionBook = {
 	MaxViews = 16,
 	MaxModels = 32,
 	Silhouette = { 14, 15, 18 } :: { number },
+}
+
+-- 8.2 SANDBOX, the daily tasks (the owner: "daily tasks that bring players back"; the city's Config.Tasks and the phone's
+-- TASKS app do not run in the sandbox). shared/SandboxTasks.luau picks and counts them (tests/sandboxtasks_test.luau),
+-- server/SandboxTasks.luau keeps profile.sandboxTasks, counts what happens and pays (tests/sandboxtasks_runtime_test.luau),
+-- client/SandboxTasksUi.luau is the TASKS panel (the key Key or the 📋 TASKS chip under the money).
+-- Every UTC day a player gets Daily tasks from DailyPool and every UTC week (from Monday 00:00 UTC) one from WeeklyPool,
+-- picked by the day's (the week's) number and the UserId: the same all day, new at 00:00 UTC; never two of one `group`
+-- a day. A kind's `event` is what the server counts:
+--   home      pieces that came home into your warehouse's stock (Collection: every new piece)
+--   rare      … of them RareRank or rarer (Config.Collection's tiers: 3 is rare)
+--   clean     a move finished with pieces home and nothing broken (everybody in its crew)
+--   moves     a move finished with pieces home (everybody in its crew)
+--   trips     the trips home of one move (`best`: the most in one move counts, not a sum)
+--   shown     pieces on show at once (`best`)
+--   sell      $ your pieces sold for
+--   income    $ your display stands paid
+--   upgrade   levels bought at the UPGRADES desk (never picked once every upgrade is at its top)
+--   danny     Danny holds the other end of your `item` (the sofa) while you carry it
+-- `text` is the title ({n} the target; `one` when it is 1), `target` the range it is picked from (in `step`s), `money`
+-- the reward at the range's low end (its high end pays TopShare more, rounded to $10), `icon` its emoji.
+--   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
+--              turns is paid then
+--   Key        the key that opens and closes the panel (a computer)
+--   StateGap   s between two states to one player; CheckEvery: s between two looks for the reset at 00:00 UTC;
+--              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
+--              Danny holds the other end of your piece (only while a danny task is open)
+--   Flag       the save's mark: profile.sandboxTasks is read only from a real save written with it
+-- The tuning: a first haul on show earns about $100 a minute (Config.Collection); the three dailies and the bonus pay
+-- $1,150 – 1,400 (about a quarter of an hour on show), the weekly $2,000 – 4,500.
+export type SandboxTaskDef = {
+	id: string,
+	event: string,
+	icon: string,
+	text: string,
+	one: string?,
+	target: { number },
+	step: number?,
+	money: number,
+	group: string?,
+	best: boolean?,
+	item: string?,
+}
+Config.SandboxTasks = {
+	Daily = 3,
+	AllDaily = 500,
+	TopShare = 0.5,
+	RareRank = 3,
+	Key = "J",
+	StateGap = 0.5,
+	CheckEvery = 10,
+	SaveDelay = 5,
+	DannyEvery = 1,
+	Flag = "sandboxTasksKept",
+	DailyPool = {
+		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 200 },
+		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 3, 5 }, money = 250 },
+		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 300 },
+		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 250 },
+		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 200 },
+		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 200 },
+		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 250 },
+		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 250 },
+		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 200 },
+	} :: { SandboxTaskDef },
+	WeeklyPool = {
+		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
+		{ id = "w_rare", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", target = { 20, 30 }, step = 5, money = 2500 },
+		{ id = "w_moves", event = "moves", icon = "🏠", text = "Finish {n} moves", target = { 5, 8 }, money = 2500 },
+		{ id = "w_clean", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", target = { 3, 5 }, money = 3000 },
+		{ id = "w_income", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 4000, 6000 }, step = 500, money = 2500 },
+		{ id = "w_sell", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 2000, 3000 }, step = 250, money = 2000 },
+	} :: { SandboxTaskDef },
 }
 
 return Config

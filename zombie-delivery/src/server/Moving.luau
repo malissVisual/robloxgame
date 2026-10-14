@@ -534,7 +534,8 @@ end
 -- stops a move). `facts` is a fresh table of the move's numbers (SB.facts) with what the moment adds (SB.tell's
 -- `extra`); a grip check's holds only its own. The moments: startMove's end, a door trip in (travel), Load (onLoad,
 -- Danny's helperLoad), a trip (deliverTrip), the end (finish) and a grip check's outcome (Grip.result).
-SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {} } :: { [string]: { (Player?, { [string]: any }) -> () } }
+-- (stored / result: the daily tasks' hooks with the move itself, Moving.onStored / onResult below)
+SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {}, stored = {}, result = {} } :: { [string]: { any } }
 
 -- A move started (LAUNCH, the admin's start): fn(owner, facts).
 function Moving.onStart(fn: (Player?, { [string]: any }) -> ())
@@ -3228,6 +3229,7 @@ function SB.result(s: Session, phase: string, why: string?, result: Rules.Result
 		local owner = s.owner
 		PlayerData.track("event", owner, "MoveDone", result.stars, s.contract.id, if #crew > 1 then "crew" else "solo")
 	end
+	for _, fn in SB.listeners.result do task.spawn(fn, s.owner, s.move, result, crew) end -- 8.2: Moving.onResult
 end
 
 -- ── Starting ───────────────────────────────────────────────────────────────
@@ -3783,6 +3785,7 @@ function SB.store(s: Session, spots: { number }): number
 			warn(`[Moving] Collection.add of {thing.item}: {uid}`)
 		end
 	end
+	if #spots > 0 then for _, fn in SB.listeners.stored do task.spawn(fn, s.owner, s.move, spots) end end -- 8.2: Moving.onStored
 	return took
 end
 
@@ -4469,6 +4472,12 @@ function Moving.busy(player: Player): string?
 	end
 	return nil
 end
+
+-- 8.2 SANDBOX (server/SandboxTasks.luau: the moves' own tables, beside the analytics' Moving.onTrip / onFinish facts):
+-- fn(owner, move, spots) after a trip home stored pieces (SB.store), fn(owner, move, result, crew) at a move's end
+-- (SB.result).
+function Moving.onStored(fn: (Player, Rules.Move, { number }) -> ()) table.insert(SB.listeners.stored, fn) end
+function Moving.onResult(fn: (Player, Rules.Move, Rules.Result, { Player }) -> ()) table.insert(SB.listeners.result, fn) end
 
 -- 8.0 SANDBOX (server/SandboxBoot.luau: every spawn): where a new body of a player on a move (its owner or its crew)
 -- stands, never stranded at home while the van is out: by the move's van when it is out and not wrecked (beside its

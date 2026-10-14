@@ -280,6 +280,7 @@ AnalyticsPlan.Sources = {
 	LevelReward = "Gameplay", -- a driver level's reward
 	CompanySafe = "Gameplay", -- your company's safe emptied
 	TaskReward = "TimedReward", -- the daily and weekly tasks
+	SandboxTask = "TimedReward", -- 8.2 SANDBOX: a daily or weekly task's reward, the all-dailies bonus (server/SandboxTasks.luau; the SKU the task's id)
 	ShiftBonus = "Gameplay", -- 6.14: a shift's pay (Config.Jobs.Shift: its deliveries in one go, server/Shift.luau)
 	SupplyDrop = "Gameplay", -- 6.15: a live event's supply drop brought to the depot (server/LiveEvents.luau)
 	HordeReward = "Gameplay", -- 6.15: a share of the horde at the gates' reward (server/LiveEvents.luau)
