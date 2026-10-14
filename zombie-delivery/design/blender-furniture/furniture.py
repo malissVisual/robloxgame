@@ -1,13 +1,15 @@
 """Zombie Delivery: nábytek pro stěhování (7.0 MOVES) v Blenderu.
 
 Spuštění v Blenderu: záložka Scripting → Open → furniture.py → Run Script (▶, nebo Alt+P). Skript postaví všech 36 kusů
-nábytku ze hry (shared/FurnitureLooks.luau) a 12 sběratelských kousků z 8.0 SANDBOXu (FurnitureLooks.Collectibles: trofej,
-rádio, glóbus … rytířská zbroj) v mřížce do kolekce "Furniture" a vedle zařízený obývák (scéna "Room").
+nábytku ze hry (shared/FurnitureLooks.luau) a 24 sběratelských kousků z 8.0 SANDBOXu (FurnitureLooks.Collectibles: trofej,
+rádio, glóbus … rytířská zbroj; 8.3: psací stroj … sejf odolný proti zombiím) v mřížce do kolekce "Furniture" a vedle
+zařízený obývák (scéna "Room").
 Každý kus má přesně rozměry ze hry (Root box): 1 jednotka = 1 stud, předek míří na -Y, spodek kusu je na zemi.
 
 Bez Blenderu, jen s modulem bpy (pip install bpy):
     python furniture.py -- --save furniture.blend --render složka --export složka
-    (--only id,id: render jen těchto kusů; --only collectibles: 12 sběratelských kousků pro collectibles-preview.png)
+    (--only id,id: render jen těchto kusů; --only collectibles: všech 24 sběratelských kousků; --only new83: 12 nových
+    z 8.3 pro collectibles-83-preview.png)
 """
 import bpy, bmesh, json, math, os, sys
 from mathutils import Vector, Matrix
@@ -1905,14 +1907,14 @@ def alphorn(W, H, D):
         box("Brace", (0.06, 0.9, 0.05), (x, 0, 0.2), "wood2", r=0.01, seg=1)
         box("Cradle", (0.14, 0.36, 0.1), (x, 0, 0.5), "wood2", r=0.02)
     pts, radii = [], []
-    for x, r in ((3.42, 0.05), (2.6, 0.055), (1.6, 0.065), (0.6, 0.078), (-0.4, 0.092), (-1.4, 0.108), (-2.3, 0.13)):
+    for x, r in ((3.42, 0.065), (2.6, 0.072), (1.6, 0.085), (0.6, 0.1), (-0.4, 0.12), (-1.4, 0.142), (-2.3, 0.17)):
         pts.append((x, 0, 0.62))
         radii.append(r)
-    cx, cz, R = -2.3, 1.3, 0.68  # (the bend up into the bell: a quarter circle)
+    cx, cz, R = -2.3, 1.26, 0.64  # (the bend up into the bell: a quarter circle)
     for k in range(1, 9):
         a = -math.pi / 2 - (math.pi / 2) * k / 8
         pts.append((cx + R * math.cos(a), 0, cz + R * math.sin(a)))
-        radii.append(0.13 + 0.17 * k / 8)
+        radii.append(0.17 + 0.16 * k / 8)
     sweep("Tube", pts, radii, "wood", seg=18)
 
     def radius_at(x):  # the straight tube's radius at x
@@ -1925,14 +1927,16 @@ def alphorn(W, H, D):
             torus("Binding", radius_at(x + dx) + 0.006, 0.014, (x + dx, 0, 0.62), "wicker", axis="X", seg=18, ring_seg=4)
     lathe("Mouthpiece", [(0.001, 0.0), (0.06, 0.0), (0.075, 0.03), (0.07, 0.06), (0.045, 0.08), (0.045, 0.16), (0.001, 0.16)],
           (3.59, 0, 0.62), "wood2", seg=16, rot=euler(ry=-math.pi / 2))
-    lathe("Bell", [(0.3, 1.3), (0.33, 1.42), (0.4, 1.55), (0.5, 1.67), (0.58, 1.75), (0.59, 1.775), (0.565, 1.77), (0.48, 1.68),
-                   (0.38, 1.56), (0.31, 1.44), (0.28, 1.31)], (-2.98, 0, 0), "wood", seg=36)
-    lathe("Band", [(0.349, 1.44), (0.408, 1.55), (0.433, 1.58), (0.425, 1.583), (0.4, 1.553), (0.341, 1.443)], (-2.98, 0, 0), "paint", seg=36)
-    torus("Rim", 0.575, 0.02, (-2.98, 0, 1.765), "wood2", seg=36, ring_seg=4)
+    bell = 1.1  # (the bell's radii, a little wider than the parts look's)
+    lathe("Bell", [(0.3 * bell, 1.3), (0.33 * bell, 1.42), (0.4 * bell, 1.55), (0.5 * bell, 1.67), (0.58 * bell, 1.75), (0.59 * bell, 1.775),
+                   (0.565 * bell, 1.77), (0.48 * bell, 1.68), (0.38 * bell, 1.56), (0.31 * bell, 1.44), (0.28 * bell, 1.31)], (-2.94, 0, 0), "wood", seg=36)
+    lathe("Band", [(0.349 * bell, 1.44), (0.408 * bell, 1.55), (0.433 * bell, 1.58), (0.425 * bell, 1.583), (0.4 * bell, 1.553), (0.341 * bell, 1.443)],
+          (-2.94, 0, 0), "paint", seg=36)
+    torus("Rim", 0.575 * bell, 0.02, (-2.94, 0, 1.765), "wood2", seg=36, ring_seg=4)
     for k in range(6):  # edelweiss painted round the band
         a = k * math.pi / 3 + 0.3
         c, s = math.cos(a), math.sin(a)
-        centre = Vector((-2.98 + 0.405 * c, 0.405 * s, 1.515))
+        centre = Vector((-2.94 + 0.405 * bell * c, 0.405 * bell * s, 1.515))
         outward = Vector((c, s, -0.55)).normalized()
         ball("Edelweiss", 0.03, tuple(centre + outward * 0.006), "white", scale=(1.0, 1.0, 1.0), seg=8, rings=5)
         ball("Edelweiss heart", 0.012, tuple(centre + outward * 0.03), "sun", seg=6, rings=4)
@@ -2064,51 +2068,68 @@ def tapered(o, width, front=None):
 
 
 def trex_skull(W, H, D):
-    """A Tyrannosaurus rex skull (a museum's cast; the snout to the right, as the game's to its left) on two steel rods
-    on its black plinth: the skull narrow at the snout and wide behind the eyes, its holes (the nostril, the big one in
-    front of the eye, the eye, the one behind it), the brow bosses, the lower jaw and its hole, the rows of teeth; the
-    plinth's plate (the game prints T. REX · 66 MILLION YEARS on it)."""
+    """A Tyrannosaurus rex skull (a museum's cast; the snout to the right, as the game's to its left), its jaw a little
+    open, on two steel rods on its black plinth: the long snout narrow at the tip and wide behind the eyes, the nasal
+    ridge and the brow bosses, its openings (the nostril, the big one in front of the eye, the eye, the tall one behind
+    it, the jaw's) deep in old earth, the rows of teeth; the plinth's plate (the game prints T. REX · 66 MILLION YEARS on
+    it)."""
     box("Plinth", (4.0, 1.6, 0.34), (0, 0, 0.17), "dark", r=0.04, seg=3)
     box("Plinth top", (3.8, 1.4, 0.06), (0, 0, 0.37), "dark", r=0.02)
     box("Plate", (1.6, 0.02, 0.2), (0, -0.81, 0.2), "brass", r=0.006)  # (the game prints T. REX · 66 MILLION YEARS on it)
-    for x, top in ((-0.9, 1.1), (0.9, 1.43)):
+    for x, top in ((-0.9, 1.17), (0.9, 1.13)):
         cyl("Rod", 0.04, top - 0.4, (x, 0, (top + 0.4) / 2), "steel", seg=12, edge=0)
         cyl("Rod foot", 0.12, 0.04, (x, 0, 0.42), "steel", seg=16, edge=0.01)
-        box("Bracket", (0.24, 0.36, 0.04), (x, 0, top), "steel", r=0.01, seg=1)
+        box("Bracket", (0.26, 0.34, 0.04), (x, 0, top), "steel", r=0.01, seg=1)
 
-    def skull_w(x):  # its half width: 0.6 behind the eyes, 0.24 at the snout's tip
-        return 0.6 if x <= -0.9 else 0.6 - 0.36 * (x + 0.9) / 2.88
+    def skull_w(x):  # its half width: 0.6 behind the eyes, 0.2 at the snout's tip
+        return 0.6 if x <= -0.9 else 0.6 - 0.4 * (x + 0.9) / 2.92
 
     def jaw_w(x):
-        return 0.45 if x <= -0.9 else 0.45 - 0.25 * (x + 0.9) / 2.82
-    skull = spline([(1.98, 1.72), (1.9, 1.98), (1.65, 2.2), (1.2, 2.42), (0.6, 2.6), (0.05, 2.78), (-0.45, 2.95), (-0.85, 2.92),
-                    (-1.35, 2.82), (-1.8, 2.66), (-2.05, 2.35), (-2.06, 1.95), (-1.85, 1.6), (-1.5, 1.52), (-0.9, 1.58), (-0.2, 1.6),
-                    (0.5, 1.6), (1.2, 1.62), (1.75, 1.64), (1.98, 1.72)], 2)
-    tapered(prism("Skull", skull, -1.0, 1.0, "fossil", r=0.08, seg=2), skull_w)
-    jaw = spline([(1.92, 1.6), (1.4, 1.5), (0.6, 1.36), (-0.2, 1.2), (-1.0, 1.06), (-1.6, 1.04), (-1.92, 1.2), (-1.9, 1.45),
-                  (-1.6, 1.55), (-0.8, 1.56), (0.2, 1.57), (1.2, 1.58), (1.92, 1.6)], 2)
-    tapered(prism("Jaw", jaw, -1.0, 1.0, "fossil", r=0.06, seg=2), jaw_w)
-    holes = ((-0.55, 2.42, 0.2, 0.24, skull_w), (0.35, 2.12, 0.42, 0.17, skull_w), (1.65, 2.2, 0.13, 0.07, skull_w),
-             (-1.35, 2.05, 0.26, 0.22, skull_w), (-1.25, 1.3, 0.22, 0.08, jaw_w))
-    for cx, cz, rx, rz, width in holes:
-        ring = [(cx + rx * math.cos(a), cz + rz * math.sin(a)) for a in (2 * math.pi * k / 16 for k in range(16))]
+        return 0.46 if x <= -0.9 else 0.46 - 0.28 * (x + 0.9) / 2.9
+    top = [(2.02, 1.86), (1.95, 2.02), (1.7, 2.14), (1.2, 2.26), (0.6, 2.4), (0.1, 2.56), (-0.35, 2.75), (-0.6, 2.86), (-0.85, 2.84),
+           (-1.2, 2.9), (-1.6, 2.92), (-1.95, 2.78), (-2.06, 2.5), (-2.04, 2.1), (-1.92, 1.8), (-1.7, 1.72)]
+    bottom = [(-1.2, 1.78), (-0.6, 1.74), (0.0, 1.68), (0.6, 1.64), (1.2, 1.64), (1.7, 1.68), (2.0, 1.75)]
+    tapered(prism("Skull", spline(top + bottom + [top[0]], 2), -1.0, 1.0, "fossil", r=0.1, seg=3), skull_w)
+    sweep("Nasal ridge", [(x, 0, z + 0.02) for x, z in top[1:7]], 0.05, "fossil", seg=8, r1=0.07)
+
+    def jaw_turn(x, z):  # the jaw dropped open about its hinge at the back
+        a, px, pz = -0.12, -1.85, 1.6
+        return (px + (x - px) * math.cos(a) - (z - pz) * math.sin(a), pz + (x - px) * math.sin(a) + (z - pz) * math.cos(a))
+    jaw_top = [(2.0, 1.72), (1.4, 1.66), (0.6, 1.64), (-0.4, 1.66), (-1.3, 1.7), (-1.85, 1.72)]
+    jaw_bottom = [(-2.0, 1.5), (-1.7, 1.28), (-1.0, 1.25), (-0.2, 1.3), (0.6, 1.4), (1.4, 1.52), (2.0, 1.62)]
+    tapered(prism("Jaw", [jaw_turn(x, z) for x, z in spline(jaw_top + jaw_bottom + [jaw_top[0]], 2)], -1.0, 1.0, "fossil", r=0.07, seg=2), jaw_w)
+
+    def oval(cx, cz, rx, rz, n=16):
+        return [(cx + rx * math.cos(a), cz + rz * math.sin(a)) for a in (2 * math.pi * k / n for k in range(n))]
+    openings = ((oval(1.75, 2.0, 0.12, 0.06), skull_w), (spline([(0.78, 2.04), (0.2, 2.34), (-0.06, 2.22), (0.04, 1.96), (0.78, 2.04)], 3)[:-1], skull_w),
+                (oval(-0.62, 2.5, 0.13, 0.18), skull_w), (oval(-1.28, 2.3, 0.22, 0.3), skull_w), (oval(0.88, 2.06, 0.07, 0.05, 10), skull_w),
+                ([jaw_turn(x, z) for x, z in oval(-1.25, 1.42, 0.24, 0.07)], jaw_w))
+    for ring, width in openings:
         for side in (-1, 1):
-            hole = tapered(prism("Hole", ring, -1.0, 1.0, "black", r=0), width, front=(0.012, 0.06))
+            hole = tapered(prism("Opening", ring, -1.0, 1.0, "soil", r=0), width, front=(0.012, 0.06))
             if side > 0:
                 for v in hole.data.vertices:
                     v.co.y = -v.co.y
                 hole.data.flip_normals()
+
+    def skull_bottom(x):
+        for (x0, z0), (x1, z1) in zip(bottom, bottom[1:]):
+            if x0 <= x <= x1:
+                return z0 + (z1 - z0) * (x - x0) / (x1 - x0)
+        return bottom[-1][1]
     for side in (-1, 1):
-        ball("Brow boss", 0.16, (-0.55, side * 0.42, 2.8), "fossil", scale=(1.0, 0.7, 0.8), seg=12)
-        for k in range(11):  # the upper teeth, biggest in the middle of the snout
-            x = 1.82 - k * 0.17
-            size = 0.13 + 0.08 * math.sin(math.pi * (k + 1) / 12)
-            cyl("Tooth", 0.035, size, (x, side * (skull_w(x) - 0.07), 1.62 - size / 2 + 0.02), "cream", seg=6, r2=0.003, edge=0,
-                rot=euler(rx=math.pi) @ euler(ry=0.15))
-        for k in range(9):
-            x = 1.7 - k * 0.18
-            size = 0.1 + 0.05 * math.sin(math.pi * (k + 1) / 10)
-            cyl("Tooth", 0.03, size, (x, side * (jaw_w(x) - 0.06), 1.56 + size / 2 - 0.02), "cream", seg=6, r2=0.003, edge=0)
+        ball("Brow boss", 0.15, (-0.62, side * 0.44, 2.8), "fossil", scale=(1.2, 0.7, 0.75), seg=12)
+        for k in range(12):  # the upper teeth, biggest in the middle of the snout
+            x = 1.9 - k * 0.165
+            size = 0.13 + 0.11 * math.sin(math.pi * (k + 1) / 13)
+            z = skull_bottom(x)
+            cyl("Tooth", 0.04, size, (x, side * (skull_w(x) - 0.06), z - size / 2 + 0.03), "bone", seg=6, r2=0.003, edge=0,
+                rot=euler(rx=math.pi) @ euler(ry=-0.18))
+        for k in range(10):  # and the lower ones, up from the open jaw
+            x0 = 1.82 - k * 0.19
+            size = 0.1 + 0.08 * math.sin(math.pi * (k + 1) / 11)
+            x, z = jaw_turn(x0, 1.65 + size / 2 - 0.03)
+            cyl("Tooth", 0.035, size, (x, side * (jaw_w(x) - 0.05), z), "bone", seg=6, r2=0.003, edge=0, rot=euler(ry=-0.3))
 
 
 def zombie_safe(W, H, D):
@@ -2124,8 +2145,8 @@ def zombie_safe(W, H, D):
     rect_frame("Pinstripe", 0.88, 1.1, [(0, 0.0), (0, -0.006), (0.02, -0.006), (0.02, 0.0)], "gilt", place=Matrix.Translation((0, -1.03, 1.6)))
     box("Plate", (1.5, 0.12, 0.3), (0, -0.99, 3.0), "brass", r=0.02)  # (the game prints ZOMBIE-PROOF on it)
     for s in (-1, 1):
-        for k in range(9):
-            ball("Rivet", 0.03, (s * 1.12, -0.955, 0.45 + k * 0.31), "dark", seg=8, rings=4)
+        for k in range(7):
+            ball("Rivet", 0.03, (s * 1.12, -0.955, 0.5 + k * 0.4), "dark", seg=8, rings=4)
     # the handle (the game's x 0.3: here -0.3): a hub and three spokes out of it, a knob at each end
     lathe("Hub", [(0.001, 0.0), (0.17, 0.0), (0.17, 0.04), (0.13, 0.08), (0.1, 0.12), (0.001, 0.12)], (-0.3, -1.03, 1.75), "chrome", seg=24,
           rot=OUT_FRONT)
@@ -2133,7 +2154,7 @@ def zombie_safe(W, H, D):
         a = math.pi / 2 + n * 2 * math.pi / 3
         tip = (-0.3 - 0.5 * math.cos(a), -1.12, 1.75 + 0.5 * math.sin(a))
         tube("Spoke", (-0.3, -1.12, 1.75), tip, 0.03, "chrome", 10)
-        ball("Knob", 0.07, tip, "chrome", seg=12)
+        ball("Knob", 0.07, tip, "chrome", seg=10, rings=6)
     lathe("Dial", [(0.001, 0.0), (0.21, 0.0), (0.21, 0.03), (0.19, 0.06), (0.17, 0.08), (0.001, 0.08)], (0.4, -1.03, 2.25), "chrome", seg=32,
           rot=OUT_FRONT)
     cyl("Dial face", 0.15, 0.006, (0.4, -1.114, 2.25), "cream", axis="Y", seg=28, edge=0)
@@ -2144,19 +2165,19 @@ def zombie_safe(W, H, D):
     cyl("Dial knob", 0.05, 0.05, (0.4, -1.13, 2.25), "black", axis="Y", seg=14, edge=0)
     box("Dial index", (0.012, 0.01, 0.05), (0.4, -1.04, 2.5), "red", r=0)
     for z in (0.8, 1.6, 2.4):  # (the game's x -0.97)
-        cyl("Hinge", 0.06, 0.28, (0.97, -1.0, z), "chrome", seg=12, edge=0.01)
+        cyl("Hinge", 0.06, 0.28, (0.97, -1.0, z), "chrome", seg=12, edge=0)
         ball("Hinge cap", 0.05, (0.97, -1.0, z + 0.15), "chrome", seg=8, rings=5)
 
-    def chain(a, b, step=0.13):
+    def chain(a, b, step=0.15):
         a, b = Vector(a), Vector(b)
         n = max(1, round((b - a).length / step))
         d = (b - a).normalized()
         for k in range(n + 1):
             twist = euler(rz=math.pi / 2) if k % 2 else Matrix()
-            torus("Chain link", 0.065, 0.014, tuple(a + (b - a) * (k / n)), "steel", seg=8, ring_seg=3, rot=towards(d) @ twist @ euler(rx=math.pi / 2))
+            torus("Chain link", 0.075, 0.014, tuple(a + (b - a) * (k / n)), "steel", seg=8, ring_seg=3, rot=towards(d) @ twist @ euler(rx=math.pi / 2))
     chain((-1.15, -1.09, 0.95), (1.15, -1.09, 0.95))
     for s in (-1, 1):
-        chain((s * 1.22, -0.98, 0.95), (s * 1.22, 1.1, 0.95))
+        chain((s * 1.21, -0.98, 0.95), (s * 1.21, 1.1, 0.95))
     prism("Padlock", [(-0.15, 0.62), (0.15, 0.62), (0.15, 0.9), (0.12, 0.96), (-0.12, 0.96), (-0.15, 0.9)], -1.19, -1.07, "gold", r=0.02)
     torus("Shackle", 0.09, 0.022, (0, -1.13, 0.96), "chrome", axis="Y", seg=16, ring_seg=5, arc=math.pi)
     cyl("Keyhole", 0.025, 0.008, (0, -1.195, 0.78), "black", axis="Y", seg=10, edge=0)
