@@ -833,4 +833,18 @@ function CameraRig.aimRay(): Ray?
 	return camera:ViewportPointToRay(viewport.X / 2, viewport.Y / 2)
 end
 
+-- 8.3 walk-in doors (client/WalkDoors.luau, while a door's trip keeps the screen black): the camera behind you, looking
+-- the way `look` goes (its pitch and zoom kept, the follow started afresh where you are). False: this rig does not
+-- drive the camera now (a touch screen keeps the Roblox camera: the caller turns that one).
+function CameraRig.face(look: Vector3): boolean
+	if not enabled or not supported then
+		return false
+	end
+	if look.X * look.X + look.Z * look.Z > 1e-6 then
+		yaw = math.atan2(-look.X, -look.Z)
+	end
+	smoothFocus = nil
+	return true
+end
+
 return CameraRig

@@ -8,12 +8,13 @@
 -- (Config.SandboxLight.House: each room's ceiling lamp, two in a room longer than Lamp.Long, at Lamp's numbers, no
 -- shadows; the two doors' daylight at Porch's; the panes, the lamps' discs and the porches' walls of daylight in its
 -- Neon colours; tests/sandboxlight_runtime_test.luau holds them to the caps); the front door's two leaves and the back
--- door's leaf shut in their doorways (DoorLeaf, Hinge; no collision, a PathfindingModifier PassThrough), the back
--- door's porch and EXIT sign.
+-- door's leaf shut in their doorways (8.3 walk-in doors: shared/DoorSwing.luau's door leaves, DoorLeaf ±1, DoorSwing,
+-- DoorAngle; no collision, a PathfindingModifier PassThrough), the back door's porch and EXIT sign.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
 local Config = require("./Config")
+Config.Sandbox.On = true -- (the big house is the sandbox's: its doors swing there)
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 local FurnitureLooks = require("./FurnitureLooks")
@@ -233,11 +234,12 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 			back = d
 		end
 	end
-	local leaves = true
-	local function leaf(name: string, door: string, hinge: string, d: any, dx: number): boolean
-		local list = named[name] or {}
-		local p = list[1]
-		if #list ~= 1 or not p then
+	-- (8.3 walk-in doors: door leaves of shared/DoorSwing.luau, shut, swinging out onto their porches a right angle: the
+	-- front door's two the models FrontDoorLeaf (their part DoorLeaf) on the porch's side of the wall, each half the
+	-- doorway, hinged at its side; the back door's the part BackLeaf in its doorway, hinged at its frame's +X jamb: south)
+	-- (`rx`, `rz`: its own +X, the end DoorLeaf 1 is at: shut across its doorway, that end where it should be)
+	local function leaf(p: any, holder: any, hinge: number, d: any, dx: number, dz: number, rx: number, rz: number): boolean
+		if not p or not holder then
 			return false
 		end
 		local at = p.CFrame.Position - o
@@ -245,13 +247,27 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 		for _, c in p:GetChildren() do
 			through = through or (c.ClassName == "PathfindingModifier" and c.PassThrough == true)
 		end
-		return through and p:GetAttribute("DoorLeaf") == door and p:GetAttribute("Hinge") == hinge and p.CanCollide == false and p.Transparency ~= 1
-			and math.abs(at.X - (d.at.X + dx)) < 0.05 and math.abs(at.Z - d.at.Z) < 0.05 and at.Y > 2 and p.Size.Y > plan.doorHeight - 0.5
+		local _, _, _, r00, _, _, _, _, _, r20 = p.CFrame:GetComponents()
+		return through and holder:GetAttribute("DoorLeaf") == hinge and holder:GetAttribute("DoorSwing") == -1 and holder:GetAttribute("DoorAngle") == 90
+			and p.CanCollide == false and p.Transparency ~= 1 and math.abs(at.X - (d.at.X + dx)) < 0.05 and math.abs(at.Z - (d.at.Z + dz)) < 0.05
+			and at.Y > 2 and p.Size.Y > plan.doorHeight - 0.5 and math.abs(r00 - rx) < 1e-6 and math.abs(r20 - rz) < 1e-6 and p.Size.X > p.Size.Z
 	end
-	leaves = leaf("FrontLeafWest", "front", "west", front, -front.width / 4) and leaf("FrontLeafEast", "front", "east", front, front.width / 4)
-		and back ~= nil and leaf("BackLeaf", "back", "south", back, 0)
-	check(`{tag}: the leaves shut in their doorways, hinged (FrontLeafWest west, FrontLeafEast east, BackLeaf south), not solid, Danny's paths through them`, leaves)
-	check(`{tag}: no front leaves opened out against the porch (the big house's are shut)`, #(named.DoorLeaf or {}) == 0)
+	local fronts: { any } = {}
+	for _, m in model:GetDescendants() do
+		if m.ClassName == "Model" and m.Name == "FrontDoorLeaf" then
+			table.insert(fronts, m)
+		end
+	end
+	table.sort(fronts, function(a: any, b: any): boolean
+		return a.PrimaryPart.CFrame.Position.X < b.PrimaryPart.CFrame.Position.X
+	end)
+	local outer = -(plan.wall / 2 + 0.27) -- (the front leaves' middle: on the porch's side of the wall)
+	local frontsOk = #fronts == 2 and leaf(fronts[1].PrimaryPart, fronts[1], -1, front, -front.width / 4, outer, 1, 0)
+		and leaf(fronts[2].PrimaryPart, fronts[2], 1, front, front.width / 4, outer, 1, 0)
+	local backs = named.BackLeaf or {}
+	check(`{tag}: the front door's two leaves shut across its doorway (FrontDoorLeaf: DoorLeaf -1 / 1, DoorSwing -1, DoorAngle 90), not solid, Danny's paths through them`, frontsOk)
+	check(`{tag}: the back door's leaf shut in its doorway (BackLeaf: DoorLeaf 1 at its south jamb, DoorSwing -1, DoorAngle 90), not solid, Danny's paths through it`,
+		back ~= nil and #backs == 1 and leaf(backs[1], backs[1], 1, back, 0, 0, 0, 1))
 	-- the back door's porch and the way out signs
 	local exits = 0
 	for _, s in named.ExitSign or {} do

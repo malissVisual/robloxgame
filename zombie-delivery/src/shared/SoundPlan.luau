@@ -41,7 +41,8 @@
 -- 8.1 SANDBOX, the sandbox's sounds (art/audio/sfx4.ogg's 8.1 part, Config.Soundscape.Sandbox; client/SoundScape.luau
 -- plays the ambience, client/SandboxSounds.luau the rest). In the sandbox (Config.Sandbox.On) moveCues leaves out the
 -- truck's ramp (the Sprinter has none: its back doors are heard swinging, swingSound's Sprinter doors) and resultCue
--- the Wall's gate (no Wall there: the trip home has its fanfare).
+-- the Wall's gate (no Wall there: the trip home has its fanfare). 8.3: and the house's door creak (its leaves creak at
+-- the door as they swing open, Config.Moving.Doors Swing: client/WalkDoors.luau).
 --   SoundPlan.SandboxLoops                        the sandbox's loops by their part of the mix: alpine (amb_alpine, a
 --                                                 calm alpine day: never the city's traffic, amb_day), warehouse
 --                                                 (amb_warehouse), room (amb_room)
@@ -337,7 +338,8 @@ function SoundPlan.moveCues(was: any, now: any, clock: number): { Cue }
 	if (now.backOpen == true) ~= (was.backOpen == true) and not Config.Sandbox.On then
 		table.insert(cues, cueOf("truck_ramp", M.Ramp, if now.backOpen == true then 1 else M.RampShut))
 	end
-	if (now.inside == true) ~= (was.inside == true) then
+	-- (8.3: not in the sandbox, whose doors' leaves creak at the door as they swing open: client/WalkDoors.luau)
+	if (now.inside == true) ~= (was.inside == true) and not (Config.Sandbox.On and Config.Moving.Doors.Swing) then
 		table.insert(cues, cueOf("house_door_creak", M.Door, if now.inside == true then 1 else M.DoorOut))
 	end
 	-- the pieces: one load and one crash at most a state (the loudest), yours louder than the crew's

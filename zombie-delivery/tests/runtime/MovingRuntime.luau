@@ -32,7 +32,7 @@ CityConfig.MoveHelper.HoldLead.Ping = 0
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()
-	messages = {}, -- { { player, kind, a, b } } every FireClient
+	messages = {}, -- { { player, kind, a, b, c } } every FireClient (8.3: c, a door trip's fade in's arrival)
 	money = {}, -- { { player, amount, reason } }
 	xp = {}, -- { { player, amount } }
 	tracked = {}, -- { { name, ... } }
@@ -359,8 +359,8 @@ Runtime.Net = {
 			remote = {
 				name = name,
 				OnServerEvent = signal(),
-				FireClient = function(_, player: any, kind: any, a: any, b: any)
-					table.insert(Runtime.messages, { player = player, remote = name, kind = kind, a = a, b = b })
+				FireClient = function(_, player: any, kind: any, a: any, b: any, c: any)
+					table.insert(Runtime.messages, { player = player, remote = name, kind = kind, a = a, b = b, c = c })
 				end,
 				FireAllClients = function() end,
 			}

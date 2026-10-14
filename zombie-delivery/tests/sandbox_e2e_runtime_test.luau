@@ -12,7 +12,9 @@
 --   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
 --   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
 --      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
---   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside.
+--   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
+--      (8.3: the chalet's leaves open before the fade, the move FadeOut + Margin s after it, the arrival a step past the
+--      door facing in, the leaves shut again Shut s later).
 --   5. A sturdy two-hands piece through the grip lift check: a crew mate's answer does nothing, a forged "ok" is a miss
 --      (a knock), the client's "ok" with a good press time lifts it balanced; a wobble answered (steady), one missed (a
 --      stagger).
@@ -38,7 +40,8 @@
 --      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
 --      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
 --  19. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
---      piece out by its doorway inside (the real plan's second way out), loaded, home.
+--      piece out by its doorway inside (the real plan's second way out), loaded, home. 8.3 walk-in doors: the back
+--      door's leaves (the map's, the interior's) swing open as she walks up to them, the fade as the front door's.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -184,6 +187,24 @@ do
 	check("…8.3: the chalet's back door (SandboxBackDoor) in its back wall where SandboxMap puts it", back ~= nil
 		and V3(back.Position.X - House.back.x, 0, back.Position.Z - House.back.z).Magnitude < 1)
 	check("…the chalet's front door (SandboxDoor) where SandboxMap puts it", door ~= nil and V3(door.Position.X - House.door.x, 0, door.Position.Z - House.door.z).Magnitude < 2)
+	-- 8.3 walk-in doors: the chalet's doors' leaves (server/SandboxWorld.luau doorLeaves: no import here, its own)
+	local leaves: { [string]: any } = {}
+	for _, d in workspace:GetDescendants() do
+		if d:GetAttribute("DoorLeaf") ~= nil and (d.Name == "FrontLeafWest" or d.Name == "FrontLeafEast" or d.Name == "BackLeaf") then
+			leaves[d.Name] = d
+		end
+	end
+	local leavesOk = true
+	for name, hinge in { FrontLeafWest = -1, FrontLeafEast = 1, BackLeaf = -1 } do
+		local leaf = leaves[name]
+		local by = if name == "BackLeaf" then back else door
+		leavesOk = leavesOk and leaf ~= nil and by ~= nil and leaf:GetAttribute("DoorLeaf") == hinge and leaf:GetAttribute("DoorSwing") == 1
+			and leaf:GetAttribute("DoorDark") == true and leaf.CanCollide == false and V3(leaf.Position.X - by.Position.X, 0, leaf.Position.Z - by.Position.Z).Magnitude < 2
+	end
+	S.frontDoor = door
+	S.frontLeaf, S.backLeaf = leaves.FrontLeafEast, leaves.BackLeaf
+	check("8.3 …the doors' leaves door leaves (FrontLeafWest, FrontLeafEast, BackLeaf: DoorLeaf -1 / 1 / -1 at their jambs; DoorSwing 1: into the house; DoorDark: a dark hall behind them), never colliding",
+		leavesOk and door ~= nil and door.CanCollide == false and door:GetAttribute("DoorLeaf") == nil)
 	check("…the sandbox's own DataStore (Config.Sandbox.Store); analytics on (a live server)", E.storeName == Config.Sandbox.Store and Config.Analytics.Enabled)
 	check("(a day whose tasks for Ann hold trips, sell and the weekly income)", S.day ~= nil)
 end
@@ -661,8 +682,48 @@ do
 	check("4. Ann drove her van to the chalet's curb, its back to the front door", H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5
 		and H.doorOf(annVan).WorldPosition.Z > annVan.chassis.Position.Z, annVan.chassis.Position)
 	check("…got out and opened the back doors (Vehicles' BackPrompt: hers, on foot, hands free)", H.setBack(ann, annVan, true), E.lastNotice(ann))
+	-- 8.3: what her client sees of the trip, on the clock (the fade's messages, her body then, the leaf), and when the
+	-- chalet's leaf opened
+	local D = Config.Moving.Doors
+	local door = S.frontLeaf
+	local seen: { any } = {}
+	local openedAt: number? = nil
+	local opening = door:GetAttributeChangedSignal("DoorOpen"):Connect(function()
+		if door:GetAttribute("DoorOpen") == true and openedAt == nil then
+			openedAt = E.clock
+		end
+	end)
+	local client = E.clients[ann]
+	E.clients[ann] = function(remote: string, kind: any, a: any, b: any, c: any, ...: any)
+		if remote == "Moving" and kind == "fade" then
+			table.insert(seen, { what = a, at = E.clock, seconds = b, arrival = c, root = E.rootOf(ann).Position, open = door:GetAttribute("DoorOpen") })
+		end
+		return client(remote, kind, a, b, c, ...)
+	end
 	local fadeAt = #E.sent
 	check("…walked up to the front door and stood in its zone facing it: in after the dwell, no E", H.enterHouse(ann), E.rootOf(ann).Position)
+	E.clients[ann] = client
+	opening:Disconnect()
+	local out, back = seen[1], seen[#seen]
+	check("8.3 the chalet's leaf swung open as she walked up to it, open Open s before the fade out started (and still open then)", openedAt ~= nil
+		and out ~= nil and out.what == "out" and out.open == true and out.at - (openedAt or 0) >= D.Open - 1e-6, out and openedAt and out.at - openedAt)
+	check("8.3 the move landed FadeOut + Margin s after the fade out (FadeOut s of it on her screen): black when she was moved", out ~= nil and back ~= nil
+		and out.seconds == D.FadeOut and back.what == "in" and back.seconds == D.FadeIn and back.at - out.at >= D.FadeOut + D.Margin - 1e-6
+		and back.at - out.at <= D.FadeOut + D.Margin + 0.1, back and out and back.at - out.at)
+	local arrival = if back then back.arrival else nil
+	local exit: any = nil
+	for _, d in workspace:FindFirstChild("Moves"):GetChildren() do
+		if d.Name == "LeaveDoor" and S.rooms[ann] and (d.Position - S.rooms[ann].Position).Magnitude < 400 then
+			exit = d
+		end
+	end
+	local past = if arrival and exit then (arrival.at - (exit.Position - V3(0, 3.5, 0))):Dot(V3(0, 0, 1)) else 0
+	check("8.3 the fade in: where she is (the client's black lasts until it sees her there), a step past the door inside, facing into the house",
+		type(arrival) == "table" and (arrival.at - back.root).Magnitude < 1e-3 and arrival.look:Dot(V3(0, 0, 1)) > 0.99 and arrival.dark == D.Dark
+		and arrival.wait == D.Wait and past > D.Depth and past < Config.Furniture.EntryIn + 1, past)
+	check("8.3 …the chalet's leaf shuts again Shut s after its zone emptied", E.waitUntil(function(): boolean
+		return door:GetAttribute("DoorOpen") == false
+	end, D.Shut + 1))
 	local fades = {}
 	for _, args in E.received(ann, "Moving", fadeAt) do
 		if args[1] == "fade" then
@@ -1608,11 +1669,29 @@ do
 	local side = V3(House.house.x + House.house.sx / 2 + 8, 3, 0) -- (round the house's east side)
 	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
 	E.walk(ann2, V3(side.X, 3, backAt.Z + 8))
+	-- (8.3 walk-in doors: the back door's leaf, the map's BackLeaf, swings open as she walks up to it, before the fade)
+	local backLeaf = S.backLeaf
+	local backOpenAt: number? = nil
+	local backOpening = backLeaf:GetAttributeChangedSignal("DoorOpen"):Connect(function()
+		if backLeaf:GetAttribute("DoorOpen") == true and backOpenAt == nil then
+			backOpenAt = E.clock
+		end
+	end)
+	local fadeFrom = #E.sent
 	E.walk(ann2, backAt + out * 8)
 	E.walk(ann2, backAt + out * 1.5)
 	local inside = E.waitUntil(function(): boolean
 		return H.isInside(ann2)
 	end, 3)
+	backOpening:Disconnect()
+	local backFades = {}
+	for _, args in E.received(ann2, "Moving", fadeFrom) do
+		if args[1] == "fade" then
+			table.insert(backFades, args[2])
+		end
+	end
+	check("8.3 the back door's leaf (BackLeaf) swung open as she walked up to it, then the fade out and in, as the front door's", backOpenAt ~= nil
+		and backFades[1] == "out" and backFades[2] == "in", table.concat(backFades, ", "))
 	local origin = E.interiorAt(E.rootOf(ann2).Position)
 	local exit2: any = nil
 	for _, d in workspace:FindFirstChild("Moves"):GetChildren() do
@@ -1634,11 +1713,28 @@ do
 	check("(a one-hand piece of the big plan in her hands)", piece ~= nil and H.pickUp(ann2, model), E.lastNotice(ann2))
 	local door = exit2.Position - V3(0, 3.5, 0)
 	local up = V3(0, Config.Furniture.EntryUp, 0)
+	-- (8.3 walk-in doors: the interior's back door leaf, server/HouseInterior.luau's BackLeaf, swings open as she walks
+	-- up to it inside)
+	local innerLeaf: any = nil
+	for _, d in workspace:GetDescendants() do
+		if d.Name == "BackLeaf" and d:GetAttribute("DoorLeaf") ~= nil and H.flat(d.Position, exit2.Position) < 6 then
+			innerLeaf = d
+		end
+	end
+	local innerOpen = false
+	local innerOpening = if innerLeaf then innerLeaf:GetAttributeChangedSignal("DoorOpen"):Connect(function()
+		innerOpen = innerOpen or innerLeaf:GetAttribute("DoorOpen") == true
+	end) else nil
 	E.walk(ann2, door + S.into[ann2] * 5 + up)
 	E.walk(ann2, door + S.into[ann2] * 1.5 + up)
 	local outAgain = E.waitUntil(function(): boolean
 		return not H.isInside(ann2)
 	end, 3)
+	if innerOpening then
+		innerOpening:Disconnect()
+	end
+	check("8.3 …the interior's back door leaf (BackLeaf: DoorLeaf 1, out onto its porch) swung open as she walked up to it", innerLeaf ~= nil and innerOpen
+		and innerLeaf:GetAttribute("DoorLeaf") == 1 and innerLeaf:GetAttribute("DoorSwing") == -1)
 	local at = E.rootOf(ann2).Position
 	check("…carried out by the back door (walked into its doorway's zone inside): out behind the house, 4 south of the door, facing the garden, the piece with her",
 		outAgain and math.abs(H.flat(at, V3(House.back.x, 0, House.back.z)) - 4) < 0.6 and E.rootOf(ann2).CFrame.LookVector.Z > 0.9

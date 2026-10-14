@@ -6258,6 +6258,21 @@ Config.CarryGrip = {
 --                     carrying in two may back through it (facing the partner), but their back to it counts only while
 --                     they walk into it at PairWalk studs/s or more (the root's flat velocity · the way through at least
 --                     Face; 8.1 review: a drift back toward the door no longer takes them through)
+--                     8.3 the doors swing and the trip is smooth (the owner: "when I go into the house, the door should
+--                     open, and then it teleports me smoothly"; shared/DoorSwing.luau has the leaves' attributes and
+--                     their swing, client/WalkDoors.luau swings them for everybody, client/Fade.luau holds the dark):
+--                     Swing: a door's leaf (a part or model with the attribute DoorLeaf at its doorway) swings open
+--                     Angle degrees on its hinge in Open s as a crew member walks up to it facing it (Approach studs in
+--                     front of it, ApproachSide past the zone's sides; Danny too, any way he faces), shut again in Close
+--                     s once its zone has been empty Shut s; the door's creak (Sound.Open) as it opens, a soft thud
+--                     (Sound.Shut at ShutPitch) as it shuts, heard within Range. The trip: in the zone facing the door
+--                     Dwell s and the leaf open Open s (a door without a leaf: Open s from the dwell's start), then the
+--                     fade out (FadeOut s) while you walk on into the doorway; the server streams the other side in
+--                     meanwhile (RequestStreamAroundAsync, Stream s at most) and moves you FadeOut + Margin s after the
+--                     fade out was sent (Margin: the network's unevenness: the screen is black on the client by then);
+--                     the client keeps it black until it sees itself there (within Arrive studs: Wait s at most), its
+--                     camera behind you looking the way you face there, then Dark s more, then the fade in (FadeIn s).
+--                     The crew mate or Danny at a pair piece's far end comes in the same dark moment, at that end
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6367,7 +6382,14 @@ Config.Moving = {
 	},
 	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
-	Doors = { Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Dwell = 0.25, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number } }, -- 8.1 walk-in doors
+	Doors = {
+		Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number }, -- 8.1 walk-in doors
+		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first)
+		-- 8.3 the leaves and the trip (server/Moving.luau's WalkIn and travel, client/WalkDoors.luau, client/Fade.luau)
+		Swing = true, Approach = 8, ApproachSide = 2, Angle = 95, Open = 0.35, Close = 0.45, Shut = 1.2,
+		FadeOut = 0.25, Margin = 0.1, Stream = 2, Wait = 1.5, Arrive = 6, Dark = 0.15, FadeIn = 0.35,
+		Sound = { Open = 0.55, Shut = 0.4, ShutPitch = 0.75, Range = 70 },
+	},
 	Slots = 6,
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },

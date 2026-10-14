@@ -6,6 +6,8 @@
 -- over the front door; the slots lie far off the map (Map.Bounds) and never overlap; destroy takes it down. 7.x alpine:
 -- the chalet's looks built (beams, wainscot, one plank floor, the Kachelofen, the corner bench and its shelf, lace, the
 -- painted front door, antlers, pictures, rag rugs), warm lights, the same plan the same interior, seeds 10-60 in budget.
+-- 8.3 walk-in doors: the front door's leaves shut across the doorway as door leaves (shared/DoorSwing.luau) in the
+-- sandbox, open along the porch as before off it.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -192,6 +194,31 @@ for _, seed in { 1, 2, 3, 4, 5, 6, 7, 8, 9, 174, 409, 647, 1955 } do -- (7.0 rev
 		and n("Backrest") == 2 and n("CornerShelf") == 1 and n("Candle") == 1)
 	check(`{tag}: lace in {n("Lace")} windows, the front door's painted leaves, the antlers, {n("PictureFrame")} pictures, rag rugs`, n("Lace") >= 4 and laceOk
 		and n("DoorLeaf") == 2 and n("Bloom") == 2 and n("Antler") == 2 and n("PictureFrame") == 2 and n("Stripe") >= 3)
+	-- 8.3 walk-in doors (the sandbox): the front door's two leaves are door leaves (shared/DoorSwing.luau): models
+	-- "FrontDoorLeaf" (their part DoorLeaf the PrimaryPart, its flower with it), shut across the doorway on the porch's side
+	-- of the wall, hinged at the doorway's sides (DoorLeaf 1 / -1), swinging out onto the porch (DoorSwing -1, DoorAngle
+	-- 90), never colliding
+	local front = plan.doors[1]
+	local outer = o.Z + front.at.Z - plan.wall / 2
+	local leaves, leavesOk = 0, true
+	for _, obj in model:GetDescendants() do
+		if obj.ClassName == "Model" and obj.Name == "FrontDoorLeaf" then
+			leaves += 1
+			local leaf = obj.PrimaryPart
+			local hinge = obj:GetAttribute("DoorLeaf")
+			local at = if leaf then leaf.CFrame.Position else nil
+			local solid = false
+			for _, d in obj:GetDescendants() do
+				solid = solid or (d:IsA("BasePart") and d.CanCollide == true)
+			end
+			leavesOk = leavesOk and leaf ~= nil and leaf.Name == "DoorLeaf" and #obj:GetChildren() == 3 and (hinge == 1 or hinge == -1)
+				and obj:GetAttribute("DoorSwing") == -1 and obj:GetAttribute("DoorAngle") == 90 and not solid
+				and math.abs(at.X - (o.X + front.at.X + hinge * front.width / 4)) < 1e-6 and at.Z < outer and at.Z > outer - 0.5
+				and math.abs(leaf.Size.X - front.width / 2) < 1e-6
+		end
+	end
+	check(`{tag}: 8.3 the front door's leaves shut across the doorway, hinged at its sides, swinging out onto the porch (DoorLeaf models)`,
+		leaves == 2 and leavesOk, leaves)
 	local warm = true
 	for _, obj in model:GetDescendants() do
 		if obj.ClassName == "PointLight" and obj.Parent and obj.Parent.Name == "Lamp" then
@@ -244,6 +271,33 @@ do
 		end
 	end
 	check(`seeds 10-60 within {T.InteriorMaxParts} parts and 12 lights (the most: seed {worstSeed}, {worst})`, #over == 0, table.concat(over, "; "))
+end
+
+-- 8.3: off the sandbox (the city's client swings no leaf: client/WalkDoors.luau is the sandbox's) the front door's leaves
+-- stand open as they always did: flat along the porch beside the doorway, no door leaf attributes
+do
+	local on = Config.Sandbox.On
+	Config.Sandbox.On = false
+	local plan = HouseLayout.plan(1955, "house")
+	local origin = HouseInterior.slot(1)
+	local model = HouseInterior.build(plan, origin)
+	Config.Sandbox.On = on
+	local o = origin.Position
+	local front = plan.doors[1]
+	local outer = o.Z + front.at.Z - plan.wall / 2
+	local open, count = true, 0
+	for _, obj in model:GetDescendants() do
+		if obj.ClassName == "Model" and obj.Name == "FrontDoorLeaf" then
+			count += 1
+			local leaf = obj.PrimaryPart
+			local at = leaf.CFrame.Position
+			local _, _, _, _, _, r3, _, _, _, _, _, r9 = leaf.CFrame:GetComponents() -- (its look: -(r3, r6, r9); turned a right angle)
+			open = open and obj:GetAttribute("DoorLeaf") == nil and math.abs(math.abs(at.X - (o.X + front.at.X)) - front.width / 2) < 0.25
+				and at.Z < outer - front.width / 4 and math.abs(r9) < 1e-6 and math.abs(r3) > 1 - 1e-6
+		end
+	end
+	check("8.3 off the sandbox: the front door's leaves stand open along the porch beside the doorway, as before (no DoorLeaf)", count == 2 and open)
+	HouseInterior.destroy(model)
 end
 
 if failures == 0 then

@@ -105,7 +105,7 @@ M.MKeys = { open = function() end, close = function() end, isOpen = function()
 end, hint = function()
 	return "SPACE"
 end }
-M.MFade = { out = function() end, into = function() end }
+M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
 M.MapView.waypointAt = function()
 	return M.waypoint
 end

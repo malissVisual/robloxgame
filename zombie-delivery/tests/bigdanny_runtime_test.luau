@@ -19,6 +19,8 @@
 --   * Ann in by the back door: Lift with Danny, they carry it out of its room by its doorway, along the corridor and out
 --     of the back door together (the door nearer to it; walked into, no E: he comes through with it, behind the house at
 --     its far end, on the ground), round the house to the van; loaded, off his list.
+--   * 8.3 the doors swing (server/Moving.luau WalkIn.helper): hired, the leaves of a door he goes out by (the
+--     interior's, shared/DoorSwing.luau's) are open as he goes through.
 -- (math.randomseed: the sandbox's seeds are math.random's.)
 math.randomseed(83) -- (the sandbox's seeds are math.random's: one plan every run)
 local E = require("./MovingRuntime")
@@ -176,6 +178,7 @@ end
 -- His ways through the doors: each transfer (his doorAt) by the way whose inside or outside he came out at; the way
 -- he first went through with a piece in his arms (8.3: his list's), by spot.
 local through = { 0, 0 }
+local leafNear, leafOpen = { 0, 0 }, { 0, 0 } -- (8.3: by way, at his transfers: the interior's leaves there, those open)
 local carriedBy: { [number]: number } = {}
 local pairAlone = false
 local lastDoor = -math.huge
@@ -203,6 +206,17 @@ local function run(seconds: number, done: (() -> boolean)?): boolean
 				through[which] = (through[which] or 0) + 1
 				if spot and role == "carrier" and carriedBy[spot] == nil then
 					carriedBy[spot] = which
+				end
+				-- (8.3 the doors swing: out of the house, that way's leaves inside, the interior's, open as he goes through:
+				-- WalkIn.helper, the move's look while he walked up to them)
+				local way = h.ways[which]
+				local out = way ~= nil and distance(at, way.outside.Position) < distance(at, way.entryIn.Position)
+				for _, d in (if out then built[#built].model:GetDescendants() else {}) do
+					if d:GetAttribute("DoorLeaf") ~= nil then
+						local p = if d.ClassName == "Model" then d.PrimaryPart.CFrame.Position else d.CFrame.Position
+						leafNear[which] = (leafNear[which] or 0) + (if distance(p, way.exitIn) < 6 then 1 else 0)
+						leafOpen[which] = (leafOpen[which] or 0) + (if distance(p, way.exitIn) < 6 and d:GetAttribute("DoorOpen") == true then 1 else 0)
+					end
 				end
 			end
 		end
@@ -357,6 +371,8 @@ end)
 check(`he carries the {lightName} out by the door nearer (this plan: {if lightWay == 2 then "the back door" else "the front door"}) and loads it at the van at the curb`,
 	loaded and carriedBy[light.id] == lightWay, light and carriedBy[light.id])
 check("…never a piece for two alone", not pairAlone)
+check(`8.3 hired, he opens the doors he goes through (WalkIn.helper): out by a way, its leaves inside open as he went (by the front door {leafOpen[1]} of {leafNear[1]}, by the back door {leafOpen[2]} of {leafNear[2]})`,
+	leafNear[lightWay] > 0 and leafOpen[1] == leafNear[1] and leafOpen[2] == leafNear[2])
 -- (his way to the van from the corridor's east end, Brain.routeVia over his ways' doors: the back door; from the
 -- hall the front door)
 local east = origin * exits[2]

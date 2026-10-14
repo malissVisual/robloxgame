@@ -18,9 +18,10 @@
 --             once ZDCHouseArt is imported, server/HouseMesh.luau dresses it (the chalet's parts hidden but still
 --             colliding, its gable re-cut under the model's roof; the FrontDoor where the model's door is), the garden
 --             beside it in "Garden"; no import: the chalet. 8.2: Atomic (with StreamingEnabled it streams whole). 8.3
---             the big move: the FrontDoor unseen behind its two leaves (FrontLeafWest, FrontLeafEast: DoorLeaf "front",
---             Hinge "west" / "east"), the back door at House.back ("BackDoor": SandboxBackDoor, unseen, no collision; its
---             leaf "BackLeaf": DoorLeaf "back", Hinge "west"); dressed, all hidden with the chalet
+--             the big move: the FrontDoor unseen behind its two leaves (FrontLeafWest, FrontLeafEast), the back door at
+--             House.back ("BackDoor": SandboxBackDoor, unseen, no collision; its leaf "BackLeaf"): door leaves that
+--             swing (shared/DoorSwing.luau: DoorLeaf -1 / 1 / -1, DoorSwing 1, DoorDark); dressed, all hidden with the
+--             chalet and the model's doors copied as the leaves that swing ("FrontDoorLeaf" ×2, "BackDoorLeaf")
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -32,6 +33,7 @@
 --   SandboxWorld.lighting()   the fixed warm alpine afternoon (in sandbox mode the city's DayNight and Weather do not
 --                             run): the clock, the sun, the ambient light, the Atmosphere's soft far haze, the sky, the
 --                             clouds and the colour grade; the workspace's clock attributes for whatever reads them
+--   SandboxWorld.doorLeaves(house)   8.3 walk-in doors: the house's doors' leaves that swing (house's build does it)
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -266,6 +268,60 @@ local function underMeshRoof(body: Model, frame: CFrame)
 	end
 end
 
+-- 8.3 walk-in doors: the house's doors' leaves (shared/DoorSwing.luau's attributes; client/WalkDoors.luau swings them,
+-- server/Moving.luau says when), the front door's two and the back door's one, each hinged at its opening's side
+-- (DoorLeaf ±1), swinging into the house (DoorSwing 1), a dark hall where it stood (DoorDark: the house's body behind
+-- it). Dressed in the owner's Blender house (its doors part of the model: still): leaves made like them just in front
+-- of them (SandboxScenery.frontLeaves, backLeaves; models "FrontDoorLeaf", "BackDoorLeaf" in the model's own finishes,
+-- HouseMesh.Looks), the chalet's own leaves hidden with it, swinging no more; else the chalet's own leaves (house's
+-- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. Returns the leaves.
+function SandboxWorld.doorLeaves(house: Model): { Instance }
+	local H = MAP.House
+	local body = house:FindFirstChild("House_" .. H.id)
+	local made: { Instance } = {}
+	if not body then
+		return made
+	end
+	if body:GetAttribute("MeshArt") == true then
+		for _, door in { { spot = H.door, name = "FrontDoorLeaf", leaves = S.frontLeaves() }, { spot = H.back, name = "BackDoorLeaf", leaves = S.backLeaves() } } do
+			local d = door.spot
+			local frame = CFrame.new(d.x, d.y, d.z) * CFrame.Angles(0, math.rad(d.yaw), 0)
+			for _, leaf in door.leaves do
+				local model = Instance.new("Model")
+				model.Name = door.name
+				for n, spec in leaf.parts do
+					local look = HouseMesh.Looks[spec.finish]
+					local turn = if spec.cylinder then CFrame.Angles(0, math.pi / 2, 0) else CFrame.new()
+					local p = deco(block(model, spec.name, Vector3.new(spec.size[1], spec.size[2], spec.size[3]), frame * CFrame.new(spec.at[1], spec.at[2], spec.at[3]) * turn, look.color, look.material))
+					p.Reflectance = look.reflectance or 0
+					if spec.cylinder then
+						p.Shape = Enum.PartType.Cylinder
+					end
+					if n == 1 then
+						model.PrimaryPart = p
+					end
+				end
+				model:SetAttribute("DoorLeaf", leaf.hinge)
+				model:SetAttribute("DoorSwing", 1)
+				model:SetAttribute("DoorDark", true)
+				model.Parent = house
+				table.insert(made, model)
+			end
+		end
+		return made
+	end
+	for _, name in { "FrontLeafWest", "FrontLeafEast", "BackLeaf" } do
+		local leaf = body:FindFirstChild(name)
+		if leaf then
+			leaf:SetAttribute("DoorLeaf", if name == "FrontLeafWest" then -1 elseif name == "FrontLeafEast" then 1 else S.BackDoor.Hinge)
+			leaf:SetAttribute("DoorSwing", 1)
+			leaf:SetAttribute("DoorDark", true)
+			table.insert(made, leaf)
+		end
+	end
+	return made
+end
+
 local function house(world: Instance): Model
 	local H = MAP.House
 	local model = Instance.new("Model")
@@ -319,23 +375,21 @@ local function house(world: Instance): Model
 			deco(p)
 		end
 	end
-	-- 8.3 the big move: the doors' leaves (shut, each a part of its own hinged at a jamb: the attributes DoorLeaf and
-	-- Hinge, the doors' swing is the client's) and the back door. The front door's two leaves in the FrontDoor's place
-	-- (it stays the doorway, the moves' front door, unseen: the leaves show the door); the back door at House.back (the
-	-- owner's model's, in the middle of its back wall): its doorway "BackDoor" (attribute SandboxBackDoor, unseen, no
-	-- collision: server/Moving.luau's second way in) as the FrontDoor is to the front, S.BackDoor.Width wide, and its
-	-- leaf. All of them the house's own parts: dressed in the owner's model they are hidden with the chalet (the model's
-	-- own leaves show its doors).
+	-- 8.3 the big move: the doors' leaves (shut, each a part of its own, each its doorway's side: SandboxWorld.doorLeaves
+	-- makes them door leaves, the doors' swing is the client's) and the back door. The front door's two leaves in the
+	-- FrontDoor's place, each half of it (it stays the doorway, the moves' front door, unseen: the leaves show the door);
+	-- the back door at House.back (the owner's model's, in the middle of its back wall): its doorway "BackDoor" (attribute
+	-- SandboxBackDoor, unseen, no collision: server/Moving.luau's second way in) as the FrontDoor is to the front,
+	-- S.BackDoor.Width wide, and its leaf. All of them the house's own parts: dressed in the owner's model they are hidden
+	-- with the chalet (copies of the model's doors swing instead: doorLeaves).
 	local front = body:FindFirstChild("FrontDoor") :: BasePart?
 	if front then
 		local size = front.Size
 		front.Transparency = 1
 		front.CastShadow = false
 		for _, side in { -1, 1 } do
-			local leaf = deco(block(body, if side < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(size.X / 2 - 0.04, size.Y, size.Z + 0.04),
+			deco(block(body, if side < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(size.X / 2, size.Y, size.Z + 0.04),
 				front.CFrame * CFrame.new(side * size.X / 4, 0, 0), front.Color, front.Material))
-			leaf:SetAttribute("DoorLeaf", "front")
-			leaf:SetAttribute("Hinge", if side < 0 then "west" else "east")
 		end
 		local back = H.back
 		local width = S.BackDoor.Width
@@ -344,9 +398,7 @@ local function house(world: Instance): Model
 		doorway:SetAttribute("SandboxBackDoor", true)
 		doorway.Transparency = 1
 		doorway.CastShadow = false
-		local leaf = deco(block(body, "BackLeaf", Vector3.new(width - 0.04, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
-		leaf:SetAttribute("DoorLeaf", "back")
-		leaf:SetAttribute("Hinge", "west")
+		deco(block(body, "BackLeaf", Vector3.new(width, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
 	end
 	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
 	-- part, where the model's door is); else the chalet as it is
@@ -386,6 +438,7 @@ local function house(world: Instance): Model
 		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
 	end
 	model.Parent = world
+	SandboxWorld.doorLeaves(model) -- 8.3 walk-in doors: its doors' leaves swing (the model's doors copied when dressed)
 	return model
 end
 
