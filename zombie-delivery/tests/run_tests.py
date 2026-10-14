@@ -17,6 +17,7 @@ PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/coll
 PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
 PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
+PURE += ("WarehouseLevels",)  # 8.3 sandbox, the warehouse's levels (tests/warehouselevels_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True

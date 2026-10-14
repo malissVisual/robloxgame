@@ -22,9 +22,8 @@
 --                                        $1; broken: scrap (value × Scrap, at least $1)
 --   CollectionRules.view(entry, boost?)  a copy with rarity, value, income (× boost), price and broken for the client
 --   CollectionRules.totals(entries, boost?)   { count, shown, value, income (the pieces on show, × boost), sell (all) }
---   CollectionRules.standsFor(profile)   the display stands a player has: the warehouse's start (Config.Warehouse.Stands,
---                                        else Config's Collection.Stands) + 8.1's More stands (profile.sandboxUpgrades,
---                                        shared/UpgradeRules.luau), never past Config.Warehouse.MaxStands
+--   CollectionRules.standsFor(profile)   the display stands a player has: 8.3, their warehouse level's
+--                                        (profile.sandboxUpgrades, shared/UpgradeRules.luau stands: 2 … 20)
 --   CollectionRules.boost(profile)       8.1: the income's × from the player's Showroom lights (1 without any)
 --   The save (profile.collection = { entries = { Entry }, nextUid = n }):
 --   CollectionRules.empty()              a new player's
@@ -195,22 +194,10 @@ local function levelsOf(profile: any?): any
 	return if type(profile) == "table" then profile.sandboxUpgrades else nil
 end
 
--- The display stands a player has: the warehouse's start (Config.Warehouse.Stands), else Config.Collection.Stands;
--- 8.1: + the More stands bought (profile.sandboxUpgrades), never past the hall's Config.Warehouse.MaxStands (a start
--- over it stays as it is).
+-- The display stands a player has: 8.3, their warehouse level's (profile.sandboxUpgrades, Config.WarehouseLevels: the
+-- garage's 2 … the logistics centre's 20; no profile: the start's).
 function CollectionRules.standsFor(profile: any?): number
-	local warehouse = (Config :: any).Warehouse
-	local stands = if type(warehouse) == "table" then warehouse.Stands else nil
-	if not finite(stands) or stands < 1 then
-		stands = tune().Stands
-	end
-	local base = math.floor(stands)
-	local extra = UpgradeRules.extraStands(levelsOf(profile))
-	if extra <= 0 then
-		return base
-	end
-	local most = if type(warehouse) == "table" and finite(warehouse.MaxStands) then math.floor(warehouse.MaxStands) else base + UpgradeRules.mostStands()
-	return math.min(base + extra, math.max(base, most))
+	return UpgradeRules.stands(levelsOf(profile))
 end
 
 -- 8.1: the stands' income × this for the player (their Showroom lights: shared/UpgradeRules.luau incomeBoost).

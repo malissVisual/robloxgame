@@ -11,13 +11,14 @@
 --   Collection.stock(player)                   { Entry } everything you own (on show or not; copies)
 --   Collection.display(player, uid, stand)     put a piece of your stock on display stand `stand` (an index of your
 --                                              warehouse's stands, CollectionRules.standsFor; one piece a stand; a
---                                              piece on show elsewhere moves there; 8.1: a piece too big for an
---                                              upgrade's small stand is refused, WarehouseLayout.fits) → ok, why
+--                                              piece on show elsewhere moves there; 8.1: a piece too big for the stand
+--                                              is refused, WarehouseLayout.fits at the player's warehouse level: 8.3,
+--                                              the Garage's and the Workshop's stands hold no hay wagon) → ok, why
 --   Collection.undisplay(player, uid)          take it down (back to the stock) → ok, why
 --   Collection.sell(player, uid)               sell it (on show or not) → the money paid (nil: refused), why
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
---   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: the start's
---                                              and the More stands you bought)
+--   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: 8.3, your
+--                                              warehouse level's)
 --   Collection.boost(player)                   8.1: your income's × (CollectionRules.boost: the Showroom lights)
 --   Collection.upgrade(player, apply)          8.1 (server/Upgrades.luau): an upgrade bought or reset. What the stands
 --                                              earned up to now is counted at the old rates, apply() changes the
@@ -74,7 +75,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.CollectionRules)
-local WarehouseLayout = require(Shared.WarehouseLayout) -- 8.1: the upgrade stands' size (fits)
+local WarehouseLayout = require(Shared.WarehouseLayout) -- 8.1: the stands' size (fits)
+local UpgradeRules = require(Shared.UpgradeRules) -- 8.3: the player's warehouse level (its stands' size)
 local StockPlan = require(Shared.StockPlan) -- 8.2: the STOCK list's bulk buttons
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -121,6 +123,12 @@ end
 
 local function standsOf(player: Player): number
 	return Rules.standsFor(PlayerData.get(player))
+end
+
+-- 8.3: the player's warehouse level (Config.WarehouseLevels: its stands' size).
+local function levelOf(player: Player): number
+	local profile = PlayerData.get(player)
+	return UpgradeRules.warehouseLevel(if profile then profile.sandboxUpgrades else nil)
 end
 
 -- 8.1: the player's income × (their Showroom lights).
@@ -336,8 +344,8 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 		return true, nil
 	end
 	local def = Rules.defOf(entry.item)
-	if def and not WarehouseLayout.fits(stand, def.size) then
-		return false, `Your {entry.name} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`
+	if def and not WarehouseLayout.fits(stand, def.size, levelOf(player)) then
+		return false, `Your {entry.name} is too big for stand {stand}: a bigger warehouse has bigger stands (UPGRADES).`
 	end
 	for _, other in collection.entries do
 		if other.stand == stand then
@@ -471,10 +479,13 @@ local function rarer(a: string?, b: string): string
 	return if a and Rules.tier(a).rank >= Rules.tier(b).rank then a else b
 end
 
--- Does a piece of this item stand on stand i (as Collection.display: an upgrade's small stand holds no bed)?
-local function fitsStand(stand: number, item: string): boolean
-	local def = Rules.defOf(item)
-	return def == nil or WarehouseLayout.fits(stand, def.size)
+-- Does a piece of this item stand on stand i of a warehouse at that level (as Collection.display: 8.3, the Garage's and
+-- the Workshop's stands hold no hay wagon)?
+local function fitsAt(level: number): (number, string) -> boolean
+	return function(stand: number, item: string): boolean
+		local def = Rules.defOf(item)
+		return def == nil or WarehouseLayout.fits(stand, def.size, level)
+	end
 end
 
 -- The collection's pieces as shared/StockPlan.luau reads them (CollectionRules.view: × the player's lights).
@@ -500,6 +511,7 @@ local function fillBest(player: Player): (number?, string?)
 	end
 	local stands = standsOf(player)
 	local pieces = piecesOf(player, collection)
+	local fitsStand = fitsAt(levelOf(player))
 	local plan = StockPlan.fill(pieces, stands, fitsStand)
 	if #plan == 0 then
 		if #StockPlan.free(pieces, stands) == 0 then
@@ -507,7 +519,7 @@ local function fillBest(player: Player): (number?, string?)
 		end
 		for _, piece in pieces do
 			if piece.stand == nil and not piece.broken and piece.income > 0 then
-				return nil, "What's in your stock is too big for your free small stands."
+				return nil, "What's in your stock is too big for your free stands: a bigger warehouse has bigger ones."
 			end
 		end
 		return nil, "Nothing in your stock would earn on a stand. Bring more home from a move!"
