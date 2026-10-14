@@ -1617,6 +1617,30 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
+## The warehouse's five levels in Blender (8.0.4, design only)
+
+The owner: "a model of my own warehouse … levels 1 to 5, each bigger, starting as a garage". The game has no warehouse
+levels yet, and these models are not wired in. `design/blender-warehouse/warehouse.py` builds five buildings, each with
+its roller door in the middle of the front wall (where the plot's door is) and a clear floor inside:
+
+| Level | Building | W × H × D (walls) | Door | Stands (suggested) |
+| --- | --- | --- | --- | --- |
+| 1 | a plastered garage with a shed roof and an open sectional door | 26 × 12 × 22 | 14 × 9.5 | 2 |
+| 2 | a corrugated workshop under a low gable | 40 × 15 × 30 | 18 × 12 | 4 |
+| 3 | a warehouse on a concrete plinth, with skylights | 58 × 19 × 42 | 22 × 14 | 8 |
+| 4 | the big warehouse: today's size (SandboxMap's plot warehouse, `DoorWidth`, `Config.Warehouse.DoorHeight`), two-tone, an office annex | 80 × 24 × 60 | 26 × 16 | 12 |
+| 5 | a logistics centre: a vaulted roof with solar panels, two docks, a glazed corner | 104 × 28 × 84 | 26 × 18 | 20 |
+
+`roblox/ZDCWarehouseArt.fbx` has `lvl<N>_<finish>` pieces and `mark_lvl<N>` markers (each level's origin: the door's
+middle on the ground). `ZDCWarehouseArt.json` lists each level's size, door, suggested stands, the wall boxes a game
+would collide with and every detail.
+
+`tools/warehouse-art/check.py <luau>` checks the levels against plot 1 (SandboxMap, Config.Warehouse):
+- level 4 is today's warehouse and each level is bigger;
+- every level is inside the plot;
+- none of them covers the van's UNLOAD HERE bay, the way in, the Moving contracts board, the spawn or the floor the
+  stands need.
+
 ## The Blender dressers refuse an import that moved (8.0.3)
 
 The owner's screenshot: in the sandbox the imported `ZDCHouseArt` lay in pieces over the road. Studio's Import 3D leaves
