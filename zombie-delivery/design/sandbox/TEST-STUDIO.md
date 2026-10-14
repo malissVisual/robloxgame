@@ -87,14 +87,15 @@ Zaškrtněte, co sedí. Když něco nesedí, poznamenejte číslo bodu a co jste
 
 ## 15. Plný server (5 hráčů)
 - [ ] Pátý hráč nemá pozemek. Stojí na Depot Row, upgrady ani START nejdou („no warehouse“).
-- [ ] ⚠ **Známá chyba 1**: pátý hráč (admin → FILL STOCK) dá v seznamu STOCK (B) **⭐ FILL BEST**. Dnes se mu kusy
-      vystaví a vydělávají, i když sklad nemá. Správně: hláška, nic se nevystaví.
+- [ ] Pátý hráč (admin → FILL STOCK) dá v seznamu STOCK (B) **⭐ FILL BEST**: hláška „Displays are for a warehouse of
+      your own…“, nic se nevystaví a nic nevydělává (opraveno v 8.2).
 - [ ] Když někdo odejde, pátý hráč dostane jeho pozemek a na skladu je jeho jméno.
 
 ## 16. Plný sklad
 - [ ] (Před spuštěním testu dočasně nastavte `Config.Collection.MaxStock` na malé číslo, např. 3; potom ho vraťte na
       300.) Trip s plným skladem: „⚠ 1 could not be stored“ a „warehouse is full“.
-- [ ] ⚠ **Známá chyba 2**: karta po FINISH dnes ukáže „1 PIECES CAME HOME“, i když se nic neuložilo. Správně: 0.
+- [ ] Kus, který se do plného skladu nevešel, se ztratil (domů nedorazil). Když nic jiného domů nedorazilo, FINISH
+      řekne „Nothing delivered yet“ a zakázku ukončíte přes GIVE UP (opraveno v 8.2).
 
 ## 17. Odchod uprostřed zakázky
 - [ ] Hráč s kusem ve vanu odejde. Jeho dům zmizí. Po návratu má jen to, co už bylo doma; kus z vanu je pryč. Zakázka

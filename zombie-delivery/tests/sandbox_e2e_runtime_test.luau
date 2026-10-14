@@ -1384,12 +1384,12 @@ do
 	for _, entry in Collection.stock(eve) do
 		up += if entry.stand ~= nil then 1 else 0
 	end
-	todo("NEG. without a warehouse Eve's FILL BEST puts nothing on show (Upgrades.buy asks for a warehouse of your own; Collection does not)",
+	check("NEG. without a warehouse Eve's FILL BEST puts nothing on show (Collection.hasWarehouse, as Upgrades.buy asks for one)",
 		up == 0 and E.lastNotice(eve, fillAt) ~= "", `{up} on show, {Collection.incomePerMinute(eve)}/min`)
 	E.advance(1.1)
 	E.fire(eve, "Collection", { kind = "undisplayall" })
 	local said = H.request(eve, { kind = "display", uid = toolbox, stand = 1 })
-	todo("NEG. without a warehouse Eve cannot put a piece on show through the remote either (it would earn on a warehouse she has not got)",
+	check("NEG. without a warehouse Eve cannot put a piece on show through the remote either (it would earn on a warehouse she has not got)",
 		said ~= "" and Collection.incomePerMinute(eve) == 0, `"{said}", {Collection.incomePerMinute(eve)}/min`)
 	E.leave(bob)
 	H.rebuilt()
@@ -1424,8 +1424,10 @@ do
 	E.fire(cid, "Moving", "finish")
 	local result = E.lastOf(cid, "Moving", "result", resultAt)
 	Config.Collection.MaxStock = maxStock
-	todo("…FINISH: the result card counts only what reached his stock (\"home: 0 pieces\")", result ~= nil and result[2].home.pieces == 0,
-		result and `home.pieces = {result[2].home.pieces}, his stock {#Collection.stock(cid)}`)
+	check("…FINISH: the refused piece never came home (lost), so there is nothing to finish with: no result card, told why",
+		result == nil and E.heard(cid, "Nothing delivered yet", resultAt), result and `home.pieces = {result[2].home.pieces}`)
+	E.fire(cid, "Moving", "giveup") -- (his move off, as GIVE UP does)
+	E.advance(1)
 end
 
 -- ── 17. Leaving mid-move, a piece in the van ─────────────────────────────

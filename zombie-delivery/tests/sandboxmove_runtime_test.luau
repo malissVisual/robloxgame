@@ -648,8 +648,11 @@ E.refuse = false
 
 E.request(bob, "giveup")
 local bobResult = E.last(bob, "Moving", "result")
-check("8.0.1: GIVE UP after a trip: \"what came home is yours\" (no Wall), no pay, no XP", bobResult ~= nil and bobResult.a.how == "done"
-	and bobResult.a.howText == "You called it off: what came home is yours" and bobResult.a.money == 0 and bobResult.a.xp == 0, bobResult and bobResult.a.howText)
+-- (8.2 e2e: the refused piece never came home, it is lost: so this GIVE UP calls off a move with nothing home)
+check("8.2: the piece the warehouse refused is lost, not home (the result, the facts and the tasks never count it)", bobResult ~= nil
+	and bobResult.a.delivered == 0 and bobResult.a.how ~= "done", bobResult and `{bobResult.a.how} {bobResult.a.delivered}`)
+check("8.0.1: GIVE UP: \"You called it off\" (no Wall), no pay, no XP", bobResult ~= nil and string.find(bobResult.a.howText, "You called it off", 1, true) == 1
+	and string.find(bobResult.a.howText, "Wall", 1, true) == nil and bobResult.a.money == 0 and bobResult.a.xp == 0, bobResult and bobResult.a.howText)
 check("8.2: …onFinish: Bob's, \"giveup\"", (lastTold("finish")).player == bob and howOf((lastTold("finish"))) == "giveup", howOf((lastTold("finish"))))
 
 -- the planning left open past Config.MoveRoles.Lobby.Timeout

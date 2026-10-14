@@ -3781,8 +3781,14 @@ function SB.store(s: Session, spots: { number }): number
 		local ok, uid = pcall(Collection.add, s.owner, { item = thing.item, variant = variant, condition = thing.condition, name = thing.name })
 		if ok and uid ~= nil then
 			took += 1
-		elseif not ok then
-			warn(`[Moving] Collection.add of {thing.item}: {uid}`)
+		else
+			if not ok then
+				warn(`[Moving] Collection.add of {thing.item}: {uid}`)
+			end
+			-- (8.2 e2e: refused (a full warehouse): it never came home, so the result, the facts and the tasks do not
+			-- count it; its model is gone with the trip)
+			thing.state, thing.place, thing.condition = "lost", nil, 0
+			s.dirty = true
 		end
 	end
 	if #spots > 0 then for _, fn in SB.listeners.stored do task.spawn(fn, s.owner, s.move, spots) end end -- 8.2: Moving.onStored

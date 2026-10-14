@@ -80,6 +80,12 @@ local PlayerData = require(script.Parent.PlayerData)
 
 local Collection = {}
 
+-- 8.2 e2e: who has a warehouse to show pieces in (server/SandboxBoot.luau sets it: SandboxPlots.of; nil: everybody, as
+-- the tests' runtimes). Without one (a full server's fifth player) nothing goes on show and nothing of theirs earns; the
+-- saved stands stay as they are for when a plot is free.
+Collection.hasWarehouse = nil :: ((Player) -> boolean)?
+local NO_WAREHOUSE = "Displays are for a warehouse of your own: wait for a free plot."
+
 export type Entry = Rules.Entry
 
 local MAX_UID = 64 -- a longer uid from a client is no piece of ours
@@ -141,6 +147,10 @@ end
 
 -- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights).
 local function rate(player: Player, collection: Rules.Saved): number
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return 0 -- (no warehouse of their own: nothing on show earns)
+	end
 	local stands = standsOf(player)
 	local boost = boostOf(player)
 	local total = 0
@@ -315,6 +325,10 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	if not entry then
 		return false, "That piece isn't in your stock."
 	end
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return false, NO_WAREHOUSE
+	end
 	if not isStand(stand, standsOf(player)) then
 		return false, "There's no such display stand."
 	end
@@ -479,6 +493,10 @@ local function fillBest(player: Player): (number?, string?)
 	local collection = collectionOf(player)
 	if not collection then
 		return nil, "Your save isn't loaded yet."
+	end
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return nil, NO_WAREHOUSE
 	end
 	local stands = standsOf(player)
 	local pieces = piecesOf(player, collection)

@@ -408,6 +408,21 @@ local function sandbox()
 		require(Server.FurnitureMesh).start()
 	end)
 	optional("Collection", "start")
+	safely("Collection's warehouses", function() -- 8.2 e2e: no plot (a full server's fifth): nothing on show earns
+		local module = Server:FindFirstChild("Collection")
+		if not module or not module:IsA("ModuleScript") then
+			return
+		end
+		local Collection = require(module :: ModuleScript) :: any
+		Collection.hasWarehouse = function(player: Player): boolean
+			return SandboxPlots.of(player) ~= nil
+		end
+		SandboxPlots.onChanged(function(_id: number, player: Player?)
+			if player then
+				Collection.upgrade(player, function() end) -- (a plot at last: what is on show earns from now, a fresh state)
+			end
+		end)
+	end)
 	optional("CollectionBook", "start") -- 8.2: the collection book (after the collection: its hook on Collection.add)
 	optional("Warehouse", "start")
 	optional("Upgrades", "start") -- 8.1: the UPGRADES desk's shop (after the collection and the warehouses)
