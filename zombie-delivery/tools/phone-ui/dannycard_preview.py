@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""8.3 Danny's orders: preview PNGs of his command card and his status line as the real client/MoveHelperCard.luau and
+"""8.3 Danny for hire: preview PNGs of his card and his status line as the real client/MoveHelperCard.luau and
 client/MoveHelperHud.luau build them (dannycard.luau's scenes on sandbox_mock.luau's recorder, its checks first): on a
 phone held sideways (844 x 390, the touch controls drawn), a computer (1280 x 800) and a big screen (1920 x 1080): the
-status line, the card beside Danny's head (a "DANNY" circle where his head is on the screen) and the wait's orange
-line; drawn by sandbox_preview.mjs in headless Chromium.
+status line for hire and hired, the card beside Danny's head (a "DANNY" circle where his head is on the screen) for hire
+(HIRE · $170) and hired (CLEAR QUEUE), and the wait's orange line; drawn by sandbox_preview.mjs in headless Chromium.
 
     NODE_PATH=/opt/node22/lib/node_modules python3 zombie-delivery/tools/phone-ui/dannycard_preview.py <luau> <out dir> [--fonts DIR]
 

@@ -2,23 +2,32 @@
 -- CLI (tests/run_tests.py builds MovingServer.luau and MoveHelperServer.luau on tests/runtime/MovingRuntime.luau's
 -- fakes). The runtime has no physics and no pathfinding: his walk here is a straight step of speed × dt (useMover, no
 -- `keep`: carrying together he is put at your piece's far end each step, as the constraints hold him in Roblox), and a
--- carried piece is moved with its carrier by the test (a weld is only a record). A solo move: Danny comes with the van;
--- 8.3 the player's Lift on the sofa calls him ("Danny, give me a hand!": no drag alone, the player waits at their end,
--- "Stop waiting" on its prompt) and he WALKS over from the van (through the front door his own way, never faded over),
--- "On three... lift!" at its far end and up it goes with him there (no pause, no snap), turned to the player, his arms
--- on it, the player's grip steadied; he moves with it (a walk that goes nowhere changes nothing: no "too far apart" any
--- more), out through the door; set down; 8.3 a call stopped (Lift again, G, STOP, walking away); lifted again (he
--- sprints over); the player loads it; he carries the ★ pieces first, a light two-hands one too (slower), then the
--- others, never a heavy one alone; he opens the van's back himself (or, not allowed, asks
--- and sets the piece down after WaitShut s); he opens it for the player coming with a piece; a piece the player is about
--- to lift is theirs; the other side of the player's heavy two-hands piece (the pair's walk); stuck: a new path after 2 s,
--- a nudge after 4 s; a bite, his death and comeback, running from a zombie, the orders (Help me: he follows you through
--- the door), the van parked far off, the crew growing (he goes) and Duo, the end of the move; a second move where the
--- room goes while he carries his piece ("Van's full, boss - drive it to the Wall?": set down beside the van), a third
--- where nothing he may carry fits, a fourth where his body goes. 8.3 the orders checked (his crew only, the four
--- orders, the rate limit), WAIT HERE; AUTO's ask on a move of its own: he goes to the heavy marble slab, "give me a
--- hand!" (the toast, the 🙋 marker, "Lift with Danny"), nobody comes: back to the light pieces, AskAgain s later he asks
--- again and the player answers: lifted together, carried to the van and loaded.
+-- carried piece is moved with its carrier by the test (a weld is only a record).
+-- 8.3 Danny for hire: a solo move; Danny comes with the van and waits there for hire ("Hire Danny · $100" over his
+-- head; the house's 6 pieces: Hire.Min). Not hired: the sofa is dragged alone, no call, he does not come; a click on a
+-- piece: "Hire Danny first". HIRE without the money: refused, nothing taken; a stranger's HIRE: nothing; with the
+-- money: $100 taken (PlayerData.spend, HelperHire), he works for the move; HIRE again: nothing more taken. Then: the
+-- player's Lift on the sofa calls him ("Danny, give me a hand!": no drag alone, the player waits at their end, "Stop
+-- waiting" on its prompt) and he WALKS over from the van (through the front door his own way, never faded over), "On
+-- three... lift!" at its far end and up it goes with him there (no pause, no snap), turned to the player, his arms on
+-- it, the player's grip steadied; he moves with it (a walk that goes nowhere changes nothing: no "too far apart" any
+-- more), out through the door; set down; a call stopped (Lift again, G, STOP, walking away); lifted again (he sprints
+-- over); the player loads it. A two-hands piece the player carries is theirs (no other side taken). His list: the
+-- lamp, the box, the clock clicked (markers 1, 2, 3; a click again takes one back), carried to the van in that order
+-- (the clock slower, in both arms), "All done."; the refusals (too far, in the van, held, his list full, not a piece,
+-- a stranger, the rate limit); a piece of his list the player picks up leaves it ("All yours, boss."); the van's back
+-- (he opens it himself, or, not allowed, asks and sets the piece down after WaitShut s); he opens it for the player
+-- coming with a piece; a bite, his death (his piece back on his list) and comeback, running from a zombie; garbage
+-- requests, the rate limits, CLEAR QUEUE; his door trips (8.1 walk-in doors); the van parked far off; the crew growing
+-- (a hired Danny stays; the crew mate gives him a piece too). Riding with you: the player at the wheel, he walks out of
+-- the house to the passenger door and sits (Seat:Sit, massless, no hold), rides while the van goes, gets out on his
+-- side when the player gets out and the van stands, and goes on with his list; his walk going nowhere: the last
+-- resort fades him into the seat; the seat taken by a crew mate: he follows on foot; the van wrecked: out at once. The
+-- end of the move ends the hire. A second move (for hire again) where the room goes while he carries his piece ("Van's
+-- full, boss - drive it to the Wall?": set down beside the van), a third where nothing of his list fits, a fourth with
+-- the marble slab (two people) on his list: he waits at it ("needs you", the toast, "Lift with Danny"), long, and the
+-- player lifts it with him through the grip's lift check; stuck (a new path, a nudge); his body taken away while he
+-- carries; an unhired Danny heads back when the crew grows; a crew mate's hire ends when they leave the move.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -109,6 +118,15 @@ local function stateOf(spot: number): any
 	end
 	return nil
 end
+local function told(player: any, text: string, from: number): boolean
+	for index = from + 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) then
+			return true
+		end
+	end
+	return false
+end
 -- A carried piece stays in front of its carrier (the weld, in Roblox; its root set straight: the recorder's PivotTo
 -- adds its rounding up step after step).
 local function follow(model: any, player: any)
@@ -184,6 +202,30 @@ end
 local function farEnd(model: any, depth: number): any
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(depth / 2 + H.Standoff))).Position
 end
+-- 8.3 a click on a piece (its model: the Moving remote's ("helper", "assign", model)) by `who` (Sol), from beside it.
+local function give(model: any, who: any?)
+	local player = who or sol
+	local was = E.rootOf(player).Position
+	E.place(player, model.PrimaryPart.Position + V3(3, 0, 0))
+	E.request(player, "helper", "assign", model)
+	E.place(player, was)
+end
+local function markOf(model: any): string?
+	local gui = model.PrimaryPart:FindFirstChild("DannyMark")
+	local label = gui and gui:FindFirstChild("Label")
+	return if label then label.Text else nil
+end
+local function listIs(list: { number }): boolean
+	if #danny.queue ~= #list then
+		return false
+	end
+	for index, spot in list do
+		if danny.queue[index] ~= spot then
+			return false
+		end
+	end
+	return true
+end
 
 -- 8.1 the leader's client (client/PairSteer.luau) while two carry: the heading turns toward the way at PairTurn at most
 -- (shared/PairCarry.luau steer; a way behind is walked backwards), the walk the pair's × the turn's factor. The most
@@ -236,7 +278,7 @@ local function walk(model: any, to: any): number
 	return worst
 end
 
--- Danny comes ----------------------------------------------------------------------------------------------------------------
+-- Danny comes: for hire ------------------------------------------------------------------------------------------------------
 
 local started = Moving.admin(sol, "start")
 check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
@@ -244,17 +286,22 @@ local truck = E.cars[sol]
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 Moving.step()
 danny = MoveHelper.find(sol)
-check("Danny comes with a crew of one, on AUTO (8.3: the default)", danny ~= nil and danny.body ~= nil and danny.mode == "auto")
-danny.askAgain = math.huge -- (8.3 his asks for a hand wait for their own move below)
+check("8.3 Danny comes with a crew of one: for hire, not working (nobody hired him, nothing on his list)", danny ~= nil and danny.body ~= nil and danny.hirer == nil
+	and #danny.queue == 0)
 local body = danny.body
 local npc = body.model
 check("his body: Danny, ZDC Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
 	and body.humanoid.MaxHealth == H.Health and body.humanoid.Health == H.Health)
 check("…at the van's back", distance(body.root.Position, cargoDoor.WorldPosition) < 8, distance(body.root.Position, cargoDoor.WorldPosition))
-check("he says: Got your back!", E.saidSince("Danny from the depot. Got your back!", 0))
-check("the player hears it", string.find(E.lastNotice(sol), "Danny from the depot joins", 1, true) ~= nil, E.lastNotice(sol))
-check("the orders' strip: MoveHelper = auto, what he does; 8.3 his id (his card finds his body by it)", sol:GetAttribute("MoveHelper") == "auto"
-	and type(sol:GetAttribute("MoveHelperDoing")) == "string" and sol:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelperCall") == nil)
+check("he says: Need a hand? Hire me!", E.saidSince("Danny from the depot. Need a hand? Hire me!", 0))
+check("the player hears it: he waits by the van for hire ($100)", string.find(E.lastNotice(sol), "waits by your van", 1, true) ~= nil
+	and string.find(E.lastNotice(sol), "$100", 1, true) ~= nil, E.lastNotice(sol))
+check("8.3 the status line: MoveHelper = offer, the price (6 pieces: Hire.Min, $100), what he does; his id (his card finds his body by it)",
+	sol:GetAttribute("MoveHelper") == "offer" and sol:GetAttribute("MoveHelperPrice") == 100 and danny.price == Brain.hirePrice(6) and danny.price == H.Hire.Min
+	and sol:GetAttribute("MoveHelperDoing") == "Waiting by the van for hire" and sol:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelperQueue") == nil
+	and sol:GetAttribute("MoveHelperCall") == nil, sol:GetAttribute("MoveHelperDoing"))
+local sign = body.root:FindFirstChild("HireSign")
+check("8.3 a sign over his head: \"🧑‍🔧 Hire Danny · $100\"", sign ~= nil and sign:FindFirstChild("Label") ~= nil and sign:FindFirstChild("Label").Text == "🧑‍🔧 Hire Danny · $100")
 check("his name in the rules' list", MoveHelper.nameOf(danny.id) == "Danny" and MoveHelper.nameOf(44) == nil)
 local targets = E.Zombies.extraTargets()
 local hunted = false
@@ -265,7 +312,7 @@ for _, t in targets do
 end
 check("the zombies go after him too (Zombies.extraTargets)", hunted)
 
--- The sofa: lifted together, carried together -------------------------------------------------------------------------------
+-- Not hired: today's rules ---------------------------------------------------------------------------------------------------
 
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
@@ -277,13 +324,48 @@ local origin = E.interiors[1]
 check("Sol is inside", (E.rootOf(sol).Position - origin.Position).Magnitude < 10)
 local sofa = itemModel(3)
 local SOFA = E.items.sofa.size
-E.place(sol, sofa.PrimaryPart.Position + V3(0, 0, 3))
 local character = sol.Character
+E.place(sol, sofa.PrimaryPart.Position + V3(0, 0, 3))
+trigger(promptIn(sofa, "Lift"), sol)
+check("8.3 not hired: the sofa's Lift is today's: dragged alone, no call, nobody waits", character:GetAttribute("MoveCarry") == 3 and danny.call == nil
+	and sol:GetAttribute("MoveHelperCall") == nil and not helped())
+run(4)
+check("…and he does not come to it: he waits by the van for hire", Rules.holding(danny.s.move, danny.id) == nil and distance(body.root.Position, cargoDoor.WorldPosition) < 8)
+E.Net.get("PutDown").OnServerEvent:Fire(sol)
+local noticeAt = #E.messages
+give(sofa)
+check("8.3 …a click on a piece: \"Hire Danny first\", nothing on his list", #danny.queue == 0 and told(sol, "Hire Danny first", noticeAt) and sofa:GetAttribute("DannyQueue") == nil)
+
+-- 8.3 the hire -----------------------------------------------------------------------------------------------------------------
+
+E.wallet[sol] = 50
+E.request(sol, "helper", "hire")
+check("8.3 HIRE without the money ($50 of $100): refused, nothing taken, still for hire", danny.hirer == nil and #E.spent == 0 and E.wallet[sol] == 50
+	and E.lastNotice(sol) == "Not enough money: Danny costs $100 for this move." and sol:GetAttribute("MoveHelper") == "offer", E.lastNotice(sol))
+local rex = E.player(66, "Rex", outside)
+E.request(rex, "helper", "hire")
+check("8.3 a player not of the move's crew: nothing (no hire, nothing taken, no word)", danny.hirer == nil and #E.spent == 0 and E.lastNotice(rex) == "")
+E.wallet[sol] = 500
+noticeAt = #E.messages
 local said = #E.said
+E.request(sol, "helper", "hire")
+check("8.3 HIRE with the money: $100 taken (PlayerData.spend: HelperHire, the contract's id), he works for the move", danny.hirer == sol and #E.spent == 1
+	and E.spent[1].player == sol and E.spent[1].amount == 100 and E.spent[1].reason == "HelperHire" and E.spent[1].sku == "marge" and E.wallet[sol] == 400)
+check("…the crew hears it, he says so; the status line: hired, nothing to carry, the price gone; the sign gone", told(sol, "Sol hired Danny for this move ($100)", noticeAt)
+	and E.saidSince(Brain.Lines.hired, said) and sol:GetAttribute("MoveHelper") == "hired" and sol:GetAttribute("MoveHelperPrice") == nil
+	and sol:GetAttribute("MoveHelperQueue") == 0 and body.root:FindFirstChild("HireSign") == nil)
+E.request(sol, "helper", "hire")
+check("8.3 once a move: HIRE again takes nothing more", #E.spent == 1 and E.wallet[sol] == 400 and E.lastNotice(sol) == "Danny works for this move already.", E.lastNotice(sol))
+E.wallet[sol] = 2000 -- (the moves below hire him again)
+
+-- The sofa: lifted together, carried together -------------------------------------------------------------------------------
+
+E.place(sol, sofa.PrimaryPart.Position + V3(0, 0, 3))
+said = #E.said
 local outsideAt = body.root.Position
 trigger(promptIn(sofa, "Lift"), sol)
-check("8.3 Lift with Danny on the move: no drag alone, Sol calls him and waits at her end", character:GetAttribute("MoveCarry") == nil
-	and character:GetAttribute("CarrySpeed") == nil and danny.s.move.things[3].state == "home" and danny.call ~= nil and danny.call.spot == 3
+check("8.3 hired: Lift calls him, no drag alone, Sol waits at her end", character:GetAttribute("MoveCarry") == nil
+	and character:GetAttribute("CarrySpeed") == nil and danny.s.move.things[3].state == "ground" and danny.call ~= nil and danny.call.spot == 3
 	and sol:GetAttribute("MoveHelperCall") == "Sofa")
 check("…\"Danny, give me a hand!\" (her toast; a bubble over her head) and his answer", string.find(E.lastNotice(sol), "\"Danny, give me a hand!\"", 1, true) ~= nil
 	and E.saidSince("Hold it, I'll get the other end!", said), E.lastNotice(sol))
@@ -516,7 +598,7 @@ check("8.1 all the way with the sofa Danny was never put at its far end (only th
 check("8.1 …his top speed: the pair's walk × HoldMargin + HoldExtra (more only while eased back)", math.abs(jump.slowest - Brain.holdSpeed(WALK * T.Speed.Pair)) < 1e-6
 	and math.abs(Brain.holdSpeed(WALK * T.Speed.Pair) - (WALK * T.Speed.Pair * H.HoldMargin + H.HoldExtra)) < 1e-6, jump.slowest)
 
--- (c) the other side of your heavy two-hands piece ----------------------------------------------------------------------------------
+-- A two-hands piece you carry is yours (8.3: no other side taken on his own) ------------------------------------------------
 
 local tv = itemModel(2)
 E.place(sol, outside)
@@ -526,96 +608,157 @@ trigger(promptIn(tv, "Pick up"), sol)
 follow(tv, sol)
 check("Sol picks up the TV (two hands, weight 4) alone", character:GetAttribute("MoveCarry") == 2
 	and math.abs((character:GetAttribute("CarrySpeed") or 0) - Rules.carrySpeed(WALK, "both", 4)) < 1e-6, character:GetAttribute("CarrySpeed"))
-said = #E.said
-local assisted = run(6, function()
-	return Rules.holding(danny.s.move, danny.id) == 2
+run(6, function()
+	follow(tv, sol)
+	return Rules.holding(danny.s.move, danny.id) ~= nil
 end)
-check("7.x Danny takes its other side (\"Here, let me take the other side.\"): the pair's walk for both (8.1: 0.7)", assisted and helped()
-	and E.saidSince("Here, let me take the other side.", said) and select(2, Rules.holding(danny.s.move, danny.id)) == "helper")
-follow(tv, sol)
-run(0.3)
-check("…at its far side, Sol's grip steadied", distance(body.root.Position, farEnd(tv, E.items.tv.size.Z)) < 0.05 and character:GetAttribute("GripSteady") == true)
+check("8.3 Danny never takes its other side on his own (nothing on his list: he waits at the van)", Rules.holding(danny.s.move, danny.id) == nil
+	and character:GetAttribute("MoveCarry") == 2 and danny.action == "wait")
 E.place(sol, origin.Position + V3(0, 3, 1))
 follow(tv, sol)
 trigger(leave, sol)
 follow(tv, sol)
 run(0.2)
-worst = walk(tv, back)
-check("…out through the door and to the van together", worst < 0.05 and helped(), worst)
+walk(tv, back)
 run(0.2)
 trigger(load, sol)
-check("…Sol loads it, both pairs of hands free", danny.s.move.things[2].state == "truck" and Rules.holding(danny.s.move, danny.id) == nil and character:GetAttribute("MoveCarry") == nil)
+check("…Sol carries it out and loads it alone", danny.s.move.things[2].state == "truck" and character:GetAttribute("MoveCarry") == nil, E.lastNotice(sol))
 
--- On his own: the ★ pieces first, then the others, a light two-hands one too, never a heavy one ---------------------------
+-- 8.3 his list: the lamp, the box, the clock -----------------------------------------------------------------------------------
 
-E.place(sol, back + V3(30, 0, 0)) -- (out of the way: no piece of his is "about to be lifted" by Sol)
+E.place(sol, outside)
+trigger(enter, sol)
+local lamp, box, clock = itemModel(1), itemModel(5), itemModel(4)
+noticeAt = #E.messages
+said = #E.said
+give(lamp)
+give(box)
+give(clock)
+check("8.3 a click on the Lamp, the Box, the Clock: on his list in that order, a toast each, his word", listIs({ 1, 5, 4 }) and told(sol, "Danny will take the Lamp.", noticeAt)
+	and told(sol, "Danny will take the Box of memories.", noticeAt) and told(sol, "Danny will take the Grandpa's Clock.", noticeAt) and E.saidSince(Brain.Lines.queued, said))
+check("…a marker over each with its number (DannyMark), the pieces' DannyQueue", markOf(lamp) == "🧑‍🔧 Danny · 1" and markOf(box) == "🧑‍🔧 Danny · 2"
+	and markOf(clock) == "🧑‍🔧 Danny · 3" and lamp:GetAttribute("DannyQueue") == 1 and clock:GetAttribute("DannyQueue") == 3
+	and lamp.PrimaryPart:FindFirstChild("DannyMark").AlwaysOnTop == true, markOf(lamp))
+check("…the status line: 3 pieces to carry", sol:GetAttribute("MoveHelperQueue") == 3)
+noticeAt = #E.messages
+give(lamp)
+check("8.3 a click on the Lamp again: off his list (\"Danny leaves the Lamp to you.\"), its marker gone, the box's number 1", listIs({ 5, 4 })
+	and told(sol, "Danny leaves the Lamp to you.", noticeAt) and markOf(lamp) == nil and lamp:GetAttribute("DannyQueue") == nil and markOf(box) == "🧑‍🔧 Danny · 1")
+give(lamp)
+check("…and on again, last", listIs({ 5, 4, 1 }) and markOf(lamp) == "🧑‍🔧 Danny · 3")
+E.place(sol, back + V3(30, 0, 0)) -- (out of the way)
 local loadedAt: { [number]: number } = {}
 local clockSpeed = 0
 local loadShown = false
 local n = 0
 local arms: any = nil
-local heavyTaken = false
--- (a): the ★ box first, never the heavy clock (two hands, weight 6 ≥ LightWeight) nor the slab (two people); then (b) the
--- bar raised over the clock's weight (H.LightWeight 7): the clock is light, his alone (★: before the lamp)
 local function look()
 	n += 1
 	local spot, role = Rules.holding(danny.s.move, danny.id)
-	heavyTaken = heavyTaken or (H.LightWeight == 5 and (spot == 4 or spot == 6))
 	loadShown = loadShown or (spot ~= nil and role == "carrier" and load.Enabled)
 	if spot == 4 and role == "carrier" and danny.action == "deliver" then
 		clockSpeed = lastSpeed
 		arms = arms or { npc:GetAttribute("Carrying"), npc:GetAttribute("CarryHands") }
 	end
 	for _, s in { 1, 4, 5 } do
-		local item = stateOf(s)
-		if item and item.state == "truck" and not loadedAt[s] then
+		if stateNow(s) == "truck" and not loadedAt[s] then
 			loadedAt[s] = n
 		end
 	end
 end
-run(160, function()
+said = #E.said
+run(300, function()
 	look()
-	return loadedAt[5] ~= nil
+	return loadedAt[1] ~= nil and loadedAt[4] ~= nil and loadedAt[5] ~= nil
 end)
-check("8.3 AUTO: the ★ box of memories first, never a heavy piece alone (Grandpa's Clock: two hands, weight 6 ≥ LightWeight; the slab)",
-	loadedAt[5] ~= nil and not heavyTaken and stateNow(4) == "home" and stateNow(6) == "home" and loadedAt[1] == nil)
-H.LightWeight = 7
-run(160, function()
-	look()
-	return loadedAt[1] ~= nil and loadedAt[4] ~= nil
-end)
-H.LightWeight = 5
-check("7.x a two-hands piece under LightWeight (the bar raised to 7): Danny carries Grandpa's Clock (★) to the van and loads it", loadedAt[4] ~= nil)
-check("…at 0.7 × a player's two-hands walk (slower than a one-hand piece)", math.abs(clockSpeed - Rules.carrySpeed(WALK, "both", 6) * 0.7) < 1e-6, clockSpeed)
-check("…in both arms (his Carrying: furniture, two hands)", arms ~= nil and arms[1] == "furniture" and arms[2] == 2)
-check("the ★ ones first (the box of memories, the clock), then the lamp", loadedAt[4] ~= nil and loadedAt[5] ~= nil and loadedAt[1] ~= nil
-	and math.max(loadedAt[4], loadedAt[5]) < loadedAt[1], `{loadedAt[4]} {loadedAt[5]} {loadedAt[1]}`)
+check("8.3 he carries his list to the van and loads it, in its order: the box, the clock, the lamp", loadedAt[1] ~= nil and loadedAt[4] ~= nil and loadedAt[5] ~= nil
+	and loadedAt[5] < loadedAt[4] and loadedAt[4] < loadedAt[1], `{loadedAt[5]} {loadedAt[4]} {loadedAt[1]}`)
+check("…Grandpa's Clock (two hands, weight 6) at 0.7 × a player's two-hands walk, in both arms", math.abs(clockSpeed - Rules.carrySpeed(WALK, "both", 6) * 0.7) < 1e-6
+	and arms ~= nil and arms[1] == "furniture" and arms[2] == 2, clockSpeed)
 check("…the van's Load prompt stays off for what he carries (the back's own E stays free)", not loadShown)
-check("Sol hears what he loaded", (function()
-	for _, m in E.messages do
-		if m.player == sol and m.remote == "Notice" and string.find(tostring(m.kind), "Danny loaded", 1, true) then
-			return true
-		end
-	end
-	return false
-end)())
-run(4)
-check("only the marble slab (two people) left: he never takes it alone", Rules.holding(danny.s.move, danny.id) == nil and stateNow(6) == "home")
-check("…he waits at the van", danny.action == "wait" and sol:GetAttribute("MoveHelperDoing") == "Waiting at the van" and distance(body.root.Position, cargoDoor.WorldPosition) < 8,
-	sol:GetAttribute("MoveHelperDoing"))
+check("Sol hears what he loaded", told(sol, "Danny loaded", 0))
+check("…each off his list as he took it, the markers gone", #danny.queue == 0 and markOf(lamp) == nil and markOf(clock) == nil and markOf(box) == nil
+	and sol:GetAttribute("MoveHelperQueue") == 0)
+run(3)
+check("…his list empty: \"All done. Anything else, boss?\", he waits at the van, the marble slab (not his) untouched", E.saidSince(Brain.Lines.empty, said)
+	and danny.action == "wait" and sol:GetAttribute("MoveHelperDoing") == "Waiting at the van" and distance(body.root.Position, cargoDoor.WorldPosition) < 8
+	and stateNow(6) == "home", sol:GetAttribute("MoveHelperDoing"))
 
--- The van's back: he opens it himself; not allowed, he asks --------------------------------------------------------------------
+-- 8.3 the refusals ----------------------------------------------------------------------------------------------------------------
 
-local lamp = itemModel(1)
+local slab = itemModel(6)
+noticeAt = #E.messages
+E.request(sol, "helper", "assign", slab) -- (Sol by the van, the slab in the house: another world)
+check("8.3 a piece out of sight (Sol outside, the slab inside): \"Get closer\", not on his list", #danny.queue == 0 and told(sol, "Get closer to the Marble slab", noticeAt))
+noticeAt = #E.messages
+give(lamp)
+check("…a piece in the van: \"The Lamp is in the van already.\"", #danny.queue == 0 and told(sol, "The Lamp is in the van already.", noticeAt))
 local unload = promptIn(truck.model, "Take out")
 E.place(sol, back)
 trigger(unload, sol)
 check("Sol takes the lamp back out", character:GetAttribute("MoveCarry") == 1, E.lastNotice(sol))
+noticeAt = #E.messages
+E.request(sol, "helper", "assign", lamp)
+check("…a piece somebody holds: \"Somebody holds the Lamp.\"", #danny.queue == 0 and told(sol, "Somebody holds the Lamp.", noticeAt))
+E.place(sol, outside + V3(2, 0, 0))
+follow(lamp, sol)
+E.Net.get("PutDown").OnServerEvent:Fire(sol)
+local queueMost = H.Queue
+H.Queue = 1
+give(lamp)
+noticeAt = #E.messages
+give(slab)
+check("…his list full (Queue: 1 here): \"Danny's list is full\", not on it", listIs({ 1 }) and told(sol, "Danny's list is full", noticeAt))
+H.Queue = queueMost
+give(lamp)
+check("…(the lamp off again)", #danny.queue == 0)
+E.request(sol, "helper", "assign", truck.model)
+E.request(sol, "helper", "assign", 3)
+E.request(sol, "helper", "assign", "Lamp")
+E.request(sol, "helper", "assign")
+E.request(sol, "helper", "assign", { lamp })
+check("8.3 not a piece (the van, a number, a name, nothing, a table): nothing", #danny.queue == 0)
+noticeAt = #E.messages
+give(lamp, rex)
+check("8.3 a player not of the move's crew: nothing (no word)", #danny.queue == 0 and not told(rex, "Danny", noticeAt))
+local limits: { any } = {}
+local allow = false
+local realLimit = E.Net.limit
+E.Net.limit = function(player: any, name: string, rate: number): boolean
+	table.insert(limits, { player = player, name = name, rate = rate })
+	return if name == "MoveHelperAssign" then allow else true
+end
+give(lamp)
+local asked = false
+for _, l in limits do
+	asked = asked or (l.player == sol and l.name == "MoveHelperAssign" and l.rate == Config.Robust.Limits.MoveHelperAssign)
+end
+check("8.3 every click asks its rate limit (MoveHelperAssign, Config.Robust.Limits.MoveHelperAssign); over it: dropped", asked and #danny.queue == 0
+	and Config.Robust.Limits.MoveHelperAssign == 5)
+E.Net.limit = realLimit
+
+-- 8.3 a piece of his list you pick up yourself leaves it ---------------------------------------------------------------------
+
+give(lamp)
+check("8.3 the lamp on his list", listIs({ 1 }) and markOf(lamp) == "🧑‍🔧 Danny · 1")
+E.place(sol, lamp.PrimaryPart.Position + V3(2, 0, 0))
+noticeAt = #E.messages
+said = #E.said
+trigger(promptIn(lamp, "Pick up"), sol)
+check("8.3 Sol picks it up first: off his list (\"You took the Lamp: off Danny's list.\", \"All yours, boss.\"), its marker gone", character:GetAttribute("MoveCarry") == 1
+	and #danny.queue == 0 and told(sol, "You took the Lamp: off Danny's list.", noticeAt) and E.saidSince("All yours, boss.", said) and markOf(lamp) == nil
+	and lamp:GetAttribute("DannyQueue") == nil and sol:GetAttribute("MoveHelperQueue") == 0)
+run(2)
+check("…and he leaves it to Sol", Rules.holding(danny.s.move, danny.id) == nil and character:GetAttribute("MoveCarry") == 1)
+
+-- The van's back: he opens it himself; not allowed, he asks --------------------------------------------------------------------
+
 E.place(sol, outside + V3(2, 0, 0))
 follow(lamp, sol)
 E.Net.get("PutDown").OnServerEvent:Fire(sol)
 E.place(sol, back + V3(30, 0, 0))
 truck.model:SetAttribute("BackOpen", false)
+give(lamp)
 said = #E.said
 local opened = E.backSet or 0
 local inAgain = run(30, function()
@@ -630,6 +773,7 @@ follow(lamp, sol)
 E.Net.get("PutDown").OnServerEvent:Fire(sol)
 E.place(sol, back + V3(30, 0, 0))
 truck.model:SetAttribute("BackOpen", false)
+give(lamp)
 said = #E.said
 local carried = run(30, function()
 	return Rules.holding(danny.s.move, danny.id) == 1
@@ -650,13 +794,15 @@ end)
 check("…WaitShut s later he sets it down beside the van", down and stateNow(1) == "ground" and distance(lamp.PrimaryPart.Position, cargoDoor.WorldPosition) < 14,
 	distance(lamp.PrimaryPart.Position, cargoDoor.WorldPosition))
 run(3)
-check("…and leaves it there while the back stays shut", Rules.holding(danny.s.move, danny.id) == nil and stateNow(1) == "ground")
+check("…and leaves it there while the back stays shut (off his list: he had taken it)", Rules.holding(danny.s.move, danny.id) == nil and stateNow(1) == "ground"
+	and #danny.queue == 0)
 H.OpenBack = true
 truck.model:SetAttribute("BackOpen", true)
+give(lamp)
 inAgain = run(20, function()
 	return stateNow(1) == "truck"
 end)
-check("the back open: he takes it in", inAgain)
+check("the back open, the lamp given again: he takes it in", inAgain)
 
 -- (d) the back for you: you come with a piece, the back shut, he opens it ---------------------------------------------------------
 
@@ -676,23 +822,6 @@ run(0.2)
 trigger(load, sol)
 check("…and Sol loads it", danny.s.move.things[1].state == "truck", E.lastNotice(sol))
 
--- The reservation: the piece you are about to lift is yours ------------------------------------------------------------------------
-
-trigger(unload, sol)
-E.place(sol, outside + V3(6, 0, 0))
-follow(lamp, sol)
-E.Net.get("PutDown").OnServerEvent:Fire(sol)
-E.place(sol, lamp.PrimaryPart.Position + V3(2, 0, 0)) -- (right by it, hands free)
-run(6)
-check("7.x Sol stands by the lamp, hands free: he leaves it to Sol", Rules.holding(danny.s.move, danny.id) == nil and stateNow(1) == "ground" and danny.action ~= "fetch",
-	danny.action)
-trigger(promptIn(lamp, "Pick up"), sol)
-check("…Sol's lift wins", character:GetAttribute("MoveCarry") == 1)
-walk(lamp, back)
-run(0.2)
-trigger(load, sol)
-check("…and Sol loads it", danny.s.move.things[1].state == "truck", E.lastNotice(sol))
-
 -- Down and back up -----------------------------------------------------------------------------------------------------------
 
 E.place(sol, back)
@@ -701,10 +830,11 @@ E.place(sol, outside + V3(2, 0, 0))
 follow(lamp, sol)
 E.Net.get("PutDown").OnServerEvent:Fire(sol)
 E.place(sol, back + V3(30, 0, 0))
+give(lamp)
 carried = run(15, function()
 	return Rules.holding(danny.s.move, danny.id) == 1
 end)
-check("he picks the lamp up again", carried)
+check("he picks the lamp up again (his list's)", carried and #danny.queue == 0)
 danny.s.move.things[1].condition = 1 -- (as good as new again: the bites and this fall would break it)
 local before = 1
 said = #E.said
@@ -714,6 +844,7 @@ run(0.3)
 check("killed: the lamp falls, knocked", stateNow(1) == "ground" and stateOf(1).condition < before - 0.1 and Rules.holding(danny.s.move, danny.id) == nil, stateOf(1).condition)
 check("…he is down (\"I'll be back!\"), the player hears it", danny.dead and E.saidSince("Ugh... I'll be back!", said)
 	and string.find(E.lastNotice(sol), "Danny is down", 1, true) ~= nil and sol:GetAttribute("MoveHelperDoing") == "Down: back at the van soon")
+check("8.3 …the lamp back at the head of his list (he finishes it when he is back)", listIs({ 1 }) and markOf(lamp) == "🧑‍🔧 Danny · 1")
 run(3.2)
 check("…his body goes a moment later", npc.Parent == nil and danny.body == nil)
 local backUp = run(H.Respawn, function()
@@ -722,6 +853,7 @@ end)
 check("Respawn s later he is back at the van", backUp and not danny.dead and distance(danny.body.root.Position, cargoDoor.WorldPosition) < 8 and E.saidSince("Back on my feet!", said))
 body = danny.body
 npc = body.model
+check("8.3 …still hired: no sign over his head", danny.hirer == sol and body.root:FindFirstChild("HireSign") == nil)
 local again = run(20, function()
 	return stateNow(1) == "truck"
 end)
@@ -740,69 +872,55 @@ z.dead = true
 run(4)
 check("…it's gone: he goes back to the van", danny.action == "wait" and not danny.fleeing)
 
--- The orders -----------------------------------------------------------------------------------------------------------------
+-- 8.3 the requests: garbage, the rate limit, CLEAR QUEUE ---------------------------------------------------------------------
 
 said = #E.said
-E.request(sol, "helper", "dance")
-check("a wrong order changes nothing", danny.mode == "auto")
-E.request(sol, "helper", "carry")
-E.request(sol, "helper", "wait")
-E.request(sol, "helper", { "van" })
-E.request(sol, "helper", 3)
+local spentBefore = #E.spent
+for _, kind in { "dance", "auto", "help", "stay", "van", "carry", 3 } do
+	E.request(sol, "helper", kind)
+end
 E.request(sol, "helper")
-check("8.3 …nor the old ones (carry, wait), nor garbage (a table, a number, nothing)", danny.mode == "auto" and sol:GetAttribute("MoveHelper") == "auto")
-local rex = E.player(66, "Rex", outside)
-E.request(rex, "helper", "van")
-check("8.3 a player who is not on his move: refused (only his crew commands him)", danny.mode == "auto" and rex:GetAttribute("MoveHelper") == nil)
-E.leave(rex)
--- 8.3 every command through the server's rate limit (Net.limit "MoveHelper" at Config.Robust.Limits.MoveHelper)
-local limits: { any } = {}
-local allow = false
-local realLimit = E.Net.limit
+E.request(sol, "helper", { "hire" })
+check("8.3 the old orders and garbage change nothing (AUTO, HELP ME, WAIT HERE, WAIT AT VAN: gone)", danny.hirer == sol and #danny.queue == 0
+	and #E.spent == spentBefore and sol:GetAttribute("MoveHelper") == "hired")
+limits = {}
+allow = false
 E.Net.limit = function(player: any, name: string, rate: number): boolean
 	table.insert(limits, { player = player, name = name, rate = rate })
 	return if name == "MoveHelper" then allow else true
 end
-E.request(sol, "helper", "van")
-local asked = false
+give(slab)
+E.request(sol, "helper", "clear")
+asked = false
 for _, l in limits do
 	asked = asked or (l.player == sol and l.name == "MoveHelper" and l.rate == Config.Robust.Limits.MoveHelper)
 end
-check("8.3 each command asks the rate limit (MoveHelper, Config.Robust.Limits.MoveHelper); over it: dropped", asked and danny.mode == "auto"
+check("8.3 HIRE, CLEAR QUEUE and STOP ask their rate limit (MoveHelper, Config.Robust.Limits.MoveHelper); over it: dropped", asked and listIs({ 6 })
 	and Config.Robust.Limits.MoveHelper == 4)
 allow = true
-E.request(sol, "helper", "van")
+noticeAt = #E.messages
+E.request(sol, "helper", "clear")
 E.Net.limit = realLimit
-check("WAIT AT VAN: the order, the strip, his word", danny.mode == "van" and sol:GetAttribute("MoveHelper") == "van" and E.saidSince("Waiting at the van.", said))
--- 8.3 WAIT HERE: where he stands now (out of the doorways)
-body.root.CFrame = M.CFrame.new(outside.X + 12, 3, outside.Z + 6)
-local stayAt = body.root.Position
-E.request(sol, "helper", "stay")
-run(4)
-check("8.3 WAIT HERE: he stays where he stood when told, the strip says so, his word", danny.mode == "stay" and danny.action == "stay"
-	and distance(body.root.Position, stayAt) < 1.5 and sol:GetAttribute("MoveHelper") == "stay" and sol:GetAttribute("MoveHelperDoing") == "Waiting here"
-	and E.saidSince("I'll wait right here.", said), distance(body.root.Position, stayAt))
-E.request(sol, "helper", "help")
-E.place(sol, outside + V3(-3, 0, 0) + facing * 6)
-local followed = run(15, function()
-	return distance(body.root.Position, E.rootOf(sol).Position) <= H.Follow + 2
-end)
-check("HELP ME: he follows you", followed and danny.mode == "help" and danny.action == "follow" and sol:GetAttribute("MoveHelperDoing") == "Right behind you")
-E.place(sol, outside)
-trigger(enter, sol)
-local inside = run(15, function()
-	return (body.root.Position - origin.Position).Magnitude < 60
-end)
-check("…through the door too", inside)
+check("8.3 CLEAR QUEUE: his list empty, the markers gone, \"Okay, my list is empty.\", the crew told", #danny.queue == 0 and markOf(slab) == nil
+	and E.saidSince(Brain.Lines.cleared, said) and told(sol, "Sol cleared Danny's list", noticeAt) and sol:GetAttribute("MoveHelperQueue") == 0)
+E.request(sol, "helper", "clear")
+check("…again: \"Danny's list is empty already.\"", E.lastNotice(sol) == "Danny's list is empty already.")
+E.Net.get("MoveLobby").OnServerEvent:Fire(sol, "chat", 2)
+check("7.0 planning: \"Need a hand here\" in the quick chat no longer orders him about (8.3)", danny.hirer == sol and #danny.queue == 0 and danny.action ~= "follow")
 -- 8.1 walk-in doors: his door trips go by the players' rule: in facing into the room, out facing away from the door and
--- clear of its reach, not back through a door before Config.Moving.Doors.Rearm s
+-- clear of its reach, not back through a door before Config.Moving.Doors.Rearm s (8.3: the slab given, then his list
+-- cleared)
 do
+	give(slab)
+	local inside = run(20, function()
+		return (body.root.Position - origin.Position).Magnitude < 60
+	end)
 	local cameIn = danny.doorAt
+	check("8.3 the slab on his list: he goes in to it", inside and listIs({ 6 }))
 	check("8.1 walk-in doors: he comes in facing into the room, away from the door", body.root.CFrame.LookVector:Dot(V3(0, 0, 1)) > 0.99, body.root.CFrame.LookVector)
-	E.place(sol, origin.Position + V3(0, 3, 1))
-	trigger(promptIn(workspace, "Leave house"), sol)
+	E.request(sol, "helper", "clear")
 	run(math.max(0.1, cameIn + T.Doors.Rearm - 0.4 - E.clock)) -- (past the old 1 s, short of Rearm)
-	check("…Sol back out at once: he follows, but not through the door before Rearm s", (body.root.Position - origin.Position).Magnitude < 60
+	check("…his list cleared at once: back out to the van, but not through the door before Rearm s", (body.root.Position - origin.Position).Magnitude < 60
 		and E.clock - cameIn > 1.2 and E.clock - cameIn < T.Doors.Rearm, E.clock - cameIn)
 	local out = run(4, function()
 		return (body.root.Position - origin.Position).Magnitude > 60
@@ -812,17 +930,10 @@ do
 	check("…then out, Rearm s after he came in", out and danny.doorAt - cameIn >= T.Doors.Rearm, danny.doorAt - cameIn)
 	check("…facing away from the door, clear of its reach (beside where the players come out)", body.root.CFrame.LookVector:Dot(facing) > 0.99
 		and distance(spot, through.Position) > H.DoorReach and distance(spot, through.Position) < H.DoorReach + 1.5, distance(spot, through.Position))
-	E.place(sol, outside)
-	trigger(enter, sol)
-	run(15, function()
-		return (body.root.Position - origin.Position).Magnitude < 60
-	end)
 end
-E.request(sol, "helper", "auto")
-check("AUTO again", danny.mode == "auto" and sol:GetAttribute("MoveHelper") == "auto")
-E.Net.get("MoveLobby").OnServerEvent:Fire(sol, "chat", 2)
-check("7.0 planning: \"Need a hand here\" in the quick chat calls him over (HELP ME)", danny.mode == "help" and sol:GetAttribute("MoveHelper") == "help")
-E.request(sol, "helper", "auto")
+run(20, function()
+	return distance(body.root.Position, cargoDoor.WorldPosition) < 8
+end)
 
 -- The van parked far off (driven somewhere else), then back by the house -------------------------------------------------------
 
@@ -837,23 +948,118 @@ local rejoined = run(20, function()
 end)
 check("…parked by the house again: he goes to it", rejoined)
 
--- The crew grows: he goes; Duo ---------------------------------------------------------------------------------------------
+-- The crew grows: a hired Danny stays ----------------------------------------------------------------------------------------
 
 local bob = E.player(55, "Bob", outside)
 E.crew[sol] = { bob }
 Moving.step()
-check("a crew of two: Danny heads back (Duo is off)", MoveHelper.find(sol) == nil and npc.Parent == nil and sol:GetAttribute("MoveHelper") == nil
-	and string.find(E.lastNotice(sol), "heads back", 1, true) ~= nil)
-H.Duo = true
-Moving.step()
-danny = MoveHelper.find(sol)
-check("Duo on: he comes for two as well", danny ~= nil and sol:GetAttribute("MoveHelper") == "auto" and bob:GetAttribute("MoveHelper") == "auto"
-	and bob:GetAttribute("MoveHelperId") == danny.id)
-H.Duo = false
+check("8.3 a crew of two: a hired Danny stays (paid for the move; Duo off), Bob gets his status line too", MoveHelper.find(sol) == danny and npc.Parent ~= nil
+	and bob:GetAttribute("MoveHelper") == "hired" and bob:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelper") == "hired")
+E.place(bob, outside)
+trigger(enter, bob)
+noticeAt = #E.messages
+give(slab, bob)
+check("8.3 …Bob, of the crew, gives him a piece too", listIs({ 6 }) and told(bob, "Danny will take the Marble slab.", noticeAt))
+
+-- 8.3 riding with you ------------------------------------------------------------------------------------------------------------
+
+local seat = truck.passengers[1]
+local inHouse = run(20, function()
+	return (body.root.Position - origin.Position).Magnitude < 60 and danny.needs == 6 and danny.needsAt > 0
+end)
+check("8.3 (the slab: he is in the house, waiting at it for you)", inHouse and slab:GetAttribute("DannyNeeds") == true and markOf(slab) == "🙋 Danny needs you")
+E.place(sol, truck.chassis.Position + V3(-5, 1, -3))
+E.seated[sol] = truck
+said = #E.said
+local walkedOut, longestRide, rideAt = 0, 0, body.root.Position
+local seated = run(40, function()
+	local now = body.root.Position
+	if (now - rideAt).Magnitude > 300 then
+		walkedOut += 1
+	else
+		longestRide = math.max(longestRide, distance(now, rideAt))
+	end
+	rideAt = now
+	return danny.seat ~= nil
+end)
+check("8.3 Sol at the van's wheel: Danny leaves the slab, walks out of the house to the passenger door and sits (Seat:Sit)", seated and danny.seat == seat
+	and seat.Occupant == body.humanoid and body.humanoid.SeatPart == seat and body.humanoid.Sit == true and seat:FindFirstChild("SeatWeld") ~= nil
+	and E.saidSince(Brain.Lines.ride, said))
+check("…walked (out by the front door, each step his sprint's at most: never faded over)", walkedOut == 1 and longestRide <= WALK * H.Sprint * 0.1 + 1e-6, `{walkedOut} {longestRide}`)
+run(0.3)
+local massless = true
+for _, d in npc:GetDescendants() do
+	if d.ClassName == "Part" and d.Massless ~= true then
+		massless = false
+	end
+end
+check("…seated: massless (the van drives as ever), no hold (no constraints, no Npcs.carried), the status line: Riding in the van",
+	massless and body.grip == nil and danny.gripped == nil and sol:GetAttribute("MoveHelperDoing") == "Riding in the van")
+check("…the slab still his (the marker back to its number: he is not at it)", listIs({ 6 }) and slab:GetAttribute("DannyNeeds") == nil and markOf(slab) == "🧑‍🔧 Danny · 1")
+truck.speed = 40
+local rode = body.root.Position
+run(3)
+check("8.3 the van drives: he rides (nothing of his own: the van carries him)", danny.seat == seat and danny.action == "seat" and (body.root.Position - rode).Magnitude < 1e-6)
+E.seated[sol] = nil
+run(1)
+check("…Sol out of the seat while the van still rolls: he stays in", danny.seat == seat)
+truck.speed = 0
+said = #E.said
+run(0.3, function()
+	return danny.seat == nil
+end)
+local rel = truck.chassis.CFrame:PointToObjectSpace(body.root.Position)
+check("8.3 the van stands, nobody at its wheel: he gets out on his side (the right), the seat free, his body as before", danny.seat == nil and seat.Occupant == nil
+	and seat:FindFirstChild("SeatWeld") == nil and body.humanoid.Sit == false and rel.X > truck.size.X / 2 and npc:FindFirstChild("HumanoidRootPart").Massless == false and body.weights == nil,
+	rel.X)
+local back2 = run(20, function()
+	return (body.root.Position - origin.Position).Magnitude < 60
+end)
+check("…and goes on with his list (the slab: back into the house)", back2 and E.saidSince(Brain.Lines.out, said) and listIs({ 6 }))
+-- Sol drives off with him left behind (40 studs a second, faster than his sprint): he walks after the van, no closer
+-- for CallBlink s: the last resort, he fades into the seat
+local parkedAt = truck.chassis.CFrame
+E.seated[sol] = truck
+truck.speed = 40
+local fadeAt = E.clock
+local walkedAfter = 0
+local faded = run(H.CallBlink + 3, function()
+	truck.chassis.CFrame = truck.chassis.CFrame * M.CFrame.new(4, 0, 0)
+	if danny.action == "ride" and danny.seat == nil then
+		walkedAfter += 1
+	end
+	return danny.seat ~= nil
+end)
+check("8.3 the van drives off with him left behind: he goes after it, and CallBlink s no closer (the last resort) he fades into the seat",
+	faded and danny.seat == seat and walkedAfter > 10 and E.clock - fadeAt >= H.CallBlink - 0.15, E.clock - fadeAt)
+truck.chassis.CFrame = parkedAt
+truck.speed = 0
+E.seated[sol] = nil
+run(0.3)
+check("…the van back and standing, Sol out: he gets out again", danny.seat == nil)
+-- the passenger seat taken by a crew mate (Bob): he follows the van on foot
+E.place(bob, truck.chassis.Position + V3(5, 1, -3))
+seat:Sit(bob.Character:FindFirstChildOfClass("Humanoid"))
+E.seated[sol] = truck
+run(25, function()
+	return danny.action == "ride" and distance(body.root.Position, cargoDoor.WorldPosition) < 8
+end)
+check("8.3 the seat taken by Bob: Danny never sits (he goes to the van's back on foot)", danny.seat == nil and danny.action == "ride" and seat.Occupant ~= body.humanoid
+	and distance(body.root.Position, cargoDoor.WorldPosition) < 8, distance(body.root.Position, cargoDoor.WorldPosition))
+seat:FindFirstChild("SeatWeld"):Destroy()
+seated = run(10, function()
+	return danny.seat ~= nil
+end)
+check("…Bob out of it: he gets in", seated and danny.seat == seat)
+truck.wrecked = true
+run(0.3)
+check("8.3 the van wrecked: out at once", danny.seat == nil and seat.Occupant == nil and body.humanoid.Sit == false)
+truck.wrecked = false
+E.seated[sol] = nil
 E.crew[sol] = {}
 Moving.step()
 danny = MoveHelper.find(sol)
-check("Bob left: Danny stays for Sol alone, Bob's strip goes", danny ~= nil and bob:GetAttribute("MoveHelper") == nil and sol:GetAttribute("MoveHelper") == "auto"
+check("Bob left: Danny stays for Sol, Bob's strip goes", danny ~= nil and bob:GetAttribute("MoveHelper") == nil and sol:GetAttribute("MoveHelper") == "hired"
 	and bob:GetAttribute("MoveHelperId") == nil)
 npc = danny.body.model
 
@@ -861,8 +1067,8 @@ npc = danny.body.model
 
 Moving.admin(sol, "end")
 run(0.2)
-check("the move ends: he goes, the strip goes", MoveHelper.find(sol) == nil and npc.Parent == nil and sol:GetAttribute("MoveHelper") == nil
-	and sol:GetAttribute("MoveHelperDoing") == nil and sol:GetAttribute("MoveHelperId") == nil)
+check("the move ends: the hire with it, he goes, the strip goes, his marker off the slab", MoveHelper.find(sol) == nil and npc.Parent == nil and sol:GetAttribute("MoveHelper") == nil
+	and sol:GetAttribute("MoveHelperDoing") == nil and sol:GetAttribute("MoveHelperId") == nil and sol:GetAttribute("MoveHelperQueue") == nil and markOf(slab) == nil)
 
 -- A second move: no room for his piece ----------------------------------------------------------------------------------------
 
@@ -876,58 +1082,60 @@ cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 danny = MoveHelper.find(sol)
-check("the next move: Danny again", danny ~= nil and danny.body ~= nil)
-danny.askAgain = math.huge -- (8.3 no ask on this one: his own pieces)
+check("8.3 the next move: Danny again, for hire again (the end of the last one ended its hire)", danny ~= nil and danny.body ~= nil and danny.hirer == nil
+	and sol:GetAttribute("MoveHelper") == "offer")
+local spent = #E.spent
+E.request(sol, "helper", "hire")
+check("…hired for this one: its price taken again", danny.hirer == sol and #E.spent == spent + 1)
+E.place(sol, outside)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+give(itemModel(1))
+give(itemModel(5))
+E.place(sol, cargoDoor.WorldPosition + V3(30, 0, 0))
 carried = run(40, function()
 	return Rules.holding(danny.s.move, danny.id) == 5
 end)
-check("he goes for the box of memories (★)", carried)
-danny.s.move.packing.height = 0.7 -- (the room went while he walked: the box is 1.5 high, the TV 0.8 on its side)
+check("8.3 the lamp never fits the low bed: he skips it for the next of his list (the box of memories)", carried and listIs({ 1 }))
+danny.s.move.packing.height = 0.7 -- (the room went while he walked: the box is 1.5 high)
 said = #E.said
 local refused = run(40, function()
 	return E.saidSince("Van's full, boss - drive it to the Wall?", said)
 end)
 check("no room at the van: \"Van's full, boss - drive it to the Wall?\"", refused)
--- (8.3: the clock is not his alone any more, so the TV he thought fits comes next; it is refused and set down too)
 run(40, function()
 	return Rules.holding(danny.s.move, danny.id) == nil and danny.action == "wait"
 end)
-local box = itemModel(5)
+box = itemModel(5)
 check("…the box set down beside the van, not in it", stateNow(5) == "ground" and distance(box.PrimaryPart.Position, cargoDoor.WorldPosition) < 14)
-check("…nothing else fits: he waits, the van full", Rules.holding(danny.s.move, danny.id) == nil and stateNow(1) == "home"
+check("…nothing of his list fits: he waits, the van full", Rules.holding(danny.s.move, danny.id) == nil and stateNow(1) == "home" and listIs({ 1 })
 	and sol:GetAttribute("MoveHelperDoing") == "Waiting: the van is full", sol:GetAttribute("MoveHelperDoing"))
 Moving.admin(sol, "end")
 run(0.2)
 
--- A third move: a van with no room for anything he carries ------------------------------------------------------------------
+-- A third move: a van with no room for anything of his list ---------------------------------------------------------------------
 
 T.Beds[E.carId].Height = 0.7 -- (lower than any of his pieces, the TV on its side too: Pack.Lie)
-said = #E.said
 Moving.admin(sol, "start")
 T.Beds[E.carId].Height = bedHeight
 Moving.step()
 danny = MoveHelper.find(sol)
+E.request(sol, "helper", "hire")
+E.place(sol, outside)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+give(itemModel(1))
+give(itemModel(2))
+E.place(sol, outside)
+said = #E.said
 local full = run(8, function()
 	return E.saidSince("Van's full, boss - drive it to the Wall?", said)
 end)
-check("nothing fits: he says so and waits at the van", full and danny.action == "wait" and sol:GetAttribute("MoveHelperDoing") == "Waiting: the van is full"
-	and Rules.holding(danny.s.move, danny.id) == nil)
-run(H.AskGap + 2)
-check("8.3 …and never asks a hand for a heavy piece that does not fit either", danny.ask == nil and danny.action == "wait")
+check("nothing of his list fits: he says so and waits at the van", full and danny.action == "wait" and sol:GetAttribute("MoveHelperDoing") == "Waiting: the van is full"
+	and Rules.holding(danny.s.move, danny.id) == nil and listIs({ 1, 2 }))
 Moving.admin(sol, "end")
 run(0.2)
 
--- 8.3 AUTO's ask for a hand: the ★ marble slab (two people), nobody comes, then Sol does ----------------------------------
+-- 8.3 a two-person piece on his list: the ★ marble slab; he waits at it for you, then Sol lifts it with him ---------------------
 
-local function told(player: any, text: string, from: number): boolean
-	for index = from + 1, #E.messages do
-		local m = E.messages[index]
-		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) then
-			return true
-		end
-	end
-	return false
-end
 Moving.admin(sol, "start")
 truck = E.cars[sol]
 cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
@@ -936,46 +1144,30 @@ Moving.step()
 danny = MoveHelper.find(sol)
 body = danny.body
 npc = body.model
-local backAsk = cargoDoor.WorldPosition + V3(0, 0, 2)
-E.place(sol, backAsk + V3(30, 0, 0)) -- (out of the way: nobody handles the slab)
-local slab = itemModel(6)
+E.request(sol, "helper", "hire")
+site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+E.place(sol, outside)
+trigger(promptIn(site, "Enter house"), sol)
+slab = itemModel(6)
 local SLAB = E.items.slab.size
-local noticeAt = #E.messages
+give(slab)
+local backAsk = cargoDoor.WorldPosition + V3(0, 0, 2)
+E.place(sol, backAsk + V3(30, 0, 0)) -- (out of the house: nobody at the slab)
+noticeAt = #E.messages
 said = #E.said
-local askStart = E.clock
 local asking = run(40, function()
-	return danny.ask ~= nil and danny.askAt > 0
+	return danny.needs == 6 and danny.needsAt > 0
 end)
-check("8.3 AUTO: the heavy piece nobody handles (the ★ marble slab: two people), AskGap s after he came, he goes to it and asks",
-	asking and danny.ask == 6 and danny.action == "ask" and E.clock - askStart >= H.AskGap - 0.15, `{danny.ask} after {E.clock - askStart} s`)
-check("…beside it: \"This one's too heavy for me alone, give me a hand!\"", E.saidSince("This one's too heavy for me alone, give me a hand!", said)
-	and distance(body.root.Position, slab.PrimaryPart.Position) <= math.max(SLAB.X, SLAB.Z) / 2 + H.PickReach + 0.5)
-check("…the crew's toast, the 🙋 marker over it, its prompt \"Lift with Danny\", the strip", told(sol, "Danny needs a hand with the Marble slab", noticeAt)
-	and slab.PrimaryPart:FindFirstChild("DannyAsk") ~= nil and promptIn(slab, "Lift with Danny") ~= nil
-	and sol:GetAttribute("MoveHelperDoing") == "Needs a hand with the Marble slab", sol:GetAttribute("MoveHelperDoing"))
--- nobody comes: AskWait s, then the light pieces; no new ask before AskAgain s
-local askedAt = E.clock
-said = #E.said
-local gaveUp = run(H.AskWait + 2, function()
-	return danny.ask == nil
-end)
-local endedAt = E.clock
-check("…nobody came within AskWait s: \"No takers? I'll grab the small stuff.\", the marker gone, the prompt as ever", gaveUp
-	and endedAt - askedAt >= H.AskWait - 0.15 and E.saidSince(Brain.Lines.askOff, said) and slab.PrimaryPart:FindFirstChild("DannyAsk") == nil
-	and promptIn(slab, "Lift") ~= nil and promptIn(slab, "Lift with Danny") == nil, endedAt - askedAt)
-local light = run(30, function()
-	return Rules.holding(danny.s.move, danny.id) ~= nil
-end)
-local first = Rules.holding(danny.s.move, danny.id)
-check("…back to the light pieces (one-hand, or two-hands under LightWeight)", light and first ~= nil and Brain.light(danny.s.move.things[first].class, danny.s.move.things[first].weight), first)
-local nagged = false
-local again = run(H.AskAgain + 30, function()
-	if danny.ask ~= nil and E.clock - endedAt < H.AskAgain - 0.15 then
-		nagged = true
-	end
-	return danny.ask == 6 and danny.askAt > 0
-end)
-check("…no nagging: AskAgain s later (not sooner) he asks again", again and not nagged and E.clock - endedAt >= H.AskAgain - 0.15, E.clock - endedAt)
+check("8.3 the slab on his list (two people): he goes to it and waits at one end", asking and danny.action == "needs"
+	and distance(body.root.Position, slab.PrimaryPart.Position) <= math.max(SLAB.X, SLAB.Z) / 2 + H.PickReach + 0.6)
+check("…\"This one's too heavy for me alone, give me a hand!\"", E.saidSince("This one's too heavy for me alone, give me a hand!", said))
+check("…the crew's toast, the marker \"🙋 Danny needs you\", its prompt \"Lift with Danny\", the strip", told(sol, "Danny is at the Marble slab: lift it with him.", noticeAt)
+	and markOf(slab) == "🙋 Danny needs you" and slab:GetAttribute("DannyNeeds") == true and promptIn(slab, "Lift with Danny") ~= nil
+	and sol:GetAttribute("MoveHelperDoing") == "Waiting for you at the Marble slab", sol:GetAttribute("MoveHelperDoing"))
+noticeAt = #E.messages
+run(60)
+check("8.3 …nobody comes for a minute: he still waits at it (no timeout: it is yours to lift with him), the crew told once", danny.needs == 6 and danny.action == "needs"
+	and listIs({ 6 }) and not told(sol, "Danny is at the Marble slab", noticeAt))
 -- Sol answers: Lift with Danny at its other end (a call he answers at once); 8.3 with the grip on (Config.CarryGrip.On:
 -- the runtime turns it off for the moves' other tests) his "On three... lift!" opens her lift check (the 8.1 grip), a
 -- miss lets it slip back down (he waits at its far end), Lift again and its hit: up together; to the van, in
@@ -996,8 +1188,8 @@ local function gripOpened(from: number): any
 end
 local gripFrom = #E.messages
 trigger(promptIn(slab, "Lift with Danny"), sol)
-check("8.3 Sol answers (\"Lift with Danny\"): a call, his ask over (the marker gone), no lift check yet", danny.call ~= nil and danny.call.spot == 6 and danny.ask == nil
-	and slab.PrimaryPart:FindFirstChild("DannyAsk") == nil and sol:GetAttribute("MoveHelperCall") == "Marble slab" and gripOpened(gripFrom) == nil)
+check("8.3 Sol answers (\"Lift with Danny\"): a call, no lift check yet, still on his list", danny.call ~= nil and danny.call.spot == 6
+	and sol:GetAttribute("MoveHelperCall") == "Marble slab" and gripOpened(gripFrom) == nil and listIs({ 6 }))
 local ready = run(8, function()
 	return danny.call ~= nil and danny.call.ready
 end)
@@ -1040,9 +1232,12 @@ retry = gripOpened(gripFrom)
 check("…Lift once more: a call he answers at once (he is there), \"On three... lift!\", a new check", readyAgain and retry ~= nil and E.saidSince("On three... lift!", said))
 hitAt = CarryGrip.firstHit(CarryGrip.fromWire(retry) :: any)
 E.now += hitAt + 0.08
+noticeAt = #E.messages
 E.request(sol, "grip", retry.id, "ok", hitAt)
 check("…its hit: up together at once (never dragged alone), Sol leading, Danny at the far end", sol.Character:GetAttribute("MoveCarry") == 6
 	and select(2, Rules.holding(danny.s.move, danny.id)) == "helper" and danny.call == nil and sol:GetAttribute("MoveHelperCall") == nil)
+check("8.3 …off his list (no \"You took\": lifted with him), the marker gone", #danny.queue == 0 and markOf(slab) == nil and slab:GetAttribute("DannyNeeds") == nil
+	and not told(sol, "You took", noticeAt))
 Config.CarryGrip.On = false
 local function together(): boolean
 	return select(2, Rules.holding(danny.s.move, danny.id)) == "helper" and sol.Character:GetAttribute("MoveCarry") == 6
@@ -1069,7 +1264,11 @@ run(0.2)
 Moving.admin(sol, "start")
 Moving.step()
 danny = MoveHelper.find(sol)
-danny.askAgain = math.huge -- (8.3 no ask on this one)
+E.request(sol, "helper", "hire")
+E.place(sol, outside)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+give(itemModel(1))
+E.place(sol, outside)
 local routes: { any } = {}
 local spawn = E.task.spawn
 E.task.spawn = function(callback: any, ...: any) -- (the path in the background: at once here)
@@ -1114,19 +1313,50 @@ run(0.2)
 Moving.admin(sol, "start")
 Moving.step()
 danny = MoveHelper.find(sol)
-danny.askAgain = math.huge -- (8.3 no ask on this one: his own pieces)
+E.request(sol, "helper", "hire")
+E.place(sol, outside)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+give(itemModel(5))
+E.place(sol, outside)
 local holds = run(40, function()
 	return danny.body ~= nil and Rules.holding(danny.s.move, danny.id) ~= nil
 end)
 local held = Rules.holding(danny.s.move, danny.id)
-check("a fifth move: Danny carries a piece", holds and held ~= nil)
+check("a later move: Danny carries the piece of his list", holds and held == 5)
 danny.body.model:Destroy()
 run(0.5)
 check("his body gone: what he held fell (never 'carried' by nobody)", Rules.holding(danny.s.move, danny.id) == nil and held ~= nil
 	and danny.s.move.things[held].state == "ground", held and danny.s.move.things[held].state)
+Moving.admin(sol, "end")
+run(0.2)
+
+-- 8.3 an unhired Danny heads back when the crew grows; a crew mate's hire ends when they leave the move -------------------------
+
+Moving.admin(sol, "start")
+Moving.step()
+danny = MoveHelper.find(sol)
+npc = danny.body.model
+E.crew[sol] = { bob }
+Moving.step()
+check("8.3 not hired, a crew of two: Danny heads home (Duo is off: your crew has it now)", MoveHelper.find(sol) == nil and npc.Parent == nil
+	and sol:GetAttribute("MoveHelper") == nil and string.find(E.lastNotice(sol), "your crew has it now", 1, true) ~= nil)
+H.Duo = true
+Moving.step()
+danny = MoveHelper.find(sol)
+check("Duo on: he comes for two as well, for hire", danny ~= nil and sol:GetAttribute("MoveHelper") == "offer" and bob:GetAttribute("MoveHelper") == "offer"
+	and bob:GetAttribute("MoveHelperId") == danny.id)
+E.wallet[bob] = 300
+E.request(bob, "helper", "hire")
+check("8.3 Bob (the crew mate) hires him: Bob's money, Bob's hire", danny.hirer == bob and E.wallet[bob] == 300 - danny.price and sol:GetAttribute("MoveHelper") == "hired")
+H.Duo = false
+E.crew[sol] = {}
+Moving.step()
+check("8.3 Bob leaves the move: his hire with him (whoever hired him owns it), Danny for hire again for Sol", MoveHelper.find(sol) == danny and danny.hirer == nil
+	and sol:GetAttribute("MoveHelper") == "offer" and string.find(E.lastNotice(sol), "Bob left the move", 1, true) ~= nil, E.lastNotice(sol))
 E.leave(sol)
 run(0.2)
 check("the owner leaves: the move and Danny are gone", MoveHelper.find(sol) == nil and E.destroyed == E.built)
+E.leave(rex)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

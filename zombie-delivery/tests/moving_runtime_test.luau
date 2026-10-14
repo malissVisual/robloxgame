@@ -21,7 +21,8 @@
 -- the doorway inside, no ping-pong (shut until you left the zone you came out in and Rearm s went by, whichever later),
 -- in and out with a piece in your hands, a pair piece's back end does not lead (said once), its front end takes it along;
 -- the doormats (▲ IN outside while a move uses the house, ▲ OUT inside).
--- 8.3 Danny's orders: a crew of players has no Danny, so a two-person Lift is today's (dragged alone, Help lift).
+-- 8.3 Danny for hire: a crew of players has no Danny (an unhired one is never called either), so a two-person Lift is today's
+-- (dragged alone, Help lift).
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")

@@ -11,7 +11,7 @@
 --   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states.
 --   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
 --   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
---      Danny for each (told to wait at the van). Bob at Ann's kiosk gets only his own card.
+--      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
 --   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside.
 --   5. A sturdy two-hands piece through the grip lift check: a crew mate's answer does nothing, a forged "ok" is a miss
 --      (a knock), the client's "ok" with a good press time lifts it balanced; a wobble answered (steady), one missed (a
@@ -37,6 +37,8 @@
 --  18. 8.3 the market: the state carries the day's hot and cold kinds; a hot piece on a stand: its tag shows the hot
 --      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
 --      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
+--  19. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
+--      piece out by its doorway inside (the real plan's second way out), loaded, home.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -52,6 +54,7 @@ local TaskRules = require("./SandboxTasks") -- (shared/SandboxTasks.luau, the pu
 local Plan = require("./AnalyticsPlan")
 local StockPlan = require("./StockPlan")
 local Market = require("./Market") -- (8.3: the day's hot and cold kinds)
+local SoundPlan = require("./SoundPlan") -- (8.3: "in the house" for the eyes and the sounds)
 
 local failures = 0
 local todos: { string } = {}
@@ -89,7 +92,7 @@ do
 	local chosen: number? = nil
 	for score = 3, 1, -1 do
 		for day = first, first + 3000 do
-			local saved = TaskRules.fresh(11, day * 86400 + 43200, nil)
+			local saved = TaskRules.fresh(11, day * 86400 + 43200, { offer = true }) -- (8.3: the visitors are off here: never their task)
 			local has: { [string]: number } = {}
 			for _, slot in saved.daily do
 				has[slot.id] = slot.target
@@ -125,6 +128,7 @@ local Vehicles = E.fakes.Vehicles
 MoveHelper.useMover(E.mover) -- (no pathfinding in the CLI: Danny walks straight)
 
 local queued: { any } = {}
+Config.Visitors.On = false -- (8.3: the showroom's visitors off here: tests/visitors_runtime_test.luau drives them)
 Boot.start(function(player: any)
 	table.insert(queued, player)
 end)
@@ -169,12 +173,16 @@ do
 	check("…the map (workspace.Sandbox), the four warehouses, a kiosk on every plot, the Cars folder; no Baseplate", workspace:FindFirstChild("Sandbox") ~= nil
 		and warehouses ~= nil and #warehouses:GetChildren() == 4 and moves ~= nil and moves:FindFirstChild("MovingBoard1") ~= nil
 		and moves:FindFirstChild("MovingBoard4") ~= nil and workspace:FindFirstChild("Cars") ~= nil and rawget(baseplate, "destroyed") == true)
-	local door: any = nil
+	local door, back: any, any = nil, nil
 	for _, d in workspace:GetDescendants() do
 		if d:GetAttribute("SandboxDoor") then
 			door = d
+		elseif d:GetAttribute("SandboxBackDoor") then
+			back = d
 		end
 	end
+	check("…8.3: the chalet's back door (SandboxBackDoor) in its back wall where SandboxMap puts it", back ~= nil
+		and V3(back.Position.X - House.back.x, 0, back.Position.Z - House.back.z).Magnitude < 1)
 	check("…the chalet's front door (SandboxDoor) where SandboxMap puts it", door ~= nil and V3(door.Position.X - House.door.x, 0, door.Position.Z - House.door.z).Magnitude < 2)
 	check("…the sandbox's own DataStore (Config.Sandbox.Store); analytics on (a live server)", E.storeName == Config.Sandbox.Store and Config.Analytics.Enabled)
 	check("(a day whose tasks for Ann hold trips, sell and the weekly income)", S.day ~= nil)
@@ -318,12 +326,11 @@ function H.takeContract(player: any, plot: any): (any, boolean, string?)
 	local card = E.lastOf(player, "Moving", "contract", before)
 	return card and card[2], ok, why
 end
--- START, LAUNCH (solo) and Danny told to wait at the van.
+-- START, LAUNCH (solo); Danny waits by the van for hire (8.3: nobody hires him here, the pieces are the player's).
 function H.launch(player: any)
 	E.fire(player, "Moving", "start", House.id)
 	E.fire(player, "MoveLobby", "launch")
 	E.advance(0.5)
-	E.fire(player, "Moving", "helper", "van") -- (8.3: WAIT AT VAN, his command card's)
 end
 -- The van's middle along the roads: out of the plot, Depot Row, Main Street, round the turnaround to the curb, backed
 -- toward the chalet's door (its nose north).
@@ -626,10 +633,11 @@ do
 	S.annMove = view.id
 	check("…its drop-off is her plot's unload circle; no horde; the clock runs", view.drop == "your warehouse" and view.dropOff.x == plots[1].unload.x
 		and view.dropOff.z == plots[1].unload.z and view.hordeAt == nil and view.endsAt > E.now)
-	check("…Danny joins her crew of one, on AUTO (8.3), his id for his command card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).mode == "auto"
+	check("…Danny comes with her crew of one, for hire (8.3), his id for his card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).hirer == nil
 		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
 	E.fire(ann, "Moving", "helper", "van")
-	check("…told to WAIT AT VAN (8.3: his command card's order): he leaves her pieces to her", ann:GetAttribute("MoveHelper") == "van", ann:GetAttribute("MoveHelper"))
+	check("…the old orders are gone (WAIT AT VAN: nothing): not hired, he leaves her pieces to her, his price on her status line",
+		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	local bobCard = H.takeContract(bob, plots[2])
 	H.launch(bob)
@@ -1549,6 +1557,105 @@ do
 		and price == math.floor(CollectionRules.sell(entry) * Config.Market.HotSell + 0.5) and type(fields) == "table" and fields.CustomField02 == "hot", `{price} {fields and fields.CustomField02}`)
 	local after = Collection.market(dee) :: any
 	check("…her demand for that kind: 1 sold today", after.demand[hotKind] ~= nil and after.demand[hotKind].n == 1 and after.demand[hotKind].sold == 1)
+end
+
+-- ── 19. 8.3: the PAINT shop ───────────────────────────────────────────────
+
+do
+	local dee = S.dee
+	local van = H.play(dee)
+	E.advance(Config.VanPaint.Prompt.Every + 0.1)
+	local prompt = if van then E.promptIn(van.model, "🎨 Paint van") else nil
+	check("19. the PAINT shop: Dee's van at her warehouse wears its 🎨 Paint van prompt (on, hers only: CargoOwner)", prompt ~= nil and prompt.Enabled == true
+		and prompt:GetAttribute("CargoOwner") == dee.UserId and van.model:GetAttribute("VanPaint") == "cream")
+	local at = E.promptAt(prompt)
+	local root = E.rootOf(dee)
+	E.walk(dee, V3(at.X - 1.5, root.Position.Y, at.Z))
+	local sentAt = #E.sent
+	local ok, why = E.trigger(prompt, dee)
+	check("…pressed there: the window opens (the state, then \"open\")", ok and E.lastKind(dee, "VanPaint", "state", sentAt) ~= nil and E.lastKind(dee, "VanPaint", "open", sentAt) ~= nil, why)
+	PlayerData.addMoney(dee, 1000, "Admin")
+	local paidAt = #money
+	E.advance(0.5)
+	E.fire(dee, "VanPaint", { kind = "buy", id = "white" })
+	E.advance(0.1)
+	check("…BUY Arctic white: $300 taken (the reason VanPaint), the van out wears it (VanPaint, PaintColor)", H.paid(dee, "VanPaint", paidAt) == -300 and van.model:GetAttribute("VanPaint") == "white"
+		and van.model:GetAttribute("PaintColor") ~= nil and E.lastKind(dee, "VanPaint", "bought", sentAt) ~= nil)
+	E.fire(dee, "SpawnCar")
+	E.advance(1)
+	local again = Vehicles.get(dee)
+	check("…CAR: the van that comes (a new one) wears it too, with its prompt", again ~= nil and again ~= van and again.model:GetAttribute("VanPaint") == "white"
+		and E.promptIn(again.model, "🎨 Paint van") ~= nil)
+end
+
+-- ── 20. 8.3 the big move: the back door ────────────────────────────────────
+-- Ann (back since step 13) on a new move: the card's big plan (Config.Furniture.Big) with its two ways out; round the
+-- house to its back door (House.back, the back wall: the walk-in zone, the fade) to the corridor's east end inside, a
+-- piece out by that doorway, out behind the house facing the garden, round to the van's back, loaded, home: a trip.
+do
+	local van = S.annVan2
+	E.advance(1.1)
+	local card = H.takeContract(ann2, plots[1])
+	check("20. 8.3: Ann's card: the chalet, 25 minutes, its pieces (the big plan's: Config.Furniture.Big.Spots and collectibles)", card ~= nil
+		and card.id == House.id and card.name == House.name and card.time == 25 * 60 and card.items >= Config.Furniture.Big.Spots[1] and card.busy == nil,
+		card and (card.busy or card.items))
+	H.launch(ann2)
+	check("(her move)", H.stateOf(ann2) ~= nil, E.lastNotice(ann2))
+	H.drive(ann2, van, H.toHouse(plots[1]))
+	check("(at the chalet's curb, the back open)", H.setBack(ann2, van, true), E.lastNotice(ann2))
+	local out = H.yawLook(House.back.yaw)
+	local backAt = V3(House.back.x, House.back.y + 3, House.back.z)
+	local side = V3(House.house.x + House.house.sx / 2 + 8, 3, 0) -- (round the house's east side)
+	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
+	E.walk(ann2, V3(side.X, 3, backAt.Z + 8))
+	E.walk(ann2, backAt + out * 8)
+	E.walk(ann2, backAt + out * 1.5)
+	local inside = E.waitUntil(function(): boolean
+		return H.isInside(ann2)
+	end, 3)
+	local origin = E.interiorAt(E.rootOf(ann2).Position)
+	local exit2: any = nil
+	for _, d in workspace:FindFirstChild("Moves"):GetChildren() do
+		if d.Name == "LeaveDoor2" and origin and (d.Position - origin.Position).Magnitude < 400 then
+			exit2 = d
+		end
+	end
+	local into = E.rootOf(ann2).CFrame.LookVector
+	check("…walked into the back door's zone: inside, by the corridor's east end (the plan's second way in), facing into the house",
+		inside and exit2 ~= nil and H.flat(E.rootOf(ann2).Position, exit2.Position) < Config.Furniture.EntryIn + 1 and into.X < -0.9,
+		E.rootOf(ann2).Position)
+	S.into[ann2] = V3(into.X, 0, into.Z).Unit
+	local here, view = E.rootOf(ann2).Position, H.stateOf(ann2)
+	check("…in the house for her eyes and her sounds (the state's inside: SoundPlan.sandboxPlace \"house\")", view ~= nil and view.inside == true
+		and SoundPlan.sandboxPlace(here.X, here.Y, here.Z, view.inside) == "house")
+	local piece, model = H.choose(ann2, function(_i: any, d: any): boolean
+		return d.class == "hand" and not d.fragile
+	end)
+	check("(a one-hand piece of the big plan in her hands)", piece ~= nil and H.pickUp(ann2, model), E.lastNotice(ann2))
+	local door = exit2.Position - V3(0, 3.5, 0)
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	E.walk(ann2, door + S.into[ann2] * 5 + up)
+	E.walk(ann2, door + S.into[ann2] * 1.5 + up)
+	local outAgain = E.waitUntil(function(): boolean
+		return not H.isInside(ann2)
+	end, 3)
+	local at = E.rootOf(ann2).Position
+	check("…carried out by the back door (walked into its doorway's zone inside): out behind the house, 4 south of the door, facing the garden, the piece with her",
+		outAgain and math.abs(H.flat(at, V3(House.back.x, 0, House.back.z)) - 4) < 0.6 and E.rootOf(ann2).CFrame.LookVector.Z > 0.9
+		and ann2.Character:GetAttribute("MoveCarry") == piece.spot, at)
+	local outView = H.stateOf(ann2)
+	check("…outdoors again for her eyes and her sounds", outView ~= nil and outView.inside ~= true and SoundPlan.sandboxPlace(at.X, at.Y, at.Z, false) == "outdoors")
+	E.walk(ann2, V3(side.X, 3, backAt.Z + 8)) -- (round the house again, to the van)
+	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
+	local loaded, why = H.loadAtBack(ann2, van)
+	check("…loaded at the van's back", loaded and H.itemOf(ann2, piece.spot).state == "truck", why or E.lastNotice(ann2))
+	H.setBack(ann2, van, false)
+	local before = #Collection.stock(ann2)
+	H.drive(ann2, van, H.toPlot(plots[1], false))
+	E.advance(1)
+	check("…home: a trip, the piece in her stock", H.stateOf(ann2).trips == 1 and #Collection.stock(ann2) == before + 1, E.lastNotice(ann2))
+	E.fire(ann2, "Moving", "finish")
+	E.advance(1)
 end
 
 -- ── The run ───────────────────────────────────────────────────────────────

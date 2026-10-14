@@ -1,25 +1,30 @@
 --!strict
--- 8.3 Danny's command card (the owner: "helping works weirdly ... I'd like to click on him any time and tell him what to
--- do, or have an auto mode where he carries only light things and calls for help with a heavy one"). A small card
--- beside Danny (server/MoveHelper.luau decides everything; his orders' words shared/MoveHelperBrain.luau's):
---   * Opening it: on a computer a click on his body (the crosshair's middle while the camera holds the mouse, else the
---     mouse's point), on a touch screen a tap on him (UserInputService.TouchTapInWorld; Config.MoveHelper.TapSlop studs
---     beside his body count, ClickReach studs at most), on a gamepad the "Talk to Danny" prompt on him (a ProximityPrompt
---     this client makes on his root, shown only while a gamepad is in use, on ButtonL1: free in the sandbox, never the
---     X of the pieces' Lift nor the Y of the van's Take out); the ORDERS button of his status line (client/
---     MoveHelperHud.luau, wired by useCard). Not by a click while your hands are full or you wait for him (a left click
---     is the grip check's press then). His body is found by your player attribute MoveHelperId (his body's MoveHelper):
---     only his move's crew has it.
---   * The card: "🧑‍🔧 DANNY", what he does now, ✕; four big buttons AUTO / HELP ME / WAIT HERE / WAIT AT VAN, a line
---     under each, the one in force lit (your player attribute MoveHelper). A tap sends the Moving remote's ("helper",
---     order) (the server checks it is his crew's and rate limits it) and the card closes. A computer has the keys 1–4
---     too; a gamepad's selection starts on the order in force.
+-- 8.3 Danny's card and his list's clicks (the owner: "make it so I click on the helper, but I have to PAY for him when I
+-- want help … you go into the house, click on something, and that assigns it to him, and the rest you carry
+-- yourself"). server/MoveHelper.luau decides everything; his words are shared/MoveHelperBrain.luau's:
+--   * Opening the card: on a computer a click on his body (the crosshair's middle while the camera holds the mouse, else
+--     the mouse's point), on a touch screen a tap on him (UserInputService.TouchTapInWorld; Config.MoveHelper.TapSlop
+--     studs beside his body count, ClickReach studs at most), on a gamepad the prompt on him ("Hire Danny" while he is
+--     for hire, then "Talk to Danny": a ProximityPrompt this client makes on his root, shown only while a gamepad is in
+--     use, on shared/SandboxPad.luau's "danny" button: L1); the button of his status line (client/MoveHelperHud.luau, wired by useCard). Never while your
+--     hands are full, you wait for him or a grip check shows (a left click is the check's press then:
+--     client/CarryGripUi.luau active). His body is found by your player attribute MoveHelperId (his body's
+--     MoveHelper): only his move's crew has it.
+--   * The card: "🧑‍🔧 DANNY", his status (MoveHelperBrain.status), ✕; for hire: "Hire Danny for this move · $170", what
+--     he does for you, and HIRE · $170 (the Moving remote's ("helper", "hire"): the server checks the crew and the
+--     money and takes it); hired: "2 pieces to carry", how to give him pieces, and CLEAR QUEUE (("helper", "clear")).
+--     A tap on its button sends once and the card closes. A gamepad's selection starts on its button.
+--   * His list (hired): a click on a piece of your move (a tap on a touch screen) sends ("helper", "assign", its model):
+--     onto his list, or off it again (the server checks and says so in a toast; its marker over the piece is the
+--     server's). On a gamepad the prompt "Give to Danny" ("Take back from Danny" for a piece of his list) on the nearest
+--     piece of your move within reach, on SandboxPad's "dannygive" button (R1: free in the sandbox, no throw or holster
+--     there).
 --   * Where (MoveHelperCard.layout, pure): beside his head as it was on the screen when it opened (right of him, else
 --     left, over, under), clear of the HUD's groups (client/Hud.luau's), the sandbox's chips (client/SandboxHud.luau's
 --     money block, client/SandboxTasksUi.luau's TASKS chip), the move's top blocks (its panel, Danny's status line, the
 --     guide's line: client/TopBlocks.luau), the quick chat's button, the move's list and on a touch screen the touch
---     controls (client/TouchLayout.luau); none clear, the place that covers the least. On a touch screen its buttons
---     and its ✕ are at least Ui.MinTouch. Placed again on a resize or when the top blocks move.
+--     controls (client/TouchLayout.luau); none clear, the place that covers the least. On a touch screen its button and
+--     its ✕ are at least Ui.MinTouch. Placed again on a resize or when the top blocks move.
 --   * One window at a time (client/Main.client.luau registers it: onOpen, ESC); ✕, ESC, the gamepad's B, a click or a
 --     tap beside it, walking Config.MoveHelper.CardReach studs from him, a seat, him gone close it.
 -- Presentation only.
@@ -28,9 +33,11 @@
 --   MoveHelperCard.close(), .isOpen(), .card()     closes it / is it open / its frame (the checks)
 --   MoveHelperCard.onOpen                          set by client/Main.client.luau (the other windows close)
 --   MoveHelperCard.body()                          his body (nil: none on your move, or not streamed in)
+--   MoveHelperCard.pieceAt(origin, direction)      the piece of your move a ray from `origin` hits first (its model), nil
 --   MoveHelperCard.layout(W, H, S, touch, anchor, blocks) -> (box, scale)   where the card goes (px under Roblox's top
 --                                                  bar; anchor: { x, y } or nil, the screen's middle)
 
+local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,12 +47,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
+local SandboxPad = require(Shared.SandboxPad) -- (the gamepad's buttons for him: its actions "danny" and "dannygive")
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local TouchLayout = require(script.Parent.TouchLayout)
 local MoveLayout = require(script.Parent.MoveLayout)
 local TopBlocks = require(script.Parent.TopBlocks)
 local MoveHelperHud = require(script.Parent.MoveHelperHud)
+local CarryGripUi = require(script.Parent.CarryGripUi)
 
 local MoveHelperCard = {}
 
@@ -56,41 +65,37 @@ local K = Theme.Contract
 local player = Players.LocalPlayer
 local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (client/MovingHud.luau's)
 -- the card at scale 1 (px)
-local CARD_W, PAD, GAP = 344, 10, 8
+local CARD_W, PAD, GAP = 320, 10, 8
 local TITLE_H, DOING_H, CLOSE = 18, 16, 28
-local BUTTON_H, KEY_W = 56, 14
-local BUTTON_W = (CARD_W - 2 * PAD - GAP) / 2
+local LINE_H, HINT_H, BUTTON_H = 20, 30, 56
 local MARGIN = 8 -- from the screen's edges and what it keeps clear of
 local SIDE = 36 -- px between his head's point and the card beside it
+local PIECE_REACH = 12 -- studs: the gamepad's "Give to Danny" on the nearest piece this near
+local TALK_PAD = SandboxPad.pads("danny")[1] or "ButtonL1" -- (shared/SandboxPad.luau: L1 his)
+local GIVE_PAD = SandboxPad.pads("dannygive")[1] or "ButtonR1"
+local PICK = { ["Pick up"] = true, Lift = true, ["Lift with " .. H.Name] = true, ["Pick up with " .. H.Name] = true } -- (a piece's own prompt)
 -- the HUD's groups (client/CarryGripUi.luau's list) and the sandbox's chips' ScreenGuis
 local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "KeyHints" }
 local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "" } -- (a ScreenGui: its piece, "" every piece)
-local HINTS: { [string]: string } = {
-	auto = "Carries light pieces, calls you for heavy ones",
-	help = "Follows you and lifts with you",
-	stay = "Waits right where he stands",
-	van = "Waits by the van's back",
-}
-local ICONS: { [string]: string } = { auto = "🤖", help = "🙋", stay = "⏸", van = "🚐" }
-local KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four }
 
 local remote = Net.get("Moving")
 local started = false
 local gui: ScreenGui? = nil
 local parts: { [string]: any } = {} -- the card's pieces (built once)
-local buttons: { [string]: TextButton } = {}
 local opened = false
 local openToken = 0
 local anchorAt: { x: number, y: number }? = nil -- his head's point when it opened
 local found: Model? = nil -- his body (found by MoveHelperId)
-local prompt: ProximityPrompt? = nil -- the gamepad's "Talk to Danny"
+local prompt: ProximityPrompt? = nil -- the gamepad's "Hire Danny" / "Talk to Danny" on him
+local give: ProximityPrompt? = nil -- the gamepad's "Give to Danny" on the nearest piece
+local giveTo: Model? = nil -- …that piece
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
 local function cardHeight(touch: boolean, scale: number): (number, number)
 	local close = if touch then math.max(CLOSE, math.ceil(Ui.MinTouch / scale)) else CLOSE
 	local head = math.max(TITLE_H + DOING_H, close)
-	return PAD + head + GAP + 2 * BUTTON_H + GAP + PAD, close
+	return PAD + head + GAP + LINE_H + HINT_H + GAP + BUTTON_H + PAD, close
 end
 
 local function clearOf(b: TouchLayout.Box, W: number, H: number, blocks: { TouchLayout.Box }): boolean
@@ -156,7 +161,7 @@ function MoveHelperCard.layout(W: number, H: number, S: number, touch: boolean, 
 	return (best or fallback or TouchLayout.box(MARGIN, MARGIN, MARGIN + w, MARGIN + h)) :: TouchLayout.Box, scale
 end
 
--- ── His body ───────────────────────────────────────────────────────────────
+-- ── His body, the pieces ───────────────────────────────────────────────────
 
 function MoveHelperCard.body(): Model?
 	local id = player:GetAttribute("MoveHelperId")
@@ -196,11 +201,54 @@ local function seated(): boolean
 	return humanoid ~= nil and humanoid.SeatPart ~= nil
 end
 
--- May a click, a tap or the prompt open it now (Danny on your move, your hands free, not waiting for him, on foot)?
-local function mayOpen(): boolean
+local function hired(): boolean
+	return player:GetAttribute("MoveHelper") == "hired"
+end
+
+-- May a click, a tap or a prompt act now (Danny on your move, your hands free, not waiting for him, no grip check, on
+-- foot)?
+local function mayAct(): boolean
 	local character = player.Character
 	return type(player:GetAttribute("MoveHelper")) == "string" and character ~= nil and character:GetAttribute("Carrying") == nil
-		and player:GetAttribute("MoveHelperCall") == nil and not seated()
+		and character:GetAttribute("Pushing") == nil and player:GetAttribute("MoveHelperCall") == nil and not seated() and not CarryGripUi.active()
+end
+
+-- A piece's own prompt (its Pick up / Lift, tagged MovePrompt) when it is your move's: shown to you (MovingHud's rule).
+local function piecePrompt(model: Instance): ProximityPrompt?
+	for _, d in model:GetDescendants() do
+		if d:IsA("ProximityPrompt") and PICK[d.ActionText] then
+			local owner = d:GetAttribute("MoveOwner")
+			if type(owner) == "number" and (owner == player.UserId or player:GetAttribute("MoveWith") == owner) then
+				return d
+			end
+			return nil
+		end
+	end
+	return nil
+end
+
+-- The piece of your move a ray hits first (its model: the attribute MoveSpot), nil: none, or another move's.
+function MoveHelperCard.pieceAt(origin: Vector3, direction: Vector3): Model?
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local ignore: { Instance } = {}
+	if player.Character then
+		table.insert(ignore, player.Character)
+	end
+	local npcs = workspace:FindFirstChild("Npcs")
+	if npcs then
+		table.insert(ignore, npcs) -- (Danny, a crew mate's … never in the way of a piece)
+	end
+	params.FilterDescendantsInstances = ignore
+	local hit = workspace:Raycast(origin, direction * H.ClickReach, params)
+	local node: Instance? = if hit then hit.Instance else nil
+	while node and node ~= workspace do
+		if node:IsA("Model") and type(node:GetAttribute("MoveSpot")) == "number" then
+			return if piecePrompt(node) then node else nil
+		end
+		node = node.Parent
+	end
+	return nil
 end
 
 -- His head's point on the screen (px under the top bar), nil: behind the camera or off it.
@@ -245,12 +293,17 @@ end
 
 -- ── The card ───────────────────────────────────────────────────────────────
 
-local function order(mode: string)
+local function send(kind: string)
 	if not opened then
-		return -- (a second tap as it closes: one order)
+		return -- (a second tap as it closes: one request)
 	end
-	remote:FireServer("helper", mode)
+	remote:FireServer("helper", kind)
 	MoveHelperCard.close()
+end
+
+local function priceNow(): number
+	local price = player:GetAttribute("MoveHelperPrice")
+	return if type(price) == "number" then price else 0
 end
 
 local function build(): Frame?
@@ -319,80 +372,79 @@ local function build(): Frame?
 		MoveHelperCard.close()
 	end)
 	parts.close = close
-	for index, mode in Brain.Modes do
-		local button = Ui.make("TextButton", {
-			Name = mode,
-			Size = UDim2.fromOffset(BUTTON_W, BUTTON_H),
-			BackgroundColor3 = K.row,
-			BorderSizePixel = 0,
-			AutoButtonColor = true,
-			Text = "",
-			LayoutOrder = index,
-		}, card)
-		Ui.corner(button, 8)
-		Ui.label(button, `{ICONS[mode]} {Brain.modeName(mode)}`, UDim2.new(1, -14, 0, 20), {
-			Name = "Label",
-			Position = UDim2.fromOffset(8, 6),
-			Font = Theme.HeadingFont,
-			TextSize = 14,
-			TextColor3 = K.text,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
-		Ui.label(button, HINTS[mode], UDim2.new(1, -KEY_W - 10, 0, 26), {
-			Name = "Hint",
-			Position = UDim2.fromOffset(8, 26),
-			Font = Theme.Font,
-			TextSize = 11,
-			TextColor3 = K.secondary,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = Enum.TextYAlignment.Top,
-			TextWrapped = true,
-		})
-		Ui.label(button, tostring(index), UDim2.fromOffset(KEY_W, 14), {
-			Name = "Key", -- (a computer's key 1-4, in the corner under the name)
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -5, 1, -4),
-			Font = Theme.HeadingFont,
-			TextSize = 10,
-			TextColor3 = K.secondary,
-		})
-		local id = mode
-		button.Activated:Connect(function()
-			order(id)
-		end)
-		buttons[mode] = button
-	end
+	parts.line = Ui.label(card, "", UDim2.fromOffset(CARD_W - 2 * PAD, LINE_H), {
+		Name = "Line",
+		Font = Theme.HeadingFont,
+		TextSize = 15,
+		TextColor3 = K.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	parts.hint = Ui.label(card, "", UDim2.fromOffset(CARD_W - 2 * PAD, HINT_H), {
+		Name = "Hint",
+		Font = Theme.Font,
+		TextSize = 12,
+		TextColor3 = K.secondary,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = true,
+	})
+	local main = Ui.make("TextButton", {
+		Name = "Main",
+		Size = UDim2.fromOffset(CARD_W - 2 * PAD, BUTTON_H),
+		BackgroundColor3 = ORANGE,
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Theme.HeadingFont,
+		TextSize = 16,
+		TextColor3 = K.charcoal,
+		Text = "HIRE",
+	}, card)
+	Ui.corner(main, 8)
+	parts.edge = Ui.make("UIStroke", { Name = "Edge", ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.rule, Thickness = 1, Transparency = 1 }, main)
+	main.Activated:Connect(function()
+		send(if hired() then "clear" else "hire")
+	end)
+	parts.main = main
 	parts.card = card
 	return card
 end
 
--- The card's own words and colours: what he does, the order in force lit, the keys on a computer only.
-local function paint()
-	local mode = player:GetAttribute("MoveHelper")
-	local doing = player:GetAttribute("MoveHelperDoing")
-	local label = parts.doing
-	if label then
-		label.Text = Brain.status(mode, if type(doing) == "string" then doing else nil)
+-- How a piece goes to him with this input (a click, a tap, the gamepad's R1).
+local function giveWords(): (string, string)
+	if Ui.gamepadActive() then
+		local button = SandboxPad.button(GIVE_PAD)
+		return `{button} by a piece gives it to him`, `{button} again takes it back`
+	elseif Ui.touchLayout() then
+		return "Tap a piece to give it to him", "tap it again to take it back"
 	end
-	local touch = Ui.touchLayout()
-	for id, button in buttons do
-		local lit = id == mode
-		button.BackgroundColor3 = if lit then ORANGE else K.row
-		local text = if lit then K.charcoal else K.text
-		local name = button:FindFirstChild("Label") :: TextLabel?
-		local hint = button:FindFirstChild("Hint") :: TextLabel?
-		local key = button:FindFirstChild("Key") :: TextLabel?
-		if name then
-			name.TextColor3 = text
-		end
-		if hint then
-			hint.TextColor3 = if lit then K.charcoal else K.secondary
-		end
-		if key then
-			key.Visible = not touch
-			key.TextColor3 = if lit then K.charcoal else K.secondary
-		end
+	return "Click a piece to give it to him", "click it again to take it back"
+end
+
+-- The card's own words and colours: his status, for hire (the price, HIRE) or hired (his list, CLEAR QUEUE).
+local function paint()
+	if not parts.card then
+		return
+	end
+	local isHired = hired()
+	local count = player:GetAttribute("MoveHelperQueue")
+	local doing = player:GetAttribute("MoveHelperDoing")
+	local price = Brain.money(priceNow())
+	parts.doing.Text = Brain.status(isHired, priceNow(), count, if type(doing) == "string" then doing else nil)
+	local first, second = giveWords()
+	if isHired then
+		parts.line.Text = Brain.queueText(count)
+		parts.hint.Text = `{first} · {second}.`
+		parts.main.Text = "CLEAR QUEUE"
+		parts.main.BackgroundColor3 = K.raised
+		parts.main.TextColor3 = K.text
+		parts.edge.Transparency = 0
+	else
+		parts.line.Text = `Hire {H.Name} for this move · {price}`
+		parts.hint.Text = "He carries the pieces you give him and lifts the heavy ones with you."
+		parts.main.Text = `HIRE · {price}`
+		parts.main.BackgroundColor3 = ORANGE
+		parts.main.TextColor3 = K.charcoal
+		parts.edge.Transparency = 1
 	end
 end
 
@@ -459,19 +511,9 @@ local function place()
 	parts.title.Size = UDim2.fromOffset(wordsW, TITLE_H)
 	parts.doing.Size = UDim2.fromOffset(wordsW, DOING_H)
 	local top = PAD + head + GAP
-	for index, mode in Brain.Modes do
-		local button = buttons[mode]
-		local column, row = (index - 1) % 2, (index - 1) // 2
-		button.Position = UDim2.fromOffset(PAD + column * (BUTTON_W + GAP), top + row * (BUTTON_H + GAP))
-		local keyHint = button:FindFirstChild("Key") :: TextLabel?
-		local hint = button:FindFirstChild("Hint") :: TextLabel?
-		if keyHint then
-			keyHint.Visible = not touch -- (the keys 1-4: a computer's)
-		end
-		if hint then
-			hint.Size = UDim2.new(1, if touch then -14 else -KEY_W - 10, 0, 26)
-		end
-	end
+	parts.line.Position = UDim2.fromOffset(PAD, top)
+	parts.hint.Position = UDim2.fromOffset(PAD, top + LINE_H)
+	parts.main.Position = UDim2.fromOffset(PAD, top + LINE_H + HINT_H + GAP)
 end
 
 function MoveHelperCard.isOpen(): boolean
@@ -514,11 +556,7 @@ function MoveHelperCard.open(at: { x: number, y: number }?)
 	if hook then
 		hook() -- (client/Main.client.luau: the other windows close)
 	end
-	local mode = player:GetAttribute("MoveHelper")
-	local lit = if type(mode) == "string" then buttons[mode] else nil
-	if lit then
-		Ui.gamepadFocus(lit)
-	end
+	Ui.gamepadFocus(parts.main)
 	-- walking away from him, a seat, him gone: it closes (a look every quarter second while it is open)
 	task.spawn(function()
 		while opened and openToken == token do
@@ -545,7 +583,23 @@ local function onCard(x: number, y: number): boolean
 	return x >= at.X and x <= at.X + size.X and y >= at.Y and y <= at.Y + size.Y
 end
 
--- ── The gamepad's prompt on him ────────────────────────────────────────────
+-- A click or a tap in the world (a ray): on him, his card; on a piece of your move while he is hired, onto his list or
+-- off it (the server decides).
+local function clicked(origin: Vector3, direction: Vector3)
+	if reaches(origin, direction) then
+		MoveHelperCard.open(nil)
+		return
+	end
+	if not hired() then
+		return
+	end
+	local piece = MoveHelperCard.pieceAt(origin, direction)
+	if piece then
+		remote:FireServer("helper", "assign", piece)
+	end
+end
+
+-- ── The gamepad's prompts: on him, on the nearest piece ────────────────────
 
 local function keepPrompt()
 	local model = MoveHelperCard.body()
@@ -564,14 +618,13 @@ local function keepPrompt()
 		end
 		local fresh = Instance.new("ProximityPrompt")
 		fresh.Name = "TalkToDanny"
-		fresh.ActionText = `Talk to {H.Name}`
 		fresh.ObjectText = ""
-		fresh.GamepadKeyCode = Enum.KeyCode.ButtonL1
+		fresh.GamepadKeyCode = (Enum.KeyCode :: any)[TALK_PAD]
 		fresh.HoldDuration = 0
 		fresh.MaxActivationDistance = 12
 		fresh.RequiresLineOfSight = false
 		fresh.Triggered:Connect(function()
-			if mayOpen() then
+			if mayAct() then
 				MoveHelperCard.open(nil)
 			end
 		end)
@@ -579,10 +632,88 @@ local function keepPrompt()
 		prompt = fresh
 		made = fresh
 	end
-	local on = Ui.gamepadActive() and mayOpen()
 	local p = made :: ProximityPrompt
+	local words = if hired() then `Talk to {H.Name}` else `Hire {H.Name}`
+	if p.ActionText ~= words then
+		p.ActionText = words
+	end
+	local on = Ui.gamepadActive() and mayAct()
 	if p.Enabled ~= on then
 		p.Enabled = on
+	end
+end
+
+-- The nearest piece of your move within PIECE_REACH (its own prompt shown: home or on the ground; or on his list).
+local function nearestPiece(): Model?
+	local mine = myRoot()
+	if not mine then
+		return nil
+	end
+	local best: Model? = nil
+	local bestDistance = PIECE_REACH
+	for _, tagged in CollectionService:GetTagged("MovePrompt") do
+		local root = tagged.Parent
+		local model = root and root.Parent
+		if not tagged:IsA("ProximityPrompt") or not PICK[tagged.ActionText] or not root or not root:IsA("BasePart") or not model or not model:IsA("Model") then
+			continue
+		end
+		if type(model:GetAttribute("MoveSpot")) ~= "number" or (not tagged.Enabled and model:GetAttribute("DannyQueue") == nil) or piecePrompt(model) == nil then
+			continue
+		end
+		local d = (root.Position - mine.Position).Magnitude
+		if d < bestDistance then
+			best, bestDistance = model, d
+		end
+	end
+	return best
+end
+
+local function keepGive()
+	local on = Ui.gamepadActive() and hired() and mayAct()
+	local piece = if on then nearestPiece() else nil
+	local root = if piece then rootOf(piece) else nil
+	local made = give
+	if not piece or not root then
+		if made then
+			made.Enabled = false
+		end
+		giveTo = nil
+		return
+	end
+	if not made or made.Parent ~= root then
+		if made then
+			made:Destroy()
+		end
+		local fresh = Instance.new("ProximityPrompt")
+		fresh.Name = "GiveToDanny"
+		fresh.GamepadKeyCode = (Enum.KeyCode :: any)[GIVE_PAD]
+		fresh.HoldDuration = 0
+		fresh.MaxActivationDistance = PIECE_REACH
+		fresh.RequiresLineOfSight = false
+		fresh.UIOffset = Vector2.new(0, 60) -- (under the piece's own prompt)
+		fresh.Triggered:Connect(function()
+			local to = giveTo
+			if to and mayAct() and hired() then
+				remote:FireServer("helper", "assign", to)
+			end
+		end)
+		fresh.Parent = root
+		give = fresh
+		made = fresh
+	end
+	giveTo = piece
+	local p = made :: ProximityPrompt
+	local words = if piece:GetAttribute("DannyQueue") ~= nil then `Take back from {H.Name}` else `Give to {H.Name}`
+	if p.ActionText ~= words then
+		p.ActionText = words
+	end
+	local own = piecePrompt(piece)
+	local object = if own then own.ObjectText else ""
+	if p.ObjectText ~= object then
+		p.ObjectText = object
+	end
+	if not p.Enabled then
+		p.Enabled = true
 	end
 end
 
@@ -598,7 +729,7 @@ function MoveHelperCard.start()
 			MoveHelperCard.open(nil)
 		end
 	end)
-	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall" } do
+	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperPrice", "MoveHelperQueue" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
 			if type(player:GetAttribute("MoveHelper")) ~= "string" then
 				MoveHelperCard.close()
@@ -608,7 +739,7 @@ function MoveHelperCard.start()
 			pcall(keepPrompt) -- (his body by his id; off while you wait for him)
 		end)
 	end
-	-- a click (a computer) or the input beside the open card (it closes); 1-4, B while it is open
+	-- a click (a computer) or the input beside the open card (it closes); B while it is open
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		local kind = input.UserInputType
 		if opened then
@@ -616,17 +747,12 @@ function MoveHelperCard.start()
 				MoveHelperCard.close()
 				return
 			end
-			local index = table.find(KEYS, input.KeyCode)
-			if index and not processed and not Ui.touchLayout() then
-				order(Brain.Modes[index])
-				return
-			end
 			if not processed and (kind == Enum.UserInputType.MouseButton1 or kind == Enum.UserInputType.Touch) and not onCard(input.Position.X, input.Position.Y) then
 				MoveHelperCard.close() -- (a click or a tap beside it)
 			end
 			return
 		end
-		if processed or kind ~= Enum.UserInputType.MouseButton1 or not mayOpen() then
+		if processed or kind ~= Enum.UserInputType.MouseButton1 or not mayAct() then
 			return
 		end
 		local camera = workspace.CurrentCamera
@@ -636,13 +762,11 @@ function MoveHelperCard.start()
 		local ray = if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
 			then camera:ViewportPointToRay(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
 			else camera:ScreenPointToRay(input.Position.X, input.Position.Y)
-		if reaches(ray.Origin, ray.Direction.Unit) then
-			MoveHelperCard.open(nil)
-		end
+		clicked(ray.Origin, ray.Direction.Unit)
 	end)
-	-- a tap on him (a touch screen)
+	-- a tap on him or on a piece (a touch screen)
 	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processed: boolean)
-		if processed or opened or not mayOpen() then
+		if processed or opened or not mayAct() then
 			return
 		end
 		local camera = workspace.CurrentCamera
@@ -650,12 +774,11 @@ function MoveHelperCard.start()
 			return
 		end
 		local ray = camera:ScreenPointToRay(position.X, position.Y)
-		if reaches(ray.Origin, ray.Direction.Unit) then
-			MoveHelperCard.open(nil)
-		end
+		clicked(ray.Origin, ray.Direction.Unit)
 	end)
 	UserInputService.LastInputTypeChanged:Connect(function()
 		pcall(keepPrompt)
+		pcall(keepGive)
 		if opened then
 			paint()
 		end
@@ -670,11 +793,19 @@ function MoveHelperCard.start()
 			place()
 		end)
 	end
-	-- his body comes and goes (streaming, a respawn): the prompt follows it (a look every second)
+	-- his body comes and goes (streaming, a respawn): his prompt follows it (a look every second); the gamepad's "Give to
+	-- Danny" follows the nearest piece (a look every quarter second, only while a gamepad is in use)
 	task.spawn(function()
+		local tick = 0
 		while true do
-			pcall(keepPrompt)
-			task.wait(1)
+			if tick % 4 == 0 then
+				pcall(keepPrompt)
+			end
+			if Ui.gamepadActive() or give ~= nil then
+				pcall(keepGive)
+			end
+			tick += 1
+			task.wait(0.25)
 		end
 	end)
 end

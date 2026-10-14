@@ -8,6 +8,8 @@
 --   * the Neon of the house's shell and dress (not the furniture): a face bigger than NeonArea (a lamp looking down,
 --     a pane, the porch's wall of daylight) no brighter than NeonLuma; the lamps' discs small, looking down
 --   * the walls' plaster a warm off-white (luma at most WallLuma), never a white
+-- 8.3 the big move: the sandbox's own plans too (HouseLayout's kind "big", Config.Moving.Sandbox.Kind: ten rooms, a
+-- corridor the house's width, the back door's porch), every room held to the same caps.
 -- Run with tests/run_tests.py.
 local M = require("./ItemMock")
 local Config = require("./Config")
@@ -58,8 +60,8 @@ end
 
 -- One interior measured: its lights, every room's load, peak and floor, its big or white Neon, its white walls.
 type Result = { lights: number, strong: number, long: number, over: { string }, neon: { string }, walls: { string }, discs: number, peak: number, floor: number, load: number }
-local function measure(seed: number): Result
-	local plan = HouseLayout.plan(seed, "house")
+local function measure(seed: number, kind: string?): Result
+	local plan = HouseLayout.plan(seed, kind or "house")
 	local origin = HouseInterior.slot(seed)
 	local model = HouseInterior.build(plan, origin)
 	local o = origin.Position
@@ -157,6 +159,29 @@ for _, seed in seeds do
 end
 check(`every house built ({built} of {#seeds})`, built == #seeds)
 print(string.format("     (the houses: the brightest face height %.2f on screen, the darkest floor %.2f, the heaviest room %.1f)", worstPeak, darkest, heaviest))
+
+-- 8.3 the big move: the sandbox's big plans (Config.Moving.Sandbox.Kind) under the same caps
+do
+	local kind = Config.Moving.Sandbox.Kind
+	local bigPeak, bigDark, bigLoad, done = 0, math.huge, 0, 0
+	local bigSeeds = { 1, 2, 3, 4, 5, 6, 7, 8, 83, 2026 }
+	for _, seed in bigSeeds do
+		local tag = `{kind} seed {seed}`
+		local ok, r = pcall(measure, seed, kind)
+		if not ok then
+			check(`{tag}: builds`, false, r)
+			continue
+		end
+		done += 1
+		bigPeak, bigDark, bigLoad = math.max(bigPeak, r.peak), math.min(bigDark, r.floor), math.max(bigLoad, r.load)
+		check(`{tag}: {r.lights} lights, each at most {CAP.Brightness} bright and {CAP.Range} long`, r.lights > 0 and r.strong <= CAP.Brightness and r.long <= CAP.Range, `{r.strong} / {r.long}`)
+		check(`{tag}: every room within its load, its peak on screen and not dark`, #r.over == 0, table.concat(r.over, "; "))
+		check(`{tag}: {r.discs} ceiling lamps' discs small and warm, no big bright Neon (panes, the porches' walls)`, #r.neon == 0 and r.discs > 0, table.concat(r.neon, ", "))
+		check(`{tag}: the plaster a warm off-white, never a white`, #r.walls == 0, table.concat(r.walls, ", "))
+	end
+	check(`every big plan built ({done} of {#bigSeeds}, kind {kind})`, done == #bigSeeds and kind == "big")
+	print(string.format("     (the big plans: the brightest face height %.2f on screen, the darkest floor %.2f, the heaviest room %.1f)", bigPeak, bigDark, bigLoad))
+end
 
 do -- 8.2's numbers (its lamps 0.9 out to 30, two past 40; the porch's 1.6 out to 18 and its white wall): the caps bite
 	local H = L.House

@@ -33,8 +33,8 @@ end
 -- Main's order of the city's services (server/Main.server.luau's `safely` list).
 local CITY = { "PlayerData", "Analytics", "Vehicles", "CarRighting", "Zombies", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Gun", "Items", "Shops", "ShopClerks", "BanditCars", "Npcs", "Animals", "Cargo", "Admin", "DayNight", "Traffic", "Crew", "Ranking", "Estate", "CarCall", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "Hand", "CloseCombat", "Buddy", "Transport", "Skills", "VanQuest", "KitWear", "Fuel", "StyleWear", "Horn", "Buses", "Rental", "ZipLines", "FurnitureMesh", "Moving" }
 -- What the sandbox starts (SandboxWorld: its start or build) and what it never touches.
-local SANDBOX = { "SandboxWorld", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "SandboxTasks", "SandboxLeaders", "SprinterMesh", "FurnitureMesh", "Moving" }
-local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "SandboxTasks", "SandboxLeaders", "SprinterMesh", "SandboxAnalytics" }
+local SANDBOX = { "SandboxWorld", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SandboxBadges", "SprinterMesh", "FurnitureMesh", "Moving" }
+local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SprinterMesh", "SandboxAnalytics", "SandboxBadges" }
 local NEVER = { "World", "MapStyle", "Alpine", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Shops", "ShopClerks", "BanditCars", "Animals", "Traffic", "Buses", "Rental", "ZipLines", "Estate", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "VanQuest", "Fuel", "Buddy", "DayNight", "Gun", "Items", "Cargo", "Ranking", "CarCall", "StyleWear", "Skills", "Hand", "CloseCombat" }
 
 -- Was anything of module `name` called or set this run?
@@ -211,6 +211,12 @@ check("8.2: the sandbox's analytics (SandboxAnalytics.start) right after Analyti
 check("8.2: the daily tasks (SandboxTasks.start) after the collection and the upgrades, before Moving", E.called("SandboxTasks.start") and started.Collection < started.SandboxTasks
 	and started.Upgrades < started.SandboxTasks and started.SandboxTasks < started.Moving)
 check("8.2: the leaders (SandboxLeaders.start: the player list's columns, the TOP MOVERS board) after the collection, before the moves", E.called("SandboxLeaders.start") and started.Collection < started.SandboxLeaders and started.SandboxLeaders < started.Moving)
+check("8.3: the showroom's visitors (Visitors.start) after the warehouses and the daily tasks, before the moves", E.called("Visitors.start") and started.Warehouse < started.Visitors
+	and started.SandboxTasks < started.Visitors and started.Visitors < started.Moving)
+check("8.3: the badges (SandboxBadges.start: listeners only) after what they listen to (the collection, the book, the upgrades, the PAINT shop, the leaders), before the moves",
+	E.called("SandboxBadges.start") and started.Collection < started.SandboxBadges and started.CollectionBook < started.SandboxBadges
+	and started.Upgrades < started.SandboxBadges and started.VanPaint < started.SandboxBadges and started.SandboxLeaders < started.SandboxBadges
+	and started.SandboxBadges < started.Moving)
 local last = 0
 for _, index in started do
 	last = math.max(last, index)

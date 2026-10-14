@@ -241,6 +241,23 @@ E.CollectionBook.admin = bookAdmin
 click(guest, "bookfill")
 check("8.2: a non-admin's FILL BOOK does nothing", #E.books == 2)
 
+-- ── 8.3: the PAINT shop (VanPaint.admin) ────────────────────────────────────
+
+table.clear(E.paints)
+mark = click(owner, "paintall")
+check("8.3: 🎨 UNLOCK PAINTS: VanPaint.admin all for the target, its answer said", #E.paints == 1 and E.paints[1].what == "all" and E.paints[1].player == owner and string.find(E.said(owner, mark), "is yours", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "paintreset", guest.UserId)
+check("8.3: 🎨 RESET PAINTS aimed at the guest: theirs reset", #E.paints == 2 and E.paints[2].what == "reset" and E.paints[2].player == guest and string.find(E.said(guest, mark), "reset", 1, true) ~= nil, E.said(guest, mark))
+local paintAdmin = E.VanPaint.admin
+E.VanPaint.admin = function()
+	error("the paint is wet")
+end
+mark = click(owner, "paintall")
+check("8.3: a VanPaint that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
+E.VanPaint.admin = paintAdmin
+click(guest, "paintall")
+check("8.3: a non-admin's UNLOCK PAINTS does nothing", #E.paints == 2)
+
 -- ── Travel and the van ───────────────────────────────────────────────────────
 
 local plot = SandboxMap.Plots[1]

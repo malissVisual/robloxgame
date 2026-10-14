@@ -18,6 +18,8 @@
 --   Collection.sell(player, uid, expect?)      sell it (on show or not) at the market's price (8.3) → the money paid
 --                                              (nil: refused), why; `expect` (the price the client asked with): only at
 --                                              that price, else refused (the prices moved) and the state sent again
+--   Collection.sellAt(player, uid, price, reason)   8.3 visitors: sell it at a price the server set (a visitor's offer,
+--                                              server/VisitorOffers.luau), paid as `reason`; else as sell → money?, why
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
 --   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: 8.3, your
 --                                              warehouse level's)
@@ -439,7 +441,7 @@ function Collection.sell(player: Player, uid: string, expect: number?): (number?
 	end
 	local market = marketOf(player)
 	local price = Rules.sell(entry, market) -- (8.3: the market's price)
-	if expect ~= nil and expect ~= price then
+	if expect ~= nil and price < expect then -- (8.3 review: only a price that fell: one that rose is paid, never refused)
 		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
 		return nil, `The market moved: your {entry.name} sells for {Market.money(price)} now.`
 	end
@@ -449,6 +451,34 @@ function Collection.sell(player: Player, uid: string, expect: number?): (number?
 	local tag = Market.tag(market, entry.item)
 	PlayerData.addMoney(player, price, "CollectionSale", entry.item)
 	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end -- 8.2: Collection.onPaid
+	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
+	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
+	changed(player)
+	return price, nil
+end
+
+-- 8.3 visitors: a piece sold at a price the server set elsewhere (server/VisitorOffers.luau: a visitor's offer), paid
+-- for `reason` (AnalyticsPlan's Sources: "VisitorOffer"). As Collection.sell: on show or not, what it earned up to now
+-- counts, the market's demand weighs one more of its kind, onPaid "sale", "sold", CollectionSold. → money?, why
+function Collection.sellAt(player: Player, uid: string, price: number, reason: string): (number?, string?)
+	local collection = collectionOf(player)
+	local profile = PlayerData.get(player)
+	if not collection or not profile then
+		return nil, "Your save isn't loaded yet."
+	end
+	local entry, index = find(collection, uid)
+	if not entry or not index then
+		return nil, "That piece isn't in your stock."
+	end
+	if not finite(price) or price ~= math.floor(price) or price < 1 or price >= 2 ^ 40 or type(reason) ~= "string" then
+		return nil, "That's no price."
+	end
+	local tag = Market.tag(marketOf(player), entry.item)
+	settle(player)
+	table.remove(collection.entries, index)
+	Market.note(profile.market, entry.item, marketDay, os.time())
+	PlayerData.addMoney(player, price, reason, entry.item)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
 	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
 	changed(player)
@@ -658,7 +688,7 @@ local function sellMany(player: Player, filter: any, expect: number?): (number?,
 		return nil, 0, NOTHING_TO_SELL[filter]
 	end
 	local total = StockPlan.price(list, market)
-	if expect ~= nil and expect ~= total then
+	if expect ~= nil and total < expect then -- (8.3 review: only a total that fell)
 		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
 		return nil, 0, `The market moved: those {#list} {if #list == 1 then "piece sells" else "pieces sell"} for {Market.money(total)} now. Ask again.`
 	end

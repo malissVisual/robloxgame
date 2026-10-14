@@ -53,7 +53,7 @@ local function made(daily: { { string | number } }, weekly: { string | number }?
 end
 
 -- ── The pools ───────────────────────────────────────────────────────────────
-local EVENTS = { home = true, rare = true, clean = true, moves = true, trips = true, shown = true, sell = true, income = true, upgrade = true, danny = true, hotsell = true, hotincome = true } -- (8.3: the market's two)
+local EVENTS = { home = true, rare = true, clean = true, moves = true, trips = true, shown = true, sell = true, income = true, upgrade = true, danny = true, hotsell = true, hotincome = true, offer = true } -- (8.3: the market's two, the visitors' offer)
 do
 	local seen: { [string]: boolean } = {}
 	local bad = {}

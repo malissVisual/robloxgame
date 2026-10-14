@@ -1,24 +1,53 @@
 --!strict
 -- 7.0, the depot's helper ("Danny from the depot"; the owner's decision in design/rework/NAVRH.md: solo play is allowed
--- with an AI helper). An NPC mover who joins a move whose crew is a single player (Config.MoveHelper.Duo: two players
--- too, off by default). server/Moving.luau calls MoveHelper.sync(session, Moving) every tick: he comes when the crew is
--- small enough and goes when it grows (setting down what he holds); his own loop (Config.MoveHelper.Tick) walks him.
--- His decisions are shared/MoveHelperBrain.luau's (pure: tests/movehelper_test.luau); what he does with the pieces goes
--- through Moving's helper hooks (Moving.helperTake / helperDrop / helperLoad / helperHurt: the same rules, welds and
--- damage as a player's hands); tests/movehelper_runtime_test.luau and tests/movehelper_art_runtime_test.luau run the
--- real module with the real Moving.
--- 7.x Danny, a partner (the owner: "my helper Danny helps weirdly, only some things, and mainly we don't carry anything
--- together"): a clear priority list each step (MoveHelperBrain.decide), and carrying together that just works.
---   * He comes with the move at its van (an orange ZDC mover: server/Npcs.luau's body and name tag) and works while the
---     van stands by the house (within TruckFar of its door); a van that stands far away, he appears at its back.
---   * Carrying together: you Lift a two-person piece and he sprints to its far end (Sprint × the walk; farther than
---     BlinkFar on foot, his path failing, or not there HelpBlink s later: he fades over to it) and takes it ("Got the
---     other end!", "On three... lift!"; 8.3 with Config.MoveHelper.WaitForHelper you wait for him instead and he walks
---     over, your call below). Then he moves WITH the piece: his own walk is off (Npcs.carried), constraints on
---     his root (AlignPosition / AlignOrientation to an attachment at the piece's far end, turned to you) hold him there
---     every physics step, on the floor under that end (stairs, steps: within HoldStep of you), through walls and door
---     frames like the piece itself (a collision group nothing collides with), through the front door's fade with you.
---     Never a "too far apart" drop. His arms hold its edge (the Carrying / CarryAt / CarrySize attributes on his body:
+-- with an AI helper). An NPC mover who comes with a move whose crew is a single player (Config.MoveHelper.Duo: two
+-- players too, off by default). server/Moving.luau calls MoveHelper.sync(session, Moving) every tick: he comes when the
+-- crew is small enough and goes when it grows (setting down what he holds; 8.3 a hired Danny stays); his own loop
+-- (Config.MoveHelper.Tick) walks him. His decisions are shared/MoveHelperBrain.luau's (pure: tests/movehelper_test.luau);
+-- what he does with the pieces goes through Moving's helper hooks (Moving.helperTake / helperDrop / helperLoad /
+-- helperHurt: the same rules, welds and damage as a player's hands); tests/movehelper_runtime_test.luau and
+-- tests/movehelper_art_runtime_test.luau run the real module with the real Moving.
+-- 8.3 Danny for hire (the owner: "make it so I click on the helper, but I have to PAY for him when I want help. It
+-- doesn't work well when he does 4 things. Instead: he helps, but for example you go into the house, click on
+-- something, and that assigns it to him, and the rest you carry yourself"; and "mainly, he must sit in my car with me"):
+--   * Hiring: at a move's start he does not work. He waits by the van (or at the house's curb once the van is parked
+--     there) with a "Hire Danny · $X" sign over his head. A click or a tap on him (a gamepad's "Hire Danny" prompt)
+--     opens his card (client/MoveHelperCard.luau) and its HIRE sends the Moving remote's ("helper", "hire"): a crew
+--     player only, checked (MoveHelperBrain.hireCheck), the money taken (PlayerData.spend, the analytics reason
+--     HelperHire). The price is the move's (MoveHelperBrain.hirePrice: Config.MoveHelper.Hire by the house's pieces).
+--     He works for that move until it ends; whoever paid owns the hire (they leave the move: he is for hire again).
+--     Not hired: today's rules for the two-person pieces (dragged alone, a crew mate's Help lift), no waiting for him.
+--   * His list: a click (a tap; a gamepad's "Give to Danny") on a piece of the move sends ("helper", "assign", its
+--     model): checked here (MoveHelperBrain.assignCheck: the move's crew, hired, the move's own piece, not in the van
+--     or home, nobody holding it, near enough, Config.MoveHelper.Queue at most; Config.Robust.Limits.MoveHelperAssign)
+--     it goes on his list ("Danny will take the Lamp."), a 🧑‍🔧 marker over it with its number (the piece's
+--     attributes DannyQueue / DannyNeeds for the clients); a click on it again takes it back. He carries them in that
+--     order (MoveHelperBrain.nextQueued: the first that still fits the van), each as he always has: a path inside, the
+--     front door his own way, a path to the van's back, the back opened, loaded (MovingRules' packer), his walk × the
+--     carry's. A two-person piece of his list: he goes to it and waits at one end ("needs": "🙋 Danny needs you" over
+--     it, a toast, its Lift says "Lift with Danny"); your Lift there is your call below. A piece of his list you pick up
+--     yourself leaves it ("All yours, boss."); CLEAR QUEUE (the card's: ("helper", "clear")) empties it; an empty list,
+--     he waits by the van ("All done. Anything else, boss?"). Everything else is yours to carry.
+--   * Your call (Config.MoveHelper.WaitForHelper; hired only): Lift on a two-person piece while he can come (his body up,
+--     his hands not on another piece's end, not in the van's seat) is no drag alone: you say "Danny, give me a hand!" (a
+--     bubble over your head, a toast; the player attribute MoveHelperCall = its name: your status line says you wait,
+--     its STOP and G stop it), its Lift prompt says "Stop waiting", and he WALKS to its far end as you will hold it
+--     (Moving's helperLiftFrame), through the walk-in doors his own way, never faded over but as the last resort
+--     (CallBlink s no closer). His own piece first: into the van right there, else set down (back at the head of his
+--     list). In place (MoveHelperBrain.inPlace): "On three... lift!", your grip steadied, and Moving opens your lift
+--     check (helperCalled; no grip: the lift at once); its hit lifts it with him at its far end (joinLift: his hold
+--     starts where he stands). Lift again, G, STOP, walking away (callKept) or his fall end it.
+--   * Riding with you: while he is hired and you sit at the move's van's wheel he walks to its passenger door (Sprint,
+--     from the house too: through its door; CallGain / CallBlink the last resort, a fade into the seat) and sits
+--     (Seat:Sit: his body welded in, massless, Roblox's sit pose; never his hold, never Npcs.carried); the van may go
+--     meanwhile, he gets in as soon as he reaches it. Nobody at the wheel and the van standing (at the house's curb, at
+--     your plot), he gets out on his side and goes on with his list. The van wrecked or gone: out at once. Its seat
+--     taken by a crew mate: he follows it on foot (by its back; parked far off, he appears there as ever).
+--   * Carrying together: he moves WITH the piece: his own walk is off (Npcs.carried), constraints on his root
+--     (AlignPosition / AlignOrientation to an attachment at the piece's far end, turned to you) hold him there every
+--     physics step, on the floor under that end (stairs, steps: within HoldStep of you), through walls and door frames
+--     like the piece itself (a collision group nothing collides with), through the front door's fade with you. Never a
+--     "too far apart" drop. His arms hold its edge (the Carrying / CarryAt / CarrySize attributes on his body:
 --     client/ArmPose.luau), his legs step with his speed (Npcs.stride, backwards when he walks backwards). Your grip bar
 --     is easier meanwhile (the character attribute GripSteady: Config.CarryGrip.Steadied × the box). He talks on the
 --     way: "Watch the doorframe!", "That's going in the van."
@@ -36,65 +65,40 @@
 --     and he is aimed your velocity × MoveHelperBrain.leadTime (HoldLead: a little + your ping) ahead of his place:
 --     your screen shows his body that late, so there he walks at his end (actHold). Nobody runs with a piece in two
 --     (the CarryPair attribute: client/PairSteer.luau).
---   * A heavy two-hands piece you carry alone (AssistWeight or more, within AssistFar): he takes its other side (the
---     pair's walk for both: MovingRules.mode), the same way.
---   * On his own: the one-hand and two-hands pieces nobody holds (★ first, then the most value a second of the trip;
---     none that no longer fits the van; never one you are about to lift: a crew player with free hands within Reserve
---     studs of it and nearer than he is gets it, "All yours, boss."), carried out at Speed × a player's walk (× the
---     carry's: slower with a two-hands piece): a path inside the interior (PathfindingService), the front door (he goes
---     through it like the players, without the fade), a path to the van's back. The back open and the van standing:
---     loaded (MovingRules' packer, like Load: "That's going in the van."); shut: he opens it himself (OpenBack, else
---     "Open the back, boss!" and WaitShut s, then set down beside it); no room: set down beside the van ("Van's full,
---     boss - drive it to the Wall?").
+--   * Your two-person piece dragged alone (hired; he could not come to your call: a crew mate's call, him down): he
+--     sprints to its far end and takes it (MoveHelperBrain.pickLift).
 --   * The van's back: somebody of the crew coming with a piece within OpenNear of the shut back while he is within
---     OpenFar of it: he opens it ("I'll get the doors!").
+--     OpenFar of it (hired): he opens it ("I'll get the doors!"). With a piece of his own at the shut back he opens it
+--     himself (OpenBack, else "Open the back, boss!" and WaitShut s, then set down beside it); no room: set down beside
+--     the van ("Van's full, boss - drive it home?").
 --   * Unstuck: no progress for StuckRepath s, a new path; StuckSnap s, he appears at his way's next point (Nudge studs
---     at most). Where he stands still (waiting, behind you) he keeps out of the doorways (MoveHelperBrain.aside).
---   * The orders (the player attribute MoveHelper = the one in force, MoveHelperDoing = what he does: client/
---     MoveHelperHud.luau's status line under the move's panel; the Moving remote's ("helper", order)): 8.3 see below.
---   * He stays out of fights: a zombie within FleeRange, he runs (never while holding the other end of your piece). The
---     zombies go after him like after a player on foot (Zombies.extraTargets); a bite knocks what he holds
---     (Moving.helperHurt); at 0 health he drops it (knocked) and lies down; he is back at the van Respawn s later.
+--     at most). Where he stands still (waiting) he keeps out of the doorways (MoveHelperBrain.aside).
+--   * The crew's attributes (client/MoveHelperHud.luau's status line under the move's panel, his card): MoveHelper =
+--     "offer" (for hire) | "hired", MoveHelperPrice (the hire's price while he is for hire), MoveHelperQueue (the pieces
+--     on his list while hired), MoveHelperDoing (what he does), MoveHelperId (his id: the card finds his body by it).
+--   * He stays out of fights: a zombie within FleeRange, he runs (never while holding the other end of your piece, nor
+--     from the van's seat). The zombies go after him like after a player on foot (Zombies.extraTargets); a bite knocks
+--     what he holds (Moving.helperHurt); at 0 health he drops it (knocked; his own piece back on his list) and lies down;
+--     he is back at the van Respawn s later.
 --   * He talks a little: a speech bubble (Npcs.say) on the way's events, never the same line within TalkRepeat s (8.0
 --     SANDBOX: MoveHelperBrain.line's sandbox words: no Wall, no depot).
 -- Performance: one helper per move, one loop for all of them, a path at most every Repath s (computed in the background,
--- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), the lists he chooses from kept
--- and refilled (every Think s), the van's room for each piece worked out only when the load changes; carrying together
--- the physics engine moves him (the loop only re-aims the far end's attachment and his top speed, a ray down a step).
---   MoveHelper.sync(s, port)   Moving's tick: the move's crew (he comes or goes) and his hands (Moving's helper hooks)
+-- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), his list's room in the van
+-- worked out only when the load changes (every Think s); carrying together the physics engine moves him (the loop only
+-- re-aims the far end's attachment and his top speed, a ray down a step); seated, the van carries him (nothing to do).
+--   MoveHelper.sync(s, port)   Moving's tick: the move's crew (he comes or goes; a hirer who left ends the hire) and his
+--                              hands (Moving's helper hooks)
 --   MoveHelper.step(dt)        one step of every helper (his loop's; the runtime test calls it)
 --   MoveHelper.useMover(m)     how he walks (a test's: the Luau CLI has no physics and no pathfinding)
 --   MoveHelper.nameOf(id)      his name by his id in a move's rules (nil: not a helper's id)
---   MoveHelper.find(player)    the helper on this player's move (his state: tests, the admin)
---   MoveHelper.order(p, mode)  7.0 planning: an order as the Moving remote's ("helper", mode) (server/Moving.luau: the
---                              quick chat's "Need a hand here" is HELP ME)
+--   MoveHelper.find(player)    the helper on this player's move (his state: tests, the admin, server/SandboxTasks.luau)
 --   MoveHelper.call(s, p, spot)    8.3 Moving's Lift on a two-person piece: "wait" (a call: you wait, he comes), "cancel"
 --                              (Lift again while you wait: you stop), "ready" (he is in place: the lift goes on), nil
---                              (no Danny for it now: today's rules, you drag it alone)
+--                              (not hired, no Danny for it now: today's rules, you drag it alone)
 --   MoveHelper.cancel(p)       8.3 G (Moving's PutDown) while you wait: the call is off (true when there was one)
 --   MoveHelper.joinLift(s, spot, p)   8.3 Moving's pick of a called piece: he takes its far end at once (the hold starts
 --                              there: no pause, no snap); true when he did
--- 8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes; I'd like to
--- click on him any time and tell him what to do, or an auto mode where he carries only light things and calls for help
--- with a heavy one"; his command card: client/MoveHelperCard.luau; his decisions MoveHelperBrain's):
---   * The orders, from his card (a click or a tap on him, a gamepad's "Talk to Danny"), his move's crew only, each one
---     checked and rate limited (MoveHelperBrain.order, Config.Robust.Limits.MoveHelper): "auto" (AUTO, the default: the
---     light pieces to the van, a hand asked for a heavy one), "help" (HELP ME: behind you, lifts with you), "stay" (WAIT
---     HERE: where he stands now, out of the doorways), "van" (WAIT AT VAN). The player attribute MoveHelperId = his id
---     (the card finds his body by it).
---   * Your call (Config.MoveHelper.WaitForHelper): Lift on a two-person piece while he can come (his body up, his hands
---     not on another piece's end; every order) is no drag alone: you say "Danny, give me a hand!" (a bubble over your
---     head, a toast; the player attribute MoveHelperCall = its name: your status line says you wait, its STOP and G
---     stop it), its Lift prompt says "Stop waiting", and he WALKS to its far end as you will hold it (Moving's
---     helperLiftFrame), through the walk-in doors his own way, never faded over but as the last resort (CallBlink s no
---     closer). In place (MoveHelperBrain.inPlace): "On three... lift!", your grip steadied, and Moving opens your lift
---     check (helperCalled; no grip: the lift at once); its hit lifts it with him at its far end (joinLift: his hold
---     starts where he stands). Lift again, G, STOP, walking away (callKept) or his fall end it.
---   * AUTO's ask: a heavy piece nobody handles (MoveHelperBrain.pickAsk: a pair one, or two-hands from LightWeight up;
---     fits the van, nobody holds it, not one you are about to lift): he goes to it, says "This one's too heavy for me
---     alone, give me a hand!", the crew gets a toast, a 🙋 marker shows over it and its prompt says "Lift with Danny";
---     your Lift there is a call he answers at once (a two-hands piece: you pick it up, he takes its other side). Nobody
---     within AskWait s: "No takers? ..." and the light pieces again, no new ask for AskAgain s (AskGap after one came).
+--   MoveHelper.taken(s, spot, p)   8.3 Moving's pick: a piece a player picked up leaves his list
 -- 7.x farm move: a place with several ways in and out (a farm's front door and barn doors: the session's `ways`, each
 -- an exit inside, where you come in by it and its door's outside) has him take the nearest way he may (Moving's
 -- helperExits: a piece may only leave by the exits it fits through) and come out at its own door.
@@ -109,6 +113,7 @@ local Rules = require(Shared.MovingRules)
 local Brain = require(Shared.MoveHelperBrain)
 local Npcs = require(script.Parent.Npcs)
 local PairHold = require(script.Parent.PairHold) -- 8.1: the far end's hold (Danny's and a crew mate's)
+local PlayerData = require(script.Parent.PlayerData) -- 8.3: the hire's money
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
 
@@ -150,6 +155,8 @@ export type Body = {
 	grip: Grip?, -- 7.x carrying together (the real mover)
 	alpha: { [Instance]: number }?, -- 7.x his parts' own transparency (a fade-over)
 	fade: number, -- 7.x the fade-over in progress
+	sit: AnimationTrack?, -- 8.3 Roblox's sit, played while he rides in the van (loaded at his first ride)
+	weights: { [BasePart]: boolean }?, -- 8.3 his parts' own Massless while he rides (given back when he gets out)
 }
 
 -- How he walks: one step toward `to` at `speed` studs / s; a stop; his way round the walls (may yield; nil: straight).
@@ -165,9 +172,6 @@ export type Mover = {
 	appear: ((body: Body) -> ())?,
 }
 
--- A crew player with free hands (a piece they are about to lift is theirs).
-type Free = { inside: boolean, x: number, z: number }
-
 -- 8.3 a crew player's call: their two-person piece, since when, he is in place (their lift check open) since readyAt,
 -- his walk there (MoveHelperBrain.approach: the last resort's clock).
 type Call = { player: Player, spot: number, since: number, ready: boolean, readyAt: number, approach: Brain.Approach }
@@ -176,7 +180,6 @@ type Helper = {
 	s: any, -- server/Moving.luau's Session (read here: move, site, origin, plan, items, truck, owner, members, ended, id)
 	port: Port,
 	id: number, -- his id in the move's rules (MovingRules' holders): ID_BASE - the move's id
-	mode: Brain.Mode,
 	body: Body?,
 	hooks: { RBXScriptConnection },
 	health: number, -- his health a step ago (a bite takes a share of what he holds)
@@ -196,8 +199,8 @@ type Helper = {
 	pathGoal: Vector3?,
 	pathAt: number,
 	pathing: boolean,
-	pathFailedAt: number, -- 7.x when his last path failed (a lift: he fades over)
-	gaveUp: { [number]: number }, -- the lifts whose take failed: until when (HelpRetry s; or the piece goes down, an order)
+	pathFailedAt: number, -- 7.x when his last path failed
+	gaveUp: { [number]: number }, -- the lifts whose take failed: until when (HelpRetry s; or the piece goes down)
 	helpSince: number, -- 7.x when he set off to your lift (HelpBlink)
 	gripped: BasePart?, -- 7.x the piece whose far end he holds (its root)
 	holdOffset: CFrame?, -- 7.x his place in its frame
@@ -212,19 +215,17 @@ type Helper = {
 	dropping: boolean, -- he sets the piece in his arms down beside the van (no room, the back stayed shut)
 	thinkAt: number,
 	lift: number?,
-	assist: number?,
-	pick: number?,
-	full: boolean,
+	pick: number?, -- 8.3 the piece of his list he goes for (MoveHelperBrain.nextQueued)
+	pair: boolean, -- … a two-person one
+	full: boolean, -- 8.3 pieces on his list, none fits the van
 	toldFull: boolean, -- "Van's full" said since it got full
 	fitKey: number, -- the van's load when fits was worked out
 	fits: { [number]: boolean },
 	input: Brain.Input,
-	candidates: { Brain.Candidate },
-	candidatePool: { Brain.Candidate },
 	lifts: { Brain.Lift },
 	liftPool: { Brain.Lift },
-	free: { Free },
-	freePool: { Free },
+	next: { Brain.Queued }, -- 8.3 his list for nextQueued (its entries kept in nextPool)
+	nextPool: { Brain.Queued },
 	doors: Brain.Doors,
 	doorways: { Brain.Doorway }, -- 7.x the interior's doorways (world)
 	fronts: { Brain.Doorway }, -- 7.x the doors outside (the front door; a farm's barn doors too)
@@ -238,16 +239,21 @@ type Helper = {
 	doingAction: string,
 	doingSpot: number?,
 	doingFull: boolean,
+	doingHired: boolean,
 	told: { [Player]: boolean }, -- the players with his attributes
 	call: Call?, -- 8.3 a crew player waits for him at their two-person piece
-	ask: number?, -- 8.3 AUTO: the heavy piece he asks a hand for
-	askAt: number, -- when he said "give me a hand!" there (0: on his way)
-	askAgain: number, -- no new ask before (os.clock)
-	askPick: number?, -- think's pick (MoveHelperBrain.pickAsk)
-	askMark: Instance?, -- the 🙋 marker over it
 	helpWalk: Brain.Approach?, -- 8.3 his walk to a piece you drag alone (the last resort's clock)
-	stayAt: Vector3?, -- 8.3 WAIT HERE: his place
-	stayInside: boolean,
+	-- 8.3 for hire
+	hirer: Player?, -- who hired him for this move (nil: for hire)
+	price: number, -- the hire for this move (MoveHelperBrain.hirePrice)
+	queue: { number }, -- his list: the pieces' spots in the order they were clicked
+	marks: { [number]: BillboardGui }, -- the markers over them
+	needs: number?, -- the two-person piece of his list he waits at for you …
+	needsAt: number, -- … since (0: on his way)
+	needsTold: number?, -- the one the crew was told about (once a piece)
+	sign: BillboardGui?, -- "Hire Danny · $X" over his head while he is for hire
+	seat: Seat?, -- the van's passenger seat he sits in
+	rideWalk: Brain.Approach?, -- his walk to the van to ride (the last resort's clock)
 }
 
 local ID_BASE = -2000000000 -- (no player's id is this low; Studio's test players are -1, -2 …)
@@ -257,6 +263,9 @@ local NUDGE = 8 -- studs at most a stuck nudge puts him on (his way's next point
 local WALK = { through = true, near = 0.6, jump = false } -- Npcs.walkTo's options: he walks on into the next order (8.3: no jump)
 local HANDS = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize" } -- 7.x his arms (client/ArmPose.luau)
 local EDGE = { Width = 2.4, Depth = 0.6 } -- 7.x the piece's near edge his hands hold at its far end (studs)
+local SIT = "rbxassetid://2506281703" -- 8.3 Roblox's R15 sit (server/Buddy.luau's)
+local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (client/MovingHud.luau's)
+local ATTRIBUTES = { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue" }
 
 local helpers: { [any]: Helper } = {} -- by the move's session
 local byId: { [number]: Helper } = {}
@@ -531,7 +540,7 @@ end
 
 -- A line in a speech bubble (never the same within TalkRepeat s, two TalkGap s apart; `force`: now; 7.x the lines of
 -- the moment, URGENT, wait for no TalkGap): true when said.
-local URGENT: { [string]: boolean } = { help = true, assist = true, three = true, door = true, open = true, mine = true }
+local URGENT: { [string]: boolean } = { help = true, three = true, door = true, open = true, mine = true, hired = true, queued = true, ride = true }
 local function say(h: Helper, key: string, clock: number, force: boolean?): boolean
 	local body = h.body
 	local text = Brain.line(key, Config.Sandbox.On) -- (8.0 SANDBOX: no Wall, no depot in his words)
@@ -547,47 +556,93 @@ local function say(h: Helper, key: string, clock: number, force: boolean?): bool
 	return true
 end
 
--- His attributes on the crew (the orders' strip): the order in force and what he does; off for those who left.
+-- 8.3 "Hire Danny · $X" over his head while he is for hire (a sign the clients see from a little way off).
+local function hireSign(h: Helper)
+	local body = h.body
+	local want = body ~= nil and h.hirer == nil and not h.dead
+	local sign = h.sign
+	if want and body and (not sign or sign.Parent ~= body.root) then
+		if sign then
+			sign:Destroy()
+		end
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "HireSign"
+		gui.Size = UDim2.fromOffset(190, 30)
+		gui.StudsOffsetWorldSpace = Vector3.new(0, 4.7, 0)
+		gui.MaxDistance = 80
+		gui.LightInfluence = 0
+		local label = Instance.new("TextLabel")
+		label.Name = "Label"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundColor3 = ORANGE
+		label.TextColor3 = Color3.fromRGB(28, 28, 30)
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 15
+		label.Text = `🧑‍🔧 Hire {cfg.Name} · {Brain.money(h.price)}`
+		label.Parent = gui
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = label
+		gui.Parent = body.root
+		h.sign = gui
+	elseif not want and sign then
+		sign:Destroy()
+		h.sign = nil
+	end
+end
+
+-- His attributes on the crew (the status line, his card): for hire or hired, the price or his list, what he does; off
+-- for those who left.
 local function tellCrew(h: Helper)
 	local s = h.s
+	local hired = h.hirer ~= nil
+	local state = if hired then "hired" else "offer"
+	local price: number? = if hired then nil else h.price
+	local count: number? = if hired then #h.queue else nil
 	for player in s.members do
 		if not player.Parent then
 			continue
 		end
 		h.told[player] = true
-		if player:GetAttribute("MoveHelper") ~= h.mode then
-			player:SetAttribute("MoveHelper", h.mode)
+		if player:GetAttribute("MoveHelper") ~= state then
+			player:SetAttribute("MoveHelper", state)
 		end
 		if player:GetAttribute("MoveHelperDoing") ~= h.doing then
 			player:SetAttribute("MoveHelperDoing", h.doing)
 		end
 		if player:GetAttribute("MoveHelperId") ~= h.id then
-			player:SetAttribute("MoveHelperId", h.id) -- 8.3 (his command card finds his body by it)
+			player:SetAttribute("MoveHelperId", h.id) -- 8.3 (his card finds his body by it)
+		end
+		if player:GetAttribute("MoveHelperPrice") ~= price then
+			player:SetAttribute("MoveHelperPrice", price)
+		end
+		if player:GetAttribute("MoveHelperQueue") ~= count then
+			player:SetAttribute("MoveHelperQueue", count)
 		end
 	end
 	for player in h.told do
 		if not s.members[player] then
 			h.told[player] = nil
-			player:SetAttribute("MoveHelper", nil)
-			player:SetAttribute("MoveHelperDoing", nil)
-			player:SetAttribute("MoveHelperId", nil)
-			player:SetAttribute("MoveHelperCall", nil)
-			player:SetAttribute("MoveHelperReady", nil)
+			for _, name in ATTRIBUTES do
+				player:SetAttribute(name, nil)
+			end
 		end
 	end
+	hireSign(h)
 end
 
 -- What he does, in words (made again only when it changes).
 local function setDoing(h: Helper, action: string, spot: number?)
-	if action == h.doingAction and spot == h.doingSpot and h.full == h.doingFull then
+	local hired = h.hirer ~= nil
+	if action == h.doingAction and spot == h.doingSpot and h.full == h.doingFull and hired == h.doingHired then
 		return
 	end
-	h.doingAction, h.doingSpot, h.doingFull = action, spot, h.full
+	h.doingAction, h.doingSpot, h.doingFull, h.doingHired = action, spot, h.full, hired
 	local thing = if spot then (h.s.move :: Rules.Move).things[spot] else nil
-	h.doing = Brain.doing(action, if thing then thing.name else nil, h.full)
+	h.doing = if not hired and action == "wait" then Brain.doing("offer") else Brain.doing(action, if thing then thing.name else nil, h.full)
 end
 
--- ── 8.3 your call and his ask: the words, the marks ────────────────────────
+-- ── 8.3 your call and his list: the words, the marks ───────────────────────
 
 -- The piece's Lift prompt (Moving's helperMark): "wait" (you wait: "Stop waiting"), "ask" ("Lift with Danny"), nil.
 local function mark(h: Helper, spot: number, how: string?)
@@ -633,44 +688,101 @@ local function shout(character: Model?, text: string)
 	end)
 end
 
--- The 🙋 marker over the piece he asks a hand for (seen through walls: the crew finds it).
-local function askMarker(root: BasePart, height: number): Instance
+-- The marker over a piece of his list (seen through walls: the crew finds it): its number, or "needs you".
+local function newMark(root: BasePart, height: number): BillboardGui
 	local gui = Instance.new("BillboardGui")
-	gui.Name = "DannyAsk"
-	gui.Size = UDim2.fromOffset(190, 34)
+	gui.Name = "DannyMark"
+	gui.Size = UDim2.fromOffset(160, 30)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, height / 2 + 1.8, 0)
 	gui.AlwaysOnTop = true
 	gui.MaxDistance = 160
 	gui.LightInfluence = 0
 	local label = Instance.new("TextLabel")
+	label.Name = "Label"
 	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.fromRGB(240, 132, 44)
+	label.BackgroundColor3 = Color3.fromRGB(250, 250, 246)
 	label.TextColor3 = Color3.fromRGB(28, 28, 30)
 	label.Font = Enum.Font.GothamBold
-	label.TextSize = 16
-	label.Text = `🙋 {cfg.Name} needs a hand`
+	label.TextSize = 15
 	label.Parent = gui
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = label
+	local edge = Instance.new("UIStroke")
+	edge.Color = ORANGE
+	edge.Thickness = 2
+	edge.Parent = label
 	gui.Parent = root
 	return gui
 end
 
--- His ask is over (`again`: s before the next one; nil: as it was). The prompt back as ever unless a call is on it.
-local function endAsk(h: Helper, clock: number, again: number?)
-	local spot = h.ask
-	local made = h.askMark
-	h.ask, h.askAt, h.askPick, h.askMark = nil, 0, nil, nil
-	if made then
-		made:Destroy()
+-- His list's markers and the pieces' attributes (DannyQueue = its number, DannyNeeds while he waits at it for you) as
+-- the list is now; the gone ones off.
+local function refreshMarks(h: Helper)
+	local s = h.s
+	local listed: { [number]: boolean } = {}
+	for index, spot in h.queue do
+		local item = s.items[spot]
+		local thing = (s.move :: Rules.Move).things[spot]
+		if not item or not thing then
+			continue
+		end
+		listed[spot] = true
+		local needs = h.needs == spot and h.needsAt > 0
+		local gui = h.marks[spot]
+		if not gui or gui.Parent ~= item.root then
+			if gui then
+				gui:Destroy()
+			end
+			local fresh = newMark(item.root, thing.size.Y)
+			h.marks[spot] = fresh
+			gui = fresh
+		end
+		local label = (gui :: BillboardGui):FindFirstChild("Label") :: TextLabel?
+		if label then
+			label.Text = Brain.markText(index, needs)
+			label.BackgroundColor3 = if needs then ORANGE else Color3.fromRGB(250, 250, 246)
+		end
+		if item.model:GetAttribute("DannyQueue") ~= index then
+			item.model:SetAttribute("DannyQueue", index)
+		end
+		if item.model:GetAttribute("DannyNeeds") ~= (if needs then true else nil) then
+			item.model:SetAttribute("DannyNeeds", if needs then true else nil)
+		end
 	end
-	local call = h.call
-	if spot and not (call and call.spot == spot) then
-		mark(h, spot, nil)
+	for spot, gui in h.marks do
+		if not listed[spot] then
+			gui:Destroy()
+			h.marks[spot] = nil
+			local item = s.items[spot]
+			if item then
+				item.model:SetAttribute("DannyQueue", nil)
+				item.model:SetAttribute("DannyNeeds", nil)
+			end
+		end
 	end
-	if again and spot then
-		h.askAgain = math.max(h.askAgain, clock + again) -- (an ask's end never brings the next one sooner)
+end
+
+-- Off his list (true when it was on it).
+local function unqueue(h: Helper, spot: number): boolean
+	local index = table.find(h.queue, spot)
+	if index then
+		table.remove(h.queue, index)
+		return true
+	end
+	return false
+end
+
+-- He no longer waits at a two-person piece of his list for you: its prompt as ever (unless a call is on it).
+local function endNeeds(h: Helper)
+	local spot = h.needs
+	h.needs, h.needsAt = nil, 0
+	if spot then
+		local call = h.call
+		if not (call and call.spot == spot) then
+			mark(h, spot, nil)
+		end
+		refreshMarks(h)
 	end
 end
 
@@ -688,7 +800,7 @@ local function endCall(h: Helper, why: string?, clock: number)
 		return
 	end
 	h.call = nil
-	mark(h, call.spot, nil)
+	mark(h, call.spot, if h.needs == call.spot and h.needsAt > 0 then "ask" else nil)
 	local player = call.player
 	if player.Parent then
 		player:SetAttribute("MoveHelperCall", nil)
@@ -754,16 +866,8 @@ end
 
 -- A place where he will stand still: moved beside a doorway it is in (inside: the interior's; outside: the front door).
 local function clearOf(h: Helper, at: Vector3, inside: boolean): Vector3
-	if inside then
-		for _, door in h.doorways do
-			local x, z, moved = Brain.aside(at.X, at.Z, door)
-			if moved then
-				return Vector3.new(x, at.Y, z)
-			end
-		end
-		return at
-	end
-	for _, door in h.fronts do
+	local doors: { Brain.Doorway } = if inside then h.doorways else h.fronts
+	for _, door in doors do
 		local x, z, moved = Brain.aside(at.X, at.Z, door)
 		if moved then
 			return Vector3.new(x, at.Y, z)
@@ -898,6 +1002,142 @@ local function homeSpot(h: Helper): Vector3
 	return clearOf(h, out.Position, false)
 end
 
+-- ── 8.3 the van's passenger seat ───────────────────────────────────────────
+
+local function seatsOf(truck: Vehicles.Car): { Seat }
+	local list = (truck :: any).passengers
+	return if type(list) == "table" then list else {}
+end
+
+-- The van's passenger seat he takes (MoveHelperBrain.pickSeat: the first nobody sits in), nil: every one taken.
+local function freeSeat(truck: Vehicles.Car): Seat?
+	local seats = seatsOf(truck)
+	local taken: { boolean } = {}
+	for index, seat in seats do
+		taken[index] = seat.Parent == nil or seat.Occupant ~= nil
+	end
+	local index = Brain.pickSeat(taken)
+	return if index then seats[index] else nil
+end
+
+-- Outside a seat's door (Vehicles' doors: its side, its place along the van), a step out of the van's side.
+local function seatDoor(truck: Vehicles.Car, seat: Seat): Vector3
+	local doors = (truck :: any).doors
+	local index = seat:GetAttribute("Door")
+	local door = if type(doors) == "table" and type(index) == "number" then doors[index] else nil
+	local size: Vector3 = (truck :: any).size or Vector3.new(6, 6, 12)
+	local frame = truck.chassis.CFrame
+	if door then
+		return (frame * CFrame.new(door.side * (size.X / 2 + 1.5), 0, door.z)).Position
+	end
+	local rel = frame:PointToObjectSpace(seat.Position)
+	return (frame * CFrame.new((if rel.X < 0 then -1 else 1) * (size.X / 2 + 1.5), 0, rel.Z)).Position
+end
+
+-- Does the move's owner sit at the van's wheel (only the owner drives their van)?
+local function driven(s: any, truck: Vehicles.Car?): boolean
+	if not truck then
+		return false
+	end
+	local car, driving = Vehicles.seatedIn(s.owner)
+	return driving and car == truck
+end
+
+-- His parts massless while he rides (the van drives as ever), their own Massless given back after.
+local function setMassless(body: Body, on: boolean)
+	if not on then
+		local was = body.weights
+		body.weights = nil
+		if not was then
+			return
+		end
+		for part, massless in was do
+			if part.Parent then
+				part.Massless = massless
+			end
+		end
+		return
+	end
+	local was: { [BasePart]: boolean } = body.weights or {}
+	for _, d in body.model:GetDescendants() do
+		if d:IsA("BasePart") then
+			if was[d] == nil then
+				was[d] = d.Massless == true
+			end
+			d.Massless = true
+		end
+	end
+	body.weights = was
+end
+
+local function sitTrack(body: Body): AnimationTrack?
+	local made = body.sit
+	if made then
+		return made
+	end
+	local animator = body.humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		return nil
+	end
+	local ok, track = pcall(function(): AnimationTrack
+		local animation = Instance.new("Animation")
+		animation.AnimationId = SIT
+		return animator:LoadAnimation(animation)
+	end)
+	if ok and track then
+		track.Looped = true
+		track.Priority = Enum.AnimationPriority.Action
+		body.sit = track
+	end
+	return body.sit
+end
+
+-- Into the seat: his walk over, his body free (welded to the seat by Seat:Sit, massless: the van drives as ever), the
+-- sit pose. Never his hold (he holds nothing), never Npcs.carried.
+local function sitIn(h: Helper, body: Body, seat: Seat)
+	Npcs.stop(body.model)
+	body.walking, body.ordered = false, nil
+	clearPath(h)
+	setMassless(body, true)
+	body.root.Anchored = false
+	body.model:PivotTo(seat.CFrame * CFrame.new(0, body.humanoid.HipHeight + body.root.Size.Y / 2, 0))
+	seat:Sit(body.humanoid)
+	h.seat = seat
+	h.stuckFor, h.lastPos, h.repathed, h.rideWalk = 0, nil, false, nil
+	local track = sitTrack(body)
+	if track then
+		track:Play(0.15)
+	end
+	h.thinkAt = 0
+end
+
+-- Out of the seat: out on its side (the van there), else where he is; standing on the ground.
+local function unseat(h: Helper, body: Body, truck: Vehicles.Car?)
+	local seat = h.seat
+	h.seat = nil
+	local track = body.sit
+	if track then
+		track:Stop(0.15)
+	end
+	if seat then
+		local weld = seat:FindFirstChild("SeatWeld")
+		if weld then
+			weld:Destroy()
+		end
+	end
+	body.humanoid.Sit = false
+	setMassless(body, false)
+	local at = body.root.Position
+	local face: Vector3? = nil
+	if truck and seat and seat.Parent then
+		at = seatDoor(truck, seat)
+		face = Vector3.new(at.X - truck.chassis.Position.X, 0, at.Z - truck.chassis.Position.Z) -- (away from the van)
+	end
+	Npcs.stop(body.model) -- (stands again, anchored)
+	placeAt(h, at, face)
+	h.thinkAt = 0
+end
+
 local function spawnBody(h: Helper, at: Vector3): boolean
 	local look = Npcs.look("mover", cfg.Name, cfg.Title)
 	look.walkSpeed = walkSpeed() * cfg.Speed
@@ -919,7 +1159,7 @@ local function spawnBody(h: Helper, at: Vector3): boolean
 	humanoid.MaxHealth = cfg.Health
 	humanoid.Health = cfg.Health
 	h.health = cfg.Health
-	local body: Body = { model = model, root = root, humanoid = humanoid, walking = false, ordered = nil, orderedAt = 0, speed = 0, path = nil, grip = nil, alpha = nil, fade = 0 }
+	local body: Body = { model = model, root = root, humanoid = humanoid, walking = false, ordered = nil, orderedAt = 0, speed = 0, path = nil, grip = nil, alpha = nil, fade = 0, sit = nil, weights = nil }
 	h.body = body
 	h.dead = false
 	-- a bite (any health lost) knocks what he holds
@@ -931,6 +1171,7 @@ local function spawnBody(h: Helper, at: Vector3): boolean
 		end
 	end))
 	placeAt(h, at, nil)
+	hireSign(h)
 	return true
 end
 
@@ -940,20 +1181,45 @@ local function removeBody(h: Helper)
 	end
 	table.clear(h.hooks)
 	local body = h.body
+	local seat = h.seat
+	h.seat = nil
+	if seat then
+		local weld = seat:FindFirstChild("SeatWeld") -- (8.3 out of the van's seat first)
+		if weld then
+			weld:Destroy()
+		end
+	end
 	ungrip(h, body) -- (7.x the attachment on the piece goes too)
 	h.body = nil
+	if h.sign then
+		h.sign:Destroy()
+		h.sign = nil
+	end
 	if body then
 		Npcs.remove(body.model)
 	end
 	clearPath(h)
 end
 
+-- 8.3 his own piece back at the head of his list (set down for your call, knocked out of his arms).
+local function requeue(h: Helper, spot: number?)
+	if spot and h.hirer and not table.find(h.queue, spot) then
+		table.insert(h.queue, 1, spot)
+		refreshMarks(h)
+	end
+end
+
 -- Down: what he holds falls, he lies on his back; his body goes FALL s later, he is back Respawn s later.
 local function fall(h: Helper, body: Body, clock: number)
 	endCall(h, "down", clock) -- 8.3
-	endAsk(h, clock, cfg.AskGap)
+	endNeeds(h)
+	if h.seat then
+		unseat(h, body, nil) -- (8.3 out of the van's seat first)
+	end
 	ungrip(h, body)
+	local own, role = Rules.holding(h.s.move, h.id)
 	h.port.helperDrop(h.s, body.model, "died")
+	requeue(h, if role == "carrier" then own else nil)
 	say(h, "down", clock, true)
 	mover.halt(body)
 	h.dead, h.downAt = true, clock
@@ -1027,7 +1293,7 @@ local function wayTo(h: Helper, body: Body, here: Vector3, target: Vector3, cloc
 				h.pathIndex, h.pathGoal = 2, target
 			else
 				h.pathGoal = nil
-				h.pathFailedAt = clock -- (7.x a lift: he fades over)
+				h.pathFailedAt = clock
 			end
 		end)
 	end
@@ -1045,9 +1311,9 @@ local function wayTo(h: Helper, body: Body, here: Vector3, target: Vector3, cloc
 end
 
 -- Toward `goal` (inside the interior or in the street: `goalInside`): to the front door first when it is in the other
--- world, then by the way; far off (Far), he appears at the next point (8.3 `walk`: never, your call's walk). Stuck
--- (Brain.unstuck): a new path after StuckRepath s, a nudge to the way's next point (NUDGE studs at most) after
--- StuckSnap s. True: there (within near).
+-- world, then by the way; far off (Far), he appears at the next point (8.3 `walk`: never, your call's walk and the
+-- ride's). Stuck (Brain.unstuck): a new path after StuckRepath s, a nudge to the way's next point (NUDGE studs at most)
+-- after StuckSnap s. True: there (within near).
 local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, near: number, speed: number, dt: number, clock: number, walk: boolean?): boolean
 	speed *= Brain.trained(h.s.owner) -- 8.1 SANDBOX: Danny's training (the owner's upgrade, server/Upgrades.luau)
 	local here = body.root.Position
@@ -1099,8 +1365,6 @@ local function think(h: Helper, body: Body, clock: number)
 	local move: Rules.Move = s.move
 	local here = body.root.Position
 	local fromInside = insideAt(h, here)
-	local truck = truckOf(s)
-	local back = if truck then byTruck(truck, 0, 0) else nil
 	-- the van's room for each piece, again only when its load changed
 	local key = #move.packing.placed + Rules.fill(move.packing)
 	if key ~= h.fitKey then
@@ -1113,101 +1377,65 @@ local function think(h: Helper, body: Body, clock: number)
 			h.gaveUp[spot] = nil
 		end
 	end
-	-- 7.x the crew's free hands: a piece one of them is about to lift is theirs
-	table.clear(h.free)
-	for player in s.members do
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if not character or not humanoid or humanoid.Health <= 0 or humanoid.SeatPart or not root or not root:IsA("BasePart") then
-			continue
-		end
-		if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("MoveCarry") ~= nil then
-			continue
-		end
-		local n = #h.free + 1
-		local f = h.freePool[n]
-		if not f then
-			f = { inside = false, x = 0, z = 0 }
-			h.freePool[n] = f
-		end
-		f.inside, f.x, f.z = insideAt(h, root.Position), root.Position.X, root.Position.Z
-		h.free[n] = f
-	end
-	local pay = Config.Moving.Pay
-	table.clear(h.candidates)
-	table.clear(h.lifts)
-	for _, spot in move.order do
+	-- 8.3 his list: the pieces that are no longer his to carry go (home or in the van already, somebody holds them)
+	local changed = false
+	for index = #h.queue, 1, -1 do
+		local spot = h.queue[index]
 		local thing = move.things[spot]
 		local item = s.items[spot]
-		if not item then
-			continue
+		if not thing or not item or not item.model.Parent or not Brain.keepQueued(thing.state, thing.carrier ~= nil or thing.helper ~= nil) then
+			table.remove(h.queue, index)
+			changed = true
 		end
-		local at = item.root.Position
-		local inside = insideAt(h, at)
-		if (thing.class == "hand" or thing.class == "both" or thing.class == "pair") and (thing.state == "home" or thing.state == "ground") then -- (8.3: a pair one he may ask a hand for)
-			local fits = h.fits[spot]
-			if fits == nil then
-				fits = Rules.canLoad(move, spot) -- (the packing fix: lying on its side, after a repack too)
-				h.fits[spot] = fits
+	end
+	if changed then
+		refreshMarks(h)
+	end
+	-- hired: a crew player's two-person piece dragged alone (he comes to its far end)
+	table.clear(h.lifts)
+	if h.hirer then
+		for _, spot in move.order do
+			local thing = move.things[spot]
+			local item = s.items[spot]
+			if not item or thing.class ~= "pair" or thing.state ~= "carried" then
+				continue
 			end
-			local n = #h.candidates + 1
-			local c = h.candidatePool[n]
-			if not c then
-				c = { spot = 0, class = "", state = "", star = false, broken = false, cost = 0, haul = 0, value = 0, weight = 0, fits = false, byTruck = false, reserved = false }
-				h.candidatePool[n] = c
-			end
-			c.spot, c.class, c.state, c.star, c.broken = spot, thing.class, thing.state, thing.star, Rules.broken(thing)
-			c.cost = (Brain.routeVia(fromInside, here.X, here.Z, inside, at.X, at.Z, h.wayDoors))
-			c.haul = if back then (Brain.routeVia(inside, at.X, at.Z, false, back.X, back.Z, h.wayDoors, exitsOf(h, spot))) else 0
-			c.value = thing.value * thing.condition * (if thing.star then pay.Star else 1)
-			c.weight = thing.weight
-			c.fits = fits
-			c.byTruck = back ~= nil and not inside and flat(at, back) <= 12
-			local nearest: number? = nil
-			for _, f in h.free do
-				local d = (Brain.routeVia(f.inside, f.x, f.z, inside, at.X, at.Z, h.wayDoors))
-				if nearest == nil or d < nearest then
-					nearest = d
-				end
-			end
-			c.reserved = Brain.reserved(nearest, c.cost)
-			h.candidates[n] = c
-		elseif (thing.class == "pair" or thing.class == "both") and thing.state == "carried" then
+			local at = item.root.Position
 			local carrier = if thing.carrier and thing.carrier > 0 then Players:GetPlayerByUserId(thing.carrier) else nil
 			local n = #h.lifts + 1
 			local l = h.liftPool[n]
 			if not l then
-				l = { spot = 0, class = "", state = "", helped = false, crew = false, cost = 0, gaveUp = false, weight = 0, byBack = false }
+				l = { spot = 0, class = "", state = "", helped = false, crew = false, cost = 0, gaveUp = false }
 				h.liftPool[n] = l
 			end
 			l.spot, l.class, l.state = spot, thing.class, thing.state
 			l.helped = thing.helper ~= nil
 			l.crew = carrier ~= nil and s.members[carrier] == true
-			l.cost = (Brain.routeVia(fromInside, here.X, here.Z, inside, at.X, at.Z, h.wayDoors))
+			l.cost = (Brain.routeVia(fromInside, here.X, here.Z, insideAt(h, at), at.X, at.Z, h.wayDoors))
 			l.gaveUp = h.gaveUp[spot] ~= nil
-			l.weight = thing.weight
-			l.byBack = back ~= nil and not inside and flat(at, back) <= cfg.AssistBack
 			h.lifts[n] = l
 		end
 	end
-	local before = if h.action == "fetch" then h.spot else nil
-	h.pick, h.full = Brain.pickItem(h.candidates, truck ~= nil and Vehicles.backOpen(truck))
-	-- 8.3 AUTO: a heavy piece nobody handles, once AskAgain (AskGap) s have gone since the last ask (one at a time)
-	h.askPick = if h.mode == "auto" and h.ask == nil and clock >= h.askAgain then Brain.pickAsk(h.candidates) else nil
 	h.lift = Brain.pickLift(h.lifts)
-	h.assist = Brain.pickAssist(h.lifts)
+	-- 8.3 the next piece of his list (the first that still fits the van: the packing fix, lying on its side too)
+	table.clear(h.next)
+	for n, spot in h.queue do
+		local fits = h.fits[spot]
+		if fits == nil then
+			fits = Rules.canLoad(move, spot)
+			h.fits[spot] = fits
+		end
+		local q = h.nextPool[n]
+		if not q then
+			q = { spot = 0, class = "", fits = false }
+			h.nextPool[n] = q
+		end
+		q.spot, q.class, q.fits = spot, move.things[spot].class, fits
+		h.next[n] = q
+	end
+	h.pick, h.pair, h.full = Brain.nextQueued(h.next)
 	if not h.full then
 		h.toldFull = false
-	end
-	-- his plan taken: the piece he went for is yours now
-	if before and h.pick ~= before then
-		for _, c in h.candidates do
-			if c.spot == before and c.reserved then
-				say(h, "mine", clock)
-				break
-			end
-		end
 	end
 end
 
@@ -1264,6 +1492,17 @@ local function loadHere(h: Helper, body: Body): boolean
 		return false
 	end
 	return (h.port.helperLoad(h.s, body.model))
+end
+
+-- 8.3 his own piece out of his arms (your call, your lift come first): into the van right here, else set down where
+-- he is, back at the head of his list.
+local function setDownOwn(h: Helper, body: Body)
+	if loadHere(h, body) then
+		return
+	end
+	local spot = Rules.holding(h.s.move, h.id)
+	h.port.helperDrop(h.s, body.model, "put")
+	requeue(h, spot)
 end
 
 -- 7.x his place at the far end of your piece, in its frame: Standoff past its far face, turned to you, on the floor
@@ -1330,7 +1569,7 @@ local function strideOf(h: Helper, body: Body, dt: number, snap: boolean)
 	Npcs.stride(body.model, Brain.holdLegs(h.trail, vx * look.X + vz * look.Z, vz * look.X - vx * look.Z, dt))
 end
 
--- 7.x the far end of your piece (or the other side of your two-hands piece): he moves with it, glued there; the words.
+-- 7.x the far end of your piece: he moves with it, glued there; the words.
 local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: number)
 	local s = h.s
 	local thing = (s.move :: Rules.Move).things[spot]
@@ -1383,7 +1622,7 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	end
 end
 
--- 7.x takes your piece's far end (or its other side): "Got the other end!", "On three... lift!" a moment later.
+-- 7.x takes your piece's far end: "Got the other end!", "On three... lift!" a moment later.
 local function takeEnd(h: Helper, body: Body, spot: number, clock: number)
 	mover.halt(body)
 	if h.port.helperTake(h.s, spot, body.model) then
@@ -1404,28 +1643,26 @@ local function blink(h: Helper, body: Body, goal: CFrame)
 	end
 end
 
--- To your lift ("help": a pair piece; "assist": the other side of a heavy two-hands piece): his own piece first (into
--- the van right here, else set down), then a sprint to its far end, and he takes it. Far on foot (BlinkFar), his path
--- failing or not there HelpBlink s after he set off: he fades over to it.
-local function actHelp(h: Helper, body: Body, action: string, spot: number, holding: string?, dt: number, clock: number)
+-- To your two-person piece dragged alone: his own piece first (into the van right here, else set down), then a sprint
+-- to its far end, and he takes it. 8.3 (WaitForHelper): he walks there, a fade-over only as the last resort (CallBlink
+-- s no closer); without it: farther than BlinkFar on foot, his path failing or not there HelpBlink s after he set off.
+local function actHelp(h: Helper, body: Body, spot: number, holding: string?, dt: number, clock: number)
 	local s = h.s
 	local thing = (s.move :: Rules.Move).things[spot]
 	local item = s.items[spot]
-	if not thing or not item or thing.state ~= "carried" or (thing.class ~= "pair" and thing.class ~= "both") or thing.helper ~= nil then
+	if not thing or not item or thing.state ~= "carried" or thing.class ~= "pair" or thing.helper ~= nil then
 		h.thinkAt = 0
 		return
 	end
 	if holding == "hand" then
-		if not loadHere(h, body) then
-			h.port.helperDrop(s, body.model, "put")
-		end
+		setDownOwn(h, body)
 		h.thinkAt = 0
 		return
 	end
-	if h.action ~= action or h.spot ~= spot then
+	if h.action ~= "help" or h.spot ~= spot then
 		h.helpSince, h.stuckFor, h.repathed = clock, 0, false
 		h.helpWalk = Brain.newApproach()
-		say(h, action, clock)
+		say(h, "help", clock)
 	end
 	local goal = item.root.CFrame * endOffset(h, body, thing, item.root, playerRoot(thing.carrier))
 	local at = goal.Position
@@ -1437,7 +1674,6 @@ local function actHelp(h: Helper, body: Body, action: string, spot: number, hold
 		return
 	end
 	local cost = (Brain.routeVia(hereInside, here.X, here.Z, inside, at.X, at.Z, h.wayDoors))
-	-- 8.3 (WaitForHelper): he walks to it, a fade-over only as the last resort (CallBlink s no closer); else today's
 	local walkTo = h.helpWalk
 	local lastResort = if cfg.WaitForHelper then walkTo ~= nil and Brain.approach(walkTo, cost, dt)
 		else cost > cfg.BlinkFar or clock - h.helpSince >= cfg.HelpBlink or h.pathFailedAt >= h.helpSince
@@ -1446,7 +1682,7 @@ local function actHelp(h: Helper, body: Body, action: string, spot: number, hold
 		takeEnd(h, body, spot, clock)
 		return
 	end
-	go(h, body, at, inside, 0.5, Brain.speed(walkSpeed(), action, nil, 0), dt, clock, cfg.WaitForHelper)
+	go(h, body, at, inside, 0.5, Brain.speed(walkSpeed(), "help", nil, 0), dt, clock, cfg.WaitForHelper)
 end
 
 -- ── 8.3 your call: he walks to its far end, "On three... lift!", your lift ─
@@ -1502,9 +1738,7 @@ local function actCome(h: Helper, body: Body, spot: number, holding: string?, dt
 		return
 	end
 	if holding == "hand" then
-		if not loadHere(h, body) then
-			h.port.helperDrop(s, body.model, "put")
-		end
+		setDownOwn(h, body)
 		h.thinkAt = 0
 		return
 	end
@@ -1563,74 +1797,59 @@ local function keepCall(h: Helper, clock: number)
 	end
 end
 
--- ── 8.3 AUTO: a hand asked for a heavy piece ───────────────────────────────
+-- ── 8.3 his list: the pieces he goes for ───────────────────────────────────
 
--- To the heavy piece (beside it, on his side), "give me a hand!" there (the crew's toast, the marker, "Lift with
--- Danny"), then he waits for your lift (a call he answers at once) or AskWait s.
-local function actAsk(h: Helper, body: Body, spot: number, dt: number, clock: number)
+-- Beside a piece, on his side (the way's end: a path can't end inside a piece that stands in the way), out of the
+-- doorways.
+local function besidePiece(h: Helper, here: Vector3, at: Vector3, inside: boolean, half: number): Vector3
+	local from = here
+	if insideAt(h, here) ~= inside then
+		local way = wayFor(h, here, not inside, at) -- (7.x farm move: the way he will come by)
+		from = if inside then way.entryIn.Position else way.outside.Position
+	end
+	local side = Vector3.new(from.X - at.X, 0, from.Z - at.Z)
+	return if side.Magnitude > 0.1 then at + side.Unit * (half + 1.5) else at
+end
+
+-- A two-person piece of his list: to it, "give me a hand!" there (the crew's toast once, the marker "needs you", its
+-- prompt "Lift with Danny"), then he waits for your lift (your call: he answers it at once).
+local function actNeeds(h: Helper, body: Body, spot: number, dt: number, clock: number)
 	local s = h.s
 	local thing = (s.move :: Rules.Move).things[spot]
 	local item = s.items[spot]
-	if h.ask ~= spot then
-		endAsk(h, clock, nil)
-		h.ask, h.askAt = spot, 0
-	end
 	if not thing or not item then
-		endAsk(h, clock, cfg.AskGap)
-		return
-	end
-	local fits = h.fits[spot]
-	if fits == nil then
-		fits = Rules.canLoad(s.move, spot)
-		h.fits[spot] = fits
-	end
-	local verdict = Brain.askKept(h.askAt > 0, clock - h.askAt, fits, thing.state == "home" or thing.state == "ground")
-	if verdict ~= "on" then
-		if verdict == "timeout" then
-			say(h, "askOff", clock, true)
-		end
-		endAsk(h, clock, if verdict == "timeout" then cfg.AskAgain else cfg.AskGap)
 		h.thinkAt = 0
 		return
 	end
-	if h.askAt > 0 then
-		mover.halt(body) -- (he waits there for a hand)
+	if h.needs ~= spot then
+		endNeeds(h)
+		h.needs, h.needsAt = spot, 0
+	end
+	if h.needsAt > 0 then
+		mover.halt(body) -- (he waits there for you)
 		return
 	end
 	local at = item.root.Position
 	local inside = insideAt(h, at)
 	local here = body.root.Position
 	local half = math.max(thing.size.X, thing.size.Z) / 2
-	if insideAt(h, here) == inside and flat(here, at) <= half + cfg.PickReach then
+	local beside = clearOf(h, besidePiece(h, here, at, inside, half), inside)
+	if insideAt(h, here) == inside and (flat(here, at) <= half + cfg.PickReach or flat(here, beside) <= 0.6) then
 		mover.halt(body)
-		h.askAt = clock
+		h.needsAt = clock
 		say(h, "ask", clock, true)
-		tell(h, `🙋 {cfg.Name} needs a hand with the {thing.name}: lift it with him.`)
+		if h.needsTold ~= spot then
+			h.needsTold = spot
+			tell(h, `🙋 {cfg.Name} is at the {thing.name}: lift it with him.`)
+		end
 		mark(h, spot, "ask")
-		h.askMark = askMarker(item.root, thing.size.Y)
+		refreshMarks(h)
 		return
 	end
-	local from = here
-	if insideAt(h, here) ~= inside then
-		local way = wayFor(h, here, not inside, at)
-		from = if inside then way.entryIn.Position else way.outside.Position
-	end
-	local side = Vector3.new(from.X - at.X, 0, from.Z - at.Z)
-	local beside = if side.Magnitude > 0.1 then at + side.Unit * (half + 1.5) else at
 	go(h, body, beside, inside, 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
 end
 
--- Is a crew player with free hands about to lift the piece at `at` (nearer to it than he is, within Reserve)?
-local function reservedNow(h: Helper, at: Vector3, inside: boolean, mine: number): boolean
-	for _, f in h.free do
-		if f.inside == inside and Brain.reserved(flat(Vector3.new(f.x, at.Y, f.z), at), mine) then
-			return true
-		end
-	end
-	return false
-end
-
--- To the next piece; there, he picks it up (not when one of the crew is about to: theirs).
+-- To the next piece of his list; there, he picks it up (off his list: in his arms now).
 local function actFetch(h: Helper, body: Body, spot: number, dt: number, clock: number)
 	local s = h.s
 	local thing = (s.move :: Rules.Move).things[spot]
@@ -1645,26 +1864,14 @@ local function actFetch(h: Helper, body: Body, spot: number, dt: number, clock: 
 	local half = math.max(thing.size.X, thing.size.Z) / 2
 	if insideAt(h, here) == inside and flat(here, at) <= half + cfg.PickReach then
 		mover.halt(body)
-		if reservedNow(h, at, inside, flat(here, at)) then
-			say(h, "mine", clock)
-			h.pick, h.thinkAt = nil, clock + cfg.Think -- (his plan dropped: the next piece)
-			return
-		end
-		if not h.port.helperTake(s, spot, body.model) then
-			h.pick = nil
-		end
+		h.port.helperTake(s, spot, body.model) -- (refused: it can't be his after all; off his list either way)
+		unqueue(h, spot)
+		refreshMarks(h)
+		h.pick = nil
 		h.waited, h.dropping, h.thinkAt = 0, false, 0
 		return
 	end
-	-- (the way's end beside it, on his side: a path can't end inside a piece that stands in the way)
-	local from = here
-	if insideAt(h, here) ~= inside then
-		local way = wayFor(h, here, not inside, at) -- (7.x farm move: the way he will come by)
-		from = if inside then way.entryIn.Position else way.outside.Position
-	end
-	local side = Vector3.new(from.X - at.X, 0, from.Z - at.Z)
-	local beside = if side.Magnitude > 0.1 then at + side.Unit * (half + 1.5) else at
-	go(h, body, beside, inside, 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
+	go(h, body, besidePiece(h, here, at, inside, half), inside, 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
 end
 
 -- With a piece in his arms: to the van's back and in (shut: he opens it when he may, else he asks and waits); no room
@@ -1711,9 +1918,9 @@ local function actDeliver(h: Helper, body: Body, spot: number, dt: number, clock
 		local ok = h.port.helperLoad(s, body.model)
 		h.waited, h.thinkAt = 0, 0
 		if ok then
-			say(h, "loaded", clock)
+			say(h, if #h.queue == 0 then "empty" else "loaded", clock) -- (8.3 the last of his list: "All done.")
 		else
-			h.dropping, h.fits[spot] = true, false -- (no room for it after all: not this one again until the load changes)
+			h.dropping, h.fits[spot] = true, false -- (no room for it after all)
 			h.toldFull = true
 			say(h, "full", clock, true)
 		end
@@ -1745,45 +1952,10 @@ local function actOpen(h: Helper, body: Body, dt: number, clock: number)
 	h.thinkAt = 0
 end
 
--- Behind the player he helps ("Help me"): the owner, else the nearest of the crew on foot; nobody on foot: at the van.
-local function followed(h: Helper, here: Vector3): BasePart?
-	local s = h.s
-	local best: BasePart? = nil
-	local bestDistance = math.huge
-	for player in s.members do
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart or not root or not root:IsA("BasePart") then
-			continue
-		end
-		local d = if player == s.owner then -1 else (root.Position - here).Magnitude
-		if d < bestDistance then
-			best, bestDistance = root, d
-		end
-	end
-	return best
-end
-
-local actWait: (Helper, Body, number, number) -> ()
-
-local function actFollow(h: Helper, body: Body, dt: number, clock: number)
-	local here = body.root.Position
-	local root = followed(h, here)
-	if not root then
-		actWait(h, body, dt, clock)
-		return
-	end
-	local look = root.CFrame.LookVector
-	local x, z = Brain.followSpot(root.Position.X, root.Position.Z, look.X, look.Z)
-	local inside = insideAt(h, root.Position)
-	go(h, body, clearOf(h, Vector3.new(x, root.Position.Y, z), inside), inside, 1.5, Brain.speed(walkSpeed(), "follow", nil, 0), dt, clock)
-end
-
 -- At the van (on its left, out of the way). It moves, or it stands far off and not by the house (driven somewhere
 -- else, a stop on the way): he stands where he is (he appears at it once it is parked by the house). No van: outside
--- the house's door (beside it, out of the doorway).
-actWait = function(h: Helper, body: Body, dt: number, clock: number)
+-- the house's door (beside it, out of the doorway). (8.3: for hire, and hired with nothing to carry.)
+local function actWait(h: Helper, body: Body, dt: number, clock: number)
 	local truck = truckOf(h.s)
 	local speed = Brain.speed(walkSpeed(), "wait", nil, 0)
 	if truck and not truckStill(truck) then
@@ -1801,16 +1973,58 @@ actWait = function(h: Helper, body: Body, dt: number, clock: number)
 	go(h, body, clearOf(h, spot :: Vector3, false), false, 1.5, speed, dt, clock)
 end
 
--- 8.3 WAIT HERE: at his place (where he stood when told, out of the doorways); back there after your call.
-local function actStay(h: Helper, body: Body, dt: number, clock: number)
-	local spot = h.stayAt
-	if not spot then
-		local here = body.root.Position
-		h.stayInside = insideAt(h, here)
-		spot = clearOf(h, here, h.stayInside)
-		h.stayAt = spot
+-- 8.3 you sit at the van's wheel: to its passenger door and in (a fade into the seat only as the last resort); the
+-- seat taken by a crew mate: after the van on foot (by its back; parked far off, he appears there as ever).
+local function actRide(h: Helper, body: Body, dt: number, clock: number)
+	local truck = truckOf(h.s)
+	if not truck then
+		return
 	end
-	go(h, body, spot :: Vector3, h.stayInside, 1.5, Brain.speed(walkSpeed(), "wait", nil, 0), dt, clock)
+	if h.action ~= "ride" then
+		h.rideWalk, h.stuckFor, h.repathed = Brain.newApproach(), 0, false
+		say(h, "ride", clock)
+	end
+	local speed = Brain.speed(walkSpeed(), "ride", nil, 0)
+	local seat = freeSeat(truck)
+	if not seat then
+		local spot = byTruck(truck, -4, 3) or truck.chassis.Position
+		go(h, body, clearOf(h, spot, false), false, 1.5, speed, dt, clock, not truckStill(truck))
+		return
+	end
+	local at = seatDoor(truck, seat)
+	local here = body.root.Position
+	local hereInside = insideAt(h, here)
+	if not hereInside and flat(here, at) <= cfg.RideReach then
+		sitIn(h, body, seat)
+		return
+	end
+	local walkTo = h.rideWalk or Brain.newApproach()
+	h.rideWalk = walkTo
+	local cost = (Brain.routeVia(hereInside, here.X, here.Z, false, at.X, at.Z, h.wayDoors))
+	if Brain.approach(walkTo, cost, dt) then
+		sitIn(h, body, seat) -- (the last resort: his path fails, the van drove off: he fades into the seat)
+		local appear = mover.appear
+		if appear then
+			appear(body)
+		end
+		return
+	end
+	go(h, body, at, false, 0.5, speed, dt, clock, true)
+end
+
+-- 8.3 in the van's seat: out when nobody drives it and it stands (on his side, on with his list), at once when it is
+-- wrecked or gone; else the van carries him.
+local function actSeat(h: Helper, body: Body, clock: number)
+	local s = h.s
+	local truck = truckOf(s)
+	local seat = h.seat
+	local carOk = truck ~= nil and seat ~= nil and seat.Parent ~= nil and seat:IsDescendantOf(truck.model) and body.humanoid.SeatPart == seat
+	if Brain.getOut(driven(s, truck), truck == nil or truckStill(truck), carOk) then
+		unseat(h, body, if carOk then truck else nil)
+		if h.hirer and #h.queue > 0 then
+			say(h, "out", clock)
+		end
+	end
 end
 
 local function actFlee(h: Helper, body: Body, from: Vector3, dt: number, clock: number)
@@ -1873,22 +2087,27 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	if clock >= h.thinkAt then
 		think(h, body, clock)
 	end
+	local seated = h.seat ~= nil
 	local threat, threatAt = nil, nil
-	if holding ~= "pair" then
+	if holding ~= "pair" and not seated then
 		threat, threatAt = nearestZombie(body.root.Position)
 	end
+	local hired = h.hirer ~= nil
+	local truck = truckOf(s)
 	local input = h.input
-	input.mode, input.dead, input.holding = h.mode, false, holding
+	input.hired, input.dead, input.holding, input.seated = hired, false, holding, seated
+	input.ride = hired and driven(s, truck) -- 8.3 (you sit at its wheel: he gets in)
 	input.threat, input.fleeing = threat, h.fleeing
-	input.lift, input.assist, input.pick = h.lift, h.assist, h.pick
-	input.open = holding == nil and wantOpen(h, body)
-	input.atHouse = truckAtHouse(s, truckOf(s))
+	input.lift = h.lift
+	input.queued, input.pair = h.pick, h.pair
+	input.open = hired and holding == nil and not seated and wantOpen(h, body)
+	input.atHouse = truckAtHouse(s, truck)
 	local call = h.call
 	input.call = if call then call.spot else nil -- 8.3
-	input.ask = h.ask or h.askPick
 	local action, target = Brain.decide(input)
-	if h.ask and (action ~= "ask" or target ~= h.ask) then
-		endAsk(h, clock, cfg.AskGap) -- 8.3 (answered, or something came first: asked again AskGap s later at the soonest)
+	local needs = h.needs
+	if needs and not ((action == "needs" or action == "come") and target == needs) then
+		endNeeds(h) -- 8.3 (lifted, taken back, or something came first)
 	end
 	h.fleeing = action == "flee"
 	if action ~= "flee" then
@@ -1896,26 +2115,26 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	end
 	if action == "hold" and spot then
 		actHold(h, body, spot, dt, clock)
+	elseif action == "seat" then
+		actSeat(h, body, clock) -- 8.3
 	elseif action == "flee" and threatAt then
 		actFlee(h, body, threatAt, dt, clock)
 	elseif action == "come" and target then
 		actCome(h, body, target, holding, dt, clock) -- 8.3
-	elseif (action == "help" or action == "assist") and target then
-		actHelp(h, body, action, target, holding, dt, clock)
+	elseif action == "help" and target then
+		actHelp(h, body, target, holding, dt, clock)
 	elseif action == "deliver" and spot then
 		actDeliver(h, body, spot, dt, clock)
+	elseif action == "ride" then
+		actRide(h, body, dt, clock) -- 8.3
 	elseif action == "open" then
 		actOpen(h, body, dt, clock)
+	elseif action == "needs" and target then
+		actNeeds(h, body, target, dt, clock) -- 8.3
 	elseif action == "fetch" and target then
 		actFetch(h, body, target, dt, clock)
-	elseif action == "follow" then
-		actFollow(h, body, dt, clock)
-	elseif action == "ask" and target then
-		actAsk(h, body, target, dt, clock) -- 8.3
-	elseif action == "stay" then
-		actStay(h, body, dt, clock) -- 8.3
 	else
-		if h.full and h.mode == "auto" and not h.toldFull then
+		if h.full and hired and not h.toldFull then
 			say(h, "full", clock, true) -- (once while it stays full)
 			h.toldFull = true
 		end
@@ -1943,25 +2162,28 @@ end
 local function dismiss(h: Helper, why: string?)
 	local s = h.s
 	local body = h.body
+	if body and h.seat then
+		unseat(h, body, nil) -- (8.3 out of the van's seat first)
+	end
 	if body and not h.dead and not s.ended then
 		h.port.helperDrop(s, body.model, "put")
 	end
 	if why == "crew" then
-		tell(h, `🧑‍🔧 {cfg.Name} heads back to the depot: your crew has it now.`)
+		tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} heads home: your crew has it now.` else `🧑‍🔧 {cfg.Name} heads back to the depot: your crew has it now.`)
 	end
 	local clock = os.clock()
 	endCall(h, if s.ended then nil else "gone", clock) -- 8.3
-	endAsk(h, clock, nil)
+	table.clear(h.queue)
+	endNeeds(h)
+	refreshMarks(h)
 	removeBody(h)
 	helpers[s] = nil
 	byId[h.id] = nil
 	for player in h.told do
 		if player.Parent then
-			player:SetAttribute("MoveHelper", nil)
-			player:SetAttribute("MoveHelperDoing", nil)
-			player:SetAttribute("MoveHelperId", nil)
-			player:SetAttribute("MoveHelperCall", nil)
-			player:SetAttribute("MoveHelperReady", nil)
+			for _, name in ATTRIBUTES do
+				player:SetAttribute(name, nil)
+			end
 		end
 	end
 	table.clear(h.told)
@@ -1995,50 +2217,153 @@ local function stopCall(player: Player): boolean
 	return false
 end
 
--- The crew's orders: the Moving remote's ("helper", "auto" | "help" | "stay" | "van"; 8.3 "stop": your call off), each
--- one rate limited (Config.Robust.Limits.MoveHelper) and checked (MoveHelperBrain.order: his move's crew only, an order
--- there is). WAIT HERE again: his place where he stands now.
-local function onOrder(player: Player, action: any, mode: any)
-	if action ~= "helper" or not Net.limit(player, "MoveHelper", Config.Robust.Limits.MoveHelper) then
-		return
+-- 8.3 the helper of the move `player` is crew of (nil: none).
+local function helperOf(player: Player): Helper?
+	for s, h in helpers do
+		if not s.ended and s.members[player] == true then
+			return h
+		end
 	end
-	if mode == "stop" then
-		stopCall(player)
+	return nil
+end
+
+-- 8.3 HIRE: checked (MoveHelperBrain.hireCheck: the move's crew, not hired yet, the money), the money taken
+-- (PlayerData.spend: "HelperHire"), he works for the move.
+local function hire(player: Player)
+	local h = helperOf(player)
+	if not h then
+		return -- (no Danny on a move of yours: nothing to hire)
+	end
+	local profile = PlayerData.get(player)
+	local money = if profile then (profile :: any).money else nil
+	local ok, why = Brain.hireCheck(true, h.hirer ~= nil, money, h.price)
+	if not ok or not PlayerData.spend(player, h.price, "HelperHire", h.s.contract.id) then
+		notice:FireClient(player, if why == "hired" then `{cfg.Name} works for this move already.`
+			else `Not enough money: {cfg.Name} costs {Brain.money(h.price)} for this move.`)
 		return
 	end
 	local clock = os.clock()
-	for s, h in helpers do
-		if s.ended then
-			continue
+	h.hirer = player
+	h.thinkAt = 0
+	say(h, "hired", clock, true)
+	tell(h, `🧑‍🔧 {player.DisplayName} hired {cfg.Name} for this move ({Brain.money(h.price)}): click a piece and he carries it to the van; the rest is yours.`)
+	setDoing(h, h.action, h.spot)
+	tellCrew(h)
+end
+
+-- 8.3 the hire is over before the move (the one who hired him left it): his list gone, what he holds set down.
+local function endHire(h: Helper, who: Player)
+	h.hirer = nil
+	table.clear(h.queue)
+	endNeeds(h)
+	refreshMarks(h)
+	local body = h.body
+	if body and not h.dead then
+		h.port.helperDrop(h.s, body.model, "put")
+	end
+	endCall(h, "gone", os.clock())
+	h.thinkAt = 0
+	tell(h, `🧑‍🔧 {who.DisplayName} left the move: {cfg.Name} waits by the van for hire again.`)
+end
+
+local ASSIGN_WHY: { [string]: string } = {
+	hire = "Hire %s first: click him by the van.",
+	far = "Get closer to the %s to give it to Danny.",
+	his = "Danny has the %s already.",
+	van = "The %s is in the van already.",
+	held = "Somebody holds the %s.",
+	full = "Danny's list is full: click a piece of it to take it back first.",
+}
+
+-- 8.3 a click on a piece (its model): onto his list, or off it again; checked (MoveHelperBrain.assignCheck).
+local function assign(player: Player, model: any)
+	local h = helperOf(player)
+	if not h or typeof(model) ~= "Instance" or not model:IsA("Model") then
+		return
+	end
+	local s = h.s
+	local raw = model:GetAttribute("MoveSpot")
+	local spot: number = if type(raw) == "number" then raw else 0
+	local item = s.items[spot]
+	local thing = if item then (s.move :: Rules.Move).things[spot] else nil
+	if not item or not thing or item.model ~= model then
+		return -- (not a piece of this move: another's, or nothing)
+	end
+	local root = playerRoot(player.UserId)
+	local near = root ~= nil and insideAt(h, root.Position) == insideAt(h, item.root.Position) and flat(root.Position, item.root.Position) <= cfg.ClickReach + 10
+	local verdict = Brain.assignCheck({ crew = true, hired = h.hirer ~= nil, mine = true, state = thing.state, held = thing.carrier ~= nil or thing.helper ~= nil,
+		his = Rules.holding(s.move, h.id) == spot, queued = table.find(h.queue, spot) ~= nil, count = #h.queue, near = near })
+	local clock = os.clock()
+	if verdict == "add" then
+		table.insert(h.queue, spot)
+		refreshMarks(h)
+		h.thinkAt = 0
+		notice:FireClient(player, `🧑‍🔧 {cfg.Name} will take the {thing.name}.`)
+		say(h, "queued", clock)
+	elseif verdict == "remove" then
+		unqueue(h, spot)
+		if h.needs == spot then
+			endNeeds(h)
 		end
-		local crew = s.members[player] == true
-		local new: Brain.Mode?, why: string? = Brain.order(mode, h.mode, crew)
-		if not new and not (why == "same" and h.mode == "stay") then
-			continue
+		refreshMarks(h)
+		h.thinkAt = 0
+		notice:FireClient(player, `{cfg.Name} leaves the {thing.name} to you.`)
+	else
+		local text = ASSIGN_WHY[verdict]
+		if text then
+			notice:FireClient(player, string.format(text, if verdict == "hire" then cfg.Name else thing.name))
 		end
-		local given: Brain.Mode = if new then new else h.mode -- (nil: WAIT HERE again, his place anew)
-		h.mode = given
-		h.thinkAt, h.waited = 0, 0
-		table.clear(h.gaveUp) -- (an order: he tries the lifts he gave up on again)
-		if h.ask then
-			endAsk(h, clock, cfg.AskGap)
+	end
+	tellCrew(h)
+end
+
+-- 8.3 CLEAR QUEUE: his list empty (he waits by the van; a piece in his arms still goes into the van).
+local function clearQueue(player: Player)
+	local h = helperOf(player)
+	if not h or not h.hirer then
+		return
+	end
+	if #h.queue == 0 then
+		notice:FireClient(player, `{cfg.Name}'s list is empty already.`)
+		return
+	end
+	table.clear(h.queue)
+	endNeeds(h)
+	refreshMarks(h)
+	h.thinkAt = 0
+	say(h, "cleared", os.clock(), true)
+	tell(h, `{player.DisplayName} cleared {cfg.Name}'s list: he waits by the van.`)
+	tellCrew(h)
+end
+
+-- The crew's requests on the Moving remote: ("helper", "hire" | "clear" | "stop") at Config.Robust.Limits.MoveHelper,
+-- ("helper", "assign", a piece's model) at MoveHelperAssign; anything else is dropped.
+local function onRequest(player: Player, action: any, kind: any, arg: any)
+	if action ~= "helper" then
+		return
+	end
+	if kind == "assign" then
+		if Net.limit(player, "MoveHelperAssign", Config.Robust.Limits.MoveHelperAssign) then
+			assign(player, arg)
 		end
-		local body = h.body
-		h.stayAt = nil
-		if given == "stay" and body then
-			local here = body.root.Position
-			h.stayInside = insideAt(h, here)
-			h.stayAt = clearOf(h, here, h.stayInside)
-		end
-		say(h, `{given}Mode`, clock, true)
-		tellCrew(h)
+		return
+	end
+	if not Net.limit(player, "MoveHelper", Config.Robust.Limits.MoveHelper) then
+		return
+	end
+	if kind == "stop" then
+		stopCall(player)
+	elseif kind == "hire" then
+		hire(player)
+	elseif kind == "clear" then
+		clearQueue(player)
 	end
 end
 
 -- 8.3 Moving's Lift on a two-person piece (Config.MoveHelper.WaitForHelper): see the header.
 function MoveHelper.call(s: any, player: Player, spot: number): string?
 	local h = helpers[s]
-	if not h or s.ended or not cfg.WaitForHelper then
+	if not h or s.ended or not cfg.WaitForHelper or not h.hirer then
 		return nil
 	end
 	local clock = os.clock()
@@ -2058,17 +2383,14 @@ function MoveHelper.call(s: any, player: Player, spot: number): string?
 	end
 	local thing = (s.move :: Rules.Move).things[spot]
 	local body = h.body
-	if h.dead or not body or not s.members[player] or not thing or thing.class ~= "pair" or (thing.state ~= "home" and thing.state ~= "ground")
+	if h.dead or not body or h.seat or not s.members[player] or not thing or thing.class ~= "pair" or (thing.state ~= "home" and thing.state ~= "ground")
 		or select(2, Rules.holding(s.move, h.id)) == "helper" then
 		return nil -- (he can't come now: today's rules, you drag it alone)
-	end
-	if h.ask == spot then
-		endAsk(h, clock, cfg.AskGap) -- (his ask answered)
 	end
 	h.call = { player = player, spot = spot, since = clock, ready = false, readyAt = 0, approach = Brain.newApproach() }
 	h.thinkAt = 0
 	shout(player.Character, "Danny, give me a hand!")
-	notice:FireClient(player, `🙋 "Danny, give me a hand!" Wait at your end of the {thing.name}: he's coming. (Lift again or G: stop)`)
+	notice:FireClient(player, `🙋 "Danny, give me a hand!" Wait at your end of the {thing.name}: he's coming. Lift again or press STOP to call it off.`) -- (8.3 review: no key named: every device)
 	if player:GetAttribute("MoveHelperCall") ~= thing.name then
 		player:SetAttribute("MoveHelperCall", thing.name)
 	end
@@ -2109,12 +2431,29 @@ function MoveHelper.joinLift(s: any, spot: number, player: Player): boolean
 	return true
 end
 
--- 7.0 planning: an order from elsewhere (server/Moving.luau: the quick chat's "Need a hand here" is HELP ME).
-function MoveHelper.order(player: Player, mode: string)
-	onOrder(player, "helper", mode)
+-- 8.3 Moving's pick: a piece `player` picked up leaves his list ("All yours, boss."; not a word when it is the one his
+-- call lifts with him).
+function MoveHelper.taken(s: any, spot: number, player: Player)
+	local h = helpers[s]
+	if not h or not unqueue(h, spot) then
+		return
+	end
+	local call = h.call
+	local together = call ~= nil and call.spot == spot
+	if h.needs == spot then
+		h.needs, h.needsAt = nil, 0
+	end
+	refreshMarks(h)
+	h.thinkAt = 0
+	if not together and player.Parent then
+		local thing = (s.move :: Rules.Move).things[spot]
+		notice:FireClient(player, `You took the {if thing then thing.name else "piece"}: off {cfg.Name}'s list.`)
+		say(h, "mine", os.clock())
+	end
+	tellCrew(h)
 end
 
--- Once: the zombies go after him too (Zombies.extraTargets, after server/Buddy.luau's), the orders, his loop.
+-- Once: the zombies go after him too (Zombies.extraTargets, after server/Buddy.luau's), the crew's requests, his loop.
 local function wire()
 	if wired then
 		return
@@ -2137,7 +2476,7 @@ local function wire()
 		end
 		return list
 	end
-	Net.get("Moving").OnServerEvent:Connect(onOrder)
+	Net.get("Moving").OnServerEvent:Connect(onRequest)
 	task.spawn(function()
 		while true do
 			local dt = task.wait(cfg.Tick)
@@ -2175,7 +2514,6 @@ local function create(s: any, port: Port): Helper
 		s = s,
 		port = port,
 		id = id,
-		mode = "auto", -- 8.3 (AUTO: the default)
 		body = nil,
 		hooks = {},
 		health = cfg.Health,
@@ -2211,19 +2549,18 @@ local function create(s: any, port: Port): Helper
 		dropping = false,
 		thinkAt = 0,
 		lift = nil,
-		assist = nil,
 		pick = nil,
+		pair = false,
 		full = false,
 		toldFull = false,
 		fitKey = -1,
 		fits = {},
-		input = { mode = "auto", dead = false, holding = nil, threat = nil, fleeing = false, lift = nil, assist = nil, pick = nil, open = false, atHouse = false, call = nil, ask = nil },
-		candidates = {},
-		candidatePool = {},
+		input = { hired = false, dead = false, holding = nil, seated = false, ride = false, threat = nil, fleeing = false, lift = nil, queued = nil, pair = false, open = false,
+			atHouse = false, call = nil },
 		lifts = {},
 		liftPool = {},
-		free = {},
-		freePool = {},
+		next = {},
+		nextPool = {},
 		doors = ways[1].doors,
 		doorways = doorways,
 		fronts = fronts,
@@ -2233,20 +2570,24 @@ local function create(s: any, port: Port): Helper
 		wayDoors = wayDoors,
 		saidAt = {},
 		lastSaid = -math.huge,
-		doing = Brain.doing("wait", nil, false),
+		doing = Brain.doing("offer"),
 		doingAction = "wait",
 		doingSpot = nil,
 		doingFull = false,
+		doingHired = false,
 		told = {},
 		call = nil,
-		ask = nil,
-		askAt = 0,
-		askAgain = clock + cfg.AskGap,
-		askPick = nil,
-		askMark = nil,
 		helpWalk = nil,
-		stayAt = nil,
-		stayInside = false,
+		hirer = nil,
+		price = Brain.hirePrice(#((s.move :: Rules.Move).order)),
+		queue = {},
+		marks = {},
+		needs = nil,
+		needsAt = 0,
+		needsTold = nil,
+		sign = nil,
+		seat = nil,
+		rideWalk = nil,
 	}
 	helpers[s] = h
 	byId[id] = h
@@ -2255,8 +2596,9 @@ local function create(s: any, port: Port): Helper
 	else
 		h.dead, h.downAt = true, clock - cfg.Respawn + 2 -- (tried again in a moment)
 	end
-	tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} joins your move: he carries the light pieces and lifts the heavy ones with you. Click or tap him for orders.`
-		else `🧑‍🔧 {cfg.Name} from the depot joins your move: he lifts with you, carries the smaller pieces to the van and opens its back. Orders: the DANNY buttons under the move's panel.`)
+	local price = Brain.money(h.price)
+	tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} waits by your van: click him to hire him for this move ({price}). He carries what you click and lifts the heavy pieces with you.`
+		else `🧑‍🔧 {cfg.Name} from the depot waits by your van: HIRE him under the move's panel ({price}) and he lifts the heavy pieces with you.`)
 	return h
 end
 
@@ -2264,14 +2606,18 @@ local function syncOne(s: any, port: Port)
 	if s.ended then
 		return
 	end
+	local h = helpers[s]
+	local hirer = if h then h.hirer else nil
+	if h and hirer and (not hirer.Parent or not s.members[hirer]) then
+		endHire(h, hirer) -- 8.3 (whoever paid owns the hire)
+	end
 	local count = 0
 	for player in s.members do
 		if player.Parent then
 			count += 1
 		end
 	end
-	local h = helpers[s]
-	local want = Brain.wanted(count)
+	local want = Brain.wanted(count, h ~= nil and h.hirer ~= nil)
 	if want and not h then
 		h = create(s, port)
 	elseif not want and h then

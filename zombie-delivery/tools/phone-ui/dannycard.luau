@@ -1,18 +1,22 @@
--- 8.3 Danny's orders: his command card (client/MoveHelperCard.luau) and his status line (client/MoveHelperHud.luau's
--- strip once the card is there: "🧑‍🔧 DANNY · AUTO", what he does, ORDERS; "⏳ WAITING FOR DANNY…" and STOP while you wait
--- for him), run for real on sandbox_mock.luau's recorder with client/TopBlocks.luau, beside the real
+-- 8.3 Danny for hire: his card (client/MoveHelperCard.luau: HIRE · $170 while he is for hire, CLEAR QUEUE once hired)
+-- and his status line (client/MoveHelperHud.luau's strip once the card is there: "🧑‍🔧 DANNY · FOR HIRE" over the
+-- price and HIRE $170; "🧑‍🔧 DANNY · 2 pieces to carry" over what he does and LIST; "⏳ WAITING FOR DANNY…" and STOP
+-- while you wait for him), run for real on sandbox_mock.luau's recorder with client/TopBlocks.luau, beside the real
 -- client/SandboxHud.luau (the money block) and client/SandboxTasksUi.luau (the TASKS chip), a stand-in move's panel (a
 -- top block where MoveLayout.panel puts it) and Hud's groups where client/Hud.luau puts them, on a phone held sideways
 -- (844 × 390: 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen
--- (1920 × 1080): nothing when Config.Sandbox.On is false; the status line under the panel, its words fitting, ORDERS a
--- finger's size on a phone; ORDERS opens the card; the card beside Danny's head on the screen (right of it, else left
--- of it: never on it), on the screen, clear of the HUD's chips, the move's panel and status line, the touch buttons,
--- the thumbstick and the jump button; its four orders (AUTO, HELP ME, WAIT HERE, WAIT AT VAN) with the one in force lit,
--- each a finger's size on a phone, their words fitting; a tap sends the Moving remote's ("helper", order) once and
--- closes it; 1-4 on a computer; ✕, the gamepad's B, a tap beside it, closing it as ESC does, walking away from him and
--- Danny gone close it, a tap on it does not; the order's change lit; the wait: the line orange, STOP and G send
--- ("helper", "stop"), ORDERS back after it; a resize while open; the gamepad's prompt on him off without a gamepad; no
--- warnings. `luau dannycard.luau -a dump` prints the preview's scenes as JSON instead (dannycard_preview.py).
+-- (1920 × 1080): nothing when Config.Sandbox.On is false; the status line under the panel, its words fitting, its button
+-- a finger's size on a phone; HIRE on it opens the card (never a purchase at one tap); the card beside Danny's head on
+-- the screen (right of it, else left of it: never on it), on the screen, clear of the HUD's chips, the move's panel and
+-- status line, the touch buttons, the thumbstick and the jump button; for hire: "Hire Danny for this move · $170" and
+-- HIRE · $170, its tap sending the Moving remote's ("helper", "hire") once and closing it; hired: his list in words, how
+-- to give him pieces (a click, a tap, R1), CLEAR QUEUE (("helper", "clear")); its button a finger's size on a phone, its
+-- words fitting; ✕, the gamepad's B, a tap beside it, closing it as ESC does, walking away from him and Danny gone close
+-- it, a tap on it does not; a click (a tap) on him opens it; a click (a tap) on a piece of your move while he is hired
+-- sends ("helper", "assign", its model), never while he is for hire, for another move's piece, with your hands full or
+-- while a grip check shows; a gamepad: "Hire Danny" / "Talk to Danny" on him (L1), "Give to Danny" / "Take back from
+-- Danny" on the nearest piece (R1); the wait: the line orange, STOP and G send ("helper", "stop"); a resize while open;
+-- no warnings. `luau dannycard.luau -a dump` prints the preview's scenes as JSON instead (dannycard_preview.py).
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -65,6 +69,9 @@ end
 local function tap(x, y, processed)
 	UIS.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.Unknown, UserInputType = M.Enum.UserInputType.Touch, Position = M.Vector3.new(x, y, 0) }, processed == true)
 end
+local function click(x, y, processed)
+	UIS.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.Unknown, UserInputType = M.Enum.UserInputType.MouseButton1, Position = M.Vector3.new(x, y, 0) }, processed == true)
+end
 local box, overlap = M.box, TouchLayout.overlap
 local function show(b)
 	return string.format("%.0f,%.0f-%.0f,%.0f", b.x0, b.y0, b.x1, b.y1)
@@ -83,7 +90,7 @@ local function shown(object)
 	return true
 end
 -- Does a one-line text fit its label (after the scales above it)? What he does may run long and is cut with "…"; a
--- title, an order's name or a button never.
+-- title, the card's line or a button never.
 local CUT_OK = { Doing = true }
 local function badTexts(root)
 	local bad = {}
@@ -101,6 +108,22 @@ local function badTexts(root)
 		end
 	end
 	return bad
+end
+-- A wrapped text's lines fit its label's height (its words broken at spaces, the mock's widths).
+local function wrapFits(object)
+	local b = box(object)
+	local size = (object.TextSize or 14) * M.scaleOf(object)
+	local lines, line = 1, ""
+	for word in string.gmatch(object.Text, "%S+") do
+		local try = if line == "" then word else line .. " " .. word
+		if M.textWidth(try, size, object.Font) > b.x1 - b.x0 + 0.5 then
+			lines += 1
+			line = word
+		else
+			line = try
+		end
+	end
+	return lines * size * 1.15 <= b.y1 - b.y0 + 0.5, `{lines} lines of {size} in {b.y1 - b.y0}`
 end
 -- The buttons a finger taps on a phone: each at least 44 × 44 screen px (the line's invisible tap area aside).
 local function smallButtons(root)
@@ -124,13 +147,58 @@ end
 UIS.TouchTapInWorld = M.signal()
 UIS.LastInputTypeChanged = M.signal()
 UIS.MouseBehavior = M.Enum.MouseBehavior.Default
-local make = M.make -- (a ProximityPrompt's Triggered: the gamepad's "Talk to Danny")
+local make = M.make -- (a ProximityPrompt's Triggered: the gamepad's prompts)
 M.make = function(class, props, parent)
 	local made = make(class, props, parent)
 	if class == "ProximityPrompt" then
 		made.Triggered = M.signal()
 	end
 	return made
+end
+-- (the vector maths a ray needs, Instance.new's prompts, the world's ray, the camera's rays, the tags)
+local vmeta = getmetatable(M.Vector3.new(0, 0, 0))
+local vindex = vmeta.__index
+vmeta.__add = function(a, b)
+	return M.Vector3.new(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
+end
+vmeta.__mul = function(a, k)
+	return M.Vector3.new(a.X * k, a.Y * k, a.Z * k)
+end
+vmeta.__index = function(a, name)
+	if name == "Unit" then
+		local m = math.sqrt(a.X * a.X + a.Y * a.Y + a.Z * a.Z)
+		return M.Vector3.new(a.X / m, a.Y / m, a.Z / m)
+	elseif name == "Dot" then
+		return function(self, b)
+			return self.X * b.X + self.Y * b.Y + self.Z * b.Z
+		end
+	end
+	return vindex(a, name)
+end
+M.methods.IsDescendantOf = function(self, ancestor)
+	local node = self.Parent
+	while node do
+		if node == ancestor then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+M.RaycastParams = { new = function()
+	return {}
+end }
+local rayHit = nil -- what the next ray hits: { Instance, Position }
+M.workspace.Raycast = function()
+	return rayHit
+end
+local tagged = {} -- tag → its instances
+M.services.CollectionService = { GetTagged = function(_, tag)
+	return tagged[tag] or {}
+end }
+local gamepad = false
+M.MUi.gamepadActive = function()
+	return gamepad
 end
 -- Danny's body in workspace.Npcs (his MoveHelper id, his root), your character's (sandbox_mock's: at 0, 0, 0)
 local DANNY_ID = -2000000001
@@ -139,6 +207,23 @@ local body = M.make("Model", { Name = "Danny" }, npcs)
 body:SetAttribute("MoveHelper", DANNY_ID)
 local dannyRoot = M.make("BasePart", { Name = "HumanoidRootPart", Position = M.Vector3.new(8, 3, -6) }, body) -- (the recorder's IsA: its own class)
 body.PrimaryPart = dannyRoot
+-- a piece of your move (the attribute MoveSpot, its own Lift prompt tagged MovePrompt with the move's owner: you), one
+-- of another move's
+M.player:SetAttribute("MoveWith", 14)
+local function piece(name, spot, owner, at)
+	local model = M.make("Model", { Name = name }, M.workspace)
+	model:SetAttribute("MoveSpot", spot)
+	local root = M.make("BasePart", { Name = "Root", Position = at }, model)
+	model.PrimaryPart = root
+	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name }, root)
+	own:SetAttribute("MoveOwner", owner)
+	tagged.MovePrompt = tagged.MovePrompt or {}
+	table.insert(tagged.MovePrompt, own)
+	return model, root
+end
+local lamp, lampRoot = piece("Lamp", 1, 14, M.Vector3.new(4, 1, 2))
+local stranger, strangerRoot = piece("Vase", 1, 99, M.Vector3.new(-4, 1, 2))
+local grip = require("./CarryGripUi")
 -- the move's panel (client/MovingHud.luau's, a top block) where MoveLayout.panel puts it, and Hud's groups where
 -- client/Hud.luau puts them (sandboxtasks.luau's boxes): a touch screen's left column (the cash, the minimap, the
 -- health), a computer's health row at the bottom left and MOUSE [ALT] / the key hints at the top right
@@ -146,7 +231,7 @@ local TopBlocks = require("./TopBlocks")
 local movingGui = M.make("ScreenGui", { Name = "MovingHud", DisplayOrder = 6 }, M.gui)
 local panel = M.make("Frame", { Name = "MovePanel", BackgroundColor3 = M.MTheme.Contract.charcoal, BackgroundTransparency = 0.12 }, movingGui)
 M.make("UICorner", { CornerRadius = M.UDim.new(0, 8) }, panel)
-local panelTitle = M.make("TextLabel", { Name = "Title", Text = "THE OLD CHALET · 14:52", TextSize = 14, Font = M.Enum.Font.GothamBold, TextColor3 = M.MTheme.Contract.text,
+M.make("TextLabel", { Name = "Title", Text = "THE OLD CHALET · 14:52", TextSize = 14, Font = M.Enum.Font.GothamBold, TextColor3 = M.MTheme.Contract.text,
 	BackgroundTransparency = 1, Position = M.UDim2.fromOffset(12, 8), Size = M.UDim2.new(1, -24, 0, 20), TextXAlignment = M.Enum.TextXAlignment.Left }, panel)
 M.make("TextLabel", { Name = "Count", Text = "📦 2 / 6 out · van 18%", TextSize = 12, Font = M.Enum.Font.GothamMedium, TextColor3 = M.MTheme.Contract.secondary,
 	BackgroundTransparency = 1, Position = M.UDim2.fromOffset(12, 32), Size = M.UDim2.new(1, -24, 0, 18), TextXAlignment = M.Enum.TextXAlignment.Left }, panel)
@@ -160,6 +245,10 @@ local function place(object, b)
 	object.Size = M.UDim2.fromOffset(b.x1 - b.x0, b.y1 - b.y0)
 end
 local camera = M.workspace.CurrentCamera
+camera.ScreenPointToRay = function()
+	return { Origin = M.Vector3.new(0, 20, 30), Direction = M.Vector3.new(0, -0.5, -1) }
+end
+camera.ViewportPointToRay = camera.ScreenPointToRay
 local function screen(touch, w, h)
 	M.touch, M.width, M.height = touch, w, h
 	M.placeHud()
@@ -207,6 +296,7 @@ local function node(n)
 		out.text, out.ts = p.Text, p.TextSize
 		out.tc, out.tt = color(p.TextColor3), p.TextTransparency
 		out.xa = if p.TextXAlignment then p.TextXAlignment.Name else nil
+		out.ya = if p.TextYAlignment then p.TextYAlignment.Name else nil
 		out.font = if p.Font then p.Font.Name else nil
 		out.wrap = p.TextWrapped == true
 		out.trunc = p.TextTruncate ~= nil and p.TextTruncate.Name == "AtEnd"
@@ -268,13 +358,13 @@ local MoveHelperCard = require("./MoveHelperCard")
 screen(true, 844, 354)
 Config.Sandbox.On = false
 MoveHelperCard.start()
-attribute("MoveHelper", "auto")
+attribute("MoveHelper", "offer")
 check("Config.Sandbox.On false: MoveHelperCard.start() does nothing (no card, no prompt on him)", not MoveHelperCard.isOpen() and M.gui:FindFirstChild("MoveHelperCard") == nil
 	and dannyRoot:FindFirstChild("TalkToDanny") == nil)
 attribute("MoveHelper", nil)
 Config.Sandbox.On = true
 
--- ── On: the HUD's chips, the status line ────────────────────────────────────
+-- ── On: the HUD's chips, the status line for hire ──────────────────────────
 local SandboxHud = require("./SandboxHud")
 local SandboxTasksUi = require("./SandboxTasksUi")
 SandboxHud.start()
@@ -291,16 +381,18 @@ check("(the HUD's chips there: the money block, the TASKS chip)", SandboxHud.blo
 MoveHelperHud.start()
 MoveHelperCard.start()
 attribute("MoveHelperId", DANNY_ID)
-attribute("MoveHelperDoing", "Carrying the Lamp to the van")
-attribute("MoveHelper", "auto")
+attribute("MoveHelperDoing", "Waiting by the van for hire")
+attribute("MoveHelperPrice", 170)
+attribute("MoveHelper", "offer")
 M.flush()
 local strip = MoveHelperHud.strip()
-check("Danny on your move: his status line (the strip) with the card: no order buttons, ORDERS", strip ~= nil and strip.Visible and named(strip, "Action").Visible
-	and named(strip, "Action").Text == "ORDERS" and not named(strip, "auto").Visible and not named(strip, "help").Visible)
-check("… \"🧑‍🔧 DANNY · AUTO\" over what he does", named(strip, "Title").Text == "🧑‍🔧 DANNY · AUTO" and named(strip, "Doing").Text == "Carrying the Lamp to the van")
-check("the gamepad's \"Talk to Danny\" on his root (ButtonL1), off without a gamepad", dannyRoot:FindFirstChild("TalkToDanny") ~= nil
-	and dannyRoot:FindFirstChild("TalkToDanny").ActionText == "Talk to Danny" and dannyRoot:FindFirstChild("TalkToDanny").GamepadKeyCode == M.Enum.KeyCode.ButtonL1
-	and dannyRoot:FindFirstChild("TalkToDanny").Enabled == false)
+check("Danny for hire on your move: his status line (the strip), HIRE $170, orange", strip ~= nil and strip.Visible and named(strip, "Action").Visible
+	and named(strip, "Action").Text == "HIRE $170" and named(strip, "Action").BackgroundColor3.R > 0.9)
+check("… \"🧑‍🔧 DANNY · FOR HIRE\" over what he does for you and his price", named(strip, "Title").Text == "🧑‍🔧 DANNY · FOR HIRE"
+	and named(strip, "Doing").Text == "Carries what you click · $170 this move")
+local talk = dannyRoot:FindFirstChild("TalkToDanny")
+check("the gamepad's prompt on his root: \"Hire Danny\" (ButtonL1), off without a gamepad", talk ~= nil and talk.ActionText == "Hire Danny"
+	and talk.GamepadKeyCode == M.Enum.KeyCode.ButtonL1 and talk.Enabled == false)
 
 -- What the card (and the status line) keeps clear of: the touch controls, Hud's groups, the chips, the move's panel.
 local function blocks(withStrip)
@@ -356,10 +448,10 @@ local function stripChecks(label)
 	check(`{label}: … clear of the touch controls, Hud's groups and the chips`, clear, why)
 	check(`{label}: … its words fit (what he does may be cut with "…")`, #badTexts(strip) == 0, badTexts(strip)[1])
 	if M.touch then
-		check(`{label}: … ORDERS a finger's size`, #smallButtons(strip) == 0, smallButtons(strip)[1])
+		check(`{label}: … its button a finger's size`, #smallButtons(strip) == 0, smallButtons(strip)[1])
 	end
 end
-local function cardChecks(label, head)
+local function cardChecks(label, head, hired)
 	local card = MoveHelperCard.card()
 	local c = box(card)
 	check(`{label}: the card open, on the screen`, MoveHelperCard.isOpen() and card.Visible and inside(c), show(c))
@@ -370,68 +462,92 @@ local function cardChecks(label, head)
 		local gap = math.max(c.x0 - head.x, head.x - c.x1, c.y0 - head.y, head.y - c.y1, 0)
 		check(`{label}: … beside Danny's head (never on it, a short way off)`, not onHim and gap <= 120, `{show(c)} by {head.x},{head.y}`)
 	end
-	local names = {}
-	for _, id in { "auto", "help", "stay", "van" } do
-		local button = named(card, id)
-		table.insert(names, if button then named(button, "Label").Text else "-")
-	end
-	check(`{label}: … its four orders in order: 🤖 AUTO, 🙋 HELP ME, ⏸ WAIT HERE, 🚐 WAIT AT VAN`, table.concat(names, "|") == "🤖 AUTO|🙋 HELP ME|⏸ WAIT HERE|🚐 WAIT AT VAN",
-		table.concat(names, "|"))
-	check(`{label}: … its words fit`, #badTexts(card) == 0, badTexts(card)[1])
-	if M.touch then
-		check(`{label}: … every button a finger's size (the orders, ✕)`, #smallButtons(card) == 0, smallButtons(card)[1])
-		check(`{label}: … no key hints on a touch screen`, not named(named(card, "auto"), "Key").Visible)
+	local main = named(card, "Main")
+	if hired then
+		check(`{label}: … hired: his list in words, how to give him pieces, CLEAR QUEUE`, named(card, "Line").Text == "2 pieces to carry"
+			and string.find(named(card, "Hint").Text, "give it to him", 1, true) ~= nil and main.Text == "CLEAR QUEUE", named(card, "Line").Text)
 	else
-		check(`{label}: … the keys 1-4 on its orders`, named(named(card, "auto"), "Key").Visible and named(named(card, "van"), "Key").Text == "4")
+		check(`{label}: … for hire: "Hire Danny for this move · $170", HIRE · $170 (orange)`, named(card, "Line").Text == "Hire Danny for this move · $170"
+			and main.Text == "HIRE · $170" and main.BackgroundColor3.R > 0.9, main.Text)
 	end
-end
-local function lit(id)
-	local card = MoveHelperCard.card()
-	local count = 0
-	for _, other in { "auto", "help", "stay", "van" } do
-		if named(card, other).BackgroundColor3.R > 0.9 then
-			count += 1
-		end
+	check(`{label}: … its words fit`, #badTexts(card) == 0, badTexts(card)[1])
+	local fits, lines = wrapFits(named(card, "Hint"))
+	check(`{label}: … its hint fits its lines`, fits, lines)
+	if M.touch then
+		check(`{label}: … every button a finger's size (its button, ✕)`, #smallButtons(card) == 0, smallButtons(card)[1])
 	end
-	return count == 1 and named(card, id).BackgroundColor3.R > 0.9
+	check(`{label}: … the gamepad's selection on its button`, M.focus == main)
 end
 
--- ── The phone ───────────────────────────────────────────────────────────────
-stripChecks("844 x 390")
-scene("danny-status-phone", nil)
+-- ── The phone: for hire ─────────────────────────────────────────────────────
+stripChecks("844 x 390, for hire")
+scene("danny-status-hire-phone", nil)
+local before = #sentOn("Moving")
 press(named(strip, "Action"))
 M.flush()
-check("ORDERS opens his card (\"MoveHelperCard\", over the HUD)", MoveHelperCard.isOpen() and M.gui:FindFirstChild("MoveHelperCard") ~= nil
-	and M.gui:FindFirstChild("MoveHelperCard").DisplayOrder > M.gui:FindFirstChild("MoveHelperHud").DisplayOrder)
-check("… \"🧑‍🔧 DANNY\" and what he does (the order · his doing)", named(MoveHelperCard.card(), "Title").Text == "🧑‍🔧 DANNY"
-	and named(MoveHelperCard.card(), "Doing").Text == "AUTO · Carrying the Lamp to the van")
-check("… AUTO lit (the order in force)", lit("auto"))
-cardChecks("844 x 390 (ORDERS: his head off the screen)", nil)
+check("HIRE $170 on the line opens his card (\"MoveHelperCard\", over the HUD), nothing bought at one tap", MoveHelperCard.isOpen() and M.gui:FindFirstChild("MoveHelperCard") ~= nil
+	and M.gui:FindFirstChild("MoveHelperCard").DisplayOrder > M.gui:FindFirstChild("MoveHelperHud").DisplayOrder and #sentOn("Moving") == before)
+check("… \"🧑‍🔧 DANNY\" and his status (for hire, the price)", named(MoveHelperCard.card(), "Title").Text == "🧑‍🔧 DANNY"
+	and named(MoveHelperCard.card(), "Doing").Text == "For hire · $170 this move")
+cardChecks("844 x 390, for hire (his head off the screen)", nil, false)
 MoveHelperCard.close()
 local heads = { { x = 422, y = 170 }, { x = 760, y = 120 }, { x = 200, y = 120 }, { x = 560, y = 250 } }
 for index, head in heads do
 	MoveHelperCard.open(head)
 	M.flush()
-	cardChecks(`844 x 390, a tap on him at {head.x},{head.y}`, head)
+	cardChecks(`844 x 390, for hire, a tap on him at {head.x},{head.y}`, head, false)
 	if index == 1 then
-		scene("danny-card-phone", head)
+		scene("danny-card-hire-phone", head)
 	end
 	MoveHelperCard.close()
 end
--- an order
 MoveHelperCard.open(heads[1])
-local before = #sentOn("Moving")
-press(named(MoveHelperCard.card(), "help"))
-press(named(MoveHelperCard.card(), "help"))
+before = #sentOn("Moving")
+press(named(MoveHelperCard.card(), "Main"))
+press(named(MoveHelperCard.card(), "Main"))
 local sent = sentOn("Moving")
-check("HELP ME: the Moving remote's (\"helper\", \"help\") once (the card closes at the first tap)", #sent == before + 1 and sent[#sent][1] == "helper" and sent[#sent][2] == "help"
-	and not MoveHelperCard.isOpen())
-attribute("MoveHelper", "help")
-attribute("MoveHelperDoing", "Right behind you")
+check("HIRE · $170: the Moving remote's (\"helper\", \"hire\") once (the card closes at the first tap; the server checks the money)", #sent == before + 1
+	and sent[#sent][1] == "helper" and sent[#sent][2] == "hire" and not MoveHelperCard.isOpen())
+-- a tap on a piece while he is for hire: nothing (his list is for a hired Danny)
+rayHit = { Instance = lampRoot, Position = lampRoot.Position }
+before = #sentOn("Moving")
+UIS.TouchTapInWorld:Fire(M.Vector2.new(400, 200), false)
+check("for hire: a tap on a piece of your move sends nothing", #sentOn("Moving") == before and not MoveHelperCard.isOpen())
+
+-- ── The phone: hired ────────────────────────────────────────────────────────
+attribute("MoveHelperPrice", nil)
+attribute("MoveHelperQueue", 2)
+attribute("MoveHelperDoing", "Carrying the Lamp to the van")
+attribute("MoveHelper", "hired")
+M.flush()
+check("the server's answer (MoveHelper = hired): \"🧑‍🔧 DANNY · 2 pieces to carry\" over what he does, LIST", named(strip, "Title").Text == "🧑‍🔧 DANNY · 2 pieces to carry"
+	and named(strip, "Doing").Text == "Carrying the Lamp to the van" and named(strip, "Action").Text == "LIST")
+check("… the gamepad's prompt on him: \"Talk to Danny\"", talk.ActionText == "Talk to Danny")
+stripChecks("844 x 390, hired")
+scene("danny-status-hired-phone", nil)
+press(named(strip, "Action"))
+M.flush()
+check("LIST opens his card: his status (2 pieces to carry · what he does)", MoveHelperCard.isOpen()
+	and named(MoveHelperCard.card(), "Doing").Text == "2 pieces to carry · Carrying the Lamp to the van")
+check("… a touch screen's words: \"Tap a piece to give it to him · tap it again to take it back.\"", string.find(named(MoveHelperCard.card(), "Hint").Text,
+	"Tap a piece to give it to him · tap it again to take it back.", 1, true) == 1, named(MoveHelperCard.card(), "Hint").Text)
+MoveHelperCard.close()
+for index, head in heads do
+	MoveHelperCard.open(head)
+	M.flush()
+	cardChecks(`844 x 390, hired, a tap on him at {head.x},{head.y}`, head, true)
+	if index == 1 then
+		scene("danny-card-hired-phone", head)
+	end
+	MoveHelperCard.close()
+end
 MoveHelperCard.open(heads[1])
-check("the server's answer (MoveHelper = help): HELP ME lit, the line too", lit("help") and named(strip, "Title").Text == "🧑‍🔧 DANNY · HELP ME"
-	and named(MoveHelperCard.card(), "Doing").Text == "HELP ME · Right behind you")
+before = #sentOn("Moving")
+press(named(MoveHelperCard.card(), "Main"))
+sent = sentOn("Moving")
+check("CLEAR QUEUE: (\"helper\", \"clear\") once, the card closes", #sent == before + 1 and sent[#sent][2] == "clear" and not MoveHelperCard.isOpen())
 -- closing
+MoveHelperCard.open(heads[1])
 press(named(MoveHelperCard.card(), "Close"))
 check("✕ closes it", not MoveHelperCard.isOpen() and not MoveHelperCard.card().Visible)
 MoveHelperCard.open(heads[1])
@@ -454,10 +570,66 @@ dannyRoot.Position = M.Vector3.new(8, 3, -6)
 MoveHelperCard.open(heads[1])
 attribute("MoveHelper", nil)
 check("Danny gone (off your move): it closes, the line goes", not MoveHelperCard.isOpen() and not strip.Visible)
-attribute("MoveHelper", "auto")
-attribute("MoveHelperDoing", "Carrying the Lamp to the van")
+attribute("MoveHelper", "hired")
 
--- the wait: you called him to a two-person piece
+-- ── Clicks and taps in the world ────────────────────────────────────────────
+before = #sentOn("Moving")
+rayHit = { Instance = lampRoot, Position = lampRoot.Position }
+UIS.TouchTapInWorld:Fire(M.Vector2.new(400, 200), false)
+sent = sentOn("Moving")
+check("hired: a tap on a piece of your move sends (\"helper\", \"assign\", its model)", #sent == before + 1 and sent[#sent][1] == "helper"
+	and sent[#sent][2] == "assign" and sent[#sent][3] == lamp and not MoveHelperCard.isOpen())
+click(400, 200, false)
+sent = sentOn("Moving")
+check("… a click (a computer) too", #sent == before + 2 and sent[#sent][3] == lamp)
+click(400, 200, true)
+check("… not a click the game took (a button)", #sentOn("Moving") == before + 2)
+rayHit = { Instance = strangerRoot, Position = strangerRoot.Position }
+click(400, 200, false)
+check("… another move's piece: nothing", #sentOn("Moving") == before + 2 and stranger ~= nil)
+rayHit = { Instance = lampRoot, Position = lampRoot.Position }
+grip.open = true
+click(400, 200, false)
+check("… while a grip check shows (its press is the click): nothing", #sentOn("Moving") == before + 2)
+grip.open = false
+M.player.Character:SetAttribute("Carrying", "crate")
+click(400, 200, false)
+check("… your hands full: nothing", #sentOn("Moving") == before + 2)
+M.player.Character:SetAttribute("Carrying", nil)
+attribute("MoveHelperCall", "Sofa")
+click(400, 200, false)
+check("… while you wait for him: nothing", #sentOn("Moving") == before + 2)
+attribute("MoveHelperCall", nil)
+rayHit = { Instance = dannyRoot, Position = dannyRoot.Position }
+click(400, 200, false)
+check("a click on him opens his card (sends nothing)", MoveHelperCard.isOpen() and #sentOn("Moving") == before + 2)
+MoveHelperCard.close()
+rayHit = nil
+
+-- ── A gamepad: "Give to Danny" on the nearest piece ─────────────────────────
+gamepad = true
+UIS.LastInputTypeChanged:Fire()
+local give = lampRoot:FindFirstChild("GiveToDanny")
+check("a gamepad: \"Give to Danny\" on the nearest piece of your move (R1, its name), \"Talk to Danny\" on him on", give ~= nil and give.Enabled
+	and give.ActionText == "Give to Danny" and give.ObjectText == "Lamp" and give.GamepadKeyCode == M.Enum.KeyCode.ButtonR1 and talk.Enabled
+	and strangerRoot:FindFirstChild("GiveToDanny") == nil)
+before = #sentOn("Moving")
+give.Triggered:Fire()
+sent = sentOn("Moving")
+check("… R1: (\"helper\", \"assign\", the piece)", #sent == before + 1 and sent[#sent][2] == "assign" and sent[#sent][3] == lamp)
+lamp:SetAttribute("DannyQueue", 1)
+M.resume()
+check("… a piece of his list: \"Take back from Danny\"", give.ActionText == "Take back from Danny")
+attribute("MoveHelper", "offer")
+M.resume()
+check("… for hire: no \"Give to Danny\"; \"Hire Danny\" on him", not give.Enabled and talk.ActionText == "Hire Danny")
+attribute("MoveHelper", "hired")
+lamp:SetAttribute("DannyQueue", nil)
+gamepad = false
+UIS.LastInputTypeChanged:Fire()
+check("… no gamepad: off", not give.Enabled and not talk.Enabled)
+
+-- ── The wait: you called him to a two-person piece ──────────────────────────
 attribute("MoveHelperCall", "Sofa")
 attribute("MoveHelperDoing", "Coming to lift the Sofa with you")
 M.flush()
@@ -484,37 +656,36 @@ attribute("MoveHelperCall", nil)
 attribute("MoveHelperDoing", "Carrying the Lamp to the van")
 key("G")
 check("… no wait: G sends nothing", #sentOn("Moving") == before + 2)
-check("the wait over: ORDERS again, the line charcoal", named(strip, "Action").Text == "ORDERS" and strip.BackgroundColor3.R < 0.2)
+check("the wait over: LIST again, the line charcoal", named(strip, "Action").Text == "LIST" and strip.BackgroundColor3.R < 0.2)
 
 -- ── A computer (1280 × 800) and a big screen (1920 × 1080) ─────────────────
 for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" } } do
 	screen(false, size[1], size[2])
 	local label = `{size[1]} x {size[2] + 36}`
-	stripChecks(label)
-	for index, head in { { x = size[1] * 0.5, y = size[2] * 0.42 }, { x = size[1] * 0.85, y = size[2] * 0.5 }, { x = size[1] * 0.3, y = size[2] * 0.12 } } do
-		MoveHelperCard.open(head)
-		M.flush()
-		cardChecks(`{label}, a click on him at {math.floor(head.x)},{math.floor(head.y)}`, head)
-		if index == 1 then
-			scene(`danny-card-{size[3]}`, head)
+	for _, hired in { false, true } do
+		attribute("MoveHelperPrice", if hired then nil else 170)
+		attribute("MoveHelper", if hired then "hired" else "offer")
+		local state = if hired then "hired" else "for hire"
+		stripChecks(`{label}, {state}`)
+		for index, head in { { x = size[1] * 0.5, y = size[2] * 0.42 }, { x = size[1] * 0.85, y = size[2] * 0.5 }, { x = size[1] * 0.3, y = size[2] * 0.12 } } do
+			MoveHelperCard.open(head)
+			M.flush()
+			cardChecks(`{label}, {state}, a click on him at {math.floor(head.x)},{math.floor(head.y)}`, head, hired)
+			if index == 1 then
+				scene(`danny-card-{if hired then "hired" else "hire"}-{size[3]}`, head)
+			end
+			MoveHelperCard.close()
 		end
-		MoveHelperCard.close()
 	end
 	MoveHelperCard.open({ x = size[1] * 0.5, y = size[2] * 0.42 })
-	before = #sentOn("Moving")
-	key("Three")
-	sent = sentOn("Moving")
-	check(`{label}: the key 3: WAIT HERE (\"helper\", \"stay\"), the card closes`, #sent == before + 1 and sent[#sent][2] == "stay" and not MoveHelperCard.isOpen())
-	MoveHelperCard.open({ x = size[1] * 0.5, y = size[2] * 0.42 })
-	key("One", true)
-	check(`{label}: … not a key the game took`, #sentOn("Moving") == before + 1 and MoveHelperCard.isOpen())
+	check(`{label}: a computer's words: "Click a piece to give it to him"`, string.find(named(MoveHelperCard.card(), "Hint").Text, "Click a piece to give it to him", 1, true) == 1)
 	MoveHelperCard.close()
 end
 
 -- ── A resize while it is open ───────────────────────────────────────────────
 MoveHelperCard.open({ x = 640, y = 320 })
 screen(true, 844, 354)
-cardChecks("a resize to a phone while open: placed again for it", nil)
+cardChecks("a resize to a phone while open: placed again for it", nil, true)
 MoveHelperCard.close()
 
 check("no warnings", #M.warnings == 0, M.warnings[1])
