@@ -16,6 +16,8 @@ within Config.MapStyle.Budget, everything there in its order, nothing made frame
 8.0 SANDBOX: the sandbox's HUD and the warehouse picker (the real SandboxHud and WarehouseUi: sandbox.luau on
 sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stock chip, the toasts, the picker on
 "pick", DISPLAY / SELL / TAKE DOWN's requests, the 3D pictures capped, clear of the touch controls, texts that fit.
+8.1 SANDBOX: the UPGRADES desk's window (the real UpgradeUi: upgrades.luau on sandbox_mock.luau) on the same screens:
+the cards, BUY's request, NEED without the money, MAX, the money from the State, closing, a phone's finger sizes.
 """
 import argparse
 from pathlib import Path
@@ -261,3 +263,8 @@ from sandboxenv import sandbox_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "sandbox.luau"], cwd=folder, check=True)
+# 8.1 SANDBOX: the UPGRADES desk's window (client/UpgradeUi.luau, shared/UpgradeRules.luau) in the same folder:
+# tools/phone-ui/upgrades.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "upgrades.luau"], cwd=folder, check=True)

@@ -39,6 +39,9 @@
 --                                              "wait" | "drop"
 --   MoveHelperBrain.speed(walk, action, carry, weight)   his walk now: × Speed (× the carry's alone: "hand" | "both"),
 --                                              Sprint × to a lift, Flee × running away
+--   MoveHelperBrain.trained(owner)             8.1 SANDBOX: his walk x this for the move's owner (Danny's training,
+--                                              the level in their player attribute Config.SandboxUpgrades.Danny,
+--                                              shared/UpgradeRules.luau dannySpeed; 1 without one)
 --   MoveHelperBrain.stuck(stuckFor, moved, dt, speed)    seconds without progress (under a fifth of his walk)
 --   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does: "walk" | "repath" (StuckRepath s) | "nudge"
 --                                              (StuckSnap s: he appears at his way's next point)
@@ -56,6 +59,7 @@
 
 local Config = require(script.Parent.Config)
 local Rules = require(script.Parent.MovingRules)
+local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: Danny's training
 
 local MoveHelperBrain = {}
 
@@ -362,6 +366,14 @@ function MoveHelperBrain.speed(walk: number, action: string, carry: string?, wei
 	end
 	local factor = if carry then Rules.speedFactor(carry, weight) else 1
 	return walk * c.Speed * factor
+end
+
+-- 8.1 SANDBOX: Danny's training (server/Upgrades.luau keeps the level in the owner's player attribute): his walk x this.
+function MoveHelperBrain.trained(owner: any): number
+	local ok, level = pcall(function(): any
+		return owner:GetAttribute(Config.SandboxUpgrades.Danny)
+	end)
+	return UpgradeRules.dannySpeed(if ok then level else nil)
 end
 
 -- ── Words ──────────────────────────────────────────────────────────────────

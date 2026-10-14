@@ -15,13 +15,17 @@
 --                                        the rarest tier whose `min` its value reaches; tier(id) the tier (Config's),
 --                                        tierOf(entry) the piece's
 --   CollectionRules.broken(entry)        its condition is at or under BrokenAt
---   CollectionRules.income(entry)        $ a minute while it is on show: value × its tier's income × condition (0 broken)
+--   CollectionRules.income(entry, boost?)   $ a minute while it is on show: value × its tier's income × condition (0
+--                                        broken) × boost (8.1: the owner's Showroom lights, CollectionRules.boost; 1
+--                                        without one)
 --   CollectionRules.sell(entry)          $ it sells for (a whole number): value × its tier's sell × condition, at least
 --                                        $1; broken: scrap (value × Scrap, at least $1)
---   CollectionRules.view(entry)          a copy with rarity, value, income, price and broken for the client
---   CollectionRules.totals(entries)      { count, shown, value, income (the pieces on show), sell (all) }
---   CollectionRules.standsFor(profile)   the display stands a player has (Config.Warehouse.Stands, else Config's
---                                        Collection.Stands; later upgrades raise it here)
+--   CollectionRules.view(entry, boost?)  a copy with rarity, value, income (× boost), price and broken for the client
+--   CollectionRules.totals(entries, boost?)   { count, shown, value, income (the pieces on show, × boost), sell (all) }
+--   CollectionRules.standsFor(profile)   the display stands a player has: the warehouse's start (Config.Warehouse.Stands,
+--                                        else Config's Collection.Stands) + 8.1's More stands (profile.sandboxUpgrades,
+--                                        shared/UpgradeRules.luau), never past Config.Warehouse.MaxStands
+--   CollectionRules.boost(profile)       8.1: the income's × from the player's Showroom lights (1 without any)
 --   The save (profile.collection = { entries = { Entry }, nextUid = n }):
 --   CollectionRules.empty()              a new player's
 --   CollectionRules.clean(raw)           a saved one checked, never trusted: entries with a uid (unique), a short item
@@ -35,6 +39,7 @@
 
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
+local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: the stands and the lights a player bought
 
 local CollectionRules = {}
 
@@ -128,12 +133,17 @@ function CollectionRules.broken(entry: { condition: number }): boolean
 	return condition(entry) <= tune().BrokenAt + EPS
 end
 
--- $ a minute while it stands on show (0 when broken).
-function CollectionRules.income(entry: { item: string, condition: number }): number
+-- A boost as given (8.1: CollectionRules.boost's), 1 for none or junk.
+local function boostOf(boost: number?): number
+	return if finite(boost) and (boost :: number) > 0 then boost :: number else 1
+end
+
+-- $ a minute while it stands on show (0 when broken), × the owner's boost (8.1: the Showroom lights).
+function CollectionRules.income(entry: { item: string, condition: number }, boost: number?): number
 	if CollectionRules.broken(entry) then
 		return 0
 	end
-	return CollectionRules.valueOf(entry) * CollectionRules.tierOf(entry).income * condition(entry)
+	return CollectionRules.valueOf(entry) * CollectionRules.tierOf(entry).income * condition(entry) * boostOf(boost)
 end
 
 -- $ it sells for (a whole number, at least 1): its tier's share of its worth, scrap when broken.
@@ -145,8 +155,9 @@ function CollectionRules.sell(entry: { item: string, condition: number }): numbe
 	return math.max(1, math.floor(price + 0.5))
 end
 
--- A copy of the piece with what the client shows: its rarity, value, $ a minute on show (to the cent), price, broken.
-function CollectionRules.view(entry: Entry): View
+-- A copy of the piece with what the client shows: its rarity, value, $ a minute on show (to the cent, × the boost),
+-- price, broken.
+function CollectionRules.view(entry: Entry, boost: number?): View
 	return {
 		uid = entry.uid,
 		item = entry.item,
@@ -157,14 +168,15 @@ function CollectionRules.view(entry: Entry): View
 		got = entry.got,
 		rarity = CollectionRules.rarityOf(CollectionRules.defOf(entry.item)),
 		value = CollectionRules.valueOf(entry),
-		income = math.floor(CollectionRules.income(entry) * 100 + 0.5) / 100,
+		income = math.floor(CollectionRules.income(entry, boost) * 100 + 0.5) / 100,
 		price = CollectionRules.sell(entry),
 		broken = CollectionRules.broken(entry),
 	}
 end
 
--- The pieces' count, how many stand on show, their value, the income of the ones on show and the price of them all.
-function CollectionRules.totals(entries: { Entry }): Totals
+-- The pieces' count, how many stand on show, their value, the income of the ones on show (× the boost) and the price of
+-- them all.
+function CollectionRules.totals(entries: { Entry }, boost: number?): Totals
 	local out: Totals = { count = 0, shown = 0, value = 0, income = 0, sell = 0 }
 	for _, entry in entries do
 		out.count += 1
@@ -172,21 +184,38 @@ function CollectionRules.totals(entries: { Entry }): Totals
 		out.sell += CollectionRules.sell(entry)
 		if entry.stand ~= nil then
 			out.shown += 1
-			out.income += CollectionRules.income(entry)
+			out.income += CollectionRules.income(entry, boost)
 		end
 	end
 	return out
 end
 
--- The display stands a player has: the warehouse's (Config.Warehouse.Stands), else Config.Collection.Stands. (The
--- profile is for the upgrades to come: more stands.)
-function CollectionRules.standsFor(_profile: any?): number
+-- The upgrades' levels in a profile (profile.sandboxUpgrades), nil without any.
+local function levelsOf(profile: any?): any
+	return if type(profile) == "table" then profile.sandboxUpgrades else nil
+end
+
+-- The display stands a player has: the warehouse's start (Config.Warehouse.Stands), else Config.Collection.Stands;
+-- 8.1: + the More stands bought (profile.sandboxUpgrades), never past the hall's Config.Warehouse.MaxStands (a start
+-- over it stays as it is).
+function CollectionRules.standsFor(profile: any?): number
 	local warehouse = (Config :: any).Warehouse
 	local stands = if type(warehouse) == "table" then warehouse.Stands else nil
 	if not finite(stands) or stands < 1 then
 		stands = tune().Stands
 	end
-	return math.floor(stands)
+	local base = math.floor(stands)
+	local extra = UpgradeRules.extraStands(levelsOf(profile))
+	if extra <= 0 then
+		return base
+	end
+	local most = if type(warehouse) == "table" and finite(warehouse.MaxStands) then math.floor(warehouse.MaxStands) else base + UpgradeRules.mostStands()
+	return math.min(base + extra, math.max(base, most))
+end
+
+-- 8.1: the stands' income × this for the player (their Showroom lights: shared/UpgradeRules.luau incomeBoost).
+function CollectionRules.boost(profile: any?): number
+	return UpgradeRules.incomeBoost(levelsOf(profile))
 end
 
 -- ── The save ───────────────────────────────────────────────────────────────

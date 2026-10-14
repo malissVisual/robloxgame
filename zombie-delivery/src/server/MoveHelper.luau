@@ -897,6 +897,7 @@ end
 -- world, then by the way; far off (Far), he appears at the next point. Stuck (Brain.unstuck): a new path after
 -- StuckRepath s, a nudge to the way's next point (NUDGE studs at most) after StuckSnap s. True: there (within near).
 local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, near: number, speed: number, dt: number, clock: number): boolean
+	speed *= Brain.trained(h.s.owner) -- 8.1 SANDBOX: Danny's training (the owner's upgrade, server/Upgrades.luau)
 	local here = body.root.Position
 	local inside = insideAt(h, here)
 	local target = goal

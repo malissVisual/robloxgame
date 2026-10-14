@@ -43,7 +43,7 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
 	"QuickChat", "CarryGripUi", "CargoPrompts",
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide" }
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
 -- buses, the rentals, the zips, the guns and the hands, the throw, the chips and banners, the leaderboard, the weather,
@@ -264,10 +264,10 @@ end
 -- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok" })
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok" })
 	local ok, where = same(starts(run), CITY)
 	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
-	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil)
+	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
@@ -275,9 +275,9 @@ end
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
 
 do
-	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok" }, true)
+	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok" }, true)
 	local ok, where = same(starts(run), concat(SANDBOX, OWN))
-	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide`, ok, where)
+	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi`, ok, where)
 	local city: { string } = {}
 	for _, name in CITY_ONLY do
 		if run.required[name] then
