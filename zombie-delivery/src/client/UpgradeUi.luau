@@ -5,7 +5,7 @@
 --   { kind = "state", levels, money }   kept; an open window is drawn again only when what it shows changed
 --   { kind = "open" }                   the desk's prompt: THE WINDOW
 --   { kind = "bought", id, level }      a toast "Showroom lights: level 2 · Income ×1.21" (UpgradeUi.notify, else
---                                       client/Hud.luau's toast)
+--                                       client/Hud.luau's toast; 8.3: "ZDC Warehouse: level 2 · Workshop · 4 stands")
 -- THE WINDOW: a modal card "ZDC UPGRADES" (your money under it, ✕) over one card an upgrade (shared/UpgradeRules.luau
 -- rows, Config.SandboxUpgrades' order): its picture (the emoji), its name and level (a segmented bar, "LV 1/4"), what
 -- it gives now and what the next level gives, the next price (money green when you have it) and BUY. BUY sends
@@ -14,6 +14,12 @@
 -- (a sale, the stands' income) so the buttons light up while it is open.
 -- ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it. It is modal: the mouse is free while it is
 -- open (a Modal button), a touch screen's buttons are under it. Follows client/WarehouseUi.luau's kit (CardKit, Theme).
+-- 8.3 (design/warehouse-levels/KONTRAKT.md): five cards, the ZDC Warehouse 🏭 first. Its bar counts the warehouse's own
+-- levels, 1 … 5 ("LV 1/5" is the Garage; its upgrade level 0 … 4 + 1, UpgradeRules.warehouseLevel: the names the
+-- players see, "level 1 Garage … level 5 Logistics Center"), its lines "Garage · 2 stands" → "Next: Workshop · 4 stands"
+-- (UpgradeRules.effect with the levels). A locked card (Row.locked: More stands below the Big Warehouse) is grey, its
+-- reason ("🔒 Needs the Big Warehouse") in place of the price and BUY; a tap only says it again, never a purchase. The
+-- cards are lower when the screen is short (a phone held sideways shows all five); the list scrolls only below that.
 --   UpgradeUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
 --   UpgradeUi.open() / close() / isOpen()
 --   UpgradeUi.state()                  { levels, money } the last state (nil: none yet)
@@ -67,6 +73,7 @@ local WIDTH = 680 -- the card's widest (unscaled px)
 local HEADER = 52
 local LIST_GAP = 4 -- under the header
 local SCROLLBAR = 6
+local WORDS = 52 -- a card's words: its name and level, what it gives now, the next level's (8.3: the lowest card's)
 
 local started = false
 local remote: RemoteEvent? = nil
@@ -90,6 +97,13 @@ function UpgradeUi.layout(W: number, H: number, touch: boolean): Layout
 	local button = if touch then math.max(44, finger) else 36
 	local rowH = math.max(if touch then 68 else 72, button + 16)
 	local rows = #UpgradeRules.Order
+	-- 8.3: five cards. Too tall for the screen (a phone held sideways), they get lower, as low as their words and BUY
+	-- allow; only below that does the list scroll.
+	local room = math.floor((H - 2 * margin) / scale) - HEADER - LIST_GAP - pad
+	if rows * rowH + (rows - 1) * gap > room then
+		gap = 4
+		rowH = math.clamp(math.floor((room - (rows - 1) * gap) / rows), math.max(WORDS + 4, button + 8), rowH)
+	end
 	local want = HEADER + LIST_GAP + rows * rowH + (rows - 1) * gap + pad
 	local w = math.floor(math.min(WIDTH, (W - 2 * margin) / scale))
 	local h = math.floor(math.min(want, (H - 2 * margin) / scale))
@@ -199,11 +213,18 @@ local function stateKey(state: State?, layout: Layout): string
 	return table.concat(parts, "|")
 end
 
--- The level's segments (one a level, the bought ones lit) and "LV 1/4".
+-- 8.3: the level a card shows: the warehouse's own (its upgrade level + 1: 1 the Garage … 5 the Logistics Center),
+-- every other upgrade's as it is.
+local function shownLevel(id: string, level: number): number
+	return if id == "warehouse" then UpgradeRules.warehouseLevel({ warehouse = level }) else level
+end
+
+-- The level's segments (one a level, the bought ones lit) and "LV 1/4" (8.3: the warehouse's "LV 1/5").
 local function levelBar(parent: any, row: UpgradeRules.Row, x: number, y: number): number
 	local seg, gap = 12, 3
-	for n = 1, row.max do
-		local on = n <= row.level
+	local level, max = shownLevel(row.id, row.level), shownLevel(row.id, row.max)
+	for n = 1, max do
+		local on = n <= level
 		local piece = Ui.make("Frame", {
 			Name = `Level{n}`,
 			Size = UDim2.fromOffset(seg, 5),
@@ -213,8 +234,8 @@ local function levelBar(parent: any, row: UpgradeRules.Row, x: number, y: number
 		}, parent)
 		Ui.corner(piece, 2)
 	end
-	local after = x + row.max * (seg + gap) + 4
-	local text = `LV {row.level}/{row.max}`
+	local after = x + max * (seg + gap) + 4
+	local text = `LV {level}/{max}`
 	Ui.label(parent, text, UDim2.fromOffset(CardKit.width(text, 11, Theme.HeadingFont) + 4, 16), { Name = "Level", Position = UDim2.fromOffset(after, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = if row.level >= row.max then C.gold else K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
 	return after + CardKit.width(text, 11, Theme.HeadingFont) + 4
 end
@@ -235,7 +256,7 @@ end
 
 -- What follows the money on an open window without a rebuild: the money's line and each NEED's amount.
 local function subtitleOf(state: State?): string
-	return if state then `Your money {UpgradeRules.money(state.money)} · more stands, brighter lights, a faster van and Danny` else "Loading your upgrades…"
+	return if state then `Your money {UpgradeRules.money(state.money)} · a bigger warehouse, more stands, brighter lights, a faster van and Danny` else "Loading your upgrades…"
 end
 
 local function followMoney()
@@ -271,17 +292,32 @@ local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout
 		BorderSizePixel = 0,
 	}, parent)
 	Ui.corner(frame, Config.UiKit.RowCorner)
-	local top = row.level >= row.max
+	local locked = row.locked -- 8.3: why it can't be bought now (nil: it can, with the money)
+	local top = row.level >= row.max and not locked
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if top then C.gold elseif row.can then C.money else K.line, Thickness = 1, Transparency = if top or row.can then 0.45 else 0.8 }, frame)
-	-- the picture: the upgrade's emoji on charcoal
+	-- the picture: the upgrade's emoji on charcoal (8.3: faded on a locked card)
 	local side = h - 12
 	local picture = Ui.make("Frame", { Name = "Picture", Size = UDim2.fromOffset(side, side), Position = UDim2.fromOffset(6, 6), BackgroundColor3 = K.charcoal, BorderSizePixel = 0 }, frame)
 	Ui.corner(picture, 8)
-	Ui.label(picture, row.icon, UDim2.fromScale(1, 1), { Name = "Emoji", TextSize = math.floor(side * 0.55), TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
-	-- the right: the price and BUY (at the top: MAX)
+	Ui.label(picture, row.icon, UDim2.fromScale(1, 1), { Name = "Emoji", TextSize = math.floor(side * 0.55), TextTransparency = if locked then 0.5 else 0, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+	-- the right: the price and BUY (at the top: MAX; 8.3: locked, its reason over both)
 	local right = layout.buttonW + 10
 	local buttonY = math.floor((h - layout.button) / 2)
-	if top then
+	if locked then
+		local why = CardKit.bigButton(frame, {
+			name = "Locked",
+			text = `🔒 {locked}`,
+			kind = "shut",
+			height = layout.button,
+			textSize = if layout.touch then 12 else 11,
+			onClick = function()
+				toast(`{row.name}: 🔒 {locked}`) -- (only says it: a locked card buys nothing)
+			end,
+		})
+		why.Size = UDim2.fromOffset(layout.priceW + 8 + layout.buttonW, layout.button)
+		why.Position = UDim2.new(1, -(right + layout.priceW + 8), 0, buttonY)
+		why.TextWrapped = true -- (a long reason takes two lines)
+	elseif top then
 		local max = Ui.label(frame, "MAX", UDim2.fromOffset(layout.buttonW, layout.button), {
 			Name = "Max",
 			Position = UDim2.new(1, -right, 0, buttonY),
@@ -335,11 +371,11 @@ local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout
 	local x = 6 + side + 12
 	local room = math.max(60, rowW - x - right - layout.priceW - 16)
 	local nameW = math.min(room, CardKit.width(row.name, 15, Theme.HeadingFont) + 12) -- (a little slack: the name is never cut where it fits)
-	local y = math.floor((h - 52) / 2)
-	Ui.label(frame, row.name, UDim2.fromOffset(nameW, 18), { Name = "UpgradeName", Position = UDim2.fromOffset(x, y), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	local y = math.floor((h - WORDS) / 2)
+	Ui.label(frame, row.name, UDim2.fromOffset(nameW, 18), { Name = "UpgradeName", Position = UDim2.fromOffset(x, y), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = if locked then K.secondary else K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	levelBar(frame, row, x + nameW + 8, y + 1)
 	Ui.label(frame, row.now, UDim2.fromOffset(room, 16), { Name = "Now", Position = UDim2.fromOffset(x, y + 20), TextSize = 13, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.label(frame, if row.next then `Next: {row.next}` else "Top level", UDim2.fromOffset(room, 14), { Name = "Next", Position = UDim2.fromOffset(x, y + 38), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if row.next then C.money else C.gold, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, if row.next then `Next: {row.next}` else "Top level", UDim2.fromOffset(room, 14), { Name = "Next", Position = UDim2.fromOffset(x, y + 38), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if locked then C.dim elseif row.next then C.money else C.gold, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 end
 
 draw = function(keepScroll: boolean)
@@ -481,7 +517,13 @@ local function onEvent(message: any)
 		local def = UpgradeRules.def(message.id)
 		local level = amount(message.level)
 		if def and level then
-			toast(`{def.name}: level {math.floor(level)} · {UpgradeRules.effect(message.id, level)}`)
+			-- 8.3: what it gives with the levels after it (the state may come after the toast): the warehouse's stands,
+			-- More stands' count on the warehouse's base; the warehouse's own level 1 … 5
+			local id: string = message.id
+			local at = math.floor(level)
+			local levels = table.clone(if current then current.levels else {})
+			levels[id] = at
+			toast(`{def.name}: level {shownLevel(id, at)} · {UpgradeRules.effect(id, at, levels)}`)
 		end
 	end
 end

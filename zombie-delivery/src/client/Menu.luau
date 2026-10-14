@@ -11,6 +11,8 @@
 -- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
 -- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
 -- (shared/SandboxMap.luau: the chalet, Main Street, your plot), never over the old city. PLAY does what the city's does.
+-- 8.3 (design/warehouse-levels/KONTRAKT.md): the two shots of your warehouse look at the building of its level
+-- (WarehouseLayout.site: 1 the Garage … 5 the Logistics Center).
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -19,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- 8.0 SANDBOX
+local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WarehouseLayout")) -- 8.3: its level's building
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 
@@ -48,15 +51,28 @@ local function shot(n: number): CFrame
 	return CFrame.lookAt(s[1], s[2])
 end
 
+-- 8.3: the level of the warehouse the shots look at: yours (the player attribute WarehouseLevel) on your plot, else the
+-- one the server built there (workspace.Warehouses' Level<id>), else 4 (the building of before 8.3).
+local function warehouseLevel(id: number, mine: boolean): number
+	local level = if mine then player:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) else nil
+	if type(level) ~= "number" then
+		local folder = workspace:FindFirstChild("Warehouses")
+		level = if folder then folder:GetAttribute(`Level{id}`) else nil
+	end
+	return if type(level) == "number" then level else 4
+end
+
 -- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
 -- from its other side, up Main Street toward the plots, your plot's warehouse (the player's Plot attribute; the first
--- plot before the server gave you one), your van's spot at its roller door, back down the street.
+-- plot before the server gave you one; 8.3: the building of its level), your van's spot at its roller door, back down
+-- the street.
 local function sandboxShots(): { { Vector3 } }
 	local house = SandboxMap.House.house
 	local door = SandboxMap.House.door
 	local turn = SandboxMap.Turnaround
-	local plot = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 1] or SandboxMap.Plots[1]
-	local w, van = plot.warehouse, plot.vanSpot
+	local mine = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 0]
+	local plot = mine or SandboxMap.Plots[1]
+	local w, van = WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)).warehouse, plot.vanSpot
 	-- (8.1: the house is the owner's Blender house's box, its roof over house.sy; 8.2.1: the big one again, 44 wide:
 	-- the two shots as far out as before 8.1)
 	local chalet = Vector3.new(house.x, house.y + house.sy * 0.8, house.z)
