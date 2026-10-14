@@ -332,7 +332,10 @@ Runtime.upgrades = {} -- { { player, what } }
 Runtime.Upgrades = {
 	admin = function(player: any, what: string): string
 		table.insert(Runtime.upgrades, { player = player, what = what })
-		return if what == "max" then "ADMIN: every upgrade at its top (20 stands)." else "ADMIN: the upgrades reset (12 stands)."
+		if string.sub(what, 1, 5) == "level" then
+			return `ADMIN: the warehouse at Level {string.sub(what, 6)}.` -- (8.3)
+		end
+		return if what == "max" then "ADMIN: every upgrade at its top (20 stands)." else "ADMIN: the upgrades reset (2 stands)."
 	end,
 }
 

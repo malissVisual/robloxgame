@@ -24,7 +24,8 @@
 --   8.1, the sandbox's own ambience (Config.Soundscape.Sandbox, art/audio/sfx4.ogg's 8.1 part): never the city's day
 --              (its traffic) or night; where you are (SoundPlan.sandboxPlace: the move's state says when you are in the
 --              chalet, client/MoveSounds.luau inside) blends the meadow's calm alpine day (a breeze, birds; until sfx4
---              is up its stand-in, sfx2's wind), a warehouse's hall (its lights' hum; a little of the meadow through
+--              is up its stand-in, sfx2's wind), a warehouse's hall (8.3: its own level's walls, the model's "Level";
+--              its lights' hum; a little of the meadow through
 --              its roller door) or the chalet's quiet room (SoundPlan.sandboxAmbience); outdoors a cowbell rings far
 --              off now and then, a random way round you (3D, every CowbellGap s); in a warehouse the room's echo
 --              (SoundService.AmbientReverb, SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND
@@ -416,9 +417,17 @@ local function setReverb(name: string)
 	end
 end
 
+-- 8.3: a plot's warehouse level (server/Warehouse.luau's model, its "Level" attribute; nil: not there yet).
+local function warehouseLevel(plotId: number): number?
+	local halls = workspace:FindFirstChild("Warehouses")
+	local hall = halls and halls:FindFirstChild(`Warehouse{plotId}`)
+	local level = hall and hall:GetAttribute("Level")
+	return if type(level) == "number" then level else nil
+end
+
 local function updateSandbox(playing: boolean)
 	local at = where()
-	local place = SoundPlan.sandboxPlace(at.X, at.Y, at.Z, MoveSounds.inside())
+	local place = SoundPlan.sandboxPlace(at.X, at.Y, at.Z, MoveSounds.inside(), warehouseLevel)
 	local mix = SoundPlan.sandboxAmbience(place, api.sheet4)
 	local on = if playing then 1 else 0
 	for _, name in CITY_LOOPS do

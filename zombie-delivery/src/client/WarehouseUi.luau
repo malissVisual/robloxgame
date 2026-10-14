@@ -36,9 +36,9 @@
 --                                        legendary gold) and their order
 -- 8.2, the warehouse's quality of life (which pieces: shared/StockPlan.luau, the rules server/Collection.luau decides
 -- with, so what a button offers before it asks is what happens):
---   * THE PICKER greys a piece too big for this stand (an upgrade's small stand, WarehouseLayout.fits: the beds, the hay
---     wagon, the wheelbarrow): "Too big for this stand" over its picture, its DISPLAY a grey TOO BIG that says which
---     stands take it; the pieces that fit come first.
+--   * THE PICKER greys a piece too big for this stand (WarehouseLayout.fits at your warehouse level, 8.3: the Garage's
+--     and the Workshop's stands hold no hay wagon): "Too big for this stand" over its picture, its DISPLAY a grey TOO
+--     BIG that says a bigger warehouse has bigger stands; the pieces that fit come first.
 --   * THE STOCK LIST's header: ⭐ FILL BEST ({ kind = "fillbest" }: the best earners onto every free stand you have,
 --     each where it fits), 💰 SELL… (a small menu: ALL COMMON, ALL BROKEN, DUPLICATES (keeps the best of each item),
 --     each with how many and their price; each asks "SELL N PIECES FOR $Y?" first, then sends { kind = "sellmany",
@@ -570,11 +570,12 @@ end
 -- Collection.display asks it (a piece without a catalogue entry: yes); each stand and item asked once.
 local fitsKnown: { [string]: boolean } = {}
 local function fitsStand(stand: number, item: string): boolean
-	local key = `{stand}|{item}`
+	local level = Players.LocalPlayer:GetAttribute(Config.WarehouseLevels.Attribute) -- 8.3: the stands' size is the level's
+	local key = `{level}|{stand}|{item}`
 	local known = fitsKnown[key]
 	if known == nil then
 		local def = catalogue(item)
-		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil)
+		local ok, yes = pcall(WarehouseLayout.fits, stand, if def then def.size else nil, level)
 		known = def == nil or (ok and yes == true)
 		fitsKnown[key] = known
 	end
@@ -867,7 +868,7 @@ local function fillWhy(list: { StockPlan.Piece }, stands: number): string
 	end
 	for _, piece in list do
 		if piece.stand == nil and piece.broken ~= true and piece.income > 0 then
-			return "What's in your stock is too big for your free small stands."
+			return "What's in your stock is too big for your free stands: a bigger warehouse has bigger ones."
 		end
 	end
 	return "Nothing in your stock would earn on a stand. Bring more home from a move!"
@@ -1067,7 +1068,7 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	if stand and tooBig then
 		-- 8.2: TOO BIG instead of DISPLAY, grey; a tap says where it goes
 		first = tileButton(frame, "Display", "TOO BIG", "shut", layout, function()
-			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`)
+			toast(`Your {nameOf(entry)} is too big for stand {stand}: a bigger warehouse has bigger stands (UPGRADES).`)
 		end)
 		first.AutoButtonColor = false
 		first.TextTransparency = 0.3

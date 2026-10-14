@@ -2,7 +2,7 @@
 -- 8.3 SANDBOX, the eyes (the owner: "in the house I cannot see my own character, it is so bright; walking into the
 -- warehouse is a flashbang"): the screen eases to the place you are in, the way eyes adapt. Where you are is what the
 -- sandbox's sounds already use (shared/SoundPlan.luau sandboxPlace: client/MoveSounds.luau inside, the interiors far
--- off the map, a plot's warehouse) and any Sprinter's walk-in bay (its BayLight: shared/SandboxLightRules.luau inBay).
+-- off the map, a plot's warehouse: its own level's walls, the model's "Level") and any Sprinter's walk-in bay (its BayLight: shared/SandboxLightRules.luau inBay).
 -- Each place's look is Config.SandboxLight.Places' (shared/SandboxLightRules.luau look):
 --   * Lighting.ExposureCompensation: the map's (Config.SandboxLight.Sky.Exposure) plus the place's;
 --   * one bloom, SandboxBloom (any other BloomEffect in Lighting, e.g. the place template's "Bloom", is switched off on
@@ -140,13 +140,21 @@ local function where(): Vector3?
 	return if camera then camera.Focus.Position else nil
 end
 
+-- 8.3: a plot's warehouse level (server/Warehouse.luau's model, its "Level" attribute; nil: not there yet).
+local function warehouseLevel(plotId: number): number?
+	local halls = workspace:FindFirstChild("Warehouses")
+	local hall = halls and halls:FindFirstChild(`Warehouse{plotId}`)
+	local level = hall and hall:GetAttribute("Level")
+	return if type(level) == "number" then level else nil
+end
+
 local function placeOf(): string
 	local at = where()
 	if not at then
 		return placeNow
 	end
 	local inside = MoveSounds.inside()
-	return SandboxLightRules.place(at.X, at.Y, at.Z, inside, not inside and inVan(at))
+	return SandboxLightRules.place(at.X, at.Y, at.Z, inside, not inside and inVan(at), warehouseLevel)
 end
 
 function SandboxLight.place(): string

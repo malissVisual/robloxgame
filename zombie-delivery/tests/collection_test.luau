@@ -167,7 +167,7 @@ do
 	table.sort(order, function(a, b)
 		return Rules.income(a) > Rules.income(b)
 	end)
-	for stand = 1, Rules.standsFor(nil) do
+	for stand = 1, 12 do -- (8.3: the Big warehouse's 12 stands, the tuning's)
 		order[stand].stand = stand
 	end
 	local t = Rules.totals(entries)
@@ -183,26 +183,17 @@ do
 	check("a legendary at its lowest value out-earns the haul's three best pieces together", legendary > Rules.income(order[1]) + Rules.income(order[2]) + Rules.income(order[3]), legendary)
 end
 
--- ── standsFor ─────────────────────────────────────────────────────────────
+-- ── standsFor (8.3: the warehouse level's, Config.WarehouseLevels) ─────────
 do
-	local C2: any = Config
-	local before = C2.Warehouse
-	C2.Warehouse = nil
-	check("no Config.Warehouse: Config.Collection.Stands (12)", Rules.standsFor(nil) == 12 and Rules.standsFor({}) == 12)
-	C2.Warehouse = { Stands = 16 }
-	check("Config.Warehouse.Stands (16)", Rules.standsFor({}) == 16)
-	C2.Warehouse = { Stands = 13.7 }
-	check("a fraction: whole stands (13)", Rules.standsFor(nil) == 13)
+	check("no profile, none bought: the start's garage, 2 stands", Rules.standsFor(nil) == 2 and Rules.standsFor({}) == 2 and Rules.standsFor({ sandboxUpgrades = {} }) == 2)
+	check("the warehouse at 4 (the Big warehouse): 12; at 5: 20", Rules.standsFor({ sandboxUpgrades = { warehouse = 4 } }) == 12 and Rules.standsFor({ sandboxUpgrades = { warehouse = 5 } }) == 20)
 	local garbage = true
 	for _, bad in { 0, -3, "x", 0 / 0, math.huge } do
-		C2.Warehouse = { Stands = bad }
-		if Rules.standsFor(nil) ~= 12 then
+		if Rules.standsFor({ sandboxUpgrades = { warehouse = bad } }) ~= 2 then
 			garbage = false
 		end
 	end
-	C2.Warehouse = "nope"
-	check("garbage (0, -3, a string, NaN, inf, no table): 12", garbage and Rules.standsFor(nil) == 12)
-	C2.Warehouse = before
+	check("garbage (0, -3, a string, NaN, inf, no table): the start's 2", garbage and Rules.standsFor({ sandboxUpgrades = "nope" }) == 2)
 end
 
 -- ── The view (what the client gets) ───────────────────────────────────────

@@ -1,8 +1,9 @@
 -- 8.2 SANDBOX, the warehouse's quality of life: shared/StockPlan.luau (pure), the rules behind the STOCK list's bulk
 -- buttons and the window's orders. The order of the best earners (every tie broken, junk numbers safe), the free stands,
 -- ⭐ FILL BEST (the best earners only, nothing on show moved, broken and $0 pieces left, what fits a small stand with
--- the real WarehouseLayout.fits and FurnitureLooks sizes, the small stands for the small pieces so the big ones still
--- go up, idempotent, a fits that errors), 💰 SELL…'s filters (common, broken, duplicates: the best of each item kept,
+-- the real FurnitureLooks sizes in a hall of big and small stands (8.1's: StockPlan takes any; 8.3: the real levels'
+-- stands, WarehouseLayout.fits, are one size a level), the small stands for the small pieces so the big ones still go
+-- up, idempotent, a fits that errors), 💰 SELL…'s filters (common, broken, duplicates: the best of each item kept,
 -- also when it is on show; nothing on show sold; a filter that isn't one), the total, the window's sorts and toggle,
 -- the search.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
@@ -44,12 +45,30 @@ local function placed(plan: { StockPlan.Placement }): string
 	return table.concat(out, ",")
 end
 
--- the real stands: 1 … 12 the big grid, 13 … 20 the upgrades' small ones
+-- a hall of big and small stands (8.1's: 1 … 12 big, 10 × 10; 13 … 20 small, 8 × 5), the real pieces' sizes
 local function fits(stand: number, item: string): boolean
 	local def = FurnitureLooks.Items[item]
-	return def == nil or WarehouseLayout.fits(stand, def.size)
+	if def == nil then
+		return true
+	end
+	if stand < 1 or stand > 20 then
+		return false
+	end
+	local sx, sz = if stand <= 12 then 10 else 8, if stand <= 12 then 10 else 5
+	return def.size.X <= sx - WarehouseLayout.Fit and def.size.Z <= sz - WarehouseLayout.Fit
 end
 check("the real sizes: a double bed fits big stand 1, not small stand 13; a radio fits both", fits(1, "bed") and not fits(13, "bed") and fits(13, "radio") and fits(1, "radio"))
+-- 8.3: the real levels' stands (one size a level): the Workshop's (9) hold no hay wagon, the Warehouse's (10) do
+local function fitsAt(level: number): (number, string) -> boolean
+	return function(stand: number, item: string): boolean
+		local def = FurnitureLooks.Items[item]
+		return def == nil or WarehouseLayout.fits(stand, def.size, level)
+	end
+end
+check("8.3: the real levels: the Garage's stands hold a double bed, not Walt's hay wagon; the Warehouse's (3) both; no stand 3 in the Garage",
+	fitsAt(1)(2, "bed") and not fitsAt(1)(2, "hay_wagon") and fitsAt(3)(8, "hay_wagon") and not fitsAt(1)(3, "radio") and not fitsAt(2)(4, "hay_wagon"))
+local wagonPlan = StockPlan.fill({ piece("w-1", "hay_wagon", "epic", 16.9, 156), piece("w-2", "radio", "common", 0.9, 8) }, 4, fitsAt(2))
+check("8.3: … FILL BEST in the Workshop: the radio goes up, the hay wagon waits for a bigger warehouse", placed(wagonPlan) == "w-2@1", placed(wagonPlan))
 
 -- ── better ──────────────────────────────────────────────────────────────────
 local a = piece("1-1", "sofa", "rare", 7.7, 63)
