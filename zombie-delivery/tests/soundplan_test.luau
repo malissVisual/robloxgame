@@ -8,7 +8,8 @@
 -- Sprinter's sliding door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features'
 -- feedback: what the book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare,
 -- a task done and claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one
--- after the other (the lane: never two stings over each other, a burst is one). In the standalone Luau CLI.
+-- after the other (the lane: never two stings over each other, a burst is one). 8.3: a plot's warehouse is the building
+-- of its level (levelOf; none known: the start's), up to its roof's top. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -16,6 +17,7 @@ local Map = require("./Map")
 local SoundSheet = require("./SoundSheet")
 local SoundPlan = require("./SoundPlan")
 local SandboxMap = require("./SandboxMap") -- (8.1: the sandbox's places)
+local WarehouseLayout = require("./WarehouseLayout") -- (8.3: a plot's warehouse is its level's)
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -273,24 +275,25 @@ local function sfx4(name: string): boolean
 end
 -- Where you are.
 local plot = SandboxMap.Plots[1]
-local w = plot.warehouse
+local w = WarehouseLayout.box(plot, nil) -- (no level known: the start's, a free plot's)
 local h = SandboxMap.House
 check("the meadow is outdoors", SoundPlan.sandboxPlace(150, 2, 300, false) == "outdoors")
 check("Main Street is outdoors", SoundPlan.sandboxPlace(0, 1, 200, false) == "outdoors")
 check("in a warehouse's hall", SoundPlan.sandboxPlace(w.x + 10, 1, w.z, false) == "warehouse")
 check("every plot's warehouse", (function(): boolean
 	for _, p in SandboxMap.Plots do
-		if SoundPlan.sandboxPlace(p.warehouse.x, 1, p.warehouse.z + 5, false) ~= "warehouse" then
+		local b = WarehouseLayout.box(p, nil)
+		if SoundPlan.sandboxPlace(b.x, 1, b.z + 5, false) ~= "warehouse" then
 			return false
 		end
 	end
 	return true
 end)())
--- 8.3: a plot's warehouse is its level's (levelOf: the client's model attribute); none: plot.warehouse (level 4's)
+-- 8.3: a plot's warehouse is its level's (levelOf: the client's model attribute, else its owner's), up to its roof's
+-- top; none known: the start's (a free plot's)
 do
-	local WarehouseLayout = require("./WarehouseLayout")
 	local garage, top = WarehouseLayout.box(plot, 1), WarehouseLayout.box(plot, 5)
-	local function at(level: number): (number) -> number?
+	local function at(level: number?): (number) -> number?
 		return function(id: number): number?
 			return if id == plot.id then level else nil
 		end
@@ -303,7 +306,37 @@ do
 	check("8.3: by the logistics centre's side wall (level 5) the warehouse, past level 4's walls: outdoors without a level",
 		SoundPlan.sandboxPlace(side, 2, top.z, false, at(5)) == "warehouse" and SoundPlan.sandboxPlace(side, 2, top.z, false) == "outdoors"
 			and SandboxMap.plotAt(side, top.z) == plot)
-	check("8.3: no level known (the model not there yet): plot.warehouse", SoundPlan.sandboxPlace(garage.x, 2, deep, false, function(): number? return nil end) == "warehouse")
+	local start = WarehouseLayout.box(plot, Config.WarehouseLevels.Start)
+	check("8.3: no level known (a free plot, the hall not streamed in): the start's building, not the old Big warehouse's",
+		SoundPlan.sandboxPlace(start.x, 2, start.z, false, at(nil)) == "warehouse" and SoundPlan.sandboxPlace(start.x, 2, start.z - start.sz / 2 - 2, false, at(nil)) == "outdoors"
+			and SoundPlan.sandboxPlace(start.x, 2, start.z - start.sz / 2 - 2, false) == "outdoors")
+	local wrong: string? = nil
+	for _, p in SandboxMap.Plots do
+		for n = 1, #Config.WarehouseLevels.List do
+			local function level(): number?
+				return n
+			end
+			local b, o = WarehouseLayout.box(p, n), WarehouseLayout.outline(p, n)
+			local spots = {
+				{ "its hall", b.x, 3, b.z, "warehouse" },
+				{ "by its east wall", o.x1 - 1, 3, b.z, "warehouse" },
+				{ "by its back wall", b.x, 3, o.z0 + 1, "warehouse" },
+				{ "under its roof's top", b.x, o.top - 0.5, b.z, "warehouse" },
+				{ "a step past its east wall", o.x1 + 1, 3, b.z, "outdoors" },
+				{ "a step past its west wall", o.x0 - 1, 3, b.z, "outdoors" },
+				{ "a step past its back wall", b.x, 3, o.z0 - 1, "outdoors" },
+				{ "on its roof", b.x, o.top + 1, b.z, "outdoors" },
+			}
+			for _, spot in spots do
+				if not wrong and SoundPlan.sandboxPlace(spot[2] :: number, spot[3] :: number, spot[4] :: number, false, level) ~= spot[5] then
+					wrong = `plot {p.id}, level {n}: {spot[1]}`
+				end
+			end
+		end
+	end
+	check("8.3: every plot at every level: in its hall, by its walls and under its roof the warehouse; a step past its walls or on its roof outdoors", wrong == nil, wrong)
+	check("8.3: the Garage's shed lower than the old 8 studs over the walls, the Logistics centre's barrel higher",
+		SoundPlan.sandboxPlace(garage.x, 15, garage.z, false, at(1)) == "outdoors" and SoundPlan.sandboxPlace(top.x, 37, top.z, false, at(5)) == "warehouse")
 end
 check("the van's spot before the roller door is outdoors", SoundPlan.sandboxPlace(plot.vanSpot.x, 2, plot.vanSpot.z, false) == "outdoors")
 check("a plot's yard beside the hall is outdoors", SoundPlan.sandboxPlace(plot.spawn.x, 3, plot.spawn.z, false) == "outdoors")

@@ -24,10 +24,10 @@
 --   8.1, the sandbox's own ambience (Config.Soundscape.Sandbox, art/audio/sfx4.ogg's 8.1 part): never the city's day
 --              (its traffic) or night; where you are (SoundPlan.sandboxPlace: the move's state says when you are in the
 --              chalet, client/MoveSounds.luau inside) blends the meadow's calm alpine day (a breeze, birds; until sfx4
---              is up its stand-in, sfx2's wind), a warehouse's hall (8.3: its own level's walls, the model's "Level";
---              its lights' hum; a little of the meadow through
---              its roller door) or the chalet's quiet room (SoundPlan.sandboxAmbience); outdoors a cowbell rings far
---              off now and then, a random way round you (3D, every CowbellGap s); in a warehouse the room's echo
+--              is up its stand-in, sfx2's wind), a warehouse's hall (8.3: its own level's walls and roof, the model's
+--              "Level" or its owner's WarehouseLevel; its lights' hum; a little of the meadow through its roller door)
+--              or the chalet's quiet room (SoundPlan.sandboxAmbience); outdoors a cowbell rings far off now and then,
+--              a random way round you (3D, every CowbellGap s); in a warehouse the room's echo
 --              (SoundService.AmbientReverb, SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND
 --              all off). The ZDC Sprinter's back doors have their own swing (SoundPlan.swingSound by its CarId).
 -- Every look is throttled (Tick, OthersEvery); the steps run on Heartbeat for a handful of bodies.
@@ -417,12 +417,23 @@ local function setReverb(name: string)
 	end
 end
 
--- 8.3: a plot's warehouse level (server/Warehouse.luau's model, its "Level" attribute; nil: not there yet).
+-- 8.3: a plot's warehouse level: its model's "Level" attribute (server/Warehouse.luau), else its owner's (the player
+-- attribute Config.WarehouseLevels.Attribute, server/Upgrades.luau: the hall streamed out or being rebuilt); nil (a free
+-- plot, or not known yet): SoundPlan takes the start's.
 local function warehouseLevel(plotId: number): number?
 	local halls = workspace:FindFirstChild("Warehouses")
 	local hall = halls and halls:FindFirstChild(`Warehouse{plotId}`)
 	local level = hall and hall:GetAttribute("Level")
-	return if type(level) == "number" then level else nil
+	if type(level) == "number" then
+		return level
+	end
+	for _, other in Players:GetPlayers() do
+		if other:GetAttribute("Plot") == plotId then
+			local own = other:GetAttribute(Config.WarehouseLevels.Attribute)
+			return if type(own) == "number" then own else nil
+		end
+	end
+	return nil
 end
 
 local function updateSandbox(playing: boolean)

@@ -155,7 +155,7 @@ do
 		and not Rules.inBay(0, feet - 2, mid) and not Rules.inBay(0, feet + 3, bay.z1 - light[3] + 2))
 	check("not in the bay: in the cab", not Rules.inBay(0, feet + 3, bay.z0 - light[3] - 3))
 	local plot = SandboxMap.Plots[1]
-	local w = plot.warehouse
+	local w = WarehouseLayout.box(plot, nil) -- (8.3: no level known: the start's, a free plot's)
 	check("a plot's hall is the warehouse", Rules.place(w.x, 3, w.z, false, false) == "warehouse")
 	check("the interiors far off the map are the house", Rules.place(9000, 403, 9000, false, false) == "house")
 	check("the move's house says inside: the house (even by a van's bay)", Rules.place(0, 3, 0, true, false) == "house" and Rules.place(0, 3, 0, true, true) == "house")

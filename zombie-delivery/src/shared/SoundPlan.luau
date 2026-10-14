@@ -50,8 +50,9 @@
 --                                                 interiors; or in the chalet's own box), "warehouse" (in a plot's
 --                                                 warehouse building) or "outdoors". 8.3: levelOf(plotId) (optional)
 --                                                 the plot's warehouse level (the client: the "Level" attribute of
---                                                 workspace.Warehouses.Warehouse<id>): that level's building; none
---                                                 (nil): SandboxMap's plot.warehouse (level 4's)
+--                                                 workspace.Warehouses.Warehouse<id>, else its owner's): that level's
+--                                                 building up to its roof's top (WarehouseLayout.outline); none known
+--                                                 (nil, or no levelOf): the start's (a free plot's: WarehouseLayout's)
 --   SoundPlan.sandboxAmbience(place, sheet4)      the loops' volumes there { alpine, warehouse, room } (sheet4: is
 --                                                 sfx4.ogg up; else the stand-ins' own volumes and no room tone)
 --   SoundPlan.reverb(place)                       SoundService.AmbientReverb's name there ("NoReverb" outdoors)
@@ -388,7 +389,6 @@ end
 SoundPlan.SandboxLoops = { alpine = "amb_alpine", warehouse = "amb_warehouse", room = "amb_room" }
 
 local OFF_MAP = 1000 -- studs past SandboxMap.Bounds: a move's interior (server/HouseInterior.luau builds them far off)
-local ROOF = 8 -- studs over a warehouse's walls that still count as in it (its gable roof)
 local INSET = 2 -- studs inside the chalet's box (its front door's step, where you come out, is outdoors)
 
 function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean, levelOf: ((plotId: number) -> number?)?): string
@@ -405,13 +405,13 @@ function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean
 		return "house"
 	end
 	local plot = SandboxMap.plotAt(x, z)
-	local w = plot and plot.warehouse
-	local level = if plot and levelOf then levelOf(plot.id) else nil
-	if plot and type(level) == "number" then
-		w = WarehouseLayout.box(plot, level) -- 8.3: the plot's own level's building
-	end
-	if w and math.abs(x - w.x) <= w.sx / 2 and math.abs(z - w.z) <= w.sz / 2 and y >= w.y - 2 and y <= w.y + w.sy + ROOF then
-		return "warehouse"
+	if plot then
+		-- 8.3: the plot's own level's building, up to its roof's top (the Garage's shed is lower than the Logistics
+		-- centre's barrel); no level known: the start's
+		local o = WarehouseLayout.outline(plot, if levelOf then levelOf(plot.id) else nil)
+		if x >= o.x0 and x <= o.x1 and z >= o.z0 and z <= o.z1 and y >= WarehouseLayout.FloorTop - 2 and y <= o.top then
+			return "warehouse"
+		end
 	end
 	return "outdoors"
 end

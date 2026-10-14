@@ -11,6 +11,8 @@
 -- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
 -- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
 -- (shared/SandboxMap.luau: the chalet, Main Street, your plot), never over the old city. PLAY does what the city's does.
+-- 8.3: the shot of your warehouse frames the building of your level (WarehouseLayout.box: the Garage close, the
+-- Logistics centre from further off).
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -19,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- 8.0 SANDBOX
+local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WarehouseLayout")) -- 8.3: its level's building
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 
@@ -51,12 +54,17 @@ end
 -- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
 -- from its other side, up Main Street toward the plots, your plot's warehouse (the player's Plot attribute; the first
 -- plot before the server gave you one), your van's spot at its roller door, back down the street.
+-- 8.3: the warehouse is your level's building (the player attribute Config.WarehouseLevels.Attribute; nil, or the first
+-- plot before you have one: the start's), its front wall on the door's line; the shot at its door pulls back with its
+-- footprint (far 1: the Big warehouse's 80 × 60, the 8.0 shot: 60 east, 40 up, 87 in front of the door).
 local function sandboxShots(): { { Vector3 } }
 	local house = SandboxMap.House.house
 	local door = SandboxMap.House.door
 	local turn = SandboxMap.Turnaround
-	local plot = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 1] or SandboxMap.Plots[1]
-	local w, van = plot.warehouse, plot.vanSpot
+	local mine = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 0]
+	local plot = mine or SandboxMap.Plots[1]
+	local w = WarehouseLayout.box(plot, if mine then player:GetAttribute(Config.WarehouseLevels.Attribute) else nil)
+	local van, front, far = plot.vanSpot, w.z + w.sz / 2, math.sqrt(w.sx * w.sx + w.sz * w.sz) / 100
 	-- (8.1: the house is the owner's Blender house's box, its roof over house.sy; 8.2.1: the big one again, 44 wide:
 	-- the two shots as far out as before 8.1)
 	local chalet = Vector3.new(house.x, house.y + house.sy * 0.8, house.z)
@@ -64,7 +72,7 @@ local function sandboxShots(): { { Vector3 } }
 		{ Vector3.new(house.x + 64, 30, door.z - 70), chalet },
 		{ Vector3.new(house.x - 70, 44, door.z - 110), chalet },
 		{ Vector3.new(turn.x + 40, 70, turn.z - 30), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
-		{ Vector3.new(w.x + 60, 40, van.z + 70), Vector3.new(w.x, w.sy * 0.4, w.z + w.sz / 2) },
+		{ Vector3.new(w.x + 60 * far, 40 * far, front + 87 * far), Vector3.new(w.x, w.sy * 0.4, front) },
 		{ Vector3.new(w.x - 50, 26, van.z + 40), Vector3.new(van.x, van.y + 4, van.z) },
 		{ Vector3.new(turn.x - 30, 60, van.z + 90), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
 	}
@@ -82,6 +90,9 @@ local function fly()
 		camera.CFrame = shot(n)
 		while flying do
 			camera.CameraType = Enum.CameraType.Scriptable
+			if Config.Sandbox.On then
+				shots = sandboxShots() -- (8.3: your plot and warehouse level can come after the start screen)
+			end
 			local tween = TweenService:Create(camera, TweenInfo.new(shotSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = shot(n + 1) })
 			tween:Play()
 			local started = os.clock()
