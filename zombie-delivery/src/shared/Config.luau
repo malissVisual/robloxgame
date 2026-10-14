@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.1"
+Config.Version = "8.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5607,7 +5607,10 @@ Config.Robust = {
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
+		CollectionBulk = 1, -- 8.2: and its bulk buttons (fillbest / sellmany / undisplayall): one a second, on top
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
+		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
+		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 	},
 }
 
@@ -5627,6 +5630,9 @@ Config.Analytics = {
 	Budget = { Base = 100, PerPlayer = 15 },
 	ErrorsPerMinute = 6,
 	ClientErrorsMax = 20,
+	-- 8.2 SANDBOX (server/SandboxAnalytics.luau): one grip check's outcome in this many is sent, a random one of each
+	-- window of them, for every player (the GripCheck event: its value says how many it stands for)
+	GripEvery = 10,
 }
 
 -- 6.12, the daily and weekly tasks (the owner: "daily and weekly tasks so players come back"; shared/Tasks.luau picks
@@ -6941,6 +6947,8 @@ Config.SandboxGuide = {
 --                   pieces on show)
 --   Lamp            the hall's lights (PointLights, always on)
 --   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
+--   ArtLevel        8.2: the level (1 … 5) of the owner's Blender warehouse (design/blender-warehouse) the warehouses wear
+--                   once ZDCWarehouseArt is imported (server/WarehouseMesh.luau; 4: the size the warehouse is)
 Config.Warehouse = {
 	Stands = 12,
 	MaxStands = 20,
@@ -6958,6 +6966,7 @@ Config.Warehouse = {
 	SellHold = 1,
 	Rebuild = 0.15,
 	MaxParts = 400,
+	ArtLevel = 4,
 	Lamp = { Range = 40, Brightness = 1.3, Color = { 255, 238, 214 } :: { number } },
 	Rarity = {
 		common = { 222, 224, 228 },
@@ -7084,6 +7093,169 @@ Config.SandboxUpgrades = {
 	} :: { [string]: SandboxUpgradeDef },
 	Flag = "sandboxUpgradesKept",
 	Danny = "DannyTraining",
+}
+
+-- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out
+-- there). Every piece of the sandbox house's catalogue (shared/FurnitureLooks.luau Order without Walt's farm pieces: the
+-- ordinary furniture and the collectibles) is unknown (a dark silhouette, "???") until a move brings one home
+-- (Collection.add), then found: its name, its rarity's colour, how many came home, the best condition, its value.
+-- shared/CollectionBookRules.luau has the rules (tests/collectionbook_test.luau), server/CollectionBook.luau keeps the
+-- save (profile.collectionBook) and pays the milestones (tests/collectionbook_runtime_test.luau), client/CollectionBookUi.luau
+-- is the book (the HUD's 📖 BOOK chip, the key).
+--   Milestones   in the book's order: id, name, kind ("found": `need` pieces found; "furniture": every ordinary piece;
+--                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
+--                by the server, "BookMilestone")
+--   Key          the key that opens and closes the book (a computer)
+--   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
+--                save fills the book from its stock, and its milestones pay on the first join)
+--   MaxCount     the most "brought home" a piece counts
+--   Window       the book's card: Width × Height at most, Margin / TouchMargin from the screen's edges, Side its left
+--                column (the progress and the milestones; SideTouch on a touch screen), Tile / TileTouch a card's
+--                narrowest, Picture / PictureTouch the picture's height over a card's width, Gap between the cards
+--   MaxViews     3D pictures (ViewportFrames) alive at once: only the cards on screen get one (a found piece in its
+--                colours, an unknown one as a dark silhouette), the others show the emoji or "?"
+--   MaxModels    the pieces' models kept built for the pictures (the oldest go)
+--   Silhouette   an unknown piece's colour (RGB): its 3D picture tinted to it
+export type BookMilestone = { id: string, name: string, kind: string, need: number?, reward: number }
+Config.CollectionBook = {
+	Milestones = {
+		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
+		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
+		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
+		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
+		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
+	} :: { BookMilestone },
+	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
+	Flag = "collectionBookKept",
+	MaxCount = 1_000_000,
+	Window = {
+		Width = 980,
+		Height = 640,
+		Margin = 16,
+		TouchMargin = 8,
+		Side = 220,
+		SideTouch = 196,
+		Tile = 120,
+		TileTouch = 128,
+		Picture = 0.62,
+		PictureTouch = 0.5,
+		Gap = 8,
+	},
+	MaxViews = 16,
+	MaxModels = 32,
+	Silhouette = { 14, 15, 18 } :: { number },
+}
+
+-- 8.2 SANDBOX, the daily tasks (the owner: "daily tasks that bring players back"; the city's Config.Tasks and the phone's
+-- TASKS app do not run in the sandbox). shared/SandboxTasks.luau picks and counts them (tests/sandboxtasks_test.luau),
+-- server/SandboxTasks.luau keeps profile.sandboxTasks, counts what happens and pays (tests/sandboxtasks_runtime_test.luau),
+-- client/SandboxTasksUi.luau is the TASKS panel (the key Key or the 📋 TASKS chip under the money).
+-- Every UTC day a player gets Daily tasks from DailyPool and every UTC week (from Monday 00:00 UTC) one from WeeklyPool,
+-- picked by the day's (the week's) number and the UserId: the same all day, new at 00:00 UTC; never two of one `group`
+-- a day. A kind's `event` is what the server counts:
+--   home      pieces that came home into your warehouse's stock (Collection: every new piece)
+--   rare      … of them RareRank or rarer (Config.Collection's tiers: 3 is rare)
+--   clean     a move finished with pieces home and nothing broken (everybody in its crew)
+--   moves     a move finished with pieces home (everybody in its crew)
+--   trips     the trips home of one move (`best`: the most in one move counts, not a sum)
+--   shown     pieces on show at once (`best`)
+--   sell      $ your pieces sold for
+--   income    $ your display stands paid
+--   upgrade   levels bought at the UPGRADES desk (never picked once every upgrade is at its top)
+--   danny     Danny holds the other end of your `item` (the sofa) while you carry it
+-- `text` is the title ({n} the target; `one` when it is 1), `target` the range it is picked from (in `step`s), `money`
+-- the reward at the range's low end (its high end pays TopShare more, rounded to $10), `icon` its emoji.
+--   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
+--              turns is paid then
+--   Key        the key that opens and closes the panel (a computer)
+--   StateGap   s between two states to one player; CheckEvery: s between two looks for the reset at 00:00 UTC;
+--              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
+--              Danny holds the other end of your piece (only while a danny task is open)
+--   Flag       the save's mark: profile.sandboxTasks is read only from a real save written with it
+-- The tuning: a first haul on show earns about $100 a minute (Config.Collection); the three dailies and the bonus pay
+-- $1,150 – 1,400 (about a quarter of an hour on show), the weekly $2,000 – 4,500.
+export type SandboxTaskDef = {
+	id: string,
+	event: string,
+	icon: string,
+	text: string,
+	one: string?,
+	target: { number },
+	step: number?,
+	money: number,
+	group: string?,
+	best: boolean?,
+	item: string?,
+}
+Config.SandboxTasks = {
+	Daily = 3,
+	AllDaily = 500,
+	TopShare = 0.5,
+	RareRank = 3,
+	Key = "J",
+	StateGap = 0.5,
+	CheckEvery = 10,
+	SaveDelay = 5,
+	DannyEvery = 1,
+	Flag = "sandboxTasksKept",
+	DailyPool = {
+		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 200 },
+		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 3, 5 }, money = 250 },
+		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 300 },
+		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 250 },
+		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 200 },
+		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 200 },
+		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 250 },
+		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 250 },
+		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 200 },
+	} :: { SandboxTaskDef },
+	WeeklyPool = {
+		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
+		{ id = "w_rare", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", target = { 20, 30 }, step = 5, money = 2500 },
+		{ id = "w_moves", event = "moves", icon = "🏠", text = "Finish {n} moves", target = { 5, 8 }, money = 2500 },
+		{ id = "w_clean", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", target = { 3, 5 }, money = 3000 },
+		{ id = "w_income", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 4000, 6000 }, step = 500, money = 2500 },
+		{ id = "w_sell", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 2000, 3000 }, step = 250, money = 2000 },
+	} :: { SandboxTaskDef },
+}
+
+-- 8.2 SANDBOX, showing off (server/SandboxLeaders.luau; its rules shared/SandboxLeadersRules.luau, checked by
+-- tests/sandboxleaders_test.luau and tests/sandboxleaders_runtime_test.luau). Roblox's player list shows every player's
+-- money, income a minute and collection (the city's Level, Money and Deliveries columns go in the sandbox), and the
+-- TOP MOVERS board at the crossroads ranks the server's players by what their collection is worth.
+--   Every        s: a player's list columns are written at most this often (the changes in between wait for it)
+--   BoardEvery   s: the board's rows are written at most this often
+--   Rows         players on the board (the best ones)
+--   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
+--   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
+--                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
+--   Board        the signboard: Corner studs east of Main Street's east edge and south of Depot Row's south edge (the
+--                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
+--                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
+--                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
+--                ridge, Rise high; PixelsPerStud and Range (studs) of its SurfaceGuis (one on each face)
+--   AllTime      the best collection worth each player ever had, kept in the OrderedDataStore Store (key: the user
+--                id): read when they join, written (UpdateAsync, only ever up) at most every Every s a player, never
+--                from Studio unless Studio is true; every call in a pcall (no API access: the column shows this
+--                session's best). On = false: no store, no ALL-TIME column
+Config.SandboxLeaders = {
+	Every = 1,
+	BoardEvery = 2,
+	Rows = 5,
+	Legendary = "legendary",
+	Stats = { Money = "💰 $", Income = "📈 $/min", Collection = "⭐ Collection" },
+	Board = {
+		Corner = { 26, 24 } :: { number },
+		Yaw = 45,
+		Width = 20,
+		Height = 11.5,
+		Lift = 2.6,
+		Thick = 0.6,
+		Roof = { Over = 2, Run = 2.2, Rise = 1.7 },
+		PixelsPerStud = 40,
+		Range = 260,
+	},
+	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
 }
 
 return Config

@@ -8,6 +8,11 @@ Míry jsou ve studech (1 jednotka = 1 stud). Předek budovy míří na -Y, poč�
 (vnější líc přední zdi). Level 4 má přesně míry dnešního skladu ve hře (80 × 24 × 60, vrata 26 × 16) a level 5 se
 ještě vejde na pozemek (120 × 152).
 
+8.2: hra (server/WarehouseMesh.luau) obléká do levelu 4 sklad z dílů na každém pozemku (Config.Warehouse.ArtLevel).
+Proto sedí na díly hry: zdi tlusté 1 stud jako ve hře, podlaha nahoře ve výšce 0,05 (pod nápisy na podlaze), vazníky
+a světla v hale tam, kde jsou lampy hry, sloupky u vrat tam, kde jsou sloupky hry. Kontrola
+tools/warehouse/mesh-check.py to hlídá.
+
 Bez Blenderu, jen s modulem bpy (pip install bpy):
     python warehouse.py -- --save warehouse.blend --render složka --export složka
 """
@@ -24,7 +29,9 @@ LEVELS = [
     {"id": 1, "name": "Garáž", "W": 26, "D": 22, "H": 12, "door": (14, 9.5), "roof": "shed", "rise": 2.5, "wall": "plaster", "stands": 2},
     {"id": 2, "name": "Dílna", "W": 40, "D": 30, "H": 15, "door": (18, 12), "roof": "gable", "rise": 4.5, "wall": "metal", "stands": 4},
     {"id": 3, "name": "Sklad", "W": 58, "D": 42, "H": 19, "door": (22, 14), "roof": "gable", "rise": 6, "wall": "plinth", "stands": 8},
-    {"id": 4, "name": "Velký sklad", "W": 80, "D": 60, "H": 24, "door": (26, 16), "roof": "gable", "rise": 8, "wall": "twotone", "stands": 12},
+    {"id": 4, "name": "Velký sklad", "W": 80, "D": 60, "H": 24, "door": (26, 16), "roof": "gable", "rise": 8, "wall": "twotone", "stands": 12,
+     # (8.2: the game's hall: its tie beams' and lamps' places, studs in from the front wall; the game dresses this level)
+     "trusses": (11, 22, 33, 44, 55), "lamps": [(x, z) for z in (22, 44) for x in (-21.5, 0.0, 21.5)]},
     {"id": 5, "name": "Logistické centrum", "W": 104, "D": 84, "H": 28, "door": (26, 18), "roof": "barrel", "rise": 10, "wall": "twotone", "stands": 20},
 ]
 
@@ -38,10 +45,14 @@ FINISHES = {
     "door": ("#C9CCD0", 0.5, 0.4, 0), "wood": ("#9A7550", 0.8, 0, 0), "rubber": ("#1A1A1C", 0.9, 0, 0),
     "solar": ("#1E2E4A", 0.15, 0.3, 0), "green": ("#4F7F3B", 0.8, 0, 0), "red": ("#C8322E", 0.5, 0, 0),
     "white": ("#F6F4EE", 0.5, 0, 0), "zinc": ("#9BA2A6", 0.35, 1, 0),
+    # 8.2: the concrete floor's slabs in three shades and their joints (colours only)
+    "floor2": ("#94928C", 0.8, 0, 0), "floor3": ("#A6A49E", 0.8, 0, 0), "joint": ("#74726E", 0.9, 0, 0),
 }
 
-T = 0.8          # the walls' thickness
+T = 1.0          # the walls' thickness (8.2: the game's, WarehouseLayout.Wall)
+FLOOR = 0.05     # the floor's top (8.2: the game's WarehouseLayout.FloorTop: its paint and stands lie on it)
 M = {}
+SOLIDS = []      # 8.2: the level being built: its things outside the walls that collide (the game makes their boxes)
 COL = None
 ORIGIN = Vector()  # the level being built: the roller door's middle on the ground, the front wall's outer face
 
@@ -205,6 +216,68 @@ def windows_row(wall, positions, z0, z1, w, lv):
             span("Okno uvnitř", p - w / 2, p + w / 2, y - T - 0.02, y - T - 0.06, z0, z1, "glasslit")
 
 
+def floor(lv):
+    """8.2: the floor inside as concrete slabs (10 × 10 from the door's middle and the front wall) in three shades with
+    dark joints, its top at FLOOR (the game's paint and stands lie on it). Colours only: one flat top, its edges each
+    the shade over them (so no shade's piece for the game is flat: Roblox sizes a mesh by its box)."""
+    W, D = lv["W"], lv["D"]
+    x0, x1, y0, y1 = -W / 2 + T, W / 2 - T, T, D - T
+    xs, ys = {x0, x1}, {y0, y1}
+    for k in range(-20, 21):
+        for e in (10 * k - 0.05, 10 * k + 0.05):
+            if x0 < e < x1:
+                xs.add(e)
+            if y0 < e < y1:
+                ys.add(e)
+    xs, ys = sorted(xs), sorted(ys)
+
+    def shade(i, j):
+        if abs((xs[i] + xs[i + 1]) / 2 - round((xs[i] + xs[i + 1]) / 20) * 10) < 0.06 or \
+                abs((ys[j] + ys[j + 1]) / 2 - round((ys[j] + ys[j + 1]) / 20) * 10) < 0.06:
+            return "joint"
+        a, b = math.floor((xs[i] + xs[i + 1]) / 20), math.floor((ys[j] + ys[j + 1]) / 20)
+        return ("floor", "floor2", "floor3")[(a * 7 + b * 3 + (a * b) % 5) % 3]
+    finishes = ["floor", "floor2", "floor3", "joint"]
+    bm = bmesh.new()
+    faces = []
+
+    def quad(pts, finish):
+        f = bm.faces.new([bm.verts.new(p) for p in pts])
+        f.material_index = finishes.index(finish)
+        faces.append(f)
+    for i in range(len(xs) - 1):
+        for j in range(len(ys) - 1):
+            quad([(xs[i], ys[j], FLOOR), (xs[i + 1], ys[j], FLOOR), (xs[i + 1], ys[j + 1], FLOOR), (xs[i], ys[j + 1], FLOOR)], shade(i, j))
+    for i in range(len(xs) - 1):
+        for j, y in ((0, y0), (len(ys) - 2, y1)):
+            quad([(xs[i], y, 0), (xs[i + 1], y, 0), (xs[i + 1], y, FLOOR), (xs[i], y, FLOOR)], shade(i, j))
+    for j in range(len(ys) - 1):
+        for i, x in ((0, x0), (len(xs) - 2, x1)):
+            quad([(x, ys[j], 0), (x, ys[j + 1], 0), (x, ys[j + 1], FLOOR), (x, ys[j], FLOOR)], shade(i, j))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces:
+        if abs(f.calc_center_median().z - FLOOR) < 1e-6:
+            if f.normal.z < 0:
+                f.normal_flip()
+        elif f.normal.dot(f.calc_center_median() - Vector(((x0 + x1) / 2, (y0 + y1) / 2, 0))) < 0:
+            f.normal_flip()
+    me = bpy.data.meshes.new("Podlaha")
+    bm.to_mesh(me)
+    bm.free()
+    for f in finishes:
+        me.materials.append(M[f])
+    o = bpy.data.objects.new("Podlaha", me)
+    COL.objects.link(o)
+    o.matrix_world = Matrix.Translation(ORIGIN)
+    return o
+
+
+def prop(name, x0, x1, y0, y1, z0, z1, finish):
+    """8.2: a thing outside the walls that one bumps into: its block, and its box for the game's collision."""
+    span(name, x0, x1, y0, y1, z0, z1, finish)
+    SOLIDS.append([min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1), min(z0, z1), max(z0, z1)])
+
+
 def building(lv):
     W, D, H = lv["W"], lv["D"], lv["H"]
     dw, dh = lv["door"]
@@ -213,13 +286,14 @@ def building(lv):
     # The heights of the walls' tops: a shed roof falls to the back; the others are level.
     back_h = H - rise if roof == "shed" else H
     collide = []
+    SOLIDS.clear()
 
     def solid(name, x0, x1, y0, y1, z0, z1, finish):
         span(name, x0, x1, y0, y1, z0, z1, finish)
         collide.append([x0, x1, y0, y1, z0, z1])
     core = "plaster" if kind == "plaster" else "metal"
     # Floor and walls (the front wall in three pieces round the open roller door).
-    span("Podlaha", -hw + T, hw - T, T, D - T, 0, 0.15, "floor")
+    floor(lv)
     solid("Zadní zeď", -hw, hw, D - T, D, 0, back_h, core)
     if roof == "shed":
         for s in (-1, 1):
@@ -241,7 +315,7 @@ def building(lv):
     for s in (-1, 1):
         x0, x1 = sorted((s * (hw + 0.12), s * (hw - T)))
         span("Sokl", x0, x1, 0, D, 0, plinth, "concrete")
-    span("Podlaha vrat", -dw / 2, dw / 2, 0, T, 0, 0.15, "floor")  # (no step at the door)
+    span("Podlaha vrat", -dw / 2, dw / 2, 0, T, 0, FLOOR, "floor")  # (no step at the door)
     if kind == "plaster":
         for x in (-hw, hw):
             s_ = 1 if x > 0 else -1
@@ -283,7 +357,7 @@ def building(lv):
     # The way in: hazard posts either side of the door (from level 3), the dock bumpers.
     if lv["id"] >= 3:
         for s in (-1, 1):
-            cyl("Sloupek", 0.4, 3.2, (s * (dw / 2 + 1.6), -1.0, 1.6), "yellow", seg=12)
+            cyl("Sloupek", 0.5, 3.4, (s * (dw / 2 + 1.8), -1.4, 1.7), "yellow", seg=14)  # (8.2: where the game's stand)
             span("Nárazník", s * (dw / 2 + 0.4) - 0.4, s * (dw / 2 + 0.4) + 0.4, -0.7, -0.35, 0.6, 2.2, "rubber")
     # Lamps over the door.
     lx, lz = (dw / 2 + 1.6, dh - 1.6) if roof == "shed" else (dw / 2 + 2.0, dh + 1.4)
@@ -293,7 +367,7 @@ def building(lv):
     roofing(lv, back_h)
     inside(lv, back_h)
     extras(lv)
-    return collide
+    return collide, list(SOLIDS)
 
 
 def roofing(lv, back_h):
@@ -385,13 +459,16 @@ def inside(lv, back_h):
         span("Světlo", -1.8, 1.8, D * 0.5 - 0.3, D * 0.5 + 0.3, back_h - 0.85, back_h - 0.6, "glow")
         return
     n = max(2, int(D / 10))
-    for k in range(1, n):
-        y = k * D / n
+    trusses = lv.get("trusses") or [k * D / n for k in range(1, n)]
+    for y in trusses:
         span("Vazník", -hw + T, hw - T, y - 0.25, y + 0.25, H - 0.6, H - 0.1, "steel")
         for s in (-1, 1):
             span("Sloupek vazníku", s * hw * 0.5 - 0.15, s * hw * 0.5 + 0.15, y - 0.2, y + 0.2, H - 0.1, H + lv["rise"] * 0.45, "steel")
-        for x in [i * W / 4 - hw + W / 8 for i in range(4)]:
-            span("Světlo", x - 1.6, x + 1.6, y - 0.35, y + 0.35, H - 1.0, H - 0.6, "glow")
+        if "lamps" not in lv:
+            for x in [i * W / 4 - hw + W / 8 for i in range(4)]:
+                span("Světlo", x - 1.6, x + 1.6, y - 0.35, y + 0.35, H - 1.0, H - 0.6, "glow")
+    for x, y in lv.get("lamps", ()):  # (8.2: over the game's lamps, whose light shines from just under them)
+        span("Světlo", x - 1.6, x + 1.6, y - 0.35, y + 0.35, H - 1.0, H - 0.6, "glow")
 
 
 def extras(lv):
@@ -406,7 +483,7 @@ def extras(lv):
         span("Dveře", hw - 0.02, hw + 0.12, 5.0, 8.4, 0.15, 7.2, "door")
         span("Dveře rám", hw - 0.02, hw + 0.08, 4.8, 8.6, 0.15, 7.4, "trim")
         windows_row("left", [D / 2], 4.0, 7.5, 4.0, lv)
-        span("Popelnice", -hw - 2.6, -hw - 0.6, 2.0, 4.0, 0, 3.0, "green")
+        prop("Popelnice", -hw - 2.6, -hw - 0.6, 2.0, 4.0, 0, 3.0, "green")
         span("Víko", -hw - 2.7, -hw - 0.5, 1.9, 4.1, 3.0, 3.25, "dark")
         return
     top = H + (lv["rise"] * 0.55 if lv["roof"] == "gable" else 0)
@@ -430,13 +507,14 @@ def extras(lv):
         windows_row("back", [-W / 4, W / 4], zw[0], zw[1], 5.0, lv)
     if lid == 2:  # pallets and barrels outside
         for k in range(3):
-            span("Paleta", -hw - 4.5, -hw - 1.0, 3 + k * 4.2, 6.6 + k * 4.2, 0, 0.6, "wood")
-        span("Paleta", -hw - 4.5, -hw - 1.0, 3, 6.6, 0.6, 1.2, "wood")
+            prop("Paleta", -hw - 4.5, -hw - 1.0, 3 + k * 4.2, 6.6 + k * 4.2, 0, 0.6, "wood")
+        prop("Paleta", -hw - 4.5, -hw - 1.0, 3, 6.6, 0.6, 1.2, "wood")
         for k in range(3):
             cyl("Sud", 0.9, 2.6, (-hw - 2.5, D - 3 - k * 2.1, 1.3), "red" if k != 1 else "steel", seg=14)
+            SOLIDS.append([-hw - 3.4, -hw - 1.6, D - 3 - k * 2.1 - 0.9, D - 3 - k * 2.1 + 0.9, 0, 2.6])
     if lid == 4:  # the office annex on the left, glazed, and the roof's air units
         ax0, ax1 = -hw - 14, -hw
-        span("Kancelář", ax0, ax1, 0.5, 16, 0, 11, "plaster")
+        prop("Kancelář", ax0, ax1, 0.5, 16, 0, 11, "plaster")
         span("Kancelář střecha", ax0 - 0.4, ax1, 0.1, 16.4, 11, 11.6, "trim")
         span("Kancelář okno", ax0 + 1.0, ax1 - 1.0, 0.36, 0.5, 4.0, 9.5, "glass")
         span("Kancelář okno", ax0 - 0.14, ax0, 2.0, 14.5, 4.0, 9.5, "glass")
@@ -453,7 +531,7 @@ def extras(lv):
             span("Límec doku", x - 5.8, x + 5.8, -1.6, 0.0, 12, 13.2, "rubber")
             for e in (-1, 1):
                 span("Límec doku", x + e * 5.4 - 0.4, x + e * 5.4 + 0.4, -1.6, 0.0, 1.4, 12, "rubber")
-            span("Rampa", x - 6, x + 6, -3.0, 0.0, 0, 1.4, "concrete")
+            prop("Rampa", x - 6, x + 6, -3.0, 0.0, 0, 1.4, "concrete")
         gx0 = hw - 15
         span("Prosklení", gx0, hw - 0.6, -0.2, -0.05, 3.0, H - 2.5, "glass")
         for k in range(1, 4):
@@ -474,7 +552,7 @@ def extras(lv):
             cyl("Stožár", 0.18, 16, (fx, -6, 8), "steel", seg=8)
             span("Vlajka", fx + 0.2, fx + 4.2, -6.06, -5.94, 12.5, 15.2, colour)
         for x in (-hw + 3, 44.0):
-            span("Truhlík", x - 2.5, x + 2.5, -4.5, -1.5, 0, 1.2, "concrete")
+            prop("Truhlík", x - 2.5, x + 2.5, -4.5, -1.5, 0, 1.2, "concrete")
             span("Keře", x - 2.2, x + 2.2, -4.2, -1.8, 1.2, 2.4, "green")
 
 
@@ -643,6 +721,15 @@ def split_by_finish(me, matrix, out, group, fallback):
     bm.free()
 
 
+def level_marks(lv):
+    """8.2: a level's markers from its origin (Blender's axes): the building's corner (W / 2 to the right, D in, H up),
+    the door's corner (half its width, its height) and the roof's top over the door."""
+    W, D, H = lv["W"], lv["D"], lv["H"]
+    dw, dh = lv["door"]
+    top = H if lv["roof"] == "shed" else H + lv["rise"]
+    return {"box": Vector((-W / 2, D, H)), "door": Vector((-dw / 2, 0, dh)), "top": Vector((0, 0, top))}
+
+
 def game(v, origin):
     """Blender → the game's axes, from a level's origin (x right = here -x, y up = here z, z back = here y)."""
     d = v - origin
@@ -658,7 +745,12 @@ def bounds(points):
 def export_game(folder, report, budget=10000):
     """ZDCWarehouseArt.fbx: "lvl<N>_<finish>" pieces (past `budget` triangles "lvl<N>b_<finish>" …), a marker
     "mark_lvl<N>" at each level's origin (the roller door's middle on the ground) and mark_o / mark_x / mark_y / mark_z.
-    The manifest: each level's size, door, stands, the boxes that collide (its walls) and the pieces (game axes)."""
+    8.2 (server/WarehouseMesh.luau dresses the game's warehouse with a level): each level's "mark_lvl<N>_box" (W / 2 to
+    the right, H up, D in: the building it is), "mark_lvl<N>_door" (the door's corner: its half width, its height) and
+    "mark_lvl<N>_top" (the roof's top over the door), and "collide_lvl<N>_<k>": a box for each thing outside its walls
+    that one bumps into (the game makes an unseen solid block of it).
+    The manifest: each level's size, door, stands, the boxes that collide (its walls; 8.2: "solids", its props'),
+    its markers (8.2: "marks") and the pieces (game axes, from the level's origin)."""
     os.makedirs(folder, exist_ok=True)
     temp = bpy.data.collections.new("Warehouse_Export")
     bpy.context.scene.collection.children.link(temp)
@@ -682,14 +774,19 @@ def export_game(folder, report, budget=10000):
             centre, size = bounds(pts)
             details.append({"name": o.name, "finish": o.material_slots[0].material["finish"], "center": centre, "size": size})
             split_by_finish(me, o.matrix_world.copy(), pieces, lv["id"], o.material_slots[0].material["finish"])
-        boxes = []
-        for x0, x1, y0, y1, z0, z1 in report[lv["id"]]:
-            a, b = game(origin + Vector((x0, y0, z0)), origin), game(origin + Vector((x1, y1, z1)), origin)
-            boxes.append({"center": [round((p + q) / 2, 4) for p, q in zip(a, b)], "size": [round(abs(p - q), 4) for p, q in zip(a, b)]})
+        walls, props = report[lv["id"]]
+
+        def boxes_of(spans):
+            out = []
+            for x0, x1, y0, y1, z0, z1 in spans:
+                a, b = game(origin + Vector((x0, y0, z0)), origin), game(origin + Vector((x1, y1, z1)), origin)
+                out.append({"center": [round((p + q) / 2, 4) for p, q in zip(a, b)], "size": [round(abs(p - q), 4) for p, q in zip(a, b)]})
+            return out
         manifest["levels"][str(lv["id"])] = {
             "name": lv["name"], "size": [lv["W"], lv["H"], lv["D"]], "door": list(lv["door"]), "roof": lv["roof"],
             "stands": lv["stands"], "bounds": {"min": [round(v, 3) for v in lo], "max": [round(v, 3) for v in hi]},
-            "collide": boxes, "details": details,
+            "collide": boxes_of(walls), "solids": boxes_of(props), "details": details, "floorTop": FLOOR,
+            "marks": {k: [round(-v.x, 4), round(v.z, 4), round(v.y, 4)] for k, v in level_marks(lv).items()},
         }
     made = []
     for (lid, finish), meshes in sorted(pieces.items()):
@@ -725,6 +822,22 @@ def export_game(folder, report, budget=10000):
             manifest["pieces"][name] = {"level": lid, "center": centre, "size": size, "triangles": sum(len(p.vertices) - 2 for p in me.polygons)}
     marks = [("mark_o", Vector((0, 0, 0))), ("mark_x", Vector((-10, 0, 0))), ("mark_y", Vector((0, 0, 10))), ("mark_z", Vector((0, 10, 0)))]
     marks += [(f"mark_lvl{lid}", at) for lid, at in origins.items()]
+    for lv in LEVELS:  # 8.2: its building, door and roof top; its props' boxes
+        marks += [(f"mark_lvl{lv['id']}_{k}", origins[lv["id"]] + v) for k, v in level_marks(lv).items()]
+    for lv in LEVELS:
+        for k, (x0, x1, y0, y1, z0, z1) in enumerate(report[lv["id"]][1], 1):
+            bm = bmesh.new()
+            bmesh.ops.create_cube(bm, size=1.0)
+            bmesh.ops.scale(bm, vec=Vector((x1 - x0, y1 - y0, z1 - z0)), verts=bm.verts)
+            bmesh.ops.translate(bm, vec=origins[lv["id"]] + Vector(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)), verts=bm.verts)
+            name = f"collide_lvl{lv['id']}_{k}"
+            me = bpy.data.meshes.new(name)
+            bm.to_mesh(me)
+            bm.free()
+            me.materials.append(M["dark"])
+            o = bpy.data.objects.new(name, me)
+            temp.objects.link(o)
+            made.append(o)
     for name, at in marks:
         bm = bmesh.new()
         bmesh.ops.create_cube(bm, size=0.3)
@@ -770,7 +883,7 @@ def main():
         manifest = export_game(folder, report)
         for lid, lv in sorted(manifest["levels"].items()):
             tris = sum(p["triangles"] for p in manifest["pieces"].values() if p["level"] == int(lid))
-            print(f"  level {lid} {lv['name']:20s} {lv['size']} door {lv['door']}: {tris} triangles, {len(lv['collide'])} walls")
+            print(f"  level {lid} {lv['name']:20s} {lv['size']} door {lv['door']}: {tris} triangles, {len(lv['collide'])} walls, {len(lv['solids'])} props")
         print(f"ZDCWarehouseArt: {len(manifest['pieces'])} pieces, {sum(p['triangles'] for p in manifest['pieces'].values())} triangles")
 
 

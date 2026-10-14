@@ -11,6 +11,10 @@
 --                Level2 and FirstVehicle (seen on PlayerData.Changed), FirstMission and FirstChapter
 --                (server/Missions.luau). A step goes into the save (profile.onboarding, server/PlayerData.luau) only
 --                once Roblox took it: in Studio, switched off or over the budget it is not marked and goes later.
+--                8.2 SANDBOX (Config.Sandbox.On): Roblox keeps one onboarding funnel an experience, so a sandbox
+--                server walks AnalyticsPlan.SandboxSteps instead, the same way (Joined and PressedPlay as here, the
+--                rest through the "step" hook from server/SandboxAnalytics.luau) in profile.sandboxOnboarding, and
+--                SessionLength's New / Veteran is by those steps.
 --   funnels      "Delivery", one session an order: Taken (Jobs' newOrder), PickedUp (a pick-up stop of it done: the
 --                "stopDone" hook; an order loaded from the start at once), Delivered (Jobs' payOrder). A failed order
 --                (failOrder, Jobs.fail) is a custom event instead: JobFailedTime / JobFailedCargo / JobGaveUp /
@@ -26,6 +30,8 @@
 --                (server/Rental.luau), StylePurchase (server/StyleWear.luau), SessionLength (on leave), ServerError
 --                and ClientError. 6.14: GoldenOffered and GoldenExpired (server/SpecialOrders.luau, server/JobQueue.luau),
 --                GoldenTaken and GoldenDone (a golden order's funnel steps, here), RegularTierUp (server/Regulars.luau).
+--                8.2 SANDBOX: the moves, the grip checks and the collectibles (server/SandboxAnalytics.luau: the
+--                "event" hook, now with up to three fields).
 --   errors       ScriptContext.Error on the server, and the ClientError remote (client/Unstuck.luau sends a script
 --                error's script name and line, one every 1 / Config.Robust.Limits.ClientError s at most, which the
 --                server's Net.limit checks again): a warning with the context and a count by script, ErrorsPerMinute
@@ -80,6 +86,14 @@ local clientErrors: { [Player]: number } = {} -- ClientError reports this sessio
 local orders: { [any]: OrderState } = setmetatable({}, { __mode = "k" }) :: any -- Jobs' Order → its funnel
 local LEVEL2 = Plan.stepOf("Level2") or 0
 local VEHICLE = Plan.stepOf("FirstVehicle") or 0
+-- 8.2 SANDBOX: a sandbox server's onboarding funnel is the sandbox's (AnalyticsPlan.SandboxSteps, in its own save field)
+local SANDBOX = Config.Sandbox.On
+local Steps = if SANDBOX then Plan.SandboxSteps else Plan.Steps
+
+-- The funnel's steps reached as the save holds them (8.2: the sandbox's in profile.sandboxOnboarding).
+local function savedSteps(profile: PlayerData.Profile): number
+	return if SANDBOX then profile.sandboxOnboarding else profile.onboarding
+end
 
 -- A mission's place in the story (the Missions path's level).
 local storyIndex: { [string]: number } = {}
@@ -148,7 +162,8 @@ end
 local function onboardingOf(player: Player, profile: PlayerData.Profile): Onboarding
 	local state = onboarding[player]
 	if not state then
-		state = { reached = profile.onboarding, done = profile.onboarding }
+		local saved = savedSteps(profile)
+		state = { reached = saved, done = saved }
 		onboarding[player] = state
 	end
 	return state
@@ -157,27 +172,30 @@ end
 -- The steps reached and not done yet, in order: each one sent (a step Roblox took is marked in the save); one over the
 -- budget stops it (it and the ones after it go the next time).
 local function logSteps(player: Player, profile: PlayerData.Profile, state: Onboarding)
-	for n = 1, Plan.logged(state.reached) do
-		if Plan.has(state.done, n) then
+	for n = 1, Plan.logged(state.reached, Steps) do
+		if Plan.has(state.done, n, Steps) then
 			continue
 		end
-		local stepName = Plan.Steps[n].name
+		local stepName = Steps[n].name
 		local result = send("onboarding", `Onboarding {n} {stepName}`, function()
 			AnalyticsService:LogOnboardingFunnelStepEvent(player, n, stepName)
 		end)
 		if result == "dropped" then
 			return
 		end
-		state.done = Plan.mark(state.done, n)
-		if result == "sent" then
+		state.done = Plan.mark(state.done, n, Steps)
+		if result == "sent" and SANDBOX then
+			profile.sandboxOnboarding = Plan.mark(profile.sandboxOnboarding, n, Steps) -- (8.2)
+		elseif result == "sent" then
 			profile.onboarding = Plan.mark(profile.onboarding, n)
 		end
 	end
 end
 
--- A step reached (by its name in AnalyticsPlan.Steps): logged with the ones that waited for it, once for life.
+-- A step reached (by its name in AnalyticsPlan.Steps; 8.2: SandboxSteps on a sandbox server): logged with the ones that
+-- waited for it, once for life.
 local function onboard(player: Player, name: string)
-	local step = Plan.stepOf(name)
+	local step = Plan.stepOf(name, Steps)
 	if not step or not live(player) then
 		return
 	end
@@ -189,7 +207,7 @@ local function onboard(player: Player, name: string)
 		return
 	end
 	local state = onboardingOf(player, profile)
-	state.reached = (Plan.reach(state.reached, step))
+	state.reached = (Plan.reach(state.reached, step, Steps))
 	logSteps(player, profile, state)
 end
 
@@ -223,7 +241,7 @@ local function onChanged(player: Player)
 		early[player] = nil
 		if waiting then
 			for _, step in waiting do
-				onboard(player, Plan.Steps[step].name)
+				onboard(player, Steps[step].name)
 			end
 		end
 	elseif level > before then
@@ -234,13 +252,14 @@ local function onChanged(player: Player)
 		end
 	end
 	local state = onboardingOf(player, profile)
-	if level >= 2 and not Plan.has(state.reached, LEVEL2) then
+	if not SANDBOX and level >= 2 and not Plan.has(state.reached, LEVEL2) then -- (8.2: the city's steps only)
 		onboard(player, "Level2")
 	end
-	if not Plan.has(state.reached, VEHICLE) and ownsVehicle(profile) then
+	if not SANDBOX and not Plan.has(state.reached, VEHICLE) and ownsVehicle(profile) then
 		onboard(player, "FirstVehicle")
 	end
-	if Plan.logged(state.reached) > 0 and not Plan.has(state.done, Plan.logged(state.reached)) then
+	local logged = Plan.logged(state.reached, Steps)
+	if logged > 0 and not Plan.has(state.done, logged, Steps) then
 		logSteps(player, profile, state) -- (a step over the budget earlier)
 	end
 end
@@ -465,9 +484,9 @@ Analytics.died = guard("died", function(player: Player, involved: boolean)
 	end
 end)
 
--- One of AnalyticsPlan.Events from another module, with up to two short field values.
-Analytics.event = guard("event", function(player: Player, name: string, value: number?, a: any?, b: any?)
-	custom(player, name, value, Plan.fields(a, b))
+-- One of AnalyticsPlan.Events from another module, with up to two short field values (8.2: three).
+Analytics.event = guard("event", function(player: Player, name: string, value: number?, a: any?, b: any?, c: any?)
+	custom(player, name, value, Plan.fields(a, b, c))
 end)
 
 -- ── Errors ─────────────────────────────────────────────────────────────────
@@ -534,7 +553,7 @@ local onLeave = guard("leave", function(player: Player)
 	local profile = PlayerData.get(player)
 	if since and profile then
 		local state = onboarding[player]
-		local new = Plan.logged(if state then state.reached else profile.onboarding) < #Plan.Steps
+		local new = Plan.logged(if state then state.reached else savedSteps(profile), Steps) < #Steps -- (8.2: the sandbox's there)
 		custom(player, "SessionLength", Plan.minutes(os.clock() - since), Plan.fields(if new then "New" else "Veteran"))
 	end
 end)

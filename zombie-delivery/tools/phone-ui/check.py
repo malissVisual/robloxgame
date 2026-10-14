@@ -16,10 +16,18 @@ within Config.MapStyle.Budget, everything there in its order, nothing made frame
 8.0 SANDBOX: the sandbox's HUD and the warehouse picker (the real SandboxHud and WarehouseUi: sandbox.luau on
 sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stock chip, the toasts, the picker on
 "pick", DISPLAY / SELL / TAKE DOWN's requests, the 3D pictures capped, clear of the touch controls, texts that fit.
+8.2: the STOCK list's bulk buttons (FILL BEST, the SELL… menu, TAKE ALL DOWN), the sort toggle, the search box and the
+picker's too-big pieces at a small upgrade stand, on the same screens.
 8.1 grip: the carry's timing check (the real CarryGripUi: carrygrip.luau, the folder from carrygripenv.py) at 844 x 390,
 740 x 360, 1024 x 768 and 1280 x 800: the widget and the GRIP button clear of everything, one press, the outcomes.
 8.1 SANDBOX: the UPGRADES desk's window (the real UpgradeUi: upgrades.luau on sandbox_mock.luau) on the same screens:
 the cards, BUY's request, NEED without the money, MAX, the money from the State, closing, a phone's finger sizes.
+8.2 SANDBOX: the collection book (the real CollectionBookUi and SandboxHud's 📖 BOOK chip: collectionbook.luau on
+sandbox_mock.luau) on the same screens: the chip, the progress and the milestones, the tabs, found and unknown cards,
+the 3D pictures capped (the silhouettes tinted), the toasts, C, closing, a phone's finger sizes.
+8.2 SANDBOX: the daily tasks' TASKS chip and panel (the real SandboxTasksUi beside the real SandboxHud: sandboxtasks.luau
+on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920 x 1080: the chip under the money, the
+panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.
 """
 import argparse
 from pathlib import Path
@@ -240,6 +248,8 @@ local function require(module) if type(module) == "table" and module.fakeModule 
 # client/CardKit.luau, TouchLayout, MoveLayout and the real shared data; shared/FurnitureLooks.luau's catalogue loaded on
 # the recorder) on sandbox_mock.luau's recorder (missions_mock.luau's, a layout, Hud's left column, the furniture's
 # recorded models): tools/phone-ui/sandbox.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+# 8.2: the STOCK list's FILL BEST / SELL… (its menu, asked first) / TAKE ALL DOWN, the sort toggle, the search box (a
+# computer) and THE PICKER's "Too big for this stand" at a small upgrade stand, on the same screens.
 # (sandboxenv.py builds the folder; sandbox_preview.py draws the same scenes.)
 from sandboxenv import sandbox_env  # noqa: E402
 
@@ -251,3 +261,15 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "upgrades.luau"], cwd=folder, check=True)
+# 8.2 SANDBOX: the collection book (client/CollectionBookUi.luau, shared/CollectionBookRules.luau) and its 📖 BOOK chip
+# in client/SandboxHud.luau, in the same folder: tools/phone-ui/collectionbook.luau on a phone (844 x 390, 667 x 375),
+# a tablet (1024 x 768), a computer (1280 x 800) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "collectionbook.luau"], cwd=folder, check=True)
+# 8.2 SANDBOX: the daily tasks' TASKS chip and panel (client/SandboxTasksUi.luau beside client/SandboxHud.luau,
+# shared/SandboxTasks.luau's views) in the same folder: tools/phone-ui/sandboxtasks.luau on a phone (844 x 390), a
+# computer (1280 x 800, the chat shut and open) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "sandboxtasks.luau"], cwd=folder, check=True)

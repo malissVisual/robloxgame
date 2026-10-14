@@ -431,6 +431,210 @@ local moneyG = (PlayerData.get(G) :: any).money
 local cleared = Collection.clear(G)
 check("clear: every piece gone, on show or not, no money paid", cleared == 3 and #Collection.stock(G) == 0 and (PlayerData.get(G) :: any).money >= moneyG and (PlayerData.get(G) :: any).money - moneyG < 1 and Collection.incomePerMinute(G) == 0, cleared)
 
+-- ── 8.2: the STOCK list's bulk buttons (only through the remote) ───────────
+-- Hal has More stands level 1 (14 stands: 12 big, small 13 and 14); 11 fillers on stands 1 … 11, so FILL BEST has big
+-- stand 12 and the small 13 and 14 to fill.
+local FurnitureLooks = require("./FurnitureLooks")
+local WarehouseLayout = require("./WarehouseLayout")
+local H = E.join(808, "Hal")
+local profileH = PlayerData.get(H) :: any
+profileH.sandboxUpgrades = { stands = 1 }
+check("8.2: Hal has 14 stands (More stands level 1)", Collection.stands(H) == 14, Collection.stands(H))
+local mine = { piano = true, grandfather_clock = true, hay_wagon = true, bed = true, sofa = true, dining_chair = true, tv = true, radio = true }
+local fillers: { string } = {}
+for _, id in FurnitureLooks.Order do
+	if #fillers < 11 and not mine[id] and Rules.valueOf({ item = id }) > 0 then
+		local uid = Collection.add(H, { item = id, condition = 1 }) :: string
+		check(`… filler {#fillers + 1} ({id}) on stand {#fillers + 1}`, Collection.display(H, uid, #fillers + 1))
+		table.insert(fillers, uid)
+	end
+end
+local hp = Collection.add(H, { item = "piano", condition = 1 }) :: string
+local hc = Collection.add(H, { item = "grandfather_clock", condition = 0.95 }) :: string
+local hw = Collection.add(H, { item = "hay_wagon", condition = 1 }) :: string
+local hb = Collection.add(H, { item = "bed", condition = 1 }) :: string
+local hs = Collection.add(H, { item = "sofa", condition = 0.9 }) :: string
+local hs2 = Collection.add(H, { item = "sofa", condition = 0.6 }) :: string
+local hch = Collection.add(H, { item = "dining_chair", condition = 1 }) :: string
+local hch2 = Collection.add(H, { item = "dining_chair", condition = 0.8 }) :: string
+local ht = Collection.add(H, { item = "tv", condition = 0.1 }) :: string
+local hr = Collection.add(H, { item = "radio", condition = 1 }) :: string
+E.flush()
+local function bulk(player: any, message: any)
+	E.advance(1.01) -- (a second apart: under Config.Robust.Limits.CollectionBulk)
+	E.fire(player, "Collection", message)
+end
+local function moneyFrom(from: number, reason: string): { Money }
+	local out = {}
+	for index = from + 1, #money do
+		if money[index].player == H and money[index].reason == reason then
+			table.insert(out, money[index])
+		end
+	end
+	return out
+end
+local function standOf(uid: string): number?
+	local entry = stockOf(H)[uid]
+	return if entry then entry.stand else nil
+end
+local function fitsHall(): boolean
+	for _, entry in Collection.stock(H) do
+		local def = Rules.defOf(entry.item)
+		if entry.stand and def and not WarehouseLayout.fits(entry.stand, def.size) then
+			return false
+		end
+	end
+	return true
+end
+
+-- ⭐ FILL BEST
+local rateBefore = Collection.incomePerMinute(H)
+mark, heardAt, eventsAt = #E.sent, #heard, #events
+bulk(H, { kind = "fillbest" })
+check("fillbest: the best earners onto the free stands, each where it fits: the piano and the clock on small 13 and 14, the hay wagon (too big for them) on big 12", standOf(hp) == 13 and standOf(hc) == 14 and standOf(hw) == 12, `{standOf(hp)} {standOf(hc)} {standOf(hw)}`)
+check("… nothing else moved (the fillers on 1 … 11, the bed, sofas, chairs, radio and TV in the stock)", standOf(fillers[1]) == 1 and standOf(fillers[11]) == 11 and standOf(hb) == nil and standOf(hs) == nil and standOf(hr) == nil and standOf(ht) == nil)
+check("… nothing on a small stand is too big for it", fitsHall())
+local gained = Rules.income(stockOf(H)[hp]) + Rules.income(stockOf(H)[hc]) + Rules.income(stockOf(H)[hw])
+check("… the income up by their $ a minute", near(Collection.incomePerMinute(H), rateBefore + gained), `{Collection.incomePerMinute(H)} {rateBefore + gained}`)
+local got = E.received(H, "Collection", mark)
+local bulkMessages = kinds(got, "bulk")
+check("… one state push, one listener call (one change)", #kinds(got, "state") == 1 and count(heard, H, heardAt) == 1, `{#kinds(got, "state")} {count(heard, H, heardAt)}`)
+check("… { kind = bulk, action = fillbest, count = 3, income }", #bulkMessages == 1 and bulkMessages[1].action == "fillbest" and bulkMessages[1].count == 3 and near(bulkMessages[1].income, math.floor(gained * 100 + 0.5) / 100), bulkMessages[1] and bulkMessages[1].income)
+local displayed = eventsNamed("CollectionDisplayed", eventsAt)
+check("… one CollectionDisplayed (their $ a minute, the rarest: epic)", #displayed == 1 and displayed[1].value == math.floor(gained + 0.5) and displayed[1].a == "epic", #displayed)
+local stockH = deepCopy(Collection.stock(H))
+mark = #E.sent
+bulk(H, { kind = "fillbest" })
+check("fillbest again: nothing changes (idempotent), the Notice says why", same(Collection.stock(H), stockH) and #kinds(E.received(H, "Collection", mark), "state") == 0
+	and E.received(H, "Notice", mark)[1] == "Every display stand you have already shows a piece.", E.received(H, "Notice", mark)[1])
+Collection.undisplay(H, hw) -- (big 12 free, the bed and the wagon fit it, the radio too; the wagon earns the most)
+Collection.undisplay(H, hc)
+E.flush()
+mark = #E.sent
+bulk(H, { kind = "fillbest" })
+check("… stands 12 and 14 free: the clock back on small 14, the wagon on big 12 (the bed stays: no room)", standOf(hc) == 14 and standOf(hw) == 12 and standOf(hb) == nil and fitsHall(), `{standOf(hc)} {standOf(hw)}`)
+profileH.sandboxUpgrades = {} -- (12 stands: 13 and 14 aren't Hal's)
+Collection.upgrade(H, function() end)
+E.flush()
+mark = #E.sent
+bulk(H, { kind = "fillbest" })
+check("… only the stands you have: with 12 nothing goes on 13 or 14 (the pieces from them back in the stock stay there)", standOf(hp) == nil and standOf(hc) == nil and E.received(H, "Notice", mark)[1] ~= nil, E.received(H, "Notice", mark)[1])
+profileH.sandboxUpgrades = { stands = 1 }
+Collection.upgrade(H, function() end)
+
+-- ↩ TAKE ALL DOWN (and the bulk rate limit)
+local shownH = 0
+for _, entry in Collection.stock(H) do
+	if entry.stand then
+		shownH += 1
+	end
+end
+E.advance(1.01)
+E.flush()
+mark, heardAt = #E.sent, #heard
+local paidBefore = paid(H, "CollectionIncome")
+E.fire(H, "Collection", { kind = "undisplayall" })
+E.fire(H, "Collection", { kind = "undisplayall" }) -- (the same second: dropped by CollectionBulk)
+local downAll = true
+for _, entry in Collection.stock(H) do
+	downAll = downAll and entry.stand == nil
+end
+got = E.received(H, "Collection", mark)
+check(`undisplayall: every piece on show ({shownH}) back in the stock, the income $0`, downAll and shownH == 12 and Collection.incomePerMinute(H) == 0, shownH)
+check("… one state push, one listener call, { kind = bulk, action = undisplayall, count }", #kinds(got, "state") == 1 and count(heard, H, heardAt) == 1 and #kinds(got, "bulk") == 1 and kinds(got, "bulk")[1].action == "undisplayall" and kinds(got, "bulk")[1].count == shownH)
+check("… a second one in the same second: dropped (no Notice, nothing sent)", #E.received(H, "Notice", mark) == 0 and #got == 2, #got)
+E.advance(30) -- (what they earned up to then is paid)
+check("… what they earned up to then was counted and paid", paid(H, "CollectionIncome") > paidBefore, paid(H, "CollectionIncome") - paidBefore)
+paidBefore = paid(H, "CollectionIncome")
+E.advance(60)
+check("… nothing after", paid(H, "CollectionIncome") == paidBefore, paid(H, "CollectionIncome") - paidBefore)
+mark = #E.sent
+bulk(H, { kind = "undisplayall" })
+check("… again with nothing on show: refused, \"Nothing is on show.\"", E.received(H, "Notice", mark)[1] == "Nothing is on show." and #kinds(E.received(H, "Collection", mark), "state") == 0)
+
+-- 💰 SELL…: duplicates (the best of each kept, also when it is on show), broken, common
+check("the sofa (0.9, the better one) and a Common filler on show", Collection.display(H, hs, 1) and Collection.display(H, fillers[2], 2))
+local commonFiller = Rules.rarityOf(Rules.defOf(stockOf(H)[fillers[2]].item)) == "common"
+E.flush()
+local function sellCase(filter: string, extra: { [string]: any }?): (number, { any }, { Money }, { any })
+	local message: { [string]: any } = { kind = "sellmany", filter = filter }
+	for k, v in extra or {} do
+		message[k] = v
+	end
+	local moneyAt = #money
+	mark, heardAt, eventsAt = #E.sent, #heard, #events
+	local before = Collection.stock(H)
+	bulk(H, message)
+	local gone = {}
+	local after = stockOf(H)
+	for _, entry in before do
+		if not after[entry.uid] then
+			table.insert(gone, entry)
+		end
+	end
+	return #gone, gone, moneyFrom(moneyAt, "CollectionSale"), E.received(H, "Collection", mark)
+end
+local function priceOf(list: { any }): number
+	local sum = 0
+	for _, entry in list do
+		sum += Rules.sell(entry)
+	end
+	return sum
+end
+local n, gone, sales, sent = sellCase("duplicates", { uids = { hp, hs }, money = 1e9 })
+local goneIds = {}
+for _, entry in gone do
+	goneIds[entry.uid] = true
+end
+check("sellmany duplicates: the worse sofa and the worse chair sold (the sofa on show is the best of its item and stays)", n == 2 and goneIds[hs2] and goneIds[hch2] and stockOf(H)[hs] ~= nil and stockOf(H)[hch] ~= nil, n)
+check("… the client's uids and money ignored (the server takes only the filter)", stockOf(H)[hp] ~= nil and #sales == 1 and sales[1].delta == priceOf(gone), sales[1] and sales[1].delta)
+check("… one payment as CollectionSale (two items: no SKU), one sold message (2 pieces, its money), one state push", #sales == 1 and sales[1].reason == "CollectionSale" and sales[1].sku == nil
+	and #kinds(sent, "sold") == 1 and kinds(sent, "sold")[1].name == "2 pieces" and kinds(sent, "sold")[1].money == priceOf(gone) and kinds(sent, "sold")[1].count == 2 and #kinds(sent, "state") == 1 and count(heard, H, heardAt) == 1)
+check("… one CollectionSold (the money, the rarest: rare)", #eventsNamed("CollectionSold", eventsAt) == 1 and eventsNamed("CollectionSold", eventsAt)[1].value == priceOf(gone) and eventsNamed("CollectionSold", eventsAt)[1].a == "rare")
+n, gone, sales, sent = sellCase("broken")
+check("sellmany broken: the broken TV for scrap ($9), its SKU the item", n == 1 and gone[1].uid == ht and #sales == 1 and sales[1].delta == 9 and sales[1].sku == "tv" and kinds(sent, "sold")[1].name == "1 piece", n)
+local commons = {}
+for _, entry in Collection.stock(H) do
+	if entry.stand == nil and Rules.rarityOf(Rules.defOf(entry.item)) == "common" then
+		commons[entry.uid] = true
+	end
+end
+n, gone, sales, sent = sellCase("common")
+local allCommon = n > 0
+for _, entry in gone do
+	allCommon = allCommon and commons[entry.uid] == true
+end
+local leftCommon = 0
+for uid in commons do
+	if stockOf(H)[uid] then
+		leftCommon += 1
+	end
+end
+check("sellmany common: every Common piece in the stock (the chair, the radio, the Common fillers), nothing else", allCommon and leftCommon == 0 and stockOf(H)[hch] == nil and stockOf(H)[hr] == nil and stockOf(H)[hp] ~= nil and stockOf(H)[hb] ~= nil, n)
+check("… a Common piece on show stays on its stand", not commonFiller or standOf(fillers[2]) == 2)
+check("… the money: their prices in one CollectionSale", #sales == 1 and sales[1].delta == priceOf(gone) and kinds(sent, "sold")[1].money == priceOf(gone))
+mark = #E.sent
+local moneyH = profileH.money
+bulk(H, { kind = "sellmany", filter = "common" })
+check("… again: nothing left to sell, refused with why, no money", E.received(H, "Notice", mark)[1] == "There's no Common piece in your stock to sell." and profileH.money == moneyH, E.received(H, "Notice", mark)[1])
+
+-- garbage on the new kinds
+local stockGarbage = deepCopy(Collection.stock(H))
+local moneyGarbage = profileH.money - paid(H, "CollectionIncome")
+mark = #E.sent
+for _, message in { { kind = "sellmany" }, { kind = "sellmany", filter = 5 }, { kind = "sellmany", filter = "all" }, { kind = "sellmany", filter = "COMMON" }, { kind = "sellmany", filter = { "common" } }, { kind = "sellmany", filter = string.rep("x", 1000) }, { kind = "fillbest " }, { kind = { "fillbest" } }, { kind = "sellMany", filter = "common" }, { kind = "undisplay_all" } } do
+	bulk(H, message)
+end
+check("garbage on the new kinds: no error, nothing sold or moved, no money", same(Collection.stock(H), stockGarbage) and profileH.money - paid(H, "CollectionIncome") == moneyGarbage)
+local garbageNotices = E.received(H, "Notice", mark)
+check("… a filter that isn't one: refused with why (6 Notices); a kind that isn't one: nothing", #garbageNotices == 6 and garbageNotices[1] == "Choose what to sell: all Common, all broken or the duplicates.", #garbageNotices)
+mark = #E.sent
+E.advance(1.01)
+E.fire(stranger, "Collection", { kind = "fillbest" })
+E.advance(1.01)
+E.fire(stranger, "Collection", { kind = "sellmany", filter = "common" })
+check("a player whose save isn't loaded: refused, nothing sent but the why", #E.received(stranger, "Collection", mark) == 0)
+
 check("no warnings (no failed save, no failed payout)", #E.warnings == 0, E.warnings[1])
 
 if failures == 0 then

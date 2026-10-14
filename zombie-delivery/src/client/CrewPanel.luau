@@ -1193,7 +1193,7 @@ function CrewPanel.start()
 		task.defer(changed)
 	end)
 
-	-- K opens and closes the panel (not while typing, e.g. in the chat).
+	-- K opens and closes the panel (not while typing, e.g. in the chat; the sandbox too: the collection book is C there).
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.KeyCode ~= Enum.KeyCode.K or UserInputService:GetFocusedTextBox() or not hudOn() then
 			return

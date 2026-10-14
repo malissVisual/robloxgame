@@ -118,7 +118,8 @@
 --                             house's front door, "warehouse" to the plot's spawn (driving your van: it goes with you,
 --                             to the house's curb / the vanSpot); 8.1: "upmax" / "upreset" every upgrade at its top
 --                             for free / none (server/Upgrades.luau admin; FILL STANDS fills the player's own stands,
---                             Collection.stands)
+--                             Collection.stands); 8.2: "bookfill" / "bookclear" every piece of the collection book found
+--                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1529,6 +1530,28 @@ end
 
 Sandbox.run.upreset = function(player: Player)
 	Sandbox.upgrades(player, "reset")
+end
+
+-- 8.2, the collection book (server/CollectionBook.luau's admin: every piece found, or the book empty) ----------------
+
+function Sandbox.book(player: Player, what: string)
+	local ok, text = pcall(function()
+		return (require(Server.CollectionBook) :: any).admin(player, what)
+	end)
+	if ok and type(text) == "string" then
+		say(player, text)
+		return
+	end
+	warn(`[Admin] sandbox: CollectionBook.admin {what} failed: {text}`)
+	say(player, `ADMIN: the collection book's {what} failed (see the server Output).`)
+end
+
+Sandbox.run.bookfill = function(player: Player)
+	Sandbox.book(player, "fill")
+end
+
+Sandbox.run.bookclear = function(player: Player)
+	Sandbox.book(player, "clear")
 end
 
 -- Travel and the van (shared/SandboxMap.luau's spots) -----------------------------------------------------------------

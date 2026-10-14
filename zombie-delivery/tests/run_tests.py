@@ -13,6 +13,10 @@ PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore",
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
+PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/collectionbook_test.luau)
+PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
+PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
+PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -128,11 +132,19 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(HERE, "runtime", "WarehouseRuntime.luau"), os.path.join(tmp, "WarehouseRuntime.luau"))
     source = open(os.path.join(os.path.dirname(SHARED), "server", "Warehouse.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "W.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
-    source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: 'require("./FurnitureMesh")' if m[1] == "FurnitureMesh" else f"W.{m[1]}", source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{m[1]}")' if m[1] in ("FurnitureMesh", "WarehouseMesh") else f"W.{m[1]}", source)
     warehouse_head = ('local W = require("./WarehouseRuntime")\nlocal M = W.Mock\nlocal game, workspace, task, os = W.game, M.workspace, W.task, W.os\n'
                       'local Instance, Vector3, Color3, CFrame, Enum, UDim2, UDim = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum, M.UDim2, M.UDim\n'
                       'local warn = function(...) print("WARN", ...) end\n')
     open(os.path.join(tmp, "WarehouseServer.luau"), "w", encoding="utf-8").write(warehouse_head + source)
+    # 8.2: its server/WarehouseMesh.luau (the owner's Blender warehouse) on the same recorder: no import there, so every
+    # warehouse stays as built (tools/warehouse/mesh-check.py dresses them with one).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "WarehouseMesh.luau"), encoding="utf-8").read()
+    source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
+    storage = ('local storage = M.Instance.new("Folder")\n'
+               'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
+               'local workspace = M.workspace\n')
+    open(os.path.join(tmp, "WarehouseMesh.luau"), "w", encoding="utf-8").write(prefix + storage + source)
     # 7.1 review: the real server/Alpine.luau as AlpineServer.luau on tools/perf/world-mock.luau (WorldMock.luau) for
     # tests/alpinebuild_test.luau (the forests stand on World's parts only; SkipInStudio), its shared modules the copies.
     shutil.copy(os.path.join(tools, "perf", "world-mock.luau"), os.path.join(tmp, "WorldMock.luau"))
@@ -171,6 +183,50 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
     source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
     open(os.path.join(tmp, "UpgradesServer.luau"), "w", encoding="utf-8").write(head + "local workspace = E.workspace\n" + source)
+    # 8.2 SANDBOX, the collection book: the real server/CollectionBook.luau as CollectionBookServer.luau for
+    # tests/collectionbook_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "CollectionBook.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+    open(os.path.join(tmp, "CollectionBookServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.2 SANDBOX, analytics: the real server/Analytics.luau and server/SandboxAnalytics.luau as AnalyticsServer.luau and
+    # SandboxAnalyticsServer.luau for tests/sandboxanalytics_runtime_test.luau on the same runtime: PlayerData and
+    # Collection the real ones above, Moving the test's fake (E.Moving: its listeners' registration), AnalyticsService the
+    # test's recorder (through E.game's GetService), Roblox's Enum the few names Analytics sends.
+    enums = ('local Enum: any = { AnalyticsEconomyFlowType = { Source = "Source", Sink = "Sink" }, '
+             'AnalyticsProgressionType = { Start = "Start", Complete = "Complete", Fail = "Fail" } }\n')
+    for module in ("Analytics", "SandboxAnalytics"):
+        source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
+        source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+        source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+        source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+        source = source.replace("require(script.Parent.Moving)", "E.Moving")
+        open(os.path.join(tmp, module + "Server.luau"), "w", encoding="utf-8").write(head + enums + source)
+    # 8.2 SANDBOX, the daily tasks: the real server/SandboxTasks.luau as SandboxTasksServer.luau for
+    # tests/sandboxtasks_runtime_test.luau on the same runtime: its PlayerData, Collection and Upgrades the real ones
+    # above, Moving and MoveHelper tests/runtime/SandboxTasksRuntime.luau's stand-ins (their hooks, Danny's find).
+    shutil.copy(os.path.join(HERE, "runtime", "SandboxTasksRuntime.luau"), os.path.join(tmp, "SandboxTasksRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxTasks.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("Upgrades", '"./UpgradesServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    for module in ("Moving", "MoveHelper"):
+        source = source.replace(f"require(script.Parent.{module})", f'require("./SandboxTasksRuntime").{module}')
+    assert "script.Parent" not in source, "server/SandboxTasks.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SandboxTasksServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.2 SANDBOX, showing off: the real server/SandboxLeaders.luau as SandboxLeadersServer.luau for
+    # tests/sandboxleaders_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above) and
+    # tests/runtime/LeadersRuntime.luau's few additions (an OrderedDataStore, UDim2 / UDim / Vector2, a game giving it).
+    shutil.copy(os.path.join(HERE, "runtime", "LeadersRuntime.luau"), os.path.join(tmp, "LeadersRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxLeaders.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+    leaders_head = ('local L = require("./LeadersRuntime")\nlocal E, M = L.E, L.E.Mock\n'
+                    'local game, task, os, warn, workspace = L.game, E.task, E.os, E.warn, E.workspace\n'
+                    'local Instance, Vector3, Vector2, CFrame, Color3, Enum, UDim2, UDim = E.Instance, M.Vector3, M.Vector2, M.CFrame, M.Color3, M.Enum, L.UDim2, L.UDim\n')
+    open(os.path.join(tmp, "SandboxLeadersServer.luau"), "w", encoding="utf-8").write(leaders_head + source)
     # 8.0 sandbox, the map: the real server/SandboxWorld.luau as SandboxWorldServer.luau on the same mock for
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
@@ -198,6 +254,21 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxPlots.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "SandboxPlotsServer.luau"), "w", encoding="utf-8").write(
         "return function(game: any, task: any, require: any)\n" + source + "\nend\n")
+    # 8.2 e2e: the whole sandbox loop with the REAL modules together (tests/sandbox_e2e_runtime_test.luau). The server
+    # modules SandboxE2E.luau lists in E.real (the boot, the map, PlayerData, the plots, the collection, the warehouse,
+    # the upgrades, the moves and theirs) and shared/Net.luau as E2E<Name>.luau, unchanged but for one line on top:
+    # setfenv to tests/runtime/SandboxE2E.luau's environment (its game, workspace, script, task, os and require: no
+    # module gains a local, no require is rewritten). Their shared modules are the copies above; a server module not in
+    # E.real is one of SandboxE2E's fakes (E.fakes) or an error that names it.
+    harness = open(os.path.join(HERE, "runtime", "SandboxE2E.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "SandboxE2E.luau"), "w", encoding="utf-8").write(harness)
+    start = harness.index("E.real = {")
+    e2e_env = 'setfenv(1, require("./SandboxE2E").env)\n'
+    for module in re.findall(r"(\w+) = true", harness[start:harness.index("}", start)]):
+        source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
+        open(os.path.join(tmp, "E2E" + module + ".luau"), "w", encoding="utf-8").write(e2e_env + source)
+    source = open(os.path.join(SHARED, "Net.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "E2ENet.luau"), "w", encoding="utf-8").write(e2e_env + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
@@ -500,7 +571,7 @@ if not review72_check():
 # the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
 def imports_first_check():
     main = open(os.path.join(os.path.dirname(HERE), "src", "server", "Main.server.luau"), encoding="utf-8").read()
-    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt")
+    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt")
     first = main.find("ServerStorage")
     wait = main.find(":WaitForChild(")
     good = first >= 0 and wait >= 0 and first < wait and all(main.find(f'"{n}"') < wait for n in names)
@@ -536,6 +607,14 @@ if requires.returncode != 0:
 sprinter = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "sprinter", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
 print("== sprinter mesh: " + ((sprinter.stdout.strip().splitlines() or ["?"])[-1][:160] if sprinter.returncode == 0 else "FAIL\n" + sprinter.stdout[-1500:] + sprinter.stderr[-1500:]))
 if sprinter.returncode != 0:
+    ok = False
+
+# 8.2 sandbox: the ZDC warehouse in the owner's Blender model (server/WarehouseMesh.luau): tools/warehouse/mesh-check.py
+# imports design/blender-warehouse/roblox/ZDCWarehouseArt.json's pieces (turned, scaled) and dresses the warehouses the
+# real server/Warehouse.luau builds; the model's sizes are the layout's, its visual parts hidden, the rest untouched.
+warehouse = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "warehouse", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
+print("== warehouse mesh: " + ((warehouse.stdout.strip().splitlines() or ["?"])[-1][:160] if warehouse.returncode == 0 else "FAIL\n" + warehouse.stdout[-1500:] + warehouse.stderr[-1500:]))
+if warehouse.returncode != 0:
     ok = False
 
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)

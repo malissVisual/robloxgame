@@ -91,3 +91,40 @@ Ve Studiu ukazuje přehled čísla tvého počítače. Opravdová čísla jsou j
 - **CPU** = skripty a fyzika.
 
 Podle toho se rozhodne další krok, proto prosím pošli screenshot s oběma čísly.
+
+## Sandbox (8.2)
+
+Sandbox (malý testovací svět, který teď hraješ) je lehký. I v nejhorším případě má asi 5 100 dílů, šestinu města:
+4 hráči, ve skladu 20 plných stojanů, 4 dodávky, běžící stěhování s domem i s Dannym. Verze 8.2 ho ještě odlehčila:
+- **Malé nápisy** na dodávkách (název firmy, loga, SPZ) a na nábytku se kreslí jen zblízka (do 220 studů). Dřív je
+  telefon kreslil přes celou mapu.
+- **Sklady a chata** se se streamováním načítají vždy celé najednou, takže nikdy neuvidíš jen půlku haly.
+- **Pár skriptů**, které běží každý snímek, dělá méně práce.
+
+Vzhled ani hratelnost se nezměnily.
+
+**Co nastavit ve Studiu.** Stačí jednou. Pokud už máš nastavený krok 1 výše, nic neměň.
+1. **Workspace:**
+
+   | Vlastnost | Hodnota |
+   |---|---|
+   | StreamingEnabled | ✔ |
+   | StreamingMinRadius | 128 |
+   | StreamingTargetRadius | 512 |
+   | StreamOutBehavior | Opportunistic |
+   | StreamingIntegrityMode | PauseOutsideLoadedArea |
+   | ModelStreamingBehavior | Improved (pokud tam je) |
+
+   V sandboxu pak telefon drží jen to, co je blízko. Když jsi doma u skladu, chata se uvolní, a vnitřek domu se
+   načte jen tomu, kdo v něm je.
+2. **Lighting → Technology:** pokud je tam **Future**, zkus **ShadowMap**. Pak porovnej FPS na telefonu v přehledu
+   výkonu (krok 2). Když se ti vzhled nebude líbit, vrať to zpátky.
+3. **Ulož a publikuj** (File → Publish to Roblox).
+
+**Test na telefonu.** Postupuj jako v kroku 3, jen v sandboxu. Udělej screenshot přehledu na těchto místech:
+1. u svého skladu;
+2. v hale mezi plnými stojany;
+3. za jízdy dodávkou k chatě;
+4. v domě při stěhování.
+
+Pošli mi screenshoty s **FPS, CPU a GPU** a model telefonu.

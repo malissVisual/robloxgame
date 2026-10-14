@@ -17,7 +17,7 @@
 --             chalet's parts in the Model "House_sandbox_house" (attribute Home) on the owner's Blender house's box:
 --             once ZDCHouseArt is imported, server/HouseMesh.luau dresses it (the chalet's parts hidden but still
 --             colliding, its gable re-cut under the model's roof; the FrontDoor where the model's door is), the garden
---             beside it in "Garden"; no import: the chalet
+--             beside it in "Garden"; no import: the chalet. 8.2: Atomic (with StreamingEnabled it streams whole)
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -268,6 +268,9 @@ local function house(world: Instance): Model
 	local model = Instance.new("Model")
 	model.Name = "TheOldChalet"
 	model:SetAttribute("SandboxHouse", H.id)
+	-- 8.2 perf (design/performance/REPORT.md, section 9): with StreamingEnabled it streams in and out whole (its door's
+	-- prompt, the garden and the owner's Blender house with it), never a house half there
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	-- 8.1: the house's own parts in a Model "House_<id>" (attribute Home), as World's buildHouse makes Marge's: the one
 	-- server/HouseMesh.luau dresses (the garden stays out of it)
 	local body = Instance.new("Model")

@@ -3,6 +3,9 @@
 -- steps, the custom events (a short fixed list of valid names, the failed orders' names), the custom fields (few,
 -- short, cleaned), the money's reasons (every source and sink of the owner's list, the transaction types, the batched
 -- ones, an unknown reason as Other), the level-ups, the errors' script and line, the budget and the admin line.
+-- 8.2 SANDBOX: the sandbox's ten steps (their order, only joining and PLAY implied, an upgrade or a sale before the move
+-- waits, the save's flag and an old sandbox save past them all), its events in the list, how a move ended in a word
+-- (the real ends' words), the counts' bands and the grip checks' sampling (one a window of GripEvery, a random one).
 -- (tests/run_tests.py also checks that every reason and event name used in src/server is one of the plan's.)
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
@@ -106,6 +109,149 @@ do
 	check("a bad number is checked", Plan.onboardingFrom({ money = 40, onboarding = 1e9 }) == Plan.ALL and Plan.onboardingFrom({ money = 40, onboarding = -3 }) == 0 and Plan.onboardingFrom({ money = 40, onboarding = 0 / 0 }) == Plan.ALL and Plan.onboardingFrom({ money = 40, onboarding = 6.7 }) == 6)
 end
 
+-- ── 8.2 SANDBOX: the sandbox's onboarding funnel ──────────────────────────
+do
+	local S = Plan.SandboxSteps
+	local names = {}
+	for _, step in S do
+		table.insert(names, step.name)
+	end
+	check("8.2: ten sandbox steps, in the owner's order", table.concat(names, " ") == "Joined PressedPlay FirstContract EnteredHouse FirstPieceInVan FirstTripHome FirstPieceOnShow FirstIncome FirstSale FirstUpgrade",
+		table.concat(names, " "))
+	local seen, bad = {}, {}
+	for _, name in names do
+		if seen[name] or not Plan.validName(name) then
+			table.insert(bad, name)
+		end
+		seen[name] = true
+	end
+	check("8.2: the sandbox's step names are valid and unique", #bad == 0, table.concat(bad, ", "))
+	check("8.2: joining and PLAY are the city's first two (the save's Joined, the Play remote's PressedPlay work there as here)",
+		S[1].name == Plan.Steps[1].name and S[2].name == Plan.Steps[2].name)
+	local implied = {}
+	for index, step in S do
+		if step.implied then
+			table.insert(implied, index)
+		end
+	end
+	check("8.2: only joining and PLAY are implied (an upgrade never implies a move)", same(implied, { 1, 2 }), list(implied))
+	check("8.2: allOf: every sandbox step", Plan.allOf(S) == 1023 and Plan.logged(Plan.allOf(S), S) == 10 and Plan.allOf(Plan.Steps) == Plan.ALL)
+	check("8.2: stepOf by name in the sandbox's steps (a city name is none of them)", Plan.stepOf("FirstContract", S) == 3 and Plan.stepOf("FirstUpgrade", S) == 10
+		and Plan.stepOf("Joined", S) == 1 and Plan.stepOf("Level2", S) == nil and Plan.stepOf("FirstContract") == nil)
+
+	-- the owner's way through, with an upgrade bought before the first move and a sale before the show
+	local mask, logged = 0, {}
+	local function reach(name: string): { number }
+		local out
+		mask, out = Plan.reach(mask, Plan.stepOf(name, S) :: number, S)
+		for _, n in out do
+			table.insert(logged, n)
+		end
+		return out
+	end
+	check("8.2: joined", same(reach("Joined"), { 1 }))
+	check("8.2: an upgrade bought right after joining: PLAY is implied, the upgrade waits", same(reach("FirstUpgrade"), { 2 }) and Plan.has(mask, 10, S) and Plan.logged(mask, S) == 2)
+	check("8.2: the contract", same(reach("FirstContract"), { 3 }))
+	check("8.2: the same step again: nothing", same(reach("FirstContract"), {}))
+	check("8.2: into the house, a piece in the van, the trip home", same(reach("EnteredHouse"), { 4 }) and same(reach("FirstPieceInVan"), { 5 }) and same(reach("FirstTripHome"), { 6 }))
+	check("8.2: a sale before the show waits (it never implies the show or the income)", same(reach("FirstSale"), {}) and Plan.logged(mask, S) == 6)
+	check("8.2: on show", same(reach("FirstPieceOnShow"), { 7 }))
+	local paid = reach("FirstIncome")
+	check("8.2: the income: it with the sale and the upgrade that waited", same(paid, { 8, 9, 10 }), list(paid))
+	check("8.2: every sandbox step once, in order", same(logged, { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }) and mask == Plan.allOf(S), list(logged))
+	local m2, out2 = Plan.reach(0, 4, S)
+	check("8.2: into the house with nothing before it (a crew mate): only joined and PLAY, the house waits for a contract", same(out2, { 1, 2 }) and Plan.has(m2, 4, S) and not Plan.has(m2, 3, S), list(out2))
+	local m3, out3 = Plan.reach(5, 11, S)
+	check("8.2: no step outside 1 – 10", m3 == 5 and #out3 == 0 and Plan.mark(5, 11, S) == 5 and Plan.mark(5, 10, S) == 517 and not Plan.has(1023, 11, S))
+	local cityMask, cityOut = Plan.reach(0, 10)
+	check("8.2: the city's functions unchanged without steps (10 is none of the city's)", Plan.mark(5, 10) == 5 and cityMask == 0 and #cityOut == 0)
+end
+
+do
+	local all = Plan.allOf(Plan.SandboxSteps)
+	local flag = Plan.SandboxFlag
+	check("8.2: the save's flag", flag == "sandboxOnboardingKept")
+	check("8.2: no save: a new player (0)", Plan.sandboxFrom(nil) == 0)
+	check("8.2: a lock-only record (no money): a new player (0)", Plan.sandboxFrom({ lock = { job = "x", at = 1 } }) == 0)
+	check("8.2: a real save from before 8.2 (no flag): past every step", Plan.sandboxFrom({ money = 40 }) == all and Plan.sandboxFrom({ money = 40, sandboxOnboarding = 3 }) == all)
+	check("8.2: a real save with the flag keeps its steps", Plan.sandboxFrom({ money = 40, sandboxOnboarding = 7, [flag] = true }) == 7
+		and Plan.sandboxFrom({ money = 40, sandboxOnboarding = 0, [flag] = true }) == 0)
+	check("8.2: a bad number is checked", Plan.sandboxFrom({ money = 40, sandboxOnboarding = 1e9, [flag] = true }) == all
+		and Plan.sandboxFrom({ money = 40, sandboxOnboarding = -3, [flag] = true }) == 0 and Plan.sandboxFrom({ money = 40, sandboxOnboarding = 0 / 0, [flag] = true }) == all
+		and Plan.sandboxFrom({ money = 40, sandboxOnboarding = 6.7, [flag] = true }) == 6 and Plan.sandboxFrom({ money = 40, sandboxOnboarding = "7", [flag] = true }) == all)
+	check("8.2: the city's steps are read as before (the sandbox's never touch them)", Plan.onboardingFrom({ money = 40, onboarding = 5, sandboxOnboarding = 9, [flag] = true }) == 5)
+end
+
+-- ── 8.2 SANDBOX: the moves' words, the bands, the grip's sampling ─────────
+do
+	local events = { "MoveStarted", "MoveFinished", "MoveFinishedValue", "MoveGaveUp", "GripCheck", "CollectibleFound", "UpgradeBought", "CollectionAdded" }
+	local missing = {}
+	for _, name in events do
+		if not Plan.isEvent(name) then
+			table.insert(missing, name)
+		end
+	end
+	check("8.2: every sandbox event in the plan (and the upgrades' and the collection's still)", #missing == 0, table.concat(missing, ", "))
+	-- the words server/Moving.luau's ends say (tests/sandboxmove_runtime_test.luau checks them on the real module)
+	local how = Plan.moveHow
+	check("8.2: FINISH", how("done", "Finished: what came home is in your warehouse", 300, false) == "finish"
+		and how("done", "Finished: what was still in the van stayed behind", 300, false) == "finish")
+	check("8.2: everything home", how("done", "Everything is home in your warehouse", 300, true) == "all")
+	check("8.2: the clock (nothing home, a late trip, a FINISH in the grace)", how("failed", "Time's up: nothing reached your warehouse", -1, false) == "time"
+		and how("late", nil, -30, false) == "time" and how("done", "Time's up: what reached your warehouse is yours", 0, false) == "time"
+		and how("done", "Finished: what came home is in your warehouse", -10, false) == "time")
+	check("8.2: GIVE UP, after a trip or before", how("done", "You called it off: what came home is yours", 300, false) == "giveup"
+		and how("cancelled", "You called it off", 300, false) == "giveup")
+	check("8.2: the owner left", how("done", "Ann left the game: what came home is in their warehouse", 300, false) == "left"
+		and how("cancelled", "Ann left the game", 300, false) == "left")
+	check("8.2: the admin's end", how("cancelled", "Called off by the admin", 300, false) == "admin" and how("done", nil, 300, false) == "admin")
+	local words = {}
+	for _, word in { "finish", "all", "time", "giveup", "left", "admin" } do
+		if Plan.fieldValue(word) ~= word then
+			table.insert(words, word)
+		end
+	end
+	check("8.2: every word survives as a field", #words == 0, table.concat(words, ", "))
+	local B = Plan.band
+	check("8.2: bands of one (the trips)", B(0, 1, 6) == "0" and B(3, 1, 6) == "3" and B(5, 1, 6) == "5" and B(6, 1, 6) == "6plus" and B(40, 1, 6) == "6plus")
+	check("8.2: bands of five (the pieces)", B(1, 5, 30) == "0-4" and B(4, 5, 30) == "0-4" and B(5, 5, 30) == "5-9" and B(17, 5, 30) == "15-19" and B(29, 5, 30) == "25-29"
+		and B(30, 5, 30) == "30plus" and B(400, 5, 30) == "30plus")
+	check("8.2: a band of a non-number or under 0: as 0, whole", B(nil, 5, 30) == "0-4" and B(0 / 0, 1, 6) == "0" and B(-3, 1, 6) == "0" and B(2.9, 1, 6) == "2")
+	check("8.2: a band is a field as it is", Plan.fieldValue(B(17, 5, 30)) == "15-19" and Plan.fieldValue(B(99, 5, 30)) == "30plus")
+	check("8.2: Config.Analytics.GripEvery: one in 10", Config.Analytics.GripEvery == 10)
+	-- the grip's sampling: one check a window of `every`, a random one of it
+	local function run(every: number, checks: number, rolls: { number }): { number }
+		local at = 0
+		local function roll(): number
+			at += 1
+			return rolls[(at - 1) % #rolls + 1]
+		end
+		local sampler = Plan.sampler(every, roll())
+		local sent = {}
+		for n = 1, checks do
+			if Plan.sample(sampler, every, roll()) then
+				table.insert(sent, n)
+			end
+		end
+		return sent
+	end
+	local sent = run(10, 100, { 0.37, 0.05, 0.91, 0.5, 0.0, 0.999, 0.2 })
+	local perWindow, inRange = {}, true
+	for _, n in sent do
+		local window = (n - 1) // 10 + 1
+		perWindow[window] = (perWindow[window] or 0) + 1
+	end
+	for window = 1, 10 do
+		inRange = inRange and perWindow[window] == 1
+	end
+	check("8.2: 100 checks: 10 sent, one in each window of 10", #sent == 10 and inRange, list(sent))
+	local first = run(10, 10, { 0 })
+	local last = run(10, 10, { 0.9999 })
+	check("8.2: the roll picks the window's check (0: its first, under 1: its last)", same(first, { 1 }) and same(last, { 10 }), `{list(first)} {list(last)}`)
+	check("8.2: under a window: one at most", #run(10, 9, { 0.95 }) == 0 and #run(10, 9, { 0.1 }) == 1)
+	check("8.2: every 1: all of them; a bad roll is the first", #run(1, 5, { 0.5 }) == 5 and same(run(10, 10, { 0 / 0 }), { 1 }))
+end
+
 -- ── The funnels ───────────────────────────────────────────────────────────
 do
 	local delivery = Plan.Funnels.Delivery
@@ -135,7 +281,7 @@ do
 		seen[name] = true
 	end
 	check("the events: valid and unique names", #bad == 0, table.concat(bad, ", "))
-	check("a short fixed list (6.14: with the golden orders' and the regulars'; 6.15: the live events'; 8.0: the collection's)", #Plan.Events >= 10 and #Plan.Events <= 30, #Plan.Events)
+	check("a short fixed list (6.14: with the golden orders' and the regulars'; 6.15: the live events'; 8.0: the collection's; 8.2: the sandbox's moves)", #Plan.Events >= 10 and #Plan.Events <= 40, #Plan.Events)
 	local wanted = { "DeathOnJob", "JobFailedTime", "JobFailedCargo", "QueueAddAll", "ZipRide", "BusRide", "ScooterRental", "StylePurchase", "SessionLength", "ServerError", "ClientError" }
 	local missing = {}
 	for _, name in wanted do

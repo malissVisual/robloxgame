@@ -63,6 +63,7 @@ Collection.sell(player, uid) -> money?, why
 Collection.incomePerMinute(player) -> number
 Collection.openPicker(player, stand)
 Collection.onChanged(fn(player))
+Collection.onAdded(fn(player, entry))   8.2: after Collection.add took a piece (entry a copy): the collection book
 ```
 
 **The remote `"Collection"`:**

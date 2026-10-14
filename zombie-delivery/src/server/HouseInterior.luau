@@ -197,6 +197,7 @@ local function sign(p: BasePart, text: string, face: Enum.NormalId, fg: Color3, 
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 50
 	gui.LightInfluence = 0
+	gui.MaxDistance = Config.Performance.SignRange -- 8.2 perf: small text, drawn only near
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = if bg then 0 else 1
