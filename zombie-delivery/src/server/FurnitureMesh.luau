@@ -123,9 +123,17 @@ local function loadArt()
 		say("the import came out mirrored or flat; the furniture keeps its own look")
 		return
 	end
+	local function off(v: Vector3): number
+		return math.abs(v.Magnitude / 10 - scale) / scale
+	end
+	if off(y - o) > 0.02 or off(z - o) > 0.02 or math.abs(ux:Dot((y - o).Unit)) > 0.02 or math.abs(ux:Dot((z - o).Unit)) > 0.02 then
+		say(`the markers moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the furniture keeps its own look`)
+		return
+	end
 	local axes = CFrame.fromMatrix(Vector3.zero, ux, uy, uz) -- the game's axes as the importer turned them
 	local found: { [string]: { Piece } } = {}
 	local count = 0
+	local turn: CFrame?, moved = nil, false
 	for _, d in art:GetDescendants() do
 		if not d:IsA("BasePart") then
 			continue
@@ -157,6 +165,11 @@ local function loadArt()
 		d.CastShadow = finish ~= "glass" and finish ~= "glow"
 		local frame = CFrame.new(origin) * axes -- the item's bottom middle, the game's axes
 		local rel = frame:ToObjectSpace(d.CFrame)
+		if not turn then
+			turn = rel - rel.Position
+		elseif rel.RightVector:Dot(turn.RightVector) < 0.999 or rel.UpVector:Dot(turn.UpVector) < 0.999 then
+			moved = true -- (the importer turns every piece alike: one turned otherwise was thrown about)
+		end
 		local list = found[id] or {}
 		found[id] = list
 		table.insert(list, { finish = finish, part = d, cf = rel - rel.Position + rel.Position / scale, size = d.Size / scale })
@@ -164,6 +177,9 @@ local function loadArt()
 	end
 	if count == 0 then
 		say("no pieces named <item>_<finish>; the furniture keeps its own look")
+		return
+	elseif moved then
+		say("its pieces moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the furniture keeps its own look")
 		return
 	end
 	items = found

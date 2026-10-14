@@ -97,9 +97,17 @@ local function loadArt()
 		say("the import came out mirrored or flat; the ZDC Van keeps its panelled look")
 		return
 	end
+	local function off(v: Vector3): number
+		return math.abs(v.Magnitude / 10 - scale) / scale
+	end
+	if off(y - o) > 0.02 or off(z - o) > 0.02 or math.abs(ux:Dot((y - o).Unit)) > 0.02 or math.abs(ux:Dot((z - o).Unit)) > 0.02 then
+		say(`the markers moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the ZDC Van keeps its panelled look`)
+		return
+	end
 	local frame = CFrame.fromMatrix(o, ux, uy, uz) -- the car's axes as the importer placed them
 	wheelAt = frame:PointToObjectSpace(w) / scale
 	local found: { [string]: { Piece } } = {}
+	local turn: CFrame?, moved = nil, false
 	for _, d in art:GetDescendants() do
 		if not d:IsA("BasePart") then
 			continue
@@ -130,12 +138,20 @@ local function loadArt()
 		d.Reflectance = look.reflectance or 0
 		d.CastShadow = finish ~= "glass"
 		local rel = frame:ToObjectSpace(d.CFrame)
+		if not turn then
+			turn = rel - rel.Position
+		elseif rel.RightVector:Dot(turn.RightVector) < 0.999 or rel.UpVector:Dot(turn.UpVector) < 0.999 then
+			moved = true -- (the importer turns every piece alike: one turned otherwise was thrown about)
+		end
 		local list = found[group] or {}
 		found[group] = list
 		table.insert(list, { finish = finish, part = d, cf = rel - rel.Position + rel.Position / scale, size = d.Size / scale })
 	end
 	if not (found.body and found.wheel and found.doorL and found.doorR and found.rearL and found.rearR) then
 		say("a body, a wheel and the four doors are needed; the ZDC Van keeps its panelled look")
+		return
+	elseif moved then
+		say("its pieces moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the ZDC Van keeps its panelled look")
 		return
 	end
 	groups = found

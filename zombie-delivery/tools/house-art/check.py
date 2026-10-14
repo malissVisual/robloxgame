@@ -13,7 +13,8 @@ two Windows; World's own lines are checked to be unchanged). Checks:
     wedges;
   - nothing of the model where the move puts its things (shared/MoveSiteLooks.luau's moving-day dress: MOVING DAY over
     the door, the boxes and the rug by it, the signs) nor in the door's "Enter house" box (server/Moving.luau);
-  - at most 10,000 triangles a piece; a house not listed, one of another size, no import: left as World builds it.
+  - at most 10,000 triangles a piece; a house not listed, one of another size, no import, an import physics threw about
+    (a piece turned): left as World builds it.
 
     python3 zombie-delivery/tools/house-art/check.py <luau>
 """
@@ -50,6 +51,12 @@ local F = getmetatable(M.CFrame.identity)
 F.__add = function(a, v) return setmetatable({ Position = a.Position + v, R = a.R }, F) end
 F.__sub = function(a, v) return setmetatable({ Position = a.Position - v, R = a.R }, F) end
 M.CFrame.fromMatrix = function(p, x, y, z) return setmetatable({ Position = p, R = { x.X, y.X, z.X, x.Y, y.Y, z.Y, x.Z, y.Z, z.Z } }, F) end
+local V3 = M.Vector3.new
+F.__index = function(cf, k)
+	if k == "RightVector" then local r = cf.R; return V3(r[1], r[4], r[7]) end
+	if k == "UpVector" then local r = cf.R; return V3(r[2], r[5], r[8]) end
+	return rawget(F, k)
+end
 local O = getmetatable(M.Instance.new("Part"))
 local isA = O.IsA
 O.IsA = function(self, c) if c == "BasePart" and (self.ClassName == "MeshPart" or self.ClassName == "WedgePart") then return true end return isA(self, c) end
@@ -58,7 +65,7 @@ local get = M.game.GetService
 M.game.GetService = function(self, name) if name == "ServerStorage" then return storage end return get(self, name) end
 local MODE = (...)
 local art = M.Instance.new("Model")
-if MODE == "art" then
+if MODE == "art" or MODE == "scattered" then
 	art.Name = "ZDCHouseArt"
 	art.Parent = M.workspace -- (as the importer leaves it: HouseMesh moves it to ServerStorage)
 	-- The import: a quarter turn about up (Roblox's x → -z, z → x), 3 times the size, moved. The importer's own axes
@@ -71,7 +78,10 @@ if MODE == "art" then
 		p.Name = row[1]
 		p.CFrame = M.CFrame.new(z * K + MOVE.X, y * K + MOVE.Y, -x * K + MOVE.Z)
 		p.Size = M.Vector3.new(sz * K, sy * K, sx * K)
-		p.Anchored = true
+		p.Anchored = false -- (as Studio's Import 3D leaves them)
+		if MODE == "scattered" and row[1] == "house_door" then
+			p.CFrame = p.CFrame * M.CFrame.Angles(0.5, 0.2, 0) -- (thrown about by physics before the game read it)
+		end
 		local skin = M.Instance.new("SurfaceAppearance")
 		skin.Parent = p
 		p.Parent = art
@@ -222,6 +232,7 @@ def main():
         stage(tmp, manifest)
         plain = run(luau, tmp, "none")
         art = run(luau, tmp, "art")
+        scattered = run(luau, tmp, "scattered")
     finishes = {name.rsplit("_", 1)[1] for name in manifest["pieces"]}
     looks = {l["finish"] for l in art["LOOK"]}
     assert finishes <= looks, f"finishes without a look in HouseMesh.LOOKS: {sorted(finishes - looks)}"
@@ -237,6 +248,8 @@ def main():
         assert not h["dressed"] and not h["attr"], (h, "dressed")
     for p in plain["PART"] + [p for p in art["PART"] if p["tag"] in ("other", "size")]:
         assert p["class"] != "MeshPart" and p["t"] == 0, (p["tag"], p["name"], "changed")
+    for h in scattered["HOUSE"]:
+        assert not h["dressed"], (h, "dressed from an import physics had thrown about")
     assert art["META"]["moved"], "the imported model was not moved to ServerStorage"
     assert main_house["dressed"] and main_house["attr"], main_house
     parts = [p for p in art["PART"] if p["tag"] == "main"]

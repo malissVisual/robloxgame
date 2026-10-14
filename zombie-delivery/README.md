@@ -1617,6 +1617,19 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
+## The Blender dressers refuse an import that moved (8.0.3)
+
+The owner's screenshot: in the sandbox the imported `ZDCHouseArt` lay in pieces over the road. Studio's Import 3D leaves
+a model in Workspace with its MeshParts loose and overlapping, and the sandbox builds no Marge's house, so nothing took
+it away and physics threw the pieces about. 8.0.2 moves the imports out of the Workspace first thing in
+`Main.server.luau`.
+
+VanMesh, FurnitureMesh and HouseMesh also check that their markers still form a square frame (three equal, square
+arms) and that every piece is turned alike (the importer turns them all the same). An import that moved anyway, for
+example renamed and left in the Workspace, is refused with a warning ("put it in ServerStorage and save"), and the car,
+furniture or house keeps its own look instead of dressing from scattered pieces. `tools/house-art/check.py` tests it
+with a thrown piece.
+
 ## Marge's house: the owner's Blender model (7.2)
 
 The owner: "udělej mi 3D model toho baráku aby vypadal klasicky evropsky barák" (a 3D model of that house, so it looks
