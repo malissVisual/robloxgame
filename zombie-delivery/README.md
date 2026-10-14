@@ -1706,7 +1706,8 @@ player's own and buyable (the contract: `design/warehouse-levels/KONTRAKT.md`):
   the building goes back (north) from there. `WarehouseLayout.site(plot, level)` is a Plot with that level's box, and
   every layout function takes it (a plain Plot is level 4): its walls (the Garage's shed roof, gables for 2 – 4, a
   gable of 10 under level 5's barrel), its lamps under the Blender model's lamps, its beams at the model's trusses, its
-  stands, the UPGRADES desk (in the Garage turned, against the west wall), the STOCK board and the UPGRADES sign.
+  stands (`WarehouseLayout.grid(n)`), the UPGRADES desk at the back wall's middle (the Garage's a smaller one between
+  its two stands), the STOCK board and the UPGRADES sign (the Garage's board on its west wall).
 - **The Blender look:** `server/WarehouseMesh.luau` dresses each warehouse with its own level of the owner's
   `ZDCWarehouseArt` import (the Model's `Level`), checked against that level's Site. The FBX was not exported again:
   the import the owner has already holds all five levels.

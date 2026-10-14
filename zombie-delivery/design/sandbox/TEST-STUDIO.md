@@ -106,9 +106,9 @@ Zaškrtněte, co sedí. Když něco nesedí, poznamenejte číslo bodu a co jste
 ## 18. Úrovně skladu (8.3)
 Pro tento bod stačí jeden hráč. Uložení začněte jako nový hráč: buď s vypnutým *Enable Studio Access to API Services*
 (nic se nenačte), nebo admin → SANDBOX → **↺ RESET UPGRADES**.
-- [ ] **Nový hráč je v garáži** (level 1): malá omítnutá budova s pultovou střechou, vrata uprostřed přede dveřmi,
-      uvnitř **2 stojany**. Pult UPGRADES stojí bokem u levé (západní) zdi, otočený do garáže, a jde na něj E.
-      Volné pozemky 3 a 4 jsou také garáže s **FOR RENT**.
+- [ ] **Nový hráč je v garáži** (level 1): malá omítnutá budova s pultovou střechou a vraty uprostřed přední zdi,
+      uvnitř **2 stojany** u zadní zdi. Mezi nimi stojí menší pult UPGRADES (jde na něj E), nad ním cedule UPGRADES.
+      Tabule STOCK visí na levé (západní) zdi. Volné pozemky 3 a 4 jsou také garáže s **FOR RENT**.
 - [ ] Van, kruh na vykládání, UNLOAD HERE, kiosk a místo, kde se objevíte, jsou tam, kde byly. Vrata garáže míří na van.
 - [ ] Okno UPGRADES: první karta **ZDC Warehouse** 🏭 (Garage · 2 stands → Workshop · 4 stands, **$1,500**).
       **More stands** je zamčená, šedá, s nápisem „Needs the Big Warehouse“, a koupit nejde.
