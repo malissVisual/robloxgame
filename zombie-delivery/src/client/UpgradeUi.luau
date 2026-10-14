@@ -18,8 +18,9 @@
 -- levels, 1 … 5 ("LV 1/5" is the Garage; its upgrade level 0 … 4 + 1, UpgradeRules.warehouseLevel: the names the
 -- players see, "level 1 Garage … level 5 Logistics Center"), its lines "Garage · 2 stands" → "Next: Workshop · 4 stands"
 -- (UpgradeRules.effect with the levels). A locked card (Row.locked: More stands below the Big Warehouse) is grey, its
--- reason ("🔒 Needs the Big Warehouse") in place of the price and BUY; a tap only says it again, never a purchase. The
--- cards are lower when the screen is short (a phone held sideways shows all five); the list scrolls only below that.
+-- reason ("🔒 Needs the Big Warehouse") in place of the price and BUY, its next line "Locked for now" (its next level
+-- gives nothing yet); a tap on the reason only says it again, never a purchase. The cards are lower when the screen is
+-- short (a phone held sideways shows all five); the list scrolls only below that.
 --   UpgradeUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
 --   UpgradeUi.open() / close() / isOpen()
 --   UpgradeUi.state()                  { levels, money } the last state (nil: none yet)
@@ -375,7 +376,8 @@ local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout
 	Ui.label(frame, row.name, UDim2.fromOffset(nameW, 18), { Name = "UpgradeName", Position = UDim2.fromOffset(x, y), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = if locked then K.secondary else K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	levelBar(frame, row, x + nameW + 8, y + 1)
 	Ui.label(frame, row.now, UDim2.fromOffset(room, 16), { Name = "Now", Position = UDim2.fromOffset(x, y + 20), TextSize = 13, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.label(frame, if row.next then `Next: {row.next}` else "Top level", UDim2.fromOffset(room, 14), { Name = "Next", Position = UDim2.fromOffset(x, y + 38), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if locked then C.dim elseif row.next then C.money else C.gold, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	-- (8.3: a locked card's next level gives nothing yet: "Locked for now", grey)
+	Ui.label(frame, if locked then "Locked for now" elseif row.next then `Next: {row.next}` else "Top level", UDim2.fromOffset(room, 14), { Name = "Next", Position = UDim2.fromOffset(x, y + 38), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if locked then C.dim elseif row.next then C.money else C.gold, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 end
 
 draw = function(keepScroll: boolean)

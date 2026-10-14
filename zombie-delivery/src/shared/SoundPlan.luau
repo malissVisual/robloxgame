@@ -380,7 +380,7 @@ local function hallOf(plot: SandboxMap.Plot, level: any): Hall
 	end
 	local known = byLevel[n]
 	if not known then
-		local site = WarehouseLayout.site(plot, n)
+		local site = WarehouseLayout.site(plot, n) or plot
 		local w = site.warehouse
 		known = { x = w.x, y = w.y, z = w.z, sx = w.sx, sz = w.sz, top = WarehouseLayout.outline(site).top }
 		byLevel[n] = known

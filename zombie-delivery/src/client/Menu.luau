@@ -72,7 +72,7 @@ local function sandboxShots(): { { Vector3 } }
 	local turn = SandboxMap.Turnaround
 	local mine = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 0]
 	local plot = mine or SandboxMap.Plots[1]
-	local w, van = WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)).warehouse, plot.vanSpot
+	local w, van = (WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)) or plot).warehouse, plot.vanSpot
 	-- (8.1: the house is the owner's Blender house's box, its roof over house.sy; 8.2.1: the big one again, 44 wide:
 	-- the two shots as far out as before 8.1)
 	local chalet = Vector3.new(house.x, house.y + house.sy * 0.8, house.z)
