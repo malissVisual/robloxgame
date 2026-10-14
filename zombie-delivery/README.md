@@ -1861,9 +1861,11 @@ van: plan several trips home to your warehouse."), and the house is laid out as 
   one. Every piece gets out by either door, and the van still parks at the curb in front, so a piece out of the back
   door goes round the house. Danny takes the nearer way he may.
 - **25 minutes** on the clock (`Config.Moving.Sandbox.Time`, was 20): the Sprinter's bed takes it home in several trips.
-- **The same house until a move brings something home** (8.4's economy): the server keeps the house's seed by your
-  user id, so GIVE UP, a move called off or leaving with nothing home gives you the same house again. The admin's
-  🏠 REFILL HOUSE gives a new one.
+- **The same house until a move brings something home** (8.4's economy): the house's seed is kept in your save
+  (`sandboxHouseSeed`, flag `sandboxHouseSeedKept`, a whole number 1 … `Config.Moving.Sandbox.Seeds`) until a trip
+  brings something home, so GIVE UP, a move called off, leaving or joining another server gives you the same house
+  again (a loaded save's seed counts over what a server remembers; no house is rolled before the save has loaded). The
+  admin's 🏠 REFILL HOUSE gives a new one.
 - Its inside is lit like every house's (`Config.SandboxLight.House`), the light budget checked on the big plans.
 
 **Tests:** `biglayout_test` (every piece out by both doors on many seeds), `bigdanny_runtime_test`,
@@ -2013,8 +2015,14 @@ on a phone. One place now decides how an action is shown on each device: `shared
   Jukebox is hot today: sell it or show it", once a market day), **upgrade** (the cheapest other upgrade the money
   buys) and **paint** ("🎨 Make your van your own", once a warehouse level is bought or with $2,000, `PaintMoney`).
   Each shows 40 s at most (`SoftSeconds`), 15 s apart (`SoftGap`), never while something covers the screen or a
-  first-time hint talks; doing it marks it done, and its ✕ dismisses that step alone for the session. Danny's steps
-  (hire him, give him pieces) are being added in the same place (the "HOOK Danny" points).
+  first-time hint talks; doing it marks it done, and its ✕ dismisses that step alone for the session. During a move,
+  three steps introduce **Danny** (`SandboxSteps.danny`, each said once): "Hire Danny to carry with you" (he is for
+  hire and your money pays him; the chevron over him), "Pick a piece to give it to Danny" (hired, his list empty, you
+  in the house) and "Heavy piece: press Lift and wait for Danny" (hired, a two-person piece's Lift within
+  `Config.SandboxGuide.HeavyNear` studs). The words are the same on every device (a gamepad adds "(L1)" / "(R1)");
+  they wait while something covers the screen and never show while you drive, carry or wait for him. On narrow
+  touch screens (667×375 … 780×360) Danny's status line moves right past the money block and the 📋 TASKS chip
+  (`MoveLayout.stripClear`) and hides while his card is open; at 844×390 and wider nothing changes.
 
 **Tests:** `sandboxpad_test`, `sandboxhints_test`, `sandboxsteps_test`, `clientboot_test`; `tools/phone-ui/keyhints.luau`,
 `carrygrip.luau`, `sandboxguide.luau`, `movehud.luau` and `sandboxpad.luau` on a phone, a computer and a gamepad;
