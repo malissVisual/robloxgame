@@ -187,7 +187,7 @@ local Moving = {}
 local remote = Net.get("Moving")
 local notice = Net.get("Notice")
 local TAG = "MovePrompt" -- client/MovingHud.luau shows a tagged prompt only to the players it is for
-local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn" } -- (7.0 grip: CarryGrip; 8.1: PairTurn)
+local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn", "CarryPair" } -- (7.0 grip: CarryGrip; 8.1: PairTurn; 8.3: CarryPair)
 
 -- The art (another branch builds it): shared/FurnitureLooks.luau (Items, build), shared/HouseLayout.luau (plan),
 -- server/HouseInterior.luau (build, slot, destroy).
@@ -1244,6 +1244,9 @@ local function setHands(s: Session, item: Item)
 		character:SetAttribute("MoveCarry", item.spot)
 		-- 8.1 carrying in two: the leader's heading turns PairTurn degrees a second at most (client/PairSteer.luau)
 		character:SetAttribute("PairTurn", if thing.helper ~= nil then Config.MoveHelper.PairTurn else nil)
+		-- 8.3 (the owner: "when I run, he just goes behind me"): two carry it, nobody runs (client/PairSteer.luau holds
+		-- the walk at CarrySpeed, the run key says Config.MoveHelper.RunHint once)
+		character:SetAttribute("CarryPair", if thing.helper ~= nil then true else nil)
 	end
 	local helper = playerById(thing.helper)
 	local helperBody = helper and helper.Character
@@ -1255,6 +1258,7 @@ local function setHands(s: Session, item: Item)
 		helperBody:SetAttribute("CarrySize", nil)
 		helperBody:SetAttribute("CarrySpeed", speed)
 		helperBody:SetAttribute("MoveCarry", item.spot)
+		helperBody:SetAttribute("CarryPair", true) -- (8.3: nobody runs)
 	end
 end
 

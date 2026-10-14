@@ -74,6 +74,13 @@ SandboxHints.found(q2, "tasks")
 check("the player found it alone while it waited (opened TASKS): not shown, seen", not SandboxHints.waiting(q2, "tasks") and SandboxHints.seen(q2, "tasks") and SandboxHints.take(q2, 500, false) == nil)
 SandboxHints.found(q2, "book")
 check("… found with no hint waiting: nothing marked", not SandboxHints.seen(q2, "book"))
+-- 8.3: busy (the guide's soft steps keep quiet meanwhile)
+local q3 = SandboxHints.new()
+check("8.3 busy: a new queue is quiet", not SandboxHints.busy(q3, 0) and not SandboxHints.busy(q3, 1e6))
+SandboxHints.offer(q3, "tasks", 10)
+check("… a hint waiting (its Delay too): busy", SandboxHints.busy(q3, 10) and SandboxHints.busy(q3, 10 + H.Delay / 2))
+check("… shown: busy for Gap s after", SandboxHints.take(q3, 10 + H.Delay, false) == "tasks" and SandboxHints.busy(q3, 10 + H.Delay + H.Gap / 2))
+check("… then quiet again", not SandboxHints.busy(q3, 10 + H.Delay + H.Gap + 0.01))
 
 -- ── The words ───────────────────────────────────────────────────────────────
 check("book, a computer: \"📖 New in your book! Press C (📖) to see it\"", SandboxHints.text("book", "keys") == "📖 New in your book! Press C (📖) to see it", SandboxHints.text("book", "keys"))
