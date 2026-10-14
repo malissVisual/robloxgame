@@ -65,6 +65,8 @@
 -- save written with its flag (sandboxOnboardingKept: AnalyticsPlan.sandboxFrom); an older real save is past every step.
 -- 8.2 SANDBOX: the daily tasks (sandboxTasks: shared/SandboxTasks.luau's save, kept by server/SandboxTasks.luau), read
 -- only from a real save written with their flag (sandboxTasksKept); older saves: none (the server starts them fresh).
+-- 8.3 SANDBOX: the market's demand (market: shared/Market.luau's save, what each kind sold today weighs on its price;
+-- kept by server/Collection.luau), read only from a real save written with its flag (marketKept); older saves: none.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -91,6 +93,7 @@ local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (
 local CollectionBookRules = require(Shared.CollectionBookRules) -- 8.2: the collection book (profile.collectionBook)
 local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
 local SandboxTaskRules = require(Shared.SandboxTasks) -- 8.2: the sandbox's daily tasks (profile.sandboxTasks)
+local Market = require(Shared.Market) -- 8.3: the market's demand (profile.market, server/Collection.luau)
 
 export type Profile = {
 	money: number,
@@ -174,6 +177,9 @@ export type Profile = {
 	-- 8.2 SANDBOX: the daily tasks (shared/SandboxTasks.luau: the day's picks and progress, the week's): read only from a
 	-- real save written with its flag (SandboxTasks.fromSave); nil until server/SandboxTasks.luau starts them
 	sandboxTasks: SandboxTaskRules.Saved?,
+	-- 8.3 SANDBOX: the market's demand (shared/Market.luau: the kinds sold today, what each weighs on its price): read only
+	-- from a real save written with its flag (Market.fromSave); an older one starts with the empty one
+	market: Market.Saved,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -277,6 +283,7 @@ local function newProfile(): Profile
 		collectionBookPaid = {}, -- 8.2: no milestone paid yet
 		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
 		sandboxTasks = nil, -- 8.2: server/SandboxTasks.luau starts them (it knows the UserId and the day)
+		market = Market.empty(), -- 8.3: nothing sold yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -611,6 +618,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
 	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
 	profile.sandboxTasks = SandboxTaskRules.fromSave(saved)
+	-- 8.3: the market's demand, checked, only from a real save written with its flag (marketKept); a save from before 8.3
+	-- (or a lock-only record) starts with the empty one (Market.fromSave)
+	profile.market = Market.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -1020,6 +1030,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
 		sandboxTasks = profile.sandboxTasks, -- 8.2
 		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
+		market = profile.market, -- 8.3
+		marketKept = true, -- 8.3: Market.Flag (applySaved reads the market's demand only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

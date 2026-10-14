@@ -18,6 +18,9 @@
 --   * toasts: a piece sold ("Sold Grandpa's Clock · +$420", client/WarehouseUi.luau's "sold") and pieces brought home
 --     ("+5 pieces in your warehouse", when a state's stock grew): Hud.toast; without client/Hud.luau a column of its own
 --     at the top left with its own toasts in the same look
+--   * 8.3: once after joining (and again when the market's day turns while you play) "🔥 Hot today: Old Globe, Jukebox,
+--     Sofa (sell ×1.6, on show ×1.25)" (shared/Market.luau hotToast, the state's market), held back while the HUD is
+--     hidden (the start screen) and told when it shows
 -- Standing in Hud's column keeps it clear of what the HUD still shows in the sandbox: the toasts flow under it, the
 -- health row (bottom left on a computer; on a touch screen the left column the column stands beside), MOUSE [ALT] and
 -- the key hints at the top right, the move's blocks at the top in the middle (tools/phone-ui/sandbox.luau checks it).
@@ -42,6 +45,7 @@ local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
 local Juice = require(script.Parent.Juice)
 local WarehouseUi = require(script.Parent.WarehouseUi)
+local Market = require(Shared.Market) -- 8.3: the market's toast
 
 local SandboxHud = {}
 
@@ -61,6 +65,8 @@ local inStock = 0
 local stockKey: Enum.KeyCode? = nil
 local arrangeQueued = false
 local toastOrder = 0
+local marketTold: number? = nil -- 8.3: the market day the "Hot today" toast was for
+local marketToast: string? = nil -- 8.3: … waiting for the HUD to show
 
 local function sandboxOn(): boolean
 	local sandbox = (Config :: any).Sandbox
@@ -387,7 +393,23 @@ function SandboxHud.setState(state: any)
 	end
 end
 
+-- 8.3: the market's toast, once the HUD shows (not on the start screen).
+local function tellMarket()
+	local text = marketToast
+	local screen = parts.gui
+	if text and screen and screen.Enabled then
+		marketToast = nil
+		SandboxHud.toast(text)
+	end
+end
+
 local function onState(state: WarehouseUi.State, previous: WarehouseUi.State?)
+	local market = state.market
+	if market and (marketTold == nil or market.day > marketTold) then
+		marketTold = market.day
+		marketToast = Market.hotToast(market)
+		tellMarket()
+	end
 	income = state.income
 	local count = 0
 	for _, entry in state.stock do
@@ -438,6 +460,7 @@ function SandboxHud.start()
 	end)
 	stockKey = if ok then key else nil
 	build(holder())
+	parts.gui:GetPropertyChangedSignal("Enabled"):Connect(tellMarket) -- (8.3: the market's toast when the HUD shows)
 	WarehouseUi.notify = SandboxHud.toast
 	if parts.bookUi then
 		parts.bookUi.notify = SandboxHud.toast -- (8.2: the collection book's toasts)

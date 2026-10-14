@@ -146,9 +146,9 @@ function SandboxTasks.rewardOf(def: Def, target: number): number
 	return math.floor(def.money * (1 + tune().TopShare * share) / 10 + 0.5) * 10
 end
 
--- Is the event's amount money ("$" in the views)?
+-- Is the event's amount money ("$" in the views)? (8.3: what the hot pieces on show earned too)
 local function unitOf(def: Def): string?
-	return if def.event == "sell" or def.event == "income" then "$" else nil
+	return if def.event == "sell" or def.event == "income" or def.event == "hotincome" then "$" else nil
 end
 
 -- ── The picks ───────────────────────────────────────────────────────────────

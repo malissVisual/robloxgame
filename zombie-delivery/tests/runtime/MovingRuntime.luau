@@ -739,6 +739,7 @@ Runtime.game = { GetService = function(_, name: string): any
 	assert(services[name], `MovingRuntime: unmocked service {name}`)
 	return services[name]
 end }
+Runtime.services = services -- (8.3: a test adds its own, e.g. a PathfindingService that records Danny's paths)
 Runtime.Players = Players
 
 -- ── The art (shaped like the art branch's interface) ───────────────────────
