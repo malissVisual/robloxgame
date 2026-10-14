@@ -68,11 +68,14 @@
 -- 8.2 SANDBOX: the daily tasks (sandboxTasks: shared/SandboxTasks.luau's save, kept by server/SandboxTasks.luau), read
 -- only from a real save written with their flag (sandboxTasksKept); older saves: none (the server starts them fresh).
 -- 8.3 SANDBOX: the moves finished (sandboxMoves: server/SandboxBadges.luau counts them for the badges, shared/
--- SandboxBadgeRules.luau), read only from a real save written with its flag (sandboxMovesKept); older saves: 0.
+-- SandboxBadgeRules.luau), read only from a real save written with its flag (sandboxMovesKept); older saves: 0. (8.4
+-- review: and in `rewards` as "mv:<n>", up to the badges' count: a save an 8.2 server wrote again gets it back from there.)
 -- 8.3 SANDBOX: the market's demand (market: shared/Market.luau's save, what each kind sold today weighs on its price;
 -- kept by server/Collection.luau), read only from a real save written with its flag (marketKept); older saves: none.
 -- 8.3 SANDBOX: the van's paint (vanPaint: { owned, worn }, shared/VanPaintRules.luau; the PAINT shop, server/VanPaint.luau),
--- read only from a real save written with its flag (vanPaintKept); older saves: nothing bought, the factory's look.
+-- read only from a real save written with its flag (vanPaintKept); older saves: nothing bought, the factory's look. (8.4
+-- review: and in `rewards` as "paint:<id>" / "paintOn:<id>": a save an 8.2 server wrote again gets it back from there; the
+-- market's demand is not kept so: it is lost there, a day's worth at most.)
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- 8.3 SAVES (Config.Saving, shared/SaveGuard.luau): a save is written (UpdateAsync) only while the stored save is still
 -- this server's session's (its lock: the JobId, the session and the save's number: never over another server's save
@@ -658,13 +661,15 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
 	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
 	profile.sandboxTasks = SandboxTaskRules.fromSave(saved)
-	-- 8.3: the moves finished (the badges), only from a real save written with their flag (sandboxMovesKept); else 0
+	-- 8.3: the moves finished (the badges), only from a real save written with their flag (sandboxMovesKept); else 0 (8.4
+	-- review: a real save without it, from the "mv:" key of its own `rewards`: an 8.2 server dropped the field)
 	profile.sandboxMoves = require(Shared.SandboxBadgeRules).movesFromSave(saved)
 	-- 8.3: the market's demand, checked, only from a real save written with its flag (marketKept); a save from before 8.3
 	-- (or a lock-only record) starts with the empty one (Market.fromSave)
 	profile.market = Market.fromSave(saved)
 	-- 8.3: the van's paint, checked, only from a real save written with its flag (vanPaintKept); a save from before 8.3
-	-- (or a lock-only record) starts with the empty one (VanPaintRules.fromSave)
+	-- (or a lock-only record) starts with the empty one (VanPaintRules.fromSave; 8.4 review: a real save without the flag,
+	-- from the "paint:" keys of its own `rewards`: an 8.2 server dropped the field)
 	profile.vanPaint = VanPaintRules.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
@@ -881,9 +886,14 @@ function PlayerData.load(player: Player)
 	if dataStore then
 		local saved: any = nil
 		ok = false
-		-- 8.3 saves: a rejoin to this server waits for its own leave save of this player (else it reads the one before)
-		local held = 0
-		while leaving[player.UserId] and player.Parent and held < Config.Saving.LeaveWait do
+		-- 8.3 saves: a rejoin to this server waits for its own leave save of this player (else it reads the one before).
+		-- 8.4 review: as long as that save runs, at most its worst case (FinalTries tries, the backoffs between them, each
+		-- UpdateAsync up to Call s) and LeaveWait s more: an outage's leave save outlasts a fixed wait
+		local held, most = 0, Config.Saving.LeaveWait + Config.Saving.FinalTries * Config.Saving.Call
+		for try = 1, Config.Saving.FinalTries - 1 do
+			most += SaveGuard.backoff(try, Config.Saving.Backoff)
+		end
+		while leaving[player.UserId] and player.Parent and held < most do
 			held += task.wait(0.25)
 		end
 		sessions[player] = `{player.UserId}-{os.time()}-{math.random(1, 2 ^ 30)}` -- 8.3: this session's (its lock)
@@ -1126,6 +1136,10 @@ function PlayerData.save(player: Player, final: boolean?): boolean
 	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
 	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
 	profile.rewards[Config.CompanyVan.Flag] = true
+	-- (8.4 review: the van's paint and the moves finished too, "paint:" / "paintOn:" and one "mv:<n>" key, the stale ones
+	-- cleared: an 8.2 server drops vanPaint and sandboxMoves with their flags; their fromSave reads these back)
+	VanPaintRules.mirror(profile.rewards, profile.vanPaint)
+	require(Shared.SandboxBadgeRules).mirror(profile.rewards, profile.sandboxMoves)
 	for id in profile.collectionBookPaid do
 		profile.rewards["book:" .. id] = true -- (8.2 review: the book's milestones paid, as the chapters done below)
 	end

@@ -115,6 +115,7 @@ do
 	check("more for a rarer piece, a hot kind, a keen kind (the collector's pay)", Visitors.offerFactor(5, false, 0, 0.5) > Visitors.offerFactor(3, false, 0, 0.5)
 		and Visitors.offerFactor(3, false, 0, 0.5) > Visitors.offerFactor(1, false, 0, 0.5) and Visitors.offerFactor(1, true, 0, 0.5) > Visitors.offerFactor(1, false, 0, 0.5)
 		and Visitors.offerFactor(1, false, 0.1, 0.5) > Visitors.offerFactor(1, false, 0, 0.5) and Visitors.offerFactor(5, true, 0.5, 0.99) == O.Top)
+	check("8.3 economy: 50 % over the market price at most (Top 1.5, was 2), never under Min", O.Top == 1.5 and O.Top >= O.Max and Visitors.offerFactor(5, true, 0.5, 0.99) == 1.5 and O.Min > 1)
 	check("the example: $230 × 1.478 = $339.94, up to $340", Visitors.offerPrice(230, 1, false, 0, (1.478 - O.Min) / (O.Max - O.Min)) == 340, Visitors.offerPrice(230, 1, false, 0, (1.478 - O.Min) / (O.Max - O.Min)))
 	check("the chance: Offer.Chance × the kind's, at most 1", Visitors.offerChance(Visitors.kind("collector") :: Visitors.Kind) == math.min(1, O.Chance * 1.6)
 		and Visitors.offerChance(Visitors.kind("tourist") :: Visitors.Kind) < Visitors.offerChance(Visitors.kind("collector") :: Visitors.Kind))

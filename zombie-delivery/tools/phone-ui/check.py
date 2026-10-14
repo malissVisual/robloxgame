@@ -32,7 +32,8 @@ panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's
 sandbox window, the notices in the device's words and the first-time hints (sandboxpad.luau on sandbox_mock.luau).
 8.3 SANDBOX: a showroom visitor's offer card (the real OfferCard: offercard.luau on sandbox_mock.luau) at 844 x 390,
 1280 x 800 and 1920 x 1080: its words, clear of the chips and the touch controls, ACCEPT / DECLINE's requests (the id
-only), the gamepad's selection on DECLINE and B, waiting under another window, the clock running out.
+only), the gamepad's selection on DECLINE and B, waiting under another window, the clock running out. 8.3 review:
+another window opening only hides it (the offer waits); smaller phones (667 x 375, 740 x 360, 780 x 360).
 8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
 keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
 words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad.
@@ -300,7 +301,8 @@ with tempfile.TemporaryDirectory() as folder:
 # pieces, the gamepad's prompts) and his status line (client/MoveHelperHud.luau with the card), beside the real
 # SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone
 # (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder; dannycard_preview.py draws
-# the same scenes).
+# the same scenes). 8.3 review: a tap beside the card is no tap in the world, the gamepad on it, its reach, the line's
+# words on every device, smaller phones (667 x 375, 740 x 360, 780 x 360).
 from dannycardenv import dannycard_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:
@@ -309,6 +311,7 @@ with tempfile.TemporaryDirectory() as folder:
 # 8.3 the showroom's visitors: a visitor's offer card (client/OfferCard.luau) beside the real SandboxHud and
 # SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/offercard.luau on a phone (844 x 390), a
 # computer (1280 x 800) and 1920 x 1080 (offercardenv.py builds the folder; offercard_preview.py draws the same scenes).
+# 8.3 review: another window opening only hides it; smaller phones (667 x 375, 740 x 360, 780 x 360).
 from offercardenv import offercard_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:

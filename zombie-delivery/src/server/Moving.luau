@@ -97,8 +97,10 @@
 --     Chalet", 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big", Config.Moving.Sandbox.Kind,
 --     its back door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the
 --     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
---     truck to door" to House.curb, out at its door; refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
---     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
+--     truck to door" to House.curb, out at its door; refilled once a move brought something home (a new HouseLayout
+--     seed: the card's own, SB.seeds, kept until then; 8.3 economy: a move called off with nothing home keeps it, no
+--     reroll). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts
+--     board
 --     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
 --     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
 --     parked at their plot's vanSpot when none is out, the sandbox's way: server/SandboxBoot.luau's parkVan, the hook
@@ -307,7 +309,9 @@ local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active; 8.0 S
 --   on        Config.Sandbox.On when Moving.start ran (false: the city's game, as it was)
 --   contract  the one house's contract (SandboxMap.House, Config.Moving.Sandbox); a move's is a copy with its seed
 --   boards    every plot's Moving contracts corkboard (server/MoveSites.luau plotBoard)
---   seeds     player → the seed of the house their card shows, kept until their move starts with it (a new one then)
+--   seeds     user id → the seed of the house their card shows, kept until a move of theirs brings something home
+--             (SB.store; a new one then). 8.3 economy: a move called off with nothing home (GIVE UP, the owner leaving)
+--             keeps it, so starting, peeking and calling off never rerolls the house; the admin's REFILL forgets it
 --   last      the last seed handed out (never twice in a row)
 --   door      the map's front door (the part with the attribute SandboxDoor), once found
 --   how       the result card's words for an end (HOW_TEXT's)
@@ -315,7 +319,7 @@ local SB = {
 	on = false,
 	contract = nil :: Contract?,
 	boards = {} :: { BasePart },
-	seeds = {} :: { [Player]: number },
+	seeds = {} :: { [number]: number },
 	last = 0,
 	door = nil :: BasePart?,
 	how = {
@@ -382,14 +386,14 @@ function SB.contractFor(player: Player): Contract?
 	if not base then
 		return nil
 	end
-	local seed = SB.seeds[player]
+	local seed = SB.seeds[player.UserId]
 	if not seed then
 		local fresh = math.random(1, 1073741823)
 		while fresh == SB.last do
 			fresh = math.random(1, 1073741823)
 		end
 		SB.last = fresh
-		SB.seeds[player] = fresh
+		SB.seeds[player.UserId] = fresh
 		seed = fresh
 	end
 	local S = T.Sandbox
@@ -400,12 +404,15 @@ function SB.contractFor(player: Player): Contract?
 	return made
 end
 
--- `player`'s card seed is spent (their move started with it) or they left: their next card shows a new house; that
--- house's plan facts go (factsOf keeps one per seed in the sandbox).
-function SB.forget(player: Player)
-	local seed = SB.seeds[player]
+-- `player`'s card seed is spent (8.3 economy: a move of theirs brought something home, SB.store; the admin's REFILL; a
+-- plan that failed): their next card shows a new house; that house's plan facts go (factsOf keeps one per seed in the
+-- sandbox). `keep` (they left): only the facts go, the seed stays theirs (by user id) for when they come back.
+function SB.forget(player: Player, keep: boolean?)
+	local seed = SB.seeds[player.UserId]
 	local house = SB.contract
-	SB.seeds[player] = nil
+	if not keep then
+		SB.seeds[player.UserId] = nil
+	end
 	if seed and house then
 		contractFacts[`{house.id}#{seed}`] = nil
 	end
@@ -3638,14 +3645,18 @@ end
 -- its seed every time and takes tens of ms): the board's card and every START of it use them (read only).
 type Facts = { plan: any, defs: { [string]: Rules.ItemDef }, spots: { Rules.Spot }, stars: { string }, count: number, estimate: number }
 
-local function factsOf(contract: Contract, a: Art): Facts?
+local function factsOf(contract: Contract, a: Art, owner: Player?): Facts?
 	local key = if SB.on then `{contract.id}#{contract.seed}` else contract.id -- (8.0 SANDBOX: a house per seed)
 	local known = contractFacts[key]
 	if known then
 		return known
 	end
+	-- 8.3 economy: a house that rolls a legendary tries the ones the owner's collection book lacks first (`owner`: the
+	-- card's player, the move's owner; their seed is theirs alone, so its facts are too)
+	local profile = if SB.on and owner then PlayerData.get(owner) else nil
+	local book = if profile then (profile :: any).collectionBook else nil
 	local ok, plan = pcall(function(): any
-		return a.layout.plan(contract.seed, contract.kind)
+		return a.layout.plan(contract.seed, contract.kind, if type(book) == "table" then book else nil)
 	end)
 	if not ok or type(plan) ~= "table" then
 		warn(`[Moving] the plan of {contract.id} failed: {plan}`)
@@ -3747,7 +3758,7 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 		say(player, "Moving is not ready in this place yet (the house art is missing).")
 		return
 	end
-	local known = factsOf(contract, a)
+	local known = factsOf(contract, a, player)
 	if not known then
 		if SB.on then
 			SB.forget(player) -- (8.0 SANDBOX: the next card tries another house)
@@ -3809,7 +3820,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	armed[owner] = nil
 	local a = artNow() :: Art
 	local slot = freeSlot() :: number
-	local known = factsOf(contract, a)
+	local known = factsOf(contract, a, owner)
 	if not known then
 		if SB.on then
 			SB.forget(owner) -- (8.0 SANDBOX: the next try plans another house)
@@ -3922,8 +3933,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	end
 	WalkIn.ways(s) -- 8.1 walk-in doors: the ways' zones and their doormats inside
 	truckPrompts(s)
-	if SB.on then -- 8.0 SANDBOX: this house is spent: the owner's next card shows a new one
-		SB.forget(owner)
+	if SB.on then -- 8.0 SANDBOX (8.3 economy: its seed stays the owner's until a trip brings something home, SB.store)
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (follow the arrow), carry the things out, load them and bring them home to your warehouse: as many trips as it takes, then FINISH.`)
 	else
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them to the Wall at the depot: as many trips as it takes, then FINISH. {Rules.counts(s.move).stars} ★ things are a must!`)
@@ -4160,6 +4170,9 @@ function SB.store(s: Session, spots: { number }): number
 		end
 	end
 	if #spots > 0 then for _, fn in SB.listeners.stored do task.spawn(fn, s.owner, s.move, spots) end end -- 8.2: Moving.onStored
+	if took > 0 then
+		SB.forget(s.owner) -- 8.3 economy: something came home: this house is spent, the owner's next card shows a new one
+	end
 	return took
 end
 
@@ -5087,7 +5100,7 @@ function Moving.start()
 		armed[player] = nil
 		traveling[player] = nil
 		WalkIn.at[player], WalkIn.held[player] = nil, nil -- (8.1 walk-in doors)
-		SB.forget(player) -- (8.0 SANDBOX: their card's house)
+		SB.forget(player, true) -- (8.0 SANDBOX: their card's house's facts; 8.3 economy: its seed kept for their return)
 	end)
 	-- a new body is never inside (a death inside respawns you at the depot)
 	local function onPlayer(player: Player)

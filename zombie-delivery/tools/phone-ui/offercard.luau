@@ -7,9 +7,13 @@
 -- $260 · +31%", "⏳ 30 s", a 🔥 for a hot kind); on the screen, clear of the HUD's chips and groups, the move's panel,
 -- the touch buttons, the thumbstick and the jump button; ACCEPT and DECLINE a finger's size on a phone, their words
 -- fitting; ACCEPT sends { kind = "accept", id } once (a second tap nothing) and closes it, DECLINE { kind = "decline", id };
--- the gamepad: the selection on DECLINE, kept inside the card, B declines; closing it (ESC, another window opening) is a
--- DECLINE; covered by another window it waits and opens when that one closes; the clock counts down and runs out (the
--- card goes, nothing sent); the server's closed message closes it; junk ignored; a resize while open; no warnings.
+-- 8.3 review: the first-time hints (client/SandboxHintsUi.luau) and the guide's soft steps wait while it is open;
+-- the gamepad: the selection on DECLINE, kept inside the card, B declines; closing it (ESC) is a DECLINE; 8.3 review:
+-- another window opening only hides it (OfferCard.hide: nothing sent, the offer waits, the card back once nothing
+-- covers the screen; its clock and the server's closed message still end it hidden); covered by another window it
+-- waits and opens when that one closes; the clock counts down and runs out (the card goes, nothing sent); the server's
+-- closed message closes it; junk ignored; 8.3 review: smaller phones (667 × 375, 740 × 360, 780 × 360: the card smaller,
+-- its buttons still a finger's size, clear of the chips and the touch controls); a resize while open; no warnings.
 -- `luau offercard.luau -a dump` prints the preview's scenes as JSON instead (offercard_preview.py).
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
@@ -322,6 +326,11 @@ check("… \"🤝 OFFER\", \"The collector offers\", \"$340\", \"for your Gramop
 	and named(card, "Item").Text == "for your Gramophone" and named(card, "Market").Text == "Market price $260 · +31%" and named(card, "Time").Text == "⏳ 30 s",
 	named(card, "Market").Text)
 check("… DECLINE and ✓ ACCEPT", named(card, "Decline").Text == "DECLINE" and named(card, "Accept").Text == "✓ ACCEPT")
+-- 8.3 review: the first-time hints (client/SandboxHintsUi.luau, started by the real SandboxHud) and through them the
+-- guide's soft steps (client/SandboxGuide.luau asks isCovered and window) wait while the card is open
+local HintsUi = require("./SandboxHintsUi")
+check("8.3 review: the card open covers the screen for the first-time hints and the guide's soft steps (SandboxHintsUi: isCovered, window \"OfferCard\")",
+	HintsUi.isCovered() and HintsUi.window() == "OfferCard", HintsUi.window())
 cardChecks("844 x 390")
 scene("offer-phone")
 -- the clock
@@ -336,6 +345,7 @@ press(named(card, "Accept"))
 local sent = sentOn("Visitors")
 check("ACCEPT: { kind = \"accept\", id } once (the second tap nothing), only the id (the server has the price), the card closes", #sent == before + 1 and sent[#sent][1].kind == "accept"
 	and sent[#sent][1].id == "o1" and sent[#sent][1].price == nil and not OfferCard.isOpen() and not card.Visible)
+check("… the hints no longer held back by it", HintsUi.window() == nil and not HintsUi.isCovered(), HintsUi.window())
 -- DECLINE
 offer("o2")
 press(named(card, "Decline"))
@@ -349,7 +359,7 @@ scene("offer-phone-hot")
 -- the gamepad
 OfferCard.close()
 sent = sentOn("Visitors")
-check("closing it (ESC, another window opening) is a DECLINE", sent[#sent][1].kind == "decline" and sent[#sent][1].id == "o3" and not OfferCard.isOpen())
+check("closing it (ESC, the Roblox menu: client/Main.client.luau while Hud.escaping) is a DECLINE", sent[#sent][1].kind == "decline" and sent[#sent][1].id == "o3" and not OfferCard.isOpen())
 offer("o4")
 check("the gamepad: the selection on DECLINE (an A by habit never sells), kept inside the card", M.focus == named(card, "Decline") and card.SelectionGroup == true
 	and card.SelectionBehaviorUp.Name == "Stop" and card.SelectionBehaviorDown.Name == "Stop" and card.SelectionBehaviorLeft.Name == "Stop" and card.SelectionBehaviorRight.Name == "Stop")
@@ -380,6 +390,43 @@ covered = false
 M.resume()
 check("… that window closed: the card opens with the time left (\"⏳ 25 s\")", OfferCard.isOpen() and named(card, "Time").Text == "⏳ 25 s" and opened == opens + 1, named(card, "Time").Text)
 OfferCard.close()
+-- 8.3 review: another window opening over it (STOCK, the BOOK to compare prices: Main's Hud.onCloseWindows, no escape)
+-- only hides it
+before = #sentOn("Visitors")
+offer("o11")
+covered = true
+OfferCard.hide()
+check("8.3 review: another window opening (OfferCard.hide) only hides it: nothing sent, the offer still waiting", not OfferCard.isOpen() and not card.Visible
+	and #sentOn("Visitors") == before and OfferCard.pending() ~= nil and OfferCard.pending().id == "o11")
+M.now += 4
+M.resume()
+check("… hidden while that window is open, its clock running", not OfferCard.isOpen() and OfferCard.pending() ~= nil)
+covered = false
+M.resume()
+check("… that window closed: the same offer again, with the time left (\"⏳ 26 s\")", OfferCard.isOpen() and named(card, "Time").Text == "⏳ 26 s"
+	and #sentOn("Visitors") == before and M.focus == named(card, "Decline"), named(card, "Time").Text)
+press(named(card, "Accept"))
+sent = sentOn("Visitors")
+check("… and ACCEPT still answers it", #sent == before + 1 and sent[#sent][1].kind == "accept" and sent[#sent][1].id == "o11")
+offer("o12")
+covered = true
+OfferCard.hide()
+M.now += 31
+M.resume()
+check("… hidden, its clock runs out: gone, nothing sent, not shown again", not OfferCard.isOpen() and OfferCard.pending() == nil and #sentOn("Visitors") == before + 1)
+covered = false
+M.resume()
+check("… (nothing comes back once the screen is free)", not OfferCard.isOpen())
+offer("o13")
+covered = true
+OfferCard.hide()
+remote.OnClientEvent:Fire({ kind = "closed", id = "o13", how = "expired" })
+covered = false
+M.resume()
+check("… hidden, the server's timeout (closed, expired): gone, nothing sent, never shown again", not OfferCard.isOpen() and OfferCard.pending() == nil
+	and #sentOn("Visitors") == before + 1)
+OfferCard.hide()
+check("… hide with nothing open: nothing", not OfferCard.isOpen() and #sentOn("Visitors") == before + 1)
 -- junk
 for _, junk in { "offer", { kind = "offer" }, { kind = "offer", id = 5, name = "X", item = "x", price = 5, base = 4, who = "W", seconds = 30 }, { kind = "offer", id = "j", name = "X", item = "x", price = -5, base = 4, who = "W", seconds = 30 } } do
 	remote.OnClientEvent:Fire(junk)
@@ -391,7 +438,27 @@ check("junk on the remote: no card", not OfferCard.isOpen() and OfferCard.pendin
 screen(true, 844, 354, true)
 offer("o8")
 cardChecks("844 x 390, a move's panel at the top")
+check("844 x 390: the card at its full touch size (scale 1: nothing to shrink for)", OfferCard.card():FindFirstChild("Scale").Scale == 1)
 OfferCard.close()
+
+-- 8.3 review: smaller phones (667 × 375: 667 × 339 under Roblox's top bar, where the card lay on the 📋 TASKS chip;
+-- 740 × 360, 780 × 360): it shrinks until a place is clear, its buttons still a finger's size
+for _, size in { { 667, 339 }, { 740, 324 }, { 780, 324 } } do
+	for _, move in { false, true } do
+		screen(true, size[1], size[2], move)
+		offer(`s{size[1]}{if move then "m" else ""}`)
+		local label = `{size[1]} x {size[2] + 36}{if move then ", a move's panel at the top" else ""}`
+		cardChecks(label)
+		local scale = OfferCard.card():FindFirstChild("Scale").Scale
+		check(`{label}: … smaller than its full touch size only as needed (scale {string.format("%.2f", scale)}), its buttons Ui.MinTouch tall`, scale <= 1 and scale >= 0.55
+			and box(named(OfferCard.card(), "Decline")).y1 - box(named(OfferCard.card(), "Decline")).y0 >= 44 - 0.01)
+		if size[1] == 667 and not move then
+			check(`{label}: … smaller there (the room under the TASKS chip)`, scale < 1, scale)
+			scene("offer-phone-small")
+		end
+		OfferCard.close()
+	end
+end
 screen(true, 844, 354, false)
 
 -- ── A computer (1280 × 800) and a big screen (1920 × 1080) ─────────────────

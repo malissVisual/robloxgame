@@ -63,7 +63,7 @@ for _, id in Rules.Order do
 end
 check("each: a name, an icon, a top level, a step (the warehouse: its levels) and one price a level", shapeOk)
 check("the prices: whole dollars, each level dearer than the one before", rising)
-check(`everything bought costs $84,250 (Config's tuning: $35,750 + the warehouse's $48,500; {Rules.money(total)})`, total == 84250, total)
+check(`everything bought costs $210,000 (8.3 economy, Config's tuning: $161,500 + the warehouse's $48,500; {Rules.money(total)})`, total == 210000, total)
 local warehouse, lights, engine, danny = Rules.def("warehouse"), Rules.def("lights"), Rules.def("engine"), Rules.def("danny")
 check("the Warehouse: levels 1 → 5 (its start 1: the garage), More stands gone into it", warehouse ~= nil and warehouse.start == 1 and warehouse.max == 5 and warehouse.name == "Warehouse"
 	and Rules.def("stands") == nil)
@@ -79,9 +79,10 @@ check("a level: 0 … its top, junk 0 (the warehouse's: its start 1 … 5, junk 
 	and Rules.level(nil, "engine") == 0 and Rules.level({ engine = 2 }, "nope") == 0
 	and Rules.level({ warehouse = 3 }, "warehouse") == 3 and Rules.level({ warehouse = 9 }, "warehouse") == 5 and Rules.level({ warehouse = -2 }, "warehouse") == 1
 	and Rules.level({ warehouse = 0 / 0 }, "warehouse") == 1 and Rules.level(nil, "warehouse") == 1 and Rules.warehouseLevel({ warehouse = 4.5 }) == 4)
-check("the next level's price: level 0 → the first, the top → none (the warehouse at 1 → level 2's $1,500)", Rules.price("engine", 0) == engine.prices[1] and Rules.price("engine", 2) == engine.prices[3]
+local L = Config.WarehouseLevels.List
+check(`the next level's price: level 0 → the first, the top → none (the warehouse at 1 → level 2's {Rules.money(L[2].price)})`, Rules.price("engine", 0) == engine.prices[1] and Rules.price("engine", 2) == engine.prices[3]
 	and Rules.price("engine", 3) == nil and Rules.price("engine", 99) == nil and Rules.price("lights", 4) == lights.prices[5] and Rules.price("nope", 0) == nil
-	and Rules.price("warehouse", 1) == 1500 and Rules.price("warehouse", 4) == 30000 and Rules.price("warehouse", 5) == nil and Rules.price("warehouse", -3) == 1500)
+	and Rules.price("warehouse", 1) == L[2].price and Rules.price("warehouse", 4) == L[5].price and Rules.price("warehouse", 5) == nil and Rules.price("warehouse", -3) == L[2].price)
 check("… a silly level asked: clamped (negative: the first, NaN: the first)", Rules.price("engine", -5) == engine.prices[1] and Rules.price("engine", 0 / 0) == engine.prices[1] and Rules.price("engine", 1.9) == engine.prices[2])
 
 -- ── The effects ─────────────────────────────────────────────────────────────
@@ -108,14 +109,20 @@ check("money: $0, $750, $1,500, $54,250, junk $0", Rules.money(0) == "$0" and Ru
 
 -- ── The window's cards ──────────────────────────────────────────────────────
 local rows = Rules.rows({ warehouse = 2, lights = 5 }, 2000)
+local level3, enginePrice = Config.WarehouseLevels.List[3].price, Config.SandboxUpgrades.List.engine.prices[1]
 check("the cards in order, each with its level and top", #rows == 4 and rows[1].id == "warehouse" and rows[2].id == "lights" and rows[3].id == "engine" and rows[4].id == "danny"
 	and rows[1].level == 2 and rows[1].max == 5 and rows[2].level == 5 and rows[3].level == 0)
-check("the Warehouse at 2 with $2,000: now Level 2 · Workshop, next Level 3 with its size and stands, $5,000, $3,000 short", rows[1].now == "Level 2 · Workshop · 4 stands"
-	and rows[1].next == "Level 3 · Warehouse · 58×42 · 8 stands" and rows[1].price == 5000 and rows[1].can == false and rows[1].short == 3000, rows[1].next)
-check("… a new player's garage (none bought): level 1, next the Workshop for $1,500", Rules.rows({}, 1500)[1].level == 1 and Rules.rows({}, 1500)[1].can == true
+check(`the Warehouse at 2 with $2,000: now Level 2 · Workshop, next Level 3 with its size and stands, {Rules.money(level3)}, {Rules.money(level3 - 2000)} short`, rows[1].now == "Level 2 · Workshop · 4 stands"
+	and rows[1].next == "Level 3 · Warehouse · 58×42 · 8 stands" and rows[1].price == level3 and rows[1].can == false and rows[1].short == level3 - 2000, rows[1].next)
+local level2 = Config.WarehouseLevels.List[2].price
+check(`… a new player's garage (none bought): level 1, next the Workshop for {Rules.money(level2)}`, Rules.rows({}, level2)[1].level == 1 and Rules.rows({}, level2)[1].can == true
+	and Rules.rows({}, level2 - 1)[1].can == false
 	and Rules.rows({}, 0)[1].next == "Level 2 · Workshop · 40×30 · 4 stands" and Rules.rows({ warehouse = 5 }, 0)[1].next == nil)
 check("the lights at the top: no next, no price, nothing to buy", rows[2].next == nil and rows[2].price == nil and rows[2].can == false and rows[2].short == 0 and rows[2].now == "Income ×1.61")
-check("the engine at 0 with $2,000: next +5 %, $600, the money buys it", rows[3].next == "Top speed +5%" and rows[3].price == 600 and rows[3].can == true and rows[3].short == 0)
+check(`the engine at 0 with $2,000: next +5 %, {Rules.money(enginePrice)}, the money buys it`, rows[3].next == "Top speed +5%" and rows[3].price == enginePrice and enginePrice <= 2000
+	and rows[3].can == true and rows[3].short == 0)
+check("8.3 economy: the first level of each upgrade $1,500, the tops $75,000 (lights), $15,000 (engine), $12,000 (Danny)", lights.prices[1] == 1500 and engine.prices[1] == 1500
+	and danny.prices[1] == 1500 and lights.prices[5] == 75000 and engine.prices[3] == 15000 and danny.prices[3] == 12000)
 check("no money (nil, NaN): nothing can be bought", not Rules.rows({}, nil)[1].can and not Rules.rows({}, 0 / 0)[4].can)
 
 -- ── The save ────────────────────────────────────────────────────────────────

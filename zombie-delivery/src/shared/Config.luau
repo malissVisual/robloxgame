@@ -6514,12 +6514,13 @@ Config.Furniture = {
 	-- rarity) a house (HouseLayout.plan(seed, "house")) holds besides its Spots, after them and on their own dice (the
 	-- seed + Salt), so the house's own pieces and its ★ stay as they were; never ★ themselves:
 	--   Count       how many (at least, at most)
-	--   Legendary   the chance a house holds a legendary one (one at most: about one house in eight)
+	--   Legendary   the chance a house holds a legendary one (one at most; 8.3 economy: one house in 25, the big one's
+	--               one in 17: a legendary is a find)
 	--   Odds        the others' rarities, by weight (a piece that finds no place gives way to one of the rarity below)
 	Collectibles = {
-		Count = { 2, 4 } :: { number },
-		Legendary = 0.125,
-		Odds = { uncommon = 60, rare = 30, epic = 10 } :: { [string]: number },
+		Count = { 1, 2 } :: { number },
+		Legendary = 0.04,
+		Odds = { uncommon = 70, rare = 25, epic = 5 } :: { [string]: number },
 		Salt = 8017,
 	},
 	-- 8.3 the big house (the sandbox's one house, the owner's big Blender house: HouseLayout.plan(seed, "big"), one big
@@ -6537,7 +6538,7 @@ Config.Furniture = {
 		BackDoor = 6,
 		Spots = { 34, 40 } :: { number },
 		Stars = 4,
-		Collectibles = { Count = { 4, 6 } :: { number }, Legendary = 0.25 },
+		Collectibles = { Count = { 2, 3 } :: { number }, Legendary = 0.06 },
 		InteriorMaxParts = 1100,
 	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
@@ -6716,11 +6717,11 @@ Config.MoveStory = {
 --   Hire               the hire, for one move, paid by the crew player who hires him (PlayerData.spend, the analytics
 --                      reason HelperHire): Base + PerPiece × the house's pieces (the bigger the house, the more he
 --                      saves you), to Round dollars, Min … Max. The tuning: the sandbox starts you with $500 and a
---                      first haul on show earns about $100 a minute, so the Old Chalet's 20-28 pieces ($150-$190) are a
---                      real choice on the first move and two minutes of the warehouse's income later; a bigger house
---                      (the Alpine Lodge's 40 or so: about $250) costs more, Max at most. Danny's training
---                      (Config.SandboxUpgrades danny) makes him faster, not cheaper. No refund: a hire lasts the move
---                      (CLEAR QUEUE stops him working; nothing more is charged)
+--                      first haul on show earns about $40 – 50 a minute (8.3 economy), so the Old Chalet's big house
+--                      (36 – 43 pieces: $230 – 270) is a real choice on the first move and five or six minutes of
+--                      the warehouse's income later; a smaller house (20 or so pieces: about $150) costs less, Max at
+--                      most. Danny's training (Config.SandboxUpgrades danny) makes him faster, not cheaper. No
+--                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
 --   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
 --                      the order they were clicked, the rest is yours
 --   RideReach          studs from the van's passenger door he gets in (your seat at its wheel: he walks there at the
@@ -6729,7 +6730,9 @@ Config.MoveStory = {
 --   SeatYield / SeatAside   8.3 review: a crew mate's Ride along at the door of the seat he sits in: he gets out for
 --                      them (Vehicles.yieldSeat), SeatAside studs past where he gets out otherwise (out of their way),
 --                      and takes no seat for SeatYield s (their boarding reserves it meanwhile)
---   CardReach / ClickReach / TapSlop   the client's: his card closes when you are CardReach studs from him; a click or
+--   CardReach / ClickReach / TapSlop   the client's: his card closes when you are CardReach studs from him (8.3 review:
+--                      at least ClickReach, or a click on him from afar opens a card that shuts at once), or CardSlack
+--                      studs farther than you were as it opened (the status line opens it from anywhere); a click or
 --                      tap reaches him (or a piece: the server checks ClickReach + 10 studs) from ClickReach studs,
 --                      TapSlop studs beside his body counts
 Config.MoveHelper = {
@@ -6810,7 +6813,8 @@ Config.MoveHelper = {
 	RideReach = 3,
 	SeatYield = 2, -- 8.3 review
 	SeatAside = 2.5,
-	CardReach = 40,
+	CardReach = 90,
+	CardSlack = 20,
 	ClickReach = 90,
 	TapSlop = 2.5,
 }
@@ -7001,32 +7005,44 @@ Config.Sandbox = {
 -- is its furniture's value (shared/FurnitureLooks.luau Items: the moves' `value`) × its condition (0 … 1).
 --   Tiers      the rarities by id: name, colour (RGB), rank (1 common … 5 legendary), min (a piece without a `rarity`
 --              of its own is the rarest tier whose min its value reaches), income (× the worth a minute on show) and
---              sell (× the worth when sold: about ten minutes of showing it)
+--              sell (× the worth when sold: about a quarter of an hour of showing it, 13 – 17 minutes)
 --   Order      the tiers' ids, common first
 --   BrokenAt   a condition at or under it is broken (the moves' own, Config.Moving.Damage.BrokenAt): it earns nothing
 --              on show and sells for scrap, Scrap × its value (at least $1)
---   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why)
+--   MaxStock   the pieces one player owns at most (Collection.add refuses more and says why); 8.4 review: also the most
+--              uids a SELL… request may list (server/Collection.luau: a longer list is refused)
 --   Stands     8.3: no longer read (the stands are the warehouse level's: Config.WarehouseLevels, CollectionRules.standsFor)
 --   Tick       s between two payouts of the stands' income (exact: the fractions carry over to the next one)
--- The tuning: a house's haul (HouseLayout's 40 first seeds: 18 – 24 pieces worth $4,800 – 7,800) at 90 % condition,
--- its best 12 on the 12 stands, earns $88 – 140 a minute (median $100); selling all of it pays $850 – 1,470, 9.6 –
--- 10.9 minutes of that (tests/collection_test.luau checks a sample haul). A legendary piece (none in a house by
--- itself: the collectibles' own `rarity`) earns 4 % of its value a minute: one at $1,500 out-earns a haul's best three.
+--   IdleAfter  8.3 economy (AFK): s without activity after which the stands pay only IdleShare (0 … 1) of their income
+--              (server/Collection.luau; the HUD's income line says "+$X/min · idle"). Activity is what the server sees:
+--              the character's root moved IdleMove studs or more between two payouts (walking, a van driven), or a call
+--              of one of IdleRemotes (not a bare "state" ask: the clients send those by themselves)
+-- The tuning (8.3 economy, the owner: "much longer: you must save up, or have more luck to find a rare piece"), the
+-- hauls of HouseLayout's 200 first seeds at 90 % condition: the sandbox's big house (kind "big", 36 – 43 pieces worth
+-- $10,200 – 21,300, median $13,400) on 12 stands earns $39 – 150 a minute (median $53), all of it sold pays $920 –
+-- 2,640 (median $1,260); a house ("house": 19 – 26 pieces worth $5,700 – 14,000) $28 – 125 a minute (median $37), sold
+-- $510 – 1,900. A piece sells for 13 – 17 minutes of showing it (tests/collection_test.luau checks a sample haul).
+-- Ordinary furniture is common, uncommon or rare (the piano, $1,200, is rare); epic and legendary are the collectibles'
+-- own `rarity`. A legendary ($5,500 – 7,000) earns 1.5 % of its value a minute: $80 – 105, a whole haul's best 12.
 export type CollectionTier = { name: string, rank: number, color: { number }, min: number, income: number, sell: number }
 Config.Collection = {
 	Tiers = {
-		common = { name = "Common", rank = 1, color = { 178, 182, 188 }, min = 0, income = 0.015, sell = 0.14 },
-		uncommon = { name = "Uncommon", rank = 2, color = { 92, 196, 104 }, min = 100, income = 0.018, sell = 0.17 },
-		rare = { name = "Rare", rank = 3, color = { 70, 144, 240 }, min = 300, income = 0.022, sell = 0.2 },
-		epic = { name = "Epic", rank = 4, color = { 178, 96, 236 }, min = 600, income = 0.026, sell = 0.24 },
-		legendary = { name = "Legendary", rank = 5, color = { 255, 178, 36 }, min = 1500, income = 0.04, sell = 0.4 },
+		common = { name = "Common", rank = 1, color = { 178, 182, 188 }, min = 0, income = 0.005, sell = 0.08 },
+		uncommon = { name = "Uncommon", rank = 2, color = { 92, 196, 104 }, min = 100, income = 0.006, sell = 0.1 },
+		rare = { name = "Rare", rank = 3, color = { 70, 144, 240 }, min = 800, income = 0.008, sell = 0.12 },
+		epic = { name = "Epic", rank = 4, color = { 178, 96, 236 }, min = 1500, income = 0.01, sell = 0.15 },
+		legendary = { name = "Legendary", rank = 5, color = { 255, 178, 36 }, min = 3000, income = 0.015, sell = 0.2 },
 	} :: { [string]: CollectionTier },
 	Order = { "common", "uncommon", "rare", "epic", "legendary" } :: { string },
 	BrokenAt = Config.Moving.Damage.BrokenAt,
-	Scrap = 0.03,
+	Scrap = 0.015, -- (8.3 economy: under a whole piece's worst price, common's 8 % × 0.21)
 	MaxStock = 300,
 	Stands = 12,
 	Tick = 10,
+	IdleAfter = 600, -- 8.3 economy: the stands of a player idle this long earn only IdleShare of their income
+	IdleShare = 0.25,
+	IdleMove = 4,
+	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint" } :: { string },
 }
 
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
@@ -7079,7 +7095,7 @@ Config.SandboxGuide = {
 	Gap = 6,
 	SoftSeconds = 40, -- 8.3: the soft steps
 	SoftGap = 15,
-	PaintMoney = 1000,
+	PaintMoney = 2000,
 }
 
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (shared/WarehouseLayout.luau
@@ -7161,7 +7177,7 @@ Config.SandboxHud = {
 	MaxViews = 12,
 	MaxModels = 24,
 	Models = true,
-	Fallback = { Rarity = { 120, 260, 520, 1000 } :: { number }, Sell = { 0.5, 1 } :: { number }, IncomeShare = 0.02 },
+	Fallback = { Rarity = { 100, 800, 1500, 3000 } :: { number }, Sell = { 0.5, 1 } :: { number }, IncomeShare = 0.008 },
 }
 
 -- 8.0 SANDBOX: the ZDC Sprinter (Config.Cars sprinter, Config.Sandbox.Van), a high-roof panel van you walk into. Its
@@ -7221,9 +7237,9 @@ Config.Sprinter = {
 -- place of 8.1's More stands (12 → 20, small stands): level 5 holds its 20 stands, all of them big.
 -- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
 -- are one size; the engine is the safe van upgrade.)
--- The tuning: a first haul on show earns about $100 a minute on 12 stands (Config.Collection), so the first level of
--- each comes after a few minutes of play, the last ones after hours; everything here costs $35,750, the warehouse's
--- levels $48,500 more.
+-- The tuning (8.3 economy: saving up): a first haul on show earns about $40 – 50 a minute on 12 stands
+-- (Config.Collection) and a move takes about 20 minutes, so the first level of each comes after a move or two, the top
+-- ones after 10 – 15 hours of play; everything here costs $161,500 (the warehouse's levels besides: their own list).
 --   Order          the cards' order in the window ("warehouse": Config.WarehouseLevels, shared/WarehouseLevels.luau)
 --   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
 --   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
@@ -7231,9 +7247,9 @@ export type SandboxUpgradeDef = { name: string, icon: string, max: number, step:
 Config.SandboxUpgrades = {
 	Order = { "warehouse", "lights", "engine", "danny" } :: { string },
 	List = {
-		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 750, 1500, 3000, 6000, 12000 } },
-		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 600, 1800, 4500 } },
-		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 600, 1500, 3500 } },
+		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 } },
+		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 } },
+		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 1500, 4000, 12000 } },
 	} :: { [string]: SandboxUpgradeDef },
 	Flag = "sandboxUpgradesKept",
 	Danny = "DannyTraining",
@@ -7249,6 +7265,10 @@ Config.SandboxUpgrades = {
 --   Milestones   in the book's order: id, name, kind ("found": `need` pieces found; "furniture": every ordinary piece;
 --                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
 --                by the server, "BookMilestone")
+--   Retired      8.4 review: a milestone's id an older server knows with another meaning → the milestone that took its
+--                place ("collectibles": 8.2's $2,500 for its 12 collectibles; "collectibles24": the 24 now, $10,000). Paid
+--                there, it stays paid in the save (an older server never pays it again) but is never paid or shown here;
+--                paying the one that took its place marks it paid too (its pieces are in it)
 --   Key          the key that opens and closes the book (a computer)
 --   Pad          8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's →; shared/SandboxPad.luau)
 --   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
@@ -7266,10 +7286,11 @@ Config.CollectionBook = {
 	Milestones = {
 		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
 		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
-		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
-		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 5000 }, -- (8.3: 24 collectibles now, was $2,500 for 12)
-		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
+		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 2000 },
+		{ id = "collectibles24", name = "Found every collectible", kind = "collectibles", reward = 10000 }, -- (8.3: 24 collectibles now, was $2,500 for 12; 8.3 economy: $10,000; 8.4 review: so a new id, Retired)
+		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 1500 },
 	} :: { BookMilestone },
+	Retired = { collectibles = "collectibles24" } :: { [string]: string }, -- 8.4 review
 	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
 	Pad = "DPadRight", -- 8.3: the gamepad's way to the book (shared/SandboxPad.luau)
 	Flag = "collectionBookKept",
@@ -7322,8 +7343,8 @@ Config.CollectionBook = {
 --              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
 --              Danny holds the other end of your piece (only while a danny task is open)
 --   Flag       the save's mark: profile.sandboxTasks is read only from a real save written with it
--- The tuning: a first haul on show earns about $100 a minute (Config.Collection); the three dailies and the bonus pay
--- $1,150 – 1,400 (about a quarter of an hour on show), the weekly $2,000 – 4,500.
+-- The tuning (8.3 economy): a first haul on show earns about $40 – 50 a minute (Config.Collection); the three dailies
+-- and the bonus pay $660 – 950 (a quarter of an hour on show or so), the weekly $1,200 – 3,000.
 export type SandboxTaskDef = {
 	id: string,
 	event: string,
@@ -7339,7 +7360,7 @@ export type SandboxTaskDef = {
 }
 Config.SandboxTasks = {
 	Daily = 3,
-	AllDaily = 500,
+	AllDaily = 300,
 	TopShare = 0.5,
 	RareRank = 3,
 	Key = "J",
@@ -7350,27 +7371,27 @@ Config.SandboxTasks = {
 	DannyEvery = 1,
 	Flag = "sandboxTasksKept",
 	DailyPool = {
-		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 200 },
-		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 3, 5 }, money = 250 },
-		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 300 },
-		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 250 },
-		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 200 },
-		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 200 },
-		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 250 },
-		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 250 },
-		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 200 },
+		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 120 },
+		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 1, 2 }, money = 150 },
+		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 200 },
+		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 150 },
+		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 120 },
+		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 120 },
+		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 150 },
+		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 150 },
+		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 120 },
 		-- 8.3, the market (Config.Market): one of these a day at most
-		{ id = "hotsell", group = "market", event = "hotsell", icon = "🔥", text = "Sell {n} hot items", one = "Sell a hot item", target = { 1, 2 }, money = 250 },
-		{ id = "hotincome", group = "market", event = "hotincome", icon = "🔥", text = "Earn ${n} from hot items on show", target = { 100, 250 }, step = 50, money = 250 },
-		{ id = "offer", event = "offer", icon = "🤝", text = "Accept {n} offers from visitors", one = "Accept an offer from a visitor", target = { 1, 1 }, money = 250 }, -- 8.3: Config.Visitors
+		{ id = "hotsell", group = "market", event = "hotsell", icon = "🔥", text = "Sell {n} hot items", one = "Sell a hot item", target = { 1, 2 }, money = 150 },
+		{ id = "hotincome", group = "market", event = "hotincome", icon = "🔥", text = "Earn ${n} from hot items on show", target = { 100, 250 }, step = 50, money = 150 },
+		{ id = "offer", event = "offer", icon = "🤝", text = "Accept {n} offers from visitors", one = "Accept an offer from a visitor", target = { 1, 1 }, money = 150 }, -- 8.3: Config.Visitors
 	} :: { SandboxTaskDef },
 	WeeklyPool = {
-		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
-		{ id = "w_rare", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", target = { 20, 30 }, step = 5, money = 2500 },
-		{ id = "w_moves", event = "moves", icon = "🏠", text = "Finish {n} moves", target = { 5, 8 }, money = 2500 },
-		{ id = "w_clean", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", target = { 3, 5 }, money = 3000 },
-		{ id = "w_income", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 4000, 6000 }, step = 500, money = 2500 },
-		{ id = "w_sell", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 2000, 3000 }, step = 250, money = 2000 },
+		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 1500 },
+		{ id = "w_rare", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", target = { 10, 20 }, step = 5, money = 1500 },
+		{ id = "w_moves", event = "moves", icon = "🏠", text = "Finish {n} moves", target = { 5, 8 }, money = 1500 },
+		{ id = "w_clean", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", target = { 3, 5 }, money = 2000 },
+		{ id = "w_income", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 4000, 6000 }, step = 500, money = 1500 },
+		{ id = "w_sell", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 2000, 3000 }, step = 250, money = 1200 },
 	} :: { SandboxTaskDef },
 }
 
@@ -7492,15 +7513,16 @@ Config.WarehouseLevels = {
 --                     sale's pieces one after the other)
 --   Recover           s for one piece's Drop to come back; at 00:00 UTC all of it comes back
 --   Salt              the picks' dice (a new salt: other days)
--- The tuning: a piece sells for about ten minutes of showing it (Config.Collection), so a hot one sells for about 16 and
--- earns a quarter more while it stays; a cold one is better kept on show until tomorrow; selling eight radios at once
--- pays the last few 40 % less, and 20 minutes later the next sells 5 % dearer again.
+-- The tuning (8.3 economy): a piece sells for about a quarter of an hour of showing it (Config.Collection), so a hot
+-- one sells for about 21 minutes' worth and earns a fifth more while it stays; a cold one is better kept on show until
+-- tomorrow; selling eight radios at once pays the last few 40 % less, and 20 minutes later the next sells 5 % dearer
+-- again.
 Config.Market = {
 	Hot = 3,
 	HotCollectibles = 1,
 	Cold = 1,
-	HotSell = 1.6,
-	HotIncome = 1.25,
+	HotSell = 1.4,
+	HotIncome = 1.2,
 	ColdSell = 0.7,
 	MinValue = 100,
 	Drop = 0.05,
@@ -7543,9 +7565,10 @@ Config.Market = {
 --               pay, Top at most, rounded up to $5 (from $100) or $10 (from $1,000)
 --   Kinds       who comes: id, title (the name tag's line and the toast's "The collector"), weight (how often), chance
 --               (× Offer.Chance), pay (+ the offer's ×), names, look (shared/NpcLooks.luau's fields over a townsperson's)
--- The tuning: a piece sells for about ten minutes of showing it (Config.Collection); an offer pays 10 – 50 % more (a
--- legendary up to 70 %, a collector's 10 % more again), so accepting one is worth it when another piece waits for the
--- stand. At the warehouse a group comes about every minute and an offer about every two (Every s apart at least).
+-- The tuning (8.3 economy): a piece sells for about a quarter of an hour of showing it (Config.Collection); an offer
+-- pays 10 – 50 % more (Top: a rarer piece's, a hot one's and a collector's offers are nearer the top, never over it),
+-- so accepting one is worth it when another piece waits for the stand. At the warehouse a group comes about every
+-- minute and an offer about every two (Every s apart at least).
 export type VisitorKind = { id: string, title: string, weight: number, chance: number, pay: number, names: { string }, look: { [string]: any } }
 Config.Visitors = {
 	On = true,
@@ -7583,7 +7606,7 @@ Config.Visitors = {
 		Max = 1.5,
 		Rare = 0.05,
 		Hot = 0.1,
-		Top = 2,
+		Top = 1.5,
 	},
 	Kinds = {
 		{ id = "tourist", title = "Tourist", weight = 4, chance = 0.6, pay = 0, names = { "Greta", "Hans", "Yuki", "Pierre", "Lena", "Marco" },
@@ -7627,8 +7650,9 @@ Config.Visitors = {
 --              swatch's narrowest (TileTouch on a touch screen) and TileHeight its height; the 3D picture's camera: Yaw
 --              (degrees from the front toward the right: below 0 the driver's side), Pitch (down onto the roof), Fov, and
 --              Fill (the van's share of the picture)
--- The tuning: the start money is $500 and a first haul on show earns about $100 a minute: a colour comes after a few
--- minutes, a livery after a quarter of an hour, Mirror chrome after hours of play; everything costs $33,200.
+-- The tuning (8.3 economy): the start money is $500 and a first haul on show earns about $40 – 50 a minute: a colour
+-- comes after a move or two, a livery after an hour or so, Collector gold once the collection book found a legendary
+-- ($5,000), Mirror chrome is the late flex ($50,000: tens of hours of play); everything costs $65,700.
 export type VanPaintDef = {
 	id: string,
 	name: string,
@@ -7653,8 +7677,8 @@ Config.VanPaint = {
 		{ id = "forest", name = "Forest green", color = { 44, 98, 64 }, price = 600 },
 		{ id = "glacier", name = "Glacier blue", color = { 118, 168, 212 }, price = 500 },
 		{ id = "navy", name = "Navy blue", color = { 30, 50, 92 }, price = 600 },
-		{ id = "gold", name = "Collector gold", color = { 214, 170, 62 }, material = "Metal", price = 2500, unlock = "collectibles", premium = true },
-		{ id = "chrome", name = "Mirror chrome", color = { 206, 212, 218 }, material = "Foil", price = 20000, premium = true },
+		{ id = "gold", name = "Collector gold", color = { 214, 170, 62 }, material = "Metal", price = 5000, unlock = "legendary", premium = true },
+		{ id = "chrome", name = "Mirror chrome", color = { 206, 212, 218 }, material = "Foil", price = 50000, premium = true },
 	} :: { VanPaintDef },
 	Liveries = {
 		{ id = "zdc", name = "ZDC classic", stripe = { 179, 38, 30 }, price = 0 },
@@ -7868,7 +7892,11 @@ Config.SandboxBadges = {
 --   Backoff    s before the next try: First × 2^(try − 1), at most Most
 --   Reserve    UpdateAsync requests of the server's budget (DataStoreService:GetRequestBudgetForRequestType) kept for
 --              the loads and the last saves: a save that can wait waits for the next round while the budget is under it
---   LeaveWait  s a join waits for this server's own leave save of the same player (a rejoin within seconds)
+--   LeaveWait  a join waits for this server's own leave save of the same player (a rejoin within seconds) as long as
+--              that save runs (8.4 review: in an outage it outlasts a fixed wait, and a join that stops waiting reads the
+--              save from before it): at most the leave save's worst case (FinalTries tries, the Backoff between them, each
+--              UpdateAsync up to Call s) and LeaveWait s more (a store that never answers)
+--   Call       s one UpdateAsync may take in an outage (only that worst case counts it)
 --   CloseWait  s the shutdown (game:BindToClose) waits for every save in flight (Roblox gives 30)
 --   WarnBytes  a save this big (its JSON, SaveGuard's estimate) warns in the output; MaxBytes: a DataStore key's 4 MB
 --              less a margin (the unknown keys kept from the loaded save are left out past it)
@@ -7880,7 +7908,8 @@ Config.Saving = {
 	LoadTries = 4,
 	Backoff = { First = 1, Most = 4 },
 	Reserve = 8,
-	LeaveWait = 20,
+	LeaveWait = 10, -- (8.4 review: + the leave save's worst case, 1 + 2 + 4 + 4 + 5 × Call = 41 s: 51 s at most)
+	Call = 6,
 	CloseWait = 25,
 	WarnBytes = 1_000_000,
 	MaxBytes = 4_000_000,

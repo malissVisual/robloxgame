@@ -167,18 +167,18 @@ local mark = #E.sent
 local want, base = priceFor(A, piano, "collector", 0.5)
 local offer = Offers.make(A, piano, "collector", 0.5, "tok1")
 E.flush()
-check("an offer for the piano on show from the collector: the market's price × its factor (epic, the collector's pay)", offer ~= nil and offer.price == want
-	and offer.base == base and offer.price > base and offer.who == "Collector" and offer.stand == 1 and offer.rarity == "epic" and offer.token == "tok1", offer and offer.price)
+check("an offer for the piano on show from the collector: the market's price × its factor (rare: 8.3 economy, the collector's pay)", offer ~= nil and offer.price == want
+	and offer.base == base and offer.price > base and offer.who == "Collector" and offer.stand == 1 and offer.rarity == "rare" and offer.token == "tok1", offer and offer.price)
 check("… its price over the market price: × 1.1 – 1.5 and more (rarity, kind), Top at most", offer ~= nil and offer.price >= base * O.Min and offer.price <= base * O.Top + 10)
 local cards = kinds(E.received(A, "Visitors", mark), "offer")
 local card = cards[1]
 check("the card's message: id, name, item, price, base, who, seconds, rarity (and nothing to Bob)", #cards == 1 and offer ~= nil and card.id == offer.id
 	and card.name == "Upright Piano" and card.item == "piano" and card.price == offer.price and card.base == base and card.who == "Collector"
-	and card.seconds == O.Expire and card.rarity == "epic" and #E.received(B, "Visitors", mark) == 0)
+	and card.seconds == O.Expire and card.rarity == "rare" and #E.received(B, "Visitors", mark) == 0)
 check("… the client reads it back (Visitors.readOffer)", Visitors.readOffer(card) ~= nil)
 check("the toast: \"🤝 The collector offers $… for your Upright Piano\"", offer ~= nil and lastNotice(A, mark) == Visitors.toast("Collector", offer.price, "Upright Piano"), lastNotice(A, mark))
 local made = lastEvent("VisitorOffer")
-check("analytics: VisitorOffer made (its $, the rarity)", made ~= nil and made.player == A and offer ~= nil and made.value == offer.price and made.a == "made" and made.b == "epic")
+check("analytics: VisitorOffer made (its $, the rarity)", made ~= nil and made.player == A and offer ~= nil and made.value == offer.price and made.a == "made" and made.b == "rare")
 check("VisitorOffers.current: a copy of the open offer", Offers.current(A) ~= nil and (Offers.current(A) :: any).id == (offer :: any).id and Offers.current(A) ~= Offers.current(A))
 local again, why = Offers.make(A, sofa1, "tourist", 0.5)
 check("one offer at a time: another refused, ready false", again == nil and why ~= nil and not Offers.ready(A) and Offers.ready(B))

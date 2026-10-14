@@ -170,7 +170,7 @@ check("… a save built from it has every key (the optional ones, the lock)", sa
 local B = Config.Saving.Backoff
 check("backoff: 1, 2, 4, 4 s (First × 2^(try − 1), at most Most)", SaveGuard.backoff(1, B) == 1 and SaveGuard.backoff(2, B) == 2 and SaveGuard.backoff(3, B) == 4 and SaveGuard.backoff(4, B) == 4)
 check("Config.Saving: sane numbers", Config.Saving.Soon > 0 and Config.Saving.Gap >= 6 and Config.Saving.FinalTries >= Config.Saving.Tries and Config.Saving.CloseWait < 30
-	and Config.Saving.MaxBytes < 4 * 1024 * 1024 and Config.Saving.WarnBytes < Config.Saving.MaxBytes)
+	and Config.Saving.MaxBytes < 4 * 1024 * 1024 and Config.Saving.WarnBytes < Config.Saving.MaxBytes and Config.Saving.Call > 0 and Config.Saving.LeaveWait > 0)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")
