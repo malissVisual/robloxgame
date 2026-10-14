@@ -391,26 +391,51 @@ trigger(help, bob)
 check("you can't help yourself", string.find(E.lastNotice(bob), "already", 1, true) ~= nil, E.lastNotice(bob))
 E.place(ann, sofaRoot.Position + V3(0, 0, 3))
 trigger(help, ann)
-check("two carry it at 0.8", math.abs((bobBody:GetAttribute("CarrySpeed") or 0) - 14 * 0.8) < 1e-6 and math.abs((character:GetAttribute("CarrySpeed") or 0) - 14 * 0.8) < 1e-6
-	and character:GetAttribute("MoveCarry") == 3)
+check("two carry it at the pair's walk (8.1: 0.7)", math.abs((bobBody:GetAttribute("CarrySpeed") or 0) - 14 * T.Speed.Pair) < 1e-6
+	and math.abs((character:GetAttribute("CarrySpeed") or 0) - 14 * T.Speed.Pair) < 1e-6 and character:GetAttribute("MoveCarry") == 3 and T.Speed.Pair < 0.8)
 check("…and Help lift is gone", not help.Enabled)
+-- 8.1 carrying in two: the leader's heading turns slowly (client/PairSteer.luau), the helper is held at the far end by
+-- the server (server/PairHold.luau), as Danny is
+local H = Config.MoveHelper
+local Brain = require("./MoveHelperBrain")
+local PairHold = require("./PairHoldServer")
+check("8.1 the leader (Bob, who lifted it) gets PairTurn: their heading turns that slowly; the helper none", bobBody:GetAttribute("PairTurn") == H.PairTurn
+	and character:GetAttribute("PairTurn") == nil)
+E.clock += 0.2
+Moving.step()
+local mateHold = PairHold.of(ann)
+local annRoot = E.rootOf(ann)
+check("8.1 the helper held at the sofa's far end by the server: constraints on Ann's root to an attachment on the sofa", mateHold ~= nil
+	and mateHold.align.Parent == annRoot and mateHold.align.Attachment1.Parent == sofaRoot and mateHold.orient.Attachment1 == mateHold.far
+	and math.abs(mateHold.far.CFrame.Position.Z + (E.items.sofa.size.Z / 2 + H.Standoff)) < 1e-6)
+check("…at the pair's top speed (never put there), along the ground only (Ann stands on the floor herself)", mateHold ~= nil
+	and math.abs(mateHold.align.MaxVelocity - Brain.holdSpeed(14 * T.Speed.Pair)) < 1e-6 and mateHold.align.MaxAxesForce.Y == 0
+	and mateHold.align.MaxAxesForce.X > 0 and math.abs(mateHold.orient.MaxAngularVelocity - Brain.holdTurn()) < 1e-6)
+check("…the server owns Ann's body meanwhile (its positions, whatever the lag)", annRoot.NetworkOwner == false)
 -- the carrier leaves the house: the helper comes along
 E.place(bob, origin.Position + V3(0, 3, 1))
 trigger(leave, ann)
 check("the helper does not lead the way", string.find(E.lastNotice(ann), "front", 1, true) ~= nil)
 trigger(leave, bob)
 check("the carrier leads out, the helper comes along", (E.rootOf(bob).Position - outside).Magnitude < 4 and (E.rootOf(ann).Position - outside).Magnitude < 6)
--- too far apart for Grace s: it goes down
+-- too far apart for Grace s: it goes down (8.1: held, the tether waits for the hold's ease back too)
+sofaRoot.CFrame = E.rootOf(bob).CFrame * M.CFrame.new(0, 0, -3) -- (the weld, in Roblox: it came out with Bob)
 E.clock += 0.2
 Moving.step()
 E.place(ann, E.rootOf(bob).Position + V3(30, 0, 0))
 E.clock += 0.2
 Moving.step()
 E.place(bob, E.rootOf(bob).Position + V3(0, 0, 0.5))
+sofaRoot.CFrame = E.rootOf(bob).CFrame * M.CFrame.new(0, 0, -3)
 E.clock += T.Grace + 0.3
+Moving.step()
+check("8.1 held: Grace s apart is not yet the end (the hold eases her back after HoldStuck s)", bobBody:GetAttribute("MoveCarry") == 3 and character:GetAttribute("MoveCarry") == 3)
+E.clock += H.HoldStuck + H.HoldEase
 Moving.step()
 check("the pair too far apart: it went down", bobBody:GetAttribute("MoveCarry") == nil and character:GetAttribute("MoveCarry") == nil and sofaRoot.Anchored and string.find(E.lastNotice(bob), "apart", 1, true) ~= nil,
 	E.lastNotice(bob))
+check("8.1 …the hold let go: its constraints gone, Ann's body hers again, Bob's PairTurn gone", PairHold.of(ann) == nil and mateHold ~= nil and mateHold.align.Parent == nil
+	and mateHold.far.Parent == nil and annRoot.NetworkOwner == ann and bobBody:GetAttribute("PairTurn") == nil)
 -- picked up again and loaded by two
 E.place(ann, sofaRoot.Position + V3(1, 0, 0))
 E.place(bob, sofaRoot.Position + V3(-1, 0, 0))
@@ -555,6 +580,7 @@ check("7.0 greeters: Marge leaves the porch with the move (called off: no welcom
 -- The horde, the delivery ------------------------------------------------------------------------------------------------
 
 E.place(ann, depot)
+local zombiesBefore = #E.zombies -- (8.1: this move's roamers only, the called-off one's are not counted)
 local said = Moving.admin(ann, "start")
 check("the admin's START", string.find(said, "started", 1, true) ~= nil and E.built == 2, said)
 truck = E.cars[ann]
@@ -635,8 +661,8 @@ E.clock += 1
 Moving.step()
 check("the horde at HordeAt left: zombies march on the house", E.marched > 0 and heard(ann, "HORDE") and E.last(ann, "Moving", "state").a.horde == true) -- (7.0 planning: a barricade's end may be the last word)
 local roamers = 0
-for _, z in E.zombies do
-	if z.roamer then
+for index = zombiesBefore + 1, #E.zombies do
+	if E.zombies[index].roamer then
 		roamers += 1
 	end
 end
@@ -1161,6 +1187,35 @@ do
 	wait(D.Dwell)
 	check("the front end walks out: both out with the sofa, side by side", not isIn(ivy) and not isIn(jo) and ivy.Character:GetAttribute("MoveCarry") == 3
 		and jo.Character:GetAttribute("MoveCarry") == 3 and (E.rootOf(jo).Position - E.rootOf(ivy).Position).Magnitude < 5)
+	-- 8.1 carrying in two (client/PairSteer.luau): the leader walks backwards, facing the sofa and Jo: she backs through
+	-- the door, her back to it
+	check("8.1 (Ivy leads the sofa in two: PairTurn on her, none on Jo)", ivy.Character:GetAttribute("PairTurn") == Config.MoveHelper.PairTurn
+		and jo.Character:GetAttribute("PairTurn") == nil)
+	stand(jo, foot + up + facing * 10, -facing)
+	stand(ivy, foot + up + facing * 7, facing)
+	wait(D.Rearm)
+	wait(0.2)
+	since = #E.messages
+	stand(ivy, front, facing) -- (her back to the door)
+	wait(0.1)
+	wait(D.Dwell + 0.1)
+	check("8.1 the leader of a pair piece backs through the door (her back to it): both in with the sofa", isIn(ivy) and isIn(jo)
+		and ivy.Character:GetAttribute("MoveCarry") == 3 and jo.Character:GetAttribute("MoveCarry") == 3 and fades(ivy, since) == 2)
+	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
+	-- …nobody else goes through backwards: Jo, hands free, her back to the doorway inside
+	wait(D.Rearm)
+	stand(jo, exitAt + into * 12, into)
+	wait(0.2)
+	since = #E.messages
+	stand(jo, exitAt + into * 1, into)
+	wait(0.1)
+	wait(D.Dwell + 0.2)
+	check("…but hands free, the back to the door is no way through (facing it, as ever)", isIn(jo) and fades(jo, since) == 0)
+	stand(jo, exitAt + into * 1, -into)
+	wait(0.1)
+	wait(D.Dwell + 0.1)
+	check("…turned to it: out", not isIn(jo))
+	E.place(ivy, foot + up + facing * 12)
 	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
 
 	Moving.admin(ivy, "end")

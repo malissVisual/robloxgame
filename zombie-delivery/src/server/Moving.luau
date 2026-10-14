@@ -23,7 +23,10 @@
 --     MoveCarry, client/ArmPose.luau reaches for it); a pair thing alone is dragged low in front, slowly. Its condition
 --     drops when its carrier falls from a height, is bitten, dies (it drops), and in the truck when the truck is hit;
 --     its helper too far from it for Grace s, it goes down. Moving faster than the carry allows (a teleport) puts it
---     down where its carrier was.
+--     down where its carrier was. 8.1 carrying in two (the owner: "when I turn around he teleports … we must walk,
+--     like, backwards and slowly"): its carrier (the leader) gets PairTurn (client/PairSteer.luau turns their heading
+--     slowly, a way behind them walked backwards: shared/PairCarry.luau), its helper is held at its far end by the
+--     server like Danny (server/PairHold.luau; the tether waits for its ease back too), both at the pair's walk.
 --   * The truck: "Load" (E) at its open back puts what you hold onto the bed (MovingRules' packer: the best scored
 --     place, turned 90°, resting on uneven tops, a both / pair piece lying on its side when it has no place standing,
 --     the bed repacked biggest first when it has no room as it is: the moved models welded anew; "No room" else, and
@@ -165,7 +168,7 @@ local Moving = {}
 local remote = Net.get("Moving")
 local notice = Net.get("Notice")
 local TAG = "MovePrompt" -- client/MovingHud.luau shows a tagged prompt only to the players it is for
-local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip" } -- (7.0 grip: CarryGrip)
+local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn" } -- (7.0 grip: CarryGrip; 8.1: PairTurn)
 
 -- The art (another branch builds it): shared/FurnitureLooks.luau (Items, build), shared/HouseLayout.luau (plan),
 -- server/HouseInterior.luau (build, slot, destroy).
@@ -926,6 +929,9 @@ end
 -- ── The carry ──────────────────────────────────────────────────────────────
 
 local function clearHands(player: Player?)
+	if player then
+		require(script.Parent.PairHold).free(player) -- 8.1: a crew mate held at a piece's far end: their body theirs again
+	end
 	local character = player and player.Character
 	if character and character:GetAttribute("MoveCarry") ~= nil then
 		for _, name in CARRY_ATTRIBUTES do
@@ -1078,6 +1084,8 @@ local function setHands(s: Session, item: Item)
 		character:SetAttribute("CarrySize", Vector3.new(thing.size.X, thing.size.Y, thing.size.Z))
 		character:SetAttribute("CarrySpeed", speed)
 		character:SetAttribute("MoveCarry", item.spot)
+		-- 8.1 carrying in two: the leader's heading turns PairTurn degrees a second at most (client/PairSteer.luau)
+		character:SetAttribute("PairTurn", if thing.helper ~= nil then Config.MoveHelper.PairTurn else nil)
 	end
 	local helper = playerById(thing.helper)
 	local helperBody = helper and helper.Character
@@ -2047,10 +2055,11 @@ function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean): (number?, Vect
 end
 
 -- One look at a crew member (WalkIn.look): on foot in a zone, facing its door (Face) for Dwell s: through it, once a
--- visit (a refusal is said once; out of the zone and in again tries again). After a trip nothing until they have left
+-- visit (a refusal is said once; out of the zone and in again tries again). 8.1 carrying in two (PairTurn): the back
+-- to the door counts too (the leader walks backwards through it, facing the piece and the partner). After a trip nothing until they have left
 -- the zone they came out in and Rearm s have gone by (WalkIn.held, set by travel).
 function WalkIn.check(s: Session, player: Player, clock: number)
-	local _, humanoid, root = bodyOf(player)
+	local character, humanoid, root = bodyOf(player)
 	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
 		WalkIn.at[player] = nil
 		return
@@ -2082,7 +2091,11 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		visit = fresh
 	end
 	local look = root.CFrame.LookVector
-	if -(look.X * out.X + look.Z * out.Z) < T.Doors.Face then
+	local toward = -(look.X * out.X + look.Z * out.Z)
+	if character and character:GetAttribute("PairTurn") ~= nil then
+		toward = math.abs(toward) -- (8.1 carrying in two: the leader backs through it too, facing the piece and the partner)
+	end
+	if toward < T.Doors.Face then
 		visit.since = nil -- (facing away, or walking past it: the dwell starts when they turn to the door)
 		return
 	end
@@ -3539,7 +3552,8 @@ local function syncMembers(s: Session)
 end
 
 -- The carried things: a helper too far for Grace s, a carrier faster than the carry (a teleport), a fall's top; 8.1
--- grip: the checks' clocks and their timeouts first (Grip.tick, the grip block).
+-- grip: the checks' clocks and their timeouts first (Grip.tick, the grip block); 8.1 carrying in two: the helper held
+-- at the far end (PairHold.follow).
 local function watchCarried(s: Session, clock: number)
 	Grip.tick(s, now())
 	for _, spot in s.move.order do
@@ -3569,9 +3583,15 @@ local function watchCarried(s: Session, clock: number)
 		if helper then
 			local _, _, helperRoot = bodyOf(helper)
 			local reach = math.max(thing.size.X, thing.size.Z) / 2 + T.Tether
+			-- 8.1 carrying in two: the crew mate held at the far end by the server, as Danny is (server/PairHold.luau: never
+			-- put there but through a door's fade, eased back when stuck); the tether waits for that ease too
+			local grace = T.Grace
+			if helperRoot and require(script.Parent.PairHold).follow(helper, helperRoot, item.root, thing.size.Z, root, holder, traveling[helper] == true or traveling[holder] == true) then
+				grace += Config.MoveHelper.HoldStuck + Config.MoveHelper.HoldEase
+			end
 			if helperRoot and flat(helperRoot.Position, item.root.Position) > reach and not traveling[helper] then
 				item.apartSince = item.apartSince or clock
-				if clock - (item.apartSince :: number) > T.Grace then
+				if clock - (item.apartSince :: number) > grace then
 					release(s, holder, "apart")
 				end
 			else

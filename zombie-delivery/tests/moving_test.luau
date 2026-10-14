@@ -30,8 +30,8 @@ local T = Config.Moving
 
 check("hand: 1 − weight × 0.03", near(Rules.speedFactor("hand", 1), 0.97) and near(Rules.speedFactor("hand", 5), 0.85) and near(Rules.speedFactor("hand", 10), 0.7))
 check("hand never under MinHand", Rules.speedFactor("hand", 99) >= T.Speed.MinHand and Rules.speedFactor("hand", 0 / 0) <= 1)
-check("both × 0.75, pair × 0.8, drag × 0.35", near(Rules.speedFactor("both", 9), 0.75) and near(Rules.speedFactor("pair", 9), 0.8) and near(Rules.speedFactor("drag", 9), 0.35))
-check("the carry's walk", near(Rules.carrySpeed(14, "pair", 8), 11.2) and near(Rules.carrySpeed(14, "drag", 8), 4.9))
+check("both × 0.75, pair × 0.7 (8.1: two carry slowly, was 0.8), drag × 0.35", near(Rules.speedFactor("both", 9), 0.75) and near(Rules.speedFactor("pair", 9), 0.7) and near(Rules.speedFactor("drag", 9), 0.35))
+check("the carry's walk", near(Rules.carrySpeed(14, "pair", 8), 9.8) and near(Rules.carrySpeed(14, "drag", 8), 4.9))
 check("dragging is the slowest, a light thing in a hand the fastest", Rules.speedFactor("drag", 1) < Rules.speedFactor("both", 1) and Rules.speedFactor("both", 1) < Rules.speedFactor("hand", 1))
 check("a hand free only with a hand thing", Rules.hands("hand") == 1 and Rules.hands("both") == 2 and Rules.hands("pair") == 2 and Rules.hands("drag") == 2)
 local thing = { class = "pair", helper = nil } :: any

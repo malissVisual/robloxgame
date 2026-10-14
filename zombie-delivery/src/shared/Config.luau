@@ -6187,7 +6187,8 @@ Config.CarryGrip = {
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
 --                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
 --                     trip; the move goes on until the owner's FINISH or the clock)
---   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair, drag
+--   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair (two
+--                     carry it: 8.1 a touch slower, and slower still while its heading turns: MoveHelper.PairTurnWalk), drag
 --   Damage            shares of a thing's condition: a fall over SafeDrop studs (over a jump's top, about 7) PerStud a
 --                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
 --                     Fragile × as much; broken at BrokenAt or less (it pays nothing and costs Pay.BrokenFine × its value)
@@ -6302,7 +6303,7 @@ Config.Moving = {
 	Board = { 44, 12 } :: { number },
 	DropOff = { 34, 46 } :: { number },
 	DropRadius = 20,
-	Speed = { HandPerWeight = 0.03, MinHand = 0.6, Both = 0.75, Pair = 0.8, Drag = 0.35 },
+	Speed = { HandPerWeight = 0.03, MinHand = 0.6, Both = 0.75, Pair = 0.7, Drag = 0.35 }, -- (8.1: Pair 0.7, was 0.8: two carry slowly)
 	Damage = { SafeDrop = 8, PerStud = 0.05, PerHp = 0.006, Death = 0.2, PerTruckHp = 0.002, Fragile = 2.5, BrokenAt = 0.2 },
 	Pay = { Scale = 1, Star = 1.5, TimeBonus = 0.25, BrokenFine = 0.25, LateShare = 0.5, Xp = 40, XpPerValue = 8, XpPerStar = 20, XpMax = 400 },
 	LateGrace = 120, -- 7.0 review: s after 0:00 the truck still has to reach the Wall (it pays LateShare); later: lost
@@ -6543,11 +6544,24 @@ Config.MoveStory = {
 --                      a lift again whose take failed
 --   BlinkFar / HelpBlink   your lift farther than BlinkFar studs on foot, his path failing, or not there HelpBlink s after
 --                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it
---   Standoff / HoldStep / HoldSnap   his root stands Standoff studs past your piece's far face, turned to you, on the
---                      floor there within HoldStep studs of your root's height (stairs, steps); farther than HoldSnap
---                      from that place (a door's fade): put there at once
---   HoldSpeed / HoldResponse   the constraints that keep him there (AlignPosition / AlignOrientation on his root):
---                      the most studs/s, their Responsiveness; his own walk is off meanwhile (Npcs.carried)
+--   Standoff / HoldStep   his root stands Standoff studs past your piece's far face, turned to you, on the floor there
+--                      within HoldStep studs of your root's height (stairs, steps)
+--   HoldResponse       the Responsiveness of the constraints that keep him there (AlignPosition / AlignOrientation on
+--                      his root); his own walk is off meanwhile (Npcs.carried)
+--   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
+--   PairCarry.luau the leader's steering, MoveHelperBrain.holdSpeed / holdTrack the far end's holder, server/PairHold.luau
+--   the constraints; Danny and a crew mate who helps lift alike):
+--   PairTurn           degrees a second the carry's heading (the leader's facing, the piece welded in front of it) turns
+--                      at most toward where the leader walks while two carry a piece (client/PairSteer.luau); PairBand:
+--                      degrees past 90 the way must be behind the facing before the leader walks backwards (and under
+--                      90 before forwards again: no flicker sideways)
+--   PairTurnWalk / PairTurnFull   × the pair's walk (Moving.Speed.Pair) while the heading is PairTurnFull degrees or
+--                      more off its way (in between: less slow)
+--   HoldMargin / HoldExtra   the far end's holder's top speed (AlignPosition.MaxVelocity): the carry's walk × HoldMargin
+--                      + HoldExtra studs/s (the swing of a turn at PairTurn fits in); HoldTurn: × PairTurn his body
+--                      turns at most (AlignOrientation.MaxAngularVelocity)
+--   HoldBehind / HoldStuck / HoldEase   more than HoldBehind studs off his place for HoldStuck s: eased back over HoldEase
+--                      s (never put there at once while holding; only a door's fade does: the piece in the other world)
 --   ThreeAfter         s after "Got the other end!" he says "On three... lift!"
 --   DoorWarn / VanSay  carrying with you: the piece this near a doorway: "Watch the doorframe!"; this near the van's
 --                      back: "That's going in the van." (its back shut: he opens it for the two of you, OpenBack)
@@ -6592,9 +6606,17 @@ Config.MoveHelper = {
 	HelpBlink = 1.6,
 	Standoff = 0.6,
 	HoldStep = 2.5,
-	HoldSnap = 6,
-	HoldSpeed = 60,
 	HoldResponse = 200,
+	PairTurn = 60, -- 8.1
+	PairBand = 20,
+	PairTurnWalk = 0.5,
+	PairTurnFull = 45,
+	HoldMargin = 1.25,
+	HoldExtra = 6,
+	HoldTurn = 3,
+	HoldBehind = 3,
+	HoldStuck = 3,
+	HoldEase = 0.5,
 	ThreeAfter = 1.2,
 	DoorWarn = 4,
 	VanSay = 12,

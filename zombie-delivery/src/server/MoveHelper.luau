@@ -16,12 +16,17 @@
 --     other end!", "On three... lift!"). Then he moves WITH the piece: his own walk is off (Npcs.carried), constraints on
 --     his root (AlignPosition / AlignOrientation to an attachment at the piece's far end, turned to you) hold him there
 --     every physics step, on the floor under that end (stairs, steps: within HoldStep of you), through walls and door
---     frames like the piece itself (a collision group nothing collides with), through the front door's fade with you
---     (farther than HoldSnap from his place: put there at once). Never a "too far apart" drop. His arms hold its edge
---     (the Carrying / CarryAt / CarrySize attributes on his body: client/ArmPose.luau), his legs step with his speed
---     (Npcs.stride, backwards when he walks backwards). Your grip bar is easier meanwhile (the character attribute
---     GripSteady: Config.CarryGrip.Steadied × the box). He talks on the way: "Watch the doorframe!", "That's going in
---     the van."
+--     frames like the piece itself (a collision group nothing collides with), through the front door's fade with you.
+--     Never a "too far apart" drop. His arms hold its edge (the Carrying / CarryAt / CarrySize attributes on his body:
+--     client/ArmPose.luau), his legs step with his speed (Npcs.stride, backwards when he walks backwards). Your grip bar
+--     is easier meanwhile (the character attribute GripSteady: Config.CarryGrip.Steadied × the box). He talks on the
+--     way: "Watch the doorframe!", "That's going in the van."
+--   * 8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"):
+--     your heading turns slowly (client/PairSteer.luau, shared/PairCarry.luau: PairTurn degrees a second; a way behind
+--     you is walked backwards), and he is never put at the far end while he holds it: his constraints (server/
+--     PairHold.luau) walk him there at the pair's walk and a margin (MoveHelperBrain.holdSpeed of your CarrySpeed), his
+--     body turning to you at holdTurn; only a door's fade puts him there (the piece in the other world). More than
+--     HoldBehind studs off his place for HoldStuck s: eased back over HoldEase s (MoveHelperBrain.holdTrack).
 --   * A heavy two-hands piece you carry alone (AssistWeight or more, within AssistFar): he takes its other side (the
 --     pair's walk for both: MovingRules.mode), the same way.
 --   * On his own: the one-hand and two-hands pieces nobody holds (★ first, then the most value a second of the trip;
@@ -47,7 +52,7 @@
 -- Performance: one helper per move, one loop for all of them, a path at most every Repath s (computed in the background,
 -- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), the lists he chooses from kept
 -- and refilled (every Think s), the van's room for each piece worked out only when the load changes; carrying together
--- the physics engine moves him (the loop only re-aims the far end's attachment, a ray down a step).
+-- the physics engine moves him (the loop only re-aims the far end's attachment and his top speed, a ray down a step).
 --   MoveHelper.sync(s, port)   Moving's tick: the move's crew (he comes or goes) and his hands (Moving's helper hooks)
 --   MoveHelper.step(dt)        one step of every helper (his loop's; the runtime test calls it)
 --   MoveHelper.useMover(m)     how he walks (a test's: the Luau CLI has no physics and no pathfinding)
@@ -68,6 +73,7 @@ local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
 local Brain = require(Shared.MoveHelperBrain)
 local Npcs = require(script.Parent.Npcs)
+local PairHold = require(script.Parent.PairHold) -- 8.1: the far end's hold (Danny's and a crew mate's)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
 
@@ -83,18 +89,9 @@ export type Port = {
 	helperExits: ((s: any, spot: number?) -> { number })?, -- 7.x farm move: the ways out he may take with it
 }
 
--- 7.x his hold on the far end of your piece (the real mover's): the attachment on the piece and on his root, the two
--- constraints, his parts' own collision groups (given back when he lets go).
-export type Grip = {
-	anchor: BasePart,
-	far: Attachment,
-	own: Attachment,
-	align: AlignPosition,
-	orient: AlignOrientation,
-	groups: { [BasePart]: string },
-	offset: CFrame,
-	lastAt: Vector3?,
-}
+-- 7.x his hold on the far end of your piece (the real mover's; 8.1 server/PairHold.luau's): the attachment on the piece
+-- and on his root, the two constraints, his parts' own collision groups (given back when he lets go).
+export type Grip = PairHold.Hold
 
 -- 7.x farm move: one way in and out (the house's front door; a farm's barn doors too): the exit inside, where he comes
 -- in, the door's outside, as Brain.Doors for the costs.
@@ -116,12 +113,13 @@ export type Body = {
 
 -- How he walks: one step toward `to` at `speed` studs / s; a stop; his way round the walls (may yield; nil: straight).
 -- 7.x carrying together: keep him at `offset` in `anchor`'s frame (the far end of your piece) / let go of it; a fade-in
--- where he was just put (the fade-over). Without keep he is simply put there (a test: no physics).
+-- where he was just put (the fade-over). 8.1: keep walks him there at `limit` studs / s at most (snap: put there, a
+-- door's fade only). Without keep he steps there at `limit` × dt at most (a test: no physics).
 export type Mover = {
 	move: (body: Body, to: Vector3, speed: number, dt: number) -> (),
 	halt: (body: Body) -> (),
 	route: ((body: Body, from: Vector3, to: Vector3) -> { Vector3 }?)?,
-	keep: ((body: Body, anchor: BasePart, offset: CFrame, dt: number) -> ())?,
+	keep: ((body: Body, anchor: BasePart, offset: CFrame, dt: number, limit: number, snap: boolean) -> ())?,
 	free: ((body: Body) -> ())?,
 	appear: ((body: Body) -> ())?,
 }
@@ -158,6 +156,9 @@ type Helper = {
 	helpSince: number, -- 7.x when he set off to your lift (HelpBlink)
 	gripped: BasePart?, -- 7.x the piece whose far end he holds (its root)
 	holdOffset: CFrame?, -- 7.x his place in its frame
+	trail: Brain.Trail, -- 8.1 how long he has been behind his place at the far end (MoveHelperBrain.holdTrack)
+	holdAt: Vector3?, -- 8.1 where his root was a step ago holding it (his legs' speed)
+	holdLimit: number, -- 8.1 his top speed holding it now (the tests read it)
 	steadied: Model?, -- 7.x the carrier's character with GripSteady
 	lineKey: string?, -- 7.x a line to say at lineAt ("On three... lift!" after "Got the other end!")
 	lineAt: number,
@@ -200,7 +201,6 @@ local FALL = 3 -- s he lies there before his body goes
 local INSIDE = 400 -- studs from a move's interior origin that count as inside it
 local NUDGE = 8 -- studs at most a stuck nudge puts him on (his way's next point)
 local WALK = { through = true, near = 0.6 } -- Npcs.walkTo's options: he walks on into the next order
-local HELD = "MoveHelperHeld" -- 7.x his collision group carrying together: nothing collides with it
 local HANDS = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize" } -- 7.x his arms (client/ArmPose.luau)
 local EDGE = { Width = 2.4, Depth = 0.6 } -- 7.x the piece's near edge his hands hold at its far end (studs)
 
@@ -241,91 +241,27 @@ local function computeRoute(body: Body, from: Vector3, to: Vector3): { Vector3 }
 	return points
 end
 
--- 7.x the collision group he carries in: registered once, colliding with nothing there is.
-local heldReady = false
-local function heldGroup()
-	if heldReady then
-		return
-	end
-	heldReady = true
-	local physics = game:GetService("PhysicsService")
-	pcall(function()
-		physics:RegisterCollisionGroup(HELD)
-	end)
-	local ok, groups = pcall(function(): { any }
-		return physics:GetRegisteredCollisionGroups()
-	end)
-	if ok and groups then
-		for _, group in groups do
-			pcall(function()
-				physics:CollisionGroupSetCollidable(HELD, group.name, false)
-			end)
-		end
-	end
-end
-
--- 7.x the hold's constraints and attachments gone, his parts' groups given back, he stands again.
+-- 7.x the hold's constraints and attachments gone, his parts' groups given back, he stands again (8.1 server/
+-- PairHold.luau's drop).
 local function gripOff(body: Body)
 	local grip = body.grip
 	if not grip then
 		return
 	end
 	body.grip = nil
-	local made: { Instance } = { grip.align, grip.orient, grip.own, grip.far }
-	for _, obj in made do
-		obj:Destroy()
-	end
-	for part, group in grip.groups do
-		if part.Parent then
-			part.CollisionGroup = group
-		end
-	end
+	PairHold.drop(grip)
 	Npcs.carried(body.model, false)
 	body.speed = -1 -- (Npcs.pace again on his next walk)
 end
 
 -- 7.x his root glued to `offset` in the piece's frame: AlignPosition and AlignOrientation between an attachment on his
--- root and one on the piece (the physics engine moves him every step, the server owns him), his own walk off.
-local function gripOn(body: Body, anchor: BasePart, offset: CFrame)
+-- root and one on the piece (the physics engine moves him every step, the server owns him), his own walk off, his parts
+-- in the group nothing collides with (8.1 server/PairHold.luau's make: at `limit` studs / s at most).
+local function gripOn(body: Body, anchor: BasePart, offset: CFrame, limit: number)
 	gripOff(body)
-	heldGroup()
-	local root = body.root
 	Npcs.carried(body.model, true)
 	body.walking, body.ordered = false, nil
-	pcall(function()
-		root:SetNetworkOwner(nil)
-	end)
-	local far = Instance.new("Attachment")
-	far.Name = "MoveHelperGrip"
-	far.CFrame = offset
-	far.Parent = anchor
-	local own = Instance.new("Attachment")
-	own.Name = "MoveHelperGrip"
-	own.Parent = root
-	local align = Instance.new("AlignPosition")
-	align.Name = "MoveHelperHold"
-	align.Attachment0 = own
-	align.Attachment1 = far
-	align.MaxForce = 1e6
-	align.MaxVelocity = cfg.HoldSpeed
-	align.Responsiveness = cfg.HoldResponse
-	align.Parent = root
-	local orient = Instance.new("AlignOrientation")
-	orient.Name = "MoveHelperTurn"
-	orient.Attachment0 = own
-	orient.Attachment1 = far
-	orient.MaxTorque = 1e6
-	orient.MaxAngularVelocity = 40
-	orient.Responsiveness = cfg.HoldResponse
-	orient.Parent = root
-	local groups: { [BasePart]: string } = {}
-	for _, d in body.model:GetDescendants() do
-		if d:IsA("BasePart") then
-			groups[d] = d.CollisionGroup
-			d.CollisionGroup = HELD
-		end
-	end
-	body.grip = { anchor = anchor, far = far, own = own, align = align, orient = orient, groups = groups, offset = offset, lastAt = nil }
+	body.grip = PairHold.make(body.model, body.root, anchor, offset, limit, { ghost = true, flat = false, owner = nil })
 end
 
 local mover: Mover = {
@@ -349,34 +285,18 @@ local mover: Mover = {
 	end,
 	route = computeRoute,
 	-- 7.x carrying together: the constraints made once (again for another piece), the far end's attachment re-aimed
-	-- when his place moved (the floor under it), put there at once when he is far off it (a door's fade), the legs
-	keep = function(body: Body, anchor: BasePart, offset: CFrame, dt: number)
+	-- when his place moved (the floor under it); 8.1 his top speed (the pair's walk and a margin), put there at once
+	-- only through a door's fade (snap: MoveHelperBrain.holdTrack); his legs: actHold's
+	keep = function(body: Body, anchor: BasePart, offset: CFrame, _dt: number, limit: number, snap: boolean)
 		local grip = body.grip
-		if not grip or grip.anchor ~= anchor or not grip.far.Parent or not grip.align.Parent then
-			gripOn(body, anchor, offset)
+		if not grip or not PairHold.alive(grip, anchor) then
+			gripOn(body, anchor, offset, limit)
 			grip = body.grip
 		end
 		local g = grip :: Grip
-		if (g.offset.Position - offset.Position).Magnitude > 0.05 then
-			g.offset = offset
-			g.far.CFrame = offset
-		end
-		local root = body.root
-		local goal = anchor.CFrame * offset
-		local here = root.Position
-		if (here - goal.Position).Magnitude > cfg.HoldSnap then
-			body.model:PivotTo(goal)
-			root.AssemblyLinearVelocity = Vector3.zero
-			g.lastAt = nil
-			Npcs.stride(body.model, 0)
-			return
-		end
-		local last = g.lastAt
-		g.lastAt = here
-		if last and dt > 0 then
-			local look = root.CFrame.LookVector
-			local v = (here - last) / dt
-			Npcs.stride(body.model, v.X * look.X + v.Z * look.Z)
+		PairHold.aim(g, offset, limit)
+		if snap then
+			PairHold.snap(g, anchor.CFrame * offset)
 		end
 	end,
 	free = gripOff,
@@ -680,7 +600,7 @@ local function ungrip(h: Helper, body: Body?)
 		free(body)
 	end
 	steady(h, nil)
-	h.gripped, h.holdOffset, h.lineKey = nil, nil, nil
+	h.gripped, h.holdOffset, h.lineKey, h.holdAt = nil, nil, nil, nil
 end
 
 -- …and on his feet on the floor where he is.
@@ -1125,14 +1045,37 @@ local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: Base
 	return CFrame.new(0, rise, -ahead) * CFrame.Angles(0, math.pi, 0)
 end
 
--- 7.x kept at `offset` in the piece's frame (the mover's constraints; a test's mover without them: his root put there).
-local function keepAt(body: Body, anchor: BasePart, offset: CFrame, dt: number)
+-- 7.x kept at `offset` in the piece's frame (the mover's constraints; 8.1 at `limit` studs / s at most, put there only
+-- on `snap`; a test's mover without them: his root stepped there, limit × dt at most).
+local function keepAt(body: Body, anchor: BasePart, offset: CFrame, dt: number, limit: number, snap: boolean)
 	local keep = mover.keep
 	if keep then
-		keep(body, anchor, offset, dt)
-	else
-		body.root.CFrame = anchor.CFrame * offset
+		keep(body, anchor, offset, dt, limit, snap)
+		return
 	end
+	local goal = anchor.CFrame * offset
+	local here = body.root.Position
+	local way = goal.Position - here
+	local step = limit * dt
+	if snap or way.Magnitude <= step then
+		body.root.CFrame = goal
+	else
+		body.root.CFrame = CFrame.new(here + way.Unit * step) * goal.Rotation
+	end
+end
+
+-- 8.1 his legs holding the far end: his real speed along his facing since the last step (negative: backwards; the walk
+-- played in reverse, Npcs.stride); none across a door's fade.
+local function strideOf(h: Helper, body: Body, dt: number, snap: boolean)
+	local here = body.root.Position
+	local last = h.holdAt
+	h.holdAt = here
+	if snap or not last or dt <= 0 then
+		Npcs.stride(body.model, 0)
+		return
+	end
+	local look = body.root.CFrame.LookVector
+	Npcs.stride(body.model, ((here.X - last.X) * look.X + (here.Z - last.Z) * look.Z) / dt)
 end
 
 -- 7.x the far end of your piece (or the other side of your two-hands piece): he moves with it, glued there; the words.
@@ -1147,8 +1090,19 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	end
 	local carrierRoot = playerRoot(thing.carrier)
 	local offset = endOffset(h, body, thing, item.root, carrierRoot)
+	if h.gripped ~= item.root then
+		h.trail, h.holdAt = Brain.newTrail(), nil -- (8.1 a new hold)
+	end
 	h.holdOffset, h.gripped = offset, item.root
-	keepAt(body, item.root, offset, dt)
+	-- 8.1 never put there while holding (a door's fade only: the piece in the other world); eased back when stuck behind
+	local goal = (item.root.CFrame * offset).Position
+	local here = body.root.Position
+	local carrier = if thing.carrier and thing.carrier > 0 then Players:GetPlayerByUserId(thing.carrier) else nil
+	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Rules.carrySpeed(walkSpeed(), "pair", thing.weight)))
+	local limit, snap = Brain.holdTrack(h.trail, (goal - here).Magnitude, insideAt(h, here) ~= insideAt(h, goal), speed, dt)
+	h.holdLimit = limit
+	keepAt(body, item.root, offset, dt, limit, snap)
+	strideOf(h, body, dt, snap)
 	steady(h, if carrierRoot then carrierRoot.Parent :: Model? else nil)
 	local at = item.root.Position
 	if insideAt(h, at) and nearDoorway(h, at, cfg.DoorWarn) then
@@ -1665,6 +1619,9 @@ local function create(s: any, port: Port): Helper
 		helpSince = 0,
 		gripped = nil,
 		holdOffset = nil,
+		trail = Brain.newTrail(),
+		holdAt = nil,
+		holdLimit = 0,
 		steadied = nil,
 		lineKey = nil,
 		lineAt = 0,

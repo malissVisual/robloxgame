@@ -149,6 +149,11 @@ function O.IsA(self: any, class: string): boolean
 	end
 	return baseIsA(self, class)
 end
+-- 8.1 carrying in two: who simulates a part (server/PairHold.luau: the server holds a crew mate's body at a far end;
+-- props.NetworkOwner: false = the server, a player, or nil = never set)
+function O.SetNetworkOwner(self: any, owner: any)
+	self.props.NetworkOwner = if owner == nil then false else owner
+end
 local baseDestroy = O.Destroy
 function O.Destroy(self: any)
 	self.destroyed = true
@@ -656,7 +661,13 @@ Runtime.Npcs = stub("Npcs", {
 	stop = noop,
 	pace = noop,
 	walkTo = noop,
+	-- 8.1 carrying in two: his legs' speed along his facing while he holds the far end (negative: backwards)
+	stride = function(npc: any, speed: number)
+		table.insert(Runtime.strides, { npc = npc, speed = speed })
+	end,
+	carried = noop,
 })
+Runtime.strides = {} -- { { npc, speed } } every Npcs.stride
 -- Did he say `text` (since message `from`)?
 function Runtime.saidSince(text: string, from: number?): boolean
 	for index = (from or 0) + 1, #Runtime.said do
