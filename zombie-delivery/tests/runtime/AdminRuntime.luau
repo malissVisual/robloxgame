@@ -327,6 +327,24 @@ Runtime.Collection = {
 	end,
 }
 
+-- 8.1: server/Upgrades.luau's admin (the SANDBOX tab's ⬆ MAX UPGRADES / ↺ RESET UPGRADES), recorded
+Runtime.upgrades = {} -- { { player, what } }
+Runtime.Upgrades = {
+	admin = function(player: any, what: string): string
+		table.insert(Runtime.upgrades, { player = player, what = what })
+		return if what == "max" then "ADMIN: every upgrade at its top (20 stands)." else "ADMIN: the upgrades reset (12 stands)."
+	end,
+}
+
+-- 8.2: server/CollectionBook.luau's admin (the SANDBOX tab's 📖 FILL BOOK / 📖 CLEAR BOOK), recorded
+Runtime.books = {} -- { { player, what } }
+Runtime.CollectionBook = {
+	admin = function(player: any, what: string): string
+		table.insert(Runtime.books, { player = player, what = what })
+		return if what == "fill" then "ADMIN: the collection book is full (56 new, 56 pieces)." else "ADMIN: the collection book is empty."
+	end,
+}
+
 -- The rest of Admin's requires: only what Admin.start touches (the others error with their name when a test calls them).
 Runtime.World = { RoadTop = 0.4 }
 Runtime.Zombies = { hunts = function()

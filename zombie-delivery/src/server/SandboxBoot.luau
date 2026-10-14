@@ -15,7 +15,10 @@
 --     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
 --     (the moves' lobby, the crew panel), Transport, KitWear, Horn;
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), the
---     collection (Collection: its payout loop), the warehouses (Warehouse), the Sprinter's model (SprinterMesh) and last
+--     collection (Collection: its payout loop) and 8.2's collection book (CollectionBook: its remote, its hook on
+--     Collection.add), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the vans' engines), 8.2's
+--     daily tasks (SandboxTasks) and SandboxLeaders (the player list's columns, the TOP MOVERS board), the Sprinter's
+--     model (SprinterMesh) and last
 --     Moving (it wraps the hooks set here: Vehicles.callCar …).
 --   The modules written alongside this one (SandboxWorld.build, Collection.start, Warehouse.start, SprinterMesh.start)
 --   run only when they are in the place (a FindFirstChild guard); every service through `safely` (one that fails only
@@ -369,6 +372,7 @@ local function services()
 	safely("Analytics", function()
 		require(Server.Analytics).start()
 	end)
+	optional("SandboxAnalytics", "start") -- 8.2: the sandbox's funnel steps and events (listeners only; after Analytics' hooks)
 	safely("Vehicles", Vehicles.start)
 	safely("CarRighting", function()
 		require(Server.CarRighting).start()
@@ -404,7 +408,26 @@ local function sandbox()
 		require(Server.FurnitureMesh).start()
 	end)
 	optional("Collection", "start")
+	safely("Collection's warehouses", function() -- 8.2 e2e: no plot (a full server's fifth): nothing on show earns
+		local module = Server:FindFirstChild("Collection")
+		if not module or not module:IsA("ModuleScript") then
+			return
+		end
+		local Collection = require(module :: ModuleScript) :: any
+		Collection.hasWarehouse = function(player: Player): boolean
+			return SandboxPlots.of(player) ~= nil
+		end
+		SandboxPlots.onChanged(function(_id: number, player: Player?)
+			if player then
+				Collection.upgrade(player, function() end) -- (a plot at last: what is on show earns from now, a fresh state)
+			end
+		end)
+	end)
+	optional("CollectionBook", "start") -- 8.2: the collection book (after the collection: its hook on Collection.add)
 	optional("Warehouse", "start")
+	optional("Upgrades", "start") -- 8.1: the UPGRADES desk's shop (after the collection and the warehouses)
+	optional("SandboxTasks", "start") -- 8.2: the daily tasks (after the collection and the upgrades: it listens to them)
+	optional("SandboxLeaders", "start") -- 8.2: the player list's $ / $/min / collection and the TOP MOVERS board
 	optional("SprinterMesh", "start") -- (before any van: PLAY parks one)
 	vehicleHooks()
 	safely("Moving", function()

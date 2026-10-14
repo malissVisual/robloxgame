@@ -8,7 +8,9 @@
 --   Groups                    the tab's sections in order: id, name, hint
 --   Actions                   the buttons: id (what the panel sends), group, label, color (a Ui.Colors / Theme.Postage
 --                             name: green, grey, yellow, red, blue, gold, violet). 🔍 SHOW ZONES is the panel's own
---                             (client/SandboxZones.luau: this screen only, no command)
+--                             (client/SandboxZones.luau: this screen only, no command). 8.1: ⬆ MAX UPGRADES / ↺ RESET
+--                             UPGRADES (server/Upgrades.luau admin) in the last group, Upgrades. 8.2: 📖 FILL BOOK / 📖
+--                             CLEAR BOOK (server/CollectionBook.luau admin) in the Collection group
 --   Money                     $ the 💰 button gives
 --   Fill                      📦 FILL STOCK: Count pieces a press, their condition Condition[1] … [2] (two decimals:
 --                             a piece at Config.Moving.Damage.BrokenAt or under is broken), their colours 1 … Variants
@@ -57,7 +59,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "collection",
 		name = "Collection",
-		hint = "The TARGET's warehouse stock. FILL: 10 random pieces in random condition. CLEAR: every piece gone ($0 for them). FILL STANDS: the stock's pieces on the free display stands.",
+		hint = "The TARGET's warehouse stock. FILL: 10 random pieces in random condition. CLEAR: every piece gone ($0 for them). FILL STANDS: the stock's pieces on the free display stands. FILL BOOK: every piece of the collection book found (its milestones pay). CLEAR BOOK: the book and its milestones empty.",
 	},
 	{
 		id = "travel",
@@ -68,6 +70,11 @@ SandboxAdmin.Groups = {
 		id = "debug",
 		name = "Debug",
 		hint = "SHOW ZONES (only on your screen): the plots' unload circles, the house's curb, the display stands and every van's cargo bay.",
+	},
+	{
+		id = "upgrades",
+		name = "Upgrades",
+		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (20 stands, the lights, the van, Danny). RESET: none (the pieces on the lost stands go back to the stock).",
 	},
 } :: { Group }
 
@@ -81,9 +88,13 @@ SandboxAdmin.Actions = {
 	{ id = "fill", group = "collection", label = "📦 FILL STOCK", color = "green" },
 	{ id = "clear", group = "collection", label = "🗑 CLEAR STOCK", color = "red" },
 	{ id = "stands", group = "collection", label = "⭐ FILL STANDS", color = "yellow" },
+	{ id = "bookfill", group = "collection", label = "📖 FILL BOOK", color = "violet" }, -- 8.2: the collection book
+	{ id = "bookclear", group = "collection", label = "📖 CLEAR BOOK", color = "grey" },
 	{ id = "van", group = "travel", label = "🚐 BRING VAN", color = "blue" },
 	{ id = "house", group = "travel", label = "📍 TO HOUSE", color = "violet" },
 	{ id = "warehouse", group = "travel", label = "📍 TO WAREHOUSE", color = "violet" },
+	{ id = "upmax", group = "upgrades", label = "⬆ MAX UPGRADES", color = "gold" },
+	{ id = "upreset", group = "upgrades", label = "↺ RESET UPGRADES", color = "grey" },
 } :: { Action }
 
 SandboxAdmin.Money = 10_000

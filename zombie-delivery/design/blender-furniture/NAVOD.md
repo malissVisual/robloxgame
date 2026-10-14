@@ -3,19 +3,29 @@
 ![Obývák](room-preview.png)
 
 Hezčí modely všech **36 věcí, které se ve stěhování (7.0 MOVES) odnášejí z domu**: od gauče, piana a ledničky po
-houpacího koně, kolo a krabici s nádobím. Každý kus má **přesně rozměry ze hry** (neviditelná krabice `Root`, kterou
-hráči nosí a skládají do auta), takže se ve hře nic nezmění, jen vzhled. Vedle katalogu je zařízený **obývák**
-(obrázek nahoře). Všechno postavil skript `furniture.py`, takže každou barvu a tvar můžeš změnit a nechat postavit znovu.
+houpacího koně, kolo a krabici s nádobím. K nim (8.1) **12 sběratelských kousků z 8.0 SANDBOXu**: vzácné věci, které
+se objevují v domě vedle nábytku a které pak vystavíš ve skladu (trofej, rádio, glóbus, jelení hlava, zlatá deska, loď
+v láhvi, babiččina šperkovnice, váza, herní automat, jukebox, olejomalba a rytířská zbroj). Každý kus má **přesně
+rozměry ze hry** (neviditelná krabice `Root`, kterou hráči nosí a skládají do auta), takže se ve hře nic nezmění, jen
+vzhled. Vedle katalogu je zařízený **obývák** (obrázek nahoře). Všechno postavil skript `furniture.py`, takže každou
+barvu a tvar můžeš změnit a nechat postavit znovu.
 
 ![Všech 36 kusů](furniture-preview.png)
 
+![12 sběratelských kousků](collectibles-preview.png)
+
+Sběratelské kousky jsou to nejvzácnější, co v domě najdeš, tak mají víc detailů: zlato se leskne (povrch `gilt`), sklo
+láhve a jukeboxu je čiré (`crystal`), trubice jukeboxu, ciferník rádia a reklama automatu svítí (`amber`, `ember`,
+`neon`), váza je bílý porcelán s modrým (kobaltovým) malováním, glóbus má pevniny na starém modrém moři. Každý má
+1 až 5 tisíc trojúhelníků (rytířská zbroj, největší, asi 6 500), takže hru nezpomalí.
+
 | Soubor | Co to je |
 | --- | --- |
-| `furniture.blend` | Hotová scéna: 36 kusů v mřížce, obývák, světla, kamera. Stačí ji otevřít. |
+| `furniture.blend` | Hotová scéna: 48 kusů v mřížce (36 kusů nábytku a 12 sběratelských), obývák, světla, kamera. Stačí ji otevřít. |
 | `furniture.py` | Skript, který všechno postaví (je přibalený i uvnitř `furniture.blend`). |
 | `roblox/ZDCFurnitureArt.fbx` | **Model pro hru**: každý kus rozdělený podle povrchu (krok 4). |
 | `roblox/ZDCFurnitureArt.json` | Seznam dílů (podle něj kontrola `mesh-check.py` ověří, že nábytek ve hře sedí). |
-| `furniture-preview.png`, `room-preview.png` | Náhledy z Blenderu (Cycles). |
+| `furniture-preview.png`, `collectibles-preview.png`, `room-preview.png` | Náhledy z Blenderu (Cycles). |
 
 ## 1. Otevři ho v Blenderu
 Dvakrát klikni na `furniture.blend` (nebo *File → Open*). Je uložený v Blenderu 5.2. Pokud ho tvoje verze neotevře,
@@ -31,8 +41,9 @@ Ovládání v 3D okně:
 
 ## 2. Prohlédni si, jak je postavený
 Vpravo nahoře je **Outliner**:
-- kolekce **Furniture** má pro každý kus vlastní kolekci `F_sofa`, `F_piano`, `F_fridge` … (36 kusů v řadách po 6,
-  10 studů od sebe). Spodek kusu je na zemi, předek míří k tobě (na −Y), 1 jednotka v Blenderu = 1 stud ve hře;
+- kolekce **Furniture** má pro každý kus vlastní kolekci `F_sofa`, `F_piano`, `F_fridge` … (48 kusů v řadách po 6,
+  10 studů od sebe; sběratelské kousky `F_bowling_trophy` … `F_knight_armour` jsou poslední dvě řady). Spodek kusu
+  je na zemi, předek míří k tobě (na −Y), 1 jednotka v Blenderu = 1 stud ve hře;
 - kolekce **Room** je obývák: podlaha z prken, tapeta, lišty, okno se záclonami, koberec, světla, kamera a kopie
   kusů z katalogu. Kopie sdílí tvar i materiály s katalogem: když v katalogu upravíš tvar gauče (Edit Mode),
   změní se i v obýváku.
@@ -57,19 +68,27 @@ FINISHES = {
     ...
 ```
 
-Každý kus má vlastní funkci (`def sofa`, `def piano`, `def fridge` …), kde jsou jeho díly: `box` (kvádr se
+Každý kus má vlastní funkci (`def sofa`, `def piano`, `def jukebox` …), kde jsou jeho díly: `box` (kvádr se
 zaoblenými hranami), `cyl` (válec), `ball` (koule), `tube` (trubka), `lathe` (soustružený tvar jako váza nebo noha
-lampy) a `torus` (prstenec). Změň, co chceš, a zmáčkni **Run Script** (▶ nebo Alt + P). Stará scéna se smaže
-a postaví se nová. Když kus vyleze ze své krabice, skript to vypíše (*sticks out*).
+lampy) a `torus` (prstenec); sběratelské kousky navíc `sweep` (trubka po křivce: paroží, ucha poháru, bublinkové
+trubice jukeboxu), `prism` (plochý tvar vytažený do hloubky: oblouk rádia, štít, bok automatu), `rect_frame` (lišta
+rámu obrazu) a `sprite` (pixelová grafika na obrazovce automatu). Změň, co chceš, a zmáčkni **Run Script** (▶ nebo
+Alt + P). Stará scéna se smaže a postaví se nová. Když kus vyleze ze své krabice, skript to vypíše (*sticks out*).
+
+Pozor u kousků s nápisem (trofej, jelení hlava, zlatá deska, automat, jukebox, olejomalba): nápis tiskne hra na
+štítek a pod ním musí zůstat díl modelu (mosazná destička, krémový pruh, svítící reklama) a před ním nic. Kontrola
+`mesh-check.py` to hlídá.
 
 Rozměry kusů v seznamu `ITEMS` neměň: hra má stejné rozměry v `src/shared/FurnitureLooks.luau` a kontrola hlídá,
 že sedí. Kdybys chtěl kus větší nebo menší i ve hře, řekni Claudovi.
 
 ## 4. Nábytek ve hře
-Hra tyhle modely použije v každém domě při stěhování (Marge's House). Hráči nosí pořád stejnou krabici `Root`
-(kolize, nošení, nakládání do auta i poškození zůstávají), jen místo kostiček z dílů uvidí model z Blenderu. Barvy
-látek, dřeva a laku se mění podle varianty kusu, takže dva gauče v různých domech nejsou stejné. Nápisy na krabicích
-(FRAGILE · KITCHEN, TOYS, FAMILY PHOTOS, THIS SIDE UP) zůstávají.
+Hra tyhle modely použije v každém domě při stěhování (Marge's House, v SANDBOXu The Old Chalet) a sběratelské kousky
+i na stojanech ve skladu. Hráči nosí pořád stejnou krabici `Root` (kolize, nošení, nakládání do auta i poškození
+zůstávají), jen místo kostiček z dílů uvidí model z Blenderu. Barvy látek, dřeva a laku (a u sběratelských kousků
+zlata, sametu, laku, neonu a srsti) se mění podle varianty kusu, takže dva gauče v různých domech nejsou stejné. Nápisy
+na krabicích (FRAGILE · KITCHEN, TOYS, FAMILY PHOTOS, THIS SIDE UP) i na sběratelských kouscích (LEAGUE CHAMPION,
+1,000,000 SOLD, HIT PARADE, název hry na automatu …) zůstávají.
 
 Nový vzhled se objeví, až model jednou nahraješ do Roblox Studia. Udělat to musíš ty: Roblox zobrazí 3D model jen
 tehdy, když je nahraný pod tvým účtem, a k tvému účtu se nepřihlásím. Do té doby má nábytek dosavadní vzhled z dílů.
@@ -84,13 +103,28 @@ Vyzkoušení: dej **Play**, zmáčkni **P** (admin panel), v sekci **Moves** dej
 TO THE HOUSE**. Dveře domu jsou zamčené: vykopni je (*Kick door*, Technician je odemkne: *Pick lock*) a dej
 *Enter house*. Uvnitř uvidíš nový nábytek.
 
+### 8.1: sběratelské kousky, nový model (naimportuj ho znovu)
+V `roblox/ZDCFurnitureArt.fbx` je teď i 12 sběratelských kousků. Ve Studiu je proto **jednou naimportuj znovu**:
+1. V Exploreru najdi starý `ZDCFurnitureArt` (ve Workspace, nebo v ServerStorage, pokud jsi ho tam přesunul),
+   klikni na něj a dej **Delete**. Starý model musí pryč dřív, než přidáš nový: kdyby zůstaly oba, hra by si mohla
+   vzít ten starý (bez sběratelských kousků).
+2. *File → Import 3D* a vyber nový `design/blender-furniture/roblox/ZDCFurnitureArt.fbx` (po `git pull` je to ten
+   nový). Nastavení nech, jak je, a dej **Insert / Import**.
+3. Ulož místo (*File → Save*) a *File → Publish to Roblox*.
+
+Vyzkoušení v SANDBOXu: dej **Play**, zmáčkni **P** (admin panel, záložka **SANDBOX**) a dej **🏠 REFILL HOUSE**
+a **📍 TO HOUSE**: v chalupě jsou 2 až 4 sběratelské kousky (každý tah znovu jiné). Nebo **📦 FILL STOCK**,
+**⭐ FILL STANDS** a **📍 TO WAREHOUSE**: kousky z Blenderu stojí na stojanech ve skladu. Dokud nový model
+nenaimportuješ, mají sběratelské kousky dosavadní vzhled z dílů (nic se nerozbije).
+
 Když nábytek v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + S) a spusť skript. Pak ve Studiu smaž
-starý `ZDCFurnitureArt` a naimportuj nový `roblox/ZDCFurnitureArt.fbx` (krok 1 až 3).
+starý `ZDCFurnitureArt` a naimportuj nový `roblox/ZDCFurnitureArt.fbx` (stejně jako výše).
 
 ### Jak to funguje (pro zvědavé)
 - Každý kus je rozdělený podle povrchu: díl `sofa_fabric` je všechna látka gauče, `sofa_wood2` jeho nohy. Hra
   (`src/server/FurnitureMesh.luau`) dá každému dílu barvu a materiál Robloxu (látka = Fabric, dřevo = Wood, mosaz
-  = Metal, sklo = Glass …). 185 dílů má dohromady asi 85 000 trojúhelníků.
+  = Metal, sklo = Glass, svítící trubice = Neon …). 287 dílů má dohromady asi 132 000 trojúhelníků (z toho 12
+  sběratelských kousků asi 47 000).
 - Malé kostičky `mark_o`, `mark_x`, `mark_y`, `mark_z` ukazují hře, jak Roblox model při importu otočil a zvětšil,
   a `mark_sofa`, `mark_piano` … kde stojí který kus. Proto na nastavení importu nezáleží.
 - Dům staví `src/server/HouseInterior.luau`: každý kus postaví jako dřív a hned ho oblékne do modelu z Blenderu.
@@ -102,5 +136,7 @@ starý `ZDCFurnitureArt` a naimportuj nový `roblox/ZDCFurnitureArt.fbx` (krok 1
 python furniture.py -- --save furniture.blend --export roblox --render /tmp/furniture-renders --samples 64
 ```
 Render udělá `item-NN-<id>.png` pro každý kus a `room.png` (obývák). Náhled `furniture-preview.png` je z nich složený
-arch. Po změně modelu spusť z kořene repozitáře `python3 zombie-delivery/tools/furniture/mesh-check.py <luau>`
+arch. Jen sběratelské kousky: `--render /tmp/collectibles --samples 64 --only collectibles` (12 obrázků
+`item-36-bowling_trophy.png` … `item-47-knight_armour.png`, z nich je složený `collectibles-preview.png`, 4 × 3
+s vzácností každého kousku). Po změně modelu spusť z kořene repozitáře `python3 zombie-delivery/tools/furniture/mesh-check.py <luau>`
 (simuluje import do hry a ověří, že každý díl sedí ve své krabici, je přivařený k Root a nic nekoliduje).

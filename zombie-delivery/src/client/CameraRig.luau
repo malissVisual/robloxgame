@@ -27,6 +27,8 @@
 -- with the lean (not with reduced motion) and widens from a lower share of the top speed (Config.LivingCity.Camera
 -- TwoWheels).
 -- 6.16: every shot kicks the aiming camera up and a headshot punches it in (client/ShotKick.luau, one call a frame).
+-- 8.1 carrying in two (client/PairSteer.luau, started here): the body no longer turns where it walks (AutoRotate stays
+-- off while it steers), and the carry's walk is slower while the heading turns (PairSteer.walk).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -41,6 +43,7 @@ local Drive = require(script.Parent.Drive)
 local Stamina = require(script.Parent.Stamina)
 local Holster = require(script.Parent.Holster)
 local ShotKick = require(script.Parent.ShotKick) -- 6.16: the shots' kick and a headshot's punch
+local PairSteer = require(script.Parent.PairSteer) -- 8.1: carrying in two (the leader's heading turns slowly)
 
 local CameraRig = {}
 
@@ -85,7 +88,9 @@ end
 -- walks at its own CarrySpeed (a lamp near the walk, a sofa dragged alone a crawl).
 local function carrySpeed(character: Model): number
 	local lift = character:GetAttribute("CarrySpeed")
-	if type(lift) == "number" and (character:GetAttribute("Pushing") ~= nil or character:GetAttribute("MoveCarry") ~= nil) then
+	if type(lift) == "number" and character:GetAttribute("MoveCarry") ~= nil then
+		return lift * PairSteer.walk() -- (8.1: slower while the heading of a piece carried in two turns)
+	elseif type(lift) == "number" and character:GetAttribute("Pushing") ~= nil then
 		return lift -- 4.0: a trolley rolls a little faster than a crate is carried (server/Equipment.luau)
 	end
 	return if type(lift) == "number" then math.min(lift, CARRY_SPEED) else CARRY_SPEED
@@ -636,7 +641,7 @@ local function update(dt: number)
 		local current = math.atan2(-look.X, -look.Z)
 		local diff = (yaw - current + math.pi) % (2 * math.pi) - math.pi
 		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, current + diff * math.min(1, dt * 18), 0)
-	elseif not busy then
+	elseif not busy and not PairSteer.steering() then -- (8.1: carrying in two, the heading is PairSteer's)
 		humanoid.AutoRotate = true
 	end
 
@@ -722,6 +727,7 @@ local function touchFeel()
 end
 
 function CameraRig.start()
+	PairSteer.start() -- 8.1: carrying in two (a computer and a touch screen alike)
 	watchFeel()
 	if not supported then
 		touchSpeed()

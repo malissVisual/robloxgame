@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.0.4"
+Config.Version = "8.2.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3670,6 +3670,38 @@ Config.Soundscape = {
 		ScrapeBlend = 0.35, -- the share of the way to its volume every Tick
 		Tick = 0.1, -- seconds between the looks at the drag
 	},
+	-- 8.1 SANDBOX, the sandbox's own sounds (art/audio/sfx4.ogg's 8.1 part; until it is up their stand-ins, SoundSheet
+	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" on the meadow, in a "warehouse" (its
+	-- building's box, SandboxMap's plot.warehouse) or in the "house" (inside the Old Chalet: the move's interior, its
+	-- state's inside, or the chalet's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience: the
+	-- city's day and night never play here), plays a cowbell far off now and then and sets the room's echo;
+	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.
+	Sandbox = {
+		Alpine = 0.24, -- amb_alpine outdoors: a calm alpine day (a soft breeze, birds) …
+		AlpineStandIn = 0.09, -- … until sfx4 is up its stand-in, sfx2's wind: a breeze only
+		AlpineIndoors = 0.3, -- … × this in a warehouse (through its open roller door)
+		Warehouse = 0.22, -- amb_warehouse in a warehouse: the lights' hum, the hall's air, the roof ticking …
+		WarehouseStandIn = 0.12, -- … until sfx4 is up its stand-in, sfx2's hum
+		Room = 0.4, -- amb_room in the house: a quiet room tone and a clock (no stand-in: silent until sfx4 is up)
+		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
+		-- in the game and SOUND is not all off
+		Reverb = { warehouse = "Room" } :: { [string]: string },
+		CowbellGap = { 25, 60 } :: { number }, -- seconds between two cowbells far off outdoors (cowbell_far: random) …
+		CowbellFar = { 70, 130 } :: { number }, -- … studs away, a random way round you (3D: you hear where)
+		Cowbell = 1.5, -- (a 3D sound that far off is quiet: its falloff)
+		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
+		TakeDown = 0.6, -- … taken down (stand_takedown)
+		Sold = 0.7, -- a sale (sale_register: the till's ka-ching)
+		Stored = 0.65, -- a trip's pieces into your warehouse (stored_fanfare: a small fanfare) …
+		StoredQuiet = 2.5, -- … not this many seconds after the move's result card (it plays its own jingle)
+		Income = 0.14, -- the stands' income coming in (coin, sfx2's: a soft clink) …
+		IncomeGap = 10, -- … at most once every this many seconds, not while the warehouse's window is open and not …
+		SoldQuiet = 2, -- … this many seconds after a sale (its money comes in too)
+		Slide = 0.75, -- the ZDC Sprinter's sliding door rolling open and slammed shut (van_slide_open / _close) …
+		SlideRange = 90, -- … heard this many studs from the camera
+		Step = 0.55, -- your foot onto a Sprinter's rear or side step (van_step_up) …
+		StepGap = 0.8, -- … at most every this many seconds
+	},
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
@@ -5575,6 +5607,10 @@ Config.Robust = {
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
 		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
+		CollectionBulk = 1, -- 8.2: and its bulk buttons (fillbest / sellmany / undisplayall): one a second, on top
+		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
+		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
+		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 	},
 }
 
@@ -5594,6 +5630,9 @@ Config.Analytics = {
 	Budget = { Base = 100, PerPlayer = 15 },
 	ErrorsPerMinute = 6,
 	ClientErrorsMax = 20,
+	-- 8.2 SANDBOX (server/SandboxAnalytics.luau): one grip check's outcome in this many is sent, a random one of each
+	-- window of them, for every player (the GripCheck event: its value says how many it stands for)
+	GripEvery = 10,
 }
 
 -- 6.12, the daily and weekly tasks (the owner: "daily and weekly tasks so players come back"; shared/Tasks.luau picks
@@ -6055,63 +6094,79 @@ Config.ItemModel = {
 	Shut = 0.35,
 }
 
--- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
--- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): shared/
--- CarryGrip.luau runs the bar (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows it and reads the presses,
--- server/Moving.luau's grip block (the character attribute CarryGrip; the Moving remote's "slip" and "grip") drops a
--- thing that slipped and wears one that shook. The bar runs from 0 (its bottom) to 1 (its top).
---   Kinds      the carries with a bar (a one-hand thing that is not fragile has none): Zone, the grip box's share of
---              the bar; Load, the load's own wildness; Gravity, × the box's fall. "hand": a fragile one-hand thing
---              (gentler); "both"; "pair": two carry it (each their own bar; either slips: it drops); "solo": a Mover
---              lifts a pair thing alone (harder); "drag": a pair thing dragged alone, low (calmer)
---   Mover      × the zone for a Mover (every kind)
---   Steadied   × the zone while Danny holds the other end of your piece (7.x: he steadies it; the character attribute
---              GripSteady, server/MoveHelper.luau)
---   Weight     + the load's wildness a weight point (1 … 10); Fragile: + when fragile
---   Motion     × the wildness: Still standing still (under StillAt studs/s); + Speed × your speed / the walk (at most
---              SpeedMax × it); + Turn turning at TurnFull rad/s or more; + Slope going up or down at SlopeFull studs/s
---              or more; + Air in the air (a jump); + a bite's jolt (Bite at BiteFull hp or more, ShockMax at most, Fade
---              a second off it)
---   Grip       the box: Lift (/s² up while held), Gravity (/s² down when let go), Rise / Fall (the fastest, /s), Bounce
---              (× its speed back up off the bottom when it hits faster than BounceMin)
---   Marker     the load (the thing's icon): a new aim every Dart[1] s (wild, at WildAt) … Dart[2] s (calm), up to Reach
---              × (Base + the wildness) away; pulled to it by Spring × (Base + the wildness), Damp a second, Jitter ×
---              the wildness; never nearer the ends than Edge
---   Meter      Fill a second inside the box, Drain outside; standing still it drains no lower than Floor; Start at the
---              lift (HeavyStart from HeavyAt weight on: the first seconds matter); full: steady (× SteadySpeed on the
---              carry's walk, the server's at most) until it is under SteadyOff; SLIPPING! at Warn or under; 0: it slips
---   Step       the longest step the bar takes at once (a slow frame takes several); MaxDt: the most time one frame counts
---   Report     s between the client's ("grip", spot, quality, steady) reports (quality: the share of the time outside)
---   Server     Wear: the condition a second fully outside the box (× WearFragile when fragile), WearCap a second at most;
---              Gap: the most s one report counts; Every: the least s between two reports that count; SteadyOutside: a
---              report this much outside or less may be steady; Slip: the condition a slip takes (× Moving.Damage.Fragile
---              when fragile)
---   Ui         Tutorial: the carries with the "Hold to keep it steady!" tip (the key's hint on the first one only);
---              Shake: px at SLIPPING! (ReducedShake with Reduced Motion); Hold: the touch HOLD button's side (px, at
---              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere; the sounds (7.1,
---              art/audio/sfx4.ogg): grip_tick at Tick's volume each TickNotches-th of the meter it moves, TickEvery s
---              apart at least, grip_warning at Warning's on each entry into SLIPPING! (the slip: MoveSounds.slipped)
+-- 8.1 grip (the owner: "when I fail, something must always happen, but make it easier, it can get harder later; it is
+-- hard to keep pressing and walk at the same time. When we pick it up the first time I should have to hit a target:
+-- I'm feeling for the grip, and when I succeed I can carry it away, I keep my balance"). No holding any more: a timing
+-- check (a needle sweeps a bar with a green zone, one press) at the lift and now and then while you carry (a WOBBLE!).
+-- shared/CarryGrip.luau has the rules (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows a check and
+-- reads the press, server/Moving.luau's grip block opens the checks, judges the answers and decides what a miss does.
+-- Every number of the difficulty is here: a harder game later changes only these (Difficulty first).
+--   On          false: no checks at all (the carry as before the grip; the server's runtime tests of other parts)
+--   Difficulty  1 = the easy start: every zone ÷ it, every needle × it (1.5: a third smaller zones, half again as fast)
+--   Kinds       the carries with checks (a one-hand thing that is not fragile has none): Zone, the green zone's share of
+--               the sweep at weight 0; Speed, the needle's sweeps a second (edge to edge); Every, × the time between two
+--               wobbles. "hand": a fragile one-hand thing (gentle, wobbles less); "both"; "pair": two carry it (each
+--               their own checks, a bigger zone: the other end steadies it); "solo": a Mover lifts a pair thing alone;
+--               "drag": a pair thing dragged alone, low (calm)
+--   Weight      a weight point (1 … 10): the zone − Zone, the needle + Speed
+--   Fragile     × the zone (Zone) and the needle (Speed) when fragile
+--   Mover       × the zone for a Mover (every kind); Steadied: × the zone while Danny holds the other end of your piece
+--               (the character attribute GripSteady, server/MoveHelper.luau)
+--   Zone        the zone after all that is kept within Min … Max of the sweep; Start: never nearer the needle's start
+--               (the left end) than this (an instant press never hits), Edge: never nearer the right end
+--   Speed       the needle kept within Min … Max sweeps a second; Sweeps: every check lasts at least this many sweeps
+--   Lift        the lift check ("feeling for the grip"): Window s to press (no press: a miss); a miss (Knock of the
+--               piece's condition) leaves it where it is (it slips back down) and the next try waits Again s
+--   Wobble      the checks while you carry: every Every[1] … Every[2] s of walking (× the kind's Every); its zone × Zone
+--               and needle × Speed, Window s to press. The wobble clock runs at Still standing still (under StillAt
+--               studs/s), 1 at the carry's own walk, + Rush × how far over it you go (half again over it: all of Rush),
+--               + Turn turning at TurnFull rad/s or more, + Air in the air (a jump, a fall); a bite moves it Bump s on.
+--               Two checks are at least Gap s apart
+--   Miss        a wobble missed: Knock of the condition, the walk × Slow for SlowFor s (a stagger), the next wobble ×
+--               Sooner. Drop: the misses in a row that drop the piece (a drop: Slip below): Sturdy, Heavy (from HeavyAt
+--               weight on), Fragile (1: a fragile piece drops at its first miss). Every miss does something: a carry
+--               put down or loaded with a wobble open takes it as a miss, and the misses stay with the piece Remember s
+--               (a new lift of it picks them up again: 8.1 review)
+--   FragileKnock × a knock when the piece is fragile; Shared: × a knock when two players hold it (each one's checks:
+--               half each, as the 7.1 wear)
+--   Slip        a drop's damage (× Moving.Damage.Fragile when fragile)
+--   SteadySpeed × the carry's walk while every player holding it hit their last check (balanced, steady)
+--   Server      Grace: s past a check's window before the server takes no answer as a miss; Lag: an answer's press may
+--               be this many s older than the server's own clock of the check (the way there and back) at most, and
+--               for each player LagPing × their round trip (Player:GetNetworkPing) + LagMin when that is less (8.1
+--               review); Ahead: … or this much newer; Slack: the share of the sweep the zone is widened by when the
+--               server judges a press
+--   Ui          Tutorial: the checks with the longer hint ("… when the needle is in the green"); Shake: px a miss
+--               shakes the widget (ReducedShake with Reduced Motion); Camera: client/CameraRig.luau's shake on a miss
+--               (CameraDrop on a drop); Linger: s the outcome stays; Tap: the touch TAP button's side (px, at least
+--               TapMin); Scale: the widget's least scale on a touch screen, Min: its least anywhere; the sounds
+--               (art/audio/sfx4.ogg; the drop: MoveSounds.slipped): Open at a check's start, Tick as the needle enters
+--               the zone, Hit, Knock, Warning (a wobble that drops on a miss)
 Config.CarryGrip = {
+	On = true,
+	Difficulty = 1,
 	Kinds = {
-		hand = { Zone = 0.36, Load = 0.35, Gravity = 1 },
-		both = { Zone = 0.3, Load = 0.55, Gravity = 1 },
-		pair = { Zone = 0.3, Load = 0.6, Gravity = 1 },
-		solo = { Zone = 0.21, Load = 0.9, Gravity = 1.2 },
-		drag = { Zone = 0.34, Load = 0.4, Gravity = 1 },
-	} :: { [string]: { Zone: number, Load: number, Gravity: number } },
+		hand = { Zone = 0.36, Speed = 0.45, Every = 1.25 },
+		both = { Zone = 0.36, Speed = 0.5, Every = 1 },
+		pair = { Zone = 0.4, Speed = 0.45, Every = 1 },
+		solo = { Zone = 0.3, Speed = 0.55, Every = 0.85 },
+		drag = { Zone = 0.4, Speed = 0.42, Every = 1.5 },
+	} :: { [string]: { Zone: number, Speed: number, Every: number } },
+	Weight = { Zone = 0.005, Speed = 0.012 },
+	Fragile = { Zone = 0.9, Speed = 1.08 },
 	Mover = 1.35,
 	Steadied = 1.3,
-	Weight = 0.04,
-	Fragile = 0.2,
-	Motion = { StillAt = 1.5, Still = 0.3, Speed = 0.7, SpeedMax = 2, Turn = 0.35, TurnFull = 3, Slope = 0.4, SlopeFull = 6, Air = 0.8, Bite = 1.2, BiteFull = 20, ShockMax = 2, Fade = 1 },
-	Grip = { Lift = 4, Gravity = 3.2, Rise = 1.6, Fall = 2, Bounce = 0.35, BounceMin = 0.12 },
-	Marker = { Dart = { 0.5, 1.6 } :: { number }, WildAt = 1.4, Reach = 0.38, Base = 0.3, Spring = 3.5, Damp = 2.6, Jitter = 0.8, Edge = 0.06 },
-	Meter = { Fill = 0.45, Drain = 0.28, Floor = 0.35, Start = 0.85, HeavyStart = 0.6, HeavyAt = 6, SteadySpeed = 1.1, SteadyOff = 0.85, Warn = 0.3 },
-	Step = 1 / 60,
-	MaxDt = 0.25,
-	Report = 1,
-	Server = { Wear = 0.008, WearFragile = 1.5, WearCap = 0.015, Gap = 1.5, Every = 0.7, SteadyOutside = 0.1, Slip = 0.06 },
-	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55, Tick = 0.5, TickEvery = 0.08, TickNotches = 50, Warning = 0.7 },
+	Zone = { Min = 0.1, Max = 0.6, Start = 0.3, Edge = 0.04 },
+	Speed = { Min = 0.2, Max = 2, Sweeps = 1.5 },
+	Lift = { Window = 3, Knock = 0.04, Again = 0.5 },
+	Wobble = { Every = { 7, 12 } :: { number }, Zone = 0.85, Speed = 1.15, Window = 2.4, Still = 0.2, StillAt = 1.5, Rush = 1, Turn = 0.6, TurnFull = 3, Air = 1, Bump = 3, Gap = 3 },
+	Miss = { Knock = 0.03, Slow = 0.6, SlowFor = 1.5, Sooner = 0.5, Drop = { Sturdy = 2, Heavy = 2, HeavyAt = 8, Fragile = 1 }, Remember = 8 },
+	FragileKnock = 1.25,
+	Shared = 0.5,
+	Slip = 0.06,
+	SteadySpeed = 1.1,
+	Server = { Grace = 1.5, Lag = 2, LagPing = 2, LagMin = 0.3, Ahead = 0.1, Slack = 0.02 },
+	Ui = { Tutorial = 3, Shake = 6, ReducedShake = 1, Camera = 0.2, CameraDrop = 0.35, Linger = 1.1, Tap = 96, TapMin = 80, Scale = 0.75, Min = 0.62, Open = 0.55, Tick = 0.3, Hit = 0.35, Knock = 0.6, Warning = 0.6 },
 }
 
 -- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside
@@ -6143,7 +6198,8 @@ Config.CarryGrip = {
 --   Board / DropOff   studs from the depot's middle (Map.Depot): the "Moving contracts" board (facing -X) and the
 --                     drop-off ("the Wall"); 7.x van moves: the van within DropRadius of it unloads its load there (a
 --                     trip; the move goes on until the owner's FINISH or the clock)
---   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair, drag
+--   Speed             × the walk with a thing: hand 1 − weight × HandPerWeight (not under MinHand), both, pair (two
+--                     carry it: 8.1 a touch slower, and slower still while its heading turns: MoveHelper.PairTurnWalk), drag
 --   Damage            shares of a thing's condition: a fall over SafeDrop studs (over a jump's top, about 7) PerStud a
 --                     stud, PerHp of its carrier's lost health, Death when its carrier dies, PerTruckHp of the truck's;
 --                     Fragile × as much; broken at BrokenAt or less (it pays nothing and costs Pay.BrokenFine × its value)
@@ -6156,6 +6212,23 @@ Config.CarryGrip = {
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
 --   Reach             studs for the prompts (the server checks them again); Slots: moves at once (their interiors)
+--   Doors             8.1 walk-in doors (the owner: "no E at the house, neither in nor out"): walk into a door's zone and
+--                     the fade takes you through, as "Enter house" / "Leave house" did (server/Moving.luau's WalkIn, in
+--                     the move's tick and every Every s between two ticks, only for the move's crew on foot). The zone:
+--                     a box at the doorway, its width + Side studs either side, Depth studs in front of it (outside: out
+--                     of the door; inside: into the room) and Through studs through it (the doorway and the porch or
+--                     the apron beyond), Height tall round a body's middle. You stand in it Dwell s facing the door (the
+--                     root's look · the way through at least Face: walking past it is no way in), then through; a
+--                     refusal (a bigDoor piece at a small door: "Too big — use the barn doors"; the back end of a pair
+--                     piece) is said once and you stay. After a trip you come out a few studs from the door facing away
+--                     (Depth is less than that), and the zones stay shut for you until you have stepped out of the one
+--                     you came out in and Rearm s have gone by (no ping-pong; Danny's own trips wait Rearm s too, his
+--                     arrival out of his door's reach: server/MoveHelper.luau). Walk false: the E prompts as before
+--                     (they stay, disabled, while it is on). Mat: the doormat on the ground at every door (its width at
+--                     most, its depth): "▲ IN" outside while a move uses the door, "▲ OUT" inside. PairWalk: a leader
+--                     carrying in two may back through it (facing the partner), but their back to it counts only while
+--                     they walk into it at PairWalk studs/s or more (the root's flat velocity · the way through at least
+--                     Face; 8.1 review: a drift back toward the door no longer takes them through)
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6244,7 +6317,7 @@ Config.Moving = {
 	Board = { 44, 12 } :: { number },
 	DropOff = { 34, 46 } :: { number },
 	DropRadius = 20,
-	Speed = { HandPerWeight = 0.03, MinHand = 0.6, Both = 0.75, Pair = 0.8, Drag = 0.35 },
+	Speed = { HandPerWeight = 0.03, MinHand = 0.6, Both = 0.75, Pair = 0.7, Drag = 0.35 }, -- (8.1: Pair 0.7, was 0.8: two carry slowly)
 	Damage = { SafeDrop = 8, PerStud = 0.05, PerHp = 0.006, Death = 0.2, PerTruckHp = 0.002, Fragile = 2.5, BrokenAt = 0.2 },
 	Pay = { Scale = 1, Star = 1.5, TimeBonus = 0.25, BrokenFine = 0.25, LateShare = 0.5, Xp = 40, XpPerValue = 8, XpPerStar = 20, XpMax = 400 },
 	LateGrace = 120, -- 7.0 review: s after 0:00 the truck still has to reach the Wall (it pays LateShare); later: lost
@@ -6262,6 +6335,7 @@ Config.Moving = {
 	},
 	Roam = { Count = 3, Range = 220, Every = 8, Near = 50, Far = 110, Kinds = { walker = 0.8, runner = 0.2 } :: { [string]: number } },
 	Reach = { Board = 12, Door = 10, Exit = 10, Item = 10, Truck = 12 },
+	Doors = { Walk = true, Depth = 3.5, Through = 6, Side = 0.5, Height = 9, Face = 0.3, Dwell = 0.25, Rearm = 2, Every = 0.1, PairWalk = 1.5, Mat = { 6, 2.2 } :: { number } }, -- 8.1 walk-in doors
 	Slots = 6,
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
@@ -6484,11 +6558,24 @@ Config.MoveStory = {
 --                      a lift again whose take failed
 --   BlinkFar / HelpBlink   your lift farther than BlinkFar studs on foot, his path failing, or not there HelpBlink s after
 --                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it
---   Standoff / HoldStep / HoldSnap   his root stands Standoff studs past your piece's far face, turned to you, on the
---                      floor there within HoldStep studs of your root's height (stairs, steps); farther than HoldSnap
---                      from that place (a door's fade): put there at once
---   HoldSpeed / HoldResponse   the constraints that keep him there (AlignPosition / AlignOrientation on his root):
---                      the most studs/s, their Responsiveness; his own walk is off meanwhile (Npcs.carried)
+--   Standoff / HoldStep   his root stands Standoff studs past your piece's far face, turned to you, on the floor there
+--                      within HoldStep studs of your root's height (stairs, steps)
+--   HoldResponse       the Responsiveness of the constraints that keep him there (AlignPosition / AlignOrientation on
+--                      his root); his own walk is off meanwhile (Npcs.carried)
+--   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
+--   PairCarry.luau the leader's steering, MoveHelperBrain.holdSpeed / holdTrack the far end's holder, server/PairHold.luau
+--   the constraints; Danny and a crew mate who helps lift alike):
+--   PairTurn           degrees a second the carry's heading (the leader's facing, the piece welded in front of it) turns
+--                      at most toward where the leader walks while two carry a piece (client/PairSteer.luau); PairBand:
+--                      degrees past 90 the way must be behind the facing before the leader walks backwards (and under
+--                      90 before forwards again: no flicker sideways)
+--   PairTurnWalk / PairTurnFull   × the pair's walk (Moving.Speed.Pair) while the heading is PairTurnFull degrees or
+--                      more off its way (in between: less slow)
+--   HoldMargin / HoldExtra   the far end's holder's top speed (AlignPosition.MaxVelocity): the carry's walk × HoldMargin
+--                      + HoldExtra studs/s (the swing of a turn at PairTurn fits in); HoldTurn: × PairTurn his body
+--                      turns at most (AlignOrientation.MaxAngularVelocity)
+--   HoldBehind / HoldStuck / HoldEase   more than HoldBehind studs off his place for HoldStuck s: eased back over HoldEase
+--                      s (never put there at once while holding; only a door's fade does: the piece in the other world)
 --   ThreeAfter         s after "Got the other end!" he says "On three... lift!"
 --   DoorWarn / VanSay  carrying with you: the piece this near a doorway: "Watch the doorframe!"; this near the van's
 --                      back: "That's going in the van." (its back shut: he opens it for the two of you, OpenBack)
@@ -6533,9 +6620,17 @@ Config.MoveHelper = {
 	HelpBlink = 1.6,
 	Standoff = 0.6,
 	HoldStep = 2.5,
-	HoldSnap = 6,
-	HoldSpeed = 60,
 	HoldResponse = 200,
+	PairTurn = 60, -- 8.1
+	PairBand = 20,
+	PairTurnWalk = 0.5,
+	PairTurnFull = 45,
+	HoldMargin = 1.25,
+	HoldExtra = 6,
+	HoldTurn = 3,
+	HoldBehind = 3,
+	HoldStuck = 3,
+	HoldEase = 0.5,
 	ThreeAfter = 1.2,
 	DoorWarn = 4,
 	VanSay = 12,
@@ -6828,29 +6923,41 @@ Config.SandboxGuide = {
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
 -- shared/WarehouseLayout.luau lays it out, server/Warehouse.luau builds it) and its display stands, where the pieces of
 -- your collection stand on show (and earn every minute you play).
---   Stands          how many display stands (Collection.display's stand: 1 … Stands; 1 nearest the door, west to east)
+--   Stands          how many display stands a warehouse starts with (Collection.display's stand: 1 … Stands; 1 nearest
+--                   the door, west to east); 8.1: the upgrades' More stands open more (Config.SandboxUpgrades), up to
+--   MaxStands       the stands the hall holds (8.1): Stands big ones in the grid, the rest smaller (SmallStand) in the
+--                   middle aisle and beside the receiving zone, each shown as a painted spot until it is bought
 --   Columns         the stands across the hall (even: half each side of the middle aisle); the rows go back from the door
 --   StandSize       a stand's podium (square, studs): every piece fits on it unturned (the biggest, the hay wagon, 6.4 × 9.6)
+--   SmallStand      8.1: an upgrade stand's podium { across, deep } (studs): every piece but the beds, the hay wagon and
+--                   the wheelbarrow fits on it unturned (Collection.display says which stand to use)
 --   StandHeight     the podium's top over the floor
---   Aisle           the least walk between two stands and between the stands and the side walls (a player with a sofa)
---   MiddleAisle     the walk from the roller door to the back wall, between the two halves
+--   Aisle           the least walk between two stands and between the stands and the side walls (8.1: 5, room for the
+--                   upgrade stands; the pieces come home with the van's unloading, nobody carries them in)
+--   MiddleAisle     the walk from the roller door to the back wall, between the two halves (8.1: the upgrade stands'
+--                   column down its middle, an Aisle each side of it)
 --   Receiving       the receiving zone's depth inside the roller door (its width the door's, SandboxMap.DoorWidth)
 --   DoorHeight      the roller door's opening (kept open)
 --   Ridge           the gable roof's ridge (north-south) over the walls' top
 --   Bay             the UNLOAD HERE box painted in front of the roller door: { width, length }, centred on the plot's
 --                   vanSpot (the parked Sprinter's middle: 4 studs to spare at each end, its words at the door's end)
---   PromptDistance  the stands' prompts' reach; SellHold the Sell prompt's hold (s)
+--   PromptDistance  the stands' prompts' reach (8.1: the UPGRADES desk's too); SellHold the Sell prompt's hold (s)
 --   Rebuild         s: the changes to one collection this close together rebuild its shown pieces once
---   MaxParts        one warehouse's part budget (the building, its stands and its bay; not the pieces on show)
+--   MaxParts        one warehouse's part budget (the building, its stands, the UPGRADES desk and its bay; not the
+--                   pieces on show)
 --   Lamp            the hall's lights (PointLights, always on)
 --   Rarity          a rarity's colour on a stand's tag (an unknown rarity: common's)
+--   ArtLevel        8.2: the level (1 … 5) of the owner's Blender warehouse (design/blender-warehouse) the warehouses wear
+--                   once ZDCWarehouseArt is imported (server/WarehouseMesh.luau; 4: the size the warehouse is)
 Config.Warehouse = {
 	Stands = 12,
+	MaxStands = 20,
 	Columns = 4,
 	StandSize = 10,
+	SmallStand = { 8, 5 } :: { number },
 	StandHeight = 1,
-	Aisle = 6,
-	MiddleAisle = 14,
+	Aisle = 5,
+	MiddleAisle = 18,
 	Receiving = 9,
 	DoorHeight = 16,
 	Ridge = 8,
@@ -6859,6 +6966,7 @@ Config.Warehouse = {
 	SellHold = 1,
 	Rebuild = 0.15,
 	MaxParts = 400,
+	ArtLevel = 4,
 	Lamp = { Range = 40, Brightness = 1.3, Color = { 255, 238, 214 } :: { number } },
 	Rarity = {
 		common = { 222, 224, 228 },
@@ -6954,6 +7062,200 @@ Config.Sprinter = {
 	Step = { Top = 1.2, Depth = 1.4, Width = 4.6 },
 	SideStep = { Top = 1.2, Depth = 1.2 },
 	Light = { Range = 13, Brightness = 1.4, Color = { 255, 244, 222 } :: { number } },
+}
+
+-- 8.1 SANDBOX, the upgrades (the owner: "the money players earn needs something to buy"): bought at the UPGRADES desk
+-- in your warehouse (server/Warehouse.luau builds it, client/UpgradeUi.luau is its window, server/Upgrades.luau decides
+-- every purchase; shared/UpgradeRules.luau has the rules, tests/upgrades_test.luau and tests/upgrades_runtime_test.luau
+-- check them). The levels are per player in the save (profile.sandboxUpgrades: Config.Upgrades and profile.upgrades are
+-- the city's gun and car tracks). Each upgrade:
+--   name, icon     its card's title and picture (an emoji)
+--   max            its top level; prices: the price of each level (prices[n] buys level n)
+--   step           what one level gives: stands +step display stands (Config.Warehouse.Stands … MaxStands); lights the
+--                  income × (1 + step) a level (compounding: CollectionRules' income, so the HUD, the stands' tags and
+--                  the picker show it); engine the van's top speed + step a level (its SpeedMult attribute,
+--                  client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau trained)
+-- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
+-- are one size; the engine is the safe van upgrade.)
+-- The tuning: a first haul on show earns about $100 a minute (Config.Collection), so the first level of each comes
+-- after a few minutes of play, the last ones after hours; everything bought costs $54,250.
+--   Order          the cards' order in the window
+--   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
+--   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
+export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number } }
+Config.SandboxUpgrades = {
+	Order = { "stands", "lights", "engine", "danny" } :: { string },
+	List = {
+		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 1000, 2500, 5000, 10000 } },
+		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 750, 1500, 3000, 6000, 12000 } },
+		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 600, 1800, 4500 } },
+		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 600, 1500, 3500 } },
+	} :: { [string]: SandboxUpgradeDef },
+	Flag = "sandboxUpgradesKept",
+	Danny = "DannyTraining",
+}
+
+-- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out
+-- there). Every piece of the sandbox house's catalogue (shared/FurnitureLooks.luau Order without Walt's farm pieces: the
+-- ordinary furniture and the collectibles) is unknown (a dark silhouette, "???") until a move brings one home
+-- (Collection.add), then found: its name, its rarity's colour, how many came home, the best condition, its value.
+-- shared/CollectionBookRules.luau has the rules (tests/collectionbook_test.luau), server/CollectionBook.luau keeps the
+-- save (profile.collectionBook) and pays the milestones (tests/collectionbook_runtime_test.luau), client/CollectionBookUi.luau
+-- is the book (the HUD's 📖 BOOK chip, the key).
+--   Milestones   in the book's order: id, name, kind ("found": `need` pieces found; "furniture": every ordinary piece;
+--                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
+--                by the server, "BookMilestone")
+--   Key          the key that opens and closes the book (a computer)
+--   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
+--                save fills the book from its stock, and its milestones pay on the first join)
+--   MaxCount     the most "brought home" a piece counts
+--   Window       the book's card: Width × Height at most, Margin / TouchMargin from the screen's edges, Side its left
+--                column (the progress and the milestones; SideTouch on a touch screen), Tile / TileTouch a card's
+--                narrowest, Picture / PictureTouch the picture's height over a card's width, Gap between the cards
+--   MaxViews     3D pictures (ViewportFrames) alive at once: only the cards on screen get one (a found piece in its
+--                colours, an unknown one as a dark silhouette), the others show the emoji or "?"
+--   MaxModels    the pieces' models kept built for the pictures (the oldest go)
+--   Silhouette   an unknown piece's colour (RGB): its 3D picture tinted to it
+export type BookMilestone = { id: string, name: string, kind: string, need: number?, reward: number }
+Config.CollectionBook = {
+	Milestones = {
+		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
+		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
+		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
+		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
+		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
+	} :: { BookMilestone },
+	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
+	Flag = "collectionBookKept",
+	MaxCount = 1_000_000,
+	Window = {
+		Width = 980,
+		Height = 640,
+		Margin = 16,
+		TouchMargin = 8,
+		Side = 220,
+		SideTouch = 196,
+		Tile = 120,
+		TileTouch = 128,
+		Picture = 0.62,
+		PictureTouch = 0.5,
+		Gap = 8,
+	},
+	MaxViews = 16,
+	MaxModels = 32,
+	Silhouette = { 14, 15, 18 } :: { number },
+}
+
+-- 8.2 SANDBOX, the daily tasks (the owner: "daily tasks that bring players back"; the city's Config.Tasks and the phone's
+-- TASKS app do not run in the sandbox). shared/SandboxTasks.luau picks and counts them (tests/sandboxtasks_test.luau),
+-- server/SandboxTasks.luau keeps profile.sandboxTasks, counts what happens and pays (tests/sandboxtasks_runtime_test.luau),
+-- client/SandboxTasksUi.luau is the TASKS panel (the key Key or the 📋 TASKS chip under the money).
+-- Every UTC day a player gets Daily tasks from DailyPool and every UTC week (from Monday 00:00 UTC) one from WeeklyPool,
+-- picked by the day's (the week's) number and the UserId: the same all day, new at 00:00 UTC; never two of one `group`
+-- a day. A kind's `event` is what the server counts:
+--   home      pieces that came home into your warehouse's stock (Collection: every new piece)
+--   rare      … of them RareRank or rarer (Config.Collection's tiers: 3 is rare)
+--   clean     a move finished with pieces home and nothing broken (everybody in its crew)
+--   moves     a move finished with pieces home (everybody in its crew)
+--   trips     the trips home of one move (`best`: the most in one move counts, not a sum)
+--   shown     pieces on show at once (`best`)
+--   sell      $ your pieces sold for
+--   income    $ your display stands paid
+--   upgrade   levels bought at the UPGRADES desk (never picked once every upgrade is at its top)
+--   danny     Danny holds the other end of your `item` (the sofa) while you carry it
+-- `text` is the title ({n} the target; `one` when it is 1), `target` the range it is picked from (in `step`s), `money`
+-- the reward at the range's low end (its high end pays TopShare more, rounded to $10), `icon` its emoji.
+--   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
+--              turns is paid then
+--   Key        the key that opens and closes the panel (a computer)
+--   StateGap   s between two states to one player; CheckEvery: s between two looks for the reset at 00:00 UTC;
+--              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
+--              Danny holds the other end of your piece (only while a danny task is open)
+--   Flag       the save's mark: profile.sandboxTasks is read only from a real save written with it
+-- The tuning: a first haul on show earns about $100 a minute (Config.Collection); the three dailies and the bonus pay
+-- $1,150 – 1,400 (about a quarter of an hour on show), the weekly $2,000 – 4,500.
+export type SandboxTaskDef = {
+	id: string,
+	event: string,
+	icon: string,
+	text: string,
+	one: string?,
+	target: { number },
+	step: number?,
+	money: number,
+	group: string?,
+	best: boolean?,
+	item: string?,
+}
+Config.SandboxTasks = {
+	Daily = 3,
+	AllDaily = 500,
+	TopShare = 0.5,
+	RareRank = 3,
+	Key = "J",
+	StateGap = 0.5,
+	CheckEvery = 10,
+	SaveDelay = 5,
+	DannyEvery = 1,
+	Flag = "sandboxTasksKept",
+	DailyPool = {
+		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 200 },
+		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 3, 5 }, money = 250 },
+		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 300 },
+		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 250 },
+		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 200 },
+		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 200 },
+		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 250 },
+		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 250 },
+		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 200 },
+	} :: { SandboxTaskDef },
+	WeeklyPool = {
+		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
+		{ id = "w_rare", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", target = { 20, 30 }, step = 5, money = 2500 },
+		{ id = "w_moves", event = "moves", icon = "🏠", text = "Finish {n} moves", target = { 5, 8 }, money = 2500 },
+		{ id = "w_clean", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", target = { 3, 5 }, money = 3000 },
+		{ id = "w_income", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 4000, 6000 }, step = 500, money = 2500 },
+		{ id = "w_sell", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 2000, 3000 }, step = 250, money = 2000 },
+	} :: { SandboxTaskDef },
+}
+
+-- 8.2 SANDBOX, showing off (server/SandboxLeaders.luau; its rules shared/SandboxLeadersRules.luau, checked by
+-- tests/sandboxleaders_test.luau and tests/sandboxleaders_runtime_test.luau). Roblox's player list shows every player's
+-- money, income a minute and collection (the city's Level, Money and Deliveries columns go in the sandbox), and the
+-- TOP MOVERS board at the crossroads ranks the server's players by what their collection is worth.
+--   Every        s: a player's list columns are written at most this often (the changes in between wait for it)
+--   BoardEvery   s: the board's rows are written at most this often
+--   Rows         players on the board (the best ones)
+--   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
+--   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
+--                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
+--   Board        the signboard: Corner studs east of Main Street's east edge and south of Depot Row's south edge (the
+--                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
+--                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
+--                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
+--                ridge, Rise high; PixelsPerStud and Range (studs) of its SurfaceGuis (one on each face)
+--   AllTime      the best collection worth each player ever had, kept in the OrderedDataStore Store (key: the user
+--                id): read when they join, written (UpdateAsync, only ever up) at most every Every s a player, never
+--                from Studio unless Studio is true; every call in a pcall (no API access: the column shows this
+--                session's best). On = false: no store, no ALL-TIME column
+Config.SandboxLeaders = {
+	Every = 1,
+	BoardEvery = 2,
+	Rows = 5,
+	Legendary = "legendary",
+	Stats = { Money = "💰 $", Income = "📈 $/min", Collection = "⭐ Collection" },
+	Board = {
+		Corner = { 26, 24 } :: { number },
+		Yaw = 45,
+		Width = 20,
+		Height = 11.5,
+		Lift = 2.6,
+		Thick = 0.6,
+		Roof = { Over = 2, Run = 2.2, Rise = 1.7 },
+		PixelsPerStud = 40,
+		Range = 260,
+	},
+	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
 }
 
 return Config

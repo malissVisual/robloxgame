@@ -70,7 +70,9 @@ FINISHES = {"plaster": ("#E8D3A2", 0.85, 0, 0), ...}   # barvy povrchů
 Pak zmáčkni **Run Script** (▶ nebo Alt + P). Starý dům se smaže a postaví se nový.
 
 Pozor na dvě věci:
-- `box` (rozměry) neměň: jsou to rozměry domu ve hře. Hra by dům odmítla a zůstala by chata.
+- `box` (rozměry) neměň: jsou to rozměry domu ve hře. Hra by dům odmítla a zůstala by chata. Když změníš výšku
+  střechy (`top`), změní se i její sklon: řekni Claudovi, musí ho přepsat i v `SandboxScenery.Chalet.Pitch`
+  (kontrola `check.py` to pozná).
 - **Barvy ve hře** nastavuje tabulka `LOOKS` v `src/server/HouseMesh.luau`, ne Blender (Roblox si barvy ze souboru
   nebere). Když změníš barvu v Blenderu a chceš ji i ve hře, řekni Claudovi.
 
@@ -78,18 +80,18 @@ Pozor na dvě věci:
 Chata dostane vzhled z Blenderu, až model jednou nahraješ do Roblox Studia. Udělat to musíš ty: Roblox zobrazí 3D
 model jen tehdy, když je nahraný pod tvým účtem, a k tvému účtu se nepřihlásím.
 
-**Máš už ve Studiu starý `ZDCHouseArt` (dům Marge)?** Smaž ho (v Exploreru ho najdeš ve Workspace nebo v
-ServerStorage). Ve městě i v sandboxu má jiné rozměry, takže by ho hra stejně nepoužila.
+**Máš už ve Studiu starý `ZDCHouseArt` (malý dům Marge z verze 8.1)?** Smaž ho (v Exploreru ho najdeš ve Workspace
+nebo v ServerStorage). Sandbox má teď zase velký dům, takže malý model by hra nepoužila.
 
-Jednou ve Studiu:
-1. *File → Import 3D* a vyber `design/blender-house/roblox/ZDCHouseArt.fbx`. Nastavení nech, jak je, a dej
-   **Import**.
-2. V Exploreru přetáhni nový model `ZDCHouseArt` do **ServerStorage**. Hra by si ho schovala i sama, ale takhle je
-   to jistota.
-3. Ulož místo (*File → Save*) a *File → Publish to Roblox*.
+Jednou ve Studiu (s hrou otevřenou jako obvykle):
+1. *File → Import 3D* (nebo karta *Home → Import 3D*) a vyber `design/blender-house/roblox/ZDCHouseArt.fbx`.
+2. Nastavení nech, jak je, a dej **Insert / Import**. V Exploreru přetáhni nový model `ZDCHouseArt` do
+   **ServerStorage**. Hra by si ho schovala i sama, ale takhle je to jistota.
+3. Ulož místo (*File → Save*) a *File → Publish to Roblox*, ať ho má i hra na Robloxu.
 
-Vyzkoušení: **Play**, dej **PLAY** a dojeď dodávkou po Main Street na jih až na konec, k domu za otočkou. Místo
-chaty tam stojí evropský dům. Dveře, *Enter house*, vítající postava i zahrada fungují jako dřív.
+Vyzkoušení: **Play**, dej **PLAY** a dojeď dodávkou po Main Street na jih až na konec, k domu za otočkou (nebo
+rovnou **P** → záložka **SANDBOX** → **📍 TO HOUSE**). Místo chaty tam stojí evropský dům. Dveře, *Enter house*,
+vítající postava i zahrada fungují jako dřív.
 
 ### Jak to funguje (pro zvědavé)
 - Dům je rozdělený podle povrchu (díl `house_plaster` je všechna omítka, `house_tile` a `house_tile2` tašky …).
@@ -97,10 +99,12 @@ chaty tam stojí evropský dům. Dveře, *Enter house*, vítající postava i za
 - Malé kostičky `mark_o`, `mark_x`, `mark_y`, `mark_z` ukazují hře, jak Roblox model při importu otočil a zvětšil,
   `mark_box` velikost domu, pro který je model udělaný. Proto na nastavení importu nezáleží.
 - Chatu staví `src/server/SandboxWorld.luau` a hned ji oblékne do modelu z Blenderu. Původní chata zůstává
-  neviditelná: do jejích zdí pořád narážíš a její dveře drží *Enter house*. Její střecha (nad zdmi) přestane kolidovat,
-  aby netrčela neviditelně skrz novou střechu.
+  neviditelná: do jejích zdí pořád narážíš a její dveře drží *Enter house*. Její neviditelná střecha se otočí podle
+  střechy z Blenderu (hřeben zleva doprava, sklon 31°, `SandboxScenery.Chalet.Pitch`), takže netrčí skrz novou střechu.
 - Když se model nehodí (jiné rozměry, chybí značky, rozházené díly), hra ho nepoužije, napíše proč do Outputu a chata
   zůstane, jak byla.
+- Dům Marge ve městě má jiné rozměry, takže tenhle model nosí jen chata v sandboxu. Pro město by se exportoval
+  `TARGET = "city"` (hra má jen jeden `ZDCHouseArt`).
 
 ## Bez Blenderu (pro AI pomocníky)
 `pip install bpy` (Python 3.13) a z této složky:
@@ -113,5 +117,5 @@ Po změně modelu spusť z kořene repozitáře `python3 zombie-delivery/tools/h
 `"target"` v manifestu simuluje import do hry na chatě postavené jako ve `SandboxWorld.luau`, nebo na domě Marge jako
 ve `World.luau`. Ověří, že:
 - díly sedí a zdi stojí na kolizích;
-- střecha je pod výškou domu ve hře;
+- neviditelná střecha chaty je celá pod střechou z Blenderu;
 - nic nepřekáží zahradě, vítající postavě, dveřím ani věcem ze stěhování.

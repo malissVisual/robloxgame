@@ -14,7 +14,7 @@
 --                  the edge lines, the give-way line where Main Street meets Depot Row)
 --   The house      the curb-to-door Path, the garden's fence round its lot (decoration: nothing stops a mover), the
 --                  gate with its THE OLD CHALET board, the mailbox, the flower boxes (the chalet itself is
---                  shared/ChaletLooks.luau's, on SandboxMap.House.house)
+--                  shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the owner's Blender house once imported)
 --   The scenery    the alpine spruces (shared/AlpineLayout.luau's two-part trees) in copses and along the edges, never
 --                  on a road, a plot, the house's lot or a van's way; wildflower patches; a rail fence round the edge
 --                  (the invisible walls are at the Bounds); the street lamps along Main Street; the signpost at the
@@ -85,7 +85,11 @@ SandboxScenery.Shadow = { Long = 4, Wide = 1 } -- a part throws a shadow only th
 SandboxScenery.FenceInset = 4 -- the rail fence this far inside the Bounds (the invisible walls on them)
 SandboxScenery.FencePost = 16 -- studs between two posts
 SandboxScenery.WallHeight = 300
-SandboxScenery.Chalet = { Walls = 14.5, Seed = 1, Render = 2, Shade = 0 } -- the walls' height (the roof's top under the box's), its dice: "tyrol"
+-- the chalet on House.house (its walls the box's height), its dice: "tyrol". 8.1: Pitch is the owner's Blender house's roof
+-- (design/blender-house/house.py PITCH): dressed in it (server/HouseMesh.luau), the chalet's gable wedges are re-cut to
+-- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model). 8.2.1:
+-- the big house's 31° (house.py TARGET "sandbox", the manifest's "pitch")
+SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }

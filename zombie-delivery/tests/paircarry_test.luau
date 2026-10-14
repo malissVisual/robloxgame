@@ -1,0 +1,194 @@
+-- 8.1 carrying in two (the owner: "the way Danny helps me is weird: when I turn around he teleports. When we carry
+-- something heavy and I need help, we must walk, like, backwards and slowly"): the leader's steering, shared/
+-- PairCarry.luau (pure; client/PairSteer.luau runs it every frame). Roblox's yaw; the heading turns toward the way at
+-- PairTurn degrees a second at most, the shorter way round; a way behind the facing is walked backwards (no turn at
+-- all), with a band against flickering sideways; the walk slower while the heading turns; a 180° turn of the input,
+-- an input sweeping round, a still stick; the boosts (AdminSpeed, KitSpeed). tests/movehelper_runtime_test.luau and
+-- tests/movehelper_art_runtime_test.luau walk the leader with it.
+local PairCarry = require("./PairCarry")
+local Brain = require("./MoveHelperBrain")
+local Config = require("./Config")
+
+local failures = 0
+local function check(name: string, ok: boolean, detail: any?)
+	if ok then
+		print("ok    " .. name)
+	else
+		failures += 1
+		print("FAIL  " .. name .. (if detail ~= nil then "  (" .. tostring(detail) .. ")" else ""))
+	end
+end
+local function near(a: number, b: number, eps: number?): boolean
+	return math.abs(a - b) < (eps or 1e-9)
+end
+
+local H = Config.MoveHelper
+local PI = math.pi
+local RATE = math.rad(H.PairTurn)
+local DT = 1 / 60
+
+-- The numbers ---------------------------------------------------------------------------------------------------------------
+
+check("PairTurn between 50 and 70 degrees a second (two movers turn slowly)", H.PairTurn >= 50 and H.PairTurn <= 70, H.PairTurn)
+check("the pair walks a touch slower than before (Moving.Speed.Pair under 0.8), slower still while it turns", Config.Moving.Speed.Pair < 0.8
+	and Config.Moving.Speed.Pair >= 0.6 and H.PairTurnWalk > 0.2 and H.PairTurnWalk < 1 and H.PairTurnFull > 0)
+check("the band against the flicker: under 45 degrees", H.PairBand > 0 and H.PairBand < 45)
+
+-- Angles ----------------------------------------------------------------------------------------------------------------------
+
+check("wrap: into −π … π", near(PairCarry.wrap(3 * PI / 2), -PI / 2) and near(PairCarry.wrap(-3 * PI / 2), PI / 2) and near(PairCarry.wrap(0.3), 0.3)
+	and near(PairCarry.wrap(2 * PI + 0.3), 0.3))
+check("yawOf: Roblox's (CFrame.Angles(0, yaw, 0) looks along (−sin yaw, 0, −cos yaw))", near(PairCarry.yawOf(0, -1), 0) and near(PairCarry.yawOf(-1, 0), PI / 2)
+	and near(PairCarry.yawOf(1, 0), -PI / 2) and near(math.abs(PairCarry.yawOf(0, 1)), PI))
+do
+	local ok = true
+	for k = 0, 35 do
+		local yaw = PairCarry.wrap(k * 0.17 - 3)
+		local lx, lz = -math.sin(yaw), -math.cos(yaw)
+		ok = ok and near(PairCarry.yawOf(lx, lz), yaw, 1e-9)
+	end
+	check("yawOf of a yaw's look is that yaw (all round)", ok)
+end
+
+-- The turn --------------------------------------------------------------------------------------------------------------------
+
+check("turn: at most rate × dt a step", near(PairCarry.turn(0, 1, RATE, 0.1), RATE * 0.1) and near(PairCarry.turn(0, -1, RATE, 0.1), -RATE * 0.1))
+check("turn: onto the goal when it is within the step", near(PairCarry.turn(0, 0.05, RATE, 0.1), 0.05))
+check("turn: the shorter way round (from 170° to −170° is 20° on, through 180°)", PairCarry.turn(math.rad(170), math.rad(-170), RATE, 0.1) > math.rad(170)
+	or PairCarry.turn(math.rad(170), math.rad(-170), RATE, 0.1) < -math.rad(170))
+check("turn: nothing with no time or no rate", near(PairCarry.turn(0.4, 2, RATE, 0), 0.4) and near(PairCarry.turn(0.4, 2, 0, 1), 0.4))
+
+-- Backwards ------------------------------------------------------------------------------------------------------------------
+
+check("the way ahead: forwards", not PairCarry.backwards(0, 0, false) and not PairCarry.backwards(0, math.rad(60), false))
+check("the way right behind: backwards (facing the piece and the partner)", PairCarry.backwards(0, PI, false))
+check("sideways (90°): as it was (no flicker)", not PairCarry.backwards(0, PI / 2, false) and PairCarry.backwards(0, PI / 2, true))
+check("forwards until 90° + PairBand off, then backwards", not PairCarry.backwards(0, math.rad(90 + H.PairBand - 1), false)
+	and PairCarry.backwards(0, math.rad(90 + H.PairBand + 1), false))
+check("backwards until under 90° − PairBand, then forwards", PairCarry.backwards(0, math.rad(90 - H.PairBand + 1), true)
+	and not PairCarry.backwards(0, math.rad(90 - H.PairBand - 1), true))
+check("the heading's goal: the way forwards, against it backwards", near(PairCarry.goal(0.5, false), 0.5) and near(PairCarry.goal(0.5, true), PairCarry.wrap(0.5 + PI)))
+
+-- The walk while it turns ----------------------------------------------------------------------------------------------------
+
+check("the pair's walk in full on its heading", near(PairCarry.walkFactor(0), 1))
+check("× PairTurnWalk at PairTurnFull degrees off or more", near(PairCarry.walkFactor(math.rad(H.PairTurnFull)), H.PairTurnWalk)
+	and near(PairCarry.walkFactor(math.rad(170)), H.PairTurnWalk))
+check("…less slow in between, never faster", PairCarry.walkFactor(math.rad(H.PairTurnFull / 2)) < 1 and PairCarry.walkFactor(math.rad(H.PairTurnFull / 2)) > H.PairTurnWalk)
+
+-- Steering a leader ----------------------------------------------------------------------------------------------------------
+
+-- The way (x, z) at `yaw` (a stick pushed that way).
+local function way(yaw: number): (number, number)
+	return -math.sin(yaw), -math.cos(yaw)
+end
+do
+	local s = PairCarry.newSteer(0)
+	local factor = PairCarry.steer(s, 0, 0, DT)
+	check("a still stick: the heading stays, the walk the pair's", near(s.heading, 0) and near(factor, 1) and not s.back)
+	local x, z = way(PI)
+	local moved = 0
+	for _ = 1, 120 do
+		local before = s.heading
+		factor = PairCarry.steer(s, x, z, DT)
+		moved += math.abs(PairCarry.wrap(s.heading - before))
+	end
+	check("the stick right back (180°): walked backwards, the heading never moves (no swing), at the pair's full walk", s.back and moved == 0 and near(factor, 1))
+	x, z = way(0)
+	for _ = 1, 30 do
+		factor = PairCarry.steer(s, x, z, DT)
+	end
+	check("…and forwards again (toward the partner): no turn either", not s.back and near(s.heading, 0) and near(factor, 1))
+end
+do
+	-- the way swept round 180° in half a second (the camera spun round, the stick held): the heading follows at PairTurn
+	-- at most; the way soon behind the facing, the leader walks it backwards (no need to turn all the way round)
+	local s = PairCarry.newSteer(0)
+	local most, slowest, t = 0, 1, 0
+	for _ = 1, 600 do
+		t += DT
+		local x, z = way(math.min(t / 0.5, 1) * math.rad(179))
+		local before = s.heading
+		local factor = PairCarry.steer(s, x, z, DT)
+		most = math.max(most, math.abs(PairCarry.wrap(s.heading - before)))
+		slowest = math.min(slowest, factor)
+	end
+	check("an input swept 180° round in 0.5 s: the heading turns PairTurn degrees a second at most", most <= RATE * DT + 1e-12, math.deg(most) / DT)
+	check("…the new way soon behind: walked backwards, facing back the old way (on it again, the pair's full walk)", s.back
+		and near(s.heading, PairCarry.goal(math.rad(179), true), 1e-6) and near(PairCarry.walkFactor(s.off), 1), math.deg(s.heading))
+	check("…the walk slower while it turned (PairTurnWalk at the worst)", near(slowest, H.PairTurnWalk))
+	-- the way swept round 180° slowly (45° a second: a gentle curve): the heading follows it forwards all the way round
+	s = PairCarry.newSteer(0)
+	most, t = 0, 0
+	local backward = false
+	for _ = 1, 360 do
+		t += DT
+		local x, z = way(math.min(t / 4, 1) * math.rad(179))
+		local before = s.heading
+		PairCarry.steer(s, x, z, DT)
+		most = math.max(most, math.abs(PairCarry.wrap(s.heading - before)))
+		backward = backward or s.back
+	end
+	check("an input swept 180° round in 4 s: the heading follows it forwards all the way round, PairTurn degrees a second at most",
+		not backward and most <= RATE * DT + 1e-12 and near(s.heading, math.rad(179), 1e-6), math.deg(s.heading))
+end
+do
+	-- the way to the right (90°): forwards still (the band), the heading turns there at PairTurn
+	local s = PairCarry.newSteer(0)
+	local x, z = way(-PI / 2)
+	local steps = 0
+	while math.abs(PairCarry.wrap(s.heading + PI / 2)) > 1e-9 and steps < 1000 do
+		PairCarry.steer(s, x, z, DT)
+		steps += 1
+	end
+	check("the way to the right: a forward turn of 90° in 90 / PairTurn s", not s.back and near(steps * DT, (PI / 2) / RATE, DT + 1e-9), steps * DT)
+	-- the stick flicking either side of 90° behind the new facing: backwards then stays (the band)
+	local flips = 0
+	local was = s.back
+	for k = 1, 40 do
+		local off = if k % 2 == 0 then math.rad(85) else math.rad(95)
+		x, z = way(s.heading + off)
+		PairCarry.steer(s, x, z, DT)
+		if s.back ~= was then
+			flips += 1
+			was = s.back
+		end
+	end
+	check("a way flicking round 90° off: no flicker between forwards and backwards", flips == 0, flips)
+end
+do
+	-- a 180° turn of the body over the steps' own rate: the client's frame time does not matter
+	local a, b = PairCarry.newSteer(0), PairCarry.newSteer(0)
+	local x, z = way(-PI / 2)
+	for _ = 1, 60 do
+		PairCarry.steer(a, x, z, 1 / 60)
+	end
+	for _ = 1, 20 do
+		PairCarry.steer(b, x, z, 1 / 20)
+	end
+	check("the same second at 60 or 20 frames: the same turn", near(a.heading, b.heading, 1e-9) and near(a.heading, -RATE, 1e-9), `{a.heading} {b.heading}`)
+end
+
+-- The far end's holder keeps up -----------------------------------------------------------------------------------------------
+
+do
+	local walk = Config.Movement.Walk * Config.Moving.Speed.Pair
+	local top = Brain.holdSpeed(walk)
+	-- the far end of a long piece (the marble slab: 9.8 deep) swings round the leader's root as the heading turns
+	local reach = Config.Cargo.CarryFront + 9.8 + H.Standoff
+	check("his top speed keeps up with the pair's walk", top >= walk * 1.2)
+	check("…and with the far end of a long piece swinging round a turn at PairTurn, the walk slowed meanwhile", top >= walk * H.PairTurnWalk + RATE * reach, `{top} vs {walk * H.PairTurnWalk + RATE * reach}`)
+	check("…yet no faster than a sprint (no flying across the room)", top <= Config.Movement.Walk * H.Sprint * 1.2, top)
+	check("his body turns faster than the heading does (always facing the leader)", Brain.holdTurn() > RATE)
+end
+
+-- The boosts -----------------------------------------------------------------------------------------------------------------
+
+check("boost: AdminSpeed × KitSpeed, clamped", near(PairCarry.boost(2, 1.5), 3) and near(PairCarry.boost(9, 9), 8) and near(PairCarry.boost(0.2, 0.2), 1))
+check("boost: anything else is 1", near(PairCarry.boost(nil, nil), 1) and near(PairCarry.boost("x", 0 / 0), 1))
+
+if failures == 0 then
+	print("ALL CHECKS PASSED")
+else
+	print(`{failures} CHECK(S) FAILED`)
+end

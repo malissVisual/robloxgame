@@ -20,6 +20,36 @@
 > (`Config.SpawnSpot.Pass`), the warehouse stands on its concrete, cheap pieces show "+$0.2/min", no city sounds, a
 > freed plot goes to a waiting player, START brings the van repaired, dying on a move puts you by the van, one arrow
 > (the guide, no GPS), the sandbox's own words everywhere (no Wall, no pay, no XP).
+>
+> **8.1** (the owner's feedback): **carrying in two** is slow and physical: the leader's heading turns at most 60° a
+> second (`client/PairSteer.luau`, `shared/PairCarry.luau`), a way behind is walked backwards (backing through doors
+> too), and the far end (Danny or a crew mate) is held there by the server (`server/PairHold.luau`), never teleported.
+> **No E at the house**: walk into a door and the fade takes you through (`Config.Moving.Doors`, doormats "▲ IN" /
+> "▲ OUT"). **The grip** is timing checks now (`shared/CarryGrip.luau`, `client/CarryGripUi.luau`): lifting a piece is
+> a lift check ("feeling for the grip": a hit lifts it balanced, a miss knocks it), and while you carry, a WOBBLE! now
+> and then (a hit: steady; a miss staggers a sturdy piece and the next drops it; a fragile piece drops at once). Every
+> miss does something: putting the piece down, loading it or walking through a door with a wobble open still counts,
+> and the misses stay with the piece a moment. Easy by default; `Config.CarryGrip.Difficulty` makes it harder later.
+> The warehouse's **UPGRADES desk** (`server/Upgrades.luau`, `client/UpgradeUi.luau`, `Config.SandboxUpgrades`): more
+> stands (12 → 20), showroom lights (more income), the van's engine and Danny's training. The sandbox **sounds like the
+> Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Chalet wears the owner's **Blender
+> house** once imported, and the 12 collectibles have their **Blender look** (`ZDCFurnitureArt`, re-import it).
+>
+> **8.2** (more to do with the money and the collection): the **collection book** (📖 BOOK chip, C on a computer;
+> `server/CollectionBook.luau`, `client/CollectionBookUi.luau`): the 56 pieces the house can hold, the unknown ones dark
+> silhouettes, milestones that pay once (found 10 / 20, all the furniture, every collectible, a legendary). **Daily
+> tasks** (📋 TASKS chip, J; `server/SandboxTasks.luau`, `Config.SandboxTasks`): three a day and one a week, picked by
+> the UTC day, CLAIM pays, a $500 bonus for all three. The STOCK list's **⭐ FILL BEST**, **💰 SELL…** (all Common, all
+> broken, the duplicates; never a piece on show) and **↩ TAKE ALL DOWN**, a sort and a search (`shared/StockPlan.luau`).
+> **Showing off**: the player list's 💰 $ / 📈 $/min / ⭐ Collection and the **TOP MOVERS** board at the crossroads
+> (`server/SandboxLeaders.luau`, the all-time best in the OrderedDataStore `Sandbox_TopCollection`). The warehouse
+> wears the owner's **Blender warehouse** (level 4 of `design/blender-warehouse`'s five, `server/WarehouseMesh.luau`,
+> `Config.Warehouse.ArtLevel`) once `ZDCWarehouseArt` is imported. The sandbox's own **analytics** funnel (10 steps,
+> `server/SandboxAnalytics.luau`) and the moves' events; a **performance** pass for phones (labels drawn only near,
+> the chalet and the halls stream whole). An **end-to-end test** runs the whole loop with the real modules
+> (`tests/sandbox_e2e_runtime_test.luau`; the Studio checklist `design/sandbox/TEST-STUDIO.md`). Fixed on the way: a
+> player without a plot shows nothing and earns nothing; a piece a full warehouse refuses is lost, not "home"; the
+> book's paid milestones survive a save through an older server (`rewards`' "book:" keys).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1437,13 +1467,13 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 - Your own ZDC Van comes next to you (7.x; 7.0 lent a Moving Truck). Drive to 155 Willow Ln (GPS).
 - At the front door the screen fades and you are inside Marge's house, built far off the map (`server/HouseInterior.luau` from `shared/HouseLayout.luau`). There are 8 rooms, laid out a little differently every time, with 18–24 of the 36 pieces from `shared/FurnitureLooks.luau`, three of them ★.
 - Carry them out: ✋ one hand, 🙌 both hands (slower), 👥 two people (Lift / Help lift; alone you drag it). G puts a piece down.
-- **The grip** (like Fisch's reeling): while you carry a 🙌 or 👥 piece, or a fragile ✋ one (gentler), a bar shows right of the middle.
-  - The piece (its icon) darts up and down: wilder when heavy or fragile, when you walk fast, turn, go up or down, jump or get bitten; calmer standing still.
-  - Hold the left mouse button or F (gamepad R2; on a phone the round HOLD button over FIRE) and the grip box rises; let go and it falls (momentum, a little bounce).
-  - The piece inside the box fills the meter (full: STEADY, +10% walk), outside drains it (standing still never under a third). SLIPPING! warns; at 0 it slips: dropped, with damage (fragile more), and a shaky carry wears it a little.
-  - Two carriers each have their own bar (either slip drops it); a Mover's box is 35% bigger, a Mover lifting a 👥 piece alone gets a harder bar; a heavy lift starts at 60%; Danny never slips.
-  - The server checks the bar (7.1 review): no slip sooner than any bar can run out (about 1.9 s after the lift; the client asks again each second, so a real slip lands), STEADY only once a meter could have filled and only while the reports keep coming (none for 2 s: the +10% goes), STEADY +10% on the bar only when the server gives it (at most 10% of the last second outside the box), a 👥 piece carried by two worn half by each one's reports, nothing from either carrier during a door's fade. A piece that slipped and is picked up again at once gets a new bar.
-  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, Moving's grip hook and grip block (the Moving remote's "slip" and "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau`.
+- **The grip** (8.1, the owner: "when I fail, something must always happen, but make it easier; it can get harder later"): no more holding a button while you walk. A 🙌 or 👥 piece, or a fragile ✋ one, has **timing checks**: a needle sweeps a bar back and forth, a green zone lies on it, and one press (the left mouse button or F, gamepad R2, the round GRIP button on a phone, or a tap on the widget) while the needle is in the zone is a hit; no press within the window is a miss.
+  - **The lift ("feeling for the grip"):** Pick up / Lift / Help lift opens a lift check instead of lifting (3 s). A hit lifts it **balanced** (+10% walk); a miss knocks it (4%, a fragile piece 5%), it hops and slips back down where it stood, and you try again (E).
+  - **Wobbles while you carry:** about every 7–12 s of walking a WOBBLE! check pops up (seldom standing still; sooner when you go faster than the carry's walk, turn hard, jump or get bitten; a drag rarer, a Mover's solo lift more often). A hit: steady again. Every miss does something: a sturdy piece's first miss is a **stagger** (a 3% knock, the walk × 0.6 for 1.5 s, the next wobble twice as soon), the second miss in a row **drops** it (the slip's damage); a fragile piece drops at its first miss (the check then says LAST CHANCE!). Walking needs no button at all.
+  - Easy by default: the green zone is about a third of the sweep (27–40%: smaller for heavy and fragile pieces), the needle slow (about 1.5 s edge to edge), a wobble's zone a little smaller and its needle a little faster. A Mover's zone is 35% bigger, Danny steadying the other end makes it 1.3× bigger, two people on a 👥 piece each get their own checks and each stagger's knock is half. Danny never has a check.
+  - **Harder later is numbers only:** `Config.CarryGrip.Difficulty` (1 today; zones ÷ it, needles × it), the zones, needles, windows, wobble times, knocks and the misses in a row that drop a piece (`Miss.Drop`: sturdy, heavy, fragile) all live in `Config.CarryGrip`; `On = false` turns the checks off.
+  - The server decides everything: it opens every check (the Moving remote's ("grip", "open", …)), judges each answer ("ok" counts only for your own open check, with a press time its own clock could have seen and the needle in the zone by the same maths), takes no answer within the window + 1.5 s as a miss, applies the knock, stagger or drop and sends the outcome; a door's trip takes an open check off. The widget sits in the middle under your character, or as near as is clear of the HUD, the guide line, the move's panel and the touch controls; the outcome (BALANCED!, SLIPPED BACK!, STEADY!, STAGGER!, DROPPED!) shows a moment with a sound and, on a miss, a short shake.
+  - Code: `shared/CarryGrip.luau` (pure), `client/CarryGripUi.luau`, `client/MoveLayout.luau` `gripCheck`, Moving's grip hook (`Grip.hands` in setHands, the lift moment in onPick / onHelp) and grip block (`Grip.*`, the remote's "grip"), `Config.CarryGrip`; tests `carrygrip_test`, `carrygrip_runtime_test`, `tools/phone-ui/carrygrip.luau` (`carrygrip_preview.py` draws its scenes).
 - Load at the open back (E). The bed is a grid packed first-fit, turned 90° when that fits; Unload (Z) takes one back out.
 - Pieces lose condition from falls, bites and truck hits, and fragile ones lose more.
 - At 3:00 left a horde comes to the house.
@@ -1453,7 +1483,7 @@ Marge turns the company into ZDC Moving & Evacuation ("We move your life. The re
 7.x (the owner: "he helps weirdly, mainly we don't carry anything together") made him a partner with a clear priority list each step:
 - **Carrying together just works.** You Lift a 👥 piece and he sprints to its far end (from far away, or when his path fails, or not there in 1.6 s: a quick fade-over) and takes it within ~2 s: "Got the other end!", then "On three... lift!".
   - Then he moves WITH the piece: his own walk is off and constraints on his root (AlignPosition / AlignOrientation to an attachment at the far end, turned to you) hold him there, on the floor under that end (stairs, steps), through door frames like the piece itself and through the front door's fade with you. No "too far apart" drop any more.
-  - His arms hold its edge (client/ArmPose.luau from his Carrying / CarryAt / CarrySize), his legs step with his speed (backwards too: `Npcs.carried`, `Npcs.stride`), and your grip bar's box is 1.3× bigger while he steadies it (the character attribute GripSteady, `Config.CarryGrip.Steadied`).
+  - His arms hold its edge (client/ArmPose.luau from his Carrying / CarryAt / CarrySize), his legs step with his speed (backwards too: `Npcs.carried`, `Npcs.stride`), and your grip checks' green zone is 1.3× bigger while he steadies it (the character attribute GripSteady, `Config.CarryGrip.Steadied`).
   - On the way: "Watch the doorframe!" at a doorway; by the van he opens its back for the two of you, else "That's going in the van."
 - **He carries more.** 🙌 pieces too (slower), not only ✋ ones: ★ first, then the most value a second of the trip. He opens the van's back himself (`OpenBack`; not allowed: "Open the back, boss!"), and says "Van's full, boss - drive it to the Wall?" and waits when it is.
 - **Your lift wins.** A piece you stand by with free hands (within 8 studs, nearer than he is) is yours: he drops his plan ("All yours, boss.").
@@ -1617,29 +1647,26 @@ look, and on three variants of every piece each model piece is in place inside t
 untouched, the labels kept, the builders' parts gone, within `Config.Furniture.MaxParts`, the palette finishes in the
 variant's colours; a whole house dressed within `InteriorMaxParts`; without the import nothing changes.
 
-## The sandbox's house in the owner's Blender model (8.0.5)
+## The sandbox's big house in the owner's Blender model (8.2.1)
 
-The owner: "předělej ten dům na chatu v sandboxu" (make the European house the sandbox's chalet). `design/blender-house/house.py` now has a `TARGET`:
-- `"sandbox"` (the export now): The Old Chalet's box (SandboxMap.House.house 44 × 34, SandboxScenery.Chalet.Walls 14.5), its roof under the box's height of 26 (the steepest pitch that fits: 31°);
-- `"city"`: Marge's 155 Willow Ln, as in 7.2.
+The owner asked to make the European house the sandbox's chalet ("předělej ten dům na chatu v sandboxu"). 8.1 had put Marge's small house (20.36 × 12.60 × 17.57) on The Old Chalet. Shown both, the owner chose the big one ("chci ten velký dům"). `design/blender-house/house.py` has a `TARGET`:
+- `"sandbox"` (the export now): The Old Chalet's old footprint, 44 × 14.5 × 34 (the walls), the roof under 26 (the steepest pitch that fits: 31°);
+- `"city"`: Marge's 155 Willow Ln, as in 7.2 (the game has one `ZDCHouseArt`, so only one of them wears it).
 
 The house is the same classic European house, with these sandbox changes:
 - six windows a floor at the front and the back, four on each gable side, two attic windows;
 - three dormers, two chimneys on the back slope;
-- planters under the ground-floor windows too (nothing hangs on the sandbox's front wall);
+- planters under the ground-floor windows too;
 - coarser tiles, flowers and frames for the bigger house: 21 pieces, about 65,000 triangles.
 
-`server/SandboxWorld.luau`'s house() hands its finished chalet to `server/HouseMesh.luau` (`Homes.sandbox_house`), if
-the module is in the place. The chalet's own parts stay, unseen: its House box still collides and its FrontDoor (SandboxDoor) still holds the "Enter house". Since 8.0.5 HouseMesh also stops whatever a house has over its walls from colliding (the chalet's gable wedges would stand through the model's roof; in the city the same for the roof's wedges).
+`SandboxMap.House.house` is that box again (z 540: the front wall still at the door, z 523), `SandboxScenery.Chalet.Pitch` is 31, and the start screen's two house shots are as far out as before 8.1. 8.1's dressing is unchanged:
+- SandboxWorld puts the chalet's parts in `House_sandbox_house` and hands them to HouseMesh;
+- the chalet's House box and gable stay solid and unseen, the gable re-cut across the house under the model's roof;
+- the FrontDoor sits on the model's door.
 
-`tools/house-art/check.py` reads the export's `"target"`. For the sandbox it builds the chalet as SandboxWorld does (its source lines are checked), with its garden (the four flower boxes, the gate, the mailbox), the greeter (Config.MoveGreeters.Porch) and the Enter house box, and checks that:
-- every piece is in place;
-- the House box and the FrontDoor are kept, and nothing over the walls collides;
-- the walls stand on the box and the roof stays under SandboxMap.House.house's height;
-- nothing of the model touches the garden things, the greeter or the door;
-- Marge's city house (another size) and an unlisted house stay unchanged.
-
-A city export (`TARGET = "city"`) passes its 7.2 checks, given as a second argument.
+`tools/house-art/check.py` reads the export's `"target"`:
+- **sandbox:** 8.1's sandbox checks, with the greeter's spot (Config.MoveGreeters.Porch) added to what must stay clear. Marge's house, another size, keeps World's look.
+- **city:** the 7.2 checks, and the sandbox's house keeps its chalet. Give a city export's manifest as a second argument.
 
 ## The warehouse's five levels in Blender (8.0.4, design only)
 

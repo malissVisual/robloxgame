@@ -440,7 +440,7 @@ check("driving down Main Street: still the house, straight on (one beam)", Sandb
 humanoid.SeatPart = nil
 stand(SandboxMap.House.curb.x + 6, SandboxMap.House.curb.z)
 tick()
-check("at the house, outside: \"Go inside: tap at the front door\" (a phone taps)", SandboxGuide.step() == "door" and words.Text == "Go inside: tap at the front door" and shown(), words.Text)
+check("at the house, outside: \"Walk in through the front door\" (8.1 walk-in doors: nothing to tap)", SandboxGuide.step() == "door" and words.Text == "Walk in through the front door" and shown(), words.Text)
 check("… the chevron over the front door", at(SandboxMap.House.door.x, SandboxMap.House.door.z) and string.find(tag.Text, "FRONT DOOR", 1, true) ~= nil, tag.Text)
 moving.OnClientEvent:Fire("state", view({ inside = true }))
 tick()

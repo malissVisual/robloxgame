@@ -116,7 +116,10 @@
 --                             (Collection.display, Config.Warehouse.Stands); "van" the sandbox van (Config.Sandbox.Van)
 --                             to the plot's vanSpot (the live van moved with its load, else a new one), "house" to the
 --                             house's front door, "warehouse" to the plot's spawn (driving your van: it goes with you,
---                             to the house's curb / the vanSpot)
+--                             to the house's curb / the vanSpot); 8.1: "upmax" / "upreset" every upgrade at its top
+--                             for free / none (server/Upgrades.luau admin; FILL STANDS fills the player's own stands,
+--                             Collection.stands); 8.2: "bookfill" / "bookclear" every piece of the collection book found
+--                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1477,9 +1480,14 @@ Sandbox.run.clear = function(player: Player)
 	say(player, if sold > 0 then `ADMIN: {sold} pieces gone from your stock ($0 for them).` elseif #stock == 0 then "ADMIN: your stock is empty already." else "ADMIN: the stock kept its pieces (Collection.sell refused them).")
 end
 
--- The stock's pieces not on show onto the free display stands (Config.Warehouse.Stands of them).
+-- The stock's pieces not on show onto the free display stands (Config.Warehouse.Stands of them; 8.1: the player's own
+-- count, Collection.stands, with the More stands they bought).
 Sandbox.run.stands = function(player: Player)
 	local stands = Sandbox.Rules.standCount((Config :: any).Warehouse)
+	if stands > 0 and Sandbox.hasCollection("stands") then
+		local ok, own = Sandbox.collection("stands", player)
+		stands = if ok and type(own) == "number" then own else stands
+	end
 	if stands <= 0 then
 		say(player, "ADMIN: no display stands in this build yet (Config.Warehouse.Stands).")
 		return
@@ -1500,6 +1508,50 @@ Sandbox.run.stands = function(player: Player)
 		end
 	end
 	say(player, if shown > 0 then `ADMIN: {shown} pieces put on show.` elseif #plan == 0 then "ADMIN: nothing to put on show (no piece in the stock, or no free stand)." else `ADMIN: the stands took nothing ({why or "Collection.display refused"}).`)
+end
+
+-- 8.1, the upgrades (server/Upgrades.luau's admin: every one at its top for free, or none) ----------------------------
+
+function Sandbox.upgrades(player: Player, what: string)
+	local ok, text = pcall(function()
+		return (require(Server.Upgrades) :: any).admin(player, what)
+	end)
+	if ok and type(text) == "string" then
+		say(player, text)
+		return
+	end
+	warn(`[Admin] sandbox: Upgrades.admin {what} failed: {text}`)
+	say(player, `ADMIN: the upgrades' {what} failed (see the server Output).`)
+end
+
+Sandbox.run.upmax = function(player: Player)
+	Sandbox.upgrades(player, "max")
+end
+
+Sandbox.run.upreset = function(player: Player)
+	Sandbox.upgrades(player, "reset")
+end
+
+-- 8.2, the collection book (server/CollectionBook.luau's admin: every piece found, or the book empty) ----------------
+
+function Sandbox.book(player: Player, what: string)
+	local ok, text = pcall(function()
+		return (require(Server.CollectionBook) :: any).admin(player, what)
+	end)
+	if ok and type(text) == "string" then
+		say(player, text)
+		return
+	end
+	warn(`[Admin] sandbox: CollectionBook.admin {what} failed: {text}`)
+	say(player, `ADMIN: the collection book's {what} failed (see the server Output).`)
+end
+
+Sandbox.run.bookfill = function(player: Player)
+	Sandbox.book(player, "fill")
+end
+
+Sandbox.run.bookclear = function(player: Player)
+	Sandbox.book(player, "clear")
 end
 
 -- Travel and the van (shared/SandboxMap.luau's spots) -----------------------------------------------------------------

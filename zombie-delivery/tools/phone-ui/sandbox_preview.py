@@ -2,7 +2,9 @@
 """8.0 SANDBOX: preview PNGs of the sandbox's HUD and the warehouse picker as the real client/SandboxHud.luau and
 client/WarehouseUi.luau build them (sandbox.luau's scenes on sandbox_mock.luau's recorder, its checks first): on a
 phone held sideways (844 x 390, the touch controls drawn), a computer (1280 x 800) and a big screen (1920 x 1080):
-the HUD with toasts, THE PICKER, the SELL question, the STOCK list; drawn by sandbox_preview.mjs in headless Chromium.
+the HUD with toasts, THE PICKER, the SELL question, the STOCK list (8.2: with its FILL BEST / SELL… / TAKE ALL DOWN, the
+SELL… menu and its question, a sort, the search box, a small stand's too-big pieces); drawn by sandbox_preview.mjs in
+headless Chromium.
 
     NODE_PATH=/opt/node22/lib/node_modules python3 zombie-delivery/tools/phone-ui/sandbox_preview.py <luau> <out dir> [--fonts DIR]
 
@@ -25,12 +27,13 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument("luau")
 parser.add_argument("out")
 parser.add_argument("--fonts", help="a folder with montserrat-500.woff2 and montserrat-700.woff2")
+parser.add_argument("--scenes", default="sandbox.luau", help="the scene script (8.1: upgrades.luau, the UPGRADES window)")
 args = parser.parse_args()
 
 with tempfile.TemporaryDirectory() as folder:
     dest = Path(folder)
     sandbox_env(dest)
-    out = subprocess.run([args.luau, "sandbox.luau", "-a", "dump"], cwd=dest, capture_output=True, text=True)
+    out = subprocess.run([args.luau, args.scenes, "-a", "dump"], cwd=dest, capture_output=True, text=True)
     if out.returncode != 0:
         sys.exit(out.stdout + out.stderr)
     scenes = json.loads(out.stdout.strip().splitlines()[-1])

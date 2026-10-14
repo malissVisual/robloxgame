@@ -11,15 +11,27 @@
 --   Collection.stock(player)                   { Entry } everything you own (on show or not; copies)
 --   Collection.display(player, uid, stand)     put a piece of your stock on display stand `stand` (an index of your
 --                                              warehouse's stands, CollectionRules.standsFor; one piece a stand; a
---                                              piece on show elsewhere moves there) → ok, why
+--                                              piece on show elsewhere moves there; 8.1: a piece too big for an
+--                                              upgrade's small stand is refused, WarehouseLayout.fits) → ok, why
 --   Collection.undisplay(player, uid)          take it down (back to the stock) → ok, why
 --   Collection.sell(player, uid)               sell it (on show or not) → the money paid (nil: refused), why
---   Collection.incomePerMinute(player)         what your pieces on show earn a minute now
+--   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
+--   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: the start's
+--                                              and the More stands you bought)
+--   Collection.boost(player)                   8.1: your income's × (CollectionRules.boost: the Showroom lights)
+--   Collection.upgrade(player, apply)          8.1 (server/Upgrades.luau): an upgrade bought or reset. What the stands
+--                                              earned up to now is counted at the old rates, apply() changes the
+--                                              levels, the pieces on stands you no longer have go back to the stock
+--                                              (how many: the return), the state goes out and the listeners hear
 --   Collection.openPicker(player, stand)       (Warehouse: an empty display stand's prompt) ask the player's client to
 --                                              pick a piece for it (the "Collection" remote's { kind = "pick", stand })
 --   Collection.clear(player)                   (the admin's CLEAR STOCK) the whole collection gone for nothing → how many
 --   Collection.onChanged(fn)                   fn(player) after any change to a player's collection (and when their
 --                                              save has loaded)
+--   Collection.onAdded(fn)                     8.2: fn(player, entry) after a piece came home (Collection.add took it;
+--                                              entry a copy): the collection book (server/CollectionBook.luau)
+--   Collection.onPaid(fn)                      8.2: fn(player, "income" | "sale", money) after the stands paid or a piece
+--                                              sold (server/SandboxTasks.luau)
 --   Collection.tick()                          pays everybody here what their stands earned since the last payout (the
 --                                              loop runs it every Config.Collection.Tick s)
 --   Collection.start()                         the remote, joining and leaving, the payout loop
@@ -34,6 +46,26 @@
 -- earned up to that moment is counted; every Tick s the whole dollars are paid ("CollectionIncome"), the cents wait for
 -- the next payout; leaving pays what was counted. A sale pays "CollectionSale". Analytics (PlayerData.track):
 -- CollectionAdded (once a frame: how many came home, the rarest), CollectionDisplayed, CollectionSold.
+-- 8.2, the STOCK list's bulk buttons (client/WarehouseUi.luau; which pieces: shared/StockPlan.luau, the rules the window
+-- shows before it asks). Only through the remote, each also under Config.Robust.Limits.CollectionBulk, each one change
+-- (one state push, one listener call, one analytics event, one payment):
+--   client → server   { kind = "fillbest" }            ⭐ FILL BEST: the best earners of the stock onto every free stand
+--                                                      the player has, each where it fits (WarehouseLayout.fits);
+--                                                      CollectionDisplayed (their $ a minute, the rarest); then
+--                                                      { kind = "bulk", action = "fillbest", count, income } (the $ a
+--                                                      minute they add)
+--                     { kind = "sellmany", filter }    💰 SELL…: every piece in the stock the filter takes ("common",
+--                                                      "broken", "duplicates": all but the best of each item; never a
+--                                                      piece on show), sold at the server's prices: one "CollectionSale"
+--                                                      (the SKU the item when they are all one item), CollectionSold (the
+--                                                      money, the rarest), { kind = "sold", name = "N pieces", money,
+--                                                      count }. The client's confirm shows the same total; the server
+--                                                      takes only the filter from it
+--                     { kind = "undisplayall" }        ↩ TAKE ALL DOWN: every piece on show back to the stock (what they
+--                                                      earned up to now counts); { kind = "bulk", action =
+--                                                      "undisplayall", count }
+--                     nothing to do (no free stand, nothing that fits, nothing to sell or on show), a filter that isn't
+--                     one or no save: refused, the Notice says why.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,9 +74,17 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.CollectionRules)
+local WarehouseLayout = require(Shared.WarehouseLayout) -- 8.1: the upgrade stands' size (fits)
+local StockPlan = require(Shared.StockPlan) -- 8.2: the STOCK list's bulk buttons
 local PlayerData = require(script.Parent.PlayerData)
 
 local Collection = {}
+
+-- 8.2 e2e: who has a warehouse to show pieces in (server/SandboxBoot.luau sets it: SandboxPlots.of; nil: everybody, as
+-- the tests' runtimes). Without one (a full server's fifth player) nothing goes on show and nothing of theirs earns; the
+-- saved stands stay as they are for when a plot is free.
+Collection.hasWarehouse = nil :: ((Player) -> boolean)?
+local NO_WAREHOUSE = "Displays are for a warehouse of your own: wait for a free plot."
 
 export type Entry = Rules.Entry
 
@@ -55,6 +95,8 @@ local remote = Net.get("Collection")
 local notice = Net.get("Notice")
 
 local listeners: { (Player) -> () } = {}
+local addedListeners: { (Player, Entry) -> () } = {} -- 8.2: Collection.onAdded's
+local paidTo: { (Player, string, number) -> () } = {} -- 8.2: Collection.onPaid's fns
 
 -- The income counted for each player here: up to `at` (os.clock), `carry` $ not paid yet.
 type Meter = { at: number, carry: number }
@@ -81,6 +123,11 @@ local function standsOf(player: Player): number
 	return Rules.standsFor(PlayerData.get(player))
 end
 
+-- 8.1: the player's income × (their Showroom lights).
+local function boostOf(player: Player): number
+	return Rules.boost(PlayerData.get(player))
+end
+
 -- The player's piece with this uid (and its index), nil for anything else.
 local function find(collection: Rules.Saved, uid: any): (Entry?, number?)
 	if type(uid) ~= "string" or #uid > MAX_UID then
@@ -98,14 +145,19 @@ local function isStand(stand: any, count: number): boolean
 	return finite(stand) and stand == math.floor(stand) and stand >= 1 and stand <= count
 end
 
--- What the pieces on show earn a minute (only on the stands the warehouse has).
+-- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights).
 local function rate(player: Player, collection: Rules.Saved): number
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return 0 -- (no warehouse of their own: nothing on show earns)
+	end
 	local stands = standsOf(player)
+	local boost = boostOf(player)
 	local total = 0
 	for _, entry in collection.entries do
 		local stand = entry.stand
 		if stand ~= nil and stand >= 1 and stand <= stands then
-			total += Rules.income(entry)
+			total += Rules.income(entry, boost)
 		end
 	end
 	return total
@@ -134,6 +186,7 @@ local function payout(player: Player)
 	if pay >= 1 then
 		meter.carry -= pay
 		PlayerData.addMoney(player, pay, "CollectionIncome")
+		for _, fn in paidTo do task.spawn(fn, player, "income", pay) end -- 8.2: Collection.onPaid
 	end
 end
 
@@ -144,8 +197,9 @@ local function sendState(player: Player)
 		return
 	end
 	local stock = table.create(#collection.entries)
+	local boost = boostOf(player)
 	for _, entry in collection.entries do
-		table.insert(stock, Rules.view(entry))
+		table.insert(stock, Rules.view(entry, boost))
 	end
 	remote:FireClient(player, { kind = "state", stock = stock, income = cents(rate(player, collection)), stands = standsOf(player) })
 end
@@ -242,8 +296,12 @@ function Collection.add(player: Player, entry: { item: string, variant: number?,
 		stand = nil,
 		got = os.time(),
 	})
+	local piece = table.clone(collection.entries[#collection.entries]) -- (8.2: for Collection.onAdded)
 	noteAdded(player, Rules.rarityOf(def))
 	changed(player)
+	for _, fn in addedListeners do -- (8.2: the collection book)
+		task.spawn(fn, player, table.clone(piece))
+	end
 	return uid, nil
 end
 
@@ -267,11 +325,19 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	if not entry then
 		return false, "That piece isn't in your stock."
 	end
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return false, NO_WAREHOUSE
+	end
 	if not isStand(stand, standsOf(player)) then
 		return false, "There's no such display stand."
 	end
 	if entry.stand == stand then
 		return true, nil
+	end
+	local def = Rules.defOf(entry.item)
+	if def and not WarehouseLayout.fits(stand, def.size) then
+		return false, `Your {entry.name} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count()}.`
 	end
 	for _, other in collection.entries do
 		if other.stand == stand then
@@ -280,7 +346,7 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	end
 	settle(player)
 	entry.stand = stand
-	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
+	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player)) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
 	changed(player)
 	return true, nil
 end
@@ -316,6 +382,7 @@ function Collection.sell(player: Player, uid: string): (number?, string?)
 	local price = Rules.sell(entry)
 	table.remove(collection.entries, index)
 	PlayerData.addMoney(player, price, "CollectionSale", entry.item)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", price) end -- 8.2: Collection.onPaid
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
 	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)))
 	changed(player)
@@ -341,6 +408,23 @@ function Collection.incomePerMinute(player: Player): number
 	return if collection then rate(player, collection) else 0
 end
 
+function Collection.stands(player: Player): number
+	return standsOf(player)
+end
+
+function Collection.boost(player: Player): number
+	return boostOf(player)
+end
+
+function Collection.upgrade(player: Player, apply: () -> ()): number
+	settle(player) -- (what the stands earned up to now, at the old rates)
+	apply()
+	local collection = collectionOf(player)
+	local moved = if collection then Rules.fitStands(collection, standsOf(player)) else 0
+	changed(player)
+	return moved
+end
+
 function Collection.openPicker(player: Player, stand: number)
 	if not collectionOf(player) or not isStand(stand, standsOf(player)) then
 		return
@@ -351,6 +435,14 @@ end
 
 function Collection.onChanged(fn: (Player) -> ())
 	table.insert(listeners, fn)
+end
+
+function Collection.onAdded(fn: (Player, Entry) -> ())
+	table.insert(addedListeners, fn)
+end
+
+function Collection.onPaid(fn: (Player, string, number) -> ())
+	table.insert(paidTo, fn)
 end
 
 function Collection.tick()
@@ -365,6 +457,157 @@ function Collection.tick()
 		end
 	end
 end
+
+-- ── 8.2: the STOCK list's bulk buttons (the remote's fillbest, sellmany, undisplayall) ──────────────────────────
+
+local NOTHING_TO_SELL: { [string]: string } = {
+	common = "There's no Common piece in your stock to sell.",
+	broken = "There's no broken piece in your stock.",
+	duplicates = "No duplicates in your stock: you have one of each.",
+}
+
+-- The rarer of two rarities (the analytics' field).
+local function rarer(a: string?, b: string): string
+	return if a and Rules.tier(a).rank >= Rules.tier(b).rank then a else b
+end
+
+-- Does a piece of this item stand on stand i (as Collection.display: an upgrade's small stand holds no bed)?
+local function fitsStand(stand: number, item: string): boolean
+	local def = Rules.defOf(item)
+	return def == nil or WarehouseLayout.fits(stand, def.size)
+end
+
+-- The collection's pieces as shared/StockPlan.luau reads them (CollectionRules.view: × the player's lights).
+local function piecesOf(player: Player, collection: Rules.Saved): { StockPlan.Piece }
+	local boost = boostOf(player)
+	local out: { StockPlan.Piece } = table.create(#collection.entries)
+	for _, entry in collection.entries do
+		local v = Rules.view(entry, boost)
+		table.insert(out, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition })
+	end
+	return out
+end
+
+-- ⭐ FILL BEST → how many went up (nil: nothing to do), why.
+local function fillBest(player: Player): (number?, string?)
+	local collection = collectionOf(player)
+	if not collection then
+		return nil, "Your save isn't loaded yet."
+	end
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return nil, NO_WAREHOUSE
+	end
+	local stands = standsOf(player)
+	local pieces = piecesOf(player, collection)
+	local plan = StockPlan.fill(pieces, stands, fitsStand)
+	if #plan == 0 then
+		if #StockPlan.free(pieces, stands) == 0 then
+			return nil, "Every display stand you have already shows a piece."
+		end
+		for _, piece in pieces do
+			if piece.stand == nil and not piece.broken and piece.income > 0 then
+				return nil, "What's in your stock is too big for your free small stands."
+			end
+		end
+		return nil, "Nothing in your stock would earn on a stand. Bring more home from a move!"
+	end
+	settle(player)
+	local byUid: { [string]: Entry } = {}
+	local taken: { [number]: boolean } = {}
+	for _, entry in collection.entries do
+		byUid[entry.uid] = entry
+		if entry.stand ~= nil then
+			taken[entry.stand] = true
+		end
+	end
+	local boost = boostOf(player)
+	local count, gained, rarest = 0, 0, nil :: string?
+	for _, place in plan do
+		-- (the plan is our own; checked all the same, as Collection.display would)
+		local entry = byUid[place.uid]
+		if entry and entry.stand == nil and isStand(place.stand, stands) and not taken[place.stand] and fitsStand(place.stand, entry.item) then
+			entry.stand = place.stand
+			taken[place.stand] = true
+			count += 1
+			gained += Rules.income(entry, boost)
+			rarest = rarer(rarest, Rules.rarityOf(Rules.defOf(entry.item)))
+		end
+	end
+	if count == 0 then
+		return nil, "Nothing could go on show."
+	end
+	PlayerData.track("event", player, "CollectionDisplayed", math.floor(gained + 0.5), rarest)
+	remote:FireClient(player, { kind = "bulk", action = "fillbest", count = count, income = cents(gained) })
+	changed(player)
+	return count, nil
+end
+
+-- 💰 SELL… → the money paid (nil: nothing sold), how many, why.
+local function sellMany(player: Player, filter: any): (number?, number, string?)
+	local collection = collectionOf(player)
+	if not collection then
+		return nil, 0, "Your save isn't loaded yet."
+	end
+	if not StockPlan.isFilter(filter) then
+		return nil, 0, "Choose what to sell: all Common, all broken or the duplicates."
+	end
+	local list = StockPlan.toSell(piecesOf(player, collection), filter)
+	if #list == 0 then
+		return nil, 0, NOTHING_TO_SELL[filter]
+	end
+	local chosen: { [string]: boolean } = {}
+	for _, piece in list do
+		chosen[piece.uid] = true
+	end
+	local kept: { Entry } = {}
+	local total, count, rarest, item, mixed = 0, 0, nil :: string?, nil :: string?, false
+	for _, entry in collection.entries do
+		if chosen[entry.uid] and entry.stand == nil then
+			total += Rules.sell(entry)
+			count += 1
+			rarest = rarer(rarest, Rules.rarityOf(Rules.defOf(entry.item)))
+			mixed = mixed or (item ~= nil and item ~= entry.item)
+			item = entry.item
+		else
+			table.insert(kept, entry)
+		end
+	end
+	table.clear(collection.entries)
+	table.move(kept, 1, #kept, 1, collection.entries)
+	PlayerData.addMoney(player, total, "CollectionSale", if mixed then nil else item)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", total) end -- 8.2 merge: Collection.onPaid (a bulk sale counts too)
+	remote:FireClient(player, { kind = "sold", name = `{count} {if count == 1 then "piece" else "pieces"}`, money = total, count = count })
+	PlayerData.track("event", player, "CollectionSold", total, rarest)
+	changed(player)
+	return total, count, nil
+end
+
+-- ↩ TAKE ALL DOWN → how many came down (nil: nothing on show), why.
+local function undisplayAll(player: Player): (number?, string?)
+	local collection = collectionOf(player)
+	if not collection then
+		return nil, "Your save isn't loaded yet."
+	end
+	local shown = 0
+	for _, entry in collection.entries do
+		if entry.stand ~= nil then
+			shown += 1
+		end
+	end
+	if shown == 0 then
+		return nil, "Nothing is on show."
+	end
+	settle(player) -- (what they earned up to now still counts)
+	for _, entry in collection.entries do
+		entry.stand = nil
+	end
+	remote:FireClient(player, { kind = "bulk", action = "undisplayall", count = shown })
+	changed(player)
+	return shown, nil
+end
+
+local BULK: { [string]: boolean } = { fillbest = true, sellmany = true, undisplayall = true }
 
 -- ── Joining, leaving, the remote ──────────────────────────────────────────
 
@@ -401,6 +644,9 @@ local function onRemote(player: Player, message: any)
 		return
 	end
 	local kind = message.kind
+	if type(kind) == "string" and BULK[kind] and not Net.limit(player, "CollectionBulk", Config.Robust.Limits.CollectionBulk) then
+		return -- (8.2: a bulk button at most CollectionBulk times a second)
+	end
 	local ok, why = true, nil :: string?
 	if kind == "state" then
 		sendState(player)
@@ -412,6 +658,18 @@ local function onRemote(player: Player, message: any)
 		local money: number? = nil
 		money, why = Collection.sell(player, message.uid)
 		ok = money ~= nil
+	elseif kind == "fillbest" then
+		local count: number? = nil
+		count, why = fillBest(player)
+		ok = count ~= nil
+	elseif kind == "sellmany" then
+		local money: number?, sold: number = nil, 0
+		money, sold, why = sellMany(player, message.filter)
+		ok = money ~= nil and sold > 0
+	elseif kind == "undisplayall" then
+		local count: number? = nil
+		count, why = undisplayAll(player)
+		ok = count ~= nil
 	end
 	if not ok and why then
 		notice:FireClient(player, why)

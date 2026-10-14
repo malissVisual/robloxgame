@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""7.2: the house a move empties in the owner's Blender model (server/HouseMesh.luau), on the house as the game builds it.
-
-8.0.5: house.py's TARGET says which house the export is for (the manifest's "target"): "sandbox", the sandbox's The Old
-Chalet (built here as server/SandboxWorld.luau builds it from shared/ChaletLooks.luau, its garden and the greeter's
-porch round it), or "city", Marge's 155 Willow Ln (World's buildHouse box house). For a sandbox export the checks are
-the same as below with the chalet's pieces for the box house's, the garden's flower boxes, gate, mailbox and the
-greeter (Config.MoveGreeters.Porch) for the moving-day dress, its roof under SandboxMap.House.house's height, and the
-chalet's own roof (over its walls) not colliding any more.
+"""7.2: Marge's house in the owner's Blender model (server/HouseMesh.luau) on a house built as World builds it, no Studio.
 
 Simulates the Roblox import of design/blender-house/roblox/ZDCHouseArt.fbx from its manifest (ZDCHouseArt.json: every
 piece's box and every detail's, in the house's space, written by house.py): the importer turns the model a quarter
@@ -22,6 +15,20 @@ two Windows; World's own lines are checked to be unchanged). Checks:
     the door, the boxes and the rug by it, the signs) nor in the door's "Enter house" box (server/Moving.luau);
   - at most 10,000 triangles a piece; a house not listed, one of another size, no import, an import physics threw about
     (a piece turned): left as World builds it.
+8.1 SANDBOX: the sandbox's one house too, built by the real server/SandboxWorld.luau (the whole test world, on
+tools/perf/world-mock.luau) with the same import in the Workspace. Checks:
+  - shared/SandboxMap.luau's House box is house.py's; without the import the chalet as it is (nothing hidden, no mesh);
+  - dressed: every piece once, where the model has it on the House box (House_sandbox_house, attribute Home), anchored
+    and not physical; the chalet's parts hidden and shadowless, the same ones solid (the House box, the gable), the
+    FrontDoor (attribute SandboxDoor, the moves' door) not; the walls on the box's faces;
+  - the gable, re-cut across the house (SandboxScenery.Chalet.Pitch), under the model's roof at every point;
+  - the FrontDoor on the model's door (across it, as wide and tall, just in front of its leaves); nothing of the model
+    in the door's "Enter house" box (server/Moving.luau SB.site), the doorway's way out or on the path but its step
+    (the path runs under it); the garden (the fence, the gate, the mailbox, the flower boxes) and the greeter's spot
+    (server/MoveGreeters.luau, Config.MoveGreeters.Porch) clear of the model.
+8.2.1: house.py's TARGET says which house the export is for (the manifest's "target"): "sandbox", the owner's big
+house on The Old Chalet (the sandbox checks above; Marge's then another size: left as World builds it), or "city",
+Marge's (the checks above it; the sandbox's then another size: the chalet as it is).
 
     python3 zombie-delivery/tools/house-art/check.py <luau> [another export's ZDCHouseArt.json]
 """
@@ -47,14 +54,6 @@ WORLD_LINES = (
     'require(script.Parent.Chalets).house(house, frame, {',
     'HouseMesh.dress(house, home.id)',
 )
-SANDBOX_LINES = (  # server/SandboxWorld.luau's house(), which the harness copies for a sandbox export
-    'for _, piece in ChaletLooks.house(spec) do',
-    'if piece.name == "Fence" then',
-    'p.Name = "FrontDoor"',
-    'p:SetAttribute("SandboxDoor", true)',
-    '(require(mesh) :: any).dress(model, H.id)',
-    'for n, spot in { { gx - 10.5, gz + 2.2 }, { gx + 10.5, gz + 2.2 }, { gx - 5.8, door.z - 2.4 }, { gx + 5.8, door.z - 2.4 } } do',
-)
 ROOF_LINES = (
     'part(parent, "Roof", Vector3.new(w, h, half), frame * CFrame.new(0, h / 2, -half / 2), color, Enum.Material.Slate).Shape = Enum.PartType.Wedge',
     'part(parent, "Roof", Vector3.new(w, h, half), frame * CFrame.new(0, h / 2, half / 2) * CFrame.Angles(0, math.pi, 0), color, Enum.Material.Slate).Shape = Enum.PartType.Wedge',
@@ -70,7 +69,6 @@ local V3 = M.Vector3.new
 F.__index = function(cf, k)
 	if k == "RightVector" then local r = cf.R; return V3(r[1], r[4], r[7]) end
 	if k == "UpVector" then local r = cf.R; return V3(r[2], r[5], r[8]) end
-	if k == "LookVector" then local r = cf.R; return V3(-r[3], -r[6], -r[9]) end
 	return rawget(F, k)
 end
 local O = getmetatable(M.Instance.new("Part"))
@@ -79,7 +77,7 @@ O.IsA = function(self, c) if c == "BasePart" and (self.ClassName == "MeshPart" o
 local storage = M.Instance.new("Folder")
 local get = M.game.GetService
 M.game.GetService = function(self, name) if name == "ServerStorage" then return storage end return get(self, name) end
-local MODE, TARGET = ...
+local MODE = (...)
 local art = M.Instance.new("Model")
 if MODE == "art" or MODE == "scattered" then
 	art.Name = "ZDCHouseArt"
@@ -145,96 +143,24 @@ local function build(lot)
 	end
 	return model, frame, body
 end
--- The sandbox's The Old Chalet as server/SandboxWorld.luau builds it (its pieces and its garden's things in a Folder).
-local SandboxMap = require("./SandboxMap")
-local SandboxScenery = require("./SandboxScenery")
-local ChaletLooks = require("./ChaletLooks")
-local Config = require("./Config")
-local function chalet()
-	local H, S = SandboxMap.House, SandboxScenery
-	local model = M.Instance.new("Model")
-	model.Name = "TheOldChalet"
-	model:SetAttribute("SandboxHouse", H.id)
-	local door = H.door
-	local frame = M.CFrame.new(door.x, door.y, door.z) * M.CFrame.Angles(0, math.rad(door.yaw), 0)
-	local lot = H.lot
-	local spec = { w = H.house.sx, d = H.house.sz, h = S.Chalet.Walls, lot = lot.x1 - lot.x0, front = (lot.x1 - lot.x0) / 2 - (door.z - lot.z0),
-		seed = S.Chalet.Seed, render = S.Chalet.Render, shade = S.Chalet.Shade }
-	for _, piece in ChaletLooks.house(spec) do
-		if piece.name == "Fence" then
-			continue
-		end
-		local turn = piece.turn or { 0, 0, 0 }
-		local p = M.Instance.new(if piece.shape == "Wedge" then "WedgePart" else "Part")
-		p.Name = piece.name
-		p.Size = M.Vector3.new(piece.size[1], piece.size[2], piece.size[3])
-		p.CFrame = frame * M.CFrame.new(piece.at[1], piece.at[2], piece.at[3]) * M.CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
-		p.CanCollide, p.CanQuery = piece.solid == true, piece.solid == true
-		if piece.name == "Door" then
-			p.Name = "FrontDoor"
-			p:SetAttribute("SandboxDoor", true)
-			p.CanCollide = false
-		end
-		p.Parent = model
-	end
-	local garden = M.Instance.new("Folder")
-	garden.Name = "Garden"
-	garden.Parent = model
-	local G = S.Garden
-	local gx, gz = door.x, G.Front
-	local things = {}
-	local function thing(name, size, x, y, z)
-		table.insert(things, { name = name, size = size, cf = M.CFrame.new(x - door.x, y - door.y, z - door.z) })
-		local p = M.Instance.new("Part")
-		p.Name, p.Size, p.CFrame, p.CanCollide = name, size, M.CFrame.new(x, y, z), false
-		p.Parent = garden
-	end
-	for n, spot in { { gx - 10.5, gz + 2.2 }, { gx + 10.5, gz + 2.2 }, { gx - 5.8, door.z - 2.4 }, { gx + 5.8, door.z - 2.4 } } do
-		thing("FlowerBox" .. n, M.Vector3.new(2.8, 1.8, 1.2), spot[1], 0.9, spot[2])
-	end
-	for _, side in { -1, 1 } do
-		thing("GatePost", M.Vector3.new(0.9, 11, 0.9), gx + side * G.Gate, 5.5, gz)
-	end
-	thing("GateBeam", M.Vector3.new(2 * G.Gate + 1.6, 2.4, 1), gx, 10.4, gz)
-	thing("Mailbox", M.Vector3.new(1.9, 4.6, 1.9), gx - G.Gate - 3.5, 2.3, gz - 1.4)
-	local porch = Config.MoveGreeters.Porch
-	thing("Greeter", M.Vector3.new(2, 6, 2), door.x + porch[1], 3, door.z + porch[2]) -- (+X right, -Z out: the frame's)
-	thing("EnterDoor", M.Vector3.new(4, 6, 1), door.x, 3.5, door.z - 0.9)
-	return model, frame, frame * M.CFrame.new(0, 0, H.house.sz / 2), things, { w = H.house.sx, h = S.Chalet.Walls, d = H.house.sz }
-end
 local function report(tag, id)
-	local model, frame, body, things, box
-	if id == SandboxMap.House.id then
-		model, frame, body, things, box = chalet()
-	else
-		local lot = lotOf(id)
-		assert(lot, "no lot for " .. id)
-		model, frame, body = build(lot)
-		box = { w = lot.w, h = lot.h, d = lot.d }
-	end
+	local lot = lotOf(id)
+	assert(lot, "no lot for " .. id)
+	local model, frame, body = build(lot)
 	local dressed = HouseMesh.dress(model, id)
 	local base = body -- (the house's bottom middle)
 	print(string.format('HOUSE {"tag":"%s","id":"%s","dressed":%s,"attr":%s,"box":[%g,%g,%g]}', tag, id, tostring(dressed),
-		tostring(model:GetAttribute("MeshArt") == true), box.w, box.h, box.d))
-	if things then
-		local back = M.CFrame.new(0, 0, box.d / 2):Inverse()
-		for _, t in things do
-			print(string.format('DRESS {"name":"%s","cf":%s,"size":[%g,%g,%g]}', t.name, f(back * t.cf), t.size.X, t.size.Y, t.size.Z))
-		end
-		print(string.format('SANDBOX {"top":%g,"door":%s}', SandboxMap.House.house.y + SandboxMap.House.house.sy,
-			tostring(model:FindFirstChild("FrontDoor") ~= nil and model:FindFirstChild("FrontDoor"):GetAttribute("SandboxDoor") == true)))
-	end
+		tostring(model:GetAttribute("MeshArt") == true), lot.w, lot.h, lot.d))
 	for _, d in model:GetDescendants() do
-		if d:IsA("BasePart") and d.Parent == model then
+		if d:IsA("BasePart") then
 			print(string.format('PART {"tag":"%s","class":"%s","name":"%s","cf":%s,"size":[%g,%g,%g],"t":%g,"shadow":%s,"collide":%s,"query":%s,"touch":%s,"anchored":%s,"night":%s,"color":%s,"skin":%s}',
 				tag, d.ClassName, d.Name, f(base:Inverse() * d.CFrame), d.Size.X, d.Size.Y, d.Size.Z, d.Transparency or 0, tostring(d.CastShadow),
 				tostring(d.CanCollide), tostring(d.CanQuery), tostring(d.CanTouch), tostring(d.Anchored), tostring(d:GetAttribute("NightLight") == true),
 				c(d.Color), tostring(d:FindFirstChildWhichIsA("SurfaceAppearance") ~= nil)))
 		end
 	end
-	if tag == "main" and not things then
+	if tag == "main" then
 		-- The moving day's things (server/MoveSites.luau: the door's frame) and the door's Enter house box (server/Moving.luau).
-		local lot = lotOf(id)
 		local back = M.CFrame.new(0, 0, lot.d / 2):Inverse()
 		for _, p in Looks.house("Marge's House", Looks.parkDepth(lot.home)) do
 			local r = p.rotation or { 0, 0, 0 }
@@ -247,15 +173,79 @@ end
 for finish, look in HouseMesh.Looks do
 	print(string.format('LOOK {"finish":"%s"}', finish))
 end
-if TARGET == "sandbox" then
-	report("main", SandboxMap.House.id)
-	report("size", "home_suburbs_2_0_00") -- (listed: Marge's, another size)
-else
-	report("main", "home_suburbs_2_0_00")
-	HouseMesh.Homes.home_suburbs_2_0_01 = true -- (listed, another size)
-	report("size", "home_suburbs_2_0_01")
+for id in HouseMesh.Homes do
+	print(string.format('HOME {"id":"%s"}', id))
 end
+report("main", "home_suburbs_2_0_00") -- (Marge's; the sandbox's house: sandbox.luau)
 report("other", "home_suburbs_2_0_10") -- (not listed)
+HouseMesh.Homes.home_suburbs_2_0_01 = true -- (listed, another size)
+report("size", "home_suburbs_2_0_01")
+print(string.format('META {"moved":%s}', tostring(art.Parent == storage and MODE == "art")))
+print("ALL DONE")
+'''
+
+# 8.1 SANDBOX: the real server/SandboxWorld.luau builds the test world (on tools/perf/world-mock.luau, as
+# tests/sandboxworld_test.luau runs it) with the real HouseMesh, the import (the same turned, scaled one) in its Workspace.
+SANDBOX = r'''
+local W = require("./WorldMock")
+local G = W.globals
+local MODE = (...)
+local storage = W.game:GetService("ServerStorage")
+local art = G.Instance.new("Model")
+if MODE == "art" then
+	art.Name = "ZDCHouseArt"
+	art.Parent = W.workspace
+	local K, MOVE = 3, G.Vector3.new(-30, 2, 55)
+	for _, row in require("./pieces") do
+		local x, y, z = row[2], row[4], -row[3]
+		local sx, sy, sz = row[5], row[7], row[6]
+		local p = G.Instance.new(if string.sub(row[1], 1, 5) == "mark_" then "Part" else "MeshPart")
+		p.Name = row[1]
+		p.CFrame = G.CFrame.new(z * K + MOVE.X, y * K + MOVE.Y, -x * K + MOVE.Z)
+		p.Size = G.Vector3.new(sz * K, sy * K, sx * K)
+		p.Anchored = true
+		G.Instance.new("SurfaceAppearance").Parent = p
+		p.Parent = art
+	end
+end
+local SandboxMap = require("./SandboxMap")
+local SandboxScenery = require("./SandboxScenery")
+local Config = require("./Config")
+local world = require("./SandboxWorldServer").build()
+local H = SandboxMap.House
+local h = H.house
+local chalet = world:FindFirstChild("TheOldChalet")
+local own = chalet and chalet:FindFirstChild("House_" .. H.id)
+-- the house's frame: its box's bottom middle, -Z out of the front door
+local base = G.CFrame.new(h.x, h.y, h.z) * G.CFrame.Angles(0, math.rad(H.door.yaw), 0)
+local inverse = base:Inverse()
+local function f(cf)
+	local list = {}
+	for _, v in { cf:GetComponents() } do
+		table.insert(list, string.format("%.17g", v))
+	end
+	return "[" .. table.concat(list, ",") .. "]"
+end
+print(string.format('HOUSE {"dressed":%s,"model":%s,"box":[%.17g,%.17g,%.17g],"pitch":%.17g}', tostring(own ~= nil and own:GetAttribute("MeshArt") == true),
+	tostring(own ~= nil and own:IsA("Model") and own:GetAttribute("Home") == H.id and own.Parent == chalet), h.sx, h.sy, h.sz, SandboxScenery.Chalet.Pitch))
+for _, d in (if chalet then chalet:GetDescendants() else {}) do
+	if d:IsA("BasePart") then
+		local shape = d.Shape
+		print(string.format('PART {"class":"%s","name":"%s","own":%s,"shape":"%s","cf":%s,"size":[%.17g,%.17g,%.17g],"t":%g,"shadow":%s,"collide":%s,"query":%s,"touch":%s,"anchored":%s,"night":%s,"door":%s,"skin":%s}',
+			d.ClassName, d.Name, tostring(own ~= nil and d.Parent == own), if shape then shape.Name else "", f(inverse * d.CFrame), d.Size.X, d.Size.Y, d.Size.Z,
+			d.Transparency or 0, tostring(d.CastShadow), tostring(d.CanCollide), tostring(d.CanQuery), tostring(d.CanTouch), tostring(d.Anchored),
+			tostring(d:GetAttribute("NightLight") == true), tostring(d:GetAttribute("SandboxDoor") == true), tostring(d:FindFirstChildWhichIsA("SurfaceAppearance") ~= nil)))
+	end
+end
+-- the door's "Enter house" box as server/Moving.luau SB.site makes it: 4 × 6 × 1, 0.9 out of House.door, 3.5 up
+local out = G.CFrame.new(H.door.x, H.door.y, H.door.z) * G.CFrame.Angles(0, math.rad(H.door.yaw), 0)
+print(string.format('ENTER {"cf":%s,"size":[4,6,1]}', f(inverse * out * G.CFrame.new(0, 3.5, -0.9))))
+-- where the move's greeter stands (server/MoveGreeters.luau: Porch in the door's frame, +X right, -Z out), a body
+local porch = Config.MoveGreeters.Porch
+print(string.format('GREETER {"cf":%s,"size":[2.4,6,2.4]}', f(inverse * out * G.CFrame.new(porch[1], 3, porch[2]))))
+-- the path kept clear from the curb to the door (SandboxScenery.Path), in the house's frame (yaw 0: only moved)
+local P = SandboxScenery.Path
+print(string.format('PATH {"x0":%.17g,"x1":%.17g,"z0":%.17g,"z1":%.17g,"yaw":%g}', P.x0 - h.x, P.x1 - h.x, P.z0 - h.z, P.z1 - h.z, H.door.yaw))
 print(string.format('META {"moved":%s}', tostring(art.Parent == storage and MODE == "art")))
 print("ALL DONE")
 '''
@@ -281,17 +271,27 @@ def stage(tmp: Path, manifest: dict):
     body = ",\n".join("{%s}" % ",".join([json.dumps(r[0])] + [repr(float(x)) for x in r[1:]]) for r in rows)
     (tmp / "pieces.luau").write_text("return {\n" + body + "\n}\n")
     (tmp / "harness.luau").write_text(HARNESS)
+    # 8.1 SANDBOX: SandboxWorld and HouseMesh on the world mock (tests/run_tests.py's way), DayNight marking the lights
+    shutil.copy(ROOT / "tools/perf/world-mock.luau", tmp / "WorldMock.luau")
+    env = 'setfenv(1, require("./WorldMock").env)\n'
+    text = (ROOT / "src/server/SandboxWorld.luau").read_text()
+    text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', text).replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshWorld")')
+    (tmp / "SandboxWorldServer.luau").write_text(env + text)
+    text = (ROOT / "src/server/HouseMesh.luau").read_text()
+    text = text.replace("require(script.Parent.DayNight)", '{ nightLight = function(p) p:SetAttribute("NightLight", true) end }')
+    (tmp / "HouseMeshWorld.luau").write_text(env + text)
+    (tmp / "sandbox.luau").write_text(SANDBOX)
 
 
-def run(luau: str, tmp: Path, mode: str, target: str):
-    r = subprocess.run([luau, "harness.luau", "-a", mode, target], cwd=tmp, capture_output=True, text=True)
+def run(luau: str, tmp: Path, mode: str, harness: str = "harness.luau"):
+    r = subprocess.run([luau, harness, "-a", mode], cwd=tmp, capture_output=True, text=True)
     assert r.returncode == 0 and "ALL DONE" in r.stdout, r.stdout[-3000:] + r.stderr[-3000:]
-    out = {"HOUSE": [], "PART": [], "DRESS": [], "LOOK": []}
+    out = {"HOUSE": [], "PART": [], "DRESS": [], "LOOK": [], "HOME": [], "ENTER": [], "PATH": [], "GREETER": []}
     for line in r.stdout.splitlines():
         kind, _, rest = line.partition(" ")
         if kind in out:
             out[kind].append(json.loads(rest))
-        elif kind in ("META", "SANDBOX"):
+        elif kind == "META":
             out[kind] = json.loads(rest)
     return out
 
@@ -317,27 +317,25 @@ def main():
     world = (ROOT / "src/server/World.luau").read_text()
     for line in WORLD_LINES + ROOF_LINES:
         assert line in world, f"server/World.luau's buildHouse changed ({line!r}): change this check's harness with it"
-    sandbox_world = (ROOT / "src/server/SandboxWorld.luau").read_text()
-    for line in SANDBOX_LINES:
-        assert line in sandbox_world, f"server/SandboxWorld.luau's house changed ({line!r}): change this check's harness with it"
     manifest = json.loads((Path(sys.argv[2]) if len(sys.argv) > 2 else MANIFEST).read_text())  # (another export: its JSON)
     target = manifest.get("target", "city")
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         stage(tmp, manifest)
-        plain = run(luau, tmp, "none", target)
-        art = run(luau, tmp, "art", target)
-        scattered = run(luau, tmp, "scattered", target)
+        plain = run(luau, tmp, "none")
+        art = run(luau, tmp, "art")
+        sandbox_plain = run(luau, tmp, "none", "sandbox.luau")
+        sandbox_art = run(luau, tmp, "art", "sandbox.luau")
+        scattered = run(luau, tmp, "scattered")
     finishes = {name.rsplit("_", 1)[1] for name in manifest["pieces"]}
     looks = {l["finish"] for l in art["LOOK"]}
     assert finishes <= looks, f"finishes without a look in HouseMesh.LOOKS: {sorted(finishes - looks)}"
     for p in manifest["pieces"].values():
         assert p["triangles"] <= 10000, p
+    assert sorted(h["id"] for h in art["HOME"]) == ["home_suburbs_2_0_00", "sandbox_house"], (art["HOME"], "HouseMesh.Homes: Marge's and the sandbox's")
     houses = {h["tag"]: h for h in art["HOUSE"]}
     main_house = houses["main"]
     W, H, D = manifest["box"]
-    assert all(abs(a - b) < 1e-3 for a, b in zip(main_house["box"], (W, H, D))), \
-        (main_house["box"], manifest["box"], "house.py's W, H, D are not the house's on the map: change them in house.py and export again")
     # Without the import, a house not listed, a house of another size: World's look.
     for h in plain["HOUSE"] + [houses["other"], houses["size"]]:
         assert not h["dressed"] and not h["attr"], (h, "dressed")
@@ -346,24 +344,25 @@ def main():
     for h in scattered["HOUSE"]:
         assert not h["dressed"], (h, "dressed from an import physics had thrown about")
     assert art["META"]["moved"], "the imported model was not moved to ServerStorage"
+    if target == "sandbox":
+        # The sandbox's big house: Marge's is another size and keeps World's look.
+        assert not main_house["dressed"] and not main_house["attr"], (main_house, "Marge's dressed with the sandbox's house")
+        for p in art["PART"]:
+            assert p["class"] != "MeshPart" and p["t"] == 0, (p["tag"], p["name"], "changed")
+        print(f"Mesh house ({target}): Marge's house ({main_house['box'][0]:.2f} × {main_house['box'][1]:.2f} × "
+              f"{main_house['box'][2]:.2f}) and the other city houses keep World's look; no import, a scattered one: unchanged")
+        print(sandbox_check(manifest, sandbox_plain, sandbox_art))
+        return
+    assert all(abs(a - b) < 1e-3 for a, b in zip(main_house["box"], (W, H, D))), \
+        (main_house["box"], manifest["box"], "house.py's city box is not the house's on the map: change it in house.py and export again")
     assert main_house["dressed"] and main_house["attr"], main_house
     parts = [p for p in art["PART"] if p["tag"] == "main"]
     own = [p for p in parts if p["class"] != "MeshPart"]
     meshes = [p for p in parts if p["class"] == "MeshPart"]
-    top = main_house["box"][1]
-    if target == "sandbox":
-        assert "House" in [p["name"] for p in own] and "FrontDoor" in [p["name"] for p in own] and art["SANDBOX"]["door"], "the chalet's House box or its FrontDoor"
-    else:
-        assert sorted(p["name"] for p in own) == ["Door", "House", "Roof", "Roof", "Window", "Window"], [p["name"] for p in own]
+    assert sorted(p["name"] for p in own) == ["Door", "House", "Roof", "Roof", "Window", "Window"], [p["name"] for p in own]
     for p in own:
         assert p["t"] == 1 and p["shadow"] is False, (p["name"], "still seen")
-        over = aabb(p)[0][1] >= top - 0.05
-        if p["name"] == "House":
-            assert p["collide"] and p["query"], "the House box stopped colliding"
-        elif over:
-            assert not p["collide"] and not p["query"], (p["name"], "over the walls and still colliding (it would poke through the roof)")
-        elif target == "city":
-            assert p["collide"] == (p["name"] != "Window"), (p["name"], "its collision changed")
+        assert p["collide"] == (p["name"] != "Window"), (p["name"], "its collision changed")
     assert sorted(p["name"] for p in meshes) == sorted(manifest["pieces"]), sorted(set(p["name"] for p in meshes) ^ set(manifest["pieces"]))
     for p in meshes:
         assert p["anchored"] and not (p["collide"] or p["query"] or p["touch"]), (p["name"], "physical")
@@ -383,15 +382,11 @@ def main():
     tiles = [box_of(d) for d in details if d["finish"] in ("tile", "tile2")]
     roof_lo = [min(b[0][i] for b in tiles) for i in range(3)]
     roof_hi = [max(b[1][i] for b in tiles) for i in range(3)]
-    wedges = [aabb(p) for p in own if p["name"] == "Roof"]  # (the chalet's: its gable's two halves)
+    wedges = [aabb(p) for p in own if p["name"] == "Roof"]
     w_lo = [min(b[0][i] for b in wedges) for i in range(3)]
     w_hi = [max(b[1][i] for b in wedges) for i in range(3)]
     assert roof_lo[0] <= w_lo[0] + 0.25 and roof_hi[0] >= w_hi[0] - 0.25 and roof_lo[2] <= w_lo[2] + 0.25 and roof_hi[2] >= w_hi[2] - 0.25, (roof_lo, roof_hi, w_lo, w_hi)
-    if target == "city":
-        assert roof_hi[1] >= w_hi[1], (roof_hi, w_hi, "the old roof pokes through")
-    else:
-        highest = max(box_of(d)[1][1] for d in details)
-        assert highest <= art["SANDBOX"]["top"] + 0.05, (highest, art["SANDBOX"]["top"], "over SandboxMap.House.house's height")
+    assert roof_hi[1] >= w_hi[1], (roof_hi, w_hi, "the old roof pokes through")
     # Nothing where the move puts its things or in the door's Enter house box.
     clashes = []
     for thing in art["DRESS"]:
@@ -401,12 +396,136 @@ def main():
                 clashes.append((thing["name"], d["name"]))
     assert not clashes, f"the model is where the move puts its things: {clashes[:8]}"
     tris = sum(p["triangles"] for p in manifest["pieces"].values())
-    print(f"Mesh house PASS ({target}): {len(manifest['pieces'])} pieces ({tris} triangles, the largest "
+    print(f"Mesh house PASS: {len(manifest['pieces'])} pieces ({tris} triangles, the largest "
           f"{max(p['triangles'] for p in manifest['pieces'].values())}) on {main_house['id']} ({W:.2f} × {H:.2f} × {D:.2f}, "
           f"the map's) from a turned, scaled import: every piece in place, anchored, not physical; the house's own parts "
-          f"hidden, the box still colliding, nothing over the walls colliding; the walls on its box, "
-          f"{'the roof under the house box' if target == 'sandbox' else 'the roof over its wedges'}; clear of the {len(art['DRESS'])} "
-          f"{'garden things, the greeter and the door' if target == 'sandbox' else 'moving-day things and the door'}; other houses and no import: unchanged")
+          f"hidden and still colliding; the walls on its box, the roof over its wedges; clear of the {len(art['DRESS'])} moving-day "
+          f"things and the door; other houses and no import: unchanged")
+    # The sandbox's house is another size: the chalet as it is.
+    for result in (sandbox_plain, sandbox_art):
+        assert not result["HOUSE"][0]["dressed"], "the sandbox's house dressed with Marge's"
+        for p in result["PART"]:
+            assert p["class"] != "MeshPart" and p["t"] == 0, (p["name"], "changed")
+    print("Sandbox house: another size (house.py TARGET \"sandbox\" exports its own), the chalet as it is")
+
+
+def corners(part):
+    """A part's eight corners (its cf: the position, then the rotation's rows)."""
+    c, r, s = part["cf"][:3], part["cf"][3:], part["size"]
+    out = []
+    for dx in (-0.5, 0.5):
+        for dy in (-0.5, 0.5):
+            for dz in (-0.5, 0.5):
+                local = (dx * s[0], dy * s[1], dz * s[2])
+                out.append([c[i] + sum(r[i * 3 + j] * local[j] for j in range(3)) for i in range(3)])
+    return out
+
+
+def wedge_top(part, steps=24):
+    """Points on a wedge's slope (a WedgePart's: from its bottom front edge, its -Z, up to its top back edge, its +Z)."""
+    c, r, s = part["cf"][:3], part["cf"][3:], part["size"]
+    out = []
+    for a in range(steps + 1):
+        for b in range(steps + 1):
+            u, t = a / steps - 0.5, b / steps
+            local = (u * s[0], -s[1] / 2 + t * s[1], -s[2] / 2 + t * s[2])
+            out.append([c[i] + sum(r[i * 3 + j] * local[j] for j in range(3)) for i in range(3)])
+    return out
+
+
+def sandbox_check(manifest, plain, art):
+    """8.1 SANDBOX: The Old Chalet (server/SandboxWorld.luau) on house.py's box, dressed by HouseMesh once imported."""
+    W, H, D = manifest["box"]
+    details = manifest["details"]
+    for result in (plain, art):
+        house = result["HOUSE"][0]
+        assert house["model"], "the sandbox house's parts are not in a Model House_sandbox_house (attribute Home)"
+        assert all(abs(a - b) < 1e-4 for a, b in zip(house["box"], (W, H, D))), \
+            (house["box"], "shared/SandboxMap.luau's House box is not house.py's: HouseMesh would not dress it")
+    # No import: the chalet as it is.
+    assert not plain["HOUSE"][0]["dressed"], "dressed without an import"
+    for p in plain["PART"]:
+        assert p["class"] != "MeshPart" and p["t"] == 0, (p["name"], "changed without an import")
+    # Dressed.
+    house = art["HOUSE"][0]
+    assert house["dressed"] and art["META"]["moved"], (house, art["META"], "not dressed, or the import left in the world")
+    own = [p for p in art["PART"] if p["own"] and p["class"] != "MeshPart"]
+    meshes = [p for p in art["PART"] if p["class"] == "MeshPart"]
+    garden = [p for p in art["PART"] if not p["own"]]
+    assert all(p["own"] for p in meshes), "a piece of the model outside House_sandbox_house"
+    assert sorted(p["name"] for p in meshes) == sorted(manifest["pieces"]), sorted(set(p["name"] for p in meshes) ^ set(manifest["pieces"]))
+    for p in meshes:
+        assert p["anchored"] and not (p["collide"] or p["query"] or p["touch"]), (p["name"], "physical")
+        assert not p["skin"], (p["name"], "the importer's SurfaceAppearance kept")
+        assert p["night"] == p["name"].endswith("_glow"), (p["name"], "night light")
+        lo, hi = aabb(p)
+        want = manifest["pieces"][p["name"]]
+        assert all(abs((a + b) / 2 - w) < 2e-3 for a, b, w in zip(lo, hi, want["center"])), (p["name"], lo, hi, want["center"])
+        assert all(abs((b - a) - w) < 2e-3 for a, b, w in zip(lo, hi, want["size"])), (p["name"], lo, hi, want["size"])
+    plain_own = sorted((p["name"], p["collide"]) for p in plain["PART"] if p["own"])
+    assert sorted((p["name"], p["collide"]) for p in own) == plain_own, "the chalet's parts or their collision changed when dressed"
+    for p in own:
+        assert p["t"] == 1 and p["shadow"] is False, (p["name"], "still seen")
+    solid = sorted(p["name"] for p in own if p["collide"])
+    assert solid == ["House", "Roof", "Roof"], (solid, "the solid parts: the House box and the gable only")
+    # The walls on the House box's faces.
+    body = next(p for p in own if p["name"] == "House")
+    lo, hi = aabb(body)
+    walls_lo, walls_hi = box_of(next(d for d in details if d["name"] == "Zdi"))
+    assert all(abs(a - b) < 1e-3 for a, b in zip((lo[0], hi[0], lo[2], hi[2], lo[1]), (walls_lo[0], walls_hi[0], walls_lo[2], walls_hi[2], walls_lo[1]))) \
+        and walls_hi[1] >= hi[1], (lo, hi, walls_lo, walls_hi)
+    # The gable across the house, over the walls' top and under the roof's tiles and ridge at every point of its slopes.
+    roof = [box_of(d) for d in details if d["finish"] in ("tile", "tile2", "tile3") and not d["name"].startswith(("Vikýř", "Komín"))]
+    wedges = [p for p in own if p["name"] == "Roof"]
+    assert all(p["shape"] == "Wedge" for p in wedges), [p["shape"] for p in wedges]
+    worst = None
+    for wedge in wedges:
+        assert all(c[1] >= H - 1e-3 for c in corners(wedge)), ("a gable wedge under the walls' top", corners(wedge))
+        for x, y, z in wedge_top(wedge):
+            over = [b for b in roof if b[0][0] - 1e-3 <= x <= b[1][0] + 1e-3 and b[0][2] - 1e-3 <= z <= b[1][2] + 1e-3]
+            assert over, ("a point of the gable not under the roof", (x, y, z))
+            margin = min(b[0][1] for b in over) - y
+            worst = margin if worst is None else min(worst, margin)
+    assert worst is not None and worst >= 0, (worst, "the re-cut gable pokes through the roof: is SandboxScenery.Chalet.Pitch house.py's PITCH?")
+    # The FrontDoor on the model's door.
+    doors = [p for p in art["PART"] if p["door"]]
+    assert len(doors) == 1 and doors[0]["name"] == "FrontDoor" and doors[0]["own"] and not doors[0]["collide"], doors
+    lo, hi = aabb(doors[0])
+    leaves = [box_of(d) for d in details if d["name"].startswith("Křídlo dveří") and d["center"][2] < 0]
+    l_lo = [min(b[0][i] for b in leaves) for i in range(3)]
+    l_hi = [max(b[1][i] for b in leaves) for i in range(3)]
+    assert abs((lo[0] + hi[0]) / 2 - (l_lo[0] + l_hi[0]) / 2) < 0.1 and abs((hi[0] - lo[0]) - (l_hi[0] - l_lo[0])) < 0.25 \
+        and abs(lo[1] - l_lo[1]) < 0.25 and abs(hi[1] - l_hi[1]) < 0.25 and hi[2] <= l_lo[2] + 1e-3 and l_lo[2] - hi[2] < 0.5, \
+        ("the FrontDoor is not on the model's door", lo, hi, l_lo, l_hi)
+    # Nothing of the model in the door's Enter house box, the doorway's way out (6 studs, over the step) or on the path
+    # (the path runs under the step); the garden clear of the model.
+    path = art["PATH"][0]
+    assert path["yaw"] == 0, path
+    # (from the front wall's skin out, 0.25: its bands, plinth and portal stand on it, the plinth's box across the
+    # doorway, its opening cut out; the path 6 wide a body high, 5: by the door the lantern hangs over its edge from
+    # 5.1 up, outside the doorway, what is carried in or out passes through the doorway's way out)
+    skin = -D / 2 - 0.25
+    keep = [
+        ("the Enter house box", aabb(art["ENTER"][0])),
+        ("the doorway's way out", ([l_lo[0], 0.3, skin - 6], [l_hi[0], l_hi[1], skin])),
+        ("the path", ([path["x0"], 0.3, path["z0"]], [path["x1"], 5, min(path["z1"], skin)])),
+        ("the greeter's spot", aabb(art["GREETER"][0])),
+    ]
+    for name, area in keep:
+        clash = [d["name"] for d in details if overlap(area, box_of(d))]
+        assert not clash, f"the model in {name}: {clash[:8]}"
+    clashes = []
+    for p in garden:
+        a = aabb(p)
+        for d in details:
+            if overlap(a, box_of(d)) and not (p["name"] == "Path" and d["name"].startswith("Schod")):
+                clashes.append((p["name"], d["name"]))
+    assert not clashes, f"the garden in the model: {clashes[:8]}"
+    return (f"Sandbox house PASS: The Old Chalet on house.py's box ({W:.2f} × {H:.2f} × {D:.2f}) as SandboxWorld builds it: "
+            f"without the import the chalet; dressed, all {len(meshes)} pieces in place on House_sandbox_house, anchored, not "
+            f"physical; the chalet's {len(own)} parts hidden, the House box and the gable still solid, the gable "
+            f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door; the Enter "
+            f"house box, the way out, the path (under the step) and the greeter's spot clear; the garden's {len(garden)} parts clear of the model")
 
 
 if __name__ == "__main__":

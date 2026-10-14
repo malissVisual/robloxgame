@@ -37,10 +37,38 @@
 --   SoundPlan.carryCue(item, up)                  the sound of your hands taking (up) or putting down a piece
 --   SoundPlan.dragged(view, spot)                 is the piece in your hands dragged (two people's, alone, no Mover)
 --   SoundPlan.resultCue(result)                   the end: the Wall's gate when the load got there, else nil
+--
+-- 8.1 SANDBOX, the sandbox's sounds (art/audio/sfx4.ogg's 8.1 part, Config.Soundscape.Sandbox; client/SoundScape.luau
+-- plays the ambience, client/SandboxSounds.luau the rest). In the sandbox (Config.Sandbox.On) moveCues leaves out the
+-- truck's ramp (the Sprinter has none: its back doors are heard swinging, swingSound's Sprinter doors) and resultCue
+-- the Wall's gate (no Wall there: the trip home has its fanfare).
+--   SoundPlan.SandboxLoops                        the sandbox's loops by their part of the mix: alpine (amb_alpine, a
+--                                                 calm alpine day: never the city's traffic, amb_day), warehouse
+--                                                 (amb_warehouse), room (amb_room)
+--   SoundPlan.sandboxPlace(x, y, z, inside)       where you are: "house" (inside: the move's state says you are in its
+--                                                 house; or far off the sandbox's map, where the moves build their
+--                                                 interiors; or in the chalet's own box), "warehouse" (in a plot's
+--                                                 warehouse building) or "outdoors"
+--   SoundPlan.sandboxAmbience(place, sheet4)      the loops' volumes there { alpine, warehouse, room } (sheet4: is
+--                                                 sfx4.ogg up; else the stand-ins' own volumes and no room tone)
+--   SoundPlan.reverb(place)                       SoundService.AmbientReverb's name there ("NoReverb" outdoors)
+--   SoundPlan.cowbellGap(r)                       seconds to the next far cowbell (r: a random 0 … 1)
+--   SoundPlan.cowbellSpot(x, z, r1, r2)           where it rings: a random way round (x, z), CowbellFar studs off
+--   SoundPlan.collectionCues(was, now, sinceResult)   two "Collection" states one after the other (server/Collection.luau)
+--                                                 → the cues: pieces that came home (stored_fanfare; not when the move's
+--                                                 result card played its own jingle sinceResult s ago), a piece put on a
+--                                                 stand or moved to another (stand_display), one taken down
+--                                                 (stand_takedown); one of each at most, nothing on the first state
+--   SoundPlan.incomeClink(gained, now, last, soldAt, open, earning)   does money that came in clink: the stands'
+--                                                 income (pieces on show earn), not a sale's (SoldQuiet s after it), the
+--                                                 warehouse's window shut, IncomeGap s since the last clink
+--   SoundPlan.slideSound(open)                    the Sprinter's sliding door rolling open / slammed shut
+--   SoundPlan.isStep(name)                        is a part of this name a Sprinter's step (its rear or side step)
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
 local MoveRoles = require(script.Parent.MoveRoles)
+local SandboxMap = require(script.Parent.SandboxMap)
 
 local SoundPlan = {}
 
@@ -158,8 +186,19 @@ local SWINGS: { [string]: { [string]: Swing } } = {
 	gate = { opening = { name = "car_door_open", pitch = 0.8 }, shut = { name = "car_door_close", pitch = 0.78 } },
 }
 
-function SoundPlan.swingSound(what: string, moment: string): (string?, number)
-	local list = SWINGS[what]
+-- 8.1: a car's own doors, by its CarId (the rest as its kind's above): the ZDC Sprinter's two back doors swing round to
+-- its sides (magnets catch them there) and its step folds out behind them (sprinter_back_open / _close, made to the same
+-- 0.45 s swing).
+local OWN_SWINGS: { [string]: { [string]: { [string]: Swing } } } = {
+	sprinter = {
+		swing = { opening = { name = "sprinter_back_open", pitch = 1 }, closing = { name = "sprinter_back_close", pitch = 1 } },
+	},
+}
+
+-- carId: the car's CarId attribute (nil: its kind's sounds).
+function SoundPlan.swingSound(what: string, moment: string, carId: string?): (string?, number)
+	local own = if carId then OWN_SWINGS[carId] else nil
+	local list = (own and own[what]) or SWINGS[what]
 	local entry = list and list[moment]
 	if not entry then
 		return nil, 1
@@ -266,7 +305,8 @@ function SoundPlan.moveCues(was: any, now: any, clock: number): { Cue }
 	if now.horde == true and was.horde ~= true then
 		table.insert(cues, cueOf("horde_siren", M.Siren))
 	end
-	if (now.backOpen == true) ~= (was.backOpen == true) then
+	-- (8.1: not in the sandbox: the Sprinter has no ramp, its back doors are heard swinging, swingSound)
+	if (now.backOpen == true) ~= (was.backOpen == true) and not Config.Sandbox.On then
 		table.insert(cues, cueOf("truck_ramp", M.Ramp, if now.backOpen == true then 1 else M.RampShut))
 	end
 	if (now.inside == true) ~= (was.inside == true) then
@@ -306,10 +346,133 @@ function SoundPlan.moveCues(was: any, now: any, clock: number): { Cue }
 end
 
 function SoundPlan.resultCue(result: any): Cue?
+	if Config.Sandbox.On then
+		return nil -- (8.1: the sandbox has no Wall: the trip home has its fanfare, collectionCues)
+	end
 	if type(result) == "table" and (result.how == "done" or result.how == "late") then
 		return cueOf("checkpoint_gate", S.Move.Gate)
 	end
 	return nil
+end
+
+-- ── 8.1 SANDBOX: the meadow, the warehouse, the chalet, the collection, the Sprinter ───────────────────────────────
+
+SoundPlan.SandboxLoops = { alpine = "amb_alpine", warehouse = "amb_warehouse", room = "amb_room" }
+
+local OFF_MAP = 1000 -- studs past SandboxMap.Bounds: a move's interior (server/HouseInterior.luau builds them far off)
+local ROOF = 8 -- studs over a warehouse's walls that still count as in it (its gable roof)
+local INSET = 2 -- studs inside the chalet's box (its front door's step, where you come out, is outdoors)
+
+function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean): string
+	if inside then
+		return "house"
+	end
+	local b = SandboxMap.Bounds
+	if x < b.x0 - OFF_MAP or x > b.x1 + OFF_MAP or z < b.z0 - OFF_MAP or z > b.z1 + OFF_MAP then
+		return "house"
+	end
+	local house: any = SandboxMap.House
+	local h = if type(house) == "table" then house.house else nil
+	if type(h) == "table" and math.abs(x - h.x) <= h.sx / 2 - INSET and math.abs(z - h.z) <= h.sz / 2 - INSET and y >= h.y - 2 and y <= h.y + h.sy then
+		return "house"
+	end
+	local plot = SandboxMap.plotAt(x, z)
+	local w = plot and plot.warehouse
+	if w and math.abs(x - w.x) <= w.sx / 2 and math.abs(z - w.z) <= w.sz / 2 and y >= w.y - 2 and y <= w.y + w.sy + ROOF then
+		return "warehouse"
+	end
+	return "outdoors"
+end
+
+export type SandboxMix = { alpine: number, warehouse: number, room: number }
+
+function SoundPlan.sandboxAmbience(place: string, sheet4: boolean): SandboxMix
+	local B = S.Sandbox
+	local alpine = if sheet4 then B.Alpine else B.AlpineStandIn
+	if place == "warehouse" then
+		return { alpine = alpine * B.AlpineIndoors, warehouse = if sheet4 then B.Warehouse else B.WarehouseStandIn, room = 0 }
+	elseif place == "house" then
+		return { alpine = 0, warehouse = 0, room = if sheet4 then B.Room else 0 }
+	end
+	return { alpine = alpine, warehouse = 0, room = 0 }
+end
+
+function SoundPlan.reverb(place: string): string
+	return S.Sandbox.Reverb[place] or "NoReverb"
+end
+
+function SoundPlan.cowbellGap(r: number): number
+	local gap = S.Sandbox.CowbellGap
+	return gap[1] + (gap[2] - gap[1]) * math.clamp(r, 0, 1)
+end
+
+function SoundPlan.cowbellSpot(x: number, z: number, r1: number, r2: number): (number, number)
+	local far = S.Sandbox.CowbellFar
+	local angle = math.clamp(r1, 0, 1) * 2 * math.pi
+	local distance = far[1] + (far[2] - far[1]) * math.clamp(r2, 0, 1)
+	return x + math.cos(angle) * distance, z + math.sin(angle) * distance
+end
+
+-- A state's pieces by their uid: the stand each is on (0: in the stock). (Over the network: junk is skipped.)
+local function standsOf(state: any): { [string]: number }?
+	if type(state) ~= "table" or type(state.stock) ~= "table" then
+		return nil
+	end
+	local out: { [string]: number } = {}
+	for _, entry in state.stock do
+		if type(entry) == "table" and (type(entry.uid) == "string" or type(entry.uid) == "number") then
+			out[tostring(entry.uid)] = if type(entry.stand) == "number" then entry.stand else 0
+		end
+	end
+	return out
+end
+
+function SoundPlan.collectionCues(was: any, now: any, sinceResult: number?): { Cue }
+	local B = S.Sandbox
+	local cues: { Cue } = {}
+	local before, after = standsOf(was), standsOf(now)
+	if not before or not after then
+		return cues -- (the first state: nothing changed yet)
+	end
+	local came, shown, taken = 0, false, false
+	for uid, stand in after do
+		local old = before[uid]
+		if old == nil then
+			came += 1
+		elseif stand ~= old then
+			if stand > 0 then
+				shown = true -- (put up, or moved to another stand)
+			else
+				taken = true
+			end
+		end
+	end
+	-- (a piece gone: sold, its till plays from the "sold" message; or cleared: nothing)
+	if came > 0 and not (sinceResult and sinceResult < B.StoredQuiet) then
+		table.insert(cues, cueOf("stored_fanfare", B.Stored))
+	end
+	if shown then
+		table.insert(cues, cueOf("stand_display", B.Display))
+	end
+	if taken then
+		table.insert(cues, cueOf("stand_takedown", B.TakeDown))
+	end
+	return cues
+end
+
+function SoundPlan.incomeClink(gained: number, now: number, last: number, soldAt: number, open: boolean, earning: boolean): boolean
+	local B = S.Sandbox
+	return gained > 0 and earning and not open and now - soldAt >= B.SoldQuiet and now - last >= B.IncomeGap
+end
+
+function SoundPlan.slideSound(open: boolean): string
+	return if open then "van_slide_open" else "van_slide_close"
+end
+
+local STEPS = { RearStep = true, SideStep = true } -- (shared/SprinterLooks.luau Switched: the steps out while a door is open)
+
+function SoundPlan.isStep(name: string): boolean
+	return STEPS[name] == true
 end
 
 return SoundPlan

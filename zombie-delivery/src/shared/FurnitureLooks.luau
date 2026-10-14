@@ -276,6 +276,7 @@ local function label(part: BasePart, text: string, color: Color3, face: Enum.Nor
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 40
 	gui.LightInfluence = 1
+	gui.MaxDistance = Config.Performance.SignRange -- 8.2 perf: small text, drawn only near (a phone draws each on its own)
 	local text_ = Instance.new("TextLabel")
 	text_.Size = UDim2.fromScale(0.92, 0.8)
 	text_.Position = UDim2.fromScale(0.04, 0.1)
@@ -1436,8 +1437,10 @@ end
 -- ── 8.0 collectibles ─────────────────────────────────────────────────────────
 -- A collector's things that turn up in a house besides its furniture (shared/HouseLayout.luau places 2-4 a house, a
 -- legendary one in about one house of eight: Config.Furniture.Collectibles), each worth clearly more than an ordinary
--- piece of its class and dearer the rarer it is (tests/furniture_test.luau). No Blender model yet: server/FurnitureMesh.luau
--- dresses only what its import has, so these keep the looks below.
+-- piece of its class and dearer the rarer it is (tests/furniture_test.luau). 8.1: the owner's Blender look
+-- (design/blender-furniture/furniture.py) has them too; once its ZDCFurnitureArt is imported, server/FurnitureMesh.luau
+-- dresses them (their gilt, velvet, lacquer, neon and fur in the variant's colours from the lists below), until then they
+-- keep the looks below.
 local collectFrom = #Order + 1
 local function collectible(id: string, name: string, icon: string, x: number, y: number, z: number, class: Class, weight: number, value: number, fragile: boolean, room: string, rarity: Rarity)
 	item(id, name, icon, x, y, z, class, weight, value, fragile, room)
@@ -1896,7 +1899,19 @@ function FurnitureLooks.parts(id: string): number
 end
 
 FurnitureLooks.MaxParts = Tuning.MaxParts
--- The builders' colour lists by finish (server/FurnitureMesh.luau colours the Blender models' pieces from them).
-FurnitureLooks.Palettes = { fabric = FABRICS, wood = WOODS, paint = PAINTS, accent = ACCENTS, appliance = APPLIANCES }
+-- The builders' colour lists by finish (server/FurnitureMesh.luau colours the Blender models' pieces from them; 8.1: the
+-- collectibles' gilt, velvet, lacquer, neon and fur too).
+FurnitureLooks.Palettes = {
+	fabric = FABRICS,
+	wood = WOODS,
+	paint = PAINTS,
+	accent = ACCENTS,
+	appliance = APPLIANCES,
+	gilt = GILT,
+	velvet = VELVETS,
+	lacquer = LACQUERS,
+	neon = NEONS,
+	fur = FURS,
+}
 
 return FurnitureLooks

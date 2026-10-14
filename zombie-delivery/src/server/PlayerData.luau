@@ -53,6 +53,18 @@
 -- short keys: Economy.vanMigrated reads either), and so are the chapters done (its story keeps only "intro").
 -- 8.0 SANDBOX: the collection (collection: the pieces the moves brought home, shared/CollectionRules.luau; kept by
 -- server/Collection.luau), read only from a real save written with its flag (collectionKept); older saves: empty.
+-- 8.2 SANDBOX: the collection book (collectionBook: { [item]: { n, best } } the pieces ever brought home,
+-- collectionBookPaid: { [milestone id]: true } its milestones paid; shared/CollectionBookRules.luau, kept by
+-- server/CollectionBook.luau), read only from a real save written with its flag (collectionBookKept); an older real save
+-- fills the book from its stock (its milestones pay on joining); a new player: empty.
+-- 8.1 SANDBOX: the upgrades bought at the warehouse's UPGRADES desk (sandboxUpgrades: { [id]: level },
+-- shared/UpgradeRules.luau; server/Upgrades.luau sells them), read only from a real save written with its flag
+-- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.)
+-- 8.2 SANDBOX, analytics: the sandbox's own onboarding funnel's steps reached (sandboxOnboarding, a bit a step of
+-- shared/AnalyticsPlan.luau's SandboxSteps; server/Analytics.luau marks them on a sandbox server), read only from a real
+-- save written with its flag (sandboxOnboardingKept: AnalyticsPlan.sandboxFrom); an older real save is past every step.
+-- 8.2 SANDBOX: the daily tasks (sandboxTasks: shared/SandboxTasks.luau's save, kept by server/SandboxTasks.luau), read
+-- only from a real save written with their flag (sandboxTasksKept); older saves: none (the server starts them fresh).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -76,6 +88,9 @@ local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funn
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
 local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
+local CollectionBookRules = require(Shared.CollectionBookRules) -- 8.2: the collection book (profile.collectionBook)
+local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
+local SandboxTaskRules = require(Shared.SandboxTasks) -- 8.2: the sandbox's daily tasks (profile.sandboxTasks)
 
 export type Profile = {
 	money: number,
@@ -135,6 +150,9 @@ export type Profile = {
 	tasks: TaskData.Saved?,
 	-- 6.13: the onboarding funnel's steps reached (a bit a step, shared/AnalyticsPlan.luau; server/Analytics.luau)
 	onboarding: number,
+	-- 8.2 SANDBOX: the sandbox's onboarding funnel's steps reached (a bit a step of AnalyticsPlan.SandboxSteps): read only
+	-- from a real save written with its flag (AnalyticsPlan.sandboxFrom); an older real save is past every step
+	sandboxOnboarding: number,
 	-- 6.14: the regulars: deliveries for each business (shared/Regulars.luau ids, the job pictures'; server/Regulars.luau
 	-- counts them); a save from before 6.14 has none (the empty table, no migration)
 	regulars: { [string]: number },
@@ -145,6 +163,17 @@ export type Profile = {
 	-- 8.0 SANDBOX: the pieces the moves brought home (shared/CollectionRules.luau; server/Collection.luau keeps it): read
 	-- only from a real save written with its flag (CollectionRules.fromSave); an older one starts with the empty one
 	collection: CollectionRules.Saved,
+	-- 8.2 SANDBOX: the collection book (shared/CollectionBookRules.luau; server/CollectionBook.luau keeps it): every piece
+	-- ever brought home ({ n, best }) and the milestones paid; read only from a real save written with its flag
+	-- (CollectionBookRules.fromSave); an older real save's is its stock's
+	collectionBook: CollectionBookRules.Book,
+	collectionBookPaid: CollectionBookRules.Paid,
+	-- 8.1 SANDBOX: the upgrades bought ({ [id]: level }, shared/UpgradeRules.luau; server/Upgrades.luau): read only from a
+	-- real save written with its flag (UpgradeRules.fromSave); an older one has none
+	sandboxUpgrades: UpgradeRules.Levels,
+	-- 8.2 SANDBOX: the daily tasks (shared/SandboxTasks.luau: the day's picks and progress, the week's): read only from a
+	-- real save written with its flag (SandboxTasks.fromSave); nil until server/SandboxTasks.luau starts them
+	sandboxTasks: SandboxTaskRules.Saved?,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -239,10 +268,15 @@ local function newProfile(): Profile
 		carRefund = nil, -- 7.x
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
 		onboarding = 0, -- 6.13: a new courier, no step yet
+		sandboxOnboarding = 0, -- 8.2: no step of the sandbox's funnel yet
 		regulars = {}, -- 6.14: no business knows you yet
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		story = {}, -- 7.0: no story card seen yet
 		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
+		collectionBook = CollectionBookRules.empty(), -- 8.2: nothing found yet
+		collectionBookPaid = {}, -- 8.2: no milestone paid yet
+		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
+		sandboxTasks = nil, -- 8.2: server/SandboxTasks.luau starts them (it knows the UserId and the day)
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -542,6 +576,9 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	-- 6.13: the onboarding funnel's steps (only a real save has them; one from before 6.13 is past every step).
 	profile.onboarding = AnalyticsPlan.onboardingFrom(saved)
+	-- 8.2: the sandbox's funnel's steps, only from a real save written with their flag (sandboxOnboardingKept); a real
+	-- save from before 8.2 is past every step (a player who knows the sandbox), a new one at none
+	profile.sandboxOnboarding = AnalyticsPlan.sandboxFrom(saved)
 	-- 6.14: the regulars, checked (known businesses, whole counts up to Config.Regulars.Cap); none before 6.14: empty.
 	profile.regulars = require(Shared.Regulars).clean(saved.regulars)
 	-- 7.0: the moves' story cards seen, checked (known keys only), only from a real save (not a lock-only record of a
@@ -552,6 +589,28 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); a save from before
 	-- 8.0 (or a lock-only record of a new player) starts with the empty one (CollectionRules.fromSave)
 	profile.collection = CollectionRules.fromSave(saved)
+	-- 8.2: the collection book, checked, only from a real save: written with its flag (collectionBookKept) its own; an
+	-- older real save the book of its stock (just read above), no milestone paid yet (CollectionBookRules.fromSave)
+	profile.collectionBook, profile.collectionBookPaid = CollectionBookRules.fromSave(saved, profile.collection)
+	-- (8.2 review: the milestones paid are also short keys of `rewards`, "book:<id>", which an older server keeps: a save
+	-- that went through one never pays them again)
+	local carried: { string } = {}
+	if type(saved.rewards) == "table" then -- (the save's own: profile.rewards is read later, applyChallenges)
+		for key, on in saved.rewards do
+			if on == true and type(key) == "string" and string.sub(key, 1, 5) == "book:" then
+				table.insert(carried, string.sub(key, 6))
+			end
+		end
+	end
+	for id in CollectionBookRules.cleanPaid(carried) do
+		profile.collectionBookPaid[id] = true
+	end
+	-- 8.1: the sandbox's upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); a save
+	-- from before 8.1 (or a lock-only record) has none (UpgradeRules.fromSave)
+	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
+	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
+	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
+	profile.sandboxTasks = SandboxTaskRules.fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -887,6 +946,9 @@ function PlayerData.save(player: Player, final: boolean?)
 	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
 	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
 	profile.rewards[Config.CompanyVan.Flag] = true
+	for id in profile.collectionBookPaid do
+		profile.rewards["book:" .. id] = true -- (8.2 review: the book's milestones paid, as the chapters done below)
+	end
 	for key in profile.story do
 		if string.sub(key, 1, 5) == "done:" then
 			profile.rewards[key] = true
@@ -944,11 +1006,20 @@ function PlayerData.save(player: Player, final: boolean?)
 		phone = profile.phone, -- 5.0
 		tasks = profile.tasks, -- 6.12
 		onboarding = profile.onboarding, -- 6.13
+		sandboxOnboarding = profile.sandboxOnboarding, -- 8.2
+		sandboxOnboardingKept = true, -- 8.2: AnalyticsPlan.SandboxFlag (applySaved reads the steps only with it)
 		regulars = profile.regulars, -- 6.14
 		skills = profile.skills, -- 6.20
 		story = profile.story, -- 7.0
 		collection = profile.collection, -- 8.0
 		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
+		collectionBook = profile.collectionBook, -- 8.2
+		collectionBookPaid = profile.collectionBookPaid, -- 8.2
+		collectionBookKept = true, -- 8.2: CollectionBookRules.Flag (applySaved reads the book only with it)
+		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
+		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
+		sandboxTasks = profile.sandboxTasks, -- 8.2
+		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

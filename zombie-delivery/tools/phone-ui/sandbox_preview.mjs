@@ -37,6 +37,7 @@ function render(scene, fonts) {
     ViewportFrame: { bg: [163, 162, 165], bgT: 0 },
     TextLabel: { bg: [255, 255, 255], bgT: 0, tc: [0, 0, 0], ts: 14 },
     TextButton: { bg: [255, 255, 255], bgT: 0, tc: [0, 0, 0], ts: 14 },
+    TextBox: { bg: [255, 255, 255], bgT: 0, tc: [0, 0, 0], ts: 14 }, // 8.2: the search box
   };
   const rgba = (c, t) => `rgba(${c[0]},${c[1]},${c[2]},${1 - (t || 0)})`;
   const weight = f => (f && /Bold|Black|Heading/.test(f) ? 700 : 500);
@@ -86,6 +87,7 @@ function render(scene, fonts) {
       const big = Math.floor(Math.min(w, h) * 0.62);
       mark.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:${big}px;font-family:${FONTS};filter:drop-shadow(0 4px 3px rgba(0,0,0,0.55));`;
       mark.textContent = n.emoji || '📦';
+      if (n.sil) mark.style.filter = 'brightness(0) opacity(0.85)'; // 8.2: an unknown piece's dark silhouette
       el.appendChild(mark);
       const tag = document.createElement('div');
       tag.style.cssText = `position:absolute;right:4px;top:4px;font:700 9px ${FONTS};color:rgba(255,255,255,0.55);`;

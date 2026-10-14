@@ -39,6 +39,9 @@
 --                                              "wait" | "drop"
 --   MoveHelperBrain.speed(walk, action, carry, weight)   his walk now: × Speed (× the carry's alone: "hand" | "both"),
 --                                              Sprint × to a lift, Flee × running away
+--   MoveHelperBrain.trained(owner)             8.1 SANDBOX: his walk x this for the move's owner (Danny's training,
+--                                              the level in their player attribute Config.SandboxUpgrades.Danny,
+--                                              shared/UpgradeRules.luau dannySpeed; 1 without one)
 --   MoveHelperBrain.stuck(stuckFor, moved, dt, speed)    seconds without progress (under a fifth of his walk)
 --   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does: "walk" | "repath" (StuckRepath s) | "nudge"
 --                                              (StuckSnap s: he appears at his way's next point)
@@ -46,6 +49,17 @@
 --                                              floor's there (stairs, steps), within HoldStep of the carrier's
 --   MoveHelperBrain.farEnd(depth)              how far in front of the piece's middle his root stands (its far face
 --                                              and Standoff)
+--   8.1 carrying in two (the owner: "when I turn around he teleports"; the leader's steering: shared/PairCarry.luau):
+--   the far end's holder (Danny, or a crew mate who helps lift: server/PairHold.luau) is never put there at once while
+--   holding, he walks there at a top speed that fits the pair's walk and the swing of a turn:
+--   MoveHelperBrain.holdSpeed(walk)            his top speed (AlignPosition.MaxVelocity) with the leader walking at
+--                                              `walk` (the carry's CarrySpeed × PairCarry.boost): × HoldMargin + HoldExtra
+--   MoveHelperBrain.holdTurn()                 his body's top turn (radians a second: HoldTurn × PairTurn)
+--   MoveHelperBrain.newTrail()                 a holder's record of how long he has been behind
+--   MoveHelperBrain.holdTrack(trail, gap, crossed, speed, dt)   one look: `gap` studs off his place, the piece in the
+--                                              other world (`crossed`: a door's fade) → (top speed now, snap): snap
+--                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
+--                                              ease of HoldEase s (the gap / HoldEase a second); else `speed`
 --   MoveHelperBrain.aside(x, z, door)          a place in a doorway (Aside's zone): the place beside it, along the wall
 --                                              (he never stands where you walk through); else the place itself
 --   MoveHelperBrain.followSpot(x, z, lookX, lookZ)       his place behind you ("Help me")
@@ -56,6 +70,7 @@
 
 local Config = require(script.Parent.Config)
 local Rules = require(script.Parent.MovingRules)
+local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: Danny's training
 
 local MoveHelperBrain = {}
 
@@ -220,6 +235,50 @@ function MoveHelperBrain.endRise(floorRise: number, carrierRise: number): number
 	return math.clamp(floorRise, carrierRise - step, carrierRise + step)
 end
 
+-- 8.1 his top speed holding the far end: the leader's walk and a margin (the far end swings round a turn at PairTurn
+-- on top of the walk: HoldExtra).
+function MoveHelperBrain.holdSpeed(walk: number): number
+	local c = cfg()
+	return math.max(walk, 0) * c.HoldMargin + c.HoldExtra
+end
+
+function MoveHelperBrain.holdTurn(): number
+	local c = cfg()
+	return math.rad(c.PairTurn) * c.HoldTurn
+end
+
+export type Trail = { behind: number, ease: number, easeSpeed: number }
+
+function MoveHelperBrain.newTrail(): Trail
+	return { behind = 0, ease = 0, easeSpeed = 0 }
+end
+
+function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, speed: number, dt: number): (number, boolean)
+	local c = cfg()
+	if crossed then
+		trail.behind, trail.ease = 0, 0
+		return speed, true
+	end
+	if trail.ease > 0 then
+		trail.ease = math.max(0, trail.ease - dt)
+		if trail.ease > 1e-6 then
+			return math.max(speed, trail.easeSpeed), false
+		end
+	end
+	if gap <= c.HoldBehind then
+		trail.behind = 0
+		return speed, false
+	end
+	trail.behind += dt
+	if trail.behind < c.HoldStuck then
+		return speed, false
+	end
+	trail.behind = 0
+	trail.ease = c.HoldEase
+	trail.easeSpeed = gap / math.max(c.HoldEase, 0.05)
+	return math.max(speed, trail.easeSpeed), false
+end
+
 -- ── What next ──────────────────────────────────────────────────────────────
 
 function MoveHelperBrain.reserved(playerCost: number?, myCost: number): boolean
@@ -362,6 +421,14 @@ function MoveHelperBrain.speed(walk: number, action: string, carry: string?, wei
 	end
 	local factor = if carry then Rules.speedFactor(carry, weight) else 1
 	return walk * c.Speed * factor
+end
+
+-- 8.1 SANDBOX: Danny's training (server/Upgrades.luau keeps the level in the owner's player attribute): his walk x this.
+function MoveHelperBrain.trained(owner: any): number
+	local ok, level = pcall(function(): any
+		return owner:GetAttribute(Config.SandboxUpgrades.Danny)
+	end)
+	return UpgradeRules.dannySpeed(if ok then level else nil)
 end
 
 -- ── Words ──────────────────────────────────────────────────────────────────

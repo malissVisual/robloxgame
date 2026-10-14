@@ -1,17 +1,34 @@
-# Nahrát nové zvuky (sfx4.ogg, verze 7.1)
+# Nahrát nové zvuky (sfx4.ogg, verze 7.1 a 8.1)
 
-Hra má 23 nových zvuků pro stěhování a pro hory. Jsou v jednom souboru `art/audio/sfx4.ogg` (50 s, asi 370 kB):
+Hra má 36 nových zvuků pro stěhování, pro hory a pro sandbox. Jsou v jednom souboru `art/audio/sfx4.ogg`
+(111 s, asi 0,9 MB):
 
 - **nábytek:** zvednutí, položení, těžký pád, rozbití skla, šoupání těžkého kusu po zemi, šustění krabice;
 - **náklaďák:** rampa a zadní dveře, kus zajíždějící do korby, utahování popruhu;
 - **dům:** vrzání domovních dveří;
 - **úchop těžkého kusu:** tiknutí, varování, vyklouznutí;
 - **stěhování:** znělka na začátku, znělka úspěchu a neúspěchu, vzdálená siréna hordy, závora na kontrolním stanovišti u Zdi;
-- **hory:** kukačkové hodiny, kravský zvonec, ptáci na louce, vítr na vrcholcích, potok.
+- **hory:** kukačkové hodiny, kravský zvonec, ptáci na louce, vítr na vrcholcích, potok;
+- **sandbox (8.1):**
+  - venku klidný alpský den místo městského provozu: jemný vánek a ptáci, občas v dálce kravský zvonec;
+  - ve skladu tiché bzučení světel a vzduch haly (a lehká ozvěna);
+  - v chalupě tichý pokoj s tikajícími hodinami;
+  - kus postavený na stojan (tlumené žuchnutí a zatřpytění), sundaný ze stojanu, prodaný (pokladna „ka-ching“);
+  - cesta domů: kusy uložené ve skladu (malá fanfára);
+  - dodávka Sprinter: zadní dveře (otevřou se až k bokům a vyklopí se schůdek), posuvné boční dveře
+    (otevření a zabouchnutí), krok na schůdek.
 
-Dokud soubor nenahrajete, hra místo nich přehrává podobné starší zvuky. Šoupání, kukačka, zvonec a ptáci do té doby mlčí.
+Dokud soubor nenahrajete, hra místo nich přehrává podobné starší zvuky:
+
+- venku v sandboxu hraje jen jemný vánek (bez ptáků), ve skladu tiché hučení;
+- stojany, pokladna, fanfára, dveře Sprinteru a schůdek mají starší náhradní zvuky.
+
+Do té doby mlčí: šoupání těžkého kusu, vzdálený kravský zvonec a tichý pokoj v chalupě.
 
 Ostatní soubory (`sfx.ogg`, `sfx2.ogg`, `sfx3.ogg`, `music.ogg`) jsou **stejné jako dřív**. Znovu je nahrávat nemusíte.
+
+**Pozor:** pokud jste už někdy nahráli starší `sfx4.ogg` (verze 7.1, 50 s), nepoužívejte ho. Nahrajte tento nový
+soubor. Obsahuje všechny staré zvuky i ty nové.
 
 ## Postup
 
@@ -39,7 +56,7 @@ na skupinu). Zvuk nahraný pod jiným vlastníkem hra nesmí přehrát a zůstan
 
 ### 2. Vložit číslo do hry
 
-1. Otevřete `zombie-delivery/src/shared/SoundSheet.luau` a najděte řádek 21:
+1. Otevřete `zombie-delivery/src/shared/SoundSheet.luau` a najděte řádek 22:
 
    ```lua
    SoundSheet.Sfx4Id = "" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)
@@ -60,6 +77,22 @@ na skupinu). Zvuk nahraný pod jiným vlastníkem hra nesmí přehrát a zůstan
 
 ## Jak to vyzkoušet
 
+### Sandbox (verze 8.1, `Config.Sandbox.On = true`)
+
+- Projděte se po louce: vánek a ptáci, žádný provoz. Asi jednou za půl minuty až minutu zazní někde v dálce kravský
+  zvonec (pokaždé z jiné strany).
+- Vejděte do svého skladu: louka ztichne, ozve se tiché bzučení světel a kroky mají lehkou ozvěnu. Venku ozvěna zmizí.
+- Ve skladu u stojanu (E) vyberte kus a dejte DISPLAY: tlumené žuchnutí a zatřpytění. TAKE DOWN: kus se sundá
+  (krátký zvuk zvednutí). SELL: pokladna „ka-ching“.
+- Když jsou kusy na stojanech a okno skladu je zavřené, příjem zacinká tichou mincí, nejvýš jednou za 10 sekund.
+- U Sprinteru otevřete zadní dveře (E): dveře se otevřou až k bokům a cvakne vyklopený schůdek. Zavřete je: dvě
+  bouchnutí. Posuvné boční dveře: zarachotí a dorazí, při zavření zabouchnou.
+- Vystupte po schůdku do dodávky: dutý kovový krok a dodávka se lehce zhoupne.
+- Stěhování: vejděte dveřmi do chalupy: venkovní zvuky utichnou a ozve se tichý pokoj s hodinami. Odvezte náklad
+  domů do skladu: malá fanfára (po poslední cestě hraje místo ní znělka výsledkové karty).
+
+### Stěhování ve městě (verze 7.1, `Config.Sandbox.On = false`)
+
 - V depu u kiosku **Moving contracts** spusťte stěhování (START, pak LAUNCH): zazní krátká znělka.
 - U domu projděte dveřmi dovnitř a ven: dveře vrznou.
 - Zvedněte kus nábytku (dřevěné ťuknutí) a krabici (šustění). Položte je klávesou G (tlumené žuchnutí).
@@ -69,8 +102,8 @@ na skupinu). Zvuk nahraný pod jiným vlastníkem hra nesmí přehrát a zůstan
 - Ve 3:00 do konce začne v dálce houkat siréna hordy.
 - Dojeďte ke kontrolnímu stanovišti u Zdi: zabzučí bzučák a zvedne se závora.
 
-Zvuky úchopu, popruhu, znělky výsledku a zvuky hor jsou připravené pro další části hry (úchop těžkého kusu,
-výsledková karta, horské kapitoly). Zatím se nikde nepřehrávají.
+Zvuky popruhu, znělky výsledku a zvuky hor (kukačka, zvonec zblízka, ptáci, vítr na vrcholcích, potok) jsou
+připravené pro další části hry. Zatím se nikde nepřehrávají.
 
 Když se některý zvuk změní a skript `art/audio/make_audio.py` se spustí s `--sheets sfx4`, vznikne nový soubor.
 Ten je potřeba nahrát znovu a vyměnit číslo.

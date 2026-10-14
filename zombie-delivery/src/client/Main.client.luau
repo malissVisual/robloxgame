@@ -33,7 +33,9 @@ end
 --   the HUD                            Hud (the city's parts hidden: client/Hud.luau ── Sandbox ──) and KeyHints (the
 --                                      move's keys and the car's only)
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
---                                      SandboxGuide: written by other workers, each started only when it is there
+--                                      SandboxGuide, 8.1's UpgradeUi (the UPGRADES desk's window), 8.2's
+--                                      CollectionBookUi (the collection book), SandboxTasksUi (the TASKS chip and
+--                                      panel): each started only when it is there
 -- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
 -- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
 -- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
@@ -53,7 +55,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide" } do
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -75,6 +77,10 @@ if Config.Sandbox.On then
 		return nil
 	end
 	local WarehouseUi = ownModule("WarehouseUi")
+	local UpgradeUi = ownModule("UpgradeUi")
+	local BookUi = ownModule("CollectionBookUi") -- (8.2: the collection book and the TASKS panel, windows like the others)
+	local TasksUi = ownModule("SandboxTasksUi")
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -115,6 +121,7 @@ if Config.Sandbox.On then
 			safely(entry.name, start)
 		end
 	end
+	safely("SandboxSounds", function() require(Client.SandboxSounds).start() end) -- 8.1: the stands, the till, the van's doors
 
 	-- The hooks (the city's, less what the sandbox does not run).
 	Drive.notify = Hud.toast
@@ -126,31 +133,49 @@ if Config.Sandbox.On then
 	QuickChat.covered = function(): boolean
 		return MovingHud.isOpen() or MoveLobbyUi.isOpen() or require(Client.MoveStoryUi).isOpen()
 	end
-	-- Is the warehouse's picker open (WarehouseUi.isOpen, when it has one)?
-	local function warehouseOpen(): boolean
-		local isOpen = WarehouseUi and WarehouseUi.isOpen
+	-- Is a sandbox window open (the warehouse's picker, 8.1's UPGRADES desk: module.isOpen, when it has one)?
+	local function ownOpen(module: any): boolean
+		local isOpen = module and module.isOpen
 		if type(isOpen) ~= "function" then
 			return false
 		end
 		local ok, open = pcall(isOpen)
 		return ok and open == true
 	end
+	local function ownClose(module: any)
+		local close = module and module.close
+		if type(close) == "function" then
+			pcall(close)
+		end
+	end
 	-- One window at a time; ESC closes them all (the crew panel, the move's cards and list, the quick chat's ring, the
-	-- planning folds to its pill, the warehouse's picker).
+	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book, the TASKS panel). `keep`: the sandbox window opening now
+	-- (its onOpen runs once it counts as open, so it must not close itself).
+	local keep: any = nil
 	Hud.onCloseWindows = function()
 		CrewPanel.close()
 		MoveLobbyUi.minimize()
 		MovingHud.closeAll()
 		QuickChat.close(false)
-		local close = WarehouseUi and WarehouseUi.close
-		if type(close) == "function" then
-			pcall(close)
+		for _, module in windows do
+			if module ~= keep then
+				ownClose(module)
+			end
 		end
 	end
 	CrewPanel.onOpen = Hud.closeWindows
+	for _, module in windows do -- (8.1 review: opening one closes the others)
+		if type(module) == "table" then
+			module.onOpen = function()
+				keep = module
+				pcall(Hud.closeWindows)
+				keep = nil
+			end
+		end
+	end
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or warehouseOpen()
+			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	KeyHints.covered = function(): boolean
@@ -290,7 +315,7 @@ safely("MovingHud", require(Client.MovingHud).start) -- 7.0: MOVES: the contract
 safely("MoveHelperHud", require(Client.MoveHelperHud).start) -- 7.0: the depot's helper's orders under the move's panel (Danny)
 safely("MoveLobbyUi", require(Client.MoveLobbyUi).start) -- 7.0 planning: the move's planning lobby (roles, READY, LAUNCH)
 safely("QuickChat", require(Client.QuickChat).start) -- 7.0 planning: the crew's quick chat (hold T on a move or in its planning)
-safely("CarryGripUi", require(Client.CarryGripUi).start) -- 7.0 grip: the grip bar while you carry a heavy or fragile thing
+safely("CarryGripUi", require(Client.CarryGripUi).start) -- 8.1 grip: the timing checks as you lift and carry a heavy or fragile thing
 require(Client.MoveLobbyUi).onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
 require(Client.MoveLobbyUi).crewOpen = CrewPanel.isOpen
 WeaponWheel.yields = require(Client.QuickChat).active -- (a held T is the quick chat on a move; a tap still takes the next gun)

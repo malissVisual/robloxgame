@@ -1,18 +1,20 @@
 --!strict
--- 7.2, the house a move empties in the owner's own Blender model (the owner: "a 3D model of that house, so it looks like
--- a classic European house"; design/blender-house/house.py → roblox/ZDCHouseArt.fbx). The owner imports ZDCHouseArt.fbx
--- once in Roblox Studio (File → Import 3D, the defaults) and publishes. A house's own parts come here in a Model with
--- its "House" box: server/World.luau's buildHouse (each Suburbs chalet, Marge's 155 Willow Ln among them) and, 8.0.5,
--- server/SandboxWorld.luau's The Old Chalet (house.py's TARGET "sandbox", the model the owner imports now). A house of
--- HouseMesh.Homes whose box is the model's (mark_box) wears the model's MeshParts (anchored, not colliding, not queried,
--- not touched). Its own parts stay where they are, invisible: the House box (the model's walls stand on its faces) and
--- whatever else collides on the ground still does (the sandbox's FrontDoor keeps its "Enter house"); what stands over
--- the walls (the old roof and gables, under the model's roof) stops colliding. No import, a house not listed or of
--- another size: the house as it was built.
+-- 7.2, Marge's house in the owner's own Blender model (the owner: "a 3D model of that house, so it looks like a classic
+-- European house"; design/blender-house/house.py → roblox/ZDCHouseArt.fbx). The owner imports ZDCHouseArt.fbx once in
+-- Roblox Studio (File → Import 3D, the defaults) and publishes. server/World.luau's buildHouse puts each Suburbs
+-- house's own parts in a Model (House, Roof, Door, Window) and hands it here: a house of HouseMesh.Homes whose box is
+-- the model's wears the model's MeshParts (anchored, not colliding, not queried, not touched). Its own parts stay where
+-- they are, invisible: the House box and the Roof wedges are still what collides (the model's walls stand on the box's
+-- faces, its roof over the wedges). No import, a house not listed or of another size: the house as World builds it.
+-- 8.1 SANDBOX: the sandbox's one house wears it too (The Old Chalet: server/SandboxWorld.luau puts its chalet's parts
+-- in a Model "House_sandbox_house" on a box of the model's size, shared/SandboxMap.luau House, and hands it here; the
+-- import is in ServerStorage from the server's first line, server/Main.server.luau, and dress loads it). 8.2.1: the
+-- import is the owner's big house for it (house.py TARGET "sandbox", 44 × 14.5 × 34); Marge's is then another size and
+-- keeps its chalet (house.py TARGET "city" exports one for her).
 --
 --   HouseMesh.start()               at the server's start: finds the import and takes it out of the world
---   HouseMesh.dress(model, homeId)  dresses one house (World's buildHouse); false: left as it was
---   HouseMesh.Homes                 the homes that wear it (Map.Homes ids)
+--   HouseMesh.dress(model, homeId)  dresses one house (World's buildHouse, SandboxWorld's house); false: left as it was
+--   HouseMesh.Homes                 the homes that wear it (Map.Homes ids, the sandbox's SandboxMap.House.id)
 --   HouseMesh.Looks                 each finish's colour and material
 --
 -- The pieces are named "house_<finish>" ("house2_<finish>" ... where a finish has more than 10,000 triangles;
@@ -27,8 +29,8 @@ local HouseMesh = {}
 local NAME = "ZDCHouseArt"
 
 HouseMesh.Homes = {
-	home_suburbs_2_0_00 = true, -- 155 Willow Ln, Marge's (the city's moves' prologue, Config.Moving)
-	sandbox_house = true, -- 8.0.5: the sandbox's The Old Chalet (server/SandboxWorld.luau, SandboxMap.House)
+	home_suburbs_2_0_00 = true, -- 155 Willow Ln, Marge's (the moves' prologue, Config.Moving)
+	sandbox_house = true, -- 8.1 SANDBOX: The Old Chalet (shared/SandboxMap.luau House, server/SandboxWorld.luau)
 } :: { [string]: boolean }
 
 type Look = { color: Color3, material: Enum.Material, reflectance: number?, night: Color3? }
@@ -187,8 +189,9 @@ function HouseMesh.start()
 	ready()
 end
 
--- Dresses one of World's houses (`model`: its House box, Roof wedges, Door and Windows): the model's pieces on the
--- box's bottom middle, the house's own parts invisible (still colliding where they did). False: left as it was.
+-- Dresses one of World's houses (`model`: its House box, Roof wedges, Door and Windows; the sandbox's: its chalet's
+-- parts, the FrontDoor among them): the model's pieces on the box's bottom middle, the house's own parts (the model's
+-- children) invisible, still colliding where they did. False: left as it was.
 function HouseMesh.dress(model: Model, homeId: string): boolean
 	if not HouseMesh.Homes[homeId] or not ready() then
 		return false
@@ -202,18 +205,10 @@ function HouseMesh.dress(model: Model, homeId: string): boolean
 		say(`{homeId}: the house is {house.Size}, the model was made for {want}; it keeps its own look`)
 		return false
 	end
-	local top = house.Position.Y + house.Size.Y / 2
 	for _, d in model:GetChildren() do
 		if d:IsA("BasePart") then
 			d.Transparency = 1
 			d.CastShadow = false
-			-- (over the walls the model's own roof stands: the old one's wedges and gables, unseen, would poke through
-			-- it, so they stop colliding; the box below and everything on the ground keep theirs)
-			local cf, size = d.CFrame, d.Size
-			local reach = (math.abs(cf.RightVector.Y) * size.X + math.abs(cf.UpVector.Y) * size.Y + math.abs(cf.LookVector.Y) * size.Z) / 2
-			if d ~= house and d.Position.Y - reach >= top - 0.05 then
-				d.CanCollide, d.CanQuery = false, false
-			end
 		end
 	end
 	local base = house.CFrame * CFrame.new(0, -house.Size.Y / 2, 0)

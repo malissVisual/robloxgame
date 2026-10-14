@@ -23,6 +23,9 @@
 --     branding iron (★ first, the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
 --     and comes out of the farmhouse's front door with Sol, then the hay wagon's (bigDoor) out of the barn doors to the
 --     van's hitch.
+--   * 8.1 walk-in doors (no E): a doormat at both doors; in by walking into the barn doors' zone; the hay wagon walked
+--     into the farmhouse's way out is refused once ("Too big — use the barn doors"), nobody goes; walked into the barn
+--     doors' way out, out at the barn with the other end beside, facing away; not straight back in.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -728,8 +731,11 @@ local solVan = E.cars[sol]
 local solBack = solVan.chassis:FindFirstChild("CargoDoor").WorldPosition
 E.clock += 12
 E.place(sol, V3(solBack.X, 3, solBack.Z) + (V3(solBack.X, 0, solBack.Z) - V3(solVan.chassis.Position.X, 0, solVan.chassis.Position.Z)).Unit * 3)
-steps(0.4, nil, solWagon)
-check("…to the van at the barn together, its back open", heldBy(wagonId) and flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
+-- (8.1: never put at the far end while he holds it: he walks after Sol's jump there at his top speed)
+local caughtUp = steps(4, function()
+	return flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
+end, solWagon)
+check("…to the van at the barn together, its back open", heldBy(wagonId) and caughtUp and flat(danny.body.root.Position, farEndOf(solWagon)) < 0.05
 	and solVan.model:GetAttribute("BackOpen") == true)
 trigger(promptIn(solVan.model, "Load"), sol)
 steps(0.3)
@@ -746,6 +752,123 @@ end)
 check("the ZDC Van's back shut: Danny opens it himself (\"I'll get the doors!\") and loads his piece", opened and E.saidSince("I'll get the doors!", saidBefore),
 	Rules.counts(s.move).out)
 Moving.admin(sol, "end")
+
+-- 8.1 walk-in doors on the farm (no E): a doormat at both doors; Uma and Vic walk in by the barn doors' zone; the hay wagon
+-- (bigDoor) walked into the farmhouse's way out: refused once with the same words, nobody goes; walked into the barn
+-- doors' way out: out at the barn, the other end beside, facing away from the doors.
+do
+	local D = T.Doors
+	local uma = E.player(166, "Uma", board + V3(-2, 0, 5))
+	local vic = E.player(167, "Vic", board + V3(-3, 0, 6))
+	E.crew[uma] = { vic }
+	E.truckAt = park
+	Moving.admin(uma, "farm")
+	Moving.step()
+	local b = built[#built]
+	local o = b.origin
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	local barnFacing = V3(barnDoor.fx, 0, barnDoor.fz)
+	local barnSide = V3(-barnFacing.Z, 0, barnFacing.X)
+	local barnFoot = V3(barnDoor.x, Map.RoadTop, barnDoor.z)
+	local entries = HouseLayout.entries(b.plan)
+	local function stand(player: any, at: any, look: any)
+		E.rootOf(player).CFrame = M.CFrame.lookAt(at, at + look)
+	end
+	local function isIn(player: any): boolean
+		return (E.rootOf(player).Position - o.Position).Magnitude < 400
+	end
+	local function times(player: any, text: string, since: number): number
+		local n = 0
+		for index = since + 1, #E.messages do
+			local m = E.messages[index]
+			n += if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then 1 else 0
+		end
+		return n
+	end
+	-- a way out inside: its exit (a body's height over the floor) and the flat way into the room from it
+	local function wayIn(n: number): (any, any)
+		local exit = (o * M.CFrame.new(b.plan.exits[n])).Position
+		local step = (o * entries[n]).Position - exit
+		return exit, V3(step.X, 0, step.Z).Unit
+	end
+	local function mats(model: any, text: string): number
+		local n = 0
+		for _, d in model:GetDescendants() do
+			local gui = if d.Name == "WalkInMat" and not d.destroyed then d:FindFirstChildOfClass("SurfaceGui") else nil
+			local label = gui and gui:FindFirstChildOfClass("TextLabel")
+			n += if label and label.Text == text and d.Transparency == 0 then 1 else 0
+		end
+		return n
+	end
+	check("8.1 walk-in doors: a doormat at both farm doors outside (▲ IN), one by both ways out inside (▲ OUT)", mats(moves:FindFirstChild("Move_walt"), "▲ IN") == 2
+		and mats(b.model, "▲ OUT") == 2)
+	check("…the E prompts there, off", not promptIn(moves:FindFirstChild("Move_walt"), "Enter barn").Enabled and not promptIn(workspace, "Leave by the barn doors").Enabled)
+
+	stand(uma, barnFoot + up + barnFacing * 2, -barnFacing)
+	stand(vic, barnFoot + up + barnFacing * 2 + barnSide * 3, -barnFacing)
+	tick(0.1)
+	tick(D.Dwell)
+	check("walked into the barn doors' zone: both in by the barn's entry (no E)", isIn(uma) and isIn(vic) and (E.rootOf(uma).Position - (o * entries[2]).Position).Magnitude < 6,
+		E.rootOf(uma).Position)
+
+	local wagonId: any = nil
+	for _, sp in b.plan.spots do
+		if sp.item == "hay_wagon" then
+			wagonId = sp.id
+		end
+	end
+	local wagon = b.pieces[wagonId]
+	E.place(uma, wagon.PrimaryPart.Position + V3(0, 0, -6))
+	trigger(promptIn(wagon, "Lift"), uma)
+	E.place(vic, wagon.PrimaryPart.Position + V3(0, 0, 6))
+	trigger(promptIn(wagon, "Help lift"), vic)
+	check("(Uma lifts the hay wagon, Vic the other end)", uma.Character:GetAttribute("MoveCarry") == wagonId and vic.Character:GetAttribute("MoveCarry") == wagonId,
+		`{E.lastNotice(uma)} / {E.lastNotice(vic)} / {uma.Character:GetAttribute("MoveCarry")} {vic.Character:GetAttribute("MoveCarry")}`)
+
+	-- to the farmhouse's way out with it, facing its door: refused, once
+	local houseExit, houseInto = wayIn(1)
+	local houseSide = V3(-houseInto.Z, 0, houseInto.X)
+	E.clock += 12 -- (the pace check's allowance: the test jumps)
+	stand(uma, houseExit + houseInto * 1, -houseInto)
+	stand(vic, houseExit + houseInto * 1 + houseSide * 5, -houseInto) -- (beside her, out of the doorway's zone)
+	follow(wagon, uma)
+	local since = #E.messages
+	tick(0.1)
+	tick(D.Dwell)
+	tick(0.4)
+	tick(0.4)
+	check("the hay wagon walked into the farmhouse's way out: refused once, \"Too big — use the barn doors\", nobody goes", isIn(uma) and isIn(vic)
+		and times(uma, "Too big — use the barn doors", since) == 1 and uma.Character:GetAttribute("MoveCarry") == wagonId
+		and vic.Character:GetAttribute("MoveCarry") == wagonId, times(uma, "Too big", since))
+
+	-- to the barn doors' way out with it: out at the barn, Vic with the other end
+	local barnExit, barnInto = wayIn(2)
+	local side = V3(-barnInto.Z, 0, barnInto.X)
+	E.clock += 12
+	stand(uma, barnExit + barnInto * 1, -barnInto)
+	stand(vic, barnExit + barnInto * 1 + side * 7.5, -barnInto)
+	follow(wagon, uma)
+	tick(0.1)
+	tick(D.Dwell)
+	follow(wagon, uma)
+	local barnOut = V3(barnDoor.out.x, 0, barnDoor.out.z)
+	check("…walked into the barn doors' way out with it: out at the barn, Vic beside with the other end", not isIn(uma) and not isIn(vic)
+		and flat(E.rootOf(uma).Position, barnOut) < 1 and flat(E.rootOf(vic).Position, barnOut) < 5 and uma.Character:GetAttribute("MoveCarry") == wagonId
+		and vic.Character:GetAttribute("MoveCarry") == wagonId, E.rootOf(uma).Position)
+	check("…facing away from the barn doors, clear of their zone", E.rootOf(uma).CFrame.LookVector:Dot(barnFacing) > 0.99
+		and (E.rootOf(uma).Position - barnFoot):Dot(barnFacing) > D.Depth)
+	-- no way straight back: Rearm s and out of the zone first
+	stand(uma, barnFoot + up + barnFacing * 2, -barnFacing)
+	follow(wagon, uma)
+	tick(0.1)
+	tick(D.Dwell)
+	tick(0.3)
+	check("…and not straight back in (Rearm s)", not isIn(uma))
+	E.Net.get("PutDown").OnServerEvent:Fire(uma)
+	Moving.admin(uma, "end")
+	E.leave(uma)
+	E.leave(vic)
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

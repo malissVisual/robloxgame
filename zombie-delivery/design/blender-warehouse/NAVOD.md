@@ -14,6 +14,8 @@ stojany a další věci, které vymyslíš). Tady je pět modelů v Blenderu, od
 | 5 | **Logistické centrum**: klenutá střecha se solárními panely, dva doky s rampami, prosklený roh, vlajky | 104 × 28 × 84 | 26 × 18 | 20 |
 
 - **Level 4 má přesně rozměry dnešního skladu ve hře.** Dnešní sklad je tedy „level 4“ a hra může začínat menším.
+  **Od verze 8.2 ho hra používá:** jakmile model naimportuješ, dostane sklad na každém pozemku vzhled levelu 4
+  (krok 3).
 - **Level 5 se ještě vejde na pozemek** (120 × 152) a nic z žádného levelu nezabírá místo, které pozemek potřebuje:
   - místo, kam couvá dodávka (UNLOAD HERE);
   - cestu vraty dovnitř;
@@ -32,6 +34,7 @@ stojany a další věci, které vymyslíš). Tady je pět modelů v Blenderu, od
 | `roblox/ZDCWarehouseArt.fbx` | **Model pro hru**: všech pět levelů, každý rozdělený podle povrchu. |
 | `roblox/ZDCWarehouseArt.json` | Velikost, vrata, zdi (na kolize) a všechny díly každého levelu. |
 | `warehouse-levels.png` | Náhled: celá řada a každý level zvlášť (Cycles). |
+| `warehouse-preview.png` | Náhled levelu 4 tak, jak bude ve hře: zvenku a zevnitř, se stojany, pultem UPGRADES, tabulí STOCK a cedulí s tvým jménem (8.2). |
 
 ## 1. Otevři ho v Blenderu
 Dvakrát klikni na `warehouse.blend`. Je uložený v Blenderu 5.2. Pokud ho tvoje verze neotevře, otevři prázdný Blender a
@@ -60,15 +63,50 @@ Záložka **Scripting** → `warehouse.py`. Nahoře je **NASTAVENÍ**, hlavně s
 Změň, co chceš, a dej **Run Script** (▶ nebo Alt + P). Staré budovy se smažou a postaví se nové. Pak spusť kontrolu
 (`tools/warehouse-art/check.py`, krok „pro AI pomocníky“ níže), jestli se pořád vejdou na pozemek. Nebo napiš Claudovi.
 
-## 3. Ve hře
-**Zatím nejsou zapojené do hry.** Levely skladu ve hře ještě nejsou a sklad dnes staví `src/server/Warehouse.luau`
-z dílů. Až budeš chtít vylepšování skladu:
+## 3. Ve hře (od verze 8.2)
+![Level 4 ve hře](warehouse-preview.png)
+
+Sklad na každém pozemku dostane vzhled **levelu 4** z Blenderu, až model jednou nahraješ do Roblox Studia. Udělat to
+musíš ty: Roblox zobrazí 3D model jen tehdy, když je nahraný pod tvým účtem, a k tvému účtu se nepřihlásím. Do té
+doby stojí sklad z kostiček jako dřív.
+
+Mění se jen vzhled. Všechno ostatní zůstává z dílů hry (`src/server/Warehouse.luau`):
+- **kolize:** neviditelné zdi, střecha a sloupky u vrat stojí přesně tam, kde je má model; kancelář na boku má navíc
+  svůj neviditelný blok, takže jí neprojdeš;
+- stojany a věci na nich, pult UPGRADES, tabule STOCK, cedule s tvým jménem nad vraty;
+- žluté čáry na podlaze a místo UNLOAD HERE před vraty;
+- světla v hale: svítí z lamp modelu.
+
+Aby to sedělo, upravil Claude level 4 v `warehouse.py` podle dílů hry (zvenku skoro stejný):
+- zdi jsou tlusté 1 stud jako ve hře;
+- podlaha je nízko pod nápisy na podlaze a má betonové desky ve třech odstínech se spárami;
+- vazníky a světla v hale visí tam, kde má hra lampy;
+- žluté sloupky u vrat stojí tam, kde má hra své.
+
+Jednou ve Studiu (s hrou otevřenou jako obvykle):
+1. *File → Import 3D* (nebo karta *Home → Import 3D*) a vyber `design/blender-warehouse/roblox/ZDCWarehouseArt.fbx`.
+2. Nastavení nech, jak je, a dej **Insert / Import**. Ve Workspace se objeví model `ZDCWarehouseArt` (všech pět
+   levelů vedle sebe). Může zůstat, kde je: hra si ho při spuštění sama schová do ServerStorage. Nebo ho v Exploreru
+   přetáhni do **ServerStorage** sám. **Nepřejmenovávej ho.**
+3. Ulož místo (*File → Save*, Ctrl + S) a *File → Publish to Roblox*, ať ho má i hra na Robloxu.
+
+Vyzkoušení: dej **Play** a na úvodní obrazovce **PLAY**. Stojíš u svého skladu. Vejdi vraty dovnitř a projdi se mezi
+stojany. Nebo: **P** (admin panel) → záložka **SANDBOX** → **📍 TO WAREHOUSE**.
+
+Který level hra použije, říká `ArtLevel = 4` v `Config.Warehouse` (soubor `src/shared/Config.luau`). Jiný level je jinak
+velký než dnešní sklad, takže by na něj nesedl: hra by ho nepoužila a sklad by zůstal z kostiček. Až budeš chtít
+vylepšování skladu (level 1 → 5), řekni Claudovi a napojíme to stejně jako dodávku, nábytek a dům:
 - kolik co stojí;
 - co každý level přidá (víc stojanů, víc místa);
 - jak se vylepšuje.
 
-…řekni a napojíme to stejně jako dodávku, nábytek a dům. Model `ZDCWarehouseArt.fbx` jednou naimportuješ ve Studiu a
-hra postaví sklad podle tvého levelu. **Zatím ho do Studia neimportuj**, protože ho ještě nic nepoužívá.
+Model je na to připravený: každý level má své značky a neviditelné bloky.
+
+Když sklad v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + S) a spusť skript. Ve Studiu pak smaž
+starý `ZDCWarehouseArt` a naimportuj nový `roblox/ZDCWarehouseArt.fbx` (krok 1 až 3). U levelu 4 neměň rozměry (`W`,
+`D`, `H`, `door`, `rise`), protože hra by ho jinak odmítla. Kontroly v kroku „pro AI pomocníky“ řeknou, jestli pořád
+sedí. Barvy ve hře nastavuje tabulka `LOOKS` v `src/server/WarehouseMesh.luau`, ne Blender: když v Blenderu změníš
+barvu, řekni Claudovi.
 
 ## Pro AI pomocníky
 `pip install bpy` (Python 3.13) a z této složky:
@@ -81,9 +119,25 @@ V `roblox/ZDCWarehouseArt.json`:
 - každý level má velikost, vrata, návrh stojanů a `collide` (zdi, se kterými by hra kolidovala) a `details` (každý
   díl);
 - souřadnice jsou v ose hry od středu vrat na zemi (x doprava, y nahoru, z dovnitř);
-- díly ve FBX se jmenují `lvl<N>_<povrch>` a značky `mark_o/x/y/z` a `mark_lvl<N>` (počátek levelu).
+- díly ve FBX se jmenují `lvl<N>_<povrch>` a značky `mark_o/x/y/z` a `mark_lvl<N>` (počátek levelu);
+- 8.2: `mark_lvl<N>_box` (roh budovy: W / 2, H, D), `mark_lvl<N>_door` (roh vrat) a `mark_lvl<N>_top` (vršek střechy)
+  říkají hře, jak velký level je; krabice `collide_lvl<N>_<k>` jsou neviditelné bloky věcí mimo zdi (kancelář, palety,
+  rampy…). V JSON k nim patří `marks`, `solids` a `floorTop` u každého levelu.
 
 `python3 zombie-delivery/tools/warehouse-art/check.py <luau>` ověří proti `shared/SandboxMap.luau` a `Config.Warehouse`:
 - level 4 = dnešní sklad;
 - každý level je větší;
 - všechno je na pozemku a mimo místa, která pozemek potřebuje.
+
+8.2: `python3 zombie-delivery/tools/warehouse/mesh-check.py <luau>` (spouští ho i `tests/run_tests.py`) naimportuje model
+podle JSON a oblékne s ním sklady, které staví skutečný `src/server/Warehouse.luau`, na všech čtyřech pozemcích:
+- každý díl na svém místě, ukotvený a bez fyziky;
+- schované jsou jen díly, které jsou jen vzhled; kolize, stojany, pult, cedule a výzvy zůstávají;
+- zdi, střecha, podlaha a lampy modelu sedí na dílech hry;
+- nic z modelu nezasahuje do stojanů, vrat ani místa UNLOAD HERE;
+- bez importu, s jinak velkým skladem nebo levelem se nic nezmění.
+
+Náhled `warehouse-preview.png` (level 4 s díly hry, zvenku a zevnitř) z kořene `zombie-delivery/`:
+```
+python tools/warehouse/preview.py -- --samples 96
+```

@@ -1,39 +1,32 @@
 --!strict
--- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
--- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): the grip bar on
--- this client. shared/CarryGrip.luau runs it (pure), server/Moving.luau decides: its grip hook gives the character the
--- attribute CarryGrip (the carry's kind, weight, fragile) next to MoveCarry (the spot) while you carry a thing with a
--- bar (a "both" or a "pair" thing, a fragile one-hand thing; Danny never has one); the bar shows while both are there.
--- 7.x: while Danny holds the other end of your piece (the character attribute GripSteady, server/MoveHelper.luau) the
--- grip box is Config.CarryGrip.Steadied × bigger (he steadies it).
---   * The panel right of the screen's middle (client/MoveLayout.luau grip: clear of the HUD's groups, the move's top
---     blocks, the quick chat's button and the touch buttons), in the UI kit's look: a charcoal panel, the bar (its
---     track), the grip box (green steady, amber, red slipping), the LOAD as the thing's icon (from the Moving remote's
---     state, its items by spot), the meter beside it, the title saying GRIP / STEADY +10% / SLIPPING! / DROPPED!
---     (7.1 review: STEADY +10% only while the server gives it: the meter full and the last report steady as the server
---     takes it, at most Config.CarryGrip.Server.SteadyOutside of it outside the box)
---   * Hold: the left mouse button or F (a computer), R2 (a gamepad), the round HOLD button on a touch screen (at the
---     right over the touch buttons, at least Config.CarryGrip.Ui.HoldMin px; jump, SPRINT and PUT DOWN stay free).
---     With a thing in your arms the gun is away, so these presses neither shoot nor punch.
---   * The body says how wild the load is: your speed and turns (the humanoid's MoveDirection), going up or down (the
---     root's vertical speed on the ground), a jump (in the air), a bite (health lost); standing still it calms down.
---   * The sounds (7.1, art/audio/sfx4.ogg): grip_tick as the meter moves a notch (like a reel's click, TickEvery s apart
---     at least), grip_warning on each entry into SLIPPING!, client/MoveSounds.luau slipped() at the slip.
---   * SLIPPING!: the panel shakes (a pixel with Reduced Motion) and flashes red. At 0 it slips: the Moving remote's
---     ("slip", spot); the server drops it (the damage, the notice) and the bar goes once MoveCarry does (DROPPED! a
---     moment first; still in your hands a second later: asked again). Picked up again, even the same piece inside
---     DROPPED!'s moment, it is a new bar (7.1 review: never the old one, which would ask "slip" again). About once a
---     Config.CarryGrip.Report s ("grip", spot, quality, steady): the share of the time outside the box (the server
---     wears the thing a little) and whether you are steady (the server's +10% walk: the meter full and at most
---     Server.SteadyOutside outside).
---   * The first Ui.Tutorial carries with a bar show "Hold to keep it steady!" beside it (the key's hint on the first
---     one only), until you are steady or a while has passed.
---   * Paused (and dark) while a door's fade is on (the Moving remote's "fade").
--- Performance: nothing runs without a bar (one light look four times a second at the attributes); with one, a step a
--- frame (RenderStepped) that makes no tables, closures or strings, and sets a property only when it changes (a UDim2
--- only when a piece moved a whole pixel). The layout is asked again on a resize, when the top blocks move, and once a
--- second while it shows.
---   CarryGripUi.start(), CarryGripUi.active() (a bar shows), CarryGripUi.panel(), CarryGripUi.holdButton()
+-- 8.1 grip (the owner: "when I fail, something must always happen, but make it easier; it is hard to keep pressing and
+-- walk at the same time. When we pick it up the first time I should have to hit a target: I'm feeling for the grip"):
+-- the timing check on this client. server/Moving.luau's grip block opens a check (the Moving remote's ("grip", "open",
+-- wire): a lift check when you Pick up / Lift / Help lift a piece with a grip, a WOBBLE! now and then while you carry
+-- it), judges the answer and sends the outcome ("grip", "result", r) or takes the check off ("grip", "close", id);
+-- shared/CarryGrip.luau has the needle's maths (the same on both sides). Nothing to hold any more: walking is free.
+--   * The widget (client/MoveLayout.luau gripCheck: in the middle under the character, else as near as is clear of
+--     the HUD's groups, the move's top blocks with the sandbox's guide line, the quick chat's button, the move's list
+--     and the touch controls), in the UI kit's look: a charcoal card, the piece's icon and the title (GET A GRIP! /
+--     WOBBLE! / LAST CHANCE! when its miss drops the piece), a track with the green zone and the needle sweeping it,
+--     the time left as a thin bar, the key under it (the first Ui.Tutorial checks: "… in the green"; LAST CHANCE!:
+--     "A miss drops it · …").
+--   * One press: the left mouse button or F (a computer), R2 (a gamepad), the round GRIP button on a touch screen (at
+--     the right over the touch buttons, at least Config.CarryGrip.Ui.TapMin px), or a tap or click on the widget. The
+--     needle stops where you pressed; the client says ("grip", id, "ok" | "miss", s into the check) at once (the
+--     server judges it again), no press within the window: ("grip", id, "miss").
+--   * The outcome (the server's): BALANCED! (+10% walk), SLIPPED BACK! (a knock: try again), STEADY!, STAGGER! (a knock,
+--     slower a moment, the next miss drops it), DROPPED! (it fell). A miss shakes the widget (a pixel with Reduced
+--     Motion) and the camera a little (client/CameraRig.luau shake), flashes red; it stays Ui.Linger s.
+--   * The sounds (art/audio/sfx4.ogg): grip_tick at a lift check's start and each time the needle enters the zone,
+--     grip_warning at a wobble's (louder when its miss drops it) and at a stagger, ding on a hit, furniture_putdown on a
+--     lift's knock, client/MoveSounds.luau slipped() on a drop (one thud, not two).
+--   * A door's fade (the Moving remote's "fade") hides it (the server takes the check off); off a move ("state" nil)
+--     it goes.
+-- Performance: nothing runs without a check; with one, a frame's step (RenderStepped) makes no tables, closures or
+-- strings and sets a property only when it changes (a UDim2 only when a piece moved a whole pixel). The layout is asked
+-- again on a resize, when the top blocks move, and once a second while it shows.
+--   CarryGripUi.start(), CarryGripUi.active() (a check or its outcome shows), CarryGripUi.panel(), CarryGripUi.tapButton()
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -57,54 +50,60 @@ local player = Players.LocalPlayer
 local K = Theme.Contract
 local G = Config.CarryGrip
 local ORANGE = Color3.fromRGB(240, 132, 44)
--- the HUD's groups (client/Hud.luau's panels, Hotbar's bar, KeyHints) the panel and the HOLD button keep clear of
+-- the HUD's groups (client/Hud.luau's panels, Hotbar's bar, KeyHints) the widget and the GRIP button keep clear of
 local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "KeyHints" }
--- the panel's insides (px at scale 1; MoveLayout.GRIP_W × GRIP_H)
-local TRACK_X, TRACK_Y, TRACK_W, TRACK_H = 14, 28, 44, 216
-local METER_X, METER_W = 68, 14
-local MARKER = 34
-local TIP_FOR = 8 -- s the tip stays at most (it goes sooner once you are steady)
-local LINGER = 0.8 -- s DROPPED! stays after a slip
+-- the widget's insides (px at scale 1; MoveLayout.CHECK_W × CHECK_H)
+local PAD = 12
+local TRACK_Y, TRACK_H = 36, 26
+local TRACK_W = MoveLayout.CHECK_W - 2 * PAD
+local TIMER_Y = 68
+local NEEDLE_W = 5
+local WAIT_FOR = 2.5 -- s an answered check waits for the server's outcome before it goes
+
+-- The outcomes' words (the title, its colour's tone, the line under it).
+local OUTCOMES = {
+	balanced = { "BALANCED!", "good" },
+	knock = { "SLIPPED BACK!", "red" },
+	steady = { "STEADY!", "good" },
+	stagger = { "STAGGER!", "warn" },
+	drop = { "DROPPED!", "red" },
+} :: { [string]: { string } }
 
 local remote = Net.get("Moving")
 local gui: ScreenGui? = nil
-local parts: any = nil -- the panel's pieces (built once)
-local icons: { [number]: string } = {} -- the things' icons by spot (the Moving remote's state)
+local parts: any = nil -- the widget's pieces (built once)
 local faded = false -- a door's fade is on
-local carries = 0 -- carries with a bar so far (the tutorial's tip)
+local checks = 0 -- checks so far (the tutorial's longer hint)
 
--- The carry with a bar now (nil: none).
+-- The check on now, or its outcome (nil: none).
 type Run = {
-	spot: number,
-	code: string,
-	mover: boolean,
-	sim: CarryGrip.Sim,
-	input: CarryGrip.Input,
-	tutorial: number, -- this carry's number (the tip on the first Ui.Tutorial ones)
-	tipUntil: number,
-	since: number, -- s since the last report
-	honoured: boolean, -- 7.1 review: the last report was steady as the server takes it (its +10% walk: the title)
-	slipSent: number, -- os.clock of the last "slip" sent (0: none, or the server dropped it: the attributes went)
-	linger: number, -- os.clock until DROPPED! stays
-	heading: number?, -- the last MoveDirection's heading (the turn)
-	health: number, -- the humanoid's health a step ago (a bite)
-	bite: number,
-	warned: boolean,
-	wasSteady: boolean,
-	steadied: boolean, -- 7.x Danny holds the other end (the character attribute GripSteady: a bigger box)
-	notch: number, -- the meter's notch at the last grip_tick (Ui.TickNotches a meter)
-	tickAt: number, -- the bar's time (sim.time) of the last grip_tick
-	hooks: { RBXScriptConnection },
+	id: number,
+	check: CarryGrip.Check?, -- (nil: an outcome of a check this client never saw)
+	what: string,
+	drop: boolean, -- a miss drops it (the server says)
+	icon: string,
+	number: number, -- this check's number (the tutorial's hint on the first Ui.Tutorial)
+	at: number, -- os.clock when it opened
+	pressed: number?, -- s into it the press came (the needle stops there)
+	verdict: string?, -- "ok" | "miss" (this client's, sent)
+	answeredAt: number,
+	outcome: string?, -- the server's
+	left: number?, -- the piece's condition after it (%)
+	goneAt: number, -- os.clock it goes (0: not yet)
+	inside: boolean, -- the needle in the zone at the last frame (the zone's tick)
+	shakeUntil: number,
+	flash: Color3?,
+	flashUntil: number,
+	title: string, -- the words as they are now (made when they change, not every frame)
+	tone: string,
+	hint: string,
 }
 local run: Run? = nil
-
--- What is held down (any of them holds the grip).
-local mouseHeld, keyHeld, padHeld, touchHeld = false, false, false, false
-local touchInput: InputObject? = nil
+local frameHook: RBXScriptConnection? = nil
 
 -- What was drawn last (a property is set only when it changes).
-local drawnZone, drawnZoneH, drawnMarker, drawnMeter = -1, -1, -1, -1
-local drawnTone, drawnInside, drawnTitle = -1, -1, ""
+local drawnNeedle, drawnTimer, drawnZone0, drawnZoneW = -1, -1, -1, -1
+local drawnTitle, drawnHint, drawnTone = "", "", ""
 local baseX, baseY, shakeX, shakeY = 0, 0, 0, 0
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
@@ -121,15 +120,15 @@ local function screen(): ScreenGui?
 		Name = "CarryGrip",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = false,
-		DisplayOrder = 8, -- (over the move's panel and list: the HOLD button stays at hand)
+		DisplayOrder = 8, -- (over the move's panel and list: the GRIP button stays at hand)
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, playerGui)
 	gui = made
 	return made
 end
 
--- The sounds (client/Sounds.luau, 7.1's sfx4: grip_tick, grip_warning; the slip is client/MoveSounds.luau's), found
--- once (a frame's tick makes no closure).
+-- The sounds (client/Sounds.luau; the drop is client/MoveSounds.luau's), the camera's shake (client/CameraRig.luau),
+-- found once (a frame's tick makes no closure).
 local soundsModule: any = nil
 local function loadSounds(): any
 	return require(script.Parent.Sounds)
@@ -152,8 +151,21 @@ local function slipped()
 		pcall(found.slipped) -- (grip_slip: a whoosh and a thud; no put-down after it)
 	end
 end
+local cameraModule: any = nil
+local function loadCamera(): any
+	return require(script.Parent.CameraRig)
+end
+local function shakeCamera(amount: number)
+	if cameraModule == nil then
+		local ok, found = pcall(loadCamera)
+		cameraModule = if ok and type(found) == "table" then found else false
+	end
+	if cameraModule and type(cameraModule.shake) == "function" then
+		pcall(cameraModule.shake, amount)
+	end
+end
 
--- Reduced Motion (the player's Roblox setting), looked at when a bar starts and once a second (not every frame).
+-- Reduced Motion (the player's Roblox setting), looked at when a check opens and once a second.
 local reduced = false
 local function lookReduced()
 	local ok, on = pcall(function(): boolean
@@ -162,181 +174,153 @@ local function lookReduced()
 	reduced = ok and on == true
 end
 
-local function holding(): boolean
-	return mouseHeld or keyHeld or padHeld or touchHeld
-end
-
 local function keysText(): string
 	if Ui.touchLayout() then
-		return "Hold the HOLD button"
+		return "Tap GRIP"
 	elseif Ui.gamepadActive() then
-		return "HOLD  R2"
+		return "Press R2"
 	end
-	return "HOLD  LMB / F"
+	return "Press LMB / F"
 end
 
--- ── The panel ──────────────────────────────────────────────────────────────
+-- ── The widget ─────────────────────────────────────────────────────────────
 
 local function build(root: ScreenGui): any
 	local panel = Ui.make("Frame", {
 		Name = "GripPanel",
-		Size = UDim2.fromOffset(MoveLayout.GRIP_W, MoveLayout.GRIP_H),
+		Size = UDim2.fromOffset(MoveLayout.CHECK_W, MoveLayout.CHECK_H),
 		BackgroundColor3 = K.charcoal,
 		BackgroundTransparency = Theme.PanelTransparency,
 		BorderSizePixel = 0,
 		Visible = false,
 	}, root)
-	Ui.corner(panel, 10)
+	Ui.corner(panel, 12)
 	local scale = Ui.make("UIScale", { Name = "Scale", Scale = 1 }, panel)
-	local edge = Ui.make("UIStroke", { Name = "Edge", Color = ORANGE, Thickness = 1, Transparency = 0.4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, panel)
+	local edge = Ui.make("UIStroke", { Name = "Edge", Color = ORANGE, Thickness = 2, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, panel)
 	local flash = Ui.make("Frame", { Name = "Flash", Size = UDim2.fromScale(1, 1), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 6 }, panel)
-	Ui.corner(flash, 10)
-	local title = Ui.label(panel, "GRIP", UDim2.new(1, -8, 0, 16), {
-		Name = "Title",
-		Position = UDim2.fromOffset(4, 7),
-		Font = Theme.HeadingFont,
-		TextSize = 12,
-		TextColor3 = K.secondary,
+	Ui.corner(flash, 12)
+	local piece = Ui.label(panel, "📦", UDim2.fromOffset(26, 24), {
+		Name = "Piece",
+		Position = UDim2.fromOffset(PAD - 2, 7),
+		Font = Theme.Font,
+		TextSize = 19,
+		TextColor3 = K.text,
 		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = false,
+		ZIndex = 7,
+	})
+	local title = Ui.label(panel, "GET A GRIP!", UDim2.fromOffset(TRACK_W - 30, 24), {
+		Name = "Title",
+		Position = UDim2.fromOffset(PAD + 30, 7),
+		Font = Theme.HeadingFont,
+		TextSize = 19,
+		TextColor3 = K.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextWrapped = false,
 		ZIndex = 7,
 	})
 	local track = Ui.make("Frame", {
 		Name = "Track",
-		Position = UDim2.fromOffset(TRACK_X, TRACK_Y),
+		Position = UDim2.fromOffset(PAD, TRACK_Y),
 		Size = UDim2.fromOffset(TRACK_W, TRACK_H),
 		BackgroundColor3 = K.recessed,
 		BorderSizePixel = 0,
 	}, panel)
 	Ui.corner(track, 8)
 	for _, at in { 0.25, 0.5, 0.75 } do -- (a faint ruler)
-		Ui.make("Frame", { Name = "Rule", Position = UDim2.new(0, 6, at, 0), Size = UDim2.new(1, -12, 0, 1), BackgroundColor3 = K.rule, BackgroundTransparency = 0.5, BorderSizePixel = 0 }, track)
+		Ui.make("Frame", { Name = "Rule", Position = UDim2.new(at, 0, 0, 6), Size = UDim2.new(0, 1, 1, -12), BackgroundColor3 = K.rule, BackgroundTransparency = 0.5, BorderSizePixel = 0 }, track)
 	end
 	local zone = Ui.make("Frame", {
 		Name = "Zone",
-		Position = UDim2.fromOffset(3, 0),
-		Size = UDim2.fromOffset(TRACK_W - 6, 40),
+		Position = UDim2.fromOffset(0, 2),
+		Size = UDim2.fromOffset(60, TRACK_H - 4),
 		BackgroundColor3 = K.good,
-		BackgroundTransparency = 0.55,
+		BackgroundTransparency = 0.35,
 		BorderSizePixel = 0,
 		ZIndex = 2,
 	}, track)
 	Ui.corner(zone, 6)
 	local zoneEdge = Ui.make("UIStroke", { Name = "ZoneEdge", Color = K.good, Thickness = 2, Transparency = 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, zone)
-	local marker = Ui.make("Frame", {
-		Name = "Marker",
+	local needle = Ui.make("Frame", {
+		Name = "Needle",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(TRACK_W / 2, TRACK_H / 2),
-		Size = UDim2.fromOffset(MARKER, MARKER),
-		BackgroundColor3 = K.raised,
+		Position = UDim2.fromOffset(0, TRACK_H / 2),
+		Size = UDim2.fromOffset(NEEDLE_W, TRACK_H + 12),
+		BackgroundColor3 = K.text,
 		BorderSizePixel = 0,
 		ZIndex = 4,
 	}, track)
-	Ui.corner(marker, MARKER / 2)
-	local markerEdge = Ui.make("UIStroke", { Name = "MarkerEdge", Color = K.text, Thickness = 2, Transparency = 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, marker)
-	local icon = Ui.label(marker, "📦", UDim2.fromScale(1, 1), {
-		Name = "Icon",
-		Font = Theme.Font,
-		TextSize = 20,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-		ZIndex = 5,
-	})
-	local meter = Ui.make("Frame", {
-		Name = "Meter",
-		Position = UDim2.fromOffset(METER_X, TRACK_Y),
-		Size = UDim2.fromOffset(METER_W, TRACK_H),
+	Ui.corner(needle, 3)
+	Ui.make("UIStroke", { Name = "NeedleEdge", Color = K.charcoal, Thickness = 1, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, needle)
+	local timer = Ui.make("Frame", {
+		Name = "Timer",
+		Position = UDim2.fromOffset(PAD, TIMER_Y),
+		Size = UDim2.fromOffset(TRACK_W, 4),
 		BackgroundColor3 = K.track,
 		BorderSizePixel = 0,
 	}, panel)
-	Ui.corner(meter, 5)
-	local fill = Ui.make("Frame", {
-		Name = "Fill",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = K.good,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-	}, meter)
-	Ui.corner(fill, 5)
-	local status = Ui.label(panel, "", UDim2.new(1, -8, 0, 14), {
-		Name = "Status",
-		Position = UDim2.fromOffset(4, MoveLayout.GRIP_H - 22),
+	Ui.corner(timer, 2)
+	local timerFill = Ui.make("Frame", { Name = "Fill", Size = UDim2.fromScale(1, 1), BackgroundColor3 = ORANGE, BorderSizePixel = 0, ZIndex = 2 }, timer)
+	Ui.corner(timerFill, 2)
+	local hint = Ui.label(panel, "", UDim2.fromOffset(TRACK_W, 18), {
+		Name = "Hint",
+		Position = UDim2.fromOffset(PAD, TIMER_Y + 8),
 		Font = Theme.HeadingFont,
-		TextSize = 11,
+		TextSize = 13,
 		TextColor3 = K.secondary,
 		TextXAlignment = Enum.TextXAlignment.Center,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextWrapped = false,
 		ZIndex = 7,
 	})
-	-- the tutorial's tip, left of the panel (it scales with it)
-	local tip = Ui.label(panel, "", UDim2.fromOffset(176, 46), {
-		Name = "Tip",
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(0, -8, 0.5, 0),
+	-- a tap or a click on the widget is a press too (the mouse's click there is the GUI's, not the world's)
+	local press = Ui.make("TextButton", {
+		Name = "Press",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 8,
+	}, panel)
+	-- the touch GRIP button (a round one, at the right over the touch buttons: MoveLayout.gripCheck)
+	local tap = Ui.make("TextButton", {
+		Name = "GripTap",
+		Size = UDim2.fromOffset(G.Ui.TapMin, G.Ui.TapMin),
 		BackgroundColor3 = K.charcoal,
-		BackgroundTransparency = Theme.PanelTransparency,
-		Font = Theme.HeadingFont,
-		TextSize = 13,
-		TextColor3 = K.text,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = true,
-		Visible = false,
-		ZIndex = 7,
-	})
-	Ui.corner(tip, 8)
-	Ui.make("UIStroke", { Color = ORANGE, Thickness = 1, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, tip)
-	-- the touch HOLD button (a round one, at the right over the touch buttons: MoveLayout.grip)
-	local hold = Ui.make("TextButton", {
-		Name = "GripHold",
-		Size = UDim2.fromOffset(G.Ui.HoldMin, G.Ui.HoldMin),
-		BackgroundColor3 = K.charcoal,
-		BackgroundTransparency = 0.25,
+		BackgroundTransparency = 0.2,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
-		Text = "HOLD",
+		Text = "GRIP",
 		Font = Theme.HeadingFont,
-		TextSize = 18,
+		TextSize = 20,
 		TextColor3 = K.text,
 		Visible = false,
 		ZIndex = 3,
 	}, root)
-	Ui.corner(hold, G.Ui.HoldMin)
-	local holdEdge = Ui.make("UIStroke", { Name = "HoldEdge", Color = ORANGE, Thickness = 2, Transparency = 0.1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, hold)
-	hold.InputBegan:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			touchHeld = true
-			touchInput = input
-		end
-	end)
-	hold.InputEnded:Connect(function(input: InputObject)
-		if input == touchInput or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			touchHeld = false
-			touchInput = nil
-		end
-	end)
+	Ui.corner(tap, G.Ui.TapMin)
+	local tapEdge = Ui.make("UIStroke", { Name = "TapEdge", Color = ORANGE, Thickness = 3, Transparency = 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, tap)
 	return {
 		panel = panel,
 		scale = scale,
 		edge = edge,
 		flash = flash,
 		title = title,
+		piece = piece,
 		track = track,
 		zone = zone,
 		zoneEdge = zoneEdge,
-		marker = marker,
-		markerEdge = markerEdge,
-		icon = icon,
-		fill = fill,
-		status = status,
-		tip = tip,
-		hold = hold,
-		holdEdge = holdEdge,
+		needle = needle,
+		timer = timer,
+		timerFill = timerFill,
+		hint = hint,
+		press = press,
+		tap = tap,
+		tapEdge = tapEdge,
 	}
 end
 
--- Where the panel and the HOLD button go now (client/MoveLayout.luau grip).
+-- Where the widget and the GRIP button go now (client/MoveLayout.luau gripCheck).
 local function place()
 	local root = gui
 	local p = parts
@@ -362,7 +346,7 @@ local function place()
 			end
 		end
 	end
-	for _, r in TopBlocks.rects(origin) do
+	for _, r in TopBlocks.rects(origin) do -- (the move's panel, Danny's strip, the sandbox's guide line)
 		table.insert(blocks, r)
 	end
 	-- the quick chat's touch button, the move's list (O) while it is open
@@ -375,9 +359,9 @@ local function place()
 		end
 	end
 	local touch = Ui.touchLayout()
-	local panelBox, scale, holdBox = MoveLayout.grip(W, H, Ui.screenScale(), touch, blocks, {
-		hold = G.Ui.Hold,
-		holdMin = G.Ui.HoldMin,
+	local panelBox, scale, tapBox = MoveLayout.gripCheck(W, H, Ui.screenScale(), touch, blocks, {
+		tap = G.Ui.Tap,
+		tapMin = G.Ui.TapMin,
 		scale = G.Ui.Scale,
 		min = G.Ui.Min,
 	})
@@ -387,243 +371,197 @@ local function place()
 	if math.abs(p.scale.Scale - scale) > 0.001 then
 		p.scale.Scale = scale
 	end
-	if holdBox then
-		local side = math.floor(holdBox.x1 - holdBox.x0 + 0.5)
-		p.hold.Position = UDim2.fromOffset(math.floor(holdBox.x0 + 0.5), math.floor(holdBox.y0 + 0.5))
-		p.hold.Size = UDim2.fromOffset(side, side)
-		p.hold.TextSize = math.max(16, math.floor(side * 0.24))
+	if tapBox then
+		local side = math.floor(tapBox.x1 - tapBox.x0 + 0.5)
+		p.tap.Position = UDim2.fromOffset(math.floor(tapBox.x0 + 0.5), math.floor(tapBox.y0 + 0.5))
+		p.tap.Size = UDim2.fromOffset(side, side)
+		p.tap.TextSize = math.max(18, math.floor(side * 0.22))
 	end
-	p.hold.Visible = touch and run ~= nil
+	local r = run
+	p.tap.Visible = touch and r ~= nil and r.check ~= nil and r.verdict == nil
 end
 
 -- ── Drawing ────────────────────────────────────────────────────────────────
 
-local TONES = { K.good, K.warn, K.red }
-
--- Steady as the server has it (7.1 review): the meter full and the last report honoured (not over
--- Server.SteadyOutside outside), so STEADY +10% never shows while the walk has no +10%.
-local function shownSteady(r: Run): boolean
-	return r.sim.steady and r.honoured
+local function resetDrawn()
+	drawnNeedle, drawnTimer, drawnZone0, drawnZoneW = -1, -1, -1, -1
+	drawnTitle, drawnHint, drawnTone = "", "", ""
+	shakeX, shakeY = 0, 0
 end
 
--- The bar as the run's sim has it (a property only when it changed).
+local function toneColor(tone: string): Color3
+	return if tone == "good" then K.good elseif tone == "warn" then K.warn elseif tone == "red" then K.red else ORANGE
+end
+
+-- The title, its tone and the line under it as the run has them now (asked when the run changes: open, a press, the
+-- timeout, the outcome).
+local function words(r: Run)
+	local outcome = r.outcome
+	if outcome then
+		local o = OUTCOMES[outcome]
+		local left = if r.left then `{r.left}% left · ` else ""
+		r.title, r.tone = if o then o[1] else "", if o then o[2] else ""
+		r.hint = if outcome == "balanced" then "Balanced: +10% walk"
+			elseif outcome == "knock" then `{left}try again (E)`
+			elseif outcome == "steady" then "Steady again: +10% walk"
+			elseif outcome == "stagger" then `{left}don't miss again`
+			else `It fell{if r.left then ` · {r.left}% left` else ""}`
+	elseif r.verdict then
+		r.title, r.tone, r.hint = if r.verdict == "ok" then "NICE!" else "MISSED!", if r.verdict == "ok" then "good" else "red", ""
+	else
+		r.title = if r.what == "wobble" then (if r.drop then "LAST CHANCE!" else "WOBBLE!") else "GET A GRIP!"
+		r.tone = if r.what == "wobble" and r.drop then "red" elseif r.what == "wobble" then "warn" else ""
+		r.hint = if r.what == "wobble" and r.drop then `A miss drops it · {keysText()}`
+			elseif r.number <= G.Ui.Tutorial then `{keysText()} in the green`
+			else keysText()
+	end
+end
+
+-- The widget as the run has it (a property only when it changed).
 local function draw(r: Run, now: number)
 	local p = parts
-	local sim = r.sim
-	local prof = sim.profile
-	local steady = shownSteady(r)
-	local zoneH = math.floor(prof.zone * TRACK_H + 0.5)
-	local zoneY = math.floor((1 - sim.zone - prof.zone) * TRACK_H + 0.5)
-	if zoneY ~= drawnZone then
-		drawnZone = zoneY
-		p.zone.Position = UDim2.fromOffset(3, zoneY)
+	local check = r.check
+	local elapsed = now - r.at
+	if check then
+		local zone0 = math.floor(check.zone0 * TRACK_W + 0.5)
+		local zoneW = math.floor(check.zone * TRACK_W + 0.5)
+		if zone0 ~= drawnZone0 or zoneW ~= drawnZoneW then
+			drawnZone0, drawnZoneW = zone0, zoneW
+			p.zone.Position = UDim2.fromOffset(zone0, 2)
+			p.zone.Size = UDim2.fromOffset(zoneW, TRACK_H - 4)
+		end
+		local at = CarryGrip.needle(check, r.pressed or math.min(elapsed, check.window))
+		local x = math.floor(at * TRACK_W + 0.5)
+		if x ~= drawnNeedle then
+			drawnNeedle = x
+			p.needle.Position = UDim2.fromOffset(x, TRACK_H / 2)
+		end
+		local left = if r.verdict then 0 else math.clamp(1 - elapsed / check.window, 0, 1)
+		local timer = math.floor(left * 200 + 0.5)
+		if timer ~= drawnTimer then
+			drawnTimer = timer
+			p.timerFill.Size = UDim2.fromScale(timer / 200, 1)
+			p.timerFill.BackgroundColor3 = if left > 0.35 then ORANGE else K.red
+		end
 	end
-	if zoneH ~= drawnZoneH then
-		drawnZoneH = zoneH
-		p.zone.Size = UDim2.fromOffset(TRACK_W - 6, zoneH)
-	end
-	local markerY = math.floor((1 - sim.marker) * TRACK_H + 0.5)
-	if markerY ~= drawnMarker then
-		drawnMarker = markerY
-		p.marker.Position = UDim2.fromOffset(TRACK_W / 2, markerY)
-	end
-	local meter = math.floor(sim.meter * 200 + 0.5)
-	if meter ~= drawnMeter then
-		drawnMeter = meter
-		p.fill.Size = UDim2.fromScale(1, meter / 200)
-	end
-	local tone = if sim.meter >= 0.66 then 1 elseif sim.meter > G.Meter.Warn then 2 else 3
-	if tone ~= drawnTone then
-		drawnTone = tone
-		local color = TONES[tone]
-		p.zone.BackgroundColor3 = color
-		p.zoneEdge.Color = color
-		p.fill.BackgroundColor3 = color
-	end
-	local inside = if sim.inside then 1 else 0
-	if inside ~= drawnInside then
-		drawnInside = inside
-		p.markerEdge.Color = if sim.inside then K.text else K.red
-	end
-	-- the title: DROPPED! / SLIPPING! / STEADY +10% / GRIP
-	local title = if sim.slipped then "DROPPED!" elseif sim.warn then "SLIPPING!" elseif steady then "STEADY +10%" else "GRIP"
-	if title ~= drawnTitle then
-		drawnTitle = title
+	local title, tone, hint = r.title, r.tone, r.hint
+	if title ~= drawnTitle or tone ~= drawnTone then
+		drawnTitle, drawnTone = title, tone
 		p.title.Text = title
-		p.title.TextColor3 = if sim.slipped or sim.warn then K.red elseif steady then K.good else K.secondary
-		p.status.Text = if sim.slipped then "" elseif sim.warn then "HOLD!" else ""
-		p.edge.Color = if sim.slipped or sim.warn then K.red elseif steady then K.good else ORANGE
+		local color = toneColor(tone)
+		p.title.TextColor3 = if tone == "" then K.text else color
+		p.edge.Color = color
 	end
-	-- SLIPPING!: a shake and a red flash
-	local alarm = sim.warn or sim.slipped
-	local amp = if alarm then (if reduced then G.Ui.ReducedShake else G.Ui.Shake) else 0
-	local dx = math.floor(math.sin(now * 47) * amp + 0.5)
-	local dy = math.floor(math.cos(now * 39) * amp * 0.5 + 0.5)
+	if hint ~= drawnHint then
+		drawnHint = hint
+		p.hint.Text = hint
+	end
+	-- a miss: a shake; a hit or a miss: a flash
+	local amp = if now < r.shakeUntil then (if reduced then G.Ui.ReducedShake else G.Ui.Shake) else 0
+	local dx = math.floor(math.sin(now * 53) * amp + 0.5)
+	local dy = math.floor(math.cos(now * 41) * amp * 0.5 + 0.5)
 	if dx ~= shakeX or dy ~= shakeY then
 		shakeX, shakeY = dx, dy
 		p.panel.Position = UDim2.fromOffset(baseX + dx, baseY + dy)
 	end
-	p.flash.BackgroundTransparency = if alarm then 0.62 + 0.3 * (0.5 + 0.5 * math.sin(now * 14)) else 1
-	-- the touch HOLD lit while held
-	if p.hold.Visible then
-		local lit = touchHeld
-		p.hold.BackgroundColor3 = if lit then K.raised else K.charcoal
-		p.holdEdge.Color = if lit then K.text else ORANGE
+	local flash = r.flash
+	if flash and now < r.flashUntil then
+		p.flash.BackgroundColor3 = flash
+		p.flash.BackgroundTransparency = 0.55 + 0.45 * (1 - (r.flashUntil - now) / 0.35)
+	elseif p.flash.BackgroundTransparency < 1 then
+		p.flash.BackgroundTransparency = 1
 	end
-end
-
-local function resetDrawn()
-	drawnZone, drawnZoneH, drawnMarker, drawnMeter = -1, -1, -1, -1
-	drawnTone, drawnInside, drawnTitle = -1, -1, ""
-	shakeX, shakeY = 0, 0
+	if p.tap.Visible and r.verdict ~= nil then
+		p.tap.Visible = false
+	end
 end
 
 -- ── The run ────────────────────────────────────────────────────────────────
 
--- The carry with a bar (code: the character's CarryGrip, spot: its MoveCarry), or nil.
-local function current(): (string?, number?)
-	local character = player.Character
-	if not character then
-		return nil, nil
-	end
-	local code = character:GetAttribute("CarryGrip")
-	local spot = character:GetAttribute("MoveCarry")
-	if type(code) ~= "string" or type(spot) ~= "number" then
-		return nil, nil
-	end
-	return code, spot
-end
-
-local function profileOf(code: string, mover: boolean, steadied: boolean): CarryGrip.Profile?
-	local kind, weight, fragile = CarryGrip.decode(code)
-	if not kind then
-		return nil
-	end
-	return CarryGrip.profile(kind, weight, fragile, mover, steadied)
-end
-
-local function bodyOf(): (BasePart?, Humanoid?)
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	return if root and root:IsA("BasePart") then root else nil, humanoid
-end
-
 local function stop()
-	local r = run
-	if not r then
-		return
-	end
-	for _, hook in r.hooks do
+	local hook = frameHook
+	if hook then
 		hook:Disconnect()
+		frameHook = nil
 	end
 	run = nil
-	touchHeld, touchInput = false, nil
 	local p = parts
 	if p then
 		p.panel.Visible = false
-		p.hold.Visible = false
-		p.tip.Visible = false
+		p.tap.Visible = false
 	end
 end
 
--- One frame of the bar: the body's state, a step, the reports, the drawing.
-local function frame(dt: number)
+-- The press: the needle stops, the answer goes at once (the server judges it again).
+local function press()
+	local r = run
+	if not r or faded or r.verdict or r.outcome then
+		return
+	end
+	local check = r.check
+	if not check then
+		return
+	end
+	local now = os.clock()
+	local elapsed = math.min(now - r.at, check.window)
+	local hit = CarryGrip.hits(check, elapsed)
+	r.pressed, r.verdict, r.answeredAt = elapsed, if hit then "ok" else "miss", now
+	remote:FireServer("grip", r.id, r.verdict, elapsed)
+	r.flash, r.flashUntil = if hit then K.good else K.red, now + 0.35
+	words(r)
+	if hit then
+		sound("ding", G.Ui.Hit, 1.4)
+	end
+	if parts then
+		parts.tap.BackgroundColor3 = K.raised
+		parts.tapEdge.Color = K.text
+	end
+end
+
+-- One frame: the timeout, the zone's tick, the outcome's end, the drawing.
+local function frame()
 	local r = run
 	local p = parts
 	if not r or not p then
 		return
 	end
 	local now = os.clock()
-	local sim = r.sim
-	if faded then
-		return -- (a door's fade: paused)
+	if r.goneAt > 0 and now >= r.goneAt then
+		stop()
+		return
 	end
-	if not sim.slipped then
-		local input = r.input
-		local root, humanoid = bodyOf()
-		input.hold = holding()
-		if root and humanoid then
-			local v = root.AssemblyLinearVelocity
-			input.speed = math.sqrt(v.X * v.X + v.Z * v.Z)
-			input.air = humanoid.FloorMaterial == Enum.Material.Air
-			input.climb = if input.air then 0 else v.Y
-			-- the turn: how fast the way you walk swings round
-			local way = humanoid.MoveDirection
-			local turn = 0
-			if way.X * way.X + way.Z * way.Z > 0.01 then
-				local heading = math.atan2(way.X, way.Z)
-				local last = r.heading
-				if last and dt > 0 then
-					local d = heading - last
-					if d > math.pi then
-						d -= 2 * math.pi
-					elseif d < -math.pi then
-						d += 2 * math.pi
-					end
-					turn = d / dt
-				end
-				r.heading = heading
-			else
-				r.heading = nil
-			end
-			input.turn = input.turn + (turn - input.turn) * math.min(1, dt * 8) -- (smoothed: no spike a frame)
-			local health = humanoid.Health
-			if health < r.health and health > 0 then
-				r.bite += r.health - health
-			end
-			r.health = health
+	local check = r.check
+	if check and not r.verdict and not faded then
+		local elapsed = now - r.at
+		if elapsed >= check.window then
+			-- no press in time: a miss (the needle stops at the end)
+			r.pressed, r.verdict, r.answeredAt = check.window, "miss", now
+			remote:FireServer("grip", r.id, "miss")
+			r.flash, r.flashUntil = K.red, now + 0.35
+			words(r)
 		else
-			input.speed, input.climb, input.air = 0, 0, false
-		end
-		input.bite = r.bite
-		r.bite = 0
-		local event = CarryGrip.step(sim, input, dt)
-		-- the report about once a second
-		r.since += dt
-		if r.since >= G.Report then
-			r.since = 0
-			local quality, steady = CarryGrip.report(sim)
-			r.honoured = steady and quality <= G.Server.SteadyOutside -- (7.1 review: as the server takes it)
-			remote:FireServer("grip", r.spot, quality, r.honoured)
-		end
-		-- the reel's tick as the meter moves a notch (TickEvery s apart at least), the warning on each entry into SLIPPING!
-		local notch = math.floor(sim.meter * G.Ui.TickNotches)
-		if notch ~= r.notch and sim.time - r.tickAt >= G.Ui.TickEvery then
-			r.notch, r.tickAt = notch, sim.time
-			sound("grip_tick", G.Ui.Tick)
-		end
-		if sim.warn and not r.warned then
-			r.warned = true
-			sound("grip_warning", G.Ui.Warning)
-		elseif not sim.warn then
-			r.warned = false
-		end
-		local steady = shownSteady(r)
-		if steady and not r.wasSteady then
-			sound("ding", 0.25, 1.4)
-			if r.tipUntil > now then
-				r.tipUntil = now + 0.6 -- (got it: the tip goes)
+			local inside = CarryGrip.inZone(check, CarryGrip.needle(check, elapsed))
+			if inside and not r.inside then
+				sound("grip_tick", G.Ui.Tick)
 			end
+			r.inside = inside
 		end
-		r.wasSteady = steady
-		if event == "slip" then
-			r.slipSent = now
-			r.linger = now + LINGER
-			remote:FireServer("slip", r.spot)
-			slipped()
-		end
-	elseif r.slipSent > 0 and now - r.slipSent > 1 then
-		r.slipSent = now -- (still in your hands a second later: asked again)
-		remote:FireServer("slip", r.spot)
 	end
-	if p.tip.Visible and now > r.tipUntil then
-		p.tip.Visible = false
+	if r.verdict and not r.outcome and r.goneAt == 0 and now - r.answeredAt > WAIT_FOR then
+		r.goneAt = now -- (no outcome came: the move ended, the check was off)
+	end
+	if faded then
+		p.panel.Visible = false
+		p.tap.Visible = false
+		return
+	end
+	if not p.panel.Visible then
+		p.panel.Visible = true
 	end
 	draw(r, now)
 end
 
-local function begin(code: string, spot: number, profile: CarryGrip.Profile, mover: boolean)
+local function show(r: Run)
 	local root = screen()
 	if not root then
 		return
@@ -632,84 +570,97 @@ local function begin(code: string, spot: number, profile: CarryGrip.Profile, mov
 		parts = build(root)
 	end
 	local p = parts
-	carries += 1
-	lookReduced()
-	local seed = (math.floor(os.clock() * 1000) + spot * 7919) % 2147483647
-	local _, humanoid = bodyOf()
-	local r: Run = {
-		spot = spot,
-		code = code,
-		mover = mover,
-		sim = CarryGrip.new(profile, seed),
-		input = CarryGrip.newInput(),
-		tutorial = carries,
-		tipUntil = if carries <= G.Ui.Tutorial then os.clock() + TIP_FOR else 0,
-		since = 0,
-		honoured = false,
-		slipSent = 0,
-		linger = 0,
-		heading = nil,
-		health = if humanoid then humanoid.Health else 100,
-		bite = 0,
-		warned = false,
-		wasSteady = false,
-		steadied = false,
-		notch = math.floor(profile.start * G.Ui.TickNotches),
-		tickAt = -math.huge,
-		hooks = {},
-	}
 	run = r
 	resetDrawn()
-	p.icon.Text = icons[spot] or "📦"
-	p.tip.Text = if carries <= 1 and not Ui.touchLayout() then `Hold to keep it steady!\n{keysText()}` else "Hold to keep it steady!"
-	p.tip.Visible = r.tipUntil > 0
-	p.panel.Visible = true
+	lookReduced()
+	p.piece.Text = r.icon
+	p.track.Visible = r.check ~= nil
+	p.timer.Visible = r.check ~= nil
+	p.tap.BackgroundColor3 = K.charcoal
+	p.tapEdge.Color = if r.what == "wobble" then K.warn else ORANGE
+	p.panel.Visible = not faded
 	place()
 	draw(r, os.clock())
-	table.insert(r.hooks, RunService.RenderStepped:Connect(frame))
+	if not frameHook then
+		frameHook = RunService.RenderStepped:Connect(frame)
+	end
 end
 
--- The carry's bar shows while the character has CarryGrip and MoveCarry (a new carry: a new bar; another kind, a role
--- switch: the same bar, its profile changed).
-local function refresh()
-	local code, spot = current()
-	local r = run
-	local mover = player:GetAttribute("MoveRole") == "mover"
-	local character = player.Character
-	local steadied = character ~= nil and character:GetAttribute("GripSteady") == true -- 7.x Danny steadies it
-	if not code or not spot then
-		if r and r.sim.slipped and os.clock() < r.linger then
-			r.slipSent = 0 -- (the server dropped it: never asked again)
-			return -- (DROPPED! stays a moment)
-		end
-		stop()
+local function newRun(id: number, check: CarryGrip.Check?, raw: any): Run
+	return {
+		id = id,
+		check = check,
+		what = if check then check.what elseif type(raw) == "table" and raw.what == "wobble" then "wobble" else "lift",
+		drop = type(raw) == "table" and raw.drop == true,
+		icon = if type(raw) == "table" and type(raw.icon) == "string" then raw.icon else "📦",
+		number = checks,
+		at = os.clock(),
+		pressed = nil,
+		verdict = nil,
+		answeredAt = 0,
+		outcome = nil,
+		left = nil,
+		goneAt = 0,
+		inside = false,
+		shakeUntil = 0,
+		flash = nil,
+		flashUntil = 0,
+		title = "",
+		tone = "",
+		hint = "",
+	}
+end
+
+-- ("grip", "open", wire): a new check (any other one goes).
+local function opened(raw: any)
+	local check = CarryGrip.fromWire(raw)
+	if not check or type(raw.id) ~= "number" then
 		return
 	end
-	-- the same carry (a slipped bar still in your hands: the server has not dropped it yet, "slip" asked again each
-	-- second). 7.1 review: a slipped bar the server dropped (its slipSent 0 since the attributes went) is over: the same
-	-- piece picked up again inside DROPPED!'s moment is a new bar, not the old one (DROPPED! and a second "slip").
-	-- 7.x: Danny took or let go of the other end (GripSteady): the same bar, its profile changed.
-	if r and r.spot == spot and not (r.sim.slipped and r.slipSent == 0) then
-		if r.code ~= code or r.mover ~= mover or r.steadied ~= steadied then
-			local profile = profileOf(code, mover, steadied)
-			if profile then
-				CarryGrip.setProfile(r.sim, profile)
-				if r.code ~= code then
-					r.honoured = false -- (another kind: the server's steady starts over)
-				end
-				r.code, r.mover, r.steadied = code, mover, steadied
-			end
-		end
+	checks += 1
+	local r = newRun(raw.id, check, raw)
+	words(r)
+	show(r)
+	if r.what == "wobble" then
+		sound("grip_warning", if r.drop then G.Ui.Warning else G.Ui.Warning * 0.6)
+	else
+		sound("grip_tick", G.Ui.Open)
+	end
+end
+
+-- ("grip", "result", r): the server's outcome (of the check on, or one this client no longer shows).
+local function outcome(raw: any)
+	if type(raw) ~= "table" or type(raw.outcome) ~= "string" or not OUTCOMES[raw.outcome] then
 		return
 	end
-	stop()
-	local profile = profileOf(code, mover, steadied)
-	if profile then
-		begin(code, spot, profile, mover)
-		local started = run
-		if started then
-			started.steadied = steadied
-		end
+	local current = run
+	local id = if type(raw.id) == "number" then raw.id else 0
+	if current and current.id > id then
+		return -- (an older check's: the one on now is newer)
+	end
+	local r: Run = if current and current.id == id then current else newRun(id, nil, raw)
+	if r ~= current then
+		show(r)
+	end
+	local now = os.clock()
+	local result = raw.outcome :: string
+	r.outcome = result
+	r.left = if type(raw.left) == "number" then math.clamp(math.floor(raw.left), 0, 100) else nil
+	r.verdict = r.verdict or (if result == "balanced" or result == "steady" then "ok" else "miss")
+	r.goneAt = now + G.Ui.Linger
+	words(r)
+	if result == "balanced" or result == "steady" then
+		r.flash, r.flashUntil = K.good, now + 0.35
+		return
+	end
+	r.flash, r.flashUntil = K.red, now + 0.35
+	r.shakeUntil = now + 0.4
+	if result == "drop" then
+		slipped()
+		shakeCamera(G.Ui.CameraDrop)
+	else
+		sound(if result == "knock" then "furniture_putdown" else "grip_warning", if result == "knock" then G.Ui.Knock else G.Ui.Warning)
+		shakeCamera(G.Ui.Camera)
 	end
 end
 
@@ -723,78 +674,54 @@ function CarryGripUi.panel(): GuiObject?
 	return if parts then parts.panel else nil
 end
 
-function CarryGripUi.holdButton(): GuiObject?
-	return if parts then parts.hold else nil
+function CarryGripUi.tapButton(): GuiObject?
+	return if parts then parts.tap else nil
 end
 
 function CarryGripUi.start()
-	screen()
-	-- the presses: the left mouse button or F, R2; the touch HOLD (its own button)
+	local root = screen()
+	if root and not parts then
+		parts = build(root)
+	end
+	-- the presses: the left mouse button or F, R2; the touch GRIP button and the widget (their own)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed or UserInputService:GetFocusedTextBox() then
+		if processed or run == nil or UserInputService:GetFocusedTextBox() then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			mouseHeld = true
-		elseif input.KeyCode == Enum.KeyCode.F then
-			keyHeld = true
-		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
-			padHeld = true
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.ButtonR2 then
+			press()
 		end
 	end)
-	UserInputService.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			mouseHeld = false
-		elseif input.KeyCode == Enum.KeyCode.F then
-			keyHeld = false
-		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
-			padHeld = false
-		end
-		if touchInput and input == touchInput then
-			touchHeld, touchInput = false, nil
-		end
-	end)
-	-- (Alt-Tab swallows a button's end)
-	UserInputService.WindowFocusReleased:Connect(function()
-		mouseHeld, keyHeld, padHeld, touchHeld, touchInput = false, false, false, false, nil
-	end)
-	-- the things' icons (the move's state) and the door's fade
-	remote.OnClientEvent:Connect(function(kind: any, a: any)
-		if kind == "state" then
-			table.clear(icons)
-			if type(a) == "table" and type(a.items) == "table" then
-				for _, item in a.items do
-					if type(item) == "table" and type(item.spot) == "number" and type(item.icon) == "string" then
-						icons[item.spot] = item.icon
-					end
+	local p = parts
+	if p then
+		for _, button in { p.tap, p.press } do
+			button.InputBegan:Connect(function(input: InputObject)
+				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+					press()
 				end
-			end
-			local r = run
-			if r and parts then
-				parts.icon.Text = icons[r.spot] or "📦"
+			end)
+		end
+	end
+	-- the checks, the outcomes, the door's fade, the move's end
+	remote.OnClientEvent:Connect(function(kind: any, a: any, b: any)
+		if kind == "grip" then
+			if a == "open" then
+				opened(b)
+			elseif a == "result" then
+				outcome(b)
+			elseif a == "close" then
+				local r = run
+				if r and r.id == b and not r.outcome then
+					stop()
+				end
 			end
 		elseif kind == "fade" then
 			faded = a == "out"
+		elseif kind == "state" and a == nil then
+			stop() -- (off a move)
 		end
 	end)
-	-- the carry's attributes: at once when they change, and a light look four times a second (a new body, a missed one)
-	local watched: Model? = nil
-	local function watch()
-		local character = player.Character
-		if character and character ~= watched then
-			watched = character
-			character:GetAttributeChangedSignal("MoveCarry"):Connect(refresh)
-			character:GetAttributeChangedSignal("CarryGrip"):Connect(refresh)
-			character:GetAttributeChangedSignal("GripSteady"):Connect(refresh) -- 7.x Danny took the other end
-		end
-	end
-	player.CharacterAdded:Connect(function()
-		watch()
-		refresh()
-	end)
-	player:GetAttributeChangedSignal("MoveRole"):Connect(refresh)
-	watch()
-	-- the screen and the top blocks: the panel's place
+	-- the screen and the top blocks: the widget's place
 	local function watchCamera()
 		local camera = workspace.CurrentCamera
 		if camera then
@@ -813,19 +740,14 @@ function CarryGripUi.start()
 		end
 	end)
 	task.spawn(function()
-		local ticks = 0
 		while true do
-			task.wait(0.25)
-			watch()
-			pcall(refresh)
-			ticks += 1
-			if run and ticks % 4 == 0 then
+			task.wait(1)
+			if run then
 				lookReduced()
 				pcall(place) -- (the HUD's groups come and go)
 			end
 		end
 	end)
-	refresh()
 end
 
 return CarryGripUi

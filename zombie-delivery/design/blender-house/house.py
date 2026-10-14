@@ -25,7 +25,7 @@ TARGET = "sandbox"   # "sandbox" = The Old Chalet v sandboxu, "city" = dům Marg
 # vpředu a vzadu, okna (polohy podél zdí), vikýře, komíny (x, y na zadním svahu), keře u vchodu.
 # tools/house-art/check.py hlídá, že krabice sedí se hrou (SandboxMap.House / Map.Homes).
 TARGETS = {
-    "sandbox": {  # shared/SandboxMap.luau House.house (44 × 34), SandboxScenery.Chalet.Walls (14.5), střecha pod 26
+    "sandbox": {  # shared/SandboxMap.luau House.house (44 × 14,5 × 34), střecha pod 26; sklon = SandboxScenery.Chalet.Pitch
         "box": (44.0, 14.5, 34.0), "pitch": None, "top": 26.0, "eave": 1.2,
         "front": [-19.0, -13.0, -7.0, 7.0, 13.0, 19.0], "front_flowers": True, "upper": 9.4, "small": 10.2,
         "back": [-19.0, -13.0, -7.0, 7.0, 13.0, 19.0], "back_upper": [-19.0, -13.0, -7.0, 0.0, 7.0, 13.0, 19.0],

@@ -15,7 +15,8 @@
 -- The pieces are named "<item id>_<finish>" (furniture.py export_game); "mark_<item id>" is the bottom middle of that
 -- item's box, mark_o / mark_x / mark_y / mark_z the origin and 10 studs to the right, up and back (the game's axes: the
 -- front of a piece is -Z). The finish is the look below; fabric, fabric2, wood, wood2, paint, accent and appliance take
--- the piece's variant colour (FurnitureLooks.Palettes, the builders' own lists).
+-- the piece's variant colour (FurnitureLooks.Palettes, the builders' own lists), and so do 8.1's gilt, velvet, lacquer,
+-- neon and fur (the 12 collectibles, FurnitureLooks.Collectibles, are in the import since 8.1).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
@@ -68,7 +69,29 @@ local LOOKS: { [string]: Look } = {
 	red = { color = hex("C8322E"), material = M.SmoothPlastic },
 	wicker = { color = hex("BE9664"), material = M.Fabric },
 	black = { color = hex("141416"), material = M.SmoothPlastic },
+	-- 8.1, the collectibles: polished gold, velvet, lacquer, the arcade's neon and a stag's coat in the variant's colours;
+	-- antlers, marble, porcelain and its cobalt, the jukebox's glowing tubes, clear glass, the old globe's sea and
+	-- parchment, the oil painting's peach, rock and slate.
+	gilt = { material = M.Metal, palette = "gilt", reflectance = 0.25 },
+	velvet = { material = M.Fabric, palette = "velvet" },
+	lacquer = { material = M.SmoothPlastic, palette = "lacquer", reflectance = 0.1 },
+	neon = { material = M.Neon, palette = "neon" },
+	fur = { material = M.Fabric, palette = "fur" },
+	bone = { color = hex("DCCDA8"), material = M.SmoothPlastic },
+	marble = { color = hex("E8E4DC"), material = M.Marble },
+	porcelain = { color = hex("F4F2EA"), material = M.SmoothPlastic, reflectance = 0.12 },
+	cobalt = { color = hex("27448F"), material = M.SmoothPlastic, reflectance = 0.08 },
+	amber = { color = hex("FF9A3C"), material = M.Neon },
+	ember = { color = hex("FF4A32"), material = M.Neon },
+	crystal = { color = hex("EEF6F4"), material = M.Glass, transparency = 0.6, reflectance = 0.1 },
+	ocean = { color = hex("5E8FA8"), material = M.SmoothPlastic, reflectance = 0.05 },
+	parchment = { color = hex("E6D3A3"), material = M.SmoothPlastic },
+	peach = { color = hex("F2B48C"), material = M.SmoothPlastic },
+	rock = { color = hex("8A8DAE"), material = M.SmoothPlastic },
+	slate = { color = hex("5E6682"), material = M.SmoothPlastic },
 }
+-- The finishes light passes through: they cast no shadow.
+local CLEAR: { [string]: boolean } = { glass = true, glow = true, crystal = true }
 FurnitureMesh.Looks = LOOKS
 
 type Piece = { finish: string, part: BasePart, cf: CFrame, size: Vector3 }
@@ -162,7 +185,7 @@ local function loadArt()
 		end
 		d.Transparency = look.transparency or 0
 		d.Reflectance = look.reflectance or 0
-		d.CastShadow = finish ~= "glass" and finish ~= "glow"
+		d.CastShadow = not CLEAR[finish]
 		local frame = CFrame.new(origin) * axes -- the item's bottom middle, the game's axes
 		local rel = frame:ToObjectSpace(d.CFrame)
 		if not turn then

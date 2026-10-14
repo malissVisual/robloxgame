@@ -20,20 +20,23 @@
 --                                                 its lines narrowed) to stay on a short or narrow screen, its lines never
 --                                                 on each other
 --   MoveLayout.overlap / MoveLayout.inside        boxes
---   MoveLayout.grip(W, H, S, touch, blocks, sizes)   7.0 grip: the grip bar's panel (client/CarryGripUi.luau, GRIP_W ×
---                                                 GRIP_H at scale 1) and, on a touch screen, its HOLD button (a square,
---                                                 sizes.hold × S, at least sizes.holdMin): the button at the right over
---                                                 the touch buttons (over FIRE, over the column, beside the column, a
---                                                 row higher), the panel right of the screen's middle at its middle
---                                                 height (farther or nearer, a little higher or lower, at the top, then
---                                                 smaller down to sizes.min); the first on the screen and clear of
---                                                 `blocks` (the HUD's groups, the move's top blocks, the quick chat's
---                                                 button), the touch buttons, the thumbstick's corner, the jump button
---                                                 and each other. 7.1 review: when no place is clear (a small phone), the
---                                                 one that covers the least (MoveLayout.clash; the touch controls and the
---                                                 HOLD button CONTROL_WEIGHT × as bad as a HUD group), not simply the
---                                                 first. Returns (panel box, its scale, the HOLD button's box or nil).
---   MoveLayout.holdSpots(W, H, S, size)           the HOLD button's places in order (a size × size square each)
+--   MoveLayout.gripCheck(W, H, S, touch, blocks, sizes)   8.1 grip: the timing check's widget (client/CarryGripUi.luau,
+--                                                 CHECK_W × CHECK_H at scale 1) and, on a touch screen, its TAP button
+--                                                 (a square, sizes.tap × S, at least sizes.tapMin): the button at the
+--                                                 right over the touch buttons (over FIRE, over the column, beside the
+--                                                 column, a row higher); the widget clear of `blocks` (the HUD's groups,
+--                                                 the move's top blocks with the sandbox's guide line, the quick chat's
+--                                                 button, the move's list), the touch buttons, the thumbstick's corner,
+--                                                 the jump button and the TAP button, on the screen, at the place
+--                                                 nearest to the preferred one (in the middle, its top 60% down: under
+--                                                 the character) among the preferred lines and the places flush against
+--                                                 an edge of what is there (a short phone: beside its bottom bar), at
+--                                                 sizes.scale (or the HUD's S), then smaller down to sizes.min. When no
+--                                                 place is clear even then, the one that covers the least
+--                                                 (MoveLayout.clash; the touch controls and the TAP button
+--                                                 CONTROL_WEIGHT × as bad as a HUD group). Returns (widget box, its
+--                                                 scale, the TAP button's box or nil).
+--   MoveLayout.tapSpots(W, H, S, size)            the TAP button's places in order (a size × size square each)
 --   MoveLayout.clash(b, W, H, blocks)             how much of b lies on `blocks` or off the screen (px², off the screen
 --                                                 counted twice): 0 when it is clear
 
@@ -153,14 +156,14 @@ function MoveLayout.ring(W: number, H: number, S: number, touch: boolean, radius
 	return scale, r, width
 end
 
--- 7.0 grip ------------------------------------------------------------------------------------------------------------
+-- 8.1 grip ------------------------------------------------------------------------------------------------------------
 
-MoveLayout.GRIP_W = 96
-MoveLayout.GRIP_H = 272
+MoveLayout.CHECK_W = 240
+MoveLayout.CHECK_H = 96
 MoveLayout.MARGIN = 16
-MoveLayout.CONTROL_WEIGHT = 4 -- 7.1 review: covering a touch control (or the HOLD button) is this much worse than a HUD group
+MoveLayout.CONTROL_WEIGHT = 4 -- 7.1 review: covering a touch control (or the TAP button) is this much worse than a HUD group
 
-export type GripSizes = { hold: number, holdMin: number, scale: number, min: number }
+export type GripSizes = { tap: number, tapMin: number, scale: number, min: number }
 
 local function clearOf(b: Box, W: number, H: number, blocks: { Box }): boolean
 	if not MoveLayout.inside(b, W, H) then
@@ -188,7 +191,7 @@ function MoveLayout.clash(b: Box, W: number, H: number, blocks: { Box }): number
 	return total
 end
 
-function MoveLayout.holdSpots(W: number, H: number, S: number, size: number): { Box }
+function MoveLayout.tapSpots(W: number, H: number, S: number, size: number): { Box }
 	local gap = MoveLayout.GAP
 	local c = TouchLayout.cluster(W, H, S)
 	local wide = 2 * gap -- (beside the column: a little farther from PUT DOWN)
@@ -201,10 +204,30 @@ function MoveLayout.holdSpots(W: number, H: number, S: number, size: number): { 
 	}
 end
 
-function MoveLayout.grip(W: number, H: number, S: number, touch: boolean, blocks: { Box }, sizes: GripSizes): (Box, number, Box?)
+-- The widget's places at w × h: flush against an edge of what is there (a gap off it), or on one of the preferred
+-- lines (its top 60%, 66% or 54% down, its bottom 42% down, its middle in the middle), centred or beside a block;
+-- (xs, ys) of their top left corners. The edges counted: the blocks that reach into the middle band of the screen.
+local function checkPlaces(W: number, H: number, w: number, h: number, avoid: { Box }): ({ number }, { number })
+	local gap = MoveLayout.GAP
+	local xs = { W / 2 - w / 2 }
+	local ys = { H * 0.6, H * 0.66, H * 0.54, H * 0.42 - h, H / 2 - h / 2 }
+	for _, b in avoid do
+		if b.y1 > H * 0.2 and b.y0 < H * 0.9 then
+			table.insert(xs, b.x1 + gap)
+			table.insert(xs, b.x0 - gap - w)
+		end
+		if b.x1 > W * 0.15 and b.x0 < W * 0.85 then
+			table.insert(ys, b.y1 + gap)
+			table.insert(ys, b.y0 - gap - h)
+		end
+	end
+	return xs, ys
+end
+
+function MoveLayout.gripCheck(W: number, H: number, S: number, touch: boolean, blocks: { Box }, sizes: GripSizes): (Box, number, Box?)
 	local gap, margin = MoveLayout.GAP, MoveLayout.MARGIN
 	local avoid = table.clone(blocks)
-	local controls: { Box } = {} -- (the touch buttons, the thumbstick's corner, the jump button, then HOLD: worse to cover)
+	local controls: { Box } = {} -- (the touch buttons, the thumbstick's corner, the jump button, then TAP: worse to cover)
 	-- how bad a place that is not clear is: what it covers, the controls CONTROL_WEIGHT × (the least is the fallback)
 	local function cost(b: Box): number
 		local total = MoveLayout.clash(b, W, H, avoid)
@@ -213,7 +236,7 @@ function MoveLayout.grip(W: number, H: number, S: number, touch: boolean, blocks
 		end
 		return total
 	end
-	local hold: Box? = nil
+	local tap: Box? = nil
 	if touch then
 		local c = TouchLayout.cluster(W, H, S)
 		for _, b in TouchLayout.buttons(c) do
@@ -224,12 +247,12 @@ function MoveLayout.grip(W: number, H: number, S: number, touch: boolean, blocks
 		for _, b in controls do
 			table.insert(avoid, b)
 		end
-		local size = math.max(sizes.holdMin, sizes.hold * S)
+		local size = math.max(sizes.tapMin, sizes.tap * S)
 		-- the first clear place; none clear (a small screen, the HUD's groups in the way): the one that covers the least
 		local best, bestCost = nil :: Box?, math.huge
-		for _, candidate in MoveLayout.holdSpots(W, H, S, size) do
+		for _, candidate in MoveLayout.tapSpots(W, H, S, size) do
 			if clearOf(candidate, W, H, avoid) then
-				hold = candidate
+				tap = candidate
 				break
 			end
 			local bad = cost(candidate)
@@ -237,39 +260,56 @@ function MoveLayout.grip(W: number, H: number, S: number, touch: boolean, blocks
 				best, bestCost = candidate, bad
 			end
 		end
-		local found = (hold or best) :: Box
-		hold = found
-		-- (the panel keeps a gap from it too)
+		local found = (tap or best) :: Box
+		tap = found
+		-- (the widget keeps a gap from it too)
 		local around = box(found.x0 - gap, found.y0 - gap, found.x1 + gap, found.y1 + gap)
 		table.insert(avoid, around)
 		table.insert(controls, around)
 	end
-	local fallback: Box? = nil -- (none clear: the place that covers the least, at its scale)
-	local fallbackScale, fallbackCost = S, math.huge
-	local scale = if touch then math.max(S, sizes.scale) else S
+	-- the widget: at each scale (down to sizes.min) the clear place nearest to the preferred one (in the middle, its top
+	-- 60% down: under the character); none clear at the smallest: the one that covers the least (then the nearest)
+	local scale = math.max(S, sizes.scale)
 	local least = math.min(scale, sizes.min)
 	while true do
-		local w, h = MoveLayout.GRIP_W * scale, MoveLayout.GRIP_H * scale
-		for _, share in { 0.18, 0.13, 0.23, 0.08, 0.28 } do -- (× the width right of the middle)
-			for _, lift in { 0, -0.25, 0.25, -math.huge } do -- (-math.huge: at the top, the margin under it)
-				local cx = W / 2 + W * share
-				local y0 = math.clamp(H / 2 - h / 2 + lift * h, margin, math.max(margin, H - margin - h))
-				local b = box(cx - w / 2, y0, cx + w / 2, y0 + h)
-				if clearOf(b, W, H, avoid) then
-					return b, scale, hold
-				end
-				local bad = cost(b)
-				if bad < fallbackCost then
-					fallback, fallbackScale, fallbackCost = b, scale, bad
+		local w, h = MoveLayout.CHECK_W * scale, MoveLayout.CHECK_H * scale
+		local px, py = W / 2, H * 0.6 + h / 2
+		local xs, ys = checkPlaces(W, H, w, h, avoid)
+		local best: Box? = nil
+		local bestNear = math.huge
+		for _, y in ys do
+			local y0 = math.clamp(y, margin, math.max(margin, H - margin - h))
+			for _, x in xs do
+				local x0 = math.clamp(x, margin, math.max(margin, W - margin - w))
+				local near = math.abs(x0 + w / 2 - px) + math.abs(y0 + h / 2 - py)
+				if near < bestNear then
+					local b = box(x0, y0, x0 + w, y0 + h)
+					if clearOf(b, W, H, avoid) then
+						best, bestNear = b, near
+					end
 				end
 			end
 		end
-		if scale <= least + 1e-6 then
-			break
+		if best then
+			return best, scale, tap
 		end
-		scale = math.max(least, scale * 0.85)
+		if scale <= least + 1e-6 then
+			local fallback, fallbackCost = box(px - w / 2, py - h / 2, px + w / 2, py + h / 2), math.huge
+			for _, y in ys do
+				local y0 = math.clamp(y, margin, math.max(margin, H - margin - h))
+				for _, x in xs do
+					local x0 = math.clamp(x, margin, math.max(margin, W - margin - w))
+					local b = box(x0, y0, x0 + w, y0 + h)
+					local bad = cost(b) + 1e-3 * (math.abs(x0 + w / 2 - px) + math.abs(y0 + h / 2 - py))
+					if bad < fallbackCost then
+						fallback, fallbackCost = b, bad
+					end
+				end
+			end
+			return fallback, scale, tap
+		end
+		scale = math.max(least, scale * 0.88)
 	end
-	return fallback :: Box, fallbackScale, hold
 end
 
 return MoveLayout

@@ -5,9 +5,12 @@
 -- are the real ones, FurnitureMesh the real one without an import). The recorder, the players, the signals (a prompt's
 -- Triggered), the remotes (Runtime.messages, Runtime.lastNotice) and task.delay (at once) are
 -- tests/runtime/MovingRuntime.luau's. Here: a fake SandboxPlots (Runtime.claim, Runtime.free) and a fake Collection
--- (a stock per player the test fills, Runtime.give / Runtime.changed; it records Runtime.calls).
+-- (a stock per player the test fills, Runtime.give / Runtime.changed; it records Runtime.calls). 8.1: the fake
+-- Collection's stands (Runtime.standCount: player → how many, else Config.Warehouse.Stands) and boost (Runtime.boosts),
+-- a fake Upgrades (its open recorded in Runtime.calls as "openUpgrades").
 local E = require("./MovingRuntime") :: any
 local SandboxMap = require("./SandboxMap")
+local Config = require("./Config")
 
 local Mock = E.Mock
 local Runtime: any = {
@@ -22,6 +25,8 @@ local Runtime: any = {
 	calls = {}, -- { { name, player, a } } every Collection call that changes something (and openPicker)
 	income = {}, -- player → Collection.incomePerMinute
 	stocks = {}, -- player → { Entry }
+	standCount = {}, -- 8.1: player → Collection.stands (else Config.Warehouse.Stands)
+	boosts = {}, -- 8.1: player → Collection.boost (else 1)
 }
 
 -- The Shared folder (empty: no CollectionRules) under the services MovingRuntime fakes.
@@ -142,6 +147,19 @@ Runtime.Collection = {
 	end,
 	onChanged = function(fn: (any) -> ())
 		table.insert(changedListeners, fn)
+	end,
+	stands = function(player: any): number
+		return Runtime.standCount[player] or Config.Warehouse.Stands
+	end,
+	boost = function(player: any): number
+		return Runtime.boosts[player] or 1
+	end,
+}
+
+-- 8.1: server/Upgrades.luau's open (the UPGRADES desk's prompt)
+Runtime.Upgrades = {
+	open = function(player: any)
+		table.insert(Runtime.calls, { "openUpgrades", player })
 	end,
 }
 

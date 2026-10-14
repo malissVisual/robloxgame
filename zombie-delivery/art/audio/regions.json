@@ -387,13 +387,68 @@
     "stream_loop": [
       43.679932,
       6.0
+    ],
+    "stand_display": [
+      49.979932,
+      0.95
+    ],
+    "stand_takedown": [
+      51.229932,
+      0.6
+    ],
+    "sale_register": [
+      52.129932,
+      1.2
+    ],
+    "stored_fanfare": [
+      53.629932,
+      1.5
+    ],
+    "van_slide_open": [
+      55.429932,
+      0.75
+    ],
+    "van_slide_close": [
+      56.479932,
+      0.85
+    ],
+    "sprinter_back_open": [
+      57.629932,
+      0.95
+    ],
+    "sprinter_back_close": [
+      58.879932,
+      1.0
+    ],
+    "van_step_up": [
+      60.179932,
+      0.5
+    ],
+    "cowbell_far": [
+      60.979932,
+      3.0
+    ],
+    "amb_alpine": [
+      64.279932,
+      24.0
+    ],
+    "amb_warehouse": [
+      88.579932,
+      12.0
+    ],
+    "amb_room": [
+      100.879932,
+      10.0
     ]
   },
   "looped": [
+    "amb_alpine",
     "amb_day",
     "amb_fountain",
     "amb_night",
     "amb_roof",
+    "amb_room",
+    "amb_warehouse",
     "ambience",
     "birds_alpine_loop",
     "engine",
@@ -410,6 +465,6 @@
     "music": "19575952dd46b6321373b1a31e5e31897da59ec6fa2f417d2d9dfc69bf3191cc",
     "sfx2": "343535d0809e9e63ea1b48f0b914ebb29651ae4d9ae6f66b1d5a55ad8d85cb9b",
     "sfx3": "63d310abebf8b82ef8c94715657fa9c92738ea6f48cd62ae490dad840d4230b0",
-    "sfx4": "f9985afc6b9a478674a2428f50248bbe7f53a5c629d2c0bd78758c6e8f1aac63"
+    "sfx4": "94c9b8813b8aedf54b97519fa59248aebd1406f47a9a061f29873a3791f5194c"
   }
 }

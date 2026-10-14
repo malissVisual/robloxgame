@@ -185,6 +185,57 @@ end
 mark = click(owner, "fill")
 check("a Collection that errors: the command says so instead of failing", string.find(E.said(owner, mark), "the stock took nothing", 1, true) ~= nil, E.said(owner, mark))
 
+-- 8.1: FILL STANDS fills the player's own stands (Collection.stands: with the More stands bought)
+E.Collection.stands = function(_player: any): number
+	return 6
+end
+config.Warehouse = { Stands = 4 }
+E.collection.stock[owner] = {}
+for i = 1, 7 do
+	table.insert(E.collection.stock[owner], { uid = `s{i}`, item = "box", variant = 1, condition = 1, name = "Box", stand = nil, got = 0 })
+end
+table.clear(E.collection.shown)
+click(owner, "stands")
+local highest = 0
+for _, put in E.collection.shown do
+	highest = math.max(highest, put.stand)
+end
+check("8.1: ⭐ FILL STANDS: the player's own stands (Collection.stands 6, not Config's 4)", #E.collection.shown == 6 and highest == 6, `{#E.collection.shown} {highest}`)
+E.Collection.stands = nil
+config.Warehouse = warehouseConfig
+
+-- ── 8.1: the upgrades (Upgrades.admin) ───────────────────────────────────────
+
+table.clear(E.upgrades)
+mark = click(owner, "upmax")
+check("8.1: ⬆ MAX UPGRADES: Upgrades.admin max for the target, its answer said", #E.upgrades == 1 and E.upgrades[1].what == "max" and E.upgrades[1].player == owner and string.find(E.said(owner, mark), "at its top", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "upreset", guest.UserId)
+check("8.1: ↺ RESET UPGRADES aimed at the guest: theirs reset", #E.upgrades == 2 and E.upgrades[2].what == "reset" and E.upgrades[2].player == guest and string.find(E.said(guest, mark), "reset", 1, true) ~= nil, E.said(guest, mark))
+local admin = E.Upgrades.admin
+E.Upgrades.admin = function()
+	error("the upgrades are mid-change")
+end
+mark = click(owner, "upmax")
+check("8.1: an Upgrades that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
+E.Upgrades.admin = admin
+
+-- ── 8.2: the collection book (CollectionBook.admin) ─────────────────────────
+
+table.clear(E.books)
+mark = click(owner, "bookfill")
+check("8.2: 📖 FILL BOOK: CollectionBook.admin fill for the target, its answer said", #E.books == 1 and E.books[1].what == "fill" and E.books[1].player == owner and string.find(E.said(owner, mark), "full", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "bookclear", guest.UserId)
+check("8.2: 📖 CLEAR BOOK aimed at the guest: theirs emptied", #E.books == 2 and E.books[2].what == "clear" and E.books[2].player == guest and string.find(E.said(guest, mark), "empty", 1, true) ~= nil, E.said(guest, mark))
+local bookAdmin = E.CollectionBook.admin
+E.CollectionBook.admin = function()
+	error("the book is mid-change")
+end
+mark = click(owner, "bookfill")
+check("8.2: a CollectionBook that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
+E.CollectionBook.admin = bookAdmin
+click(guest, "bookfill")
+check("8.2: a non-admin's FILL BOOK does nothing", #E.books == 2)
+
 -- ── Travel and the van ───────────────────────────────────────────────────────
 
 local plot = SandboxMap.Plots[1]
