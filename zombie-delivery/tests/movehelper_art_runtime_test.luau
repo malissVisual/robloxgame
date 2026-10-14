@@ -227,18 +227,21 @@ E.place(ann, outside)
 trigger(promptIn(site, "Enter house"), ann)
 local front = sofa.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(FurnitureLooks.Items.sofa.size.Z / 2 + 2)) -- (its front: its -Z)
 E.rootOf(ann).CFrame = M.CFrame.lookAt(V3(front.Position.X, origin.Position.Y + 3, front.Position.Z), V3(sofa.PrimaryPart.Position.X, origin.Position.Y + 3, sofa.PrimaryPart.Position.Z))
-trigger(promptIn(sofa, "Lift"), ann)
-follow(sofa)
-check("Ann lifts the sofa: alone she drags it", ann.Character:GetAttribute("MoveCarry") == sofaSpot.id and Rules.mode(danny.s.move.things[sofaSpot.id]) == "drag")
 local said = #E.said
+trigger(promptIn(sofa, "Lift"), ann)
+check("8.3 Ann lifts the sofa: no drag alone, she calls Danny and waits at her end", ann.Character:GetAttribute("MoveCarry") == nil
+	and danny.call ~= nil and ann:GetAttribute("MoveHelperCall") == FurnitureLooks.Items.sofa.name)
 local took = 0
-local lifted = run(5, function()
+local alone = false
+local lifted = run(20, function()
 	took += 0.1
+	alone = alone or (ann.Character:GetAttribute("MoveCarry") == sofaSpot.id and not helped())
 	return helped()
 end)
-check("Danny takes the far end within 2 s: the two-person walk", lifted and took <= 2 + 1e-6 and E.saidSince("Got the other end!", said), took)
+check("8.3 Danny walks over from the van (in by the front door), \"On three... lift!\": up together, the two-person walk, never dragged alone",
+	lifted and not alone and E.saidSince("On three... lift!", said), took)
 follow(sofa)
-run(0.2)
+run(0.6)
 check("…at its far end, turned to Ann, his arms on it, Ann's grip steadied", distance(danny.body.root.Position, farEnd(sofa)) < 0.05
 	and danny.body.root.CFrame.LookVector:Dot(E.rootOf(ann).Position - danny.body.root.Position) > 0
 	and danny.body.model:GetAttribute("Carrying") == "furniture" and ann.Character:GetAttribute("GripSteady") == true)
