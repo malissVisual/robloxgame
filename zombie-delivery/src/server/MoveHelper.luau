@@ -151,6 +151,7 @@ export type Body = {
 	alpha: { [Instance]: number }?, -- 7.x his parts' own transparency (a fade-over)
 	fade: number, -- 7.x the fade-over in progress
 	sit: AnimationTrack?, -- 8.3 Roblox's sit, played while he rides in the van (loaded at his first ride)
+	weights: { [BasePart]: boolean }?, -- 8.3 his parts' own Massless while he rides (given back when he gets out)
 }
 
 -- How he walks: one step toward `to` at `speed` studs / s; a stop; his way round the walls (may yield; nil: straight).
@@ -1037,12 +1038,31 @@ local function driven(s: any, truck: Vehicles.Car?): boolean
 	return driving and car == truck
 end
 
+-- His parts massless while he rides (the van drives as ever), their own Massless given back after.
 local function setMassless(body: Body, on: boolean)
+	if not on then
+		local was = body.weights
+		body.weights = nil
+		if not was then
+			return
+		end
+		for part, massless in was do
+			if part.Parent then
+				part.Massless = massless
+			end
+		end
+		return
+	end
+	local was: { [BasePart]: boolean } = body.weights or {}
 	for _, d in body.model:GetDescendants() do
 		if d:IsA("BasePart") then
-			d.Massless = on
+			if was[d] == nil then
+				was[d] = d.Massless == true
+			end
+			d.Massless = true
 		end
 	end
+	body.weights = was
 end
 
 local function sitTrack(body: Body): AnimationTrack?
@@ -1134,7 +1154,7 @@ local function spawnBody(h: Helper, at: Vector3): boolean
 	humanoid.MaxHealth = cfg.Health
 	humanoid.Health = cfg.Health
 	h.health = cfg.Health
-	local body: Body = { model = model, root = root, humanoid = humanoid, walking = false, ordered = nil, orderedAt = 0, speed = 0, path = nil, grip = nil, alpha = nil, fade = 0, sit = nil }
+	local body: Body = { model = model, root = root, humanoid = humanoid, walking = false, ordered = nil, orderedAt = 0, speed = 0, path = nil, grip = nil, alpha = nil, fade = 0, sit = nil, weights = nil }
 	h.body = body
 	h.dead = false
 	-- a bite (any health lost) knocks what he holds

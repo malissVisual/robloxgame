@@ -29,7 +29,8 @@
 -- strip, client/CarryGripUi.luau's grip check, client/MovingHud.luau's next step, client/SandboxGuide.luau's line).
 -- The gamepad's map: X the prompts (Use, Pick up, Load, Display; out of a seat), Y held for Sell and the van's Take out,
 -- R2 the grip, B Put down and closing (held: the guide on and off, as a held G), L1 "Talk to Danny" (reserved for
--- him), R1 "Give to Danny" at a piece (8.3 Danny for hire), R2 / L2 and the left stick Roblox's driving. A word names a gamepad button as Roblox does ("X", "R2").
+-- him; 8.3 Danny for hire: R1 his "Give to Danny" at a piece), R2 / L2 and the left stick Roblox's driving. A word names
+-- a gamepad button as Roblox does ("X", "R2").
 --   SandboxPad.Actions                      the actions (id → { key, pad, tap?, hold? }): key the keyboard's ("E"),
 --                                           pad the gamepad's buttons (Enum.KeyCode names, never the D-pad: the chips'),
 --                                           tap a touch screen's button for it ("GRIP", "💡"; nil: the thing itself, a

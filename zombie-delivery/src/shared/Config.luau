@@ -6578,7 +6578,7 @@ Config.MoveStory = {
 --   Name / Title       his name tag
 --   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
 --   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
---                      slower than a player; Sprint: × the walk on his way to your lift (or the other side of your piece)
+--                      slower than a player; Sprint: × the walk on his way to your lift (8.3: and to the van's seat)
 --   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
 --   Tick / Think / Repath   s between his steps / his looks for the next piece / two paths (PathfindingService)
 --   HelpFar            studs (the way there, the door counted) he comes from to help lift; HelpRetry: s before he tries

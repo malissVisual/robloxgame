@@ -1010,7 +1010,7 @@ run(0.3, function()
 end)
 local rel = truck.chassis.CFrame:PointToObjectSpace(body.root.Position)
 check("8.3 the van stands, nobody at its wheel: he gets out on his side (the right), the seat free, his body as before", danny.seat == nil and seat.Occupant == nil
-	and seat:FindFirstChild("SeatWeld") == nil and body.humanoid.Sit == false and rel.X > truck.size.X / 2 and npc:FindFirstChild("HumanoidRootPart").Massless == false,
+	and seat:FindFirstChild("SeatWeld") == nil and body.humanoid.Sit == false and rel.X > truck.size.X / 2 and npc:FindFirstChild("HumanoidRootPart").Massless == false and body.weights == nil,
 	rel.X)
 local back2 = run(20, function()
 	return (body.root.Position - origin.Position).Magnitude < 60
