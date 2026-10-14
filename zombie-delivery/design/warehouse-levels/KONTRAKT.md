@@ -62,9 +62,12 @@ Plot or a Site; **a plain Plot is level 4** (today's building: every existing ca
 - `stand(site, i)`, `stands(site | id, count?)`, `standAt(site, x, z)`: the level's spots (unchanged shape)
 - `standSize(i, level?)`, `fits(i, size, level?)`: stand i of that level (nil: 4)
 - `outline(site)` (`top`: H + rise; the shed's H), `inside`, `door(site)` (the level's door width × height),
-  `receiving`, `doorPath`, `terminal(site)` (`yaw` the way the desk faces: 180 south; level 1: −90, east, against the
-  west wall), `bay` (the same on every level), `pieces(site)` (the level's building: its walls, its roof, its own
-  lamps and beams under the Blender model's, its stands and small spots, desk, signs)
+  `receiving`, `doorPath`, `terminal(site)` (against the back wall's middle on every level, `yaw` 180 as today; the
+  Garage's is a smaller desk, 3.6 × 2.4, between its two stands), `bay` (the same on every level), `pieces(site)` (the
+  level's building: its walls, its roof, its own lamps and beams under the Blender model's, its stands and small spots,
+  desk, signs; the Garage's STOCK board on its west wall)
+- `grid(n)` level n's stand grid (`columns, middle, aisle, side, front, gap, receiving, walk`: `walk` the least room in
+  front of a stand and past the receiving zone, `side` the room along the side walls, 0 where stands stand against them)
 - `WarehouseLayout.Levels` = 5
 
 ### `shared/UpgradeRules.luau`, `shared/CollectionRules.luau` (lead)
