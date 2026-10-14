@@ -16,7 +16,8 @@
 --     (the moves' lobby, the crew panel), Transport, KitWear, Horn;
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), the
 --     collection (Collection: its payout loop), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the
---     vans' engines), the Sprinter's model (SprinterMesh) and last
+--     vans' engines), 8.2's SandboxLeaders (the player list's columns, the TOP MOVERS board), the Sprinter's model
+--     (SprinterMesh) and last
 --     Moving (it wraps the hooks set here: Vehicles.callCar …).
 --   The modules written alongside this one (SandboxWorld.build, Collection.start, Warehouse.start, SprinterMesh.start)
 --   run only when they are in the place (a FindFirstChild guard); every service through `safely` (one that fails only
@@ -407,6 +408,7 @@ local function sandbox()
 	optional("Collection", "start")
 	optional("Warehouse", "start")
 	optional("Upgrades", "start") -- 8.1: the UPGRADES desk's shop (after the collection and the warehouses)
+	optional("SandboxLeaders", "start") -- 8.2: the player list's $ / $/min / collection and the TOP MOVERS board
 	optional("SprinterMesh", "start") -- (before any van: PLAY parks one)
 	vehicleHooks()
 	safely("Moving", function()
