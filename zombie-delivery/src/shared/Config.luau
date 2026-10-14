@@ -6262,7 +6262,9 @@ Config.CarryGrip = {
 --                     warehouse earns), no XP; no story. Client / Icon / Address / Blurb: the card's; Time / HordeAt: the
 --                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
 --                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
---                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay
+--                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay.
+--                     8.3 the lodge: the one house is The Alpine Lodge (it replaced The Old Chalet): Kind its plan's
+--                     (HouseLayout's "lodge"), a longer Time (the Sprinter's bed takes it home in several trips)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6340,11 +6342,12 @@ Config.Moving = {
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
-		Client = "The Hubers",
-		Icon = "🏡",
+		Client = "The Brunners",
+		Icon = "🏔️",
 		Address = "the end of Main Street",
-		Blurb = "An old alpine chalet full of things. Bring them home to your warehouse and put them on show.",
-		Time = 20 * 60,
+		Blurb = "A big two-storey alpine lodge, packed full. Too much for one van: plan several trips home.",
+		Kind = "lodge", -- 8.3: the house's plan (shared/HouseLayout.luau: The Alpine Lodge's, Config.Furniture.Lodge)
+		Time = 25 * 60, -- (8.3: the lodge's, was the chalet's 20 min: it takes several trips)
 		HordeAt = 3 * 60,
 		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
@@ -6466,6 +6469,34 @@ Config.Furniture = {
 		Legendary = 0.125,
 		Odds = { uncommon = 60, rare = 30, epic = 10 } :: { [string]: number },
 		Salt = 8017,
+	},
+	-- 8.3 the lodge (the sandbox's house, The Alpine Lodge: HouseLayout.plan(seed, "lodge"), one big floor laid out as a
+	-- house's, bigger): six rooms in the back row (the house's four, a guest room and a study), a bigger front row
+	-- (Front: its depth's least, 2 more a die step; Kitchen: the kitchen's least share of the front row beside the hall),
+	-- and a second way out, the terrace door (BackDoor wide) at the corridor's east end. Every piece gets out by both doors.
+	--   Spots / Stars          its pieces (at least, at most) and its ★ ones
+	--   Collectibles           its collector's pieces (Count: at least, at most; Legendary: the chance of one), the
+	--                          house's Odds and Salt
+	--   InteriorMaxParts       an interior's parts at most, its furniture included (tests/lodgelayout_test.luau)
+	--   Light / DoorLight      its inside's lights (server/HouseInterior.luau; the owner: the house's inside "a flashbang"):
+	--                          one modest warm ceiling light a room (Brightness, Range, Color), the doorways' daylight a
+	--                          soft one; no glowing (Neon) lamps, panes or porch walls
+	--   Walls                  the warm off-white its plaster is mixed toward (WallsMix of the way: never a bright white)
+	--   Porch / Pane           the porches' outer wall and the windows' panes (soft, not glowing)
+	Lodge = {
+		Front = 26,
+		Kitchen = 0.4,
+		BackDoor = 6,
+		Spots = { 34, 40 } :: { number },
+		Stars = 4,
+		Collectibles = { Count = { 4, 6 } :: { number }, Legendary = 0.25 },
+		InteriorMaxParts = 1100,
+		Light = { Brightness = 0.8, Range = 14, Color = { 255, 206, 150 } :: { number } },
+		DoorLight = { Brightness = 0.6, Range = 12, Color = { 255, 226, 190 } :: { number } },
+		Walls = { 226, 212, 188 } :: { number },
+		WallsMix = 0.7,
+		Porch = { 176, 188, 186 } :: { number },
+		Pane = { 104, 124, 140 } :: { number },
 	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
 	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:

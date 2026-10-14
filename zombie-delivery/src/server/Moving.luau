@@ -93,8 +93,10 @@
 --     after VanAgain s and the move takes it over (its Load / Unload prompts made again on it).
 --   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
 --     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
---     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
---     Chalet"): its "Enter house" on the map's front door (the part with the attribute SandboxDoor, server/
+--     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: 8.3 "The
+--     Alpine Lodge", in The Old Chalet's place: its plan HouseLayout's kind "lodge", Config.Moving.Sandbox.Kind; its
+--     terrace door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the part
+--     with the attribute SandboxDoor, server/
 --     SandboxWorld.luau's; else an invisible one at House.door), "Call truck to door" to House.curb, out at its door;
 --     refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
 --     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
@@ -951,7 +953,9 @@ end
 -- Its front door (the spot outside it, looking out to the road), the van's curb (its pivot: the nose to the road, the
 -- back to the door: "Call truck to door"), out where you came in (4 studs out of the door). Its "Enter house" part is an
 -- invisible one at the door until the map's front door is found (SB.frontDoor: the prompt goes onto that). No
--- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is.
+-- moving-day dress: the map's house (server/SandboxWorld.luau; 8.3 The Alpine Lodge) stands there as it is. 8.3: its
+-- second door, the lodge's terrace door (House.back: "Enter" there to the plan's exits[2], out there by it), as a farm's
+-- barn doors; the van's spot for both the curb.
 local function yawLook(yaw: number): Vector3
 	local r = math.rad(yaw)
 	return Vector3.new(-math.sin(r), 0, -math.cos(r))
@@ -965,8 +969,24 @@ function SB.site(contract: Contract, parent: Instance): Site
 	local model = Instance.new("Model")
 	model.Name = `Move_{contract.id}`
 	local up = Vector3.new(0, 3.5, 0)
-	local enter = invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
+	local width = h.doorWidth -- (8.3 the lodge: its double front door)
+	local enter = invisible("EnterDoor", Vector3.new(width, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
 	model.PrimaryPart = enter
+	-- 8.3 the lodge: its terrace door (House.back, the plan's exits[2]), a second way in and out; the van's spot the curb
+	local backFacing = yawLook(h.back.yaw)
+	local backDoor = Vector3.new(h.back.x, h.back.y, h.back.z)
+	local backOut = backDoor + backFacing * 4 + Vector3.new(0, 0.1, 0)
+	local terrace: SiteDoor = {
+		exit = 2,
+		name = "terrace door",
+		door = backDoor,
+		facing = backFacing,
+		outside = CFrame.lookAt(backOut, backOut + backFacing),
+		park = park,
+		heading = yawLook(h.curb.yaw),
+		width = 4,
+		part = invisible("EnterDoor2", Vector3.new(4, 6, 1), CFrame.lookAt(backDoor + backFacing * 0.9 + up, backDoor + backFacing * 3 + up), model),
+	}
 	model.Parent = parent
 	local out = door + facing * 4 + Vector3.new(0, 0.1, 0) -- (8.1 walk-in doors: 4 out, as the city's, clear of its zone)
 	local outside = CFrame.lookAt(out, out + facing)
@@ -984,8 +1004,8 @@ function SB.site(contract: Contract, parent: Instance): Site
 		park = { x = park.X, z = park.Z },
 		pile = { x = out.X, z = out.Z },
 	}
-	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = 4, part = enter }
-	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front } }
+	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = width, part = enter }
+	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front, terrace } }
 end
 
 -- The map's front door (server/SandboxWorld.luau's FrontDoor: the part with the attribute SandboxDoor), looked for when
@@ -1006,11 +1026,12 @@ function SB.frontDoor(): BasePart?
 	return nil
 end
 
--- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words.
+-- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words; 8.3
+-- its plan's kind the lodge's (Sandbox.Kind: HouseLayout's "lodge").
 function SB.newContract(): Contract
 	local S = T.Sandbox
 	local h = SandboxMap.House
-	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = "house", blurb = S.Blurb, time = S.Time, hordeAt = 0 }
+	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = S.Kind, blurb = S.Blurb, time = S.Time, hordeAt = 0 }
 end
 
 -- Is a point on the test world's asphalt (SandboxMap.Roads and the turnaround, 2 studs of slack)? (The Guard's

@@ -4,9 +4,20 @@
 -- server/HouseInterior.luau builds a plan, the moving job (server/Moving.luau) carries its pieces out of it.
 --
 --   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": Marge's family house in the suburbs, one storey; 7.x
---                                  "farm": Walt's alpine farm, shared/Layouts/Farm.luau, its plan adds `exits`; an
+--                                  "farm": Walt's alpine farm, shared/Layouts/Farm.luau, its plan adds `exits`; 8.3
+--                                  "lodge": the sandbox's Alpine Lodge, a house's plan made bigger, see below; an
 --                                  unknown kind is a house). Every position is LOCAL to the house's origin: the ground
 --                                  (the floor's top) at the front door's middle, +Z into the house, +Y up.
+--   8.3 the lodge (Config.Furniture.Lodge): one big floor laid out as a house (the same rooms' kinds, fixtures, rules
+--   and dice), only bigger: six rooms in the back row (the house's four, the guest room "guest" of kind bedroom and the
+--   study "study" of kind living: HouseLayout.LodgeRecipes), a bigger front row, more pieces (Lodge.Spots), more ★
+--   (Lodge.Stars) and collectibles (Lodge.Collectibles), and a second way out: the terrace door at the corridor's east
+--   end (+X, mirrored or not; its doorway doors[n] with rooms { "corridor", "outside" }), so its plan has `exits` as a
+--   farm's (exits[1] the front door, exits[2] the terrace door). Every piece gets out by either door (its layout checks
+--   both). A house's plan is the same as before the lodge (its dice untouched).
+--   8.3: HouseLayout.Collectibles is the whole pool a house's collectibles come from: its own entries, then any other
+--   piece of FurnitureLooks.Collectibles (a new one joins on its own, at a wall in the room its catalogue entry names,
+--   when the house has that room). HouseLayout.LodgeRecipes: the lodge's rooms' recipes (its own and the house's).
 --   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "farm", "hotel") is a function
 --                                  seed's dice → Plan added to KINDS below)
 --   HouseLayout.Recipes            what each room holds: its pieces, how each is placed, the musts and the ★ ones
@@ -72,6 +83,7 @@ export type Plan = {
 	doors: { Door },
 	entry: CFrame,
 	exit: Vector3,
+	exits: { Vector3 }?, -- (7.x a farm's, 8.3 a lodge's ways out: exits[1] == exit)
 	spots: { Spot },
 	ceiling: number,
 	wall: number,
@@ -277,6 +289,9 @@ local function stuckOf(field: Field, pieces: { Rect }, radii: { number }): { num
 		local radius = radii[index]
 		local need = math.ceil(radius / STEP - 1e-9)
 		local function clearFor(k: number, x: number, z: number): boolean
+			if clear[k] >= radius then
+				return true -- (8.3: nothing at all is that close, its own box neither: the same answer, quicker)
+			end
 			local c = field.static[k]
 			if c < radius then
 				return false
@@ -452,11 +467,66 @@ local COLLECTIBLES: { Entry } = {
 	{ item = "oil_painting", how = "wall" },
 	{ item = "knight_armour", how = "corner" },
 }
-HouseLayout.Collectibles = COLLECTIBLES
+-- 8.3: the pool a house's collectibles come from (HouseLayout.Collectibles): COLLECTIBLES' entries (their placement),
+-- then every other piece of FurnitureLooks.Collectibles (one added to the catalogue joins on its own: at a wall, in its
+-- catalogue room)
+local POOL: { Entry } = table.clone(COLLECTIBLES)
+do
+	local known: { [string]: boolean } = {}
+	for _, e in COLLECTIBLES do
+		known[e.item] = true
+	end
+	for _, id in (FurnitureLooks :: any).Collectibles or {} do
+		if not known[id] and FurnitureLooks.Items[id] then
+			table.insert(POOL, { item = id, how = "wall" })
+		end
+	end
+end
+HouseLayout.Collectibles = POOL
 -- the rooms in the order they are furnished (and their spots numbered)
 local FURNISH = { "living", "kitchen", "bedroom", "kids", "bath", "garage", "hall" }
 -- where a filler box goes when a house is short of pieces
 local FILLER = { "garage", "living", "bedroom", "kitchen", "kids", "hall" }
+
+-- 8.3 the lodge's rooms: the house's recipes (the same entries) and its own: a living room with a few more seats and
+-- lamps for its size, the guest room (a bedroom's), the study (the bookshelves, an armchair, a ★ cuckoo clock)
+local LODGE_LIVING: { Entry } = table.clone(RECIPES.living)
+table.insert(LODGE_LIVING, { item = "armchair", how = "wall", odds = 2 })
+table.insert(LODGE_LIVING, { item = "floor_lamp", how = "corner" })
+table.insert(LODGE_LIVING, { item = "plant", how = "corner", odds = 1.5 })
+local LODGE_RECIPES: { [string]: { Entry } } = {
+	hall = RECIPES.hall,
+	living = LODGE_LIVING,
+	kitchen = RECIPES.kitchen,
+	bedroom = RECIPES.bedroom,
+	kids = RECIPES.kids,
+	bath = RECIPES.bath,
+	garage = RECIPES.garage,
+	guest = {
+		{ item = "bed", how = "far", must = true },
+		{ item = "nightstand", how = "beside", ref = "bed", must = true },
+		{ item = "painted_cupboard", how = "wall", must = true },
+		{ item = "nightstand", how = "beside", ref = "bed" },
+		{ item = "carved_chest", how = "front", ref = "bed", odds = 2 },
+		{ item = "dresser", how = "wall", odds = 1.5 },
+		{ item = "mirror", how = "corner" },
+		{ item = "edelweiss_frame", how = "corner", odds = 2 },
+		{ item = "plant", how = "corner" },
+	},
+	study = {
+		{ item = "bookshelf", how = "centre", must = true },
+		{ item = "armchair", how = "facing", ref = "bookshelf", must = true },
+		{ item = "floor_lamp", how = "beside", ref = "armchair" },
+		{ item = "cuckoo_clock", how = "wall", star = true },
+		{ item = "bookshelf", how = "wall", odds = 2 },
+		{ item = "piano", how = "wall", odds = 1.5 },
+		{ item = "painting", how = "wall", odds = 1.5 },
+		{ item = "heart_chair", how = "wall", odds = 2 },
+		{ item = "accordion", how = "corner", odds = 2 },
+		{ item = "plant", how = "corner" },
+	},
+}
+HouseLayout.LodgeRecipes = LODGE_RECIPES
 
 -- ── A house ─────────────────────────────────────────────────────────────────────
 
@@ -489,7 +559,64 @@ local BACK_ORDERS = {
 	{ "bedroom", "bath", "kids", "garage" },
 }
 local BACK_WIDTH: { [string]: { number } } = { garage = { 16, 18 }, kids = { 16, 18 }, bath = { 11, 12 }, bedroom = { 20, 23 } }
-local KIND_OF: { [string]: string } = { corridor = "hall" }
+local KIND_OF: { [string]: string } = { corridor = "hall", guest = "bedroom", study = "living" }
+
+-- 8.3 the lodge: what a kind of house is laid out from (planHouse's shape). The house's is the house as it always was
+-- (the same dice in the same order); the lodge's: six back rooms (the garage, its ski room, at an end), a deeper and
+-- wider front row, its own recipes, counts and the terrace door (backDoor wide, at the corridor's east end).
+type Shape = {
+	kind: string,
+	orders: { { string } },
+	widths: { [string]: { number } },
+	front: number, -- the front row's depth: front + 2 × (0 … 2)
+	kitchen: number, -- the kitchen's share of the front row beside the hall: kitchen + (0 … 0.06)
+	recipes: { [string]: { Entry } },
+	furnish: { string },
+	filler: { string },
+	spots: { number },
+	stars: number,
+	collectibles: { number },
+	legendary: number,
+	backDoor: number?,
+}
+local LODGE_CONFIG = (T :: any).Lodge
+local SHAPES: { [string]: Shape } = {
+	house = {
+		kind = "house",
+		orders = BACK_ORDERS,
+		widths = BACK_WIDTH,
+		front = 24,
+		kitchen = 0.44,
+		recipes = RECIPES,
+		furnish = FURNISH,
+		filler = FILLER,
+		spots = T.Spots,
+		stars = T.Stars,
+		collectibles = T.Collectibles.Count,
+		legendary = T.Collectibles.Legendary,
+		backDoor = nil,
+	},
+	lodge = {
+		kind = "lodge",
+		orders = {
+			{ "garage", "kids", "bath", "guest", "study", "bedroom" },
+			{ "garage", "study", "bedroom", "bath", "guest", "kids" },
+			{ "kids", "bath", "bedroom", "study", "guest", "garage" },
+			{ "bedroom", "guest", "bath", "kids", "study", "garage" },
+		},
+		widths = { garage = { 16, 18 }, kids = { 16, 18 }, bath = { 11, 12 }, bedroom = { 20, 23 }, guest = { 17, 19 }, study = { 16, 18 } },
+		front = LODGE_CONFIG.Front,
+		kitchen = LODGE_CONFIG.Kitchen,
+		recipes = LODGE_RECIPES,
+		furnish = { "living", "kitchen", "bedroom", "guest", "study", "kids", "bath", "garage", "hall" },
+		filler = { "garage", "living", "study", "bedroom", "guest", "kitchen", "kids", "hall" },
+		spots = LODGE_CONFIG.Spots,
+		stars = LODGE_CONFIG.Stars,
+		collectibles = LODGE_CONFIG.Collectibles.Count,
+		legendary = LODGE_CONFIG.Collectibles.Legendary,
+		backDoor = LODGE_CONFIG.BackDoor,
+	},
+}
 
 -- A side of a room: the wall at its min Z ("S"), max Z ("N"), min X ("W"), max X ("E"); a piece with its back to it
 -- turns `turn` degrees and faces (fx, fz) into the room.
@@ -518,28 +645,30 @@ local function span(inner: Rect, side: string): (number, number)
 	return inner.z0, inner.z1
 end
 
-local function planHouse(seed: number): Plan
+local function planHouse(seed: number, shape: Shape): Plan
 	local rng = newRng(seed)
 	local W_ = T.Wall
 	local HALF_WALL = W_ / 2
+	local RECIPES = shape.recipes -- (8.3: the lodge's own; the house's the same as ever)
 
 	-- The shell: a front row (kitchen, the entrance hall with the front door, the living room), the corridor across
-	-- the house, a back row (garage, kids' room, bathroom, bedroom in one of four orders), then maybe mirrored.
-	local order = BACK_ORDERS[rng.int(1, #BACK_ORDERS)]
+	-- the house, a back row (garage, kids' room, bathroom, bedroom in one of four orders; 8.3 the lodge: six rooms), then
+	-- maybe mirrored.
+	local order = shape.orders[rng.int(1, #shape.orders)]
 	local widths: { [string]: number } = {}
 	local W = 0
 	for _, id in order do
-		local range = BACK_WIDTH[id]
+		local range = shape.widths[id]
 		widths[id] = rng.int(range[1], range[2])
 		W += widths[id]
 	end
-	local F = 24 + 2 * rng.int(0, 2)
+	local F = shape.front + 2 * rng.int(0, 2)
 	local C = T.Corridor
 	local B = 22 + 2 * rng.int(0, 1)
 	local D = F + C + B
 	local half = T.HallWidth / 2
 	local rest = W - T.HallWidth
-	local kw = math.floor(rest * (0.44 + rng.num() * 0.06) + 0.5)
+	local kw = math.floor(rest * (shape.kitchen + rng.num() * 0.06) + 0.5)
 	local lw = rest - kw
 	local x0, x1 = -half - kw, half + lw
 
@@ -587,6 +716,10 @@ local function planHouse(seed: number): Plan
 		for _, door in doors do
 			door.x = -door.x
 		end
+	end
+	if shape.backDoor then
+		-- 8.3 the lodge: the terrace door, a second way out, in the corridor's east end (+X, mirrored or not)
+		addDoor(x1, F + C / 2, shape.backDoor, false, "corridor", nil)
 	end
 	for _, room in rooms do
 		local c = room.cell
@@ -830,6 +963,9 @@ local function planHouse(seed: number): Plan
 		end
 		local corridor = byId.corridor
 		for _, side in { "W", "E" } do
+			if side == "E" and shape.backDoor then
+				continue -- (8.3 the lodge: the terrace door there)
+			end
 			local a4, b4 = span(corridor.inner, side)
 			window(corridor, side, (a4 + b4) / 2, { 3, T.Window[2] }, T.WindowSill)
 		end
@@ -1104,7 +1240,7 @@ local function planHouse(seed: number): Plan
 	-- the ★ pieces: Stars of the sentimental ones, by the dice
 	type Pick = { room: string, entry: Entry }
 	local sentimental: { Pick } = {}
-	for _, roomId in FURNISH do
+	for _, roomId in shape.furnish do
 		for _, e in RECIPES[roomId] do
 			if e.star then
 				table.insert(sentimental, { room = roomId, entry = e })
@@ -1113,13 +1249,13 @@ local function planHouse(seed: number): Plan
 	end
 	shuffle(sentimental, rng)
 	local starred: { [Entry]: boolean } = {}
-	for n = 1, math.min(T.Stars, #sentimental) do
+	for n = 1, math.min(shape.stars, #sentimental) do
 		starred[sentimental[n].entry] = true
 	end
-	local target = rng.int(T.Spots[1], T.Spots[2])
+	local target = rng.int(shape.spots[1], shape.spots[2])
 	-- the musts, then the ★ ones, then the rest in a shuffled order until the house holds `target` pieces
 	local optional: { Pick } = {}
-	for _, roomId in FURNISH do
+	for _, roomId in shape.furnish do
 		for _, e in RECIPES[roomId] do
 			if e.must then
 				place(roomId, e, true, false)
@@ -1128,7 +1264,7 @@ local function planHouse(seed: number): Plan
 			end
 		end
 	end
-	for _, roomId in FURNISH do
+	for _, roomId in shape.furnish do
 		for _, e in RECIPES[roomId] do
 			if starred[e] then
 				place(roomId, e, true, true)
@@ -1159,13 +1295,21 @@ local function planHouse(seed: number): Plan
 		end
 	end
 	local field = newField(rect(house.x0 - HALF_WALL, -HALF_WALL, house.x1 + HALF_WALL, house.z1 + HALF_WALL), solidRects, doorway)
-	local function stuckNow(): { number }
+	-- (8.3 the lodge: the terrace door's way out is checked once every piece stands, below: the field of its own here)
+	local backField = if shape.backDoor
+		then newField(
+			rect(house.x0 - HALF_WALL, -HALF_WALL, house.x1 + HALF_WALL, house.z1 + HALF_WALL),
+			solidRects,
+			rect(x1 - HALF_WALL, F + C / 2 - shape.backDoor / 2, x1 + HALF_WALL, F + C / 2 + shape.backDoor / 2)
+		)
+		else nil
+	local function stuckNow(other: Field?): { number }
 		local rects, radii = {}, {}
 		for _, p in placed do
 			table.insert(rects, p.rect)
 			table.insert(radii, radiusOf(p.item))
 		end
-		return stuckOf(field, rects, radii)
+		return stuckOf(other or field, rects, radii)
 	end
 	for _ = 1, 16 do
 		local stuck = stuckNow()
@@ -1204,8 +1348,8 @@ local function planHouse(seed: number): Plan
 	end
 	-- too few pieces: moving boxes where they fit (and can get out)
 	local fill = 1
-	while #placed < T.Spots[1] and fill <= #FILLER * 3 do
-		local roomId = FILLER[(fill - 1) % #FILLER + 1]
+	while #placed < shape.spots[1] and fill <= #shape.filler * 3 do
+		local roomId = shape.filler[(fill - 1) % #shape.filler + 1]
 		fill += 1
 		local p = place(roomId, { item = "box", how = "corner" }, false, false)
 		if p and #stuckNow() > 0 then
@@ -1220,7 +1364,7 @@ local function planHouse(seed: number): Plan
 			stars += 1
 		end
 	end
-	if stars < T.Stars then
+	if stars < shape.stars then
 		local byValue = table.clone(placed)
 		table.sort(byValue, function(a: Placed, b: Placed): boolean
 			local da, db = FurnitureLooks.Items[a.item], FurnitureLooks.Items[b.item]
@@ -1234,7 +1378,7 @@ local function planHouse(seed: number): Plan
 			return a.order < b.order
 		end)
 		for _, p in byValue do
-			if stars >= T.Stars then
+			if stars >= shape.stars then
 				break
 			end
 			if not p.star then
@@ -1247,14 +1391,16 @@ local function planHouse(seed: number): Plan
 	-- 8.0 collectibles: Collectibles.Count of the rare pieces, after the house's own pieces and its ★ (those stay as they
 	-- were; a collectible is never ★), on their own dice: a legendary one in about one house of eight (Legendary), the
 	-- others' rarities by their Odds; each in its own room, none twice. A piece that finds no place there (or whose
-	-- place would keep a piece from getting out) gives way to another of its rarity, else of the rarity below.
+	-- place would keep a piece from getting out) gives way to another of its rarity, else of the rarity below. (8.3: the
+	-- lodge's count and legendary chance its own; drawn from HouseLayout.Collectibles, only pieces of a room the house
+	-- has)
 	do
 		local rules = T.Collectibles
 		local rarities = FurnitureLooks.Rarities
 		local dice = newRng(seed + rules.Salt)
-		local want = dice.int(rules.Count[1], rules.Count[2])
+		local want = dice.int(shape.collectibles[1], shape.collectibles[2])
 		local tiers: { string } = {}
-		if dice.num() < rules.Legendary then
+		if dice.num() < shape.legendary then
 			table.insert(tiers, "legendary")
 		end
 		local total = 0
@@ -1280,8 +1426,9 @@ local function planHouse(seed: number): Plan
 		local byRarity: { [string]: { Entry } } = {}
 		for _, rarity in rarities do
 			local list: { Entry } = {}
-			for _, e in COLLECTIBLES do
-				if FurnitureLooks.Items[e.item].rarity == rarity then
+			for _, e in POOL do
+				local def = FurnitureLooks.Items[e.item]
+				if def.rarity == rarity and byId[def.room] then
 					table.insert(list, e)
 				end
 			end
@@ -1333,13 +1480,32 @@ local function planHouse(seed: number): Plan
 		-- (too few that fit: any other but a legendary one, the commonest first)
 		for _, rarity in rarities do
 			for _, e in byRarity[rarity] do
-				if count >= rules.Count[1] or rarity == "legendary" then
+				if count >= shape.collectibles[1] or rarity == "legendary" then
 					break
 				end
 				if not tried[e.item] then
 					put(e)
 				end
 			end
+		end
+	end
+	-- 8.3 the lodge: every piece gets out of the terrace door too. Its way is the corridor, which a piece that gets to the
+	-- front door nearly always has (the rooms open onto it), so this looks once every piece stands; a piece that cannot
+	-- get there clears its way as the front door's loop does: the latest optional piece of its room goes, else itself.
+	if backField then
+		for _ = 1, 8 do
+			local stuck = stuckNow(backField)
+			if #stuck == 0 then
+				break
+			end
+			local victim = placed[stuck[1]]
+			local latest: Placed? = nil
+			for _, p in placed do
+				if p ~= victim and p.room == victim.room and not p.must and not p.star and (latest == nil or p.order > latest.order) then
+					latest = p
+				end
+			end
+			table.remove(placed, table.find(placed, latest or victim) :: number)
 		end
 	end
 
@@ -1361,15 +1527,21 @@ local function planHouse(seed: number): Plan
 			local face = SIDE_FACE[sofa.side]
 			rug("rug", "living", table_.x - face[1] * 0.6, table_.z - face[2] * 0.6, 8.4, 6.4, sofa.turn)
 		end
-		local bed = find("bedroom", "bed")
-		if bed and bed.side then
-			local face = SIDE_FACE[bed.side]
-			rug("rug", "bedroom", bed.x + face[1] * 3.2, bed.z + face[2] * 3.2, 8, 4.4, bed.turn)
+		for _, roomId in { "bedroom", "guest" } do -- (8.3: the lodge's guest room too)
+			local bed = if byId[roomId] then find(roomId, "bed") else nil
+			if bed and bed.side then
+				local face = SIDE_FACE[bed.side]
+				rug("rug", roomId, bed.x + face[1] * 3.2, bed.z + face[2] * 3.2, 8, 4.4, bed.turn)
+			end
 		end
 		local kids = byId.kids.inner
 		rug("round_rug", "kids", (kids.x0 + kids.x1) / 2, (kids.z0 + kids.z1) / 2, 6, 6, 0)
 		local hall = byId.hall.inner
 		rug("runner", "hall", 0, (hall.z0 + 4 + hall.z1 - 3) / 2, 3.6, hall.z1 - hall.z0 - 7, 0)
+		local study = byId.study -- (8.3: the lodge's study, a round rug in its middle)
+		if study then
+			rug("round_rug", "study", (study.inner.x0 + study.inner.x1) / 2, (study.inner.z0 + study.inner.z1) / 2, 7, 7, 0)
+		end
 	end
 
 	-- 7.x alpine: the wall decor, high on the walls (its bottom Alpine.Decor up: over every piece and below the
@@ -1457,12 +1629,16 @@ local function planHouse(seed: number): Plan
 		hang("antlers", "living", A.Antlers)
 		hang("picture", "hall", A.Picture)
 		hang("picture", "bedroom", A.Picture)
+		if byId.study and byId.guest then -- (8.3 the lodge: antlers in the study, a picture in the guest room)
+			hang("antlers", "study", A.Antlers)
+			hang("picture", "guest", A.Picture)
+		end
 	end
 
 	-- ── The plan ───────────────────────────────────────────────────────────────
 	-- spots numbered room by room, in placing order
 	local rank: { [string]: number } = {}
-	for n, id in FURNISH do
+	for n, id in shape.furnish do
 		rank[id] = n
 	end
 	table.sort(placed, function(a: Placed, b: Placed): boolean
@@ -1525,7 +1701,7 @@ local function planHouse(seed: number): Plan
 	local max = Vector3.new(house.x1 + HALF_WALL, ceiling, house.z1 + HALF_WALL)
 	local up = T.EntryUp
 	return {
-		kind = "house",
+		kind = shape.kind,
 		seed = seed,
 		mirrored = mirrored,
 		size = max - min,
@@ -1535,6 +1711,8 @@ local function planHouse(seed: number): Plan
 		doors = planDoors,
 		entry = CFrame.lookAt(Vector3.new(0, up, T.EntryIn), Vector3.new(0, up, T.EntryIn + 1)),
 		exit = Vector3.new(0, up, HALF_WALL),
+		-- (8.3 the lodge: its ways out, the front door's and the terrace door's insides; a house: none, its exit)
+		exits = if shape.backDoor then { Vector3.new(0, up, HALF_WALL), Vector3.new(x1 - HALF_WALL, up, F + C / 2) } else nil,
 		spots = spots,
 		ceiling = ceiling,
 		wall = W_,
@@ -1546,10 +1724,15 @@ local function planHouse(seed: number): Plan
 end
 
 local KINDS: { [string]: (number) -> Plan } = {
-	house = planHouse,
+	house = function(seed: number): Plan
+		return planHouse(seed, SHAPES.house)
+	end,
 	farm = Farm.plan,
+	lodge = function(seed: number): Plan -- 8.3: the sandbox's Alpine Lodge
+		return planHouse(seed, SHAPES.lodge)
+	end,
 }
-HouseLayout.Kinds = { "house", "farm" }
+HouseLayout.Kinds = { "house", "farm", "lodge" }
 
 function HouseLayout.plan(seed: number, kind: string): Plan
 	local make = KINDS[kind] or KINDS.house
@@ -1586,15 +1769,21 @@ function HouseLayout.entries(plan: Plan): { CFrame }
 end
 
 -- The exits (indexes into exitsOf) a piece of this FurnitureLooks id can be carried out of: a farm's Farm.exitsFor (a
--- bigDoor piece only the barn doors), a house's its front door.
+-- bigDoor piece only the barn doors), a house's its front door (8.3: a lodge's either door: both doorways take every
+-- piece of a house, and its layout checks the way to each).
 function HouseLayout.exitsFor(plan: Plan, id: string): { number }
 	if plan.kind == "farm" then
 		return Farm.exitsFor(plan :: any, id)
 	end
-	return { 1 }
+	local all: { number } = {}
+	for index in HouseLayout.exitsOf(plan) do
+		table.insert(all, index)
+	end
+	return all
 end
 
--- The spots of a plan whose piece cannot be carried out of the front door (with every other piece in place).
+-- The spots of a plan whose piece cannot be carried out of the front door (with every other piece in place). 8.3: a
+-- lodge's, of the front door or of the terrace door (every doorway to the outside).
 function HouseLayout.stuck(plan: Plan): { number }
 	if plan.kind == "farm" then -- 7.x the farm: its exits (the barn doors too)
 		return Farm.stuck(plan :: any)
@@ -1613,9 +1802,6 @@ function HouseLayout.stuck(plan: Plan): { number }
 			table.insert(walls, rect(p.X - ex / 2, p.Z - ez / 2, p.X + ex / 2, p.Z + ez / 2))
 		end
 	end
-	local front = plan.doors[1]
-	local doorway = rect(front.at.X - front.width / 2, front.at.Z - half, front.at.X + front.width / 2, front.at.Z + half)
-	local field = newField(rect(plan.min.X, plan.min.Z, plan.max.X, plan.max.Z), walls, doorway)
 	local rects, radii = {}, {}
 	for _, s in plan.spots do
 		local ex, ez = HouseLayout.extent(s.item, s.turn)
@@ -1624,9 +1810,25 @@ function HouseLayout.stuck(plan: Plan): { number }
 		table.insert(radii, radiusOf(s.item))
 	end
 	local out: { number } = {}
-	for _, index in stuckOf(field, rects, radii) do
-		table.insert(out, plan.spots[index].id)
+	local seen: { [number]: boolean } = {}
+	for _, door in plan.doors do
+		if door.rooms[2] ~= "outside" then
+			continue
+		end
+		local w = door.width / 2
+		local doorway = if door.axis == "X"
+			then rect(door.at.X - w, door.at.Z - half, door.at.X + w, door.at.Z + half)
+			else rect(door.at.X - half, door.at.Z - w, door.at.X + half, door.at.Z + w)
+		local field = newField(rect(plan.min.X, plan.min.Z, plan.max.X, plan.max.Z), walls, doorway)
+		for _, index in stuckOf(field, rects, radii) do
+			local id = plan.spots[index].id
+			if not seen[id] then
+				seen[id] = true
+				table.insert(out, id)
+			end
+		end
 	end
+	table.sort(out)
 	return out
 end
 

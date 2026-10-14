@@ -22,9 +22,12 @@
 --                      board       the Moving contracts board (by the roller door, on the wall's outside)
 --   House            the one house to empty: its lot, the house's box (its footprint's middle, its bottom, its size:
 --                    the walls' box, the roof over it), its front door (outside, looking out: north to the road), curb
---                    (the van's pivot, nose north, back to the door). 8.1: the box is the owner's Blender house's
---                    (design/blender-house: Marge's 20.36 × 12.60 × 17.57, server/HouseMesh.luau dresses only a box of
---                    its size), its front wall where the chalet's always was (the door, the path and the curb unmoved)
+--                    (the van's pivot, nose north, back to the door). 8.3 the lodge (the owner: "a udělej mi ten větší
+--                    dům", make me the bigger house; then "the small chalet doesn't stay"): "The Alpine Lodge" in place
+--                    of The Old Chalet, on its lot (its front wall, door, path and curb where the chalet's were), its box
+--                    the two-storey lodge's (shared/LodgeLooks.luau: 40 × 20 × 26, the roof over it; no Blender house
+--                    dresses it); doorWidth its double front door's width; back its second door, the terrace door in its
+--                    east wall (outside it, looking out: east)
 --   SandboxMap.plotAt(x, z)   the plot whose rect holds the point (nil: none)
 --   SandboxMap.cframe(spot)   (Roblox only) a spot's CFrame
 
@@ -32,6 +35,16 @@ local SandboxMap = {}
 
 export type Spot = { x: number, y: number, z: number, yaw: number }
 export type Rect = { x0: number, x1: number, z0: number, z1: number }
+export type House = {
+	id: string,
+	name: string,
+	lot: Rect,
+	house: { x: number, y: number, z: number, sx: number, sy: number, sz: number },
+	door: Spot,
+	curb: Spot,
+	doorWidth: number,
+	back: Spot,
+}
 export type Plot = {
 	id: number,
 	rect: Rect,
@@ -76,14 +89,16 @@ end
 SandboxMap.Plots = plots
 
 SandboxMap.House = {
-	id = "sandbox_house",
-	name = "The Old Chalet",
+	id = "sandbox_lodge",
+	name = "The Alpine Lodge",
 	lot = { x0 = -60, x1 = 60, z0 = 504, z1 = 600 } :: Rect,
-	-- (the front wall at the door, z 523; the house's box back from it: tools/house-art/check.py, house.py's W, H, D)
-	house = { x = 0, y = 0, z = 523 + 17.5669 / 2, sx = 20.3572, sy = 12.598, sz = 17.5669 },
+	-- (the front wall at the door, z 523; the house's box back from it: two storeys, shared/LodgeLooks.luau's roof over it)
+	house = { x = 0, y = 0, z = 523 + 26 / 2, sx = 40, sy = 20, sz = 26 },
 	door = { x = 0, y = 0, z = 523, yaw = 0 } :: Spot, -- outside the front door, looking north to the road
 	curb = { x = 0, y = SandboxMap.RoadTop, z = 492, yaw = 0 } :: Spot, -- the van's pivot: nose north, back to the door
-}
+	doorWidth = 5, -- (its double front door)
+	back = { x = 20, y = 0, z = 523 + 18, yaw = 270 } :: Spot, -- outside the terrace door (east wall), looking out east
+} :: House
 
 function SandboxMap.plotAt(x: number, z: number): Plot?
 	for _, plot in plots do
