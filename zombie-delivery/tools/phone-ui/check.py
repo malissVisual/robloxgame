@@ -16,6 +16,8 @@ within Config.MapStyle.Budget, everything there in its order, nothing made frame
 8.0 SANDBOX: the sandbox's HUD and the warehouse picker (the real SandboxHud and WarehouseUi: sandbox.luau on
 sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stock chip, the toasts, the picker on
 "pick", DISPLAY / SELL / TAKE DOWN's requests, the 3D pictures capped, clear of the touch controls, texts that fit.
+8.2: the STOCK list's bulk buttons (FILL BEST, the SELL… menu, TAKE ALL DOWN), the sort toggle, the search box and the
+picker's too-big pieces at a small upgrade stand, on the same screens.
 8.1 grip: the carry's timing check (the real CarryGripUi: carrygrip.luau, the folder from carrygripenv.py) at 844 x 390,
 740 x 360, 1024 x 768 and 1280 x 800: the widget and the GRIP button clear of everything, one press, the outcomes.
 8.1 SANDBOX: the UPGRADES desk's window (the real UpgradeUi: upgrades.luau on sandbox_mock.luau) on the same screens:
@@ -240,6 +242,8 @@ local function require(module) if type(module) == "table" and module.fakeModule 
 # client/CardKit.luau, TouchLayout, MoveLayout and the real shared data; shared/FurnitureLooks.luau's catalogue loaded on
 # the recorder) on sandbox_mock.luau's recorder (missions_mock.luau's, a layout, Hud's left column, the furniture's
 # recorded models): tools/phone-ui/sandbox.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+# 8.2: the STOCK list's FILL BEST / SELL… (its menu, asked first) / TAKE ALL DOWN, the sort toggle, the search box (a
+# computer) and THE PICKER's "Too big for this stand" at a small upgrade stand, on the same screens.
 # (sandboxenv.py builds the folder; sandbox_preview.py draws the same scenes.)
 from sandboxenv import sandbox_env  # noqa: E402
 

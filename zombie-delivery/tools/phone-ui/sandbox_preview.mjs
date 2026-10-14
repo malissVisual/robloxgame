@@ -37,6 +37,7 @@ function render(scene, fonts) {
     ViewportFrame: { bg: [163, 162, 165], bgT: 0 },
     TextLabel: { bg: [255, 255, 255], bgT: 0, tc: [0, 0, 0], ts: 14 },
     TextButton: { bg: [255, 255, 255], bgT: 0, tc: [0, 0, 0], ts: 14 },
+    TextBox: { bg: [255, 255, 255], bgT: 0, tc: [0, 0, 0], ts: 14 }, // 8.2: the search box
   };
   const rgba = (c, t) => `rgba(${c[0]},${c[1]},${c[2]},${1 - (t || 0)})`;
   const weight = f => (f && /Bold|Black|Heading/.test(f) ? 700 : 500);
