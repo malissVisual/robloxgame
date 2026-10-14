@@ -2574,7 +2574,7 @@ local function enterPrompt(s: Session)
 		if not spot then
 			continue
 		end
-		local action = if index == 1 then "Enter house" else "Enter barn"
+		local action = if index == 1 then "Enter house" elseif SB.on then `Enter by the {door.name}` else "Enter barn" -- (8.3: the lodge's terrace door)
 		local enter = newPrompt(spot, action, `{s.contract.icon} {s.contract.name}`, Enum.KeyCode.E, 0, T.Reach.Door + door.width / 2)
 		enter.Enabled = not T.Doors.Walk -- (8.1 walk-in doors: you walk in; the prompt stays, off)
 		tag(enter, s.owner)

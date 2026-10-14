@@ -402,7 +402,7 @@ do
 	moving.OnClientEvent:Fire("state", view({ drop = "your warehouse", dropOff = { x = -195, z = -122 }, counts = { total = 2, out = 0, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 2 } }))
 	check("…nor to the house", M.waypoint == nil and told == 0)
 	-- the end (server/Moving.luau's SB.result): what came home, never the Wall, pay or XP
-	moving.OnClientEvent:Fire("result", { name = "The Old Chalet", icon = "🏡", how = "done", howText = "Finished: what came home is in your warehouse",
+	moving.OnClientEvent:Fire("result", { name = "The Alpine Lodge", icon = "🏔️", how = "done", howText = "Finished: what came home is in your warehouse",
 		delivered = 3, left = 3, broken = 0, total = 6, starsOut = 1, starsTotal = 2, stars = 4, pay = 0, money = 0, xp = 0, base = 0, starBonus = 0,
 		timeBonus = 0, fine = 0, crew = 1, trips = 2, home = { pieces = 3, value = 640 } })
 	local resultCard = named(M.gui, "MoveResult")

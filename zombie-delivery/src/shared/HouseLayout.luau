@@ -1494,11 +1494,11 @@ local function planHouse(seed: number, shape: Shape): Plan
 	-- get there clears its way as the front door's loop does: the latest optional piece of its room goes, else itself.
 	if backField then
 		for _ = 1, 8 do
-			local stuck = stuckNow(backField)
-			if #stuck == 0 then
+			local behind = stuckNow(backField)
+			if #behind == 0 then
 				break
 			end
-			local victim = placed[stuck[1]]
+			local victim = placed[behind[1]]
 			local latest: Placed? = nil
 			for _, p in placed do
 				if p ~= victim and p.room == victim.room and not p.must and not p.star and (latest == nil or p.order > latest.order) then
@@ -1723,13 +1723,28 @@ local function planHouse(seed: number, shape: Shape): Plan
 	}
 end
 
+-- A shape with its numbers read from Config now (not when this module loaded: a test may change them a moment).
+local function live(shape: Shape): Shape
+	local made = table.clone(shape)
+	if shape.kind == "lodge" then
+		local L = (T :: any).Lodge
+		made.front, made.kitchen, made.backDoor = L.Front, L.Kitchen, L.BackDoor
+		made.spots, made.stars = L.Spots, L.Stars
+		made.collectibles, made.legendary = L.Collectibles.Count, L.Collectibles.Legendary
+	else
+		made.spots, made.stars = T.Spots, T.Stars
+		made.collectibles, made.legendary = T.Collectibles.Count, T.Collectibles.Legendary
+	end
+	return made
+end
+
 local KINDS: { [string]: (number) -> Plan } = {
 	house = function(seed: number): Plan
-		return planHouse(seed, SHAPES.house)
+		return planHouse(seed, live(SHAPES.house))
 	end,
 	farm = Farm.plan,
 	lodge = function(seed: number): Plan -- 8.3: the sandbox's Alpine Lodge
-		return planHouse(seed, SHAPES.lodge)
+		return planHouse(seed, live(SHAPES.lodge))
 	end,
 }
 HouseLayout.Kinds = { "house", "farm", "lodge" }

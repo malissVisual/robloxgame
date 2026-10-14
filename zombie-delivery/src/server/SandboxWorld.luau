@@ -13,9 +13,11 @@
 --   House     8.3: "TheAlpineLodge" (a Model, attribute SandboxHouse = SandboxMap.House.id, Atomic: with StreamingEnabled
 --             it streams whole), The Old Chalet's place taken: shared/LodgeLooks.luau's two-storey lodge on
 --             SandboxMap.House.house (SandboxScenery.lodgeSpec), facing north to the road, its front door the part
---             "FrontDoor" (attribute SandboxDoor = true, no collision: server/Moving.luau's front door) at House.door, its
---             terrace door the part "TerraceDoor" (attribute SandboxBackDoor = true, no collision: the move's second
---             way in) at House.back, the name board on its balcony; its parts in the Model "House_<id>" (attribute
+--             "FrontDoor" (attribute SandboxDoor = true, no collision, unseen: server/Moving.luau's front door) at
+--             House.door, its terrace door the part "TerraceDoor" (attribute SandboxBackDoor = true, no collision, unseen:
+--             the move's second way in) at House.back, the doors' leaves shut in them (FrontLeafWest, FrontLeafEast,
+--             TerraceLeaf: LodgeLooks.Leaves' attributes DoorLeaf and Hinge, for the doors' swing), the name board on its
+--             balcony; its parts in the Model "House_<id>" (attribute
 --             Home: no Blender house dresses it, the owner's ZDCHouseArt is the chalet's size and waits in
 --             ServerStorage, server/Main.server.luau), the garden beside it in "Garden": the path from the curb to the
 --             door, the gravel path from the terrace (SandboxScenery.TerracePath), the garden's fence and gate (THE
@@ -272,14 +274,24 @@ local function house(world: Instance): Model
 		elseif piece.shape == "Cylinder" then
 			p.Shape = Enum.PartType.Cylinder
 		end
-		if piece.name == "Door" then
-			-- the moves' front door (server/Moving.luau's "Enter house" goes here); nothing to bump into
-			p.Name = "FrontDoor"
-			p:SetAttribute("SandboxDoor", true)
+		local leaf = LodgeLooks.Leaves[piece.name]
+		if piece.name == "Door" or piece.name == "TerraceDoor" then
+			-- the doorways: the moves' front door (server/Moving.luau's "Enter house" goes here) and its second way in
+			-- (House.back); nothing to bump into, unseen (their leaves show the doors)
+			if piece.name == "Door" then
+				p.Name = "FrontDoor"
+				p:SetAttribute("SandboxDoor", true)
+			else
+				p:SetAttribute("SandboxBackDoor", true)
+			end
 			p.CanCollide = false
-		elseif piece.name == "TerraceDoor" then
-			p:SetAttribute("SandboxBackDoor", true) -- (the move's second way in, House.back)
-			p.CanCollide = false
+			p.Transparency = 1
+			p.CastShadow = false
+		elseif leaf then
+			-- a door's leaf, shut in its doorway: its door and its hinge's side (the doors' swing is the client's)
+			deco(p)
+			p:SetAttribute("DoorLeaf", leaf.door)
+			p:SetAttribute("Hinge", leaf.hinge)
 		elseif piece.name == "House" then
 			body.PrimaryPart = p
 			model.PrimaryPart = p

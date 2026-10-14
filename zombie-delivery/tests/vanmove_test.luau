@@ -220,8 +220,8 @@ check("a new seed is a new house (the sandbox refills it every move)", (function
 	end
 	return not same
 end)())
-check("the sandbox's house: SandboxMap.House's id and name, 20 minutes, no horde and no roamers by default (no guns), switches kept",
-	SandboxMap.House.id == "sandbox_house" and SandboxMap.House.name == "The Old Chalet" and T.Sandbox.Time == 20 * 60 and T.Sandbox.Horde == false
+check("the sandbox's house: SandboxMap.House's id and name (8.3: The Alpine Lodge, its plan the lodge's), 25 minutes, no horde and no roamers by default (no guns), switches kept",
+	SandboxMap.House.id == "sandbox_lodge" and SandboxMap.House.name == "The Alpine Lodge" and T.Sandbox.Kind == "lodge" and T.Sandbox.Time == 25 * 60 and T.Sandbox.Horde == false
 	and T.Sandbox.Roam == 0 and T.Sandbox.HordeAt > 0 and T.Sandbox.HordeAt < T.Sandbox.Time and #T.Sandbox.Blurb <= Config.MoveStory.Limits.Blurb)
 check("the sandbox's van is the Sprinter, its bed set", Config.Sandbox.Van == "sprinter" and T.Beds[Config.Sandbox.Van] ~= nil)
 check("the house's front door looks out to the road, the van's curb between them (its back to the door)", (function()

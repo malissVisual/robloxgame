@@ -10,7 +10,7 @@
 --     TouchScale big and its ✕ a finger's size.
 --   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts) along the
 --     roads (SandboxSteps.route: out to Depot Row, along Main Street, in), a floating orange chevron over the target and
---     its distance tag ("THE OLD CHALET · 420 m"). Inside the house only the hint (no target there).
+--     its distance tag ("THE ALPINE LODGE · 420 m"). Inside the house only the hint (no target there).
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and

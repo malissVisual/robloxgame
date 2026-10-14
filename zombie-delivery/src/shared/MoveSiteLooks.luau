@@ -22,8 +22,8 @@
 --   MoveSiteLooks.board(sandbox?)       the Moving contracts kiosk (frame: its foot, -Z toward the yard); Moving hangs its
 --                                       prompt on the piece named "Board" (the corkboard). 8.0 SANDBOX (sandbox true: the
 --                                       plots' kiosks, server/MoveSites.luau plotBoard): no evacuation, no Wall, no city
---                                       houses on it: the chalet's photo and notices about bringing it home to your
---                                       warehouse, the same kiosk round them
+--                                       houses on it: the house's photo (8.3: The Alpine Lodge) and notices about
+--                                       bringing it home to your warehouse, the same kiosk round them
 --   MoveSiteLooks.house(title, park)    a contract's house dressed for moving day (frame: its front door's foot, -Z out
 --                                       to the street; park: studs from the door to the truck's kerb spot, Map.Home park)
 --   MoveSiteLooks.banner()              the depot's ZDC MOVING & EVACUATION banner (frame: its middle, -Z to the yard)
@@ -339,11 +339,12 @@ local function photo(emoji: string, caption: string, sky: { number }): { Words }
 	return { { face = "Front", back = sky, inset = 0.07, lines = { line(emoji, INK, 0.6), line(caption, CHARCOAL, 0.2, "Bold") } } }
 end
 
--- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the one house, what to do with it.
+-- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the one house (8.3: The Alpine Lodge), what
+-- to do with it.
 local function sandboxPins(p: { Piece }, top: number, low: number)
 	local house = string.upper(SandboxMap.House.name)
-	pinned(p, "PhotoChalet", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", house, { 148, 196, 228 }), RED)
-	pinned(p, "FlyerChalet", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
+	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏔️", house, { 148, 196, 228 }), RED)
+	pinned(p, "FlyerHouse", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
 		line(house, RED, 0.16, "Black"),
 		line("END OF MAIN STREET", CHARCOAL, 0.12, "Bold"),
 		line("Bring it home to your warehouse.", CHARCOAL, 0.1),
@@ -359,7 +360,7 @@ local function sandboxPins(p: { Piece }, top: number, low: number)
 	pinned(p, "PhotoWarehouse", { 1.3, 1.15 }, -0.85, low, 2, PAPER, photo("🏭", "YOUR WAREHOUSE", { 196, 180, 220 }), YELLOW)
 	pinned(p, "FlyerRefill", { 1.2, 1.2 }, 0.85, low, -3, PAPER, { { face = "Front", lines = {
 		line("NEW EVERY MOVE", CHARCOAL, 0.24, "Black"),
-		line("The chalet is filled again", CHARCOAL, 0.15),
+		line("The lodge is filled again", CHARCOAL, 0.15),
 	} } }, { 60, 150, 80 })
 	pinned(p, "PhotoEarn", { 1.3, 1.15 }, 2.55, low, -2, PAPER, photo("💰", "EARNS EVERY MINUTE", { 210, 226, 236 }), RED)
 end

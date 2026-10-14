@@ -13,8 +13,8 @@
 -- x = -w / 2 to w / 2.
 --
 --   the body      the solid box (white render, Spec.h high), a stone plinth, the upper storey (from Spec.ground up) clad
---                 in dark timber, painted corners; the double front door (the part "Door": the moves' front door) in its
---                 painted surround, a lantern either side; four ground-floor windows across the front between open
+--                 in dark timber, painted corners; the double front door in its painted surround (the part "Door": the
+--                 doorway, the moves' front door; its two leaves shut in it, LodgeLooks.Leaves), a lantern either side; four ground-floor windows across the front between open
 --                 shutters over boxes of geraniums, four upper ones behind the balcony and its door between them, two
 --                 a floor on the west wall, the east wall's ground-floor window and two upper ones
 --   the balcony   along the whole front on the ground floor's top: its floor on four struts, the carved balustrade, the
@@ -23,8 +23,8 @@
 --                 at its ends), two slate slabs with deep eaves (deepest over the balcony), the ridge cap; the cross
 --                 gable over the entrance (a steeper roof from the front wall back into the main one, its face the lodge's
 --                 name board and a carved sun); two chimneys through the back slope
---   the terrace   the terrace door (the part "TerraceDoor": the moves' second way in) in its painted surround in the east
---                 wall Spec.terrace back from the front, a deck in front of it with a rail either side, firewood stacked
+--   the terrace   the terrace door (the part "TerraceDoor": the doorway, the moves' second way in; its leaf
+--                 "TerraceLeaf") in its painted surround in the east wall Spec.terrace back from the front, a deck in front of it with a rail either side, firewood stacked
 --                 by the west wall, a bench under a front window either side of the door
 -- Only the body and the main roof's wedges are solid (Piece.solid); everything else is decoration: nothing on the
 -- doors' ways out, nothing a mover with a sofa bumps into.
@@ -50,6 +50,14 @@ export type Spec = {
 }
 
 LodgeLooks.Budget = 96
+-- The doors' leaves (shut in their doorways, each a piece of its own, apart from the wall): their door and the side of
+-- the doorway they hang on (the house's frame turned to the map: its door looks north, so -X is west, +Z south).
+-- server/SandboxWorld.luau sets them as the attributes DoorLeaf and Hinge (the doors' swing is the client's).
+LodgeLooks.Leaves = {
+	FrontLeafWest = { door = "front", hinge = "west" },
+	FrontLeafEast = { door = "front", hinge = "east" },
+	TerraceLeaf = { door = "terrace", hinge = "south" },
+} :: { [string]: { door: string, hinge: string } }
 LodgeLooks.Sign = "THE ALPINE LODGE"
 LodgeLooks.Pitch = 32 -- the main roof's (degrees)
 LodgeLooks.CrossPitch = 44 -- the cross gable's, steeper
@@ -104,7 +112,12 @@ function LodgeLooks.house(spec: Spec): { Piece }
 	-- the double front door in its surround, a lantern either side (lit at night by the world's first window die)
 	local dw = spec.doorWidth
 	add("DoorSurround", { dw + 1.8, 8.8, 0.12 }, { 0, 4.4, -0.06 }, TRIM, "Plaster")
+	-- (the doorway: the moves' front door, hidden by server/SandboxWorld.luau; its two leaves shut in it, each hinged at its
+	-- jamb: LodgeLooks.Leaves)
 	add("Door", { dw, 7.8, 0.4 }, { 0, 3.9, -0.2 }, DOOR, "Wood", { solid = true })
+	for _, side in { -1, 1 } do
+		add(if side < 0 then "FrontLeafWest" else "FrontLeafEast", { dw / 2 - 0.06, 7.7, 0.3 }, { side * dw / 4, 3.85, -0.2 }, DOOR, "Wood")
+	end
 	for n, side in { -1, 1 } do
 		add("Lantern", { 0.7, 1.1, 0.7 }, { side * (dw / 2 + 1.5), 6.6, -0.5 }, LANTERN, "Glass", { window = n })
 	end
@@ -200,7 +213,8 @@ function LodgeLooks.house(spec: Spec): { Piece }
 	-- ── The terrace door, the deck, the yard ────────────────────────────────
 	local tz = spec.terrace
 	add("TerraceSurround", { 0.12, 8.4, 5.6 }, { half + 0.06, 4.2, tz }, TRIM, "Plaster")
-	add("TerraceDoor", { 0.4, 7.4, 4 }, { half + 0.2, 3.7, tz }, DOOR, "Wood", { solid = true })
+	add("TerraceDoor", { 0.4, 7.4, 4 }, { half + 0.2, 3.7, tz }, DOOR, "Wood", { solid = true }) -- (the doorway, hidden: its leaf shows it)
+	add("TerraceLeaf", { 0.3, 7.3, 3.94 }, { half + 0.2, 3.65, tz }, DOOR, "Wood")
 	local deck = 7
 	add("TerraceDeck", { deck, 0.3, 11 }, { half + deck / 2, 0.15, tz }, LIGHT_WOOD, "WoodPlanks")
 	for _, side in { -1, 1 } do

@@ -4,9 +4,10 @@
 -- and the turnaround with a shoulder down to the meadow on every edge (no step a wheel would catch), nothing that
 -- collides on the roads, the turnaround, the plots (but their pads), the path from the curb to the house's door or in
 -- the door's way, the trees off all of that and off the vans' ways, the part budget, the shadows only on bigger
--- parts, the chalet in its box with its FrontDoor at House.door, the signpost's and the mailbox's words, the light;
--- 8.1: the house's box the owner's Blender house's, its parts in House_sandbox_house for server/HouseMesh.luau, the
--- FrontDoor on the model's door;
+-- parts, the house in its box with its FrontDoor at House.door, the signpost's and the mailbox's words, the light;
+-- 8.3: the house is The Alpine Lodge (shared/LodgeLooks.luau, in The Old Chalet's place): two storeys, its terrace door,
+-- only its body and roof solid, nothing in its doors' ways or on its paths, no Blender house on it (the import is the
+-- chalet's size);
 -- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
 -- box query, Config.SpawnSpot.Pass leaving out the ground's mounds), and not where a player stands.
 -- Run with tests/run_tests.py.
@@ -20,6 +21,7 @@ local SandboxScenery = require("./SandboxScenery")
 local SandboxWorld = require("./SandboxWorldServer")
 local HouseMesh = require("./HouseMeshServer")
 local HouseArt = require("./HouseArt")
+local LodgeLooks = require("./LodgeLooks")
 local SpawnSpot = require("./SpawnSpot")
 local SprinterLooks = require("./SprinterLooks")
 local WarehouseLayout = require("./WarehouseLayout")
@@ -368,7 +370,14 @@ do
 	end
 	table.insert(areas, { name = "the path from the curb to the door", rect = { x0 = SandboxScenery.Path.x0, x1 = SandboxScenery.Path.x1, z0 = SandboxScenery.Path.z0, z1 = HOUSE.door.z - 0.01 } })
 	local d = HOUSE.door
-	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - 2.5, x1 = d.x + 2.5, z0 = d.z - 5, z1 = d.z - 0.01 } })
+	local wide = HOUSE.doorWidth / 2 + 0.5
+	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - wide, x1 = d.x + wide, z0 = d.z - 5, z1 = d.z - 0.01 } })
+	-- 8.3 the lodge: its terrace door's way out (east, House.back) and the gravel path from it to the front path
+	local t = HOUSE.back
+	table.insert(areas, { name = "the terrace door's way", rect = { x0 = t.x + 0.01, x1 = t.x + 6, z0 = t.z - 2.5, z1 = t.z + 2.5 } })
+	for n, r in SandboxScenery.TerracePath do
+		table.insert(areas, { name = `the terrace path ({n})`, rect = r })
+	end
 	local blocked: string? = nil
 	local floorHigh: string? = nil
 	for _, b in boxes do
@@ -463,79 +472,76 @@ do
 	check("a trunk collides, its needles do not", solid)
 end
 
--- the chalet: in House.house's box, facing north, its FrontDoor at House.door. 8.1: its parts in the Model
--- "House_sandbox_house" (attribute Home) that server/HouseMesh.luau dresses, on the owner's Blender house's box (HouseMesh
--- dresses only a house of that size; HouseArt: design/blender-house's manifest, tests/run_tests.py), the FrontDoor on the
--- model's front door; no import here, so the chalet as it is (tools/house-art/check.py dresses it).
+-- 8.3 the lodge (The Alpine Lodge in The Old Chalet's place): shared/LodgeLooks.luau's on House.house's box, facing north,
+-- its parts in the Model "House_<id>" (attribute Home), the garden beside it; its FrontDoor at House.door (as wide as
+-- House.doorWidth), its TerraceDoor at House.back on the east wall; only the body and the roof's two wedges collide;
+-- everything on the lot. No Blender house dresses it: the owner's ZDCHouseArt is the chalet's size (HouseArt), HouseMesh
+-- does not list the sandbox's house and SandboxWorld hands it nothing.
 do
-	local chalet = world:FindFirstChild("TheOldChalet")
-	check("the chalet is a model with its house's id", chalet ~= nil and chalet:IsA("Model") and chalet:GetAttribute("SandboxHouse") == HOUSE.id)
-	local own = chalet and chalet:FindFirstChild("House_" .. HOUSE.id)
+	local lodge = world:FindFirstChild("TheAlpineLodge")
+	check("the lodge is a model with its house's id, streamed whole (Atomic)", lodge ~= nil and lodge:IsA("Model") and lodge:GetAttribute("SandboxHouse") == HOUSE.id
+		and lodge.ModelStreamingMode == Enum.ModelStreamingMode.Atomic and world:FindFirstChild("TheOldChalet") == nil)
+	local own = lodge and lodge:FindFirstChild("House_" .. HOUSE.id)
 	local h = HOUSE.house
 	local body = named("House")[1]
 	local doors = named("FrontDoor")
 	local door = doors[1]
-	check("its parts in a Model House_sandbox_house (Home = its id) as World's Marge's house, the garden beside it",
+	check("its parts in a Model House_<id> (Home = its id), the garden beside it",
 		own ~= nil and own:IsA("Model") and own:GetAttribute("Home") == HOUSE.id and body ~= nil and body.part.Parent == own
-			and door ~= nil and door.part.Parent == own and chalet:FindFirstChild("Garden") ~= nil and own:FindFirstChild("Garden") == nil)
-	check("its body fills House.house's footprint", body ~= nil and math.abs(body.x0 - (h.x - h.sx / 2)) < EPS and math.abs(body.x1 - (h.x + h.sx / 2)) < EPS and math.abs(body.z0 - (h.z - h.sz / 2)) < EPS and math.abs(body.z1 - (h.z + h.sz / 2)) < EPS and math.abs(body.y0 - h.y) < EPS)
-	local box = HouseArt.box
-	local size = body and body.part.Size
-	check(`the house's box is the Blender house's ({box[1]} × {box[2]} × {box[3]}: HouseMesh dresses only that size)`,
-		math.abs(h.sx - box[1]) < 1e-4 and math.abs(h.sy - box[2]) < 1e-4 and math.abs(h.sz - box[3]) < 1e-4 and size ~= nil
-			and math.abs(size.X - box[1]) < 1e-4 and math.abs(size.Y - box[2]) < 1e-4 and math.abs(size.Z - box[3]) < 1e-4,
-		size and tostring(size))
+			and door ~= nil and door.part.Parent == own and lodge:FindFirstChild("Garden") ~= nil and own:FindFirstChild("Garden") == nil)
+	check("its body fills House.house's box", body ~= nil and math.abs(body.x0 - (h.x - h.sx / 2)) < EPS and math.abs(body.x1 - (h.x + h.sx / 2)) < EPS
+		and math.abs(body.z0 - (h.z - h.sz / 2)) < EPS and math.abs(body.z1 - (h.z + h.sz / 2)) < EPS and math.abs(body.y0 - h.y) < EPS and math.abs(body.y1 - (h.y + h.sy)) < EPS)
+	-- (the chalet it replaced: 20.36 × 12.60 × 17.57)
+	check(`clearly bigger than the chalet was: {h.sx} × {h.sy} × {h.sz}, two storeys (twice its floor at least, a storey higher)`,
+		h.sx * h.sz >= 2 * 20.36 * 17.57 and h.sy >= 12.6 + 6 and SandboxScenery.Lodge.Ground < h.sy - 6)
 	local front = h.z - h.sz / 2
 	check("its front wall where the door, the path and the curb are (House.door on it)", math.abs(front - HOUSE.door.z) < EPS and math.abs(h.x - HOUSE.door.x) < EPS and HOUSE.door.yaw == 0)
-	local call = dressed[1]
-	check("SandboxWorld hands that model to HouseMesh.dress, which lists the house (no import here: the chalet stays)",
-		HouseMesh.Homes[HOUSE.id] == true and #dressed == 1 and call.model == own and call.id == HOUSE.id and call.result == false
-			and own ~= nil and own:GetAttribute("MeshArt") == nil and body ~= nil and body.part.Transparency == 0, #dressed)
-	local top, outside = -math.huge, nil :: string?
+	local box = HouseArt.box
+	check("no Blender house dresses it: HouseMesh.Homes does not list it, SandboxWorld hands nothing to HouseMesh.dress, the import's box is the chalet's",
+		HouseMesh.Homes[HOUSE.id] == nil and HouseMesh.Homes.sandbox_house == nil and #dressed == 0 and own ~= nil and own:GetAttribute("MeshArt") == nil
+			and math.abs(h.sx - box[1]) > 1 and body ~= nil and body.part.Transparency == 0, #dressed)
+	local top, outside, parts = -math.huge, nil :: string?, 0
+	local solid: { string } = {}
 	for _, b in boxes do
-		if chalet and b.part:IsDescendantOf(chalet) then
+		if lodge and b.part:IsDescendantOf(lodge) then
+			parts += 1
 			top = math.max(top, b.y1)
 			if b.x0 < HOUSE.lot.x0 - EPS or b.x1 > HOUSE.lot.x1 + EPS or b.z0 < HOUSE.lot.z0 - EPS or b.z1 > HOUSE.lot.z1 + EPS then
 				outside = b.name
 			end
+			if own and b.part:IsDescendantOf(own) and b.part.CanCollide then
+				table.insert(solid, b.name)
+			end
 		end
 	end
-	check(`the chalet's roof over its box, its top ({string.format("%.1f", top)}) under the Blender house's ({string.format("%.1f", HouseArt.top)})`, top > h.y + h.sy + 5 and top <= h.y + HouseArt.top + 0.05)
-	check("all of the chalet and its garden on the house's lot", outside == nil, outside)
+	table.sort(solid)
+	local rise = LodgeLooks.roof(SandboxScenery.lodgeSpec())
+	check(`its roof over its box (its ridge {string.format("%.1f", h.sy + rise)} up, the chimneys over it: the top {string.format("%.1f", top)})`, top > h.y + h.sy + rise and top < h.y + h.sy + rise + 6)
+	check("all of the lodge and its garden on the house's lot", outside == nil, outside)
+	check(`only its body and the roof's two wedges collide ({table.concat(solid, ", ")})`, table.concat(solid, ",") == "House,Roof,Roof")
+	local own_parts = #LodgeLooks.house(SandboxScenery.lodgeSpec())
+	check(`the lodge's look: every piece of LodgeLooks.house one part ({own_parts}, at most {LodgeLooks.Budget}), {parts} with the garden`, own ~= nil
+		and #own:GetChildren() == own_parts and own_parts <= LodgeLooks.Budget and parts <= own_parts + 90, parts)
 	local d = HOUSE.door
 	local okDoor = #doors == 1
 		and door.part:GetAttribute("SandboxDoor") == true
 		and not door.part.CanCollide
 		and math.abs((door.x0 + door.x1) / 2 - d.x) < 0.1
+		and math.abs((door.x1 - door.x0) - HOUSE.doorWidth) < 0.05
 		and math.abs(door.z0 - d.z) < 0.5
 		and math.abs(door.y0 - d.y) < 0.1
-		and door.part:IsDescendantOf(chalet)
-	check("one FrontDoor (SandboxDoor = true, no collision) at House.door", okDoor, door and string.format("%.2f, %.2f, %.2f", (door.x0 + door.x1) / 2, door.y0, door.z0))
+		and door.part:IsDescendantOf(lodge)
+	check("one FrontDoor (SandboxDoor = true, no collision) at House.door, House.doorWidth wide", okDoor, door and string.format("%.2f, %.2f, %.2f", (door.x0 + door.x1) / 2, door.y0, door.z0))
 	check("the door is on the north wall, facing the road", door ~= nil and body ~= nil and door.z1 <= body.z0 + EPS)
-	-- the Blender house's door leaves in the world (the house's frame: its bottom's middle, -Z to the road)
-	local frame = G.CFrame.new(h.x, h.y, h.z) * G.CFrame.Angles(0, math.rad(d.yaw), 0)
-	local a = HouseArt.door
-	local lo, hi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
-	for _, x in { a.x0, a.x1 } do
-		for _, y in { a.y0, a.y1 } do
-			for _, z in { a.z0, a.z1 } do
-				local p = frame * G.Vector3.new(x, y, z)
-				lo = { math.min(lo[1], p.X), math.min(lo[2], p.Y), math.min(lo[3], p.Z) }
-				hi = { math.max(hi[1], p.X), math.max(hi[2], p.Y), math.max(hi[3], p.Z) }
-			end
-		end
-	end
-	local onLeaves = door ~= nil
-		and math.abs((door.x0 + door.x1) / 2 - (lo[1] + hi[1]) / 2) < 0.1
-		and math.abs((door.x1 - door.x0) - (hi[1] - lo[1])) < 0.25
-		and math.abs(door.y0 - lo[2]) < 0.25
-		and math.abs(door.y1 - hi[2]) < 0.25
-		and door.z1 <= lo[3] + EPS
-		and lo[3] - door.z1 < 0.5
-	check("the FrontDoor on the Blender house's door: across it, as wide and tall, just in front of its leaves", onLeaves,
-		door and string.format("FrontDoor %.2f … %.2f, %.2f … %.2f, %.2f … %.2f; leaves %.2f … %.2f, %.2f … %.2f, %.2f … %.2f",
-			door.x0, door.x1, door.y0, door.y1, door.z0, door.z1, lo[1], hi[1], lo[2], hi[2], lo[3], hi[3]))
-	local garden = chalet and chalet:FindFirstChild("Garden")
+	local terraces = named("TerraceDoor")
+	local terrace = terraces[1]
+	local t = HOUSE.back
+	check("one TerraceDoor (SandboxBackDoor, no collision) at House.back, on the east wall facing east", #terraces == 1 and terrace.part:GetAttribute("SandboxBackDoor") == true
+		and not terrace.part.CanCollide and math.abs((terrace.z0 + terrace.z1) / 2 - t.z) < 0.1 and math.abs(terrace.x0 - t.x) < 0.5 and body ~= nil
+		and terrace.x0 >= body.x1 - EPS and t.yaw == 270 and math.abs(t.x - (h.x + h.sx / 2)) < EPS, terrace and terrace.x0)
+	local signs = named("LodgeSign")
+	check("the name board on the balcony, over the front door, over the walk", #signs == 1 and signs[1].z1 < front and signs[1].y0 > SandboxScenery.Lodge.Ground)
+	local garden = lodge and lodge:FindFirstChild("Garden")
 	local gardenSolid: string? = if garden then nil else "no garden"
 	local gardenParts = 0
 	for _, b in boxes do
@@ -546,7 +552,12 @@ do
 			end
 		end
 	end
-	check(`the garden (fence, gate, mailbox, flower boxes, path: {gardenParts} parts) never collides`, gardenSolid == nil and #named("FlowerBox") >= 3 and #named("Mailbox") == 1 and #named("Path") == 1, gardenSolid)
+	check(`the garden (fence, gate, mailbox, flower boxes, the paths: {gardenParts} parts) never collides`, gardenSolid == nil and #named("FlowerBox") >= 2 and #named("Mailbox") == 1
+		and #named("Path") == 1 and #named("TerracePath") == #SandboxScenery.TerracePath, gardenSolid)
+	-- the terrace path joins the terrace door's deck to the front path
+	local tp = SandboxScenery.TerracePath
+	check("the terrace path: from the terrace door's deck along the east side and the front to the front path", #tp == 2 and tp[1].z1 >= t.z - 6 and tp[1].x0 > t.x
+		and tp[2].x0 <= SandboxScenery.Path.x1 + EPS and tp[2].x1 >= tp[1].x1 - EPS and tp[2].z1 > tp[1].z0 and tp[2].z1 < d.z)
 end
 
 -- the words: the signpost's boards, the gate's and the mailbox's
@@ -561,8 +572,9 @@ do
 			end
 		end
 	end
-	check("the signpost: ← WAREHOUSES, THE OLD CHALET → (and the other ways round)", texts["← WAREHOUSES"] == 2 and texts["WAREHOUSES →"] == 2 and texts["THE OLD CHALET →"] == 1 and texts["← THE OLD CHALET"] == 1)
-	check("the mailbox says THE OLD CHALET", mailbox == "THE OLD CHALET", mailbox)
+	check("the signpost: ← WAREHOUSES, THE ALPINE LODGE → (and the other ways round)", texts["← WAREHOUSES"] == 2 and texts["WAREHOUSES →"] == 2 and texts["THE ALPINE LODGE →"] == 1 and texts["← THE ALPINE LODGE"] == 1)
+	check("the mailbox says THE ALPINE LODGE", mailbox == "THE ALPINE LODGE", mailbox)
+	check("the lodge's name on its gate (both faces), its mailbox and its balcony", texts["THE ALPINE LODGE"] == 4, texts["THE ALPINE LODGE"])
 end
 
 -- the street lamps along Main Street, off its shoulders

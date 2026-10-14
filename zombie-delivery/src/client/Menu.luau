@@ -10,7 +10,7 @@
 -- hairline rows (no corners), and the controls card has the ZDC heading.
 -- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
 -- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
--- (shared/SandboxMap.luau: the chalet, Main Street, your plot), never over the old city. PLAY does what the city's does.
+-- (shared/SandboxMap.luau: the house, Main Street, your plot), never over the old city. PLAY does what the city's does.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -48,7 +48,7 @@ local function shot(n: number): CFrame
 	return CFrame.lookAt(s[1], s[2])
 end
 
--- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
+-- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the house from the turnaround, then
 -- from its other side, up Main Street toward the plots, your plot's warehouse (the player's Plot attribute; the first
 -- plot before the server gave you one), your van's spot at its roller door, back down the street.
 local function sandboxShots(): { { Vector3 } }
@@ -57,11 +57,11 @@ local function sandboxShots(): { { Vector3 } }
 	local turn = SandboxMap.Turnaround
 	local plot = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 1] or SandboxMap.Plots[1]
 	local w, van = plot.warehouse, plot.vanSpot
-	-- (8.1: the house is the owner's Blender house's box, 20 wide, its roof over house.sy: the two shots closer in)
-	local chalet = Vector3.new(house.x, house.y + house.sy * 0.7, house.z)
+	-- (8.3: the house is The Alpine Lodge, 40 wide and two storeys, its roof over house.sy: the two shots a little higher)
+	local lodge = Vector3.new(house.x, house.y + house.sy * 0.7, house.z)
 	return {
-		{ Vector3.new(house.x + 40, 18, door.z - 45), chalet },
-		{ Vector3.new(house.x - 46, 30, door.z - 62), chalet },
+		{ Vector3.new(house.x + 40, 22, door.z - 48), lodge },
+		{ Vector3.new(house.x - 46, 34, door.z - 64), lodge },
 		{ Vector3.new(turn.x + 40, 70, turn.z - 30), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
 		{ Vector3.new(w.x + 60, 40, van.z + 70), Vector3.new(w.x, w.sy * 0.4, w.z + w.sz / 2) },
 		{ Vector3.new(w.x - 50, 26, van.z + 40), Vector3.new(van.x, van.y + 4, van.z) },

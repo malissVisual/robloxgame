@@ -6,7 +6,7 @@ Two runs of the real server code on the Luau CLI:
     server/SandboxWorld.luau's map, the four Moving contracts kiosks (server/MoveSites.luau), the four warehouses
     (server/Warehouse.luau: four owners, every display stand open and full of the heaviest pieces; Collection,
     SandboxPlots and Upgrades are stand-ins written here), the house's inside while a move runs (server/HouseInterior.luau:
-    the largest of 24 plans) and Danny (server/Npcs.luau on the stand-in's classic R15);
+    the largest of 24 plans of the sandbox's house, 8.3 The Alpine Lodge's) and Danny (server/Npcs.luau on the stand-in's classic R15);
   * tools/perf/van-count.luau on tools/vehicle-preview/roblox-mock.luau (export_fleet.py's preparation): the sandbox's
     van (Config.Sandbox.Van, the ZDC Sprinter's parts model) at every stage, by day (its night lights out).
 Each piece's row (tools/perf/census.luau): parts, MeshParts, visible / see-through / invisible parts, shadow casters
@@ -14,7 +14,8 @@ Each piece's row (tools/perf/census.luau): parts, MeshParts, visible / see-throu
 (and those drawn at any distance), ParticleEmitters, Beams, fire / smoke / sparkles, decals, ProximityPrompts;
 the client's own 3D (client/SandboxGuide.luau's path and marker) read from its source. Then the worst case: 4 players,
 every warehouse's 20 stands full, 4 vans, a move running with the inside and Danny. The players' own avatars, the
-greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it.
+greeters on the porch and the owner's Blender imports (the Sprinter, the furniture) are not in it. 8.3: the lodge's inside
+is counted for every player at once too (4 moves running: a worst case past the one move's).
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]
 
@@ -48,6 +49,7 @@ function C.stock(player) return stock[player] or {} end
 function C.stands(player) return stands[player] or 12 end
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
+function C.marketIncome() return 1 end -- (8.3: the market's hook, a plain day)
 function C.onChanged() end
 function C.openPicker() end
 function C.undisplay() return true end
@@ -172,6 +174,11 @@ def main():
     add(worst, rows["danny"])
     add(worst, rows["client/SandboxGuide"])
     entries.append((f"**worst case** ({PLAYERS} players, every stand full, {PLAYERS} vans, a move with the inside and Danny)", worst))
+    # 8.3: every player on a move of their own at once (each a lodge's inside and a Danny)
+    every = dict(worst)
+    add(every, rows["interior"], PLAYERS - 1)
+    add(every, rows["danny"], PLAYERS - 1)
+    entries.append((f"**every player on a move** ({PLAYERS} lodges' insides, {PLAYERS} Dannys, the rest as the worst case)", every))
     print(table(entries))
     print()
     for label, row in rows.items():

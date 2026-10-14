@@ -352,7 +352,7 @@ print(encode({ kind = "summary", parts = count, budget = Config.MoveSites.Budget
 	plotBoards = plotBoards, -- 8.0 SANDBOX
 	plots = #SandboxMap.Plots,
 	boardPieces = #Looks.board(),
-	plotBoardPieces = #Looks.board(true), -- 8.0 SANDBOX: the plots' corkboard (the chalet, no Wall)
+	plotBoardPieces = #Looks.board(true), -- 8.0 SANDBOX: the plots' corkboard (the house, no Wall)
 	doorWidth = SandboxMap.DoorWidth,
 	groundTop = SandboxMap.GroundTop,
 }))

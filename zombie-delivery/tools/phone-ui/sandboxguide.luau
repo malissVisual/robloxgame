@@ -309,7 +309,7 @@ local function tick()
 end
 local function view(extra)
 	local v = {
-		id = 1, contract = "sandbox_house", name = SandboxMap.House.name, icon = "🏠", client = "Ms Alder", owner = "Courier", mine = true,
+		id = 1, contract = SandboxMap.House.id, name = SandboxMap.House.name, icon = "🏔️", client = "Ms Alder", owner = "Courier", mine = true,
 		endsAt = M.now + 600, hordeAt = M.now + 420, seconds = 600, horde = false,
 		items = {
 			{ spot = 1, name = "Sofa", icon = "🛋️", star = true, class = "pair", state = "home", condition = 1, broken = false, mine = false },
@@ -402,11 +402,11 @@ local panel = MovingHud.panel()
 local panelBox = box(panel)
 b = hintBox()
 cb = closeBox()
-check("a move started: \"Drive to The Old Chalet\"", SandboxGuide.step() == "drive" and words.Text == "Drive to The Old Chalet" and shown(), words.Text)
+check("a move started: \"Drive to The Alpine Lodge\"", SandboxGuide.step() == "drive" and words.Text == "Drive to The Alpine Lodge" and shown(), words.Text)
 check("… under the move's panel, never on it (the ✕'s finger area neither)", b.y0 >= panelBox.y1 and cb.y0 >= panelBox.y1 - 0.01 and not overlap(b, panelBox) and not overlap(cb, panelBox),
 	`{show(panelBox)} / {show(b)} / {show(cb)}`)
 check("… on the screen, clear of the money and the touch buttons", inside(b) and inside(cb) and not overlap(b, moneyBox) and clearOfTouch(b) and clearOfTouch(cb), show(b))
-check("… the chevron over the house's curb", marker.Enabled and at(SandboxMap.House.curb.x, SandboxMap.House.curb.z) and string.find(tag.Text, "THE OLD CHALET", 1, true) ~= nil, tag.Text)
+check("… the chevron over the house's curb", marker.Enabled and at(SandboxMap.House.curb.x, SandboxMap.House.curb.z) and string.find(tag.Text, "THE ALPINE LODGE", 1, true) ~= nil, tag.Text)
 check("… the path along the roads (out to Depot Row, along it, down Main Street: three beams)", lit() == 3, lit())
 screen(false)
 panelBox = box(panel)
@@ -483,7 +483,7 @@ trip.items[1].state = "delivered"
 moving.OnClientEvent:Fire("state", trip)
 stand(plot.spawn.x, plot.spawn.z)
 tick()
-check("a trip unloaded: \"Drive back to The Old Chalet for more, or FINISH\"", SandboxGuide.step() == "back" and shown(), words.Text)
+check("a trip unloaded: \"Drive back to The Alpine Lodge for more, or FINISH\"", SandboxGuide.step() == "back" and shown(), words.Text)
 stand(SandboxMap.House.curb.x, SandboxMap.House.curb.z)
 tick()
 check("at the house again: the door's hint was done, quiet (the line fades out)", SandboxGuide.step() == "door" and not hint.Visible and not marker.Enabled)

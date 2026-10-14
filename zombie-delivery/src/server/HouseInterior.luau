@@ -610,6 +610,20 @@ LOOKS.barn_doors = function(parent, at, s)
 	sign(exit, "EXIT", Enum.NormalId.Front, rgb(255, 255, 255), rgb(30, 160, 80))
 end
 
+-- 8.3 the lodge: a door's leaf, shut in its doorway (a part of its own, apart from the wall, no collision): its name, its
+-- door ("front", "terrace": the attribute DoorLeaf) and the side of the doorway it hangs on (Hinge: "west", "east",
+-- "south", "north", the interior's axes as the map's). The doors' swing is the client's (it reads these).
+local function doorLeaf(parent: Instance, name: string, size: Vector3, cf: CFrame, c: Color3, door: string, hinge: string): Part
+	local p = part(parent, name, size, cf, c, Enum.Material.Wood)
+	p:SetAttribute("DoorLeaf", door)
+	p:SetAttribute("Hinge", hinge)
+	-- (Danny's paths go through it, whatever its swing does with it: a door, not a wall)
+	local through = Instance.new("PathfindingModifier")
+	through.PassThrough = true
+	through.Parent = p
+	return p
+end
+
 -- 8.3 the lodge's numbers (Config.Furniture.Lodge: the owner found a house's inside "a flashbang"): its lights modest,
 -- warm, read from there; no glowing lamps, panes or porch walls; its plaster a warm off-white.
 local LODGE = (T :: any).Lodge
@@ -660,6 +674,10 @@ local function sidePorch(shell: Instance, decor: Instance, plan: HouseLayout.Pla
 	end
 	part(shell, "TerraceRoof", Vector3.new(2 * w + 1, 0.5, porch), frame * CFrame.new(0, h + 1.25, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
 	part(decor, "Lintel", Vector3.new(door.width + 0.8, 0.4, plan.wall + 0.3), frame * CFrame.new(0, h + 0.2, 0), rgb(110, 76, 50), Enum.Material.Wood)
+	-- its leaf, shut in the doorway, hinged at the frame's +X jamb (the lodge's east door: its south side)
+	local right = Vector3.new(-out.Z, 0, out.X) -- (the frame's +X: its RightVector)
+	local hinge = if math.abs(right.X) > math.abs(right.Z) then (if right.X > 0 then "east" else "west") else (if right.Z > 0 then "south" else "north")
+	doorLeaf(decor, "TerraceLeaf", Vector3.new(door.width - 0.06, h - 0.15, 0.24), frame * CFrame.new(0, (h - 0.15) / 2, 0), rgb(96, 64, 40), "terrace", hinge)
 	local glow = part(shell, "TerraceDaylight", Vector3.new(2 * w, h + 1.5, 0.4), frame * CFrame.new(0, (h + 1.5) / 2, -(half + porch + 0.2)), rgb(236, 240, 228), Enum.Material.Neon, true)
 	glow.CastShadow = false
 	porchLight(glow, plan.kind == "lodge") -- (the lodge's: soft, Config.Furniture.Lodge.DoorLight)
@@ -983,7 +1001,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local leaf = front.width / 2
 		local paint = DOORS[roll(#DOORS)]
 		local bloom = BLOOMS[roll(#BLOOMS)]
-		for _, s in { -1, 1 } do
+		for _, s in (if lodge then {} else { -1, 1 }) :: { number } do -- (8.3 the lodge: its leaves shut, below)
 			local lx = x + s * (leaf + 0.12)
 			local lz = z - 0.15 - leaf / 2
 			local tall = plan.doorHeight - 0.15
@@ -995,6 +1013,13 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), rgb(236, 240, 228), Enum.Material.Neon, true)
 		glow.CastShadow = false
 		porchLight(glow, lodge) -- (its light into the house; 8.3 the lodge's soft, Config.Furniture.Lodge.DoorLight)
+		if lodge then
+			-- 8.3 the lodge: the front door's two leaves shut in the doorway, each hinged at its jamb (west, east): a door
+			-- that opens as you walk through it (the doors' swing is the client's; nothing collides)
+			for _, s in { -1, 1 } do
+				doorLeaf(decor, if s < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(leaf - 0.06, plan.doorHeight - 0.15, 0.24), at(x + s * leaf / 2, (plan.doorHeight - 0.15) / 2, front.at.Z), paint, "front", if s < 0 then "west" else "east")
+			end
+		end
 		local mat = part(decor, "WelcomeMat", Vector3.new(4, 0.06, 2.2), at(x, 0.03, z - 1.6), rgb(150, 110, 70), Enum.Material.Fabric)
 		sign(mat, "WELCOME", Enum.NormalId.Top, rgb(60, 40, 24))
 		local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), at(x, plan.doorHeight + 1.05, front.at.Z + half + 0.15), rgb(250, 250, 248), SMOOTH)

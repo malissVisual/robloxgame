@@ -8,6 +8,7 @@
 --   warehouses/building  the four ZDC warehouses (server/Warehouse.luau): the hall, every stand open, the prompts
 --   warehouses/shown     the pieces on show in them: every stand full, the heaviest pieces (FurnitureLooks' part count)
 --   interior             the house's inside while a move runs (server/HouseInterior.luau): the largest of SEEDS plans
+--                        (8.3: the sandbox's house's kind, Config.Moving.Sandbox.Kind: The Alpine Lodge's)
 --   danny                Danny's body (server/Npcs.luau on the stand-in's classic R15)
 setfenv(1, require("./mock").env)
 local Census = require("./census")
@@ -24,6 +25,7 @@ local Collection = require("./server/Collection") -- (the stand-in)
 local SandboxPlots = require("./server/SandboxPlots") -- (the stand-in)
 
 local SEEDS = 24 -- house plans tried for the interior's worst case
+local KIND = Config.Moving.Sandbox.Kind or "house" -- (8.3: the lodge)
 
 local function emit(label: string, row: { [string]: number })
 	print(Census.line(label, row))
@@ -112,7 +114,7 @@ detail("warehouses/shown", shown)
 local largest: Model? = nil
 local largestRow, largestParts, sum, fewest = nil, -1, 0, math.huge
 for seed = 1, SEEDS do
-	local model = HouseInterior.build(HouseLayout.plan(seed, "house"), HouseInterior.slot(0))
+	local model = HouseInterior.build(HouseLayout.plan(seed, KIND), HouseInterior.slot(0))
 	local row = Census.under(model)
 	sum += row.parts
 	fewest = math.min(fewest, row.parts)
@@ -125,7 +127,7 @@ for seed = 1, SEEDS do
 		model:Destroy()
 	end
 end
-print(string.format("INFO interior\t%d plans: %d – %d parts, %.0f on average", SEEDS, fewest, largestParts, sum / SEEDS))
+print(string.format("INFO interior\t%d plans of kind %s: %d – %d parts, %.0f on average", SEEDS, KIND, fewest, largestParts, sum / SEEDS))
 emit("interior", largestRow :: any)
 modes("interior", largest :: Model)
 detail("interior", Census.list(largest))
