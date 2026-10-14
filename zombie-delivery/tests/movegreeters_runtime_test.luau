@@ -164,7 +164,7 @@ end
 check("nothing goes after her (no Zombies.extraTargets entry)", not hunted)
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
-check("the front door is open all along (Enter house before her hello)", enter ~= nil and enter.Enabled)
+check("the front door is open all along (8.1 walk-in doors: walked through, its Enter house there but off)", enter ~= nil and not enter.Enabled)
 
 -- her hello: once, to the first who comes near
 E.place(bob, mroot.Position + facing * (G.Hello + 6))

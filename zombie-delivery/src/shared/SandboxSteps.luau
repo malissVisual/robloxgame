@@ -20,7 +20,7 @@
 --   in the house                        inside    "Carry the furniture out to your van (E to pick up)"   (no target)
 --   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
 --   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
---   a move, at the house, outside       door      "Go inside: E at the front door"                        House.door
+--   a move, at the house, outside       door      "Walk in through the front door"                        House.door
 --   a move, not at the house            drive     "Drive to The Old Chalet"                               House.curb
 --     (after a trip home)               back      "Drive back to The Old Chalet for more, or FINISH"      House.curb
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
@@ -90,7 +90,7 @@ SandboxSteps.Steps = {
 	planCrew = step("planCrew", "Get ready: the move's owner presses LAUNCH", nil, false, false),
 	drive = step("drive", `Drive to {HOUSE}`, "curb", true, false),
 	back = step("back", `Drive back to {HOUSE} for more, or FINISH`, "curb", true, false),
-	door = step("door", "Go inside: E at the front door", "door", false, false),
+	door = step("door", "Walk in through the front door", "door", false, false), -- (8.1 walk-in doors: no E)
 	inside = step("inside", "Carry the furniture out to your van (E to pick up)", nil, false, false),
 	load = step("load", "Load it into the van: walk in or E at the back", "van", false, false),
 	home = step("home", "Drive home to your warehouse to unload (or keep loading)", "unload", true, false),
