@@ -24,7 +24,9 @@ def rel(from_dir, target):
     return path if path.startswith(".") else "./" + path
 
 
-def prepare(game, out):
+def prepare(game, out, people=False):
+    """Copies the stand-in, the counter and every server and shared module (their requires rewritten) into `out`.
+    8.2: `people` keeps the real server/Npcs.luau (tools/perf/sandbox_count.py counts Danny's body); else a stub."""
     shutil.copy(os.path.join(HERE, "world-mock.luau"), os.path.join(out, "mock.luau"))
     shutil.copy(os.path.join(HERE, "world-count.luau"), os.path.join(out, "main.luau"))
     shared_dir = os.path.join(out, "shared")
@@ -45,6 +47,9 @@ def prepare(game, out):
                 text = re.sub(r'require\(Shared\.(\w+)\)', shared, text)
                 text = re.sub(r'require\(Shared:WaitForChild\("(\w+)"\)\)', shared, text)
                 text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\):WaitForChild\("(\w+)"\)\)', shared, text)
+                # 8.2: the other spellings (server/FurnitureMesh.luau, server/Npcs.luau)
+                text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', shared, text)
+                text = re.sub(r'require\(game:GetService\("ReplicatedStorage"\):WaitForChild\("Shared"\):WaitForChild\("(\w+)"\)\)', shared, text)
 
                 def parent(m):
                     base = here
@@ -57,6 +62,8 @@ def prepare(game, out):
                 header = f'setfenv(1, require("{rel(here, os.path.join(out, "mock"))}").env)\n'
                 open(dst, "w", encoding="utf-8").write(header + text)
     # The people and the animals: World only places them; their bodies are not the city's parts.
+    if people:
+        return
     open(os.path.join(out, "server", "Npcs.luau"), "w").write(
         "local N = {}\nfunction N.look(...) return {} end\nfunction N.spawn(...) return nil end\n"
         "function N.say() end\nfunction N.glance() end\nfunction N.start() end\nreturn N\n")

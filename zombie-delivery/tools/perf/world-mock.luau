@@ -786,7 +786,40 @@ function methods.SetNetworkOwner() end
 function methods.ApplyImpulse() end
 function methods.MoveTo() end
 function methods.LoadAnimation()
-	return { Play = function() end, Stop = function() end, AdjustSpeed = function() end, Looped = false }
+	return { Play = function() end, Stop = function() end, AdjustSpeed = function() end, Looped = false, Length = 1, TimePosition = 0 }
+end
+function methods.SetStateEnabled() end
+-- 8.2: Players:CreateHumanoidModelFromDescription makes Roblox's classic R15 (the root and 15 MeshParts at their
+-- default sizes, a Humanoid with its Animator, the face): server/Npcs.luau's people (tools/perf/sandbox_count.py: Danny).
+local R15 = {
+	{ "HumanoidRootPart", 2, 2, 1 }, { "Head", 1.2, 1.2, 1.2 }, { "UpperTorso", 2, 1.6, 1 }, { "LowerTorso", 2, 0.4, 1 },
+	{ "LeftUpperArm", 1, 1.17, 1 }, { "LeftLowerArm", 1, 1.05, 1 }, { "LeftHand", 1, 0.3, 1 },
+	{ "RightUpperArm", 1, 1.17, 1 }, { "RightLowerArm", 1, 1.05, 1 }, { "RightHand", 1, 0.3, 1 },
+	{ "LeftUpperLeg", 1, 1.22, 1 }, { "LeftLowerLeg", 1, 1.2, 1 }, { "LeftFoot", 1, 0.3, 1 },
+	{ "RightUpperLeg", 1, 1.22, 1 }, { "RightLowerLeg", 1, 1.2, 1 }, { "RightFoot", 1, 0.3, 1 },
+}
+function methods.CreateHumanoidModelFromDescription()
+	local model = new("Model")
+	for _, spec in R15 do
+		local root = spec[1] == "HumanoidRootPart"
+		local part = new(if root then "Part" else "MeshPart")
+		local props = rawget(part, "__props")
+		props.Name = spec[1]
+		props.Size = v3(spec[2], spec[3], spec[4])
+		if root then
+			props.Transparency = 1
+		end
+		part.Parent = model
+	end
+	local humanoid = new("Humanoid")
+	rawget(humanoid, "__props").Name = "Humanoid"
+	rawget(humanoid, "__props").HipHeight = 2
+	humanoid.Parent = model
+	new("Animator").Parent = humanoid
+	local face = new("Decal")
+	rawget(face, "__props").Name = "face"
+	face.Parent = methods.FindFirstChild(model, "Head")
+	return model
 end
 function methods.GetTextSize(_, text, size)
 	return v2(#tostring(text) * size * 0.6, size)

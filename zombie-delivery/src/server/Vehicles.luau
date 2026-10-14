@@ -1752,6 +1752,8 @@ function SprinterBuild.emit(parent: Instance, to: BasePart?, top: CFrame, pieces
 			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 			gui.PixelsPerStud = 50
 			gui.LightInfluence = 1
+			-- 8.2 perf: drawn only near (Config.Performance's small text: a phone draws every SurfaceGui on its own)
+			gui.MaxDistance = math.max(Config.Performance.SignRange, Config.Performance.SignPerStud * s[2])
 			gui.Parent = p
 			local textLabel = Instance.new("TextLabel")
 			textLabel.Size = UDim2.fromScale(1, 1)
