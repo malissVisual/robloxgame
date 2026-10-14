@@ -5635,6 +5635,7 @@ Config.Robust = {
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
+		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 	},
 }
 
@@ -7423,6 +7424,84 @@ Config.Market = {
 	Recover = 1200,
 	Salt = 8303,
 	Flag = "marketKept",
+}
+
+-- 8.3 SANDBOX, the PAINT shop (the owner: give players a way to make their van their own). A 🎨 Paint van prompt on your
+-- own Sprinter while it stands at your plot's van spot opens the shop's window (client/VanPaintUi.luau; its 3D picture
+-- client/VanPaintPreview.luau). server/VanPaint.luau sells, keeps what you own (profile.vanPaint: { owned, worn }, read
+-- only from a real save written with Flag) and paints every van of yours as it comes out (PLAY, START, CAR) with
+-- shared/VanLook.luau, for everybody to see; shared/VanPaintRules.luau has the rules (tests/vanpaint_test.luau,
+-- tests/vanpaint_runtime_test.luau). Cosmetic only: the van's collision, cargo bay, doors and speed never change. Each
+-- item is bought once and kept for good; wearing one you own is free.
+--   Paints     the body colours in the window's order: id, name, color (RGB), price ($; 0 and no unlock: everybody's),
+--              material (a Roblox material, the premium finishes; else SmoothPlastic), unlock (a collection book
+--              milestone's id, Config.CollectionBook.Milestones: locked until the book has paid it), premium (the
+--              window's gold frame). The first is the factory's: the van as built (its parts look in Config.Cars' colour,
+--              the owner's Blender look in its own cream)
+--   Liveries   the stripes: id, name, stripe (RGB, or "contrast": Contrast's light ink on a dark body, its dark ink on a
+--              light one) that the ZDC band, the ZDC logo, the nose badge and the back doors' stripes take, material,
+--              roof (a Roofs decoration on the high roof), price, unlock, premium as the paints'. The first is the
+--              factory's (the ZDC red)
+--   Roofs      a decoration on the flat high roof: its stripes along the van (x their middle, w their width, color their
+--              own, else the livery's stripe) from z From to To (studs in the van's frame, -z its front: the flat roof
+--              of both looks), Lift over the roof's top and Thick (thin parts, no collision, welded to the body)
+--   Contrast   the "contrast" stripe: Light on a body darker than Threshold (its luminance, 0 … 255), else Dark
+--   Finishes   the Blender look's finishes the paint takes (server/SprinterMesh.luau): finish → the prefix of the car
+--              model's attributes (<prefix>Color, <prefix>Material, <prefix>Reflectance; none: the finish's own look)
+--   Prompt     🎨 Paint van: Reach (studs), Home (studs: the van's middle this near its plot's vanSpot counts as parked
+--              there), Still (studs a second: slower counts as standing), Every (s between two looks), At (its point in
+--              the van's frame: the driver's side of the cargo box, clear of the doors' prompts)
+--   Flag       the save's mark: profile.vanPaint is read only from a real save written with it
+--   Window     the card: Width × Height at most (unscaled px), Preview the 3D picture's share of its width, Tile a
+--              swatch's narrowest (TileTouch on a touch screen) and TileHeight its height; the 3D picture's camera: Yaw
+--              (degrees from the front toward the right: below 0 the driver's side), Pitch (down onto the roof), Fov, and
+--              Fill (the van's share of the picture)
+-- The tuning: the start money is $500 and a first haul on show earns about $100 a minute: a colour comes after a few
+-- minutes, a livery after a quarter of an hour, Mirror chrome after hours of play; everything costs $33,200.
+export type VanPaintDef = {
+	id: string,
+	name: string,
+	price: number,
+	color: { number }?,
+	stripe: any?, -- (a livery's: RGB or "contrast")
+	material: string?,
+	roof: string?,
+	unlock: string?,
+	premium: boolean?,
+}
+Config.VanPaint = {
+	Paints = {
+		{ id = "cream", name = "ZDC cream", color = { 232, 226, 210 }, price = 0 },
+		{ id = "white", name = "Arctic white", color = { 241, 243, 245 }, price = 300 },
+		{ id = "silver", name = "Silver grey", color = { 170, 175, 181 }, price = 400 },
+		{ id = "graphite", name = "Graphite", color = { 66, 70, 76 }, price = 500 },
+		{ id = "black", name = "Midnight black", color = { 27, 29, 33 }, price = 600 },
+		{ id = "red", name = "Fire red", color = { 176, 32, 32 }, price = 500 },
+		{ id = "orange", name = "Sunset orange", color = { 226, 112, 38 }, price = 500 },
+		{ id = "yellow", name = "Taxi yellow", color = { 242, 190, 44 }, price = 500 },
+		{ id = "forest", name = "Forest green", color = { 44, 98, 64 }, price = 600 },
+		{ id = "glacier", name = "Glacier blue", color = { 118, 168, 212 }, price = 500 },
+		{ id = "navy", name = "Navy blue", color = { 30, 50, 92 }, price = 600 },
+		{ id = "gold", name = "Collector gold", color = { 214, 170, 62 }, material = "Metal", price = 2500, unlock = "collectibles", premium = true },
+		{ id = "chrome", name = "Mirror chrome", color = { 206, 212, 218 }, material = "Foil", price = 20000, premium = true },
+	} :: { VanPaintDef },
+	Liveries = {
+		{ id = "zdc", name = "ZDC classic", stripe = { 179, 38, 30 }, price = 0 },
+		{ id = "alpine", name = "Alpine", stripe = { 34, 110, 70 }, roof = "snow", price = 1200 },
+		{ id = "racing", name = "Racing stripes", stripe = "contrast", roof = "racing", price = 1500 },
+		{ id = "goldline", name = "Gold line", stripe = { 212, 170, 60 }, material = "Metal", roof = "pinstripe", price = 3000 },
+	} :: { VanPaintDef },
+	Roofs = {
+		racing = { { x = -0.75, w = 0.9 }, { x = 0.75, w = 0.9 } },
+		snow = { { x = 0, w = 5.8, color = { 244, 247, 250 } } },
+		pinstripe = { { x = -2.7, w = 0.16 }, { x = 2.7, w = 0.16 } },
+	} :: { [string]: { { x: number, w: number, color: { number }? } } },
+	Roof = { From = -4.9, To = 10.6, Lift = 0.01, Thick = 0.05 },
+	Contrast = { Light = { 244, 244, 238 } :: { number }, Dark = { 30, 32, 36 } :: { number }, Threshold = 150 },
+	Finishes = { paint = "Paint", stripe = "Stripe" } :: { [string]: string },
+	Prompt = { Reach = 8, Home = 12, Still = 1.5, Every = 0.5, At = { -4.6, 4.6, 4.0 } :: { number } },
+	Flag = "vanPaintKept",
+	Window = { Width = 880, Height = 470, Preview = 0.42, Tile = 92, TileTouch = 96, TileHeight = 70, Yaw = -38, Pitch = 26, Fov = 30, Fill = 0.92 },
 }
 
 -- 8.3 SANDBOX, the light (the owner: "it is too bright: in the house I cannot see my own character, and walking into the

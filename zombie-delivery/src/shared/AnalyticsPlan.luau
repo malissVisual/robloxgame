@@ -310,6 +310,7 @@ AnalyticsPlan.Sinks = {
 	Paint = "Shop",
 	Stage = "Shop",
 	Upgrade = "Shop", -- a city upgrade track; 8.1 SANDBOX: a warehouse upgrade at the UPGRADES desk (server/Upgrades.luau; the SKU its id)
+	VanPaint = "Shop", -- 8.3 SANDBOX: a paint or a livery for your van at the PAINT shop (server/VanPaint.luau; the SKU its id)
 	Style = "Shop",
 	RealEstate = "Shop",
 	Company = "Shop", -- a courier hired, an upgrade of your company
