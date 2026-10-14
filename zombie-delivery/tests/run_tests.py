@@ -254,6 +254,21 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxPlots.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "SandboxPlotsServer.luau"), "w", encoding="utf-8").write(
         "return function(game: any, task: any, require: any)\n" + source + "\nend\n")
+    # 8.2 e2e: the whole sandbox loop with the REAL modules together (tests/sandbox_e2e_runtime_test.luau). The server
+    # modules SandboxE2E.luau lists in E.real (the boot, the map, PlayerData, the plots, the collection, the warehouse,
+    # the upgrades, the moves and theirs) and shared/Net.luau as E2E<Name>.luau, unchanged but for one line on top:
+    # setfenv to tests/runtime/SandboxE2E.luau's environment (its game, workspace, script, task, os and require: no
+    # module gains a local, no require is rewritten). Their shared modules are the copies above; a server module not in
+    # E.real is one of SandboxE2E's fakes (E.fakes) or an error that names it.
+    harness = open(os.path.join(HERE, "runtime", "SandboxE2E.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "SandboxE2E.luau"), "w", encoding="utf-8").write(harness)
+    start = harness.index("E.real = {")
+    e2e_env = 'setfenv(1, require("./SandboxE2E").env)\n'
+    for module in re.findall(r"(\w+) = true", harness[start:harness.index("}", start)]):
+        source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
+        open(os.path.join(tmp, "E2E" + module + ".luau"), "w", encoding="utf-8").write(e2e_env + source)
+    source = open(os.path.join(SHARED, "Net.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "E2ENet.luau"), "w", encoding="utf-8").write(e2e_env + source)
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
