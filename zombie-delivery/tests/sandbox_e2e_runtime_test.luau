@@ -1532,6 +1532,35 @@ do
 	check("…her demand for that kind: 1 sold today", after.demand[hotKind] ~= nil and after.demand[hotKind].n == 1 and after.demand[hotKind].sold == 1)
 end
 
+-- ── 19. 8.3: the PAINT shop ───────────────────────────────────────────────
+
+do
+	local dee = S.dee
+	local van = H.play(dee)
+	E.advance(Config.VanPaint.Prompt.Every + 0.1)
+	local prompt = if van then E.promptIn(van.model, "🎨 Paint van") else nil
+	check("19. the PAINT shop: Dee's van at her warehouse wears its 🎨 Paint van prompt (on, hers only: CargoOwner)", prompt ~= nil and prompt.Enabled == true
+		and prompt:GetAttribute("CargoOwner") == dee.UserId and van.model:GetAttribute("VanPaint") == "cream")
+	local at = E.promptAt(prompt)
+	local root = E.rootOf(dee)
+	E.walk(dee, V3(at.X - 1.5, root.Position.Y, at.Z))
+	local sentAt = #E.sent
+	local ok, why = E.trigger(prompt, dee)
+	check("…pressed there: the window opens (the state, then \"open\")", ok and E.lastKind(dee, "VanPaint", "state", sentAt) ~= nil and E.lastKind(dee, "VanPaint", "open", sentAt) ~= nil, why)
+	PlayerData.addMoney(dee, 1000, "Admin")
+	local paidAt = #money
+	E.advance(0.5)
+	E.fire(dee, "VanPaint", { kind = "buy", id = "white" })
+	E.advance(0.1)
+	check("…BUY Arctic white: $300 taken (the reason VanPaint), the van out wears it (VanPaint, PaintColor)", H.paid(dee, "VanPaint", paidAt) == -300 and van.model:GetAttribute("VanPaint") == "white"
+		and van.model:GetAttribute("PaintColor") ~= nil and E.lastKind(dee, "VanPaint", "bought", sentAt) ~= nil)
+	E.fire(dee, "SpawnCar")
+	E.advance(1)
+	local again = Vehicles.get(dee)
+	check("…CAR: the van that comes (a new one) wears it too, with its prompt", again ~= nil and again ~= van and again.model:GetAttribute("VanPaint") == "white"
+		and E.promptIn(again.model, "🎨 Paint van") ~= nil)
+end
+
 -- ── The run ───────────────────────────────────────────────────────────────
 
 do

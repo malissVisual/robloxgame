@@ -19,6 +19,7 @@ PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_te
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
 PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
 PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
+PURE += ("VanPaintRules",)  # 8.3 sandbox, the PAINT shop: the catalogue, the prices, the looks, the save (tests/vanpaint_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -57,6 +58,11 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # 7.x: the farm's layout
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 8.3: shared/VanLook.luau (the PAINT shop paints a van: Roblox instances) on the same recorder, with its typeof
+    # (tests/vanpaint_runtime_test.luau; the sandbox's e2e paints its vans with it too).
+    source = open(os.path.join(SHARED, "VanLook.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "VanLook.luau"), "w", encoding="utf-8").write(prefix + "local typeof = M.typeof\n" + source)
     # 7.x: shared/Layouts (Farm.luau: Walt's farm, HouseLayout's kind "farm"; tests/farmlayout_test.luau) next to them,
     # on the same recorder, their script.Parent.Parent.X requires the copies above
     for path in sorted(glob.glob(os.path.join(SHARED, "Layouts", "*.luau"))):
@@ -204,6 +210,20 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
     source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
     open(os.path.join(tmp, "CollectionBookServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the PAINT shop: the real server/VanPaint.luau as VanPaintServer.luau for tests/vanpaint_runtime_test.luau
+    # on the same runtime (its PlayerData the real one above) and tests/runtime/VanPaintRuntime.luau's few additions (a
+    # CollectionService, a prompt's Triggered, the vans: a fake Vehicles); shared/VanLook.luau the recorder's copy above.
+    shutil.copy(os.path.join(HERE, "runtime", "VanPaintRuntime.luau"), os.path.join(tmp, "VanPaintRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "VanPaint.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Vehicles)", "P.Vehicles")
+    source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
+    assert "script.Parent" not in source, "server/VanPaint.luau requires a module tests/run_tests.py does not give it"
+    paint_head = ('local P = require("./VanPaintRuntime")\nlocal E, M = P.E, P.Mock\n'
+                  'local game, task, os, warn, Instance = P.game, E.task, E.os, E.warn, P.Instance\n'
+                  'local Vector3, CFrame, Color3, Enum, typeof = M.Vector3, M.CFrame, M.Color3, M.Enum, M.typeof\n')
+    open(os.path.join(tmp, "VanPaintServer.luau"), "w", encoding="utf-8").write(paint_head + source)
     # 8.2 SANDBOX, analytics: the real server/Analytics.luau and server/SandboxAnalytics.luau as AnalyticsServer.luau and
     # SandboxAnalyticsServer.luau for tests/sandboxanalytics_runtime_test.luau on the same runtime: PlayerData and
     # Collection the real ones above, Moving the test's fake (E.Moving: its listeners' registration), AnalyticsService the

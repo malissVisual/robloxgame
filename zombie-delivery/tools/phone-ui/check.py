@@ -30,6 +30,8 @@ on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920
 panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.
 8.3 SANDBOX: every device's way to the chips (the keys, the gamepad's D-pad glyphs and routes), the gamepad in every
 sandbox window, the notices in the device's words and the first-time hints (sandboxpad.luau on sandbox_mock.luau).
+8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
+and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
 """
 import argparse
 from pathlib import Path
@@ -283,6 +285,11 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "sandboxpad.luau"], cwd=folder, check=True)
+# 8.3 SANDBOX: the PAINT shop's window (client/VanPaintUi.luau, shared/VanPaintRules.luau; its 3D picture recorded) in the
+# same folder: tools/phone-ui/vanpaint.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "vanpaint.luau"], cwd=folder, check=True)
 # 8.3 Danny's orders: his command card (client/MoveHelperCard.luau) and his status line (client/MoveHelperHud.luau with
 # the card), beside the real SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/
 # dannycard.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder;

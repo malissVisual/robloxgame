@@ -345,6 +345,15 @@ Runtime.CollectionBook = {
 	end,
 }
 
+-- 8.3: server/VanPaint.luau's admin (the SANDBOX tab's 🎨 UNLOCK PAINTS / 🎨 RESET PAINTS), recorded
+Runtime.paints = {} -- { { player, what } }
+Runtime.VanPaint = {
+	admin = function(player: any, what: string): string
+		table.insert(Runtime.paints, { player = player, what = what })
+		return if what == "all" then "ADMIN: every paint and livery of the PAINT shop is yours (16 items): wear them at your van." else "ADMIN: the paints reset: nothing bought, your van in ZDC cream with the ZDC classic stripe."
+	end,
+}
+
 -- The rest of Admin's requires: only what Admin.start touches (the others error with their name when a test calls them).
 Runtime.World = { RoadTop = 0.4 }
 Runtime.Zombies = { hunts = function()
