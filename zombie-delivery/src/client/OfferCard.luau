@@ -7,18 +7,25 @@
 --     sets it, the same check that frees the mouse): then it waits and opens when that one closes, while the offer is
 --     still open. It goes when the offer closes (the remote's { kind = "closed" }) or its clock runs out.
 --   * ACCEPT sends { kind = "accept", id }, DECLINE { kind = "decline", id } (only the id: the server has the price) and
---     the card closes; closing it any other way (✕-less: ESC, another window opening, the gamepad's B) is a DECLINE.
+--     the card closes; closing it the ✕-less ways, ESC (the Roblox menu: client/Hud.luau's escape) and the gamepad's B,
+--     is a DECLINE. 8.3 review: another window opening (📦 STOCK, the 📖 BOOK to compare prices …) only hides it
+--     (OfferCard.hide: client/Main.client.luau's Hud.onCloseWindows when it is no escape): the offer keeps waiting, its
+--     clock running, and the card comes back once nothing covers the screen; its clock or the server's closed message
+--     ends it there as anywhere.
 --   * Where (OfferCard.layout, pure): at the screen's right a little over the middle, clear of the HUD's groups
 --     (client/Hud.luau's), the sandbox's chips (client/SandboxHud.luau's money block, client/SandboxTasksUi.luau's TASKS
 --     chip), the move's top blocks (client/TopBlocks.luau), the quick chat's button, the move's list and on a touch
 --     screen the touch controls (client/TouchLayout.luau); none clear, the place that covers the least. A touch screen's
---     buttons are at least Ui.MinTouch. Placed again on a resize or when the top blocks move.
+--     buttons are at least Ui.MinTouch; 8.3 review: on a small one (667 × 375) the card shrinks, SHRINK at a time down
+--     to the HUD's scale, until a place is clear (only its buttons stay Ui.MinTouch tall). Placed again on a resize or
+--     when the top blocks move.
 --   * A gamepad: the selection starts on DECLINE (an A pressed by habit never sells), stays inside the card; B declines.
 --   * One window at a time (client/Main.client.luau registers it: onOpen, ESC).
 -- Presentation only.
 --   OfferCard.start()                         listens (nothing outside the sandbox)
 --   OfferCard.open()                          shows the offer that waits (nothing: none)
 --   OfferCard.close()                         closes it (a DECLINE of the offer it shows)
+--   OfferCard.hide()                          8.3 review: hides it, the offer still waiting (another window opened)
 --   OfferCard.isOpen(), .card(), .pending()   is it open / its frame / the offer that waits (shared/Visitors.luau's)
 --   OfferCard.onOpen                          set by client/Main.client.luau (the other windows close)
 --   OfferCard.covered                         set by client/Main.client.luau: is another window open now?
@@ -54,6 +61,7 @@ local BUTTON_H = 44
 local BUTTON_W = (CARD_W - 2 * PAD - GAP) / 2
 local CARD_H = PAD + TITLE_H + 2 + WHO_H + PRICE_H + ITEM_H + 2 + MARKET_H + GAP + BAR_H + 10 + BUTTON_H + PAD
 local MARGIN = 8 -- from the screen's edges and what it keeps clear of
+local SHRINK = 0.05 -- 8.3 review: a small touch screen's card tries this much smaller each time (down to the HUD's scale)
 local TICK = 0.25 -- s between two looks while an offer waits
 -- the HUD's groups (client/CarryGripUi.luau's list) and the sandbox's chips' ScreenGuis
 local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "KeyHints" }
@@ -82,9 +90,32 @@ local function clearOf(b: TouchLayout.Box, W: number, H: number, blocks: { Touch
 	return true
 end
 
+-- Its buttons' height at a scale (a touch screen: at least Ui.MinTouch screen px), and so its own.
+local function buttonHeight(touch: boolean, scale: number): number
+	return if touch then math.max(BUTTON_H, math.ceil(Ui.MinTouch / scale - 1e-6)) else BUTTON_H
+end
+
+local function cardHeight(touch: boolean, scale: number): number
+	return CARD_H - BUTTON_H + buttonHeight(touch, scale)
+end
+
+-- 8.3 review: the scales it tries, the biggest first: on a touch screen its buttons a finger's height as drawn, then
+-- SHRINK smaller down to the HUD's scale S (a small phone); elsewhere S.
+local function scalesFor(S: number, touch: boolean): { number }
+	local big = if touch then math.max(S, Ui.MinTouch / BUTTON_H) else S
+	local list = { big }
+	local s = big - SHRINK
+	while s > S + 1e-6 do
+		table.insert(list, s)
+		s -= SHRINK
+	end
+	if big > S + 1e-6 then
+		table.insert(list, S)
+	end
+	return list
+end
+
 function OfferCard.layout(W: number, H: number, S: number, touch: boolean, blocks: { TouchLayout.Box }): (TouchLayout.Box, number)
-	local scale = if touch then math.max(S, Ui.MinTouch / BUTTON_H) else S
-	local w, h = CARD_W * scale, CARD_H * scale
 	local avoid = table.clone(blocks)
 	if touch then
 		local c = TouchLayout.cluster(W, H, S)
@@ -94,37 +125,44 @@ function OfferCard.layout(W: number, H: number, S: number, touch: boolean, block
 		table.insert(avoid, c.thumb)
 		table.insert(avoid, c.jump)
 	end
-	-- the preferred place: the right edge, a little over the middle; then every place flush against an edge of what is
-	-- there (and the screen's middle)
-	local px, py = W - MARGIN - w, H * 0.45 - h / 2
-	local xs = { px, (W - w) / 2, MARGIN }
-	local ys = { py, MARGIN, H - MARGIN - h }
-	for _, b in avoid do
-		table.insert(xs, b.x1 + MARGIN)
-		table.insert(xs, b.x0 - MARGIN - w)
-		table.insert(ys, b.y1 + MARGIN)
-		table.insert(ys, b.y0 - MARGIN - h)
-	end
-	local best: TouchLayout.Box? = nil
-	local bestNear = math.huge
 	local fallback: TouchLayout.Box? = nil
+	local fallbackScale = S
 	local fallbackCost = math.huge
-	for _, y in ys do
-		local y0 = math.floor(math.clamp(y, MARGIN, math.max(MARGIN, H - MARGIN - h)) + 0.5) -- (whole px: where it is put)
-		for _, x in xs do
-			local x0 = math.floor(math.clamp(x, MARGIN, math.max(MARGIN, W - MARGIN - w)) + 0.5)
-			local b = TouchLayout.box(x0, y0, x0 + w, y0 + h)
-			local near = math.abs(x0 - px) + math.abs(y0 - py)
-			if near < bestNear and clearOf(b, W, H, avoid) then
-				best, bestNear = b, near
-			end
-			local bad = MoveLayout.clash(b, W, H, avoid) + 1e-3 * near
-			if bad < fallbackCost then
-				fallback, fallbackCost = b, bad
+	for _, scale in scalesFor(S, touch) do
+		local w, h = CARD_W * scale, cardHeight(touch, scale) * scale
+		-- the preferred place: the right edge, a little over the middle; then every place flush against an edge of what
+		-- is there (and the screen's middle)
+		local px, py = W - MARGIN - w, H * 0.45 - h / 2
+		local xs = { px, (W - w) / 2, MARGIN }
+		local ys = { py, MARGIN, H - MARGIN - h }
+		for _, b in avoid do
+			table.insert(xs, b.x1 + MARGIN)
+			table.insert(xs, b.x0 - MARGIN - w)
+			table.insert(ys, b.y1 + MARGIN)
+			table.insert(ys, b.y0 - MARGIN - h)
+		end
+		local best: TouchLayout.Box? = nil
+		local bestNear = math.huge
+		for _, y in ys do
+			local y0 = math.floor(math.clamp(y, MARGIN, math.max(MARGIN, H - MARGIN - h)) + 0.5) -- (whole px: where it is put)
+			for _, x in xs do
+				local x0 = math.floor(math.clamp(x, MARGIN, math.max(MARGIN, W - MARGIN - w)) + 0.5)
+				local b = TouchLayout.box(x0, y0, x0 + w, y0 + h)
+				local near = math.abs(x0 - px) + math.abs(y0 - py)
+				if near < bestNear and clearOf(b, W, H, avoid) then
+					best, bestNear = b, near
+				end
+				local bad = MoveLayout.clash(b, W, H, avoid) + 1e-3 * near
+				if bad < fallbackCost then
+					fallback, fallbackScale, fallbackCost = b, scale, bad
+				end
 			end
 		end
+		if best then
+			return best, scale -- (the biggest scale with a clear place)
+		end
 	end
-	return (best or fallback or TouchLayout.box(MARGIN, MARGIN, MARGIN + w, MARGIN + h)) :: TouchLayout.Box, scale
+	return (fallback or TouchLayout.box(MARGIN, MARGIN, MARGIN + CARD_W * S, MARGIN + cardHeight(touch, S) * S)) :: TouchLayout.Box, fallbackScale
 end
 
 -- ── The card ───────────────────────────────────────────────────────────────
@@ -325,7 +363,12 @@ local function place()
 		local s = Ui.screenSize()
 		W, H = s.X, s.Y
 	end
-	local b, scale = OfferCard.layout(W, H, Ui.screenScale(), Ui.touchLayout(), blocksNow(screen.AbsolutePosition))
+	local touch = Ui.touchLayout()
+	local b, scale = OfferCard.layout(W, H, Ui.screenScale(), touch, blocksNow(screen.AbsolutePosition))
+	local tall = buttonHeight(touch, scale)
+	card.Size = UDim2.fromOffset(CARD_W, cardHeight(touch, scale))
+	parts.decline.Size = UDim2.fromOffset(BUTTON_W, tall)
+	parts.accept.Size = UDim2.fromOffset(BUTTON_W, tall)
 	card.Position = UDim2.fromOffset(math.floor(b.x0 + 0.5), math.floor(b.y0 + 0.5))
 	parts.scale.Scale = scale
 end
@@ -351,12 +394,20 @@ function OfferCard.pending(): Rules.Offer?
 	return waiting
 end
 
--- ESC, another window opening, the gamepad's B: a DECLINE of the offer it shows.
+-- ESC (the Roblox menu), the gamepad's B: a DECLINE of the offer it shows.
 function OfferCard.close()
 	if not opened then
 		return
 	end
 	answer(false)
+end
+
+-- 8.3 review: another window opening (client/Main.client.luau, no escape) only hides it: the offer keeps waiting and
+-- follow() shows it again once nothing covers the screen (its clock and the server's closed message still end it).
+function OfferCard.hide()
+	if opened then
+		hide()
+	end
 end
 
 function OfferCard.open()

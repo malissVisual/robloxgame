@@ -2246,7 +2246,7 @@ local function hire(player: Player)
 	h.hirer = player
 	h.thinkAt = 0
 	say(h, "hired", clock, true)
-	tell(h, `🧑‍🔧 {player.DisplayName} hired {cfg.Name} for this move ({Brain.money(h.price)}): click a piece and he carries it to the van; the rest is yours.`)
+	tell(h, `🧑‍🔧 {player.DisplayName} hired {cfg.Name} for this move ({Brain.money(h.price)}): pick a piece and he carries it to the van; the rest is yours.`)
 	setDoing(h, h.action, h.spot)
 	tellCrew(h)
 end
@@ -2266,13 +2266,14 @@ local function endHire(h: Helper, who: Player)
 	tell(h, `🧑‍🔧 {who.DisplayName} left the move: {cfg.Name} waits by the van for hire again.`)
 end
 
+-- (8.3 review: the notices' words fit every device: "pick" a piece or him, never a computer's "click")
 local ASSIGN_WHY: { [string]: string } = {
-	hire = "Hire %s first: click him by the van.",
+	hire = "Hire %s first: pick him by the van.",
 	far = "Get closer to the %s to give it to Danny.",
 	his = "Danny has the %s already.",
 	van = "The %s is in the van already.",
 	held = "Somebody holds the %s.",
-	full = "Danny's list is full: click a piece of it to take it back first.",
+	full = "Danny's list is full: pick a piece of it to take it back first.",
 }
 
 -- 8.3 a click on a piece (its model): onto his list, or off it again; checked (MoveHelperBrain.assignCheck).
@@ -2597,7 +2598,7 @@ local function create(s: any, port: Port): Helper
 		h.dead, h.downAt = true, clock - cfg.Respawn + 2 -- (tried again in a moment)
 	end
 	local price = Brain.money(h.price)
-	tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} waits by your van: click him to hire him for this move ({price}). He carries what you click and lifts the heavy pieces with you.`
+	tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} waits by your van: pick him to hire him for this move ({price}). He carries the pieces you pick and lifts the heavy ones with you.`
 		else `🧑‍🔧 {cfg.Name} from the depot waits by your van: HIRE him under the move's panel ({price}) and he lifts the heavy pieces with you.`)
 	return h
 end

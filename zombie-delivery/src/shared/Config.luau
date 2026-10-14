@@ -6727,7 +6727,9 @@ Config.MoveStory = {
 --   RideReach          studs from the van's passenger door he gets in (your seat at its wheel: he walks there at the
 --                      Sprint, CallGain / CallBlink his last resort; the seat taken by a crew mate: he follows the van
 --                      on foot)
---   CardReach / ClickReach / TapSlop   the client's: his card closes when you are CardReach studs from him; a click or
+--   CardReach / ClickReach / TapSlop   the client's: his card closes when you are CardReach studs from him (8.3 review:
+--                      at least ClickReach, or a click on him from afar opens a card that shuts at once), or CardSlack
+--                      studs farther than you were as it opened (the status line opens it from anywhere); a click or
 --                      tap reaches him (or a piece: the server checks ClickReach + 10 studs) from ClickReach studs,
 --                      TapSlop studs beside his body counts
 Config.MoveHelper = {
@@ -6806,7 +6808,8 @@ Config.MoveHelper = {
 	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
 	Queue = 6,
 	RideReach = 3,
-	CardReach = 40,
+	CardReach = 90,
+	CardSlack = 20,
 	ClickReach = 90,
 	TapSlop = 2.5,
 }

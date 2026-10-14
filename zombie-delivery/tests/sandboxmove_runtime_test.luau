@@ -327,9 +327,9 @@ end
 check("nobody on the porch, no Marge's text (no story)", not porch and E.last(ann, "Tutorial", "message") == nil)
 local danny = MoveHelper.find(ann)
 check("Danny joins a crew of one", danny ~= nil and danny.body ~= nil)
-check("8.3 …for hire (nobody hired him: he waits by the van, his price on the status line; the sandbox's words: click him)", danny.hirer == nil
+check("8.3 …for hire (nobody hired him: he waits by the van, his price on the status line; the sandbox's words, 8.3 review: every device's, pick him, no click)", danny.hirer == nil
 	and ann:GetAttribute("MoveHelper") == "offer" and ann:GetAttribute("MoveHelperPrice") == danny.price
-	and string.find(E.lastNotice(ann), "click him to hire him", 1, true) ~= nil, E.lastNotice(ann))
+	and string.find(E.lastNotice(ann), "pick him to hire him", 1, true) ~= nil and string.find(string.lower(E.lastNotice(ann) or ""), "click", 1, true) == nil, E.lastNotice(ann))
 check("8.0.1: Danny says hello without the city's depot; his full van's line names no Wall", E.saidSince(Brain.line("hello", true) :: string, 0)
 	and not E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.line("full", true) :: string, "Wall", 1, true) == nil)
 
