@@ -13,6 +13,7 @@ PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore",
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
+PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/collectionbook_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -171,6 +172,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
     source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
     open(os.path.join(tmp, "UpgradesServer.luau"), "w", encoding="utf-8").write(head + "local workspace = E.workspace\n" + source)
+    # 8.2 SANDBOX, the collection book: the real server/CollectionBook.luau as CollectionBookServer.luau for
+    # tests/collectionbook_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "CollectionBook.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+    open(os.path.join(tmp, "CollectionBookServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.0 sandbox, the map: the real server/SandboxWorld.luau as SandboxWorldServer.luau on the same mock for
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()

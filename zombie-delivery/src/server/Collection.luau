@@ -28,6 +28,8 @@
 --   Collection.clear(player)                   (the admin's CLEAR STOCK) the whole collection gone for nothing → how many
 --   Collection.onChanged(fn)                   fn(player) after any change to a player's collection (and when their
 --                                              save has loaded)
+--   Collection.onAdded(fn)                     8.2: fn(player, entry) after a piece came home (Collection.add took it;
+--                                              entry a copy): the collection book (server/CollectionBook.luau)
 --   Collection.tick()                          pays everybody here what their stands earned since the last payout (the
 --                                              loop runs it every Config.Collection.Tick s)
 --   Collection.start()                         the remote, joining and leaving, the payout loop
@@ -64,6 +66,7 @@ local remote = Net.get("Collection")
 local notice = Net.get("Notice")
 
 local listeners: { (Player) -> () } = {}
+local addedListeners: { (Player, Entry) -> () } = {} -- 8.2: Collection.onAdded's
 
 -- The income counted for each player here: up to `at` (os.clock), `carry` $ not paid yet.
 type Meter = { at: number, carry: number }
@@ -258,8 +261,12 @@ function Collection.add(player: Player, entry: { item: string, variant: number?,
 		stand = nil,
 		got = os.time(),
 	})
+	local piece = table.clone(collection.entries[#collection.entries]) -- (8.2: for Collection.onAdded)
 	noteAdded(player, Rules.rarityOf(def))
 	changed(player)
+	for _, fn in addedListeners do -- (8.2: the collection book)
+		task.spawn(fn, player, table.clone(piece))
+	end
 	return uid, nil
 end
 
@@ -388,6 +395,10 @@ end
 
 function Collection.onChanged(fn: (Player) -> ())
 	table.insert(listeners, fn)
+end
+
+function Collection.onAdded(fn: (Player, Entry) -> ())
+	table.insert(addedListeners, fn)
 end
 
 function Collection.tick()

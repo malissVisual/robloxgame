@@ -34,7 +34,7 @@ for _, action in SandboxAdmin.Actions do
 	ids[action.id] = true
 end
 check("every button: a new id, a group of the tab, a known colour, a short label", #bad == 0, table.concat(bad, ", "))
-local wanted = { "money", "broke", "refill", "start", "clock", "horde", "fill", "clear", "stands", "van", "house", "warehouse", "upmax", "upreset" } -- (8.1: the upgrades' two)
+local wanted = { "money", "broke", "refill", "start", "clock", "horde", "fill", "clear", "stands", "van", "house", "warehouse", "upmax", "upreset", "bookfill", "bookclear" } -- (8.1: the upgrades' two; 8.2: the book's two)
 local missing: { string } = {}
 for _, id in wanted do
 	if not ids[id] then
@@ -48,6 +48,10 @@ check("+$10K is 10 000", SandboxAdmin.Money == 10_000)
 local maxUp, resetUp = SandboxAdmin.find("upmax"), SandboxAdmin.find("upreset")
 check("8.1: ⬆ MAX UPGRADES / ↺ RESET UPGRADES in the last group, Upgrades", maxUp ~= nil and resetUp ~= nil and maxUp.label == "⬆ MAX UPGRADES" and resetUp.label == "↺ RESET UPGRADES"
 	and maxUp.group == "upgrades" and resetUp.group == "upgrades" and SandboxAdmin.Groups[#SandboxAdmin.Groups].id == "upgrades" and SandboxAdmin.Groups[#SandboxAdmin.Groups].name == "Upgrades")
+
+local fillBook, clearBook = SandboxAdmin.find("bookfill"), SandboxAdmin.find("bookclear")
+check("8.2: 📖 FILL BOOK / 📖 CLEAR BOOK in the Collection group", fillBook ~= nil and clearBook ~= nil and fillBook.label == "📖 FILL BOOK" and clearBook.label == "📖 CLEAR BOOK"
+	and fillBook.group == "collection" and clearBook.group == "collection")
 
 -- The check (the server's) ------------------------------------------------------------------------------------------
 
