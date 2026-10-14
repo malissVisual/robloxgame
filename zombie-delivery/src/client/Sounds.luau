@@ -46,7 +46,8 @@
 -- and the chalet's room are client/SoundScape.luau's (it is told whether sfx4 is up: sheet4); the stands, the till,
 -- the trip home's fanfare, the stands' income, the Sprinter's sliding door and its step are client/SandboxSounds.luau's
 -- (through Sounds.play / playAt). Money that went up outside a job plays nothing here in the sandbox (its money is a
--- sale or the stands' income: SandboxSounds plays those).
+-- sale or the stands' income: SandboxSounds plays those). 8.3: the book's, the tasks' and the bulk actions' feedback are
+-- SandboxSounds' too (shared/SoundPlan.luau feedbackCues: the existing sheets' sounds, one after the other).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -148,7 +149,7 @@ local function makeSound(asset: string, range: NumberRange, looped: boolean, gro
 end
 
 -- 2D effects: one ready Sound per name (a small round of them for the fast ones), replayed from the start.
-local ROUND = { gun_light = 3, gun_crack = 2, gun_heavy = 2, gun_rapid = 4, hit = 3, kill = 2, ui_click = 2, step_a = 2, step_b = 2, coin = 2 }
+local ROUND = { gun_light = 3, gun_crack = 2, gun_heavy = 2, gun_rapid = 4, hit = 3, kill = 2, ui_click = 2, step_a = 2, step_b = 2, coin = 2, stand_display = 3 } -- (8.3: FILL BEST's clicks ring out)
 local flat: { [string]: { sounds: { Sound }, next: number } } = {}
 
 local function play(name: string, volume: number?, pitch: number?)

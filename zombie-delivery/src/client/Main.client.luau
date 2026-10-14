@@ -125,6 +125,7 @@ if Config.Sandbox.On then
 		end
 	end
 	safely("SandboxSounds", function() require(Client.SandboxSounds).start() end) -- 8.1: the stands, the till, the van's doors
+	safely("SandboxLight", function() require(Client.SandboxLight).start() end) -- 8.3: the eyes adapt to the house, the hall, the van
 
 	-- The hooks (the city's, less what the sandbox does not run).
 	Drive.notify = Hud.toast
@@ -198,7 +199,7 @@ if Config.Sandbox.On then
 			pcall(setState, state)
 		end
 	end)
-	Net.get("Notice").OnClientEvent:Connect(Hud.toast)
+	Net.get("Notice").OnClientEvent:Connect(if SandboxHud and type(SandboxHud.notice) == "function" then SandboxHud.notice else Hud.toast) -- (8.3: in this device's words)
 
 	local function play()
 		pcall(function()

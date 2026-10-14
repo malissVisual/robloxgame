@@ -36,6 +36,7 @@
 --   SandboxScenery.outside(x, z)        how far (x, z) is outside the Bounds (≤ 0: inside)
 --   SandboxScenery.rectDistance(r, x, z)   how far (x, z) is from a rect (0 inside)
 
+local Config = require(script.Parent.Config)
 local SandboxMap = require(script.Parent.SandboxMap)
 
 local SandboxScenery = {}
@@ -87,38 +88,14 @@ SandboxScenery.FencePost = 16 -- studs between two posts
 SandboxScenery.WallHeight = 300
 -- the chalet on House.house (its walls the box's height), its dice: "tyrol". 8.1: Pitch is the owner's Blender house's roof
 -- (design/blender-house/house.py PITCH): dressed in it (server/HouseMesh.luau), the chalet's gable wedges are re-cut to
--- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model)
-SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 42 }
+-- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model). 8.2.1:
+-- the big house's 31° (house.py TARGET "sandbox", the manifest's "pitch")
+SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }
 SandboxScenery.Trees = { Height = { 28, 50 } :: { number }, Edge = { 24, 34 } :: { number }, Canopy = 0.19, Chunk = 128, Max = 120 }
-SandboxScenery.Light = {
-	Clock = 15.4, -- a fixed afternoon (Lighting.ClockTime)
-	Latitude = 47, -- the Alps
-	Brightness = 2,
-	Exposure = 0,
-	Ambient = { 80, 74, 72 } :: { number },
-	Outdoor = { 124, 118, 112 } :: { number },
-	ShiftTop = { 64, 42, 16 } :: { number }, -- (the sun's warm tint)
-	ShiftBottom = { 12, 10, 8 } :: { number },
-	Diffuse = 0.55,
-	Specular = 0.6,
-	Softness = 0.3,
-	Air = { 200, 204, 212 } :: { number },
-	Decay = { 132, 136, 150 } :: { number },
-	Density = 0.26,
-	Offset = 0.12,
-	Glare = 0.6,
-	Haze = 1.3,
-	Fog = { 1200, 4000 } :: { number }, -- (only when nothing else draws the air: an Atmosphere does)
-	Tint = { 255, 246, 232 } :: { number },
-	Saturation = 0.06,
-	Contrast = 0.1,
-	Lift = 0.01,
-	Clouds = { Cover = 0.42, Density = 0.45, Color = { 255, 250, 242 } :: { number } },
-	Sun = 12, -- the sun's size (degrees)
-}
+SandboxScenery.Light = Config.SandboxLight.Sky -- 8.3: the afternoon's light lives in Config with the rest of the light
 SandboxScenery.Colors = {
 	Meadow = { 96, 138, 60 } :: { number },
 	Lawn = { 108, 152, 64 } :: { number },

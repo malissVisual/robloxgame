@@ -48,6 +48,7 @@ local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
 
 local T = Config.Furniture
+local LIT = Config.SandboxLight.House -- 8.3: the lights' numbers and the Neon's colours (Config.SandboxLight)
 local HouseInterior = {}
 
 local SMOOTH = Enum.Material.SmoothPlastic
@@ -65,12 +66,12 @@ end
 -- over them).
 local KINDS = { "hall", "living", "kitchen", "bedroom", "kids", "bath", "garage" } -- (the lists' order: the dice's)
 local PLASTER: { [string]: { Color3 } } = {
-	hall = { rgb(242, 236, 222), rgb(236, 230, 214) },
-	living = { rgb(244, 238, 226), rgb(240, 230, 212) },
-	kitchen = { rgb(244, 240, 228), rgb(238, 234, 220) },
-	bedroom = { rgb(240, 234, 226), rgb(234, 228, 234) },
-	kids = { rgb(242, 236, 212), rgb(228, 238, 228) },
-	bath = { rgb(226, 238, 240), rgb(236, 240, 242) },
+	hall = { rgb(226, 216, 198), rgb(220, 210, 192) }, -- (8.3: a warm off-white, never a white: Config.SandboxLight.Caps.WallLuma)
+	living = { rgb(228, 218, 200), rgb(224, 212, 192) },
+	kitchen = { rgb(226, 218, 202), rgb(220, 212, 196) },
+	bedroom = { rgb(224, 214, 204), rgb(218, 210, 214) },
+	kids = { rgb(226, 216, 190), rgb(210, 222, 208) },
+	bath = { rgb(206, 218, 220), rgb(214, 220, 218) },
 	garage = { rgb(150, 152, 150), rgb(160, 150, 140) },
 }
 local PINE = { rgb(186, 134, 82), rgb(166, 114, 70), rgb(200, 150, 96) }
@@ -91,13 +92,13 @@ local FLOOR_OF: { [string]: Floor } = {
 	bath = { color = rgb(214, 230, 236), material = Enum.Material.CeramicTiles },
 	garage = { color = rgb(128, 128, 124), material = Enum.Material.Concrete },
 }
-local TRIM = rgb(240, 236, 228)
+local TRIM = rgb(222, 214, 200)
 local WOODWORK = rgb(132, 88, 54) -- the door frames, the window frames and sills
-local CEILING = rgb(222, 194, 152) -- pine boards
+local CEILING = rgb(204, 174, 132) -- pine boards (8.3: a shade darker round the lamps)
 local BEAM = rgb(108, 72, 44)
-local LACE = rgb(250, 248, 242)
-local LAMP = rgb(255, 222, 176) -- a warm glow
-local DAYLIGHT = rgb(126, 156, 178) -- the windows' dim glow (Neon)
+local LACE = rgb(234, 228, 216)
+local LAMP = color(LIT.Glow) -- a warm glow
+local DAYLIGHT = color(LIT.Window) -- the windows' dim glow (Neon)
 -- 7.0 review: the same at night (no glow): the panes, the bathroom's, the porch's wall; the porch light's share and hue
 local NIGHT = { pane = rgb(28, 36, 58), bath = rgb(36, 44, 62), porch = rgb(24, 30, 48), light = 0.25, lightColor = rgb(150, 170, 220) }
 type Daylit = { day: Color3, night: Color3, light: SurfaceLight?, brightness: number, color: Color3 }
@@ -952,14 +953,14 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local paint = DOORS[roll(#DOORS)]
 		local bloom = BLOOMS[roll(#BLOOMS)]
 		frontLeaves(decor, at, x, z, front.width / 2, plan.doorHeight - 0.15, paint, bloom)
-		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), rgb(236, 240, 228), Enum.Material.Neon, true)
+		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), color(LIT.Daylight), Enum.Material.Neon, true)
 		glow.CastShadow = false
 		local light = Instance.new("SurfaceLight")
 		light.Face = Enum.NormalId.Back -- (+Z: into the house)
-		light.Brightness = T.DoorLight.Brightness
-		light.Range = T.DoorLight.Range
+		light.Brightness = LIT.Porch.Brightness
+		light.Range = LIT.Porch.Range
 		light.Angle = 70
-		light.Color = color(T.DoorLight.Color)
+		light.Color = color(LIT.Porch.Color)
 		light.Parent = glow
 		daylight(glow, NIGHT.porch, light) -- 7.0 review: dark at night
 		local mat = part(decor, "WelcomeMat", Vector3.new(4, 0.06, 2.2), at(x, 0.03, z - 1.6), rgb(150, 110, 70), Enum.Material.Fabric)
@@ -975,7 +976,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local frame = origin * CFrame.lookAt(w.at, w.at + w.normal) -- -Z into the room
 		local small = w.width <= 3
 		part(decor, "WindowFrame", Vector3.new(w.width + 0.5, w.height + 0.5, 0.16), frame * CFrame.new(0, 0, -0.08), WOODWORK, Enum.Material.Wood)
-		local pane = part(decor, "Window", Vector3.new(w.width, w.height, 0.06), frame * CFrame.new(0, 0, -0.19), if kind == "bath" then rgb(170, 190, 200) else DAYLIGHT, Enum.Material.Neon)
+		local pane = part(decor, "Window", Vector3.new(w.width, w.height, 0.06), frame * CFrame.new(0, 0, -0.19), if kind == "bath" then color(LIT.BathWindow) else DAYLIGHT, Enum.Material.Neon)
 		pane:SetAttribute("InteriorWindow", true)
 		daylight(pane, if kind == "bath" then NIGHT.bath else NIGHT.pane) -- 7.0 review: a night sky at night
 		if not small then
@@ -996,21 +997,21 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local lx, lz = room.max.X - room.min.X, room.max.Z - room.min.Z
 		local cx, cz = (room.min.X + room.max.X) / 2, (room.min.Z + room.max.Z) / 2
 		local spots: { { number } } = { { cx, cz } }
-		if math.max(lx, lz) > T.Light.LongRoom then
+		if math.max(lx, lz) > LIT.Lamp.Long then
 			spots = if lx > lz then { { room.min.X + lx / 4, cz }, { room.max.X - lx / 4, cz } } else { { cx, room.min.Z + lz / 4 }, { cx, room.max.Z - lz / 4 } }
 		end
 		for _, s in spots do
 			local lamp
 			if room.kind == "garage" then
-				lamp = part(decor, "Tube", Vector3.new(4, 0.3, 0.6), at(s[1], ceiling - 0.15, s[2]), rgb(236, 244, 255), Enum.Material.Neon)
+				lamp = part(decor, "Tube", Vector3.new(4, 0.3, 0.6), at(s[1], ceiling - 0.15, s[2]), color(LIT.Tube), Enum.Material.Neon)
 			else
 				lamp = cylinder(part(decor, "Lamp", Vector3.new(0.3, 2.6, 2.6), at(s[1], ceiling - 0.15, s[2]) * CFrame.Angles(0, 0, math.pi / 2), LAMP, Enum.Material.Neon))
 			end
 			lamp.CastShadow = false
 			local light = Instance.new("PointLight")
-			light.Brightness = T.Light.Brightness
-			light.Range = T.Light.Range
-			light.Color = if room.kind == "garage" then rgb(226, 236, 255) else color(T.Light.Color)
+			light.Brightness = LIT.Lamp.Brightness
+			light.Range = LIT.Lamp.Range
+			light.Color = if room.kind == "garage" then rgb(226, 236, 255) else color(LIT.Lamp.Color)
 			light.Shadows = false
 			light.Parent = lamp
 		end

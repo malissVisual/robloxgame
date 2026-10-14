@@ -1,12 +1,12 @@
 """8.2: design/blender-warehouse/warehouse-preview.png: the warehouse as the game shows it once ZDCWarehouseArt is imported:
-the Blender model's level (Config.Warehouse.ArtLevel, 4) with what the game keeps in it (the stands, the UPGRADES desk,
+the Blender model's level 4 (8.3: the Big warehouse, one of the five the game builds; tools/warehouse/levels-preview.py draws all five as parts) with what the game keeps in it (the stands, the UPGRADES desk,
 the STOCK board, the owner's sign, the floor's paint, the bay), from outside and from inside. Needs bpy (pip install
 bpy, Python 3.13) and Pillow:
 
     python tools/warehouse/preview.py -- --out design/blender-warehouse/warehouse-preview.png --samples 64
 
 It runs design/blender-warehouse/warehouse.py (all five levels), hides the other levels and adds the game's parts
-(only for the picture: shared/WarehouseLayout.luau's numbers, Config.Warehouse's 12 stands).
+(only for the picture: shared/WarehouseLayout.luau's numbers, level 4's 12 stands, Config.WarehouseLevels).
 """
 import math
 import os
