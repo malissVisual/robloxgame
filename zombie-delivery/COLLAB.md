@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (the Blender helper, branch `claude/magical-brahmagupta-af54ch`) · the owner's request: the ZDC warehouse as five Blender models, level 1 (a garage) to level 5 (a logistics centre), each bigger, for a future warehouse upgrade · `design/blender-warehouse/` (new) only: models, renders, the size of each level; no game code (the levels' rules and the dressing are a later step, with whoever owns `server/Warehouse.luau`) · 2026-10-14
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
