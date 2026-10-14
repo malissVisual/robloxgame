@@ -36,7 +36,8 @@ only), the gamepad's selection on DECLINE and B, waiting under another window, t
 another window opening only hides it (the offer waits); smaller phones (667 x 375, 740 x 360, 780 x 360).
 8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
 keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
-words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad.
+words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad. 8.4: the guide's steps for
+Danny for hire (hire him, give him a piece, a heavy piece's Lift) in the same scene.
 8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
 and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
 """

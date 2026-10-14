@@ -7073,6 +7073,9 @@ Config.Collection = {
 --   SoftSeconds   s a soft step shows before it counts as done (said long enough)
 --   SoftGap       s after a soft step ended (done, dismissed, covered) before the next one may show
 --   PaintMoney    $ from which the PAINT shop's step may show (else once a warehouse level is bought)
+--   8.4, Danny for hire's steps (hire him, give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step):
+--   HeavyNear     studs: a two-person piece of your move this near you (its Lift shown) says "press Lift and wait for
+--                 Danny" (looked for at most once a second, only while that step may still show)
 Config.SandboxGuide = {
 	Every = 0.2,
 	Fade = 0.5,
@@ -7096,6 +7099,7 @@ Config.SandboxGuide = {
 	SoftSeconds = 40, -- 8.3: the soft steps
 	SoftGap = 15,
 	PaintMoney = 2000,
+	HeavyNear = 12, -- 8.4
 }
 
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
