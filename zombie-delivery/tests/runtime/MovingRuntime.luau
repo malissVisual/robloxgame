@@ -16,6 +16,9 @@
 local Mock = require("./ItemMock") :: any
 local CityConfig = require("./Config") :: any
 CityConfig.Sandbox.On = false
+-- 8.1 grip: no timing checks by default (a pick lifts at once, no wobbles: the moves' other tests carry as before);
+-- tests/carrygrip_runtime_test.luau turns them on (the server reads Config.CarryGrip.On at every lift and carry).
+CityConfig.CarryGrip.On = false
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()

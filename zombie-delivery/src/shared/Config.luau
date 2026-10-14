@@ -6055,63 +6055,75 @@ Config.ItemModel = {
 	Shut = 0.35,
 }
 
--- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
--- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): shared/
--- CarryGrip.luau runs the bar (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows it and reads the presses,
--- server/Moving.luau's grip block (the character attribute CarryGrip; the Moving remote's "slip" and "grip") drops a
--- thing that slipped and wears one that shook. The bar runs from 0 (its bottom) to 1 (its top).
---   Kinds      the carries with a bar (a one-hand thing that is not fragile has none): Zone, the grip box's share of
---              the bar; Load, the load's own wildness; Gravity, × the box's fall. "hand": a fragile one-hand thing
---              (gentler); "both"; "pair": two carry it (each their own bar; either slips: it drops); "solo": a Mover
---              lifts a pair thing alone (harder); "drag": a pair thing dragged alone, low (calmer)
---   Mover      × the zone for a Mover (every kind)
---   Steadied   × the zone while Danny holds the other end of your piece (7.x: he steadies it; the character attribute
---              GripSteady, server/MoveHelper.luau)
---   Weight     + the load's wildness a weight point (1 … 10); Fragile: + when fragile
---   Motion     × the wildness: Still standing still (under StillAt studs/s); + Speed × your speed / the walk (at most
---              SpeedMax × it); + Turn turning at TurnFull rad/s or more; + Slope going up or down at SlopeFull studs/s
---              or more; + Air in the air (a jump); + a bite's jolt (Bite at BiteFull hp or more, ShockMax at most, Fade
---              a second off it)
---   Grip       the box: Lift (/s² up while held), Gravity (/s² down when let go), Rise / Fall (the fastest, /s), Bounce
---              (× its speed back up off the bottom when it hits faster than BounceMin)
---   Marker     the load (the thing's icon): a new aim every Dart[1] s (wild, at WildAt) … Dart[2] s (calm), up to Reach
---              × (Base + the wildness) away; pulled to it by Spring × (Base + the wildness), Damp a second, Jitter ×
---              the wildness; never nearer the ends than Edge
---   Meter      Fill a second inside the box, Drain outside; standing still it drains no lower than Floor; Start at the
---              lift (HeavyStart from HeavyAt weight on: the first seconds matter); full: steady (× SteadySpeed on the
---              carry's walk, the server's at most) until it is under SteadyOff; SLIPPING! at Warn or under; 0: it slips
---   Step       the longest step the bar takes at once (a slow frame takes several); MaxDt: the most time one frame counts
---   Report     s between the client's ("grip", spot, quality, steady) reports (quality: the share of the time outside)
---   Server     Wear: the condition a second fully outside the box (× WearFragile when fragile), WearCap a second at most;
---              Gap: the most s one report counts; Every: the least s between two reports that count; SteadyOutside: a
---              report this much outside or less may be steady; Slip: the condition a slip takes (× Moving.Damage.Fragile
---              when fragile)
---   Ui         Tutorial: the carries with the "Hold to keep it steady!" tip (the key's hint on the first one only);
---              Shake: px at SLIPPING! (ReducedShake with Reduced Motion); Hold: the touch HOLD button's side (px, at
---              least HoldMin); Scale: the bar's least scale on a touch screen, Min: its least anywhere; the sounds (7.1,
---              art/audio/sfx4.ogg): grip_tick at Tick's volume each TickNotches-th of the meter it moves, TickEvery s
---              apart at least, grip_warning at Warning's on each entry into SLIPPING! (the slip: MoveSounds.slipped)
+-- 8.1 grip (the owner: "when I fail, something must always happen, but make it easier, it can get harder later; it is
+-- hard to keep pressing and walk at the same time. When we pick it up the first time I should have to hit a target:
+-- I'm feeling for the grip, and when I succeed I can carry it away, I keep my balance"). No holding any more: a timing
+-- check (a needle sweeps a bar with a green zone, one press) at the lift and now and then while you carry (a WOBBLE!).
+-- shared/CarryGrip.luau has the rules (pure: tests/carrygrip_test.luau), client/CarryGripUi.luau shows a check and
+-- reads the press, server/Moving.luau's grip block opens the checks, judges the answers and decides what a miss does.
+-- Every number of the difficulty is here: a harder game later changes only these (Difficulty first).
+--   On          false: no checks at all (the carry as before the grip; the server's runtime tests of other parts)
+--   Difficulty  1 = the easy start: every zone ÷ it, every needle × it (1.5: a third smaller zones, half again as fast)
+--   Kinds       the carries with checks (a one-hand thing that is not fragile has none): Zone, the green zone's share of
+--               the sweep at weight 0; Speed, the needle's sweeps a second (edge to edge); Every, × the time between two
+--               wobbles. "hand": a fragile one-hand thing (gentle, wobbles less); "both"; "pair": two carry it (each
+--               their own checks, a bigger zone: the other end steadies it); "solo": a Mover lifts a pair thing alone;
+--               "drag": a pair thing dragged alone, low (calm)
+--   Weight      a weight point (1 … 10): the zone − Zone, the needle + Speed
+--   Fragile     × the zone (Zone) and the needle (Speed) when fragile
+--   Mover       × the zone for a Mover (every kind); Steadied: × the zone while Danny holds the other end of your piece
+--               (the character attribute GripSteady, server/MoveHelper.luau)
+--   Zone        the zone after all that is kept within Min … Max of the sweep; Start: never nearer the needle's start
+--               (the left end) than this (an instant press never hits), Edge: never nearer the right end
+--   Speed       the needle kept within Min … Max sweeps a second; Sweeps: every check lasts at least this many sweeps
+--   Lift        the lift check ("feeling for the grip"): Window s to press (no press: a miss); a miss (Knock of the
+--               piece's condition) leaves it where it is (it slips back down) and the next try waits Again s
+--   Wobble      the checks while you carry: every Every[1] … Every[2] s of walking (× the kind's Every); its zone × Zone
+--               and needle × Speed, Window s to press. The wobble clock runs at Still standing still (under StillAt
+--               studs/s), 1 at the carry's own walk, + Rush × how far over it you go (half again over it: all of Rush),
+--               + Turn turning at TurnFull rad/s or more, + Air in the air (a jump, a fall); a bite moves it Bump s on.
+--               Two checks are at least Gap s apart
+--   Miss        a wobble missed: Knock of the condition, the walk × Slow for SlowFor s (a stagger), the next wobble ×
+--               Sooner. Drop: the misses in a row that drop the piece (a drop: Slip below): Sturdy, Heavy (from HeavyAt
+--               weight on), Fragile (1: a fragile piece drops at its first miss). Every miss does something
+--   FragileKnock × a knock when the piece is fragile; Shared: × a knock when two players hold it (each one's checks:
+--               half each, as the 7.1 wear)
+--   Slip        a drop's damage (× Moving.Damage.Fragile when fragile)
+--   SteadySpeed × the carry's walk while every player holding it hit their last check (balanced, steady)
+--   Server      Grace: s past a check's window before the server takes no answer as a miss; Lag: an answer's press may
+--               be this many s older than the server's own clock of the check (the way there and back); Ahead: … or
+--               this much newer; Slack: the share of the sweep the zone is widened by when the server judges a press
+--   Ui          Tutorial: the checks with the longer hint ("… when the needle is in the green"); Shake: px a miss
+--               shakes the widget (ReducedShake with Reduced Motion); Camera: client/CameraRig.luau's shake on a miss
+--               (CameraDrop on a drop); Linger: s the outcome stays; Tap: the touch TAP button's side (px, at least
+--               TapMin); Scale: the widget's least scale on a touch screen, Min: its least anywhere; the sounds
+--               (art/audio/sfx4.ogg; the drop: MoveSounds.slipped): Open at a check's start, Tick as the needle enters
+--               the zone, Hit, Knock, Warning (a wobble that drops on a miss)
 Config.CarryGrip = {
+	On = true,
+	Difficulty = 1,
 	Kinds = {
-		hand = { Zone = 0.36, Load = 0.35, Gravity = 1 },
-		both = { Zone = 0.3, Load = 0.55, Gravity = 1 },
-		pair = { Zone = 0.3, Load = 0.6, Gravity = 1 },
-		solo = { Zone = 0.21, Load = 0.9, Gravity = 1.2 },
-		drag = { Zone = 0.34, Load = 0.4, Gravity = 1 },
-	} :: { [string]: { Zone: number, Load: number, Gravity: number } },
+		hand = { Zone = 0.36, Speed = 0.45, Every = 1.25 },
+		both = { Zone = 0.36, Speed = 0.5, Every = 1 },
+		pair = { Zone = 0.4, Speed = 0.45, Every = 1 },
+		solo = { Zone = 0.3, Speed = 0.55, Every = 0.85 },
+		drag = { Zone = 0.4, Speed = 0.42, Every = 1.5 },
+	} :: { [string]: { Zone: number, Speed: number, Every: number } },
+	Weight = { Zone = 0.005, Speed = 0.012 },
+	Fragile = { Zone = 0.9, Speed = 1.08 },
 	Mover = 1.35,
 	Steadied = 1.3,
-	Weight = 0.04,
-	Fragile = 0.2,
-	Motion = { StillAt = 1.5, Still = 0.3, Speed = 0.7, SpeedMax = 2, Turn = 0.35, TurnFull = 3, Slope = 0.4, SlopeFull = 6, Air = 0.8, Bite = 1.2, BiteFull = 20, ShockMax = 2, Fade = 1 },
-	Grip = { Lift = 4, Gravity = 3.2, Rise = 1.6, Fall = 2, Bounce = 0.35, BounceMin = 0.12 },
-	Marker = { Dart = { 0.5, 1.6 } :: { number }, WildAt = 1.4, Reach = 0.38, Base = 0.3, Spring = 3.5, Damp = 2.6, Jitter = 0.8, Edge = 0.06 },
-	Meter = { Fill = 0.45, Drain = 0.28, Floor = 0.35, Start = 0.85, HeavyStart = 0.6, HeavyAt = 6, SteadySpeed = 1.1, SteadyOff = 0.85, Warn = 0.3 },
-	Step = 1 / 60,
-	MaxDt = 0.25,
-	Report = 1,
-	Server = { Wear = 0.008, WearFragile = 1.5, WearCap = 0.015, Gap = 1.5, Every = 0.7, SteadyOutside = 0.1, Slip = 0.06 },
-	Ui = { Tutorial = 2, Shake = 5, ReducedShake = 1, Hold = 84, HoldMin = 76, Scale = 0.7, Min = 0.55, Tick = 0.5, TickEvery = 0.08, TickNotches = 50, Warning = 0.7 },
+	Zone = { Min = 0.1, Max = 0.6, Start = 0.3, Edge = 0.04 },
+	Speed = { Min = 0.2, Max = 2, Sweeps = 1.5 },
+	Lift = { Window = 3, Knock = 0.04, Again = 0.5 },
+	Wobble = { Every = { 7, 12 } :: { number }, Zone = 0.85, Speed = 1.15, Window = 2.4, Still = 0.2, StillAt = 1.5, Rush = 1, Turn = 0.6, TurnFull = 3, Air = 1, Bump = 3, Gap = 3 },
+	Miss = { Knock = 0.03, Slow = 0.6, SlowFor = 1.5, Sooner = 0.5, Drop = { Sturdy = 2, Heavy = 2, HeavyAt = 8, Fragile = 1 } },
+	FragileKnock = 1.25,
+	Shared = 0.5,
+	Slip = 0.06,
+	SteadySpeed = 1.1,
+	Server = { Grace = 1.5, Lag = 2, Ahead = 0.1, Slack = 0.02 },
+	Ui = { Tutorial = 3, Shake = 6, ReducedShake = 1, Camera = 0.2, CameraDrop = 0.35, Linger = 1.1, Tap = 96, TapMin = 80, Scale = 0.75, Min = 0.62, Open = 0.55, Tick = 0.3, Hit = 0.35, Knock = 0.6, Warning = 0.6 },
 }
 
 -- 7.0 prototype, MOVES (the owner's rework, design/rework/NAVRH.md: one house move first, the old game stays beside

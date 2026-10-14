@@ -1,37 +1,47 @@
 --!strict
--- 7.0 grip (the owner, like the Roblox game Fisch's reeling: "while you carry something a bar shows, the load keeps
--- slipping away and you click / hold to keep it under control; hold it and you get it to the truck"): the grip bar of a
--- carried thing, pure (no Roblox at the top level: tests/carrygrip_test.luau). client/CarryGripUi.luau runs it every
--- frame and draws it; server/Moving.luau's grip block names the carry's kind (the character attribute CarryGrip,
--- CarryGrip.encode), drops a thing whose bar ran out (the Moving remote's "slip") and wears one that shook (its
--- "grip" reports: CarryGrip.wear). The numbers are Config.CarryGrip's.
---
--- The bar runs from 0 (its bottom) to 1 (its top). The LOAD (the thing's icon) darts up and down by itself, the wilder
--- the heavier and the more fragile it is, the faster you walk, the sharper you turn, up or down a slope, in a jump or
--- bitten; standing still it calms down. The GRIP (a box) rises while you hold (the left mouse button or F, a gamepad's
--- R2, the touch HOLD button) and falls back when you let go, with momentum and a little bounce at the bottom. The METER
--- fills while the load is inside the box and drains while it is out (standing still: never under Meter.Floor); full,
--- you are steady (the carry's walk × Meter.SteadySpeed); at Meter.Warn it is SLIPPING!; at 0 the thing slips out of
--- your hands.
+-- 8.1 grip (the owner: "when I fail, something must always happen, but make it easier, it can get harder later; it is
+-- hard to keep pressing and walk at the same time. When we pick it up the first time I should have to hit a target:
+-- I'm feeling for the grip, and when I succeed I can carry it away, I keep my balance"), pure (no Roblox at the top
+-- level: tests/carrygrip_test.luau). The 7.0 bar you held all the way is gone: a carry with a grip has TIMING CHECKS.
+-- A needle sweeps a bar back and forth at a steady speed (it starts at the left end, going right); a green zone lies
+-- on it; one press (the left mouse button or F, a gamepad's R2, the touch TAP button) while the needle is in the zone
+-- is a hit. No press within the check's window is a miss.
+--   * The lift check ("feeling for the grip"): Pick up / Lift / Help lift on a piece with a grip opens one; a hit lifts
+--     it balanced (the steady walk), a miss knocks it (it slips back down where it stood) and you try again.
+--   * Wobbles: while you carry it, a WOBBLE! check now and then (Wobble.Every s of walking; sooner when you go faster
+--     than the carry's walk, turn hard, jump or get bitten; seldom standing still). A hit: steady again. A miss always
+--     does something: a stagger (a knock, a short slowdown, the next wobble sooner) or, the Drop-th miss in a row (a
+--     fragile piece: the first), a drop.
+-- client/CarryGripUi.luau draws a check and reads the press; server/Moving.luau's grip block opens the checks, judges
+-- the answers (CarryGrip.judge: a hit only in an open check, at a press time the needle was in the zone) and applies
+-- the outcome. Every number is Config.CarryGrip's (Difficulty: × the needles, ÷ the zones).
 --
 --   CarryGrip.kind(class, fragile, helped, role)   the carry's kind ("hand" | "both" | "pair" | "solo" | "drag"), nil:
---                                         no bar (a one-hand thing that is not fragile). helped: a pair thing has its
---                                         second carrier; role: its carrier's (a Mover alone with it: "solo")
+--                                         no checks (a one-hand thing that is not fragile). helped: a pair thing has
+--                                         its second carrier; role: its carrier's (a Mover alone with it: "solo")
 --   CarryGrip.encode(kind, weight, fragile) / decode(text)   the character attribute CarryGrip ("both 4 fragile")
---   CarryGrip.profile(kind, weight, fragile, mover)   the bar for one carry (its zone, load, gravity and start)
---                                         7.x steadied: Danny holds the other end (the zone × Steadied)
---   CarryGrip.new(profile, seed)          a bar at the lift: the load in the middle in the box, the meter at its start
---   CarryGrip.setProfile(sim, profile)    the same carry, another kind (a helper took the other end): the meter kept
---   CarryGrip.newInput()                  the body's state for a step (the client fills one table and reuses it)
---   CarryGrip.agitation(profile, input, shock)   the load's wildness now
---   CarryGrip.step(sim, input, dt) -> "slip"?   the bar after dt s (in steps of Step at most): "slip" once, when it ran out
---   CarryGrip.meterStep(sim, inside, still, dt)  the meter alone (step's)
---   CarryGrip.report(sim) -> (quality, steady)   the share of the time outside since the last report (and resets it)
---   CarryGrip.wear(quality, fragile, dt)  the condition a report takes on the server (WearCap a second at most)
---   CarryGrip.slipDamage(fragile)         the condition a slip takes
---   CarryGrip.speedFactor(steady)         × the carry's walk (SteadySpeed when steady)
--- Deterministic: the load's darts come from the bar's own seed (a xorshift), so a seed and the same steps give the same
--- bar. A step makes no tables, closures or strings (the client steps it every frame).
+--   CarryGrip.profile(kind, weight, fragile, mover, steadied?)   a carry's checks: the zone, the needle, × the wobbles'
+--                                         interval (steadied: Danny holds the other end, the zone × Steadied)
+--   CarryGrip.check(profile, what, roll)  a check ("lift" | "wobble"): its zone's place from roll (0 … 1), its window
+--   CarryGrip.needle(check, elapsed)      the needle's place (0 … 1) elapsed s into the check
+--   CarryGrip.inZone(check, at, slack?)   is a place in the zone (widened by slack each side)?
+--   CarryGrip.hits(check, elapsed)        a press elapsed s in: a hit?
+--   CarryGrip.firstHit(check)             the first time the needle is at the zone's middle (s)
+--   CarryGrip.judge(check, verdict, pressed, elapsed)   the server's verdict on an answer: a hit only for "ok", a
+--                                         press time that can be true (not newer than the server's elapsed + Ahead,
+--                                         not older than it − Lag, within the window) with the needle in the zone
+--   CarryGrip.wire(check, extra?) / fromWire(raw)   a check as the Moving remote sends it, and back (checked numbers)
+--   CarryGrip.dropAt(profile)             the wobble misses in a row that drop it
+--   CarryGrip.outcome(what, hit, profile, misses)   "balanced" | "knock" (a lift), "steady" | "stagger" | "drop" (a
+--                                         wobble; misses: in a row, this one counted)
+--   CarryGrip.knock(what, fragile, shared)   the condition a lift miss or a stagger takes (shared: two players hold it)
+--   CarryGrip.slipDamage(fragile)         the condition a drop takes
+--   CarryGrip.speedFactor(steady, staggered?)   × the carry's walk
+--   CarryGrip.interval(profile, roll, shaky)   s of the wobble clock to the next wobble (shaky: after a stagger)
+--   CarryGrip.rate(speed, walk, turn, air)   the wobble clock's pace (1 at the carry's own walk)
+--   CarryGrip.wobbles(profile, roll) / advance(w, dt, rate) / bump(w) / rearm(w, profile, roll, shaky)   the wobble
+--                                         clock: advance says true when a wobble is due
+-- No tables, closures or strings in needle / inZone / hits (the client asks every frame).
 
 local Config = require(script.Parent.Config)
 
@@ -42,49 +52,28 @@ export type Profile = {
 	weight: number,
 	fragile: boolean,
 	mover: boolean,
-	zone: number, -- the grip box's share of the bar
-	load: number, -- the load's own wildness
-	gravity: number, -- × the box's fall
-	start: number, -- the meter at the lift
+	steadied: boolean,
+	zone: number, -- the lift check's green zone (a share of the sweep)
+	speed: number, -- the lift check's needle (sweeps a second)
+	every: number, -- × the time between two wobbles
 }
 
-export type Input = {
-	hold: boolean, -- held now (a mouse button, F, R2, the touch HOLD)
-	speed: number, -- studs/s along the ground
-	turn: number, -- rad/s about the vertical
-	climb: number, -- studs/s up or down on the ground (a slope, stairs)
-	air: boolean, -- in the air (a jump, a fall)
-	bite: number, -- hp lost since the last step (0: none)
+export type Check = {
+	what: string, -- "lift" | "wobble"
+	zone0: number, -- the zone's left end (0 … 1)
+	zone: number, -- its width
+	speed: number, -- sweeps a second
+	window: number, -- s to press
 }
 
-export type Sim = {
-	profile: Profile,
-	zone: number, -- the box's bottom edge (0 … 1 - profile.zone)
-	zoneVel: number,
-	marker: number, -- the load's middle (0 … 1)
-	markerVel: number,
-	aim: number, -- where the load darts to
-	dart: number, -- s to its next aim
-	meter: number, -- 0 … 1
-	agitation: number, -- the load's wildness at the last step
-	shock: number, -- a bite's jolt, fading
-	inside: boolean,
-	still: boolean,
-	steady: boolean,
-	warn: boolean,
-	slipped: boolean,
-	outside: number, -- s outside the box since the last report
-	window: number, -- s since the last report
-	seed: number, -- the random state (xorshift32)
-	time: number,
+export type Wobbles = {
+	due: number, -- the wobble clock (s) since the last check
+	next: number, -- the clock's s when the next wobble comes
+	gap: number, -- real s since the last check (Wobble.Gap)
 }
 
 local function tune(): any
 	return (Config :: any).CarryGrip
-end
-
-local function walk(): number
-	return (Config :: any).Movement.Walk
 end
 
 -- A number, or 0 (nil, NaN, ±inf, a string a client sent).
@@ -93,6 +82,15 @@ local function finite(value: any): number
 		return 0
 	end
 	return value
+end
+
+local function isFinite(value: any): boolean
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+local function difficulty(): number
+	local d = finite(tune().Difficulty)
+	return if d > 0 then d else 1
 end
 
 -- ── The kind ───────────────────────────────────────────────────────────────
@@ -116,7 +114,7 @@ function CarryGrip.encode(kind: string, weight: number, fragile: boolean): strin
 	return `{kind} {w}{if fragile then " fragile" else ""}`
 end
 
--- (kind, weight, fragile); kind nil: not a bar's attribute.
+-- (kind, weight, fragile); kind nil: not a grip's attribute.
 function CarryGrip.decode(text: any): (string?, number, boolean)
 	if type(text) ~= "string" then
 		return nil, 0, false
@@ -128,197 +126,176 @@ function CarryGrip.decode(text: any): (string?, number, boolean)
 	return kind, tonumber(weight) or 0, rest == " fragile"
 end
 
--- ── The bar ────────────────────────────────────────────────────────────────
+-- ── The checks ─────────────────────────────────────────────────────────────
 
 function CarryGrip.profile(kind: string, weight: number, fragile: boolean, mover: boolean, steadied: boolean?): Profile
 	local t = tune()
 	local k = t.Kinds[kind] or t.Kinds.both
 	local w = math.clamp(finite(weight), 0, 10)
+	local d = difficulty()
+	local zone = (k.Zone - w * t.Weight.Zone) * (if fragile then t.Fragile.Zone else 1)
+	zone *= (if mover then t.Mover else 1) * (if steadied then t.Steadied else 1) / d
+	local speed = (k.Speed + w * t.Weight.Speed) * (if fragile then t.Fragile.Speed else 1) * d
 	return {
 		kind = if t.Kinds[kind] then kind else "both",
 		weight = w,
 		fragile = fragile,
 		mover = mover,
-		zone = math.clamp(k.Zone * (if mover then t.Mover else 1) * (if steadied then t.Steadied else 1), 0.05, 0.9),
-		load = k.Load + w * t.Weight + (if fragile then t.Fragile else 0),
-		gravity = k.Gravity,
-		start = if w >= t.Meter.HeavyAt then t.Meter.HeavyStart else t.Meter.Start,
+		steadied = steadied == true,
+		zone = math.clamp(zone, t.Zone.Min, t.Zone.Max),
+		speed = math.clamp(speed, t.Speed.Min, t.Speed.Max),
+		every = k.Every,
 	}
 end
 
--- xorshift32 (bit32: the same on every machine): 0 … 1.
-local function random(sim: Sim): number
-	local x = sim.seed
-	x = bit32.bxor(x, bit32.lshift(x, 13))
-	x = bit32.bxor(x, bit32.rshift(x, 17))
-	x = bit32.bxor(x, bit32.lshift(x, 5))
-	sim.seed = x
-	return x / 4294967296
-end
-
-function CarryGrip.new(profile: Profile, seed: number?): Sim
-	local s = bit32.band(math.floor(math.abs(finite(seed or 1))), 0xFFFFFFFF)
-	local sim: Sim = {
-		profile = profile,
-		zone = math.clamp(0.5 - profile.zone / 2, 0, 1 - profile.zone),
-		zoneVel = 0,
-		marker = 0.5,
-		markerVel = 0,
-		aim = 0.5,
-		dart = 0,
-		meter = profile.start,
-		agitation = 0,
-		shock = 0,
-		inside = true,
-		still = true,
-		steady = profile.start >= 1,
-		warn = false,
-		slipped = false,
-		outside = 0,
-		window = 0,
-		seed = if s == 0 then 0x9E3779B9 else s,
-		time = 0,
-	}
-	random(sim) -- (the first draw mixes a small seed)
-	sim.dart = 0.4 + 0.4 * random(sim) -- (a calm moment at the lift before the first dart)
-	return sim
-end
-
-function CarryGrip.setProfile(sim: Sim, profile: Profile)
-	sim.profile = profile
-	sim.zone = math.clamp(sim.zone, 0, 1 - profile.zone)
-end
-
-function CarryGrip.newInput(): Input
-	return { hold = false, speed = 0, turn = 0, climb = 0, air = false, bite = 0 }
-end
-
-function CarryGrip.agitation(profile: Profile, input: Input, shock: number): number
-	local m = tune().Motion
-	local move = math.clamp(finite(input.speed) / walk(), 0, m.SpeedMax)
-	local turn = math.clamp(math.abs(finite(input.turn)) / m.TurnFull, 0, 1)
-	local climb = math.clamp(math.abs(finite(input.climb)) / m.SlopeFull, 0, 1)
-	local motion = m.Still + move * m.Speed + turn * m.Turn + climb * m.Slope + (if input.air then m.Air else 0)
-	return profile.load * (motion + math.max(0, finite(shock)))
-end
-
-function CarryGrip.meterStep(sim: Sim, inside: boolean, still: boolean, dt: number)
-	local m = tune().Meter
-	if inside then
-		sim.meter = math.min(1, sim.meter + m.Fill * dt)
-	else
-		local drained = sim.meter - m.Drain * dt
-		if still then
-			drained = math.max(drained, math.min(sim.meter, m.Floor)) -- (standing still: you can recover)
-		end
-		sim.meter = math.max(0, drained)
-	end
-	if sim.meter >= 1 - 1e-9 then
-		sim.steady = true
-	elseif sim.meter < m.SteadyOff then
-		sim.steady = false
-	end
-	sim.warn = sim.meter <= m.Warn
-end
-
--- One step of at most Step s.
-local function tick(sim: Sim, input: Input, dt: number)
+-- A check of `profile`: a lift's as the profile has it, a wobble's zone × Wobble.Zone and needle × Wobble.Speed (kept
+-- within Zone / Speed's bounds); the zone at roll (0 … 1) of the room between Zone.Start and the right end less Edge;
+-- the window the kind's, at least Speed.Sweeps sweeps.
+function CarryGrip.check(profile: Profile, what: string, roll: number): Check
 	local t = tune()
-	local p = sim.profile
-	-- the load's wildness: the body's motion, a bite's jolt fading
-	sim.shock = math.max(0, sim.shock - t.Motion.Fade * dt)
-	local a = CarryGrip.agitation(p, input, sim.shock)
-	sim.agitation = a
-	sim.still = finite(input.speed) < t.Motion.StillAt and not input.air
-	-- the load darts to a new aim now and then (wilder: sooner and farther), pulled there with a jitter
-	local mk = t.Marker
-	sim.dart -= dt
-	if sim.dart <= 0 then
-		local wild = math.clamp(a / mk.WildAt, 0, 1)
-		sim.dart = (mk.Dart[2] + (mk.Dart[1] - mk.Dart[2]) * wild) * (0.7 + 0.6 * random(sim))
-		local reach = mk.Reach * (mk.Base + a)
-		sim.aim = math.clamp(sim.marker + (random(sim) * 2 - 1) * reach, mk.Edge, 1 - mk.Edge)
-	end
-	local pull = mk.Spring * (mk.Base + a)
-	sim.markerVel += ((sim.aim - sim.marker) * pull + (random(sim) * 2 - 1) * mk.Jitter * a) * dt
-	sim.markerVel *= math.exp(-mk.Damp * dt)
-	sim.marker += sim.markerVel * dt
-	if sim.marker < 0 then
-		sim.marker, sim.markerVel = 0, 0
-	elseif sim.marker > 1 then
-		sim.marker, sim.markerVel = 1, 0
-	end
-	-- the grip box: up while held, down when let go (momentum), a little bounce off the bottom
-	local g = t.Grip
-	if input.hold then
-		sim.zoneVel += g.Lift * dt
-	else
-		sim.zoneVel -= g.Gravity * p.gravity * dt
-	end
-	sim.zoneVel = math.clamp(sim.zoneVel, -g.Fall, g.Rise)
-	sim.zone += sim.zoneVel * dt
-	local top = 1 - p.zone
-	if sim.zone <= 0 then
-		sim.zone = 0
-		sim.zoneVel = if sim.zoneVel < -g.BounceMin then -sim.zoneVel * g.Bounce else math.max(0, sim.zoneVel)
-	elseif sim.zone >= top then
-		sim.zone = top
-		sim.zoneVel = math.min(0, sim.zoneVel)
-	end
-	-- the meter
-	sim.inside = sim.marker >= sim.zone and sim.marker <= sim.zone + p.zone
-	CarryGrip.meterStep(sim, sim.inside, sim.still, dt)
-	sim.window += dt
-	if not sim.inside then
-		sim.outside += dt
-	end
-	sim.time += dt
+	local wobble = what == "wobble"
+	local zone = math.clamp(profile.zone * (if wobble then t.Wobble.Zone else 1), t.Zone.Min, t.Zone.Max)
+	local speed = math.clamp(profile.speed * (if wobble then t.Wobble.Speed else 1), t.Speed.Min, t.Speed.Max)
+	local lo = t.Zone.Start
+	local hi = math.max(lo, 1 - t.Zone.Edge - zone)
+	local zone0 = math.min(lo + (hi - lo) * math.clamp(finite(roll), 0, 1), 1 - zone)
+	local window = math.max(if wobble then t.Wobble.Window else t.Lift.Window, t.Speed.Sweeps / speed)
+	return { what = if wobble then "wobble" else "lift", zone0 = zone0, zone = zone, speed = speed, window = window }
 end
 
-function CarryGrip.step(sim: Sim, input: Input, dt: number): string?
-	if sim.slipped then
+-- The needle elapsed s in: a triangle wave from 0 (the left end) right to 1, back to 0, at check.speed sweeps a second.
+function CarryGrip.needle(check: Check, elapsed: number): number
+	local u = (math.max(0, finite(elapsed)) * check.speed) % 2
+	return if u <= 1 then u else 2 - u
+end
+
+function CarryGrip.inZone(check: Check, at: number, slack: number?): boolean
+	local s = slack or 0
+	return at >= check.zone0 - s and at <= check.zone0 + check.zone + s
+end
+
+function CarryGrip.hits(check: Check, elapsed: number): boolean
+	local e = finite(elapsed)
+	if e < 0 or e > check.window then
+		return false
+	end
+	return CarryGrip.inZone(check, CarryGrip.needle(check, e))
+end
+
+function CarryGrip.firstHit(check: Check): number
+	return (check.zone0 + check.zone / 2) / check.speed
+end
+
+-- The server's verdict on an answer (verdict "ok" | "miss", the press `pressed` s into the check by the client's
+-- clock, `elapsed` s since the server opened it): a hit only for an "ok" whose press can be true and whose needle was
+-- in the zone (Server.Slack wider each side); anything else a miss.
+function CarryGrip.judge(check: Check, verdict: any, pressed: any, elapsed: number): boolean
+	if verdict ~= "ok" or not isFinite(pressed) then
+		return false
+	end
+	local s = tune().Server
+	local p = pressed :: number
+	if p < 0 or p > check.window + s.Ahead or p > elapsed + s.Ahead or p < elapsed - s.Lag then
+		return false
+	end
+	return CarryGrip.inZone(check, CarryGrip.needle(check, p), s.Slack)
+end
+
+-- A check as the Moving remote sends it ("grip", "open", wire): its numbers, plus the server's own fields (`extra`: the
+-- id, the spot, the piece's name and icon, whether a miss drops it).
+function CarryGrip.wire(check: Check, extra: { [string]: any }?): { [string]: any }
+	local out: { [string]: any } = if extra then table.clone(extra) else {}
+	out.what, out.zone0, out.zone, out.speed, out.window = check.what, check.zone0, check.zone, check.speed, check.window
+	return out
+end
+
+-- The check in a wire table (nil: not one: a number missing or out of bounds).
+function CarryGrip.fromWire(raw: any): Check?
+	if type(raw) ~= "table" then
 		return nil
 	end
+	local zone0, zone, speed, window = raw.zone0, raw.zone, raw.speed, raw.window
+	if not isFinite(zone0) or not isFinite(zone) or not isFinite(speed) or not isFinite(window) then
+		return nil
+	end
+	if zone <= 0 or zone >= 1 or zone0 < 0 or zone0 + zone > 1 + 1e-6 or speed <= 0 or speed > 10 or window <= 0 or window > 30 then
+		return nil
+	end
+	return { what = if raw.what == "wobble" then "wobble" else "lift", zone0 = zone0, zone = zone, speed = speed, window = window }
+end
+
+-- ── The outcomes ───────────────────────────────────────────────────────────
+
+function CarryGrip.dropAt(profile: Profile): number
+	local drop = tune().Miss.Drop
+	local at = if profile.fragile then drop.Fragile elseif profile.weight >= drop.HeavyAt then drop.Heavy else drop.Sturdy
+	return math.max(1, math.floor(finite(at) + 0.5))
+end
+
+function CarryGrip.outcome(what: string, hit: boolean, profile: Profile, misses: number): string
+	if what ~= "wobble" then
+		return if hit then "balanced" else "knock"
+	end
+	if hit then
+		return "steady"
+	end
+	return if finite(misses) >= CarryGrip.dropAt(profile) then "drop" else "stagger"
+end
+
+function CarryGrip.knock(what: string, fragile: boolean, shared: boolean?): number
 	local t = tune()
-	local left = math.clamp(finite(dt), 0, t.MaxDt)
-	local bite = finite(input.bite)
-	if bite > 0 then
-		local m = t.Motion
-		sim.shock = math.min(m.ShockMax, sim.shock + m.Bite * math.min(1, bite / m.BiteFull))
-	end
-	while left > 1e-9 do
-		local d = math.min(left, t.Step)
-		tick(sim, input, d)
-		left -= d
-		if sim.meter <= 0 then
-			sim.slipped = true
-			return "slip"
-		end
-	end
-	return nil
-end
-
-function CarryGrip.report(sim: Sim): (number, boolean)
-	local quality = if sim.window > 1e-6 then math.clamp(sim.outside / sim.window, 0, 1) else 0
-	sim.outside, sim.window = 0, 0
-	return quality, sim.steady
-end
-
--- ── The server's side ──────────────────────────────────────────────────────
-
-function CarryGrip.wear(quality: any, fragile: boolean, dt: any): number
-	local s = tune().Server
-	local q = math.clamp(finite(quality), 0, 1)
-	local d = math.clamp(finite(dt), 0, s.Gap)
-	return math.min(q * s.Wear * (if fragile then s.WearFragile else 1), s.WearCap) * d
+	local base = if what == "wobble" then t.Miss.Knock else t.Lift.Knock
+	return base * (if fragile then t.FragileKnock else 1) * (if shared then t.Shared else 1)
 end
 
 function CarryGrip.slipDamage(fragile: boolean): number
-	return tune().Server.Slip * (if fragile then (Config :: any).Moving.Damage.Fragile else 1)
+	return tune().Slip * (if fragile then (Config :: any).Moving.Damage.Fragile else 1)
 end
 
-function CarryGrip.speedFactor(steady: boolean): number
-	return if steady then tune().Meter.SteadySpeed else 1
+function CarryGrip.speedFactor(steady: boolean, staggered: boolean?): number
+	local t = tune()
+	return (if steady then t.SteadySpeed else 1) * (if staggered then t.Miss.Slow else 1)
+end
+
+-- ── The wobble clock ───────────────────────────────────────────────────────
+
+function CarryGrip.interval(profile: Profile, roll: number, shaky: boolean): number
+	local t = tune()
+	local every = t.Wobble.Every
+	local s = every[1] + (every[2] - every[1]) * math.clamp(finite(roll), 0, 1)
+	return s * profile.every * (if shaky then t.Miss.Sooner else 1)
+end
+
+-- The clock's pace: Still standing still (under StillAt studs/s), up to 1 at `walk` (the carry's walk), + Rush × how far
+-- over it (all of it half again over), + Turn turning at TurnFull rad/s, + Air in the air.
+function CarryGrip.rate(speed: number, walk: number, turn: number, air: boolean): number
+	local w = tune().Wobble
+	local v = math.max(0, finite(speed))
+	local share = if v < w.StillAt then 0 else v / math.max(finite(walk), 1)
+	local pace = w.Still + (1 - w.Still) * math.min(share, 1)
+	pace += w.Rush * math.clamp((share - 1) / 0.5, 0, 1)
+	pace += w.Turn * math.clamp(math.abs(finite(turn)) / w.TurnFull, 0, 1)
+	return pace + (if air then w.Air else 0)
+end
+
+function CarryGrip.wobbles(profile: Profile, roll: number): Wobbles
+	return { due = 0, next = CarryGrip.interval(profile, roll, false), gap = 0 }
+end
+
+function CarryGrip.advance(w: Wobbles, dt: number, rate: number): boolean
+	local d = math.max(0, finite(dt))
+	w.due += d * math.max(0, finite(rate))
+	w.gap += d
+	return w.due >= w.next and w.gap >= tune().Wobble.Gap
+end
+
+function CarryGrip.bump(w: Wobbles)
+	w.due += tune().Wobble.Bump
+end
+
+function CarryGrip.rearm(w: Wobbles, profile: Profile, roll: number, shaky: boolean)
+	w.due, w.gap = 0, 0
+	w.next = CarryGrip.interval(profile, roll, shaky)
 end
 
 return CarryGrip
