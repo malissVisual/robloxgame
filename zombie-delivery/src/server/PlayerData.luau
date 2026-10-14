@@ -56,6 +56,9 @@
 -- 8.1 SANDBOX: the upgrades bought at the warehouse's UPGRADES desk (sandboxUpgrades: { [id]: level },
 -- shared/UpgradeRules.luau; server/Upgrades.luau sells them), read only from a real save written with its flag
 -- (sandboxUpgradesKept); older saves: none. (profile.upgrades stays the city's gun tracks.)
+-- 8.2 SANDBOX, analytics: the sandbox's own onboarding funnel's steps reached (sandboxOnboarding, a bit a step of
+-- shared/AnalyticsPlan.luau's SandboxSteps; server/Analytics.luau marks them on a sandbox server), read only from a real
+-- save written with its flag (sandboxOnboardingKept: AnalyticsPlan.sandboxFrom); an older real save is past every step.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -139,6 +142,9 @@ export type Profile = {
 	tasks: TaskData.Saved?,
 	-- 6.13: the onboarding funnel's steps reached (a bit a step, shared/AnalyticsPlan.luau; server/Analytics.luau)
 	onboarding: number,
+	-- 8.2 SANDBOX: the sandbox's onboarding funnel's steps reached (a bit a step of AnalyticsPlan.SandboxSteps): read only
+	-- from a real save written with its flag (AnalyticsPlan.sandboxFrom); an older real save is past every step
+	sandboxOnboarding: number,
 	-- 6.14: the regulars: deliveries for each business (shared/Regulars.luau ids, the job pictures'; server/Regulars.luau
 	-- counts them); a save from before 6.14 has none (the empty table, no migration)
 	regulars: { [string]: number },
@@ -246,6 +252,7 @@ local function newProfile(): Profile
 		carRefund = nil, -- 7.x
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
 		onboarding = 0, -- 6.13: a new courier, no step yet
+		sandboxOnboarding = 0, -- 8.2: no step of the sandbox's funnel yet
 		regulars = {}, -- 6.14: no business knows you yet
 		skills = {}, -- 6.20: no skill yet (the points come with the levels)
 		story = {}, -- 7.0: no story card seen yet
@@ -550,6 +557,9 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	-- 6.13: the onboarding funnel's steps (only a real save has them; one from before 6.13 is past every step).
 	profile.onboarding = AnalyticsPlan.onboardingFrom(saved)
+	-- 8.2: the sandbox's funnel's steps, only from a real save written with their flag (sandboxOnboardingKept); a real
+	-- save from before 8.2 is past every step (a player who knows the sandbox), a new one at none
+	profile.sandboxOnboarding = AnalyticsPlan.sandboxFrom(saved)
 	-- 6.14: the regulars, checked (known businesses, whole counts up to Config.Regulars.Cap); none before 6.14: empty.
 	profile.regulars = require(Shared.Regulars).clean(saved.regulars)
 	-- 7.0: the moves' story cards seen, checked (known keys only), only from a real save (not a lock-only record of a
@@ -955,6 +965,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		phone = profile.phone, -- 5.0
 		tasks = profile.tasks, -- 6.12
 		onboarding = profile.onboarding, -- 6.13
+		sandboxOnboarding = profile.sandboxOnboarding, -- 8.2
+		sandboxOnboardingKept = true, -- 8.2: AnalyticsPlan.SandboxFlag (applySaved reads the steps only with it)
 		regulars = profile.regulars, -- 6.14
 		skills = profile.skills, -- 6.20
 		story = profile.story, -- 7.0

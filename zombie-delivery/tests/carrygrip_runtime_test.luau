@@ -44,6 +44,11 @@ local bob = E.player(22, "Bob", depot + V3(3, 0, 0))
 local cid = E.player(33, "Cid", depot + V3(-3, 0, 0))
 E.crew[ann] = { bob }
 Moving.useArt(E.art)
+-- 8.2: Moving.onGrip's listener (server/SandboxAnalytics.luau samples them): every outcome a client hears, it hears too
+local heardGrips: { { player: any, what: string, outcome: string, item: string, fragile: boolean } } = {}
+Moving.onGrip(function(player: any, facts: any)
+	table.insert(heardGrips, { player = player, what = facts.what, outcome = facts.outcome, item = facts.item, fragile = facts.fragile })
+end)
 Moving.start()
 local said = Moving.admin(ann, "start")
 check("the admin's START: a move with Ann and Bob", string.find(said, "started", 1, true) ~= nil, said)
@@ -417,6 +422,25 @@ G.On = true
 
 Moving.admin(ann, "end")
 check("the move ends: nobody keeps a grip", grip(ann) == nil and grip(bob) == nil)
+
+-- 8.2: Moving.onGrip heard every outcome the clients heard, in their order, with what, the piece and fragile
+do
+	local results = {}
+	for _, m in E.messages do
+		if m.remote == "Moving" and m.kind == "grip" and m.a == "result" then
+			table.insert(results, { player = m.player, what = m.b.what, outcome = m.b.outcome })
+		end
+	end
+	local same, kinds = #results == #heardGrips and #results > 0, {}
+	for index, result in results do
+		local mine = heardGrips[index]
+		same = same and mine ~= nil and mine.player == result.player and mine.what == result.what and mine.outcome == result.outcome
+			and type(mine.item) == "string" and type(mine.fragile) == "boolean"
+		kinds[result.outcome] = true
+	end
+	check("8.2: Moving.onGrip hears every check's outcome (each one its player's, lift or wobble, the piece's id and fragile)", same, `{#results} {#heardGrips}`)
+	check("8.2: …of every kind (balanced, knock, steady, stagger, drop)", kinds.balanced and kinds.knock and kinds.steady and kinds.stagger and kinds.drop or false)
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

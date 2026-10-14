@@ -171,6 +171,19 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
     source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
     open(os.path.join(tmp, "UpgradesServer.luau"), "w", encoding="utf-8").write(head + "local workspace = E.workspace\n" + source)
+    # 8.2 SANDBOX, analytics: the real server/Analytics.luau and server/SandboxAnalytics.luau as AnalyticsServer.luau and
+    # SandboxAnalyticsServer.luau for tests/sandboxanalytics_runtime_test.luau on the same runtime: PlayerData and
+    # Collection the real ones above, Moving the test's fake (E.Moving: its listeners' registration), AnalyticsService the
+    # test's recorder (through E.game's GetService), Roblox's Enum the few names Analytics sends.
+    enums = ('local Enum: any = { AnalyticsEconomyFlowType = { Source = "Source", Sink = "Sink" }, '
+             'AnalyticsProgressionType = { Start = "Start", Complete = "Complete", Fail = "Fail" } }\n')
+    for module in ("Analytics", "SandboxAnalytics"):
+        source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
+        source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+        source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+        source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
+        source = source.replace("require(script.Parent.Moving)", "E.Moving")
+        open(os.path.join(tmp, module + "Server.luau"), "w", encoding="utf-8").write(head + enums + source)
     # 8.0 sandbox, the map: the real server/SandboxWorld.luau as SandboxWorldServer.luau on the same mock for
     # tests/sandboxworld_test.luau, its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()

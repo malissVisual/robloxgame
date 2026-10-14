@@ -11,7 +11,7 @@ Nic z toho nemusíš zapínat. Stačí hru zveřejnit a hrát.
 1. Otevři **create.roblox.com** a přihlas se.
 2. Nahoře klikni na **Creations** a vyber **Zombie Delivery**.
 3. V levém menu najdi sekci **Analytics**. Tam jsou stránky, které tě zajímají:
-   - **Funnels** → **Onboarding**: cesta nového hráče (9 kroků, viz níže).
+   - **Funnels** → **Onboarding**: cesta nového hráče (ve městě 9 kroků, v sandboxu 10 kroků, viz níže).
    - **Funnels** → **Recurring** (opakované): rozvoz zakázek (**Delivery**) a mise (**Mission**).
    - **Economy**: odkud peníze přicházejí a kam odcházejí. Měna se jmenuje **Cash**.
    - **Progression**: růst úrovně řidiče (**DriverLevel**) a mise v příběhu (**Missions**).
@@ -32,7 +32,95 @@ období, ať ti ji nepřekryjí starší dny.
 - Některé grafy Roblox ukáže, až když hru hraje **dost lidí**. Při pár hráčích denně můžou být chvíli prázdné. To je
   v pořádku.
 
-## Cesta nového hráče (Onboarding, 9 kroků)
+## Sandbox (od 8.2): kde hráči odpadají v testovacím světě
+
+Tohle platí, dokud je zapnutý sandbox (`Config.Sandbox.On = true`, malý alpský svět se skladem a jedním domem).
+
+### Kde to najdeš
+
+1. **create.roblox.com** → **Creations** → **Zombie Delivery** → v levém menu **Analytics** → **Funnels** →
+   **Onboarding**.
+2. Nahoře vyber **období ode dne, kdy jsi zveřejnil verzi 8.2** (nebo novější). Roblox má pro jednu hru jen
+   **jednu** cestu nového hráče a kroky řadí podle čísla. Kroky 1 a 2 jsou stejné jako ve městě, od kroku 3 jsou jiné.
+   Kdyby období zasahovalo do dnů, kdy běželo město, smíchaly by se v grafu kroky města s kroky sandboxu.
+3. Vlastní události sandboxu (tabulka níže) najdeš v **Analytics** → **Custom events**. Peníze v **Economy**:
+   příjmy ze stojanů (**CollectionIncome**), prodeje (**CollectionSale**) a nákupy vylepšení (**Upgrade**).
+
+### Cesta nového hráče v sandboxu (10 kroků)
+
+| Krok | Název v grafu | Co to znamená |
+|---|---|---|
+| 1 | Joined | Hráč přišel a jeho uložená hra se načetla. |
+| 2 | PressedPlay | Zmáčkl **PLAY** na úvodní obrazovce (u skladu na něj čeká van). |
+| 3 | FirstContract | Vzal si první zakázku na stěhování (LAUNCH u tabule u skladu). |
+| 4 | EnteredHouse | Poprvé vešel do domu (The Old Chalet). |
+| 5 | FirstPieceInVan | Poprvé naložil věc do vanu. Počítá se i věc, kterou do jeho vanu naloží Danny nebo parťák. |
+| 6 | FirstTripHome | Poprvé dovezl náklad domů ke skladu (věci šly do skladu). |
+| 7 | FirstPieceOnShow | Poprvé dal věc na stojan ve skladu. |
+| 8 | FirstIncome | Stojany mu poprvé vydělaly peníze. |
+| 9 | FirstSale | Poprvé prodal věc ze sbírky. |
+| 10 | FirstUpgrade | Poprvé koupil vylepšení u pultu UPGRADES. |
+
+Pravidla, ať tě graf nepřekvapí:
+- Každý krok se počítá **jednou za celý život hráče** a hra si ho pamatuje v uložené hře. Když hráč odejde a vrátí se,
+  pokračuje tam, kde skončil. Nic se nepočítá dvakrát.
+- Kroky se počítají **popořadě**. Když hráč koupí vylepšení (krok 10) hned po startu, započítá se, až projde kroky
+  3 až 9. Stejně tak prodej před prvním vystavením čeká na vystavení a na první příjem. Proto graf nikdy neukáže víc
+  hráčů na pozdějším kroku než na dřívějším.
+- Parťák, který vejde do domu na cizím stěhování, má krok 4 schovaný, dokud si nevezme vlastní zakázku (krok 3).
+- Počítají se jen **noví hráči**. Kdo hrál sandbox před verzí 8.2 (ty a testeři), se nepočítá. Když si cestu chceš
+  projít sám, dej v admin panelu (P) → **PLAYER** → **RESET MY SAVE**. Pozor, smaže to celou tvou uloženou hru
+  v sandboxu.
+
+Jak číst schody:
+- **1 → 2**: hráči odejdou ještě před PLAY. Hra se možná načítá moc dlouho.
+- **2 → 3**: po startu nevědí, co dělat. Najdou tabuli se zakázkou u skladu?
+- **3 → 4**: zakázku vzali, ale k domu nedojeli. Cesta k domu je moc dlouhá, nebo se ztratí.
+- **4 → 5**: v domě jsou, ale nic nenaložili. Nosit věci je moc těžké. Podívej se na **GripCheck** (níže).
+- **5 → 6**: naložili, ale domů nedovezli. Podívej se na **MoveGaveUp** a na pole 02 („kam došli“).
+- **6 → 7**: věci jsou ve skladu, ale nevystavili je. Stojany nejsou vidět, nebo není jasné, k čemu jsou.
+- **7 → 8**: stojany platí samy, ale levná věc vydělá první dolar třeba až za pár minut. Velký schod znamená, že
+  hráči odešli dřív, než jim stojany něco vydělaly.
+- **8 → 9 → 10**: hra je baví, ale prodej nebo vylepšení nenajdou nebo na ně nemají.
+- Porovnej s **SessionLength**. V sandboxu je **New**, kdo ještě neprošel všech 10 kroků.
+
+### Vlastní události sandboxu
+
+| Událost | Kdy se zapíše | Hodnota a údaje |
+|---|---|---|
+| MoveStarted | začalo stěhování | hodnota: kolikáté stěhování v této hře (1 = první), 01: `solo` nebo `crew` |
+| MoveFinished | stěhování skončilo a domů se něco dovezlo | hodnota: minuty, 01: jak skončilo, 02: kolik jízd domů, 03: kolik věcí domů |
+| MoveFinishedValue | to samé stěhování: kolik má dovezené cenu | hodnota: cena dovezených věcí ($), 01: jak skončilo, 02: kolik věcí, 03: `solo` / `crew` |
+| MoveGaveUp | stěhování skončilo a **domů se nedovezlo nic** | hodnota: minuty, 01: jak skončilo, 02: kam došli, 03: `solo` / `crew` |
+| GripCheck | výsledek zkoušky úchopu při nošení (jen každá desátá) | hodnota: 10, 01: výsledek, 02: `lift` (zvedání) / `wobble` (zakolísání), 03: `fragile` (křehké) / `sturdy` |
+| CollectibleFound | sběratelský kousek se dovezl domů do skladu | hodnota: jeho cena ($), 01: vzácnost (`uncommon`, `rare`, `epic`, `legendary`), 02: který kousek |
+
+Co znamenají slova v údajích:
+- **Jak skončilo** (01 u MoveFinished a MoveGaveUp): `finish` = zmáčkl FINISH, `all` = dovezl všechno, `time` = došel
+  čas, `giveup` = vzdal to (GIVE UP), `left` = odešel ze hry, `admin` = ukončeno z admin panelu.
+- **Kolik jízd** (02 u MoveFinished): `1` až `5`, víc je `6plus`.
+- **Kolik věcí** (03 u MoveFinished, 02 u MoveFinishedValue): po pěti, `0-4`, `5-9` … `25-29`, víc je `30plus`.
+- **Kam došli** (02 u MoveGaveUp): `started` = jen vzali zakázku, `house` = byli v domě, `van` = něco naložili,
+  `home` = něco dovezli (to by tu být nemělo).
+- **Výsledek úchopu** (01 u GripCheck): `balanced` = zvedl v rovnováze, `knock` = zvedání se nepovedlo (věc ťukla
+  o zem), `steady` = zakolísání ustál, `stagger` = zavrávoral, `drop` = věc upadla.
+- **GripCheck je jen vzorek**: posílá se jedna zkouška z každých deseti u každého hráče. Počet událostí krát 10
+  (nebo součet hodnot) je zhruba počet všech zkoušek. Poměr výsledků (kolik `drop`, kolik `steady`) platí i tak.
+  Hodně `drop` a `knock` znamená, že je nošení moc těžké.
+
+Dál zůstávají události sandboxu z dřívějška: **UpgradeBought** (koupené vylepšení: hodnota úroveň, 01 které),
+**CollectionAdded** / **CollectionDisplayed** / **CollectionSold** (sklad) a **MoveDone** (hvězdy stěhování).
+
+### Jak to vyzkoušet ve Studiu
+
+Ve Studiu se nic neposílá, ale hra to počítá. Spusť hru, zmáčkni **P** → **WORLD** a dívej se na řádek **Analytics**.
+Číslo **onboarding** stoupne po každém novém kroku (ve Studiu bez ukládání začínáš vždycky jako nový hráč), číslo
+**custom** po každé události. Na konci řádku je poslední událost, např. `last: Onboarding 4 EnteredHouse` nebo
+`last: MoveFinished`.
+
+## Cesta nového hráče ve městě (Onboarding, 9 kroků)
+
+Tohle platí pro velké město (`Config.Sandbox.On = false`).
 
 Každý krok se počítá **jednou za celý život hráče**. Počítají se jen **noví hráči** (kdo hrál před verzí 6.13, se
 do téhle cesty nepočítá). Graf ukazuje, kolik hráčů došlo na každý krok. Kde je velký schod dolů, tam hráči odpadají.
