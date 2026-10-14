@@ -119,7 +119,9 @@
 --                             to the house's curb / the vanSpot); 8.1: "upmax" / "upreset" every upgrade at its top
 --                             for free / none (server/Upgrades.luau admin; FILL STANDS fills the player's own stands,
 --                             Collection.stands); 8.2: "bookfill" / "bookclear" every piece of the collection book found
---                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin)
+--                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin);
+--                             8.3: "level1" … "level5" the warehouse at that level for free (Upgrades.admin: its
+--                             building rebuilt, the pieces on stands it hasn't back to the stock)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1480,11 +1482,11 @@ Sandbox.run.clear = function(player: Player)
 	say(player, if sold > 0 then `ADMIN: {sold} pieces gone from your stock ($0 for them).` elseif #stock == 0 then "ADMIN: your stock is empty already." else "ADMIN: the stock kept its pieces (Collection.sell refused them).")
 end
 
--- The stock's pieces not on show onto the free display stands (Config.Warehouse.Stands of them; 8.1: the player's own
--- count, Collection.stands, with the More stands they bought).
+-- The stock's pieces not on show onto the free display stands (8.1: the player's own count, Collection.stands: 8.3,
+-- their warehouse level's; a build without it: Config.Warehouse.Stands of them).
 Sandbox.run.stands = function(player: Player)
 	local stands = Sandbox.Rules.standCount((Config :: any).Warehouse)
-	if stands > 0 and Sandbox.hasCollection("stands") then
+	if Sandbox.hasCollection("stands") then
 		local ok, own = Sandbox.collection("stands", player)
 		stands = if ok and type(own) == "number" then own else stands
 	end
@@ -1530,6 +1532,13 @@ end
 
 Sandbox.run.upreset = function(player: Player)
 	Sandbox.upgrades(player, "reset")
+end
+
+-- 8.3: 🏗 LV 1 … 5, the warehouse's level (Upgrades.admin "level1" … "level5")
+for level = 1, 5 do
+	Sandbox.run[`level{level}`] = function(player: Player)
+		Sandbox.upgrades(player, `level{level}`)
+	end
 end
 
 -- 8.2, the collection book (server/CollectionBook.luau's admin: every piece found, or the book empty) ----------------

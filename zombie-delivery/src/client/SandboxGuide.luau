@@ -99,7 +99,7 @@ local gUsed = false -- (this hold already toggled)
 local path: { number } = table.create(MAX_POINTS * 2, 0) -- the path's x, z pairs (reused)
 local ui: any = {} -- the hint line's instances and what it shows
 local world: any = {} -- the 3D guide's instances and what it shows
-local standSpots: { [number]: { [number]: SandboxSteps.Place } } = {} -- a plot's display stands (found once)
+local standSpots: { [number]: { [number]: SandboxSteps.Place } } = {} -- a plot's display stands (found once a level: 8.3)
 
 -- ── What the client sees ───────────────────────────────────────────────────
 
@@ -179,9 +179,12 @@ local function placeOf(value: any, plot: SandboxMap.Plot, depth: number): Sandbo
 	return nil
 end
 
--- A plot's display stands (index = the stand's number, Collection.display's `stand`), found once.
+-- A plot's display stands (index = the stand's number, Collection.display's `stand`), found once a warehouse level
+-- (8.3: the player attribute Config.WarehouseLevels.Attribute, server/Upgrades.luau's: a level's stands stand elsewhere).
 local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
-	local known = standSpots[plotId]
+	local level = player:GetAttribute(Config.WarehouseLevels.Attribute)
+	local key = plotId * 100 + (if type(level) == "number" and level == level then math.clamp(math.floor(level), 0, 99) else 0)
+	local known = standSpots[key]
 	if known then
 		return known
 	end
@@ -193,9 +196,9 @@ local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
 		for _, name in { "stands", "standSpots", "Stands", "spots" } do
 			local field = layout[name]
 			if type(field) == "function" then
-				local ok, got = pcall(field, plotId)
+				local ok, got = pcall(field, plotId, level)
 				if not (ok and type(got) == "table") then
-					ok, got = pcall(field, plot)
+					ok, got = pcall(field, plot, level)
 				end
 				raw = if ok and type(got) == "table" then got else nil
 			elseif type(field) == "table" then
@@ -214,16 +217,12 @@ local function standsOf(plotId: number): { [number]: SandboxSteps.Place }
 			end
 		end
 	end
-	standSpots[plotId] = list
+	standSpots[key] = list
 	return list
 end
 
--- The display stands a warehouse has (Config.Warehouse.Stands, else the layout's count; nil: not known).
+-- The display stands a warehouse has (8.3: its level's, the layout's count; nil: not known).
 local function standCount(): number?
-	local warehouse = (Config :: any).Warehouse
-	if type(warehouse) == "table" and type(warehouse.Stands) == "number" then
-		return warehouse.Stands
-	end
 	local plot = player:GetAttribute("Plot")
 	local count = if type(plot) == "number" then #standsOf(plot) else 0
 	return if count > 0 then count else nil

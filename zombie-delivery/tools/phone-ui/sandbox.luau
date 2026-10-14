@@ -22,11 +22,14 @@
 -- (each filter's count and price as shared/StockPlan.luau picks them, its texts fitting, asked first: CANCEL sends
 -- nothing, SELL only { kind = "sellmany", filter }); the server's bulk and sold answers as toasts; the sort toggle
 -- ($/MIN → VALUE → NEWEST → RARITY, kept for the picker); the search box on a computer only (every word, any case, the
--- card and the box not drawn again while typing, 40 letters at most, cleared with the window); THE PICKER at a small
--- upgrade stand (the bed, the hay wagon and the wheelbarrow greyed with "Too big for this stand" and TOO BIG, last;
--- TOO BIG sends nothing and says where it goes) and at a big one (nothing greyed).
+-- card and the box not drawn again while typing, 40 letters at most, cleared with the window); THE PICKER in the
+-- Workshop (8.3: level 2, the player attribute; its stands hold no hay wagon: greyed with "Too big for this stand" and
+-- TOO BIG, last; TOO BIG sends nothing and says a bigger warehouse has bigger stands) and in the Big warehouse (level 4:
+-- nothing greyed).
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
+local WAREHOUSE_LEVEL = require("./Config").WarehouseLevels.Attribute -- 8.3: the player's warehouse level (the stands' size)
+M.player:SetAttribute(WAREHOUSE_LEVEL, 4) -- (the Big warehouse: 12 big stands)
 local Config = require("./Config")
 local WarehouseLayout = require("./WarehouseLayout")
 local TouchLayout = require("./TouchLayout")
@@ -834,17 +837,20 @@ press(named(picker, "FillBest"))
 check("… FILL BEST's tap: \"Every display stand you have already shows a piece.\", nothing sent", M.toasts[#M.toasts] == "Every display stand you have already shows a piece." and #sentOn("Collection") == before, M.toasts[#M.toasts])
 press(named(picker, "SellMenu"))
 check("… SELL…'s tap: \"Your stock is empty: nothing to sell.\" (no menu)", M.toasts[#M.toasts] == "Your stock is empty: nothing to sell." and named(picker, "Menu") == nil)
--- (14 stands, the 12 big ones taken: only small 13 and 14 free; a bed and a broken TV in the stock)
+-- (8.3: the Workshop, 4 stands of 9 × 9, 3 taken: stand 4 free; a hay wagon and a broken TV in the stock)
+M.player:SetAttribute(WAREHOUSE_LEVEL, 2)
 local BIGFULL = {}
-for i = 1, 12 do
+for i = 1, 3 do
 	table.insert(BIGFULL, { uid = `k{i}`, item = "radio", variant = 1, condition = 1, name = "Kitchen Radio", got = i, stand = i })
 end
-table.insert(BIGFULL, { uid = "k13", item = "bed", variant = 1, condition = 1, name = "Double Bed", got = 13 })
+table.insert(BIGFULL, { uid = "k13", item = "hay_wagon", variant = 1, condition = 1, name = "Hay Wagon", got = 13 })
 table.insert(BIGFULL, { uid = "k14", item = "tv", variant = 1, condition = 0, name = "Old TV", got = 14 })
-collection.OnClientEvent:Fire(withStands(BIGFULL, 12, 14))
+collection.OnClientEvent:Fire(withStands(BIGFULL, 3, 4))
 picker = named(gui, "Picker")
 press(named(picker, "FillBest"))
-check("only small stands free and a bed: FILL BEST grey, \"What's in your stock is too big for your free small stands.\"", named(picker, "FillBest"):GetAttribute("Live") == false and M.toasts[#M.toasts] == "What's in your stock is too big for your free small stands.", M.toasts[#M.toasts])
+check("the Workshop's free stand and a hay wagon: FILL BEST grey, \"What's in your stock is too big for your free stands: a bigger warehouse has bigger ones.\"", named(picker, "FillBest"):GetAttribute("Live") == false
+	and M.toasts[#M.toasts] == "What's in your stock is too big for your free stands: a bigger warehouse has bigger ones.", M.toasts[#M.toasts])
+M.player:SetAttribute(WAREHOUSE_LEVEL, 4)
 collection.OnClientEvent:Fire(withStands({}, 0, 12))
 picker = named(gui, "Picker")
 press(named(picker, "TakeAllDown"))
@@ -900,7 +906,8 @@ end
 check("… round to $/MIN again", WarehouseUi.sorting() == "income")
 WarehouseUi.close()
 
--- THE PICKER at a small upgrade stand: the pieces too big for it greyed, "Too big for this stand", last
+-- THE PICKER in the Workshop (8.3: level 2): the pieces too big for its stands greyed, "Too big for this stand", last
+M.player:SetAttribute(WAREHOUSE_LEVEL, 2)
 local SMALL = {
 	{ uid = "s1", item = "bed", variant = 1, condition = 1, name = "Double Bed", got = 1, rarity = "rare", perMinute = 9.9, sell = 90 },
 	{ uid = "s2", item = "hay_wagon", variant = 1, condition = 1, name = "Hay Wagon", got = 2, rarity = "epic", perMinute = 16.9, sell = 156 },
@@ -908,30 +915,32 @@ local SMALL = {
 	{ uid = "s4", item = "piano", variant = 1, condition = 1, name = "Upright Piano", got = 4, rarity = "epic", perMinute = 31.2, sell = 288 },
 	{ uid = "s5", item = "wheelbarrow", variant = 1, condition = 1, name = "Wheelbarrow", got = 5, rarity = "common", perMinute = 1, sell = 10 },
 }
-collection.OnClientEvent:Fire(withStands(SMALL, 0, 14))
-collection.OnClientEvent:Fire({ kind = "pick", stand = 13 })
+collection.OnClientEvent:Fire(withStands(SMALL, 0, 4))
+collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
 picker = named(gui, "Picker")
 grid = named(picker, "Grid")
 local order = {}
 for _, tile in tilesOf() do
 	table.insert(order, tile.Name)
 end
-check("small stand 13: the pieces that fit first (the piano, the radio), the bed, the hay wagon and the wheelbarrow last", table.concat(order, ",") == "Tile_s4,Tile_s3,Tile_s2,Tile_s1,Tile_s5", table.concat(order, ","))
-local bed = named(grid, "Tile_s1")
-check("… a bed's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for DISPLAY", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Display").Text == "TOO BIG"
+check("the Workshop's stand 3: the pieces that fit first (the piano, the bed, the wheelbarrow, the radio), the hay wagon last", table.concat(order, ",") == "Tile_s4,Tile_s1,Tile_s5,Tile_s3,Tile_s2", table.concat(order, ","))
+local bed = named(grid, "Tile_s2") -- (8.3: the hay wagon, the one piece the Workshop's stands don't hold)
+check("… the hay wagon's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for DISPLAY", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Display").Text == "TOO BIG"
 	and named(bed, "PieceName").TextTransparency > 0 and bed.BackgroundTransparency > 0)
 check("… the piano's not: DISPLAY", named(named(grid, "Tile_s4"), "Display").Text == "DISPLAY" and named(grid, "Tile_s4"):GetAttribute("TooBig") == false and named(named(grid, "Tile_s4"), "TooBig") == nil)
-pickerChecks("844 x 390, small stand 13")
+pickerChecks("844 x 390, the Workshop's stand 3")
 scene("phone-toobig")
 before = #sentOn("Collection")
 press(named(bed, "Display"))
-check("… TOO BIG sends nothing, says where it goes (stands 1 – 12), the picker stays", #sentOn("Collection") == before and WarehouseUi.isOpen() and M.toasts[#M.toasts] == "Your Double Bed is too big for small stand 13: show it on stands 1 – 12.", M.toasts[#M.toasts])
+check("… TOO BIG sends nothing, says a bigger warehouse has bigger stands, the picker stays", #sentOn("Collection") == before and WarehouseUi.isOpen()
+	and M.toasts[#M.toasts] == "Your Hay Wagon is too big for stand 3: a bigger warehouse has bigger stands (UPGRADES).", M.toasts[#M.toasts])
 press(named(bed, "Sell"))
 check("… its SELL still asks", named(picker, "Confirm") ~= nil)
 key("Escape")
 press(named(named(grid, "Tile_s4"), "Display"))
 sent = sentOn("Collection")
-check("… DISPLAY on a piece that fits: { kind = \"display\", uid, stand = 13 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 13)
+check("… DISPLAY on a piece that fits: { kind = \"display\", uid, stand = 3 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 3)
+M.player:SetAttribute(WAREHOUSE_LEVEL, 4) -- (the Big warehouse)
 collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
 picker = named(gui, "Picker")
 grid = named(picker, "Grid")

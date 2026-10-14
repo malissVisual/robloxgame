@@ -75,7 +75,7 @@ end
 table.sort(pieces, function(a, b)
 	return if a.n == b.n then a.id < b.id else a.n > b.n
 end)
-local stands = WarehouseLayout.capacity()
+local stands = WarehouseLayout.most() -- (8.3: the Logistics centre's; the stand-in Upgrades gives every owner level 5)
 local shownParts = 0
 for i = 1, stands do
 	shownParts += pieces[i].n

@@ -6,11 +6,12 @@
 -- Triggered), the remotes (Runtime.messages, Runtime.lastNotice) and task.delay (at once) are
 -- tests/runtime/MovingRuntime.luau's. Here: a fake SandboxPlots (Runtime.claim, Runtime.free) and a fake Collection
 -- (a stock per player the test fills, Runtime.give / Runtime.changed; it records Runtime.calls). 8.1: the fake
--- Collection's stands (Runtime.standCount: player → how many, else Config.Warehouse.Stands) and boost (Runtime.boosts),
--- a fake Upgrades (its open recorded in Runtime.calls as "openUpgrades").
+-- Collection's stands (Runtime.standCount: player → how many, else their warehouse level's) and boost (Runtime.boosts),
+-- a fake Upgrades (its open recorded in Runtime.calls as "openUpgrades"; 8.3: its warehouseLevel, Runtime.levels:
+-- player → level, else the start's).
 local E = require("./MovingRuntime") :: any
 local SandboxMap = require("./SandboxMap")
-local Config = require("./Config")
+local WarehouseLevels = require("./WarehouseLevels")
 
 local Mock = E.Mock
 local Runtime: any = {
@@ -19,13 +20,16 @@ local Runtime: any = {
 	task = E.task,
 	os = E.os,
 	player = E.player,
+	place = E.place, -- 8.3: a player moved (Runtime.place(player, Vector3)), where they stand (Runtime.rootOf(player))
+	rootOf = E.rootOf,
 	leave = E.leave,
 	messages = E.messages,
 	lastNotice = E.lastNotice,
 	calls = {}, -- { { name, player, a } } every Collection call that changes something (and openPicker)
 	income = {}, -- player → Collection.incomePerMinute
 	stocks = {}, -- player → { Entry }
-	standCount = {}, -- 8.1: player → Collection.stands (else Config.Warehouse.Stands)
+	standCount = {}, -- 8.1: player → Collection.stands (else their warehouse level's)
+	levels = {}, -- 8.3: player → their warehouse level (else the start's)
 	boosts = {}, -- 8.1: player → Collection.boost (else 1)
 }
 
@@ -149,7 +153,7 @@ Runtime.Collection = {
 		table.insert(changedListeners, fn)
 	end,
 	stands = function(player: any): number
-		return Runtime.standCount[player] or Config.Warehouse.Stands
+		return Runtime.standCount[player] or WarehouseLevels.stands(Runtime.levels[player] or WarehouseLevels.Start)
 	end,
 	boost = function(player: any): number
 		return Runtime.boosts[player] or 1
@@ -160,6 +164,9 @@ Runtime.Collection = {
 Runtime.Upgrades = {
 	open = function(player: any)
 		table.insert(Runtime.calls, { "openUpgrades", player })
+	end,
+	warehouseLevel = function(player: any): number
+		return Runtime.levels[player] or WarehouseLevels.Start
 	end,
 }
 

@@ -350,7 +350,7 @@ for index, pick in fresh do
 end
 check("… the new day's picks (none \"upgrade\": every upgrade is bought), the state sent", same and #kinds(E.received(A, "SandboxTasks", mark), "state") >= 1)
 check("… the weekly kept (the same week)", profileA.sandboxTasks.weekly ~= nil and profileA.sandboxTasks.weekly.id == "w_home")
-check("UpgradeRules: everything at its top", UpgradeRules.level(profileA.sandboxUpgrades, "stands") == (UpgradeRules.def("stands") :: any).max)
+check("UpgradeRules: everything at its top (8.3: the warehouse at the Logistics centre)", UpgradeRules.level(profileA.sandboxUpgrades, "warehouse") == (UpgradeRules.def("warehouse") :: any).max)
 profileA.sandboxTasks.weekly.progress = 60
 moneyAt = #money
 E.now = (day + 2) * DAY + 30 -- (Monday: a new week)

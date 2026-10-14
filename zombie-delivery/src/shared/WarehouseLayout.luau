@@ -566,10 +566,11 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
 		local slope = math.atan(rise / (2 * hz))
 		local run = 2 * hz + 2 -- (a stud over each end)
 		local length = run / math.cos(slope)
+		local sheet = 0.4 -- (warehouse.py's: the model's roof over the slabs)
 		for _, side in { -1, 1 } do
 			local tag = if side < 0 then "West" else "East"
 			local cx = side * (hx + 1) / 2
-			local slab = look(solid(add("Roof" .. tag, "roof", { hx + 1, thick, length }, { cx, (h + back) / 2 + math.cos(slope) * thick / 2, -math.sin(slope) * thick / 2 }, ROOF, "Metal"), true))
+			local slab = look(solid(add("Roof" .. tag, "roof", { hx + 1, sheet, length }, { cx, (h + back) / 2 + sheet / 2, 0 }, ROOF, "Metal"), true))
 			slab.pitch = -math.deg(slope) -- (its front end up)
 		end
 		look(add("Parapet", "roof", { 2 * hx + 2.2, 0.7, 0.3 }, { 0, h + 0.4, hz + 1 }, WHITE, "SmoothPlastic"))
@@ -606,9 +607,9 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
 				local z = front * (hz - WALL / 2)
 				local where = if front > 0 then "Front" else "Back"
 				if low - h > 0.01 then
-					look(solid(add(`GableBlock{where}{tag}`, "shell", { math.abs(dx), low - h, WALL }, { mx, h + (low - h) / 2, z }, clad, cladMaterial), true))
+					look(solid(add(`GableBlock{where}{tag}`, "shell", { math.abs(dx), low - h, WALL }, { mx, h + (low - h) / 2, z }, clad, cladMaterial)))  -- (no shadow: the vault's slabs cast it; perf)
 				end
-				local wedge = look(solid(add(`Gable{where}{tag}`, "shell", { WALL, math.max(high - low, 0.01), math.abs(dx) }, { mx, low + (high - low) / 2, z }, clad, cladMaterial), true))
+				local wedge = look(solid(add(`Gable{where}{tag}`, "shell", { WALL, math.max(high - low, 0.01), math.abs(dx) }, { mx, low + (high - low) / 2, z }, clad, cladMaterial)))
 				wedge.shape = "Wedge"
 				wedge.yaw = if west then 90 else -90 -- (a wedge's tall side is its +Z: turned to the crown)
 			end
