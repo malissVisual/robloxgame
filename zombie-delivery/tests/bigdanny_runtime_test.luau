@@ -1,23 +1,25 @@
--- 8.3 the big move × Danny: the real server/Moving.luau, server/MoveHelper.luau (on tests/runtime/MovingRuntime.luau's
--- fakes, Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau's kind "big",
--- server/HouseInterior.luau: tests/run_tests.py builds them on the recorder), a solo move into the sandbox's big house
--- (The Old Chalet, the owner's big Blender house: its big plan). No
+-- 8.3 the big move × Danny for hire: the real server/Moving.luau, server/MoveHelper.luau (on
+-- tests/runtime/MovingRuntime.luau's fakes, Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau,
+-- shared/HouseLayout.luau's kind "big", server/HouseInterior.luau: tests/run_tests.py builds them on the recorder), a solo
+-- move into the sandbox's big house (The Old Chalet, the owner's big Blender house: its big plan). No
 -- physics, no pathfinding: his walk is a straight step (useMover, as tests/movehelper_art_runtime_test.luau's), a carried
 -- piece goes where its carrier is (the test moves it); his paths through the real walls are PathfindingService's in
 -- Roblox (the big house's doorways are a house's; its leaves PassThrough: tests/biglayout_test.luau), the floor under
 -- his end tests/movehelper_hop_runtime_test.luau's.
---   * Danny comes with the van on AUTO; his ways are the house's two (the front door, the back door: Moving's ways,
---     their insides the plan's exits, their outsides the map's doors), every doorway of the plan his to keep out of,
---     every piece may leave by either (Moving.helperExits: HouseLayout.exitsFor);
---   * AUTO on the big house: a heavy piece nobody handles (a piece for two), he goes to it and asks for a hand ("give me a
---     hand!", the 🙋 marker); nobody comes: the light pieces, carried out and loaded at the van at the curb, never a
---     heavy one alone; his way to the van by the door nearer (from the corridor's east end the back door, from the
---     hall the front door: MoveHelperBrain.routeVia over his two ways);
---   * Ann in by the back door: she lifts a piece for two (the nearest to it in a room off the corridor) with him,
---     they carry it out of its room by its doorway, along the corridor and out of the back door together (walked
---     into, no E: he comes through with it, behind the house at its far end, on the ground), round the house to the
---     van; loaded.
--- (math.randomseed: the sandbox's seeds are math.random's; 80 seeds passed when it was written.)
+--   * Danny comes with the van, for hire (MoveHelper "offer", the big house's price: MoveHelperBrain.hirePrice); his ways
+--     are the house's two (the front door, the back door: Moving's ways, their insides the plan's exits, their outsides
+--     the map's doors), every doorway of the plan his to keep out of, every piece may leave by either
+--     (Moving.helperExits: HouseLayout.exitsFor); not hired, he touches nothing;
+--   * Ann hires him (PlayerData.spend "HelperHire") and gives him two pieces (a click on each, from beside it): a light
+--     one (the one whose way to the van is the back door's by the most; a plan with none clearly so: the front door's)
+--     and a piece for two (the nearest to the back door in a room off the corridor); he carries the light one out by the
+--     door nearer, either (MoveHelperBrain.routeVia over his two ways: from the corridor's east end the back door, from
+--     the hall the front door) and loads it at the van at the curb, never a piece for two alone; then he goes to the
+--     piece for two and waits there ("give me a hand!", the crew's toast, "🙋 Danny needs you", "Lift with Danny");
+--   * Ann in by the back door: Lift with Danny, they carry it out of its room by its doorway, along the corridor and out
+--     of the back door together (the door nearer to it; walked into, no E: he comes through with it, behind the house at
+--     its far end, on the ground), round the house to the van; loaded, off his list.
+-- (math.randomseed: the sandbox's seeds are math.random's.)
 math.randomseed(83) -- (the sandbox's seeds are math.random's: one plan every run)
 local E = require("./MovingRuntime")
 local Config = require("./Config")
@@ -130,14 +132,6 @@ end
 local function distance(a: any, b: any): number
 	return V3(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
-local function askPrompt(model: any): any -- (Moving's "<Lift / Pick up> with Danny")
-	for _, d in model:GetDescendants() do
-		if d.ClassName == "ProximityPrompt" and not d.destroyed and string.find(tostring(d.ActionText), ` with {H.Name}`, 1, true) then
-			return d
-		end
-	end
-	return nil
-end
 local function told(player: any, text: string, from: number): boolean
 	for index = from + 1, #E.messages do
 		local m = E.messages[index]
@@ -156,9 +150,34 @@ end
 local function follow(model: any)
 	model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * CF(0, 0, -3)
 end
--- His ways through the doors: each transfer (his doorAt) by the way whose inside or outside he came out at.
+-- 8.3 a click on a piece (its model: the Moving remote's ("helper", "assign", model)) by Ann, from beside it.
+local function give(model: any)
+	local was = E.rootOf(ann).Position
+	E.place(ann, model.PrimaryPart.Position + V3(3, 0, 0))
+	E.request(ann, "helper", "assign", model)
+	E.place(ann, was)
+end
+local function markOf(model: any): string?
+	local gui = model.PrimaryPart:FindFirstChild("DannyMark")
+	local label = gui and gui:FindFirstChild("Label")
+	return if label then label.Text else nil
+end
+local function listIs(list: { number }): boolean
+	if #danny.queue ~= #list then
+		return false
+	end
+	for index, spot in list do
+		if danny.queue[index] ~= spot then
+			return false
+		end
+	end
+	return true
+end
+-- His ways through the doors: each transfer (his doorAt) by the way whose inside or outside he came out at; the way
+-- he first went through with a piece in his arms (8.3: his list's), by spot.
 local through = { 0, 0 }
-local heavyAlone = false
+local carriedBy: { [number]: number } = {}
+local pairAlone = false
 local lastDoor = -math.huge
 local function run(seconds: number, done: (() -> boolean)?): boolean
 	for index = 1, math.ceil(seconds / 0.1 - 1e-9) do
@@ -169,8 +188,7 @@ local function run(seconds: number, done: (() -> boolean)?): boolean
 			local spot, role = Rules.holding(h.s.move, h.id)
 			if spot and role == "carrier" then
 				pieceOf(spot).PrimaryPart.CFrame = h.body.root.CFrame * CF(0, 0, -1.5)
-				local thing = h.s.move.things[spot]
-				heavyAlone = heavyAlone or not Brain.light(thing.class, thing.weight)
+				pairAlone = pairAlone or h.s.move.things[spot].class == "pair"
 			end
 			if h.doorAt ~= lastDoor and h.doorAt > 0 then
 				lastDoor = h.doorAt
@@ -183,6 +201,9 @@ local function run(seconds: number, done: (() -> boolean)?): boolean
 					end
 				end
 				through[which] = (through[which] or 0) + 1
+				if spot and role == "carrier" and carriedBy[spot] == nil then
+					carriedBy[spot] = which
+				end
 			end
 		end
 		if index % 2 == 0 then
@@ -211,7 +232,7 @@ truck.model:SetAttribute("BackOpen", true)
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 local plan = built[1].plan
 local origin = built[1].origin
-check("Danny comes with the van, on AUTO", danny ~= nil and danny.body ~= nil and danny.mode == "auto")
+check("Danny comes with the van, for hire (not hired yet)", danny ~= nil and danny.body ~= nil and danny.hirer == nil)
 danny.body.root.CFrame = CF(cargoDoor.WorldPosition + V3(3, 1, 3)) -- (by the van's back at the curb)
 
 local exits = HouseLayout.exitsOf(plan)
@@ -230,59 +251,54 @@ for _, s in plan.spots do
 end
 check("every piece may leave by either door (Moving.helperExits: HouseLayout.exitsFor)", both)
 
--- ── AUTO: he asks for a hand with a heavy piece, nobody comes, the light ones ─
+-- ── For hire: the big house's price, he touches nothing ──────────────────────
 
 E.place(ann, V3(House.curb.x - 60, 3, House.curb.z - 30)) -- (out on the road, out of the way: nobody handles a thing)
-local said = #E.said
-local noticeAt = #E.messages
-local asked = run(60, function()
-	return danny.ask ~= nil and (danny.askAt or 0) > 0
-end)
-local askSpot = danny.ask
-local askThing = if askSpot then danny.s.move.things[askSpot] else nil
-local askModel = if askSpot then pieceOf(askSpot) else nil
-check("AUTO on the big house: a heavy piece nobody handles (a piece for two), he goes to it and asks", asked and askThing ~= nil
-	and not Brain.light(askThing.class, askThing.weight) and danny.action == "ask", askThing and askThing.item)
-check("…beside it: \"give me a hand!\", the crew's toast, the 🙋 marker, \"Lift with Danny\" (or Pick up)", askModel ~= nil
-	and E.saidSince("This one's too heavy for me alone, give me a hand!", said) and told(ann, "Danny needs a hand", noticeAt)
-	and askModel.PrimaryPart:FindFirstChild("DannyAsk") ~= nil and askPrompt(askModel) ~= nil
-	and distance(danny.body.root.Position, askModel.PrimaryPart.Position) < 12)
-local gaveUp = run(H.AskWait + 2, function()
-	return danny.ask == nil
-end)
-check("…nobody came: back to the light pieces", gaveUp and askModel ~= nil and askModel.PrimaryPart:FindFirstChild("DannyAsk") == nil)
--- the light pieces carried out and loaded (both doors), never a heavy one alone
-local loaded: { number } = {}
-local function inVan(): number
-	local n = 0
-	for _, thing in danny.s.move.things do
-		n += if thing.state == "truck" then 1 else 0
-	end
-	return n
+local price = danny.price
+run(5)
+local touched = false
+for _, thing in danny.s.move.things do
+	touched = touched or thing.state ~= "home"
 end
-run(300, function()
-	return inVan() >= 6 and through[1] > 0
-end)
-for spot, thing in danny.s.move.things do
-	if thing.state == "truck" then
-		table.insert(loaded, spot)
-	end
-end
-check(`AUTO: he carries the big house's light pieces out and loads them at the curb ({#loaded} in the van)`, #loaded >= 4, #loaded)
-check("…never a heavy one alone", not heavyAlone)
--- (his way to the van from the corridor's east end, Brain.routeVia over his ways' doors: the back door; from the
--- hall the front door)
+check(`for hire on the big house ({Brain.money(price)}: MoveHelperBrain.hirePrice of its {#danny.s.move.order} pieces): Ann's strip says so, he touches nothing`,
+	price == Brain.hirePrice(#danny.s.move.order) and ann:GetAttribute("MoveHelper") == "offer" and ann:GetAttribute("MoveHelperPrice") == price
+	and Rules.holding(danny.s.move, danny.id) == nil and not touched, ann:GetAttribute("MoveHelperPrice"))
+
+-- ── The two pieces: a light one by the back door's way, one for two off the corridor ─
+
 local van = cargoDoor.WorldPosition
-local east = origin * exits[2]
-local hall = origin * (exits[1] + V3(0, 0, 4))
-local _, fromEast = Brain.routeVia(true, east.X, east.Z, false, van.X, van.Z, danny.wayDoors, Moving.helperExits(danny.s, nil))
-local _, fromHall = Brain.routeVia(true, hall.X, hall.Z, false, van.X, van.Z, danny.wayDoors, Moving.helperExits(danny.s, nil))
-check(`…by the door nearer: the back door from the corridor's east end, the front door from the hall (this run: {through[1]} times by the front door, {through[2]} by the back door)`,
-	through[1] > 0 and fromEast == 2 and fromHall == 1, `{fromEast} {fromHall}`)
-
--- ── Ann answers by the back door: the heavy piece out of the back door together ─
-
--- (the heavy piece Danny asked about, or another heavy one in a room off the corridor: the nearest to the back door)
+local function wayCost(at: any, way: number): number
+	return (Brain.routeVia(true, at.X, at.Z, false, van.X, van.Z, danny.wayDoors, { way }))
+end
+-- the light one: the piece (not for two) whose way to the van is the back door's by the most (a plan with none clearly
+-- so: the front door's by the most), either door
+local light: any = nil
+local lightBy = -math.huge
+local front: any = nil
+local frontBy = math.huge
+for _, s in plan.spots do
+	local thing = danny.s.move.things[s.id]
+	local def = FurnitureLooks.Items[s.item]
+	if thing.state == "home" and def.class ~= "pair" and not def.fragile and Rules.canLoad(danny.s.move, s.id) then
+		local at = pieceOf(s.id).PrimaryPart.Position
+		local by = wayCost(at, 1) - wayCost(at, 2)
+		if by > lightBy then
+			light, lightBy = s, by
+		end
+		if by < frontBy then
+			front, frontBy = s, by
+		end
+	end
+end
+if lightBy <= 5 then
+	light, lightBy = front, frontBy
+end
+local lightWay = if lightBy > 0 then 2 else 1
+local lightModel = if light then pieceOf(light.id) else nil
+local lightName = if light then FurnitureLooks.Items[light.item].name else "?"
+check(`a light piece: the {lightName} (its way to the van {if lightWay == 2 then "the back door's" else "the front door's"}, {math.floor(math.abs(lightBy))} studs shorter)`,
+	light ~= nil and math.abs(lightBy) > 5, lightBy)
+-- the piece for two: in a room off the corridor, the nearest to the back door (nearer to it than to the front door)
 local backDoor: any = nil
 for index, d in plan.doors do
 	if index > 1 and d.rooms[2] == "outside" then
@@ -310,9 +326,59 @@ for _, s in plan.spots do
 		end
 	end
 end
-check("a heavy piece for two in a room off the corridor, still in the big house", pick ~= nil and backDoor ~= nil, pick and pick.item)
+check("a heavy piece for two in a room off the corridor, nearer to the back door than to the front door", pick ~= nil and backDoor ~= nil
+	and distance(pick.at.Position, exits[2]) < distance(pick.at.Position, exits[1]), pick and pick.item)
+local pairModel = if pick then pieceOf(pick.id) else nil
+local pairName = if pick then FurnitureLooks.Items[pick.item].name else "?"
+
+-- ── Ann hires him, gives him both ────────────────────────────────────────────
+
+local money = E.wallet[ann] or E.startMoney
+local spentAt = #E.spent
+E.request(ann, "helper", "hire")
+local paid = E.spent[spentAt + 1]
+run(0.3)
+check(`Ann hires Danny: {Brain.money(price)} paid (PlayerData.spend "HelperHire"), hers`, danny.hirer == ann and paid ~= nil and paid.player == ann
+	and paid.amount == price and paid.reason == "HelperHire" and E.wallet[ann] == money - price and ann:GetAttribute("MoveHelper") == "hired")
+if light and pick then
+	give(lightModel)
+	give(pairModel)
+end
+local said = #E.said
+local noticeAt = #E.messages
+check(`…and gives him the {lightName}, then the {pairName}: his list in that order, numbered over them`, light ~= nil and pick ~= nil
+	and listIs({ light.id, pick.id }) and markOf(lightModel) == "🧑‍🔧 Danny · 1" and markOf(pairModel) == "🧑‍🔧 Danny · 2", #danny.queue)
+
+-- ── He carries the light one out by the door nearer, then waits at the piece for two ─
+
+local loaded = light ~= nil and run(300, function()
+	return danny.s.move.things[light.id].state == "truck"
+end)
+check(`he carries the {lightName} out by the door nearer (this plan: {if lightWay == 2 then "the back door" else "the front door"}) and loads it at the van at the curb`,
+	loaded and carriedBy[light.id] == lightWay, light and carriedBy[light.id])
+check("…never a piece for two alone", not pairAlone)
+-- (his way to the van from the corridor's east end, Brain.routeVia over his ways' doors: the back door; from the
+-- hall the front door)
+local east = origin * exits[2]
+local hall = origin * (exits[1] + V3(0, 0, 4))
+local _, fromEast = Brain.routeVia(true, east.X, east.Z, false, van.X, van.Z, danny.wayDoors, Moving.helperExits(danny.s, nil))
+local _, fromHall = Brain.routeVia(true, hall.X, hall.Z, false, van.X, van.Z, danny.wayDoors, Moving.helperExits(danny.s, nil))
+check(`…the door nearer: the back door from the corridor's east end, the front door from the hall (this run: {through[1]} times by the front door, {through[2]} by the back door)`,
+	fromEast == 2 and fromHall == 1, `{fromEast} {fromHall}`)
+local waiting = pick ~= nil and run(120, function()
+	return danny.needs == pick.id and danny.needsAt > 0
+end)
+check(`then the {pairName} (two people): he goes to it and waits there, his list the {pairName}`, waiting and danny.action == "needs" and listIs({ pick.id })
+	and distance(danny.body.root.Position, pairModel.PrimaryPart.Position) < 12)
+check("…\"give me a hand!\", the crew's toast, \"🙋 Danny needs you\" over it, its prompt \"Lift with Danny\"", pairModel ~= nil
+	and E.saidSince("This one's too heavy for me alone, give me a hand!", said) and told(ann, `Danny is at the {pairName}: lift it with him.`, noticeAt)
+	and markOf(pairModel) == "🙋 Danny needs you" and pairModel:GetAttribute("DannyNeeds") == true and promptIn(pairModel, "Lift with Danny") ~= nil,
+	pairModel and markOf(pairModel))
+
+-- ── Ann answers by the back door: the piece for two out of the back door together ─
+
 if pick and backDoor then
-	local model = pieceOf(pick.id)
+	local model = pairModel
 	carried = model
 	local y = origin.Position.Y + 3
 	local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{House.id}`)
@@ -321,17 +387,19 @@ if pick and backDoor then
 	trigger(promptIn(site, "Enter by the back door"), ann)
 	check("Ann in by the back door: inside, by the corridor's east end", distance(E.rootOf(ann).Position, origin * exits[2]) < Config.Furniture.EntryIn + 1.5,
 		E.rootOf(ann).Position)
-	-- at the piece's front, facing it: Lift (Danny's ask answered, or he is called)
+	-- at the piece's front, facing it: Lift with Danny (a call he answers at once: he is there)
 	local size = FurnitureLooks.Items[pick.item].size
 	local front = model.PrimaryPart.CFrame * CF(0, 0, -(size.Z / 2 + 2))
 	E.rootOf(ann).CFrame = M.CFrame.lookAt(V3(front.Position.X, y, front.Position.Z), V3(model.PrimaryPart.Position.X, y, model.PrimaryPart.Position.Z))
-	local lift = askPrompt(model) or promptIn(model, "Lift")
-	trigger(lift, ann)
+	noticeAt = #E.messages
+	trigger(promptIn(model, "Lift with Danny"), ann)
 	local function helped(): boolean
 		return math.abs((ann.Character:GetAttribute("CarrySpeed") or 0) - WALK * T.Speed.Pair) < 1e-6
 	end
 	local up = run(40, helped)
-	check(`Ann lifts the {FurnitureLooks.Items[pick.item].name} with Danny: up together (the two-person walk)`, up and ann.Character:GetAttribute("MoveCarry") == pick.id, ann.Character:GetAttribute("MoveCarry"))
+	check(`Ann lifts the {pairName} with Danny: up together (the two-person walk)`, up and ann.Character:GetAttribute("MoveCarry") == pick.id, ann.Character:GetAttribute("MoveCarry"))
+	check("…off his list (lifted with him), the marker gone", #danny.queue == 0 and markOf(model) == nil and model:GetAttribute("DannyNeeds") == nil
+		and not told(ann, "You took", noticeAt))
 	local function farEnd(): any
 		return (model.PrimaryPart.CFrame * CF(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 	end
@@ -383,7 +451,8 @@ if pick and backDoor then
 	local w3, d3, h3 = walk(V3(exitIn.X - Config.Moving.Doors.Through - 2, y, exitIn.Z))
 	check("out of its room by its doorway and along the corridor to the back door together: he never leaves its far end, on the floor",
 		math.max(w1, w2, w3) < 0.05 and not (d1 or d2 or d3) and helped() and math.max(h1, h2, h3) < 0.5 and room ~= nil, `{math.max(w1, w2, w3)} off, {math.max(h1, h2, h3)} up`)
-	-- out of the back door (8.1 walk-in doors: into its zone facing it, the dwell): he comes through with it
+	-- out of the back door, the door nearer to it (8.1 walk-in doors: into its zone facing it, the dwell): he comes
+	-- through with it
 	local inZone = false
 	for _ = 1, 40 do
 		E.rootOf(ann).CFrame = M.CFrame.lookAt(V3(exitIn.X - 1.5, y, exitIn.Z), V3(exitIn.X + 1, y, exitIn.Z))
@@ -397,21 +466,21 @@ if pick and backDoor then
 	follow(model)
 	run(0.3)
 	local out = E.rootOf(ann).Position
-	check("out of the back door together (walked into it, no E): behind the house (south of it), Danny with it at its far end, on the ground",
+	check("out of the back door together (the door nearer; walked into it, no E): behind the house (south of it), Danny with it at its far end, on the ground",
 		inZone and distance(out, V3(House.back.x, 0, House.back.z)) < 6 and out.Z > House.back.z and distance(danny.body.root.Position, farEnd()) < 0.05
 		and math.abs(danny.body.root.Position.Y - out.Y) < 0.5 and helped(), `{out.X}, {out.Y}, {out.Z}`)
 	-- round the house to the van's back
 	local backAt = cargoDoor.WorldPosition
 	local away = V3(backAt.X - truck.chassis.Position.X, 0, backAt.Z - truck.chassis.Position.Z).Unit
-	local east = House.house.x + House.house.sx / 2 + 10 -- (round the house's east side)
-	local w4, d4 = walk(V3(east, 3, House.back.z + 6))
-	local w6, d6 = walk(V3(east, 3, House.door.z - 6))
+	local eastSide = House.house.x + House.house.sx / 2 + 10 -- (round the house's east side)
+	local w4, d4 = walk(V3(eastSide, 3, House.back.z + 6))
+	local w6, d6 = walk(V3(eastSide, 3, House.door.z - 6))
 	local w5, d5 = walk(backAt + away * 3)
 	check("round the house to the van at the curb together, no drop", math.max(w4, w5, w6) < 0.05 and not (d4 or d5 or d6) and helped(), math.max(w4, w5, w6))
 	run(0.2)
 	trigger(promptIn(truck.model, "Load"), ann)
-	check(`Ann loads the {FurnitureLooks.Items[pick.item].name}: in the van`, danny.s.move.things[pick.id].state == "truck" and ann.Character:GetAttribute("MoveCarry") == nil,
-		E.lastNotice(ann))
+	check(`Ann loads the {pairName}: in the van, beside the {lightName}`, danny.s.move.things[pick.id].state == "truck" and ann.Character:GetAttribute("MoveCarry") == nil
+		and danny.s.move.things[light.id].state == "truck", E.lastNotice(ann))
 end
 
 Moving.admin(ann, "end")
