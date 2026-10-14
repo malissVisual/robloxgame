@@ -20,8 +20,11 @@
 --                      unload      the circle the van's back must be in to unload into the warehouse
 --                      spawn       where the player appears (beside the van, inside the plot)
 --                      board       the Moving contracts board (by the roller door, on the wall's outside)
---   House            the one house to empty: its lot, the house's middle and size, its front door (outside, looking
---                    out: north to the road), curb (the van's pivot, nose north, back to the door)
+--   House            the one house to empty: its lot, the house's box (its footprint's middle, its bottom, its size:
+--                    the walls' box, the roof over it), its front door (outside, looking out: north to the road), curb
+--                    (the van's pivot, nose north, back to the door). 8.1: the box is the owner's Blender house's
+--                    (design/blender-house: Marge's 20.36 × 12.60 × 17.57, server/HouseMesh.luau dresses only a box of
+--                    its size), its front wall where the chalet's always was (the door, the path and the curb unmoved)
 --   SandboxMap.plotAt(x, z)   the plot whose rect holds the point (nil: none)
 --   SandboxMap.cframe(spot)   (Roblox only) a spot's CFrame
 
@@ -76,7 +79,8 @@ SandboxMap.House = {
 	id = "sandbox_house",
 	name = "The Old Chalet",
 	lot = { x0 = -60, x1 = 60, z0 = 504, z1 = 600 } :: Rect,
-	house = { x = 0, y = 0, z = 540, sx = 44, sy = 26, sz = 34 },
+	-- (the front wall at the door, z 523; the house's box back from it: tools/house-art/check.py, house.py's W, H, D)
+	house = { x = 0, y = 0, z = 523 + 17.5669 / 2, sx = 20.3572, sy = 12.598, sz = 17.5669 },
 	door = { x = 0, y = 0, z = 523, yaw = 0 } :: Spot, -- outside the front door, looking north to the road
 	curb = { x = 0, y = SandboxMap.RoadTop, z = 492, yaw = 0 } :: Spot, -- the van's pivot: nose north, back to the door
 }

@@ -52,7 +52,8 @@ do
 	step = SandboxSteps.decide(state({ move = true, seated = true }))
 	check("… driving there too", step.id == "drive", show(step))
 	step = SandboxSteps.decide(state({ move = true, atHouse = true }))
-	check("at the house, outside: go inside (E at the front door)", step.id == "door" and step.hint == "Go inside: E at the front door" and step.target == "door", show(step))
+	check("8.1 walk-in doors: at the house, outside: walk in through the front door (no E)", step.id == "door" and step.hint == "Walk in through the front door" and step.target == "door"
+		and string.find(step.hint, "E at", 1, true) == nil, show(step))
 	step = SandboxSteps.decide(state({ move = true, atHouse = true, inside = true }))
 	check("in the house: carry the furniture out (the hint only, no 3D target inside)", step.id == "inside" and step.hint == "Carry the furniture out to your van (E to pick up)" and step.target == nil, show(step))
 	step = SandboxSteps.decide(state({ move = true, atHouse = true, inside = true, carrying = true }))
@@ -167,10 +168,10 @@ end
 -- ── The words on a touch screen ─────────────────────────────────────────────
 do
 	local Steps = SandboxSteps.Steps
-	check("a touch screen taps: the front door", SandboxSteps.text(Steps.door, true) == "Go inside: tap at the front door", SandboxSteps.text(Steps.door, true))
+	check("8.1 walk-in doors: the front door is walked through on a touch screen too (nothing to tap)", SandboxSteps.text(Steps.door, true) == "Walk in through the front door", SandboxSteps.text(Steps.door, true))
 	check("… pick up", SandboxSteps.text(Steps.inside, true) == "Carry the furniture out to your van (tap to pick up)", SandboxSteps.text(Steps.inside, true))
 	check("… the van's back", SandboxSteps.text(Steps.load, true) == "Load it into the van: walk in or tap at the back")
-	check("… a computer keeps E", SandboxSteps.text(Steps.door, false) == Steps.door.hint)
+	check("… a computer keeps E (the door: its own words, no key)", SandboxSteps.text(Steps.door, false) == Steps.door.hint and SandboxSteps.text(Steps.load, false) == Steps.load.hint)
 	check("… words without a key unchanged (LAUNCH, FINISH keep their E)", SandboxSteps.text(Steps.plan, true) == Steps.plan.hint and SandboxSteps.text(Steps.back, true) == Steps.back.hint)
 end
 

@@ -13,7 +13,11 @@
 --   House     "TheOldChalet" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
 --             server/Moving.luau puts its "Enter house" prompt there) at House.door; the path from the curb to it, the
---             garden's fence and gate (THE OLD CHALET over it), the mailbox, the flower boxes (all decoration)
+--             garden's fence and gate (THE OLD CHALET over it), the mailbox, the flower boxes (all decoration). 8.1: the
+--             chalet's parts in the Model "House_sandbox_house" (attribute Home) on the owner's Blender house's box:
+--             once ZDCHouseArt is imported, server/HouseMesh.luau dresses it (the chalet's parts hidden but still
+--             colliding, its gable re-cut under the model's roof; the FrontDoor where the model's door is), the garden
+--             beside it in "Garden"; no import: the chalet
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -35,6 +39,8 @@ local ChaletLooks = require(Shared.ChaletLooks)
 local RenderBudget = require(Shared.RenderBudget)
 local SandboxMap = require(Shared.SandboxMap)
 local SandboxScenery = require(Shared.SandboxScenery)
+
+local HouseMesh = require(script.Parent.HouseMesh) -- 8.1: the owner's Blender house (design/blender-house)
 
 local SandboxWorld = {}
 
@@ -239,11 +245,35 @@ end
 
 -- ── The house ──────────────────────────────────────────────────────────────
 
+-- 8.1: dressed in the owner's Blender house (its roof's ridge across the house, from side to side), the chalet's gable
+-- (its ridge from the front to the back) would stand out of that roof over the front and back walls, unseen but solid:
+-- its two wedges, still solid and unseen, become a gable across the house, S.Chalet.Pitch steep, under the model's roof.
+local function underMeshRoof(body: Model, frame: CFrame)
+	local box = MAP.House.house
+	local half = box.sz / 2
+	local rise = half * math.tan(math.rad(S.Chalet.Pitch))
+	local n = 0
+	for _, p in body:GetChildren() do
+		if p.Name == "Roof" and p:IsA("BasePart") then
+			-- (a wedge's slope looks to its -Z: the front half's to the street, the back half's turned round)
+			p.Size = Vector3.new(box.sx, rise, half)
+			p.CFrame = frame * CFrame.new(0, box.sy + rise / 2, half / 2 + n * half) * CFrame.Angles(0, n * math.pi, 0)
+			n += 1
+		end
+	end
+end
+
 local function house(world: Instance): Model
 	local H = MAP.House
 	local model = Instance.new("Model")
 	model.Name = "TheOldChalet"
 	model:SetAttribute("SandboxHouse", H.id)
+	-- 8.1: the house's own parts in a Model "House_<id>" (attribute Home), as World's buildHouse makes Marge's: the one
+	-- server/HouseMesh.luau dresses (the garden stays out of it)
+	local body = Instance.new("Model")
+	body.Name = "House_" .. H.id
+	body:SetAttribute("Home", H.id)
+	body.Parent = model
 	local door = H.door
 	-- the front door's frame: its middle on the ground at the front wall, -Z out of the door (north, to the road)
 	local frame = CFrame.new(door.x, door.y, door.z) * CFrame.Angles(0, math.rad(door.yaw), 0)
@@ -251,7 +281,7 @@ local function house(world: Instance): Model
 	local spec: ChaletLooks.Spec = {
 		w = H.house.sx,
 		d = H.house.sz,
-		h = S.Chalet.Walls,
+		h = H.house.sy,
 		lot = lot.x1 - lot.x0,
 		front = (lot.x1 - lot.x0) / 2 - (door.z - lot.z0), -- (its own front fence is left out: the garden has one)
 		seed = S.Chalet.Seed,
@@ -265,7 +295,7 @@ local function house(world: Instance): Model
 		local turn = piece.turn or { 0, 0, 0 }
 		local at, size = piece.at, piece.size
 		local cframe = frame * CFrame.new(at[1], at[2], at[3]) * CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
-		local p = block(model, piece.name, Vector3.new(size[1], size[2], size[3]), cframe, rgb(piece.color), material(piece.material))
+		local p = block(body, piece.name, Vector3.new(size[1], size[2], size[3]), cframe, rgb(piece.color), material(piece.material))
 		if piece.shape == "Wedge" then
 			p.Shape = Enum.PartType.Wedge
 		elseif piece.shape == "Cylinder" then
@@ -277,10 +307,16 @@ local function house(world: Instance): Model
 			p:SetAttribute("SandboxDoor", true)
 			p.CanCollide = false
 		elseif piece.name == "House" then
+			body.PrimaryPart = p
 			model.PrimaryPart = p
 		elseif not piece.solid then
 			deco(p)
 		end
+	end
+	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
+	-- part, where the model's door is); else the chalet as it is
+	if HouseMesh.dress(body, H.id) then
+		underMeshRoof(body, frame)
 	end
 
 	-- The garden: the path from the curb's shoulder to the door, the fence round the lot with its gate, the board over

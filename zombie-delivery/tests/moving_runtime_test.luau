@@ -16,6 +16,11 @@
 -- 8.0 SANDBOX off (tests/runtime/MovingRuntime.luau: Config.Sandbox.On false): the city's game as it was: the depot's
 -- board, the Wall, Marge and Walt, the story, the pay; no plot kiosks, no walk-in bay's Load, no sandbox fields
 -- (tests/sandboxmove_runtime_test.luau has the sandbox).
+-- 8.1 walk-in doors (Config.Moving.Doors; the E prompts there but off): walking into the door's zone facing it goes in
+-- after the dwell (not a stranger, not from a seat, not walking past, not brushing past, not beside the doorway), out by
+-- the doorway inside, no ping-pong (shut until you left the zone you came out in and Rearm s went by, whichever later),
+-- in and out with a piece in your hands, a pair piece's back end does not lead (said once), its front end takes it along;
+-- the doormats (▲ IN outside while a move uses the house, ▲ OUT inside).
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
@@ -236,7 +241,8 @@ check("no wait at the truck's back for a Driver (the prompts' MoveQuick)", promp
 local site = moves:FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
 -- the owner took the Technician out: the front door is never locked
-check("the move's own Enter house: its crew's only (MoveOwner), open from the start", enter ~= nil and enter:GetAttribute("MoveOwner") == 11 and enter.Enabled
+check("the move's own Enter house: its crew's only (MoveOwner), open from the start (8.1 walk-in doors: walked through, the prompt off)", enter ~= nil
+	and enter:GetAttribute("MoveOwner") == 11 and not enter.Enabled
 	and ann:GetAttribute("MoveLocked") == nil and bob:GetAttribute("MoveLocked") == nil)
 check("no Pick lock, no Kick door", promptIn(site, "Pick lock") == nil and promptIn(site, "Kick door") == nil)
 E.place(cid, outside)
@@ -585,7 +591,7 @@ E.place(ann, outside)
 enter = promptIn(site, "Enter house")
 -- 7.0 planning: the admin's start gives free roles; the door open at once (nothing to kick in, no noise); the Guard
 check("the admin's start: free roles", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "mover")
-check("the door open at once: Enter house, no Kick door, no noise", enter ~= nil and enter.Enabled and promptIn(site, "Kick door") == nil and E.noises == 0)
+check("the door open at once: Enter house (off: 8.1 walk-in doors), no Kick door, no noise", enter ~= nil and not enter.Enabled and promptIn(site, "Kick door") == nil and E.noises == 0)
 check("7.0 greeters: a new Marge on the porch for the new move", porchOf(ann) ~= nil and porchOf(ann) ~= marge)
 E.clock += T.Roam.Every + 0.1
 Moving.step() -- (Ann outside by the house: the move's few roamers come round it)
@@ -981,6 +987,213 @@ do
 	local since = #E.messages
 	Lobby.step()
 	check("8.0.1, the city unchanged: the planning's timeout says the depot's board", heard(hal, "take the contract again at the depot's board", since), E.lastNotice(hal))
+end
+-- 8.1 walk-in doors (the owner: "no E at the house, neither in nor out"; Config.Moving.Doors): walk into the zone in
+-- front of the door and through it after Dwell s facing it; brushing past or walking by is no way in; out the same way
+-- by the doorway inside; after a trip no way back until you stepped out of the zone you came out in and Rearm s went by;
+-- a piece in your hands and a pair piece's other end come along; only the move's crew on foot; the doormats.
+do
+	local D = T.Doors
+	local ivy = E.player(111, "Ivy", board + V3(-2, 0, -4))
+	local jo = E.player(112, "Jo", board + V3(-3, 0, -5))
+	local kim = E.player(113, "Kim", depot)
+	E.crew[ivy] = { jo }
+	check("(the walk-in doors on: a dwell, a longer re-arm, the zone shallower than where you come out)", D.Walk == true and D.Dwell > 0 and D.Rearm > D.Dwell
+		and D.Depth < 4 and D.Every <= T.Tick)
+	Moving.admin(ivy, "start")
+	Moving.step()
+	local origin = E.interiors[#E.interiors]
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	local foot = V3(home.door.x, Map.WalkTop, home.door.z) -- (the door's foot outside, the server's)
+	local side = V3(-facing.Z, 0, facing.X)
+	local front = foot + up + facing * 2 -- (in front of the door, in its zone)
+	local into = V3(0, 0, 1) -- (the fake plan's +Z: from its exit to its entry)
+	local exitAt = origin * V3(0, 0, 0.5) + up -- (the fake plan's exit, a body's height over the floor)
+	local function stand(player: any, at: any, look: any)
+		E.rootOf(player).CFrame = M.CFrame.lookAt(at, at + look)
+	end
+	local function wait(seconds: number)
+		E.clock += seconds
+		Moving.step()
+	end
+	local function isIn(player: any): boolean
+		return (E.rootOf(player).Position - origin.Position).Magnitude < 100
+	end
+	local function fades(player: any, since: number): number
+		local n = 0
+		for index = since + 1, #E.messages do
+			n += if E.messages[index].player == player and E.messages[index].kind == "fade" then 1 else 0
+		end
+		return n
+	end
+	local function said(player: any, text: string, since: number): number
+		local n = 0
+		for index = since + 1, #E.messages do
+			local m = E.messages[index]
+			n += if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then 1 else 0
+		end
+		return n
+	end
+	local function matsIn(model: any): { any }
+		local found = {}
+		for _, d in model:GetDescendants() do
+			if d.Name == "WalkInMat" and not d.destroyed then
+				table.insert(found, d)
+			end
+		end
+		return found
+	end
+	local function words(mat: any): string
+		local gui = mat:FindFirstChildOfClass("SurfaceGui")
+		local label = gui and gui:FindFirstChildOfClass("TextLabel")
+		return if label then tostring(label.Text) else ""
+	end
+
+	check("8.1 walk-in doors: no E at the doors (Enter house and Leave house there, off)", not promptIn(site, "Enter house").Enabled
+		and not promptIn(workspace, "Leave house").Enabled)
+	local outMats = matsIn(site)
+	local mat = outMats[1]
+	local matAt = if mat then mat.Position - foot else V3()
+	check("a doormat in front of the door (▲ IN), in its zone, shown while a move uses the house", #outMats == 1 and words(mat) == "▲ IN" and mat.Transparency == 0
+		and mat:FindFirstChildOfClass("SurfaceGui").Enabled == true and matAt:Dot(facing) > 0.5 and matAt:Dot(facing) < D.Depth and math.abs(matAt:Dot(side)) < 0.1
+		and mat.CanCollide == false and mat.CanQuery == false, `{#outMats} {mat and words(mat)}`)
+	local inMat = nil
+	for _, d in matsIn(workspace) do
+		if words(d) == "▲ OUT" and (d.Position - origin.Position).Magnitude < 20 then
+			inMat = d
+		end
+	end
+	check("…and one inside by the way out (▲ OUT), in the interior", inMat ~= nil and inMat.Parent ~= nil and inMat.Parent.Name == "Interior")
+
+	-- a stranger, a seated crew mate: nothing
+	local since = #E.messages
+	stand(kim, front, -facing)
+	wait(0.1)
+	wait(0.5)
+	wait(0.5)
+	check("a stranger in the zone facing the door: stays out (only the move's crew)", not isIn(kim) and fades(kim, since) == 0)
+	E.place(kim, depot)
+	E.seated[jo] = E.cars[ivy]
+	E.rootOf(jo).Parent:FindFirstChildOfClass("Humanoid").SeatPart = E.cars[ivy].chassis
+	stand(jo, front, -facing)
+	wait(0.1)
+	wait(0.5)
+	check("…nor a crew mate sitting (in a seat)", not isIn(jo) and fades(jo, since) == 0)
+	E.rootOf(jo).Parent:FindFirstChildOfClass("Humanoid").SeatPart = nil
+	E.seated[jo] = nil
+	E.place(jo, foot + up + facing * 12)
+
+	-- walking past, brushing past: no way in
+	stand(ivy, front, side)
+	wait(0.1)
+	wait(0.4)
+	wait(0.4)
+	check("walking past the door (in its zone, looking along the wall): no way in", not isIn(ivy) and fades(ivy, since) == 0)
+	stand(ivy, front, -facing)
+	wait(0.1)
+	wait(D.Dwell * 0.5)
+	stand(ivy, front + facing * 4, -facing)
+	wait(0.1)
+	wait(D.Dwell + 0.2)
+	check("brushing past (in it facing the door for less than the dwell, then out of it): no way in", not isIn(ivy) and fades(ivy, since) == 0)
+	stand(ivy, front + side * (2 / 2 + D.Side + 1.5), -facing)
+	wait(0.1)
+	wait(D.Dwell + 0.2)
+	check("…nor beside the doorway (past its jambs)", not isIn(ivy))
+
+	-- walk in
+	stand(ivy, front, -facing)
+	wait(0.1)
+	check("in the zone facing the door: not before the dwell", not isIn(ivy))
+	wait(D.Dwell)
+	local entry = origin * M.CFrame.new(0, 0, 1)
+	check("walked in after the dwell: in the house at its entry, no E", isIn(ivy) and (E.rootOf(ivy).Position - entry.Position).Magnitude < 4, E.rootOf(ivy).Position)
+	check("…with the fade out and in", fades(ivy, since) == 2, fades(ivy, since))
+	check("…facing into the room, away from the door", E.rootOf(ivy).CFrame.LookVector:Dot(into) > 0.99)
+	local state = E.last(ivy, "Moving", "state")
+	check("…the state says inside (the HUD, the guide)", state ~= nil and state.a ~= nil and state.a.inside == true)
+
+	-- no ping-pong: the zone she came out in stays shut until she has left it, Rearm s at least
+	stand(ivy, exitAt + into * 0.5, -into) -- (turned straight back to the door, still in the zone)
+	since = #E.messages
+	for _ = 1, 6 do
+		wait(0.5)
+	end
+	check("no ping-pong: turned back to the door in its zone, past Rearm s: still in (she never left it)", isIn(ivy) and fades(ivy, since) == 0)
+	stand(ivy, exitAt + into * 8, -into)
+	wait(0.1)
+	stand(ivy, exitAt + into * 1, -into)
+	wait(0.1)
+	check("…out of the zone and back in: not before the dwell", isIn(ivy))
+	wait(D.Dwell)
+	local outside4 = foot + facing * 4
+	check("walked out by the doorway inside: at the house's door, a few studs out", not isIn(ivy) and math.abs(V3(E.rootOf(ivy).Position.X - foot.X, 0, E.rootOf(ivy).Position.Z - foot.Z).Magnitude - 4) < 0.5,
+		E.rootOf(ivy).Position)
+	check("…facing away from the door, with the fade", E.rootOf(ivy).CFrame.LookVector:Dot(facing) > 0.99 and fades(ivy, since) == 2)
+	check("…where she came out is clear of the zone (Depth)", (E.rootOf(ivy).Position - foot):Dot(facing) > D.Depth and (outside4 - foot):Dot(facing) > D.Depth)
+	-- Rearm s, whichever is later: she steps back into the zone at once, facing the door
+	local arrived = E.clock
+	stand(ivy, front, -facing)
+	while E.clock - arrived < D.Rearm - 0.15 do
+		wait(0.1)
+	end
+	check("…stepped back into the zone at once: shut for Rearm s (whichever is later)", not isIn(ivy))
+	wait(0.2)
+	wait(0.1)
+	wait(D.Dwell)
+	check("…then in again after the dwell", isIn(ivy))
+
+	-- carrying: out with a piece in the hands, in with it
+	local tvModel = newItem(2)
+	E.place(ivy, tvModel.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(tvModel, "Pick up"), ivy)
+	wait(1)
+	check("(Ivy holds the TV)", ivy.Character:GetAttribute("MoveCarry") == 2)
+	stand(ivy, exitAt + into * 2, -into)
+	wait(1) -- (no teleport: a second for the way there)
+	wait(D.Dwell)
+	check("carrying: out by the door with the TV in her hands", not isIn(ivy) and ivy.Character:GetAttribute("MoveCarry") == 2 and stateOf(ivy, 2).state == "carried")
+	stand(ivy, foot + up + facing * 9, -facing)
+	wait(D.Rearm)
+	stand(ivy, front, -facing)
+	wait(0.6)
+	wait(D.Dwell)
+	check("…and in again with it", isIn(ivy) and ivy.Character:GetAttribute("MoveCarry") == 2)
+	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
+
+	-- a pair piece: the back end does not lead; the front end walks out and the other end comes along
+	stand(jo, front, -facing)
+	wait(0.1)
+	wait(D.Dwell)
+	check("Jo walks in too", isIn(jo))
+	local sofaModel = newItem(3)
+	local sofaAt = sofaModel.PrimaryPart.Position
+	E.place(ivy, sofaAt + V3(0, 0, -3))
+	E.place(jo, sofaAt + V3(0, 0, 3))
+	trigger(promptIn(sofaModel, "Lift"), ivy)
+	trigger(promptIn(sofaModel, "Help lift"), jo)
+	wait(1)
+	check("(Ivy and Jo carry the sofa: Ivy at the front)", ivy.Character:GetAttribute("MoveCarry") == 3 and jo.Character:GetAttribute("MoveCarry") == 3)
+	since = #E.messages
+	stand(jo, exitAt + into * 1 + V3(1.5, 0, 0), -into)
+	stand(ivy, exitAt + into * 9, -into)
+	wait(1)
+	wait(D.Dwell)
+	wait(0.4)
+	check("the back end in the doorway first: it does not lead (said once), nobody goes", isIn(jo) and isIn(ivy) and said(jo, "front leads", since) == 1)
+	stand(ivy, exitAt + into * 2, -into)
+	stand(jo, exitAt + into * 6, -into)
+	wait(0.6)
+	wait(D.Dwell)
+	check("the front end walks out: both out with the sofa, side by side", not isIn(ivy) and not isIn(jo) and ivy.Character:GetAttribute("MoveCarry") == 3
+		and jo.Character:GetAttribute("MoveCarry") == 3 and (E.rootOf(jo).Position - E.rootOf(ivy).Position).Magnitude < 5)
+	E.Net.get("PutDown").OnServerEvent:Fire(ivy)
+
+	Moving.admin(ivy, "end")
+	check("the move over: the doormat outside hidden again", mat ~= nil and mat.Transparency == 1 and mat:FindFirstChildOfClass("SurfaceGui").Enabled == false)
+	E.leave(ivy)
+	E.leave(jo)
+	E.leave(kim)
 end
 check("every interior went (slots free again)", E.destroyed == E.built, `{E.destroyed} of {E.built}`)
 

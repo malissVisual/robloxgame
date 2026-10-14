@@ -374,7 +374,7 @@ local function nextStep(s: any): string
 		return if out > 0 then `🧟 THE HORDE! Drive the van to {wallOf(s)} NOW` else "🧟 THE HORDE! Load something and get out"
 	end
 	if s.inside == true then
-		return if carried > 0 then "Carry it out: \"Leave\" by a door" else "Pick up the things (E) · ★ first"
+		return if carried > 0 then "Carry it out: walk out through a door" else "Pick up the things (E) · ★ first" -- (8.1 walk-in doors)
 	end
 	if carried > 0 then
 		return if s.backOpen == true then "Load it at the van's back (E)" else "Open the van's back (E), then Load"
@@ -386,7 +386,7 @@ local function nextStep(s: any): string
 		local gps = if Config.Sandbox.On then "" else " (GPS)" -- (8.0 SANDBOX: no GPS, the guide's arrow)
 		return if out > 0 then `Drive to {wallOf(s)}{gps}, or back for more` elseif delivered > 0 then `Back to {s.name} for more, or FINISH` else `Drive to {s.name}{gps}`
 	end
-	return `"Enter" at {s.name}'s door`
+	return `Walk in through {s.name}'s door` -- (8.1 walk-in doors: no E)
 end
 
 -- 7.0 planning: your role and what only it does (the panel's last line).

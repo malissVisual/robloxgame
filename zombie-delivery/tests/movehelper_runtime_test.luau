@@ -262,7 +262,7 @@ local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
 -- the owner took the Technician out: the front door is open from the start (no lock for Danny to wait at)
 E.place(sol, outside)
-check("the front door is open: Enter house at once, no Pick lock", enter ~= nil and enter.Enabled and promptIn(site, "Pick lock") == nil and sol:GetAttribute("MoveRole") == "driver")
+check("the front door is open: in at once (8.1: walked through, Enter house off), no Pick lock", enter ~= nil and not enter.Enabled and promptIn(site, "Pick lock") == nil and sol:GetAttribute("MoveRole") == "driver")
 trigger(enter, sol)
 local origin = E.interiors[1]
 check("Sol is inside", (E.rootOf(sol).Position - origin.Position).Magnitude < 10)
@@ -675,6 +675,30 @@ local inside = run(15, function()
 	return (body.root.Position - origin.Position).Magnitude < 60
 end)
 check("…through the door too", inside)
+-- 8.1 walk-in doors: his door trips go by the players' rule: in facing into the room, out facing away from the door and
+-- clear of its reach, not back through a door before Config.Moving.Doors.Rearm s
+do
+	local cameIn = danny.doorAt
+	check("8.1 walk-in doors: he comes in facing into the room, away from the door", body.root.CFrame.LookVector:Dot(V3(0, 0, 1)) > 0.99, body.root.CFrame.LookVector)
+	E.place(sol, origin.Position + V3(0, 3, 1))
+	trigger(promptIn(workspace, "Leave house"), sol)
+	run(math.max(0.1, cameIn + T.Doors.Rearm - 0.4 - E.clock)) -- (past the old 1 s, short of Rearm)
+	check("…Sol back out at once: he follows, but not through the door before Rearm s", (body.root.Position - origin.Position).Magnitude < 60
+		and E.clock - cameIn > 1.2 and E.clock - cameIn < T.Doors.Rearm, E.clock - cameIn)
+	local out = run(4, function()
+		return (body.root.Position - origin.Position).Magnitude > 60
+	end)
+	local through = danny.s.site.outside
+	local spot = body.root.Position
+	check("…then out, Rearm s after he came in", out and danny.doorAt - cameIn >= T.Doors.Rearm, danny.doorAt - cameIn)
+	check("…facing away from the door, clear of its reach (beside where the players come out)", body.root.CFrame.LookVector:Dot(facing) > 0.99
+		and distance(spot, through.Position) > H.DoorReach and distance(spot, through.Position) < H.DoorReach + 1.5, distance(spot, through.Position))
+	E.place(sol, outside)
+	trigger(enter, sol)
+	run(15, function()
+		return (body.root.Position - origin.Position).Magnitude < 60
+	end)
+end
 E.request(sol, "helper", "carry")
 check("SMALL STUFF again", danny.mode == "carry" and sol:GetAttribute("MoveHelper") == "carry")
 E.Net.get("MoveLobby").OnServerEvent:Fire(sol, "chat", 2)
