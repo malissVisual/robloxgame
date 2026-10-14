@@ -5638,6 +5638,7 @@ Config.Robust = {
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
+		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
 		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 	},
@@ -6739,6 +6740,17 @@ Config.MoveStory = {
 --                      studs farther than you were as it opened (the status line opens it from anywhere); a click or
 --                      tap reaches him (or a piece: the server checks ClickReach + 10 studs) from ClickReach studs,
 --                      TapSlop studs beside his body counts
+--   8.5 Danny's clipboard, orders mode (the owner: "I'll hold a paper in my hand, like a notepad … a kind of ordering
+--   mode and I click on what he should carry"; shared/ClipboardRules.luau, server/Clipboard.luau, client/DannyOrders.luau;
+--   the rate limit Config.Robust.Limits.Clipboard): only with it out does a click, a tap or R1 give him a piece
+--   Clipboard.Key      the computer's key that takes it out and puts it away (Q: free in the sandbox; the gamepad's R1
+--                      and B are shared/SandboxPad.luau's "clipboard" and "stow")
+--   Clipboard.Look     s between two looks at the piece you point at (its outline and its words)
+--   Clipboard.Flash    s a tapped piece stays outlined (a touch screen has no pointer)
+--   Clipboard.Button / ButtonMin   the touch 📋 button's side at the HUD's scale 1 / at least (px; Ui.MinTouch or more)
+--   Clipboard.Text     the bottom line's text size at scale 1 (Pad: px round its words, Tall: its height)
+--   Clipboard.Give / Back / No   the outline's colours: it can be given (green), on his list (orange: take it back),
+--                      not now (red, with the reason)
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -6821,6 +6833,20 @@ Config.MoveHelper = {
 	CardSlack = 20,
 	ClickReach = 90,
 	TapSlop = 2.5,
+	-- 8.5 Danny's clipboard (orders mode)
+	Clipboard = {
+		Key = "Q",
+		Look = 0.1,
+		Flash = 1.5,
+		Button = 64,
+		ButtonMin = 48,
+		Text = 16,
+		Pad = 14,
+		Tall = 34,
+		Give = { 96, 214, 112 } :: { number },
+		Back = { 240, 132, 44 } :: { number },
+		No = { 226, 72, 62 } :: { number },
+	},
 }
 
 -- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the

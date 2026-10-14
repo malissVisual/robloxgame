@@ -149,6 +149,7 @@ local state: SandboxSteps.State = {
 	waiting = false,
 	heavy = 0,
 	heavyNear = false,
+	clipboard = false, -- 8.5 Danny's clipboard out (orders mode)
 }
 local softAfter = 0 -- 8.3: os.clock() before which no soft step shows (one just ended: Config.SandboxGuide.SoftGap)
 local hintsUi: any = nil -- 8.3: client/SandboxHintsUi.luau (looked for once; false: not there)
@@ -179,7 +180,8 @@ local function seated(): boolean
 end
 
 -- 8.4: Danny on your move, from your player attributes (server/MoveHelper.luau's: for hire or hired, his price, his
--- list, your call to him): every look and every Moving state (they change without one).
+-- list, your call to him): every look and every Moving state (they change without one). 8.5: your clipboard out (your
+-- character's ClipboardHeld, server/Clipboard.luau's: the give step's words then).
 local function readHelper()
 	local helper = player:GetAttribute("MoveHelper")
 	local price, queue = player:GetAttribute("MoveHelperPrice"), player:GetAttribute("MoveHelperQueue")
@@ -188,6 +190,8 @@ local function readHelper()
 	state.helperPrice = if type(price) == "number" then price else nil
 	state.helperQueue = if type(queue) == "number" then queue else nil
 	state.waiting = type(call) == "string" and call ~= ""
+	local character = player.Character
+	state.clipboard = character ~= nil and character:GetAttribute("ClipboardHeld") == true
 end
 
 -- The Moving remote's state: what the steps read from it (once a message, not every look).

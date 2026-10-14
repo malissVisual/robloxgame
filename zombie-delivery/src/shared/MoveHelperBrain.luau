@@ -28,7 +28,9 @@
 --   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, hired, mine, state, held,
 --                                              his, queued, count, near): "add" | "remove" | why: "crew" | "hire" |
 --                                              "piece" (not this move's) | "far" | "van" (in the van) | "gone" (home
---                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full"
+--                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full";
+--                                              8.5 "clipboard": hired, but the player's clipboard is not out (orders
+--                                              mode: shared/ClipboardRules.luau; a click on his list's piece too)
 --   MoveHelperBrain.keepQueued(state, held)    8.3 is a piece of his list still his to carry (home or on the ground,
 --                                              nobody holding it)?
 --   MoveHelperBrain.nextQueued(list)           8.3 the piece of his list he goes for now (Queued: in his list's order, the
@@ -148,6 +150,7 @@ export type Assign = {
 	queued: boolean, -- it is on his list already
 	count: number, -- the pieces on his list
 	near: boolean, -- the player is near enough to it to see it (ClickReach)
+	clipboard: boolean, -- 8.5 the player's clipboard is out (orders mode: the character attribute ClipboardHeld)
 }
 
 export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- the front door outside, the exit inside
@@ -229,6 +232,8 @@ function MoveHelperBrain.assignCheck(a: Assign): string
 		return "piece"
 	elseif not a.hired then
 		return "hire"
+	elseif not a.clipboard then
+		return "clipboard" -- (8.5: orders only with the clipboard out: never a piece given by a stray click)
 	elseif a.queued then
 		return "remove" -- (a click on a piece of his list takes it back, wherever it is now)
 	elseif not a.near then

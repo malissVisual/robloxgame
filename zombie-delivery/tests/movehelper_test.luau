@@ -68,7 +68,7 @@ check("8.3 the money's words", Brain.money(170) == "$170" and Brain.money(1234) 
 -- 8.3 a click on a piece: onto his list, off it -----------------------------------------------------------------------------
 
 local function assign(fields: { [string]: any }): string
-	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true }
+	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true, clipboard = true }
 	for key, value in fields do
 		(a :: any)[key] = value
 	end
@@ -86,6 +86,14 @@ check("…in his arms already: (his)", assign({ his = true, state = "carried", h
 check("…in the van: (van); home or lost: (gone)", assign({ state = "truck" }) == "van" and assign({ state = "delivered" }) == "gone" and assign({ state = "lost" }) == "gone")
 check("…somebody holds it: (held)", assign({ state = "carried", held = true }) == "held" and assign({ held = true }) == "held")
 check("…his list full (Queue 6): (full); one less: add", assign({ count = H.Queue }) == "full" and assign({ count = H.Queue - 1 }) == "add" and H.Queue == 6)
+-- 8.5 orders mode (shared/ClipboardRules.luau, server/Clipboard.luau): a piece goes to him only from a player whose
+-- clipboard is out
+check("8.5 the clipboard away: refused (clipboard), never added, never taken back; out: add / remove", assign({ clipboard = false }) == "clipboard"
+	and assign({ clipboard = false, queued = true }) == "clipboard" and assign({ clipboard = true }) == "add" and assign({ clipboard = true, queued = true }) == "remove")
+check("…but the crew, the piece and the hire come first (no clipboard to take out before he is hired)", assign({ clipboard = false, crew = false }) == "crew"
+	and assign({ clipboard = false, mine = false }) == "piece" and assign({ clipboard = false, hired = false }) == "hire")
+check("…and before the rest (far, in the van, full: the clipboard first)", assign({ clipboard = false, near = false }) == "clipboard"
+	and assign({ clipboard = false, state = "truck" }) == "clipboard" and assign({ clipboard = false, count = H.Queue }) == "clipboard")
 check("8.3 a piece of his list stays his while it is home or on the ground and nobody holds it", Brain.keepQueued("home", false) and Brain.keepQueued("ground", false)
 	and not Brain.keepQueued("carried", true) and not Brain.keepQueued("home", true) and not Brain.keepQueued("truck", false) and not Brain.keepQueued("delivered", false))
 

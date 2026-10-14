@@ -207,6 +207,7 @@ local function give(model: any, who: any?)
 	local player = who or sol
 	local was = E.rootOf(player).Position
 	E.place(player, model.PrimaryPart.Position + V3(3, 0, 0))
+	player.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: the clipboard out, server/Clipboard.luau's)
 	E.request(player, "helper", "assign", model)
 	E.place(player, was)
 end
@@ -638,6 +639,13 @@ check("…Sol carries it out and loads it alone", danny.s.move.things[2].state =
 E.place(sol, outside)
 trigger(enter, sol)
 local lamp, box, clock = itemModel(1), itemModel(5), itemModel(4)
+-- 8.5 orders mode: without the clipboard out (its ClipboardHeld, server/Clipboard.luau's) the click gives him nothing
+noticeAt = #E.messages
+sol.Character:SetAttribute("ClipboardHeld", nil)
+E.place(sol, lamp.PrimaryPart.Position + V3(3, 0, 0))
+E.request(sol, "helper", "assign", lamp)
+check("8.5 a click on the Lamp with the clipboard away: not on his list, \"📋 Take out your clipboard (Q)\"", #danny.queue == 0 and lamp:GetAttribute("DannyQueue") == nil
+	and told(sol, "📋 Take out your clipboard (Q) to give Danny pieces.", noticeAt), E.lastNotice(sol))
 noticeAt = #E.messages
 said = #E.said
 give(lamp)
@@ -655,6 +663,11 @@ check("8.3 a click on the Lamp again: off his list (\"Danny leaves the Lamp to y
 	and told(sol, "Danny leaves the Lamp to you.", noticeAt) and markOf(lamp) == nil and lamp:GetAttribute("DannyQueue") == nil and markOf(box) == "🧑‍🔧 Danny · 1")
 give(lamp)
 check("…and on again, last", listIs({ 5, 4, 1 }) and markOf(lamp) == "🧑‍🔧 Danny · 3")
+sol.Character:SetAttribute("ClipboardHeld", nil)
+E.place(sol, lamp.PrimaryPart.Position + V3(3, 0, 0))
+E.request(sol, "helper", "assign", lamp)
+check("8.5 …a click on it with the clipboard away: still on his list (no stray take-back)", listIs({ 5, 4, 1 }) and markOf(lamp) == "🧑‍🔧 Danny · 3")
+sol.Character:SetAttribute("ClipboardHeld", true)
 E.place(sol, back + V3(30, 0, 0)) -- (out of the way)
 local loadedAt: { [number]: number } = {}
 local clockSpeed = 0

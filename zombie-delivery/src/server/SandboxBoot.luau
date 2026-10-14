@@ -13,7 +13,7 @@
 --     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
 --   * PlayerData (its own saves, Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
 --     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
---     (the moves' lobby, the crew panel), Transport, KitWear, Horn;
+--     (the moves' lobby, the crew panel), Transport, KitWear, Horn, 8.5's Clipboard (Danny's clipboard: orders mode);
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), the
 --     collection (Collection: its payout loop) and 8.2's collection book (CollectionBook: its remote, its hook on
 --     Collection.add), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the vans' engines), 8.2's
@@ -396,6 +396,9 @@ local function services()
 	end)
 	safely("Horn", function()
 		require(Server.Horn).start()
+	end)
+	safely("Clipboard", function() -- 8.5: Danny's clipboard in your hand (orders mode)
+		require(Server.Clipboard).start()
 	end)
 end
 

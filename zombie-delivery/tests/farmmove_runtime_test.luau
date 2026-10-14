@@ -608,6 +608,7 @@ E.request(sol, "helper", "hire")
 local solIron = solBuild.pieces[ironSpot.id]
 local outsideSol = E.rootOf(sol).Position
 E.place(sol, solIron.PrimaryPart.Position + V3(3, 0, 0))
+sol.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: his clipboard out, server/Clipboard.luau's)
 E.request(sol, "helper", "assign", solIron)
 E.place(sol, outsideSol)
 check("8.3 Sol hires Danny and gives him the branding iron", danny.hirer == sol and danny.queue[1] == ironSpot.id, danny.queue[1])
@@ -768,6 +769,7 @@ for _, sp in solBuild.plan.spots do
 end
 local nextModel = solBuild.pieces[nextPiece.id]
 E.place(sol, nextModel.PrimaryPart.Position + V3(3, 0, 0))
+sol.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode)
 E.request(sol, "helper", "assign", nextModel)
 E.place(sol, barnOut + V3(-20, 0, 0)) -- (out of the way, hands free)
 local saidBefore = #E.said

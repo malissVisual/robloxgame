@@ -493,16 +493,26 @@ do
 		check(`{id}: a soft step (said once, its ✕ dismisses it), not a nav or info one, no "click" or "tap" in its words`, def ~= nil and def.soft and not def.nav
 			and not def.info and string.find(string.lower(def.hint), "click", 1, true) == nil and string.find(string.lower(def.hint), "tap", 1, true) == nil, def and def.hint)
 	end
-	check("their words: \"Hire Danny to carry with you\" (the chevron over him), \"Pick a piece to give it to Danny\", \"Heavy piece: press Lift and wait for Danny\"",
-		hire.hint == "Hire Danny to carry with you" and hire.target == "danny" and give.hint == "Pick a piece to give it to Danny" and give.target == nil
-		and lift.hint == "Heavy piece: press Lift and wait for Danny" and lift.target == nil)
-	check("… his name Config's", Config.MoveHelper.Name == "Danny")
+	check("their words: \"Hire Danny to carry with you\" (the chevron over him), 8.5 \"Take out your clipboard (Q) and pick a piece for Danny\", \"Heavy piece: press Lift and wait for Danny\"",
+		hire.hint == "Hire Danny to carry with you" and hire.target == "danny" and give.hint == "Take out your clipboard (Q) and pick a piece for Danny" and give.target == nil
+		and lift.hint == "Heavy piece: press Lift and wait for Danny" and lift.target == nil, give.hint)
+	check("… his name Config's, the clipboard's key Config's", Config.MoveHelper.Name == "Danny" and Config.MoveHelper.Clipboard.Key == "Q")
 	check("… a computer's and a phone's words as they are (no key: \"pick\" is a click or a tap; Lift its prompt's)", SandboxSteps.onDevice(hire, nil, "keys") == hire.hint
-		and SandboxSteps.onDevice(hire, nil, "touch") == hire.hint and SandboxSteps.onDevice(give, nil, "keys") == give.hint
-		and SandboxSteps.onDevice(give, nil, "touch") == give.hint and SandboxSteps.onDevice(lift, nil, "touch") == lift.hint)
-	check("… a gamepad's: SandboxPad's buttons for him (\"(L1)\" at him, \"(R1)\" at a piece), Lift's own on the prompt",
-		SandboxSteps.onDevice(hire, nil, "pad") == "Hire Danny to carry with you (L1)" and SandboxSteps.onDevice(give, nil, "pad") == "Pick a piece to give it to Danny (R1)"
+		and SandboxSteps.onDevice(hire, nil, "touch") == hire.hint and SandboxSteps.onDevice(lift, nil, "touch") == lift.hint)
+	check("… 8.5 give's: the clipboard's key in the device's way (Q on a computer, \"tap 📋\" on a phone: its 📋 button)", SandboxSteps.onDevice(give, nil, "keys") == give.hint
+		and SandboxSteps.onDevice(give, nil, "touch") == "Take out your clipboard (tap 📋) and pick a piece for Danny", SandboxSteps.onDevice(give, nil, "touch"))
+	check("… a gamepad's: SandboxPad's buttons for him (\"(L1)\" at him, 8.5 R1 his clipboard's, in its place), Lift's own on the prompt",
+		SandboxSteps.onDevice(hire, nil, "pad") == "Hire Danny to carry with you (L1)" and SandboxSteps.onDevice(give, nil, "pad") == "Take out your clipboard (R1) and pick a piece for Danny"
 		and SandboxSteps.onDevice(lift, nil, "pad") == lift.hint, SandboxSteps.onDevice(give, nil, "pad"))
+	-- 8.5 the clipboard out (orders mode): give's words say what to do now ("(R1)" with a gamepad: at a piece)
+	local out = dannyState({ helper = "hired", helperQueue = 0, inside = true, clipboard = true })
+	local outWords = SandboxSteps.words(give, out)
+	check("8.5 the clipboard out: \"Pick a piece to give it to Danny\" (a click or a tap: no key; a gamepad's R1 after it)", outWords == "Pick a piece to give it to Danny"
+		and SandboxSteps.onDevice(give, outWords, "keys") == outWords and SandboxSteps.onDevice(give, outWords, "touch") == outWords
+		and SandboxSteps.onDevice(give, outWords, "pad") == "Pick a piece to give it to Danny (R1)", SandboxSteps.onDevice(give, outWords, "pad"))
+	check("… its detail follows the clipboard (the client makes its words again)", SandboxSteps.detail(give, out) == "clipboard"
+		and SandboxSteps.detail(give, dannyState({ helper = "hired", helperQueue = 0, inside = true })) == nil)
+	check("… still give's step (the same step, other words)", chosen(out).id == "give")
 	check("… the other steps on a device as before (a phone's tap, a gamepad's X)", SandboxSteps.onDevice(Steps.load, nil, "touch") == "Load it into the van: walk in or tap at the back"
 		and SandboxSteps.onDevice(Steps.load, nil, "pad") == "Load it into the van: walk in or X at the back" and SandboxSteps.onDevice(Steps.load, nil, "keys") == Steps.load.hint)
 

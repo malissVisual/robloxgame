@@ -18,9 +18,10 @@
 --     He works for that move until it ends; whoever paid owns the hire (they leave the move: he is for hire again).
 --     Not hired: today's rules for the two-person pieces (dragged alone, a crew mate's Help lift), no waiting for him.
 --   * His list: a click (a tap; a gamepad's "Give to Danny") on a piece of the move sends ("helper", "assign", its
---     model): checked here (MoveHelperBrain.assignCheck: the move's crew, hired, the move's own piece, not in the van
---     or home, nobody holding it, near enough, Config.MoveHelper.Queue at most; Config.Robust.Limits.MoveHelperAssign)
---     it goes on his list ("Danny will take the Lamp."), a 🧑‍🔧 marker over it with its number (the piece's
+--     model): checked here (MoveHelperBrain.assignCheck: the move's crew, hired, 8.5 the player's clipboard out (orders
+--     mode: their character's ClipboardHeld, server/Clipboard.luau's; else "Take out your clipboard"), the move's own
+--     piece, not in the van or home, nobody holding it, near enough, Config.MoveHelper.Queue at most;
+--     Config.Robust.Limits.MoveHelperAssign) it goes on his list ("Danny will take the Lamp."), a 🧑‍🔧 marker over it with its number (the piece's
 --     attributes DannyQueue / DannyNeeds for the clients); a click on it again takes it back. He carries them in that
 --     order (MoveHelperBrain.nextQueued: the first that still fits the van), each as he always has: a path inside, the
 --     front door his own way, a path to the van's back, the back opened, loaded (MovingRules' packer), his walk × the
@@ -2298,7 +2299,8 @@ local function hire(player: Player)
 	h.hirer = player
 	h.thinkAt = 0
 	say(h, "hired", clock, true)
-	tell(h, `🧑‍🔧 {player.DisplayName} hired {cfg.Name} for this move ({Brain.money(h.price)}): pick a piece and he carries it to the van; the rest is yours.`)
+	local how = if Config.Sandbox.On then `take out your clipboard ({cfg.Clipboard.Key}) and pick a piece, he` else "pick a piece and he" -- (8.5: the sandbox's orders mode)
+	tell(h, `🧑‍🔧 {player.DisplayName} hired {cfg.Name} for this move ({Brain.money(h.price)}): {how} carries it to the van; the rest is yours.`)
 	setDoing(h, h.action, h.spot)
 	tellCrew(h)
 end
@@ -2318,9 +2320,11 @@ local function endHire(h: Helper, who: Player)
 	tell(h, `🧑‍🔧 {who.DisplayName} left the move: {cfg.Name} waits by the van for hire again.`)
 end
 
--- (8.3 review: the notices' words fit every device: "pick" a piece or him, never a computer's "click")
+-- (8.3 review: the notices' words fit every device: "pick" a piece or him, never a computer's "click"; 8.5 a key in
+-- brackets goes on a phone and with a gamepad: SandboxPad.notice)
 local ASSIGN_WHY: { [string]: string } = {
 	hire = "Hire %s first: pick him by the van.",
+	clipboard = `📋 Take out your clipboard ({cfg.Clipboard.Key}) to give %s pieces.`, -- 8.5 orders mode
 	far = "Get closer to the %s to give it to Danny.",
 	his = "Danny has the %s already.",
 	van = "The %s is in the van already.",
@@ -2328,7 +2332,8 @@ local ASSIGN_WHY: { [string]: string } = {
 	full = "Danny's list is full: pick a piece of it to take it back first.",
 }
 
--- 8.3 a click on a piece (its model): onto his list, or off it again; checked (MoveHelperBrain.assignCheck).
+-- 8.3 a click on a piece (its model): onto his list, or off it again; checked (MoveHelperBrain.assignCheck). 8.5 only
+-- with the player's clipboard out (orders mode: the character attribute ClipboardHeld, server/Clipboard.luau's).
 local function assign(player: Player, model: any)
 	local h = helperOf(player)
 	if not h or typeof(model) ~= "Instance" or not model:IsA("Model") then
@@ -2344,8 +2349,10 @@ local function assign(player: Player, model: any)
 	end
 	local root = rootOf(player)
 	local near = root ~= nil and insideAt(h, root.Position) == insideAt(h, item.root.Position) and flat(root.Position, item.root.Position) <= cfg.ClickReach + 10
+	local character = player.Character
 	local verdict = Brain.assignCheck({ crew = true, hired = h.hirer ~= nil, mine = true, state = thing.state, held = thing.carrier ~= nil or thing.helper ~= nil,
-		his = Rules.holding(s.move, h.id) == spot, queued = table.find(h.queue, spot) ~= nil, count = #h.queue, near = near })
+		his = Rules.holding(s.move, h.id) == spot, queued = table.find(h.queue, spot) ~= nil, count = #h.queue, near = near,
+		clipboard = character ~= nil and character:GetAttribute("ClipboardHeld") == true })
 	local clock = os.clock()
 	if verdict == "add" then
 		table.insert(h.queue, spot)
@@ -2364,7 +2371,7 @@ local function assign(player: Player, model: any)
 	else
 		local text = ASSIGN_WHY[verdict]
 		if text then
-			notice:FireClient(player, string.format(text, if verdict == "hire" then cfg.Name else thing.name))
+			notice:FireClient(player, string.format(text, if verdict == "hire" or verdict == "clipboard" then cfg.Name else thing.name))
 		end
 	end
 	tellCrew(h)
@@ -2685,7 +2692,7 @@ local function create(s: any, port: Port): Helper
 		h.dead, h.downAt = true, clock - cfg.Respawn + 2 -- (tried again in a moment)
 	end
 	local price = Brain.money(h.price)
-	tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} waits by your van: pick him to hire him for this move ({price}). He carries the pieces you pick and lifts the heavy ones with you.`
+	tell(h, if Config.Sandbox.On then `🧑‍🔧 {cfg.Name} waits by your van: pick him to hire him for this move ({price}). He carries the pieces you pick from your clipboard and lifts the heavy ones with you.`
 		else `🧑‍🔧 {cfg.Name} from the depot waits by your van: HIRE him under the move's panel ({price}) and he lifts the heavy pieces with you.`)
 	return h
 end

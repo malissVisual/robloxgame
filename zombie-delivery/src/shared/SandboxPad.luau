@@ -31,7 +31,11 @@
 -- R2 the grip, B Put down and closing (held: the guide on and off, as a held G), L1 "Talk to Danny" (reserved for
 -- him; 8.3 Danny for hire: R1 his "Give to Danny" at a piece), R2 / L2 and the left stick Roblox's driving. A word names
 -- a gamepad button as Roblox does ("X", "R2").
---   SandboxPad.Actions                      the actions (id → { key, pad, tap?, hold? }): key the keyboard's ("E"),
+-- 8.5 Danny's clipboard (orders mode: client/DannyOrders.luau, server/Clipboard.luau): "clipboard" takes it out, on a
+-- computer Config.MoveHelper.Clipboard.Key (Q: free in the sandbox, where E, F, C, J, K, B, G, P, O, T, Z, H and Tab are
+-- taken and R is the city's clerks'), with a gamepad R1 (Danny's: with it out, R1 by a piece gives it to him, his
+-- "dannygive"), on a touch screen its 📋 button; "stow" puts it away (Q again, a gamepad's B: back).
+--   SandboxPad.Actions                     the actions (id → { key, pad, tap?, hold? }): key the keyboard's ("E"),
 --                                           pad the gamepad's buttons (Enum.KeyCode names, never the D-pad: the chips'),
 --                                           tap a touch screen's button for it ("GRIP", "💡"; nil: the thing itself, a
 --                                           prompt, is tapped)
@@ -68,6 +72,8 @@ SandboxPad.Actions = {
 	grip = { key = "LMB / F", pad = { "ButtonR2" }, tap = "GRIP" }, -- the grip check's one press (a phone: its GRIP button)
 	danny = { key = "E", pad = { "ButtonL1" } }, -- "Talk to Danny" (L1 his)
 	dannygive = { key = "LMB", pad = { "ButtonR1" } }, -- 8.3 Danny for hire: a piece onto his list or off it (a click, a tap, R1 at it)
+	clipboard = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonR1" }, tap = "📋" }, -- 8.5 Danny's clipboard out (orders mode)
+	stow = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonB" }, tap = "📋" }, -- 8.5 … and put away again
 	drive = { key = "W/S", pad = { "ButtonR2", "ButtonL2" } }, -- Roblox's driving: R2 on, L2 back
 	steer = { key = "A/D", pad = { "Thumbstick1" } },
 	horn = { key = "H", pad = {} }, -- (no button: the keyboard's H only)

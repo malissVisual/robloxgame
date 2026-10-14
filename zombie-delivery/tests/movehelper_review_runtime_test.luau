@@ -157,6 +157,7 @@ check("Player1 is inside", (E.rootOf(one).Position - origin.Position).Magnitude 
 local lamp, sofa = itemModel(1), itemModel(3)
 local noticeAt = #E.messages
 E.place(one, lamp.PrimaryPart.Position + V3(3, 0, 0))
+one.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: the clipboard out, server/Clipboard.luau's)
 E.request(one, "helper", "assign", lamp)
 check("4. Player1 (-1) clicks the Lamp beside it: on Danny's list (never \"Get closer\")", #danny.queue == 1 and danny.queue[1] == 1
 	and told(one, "Danny will take the Lamp.", noticeAt) and not told(one, "Get closer", noticeAt), E.lastNotice(one))

@@ -21,7 +21,12 @@
 --     onto his list, or off it again (the server checks and says so in a toast; its marker over the piece is the
 --     server's). On a gamepad the prompt "Give to Danny" ("Take back from Danny" for a piece of his list) on the nearest
 --     piece of your move within reach, on SandboxPad's "dannygive" button (R1: free in the sandbox, no throw or holster
---     there).
+--     there). 8.5 ORDERS MODE (the owner: "I'll hold a paper in my hand, like a notepad … and I click on what he should
+--     carry"): only while your clipboard is out (your character's ClipboardHeld: server/Clipboard.luau; client/
+--     DannyOrders.luau takes it out and shows the mode) does a click, a tap or R1 give him a piece: without it a click
+--     on a piece does nothing for him (no stray orders) and the gamepad's prompt is off; with it a click never opens his
+--     card (nothing else fires), only the pieces. Hired, the card's button row is 📋 CLIPBOARD (out; "📋 PUT AWAY" while
+--     it is out: the Clipboard remote, the card closes) beside CLEAR QUEUE, its words how (ClipboardRules.cardHint).
 --   * Where (MoveHelperCard.layout, pure): beside his head as it was on the screen when it opened (right of him, else
 --     left, over, under), clear of the HUD's groups (client/Hud.luau's), the sandbox's chips (client/SandboxHud.luau's
 --     money block, client/SandboxTasksUi.luau's TASKS chip), the move's top blocks (its panel, Danny's status line, the
@@ -49,6 +54,10 @@
 --   MoveHelperCard.pieceAt(origin, direction)      the piece of your move a ray from `origin` hits first (its model), nil
 --   MoveHelperCard.layout(W, H, S, touch, anchor, blocks) -> (box, scale)   where the card goes (px under Roblox's top
 --                                                  bar; anchor: { x, y } or nil, the screen's middle)
+--   MoveHelperCard.promptOf(model)                 8.5 a piece's own Pick up / Lift prompt when it is your move's (nil)
+--   MoveHelperCard.giveTarget()                    8.5 the piece the gamepad's "Give to Danny" is on (nil: none)
+--   MoveHelperCard.tapped() -> (Model?, number)    8.5 the piece a click or a tap last gave or took back, and when
+--                                                  (os.clock())
 
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
@@ -61,6 +70,8 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
 local SandboxPad = require(Shared.SandboxPad) -- (the gamepad's buttons for him: its actions "danny" and "dannygive")
+local ClipboardRules = require(Shared.ClipboardRules) -- 8.5: orders mode's words
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.5: the device used now (the card's words)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local TouchLayout = require(script.Parent.TouchLayout)
@@ -95,6 +106,7 @@ local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint"
 local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "" } -- (a ScreenGui: its piece, "" every piece)
 
 local remote = Net.get("Moving")
+local clipboard = Net.get("Clipboard") -- 8.5: the card's 📋 CLIPBOARD
 local started = false
 local gui: ScreenGui? = nil
 local parts: { [string]: any } = {} -- the card's pieces (built once)
@@ -106,6 +118,8 @@ local found: Model? = nil -- his body (found by MoveHelperId)
 local prompt: ProximityPrompt? = nil -- the gamepad's "Hire Danny" / "Talk to Danny" on him
 local give: ProximityPrompt? = nil -- the gamepad's "Give to Danny" on the nearest piece
 local giveTo: Model? = nil -- …that piece
+local tappedPiece: Model? = nil -- 8.5 the piece a click or a tap last gave (client/DannyOrders.luau outlines it a moment)
+local tappedAt = 0
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
@@ -262,6 +276,12 @@ local function hired(): boolean
 	return player:GetAttribute("MoveHelper") == "hired"
 end
 
+-- 8.5 orders mode: your clipboard out (the server's ClipboardHeld on your character).
+local function orders(): boolean
+	local character = player.Character
+	return character ~= nil and character:GetAttribute("ClipboardHeld") == true
+end
+
 -- May a click, a tap or a prompt act now (Danny on your move, your hands free, not waiting for him, no grip check, on
 -- foot)?
 local function mayAct(): boolean
@@ -282,6 +302,18 @@ local function piecePrompt(model: Instance): ProximityPrompt?
 		end
 	end
 	return nil
+end
+
+function MoveHelperCard.promptOf(model: Instance): ProximityPrompt?
+	return piecePrompt(model)
+end
+
+function MoveHelperCard.giveTarget(): Model?
+	return if give ~= nil and give.Enabled then giveTo else nil
+end
+
+function MoveHelperCard.tapped(): (Model?, number)
+	return tappedPiece, tappedAt
 end
 
 -- The piece of your move a ray hits first (its model: the attribute MoveSpot), nil: none, or another move's.
@@ -467,22 +499,34 @@ local function build(): Frame?
 		send(if hired() then "clear" else "hire")
 	end)
 	parts.main = main
+	-- 8.5 hired: 📋 CLIPBOARD (the clipboard out; 📋 PUT AWAY while it is) beside CLEAR QUEUE, the card closes
+	local clip = Ui.make("TextButton", {
+		Name = "Clip",
+		Size = UDim2.fromOffset((CARD_W - 2 * PAD - GAP) / 2, BUTTON_H),
+		BackgroundColor3 = ORANGE,
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Theme.HeadingFont,
+		TextSize = 16,
+		TextColor3 = K.charcoal,
+		Text = ClipboardRules.cardButton(false),
+		Visible = false,
+	}, card)
+	Ui.corner(clip, 8)
+	clip.Activated:Connect(function()
+		if not opened then
+			return -- (a second tap as it closes: one request)
+		end
+		clipboard:FireServer(not orders())
+		MoveHelperCard.close()
+	end)
+	parts.clip = clip
 	parts.card = card
 	return card
 end
 
--- How a piece goes to him with this input (a click, a tap, the gamepad's R1).
-local function giveWords(): (string, string)
-	if Ui.gamepadActive() then
-		local button = SandboxPad.button(GIVE_PAD)
-		return `{button} by a piece gives it to him`, `{button} again takes it back`
-	elseif Ui.touchLayout() then
-		return "Tap a piece to give it to him", "tap it again to take it back"
-	end
-	return "Click a piece to give it to him", "click it again to take it back"
-end
-
--- The card's own words and colours: his status, for hire (the price, HIRE) or hired (his list, CLEAR QUEUE).
+-- The card's own words and colours: his status, for hire (the price, HIRE) or hired (his list, how to give him pieces
+-- with this input: 8.5 the clipboard's, 📋 CLIPBOARD, CLEAR QUEUE).
 local function paint()
 	if not parts.card then
 		return
@@ -492,14 +536,19 @@ local function paint()
 	local doing = player:GetAttribute("MoveHelperDoing")
 	local price = Brain.money(priceNow())
 	parts.doing.Text = Brain.status(isHired, priceNow(), count, if type(doing) == "string" then doing else nil)
-	local first, second = giveWords()
+	parts.clip.Visible = isHired -- 8.5
 	if isHired then
 		parts.line.Text = Brain.queueText(count)
-		parts.hint.Text = `{first} · {second}.`
+		-- 8.5 orders mode: a piece goes to him only with the clipboard out (its key on this device)
+		parts.hint.Text = ClipboardRules.cardHint(PadGlyph.device())
 		parts.main.Text = "CLEAR QUEUE"
 		parts.main.BackgroundColor3 = K.raised
 		parts.main.TextColor3 = K.text
 		parts.edge.Transparency = 0
+		local out = orders()
+		parts.clip.Text = ClipboardRules.cardButton(out)
+		parts.clip.BackgroundColor3 = if out then K.raised else ORANGE
+		parts.clip.TextColor3 = if out then K.text else K.charcoal
 	else
 		parts.line.Text = `Hire {H.Name} for this move · {price}`
 		parts.hint.Text = "He carries the pieces you give him and lifts the heavy ones with you."
@@ -565,7 +614,11 @@ local function place()
 	local b, scale = MoveHelperCard.layout(W, Hh, Ui.screenScale(), touch, anchorAt, blocksNow(screen.AbsolutePosition))
 	local tall, close, button = cardHeight(touch, scale)
 	card.Size = UDim2.fromOffset(CARD_W, tall)
-	parts.main.Size = UDim2.fromOffset(CARD_W - 2 * PAD, button)
+	-- (8.5 hired: 📋 CLIPBOARD left, CLEAR QUEUE right, half the row each)
+	local half = (CARD_W - 2 * PAD - GAP) / 2
+	local split = parts.clip.Visible
+	parts.main.Size = UDim2.fromOffset(if split then half else CARD_W - 2 * PAD, button)
+	parts.clip.Size = UDim2.fromOffset(half, button)
 	card.Position = UDim2.fromOffset(math.floor(b.x0 + 0.5), math.floor(b.y0 + 0.5))
 	parts.scale.Scale = scale
 	local head = math.max(TITLE_H + DOING_H, close)
@@ -576,7 +629,8 @@ local function place()
 	local top = PAD + head + GAP
 	parts.line.Position = UDim2.fromOffset(PAD, top)
 	parts.hint.Position = UDim2.fromOffset(PAD, top + LINE_H)
-	parts.main.Position = UDim2.fromOffset(PAD, top + LINE_H + HINT_H + GAP)
+	parts.main.Position = UDim2.fromOffset(if split then PAD + half + GAP else PAD, top + LINE_H + HINT_H + GAP)
+	parts.clip.Position = UDim2.fromOffset(PAD, top + LINE_H + HINT_H + GAP)
 end
 
 function MoveHelperCard.isOpen(): boolean
@@ -668,11 +722,16 @@ function MoveHelperCard.open(at: { x: number, y: number }?)
 	-- walking away from him (8.3 review: past CardReach, or CardSlack studs farther than you were as it opened: the
 	-- status line opens it from anywhere), a seat, him gone: it closes (a look every quarter second while it is open)
 	local from = apart()
+	local out = orders() -- (8.5: the clipboard out or away while it is open: its button says so)
 	task.spawn(function()
 		while opened and openToken == token do
 			task.wait(0.25)
 			if not opened or openToken ~= token then
 				return
+			end
+			if orders() ~= out then
+				out = orders()
+				paint()
 			end
 			local now = apart()
 			if now and not from then
@@ -697,19 +756,23 @@ local function onCard(x: number, y: number): boolean
 	return x >= at.X and x <= at.X + size.X and y >= at.Y and y <= at.Y + size.Y
 end
 
--- A click or a tap in the world (a ray): on him, his card; on a piece of your move while he is hired, onto his list or
--- off it (the server decides).
+-- A click or a tap in the world (a ray): on him, his card. 8.5 orders mode (your clipboard out, he is hired): on a
+-- piece of your move, onto his list or off it (the server decides), and nothing else (never his card); without the
+-- clipboard a piece is nothing to him (no stray orders).
 local function clicked(origin: Vector3, direction: Vector3)
+	if orders() then
+		if not hired() then
+			return
+		end
+		local piece = MoveHelperCard.pieceAt(origin, direction)
+		if piece then
+			tappedPiece, tappedAt = piece, os.clock()
+			remote:FireServer("helper", "assign", piece)
+		end
+		return
+	end
 	if reaches(origin, direction) then
 		MoveHelperCard.open(nil)
-		return
-	end
-	if not hired() then
-		return
-	end
-	local piece = MoveHelperCard.pieceAt(origin, direction)
-	if piece then
-		remote:FireServer("helper", "assign", piece)
 	end
 end
 
@@ -783,7 +846,7 @@ local function nearestPiece(): Model?
 end
 
 local function keepGive()
-	local on = Ui.gamepadActive() and hired() and mayAct()
+	local on = Ui.gamepadActive() and hired() and mayAct() and orders() -- (8.5: only with the clipboard out)
 	local piece = if on then nearestPiece() else nil
 	local root = if piece then rootOf(piece) else nil
 	local made = give
@@ -807,7 +870,8 @@ local function keepGive()
 		fresh.UIOffset = Vector2.new(0, 60) -- (under the piece's own prompt)
 		fresh.Triggered:Connect(function()
 			local to = giveTo
-			if to and mayAct() and hired() then
+			if to and mayAct() and hired() and orders() then
+				tappedPiece, tappedAt = to, os.clock()
 				remote:FireServer("helper", "assign", to)
 			end
 		end)
@@ -849,6 +913,7 @@ function MoveHelperCard.start()
 				MoveHelperCard.close()
 			elseif opened then
 				paint()
+				place() -- (8.5: hired, its button row splits for 📋 CLIPBOARD)
 			end
 			pcall(keepPrompt) -- (his body by his id; off while you wait for him)
 		end)

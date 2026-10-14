@@ -26,9 +26,16 @@
 -- (MoveLayout.stripClear: shifted right just past the chips, else under them). Moved so, it hides while his card is
 -- open (the card shows his status and its button too; on 667 px the shifted strip would take the card's room right of
 -- the panel). 844 × 390 and wider: in the middle as before (nothing in its way), shown with the card too.
+-- 8.5 Danny's clipboard, orders mode (client/DannyOrders.luau calls MoveHelperHud.useOrders: the sandbox): hired, the
+-- button is 📋 ORDERS (it takes the clipboard out; "📋 PUT AWAY", orange, while it is out: shared/ClipboardRules.luau
+-- orders) in LIST's place, his card a tap on the line as before; the words say how a piece goes to him
+-- (ClipboardRules.carries: "Take out your clipboard (Q) to give him pieces", the device's key) for hire (the price is
+-- HIRE's) and while his list is empty and the clipboard away. The city's line as before (no clipboard there).
 --   MoveHelperHud.start(), MoveHelperHud.strip()   the strip (nil before Danny first comes)
 --   MoveHelperHud.useCard(open)                    8.3 HIRE and LIST open his card (open: the card's opener)
 --   MoveHelperHud.cardOpen(open)                   8.4 his card opened or closed (client/MoveHelperCard.luau)
+--   MoveHelperHud.useOrders(toggle)                8.5 hired, the button is 📋 ORDERS (toggle: the clipboard out / away)
+--   MoveHelperHud.setOrders(on)                    8.5 the clipboard out or away now (client/DannyOrders.luau)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,6 +46,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
 local SandboxPad = require(Shared.SandboxPad) -- 8.3 review: a gamepad button's word
+local ClipboardRules = require(Shared.ClipboardRules) -- 8.5: the clipboard's words
 local Ui = require(script.Parent.Ui)
 local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 review: the device used now
 local Theme = require(script.Parent.Theme)
@@ -65,6 +73,8 @@ local status: { [string]: any } = {} -- 8.3 the status line's pieces: tap (the l
 local openCard: (() -> ())? = nil -- 8.3 his card's opener (useCard)
 local cardShown = false -- 8.4 his card is open (MoveHelperHud.cardOpen)
 local moved = false -- 8.4 the strip stands off its place in the middle (MoveLayout.stripClear: a small phone)
+local orders: (() -> ())? = nil -- 8.5 the clipboard's toggle (useOrders)
+local ordersOn = false -- 8.5 the clipboard is out (setOrders)
 
 local function waiting(): string?
 	local call = player:GetAttribute("MoveHelperCall")
@@ -80,10 +90,16 @@ local function priceNow(): number
 	return if type(price) == "number" then price else 0
 end
 
--- The button: STOP while you wait; with the card HIRE / LIST open it; without it HIRE and CLEAR go to the server.
+-- The button: STOP while you wait; with the card HIRE / LIST open it; without it HIRE and CLEAR go to the server. 8.5
+-- hired, with the clipboard (the sandbox): 📋 ORDERS takes it out or puts it away.
 local function act()
 	if waiting() then
 		remote:FireServer("helper", "stop")
+		return
+	end
+	local toggle = orders
+	if toggle and hired() then
+		toggle()
 		return
 	end
 	local open = openCard
@@ -299,9 +315,13 @@ local function stopWords(ready: boolean): string
 	return if word then ` · {word}: stop` else ""
 end
 
--- 8.3 review: what he carries for you, in this device's words.
+-- 8.3 review: what he carries for you, in this device's words. 8.5 with the clipboard (the sandbox): how a piece goes to
+-- him ("Take out your clipboard (Q) to give him pieces": its key on this device).
 local function carriesWords(): string
 	local device = PadGlyph.device()
+	if orders then
+		return ClipboardRules.carries(device)
+	end
 	return if device == "touch" then "Carries what you tap" elseif device == "pad" then "Carries what you give him" else "Carries what you click"
 end
 
@@ -326,11 +346,16 @@ local function refresh()
 		paint(frame, if ready then "💪 ON THREE… LIFT!" else `⏳ WAITING FOR {name}…`,
 			(if ready then `{Config.MoveHelper.Name} is at the other end of the {piece}` else `Stay at your end of the {piece}`) .. stopWords(ready), "STOP", true, false)
 	elseif hired() then
-		paint(frame, `🧑‍🔧 {name} · {Brain.queueText(player:GetAttribute("MoveHelperQueue"))}`, if type(doing) == "string" then doing else "",
-			if openCard then "LIST" else "CLEAR", false, false)
+		-- (8.5: with the clipboard the button is 📋 ORDERS, orange while it is out; his list empty and the clipboard
+		-- away, the words say how a piece goes to him)
+		local count = player:GetAttribute("MoveHelperQueue")
+		local how = orders ~= nil and not ordersOn and (type(count) ~= "number" or count <= 0)
+		paint(frame, `🧑‍🔧 {name} · {Brain.queueText(count)}`, if how then carriesWords() elseif type(doing) == "string" then doing else "",
+			if orders then ClipboardRules.orders(ordersOn) elseif openCard then "LIST" else "CLEAR", false, orders ~= nil and ordersOn)
 	else
 		local price = Brain.money(priceNow())
-		paint(frame, `🧑‍🔧 {name} · FOR HIRE`, `{carriesWords()} · {price} this move`, `HIRE {price}`, false, true)
+		-- (8.5: with the clipboard its words alone, the price HIRE's)
+		paint(frame, `🧑‍🔧 {name} · FOR HIRE`, if orders then carriesWords() else `{carriesWords()} · {price} this move`, `HIRE {price}`, false, true)
 	end
 end
 
@@ -350,6 +375,20 @@ function MoveHelperHud.cardOpen(open: boolean)
 	if cardShown ~= open then
 		cardShown = open
 		place()
+	end
+end
+
+-- 8.5 Danny's clipboard is there (client/DannyOrders.luau's start): hired, the button is 📋 ORDERS.
+function MoveHelperHud.useOrders(toggle: () -> ())
+	orders = toggle
+	refresh()
+end
+
+-- 8.5 the clipboard out or away (client/DannyOrders.luau, at every change it sees): the button's words and colour.
+function MoveHelperHud.setOrders(on: boolean)
+	if ordersOn ~= on then
+		ordersOn = on
+		refresh()
 	end
 end
 

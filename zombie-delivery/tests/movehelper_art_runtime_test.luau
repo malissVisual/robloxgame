@@ -206,6 +206,7 @@ check("8.3 Ann hires him for the move", danny.hirer == ann)
 local function give(model: any)
 	local was = E.rootOf(ann).Position
 	E.place(ann, model.PrimaryPart.Position + V3(3, 0, 0))
+	ann.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: her clipboard out, server/Clipboard.luau's)
 	E.request(ann, "helper", "assign", model)
 	E.place(ann, was)
 end
