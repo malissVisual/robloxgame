@@ -32,9 +32,10 @@
 -- barn doors a second way out with their own daylight. The farmhouse is a chalet inside like a house (its planks,
 -- panelling, beams, lace, the front door's leaves); the barn and the yard keep their own (no chalet beams there), and a
 -- fixture kind both have (the Stube's kachelofen) takes the farm's own look (FARM_LOOKS).
--- 8.3 the lodge: a plan of kind "lodge" (shared/HouseLayout.luau: a house's plan made bigger, its guest room a bedroom's
--- kind, its study a living room's) builds as a house, and its terrace door (a second doorway to the outside, in a side
--- wall) gets a porch of daylight like the front door's (sidePorch).
+-- 8.3 the big house: a plan of kind "big" (shared/HouseLayout.luau: the sandbox's big house, a house's plan made
+-- bigger, its guest room a bedroom's kind, its study a living room's) builds as a house, its lights and Neon as every
+-- house's (Config.SandboxLight.House), its front door's two leaves shut in the doorway (doorLeaf), and its back door (a
+-- second doorway to the outside, in a side wall) gets a porch of daylight like the front door's (sidePorch).
 -- The owner's Blender furniture (design/blender-furniture/): once ZDCFurnitureArt is imported, server/FurnitureMesh.luau
 -- dresses each piece in its models (the Root, its welds and its labels stay; without the import FurnitureLooks' look).
 
@@ -47,6 +48,7 @@ local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
 
 local T = Config.Furniture
+local LIT = Config.SandboxLight.House -- 8.3: the lights' numbers and the Neon's colours (Config.SandboxLight)
 local HouseInterior = {}
 
 local SMOOTH = Enum.Material.SmoothPlastic
@@ -64,12 +66,12 @@ end
 -- over them).
 local KINDS = { "hall", "living", "kitchen", "bedroom", "kids", "bath", "garage" } -- (the lists' order: the dice's)
 local PLASTER: { [string]: { Color3 } } = {
-	hall = { rgb(242, 236, 222), rgb(236, 230, 214) },
-	living = { rgb(244, 238, 226), rgb(240, 230, 212) },
-	kitchen = { rgb(244, 240, 228), rgb(238, 234, 220) },
-	bedroom = { rgb(240, 234, 226), rgb(234, 228, 234) },
-	kids = { rgb(242, 236, 212), rgb(228, 238, 228) },
-	bath = { rgb(226, 238, 240), rgb(236, 240, 242) },
+	hall = { rgb(226, 216, 198), rgb(220, 210, 192) }, -- (8.3: a warm off-white, never a white: Config.SandboxLight.Caps.WallLuma)
+	living = { rgb(228, 218, 200), rgb(224, 212, 192) },
+	kitchen = { rgb(226, 218, 202), rgb(220, 212, 196) },
+	bedroom = { rgb(224, 214, 204), rgb(218, 210, 214) },
+	kids = { rgb(226, 216, 190), rgb(210, 222, 208) },
+	bath = { rgb(206, 218, 220), rgb(214, 220, 218) },
 	garage = { rgb(150, 152, 150), rgb(160, 150, 140) },
 }
 local PINE = { rgb(186, 134, 82), rgb(166, 114, 70), rgb(200, 150, 96) }
@@ -90,13 +92,13 @@ local FLOOR_OF: { [string]: Floor } = {
 	bath = { color = rgb(214, 230, 236), material = Enum.Material.CeramicTiles },
 	garage = { color = rgb(128, 128, 124), material = Enum.Material.Concrete },
 }
-local TRIM = rgb(240, 236, 228)
+local TRIM = rgb(222, 214, 200)
 local WOODWORK = rgb(132, 88, 54) -- the door frames, the window frames and sills
-local CEILING = rgb(222, 194, 152) -- pine boards
+local CEILING = rgb(204, 174, 132) -- pine boards (8.3: a shade darker round the lamps)
 local BEAM = rgb(108, 72, 44)
-local LACE = rgb(250, 248, 242)
-local LAMP = rgb(255, 222, 176) -- a warm glow
-local DAYLIGHT = rgb(126, 156, 178) -- the windows' dim glow (Neon)
+local LACE = rgb(234, 228, 216)
+local LAMP = color(LIT.Glow) -- a warm glow
+local DAYLIGHT = color(LIT.Window) -- the windows' dim glow (Neon)
 -- 7.0 review: the same at night (no glow): the panes, the bathroom's, the porch's wall; the porch light's share and hue
 local NIGHT = { pane = rgb(28, 36, 58), bath = rgb(36, 44, 62), porch = rgb(24, 30, 48), light = 0.25, lightColor = rgb(150, 170, 220) }
 type Daylit = { day: Color3, night: Color3, light: SurfaceLight?, brightness: number, color: Color3 }
@@ -610,8 +612,8 @@ LOOKS.barn_doors = function(parent, at, s)
 	sign(exit, "EXIT", Enum.NormalId.Front, rgb(255, 255, 255), rgb(30, 160, 80))
 end
 
--- 8.3 the lodge: a door's leaf, shut in its doorway (a part of its own, apart from the wall, no collision): its name, its
--- door ("front", "terrace": the attribute DoorLeaf) and the side of the doorway it hangs on (Hinge: "west", "east",
+-- 8.3 the big house: a door's leaf, shut in its doorway (a part of its own, apart from the wall, no collision): its name,
+-- its door ("front", "back": the attribute DoorLeaf) and the side of the doorway it hangs on (Hinge: "west", "east",
 -- "south", "north", the interior's axes as the map's). The doors' swing is the client's (it reads these).
 local function doorLeaf(parent: Instance, name: string, size: Vector3, cf: CFrame, c: Color3, door: string, hinge: string): Part
 	local p = part(parent, name, size, cf, c, Enum.Material.Wood)
@@ -624,43 +626,23 @@ local function doorLeaf(parent: Instance, name: string, size: Vector3, cf: CFram
 	return p
 end
 
--- 8.3 the lodge's numbers (Config.Furniture.Lodge: the owner found a house's inside "a flashbang"): its lights modest,
--- warm, read from there; no glowing lamps, panes or porch walls; its plaster a warm off-white.
-local LODGE = (T :: any).Lodge
-
--- The daylight through a doorway to the outside: the porch's outer wall glows, a SurfaceLight on it shines into the house
--- (+Z, its Back), dark at night (7.0 review). 8.3 the lodge: the wall soft (not glowing, LODGE.Porch), its light the
--- modest LODGE.DoorLight, never the daylight's.
-local function porchLight(glow: BasePart, lodge: boolean)
-	local tune = if lodge then LODGE.DoorLight else T.DoorLight
+-- The daylight through a doorway to the outside: the porch's outer wall (Neon, LIT.Daylight) and a SurfaceLight on it
+-- shining into the house (+Z, its Back: LIT.Porch), dark at night (7.0 review).
+local function porchLight(glow: BasePart)
 	local light = Instance.new("SurfaceLight")
 	light.Face = Enum.NormalId.Back -- (+Z: into the house)
-	light.Brightness = tune.Brightness
-	light.Range = tune.Range
+	light.Brightness = LIT.Porch.Brightness
+	light.Range = LIT.Porch.Range
 	light.Angle = 70
-	light.Color = color(tune.Color)
+	light.Color = color(LIT.Porch.Color)
 	light.Parent = glow
-	if lodge then
-		glow.Material = SMOOTH
-		glow.Color = color(LODGE.Porch)
-	else
-		daylight(glow, NIGHT.porch, light) -- 7.0 review: dark at night
-	end
+	daylight(glow, NIGHT.porch, light) -- 7.0 review: dark at night
 end
 
--- 8.3 the lodge: its rooms' plaster mixed toward the warm off-white (not the bathroom's tiles nor the garage's concrete).
-local function lodgeWalls(plaster: { [string]: Color3 })
-	for kind, c in plaster do
-		if kind ~= "bath" and kind ~= "garage" then
-			plaster[kind] = c:Lerp(color(LODGE.Walls), LODGE.WallsMix)
-		end
-	end
-end
-
--- 8.3 the lodge: a way out that is not the front door (the terrace door in a side wall: HouseLayout's kind "lodge") gets
--- a porch as the front door's (its floor, larch sides and roof, the outer wall that stops a walk out with its light into
--- the house: porchLight's, the lodge's soft), the door's lintel and the EXIT sign over it inside. The frame: the
--- doorway's middle on its wall's centre line, -Z out of the house.
+-- 8.3 the big house: a way out that is not the front door (the back door, in the corridor's east wall: HouseLayout's
+-- kind "big") gets a porch as the front door's (its floor, larch sides and roof, the outer wall of daylight that stops a
+-- walk out, porchLight's), the door's lintel, its leaf and the EXIT sign over it inside. The frame: the doorway's middle
+-- on its wall's centre line, -Z out of the house.
 local function sidePorch(shell: Instance, decor: Instance, plan: HouseLayout.Plan, origin: CFrame, door: HouseLayout.Door)
 	local half = plan.wall / 2
 	local mid = (plan.min + plan.max) / 2
@@ -668,19 +650,19 @@ local function sidePorch(shell: Instance, decor: Instance, plan: HouseLayout.Pla
 	local frame = origin * CFrame.lookAt(door.at, door.at + out)
 	local w, porch, h = door.width / 2 + 1, 6, plan.doorHeight
 	local larch = rgb(156, 112, 72)
-	part(shell, "TerracePorch", Vector3.new(2 * w, 0.2, porch), frame * CFrame.new(0, -0.1, -(half + porch / 2)), rgb(150, 146, 140), Enum.Material.WoodPlanks, true)
+	part(shell, "BackPorch", Vector3.new(2 * w, 0.2, porch), frame * CFrame.new(0, -0.1, -(half + porch / 2)), rgb(150, 146, 140), Enum.Material.WoodPlanks, true)
 	for _, s in { -1, 1 } do
-		part(shell, "TerraceWall", Vector3.new(0.5, plan.ceiling, porch), frame * CFrame.new(s * (w + 0.25), plan.ceiling / 2, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
+		part(shell, "BackPorchWall", Vector3.new(0.5, plan.ceiling, porch), frame * CFrame.new(s * (w + 0.25), plan.ceiling / 2, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
 	end
-	part(shell, "TerraceRoof", Vector3.new(2 * w + 1, 0.5, porch), frame * CFrame.new(0, h + 1.25, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
+	part(shell, "BackPorchRoof", Vector3.new(2 * w + 1, 0.5, porch), frame * CFrame.new(0, h + 1.25, -(half + porch / 2)), larch, Enum.Material.WoodPlanks, true)
 	part(decor, "Lintel", Vector3.new(door.width + 0.8, 0.4, plan.wall + 0.3), frame * CFrame.new(0, h + 0.2, 0), rgb(110, 76, 50), Enum.Material.Wood)
-	-- its leaf, shut in the doorway, hinged at the frame's +X jamb (the lodge's east door: its south side)
+	-- its leaf, shut in the doorway, hinged at the frame's +X jamb (the east wall's door: its south side)
 	local right = Vector3.new(-out.Z, 0, out.X) -- (the frame's +X: its RightVector)
 	local hinge = if math.abs(right.X) > math.abs(right.Z) then (if right.X > 0 then "east" else "west") else (if right.Z > 0 then "south" else "north")
-	doorLeaf(decor, "TerraceLeaf", Vector3.new(door.width - 0.06, h - 0.15, 0.24), frame * CFrame.new(0, (h - 0.15) / 2, 0), rgb(96, 64, 40), "terrace", hinge)
-	local glow = part(shell, "TerraceDaylight", Vector3.new(2 * w, h + 1.5, 0.4), frame * CFrame.new(0, (h + 1.5) / 2, -(half + porch + 0.2)), rgb(236, 240, 228), Enum.Material.Neon, true)
+	doorLeaf(decor, "BackLeaf", Vector3.new(door.width - 0.06, h - 0.15, 0.24), frame * CFrame.new(0, (h - 0.15) / 2, 0), rgb(96, 64, 40), "back", hinge)
+	local glow = part(shell, "BackDaylight", Vector3.new(2 * w, h + 1.5, 0.4), frame * CFrame.new(0, (h + 1.5) / 2, -(half + porch + 0.2)), color(LIT.Daylight), Enum.Material.Neon, true)
 	glow.CastShadow = false
-	porchLight(glow, plan.kind == "lodge") -- (the lodge's: soft, Config.Furniture.Lodge.DoorLight)
+	porchLight(glow)
 	local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), frame * CFrame.new(0, h + 1.05, half + 0.15), rgb(250, 250, 248), SMOOTH)
 	sign(exit, "EXIT", Enum.NormalId.Back, rgb(255, 255, 255), rgb(30, 160, 80))
 end
@@ -855,10 +837,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		end
 	end
 	plaster.pantry, panelling.pantry = plaster.hall, panelling.hall -- (7.x the farm's pantry looks like its hall)
-	local lodge = plan.kind == "lodge" -- 8.3: warm off-white walls, modest lights (Config.Furniture.Lodge)
-	if lodge then
-		lodgeWalls(plaster)
-	end
+	local big = plan.kind == "big" -- 8.3 the big house: its front door's leaves shut (below)
 	local planks = PLANKS[roll(#PLANKS)]
 	local kindOf: { [string]: string } = {}
 	for _, room in plan.rooms do
@@ -1001,7 +980,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local leaf = front.width / 2
 		local paint = DOORS[roll(#DOORS)]
 		local bloom = BLOOMS[roll(#BLOOMS)]
-		for _, s in (if lodge then {} else { -1, 1 }) :: { number } do -- (8.3 the lodge: its leaves shut, below)
+		for _, s in (if big then {} else { -1, 1 }) :: { number } do -- (8.3 the big house: its leaves shut, below)
 			local lx = x + s * (leaf + 0.12)
 			local lz = z - 0.15 - leaf / 2
 			local tall = plan.doorHeight - 0.15
@@ -1010,11 +989,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 			cylinder(part(decor, "Bloom", Vector3.new(0.04, 1.1, 1.1), at(face, tall * 0.68, lz), bloom, SMOOTH))
 			part(decor, "Leaves", Vector3.new(0.04, 0.9, 0.9), at(face, tall * 0.5, lz) * CFrame.Angles(math.pi / 4, 0, 0), LEAF, SMOOTH)
 		end
-		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), rgb(236, 240, 228), Enum.Material.Neon, true)
+		local glow = part(shell, "Daylight", Vector3.new(2 * w, plan.doorHeight + 1.5, 0.4), at(x, (plan.doorHeight + 1.5) / 2, z - porch - 0.2), color(LIT.Daylight), Enum.Material.Neon, true)
 		glow.CastShadow = false
-		porchLight(glow, lodge) -- (its light into the house; 8.3 the lodge's soft, Config.Furniture.Lodge.DoorLight)
-		if lodge then
-			-- 8.3 the lodge: the front door's two leaves shut in the doorway, each hinged at its jamb (west, east): a door
+		porchLight(glow) -- (its light into the house: Config.SandboxLight.House.Porch, dark at night)
+		if big then
+			-- 8.3 the big house: the front door's two leaves shut in the doorway, each hinged at its jamb (west, east): a door
 			-- that opens as you walk through it (the doors' swing is the client's; nothing collides)
 			for _, s in { -1, 1 } do
 				doorLeaf(decor, if s < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(leaf - 0.06, plan.doorHeight - 0.15, 0.24), at(x + s * leaf / 2, (plan.doorHeight - 0.15) / 2, front.at.Z), paint, "front", if s < 0 then "west" else "east")
@@ -1025,7 +1004,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), at(x, plan.doorHeight + 1.05, front.at.Z + half + 0.15), rgb(250, 250, 248), SMOOTH)
 		sign(exit, "EXIT", Enum.NormalId.Back, rgb(255, 255, 255), rgb(30, 160, 80))
 	end
-	-- 8.3 the lodge: its other way out (the terrace door) gets its own porch of daylight (a farm's barn doors have theirs)
+	-- 8.3 the big house: its other way out (the back door) gets its own porch of daylight (a farm's barn doors have theirs)
 	if plan.kind ~= "farm" then
 		for index, door in plan.doors do
 			if index > 1 and door.rooms[2] == "outside" then
@@ -1041,13 +1020,9 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local frame = origin * CFrame.lookAt(w.at, w.at + w.normal) -- -Z into the room
 		local small = w.width <= 3
 		part(decor, "WindowFrame", Vector3.new(w.width + 0.5, w.height + 0.5, 0.16), frame * CFrame.new(0, 0, -0.08), WOODWORK, Enum.Material.Wood)
-		local pane = part(decor, "Window", Vector3.new(w.width, w.height, 0.06), frame * CFrame.new(0, 0, -0.19), if kind == "bath" then rgb(170, 190, 200) else DAYLIGHT, Enum.Material.Neon)
+		local pane = part(decor, "Window", Vector3.new(w.width, w.height, 0.06), frame * CFrame.new(0, 0, -0.19), if kind == "bath" then color(LIT.BathWindow) else DAYLIGHT, Enum.Material.Neon)
 		pane:SetAttribute("InteriorWindow", true)
-		if lodge then
-			pane.Material, pane.Color = SMOOTH, color(LODGE.Pane) -- (8.3 the lodge: a soft pane, no glow)
-		else
-			daylight(pane, if kind == "bath" then NIGHT.bath else NIGHT.pane) -- 7.0 review: a night sky at night
-		end
+		daylight(pane, if kind == "bath" then NIGHT.bath else NIGHT.pane) -- 7.0 review: a night sky at night
 		if not small then
 			part(decor, "Sill", Vector3.new(w.width + 1, 0.2, 0.6), frame * CFrame.new(0, -w.height / 2 - 0.1, -0.3), WOODWORK, Enum.Material.Wood)
 		end
@@ -1058,8 +1033,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	end
 
 	-- the ceiling lights: one in the middle of every room, two in a long one, a warm glow (7.x alpine); a tube in the
-	-- garage. 8.3 the lodge: one modest warm light a room (Config.Furniture.Lodge.Light), its lamp not glowing.
-	local tune = if lodge then LODGE.Light else T.Light
+	-- garage.
 	for _, room in plan.rooms do
 		if FARM_OWN[room.kind] then
 			continue -- 7.x the farm's barn: its lanterns are fixtures; the yard is open to the sky
@@ -1067,21 +1041,21 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local lx, lz = room.max.X - room.min.X, room.max.Z - room.min.Z
 		local cx, cz = (room.min.X + room.max.X) / 2, (room.min.Z + room.max.Z) / 2
 		local spots: { { number } } = { { cx, cz } }
-		if math.max(lx, lz) > T.Light.LongRoom and not lodge then
+		if math.max(lx, lz) > LIT.Lamp.Long then
 			spots = if lx > lz then { { room.min.X + lx / 4, cz }, { room.max.X - lx / 4, cz } } else { { cx, room.min.Z + lz / 4 }, { cx, room.max.Z - lz / 4 } }
 		end
 		for _, s in spots do
 			local lamp
 			if room.kind == "garage" then
-				lamp = part(decor, "Tube", Vector3.new(4, 0.3, 0.6), at(s[1], ceiling - 0.15, s[2]), rgb(236, 244, 255), if lodge then SMOOTH else Enum.Material.Neon)
+				lamp = part(decor, "Tube", Vector3.new(4, 0.3, 0.6), at(s[1], ceiling - 0.15, s[2]), color(LIT.Tube), Enum.Material.Neon)
 			else
-				lamp = cylinder(part(decor, "Lamp", Vector3.new(0.3, 2.6, 2.6), at(s[1], ceiling - 0.15, s[2]) * CFrame.Angles(0, 0, math.pi / 2), LAMP, if lodge then SMOOTH else Enum.Material.Neon))
+				lamp = cylinder(part(decor, "Lamp", Vector3.new(0.3, 2.6, 2.6), at(s[1], ceiling - 0.15, s[2]) * CFrame.Angles(0, 0, math.pi / 2), LAMP, Enum.Material.Neon))
 			end
 			lamp.CastShadow = false
 			local light = Instance.new("PointLight")
-			light.Brightness = tune.Brightness
-			light.Range = tune.Range
-			light.Color = if room.kind == "garage" and not lodge then rgb(226, 236, 255) else color(tune.Color)
+			light.Brightness = LIT.Lamp.Brightness
+			light.Range = LIT.Lamp.Range
+			light.Color = if room.kind == "garage" then rgb(226, 236, 255) else color(LIT.Lamp.Color)
 			light.Shadows = false
 			light.Parent = lamp
 		end

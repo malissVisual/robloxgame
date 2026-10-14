@@ -121,7 +121,7 @@ local INK = { 26, 27, 29 }
 local PODIUM = { 50, 53, 58 }
 local FELT = { 202, 196, 184 }
 local PAINT = { 242, 198, 42 }
-local GLOW = { 255, 244, 224 }
+local GLOW = Config.SandboxLight.Warehouse.Glow -- 8.3: the lamps' discs (Config.SandboxLight)
 
 -- The building's middle, half sizes and wall height.
 local function frame(plot: SandboxMap.Plot): (number, number, number, number, number)
@@ -535,7 +535,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 			housing.shape, housing.roll = "Cylinder", 90
 			local glow = look(add(`LampGlow{lamps}`, "inside", { 0.14, 2.6, 2.6 }, { x, h - 1.77, z }, GLOW, "Neon")) -- (its light stays)
 			glow.shape, glow.roll = "Cylinder", 90
-			glow.light = { range = T.Lamp.Range, brightness = T.Lamp.Brightness, color = T.Lamp.Color }
+			glow.light = { range = Config.SandboxLight.Warehouse.Lamp.Range, brightness = Config.SandboxLight.Warehouse.Lamp.Brightness, color = Config.SandboxLight.Warehouse.Lamp.Color }
 		end
 	end
 

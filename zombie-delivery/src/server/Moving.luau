@@ -93,12 +93,11 @@
 --     after VanAgain s and the move takes it over (its Load / Unload prompts made again on it).
 --   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
 --     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
---     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: 8.3 "The
---     Alpine Lodge", in The Old Chalet's place: its plan HouseLayout's kind "lodge", Config.Moving.Sandbox.Kind; its
---     terrace door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the part
---     with the attribute SandboxDoor, server/
---     SandboxWorld.luau's; else an invisible one at House.door), "Call truck to door" to House.curb, out at its door;
---     refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
+--     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
+--     Chalet", 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big", Config.Moving.Sandbox.Kind,
+--     its back door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the
+--     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
+--     truck to door" to House.curb, out at its door; refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
 --     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
 --     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
 --     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
@@ -962,9 +961,9 @@ end
 -- Its front door (the spot outside it, looking out to the road), the van's curb (its pivot: the nose to the road, the
 -- back to the door: "Call truck to door"), out where you came in (4 studs out of the door). Its "Enter house" part is an
 -- invisible one at the door until the map's front door is found (SB.frontDoor: the prompt goes onto that). No
--- moving-day dress: the map's house (server/SandboxWorld.luau; 8.3 The Alpine Lodge) stands there as it is. 8.3: its
--- second door, the lodge's terrace door (House.back: "Enter" there to the plan's exits[2], out there by it), as a farm's
--- barn doors; the van's spot for both the curb.
+-- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is. 8.3 the big move: its second
+-- door, the back door (House.back, the owner's model's back door: "Enter" there to the plan's exits[2], out there by
+-- it), as a farm's barn doors; the van's spot for both the curb.
 local function yawLook(yaw: number): Vector3
 	local r = math.rad(yaw)
 	return Vector3.new(-math.sin(r), 0, -math.cos(r))
@@ -978,16 +977,15 @@ function SB.site(contract: Contract, parent: Instance): Site
 	local model = Instance.new("Model")
 	model.Name = `Move_{contract.id}`
 	local up = Vector3.new(0, 3.5, 0)
-	local width = h.doorWidth -- (8.3 the lodge: its double front door)
-	local enter = invisible("EnterDoor", Vector3.new(width, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
+	local enter = invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
 	model.PrimaryPart = enter
-	-- 8.3 the lodge: its terrace door (House.back, the plan's exits[2]), a second way in and out; the van's spot the curb
+	-- 8.3 the big move: its back door (House.back, the plan's exits[2]), a second way in and out; the van's spot the curb
 	local backFacing = yawLook(h.back.yaw)
 	local backDoor = Vector3.new(h.back.x, h.back.y, h.back.z)
 	local backOut = backDoor + backFacing * 4 + Vector3.new(0, 0.1, 0)
-	local terrace: SiteDoor = {
+	local back: SiteDoor = {
 		exit = 2,
-		name = "terrace door",
+		name = "back door",
 		door = backDoor,
 		facing = backFacing,
 		outside = CFrame.lookAt(backOut, backOut + backFacing),
@@ -1013,8 +1011,8 @@ function SB.site(contract: Contract, parent: Instance): Site
 		park = { x = park.X, z = park.Z },
 		pile = { x = out.X, z = out.Z },
 	}
-	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = width, part = enter }
-	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front, terrace } }
+	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = 4, part = enter }
+	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front, back } }
 end
 
 -- The map's front door (server/SandboxWorld.luau's FrontDoor: the part with the attribute SandboxDoor), looked for when
@@ -1036,7 +1034,7 @@ function SB.frontDoor(): BasePart?
 end
 
 -- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words; 8.3
--- its plan's kind the lodge's (Sandbox.Kind: HouseLayout's "lodge").
+-- its plan's kind the big house's (Sandbox.Kind: HouseLayout's "big").
 function SB.newContract(): Contract
 	local S = T.Sandbox
 	local h = SandboxMap.House
@@ -2574,7 +2572,7 @@ local function enterPrompt(s: Session)
 		if not spot then
 			continue
 		end
-		local action = if index == 1 then "Enter house" elseif SB.on then `Enter by the {door.name}` else "Enter barn" -- (8.3: the lodge's terrace door)
+		local action = if index == 1 then "Enter house" elseif SB.on then `Enter by the {door.name}` else "Enter barn" -- (8.3: the big house's back door)
 		local enter = newPrompt(spot, action, `{s.contract.icon} {s.contract.name}`, Enum.KeyCode.E, 0, T.Reach.Door + door.width / 2)
 		enter.Enabled = not T.Doors.Walk -- (8.1 walk-in doors: you walk in; the prompt stays, off)
 		tag(enter, s.owner)

@@ -1,13 +1,15 @@
--- 8.3 the lodge's inside: shared/HouseLayout.luau's kind "lodge" (the sandbox's Alpine Lodge, Config.Furniture.Lodge)
--- over many seeds, and the real server/HouseInterior.luau building it on the recorder (tools/fixtures/item-mock.luau).
--- A lodge's plan: ten rooms on one floor (the house's eight, the guest room and the study), Lodge.Spots pieces and
--- Lodge.Collectibles collectibles besides, Lodge.Stars ★, more pieces for two than a house's; two ways out (the front
--- door, the terrace door at the corridor's east end) and a way in by each; every piece carried out by either (nothing
--- stuck, HouseLayout.exitsFor every exit); the same plan for the same seed, another for another. Its inside: within
--- Lodge.InteriorMaxParts, one modest warm light a room (Lodge.Light's numbers, no shadows) and the doors' soft
--- Lodge.DoorLight, nothing big that glows, warm off-white walls; the front door's two leaves and the terrace door's leaf
--- shut in their doorways (DoorLeaf, Hinge; no collision, a PathfindingModifier PassThrough), the terrace door's porch
--- and EXIT sign.
+-- 8.3 the big move: shared/HouseLayout.luau's kind "big" (the plan of the sandbox's big house, The Old Chalet: the
+-- owner's big Blender house; Config.Furniture.Big) over many seeds, and the real server/HouseInterior.luau building it
+-- on the recorder (tools/fixtures/item-mock.luau). A big plan: ten rooms on one floor (eight rooms: the house's six,
+-- the guest room and the study; the hall and the corridor), Big.Spots pieces and Big.Collectibles collectibles besides,
+-- Big.Stars ★, more pieces for two than a house's; two ways out (the front door, the back door at the corridor's east
+-- end) and a way in by each; every piece carried out by either (nothing stuck, HouseLayout.exitsFor every exit); the
+-- same plan for the same seed, another for another. Its inside: within Big.InteriorMaxParts; lit as every house
+-- (Config.SandboxLight.House: each room's ceiling lamp, two in a room longer than Lamp.Long, at Lamp's numbers, no
+-- shadows; the two doors' daylight at Porch's; the panes, the lamps' discs and the porches' walls of daylight in its
+-- Neon colours; tests/sandboxlight_runtime_test.luau holds them to the caps); the front door's two leaves and the back
+-- door's leaf shut in their doorways (DoorLeaf, Hinge; no collision, a PathfindingModifier PassThrough), the back
+-- door's porch and EXIT sign.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -27,14 +29,14 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local T = Config.Furniture
-local L = (T :: any).Lodge
+local L = (T :: any).Big
 local Items = FurnitureLooks.Items
 local SEEDS = 40
 
-check("Config.Furniture.Lodge: its numbers (pieces, ★, collectibles 4-6, the terrace door, a part budget, modest warm lights)",
+local LIT = Config.SandboxLight.House
+check("Config.Furniture.Big: its numbers (pieces, ★, collectibles 4-6, the back door, a part budget); Config.Moving.Sandbox's kind",
 	type(L) == "table" and L.Spots[1] >= 30 and L.Spots[2] >= L.Spots[1] and L.Stars >= T.Stars and L.Collectibles.Count[1] == 4 and L.Collectibles.Count[2] == 6
-	and L.BackDoor >= 5 and L.InteriorMaxParts > 0 and L.Light.Brightness <= 1 and L.Light.Range <= 16 and L.DoorLight.Brightness <= 1
-	and L.Light.Color[1] > L.Light.Color[3] and table.find(HouseLayout.Kinds, "lodge") ~= nil)
+	and L.BackDoor >= 5 and L.InteriorMaxParts > 0 and table.find(HouseLayout.Kinds, "big") ~= nil and Config.Moving.Sandbox.Kind == "big")
 
 -- ── the plans ────────────────────────────────────────────────────────────────
 local function counts(plan: any): (number, number, number, number)
@@ -53,18 +55,18 @@ local function counts(plan: any): (number, number, number, number)
 end
 
 local bad: { string } = {}
-local lodgePairs, housePairs, lodgePieces, housePieces = 0, 0, 0, 0
+local bigPairs, housePairs, bigPieces, housePieces = 0, 0, 0, 0
 local fewestRooms, mostRooms = math.huge, 0
 local mirrored = 0
 for seed = 1, SEEDS do
-	local plan: any = HouseLayout.plan(seed, "lodge")
+	local plan: any = HouseLayout.plan(seed, "big")
 	local tag = `seed {seed}`
 	local ids: { [string]: any } = {}
 	for _, r in plan.rooms do
 		ids[r.id] = r
 	end
 	fewestRooms, mostRooms = math.min(fewestRooms, #plan.rooms), math.max(mostRooms, #plan.rooms)
-	if plan.kind ~= "lodge" or #plan.rooms ~= 10 or not ids.guest or not ids.study or not ids.corridor or ids.guest.kind ~= "bedroom" or ids.study.kind ~= "living" then
+	if plan.kind ~= "big" or #plan.rooms ~= 10 or not ids.guest or not ids.study or not ids.corridor or ids.guest.kind ~= "bedroom" or ids.study.kind ~= "living" then
 		table.insert(bad, `{tag}: its rooms`)
 	end
 	local pieces, rare, pairs_, stars = counts(plan)
@@ -79,8 +81,8 @@ for seed = 1, SEEDS do
 	if not inRoom then
 		table.insert(bad, `{tag}: a piece outside its room`)
 	end
-	lodgePairs += pairs_
-	lodgePieces += pieces
+	bigPairs += pairs_
+	bigPieces += pieces
 	local house: any = HouseLayout.plan(seed, "house")
 	local hp, _, hpairs = counts(house)
 	housePairs += hpairs
@@ -94,16 +96,16 @@ for seed = 1, SEEDS do
 			table.insert(outside, d)
 		end
 	end
-	local terrace = outside[2]
+	local backDoor = outside[2]
 	local corridor = ids.corridor
 	if #exits ~= 2 or #entries ~= 2 or #outside ~= 2 or (exits[1] - plan.exit).Magnitude > 1e-6 or outside[1] ~= plan.doors[1] then
 		table.insert(bad, `{tag}: {#exits} exits, {#entries} entries, {#outside} doorways out`)
-	elseif not (terrace.rooms[1] == "corridor" and terrace.axis == "Z" and math.abs(terrace.at.X - corridor.max.X) < plan.wall
-		and terrace.at.Z > corridor.min.Z and terrace.at.Z < corridor.max.Z and terrace.width == L.BackDoor and terrace.at.X > 0) then
-		table.insert(bad, `{tag}: the terrace door not at the corridor's east end`)
-	elseif not ((exits[2] - terrace.at).Magnitude < plan.wall + T.EntryUp + 0.5 and exits[2].X < terrace.at.X
+	elseif not (backDoor.rooms[1] == "corridor" and backDoor.axis == "Z" and math.abs(backDoor.at.X - corridor.max.X) < plan.wall
+		and backDoor.at.Z > corridor.min.Z and backDoor.at.Z < corridor.max.Z and backDoor.width == L.BackDoor and backDoor.at.X > 0) then
+		table.insert(bad, `{tag}: the back door not at the corridor's east end`)
+	elseif not ((exits[2] - backDoor.at).Magnitude < plan.wall + T.EntryUp + 0.5 and exits[2].X < backDoor.at.X
 		and -entries[2].R[3] < -0.99 and entries[2].Position.X < exits[2].X) then
-		table.insert(bad, `{tag}: the terrace door's way out and in`)
+		table.insert(bad, `{tag}: the back door's way out and in`)
 	end
 	mirrored += if plan.mirrored then 1 else 0
 	-- every piece out by either door
@@ -118,9 +120,9 @@ for seed = 1, SEEDS do
 			break
 		end
 	end
-	-- the same seed, the same lodge
+	-- the same seed, the same plan
 	if seed <= 6 then
-		local again: any = HouseLayout.plan(seed, "lodge")
+		local again: any = HouseLayout.plan(seed, "big")
 		local same = #again.spots == #plan.spots and again.mirrored == plan.mirrored and (again.size - plan.size).Magnitude < 1e-9
 		for i, s in plan.spots do
 			local t = again.spots[i]
@@ -131,20 +133,20 @@ for seed = 1, SEEDS do
 		end
 	end
 end
-check(`{SEEDS} lodges: ten rooms each (the guest room a bedroom, the study a living room), {L.Spots[1]}-{L.Spots[2]} pieces, {L.Collectibles.Count[1]}-{L.Collectibles.Count[2]} collectibles, {L.Stars} ★, each piece in its room`,
+check(`{SEEDS} big houses: ten rooms each (the guest room a bedroom, the study a living room), {L.Spots[1]}-{L.Spots[2]} pieces, {L.Collectibles.Count[1]}-{L.Collectibles.Count[2]} collectibles, {L.Stars} ★, each piece in its room`,
 	#bad == 0 and fewestRooms == 10 and mostRooms == 10, table.concat(bad, "; "))
-check(`more pieces for two than a house's ({string.format("%.1f", lodgePairs / SEEDS)} a lodge, {string.format("%.1f", housePairs / SEEDS)} a house) and more pieces ({string.format("%.1f", lodgePieces / SEEDS)}, {string.format("%.1f", housePieces / SEEDS)})`,
-	lodgePairs >= housePairs * 1.4 and lodgePieces > housePieces + 10)
-check(`mirrored and not ({mirrored} of {SEEDS}): the terrace door at the corridor's east end either way`, mirrored > 0 and mirrored < SEEDS)
-local a: any, b: any = HouseLayout.plan(1, "lodge"), HouseLayout.plan(2, "lodge")
+check(`more pieces for two than a house's ({string.format("%.1f", bigPairs / SEEDS)} a big house, {string.format("%.1f", housePairs / SEEDS)} a house) and more pieces ({string.format("%.1f", bigPieces / SEEDS)}, {string.format("%.1f", housePieces / SEEDS)})`,
+	bigPairs >= housePairs * 1.4 and bigPieces > housePieces + 10)
+check(`mirrored and not ({mirrored} of {SEEDS}): the back door at the corridor's east end either way`, mirrored > 0 and mirrored < SEEDS)
+local a: any, b: any = HouseLayout.plan(1, "big"), HouseLayout.plan(2, "big")
 local differs = #a.spots ~= #b.spots or a.mirrored ~= b.mirrored
 for i, s in a.spots do
 	differs = differs or b.spots[i] == nil or b.spots[i].item ~= s.item or (b.spots[i].at.Position - s.at.Position).Magnitude > 1e-6
 end
-check("another seed, another lodge (a new seed a move)", differs)
-local big: any = HouseLayout.plan(3, "lodge")
+check("another seed, another big house (a new seed a move)", differs)
+local big: any = HouseLayout.plan(3, "big")
 local small: any = HouseLayout.plan(3, "house")
-check(`a lodge bigger than a house ({math.floor(big.size.X)} × {math.floor(big.size.Z)}, a house {math.floor(small.size.X)} × {math.floor(small.size.Z)}), fitting its interior slot`,
+check(`a big house bigger than a house ({math.floor(big.size.X)} × {math.floor(big.size.Z)}, a house {math.floor(small.size.X)} × {math.floor(small.size.Z)}), fitting its interior slot`,
 	big.size.X * big.size.Z > 1.4 * small.size.X * small.size.Z and math.max(big.size.X, big.size.Z) + 2 * T.Ground.Margin + 40 <= T.Slot.Spacing)
 
 -- ── the inside ───────────────────────────────────────────────────────────────
@@ -164,7 +166,7 @@ end
 
 local mostParts = 0
 for _, seed in { 1, 2, 3, 4, 5, 6 } do
-	local plan: any = HouseLayout.plan(seed, "lodge")
+	local plan: any = HouseLayout.plan(seed, "big")
 	local origin = HouseInterior.slot(seed % 7)
 	local ok, model = pcall(HouseInterior.build, plan, origin)
 	local tag = `seed {seed}`
@@ -175,17 +177,19 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 	local o = origin.Position
 	local parts, glows = 0, {}
 	local roomLights, doorLights, wrongLight = 0, 0, {}
+	local NEON = { LIT.Glow, LIT.Tube, LIT.Window, LIT.BathWindow, LIT.Daylight } -- (the house's own Neon: these colours)
 	local named: { [string]: { any } } = {}
 	local warm, walls = 0, 0
 	for _, obj in model:GetDescendants() do
 		if obj.ClassName == "PointLight" then
 			roomLights += 1
-			if not (obj.Brightness == L.Light.Brightness and obj.Range == L.Light.Range and near(obj.Color, L.Light.Color) and obj.Shadows ~= true) then
+			if not (obj.Brightness == LIT.Lamp.Brightness and obj.Range == LIT.Lamp.Range and obj.Shadows ~= true
+				and (near(obj.Color, LIT.Lamp.Color) or (obj.Parent and obj.Parent.Name == "Tube"))) then
 				table.insert(wrongLight, `{obj.Parent and obj.Parent.Name}: {obj.Brightness}/{obj.Range}`)
 			end
 		elseif obj.ClassName == "SurfaceLight" or obj.ClassName == "SpotLight" then
 			doorLights += 1
-			if not (obj.Brightness == L.DoorLight.Brightness and obj.Range == L.DoorLight.Range and obj.Shadows ~= true) then
+			if not (obj.Brightness == LIT.Porch.Brightness and obj.Range == LIT.Porch.Range and near(obj.Color, LIT.Porch.Color) and obj.Shadows ~= true) then
 				table.insert(wrongLight, `{obj.Parent and obj.Parent.Name}: {obj.Brightness}/{obj.Range}`)
 			end
 		end
@@ -197,8 +201,14 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 		table.insert(named[obj.Name], obj)
 		local s = obj.Size
 		local faces = math.max(s.X * s.Y, s.X * s.Z, s.Y * s.Z)
-		if obj.Material == M.Enum.Material.Neon and faces > 2 then -- (a piece's own small glow, a sign or embers, is not a lamp)
-			table.insert(glows, `{obj.Name} {string.format("%.1f", faces)}`)
+		if obj.Material == M.Enum.Material.Neon and faces > 2 then -- (a piece's own small glow, a sign or embers: its own)
+			local known = false
+			for _, c in NEON do
+				known = known or near(obj.Color, c)
+			end
+			if not known then
+				table.insert(glows, `{obj.Name} {string.format("%.1f", faces)}`)
+			end
 		end
 		if obj.Name == "Wall" then
 			walls += 1
@@ -207,16 +217,20 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 		end
 	end
 	mostParts = math.max(mostParts, parts)
-	check(`{tag}: {parts} parts (at most Lodge.InteriorMaxParts {L.InteriorMaxParts}, {#plan.spots} pieces)`, parts <= L.InteriorMaxParts)
-	check(`{tag}: one modest warm light a room ({roomLights} for {#plan.rooms} rooms: Lodge.Light), the two doors' soft light ({doorLights}: Lodge.DoorLight), no shadows`,
-		roomLights == #plan.rooms and doorLights == 2 and #wrongLight == 0, table.concat(wrongLight, ", "))
-	check(`{tag}: nothing big that glows (no Neon lamps, panes or porch walls; a glow of 2 square studs at most)`, #glows == 0, table.concat(glows, ", "))
+	check(`{tag}: {parts} parts (at most Big.InteriorMaxParts {L.InteriorMaxParts}, {#plan.spots} pieces)`, parts <= L.InteriorMaxParts)
+	local lamps = 0
+	for _, room in plan.rooms do
+		lamps += if math.max(room.max.X - room.min.X, room.max.Z - room.min.Z) > LIT.Lamp.Long then 2 else 1
+	end
+	check(`{tag}: a ceiling lamp a room, two in a long one ({roomLights} for {#plan.rooms} rooms: Config.SandboxLight.House.Lamp), the two doors' daylight ({doorLights}: Porch), no shadows`,
+		roomLights == lamps and doorLights == 2 and #wrongLight == 0, table.concat(wrongLight, ", "))
+	check(`{tag}: its big Neon (the lamps' discs, the panes, the porches' walls) in Config.SandboxLight.House's colours only`, #glows == 0, table.concat(glows, ", "))
 	check(`{tag}: warm off-white walls ({warm} of {walls}; the bathroom's tiles and the garage's concrete their own)`, walls > 0 and warm >= walls * 0.6)
 	-- the doors' leaves
-	local front, terrace = plan.doors[1], nil
+	local front, back = plan.doors[1], nil
 	for index, d in plan.doors do
 		if index > 1 and d.rooms[2] == "outside" then
-			terrace = d
+			back = d
 		end
 	end
 	local leaves = true
@@ -235,19 +249,19 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 			and math.abs(at.X - (d.at.X + dx)) < 0.05 and math.abs(at.Z - d.at.Z) < 0.05 and at.Y > 2 and p.Size.Y > plan.doorHeight - 0.5
 	end
 	leaves = leaf("FrontLeafWest", "front", "west", front, -front.width / 4) and leaf("FrontLeafEast", "front", "east", front, front.width / 4)
-		and terrace ~= nil and leaf("TerraceLeaf", "terrace", "south", terrace, 0)
-	check(`{tag}: the leaves shut in their doorways, hinged (FrontLeafWest west, FrontLeafEast east, TerraceLeaf south), not solid, Danny's paths through them`, leaves)
-	check(`{tag}: no front leaves opened out against the porch (the lodge's are shut)`, #(named.DoorLeaf or {}) == 0)
-	-- the terrace door's porch and the way out signs
+		and back ~= nil and leaf("BackLeaf", "back", "south", back, 0)
+	check(`{tag}: the leaves shut in their doorways, hinged (FrontLeafWest west, FrontLeafEast east, BackLeaf south), not solid, Danny's paths through them`, leaves)
+	check(`{tag}: no front leaves opened out against the porch (the big house's are shut)`, #(named.DoorLeaf or {}) == 0)
+	-- the back door's porch and the way out signs
 	local exits = 0
 	for _, s in named.ExitSign or {} do
 		exits += if textOf(s) == "EXIT" then 1 else 0
 	end
-	local porch = (named.TerracePorch or {})[1]
-	local soft = (named.TerraceDaylight or {})[1]
-	check(`{tag}: the terrace door's porch (its floor, sides, roof, its soft wall) east of the house, an EXIT sign over each way out`, porch ~= nil
-		and porch.CFrame.Position.X - o.X > terrace.at.X and soft ~= nil and soft.Material ~= M.Enum.Material.Neon and near(soft.Color, L.Porch)
-		and #(named.TerraceWall or {}) == 2 and #(named.TerraceRoof or {}) == 1 and exits == 2)
+	local porch = (named.BackPorch or {})[1]
+	local soft = (named.BackDaylight or {})[1]
+	check(`{tag}: the back door's porch (its floor, sides, roof, its wall of daylight: LIT.Daylight) east of the house, an EXIT sign over each way out`, porch ~= nil
+		and porch.CFrame.Position.X - o.X > back.at.X and soft ~= nil and soft.Material == M.Enum.Material.Neon and near(soft.Color, LIT.Daylight)
+		and #(named.BackPorchWall or {}) == 2 and #(named.BackPorchRoof or {}) == 1 and exits == 2)
 	model:Destroy()
 end
 print(`(the busiest of these: {mostParts} parts)`)

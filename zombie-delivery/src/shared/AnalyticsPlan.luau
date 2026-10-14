@@ -48,7 +48,7 @@ AnalyticsPlan.SandboxSteps = {
 	{ name = "Joined", implied = true }, -- 1: the save loaded (server/Analytics.luau)
 	{ name = "PressedPlay", implied = true }, -- 2: PLAY on the start screen (server/SandboxBoot.luau's Play)
 	{ name = "FirstContract" }, -- 3: a moving contract taken (their move started: LAUNCH at a plot's board)
-	{ name = "EnteredHouse" }, -- 4: into the house of a move (its front door)
+	{ name = "EnteredHouse" }, -- 4: into the house of a move (the chalet's front door)
 	{ name = "FirstPieceInVan" }, -- 5: a piece loaded into the van (by them, or into the van of their move)
 	{ name = "FirstTripHome" }, -- 6: their van home at their warehouse with a load (a trip: the pieces into the stock)
 	{ name = "FirstPieceOnShow" }, -- 7: a piece of their stock on a display stand

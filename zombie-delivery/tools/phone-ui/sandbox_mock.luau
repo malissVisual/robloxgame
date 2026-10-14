@@ -27,6 +27,32 @@ M.Vector2.zero = M.Vector2.new(0, 0)
 
 -- ── Services ────────────────────────────────────────────────────────────────
 M.services.UserInputService.InputEnded = M.signal()
+-- 8.3, a gamepad: the last input's type changing (client/PadGlyph.luau watch), the platform's picture of a button
+-- (M.padImages false: none, the arrows stand in) and GuiService's selection (the windows' Ui.gamepadFocus)
+M.services.UserInputService.LastInputTypeChanged = M.signal()
+M.padImages = true
+M.services.UserInputService.GetImageForKeyCode = function(_, key)
+	return if M.padImages and key then "rbxasset://textures/ui/Controls/" .. key.Name .. ".png" else ""
+end
+function M.inputChanged()
+	M.services.UserInputService.LastInputTypeChanged:Fire(if M.gamepad then M.Enum.UserInputType.Gamepad1 else M.Enum.UserInputType.Keyboard)
+end
+setmetatable(M.services.GuiService, {
+	__index = function(_, key)
+		if key == "SelectedObject" then
+			return M.MUi.gamepadSelection()
+		end
+		return nil
+	end,
+})
+-- 8.3: what covers the screen for the first-time hints: a grip check (client/CarryGripUi.luau), the move's cards with
+-- its result (client/MovingHud.luau)
+M.Grip = { active = function()
+	return M.gripActive == true
+end }
+M.MoveCards = { isOpen = function()
+	return M.moveCard == true
+end }
 M.services.GuiService.GetGuiInset = function()
 	return M.Vector2.new(0, 0)
 end
@@ -93,7 +119,7 @@ function M.MUi.touchLayout()
 	return M.touch
 end
 function M.MUi.gamepadActive()
-	return false
+	return M.gamepad == true -- (8.3: a check picks up the gamepad: M.gamepad, then M.inputChanged())
 end
 function M.MUi.closeButton(parent, fn)
 	local made = M.make("TextButton", { Name = "Close", Text = "✕", Size = M.UDim2.fromOffset(40, 40), Position = M.UDim2.new(1, -8, 0, 8), AnchorPoint = M.Vector2.new(1, 0), TextSize = 18, BackgroundTransparency = 1, TextColor3 = M.MTheme.Contract.text }, parent)

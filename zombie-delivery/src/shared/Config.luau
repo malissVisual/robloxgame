@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.2"
+Config.Version = "8.2.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3701,6 +3701,28 @@ Config.Soundscape = {
 		SlideRange = 90, -- … heard this many studs from the camera
 		Step = 0.55, -- your foot onto a Sprinter's rear or side step (van_step_up) …
 		StepGap = 0.8, -- … at most every this many seconds
+		-- 8.3, the 8.2 features' feedback (the existing sheets only; shared/SoundPlan.luau feedbackOf / feedbackCues /
+		-- slot, client/SandboxSounds.luau): the stings play one after the other, never over each other (the trip home's
+		-- fanfare, then the book's chime, then a milestone's fanfare); the same one again only after its Gap s; one that
+		-- would wait longer than FeedbackWait s behind the others is left out.
+		Discovery = 0.5, -- a piece new in your collection book (ding: a bright bell, a little higher) …
+		DiscoveryGap = 2,
+		Milestone = 0.6, -- a book milestone paid (level_up: the bells' fanfare) …
+		MilestoneGap = 4,
+		TaskDone = 0.6, -- a task done (task_done) …
+		TaskDoneGap = 1.5,
+		Claimed = 0.55, -- a task's reward claimed (cash: the money's ka-ching) …
+		ClaimedGap = 0.6,
+		Fill = 0.38, -- ⭐ FILL BEST: a few soft stand clicks (stand_display, quieter, each a little higher) …
+		FillClicks = 3, -- … at most this many (fewer when fewer pieces went up) …
+		FillEvery = 0.13, -- … this many seconds apart …
+		FillGap = 2,
+		FillQuiet = 1.5, -- … and the state after it plays no stand_display of its own for this many seconds
+		BulkSold = 0.9, -- 💰 SELL…'s sale: the till once (sale_register), louder than one piece's …
+		BulkKa = 0.5, -- … the old ka-ching (cash) on top of it …
+		BulkKaAt = 0.12, -- … this many seconds in …
+		BulkGap = 1.5,
+		FeedbackWait = 4.5,
 	},
 }
 
@@ -6264,8 +6286,9 @@ Config.CarryGrip = {
 --                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
 --                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
 --                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay.
---                     8.3 the lodge: the one house is The Alpine Lodge (it replaced The Old Chalet): Kind its plan's
---                     (HouseLayout's "lodge"), a longer Time (the Sprinter's bed takes it home in several trips)
+--                     8.3 the big move: the one house (The Old Chalet, the owner's big Blender house, 44 × 14.5 × 34)
+--                     empties as a big house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms,
+--                     more pieces, a back door), a longer Time (the Sprinter's bed takes it home in several trips)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6343,12 +6366,12 @@ Config.Moving = {
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
-		Client = "The Brunners",
-		Icon = "🏔️",
+		Client = "The Hubers",
+		Icon = "🏡",
 		Address = "the end of Main Street",
-		Blurb = "A big two-storey alpine lodge, packed full. Too much for one van: plan several trips home.",
-		Kind = "lodge", -- 8.3: the house's plan (shared/HouseLayout.luau: The Alpine Lodge's, Config.Furniture.Lodge)
-		Time = 25 * 60, -- (8.3: the lodge's, was the chalet's 20 min: it takes several trips)
+		Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
+		Kind = "big", -- 8.3: the house's plan (shared/HouseLayout.luau's big house, Config.Furniture.Big)
+		Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
 		HordeAt = 3 * 60,
 		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
@@ -6471,20 +6494,16 @@ Config.Furniture = {
 		Odds = { uncommon = 60, rare = 30, epic = 10 } :: { [string]: number },
 		Salt = 8017,
 	},
-	-- 8.3 the lodge (the sandbox's house, The Alpine Lodge: HouseLayout.plan(seed, "lodge"), one big floor laid out as a
-	-- house's, bigger): six rooms in the back row (the house's four, a guest room and a study), a bigger front row
-	-- (Front: its depth's least, 2 more a die step; Kitchen: the kitchen's least share of the front row beside the hall),
-	-- and a second way out, the terrace door (BackDoor wide) at the corridor's east end. Every piece gets out by both doors.
+	-- 8.3 the big house (the sandbox's one house, the owner's big Blender house: HouseLayout.plan(seed, "big"), one big
+	-- floor laid out as a house's, bigger): six rooms in the back row (the house's four, a guest room and a study), a
+	-- bigger front row (Front: its depth's least, 2 more a die step; Kitchen: the kitchen's least share of the front row
+	-- beside the hall), and a second way out, the back door (BackDoor wide) at the corridor's east end. Every piece gets
+	-- out by both doors. Its lights and Neon are every house's (Config.SandboxLight.House).
 	--   Spots / Stars          its pieces (at least, at most) and its ★ ones
 	--   Collectibles           its collector's pieces (Count: at least, at most; Legendary: the chance of one), the
 	--                          house's Odds and Salt
-	--   InteriorMaxParts       an interior's parts at most, its furniture included (tests/lodgelayout_test.luau)
-	--   Light / DoorLight      its inside's lights (server/HouseInterior.luau; the owner: the house's inside "a flashbang"):
-	--                          one modest warm ceiling light a room (Brightness, Range, Color), the doorways' daylight a
-	--                          soft one; no glowing (Neon) lamps, panes or porch walls
-	--   Walls                  the warm off-white its plaster is mixed toward (WallsMix of the way: never a bright white)
-	--   Porch / Pane           the porches' outer wall and the windows' panes (soft, not glowing)
-	Lodge = {
+	--   InteriorMaxParts       an interior's parts at most, its furniture included (tests/biglayout_test.luau)
+	Big = {
 		Front = 26,
 		Kitchen = 0.4,
 		BackDoor = 6,
@@ -6492,12 +6511,6 @@ Config.Furniture = {
 		Stars = 4,
 		Collectibles = { Count = { 4, 6 } :: { number }, Legendary = 0.25 },
 		InteriorMaxParts = 1100,
-		Light = { Brightness = 0.8, Range = 14, Color = { 255, 206, 150 } :: { number } },
-		DoorLight = { Brightness = 0.6, Range = 12, Color = { 255, 226, 190 } :: { number } },
-		Walls = { 226, 212, 188 } :: { number },
-		WallsMix = 0.7,
-		Porch = { 176, 188, 186 } :: { number },
-		Pane = { 104, 124, 140 } :: { number },
 	},
 	-- 7.x, Walt's farm (chapter 1 "Hold Your Horses": shared/Layouts/Farm.luau lays it out, HouseLayout.plan(seed,
 	-- "farm"); server/HouseInterior.luau's farm block builds the barn and the yard). Studs, the walls' middles:
@@ -7071,6 +7084,12 @@ Config.Warehouse = {
 --   Chip / ChipText          the "📦 N in stock" chip under them (on a touch screen at least Ui.MinTouch screen px high)
 --   TouchScale               the money block's smallest scale on a touch screen (it is never smaller than this)
 --   StockKey                 the key that opens / closes the STOCK list (a computer)
+--   StockPad                 8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's ←; shared/SandboxPad.luau
+--                            has the sandbox's D-pad map and why ↑ stays Roblox's)
+--   Hints                    8.3, the first-time hints (shared/SandboxHints.luau, client/SandboxHintsUi.luau): a hint shows
+--                            Delay s after what made it matter, at least Gap s after the hint before (one at a time), and
+--                            waits while something covers the screen, looked at every Every s; the ⭐ FILL BEST hint
+--                            once FillStock pieces that would earn wait in the stock beside a free stand
 --   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
 --   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
 --                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
@@ -7090,6 +7109,8 @@ Config.SandboxHud = {
 	ChipText = 14,
 	TouchScale = 0.8,
 	StockKey = "B",
+	StockPad = "DPadLeft", -- 8.3: the gamepad's way to the STOCK list
+	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5 }, -- 8.3: the first-time hints
 	Toast = 3,
 	MaxToasts = 3,
 	Picker = {
@@ -7194,6 +7215,7 @@ Config.SandboxUpgrades = {
 --                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
 --                by the server, "BookMilestone")
 --   Key          the key that opens and closes the book (a computer)
+--   Pad          8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's →; shared/SandboxPad.luau)
 --   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
 --                save fills the book from its stock, and its milestones pay on the first join)
 --   MaxCount     the most "brought home" a piece counts
@@ -7210,10 +7232,11 @@ Config.CollectionBook = {
 		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
 		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
 		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
-		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
+		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 5000 }, -- (8.3: 24 collectibles now, was $2,500 for 12)
 		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
 	} :: { BookMilestone },
 	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
+	Pad = "DPadRight", -- 8.3: the gamepad's way to the book (shared/SandboxPad.luau)
 	Flag = "collectionBookKept",
 	MaxCount = 1_000_000,
 	Window = {
@@ -7258,6 +7281,7 @@ Config.CollectionBook = {
 --   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
 --              turns is paid then
 --   Key        the key that opens and closes the panel (a computer)
+--   Pad        8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's ↓; shared/SandboxPad.luau)
 --   StateGap   s between two states to one player; CheckEvery: s between two looks for the reset at 00:00 UTC;
 --              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
 --              Danny holds the other end of your piece (only while a danny task is open)
@@ -7283,6 +7307,7 @@ Config.SandboxTasks = {
 	TopShare = 0.5,
 	RareRank = 3,
 	Key = "J",
+	Pad = "DPadDown", -- 8.3: the gamepad's way to the TASKS panel (shared/SandboxPad.luau)
 	StateGap = 0.5,
 	CheckEvery = 10,
 	SaveDelay = 5,
@@ -7381,6 +7406,137 @@ Config.Market = {
 	Recover = 1200,
 	Salt = 8303,
 	Flag = "marketKept",
+}
+
+-- 8.3 SANDBOX, the light (the owner: "it is too bright: in the house I cannot see my own character, and walking into the
+-- warehouse is a flashbang"). Every light number of the sandbox, in one place. shared/SandboxLightRules.luau has the
+-- rules; tests/sandboxlight_test.luau and tests/sandboxlight_runtime_test.luau hold every light to Caps.
+--   Sky        the fixed alpine afternoon outside (server/SandboxWorld.luau lighting(), as SandboxScenery.Light): Clock
+--              (Lighting.ClockTime), Latitude, Brightness (the sun), Exposure (the base ExposureCompensation: the eyes
+--              add their place's), Ambient (the light indoors and in the shade: the house's and the hall's fill),
+--              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
+--              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
+--              the fog's), Decay, Density, Offset, Glare, Haze; Fog (FogStart, FogEnd: only without an Atmosphere); the
+--              grade SandboxGrade: Tint, Saturation, Contrast, Lift (its Brightness); Clouds; Sun (the sun's size, deg)
+--   Places     the eyes (client/SandboxLight.luau): each place's look, eased in whenever you walk into it ("outdoors",
+--              "house": the move's house inside, "warehouse": a plot's hall, "van": a Sprinter's walk-in bay):
+--                Exposure   added to Sky.Exposure (Lighting.ExposureCompensation, stops; Roblox takes -3 … 3)
+--                Bloom      the one BloomEffect: Intensity (0 … 1), Size (px, 0 … 56), Threshold (0.8 … 4: how bright a
+--                           pixel must be to glow; over 1.5 only the Neon and the sun's glints, never a white wall)
+--                Grade      the client's own ColorCorrection "SandboxEyes" over the server's SandboxGrade: Brightness,
+--                           Contrast, Saturation (-1 … 1; 0 is no change) and Tint (white is no change)
+--                Rays       the SunRays' Intensity (0 … 1; RaySpread its Spread); indoors none
+--   Ease       s: the eyes reach 95 % of a new place's look in this long (never at once: no flash at a door)
+--   Step       s: one easing step at most this long (a hitch never jumps the look)
+--   Every      s between two looks at where you are (the easing writes every frame only while it moves)
+--   LiteBloom  a phone's or a tablet's bloom: × this (client/DeviceBudget.luau lite)
+--   House      the house's inside (server/HouseInterior.luau): Lamp (each room's ceiling light, a PointLight: Brightness,
+--              Range, Color; a room longer than Long gets two), Porch (the daylight through the front door: a
+--              SurfaceLight's Brightness, Range, Color) and the Neon parts' colours: Glow (the ceiling lamps' discs),
+--              Tube (the garage's), Window / BathWindow (the panes' daylight), Daylight (the porch's wall of daylight)
+--   Warehouse  the hall (shared/WarehouseLayout.luau, server/WarehouseMesh.luau): Lamp (each of its hall lights, a
+--              PointLight), Glow (their Neon discs), MeshGlow (the owner's Blender lamps, the finish "glow")
+--   Van        the Sprinter's walk-in bay (server/Vehicles.luau): Bay (its ceiling light while a door stands open)
+--   Caps       what the tests hold the light to (the model: a light gives Brightness × (1 - (d / Range)²)² at d studs,
+--              shared/SandboxLightRules.luau falloff; a sunlit face outside gets about 1.5):
+--                Brightness / Range   one light at most
+--                RoomLoad / HallLoad  Σ Brightness × Range of a house room's lights / of a hall's at most
+--                Peak       the light at a face's height (HeadY over the floor) anywhere indoors, × 2^Exposure, at most
+--                           (8.2's house: 2.15, its hall 2.39, the van 1.28: brighter than the sunlit meadow)
+--                Floor      the least mean light on a room's or the hall's floor (not a cave either)
+--                NeonArea   studs²: a Neon face bigger than this (a lamp looking down, a pane into a room) must be dim:
+--                NeonLuma   its colour's luma (0 … 255) at most; a lamp's own small Neon (Glow, Tube, MeshGlow) GlowLuma
+--                WallLuma   a house wall's plaster at most (a warm off-white, never a white)
+--                Step       the most the exposure may change in one easing step (a 10 fps phone included)
+Config.SandboxLight = {
+	Sky = {
+		Clock = 15.4,
+		Latitude = 47,
+		Brightness = 1.8,
+		Exposure = 0,
+		Ambient = { 78, 72, 68 } :: { number },
+		Outdoor = { 114, 110, 104 } :: { number },
+		ShiftTop = { 56, 38, 16 } :: { number },
+		ShiftBottom = { 12, 10, 8 } :: { number },
+		Diffuse = 0.5,
+		Specular = 0.45,
+		Softness = 0.3,
+		Air = { 200, 204, 212 } :: { number },
+		Decay = { 132, 136, 150 } :: { number },
+		Density = 0.26,
+		Offset = 0.12,
+		Glare = 0.4,
+		Haze = 1.3,
+		Fog = { 1200, 4000 } :: { number },
+		Tint = { 255, 246, 232 } :: { number },
+		Saturation = 0.06,
+		Contrast = 0.12,
+		Lift = 0,
+		Clouds = { Cover = 0.42, Density = 0.45, Color = { 255, 250, 242 } :: { number } },
+		Sun = 12,
+	},
+	Places = {
+		outdoors = {
+			Exposure = 0,
+			Bloom = { Intensity = 0.3, Size = 20, Threshold = 1.5 },
+			Grade = { Brightness = 0, Contrast = 0, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0.04,
+		},
+		house = {
+			Exposure = 0.15,
+			Bloom = { Intensity = 0.2, Size = 14, Threshold = 1.9 },
+			Grade = { Brightness = 0.01, Contrast = -0.03, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0,
+		},
+		warehouse = {
+			Exposure = 0.15,
+			Bloom = { Intensity = 0.15, Size = 14, Threshold = 2.1 },
+			Grade = { Brightness = 0, Contrast = -0.02, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0,
+		},
+		van = {
+			Exposure = 0.05,
+			Bloom = { Intensity = 0.1, Size = 12, Threshold = 2.2 },
+			Grade = { Brightness = 0.01, Contrast = -0.03, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0,
+		},
+	},
+	RaySpread = 0.4,
+	Ease = 0.6,
+	Step = 0.1,
+	Every = 0.1,
+	LiteBloom = 0.6,
+	House = {
+		Lamp = { Brightness = 0.5, Range = 24, Long = 28, Color = { 255, 230, 196 } :: { number } },
+		Porch = { Brightness = 0.45, Range = 12, Color = { 255, 246, 230 } :: { number } },
+		Glow = { 220, 188, 148 } :: { number },
+		Tube = { 196, 206, 218 } :: { number },
+		Window = { 108, 134, 154 } :: { number },
+		BathWindow = { 146, 162, 172 } :: { number },
+		Daylight = { 168, 176, 172 } :: { number },
+	},
+	Warehouse = {
+		Lamp = { Brightness = 0.8, Range = 34, Color = { 255, 240, 220 } :: { number } },
+		Glow = { 226, 212, 186 } :: { number },
+		MeshGlow = { 232, 216, 188 } :: { number },
+	},
+	Van = {
+		Bay = { Brightness = 0.6, Range = 10, Color = { 255, 242, 220 } :: { number } },
+	},
+	Caps = {
+		Brightness = 1,
+		Range = 36,
+		RoomLoad = 26,
+		HallLoad = 170,
+		Peak = 1,
+		HeadY = 4.5,
+		Floor = 0.15,
+		NeonArea = 6,
+		NeonLuma = 180,
+		GlowLuma = 225,
+		WallLuma = 220,
+		Step = 0.08,
+	},
 }
 
 return Config

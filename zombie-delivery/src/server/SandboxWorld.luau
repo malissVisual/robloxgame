@@ -10,18 +10,17 @@
 --             whole boxes would fill the map)
 --   Roads     the asphalt of SandboxMap.Roads and the turnaround (its top a hair under Main Street's where they overlap),
 --             the gravel shoulders down to the meadow on every edge (the cars roll off and on anywhere), the markings
---   House     8.3: "TheAlpineLodge" (a Model, attribute SandboxHouse = SandboxMap.House.id, Atomic: with StreamingEnabled
---             it streams whole), The Old Chalet's place taken: shared/LodgeLooks.luau's two-storey lodge on
---             SandboxMap.House.house (SandboxScenery.lodgeSpec), facing north to the road, its front door the part
---             "FrontDoor" (attribute SandboxDoor = true, no collision, unseen: server/Moving.luau's front door) at
---             House.door, its terrace door the part "TerraceDoor" (attribute SandboxBackDoor = true, no collision, unseen:
---             the move's second way in) at House.back, the doors' leaves shut in them (FrontLeafWest, FrontLeafEast,
---             TerraceLeaf: LodgeLooks.Leaves' attributes DoorLeaf and Hinge, for the doors' swing), the name board on its
---             balcony; its parts in the Model "House_<id>" (attribute
---             Home: no Blender house dresses it, the owner's ZDCHouseArt is the chalet's size and waits in
---             ServerStorage, server/Main.server.luau), the garden beside it in "Garden": the path from the curb to the
---             door, the gravel path from the terrace (SandboxScenery.TerracePath), the garden's fence and gate (THE
---             ALPINE LODGE over it), the mailbox, the flower boxes (all decoration)
+--   House     "TheOldChalet" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet on SandboxMap.House.house,
+--             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
+--             server/Moving.luau puts its "Enter house" prompt there) at House.door; the path from the curb to it, the
+--             garden's fence and gate (THE OLD CHALET over it), the mailbox, the flower boxes (all decoration). 8.1: the
+--             chalet's parts in the Model "House_sandbox_house" (attribute Home) on the owner's Blender house's box:
+--             once ZDCHouseArt is imported, server/HouseMesh.luau dresses it (the chalet's parts hidden but still
+--             colliding, its gable re-cut under the model's roof; the FrontDoor where the model's door is), the garden
+--             beside it in "Garden"; no import: the chalet. 8.2: Atomic (with StreamingEnabled it streams whole). 8.3
+--             the big move: the FrontDoor unseen behind its two leaves (FrontLeafWest, FrontLeafEast: DoorLeaf "front",
+--             Hinge "west" / "east"), the back door at House.back ("BackDoor": SandboxBackDoor, unseen, no collision; its
+--             leaf "BackLeaf": DoorLeaf "back", Hinge "west"); dressed, all hidden with the chalet
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -39,11 +38,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AlpineLayout = require(Shared.AlpineLayout)
-local LodgeLooks = require(Shared.LodgeLooks) -- 8.3: the lodge (it replaced The Old Chalet)
+local ChaletLooks = require(Shared.ChaletLooks)
 local RenderBudget = require(Shared.RenderBudget)
 local SandboxMap = require(Shared.SandboxMap)
 local SandboxScenery = require(Shared.SandboxScenery)
 
+local HouseMesh = require(script.Parent.HouseMesh) -- 8.1: the owner's Blender house (design/blender-house)
 
 local SandboxWorld = {}
 
@@ -248,15 +248,34 @@ end
 
 -- ── The house ──────────────────────────────────────────────────────────────
 
+-- 8.1: dressed in the owner's Blender house (its roof's ridge across the house, from side to side), the chalet's gable
+-- (its ridge from the front to the back) would stand out of that roof over the front and back walls, unseen but solid:
+-- its two wedges, still solid and unseen, become a gable across the house, S.Chalet.Pitch steep, under the model's roof.
+local function underMeshRoof(body: Model, frame: CFrame)
+	local box = MAP.House.house
+	local half = box.sz / 2
+	local rise = half * math.tan(math.rad(S.Chalet.Pitch))
+	local n = 0
+	for _, p in body:GetChildren() do
+		if p.Name == "Roof" and p:IsA("BasePart") then
+			-- (a wedge's slope looks to its -Z: the front half's to the street, the back half's turned round)
+			p.Size = Vector3.new(box.sx, rise, half)
+			p.CFrame = frame * CFrame.new(0, box.sy + rise / 2, half / 2 + n * half) * CFrame.Angles(0, n * math.pi, 0)
+			n += 1
+		end
+	end
+end
+
 local function house(world: Instance): Model
 	local H = MAP.House
 	local model = Instance.new("Model")
-	model.Name = "TheAlpineLodge"
+	model.Name = "TheOldChalet"
 	model:SetAttribute("SandboxHouse", H.id)
-	-- 8.2 perf (design/performance/REPORT.md, section 9): with StreamingEnabled it streams in and out whole (its doors,
-	-- the garden with it), never a house half there
+	-- 8.2 perf (design/performance/REPORT.md, section 9): with StreamingEnabled it streams in and out whole (its door's
+	-- prompt, the garden and the owner's Blender house with it), never a house half there
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	-- the house's own parts in a Model "House_<id>" (attribute Home), the garden beside it
+	-- 8.1: the house's own parts in a Model "House_<id>" (attribute Home), as World's buildHouse makes Marge's: the one
+	-- server/HouseMesh.luau dresses (the garden stays out of it)
 	local body = Instance.new("Model")
 	body.Name = "House_" .. H.id
 	body:SetAttribute("Home", H.id)
@@ -264,7 +283,21 @@ local function house(world: Instance): Model
 	local door = H.door
 	-- the front door's frame: its middle on the ground at the front wall, -Z out of the door (north, to the road)
 	local frame = CFrame.new(door.x, door.y, door.z) * CFrame.Angles(0, math.rad(door.yaw), 0)
-	for _, piece in LodgeLooks.house(S.lodgeSpec()) do
+	local lot = H.lot
+	local spec: ChaletLooks.Spec = {
+		w = H.house.sx,
+		d = H.house.sz,
+		h = H.house.sy,
+		lot = lot.x1 - lot.x0,
+		front = (lot.x1 - lot.x0) / 2 - (door.z - lot.z0), -- (its own front fence is left out: the garden has one)
+		seed = S.Chalet.Seed,
+		render = S.Chalet.Render,
+		shade = S.Chalet.Shade,
+	}
+	for _, piece in ChaletLooks.house(spec) do
+		if piece.name == "Fence" then
+			continue
+		end
 		local turn = piece.turn or { 0, 0, 0 }
 		local at, size = piece.at, piece.size
 		local cframe = frame * CFrame.new(at[1], at[2], at[3]) * CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
@@ -274,46 +307,61 @@ local function house(world: Instance): Model
 		elseif piece.shape == "Cylinder" then
 			p.Shape = Enum.PartType.Cylinder
 		end
-		local leaf = LodgeLooks.Leaves[piece.name]
-		if piece.name == "Door" or piece.name == "TerraceDoor" then
-			-- the doorways: the moves' front door (server/Moving.luau's "Enter house" goes here) and its second way in
-			-- (House.back); nothing to bump into, unseen (their leaves show the doors)
-			if piece.name == "Door" then
-				p.Name = "FrontDoor"
-				p:SetAttribute("SandboxDoor", true)
-			else
-				p:SetAttribute("SandboxBackDoor", true)
-			end
+		if piece.name == "Door" then
+			-- the moves' "Enter house" prompt goes here; nothing to bump into
+			p.Name = "FrontDoor"
+			p:SetAttribute("SandboxDoor", true)
 			p.CanCollide = false
-			p.Transparency = 1
-			p.CastShadow = false
-		elseif leaf then
-			-- a door's leaf, shut in its doorway: its door and its hinge's side (the doors' swing is the client's)
-			deco(p)
-			p:SetAttribute("DoorLeaf", leaf.door)
-			p:SetAttribute("Hinge", leaf.hinge)
 		elseif piece.name == "House" then
 			body.PrimaryPart = p
 			model.PrimaryPart = p
 		elseif not piece.solid then
 			deco(p)
 		end
-		if piece.name == "LodgeSign" then
-			label(p, Enum.NormalId.Front, LodgeLooks.Sign, Color3.fromRGB(250, 244, 228))
+	end
+	-- 8.3 the big move: the doors' leaves (shut, each a part of its own hinged at a jamb: the attributes DoorLeaf and
+	-- Hinge, the doors' swing is the client's) and the back door. The front door's two leaves in the FrontDoor's place
+	-- (it stays the doorway, the moves' front door, unseen: the leaves show the door); the back door at House.back (the
+	-- owner's model's, in the middle of its back wall): its doorway "BackDoor" (attribute SandboxBackDoor, unseen, no
+	-- collision: server/Moving.luau's second way in) as the FrontDoor is to the front, S.BackDoor.Width wide, and its
+	-- leaf. All of them the house's own parts: dressed in the owner's model they are hidden with the chalet (the model's
+	-- own leaves show its doors).
+	local front = body:FindFirstChild("FrontDoor") :: BasePart?
+	if front then
+		local size = front.Size
+		front.Transparency = 1
+		front.CastShadow = false
+		for _, side in { -1, 1 } do
+			local leaf = deco(block(body, if side < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(size.X / 2 - 0.04, size.Y, size.Z + 0.04),
+				front.CFrame * CFrame.new(side * size.X / 4, 0, 0), front.Color, front.Material))
+			leaf:SetAttribute("DoorLeaf", "front")
+			leaf:SetAttribute("Hinge", if side < 0 then "west" else "east")
 		end
+		local back = H.back
+		local width = S.BackDoor.Width
+		local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0) * frame:ToObjectSpace(front.CFrame)
+		local doorway = deco(block(body, "BackDoor", Vector3.new(width, size.Y, size.Z), backFrame, front.Color, front.Material))
+		doorway:SetAttribute("SandboxBackDoor", true)
+		doorway.Transparency = 1
+		doorway.CastShadow = false
+		local leaf = deco(block(body, "BackLeaf", Vector3.new(width - 0.04, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
+		leaf:SetAttribute("DoorLeaf", "back")
+		leaf:SetAttribute("Hinge", "west")
+	end
+	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
+	-- part, where the model's door is); else the chalet as it is
+	if HouseMesh.dress(body, H.id) then
+		underMeshRoof(body, frame)
 	end
 
-	-- The garden: the path from the curb's shoulder to the door, the gravel path from the terrace, the fence round the
-	-- lot with its gate, the board over the gate, the mailbox, the flower boxes. Decoration all: nothing stops a mover.
+	-- The garden: the path from the curb's shoulder to the door, the fence round the lot with its gate, the board over
+	-- the gate, the mailbox, the flower boxes. Decoration all: nothing stops a mover with a sofa.
 	local garden = folder(model, "Garden")
 	local path = S.Path
 	local G = S.Garden
 	local from = G.Front - 2.5 -- (the turnaround's shoulder reaches to about here)
 	local to = door.z - 0.4 -- (the door's front)
 	deco(block(garden, "Path", Vector3.new(path.x1 - path.x0, 0.1, to - from), CFrame.new((path.x0 + path.x1) / 2, MAP.GroundTop + 0.03, (from + to) / 2), rgb(C.Path), Enum.Material.Pebble)).CastShadow = false
-	for _, r in S.TerracePath do
-		deco(block(garden, "TerracePath", Vector3.new(r.x1 - r.x0, 0.08, r.z1 - r.z0), CFrame.new((r.x0 + r.x1) / 2, MAP.GroundTop + 0.02, (r.z0 + r.z1) / 2), rgb(C.Path), Enum.Material.Pebble)).CastShadow = false
-	end
 	fenceRun(garden, S.garden(), G.Post, G.Height, 2, rgb(C.Fence), false)
 	local wood, dark = rgb(C.Fence), Color3.fromRGB(70, 48, 32)
 	local gx, gz = door.x, G.Front
@@ -322,7 +370,7 @@ local function house(world: Instance): Model
 		deco(block(garden, "GatePost", Vector3.new(0.9, 11, 0.9), CFrame.new(gx + side * G.Gate, 5.5, gz), wood, Enum.Material.Wood))
 	end
 	deco(block(garden, "GateBeam", Vector3.new(2 * G.Gate + 1.6, 0.8, 1), CFrame.new(gx, 11.2, gz), dark, Enum.Material.Wood))
-	local name = deco(block(garden, "GateBoard", Vector3.new(10, 1.6, 0.25), CFrame.new(gx, 9.6, gz), Color3.fromRGB(150, 108, 66), Enum.Material.WoodPlanks))
+	local name = deco(block(garden, "GateBoard", Vector3.new(9, 1.6, 0.25), CFrame.new(gx, 9.6, gz), Color3.fromRGB(150, 108, 66), Enum.Material.WoodPlanks))
 	label(name, Enum.NormalId.Front, string.upper(H.name), Color3.fromRGB(250, 244, 228))
 	label(name, Enum.NormalId.Back, string.upper(H.name), Color3.fromRGB(250, 244, 228))
 	-- the mailbox outside the fence, left of the gate, its name board to the road
@@ -331,9 +379,9 @@ local function house(world: Instance): Model
 	deco(block(garden, "Mailbox", Vector3.new(1.5, 1.1, 1.9), CFrame.new(mx, 3.95, mz), Color3.fromRGB(46, 84, 58), Enum.Material.Metal))
 	local plate = deco(block(garden, "MailboxName", Vector3.new(3.2, 0.7, 0.12), CFrame.new(mx, 2.6, mz - 0.25), Color3.fromRGB(242, 236, 220), Enum.Material.Wood))
 	label(plate, Enum.NormalId.Front, string.upper(H.name), INK)
-	-- the flower boxes by the gate inside the fence (the lodge's windows have their own)
-	local blooms = { Color3.fromRGB(210, 38, 46), Color3.fromRGB(246, 196, 52) }
-	for n, spot in { { gx - 10.5, gz + 2.2 }, { gx + 10.5, gz + 2.2 } } do
+	-- the flower boxes: by the gate inside the fence, either side of the door
+	local blooms = { Color3.fromRGB(210, 38, 46), Color3.fromRGB(246, 196, 52), Color3.fromRGB(226, 96, 150), Color3.fromRGB(150, 92, 200) }
+	for n, spot in { { gx - 10.5, gz + 2.2 }, { gx + 10.5, gz + 2.2 }, { gx - 5.8, door.z - 2.4 }, { gx + 5.8, door.z - 2.4 } } do
 		deco(block(garden, "FlowerBox", Vector3.new(2.8, 1, 1.2), CFrame.new(spot[1], 0.5, spot[2]), Color3.fromRGB(132, 92, 58), Enum.Material.WoodPlanks))
 		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
 	end
@@ -407,7 +455,7 @@ local function scenery(world: Instance)
 		deco(block(lamps, "LampHood", Vector3.new(2, 0.3, 1.4), CFrame.lookAt(at + up, at + up + out), POLE, Enum.Material.Metal))
 		deco(block(lamps, "Lamp", Vector3.new(1.7, 0.3, 1.1), CFrame.lookAt(at, at + out), LAMP_DIM, Enum.Material.Glass))
 	end
-	-- the signpost at the crossroads: a post, three yellow boards (to the warehouses either way, to the lodge)
+	-- the signpost at the crossroads: a post, three yellow boards (to the warehouses either way, to the chalet)
 	local sign = folder(holder, "Signpost")
 	local s = S.Signpost
 	block(sign, "SignPost", Vector3.new(0.7, 12, 0.7), CFrame.new(s.x, 6, s.z), Color3.fromRGB(96, 70, 48), Enum.Material.Wood)

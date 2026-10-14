@@ -21,8 +21,8 @@
 --   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
 --   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
 --   a move, at the house, outside       door      "Walk in through the front door"                        House.door
---   a move, not at the house            drive     "Drive to The Alpine Lodge"                             House.curb
---     (after a trip home)               back      "Drive back to The Alpine Lodge for more, or FINISH"    House.curb
+--   a move, not at the house            drive     "Drive to The Old Chalet"                               House.curb
+--     (after a trip home)               back      "Drive back to The Old Chalet for more, or FINISH"      House.curb
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
 --   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the board

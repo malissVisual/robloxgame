@@ -13,8 +13,8 @@
 --                  convex corner, a ring of wedges round the turnaround; the white markings (a dashed centre line,
 --                  the edge lines, the give-way line where Main Street meets Depot Row)
 --   The house      the curb-to-door Path, the garden's fence round its lot (decoration: nothing stops a mover), the
---                  gate with its THE ALPINE LODGE board, the mailbox, the flower boxes (8.3: the house itself is
---                  shared/LodgeLooks.luau's lodge, on SandboxMap.House.house; it took The Old Chalet's place)
+--                  gate with its THE OLD CHALET board, the mailbox, the flower boxes (the chalet itself is
+--                  shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the owner's Blender house once imported)
 --   The scenery    the alpine spruces (shared/AlpineLayout.luau's two-part trees) in copses and along the edges, never
 --                  on a road, a plot, the house's lot or a van's way; wildflower patches; a rail fence round the edge
 --                  (the invisible walls are at the Bounds); the street lamps along Main Street; the signpost at the
@@ -32,12 +32,11 @@
 --   SandboxScenery.trees()              the trees (AlpineLayout.Tree's fields: AlpineLayout.treeParts draws them)
 --   SandboxScenery.flowers()            the wildflower patches
 --   SandboxScenery.lamps(), fence(), garden(), signpost(), vanPaths(), farGround(), hills(), peaks()
---   SandboxScenery.lodgeSpec()          8.3: the lodge's look's numbers (shared/LodgeLooks.luau Spec) on House.house;
---                                       Lodge.Ground its ground floor's top, TerracePath the terrace door's gravel path
 --   SandboxScenery.circleOut(x, z)      how far (x, z) is outside the turnaround's asphalt (≤ 0: on it)
 --   SandboxScenery.outside(x, z)        how far (x, z) is outside the Bounds (≤ 0: inside)
 --   SandboxScenery.rectDistance(r, x, z)   how far (x, z) is from a rect (0 inside)
 
+local Config = require(script.Parent.Config)
 local SandboxMap = require(script.Parent.SandboxMap)
 
 local SandboxScenery = {}
@@ -87,43 +86,17 @@ SandboxScenery.Shadow = { Long = 4, Wide = 1 } -- a part throws a shadow only th
 SandboxScenery.FenceInset = 4 -- the rail fence this far inside the Bounds (the invisible walls on them)
 SandboxScenery.FencePost = 16 -- studs between two posts
 SandboxScenery.WallHeight = 300
+-- the chalet on House.house (its walls the box's height), its dice: "tyrol". 8.1: Pitch is the owner's Blender house's roof
+-- (design/blender-house/house.py PITCH): dressed in it (server/HouseMesh.luau), the chalet's gable wedges are re-cut to
+-- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model). 8.2.1:
+-- the big house's 31° (house.py TARGET "sandbox", the manifest's "pitch")
+SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
--- 8.3 the lodge: its ground floor's top (the balcony's floor) and the gravel path from its terrace door (the deck in front
--- of it, shared/LodgeLooks.luau) along the east side and the front to the front path (decoration, on the lot)
-SandboxScenery.Lodge = { Ground = 10 }
-SandboxScenery.TerracePath = {
-	{ x0 = HOUSE.back.x + 4, x1 = HOUSE.back.x + 8, z0 = HOUSE.door.z - 8, z1 = HOUSE.back.z - 5.5 },
-	{ x0 = HOUSE.door.x + 3, x1 = HOUSE.back.x + 8, z0 = HOUSE.door.z - 8, z1 = HOUSE.door.z - 4 },
-} :: { Rect }
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
+SandboxScenery.BackDoor = { Width = 3 } -- 8.3: the back door at House.back (the owner's model's: house.py), its width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }
 SandboxScenery.Trees = { Height = { 28, 50 } :: { number }, Edge = { 24, 34 } :: { number }, Canopy = 0.19, Chunk = 128, Max = 120 }
-SandboxScenery.Light = {
-	Clock = 15.4, -- a fixed afternoon (Lighting.ClockTime)
-	Latitude = 47, -- the Alps
-	Brightness = 2,
-	Exposure = 0,
-	Ambient = { 80, 74, 72 } :: { number },
-	Outdoor = { 124, 118, 112 } :: { number },
-	ShiftTop = { 64, 42, 16 } :: { number }, -- (the sun's warm tint)
-	ShiftBottom = { 12, 10, 8 } :: { number },
-	Diffuse = 0.55,
-	Specular = 0.6,
-	Softness = 0.3,
-	Air = { 200, 204, 212 } :: { number },
-	Decay = { 132, 136, 150 } :: { number },
-	Density = 0.26,
-	Offset = 0.12,
-	Glare = 0.6,
-	Haze = 1.3,
-	Fog = { 1200, 4000 } :: { number }, -- (only when nothing else draws the air: an Atmosphere does)
-	Tint = { 255, 246, 232 } :: { number },
-	Saturation = 0.06,
-	Contrast = 0.1,
-	Lift = 0.01,
-	Clouds = { Cover = 0.42, Density = 0.45, Color = { 255, 250, 242 } :: { number } },
-	Sun = 12, -- the sun's size (degrees)
-}
+SandboxScenery.Light = Config.SandboxLight.Sky -- 8.3: the afternoon's light lives in Config with the rest of the light
 SandboxScenery.Colors = {
 	Meadow = { 96, 138, 60 } :: { number },
 	Lawn = { 108, 152, 64 } :: { number },
@@ -138,13 +111,6 @@ SandboxScenery.Colors = {
 	Snow = { 242, 245, 248 } :: { number },
 	Hills = { { 52, 80, 48 }, { 62, 92, 54 }, { 76, 106, 60 } } :: { { number } },
 }
-
--- 8.3 the lodge's look on House.house (shared/LodgeLooks.luau's Spec): its walls' box, its ground floor, the terrace door
--- this far back along the east wall, the front door's width.
-function SandboxScenery.lodgeSpec(): { w: number, h: number, d: number, ground: number, terrace: number, doorWidth: number }
-	local box = HOUSE.house
-	return { w = box.sx, h = box.sy, d = box.sz, ground = SandboxScenery.Lodge.Ground, terrace = HOUSE.back.z - HOUSE.door.z, doorWidth = HOUSE.doorWidth }
-end
 
 -- ── Small tools ────────────────────────────────────────────────────────────
 
@@ -666,7 +632,7 @@ function SandboxScenery.signpost(): { Board }
 	return {
 		{ text = "WAREHOUSES →", back = "← WAREHOUSES", dx = -1, dz = 0, y = 10.2 }, -- (west: plots 1 and 2)
 		{ text = "← WAREHOUSES", back = "WAREHOUSES →", dx = 1, dz = 0, y = 9 }, -- (east: plots 3 and 4)
-		{ text = "THE ALPINE LODGE →", back = "← THE ALPINE LODGE", dx = 0, dz = 1, y = 7.8 }, -- (south, down Main Street)
+		{ text = "THE OLD CHALET →", back = "← THE OLD CHALET", dx = 0, dz = 1, y = 7.8 }, -- (south, down Main Street)
 	}
 end
 

@@ -124,7 +124,7 @@ local function tasksOf(player: Player): Rules.Saved?
 		saveSoon(player)
 	end
 	if dayNew and loaded[player] then
-		say(player, "📋 New daily tasks: open TASKS (J).")
+		say(player, "🌅 New daily tasks: open 📋 TASKS.") -- (8.3: no key here: each client adds its own, client/SandboxHud.luau notice)
 	end
 	return saved
 end

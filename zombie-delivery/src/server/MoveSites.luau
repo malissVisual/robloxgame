@@ -25,7 +25,7 @@
 --   MoveSites.plotBoard(parent, plot)    the "MovingBoard<id>" kiosk (Persistent) at the plot's board spot
 --                                     (shared/SandboxMap.luau plot.board: by the warehouse's roller door, on its wall's
 --                                     outside, facing out), half a stud farther out (its plinth against the wall), its
---                                     corkboard the sandbox's (MoveSiteLooks.board(true): the lodge, no Wall);
+--                                     corkboard the sandbox's (MoveSiteLooks.board(true): the chalet, no Wall);
 --                                     returns the model and its corkboard ("Board", the part Moving hangs its prompt
 --                                     on; its attribute Plot = the plot's id)
 --   MoveSites.plotBoardPlace(plot)    where that kiosk's foot stands (tools/move-sites/check.py checks it there)
