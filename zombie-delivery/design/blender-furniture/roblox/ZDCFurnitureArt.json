@@ -1,5 +1,29 @@
 {
  "items": {
+  "antique_vase": {
+   "cell": [
+    10.0,
+    -70.0,
+    0.0
+   ],
+   "size": [
+    1.4,
+    2.8,
+    1.4
+   ]
+  },
+  "arcade_cabinet": {
+   "cell": [
+    20.0,
+    -70.0,
+    0.0
+   ],
+   "size": [
+    2.8,
+    6.0,
+    3.0
+   ]
+  },
   "armchair": {
    "cell": [
     10.0,
@@ -46,6 +70,18 @@
     4.2,
     6.6,
     1.6
+   ]
+  },
+  "bowling_trophy": {
+   "cell": [
+    0.0,
+    -60.0,
+    0.0
+   ],
+   "size": [
+    1.4,
+    2.8,
+    1.0
    ]
   },
   "box": {
@@ -168,6 +204,18 @@
     2.8
    ]
   },
+  "gold_record": {
+   "cell": [
+    40.0,
+    -60.0,
+    0.0
+   ],
+   "size": [
+    2.2,
+    2.6,
+    0.4
+   ]
+  },
   "grandfather_clock": {
    "cell": [
     30.0,
@@ -192,6 +240,30 @@
     0.8
    ]
   },
+  "jewellery_box": {
+   "cell": [
+    0.0,
+    -70.0,
+    0.0
+   ],
+   "size": [
+    1.7,
+    1.2,
+    1.1
+   ]
+  },
+  "jukebox": {
+   "cell": [
+    30.0,
+    -70.0,
+    0.0
+   ],
+   "size": [
+    3.4,
+    5.4,
+    2.5
+   ]
+  },
   "kids_bed": {
    "cell": [
     50.0,
@@ -202,6 +274,18 @@
     3.6,
     3.0,
     6.2
+   ]
+  },
+  "knight_armour": {
+   "cell": [
+    50.0,
+    -70.0,
+    0.0
+   ],
+   "size": [
+    2.6,
+    6.8,
+    1.8
    ]
   },
   "laundry_basket": {
@@ -261,6 +345,30 @@
    "size": [
     1.8,
     2.4,
+    1.6
+   ]
+  },
+  "oil_painting": {
+   "cell": [
+    40.0,
+    -70.0,
+    0.0
+   ],
+   "size": [
+    4.8,
+    3.8,
+    0.6
+   ]
+  },
+  "old_globe": {
+   "cell": [
+    20.0,
+    -60.0,
+    0.0
+   ],
+   "size": [
+    1.6,
+    2.6,
     1.6
    ]
   },
@@ -348,6 +456,18 @@
     1.4
    ]
   },
+  "ship_bottle": {
+   "cell": [
+    50.0,
+    -60.0,
+    0.0
+   ],
+   "size": [
+    2.2,
+    1.35,
+    0.9
+   ]
+  },
   "shoe_cabinet": {
    "cell": [
     10.0,
@@ -370,6 +490,18 @@
     7.2,
     3.4,
     3.2
+   ]
+  },
+  "stag_head": {
+   "cell": [
+    30.0,
+    -60.0,
+    0.0
+   ],
+   "size": [
+    3.2,
+    3.4,
+    1.7
    ]
   },
   "toolbox": {
@@ -408,6 +540,18 @@
     2.4
    ]
   },
+  "vintage_radio": {
+   "cell": [
+    10.0,
+    -60.0,
+    0.0
+   ],
+   "size": [
+    1.8,
+    2.0,
+    1.2
+   ]
+  },
   "wardrobe": {
    "cell": [
     0.0,
@@ -434,6 +578,214 @@
   }
  },
  "pieces": {
+  "antique_vase_cobalt": {
+   "center": [
+    -0.0,
+    1.415,
+    0.0
+   ],
+   "size": [
+    1.3279,
+    2.16,
+    1.3279
+   ],
+   "triangles": 1360
+  },
+  "antique_vase_gilt": {
+   "center": [
+    0.0,
+    2.376,
+    0.0
+   ],
+   "size": [
+    0.668,
+    0.636,
+    0.668
+   ],
+   "triangles": 576
+  },
+  "antique_vase_porcelain": {
+   "center": [
+    0.0,
+    1.4625,
+    0.0
+   ],
+   "size": [
+    1.3,
+    2.445,
+    1.3
+   ],
+   "triangles": 1368
+  },
+  "antique_vase_wood2": {
+   "center": [
+    0.0,
+    0.12,
+    0.0159
+   ],
+   "size": [
+    1.1636,
+    0.24,
+    1.1917
+   ],
+   "triangles": 1002
+  },
+  "arcade_cabinet_accent": {
+   "center": [
+    0.0,
+    2.995,
+    0.3675
+   ],
+   "size": [
+    2.78,
+    5.99,
+    2.165
+   ],
+   "triangles": 432
+  },
+  "arcade_cabinet_black": {
+   "center": [
+    0.0,
+    1.6615,
+    -0.015
+   ],
+   "size": [
+    2.8,
+    3.3231,
+    2.87
+   ],
+   "triangles": 240
+  },
+  "arcade_cabinet_cobalt": {
+   "center": [
+    -0.56,
+    3.2397,
+    -1.0524
+   ],
+   "size": [
+    0.21,
+    0.137,
+    0.369
+   ],
+   "triangles": 192
+  },
+  "arcade_cabinet_dark": {
+   "center": [
+    0.0,
+    4.65,
+    0.355
+   ],
+   "size": [
+    2.8,
+    2.7,
+    2.13
+   ],
+   "triangles": 420
+  },
+  "arcade_cabinet_glass": {
+   "center": [
+    0.0,
+    4.2012,
+    -0.5849
+   ],
+   "size": [
+    1.9,
+    1.4427,
+    0.1656
+   ],
+   "triangles": 108
+  },
+  "arcade_cabinet_glow": {
+   "center": [
+    0.2,
+    3.808,
+    -0.6372
+   ],
+   "size": [
+    0.198,
+    0.4546,
+    0.0465
+   ],
+   "triangles": 18
+  },
+  "arcade_cabinet_leaf2": {
+   "center": [
+    0.0,
+    3.8443,
+    -0.6335
+   ],
+   "size": [
+    1.292,
+    0.0955,
+    0.0098
+   ],
+   "triangles": 48
+  },
+  "arcade_cabinet_neon": {
+   "center": [
+    0.0,
+    3.695,
+    -0.6293
+   ],
+   "size": [
+    2.5,
+    4.21,
+    0.1813
+   ],
+   "triangles": 804
+  },
+  "arcade_cabinet_red": {
+   "center": [
+    0.057,
+    3.0784,
+    -0.8839
+   ],
+   "size": [
+    1.2381,
+    3.6568,
+    0.7181
+   ],
+   "triangles": 404
+  },
+  "arcade_cabinet_steel": {
+   "center": [
+    0.0,
+    1.7626,
+    -1.0775
+   ],
+   "size": [
+    2.8,
+    3.4551,
+    0.795
+   ],
+   "triangles": 540
+  },
+  "arcade_cabinet_sun": {
+   "center": [
+    -0.32,
+    3.2397,
+    -1.0524
+   ],
+   "size": [
+    0.21,
+    0.137,
+    0.369
+   ],
+   "triangles": 192
+  },
+  "arcade_cabinet_white": {
+   "center": [
+    0.0,
+    2.175,
+    0.2901
+   ],
+   "size": [
+    2.8,
+    2.65,
+    2.2598
+   ],
+   "triangles": 264
+  },
   "armchair_fabric": {
    "center": [
     0.0,
@@ -745,6 +1097,110 @@
     1.57
    ],
    "triangles": 120
+  },
+  "bowling_trophy_black": {
+   "center": [
+    -0.3774,
+    1.0083,
+    -0.2997
+   ],
+   "size": [
+    0.1323,
+    0.1041,
+    0.1097
+   ],
+   "triangles": 84
+  },
+  "bowling_trophy_brass": {
+   "center": [
+    0.0,
+    0.5,
+    -0.41
+   ],
+   "size": [
+    0.8,
+    0.2,
+    0.02
+   ],
+   "triangles": 108
+  },
+  "bowling_trophy_gilt": {
+   "center": [
+    0.0,
+    1.46,
+    0.0
+   ],
+   "size": [
+    1.2812,
+    1.68,
+    0.89
+   ],
+   "triangles": 2080
+  },
+  "bowling_trophy_lacquer": {
+   "center": [
+    -0.4,
+    0.85,
+    -0.15
+   ],
+   "size": [
+    0.46,
+    0.46,
+    0.46
+   ],
+   "triangles": 360
+  },
+  "bowling_trophy_marble": {
+   "center": [
+    0.0,
+    0.16,
+    0.0
+   ],
+   "size": [
+    1.4,
+    0.32,
+    1.0
+   ],
+   "triangles": 376
+  },
+  "bowling_trophy_red": {
+   "center": [
+    0.0,
+    2.627,
+    0.0
+   ],
+   "size": [
+    0.152,
+    0.052,
+    0.152
+   ],
+   "triangles": 256
+  },
+  "bowling_trophy_white": {
+   "center": [
+    0.0,
+    2.55,
+    0.0
+   ],
+   "size": [
+    0.21,
+    0.5,
+    0.21
+   ],
+   "triangles": 384
+  },
+  "bowling_trophy_wood2": {
+   "center": [
+    0.0,
+    0.47,
+    0.0
+   ],
+   "size": [
+    1.1,
+    0.3,
+    0.8
+   ],
+   "triangles": 188
   },
   "box_card": {
    "center": [
@@ -1266,6 +1722,97 @@
    ],
    "triangles": 464
   },
+  "gold_record_accent": {
+   "center": [
+    0.0,
+    1.545,
+    0.009
+   ],
+   "size": [
+    0.43,
+    0.43,
+    0.008
+   ],
+   "triangles": 108
+  },
+  "gold_record_black": {
+   "center": [
+    0.0,
+    1.545,
+    0.003
+   ],
+   "size": [
+    0.05,
+    0.05,
+    0.004
+   ],
+   "triangles": 44
+  },
+  "gold_record_brass": {
+   "center": [
+    0.0,
+    0.45,
+    -0.145
+   ],
+   "size": [
+    1.2,
+    0.3,
+    0.03
+   ],
+   "triangles": 108
+  },
+  "gold_record_card": {
+   "center": [
+    0.0,
+    0.9997,
+    0.0248
+   ],
+   "size": [
+    2.2,
+    1.9994,
+    0.3495
+   ],
+   "triangles": 324
+  },
+  "gold_record_gilt": {
+   "center": [
+    0.0,
+    1.545,
+    -0.035
+   ],
+   "size": [
+    1.8,
+    1.77,
+    0.15
+   ],
+   "triangles": 1320
+  },
+  "gold_record_lacquer": {
+   "center": [
+    0.0,
+    1.315,
+    -0.015
+   ],
+   "size": [
+    2.14,
+    2.57,
+    0.23
+   ],
+   "triangles": 172
+  },
+  "gold_record_velvet": {
+   "center": [
+    0.0,
+    1.545,
+    0.05
+   ],
+   "size": [
+    1.8,
+    1.77,
+    0.02
+   ],
+   "triangles": 12
+  },
   "grandfather_clock_black": {
    "center": [
     0.0,
@@ -1409,6 +1956,279 @@
    ],
    "triangles": 324
   },
+  "jewellery_box_accent": {
+   "center": [
+    -0.15,
+    0.74,
+    0.0
+   ],
+   "size": [
+    0.2,
+    0.104,
+    0.195
+   ],
+   "triangles": 204
+  },
+  "jewellery_box_brass": {
+   "center": [
+    -0.786,
+    0.3,
+    -0.1
+   ],
+   "size": [
+    0.072,
+    0.134,
+    0.07
+   ],
+   "triangles": 220
+  },
+  "jewellery_box_ceramic": {
+   "center": [
+    -0.1903,
+    0.5763,
+    -0.2575
+   ],
+   "size": [
+    0.7645,
+    0.5742,
+    0.5569
+   ],
+   "triangles": 1088
+  },
+  "jewellery_box_crystal": {
+   "center": [
+    0.45,
+    0.665,
+    -0.27
+   ],
+   "size": [
+    0.06,
+    0.075,
+    0.06
+   ],
+   "triangles": 48
+  },
+  "jewellery_box_gilt": {
+   "center": [
+    0.0,
+    0.5811,
+    -0.0324
+   ],
+   "size": [
+    1.53,
+    1.1621,
+    1.0213
+   ],
+   "triangles": 1500
+  },
+  "jewellery_box_lacquer": {
+   "center": [
+    0.0,
+    0.6202,
+    -0.0086
+   ],
+   "size": [
+    1.5,
+    1.0805,
+    0.9627
+   ],
+   "triangles": 484
+  },
+  "jewellery_box_mirror": {
+   "center": [
+    0.0,
+    0.8534,
+    0.3436
+   ],
+   "size": [
+    0.912,
+    0.4716,
+    0.1012
+   ],
+   "triangles": 156
+  },
+  "jewellery_box_red": {
+   "center": [
+    -0.1016,
+    0.4569,
+    -0.3857
+   ],
+   "size": [
+    0.6633,
+    0.4913,
+    0.2913
+   ],
+   "triangles": 112
+  },
+  "jewellery_box_velvet": {
+   "center": [
+    0.0,
+    0.54,
+    -0.1
+   ],
+   "size": [
+    1.42,
+    0.1,
+    0.68
+   ],
+   "triangles": 196
+  },
+  "jukebox_accent": {
+   "center": [
+    0.0,
+    3.8326,
+    -0.42
+   ],
+   "size": [
+    0.616,
+    0.8821,
+    0.6
+   ],
+   "triangles": 240
+  },
+  "jukebox_amber": {
+   "center": [
+    0.0,
+    2.8025,
+    -1.1175
+   ],
+   "size": [
+    2.97,
+    4.765,
+    0.135
+   ],
+   "triangles": 616
+  },
+  "jukebox_black": {
+   "center": [
+    -0.57,
+    3.5268,
+    -0.49
+   ],
+   "size": [
+    1.88,
+    2.0736,
+    1.32
+   ],
+   "triangles": 444
+  },
+  "jukebox_chrome": {
+   "center": [
+    0.0,
+    2.2425,
+    -0.7075
+   ],
+   "size": [
+    3.3027,
+    3.875,
+    0.975
+   ],
+   "triangles": 928
+  },
+  "jukebox_cream": {
+   "center": [
+    0.0,
+    2.95,
+    -1.15
+   ],
+   "size": [
+    2.2,
+    0.4,
+    0.1
+   ],
+   "triangles": 108
+  },
+  "jukebox_crystal": {
+   "center": [
+    0.0,
+    4.15,
+    -1.05
+   ],
+   "size": [
+    2.5,
+    1.6,
+    0.02
+   ],
+   "triangles": 128
+  },
+  "jukebox_ember": {
+   "center": [
+    0.0,
+    2.8825,
+    -1.12
+   ],
+   "size": [
+    3.29,
+    4.925,
+    0.13
+   ],
+   "triangles": 524
+  },
+  "jukebox_glow": {
+   "center": [
+    0.0,
+    4.173,
+    -0.355
+   ],
+   "size": [
+    2.592,
+    1.646,
+    1.35
+   ],
+   "triangles": 448
+  },
+  "jukebox_white": {
+   "center": [
+    0.0,
+    2.58,
+    -1.18
+   ],
+   "size": [
+    1.95,
+    0.13,
+    0.08
+   ],
+   "triangles": 120
+  },
+  "jukebox_wicker": {
+   "center": [
+    0.0,
+    1.475,
+    -1.01
+   ],
+   "size": [
+    2.0,
+    1.85,
+    0.02
+   ],
+   "triangles": 104
+  },
+  "jukebox_wood": {
+   "center": [
+    0.0,
+    2.8,
+    0.05
+   ],
+   "size": [
+    2.9,
+    5.0,
+    2.1
+   ],
+   "triangles": 328
+  },
+  "jukebox_wood2": {
+   "center": [
+    0.0,
+    2.7,
+    0.06
+   ],
+   "size": [
+    3.4,
+    5.4,
+    2.36
+   ],
+   "triangles": 864
+  },
   "kids_bed_accent": {
    "center": [
     0.0,
@@ -1473,6 +2293,97 @@
     0.56
    ],
    "triangles": 448
+  },
+  "knight_armour_black": {
+   "center": [
+    0.0,
+    5.5806,
+    -0.3352
+   ],
+   "size": [
+    0.3539,
+    0.3692,
+    0.2375
+   ],
+   "triangles": 240
+  },
+  "knight_armour_chrome": {
+   "center": [
+    0.0,
+    3.18,
+    -0.1027
+   ],
+   "size": [
+    2.1085,
+    5.64,
+    1.0741
+   ],
+   "triangles": 3652
+  },
+  "knight_armour_gilt": {
+   "center": [
+    -0.1351,
+    3.0337,
+    -0.2961
+   ],
+   "size": [
+    1.8554,
+    5.9699,
+    1.2433
+   ],
+   "triangles": 934
+  },
+  "knight_armour_leather": {
+   "center": [
+    0.0,
+    3.43,
+    -0.1297
+   ],
+   "size": [
+    1.13,
+    0.53,
+    1.0606
+   ],
+   "triangles": 172
+  },
+  "knight_armour_steel": {
+   "center": [
+    0.0,
+    2.7325,
+    -0.1993
+   ],
+   "size": [
+    0.88,
+    4.735,
+    1.0615
+   ],
+   "triangles": 780
+  },
+  "knight_armour_velvet": {
+   "center": [
+    -0.447,
+    3.311,
+    -0.0693
+   ],
+   "size": [
+    1.3328,
+    6.605,
+    1.6613
+   ],
+   "triangles": 596
+  },
+  "knight_armour_wood2": {
+   "center": [
+    0.0,
+    0.175,
+    0.0
+   ],
+   "size": [
+    2.0,
+    0.35,
+    1.6
+   ],
+   "triangles": 152
   },
   "laundry_basket_fabric": {
    "center": [
@@ -1850,6 +2761,292 @@
     1.3193
    ],
    "triangles": 776
+  },
+  "oil_painting_brass": {
+   "center": [
+    0.0,
+    0.24,
+    -0.14
+   ],
+   "size": [
+    0.9,
+    0.18,
+    0.08
+   ],
+   "triangles": 108
+  },
+  "oil_painting_card": {
+   "center": [
+    0.0,
+    1.5495,
+    0.0578
+   ],
+   "size": [
+    4.8,
+    3.0991,
+    0.4735
+   ],
+   "triangles": 324
+  },
+  "oil_painting_cream": {
+   "center": [
+    0.0,
+    1.85,
+    0.005
+   ],
+   "size": [
+    3.92,
+    2.62,
+    0.07
+   ],
+   "triangles": 32
+  },
+  "oil_painting_gilt": {
+   "center": [
+    0.0,
+    1.85,
+    -0.0257
+   ],
+   "size": [
+    4.8,
+    3.5,
+    0.2914
+   ],
+   "triangles": 1144
+  },
+  "oil_painting_glow": {
+   "center": [
+    0.07,
+    2.4025,
+    -0.1225
+   ],
+   "size": [
+    1.5,
+    2.445,
+    0.275
+   ],
+   "triangles": 128
+  },
+  "oil_painting_gold": {
+   "center": [
+    0.0,
+    3.6718,
+    -0.1115
+   ],
+   "size": [
+    1.55,
+    0.2265,
+    0.3869
+   ],
+   "triangles": 424
+  },
+  "oil_painting_grass": {
+   "center": [
+    0.0,
+    1.005,
+    0.0045
+   ],
+   "size": [
+    3.68,
+    0.69,
+    0.003
+   ],
+   "triangles": 32
+  },
+  "oil_painting_leaf": {
+   "center": [
+    0.0,
+    1.29,
+    0.0045
+   ],
+   "size": [
+    3.68,
+    1.26,
+    0.005
+   ],
+   "triangles": 140
+  },
+  "oil_painting_ocean": {
+   "center": [
+    0.0,
+    1.415,
+    0.0065
+   ],
+   "size": [
+    3.68,
+    0.33,
+    0.003
+   ],
+   "triangles": 12
+  },
+  "oil_painting_peach": {
+   "center": [
+    0.0,
+    2.085,
+    0.0122
+   ],
+   "size": [
+    3.68,
+    1.07,
+    0.0115
+   ],
+   "triangles": 56
+  },
+  "oil_painting_red": {
+   "center": [
+    0.7,
+    1.355,
+    0.003
+   ],
+   "size": [
+    0.44,
+    0.15,
+    0.003
+   ],
+   "triangles": 8
+  },
+  "oil_painting_rock": {
+   "center": [
+    0.0,
+    2.085,
+    0.0115
+   ],
+   "size": [
+    3.68,
+    1.07,
+    0.003
+   ],
+   "triangles": 68
+  },
+  "oil_painting_sky": {
+   "center": [
+    0.0,
+    1.85,
+    0.03
+   ],
+   "size": [
+    3.7,
+    2.4,
+    0.02
+   ],
+   "triangles": 12
+  },
+  "oil_painting_slate": {
+   "center": [
+    0.82,
+    2.0,
+    0.0085
+   ],
+   "size": [
+    2.04,
+    0.9,
+    0.003
+   ],
+   "triangles": 40
+  },
+  "oil_painting_sun": {
+   "center": [
+    0.0,
+    1.675,
+    0.0103
+   ],
+   "size": [
+    3.68,
+    0.75,
+    0.0115
+   ],
+   "triangles": 32
+  },
+  "oil_painting_white": {
+   "center": [
+    -0.21,
+    2.41,
+    0.009
+   ],
+   "size": [
+    2.48,
+    0.42,
+    0.006
+   ],
+   "triangles": 80
+  },
+  "oil_painting_wood2": {
+   "center": [
+    0.7,
+    1.21,
+    0.0035
+   ],
+   "size": [
+    0.3,
+    0.18,
+    0.003
+   ],
+   "triangles": 12
+  },
+  "old_globe_black": {
+   "center": [
+    0.0,
+    1.8695,
+    0.0
+   ],
+   "size": [
+    1.57,
+    0.003,
+    1.57
+   ],
+   "triangles": 144
+  },
+  "old_globe_brass": {
+   "center": [
+    0.0,
+    1.2835,
+    0.175
+   ],
+   "size": [
+    1.434,
+    2.567,
+    1.1451
+   ],
+   "triangles": 856
+  },
+  "old_globe_ocean": {
+   "center": [
+    0.0,
+    1.85,
+    0.0
+   ],
+   "size": [
+    1.2998,
+    1.2998,
+    1.3
+   ],
+   "triangles": 864
+  },
+  "old_globe_parchment": {
+   "center": [
+    0.0,
+    1.8547,
+    0.0
+   ],
+   "size": [
+    1.57,
+    1.3092,
+    1.57
+   ],
+   "triangles": 1439
+  },
+  "old_globe_wood": {
+   "center": [
+    0.0,
+    0.9385,
+    0.0
+   ],
+   "size": [
+    1.6,
+    1.8531,
+    1.6
+   ],
+   "triangles": 1406
   },
   "painting_gold": {
    "center": [
@@ -2397,6 +3594,123 @@
    ],
    "triangles": 1848
   },
+  "ship_bottle_brass": {
+   "center": [
+    0.0,
+    0.06,
+    -0.355
+   ],
+   "size": [
+    0.5,
+    0.07,
+    0.012
+   ],
+   "triangles": 108
+  },
+  "ship_bottle_cream": {
+   "center": [
+    0.096,
+    0.9512,
+    0.0
+   ],
+   "size": [
+    0.792,
+    0.3824,
+    0.26
+   ],
+   "triangles": 194
+  },
+  "ship_bottle_crystal": {
+   "center": [
+    -0.0175,
+    0.85,
+    0.0
+   ],
+   "size": [
+    1.875,
+    0.8,
+    0.8
+   ],
+   "triangles": 1200
+  },
+  "ship_bottle_lacquer": {
+   "center": [
+    0.27,
+    0.63,
+    0.0
+   ],
+   "size": [
+    0.8,
+    0.3,
+    0.192
+   ],
+   "triangles": 332
+  },
+  "ship_bottle_ocean": {
+   "center": [
+    0.275,
+    0.5583,
+    0.0
+   ],
+   "size": [
+    1.238,
+    0.1465,
+    0.5316
+   ],
+   "triangles": 448
+  },
+  "ship_bottle_red": {
+   "center": [
+    -0.25,
+    0.9525,
+    0.0
+   ],
+   "size": [
+    1.66,
+    0.485,
+    0.28
+   ],
+   "triangles": 196
+  },
+  "ship_bottle_wicker": {
+   "center": [
+    -0.905,
+    0.85,
+    0.0
+   ],
+   "size": [
+    0.25,
+    0.244,
+    0.244
+   ],
+   "triangles": 160
+  },
+  "ship_bottle_wood": {
+   "center": [
+    0.0,
+    0.06,
+    0.0
+   ],
+   "size": [
+    1.8,
+    0.12,
+    0.7
+   ],
+   "triangles": 188
+  },
+  "ship_bottle_wood2": {
+   "center": [
+    0.065,
+    0.66,
+    0.0
+   ],
+   "size": [
+    1.09,
+    1.08,
+    0.6001
+   ],
+   "triangles": 612
+  },
   "shoe_cabinet_brass": {
    "center": [
     0.0,
@@ -2526,6 +3840,84 @@
     2.6787
    ],
    "triangles": 560
+  },
+  "stag_head_black": {
+   "center": [
+    0.0,
+    1.72,
+    -0.5238
+   ],
+   "size": [
+    0.5551,
+    0.46,
+    0.6075
+   ],
+   "triangles": 300
+  },
+  "stag_head_bone": {
+   "center": [
+    0.0,
+    2.6306,
+    -0.034
+   ],
+   "size": [
+    2.68,
+    1.2123,
+    0.6467
+   ],
+   "triangles": 1256
+  },
+  "stag_head_brass": {
+   "center": [
+    0.0,
+    0.45,
+    0.685
+   ],
+   "size": [
+    0.7,
+    0.18,
+    0.02
+   ],
+   "triangles": 108
+  },
+  "stag_head_fur": {
+   "center": [
+    0.0,
+    1.522,
+    -0.0078
+   ],
+   "size": [
+    1.0505,
+    1.4858,
+    1.6143
+   ],
+   "triangles": 1076
+  },
+  "stag_head_wood": {
+   "center": [
+    0.0,
+    1.065,
+    0.7627
+   ],
+   "size": [
+    1.3,
+    1.87,
+    0.1647
+   ],
+   "triangles": 968
+  },
+  "stag_head_wood2": {
+   "center": [
+    0.0,
+    0.06,
+    0.37
+   ],
+   "size": [
+    1.2,
+    0.12,
+    0.95
+   ],
+   "triangles": 108
   },
   "toolbox_dark": {
    "center": [
@@ -2721,6 +4113,84 @@
     1.9745
    ],
    "triangles": 112
+  },
+  "vintage_radio_amber": {
+   "center": [
+    0.0,
+    0.66,
+    -0.51
+   ],
+   "size": [
+    0.27,
+    0.27,
+    0.03
+   ],
+   "triangles": 108
+  },
+  "vintage_radio_black": {
+   "center": [
+    0.0,
+    0.4938,
+    -0.5425
+   ],
+   "size": [
+    1.16,
+    0.5076,
+    0.085
+   ],
+   "triangles": 444
+  },
+  "vintage_radio_brass": {
+   "center": [
+    0.0,
+    0.66,
+    -0.522
+   ],
+   "size": [
+    0.35,
+    0.35,
+    0.05
+   ],
+   "triangles": 192
+  },
+  "vintage_radio_wicker": {
+   "center": [
+    0.0,
+    1.37,
+    -0.5025
+   ],
+   "size": [
+    1.0,
+    0.9,
+    0.025
+   ],
+   "triangles": 128
+  },
+  "vintage_radio_wood": {
+   "center": [
+    0.0,
+    1.005,
+    -0.5
+   ],
+   "size": [
+    1.7427,
+    1.71,
+    0.15
+   ],
+   "triangles": 492
+  },
+  "vintage_radio_wood2": {
+   "center": [
+    0.0,
+    0.98,
+    0.0
+   ],
+   "size": [
+    1.8,
+    1.96,
+    1.2
+   ],
+   "triangles": 1648
   },
   "wardrobe_brass": {
    "center": [
