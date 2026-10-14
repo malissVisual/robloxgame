@@ -12,6 +12,11 @@
 --     too); task.spawn runs at once (a coroutine: task.wait inside it waits for advance);
 --   * Net: Net.get gives a fake remote (FireClient is recorded in Runtime.sent; Runtime.fire sends a client's request),
 --     Net.limit is shared/Net.luau's token bucket on the test's clock.
+--   * 8.3 saves (tests/saving_runtime_test.luau): the DataStore can fail (Runtime.storeFault: a function of the key and
+--     the call's number → an error's text, nil: it goes through), be slow (Runtime.storeLatency s an UpdateAsync yields
+--     in a thread before it reads and writes; on the main thread the time just passes) and be short of requests
+--     (Runtime.budget: what DataStoreService:GetRequestBudgetForRequestType answers; Runtime.Enum its request types);
+--     every UpdateAsync is logged in Runtime.storeCalls ({ key, at = the clock, wrote, failed }).
 local Mock = require("./ItemMock") :: any
 
 local Runtime: any = {
@@ -24,8 +29,13 @@ local Runtime: any = {
 	warnings = {},
 	sleeping = {}, -- { { co, wake, args? } } threads in task.wait / task.delay
 	deferred = {}, -- { { fn, args } } task.defer
+	storeFault = nil, -- 8.3: (key, call) → an error's text or nil
+	storeLatency = 0, -- 8.3: s an UpdateAsync yields
+	budget = 100, -- 8.3: the UpdateAsync request budget
+	storeCalls = {}, -- 8.3: { { key, at, wrote, failed } }
 }
 Runtime.Mock = Mock
+Runtime.Enum = { DataStoreRequestType = { GetAsync = "GetAsync", SetIncrementAsync = "SetIncrementAsync", UpdateAsync = "UpdateAsync" } }
 
 -- ── Signals ─────────────────────────────────────────────────────────────────
 
@@ -203,11 +213,22 @@ Runtime.stored = stored
 
 local dataStore: any = {}
 function dataStore.UpdateAsync(_self: any, key: string, transform: (any) -> any): any
+	local call = { key = key, at = Runtime.clock, wrote = false, failed = false }
+	table.insert(Runtime.storeCalls, call)
+	if Runtime.storeLatency > 0 then
+		task.wait(Runtime.storeLatency) -- (8.3: the request's way there and back; a thread waits, the main thread's time passes)
+	end
+	local fault = Runtime.storeFault and Runtime.storeFault(key, #Runtime.storeCalls)
+	if fault then
+		call.failed = true
+		error(fault, 0)
+	end
 	local old = Runtime.saves[key]
 	local new = transform(if old ~= nil then stored(old, key) else nil)
 	if new ~= nil then
 		Runtime.saves[key] = stored(new, key)
 		Runtime.writes += 1
+		call.wrote = true
 	end
 	return new
 end
@@ -246,6 +267,10 @@ local services: { [string]: any } = {
 	DataStoreService = {
 		GetDataStore = function()
 			return dataStore
+		end,
+		GetRequestBudgetForRequestType = function(_self: any, kind: any): any
+			assert(kind == Runtime.Enum.DataStoreRequestType.UpdateAsync, `the budget of {tostring(kind)}?`)
+			return Runtime.budget
 		end,
 	},
 }

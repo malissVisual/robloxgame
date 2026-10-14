@@ -23,6 +23,7 @@ PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (
 PURE += ("Visitors",)  # 8.3 sandbox, the showroom's visitors: who, when, where they walk, the offers' prices (tests/visitors_test.luau)
 PURE += ("VanPaintRules",)  # 8.3 sandbox, the PAINT shop: the catalogue, the prices, the looks, the save (tests/vanpaint_test.luau)
 PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_test.luau, tests/sandboxlight_runtime_test.luau)
+PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -191,7 +192,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # modules the copies above (shared/CollectionRules.luau on FurnitureLooks' recorder copy).
     shutil.copy(os.path.join(HERE, "runtime", "CollectionRuntime.luau"), os.path.join(tmp, "CollectionRuntime.luau"))
     head = ('local E = require("./CollectionRuntime")\n'
-            'local game, task, os, Instance, warn = E.game, E.task, E.os, E.Instance, E.warn\n')
+            'local game, task, os, Instance, warn, Enum = E.game, E.task, E.os, E.Instance, E.warn, E.Enum\n')
     for module in ("PlayerData", "Collection"):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)

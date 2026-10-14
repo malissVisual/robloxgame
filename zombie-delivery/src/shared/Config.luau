@@ -7758,4 +7758,33 @@ Config.SandboxLight = {
 	},
 }
 
+-- 8.3 SAVES (server/PlayerData.luau, shared/SaveGuard.luau; tests/saving_runtime_test.luau): how the save pipeline
+-- writes, tries again and waits. Config.AutosaveSeconds, SaveLockWait and SaveLockStale (at the top) still hold.
+--   Soon       s from a purchase (PlayerData.spend), a book milestone or pieces brought home to their save
+--              (PlayerData.saveSoon: one save for a burst)
+--   Gap        s at least from one player's write to their next one that can wait (a Soon save waits for it, the
+--              autosave skips a player written this recently; a DataStore key takes one write in 6 s)
+--   Tries      tries of a save that can wait (the autosave, a Soon save); FinalTries: of the last one (leaving, the
+--              shutdown); LoadTries: of the load (then a live player is kicked: never played on a fresh profile)
+--   Backoff    s before the next try: First × 2^(try − 1), at most Most
+--   Reserve    UpdateAsync requests of the server's budget (DataStoreService:GetRequestBudgetForRequestType) kept for
+--              the loads and the last saves: a save that can wait waits for the next round while the budget is under it
+--   LeaveWait  s a join waits for this server's own leave save of the same player (a rejoin within seconds)
+--   CloseWait  s the shutdown (game:BindToClose) waits for every save in flight (Roblox gives 30)
+--   WarnBytes  a save this big (its JSON, SaveGuard's estimate) warns in the output; MaxBytes: a DataStore key's 4 MB
+--              less a margin (the unknown keys kept from the loaded save are left out past it)
+Config.Saving = {
+	Soon = 3,
+	Gap = 7,
+	Tries = 3,
+	FinalTries = 5,
+	LoadTries = 4,
+	Backoff = { First = 1, Most = 4 },
+	Reserve = 8,
+	LeaveWait = 20,
+	CloseWait = 25,
+	WarnBytes = 1_000_000,
+	MaxBytes = 4_000_000,
+}
+
 return Config

@@ -358,6 +358,7 @@ function Collection.add(player: Player, entry: { item: string, variant: number?,
 	})
 	local piece = table.clone(collection.entries[#collection.entries]) -- (8.2: for Collection.onAdded)
 	noteAdded(player, Rules.rarityOf(def))
+	PlayerData.saveSoon(player) -- (8.3 saves: a trip's pieces home are saved a moment later, one save for the van)
 	changed(player)
 	for _, fn in addedListeners do -- (8.2: the collection book)
 		task.spawn(fn, player, table.clone(piece))
