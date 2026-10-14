@@ -63,6 +63,7 @@ local Upgrades = require(script.Parent.Upgrades) -- 8.1: the UPGRADES desk's win
 local WarehouseMesh = require(script.Parent.WarehouseMesh) -- 8.2: the owner's Blender warehouse
 
 local T = Config.Warehouse
+local TAG_REACH, TAG_UNDER = 3.5, 0.9 -- 8.3: a stand's tag's half width (7 studs) and its middle under the roof (its half height 0.8)
 
 local Warehouse = {}
 
@@ -468,9 +469,11 @@ local function refresh(state: PlotState)
 		local now = stand.shown
 		if entry and now then
 			setLines(stand.tagLabels, WarehouseLayout.tagLines(entry.name, rarityOf(entry), rates[index] or 0))
-			-- (over the piece: from the podium's middle up past its top)
+			-- (over the piece: from the podium's middle up past its top; 8.3: its top under the hall's roof where its half
+			-- width reaches back, a Garage's low back slope: WarehouseLayout.ceiling, so a tall piece's tag sits lower)
 			local top = WarehouseLayout.FloorTop + T.StandHeight + now.height
-			stand.tag.StudsOffsetWorldSpace = Vector3.new(0, top + 1.3 - stand.podium.Position.Y, 0)
+			local roof = WarehouseLayout.ceiling(state.site, stand.podium.Position.Z - TAG_REACH) - TAG_UNDER
+			stand.tag.StudsOffsetWorldSpace = Vector3.new(0, math.min(top + 1.3, roof) - stand.podium.Position.Y, 0)
 			stand.tag.Enabled = true
 		else
 			stand.tag.Enabled = false

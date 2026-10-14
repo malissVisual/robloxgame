@@ -157,6 +157,12 @@ check("… a lock-only record (no money), a new player's nil, junk: none", same(
 	and same(Rules.fromSave(nil), {}) and same(Rules.fromSave("x"), {}) and same(Rules.fromSave({ money = 1, sandboxUpgradesKept = "yes", warehouseLevelKept = true, sandboxUpgrades = { stands = 1 } }), {}))
 local again = Rules.fromSave({ money = 500, sandboxUpgradesKept = true, warehouseLevelKept = true, sandboxUpgrades = Rules.fromSave(saved) })
 check("… run again on what it gave (saved again): the same", same(again, Rules.fromSave(saved)))
+check("8.3: … a save an older server wrote again (the level and its flag gone, rewards' key kept): its own level, the Garage's too",
+	same(Rules.fromSave({ money = 9, sandboxUpgradesKept = true, sandboxUpgrades = { stands = 2 }, rewards = { ["warehouse:4"] = true } }), { stands = 2, warehouse = 4 })
+		and same(Rules.fromSave({ money = 9, sandboxUpgradesKept = true, sandboxUpgrades = {}, rewards = { ["warehouse:0"] = true } }), {})
+		and same(Rules.fromSave({ money = 9, rewards = { ["warehouse:1"] = true, ["warehouse:2"] = true, other = true } }), { warehouse = 2 }))
+check("8.3: keptWarehouse and warehouseKey: the key round-trips; junk keys are no level", Rules.warehouseKey({ warehouse = 3 }) == "warehouse:3" and Rules.warehouseKey({}) == "warehouse:0"
+	and Rules.keptWarehouse({ [Rules.warehouseKey({ warehouse = 3 })] = true }) == 3 and Rules.keptWarehouse(nil) == nil and Rules.keptWarehouse({ ["warehouse:x"] = true, ["warehouse:9"] = true, ["warehouse:1.5"] = true, ["warehouse:2"] = false }) == nil)
 local old = Rules.fromSave({ money = 500, sandboxUpgradesKept = true, sandboxUpgrades = { lights = 1 } })
 check("8.3: … a migrated save saved again (with the flag): still level 4", same(Rules.fromSave({ money = 500, sandboxUpgradesKept = true, warehouseLevelKept = true, sandboxUpgrades = old }), { lights = 1, warehouse = 3 }))
 

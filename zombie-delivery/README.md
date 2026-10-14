@@ -1692,6 +1692,8 @@ player's own and buyable (the contract: `design/warehouse-levels/KONTRAKT.md`):
 
 - **Who starts where:** a new player in the Garage; a real save from before 8.3 (one without `warehouseLevelKept`) at
   level 4, what it had (`UpgradeRules.fromSave`). A free plot shows the Garage, FOR RENT (`Config.Warehouse.FreeLevel`).
+  The level is saved in `sandboxUpgrades.warehouse` and, as a short key of `rewards` (`warehouse:<k>`), which an older
+  server keeps: a save such a server wrote again (the level and its flag dropped) gets its own level back, not 4.
 - **Buying:** the UPGRADES desk's first card, **ZDC Warehouse** 🏭 (`Config.SandboxUpgrades.List.warehouse`: upgrade
   level k is warehouse level k + 1). The server rebuilds the owner's warehouse at the new level at once
   (`server/Warehouse.luau` listens to `Upgrades.onChanged`); the pieces on show stay on their stands (a level up never
@@ -1707,7 +1709,9 @@ player's own and buyable (the contract: `design/warehouse-levels/KONTRAKT.md`):
   every layout function takes it (a plain Plot is level 4): its walls (the Garage's shed roof, gables for 2 – 4, a
   gable of 10 under level 5's barrel), its lamps under the Blender model's lamps, its beams at the model's trusses, its
   stands (`WarehouseLayout.grid(n)`), the UPGRADES desk at the back wall's middle (the Garage's a smaller one between
-  its two stands), the STOCK board and the UPGRADES sign (the Garage's board on its west wall).
+  its two stands), the STOCK board and the UPGRADES sign (the Garage's board on its west wall). A stand's tag stays
+  under the hall's roof where it reaches back (`WarehouseLayout.ceiling`: the Garage's low back slope lowers a tall
+  piece's tag).
 - **The Blender look:** `server/WarehouseMesh.luau` dresses each warehouse with its own level of the owner's
   `ZDCWarehouseArt` import (the Model's `Level`), checked against that level's Site. The FBX was not exported again:
   the import the owner has already holds all five levels.

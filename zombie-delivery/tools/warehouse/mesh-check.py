@@ -93,8 +93,12 @@ WAREHOUSE_LINES = (
     'model:SetAttribute("Plot", plot.id)',
 )
 TAG_LINES = ("tag.Size = UDim2.fromScale(7, 1.6) -- (studs)", "local top = WarehouseLayout.FloorTop + T.StandHeight + now.height",
-             "stand.tag.StudsOffsetWorldSpace = Vector3.new(0, top + 1.3 - stand.podium.Position.Y, 0)")
-TAG = (7.0, 1.6, 1.3)  # a stand's tag: its width and height (studs) and its middle over the piece's top
+             "local TAG_REACH, TAG_UNDER = 3.5, 0.9",
+             "local roof = WarehouseLayout.ceiling(state.site, stand.podium.Position.Z - TAG_REACH) - TAG_UNDER",
+             "stand.tag.StudsOffsetWorldSpace = Vector3.new(0, math.min(top + 1.3, roof) - stand.podium.Position.Y, 0)")
+# a stand's tag: its width and height (studs), its middle over the piece's top, and (8.3) its middle at most this far
+# under the hall's roof where its half width reaches back (WarehouseLayout.ceiling: a Garage's low back slope)
+TAG = (7.0, 1.6, 1.3, 0.9)
 
 HARNESS = r'''
 local M = require("./ItemMock")
@@ -177,7 +181,7 @@ local function layout(plot, tag, site)
 	local d = WarehouseLayout.door(site)
 	local stands = {}
 	for _, s in WarehouseLayout.stands(site, WarehouseLayout.capacity(n)) do
-		table.insert(stands, string.format("[%.6f,%.6f,%.6f,%.6f,%.6f]", s.x - w.x, s.z - w.z, s.sx, s.sz, s.y))
+		table.insert(stands, string.format("[%.6f,%.6f,%.6f,%.6f,%.6f,%.6f]", s.x - w.x, s.z - w.z, s.sx, s.sz, s.y, WarehouseLayout.ceiling(site, s.z - 3.5)))
 	end
 	local t = WarehouseLayout.terminal(site)
 	print(string.format('LAYOUT {"plot":%d,"tag":"%s","level":%d,"world":[%.6f,%.6f],"size":[%.6f,%.6f,%.6f],"outline":%s,"top":%.6f,"door":[%.6f,%.6f,%.6f,%.6f],"floorTop":%.6f,"wall":%.6f,"inside":%s,"doorPath":%s,"receiving":%s,"bay":%s,"stands":[%s],"count":%d,"capacity":%d,"terminal":[%.6f,%.6f,%.6f,%.6f,%.6f,%.6f],"def":{"name":"%s","size":%s,"door":%s,"roof":"%s","rise":%.6f,"stands":%d}}',
@@ -942,11 +946,12 @@ def rooms_of(lay, parts, meta0, back):
         ("the UNLOAD HERE bay", ("box", [bay["x0"], 0.1, bay["z0"]], [bay["x1"], BAY_HIGH, bay["z1"]])),
     ]
     tallest, fit = meta0["tallest"], meta0["fit"]
-    width, high, over = TAG
-    for k, (x, z, sx, sz, top) in enumerate(lay["stands"], 1):
+    width, high, over, under = TAG
+    for k, (x, z, sx, sz, top, ceiling) in enumerate(lay["stands"], 1):
         piece = top + tallest
         rooms.append((f"stand {k}'s piece (the tallest, {tallest:g})", ("box", [x - sx / 2 + fit / 2, floor_top, z - sz / 2 + fit / 2], [x + sx / 2 - fit / 2, piece, z + sz / 2 - fit / 2])))
-        rooms.append((f"stand {k}'s tag", ("disc", (x, z), width / 2, piece + over - high / 2, piece + over + high / 2)))
+        middle = min(piece + over, ceiling - under)  # (server/Warehouse.luau's refresh: under the roof where it reaches back)
+        rooms.append((f"stand {k}'s tag", ("disc", (x, z), width / 2, middle - high / 2, middle + high / 2)))
     tx, tz, tsx, tsz, ty, yaw = lay["terminal"]
     fx, fz = -math.sin(math.radians(yaw)), -math.cos(math.radians(yaw))  # (the way it faces)
     lo, hi = [tx - tsx / 2, floor_top, tz - tsz / 2], [tx + tsx / 2, ty + 4.0, tz + tsz / 2]

@@ -962,6 +962,14 @@ function PlayerData.save(player: Player, final: boolean?)
 			profile.rewards[key] = true
 		end
 	end
+	-- 8.3: the warehouse's level as a short key too ("warehouse:<k>", only the one it is now): a save an older server
+	-- writes again loses sandboxUpgrades.warehouse and its flag, and UpgradeRules.fromSave reads the level back from it
+	for key in profile.rewards do
+		if type(key) == "string" and string.sub(key, 1, 10) == "warehouse:" then
+			profile.rewards[key] = nil
+		end
+	end
+	profile.rewards[UpgradeRules.warehouseKey(profile.sandboxUpgrades)] = true
 	local data = {
 		money = profile.money,
 		cars = profile.cars,

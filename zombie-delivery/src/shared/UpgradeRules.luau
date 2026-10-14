@@ -37,6 +37,9 @@
 --                                       save without WarehouseFlag (from before 8.3) had today's warehouse: level 4
 --   UpgradeRules.Flag                   that flag
 --   UpgradeRules.WarehouseFlag          8.3: the warehouse level's (Config.SandboxUpgrades.WarehouseFlag)
+--   UpgradeRules.warehouseKey(levels)   8.3: the short key of `rewards` keeping the level through an older server
+--                                       ("warehouse:<k>"; server/PlayerData.luau writes it, fromSave reads it back
+--                                       when the flag is gone: keptWarehouse(rewards))
 --   UpgradeRules.WarehouseAttribute     8.3: the player attribute with their warehouse level (server/Upgrades.luau)
 
 local Config = require(script.Parent.Config)
@@ -308,10 +311,43 @@ function UpgradeRules.fromSave(saved: any): Levels
 	if saved[UpgradeRules.WarehouseFlag] ~= true then
 		local def = UpgradeRules.def("warehouse")
 		if def then
-			out.warehouse = math.max(out.warehouse or 0, math.min(3, def.max))
+			-- (a save an older server wrote again lost the level and its flag, but kept `rewards`' short keys: the level
+			-- PlayerData writes there too, "warehouse:<k>", is its own; none: a save from before 8.3, level 4)
+			local kept = UpgradeRules.keptWarehouse(saved.rewards)
+			if kept and kept > 0 then
+				out.warehouse = kept
+			elseif kept then
+				(out :: any).warehouse = nil -- (the Garage: none saved)
+			else
+				out.warehouse = math.max(out.warehouse or 0, math.min(3, def.max))
+			end
 		end
 	end
 	return out
+end
+
+-- 8.3: the warehouse level an older server kept in a save's `rewards` ("warehouse:<k>", PlayerData's save: its upgrade
+-- level k, 0 the Garage); nil: none there.
+function UpgradeRules.keptWarehouse(rewards: any): number?
+	if type(rewards) ~= "table" then
+		return nil
+	end
+	local def = UpgradeRules.def("warehouse")
+	local best: number? = nil
+	for key, on in rewards do
+		if on == true and type(key) == "string" and string.sub(key, 1, 10) == "warehouse:" then
+			local k = tonumber(string.sub(key, 11))
+			if k and k == math.floor(k) and k >= 0 and (def == nil or k <= def.max) then
+				best = math.max(best or 0, k)
+			end
+		end
+	end
+	return best
+end
+
+-- 8.3: the `rewards` key that keeps a warehouse level through an older server ("warehouse:<k>", k its upgrade level).
+function UpgradeRules.warehouseKey(levels: any): string
+	return `warehouse:{UpgradeRules.level(levels, "warehouse")}`
 end
 
 return UpgradeRules
