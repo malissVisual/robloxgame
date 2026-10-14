@@ -5,7 +5,9 @@
 -- assist), when he runs from a zombie, what he does now (the priority list), the van's back (he opens it), his speeds
 -- (slower than a player, a sprint to your lift), stuck (a new path, a nudge), the far end of your piece (on the floor
 -- there), the doorways he keeps out of, his place behind you and his words. tests/movehelper_runtime_test.luau and
--- tests/movehelper_art_runtime_test.luau run the server side.
+-- tests/movehelper_art_runtime_test.luau run the server side. 8.3 Danny's orders: the four orders and a command's check
+-- (his move's crew only), the light pieces AUTO carries alone, the heavy one he asks a hand for (and for how long), your
+-- call (in place, the last resort's clock, walking away, idle) and the priority list with them.
 local Brain = require("./MoveHelperBrain")
 local Config = require("./Config")
 local Rules = require("./MovingRules")
@@ -38,8 +40,32 @@ H.Duo = false
 H.Solo = false
 check("Solo off: nobody gets him", not Brain.wanted(1))
 H.Solo = true
-check("the orders: help, carry, wait", Brain.validMode("help") and Brain.validMode("carry") and Brain.validMode("wait")
-	and not Brain.validMode("dance") and not Brain.validMode(nil) and not Brain.validMode(3))
+check("8.3 the orders: auto, help, stay, van (the card's order)", Brain.validMode("auto") and Brain.validMode("help") and Brain.validMode("stay")
+	and Brain.validMode("van") and #Brain.Modes == 4 and Brain.Modes[1] == "auto" and Brain.Modes[2] == "help" and Brain.Modes[3] == "stay" and Brain.Modes[4] == "van")
+check("…nothing else (the old carry / wait, garbage)", not Brain.validMode("carry") and not Brain.validMode("wait") and not Brain.validMode("dance")
+	and not Brain.validMode(nil) and not Brain.validMode(3) and not Brain.validMode({}) and not Brain.validMode("stop"))
+
+-- 8.3 a command: his move's crew only, a real order, not the one in force ------------------------------------------------------
+
+local given, why = Brain.order("help", "auto", true)
+check("8.3 a crew player's HELP ME on AUTO: taken", given == "help" and why == nil)
+given, why = Brain.order("help", "auto", false)
+check("…a player of another move (not his crew): refused (crew)", given == nil and why == "crew")
+given, why = Brain.order("dance", "auto", true)
+check("…no such order: refused (mode)", given == nil and why == "mode")
+given, why = Brain.order(nil, "auto", true)
+local given2, why2 = Brain.order({ "auto" }, "help", true)
+check("…garbage (nil, a table): refused (mode)", given == nil and why == "mode" and given2 == nil and why2 == "mode")
+given, why = Brain.order("van", "van", true)
+check("…the order in force: nothing to change (same)", given == nil and why == "same")
+given, why = Brain.order("auto", "van", false)
+check("…the crew is checked first", given == nil and why == "crew")
+check("8.3 the orders' names: AUTO, HELP ME, WAIT HERE, WAIT AT VAN", Brain.modeName("auto") == "AUTO" and Brain.modeName("help") == "HELP ME"
+	and Brain.modeName("stay") == "WAIT HERE" and Brain.modeName("van") == "WAIT AT VAN" and Brain.modeName("dance") == "AUTO")
+check("8.3 the status line: the order · what he does", Brain.status("auto", "Carrying the Lamp to the van") == "AUTO · Carrying the Lamp to the van"
+	and Brain.status("stay", nil) == "WAIT HERE" and Brain.status("van", "") == "WAIT AT VAN")
+check("8.3 light pieces (AUTO carries them alone): one-hand, two-hands under LightWeight", Brain.light("hand", 9) and Brain.light("both", H.LightWeight - 1)
+	and not Brain.light("both", H.LightWeight) and not Brain.light("pair", 1) and H.LightWeight == 5)
 
 -- The way ------------------------------------------------------------------------------------------------------------------
 
@@ -102,6 +128,40 @@ pick, full = Brain.pickItem({ thing(3, "pair", 1) }, true)
 check("only a pair piece left: nothing for him alone", pick == nil and full == false)
 pick = Brain.pickItem({ thing(1, "hand", 5, { state = "ground" }) }, true)
 check("a piece on the ground counts", pick == 1)
+pick, full = Brain.pickItem({ thing(2, "both", 2, { weight = H.LightWeight, star = true }), thing(1, "hand", 30) }, true)
+check("8.3 AUTO: a heavy two-hands piece (LightWeight or more) is not his alone, ★ or not: the lamp", pick == 1 and full == false, pick)
+pick, full = Brain.pickItem({ thing(2, "both", 2, { weight = 6 }), thing(3, "pair", 1) }, true)
+check("…only heavy ones left: nothing alone, and the van is not 'full' for them", pick == nil and full == false)
+
+-- 8.3 AUTO's ask: the heavy piece he asks a hand for ---------------------------------------------------------------------------
+
+local heavy = {
+	thing(1, "hand", 5), -- the lamp: his alone, never asked for
+	thing(2, "both", 6, { weight = 6, value = 180 }), -- the dresser: two-hands, heavy
+	thing(3, "pair", 9, { weight = 8, value = 350 }), -- the sofa
+	thing(4, "both", 3, { weight = 3 }), -- a light two-hands piece: his alone
+}
+check("8.3 the ask: the heavy piece worth the most a second of a trip in two (the sofa)", Brain.pickAsk(heavy) == 3, Brain.pickAsk(heavy))
+heavy[2].star = true
+check("…★ first (the dresser)", Brain.pickAsk(heavy) == 2)
+heavy[2].reserved = true
+check("…not one you are about to lift (yours)", Brain.pickAsk(heavy) == 3)
+heavy[3].fits = false
+check("…never one that no longer fits the van", Brain.pickAsk(heavy) == nil)
+heavy[3].fits, heavy[2].reserved = true, false
+heavy[2].state = "carried"
+check("…never one somebody holds", Brain.pickAsk(heavy) == 3)
+heavy[3].broken = true
+check("…nor a broken one", Brain.pickAsk(heavy) == nil)
+heavy[3].broken, heavy[2].state = false, "ground"
+heavy[3].cost, heavy[2].cost = H.AskFar + 1, H.AskFar
+check("…within AskFar studs (on foot) only", Brain.pickAsk(heavy) == 2)
+check("…a piece on the ground counts; light ones never", Brain.pickAsk({ thing(1, "hand", 5), thing(4, "both", 3, { weight = 4 }) }) == nil)
+check("8.3 his ask goes on while it is free and fits, AskWait s after his \"give me a hand!\"", Brain.askKept(false, 999, true, true) == "on"
+	and Brain.askKept(true, H.AskWait - 0.1, true, true) == "on")
+check("…nobody came within AskWait s: timeout (the light pieces again)", Brain.askKept(true, H.AskWait, true, true) == "timeout")
+check("…taken, or no room any more: gone", Brain.askKept(true, 1, true, false) == "gone" and Brain.askKept(false, 0, false, true) == "gone")
+check("8.3 no nagging: AskAgain s after nobody came, AskGap after somebody did", H.AskAgain >= 30 and H.AskGap > 0 and H.AskGap < H.AskAgain)
 
 -- The reservation (7.x) ----------------------------------------------------------------------------------------------------
 
@@ -132,6 +192,38 @@ check("…not farther than AssistFar", Brain.pickAssist({ lift(2, H.AssistFar + 
 check("…not by the van's back already (you load it now)", Brain.pickAssist({ lift(2, 5, { class = "both", byBack = true }) }) == nil)
 check("…not a pair piece, not one helped already", Brain.pickAssist({ lift(3, 5), lift(2, 5, { class = "both", helped = true }) }) == nil)
 
+-- 8.3 your call: you wait at your end, he walks over ------------------------------------------------------------------------
+
+check("8.3 the switch: a two-person Lift waits for Danny", H.WaitForHelper == true)
+check("8.3 in place within CallReady studs of his place at its far end", Brain.inPlace(H.CallReady, 0) and Brain.inPlace(0.2, 0) and not Brain.inPlace(H.CallReady + 0.1, 0))
+check("…or within CallClose, blocked CallStuck s (a wall, the piece: the hold walks him the rest)", Brain.inPlace(H.CallClose, H.CallStuck)
+	and not Brain.inPlace(H.CallClose, H.CallStuck - 0.1) and not Brain.inPlace(H.CallClose + 0.1, 99))
+do
+	local a = Brain.newApproach()
+	local resort = false
+	for step = 1, 300 do -- (30 s walking closer at 10 studs a second: never the last resort)
+		resort = resort or Brain.approach(a, 400 - step, 0.1)
+	end
+	check("8.3 his walk to your call, coming closer: never faded over (even a long one)", not resort)
+	local steps = 0
+	repeat
+		steps += 1
+	until Brain.approach(a, 100.5, 0.1) or steps > 1000
+	check("…no closer by CallGain studs for CallBlink s: the last resort (a fade-over)", near(steps * 0.1, H.CallBlink, 0.11), steps * 0.1)
+	a = Brain.newApproach()
+	Brain.approach(a, 50, 0.1)
+	local blocked = 0
+	for _ = 1, math.floor(H.CallBlink / 0.1) - 5 do
+		blocked += if Brain.approach(a, 50 - H.CallGain * 0.5, 0.1) then 1 else 0
+	end
+	local progress = Brain.approach(a, 50 - H.CallGain - 0.1, 0.1)
+	check("…a little closer (under CallGain) is no progress; CallGain closer starts the clock again", blocked == 0 and not progress and a.idle == 0)
+end
+local reach = Config.Moving.Reach.Item + 3 + 2
+check("8.3 your call goes on at your end", Brain.callKept(4, reach, false, 0) == "on" and Brain.callKept(reach + H.CallLeave, reach, true, 1) == "on")
+check("…walked CallLeave studs past the Lift's reach: away", Brain.callKept(reach + H.CallLeave + 0.1, reach, false, 0) == "away")
+check("…he stood ready CallIdle s and you never lifted: idle", Brain.callKept(3, reach, true, H.CallIdle) == "idle" and Brain.callKept(3, reach, false, H.CallIdle) == "on")
+
 -- Running from zombies -----------------------------------------------------------------------------------------------------
 
 check("no zombie: he stays", not Brain.shouldFlee(nil, false, nil))
@@ -147,32 +239,44 @@ check("…a zombie right on him: some way", near(math.sqrt((fx - 3) ^ 2 + (fz - 
 -- What he does now: the priority list ----------------------------------------------------------------------------------------
 
 local function decide(fields: { [string]: any }): (string, number?)
-	local input: Brain.Input = { mode = "carry", dead = false, holding = nil, threat = nil, fleeing = false, lift = nil, assist = nil, pick = nil, open = false, atHouse = true }
+	local input: Brain.Input = { mode = "auto", dead = false, holding = nil, threat = nil, fleeing = false, lift = nil, assist = nil, pick = nil, open = false, atHouse = true,
+		call = nil, ask = nil }
 	for key, value in fields do
 		(input :: any)[key] = value
 	end
 	return Brain.decide(input)
 end
-check("down", decide({ dead = true, holding = "hand" }) == "down")
-check("the other end of your piece first, zombies or not", decide({ holding = "pair", threat = 2, lift = 3, open = true }) == "hold")
-check("a zombie near: he runs, with his piece", decide({ holding = "hand", threat = 3, lift = 3 }) == "flee")
-local action, spot = decide({ lift = 3, pick = 1, assist = 2 })
-check("(a) your two-person lift before anything of his own", action == "help" and spot == 3)
+check("down", decide({ dead = true, holding = "hand", call = 3 }) == "down")
+check("the other end of your piece first, zombies or not", decide({ holding = "pair", threat = 2, lift = 3, open = true, call = 6 }) == "hold")
+check("a zombie near: he runs, with his piece", decide({ holding = "hand", threat = 3, lift = 3, call = 6 }) == "flee")
+local action, spot = decide({ call = 6, lift = 3, pick = 1, assist = 2, ask = 4 })
+check("8.3 your call first (you wait at your end): before anything of his own", action == "come" and spot == 6)
+action, spot = decide({ call = 6, holding = "hand" })
+check("…even with a piece in his arms (he loads it or sets it down first)", action == "come" and spot == 6)
+check("…on every order: HELP ME, WAIT HERE, WAIT AT VAN", decide({ mode = "help", call = 6 }) == "come" and decide({ mode = "stay", call = 6 }) == "come"
+	and decide({ mode = "van", call = 6 }) == "come")
+action, spot = decide({ lift = 3, pick = 1, assist = 2, ask = 4 })
+check("(a) your two-person piece dragged alone before anything of his own", action == "help" and spot == 3)
 action, spot = decide({ lift = 3, holding = "hand" })
 check("…even with a piece in his arms (he loads it or sets it down first)", action == "help" and spot == 3)
-check("…and on Help me", decide({ mode = "help", lift = 3 }) == "help")
-check("Wait at the van: no lifting", decide({ mode = "wait", lift = 3 }) == "wait")
+check("…8.3 on every order (a two-person piece always gets him)", decide({ mode = "help", lift = 3 }) == "help" and decide({ mode = "stay", lift = 3 }) == "help"
+	and decide({ mode = "van", lift = 3 }) == "help")
 check("(b) a piece in his arms: to the van (on every order), before an assist", decide({ holding = "hand", pick = 1 }) == "deliver"
-	and decide({ holding = "hand", mode = "wait" }) == "deliver" and decide({ holding = "hand", assist = 2 }) == "deliver")
-check("(d) the van's back for somebody coming with a piece, before his next piece", decide({ open = true, pick = 1, assist = 2 }) == "open"
-	and decide({ open = true, mode = "wait" }) == "open")
-action, spot = decide({ assist = 2, pick = 5 })
-check("(c) the other side of your heavy two-hands piece before his next one", action == "assist" and spot == 2)
-check("…on Help me too, not on Wait at the van", decide({ mode = "help", assist = 2 }) == "assist" and decide({ mode = "wait", assist = 2 }) == "wait")
-check("Help me: he follows you", decide({ mode = "help", pick = 1 }) == "follow")
+	and decide({ holding = "hand", mode = "van" }) == "deliver" and decide({ holding = "hand", mode = "stay" }) == "deliver" and decide({ holding = "hand", assist = 2 }) == "deliver")
+check("(d) the van's back for somebody coming with a piece, before his next piece (not on WAIT HERE)", decide({ open = true, pick = 1, assist = 2 }) == "open"
+	and decide({ open = true, mode = "van" }) == "open" and decide({ open = true, mode = "stay" }) == "stay")
+action, spot = decide({ assist = 2, pick = 5, ask = 4 })
+check("(c) the other side of your heavy two-hands piece before his ask and his next one", action == "assist" and spot == 2)
+check("…on HELP ME too, not on WAIT HERE or WAIT AT VAN", decide({ mode = "help", assist = 2 }) == "assist" and decide({ mode = "van", assist = 2 }) == "wait"
+	and decide({ mode = "stay", assist = 2 }) == "stay")
+check("HELP ME: he follows you (no ask, no piece of his own)", decide({ mode = "help", pick = 1, ask = 4 }) == "follow")
+check("8.3 WAIT HERE: he stays (no ask, no piece of his own)", decide({ mode = "stay", pick = 1, ask = 4 }) == "stay")
+check("WAIT AT VAN: at the van", decide({ mode = "van", pick = 1, ask = 4 }) == "wait")
+action, spot = decide({ ask = 4, pick = 5 })
+check("8.3 AUTO: his ask for a hand with a heavy piece before his next light one", action == "ask" and spot == 4)
 action, spot = decide({ pick = 5 })
-check("Carry small stuff: the next piece", action == "fetch" and spot == 5)
-check("…only while the van stands by the house", decide({ pick = 5, atHouse = false }) == "wait")
+check("AUTO: the next light piece", action == "fetch" and spot == 5)
+check("…only while the van stands by the house (the ask too)", decide({ pick = 5, ask = 4, atHouse = false }) == "wait")
 check("nothing to carry: he waits at the van", decide({}) == "wait")
 
 -- The van's back -----------------------------------------------------------------------------------------------------------
@@ -191,7 +295,8 @@ check("…slower than a player with it", Brain.speed(WALK, "deliver", "hand", 3)
 check("7.x a two-hands piece of his own: slower still", near(Brain.speed(WALK, "deliver", "both", 4), Rules.carrySpeed(WALK, "both", 4) * 0.7)
 	and Brain.speed(WALK, "deliver", "both", 4) < Brain.speed(WALK, "deliver", "hand", 4))
 check("7.x to your lift: a sprint, faster than your two-person walk", near(Brain.speed(WALK, "help", nil, 0), WALK * H.Sprint)
-	and Brain.speed(WALK, "assist", nil, 0) == Brain.speed(WALK, "help", nil, 0) and Brain.speed(WALK, "help", nil, 0) > Rules.carrySpeed(WALK, "pair", 8) * 1.1)
+	and Brain.speed(WALK, "assist", nil, 0) == Brain.speed(WALK, "help", nil, 0) and Brain.speed(WALK, "help", nil, 0) > Rules.carrySpeed(WALK, "pair", 8) * 1.1
+	and Brain.speed(WALK, "come", nil, 0) == Brain.speed(WALK, "help", nil, 0)) -- (8.3: to your call too)
 check("running from a zombie: Flee × the walk", near(Brain.speed(WALK, "flee", nil, 0), WALK * H.Flee))
 
 -- Stuck ----------------------------------------------------------------------------------------------------------------------
@@ -211,8 +316,45 @@ check("…StuckSnap s: a nudge to his way's next point", Brain.unstuck(H.StuckSn
 check("his root Standoff past the far face", near(Brain.farEnd(3.2), 1.6 + H.Standoff))
 check("on the floor there: level with you", near(Brain.endRise(-1.75, -1.75), -1.75))
 check("…a step up or down: with the floor", near(Brain.endRise(-1, -1.75), -1) and near(Brain.endRise(-3, -1.75), -3))
-check("…never off his hands' reach (HoldStep at most)", near(Brain.endRise(9, -1.75), -1.75 + H.HoldStep) and near(Brain.endRise(-40, -1.75), -1.75 - H.HoldStep))
+check("…a step's reach at most (HoldStep): the floor there", near(Brain.endRise(-1.75 + H.HoldStep, -1.75), -1.75 + H.HoldStep)
+	and near(Brain.endRise(-1.75 - H.HoldStep, -1.75), -1.75 - H.HoldStep))
+-- 8.3 (the owner: "he just jumps weirdly"): the porch's roof over his end (the 3.3-stud Dining Table's ray found it, 8.8
+-- over the middle) was clamped HoldStep over you: a 2.5-stud hop. A floor out of a step's reach is not his.
+check("8.3 a floor farther off than a step (a roof, a ceiling, a header; a pit): not his, level with you (never a hop)",
+	near(Brain.endRise(8.8, -1.7), -1.7) and near(Brain.endRise(-1.75 + H.HoldStep + 0.01, -1.75), -1.75) and near(Brain.endRise(-40, -1.75), -1.75))
 check("…no floor read: level with you", near(Brain.endRise(0 / 0, -1.75), -1.75))
+do
+	-- 8.3 his height follows the floor under his end at HoldClimb studs a second at most: a step stepped, never popped
+	local trail = Brain.newTrail()
+	check("8.3 a new hold: his height there at once", near(Brain.holdClimb(trail, 3, 0.1, false), 3) and trail.height == 3)
+	local most, last, steps = 0, 3, 0
+	repeat
+		local y = Brain.holdClimb(trail, 4.5, 0.1, false)
+		most = math.max(most, y - last)
+		last = y
+		steps += 1
+	until near(y, 4.5) or steps > 50
+	check("…a 1.5-stud step up: HoldClimb × dt a tick at most, there in 1.5 / HoldClimb s", near(last, 4.5) and most <= H.HoldClimb * 0.1 + 1e-9
+		and steps == math.ceil(1.5 / (H.HoldClimb * 0.1) - 1e-9), `{steps} ticks, {most} at most`)
+	check("…and down the same way", near(Brain.holdClimb(trail, 2, 0.1, false), 4.5 - H.HoldClimb * 0.1))
+	check("…through a door's fade (the other world): there at once", near(Brain.holdClimb(trail, -5000, 0.1, true), -5000))
+	check("…HoldClimb about a person's step (8 studs a second: a kerb's stud in an eighth of a second)", H.HoldClimb >= 4 and H.HoldClimb <= 12)
+end
+do
+	-- 8.3 his legs (the owner: "walk like me, backwards too"): his whole speed, backwards when the way is behind him
+	local L = H.HoldLegs
+	local trail = Brain.newTrail()
+	check("8.3 standing (under HoldLegs.From): his legs stand", Brain.holdLegs(trail, 0.5, 0, 0.1) == 0 and not trail.walking)
+	check("…walking ahead (forwards along his facing): forwards at his speed", near(Brain.holdLegs(trail, 4.9, 0, 0.1), 4.9) and trail.walking)
+	check("…the way behind him (you walk toward him): backwards at his speed", near(Brain.holdLegs(trail, -9.8, 0, 0.1), -9.8) and trail.back)
+	check("…a step to the side: steps at his whole speed, the way they went (no flicker, no slide on still legs)",
+		near(Brain.holdLegs(trail, 0.2, 5, 0.1), -math.sqrt(0.04 + 25)) and near(Brain.holdLegs(trail, -0.2, -5, 0.1), -math.sqrt(0.04 + 25)))
+	check("…a diagonal: his whole speed, not its share along his facing", near(Brain.holdLegs(trail, -3, 4, 0.1), -5))
+	check("…forwards again once more than Band of the way is ahead", near(Brain.holdLegs(trail, 4, 3, 0.1), 5) and not trail.back)
+	check("…slowing: walking on down to HoldLegs.To, standing under it", near(Brain.holdLegs(trail, (L.From + L.To) / 2, 0, 0.1), (L.From + L.To) / 2)
+		and Brain.holdLegs(trail, L.To * 0.9, 0, 0.1) == 0 and Brain.holdLegs(trail, (L.From + L.To) / 2, 0, 0.1) == 0)
+	check("…the slow pair walk steps (the pair's walk turning: Pair × PairTurnWalk)", Brain.holdLegs(Brain.newTrail(), WALK * Config.Moving.Speed.Pair * H.PairTurnWalk, 0, 0.1) > 0)
+end
 
 -- 8.1 holding the far end: never put there (the owner: "when I turn around he teleports") ------------------------------
 
@@ -297,12 +439,16 @@ check("his lines: Got the other end! On three... lift! Watch the doorframe! That
 	and Brain.Lines.three == "On three... lift!" and Brain.Lines.door == "Watch the doorframe!" and Brain.Lines.van == "That's going in the van."
 	and string.find(Brain.Lines.full, "Van's full, boss", 1, true) == 1 and string.find(Brain.Lines.full, "Wall", 1, true) ~= nil)
 local orders = 0
-for _, mode in { "help", "carry", "wait" } do
+for _, mode in Brain.Modes do
 	if type(Brain.Lines[mode .. "Mode"]) == "string" then
 		orders += 1
 	end
 end
-check("a line for every order", orders == 3)
+check("a line for every order", orders == 4)
+check("8.3 what he does for your call and his ask, in words", Brain.doing("come", "Sofa") == "Coming to lift the Sofa with you"
+	and Brain.doing("ready", "Sofa") == "At the Sofa: on three!" and Brain.doing("ask", "Piano") == "Needs a hand with the Piano" and Brain.doing("stay") == "Waiting here")
+check("8.3 his ask: \"This one's too heavy for me alone, give me a hand!\"; nobody came: back to the small stuff", Brain.Lines.ask == "This one's too heavy for me alone, give me a hand!"
+	and string.find(Brain.Lines.askOff, "small stuff", 1, true) ~= nil)
 local ascii, short, truck = true, true, false
 for _, text in Brain.Lines do
 	if string.find(text, "[\128-\255]") then

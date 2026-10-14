@@ -3,8 +3,9 @@
 -- (client/WarehouseUi.luau shows them; server/Collection.luau decides with the same rules, so what the window offers
 -- before it asks is what the server does). Pure (no Roblox at its top level; tests/stockplan_test.luau).
 -- It works on pieces as the collection's views carry them (shared/CollectionRules.luau view: uid, item, stand, got,
--- rarity, income, price, broken, condition): the server builds them from its own entries, the client has them in the
--- "Collection" remote's state. A number that is no number counts as 0; a uid may be a string or a number.
+-- rarity, income, price, broken, condition; 8.3: base, the price without the market): the server builds them from its
+-- own entries, the client has them in the "Collection" remote's state. A number that is no number counts as 0; a uid may
+-- be a string or a number.
 --
 --   StockPlan.better(a, b)               does piece a earn more on show than b: its $ a minute, then its rarity, its
 --                                        price, its condition, then the older piece (its uid's number) first; every tie
@@ -23,7 +24,9 @@
 --   StockPlan.toSell(pieces, filter)     the pieces that filter sells, best first: only pieces in the stock (a piece on
 --                                        show is never sold in bulk; it still counts as the best of its item); {} for a
 --                                        filter that isn't one
---   StockPlan.price(pieces)              what they sell for together (their prices summed)
+--   StockPlan.price(pieces, market?)     what they sell for together (their prices summed); 8.3: with the player's
+--                                        market (shared/Market.luau's View) sold one after the other in this order, so
+--                                        the demand weighs on each next piece of a kind (Market.batch on their base)
 --   StockPlan.Sorts                      the window's orders, in the toggle's order: "income" ($/MIN, the best earners
 --                                        first), "value" (the price), "newest" (came home last), "rarity" (the rarest);
 --   StockPlan.order(by)                  its comparator (an unknown order: income's); StockPlan.sortLabel(by) its words;
@@ -32,6 +35,7 @@
 --                                        query matches everything
 
 local Config = require(script.Parent.Config)
+local Market = require(script.Parent.Market) -- 8.3: a bulk sale's total at the market's prices
 
 local StockPlan = {}
 
@@ -45,6 +49,7 @@ export type Piece = {
 	price: number, -- $ it sells for
 	broken: boolean?,
 	condition: number?,
+	base: number?, -- 8.3: $ it sells for without the market (Market.batch; nil: its price)
 }
 export type Placement = { uid: any, stand: number }
 
@@ -217,7 +222,14 @@ function StockPlan.toSell(pieces: { Piece }, filter: any): { Piece }
 	return out
 end
 
-function StockPlan.price(pieces: { Piece }): number
+function StockPlan.price(pieces: { Piece }, market: Market.View?): number
+	if market then
+		local priced: { Market.Priced } = table.create(#pieces)
+		for _, piece in pieces do
+			table.insert(priced, { item = tostring(piece.item), base = if piece.base ~= nil then number(piece.base) else nil, price = number(piece.price) })
+		end
+		return (Market.batch(priced, market))
+	end
 	local total = 0
 	for _, piece in pieces do
 		total += math.max(0, number(piece.price))

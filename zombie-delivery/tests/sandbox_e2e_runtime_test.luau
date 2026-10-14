@@ -33,6 +33,9 @@
 --  15. A full server: the fifth player waits for a plot, gets Bob's when he leaves.
 --  16. A full warehouse at a trip.
 --  17. Leaving mid-move with a piece in the van; coming back. Last: the all-time best in its OrderedDataStore.
+--  18. 8.3 the market: the state carries the day's hot and cold kinds; a hot piece on a stand: its tag shows the hot
+--      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
+--      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -47,6 +50,7 @@ local SprinterLooks = require("./SprinterLooks")
 local TaskRules = require("./SandboxTasks") -- (shared/SandboxTasks.luau, the pure rules)
 local Plan = require("./AnalyticsPlan")
 local StockPlan = require("./StockPlan")
+local Market = require("./Market") -- (8.3: the day's hot and cold kinds)
 
 local failures = 0
 local todos: { string } = {}
@@ -318,7 +322,7 @@ function H.launch(player: any)
 	E.fire(player, "Moving", "start", House.id)
 	E.fire(player, "MoveLobby", "launch")
 	E.advance(0.5)
-	E.fire(player, "Moving", "helper", "wait")
+	E.fire(player, "Moving", "helper", "van") -- (8.3: WAIT AT VAN, his command card's)
 end
 -- The van's middle along the roads: out of the plot, Depot Row, Main Street, round the turnaround to the curb, backed
 -- toward the chalet's door (its nose north).
@@ -619,9 +623,10 @@ do
 	S.annMove = view.id
 	check("…its drop-off is her plot's unload circle; no horde; the clock runs", view.drop == "your warehouse" and view.dropOff.x == plots[1].unload.x
 		and view.dropOff.z == plots[1].unload.z and view.hordeAt == nil and view.endsAt > E.now)
-	check("…Danny joins her crew of one", MoveHelper.find(ann) ~= nil)
-	E.fire(ann, "Moving", "helper", "wait")
-	check("…told to WAIT AT VAN (the DANNY buttons): he leaves her pieces to her", ann:GetAttribute("MoveHelper") == "wait", ann:GetAttribute("MoveHelper"))
+	check("…Danny joins her crew of one, on AUTO (8.3), his id for his command card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).mode == "auto"
+		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
+	E.fire(ann, "Moving", "helper", "van")
+	check("…told to WAIT AT VAN (8.3: his command card's order): he leaves her pieces to her", ann:GetAttribute("MoveHelper") == "van", ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	local bobCard = H.takeContract(bob, plots[2])
 	H.launch(bob)
@@ -880,7 +885,7 @@ end
 
 local annStock = Collection.stock(ann)
 table.sort(annStock, function(a: any, b: any): boolean
-	return CollectionRules.income(a) > CollectionRules.income(b)
+	return CollectionRules.income(a, 1, Collection.market(ann)) > CollectionRules.income(b, 1, Collection.market(ann))
 end)
 do
 	H.toStand(ann, plots[1], 1)
@@ -952,8 +957,9 @@ end
 
 do
 	local rate = Collection.incomePerMinute(ann)
-	local expected = CollectionRules.income(annStock[1], 1) + CollectionRules.income(annStock[2], 1)
-	check("9. her income a minute: the two pieces on show (CollectionRules.income)", rate > 0 and math.abs(rate - expected) < 1e-9, `{rate} vs {expected}`)
+	local market = Collection.market(ann) -- (8.3: a hot kind earns more)
+	local expected = CollectionRules.income(annStock[1], 1, market) + CollectionRules.income(annStock[2], 1, market)
+	check("9. her income a minute: the two pieces on show (CollectionRules.income, the market's)", rate > 0 and math.abs(rate - expected) < 1e-9, `{rate} vs {expected}`)
 	S.rate = rate
 	local incomeAt = #money
 	local was = H.profileOf(ann).money
@@ -1060,7 +1066,7 @@ do
 	check("…Showroom lights 1: the income × 1.1", Upgrades.levels(ann).lights == 1 and math.abs(after / before - 1.1) < 1e-6 and Collection.boost(ann) > 1.09,
 		`{before} → {after}`)
 	local tag = Warehouse.model(1):FindFirstChild("Stand1"):FindFirstChild("Tag")
-	local boosted = CollectionRules.income(H.byUid(Collection.stock(ann), annStock[1].uid), Collection.boost(ann))
+	local boosted = CollectionRules.income(H.byUid(Collection.stock(ann), annStock[1].uid), Collection.boost(ann), Collection.market(ann))
 	check("…the stand's tag shows the new $/min", H.anyText(tag, WarehouseLayout.money(boosted)) or H.anyText(tag, string.format("%.1f", boosted))
 		or H.anyText(tag, tostring(math.floor(boosted * 10 + 0.5) / 10)), table.concat(H.textsOf(tag), " | "))
 end
@@ -1069,7 +1075,7 @@ end
 
 do
 	local entry = H.byUid(Collection.stock(ann), annStock[2].uid)
-	local price = CollectionRules.sell(entry)
+	local price = CollectionRules.sell(entry, Collection.market(ann)) -- (8.3: the market's price)
 	local sellTask = H.task(ann, "sell")
 	local sellWas = if sellTask then sellTask.progress else 0
 	H.toStand(ann, plots[1], 2)
@@ -1103,9 +1109,10 @@ do
 	E.advance(0.2)
 	local bookN = Book.book(ann)[annStock[1].item].n
 	local pieces = {}
+	local market = Collection.market(ann) -- (8.3: the market's prices, one piece after the other)
 	for _, e in Collection.stock(ann) do
-		local v = CollectionRules.view(e, Collection.boost(ann))
-		table.insert(pieces, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition })
+		local v = CollectionRules.view(e, Collection.boost(ann), market)
+		table.insert(pieces, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition, base = v.base })
 	end
 	local plan = StockPlan.toSell(pieces, "duplicates")
 	local saleAt2, sentAt2 = #money, #E.sent
@@ -1113,11 +1120,11 @@ do
 	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates" })
 	local soldMany = E.lastKind(ann, "Collection", "sold", sentAt2)
 	check("8.2 bulk: SELL… duplicates sells the worse twin only, at the price the window shows (StockPlan)", #plan == 1 and plan[1].uid == twin
-		and soldMany ~= nil and soldMany.count == 1 and soldMany.money == StockPlan.price(plan) and H.paid(ann, "CollectionSale", saleAt2) == StockPlan.price(plan)
+		and soldMany ~= nil and soldMany.count == 1 and soldMany.money == StockPlan.price(plan, market) and H.paid(ann, "CollectionSale", saleAt2) == StockPlan.price(plan, market)
 		and H.byUid(Collection.stock(ann), twin) == nil and H.byUid(Collection.stock(ann), annStock[1].uid) ~= nil, soldMany and soldMany.money)
 	check("…the book still counts both found (a sale takes nothing out of it)", Book.book(ann)[annStock[1].item].n == bookN and bookN == 2)
 	sellTask = H.task(ann, "sell")
-	check("8.2 tasks: \"sell\" counts the bulk sale too", sellTask ~= nil and sellTask.progress == math.min(sellTask.target, sellWas + price + StockPlan.price(plan)),
+	check("8.2 tasks: \"sell\" counts the bulk sale too", sellTask ~= nil and sellTask.progress == math.min(sellTask.target, sellWas + price + StockPlan.price(plan, market)),
 		sellTask and sellTask.progress)
 	local refusedAt = #E.sent
 	E.advance(1.1)
@@ -1472,6 +1479,7 @@ do
 	end
 	check("…the analytics: the move's end once (MoveFinished: pieces came home)", finished == 1, finished)
 	local dee2 = E.join(44, "Dee")
+	S.dee = dee2 -- (8.3: step 18's)
 	H.rebuilt()
 	check("…back: plot 4, her one piece, no move running (a fresh contract at her kiosk)", dee2:GetAttribute("Plot") == 4 and #Collection.stock(dee2) == 1
 		and H.stateOf(dee2) == nil and Moving.busy(dee2) == nil)
@@ -1484,6 +1492,44 @@ do
 	local stored = (E.ordered[L.Store] or {})["11"]
 	check("8.2 leaders: Ann's all-time best in the OrderedDataStore (a whole number, at least her worth at step 9, the server's best; not lowered by her sales)",
 		type(stored) == "number" and stored >= S.annWorth and stored == H.Leaders.best(11), `{stored} vs {S.annWorth}, best {H.Leaders.best(11)}`)
+end
+
+
+-- ── 18. 8.3: the market ────────────────────────────────────────────────────
+
+do
+	local dee = S.dee
+	local day = Market.dayOf(E.wall)
+	local picks = Market.pick(day)
+	local stateAt = #E.sent
+	E.fire(dee, "Collection", { kind = "state" })
+	local state = E.lastKind(dee, "Collection", "state", stateAt)
+	check("18. the market: Dee's state carries today's hot and cold kinds (the day's picks, the same on every server)", state ~= nil and state.market ~= nil and state.market.day == day
+		and table.concat(state.market.hot, ",") == table.concat(picks.hot, ",") and table.concat(state.market.cold, ",") == table.concat(picks.cold, ","))
+	local hotKind = picks.hot[1] -- (furniture: the collectible comes last in the catalogue's order)
+	local uid = Collection.add(dee, { item = hotKind, variant = 1, condition = 0.9 }) :: string -- (the admin's FILL STOCK way)
+	E.advance(0.2)
+	H.toStand(dee, plots[4], 2)
+	E.advance(1.1)
+	check("…a hot piece on stand 2 (the remote)", H.request(dee, { kind = "display", uid = uid, stand = 2 }) == "")
+	H.rebuilt()
+	local entry = H.byUid(Collection.stock(dee), uid)
+	local market = Collection.market(dee)
+	local hot = CollectionRules.income(entry, Collection.boost(dee), market)
+	local tag = Warehouse.model(4):FindFirstChild("Stand2"):FindFirstChild("Tag")
+	check(`…its stand's tag shows the hot income (× {Config.Market.HotIncome}: Warehouse's hook, Collection.marketIncome)`, math.abs(hot - CollectionRules.income(entry, Collection.boost(dee)) * Config.Market.HotIncome) < 1e-9
+		and (H.anyText(tag, WarehouseLayout.money(hot)) or H.anyText(tag, string.format("%.1f", hot))), table.concat(H.textsOf(tag), " | "))
+	local price = CollectionRules.sell(entry, market)
+	local saleAt, sentAt = #money, #E.sent
+	E.trigger(H.standPrompt(4, 2, "Sell"), dee)
+	H.rebuilt()
+	local sold = E.lastKind(dee, "Collection", "sold", sentAt)
+	local events = H.events("CollectionSold", dee)
+	local fields = events[#events] and events[#events][4]
+	check(`…sold at the stand for the hot price (× {Config.Market.HotSell}), the analytics' CollectionSold says "hot"`, sold ~= nil and sold.money == price and H.paid(dee, "CollectionSale", saleAt) == price
+		and price == math.floor(CollectionRules.sell(entry) * Config.Market.HotSell + 0.5) and type(fields) == "table" and fields.CustomField02 == "hot", `{price} {fields and fields.CustomField02}`)
+	local after = Collection.market(dee) :: any
+	check("…her demand for that kind: 1 sold today", after.demand[hotKind] ~= nil and after.demand[hotKind].n == 1 and after.demand[hotKind].sold == 1)
 end
 
 -- ── The run ───────────────────────────────────────────────────────────────

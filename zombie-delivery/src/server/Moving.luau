@@ -124,6 +124,14 @@
 --     stepped out of the one they came out in and Rearm s have gone by; you come out a few studs from the door facing
 --     away (the house's 4, the plan's entry inside). The E prompts stay, disabled (Doors.Walk false: as before). A
 --     doormat on the ground at every door: "▲ IN" outside (shown while a move uses that door), "▲ OUT" inside.
+--   * 8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes";
+--     Config.MoveHelper.WaitForHelper; server/MoveHelper.luau's call): Lift on a two-person piece with Danny on the move
+--     calls him (onPick asks MoveHelper.call): no drag alone, you wait at your end ("Stop waiting" on its prompt; Lift
+--     again or G stop it) while he walks to its far end; there he makes your lift (Moving.helperCalled: onPick again,
+--     the lift check, or the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift).
+--     Moving.helperLiftFrame says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he
+--     asks a hand for it on AUTO), Moving.helperCallOff closes its open lift check when the call ends before the lift.
+--     Without Danny on the move (a crew of players, him down): today's rules.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
@@ -136,7 +144,8 @@
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
---                             Danny joins a crew of one; MoveHelper.sync in the tick)
+--                             Danny joins a crew of one; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
+--                             helperCalled / helperMark / helperCallOff: his side of your call (after onHelp)
 --   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
 --                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
 --                             a lift check) and the grip block (the checks, the remote's "grip" answers, the wobbles)
@@ -2357,6 +2366,13 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
+	-- 8.3 Danny's orders (Config.MoveHelper.WaitForHelper): a two-person piece with Danny on the move calls him, you wait
+	-- at your end ("wait"; Lift again: "cancel"); once he is at its far end ("ready") its lift goes on. nil: today's rules
+	local answer = if not lifted and thing.class == "pair" then MoveHelper.call(s, player, spot) else nil
+	if answer == "wait" or answer == "cancel" then
+		s.dirty = true
+		return
+	end
 	if not lifted and Grip.liftStart(s, spot, player, false) then
 		return -- 8.1 grip: a piece with a grip is lifted by its lift check's hit (the grip block calls this again, lifted)
 	end
@@ -2366,7 +2382,7 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		return
 	end
 	carry(s, item)
-	if thing.class == "pair" then
+	if thing.class == "pair" and not MoveHelper.joinLift(s, spot, player) then -- (8.3: lifted with Danny at its far end)
 		say(player, `The {thing.name} needs two: you drag it slowly. A crew mate can "Help lift" the other end.`)
 	end
 	s.dirty = true
@@ -2411,6 +2427,49 @@ local function onHelp(s: Session, spot: number, player: Player, lifted: boolean?
 	end
 	say(player, `You hold the other end of the {thing.name}: stay close to it.`)
 	s.dirty = true
+end
+
+-- 8.3 Danny's orders: his side of your call (server/MoveHelper.luau's call; the gate is onPick's). Where `player` will
+-- hold the piece lifted with him (its far end is his place): their root's frame and the pair's hold.
+function Moving.helperLiftFrame(s: Session, spot: number, player: Player): CFrame?
+	local thing = s.move.things[spot]
+	local _, humanoid, root = bodyOrNil(player)
+	if not thing or not humanoid or not root then
+		return nil
+	end
+	return root.CFrame * holdOffset(thing, "pair", root, humanoid)
+end
+
+-- He is in place: `player`'s lift now (its check opens; without the grip it is up, him at its far end). True when the
+-- check is open or the piece is up.
+function Moving.helperCalled(s: Session, spot: number, player: Player): boolean
+	onPick(s, spot, player)
+	local hold = Grip.holds[player]
+	return Rules.holding(s.move, player.UserId) == spot or (hold ~= nil and hold.open ~= nil and hold.spot == spot)
+end
+
+-- The piece's Lift prompt while a call or his ask is on it: "wait" (E again stops waiting), "ask" ("Lift with Danny"),
+-- nil (as it was made).
+function Moving.helperMark(s: Session, spot: number, how: string?)
+	local item = s.items[spot]
+	local thing = s.move.things[spot]
+	if not item or not thing then
+		return
+	end
+	local verb = if thing.class == "pair" then "Lift" else "Pick up"
+	item.pick.ActionText = if how == "wait" then "Stop waiting" elseif how == "ask" then `{verb} with {Config.MoveHelper.Name}` else verb
+	item.pick.ObjectText = if how == "wait" then `Waiting for {Config.MoveHelper.Name}…` else labelOf(thing)
+end
+
+-- The call is off once he was in place (G, walked away, him down): `player`'s lift check on it, still open, closes
+-- (no outcome: never a lift alone after).
+function Moving.helperCallOff(s: Session, spot: number, player: Player)
+	local hold = Grip.holds[player]
+	local open = if hold then hold.open else nil
+	if hold and open and hold.session == s.id and open.spot == spot and open.check.what == "lift" and not hold.carrying then
+		Grip.close(player, hold)
+		Grip.holds[player] = nil
+	end
 end
 
 local function setupItem(s: Session, spot: number, model: Model)
@@ -4370,6 +4429,8 @@ local function onPutDown(player: Player)
 	local s = sessionOf(player)
 	if s and Rules.holding(s.move, player.UserId) then
 		release(s, player, "put")
+	elseif s then
+		MoveHelper.cancel(player) -- 8.3 G with empty hands: you stop waiting for Danny
 	end
 end
 

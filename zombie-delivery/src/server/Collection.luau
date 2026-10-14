@@ -14,7 +14,9 @@
 --                                              piece on show elsewhere moves there; 8.1: a piece too big for an
 --                                              upgrade's small stand is refused, WarehouseLayout.fits) → ok, why
 --   Collection.undisplay(player, uid)          take it down (back to the stock) → ok, why
---   Collection.sell(player, uid)               sell it (on show or not) → the money paid (nil: refused), why
+--   Collection.sell(player, uid, expect?)      sell it (on show or not) at the market's price (8.3) → the money paid
+--                                              (nil: refused), why; `expect` (the price the client asked with): only at
+--                                              that price, else refused (the prices moved) and the state sent again
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
 --   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: the start's
 --                                              and the More stands you bought)
@@ -30,8 +32,13 @@
 --                                              save has loaded)
 --   Collection.onAdded(fn)                     8.2: fn(player, entry) after a piece came home (Collection.add took it;
 --                                              entry a copy): the collection book (server/CollectionBook.luau)
---   Collection.onPaid(fn)                      8.2: fn(player, "income" | "sale", money) after the stands paid or a piece
---                                              sold (server/SandboxTasks.luau)
+--   Collection.onPaid(fn)                      8.2: fn(player, "income" | "sale", money, paid) after the stands paid or a
+--                                              piece sold (server/SandboxTasks.luau); 8.3: paid = { hot }: the dollars of
+--                                              that income the hot kinds earned, the hot pieces of that sale
+--   Collection.market(player)                  8.3: the player's market now (shared/Market.luau's View: today's hot and
+--                                              cold kinds, their own demand; nil: no save yet)
+--   Collection.marketIncome(item)              8.3: today's × on the income of a piece of that kind (Market.incomeFactor:
+--                                              the stands' $/min tags, server/Warehouse.luau)
 --   Collection.tick()                          pays everybody here what their stands earned since the last payout (the
 --                                              loop runs it every Config.Collection.Tick s)
 --   Collection.start()                         the remote, joining and leaving, the payout loop
@@ -39,9 +46,18 @@
 -- The "Collection" remote (Config.Robust.Limits.Collection requests a second; every input checked):
 --   client → server   { kind = "display", uid, stand } | { kind = "undisplay", uid } | { kind = "sell", uid } |
 --                     { kind = "state" }; a refusal comes back as a Notice (its why)
---   server → client   { kind = "state", stock = { View }, income, stands } after every change (once a frame), when the
---                     save has loaded and when asked (a View is an Entry with rarity, value, income, price, broken:
---                     CollectionRules.view); { kind = "pick", stand } opens the picker; { kind = "sold", name, money }
+--   server → client   { kind = "state", stock = { View }, income, stands, market } after every change (once a frame),
+--                     when the save has loaded and when asked (a View is an Entry with rarity, value, income, price,
+--                     broken, 8.3 base and market: CollectionRules.view; market the player's Market View); { kind =
+--                     "pick", stand } opens the picker; { kind = "sold", name, money }
+-- 8.3, the market (shared/Market.luau, Config.Market): every price and the stands' income are the market's. Today's hot
+-- kinds sell for more and earn more on show, the cold one sells for less (the day's picks, the same on every server);
+-- every piece of a kind the player sells weighs on that kind's price for them (profile.market, saved with its flag:
+-- server/PlayerData.luau), a step of it comes back every Config.Market.Recover s. The market's day turns at the first
+-- payout after 00:00 UTC: what the stands earned up to then is counted at the old day's rates, then every state goes
+-- out again (the warehouses' tags hear the change); when a step of a player's demand comes back their state goes out
+-- again at the next payout. A sale's CollectionSold carries the market ("hot", "cold"; a bulk sale: "hot" when a hot
+-- piece was in it, else "cold" when a cold one was).
 -- The income is exact: whenever the pieces on show change (one put up, taken down, sold) and at every payout, what they
 -- earned up to that moment is counted; every Tick s the whole dollars are paid ("CollectionIncome"), the cents wait for
 -- the next payout; leaving pays what was counted. A sale pays "CollectionSale". Analytics (PlayerData.track):
@@ -54,13 +70,16 @@
 --                                                      CollectionDisplayed (their $ a minute, the rarest); then
 --                                                      { kind = "bulk", action = "fillbest", count, income } (the $ a
 --                                                      minute they add)
---                     { kind = "sellmany", filter }    💰 SELL…: every piece in the stock the filter takes ("common",
---                                                      "broken", "duplicates": all but the best of each item; never a
---                                                      piece on show), sold at the server's prices: one "CollectionSale"
---                                                      (the SKU the item when they are all one item), CollectionSold (the
---                                                      money, the rarest), { kind = "sold", name = "N pieces", money,
---                                                      count }. The client's confirm shows the same total; the server
---                                                      takes only the filter from it
+--                     { kind = "sellmany", filter, expect? }   💰 SELL…: every piece in the stock the filter takes
+--                                                      ("common", "broken", "duplicates": all but the best of each item;
+--                                                      never a piece on show), sold at the server's prices (8.3: the
+--                                                      market's, one after the other in StockPlan.toSell's order:
+--                                                      StockPlan.price): one "CollectionSale" (the SKU the item when they
+--                                                      are all one item), CollectionSold (the money, the rarest, the
+--                                                      market), { kind = "sold", name = "N pieces", money, count }. The
+--                                                      client's confirm shows the same total and sends it as `expect`:
+--                                                      another total (the prices moved) sells nothing, says so and sends
+--                                                      the state again
 --                     { kind = "undisplayall" }        ↩ TAKE ALL DOWN: every piece on show back to the stock (what they
 --                                                      earned up to now counts); { kind = "bulk", action =
 --                                                      "undisplayall", count }
@@ -76,6 +95,7 @@ local Net = require(Shared.Net)
 local Rules = require(Shared.CollectionRules)
 local WarehouseLayout = require(Shared.WarehouseLayout) -- 8.1: the upgrade stands' size (fits)
 local StockPlan = require(Shared.StockPlan) -- 8.2: the STOCK list's bulk buttons
+local Market = require(Shared.Market) -- 8.3: the market (hot and cold kinds, the player's demand)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Collection = {}
@@ -96,15 +116,19 @@ local notice = Net.get("Notice")
 
 local listeners: { (Player) -> () } = {}
 local addedListeners: { (Player, Entry) -> () } = {} -- 8.2: Collection.onAdded's
-local paidTo: { (Player, string, number) -> () } = {} -- 8.2: Collection.onPaid's fns
+export type Paid = { hot: number } -- 8.3: Collection.onPaid's last argument
+local paidTo: { (Player, string, number, Paid) -> () } = {} -- 8.2: Collection.onPaid's fns
 
--- The income counted for each player here: up to `at` (os.clock), `carry` $ not paid yet.
-type Meter = { at: number, carry: number }
+-- The income counted for each player here: up to `at` (os.clock), `carry` $ not paid yet (8.3: `hot` of it earned by
+-- the hot kinds).
+type Meter = { at: number, carry: number, hot: number }
 local meters: { [Player]: Meter } = {}
 local pushing: { [Player]: boolean } = {} -- a state push waits for the frame's end
 type Batch = { n: number, rarity: string }
 local added: { [Player]: Batch } = {} -- pieces that came home this frame (one analytics event)
 local refused: { [Player]: number } = {} -- pieces refused this frame (stock full: one notice)
+local marketDay = Market.dayOf(os.time()) -- 8.3: the market's day (it turns at the first payout after 00:00 UTC)
+local marketDue: { [Player]: number } = {} -- 8.3: os.time() a step of the player's demand comes back (the state again)
 
 local function finite(n: any): boolean
 	return type(n) == "number" and n == n and n > -math.huge and n < math.huge
@@ -128,6 +152,15 @@ local function boostOf(player: Player): number
 	return Rules.boost(PlayerData.get(player))
 end
 
+-- 8.3: the player's market now (today's hot and cold kinds, their demand; nil: no save yet).
+local function marketOf(player: Player): Market.View?
+	local profile = PlayerData.get(player)
+	if not profile then
+		return nil
+	end
+	return Market.view(profile.market, marketDay, os.time())
+end
+
 -- The player's piece with this uid (and its index), nil for anything else.
 local function find(collection: Rules.Saved, uid: any): (Entry?, number?)
 	if type(uid) ~= "string" or #uid > MAX_UID then
@@ -145,22 +178,28 @@ local function isStand(stand: any, count: number): boolean
 	return finite(stand) and stand == math.floor(stand) and stand >= 1 and stand <= count
 end
 
--- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights).
-local function rate(player: Player, collection: Rules.Saved): number
+-- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights; 8.3: × the market's)
+-- and how much of it the hot kinds earn.
+local function rate(player: Player, collection: Rules.Saved): (number, number)
 	local housed = Collection.hasWarehouse
 	if housed and not housed(player) then
-		return 0 -- (no warehouse of their own: nothing on show earns)
+		return 0, 0 -- (no warehouse of their own: nothing on show earns)
 	end
 	local stands = standsOf(player)
 	local boost = boostOf(player)
-	local total = 0
+	local market = marketOf(player)
+	local total, hot = 0, 0
 	for _, entry in collection.entries do
 		local stand = entry.stand
 		if stand ~= nil and stand >= 1 and stand <= stands then
-			total += Rules.income(entry, boost)
+			local earns = Rules.income(entry, boost, market)
+			total += earns
+			if Market.tag(market, entry.item) == "hot" then
+				hot += earns
+			end
 		end
 	end
-	return total
+	return total, hot
 end
 
 -- Counts what the pieces on show earned up to now (before they change, and at every payout).
@@ -173,7 +212,9 @@ local function settle(player: Player)
 	local now = os.clock()
 	local seconds = math.clamp(now - meter.at, 0, Config.Collection.Tick * 6) -- (a stalled server pays no hours)
 	meter.at = now
-	meter.carry += rate(player, collection) * seconds / 60
+	local total, hot = rate(player, collection)
+	meter.carry += total * seconds / 60
+	meter.hot += hot * seconds / 60
 end
 
 -- Pays the whole dollars counted (the cents stay for the next payout).
@@ -185,8 +226,10 @@ local function payout(player: Player)
 	local pay = math.floor(meter.carry + 1e-9)
 	if pay >= 1 then
 		meter.carry -= pay
+		local hot = math.min(pay, math.floor(meter.hot + 1e-9)) -- (8.3: the hot kinds' whole dollars of it)
+		meter.hot -= hot
 		PlayerData.addMoney(player, pay, "CollectionIncome")
-		for _, fn in paidTo do task.spawn(fn, player, "income", pay) end -- 8.2: Collection.onPaid
+		for _, fn in paidTo do task.spawn(fn, player, "income", pay, { hot = hot }) end -- 8.2: Collection.onPaid
 	end
 end
 
@@ -198,10 +241,17 @@ local function sendState(player: Player)
 	end
 	local stock = table.create(#collection.entries)
 	local boost = boostOf(player)
+	local market = marketOf(player)
 	for _, entry in collection.entries do
-		table.insert(stock, Rules.view(entry, boost))
+		table.insert(stock, Rules.view(entry, boost, market))
 	end
-	remote:FireClient(player, { kind = "state", stock = stock, income = cents(rate(player, collection)), stands = standsOf(player) })
+	local profile = PlayerData.get(player)
+	local wait: number? = if profile then Market.nextChange(profile.market, marketDay, os.time()) else nil
+	marketDue[player] = nil
+	if wait ~= nil then
+		marketDue[player] = os.time() + math.max(1, math.ceil(wait)) -- (8.3: a step of the demand back: the state again)
+	end
+	remote:FireClient(player, { kind = "state", stock = stock, income = cents((rate(player, collection))), stands = standsOf(player), market = market })
 end
 
 -- The state goes out once at the frame's end, however many changes it had (a van unloaded: one push).
@@ -346,7 +396,7 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	end
 	settle(player)
 	entry.stand = stand
-	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player)) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
+	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player), marketOf(player)) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
 	changed(player)
 	return true, nil
 end
@@ -369,22 +419,30 @@ function Collection.undisplay(player: Player, uid: string): (boolean, string?)
 	return true, nil
 end
 
-function Collection.sell(player: Player, uid: string): (number?, string?)
+function Collection.sell(player: Player, uid: string, expect: number?): (number?, string?)
 	local collection = collectionOf(player)
-	if not collection then
+	local profile = PlayerData.get(player)
+	if not collection or not profile then
 		return nil, "Your save isn't loaded yet."
 	end
 	local entry, index = find(collection, uid)
 	if not entry or not index then
 		return nil, "That piece isn't in your stock."
 	end
+	local market = marketOf(player)
+	local price = Rules.sell(entry, market) -- (8.3: the market's price)
+	if expect ~= nil and expect ~= price then
+		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
+		return nil, `The market moved: your {entry.name} sells for {Market.money(price)} now.`
+	end
 	settle(player) -- (on show: what it earned up to now still counts)
-	local price = Rules.sell(entry)
 	table.remove(collection.entries, index)
+	Market.note(profile.market, entry.item, marketDay, os.time()) -- (8.3: one more of its kind sold today)
+	local tag = Market.tag(market, entry.item)
 	PlayerData.addMoney(player, price, "CollectionSale", entry.item)
-	for _, fn in paidTo do task.spawn(fn, player, "sale", price) end -- 8.2: Collection.onPaid
+	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end -- 8.2: Collection.onPaid
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
-	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)))
+	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
 	changed(player)
 	return price, nil
 end
@@ -416,6 +474,14 @@ function Collection.boost(player: Player): number
 	return boostOf(player)
 end
 
+function Collection.market(player: Player): Market.View?
+	return marketOf(player)
+end
+
+function Collection.marketIncome(item: string): number
+	return Market.incomeFactor(Market.today(marketDay), item)
+end
+
 function Collection.upgrade(player: Player, apply: () -> ()): number
 	settle(player) -- (what the stands earned up to now, at the old rates)
 	apply()
@@ -441,7 +507,7 @@ function Collection.onAdded(fn: (Player, Entry) -> ())
 	table.insert(addedListeners, fn)
 end
 
-function Collection.onPaid(fn: (Player, string, number) -> ())
+function Collection.onPaid(fn: (Player, string, number, Paid) -> ())
 	table.insert(paidTo, fn)
 end
 
@@ -454,6 +520,23 @@ function Collection.tick()
 		if player.Parent then
 			settle(player)
 			payout(player)
+		end
+	end
+	-- 8.3: the market's day turns (after the stands were counted at the old day's rates): every state again; a step of
+	-- a player's demand came back: their state again
+	local now = os.time()
+	local day = Market.dayOf(now)
+	local turned = day ~= marketDay
+	marketDay = day
+	for _, player in here do
+		local due = marketDue[player]
+		if player.Parent and (turned or (due ~= nil and now >= due)) then
+			marketDue[player] = nil
+			if turned then
+				changed(player)
+			else
+				pushState(player)
+			end
 		end
 	end
 end
@@ -477,13 +560,14 @@ local function fitsStand(stand: number, item: string): boolean
 	return def == nil or WarehouseLayout.fits(stand, def.size)
 end
 
--- The collection's pieces as shared/StockPlan.luau reads them (CollectionRules.view: × the player's lights).
-local function piecesOf(player: Player, collection: Rules.Saved): { StockPlan.Piece }
+-- The collection's pieces as shared/StockPlan.luau reads them (CollectionRules.view: × the player's lights; 8.3: at the
+-- market's prices and incomes, with their price without it).
+local function piecesOf(player: Player, collection: Rules.Saved, market: Market.View?): { StockPlan.Piece }
 	local boost = boostOf(player)
 	local out: { StockPlan.Piece } = table.create(#collection.entries)
 	for _, entry in collection.entries do
-		local v = Rules.view(entry, boost)
-		table.insert(out, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition })
+		local v = Rules.view(entry, boost, market)
+		table.insert(out, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition, base = v.base })
 	end
 	return out
 end
@@ -499,7 +583,8 @@ local function fillBest(player: Player): (number?, string?)
 		return nil, NO_WAREHOUSE
 	end
 	local stands = standsOf(player)
-	local pieces = piecesOf(player, collection)
+	local market = marketOf(player)
+	local pieces = piecesOf(player, collection, market)
 	local plan = StockPlan.fill(pieces, stands, fitsStand)
 	if #plan == 0 then
 		if #StockPlan.free(pieces, stands) == 0 then
@@ -530,7 +615,7 @@ local function fillBest(player: Player): (number?, string?)
 			entry.stand = place.stand
 			taken[place.stand] = true
 			count += 1
-			gained += Rules.income(entry, boost)
+			gained += Rules.income(entry, boost, market)
 			rarest = rarer(rarest, Rules.rarityOf(Rules.defOf(entry.item)))
 		end
 	end
@@ -543,29 +628,42 @@ local function fillBest(player: Player): (number?, string?)
 	return count, nil
 end
 
--- 💰 SELL… → the money paid (nil: nothing sold), how many, why.
-local function sellMany(player: Player, filter: any): (number?, number, string?)
+-- 💰 SELL… → the money paid (nil: nothing sold), how many, why. 8.3: at the market's prices, the pieces one after the
+-- other (StockPlan.price: each next piece of a kind under the demand of the ones before it); `expect`, the total the
+-- client's confirm showed: another total sells nothing (the state goes out again).
+local function sellMany(player: Player, filter: any, expect: number?): (number?, number, string?)
 	local collection = collectionOf(player)
-	if not collection then
+	local profile = PlayerData.get(player)
+	if not collection or not profile then
 		return nil, 0, "Your save isn't loaded yet."
 	end
 	if not StockPlan.isFilter(filter) then
 		return nil, 0, "Choose what to sell: all Common, all broken or the duplicates."
 	end
-	local list = StockPlan.toSell(piecesOf(player, collection), filter)
+	local market = marketOf(player)
+	local list = StockPlan.toSell(piecesOf(player, collection, market), filter)
 	if #list == 0 then
 		return nil, 0, NOTHING_TO_SELL[filter]
+	end
+	local total = StockPlan.price(list, market)
+	if expect ~= nil and expect ~= total then
+		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
+		return nil, 0, `The market moved: those {#list} {if #list == 1 then "piece sells" else "pieces sell"} for {Market.money(total)} now. Ask again.`
 	end
 	local chosen: { [string]: boolean } = {}
 	for _, piece in list do
 		chosen[piece.uid] = true
 	end
 	local kept: { Entry } = {}
-	local total, count, rarest, item, mixed = 0, 0, nil :: string?, nil :: string?, false
+	local kinds: { [string]: number } = {} -- (8.3: how many of each kind went)
+	local count, hot, cold, rarest, item, mixed = 0, 0, 0, nil :: string?, nil :: string?, false
 	for _, entry in collection.entries do
 		if chosen[entry.uid] and entry.stand == nil then
-			total += Rules.sell(entry)
 			count += 1
+			kinds[entry.item] = (kinds[entry.item] or 0) + 1
+			local tag = Market.tag(market, entry.item)
+			hot += if tag == "hot" then 1 else 0
+			cold += if tag == "cold" then 1 else 0
 			rarest = rarer(rarest, Rules.rarityOf(Rules.defOf(entry.item)))
 			mixed = mixed or (item ~= nil and item ~= entry.item)
 			item = entry.item
@@ -575,10 +673,14 @@ local function sellMany(player: Player, filter: any): (number?, number, string?)
 	end
 	table.clear(collection.entries)
 	table.move(kept, 1, #kept, 1, collection.entries)
+	local now = os.time()
+	for kind, n in kinds do
+		Market.note(profile.market, kind, marketDay, now, n)
+	end
 	PlayerData.addMoney(player, total, "CollectionSale", if mixed then nil else item)
-	for _, fn in paidTo do task.spawn(fn, player, "sale", total) end -- 8.2 merge: Collection.onPaid (a bulk sale counts too)
+	for _, fn in paidTo do task.spawn(fn, player, "sale", total, { hot = hot }) end -- 8.2 merge: Collection.onPaid (a bulk sale counts too)
 	remote:FireClient(player, { kind = "sold", name = `{count} {if count == 1 then "piece" else "pieces"}`, money = total, count = count })
-	PlayerData.track("event", player, "CollectionSold", total, rarest)
+	PlayerData.track("event", player, "CollectionSold", total, rarest, if hot > 0 then "hot" elseif cold > 0 then "cold" else nil)
 	changed(player)
 	return total, count, nil
 end
@@ -609,6 +711,11 @@ end
 
 local BULK: { [string]: boolean } = { fillbest = true, sellmany = true, undisplayall = true }
 
+-- 8.3: the price a client's confirm showed (a whole number of dollars; anything else: none, the sale goes on as before).
+local function expected(value: any): number?
+	return if finite(value) and value == math.floor(value) and value >= 0 and value < 2 ^ 40 then value else nil
+end
+
 -- ── Joining, leaving, the remote ──────────────────────────────────────────
 
 -- The save has loaded (PlayerData.Changed fires then first): the income is counted from now, pieces on stands the
@@ -621,7 +728,7 @@ local function joined(player: Player)
 	if not collection then
 		return
 	end
-	meters[player] = { at = os.clock(), carry = 0 }
+	meters[player] = { at = os.clock(), carry = 0, hot = 0 }
 	Rules.fitStands(collection, standsOf(player))
 	changed(player)
 end
@@ -634,6 +741,7 @@ local function left(player: Player)
 	pushing[player] = nil
 	added[player] = nil
 	refused[player] = nil
+	marketDue[player] = nil
 end
 
 local function onRemote(player: Player, message: any)
@@ -656,7 +764,7 @@ local function onRemote(player: Player, message: any)
 		ok, why = Collection.undisplay(player, message.uid)
 	elseif kind == "sell" then
 		local money: number? = nil
-		money, why = Collection.sell(player, message.uid)
+		money, why = Collection.sell(player, message.uid, expected(message.expect))
 		ok = money ~= nil
 	elseif kind == "fillbest" then
 		local count: number? = nil
@@ -664,7 +772,7 @@ local function onRemote(player: Player, message: any)
 		ok = count ~= nil
 	elseif kind == "sellmany" then
 		local money: number?, sold: number = nil, 0
-		money, sold, why = sellMany(player, message.filter)
+		money, sold, why = sellMany(player, message.filter, expected(message.expect))
 		ok = money ~= nil and sold > 0
 	elseif kind == "undisplayall" then
 		local count: number? = nil

@@ -25,6 +25,12 @@
 -- card and the box not drawn again while typing, 40 letters at most, cleared with the window); THE PICKER at a small
 -- upgrade stand (the bed, the hay wagon and the wheelbarrow greyed with "Too big for this stand" and TOO BIG, last;
 -- TOO BIG sends nothing and says where it goes) and at a big one (nothing greyed).
+-- 8.3 (the market, shared/Market.luau): on each screen the STOCK list's and the picker's line "Today's market: 🔥 … ·
+-- ❄ … · new in 5 h" (whole, clear of the header's buttons, the chips and the grid), the tags on the pieces' pictures
+-- (🔥 HOT ×1.6, ❄ COLD, 📉 −10%; under ON STAND n), the prices the server's (the market's); SELL's question says why
+-- (the demand's line, hot, cold) and sends the price it showed (expect), SELL…'s totals one piece after the other with
+-- the demand's hint and the total sent (expect), never a guessed price; the HUD's "🔥 Hot today: …" toast once a day,
+-- held back while the HUD is hidden.
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -1042,6 +1048,222 @@ screen(true, 844, 354)
 picker = named(gui, "Picker")
 check("a resize to a phone while open: drawn again for it (a finger's buttons)", math.abs(M.uiScale(picker) - WarehouseUi.layout(844, 354, true).scale) < 0.001 and #smallButtons(picker) == 0)
 WarehouseUi.close()
+
+-- ── 8.3: the market ─────────────────────────────────────────────────────────
+-- The server's state with the player's market (shared/Market.luau's View): today's hot and cold kinds and the demand
+-- of what they sold today; every view's price and income the market's (CollectionRules.view with it, as
+-- server/Collection.luau sends them).
+do
+	local Market = require("./Market")
+	local CollectionRules = require("./CollectionRules")
+	local MK = Config.Market
+	local view = { day = 20375, hot = { "record_player", "old_globe", "jukebox" }, cold = { "wardrobe" }, left = 5 * 3600 + 600,
+		demand = { vintage_radio = { n = 2, sold = 2, back = 600 }, dining_chair = { n = 1, sold = 1, back = 300 } } }
+	local raw = {
+		{ uid = "m1", item = "record_player", variant = 1, condition = 0.92, name = "Old Record Player", got = 31 },
+		{ uid = "m2", item = "old_globe", variant = 1, condition = 1, name = "Old Globe", got = 32, stand = 1 },
+		{ uid = "m3", item = "wardrobe", variant = 2, condition = 0.85, name = "Wardrobe", got = 33 },
+		{ uid = "m4", item = "vintage_radio", variant = 1, condition = 0.9, name = "Vintage Radio", got = 34 },
+		{ uid = "m5", item = "dining_chair", variant = 1, condition = 0.9, name = "Chair", got = 35 },
+		{ uid = "m6", item = "dining_chair", variant = 2, condition = 0.8, name = "Chair", got = 36 },
+		{ uid = "m7", item = "dining_chair", variant = 3, condition = 0.7, name = "Chair", got = 37 },
+		{ uid = "m8", item = "jukebox", variant = 1, condition = 0.95, name = "Jukebox", got = 38, stand = 12 },
+		{ uid = "m9", item = "sofa", variant = 1, condition = 0.9, name = "Sofa", got = 39 },
+	}
+	local stock = {}
+	for _, entry in raw do
+		table.insert(stock, CollectionRules.view(entry :: any, 1, view :: any))
+	end
+	local byUid = {}
+	for _, v in stock do
+		byUid[v.uid] = v
+	end
+	local function marketState(market)
+		return { kind = "state", stock = stock, income = 64.2, stands = 12, market = market }
+	end
+	check("8.3: the server's views carry the market (a hot piece × 1.6, the cold one × 0.7, the radio −10 %)", byUid.m1.market == "hot" and byUid.m1.price == math.floor(byUid.m1.base * MK.HotSell + 0.5)
+		and byUid.m3.market == "cold" and byUid.m3.price == math.floor(byUid.m3.base * MK.ColdSell + 0.5) and byUid.m4.price == math.floor(byUid.m4.base * 0.9 + 0.5))
+
+	-- the toast: once after joining (for the day), held while the HUD is hidden
+	screen(true, 844, 354)
+	local toastsAt = #M.toasts
+	local function hotToasts(): { string }
+		local out = {}
+		for index = toastsAt + 1, #M.toasts do
+			if string.sub(M.toasts[index], 1, #"🔥 Hot today") == "🔥 Hot today" then
+				table.insert(out, M.toasts[index])
+			end
+		end
+		return out
+	end
+	collection.OnClientEvent:Fire(marketState(view))
+	M.flush()
+	local hotToast = "🔥 Hot today: Old Record Player, Old Globe, Jukebox (sell ×1.6, on show ×1.25)"
+	check("the first state with a market: the toast \"🔥 Hot today: … (sell ×1.6, on show ×1.25)\"", #hotToasts() == 1 and hotToasts()[1] == hotToast and Market.hotToast(view :: any) == hotToast, hotToasts()[1])
+	collection.OnClientEvent:Fire(marketState(view))
+	M.flush()
+	check("… the same day's next states: no toast again", #hotToasts() == 1)
+	M.hudGui.Enabled = false
+	M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
+	local tomorrow = table.clone(view)
+	tomorrow.day = view.day + 1
+	tomorrow.hot = { "sofa", "piano", "jukebox" }
+	collection.OnClientEvent:Fire(marketState(tomorrow))
+	M.flush()
+	check("… a new day while the HUD is hidden (the start screen): held back", #hotToasts() == 1)
+	M.hudGui.Enabled = true
+	M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
+	ownGui:GetPropertyChangedSignal("Enabled"):Fire()
+	M.flush()
+	check("… told when the HUD shows: \"🔥 Hot today: Sofa, Upright Piano, Jukebox …\"", #hotToasts() == 2 and string.find(hotToasts()[2], "Sofa, Upright Piano, Jukebox", 1, true) ~= nil, hotToasts()[2])
+	collection.OnClientEvent:Fire(marketState(view))
+	M.flush()
+	check("… an older day after it (a clock that went back): no toast", #hotToasts() == 2)
+
+	-- the STOCK list on each screen: the market's line, the tags, the prices
+	local function marketChecks(label)
+		picker = named(gui, "Picker")
+		grid = named(picker, "Grid")
+		local line = named(picker, "Market")
+		check(`{label}: the market's line "Today's market: 🔥 … · ❄ Wardrobe · new in 5 h"`, line ~= nil and line.Text == "Today's market: 🔥 Old Record Player, Old Globe, Jukebox · ❄ Wardrobe · new in 5 h", line and line.Text)
+		local room, need = textRoom(line)
+		local lineBox = box(line)
+		local clear, hit = within(lineBox, box(picker)), nil
+		for _, name in { "Title", "Subtitle", "Close", "FillBest", "SellMenu", "TakeAllDown", "Filter_all", "Sort", "Grid" } do
+			local other = named(picker, name)
+			if other and overlap(lineBox, box(other)) then
+				clear, hit = false, name
+			end
+		end
+		check(`{label}: … whole on one line, inside the card, clear of the title, its line, the ✕, the bulk buttons, the chips and the grid`, need <= room + 0.5 and clear, hit or `{math.floor(need)} > {math.floor(room)}`)
+		local longest, longestW = "", 0
+		for day = 20300, 20664 do
+			local text = Market.line(Market.today(day), 23 * 3600 + 3000)
+			local width = M.textWidth(text, 12 * M.scaleOf(line), line.Font)
+			if width > longestW then
+				longest, longestW = text, width
+			end
+		end
+		check(`{label}: … a year's longest line whole too`, longestW <= room + 0.5, `{math.floor(longestW)} > {math.floor(room)}: {longest}`)
+		local function tag(uid, name)
+			local tile = named(grid, `Tile_{uid}`)
+			return tile and named(tile, name), tile
+		end
+		local hotTag, hotTile = tag("m1", "MarketTag")
+		local coldTag = tag("m3", "MarketTag")
+		local dropTag = tag("m4", "DemandTag")
+		local plainTag = tag("m9", "MarketTag")
+		check(`{label}: the tags: "🔥 HOT ×1.6" on a hot kind, "❄ COLD" on the cold one, "📉 −10%" on the radio, none on the sofa`, hotTag ~= nil and hotTag.Text == "🔥 HOT ×1.6" and coldTag ~= nil and coldTag.Text == "❄ COLD"
+			and dropTag ~= nil and dropTag.Text == "📉 −10%" and plainTag == nil and tag("m9", "DemandTag") == nil)
+		check(`{label}: … each on its piece's picture, its words fitting`, within(box(hotTag), box(named(hotTile, "Picture"))) and #badTexts(hotTile) == 0 and #badTexts(named(grid, "Tile_m4")) == 0, badTexts(hotTile)[1])
+		local onStand = named(grid, "Tile_m8")
+		local ribbon, juke = named(onStand, "OnStand"), named(onStand, "MarketTag")
+		check(`{label}: … on a piece on show: under ON STAND n, not on it`, ribbon ~= nil and juke ~= nil and not overlap(box(ribbon), box(juke)) and box(juke).y0 >= box(ribbon).y1 - 0.5
+			and within(box(juke), box(named(onStand, "Picture"))))
+		local chairs = named(grid, "Tile_m5")
+		check(`{label}: … the prices are the market's (the server's): the record player's "Sell {M.MUi.money(byUid.m1.price)}"`, named(hotTile, "SellPrice").Text == `Sell {M.MUi.money(byUid.m1.price)}`
+			and named(chairs, "SellPrice").Text == `Sell {M.MUi.money(byUid.m5.price)}`)
+	end
+	for _, size in { { true, 844, 354, "phone" }, { false, 1280, 764, "computer" }, { false, 1920, 1044, "big" } } do
+		screen(size[1], size[2], size[3])
+		collection.OnClientEvent:Fire(marketState(view))
+		WarehouseUi.openStock()
+		local label = `8.3, {size[2]} x {size[3] + 36}`
+		marketChecks(label)
+		pickerChecks(`{label}, the STOCK list with the market`)
+		headerChecks(label)
+		scene(`{size[4]}-market`)
+		WarehouseUi.close()
+		collection.OnClientEvent:Fire({ kind = "pick", stand = 4 })
+		picker = named(gui, "Picker")
+		grid = named(picker, "Grid")
+		local pickLine = named(picker, "Market")
+		check(`{label}: the picker has the market's line too, its hot pieces tagged`, pickLine ~= nil and string.sub(pickLine.Text, 1, 16) == "Today's market: " and named(named(grid, "Tile_m1"), "MarketTag") ~= nil)
+		pickerChecks(`{label}, the picker with the market`)
+		WarehouseUi.close()
+	end
+
+	-- SELL's question: why the price is what it is; the price it showed goes with the request
+	screen(true, 844, 354)
+	collection.OnClientEvent:Fire(marketState(view))
+	WarehouseUi.openStock()
+	picker = named(gui, "Picker")
+	grid = named(picker, "Grid")
+	press(named(named(grid, "Tile_m4"), "Sell"))
+	local ask = named(picker, "Confirm")
+	check("SELL the radio: \"SELL FOR $Y?\" at the market's price, the hint \"Market: Vintage Radio −10% (you sold 2 today)\"", ask ~= nil and named(ask, "Question").Text == `SELL FOR {M.MUi.money(byUid.m4.price)}?`
+		and named(ask, "Hint").Text == "Market: Vintage Radio −10% (you sold 2 today)", ask and named(ask, "Hint").Text)
+	local hintRoom, hintNeed = textRoom(named(ask, "Hint"))
+	check("… its texts fit, the demand's line whole (not cut)", #badTexts(ask) == 0 and hintNeed <= hintRoom + 0.5, badTexts(ask)[1] or `{math.floor(hintNeed)} > {math.floor(hintRoom)}`)
+	scene("phone-market-confirm")
+	local before = #sentOn("Collection")
+	press(named(ask, "ConfirmSell"))
+	local sent = sentOn("Collection")
+	check("… SELL: { kind = \"sell\", uid, expect = the price it showed }", #sent == before + 1 and sent[#sent][1].kind == "sell" and sent[#sent][1].uid == "m4" and sent[#sent][1].expect == byUid.m4.price)
+	WarehouseUi.close()
+	collection.OnClientEvent:Fire(marketState(view))
+	WarehouseUi.openStock()
+	picker = named(gui, "Picker")
+	grid = named(picker, "Grid")
+	press(named(named(grid, "Tile_m1"), "Sell"))
+	check("… a hot piece's hint: \"🔥 Hot today: it sells for ×1.6, earns ×1.25 on show.\"", named(named(picker, "Confirm"), "Hint").Text == "🔥 Hot today: it sells for ×1.6, earns ×1.25 on show.", named(named(picker, "Confirm"), "Hint").Text)
+	key("Escape")
+	press(named(named(grid, "Tile_m3"), "Sell"))
+	check("… the cold one's: \"❄ Cold today: it sells for ×0.7. Keep it on show till tomorrow?\"", named(named(picker, "Confirm"), "Hint").Text == "❄ Cold today: it sells for ×0.7. Keep it on show till tomorrow?", named(named(picker, "Confirm"), "Hint").Text)
+	key("Escape")
+	press(named(named(grid, "Tile_m9"), "Sell"))
+	check("… a piece the market doesn't touch: the hint as before", named(named(picker, "Confirm"), "Hint").Text == `On show it would earn {WarehouseUi.rate(byUid.m9.income)}.`)
+	key("Escape")
+
+	-- 💰 SELL…: the market's totals, one piece after the other (the chairs: −5 %, −10 %, −15 %), the total expected
+	press(named(picker, "SellMenu"))
+	local menuBox = named(named(picker, "Menu"), "MenuBox")
+	local pieces = {}
+	for _, v in stock do
+		table.insert(pieces, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition, base = v.base })
+	end
+	local commons = StockPlan.toSell(pieces, "common")
+	local total = StockPlan.price(commons, view :: any)
+	check("SELL…'s ALL COMMON: the three chairs at the market's total (each next one 5 % lower: under their single prices)", #commons == 3 and total < StockPlan.price(commons)
+		and named(named(menuBox, "Sell_common"), "Price").Text == M.MUi.money(total), named(named(menuBox, "Sell_common"), "Price").Text)
+	press(named(menuBox, "Sell_common"))
+	ask = named(picker, "Confirm")
+	check(`… asked: "SELL 3 PIECES FOR {M.MUi.money(total)}?", the hint: each piece of a kind lowers the next one's price`, named(ask, "Question").Text == `SELL 3 PIECES FOR {M.MUi.money(total)}?`
+		and named(ask, "Hint").Text == "Market: each next piece of a kind sells 5% lower." and #badTexts(ask) == 0, named(ask, "Hint").Text)
+	local room, need = textRoom(named(ask, "Hint"))
+	check("… the hint whole on a phone (not cut)", need <= room + 0.5, `{math.floor(need)} > {math.floor(room)}`)
+	scene("phone-market-sellconfirm")
+	local from = os.clock()
+	while os.clock() - from < 0.65 do -- (WarehouseUi's double-tap guard: a kind's request once in 0.6 s; 8.2's sellmany was just now)
+	end
+	before = #sentOn("Collection")
+	press(named(ask, "ConfirmSell"))
+	sent = sentOn("Collection")
+	check("… SELL: { kind = \"sellmany\", filter, expect = that total }", #sent == before + 1 and sent[#sent][1].kind == "sellmany" and sent[#sent][1].filter == "common" and sent[#sent][1].expect == total)
+	WarehouseUi.close()
+
+	-- a guessed price is never expected (only the server's)
+	collection.OnClientEvent:Fire(state(STOCK, 36))
+	WarehouseUi.openStock()
+	picker = named(gui, "Picker")
+	grid = named(picker, "Grid")
+	press(named(named(grid, "Tile_a2"), "Sell"))
+	before = #sentOn("Collection")
+	press(named(named(picker, "Confirm"), "ConfirmSell"))
+	sent = sentOn("Collection")
+	check("a state without a market or prices: no line, no tags, SELL sends no expect (the server's price stands)", named(picker, "Market") == nil and #sent == before + 1 and sent[#sent][1].expect == nil
+		and named(grid, "MarketTag") == nil)
+	WarehouseUi.close()
+	check("Market.readView: junk from the remote is no market (no line)", (function(): boolean
+		collection.OnClientEvent:Fire(marketState({ day = "x", hot = 5 }))
+		WarehouseUi.openStock()
+		local none = named(named(gui, "Picker"), "Market") == nil
+		WarehouseUi.close()
+		return none
+	end)())
+	collection.OnClientEvent:Fire(state(STOCK, 36))
+	M.flush()
+end
 
 -- ── Without client/Hud.luau: its own column and toasts ─────────────────────
 local Alone = require("./SandboxHudAlone")

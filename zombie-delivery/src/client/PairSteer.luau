@@ -9,6 +9,9 @@
 -- a way ahead forwards, your partner backwards. While the heading turns the walk is slower (PairSteer.walk: × the
 -- carry's CarrySpeed in client/CameraRig.luau). The far end's carrier is the server's (server/MoveHelper.luau,
 -- server/PairHold.luau): only your input and your body's turn are this client's.
+-- 8.3 (the owner: "he just jumps weirdly"): no jump while you carry a piece in two (Humanoid.Jump cleared every step
+-- before the physics: Space, the touch button): a jump lifted the piece and, until the server aimed again, Danny with it.
+-- Nothing is switched off, so nothing has to be given back (a bus ride's own jump lock stays the bus's).
 --   PairSteer.start()      its step before every physics step (client/CameraRig.luau's start, on a computer and on a
 --                          touch screen)
 --   PairSteer.steering()   does your body carry a piece in two now (CameraRig leaves AutoRotate off)
@@ -78,6 +81,9 @@ function PairSteer.step(dt: number)
 	end
 	if humanoid.AutoRotate then
 		humanoid.AutoRotate = false
+	end
+	if humanoid.Jump then
+		humanoid.Jump = false -- (8.3: two carry it on the ground)
 	end
 	-- (the body is the truth: a door's trip turns it, and the heading goes on from there)
 	local look = root.CFrame.LookVector
