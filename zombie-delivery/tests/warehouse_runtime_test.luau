@@ -306,11 +306,11 @@ check("8.1: … the piece on stand 13 shows now, looking north (a corner stand l
 check("8.1: … its prompts at its north edge: Take down and Sell on; stand 14's Display on", stand(2, 13):FindFirstChild("Prompts").CFrame.Position.Z < 0 and promptsOf(2, 13).takeDown.Enabled == true
 	and promptsOf(2, 14).display.Enabled == true and promptsOf(2, 15).display.Enabled == false, `{stand(2, 13):FindFirstChild("Prompts").CFrame.Position.Z} {promptsOf(2, 13).takeDown.Enabled} {promptsOf(2, 14).display.Enabled} {promptsOf(2, 15).display.Enabled}`)
 check("8.1: … the board counts 14 stands", line(board, 3) == `1 of {BIG + 2} stands on show`, line(board, 3))
-W.boosts[ana] = 1.21
+W.boosts[ana] = 1.61 -- (the lights at their top: 8.3 economy, a box's $/min is small, ×1.21 rounds the same)
 W.changed(ana)
 local _, _, lit = tagText(2, 13)
 local boxEntry = { item = "box", condition = 1 }
-check("8.1: the Showroom lights (Collection.boost 1.21): the tag's $/min × 1.21", lit == WarehouseLayout.tagLines("Box", CollectionRules.rarityOf(CollectionRules.defOf("box")), CollectionRules.income(boxEntry, 1.21))[2].text and lit ~= tagOf(boxEntry), lit)
+check("8.1: the Showroom lights (Collection.boost 1.61): the tag's $/min × 1.61", lit == WarehouseLayout.tagLines("Box", CollectionRules.rarityOf(CollectionRules.defOf("box")), CollectionRules.income(boxEntry, 1.61))[2].text and lit ~= tagOf(boxEntry), lit)
 W.boosts[ana] = nil
 
 -- the UPGRADES desk: the owner's prompt

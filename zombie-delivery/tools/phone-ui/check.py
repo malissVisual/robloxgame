@@ -28,6 +28,18 @@ the 3D pictures capped (the silhouettes tinted), the toasts, C, closing, a phone
 8.2 SANDBOX: the daily tasks' TASKS chip and panel (the real SandboxTasksUi beside the real SandboxHud: sandboxtasks.luau
 on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920 x 1080: the chip under the money, the
 panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.
+8.3 SANDBOX: every device's way to the chips (the keys, the gamepad's D-pad glyphs and routes), the gamepad in every
+sandbox window, the notices in the device's words and the first-time hints (sandboxpad.luau on sandbox_mock.luau).
+8.3 SANDBOX: a showroom visitor's offer card (the real OfferCard: offercard.luau on sandbox_mock.luau) at 844 x 390,
+1280 x 800 and 1920 x 1080: its words, clear of the chips and the touch controls, ACCEPT / DECLINE's requests (the id
+only), the gamepad's selection on DECLINE and B, waiting under another window, the clock running out. 8.3 review:
+another window opening only hides it (the offer waits); smaller phones (667 x 375, 740 x 360, 780 x 360).
+8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
+keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
+words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad. 8.4: the guide's steps for
+Danny for hire (hire him, give him a piece, a heavy piece's Lift) in the same scene.
+8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
+and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
 """
 import argparse
 from pathlib import Path
@@ -115,7 +127,7 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
 local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
 local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
-    for name in ("MovingHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("MovingHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
@@ -143,7 +155,7 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
 local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
 local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
-    for name in ("MovingHud", "MoveHelperHud", "QuickChat", "MoveLobbyUi", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("MovingHud", "MoveHelperHud", "QuickChat", "MoveLobbyUi", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
@@ -233,7 +245,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     found = '''local __require = require
 local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
 '''
-    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
@@ -273,3 +285,45 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "sandboxtasks.luau"], cwd=folder, check=True)
+# 8.3 SANDBOX: every device's way to the HUD's chips (client/PadGlyph.luau, shared/SandboxPad.luau: the keys, the
+# gamepad's D-pad glyphs and routes, nothing on a phone), the gamepad in every sandbox window (the selection landing,
+# kept inside, kept over a redraw, the book's cards and a maxed upgrade reachable, B), the notices in the device's words
+# and the first-time hints (client/SandboxHintsUi.luau, shared/SandboxHints.luau) in the same folder:
+# tools/phone-ui/sandboxpad.luau on a computer (1280 x 800) and a phone (844 x 390).
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "sandboxpad.luau"], cwd=folder, check=True)
+# 8.3 SANDBOX: the PAINT shop's window (client/VanPaintUi.luau, shared/VanPaintRules.luau; its 3D picture recorded) in the
+# same folder: tools/phone-ui/vanpaint.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080.
+with tempfile.TemporaryDirectory() as folder:
+    sandbox_env(Path(folder))
+    subprocess.run([args.luau, "vanpaint.luau"], cwd=folder, check=True)
+# 8.3 Danny for hire: his card (client/MoveHelperCard.luau: HIRE, CLEAR QUEUE, the clicks and taps on him and on the
+# pieces, the gamepad's prompts) and his status line (client/MoveHelperHud.luau with the card), beside the real
+# SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone
+# (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder; dannycard_preview.py draws
+# the same scenes). 8.3 review: a tap beside the card is no tap in the world, the gamepad on it, its reach, the line's
+# words on every device, smaller phones (667 x 375, 740 x 360, 780 x 360).
+from dannycardenv import dannycard_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    dannycard_env(Path(folder))
+    subprocess.run([args.luau, "dannycard.luau"], cwd=folder, check=True)
+# 8.3 the showroom's visitors: a visitor's offer card (client/OfferCard.luau) beside the real SandboxHud and
+# SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/offercard.luau on a phone (844 x 390), a
+# computer (1280 x 800) and 1920 x 1080 (offercardenv.py builds the folder; offercard_preview.py draws the same scenes).
+# 8.3 review: another window opening only hides it; smaller phones (667 x 375, 740 x 360, 780 x 360).
+from offercardenv import offercard_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    offercard_env(Path(folder))
+    subprocess.run([args.luau, "offercard.luau"], cwd=folder, check=True)
+# 8.3 keys: the key hints (client/KeyHints.luau with shared/SandboxPad.luau's actions and client/PadGlyph.luau) in
+# sandboxenv.py's folder (keyhintsenv.py: the real KeyHints, its HudContract, Holster and Drive stand-ins):
+# tools/phone-ui/keyhints.luau on a computer (1280 x 800) with its keys and with a gamepad (the platform's glyphs, at
+# once when it is picked up or put down), a console, a phone (none) and a phone with a gamepad; the city's strip as before.
+from keyhintsenv import keyhints_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    keyhints_env(Path(folder))
+    subprocess.run([args.luau, "keyhints.luau"], cwd=folder, check=True)

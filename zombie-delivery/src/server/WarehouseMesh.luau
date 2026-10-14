@@ -36,7 +36,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
-local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared").Config) -- (8.3: the lamps' glow, Config.SandboxLight)
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared").SandboxMap)
 local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared").WarehouseLayout)
 
@@ -70,7 +70,7 @@ local LOOKS: { [string]: Look } = {
 	glass = { color = rgb(47, 66, 82), material = GLASS, reflectance = 0.2 },
 	glasslit = { color = rgb(191, 214, 226), material = P, shadow = false }, -- the windows seen from inside
 	skylight = { color = rgb(216, 230, 234), material = GLASS, reflectance = 0.1 },
-	glow = { color = rgb(255, 241, 214), material = Enum.Material.Neon, shadow = false }, -- the lamps (the hall's always lit)
+	glow = { color = Color3.fromRGB(table.unpack(Config.SandboxLight.Warehouse.MeshGlow)), material = Enum.Material.Neon, shadow = false }, -- the lamps (the hall's always lit; 8.3: Config.SandboxLight)
 	yellow = { color = rgb(242, 194, 48), material = P }, -- the bollards
 	door = { color = rgb(201, 204, 208), material = P, reflectance = 0.05 },
 	wood = { color = rgb(154, 117, 80), material = P },

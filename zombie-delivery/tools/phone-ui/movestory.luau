@@ -52,7 +52,7 @@ M.MKeys = {
 		return "SPACE"
 	end,
 }
-M.MFade = { out = function() end, into = function() end }
+M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
 M.MapView.waypointAt = function() -- (7.0 review: the move clears only its own waypoint)
 	return M.waypoint
 end

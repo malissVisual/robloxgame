@@ -474,6 +474,33 @@ check("8.1: a small stand takes at least 9 in 10 of the catalogue, the sofa, the
 check("8.1: … not the double bed; standSize and fits for no such stand: nil, false; a piece without a size fits", not WarehouseLayout.fits(ALL, FurnitureLooks.Items.bed.size)
 	and WarehouseLayout.standSize(0) == nil and WarehouseLayout.standSize(ALL + 1) == nil and not WarehouseLayout.fits(ALL + 1, FurnitureLooks.Items.box.size) and WarehouseLayout.fits(3, {}) and select(1, WarehouseLayout.standSize(ALL)) == T.SmallStand[1])
 
+-- 8.3, the light (the owner's "flashbang"): every level's hall lights are Config.SandboxLight's, this level's brightness
+-- and reach (Config.SandboxLight.Warehouse.Levels), the Lamp's colour, nothing brighter
+local lit = Config.SandboxLight.Warehouse
+local lampsOk, lampCount = true, {}
+for n = 1, WarehouseLayout.Levels do
+	local want = lit.Levels[n]
+	lampCount[n] = 0
+	for _, p in WarehouseLayout.pieces(WarehouseLayout.site(SandboxMap.Plots[1], n) :: any) do
+		if p.light then
+			lampCount[n] += 1
+			lampsOk = lampsOk and want ~= nil and p.light.brightness == want.Brightness and p.light.range == want.Range and p.light.color == lit.Lamp.Color
+		end
+	end
+end
+check(`8.3: every level's hall lights are Config.SandboxLight's (lamps a level: {table.concat(lampCount, ", ")})`, lampsOk and lampCount[1] >= 1)
+
+-- 8.3: the two-person collectibles (the alphorn 7.2 × 1.4, the T. rex skull, the safe) stand on every level's big stands
+local pairsFit = true
+for _, id in { "alphorn", "trex_skull", "zombie_safe" } do
+	local def = FurnitureLooks.Items[id]
+	pairsFit = pairsFit and def ~= nil and def.class == "pair" and def.rarity ~= nil
+	for n = 1, WarehouseLayout.Levels do
+		pairsFit = pairsFit and def ~= nil and WarehouseLayout.fits(1, def.size, n) and WarehouseLayout.fits(WarehouseLayout.count(n), def.size, n)
+	end
+end
+check("8.3: the two-person collectibles (the alphorn, the T. rex skull, the safe) stand on every level's big stands, the Garage's too", pairsFit)
+
 -- the texts
 check("the owner's sign: <Name>'s Warehouse", WarehouseLayout.ownerLines("Pavel", 2)[1].text == "Pavel's Warehouse" and WarehouseLayout.ownerLines("Pavel", 2)[2].text == "ZDC STORAGE · PLOT 2")
 check("…FOR RENT without an owner", WarehouseLayout.ownerLines(nil, 3)[1].text == "FOR RENT")

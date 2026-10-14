@@ -10,6 +10,22 @@
 -- the roads; a step done once goes quiet, the arrow home stays while driving; the ✕ and a held G; the 💡 chip on a
 -- phone; nothing made loop after loop; no warnings. 8.0.1: one arrow: the move's HUD (client/MovingHud.luau) sets no GPS
 -- in the sandbox (no waypoint, so none of client/Hud.luau's GPS ring, beacon, label or toasts) beside the guide's.
+-- 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words for the device used now: a computer's
+-- "E at the back", a phone's "tap at the back", a gamepad's "X at the back" (a phone's or a computer's, used last);
+-- "Guide off · hold G / tap 💡 / hold B to bring it back"; a gamepad's B held as G (not while carrying, not while a
+-- window holds the gamepad's selection), no 💡 chip while a gamepad is used.
+-- 8.3, the soft steps (SandboxSteps.choose) at 844 × 390, 1280 × 800 and 1920 × 1080: the warehouse full and its next
+-- level affordable (the chevron over the real UPGRADES desk at the warehouse's level, shared/WarehouseLayout.luau
+-- terminal), the market's hot piece (a free stand, else an orange ring round the HUD's 📦 STOCK chip), another upgrade,
+-- the PAINT shop (the van's PaintPoint); the line placed as above; nothing while the screen is covered, SoftGap after;
+-- the ✕ on one dismisses it alone (the guide stays on); a window opened, a purchase or SoftSeconds on the screen: done;
+-- a move wins; the ring makes nothing loop after loop.
+-- 8.4, Danny for hire's steps (SandboxSteps.danny) at the same three sizes: "Hire Danny to carry with you" on a move
+-- while he is for hire and the money pays him (the chevron over his body, "(L1)" with a gamepad), never while something
+-- covers the screen or his card is open (which shows his offer: done); hired: "Pick a piece to give it to Danny" in the
+-- house ("(R1)" with a gamepad) until a piece goes on his list; "Heavy piece: press Lift and wait for Danny" with a
+-- two-person piece's Lift near (looked for at most once a second, no more once done) until your Lift calls him; the
+-- line under the move's panel and Danny's strip, clear of the money, the touch buttons and the player list.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's, as movehud.luau) ────────
@@ -85,7 +101,7 @@ M.MUi.touchLayout = function()
 	return M.touch
 end
 M.MUi.gamepadActive = function()
-	return false
+	return M.gamepad == true -- (8.3 keys: a gamepad used last)
 end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
@@ -95,7 +111,7 @@ M.MKeys = { open = function() end, close = function() end, isOpen = function()
 end, hint = function()
 	return "SPACE"
 end }
-M.MFade = { out = function() end, into = function() end }
+M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
 M.MapView.waypointAt = function()
 	return M.waypoint
 end
@@ -157,6 +173,10 @@ M.warehouseLayout = {
 		return if site.level == 5 then standsLevel5 else standsGiven
 	end,
 }
+M.warehouseLayout.terminal = function(site) -- 8.3: the UPGRADES desk, the real one's spot at the Site's level
+	local real = require("./WarehouseLayout")
+	return real.terminal(real.site(site.id, site.level) or site)
+end
 rawset(M.services.ReplicatedStorage.Shared, "FindFirstChild", function(_, name)
 	if name == "WarehouseLayout" then
 		return { fakeModule = M.warehouseLayout, IsA = function(_, class)
@@ -355,10 +375,10 @@ end
 local function hintBox()
 	return box(hint)
 end
--- the screen: a phone sideways (844 × 354 under the top bar) or a computer (1280 × 684)
-local function screen(touch)
+-- the screen: a phone sideways (844 × 354 under the top bar) or a computer (1280 × 684); 8.3: or the size given
+local function screen(touch, w, h)
 	M.touch = touch
-	M.width, M.height = if touch then 844 else 1280, if touch then 354 else 684
+	M.width, M.height = w or (if touch then 844 else 1280), h or (if touch then 354 else 684)
 	M.scale = math.clamp(math.min(M.width / 1150, M.height / 680), 0.55, 1.1)
 	moneyScale.Scale = M.scale
 	camera:GetPropertyChangedSignal("ViewportSize"):Fire()
@@ -403,6 +423,7 @@ closeButton.Activated:Fire()
 tick()
 check("the ✕ hides the guide: \"Guide off\" for a moment, no ✕ on it, no 3D guide", not SandboxGuide.enabled() and shown()
 	and string.find(words.Text, "Guide off", 1, true) ~= nil and not closeButton.Visible and not marker.Enabled and lit() == 0, words.Text)
+check("… a phone's words: \"Guide off · tap 💡 to bring it back\" (8.3 keys)", words.Text == "Guide off · tap 💡 to bring it back", words.Text)
 wait(G.OffNote + 0.02)
 tick()
 local chipBox = box(chip)
@@ -444,7 +465,7 @@ check("a computer: under the move's panel at the screen's scale, never on it, in
 	and math.abs((b.x0 + b.x1) / 2 - M.width / 2) < 1 and inside(b) and not overlap(b, box(money)), `{show(panelBox)} / {show(b)}`)
 screen(true)
 panelBox = box(panel)
-attribute("MoveHelper", "carry")
+attribute("MoveHelper", "offer") -- (8.3: Danny on the move; 8.4: for hire, the money not known yet: no hire step, not done)
 tick()
 local strip = MoveHelperHud.strip()
 b = hintBox()
@@ -472,6 +493,11 @@ check("… the chevron over the front door", at(SandboxMap.House.door.x, Sandbox
 moving.OnClientEvent:Fire("state", view({ inside = true }))
 tick()
 check("in the house: \"Carry the furniture out to your van (tap to pick up)\"", SandboxGuide.step() == "inside" and words.Text == "Carry the furniture out to your van (tap to pick up)" and shown(), words.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"(X to pick up)\" (8.3 keys)", words.Text == "Carry the furniture out to your van (X to pick up)", words.Text)
+M.gamepad = false
+tick()
 check("… no 3D target inside: no chevron, no path", not marker.Enabled and lit() == 0)
 local vanModel = make("Model", { Name = "Courier's Sprinter" }, cars)
 vanModel:SetAttribute("OwnerId", M.player.UserId)
@@ -486,6 +512,20 @@ moving.OnClientEvent:Fire("state", carried)
 stand(SandboxMap.House.door.x, SandboxMap.House.door.z - 4)
 tick()
 check("out with a piece: \"Load it into the van: walk in or tap at the back\"", SandboxGuide.step() == "load" and words.Text == "Load it into the van: walk in or tap at the back" and shown(), words.Text)
+-- 8.3 keys: the same step's words on a phone with a gamepad used last, on a computer, a computer's gamepad
+M.gamepad = true
+tick()
+check("… a phone with a gamepad used last: \"walk in or X at the back\" (8.3 keys: the prompts' X)", words.Text == "Load it into the van: walk in or X at the back" and shown(), words.Text)
+M.gamepad = false
+screen(false)
+tick()
+check("… a computer: \"walk in or E at the back\"", words.Text == "Load it into the van: walk in or E at the back" and shown(), words.Text)
+M.gamepad = true
+tick()
+check("… a computer's gamepad: \"walk in or X at the back\"", words.Text == "Load it into the van: walk in or X at the back" and shown(), words.Text)
+M.gamepad = false
+screen(true)
+tick()
 check("… the chevron over the van's back (its CargoDoor)", at(vanBack.x, vanBack.z + 10) and string.find(tag.Text, "YOUR VAN", 1, true) ~= nil, tag.Text)
 local held = 0
 M.services.UserInputService.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.G }, false)
@@ -536,6 +576,11 @@ collection.OnClientEvent:Fire({ kind = "state", stock = {
 }, income = 4, stands = 3 })
 tick()
 check("pieces in the stock: \"Put your pieces on show: tap at an empty stand\"", SandboxGuide.step() == "show" and words.Text == "Put your pieces on show: tap at an empty stand" and shown(), words.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"X at an empty stand\" (8.3 keys)", words.Text == "Put your pieces on show: X at an empty stand", words.Text)
+M.gamepad = false
+tick()
 local nearest = SandboxSteps.nearestFree(plot.door.x, plot.door.z + 6, standsGiven, { [2] = true })
 check("… the chevron over the nearest empty stand (shared/WarehouseLayout.luau's; the taken one skipped)", nearest ~= nil and nearest ~= 2
 	and at(standsGiven[nearest].x, standsGiven[nearest].z) and string.find(tag.Text, "EMPTY STAND", 1, true) ~= nil, tag.Text)
@@ -602,6 +647,332 @@ tick()
 check("held again: back on (driving: the arrow to the house again)", SandboxGuide.enabled() and marker.Enabled and lit() > 0)
 humanoid.SeatPart = nil
 M.services.UserInputService.InputEnded:Fire({ KeyCode = M.Enum.KeyCode.G })
+
+-- ── 8.3 keys: a gamepad: B held as G ────────────────────────────────────────
+local input = M.services.UserInputService
+local B = M.Enum.KeyCode.ButtonB
+M.gamepad = true
+input.InputBegan:Fire({ KeyCode = B }, false)
+tick()
+check("a gamepad: a short B: nothing", SandboxGuide.enabled())
+wait(G.HideHold + 0.02)
+tick()
+check("… B held: the guide off, \"Guide off · hold B to bring it back\", no 💡 chip", not SandboxGuide.enabled() and not marker.Enabled
+	and words.Text == "Guide off · hold B to bring it back" and shown() and not chip.Visible, words.Text)
+input.InputEnded:Fire({ KeyCode = B })
+M.services.GuiService.SelectedObject = make("TextButton", { Name = "AWindowsButton" })
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("… B while a window holds the gamepad's selection (B closes it): left alone", not SandboxGuide.enabled())
+input.InputEnded:Fire({ KeyCode = B })
+M.services.GuiService.SelectedObject = nil
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("… B held again: back on", SandboxGuide.enabled())
+input.InputEnded:Fire({ KeyCode = B })
+moving.OnClientEvent:Fire("state", carried)
+tick()
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("… B held while carrying puts the piece down (the server's prompt): the guide stays", SandboxGuide.enabled())
+input.InputEnded:Fire({ KeyCode = B })
+moving.OnClientEvent:Fire("state", nil)
+screen(true)
+input.InputBegan:Fire({ KeyCode = B }, false)
+wait(G.HideHold + 0.02)
+tick()
+check("a phone with a gamepad used last: B held: \"hold B\", no 💡 chip", not SandboxGuide.enabled() and words.Text == "Guide off · hold B to bring it back" and not chip.Visible, words.Text)
+input.InputEnded:Fire({ KeyCode = B })
+wait(G.OffNote + 0.02)
+tick()
+check("… the note gone: still no 💡 chip while the gamepad is used", not hint.Visible and not chip.Visible)
+M.gamepad = false
+tick()
+check("… the screen touched (no gamepad used last): the 💡 chip", chip.Visible)
+chip.Activated:Fire()
+tick()
+check("… a tap on it: back on", SandboxGuide.enabled())
+screen(false)
+
+-- ── 8.3: the soft steps (the UPGRADES desk, the market, the PAINT shop) ─────
+-- at 844 × 390 (844 × 354 under the top bar), 1280 × 800 (1280 × 764) and 1920 × 1080 (1920 × 1044)
+local WarehouseLayout = require("./WarehouseLayout")
+G.SoftGap = 0.05 -- (the waits short: the check's own clock is the real one)
+local coveredNow, windowNow = false, nil
+SandboxGuide.covered = function()
+	return coveredNow
+end
+SandboxGuide.windowOpen = function()
+	return windowNow
+end
+local SIZES = { { true, 844, 354, "844 x 390" }, { false, 1280, 764, "1280 x 800" }, { false, 1920, 1044, "1920 x 1080" } }
+-- the HUD's 📦 STOCK chip under the money (client/SandboxHud.luau's "StockChip" in its block)
+local stockChipUi = make("TextButton", { Name = "StockChip", Position = M.UDim2.fromOffset(0, 64), Size = M.UDim2.fromOffset(150, 32), Visible = true }, money)
+local ring = named(M.gui, "StockRing")
+local function onScreenClear(what)
+	local hb, cb2 = hintBox(), closeBox()
+	local ok = shown() and inside(hb) and inside(cb2) and math.abs((hb.x0 + hb.x1) / 2 - M.width / 2) < 1 and hb.y0 < 40
+		and not overlap(hb, box(money)) and not overlap(cb2, box(money))
+	if M.touch then
+		ok = ok and clearOfTouch(hb) and clearOfTouch(cb2) and cb2.x1 - cb2.x0 >= 44 - 0.01 and cb2.y1 - cb2.y0 >= 44 - 0.01
+	else
+		local list = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y0 = 0, x1 = M.width, y1 = math.min(M.height * 0.45, 52 + 40) }
+		ok = ok and not overlap(hb, list) and not overlap(cb2, list)
+	end
+	check(`… {what}: the line at the top in the middle, on the screen, clear of the money{if M.touch then ", the touch buttons (its ✕ a finger's size)" else " and the player list"}`, ok, show(hb))
+end
+moving.OnClientEvent:Fire("state", nil)
+lobby.OnClientEvent:Fire("lobby", nil)
+stand(plot.door.x, plot.door.z + 6)
+attribute(Config.SandboxUpgrades.WarehouseAttribute, 2)
+local growTo = Config.SandboxUpgrades.List.warehouse.prices[2] -- (the Storehouse's price, 8.3 economy: Config's; $200 more in hand)
+M.remotes.Upgrades.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 1 }, money = growTo + 200 }) -- (level 2: the Workshop)
+M.remotes.State.OnClientEvent:Fire({ money = growTo + 200 })
+local market = { day = 20375, hot = { "jukebox" }, cold = { "sofa" }, left = 4000, demand = {} }
+local function hotState(free)
+	return { kind = "state", stands = 3, market = market, income = 9, stock = {
+		{ uid = "a", item = "sofa", name = "Sofa", stand = 1, market = "cold" },
+		{ uid = "c", item = "vase", name = "Vase", stand = 3 },
+		{ uid = "b", item = "lamp", name = "Lamp", stand = if free then nil else 2 },
+		{ uid = "j", item = "jukebox", name = "Jukebox", market = "hot" },
+		{ uid = "k", item = "clock", name = "Clock" },
+	} }
+end
+collection.OnClientEvent:Fire(hotState(true))
+check("8.3: the guide asks for the UPGRADES' and the PAINT shop's states too", (function()
+	local asked = {}
+	for _, entry in M.sent do
+		if type(entry.args[1]) == "table" and entry.args[1].kind == "state" then
+			asked[entry.name] = true
+		end
+	end
+	return asked.Upgrades == true and asked.VanPaint == true
+end)())
+local desk2 = WarehouseLayout.terminal(WarehouseLayout.site(plot, 2))
+local desk1 = WarehouseLayout.terminal(WarehouseLayout.site(plot, 1))
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`{size[4]}: the warehouse full (3 waiting, 1 free stand), {WarehouseLayout.money(growTo + 200)} at level 2: "Your warehouse is full: grow it at the UPGRADES desk ({WarehouseLayout.money(growTo)})"`,
+		SandboxGuide.step() == "grow" and words.Text == `Your warehouse is full: grow it at the UPGRADES desk ({WarehouseLayout.money(growTo)})` and shown() and closeButton.Visible, words.Text)
+	onScreenClear(size[4])
+end
+check("… the chevron over the UPGRADES desk at the level-2 warehouse's back wall (shared/WarehouseLayout.luau terminal), its tag", marker.Enabled
+	and at(desk2.x, desk2.z) and string.find(tag.Text, "^UPGRADES DESK · %d+ m$") ~= nil and (desk1.z ~= desk2.z), `{tag.Text} {desk1.z} {desk2.z}`)
+check("… a path to it", lit() >= 1, lit())
+coveredNow = true
+tick()
+check("never while something covers the screen (a grip check, the result card, a window): quiet", SandboxGuide.step() ~= "grow" and not hint.Visible and not marker.Enabled)
+coveredNow = false
+tick()
+check("… the window shut: not at once (SoftGap)", SandboxGuide.step() ~= "grow" and not hint.Visible)
+wait(G.SoftGap + 0.02)
+tick()
+check("… then back", SandboxGuide.step() == "grow" and shown())
+closeButton.Activated:Fire()
+tick()
+check("its ✕: that step alone dismissed, the guide stays on (no \"Guide off\")", SandboxGuide.enabled() and SandboxGuide.step() ~= "grow"
+	and string.find(words.Text, "Guide off", 1, true) == nil and not hint.Visible, words.Text)
+wait(G.SoftGap + 0.02)
+tick()
+check("… the next soft step after SoftGap: \"🔥 Your Jukebox is hot today: sell it or show it\" (the computer's words)", SandboxGuide.step() == "hot"
+	and words.Text == "🔥 Your Jukebox is hot today: sell it or show it" and shown(), words.Text)
+local free = standsGiven[2]
+check("… a stand free: the chevron over it (EMPTY STAND), no ring round the chip", at(free.x, free.z) and string.find(tag.Text, "EMPTY STAND", 1, true) ~= nil and not ring.Visible, tag.Text)
+collection.OnClientEvent:Fire(hotState(false))
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	local rb, chipB = box(ring), box(stockChipUi)
+	check(`{size[4]}: every stand taken: no chevron, an orange ring round the 📦 STOCK chip (on the screen, round it)`, SandboxGuide.step() == "hot" and shown()
+		and not marker.Enabled and ring.Visible and rb.x0 <= chipB.x0 and rb.y0 <= chipB.y0 and rb.x1 >= chipB.x1 and rb.y1 >= chipB.y1 and inside(rb)
+		and (not M.touch or clearOfTouch(rb)) and not overlap(rb, hintBox()), `{show(rb)} / {show(chipB)}`)
+	onScreenClear(size[4])
+end
+local before = made
+for _ = 1, 20 do
+	tick()
+end
+check("… twenty looks with the ring make no instance", ring.Visible and made == before, made - before)
+coveredNow, windowNow = true, "WarehouseUi"
+tick()
+check("the STOCK list opened (it shows the 🔥 tags): the market found, the ring gone", not ring.Visible and not hint.Visible)
+coveredNow, windowNow = false, nil
+wait(G.SoftGap + 0.02)
+tick()
+check("… then another upgrade in reach (8.3 economy: all three $1,500, the window's order first): \"💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)\" (the desk again)", SandboxGuide.step() == "upgrade"
+	and words.Text == "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)" and shown() and at(desk2.x, desk2.z), words.Text)
+local soft = G.SoftSeconds
+G.SoftSeconds = 1
+for _ = 1, math.ceil(1 / G.Every) + 1 do
+	tick()
+end
+check("… said for a while (Config.SandboxGuide.SoftSeconds): then done and quiet", SandboxGuide.step() ~= "upgrade" and not hint.Visible)
+G.SoftSeconds = soft
+-- the PAINT shop: your van parked at home (its 🎨 prompt's PaintPoint), nothing bought there yet
+chassis.Position = M.Vector3.new(plot.vanSpot.x, 3, plot.vanSpot.z)
+local paintPoint = make("Attachment", { Name = "PaintPoint", WorldPosition = M.Vector3.new(plot.vanSpot.x - 4.6, 4.6, plot.vanSpot.z + 4) }, chassis)
+M.remotes.VanPaint.OnClientEvent:Fire({ kind = "state", owned = {}, worn = { paint = "cream", livery = "zdc" }, money = growTo + 200, paid = {} })
+wait(G.SoftGap + 0.02)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	local want = if M.touch then "🎨 Make your van your own: tap at its side opens the PAINT SHOP" else "🎨 Make your van your own: E at its side opens the PAINT SHOP"
+	check(`{size[4]}: the van at home, a level bought: "{want}"`, SandboxGuide.step() == "paint" and words.Text == want and shown(), words.Text)
+	onScreenClear(size[4])
+end
+M.gamepad = true
+tick()
+check("… with a gamepad: \"X at its side\" (8.3 keys)", words.Text == "🎨 Make your van your own: X at its side opens the PAINT SHOP", words.Text)
+M.gamepad = false
+tick()
+check("… the chevron over the van's 🎨 prompt (PAINT SHOP)", at(paintPoint.WorldPosition.X, paintPoint.WorldPosition.Z) and string.find(tag.Text, "PAINT SHOP", 1, true) ~= nil, tag.Text)
+moving.OnClientEvent:Fire("state", view())
+tick()
+check("a move wins over every soft step (drive to the house)", SandboxGuide.step() == "drive")
+moving.OnClientEvent:Fire("state", nil)
+wait(G.SoftGap + 0.02)
+tick()
+check("… the move gone: the paint step again", SandboxGuide.step() == "paint" and shown())
+M.remotes.VanPaint.OnClientEvent:Fire({ kind = "bought", id = "red" })
+tick()
+check("something bought at the PAINT shop: done, quiet", SandboxGuide.step() ~= "paint" and not hint.Visible)
+
+-- ── 8.4: Danny for hire's steps (hire him, give him a piece, a heavy piece) ─
+-- a move from your plot, Danny for hire by your van at $170 (your money pays him), his body in workspace.Npcs (its
+-- MoveHelper your MoveHelperId), the move's pieces' own prompts tagged MovePrompt (a heavy one's Lift)
+local DANNY_ID = -2000000001
+local npcs = make("Folder", { Name = "Npcs" }, M.workspace)
+local dannyModel = make("Model", { Name = "Danny" }, npcs)
+dannyModel:SetAttribute("MoveHelper", DANNY_ID)
+local dannyAt = M.Vector3.new(plot.vanSpot.x + 6, 3, plot.vanSpot.z)
+dannyModel.PrimaryPart = make("BasePart", { Name = "HumanoidRootPart", Position = dannyAt }, dannyModel) -- (the recorder's IsA: its own class)
+local tagged, tagLooks = {}, 0
+M.services.CollectionService.GetTagged = function(_, name)
+	tagLooks += 1
+	return tagged[name] or {}
+end
+-- the line under the move's panel and Danny's strip, in the middle, on the screen, clear of the money, the touch buttons
+-- (its ✕ a finger's size) or Roblox's player list
+local function dannyClear(what)
+	local hb, cb2 = hintBox(), closeBox()
+	local strip2, panel2 = box(MoveHelperHud.strip()), box(MovingHud.panel())
+	local ok = shown() and inside(hb) and inside(cb2) and math.abs((hb.x0 + hb.x1) / 2 - M.width / 2) < 1 and hb.y0 >= strip2.y1 and cb2.y0 >= strip2.y1 - 0.01
+		and not overlap(hb, panel2) and not overlap(cb2, panel2) and not overlap(hb, box(money)) and not overlap(cb2, box(money))
+	if M.touch then
+		ok = ok and clearOfTouch(hb) and clearOfTouch(cb2) and cb2.x1 - cb2.x0 >= 44 - 0.01 and cb2.y1 - cb2.y0 >= 44 - 0.01
+	else
+		local list = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y0 = 0, x1 = M.width, y1 = math.min(M.height * 0.45, 52 + 40) }
+		ok = ok and not overlap(hb, list) and not overlap(cb2, list)
+	end
+	check(`… {what}: the line under the move's panel and Danny's strip, in the middle, on the screen, clear of the money{if M.touch then ", the touch buttons (its ✕ a finger's size)" else " and the player list"}`,
+		ok, `{show(hb)} under {show(strip2)}`)
+end
+stand(plot.vanSpot.x - 14, plot.vanSpot.z)
+attribute("MoveHelperId", DANNY_ID)
+attribute("MoveHelperDoing", "Waiting by the van for hire")
+attribute("MoveHelperPrice", 170)
+attribute("MoveHelper", "offer")
+moving.OnClientEvent:Fire("state", view())
+wait(G.SoftGap + 0.02)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`8.4 {size[4]}: a move, Danny for hire, $170 in reach: "Hire Danny to carry with you" (before the move's own step)`, SandboxGuide.step() == "hire"
+		and words.Text == "Hire Danny to carry with you" and shown() and closeButton.Visible, words.Text)
+	dannyClear(size[4])
+end
+check("… the chevron over Danny (DANNY · its metres)", marker.Enabled and at(dannyAt.X, dannyAt.Z + 0) and string.find(tag.Text, "^DANNY · %d+ m$") ~= nil, tag.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"Hire Danny to carry with you (L1)\" (SandboxPad's button for him)", words.Text == "Hire Danny to carry with you (L1)", words.Text)
+M.gamepad = false
+tick()
+coveredNow = true -- (the move's card, a grip check: something covers the screen)
+tick()
+check("… never while something covers the screen (the move's own step instead: quiet, done before)", SandboxGuide.step() ~= "hire" and not hint.Visible)
+coveredNow = false
+wait(G.SoftGap + 0.02)
+tick()
+check("… uncovered: back after SoftGap", SandboxGuide.step() == "hire" and shown())
+coveredNow, windowNow = true, "MoveHelperCard"
+tick()
+check("… his card opened (a window): quiet", SandboxGuide.step() ~= "hire" and not hint.Visible)
+coveredNow, windowNow = false, nil
+wait(G.SoftGap + 0.02)
+tick()
+check("… shut again: his offer was seen there, hire done (not again)", SandboxGuide.step() ~= "hire" and not hint.Visible)
+attribute("MoveHelperPrice", nil)
+attribute("MoveHelperQueue", 0)
+attribute("MoveHelper", "hired")
+tick()
+check("hired (MoveHelper = hired): hire done; outside his list says nothing yet (the move's step: quiet)", SandboxGuide.step() ~= "hire" and not hint.Visible)
+moving.OnClientEvent:Fire("state", view({ inside = true }))
+wait(G.SoftGap + 0.02)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`{size[4]}: in the house, his list empty: "Pick a piece to give it to Danny" (every device's words: a click or a tap)`, SandboxGuide.step() == "give"
+		and words.Text == "Pick a piece to give it to Danny" and shown(), words.Text)
+	dannyClear(size[4])
+end
+check("… no 3D target in the house", not marker.Enabled and lit() == 0)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"(R1)\" (his \"Give to Danny\" at a piece)", words.Text == "Pick a piece to give it to Danny (R1)", words.Text)
+M.gamepad = false
+tick()
+attribute("MoveHelperQueue", 1)
+tick()
+check("… a piece given him (his list went up): give done, quiet", SandboxGuide.step() ~= "give" and not hint.Visible)
+-- a heavy piece: the Sofa (two people, still in the house) near you, its own Lift prompt
+local sofaPart = make("BasePart", { Name = "Root", Position = M.root.Position + M.Vector3.new(4, 0, 3) }, make("Model", { Name = "Sofa" }, M.workspace))
+local lift = make("ProximityPrompt", { Name = "Pick", ActionText = "Lift", ObjectText = "Sofa", Enabled = true }, sofaPart)
+lift:SetAttribute("MoveOwner", M.player.UserId)
+tagged.MovePrompt = { lift }
+local looksBefore = tagLooks
+for _ = 1, 4 do
+	tick()
+end
+check("8.4 a heavy piece looked for at most once a second (a few looks: one scan at most)", tagLooks - looksBefore <= 1, tagLooks - looksBefore)
+wait(1.05)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`{size[4]}: a two-person piece near (its Lift): "Heavy piece: press Lift and wait for Danny"`, SandboxGuide.step() == "lift"
+		and words.Text == "Heavy piece: press Lift and wait for Danny" and shown(), words.Text)
+	dannyClear(size[4])
+end
+M.gamepad = true
+tick()
+check("… with a gamepad the same (the prompt's Lift shows its own button)", words.Text == "Heavy piece: press Lift and wait for Danny", words.Text)
+M.gamepad = false
+attribute("MoveHelperCall", "Sofa")
+tick()
+check("… your Lift called him (MoveHelperCall: you wait for him): lift done, quiet", SandboxGuide.step() ~= "lift" and not hint.Visible)
+attribute("MoveHelperCall", nil)
+wait(1.05)
+looksBefore = tagLooks
+for _ = 1, 10 do
+	tick()
+end
+check("… done: no more looks for heavy pieces", tagLooks == looksBefore and SandboxGuide.step() ~= "lift", tagLooks - looksBefore)
+before = made
+for _ = 1, 20 do
+	tick()
+end
+check("… twenty looks on a move with Danny make no instance", made == before, made - before)
+moving.OnClientEvent:Fire("state", nil)
+for _, name in { "MoveHelper", "MoveHelperQueue", "MoveHelperDoing", "MoveHelperId" } do
+	attribute(name, nil)
+end
+tagged.MovePrompt = nil
+tick()
+SandboxGuide.covered, SandboxGuide.windowOpen = nil, nil
+screen(false)
 check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",
 	Config.Sandbox.On == true and gpsSets == 0 and gpsTold == 0 and M.waypoint == nil, `{gpsSets} {gpsTold}`)
 check("no warnings", #M.warnings == 0, M.warnings[1])

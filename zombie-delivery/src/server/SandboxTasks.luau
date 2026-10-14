@@ -12,6 +12,8 @@
 --   shown       Collection.onChanged: the pieces on your stands now (the best counts)
 --   sell        Collection.onPaid "sale": the money a piece sold for
 --   income      Collection.onPaid "income": what the stands paid (CollectionIncome)
+--   hotsell     8.3: Collection.onPaid "sale": the pieces of today's hot kinds in it (Config.Market)
+--   hotincome   8.3: Collection.onPaid "income": the dollars of it the hot pieces on show earned
 --   upgrade     Upgrades.onChanged: the levels bought since the last look (your levels in all went up)
 --   trips       Moving.onStored: the move's trips home so far (the owner's; the best counts)
 --   moves       Moving.onResult: a move done (or late) with pieces home, for everybody in its crew
@@ -81,15 +83,25 @@ local function saveSoon(player: Player)
 	end)
 end
 
--- The kinds that can't be done now: "upgrade" once every upgrade is at its top.
+-- The kinds that can't be done now: "upgrade" once every upgrade is at its top; 8.3: "offer" while the visitors are off;
+-- 8.4: "shown" while the warehouse has fewer stands than its highest target (the Garage, the Workshop, the Storehouse).
 local function skipFor(profile: PlayerData.Profile): { [string]: boolean }?
+	local skip: { [string]: boolean }? = if Config.Visitors.On then nil else { offer = true }
+	for _, def in T.DailyPool do
+		if def.event == "shown" and CollectionRules.standsFor(profile) < def.target[2] then
+			skip = skip or {}
+			;(skip :: { [string]: boolean }).shown = true
+		end
+	end
 	for _, id in UpgradeRules.Order do
 		local def = UpgradeRules.def(id)
 		if def and UpgradeRules.level(profile.sandboxUpgrades, id) < def.max then
-			return nil
+			return skip
 		end
 	end
-	return { upgrade = true }
+	local all: { [string]: boolean } = skip or {}
+	all.upgrade = true
+	return all
 end
 
 -- The upgrade levels in all.
@@ -122,7 +134,7 @@ local function tasksOf(player: Player): Rules.Saved?
 		saveSoon(player)
 	end
 	if dayNew and loaded[player] then
-		say(player, "📋 New daily tasks: open TASKS (J).")
+		say(player, "🌅 New daily tasks: open 📋 TASKS.") -- (8.3: no key here: each client adds its own, client/SandboxHud.luau notice)
 	end
 	return saved
 end
@@ -251,11 +263,18 @@ local function onCollection(player: Player)
 	task.defer(lookAtStock, player)
 end
 
-local function onPaid(player: Player, kind: string, money: number)
+local function onPaid(player: Player, kind: string, money: number, paid: Collection.Paid?)
+	local hot = if type(paid) == "table" and type(paid.hot) == "number" then paid.hot else 0 -- (8.3: the market's)
 	if kind == "sale" then
 		SandboxTasks.note(player, "sell", money)
+		if hot > 0 then
+			SandboxTasks.note(player, "hotsell", hot)
+		end
 	elseif kind == "income" then
 		SandboxTasks.note(player, "income", money)
+		if hot > 0 then
+			SandboxTasks.note(player, "hotincome", hot)
+		end
 	end
 end
 

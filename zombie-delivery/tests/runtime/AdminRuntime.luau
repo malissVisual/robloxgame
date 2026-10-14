@@ -332,7 +332,10 @@ Runtime.upgrades = {} -- { { player, what } }
 Runtime.Upgrades = {
 	admin = function(player: any, what: string): string
 		table.insert(Runtime.upgrades, { player = player, what = what })
-		return if what == "max" then "ADMIN: every upgrade at its top (20 stands)." else "ADMIN: the upgrades reset (12 stands)."
+		if string.sub(what, 1, 5) == "level" then
+			return `ADMIN: the warehouse at Level {string.sub(what, 6)}.` -- (8.3)
+		end
+		return if what == "max" then "ADMIN: every upgrade at its top (20 stands)." else "ADMIN: the upgrades reset (2 stands)."
 	end,
 }
 
@@ -341,7 +344,16 @@ Runtime.books = {} -- { { player, what } }
 Runtime.CollectionBook = {
 	admin = function(player: any, what: string): string
 		table.insert(Runtime.books, { player = player, what = what })
-		return if what == "fill" then "ADMIN: the collection book is full (56 new, 56 pieces)." else "ADMIN: the collection book is empty."
+		return if what == "fill" then "ADMIN: the collection book is full (68 new, 68 pieces)." else "ADMIN: the collection book is empty."
+	end,
+}
+
+-- 8.3: server/VanPaint.luau's admin (the SANDBOX tab's 🎨 UNLOCK PAINTS / 🎨 RESET PAINTS), recorded
+Runtime.paints = {} -- { { player, what } }
+Runtime.VanPaint = {
+	admin = function(player: any, what: string): string
+		table.insert(Runtime.paints, { player = player, what = what })
+		return if what == "all" then "ADMIN: every paint and livery of the PAINT shop is yours (16 items): wear them at your van." else "ADMIN: the paints reset: nothing bought, your van in ZDC cream with the ZDC classic stripe."
 	end,
 }
 

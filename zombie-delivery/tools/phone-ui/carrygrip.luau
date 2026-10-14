@@ -15,6 +15,11 @@
 -- client/MoveSounds.luau's grip_slip and no heavy_drop for the drop's damage), a miss shakes it and the camera; it goes
 -- Ui.Linger s after; a "close" takes it off; a door's fade hides it (no press then); an older check's outcome is
 -- ignored; the first Ui.Tutorial checks say "… when the needle is in the green"; no warnings.
+-- 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the press in the words of the device used now: a phone's
+-- "Tap GRIP", a computer's "Press LMB / F", a gamepad's "Press R2" with R2's glyph at the top right (only while the
+-- check waits; none when the platform gives no picture), a phone with a gamepad used last the gamepad's; SLIPPED BACK!'s
+-- "try again" (a phone: the prompt is tapped), "(E)", "(X)"; a gamepad picked up or put down mid-check: the words and
+-- the glyph follow at once.
 -- CarryGripUi's and MoveSounds' os.clock is this check's M.clock (mock.os): a frame moves it on by its dt.
 -- `luau carrygrip.luau -a dump` prints the preview's scenes instead (tools/phone-ui/carrygrip_preview.py).
 local dump = select(1, ...) == "dump"
@@ -92,6 +97,17 @@ M.gamepad = false
 M.MUi.gamepadActive = function()
 	return M.gamepad
 end
+-- 8.3 keys: the last input's type changing (client/PadGlyph.luau watch), the platform's picture of a button
+-- (M.padImages false: none)
+M.services.UserInputService.LastInputTypeChanged = M.signal()
+M.padImages = true
+M.services.UserInputService.GetImageForKeyCode = function(_, key)
+	return if M.padImages and key then "rbxasset://textures/ui/Controls/" .. key.Name .. ".png" else ""
+end
+local function useGamepad(on)
+	M.gamepad = on
+	M.services.UserInputService.LastInputTypeChanged:Fire(if on then M.Enum.UserInputType.Gamepad1 else M.Enum.UserInputType.Keyboard)
+end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
 M.MTheme.WindowTransparency = 0.02
@@ -100,7 +116,7 @@ M.MKeys = { open = function() end, close = function() end, isOpen = function()
 end, hint = function()
 	return "SPACE"
 end }
-M.MFade = { out = function() end, into = function() end }
+M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
 M.MapView.waypointAt = function()
 	return M.waypoint
 end
@@ -411,7 +427,7 @@ local function moveState(tvState, tvCondition)
 	}
 end
 moving.OnClientEvent:Fire("state", moveState("carried", 1))
-setAttr(M.player, "MoveHelper", "carry") -- (Danny's strip)
+setAttr(M.player, "MoveHelper", "hired") -- (Danny's strip: 8.3 hired)
 setAttr(M.player, "MoveWith", 14) -- (the 💬 button)
 local panel = named(M.gui, "MovePanel")
 local strip = MoveHelperHud.strip()
@@ -461,6 +477,8 @@ check("the server's lift check: the widget and the GRIP button show", CarryGripU
 local title, piece, hint = named(grip, "Title"), named(grip, "Piece"), named(grip, "Hint")
 check("…GET A GRIP!, the piece's icon (📺), the tutorial's hint (a phone: Tap GRIP in the green)", title.Text == "GET A GRIP!" and piece.Text == "📺"
 	and hint.Text == "Tap GRIP in the green", `{title.Text} / {piece.Text} / {hint.Text}`)
+local padKey = named(grip, "PadKey")
+check("…no gamepad glyph on a phone (8.3 keys)", padKey ~= nil and not padKey.Visible)
 check("…grip_tick as it opens", played("grip_tick") == 1)
 local gripBox, tapBox = box(grip), box(tap)
 check("the GRIP button: round, 80 px and more, at the right over the touch buttons", tapBox.x1 - tapBox.x0 >= 80 and math.abs((tapBox.x1 - tapBox.x0) - (tapBox.y1 - tapBox.y0)) < 1
@@ -525,8 +543,8 @@ for _ = 1, 12 do
 	frames(1)
 	moved = moved or math.floor(box(grip).x0 + 0.5) ~= restX
 end
-check("the server's knock: SLIPPED BACK!, \"95% left · try again (E)\", furniture_putdown, a shake (the widget and the camera)", title.Text == "SLIPPED BACK!"
-	and hint.Text == "95% left · try again (E)" and played("furniture_putdown") == 1 and moved and #M.shakes == shakes + 1, `{title.Text} / {hint.Text}`)
+check("the server's knock: SLIPPED BACK!, \"95% left · try again\" (8.3 keys: a phone taps the prompt, no E), furniture_putdown, a shake (the widget and the camera)", title.Text == "SLIPPED BACK!"
+	and hint.Text == "95% left · try again" and played("furniture_putdown") == 1 and moved and #M.shakes == shakes + 1, `{title.Text} / {hint.Text}`)
 frames(math.ceil(G.Ui.Linger * 60) + 2)
 check("…and it goes", not CarryGripUi.active())
 
@@ -682,10 +700,62 @@ M.gamepad = true
 wire = open("wobble", false)
 frames(1)
 check("a gamepad: \"Press R2\"", hint.Text == "Press R2")
+-- 8.3 keys: R2's glyph at the top right, the title making room for it
+check("…R2's glyph at the widget's top right (the platform's picture), the title narrower", padKey.Visible and string.find(padKey.Image, "ButtonR2", 1, true) ~= nil
+	and box(padKey).x1 <= box(grip).x1 and box(padKey).y0 >= box(grip).y0 and box(title).x1 <= box(padKey).x0 + 1, `{padKey.Image} {show(box(padKey))} / {show(box(title))}`)
 input.InputBegan:Fire({ UserInputType = M.Enum.UserInputType.Gamepad1, KeyCode = M.Enum.KeyCode.ButtonR2 }, false)
 check("…R2 presses", answers()[#answers()][2] == wire.id)
-M.gamepad = false
+frames(1)
+check("…the glyph goes once pressed (nothing more to press)", not padKey.Visible)
+result(wire.id, "knock", 90)
+frames(1)
+check("…SLIPPED BACK! with a gamepad: \"90% left · try again (X)\" (the prompts' X)", hint.Text == "90% left · try again (X)", hint.Text)
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+-- 8.3 keys: no picture from the platform: the words alone
+M.padImages = false
+wire = open("wobble", false)
+frames(1)
+check("a gamepad without the platform's pictures: \"Press R2\", no glyph", hint.Text == "Press R2" and not padKey.Visible)
 moving.OnClientEvent:Fire("grip", "close", wire.id)
+M.padImages = true
+-- 8.3 keys: the gamepad put down mid-check (the mouse used): the computer's words at the next frame, the glyph gone; picked up again
+wire = open("wobble", false)
+frames(1)
+useGamepad(false)
+frames(1) -- (the next frame draws it)
+check("the gamepad put down mid-check: \"Press LMB / F\" at once, no glyph", hint.Text == "Press LMB / F" and not padKey.Visible, hint.Text)
+useGamepad(true)
+frames(1) -- (the next frame draws it)
+check("…picked up again: \"Press R2\" and its glyph at once", hint.Text == "Press R2" and padKey.Visible, hint.Text)
+moving.OnClientEvent:Fire("grip", "close", wire.id)
+-- 8.3 keys: a computer's knock names the prompt's E
+useGamepad(false)
+wire = open("lift", false)
+frames(1)
+result(wire.id, "knock", 88)
+frames(1)
+check("a computer's knock: \"88% left · try again (E)\"", hint.Text == "88% left · try again (E)", hint.Text)
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+-- 8.3 keys: a phone with a gamepad used last: the gamepad's words (the GRIP button still there to tap)
+M.touch = true
+useGamepad(true)
+wire = open("wobble", false)
+frames(1)
+check("a phone with a gamepad used last: \"Press R2\" and its glyph", hint.Text == "Press R2" and padKey.Visible, hint.Text)
+moving.OnClientEvent:Fire("grip", "close", wire.id)
+-- 8.3 keys: the city's words as before (a touch screen first, its E; no glyph)
+Config.Sandbox.On = false
+wire = open("lift", false)
+frames(1)
+check("the city: a phone with a gamepad: \"Tap GRIP\" as before, no glyph", string.find(hint.Text, "Tap GRIP", 1, true) == 1 and not padKey.Visible, hint.Text)
+result(wire.id, "knock", 87)
+frames(1)
+check("… its knock: \"87% left · try again (E)\" as before", hint.Text == "87% left · try again (E)", hint.Text)
+frames(math.ceil(G.Ui.Linger * 60) + 2)
+Config.Sandbox.On = true
+M.touch = false
+useGamepad(false)
+frames(1)
 -- the list (O) open at the right: the widget keeps clear of it
 input.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.O, UserInputType = M.Enum.UserInputType.Keyboard }, false)
 M.resume()

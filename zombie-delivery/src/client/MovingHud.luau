@@ -42,6 +42,10 @@
 -- before): the state's `drop` ("your warehouse": the drop-off's words in the panel, the list, the GPS, a delivered
 -- thing is HOME); the card's `story` false (no intro, no CHAPTERS) and `note` (no pay per piece), a horde at 0:00 none;
 -- the result's `home` (what came home: the pieces, their value; no pay lines).
+-- 8.3 keys (the sandbox; shared/SandboxPad.luau, client/PadGlyph.luau): the panel's words name the keys of the device
+-- used now, a gamepad used last first: what to do next ("Pick up the things (E)", "(X)" with a gamepad, no key on a
+-- touch screen: the prompt is tapped) and the list's hint ("LIST [O]", "TAP: LIST" on a touch screen, none with a
+-- gamepad: no button opens it). Every refresh, so they follow a gamepad picked up or put down. The city's as before.
 -- Presentation only.
 
 local CollectionService = game:GetService("CollectionService")
@@ -55,7 +59,9 @@ local Net = require(Shared.Net)
 local Map = require(Shared.Map)
 local Config = require(Shared.Config)
 local MoveRoles = require(Shared.MoveRoles) -- 7.0 planning
+local SandboxPad = require(Shared.SandboxPad) -- 8.3 keys
 local Ui = require(script.Parent.Ui)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 keys: the device used now
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
 local Fade = require(script.Parent.Fade)
@@ -360,6 +366,19 @@ local function buildPanel(root: ScreenGui)
 	end)
 end
 
+-- 8.3 keys: a prompt's key at the end of the words: the sandbox's for the device used now (shared/SandboxPad.luau
+-- withKey: "(E)", "(X)", none on a touch screen), the city's E.
+local function keyed(text: string): string
+	return if Config.Sandbox.On then SandboxPad.withKey(text, "use", PadGlyph.device()) else `{text} (E)`
+end
+
+-- 8.3 keys: the list's hint (the sandbox's: its key, a touch screen's tap, none with a gamepad).
+local function listHint(): string
+	local device = PadGlyph.device()
+	local key = SandboxPad.keyWord("list", device)
+	return if key then `LIST [{key}]` elseif device == "touch" then "TAP: LIST" else ""
+end
+
 -- What to do now, from the state.
 local function nextStep(s: any): string
 	local counts = s.counts or {}
@@ -374,10 +393,10 @@ local function nextStep(s: any): string
 		return if out > 0 then `🧟 THE HORDE! Drive the van to {wallOf(s)} NOW` else "🧟 THE HORDE! Load something and get out"
 	end
 	if s.inside == true then
-		return if carried > 0 then "Carry it out: walk out through a door" else "Pick up the things (E) · ★ first" -- (8.1 walk-in doors)
+		return if carried > 0 then "Carry it out: walk out through a door" else `{keyed("Pick up the things")} · ★ first` -- (8.1 walk-in doors)
 	end
 	if carried > 0 then
-		return if s.backOpen == true then "Load it at the van's back (E)" else "Open the van's back (E), then Load"
+		return if s.backOpen == true then keyed("Load it at the van's back") else `{keyed("Open the van's back")}, then Load`
 	end
 	if out > 0 and out + delivered >= total and total > 0 then
 		return if s.drop then `Everything is in: drive to {wallOf(s)}` else "Everything is in: drive to the Wall at the depot"
@@ -436,6 +455,9 @@ refreshPanel = function()
 	refs.next.Text = if late and grace then `⏱ TIME'S UP · REACH {string.upper(wallOf(s))} · {clock(grace - nowAt)}` else nextStep(s)
 	refs.next.TextColor3 = if s.horde == true or late then K.red else K.text
 	refs.role.Text = roleLine(s) -- 7.0 planning
+	if Config.Sandbox.On then
+		refs.hint.Text = listHint() -- 8.3 keys
+	end
 	local finish = refs.finish -- 7.x van moves: the owner's FINISH once something reached the Wall (asked twice)
 	if finish then
 		local can = s.mine == true and delivered > 0
@@ -1083,7 +1105,7 @@ function MovingHud.start()
 		buildPanel(root)
 	end
 	watchPrompts()
-	remote.OnClientEvent:Connect(function(kind: any, a: any, b: any)
+	remote.OnClientEvent:Connect(function(kind: any, a: any, b: any, c: any)
 		if kind == "state" then
 			setState(a)
 		elseif kind == "contract" then
@@ -1095,7 +1117,7 @@ function MovingHud.start()
 			if a == "out" then
 				Fade.out(seconds)
 			else
-				Fade.into(seconds)
+				Fade.into(seconds, Fade.arrival(c)) -- (8.3 a door's trip: dark until you are there, client/Fade.luau)
 			end
 		end
 	end)

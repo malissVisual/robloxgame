@@ -27,7 +27,8 @@
 -- Garage's shed: the front wall H, the back wall rise lower; the Logistics Center's barrel: a gable of rise under it),
 -- its lamps and tie beams where the Blender model has its lamps and trusses (the model hides these; their lights
 -- shine from just under the model's lamps), its STOCK board and UPGRADES sign where its walls have room (a Garage's
--- board on its west wall, over nothing).
+-- board on its west wall, over nothing). The lamps' light (the sandbox's light, 8.3) is Config.SandboxLight.Warehouse's:
+-- its Lamp's colour, each level's brightness and reach (its Levels).
 --
 -- World coordinates (studs) of one plot. Every warehouse looks south, so its own frame is only moved: x across (east
 -- +), z to the door (south +), y up from the ground.
@@ -154,7 +155,7 @@ local INK = { 26, 27, 29 }
 local PODIUM = { 50, 53, 58 }
 local FELT = { 202, 196, 184 }
 local PAINT = { 242, 198, 42 }
-local GLOW = { 255, 244, 224 }
+local GLOW = Config.SandboxLight.Warehouse.Glow -- 8.3: the lamps' discs (Config.SandboxLight)
 
 -- 8.3: each level's hall, fitted to the owner's Blender building (Config.Warehouse.Levels: its size and door). The
 -- stands' grid (WarehouseLayout.grid; level 4's from Config, the warehouse of 8.0 – 8.2); `beams` and `lamps` are the
@@ -510,7 +511,7 @@ function WarehouseLayout.terminalLines(): { Line }
 	return {
 		line("ZDC UPGRADES", ORANGE, 0.36, "Black"),
 		line("Warehouse · Stands · Lights · Van", WHITE, 0.2, "Bold"),
-		line("[E] OPEN", GREY, 0.18, "Medium"),
+		line("WALK UP TO OPEN", GREY, 0.18, "Medium"), -- (8.3 keys: no key, a phone and a gamepad read it too)
 	}
 end
 
@@ -772,13 +773,17 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	-- (the model's lamps hang a stud under the walls' top, a shed's 0.85 under its back wall: the game's glow 0.77
 	-- under theirs, its light shining from just under them)
 	local glowY = if shed then back - 0.85 - 0.77 else h - 1.77
+	-- (8.3, the light: Config.SandboxLight's, its Lamp's colour and this level's brightness and reach: a lower hall's
+	-- dimmer and shorter, the Logistics Center's longer to its floor)
+	local lit = Config.SandboxLight.Warehouse
+	local shine = lit.Levels[level] or lit.Lamp
 	for lamps, at in hall.lamps do
 		local x, z = at[1], hz - at[2]
 		local housing = look(add(`Lamp{lamps}`, "inside", { 0.7, 3.2, 3.2 }, { x, glowY + 0.42, z }, TRIM, "Metal"))
 		housing.shape, housing.roll = "Cylinder", 90
 		local glow = look(add(`LampGlow{lamps}`, "inside", { 0.14, 2.6, 2.6 }, { x, glowY, z }, GLOW, "Neon")) -- (its light stays)
 		glow.shape, glow.roll = "Cylinder", 90
-		glow.light = { range = T.Lamp.Range, brightness = T.Lamp.Brightness, color = T.Lamp.Color }
+		glow.light = { range = shine.Range, brightness = shine.Brightness, color = lit.Lamp.Color }
 	end
 
 	-- the floor's paint: the receiving zone's box and name, the middle aisle's edges

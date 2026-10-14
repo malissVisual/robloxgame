@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sandbox map</title>
+<!-- 8.3: tools/sandbox-map's page: renderTop draws parts from straight above with three.js; compose.js lays out the sheet. -->
+<style>
+@font-face { font-family: 'Montserrat'; font-weight: 500; src: url(montserrat-500.woff2) format('woff2'); }
+@font-face { font-family: 'Montserrat'; font-weight: 700; src: url(montserrat-700.woff2) format('woff2'); }
+@font-face { font-family: 'Montserrat'; font-weight: 800; src: url(montserrat-800.woff2) format('woff2'); }
+html, body { margin: 0; background: #1d2127; }
+#sheet { position: relative; overflow: hidden; }
+#sheet canvas { position: absolute; display: block; }
+#sheet svg { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<div style="font-family:Montserrat;font-weight:500;position:absolute;opacity:0">a</div>
+<div style="font-family:Montserrat;font-weight:700;position:absolute;opacity:0">a</div>
+<div style="font-family:Montserrat;font-weight:800;position:absolute;opacity:0">a</div>
+<div id="sheet"></div>
+<script type="module">
+import * as THREE from './three.module.min.js';
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 32).rotateZ(-Math.PI / 2); // (Roblox's cylinder lies along X)
+const unitBall = new THREE.SphereGeometry(0.5, 32, 20);
+function prism(v, tris) {
+  const pos = [];
+  for (const t of tris) for (const k of t) pos.push(...v[k]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+const unitWedge = prism({ bfl: [-.5, -.5, -.5], bfr: [.5, -.5, -.5], bbl: [-.5, -.5, .5], bbr: [.5, -.5, .5], tbl: [-.5, .5, .5], tbr: [.5, .5, .5] },
+  [['bfl', 'bbr', 'bfr'], ['bfl', 'bbl', 'bbr'], ['bbl', 'tbr', 'bbr'], ['bbl', 'tbl', 'tbr'], ['bfl', 'bfr', 'tbr'], ['bfl', 'tbr', 'tbl'], ['bfl', 'tbl', 'bbl'], ['bfr', 'bbr', 'tbr']]);
+const unitCorner = prism({ a: [-.5, -.5, -.5], b: [.5, -.5, -.5], c: [.5, -.5, .5], d: [-.5, -.5, .5], t: [.5, .5, -.5] },
+  [['a', 'c', 'b'], ['a', 'd', 'c'], ['b', 'c', 't'], ['a', 'b', 't'], ['a', 't', 'd'], ['d', 't', 'c']]);
+const ROUGH = { SmoothPlastic: 0.5, Plastic: 0.6, Metal: 0.45, Glass: 0.15, Grass: 0.95, Concrete: 0.9, Asphalt: 0.95, Slate: 0.85, WoodPlanks: 0.8, Wood: 0.8, Pebble: 0.95, Fabric: 0.9, Neon: 1 };
+
+let renderer = null;
+function makeRenderer(W, H) {
+  if (!renderer) {
+    renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+  }
+  renderer.setPixelRatio(1);
+  renderer.setSize(W, H, false);
+}
+
+// One part record → a mesh. Records: { p, r (9, row-major), s, c (0-255), t, mat, class, shape, mesh }
+function meshOf(p, mats) {
+  if (p.t >= 0.95) return null;
+  let geo = unitBox;
+  if (p.class === 'WedgePart' || p.shape === 'Wedge') geo = unitWedge;
+  else if (p.class === 'CornerWedgePart' || p.shape === 'CornerWedge') geo = unitCorner;
+  else if (p.shape === 'Cylinder') geo = unitCyl;
+  else if (p.shape === 'Ball' || p.mesh === 'Sphere') geo = unitBall;
+  const key = `${p.c.join(',')}|${p.mat}|${p.t.toFixed(2)}`;
+  let mat = mats.get(key);
+  if (!mat) {
+    const color = new THREE.Color().setRGB(p.c[0] / 255, p.c[1] / 255, p.c[2] / 255, THREE.SRGBColorSpace);
+    const opts = { color, roughness: ROUGH[p.mat] ?? 0.7, metalness: p.mat === 'Metal' ? 0.2 : 0 };
+    if (p.mat === 'Neon') opts.emissive = color, opts.emissiveIntensity = 0.6;
+    mat = new THREE.MeshStandardMaterial(opts);
+    if (p.t > 0.01) { mat.transparent = true; mat.opacity = 1 - p.t; mat.depthWrite = false; }
+    mats.set(key, mat);
+  }
+  const m = new THREE.Mesh(geo, mat);
+  const r = p.r, q = p.p;
+  const m4 = new THREE.Matrix4().set(r[0], r[1], r[2], q[0], r[3], r[4], r[5], q[1], r[6], r[7], r[8], q[2], 0, 0, 0, 1);
+  let s = p.s;
+  if (p.shape === 'Ball' && !p.mesh) { const d = Math.min(s[0], s[1], s[2]); s = [d, d, d]; }
+  m4.multiply(new THREE.Matrix4().makeScale(s[0], s[1], s[2]));
+  m.matrixAutoUpdate = false;
+  m.matrix.copy(m4);
+  const big = Math.max(...s);
+  m.castShadow = p.t < 0.5 && big > 0.6 && !(s[1] < 0.3 && big > 40);
+  m.receiveShadow = true;
+  return m;
+}
+
+// The van's parts (model space, the nose to -Z) at a spot { x, y, z, yaw } (Roblox: CFrame.new(x, y, z) * Angles(0, yaw, 0))
+function vanParts(van, spot) {
+  const a = spot.yaw * Math.PI / 180;
+  const c = Math.cos(a), s = Math.sin(a);
+  // R_y(a) = [[c,0,s],[0,1,0],[-s,0,c]]
+  const out = [];
+  for (const p of van) {
+    const [px, py, pz] = p.p;
+    const r = p.r;
+    const wx = c * px + s * pz + spot.x, wy = py + spot.y, wz = -s * px + c * pz + spot.z;
+    const R = [
+      c * r[0] + s * r[6], c * r[1] + s * r[7], c * r[2] + s * r[8],
+      r[3], r[4], r[5],
+      -s * r[0] + c * r[6], -s * r[1] + c * r[7], -s * r[2] + c * r[8],
+    ];
+    out.push({ ...p, p: [wx, wy, wz], r: R });
+  }
+  return out;
+}
+
+// Renders the parts from straight above: centre (x, z), k px a stud, W × H px; screen right = +Z, screen up = +X.
+window.renderTop = (parts, view) => {
+  const { W, H, k, cx, cz } = view;
+  makeRenderer(W, H);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x7fa35a);
+  scene.add(new THREE.HemisphereLight(0xeef3ff, 0x606048, 1.15));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
+  // light from the screen's top left (+X, -Z) and high: the shadows fall to the bottom right
+  sun.position.set(cx + 200, 640, cz - 230);
+  sun.target.position.set(cx, 0, cz);
+  scene.add(sun.target);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(view.shadowMap || 4096, view.shadowMap || 4096);
+  const half = Math.max(W, H) / k * 0.62;
+  const sc = sun.shadow.camera;
+  sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 10; sc.far = 2000;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
+  scene.add(sun);
+  const mats = new Map();
+  let count = 0;
+  for (const p of parts) {
+    const m = meshOf(p, mats);
+    if (m) { scene.add(m); count++; }
+  }
+  const w = W / k, h = H / k;
+  const cam = new THREE.OrthographicCamera(-w / 2, w / 2, h / 2, -h / 2, 1, 3000);
+  cam.position.set(cx, 1200, cz);
+  cam.up.set(1, 0, 0);
+  cam.lookAt(cx, 0, cz);
+  renderer.render(scene, cam);
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  out.getContext('2d').drawImage(renderer.domElement, 0, 0);
+  mats.forEach(m => m.dispose());
+  return { canvas: out, count };
+};
+
+window.vanParts = vanParts;
+document.fonts.ready.then(() => { window.ready = true; });
+</script>
+<script src="compose.js"></script>
+</body>
+</html>

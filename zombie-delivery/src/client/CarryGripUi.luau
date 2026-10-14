@@ -18,6 +18,11 @@
 --   * The outcome (the server's): BALANCED! (+10% walk), SLIPPED BACK! (a knock: try again), STEADY!, STAGGER! (a knock,
 --     slower a moment, the next miss drops it), DROPPED! (it fell). A miss shakes the widget (a pixel with Reduced
 --     Motion) and the camera a little (client/CameraRig.luau shake), flashes red; it stays Ui.Linger s.
+--   * 8.3 keys (the sandbox; shared/SandboxPad.luau "grip" and "use", client/PadGlyph.luau): the words name the press
+--     of the device used now, a gamepad used last first: "Press LMB / F", "Press R2" with R2's glyph at the widget's top
+--     right (the platform's picture; while the check waits for the press), "Tap GRIP"; SLIPPED BACK!'s "try again (E)",
+--     "(X)" with a gamepad, no key on a touch screen (its Pick up is tapped). They follow a gamepad picked up or put
+--     down at once. The city's words as before.
 --   * The sounds (art/audio/sfx4.ogg): grip_tick at a lift check's start and each time the needle enters the zone,
 --     grip_warning at a wobble's (louder when its miss drops it) and at a stagger, ding on a hit, furniture_putdown on a
 --     lift's knock, client/MoveSounds.luau slipped() on a drop (one thud, not two).
@@ -38,7 +43,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local CarryGrip = require(Shared.CarryGrip)
+local SandboxPad = require(Shared.SandboxPad) -- 8.3 keys
 local Ui = require(script.Parent.Ui)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 keys: the device, a gamepad button's glyph
 local Theme = require(script.Parent.Theme)
 local TouchLayout = require(script.Parent.TouchLayout)
 local MoveLayout = require(script.Parent.MoveLayout)
@@ -58,6 +65,7 @@ local TRACK_Y, TRACK_H = 36, 26
 local TRACK_W = MoveLayout.CHECK_W - 2 * PAD
 local TIMER_Y = 68
 local NEEDLE_W = 5
+local GLYPH = 22 -- 8.3 keys: the gamepad button's glyph at the top right (px at scale 1)
 local WAIT_FOR = 2.5 -- s an answered check waits for the server's outcome before it goes
 
 -- The outcomes' words (the title, its colour's tone, the line under it).
@@ -175,6 +183,9 @@ local function lookReduced()
 end
 
 local function keysText(): string
+	if Config.Sandbox.On then -- 8.3 keys: the device used now (a gamepad used last first)
+		return SandboxPad.howTo("grip", PadGlyph.device()) or ""
+	end
 	if Ui.touchLayout() then
 		return "Tap GRIP"
 	elseif Ui.gamepadActive() then
@@ -263,6 +274,18 @@ local function build(root: ScreenGui): any
 	Ui.corner(timer, 2)
 	local timerFill = Ui.make("Frame", { Name = "Fill", Size = UDim2.fromScale(1, 1), BackgroundColor3 = ORANGE, BorderSizePixel = 0, ZIndex = 2 }, timer)
 	Ui.corner(timerFill, 2)
+	-- 8.3 keys: with a gamepad its button for the press (the platform's glyph; the hint names it too)
+	local padKey = Ui.make("ImageLabel", {
+		Name = "PadKey",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -PAD + 2, 0, 8),
+		Size = UDim2.fromOffset(GLYPH, GLYPH),
+		BackgroundTransparency = 1,
+		ScaleType = Enum.ScaleType.Fit,
+		Image = "",
+		Visible = false,
+		ZIndex = 7,
+	}, panel)
 	local hint = Ui.label(panel, "", UDim2.fromOffset(TRACK_W, 18), {
 		Name = "Hint",
 		Position = UDim2.fromOffset(PAD, TIMER_Y + 8),
@@ -314,6 +337,7 @@ local function build(root: ScreenGui): any
 		timer = timer,
 		timerFill = timerFill,
 		hint = hint,
+		padKey = padKey,
 		press = press,
 		tap = tap,
 		tapEdge = tapEdge,
@@ -393,8 +417,30 @@ local function toneColor(tone: string): Color3
 	return if tone == "good" then K.good elseif tone == "warn" then K.warn elseif tone == "red" then K.red else ORANGE
 end
 
+-- 8.3 keys: the press's gamepad button as its glyph at the top right (the sandbox, a gamepad used last, the check
+-- waiting for the press; the title makes room).
+local function badge(r: Run)
+	local p = parts
+	if not p then
+		return
+	end
+	local waits = r.check ~= nil and r.verdict == nil and r.outcome == nil
+	local image = if Config.Sandbox.On and waits and PadGlyph.device() == "pad" then PadGlyph.image(SandboxPad.pads("grip")[1] or "") else ""
+	local on = image ~= ""
+	if p.padKey.Visible ~= on or p.padKey.Image ~= image then
+		p.padKey.Image = image
+		p.padKey.Visible = on
+		p.title.Size = UDim2.fromOffset(TRACK_W - 30 - (if on then GLYPH + 4 else 0), 24)
+	end
+end
+
+-- SLIPPED BACK!'s way on (8.3 keys: the sandbox's in the device's words, the Pick up prompt's key; the city's E).
+local function tryAgain(): string
+	return if Config.Sandbox.On then SandboxPad.withKey("try again", "use", PadGlyph.device()) else "try again (E)"
+end
+
 -- The title, its tone and the line under it as the run has them now (asked when the run changes: open, a press, the
--- timeout, the outcome).
+-- timeout, the outcome; 8.3 keys: the device changing).
 local function words(r: Run)
 	local outcome = r.outcome
 	if outcome then
@@ -402,7 +448,7 @@ local function words(r: Run)
 		local left = if r.left then `{r.left}% left · ` else ""
 		r.title, r.tone = if o then o[1] else "", if o then o[2] else ""
 		r.hint = if outcome == "balanced" then "Balanced: +10% walk"
-			elseif outcome == "knock" then `{left}try again (E)`
+			elseif outcome == "knock" then `{left}{tryAgain()}`
 			elseif outcome == "steady" then "Steady again: +10% walk"
 			elseif outcome == "stagger" then `{left}don't miss again`
 			else `It fell{if r.left then ` · {r.left}% left` else ""}`
@@ -415,6 +461,7 @@ local function words(r: Run)
 			elseif r.number <= G.Ui.Tutorial then `{keysText()} in the green`
 			else keysText()
 	end
+	badge(r)
 end
 
 -- The widget as the run has it (a property only when it changed).
@@ -579,6 +626,7 @@ local function show(r: Run)
 	p.tap.BackgroundColor3 = K.charcoal
 	p.tapEdge.Color = if r.what == "wobble" then K.warn else ORANGE
 	p.panel.Visible = not faded
+	badge(r) -- (8.3 keys)
 	place()
 	draw(r, os.clock())
 	if not frameHook then
@@ -719,6 +767,13 @@ function CarryGripUi.start()
 			faded = a == "out"
 		elseif kind == "state" and a == nil then
 			stop() -- (off a move)
+		end
+	end)
+	-- 8.3 keys: a gamepad picked up or put down: the words and the glyph for it at once
+	PadGlyph.watch(function()
+		local r = run
+		if r then
+			words(r)
 		end
 	end)
 	-- the screen and the top blocks: the widget's place

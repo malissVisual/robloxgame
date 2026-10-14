@@ -26,12 +26,17 @@
 -- the id).
 --
 --   Upgrades.levels(player)          { [id]: level } (a copy; {} before the save loads)
+--   Upgrades.warehouseLevel(player)  8.3: the player's warehouse level (1 … 5; the Garage's 1 before the save loads)
 --   Upgrades.buy(player, id, level?) the next level of `id` (level: the one the window offered) → ok, why
 --   Upgrades.open(player)            the UPGRADES desk's prompt: the state, then { kind = "open" } to the client
 --   Upgrades.admin(player, what)     the admin's ⬆ MAX UPGRADES ("max": the warehouse at level 5 too) / ↺ RESET
---                                    UPGRADES ("reset": back to the garage, level 1) → what to say
+--                                    UPGRADES ("reset": back to the garage, level 1); 8.3: 🏗 LV n ("level1" …
+--                                    "level5": the warehouse at that level for free, the other upgrades kept, the
+--                                    pieces on stands it hasn't back to the stock) → what to say
 --   Upgrades.onChanged(fn)           fn(player) after any change to a player's levels, 8.3: and when their save has
 --                                    loaded (server/Warehouse.luau builds their warehouse at its level then)
+--   Upgrades.onBought(fn)            8.3: fn(player, id, level) after a level bought at the desk (not the admin's, not a
+--                                    save loading: server/SandboxBadges.luau's firstUpgrade)
 --   Upgrades.start()                 the remote, joining and leaving, the vans
 --
 -- The "Upgrades" remote (Config.Robust.Limits.Upgrades requests a second; every input checked):
@@ -57,6 +62,7 @@ local remote = Net.get("Upgrades")
 local notice = Net.get("Notice")
 
 local listeners: { (Player) -> () } = {}
+local buyers: { (Player, string, number) -> () } = {} -- 8.3: Upgrades.onBought's fns
 local known: { [Player]: boolean } = {} -- the save has loaded (the effects are set)
 local pushing: { [Player]: boolean } = {} -- a state push waits for the frame's end
 local started = false
@@ -147,6 +153,10 @@ function Upgrades.levels(player: Player): Rules.Levels
 	return if levels then table.clone(levels) else {}
 end
 
+function Upgrades.warehouseLevel(player: Player): number
+	return Rules.warehouseLevel(levelsOf(player))
+end
+
 function Upgrades.buy(player: Player, id: any, expect: any): (boolean, string?)
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -181,6 +191,9 @@ function Upgrades.buy(player: Player, id: any, expect: any): (boolean, string?)
 	end)
 	PlayerData.track("event", player, "UpgradeBought", now, id)
 	remote:FireClient(player, { kind = "bought", id = id, level = now })
+	for _, fn in buyers do
+		task.spawn(fn, player, id, now)
+	end
 	return true, nil
 end
 
@@ -211,6 +224,17 @@ function Upgrades.admin(player: Player, what: string): string
 		end)
 		return `ADMIN: every upgrade at its top ({warehouseWords(player)}: {Collection.stands(player)} stands, income ×{string.format("%.2f", Collection.boost(player))}).`
 	end
+	local wanted = tonumber(string.match(what, "^level(%d)$"))
+	if wanted then
+		-- (8.3: 🏗 LV n: warehouse level n is the ZDC Warehouse upgrade's level n - 1; 0, the Garage, is not kept)
+		local def = Rules.def("warehouse")
+		local k = math.clamp(wanted - 1, 0, if def then def.max else 0)
+		local moved = change(player, function(levels: Rules.Levels)
+			(levels :: any).warehouse = if k > 0 then k else nil
+		end)
+		local back = if moved == 1 then " 1 piece went back to the stock." elseif moved > 1 then ` {moved} pieces went back to the stock.` else ""
+		return `ADMIN: the {warehouseWords(player)} ({Collection.stands(player)} stands).{back}`
+	end
 	local moved = change(player, function(levels: Rules.Levels)
 		table.clear(levels)
 	end)
@@ -220,6 +244,10 @@ end
 
 function Upgrades.onChanged(fn: (Player) -> ())
 	table.insert(listeners, fn)
+end
+
+function Upgrades.onBought(fn: (Player, string, number) -> ())
+	table.insert(buyers, fn)
 end
 
 -- ── Joining, leaving, the remote ──────────────────────────────────────────

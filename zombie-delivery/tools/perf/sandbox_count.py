@@ -4,17 +4,22 @@
 Two runs of the real server code on the Luau CLI:
   * tools/perf/sandbox-count.luau on tools/perf/world-mock.luau (world_count.py's preparation, the real server/Npcs):
     server/SandboxWorld.luau's map, the four Moving contracts kiosks (server/MoveSites.luau), the four warehouses
-    (server/Warehouse.luau: four owners, every display stand open and full of the heaviest pieces; Collection,
-    SandboxPlots and Upgrades are stand-ins written here), the house's inside while a move runs (server/HouseInterior.luau:
-    the largest of 24 plans) and Danny (server/Npcs.luau on the stand-in's classic R15);
+    (server/Warehouse.luau: four owners, every display stand open and full of the heaviest pieces, 8.3: each on a stand
+    it fits, WarehouseLayout.fits, so a big piece only on a big stand; Collection, SandboxPlots and Upgrades are
+    stand-ins written here), the house's inside while a move runs (server/HouseInterior.luau:
+    the largest of 24 plans of the sandbox's house's kind, 8.3 the big plan), Danny (server/Npcs.luau on the stand-in's
+    classic R15) and 8.3's showroom visitors (server/Visitors.luau's bodies: Config.Visitors.Cap of them, every kind's
+    look, each with the box of a sale);
   * tools/perf/van-count.luau on tools/vehicle-preview/roblox-mock.luau (export_fleet.py's preparation): the sandbox's
     van (Config.Sandbox.Van, the ZDC Sprinter's parts model) at every stage, by day (its night lights out).
 Each piece's row (tools/perf/census.luau): parts, MeshParts, visible / see-through / invisible parts, shadow casters
 (and the small ones under RenderBudget's size rule), lights (and those with Shadows on), SurfaceGuis and BillboardGuis
 (and those drawn at any distance), ParticleEmitters, Beams, fire / smoke / sparkles, decals, ProximityPrompts;
 the client's own 3D (client/SandboxGuide.luau's path and marker) read from its source. Then the worst case: 4 players,
-every warehouse's 20 stands full, 4 vans, a move running with the inside and Danny. The players' own avatars, the
-greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it.
+every warehouse a Logistics Center (8.3: level 5, the biggest, More stands at its top) with its 32 stands full, 4 vans, a
+move running with the inside and Danny, the server's cap of visitors. The players' own avatars, the
+greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it. 8.3 the
+big move: its inside is counted for every player at once too (4 moves running: a worst case past the one move's).
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]
 
@@ -45,9 +50,10 @@ function C.__own(player, entries, count)
 	stands[player] = count
 end
 function C.stock(player) return stock[player] or {} end
-function C.stands(player) return stands[player] or 12 end
+function C.stands(player) return stands[player] or 32 end
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
+function C.marketIncome() return 1 end -- (8.3: the market's hot kinds, server/Warehouse.luau's tags)
 function C.onChanged() end
 function C.openPicker() end
 function C.undisplay() return true end
@@ -62,7 +68,9 @@ function P.owner(id) return owners[id] end
 function P.onChanged() end
 return P
 """
-UPGRADES = "local U = {}\nfunction U.open() end\nreturn U\n"
+UPGRADES = ("local U = {}\nfunction U.open() end\nfunction U.onChanged() end\n"
+            "function U.levels() return { warehouse = 4, stands = 4 } end -- (8.3: the worst case, the Logistics Center, More stands at its top)\n"
+            "return U\n")
 
 COLUMNS = [
     ("parts", "parts"), ("meshParts", "MeshParts"), ("visible", "visible"), ("seeThrough", "see-through"),
@@ -155,11 +163,12 @@ def main():
     entries.append(("**the map (SandboxWorld)**", world))
     entries += [
         ("kiosks (4)", rows["kiosks"]),
-        ("warehouses (4): the halls, 20 stands each", rows["warehouses/building"]),
-        ("warehouses (4): 20 pieces on show each", rows["warehouses/shown"]),
+        ("warehouses (4): the halls, level 5, 32 stands each", rows["warehouses/building"]),
+        ("warehouses (4): every stand full (32 pieces on show each)", rows["warehouses/shown"]),
         ("a van (Sprinter, stage 0)", van),
         ("the house's inside (largest plan)", rows["interior"]),
         ("Danny", rows["danny"]),
+        ("8.3 visitors (the server's cap, each with a sale's box)", rows["visitors"]),
         ("client: SandboxGuide", rows["client/SandboxGuide"]),
     ]
     worst = {}
@@ -170,8 +179,14 @@ def main():
     add(worst, van, PLAYERS)
     add(worst, rows["interior"])
     add(worst, rows["danny"])
+    add(worst, rows["visitors"])
     add(worst, rows["client/SandboxGuide"])
-    entries.append((f"**worst case** ({PLAYERS} players, every stand full, {PLAYERS} vans, a move with the inside and Danny)", worst))
+    entries.append((f"**worst case** ({PLAYERS} players, every stand full, {PLAYERS} vans, a move with the inside and Danny, the visitors)", worst))
+    # 8.3: every player on a move of their own at once (each a big plan's inside and a Danny)
+    every = dict(worst)
+    add(every, rows["interior"], PLAYERS - 1)
+    add(every, rows["danny"], PLAYERS - 1)
+    entries.append((f"**every player on a move** ({PLAYERS} big insides, {PLAYERS} Dannys, the rest as the worst case)", every))
     print(table(entries))
     print()
     for label, row in rows.items():

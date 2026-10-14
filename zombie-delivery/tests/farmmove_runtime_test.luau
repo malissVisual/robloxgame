@@ -19,13 +19,14 @@
 --     s, the new van taken over), FINISH: paid for the three trips at the farm's pay (× its pay), chapter 1 done in the
 --     crew's saves (7.2 review: not for Cy, who joined without the prologue), the interior gone, the van's back its own
 --     again.
---   * Danny on a solo farm move: two ways; with the van at the barn he goes in and out by the barn doors for the
---     branding iron (★ first, the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
+--   * Danny on a solo farm move: two ways; 8.3 hired and given the branding iron, with the van at the barn he goes in
+--     and out by the barn doors for it (the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
 --     and comes out of the farmhouse's front door with Sol, then the hay wagon's (bigDoor) out of the barn doors to the
 --     van's hitch.
 --   * 8.1 walk-in doors (no E): a doormat at both doors; in by walking into the barn doors' zone; the hay wagon walked
 --     into the farmhouse's way out is refused once ("Too big — use the barn doors"), nobody goes; walked into the barn
---     doors' way out, out at the barn with the other end beside, facing away; not straight back in.
+--     doors' way out, out at the barn with the other end at its far end in front (8.3: lined up), facing away; not
+--     straight back in.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -407,7 +408,10 @@ follow(wagon, ann)
 tick()
 trigger(promptIn(workspace, "Leave by the barn doors"), ann)
 follow(wagon, ann)
-check("…out by the barn doors: at the barn's outside, Bob with the other end beside", flat(E.rootOf(ann).Position, barnOut) < 4 and flat(E.rootOf(bob).Position, barnOut) < 6
+local apart = E.rootOf(bob).Position - E.rootOf(ann).Position
+local annLook = E.rootOf(ann).CFrame.LookVector
+check("…out by the barn doors: at the barn's outside, Bob with the other end at its far end, straight in front of her (8.3: lined up)",
+	flat(E.rootOf(ann).Position, barnOut) < 4 and apart.X * annLook.X + apart.Z * annLook.Z > 3 and math.abs(apart.X * annLook.Z - apart.Z * annLook.X) < 1
 	and ann.Character:GetAttribute("MoveCarry") == wagonSpot.id and bob.Character:GetAttribute("MoveCarry") == wagonSpot.id, E.rootOf(ann).Position)
 -- the Driver calls the van to the nearest door: the barn's
 E.request(ann, "call")
@@ -599,6 +603,14 @@ local danny = MoveHelper.find(sol)
 local solBuild = built[#built]
 check("a solo farm move: Danny comes, with both ways (the front door, the barn doors)", danny ~= nil and #danny.ways == 2 and solBuild.plan.kind == "farm")
 E.cars[sol].model:SetAttribute("BackOpen", true)
+-- (8.3 Danny for hire: Sol hires him and gives him the branding iron, from beside it inside, then waits outside)
+E.request(sol, "helper", "hire")
+local solIron = solBuild.pieces[ironSpot.id]
+local outsideSol = E.rootOf(sol).Position
+E.place(sol, solIron.PrimaryPart.Position + V3(3, 0, 0))
+E.request(sol, "helper", "assign", solIron)
+E.place(sol, outsideSol)
+check("8.3 Sol hires Danny and gives him the branding iron", danny.hirer == sol and danny.queue[1] == ironSpot.id, danny.queue[1])
 local solOrigin = solBuild.origin
 local solBarnEntry = (solOrigin * HouseLayout.entries(solBuild.plan)[2]).Position
 local solFrontEntry = (solOrigin * solBuild.plan.entry).Position
@@ -631,7 +643,7 @@ for _ = 1, 2400 do
 		break
 	end
 end
-check("Danny goes in by the barn doors (the nearest way to the branding iron, ★ first)", cameIn ~= nil and (cameIn - solBarnEntry).Magnitude < 6 and (cameIn - solFrontEntry).Magnitude > 30,
+check("Danny goes in by the barn doors (the nearest way to the branding iron, his list's)", cameIn ~= nil and (cameIn - solBarnEntry).Magnitude < 6 and (cameIn - solFrontEntry).Magnitude > 30,
 	cameIn)
 check("…comes out by them with it and loads it into the van at the barn", cameOut ~= nil and flat(cameOut, barnOut) < 6 and ironIn, cameOut)
 
@@ -683,12 +695,14 @@ check("the farm has a pair piece that leaves by the farmhouse's front door", ben
 local bench = solBuild.pieces[benchSpot.id]
 E.place(sol, bench.PrimaryPart.Position + V3(0, 0, 4))
 trigger(promptIn(bench, "Lift"), sol)
+check(`8.3 Sol lifts the {benchSpot.item}: no drag alone, she calls Danny and waits`, sol.Character:GetAttribute("MoveCarry") == nil and danny.call ~= nil)
 local took = 0
-local helped = steps(4, function()
+local helped = steps(20, function() -- (8.3: he walks over, the piece on the floor meanwhile)
 	took += 0.1
 	return heldBy(benchSpot.id)
-end, bench)
-check(`Danny takes the far end of the {benchSpot.item} on the farm within 2 s`, helped and took <= 2.2, took)
+end)
+check(`8.3 Danny walks to the far end of the {benchSpot.item} on the farm: up together`, helped and sol.Character:GetAttribute("MoveCarry") == benchSpot.id, took)
+steps(0.6, nil, bench)
 local solFrontExit = (solOrigin * M.CFrame.new(solBuild.plan.exits[1])).Position
 E.clock += 12 -- (the pace check's allowance: the test jumps)
 E.place(sol, solFrontExit + V3(0, 3, 0))
@@ -714,11 +728,12 @@ E.clock += 12
 E.place(sol, solWagon.PrimaryPart.Position + V3(0, 0, 7))
 trigger(promptIn(solWagon, "Lift"), sol)
 took = 0
-helped = steps(4, function()
+helped = steps(20, function() -- (8.3: a call: he walks over)
 	took += 0.1
 	return heldBy(wagonId)
-end, solWagon)
-check("Danny takes the hay wagon's far end within 2 s", helped and took <= 2.2, took)
+end)
+check("8.3 Danny walks to the hay wagon's far end: up together", helped and sol.Character:GetAttribute("MoveCarry") == wagonId, took)
+steps(0.6, nil, solWagon)
 local solBarnExit = (solOrigin * M.CFrame.new(solBuild.plan.exits[2])).Position
 E.clock += 12
 E.place(sol, solBarnExit + V3(0, 3, 0))
@@ -741,8 +756,19 @@ trigger(promptIn(solVan.model, "Load"), sol)
 steps(0.3)
 check("…Sol loads it: on the van's hitch, Danny's hands free", s.move.things[wagonId].state == "truck" and s.move.hitch == wagonId
 	and Rules.holding(s.move, danny.id) == nil, E.lastNotice(sol))
--- the ZDC Van's back shut: he opens it himself when he comes with his next piece, and it goes in (helperLoad)
+-- the ZDC Van's back shut: he opens it himself when he comes with his next piece (8.3: one Sol gives him), and it
+-- goes in (helperLoad)
 solVan.model:SetAttribute("BackOpen", false)
+local nextPiece: any = nil
+for _, sp in solBuild.plan.spots do
+	local def = FurnitureLooks.Items[sp.item]
+	if not nextPiece and def and def.class == "hand" and s.move.things[sp.id].state == "home" and table.find(Moving.helperExits(s, sp.id), 2) then
+		nextPiece = sp
+	end
+end
+local nextModel = solBuild.pieces[nextPiece.id]
+E.place(sol, nextModel.PrimaryPart.Position + V3(3, 0, 0))
+E.request(sol, "helper", "assign", nextModel)
 E.place(sol, barnOut + V3(-20, 0, 0)) -- (out of the way, hands free)
 local saidBefore = #E.said
 local loadedBefore = Rules.counts(s.move).out
@@ -755,9 +781,10 @@ Moving.admin(sol, "end")
 
 -- 8.1 walk-in doors on the farm (no E): a doormat at both doors; Uma and Vic walk in by the barn doors' zone; the hay wagon
 -- (bigDoor) walked into the farmhouse's way out: refused once with the same words, nobody goes; walked into the barn
--- doors' way out: out at the barn, the other end beside, facing away from the doors.
+-- doors' way out: out at the barn, the other end at its far end in front (8.3: lined up), facing away from the doors.
 do
 	local D = T.Doors
+	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
 	local uma = E.player(166, "Uma", board + V3(-2, 0, 5))
 	local vic = E.player(167, "Vic", board + V3(-3, 0, 6))
 	E.crew[uma] = { vic }
@@ -807,7 +834,7 @@ do
 	stand(uma, barnFoot + up + barnFacing * 2, -barnFacing)
 	stand(vic, barnFoot + up + barnFacing * 2 + barnSide * 3, -barnFacing)
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	check("walked into the barn doors' zone: both in by the barn's entry (no E)", isIn(uma) and isIn(vic) and (E.rootOf(uma).Position - (o * entries[2]).Position).Magnitude < 6,
 		E.rootOf(uma).Position)
 
@@ -834,7 +861,7 @@ do
 	follow(wagon, uma)
 	local since = #E.messages
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	tick(0.4)
 	tick(0.4)
 	check("the hay wagon walked into the farmhouse's way out: refused once, \"Too big — use the barn doors\", nobody goes", isIn(uma) and isIn(vic)
@@ -849,11 +876,14 @@ do
 	stand(vic, barnExit + barnInto * 1 + side * 7.5, -barnInto)
 	follow(wagon, uma)
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	follow(wagon, uma)
 	local barnOut = V3(barnDoor.out.x, 0, barnDoor.out.z)
-	check("…walked into the barn doors' way out with it: out at the barn, Vic beside with the other end", not isIn(uma) and not isIn(vic)
-		and flat(E.rootOf(uma).Position, barnOut) < 1 and flat(E.rootOf(vic).Position, barnOut) < 5 and uma.Character:GetAttribute("MoveCarry") == wagonId
+	local apart = E.rootOf(vic).Position - E.rootOf(uma).Position
+	local look = E.rootOf(uma).CFrame.LookVector
+	check("…walked into the barn doors' way out with it: out at the barn, Vic at its far end straight in front of her (8.3: lined up)", not isIn(uma)
+		and not isIn(vic) and flat(E.rootOf(uma).Position, barnOut) < 1 and apart.X * look.X + apart.Z * look.Z > 3
+		and math.abs(apart.X * look.Z - apart.Z * look.X) < 1 and uma.Character:GetAttribute("MoveCarry") == wagonId
 		and vic.Character:GetAttribute("MoveCarry") == wagonId, E.rootOf(uma).Position)
 	check("…facing away from the barn doors, clear of their zone", E.rootOf(uma).CFrame.LookVector:Dot(barnFacing) > 0.99
 		and (E.rootOf(uma).Position - barnFoot):Dot(barnFacing) > D.Depth)
@@ -861,7 +891,7 @@ do
 	stand(uma, barnFoot + up + barnFacing * 2, -barnFacing)
 	follow(wagon, uma)
 	tick(0.1)
-	tick(D.Dwell)
+	tick(THROUGH)
 	tick(0.3)
 	check("…and not straight back in (Rearm s)", not isIn(uma))
 	E.Net.get("PutDown").OnServerEvent:Fire(uma)

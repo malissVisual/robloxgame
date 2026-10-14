@@ -13,16 +13,26 @@
 -- before Moving.start (tests/sandboxmove_runtime_test.luau). Its fakes: SandboxPlots (Runtime.plots: player → a
 -- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); the
 -- test sets server/SandboxBoot.luau's hook Moving.parkVan itself (Runtime.makeCar: a fake car).
+-- 8.3 Danny for hire: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and
+-- records it (Runtime.spent); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
+-- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
+-- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it).
 local Mock = require("./ItemMock") :: any
 local CityConfig = require("./Config") :: any
 CityConfig.Sandbox.On = false
 -- 8.1 grip: no timing checks by default (a pick lifts at once, no wobbles: the moves' other tests carry as before);
 -- tests/carrygrip_runtime_test.luau turns them on (the server reads Config.CarryGrip.On at every lift and carry).
 CityConfig.CarryGrip.On = false
+-- 8.3 keeping up: Danny not aimed ahead of his place by default (the moves' tests check him right at the far end: this
+-- runtime has no network delay to make up for); tests/movehelper_keepup_runtime_test.luau turns HoldLead on again
+-- (Runtime.gameLead: the game's numbers).
+local gameLead = table.clone(CityConfig.MoveHelper.HoldLead)
+CityConfig.MoveHelper.HoldLead.Base = 0
+CityConfig.MoveHelper.HoldLead.Ping = 0
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()
-	messages = {}, -- { { player, kind, a, b } } every FireClient
+	messages = {}, -- { { player, kind, a, b, c } } every FireClient (8.3: c, a door trip's fade in's arrival)
 	money = {}, -- { { player, amount, reason } }
 	xp = {}, -- { { player, amount } }
 	tracked = {}, -- { { name, ... } }
@@ -39,6 +49,7 @@ local Runtime: any = {
 	zombieHits = {}, -- { { z, amount, by, info } } what Zombies.damage was asked
 	noises = 0,
 	stoodUp = 0,
+	gameLead = gameLead, -- 8.3 Config.MoveHelper.HoldLead as the game has it
 }
 
 local O = getmetatable(Mock.Instance.new("Model"))
@@ -157,6 +168,10 @@ end
 local baseDestroy = O.Destroy
 function O.Destroy(self: any)
 	self.destroyed = true
+	local hook = self.props.OnDestroyed -- (8.3: a fake's own clean-up: a SeatWeld's)
+	if hook then
+		hook()
+	end
 	baseDestroy(self)
 end
 -- (a part's AncestryChanged when it leaves the world: the character's watchers)
@@ -344,8 +359,8 @@ Runtime.Net = {
 			remote = {
 				name = name,
 				OnServerEvent = signal(),
-				FireClient = function(_, player: any, kind: any, a: any, b: any)
-					table.insert(Runtime.messages, { player = player, remote = name, kind = kind, a = a, b = b })
+				FireClient = function(_, player: any, kind: any, a: any, b: any, c: any)
+					table.insert(Runtime.messages, { player = player, remote = name, kind = kind, a = a, b = b, c = c })
 				end,
 				FireAllClients = function() end,
 			}
@@ -407,9 +422,25 @@ Runtime.Crew = stub("Crew", {
 	end,
 })
 
+Runtime.wallet = {} -- 8.3: player → their money (PlayerData.get's money, spend's)
+Runtime.startMoney = 1000
+Runtime.spent = {} -- { { player, amount, reason, sku } } every PlayerData.spend that took the money
+local function moneyOf(player: any): number
+	local money = Runtime.wallet[player]
+	return if type(money) == "number" then money else Runtime.startMoney
+end
 Runtime.PlayerData = stub("PlayerData", {
 	addMoney = function(player: any, amount: number, reason: string)
 		table.insert(Runtime.money, { player = player, amount = amount, reason = reason })
+	end,
+	spend = function(player: any, amount: number, reason: string?, sku: string?): boolean
+		local money = moneyOf(player)
+		if type(amount) ~= "number" or amount < 0 or money < amount then
+			return false
+		end
+		Runtime.wallet[player] = money - amount
+		table.insert(Runtime.spent, { player = player, amount = amount, reason = reason, sku = sku })
+		return true
 	end,
 	addXp = function(player: any, amount: number)
 		table.insert(Runtime.xp, { player = player, amount = amount })
@@ -425,9 +456,15 @@ Runtime.PlayerData = stub("PlayerData", {
 		local own = Runtime.profiles[player]
 		if own then
 			own.story = Runtime.story[player]
+			own.money = moneyOf(player)
 			return own
 		end
-		return { story = Runtime.story[player], car = Runtime.carId }
+		return { story = Runtime.story[player], car = Runtime.carId, money = moneyOf(player) }
+	end,
+	-- 8.4: was the player's save read? A test's own Runtime.profiles[player] stands for one (its sandboxHouseSeed the
+	-- save's, kept there as Moving sets it); without one: a fresh profile, never saved (Moving's own memory counts)
+	loaded = function(player: any): boolean
+		return Runtime.profiles[player] ~= nil
 	end,
 	notify = noop, -- (7.2 review: the profile's car changed)
 	markStory = function(player: any, key: string): boolean
@@ -462,8 +499,48 @@ local function makeCar(owner: any, id: string, at: any): any
 		model:SetAttribute("BackOpen", false)
 	end
 	model.Parent = workspace
-	return { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false, bike = bike }
+	local car: any = { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false, bike = bike, speed = 0 }
+	if not bike then
+		-- 8.3: its seats (the driver's, one passenger's on the right: Door 2), its doors and its size
+		local function sit(seat: any, humanoid: any)
+			if seat.Occupant ~= nil or humanoid.SeatPart ~= nil then
+				return
+			end
+			seat.Occupant, humanoid.SeatPart, humanoid.Sit = humanoid, seat, true
+			local weld = Mock.Instance.new("Weld")
+			weld.Name = "SeatWeld"
+			weld.Part0, weld.Part1 = seat, humanoid.RootPart or humanoid.Parent.PrimaryPart
+			weld.OnDestroyed = function() -- (Roblox: the seat's occupant gone with its weld)
+				if seat.Occupant == humanoid then
+					seat.Occupant = nil
+				end
+				if humanoid.SeatPart == seat then
+					humanoid.SeatPart = nil
+				end
+			end
+			weld.Parent = seat
+			table.insert(Runtime.sat, { seat = seat, humanoid = humanoid })
+		end
+		local driver = Mock.Instance.new("VehicleSeat")
+		driver.Name = "DriverSeat"
+		driver.CFrame = chassis.CFrame * Mock.CFrame.new(-1.4, 1.5, -3)
+		driver:SetAttribute("Door", 1)
+		driver.Parent = model
+		driver.Sit = sit
+		local passenger = Mock.Instance.new("Seat")
+		passenger.Name = "PassengerSeat"
+		passenger.CFrame = chassis.CFrame * Mock.CFrame.new(1.4, 1.5, -3)
+		passenger:SetAttribute("Index", 1)
+		passenger:SetAttribute("Door", 2)
+		passenger.Parent = model
+		passenger.Sit = sit
+		car.seat, car.passengers = driver, { passenger }
+		car.doors = { { side = -1, z = -3, driver = true, seats = {} }, { side = 1, z = -3, driver = false, seats = { 1 } } }
+		car.size = Mock.Vector3.new(6, 6, 18)
+	end
+	return car
 end
+Runtime.sat = {} -- 8.3: { { seat, humanoid } } every Seat:Sit
 Runtime.makeCar = makeCar -- (8.0 SANDBOX: the test's own Moving.parkVan parks one)
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
 -- 7.x van moves: a move goes with its owner's own car: the one placeNear makes when it is given no id (the old tests'
@@ -511,8 +588,8 @@ Runtime.Vehicles = stub("Vehicles", {
 	backVerb = function(_car: any, opening: boolean): string
 		return if opening then "open the back doors" else "close the back doors"
 	end,
-	speed = function()
-		return 0
+	speed = function(car: any): number -- (8.3: the test's `speed` on the car)
+		return if type(car.speed) == "number" then car.speed else 0
 	end,
 	cargoSlots = function(): any
 		return { Mock.CFrame.new(0, 0.6, 0) }
@@ -567,6 +644,11 @@ Runtime.Vehicles = stub("Vehicles", {
 	end,
 	callCar = function()
 		return "called"
+	end,
+	-- 8.3 review: the hook a passenger door's Ride along asks (server/Buddy.luau's: no buddy here; server/MoveHelper.luau
+	-- wraps it: Danny gets out for his crew; a test calls it as the door's prompt would)
+	yieldSeat = function(_seat: any, _player: any): boolean
+		return false
 	end,
 })
 
@@ -739,6 +821,7 @@ Runtime.game = { GetService = function(_, name: string): any
 	assert(services[name], `MovingRuntime: unmocked service {name}`)
 	return services[name]
 end }
+Runtime.services = services -- (8.3: a test adds its own, e.g. a PathfindingService that records Danny's paths)
 Runtime.Players = Players
 
 -- ── The art (shaped like the art branch's interface) ───────────────────────

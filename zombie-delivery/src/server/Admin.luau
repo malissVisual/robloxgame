@@ -113,13 +113,17 @@
 --                             start / time / horde); "fill" 10 random pieces in random condition into the stock
 --                             (Collection.add), "clear" the stock emptied ($0 for it: Collection.clear, else every piece
 --                             sold and the money put back), "stands" the stock's pieces on the free display stands
---                             (Collection.display, Config.Warehouse.Stands); "van" the sandbox van (Config.Sandbox.Van)
+--                             (Collection.display, Collection.stands: 8.3, the warehouse level's); "van" the sandbox van (Config.Sandbox.Van)
 --                             to the plot's vanSpot (the live van moved with its load, else a new one), "house" to the
 --                             house's front door, "warehouse" to the plot's spawn (driving your van: it goes with you,
 --                             to the house's curb / the vanSpot); 8.1: "upmax" / "upreset" every upgrade at its top
 --                             for free / none (server/Upgrades.luau admin; FILL STANDS fills the player's own stands,
 --                             Collection.stands); 8.2: "bookfill" / "bookclear" every piece of the collection book found
---                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin)
+--                             (its milestones pay) / the book and its milestones empty (server/CollectionBook.luau admin);
+--                             8.3: "paintall" / "paintreset" every paint and livery of the PAINT shop owned for free /
+--                             none, the van in the factory's look (server/VanPaint.luau admin);
+--                             8.3: "level1" … "level5" the warehouse at that level for free (Upgrades.admin: its
+--                             building rebuilt, the pieces on stands it hasn't back to the stock)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1394,9 +1398,10 @@ end
 
 -- Moves (the sandbox house: Moving's admin) ----------------------------------------------------------------------------
 
--- Every move gets a new seed (KONTRAKT: "Each move gets a new seed, so the house is refilled"): a running one ends
--- cleanly (Moving.admin "end", called off), then Moving.admin "refill" forgets the seed your card holds (a card opened
--- before keeps its house until its move starts) and opens the card on a new one: the next START fills the house anew.
+-- A new seed refills the house (KONTRAKT: "Each move gets a new seed, so the house is refilled"; 8.3 economy: once a
+-- move brought something home, a move called off with nothing home keeps it): a running one ends cleanly
+-- (Moving.admin "end", called off), then Moving.admin "refill" forgets the seed your card holds and opens the card on a
+-- new one: the next START fills the house anew.
 Sandbox.run.refill = function(player: Player)
 	local ended = if Sandbox.onMove(player) then string.gsub(Sandbox.moving(player, "end"), "^ADMIN: ", "") .. " " else "No move was running. "
 	Sandbox.moving(player, "refill")
@@ -1480,11 +1485,11 @@ Sandbox.run.clear = function(player: Player)
 	say(player, if sold > 0 then `ADMIN: {sold} pieces gone from your stock ($0 for them).` elseif #stock == 0 then "ADMIN: your stock is empty already." else "ADMIN: the stock kept its pieces (Collection.sell refused them).")
 end
 
--- The stock's pieces not on show onto the free display stands (Config.Warehouse.Stands of them; 8.1: the player's own
--- count, Collection.stands, with the More stands they bought).
+-- The stock's pieces not on show onto the free display stands (8.1: the player's own count, Collection.stands: 8.3,
+-- their warehouse level's; a build without it: Config.Warehouse.Stands of them).
 Sandbox.run.stands = function(player: Player)
 	local stands = Sandbox.Rules.standCount((Config :: any).Warehouse)
-	if stands > 0 and Sandbox.hasCollection("stands") then
+	if Sandbox.hasCollection("stands") then
 		local ok, own = Sandbox.collection("stands", player)
 		stands = if ok and type(own) == "number" then own else stands
 	end
@@ -1532,6 +1537,13 @@ Sandbox.run.upreset = function(player: Player)
 	Sandbox.upgrades(player, "reset")
 end
 
+-- 8.3: 🏗 LV 1 … 5, the warehouse's level (Upgrades.admin "level1" … "level5")
+for level = 1, 5 do
+	Sandbox.run[`level{level}`] = function(player: Player)
+		Sandbox.upgrades(player, `level{level}`)
+	end
+end
+
 -- 8.2, the collection book (server/CollectionBook.luau's admin: every piece found, or the book empty) ----------------
 
 function Sandbox.book(player: Player, what: string)
@@ -1552,6 +1564,28 @@ end
 
 Sandbox.run.bookclear = function(player: Player)
 	Sandbox.book(player, "clear")
+end
+
+-- 8.3, the PAINT shop (server/VanPaint.luau's admin: every paint and livery owned, or none) ---------------------------
+
+function Sandbox.paints(player: Player, what: string)
+	local ok, text = pcall(function()
+		return (require(Server.VanPaint) :: any).admin(player, what)
+	end)
+	if ok and type(text) == "string" then
+		say(player, text)
+		return
+	end
+	warn(`[Admin] sandbox: VanPaint.admin {what} failed: {text}`)
+	say(player, `ADMIN: the paints' {what} failed (see the server Output).`)
+end
+
+Sandbox.run.paintall = function(player: Player)
+	Sandbox.paints(player, "all")
+end
+
+Sandbox.run.paintreset = function(player: Player)
+	Sandbox.paints(player, "reset")
 end
 
 -- Travel and the van (shared/SandboxMap.luau's spots) -----------------------------------------------------------------

@@ -25,7 +25,9 @@
 --                    (the van's pivot, nose north, back to the door). 8.1: the box is the owner's Blender house's
 --                    (server/HouseMesh.luau dresses only a box of its size), its front wall where the chalet's always
 --                    was (the door, the path and the curb unmoved). 8.2.1: the owner's big European house
---                    (design/blender-house/house.py TARGET "sandbox": 44 × 14.5 × 34, the chalet's old footprint)
+--                    (design/blender-house/house.py TARGET "sandbox": 44 × 14.5 × 34, the chalet's old footprint).
+--                    8.3 the big move: back, its back door (the model's, in the middle of its back wall; outside it,
+--                    looking out: south), a second way in and out of a move (server/Moving.luau SB.site)
 --   SandboxMap.plotAt(x, z)   the plot whose rect holds the point (nil: none)
 --   SandboxMap.cframe(spot)   (Roblox only) a spot's CFrame
 
@@ -85,6 +87,7 @@ SandboxMap.House = {
 	house = { x = 0, y = 0, z = 523 + 34 / 2, sx = 44, sy = 14.5, sz = 34 },
 	door = { x = 0, y = 0, z = 523, yaw = 0 } :: Spot, -- outside the front door, looking north to the road
 	curb = { x = 0, y = SandboxMap.RoadTop, z = 492, yaw = 0 } :: Spot, -- the van's pivot: nose north, back to the door
+	back = { x = 0, y = 0, z = 523 + 34, yaw = 180 } :: Spot, -- 8.3: outside the back door, looking south into the garden
 }
 
 function SandboxMap.plotAt(x: number, z: number): Plot?

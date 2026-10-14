@@ -28,7 +28,8 @@
 --   SANDBOX          8.0, only in the sandbox world (Config.Sandbox.On; then the first tab, open by default): the
 --                    owner's quick test tools (shared/SandboxAdmin.luau's buttons, each ("sandbox", id) to the TARGET:
 --                    money, the house's move, the warehouse's stock and stands, the van and the teleports) and
---                    🔍 SHOW ZONES (client/SandboxZones.luau: debug marks on your screen only)
+--                    🔍 SHOW ZONES (client/SandboxZones.luau: debug marks on your screen only); 8.3: the Badges line
+--                    (read-only: which Roblox badges are set up, server/SandboxBadges.luau's AdminBadges attribute)
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -818,6 +819,8 @@ R.sandbox = function()
 		`Sandbox · {whom()}{if type(plot) == "number" then ` · plot {plot}` else " · no plot"}`,
 		"Quick tools for the sandbox world. Every button goes to the TARGET picked at the top; the answer comes in the footer."
 	)
+	-- 8.3: the Roblox badges, read-only (server/SandboxBadges.luau keeps AdminBadges on the admins; ids: Config.SandboxBadges)
+	heading("Badges", tostring(player:GetAttribute("AdminBadges") or "No answer from the server yet."))
 	local colors: { [string]: Color3 } = { green = C.green, grey = C.grey, yellow = C.yellow, red = C.red, blue = C.blue, gold = P.gold, violet = P.violet }
 	for _, group in SandboxAdmin.Groups do
 		heading(group.name, group.hint)

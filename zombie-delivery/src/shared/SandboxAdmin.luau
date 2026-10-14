@@ -10,7 +10,10 @@
 --                             name: green, grey, yellow, red, blue, gold, violet). 🔍 SHOW ZONES is the panel's own
 --                             (client/SandboxZones.luau: this screen only, no command). 8.1: ⬆ MAX UPGRADES / ↺ RESET
 --                             UPGRADES (server/Upgrades.luau admin) in the last group, Upgrades. 8.2: 📖 FILL BOOK / 📖
---                             CLEAR BOOK (server/CollectionBook.luau admin) in the Collection group
+--                             CLEAR BOOK (server/CollectionBook.luau admin) in the Collection group. 8.3: 🏗 LV 1 … 🏗 LV 5
+--                             (the TARGET's warehouse at that level for free: Upgrades.admin "level1" … "level5") in
+--                             the Upgrades group; 🎨 UNLOCK PAINTS / 🎨 RESET PAINTS (server/VanPaint.luau admin: the
+--                             PAINT shop) there too
 --   Money                     $ the 💰 button gives
 --   Fill                      📦 FILL STOCK: Count pieces a press, their condition Condition[1] … [2] (two decimals:
 --                             a piece at Config.Moving.Damage.BrokenAt or under is broken), their colours 1 … Variants
@@ -74,7 +77,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "upgrades",
 		name = "Upgrades",
-		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (20 stands, the lights, the van, Danny). RESET: none (the pieces on the lost stands go back to the stock).",
+		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (the Logistics centre's 24 stands and More stands' 8, the lights, the van, Danny). RESET: none (the Garage; the pieces on the lost stands go back to the stock). LV 1 – 5: the warehouse at that level (1 the Garage … 5 the Logistics centre), the rest as it is. 8.3: UNLOCK PAINTS: every paint and livery of the PAINT shop owned for free (wear them at the van). RESET PAINTS: none, the van back in ZDC cream.",
 	},
 } :: { Group }
 
@@ -95,6 +98,13 @@ SandboxAdmin.Actions = {
 	{ id = "warehouse", group = "travel", label = "📍 TO WAREHOUSE", color = "violet" },
 	{ id = "upmax", group = "upgrades", label = "⬆ MAX UPGRADES", color = "gold" },
 	{ id = "upreset", group = "upgrades", label = "↺ RESET UPGRADES", color = "grey" },
+	{ id = "level1", group = "upgrades", label = "🏗 LV 1", color = "blue" }, -- 8.3: the warehouse's level
+	{ id = "level2", group = "upgrades", label = "🏗 LV 2", color = "blue" },
+	{ id = "level3", group = "upgrades", label = "🏗 LV 3", color = "blue" },
+	{ id = "level4", group = "upgrades", label = "🏗 LV 4", color = "blue" },
+	{ id = "level5", group = "upgrades", label = "🏗 LV 5", color = "blue" },
+	{ id = "paintall", group = "upgrades", label = "🎨 UNLOCK PAINTS", color = "violet" }, -- 8.3: the PAINT shop
+	{ id = "paintreset", group = "upgrades", label = "🎨 RESET PAINTS", color = "grey" },
 } :: { Action }
 
 SandboxAdmin.Money = 10_000

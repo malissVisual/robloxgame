@@ -211,6 +211,11 @@ mark = click(owner, "upmax")
 check("8.1: ⬆ MAX UPGRADES: Upgrades.admin max for the target, its answer said", #E.upgrades == 1 and E.upgrades[1].what == "max" and E.upgrades[1].player == owner and string.find(E.said(owner, mark), "at its top", 1, true) ~= nil, E.said(owner, mark))
 mark = click(owner, "upreset", guest.UserId)
 check("8.1: ↺ RESET UPGRADES aimed at the guest: theirs reset", #E.upgrades == 2 and E.upgrades[2].what == "reset" and E.upgrades[2].player == guest and string.find(E.said(guest, mark), "reset", 1, true) ~= nil, E.said(guest, mark))
+mark = click(owner, "level3", guest.UserId)
+check("8.3: 🏗 LV 3 aimed at the guest: Upgrades.admin level3 for them, its answer said", #E.upgrades == 3 and E.upgrades[3].what == "level3" and E.upgrades[3].player == guest
+	and string.find(E.said(guest, mark), "Level 3", 1, true) ~= nil, E.said(guest, mark))
+mark = click(owner, "level5")
+check("8.3: 🏗 LV 5: level5 for the owner", #E.upgrades == 4 and E.upgrades[4].what == "level5" and E.upgrades[4].player == owner)
 local admin = E.Upgrades.admin
 E.Upgrades.admin = function()
 	error("the upgrades are mid-change")
@@ -235,6 +240,23 @@ check("8.2: a CollectionBook that errors: the command says so instead of failing
 E.CollectionBook.admin = bookAdmin
 click(guest, "bookfill")
 check("8.2: a non-admin's FILL BOOK does nothing", #E.books == 2)
+
+-- ── 8.3: the PAINT shop (VanPaint.admin) ────────────────────────────────────
+
+table.clear(E.paints)
+mark = click(owner, "paintall")
+check("8.3: 🎨 UNLOCK PAINTS: VanPaint.admin all for the target, its answer said", #E.paints == 1 and E.paints[1].what == "all" and E.paints[1].player == owner and string.find(E.said(owner, mark), "is yours", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "paintreset", guest.UserId)
+check("8.3: 🎨 RESET PAINTS aimed at the guest: theirs reset", #E.paints == 2 and E.paints[2].what == "reset" and E.paints[2].player == guest and string.find(E.said(guest, mark), "reset", 1, true) ~= nil, E.said(guest, mark))
+local paintAdmin = E.VanPaint.admin
+E.VanPaint.admin = function()
+	error("the paint is wet")
+end
+mark = click(owner, "paintall")
+check("8.3: a VanPaint that errors: the command says so instead of failing", string.find(E.said(owner, mark), "failed", 1, true) ~= nil, E.said(owner, mark))
+E.VanPaint.admin = paintAdmin
+click(guest, "paintall")
+check("8.3: a non-admin's UNLOCK PAINTS does nothing", #E.paints == 2)
 
 -- ── Travel and the van ───────────────────────────────────────────────────────
 

@@ -34,7 +34,7 @@ Everything below is for the workers (agents). **Keep the names and shapes here.*
 3. **Drive.** Drive down Main Street to the house. Its front door at `House.door` has "Enter house", which fades you into `HouseInterior`, the existing system.
 4. **Carry.** Carry the pieces out (grip, Danny, two-person lifts all as now) and load them into the van. You can walk inside the van; the load and packing work as now.
 5. **Unload.** Drive back. With the van's back or middle (or the line between them; 8.0.1) inside your plot's `unload` circle, the van's contents go into your warehouse's stock: `Collection.add` for each piece, to the move's owner. This is a "trip". You can do more trips until you press FINISH or the clock runs out.
-6. **Warehouse.** It has `Config.Warehouse.Stands` display stands. An empty stand's prompt opens the picker (`Collection.openPicker`), and you choose a piece from your stock. It stands there (its 3D model) and earns money every minute you play. A shown piece's prompt can take it down or sell it.
+6. **Warehouse.** It has its level's display stands (8.3: `Config.Warehouse.Levels`, the Garage's 2 … the Logistics Center's 24, and More stands' small ones from the Big Warehouse on; bought at its UPGRADES desk: design/warehouse-levels/KONTRAKT.md). An empty stand's prompt opens the picker (`Collection.openPicker`), and you choose a piece from your stock. It stands there (its 3D model) and earns money every minute you play. A shown piece's prompt can take it down or sell it.
 
 ## Who owns what
 These are the workers and their files. Don't edit another worker's files except for a one-line hook, and report any hook you add.
@@ -64,6 +64,11 @@ Collection.incomePerMinute(player) -> number
 Collection.openPicker(player, stand)
 Collection.onChanged(fn(player))
 Collection.onAdded(fn(player, entry))   8.2: after Collection.add took a piece (entry a copy): the collection book
+Collection.sell(player, uid, expect?)   8.3: at the market's price (shared/Market.luau); `expect` given: only at that price
+Collection.market(player) -> View?      8.3: today's hot and cold kinds and the player's demand
+Collection.marketIncome(item) -> number 8.3: today's × on a piece's income (the stands' tags)
+Collection.onPaid(fn(player, kind, money, paid))   8.3: paid = { hot } (the hot kinds' share)
+Collection.sellAt(player, uid, price, reason) -> money?, why   8.3 visitors: sold at a price the server set (a visitor's offer, server/VisitorOffers.luau), paid as `reason`
 ```
 
 **The remote `"Collection"`:**
@@ -72,11 +77,12 @@ Collection.onAdded(fn(player, entry))   8.2: after Collection.add took a piece (
   - `{ kind = "state", stock = { Entry }, income = n, stands = n }`, sent after every change and on request;
   - `{ kind = "pick", stand = n }`, which opens the picker;
   - `{ kind = "sold", name, money }`.
+  - 8.3: the state also carries `market` (the player's Market View); a View has `base` (the price without the market) and `market` ("hot", "cold" or nil); `sell` and `sellmany` may carry `expect` (the price the client showed).
 
 ## Config tables
 Each worker appends its own table at the end of `shared/Config.luau`, just before `return Config`:
 - `Config.Sprinter`;
-- `Config.Warehouse` (`Stands`, …);
+- `Config.Warehouse` (`Stands`, …; 8.3: `Levels`, each level's size and stands);
 - `Config.Collection` (`Tiers`, …);
 - `Config.SandboxHud`.
 

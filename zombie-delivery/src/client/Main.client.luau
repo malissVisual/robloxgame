@@ -35,7 +35,9 @@ end
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
 --                                      SandboxGuide, 8.1's UpgradeUi (the UPGRADES desk's window), 8.2's
 --                                      CollectionBookUi (the collection book), SandboxTasksUi (the TASKS chip and
---                                      panel): each started only when it is there
+--                                      panel), 8.3's MoveHelperCard (Danny's command card: a window too), OfferCard (a
+--                                      showroom visitor's offer: a window too) and VanPaintUi (the PAINT shop's window):
+--                                      each started only when it is there
 -- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
 -- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
 -- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
@@ -55,7 +57,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "OfferCard", "VanPaintUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -80,7 +82,10 @@ if Config.Sandbox.On then
 	local UpgradeUi = ownModule("UpgradeUi")
 	local BookUi = ownModule("CollectionBookUi") -- (8.2: the collection book and the TASKS panel, windows like the others)
 	local TasksUi = ownModule("SandboxTasksUi")
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi }
+	local DannyCard = ownModule("MoveHelperCard") -- (8.3: Danny's command card, a window like the others)
+	local OfferCard = ownModule("OfferCard") -- (8.3: a showroom visitor's offer, a window like the others)
+	local PaintUi = ownModule("VanPaintUi") -- (8.3: the PAINT shop's window)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -113,6 +118,7 @@ if Config.Sandbox.On then
 	safely("MoveLobbyUi", MoveLobbyUi.start)
 	safely("QuickChat", QuickChat.start)
 	safely("CarryGripUi", require(Client.CarryGripUi).start)
+	safely("WalkDoors", require(Client.WalkDoors).start) -- 8.3: the doors' leaves swing, the trip's camera behind you
 	-- (8.0 merge: the moves' and the warehouse stands' prompts are their owner's: the others' hidden, as in the city)
 	safely("CargoPrompts", require(Client.CargoPrompts).start)
 	for _, entry in own do
@@ -122,6 +128,7 @@ if Config.Sandbox.On then
 		end
 	end
 	safely("SandboxSounds", function() require(Client.SandboxSounds).start() end) -- 8.1: the stands, the till, the van's doors
+	safely("SandboxLight", function() require(Client.SandboxLight).start() end) -- 8.3: the eyes adapt to the house, the hall, the van
 
 	-- The hooks (the city's, less what the sandbox does not run).
 	Drive.notify = Hud.toast
@@ -149,8 +156,11 @@ if Config.Sandbox.On then
 		end
 	end
 	-- One window at a time; ESC closes them all (the crew panel, the move's cards and list, the quick chat's ring, the
-	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book, the TASKS panel). `keep`: the sandbox window opening now
+	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book, the TASKS panel,
+	-- 8.3: Danny's command card). `keep`: the sandbox window opening now
 	-- (its onOpen runs once it counts as open, so it must not close itself).
+	-- 8.3 review: a visitor's offer is declined only by ESC (the Roblox menu: Hud.escaping); another window opening (STOCK,
+	-- the BOOK to compare prices …) only hides it (OfferCard.hide): it waits and comes back once nothing covers the screen.
 	local keep: any = nil
 	Hud.onCloseWindows = function()
 		CrewPanel.close()
@@ -158,7 +168,13 @@ if Config.Sandbox.On then
 		MovingHud.closeAll()
 		QuickChat.close(false)
 		for _, module in windows do
-			if module ~= keep then
+			if module == keep then
+				continue
+			end
+			local hide = if module == OfferCard and not Hud.escaping then module.hide else nil
+			if type(hide) == "function" then
+				pcall(hide)
+			else
 				ownClose(module)
 			end
 		end
@@ -175,9 +191,13 @@ if Config.Sandbox.On then
 	end
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi)
+			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
+			or ownOpen(OfferCard)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
+	if type(OfferCard) == "table" then
+		OfferCard.covered = CameraRig.windowOpen -- (8.3: a visitor's offer waits while another window is open)
+	end
 	KeyHints.covered = function(): boolean
 		return CameraRig.mouseNeeded() or Hud.resultOpen()
 	end
@@ -194,7 +214,7 @@ if Config.Sandbox.On then
 			pcall(setState, state)
 		end
 	end)
-	Net.get("Notice").OnClientEvent:Connect(Hud.toast)
+	Net.get("Notice").OnClientEvent:Connect(if SandboxHud and type(SandboxHud.notice) == "function" then SandboxHud.notice else Hud.toast) -- (8.3: in this device's words)
 
 	local function play()
 		pcall(function()

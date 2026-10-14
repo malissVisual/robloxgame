@@ -403,7 +403,7 @@ end
 local function ratesOf(onStand: { [number]: Collection.Entry }, boost: number): { [number]: number }
 	local rates: { [number]: number } = {}
 	for index, entry in onStand do
-		rates[index] = CollectionRules.income(entry :: any, boost)
+		rates[index] = CollectionRules.income(entry :: any, boost) * Collection.marketIncome(entry.item) -- (8.3 hook: a hot kind's)
 	end
 	return rates
 end

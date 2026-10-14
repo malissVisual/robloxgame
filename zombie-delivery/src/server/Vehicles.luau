@@ -1829,7 +1829,7 @@ function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CF
 	spot.Name = "BayLight"
 	spot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + SprinterBuild.point(Sprinter.Light)
 	spot.Parent = chassis
-	local tune = Config.Sprinter.Light
+	local tune = Config.SandboxLight.Van.Bay -- (8.3: the sandbox's light, Config.SandboxLight)
 	local light = Instance.new("PointLight")
 	light.Name = "BayLight"
 	light.Range = tune.Range
@@ -3934,12 +3934,13 @@ local function watchPrompts(car: Car)
 						return
 					end
 				end
-				-- 4.5: an admin's buddy (server/Buddy.luau) in the seat gets out for a player.
+				-- 4.5: an admin's buddy (server/Buddy.luau) in the seat gets out for a player (8.3 review: Danny too, for his
+				-- move's crew: server/MoveHelper.luau, the player who asks passed on).
 				local yield = Vehicles.yieldSeat
 				for _, n in door.seats do
 					local seat = car.passengers[n]
 					local occupant = seat and seat.Occupant
-					if yield and seat and occupant and not reserved[seat] and not Players:GetPlayerFromCharacter(occupant.Parent) and yield(seat) then
+					if yield and seat and occupant and not reserved[seat] and not Players:GetPlayerFromCharacter(occupant.Parent) and yield(seat, player) then
 						-- (the seat empties as the buddy's SeatWeld goes; a frame later at the latest)
 						task.delay(0.1, function()
 							if seatFree(seat) and humanoid.Parent and humanoid.Health > 0 and not humanoid.SeatPart and not boarders[player] and not car.wrecked then
@@ -4319,7 +4320,7 @@ function SprinterBuild.wire(car: Car)
 	end
 	local spot = chassis:FindFirstChild("BayLight")
 	local light = spot and spot:FindFirstChildOfClass("PointLight")
-	local lampLit = rgb(Config.Sprinter.Light.Color)
+	local lampLit = rgb(Config.SandboxLight.Van.Bay.Color)
 	local lampDim = if lamps[1] then lamps[1].Color else lampLit
 	local slideShut = true -- (the side door is shut, not only on its way shut)
 	local function sync()
@@ -4424,8 +4425,9 @@ local function remember(car: Car)
 end
 
 -- 4.5, set by server/Buddy.luau: a player wants the passenger seat an admin's NPC buddy sits in: the buddy gets out
--- (true when it did; it keeps away from that seat a moment).
-Vehicles.yieldSeat = nil :: ((seat: Seat) -> boolean)?
+-- (true when it did; it keeps away from that seat a moment). 8.3 review: `player` is who asks; server/MoveHelper.luau
+-- wraps it (Danny gets out for his move's crew).
+Vehicles.yieldSeat = nil :: ((seat: Seat, player: Player?) -> boolean)?
 
 -- 3.4, set by server/Repair.luau: the owner gets back into a car on the lift (the repair is cancelled).
 Vehicles.beforeDrive = function(_player: Player, _car: Car) end

@@ -68,8 +68,9 @@ function CollectionBook.settle(player: Player): number
 	end
 	local due = Rules.due(book, paid)
 	for _, milestone in due do
-		paid[milestone.id] = true -- (before the money: a milestone pays once, whatever happens next)
+		Rules.pay(paid, milestone.id) -- (before the money: a milestone pays once, whatever happens next; 8.4 review: + the retired one it replaced)
 		PlayerData.addMoney(player, milestone.reward, "BookMilestone", milestone.id)
+		PlayerData.saveSoon(player) -- (8.3 saves: a milestone paid is saved a moment later)
 		if player.Parent then
 			remote:FireClient(player, { kind = "milestone", id = milestone.id, name = milestone.name, money = milestone.reward })
 		end

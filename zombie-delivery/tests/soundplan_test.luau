@@ -5,7 +5,10 @@
 -- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (the meadow, a warehouse, the chalet), its
 -- ambience (a calm alpine day, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the far
 -- cowbell, the collection's cues (on a stand, taken down, home), the income's clink (soft, not too often), the
--- Sprinter's sliding door, step and back doors, no ramp and no Wall's gate on a sandbox move. In the standalone Luau CLI.
+-- Sprinter's sliding door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features'
+-- feedback: what the book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare,
+-- a task done and claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one
+-- after the other (the lane: never two stings over each other, a burst is one). In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -410,8 +413,105 @@ check("… its cabin doors as any car's", SoundPlan.swingSound("door", "opening"
 check("another van's back as before", SoundPlan.swingSound("swing", "opening", "van") == "van_back_open" and SoundPlan.swingSound("swing", "opening") == "van_back_open")
 -- The moves in the sandbox: no ramp (the Sprinter's doors are heard), no Wall's gate (the trip home's fanfare).
 check("the sandbox: the Sprinter's back plays no truck ramp", names(SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)) == "" and names(SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)) == "")
-check("… the house's door still creaks", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+check("… 8.3: the house's door creaks at its leaf as it swings (client/WalkDoors.luau), not again from the state", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == ""
+	and names(SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)) == "")
+do
+	local swing = Config.Moving.Doors.Swing
+	Config.Moving.Doors.Swing = false
+	check("… its leaves still (Doors.Swing false): the state's creak as before", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+	Config.Moving.Doors.Swing = swing
+end
 check("… and no Wall's gate at the end", SoundPlan.resultCue({ how = "done" }) == nil and SoundPlan.resultCue({ how = "late" }) == nil)
+-- 8.3: the 8.2 features' feedback (the book, the tasks, the bulk actions), from the remotes' existing messages, with
+-- the existing sheets' sounds only, one after the other.
+local function onASheet(name: string): boolean
+	return SoundSheet.Sfx[name] ~= nil or SoundSheet.Sfx2[name] ~= nil or SoundSheet.Sfx3[name] ~= nil or SoundSheet.Sfx4[name] ~= nil
+end
+local function kindOf(remote: string, message: any): string
+	local kind, n = SoundPlan.feedbackOf(remote, message)
+	return `{kind or "-"}:{n}`
+end
+check("a piece new in the book: the discovery (how many)", kindOf("CollectionBook", { kind = "state", book = {}, paid = {}, new = { "jukebox", "sofa" } }) == "discovery:2")
+check("… a state with nothing new: nothing (the first state, a refresh)", kindOf("CollectionBook", { kind = "state", book = {}, paid = {}, new = {} }) == "-:0"
+	and kindOf("CollectionBook", { kind = "state", book = {}, paid = {} }) == "-:0")
+check("a milestone paid: the fanfare", kindOf("CollectionBook", { kind = "milestone", id = "found10", name = "Found 10 pieces", money = 250 }) == "milestone:1")
+check("a task done, a reward claimed", kindOf("SandboxTasks", { kind = "done", title = "x", money = 200 }) == "taskDone:1" and kindOf("SandboxTasks", { kind = "claimed", title = "x", money = 200 }) == "claimed:1")
+check("… the tasks' state: nothing", kindOf("SandboxTasks", { kind = "state", daily = {} }) == "-:0")
+check("FILL BEST's answer: the clicks (how many went up)", kindOf("Collection", { kind = "bulk", action = "fillbest", count = 5, income = 3 }) == "fill:5")
+check("… nothing went up: nothing", kindOf("Collection", { kind = "bulk", action = "fillbest", count = 0 }) == "-:0")
+check("… TAKE ALL DOWN's: nothing here (the state's take-down plays)", kindOf("Collection", { kind = "bulk", action = "undisplayall", count = 4 }) == "-:0")
+check("SELL…'s sale of 2+ pieces: the bulk till", kindOf("Collection", { kind = "sold", name = "6 pieces", money = 900, count = 6 }) == "bulkSold:6")
+check("… one piece's sale: the till as before (nothing new)", kindOf("Collection", { kind = "sold", name = "Clock", money = 420 }) == "-:0" and kindOf("Collection", { kind = "sold", name = "1 piece", money = 40, count = 1 }) == "-:0")
+check("junk: nothing", kindOf("Collection", "x") == "-:0" and kindOf("CollectionBook", { kind = "state", new = { 5, {} } }) == "-:0" and kindOf("Nope", { kind = "done" }) == "-:0"
+	and kindOf("Collection", { kind = "bulk", action = "fillbest", count = 0 / 0 }) == "-:0")
+for _, kind in SoundPlan.FeedbackKinds do
+	local cues = SoundPlan.feedbackCues(kind, 5)
+	local fine = #cues > 0
+	for _, cue in cues do
+		fine = fine and onASheet(cue.name) and SoundPlan.seconds(cue.name) > 0 and cue.volume > 0 and cue.volume <= 1 and cue.pitch >= 0.8 and cue.pitch <= 1.3 and cue.at >= 0
+	end
+	check(`{kind}: its sounds on the existing sheets (or their stand-ins), each plays today`, fine)
+end
+check("no new sheet: still sfx, sfx2, sfx3, sfx4 and the music", SoundSheet.Seconds.sfx5 == nil and (SoundSheet :: any).Sfx5 == nil)
+local function names2(cues: { SoundPlan.Timed }): string
+	local list = {}
+	for _, cue in cues do
+		table.insert(list, cue.name)
+	end
+	return table.concat(list, ",")
+end
+check("the sounds: a bell for a discovery, the bells' fanfare for a milestone, the task's sting, the ka-ching for a claim",
+	names2(SoundPlan.feedbackCues("discovery")) == "ding" and names2(SoundPlan.feedbackCues("milestone")) == "level_up"
+	and names2(SoundPlan.feedbackCues("taskDone")) == "task_done" and names2(SoundPlan.feedbackCues("claimed")) == "cash" and names2(SoundPlan.feedbackCues("stored")) == "stored_fanfare")
+local clicks = SoundPlan.feedbackCues("fill", 9)
+check(`FILL BEST: a few soft stand clicks (at most {SB.FillClicks}), FillEvery apart, each a little higher, softer than one piece put up`,
+	#clicks == SB.FillClicks and clicks[1].name == "stand_display" and clicks[2].at == SB.FillEvery and clicks[3].pitch > clicks[2].pitch and clicks[2].pitch > clicks[1].pitch and clicks[1].volume < SB.Display)
+check("… one piece: one click", #SoundPlan.feedbackCues("fill", 1) == 1 and #SoundPlan.feedbackCues("fill") == 1)
+local bulk = SoundPlan.feedbackCues("bulkSold", 6)
+check("SELL…'s sale: the till once (louder than one piece's), the old ka-ching on top a moment in", names2(bulk) == "sale_register,cash" and bulk[1].volume > SB.Sold and bulk[2].at == SB.BulkKaAt and bulk[2].at > 0)
+check("an unknown kind: nothing", #SoundPlan.feedbackCues("nope") == 0)
+-- how long a sound plays: its sheet's region, else its stand-in's (as client/Sounds.luau finds it)
+check("seconds: a first sheet's sound its region", SoundPlan.seconds("ding") == SoundSheet.Sfx.ding[2] and SoundPlan.seconds("level_up") == SoundSheet.Sfx.level_up[2])
+check("… a later sheet's: its region when that sheet is up, else its stand-in's", SoundPlan.seconds("stored_fanfare") == (if SoundSheet.Sfx4Id ~= "" then SoundSheet.Sfx4.stored_fanfare[2]
+	elseif SoundSheet.Sfx3Id ~= "" then SoundSheet.Sfx3.task_done[2] else SoundSheet.Sfx.job_done[2]))
+check("… nothing anywhere: 0", SoundPlan.seconds("nope") == 0)
+-- the lane: the stings one after the other, never over each other
+local lane = SoundPlan.lane()
+local t0 = 1000
+local storedAt = SoundPlan.slot(lane, "stored", t0)
+local chimeAt = SoundPlan.slot(lane, "discovery", t0, 2)
+local fanfareAt = SoundPlan.slot(lane, "milestone", t0)
+check("the trip home's fanfare at once", storedAt == t0)
+check("… the book's chime when it ends (not over it)", chimeAt ~= nil and math.abs((chimeAt :: number) - (t0 + SoundPlan.seconds("stored_fanfare"))) < 1e-6, chimeAt)
+check("… a milestone's fanfare when the chime ends", fanfareAt ~= nil and chimeAt ~= nil and math.abs((fanfareAt :: number) - ((chimeAt :: number) + SoundPlan.seconds("ding") / 1.12)) < 1e-6, fanfareAt)
+check("… a burst of discoveries is one (DiscoveryGap)", SoundPlan.slot(lane, "discovery", t0 + 0.1) == nil)
+check("… five milestones at once: one fanfare (MilestoneGap)", SoundPlan.slot(lane, "milestone", t0 + 0.05) == nil)
+local answer = SoundPlan.slot(lane, "claimed", t0 + 0.2)
+check("an answer to your own press (a claim) plays at once", answer == t0 + 0.2)
+check("… a second claim within ClaimedGap: not again", SoundPlan.slot(lane, "claimed", t0 + 0.2 + SB.ClaimedGap / 2) == nil)
+local lane2 = SoundPlan.lane()
+SoundPlan.slot(lane2, "bulkSold", t0, 6)
+local doneAt = SoundPlan.slot(lane2, "taskDone", t0)
+check("a sting after your sale waits for its till (the task done by it)", doneAt ~= nil and (doneAt :: number) >= t0 + SoundPlan.seconds("sale_register") / 0.94 - 1e-6, doneAt)
+local lane3 = SoundPlan.lane()
+lane3.free = t0 + SB.FeedbackWait + 1
+check("a sting that would wait over FeedbackWait: left out", SoundPlan.slot(lane3, "milestone", t0) == nil and lane3.last.milestone == nil)
+check("an unknown kind: never", SoundPlan.slot(SoundPlan.lane(), "nope", t0) == nil)
+local lane4 = SoundPlan.lane()
+SoundPlan.hold(lane4, t0, SoundPlan.seconds("job_done"))
+local afterJingle = SoundPlan.slot(lane4, "discovery", t0 + 0.1, 1)
+check("the move's result card's jingle holds the lane: the book's chime after it", afterJingle ~= nil and math.abs((afterJingle :: number) - (t0 + SoundPlan.seconds("job_done"))) < 1e-6, afterJingle)
+SoundPlan.hold(lane4, t0, -5)
+check("… a hold never moves the lane back", lane4.free >= t0 + SoundPlan.seconds("job_done"))
+-- FILL BEST's state: its clicks said it (no stand_display for FillQuiet s), then as before
+local filled = stock({ { "1-1", 1 }, { "1-2", 2 } })
+check("the state right after FILL BEST: no stand_display of its own", cueNames(SoundPlan.collectionCues(s0, filled, nil, SB.FillQuiet / 2)) == "")
+check("… a while after: as before", cueNames(SoundPlan.collectionCues(s0, filled, nil, SB.FillQuiet + 1)) == "stand_display" and cueNames(SoundPlan.collectionCues(s0, filled)) == "stand_display")
+for _, value in { "Discovery", "Milestone", "TaskDone", "Claimed", "Fill", "BulkSold", "BulkKa" } do
+	check(`Config.Soundscape.Sandbox.{value} is a volume (0 … 1)`, SB[value] > 0 and SB[value] <= 1)
+end
+check("the gaps and the wait: a burst is one, a sting waits a few seconds at most", SB.DiscoveryGap > 0 and SB.MilestoneGap >= SB.DiscoveryGap and SB.TaskDoneGap > 0 and SB.ClaimedGap > 0
+	and SB.FillGap > 0 and SB.BulkGap > 0 and SB.FeedbackWait >= 3 and SB.FeedbackWait <= 6 and SB.FillClicks >= 2 and SB.FillClicks <= 4)
 for key, value in SB do
 	if type(value) == "number" then
 		local most = if string.find(key, "Range", 1, true) then 200 else 60 -- (a range in studs)

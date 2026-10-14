@@ -4,7 +4,7 @@
 -- 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): nothing
 -- when Config.Sandbox.On is false; the state asked at the start; the chip beside "📦 N in stock" (a finger's size on a
 -- phone, its key C on a computer, the HUD's block still clear of the touch buttons) opening and closing the book; the
--- key C (not when something else took it, not on the start screen); the book: "23 / 56 found" and its bar, the counts,
+-- key C (not when something else took it, not on the start screen); the book: "23 / 68 found" and its bar, the counts,
 -- the milestones (✔ when paid, else how far, and the reward), the tabs ALL / COLLECTIBLES / FURNITURE with their counts,
 -- a card a piece in the book's order (found: its name, rarity colour, ×n, best condition, value; unknown: "???", a "?"
 -- or its dark silhouette), the 3D pictures only on the cards on screen and never more than Config.CollectionBook.MaxViews
@@ -360,16 +360,16 @@ local function bookChecks(label)
 end
 bookChecks("844 x 390")
 window = named(gui, "Book")
-check("the progress: \"23 / 56 found\", its bar 23/56 full", named(window, "Progress").Text == "23 / 56 found" and math.abs(named(window, "Fill").Size.X.Scale - 23 / 56) < 1e-6, named(window, "Progress").Text)
-check("… the counts: Furniture 20 / 44, Collectibles 3 / 12", named(window, "FurnitureCount").Text == "Furniture 20 / 44" and named(window, "CollectibleCount").Text == "Collectibles 3 / 12")
+check("the progress: \"23 / 68 found\", its bar 23/68 full", named(window, "Progress").Text == "23 / 68 found" and math.abs(named(window, "Fill").Size.X.Scale - 23 / 68) < 1e-6, named(window, "Progress").Text)
+check("… the counts: Furniture 20 / 44, Collectibles 3 / 24", named(window, "FurnitureCount").Text == "Furniture 20 / 44" and named(window, "CollectibleCount").Text == "Collectibles 3 / 24")
 local rowFound10, rowFurniture = named(window, "Milestone_found10"), named(window, "Milestone_furniture")
 check("the milestones: a paid one ✔ \"Paid · +$250\"", named(rowFound10, "Check").Text == "✔" and named(rowFound10, "Reward").Text == "Paid · +$250" and named(rowFound10, "MilestoneName").Text == "Found 10 pieces")
-check("… an open one: how far and its reward (\"20 / 44 · +$1,500\")", named(rowFurniture, "Check").Text == "○" and named(rowFurniture, "Reward").Text == "20 / 44 · +$1,500", named(rowFurniture, "Reward").Text)
-check("… every collectible: 3 / 12 · +$2,500; A legendary! ✔", named(named(window, "Milestone_collectibles"), "Reward").Text == "3 / 12 · +$2,500" and named(named(window, "Milestone_legendary"), "Check").Text == "✔")
-check("the tabs: ALL 23/56 (lit), COLLECTIBLES 3/12, FURNITURE 20/44", named(window, "Tab_all").Text == "ALL 23/56" and named(window, "Tab_collectibles").Text == "COLLECTIBLES 3/12" and named(window, "Tab_furniture").Text == "FURNITURE 20/44"
+check("… an open one: how far and its reward (\"20 / 44 · +$2,000\": 8.3 economy)", named(rowFurniture, "Check").Text == "○" and named(rowFurniture, "Reward").Text == "20 / 44 · +$2,000", named(rowFurniture, "Reward").Text)
+check("… every collectible: 3 / 24 · +$10,000; A legendary! ✔", named(named(window, "Milestone_collectibles24"), "Reward").Text == "3 / 24 · +$10,000" and named(named(window, "Milestone_legendary"), "Check").Text == "✔")
+check("the tabs: ALL 23/68 (lit), COLLECTIBLES 3/24, FURNITURE 20/44", named(window, "Tab_all").Text == "ALL 23/68" and named(window, "Tab_collectibles").Text == "COLLECTIBLES 3/24" and named(window, "Tab_furniture").Text == "FURNITURE 20/44"
 	and named(window, "Tab_all"):FindFirstChild("Underline") ~= nil and named(window, "Tab_furniture"):FindFirstChild("Underline") == nil)
 local cards = cardsOf()
-check("ALL: a card a piece of the book (56), in its order", #cards == 56 and cards[1].Name == `Card_{Rules.Pieces[1]}` and cards[56].Name == `Card_{Rules.Pieces[56]}`)
+check("ALL: a card a piece of the book (68), in its order", #cards == 68 and cards[1].Name == `Card_{Rules.Pieces[1]}` and cards[68].Name == `Card_{Rules.Pieces[68]}`)
 local first = cards[1]
 local def1 = M.FurnitureLooks.Items[Rules.Pieces[1]]
 local found1 = FOUND[Rules.Pieces[1]]
@@ -447,14 +447,14 @@ scene("book-phone")
 press(named(window, "Tab_collectibles"))
 window = named(gui, "Book")
 cards = cardsOf()
-check("COLLECTIBLES: the 12 collectibles (3 found), the tab lit", #cards == 12 and cards[1].Name == `Card_{Rules.Collectibles[1]}` and named(window, "Tab_collectibles"):FindFirstChild("Underline") ~= nil)
+check("COLLECTIBLES: the 24 collectibles (3 found), the tab lit", #cards == 24 and cards[1].Name == `Card_{Rules.Collectibles[1]}` and named(window, "Tab_collectibles"):FindFirstChild("Underline") ~= nil)
 bookChecks("844 x 390, COLLECTIBLES")
 scene("book-phone-collectibles")
 press(named(window, "Tab_furniture"))
 cards = cardsOf()
 check("FURNITURE: the 44 pieces of furniture", #cards == 44 and cards[1].Name == `Card_{Rules.Furniture[1]}`)
 press(named(named(gui, "Book"), "Tab_all"))
-check("ALL: every piece again", #cardsOf() == 56)
+check("ALL: every piece again", #cardsOf() == 68)
 
 -- a discovery and a milestone while it is open
 local more = table.clone(FOUND)
@@ -462,20 +462,20 @@ more.oil_painting = { n = 1, best = 0.8 }
 remote.OnClientEvent:Fire(state(more, { "found10", "found20", "legendary" }, { "oil_painting" }))
 M.flush()
 check("a new piece: the toast \"📖 New in your book: Oil Painting\"", M.toasts[#M.toasts] == "📖 New in your book: Oil Painting", M.toasts[#M.toasts])
-check("… the open book drawn again: 24 / 56, its card found", named(named(gui, "Book"), "Progress").Text == "24 / 56 found" and named(named(gui, "Book"), "Card_oil_painting"):GetAttribute("Found") == true)
+check("… the open book drawn again: 24 / 68, its card found", named(named(gui, "Book"), "Progress").Text == "24 / 68 found" and named(named(gui, "Book"), "Card_oil_painting"):GetAttribute("Found") == true)
 more.ship_bottle = { n = 1, best = 0.5 }
 more.old_globe = { n = 1, best = 0.5 }
 more.bowling_trophy = { n = 1, best = 0.5 }
 remote.OnClientEvent:Fire(state(more, { "found10", "found20", "legendary" }, { "ship_bottle", "old_globe", "bowling_trophy", "nope" }))
 check("several new pieces: \"📖 3 new pieces in your book\" (an id not in the book ignored)", M.toasts[#M.toasts] == "📖 3 new pieces in your book", M.toasts[#M.toasts])
-remote.OnClientEvent:Fire({ kind = "milestone", id = "furniture", name = "All the furniture", money = 1500 })
-check("a milestone: the toast \"🏆 All the furniture · +$1,500\"", M.toasts[#M.toasts] == "🏆 All the furniture · +$1,500", M.toasts[#M.toasts])
+remote.OnClientEvent:Fire({ kind = "milestone", id = "furniture", name = "All the furniture", money = 2000 })
+check("a milestone: the toast \"🏆 All the furniture · +$2,000\"", M.toasts[#M.toasts] == "🏆 All the furniture · +$2,000", M.toasts[#M.toasts])
 check("… its ✔ at once in the open book", named(named(named(gui, "Book"), "Milestone_furniture"), "Check").Text == "✔")
 local toastsBefore = #M.toasts
 remote.OnClientEvent:Fire({ kind = "milestone", id = "nope", money = 1e9 })
 remote.OnClientEvent:Fire("junk")
 remote.OnClientEvent:Fire({ kind = "state", book = "x", paid = 5 })
-check("garbage from the remote: no toast, no error (a junk state: an empty book)", #M.toasts == toastsBefore and named(named(gui, "Book"), "Progress").Text == "0 / 56 found")
+check("garbage from the remote: no toast, no error (a junk state: an empty book)", #M.toasts == toastsBefore and named(named(gui, "Book"), "Progress").Text == "0 / 68 found")
 remote.OnClientEvent:Fire(state(FOUND, { "found10", "found20", "legendary" }))
 
 -- closing
@@ -515,12 +515,12 @@ M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
 key("C")
 check("the HUD hidden (the start screen): C does nothing", not ownGui.Enabled and not Book.isOpen())
 toastsBefore = #M.toasts
-remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles", name = "Found every collectible", money = 2500 })
+remote.OnClientEvent:Fire({ kind = "milestone", id = "collectibles24", name = "Found every collectible", money = 10000 })
 check("… a milestone's toast waits", #M.toasts == toastsBefore)
 M.hudGui.Enabled = true
 M.hudGui:GetPropertyChangedSignal("Enabled"):Fire()
 ownGui:GetPropertyChangedSignal("Enabled"):Fire()
-check("… and comes when the HUD shows", #M.toasts == toastsBefore + 1 and M.toasts[#M.toasts] == "🏆 Found every collectible · +$2,500", M.toasts[#M.toasts])
+check("… and comes when the HUD shows", #M.toasts == toastsBefore + 1 and M.toasts[#M.toasts] == "🏆 Found every collectible · +$10,000", M.toasts[#M.toasts])
 remote.OnClientEvent:Fire(state(FOUND, { "found10", "found20", "legendary" }))
 
 -- ── A computer (1280 × 800) and a big screen (1920 × 1080) ─────────────────

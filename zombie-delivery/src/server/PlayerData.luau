@@ -70,7 +70,30 @@
 -- save written with its flag (sandboxOnboardingKept: AnalyticsPlan.sandboxFrom); an older real save is past every step.
 -- 8.2 SANDBOX: the daily tasks (sandboxTasks: shared/SandboxTasks.luau's save, kept by server/SandboxTasks.luau), read
 -- only from a real save written with their flag (sandboxTasksKept); older saves: none (the server starts them fresh).
+-- 8.3 SANDBOX: the moves finished (sandboxMoves: server/SandboxBadges.luau counts them for the badges, shared/
+-- SandboxBadgeRules.luau), read only from a real save written with its flag (sandboxMovesKept); older saves: 0. (8.4
+-- review: and in `rewards` as "mv:<n>", up to the badges' count: a save an 8.2 server wrote again gets it back from there.)
+-- 8.3 SANDBOX: the market's demand (market: shared/Market.luau's save, what each kind sold today weighs on its price;
+-- kept by server/Collection.luau), read only from a real save written with its flag (marketKept); older saves: none.
+-- 8.3 SANDBOX: the van's paint (vanPaint: { owned, worn }, shared/VanPaintRules.luau; the PAINT shop, server/VanPaint.luau),
+-- read only from a real save written with its flag (vanPaintKept); older saves: nothing bought, the factory's look. (8.4
+-- review: and in `rewards` as "paint:<id>" / "paintOn:<id>": a save an 8.2 server wrote again gets it back from there; the
+-- market's demand is not kept so: it is lost there, a day's worth at most.)
+-- 8.4 SANDBOX: the house the moving card shows (sandboxHouseSeed: its seed, server/Moving.luau's SB.seeds, kept until a
+-- trip brings something home), read only from a real save written with its flag (sandboxHouseSeedKept) and only a
+-- whole number 1 … Config.Moving.Sandbox.Seeds; else none (the next card rolls one). Leaving and joining another server
+-- shows the same house (no reroll by server hopping). Not mirrored into `rewards` (an 8.2 server drops it: a new house).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
+-- 8.3 SAVES (Config.Saving, shared/SaveGuard.luau): a save is written (UpdateAsync) only while the stored save is still
+-- this server's session's (its lock: the JobId, the session and the save's number: never over another server's save
+-- or over a newer snapshot), checked on its way (SaveGuard.clean: one bad value never costs the whole save; a bad money
+-- keeps the stored one), with the top-level keys of the loaded save this version does not know put back (a newer
+-- server's fields survive a round trip through this one), and tried again after a backoff. When: the autosave (every
+-- AutosaveSeconds; a player written a moment ago waits for the next round, and so does every save that can wait while
+-- the request budget is under Reserve), a save soon after a purchase (PlayerData.spend), a book milestone or pieces
+-- brought home (PlayerData.saveSoon: one for a burst), the leave save and the shutdown's (all at once, waited for). A
+-- load that fails, or a save that cannot be read without an error, never gets a fresh profile that would be saved over
+-- the real one: a live player is kicked. A rejoin to this server waits for its own leave save of that player.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
 
@@ -96,6 +119,9 @@ local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (
 local CollectionBookRules = require(Shared.CollectionBookRules) -- 8.2: the collection book (profile.collectionBook)
 local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
 local SandboxTaskRules = require(Shared.SandboxTasks) -- 8.2: the sandbox's daily tasks (profile.sandboxTasks)
+local Market = require(Shared.Market) -- 8.3: the market's demand (profile.market, server/Collection.luau)
+local VanPaintRules = require(Shared.VanPaintRules) -- 8.3: the van's paint (profile.vanPaint, server/VanPaint.luau)
+local SaveGuard = require(Shared.SaveGuard) -- 8.3 saves: what a save writes, checked; the unknown keys kept
 
 export type Profile = {
 	money: number,
@@ -179,6 +205,19 @@ export type Profile = {
 	-- 8.2 SANDBOX: the daily tasks (shared/SandboxTasks.luau: the day's picks and progress, the week's): read only from a
 	-- real save written with its flag (SandboxTasks.fromSave); nil until server/SandboxTasks.luau starts them
 	sandboxTasks: SandboxTaskRules.Saved?,
+	-- 8.3 SANDBOX: the moves finished, done or late with pieces home (server/SandboxBadges.luau: the badges): read only
+	-- from a real save written with its flag (SandboxBadgeRules.movesFromSave); an older one starts at 0
+	sandboxMoves: number,
+	-- 8.3 SANDBOX: the market's demand (shared/Market.luau: the kinds sold today, what each weighs on its price): read only
+	-- from a real save written with its flag (Market.fromSave); an older one starts with the empty one
+	market: Market.Saved,
+	-- 8.3 SANDBOX: the van's paint (shared/VanPaintRules.luau: the paints and liveries bought, the ones worn): read only
+	-- from a real save written with its flag (VanPaintRules.fromSave); an older one starts with the empty one
+	vanPaint: VanPaintRules.Saved,
+	-- 8.4 SANDBOX: the seed of the house the moving card shows (server/Moving.luau sets and drops it with SB.seeds): read
+	-- only from a real save written with its flag (sandboxHouseSeedKept), a whole number 1 … Config.Moving.Sandbox.Seeds;
+	-- nil: none yet (the next card rolls one)
+	sandboxHouseSeed: number?,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -188,6 +227,19 @@ local PlayerData = {}
 
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
+-- 8.3 saves: each player's session here (the lock's `session`), the top-level keys of their loaded save this version
+-- does not know (written back with every save) and that copy's size, their last write (os.clock), their saves'
+-- number (the lock's `seq`), a save asked for soon; the leave saves running (by UserId: a rejoin waits for them); every
+-- top-level key this version writes (PlayerData.start builds it: SaveGuard.probe) and what a save writes (build,
+-- defined at PlayerData.save).
+local sessions: { [Player]: string } = {}
+local extras: { [Player]: { data: { [string]: any }, bytes: number } } = {}
+local wrote: { [Player]: number } = {}
+local serial: { [Player]: number } = {}
+local soon: { [Player]: boolean } = {}
+local leaving: { [number]: number } = {}
+local known: { [string]: boolean }? = nil
+local build: (profile: Profile, lock: any) -> { [string]: any }
 local changed = Instance.new("BindableEvent")
 
 -- Fires (player) whenever money or the inventory changed, so the state is sent to the client.
@@ -282,6 +334,10 @@ local function newProfile(): Profile
 		collectionBookPaid = {}, -- 8.2: no milestone paid yet
 		sandboxUpgrades = UpgradeRules.empty(), -- 8.1: no upgrade bought yet
 		sandboxTasks = nil, -- 8.2: server/SandboxTasks.luau starts them (it knows the UserId and the day)
+		sandboxMoves = 0, -- 8.3: no move finished yet (the badges)
+		market = Market.empty(), -- 8.3: nothing sold yet
+		vanPaint = VanPaintRules.empty(), -- 8.3: nothing bought, the factory's look
+		sandboxHouseSeed = nil, -- 8.4: no house rolled yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -619,6 +675,21 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.2: the sandbox's daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); a save
 	-- from before 8.2 (or a lock-only record) has none: server/SandboxTasks.luau starts them fresh
 	profile.sandboxTasks = SandboxTaskRules.fromSave(saved)
+	-- 8.3: the moves finished (the badges), only from a real save written with their flag (sandboxMovesKept); else 0 (8.4
+	-- review: a real save without it, from the "mv:" key of its own `rewards`: an 8.2 server dropped the field)
+	profile.sandboxMoves = require(Shared.SandboxBadgeRules).movesFromSave(saved)
+	-- 8.3: the market's demand, checked, only from a real save written with its flag (marketKept); a save from before 8.3
+	-- (or a lock-only record) starts with the empty one (Market.fromSave)
+	profile.market = Market.fromSave(saved)
+	-- 8.3: the van's paint, checked, only from a real save written with its flag (vanPaintKept); a save from before 8.3
+	-- (or a lock-only record) starts with the empty one (VanPaintRules.fromSave; 8.4 review: a real save without the flag,
+	-- from the "paint:" keys of its own `rewards`: an 8.2 server dropped the field)
+	profile.vanPaint = VanPaintRules.fromSave(saved)
+	-- 8.4: the house the moving card shows, only from a real save written with its flag (sandboxHouseSeedKept), and only
+	-- a whole number in the seeds' range (Config.Moving.Sandbox.Seeds: Moving rolls 1 … that); else none
+	local seed = saved.sandboxHouseSeed
+	profile.sandboxHouseSeed = if saved.money ~= nil and saved.sandboxHouseSeedKept == true and type(seed) == "number" and seed == math.floor(seed)
+		and seed >= 1 and seed <= Config.Moving.Sandbox.Seeds then seed else nil
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -817,7 +888,7 @@ local function readAndLock(dataStore: DataStore, player: Player, force: boolean)
 				return nil -- leave it as it is
 			end
 			local data: { [any]: any } = if type(old) == "table" then table.clone(old) else {}
-			data.lock = { job = game.JobId, at = os.time() }
+			data.lock = { job = game.JobId, at = os.time(), session = sessions[player], seq = 0 } -- (8.3: + this session)
 			return data
 		end)
 	end)
@@ -834,6 +905,17 @@ function PlayerData.load(player: Player)
 	if dataStore then
 		local saved: any = nil
 		ok = false
+		-- 8.3 saves: a rejoin to this server waits for its own leave save of this player (else it reads the one before).
+		-- 8.4 review: as long as that save runs, at most its worst case (FinalTries tries, the backoffs between them, each
+		-- UpdateAsync up to Call s) and LeaveWait s more: an outage's leave save outlasts a fixed wait
+		local held, most = 0, Config.Saving.LeaveWait + Config.Saving.FinalTries * Config.Saving.Call
+		for try = 1, Config.Saving.FinalTries - 1 do
+			most += SaveGuard.backoff(try, Config.Saving.Backoff)
+		end
+		while leaving[player.UserId] and player.Parent and held < most do
+			held += task.wait(0.25)
+		end
+		sessions[player] = `{player.UserId}-{os.time()}-{math.random(1, 2 ^ 30)}` -- 8.3: this session's (its lock)
 		local failures, waited = 0, 0
 		while player.Parent do
 			local success, result, locked = readAndLock(dataStore, player, waited >= Config.SaveLockWait)
@@ -846,21 +928,37 @@ function PlayerData.load(player: Player)
 				waited += 2
 			else
 				failures += 1
-				if failures >= 3 or RunService:IsStudio() then
+				if failures >= Config.Saving.LoadTries or RunService:IsStudio() then
 					break -- (Studio without API access: play without saving, right away)
 				end
-				task.wait(failures)
+				task.wait(SaveGuard.backoff(failures, Config.Saving.Backoff)) -- (8.3: 1, 2, 4 s)
 			end
 		end
-		applySaved(profile, saved)
+		-- 8.3 saves: a save that cannot be read without an error (a migration's bug on odd data) is never played on a
+		-- fresh profile (nor saved over): as a failed load. The top-level keys it has that this version does not know
+		-- are kept to be written back (known: PlayerData.start).
+		local applied, err = pcall(function()
+			applySaved(profile, saved)
+		end)
+		if not applied then
+			warn(`[PlayerData] {player.Name}'s save could not be read: {err}`)
+			ok, profile = false, newProfile()
+		elseif ok and known then
+			local kept, _, bytes = SaveGuard.clean(SaveGuard.unknown(saved, known))
+			if next(kept) ~= nil then
+				extras[player] = { data = kept, bytes = bytes }
+			end
+		end
 		profile.bags = require(Shared.Transport).startBags(profile.tutorial) -- 6.23: the free bag only with the tutorial ahead
 		if not ok and player.Parent and not RunService:IsStudio() then
 			-- Never let a live player play on a profile that cannot be saved: they would lose all of it.
+			sessions[player], extras[player] = nil, nil
 			player:Kick("Your save could not be loaded right now (Roblox data service). Please rejoin in a moment.")
 			return
 		end
 	end
 	if not player.Parent then
+		sessions[player], extras[player] = nil, nil -- (8.3: their leave's cleanup may have run already)
 		return -- left while loading: nothing to keep (and no lock to release: the next join takes it after the wait)
 	end
 	-- Never overwrite a save we could not read.
@@ -940,37 +1038,11 @@ changed.Event:Connect(updateLeaderstats)
 local saving = 0 -- saves in flight (BindToClose waits for them)
 local finished: { [Player]: boolean } = {} -- the final save (leave or shutdown) has started: no more saves
 
--- final = the player leaves (or the server closes): the lock is released and a failed write is tried again.
-function PlayerData.save(player: Player, final: boolean?)
-	local profile = profiles[player]
-	local dataStore = store
-	if not profile or not dataStore or not canSave[player] or finished[player] then
-		return
-	end
-	if final then
-		finished[player] = true
-	end
-	-- 7.2 review: an older server (main before 7.x) keeps the fields it knows only, but every short key of `rewards`:
-	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
-	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
-	profile.rewards[Config.CompanyVan.Flag] = true
-	for id in profile.collectionBookPaid do
-		profile.rewards["book:" .. id] = true -- (8.2 review: the book's milestones paid, as the chapters done below)
-	end
-	for key in profile.story do
-		if string.sub(key, 1, 5) == "done:" then
-			profile.rewards[key] = true
-		end
-	end
-	-- 8.3: the warehouse's level as a short key too ("warehouse:<k>", only the one it is now): a save an older server
-	-- writes again loses sandboxUpgrades.warehouse and its flag, and UpgradeRules.fromSave reads the level back from it
-	for key in profile.rewards do
-		if type(key) == "string" and string.sub(key, 1, 10) == "warehouse:" then
-			profile.rewards[key] = nil
-		end
-	end
-	profile.rewards[UpgradeRules.warehouseKey(profile.sandboxUpgrades)] = true
-	local data = {
+-- 8.3 saves: what a save writes, every field and flag of this version (lock: this server's, nil = released: the leave
+-- save). PlayerData.start builds one from a stand-in with every field set (SaveGuard.probe) for the keys this version
+-- knows, so a field added here is known by itself.
+build = function(profile: Profile, lock: any): { [string]: any }
+	return {
 		money = profile.money,
 		cars = profile.cars,
 		car = profile.car,
@@ -1037,27 +1109,120 @@ function PlayerData.save(player: Player, final: boolean?)
 		warehouseLevelKept = true, -- 8.3: Config.SandboxUpgrades.WarehouseFlag (the warehouse's level in them is the player's: no migration)
 		sandboxTasks = profile.sandboxTasks, -- 8.2
 		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
+		sandboxMoves = profile.sandboxMoves, -- 8.3
+		sandboxMovesKept = true, -- 8.3: SandboxBadgeRules.Flag (applySaved reads the moves finished only with it)
+		market = profile.market, -- 8.3
+		marketKept = true, -- 8.3: Market.Flag (applySaved reads the market's demand only with it)
+		vanPaint = profile.vanPaint, -- 8.3
+		vanPaintKept = true, -- 8.3: VanPaintRules.Flag (applySaved reads the van's paint only with it)
+		sandboxHouseSeed = profile.sandboxHouseSeed, -- 8.4 (nil: none)
+		sandboxHouseSeedKept = true, -- 8.4 (applySaved reads the house's seed only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
-		lock = if final then nil else { job = game.JobId, at = os.time() }, -- 4.2: this server plays it (nil = free)
+		lock = lock, -- 4.2: this server plays it (nil = free); 8.3: { job, at, session, seq }
 	}
+end
+
+-- 8.3 saves: is the stored save still this session's (its lock: this JobId and this session)? Only then is it written:
+-- else another server took it over, or a later session of this player here (a rejoin), or it was released.
+local function ours(old: any, session: string?): boolean
+	local lock = if type(old) == "table" then old.lock else nil
+	return type(lock) == "table" and lock.job == game.JobId and session ~= nil and lock.session == session
+end
+
+-- 8.3 saves: room in the server's UpdateAsync budget for a save that can wait (Config.Saving.Reserve stays for the
+-- loads and the last saves)? Without a budget to read (Studio, the tests' runtimes): yes.
+local function roomFor(): boolean
+	local read, budget = pcall(function(): any
+		return DataStoreService:GetRequestBudgetForRequestType(Enum.DataStoreRequestType.UpdateAsync)
+	end)
+	return not read or type(budget) ~= "number" or budget >= Config.Saving.Reserve
+end
+
+-- final = the player leaves (or the server closes): the lock is released. 8.3 saves: true when it was written. The
+-- data is a snapshot, checked (SaveGuard.clean; a bad money keeps the stored one), with the unknown keys of the loaded
+-- save put back; written only while the save is this session's and never over a newer save of it (the lock's seq);
+-- every failed write tried again after a backoff (Config.Saving: Tries, FinalTries).
+function PlayerData.save(player: Player, final: boolean?): boolean
+	local profile = profiles[player]
+	local dataStore = store
+	if not profile or not dataStore or not canSave[player] or finished[player] then
+		return false
+	end
+	if final then
+		finished[player] = true
+	end
+	-- 7.2 review: an older server (main before 7.x) keeps the fields it knows only, but every short key of `rewards`:
+	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice) and so do the chapters done (its
+	-- story keeps only "intro"; MoveStory.cleanSeen reads them back)
+	profile.rewards[Config.CompanyVan.Flag] = true
+	-- (8.4 review: the van's paint and the moves finished too, "paint:" / "paintOn:" and one "mv:<n>" key, the stale ones
+	-- cleared: an 8.2 server drops vanPaint and sandboxMoves with their flags; their fromSave reads these back)
+	VanPaintRules.mirror(profile.rewards, profile.vanPaint)
+	require(Shared.SandboxBadgeRules).mirror(profile.rewards, profile.sandboxMoves)
+	for id in profile.collectionBookPaid do
+		profile.rewards["book:" .. id] = true -- (8.2 review: the book's milestones paid, as the chapters done below)
+	end
+	for key in profile.story do
+		if string.sub(key, 1, 5) == "done:" then
+			profile.rewards[key] = true
+		end
+	end
+	-- 8.3: the warehouse's level as a short key too ("warehouse:<k>", only the one it is now): a save an older server
+	-- writes again loses sandboxUpgrades.warehouse and its flag, and UpgradeRules.fromSave reads the level back from it
+	for key in profile.rewards do
+		if type(key) == "string" and string.sub(key, 1, 10) == "warehouse:" then
+			profile.rewards[key] = nil
+		end
+	end
+	profile.rewards[UpgradeRules.warehouseKey(profile.sandboxUpgrades)] = true
+	local seq = (serial[player] or 0) + 1
+	serial[player] = seq
+	local session = sessions[player] -- (kept here: the leave's cleanup may clear it while the shutdown's save still runs)
+	local lock = if final then nil else { job = game.JobId, at = os.time(), session = session, seq = seq }
+	local data, problems, bytes = SaveGuard.clean(build(profile, lock))
+	local money = profile.money
+	local badMoney = type(money) ~= "number" or money ~= money or money < 0 or money == math.huge
+	if #problems > 0 or badMoney then
+		warn(`[PlayerData] {player.Name}'s save mended: {table.concat(problems, "; ")}{if badMoney then ` (money {money}: the stored money kept)` else ""}`)
+	end
+	local more = extras[player]
+	if more and bytes + more.bytes <= Config.Saving.MaxBytes then
+		SaveGuard.merge(data, more.data)
+		bytes += more.bytes
+	elseif more then
+		warn(`[PlayerData] {player.Name}'s save: the keys of a newer server left out ({more.bytes} bytes; too big)`)
+	end
+	if bytes >= Config.Saving.WarnBytes then
+		warn(`[PlayerData] {player.Name}'s save is {math.floor(bytes / 1000)} kB (a DataStore key holds 4 MB)`)
+	end
 	saving += 1
-	for attempt = 1, if final then 4 else 1 do
-		local taken = false
+	local tries = if final then Config.Saving.FinalTries else Config.Saving.Tries
+	local written = false
+	for attempt = 1, tries do
+		local taken, put = false, false
 		local success, err = pcall(function()
 			dataStore:UpdateAsync(key(player), function(old: any): any
-				taken = false
+				taken, put = false, false
 				-- 5.7: a regular autosave still in flight when the leave save started (or after a RESET MY SAVE swapped
 				-- the profile) writes nothing: it would put this server's lock back on a save that was just released
 				-- (the next server would wait for it), or write the old profile over the new one.
 				if not final and (finished[player] or profiles[player] ~= profile) then
 					return nil
 				end
-				if type(old) == "table" and type(old.lock) == "table" and old.lock.job ~= game.JobId then
+				if not ours(old, session) then
 					taken = true -- another server took the save over (we were stale): never overwrite its newer data
 					return nil
 				end
+				local newest = old.lock.seq
+				if type(newest) == "number" and newest > seq then
+					return nil -- (8.3: a newer save of this session is in already: never an older snapshot over it)
+				end
+				if badMoney then
+					data.money = if type(old.money) == "number" and old.money >= 0 then old.money else 0
+				end
+				put = true
 				return data
 			end)
 		end)
@@ -1066,14 +1231,44 @@ function PlayerData.save(player: Player, final: boolean?)
 			canSave[player] = false
 			break
 		elseif success then
+			written = put
 			break
 		end
-		warn(`[PlayerData] save failed ({attempt}): {err}`)
-		if final and attempt < 4 then
-			task.wait(attempt)
+		warn(`[PlayerData] save failed ({attempt}/{tries}): {err}`)
+		if attempt < tries then
+			task.wait(SaveGuard.backoff(attempt, Config.Saving.Backoff))
+			if not final and (finished[player] or profiles[player] ~= profile or serial[player] ~= seq) then
+				break -- (a newer save, or the leave save, carries it now)
+			end
+		end
+	end
+	if written and profiles[player] == profile then
+		wrote[player] = os.clock()
+		if badMoney then
+			profile.money = data.money -- (the live money mended too: never negative, never NaN)
 		end
 	end
 	saving -= 1
+	return written
+end
+
+-- 8.3 saves: a save a moment from now (Config.Saving.Soon s; one for a burst of calls). PlayerData.spend asks for it
+-- after every purchase (the warehouse's level, the upgrades, the paint), server/CollectionBook.luau after a milestone,
+-- server/Collection.luau when pieces come home (server/SandboxTasks.luau saves its claims its own way). Never sooner
+-- than Gap s after this player's last write; while the request budget is under Reserve it is left to the autosave.
+-- Nothing while the save is not loaded or the player is leaving (the leave save carries it).
+function PlayerData.saveSoon(player: Player)
+	if soon[player] or not canSave[player] or finished[player] or not profiles[player] then
+		return
+	end
+	soon[player] = true
+	local since = os.clock() - (wrote[player] or -math.huge)
+	task.delay(math.max(Config.Saving.Soon, Config.Saving.Gap - since), function()
+		soon[player] = nil
+		if player.Parent and profiles[player] and roomFor() then
+			PlayerData.save(player)
+		end
+	end)
 end
 
 -- 4.0.5, the admin's RESET MY SAVE: the profile starts over as a new player's (the tutorial, the fog, $ and all) and is
@@ -1087,17 +1282,31 @@ function PlayerData.resetSave(player: Player)
 		fresh.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
 	profiles[player] = fresh
+	extras[player] = nil -- (8.3: a fresh start keeps no newer server's keys either)
 	PlayerData.save(player)
 end
 
 function PlayerData.release(player: Player)
 	-- 5.7: the leave save runs after every other PlayerRemoving handler (Business pays the last accrual, Jobs ends a
 	-- job, Fuel and Vehicles store the tank and the damage): a deferred thread starts once they all had their turn.
+	-- 8.3 saves: a rejoin to this server waits for it (leaving, by UserId); an error in it still cleans up.
+	local userId = player.UserId
+	leaving[userId] = (leaving[userId] or 0) + 1
 	task.defer(function()
-		PlayerData.save(player, true)
+		local ok, err = pcall(PlayerData.save, player, true)
+		if not ok then
+			warn(`[PlayerData] {player.Name}'s leave save failed: {err}`)
+		end
 		profiles[player] = nil
 		canSave[player] = nil
 		finished[player] = nil -- (with the profile gone, a late autosave's transform still writes nothing)
+		sessions[player], extras[player], wrote[player], serial[player], soon[player] = nil, nil, nil, nil, nil
+		local left = (leaving[userId] or 1) - 1
+		if left > 0 then
+			leaving[userId] = left
+		else
+			leaving[userId] = nil
+		end
 	end)
 end
 
@@ -1149,6 +1358,9 @@ function PlayerData.spend(player: Player, amount: number, reason: string?, sku: 
 	profile.money -= amount
 	changed:Fire(player)
 	tellMoney(player, -amount, reason, sku)
+	if amount > 0 then
+		PlayerData.saveSoon(player) -- 8.3 saves: a purchase is saved a moment later (one save for a burst)
+	end
 	return true
 end
 
@@ -1334,6 +1546,14 @@ function PlayerData.notify(player: Player)
 end
 
 function PlayerData.start()
+	-- 8.3 saves: every top-level key this version writes (a save built from a stand-in with every field set); a loaded
+	-- save's other keys are a newer server's, kept and written back. Without the list (an error): none are kept.
+	local built, probe = pcall(build, SaveGuard.probe(), {})
+	if built and type(probe) == "table" then
+		known = SaveGuard.keys(probe)
+	else
+		warn(`[PlayerData] the save's keys could not be listed ({probe}): a newer server's keys are not kept`)
+	end
 	Players.PlayerAdded:Connect(function(player)
 		PlayerData.load(player)
 	end)
@@ -1346,7 +1566,7 @@ function PlayerData.start()
 			task.spawn(PlayerData.save, player, true)
 		end
 		-- Wait for every save in flight (the leave saves too), not a fixed time: up to 25 s of the 30 Roblox gives.
-		local deadline = os.clock() + 25
+		local deadline = os.clock() + Config.Saving.CloseWait
 		task.wait()
 		while saving > 0 and os.clock() < deadline do
 			task.wait(0.25)
@@ -1355,8 +1575,20 @@ function PlayerData.start()
 	task.spawn(function()
 		while true do
 			task.wait(Config.AutosaveSeconds)
+			-- 8.3 saves: a player written a moment ago (a purchase's save) waits for the next round, and so does every
+			-- save while the request budget is under its reserve (the loads and the leave saves come first)
+			local waiting = 0
 			for player in profiles do
+				if not canSave[player] or os.clock() - (wrote[player] or -math.huge) < Config.Saving.Gap then
+					continue -- (a save not loaded, Studio without API access: nothing to write)
+				elseif not roomFor() then
+					waiting += 1
+					continue
+				end
 				task.spawn(PlayerData.save, player)
+			end
+			if waiting > 0 then
+				warn(`[PlayerData] the DataStore's request budget is low: {waiting} autosave(s) wait for the next round`)
 			end
 		end
 	end)

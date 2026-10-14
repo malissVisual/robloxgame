@@ -17,6 +17,14 @@ PURE += ("CollectionBookRules",)  # 8.2 sandbox, the collection book (tests/coll
 PURE += ("StockPlan",)  # 8.2 sandbox, the STOCK list's bulk buttons and orders (tests/stockplan_test.luau)
 PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_test.luau)
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
+PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
+PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
+PURE += ("Visitors",)  # 8.3 sandbox, the showroom's visitors: who, when, where they walk, the offers' prices (tests/visitors_test.luau)
+PURE += ("VanPaintRules",)  # 8.3 sandbox, the PAINT shop: the catalogue, the prices, the looks, the save (tests/vanpaint_test.luau)
+PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_test.luau, tests/sandboxlight_runtime_test.luau)
+PURE += ("DoorSwing",)  # 8.3 walk-in doors: a door leaf's swing (tests/doorswing_test.luau)
+PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxbadges_test.luau, tests/sandboxbadges_runtime_test.luau)
+PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -55,6 +63,11 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # 7.x: the farm's layout
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
+    # 8.3: shared/VanLook.luau (the PAINT shop paints a van: Roblox instances) on the same recorder, with its typeof
+    # (tests/vanpaint_runtime_test.luau; the sandbox's e2e paints its vans with it too).
+    source = open(os.path.join(SHARED, "VanLook.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "VanLook.luau"), "w", encoding="utf-8").write(prefix + "local typeof = M.typeof\n" + source)
     # 7.x: shared/Layouts (Farm.luau: Walt's farm, HouseLayout's kind "farm"; tests/farmlayout_test.luau) next to them,
     # on the same recorder, their script.Parent.Parent.X requires the copies above
     for path in sorted(glob.glob(os.path.join(SHARED, "Layouts", "*.luau"))):
@@ -117,6 +130,18 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{built_as[m[1]]}")' if m[1] in built_as else f"E.{m[1]}", source)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 (Danny's hops): the real server/Npcs.luau as NpcsServer.luau for tests/npcs_runtime_test.luau, one line on
+    # top: setfenv to tests/runtime/NpcsRuntime.luau's environment (its services, a person's body on the item recorder,
+    # a require that gives the Shared copies above for ReplicatedStorage.Shared's modules).
+    shutil.copy(os.path.join(HERE, "runtime", "NpcsRuntime.luau"), os.path.join(tmp, "NpcsRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "Npcs.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "NpcsServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./NpcsRuntime").env)\n' + source)
+    # 8.3: the real client/PairSteer.luau (the leader's side of carrying in two) as PairSteerClient.luau for
+    # tests/pairsteer_test.luau: a function of the globals it reads (the test's game, a require that gives the PairCarry
+    # copy above, the recorder's CFrame).
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, require: any, CFrame: any)\n" + source + "\nend\n")
     # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
     # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
     # and for tests/movesites_test.luau.
@@ -168,7 +193,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # modules the copies above (shared/CollectionRules.luau on FurnitureLooks' recorder copy).
     shutil.copy(os.path.join(HERE, "runtime", "CollectionRuntime.luau"), os.path.join(tmp, "CollectionRuntime.luau"))
     head = ('local E = require("./CollectionRuntime")\n'
-            'local game, task, os, Instance, warn = E.game, E.task, E.os, E.Instance, E.warn\n')
+            'local game, task, os, Instance, warn, Enum = E.game, E.task, E.os, E.Instance, E.warn, E.Enum\n')
     for module in ("PlayerData", "Collection"):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
@@ -190,6 +215,20 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
     source = source.replace("require(script.Parent.Collection)", 'require("./CollectionServer")')
     open(os.path.join(tmp, "CollectionBookServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the PAINT shop: the real server/VanPaint.luau as VanPaintServer.luau for tests/vanpaint_runtime_test.luau
+    # on the same runtime (its PlayerData the real one above) and tests/runtime/VanPaintRuntime.luau's few additions (a
+    # CollectionService, a prompt's Triggered, the vans: a fake Vehicles); shared/VanLook.luau the recorder's copy above.
+    shutil.copy(os.path.join(HERE, "runtime", "VanPaintRuntime.luau"), os.path.join(tmp, "VanPaintRuntime.luau"))
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "VanPaint.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.Vehicles)", "P.Vehicles")
+    source = source.replace("require(script.Parent.SandboxPlots)", "E.SandboxPlots")
+    assert "script.Parent" not in source, "server/VanPaint.luau requires a module tests/run_tests.py does not give it"
+    paint_head = ('local P = require("./VanPaintRuntime")\nlocal E, M = P.E, P.Mock\n'
+                  'local game, task, os, warn, Instance = P.game, E.task, E.os, E.warn, P.Instance\n'
+                  'local Vector3, CFrame, Color3, Enum, typeof = M.Vector3, M.CFrame, M.Color3, M.Enum, M.typeof\n')
+    open(os.path.join(tmp, "VanPaintServer.luau"), "w", encoding="utf-8").write(paint_head + source)
     # 8.2 SANDBOX, analytics: the real server/Analytics.luau and server/SandboxAnalytics.luau as AnalyticsServer.luau and
     # SandboxAnalyticsServer.luau for tests/sandboxanalytics_runtime_test.luau on the same runtime: PlayerData and
     # Collection the real ones above, Moving the test's fake (E.Moving: its listeners' registration), AnalyticsService the
@@ -215,6 +254,27 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace(f"require(script.Parent.{module})", f'require("./SandboxTasksRuntime").{module}')
     assert "script.Parent" not in source, "server/SandboxTasks.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "SandboxTasksServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the showroom visitors' offers: the real server/VisitorOffers.luau as VisitorOffersServer.luau for
+    # tests/visitoroffers_runtime_test.luau on the same runtime (its PlayerData, Collection and SandboxTasks the real ones
+    # above).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "VisitorOffers.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("SandboxTasks", '"./SandboxTasksServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    assert "script.Parent" not in source, "server/VisitorOffers.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "VisitorOffersServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.3 SANDBOX, the Roblox badges: the real server/SandboxBadges.luau as SandboxBadgesServer.luau for
+    # tests/sandboxbadges_runtime_test.luau on the same runtime: its PlayerData, Collection and Upgrades the real ones
+    # above, Moving and SandboxLeaders the test's stand-ins (E.Moving: its onResult; E.SandboxLeaders: the board's rows),
+    # BadgeService the test's fake (through E.game's GetService).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxBadges.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("Upgrades", '"./UpgradesServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    for module in ("Moving", "SandboxLeaders"):
+        source = source.replace(f"require(script.Parent.{module})", f"E.{module}")
+    assert "script.Parent" not in source, "server/SandboxBadges.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SandboxBadgesServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.2 SANDBOX, showing off: the real server/SandboxLeaders.luau as SandboxLeadersServer.luau for
     # tests/sandboxleaders_runtime_test.luau on the same runtime (its PlayerData and Collection the real ones above) and
     # tests/runtime/LeadersRuntime.luau's few additions (an OrderedDataStore, UDim2 / UDim / Vector2, a game giving it).
@@ -245,9 +305,16 @@ with tempfile.TemporaryDirectory() as tmp:
     lo = [min(d["center"][i] - d["size"][i] / 2 for d in leaves) for i in range(3)]
     hi = [max(d["center"][i] + d["size"][i] / 2 for d in leaves) for i in range(3)]
     top = max(p["center"][1] + p["size"][1] / 2 for p in art["pieces"].values())
+    # (8.3 the big move: its back door's leaf too, the one in the back wall: +Z; none in a city export: the front's)
+    backs = [d for d in art["details"] if d["name"].startswith("Křídlo dveří") and d["center"][2] > 0] or leaves
+    b_lo = [min(d["center"][i] - d["size"][i] / 2 for d in backs) for i in range(3)]
+    b_hi = [max(d["center"][i] + d["size"][i] / 2 for d in backs) for i in range(3)]
+    # (8.3 walk-in doors: where its back door's handle is across it, its knob's X: the leaf hangs on the other side)
+    knobs = [d["center"][0] for d in art["details"] if d["name"].startswith("Klika") and d["center"][2] > 0] or [0]
     open(os.path.join(tmp, "HouseArt.luau"), "w", encoding="utf-8").write(
-        "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r }\n"
-        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top))
+        "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r, "
+        "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, backKnob = %r }\n"
+        % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2], sum(knobs) / len(knobs)))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -592,6 +659,42 @@ def upgrades_hooks_check():
     return good
 
 if not upgrades_hooks_check():
+    ok = False
+
+# 8.3 SANDBOX: the gamepad's D-pad (← the STOCK list, → the book, ↓ the TASKS panel: Config's StockPad / Pad,
+# shared/SandboxPad.luau) is free in the sandbox: no module the sandbox's client starts (client/Main.client.luau's
+# sandbox block: what it requires, its own modules) reads a D-pad button itself, none of the city's D-pad users (the
+# weapon wheel ↑, the phone ↓, the hands ← →) is started there, no prompt of the server's (GamepadKeyCode) is on the
+# D-pad, and the three chips are on three different D-pad buttons, never ↑ (Roblox's emote wheel).
+def pad_check():
+    root = os.path.dirname(HERE)
+    client = os.path.join(root, "src", "client")
+    main = open(os.path.join(client, "Main.client.luau"), encoding="utf-8").read()
+    start = main.index("if Config.Sandbox.On then")
+    block = main[start:main.index("\nend\n", start)]
+    started = set(re.findall(r"require\(Client\.(\w+)\)", block))
+    own = re.search(r"for _, name in \{([^}]*)\} do", block)
+    started |= set(re.findall(r'"(\w+)"', own.group(1))) if own else set()
+    bad = []
+    for name in sorted(started):
+        path = os.path.join(client, name + ".luau")
+        if os.path.exists(path) and re.search(r"KeyCode\.DPad\w+", open(path, encoding="utf-8").read()):
+            bad.append(f"client/{name}.luau reads the D-pad")
+    for city in ("Holster", "WeaponWheel", "Phone"):
+        if city in started:
+            bad.append(f"the sandbox starts {city} (a D-pad user of the city's)")
+    for folder, _, files in os.walk(os.path.join(root, "src", "server")):
+        for name in files:
+            if name.endswith(".luau") and re.search(r"GamepadKeyCode\s*=\s*Enum\.KeyCode\.DPad", open(os.path.join(folder, name), encoding="utf-8").read()):
+                bad.append(f"server/{name}: a prompt on the D-pad")
+    config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
+    pads = re.findall(r'^\t(?:StockPad|Pad) = "(\w+)"', config, re.M)
+    if len(pads) != 3 or len(set(pads)) != 3 or any(not p.startswith("DPad") or p == "DPadUp" for p in pads):
+        bad.append(f"the chips' pads {pads}: three different D-pad buttons, never DPadUp")
+    print("== sandbox D-pad: " + (f"free for the chips ({', '.join(pads)}): none of the {len(started)} modules the sandbox starts reads it, no prompt on it" if not bad else "; ".join(bad)))
+    return not bad
+
+if not pad_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

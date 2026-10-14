@@ -1,7 +1,7 @@
 """8.1 grip: the folder tools/phone-ui/carrygrip.luau runs in (check.py runs its checks there, carrygrip_preview.py its
 scenes): the real shared modules, the real client/CarryGripUi.luau with client/MoveSounds.luau, client/MovingHud.luau,
 client/MoveHelperHud.luau, client/QuickChat.luau (client/MoveStoryUi.luau, client/Portrait.luau, client/CardKit.luau,
-client/TouchLayout.luau, client/MoveLayout.luau, client/TopBlocks.luau) on missions_mock.luau's recorder, the Ui, Theme,
+client/TouchLayout.luau, client/MoveLayout.luau, client/TopBlocks.luau; 8.3 keys: client/PadGlyph.luau) on missions_mock.luau's recorder, the Ui, Theme,
 Net, MapView, Sounds, DialogKeys and Fade stand-ins. CarryGripUi's and MoveSounds' os.clock is the check's own clock
 (mock.os: carrygrip.luau's M.clock, moved on by its frames), so every timing is the same each run."""
 import re
@@ -25,7 +25,7 @@ def local(text: str) -> str:
 def carrygrip_env(dest: Path):
     for source in (ROOT / "src/shared").glob("*.luau"):
         (dest / source.name).write_text(local(source.read_text()))
-    for name in ("CarryGripUi", "MoveSounds", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks"):
+    for name in ("CarryGripUi", "MoveSounds", "MovingHud", "MoveHelperHud", "QuickChat", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         clock = "local os = mock.os or os\n" if name in ("CarryGripUi", "MoveSounds") else ""
         (dest / f"{name}.luau").write_text(PREFIX + clock + local((ROOT / f"src/client/{name}.luau").read_text()))
     (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")

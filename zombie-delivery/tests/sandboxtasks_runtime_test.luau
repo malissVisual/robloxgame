@@ -142,19 +142,20 @@ check("SandboxTasks.state: the same view", Tasks.state(A) ~= nil and #(Tasks.sta
 setTasks(A, { { "home", 8 }, { "shown", 6 }, { "sell", 150 } }, { "w_rare", 20 })
 mark = #E.sent
 for _ = 1, 2 do
-	Collection.add(A, { item = "sofa", condition = 1 }) -- (rare: $350)
+	Collection.add(A, { item = "grandfather_clock", condition = 1 }) -- (rare: $900; 8.3 economy: the sofa is uncommon now)
 end
 for _ = 1, 3 do
 	Collection.add(A, { item = "plant", condition = 0.9 }) -- (common)
 end
 E.flush()
 check("five pieces home (a van unloaded): home 5/8; the stock the save had never counts", slot(A, 1).progress == 5, slot(A, 1).progress)
-check("… two of them rare or better: the weekly 2/20", slot(A, "weekly").progress == 2 and CollectionRules.tierOf({ item = "sofa" }).rank >= T.RareRank)
+check("… two of them rare or better: the weekly 2/20", slot(A, "weekly").progress == 2 and CollectionRules.tierOf({ item = "grandfather_clock" }).rank >= T.RareRank
+	and CollectionRules.tierOf({ item = "sofa" }).rank < T.RareRank)
 check("… no task done yet: no \"done\"", #kinds(E.received(A, "SandboxTasks", mark), "done") == 0)
 E.advance(1)
 local stateNow = kinds(E.received(A, "SandboxTasks", mark), "state")
 check("… the state followed (once for the burst)", #stateNow == 1 and stateNow[1].daily[1].progress == 5, #stateNow)
-Collection.add(A, { item = "piano", condition = 1 }) -- (epic)
+Collection.add(A, { item = "piano", condition = 1 }) -- (rare)
 Collection.add(A, { item = "plant", condition = 1 })
 Collection.add(A, { item = "plant", condition = 1 })
 mark = #E.sent
@@ -163,12 +164,12 @@ E.flush()
 local dones = kinds(E.received(A, "SandboxTasks", mark), "done")
 check("eight home: the task done, \"done\" with its title and reward", slot(A, 1).progress == 8 and #dones == 1 and dones[1].title == "Bring 8 pieces home"
 	and dones[1].money == Rules.rewardOf(Rules.def("home") :: Rules.Def, 8) and dones[1].weekly == false and slot(A, "weekly").progress == 3)
-Collection.display(A, uidOf(A, "sofa") :: string, 1)
+Collection.display(A, uidOf(A, "grandfather_clock") :: string, 1)
 Collection.display(A, uidOf(A, "piano") :: string, 2)
-Collection.display(A, uidOf(A, "sofa", 2) :: string, 3)
+Collection.display(A, uidOf(A, "grandfather_clock", 2) :: string, 3)
 E.flush()
 check("three on show: shown 3/6", slot(A, 2).progress == 3, slot(A, 2).progress)
-Collection.undisplay(A, uidOf(A, "sofa", 2) :: string)
+Collection.undisplay(A, uidOf(A, "grandfather_clock", 2) :: string)
 E.flush()
 check("… one taken down: still 3 (the most at once)", slot(A, 2).progress == 3)
 local moneyAt = #money
@@ -182,6 +183,30 @@ moneyAt = #money
 E.advance(Config.Collection.Tick * 3 + 0.5)
 local income = paid(A, "CollectionIncome", moneyAt)
 check("the stands paid (three payouts): income counts what they paid, the weekly too", income > 0 and slot(A, 1).progress == income and slot(A, "weekly").progress == income, income)
+
+-- ── 8.3: the market's tasks (today's hot kinds, shared/Market.luau) ────────
+do
+	local Market = require("./Market")
+	local hotKind = Market.pick(Market.dayOf(E.now)).hot[1]
+	setTasks(A, { { "hotsell", 2 }, { "hotincome", 100 }, { "home", 8 } }, { "w_income", 4000 })
+	Collection.add(A, { item = hotKind, condition = 1 })
+	Collection.add(A, { item = hotKind, condition = 1 })
+	Collection.add(A, { item = "box", condition = 1 }) -- (not hot: its sale counts no hot piece)
+	E.flush()
+	Collection.sell(A, uidOf(A, "box") :: string)
+	E.flush()
+	check(`8.3: a piece that isn't hot sold: hotsell 0/2`, slot(A, 1).progress == 0, slot(A, 1).progress)
+	local hotPrice = Collection.sell(A, uidOf(A, hotKind) :: string)
+	E.flush()
+	check(`… a hot piece ({hotKind}) sold: hotsell 1/2`, hotPrice ~= nil and slot(A, 1).progress == 1, slot(A, 1).progress)
+	Collection.display(A, uidOf(A, hotKind) :: string, 4)
+	moneyAt = #money
+	E.advance(Config.Collection.Tick * 18 + 0.5) -- (8.3 economy: a cheap hot piece earns under $1 a minute)
+	local paidNow = paid(A, "CollectionIncome", moneyAt)
+	check("… a hot piece on show: hotincome counts its part of what the stands paid (never more)", slot(A, 2).progress > 0 and slot(A, 2).progress < paidNow, `{slot(A, 2).progress} of {paidNow}`)
+	Collection.undisplay(A, uidOf(A, hotKind) :: string)
+	setTasks(A, { { "income", 300 }, { "trips", 3 }, { "clean", 1 } }, { "w_income", 4000 }) -- (as the moves below find them)
+end
 
 -- ── A move's trips, its end ────────────────────────────────────────────────
 local B = E.join(202, "Ben") -- a new player, Ann's crew mate
@@ -283,7 +308,7 @@ slot(A, "weekly").progress = 5
 E.advance(1)
 E.fire(A, "SandboxTasks", { kind = "claim", slot = "weekly" })
 got, _, sku = paid(A, "SandboxTask", moneyAt)
-check("the weekly done: its own claim, its bigger reward (SKU w_moves)", got == Rules.rewardOf(Rules.def("w_moves") :: Rules.Def, 5) and got >= 2000 and sku == "w_moves")
+check("the weekly done: its own claim, its bigger reward (SKU w_moves)", got == Rules.rewardOf(Rules.def("w_moves") :: Rules.Def, 5) and got >= 1000 and sku == "w_moves")
 E.advance(5)
 check("the claims saved a moment later (SaveDelay)", (E.saves.Player_101 :: any).sandboxTasks ~= nil and (E.saves.Player_101 :: any).sandboxTasks.bonus == true)
 
@@ -346,11 +371,13 @@ local skip = { upgrade = true }
 local fresh = Rules.pickDaily(nextDay, 101, skip)
 local same = profileA.sandboxTasks.day == nextDay and #profileA.sandboxTasks.daily == #fresh
 for index, pick in fresh do
-	same = same and profileA.sandboxTasks.daily[index].id == pick.id and profileA.sandboxTasks.daily[index].progress == 0
+	-- (8.3: a kind the stands' payouts count, "income" or "hotincome", may have counted the payout after the reset)
+	local event = (Rules.def(pick.id) :: Rules.Def).event
+	same = same and profileA.sandboxTasks.daily[index].id == pick.id and (profileA.sandboxTasks.daily[index].progress == 0 or event == "income" or event == "hotincome")
 end
 check("… the new day's picks (none \"upgrade\": every upgrade is bought), the state sent", same and #kinds(E.received(A, "SandboxTasks", mark), "state") >= 1)
 check("… the weekly kept (the same week)", profileA.sandboxTasks.weekly ~= nil and profileA.sandboxTasks.weekly.id == "w_home")
-check("UpgradeRules: everything at its top", UpgradeRules.level(profileA.sandboxUpgrades, "stands") == (UpgradeRules.def("stands") :: any).max)
+check("UpgradeRules: everything at its top (8.3: the warehouse at the Logistics centre)", UpgradeRules.level(profileA.sandboxUpgrades, "warehouse") == (UpgradeRules.def("warehouse") :: any).max)
 profileA.sandboxTasks.weekly.progress = 60
 moneyAt = #money
 E.now = (day + 2) * DAY + 30 -- (Monday: a new week)
@@ -389,6 +416,23 @@ local D = E.join(404, "Dee")
 E.flush()
 local fromLock = profileOf(D).sandboxTasks
 check("a lock-only record (no money): not read, today's picks fresh", fromLock ~= nil and fromLock.day == Rules.dayOf(E.now) and #fromLock.daily == T.Daily)
+
+-- 8.4: a new player's Garage (2 stands) never gets "Have {n} pieces on show" (its targets need more stands than it has)
+local Eve = E.join(505, "Eve")
+E.flush()
+local shownSeen, shownDrawn = false, false
+for _ = 1, 40 do
+	E.now += DAY
+	E.advance(T.CheckEvery + 0.5)
+	local picks = profileOf(Eve).sandboxTasks
+	for _, pick in (if picks then picks.daily else {}) do
+		shownSeen = shownSeen or pick.id == "shown"
+	end
+	for _, pick in Rules.pickDaily(Rules.dayOf(E.now), 505, nil) do
+		shownDrawn = shownDrawn or pick.id == "shown"
+	end
+end
+check("8.4: 40 days in the Garage: \"shown\" never picked (the same days without the skip draw it)", not shownSeen and shownDrawn)
 
 check("no warnings", #E.warnings == 0, E.warnings[1])
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

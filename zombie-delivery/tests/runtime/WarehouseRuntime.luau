@@ -163,6 +163,9 @@ Runtime.Collection = {
 	boost = function(player: any): number
 		return Runtime.boosts[player] or 1
 	end,
+	marketIncome = function(): number -- (8.3: no hot kinds here)
+		return 1
+	end,
 }
 
 -- 8.1: server/Upgrades.luau's open (the UPGRADES desk's prompt); 8.3: its levels and listeners

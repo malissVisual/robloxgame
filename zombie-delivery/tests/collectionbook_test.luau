@@ -1,5 +1,5 @@
 -- 8.2 SANDBOX, the collection book's rules (shared/CollectionBookRules.luau, Config.CollectionBook): the book's pieces
--- (the catalogue without Walt's farm pieces: the ordinary furniture, then the 12 collectibles; exactly what the sandbox
+-- (the catalogue without Walt's farm pieces: the ordinary furniture, then the 24 collectibles; exactly what the sandbox
 -- house can hold), record (a discovery, the count, the best condition, nothing for a piece not in the book), the
 -- counts, the milestones (their order and rewards, progress, reached, due: each once, a legendary, every collectible,
 -- all the furniture), the admin's fill, the view for the remote (what a remote and a DataStore keep), and the save:
@@ -67,8 +67,8 @@ for _, id in FurnitureLooks.FarmPieces do
 	farm[id] = true
 end
 local expected = #FurnitureLooks.Order - #FurnitureLooks.FarmPieces
-check(`the book: the catalogue without the farm's {#FurnitureLooks.FarmPieces} pieces ({expected})`, #Rules.Pieces == expected and expected == 56, #Rules.Pieces)
-check("… the 12 collectibles (FurnitureLooks.Collectibles, in their order)", #Rules.Collectibles == 12 and same(Rules.Collectibles, FurnitureLooks.Collectibles))
+check(`the book: the catalogue without the farm's {#FurnitureLooks.FarmPieces} pieces ({expected})`, #Rules.Pieces == expected and expected == 68, #Rules.Pieces) -- (8.3: 56 + 12 collectibles)
+check("… the 24 collectibles (FurnitureLooks.Collectibles, in their order)", #Rules.Collectibles == 24 and same(Rules.Collectibles, FurnitureLooks.Collectibles))
 check("… and 44 pieces of furniture (no rarity of their own)", #Rules.Furniture == 44 and #Rules.Furniture + #Rules.Collectibles == #Rules.Pieces)
 local inOrder, noFarm, unique = true, true, true
 local seen: { [string]: boolean } = {}
@@ -129,7 +129,7 @@ check("… a worse one: n 3, best stays 0.9", Rules.record(book, "sofa", 0.2) ==
 check("… a condition out of range or garbage: 0 … 1", Rules.record(book, "tv", 7) and book.tv.best == 1 and Rules.record(book, "piano", 0 / 0) and book.piano.best == 0 and Rules.record(book, "radio", "x") and book.radio.best == 0)
 check("… a piece not in the book (a farm piece, junk): nothing", Rules.record(book, "hay_wagon", 1) == false and Rules.record(book, "nope", 1) == false and Rules.record(book, nil, 1) == false and book.hay_wagon == nil and book.nope == nil)
 local counts = Rules.counts(book)
-check("counts: 4 found of 56 (4 furniture of 44, 0 collectibles of 12, no legendary)", counts.found == 4 and counts.total == 56 and counts.furniture == 4 and counts.furnitureTotal == 44 and counts.collectibles == 0 and counts.collectiblesTotal == 12 and counts.legendary == 0)
+check("counts: 4 found of 68 (4 furniture of 44, 0 collectibles of 24, no legendary)", counts.found == 4 and counts.total == 68 and counts.furniture == 4 and counts.furnitureTotal == 44 and counts.collectibles == 0 and counts.collectiblesTotal == 24 and counts.legendary == 0)
 Rules.record(book, "oil_painting", 0.8)
 counts = Rules.counts(book)
 check("… a legendary collectible counts as a collectible and a legendary", counts.found == 5 and counts.collectibles == 1 and counts.legendary == 1)
@@ -144,13 +144,14 @@ local ids = {}
 for _, milestone in M do
 	table.insert(ids, milestone.id)
 end
-check("the milestones in order: found 10, found 20, all the furniture, every collectible, a legendary", table.concat(ids, ",") == "found10,found20,furniture,collectibles,legendary", table.concat(ids, ","))
+check("the milestones in order: found 10, found 20, all the furniture, every collectible, a legendary", table.concat(ids, ",") == "found10,found20,furniture,collectibles24,legendary", table.concat(ids, ","))
 check("… their names as the owner asked", M[1].name == "Found 10 pieces" and M[2].name == "Found 20 pieces" and M[4].name == "Found every collectible" and M[5].name == "A legendary!")
 local small = true
 for _, milestone in M do
-	small = small and milestone.reward >= 100 and milestone.reward <= 5000 and milestone.reward == math.floor(milestone.reward)
+	small = small and milestone.reward >= 100 and milestone.reward <= 10000 and milestone.reward == math.floor(milestone.reward)
 end
-check("… small whole-dollar rewards ($100 – 5,000), the rarer goals dearer", small and M[1].reward < M[2].reward and M[2].reward < M[3].reward and M[3].reward < M[4].reward)
+check("… whole-dollar rewards ($100 – 10,000), the rarer goals dearer", small and M[1].reward < M[2].reward and M[2].reward < M[3].reward and M[3].reward < M[4].reward)
+check("8.3 economy: $250, $500, $2,000, $10,000 and the legendary $1,500", M[1].reward == 250 and M[2].reward == 500 and M[3].reward == 2000 and M[4].reward == 10000 and M[5].reward == 1500)
 check("milestone(id): the milestone, nil for anything else", Rules.milestone("found10") == M[1] and Rules.milestone("nope") == nil and Rules.milestone(nil) == nil and Rules.milestone(5) == nil)
 local fresh = Rules.empty()
 local have, need = Rules.progress(fresh, M[1])
@@ -177,12 +178,22 @@ for _, id in Rules.Furniture do
 	Rules.record(fresh, id, 1)
 end
 due = Rules.due(fresh, { found10 = true, found20 = true, legendary = true })
-check("every piece of furniture: \"All the furniture\" due (not the collectibles: 2 of 12)", #due == 1 and due[1].id == "furniture" and select(1, Rules.progress(fresh, M[4])) == 2)
+check("every piece of furniture: \"All the furniture\" due (not the collectibles: 2 of 24)", #due == 1 and due[1].id == "furniture" and select(1, Rules.progress(fresh, M[4])) == 2)
 for _, id in Rules.Collectibles do
 	Rules.record(fresh, id, 1)
 end
 due = Rules.due(fresh, { found10 = true, found20 = true, legendary = true, furniture = true })
-check("every collectible: \"Found every collectible\" due", #due == 1 and due[1].id == "collectibles")
+check("every collectible: \"Found every collectible\" due", #due == 1 and due[1].id == "collectibles24")
+-- 8.4 review: 8.2's "collectibles" ($2,500 for its 12) is retired: the 24-piece one has its own id
+check("… its own id (collectibles24); 8.2's \"collectibles\" retired in its favour (no milestone of the book)", Config.CollectionBook.Retired.collectibles == "collectibles24"
+	and Rules.Retired.collectibles == "collectibles24" and Rules.milestone("collectibles") == nil and Rules.milestone("collectibles24") == M[4])
+check("… paid by an older server (\"collectibles\"): the 24 still due here (its own reward pays)", #Rules.due(fresh, { found10 = true, found20 = true, legendary = true, furniture = true, collectibles = true }) == 1)
+local paidNow: { [string]: boolean } = {}
+Rules.pay(paidNow, "collectibles24")
+check("pay: the 24 marks the retired one paid too (an older server never pays its 12 again); another milestone only itself", same(paidNow, { collectibles24 = true, collectibles = true }))
+local paidOne: { [string]: boolean } = {}
+Rules.pay(paidOne, "found10")
+check("… found10: only itself", same(paidOne, { found10 = true }))
 local everything = Rules.due(fresh, {})
 check("a full book unpaid: all five due, in order", #everything == 5 and everything[1].id == "found10" and everything[5].id == "legendary")
 local weird = { id = "odd", name = "Odd", kind = "dance", reward = 5 }
@@ -193,7 +204,7 @@ local part = Rules.empty()
 Rules.record(part, "sofa", 0.3)
 Rules.record(part, "sofa", 0.3)
 local added = Rules.fill(part)
-check("fill: every piece not found yet once (55 added, in order), the found ones kept", #added == 55 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 56 and same(part.jukebox, { n = 1, best = 1 }))
+check("fill: every piece not found yet once (67 added, in order), the found ones kept", #added == 67 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 68 and same(part.jukebox, { n = 1, best = 1 }))
 check("… a full book: fill adds nothing", #Rules.fill(part) == 0)
 
 -- ── view, paidList ─────────────────────────────────────────────────────────
@@ -206,6 +217,7 @@ view.sofa.n = 99
 check("… changing it changes nothing in the book", raw.sofa.n == 1)
 check("… what a remote and a DataStore keep", storable(Rules.view(fresh)) and storable(Rules.view(Rules.empty())))
 check("paidList: the paid milestones' ids in order", same(Rules.paidList({ legendary = true, found10 = true, junk = true }), { "found10", "legendary" }) and #Rules.paidList({}) == 0)
+check("… a retired one is not in it (the book never shows it)", same(Rules.paidList({ collectibles = true, collectibles24 = true }), { "collectibles24" }))
 
 -- ── The save ───────────────────────────────────────────────────────────────
 check("empty: a new book", same(Rules.empty(), {}))
@@ -231,6 +243,8 @@ check("clean: only the book's pieces, n whole (none: 1; under 1 or NaN: not foun
 check("… garbage: empty", same(Rules.clean(nil), {}) and same(Rules.clean("x"), {}) and same(Rules.clean(5), {}))
 check("cleanPaid: the known ids marked true (a list of ids too), nothing else", same(Rules.cleanPaid({ found10 = true, legendary = "yes", nope = true }), { found10 = true })
 	and same(Rules.cleanPaid({ "found20", "nope" }), { found20 = true }) and same(Rules.cleanPaid(nil), {}))
+check("cleanPaid: a retired id an older server paid is kept (never dropped: it never pays there again)", same(Rules.cleanPaid({ collectibles = true, nope = true }), { collectibles = true })
+	and same(Rules.cleanPaid({ "collectibles" }), { collectibles = true }) and same(Rules.cleanPaid({ collectibles = "yes" }), {}))
 local stock = {
 	{ uid = "1-1", item = "sofa", condition = 0.5 },
 	{ uid = "1-2", item = "sofa", condition = 0.9 },
@@ -258,9 +272,9 @@ check("… saved with the flag: its own book and paid milestones", same(b2, b1) 
 local b3, p3 = Rules.fromSave({ money = 500, [Rules.Flag] = true, collectionBook = b2, collectionBookPaid = p2 }, CollectionRules.empty())
 check("… running it again on what it gave: the same (the stock is not read again)", same(b3, b2) and same(p3, p2))
 local b4 = Rules.fromSave({ money = 500, [Rules.Flag] = true }, collection)
-check("… flagged but no book in it: empty (not the stock's)", same(b4, {}))
+check("… flagged but no book in it: the stock's pieces still found (8.3 review: a piece in the stock is always found)", same(b4, b1))
 local b5, p5 = Rules.fromSave({ money = 0, [Rules.Flag] = true, collectionBook = { sofa = { n = "x" }, tv = { n = 2, best = 0.5 } }, collectionBookPaid = "all" }, collection)
-check("… a garbled book in the save: cleaned", same(b5, { tv = { n = 2, best = 0.5 } }) and same(p5, {}))
+check("… a garbled book in the save: cleaned, the stock's pieces found again", same(b5, { tv = { n = 2, best = 0.5 }, sofa = { n = 2, best = 0.9 }, jukebox = { n = 1, best = 0.7 } }) and same(p5, {}))
 check("the flag is Config's", Rules.Flag == Config.CollectionBook.Flag and Rules.Flag == "collectionBookKept")
 
 -- ── Config ─────────────────────────────────────────────────────────────────

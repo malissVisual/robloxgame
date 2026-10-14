@@ -8,7 +8,8 @@
 -- in Hud's column (the toasts under it), clear of the touch buttons, the thumbstick, the left column and the move's
 -- panel, a finger's size on a phone; THE PANEL on J, on the chip (a key the game took does nothing), the three dailies,
 -- the bonus and the weekly with their progress ("3 / 10", "$120 / $250"), bars, rewards and CLAIM on a done one only;
--- CLAIM's request ({ kind = "claim", slot }) once for a double tap; "done" and "claimed" toasts and sounds; no redraw
+-- CLAIM's request ({ kind = "claim", slot }) once for a double tap; "done" and "claimed" toasts (8.3: their sounds are
+-- client/SandboxSounds.luau's, the panel plays none); no redraw
 -- for the same state; the countdown; ✕, J, ESC, the gamepad's B, the menu and a tap beside it close it; on each screen
 -- the panel on the screen, every row shown whole inside it, the texts fitting, a phone's buttons a finger's size (44
 -- px), a computer's panel under the chip, a phone's beside (two columns); a resize while open; garbage states.
@@ -351,7 +352,7 @@ check("… the bars: full, a third, about half", named(named(home, "Bar"), "Fill
 check("… CLAIM only on the done one (green, its reward); the others their reward in money green", named(home, "Claim") ~= nil and named(home, "Claim").Text == `CLAIM {M.MUi.money(FIRST.daily[1].money)}`
 	and named(trips, "Claim") == nil and named(trips, "Reward").Text == M.MUi.money(FIRST.daily[2].money) and named(trips, "Reward").TextColor3 == CardKit.Color.money)
 local bonus, weekly = named(panel, "Bonus"), named(panel, "Task_weekly")
-check("the bonus: \"⭐ All three done: +$500\", \"1 / 3 done\"", named(bonus, "Words").Text == "⭐ All three done: +$500" and named(bonus, "Count").Text == "1 / 3 done")
+check("the bonus: \"⭐ All three done: +$300\" (8.3 economy), \"1 / 3 done\"", named(bonus, "Words").Text == "⭐ All three done: +$300" and named(bonus, "Count").Text == "1 / 3 done")
 check("the weekly: gold, its title, \"$1,830 / $4,500\", its reward", named(weekly, "Title").Text == "Earn $4,500 from your stands" and named(weekly, "Progress").Text == "$1,830 / $4,500"
 	and named(weekly, "Reward").TextColor3 == CardKit.Color.gold and named(named(weekly, "Bar"), "Fill").BackgroundColor3 == CardKit.Color.gold)
 check("the countdowns: \"New tasks in 5 h 12 min\", \"THIS WEEK · NEW IN 1 D 5 H\"", named(panel, "Subtitle").Text == "New tasks in 5 h 12 min" and named(panel, "WeekLabel").Text == "THIS WEEK · NEW IN 1 D 5 H", named(panel, "WeekLabel").Text)
@@ -370,8 +371,9 @@ remote.OnClientEvent:Fire(FIRST)
 M.flush()
 check("the same state again: no redraw (a tap is never lost)", named(panelGui, "Tasks") == same)
 local toastsAt = #M.toasts
+local playedAt = #M.played
 remote.OnClientEvent:Fire({ kind = "claimed", title = "Bring 12 pieces home", money = 270 })
-check("\"claimed\": a toast and the money's sound", M.toasts[#M.toasts] == "💰 Bring 12 pieces home: +$270" and M.played[#M.played] == "cash" and #M.toasts == toastsAt + 1, M.toasts[#M.toasts])
+check("\"claimed\": a toast (8.3: its sound is SandboxSounds', the panel plays none)", M.toasts[#M.toasts] == "💰 Bring 12 pieces home: +$270" and #M.played == playedAt and #M.toasts == toastsAt + 1, M.toasts[#M.toasts])
 local CLAIMED = viewOf({ { "home", 12, 12, true }, { "trips", 3, 3 }, { "sell", 250, 250 } }, { "w_income", 4500, 4500 })
 remote.OnClientEvent:Fire(CLAIMED)
 M.flush()
@@ -390,7 +392,7 @@ press(named(named(panel, "Task_weekly"), "Claim"))
 sent = sentOn("SandboxTasks")
 check("the weekly's CLAIM sends slot \"weekly\"", sent[#sent][1].slot == "weekly")
 remote.OnClientEvent:Fire({ kind = "done", title = "Make 3 trips home in one move", money = 380, weekly = false })
-check("\"done\": a toast (claim it in TASKS) and the task's sound", M.toasts[#M.toasts] == "✅ Task done: Make 3 trips home in one move · claim $380 in TASKS" and M.played[#M.played] == "task_done", M.toasts[#M.toasts])
+check("\"done\": a toast (claim it in TASKS; 8.3: its sound is SandboxSounds')", M.toasts[#M.toasts] == "✅ Task done: Make 3 trips home in one move · claim $380 in TASKS" and #M.played == playedAt, M.toasts[#M.toasts])
 remote.OnClientEvent:Fire({ kind = "done", title = "Earn $4,500 from your stands", money = 2630, weekly = true })
 check("… a weekly one says so", string.find(M.toasts[#M.toasts], "Weekly task done", 1, true) ~= nil)
 

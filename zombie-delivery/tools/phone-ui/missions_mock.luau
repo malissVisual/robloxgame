@@ -195,6 +195,14 @@ M.MTheme = {
 local Ui = { HAIRLINE = 0.8, HAIRLINE_SELECTED = 0.5, Colors = Colors, onClick = nil }
 M.MUi = Ui
 Ui.make = M.make
+-- 8.3 keys: the device (client/PadGlyph.luau): a touch screen (M.touch), a gamepad used last (M.gamepad); a check
+-- may give its own
+function Ui.touchLayout()
+	return M.touch
+end
+function Ui.gamepadActive()
+	return M.gamepad == true
+end
 function Ui.label(parent, text, size, props)
 	local made = M.make("TextLabel", { Text = text, Size = size, BackgroundTransparency = 1 }, parent)
 	for key, value in props or {} do

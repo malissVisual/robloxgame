@@ -4,7 +4,8 @@
 -- or sold any time. The server decides every value; this window only shows them and asks through the "Collection"
 -- remote:
 --   { kind = "state", stock, income, stands }   kept (WarehouseUi.state, WarehouseUi.onState); an open window is drawn
---                                               again only when what it shows changed (its scroll kept)
+--                                               again only when what it shows changed (its scroll kept); 8.3 economy:
+--                                               `idle` the share the stands pay while you are idle (else none)
 --   { kind = "pick", stand }                    an empty display stand's prompt (Collection.openPicker): THE PICKER
 --   { kind = "sold", name, money }              a toast "Sold Grandpa's Clock · +$420" (WarehouseUi.notify, else
 --                                               client/Hud.luau's toast)
@@ -48,6 +49,16 @@
 --     the rarity chips as before and, on a computer, a 🔍 search box (every word in the piece's name; typing redraws
 --     only the grid, the box keeps its focus; closing the window clears it).
 --   WarehouseUi.sorting() / search()     the order and the search the windows use now
+-- 8.3, the market (shared/Market.luau; the state's `market`, the player's View: today's hot and cold kinds and their
+-- own demand; every price and $/min in the state is the market's already):
+--   * both windows: a line under the title "Today's market: 🔥 Old Globe, Jukebox, Sofa · ❄ Wardrobe · new in 5 h"; a
+--     tile of a hot kind "🔥 HOT ×1.4", of a cold one "❄ COLD", of a kind the player sold today "📉 −10%" (on its
+--     picture, under ON STAND n)
+--   * SELL's question says why the price is what it is ("Market: Vintage Radio −10% (you sold 2 today)", hot, cold)
+--     and sends the price it showed ({ kind = "sell", uid, expect }); SELL…'s totals are the market's (StockPlan.price:
+--     each next piece of a kind under the demand of the ones before it) and its SELL sends the total it showed
+--     ({ kind = "sellmany", filter, expect }): the server sells only at that total (the prices moved: it says so and
+--     sends the state again). Only prices the server sent are expected (a guessed one is never sent).
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): which stands are small depends on your warehouse's level (the player
 -- attribute Config.SandboxUpgrades.WarehouseAttribute, 1 … 5, server/Upgrades.luau; 4 until the server sets it, as a
 -- plain Plot): WarehouseLayout.fits and count ask with it, so TOO BIG and its words follow a level up.
@@ -65,6 +76,7 @@ local FurnitureLooks = require(Shared.FurnitureLooks)
 local ItemLooks = require(Shared.ItemLooks) -- (the 3/4 camera on a model's box: bounds, frame)
 local WarehouseLayout = require(Shared.WarehouseLayout) -- (8.0.1: the $/min as the stands' tags write it; 8.2: fits)
 local StockPlan = require(Shared.StockPlan) -- 8.2: FILL BEST, SELL…, the sorts, the search
+local Market = require(Shared.Market) -- 8.3: the market's line, tags and words
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
@@ -85,7 +97,14 @@ export type Entry = {
 	stand: number?,
 	got: number?,
 }
-export type State = { stock: { Entry }, income: number, stands: number }
+export type State = {
+	stock: { Entry },
+	income: number,
+	stands: number,
+	market: Market.View?, -- 8.3: the player's market (nil: none sent)
+	marketAt: number, -- 8.3: os.clock() it came (its `left` counts from then)
+	idle: number?, -- 8.3 economy: idle, the share of `income` the stands pay (nil: active, all of it)
+}
 export type Values = { rarity: string, perMinute: number, sell: number }
 export type Layout = {
 	touch: boolean,
@@ -95,7 +114,8 @@ export type Layout = {
 	w: number, -- the card's size (unscaled)
 	h: number,
 	pad: number,
-	header: number, -- (8.2: on a touch screen high enough for the STOCK list's finger-sized buttons)
+	header: number, -- (8.2: on a touch screen high enough for the STOCK list's finger-sized buttons; 8.3: and the market)
+	market: number, -- 8.3: the market's line (its top, under the title's line and the bulk buttons)
 	chips: number, -- the filter chips' height
 	close: number, -- the ✕'s side
 	gridX: number,
@@ -132,6 +152,9 @@ WarehouseUi.Rules = nil :: any -- shared/CollectionRules.luau once found (start)
 
 local TILE_TEXT = 100 -- a tile's height besides its picture and buttons (unscaled px)
 local HEADER = 52
+local MARKET_H = 18 -- 8.3: the market's line under the header
+local HOT_FACE, HOT_INK = Color3.fromRGB(74, 32, 18), Color3.fromRGB(255, 156, 96) -- 8.3: a hot kind's tag, the line
+local COLD_FACE, COLD_INK = Color3.fromRGB(22, 38, 58), Color3.fromRGB(150, 200, 255) -- 8.3: a cold kind's tag
 local SEARCH_W = 170 -- 8.2: the search box (a computer)
 local MAX_SEARCH = 40 -- its longest words
 local SCROLLBAR = 6
@@ -150,6 +173,7 @@ local shownKey = ""
 local card: any = nil -- the shade over the screen (the window: card's Picker)
 local panel: any = nil -- the card itself (Picker)
 local question: any = nil
+local questionFrom: any = nil -- 8.3: what the gamepad had selected when the question opened (selected again after it)
 local grid: any = nil
 local plan: Layout? = nil
 local listed: Listed? = nil -- 8.2: what the grid lists (draw keeps it, fillGrid reads it)
@@ -285,7 +309,8 @@ function WarehouseUi.layout(W: number, H: number, touch: boolean): Layout
 	local chips = if touch then finger else 30
 	local gap = PICK.Gap
 	local button = if touch then math.max(PICK.Button, finger) else PICK.Button
-	local header = if touch then math.max(HEADER, button + 8) else HEADER -- (8.2: FILL BEST & co. a finger's size)
+	local top = if touch then math.max(HEADER, button + 8) else HEADER -- (8.2: FILL BEST & co. a finger's size)
+	local header = top + MARKET_H -- (8.3: the market's line under them)
 	local gridY = header + chips + 8
 	local gridW = w - 2 * pad
 	local area = gridW - SCROLLBAR - 2
@@ -302,6 +327,7 @@ function WarehouseUi.layout(W: number, H: number, touch: boolean): Layout
 		h = h,
 		pad = pad,
 		header = header,
+		market = top,
 		chips = chips,
 		close = if touch then math.max(40, finger) else 40,
 		gridX = pad,
@@ -507,6 +533,11 @@ local function closeQuestion()
 	if question then
 		question:Destroy()
 		question = nil
+		local from = questionFrom -- (8.3: the gamepad's selection back on what asked, not lost with the question)
+		questionFrom = nil
+		if from and from.Parent and not Ui.gamepadSelection() then
+			Ui.gamepadFocus(from)
+		end
 	end
 end
 
@@ -568,7 +599,19 @@ local function pieceOf(entry: Entry, values: Values): StockPlan.Piece
 	local e: any = entry
 	local condition = math.clamp(tonumber(entry.condition) or 1, 0, 1)
 	local broken = if type(e.broken) == "boolean" then e.broken else condition <= Config.Collection.BrokenAt + 1e-6
-	return { uid = entry.uid, item = entry.item, stand = entry.stand, got = tonumber(entry.got) or 0, rarity = values.rarity, income = values.perMinute, price = values.sell, broken = broken, condition = condition }
+	return { uid = entry.uid, item = entry.item, stand = entry.stand, got = tonumber(entry.got) or 0, rarity = values.rarity, income = values.perMinute, price = values.sell, broken = broken, condition = condition, base = amount(e.base) }
+end
+
+-- 8.3: the market the window shows (nil: none sent yet).
+local function marketNow(): Market.View?
+	local state = current
+	return if state then state.market else nil
+end
+
+-- 8.3: the price the server sent for a piece (only that one is sent back as `expect`; nil for a guessed one).
+local function served(entry: Entry): number?
+	local price = amount((entry :: any).price)
+	return if price then math.floor(price + 0.5) else nil
 end
 
 -- What the open window lists: the pieces (the picker: not on show), each with its values; in the sort toggle's order
@@ -631,7 +674,13 @@ local function questionBox(name: string, boxW: number, boxH: number): (any, any)
 		BorderSizePixel = 0,
 		Active = true,
 		ZIndex = 21,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the question)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, shade)
+	questionFrom = Ui.gamepadSelection()
 	Ui.corner(box, 12)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, box)
 	question = shade
@@ -665,15 +714,31 @@ local function confirm(ask: Ask)
 	Ui.gamepadFocus(sell)
 end
 
--- SELL's question for one piece: "SELL FOR $Y?", the piece, CANCEL and SELL.
+-- 8.3: why the market prices a piece of this kind as it does now (nil: it doesn't touch it).
+local function marketHint(entry: Entry): string?
+	local market = marketNow()
+	local line = Market.demandLine(market, entry.item, nameOf(entry))
+	if line then
+		return line
+	end
+	local tag = Market.tag(market, entry.item)
+	if tag == "hot" then
+		return `🔥 Hot today: it sells for {Market.factor(Config.Market.HotSell)}, earns {Market.factor(Config.Market.HotIncome)} on show.`
+	elseif tag == "cold" then
+		return `❄ Cold today: it sells for {Market.factor(Config.Market.ColdSell)}. Keep it on show till tomorrow?`
+	end
+	return nil
+end
+
+-- SELL's question for one piece: "SELL FOR $Y?", the piece, CANCEL and SELL (8.3: the price it showed sent with it).
 local function askSell(row: Row)
 	local values, entry = row.values, row.entry
 	confirm({
 		question = `SELL FOR {Ui.money(values.sell)}?`,
 		what = `{nameOf(entry)} · {string.upper(values.rarity)} · {percent(entry)}`,
-		hint = if entry.stand then "It comes off its stand." else `On show it would earn {WarehouseUi.rate(values.perMinute)}.`,
+		hint = marketHint(entry) or (if entry.stand then "It comes off its stand." else `On show it would earn {WarehouseUi.rate(values.perMinute)}.`),
 		onYes = function()
-			send({ kind = "sell", uid = entry.uid })
+			send({ kind = "sell", uid = entry.uid, expect = served(entry) })
 			for _, tile in tiles do
 				if tile.entry == entry then
 					for _, button in tile.buttons do
@@ -739,6 +804,7 @@ local function sellMenu()
 	for _, row in all do
 		byUid[row.entry.uid] = row.entry
 	end
+	local market = state.market -- (8.3: the totals at the market's prices)
 	local optionH = math.max(layout.button, 40) + 8
 	local boxW = math.min(420, layout.w - 2 * layout.pad)
 	local boxH = 16 + 26 + 24 + #StockPlan.Filters * (optionH + 8) + layout.button + 16
@@ -749,8 +815,17 @@ local function sellMenu()
 	local first: any = nil
 	for _, id in StockPlan.Filters do
 		local chosen = StockPlan.toSell(list, id)
-		local total = StockPlan.price(chosen)
+		local total = StockPlan.price(chosen, market)
 		local words = FILTER_WORDS[id]
+		-- 8.3: the total the server will pay is sent with the request (only when every price in it is the server's)
+		local expect: number? = total
+		for _, piece in chosen do
+			local entry = byUid[piece.uid]
+			if not (entry and served(entry)) then
+				expect = nil
+			end
+		end
+		local hint = if market and total < StockPlan.price(chosen) then `Market: each next piece of a kind sells {math.floor(Config.Market.Drop * 100 + 0.5)}% lower.` else words.hint
 		local some = #chosen > 0
 		local option = Ui.make("TextButton", {
 			Name = `Sell_{id}`,
@@ -782,9 +857,14 @@ local function sellMenu()
 			confirm({
 				question = `SELL {string.upper(pieces(#chosen))} FOR {Ui.money(total)}?`,
 				what = someNames(chosen, byUid),
-				hint = words.hint,
+				hint = hint,
 				onYes = function()
-					if send({ kind = "sellmany", filter = id }) then
+					-- (8.4 review: + the pieces it listed: the server sells exactly those, or nothing if the stock changed)
+					local uids = table.create(#chosen)
+					for _, piece in chosen do
+						table.insert(uids, piece.uid)
+					end
+					if send({ kind = "sellmany", filter = id, expect = expect, uids = uids }) then
 						waiting("SellMenu")
 					end
 				end,
@@ -952,6 +1032,35 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 			ZIndex = 4,
 		})
 		Ui.corner(ribbon, 10)
+	end
+	-- 8.3: the market's tags on the picture, under ON STAND n: 🔥 HOT ×1.4 / ❄ COLD, 📉 −10% (the player's demand)
+	local tagY = if entry.stand then 30 else 6
+	local market = marketNow()
+	local tags: { { string } } = {}
+	local badge = Market.badge(market, entry.item)
+	if badge then
+		table.insert(tags, { "MarketTag", badge, Market.tag(market, entry.item) or "" })
+	end
+	local down = Market.percent(market, entry.item)
+	if down > 0 then
+		table.insert(tags, { "DemandTag", `📉 −{down}%`, "drop" })
+	end
+	for _, tag in tags do
+		local hot, cold = tag[3] == "hot", tag[3] == "cold"
+		local pill = Ui.label(picture, tag[2], UDim2.fromOffset(CardKit.width(tag[2], 11, Theme.HeadingFont) + 14, 20), {
+			Name = tag[1],
+			Position = UDim2.fromOffset(6, tagY),
+			BackgroundColor3 = if hot then HOT_FACE elseif cold then COLD_FACE else K.charcoal,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextColor3 = if hot then HOT_INK elseif cold then COLD_INK else K.warn,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 4,
+		})
+		Ui.corner(pill, 10)
+		tagY += 24
 	end
 	local inner = w - 20
 	if tooBig then
@@ -1138,6 +1247,17 @@ local function stateKey(state: State?, layout: Layout): string
 		end
 		table.insert(parts, tostring(state.income))
 		table.insert(parts, tostring(state.stands)) -- (8.2: FILL BEST's free stands)
+		local market = state.market
+		if market then
+			-- 8.3: the day's kinds and the player's demand (the tags, the prices' reasons)
+			table.insert(parts, `{market.day}:{table.concat(market.hot, ",")}:{table.concat(market.cold, ",")}`)
+			local kinds: { string } = {}
+			for item, demand in market.demand do
+				table.insert(kinds, `{item}={demand.n}/{demand.sold}`)
+			end
+			table.sort(kinds)
+			table.insert(parts, table.concat(kinds, ","))
+		end
 	else
 		table.insert(parts, "none")
 	end
@@ -1169,6 +1289,13 @@ draw = function(keepScroll: boolean)
 	end
 	shownKey = key
 	local scroll = if keepScroll and grid then grid.CanvasPosition else Vector2.zero
+	local selected = Ui.gamepadSelection() -- (8.3: the gamepad's selection, selected again once drawn)
+	local heldName, heldTile = nil, nil
+	if card and selected and selected:IsDescendantOf(card) then
+		local parent = selected.Parent
+		heldName = selected.Name
+		heldTile = if parent and string.sub(parent.Name, 1, 5) == "Tile_" then parent.Name else nil
+	end
 	closeQuestion()
 	for _, tile in tiles do
 		unmount(tile)
@@ -1201,6 +1328,11 @@ draw = function(keepScroll: boolean)
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the window)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, card)
 	panel = frame
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, frame)
@@ -1223,6 +1355,12 @@ draw = function(keepScroll: boolean)
 		elseif stand then "On show it earns money every minute you play."
 		else `{#all} {if #all == 1 then "piece" else "pieces"} · {onShow} on show{if earning > 0 then ` · {WarehouseUi.rate(earning)}` else ""}`
 	Ui.label(frame, subtitle, UDim2.new(1, -(layout.pad * 2 + layout.close + 8), 0, 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, 33), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	local market = if state then state.market else nil
+	if state and market then
+		-- 8.3: "Today's market: 🔥 … · ❄ … · new in 5 h" under the title's line and the bulk buttons
+		local left = market.left - (os.clock() - state.marketAt)
+		Ui.label(frame, Market.line(market, left), UDim2.new(1, -layout.pad * 2, 0, 16), { Name = "Market", Position = UDim2.fromOffset(layout.pad, layout.market), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = HOT_INK, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	end
 	local close = Ui.closeButton(frame, WarehouseUi.close)
 	close.Size = UDim2.fromOffset(layout.close, layout.close)
 	close.Position = UDim2.new(1, -6, 0, 6)
@@ -1245,7 +1383,12 @@ draw = function(keepScroll: boolean)
 	drawChips(frame, list, layout)
 	fillGrid(scroll.Y)
 	local firstTile = tiles[1]
-	Ui.gamepadFocus(if firstTile then firstTile.buttons[1] else close)
+	local again: any = nil -- (8.3: the same tile's button, or the header's, chip or sort)
+	if heldName then
+		local tile = if heldTile then grid and grid:FindFirstChild(heldTile) else nil
+		again = if heldTile then (if tile then tile:FindFirstChild(heldName) else nil) else frame:FindFirstChild(heldName)
+	end
+	Ui.gamepadFocus(again or (if firstTile then firstTile.buttons[1] else close))
 end
 
 -- The grid (and its empty words) for what the window lists now: the rarity chip's, the search's (8.2: typing in the
@@ -1315,7 +1458,8 @@ local function setState(raw: any)
 		end
 	end
 	local previous = current
-	local state: State = { stock = stock, income = amount(raw.income) or 0, stands = amount(raw.stands) or 0 }
+	local idle = amount(raw.idle) -- (8.3 economy: idle, the stands' share)
+	local state: State = { stock = stock, income = amount(raw.income) or 0, stands = amount(raw.stands) or 0, market = Market.readView(raw.market), marketAt = os.clock(), idle = if idle and idle < 1 then idle else nil }
 	current = state
 	for _, fn in listeners do
 		task.spawn(fn, state, previous)

@@ -1435,8 +1435,8 @@ BUILDERS.ski_bundle = function(c: Ctx)
 end
 
 -- ── 8.0 collectibles ─────────────────────────────────────────────────────────
--- A collector's things that turn up in a house besides its furniture (shared/HouseLayout.luau places 2-4 a house, a
--- legendary one in about one house of eight: Config.Furniture.Collectibles), each worth clearly more than an ordinary
+-- A collector's things that turn up in a house besides its furniture (shared/HouseLayout.luau places 1-2 a house, a
+-- legendary one in about one house in 25: Config.Furniture.Collectibles), each worth clearly more than an ordinary
 -- piece of its class and dearer the rarer it is (tests/furniture_test.luau). 8.1: the owner's Blender look
 -- (design/blender-furniture/furniture.py) has them too; once its ZDCFurnitureArt is imported, server/FurnitureMesh.luau
 -- dresses them (their gilt, velvet, lacquer, neon and fur in the variant's colours from the lists below), until then they
@@ -1459,6 +1459,22 @@ collectible("arcade_cabinet", "Arcade Cabinet", "🕹️", 2.8, 6.0, 3.0, "pair"
 collectible("jukebox", "Jukebox", "🎵", 3.4, 5.4, 2.5, "pair", 9, 3400, false, "garage", "epic")
 collectible("oil_painting", "Oil Painting", "🎨", 4.8, 3.8, 0.6, "both", 3, 6000, true, "living", "legendary")
 collectible("knight_armour", "Knight's Armour", "🛡️", 2.6, 6.8, 1.8, "both", 6, 5500, false, "living", "legendary")
+-- 8.3: twelve more for The Old Chalet (the book's 68 pieces), three of each rarity: a chalet's alpine things (the carved
+-- bear, the alphorn, the ski trophy) beside Grandpa's treasures, and two legendary jokes of a moving company in a zombie
+-- world (the T. rex skull in the garage, the zombie-proof safe in the bedroom). (8.4: Danny carries what you give him,
+-- whatever its weight; a pair piece waits for him at the other end.)
+collectible("antique_typewriter", "Antique Typewriter", "⌨️", 1.8, 1.2, 1.6, "hand", 3, 900, false, "bedroom", "uncommon")
+collectible("vintage_camera", "Vintage Camera", "📷", 1.6, 4.4, 1.6, "both", 3, 950, true, "hall", "uncommon")
+collectible("carved_bear", "Carved Wooden Bear", "🐻", 1.8, 3.3, 1.4, "both", 6, 880, false, "hall", "uncommon")
+collectible("gramophone", "Gramophone", "🎼", 1.8, 2.8, 2.2, "both", 3, 1650, true, "living", "rare")
+collectible("pocket_watch", "Grandpa's Pocket Watch", "⏱️", 1.0, 1.5, 1.0, "hand", 1, 1800, true, "bedroom", "rare")
+collectible("golden_horseshoe", "Golden Horseshoe", "🍀", 1.6, 2.0, 0.8, "hand", 2, 1550, false, "hall", "rare")
+collectible("crystal_chandelier", "Crystal Chandelier", "🕯️", 2.4, 2.6, 2.4, "both", 3, 3200, true, "kitchen", "epic")
+collectible("alphorn", "Alphorn", "📯", 7.2, 1.8, 1.4, "pair", 5, 2900, false, "garage", "epic")
+collectible("signed_guitar", "Signed Guitar", "🤘", 1.6, 4.4, 1.2, "both", 2, 3000, true, "kids", "epic")
+collectible("ski_trophy", "Golden Ski Trophy", "⛷️", 2.2, 3.6, 1.2, "both", 5, 5800, false, "living", "legendary")
+collectible("trex_skull", "T. Rex Skull", "🦖", 4.2, 3.2, 1.8, "pair", 8, 7000, true, "garage", "legendary")
+collectible("zombie_safe", "Zombie-Proof Safe", "🔐", 2.6, 3.4, 2.4, "pair", 10, 6500, false, "bedroom", "legendary")
 FurnitureLooks.Collectibles = table.move(Order, collectFrom, #Order, 1, {}) :: { string }
 
 -- Their palette: gold and gilt, old porcelain's glazes, lacquers and velvets, polished plate, the bone of antlers, a
@@ -1828,6 +1844,321 @@ BUILDERS.knight_armour = function(c: Ctx)
 	local emblem = Instance.new("Part")
 	emblem.Shape = Enum.PartType.Cylinder
 	finish(c, emblem, "Emblem", Vector3.new(0.03, 0.46, 0.46), lean * CFrame.new(0, 0.08, -0.05) * CFrame.Angles(0, math.pi / 2, 0), charge, METAL)
+end
+
+-- 8.3 collectibles. The pieces with a printed text (the typewriter's page, the bear's sign, the plates) keep that part the
+-- frontmost thing over its text, so the Blender look can put its own part right behind it (tools/furniture/mesh-check.py).
+
+BUILDERS.antique_typewriter = function(c: Ctx)
+	-- A 1920s typewriter: the frame, the keyboard's three rows of keys sloping to the front and its space bar, the type
+	-- basket's hump with the two ribbon spools, the platen and its knobs, the carriage return lever, and the last page
+	-- of somebody's novel still in it.
+	local body = pick({ rgb(30, 30, 34), rgb(58, 74, 60), rgb(110, 32, 36), rgb(70, 60, 54) }, c.v)
+	box(c, "Frame", 1.6, 0.3, 1.5, 0, 0.15, 0, body)
+	wedge(c, "Deck", 1.5, 0.25, 0.75, 0, 0.425, -0.35, shade(body, 0.12))
+	for n, z in { -0.6, -0.4, -0.2 } do
+		box(c, "Keys", 1.3, 0.06, 0.12, 0, 0.33 + n * 0.068, z, CREAM)
+	end
+	box(c, "Space", 0.7, 0.05, 0.08, 0, 0.33, -0.74, SILVER, METAL)
+	box(c, "Hump", 1.5, 0.4, 0.72, 0, 0.5, 0.39, body)
+	for _, s in { -1, 1 } do
+		cyl(c, "Spool", 0.06, 0.3, s * 0.5, 0.73, 0.15, "y", pick({ rgb(170, 36, 36), DARK, rgb(170, 36, 36), DARK }, c.v, s))
+		cyl(c, "Knob", 0.1, 0.34, s * 0.84, 0.79, 0.42, "x", DARK)
+	end
+	cyl(c, "Platen", 1.56, 0.28, 0, 0.79, 0.42, "x", rgb(24, 24, 26), RUBBER)
+	strut(c, "Lever", Vector3.new(-0.82, 0.86, 0.3), Vector3.new(-0.7, 0.9, -0.05), 0.05, SILVER, METAL)
+	local page = box(c, "Page", 1.1, 0.25, 0.02, 0, 1.075, 0.44, rgb(246, 244, 238))
+	label(page, "THE END?", DARK, Enum.NormalId.Front, Enum.Font.SpecialElite)
+end
+
+BUILDERS.vintage_camera = function(c: Ctx)
+	-- A photographer's wooden field camera on its tripod: the bellows between the front and back standards, the brass
+	-- lens, the focusing knobs, and the black cloth he hid under thrown over the back.
+	local wood = pick(WOODS, c.v, 1)
+	local apex = Vector3.new(0, 3.3, 0)
+	for _, foot in { Vector3.new(-0.68, 0.04, -0.4), Vector3.new(0.68, 0.04, -0.4), Vector3.new(0, 0.04, 0.72) } do
+		strut(c, "Leg", apex, foot, 0.1, wood, WOOD)
+	end
+	cyl(c, "Head", 0.12, 0.5, 0, 3.36, 0, "y", BRASS, METAL)
+	box(c, "Bed", 0.9, 0.08, 1.3, 0, 3.46, 0, wood, WOOD)
+	box(c, "Back", 1.0, 0.9, 0.22, 0, 3.95, 0.5, wood, WOOD)
+	box(c, "Bellows", 0.78, 0.72, 0.66, 0, 3.92, 0.06, pick({ rgb(150, 36, 40), rgb(30, 30, 34), rgb(110, 70, 44), rgb(40, 60, 100) }, c.v), FABRIC)
+	box(c, "Front", 0.9, 0.85, 0.14, 0, 3.93, -0.34, wood, WOOD)
+	shine(cyl(c, "Lens", 0.3, 0.36, 0, 3.92, -0.56, "z", BRASS, METAL), 0.2)
+	shine(cyl(c, "Glass", 0.02, 0.26, 0, 3.92, -0.72, "z", SKIN_GLASS, GLASS), 0.4)
+	box(c, "Cloth", 1.2, 0.75, 0.16, 0, 4.0, 0.69, rgb(36, 34, 38), FABRIC)
+	for _, s in { -1, 1 } do
+		cyl(c, "Focus", 0.08, 0.14, s * 0.5, 3.46, -0.3, "x", BRASS, METAL)
+	end
+end
+
+BUILDERS.carved_bear = function(c: Ctx)
+	-- A chainsaw-carved bear out of a larch log, stood on its stump, holding up the chalet's welcome sign.
+	local wood = pick(PINES, c.v, 3)
+	local dark = shade(wood, 0.3)
+	cyl(c, "Stump", 0.45, 1.36, 0, 0.225, 0.02, "y", shade(wood, 0.2), WOOD)
+	ball(c, "Belly", 1.1, 0, 1.5, 0.12, wood, WOOD)
+	ball(c, "Chest", 0.96, 0, 2.1, 0.1, wood, WOOD)
+	ball(c, "Head", 0.74, 0, 2.82, 0.06, wood, WOOD)
+	cyl(c, "Snout", 0.32, 0.34, 0, 2.74, -0.36, "z", tint(wood, 0.1), WOOD)
+	ball(c, "Nose", 0.14, 0, 2.78, -0.54, DARK)
+	for _, s in { -1, 1 } do
+		cyl(c, "Leg", 0.6, 0.42, s * 0.26, 0.75, 0.12, "y", wood, WOOD)
+		ball(c, "Eye", 0.08, s * 0.15, 2.95, -0.26, DARK)
+		ball(c, "Ear", 0.26, s * 0.27, 3.13, 0.12, wood, WOOD)
+		strut(c, "Arm", Vector3.new(s * 0.42, 2.25, 0.05), Vector3.new(s * 0.55, 1.85, -0.42), 0.28, wood, WOOD)
+		ball(c, "Paw", 0.28, s * 0.55, 1.85, -0.42, dark, WOOD)
+	end
+	local sign = box(c, "Sign", 1.6, 0.5, 0.08, 0, 1.62, -0.6, rgb(230, 211, 163), WOOD)
+	label(sign, "WELCOME", rgb(90, 56, 34), Enum.NormalId.Front, Enum.Font.Fondamento)
+end
+
+BUILDERS.gramophone = function(c: Ctx)
+	-- A wind-up gramophone: the wooden cabinet and its crank, the turntable's felt and a shellac record, the elbow at the
+	-- back and the horn flaring out over the record (brass, or painted like the old flower horns).
+	local wood = pick(WOODS, c.v, 2)
+	local horn = pick({ BRASS, rgb(170, 50, 46), rgb(50, 96, 70), rgb(46, 70, 130) }, c.v)
+	box(c, "Plinth", 1.4, 0.1, 1.4, 0, 0.05, 0.35, shade(wood, 0.25), WOOD)
+	box(c, "Cabinet", 1.3, 0.7, 1.3, 0, 0.45, 0.35, wood, WOOD)
+	cyl(c, "Crank", 0.3, 0.08, 0.75, 0.5, 0.35, "x", SILVER, METAL)
+	box(c, "Handle", 0.06, 0.26, 0.06, 0.87, 0.4, 0.35, DARK)
+	cyl(c, "Felt", 0.04, 1.0, 0, 0.82, 0.35, "y", pick({ rgb(40, 96, 60), rgb(120, 30, 40), rgb(40, 60, 110), rgb(40, 96, 60) }, c.v), FABRIC)
+	shine(cyl(c, "Record", 0.02, 0.92, 0, 0.85, 0.35, "y", rgb(18, 18, 20)), 0.3)
+	cyl(c, "Label", 0.02, 0.3, 0, 0.86, 0.35, "y", pick(ACCENTS, c.v, 2))
+	cyl(c, "Elbow", 0.5, 0.12, 0, 1.05, 0.9, "y", horn, METAL)
+	-- the horn: from the elbow's top forward and up to the bell, wider at each step
+	local p0, p1 = Vector3.new(0, 1.3, 0.9), Vector3.new(0, 2.0, -0.55)
+	local dir = (p1 - p0).Unit
+	local aim = CFrame.lookAt(Vector3.zero, dir)
+	local function along(name: string, t: number, length: number, diameter: number, colour: Color3): BasePart
+		local at = p0 + dir * t
+		return cyl(c, name, length, diameter, at.X, at.Y, at.Z, "z", colour, METAL, aim)
+	end
+	along("Horn", 0.25, 0.5, 0.16, horn)
+	along("Horn", 0.7, 0.4, 0.36, horn)
+	along("Horn", 1.08, 0.36, 0.7, horn)
+	shine(along("Bell", 1.4, 0.3, 1.2, horn), 0.15)
+	shine(along("Rim", 1.58, 0.06, 1.7, horn), 0.2)
+	along("Throat", 1.615, 0.01, 1.3, shade(horn, 0.55))
+end
+
+BUILDERS.pocket_watch = function(c: Ctx)
+	-- Grandpa's gold pocket watch on its brass stand under a glass dome: the velvet cushion, the watch's dial and hands,
+	-- its crown and bow, the chain draped down to the cushion, the engraved plate on the base.
+	local gilt = pick(GILT, c.v)
+	box(c, "Base", 0.95, 0.2, 0.95, 0, 0.1, 0, shade(pick(WOODS, c.v, 3), 0.25), WOOD)
+	local plate = box(c, "Plate", 0.6, 0.13, 0.02, 0, 0.1, -0.485, BRASS, METAL)
+	label(plate, "NEVER LATE · 1908", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	cyl(c, "Cushion", 0.06, 0.78, 0, 0.23, 0, "y", pick(VELVETS, c.v, 1), FABRIC)
+	cyl(c, "Post", 0.7, 0.05, 0, 0.6, 0.18, "y", BRASS, METAL)
+	box(c, "Hook", 0.05, 0.05, 0.2, 0, 0.94, 0.09, BRASS, METAL)
+	shine(cyl(c, "Watch", 0.12, 0.56, 0, 0.62, 0, "z", gilt, METAL), 0.3)
+	cyl(c, "Crown", 0.08, 0.1, 0, 0.93, 0, "y", gilt, METAL)
+	cyl(c, "Bow", 0.04, 0.16, 0, 1.0, 0, "z", gilt, METAL)
+	cyl(c, "Dial", 0.02, 0.46, 0, 0.62, -0.07, "z", CREAM)
+	box(c, "Hand", 0.03, 0.16, 0.01, 0.03, 0.68, -0.085, DARK, SMOOTH, CFrame.Angles(0, 0, -0.5))
+	box(c, "Hand", 0.03, 0.11, 0.01, -0.03, 0.6, -0.085, DARK, SMOOTH, CFrame.Angles(0, 0, 0.9))
+	strut(c, "Chain", Vector3.new(0.05, 0.98, -0.02), Vector3.new(0.3, 0.45, -0.2), 0.03, gilt, METAL)
+	strut(c, "Chain", Vector3.new(0.3, 0.45, -0.2), Vector3.new(0.12, 0.27, -0.3), 0.03, gilt, METAL)
+	cyl(c, "Rim", 0.04, 0.84, 0, 0.28, 0, "y", BRASS, METAL)
+	for _, part in { cyl(c, "Dome", 0.8, 0.8, 0, 0.66, 0, "y", rgb(226, 236, 240), GLASS), ball(c, "DomeTop", 0.8, 0, 1.06, 0, rgb(226, 236, 240), GLASS) } do
+		part.Transparency = 0.75
+		part.Reflectance = 0.15
+	end
+	ball(c, "Knob", 0.08, 0, 1.455, 0, BRASS, METAL)
+end
+
+BUILDERS.golden_horseshoe = function(c: Ctx)
+	-- A lucky golden horseshoe (the ends up, so the luck stays in) nailed on velvet on an oak board, a red bow on top,
+	-- the board in its foot with an engraved plate.
+	local gilt = pick(GILT, c.v)
+	box(c, "Foot", 1.6, 0.15, 0.76, 0, 0.075, 0, shade(pick(WOODS, c.v, 2), 0.2), WOOD)
+	local plate = box(c, "Plate", 0.9, 0.11, 0.02, 0, 0.075, -0.39, BRASS, METAL)
+	label(plate, "GOOD LUCK", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	box(c, "Board", 1.3, 1.75, 0.12, 0, 1.025, 0.22, pick(WOODS, c.v, 4), WOOD)
+	box(c, "Velvet", 1.04, 1.4, 0.02, 0, 1.1, 0.15, pick(VELVETS, c.v, 3), FABRIC)
+	shine(box(c, "Toe", 0.4, 0.16, 0.1, 0, 0.68, 0.09, gilt, METAL), 0.3)
+	for _, s in { -1, 1 } do
+		shine(box(c, "Quarter", 0.4, 0.16, 0.1, s * 0.325, 0.79, 0.09, gilt, METAL, CFrame.Angles(0, 0, s * 0.72)), 0.3)
+		shine(box(c, "Branch", 0.16, 0.75, 0.1, s * 0.47, 1.25, 0.09, gilt, METAL, CFrame.Angles(0, 0, s * 0.08)), 0.3)
+		box(c, "Heel", 0.18, 0.08, 0.12, s * 0.44, 1.6, 0.09, shade(gilt, 0.15), METAL)
+		for _, y in { 1.05, 1.35 } do
+			ball(c, "Nail", 0.06, s * 0.47, y, 0.03, DARK, METAL)
+		end
+		box(c, "Bow", 0.24, 0.14, 0.04, s * 0.13, 1.84, 0.13, rgb(196, 36, 40), FABRIC, CFrame.Angles(0, 0, s * 0.3))
+	end
+	ball(c, "Knot", 0.1, 0, 1.84, 0.12, rgb(176, 30, 36), FABRIC)
+end
+
+BUILDERS.crystal_chandelier = function(c: Ctx)
+	-- A small crystal chandelier taken down for the move, resting on a padded moving ring: the gilt column and bowl, six
+	-- arms with their candle cups and warm bulbs, a crystal drop under every other one (a lean part count: a house holds
+	-- it among its other pieces, Config.Furniture.InteriorMaxParts), the crystal ball at the bottom, the chain and the
+	-- ceiling rose on top.
+	local gilt = pick(GILT, c.v)
+	local crystal = rgb(232, 244, 250)
+	cyl(c, "Ring", 0.28, 1.2, 0, 0.14, 0, "y", pick({ rgb(60, 96, 160), rgb(70, 120, 90), rgb(150, 60, 60), rgb(90, 90, 100) }, c.v), FABRIC)
+	local function clear(p: BasePart): BasePart
+		p.Transparency = 0.35
+		p.Reflectance = 0.3
+		return p
+	end
+	clear(ball(c, "Ball", 0.36, 0, 0.46, 0, crystal, GLASS))
+	shine(cyl(c, "Column", 1.65, 0.2, 0, 1.4, 0, "y", gilt, METAL), 0.25)
+	shine(cyl(c, "Bowl", 0.16, 0.7, 0, 1.0, 0, "y", gilt, METAL), 0.25)
+	for n = 0, 2 do
+		box(c, "Arm", 2.16, 0.08, 0.08, 0, 1.28, 0, gilt, METAL, CFrame.Angles(0, n * math.pi / 3, 0))
+	end
+	for n = 0, 5 do
+		local a = n * math.pi / 3
+		local x, z = 1.08 * math.cos(a), 1.08 * math.sin(a)
+		cyl(c, "Cup", 0.08, 0.22, x, 1.36, z, "y", gilt, METAL)
+		ball(c, "Bulb", 0.16, x, 1.5, z, rgb(255, 226, 170), NEON)
+		if n % 2 == 0 then
+			clear(ball(c, "Drop", 0.18, x, 1.15, z, crystal, GLASS))
+		end
+	end
+	cyl(c, "Chain", 0.25, 0.06, 0, 2.35, 0, "y", gilt, METAL)
+	cyl(c, "Rose", 0.12, 0.5, 0, 2.54, 0, "y", gilt, METAL)
+end
+
+BUILDERS.alphorn = function(c: Ctx)
+	-- An alphorn lying on its two trestles: the long spruce tube widening from the mouthpiece to the upturned bell, the
+	-- cane bindings round it, the painted band on the bell.
+	local wood = pick(PINES, c.v, 1)
+	local dark = shade(wood, 0.3)
+	for _, x in { -2.2, 1.2 } do
+		box(c, "Trestle", 0.16, 0.5, 1.3, x, 0.25, 0, dark, WOOD)
+		box(c, "Saddle", 0.3, 0.1, 0.3, x, 0.52, 0, dark, WOOD)
+	end
+	cyl(c, "Mouthpiece", 0.2, 0.14, -3.49, 0.62, 0, "x", dark, WOOD)
+	cyl(c, "Tube", 2.4, 0.1, -2.2, 0.62, 0, "x", wood, WOOD)
+	cyl(c, "Tube", 2.0, 0.16, 0, 0.62, 0, "x", wood, WOOD)
+	cyl(c, "Tube", 1.4, 0.26, 1.7, 0.62, 0, "x", wood, WOOD)
+	cyl(c, "Bend", 0.75, 0.36, 2.62, 0.86, 0, "x", wood, WOOD, CFrame.Angles(0, 0, math.pi / 4))
+	cyl(c, "Flare", 0.4, 0.62, 2.96, 1.25, 0, "y", wood, WOOD)
+	cyl(c, "Bell", 0.28, 1.1, 2.98, 1.55, 0, "y", wood, WOOD)
+	cyl(c, "Band", 0.1, 1.13, 2.98, 1.47, 0, "y", pick(PAINTED, c.v, 2))
+	cyl(c, "Rim", 0.08, 1.18, 2.98, 1.72, 0, "y", dark, WOOD)
+	cyl(c, "Inside", 0.02, 0.92, 2.98, 1.765, 0, "y", shade(wood, 0.6), WOOD)
+	for _, ring in { { -2.8, 0.15 }, { -0.4, 0.21 }, { 1.7, 0.31 } } do
+		cyl(c, "Binding", 0.1, ring[2], ring[1], 0.62, 0, "x", rgb(190, 150, 100), FABRIC)
+	end
+end
+
+BUILDERS.signed_guitar = function(c: Ctx)
+	-- An electric guitar signed by a famous band, on its stand on a display plinth: the single-cut body with its
+	-- pickguard, pickups, bridge and knobs, the neck and headstock, the signatures in silver, the plate with the band.
+	local body = pick({ rgb(170, 30, 36), rgb(28, 28, 30), rgb(214, 170, 70), rgb(120, 200, 190) }, c.v)
+	box(c, "Plinth", 1.6, 0.25, 1.1, 0, 0.125, 0, DARK)
+	local plate = box(c, "Plate", 0.9, 0.14, 0.02, 0, 0.125, -0.56, BRASS, METAL)
+	label(plate, "THE ROLLING BONES", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	box(c, "Upright", 0.1, 3.0, 0.1, 0, 1.75, 0.42, DARK)
+	box(c, "Yoke", 0.36, 0.08, 0.44, 0, 3.25, 0.22, DARK)
+	box(c, "Cradle", 0.9, 0.08, 0.7, 0, 0.35, 0.05, DARK)
+	shine(cyl(c, "Body", 0.24, 1.36, 0, 1.08, -0.06, "z", body), 0.2)
+	shine(cyl(c, "Upper", 0.24, 1.0, 0.07, 1.82, -0.06, "z", body), 0.2)
+	box(c, "Pickguard", 0.36, 0.62, 0.02, 0.32, 1.38, -0.19, CREAM)
+	for _, y in { 1.18, 1.6 } do
+		box(c, "Pickup", 0.42, 0.15, 0.04, 0, y, -0.2, CREAM)
+	end
+	box(c, "Bridge", 0.46, 0.08, 0.05, 0, 0.88, -0.2, SILVER, METAL)
+	for _, y in { 0.78, 0.98 } do
+		cyl(c, "Knob", 0.07, 0.13, 0.42, y, -0.21, "z", GOLD, METAL)
+	end
+	box(c, "Neck", 0.24, 1.9, 0.12, 0, 3.1, -0.04, pick(WOODS, c.v, 2), WOOD)
+	box(c, "Fretboard", 0.2, 1.9, 0.02, 0, 3.1, -0.11, DARK)
+	box(c, "Headstock", 0.4, 0.55, 0.1, 0, 4.1, -0.03, DARK)
+	box(c, "Signature", 0.5, 0.035, 0.01, -0.25, 1.0, -0.185, rgb(236, 238, 240), SMOOTH, CFrame.Angles(0, 0, 0.35))
+	box(c, "Signature", 0.42, 0.035, 0.01, -0.05, 2.0, -0.185, rgb(236, 238, 240), SMOOTH, CFrame.Angles(0, 0, -0.25))
+end
+
+BUILDERS.ski_trophy = function(c: Ctx)
+	-- The downhill champion's trophy: a pair of old wooden racing skis crossed behind a gold skier in a tuck on a gold
+	-- snow hump, the marble base and the wooden step with the engraved plate.
+	local gilt = pick(GILT, c.v)
+	box(c, "Base", 2.2, 0.3, 1.2, 0, 0.15, 0, pick({ rgb(236, 234, 228), rgb(40, 40, 44), rgb(70, 110, 90), rgb(150, 60, 56) }, c.v), Enum.Material.Marble)
+	box(c, "Step", 1.6, 0.35, 0.8, 0, 0.475, 0, shade(pick(WOODS, c.v, 2), 0.2), WOOD)
+	local plate = box(c, "Plate", 1.2, 0.18, 0.02, 0, 0.475, -0.41, BRASS, METAL)
+	label(plate, "DOWNHILL CHAMPION 1964", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	local ski = pick({ rgb(176, 120, 66), rgb(150, 44, 40), rgb(206, 166, 108), rgb(60, 86, 120) }, c.v)
+	for _, s in { -1, 1 } do
+		box(c, "Ski", 0.2, 3.0, 0.06, 0, 2.1, 0.3, ski, WOOD, CFrame.Angles(0, 0, s * 0.3))
+	end
+	shine(ball(c, "Hump", 0.8, 0, 0.95, 0, gilt, METAL), 0.3)
+	-- the skier: skis, legs, the body bent low, the head up, the poles tucked under the arms
+	for _, s in { -1, 1 } do
+		box(c, "SkierSki", 0.07, 0.03, 0.85, s * 0.09, 1.37, -0.05, gilt, METAL)
+		strut(c, "SkierLeg", Vector3.new(s * 0.09, 1.39, 0.08), Vector3.new(s * 0.09, 1.62, -0.1), 0.11, gilt, METAL)
+		strut(c, "Pole", Vector3.new(s * 0.2, 1.68, -0.1), Vector3.new(s * 0.28, 1.45, 0.42), 0.025, SILVER, METAL)
+	end
+	shine(box(c, "SkierBody", 0.3, 0.26, 0.48, 0, 1.72, 0.05, gilt, METAL, CFrame.Angles(0.2, 0, 0)), 0.3)
+	shine(ball(c, "SkierHead", 0.22, 0, 1.86, -0.25, gilt, METAL), 0.3)
+end
+
+BUILDERS.trex_skull = function(c: Ctx)
+	-- A Tyrannosaurus rex skull (a museum's cast, the snout to the left) on two steel rods on its black plinth: the long
+	-- jaw, the snout and the tall skull behind it, the holes in it (the eye, the big one in front of it, the nostril, the
+	-- one behind), the brow horn, the rows of teeth; the plate says how old it is.
+	local fossil = pick({ rgb(176, 150, 112), rgb(120, 96, 72), rgb(214, 200, 170), rgb(150, 140, 128) }, c.v)
+	local hole = shade(fossil, 0.7)
+	box(c, "Plinth", 4.0, 0.4, 1.6, 0, 0.2, 0, DARK)
+	local plate = box(c, "Plate", 1.6, 0.2, 0.02, 0, 0.2, -0.81, BRASS, METAL)
+	label(plate, "T. REX · 66 MILLION YEARS", DARK, Enum.NormalId.Front, Enum.Font.Garamond)
+	for _, x in { -0.9, 0.9 } do
+		cyl(c, "Rod", 0.75, 0.1, x, 0.775, 0, "y", SILVER, METAL)
+	end
+	box(c, "Jaw", 3.3, 0.42, 0.8, -0.25, 1.2, 0, shade(fossil, 0.08), SMOOTH)
+	box(c, "Snout", 2.1, 0.72, 0.9, -0.85, 1.98, 0, fossil, SMOOTH)
+	wedge(c, "Nose", 0.9, 0.35, 2.0, -0.85, 2.515, 0, fossil, SMOOTH, CFrame.Angles(0, math.pi / 2, 0))
+	box(c, "Skull", 1.7, 1.3, 1.25, 1.0, 2.2, 0, fossil, SMOOTH)
+	box(c, "Back", 0.35, 1.0, 1.1, 1.9, 2.15, 0, shade(fossil, 0.1), SMOOTH)
+	ball(c, "Horn", 0.36, 0.55, 2.9, -0.2, tint(fossil, 0.08))
+	cyl(c, "Eye", 0.04, 0.4, 0.55, 2.4, -0.635, "z", hole)
+	box(c, "Opening", 0.75, 0.32, 0.04, -0.35, 2.1, -0.465, hole)
+	box(c, "Nostril", 0.24, 0.12, 0.04, -1.65, 2.2, -0.465, hole)
+	box(c, "Temple", 0.5, 0.42, 0.04, 1.35, 2.05, -0.64, hole)
+	local tooth = tint(fossil, 0.35)
+	for n = 0, 4 do
+		box(c, "Tooth", 0.1, 0.26, 0.08, -1.75 + n * 0.35, 1.5, -0.4, tooth)
+	end
+	for n = 0, 3 do
+		box(c, "Tooth", 0.1, 0.16, 0.08, -1.55 + n * 0.35, 1.48, -0.36, tooth)
+	end
+end
+
+BUILDERS.zombie_safe = function(c: Ctx)
+	-- Grandma's zombie-proof safe: the steel body on its plinth, the door with its spoked handle, the dial and the three
+	-- hinges, a chain round it all with a padlock, claw marks down one side where somebody tried, and the maker's plate.
+	local paint = pick({ rgb(36, 70, 52), rgb(30, 30, 34), rgb(110, 30, 34), rgb(60, 70, 90) }, c.v)
+	box(c, "Plinth", 2.5, 0.25, 2.2, 0, 0.125, 0.1, DARK)
+	box(c, "Body", 2.4, 2.95, 2.1, 0, 1.725, 0.1, paint, METAL)
+	box(c, "Cap", 2.5, 0.2, 2.2, 0, 3.3, 0.1, shade(paint, 0.2), METAL)
+	box(c, "Door", 1.9, 2.35, 0.08, 0, 1.6, -0.99, shade(paint, 0.1), METAL)
+	local plate = box(c, "Plate", 1.5, 0.3, 0.12, 0, 3.0, -0.99, BRASS, METAL)
+	label(plate, "ZOMBIE-PROOF", rgb(120, 16, 16), Enum.NormalId.Front, Enum.Font.Creepster)
+	-- the handle: a hub and three spokes out of it, a knob at each end
+	shine(cyl(c, "Hub", 0.12, 0.32, 0.3, 1.75, -1.09, "z", SILVER, METAL), 0.3)
+	for n = 0, 2 do
+		local a = math.pi / 2 + n * 2 * math.pi / 3
+		local cos, sin = math.cos(a), math.sin(a)
+		box(c, "Spoke", 0.5, 0.07, 0.07, 0.3 + 0.25 * cos, 1.75 + 0.25 * sin, -1.12, SILVER, METAL, CFrame.Angles(0, 0, a))
+		ball(c, "Knob", 0.14, 0.3 + 0.5 * cos, 1.75 + 0.5 * sin, -1.12, SILVER, METAL)
+	end
+	shine(cyl(c, "Dial", 0.08, 0.42, -0.4, 2.25, -1.07, "z", SILVER, METAL), 0.3)
+	cyl(c, "DialFace", 0.02, 0.3, -0.4, 2.25, -1.115, "z", CREAM)
+	for _, y in { 0.8, 1.6, 2.4 } do
+		cyl(c, "Hinge", 0.28, 0.12, -0.97, y, -1.0, "y", DARK, METAL)
+	end
+	box(c, "Chain", 2.46, 0.1, 0.08, 0, 0.95, -1.08, STEEL, METAL)
+	for _, s in { -1, 1 } do
+		box(c, "Chain", 0.08, 0.1, 2.1, s * 1.24, 0.95, 0.1, STEEL, METAL)
+	end
+	box(c, "Padlock", 0.3, 0.36, 0.12, 0, 0.8, -1.13, GOLD, METAL)
+	cyl(c, "Shackle", 0.05, 0.22, 0, 1.0, -1.12, "z", SILVER, METAL)
+	for _, z in { -0.25, -0.05, 0.15 } do
+		box(c, "Claw", 0.02, 0.8, 0.06, 1.205, 2.1, z, rgb(20, 20, 22), SMOOTH, CFrame.Angles(0.35, 0, 0))
+	end
 end
 
 -- ── The model ────────────────────────────────────────────────────────────────

@@ -94,10 +94,13 @@
 --   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
 --     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
 --     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
---     Chalet"): its "Enter house" on the map's front door (the part with the attribute SandboxDoor, server/
---     SandboxWorld.luau's; else an invisible one at House.door), "Call truck to door" to House.curb, out at its door;
---     refilled every move (a new HouseLayout seed: the card's own, SB.seeds, kept until the player's move starts with
---     it). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts board
+--     Chalet", 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big", Config.Moving.Sandbox.Kind,
+--     its back door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the
+--     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
+--     truck to door" to House.curb, out at its door; refilled once a move brought something home (a new HouseLayout
+--     seed: the card's own, SB.seeds, kept until then; 8.3 economy: a move called off with nothing home keeps it, no
+--     reroll; 8.4: kept in the player's save too, so another server shows the same house). No Marge or Walt, no story (no chapter, no dispatch, no porch greeter, no soldier). A Moving contracts
+--     board
 --     on every player's plot (server/MoveSites.luau plotBoard at SandboxMap plot.board): any of them opens the card and
 --     LAUNCHes. The move goes with the player's own van (Config.Sandbox.Van, the walk-in Sprinter, else the ZDC Van;
 --     parked at their plot's vanSpot when none is out, the sandbox's way: server/SandboxBoot.luau's parkVan, the hook
@@ -124,6 +127,21 @@
 --     stepped out of the one they came out in and Rearm s have gone by; you come out a few studs from the door facing
 --     away (the house's 4, the plan's entry inside). The E prompts stay, disabled (Doors.Walk false: as before). A
 --     doormat on the ground at every door: "▲ IN" outside (shown while a move uses that door), "▲ OUT" inside.
+--     8.3 (the owner: "the door should open, and then it teleports me smoothly"; the block "8.3 the doors swing"): a
+--     door's leaf (DoorLeaf: shared/DoorSwing.luau) swings open as you walk up to it (its DoorOpen; client/WalkDoors.luau
+--     on every client), the trip waits until it is open, then the fade out, the move in the dark (FadeOut + Margin s
+--     later: the other end of a pair piece with you, Danny too), the client's dark held until it sees you there.
+--   * 8.3 Danny for hire (the owner: "when you want to take a heavy thing you must wait until the helper comes";
+--     "I have to PAY for him … you click on something, and that assigns it to him"; Config.MoveHelper.WaitForHelper;
+--     server/MoveHelper.luau's call): Lift on a two-person piece with Danny hired for the move calls him (onPick asks
+--     MoveHelper.call): no drag alone, you wait at your end ("Stop waiting" on its prompt; Lift again or G stop it)
+--     while he walks to its far end; there he makes your lift (Moving.helperCalled: onPick again, the lift check, or
+--     the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift). Moving.helperLiftFrame
+--     says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he waits at a two-person
+--     piece of his list), Moving.helperCallOff closes its open lift check when the call ends before the lift. A piece
+--     you pick up leaves his list (onPick: MoveHelper.taken). Without Danny hired (a crew of players, him for hire, him
+--     down): today's rules. 8.3 review: a crew mate's Lift on the piece somebody waits at with him is refused (who
+--     waits: MoveHelper.call's "busy"); the lift check his arrival opens, left unanswered, closes without a knock.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
@@ -136,7 +154,8 @@
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
---                             Danny joins a crew of one; MoveHelper.sync in the tick)
+--                             Danny comes to a crew of one, 8.3 for hire; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
+--                             helperCalled / helperMark / helperCallOff: his side of your call (after onHelp)
 --   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
 --                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
 --                             a lift check) and the grip block (the checks, the remote's "grip" answers, the wobbles)
@@ -171,7 +190,7 @@ local Moving = {}
 local remote = Net.get("Moving")
 local notice = Net.get("Notice")
 local TAG = "MovePrompt" -- client/MovingHud.luau shows a tagged prompt only to the players it is for
-local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn" } -- (7.0 grip: CarryGrip; 8.1: PairTurn)
+local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn", "CarryPair" } -- (7.0 grip: CarryGrip; 8.1: PairTurn; 8.3: CarryPair)
 
 -- The art (another branch builds it): shared/FurnitureLooks.luau (Items, build), shared/HouseLayout.luau (plan),
 -- server/HouseInterior.luau (build, slot, destroy).
@@ -290,7 +309,11 @@ local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active; 8.0 S
 --   on        Config.Sandbox.On when Moving.start ran (false: the city's game, as it was)
 --   contract  the one house's contract (SandboxMap.House, Config.Moving.Sandbox); a move's is a copy with its seed
 --   boards    every plot's Moving contracts corkboard (server/MoveSites.luau plotBoard)
---   seeds     player → the seed of the house their card shows, kept until their move starts with it (a new one then)
+--   seeds     user id → the seed of the house their card shows, kept until a move of theirs brings something home
+--             (SB.store; a new one then). 8.3 economy: a move called off with nothing home (GIVE UP, the owner leaving)
+--             keeps it, so starting, peeking and calling off never rerolls the house; the admin's REFILL forgets it.
+--             8.4: kept in their save too (PlayerData's sandboxHouseSeed: SB.keepSeed sets and drops both), and their
+--             save's is the one while it is loaded (SB.seedOf): leaving and joining another server shows the same house
 --   last      the last seed handed out (never twice in a row)
 --   door      the map's front door (the part with the attribute SandboxDoor), once found
 --   how       the result card's words for an end (HOW_TEXT's)
@@ -298,7 +321,7 @@ local SB = {
 	on = false,
 	contract = nil :: Contract?,
 	boards = {} :: { BasePart },
-	seeds = {} :: { [Player]: number },
+	seeds = {} :: { [number]: number },
 	last = 0,
 	door = nil :: BasePart?,
 	how = {
@@ -316,10 +339,23 @@ local SB = {
 --   held    player → after a trip: the zones shut for them until they stepped out of the one they came out in (left;
 --           nil: not looked at yet, `from` where they came out) and Rearm s have gone by (untilAt, os.clock)
 --   mats    a site → its doormats outside ("▲ IN"), shown while a move uses that site
+-- 8.3 the doors swing (Config.Moving.Doors Swing …; shared/DoorSwing.luau; client/WalkDoors.luau swings them):
+--   leaves  a door (a site door outside, a way inside: its table) → its leaves (the parts and models with the attribute
+--           DoorLeaf at its doorway, tagged DoorLeaf for the clients), found once (WalkIn.leavesOf; weak keys)
+--   want    a leaf → the os.clock somebody last wanted it open (in its approach facing it, Danny hired near it, a
+--           trip through it); its DoorOpen is true from then until Shut s after (WalkIn.sweep)
+--   opened  a leaf → when it opened (the trip waits until it has been open Open s: WalkIn.ready)
+--   send    the move's state to its crew now (send's: a trip sends where you are before its fade in, so the client's
+--           eyes, client/SandboxLight.luau, adapt while the screen is still black)
 local WalkIn = {
 	at = {} :: { [Player]: { key: number, since: number?, tried: boolean } },
 	held = {} :: { [Player]: { untilAt: number, left: boolean?, from: Vector3? } },
 	mats = {} :: { [Site]: { BasePart } },
+	leaves = setmetatable({}, { __mode = "k" }) :: any,
+	want = {} :: { [Instance]: number },
+	opened = {} :: { [Instance]: number },
+	none = table.freeze({}) :: { Instance },
+	send = nil :: ((any) -> ())?,
 }
 
 -- The drop-off in a sentence: "the Wall" (the city), "your warehouse" (8.0 SANDBOX).
@@ -344,22 +380,51 @@ function SB.plotOf(player: Player): SandboxMap.Plot?
 	return require(script.Parent.SandboxPlots).of(player)
 end
 
+-- 8.4: `player`'s card seed set (a number) or dropped (nil), here and in their profile (their next save keeps it).
+function SB.keepSeed(player: Player, seed: number?)
+	if seed then
+		SB.seeds[player.UserId] = seed
+	else
+		SB.seeds[player.UserId] = nil
+	end
+	local profile = PlayerData.get(player)
+	if profile then
+		profile.sandboxHouseSeed = seed
+	end
+end
+
+-- 8.4: `player`'s card seed: their save's while it is loaded (PlayerData's sandboxHouseSeed, as their join read it: a
+-- house rolled on another server is the same here, and one a trip spent there is spent here too, whatever this server
+-- remembered of them), else this server's (SB.seeds: a save not read, Studio without a DataStore). nil: none yet.
+function SB.seedOf(player: Player): number?
+	local profile = PlayerData.get(player)
+	if profile and PlayerData.loaded(player) then
+		SB.keepSeed(player, profile.sandboxHouseSeed)
+	end
+	return SB.seeds[player.UserId]
+end
+
 -- The house's contract with the seed of `player`'s next move: their card's, else a new one (never the last one handed
 -- out): every move refills the house; its clock and horde Config.Moving.Sandbox's as they are now (Horde false: hordeAt
--- 0, never). nil before Moving.start made it.
+-- 0, never). nil before Moving.start made it; 8.4: nil while their save still loads (no house rolled before it says
+-- which one they have).
 function SB.contractFor(player: Player): Contract?
 	local base = SB.contract
 	if not base then
 		return nil
 	end
-	local seed = SB.seeds[player]
-	if not seed then
-		local fresh = math.random(1, 1073741823)
+	local seed: number = SB.seedOf(player) or 0 -- (0: none yet; a seed is 1 or more)
+	if seed < 1 then
+		if not PlayerData.get(player) then
+			return nil
+		end
+		local most = T.Sandbox.Seeds
+		local fresh = math.random(1, most)
 		while fresh == SB.last do
-			fresh = math.random(1, 1073741823)
+			fresh = math.random(1, most)
 		end
 		SB.last = fresh
-		SB.seeds[player] = fresh
+		SB.keepSeed(player, fresh)
 		seed = fresh
 	end
 	local S = T.Sandbox
@@ -370,12 +435,16 @@ function SB.contractFor(player: Player): Contract?
 	return made
 end
 
--- `player`'s card seed is spent (their move started with it) or they left: their next card shows a new house; that
--- house's plan facts go (factsOf keeps one per seed in the sandbox).
-function SB.forget(player: Player)
-	local seed = SB.seeds[player]
+-- `player`'s card seed is spent (8.3 economy: a move of theirs brought something home, SB.store; the admin's REFILL; a
+-- plan that failed): their next card shows a new house; that house's plan facts go (factsOf keeps one per seed in the
+-- sandbox). `keep` (they left): only the facts go, the seed stays theirs (by user id) for when they come back (8.4: and
+-- in their save, written as they leave, for another server).
+function SB.forget(player: Player, keep: boolean?)
+	local seed = SB.seeds[player.UserId]
 	local house = SB.contract
-	SB.seeds[player] = nil
+	if not keep then
+		SB.keepSeed(player, nil) -- (8.4: their save's too)
+	end
 	if seed and house then
 		contractFacts[`{house.id}#{seed}`] = nil
 	end
@@ -951,7 +1020,9 @@ end
 -- Its front door (the spot outside it, looking out to the road), the van's curb (its pivot: the nose to the road, the
 -- back to the door: "Call truck to door"), out where you came in (4 studs out of the door). Its "Enter house" part is an
 -- invisible one at the door until the map's front door is found (SB.frontDoor: the prompt goes onto that). No
--- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is.
+-- moving-day dress: the map's chalet (server/SandboxWorld.luau) stands there as it is. 8.3 the big move: its second
+-- door, the back door (House.back, the owner's model's back door: "Enter" there to the plan's exits[2], out there by
+-- it), as a farm's barn doors; the van's spot for both the curb.
 local function yawLook(yaw: number): Vector3
 	local r = math.rad(yaw)
 	return Vector3.new(-math.sin(r), 0, -math.cos(r))
@@ -967,6 +1038,21 @@ function SB.site(contract: Contract, parent: Instance): Site
 	local up = Vector3.new(0, 3.5, 0)
 	local enter = invisible("EnterDoor", Vector3.new(4, 6, 1), CFrame.lookAt(door + facing * 0.9 + up, door + facing * 3 + up), model)
 	model.PrimaryPart = enter
+	-- 8.3 the big move: its back door (House.back, the plan's exits[2]), a second way in and out; the van's spot the curb
+	local backFacing = yawLook(h.back.yaw)
+	local backDoor = Vector3.new(h.back.x, h.back.y, h.back.z)
+	local backOut = backDoor + backFacing * 4 + Vector3.new(0, 0.1, 0)
+	local back: SiteDoor = {
+		exit = 2,
+		name = "back door",
+		door = backDoor,
+		facing = backFacing,
+		outside = CFrame.lookAt(backOut, backOut + backFacing),
+		park = park,
+		heading = yawLook(h.curb.yaw),
+		width = 4,
+		part = invisible("EnterDoor2", Vector3.new(4, 6, 1), CFrame.lookAt(backDoor + backFacing * 0.9 + up, backDoor + backFacing * 3 + up), model),
+	}
 	model.Parent = parent
 	local out = door + facing * 4 + Vector3.new(0, 0.1, 0) -- (8.1 walk-in doors: 4 out, as the city's, clear of its zone)
 	local outside = CFrame.lookAt(out, out + facing)
@@ -985,7 +1071,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 		pile = { x = out.X, z = out.Z },
 	}
 	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = 4, part = enter }
-	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front } }
+	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = { front, back } }
 end
 
 -- The map's front door (server/SandboxWorld.luau's FrontDoor: the part with the attribute SandboxDoor), looked for when
@@ -1006,11 +1092,12 @@ function SB.frontDoor(): BasePart?
 	return nil
 end
 
--- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words.
+-- The house's contract (its seed, clock and horde set per move: SB.contractFor): Config.Moving.Sandbox's words; 8.3
+-- its plan's kind the big house's (Sandbox.Kind: HouseLayout's "big").
 function SB.newContract(): Contract
 	local S = T.Sandbox
 	local h = SandboxMap.House
-	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = "house", blurb = S.Blurb, time = S.Time, hordeAt = 0 }
+	return { id = h.id, name = h.name, client = S.Client, icon = S.Icon, seed = 0, kind = S.Kind, blurb = S.Blurb, time = S.Time, hordeAt = 0 }
 end
 
 -- Is a point on the test world's asphalt (SandboxMap.Roads and the turnaround, 2 studs of slack)? (The Guard's
@@ -1097,7 +1184,7 @@ end
 -- CarryGrip.speedFactor (steady while every player holding it hit their last check; × Miss.Slow while one of them
 -- staggers).
 local CarryGrip = require(Shared.CarryGrip)
-type GripOpen = { id: number, check: CarryGrip.Check, spot: number, help: boolean, opened: number }
+type GripOpen = { id: number, check: CarryGrip.Check, spot: number, help: boolean, opened: number, called: boolean? } -- (8.3 review: called, Moving.helperCalled's)
 type GripHold = {
 	session: number,
 	spot: number, -- the piece (its lift check's, then the carry's)
@@ -1197,6 +1284,9 @@ local function setHands(s: Session, item: Item)
 		character:SetAttribute("MoveCarry", item.spot)
 		-- 8.1 carrying in two: the leader's heading turns PairTurn degrees a second at most (client/PairSteer.luau)
 		character:SetAttribute("PairTurn", if thing.helper ~= nil then Config.MoveHelper.PairTurn else nil)
+		-- 8.3 (the owner: "when I run, he just goes behind me"): two carry it, nobody runs (client/PairSteer.luau holds
+		-- the walk at CarrySpeed, the run key says Config.MoveHelper.RunHint once)
+		character:SetAttribute("CarryPair", if thing.helper ~= nil then true else nil)
 	end
 	local helper = playerById(thing.helper)
 	local helperBody = helper and helper.Character
@@ -1208,6 +1298,7 @@ local function setHands(s: Session, item: Item)
 		helperBody:SetAttribute("CarrySize", nil)
 		helperBody:SetAttribute("CarrySpeed", speed)
 		helperBody:SetAttribute("MoveCarry", item.spot)
+		helperBody:SetAttribute("CarryPair", true) -- (8.3: nobody runs)
 	end
 end
 
@@ -1941,63 +2032,270 @@ function Moving.helperHurt(s: Session, npc: Model, hp: number)
 	end
 end
 
+-- ── 8.3 the doors swing (Config.Moving.Doors Swing …; shared/DoorSwing.luau has the attributes) ──────────────────────
+-- A door's leaves are the parts and models with the attribute DoorLeaf at its doorway (outside: anywhere in the world
+-- within its width of the site door's foot, the map's house's; inside: the move's interior's, at the way out), found
+-- once a move (WalkIn.ways forgets the site's) and tagged DoorLeaf: every client swings a tagged leaf open while its
+-- DoorOpen is true (client/WalkDoors.luau). The server only says when: somebody wants it open (a crew member in its
+-- approach facing it, Danny near it, a trip through it: WalkIn.open), and it shuts Shut s after the last of that
+-- (WalkIn.sweep). The leaves never collide (the builders' parts don't, the clients move only their own view).
+
+-- The door (a site door outside, a way inside) nearest `at` on that side, within its approach's reach; nil: none.
+function WalkIn.doorNear(s: Session, at: Vector3, inside: boolean): any
+	local best: any = nil
+	local reach = T.Doors.Approach + T.Doors.Through
+	if inside then
+		for _, way in s.ways do
+			local d = flat(way.inside, at)
+			if d <= reach + (way.width or 4) / 2 then
+				best, reach = way, d
+			end
+		end
+	else
+		for _, door in s.site.doors do
+			local d = flat(door.door, at)
+			if d <= reach + door.width / 2 then
+				best, reach = door, d
+			end
+		end
+	end
+	return best
+end
+
+-- The leaves under `root` within `reach` studs (flat) of `at` and Height of its height, tagged for the clients.
+function WalkIn.find(root: Instance?, at: Vector3, reach: number): { Instance }
+	local found: { Instance } = {}
+	for _, d in (if root then root:GetDescendants() else {}) :: { Instance } do
+		if d:GetAttribute("DoorLeaf") == nil then
+			continue
+		end
+		local pivot: Vector3? = if d:IsA("BasePart") then d.Position elseif d:IsA("Model") then d:GetPivot().Position else nil
+		if pivot and flat(pivot, at) <= reach and math.abs(pivot.Y - at.Y) <= T.Doors.Height then
+			CollectionService:AddTag(d, "DoorLeaf")
+			table.insert(found, d)
+		end
+	end
+	return found
+end
+
+-- A door's leaves (`door`: a site door outside, a way inside; nil: none), found the first time (again once one went).
+function WalkIn.leavesOf(s: Session, door: any, inside: boolean): { Instance }
+	if not door or not T.Doors.Swing then
+		return WalkIn.none
+	end
+	local known = WalkIn.leaves[door]
+	if known then
+		local whole = true
+		for _, leaf in known do
+			whole = whole and leaf.Parent ~= nil
+		end
+		if whole then
+			return known
+		end
+	end
+	local found = if inside
+		then WalkIn.find(s.interior, door.inside, (door.width or 4) / 2 + 2)
+		else WalkIn.find(workspace, door.door, door.width / 2 + 2)
+	WalkIn.leaves[door] = found
+	return found
+end
+
+-- Somebody wants these leaves open now: open from now (DoorOpen) until Shut s after the last want.
+function WalkIn.open(leaves: { Instance }, clock: number)
+	for _, leaf in leaves do
+		WalkIn.want[leaf] = clock
+		if not WalkIn.opened[leaf] then
+			WalkIn.opened[leaf] = clock
+			leaf:SetAttribute("DoorOpen", true)
+		end
+	end
+end
+
+-- The leaves nobody wanted open for Shut s shut again (DoorOpen false); gone ones forgotten.
+function WalkIn.sweep(clock: number)
+	for leaf, at in WalkIn.want do
+		if leaf.Parent == nil then
+			WalkIn.want[leaf], WalkIn.opened[leaf] = nil, nil
+		elseif clock - at >= T.Doors.Shut then
+			WalkIn.want[leaf], WalkIn.opened[leaf] = nil, nil
+			leaf:SetAttribute("DoorOpen", false)
+		end
+	end
+end
+
+-- May a crew member who has faced the door since `since` go through it now? Dwell s in its zone, and its leaves open
+-- Open s (they swing open first); a door without a leaf: Open s since the dwell's start, as if it had one.
+function WalkIn.ready(leaves: { Instance }, clock: number, since: number): boolean
+	local opened = since
+	if #leaves > 0 then
+		opened = -math.huge
+		for _, leaf in leaves do
+			opened = math.max(opened, WalkIn.opened[leaf] or clock)
+		end
+	end
+	return clock - since >= T.Doors.Dwell and clock - opened >= T.Doors.Open
+end
+
+-- Danny (server/MoveHelper.luau), hired (for hire he touches nothing, by the van), near a door opens it too, whichever
+-- way he faces (he goes through it his own way): the front door, the back door, inside and out.
+function WalkIn.helper(s: Session, clock: number)
+	local h = MoveHelper.find(s.owner)
+	local body = if h and h.hirer then h.body else nil
+	local root = if body then body.root else nil
+	if typeof(root) ~= "Instance" or not root:IsA("BasePart") or root.Parent == nil then
+		return
+	end
+	local at = root.Position
+	local index = WalkIn.zoneOf(s, at, true, T.Doors.Approach, T.Doors.ApproachSide)
+	if index then
+		WalkIn.open(WalkIn.leavesOf(s, s.ways[index], true), clock)
+		return
+	end
+	index = WalkIn.zoneOf(s, at, false, T.Doors.Approach, T.Doors.ApproachSide)
+	if index then
+		WalkIn.open(WalkIn.leavesOf(s, s.site.doors[index], false), clock)
+	end
+end
+
+-- The trip's moment in the dark (travel's, FadeOut + Margin s after the fade out): `player` at `target` (their root
+-- their hips over it, facing on), the crew mate of the trip (`party`'s second) at the pair piece's far end as it stands
+-- in front of `player` (their hold's place, else where they stood from `player`); the walk `speed` carried on the way
+-- they face; the door there opens behind them (it shuts Shut s later). Danny at that far end comes by his own hold's
+-- next step (server/MoveHelper.luau: the piece in the other world puts him there at once, within Config.MoveHelper.Tick
+-- s, inside the client's Dark). The move ended (or its house went) while the screen was dark: out at the house's door,
+-- never the void. Returns, by player, where each one is now and the way they face, for the fade in (the client's dark
+-- lasts until it sees them there).
+function WalkIn.trip(s: Session, player: Player, target: CFrame, inside: boolean, party: { Player }, speed: number): { [Player]: any }
+	local D = T.Doors
+	local arrived: { [Player]: any } = {}
+	local goal, goalInside = target, inside
+	if inside and (s.ended or not (s.interior and s.interior.Parent)) then
+		goal, goalInside = s.site.outside, false
+	end
+	local character, humanoid, root = bodyOf(player)
+	if not character or not humanoid or not root then
+		return arrived
+	end
+	-- the far end's place in front of you (the piece where you hold it, its far end where its hold keeps the other one:
+	-- it comes along lined up; else where they stand from you)
+	local before = root.CFrame
+	local spot, role = Rules.holding(s.move, player.UserId)
+	local thing = if spot then s.move.things[spot] else nil
+	local item = if spot then s.items[spot] else nil
+	local held = if thing and role == "carrier" then holdOffset(thing, heldMode(s, thing), root, humanoid) else nil
+	local mate = party[2]
+	local mateAt: CFrame? = nil
+	if mate and spot and Rules.holding(s.move, mate.UserId) == spot then
+		local hold = require(script.Parent.PairHold).of(mate)
+		local _, _, mateRoot = bodyOf(mate)
+		if hold and held and item and hold.anchor == item.root then
+			local far = held * hold.offset -- (at your root's height, as the hold keeps them)
+			mateAt = CFrame.new(far.X, 0, far.Z) * far.Rotation
+		elseif mateRoot then
+			mateAt = before:ToObjectSpace(mateRoot.CFrame)
+		end
+	end
+
+	local function land(who: Player, body: Model, at: CFrame)
+		body:PivotTo(at)
+		local _, _, whoRoot = bodyOf(who)
+		if whoRoot then
+			whoRoot.AssemblyLinearVelocity = goal.LookVector * speed -- (still walking, the way they face now)
+			local look = whoRoot.CFrame.LookVector
+			arrived[who] = { at = whoRoot.Position, look = Vector3.new(look.X, 0, look.Z), dark = D.Dark, wait = D.Wait, near = D.Arrive }
+		end
+		if goalInside then
+			s.inside[who] = true
+			SB.tell("enter", s, who) -- 8.2: the listeners (Moving.onEnterHouse)
+		else
+			s.inside[who] = nil
+		end
+	end
+	local now = goal + Vector3.new(0, humanoid.HipHeight + root.Size.Y / 2, 0)
+	land(player, character, now)
+	if item then
+		item.lastAt, item.fallFrom, item.apartSince = nil, nil, nil
+	end
+	local mateBody = if mate then mate.Character else nil
+	if mate and mateBody and mateAt then
+		land(mate, mateBody, now * mateAt)
+	end
+	WalkIn.open(WalkIn.leavesOf(s, WalkIn.doorNear(s, now.Position, goalInside), goalInside), os.clock()) -- (behind them)
+	return arrived
+end
+
 -- ── Doors: in and out with a fade ──────────────────────────────────────────
+-- 8.3 the trip (Config.Moving.Doors; the owner: "the door should open, and then it teleports me smoothly"): the door
+-- you go by opens (an E prompt's trip too) and the fade out starts (FadeOut s on the client) for you and the crew mate
+-- at the other end of the pair piece you hold; the other side streams in meanwhile (each one's
+-- RequestStreamAroundAsync, Stream s at most). FadeOut + Margin s after the fade out was sent (the screen black on the
+-- client by then, whatever the network's unevenness) everybody of the trip is moved in one moment (WalkIn.trip), and
+-- the fade in carries where you are and the way you face: the client holds the dark until it sees you there, its
+-- camera behind you, then Dark s, then FadeIn s (client/Fade.luau). (8.3 review: Stream stays 2, not 7.0's 4: the
+-- trip's worst case, FadeOut + Margin + Stream, must end before client/Fade.luau lifts an unanswered black by itself,
+-- HOLD 4 s after its FadeOut; a stream done sooner moves you sooner, the big house's rest streams in round you there.)
 
-local travel: (Player, CFrame, Session, boolean, boolean?) -> ()
+local travel: (Player, CFrame, Session, boolean) -> ()
 
-travel = function(player: Player, target: CFrame, s: Session, inside: boolean, partner: boolean?)
+travel = function(player: Player, target: CFrame, s: Session, inside: boolean)
 	if traveling[player] then
 		return
 	end
-	traveling[player] = true
-	remote:FireClient(player, "fade", "out", T.Fade)
-	task.delay(T.Fade, function()
-		-- (7.0 review: in a pcall; whatever happens the trip is over and the fade lifts)
-		local ok, err = pcall(function()
+	local D = T.Doors
+	-- the trip's party: you, and the crew mate at the other end of your pair piece (Danny there: his hold's own step)
+	local spot, role = Rules.holding(s.move, player.UserId)
+	local thing = if spot then s.move.things[spot] else nil
+	local other = if thing then playerById(if role == "carrier" then thing.helper else thing.carrier) else nil
+	local party = { player }
+	if other and other ~= player and not traveling[other] then
+		table.insert(party, other)
+	end
+	local _, _, root = bodyOf(player)
+	local from = s.inside[player] == true
+	WalkIn.open(WalkIn.leavesOf(s, if root then WalkIn.doorNear(s, root.Position, from) else nil, from), os.clock()) -- (the door you go by)
+	local speed = 0 -- (your walk now, carried on there)
+	local v: Vector3? = if root then root.AssemblyLinearVelocity else nil
+	if v then
+		speed = math.sqrt(v.X * v.X + v.Z * v.Z)
+	end
+	local streamed = 0
+	for _, member in party do
+		traveling[member] = true
+		remote:FireClient(member, "fade", "out", D.FadeOut)
+		task.delay(0, function()
 			pcall(function()
-				player:RequestStreamAroundAsync(target.Position, 4)
+				member:RequestStreamAroundAsync(target.Position, D.Stream)
 			end)
-			-- the move ended (or its house went) while the screen was dark: out at the house's door, never the void
-			local goal, goalInside = target, inside
-			if inside and (s.ended or not (s.interior and s.interior.Parent)) then
-				goal, goalInside = s.site.outside, false
+			streamed += 1
+		end)
+	end
+	task.delay(D.FadeOut + D.Margin, function()
+		-- (7.0 review: in a pcall; whatever happens the trip is over and the fade lifts)
+		local arrived: { [Player]: any } = {}
+		local ok, err = pcall(function()
+			local waited = 0
+			while streamed < #party and waited < D.Stream do -- (the stream's own wait, Stream s at most)
+				waited += math.max(task.wait(0.05), 0.05)
 			end
-			local character, humanoid, root = bodyOf(player)
-			if character and humanoid and root then
-				local lift = humanoid.HipHeight + root.Size.Y / 2
-				character:PivotTo(goal + Vector3.new(0, lift, 0))
-				if goalInside then
-					s.inside[player] = true
-					SB.tell("enter", s, player) -- 8.2: the listeners (Moving.onEnterHouse)
-				else
-					s.inside[player] = nil
-				end
-				local spot, role = Rules.holding(s.move, player.UserId)
-				if spot then
-					local item = s.items[spot]
-					if item then
-						item.lastAt, item.fallFrom, item.apartSince = nil, nil, nil
-					end
-					-- the other end of a pair thing comes along, beside you
-					local thing = s.move.things[spot]
-					local other = playerById(if role == "carrier" then thing.helper else thing.carrier)
-					if other and not partner then
-						travel(other, goal * CFrame.new(3.5, 0, 0), s, goalInside, true)
-					end
-				end
-			end
+			arrived = WalkIn.trip(s, player, target, inside, party, speed)
 		end)
 		if not ok then
 			warn(`[Moving] a door trip failed: {err}`)
 		end
-		traveling[player] = nil
-		-- 8.1 walk-in doors: no way back until they stepped out of the zone here (come out clear of it: out already, judged
-		-- by WalkIn.check from where they came out) and Rearm s went by
-		local _, _, body = bodyOf(player)
-		WalkIn.at[player] = nil
-		WalkIn.held[player] = { untilAt = os.clock() + T.Doors.Rearm, left = nil, from = if body then body.Position else nil }
-		if player.Parent then
-			remote:FireClient(player, "fade", "in", T.Fade)
+		local push = WalkIn.send -- (where you are now, before the fade in: the HUD, the sounds and the eyes while black)
+		if push and not s.ended then
+			pcall(push, s)
+		end
+		for _, member in party do
+			traveling[member] = nil
+			-- 8.1 walk-in doors: no way back until they stepped out of the zone here (come out clear of it: out already,
+			-- judged by WalkIn.check from where they came out) and Rearm s went by
+			local _, _, body = bodyOf(member)
+			WalkIn.at[member] = nil
+			WalkIn.held[member] = { untilAt = os.clock() + D.Rearm, left = nil, from = if body then body.Position else nil }
+			if member.Parent then
+				remote:FireClient(member, "fade", "in", D.FadeIn, arrived[member])
+			end
 		end
 		s.dirty = true
 	end)
@@ -2138,22 +2436,23 @@ end
 
 -- Is `at` in a doorway's zone: `mid` its threshold at a body's middle, `out` the flat way out of it on the side you
 -- stand (outside: the door's facing; inside: into the room), `width` the doorway's? Depth in front of it, Through
--- through it, Side past its jambs, Height round the middle.
-function WalkIn.inZone(at: Vector3, mid: Vector3, out: Vector3, width: number): boolean
+-- through it, Side past its jambs, Height round the middle. 8.3: `depth` / `side` given: that box instead (the door's
+-- approach: Approach deep, ApproachSide wider).
+function WalkIn.inZone(at: Vector3, mid: Vector3, out: Vector3, width: number, depth: number?, side: number?): boolean
 	local D = T.Doors
 	local dx, dz = at.X - mid.X, at.Z - mid.Z
 	local along = dx * out.X + dz * out.Z
-	return along <= D.Depth and along >= -D.Through and math.abs(dx * out.Z - dz * out.X) <= width / 2 + D.Side
+	return along <= (depth or D.Depth) and along >= -D.Through and math.abs(dx * out.Z - dz * out.X) <= width / 2 + D.Side + (side or 0)
 		and math.abs(at.Y - mid.Y) <= D.Height / 2
 end
 
 -- The zone a body at `at` stands in (inside: the ways out's; outside: the site's doors'): its index and its flat way
--- out of the doorway on that side, or nil.
-function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean): (number?, Vector3?)
+-- out of the doorway on that side, or nil. 8.3: `depth` / `side` given: the door's approach (WalkIn.inZone).
+function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean, depth: number?, side: number?): (number?, Vector3?)
 	if inside then
 		for index, way in s.ways do
 			local into = way.into
-			if into and WalkIn.inZone(at, way.inside, into, way.width or way.part.Size.X) then
+			if into and WalkIn.inZone(at, way.inside, into, way.width or way.part.Size.X, depth, side) then
 				return index, into
 			end
 		end
@@ -2161,17 +2460,33 @@ function WalkIn.zoneOf(s: Session, at: Vector3, inside: boolean): (number?, Vect
 	end
 	local up = Vector3.new(0, Config.Furniture.EntryUp, 0) -- (a root's height over the ground: the door's foot is on it)
 	for index, door in s.site.doors do
-		if WalkIn.inZone(at, door.door + up, door.facing, door.width) then
+		if WalkIn.inZone(at, door.door + up, door.facing, door.width, depth, side) then
 			return index, door.facing
 		end
 	end
 	return nil, nil
 end
 
+-- How much a body faces the way through a door (`out`: its flat way out on the side they stand): the root's look ·
+-- the way in (1 straight at it, -1 away from it). 8.1 carrying in two (PairTurn): a leader backs through it, facing the
+-- piece and the partner: their walk into it counts then, only at PairWalk studs/s or more (8.1 review: a drift back
+-- toward the door no longer takes them through).
+function WalkIn.toward(character: Model?, root: BasePart, out: Vector3): number
+	local look = root.CFrame.LookVector
+	local toward = -(look.X * out.X + look.Z * out.Z)
+	if toward < T.Doors.Face and character and character:GetAttribute("PairTurn") ~= nil then
+		local v: Vector3? = root.AssemblyLinearVelocity
+		local speed = if v then math.sqrt(v.X * v.X + v.Z * v.Z) else 0
+		toward = if v and speed >= T.Doors.PairWalk then -(v.X * out.X + v.Z * out.Z) / speed else -1
+	end
+	return toward
+end
+
 -- One look at a crew member (WalkIn.look): on foot in a zone, facing its door (Face) for Dwell s: through it, once a
 -- visit (a refusal is said once; out of the zone and in again tries again). 8.1 carrying in two (PairTurn): the back
 -- to the door counts too (the leader walks backwards through it, facing the piece and the partner). After a trip nothing until they have left
--- the zone they came out in and Rearm s have gone by (WalkIn.held, set by travel).
+-- the zone they came out in and Rearm s have gone by (WalkIn.held, set by travel). 8.3: walking up to a door facing it
+-- (its approach) opens its leaf, and the trip waits until it has been open Open s (WalkIn.ready).
 function WalkIn.check(s: Session, player: Player, clock: number)
 	local character, humanoid, root = bodyOf(player)
 	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
@@ -2193,6 +2508,11 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		end
 		WalkIn.held[player] = nil
 	end
+	-- 8.3 the leaf swings open as they walk up to the door facing it (its approach: the zone, deeper and wider)
+	local near, nearOut = WalkIn.zoneOf(s, root.Position, inside, T.Doors.Approach, T.Doors.ApproachSide)
+	if near and nearOut and WalkIn.toward(character, root, nearOut) >= T.Doors.Face then
+		WalkIn.open(WalkIn.leavesOf(s, if inside then s.ways[near] else s.site.doors[near], inside), clock)
+	end
 	if not index or not out then
 		WalkIn.at[player] = nil
 		return
@@ -2204,23 +2524,14 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		WalkIn.at[player] = fresh
 		visit = fresh
 	end
-	local look = root.CFrame.LookVector
-	local toward = -(look.X * out.X + look.Z * out.Z)
-	if toward < T.Doors.Face and character and character:GetAttribute("PairTurn") ~= nil then
-		-- (8.1 carrying in two: the leader backs through it too, facing the piece and the partner; their back to it only
-		-- counts while they walk into it (8.1 review: a drift back toward the door no longer takes them through))
-		local v: Vector3? = root.AssemblyLinearVelocity
-		local speed = if v then math.sqrt(v.X * v.X + v.Z * v.Z) else 0
-		toward = if v and speed >= T.Doors.PairWalk then -(v.X * out.X + v.Z * out.Z) / speed else -1
-	end
-	if toward < T.Doors.Face then
+	if WalkIn.toward(character, root, out) < T.Doors.Face then
 		visit.since = nil -- (facing away, or walking past it: the dwell starts when they turn to the door)
 		return
 	end
 	local since = visit.since
 	if since == nil then
 		visit.since = clock
-	elseif not visit.tried and clock - since >= T.Doors.Dwell then
+	elseif not visit.tried and WalkIn.ready(WalkIn.leavesOf(s, if inside then s.ways[index] else s.site.doors[index], inside), clock, since) then
 		visit.tried = true
 		if inside then
 			onLeave(player, s, index)
@@ -2230,8 +2541,10 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 	end
 end
 
--- The move's crew at its doors: every member's look (the tick's, and Moving.doors' between two ticks).
+-- The move's crew at its doors: every member's look (the tick's, and Moving.doors' between two ticks). 8.3: the
+-- leaves nobody wants open any more shut (WalkIn.sweep), Danny near a door opens it (WalkIn.helper).
 function WalkIn.look(s: Session, clock: number)
+	WalkIn.sweep(clock)
 	if not T.Doors.Walk then
 		return
 	end
@@ -2241,6 +2554,7 @@ function WalkIn.look(s: Session, clock: number)
 		end
 		WalkIn.check(s, player, clock)
 	end
+	WalkIn.helper(s, clock)
 end
 
 -- A doormat on the ground: its middle `at` (on the floor), the door `toward` it (flat), the doorway's `width`; its words
@@ -2310,7 +2624,8 @@ end
 -- A new move's ways out (startMove): each one's doorway width (the plan's doors to the outside, in the exits' order;
 -- else its Leave part's), its flat way into the room (from its exit to where you come in by it: you come in facing
 -- that way, away from the door, Danny too) and its doormat inside ("▲ OUT" on the floor just inside the doorway, in the
--- interior: it goes with it).
+-- interior: it goes with it). 8.3: every door's leaves of the move found now (the interior's, the site's), shut and
+-- tagged before anybody walks up to them.
 function WalkIn.ways(s: Session)
 	local widths: { number } = {}
 	local doors = s.plan.doors
@@ -2331,6 +2646,11 @@ function WalkIn.ways(s: Session)
 			local floor = way.inside - Vector3.new(0, Config.Furniture.EntryUp, 0)
 			WalkIn.mat(s.interior or folder or workspace, floor + into * (T.Doors.Mat[2] / 2 + 0.3), -into, width, "▲ OUT")
 		end
+		WalkIn.leavesOf(s, way, true) -- (8.3: its leaves found and tagged now, shut: the clients know them before they swing)
+	end
+	for _, door in s.site.doors do
+		WalkIn.leaves[door] = nil -- (8.3: the site's leaves looked for again, the map's house as it stands now)
+		WalkIn.leavesOf(s, door, false)
 	end
 end
 
@@ -2357,6 +2677,14 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
+	-- 8.3 Danny's orders (Config.MoveHelper.WaitForHelper): a two-person piece with Danny on the move calls him, you wait
+	-- at your end ("wait"; Lift again: "cancel"); once he is at its far end ("ready") its lift goes on. nil: today's rules
+	-- (8.3 review: "busy", a crew mate waits for him at it: refused, never lifted from under their call)
+	local answer = if not lifted and thing.class == "pair" then MoveHelper.call(s, player, spot) else nil
+	if answer == "wait" or answer == "cancel" or answer == "busy" then
+		s.dirty = true
+		return
+	end
 	if not lifted and Grip.liftStart(s, spot, player, false) then
 		return -- 8.1 grip: a piece with a grip is lifted by its lift check's hit (the grip block calls this again, lifted)
 	end
@@ -2366,7 +2694,8 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		return
 	end
 	carry(s, item)
-	if thing.class == "pair" then
+	MoveHelper.taken(s, spot, player) -- (8.3: off Danny's list, if it was on it)
+	if thing.class == "pair" and not MoveHelper.joinLift(s, spot, player) then -- (8.3: lifted with Danny at its far end)
 		say(player, `The {thing.name} needs two: you drag it slowly. A crew mate can "Help lift" the other end.`)
 	end
 	s.dirty = true
@@ -2411,6 +2740,54 @@ local function onHelp(s: Session, spot: number, player: Player, lifted: boolean?
 	end
 	say(player, `You hold the other end of the {thing.name}: stay close to it.`)
 	s.dirty = true
+end
+
+-- 8.3 Danny's orders: his side of your call (server/MoveHelper.luau's call; the gate is onPick's). Where `player` will
+-- hold the piece lifted with him (its far end is his place): their root's frame and the pair's hold.
+function Moving.helperLiftFrame(s: Session, spot: number, player: Player): CFrame?
+	local thing = s.move.things[spot]
+	local _, humanoid, root = bodyOrNil(player)
+	if not thing or not humanoid or not root then
+		return nil
+	end
+	return root.CFrame * holdOffset(thing, "pair", root, humanoid)
+end
+
+-- He is in place: `player`'s lift now (its check opens; without the grip it is up, him at its far end). True when the
+-- check is open or the piece is up. 8.3 review: that check opened by his arrival, not by a press (maybe half a minute
+-- after it), is marked `called`: unanswered it closes without a knock (Grip.tick), the next Lift opens a new one.
+function Moving.helperCalled(s: Session, spot: number, player: Player): boolean
+	onPick(s, spot, player)
+	local hold = Grip.holds[player]
+	local open = if hold then hold.open else nil
+	if hold and open and hold.spot == spot and open.check.what == "lift" then
+		open.called = true
+	end
+	return Rules.holding(s.move, player.UserId) == spot or (hold ~= nil and hold.open ~= nil and hold.spot == spot)
+end
+
+-- The piece's Lift prompt while a call is on it or he waits at it for you: "wait" (E again stops waiting), "ask" ("Lift
+-- with Danny"), nil (as it was made).
+function Moving.helperMark(s: Session, spot: number, how: string?)
+	local item = s.items[spot]
+	local thing = s.move.things[spot]
+	if not item or not thing then
+		return
+	end
+	local verb = if thing.class == "pair" then "Lift" else "Pick up"
+	item.pick.ActionText = if how == "wait" then "Stop waiting" elseif how == "ask" then `{verb} with {Config.MoveHelper.Name}` else verb
+	item.pick.ObjectText = if how == "wait" then `Waiting for {Config.MoveHelper.Name}…` else labelOf(thing)
+end
+
+-- The call is off once he was in place (G, walked away, him down): `player`'s lift check on it, still open, closes
+-- (no outcome: never a lift alone after).
+function Moving.helperCallOff(s: Session, spot: number, player: Player)
+	local hold = Grip.holds[player]
+	local open = if hold then hold.open else nil
+	if hold and open and hold.session == s.id and open.spot == spot and open.check.what == "lift" and not hold.carrying then
+		Grip.close(player, hold)
+		Grip.holds[player] = nil
+	end
 end
 
 local function setupItem(s: Session, spot: number, model: Model)
@@ -2494,7 +2871,7 @@ local function enterPrompt(s: Session)
 		if not spot then
 			continue
 		end
-		local action = if index == 1 then "Enter house" else "Enter barn"
+		local action = if index == 1 then "Enter house" elseif SB.on then `Enter by the {door.name}` else "Enter barn" -- (8.3: the big house's back door)
 		local enter = newPrompt(spot, action, `{s.contract.icon} {s.contract.name}`, Enum.KeyCode.E, 0, T.Reach.Door + door.width / 2)
 		enter.Enabled = not T.Doors.Walk -- (8.1 walk-in doors: you walk in; the prompt stays, off)
 		tag(enter, s.owner)
@@ -3008,7 +3385,29 @@ local function cleanup(s: Session)
 			setParts(item.model, true, false, item.root)
 		end
 	end
-	task.delay(T.Fade + 0.5, function()
+	-- 8.3 review: the interior goes once the door trips are over: somebody of the crew on one now (those sent out just
+	-- above: travel moves them FadeOut + Margin s after the fade out, and up to Stream s later while the street streams
+	-- in), not before FadeOut + Margin + Stream + 0.5 s, and a moment more while one is still on it (a lagging server,
+	-- Stream s at most): never the floor gone under somebody in the dark. Nobody on a trip: T.Fade + 0.5 s, as ever.
+	local D = T.Doors
+	local function tripping(): boolean
+		for member in s.members do
+			if traveling[member] then
+				return true
+			end
+		end
+		for member in s.inside do
+			if traveling[member] then
+				return true
+			end
+		end
+		return false
+	end
+	task.delay(if tripping() then math.max(T.Fade, D.FadeOut + D.Margin + D.Stream) + 0.5 else T.Fade + 0.5, function()
+		local waited = 0
+		while tripping() and waited < D.Stream do
+			waited += math.max(task.wait(0.1), 0.1)
+		end
 		-- the interior first (server/HouseInterior.luau's own way), then the things that left it (carried, set down
 		-- outside, in the truck: unloaded at the Wall)
 		local interior = s.interior
@@ -3278,14 +3677,18 @@ end
 -- its seed every time and takes tens of ms): the board's card and every START of it use them (read only).
 type Facts = { plan: any, defs: { [string]: Rules.ItemDef }, spots: { Rules.Spot }, stars: { string }, count: number, estimate: number }
 
-local function factsOf(contract: Contract, a: Art): Facts?
+local function factsOf(contract: Contract, a: Art, owner: Player?): Facts?
 	local key = if SB.on then `{contract.id}#{contract.seed}` else contract.id -- (8.0 SANDBOX: a house per seed)
 	local known = contractFacts[key]
 	if known then
 		return known
 	end
+	-- 8.3 economy: a house that rolls a legendary tries the ones the owner's collection book lacks first (`owner`: the
+	-- card's player, the move's owner; their seed is theirs alone, so its facts are too)
+	local profile = if SB.on and owner then PlayerData.get(owner) else nil
+	local book = if profile then (profile :: any).collectionBook else nil
 	local ok, plan = pcall(function(): any
-		return a.layout.plan(contract.seed, contract.kind)
+		return a.layout.plan(contract.seed, contract.kind, if type(book) == "table" then book else nil)
 	end)
 	if not ok or type(plan) ~= "table" then
 		warn(`[Moving] the plan of {contract.id} failed: {plan}`)
@@ -3384,10 +3787,11 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 	local contract = if SB.on then SB.contractFor(player) else contractById(contractId) or nextContract(player)
 	local a = artNow()
 	if not contract or not a then
-		say(player, "Moving is not ready in this place yet (the house art is missing).")
+		say(player, if SB.on and a then "Your save is still loading: try the board again in a moment." -- (8.4: SB.contractFor)
+			else "Moving is not ready in this place yet (the house art is missing).")
 		return
 	end
-	local known = factsOf(contract, a)
+	local known = factsOf(contract, a, player)
 	if not known then
 		if SB.on then
 			SB.forget(player) -- (8.0 SANDBOX: the next card tries another house)
@@ -3449,7 +3853,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	armed[owner] = nil
 	local a = artNow() :: Art
 	local slot = freeSlot() :: number
-	local known = factsOf(contract, a)
+	local known = factsOf(contract, a, owner)
 	if not known then
 		if SB.on then
 			SB.forget(owner) -- (8.0 SANDBOX: the next try plans another house)
@@ -3562,8 +3966,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	end
 	WalkIn.ways(s) -- 8.1 walk-in doors: the ways' zones and their doormats inside
 	truckPrompts(s)
-	if SB.on then -- 8.0 SANDBOX: this house is spent: the owner's next card shows a new one
-		SB.forget(owner)
+	if SB.on then -- 8.0 SANDBOX (8.3 economy: its seed stays the owner's until a trip brings something home, SB.store)
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (follow the arrow), carry the things out, load them and bring them home to your warehouse: as many trips as it takes, then FINISH.`)
 	else
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them to the Wall at the depot: as many trips as it takes, then FINISH. {Rules.counts(s.move).stars} ★ things are a must!`)
@@ -3800,6 +4203,9 @@ function SB.store(s: Session, spots: { number }): number
 		end
 	end
 	if #spots > 0 then for _, fn in SB.listeners.stored do task.spawn(fn, s.owner, s.move, spots) end end -- 8.2: Moving.onStored
+	if took > 0 then
+		SB.forget(s.owner) -- 8.3 economy: something came home: this house is spent, the owner's next card shows a new one
+	end
 	return took
 end
 
@@ -4039,7 +4445,8 @@ end
 --   * Trust: an answer counts only for the sender's own open check (its id); "ok" is a hit only when CarryGrip.judge
 --     finds its press time true (Server.Lag / Ahead of the server's own clock of the check) with the needle in the zone;
 --     no answer by the window + Server.Grace is a miss (Grip.tick). Nothing while either end of the piece is on a door
---     trip (the check off, the clock waits). Danny never has a check.
+--     trip (the check off, the clock waits). Danny never has a check. 8.3 review: a lift check his arrival opened
+--     (Moving.helperCalled: no press of yours) and never answered closes without a knock (Grip.unheard).
 --   Moving.gripCheck(player)  a wobble check now on what `player` carries (tests; true when one opened)
 
 -- The check's outcome to its player (the client shows it; the piece's condition after it).
@@ -4058,6 +4465,17 @@ function Grip.close(player: Player, hold: GripHold)
 		if player.Parent then
 			remote:FireClient(player, "grip", "close", open.id)
 		end
+	end
+end
+
+-- 8.3 review: a lift check Danny's arrival opened (`called`: Moving.helperCalled), never answered (its time ran out, or
+-- a door's trip): closed without an outcome, no knock; the piece stays as it is, his call ready, and the next Lift
+-- opens a new check (`thing`: told so; nil: a door's trip, nothing said).
+function Grip.unheard(player: Player, hold: GripHold, thing: Rules.Thing?)
+	Grip.close(player, hold)
+	Grip.holds[player] = nil
+	if thing then
+		say(player, `{Config.MoveHelper.Name} waits at the other end of the {thing.name}: lift it when you're ready.`)
 	end
 end
 
@@ -4287,7 +4705,9 @@ function Grip.tick(s: Session, t: number)
 		local partner = if carrying then playerById(if role == "carrier" then thing.helper else thing.carrier) else nil
 		if traveling[player] or (partner and traveling[partner]) then
 			local open = hold.open
-			if open and open.check.what == "lift" then
+			if open and open.called then
+				Grip.unheard(player, hold, nil) -- (8.3 review: Danny's arrival opened it, not a press: no knock)
+			elseif open and open.check.what == "lift" then
 				Grip.settle(s, player, hold, false) -- (8.1 review: walked off mid-lift: its knock all the same)
 			else
 				hold.owed = hold.owed or open ~= nil -- (a wobble: it opens again on the other side)
@@ -4302,6 +4722,8 @@ function Grip.tick(s: Session, t: number)
 			if gone then
 				Grip.close(player, hold) -- (somebody else took it meanwhile)
 				Grip.holds[player] = nil
+			elseif t - open.opened > open.check.window + G.Server.Grace and open.called then
+				Grip.unheard(player, hold, thing) -- (8.3 review: Danny's arrival opened it: no answer, no knock)
 			elseif t - open.opened > open.check.window + G.Server.Grace then
 				Grip.settle(s, player, hold, false) -- (no answer: a miss)
 			end
@@ -4370,6 +4792,8 @@ local function onPutDown(player: Player)
 	local s = sessionOf(player)
 	if s and Rules.holding(s.move, player.UserId) then
 		release(s, player, "put")
+	elseif s then
+		MoveHelper.cancel(player) -- 8.3 G with empty hands: you stop waiting for Danny
 	end
 end
 
@@ -4423,6 +4847,9 @@ local function planMove(owner: Player, contractId: any): string?
 end
 
 local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3: any)
+	if action == "helper" then
+		return -- (8.3: Danny's own, server/MoveHelper.luau's, at its own rate limits)
+	end
 	if not Net.limit(player, "Moving", Config.Robust.Limits.Moving) then
 		return
 	end
@@ -4658,6 +5085,7 @@ function Moving.start()
 		end
 		WalkIn.show()
 	end
+	WalkIn.send = send -- 8.3 walk-in doors: a trip sends where you are before its fade in (travel)
 	wireHooks()
 	-- 7.0 planning: the lobby before a move (its LAUNCH starts it with the roles; the quick chat reaches the move's crew)
 	MoveLobby.onLaunch = function(owner: Player, contractId: string, roles: { [number]: string }): string?
@@ -4673,13 +5101,6 @@ function Moving.start()
 	MoveLobby.moveCrew = function(player: Player): { Player }?
 		local s = sessionOf(player)
 		return if s then membersOf(s) else nil
-	end
-	-- (the quick chat's "Need a hand here" on a move calls the depot's helper over: HELP ME)
-	MoveLobby.onQuickChat = function(player: Player, index: number)
-		local line = MoveRoles.Chat[index]
-		if line and line.id == "hand" and sessionOf(player) then
-			MoveHelper.order(player, "help")
-		end
 	end
 	MoveLobby.start()
 	remote.OnServerEvent:Connect(onRequest)
@@ -4712,7 +5133,7 @@ function Moving.start()
 		armed[player] = nil
 		traveling[player] = nil
 		WalkIn.at[player], WalkIn.held[player] = nil, nil -- (8.1 walk-in doors)
-		SB.forget(player) -- (8.0 SANDBOX: their card's house)
+		SB.forget(player, true) -- (8.0 SANDBOX: their card's house's facts; 8.3 economy: its seed kept for their return)
 	end)
 	-- a new body is never inside (a death inside respawns you at the depot)
 	local function onPlayer(player: Player)
@@ -4759,8 +5180,10 @@ function Moving.step()
 end
 
 -- 8.1 walk-in doors: one look at every running move's doors (the loop's between two ticks, about every Doors.Every s).
+-- 8.3: the leaves nobody wants open any more shut first (a move's end leaves none open).
 function Moving.doors()
 	local clock = os.clock()
+	WalkIn.sweep(clock)
 	for _, s in sessions do
 		if not s.ended then
 			local ok, err = pcall(function()
