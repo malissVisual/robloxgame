@@ -6561,7 +6561,8 @@ Config.MoveStory = {
 --                      he set off: he fades over to its far end (a quick fade-out, there, a fade-in) and takes it (8.3:
 --                      only with WaitForHelper false; with it he walks, CallGain / CallBlink the last resort)
 --   Standoff / HoldStep   his root stands Standoff studs past your piece's far face, turned to you, on the floor there
---                      within HoldStep studs of your root's height (stairs, steps)
+--                      within HoldStep studs of the floor under you (stairs, steps; 8.3: of your feet's floor, not your
+--                      root's height: your jump never lifts him; a floor farther off, a roof or a ceiling, is not his)
 --   HoldResponse       the Responsiveness of the constraints that keep him there (AlignPosition / AlignOrientation on
 --                      his root); his own walk is off meanwhile (Npcs.carried)
 --   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
@@ -6578,7 +6579,18 @@ Config.MoveStory = {
 --                      turns at most (AlignOrientation.MaxAngularVelocity)
 --   HoldBehind / HoldStuck / HoldEase   more than HoldBehind studs off his place for HoldStuck s: eased back over HoldEase
 --                      s (never put there at once while holding; only a door's fade does: the piece in the other world)
---   ThreeAfter         s after "Got the other end!" he says "On three... lift!"
+--   8.3 (the owner: "he just jumps weirdly"; MoveHelperBrain.holdClimb / holdLegs, server/PairHold.luau's lift):
+--   HoldClimb          studs a second his height goes up or down at most holding the far end (a step or a kerb stepped,
+--                      never popped): the floor under his end followed that fast, and the lift (his root's own
+--                      AlignPosition, up and down only) at most that fast
+--   HoldLegs           his legs holding it (Npcs.stride, the far bodies' walk; near ones the clients' gait): stepping from
+--                      From studs/s of his own speed along the ground, standing under To; backwards once the way is more
+--                      than Band of it behind him, forwards once more than Band ahead (sideways: the way they went)
+--   PathRadius / PathHeight / PathSpacing   his paths (PathfindingService: never a jump, never a climb); PathAgain:
+--                      studs his goal moves off a path's end before he asks for a new one; PathDrift: studs it may move
+--                      off it while he still follows that path (then on from its end; straight lines only while no path
+--                      is known: a straight line meets the low fixtures he would step onto)
+--   ThreeAfter        s after "Got the other end!" he says "On three... lift!"
 --   DoorWarn / VanSay  carrying with you: the piece this near a doorway: "Watch the doorframe!"; this near the van's
 --                      back: "That's going in the van." (its back shut: he opens it for the two of you, OpenBack)
 --   HelpReach / PickReach   studs from your piece's far end he takes it / from a piece's edge he picks it up; LoadReach:
@@ -6653,6 +6665,13 @@ Config.MoveHelper = {
 	HoldBehind = 3,
 	HoldStuck = 3,
 	HoldEase = 0.5,
+	HoldClimb = 8, -- 8.3
+	HoldLegs = { From = 0.8, To = 0.4, Band = 0.3 },
+	PathRadius = 1.5,
+	PathHeight = 5,
+	PathSpacing = 4,
+	PathAgain = 3,
+	PathDrift = 6,
 	ThreeAfter = 1.2,
 	DoorWarn = 4,
 	VanSay = 12,

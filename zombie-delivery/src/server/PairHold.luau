@@ -8,15 +8,19 @@
 -- holdTurn; the server owns the holder's body meanwhile (SetNetworkOwner(nil): the positions are the server's whatever
 -- the lag; a player's body is given back when they let go). The leader's client turns the piece slowly (client/
 -- PairSteer.luau), so the far end never swings faster than that.
---   * Danny (ghost): his parts in a collision group nothing collides with (through door frames like the piece), held
---     in all three axes (his own walk is off: server/Npcs.luau carried).
+--   * Danny (ghost): his parts in a collision group nothing collides with (through door frames like the piece), his
+--     own walk off (server/Npcs.luau carried). 8.3 (the owner: "he just jumps weirdly"): the align pulls him along the
+--     ground only, his height is the lift's (a third constraint on his root, up and down only, at the far end's height
+--     at each aim: the floor under his end, server/MoveHelper.luau's, and at HoldClimb studs a second at most): the
+--     piece's own ups and downs (your step up a kerb, into the van, a jump) never carry him up between two aims.
 --   * A crew mate (flat): their body keeps colliding and stands on the floor itself: the align pulls along the ground
 --     only. Never put there at once (MoveHelperBrain.holdTrack): more than HoldBehind studs off for HoldStuck s, an ease
 --     of HoldEase s (ghost and held in all three axes meanwhile: through whatever is in the way). A door's trip (either
 --     end on it) pauses the hold; the piece in the other world without one: put there.
---   PairHold.make(model, root, anchor, offset, limit, options) -> Hold   the hold made (options: ghost, flat, owner)
+--   PairHold.make(model, root, anchor, offset, limit, options) -> Hold   the hold made (options: ghost, flat, owner;
+--                                            8.3 lift: the height by the lift, the align along the ground)
 --   PairHold.aim(hold, offset, limit, flat?)   its far end's place in the piece's frame, its top speed, along the
---                                            ground only or not
+--                                            ground only or not (the lift's height: the far end's now)
 --   PairHold.ghost(hold, on)                 the holder's parts in the collision group nothing collides with, or back
 --   PairHold.pause(hold, paused)             the constraints off (a door's trip) or on again
 --   PairHold.snap(hold, goal)                put there at once (a door's fade only)
@@ -52,6 +56,7 @@ export type Hold = {
 	own: Attachment,
 	align: AlignPosition,
 	orient: AlignOrientation,
+	lift: AlignPosition?, -- 8.3 his height (up and down only), when the hold has one
 	groups: { [BasePart]: string }?, -- the parts' own groups while ghosted
 	owner: Player?, -- a player's body: theirs again on drop
 	flat: boolean,
@@ -59,7 +64,7 @@ export type Hold = {
 	limit: number,
 }
 
-export type Options = { ghost: boolean, flat: boolean, owner: Player? }
+export type Options = { ghost: boolean, flat: boolean, owner: Player?, lift: boolean? }
 
 type Mate = { hold: Hold, trail: Brain.Trail, at: number }
 
@@ -129,14 +134,32 @@ function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: C
 	local own = Instance.new("Attachment")
 	own.Name = NAME
 	own.Parent = root
+	local flat = options.flat or options.lift == true -- (8.3 a lift holds the height: the align along the ground only)
 	local align = Instance.new("AlignPosition")
 	align.Name = NAME
 	align.Attachment0 = own
 	align.Attachment1 = far
-	setForce(align, options.flat)
+	setForce(align, flat)
 	align.MaxVelocity = limit
 	align.Responsiveness = cfg.HoldResponse
 	align.Parent = root
+	local lift: AlignPosition? = nil
+	if options.lift then
+		-- 8.3 his height: one attachment to a point in the world (the far end's, set at each aim), up and down only, at
+		-- HoldClimb studs a second at most
+		local made = Instance.new("AlignPosition")
+		made.Name = NAME
+		made.Mode = Enum.PositionAlignmentMode.OneAttachment
+		made.Attachment0 = own
+		made.ForceLimitMode = Enum.ForceLimitMode.PerAxis
+		made.ForceRelativeTo = Enum.ActuatorRelativeTo.World
+		made.MaxAxesForce = Vector3.new(0, FORCE, 0)
+		made.MaxVelocity = cfg.HoldClimb
+		made.Responsiveness = cfg.HoldResponse
+		made.Position = (anchor.CFrame * offset).Position
+		made.Parent = root
+		lift = made
+	end
 	local orient = Instance.new("AlignOrientation")
 	orient.Name = NAME
 	orient.Attachment0 = own
@@ -148,8 +171,8 @@ function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: C
 	pcall(function()
 		root:SetNetworkOwner(nil) -- (the server's positions, whatever the lag)
 	end)
-	local hold: Hold = { model = model, root = root, anchor = anchor, far = far, own = own, align = align, orient = orient, groups = nil, owner = options.owner,
-		flat = options.flat, offset = offset, limit = limit }
+	local hold: Hold = { model = model, root = root, anchor = anchor, far = far, own = own, align = align, orient = orient, lift = lift, groups = nil,
+		owner = options.owner, flat = flat, offset = offset, limit = limit }
 	if options.ghost then
 		PairHold.ghost(hold, true)
 	end
@@ -165,10 +188,14 @@ function PairHold.aim(hold: Hold, offset: CFrame, limit: number, flat: boolean?)
 		hold.limit = limit
 		hold.align.MaxVelocity = limit
 	end
-	local wantFlat = if flat == nil then hold.flat else flat
+	local lift = hold.lift
+	local wantFlat = if lift then true elseif flat == nil then hold.flat else flat
 	if wantFlat ~= hold.flat then
 		hold.flat = wantFlat
 		setForce(hold.align, wantFlat)
+	end
+	if lift then
+		lift.Position = (hold.anchor.CFrame * hold.offset).Position -- (8.3 the height his end's floor puts him at now)
 	end
 end
 
@@ -176,6 +203,10 @@ function PairHold.pause(hold: Hold, paused: boolean)
 	if hold.align.Enabled ~= not paused then
 		hold.align.Enabled = not paused
 		hold.orient.Enabled = not paused
+		local lift = hold.lift
+		if lift then
+			lift.Enabled = not paused
+		end
 	end
 end
 
@@ -185,12 +216,17 @@ function PairHold.snap(hold: Hold, goal: CFrame)
 end
 
 function PairHold.alive(hold: Hold, anchor: BasePart?): boolean
+	local lift = hold.lift
 	return (anchor == nil or hold.anchor == anchor) and hold.far.Parent ~= nil and hold.own.Parent ~= nil and hold.align.Parent ~= nil
-		and hold.orient.Parent ~= nil and hold.root.Parent ~= nil
+		and hold.orient.Parent ~= nil and hold.root.Parent ~= nil and (lift == nil or lift.Parent ~= nil)
 end
 
 function PairHold.drop(hold: Hold)
 	local made: { Instance } = { hold.align, hold.orient, hold.own, hold.far }
+	local lift = hold.lift
+	if lift then
+		table.insert(made, lift)
+	end
 	for _, obj in made do
 		obj:Destroy()
 	end

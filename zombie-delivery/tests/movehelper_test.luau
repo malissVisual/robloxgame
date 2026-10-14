@@ -316,8 +316,45 @@ check("…StuckSnap s: a nudge to his way's next point", Brain.unstuck(H.StuckSn
 check("his root Standoff past the far face", near(Brain.farEnd(3.2), 1.6 + H.Standoff))
 check("on the floor there: level with you", near(Brain.endRise(-1.75, -1.75), -1.75))
 check("…a step up or down: with the floor", near(Brain.endRise(-1, -1.75), -1) and near(Brain.endRise(-3, -1.75), -3))
-check("…never off his hands' reach (HoldStep at most)", near(Brain.endRise(9, -1.75), -1.75 + H.HoldStep) and near(Brain.endRise(-40, -1.75), -1.75 - H.HoldStep))
+check("…a step's reach at most (HoldStep): the floor there", near(Brain.endRise(-1.75 + H.HoldStep, -1.75), -1.75 + H.HoldStep)
+	and near(Brain.endRise(-1.75 - H.HoldStep, -1.75), -1.75 - H.HoldStep))
+-- 8.3 (the owner: "he just jumps weirdly"): the porch's roof over his end (the 3.3-stud Dining Table's ray found it, 8.8
+-- over the middle) was clamped HoldStep over you: a 2.5-stud hop. A floor out of a step's reach is not his.
+check("8.3 a floor farther off than a step (a roof, a ceiling, a header; a pit): not his, level with you (never a hop)",
+	near(Brain.endRise(8.8, -1.7), -1.7) and near(Brain.endRise(-1.75 + H.HoldStep + 0.01, -1.75), -1.75) and near(Brain.endRise(-40, -1.75), -1.75))
 check("…no floor read: level with you", near(Brain.endRise(0 / 0, -1.75), -1.75))
+do
+	-- 8.3 his height follows the floor under his end at HoldClimb studs a second at most: a step stepped, never popped
+	local trail = Brain.newTrail()
+	check("8.3 a new hold: his height there at once", near(Brain.holdClimb(trail, 3, 0.1, false), 3) and trail.height == 3)
+	local most, last, steps = 0, 3, 0
+	repeat
+		local y = Brain.holdClimb(trail, 4.5, 0.1, false)
+		most = math.max(most, y - last)
+		last = y
+		steps += 1
+	until near(y, 4.5) or steps > 50
+	check("…a 1.5-stud step up: HoldClimb × dt a tick at most, there in 1.5 / HoldClimb s", near(last, 4.5) and most <= H.HoldClimb * 0.1 + 1e-9
+		and steps == math.ceil(1.5 / (H.HoldClimb * 0.1) - 1e-9), `{steps} ticks, {most} at most`)
+	check("…and down the same way", near(Brain.holdClimb(trail, 2, 0.1, false), 4.5 - H.HoldClimb * 0.1))
+	check("…through a door's fade (the other world): there at once", near(Brain.holdClimb(trail, -5000, 0.1, true), -5000))
+	check("…HoldClimb about a person's step (8 studs a second: a kerb's stud in an eighth of a second)", H.HoldClimb >= 4 and H.HoldClimb <= 12)
+end
+do
+	-- 8.3 his legs (the owner: "walk like me, backwards too"): his whole speed, backwards when the way is behind him
+	local L = H.HoldLegs
+	local trail = Brain.newTrail()
+	check("8.3 standing (under HoldLegs.From): his legs stand", Brain.holdLegs(trail, 0.5, 0, 0.1) == 0 and not trail.walking)
+	check("…walking ahead (forwards along his facing): forwards at his speed", near(Brain.holdLegs(trail, 4.9, 0, 0.1), 4.9) and trail.walking)
+	check("…the way behind him (you walk toward him): backwards at his speed", near(Brain.holdLegs(trail, -9.8, 0, 0.1), -9.8) and trail.back)
+	check("…a step to the side: steps at his whole speed, the way they went (no flicker, no slide on still legs)",
+		near(Brain.holdLegs(trail, 0.2, 5, 0.1), -math.sqrt(0.04 + 25)) and near(Brain.holdLegs(trail, -0.2, -5, 0.1), -math.sqrt(0.04 + 25)))
+	check("…a diagonal: his whole speed, not its share along his facing", near(Brain.holdLegs(trail, -3, 4, 0.1), -5))
+	check("…forwards again once more than Band of the way is ahead", near(Brain.holdLegs(trail, 4, 3, 0.1), 5) and not trail.back)
+	check("…slowing: walking on down to HoldLegs.To, standing under it", near(Brain.holdLegs(trail, (L.From + L.To) / 2, 0, 0.1), (L.From + L.To) / 2)
+		and Brain.holdLegs(trail, L.To * 0.9, 0, 0.1) == 0 and Brain.holdLegs(trail, (L.From + L.To) / 2, 0, 0.1) == 0)
+	check("…the slow pair walk steps (the pair's walk turning: Pair × PairTurnWalk)", Brain.holdLegs(Brain.newTrail(), WALK * Config.Moving.Speed.Pair * H.PairTurnWalk, 0, 0.1) > 0)
+end
 
 -- 8.1 holding the far end: never put there (the owner: "when I turn around he teleports") ------------------------------
 
