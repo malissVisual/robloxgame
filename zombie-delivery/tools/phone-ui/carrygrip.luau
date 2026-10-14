@@ -411,7 +411,7 @@ local function moveState(tvState, tvCondition)
 	}
 end
 moving.OnClientEvent:Fire("state", moveState("carried", 1))
-setAttr(M.player, "MoveHelper", "carry") -- (Danny's strip)
+setAttr(M.player, "MoveHelper", "hired") -- (Danny's strip: 8.3 hired)
 setAttr(M.player, "MoveWith", 14) -- (the 💬 button)
 local panel = named(M.gui, "MovePanel")
 local strip = MoveHelperHud.strip()

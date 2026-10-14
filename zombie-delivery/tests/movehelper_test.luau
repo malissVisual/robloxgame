@@ -1,13 +1,11 @@
--- 7.0, the depot's helper ("Danny from the depot"): his decisions (shared/MoveHelperBrain.luau, pure). Who gets him,
--- which piece he carries next (★ first, then the most value a second of the trip; one-hand and, 7.x, two-hands ones;
--- never a pair piece alone, a broken one, one you are about to lift (the reservation), one that no longer fits the van,
--- one waiting by the shut van), which lift he comes to help with, the other side of your heavy two-hands piece (7.x
--- assist), when he runs from a zombie, what he does now (the priority list), the van's back (he opens it), his speeds
--- (slower than a player, a sprint to your lift), stuck (a new path, a nudge), the far end of your piece (on the floor
--- there), the doorways he keeps out of, his place behind you and his words. tests/movehelper_runtime_test.luau and
--- tests/movehelper_art_runtime_test.luau run the server side. 8.3 Danny's orders: the four orders and a command's check
--- (his move's crew only), the light pieces AUTO carries alone, the heavy one he asks a hand for (and for how long), your
--- call (in place, the last resort's clock, walking away, idle) and the priority list with them.
+-- 7.0, the depot's helper ("Danny from the depot"): his decisions (shared/MoveHelperBrain.luau, pure). Who has him,
+-- which lift he comes to help with, when he runs from a zombie, what he does now (the priority list), the van's back
+-- (he opens it), his speeds (slower than a player, a sprint to your lift), stuck (a new path, a nudge), the far end of
+-- your piece (on the floor there), the doorways he keeps out of and his words. tests/movehelper_runtime_test.luau and
+-- tests/movehelper_art_runtime_test.luau run the server side. 8.3 Danny for hire: the price (the house's pieces), the
+-- hire's check (the crew, once, the money), a click on a piece (onto his list, off it, every refusal), his list's next
+-- piece (in order, the first that fits, a two-person one he waits at), its words and markers, the van's seat (which
+-- one, when he gets out), your call (in place, the last resort's clock, walking away, idle) and the priority list.
 local Brain = require("./MoveHelperBrain")
 local Config = require("./Config")
 local Rules = require("./MovingRules")
@@ -40,33 +38,83 @@ H.Duo = false
 H.Solo = false
 check("Solo off: nobody gets him", not Brain.wanted(1))
 H.Solo = true
-check("8.3 the orders: auto, help, stay, van (the card's order)", Brain.validMode("auto") and Brain.validMode("help") and Brain.validMode("stay")
-	and Brain.validMode("van") and #Brain.Modes == 4 and Brain.Modes[1] == "auto" and Brain.Modes[2] == "help" and Brain.Modes[3] == "stay" and Brain.Modes[4] == "van")
-check("…nothing else (the old carry / wait, garbage)", not Brain.validMode("carry") and not Brain.validMode("wait") and not Brain.validMode("dance")
-	and not Brain.validMode(nil) and not Brain.validMode(3) and not Brain.validMode({}) and not Brain.validMode("stop"))
+check("8.3 hired: he stays with any crew of one or more (paid for the move), never with nobody", Brain.wanted(2, true) and Brain.wanted(4, true)
+	and Brain.wanted(1, true) and not Brain.wanted(0, true) and not Brain.wanted(2, false))
 
--- 8.3 a command: his move's crew only, a real order, not the one in force ------------------------------------------------------
+-- 8.3 the hire: its price, its check -------------------------------------------------------------------------------------------
 
-local given, why = Brain.order("help", "auto", true)
-check("8.3 a crew player's HELP ME on AUTO: taken", given == "help" and why == nil)
-given, why = Brain.order("help", "auto", false)
-check("…a player of another move (not his crew): refused (crew)", given == nil and why == "crew")
-given, why = Brain.order("dance", "auto", true)
-check("…no such order: refused (mode)", given == nil and why == "mode")
-given, why = Brain.order(nil, "auto", true)
-local given2, why2 = Brain.order({ "auto" }, "help", true)
-check("…garbage (nil, a table): refused (mode)", given == nil and why == "mode" and given2 == nil and why2 == "mode")
-given, why = Brain.order("van", "van", true)
-check("…the order in force: nothing to change (same)", given == nil and why == "same")
-given, why = Brain.order("auto", "van", false)
-check("…the crew is checked first", given == nil and why == "crew")
-check("8.3 the orders' names: AUTO, HELP ME, WAIT HERE, WAIT AT VAN", Brain.modeName("auto") == "AUTO" and Brain.modeName("help") == "HELP ME"
-	and Brain.modeName("stay") == "WAIT HERE" and Brain.modeName("van") == "WAIT AT VAN" and Brain.modeName("dance") == "AUTO")
-check("8.3 the status line: the order · what he does", Brain.status("auto", "Carrying the Lamp to the van") == "AUTO · Carrying the Lamp to the van"
-	and Brain.status("stay", nil) == "WAIT HERE" and Brain.status("van", "") == "WAIT AT VAN")
-check("8.3 light pieces (AUTO carries them alone): one-hand, two-hands under LightWeight", Brain.light("hand", 9) and Brain.light("both", H.LightWeight - 1)
-	and not Brain.light("both", H.LightWeight) and not Brain.light("pair", 1) and H.LightWeight == 5)
+local HIRE = H.Hire
+check("8.3 the hire: Base + PerPiece a piece (the sandbox: $50 + $5)", HIRE.Base == 50 and HIRE.PerPiece == 5 and HIRE.Round == 10 and HIRE.Min == 100 and HIRE.Max == 400)
+check("…the Old Chalet's 20-28 pieces: $150-$190 (a third of the start money, two minutes of a first haul's income)", Brain.hirePrice(20) == 150
+	and Brain.hirePrice(24) == 170 and Brain.hirePrice(28) == 190 and Brain.hirePrice(28) < Config.Sandbox.StartMoney / 2)
+check("…a bigger house costs more (the Alpine Lodge's 40: $250), never past Max", Brain.hirePrice(40) == 250 and Brain.hirePrice(40) > Brain.hirePrice(28)
+	and Brain.hirePrice(500) == HIRE.Max)
+check("…a small house: Min at least; whole Round dollars", Brain.hirePrice(6) == HIRE.Min and Brain.hirePrice(0) == HIRE.Min and Brain.hirePrice(23) == 170
+	and Brain.hirePrice(23) % HIRE.Round == 0)
+check("…junk: no pieces (Min)", Brain.hirePrice(nil) == HIRE.Min and Brain.hirePrice(0 / 0) == HIRE.Min and Brain.hirePrice("9") == HIRE.Min and Brain.hirePrice(-4) == HIRE.Min)
+local ok, why = Brain.hireCheck(true, false, 500, 170)
+check("8.3 a crew player with the money hires him", ok and why == nil)
+ok, why = Brain.hireCheck(true, false, 169, 170)
+check("…not enough money: refused (money)", not ok and why == "money")
+ok, why = Brain.hireCheck(true, false, 170, 170)
+local ok2, why2 = Brain.hireCheck(true, false, nil, 170)
+check("…the price exactly is enough; no money read (nil, NaN): refused", ok and why == nil and not ok2 and why2 == "money" and not (Brain.hireCheck(true, false, 0 / 0, 170)))
+ok, why = Brain.hireCheck(true, true, 9999, 170)
+check("…once a move: hired already (hired)", not ok and why == "hired")
+ok, why = Brain.hireCheck(false, false, 9999, 170)
+check("…a player not of the move's crew: refused (crew), before anything else", not ok and why == "crew" and select(2, Brain.hireCheck(false, true, 0, 170)) == "crew")
+check("8.3 the money's words", Brain.money(170) == "$170" and Brain.money(1234) == "$1,234")
 
+-- 8.3 a click on a piece: onto his list, off it -----------------------------------------------------------------------------
+
+local function assign(fields: { [string]: any }): string
+	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true }
+	for key, value in fields do
+		(a :: any)[key] = value
+	end
+	return Brain.assignCheck(a)
+end
+check("8.3 a piece in the house, Danny hired: onto his list (add)", assign({}) == "add" and assign({ state = "ground" }) == "add")
+check("…a click on a piece of his list: off it again (remove), wherever it is now", assign({ queued = true }) == "remove" and assign({ queued = true, near = false }) == "remove")
+check("…not of the move's crew: refused first (crew)", assign({ crew = false, queued = true }) == "crew")
+check("…not this move's piece (another move's model): refused (piece)", assign({ mine = false }) == "piece")
+check("…not hired: hire him first (hire)", assign({ hired = false }) == "hire" and assign({ hired = false, queued = true }) == "hire")
+check("…too far to see it (ClickReach): refused (far)", assign({ near = false }) == "far")
+check("…in his arms already: (his)", assign({ his = true, state = "carried", held = true }) == "his")
+check("…in the van: (van); home or lost: (gone)", assign({ state = "truck" }) == "van" and assign({ state = "delivered" }) == "gone" and assign({ state = "lost" }) == "gone")
+check("…somebody holds it: (held)", assign({ state = "carried", held = true }) == "held" and assign({ held = true }) == "held")
+check("…his list full (Queue 6): (full); one less: add", assign({ count = H.Queue }) == "full" and assign({ count = H.Queue - 1 }) == "add" and H.Queue == 6)
+check("8.3 a piece of his list stays his while it is home or on the ground and nobody holds it", Brain.keepQueued("home", false) and Brain.keepQueued("ground", false)
+	and not Brain.keepQueued("carried", true) and not Brain.keepQueued("home", true) and not Brain.keepQueued("truck", false) and not Brain.keepQueued("delivered", false))
+
+-- 8.3 his list's next piece --------------------------------------------------------------------------------------------------
+
+local function queued(spot: number, class: string, fits: boolean?): Brain.Queued
+	return { spot = spot, class = class, fits = fits ~= false }
+end
+local spotNext, pair, full = Brain.nextQueued({ queued(4, "hand"), queued(2, "both"), queued(7, "pair") })
+check("8.3 in his list's order: the first one (the lamp)", spotNext == 4 and not pair and not full)
+spotNext, pair, full = Brain.nextQueued({ queued(4, "hand", false), queued(2, "both"), queued(7, "pair") })
+check("…one that no longer fits the van is skipped (the next that fits)", spotNext == 2 and not pair and not full)
+spotNext, pair, full = Brain.nextQueued({ queued(7, "pair"), queued(4, "hand") })
+check("…a two-person piece first: that one, pair (he waits at it for you)", spotNext == 7 and pair and not full)
+spotNext, pair, full = Brain.nextQueued({ queued(4, "hand", false), queued(7, "pair", false) })
+check("…none fits: none, the van full for his list", spotNext == nil and not pair and full)
+spotNext, pair, full = Brain.nextQueued({})
+check("…an empty list: none, not full", spotNext == nil and not pair and not full)
+check("8.3 his list in words", Brain.queueText(0) == "Nothing to carry" and Brain.queueText(1) == "1 piece to carry" and Brain.queueText(3) == "3 pieces to carry"
+	and Brain.queueText(nil) == "Nothing to carry")
+check("8.3 his status: for hire (the price), hired (his list · what he does)", Brain.status(false, 170, nil, nil) == "For hire · $170 this move"
+	and Brain.status(true, 170, 2, "Carrying the Lamp to the van") == "2 pieces to carry · Carrying the Lamp to the van" and Brain.status(true, 0, 0, "") == "Nothing to carry")
+check("8.3 the marker over a piece of his list: its number, or he needs you", Brain.markText(2, false) == "🧑‍🔧 Danny · 2" and Brain.markText(1, true) == "🙋 Danny needs you")
+
+-- 8.3 the van's seat ---------------------------------------------------------------------------------------------------------
+
+check("8.3 the first seat nobody sits in; every one taken: none (he follows on foot)", Brain.pickSeat({ false }) == 1 and Brain.pickSeat({ true, false }) == 2
+	and Brain.pickSeat({ true }) == nil and Brain.pickSeat({}) == nil)
+check("8.3 seated: out when nobody drives and the van stands", Brain.getOut(false, true, true) and not Brain.getOut(true, true, true) and not Brain.getOut(false, false, true)
+	and not Brain.getOut(true, false, true))
+check("…at once when the van is wrecked or gone (moving or not)", Brain.getOut(true, false, false) and Brain.getOut(false, false, false))
 -- The way ------------------------------------------------------------------------------------------------------------------
 
 local doors: Brain.Doors = { outX = 100, outZ = 0, inX = 5000, inZ = 0 }
@@ -75,105 +123,10 @@ check("inside to the street: to the exit, from the front door", near(Brain.route
 check("the street to inside: to the front door, from the exit", near(Brain.routeCost(false, 100, 5, true, 5000, 12, doors), 5 + 12))
 check("inside, from room to room", near(Brain.routeCost(true, 5000, 0, true, 5003, 4, doors), 5))
 
--- Which piece next ---------------------------------------------------------------------------------------------------------
-
-local function thing(spot: number, class: string, cost: number, extra: { [string]: any }?): Brain.Candidate
-	local c: Brain.Candidate = { spot = spot, class = class, state = "home", star = false, broken = false, cost = cost, haul = 20, value = 100, weight = 2, fits = true,
-		byTruck = false, reserved = false }
-	for key, value in extra or {} do
-		(c :: any)[key] = value
-	end
-	return c
-end
-
-local list = {
-	thing(1, "hand", 10), -- the lamp
-	thing(3, "pair", 1), -- the sofa: never alone
-	thing(5, "hand", 30, { star = true }), -- the box of memories (★)
-	thing(6, "hand", 1, { broken = true }), -- a broken one pays nothing
-	thing(7, "hand", 1, { state = "carried" }), -- somebody has it
-	thing(8, "hand", 1, { state = "truck" }), -- in the van already
-}
-local pick, full = Brain.pickItem(list, true)
-check("★ first: the box of memories, though the lamp is nearer", pick == 5 and full == false, pick)
-list[3].star = false
-pick = Brain.pickItem(list, true)
-check("no ★ left: the same value nearer wins (the lamp)", pick == 1, pick)
-list[1].cost = 40
-pick = Brain.pickItem(list, true)
-check("…the nearer one wins (the box)", pick == 5, pick)
-list[1].value = 400
-pick = Brain.pickItem(list, true)
-check("7.x the most value a second of the trip: the lamp worth 4× is worth the walk", pick == 1, pick)
-list[1].value, list[1].cost = 100, 10
-list[3].fits = false
-list[1].fits = false
-pick, full = Brain.pickItem(list, true)
-check("nothing fits: none, and the van is full", pick == nil and full == true)
-list[1].fits = true
-list[1].reserved = true
-pick, full = Brain.pickItem(list, true)
-check("7.x a piece you are about to lift is yours: he leaves it (the box does not fit: the van is full for him)", pick == nil and full == true)
-local byTruck = { thing(9, "hand", 3, { state = "ground", byTruck = true }) }
-pick, full = Brain.pickItem(byTruck, false)
-check("set down by the shut van: it waits (not 'full')", pick == nil and full == false)
-pick = Brain.pickItem(byTruck, true)
-check("…the back open: he takes it in", pick == 9)
-pick = Brain.pickItem({ thing(2, "both", 4, { weight = 4 }), thing(3, "pair", 1) }, true)
-check("7.x a two-hands piece on his own too (never a pair one)", pick == 2, pick)
-pick = Brain.pickItem({ thing(2, "both", 5, { weight = 6 }), thing(1, "hand", 5, { weight = 6 }) }, true)
-check("…the same value, the same way: the quicker one-hand carry first", pick == 1, pick)
-check("…worth: slower with two hands", Brain.worth(thing(2, "both", 5, { weight = 6 })) < Brain.worth(thing(1, "hand", 5, { weight = 6 })))
-pick, full = Brain.pickItem({ thing(3, "pair", 1) }, true)
-check("only a pair piece left: nothing for him alone", pick == nil and full == false)
-pick = Brain.pickItem({ thing(1, "hand", 5, { state = "ground" }) }, true)
-check("a piece on the ground counts", pick == 1)
-pick, full = Brain.pickItem({ thing(2, "both", 2, { weight = H.LightWeight, star = true }), thing(1, "hand", 30) }, true)
-check("8.3 AUTO: a heavy two-hands piece (LightWeight or more) is not his alone, ★ or not: the lamp", pick == 1 and full == false, pick)
-pick, full = Brain.pickItem({ thing(2, "both", 2, { weight = 6 }), thing(3, "pair", 1) }, true)
-check("…only heavy ones left: nothing alone, and the van is not 'full' for them", pick == nil and full == false)
-
--- 8.3 AUTO's ask: the heavy piece he asks a hand for ---------------------------------------------------------------------------
-
-local heavy = {
-	thing(1, "hand", 5), -- the lamp: his alone, never asked for
-	thing(2, "both", 6, { weight = 6, value = 180 }), -- the dresser: two-hands, heavy
-	thing(3, "pair", 9, { weight = 8, value = 350 }), -- the sofa
-	thing(4, "both", 3, { weight = 3 }), -- a light two-hands piece: his alone
-}
-check("8.3 the ask: the heavy piece worth the most a second of a trip in two (the sofa)", Brain.pickAsk(heavy) == 3, Brain.pickAsk(heavy))
-heavy[2].star = true
-check("…★ first (the dresser)", Brain.pickAsk(heavy) == 2)
-heavy[2].reserved = true
-check("…not one you are about to lift (yours)", Brain.pickAsk(heavy) == 3)
-heavy[3].fits = false
-check("…never one that no longer fits the van", Brain.pickAsk(heavy) == nil)
-heavy[3].fits, heavy[2].reserved = true, false
-heavy[2].state = "carried"
-check("…never one somebody holds", Brain.pickAsk(heavy) == 3)
-heavy[3].broken = true
-check("…nor a broken one", Brain.pickAsk(heavy) == nil)
-heavy[3].broken, heavy[2].state = false, "ground"
-heavy[3].cost, heavy[2].cost = H.AskFar + 1, H.AskFar
-check("…within AskFar studs (on foot) only", Brain.pickAsk(heavy) == 2)
-check("…a piece on the ground counts; light ones never", Brain.pickAsk({ thing(1, "hand", 5), thing(4, "both", 3, { weight = 4 }) }) == nil)
-check("8.3 his ask goes on while it is free and fits, AskWait s after his \"give me a hand!\"", Brain.askKept(false, 999, true, true) == "on"
-	and Brain.askKept(true, H.AskWait - 0.1, true, true) == "on")
-check("…nobody came within AskWait s: timeout (the light pieces again)", Brain.askKept(true, H.AskWait, true, true) == "timeout")
-check("…taken, or no room any more: gone", Brain.askKept(true, 1, true, false) == "gone" and Brain.askKept(false, 0, false, true) == "gone")
-check("8.3 no nagging: AskAgain s after nobody came, AskGap after somebody did", H.AskAgain >= 30 and H.AskGap > 0 and H.AskGap < H.AskAgain)
-
--- The reservation (7.x) ----------------------------------------------------------------------------------------------------
-
-check("you within Reserve and nearer: yours", Brain.reserved(H.Reserve - 1, 20) and Brain.reserved(3, 4))
-check("…farther than Reserve: still his to take", not Brain.reserved(H.Reserve + 1, 40))
-check("…he is nearer: his", not Brain.reserved(5, 2))
-check("…nobody with free hands: his", not Brain.reserved(nil, 20))
-
--- Which lift, which assist -------------------------------------------------------------------------------------------------
+-- Which lift -----------------------------------------------------------------------------------------------------------
 
 local function lift(spot: number, cost: number, extra: { [string]: any }?): Brain.Lift
-	local l: Brain.Lift = { spot = spot, class = "pair", state = "carried", helped = false, crew = true, cost = cost, gaveUp = false, weight = 8, byBack = false }
+	local l: Brain.Lift = { spot = spot, class = "pair", state = "carried", helped = false, crew = true, cost = cost, gaveUp = false }
 	for key, value in extra or {} do
 		(l :: any)[key] = value
 	end
@@ -185,12 +138,7 @@ check("not one somebody holds the other end of", Brain.pickLift({ lift(3, 20, { 
 check("not a stranger's", Brain.pickLift({ lift(3, 20, { crew = false }) }) == nil)
 check("not one whose take failed a moment ago", Brain.pickLift({ lift(3, 20, { gaveUp = true }) }) == nil)
 check("not from farther than HelpFar", Brain.pickLift({ lift(3, H.HelpFar + 1) }) == nil and Brain.pickLift({ lift(3, H.HelpFar) }) == 3)
-check("not one on the ground, not a two-hands one (that's an assist)", Brain.pickLift({ lift(3, 5, { state = "ground" }), lift(2, 5, { class = "both" }) }) == nil)
-check("7.x assist: a heavy two-hands piece you carry alone", Brain.pickAssist({ lift(2, 10, { class = "both", weight = H.AssistWeight }) }) == 2)
-check("…not a light one", Brain.pickAssist({ lift(2, 10, { class = "both", weight = H.AssistWeight - 1 }) }) == nil)
-check("…not farther than AssistFar", Brain.pickAssist({ lift(2, H.AssistFar + 1, { class = "both" }) }) == nil)
-check("…not by the van's back already (you load it now)", Brain.pickAssist({ lift(2, 5, { class = "both", byBack = true }) }) == nil)
-check("…not a pair piece, not one helped already", Brain.pickAssist({ lift(3, 5), lift(2, 5, { class = "both", helped = true }) }) == nil)
+check("not one on the ground, not a two-hands one", Brain.pickLift({ lift(3, 5, { state = "ground" }), lift(2, 5, { class = "both" }) }) == nil)
 
 -- 8.3 your call: you wait at your end, he walks over ------------------------------------------------------------------------
 
@@ -239,45 +187,37 @@ check("…a zombie right on him: some way", near(math.sqrt((fx - 3) ^ 2 + (fz - 
 -- What he does now: the priority list ----------------------------------------------------------------------------------------
 
 local function decide(fields: { [string]: any }): (string, number?)
-	local input: Brain.Input = { mode = "auto", dead = false, holding = nil, threat = nil, fleeing = false, lift = nil, assist = nil, pick = nil, open = false, atHouse = true,
-		call = nil, ask = nil }
+	local input: Brain.Input = { hired = true, dead = false, holding = nil, seated = false, ride = false, threat = nil, fleeing = false, lift = nil, queued = nil,
+		pair = false, open = false, atHouse = true, call = nil }
 	for key, value in fields do
 		(input :: any)[key] = value
 	end
 	return Brain.decide(input)
 end
-check("down", decide({ dead = true, holding = "hand", call = 3 }) == "down")
-check("the other end of your piece first, zombies or not", decide({ holding = "pair", threat = 2, lift = 3, open = true, call = 6 }) == "hold")
+check("down", decide({ dead = true, holding = "hand", call = 3, seated = true }) == "down")
+check("the other end of your piece first, zombies or not", decide({ holding = "pair", threat = 2, lift = 3, open = true, call = 6, ride = true }) == "hold")
+check("8.3 in the van's seat: he rides (zombies, your call, his list or not)", decide({ seated = true, threat = 2, call = 6, queued = 1, ride = true }) == "seat"
+	and decide({ seated = true, hired = false }) == "seat")
 check("a zombie near: he runs, with his piece", decide({ holding = "hand", threat = 3, lift = 3, call = 6 }) == "flee")
-local action, spot = decide({ call = 6, lift = 3, pick = 1, assist = 2, ask = 4 })
+local action, spot = decide({ call = 6, lift = 3, queued = 1, ride = true })
 check("8.3 your call first (you wait at your end): before anything of his own", action == "come" and spot == 6)
 action, spot = decide({ call = 6, holding = "hand" })
 check("…even with a piece in his arms (he loads it or sets it down first)", action == "come" and spot == 6)
-check("…on every order: HELP ME, WAIT HERE, WAIT AT VAN", decide({ mode = "help", call = 6 }) == "come" and decide({ mode = "stay", call = 6 }) == "come"
-	and decide({ mode = "van", call = 6 }) == "come")
-action, spot = decide({ lift = 3, pick = 1, assist = 2, ask = 4 })
+action, spot = decide({ lift = 3, queued = 1 })
 check("(a) your two-person piece dragged alone before anything of his own", action == "help" and spot == 3)
 action, spot = decide({ lift = 3, holding = "hand" })
 check("…even with a piece in his arms (he loads it or sets it down first)", action == "help" and spot == 3)
-check("…8.3 on every order (a two-person piece always gets him)", decide({ mode = "help", lift = 3 }) == "help" and decide({ mode = "stay", lift = 3 }) == "help"
-	and decide({ mode = "van", lift = 3 }) == "help")
-check("(b) a piece in his arms: to the van (on every order), before an assist", decide({ holding = "hand", pick = 1 }) == "deliver"
-	and decide({ holding = "hand", mode = "van" }) == "deliver" and decide({ holding = "hand", mode = "stay" }) == "deliver" and decide({ holding = "hand", assist = 2 }) == "deliver")
-check("(d) the van's back for somebody coming with a piece, before his next piece (not on WAIT HERE)", decide({ open = true, pick = 1, assist = 2 }) == "open"
-	and decide({ open = true, mode = "van" }) == "open" and decide({ open = true, mode = "stay" }) == "stay")
-action, spot = decide({ assist = 2, pick = 5, ask = 4 })
-check("(c) the other side of your heavy two-hands piece before his ask and his next one", action == "assist" and spot == 2)
-check("…on HELP ME too, not on WAIT HERE or WAIT AT VAN", decide({ mode = "help", assist = 2 }) == "assist" and decide({ mode = "van", assist = 2 }) == "wait"
-	and decide({ mode = "stay", assist = 2 }) == "stay")
-check("HELP ME: he follows you (no ask, no piece of his own)", decide({ mode = "help", pick = 1, ask = 4 }) == "follow")
-check("8.3 WAIT HERE: he stays (no ask, no piece of his own)", decide({ mode = "stay", pick = 1, ask = 4 }) == "stay")
-check("WAIT AT VAN: at the van", decide({ mode = "van", pick = 1, ask = 4 }) == "wait")
-action, spot = decide({ ask = 4, pick = 5 })
-check("8.3 AUTO: his ask for a hand with a heavy piece before his next light one", action == "ask" and spot == 4)
-action, spot = decide({ pick = 5 })
-check("AUTO: the next light piece", action == "fetch" and spot == 5)
-check("…only while the van stands by the house (the ask too)", decide({ pick = 5, ask = 4, atHouse = false }) == "wait")
+check("(b) a piece in his arms: to the van, before his ride and his list", decide({ holding = "hand", queued = 1, ride = true }) == "deliver")
+check("8.3 (c) you at the van's wheel: into it, before his list and the van's back", decide({ ride = true, queued = 1, open = true }) == "ride")
+check("(d) the van's back for somebody coming with a piece, before his next piece", decide({ open = true, queued = 1 }) == "open")
+action, spot = decide({ queued = 5 })
+check("8.3 the next piece of his list", action == "fetch" and spot == 5)
+action, spot = decide({ queued = 7, pair = true })
+check("8.3 …a two-person one: he waits at it for you (needs)", action == "needs" and spot == 7)
+check("…only while the van stands by the house", decide({ queued = 5, atHouse = false }) == "wait" and decide({ queued = 7, pair = true, atHouse = false }) == "wait")
 check("nothing to carry: he waits at the van", decide({}) == "wait")
+check("8.3 not hired: he waits by the van for hire (no call, no lift, no ride, no list, no back)", decide({ hired = false, call = 6, lift = 3, ride = true, queued = 1, open = true }) == "wait")
+check("…but runs from a zombie, and a piece still in his arms goes to the van", decide({ hired = false, threat = 2 }) == "flee" and decide({ hired = false, holding = "hand" }) == "deliver")
 
 -- The van's back -----------------------------------------------------------------------------------------------------------
 
@@ -295,8 +235,8 @@ check("…slower than a player with it", Brain.speed(WALK, "deliver", "hand", 3)
 check("7.x a two-hands piece of his own: slower still", near(Brain.speed(WALK, "deliver", "both", 4), Rules.carrySpeed(WALK, "both", 4) * 0.7)
 	and Brain.speed(WALK, "deliver", "both", 4) < Brain.speed(WALK, "deliver", "hand", 4))
 check("7.x to your lift: a sprint, faster than your two-person walk", near(Brain.speed(WALK, "help", nil, 0), WALK * H.Sprint)
-	and Brain.speed(WALK, "assist", nil, 0) == Brain.speed(WALK, "help", nil, 0) and Brain.speed(WALK, "help", nil, 0) > Rules.carrySpeed(WALK, "pair", 8) * 1.1
-	and Brain.speed(WALK, "come", nil, 0) == Brain.speed(WALK, "help", nil, 0)) -- (8.3: to your call too)
+	and Brain.speed(WALK, "help", nil, 0) > Rules.carrySpeed(WALK, "pair", 8) * 1.1
+	and Brain.speed(WALK, "come", nil, 0) == Brain.speed(WALK, "help", nil, 0) and Brain.speed(WALK, "ride", nil, 0) == Brain.speed(WALK, "help", nil, 0)) -- (8.3: to your call, to the van's seat too)
 check("running from a zombie: Flee × the walk", near(Brain.speed(WALK, "flee", nil, 0), WALK * H.Flee))
 
 -- Stuck ----------------------------------------------------------------------------------------------------------------------
@@ -421,34 +361,26 @@ local front: Brain.Doorway = { x = 0, z = 0, half = 2, dirX = 1, dirZ = 0, depth
 x, z, moved = Brain.aside(4, 0.5, front)
 check("the porch in front of the front door: beside it", moved and near(x, 4) and near(z, 2 + H.Aside.Step), `{x}, {z}`)
 
--- His place behind you ------------------------------------------------------------------------------------------------------
-
-local bx, bz = Brain.followSpot(10, 10, 0, -1)
-check("Follow studs behind your back", near(bx, 10) and near(bz, 10 + H.Follow))
-bx, bz = Brain.followSpot(0, 0, 3, 4)
-check("…along your look", near(bx, -3 / 5 * H.Follow) and near(bz, -4 / 5 * H.Follow))
-
 -- Words --------------------------------------------------------------------------------------------------------------------
 
 check("what he does, in words (the van)", Brain.doing("deliver", "Lamp") == "Carrying the Lamp to the van" and Brain.doing("hold", "Sofa") == "Carrying the Sofa with you"
-	and Brain.doing("follow") == "Right behind you" and Brain.doing("wait") == "Waiting at the van" and Brain.doing("open") == "Opening the van's back"
-	and Brain.doing("assist", "Armchair") == "Taking the other side of the Armchair" and Brain.doing("help", "Sofa") == "Coming to lift the Sofa")
+	and Brain.doing("wait") == "Waiting at the van" and Brain.doing("open") == "Opening the van's back" and Brain.doing("help", "Sofa") == "Coming to lift the Sofa"
+	and Brain.doing("fetch", "Lamp") == "Going for the Lamp")
 check("…the van full", Brain.doing("wait", nil, true) == "Waiting: the van is full")
 check("…something unknown: waiting", Brain.doing("dance") == "Waiting at the van")
 check("his lines: Got the other end! On three... lift! Watch the doorframe! That's going in the van.", Brain.Lines.lift == "Got the other end!"
 	and Brain.Lines.three == "On three... lift!" and Brain.Lines.door == "Watch the doorframe!" and Brain.Lines.van == "That's going in the van."
 	and string.find(Brain.Lines.full, "Van's full, boss", 1, true) == 1 and string.find(Brain.Lines.full, "Wall", 1, true) ~= nil)
-local orders = 0
-for _, mode in Brain.Modes do
-	if type(Brain.Lines[mode .. "Mode"]) == "string" then
-		orders += 1
-	end
-end
-check("a line for every order", orders == 4)
-check("8.3 what he does for your call and his ask, in words", Brain.doing("come", "Sofa") == "Coming to lift the Sofa with you"
-	and Brain.doing("ready", "Sofa") == "At the Sofa: on three!" and Brain.doing("ask", "Piano") == "Needs a hand with the Piano" and Brain.doing("stay") == "Waiting here")
-check("8.3 his ask: \"This one's too heavy for me alone, give me a hand!\"; nobody came: back to the small stuff", Brain.Lines.ask == "This one's too heavy for me alone, give me a hand!"
-	and string.find(Brain.Lines.askOff, "small stuff", 1, true) ~= nil)
+check("8.3 what he does for your call, his list, for hire and in the van, in words", Brain.doing("come", "Sofa") == "Coming to lift the Sofa with you"
+	and Brain.doing("ready", "Sofa") == "At the Sofa: on three!" and Brain.doing("needs", "Piano") == "Waiting for you at the Piano"
+	and Brain.doing("offer") == "Waiting by the van for hire" and Brain.doing("ride") == "Getting in the van" and Brain.doing("seat") == "Riding in the van")
+check("8.3 his lines for hire: hello asks to be hired (the sandbox's names no depot), hired, a piece given, the list cleared or done, a piece you took",
+	string.find(Brain.Lines.hello, "Hire me!", 1, true) ~= nil and string.find(Brain.line("hello", true) :: string, "depot", 1, true) == nil
+	and Brain.Lines.hired ~= nil and Brain.Lines.queued ~= nil and Brain.Lines.cleared ~= nil and Brain.Lines.empty ~= nil and Brain.Lines.mine == "All yours, boss.")
+check("8.3 …a two-person piece of his list: 'too heavy for me alone, give me a hand!'; the ride: in and out", Brain.Lines.ask == "This one's too heavy for me alone, give me a hand!"
+	and Brain.Lines.ride ~= nil and Brain.Lines.out ~= nil)
+check("8.3 the old orders' lines are gone (AUTO, HELP ME, WAIT HERE, WAIT AT VAN, the ask's no-takers)", Brain.Lines.autoMode == nil and Brain.Lines.helpMode == nil
+	and Brain.Lines.stayMode == nil and Brain.Lines.vanMode == nil and Brain.Lines.askOff == nil and (Brain :: any).Modes == nil and (Brain :: any).order == nil)
 local ascii, short, truck = true, true, false
 for _, text in Brain.Lines do
 	if string.find(text, "[\128-\255]") then

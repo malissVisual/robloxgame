@@ -318,6 +318,7 @@ AnalyticsPlan.Sinks = {
 	Repair = "ContextualPurchase",
 	Reroll = "ContextualPurchase",
 	Rental = "ContextualPurchase",
+	HelperHire = "ContextualPurchase", -- 8.3: Danny hired for a move (server/MoveHelper.luau; the SKU the move's contract id)
 }
 
 -- The frequent small ones: summed a player and sent every Config.Analytics.BatchSeconds (and when they leave).

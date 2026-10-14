@@ -417,7 +417,7 @@ check("a computer: under the move's panel at the screen's scale, never on it, in
 	and math.abs((b.x0 + b.x1) / 2 - M.width / 2) < 1 and inside(b) and not overlap(b, box(money)), `{show(panelBox)} / {show(b)}`)
 screen(true)
 panelBox = box(panel)
-attribute("MoveHelper", "carry")
+attribute("MoveHelper", "hired") -- (8.3: Danny hired)
 tick()
 local strip = MoveHelperHud.strip()
 b = hintBox()

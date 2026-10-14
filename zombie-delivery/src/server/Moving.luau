@@ -124,14 +124,16 @@
 --     stepped out of the one they came out in and Rearm s have gone by; you come out a few studs from the door facing
 --     away (the house's 4, the plan's entry inside). The E prompts stay, disabled (Doors.Walk false: as before). A
 --     doormat on the ground at every door: "▲ IN" outside (shown while a move uses that door), "▲ OUT" inside.
---   * 8.3 Danny's orders (the owner: "when you want to take a heavy thing you must wait until the helper comes";
---     Config.MoveHelper.WaitForHelper; server/MoveHelper.luau's call): Lift on a two-person piece with Danny on the move
---     calls him (onPick asks MoveHelper.call): no drag alone, you wait at your end ("Stop waiting" on its prompt; Lift
---     again or G stop it) while he walks to its far end; there he makes your lift (Moving.helperCalled: onPick again,
---     the lift check, or the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift).
---     Moving.helperLiftFrame says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he
---     asks a hand for it on AUTO), Moving.helperCallOff closes its open lift check when the call ends before the lift.
---     Without Danny on the move (a crew of players, him down): today's rules.
+--   * 8.3 Danny for hire (the owner: "when you want to take a heavy thing you must wait until the helper comes";
+--     "I have to PAY for him … you click on something, and that assigns it to him"; Config.MoveHelper.WaitForHelper;
+--     server/MoveHelper.luau's call): Lift on a two-person piece with Danny hired for the move calls him (onPick asks
+--     MoveHelper.call): no drag alone, you wait at your end ("Stop waiting" on its prompt; Lift again or G stop it)
+--     while he walks to its far end; there he makes your lift (Moving.helperCalled: onPick again, the lift check, or
+--     the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift). Moving.helperLiftFrame
+--     says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he waits at a two-person
+--     piece of his list), Moving.helperCallOff closes its open lift check when the call ends before the lift. A piece
+--     you pick up leaves his list (onPick: MoveHelper.taken). Without Danny hired (a crew of players, him for hire, him
+--     down): today's rules.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
@@ -144,7 +146,7 @@
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
---                             Danny joins a crew of one; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
+--                             Danny comes to a crew of one, 8.3 for hire; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
 --                             helperCalled / helperMark / helperCallOff: his side of your call (after onHelp)
 --   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
 --                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
@@ -2382,6 +2384,7 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		return
 	end
 	carry(s, item)
+	MoveHelper.taken(s, spot, player) -- (8.3: off Danny's list, if it was on it)
 	if thing.class == "pair" and not MoveHelper.joinLift(s, spot, player) then -- (8.3: lifted with Danny at its far end)
 		say(player, `The {thing.name} needs two: you drag it slowly. A crew mate can "Help lift" the other end.`)
 	end
@@ -2448,8 +2451,8 @@ function Moving.helperCalled(s: Session, spot: number, player: Player): boolean
 	return Rules.holding(s.move, player.UserId) == spot or (hold ~= nil and hold.open ~= nil and hold.spot == spot)
 end
 
--- The piece's Lift prompt while a call or his ask is on it: "wait" (E again stops waiting), "ask" ("Lift with Danny"),
--- nil (as it was made).
+-- The piece's Lift prompt while a call is on it or he waits at it for you: "wait" (E again stops waiting), "ask" ("Lift
+-- with Danny"), nil (as it was made).
 function Moving.helperMark(s: Session, spot: number, how: string?)
 	local item = s.items[spot]
 	local thing = s.move.things[spot]
@@ -4484,6 +4487,9 @@ local function planMove(owner: Player, contractId: any): string?
 end
 
 local function onRequest(player: Player, action: any, arg: any, arg2: any, arg3: any)
+	if action == "helper" then
+		return -- (8.3: Danny's own, server/MoveHelper.luau's, at its own rate limits)
+	end
 	if not Net.limit(player, "Moving", Config.Robust.Limits.Moving) then
 		return
 	end
@@ -4734,13 +4740,6 @@ function Moving.start()
 	MoveLobby.moveCrew = function(player: Player): { Player }?
 		local s = sessionOf(player)
 		return if s then membersOf(s) else nil
-	end
-	-- (the quick chat's "Need a hand here" on a move calls the depot's helper over: HELP ME)
-	MoveLobby.onQuickChat = function(player: Player, index: number)
-		local line = MoveRoles.Chat[index]
-		if line and line.id == "hand" and sessionOf(player) then
-			MoveHelper.order(player, "help")
-		end
 	end
 	MoveLobby.start()
 	remote.OnServerEvent:Connect(onRequest)

@@ -9,7 +9,7 @@
 --   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the Driver's
 --     call parks the van at House.curb (its nose to the road, its back to the door).
 --   * Load at the back doors, and from inside the walk-in bay (its own Load, the back shut), every piece inside the
---     bay; Danny on a solo move.
+--     bay; Danny on a solo move (8.3: for hire, not hired: a two-person Lift is dragged alone).
 --   * The drop-off: not another player's plot; the van's back in the owner's plot's unload circle: a trip, every piece
 --     in the van into the owner's stock (Collection.add with its item, variant, condition, name), no pay; a second
 --     trip; FINISH: the result card says what came home (pieces, value, trips), no money, no XP.
@@ -309,6 +309,9 @@ end
 check("nobody on the porch, no Marge's text (no story)", not porch and E.last(ann, "Tutorial", "message") == nil)
 local danny = MoveHelper.find(ann)
 check("Danny joins a crew of one", danny ~= nil and danny.body ~= nil)
+check("8.3 …for hire (nobody hired him: he waits by the van, his price on the status line; the sandbox's words: click him)", danny.hirer == nil
+	and ann:GetAttribute("MoveHelper") == "offer" and ann:GetAttribute("MoveHelperPrice") == danny.price
+	and string.find(E.lastNotice(ann), "click him to hire him", 1, true) ~= nil, E.lastNotice(ann))
 check("8.0.1: Danny says hello without the city's depot; his full van's line names no Wall", E.saidSince(Brain.line("hello", true) :: string, 0)
 	and not E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.line("full", true) :: string, "Wall", 1, true) == nil)
 
@@ -413,10 +416,8 @@ E.place(ann, outside)
 trigger(enter, ann)
 local sofa = newItem(3)
 E.place(ann, sofa.PrimaryPart.Position + V3(1, 0, 0))
-Config.MoveHelper.WaitForHelper = false -- (8.3 the switch off: today's rule, the sofa dragged alone; Danny's call is movehelper_runtime_test's)
-trigger(promptIn(sofa, "Lift"), ann)
-Config.MoveHelper.WaitForHelper = true
-check("8.3 WaitForHelper off: a two-person Lift is a drag alone as before (no call)", ann.Character:GetAttribute("MoveCarry") == 3
+trigger(promptIn(sofa, "Lift"), ann) -- (8.3 Danny not hired: today's rule, the sofa dragged alone; his call is movehelper_runtime_test's)
+check("8.3 Danny not hired: a two-person Lift is a drag alone as before (no call, WaitForHelper or not)", Config.MoveHelper.WaitForHelper and ann.Character:GetAttribute("MoveCarry") == 3
 	and ann:GetAttribute("MoveHelperCall") == nil and MoveHelper.find(ann).call == nil)
 step()
 E.place(ann, origin.Position + V3(0, 3, 1))
