@@ -1114,13 +1114,14 @@ do
 		and E.lastKind(ann, "Upgrades", "state", openAt) ~= nil, why)
 	local poor = H.profileOf(ann).money
 	local poorAt = #money
+	local WP, SP = Config.SandboxUpgrades.List.warehouse.prices, Config.SandboxUpgrades.List.stands.prices -- (8.3 economy: Config's prices)
 	local said = H.buy(ann, "stands", 1)
 	check("NEG. 8.3: More stands in her garage: refused with the lock's reason (\"Needs the Big Warehouse\"), nothing taken, nothing changed", said == "Needs the Big Warehouse"
 		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).stands == nil and Collection.stands(ann) == WarehouseLayout.count(1), said)
 	said = H.buy(ann, "warehouse", 1)
-	check("NEG. the ZDC Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < 1500 and string.find(said, "costs $1,500", 1, true) ~= nil
+	check("NEG. the ZDC Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < WP[1] and string.find(said, `costs {WarehouseLayout.money(WP[1])}`, 1, true) ~= nil
 		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).warehouse == nil and Warehouse.level(1) == 1, said)
-	PlayerData.addMoney(ann, 80000, "Admin") -- (the admin panel's money button: PlayerData.addMoney)
+	PlayerData.addMoney(ann, 250000, "Admin") -- (the admin panel's money button: PlayerData.addMoney; 8.3 economy: every level below)
 	local rich = H.profileOf(ann).money
 	local spentAt = #money
 	local garage = Warehouse.model(1)
@@ -1138,21 +1139,21 @@ do
 		end
 		return true
 	end
-	check("8.3: …with the money: the Workshop bought ($1,500, the reason Upgrade): her plot rebuilt (a new Model at Level 2, the garage gone), 4 stands, WarehouseLevel 2",
-		Upgrades.levels(ann).warehouse == 1 and H.paid(ann, "Upgrade", spentAt) == -1500 and E.lastKind(ann, "Upgrades", "bought") ~= nil and Warehouse.model(1) ~= garage
+	check(`8.3: …with the money: the Workshop bought ({WarehouseLayout.money(WP[1])}, the reason Upgrade): her plot rebuilt (a new Model at Level 2, the garage gone), 4 stands, WarehouseLevel 2`,
+		Upgrades.levels(ann).warehouse == 1 and H.paid(ann, "Upgrade", spentAt) == -WP[1] and E.lastKind(ann, "Upgrades", "bought") ~= nil and Warehouse.model(1) ~= garage
 			and not garage:IsDescendantOf(workspace) and Warehouse.model(1):IsDescendantOf(workspace) and Warehouse.level(1) == 2 and Warehouse.model(1):GetAttribute("Level") == 2
 			and workspace:FindFirstChild("Warehouses"):GetAttribute("Level1") == 2 and Collection.stands(ann) == 4 and Warehouse.isOpen(1, 4)
 			and ann:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 2 and E.lastKind(ann, "Collection", "state").stands == 4)
 	check("8.3: …her two pieces still on stands 1 and 2, standing at the Workshop's spots; the income the same", onTheirStands() and math.abs(Collection.incomePerMinute(ann) - S.rate) < 1e-9)
 	E.advance(0.1)
 	check("…the window's state shows the money left; the analytics' UpgradeBought; FirstUpgrade (step 10) waits for FirstSale (9): the funnel is in order",
-		E.lastKind(ann, "Upgrades", "state").money == rich - 1500 + H.paid(ann, "CollectionIncome", spentAt) and #H.events("UpgradeBought", ann) == 1 and H.steps(11).FirstUpgrade == nil)
+		E.lastKind(ann, "Upgrades", "state").money == rich - WP[1] + H.paid(ann, "CollectionIncome", spentAt) and #H.events("UpgradeBought", ann) == 1 and H.steps(11).FirstUpgrade == nil)
 	H.buy(ann, "warehouse", 2)
 	H.buy(ann, "warehouse", 3)
 	H.rebuilt()
 	check("8.3: …the Storehouse, then the Big Warehouse (level 4, the warehouse of 8.0 – 8.2): 12 stands, her pieces on 1 and 2 at its spots",
 		Upgrades.levels(ann).warehouse == 3 and Warehouse.level(1) == 4 and Collection.stands(ann) == 12 and Warehouse.isOpen(1, 12) and not Warehouse.isOpen(1, 13)
-			and onTheirStands() and ann:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 4 and H.paid(ann, "Upgrade", spentAt) == -18500)
+			and onTheirStands() and ann:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 4 and H.paid(ann, "Upgrade", spentAt) == -(WP[1] + WP[2] + WP[3]))
 	local deskNow = Warehouse.terminal(1):FindFirstChild("Prompts")
 	E.walk(ann, V3(deskNow.WorldPosition.X, WarehouseLayout.FloorTop + 3, deskNow.WorldPosition.Z + 3))
 	local againAt = #E.sent
@@ -1162,8 +1163,8 @@ do
 	rich = H.profileOf(ann).money
 	spentAt = #money
 	H.buy(ann, "stands", 1)
-	check("…with the money: More stands 1 bought ($1,000, the reason Upgrade): 14 stands", Upgrades.levels(ann).stands == 1 and Collection.stands(ann) == 14
-		and H.profileOf(ann).money - rich == -1000 + H.paid(ann, "CollectionIncome", spentAt) and H.paid(ann, "Upgrade", spentAt) == -1000 and E.lastKind(ann, "Upgrades", "bought") ~= nil)
+	check(`…with the money: More stands 1 bought ({WarehouseLayout.money(SP[1])}, the reason Upgrade): 14 stands`, Upgrades.levels(ann).stands == 1 and Collection.stands(ann) == 14
+		and H.profileOf(ann).money - rich == -SP[1] + H.paid(ann, "CollectionIncome", spentAt) and H.paid(ann, "Upgrade", spentAt) == -SP[1] and E.lastKind(ann, "Upgrades", "bought") ~= nil)
 	H.rebuilt()
 	check("…the warehouse opens stands 13 and 14 (15 still a painted spot); the collection's state says 14", Warehouse.isOpen(1, 13) and Warehouse.isOpen(1, 14)
 		and not Warehouse.isOpen(1, 15) and E.lastKind(ann, "Collection", "state").stands == 14)
@@ -1240,9 +1241,18 @@ do
 		table.insert(pieces, { uid = v.uid, item = v.item, stand = v.stand, got = v.got, rarity = v.rarity, income = v.income, price = v.price, broken = v.broken, condition = v.condition, base = v.base })
 	end
 	local plan = StockPlan.toSell(pieces, "duplicates")
+	local planUids = {} -- (8.4 review: the confirm sends the pieces it listed; the server sells exactly those)
+	for _, piece in plan do
+		table.insert(planUids, piece.uid)
+	end
+	local staleAt = #E.sent
+	E.advance(1.1)
+	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates", uids = { annStock[1].uid } })
+	check("NEG. 8.4 review: SELL… listing a piece its filter does not take now (the best one, kept): refused, nothing sold", E.heard(ann, "stock changed", staleAt)
+		and H.byUid(Collection.stock(ann), twin) ~= nil and H.byUid(Collection.stock(ann), annStock[1].uid) ~= nil)
 	local saleAt2, sentAt2 = #money, #E.sent
 	E.advance(1.1)
-	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates" })
+	E.fire(ann, "Collection", { kind = "sellmany", filter = "duplicates", uids = planUids })
 	local soldMany = E.lastKind(ann, "Collection", "sold", sentAt2)
 	check("8.2 bulk: SELL… duplicates sells the worse twin only, at the price the window shows (StockPlan)", #plan == 1 and plan[1].uid == twin
 		and soldMany ~= nil and soldMany.count == 1 and soldMany.money == StockPlan.price(plan, market) and H.paid(ann, "CollectionSale", saleAt2) == StockPlan.price(plan, market)
@@ -1454,8 +1464,9 @@ do
 		kept = kept and H.byUid(Collection.stock(ann2), uid).stand == at
 		shown = shown and model ~= nil and model:GetAttribute("Uid") == uid and H.flat(model:GetPivot().Position, V3(where.x, 0, where.z)) < 0.1
 	end
-	check("8.3: the Logistics Center bought ($30,000): a new Model at Level 5, 24 big stands + her More stands' 2, WarehouseLevel 5", said == ""
-		and H.paid(ann2, "Upgrade", spentAt) == -30000 and Warehouse.model(1) ~= before and not before:IsDescendantOf(workspace) and Warehouse.level(1) == 5
+	local topPrice = Config.SandboxUpgrades.List.warehouse.prices[4] -- (8.3 economy: Config's)
+	check(`8.3: the Logistics Center bought ({WarehouseLayout.money(topPrice)}): a new Model at Level 5, 24 big stands + her More stands' 2, WarehouseLevel 5`, said == ""
+		and H.paid(ann2, "Upgrade", spentAt) == -topPrice and Warehouse.model(1) ~= before and not before:IsDescendantOf(workspace) and Warehouse.level(1) == 5
 		and Collection.stands(ann2) == 26 and Warehouse.isOpen(1, 26) and not Warehouse.isOpen(1, 27) and ann2:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 5, said)
 	check("8.3: …every piece still on its stand (the one on stand 13 too: a big stand there now), standing at the level's spots", kept and shown)
 	local top = H.buy(ann2, "warehouse", 5)

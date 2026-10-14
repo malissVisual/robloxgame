@@ -125,7 +125,7 @@ function UpgradeUi.layout(W: number, H: number, touch: boolean): Layout
 		gap = gap,
 		button = button,
 		buttonW = if touch then 112 else 104,
-		priceW = 92,
+		priceW = 100, -- (8.3 economy: "$100,000", the Logistics Center's, whole)
 	}
 end
 

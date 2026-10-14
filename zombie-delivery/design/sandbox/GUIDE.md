@@ -45,8 +45,8 @@ The hint line at the top and the glowing path on the ground always show the next
 | 📖 Book (C) | All 68 pieces the house can hold (8.3: 44 furniture, 24 collectibles). Unknown ones are dark. Milestones pay once: 10 found $250, 20 found $500, all furniture $1,500, every collectible $5,000, a legendary $750. |
 | 📋 Tasks (J) | 3 daily tasks and 1 weekly task. **CLAIM** pays, and finishing all three dailies adds a $500 bonus. New tasks come at midnight UTC; the weekly one changes on Monday. |
 | Leaderboards | The player list shows 💰 $, 📈 $/min and ⭐ Collection. The **TOP MOVERS** board at the crossroads ranks this server's players by what their collection is worth, with each player's all-time best. |
-| Warehouse levels (8.3) | 1 Garage (2 stands, the start), 2 Workshop (4 stands, $1,500), 3 Warehouse (8, $5,000), 4 Big warehouse (12, $12,000), 5 Logistics centre (20, $30,000). After a purchase the building is rebuilt bigger on the same spot; your pieces stay on their stands. An existing save starts at level 4, or level 5 if it bought "More stands". |
-| Upgrades | At the UPGRADES desk: the warehouse level (8.3), **Showroom lights** (+10 % income a level, 5 levels), **Van engine** (+5 % top speed, 3 levels) and **Danny's training** (he walks 10 % faster a level, 3 levels). |
+| Warehouse levels (8.3) | The **ZDC Warehouse** card: 1 Garage (2 stands, the start), 2 Workshop (4 stands, $1,000), 3 Storehouse (8, $7,500), 4 Big Warehouse (12, $30,000), 5 Logistics Center (24, $100,000). After a purchase the building is rebuilt bigger on the same spot; your pieces stay on their stands. **More stands** (+2 small stands a level) opens at the Big Warehouse: 12 – 20 stands there, 24 – 32 in the Logistics Center. An existing save starts at level 4, the warehouse it had. |
+| Upgrades | At the UPGRADES desk: the warehouse level (8.3), **More stands** (from the Big Warehouse on), **Showroom lights** (+10 % income a level, 5 levels), **Van engine** (+5 % top speed, 3 levels) and **Danny's training** (he walks 10 % faster a level, 3 levels). |
 
 ## 2. Controls
 
@@ -96,9 +96,9 @@ default). The answer appears in the panel's footer.
 | Travel and the van | 🚐 BRING VAN | Parks the van on the TARGET's plot, back to the door. |
 | | 📍 TO HOUSE / 📍 TO WAREHOUSE | Teleports the TARGET there, with the van they are driving. |
 | Debug | 🔍 SHOW ZONES | On your screen only: the unload circles, the house's curb, the stands and the vans' cargo bays. |
-| Upgrades | ⬆ MAX UPGRADES | Every upgrade at its top for free (the Logistics centre's 20 stands too). |
+| Upgrades | ⬆ MAX UPGRADES | Every upgrade at its top for free (the Logistics Center with 32 stands). |
 | | ↺ RESET UPGRADES | No upgrades: back to the Garage. Pieces on lost stands go back to the stock. |
-| | 🏗 LV 1 … 🏗 LV 5 (8.3) | Sets the warehouse to that level for free. |
+| | 🏗 LV 1 … 🏗 LV 5 (8.3) | Sets the warehouse to that level for free (the other upgrades stay). Pieces on lost stands, or too big for a smaller stand, go back to the stock. |
 | | 🎨 UNLOCK PAINTS / 🎨 RESET PAINTS (8.3) | Gives every van paint and livery / none (the van back in ZDC cream). |
 
 ## 4. How to test
@@ -118,13 +118,13 @@ The full two-player checklist is [TEST-STUDIO.md](TEST-STUDIO.md) (17 sections, 
 - [ ] A quick loop alone: PLAY → kiosk → drive → house → grip check → load → unload circle → display → wait one minute
       (the money grows) → sell.
 - [ ] Two players: Test tab → Clients and Servers → Local Server, 2 players. Then work through TEST-STUDIO.md. With
-      8.3, "More stands" (its sections 10 and 13) is replaced by the warehouse levels.
+      8.3, its sections cover the warehouse levels too.
 
 **New in 8.3**
 - [ ] Danny: click him and try all four orders. Lift a two-person piece: you wait while he walks to the other end.
 - [ ] Market: the STOCK list shows "Today's market" and 🔥 HOT / ❄ COLD tags. Sell three pieces of one kind: each
       next one sells for 5 % less.
-- [ ] Warehouse levels: buy level 2 at the UPGRADES desk ($1,500). The building grows and your pieces stay. Also try
+- [ ] Warehouse levels: buy level 2 at the UPGRADES desk ($1,000). The building grows and your pieces stay. Also try
       admin 🏗 LV 1 to LV 5.
 - [ ] Light: inside the house you can see your character clearly. Walking into the warehouse does not flash white;
       the light eases in.
@@ -200,7 +200,7 @@ Leave that window open. In Studio, click Rojo → Disconnect, then Connect.
 - **Danny's orders:** the AUTO / HELP ME / WAIT HERE / WAIT AT VAN card. He no longer hops, and he walks backwards
   with you.
 - **The market:** hot and cold kinds every day, and prices drop when you sell many of one kind.
-- **Warehouse levels 1 to 5**, from the Garage to the Logistics centre.
+- **Warehouse levels 1 to 5**, from the Garage to the Logistics Center.
 - **12 more collectibles:** 24 in all, and the book has 68 pieces. Re-import `ZDCFurnitureArt`.
 - **Calmer light:** the house and the warehouse are no longer blinding, and your eyes adapt when you walk in.
 - **Controls on every device:** the gamepad's D-pad opens the chips, the key hints match your device, and first-time

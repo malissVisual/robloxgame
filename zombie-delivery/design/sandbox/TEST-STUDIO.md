@@ -110,15 +110,15 @@ Pro tento bod stačí jeden hráč. Uložení začněte jako nový hráč: buď 
       uvnitř **2 stojany** u zadní zdi. Mezi nimi stojí menší pult UPGRADES (jde na něj E), nad ním cedule UPGRADES.
       Tabule STOCK visí na levé (západní) zdi. Volné pozemky 3 a 4 jsou také garáže s **FOR RENT**.
 - [ ] Van, kruh na vykládání, UNLOAD HERE, kiosk a místo, kde se objevíte, jsou tam, kde byly. Vrata garáže míří na van.
-- [ ] Okno UPGRADES: první karta **ZDC Warehouse** 🏭 (Garage · 2 stands → Workshop · 4 stands, **$1,500**).
+- [ ] Okno UPGRADES: první karta **ZDC Warehouse** 🏭 (Garage · 2 stands → Workshop · 4 stands, **$1,000**).
       **More stands** je zamčená, šedá, s nápisem „Needs the Big Warehouse“, a koupit nejde.
 - [ ] Bez peněz koupě nejde. Admin → SANDBOX → **💰 +$10K** (několikrát) a kupujte level po levelu. Po každé koupi se
       sklad hned přestaví na větší budovu a přibudou stojany:
-  - [ ] level 2 **Workshop** ($1,500): plechová dílna se sedlovou střechou, palety a sudy venku, **4 stojany**;
-  - [ ] level 3 **Storehouse** ($5,000): betonový sokl, světlíky ve střeše, žluté sloupky u vrat, **8 stojanů**;
-  - [ ] level 4 **Big Warehouse** ($12,000): dnešní velký sklad s kanceláří na boku, **12 stojanů**. **More stands** jde
+  - [ ] level 2 **Workshop** ($1,000): plechová dílna se sedlovou střechou, palety a sudy venku, **4 stojany**;
+  - [ ] level 3 **Storehouse** ($7,500): betonový sokl, světlíky ve střeše, žluté sloupky u vrat, **8 stojanů**;
+  - [ ] level 4 **Big Warehouse** ($30,000): dnešní velký sklad s kanceláří na boku, **12 stojanů**. **More stands** jde
         koupit (po dvou malých stojanech, nejvýš 20);
-  - [ ] level 5 **Logistics Center** ($30,000): klenutá střecha se solárními panely, rampy, **24 stojanů** (s More stands
+  - [ ] level 5 **Logistics Center** ($100,000): klenutá střecha se solárními panely, rampy, **24 stojanů** (s More stands
         až 32). Karta ZDC Warehouse je na maximu.
 - [ ] Kus vystavený před koupí zůstane po přestavbě na stejném stojanu (číslo i cedulka $/min sedí). Tabule STOCK
       ukazuje správný počet stojanů.

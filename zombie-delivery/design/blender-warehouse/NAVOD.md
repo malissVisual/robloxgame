@@ -79,10 +79,10 @@ každý hráč má sklad svého levelu a stojí v něm budova toho levelu z Blen
 
 | Koupíš | Budova | Cena | Velkých stojanů |
 | --- | --- | --- | --- |
-| level 2 | Dílna (Workshop) | $1,500 | 4 |
-| level 3 | Sklad (Storehouse) | $5,000 | 8 |
-| level 4 | Velký sklad (Big Warehouse) | $12,000 | 12 |
-| level 5 | Logistické centrum (Logistics Center) | $30,000 | 24 |
+| level 2 | Dílna (Workshop) | $1,000 | 4 |
+| level 3 | Sklad (Storehouse) | $7,500 | 8 |
+| level 4 | Velký sklad (Big Warehouse) | $30,000 | 12 |
+| level 5 | Logistické centrum (Logistics Center) | $100,000 | 24 |
 
 - Po koupi se sklad hned přestaví na větší budovu. Kusy, které máš vystavené, zůstanou na svých stojanech (stojan se
   nikdy nezmenší).

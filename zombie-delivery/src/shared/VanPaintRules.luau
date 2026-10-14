@@ -30,7 +30,14 @@
 --   VanPaintRules.clean(raw)             a saved one checked, never trusted: known ids bought, worn only what is owned
 --   VanPaintRules.fromSave(saved)        the migration (server/PlayerData.luau applySaved): only a real save (money in
 --                                        it) written with the flag keeps its paint; any other starts with the empty one
+--                                        (8.4 review: a real save without the flag rebuilds it from its `rewards` keys)
 --   VanPaintRules.Flag                   that flag
+--   8.4 review, through an older server: an 8.2 server drops vanPaint and its flag but keeps the short keys of the save's
+--   `rewards` (40 characters at most), so the paint goes there too: "paint:<id>" an item bought, "paintOn:<id>" an item
+--   worn (a paint or a livery: their ids are one list's; the factory's is never written)
+--   VanPaintRules.Owned / VanPaintRules.Worn   those two prefixes
+--   VanPaintRules.mirror(rewards, saved) those keys made what `saved` holds (the stale ones cleared): every save
+--   VanPaintRules.fromRewards(rewards)   the paint those keys hold, cleaned (none: the empty one)
 
 local Config = require(script.Parent.Config)
 local SprinterLooks = require(script.Parent.SprinterLooks)
@@ -414,11 +421,65 @@ function VanPaintRules.clean(raw: any): Saved
 	return saved
 end
 
+-- 8.4 review: the paint's short keys in `rewards` (an older server keeps them while it drops vanPaint).
+VanPaintRules.Owned = "paint:"
+VanPaintRules.Worn = "paintOn:"
+
+local function mirrored(key: any): boolean
+	return type(key) == "string"
+		and (string.sub(key, 1, #VanPaintRules.Owned) == VanPaintRules.Owned or string.sub(key, 1, #VanPaintRules.Worn) == VanPaintRules.Worn)
+end
+
+function VanPaintRules.mirror(rewards: { [string]: boolean }, saved: any)
+	local paint = VanPaintRules.clean(saved)
+	local want: { [string]: boolean } = {}
+	for id in paint.owned do
+		want[VanPaintRules.Owned .. id] = true
+	end
+	if paint.worn.paint ~= VanPaintRules.Default.paint then
+		want[VanPaintRules.Worn .. paint.worn.paint] = true
+	end
+	if paint.worn.livery ~= VanPaintRules.Default.livery then
+		want[VanPaintRules.Worn .. paint.worn.livery] = true
+	end
+	for key in rewards do
+		if mirrored(key) and not want[key] then
+			rewards[key] = nil
+		end
+	end
+	for key in want do
+		rewards[key] = true
+	end
+end
+
+function VanPaintRules.fromRewards(rewards: any): Saved
+	local raw = { owned = {} :: { [string]: boolean }, worn = {} :: { [string]: string } }
+	if type(rewards) == "table" then
+		for key, on in rewards do
+			if on == true and mirrored(key) then
+				local worn = string.sub(key, 1, #VanPaintRules.Worn) == VanPaintRules.Worn
+				local item = VanPaintRules.find(string.sub(key, if worn then #VanPaintRules.Worn + 1 else #VanPaintRules.Owned + 1))
+				if item and worn then
+					raw.worn[item.kind] = item.id
+				elseif item then
+					raw.owned[item.id] = true
+				end
+			end
+		end
+	end
+	return VanPaintRules.clean(raw)
+end
+
 -- The migration: a real save (money in it) written with the flag keeps its paint (cleaned); every other one (from
--- before 8.3, a new player's nil, a lock-only record) starts with the empty one. Running it again gives the same.
+-- before 8.3, a new player's nil, a lock-only record) starts with the empty one. 8.4 review: a real save without the
+-- flag that has the paint's keys in its `rewards` went through an older server: rebuilt from them (the save's own
+-- rewards: the profile's are read later). Running it again gives the same.
 function VanPaintRules.fromSave(saved: any): Saved
-	if type(saved) ~= "table" or saved.money == nil or saved[VanPaintRules.Flag] ~= true then
+	if type(saved) ~= "table" or saved.money == nil then
 		return VanPaintRules.empty()
+	end
+	if saved[VanPaintRules.Flag] ~= true then
+		return VanPaintRules.fromRewards(saved.rewards)
 	end
 	return VanPaintRules.clean(saved.vanPaint)
 end

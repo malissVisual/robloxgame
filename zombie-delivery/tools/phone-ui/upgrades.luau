@@ -254,18 +254,22 @@ local function litOf(card, color)
 	return n
 end
 local money = require("./CardKit").Color.money
+local P = Config.SandboxUpgrades.List -- (the prices: Config's, 8.3 economy)
+local cash = UpgradeRules.money
 check("8.3: the ZDC Warehouse at its level 4 (upgrade 3): LV 4/5, five segments, four lit", named(warehouse, "Level").Text == "LV 4/5" and named(warehouse, "Level5") ~= nil
 	and named(warehouse, "Level6") == nil and litOf(warehouse, money) == 4, named(warehouse, "Level").Text)
-check("… \"Big Warehouse · 12 stands\" now, \"Logistics Center · 24 stands\" next, $30,000, NEED $28,000", named(warehouse, "Now").Text == "Big Warehouse · 12 stands"
-	and named(warehouse, "Next").Text == "Next: Logistics Center · 24 stands" and named(warehouse, "Price").Text == "$30,000" and named(warehouse, "Buy").Text == "NEED $28,000",
+check(`… "Big Warehouse · 12 stands" now, "Logistics Center · 24 stands" next, {cash(P.warehouse.prices[4])}, NEED {cash(P.warehouse.prices[4] - 2000)}`, named(warehouse, "Now").Text == "Big Warehouse · 12 stands"
+	and named(warehouse, "Next").Text == "Next: Logistics Center · 24 stands" and named(warehouse, "Price").Text == cash(P.warehouse.prices[4])
+	and named(warehouse, "Buy").Text == `NEED {cash(P.warehouse.prices[4] - 2000)}`,
 	`{named(warehouse, "Now").Text} / {named(warehouse, "Next").Text}`)
-check("More stands at 1 with $2,000: LV 1/4, 14 stands, next 16, $2,500, a grey NEED $500", named(stands, "Level").Text == "LV 1/4" and named(stands, "Now").Text == "14 display stands"
-	and named(stands, "Next").Text == "Next: 16 display stands" and named(stands, "Price").Text == "$2,500" and named(stands, "Buy").Text == "NEED $500"
+check(`More stands at 1 with $2,000: LV 1/4, 14 stands, next 16, {cash(P.stands.prices[2])}, a grey NEED {cash(P.stands.prices[2] - 2000)}`, named(stands, "Level").Text == "LV 1/4"
+	and named(stands, "Now").Text == "14 display stands" and named(stands, "Next").Text == "Next: 16 display stands" and named(stands, "Price").Text == cash(P.stands.prices[2])
+	and named(stands, "Buy").Text == `NEED {cash(P.stands.prices[2] - 2000)}`
 	and named(stands, "Buy").BackgroundColor3 == require("./CardKit").Buttons.shut.face, named(stands, "Buy").Text)
 check("… its level's segments: one lit of four", litOf(stands, money) == 1 and named(stands, "Level4") ~= nil and named(stands, "Level5") == nil)
 check("Showroom lights at its top: a gold MAX, \"Top level\", no price, no BUY", named(lights, "Max") ~= nil and named(lights, "Max").Text == "MAX" and named(lights, "Buy") == nil
 	and named(lights, "Price") == nil and named(lights, "Next").Text == "Top level" and named(lights, "Now").Text == "Income ×1.61")
-check("Van engine at 0: $600 in money green, a green BUY", named(engine, "Price").Text == "$600" and named(engine, "Price").TextColor3 == require("./CardKit").Color.money
+check("Van engine at 0: $1,500 in money green (8.3 economy), a green BUY", named(engine, "Price").Text == UpgradeRules.money(Config.SandboxUpgrades.List.engine.prices[1]) and named(engine, "Price").Text == "$1,500" and named(engine, "Price").TextColor3 == require("./CardKit").Color.money
 	and named(engine, "Buy").Text == "BUY" and named(engine, "Next").Text == "Next: Top speed +5%")
 check("the subtitle: your money", string.find(named(window, "Subtitle").Text, "$2,000", 1, true) ~= nil, named(window, "Subtitle").Text)
 scene("upgrades-phone")
@@ -280,23 +284,26 @@ check("BUY sends { kind = \"buy\", id = \"engine\", level = 1 } once for a doubl
 local toastsBefore = #M.toasts
 before = #sentOn("Upgrades")
 press(named(stands, "Buy"))
-check("a grey NEED button sends nothing, it says how much is missing", #sentOn("Upgrades") == before and M.toasts[#M.toasts] == "More stands: you need $500 more.", M.toasts[#M.toasts])
+check("a grey NEED button sends nothing, it says how much is missing", #sentOn("Upgrades") == before and M.toasts[#M.toasts] == `More stands: you need {cash(P.stands.prices[2] - 2000)} more.`, M.toasts[#M.toasts])
 -- the server's answer
 remote.OnClientEvent:Fire({ kind = "bought", id = "engine", level = 1 })
 check("\"bought\": a toast with what it gives", M.toasts[#M.toasts] == "Van engine: level 1 · Top speed +5%" and #M.toasts == toastsBefore + 2, M.toasts[#M.toasts])
 remote.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 3, stands = 1, lights = 5, engine = 1 }, money = 1400 })
 M.flush()
 engine = cards()[4]
-check("the new state: drawn again (the engine LV 1/3, its next level $1,800, NEED $400)", named(engine, "Level").Text == "LV 1/3" and named(engine, "Price").Text == "$1,800" and named(engine, "Buy").Text == "NEED $400", named(engine, "Buy").Text)
+local engine2 = P.engine.prices[2] -- (8.3 economy: Config's)
+check(`the new state: drawn again (the engine LV 1/3, its next level {UpgradeRules.money(engine2)}, NEED {UpgradeRules.money(engine2 - 1400)})`, named(engine, "Level").Text == "LV 1/3"
+	and named(engine, "Price").Text == UpgradeRules.money(engine2) and named(engine, "Buy").Text == `NEED {UpgradeRules.money(engine2 - 1400)}`, named(engine, "Buy").Text)
 local same = named(gui, "Upgrades")
 remote.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 3, stands = 1, lights = 5, engine = 1 }, money = 1400 })
 M.flush()
 check("the same state again: no redraw (a tap is never lost)", named(gui, "Upgrades") == same)
 -- the money from the State remote (a sale while it is open)
-M.remotes.State.OnClientEvent:Fire({ money = 3000 })
+M.remotes.State.OnClientEvent:Fire({ money = P.stands.prices[2] })
 M.flush()
 stands = cards()[2]
-check("the money follows the State remote: More stands' BUY lights up at $3,000", named(stands, "Buy").Text == "BUY" and string.find(named(named(gui, "Upgrades"), "Subtitle").Text, "$3,000", 1, true) ~= nil)
+check(`the money follows the State remote: More stands' BUY lights up at {cash(P.stands.prices[2])}`, named(stands, "Buy").Text == "BUY"
+	and string.find(named(named(gui, "Upgrades"), "Subtitle").Text, cash(P.stands.prices[2]), 1, true) ~= nil)
 -- closing
 key("Escape")
 check("ESC closes it", not UpgradeUi.isOpen() and named(gui, "Upgrades") == nil)
@@ -317,9 +324,9 @@ remote.OnClientEvent:Fire({ kind = "open" })
 M.flush()
 cardChecks("844 x 390, a new player")
 warehouse, stands = cards()[1], cards()[2]
-check("8.3: a new player's warehouse: LV 1/5 (one segment lit of five), \"Garage · 2 stands\", next \"Workshop · 4 stands\", $1,500, a green BUY", named(warehouse, "Level").Text == "LV 1/5"
+check("8.3: a new player's warehouse: LV 1/5 (one segment lit of five), \"Garage · 2 stands\", next \"Workshop · 4 stands\", the first price, a green BUY", named(warehouse, "Level").Text == "LV 1/5"
 	and litOf(warehouse, money) == 1 and named(warehouse, "Level5") ~= nil and named(warehouse, "Now").Text == "Garage · 2 stands" and named(warehouse, "Next").Text == "Next: Workshop · 4 stands"
-	and named(warehouse, "Price").Text == "$1,500" and named(warehouse, "Buy").Text == "BUY", `{named(warehouse, "Now").Text} / {named(warehouse, "Next").Text}`)
+	and named(warehouse, "Price").Text == cash(P.warehouse.prices[1]) and P.warehouse.prices[1] <= 2000 and named(warehouse, "Buy").Text == "BUY", `{named(warehouse, "Now").Text} / {named(warehouse, "Next").Text}`)
 local locked = named(stands, "Locked")
 check("… More stands locked: \"🔒 Needs the Big Warehouse\" grey in place of the price and BUY, \"Locked for now\" grey", locked ~= nil and locked.Text == "🔒 Needs the Big Warehouse"
 	and locked.BackgroundColor3 == require("./CardKit").Buttons.shut.face and named(stands, "Buy") == nil and named(stands, "Price") == nil and named(stands, "Max") == nil
@@ -341,7 +348,7 @@ check("\"bought\": \"ZDC Warehouse: level 2 · Workshop · 4 stands\" (its own l
 remote.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 3 }, money = 2000 })
 M.flush()
 stands = cards()[2]
-check("at the Big Warehouse (level 4) More stands opens: its BUY, no lock, \"12 display stands\" → \"14\"", named(stands, "Locked") == nil and named(stands, "Buy") ~= nil and named(stands, "Price").Text == "$1,000"
+check("at the Big Warehouse (level 4) More stands opens: its BUY, no lock, \"12 display stands\" → \"14\"", named(stands, "Locked") == nil and named(stands, "Buy") ~= nil and named(stands, "Price").Text == cash(P.stands.prices[1])
 	and named(stands, "Now").Text == "12 display stands" and named(stands, "Next").Text == "Next: 14 display stands", named(stands, "Now").Text)
 remote.OnClientEvent:Fire({ kind = "bought", id = "stands", level = 1 })
 check("… its \"bought\" toast counts on the warehouse's base: \"More stands: level 1 · 14 display stands\"", M.toasts[#M.toasts] == "More stands: level 1 · 14 display stands", M.toasts[#M.toasts])

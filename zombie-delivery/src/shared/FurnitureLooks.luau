@@ -1435,8 +1435,8 @@ BUILDERS.ski_bundle = function(c: Ctx)
 end
 
 -- ── 8.0 collectibles ─────────────────────────────────────────────────────────
--- A collector's things that turn up in a house besides its furniture (shared/HouseLayout.luau places 2-4 a house, a
--- legendary one in about one house of eight: Config.Furniture.Collectibles), each worth clearly more than an ordinary
+-- A collector's things that turn up in a house besides its furniture (shared/HouseLayout.luau places 1-2 a house, a
+-- legendary one in about one house in 25: Config.Furniture.Collectibles), each worth clearly more than an ordinary
 -- piece of its class and dearer the rarer it is (tests/furniture_test.luau). 8.1: the owner's Blender look
 -- (design/blender-furniture/furniture.py) has them too; once its ZDCFurnitureArt is imported, server/FurnitureMesh.luau
 -- dresses them (their gilt, velvet, lacquer, neon and fur in the variant's colours from the lists below), until then they

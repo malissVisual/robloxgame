@@ -37,7 +37,14 @@
 --   The save (profile.sandboxMoves: the moves finished, for tenMoves):
 --   SandboxBadgeRules.Flag                the save's mark (Config.SandboxBadges.Flag)
 --   SandboxBadgeRules.movesFromSave(saved)   the counter: only from a real save (money in it) written with the flag, a
---                                         whole number ≥ 0; anything else 0
+--                                         whole number ≥ 0; anything else 0 (8.4 review: a real save without the flag that
+--                                         has the "mv:" key in its `rewards`: that key's count)
+--   8.4 review, through an older server: an 8.2 server drops sandboxMoves and its flag but keeps the short keys of the
+--   save's `rewards`, so the counter goes there too: one "mv:<n>" key, n capped at the most moves a badge wants
+--   (Config.SandboxBadges.Moves: the badges need no more), none at 0
+--   SandboxBadgeRules.Key                 that prefix
+--   SandboxBadgeRules.mirror(rewards, moves)   that key made the count's (the stale ones cleared): every save
+--   SandboxBadgeRules.fromRewards(rewards)   the count that key holds (none: 0)
 --   SandboxBadgeRules.count(moves)        one more finished move (a whole number, never past 1e9)
 --   SandboxBadgeRules.summary(live?, awarded?)   the admin panel's line: how many are set up, whether this server awards
 --                                         (live: nil unknown), how many it awarded, and the names set up and not
@@ -280,9 +287,47 @@ end
 
 -- ── The save ───────────────────────────────────────────────────────────────
 
+-- 8.4 review: the counter's short key in `rewards` (an older server keeps it while it drops sandboxMoves).
+SandboxBadgeRules.Key = "mv:"
+
+local function mirrorCap(): number
+	return math.max(1, whole(tune().Moves))
+end
+
+function SandboxBadgeRules.mirror(rewards: { [string]: boolean }, moves: any)
+	local n = math.min(whole(moves), mirrorCap())
+	local want = if n > 0 then SandboxBadgeRules.Key .. n else nil
+	for key in rewards do
+		if type(key) == "string" and string.sub(key, 1, #SandboxBadgeRules.Key) == SandboxBadgeRules.Key and key ~= want then
+			rewards[key] = nil
+		end
+	end
+	if want then
+		rewards[want] = true
+	end
+end
+
+function SandboxBadgeRules.fromRewards(rewards: any): number
+	local most = 0
+	if type(rewards) == "table" then
+		for key, on in rewards do
+			if on == true and type(key) == "string" and #key <= 12 and string.sub(key, 1, #SandboxBadgeRules.Key) == SandboxBadgeRules.Key then
+				local n = tonumber(string.sub(key, #SandboxBadgeRules.Key + 1))
+				if finite(n) and n == math.floor(n :: number) then
+					most = math.max(most, math.min(whole(n), mirrorCap()))
+				end
+			end
+		end
+	end
+	return most
+end
+
 function SandboxBadgeRules.movesFromSave(saved: any): number
-	if type(saved) ~= "table" or saved.money == nil or saved[SandboxBadgeRules.Flag] ~= true then
+	if type(saved) ~= "table" or saved.money == nil then
 		return 0
+	end
+	if saved[SandboxBadgeRules.Flag] ~= true then
+		return SandboxBadgeRules.fromRewards(saved.rewards) -- (8.4 review: through an older server; the save's own rewards)
 	end
 	return whole(saved.sandboxMoves)
 end

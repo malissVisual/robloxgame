@@ -190,6 +190,24 @@ check("movesFromSave: junk counts checked (a fraction down, under 0, NaN, a stri
 	and Rules.movesFromSave({ money = 1, sandboxMovesKept = true, sandboxMoves = -2 }) == 0 and Rules.movesFromSave({ money = 1, sandboxMovesKept = true, sandboxMoves = 0 / 0 }) == 0
 	and Rules.movesFromSave({ money = 1, sandboxMovesKept = true, sandboxMoves = "9" }) == 0 and Rules.movesFromSave({ money = 1, sandboxMovesKept = true, sandboxMoves = 1e300 }) == 1e9)
 check("count: one more; junk is 0 before; never past the cap", Rules.count(0) == 1 and Rules.count(9) == 10 and Rules.count(nil) == 1 and Rules.count(0 / 0) == 1 and Rules.count(1e9) == 1e9)
+-- 8.4 review: through an older (8.2) server: it drops sandboxMoves and its flag but keeps the short keys of `rewards`
+local rewards: { [string]: boolean } = { ["mv:2"] = true, ["book:found10"] = true, ["paint:red"] = true }
+Rules.mirror(rewards, 7)
+check("mirror: one \"mv:<n>\" key (the stale one cleared, the others kept)", rewards["mv:7"] == true and rewards["mv:2"] == nil and rewards["book:found10"] == true
+	and rewards["paint:red"] == true)
+check("movesFromSave without the flag: the count from the save's rewards", Rules.movesFromSave({ money = 1, rewards = rewards }) == 7)
+Rules.mirror(rewards, 57)
+check("mirror: capped at the most moves a badge wants (Config.SandboxBadges.Moves)", rewards[`mv:{B.Moves}`] == true and rewards["mv:7"] == nil and rewards["mv:57"] == nil
+	and Rules.movesFromSave({ money = 1, rewards = rewards }) == B.Moves)
+check("… enough for every badge it earns back (tenMoves)", table.find(Rules.fromState(Rules.stateOf({ sandboxMoves = Rules.movesFromSave({ money = 1, rewards = rewards }) }, false)), "tenMoves") ~= nil)
+Rules.mirror(rewards, 0)
+check("mirror at 0: no \"mv:\" key", rewards[`mv:{B.Moves}`] == nil and rewards["mv:0"] == nil and Rules.movesFromSave({ money = 1, rewards = rewards }) == 0)
+check("fromRewards: junk (not `true`, not whole, negative, too big, NaN, no number, long): 0 or capped", Rules.fromRewards({ ["mv:3"] = "yes" :: any }) == 0
+	and Rules.fromRewards({ ["mv:2.5"] = true }) == 0 and Rules.fromRewards({ ["mv:-4"] = true }) == 0 and Rules.fromRewards({ ["mv:999999"] = true }) == B.Moves
+	and Rules.fromRewards({ ["mv:nan"] = true }) == 0 and Rules.fromRewards({ ["mv:"] = true }) == 0 and Rules.fromRewards({ [`mv:{string.rep("1", 40)}`] = true }) == 0
+	and Rules.fromRewards(nil) == 0 and Rules.fromRewards({ ["mv:1"] = true, ["mv:4"] = true }) == 4)
+check("… a lock-only record (no money) with the key: 0; the flag there: the field wins", Rules.movesFromSave({ rewards = { ["mv:5"] = true } }) == 0
+	and Rules.movesFromSave({ money = 1, sandboxMovesKept = true, sandboxMoves = 2, rewards = { ["mv:5"] = true } }) == 2)
 
 -- ── The admin panel's line ─────────────────────────────────────────────────
 local none = Rules.summary(nil, nil)

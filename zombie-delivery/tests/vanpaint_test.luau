@@ -1,6 +1,6 @@
 -- 8.3 SANDBOX, the PAINT shop's rules (shared/VanPaintRules.luau, Config.VanPaint): the catalogue as the owner asked
 -- (8 – 12 body colours, the free factory's cream first; a few liveries, the free ZDC classic first; one or two premium
--- items, Collector gold behind the collection book's "every collectible" milestone), the prices against the economy,
+-- items, Collector gold behind the collection book's "A legendary!" milestone: 8.3 economy), the prices against the economy,
 -- what may be bought (known, not owned, unlocked, the money) and worn (owned), the Look a van wears (the body, the
 -- stripe, "contrast", the roof's stripes on both looks' flat roof), the window's swatches, the labels inked in the
 -- stripe's colour, and the save checked and migrated (only a real save written with the flag).
@@ -81,15 +81,16 @@ for _, items in { Rules.Paints, Rules.Liveries } do
 end
 check("every item: a new id, a short name, a whole price, its colour (a livery: RGB or contrast), a known roof", #bad == 0, table.concat(bad, ", "))
 local gold = Rules.find("gold") :: any
-check("Collector gold: premium, unlocked by the book's \"Found every collectible\" (a paid milestone of Config.CollectionBook)", gold ~= nil and gold.premium and gold.unlock == "collectibles"
-	and Rules.lockText(gold) == "Collection book: Found every collectible" and gold.material == "Metal")
+check("Collector gold: premium, unlocked by the book's \"A legendary!\" (8.3 economy: a paid milestone of Config.CollectionBook), $5,000", gold ~= nil and gold.premium and gold.unlock == "legendary"
+	and Rules.lockText(gold) == "Collection book: A legendary!" and gold.material == "Metal" and gold.price == 5000)
 local known = false
 for _, milestone in Config.CollectionBook.Milestones do
 	known = known or milestone.id == gold.unlock
 end
 check("… its milestone exists", known)
 local chrome = Rules.find("chrome") :: any
-check("Mirror chrome: premium and expensive (hours of a first haul's $100 a minute)", chrome ~= nil and chrome.premium and chrome.price >= 100 * 60 * 2 and chrome.unlock == nil)
+check("Mirror chrome: premium, the late flex (8.3 economy: $50,000, tens of hours of a first haul's $40 – 50 a minute)", chrome ~= nil and chrome.premium and chrome.price == 50000
+	and chrome.price >= 50 * 60 * 15 and chrome.unlock == nil)
 local cheapest, total = math.huge, 0
 for _, items in { Rules.Paints, Rules.Liveries } do
 	for _, item in items do
@@ -99,8 +100,8 @@ for _, items in { Rules.Paints, Rules.Liveries } do
 		end
 	end
 end
-check("the economy: the cheapest colour within the start money ($500), a livery within half an hour of a first haul", cheapest <= Config.Sandbox.StartMoney and Rules.find("alpine").price <= 100 * 30)
-check(`everything costs {Rules.money(total)} (Config's tuning line)`, total == 33200, total)
+check("the economy: the cheapest colour within the start money ($500), a livery within an hour of a first haul ($40 a minute)", cheapest <= Config.Sandbox.StartMoney and Rules.find("alpine").price <= 40 * 60)
+check(`everything costs {Rules.money(total)} (Config's tuning line, 8.3 economy)`, total == 65700, total)
 check("find: junk and unknown ids give nil", Rules.find(nil) == nil and Rules.find(5) == nil and Rules.find("") == nil and Rules.find(string.rep("x", 64)) == nil and Rules.find("purple") == nil)
 
 -- ── Buying and wearing ──────────────────────────────────────────────────────
@@ -116,11 +117,12 @@ check("an unknown id: no", not ok and why == "That's no paint.")
 ok, why = Rules.check(saved, "cream", 1e9, {})
 check("an everybody's item: never bought (yours already)", not ok and string.find(why :: string, "yours already", 1, true) ~= nil)
 ok, why = Rules.check(saved, "gold", 1e9, {})
-check("Collector gold without the milestone: locked, says what unlocks it", not ok and why == "Collector gold unlocks with the collection book's \"Found every collectible\".", why)
-ok = Rules.check(saved, "gold", 1e9, { collectibles = true })
+check("Collector gold without the milestone: locked, says what unlocks it", not ok and why == "Collector gold unlocks with the collection book's \"A legendary!\".", why)
+check("… another milestone paid (every collectible, and 8.2's retired one): still locked", not Rules.check(saved, "gold", 1e9, { collectibles24 = true, collectibles = true }))
+ok = Rules.check(saved, "gold", 1e9, { legendary = true })
 check("… with it paid: may be bought", ok)
-ok, why = Rules.check(saved, "gold", 100, { collectibles = true })
-check("… but not without its money", not ok and string.find(why :: string, "$2,500", 1, true) ~= nil)
+ok, why = Rules.check(saved, "gold", 100, { legendary = true })
+check("… but not without its money", not ok and string.find(why :: string, "$5,000", 1, true) ~= nil)
 Rules.buy(saved, "red")
 check("bought: owned for good and worn at once", saved.owned.red == true and saved.worn.paint == "red" and saved.worn.livery == "zdc")
 ok, why = Rules.check(saved, "red", 1e9, {})
@@ -199,8 +201,8 @@ local function row(list: { Rules.Row }, id: string): Rules.Row
 end
 check("navy: owned and worn; cream: owned, not worn", row(rows, "navy").owned and row(rows, "navy").worn and row(rows, "cream").owned and not row(rows, "cream").worn)
 check("white ($300) with $450: can; black ($600): short $150", row(rows, "white").can and not row(rows, "black").can and row(rows, "black").short == 150)
-check("Collector gold: locked with its words, never can", row(rows, "gold").locked and row(rows, "gold").lock == "Collection book: Found every collectible" and not row(rows, "gold").can)
-check("… unlocked once the milestone is paid", not row(Rules.rows(mine, 450, { collectibles = true }, "paint"), "gold").locked)
+check("Collector gold: locked with its words, never can", row(rows, "gold").locked and row(rows, "gold").lock == "Collection book: A legendary!" and not row(rows, "gold").can)
+check("… unlocked once the milestone is paid", not row(Rules.rows(mine, 450, { legendary = true }, "paint"), "gold").locked)
 local liveries = Rules.rows(mine, 2000, {}, "livery")
 check("the livery swatches: the stripe on the body you wear (navy), the racing contrast light", #liveries == #Rules.Liveries and same(row(liveries, "racing").body, { 30, 50, 92 })
 	and same(row(liveries, "racing").color, P.Contrast.Light) and row(liveries, "zdc").worn and row(liveries, "alpine").can)
@@ -232,6 +234,34 @@ check("… without the flag (an older save): the empty one", same(Rules.fromSave
 check("… a lock-only record (no money) or nothing: the empty one", same(Rules.fromSave({ [Rules.Flag] = true, vanPaint = real.vanPaint }), Rules.empty()) and same(Rules.fromSave(nil), Rules.empty()))
 local once = Rules.fromSave(real)
 check("… again on what it gave: the same", same(Rules.fromSave({ money = 1, [Rules.Flag] = true, vanPaint = once }), once))
+-- 8.4 review: through an older (8.2) server: it drops vanPaint and its flag but keeps the short keys of `rewards`
+local longest = 0
+for _, items in { Rules.Paints, Rules.Liveries } do
+	for _, item in items do
+		longest = math.max(longest, #item.id)
+	end
+end
+check("the rewards keys fit an older server's rewards (40 characters at most, the longest id's \"paintOn:\" too)", #Rules.Worn + longest <= 40
+	and #Rules.Owned + longest <= 40 and #Rules.Worn + 32 <= 40, longest)
+local rewards: { [string]: boolean } = { ["book:found10"] = true, ["paint:white"] = true, ["paintOn:white"] = true, x = true }
+local mine2 = { owned = { red = true, racing = true }, worn = { paint = "red", livery = "racing" } }
+Rules.mirror(rewards, mine2)
+check("mirror: a key for each item bought and each worn (not the factory's), the stale ones cleared, the others kept", same(rewards, {
+	["book:found10"] = true, x = true, ["paint:red"] = true, ["paint:racing"] = true, ["paintOn:red"] = true, ["paintOn:racing"] = true }))
+local trip = { money = 100, rewards = rewards } -- (an 8.2 server wrote it again: no vanPaint, no flag)
+check("fromSave without the flag: rebuilt from the save's rewards (owned and worn)", same(Rules.fromSave(trip), mine2))
+check("… the same as mirrored again (stable)", same(Rules.fromSave({ money = 1, rewards = rewards }), Rules.fromSave(trip)))
+local factory = { owned = { gold = true }, worn = { paint = "cream", livery = "zdc" } }
+Rules.mirror(rewards, factory)
+check("mirror: the factory's worn writes no key; red and racing gone", same(rewards, { ["book:found10"] = true, x = true, ["paint:gold"] = true }))
+check("… rebuilt: gold owned, the factory's worn", same(Rules.fromSave({ money = 1, rewards = rewards }), factory))
+check("fromRewards: junk keys, a worn one not owned, an everybody's, not `true`: the empty one", same(Rules.fromRewards({ ["paint:nope"] = true, ["paintOn:black"] = true,
+	["paint:cream"] = true, ["paint:red"] = "yes", ["paint:"] = true, [5] = true }), Rules.empty()) and same(Rules.fromRewards(nil), Rules.empty()))
+check("… a lock-only record (no money) with the keys: the empty one", same(Rules.fromSave({ rewards = { ["paint:red"] = true } }), Rules.empty()))
+check("… the flag there: the field wins (never the keys)", same(Rules.fromSave({ money = 1, [Rules.Flag] = true, vanPaint = Rules.empty(), rewards = { ["paint:red"] = true } }), Rules.empty()))
+local cleared = { ["paint:red"] = true, ["paintOn:red"] = true }
+Rules.mirror(cleared, Rules.empty())
+check("mirror of nothing bought: every paint key cleared", next(cleared) == nil)
 check("the flag is Config's", Rules.Flag == "vanPaintKept" and P.Flag == Rules.Flag)
 check("the remote's rate limit (a few a second)", (Config.Robust.Limits :: any).VanPaint ~= nil and (Config.Robust.Limits :: any).VanPaint >= 1 and (Config.Robust.Limits :: any).VanPaint <= 10)
 

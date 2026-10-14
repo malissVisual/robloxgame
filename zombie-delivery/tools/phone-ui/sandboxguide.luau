@@ -722,8 +722,9 @@ moving.OnClientEvent:Fire("state", nil)
 lobby.OnClientEvent:Fire("lobby", nil)
 stand(plot.door.x, plot.door.z + 6)
 attribute(Config.SandboxUpgrades.WarehouseAttribute, 2)
-M.remotes.Upgrades.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 1 }, money = 5200 }) -- (level 2: the Workshop)
-M.remotes.State.OnClientEvent:Fire({ money = 5200 })
+local growTo = Config.SandboxUpgrades.List.warehouse.prices[2] -- (the Storehouse's price, 8.3 economy: Config's; $200 more in hand)
+M.remotes.Upgrades.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 1 }, money = growTo + 200 }) -- (level 2: the Workshop)
+M.remotes.State.OnClientEvent:Fire({ money = growTo + 200 })
 local market = { day = 20375, hot = { "jukebox" }, cold = { "sofa" }, left = 4000, demand = {} }
 local function hotState(free)
 	return { kind = "state", stands = 3, market = market, income = 9, stock = {
@@ -749,8 +750,8 @@ local desk1 = WarehouseLayout.terminal(WarehouseLayout.site(plot, 1))
 for _, size in SIZES do
 	screen(size[1], size[2], size[3])
 	tick()
-	check(`{size[4]}: the warehouse full (3 waiting, 1 free stand), $5,200 at level 2: "Your warehouse is full: grow it at the UPGRADES desk ($5,000)"`,
-		SandboxGuide.step() == "grow" and words.Text == "Your warehouse is full: grow it at the UPGRADES desk ($5,000)" and shown() and closeButton.Visible, words.Text)
+	check(`{size[4]}: the warehouse full (3 waiting, 1 free stand), {WarehouseLayout.money(growTo + 200)} at level 2: "Your warehouse is full: grow it at the UPGRADES desk ({WarehouseLayout.money(growTo)})"`,
+		SandboxGuide.step() == "grow" and words.Text == `Your warehouse is full: grow it at the UPGRADES desk ({WarehouseLayout.money(growTo)})` and shown() and closeButton.Visible, words.Text)
 	onScreenClear(size[4])
 end
 check("… the chevron over the UPGRADES desk at the level-2 warehouse's back wall (shared/WarehouseLayout.luau terminal), its tag", marker.Enabled
@@ -796,8 +797,8 @@ check("the STOCK list opened (it shows the 🔥 tags): the market found, the rin
 coveredNow, windowNow = false, nil
 wait(G.SoftGap + 0.02)
 tick()
-check("… then another upgrade in reach: \"🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)\" (the desk again)", SandboxGuide.step() == "upgrade"
-	and words.Text == "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)" and shown() and at(desk2.x, desk2.z), words.Text)
+check("… then another upgrade in reach (8.3 economy: all three $1,500, the window's order first): \"💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)\" (the desk again)", SandboxGuide.step() == "upgrade"
+	and words.Text == "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)" and shown() and at(desk2.x, desk2.z), words.Text)
 local soft = G.SoftSeconds
 G.SoftSeconds = 1
 for _ = 1, math.ceil(1 / G.Every) + 1 do
@@ -808,7 +809,7 @@ G.SoftSeconds = soft
 -- the PAINT shop: your van parked at home (its 🎨 prompt's PaintPoint), nothing bought there yet
 chassis.Position = M.Vector3.new(plot.vanSpot.x, 3, plot.vanSpot.z)
 local paintPoint = make("Attachment", { Name = "PaintPoint", WorldPosition = M.Vector3.new(plot.vanSpot.x - 4.6, 4.6, plot.vanSpot.z + 4) }, chassis)
-M.remotes.VanPaint.OnClientEvent:Fire({ kind = "state", owned = {}, worn = { paint = "cream", livery = "zdc" }, money = 5200, paid = {} })
+M.remotes.VanPaint.OnClientEvent:Fire({ kind = "state", owned = {}, worn = { paint = "cream", livery = "zdc" }, money = growTo + 200, paid = {} })
 wait(G.SoftGap + 0.02)
 for _, size in SIZES do
 	screen(size[1], size[2], size[3])

@@ -65,14 +65,14 @@
 -- while something else talks (a first-time hint, shared/SandboxHints.luau busy; a soft step just ended: `hush`). The
 -- first that fits, in this order (SandboxSteps.Soft):
 --   grow     the warehouse's next level bought now and the stock fills the free stands (stock ≥ free, some pieces)
---            "Your warehouse is full: grow it at the UPGRADES desk ($1,500)"              the desk (its level's spot)
+--            "Your warehouse is full: grow it at the UPGRADES desk ($1,000)"              the desk (its level's spot)
 --   hot      a hot piece of today's market in the stock, none of the hot kinds sold today
 --            "🔥 Your Jukebox is hot today: sell it or show it"                           a free stand, else the 📦 chip
 --   upgrade  another upgrade the money buys now (the cheapest; the window's order breaks a tie; never a locked one:
 --            UpgradeRules.locked, More stands below the Big Warehouse)
---            "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)"            the desk
+--            "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)"     the desk
 --   paint    nothing bought at the PAINT shop yet, the van parked at home (its 🎨 prompt on), and a warehouse past the
---            Garage (UpgradeRules.warehouseLevel) or Config.SandboxGuide.PaintMoney ($1,000) in your pocket
+--            Garage (UpgradeRules.warehouseLevel) or Config.SandboxGuide.PaintMoney ($2,000) in your pocket
 --            "🎨 Make your van your own: E at its side opens the PAINT SHOP"              the van's 🎨 prompt
 -- (The collection book and the TASKS have their first-time hints, shared/SandboxHints.luau "book" and "tasks": no step
 -- here.) A soft step is done for the session by what the player did (its window opened while it fits, a level bought, a

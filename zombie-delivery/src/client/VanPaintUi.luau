@@ -381,7 +381,8 @@ local function act()
 	elseif row.owned then
 		ask = "wear"
 	elseif row.locked then
-		toast(`{row.name} unlocks with your {string.lower(row.lock)}.`)
+		local lock = string.lower(row.lock) -- (8.3 economy: "collection book: a legendary!" ends a sentence itself)
+		toast(`{row.name} unlocks with your {lock}{if string.find(lock, "[%.!?]$") then "" else "."}`)
 	elseif row.can then
 		ask = "buy"
 	else

@@ -271,14 +271,15 @@ do
 	local G = Config.SandboxGuide
 	local nothing: { [string]: boolean } = {}
 	local NONE = {} -- (a field given as NONE is left out: not known)
-	-- what makes every soft step fit: the warehouse full (4 waiting, 2 free), $1,600 at level 1, a hot Jukebox, the van
-	-- parked at home and nothing painted
+	-- what makes every soft step fit: the warehouse full (4 waiting, 2 free), $2,000 at level 1 (the next level $1,000;
+	-- 8.3 economy: every upgrade's first $1,500, PaintMoney $2,000), a hot Jukebox, the van parked at home and nothing
+	-- painted
 	local function rich(fields: { [string]: any }?): SandboxSteps.State
 		local s: { [string]: any } = {
 			stock = 4,
 			shown = 0,
 			freeStands = 2,
-			money = 1600,
+			money = 2000,
 			levels = {},
 			hot = "Jukebox",
 			hotCount = 1,
@@ -313,15 +314,18 @@ do
 		check(`{id}: soft only if one of the 8.3 steps`, def.soft == (table.find(SandboxSteps.Soft, id) ~= nil))
 	end
 	local step = chosen(rich())
-	check("the warehouse full, the next level affordable: \"Your warehouse is full: grow it at the UPGRADES desk ($1,500)\" (the desk)",
-		step.id == "grow" and SandboxSteps.words(step, rich()) == "Your warehouse is full: grow it at the UPGRADES desk ($1,500)" and step.target == "desk", show(step))
-	check("… its price the next level's (the ZDC Warehouse: level 2 costs $1,500)", SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0) and UpgradeRules.price("warehouse", 0) == 1500)
-	check("… at level 2 (the Workshop) the next one's ($5,000) when the money reaches it", SandboxSteps.growPrice(rich({ levels = { warehouse = 1 }, money = 5000 })) == 5000
-		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 1 }, money = 5000 })) == "Your warehouse is full: grow it at the UPGRADES desk ($5,000)")
-	check("… not short of the money", SandboxSteps.growPrice(rich({ money = 1499 })) == nil)
+	local wprices = Config.SandboxUpgrades.List.warehouse.prices -- (8.3: the ZDC Warehouse's level k + 1 costs prices[k])
+	local level2, level3 = wprices[1], wprices[2]
+	check(`the warehouse full, the next level affordable: "Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level2)})" (the desk)`,
+		step.id == "grow" and SandboxSteps.words(step, rich()) == `Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level2)})` and step.target == "desk", show(step))
+	check(`… its price the next level's (the ZDC Warehouse: level 2 costs {UpgradeRules.money(level2)})`, SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0)
+		and UpgradeRules.price("warehouse", 0) == level2 and level2 <= 2000)
+	check(`… at level 2 (the Workshop) the next one's ({UpgradeRules.money(level3)}) when the money reaches it`, SandboxSteps.growPrice(rich({ levels = { warehouse = 1 }, money = level3 })) == level3
+		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 1 }, money = level3 })) == `Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level3)})`)
+	check("… not short of the money", SandboxSteps.growPrice(rich({ money = level2 - 1 })) == nil)
 	check("… not at the top level", SandboxSteps.growPrice(rich({ levels = { warehouse = (UpgradeRules.def("warehouse") :: any).max }, money = 1e9 })) == nil)
-	check("… stock as many as the free stands: full", SandboxSteps.growPrice(rich({ stock = 2, freeStands = 2 })) == 1500)
-	check("… every stand taken, nothing waiting: full", SandboxSteps.growPrice(rich({ stock = 0, shown = 2, freeStands = 0 })) == 1500)
+	check("… stock as many as the free stands: full", SandboxSteps.growPrice(rich({ stock = 2, freeStands = 2 })) == level2)
+	check("… every stand taken, nothing waiting: full", SandboxSteps.growPrice(rich({ stock = 0, shown = 2, freeStands = 0 })) == level2)
 	check("… fewer waiting than free stands: not full", SandboxSteps.growPrice(rich({ stock = 1, freeStands = 2 })) == nil)
 	check("… nothing at all in the warehouse: not full", SandboxSteps.growPrice(rich({ stock = 0, shown = 0, freeStands = 2 })) == nil)
 	check("… the free stands, the levels or the money not known: nothing said", SandboxSteps.growPrice(rich({ freeStands = NONE })) == nil
@@ -333,11 +337,12 @@ do
 	check("… not without a hot piece in the stock", chosen(rich({ hot = NONE, hotCount = 0 }), { show = true, grow = true }).id ~= "hot")
 	step = chosen(rich(), { show = true, grow = true, hot = true })
 	local cheapest, price = SandboxSteps.upgradeFor(rich())
-	check("then another upgrade in reach (the cheapest: the van engine, $600): \"🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)\"",
-		step.id == "upgrade" and step.target == "desk" and cheapest == "engine" and price == 600
-		and SandboxSteps.words(step, rich()) == "🚐 New upgrade in reach: Van engine at the UPGRADES desk ($600)", SandboxSteps.words(step, rich()))
-	check("… the engine at its top: the next cheapest (Danny's training $600 before the lights' $750)", SandboxSteps.upgradeFor(rich({ levels = { engine = 3 } })) == "danny")
-	check("… $700: no lights ($750)", select(2, SandboxSteps.upgradeFor(rich({ money = 700, levels = { engine = 3, danny = 3 } }))) == nil)
+	check("then another upgrade in reach (the cheapest, 8.3 economy: all three $1,500, the window's order breaks the tie: the lights): \"💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)\"",
+		step.id == "upgrade" and step.target == "desk" and cheapest == "lights" and price == 1500
+		and SandboxSteps.words(step, rich()) == "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)", SandboxSteps.words(step, rich()))
+	check("… the lights at their top: the next in the window's order at the same price (the van engine)", SandboxSteps.upgradeFor(rich({ levels = { lights = 5 } })) == "engine")
+	check("… the lights' next level dearer ($4,000): the engine's $1,500 first", SandboxSteps.upgradeFor(rich({ money = 5000, levels = { lights = 1 } })) == "engine")
+	check("… $1,400: none ($1,500 each)", select(2, SandboxSteps.upgradeFor(rich({ money = 1400 }))) == nil)
 	check("… never the warehouse (grow's), nor a locked card (More stands below the Big Warehouse)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { lights = 5, engine = 3, danny = 3 } })) == nil)
 	check("… More stands once the warehouse is the Big Warehouse (level 4)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { warehouse = 3, lights = 5, engine = 3, danny = 3 } })) == "stands")
 	step = chosen(rich(), { show = true, grow = true, hot = true, upgrade = true })
@@ -427,9 +432,9 @@ do
 
 	-- the words' details (the client makes the words again only when they change)
 	local a, b = SandboxSteps.detail(Steps.grow, rich())
-	check("details: grow its price", a == nil and b == 1500)
+	check("details: grow its price", a == nil and b == level2)
 	a, b = SandboxSteps.detail(Steps.upgrade, rich())
-	check("… upgrade its id and price", a == "engine" and b == 600)
+	check("… upgrade its id and price", a == "lights" and b == 1500)
 	a, b = SandboxSteps.detail(Steps.hot, rich())
 	check("… hot the piece's name", a == "Jukebox" and b == nil)
 	a, b = SandboxSteps.detail(Steps.show, rich())
