@@ -140,7 +140,8 @@
 --     says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he waits at a two-person
 --     piece of his list), Moving.helperCallOff closes its open lift check when the call ends before the lift. A piece
 --     you pick up leaves his list (onPick: MoveHelper.taken). Without Danny hired (a crew of players, him for hire, him
---     down): today's rules.
+--     down): today's rules. 8.3 review: a crew mate's Lift on the piece somebody waits at with him is refused (who
+--     waits: MoveHelper.call's "busy"); the lift check his arrival opens, left unanswered, closes without a knock.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
@@ -1151,7 +1152,7 @@ end
 -- CarryGrip.speedFactor (steady while every player holding it hit their last check; × Miss.Slow while one of them
 -- staggers).
 local CarryGrip = require(Shared.CarryGrip)
-type GripOpen = { id: number, check: CarryGrip.Check, spot: number, help: boolean, opened: number }
+type GripOpen = { id: number, check: CarryGrip.Check, spot: number, help: boolean, opened: number, called: boolean? } -- (8.3 review: called, Moving.helperCalled's)
 type GripHold = {
 	session: number,
 	spot: number, -- the piece (its lift check's, then the carry's)
@@ -2198,7 +2199,9 @@ end
 -- RequestStreamAroundAsync, Stream s at most). FadeOut + Margin s after the fade out was sent (the screen black on the
 -- client by then, whatever the network's unevenness) everybody of the trip is moved in one moment (WalkIn.trip), and
 -- the fade in carries where you are and the way you face: the client holds the dark until it sees you there, its
--- camera behind you, then Dark s, then FadeIn s (client/Fade.luau).
+-- camera behind you, then Dark s, then FadeIn s (client/Fade.luau). (8.3 review: Stream stays 2, not 7.0's 4: the
+-- trip's worst case, FadeOut + Margin + Stream, must end before client/Fade.luau lifts an unanswered black by itself,
+-- HOLD 4 s after its FadeOut; a stream done sooner moves you sooner, the big house's rest streams in round you there.)
 
 local travel: (Player, CFrame, Session, boolean) -> ()
 
@@ -2644,8 +2647,9 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 	end
 	-- 8.3 Danny's orders (Config.MoveHelper.WaitForHelper): a two-person piece with Danny on the move calls him, you wait
 	-- at your end ("wait"; Lift again: "cancel"); once he is at its far end ("ready") its lift goes on. nil: today's rules
+	-- (8.3 review: "busy", a crew mate waits for him at it: refused, never lifted from under their call)
 	local answer = if not lifted and thing.class == "pair" then MoveHelper.call(s, player, spot) else nil
-	if answer == "wait" or answer == "cancel" then
+	if answer == "wait" or answer == "cancel" or answer == "busy" then
 		s.dirty = true
 		return
 	end
@@ -2718,10 +2722,15 @@ function Moving.helperLiftFrame(s: Session, spot: number, player: Player): CFram
 end
 
 -- He is in place: `player`'s lift now (its check opens; without the grip it is up, him at its far end). True when the
--- check is open or the piece is up.
+-- check is open or the piece is up. 8.3 review: that check opened by his arrival, not by a press (maybe half a minute
+-- after it), is marked `called`: unanswered it closes without a knock (Grip.tick), the next Lift opens a new one.
 function Moving.helperCalled(s: Session, spot: number, player: Player): boolean
 	onPick(s, spot, player)
 	local hold = Grip.holds[player]
+	local open = if hold then hold.open else nil
+	if hold and open and hold.spot == spot and open.check.what == "lift" then
+		open.called = true
+	end
 	return Rules.holding(s.move, player.UserId) == spot or (hold ~= nil and hold.open ~= nil and hold.spot == spot)
 end
 
@@ -3344,7 +3353,29 @@ local function cleanup(s: Session)
 			setParts(item.model, true, false, item.root)
 		end
 	end
-	task.delay(T.Fade + 0.5, function()
+	-- 8.3 review: the interior goes once the door trips are over: somebody of the crew on one now (those sent out just
+	-- above: travel moves them FadeOut + Margin s after the fade out, and up to Stream s later while the street streams
+	-- in), not before FadeOut + Margin + Stream + 0.5 s, and a moment more while one is still on it (a lagging server,
+	-- Stream s at most): never the floor gone under somebody in the dark. Nobody on a trip: T.Fade + 0.5 s, as ever.
+	local D = T.Doors
+	local function tripping(): boolean
+		for member in s.members do
+			if traveling[member] then
+				return true
+			end
+		end
+		for member in s.inside do
+			if traveling[member] then
+				return true
+			end
+		end
+		return false
+	end
+	task.delay(if tripping() then math.max(T.Fade, D.FadeOut + D.Margin + D.Stream) + 0.5 else T.Fade + 0.5, function()
+		local waited = 0
+		while tripping() and waited < D.Stream do
+			waited += math.max(task.wait(0.1), 0.1)
+		end
 		-- the interior first (server/HouseInterior.luau's own way), then the things that left it (carried, set down
 		-- outside, in the truck: unloaded at the Wall)
 		local interior = s.interior
@@ -4381,7 +4412,8 @@ end
 --   * Trust: an answer counts only for the sender's own open check (its id); "ok" is a hit only when CarryGrip.judge
 --     finds its press time true (Server.Lag / Ahead of the server's own clock of the check) with the needle in the zone;
 --     no answer by the window + Server.Grace is a miss (Grip.tick). Nothing while either end of the piece is on a door
---     trip (the check off, the clock waits). Danny never has a check.
+--     trip (the check off, the clock waits). Danny never has a check. 8.3 review: a lift check his arrival opened
+--     (Moving.helperCalled: no press of yours) and never answered closes without a knock (Grip.unheard).
 --   Moving.gripCheck(player)  a wobble check now on what `player` carries (tests; true when one opened)
 
 -- The check's outcome to its player (the client shows it; the piece's condition after it).
@@ -4400,6 +4432,17 @@ function Grip.close(player: Player, hold: GripHold)
 		if player.Parent then
 			remote:FireClient(player, "grip", "close", open.id)
 		end
+	end
+end
+
+-- 8.3 review: a lift check Danny's arrival opened (`called`: Moving.helperCalled), never answered (its time ran out, or
+-- a door's trip): closed without an outcome, no knock; the piece stays as it is, his call ready, and the next Lift
+-- opens a new check (`thing`: told so; nil: a door's trip, nothing said).
+function Grip.unheard(player: Player, hold: GripHold, thing: Rules.Thing?)
+	Grip.close(player, hold)
+	Grip.holds[player] = nil
+	if thing then
+		say(player, `{Config.MoveHelper.Name} waits at the other end of the {thing.name}: lift it when you're ready.`)
 	end
 end
 
@@ -4629,7 +4672,9 @@ function Grip.tick(s: Session, t: number)
 		local partner = if carrying then playerById(if role == "carrier" then thing.helper else thing.carrier) else nil
 		if traveling[player] or (partner and traveling[partner]) then
 			local open = hold.open
-			if open and open.check.what == "lift" then
+			if open and open.called then
+				Grip.unheard(player, hold, nil) -- (8.3 review: Danny's arrival opened it, not a press: no knock)
+			elseif open and open.check.what == "lift" then
 				Grip.settle(s, player, hold, false) -- (8.1 review: walked off mid-lift: its knock all the same)
 			else
 				hold.owed = hold.owed or open ~= nil -- (a wobble: it opens again on the other side)
@@ -4644,6 +4689,8 @@ function Grip.tick(s: Session, t: number)
 			if gone then
 				Grip.close(player, hold) -- (somebody else took it meanwhile)
 				Grip.holds[player] = nil
+			elseif t - open.opened > open.check.window + G.Server.Grace and open.called then
+				Grip.unheard(player, hold, thing) -- (8.3 review: Danny's arrival opened it: no answer, no knock)
 			elseif t - open.opened > open.check.window + G.Server.Grace then
 				Grip.settle(s, player, hold, false) -- (no answer: a miss)
 			end

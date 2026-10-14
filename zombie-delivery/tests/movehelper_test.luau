@@ -80,6 +80,8 @@ check("…not of the move's crew: refused first (crew)", assign({ crew = false, 
 check("…not this move's piece (another move's model): refused (piece)", assign({ mine = false }) == "piece")
 check("…not hired: hire him first (hire)", assign({ hired = false }) == "hire" and assign({ hired = false, queued = true }) == "hire")
 check("…too far to see it (ClickReach): refused (far)", assign({ near = false }) == "far")
+check("8.3 review: his card's reach (CardReach) at least a click's (ClickReach), a little slack past where it opened (CardSlack): a click on him from afar never opens a card that shuts at once",
+	H.CardReach >= H.ClickReach and H.CardSlack > 0)
 check("…in his arms already: (his)", assign({ his = true, state = "carried", held = true }) == "his")
 check("…in the van: (van); home or lost: (gone)", assign({ state = "truck" }) == "van" and assign({ state = "delivered" }) == "gone" and assign({ state = "lost" }) == "gone")
 check("…somebody holds it: (held)", assign({ state = "carried", held = true }) == "held" and assign({ held = true }) == "held")

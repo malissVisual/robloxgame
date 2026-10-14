@@ -640,6 +640,11 @@ Runtime.Vehicles = stub("Vehicles", {
 	callCar = function()
 		return "called"
 	end,
+	-- 8.3 review: the hook a passenger door's Ride along asks (server/Buddy.luau's: no buddy here; server/MoveHelper.luau
+	-- wraps it: Danny gets out for his crew; a test calls it as the door's prompt would)
+	yieldSeat = function(_seat: any, _player: any): boolean
+		return false
+	end,
 })
 
 Runtime.Zombies = stub("Zombies", {

@@ -7,11 +7,15 @@
 -- 8.3 Danny for hire (the owner: "I have to PAY for him when I want help … click on something, and that assigns it to
 -- him"): the strip is his STATUS LINE, two lines of words and one button (shared/MoveHelperBrain.luau's words; the
 -- player attributes MoveHelper "offer" | "hired", MoveHelperPrice, MoveHelperQueue, MoveHelperDoing):
---   * for hire: "🧑‍🔧 DANNY · FOR HIRE" over "Carries what you click · $170 this move", HIRE $170;
+--   * for hire: "🧑‍🔧 DANNY · FOR HIRE" over "Carries what you click · $170 this move" (8.3 review: in this device's
+--     words, client/PadGlyph.luau: "tap" on a touch screen, "give him" with a gamepad), HIRE $170;
 --   * hired: "🧑‍🔧 DANNY · 2 pieces to carry" over what he does, LIST;
 --   * you wait for him at a two-person piece (your player attribute MoveHelperCall = its name): orange, "⏳ WAITING FOR
 --     DANNY…" ("💪 ON THREE… LIFT!" once he is at its other end: MoveHelperReady, your lift check open), STOP (G on a
---     keyboard too): the Moving remote's ("helper", "stop"); the server decides.
+--     keyboard too): the Moving remote's ("helper", "stop"); the server decides. 8.3 review: how to stop it in this
+--     device's words: "G: stop" on a computer, "tap STOP" on a touch screen, with a gamepad the piece's own "Stop
+--     waiting" prompt ("X: stop", SandboxPad's "use") while he comes (nothing once he is there: its prompt is Lift
+--     again). Drawn again when the device changes.
 --   With his card (client/MoveHelperCard.luau calls MoveHelperHud.useCard: the sandbox) HIRE and LIST open the card (a
 --   tap on the line too): its HIRE spends the money, its CLEAR QUEUE empties his list. Without it (the city: client/
 --   Main.client.luau starts the card only in the sandbox) HIRE sends ("helper", "hire") itself and LIST is CLEAR
@@ -27,7 +31,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
+local SandboxPad = require(Shared.SandboxPad) -- 8.3 review: a gamepad button's word
 local Ui = require(script.Parent.Ui)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 review: the device used now
 local Theme = require(script.Parent.Theme)
 local MoveLayout = require(script.Parent.MoveLayout) -- 7.0 review
 local TopBlocks = require(script.Parent.TopBlocks) -- 7.0 review
@@ -220,6 +226,24 @@ local function paint(frame: Frame, title: string, doing: string, button: string,
 	status.action.TextColor3 = if alert then K.text elseif buttonLit then K.charcoal else K.text
 end
 
+-- 8.3 review: how you stop waiting for him, in this device's words (none: the line says only where you are).
+local function stopWords(ready: boolean): string
+	local device = PadGlyph.device()
+	if device == "keys" then
+		return " · G: stop"
+	elseif device == "touch" then
+		return " · tap STOP"
+	end
+	local word = if ready then nil else SandboxPad.keyWord("use", device) -- (the piece's "Stop waiting" prompt)
+	return if word then ` · {word}: stop` else ""
+end
+
+-- 8.3 review: what he carries for you, in this device's words.
+local function carriesWords(): string
+	local device = PadGlyph.device()
+	return if device == "touch" then "Carries what you tap" elseif device == "pad" then "Carries what you give him" else "Carries what you click"
+end
+
 local function refresh()
 	local state = player:GetAttribute("MoveHelper")
 	local on = type(state) == "string"
@@ -239,13 +263,13 @@ local function refresh()
 		-- you wait for him at your end of a two-person piece (then he is there: your lift): STOP (G) ends it
 		local ready = player:GetAttribute("MoveHelperReady") == true
 		paint(frame, if ready then "💪 ON THREE… LIFT!" else `⏳ WAITING FOR {name}…`,
-			if ready then `{Config.MoveHelper.Name} is at the other end of the {piece} · G: stop` else `Stay at your end of the {piece} · G: stop`, "STOP", true, false)
+			(if ready then `{Config.MoveHelper.Name} is at the other end of the {piece}` else `Stay at your end of the {piece}`) .. stopWords(ready), "STOP", true, false)
 	elseif hired() then
 		paint(frame, `🧑‍🔧 {name} · {Brain.queueText(player:GetAttribute("MoveHelperQueue"))}`, if type(doing) == "string" then doing else "",
 			if openCard then "LIST" else "CLEAR", false, false)
 	else
 		local price = Brain.money(priceNow())
-		paint(frame, `🧑‍🔧 {name} · FOR HIRE`, `Carries what you click · {price} this move`, `HIRE {price}`, false, true)
+		paint(frame, `🧑‍🔧 {name} · FOR HIRE`, `{carriesWords()} · {price} this move`, `HIRE {price}`, false, true)
 	end
 end
 
@@ -279,6 +303,7 @@ function MoveHelperHud.start()
 			remote:FireServer("helper", "stop")
 		end
 	end)
+	PadGlyph.watch(refresh) -- 8.3 review: a gamepad picked up or put down, the screen touched: the words again
 	refresh()
 end
 
