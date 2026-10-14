@@ -1033,7 +1033,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	end
 
 	-- the ceiling lights: one in the middle of every room, two in a long one, a warm glow (7.x alpine); a tube in the
-	-- garage.
+	-- garage
 	for _, room in plan.rooms do
 		if FARM_OWN[room.kind] then
 			continue -- 7.x the farm's barn: its lanterns are fixtures; the yard is open to the sky
