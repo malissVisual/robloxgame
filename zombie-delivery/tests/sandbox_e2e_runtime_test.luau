@@ -318,7 +318,7 @@ function H.launch(player: any)
 	E.fire(player, "Moving", "start", House.id)
 	E.fire(player, "MoveLobby", "launch")
 	E.advance(0.5)
-	E.fire(player, "Moving", "helper", "wait")
+	E.fire(player, "Moving", "helper", "van") -- (8.3: WAIT AT VAN, his command card's)
 end
 -- The van's middle along the roads: out of the plot, Depot Row, Main Street, round the turnaround to the curb, backed
 -- toward the chalet's door (its nose north).
@@ -619,9 +619,10 @@ do
 	S.annMove = view.id
 	check("…its drop-off is her plot's unload circle; no horde; the clock runs", view.drop == "your warehouse" and view.dropOff.x == plots[1].unload.x
 		and view.dropOff.z == plots[1].unload.z and view.hordeAt == nil and view.endsAt > E.now)
-	check("…Danny joins her crew of one", MoveHelper.find(ann) ~= nil)
-	E.fire(ann, "Moving", "helper", "wait")
-	check("…told to WAIT AT VAN (the DANNY buttons): he leaves her pieces to her", ann:GetAttribute("MoveHelper") == "wait", ann:GetAttribute("MoveHelper"))
+	check("…Danny joins her crew of one, on AUTO (8.3), his id for his command card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).mode == "auto"
+		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
+	E.fire(ann, "Moving", "helper", "van")
+	check("…told to WAIT AT VAN (8.3: his command card's order): he leaves her pieces to her", ann:GetAttribute("MoveHelper") == "van", ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	local bobCard = H.takeContract(bob, plots[2])
 	H.launch(bob)
