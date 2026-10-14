@@ -7315,4 +7315,135 @@ Config.SandboxLeaders = {
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
 }
 
+-- 8.3 SANDBOX, the light (the owner: "it is too bright: in the house I cannot see my own character, and walking into the
+-- warehouse is a flashbang"). Every light number of the sandbox, in one place. shared/SandboxLightRules.luau has the
+-- rules; tests/sandboxlight_test.luau and tests/sandboxlight_runtime_test.luau hold every light to Caps.
+--   Sky        the fixed alpine afternoon outside (server/SandboxWorld.luau lighting(), as SandboxScenery.Light): Clock
+--              (Lighting.ClockTime), Latitude, Brightness (the sun), Exposure (the base ExposureCompensation: the eyes
+--              add their place's), Ambient (the light indoors and in the shade: the house's and the hall's fill),
+--              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
+--              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
+--              the fog's), Decay, Density, Offset, Glare, Haze; Fog (FogStart, FogEnd: only without an Atmosphere); the
+--              grade SandboxGrade: Tint, Saturation, Contrast, Lift (its Brightness); Clouds; Sun (the sun's size, deg)
+--   Places     the eyes (client/SandboxLight.luau): each place's look, eased in whenever you walk into it ("outdoors",
+--              "house": the move's house inside, "warehouse": a plot's hall, "van": a Sprinter's walk-in bay):
+--                Exposure   added to Sky.Exposure (Lighting.ExposureCompensation, stops; Roblox takes -3 … 3)
+--                Bloom      the one BloomEffect: Intensity (0 … 1), Size (px, 0 … 56), Threshold (0.8 … 4: how bright a
+--                           pixel must be to glow; over 1.5 only the Neon and the sun's glints, never a white wall)
+--                Grade      the client's own ColorCorrection "SandboxEyes" over the server's SandboxGrade: Brightness,
+--                           Contrast, Saturation (-1 … 1; 0 is no change) and Tint (white is no change)
+--                Rays       the SunRays' Intensity (0 … 1; RaySpread its Spread); indoors none
+--   Ease       s: the eyes reach 95 % of a new place's look in this long (never at once: no flash at a door)
+--   Step       s: one easing step at most this long (a hitch never jumps the look)
+--   Every      s between two looks at where you are (the easing writes every frame only while it moves)
+--   LiteBloom  a phone's or a tablet's bloom: × this (client/DeviceBudget.luau lite)
+--   House      the house's inside (server/HouseInterior.luau): Lamp (each room's ceiling light, a PointLight: Brightness,
+--              Range, Color; a room longer than Long gets two), Porch (the daylight through the front door: a
+--              SurfaceLight's Brightness, Range, Color) and the Neon parts' colours: Glow (the ceiling lamps' discs),
+--              Tube (the garage's), Window / BathWindow (the panes' daylight), Daylight (the porch's wall of daylight)
+--   Warehouse  the hall (shared/WarehouseLayout.luau, server/WarehouseMesh.luau): Lamp (each of its hall lights, a
+--              PointLight), Glow (their Neon discs), MeshGlow (the owner's Blender lamps, the finish "glow")
+--   Van        the Sprinter's walk-in bay (server/Vehicles.luau): Bay (its ceiling light while a door stands open)
+--   Caps       what the tests hold the light to (the model: a light gives Brightness × (1 - (d / Range)²)² at d studs,
+--              shared/SandboxLightRules.luau falloff; a sunlit face outside gets about 1.5):
+--                Brightness / Range   one light at most
+--                RoomLoad / HallLoad  Σ Brightness × Range of a house room's lights / of a hall's at most
+--                Peak       the light at a face's height (HeadY over the floor) anywhere indoors, × 2^Exposure, at most
+--                           (8.2's house: 2.15, its hall 2.39, the van 1.28: brighter than the sunlit meadow)
+--                Floor      the least mean light on a room's or the hall's floor (not a cave either)
+--                NeonArea   studs²: a Neon face bigger than this (a lamp looking down, a pane into a room) must be dim:
+--                NeonLuma   its colour's luma (0 … 255) at most; a lamp's own small Neon (Glow, Tube, MeshGlow) GlowLuma
+--                WallLuma   a house wall's plaster at most (a warm off-white, never a white)
+--                Step       the most the exposure may change in one easing step (a 10 fps phone included)
+Config.SandboxLight = {
+	Sky = {
+		Clock = 15.4,
+		Latitude = 47,
+		Brightness = 1.8,
+		Exposure = 0,
+		Ambient = { 78, 72, 68 } :: { number },
+		Outdoor = { 114, 110, 104 } :: { number },
+		ShiftTop = { 56, 38, 16 } :: { number },
+		ShiftBottom = { 12, 10, 8 } :: { number },
+		Diffuse = 0.5,
+		Specular = 0.45,
+		Softness = 0.3,
+		Air = { 200, 204, 212 } :: { number },
+		Decay = { 132, 136, 150 } :: { number },
+		Density = 0.26,
+		Offset = 0.12,
+		Glare = 0.4,
+		Haze = 1.3,
+		Fog = { 1200, 4000 } :: { number },
+		Tint = { 255, 246, 232 } :: { number },
+		Saturation = 0.06,
+		Contrast = 0.12,
+		Lift = 0,
+		Clouds = { Cover = 0.42, Density = 0.45, Color = { 255, 250, 242 } :: { number } },
+		Sun = 12,
+	},
+	Places = {
+		outdoors = {
+			Exposure = 0,
+			Bloom = { Intensity = 0.3, Size = 20, Threshold = 1.5 },
+			Grade = { Brightness = 0, Contrast = 0, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0.04,
+		},
+		house = {
+			Exposure = 0.15,
+			Bloom = { Intensity = 0.2, Size = 14, Threshold = 1.9 },
+			Grade = { Brightness = 0.01, Contrast = -0.03, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0,
+		},
+		warehouse = {
+			Exposure = 0.15,
+			Bloom = { Intensity = 0.15, Size = 14, Threshold = 2.1 },
+			Grade = { Brightness = 0, Contrast = -0.02, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0,
+		},
+		van = {
+			Exposure = 0.05,
+			Bloom = { Intensity = 0.1, Size = 12, Threshold = 2.2 },
+			Grade = { Brightness = 0.01, Contrast = -0.03, Saturation = 0, Tint = { 255, 255, 255 } :: { number } },
+			Rays = 0,
+		},
+	},
+	RaySpread = 0.4,
+	Ease = 0.6,
+	Step = 0.1,
+	Every = 0.1,
+	LiteBloom = 0.6,
+	House = {
+		Lamp = { Brightness = 0.5, Range = 24, Long = 28, Color = { 255, 230, 196 } :: { number } },
+		Porch = { Brightness = 0.45, Range = 12, Color = { 255, 246, 230 } :: { number } },
+		Glow = { 220, 188, 148 } :: { number },
+		Tube = { 196, 206, 218 } :: { number },
+		Window = { 108, 134, 154 } :: { number },
+		BathWindow = { 146, 162, 172 } :: { number },
+		Daylight = { 168, 176, 172 } :: { number },
+	},
+	Warehouse = {
+		Lamp = { Brightness = 0.8, Range = 34, Color = { 255, 240, 220 } :: { number } },
+		Glow = { 226, 212, 186 } :: { number },
+		MeshGlow = { 232, 216, 188 } :: { number },
+	},
+	Van = {
+		Bay = { Brightness = 0.6, Range = 10, Color = { 255, 242, 220 } :: { number } },
+	},
+	Caps = {
+		Brightness = 1,
+		Range = 36,
+		RoomLoad = 26,
+		HallLoad = 170,
+		Peak = 1,
+		HeadY = 4.5,
+		Floor = 0.15,
+		NeonArea = 6,
+		NeonLuma = 180,
+		GlowLuma = 225,
+		WallLuma = 220,
+		Step = 0.08,
+	},
+}
+
 return Config
