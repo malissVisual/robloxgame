@@ -77,6 +77,8 @@ if Config.Sandbox.On then
 	end
 	local WarehouseUi = ownModule("WarehouseUi")
 	local UpgradeUi = ownModule("UpgradeUi")
+	local BookUi = ownModule("CollectionBookUi") -- (8.2: the collection book, a window like the others)
+	local windows = { WarehouseUi, UpgradeUi, BookUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -145,7 +147,7 @@ if Config.Sandbox.On then
 		end
 	end
 	-- One window at a time; ESC closes them all (the crew panel, the move's cards and list, the quick chat's ring, the
-	-- planning folds to its pill, the warehouse's picker, the UPGRADES window). `keep`: the sandbox window opening now
+	-- planning folds to its pill, the warehouse's picker, the UPGRADES window, the collection book). `keep`: the sandbox window opening now
 	-- (its onOpen runs once it counts as open, so it must not close itself).
 	local keep: any = nil
 	Hud.onCloseWindows = function()
@@ -153,14 +155,14 @@ if Config.Sandbox.On then
 		MoveLobbyUi.minimize()
 		MovingHud.closeAll()
 		QuickChat.close(false)
-		for _, module in { WarehouseUi, UpgradeUi } do
+		for _, module in windows do
 			if module ~= keep then
 				ownClose(module)
 			end
 		end
 	end
 	CrewPanel.onOpen = Hud.closeWindows
-	for _, module in { WarehouseUi, UpgradeUi } do -- (8.1 review: opening one closes the others)
+	for _, module in windows do -- (8.1 review: opening one closes the others)
 		if type(module) == "table" then
 			module.onOpen = function()
 				keep = module
@@ -171,7 +173,7 @@ if Config.Sandbox.On then
 	end
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi)
+			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	KeyHints.covered = function(): boolean
