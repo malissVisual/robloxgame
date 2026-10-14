@@ -588,8 +588,9 @@ do
 end
 
 -- 8.0 SANDBOX collectibles (HouseLayout.Collectibles, Config.Furniture.Collectibles) over 200 seeds: every house holds
--- Count of them (2-4), none twice, each in the room its catalogue entry names, never ★; a legendary one in about one
--- house of eight (one at most), every rarity and every collectible turning up somewhere, the commoner the oftener; none
+-- Count of them (8.3 economy: 1-2), none twice, each in the room its catalogue entry names, never ★; a legendary one at
+-- about Legendary's rate (one at most: 8.3 economy, one house in 25), every rarity turning up somewhere, the commoner the
+-- oftener, and every collectible (with the dice turned up a moment: 8.3 economy's 5 % epics may miss one in 200); none
 -- overlapping a piece or a solid fixture or standing in a doorway's way; every piece still gets out (HouseLayout.stuck on
 -- all of them, this test's own grid walk on a few with a big one); and the house's own pieces and its ★ are exactly
 -- those of the same house without any collectible (their own dice change nothing else).
@@ -677,16 +678,33 @@ do
 	local rate = legendary / SEEDS2
 	check(`the collectibles over {SEEDS2} seeds ({string.format("%.2f", total / SEEDS2)} a house): {C.Count[1]}-{C.Count[2]} each, none twice, in its own room, never ★`,
 		#bad == 0, table.concat(bad, "; "))
-	check(`a legendary one in {legendary} houses of {SEEDS2} ({string.format("%.3f", rate)}): about one in eight`, rate >= 0.07 and rate <= 0.2)
+	local spread = 3 * math.sqrt(C.Legendary * (1 - C.Legendary) / SEEDS2) + 0.01
+	check(`a legendary one in {legendary} houses of {SEEDS2} ({string.format("%.3f", rate)}): about Legendary's {C.Legendary} (8.3 economy: one in 25)`,
+		math.abs(rate - C.Legendary) <= spread and legendary > 0, spread)
 	local u, r, e, l = perRarity.uncommon or 0, perRarity.rare or 0, perRarity.epic or 0, perRarity.legendary or 0
 	check(`every rarity turns up, the commoner the oftener ({u} uncommon, {r} rare, {e} epic, {l} legendary)`, u > r and r > e and e > l and l > 0)
-	local never = {}
-	for _, id in FurnitureLooks.Collectibles do
-		if not perItem[id] then
-			table.insert(never, id)
+	-- (8.3 economy: 1-2 a house, 5 % of them epic: with the dice turned up a moment, Config read at each plan, the rest
+	-- turns up too: every collectible is one a house can hold)
+	local saved = { C.Count, C.Legendary, C.Odds }
+	C.Count, C.Legendary, C.Odds = { 5, 6 }, 0.5, { uncommon = 1, rare = 1, epic = 1 }
+	local boosted: { [string]: boolean } = {}
+	for seed = 1, 30 do
+		for _, s in HouseLayout.plan(seed, "house").spots do
+			if Items[s.item].rarity then
+				boosted[s.item] = true
+			end
 		end
 	end
-	check(`every collectible turns up in some house`, #never == 0, table.concat(never, ", "))
+	C.Count, C.Legendary, C.Odds = saved[1], saved[2], saved[3]
+	local never, missed = {}, {}
+	for _, id in FurnitureLooks.Collectibles do
+		if not perItem[id] and not boosted[id] then
+			table.insert(never, id)
+		elseif not perItem[id] then
+			table.insert(missed, id)
+		end
+	end
+	check(`every collectible turns up in some house ({#missed} only with the dice turned up: {table.concat(missed, ", ")})`, #never == 0 and #missed <= 4, table.concat(never, ", "))
 	check("no collectible overlaps a piece or a solid fixture or stands in a doorway's way", #overlaps == 0, table.concat(overlaps, "; "))
 	check(`every piece still gets out (HouseLayout.stuck, {SEEDS2} seeds)`, #stuckOnes == 0, table.concat(stuckOnes, "; "))
 	-- the same houses without any collectible: their own pieces where they were (colours, turns), the same ★; and the
@@ -733,6 +751,60 @@ do
 	check("the house's own pieces and ★ are those of the same house without its collectibles", #changed == 0, table.concat(changed, ", "))
 	check(`the grid walk: nothing stuck by the collectibles ({#walkSeeds} houses with a big one: {table.concat(walkSeeds, ", ")})`, #walkSeeds >= 4
 		and #walkBad == 0, table.concat(walkBad, "; "))
+
+	-- 8.3 economy: HouseLayout.plan(seed, kind, found): a house that rolls a legendary tries the ones not in the move
+	-- owner's collection book first; an empty book, or one with every legendary, changes nothing (the same plan)
+	local function legendaryOf(plan: any): string?
+		for _, s in plan.spots do
+			if Items[s.item].rarity == "legendary" then
+				return s.item
+			end
+		end
+		return nil
+	end
+	local function sameSpots(a: any, b: any): boolean
+		if #a.spots ~= #b.spots then
+			return false
+		end
+		for index, s in a.spots do
+			local t = b.spots[index]
+			if s.item ~= t.item or s.room ~= t.room or (s.at.Position - t.at.Position).Magnitude > 1e-6 or s.variant ~= t.variant then
+				return false
+			end
+		end
+		return true
+	end
+	local allLegendary: { [string]: any } = {}
+	for _, id in FurnitureLooks.Collectibles do
+		if Items[id].rarity == "legendary" then
+			allLegendary[id] = { n = 1, best = 1 }
+		end
+	end
+	local tried, other, same = 0, 0, 0
+	local biasBad = {}
+	for seed = 1, SEEDS2 do
+		local was = legendaryOf(plans[seed])
+		if not was or tried >= 4 then
+			continue
+		end
+		tried += 1
+		if sameSpots(HouseLayout.plan(seed, "house", {}), plans[seed]) and sameSpots(HouseLayout.plan(seed, "house", allLegendary), plans[seed]) then
+			same += 1
+		end
+		local book = { [was :: string] = { n = 1, best = 1 }, sofa = { n = 3, best = 0.9 } }
+		local now = legendaryOf(HouseLayout.plan(seed, "house", book))
+		if now and now ~= was and not book[now] then
+			other += 1
+		else
+			table.insert(biasBad, `seed {seed}: {was} → {tostring(now)}`)
+		end
+		local again = HouseLayout.plan(seed, "house", book)
+		if legendaryOf(again) ~= now then
+			table.insert(biasBad, `seed {seed}: not the same twice`)
+		end
+	end
+	check(`8.3 economy: an empty book or one with every legendary: the same plan ({same} of {tried} houses with a legendary)`, tried >= 3 and same == tried)
+	check(`… the book holds the house's legendary: it gets another one, not in the book, the same every time ({other} of {tried})`, other == tried and #biasBad == 0, table.concat(biasBad, "; "))
 end
 
 local function count(t: { [any]: boolean }): number

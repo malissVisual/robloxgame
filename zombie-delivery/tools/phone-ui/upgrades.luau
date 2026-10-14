@@ -254,7 +254,7 @@ end
 check("… its level's segments: two lit of five (the Garage, the start, lit from the first)", lit == 2 and named(stands, "Level6") == nil)
 check("Showroom lights at its top: a gold MAX, \"Top level\", no price, no BUY", named(lights, "Max") ~= nil and named(lights, "Max").Text == "MAX" and named(lights, "Buy") == nil
 	and named(lights, "Price") == nil and named(lights, "Next").Text == "Top level" and named(lights, "Now").Text == "Income ×1.61")
-check("Van engine at 0: $600 in money green, a green BUY", named(engine, "Price").Text == "$600" and named(engine, "Price").TextColor3 == require("./CardKit").Color.money
+check("Van engine at 0: $1,500 in money green (8.3 economy), a green BUY", named(engine, "Price").Text == UpgradeRules.money(Config.SandboxUpgrades.List.engine.prices[1]) and named(engine, "Price").Text == "$1,500" and named(engine, "Price").TextColor3 == require("./CardKit").Color.money
 	and named(engine, "Buy").Text == "BUY" and named(engine, "Next").Text == "Next: Top speed +5%")
 check("the subtitle: your money", string.find(named(window, "Subtitle").Text, "$2,000", 1, true) ~= nil, named(window, "Subtitle").Text)
 scene("upgrades-phone")
@@ -278,7 +278,7 @@ check("8.3: the warehouse's \"bought\": \"🏗 Your warehouse grew: Workshop (4 
 remote.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 2, lights = 5, engine = 1 }, money = 1400 })
 M.flush()
 engine = cards()[3]
-check("the new state: drawn again (the engine LV 1/3, its next level $1,800, NEED $400)", named(engine, "Level").Text == "LV 1/3" and named(engine, "Price").Text == "$1,800" and named(engine, "Buy").Text == "NEED $400", named(engine, "Buy").Text)
+check("the new state: drawn again (the engine LV 1/3, its next level $5,000, NEED $3,600: 8.3 economy)", named(engine, "Level").Text == "LV 1/3" and named(engine, "Price").Text == "$5,000" and named(engine, "Buy").Text == "NEED $3,600", named(engine, "Buy").Text)
 local same = named(gui, "Upgrades")
 remote.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 2, lights = 5, engine = 1 }, money = 1400 })
 M.flush()

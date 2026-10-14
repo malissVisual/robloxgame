@@ -15,6 +15,9 @@
 --   end (+X, mirrored or not; its doorway doors[n] with rooms { "corridor", "outside" }), so its plan has `exits` as a
 --   farm's (exits[1] the front door, exits[2] the back door). Every piece gets out by either door (its layout checks
 --   both). A house's plan is the same as before the big house (its dice untouched).
+--   8.3 economy: HouseLayout.plan(seed, kind, found), `found` the move owner's collection book ({ [item] = anything },
+--   optional): a house that rolls a legendary collectible tries the legendaries not in it first (the same seed, kind
+--   and book give the same plan; without `found` the plan is as before). A farm ignores it.
 --   8.3: HouseLayout.Collectibles is the whole pool a house's collectibles come from: its own entries, then any other
 --   piece of FurnitureLooks.Collectibles (a new one joins on its own, at a wall in the room its catalogue entry names,
 --   when the house has that room). HouseLayout.BigRecipes: the big house's rooms' recipes (its own and the house's).
@@ -23,7 +26,7 @@
 --   HouseLayout.Recipes            what each room holds: its pieces, how each is placed, the musts and the ★ ones
 --   HouseLayout.Collectibles       8.0: how each collectible (FurnitureLooks.Collectibles, a piece with a rarity) is
 --                                  placed in its room; a house holds Config.Furniture.Collectibles.Count of them besides
---                                  its Spots (their own dice, never ★; a legendary one in about one house of eight)
+--                                  its Spots (their own dice, never ★; a legendary one in about one house in 25)
 --   HouseLayout.extent(id, turn)   a piece's footprint (X, Z) turned by `turn` degrees (a multiple of 90)
 --   HouseLayout.stuck(plan)        the spots whose piece cannot be carried out of the front door (empty for every plan
 --                                  it makes: it checks this while it lays the pieces out)
@@ -591,6 +594,7 @@ type Shape = {
 	collectibles: { number },
 	legendary: number,
 	backDoor: number?,
+	found: { [string]: any }?, -- 8.3 economy: the move owner's book (HouseLayout.plan's `found`)
 }
 local BIG_CONFIG = (T :: any).Big
 local SHAPES: { [string]: Shape } = {
@@ -656,6 +660,20 @@ local function span(inner: Rect, side: string): (number, number)
 		return inner.x0, inner.x1
 	end
 	return inner.z0, inner.z1
+end
+
+-- 8.3 economy: a shuffled list of collectibles with the ones not in `found` first (each part in its shuffled order).
+local function unfoundFirst(list: { Entry }, found: { [string]: any }?): { Entry }
+	if not found then
+		return list
+	end
+	local fresh: { Entry } = {}
+	local seen: { Entry } = {}
+	for _, e in list do
+		table.insert(if found[e.item] then seen else fresh, e)
+	end
+	table.move(seen, 1, #seen, #fresh + 1, fresh)
+	return fresh
 end
 
 local function planHouse(seed: number, shape: Shape): Plan
@@ -1402,7 +1420,7 @@ local function planHouse(seed: number, shape: Shape): Plan
 	end
 
 	-- 8.0 collectibles: Collectibles.Count of the rare pieces, after the house's own pieces and its ★ (those stay as they
-	-- were; a collectible is never ★), on their own dice: a legendary one in about one house of eight (Legendary), the
+	-- were; a collectible is never ★), on their own dice: a legendary one in about one house of 25 (Legendary), the
 	-- others' rarities by their Odds; each in its own room, none twice. A piece that finds no place there (or whose
 	-- place would keep a piece from getting out) gives way to another of its rarity, else of the rarity below. (8.3: the
 	-- big house's count and legendary chance its own; drawn from HouseLayout.Collectibles, only pieces of a room the house
@@ -1446,7 +1464,7 @@ local function planHouse(seed: number, shape: Shape): Plan
 				end
 			end
 			shuffle(list, dice)
-			byRarity[rarity] = list
+			byRarity[rarity] = if rarity == "legendary" then unfoundFirst(list, shape.found) else list -- (8.3 economy)
 		end
 		local tried: { [string]: boolean } = {}
 		local count = 0
@@ -1736,9 +1754,11 @@ local function planHouse(seed: number, shape: Shape): Plan
 	}
 end
 
--- A shape with its numbers read from Config now (not when this module loaded: a test may change them a moment).
-local function live(shape: Shape): Shape
+-- A shape with its numbers read from Config now (not when this module loaded: a test may change them a moment); 8.3
+-- economy: the move owner's book (`found`).
+local function live(shape: Shape, found: { [string]: any }?): Shape
 	local made = table.clone(shape)
+	made.found = found
 	if shape.kind == "big" then
 		local L = (T :: any).Big
 		made.front, made.kitchen, made.backDoor = L.Front, L.Kitchen, L.BackDoor
@@ -1751,20 +1771,22 @@ local function live(shape: Shape): Shape
 	return made
 end
 
-local KINDS: { [string]: (number) -> Plan } = {
-	house = function(seed: number): Plan
-		return planHouse(seed, live(SHAPES.house))
+local KINDS: { [string]: (number, { [string]: any }?) -> Plan } = {
+	house = function(seed: number, found: { [string]: any }?): Plan
+		return planHouse(seed, live(SHAPES.house, found))
 	end,
-	farm = Farm.plan,
-	big = function(seed: number): Plan -- 8.3: the sandbox's big house
-		return planHouse(seed, live(SHAPES.big))
+	farm = function(seed: number): Plan
+		return Farm.plan(seed)
+	end,
+	big = function(seed: number, found: { [string]: any }?): Plan -- 8.3: the sandbox's big house
+		return planHouse(seed, live(SHAPES.big, found))
 	end,
 }
 HouseLayout.Kinds = { "house", "farm", "big" }
 
-function HouseLayout.plan(seed: number, kind: string): Plan
+function HouseLayout.plan(seed: number, kind: string, found: { [string]: any }?): Plan
 	local make = KINDS[kind] or KINDS.house
-	return make(seed)
+	return make(seed, if type(found) == "table" then found else nil)
 end
 
 -- 7.x farm move (server/Moving.luau): a plan's ways out, in order: its exits (a farm's: the front door, the barn doors),

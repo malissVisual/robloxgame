@@ -42,6 +42,9 @@
 --                                              cold kinds, their own demand; nil: no save yet)
 --   Collection.marketIncome(item)              8.3: today's × on the income of a piece of that kind (Market.incomeFactor:
 --                                              the stands' $/min tags, server/Warehouse.luau)
+--   Collection.active(player)                  8.3 economy: the player did something now (their stands pay in full
+--                                              again; the remotes and the walking below call it by themselves)
+--   Collection.idle(player)                    8.3 economy: the share their stands pay now (1: active; IdleShare: idle)
 --   Collection.tick()                          pays everybody here what their stands earned since the last payout (the
 --                                              loop runs it every Config.Collection.Tick s)
 --   Collection.start()                         the remote, joining and leaving, the payout loop
@@ -49,8 +52,8 @@
 -- The "Collection" remote (Config.Robust.Limits.Collection requests a second; every input checked):
 --   client → server   { kind = "display", uid, stand } | { kind = "undisplay", uid } | { kind = "sell", uid } |
 --                     { kind = "state" }; a refusal comes back as a Notice (its why)
---   server → client   { kind = "state", stock = { View }, income, stands, market } after every change (once a frame),
---                     when the save has loaded and when asked (a View is an Entry with rarity, value, income, price,
+--   server → client   { kind = "state", stock = { View }, income, stands, market, idle? (8.3 economy) } after every
+--                     change (once a frame), when the save has loaded and when asked (a View is an Entry with rarity, value, income, price,
 --                     broken, 8.3 base and market: CollectionRules.view; market the player's Market View); { kind =
 --                     "pick", stand } opens the picker; { kind = "sold", name, money }
 -- 8.3, the market (shared/Market.luau, Config.Market): every price and the stands' income are the market's. Today's hot
@@ -65,6 +68,16 @@
 -- earned up to that moment is counted; every Tick s the whole dollars are paid ("CollectionIncome"), the cents wait for
 -- the next payout; leaving pays what was counted. A sale pays "CollectionSale". Analytics (PlayerData.track):
 -- CollectionAdded (once a frame: how many came home, the rarest), CollectionDisplayed, CollectionSold.
+-- 8.3 economy, AFK (the owner: the money should take long to save up, not come by itself): the stands pay in full while
+-- their owner plays; after Config.Collection.IdleAfter s without activity only IdleShare of it (0: nothing), counted
+-- exactly (the idle stretch of a payout at the share, the rest in full). Activity is what the server sees, one clock a
+-- player (Meter.active): the character's root moved IdleMove studs or more over the ground since the last such move
+-- (looked at every payout: walking, a van driven; a jump is none), or a call of one of Config.Collection.IdleRemotes
+-- (the Collection, Moving, Upgrades, SandboxTasks, Visitors and VanPaint remotes; a bare "state" ask does not count:
+-- the clients send those by themselves).
+-- The state's `idle` (the share, only while idle) puts "· idle" on the HUD's income line; the state goes out again when
+-- the player goes idle and when they come back. Roblox kicks an idle player after about 20 minutes, but anti-idle
+-- macros exist: a jump in place or a key pressed now and then does not count.
 -- 8.2, the STOCK list's bulk buttons (client/WarehouseUi.luau; which pieces: shared/StockPlan.luau, the rules the window
 -- shows before it asks). Only through the remote, each also under Config.Robust.Limits.CollectionBulk, each one change
 -- (one state push, one listener call, one analytics event, one payment):
@@ -124,8 +137,9 @@ export type Paid = { hot: number } -- 8.3: Collection.onPaid's last argument
 local paidTo: { (Player, string, number, Paid) -> () } = {} -- 8.2: Collection.onPaid's fns
 
 -- The income counted for each player here: up to `at` (os.clock), `carry` $ not paid yet (8.3: `hot` of it earned by
--- the hot kinds).
-type Meter = { at: number, carry: number, hot: number }
+-- the hot kinds). 8.3 economy, AFK: `active` the os.clock of their last activity, `idle` whether their state says they
+-- are idle, `pos` where their root was at the last move that counted.
+type Meter = { at: number, carry: number, hot: number, active: number, idle: boolean, pos: Vector3? }
 local meters: { [Player]: Meter } = {}
 local pushing: { [Player]: boolean } = {} -- a state push waits for the frame's end
 type Batch = { n: number, rarity: string }
@@ -223,8 +237,19 @@ local function settle(player: Player)
 	local seconds = math.clamp(now - meter.at, 0, Config.Collection.Tick * 6) -- (a stalled server pays no hours)
 	meter.at = now
 	local total, hot = rate(player, collection)
-	meter.carry += total * seconds / 60
-	meter.hot += hot * seconds / 60
+	-- 8.3 economy, AFK: the stretch of it past IdleAfter without activity counts at IdleShare
+	local C = Config.Collection
+	local idle = math.clamp(now - (meter.active + C.IdleAfter), 0, seconds)
+	local counted = seconds - idle + idle * math.clamp(C.IdleShare, 0, 1)
+	meter.carry += total * counted / 60
+	meter.hot += hot * counted / 60
+end
+
+-- 8.3 economy, AFK: the share `player`'s stands pay now (1: active; Config.Collection.IdleShare: idle).
+local function shareOf(player: Player): number
+	local meter = meters[player]
+	local C = Config.Collection
+	return if meter and os.clock() - meter.active >= C.IdleAfter then math.clamp(C.IdleShare, 0, 1) else 1
 end
 
 -- Pays the whole dollars counted (the cents stay for the next payout).
@@ -261,7 +286,12 @@ local function sendState(player: Player)
 	if wait ~= nil then
 		marketDue[player] = os.time() + math.max(1, math.ceil(wait)) -- (8.3: a step of the demand back: the state again)
 	end
-	remote:FireClient(player, { kind = "state", stock = stock, income = cents((rate(player, collection))), stands = standsOf(player), market = market })
+	local share = shareOf(player)
+	local meter = meters[player]
+	if meter then
+		meter.idle = share < 1
+	end
+	remote:FireClient(player, { kind = "state", stock = stock, income = cents((rate(player, collection))), stands = standsOf(player), market = market, idle = if share < 1 then share else nil })
 end
 
 -- The state goes out once at the frame's end, however many changes it had (a van unloaded: one push).
@@ -538,6 +568,27 @@ function Collection.openPicker(player: Player, stand: number)
 	remote:FireClient(player, { kind = "pick", stand = stand })
 end
 
+-- 8.3 economy, AFK: `player` did something now. Back from idle: what the stands earned while idle is counted at the
+-- idle share first, then they pay in full again and the state goes out (the HUD's "· idle" goes).
+function Collection.active(player: Player)
+	local meter = meters[player]
+	if not meter then
+		return
+	end
+	local now = os.clock()
+	if now - meter.active >= Config.Collection.IdleAfter then
+		settle(player)
+	end
+	meter.active = now
+	if meter.idle then
+		pushState(player)
+	end
+end
+
+function Collection.idle(player: Player): number
+	return shareOf(player)
+end
+
 function Collection.onChanged(fn: (Player) -> ())
 	table.insert(listeners, fn)
 end
@@ -557,8 +608,26 @@ function Collection.tick()
 	end
 	for _, player in here do
 		if player.Parent then
+			-- 8.3 economy, AFK: the root moved IdleMove studs since the last move that counted (walking, a van driven)
+			local meter = meters[player]
+			local character = player.Character
+			local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+			if meter and root and root:IsA("BasePart") then
+				local at = (root :: BasePart).Position
+				local from = meter.pos or at
+				local dx, dz = at.X - from.X, at.Z - from.Z
+				if meter.pos == nil then
+					meter.pos = at
+				elseif dx * dx + dz * dz >= Config.Collection.IdleMove ^ 2 then -- (over the ground: a jump is none)
+					meter.pos = at
+					Collection.active(player)
+				end
+			end
 			settle(player)
 			payout(player)
+			if meter and not meter.idle and shareOf(player) < 1 then
+				pushState(player) -- (8.3 economy: idle now: the HUD's "· idle")
+			end
 		end
 	end
 	-- 8.3: the market's day turns (after the stands were counted at the old day's rates): every state again; a step of
@@ -771,7 +840,7 @@ local function joined(player: Player)
 	if not collection then
 		return
 	end
-	meters[player] = { at = os.clock(), carry = 0, hot = 0 }
+	meters[player] = { at = os.clock(), carry = 0, hot = 0, active = os.clock(), idle = false, pos = nil }
 	Rules.fitStands(collection, standsOf(player))
 	changed(player)
 end
@@ -827,8 +896,24 @@ local function onRemote(player: Player, message: any)
 	end
 end
 
+-- 8.3 economy, AFK: a call of one of the remotes counts as activity (not a bare "state" ask: the clients send those by
+-- themselves: ("state") or { kind = "state" }).
+local function onActivity(player: Player, first: any)
+	if first ~= "state" and not (type(first) == "table" and first.kind == "state") then
+		Collection.active(player)
+	end
+end
+
 function Collection.start()
 	remote.OnServerEvent:Connect(onRemote)
+	for _, name in Config.Collection.IdleRemotes do
+		task.spawn(function()
+			local ok, other = pcall(Net.get, name)
+			if ok and other then
+				other.OnServerEvent:Connect(onActivity)
+			end
+		end)
+	end
 	PlayerData.Changed:Connect(joined)
 	for _, player in Players:GetPlayers() do
 		joined(player)

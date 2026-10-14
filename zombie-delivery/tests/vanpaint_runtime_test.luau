@@ -199,7 +199,7 @@ E.advance(1)
 mark = #E.sent
 E.fire(A, "VanPaint", { kind = "buy", id = "gold" })
 check("Collector gold without the collection book's milestone: refused, says what unlocks it", profileA.vanPaint.owned.gold == nil and profileA.money == 50000
-	and string.find(lastNotice(A, mark), "Found every collectible", 1, true) ~= nil, lastNotice(A, mark))
+	and string.find(lastNotice(A, mark), "A legendary!", 1, true) ~= nil, lastNotice(A, mark))
 E.advance(1)
 mark = #E.sent
 E.fire(A, "VanPaint", { kind = "buy", id = "red" })
@@ -270,21 +270,32 @@ check("the ZDC classic again: the red band, no roof stripes, StripeColor gone", 
 E.advance(1)
 E.fire(A, "VanPaint", { kind = "wear", id = "racing" })
 
--- ── The premium: Collector gold, the collection book's milestone ─────────
+-- ── The premium: Collector gold, the collection book's milestone (8.3 economy: "A legendary!") ─────────
 E.advance(2)
 mark = #E.sent
-profileA.collectionBookPaid.collectibles = true -- (server/CollectionBook.luau pays it: the money moves, PlayerData.Changed fires)
-PlayerData.addMoney(A, 2500, "BookMilestone", "collectibles")
+local goldPrice, legendaryReward = 0, 0
+for _, item in Config.VanPaint.Paints do
+	if item.id == "gold" then
+		goldPrice = item.price
+	end
+end
+for _, milestone in Config.CollectionBook.Milestones do
+	if milestone.id == "legendary" then
+		legendaryReward = milestone.reward
+	end
+end
+profileA.collectionBookPaid.legendary = true -- (server/CollectionBook.luau pays it: the money moves, PlayerData.Changed fires)
+PlayerData.addMoney(A, legendaryReward, "BookMilestone", "legendary")
 E.flush()
 local after = kinds(E.received(A, "VanPaint", mark), "state")
-check("the book paid \"Found every collectible\": a state with the paid milestone (the window's lock opens)", #after == 1 and table.find(after[1].paid, "collectibles") ~= nil, #after)
+check("the book paid \"A legendary!\": a state with the paid milestone (the window's lock opens)", #after == 1 and table.find(after[1].paid, "legendary") ~= nil, #after)
 mark = #E.sent
 PlayerData.addMoney(A, 10, "Admin")
 E.flush()
 check("… the money moving again alone sends no state", #kinds(E.received(A, "VanPaint", mark), "state") == 0)
 E.advance(1)
 E.fire(A, "VanPaint", { kind = "buy", id = "gold" })
-check("Collector gold bought ($2,500) and worn: Metal", profileA.vanPaint.owned.gold == true and profileA.money == 48500 + 10 and profileA.vanPaint.worn.paint == "gold"
+check(`Collector gold bought ({goldPrice}) and worn: Metal`, profileA.vanPaint.owned.gold == true and profileA.money == 48500 + legendaryReward + 10 - goldPrice and profileA.vanPaint.worn.paint == "gold"
 	and find(model, "CargoSide").Material == "Metal" and model:GetAttribute("PaintMaterial") == "Metal", profileA.money)
 
 -- ── The owner's Blender look ───────────────────────────────────────────────

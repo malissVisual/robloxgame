@@ -10,7 +10,8 @@
 --     remote's table, SandboxHud.setState from client/Main.client.luau, as the old HUD gets it), the player list's
 --     leaderstats Money until then (boot-client hides the old money line, its level and XP in the sandbox)
 --   * "+$X/min" in green under it while pieces are on show (the "Collection" remote's state: income; WarehouseUi.rate:
---     a tenth under $10, "+$0.4/min")
+--     a tenth under $10, "+$0.4/min"); 8.3 economy: idle (the state's `idle`, server/Collection.luau's AFK share) what
+--     they pay then, greyed, "+$2.5/min · idle"
 --   * the chip "📦 N in stock" (the pieces not on show): a tap, or the key Config.SandboxHud.StockKey (B), opens the
 --     STOCK list (client/WarehouseUi.luau; the key again closes it)
 --   * 8.2: the chip "📖 BOOK" beside it (when client/CollectionBookUi.luau is there): a tap opens and closes the
@@ -68,6 +69,7 @@ local parts: { [string]: any } = {}
 local hudToast: ((string) -> ())? = nil
 local money = 0
 local income = 0
+local idleShare: number? = nil -- 8.3 economy: the state's `idle` (nil: active)
 local inStock = 0
 local stockKey: Enum.KeyCode? = nil
 local arrangeQueued = false
@@ -120,7 +122,7 @@ local function arrange()
 	-- the money card: the money (as wide as its target) over "+$X/min"
 	local moneyText = Ui.money(money)
 	local moneyW = CardKit.width(moneyText, HUD.MoneySize, Theme.DisplayFont)
-	local incomeText = WarehouseUi.rate(income)
+	local incomeText = if idleShare then `{WarehouseUi.rate(income * idleShare)} · idle` else WarehouseUi.rate(income)
 	local incomeW = if income > 0 then CardKit.width(incomeText, HUD.IncomeSize, Theme.HeadingFont) else 0
 	local cardW = math.ceil(math.max(moneyW, incomeW, 90)) + 2 * PAD_X
 	local moneyH = HUD.MoneySize + 4
@@ -129,6 +131,7 @@ local function arrange()
 	parts.money.Size = UDim2.fromOffset(cardW - 2 * PAD_X, moneyH)
 	parts.income.Visible = income > 0
 	parts.income.Text = incomeText
+	parts.income.TextColor3 = if idleShare then K.secondary else K.good
 	parts.income.Size = UDim2.fromOffset(cardW - 2 * PAD_X, HUD.IncomeSize + 4)
 	-- the chip: "📦 N in stock" (and its key on a computer, 8.3: the D-pad's glyph with a gamepad), a finger's size on a
 	-- touch screen
@@ -430,6 +433,7 @@ local function onState(state: WarehouseUi.State, previous: WarehouseUi.State?)
 		tellMarket()
 	end
 	income = state.income
+	idleShare = state.idle
 	local count = 0
 	for _, entry in state.stock do
 		if not entry.stand then
