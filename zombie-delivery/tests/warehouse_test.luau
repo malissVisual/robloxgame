@@ -261,7 +261,8 @@ for n, def in LEVELS do
 			if p.light then
 				lamps += 1
 				-- (8.3 review, the owner's "flashbang": the lights' brightness and reach are Config's, nothing brighter)
-				lampsOk = lampsOk and p.light.brightness == T.Lamp.Brightness and p.light.range == T.Lamp.Range and p.light.color == T.Lamp.Color
+				local lit = Config.SandboxLight.Warehouse -- (the lighting's numbers, Config.SandboxLight: this level's)
+				lampsOk = lampsOk and p.light.brightness == lit.Levels[n].Brightness and p.light.range == lit.Levels[n].Range and p.light.color == lit.Lamp.Color
 			end
 			if p.material == "Neon" then
 				neon += 1

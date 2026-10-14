@@ -135,7 +135,7 @@ local INK = { 26, 27, 29 }
 local PODIUM = { 50, 53, 58 }
 local FELT = { 202, 196, 184 }
 local PAINT = { 242, 198, 42 }
-local GLOW = { 255, 244, 224 }
+local GLOW = Config.SandboxLight.Warehouse.Glow -- 8.3: the lamps' discs (Config.SandboxLight)
 
 -- 8.3: each level's looks, mirroring design/blender-warehouse/warehouse.py (depths: studs in from the front wall's
 -- outer face; x across from the door's middle):
@@ -143,7 +143,8 @@ local GLOW = { 255, 244, 224 }
 --   warehouse.py's), posts (their posts along the side walls), lamps ({ x, depth }: under warehouse.py's lights; 8.3
 --   review, the owner's "flashbang": about one a level 4's floor per lamp, 800 square studs, so a bigger hall is no
 --   brighter: the Garage 1, the Workshop 2, the Warehouse 4, the Big warehouse 6, the Logistics centre 12; their
---   brightness and reach are Config's, Config.Warehouse.Lamp),
+--   colour is Config.SandboxLight.Warehouse.Lamp's, their brightness and reach its Levels' (a lower hall's dimmer and
+--   shorter), their discs' Glow; tests/sandboxlight_test.luau measures every level's hall),
 --   lampTop (a lamp's top: warehouse.py's light's underside), owner / board / sign ({ width, height, x, y } of the
 --   owner's sign, the STOCK board, the UPGRADES sign; the last two on the back wall's middle), zdc ({ width, height, y }:
 --   the ZDC sign in the front gable, the garage's plate over its door), bollards (warehouse.py's posts by the door)
@@ -760,12 +761,15 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot, level: any): { Piece }
 		end
 	end
 	local wide = if roofKind == "shed" then 2.2 else 3.2 -- (a lamp's housing across)
+	-- (8.3: the lamps' light is Config.SandboxLight's: its Lamp's colour, this level's brightness and reach)
+	local lit = Config.SandboxLight.Warehouse
+	local lamp = lit.Levels[f.n] or lit.Lamp
 	for k, spot in looks.lamps do
 		local housing = look(add(`Lamp{k}`, "inside", { 0.7, wide, wide }, { spot[1], looks.lampTop - 0.35, depth(spot[2]) }, TRIM, "Metal"))
 		housing.shape, housing.roll = "Cylinder", 90
 		local glow = look(add(`LampGlow{k}`, "inside", { 0.14, wide - 0.6, wide - 0.6 }, { spot[1], looks.lampTop - 0.77, depth(spot[2]) }, GLOW, "Neon")) -- (its light stays)
 		glow.shape, glow.roll = "Cylinder", 90
-		glow.light = { range = T.Lamp.Range, brightness = T.Lamp.Brightness, color = T.Lamp.Color }
+		glow.light = { range = lamp.Range, brightness = lamp.Brightness, color = lit.Lamp.Color }
 	end
 
 	-- the floor's paint: the receiving zone's box and name, the middle aisle's edges

@@ -1,12 +1,14 @@
-"""Zombie Delivery: dům Marge (155 Willow Ln, první stěhování) jako klasický evropský rodinný dům, v Blenderu.
+"""Zombie Delivery: klasický evropský rodinný dům v Blenderu, místo domu, ze kterého se stěhuje.
 
 Spuštění v Blenderu: záložka Scripting → Open → house.py → Run Script (▶, nebo Alt+P). Skript postaví dům do kolekce
 "House": omítnuté zdi s rohovými kvádry a soklem, bílé šambrány, parapety a okna s křížem, truhlíky s muškáty,
-dvoukřídlé zelené dveře, strmou sedlovou střechu z pálených tašek s vikýřem, komínem, okapy a svody.
+dvoukřídlé zelené dveře, sedlovou střechu z pálených tašek s vikýři, komíny, okapy a svody.
 
-Rozměry jsou přesně ty, které má dům ve hře (krabice HOUSE: šířka W, výška zdí H, hloubka D; 1 jednotka = 1 stud).
-Předek domu míří na -Y, střed spodku domu je v počátku. Na zdi s dveřmi hra věší transparent MOVING DAY a staví
-krabice a srolovaný koberec, proto tam nejsou okenice ani truhlíky v přízemí.
+TARGET vybírá, který dům ve hře nahradí: "sandbox" = The Old Chalet v testovacím světě (44 × 14,5 × 34, střecha do
+výšky 26), "city" = dům Marge ve městě (155 Willow Ln). Rozměry jsou přesně ty, které má dům ve hře (krabice HOUSE:
+šířka W, výška zdí H, hloubka D; 1 jednotka = 1 stud). Předek domu míří na -Y, střed spodku domu je v počátku. Ve
+městě hra na zeď s dveřmi věší transparent MOVING DAY a staví krabice a srolovaný koberec, proto tam nejsou truhlíky
+v přízemí; v sandboxu stojí před dveřmi vítající postava a zahradní truhlíky.
 
 Bez Blenderu, jen s modulem bpy (pip install bpy):
     python house.py -- --save house.blend --render složka --export složka
@@ -17,11 +19,44 @@ from mathutils import Vector, Matrix
 # ───────────────────────────────────────────────────────────── NASTAVENÍ
 EXPORT = False   # True = uloží ZDCHouseArt.fbx pro hru do složky "roblox" vedle .blend souboru
 
-# Krabice domu ve hře (shared/Map.luau: dům home_suburbs_2_0_00). tools/house-art/check.py hlídá, že sedí se hrou.
-W, H, D = 20.3572, 12.5980, 17.5669
-PITCH = 42        # sklon střechy (stupně)
-EAVE = 1.0        # přesah střechy vpředu a vzadu (jako ve hře)
-VERGE = 0.8       # přesah střechy na štítech
+TARGET = "sandbox"   # "sandbox" = The Old Chalet v sandboxu, "city" = dům Marge ve městě
+
+# Dům pro každý cíl: krabice ve hře (W, H, D), sklon střechy (None: co nejstrmější pod výškou "top"), přesah střechy
+# vpředu a vzadu, okna (polohy podél zdí), vikýře, komíny (x, y na zadním svahu), keře u vchodu.
+# tools/house-art/check.py hlídá, že krabice sedí se hrou (SandboxMap.House / Map.Homes).
+TARGETS = {
+    "sandbox": {  # shared/SandboxMap.luau House.house (44 × 14,5 × 34), střecha pod 26; sklon = SandboxScenery.Chalet.Pitch
+        "box": (44.0, 14.5, 34.0), "pitch": None, "top": 26.0, "eave": 1.2,
+        "front": [-19.0, -13.0, -7.0, 7.0, 13.0, 19.0], "front_flowers": True, "upper": 9.4, "small": 10.2,
+        "back": [-19.0, -13.0, -7.0, 7.0, 13.0, 19.0], "back_upper": [-19.0, -13.0, -7.0, 0.0, 7.0, 13.0, 19.0],
+        "side": [-12.0, -5.0, 5.0, 12.0], "attic": [-3.5, 3.5], "dormers": [-13.0, 0.0, 13.0],
+        "chimneys": [(-15.0, 6.0), (12.0, 6.0)], "bushes": [-20.4, 20.4], "lantern": 3.1,
+    },
+    "city": {  # shared/Map.luau: dům home_suburbs_2_0_00
+        "box": (20.3572, 12.5980, 17.5669), "pitch": 42, "top": None, "eave": 1.0,
+        "front": [-6.4, 6.4], "front_flowers": False, "upper": 8.6, "small": 9.9,
+        "back": [-6.4, 6.4], "back_upper": [-6.4, 0.0, 6.4],
+        "side": [-4.2, 4.2], "attic": [0.0], "dormers": [0.0],
+        "chimneys": [(4.6, 1.4)], "bushes": [-8.6, 8.6], "lantern": 3.1,
+    },
+}
+LAYOUT = TARGETS[TARGET]
+W, H, D = LAYOUT["box"]
+EAVE = LAYOUT["eave"]   # přesah střechy vpředu a vzadu
+VERGE = 0.8             # přesah střechy na štítech
+
+
+def steepest(top):
+    """The steepest pitch whose ridge tile stays under `top`."""
+    for tenth in range(600, 50, -1):
+        a = math.radians(tenth / 10)
+        ridge = H - 0.25 + (D / 2 + EAVE) * math.tan(a) + 0.25 / math.cos(a) + 0.44
+        if ridge <= top - 0.05:
+            return tenth / 10
+    return 10.0
+
+
+PITCH = LAYOUT["pitch"] or steepest(LAYOUT["top"])   # sklon střechy (stupně)
 
 # Povrchy: jméno → (barva #RRGGBB, drsnost, kov, záře). Hra (server/HouseMesh.luau) dá každému povrchu barvu
 # a materiál Robloxu.
@@ -115,6 +150,8 @@ def box(name, size, at, finish, r=0.03, rot=None, seg=None):
     bmesh.ops.scale(bm, vec=Vector(size), verts=bm.verts)
     o = obj(name, bm, finish)
     o.matrix_world = Matrix.Translation(Vector(at)) @ (rot or Matrix())
+    if r < 0.02 and W > 30:
+        return o  # (a big house's window frames and bars: sharp, a quarter of the triangles)
     return bevel(o, min(r, min(size) * 0.45), seg or (1 if r <= 0.03 else 2))  # (small edges: one bevel segment)
 
 
@@ -221,8 +258,9 @@ def window(wall, u, vb, ow, oh, keystone=False, flowers=False, tag="Okno"):
         n = 7
         for k in range(n):
             du = (k - (n - 1) / 2) * (ow / n)
-            ball(f"{tag} listí", 0.21, at(u + du, vb - 0.13, 0.3 + (0.06 if k % 2 else -0.04)), "leaf", scale=(1.1, 1.0, 0.8), seg=8)
-            ball(f"{tag} muškát", 0.14, at(u + du + 0.12, vb + 0.02 + (0.05 if k % 2 else 0), 0.34), "red", seg=8)
+            seg = 6 if W > 30 else 8
+            ball(f"{tag} listí", 0.21, at(u + du, vb - 0.13, 0.3 + (0.06 if k % 2 else -0.04)), "leaf", scale=(1.1, 1.0, 0.8), seg=seg)
+            ball(f"{tag} muškát", 0.14, at(u + du + 0.12, vb + 0.02 + (0.05 if k % 2 else 0), 0.34), "red", seg=seg)
 
 
 # ───────────────────────────────────────────────────────────── dům
@@ -270,29 +308,32 @@ def walls():
 
 
 def fronts():
-    # The street side: the door in the middle (the game's door: 4 wide, 7 tall), a window either side downstairs, two
-    # upstairs with their planters, a small one over the door (MOVING DAY hangs between it and the door).
+    L = LAYOUT
+    upper = L["upper"]
+    # The street side: the door in the middle (the game's door: 4 wide, 7 tall), windows either side on both floors,
+    # their planters upstairs (and downstairs where nothing stands in front of the wall), a small one over the door.
     door("front", 0, 4.0, 6.85, double=True)
-    for u in (-6.4, 6.4):
-        window("front", u, 3.2, 2.8, 3.6, keystone=True)
-        window("front", u, 8.6, 2.8, 3.0, flowers=True)
-    window("front", 0, 9.9, 1.6, 1.6, tag="Okénko")
-    lantern("front", 3.1)
-    for u in (-8.6, 8.6):
+    for u in L["front"]:
+        window("front", u, 3.2, 2.8, 3.6, keystone=True, flowers=L["front_flowers"])
+        window("front", u, upper, 2.8, 3.0, flowers=True)
+    window("front", 0, L["small"], 1.6, 1.6, tag="Okénko")
+    lantern("front", L["lantern"])
+    for u in L["bushes"]:
         at, _ = WALLS["front"]
         ball("Keř", 0.85, at(u, 0.7, 0.95), "shrub", scale=(1.15, 1.0, 0.85), seg=12)
     # The garden side: a back door, windows.
     door("back", 0, 3.0, 6.8, double=False)
-    for u in (-6.4, 6.4):
+    for u in L["back"]:
         window("back", u, 3.2, 2.8, 3.6)
-    for u in (-6.4, 0, 6.4):
-        window("back", u, 8.6, 2.8, 3.0)
-    # The gable sides: two windows a floor, a planter downstairs, an attic window in the gable.
+    for u in L["back_upper"]:
+        window("back", u, upper, 2.8, 3.0)
+    # The gable sides: windows on both floors, planters downstairs, attic windows in the gable.
     for wall in ("right", "left"):
-        for u in (-4.2, 4.2):
+        for u in L["side"]:
             window(wall, u, 3.2, 2.8, 3.6, keystone=True, flowers=True)
-            window(wall, u, 8.6, 2.8, 3.0)
-        window(wall, 0, H + 2.6, 1.8, 2.2, tag="Půdní okno")
+            window(wall, u, upper, 2.8, 3.0)
+        for u in L["attic"]:
+            window(wall, u, H + 2.6, 1.8, 2.2, tag="Půdní okno")
 
 
 def door(wall, u, ow, oh, double):
@@ -344,9 +385,12 @@ def slope_turn(side):
     return euler(rx=math.radians(PITCH)) if side < 0 else euler(rz=math.pi) @ euler(rx=math.radians(PITCH))
 
 
-def tile_row(name, side, u0, length, x0, x1, finish, amp=0.09, lift=0.12, period=1.0, steps=6):
+def tile_row(name, side, u0, length, x0, x1, finish, amp=0.09, lift=0.12, period=None, steps=None):
     """One course of pantiles: a wavy strip up the slope from u0, its lower edge lifted (the course under it shows)."""
     up, out = slope(side)
+    big = W > 30  # (a big house: coarser waves, the same look from the street, a third of the triangles)
+    period = period or (1.3 if big else 1.0)
+    steps = steps or (3 if big else 6)
     n = max(1, round((x1 - x0) / period))
     lam = (x1 - x0) / n
     xs = [x0 + (x1 - x0) * i / (n * steps) for i in range(n * steps + 1)]
@@ -400,24 +444,36 @@ def roof():
     cyl("Hřebenáč", 0.34, span + 0.12, (0, 0, Z_RT + 0.1), "tile3", axis="X", seg=16)
     for x in (x0 - 0.06, x1 + 0.06):
         ball("Hřebenáč konec", 0.34, (x, 0, Z_RT + 0.1), "tile3", seg=12)
-    dormer()
-    chimney(4.6, 1.4)
+    for x in LAYOUT["dormers"]:
+        dormer(x)
+    for x, y in LAYOUT["chimneys"]:
+        chimney(x, y)
 
 
-def dormer():
-    """A gabled dormer on the street slope over the door: its plastered cheeks, its window, its own little roof."""
+def roof_top(y):
+    """The tiles' top over a point of the roof (y from the middle: the ridge is at 0)."""
+    return Z_EB + (Y_E - abs(y)) * T + SLAB / C + 0.25
+
+
+def dormer(x0=0.0):
+    """A gabled dormer on the street slope: its plastered cheeks, its window, its own little roof, deep enough for its
+    ridge to end inside the main roof."""
     yf = -D / 2 + 2.0
-    half, depth = 1.7, 5.0
-    bottom, top = H + 2.0, H + 5.4
-    openings(box("Vikýř", (2 * half, depth, top - bottom), (0, yf + depth / 2, (top + bottom) / 2), "plaster", r=0))
+    half = 1.7
+    top = H + 5.4
+    bottom = Z_EB + (Y_E - abs(yf)) * T - 0.2  # (under the main roof's boards at its front)
+    ridge_top = top + half - 0.05 + 0.22 * math.sqrt(2) + 0.26
+    back = Y_E - (ridge_top - Z_EB - SLAB / C - 0.25) / T  # (where the main roof is over its ridge)
+    depth = max(5.0, -back - yf + 0.3)
+    openings(box("Vikýř", (2 * half, depth, top - bottom), (x0, yf + depth / 2, (top + bottom) / 2), "plaster", r=0))
     # Its window on its front (a wall frame at y = yf, like the front's).
-    WALLS["dormer"] = (lambda u, v, w: Vector((u, yf - w, v)), "y")
+    WALLS["dormer"] = (lambda u, v, w: Vector((x0 + u, yf - w, v)), "y")
     window("dormer", 0, H + 3.2, 1.6, 1.7, tag="Vikýř okno")
     wbox("dormer", "Vikýř římsa", 2 * half + 0.3, 0.25, -0.1, 0.12, 0, top - 0.1, "trim", r=0.02)
     # Its gable over the window and its roof (45°), both reaching back into the main roof.
     apex = half - 0.05
     bm = bmesh.new()
-    a = [bm.verts.new((-half, yf, top)), bm.verts.new((half, yf, top)), bm.verts.new((0, yf, top + apex))]
+    a = [bm.verts.new((x0 - half, yf, top)), bm.verts.new((x0 + half, yf, top)), bm.verts.new((x0, yf, top + apex))]
     b = [bm.verts.new((v.co.x, yf + depth, v.co.z)) for v in a]
     bm.faces.new((a[0], a[1], a[2]))
     bm.faces.new((b[0], b[2], b[1]))
@@ -433,20 +489,23 @@ def dormer():
     ridge = top + apex                       # the boards' underside at the ridge
     for side in (-1, 1):
         turn = euler(ry=side * math.radians(45))
-        cx = side * (reach / 2 + lift)
+        cx = x0 + side * (reach / 2 + lift)
         cz = ridge - reach / 2 + lift
         box("Vikýř střecha", (length, depth + 0.4, thick), (cx, yf + depth / 2 - 0.2, cz), "tile2", r=0.02, rot=turn)
         surface = ridge + thick * math.sqrt(2)  # the boards' top over the ridge line
         for k in range(3):
             x = 0.45 + 0.55 * k
-            box("Vikýř tašky", (0.14, depth + 0.4, 0.1), (side * x, yf + depth / 2 - 0.2, surface - x + 0.03), "tile", r=0.02, rot=turn)
+            box("Vikýř tašky", (0.14, depth + 0.4, 0.1), (x0 + side * x, yf + depth / 2 - 0.2, surface - x + 0.03), "tile", r=0.02, rot=turn)
         box("Vikýř prkno", (length, 0.1, 0.34), (cx, yf - 0.42, cz - 0.03), "trim", r=0.02, rot=turn)
-    cyl("Vikýř hřebenáč", 0.16, depth + 0.4, (0, yf + depth / 2 - 0.2, ridge + thick * math.sqrt(2) - 0.02), "tile3", axis="Y", seg=12)
+    cyl("Vikýř hřebenáč", 0.16, depth + 0.4, (x0, yf + depth / 2 - 0.2, ridge + thick * math.sqrt(2) - 0.02), "tile3", axis="Y", seg=12)
 
 
 def chimney(x, y):
     top = Z_RT + 2.5
-    box("Komín", (1.3, 1.3, top - (H + 5.0)), (x, y, (top + H + 5.0) / 2), "plaster", r=0.02)
+    if LAYOUT["top"]:
+        top = min(top, LAYOUT["top"] - 0.75)  # (its cap under the house's height in the game)
+    base = roof_top(y) - 2.0
+    box("Komín", (1.3, 1.3, top - base), (x, y, (top + base) / 2), "plaster", r=0.02)
     box("Komín římsa", (1.46, 1.46, 0.28), (x, y, top - 0.41), "stone2", r=0.03)
     box("Komín hlava", (1.42, 1.42, 0.14), (x, y, top + 0.07), "stone2", r=0.02)
     for sx in (-1, 1):
@@ -523,15 +582,16 @@ def scene():
         col.objects.link(o)
         o.location = at
         return o
-    plane("Trávník", (90, 90, 0.2), (0, -6, -0.1), mat("Garden grass", "#5E8A44"))
-    plane("Chodník k domu", (3, 7.0, 0.1), (0, -D / 2 - 3.5, 0.05), mat("Garden path", "#B0ACA4"))
-    plane("Chodník", (90, 5, 0.12), (0, -D / 2 - 9.5, 0.06), mat("Garden sidewalk", "#9A968E"))
+    k = max(W / 20.3572, 1.0)  # (the scene and the cameras grow with the house)
+    plane("Trávník", (90 * k, 90 * k, 0.2), (0, -6 * k, -0.1), mat("Garden grass", "#5E8A44"))
+    plane("Chodník k domu", (3 + 3 * (k > 1), 7.0 * k, 0.1), (0, -D / 2 - 3.5 * k, 0.05), mat("Garden path", "#B0ACA4"))
+    plane("Chodník", (90 * k, 5, 0.12), (0, -D / 2 - 9.5 * k, 0.06), mat("Garden sidewalk", "#9A968E"))
     sun = bpy.data.objects.new("Slunce", bpy.data.lights.new("Slunce", "SUN"))
     col.objects.link(sun)
     sun.data.energy, sun.data.angle = 3.2, math.radians(6)
     sun.rotation_euler = (math.radians(52), 0, math.radians(-38))
-    for name, target, direction, distance, lens in (("Kamera", (0, 0, 10.0), (1.0, -1.45, 0.62), 57, 40),
-                                                     ("Kamera ulice", (0, 0, 10.5), (0.0, -1.0, 0.16), 54, 40)):
+    for name, target, direction, distance, lens in (("Kamera", (0, 0, 10.0 * k ** 0.5), (1.0, -1.45, 0.62), 57 * k, 40),
+                                                     ("Kamera ulice", (0, 0, 10.5 * k ** 0.5), (0.0, -1.0, 0.16), 54 * k, 40)):
         cam = bpy.data.objects.new(name, bpy.data.cameras.new(name))
         col.objects.link(cam)
         cam.location = Vector(target) + Vector(direction).normalized() * distance
@@ -625,7 +685,7 @@ def export_game(folder, budget=10000):
         finish = o.material_slots[0].material["finish"]
         details.append({"name": o.name, "finish": finish, "center": centre, "size": size})
         split_by_finish(me, o.matrix_world.copy(), pieces, finish)
-    made, manifest = [], {"box": [W, H, D], "pieces": {}, "details": details}
+    made, manifest = [], {"target": TARGET, "box": [W, H, D], "pitch": PITCH, "pieces": {}, "details": details}
     for finish, meshes in sorted(pieces.items()):
         groups, tris = [[]], 0
         for piece in meshes:

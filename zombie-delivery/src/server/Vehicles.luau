@@ -1829,7 +1829,7 @@ function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CF
 	spot.Name = "BayLight"
 	spot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + SprinterBuild.point(Sprinter.Light)
 	spot.Parent = chassis
-	local tune = Config.Sprinter.Light
+	local tune = Config.SandboxLight.Van.Bay -- (8.3: the sandbox's light, Config.SandboxLight)
 	local light = Instance.new("PointLight")
 	light.Name = "BayLight"
 	light.Range = tune.Range
@@ -4319,7 +4319,7 @@ function SprinterBuild.wire(car: Car)
 	end
 	local spot = chassis:FindFirstChild("BayLight")
 	local light = spot and spot:FindFirstChildOfClass("PointLight")
-	local lampLit = rgb(Config.Sprinter.Light.Color)
+	local lampLit = rgb(Config.SandboxLight.Van.Bay.Color)
 	local lampDim = if lamps[1] then lamps[1].Color else lampLit
 	local slideShut = true -- (the side door is shut, not only on its way shut)
 	local function sync()

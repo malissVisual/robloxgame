@@ -20,6 +20,7 @@ PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleade
 PURE += ("WarehouseLevels",)  # 8.3 sandbox, the warehouse's levels (tests/warehouselevels_test.luau)
 PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
 PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
+PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_test.luau, tests/sandboxlight_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
