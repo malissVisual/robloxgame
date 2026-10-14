@@ -8,7 +8,7 @@
 -- A hint is one toast (SandboxHintsUi.notify: client/SandboxHud.luau's), in this device's words (client/PadGlyph.luau),
 -- once a session, one at a time, never while something covers the screen: a grip check (client/CarryGripUi.luau active),
 -- the move's cards with its result (client/MovingHud.luau isOpen), a sandbox window (the warehouse's, the UPGRADES
--- desk's, the book, the TASKS panel) or the start screen (the ScreenGui "SandboxHud" off). A hint no longer true when
+-- desk's, the book, the TASKS panel, Danny's command card) or the start screen (the ScreenGui "SandboxHud" off). A hint no longer true when
 -- its turn comes (the reward claimed, FILL BEST used) is left out; one whose window the player opened alone while it
 -- waited (the book, the TASKS panel) is not needed any more. client/SandboxHud.luau starts it.
 --   SandboxHintsUi.start()            listens (once; nothing when Config.Sandbox.On is false)
@@ -74,6 +74,9 @@ local LOADERS: { [string]: () -> any } = {
 	SandboxTasksUi = function(): any
 		return require(script.Parent.SandboxTasksUi)
 	end,
+	MoveHelperCard = function(): any
+		return require(script.Parent.MoveHelperCard)
+	end,
 }
 local modules: { [string]: any } = {}
 local function client(name: string): any
@@ -105,7 +108,7 @@ local function hudHidden(): boolean
 	return hud ~= nil and hud:IsA("ScreenGui") and (hud :: ScreenGui).Enabled == false
 end
 
-local WINDOWS = { "WarehouseUi", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi" }
+local WINDOWS = { "WarehouseUi", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard" } -- (8.3: Danny's card too)
 
 local function covered(): boolean
 	local hook = SandboxHintsUi.covered

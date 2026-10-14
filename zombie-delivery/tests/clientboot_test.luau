@@ -45,7 +45,7 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
 	"QuickChat", "CarryGripUi", "CargoPrompts",
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel)
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's command card)
 local LAST = { "SandboxSounds" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
@@ -270,10 +270,11 @@ end
 -- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok" })
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok" })
 	local ok, where = same(starts(run), CITY)
 	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
-	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil)
+	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil
+		and run.required.MoveHelperCard == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
@@ -281,9 +282,9 @@ end
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
 
 do
-	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok" }, true)
+	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok" }, true)
 	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
-	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, then SandboxSounds`, ok, where)
+	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, MoveHelperCard, then SandboxSounds`, ok, where)
 	local city: { string } = {}
 	for _, name in CITY_ONLY do
 		if run.required[name] then
@@ -330,6 +331,7 @@ do
 	end
 	check("ESC closes the crew panel, folds the planning, closes the move's cards, the quick chat and the warehouse's picker", called(run, "CrewPanel.close") and called(run, "MoveLobbyUi.minimize") and called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
 	check("… and the UPGRADES window (8.1 review)", called(run, "UpgradeUi.close"))
+	check("… and 8.3 Danny's command card (a window like the others, with its onOpen)", called(run, "MoveHelperCard.close") and type(run.modules.MoveHelperCard.onOpen) == "function")
 	-- 8.1 review: opening a sandbox window closes the others, never itself (its onOpen runs once it counts as open)
 	local onOpen = run.modules.UpgradeUi.onOpen
 	check("the UPGRADES window has an onOpen", type(onOpen) == "function" and type(run.modules.WarehouseUi.onOpen) == "function")
@@ -354,6 +356,18 @@ end
 do -- 8.1 review: the UPGRADES window alone frees the mouse too (on PC the camera no longer holds it)
 	local run = boot(true, { UpgradeUi = "ok" }, true)
 	check("the open UPGRADES window frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
+end
+
+do -- 8.3 Danny's command card alone: open, it frees the mouse (its buttons are clicked); it closes the other windows
+	local run = boot(true, { MoveHelperCard = "ok", WarehouseUi = "ok" }, true)
+	check("8.3 Danny's open command card frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
+	local onOpen = run.modules.MoveHelperCard.onOpen
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = run.modules.Hud.onCloseWindows
+		onOpen()
+	end
+	check("… opening it closes the picker but not itself", type(onOpen) == "function" and called(run, "WarehouseUi.close") and not called(run, "MoveHelperCard.close"))
 end
 
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)

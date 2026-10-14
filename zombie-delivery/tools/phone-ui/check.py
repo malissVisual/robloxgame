@@ -283,3 +283,12 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "sandboxpad.luau"], cwd=folder, check=True)
+# 8.3 Danny's orders: his command card (client/MoveHelperCard.luau) and his status line (client/MoveHelperHud.luau with
+# the card), beside the real SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/
+# dannycard.luau on a phone (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder;
+# dannycard_preview.py draws the same scenes).
+from dannycardenv import dannycard_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    dannycard_env(Path(folder))
+    subprocess.run([args.luau, "dannycard.luau"], cwd=folder, check=True)

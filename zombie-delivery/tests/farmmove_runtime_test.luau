@@ -683,12 +683,14 @@ check("the farm has a pair piece that leaves by the farmhouse's front door", ben
 local bench = solBuild.pieces[benchSpot.id]
 E.place(sol, bench.PrimaryPart.Position + V3(0, 0, 4))
 trigger(promptIn(bench, "Lift"), sol)
+check(`8.3 Sol lifts the {benchSpot.item}: no drag alone, she calls Danny and waits`, sol.Character:GetAttribute("MoveCarry") == nil and danny.call ~= nil)
 local took = 0
-local helped = steps(4, function()
+local helped = steps(20, function() -- (8.3: he walks over, the piece on the floor meanwhile)
 	took += 0.1
 	return heldBy(benchSpot.id)
-end, bench)
-check(`Danny takes the far end of the {benchSpot.item} on the farm within 2 s`, helped and took <= 2.2, took)
+end)
+check(`8.3 Danny walks to the far end of the {benchSpot.item} on the farm: up together`, helped and sol.Character:GetAttribute("MoveCarry") == benchSpot.id, took)
+steps(0.6, nil, bench)
 local solFrontExit = (solOrigin * M.CFrame.new(solBuild.plan.exits[1])).Position
 E.clock += 12 -- (the pace check's allowance: the test jumps)
 E.place(sol, solFrontExit + V3(0, 3, 0))
@@ -714,11 +716,12 @@ E.clock += 12
 E.place(sol, solWagon.PrimaryPart.Position + V3(0, 0, 7))
 trigger(promptIn(solWagon, "Lift"), sol)
 took = 0
-helped = steps(4, function()
+helped = steps(20, function() -- (8.3: a call: he walks over)
 	took += 0.1
 	return heldBy(wagonId)
-end, solWagon)
-check("Danny takes the hay wagon's far end within 2 s", helped and took <= 2.2, took)
+end)
+check("8.3 Danny walks to the hay wagon's far end: up together", helped and sol.Character:GetAttribute("MoveCarry") == wagonId, took)
+steps(0.6, nil, solWagon)
 local solBarnExit = (solOrigin * M.CFrame.new(solBuild.plan.exits[2])).Position
 E.clock += 12
 E.place(sol, solBarnExit + V3(0, 3, 0))

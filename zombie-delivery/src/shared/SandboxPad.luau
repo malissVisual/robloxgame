@@ -6,9 +6,10 @@
 --     Config.SandboxHud.StockPad, the D-pad's ←), 📖 BOOK (Config.CollectionBook.Key / Pad: C, the D-pad's →), 📋 TASKS
 --     (Config.SandboxTasks.Key / Pad: J, the D-pad's ↓). Why the D-pad: in the sandbox nothing else of the game is on it
 --     (the city's weapon wheel (↑), phone (↓) and hands (← →) never start there: client/Main.client.luau), A, B, X, Y,
---     the bumpers, the triggers and the sticks are taken (jump, closing, the prompts, the grip, the sprint, the camera),
---     and the D-pad's ↑ is left to Roblox (its emote wheel). While a window has the gamepad's selection the D-pad moves
---     it instead (client/PadGlyph.luau pressed).
+--     the bumpers, the triggers and the sticks are taken (jump, closing, the prompts, Danny's "Talk to Danny" on L1
+--     (client/MoveHelperCard.luau), the grip, the sprint, the camera), and the D-pad's ↑ is left to Roblox (its emote
+--     wheel). While a window has the gamepad's selection the D-pad moves it instead (client/PadGlyph.luau pressed).
+--     tests/run_tests.py checks the sandbox's modules leave the D-pad alone.
 --   * A device: "keys" (a keyboard and a mouse), "pad" (a gamepad used last) or "touch" (a touch screen without keys).
 --   SandboxPad.Ids                          the chips in the HUD's order: "stock", "book", "tasks"
 --   SandboxPad.chip(id) -> Chip?            { id, icon, word, key, pad } (key a key's name, pad an Enum.KeyCode name)

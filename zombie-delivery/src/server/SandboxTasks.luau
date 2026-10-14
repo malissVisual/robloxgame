@@ -12,6 +12,8 @@
 --   shown       Collection.onChanged: the pieces on your stands now (the best counts)
 --   sell        Collection.onPaid "sale": the money a piece sold for
 --   income      Collection.onPaid "income": what the stands paid (CollectionIncome)
+--   hotsell     8.3: Collection.onPaid "sale": the pieces of today's hot kinds in it (Config.Market)
+--   hotincome   8.3: Collection.onPaid "income": the dollars of it the hot pieces on show earned
 --   upgrade     Upgrades.onChanged: the levels bought since the last look (your levels in all went up)
 --   trips       Moving.onStored: the move's trips home so far (the owner's; the best counts)
 --   moves       Moving.onResult: a move done (or late) with pieces home, for everybody in its crew
@@ -251,11 +253,18 @@ local function onCollection(player: Player)
 	task.defer(lookAtStock, player)
 end
 
-local function onPaid(player: Player, kind: string, money: number)
+local function onPaid(player: Player, kind: string, money: number, paid: Collection.Paid?)
+	local hot = if type(paid) == "table" and type(paid.hot) == "number" then paid.hot else 0 -- (8.3: the market's)
 	if kind == "sale" then
 		SandboxTasks.note(player, "sell", money)
+		if hot > 0 then
+			SandboxTasks.note(player, "hotsell", hot)
+		end
 	elseif kind == "income" then
 		SandboxTasks.note(player, "income", money)
+		if hot > 0 then
+			SandboxTasks.note(player, "hotincome", hot)
+		end
 	end
 end
 

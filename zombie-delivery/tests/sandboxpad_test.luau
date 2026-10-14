@@ -26,9 +26,10 @@ check("their keys: B, C, J (the configs')", stock ~= nil and book ~= nil and tas
 check("their gamepad buttons: the D-pad's ←, →, ↓", stock ~= nil and book ~= nil and tasks ~= nil and stock.pad == "DPadLeft" and book.pad == "DPadRight" and tasks.pad == "DPadDown")
 check("… each its own (no two chips on one button)", stock ~= nil and book ~= nil and tasks ~= nil and stock.pad ~= book.pad and book.pad ~= tasks.pad and stock.pad ~= tasks.pad)
 -- The sandbox's gamepad buttons taken elsewhere (none of them is the D-pad): jump (A), every window's close and the
--- put-down prompt (B), the prompts (X; the stands' SELL: Y; the move's unload: Y), the grip (R2), the sprint (L3), the
--- camera (the right stick), Roblox's emote wheel (the D-pad's ↑).
-local TAKEN = { "ButtonA", "ButtonB", "ButtonX", "ButtonY", "ButtonR2", "ButtonL3", "Thumbstick1", "Thumbstick2", "DPadUp", "ButtonSelect", "ButtonStart" }
+-- put-down prompt (B), the prompts (X; the stands' SELL: Y; the move's unload: Y), Danny's "Talk to Danny" (L1,
+-- client/MoveHelperCard.luau), the grip (R2), the sprint (L3), the camera (the right stick), Roblox's emote wheel (the
+-- D-pad's ↑). (tests/run_tests.py checks the modules the sandbox starts read no D-pad button.)
+local TAKEN = { "ButtonA", "ButtonB", "ButtonX", "ButtonY", "ButtonL1", "ButtonR2", "ButtonL3", "Thumbstick1", "Thumbstick2", "DPadUp", "ButtonSelect", "ButtonStart" }
 local clash = {}
 for _, id in SandboxPad.Ids do
 	local chip = SandboxPad.chip(id)

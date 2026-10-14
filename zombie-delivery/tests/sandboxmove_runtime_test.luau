@@ -413,7 +413,11 @@ E.place(ann, outside)
 trigger(enter, ann)
 local sofa = newItem(3)
 E.place(ann, sofa.PrimaryPart.Position + V3(1, 0, 0))
+Config.MoveHelper.WaitForHelper = false -- (8.3 the switch off: today's rule, the sofa dragged alone; Danny's call is movehelper_runtime_test's)
 trigger(promptIn(sofa, "Lift"), ann)
+Config.MoveHelper.WaitForHelper = true
+check("8.3 WaitForHelper off: a two-person Lift is a drag alone as before (no call)", ann.Character:GetAttribute("MoveCarry") == 3
+	and ann:GetAttribute("MoveHelperCall") == nil and MoveHelper.find(ann).call == nil)
 step()
 E.place(ann, origin.Position + V3(0, 3, 1))
 trigger(promptIn(workspace, "Leave house"), ann)
