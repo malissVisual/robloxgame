@@ -18,7 +18,9 @@
 --     them stand there (the start's 12 and the More stands bought), the others are only their painted spot (their
 --     podium, top and plate hidden and not solid, no prompts); the tags' $/min are × the owner's Showroom lights
 --     (Collection.boost); the UPGRADES desk at the back wall has the owner's "Upgrades" prompt (E: Upgrades.open, the
---     window client/UpgradeUi.luau; somebody else's use gets a notice, as at the stands).
+--     window client/UpgradeUi.luau; somebody else's use gets a notice, as at the stands);
+--   * 8.2: the owner's Blender look (server/WarehouseMesh.luau, once ZDCWarehouseArt is imported): the layout's visual
+--     pieces carry the attribute WarehouseVisual and are hidden under the model (the solid ones still collide).
 -- A collection's changes (Collection.onChanged) rebuild only the stands whose piece changed, Config.Warehouse.Rebuild
 -- apart at most; an owner who leaves takes their pieces with them (the plot is FOR RENT again). Nothing runs per frame.
 -- The van's unloading is the moves' (the plot's unload circle); here only its bay is painted.
@@ -43,6 +45,7 @@ local Collection = require(script.Parent.Collection)
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local SandboxPlots = require(script.Parent.SandboxPlots)
 local Upgrades = require(script.Parent.Upgrades) -- 8.1: the UPGRADES desk's window
+local WarehouseMesh = require(script.Parent.WarehouseMesh) -- 8.2: the owner's Blender warehouse
 
 local T = Config.Warehouse
 
@@ -159,6 +162,7 @@ local function build(parent: Instance, d: WarehouseLayout.Piece): (BasePart, { T
 	p.CanTouch = false
 	p.CastShadow = d.shadow == true
 	p.Transparency = d.transparency or 0
+	p:SetAttribute(WarehouseMesh.Attribute, d.visual) -- 8.2: only looks (WarehouseMesh hides it under the Blender model)
 	if p:IsA("Part") then
 		if d.shape == "Cylinder" then
 			p.Shape = Enum.PartType.Cylinder
@@ -302,6 +306,7 @@ local function buildPlot(parent: Instance, plot: SandboxMap.Plot): PlotState
 	deskAnchor.CFrame = CFrame.new(0, 0.6, terminal.Size.Z / 2 + 0.2)
 	deskAnchor.Parent = terminal
 	model.WorldPivot = CFrame.new(plot.warehouse.x, 0, plot.warehouse.z)
+	WarehouseMesh.dress(model) -- 8.2: the owner's Blender look, once imported (no import: as built)
 	model.Parent = parent
 	return {
 		plot = plot,

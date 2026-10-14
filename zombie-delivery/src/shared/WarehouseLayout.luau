@@ -58,7 +58,8 @@
 -- Angles(pitch, 0, roll)), color, material (an Enum.Material name), shape ("Wedge" | "Cylinder" | nil: a block), solid
 -- (collides and is queried; the rest is decoration), shadow (casts one: the big parts only), transparency, words
 -- (SurfaceGui text: face, lines { text, color, size (share of the face's height), font }, back (a panel colour), lit), light
--- (a PointLight: range, brightness, color) and stand (the stand it belongs to).
+-- (a PointLight: range, brightness, color) and stand (the stand it belongs to). 8.2: visual (only looks: the owner's
+-- Blender model ZDCWarehouseArt draws it, so server/WarehouseMesh.luau hides it once imported; a solid one still collides).
 
 local Config = require(script.Parent.Config)
 local SandboxMap = require(script.Parent.SandboxMap)
@@ -89,6 +90,7 @@ export type Piece = {
 	words: { Words }?,
 	light: Light?,
 	stand: number?,
+	visual: boolean?, -- 8.2: only looks (the Blender model draws it; server/WarehouseMesh.luau)
 }
 
 local WALL = 1 -- the walls' thickness
@@ -398,21 +400,26 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		p.shadow = shadow == true
 		return p
 	end
+	-- 8.2: only looks (the owner's Blender warehouse draws it: server/WarehouseMesh.luau hides it once imported)
+	local function look(p: Piece): Piece
+		p.visual = true
+		return p
+	end
 	local door, doorHigh = SandboxMap.DoorWidth, T.DoorHeight
 	local section = hx - door / 2 -- the front wall's width each side of the door
 	local ridge = T.Ridge
 
 	-- the floor: one slab under the whole building (and its doorway), from the pad up to a hair over it
-	solid(add("Floor", "inside", { 2 * hx, FLOOR_TOP - GROUND, 2 * hz }, { 0, (GROUND + FLOOR_TOP) / 2, 0 }, FLOOR, "Concrete"))
+	look(solid(add("Floor", "inside", { 2 * hx, FLOOR_TOP - GROUND, 2 * hz }, { 0, (GROUND + FLOOR_TOP) / 2, 0 }, FLOOR, "Concrete")))
 
 	-- the walls: the back, the sides, the front each side of the door and the header over it
-	solid(add("WallBack", "shell", { 2 * hx, h, WALL }, { 0, h / 2, -hz + WALL / 2 }, CLAD, "Metal"), true)
+	look(solid(add("WallBack", "shell", { 2 * hx, h, WALL }, { 0, h / 2, -hz + WALL / 2 }, CLAD, "Metal"), true))
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "West" else "East"
-		solid(add("Wall" .. tag, "shell", { WALL, h, 2 * hz - 2 * WALL }, { side * (hx - WALL / 2), h / 2, 0 }, CLAD, "Metal"), true)
-		solid(add("WallFront" .. tag, "shell", { section, h, WALL }, { side * (door / 2 + section / 2), h / 2, hz - WALL / 2 }, CLAD, "Metal"), true)
+		look(solid(add("Wall" .. tag, "shell", { WALL, h, 2 * hz - 2 * WALL }, { side * (hx - WALL / 2), h / 2, 0 }, CLAD, "Metal"), true))
+		look(solid(add("WallFront" .. tag, "shell", { section, h, WALL }, { side * (door / 2 + section / 2), h / 2, hz - WALL / 2 }, CLAD, "Metal"), true))
 	end
-	solid(add("Header", "shell", { door, h - doorHigh, WALL }, { 0, doorHigh + (h - doorHigh) / 2, hz - WALL / 2 }, CLAD, "Metal"), true)
+	look(solid(add("Header", "shell", { door, h - doorHigh, WALL }, { 0, doorHigh + (h - doorHigh) / 2, hz - WALL / 2 }, CLAD, "Metal"), true))
 
 	-- the gables (two wedges each, their tall side at the ridge) and the roof's two slopes, the ridge's cap
 	local slope = math.atan(ridge / hx)
@@ -422,7 +429,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	for _, front in { -1, 1 } do
 		local tag = if front > 0 then "Front" else "Back"
 		for _, side in { -1, 1 } do
-			local wedge = solid(add(`Gable{tag}{if side < 0 then "West" else "East"}`, "shell", { WALL, ridge, hx }, { side * hx / 2, h + ridge / 2, front * (hz - WALL / 2) }, CLAD, "Metal"), true)
+			local wedge = look(solid(add(`Gable{tag}{if side < 0 then "West" else "East"}`, "shell", { WALL, ridge, hx }, { side * hx / 2, h + ridge / 2, front * (hz - WALL / 2) }, CLAD, "Metal"), true))
 			wedge.shape = "Wedge"
 			wedge.yaw = if side > 0 then -90 else 90 -- (a wedge's tall side is its +Z: turned to the ridge)
 		end
@@ -432,25 +439,25 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		-- the slab's underside on the gables' slope (from the ridge down), its middle half its length down
 		local cx = side * (math.cos(slope) * length / 2 + math.sin(slope) * thick / 2)
 		local cy = h + ridge - math.sin(slope) * length / 2 + math.cos(slope) * thick / 2
-		local roof = solid(add("Roof" .. tag, "roof", { length, thick, deep }, { cx, cy, 0 }, ROOF, "Metal"), true)
+		local roof = look(solid(add("Roof" .. tag, "roof", { length, thick, deep }, { cx, cy, 0 }, ROOF, "Metal"), true))
 		roof.roll = -side * math.deg(slope)
 		-- the barge boards along the gables' edges
 		for _, front in { -1, 1 } do
-			local barge = add(`Barge{if front > 0 then "Front" else "Back"}{tag}`, "roof", { length, 0.9, 0.3 }, { cx, cy - 0.15, front * (deep / 2 + 0.15) }, TRIM, "Metal")
+			local barge = look(add(`Barge{if front > 0 then "Front" else "Back"}{tag}`, "roof", { length, 0.9, 0.3 }, { cx, cy - 0.15, front * (deep / 2 + 0.15) }, TRIM, "Metal"))
 			barge.roll = roof.roll
 		end
 		-- the gutter under the eave and its downpipe at the front corner
 		local eave = h + ridge - math.sin(slope) * (length - overhang / 2) -- (about the walls' top)
-		add("Gutter" .. tag, "roof", { 0.8, 0.8, deep }, { side * (hx + 0.9), eave - 0.6, 0 }, TRIM, "Metal")
-		local pipe = add("Downpipe" .. tag, "shell", { eave - 0.6, 0.6, 0.6 }, { side * (hx + 0.5), (eave - 0.6) / 2, hz - 1.4 }, TRIM, "Metal")
+		look(add("Gutter" .. tag, "roof", { 0.8, 0.8, deep }, { side * (hx + 0.9), eave - 0.6, 0 }, TRIM, "Metal"))
+		local pipe = look(add("Downpipe" .. tag, "shell", { eave - 0.6, 0.6, 0.6 }, { side * (hx + 0.5), (eave - 0.6) / 2, hz - 1.4 }, TRIM, "Metal"))
 		pipe.shape, pipe.roll = "Cylinder", 90
 	end
-	add("RidgeCap", "roof", { 2, 0.4, deep }, { 0, h + ridge + thick + 0.15, 0 }, TRIM, "Metal")
+	look(add("RidgeCap", "roof", { 2, 0.4, deep }, { 0, h + ridge + thick + 0.15, 0 }, TRIM, "Metal"))
 
 	-- the cladding's ribs (outside, from the base course up; over the door only on the header)
 	local function rib(name: string, x: number, z: number, bottom: number, alongX: boolean)
 		local tall = h - bottom
-		add(name, "shell", if alongX then { 0.5, tall, 0.3 } else { 0.3, tall, 0.5 }, { x, bottom + tall / 2, z }, RIBS, "Metal")
+		look(add(name, "shell", if alongX then { 0.5, tall, 0.3 } else { 0.3, tall, 0.5 }, { x, bottom + tall / 2, z }, RIBS, "Metal"))
 	end
 	local count = math.floor((2 * hx) / RIB)
 	for k = 0, count - 1 do
@@ -471,18 +478,18 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 
 	-- the base course, the ZDC stripe and the corners' trims
 	local function band(name: string, y: number, tall: number, out: number, color: { number }, material: string)
-		add(name .. "Back", "shell", { 2 * hx, tall, out }, { 0, y, -hz - out / 2 }, color, material)
+		look(add(name .. "Back", "shell", { 2 * hx, tall, out }, { 0, y, -hz - out / 2 }, color, material))
 		for _, side in { -1, 1 } do
 			local tag = if side < 0 then "West" else "East"
-			add(name .. tag, "shell", { out, tall, 2 * hz }, { side * (hx + out / 2), y, 0 }, color, material)
-			add(name .. "Front" .. tag, "shell", { section, tall, out }, { side * (door / 2 + section / 2), y, hz + out / 2 }, color, material)
+			look(add(name .. tag, "shell", { out, tall, 2 * hz }, { side * (hx + out / 2), y, 0 }, color, material))
+			look(add(name .. "Front" .. tag, "shell", { section, tall, out }, { side * (door / 2 + section / 2), y, hz + out / 2 }, color, material))
 		end
 	end
 	band("Plinth", PLINTH / 2, PLINTH, 0.4, CONCRETE, "Concrete")
 	band("Stripe", 5.6, 0.8, 0.45, ORANGE, "SmoothPlastic")
 	for _, sx in { -1, 1 } do
 		for _, sz in { -1, 1 } do
-			add(`Corner{if sz > 0 then "Front" else "Back"}{if sx < 0 then "West" else "East"}`, "shell", { 1.1, h, 1.1 }, { sx * hx, h / 2, sz * hz }, TRIM, "Metal")
+			look(add(`Corner{if sz > 0 then "Front" else "Back"}{if sx < 0 then "West" else "East"}`, "shell", { 1.1, h, 1.1 }, { sx * hx, h / 2, sz * hz }, TRIM, "Metal"))
 		end
 	end
 
@@ -490,16 +497,16 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	-- a bollard each side outside
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "West" else "East"
-		add("DoorRail" .. tag, "door", { 0.7, doorHigh, 0.6 }, { side * (door / 2 + 0.35), doorHigh / 2, hz + 0.3 }, STEEL, "Metal")
-		local bollard = solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), GROUND + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic"))
+		look(add("DoorRail" .. tag, "door", { 0.7, doorHigh, 0.6 }, { side * (door / 2 + 0.35), doorHigh / 2, hz + 0.3 }, STEEL, "Metal"))
+		local bollard = look(solid(add("Bollard" .. tag, "door", { 3.4, 1, 1 }, { side * (door / 2 + 1.8), GROUND + 1.7, hz + 1.4 }, PAINT, "SmoothPlastic")))
 		bollard.shape, bollard.roll = "Cylinder", 90
 	end
-	add("DoorCurtain", "door", { door, 1.6, 0.3 }, { 0, doorHigh - 0.8, hz - WALL / 2 }, ORANGE, "Metal")
-	add("DoorBar", "door", { door, 0.3, 0.45 }, { 0, doorHigh - 1.75, hz - WALL / 2 }, INK, "Rubber")
-	add("DoorHood", "door", { door + 1.6, 2.6, 2.6 }, { 0, doorHigh + 1.5, hz - WALL - 1.3 }, STEEL, "Metal")
+	look(add("DoorCurtain", "door", { door, 1.6, 0.3 }, { 0, doorHigh - 0.8, hz - WALL / 2 }, ORANGE, "Metal"))
+	look(add("DoorBar", "door", { door, 0.3, 0.45 }, { 0, doorHigh - 1.75, hz - WALL / 2 }, INK, "Rubber"))
+	look(add("DoorHood", "door", { door + 1.6, 2.6, 2.6 }, { 0, doorHigh + 1.5, hz - WALL - 1.3 }, STEEL, "Metal"))
 
 	-- the signs: ZDC in the front gable, the owner's over the door (server/Warehouse.luau writes it), STOCK inside
-	local zdc = add("ZdcSign", "sign", { 20, 5, 0.4 }, { 0, h + 0.5 + 2.5, hz + 0.3 }, TRIM, "SmoothPlastic")
+	local zdc = look(add("ZdcSign", "sign", { 20, 5, 0.4 }, { 0, h + 0.5 + 2.5, hz + 0.3 }, TRIM, "SmoothPlastic"))
 	zdc.yaw = 180
 	zdc.words = { { face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.6, "Black"), line("ZOMBIE DELIVERY CO.", WHITE, 0.24, "Bold") } } }
 	local owner = add("OwnerSign", "sign", { 24, 3.6, 0.4 }, { 0, doorHigh + (h - doorHigh) / 2, hz + 0.5 }, TRIM, "SmoothPlastic")
@@ -512,10 +519,10 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	-- inside: the tie beams on posts along the side walls, the lamps hung from two of them over the aisles
 	local beams = { -25, -14, -3, 8, 19 }
 	for n, z in beams do
-		add(`Beam{n}`, "inside", { 2 * hx - 2 * WALL, 0.8, 0.8 }, { 0, h - 0.6, z }, STEEL, "Metal")
+		look(add(`Beam{n}`, "inside", { 2 * hx - 2 * WALL, 0.8, 0.8 }, { 0, h - 0.6, z }, STEEL, "Metal"))
 		for _, side in { -1, 1 } do
 			local tall = h - 1 - FLOOR_TOP
-			add(`Post{n}{if side < 0 then "West" else "East"}`, "inside", { 0.8, tall, 0.8 }, { side * (hx - WALL - 0.4), FLOOR_TOP + tall / 2, z }, STEEL, "Metal")
+			look(add(`Post{n}{if side < 0 then "West" else "East"}`, "inside", { 0.8, tall, 0.8 }, { side * (hx - WALL - 0.4), FLOOR_TOP + tall / 2, z }, STEEL, "Metal"))
 		end
 	end
 	local aisle = T.MiddleAisle / 2 + T.StandSize + T.Aisle / 2 -- (the side aisles' middles)
@@ -523,7 +530,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	for _, z in { beams[2], beams[4] } do
 		for _, x in { -aisle, 0, aisle } do
 			lamps += 1
-			local housing = add(`Lamp{lamps}`, "inside", { 0.7, 3.2, 3.2 }, { x, h - 1.35, z }, TRIM, "Metal")
+			local housing = look(add(`Lamp{lamps}`, "inside", { 0.7, 3.2, 3.2 }, { x, h - 1.35, z }, TRIM, "Metal"))
 			housing.shape, housing.roll = "Cylinder", 90
 			local glow = add(`LampGlow{lamps}`, "inside", { 0.14, 2.6, 2.6 }, { x, h - 1.77, z }, GLOW, "Neon")
 			glow.shape, glow.roll = "Cylinder", 90
