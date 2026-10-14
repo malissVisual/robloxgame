@@ -100,9 +100,40 @@ function WarehouseLevels.card(): Config.SandboxUpgradeDef
 	return fresh
 end
 
+-- 8.3 review: the level an older server could not drop. 8.2 keeps every short key of `rewards` but neither
+-- sandboxUpgrades.warehouse nor the flag, so the save also carries "wh:<level>" there (PlayerData.save). nil: none.
+WarehouseLevels.RewardKey = "wh:"
+function WarehouseLevels.carried(saved: any): number?
+	local rewards = if type(saved) == "table" then saved.rewards else nil
+	if type(rewards) ~= "table" then
+		return nil
+	end
+	local best: number? = nil
+	for key, on in rewards do
+		if on == true and type(key) == "string" and string.sub(key, 1, #WarehouseLevels.RewardKey) == WarehouseLevels.RewardKey then
+			local n = tonumber(string.sub(key, #WarehouseLevels.RewardKey + 1))
+			if n and n == math.floor(n) and n >= 1 and n <= #LIST then
+				best = math.max(best or 0, n)
+			end
+		end
+	end
+	return best
+end
+
+-- 8.3 review: what an older (8.2) server shows of this level: its More stands count (12 + 2 a level), so a visit there
+-- neither hides stands nor sends pieces back to the stock. Levels 1 - 4: 0; level 5: 4.
+function WarehouseLevels.oldStands(level: number): number
+	local old = L.Old
+	return math.clamp(math.floor((WarehouseLevels.stands(level) - old.Stands) / old.Step), 0, old.Bought)
+end
+
 function WarehouseLevels.migrate(saved: any): number?
 	if type(saved) ~= "table" or saved.money == nil or saved[L.Flag] == true then
 		return nil
+	end
+	local kept = WarehouseLevels.carried(saved)
+	if kept then
+		return kept -- (8.3 review: a save that went through an older server: its level from `rewards`, not migrated again)
 	end
 	local old = L.Old
 	local bought = 0

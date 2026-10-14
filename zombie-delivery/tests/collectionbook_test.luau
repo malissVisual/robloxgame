@@ -258,9 +258,9 @@ check("… saved with the flag: its own book and paid milestones", same(b2, b1) 
 local b3, p3 = Rules.fromSave({ money = 500, [Rules.Flag] = true, collectionBook = b2, collectionBookPaid = p2 }, CollectionRules.empty())
 check("… running it again on what it gave: the same (the stock is not read again)", same(b3, b2) and same(p3, p2))
 local b4 = Rules.fromSave({ money = 500, [Rules.Flag] = true }, collection)
-check("… flagged but no book in it: empty (not the stock's)", same(b4, {}))
+check("… flagged but no book in it: the stock's pieces still found (8.3 review: a piece in the stock is always found)", same(b4, b1))
 local b5, p5 = Rules.fromSave({ money = 0, [Rules.Flag] = true, collectionBook = { sofa = { n = "x" }, tv = { n = 2, best = 0.5 } }, collectionBookPaid = "all" }, collection)
-check("… a garbled book in the save: cleaned", same(b5, { tv = { n = 2, best = 0.5 } }) and same(p5, {}))
+check("… a garbled book in the save: cleaned, the stock's pieces found again", same(b5, { tv = { n = 2, best = 0.5 }, sofa = { n = 2, best = 0.9 }, jukebox = { n = 1, best = 0.7 } }) and same(p5, {}))
 check("the flag is Config's", Rules.Flag == Config.CollectionBook.Flag and Rules.Flag == "collectionBookKept")
 
 -- ── Config ─────────────────────────────────────────────────────────────────

@@ -441,7 +441,7 @@ function Collection.sell(player: Player, uid: string, expect: number?): (number?
 	end
 	local market = marketOf(player)
 	local price = Rules.sell(entry, market) -- (8.3: the market's price)
-	if expect ~= nil and expect ~= price then
+	if expect ~= nil and price < expect then -- (8.3 review: only a price that fell: one that rose is paid, never refused)
 		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
 		return nil, `The market moved: your {entry.name} sells for {Market.money(price)} now.`
 	end
@@ -688,7 +688,7 @@ local function sellMany(player: Player, filter: any, expect: number?): (number?,
 		return nil, 0, NOTHING_TO_SELL[filter]
 	end
 	local total = StockPlan.price(list, market)
-	if expect ~= nil and expect ~= total then
+	if expect ~= nil and total < expect then -- (8.3 review: only a total that fell)
 		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
 		return nil, 0, `The market moved: those {#list} {if #list == 1 then "piece sells" else "pieces sell"} for {Market.money(total)} now. Ask again.`
 	end

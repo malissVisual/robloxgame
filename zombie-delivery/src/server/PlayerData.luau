@@ -972,6 +972,14 @@ function PlayerData.save(player: Player, final: boolean?)
 	for id in profile.collectionBookPaid do
 		profile.rewards["book:" .. id] = true -- (8.2 review: the book's milestones paid, as the chapters done below)
 	end
+	-- (8.3 review: the warehouse's level too, one "wh:<level>" key: an older server keeps it while it drops the level)
+	local whLevel = UpgradeRules.warehouseLevel(profile.sandboxUpgrades)
+	for key in profile.rewards do
+		if string.sub(key, 1, 3) == "wh:" and key ~= "wh:" .. whLevel then
+			profile.rewards[key] = nil
+		end
+	end
+	profile.rewards["wh:" .. whLevel] = true
 	for key in profile.story do
 		if string.sub(key, 1, 5) == "done:" then
 			profile.rewards[key] = true
@@ -1039,7 +1047,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		collectionBook = profile.collectionBook, -- 8.2
 		collectionBookPaid = profile.collectionBookPaid, -- 8.2
 		collectionBookKept = true, -- 8.2: CollectionBookRules.Flag (applySaved reads the book only with it)
-		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
+		sandboxUpgrades = UpgradeRules.forSave(profile.sandboxUpgrades), -- 8.1 (8.3 review: + an older server's stands count)
 		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
 		warehouseLevelKept = true, -- 8.3: UpgradeRules.WarehouseFlag (a real save without it is migrated to its warehouse level once)
 		sandboxTasks = profile.sandboxTasks, -- 8.2
