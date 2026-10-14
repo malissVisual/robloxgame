@@ -8,6 +8,9 @@
 -- one on show, scrap), the remote (every kind, garbage, the rate limit, the client never names a price), openPicker,
 -- Config.Warehouse's stands, leaving (the income counted is paid), the save round trip (the flag, rejoining twice
 -- gives the same, the uids go on) and the migration (an old save twice, a new player, a garbled save cleaned).
+-- 8.3, the warehouse's levels: an old save comes with the Big Warehouse (12 stands), a new player has the garage's 2;
+-- the bulk buttons run on Hal's Big Warehouse (as in 8.2); in the Logistics Center a piece fits the level's stands
+-- (13 a big one, 25 small: the refusal names the level's big stands) and FILL BEST fits them there.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local E = require("./CollectionRuntime")
@@ -432,13 +435,15 @@ local cleared = Collection.clear(G)
 check("clear: every piece gone, on show or not, no money paid", cleared == 3 and #Collection.stock(G) == 0 and (PlayerData.get(G) :: any).money >= moneyG and (PlayerData.get(G) :: any).money - moneyG < 1 and Collection.incomePerMinute(G) == 0, cleared)
 
 -- ── 8.2: the STOCK list's bulk buttons (only through the remote) ───────────
--- Hal has More stands level 1 (14 stands: 12 big, small 13 and 14); 11 fillers on stands 1 … 11, so FILL BEST has big
--- stand 12 and the small 13 and 14 to fill.
+-- Hal has the Big Warehouse (8.3: level 4) and More stands level 1 (14 stands: 12 big, small 13 and 14); 11 fillers on
+-- stands 1 … 11, so FILL BEST has big stand 12 and the small 13 and 14 to fill.
 local FurnitureLooks = require("./FurnitureLooks")
 local WarehouseLayout = require("./WarehouseLayout")
+local UpgradeRules = require("./UpgradeRules")
 local H = E.join(808, "Hal")
 local profileH = PlayerData.get(H) :: any
-profileH.sandboxUpgrades = { stands = 1 }
+check("8.3: Hal, a new player: the garage's 2 stands", Collection.stands(H) == 2, Collection.stands(H))
+profileH.sandboxUpgrades = { warehouse = 3, stands = 1 } -- (8.3: the Big Warehouse, the warehouse of 8.1 and 8.2)
 check("8.2: Hal has 14 stands (More stands level 1)", Collection.stands(H) == 14, Collection.stands(H))
 local mine = { piano = true, grandfather_clock = true, hay_wagon = true, bed = true, sofa = true, dining_chair = true, tv = true, radio = true }
 local fillers: { string } = {}
@@ -477,10 +482,11 @@ local function standOf(uid: string): number?
 	local entry = stockOf(H)[uid]
 	return if entry then entry.stand else nil
 end
-local function fitsHall(): boolean
+local function fitsHall(): boolean -- (8.3: the stands of Hal's warehouse level)
+	local level = UpgradeRules.warehouseLevel(profileH.sandboxUpgrades)
 	for _, entry in Collection.stock(H) do
 		local def = Rules.defOf(entry.item)
-		if entry.stand and def and not WarehouseLayout.fits(entry.stand, def.size) then
+		if entry.stand and def and not WarehouseLayout.fits(entry.stand, def.size, level) then
 			return false
 		end
 	end
@@ -513,13 +519,13 @@ E.flush()
 mark = #E.sent
 bulk(H, { kind = "fillbest" })
 check("… stands 12 and 14 free: the clock back on small 14, the wagon on big 12 (the bed stays: no room)", standOf(hc) == 14 and standOf(hw) == 12 and standOf(hb) == nil and fitsHall(), `{standOf(hc)} {standOf(hw)}`)
-profileH.sandboxUpgrades = {} -- (12 stands: 13 and 14 aren't Hal's)
+profileH.sandboxUpgrades = { warehouse = 3 } -- (12 stands: 13 and 14 aren't Hal's)
 Collection.upgrade(H, function() end)
 E.flush()
 mark = #E.sent
 bulk(H, { kind = "fillbest" })
 check("… only the stands you have: with 12 nothing goes on 13 or 14 (the pieces from them back in the stock stay there)", standOf(hp) == nil and standOf(hc) == nil and E.received(H, "Notice", mark)[1] ~= nil, E.received(H, "Notice", mark)[1])
-profileH.sandboxUpgrades = { stands = 1 }
+profileH.sandboxUpgrades = { warehouse = 3, stands = 1 }
 Collection.upgrade(H, function() end)
 
 -- ↩ TAKE ALL DOWN (and the bulk rate limit)
@@ -551,6 +557,29 @@ check("… nothing after", paid(H, "CollectionIncome") == paidBefore, paid(H, "C
 mark = #E.sent
 bulk(H, { kind = "undisplayall" })
 check("… again with nothing on show: refused, \"Nothing is on show.\"", E.received(H, "Notice", mark)[1] == "Nothing is on show." and #kinds(E.received(H, "Collection", mark), "state") == 0)
+
+-- 8.3: the stands of Hal's warehouse level: in the Logistics Center (More stands 1: 26 stands) stand 13 is a big one, 25
+-- the first small one; the refusal names the level's big stands (1 – 24); FILL BEST fits each piece to that level
+profileH.sandboxUpgrades = { warehouse = 4, stands = 1 }
+Collection.upgrade(H, function() end)
+local okBig = Collection.display(H, hb, 13)
+local okSmall, whySmall = Collection.display(H, hw, 25)
+check("8.3: the Logistics Center: the bed on stand 13 (a big stand there), the hay wagon refused on its small stand 25 (\"… show it on stands 1 – 24.\")",
+	Collection.stands(H) == 26 and okBig == true and standOf(hb) == 13 and okSmall == false and standOf(hw) == nil
+		and string.find(tostring(whySmall), "too big for small stand 25: show it on stands 1 – 24.", 1, true) ~= nil, whySmall)
+bulk(H, { kind = "fillbest" })
+local smallOk = true
+for _, entry in Collection.stock(H) do
+	local def = Rules.defOf(entry.item)
+	if entry.stand and entry.stand > 24 and def then
+		smallOk = smallOk and WarehouseLayout.fits(entry.stand, def.size, 5)
+	end
+end
+check("8.3: … FILL BEST there: the hay wagon on a big stand, nothing too big on 25 or 26 (the level's fits)", standOf(hw) ~= nil and (standOf(hw) :: number) <= 24 and smallOk and fitsHall(), standOf(hw))
+bulk(H, { kind = "undisplayall" })
+profileH.sandboxUpgrades = { warehouse = 3, stands = 1 } -- (back to the Big Warehouse for what follows)
+Collection.upgrade(H, function() end)
+E.flush()
 
 -- 💰 SELL…: duplicates (the best of each kept, also when it is on show), broken, common
 check("the sofa (0.9, the better one) and a Common filler on show", Collection.display(H, hs, 1) and Collection.display(H, fillers[2], 2))
