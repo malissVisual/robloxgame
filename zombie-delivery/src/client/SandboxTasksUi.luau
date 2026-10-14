@@ -15,8 +15,13 @@
 --     gold). On a computer it hangs under the chip; on a screen too short for one column (a phone held sideways) the
 --     bonus and the weekly stand beside the dailies, centred. Modal: the mouse is free while it is open; ✕, the key,
 --     ESC, the gamepad's B, the Roblox menu or a tap beside it close it.
---   * A task done (the server's "done"): a toast ("✅ Task done: … · +$250 to claim in TASKS (J)") and the task sound;
---     a claim paid ("claimed"): a toast and the money's sound.
+--   * A task done (the server's "done"): a toast ("✅ Task done: … · claim $250 in TASKS (J)"; 8.3: the gamepad's
+--     "TASKS (D-pad ↓)", a touch screen's "TASKS"); a claim paid ("claimed"): a toast. (8.3: their sounds are
+--     client/SandboxSounds.luau's, from the same messages, one after the other with the sandbox's other stings.)
+--   * 8.3, a gamepad (shared/SandboxPad.luau, client/PadGlyph.luau): the chip's key outline shows the D-pad's glyph (↓)
+--     while a gamepad is used, the D-pad's ↓ opens and closes the panel (not while another window has the gamepad's
+--     selection); the panel keeps the selection inside it (a selection group), lands on the first CLAIM (else ✕) and
+--     keeps what was selected when a new state draws it again; B closes it.
 --   SandboxTasksUi.start()               listens (once; nothing when Config.Sandbox.On is false)
 --   SandboxTasksUi.open() / close() / toggle() / isOpen()
 --   SandboxTasksUi.state()               the last state (nil: none yet)
@@ -35,9 +40,11 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
+local SandboxPad = require(Shared.SandboxPad) -- 8.3: the chip's way on this device
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3: the gamepad's D-pad ↓, the chip's glyph
 
 local SandboxTasksUi = {}
 
@@ -221,15 +228,6 @@ local function toast(text: string)
 	end)
 end
 
-local function sound(name: string)
-	pcall(function()
-		local play = (require(script.Parent.Sounds) :: any).play
-		if type(play) == "function" then
-			play(name)
-		end
-	end)
-end
-
 -- ── The state ───────────────────────────────────────────────────────────────
 
 local function number(value: any): number?
@@ -368,8 +366,7 @@ local function arrange()
 	end
 	local text = `📋 TASKS {done}/{total}`
 	parts.label.Text = text
-	local keyShown = not touch and key ~= nil
-	parts.key.Visible = keyShown
+	local keyShown = PadGlyph.show(parts.key, "tasks") -- (its key; 8.3: the D-pad's glyph with a gamepad; none on touch)
 	parts.badge.Visible = ready > 0
 	parts.badge.Text = tostring(ready)
 	local chipH = HUD.Chip
@@ -713,6 +710,14 @@ draw = function()
 		return -- (nothing it shows changed: no redraw, a tap is never lost)
 	end
 	shownKey = key2
+	-- 8.3: what the gamepad had selected in it (a row's CLAIM, ✕), selected again once drawn
+	local selected = Ui.gamepadSelection()
+	local heldName, heldRow = nil, nil
+	if shade and selected and selected:IsDescendantOf(shade) then
+		local parent = selected.Parent
+		heldName = selected.Name
+		heldRow = if parent then parent.Name else nil
+	end
 	if shade then
 		shade:Destroy()
 	end
@@ -738,6 +743,11 @@ draw = function()
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
+		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the panel)
+		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 	}, shade)
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, panel)
 	Ui.corner(panel, Config.UiKit.Corner)
@@ -780,7 +790,13 @@ draw = function()
 			end
 		end
 	end
-	Ui.gamepadFocus(first or close)
+	-- 8.3: what was selected before a redraw (the same row's button), else the first CLAIM, else ✕
+	local again: any = nil
+	if heldName then
+		local row = if heldRow then panel:FindFirstChild(heldRow) else nil
+		again = (if row then row:FindFirstChild(heldName) else nil) or panel:FindFirstChild(heldName)
+	end
+	Ui.gamepadFocus(again or first or close)
 end
 
 function SandboxTasksUi.open()
@@ -833,12 +849,10 @@ local function onEvent(message: any)
 		end
 	elseif kind == "done" and type(message.title) == "string" then
 		local money = number(message.money) or 0
-		local where = if Ui.touchLayout() then "TASKS" else `TASKS ({T.Key})`
+		local where = SandboxPad.named("tasks", PadGlyph.device()) -- (8.3: "TASKS (J)", "TASKS (D-pad ↓)", "TASKS")
 		toast(`✅ {if message.weekly == true then "Weekly task" else "Task"} done: {message.title} · claim {Ui.money(money)} in {where}`)
-		sound("task_done")
 	elseif kind == "claimed" and type(message.title) == "string" then
 		toast(`💰 {message.title}: +{Ui.money(number(message.money) or 0)}`)
-		sound("cash")
 	end
 end
 
@@ -860,10 +874,11 @@ function SandboxTasksUi.start()
 		end
 		if (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) and opened then
 			SandboxTasksUi.close()
-		elseif input.KeyCode == key and key ~= nil and not processed and parts.gui and parts.gui.Enabled then
-			SandboxTasksUi.toggle()
+		elseif ((input.KeyCode == key and key ~= nil and not processed) or PadGlyph.pressed(input, processed, "tasks")) and parts.gui and parts.gui.Enabled then
+			SandboxTasksUi.toggle() -- (its key; 8.3: the gamepad's D-pad ↓)
 		end
 	end)
+	PadGlyph.watch(arrange) -- (8.3: a gamepad picked up or put down: the chip's key again)
 	GuiService.MenuOpened:Connect(SandboxTasksUi.close)
 	local camera = workspace.CurrentCamera
 	if camera then

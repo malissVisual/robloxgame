@@ -3701,6 +3701,28 @@ Config.Soundscape = {
 		SlideRange = 90, -- … heard this many studs from the camera
 		Step = 0.55, -- your foot onto a Sprinter's rear or side step (van_step_up) …
 		StepGap = 0.8, -- … at most every this many seconds
+		-- 8.3, the 8.2 features' feedback (the existing sheets only; shared/SoundPlan.luau feedbackOf / feedbackCues /
+		-- slot, client/SandboxSounds.luau): the stings play one after the other, never over each other (the trip home's
+		-- fanfare, then the book's chime, then a milestone's fanfare); the same one again only after its Gap s; one that
+		-- would wait longer than FeedbackWait s behind the others is left out.
+		Discovery = 0.5, -- a piece new in your collection book (ding: a bright bell, a little higher) …
+		DiscoveryGap = 2,
+		Milestone = 0.6, -- a book milestone paid (level_up: the bells' fanfare) …
+		MilestoneGap = 4,
+		TaskDone = 0.6, -- a task done (task_done) …
+		TaskDoneGap = 1.5,
+		Claimed = 0.55, -- a task's reward claimed (cash: the money's ka-ching) …
+		ClaimedGap = 0.6,
+		Fill = 0.38, -- ⭐ FILL BEST: a few soft stand clicks (stand_display, quieter, each a little higher) …
+		FillClicks = 3, -- … at most this many (fewer when fewer pieces went up) …
+		FillEvery = 0.13, -- … this many seconds apart …
+		FillGap = 2,
+		FillQuiet = 1.5, -- … and the state after it plays no stand_display of its own for this many seconds
+		BulkSold = 0.9, -- 💰 SELL…'s sale: the till once (sale_register), louder than one piece's …
+		BulkKa = 0.5, -- … the old ka-ching (cash) on top of it …
+		BulkKaAt = 0.12, -- … this many seconds in …
+		BulkGap = 1.5,
+		FeedbackWait = 4.5,
 	},
 }
 
@@ -7040,6 +7062,12 @@ Config.Warehouse = {
 --   Chip / ChipText          the "📦 N in stock" chip under them (on a touch screen at least Ui.MinTouch screen px high)
 --   TouchScale               the money block's smallest scale on a touch screen (it is never smaller than this)
 --   StockKey                 the key that opens / closes the STOCK list (a computer)
+--   StockPad                 8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's ←; shared/SandboxPad.luau
+--                            has the sandbox's D-pad map and why ↑ stays Roblox's)
+--   Hints                    8.3, the first-time hints (shared/SandboxHints.luau, client/SandboxHintsUi.luau): a hint shows
+--                            Delay s after what made it matter, at least Gap s after the hint before (one at a time), and
+--                            waits while something covers the screen, looked at every Every s; the ⭐ FILL BEST hint
+--                            once FillStock pieces that would earn wait in the stock beside a free stand
 --   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
 --   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
 --                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
@@ -7059,6 +7087,8 @@ Config.SandboxHud = {
 	ChipText = 14,
 	TouchScale = 0.8,
 	StockKey = "B",
+	StockPad = "DPadLeft", -- 8.3: the gamepad's way to the STOCK list
+	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5 }, -- 8.3: the first-time hints
 	Toast = 3,
 	MaxToasts = 3,
 	Picker = {
@@ -7163,6 +7193,7 @@ Config.SandboxUpgrades = {
 --                "collectibles": every collectible; "legendary": a legendary piece found) and its reward ($: paid once,
 --                by the server, "BookMilestone")
 --   Key          the key that opens and closes the book (a computer)
+--   Pad          8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's →; shared/SandboxPad.luau)
 --   Flag         the save's mark: profile.collectionBook is read only from a real save written with it (an older real
 --                save fills the book from its stock, and its milestones pay on the first join)
 --   MaxCount     the most "brought home" a piece counts
@@ -7179,10 +7210,11 @@ Config.CollectionBook = {
 		{ id = "found10", name = "Found 10 pieces", kind = "found", need = 10, reward = 250 },
 		{ id = "found20", name = "Found 20 pieces", kind = "found", need = 20, reward = 500 },
 		{ id = "furniture", name = "All the furniture", kind = "furniture", reward = 1500 },
-		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 2500 },
+		{ id = "collectibles", name = "Found every collectible", kind = "collectibles", reward = 5000 }, -- (8.3: 24 collectibles now, was $2,500 for 12)
 		{ id = "legendary", name = "A legendary!", kind = "legendary", reward = 750 },
 	} :: { BookMilestone },
 	Key = "C", -- (8.2 review: C for Collection; K stays the crew panel's, as the crew's texts say)
+	Pad = "DPadRight", -- 8.3: the gamepad's way to the book (shared/SandboxPad.luau)
 	Flag = "collectionBookKept",
 	MaxCount = 1_000_000,
 	Window = {
@@ -7220,11 +7252,14 @@ Config.CollectionBook = {
 --   income    $ your display stands paid
 --   upgrade   levels bought at the UPGRADES desk (never picked once every upgrade is at its top)
 --   danny     Danny holds the other end of your `item` (the sofa) while you carry it
+--   hotsell   8.3: pieces of today's hot kinds you sold (Config.Market)
+--   hotincome 8.3: $ your hot pieces on show earned (their share of what the stands paid)
 -- `text` is the title ({n} the target; `one` when it is 1), `target` the range it is picked from (in `step`s), `money`
 -- the reward at the range's low end (its high end pays TopShare more, rounded to $10), `icon` its emoji.
 --   AllDaily   the bonus for every daily done (its own CLAIM); a task done and not claimed when the day (the week)
 --              turns is paid then
 --   Key        the key that opens and closes the panel (a computer)
+--   Pad        8.3: the gamepad's button for it (an Enum.KeyCode name: the D-pad's ↓; shared/SandboxPad.luau)
 --   StateGap   s between two states to one player; CheckEvery: s between two looks for the reset at 00:00 UTC;
 --              SaveDelay: s from a claim to its save (one save for a burst); DannyEvery: s between two looks whether
 --              Danny holds the other end of your piece (only while a danny task is open)
@@ -7250,6 +7285,7 @@ Config.SandboxTasks = {
 	TopShare = 0.5,
 	RareRank = 3,
 	Key = "J",
+	Pad = "DPadDown", -- 8.3: the gamepad's way to the TASKS panel (shared/SandboxPad.luau)
 	StateGap = 0.5,
 	CheckEvery = 10,
 	SaveDelay = 5,
@@ -7265,6 +7301,9 @@ Config.SandboxTasks = {
 		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 250 },
 		{ id = "upgrade", event = "upgrade", icon = "⬆️", text = "Buy {n} upgrades", one = "Buy an upgrade", target = { 1, 1 }, money = 250 },
 		{ id = "danny", event = "danny", item = "sofa", icon = "🛋️", text = "Carry the sofa with Danny", target = { 1, 1 }, money = 200 },
+		-- 8.3, the market (Config.Market): one of these a day at most
+		{ id = "hotsell", group = "market", event = "hotsell", icon = "🔥", text = "Sell {n} hot items", one = "Sell a hot item", target = { 1, 2 }, money = 250 },
+		{ id = "hotincome", group = "market", event = "hotincome", icon = "🔥", text = "Earn ${n} from hot items on show", target = { 100, 250 }, step = 50, money = 250 },
 	} :: { SandboxTaskDef },
 	WeeklyPool = {
 		{ id = "w_home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 60, 90 }, step = 10, money = 2500 },
@@ -7313,6 +7352,38 @@ Config.SandboxLeaders = {
 		Range = 260,
 	},
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
+}
+
+-- 8.3 SANDBOX, the market (the owner: selling should be a decision, not a reflex). shared/Market.luau has the rules
+-- (tests/market_test.luau), server/Collection.luau prices every sale and the stands' income with it, the STOCK list and
+-- the picker show it (client/WarehouseUi.luau: the 🔥 / ❄ tags, the header's line, prices with the market in them).
+-- Every UTC day, picked from the day's number alone (the same on every server and for everybody):
+--   Hot               kinds are hot: they sell for × HotSell and earn × HotIncome on show; HotCollectibles of them are
+--                     collectibles (a piece with its own rarity), the rest ordinary furniture
+--   Cold              kinds of furniture are cold: they sell for × ColdSell
+--   MinValue          the cheapest kind ($, its catalogue value) the market picks: the sandbox house's kinds (the
+--                     catalogue without Walt's farm pieces) worth this or more (a new piece joins by itself)
+-- And per player, kept in the save (profile.market, only from a real save written with Flag):
+--   Drop / MaxDrop    every piece of a kind you sell lowers that kind's price for you by Drop, at most MaxDrop (a bulk
+--                     sale's pieces one after the other)
+--   Recover           s for one piece's Drop to come back; at 00:00 UTC all of it comes back
+--   Salt              the picks' dice (a new salt: other days)
+-- The tuning: a piece sells for about ten minutes of showing it (Config.Collection), so a hot one sells for about 16 and
+-- earns a quarter more while it stays; a cold one is better kept on show until tomorrow; selling eight radios at once
+-- pays the last few 40 % less, and 20 minutes later the next sells 5 % dearer again.
+Config.Market = {
+	Hot = 3,
+	HotCollectibles = 1,
+	Cold = 1,
+	HotSell = 1.6,
+	HotIncome = 1.25,
+	ColdSell = 0.7,
+	MinValue = 100,
+	Drop = 0.05,
+	MaxDrop = 0.4,
+	Recover = 1200,
+	Salt = 8303,
+	Flag = "marketKept",
 }
 
 -- 8.3 SANDBOX, the light (the owner: "it is too bright: in the house I cannot see my own character, and walking into the

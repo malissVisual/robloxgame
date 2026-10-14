@@ -54,19 +54,43 @@
 --   SoundPlan.reverb(place)                       SoundService.AmbientReverb's name there ("NoReverb" outdoors)
 --   SoundPlan.cowbellGap(r)                       seconds to the next far cowbell (r: a random 0 … 1)
 --   SoundPlan.cowbellSpot(x, z, r1, r2)           where it rings: a random way round (x, z), CowbellFar studs off
---   SoundPlan.collectionCues(was, now, sinceResult)   two "Collection" states one after the other (server/Collection.luau)
---                                                 → the cues: pieces that came home (stored_fanfare; not when the move's
---                                                 result card played its own jingle sinceResult s ago), a piece put on a
---                                                 stand or moved to another (stand_display), one taken down
---                                                 (stand_takedown); one of each at most, nothing on the first state
+--   SoundPlan.collectionCues(was, now, sinceResult, sinceFill)   two "Collection" states one after the other
+--                                                 (server/Collection.luau) → the cues: pieces that came home
+--                                                 (stored_fanfare; not when the move's result card played its own jingle
+--                                                 sinceResult s ago), a piece put on a stand or moved to another
+--                                                 (stand_display; 8.3: not FillQuiet s after ⭐ FILL BEST, sinceFill: its
+--                                                 clicks said it), one taken down (stand_takedown); one of each at most,
+--                                                 nothing on the first state
 --   SoundPlan.incomeClink(gained, now, last, soldAt, open, earning)   does money that came in clink: the stands'
 --                                                 income (pieces on show earn), not a sale's (SoldQuiet s after it), the
 --                                                 warehouse's window shut, IncomeGap s since the last clink
 --   SoundPlan.slideSound(open)                    the Sprinter's sliding door rolling open / slammed shut
 --   SoundPlan.isStep(name)                        is a part of this name a Sprinter's step (its rear or side step)
+--
+-- 8.3 SANDBOX, the 8.2 features' feedback (the existing sheets only: sfx, sfx2, sfx3, sfx4 with its stand-ins;
+-- Config.Soundscape.Sandbox's Discovery … FeedbackWait; client/SandboxSounds.luau plays them from the remotes' existing
+-- messages). The kinds: "stored" (the trip home's fanfare, collectionCues'), "discovery" (a piece new in the collection
+-- book: ding, a bright bell), "milestone" (a book milestone paid: level_up, the bells' fanfare), "taskDone" (task_done),
+-- "claimed" (a task's reward: cash), "fill" (⭐ FILL BEST: a few soft stand clicks, stand_display), "bulkSold" (💰 SELL…:
+-- the till once, sale_register louder, the old ka-ching, cash, on top).
+--   SoundPlan.feedbackOf(remote, message) -> (kind?, count)   what a message of the "CollectionBook", "SandboxTasks" or
+--                                                 "Collection" remote plays (count: the pieces it was about); nil: none
+--                                                 (one piece sold is the till's own, as before)
+--   SoundPlan.feedbackCues(kind, count?) -> { Timed }   its cues, each `at` s after it starts
+--   SoundPlan.seconds(name) -> number             how long a sound plays: its region on the sheet that plays it (the
+--                                                 sheet when its id is in, else its stand-in's, as client/Sounds.luau
+--                                                 finds it)
+--   SoundPlan.lane() -> Lane / SoundPlan.slot(lane, kind, now, count?) -> number?   when a kind starts (the clock's
+--                                                 time): a sting (stored, discovery, milestone, taskDone) waits until the
+--                                                 one before it ends, never over it; an answer to your own press
+--                                                 (claimed, fill, bulkSold) at once, the stings after it wait; nil: left
+--                                                 out (the same kind within its Gap, or a wait over FeedbackWait)
+--   SoundPlan.hold(lane, now, seconds)            another module's sting plays now (the move's result card's jingle):
+--                                                 the lane's stings wait for it too
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
+local SoundSheet = require(script.Parent.SoundSheet) -- (8.3: how long a sound plays)
 local MoveRoles = require(script.Parent.MoveRoles)
 local SandboxMap = require(script.Parent.SandboxMap)
 
@@ -427,7 +451,7 @@ local function standsOf(state: any): { [string]: number }?
 	return out
 end
 
-function SoundPlan.collectionCues(was: any, now: any, sinceResult: number?): { Cue }
+function SoundPlan.collectionCues(was: any, now: any, sinceResult: number?, sinceFill: number?): { Cue }
 	local B = S.Sandbox
 	local cues: { Cue } = {}
 	local before, after = standsOf(was), standsOf(now)
@@ -451,7 +475,7 @@ function SoundPlan.collectionCues(was: any, now: any, sinceResult: number?): { C
 	if came > 0 and not (sinceResult and sinceResult < B.StoredQuiet) then
 		table.insert(cues, cueOf("stored_fanfare", B.Stored))
 	end
-	if shown then
+	if shown and not (sinceFill and sinceFill < B.FillQuiet) then -- (8.3: FILL BEST's clicks said it)
 		table.insert(cues, cueOf("stand_display", B.Display))
 	end
 	if taken then
@@ -473,6 +497,148 @@ local STEPS = { RearStep = true, SideStep = true } -- (shared/SprinterLooks.luau
 
 function SoundPlan.isStep(name: string): boolean
 	return STEPS[name] == true
+end
+
+-- ── 8.3 SANDBOX: the book's, the tasks' and the bulk actions' feedback ──────────────────────────────────────────────
+
+export type Timed = { name: string, volume: number, pitch: number, at: number }
+export type Lane = { free: number, last: { [string]: number } }
+
+SoundPlan.FeedbackKinds = { "stored", "discovery", "milestone", "taskDone", "claimed", "fill", "bulkSold" }
+local ANSWERS = { claimed = true, fill = true, bulkSold = true } -- (your own press: at once)
+
+local function count(value: any): number
+	return if type(value) == "number" and value == value and value > -math.huge and value < math.huge then math.floor(value) else 0
+end
+
+function SoundPlan.feedbackOf(remote: string, message: any): (string?, number)
+	if type(message) ~= "table" then
+		return nil, 0
+	end
+	local kind = message.kind
+	if remote == "CollectionBook" then
+		if kind == "state" and type(message.new) == "table" then
+			local n = 0
+			for _, item in message.new do
+				if type(item) == "string" then
+					n += 1
+				end
+			end
+			if n > 0 then
+				return "discovery", n
+			end
+		elseif kind == "milestone" and type(message.id) == "string" then
+			return "milestone", 1
+		end
+	elseif remote == "SandboxTasks" then
+		if kind == "done" then
+			return "taskDone", 1
+		elseif kind == "claimed" then
+			return "claimed", 1
+		end
+	elseif remote == "Collection" then
+		if kind == "bulk" and message.action == "fillbest" and count(message.count) > 0 then
+			return "fill", count(message.count)
+		elseif kind == "sold" and count(message.count) >= 2 then
+			return "bulkSold", count(message.count)
+		end
+	end
+	return nil, 0
+end
+
+local function timed(name: string, volume: number, pitch: number, at: number): Timed
+	return { name = name, volume = volume, pitch = pitch, at = at }
+end
+
+function SoundPlan.feedbackCues(kind: string, n: number?): { Timed }
+	local B = S.Sandbox
+	if kind == "stored" then
+		return { timed("stored_fanfare", B.Stored, 1, 0) }
+	elseif kind == "discovery" then
+		return { timed("ding", B.Discovery, 1.12, 0) }
+	elseif kind == "milestone" then
+		return { timed("level_up", B.Milestone, 1, 0) }
+	elseif kind == "taskDone" then
+		return { timed("task_done", B.TaskDone, 1, 0) }
+	elseif kind == "claimed" then
+		return { timed("cash", B.Claimed, 1.04, 0) }
+	elseif kind == "fill" then
+		local clicks: { Timed } = {}
+		for i = 1, math.clamp(math.floor(n or 1), 1, B.FillClicks) do
+			table.insert(clicks, timed("stand_display", B.Fill, 1 + 0.07 * (i - 1), (i - 1) * B.FillEvery))
+		end
+		return clicks
+	elseif kind == "bulkSold" then
+		return { timed("sale_register", B.BulkSold, 0.94, 0), timed("cash", B.BulkKa, 1, B.BulkKaAt) }
+	end
+	return {}
+end
+
+function SoundPlan.seconds(name: string): number
+	local sheets = {
+		{ sheet = SoundSheet.Sfx, up = true },
+		{ sheet = SoundSheet.Sfx2, up = SoundSheet.Sfx2Id ~= "" },
+		{ sheet = SoundSheet.Sfx3, up = SoundSheet.Sfx3Id ~= "" },
+		{ sheet = SoundSheet.Sfx4, up = SoundSheet.Sfx4Id ~= "" },
+	}
+	local now: string? = name
+	for _ = 1, 6 do -- (a stand-in's stand-in)
+		local look = now
+		if not look then
+			break
+		end
+		for _, entry in sheets do
+			local region = entry.sheet[look]
+			if entry.up and region then
+				return region[2]
+			end
+		end
+		now = SoundSheet.Fallback[look]
+	end
+	return 0
+end
+
+function SoundPlan.lane(): Lane
+	return { free = -math.huge, last = {} }
+end
+
+function SoundPlan.hold(lane: Lane, now: number, seconds: number)
+	lane.free = math.max(lane.free, now + math.max(0, seconds))
+end
+
+local function gapOf(kind: string): number
+	local B = S.Sandbox
+	local gaps: { [string]: number } = {
+		discovery = B.DiscoveryGap,
+		milestone = B.MilestoneGap,
+		taskDone = B.TaskDoneGap,
+		claimed = B.ClaimedGap,
+		fill = B.FillGap,
+		bulkSold = B.BulkGap,
+	}
+	return gaps[kind] or 0
+end
+
+function SoundPlan.slot(lane: Lane, kind: string, now: number, n: number?): number?
+	local cues = SoundPlan.feedbackCues(kind, n)
+	if #cues == 0 then
+		return nil
+	end
+	local last = lane.last[kind]
+	if last and now - last < gapOf(kind) then
+		return nil -- (the same again too soon: a burst is one)
+	end
+	local at = if ANSWERS[kind] then now else math.max(now, lane.free)
+	if at - now > S.Sandbox.FeedbackWait then
+		return nil -- (too far behind the stings before it)
+	end
+	lane.last[kind] = now
+	local length = 0
+	for _, cue in cues do
+		length = math.max(length, cue.at + SoundPlan.seconds(cue.name) / cue.pitch)
+	end
+	lane.free = math.max(lane.free, at + length)
+	return at
 end
 
 return SoundPlan

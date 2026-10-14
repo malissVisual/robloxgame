@@ -18,15 +18,24 @@
 --   * toasts: a piece sold ("Sold Grandpa's Clock · +$420", client/WarehouseUi.luau's "sold") and pieces brought home
 --     ("+5 pieces in your warehouse", when a state's stock grew): Hud.toast; without client/Hud.luau a column of its own
 --     at the top left with its own toasts in the same look
+--   * 8.3: once after joining (and again when the market's day turns while you play) "🔥 Hot today: Old Globe, Jukebox,
+--     Sofa (sell ×1.6, on show ×1.25)" (shared/Market.luau hotToast, the state's market), held back while the HUD is
+--     hidden (the start screen) and told when it shows
 -- Standing in Hud's column keeps it clear of what the HUD still shows in the sandbox: the toasts flow under it, the
 -- health row (bottom left on a computer; on a touch screen the left column the column stands beside), MOUSE [ALT] and
 -- the key hints at the top right, the move's blocks at the top in the middle (tools/phone-ui/sandbox.luau checks it).
 -- A touch screen: the block is never smaller than Config.SandboxHud.TouchScale and its chip is a finger's size
 -- (Ui.MinTouch screen px). SandboxHud.start() does nothing when Config.Sandbox.On is false; it also starts
 -- client/WarehouseUi.luau (once).
+-- 8.3, every device (shared/SandboxPad.luau, client/PadGlyph.luau): a chip's key outline shows its key on a computer
+-- (B, C), the gamepad's D-pad glyph while a gamepad is used (← the STOCK list, → the book; drawn again when the device
+-- changes), nothing on a touch screen; the D-pad's ← opens and closes the STOCK list (not while a window has the
+-- gamepad's selection). The server's notices come through SandboxHud.notice (client/Main.client.luau): in this
+-- device's words. It also starts the first-time hints (client/SandboxHintsUi.luau: their toasts are its toasts).
 --   SandboxHud.start()         builds it and listens
 --   SandboxHud.setState(state) the player's State (its money)
 --   SandboxHud.toast(text)     a toast (SandboxHud.notify when set, else Hud.toast, else its own)
+--   SandboxHud.notice(text)    8.3: a server's notice as a toast, in this device's words (SandboxPad.notice)
 --   SandboxHud.block()         its frame (nil before start); SandboxHud.gui() its ScreenGui "SandboxHud"
 -- Presentation only: the server decides the money and the collection.
 
@@ -42,6 +51,8 @@ local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
 local Juice = require(script.Parent.Juice)
 local WarehouseUi = require(script.Parent.WarehouseUi)
+local PadGlyph = require(script.Parent.PadGlyph) -- 8.3: the chips' keys on every device, the gamepad's D-pad
+local Market = require(Shared.Market) -- 8.3: the market's toast
 
 local SandboxHud = {}
 
@@ -61,6 +72,8 @@ local inStock = 0
 local stockKey: Enum.KeyCode? = nil
 local arrangeQueued = false
 local toastOrder = 0
+local marketTold: number? = nil -- 8.3: the market day the "Hot today" toast was for
+local marketToast: string? = nil -- 8.3: … waiting for the HUD to show
 
 local function sandboxOn(): boolean
 	local sandbox = (Config :: any).Sandbox
@@ -117,12 +130,12 @@ local function arrange()
 	parts.income.Visible = income > 0
 	parts.income.Text = incomeText
 	parts.income.Size = UDim2.fromOffset(cardW - 2 * PAD_X, HUD.IncomeSize + 4)
-	-- the chip: "📦 N in stock" (and its key on a computer), a finger's size on a touch screen
+	-- the chip: "📦 N in stock" (and its key on a computer, 8.3: the D-pad's glyph with a gamepad), a finger's size on a
+	-- touch screen
 	local chip = parts.chip
 	local chipText = `📦 {inStock} in stock`
 	chip.Text = chipText
-	local keyShown = not touch and stockKey ~= nil
-	parts.key.Visible = keyShown
+	local keyShown = PadGlyph.show(parts.key, "stock")
 	local chipH = HUD.Chip
 	local chipW = CardKit.width(chipText, HUD.ChipText, Theme.HeadingFont) + 24 + (if keyShown then 28 else 0)
 	if touch then
@@ -133,12 +146,12 @@ local function arrange()
 	chip.Size = UDim2.fromOffset(chipW, chipH)
 	chip.Position = UDim2.fromOffset(0, cardH + GAP)
 	parts.chipCorner.CornerRadius = UDim.new(0, math.floor(chipH / 2))
-	-- 8.2: the "📖 BOOK" chip beside it, as tall (its key on a computer)
+	-- 8.2: the "📖 BOOK" chip beside it, as tall (its key on a computer; 8.3: the D-pad's glyph with a gamepad)
 	local rowW = chipW
 	local book = parts.book
 	if book then
-		parts.bookKey.Visible = not touch
-		local bookW = CardKit.width(book.Text, HUD.ChipText, Theme.HeadingFont) + 24 + (if touch then 0 else 28)
+		local bookKeyShown = PadGlyph.show(parts.bookKey, "book")
+		local bookW = CardKit.width(book.Text, HUD.ChipText, Theme.HeadingFont) + 24 + (if bookKeyShown then 28 else 0)
 		if touch then
 			bookW = math.max(bookW, math.ceil(Ui.MinTouch / scale))
 		end
@@ -233,8 +246,20 @@ function SandboxHud.toast(text: string)
 	local notify: ((string) -> ())? = SandboxHud.notify or hudToast
 	if notify then
 		notify(text)
-	else
+	elseif parts.toasts then
 		ownToast(text)
+	else
+		pcall(function() -- (8.3: not built yet: the HUD's toast all the same, a notice is never lost)
+			require(script.Parent.Hud).toast(text)
+		end)
+	end
+end
+
+-- 8.3: a server's notice (the Notice remote, client/Main.client.luau) in this device's words: a key in brackets goes on
+-- a touch screen and with a gamepad, a chip's name gets this device's key ("📋 TASKS" → "📋 TASKS (J)").
+function SandboxHud.notice(text: any)
+	if type(text) == "string" then
+		SandboxHud.toast(PadGlyph.words(text))
 	end
 end
 
@@ -387,7 +412,23 @@ function SandboxHud.setState(state: any)
 	end
 end
 
+-- 8.3: the market's toast, once the HUD shows (not on the start screen).
+local function tellMarket()
+	local text = marketToast
+	local screen = parts.gui
+	if text and screen and screen.Enabled then
+		marketToast = nil
+		SandboxHud.toast(text)
+	end
+end
+
 local function onState(state: WarehouseUi.State, previous: WarehouseUi.State?)
+	local market = state.market
+	if market and (marketTold == nil or market.day > marketTold) then
+		marketTold = market.day
+		marketToast = Market.hotToast(market)
+		tellMarket()
+	end
 	income = state.income
 	local count = 0
 	for _, entry in state.stock do
@@ -438,6 +479,7 @@ function SandboxHud.start()
 	end)
 	stockKey = if ok then key else nil
 	build(holder())
+	parts.gui:GetPropertyChangedSignal("Enabled"):Connect(tellMarket) -- (8.3: the market's toast when the HUD shows)
 	WarehouseUi.notify = SandboxHud.toast
 	if parts.bookUi then
 		parts.bookUi.notify = SandboxHud.toast -- (8.2: the collection book's toasts)
@@ -446,7 +488,8 @@ function SandboxHud.start()
 	WarehouseUi.start()
 	task.spawn(watchLeaderstats)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed or input.KeyCode ~= stockKey or UserInputService:GetFocusedTextBox() then
+		local pad = PadGlyph.pressed(input, processed, "stock") -- (8.3: the gamepad's D-pad ←)
+		if not pad and (processed or input.KeyCode ~= stockKey or UserInputService:GetFocusedTextBox()) then
 			return
 		end
 		local screen = parts.gui
@@ -455,6 +498,18 @@ function SandboxHud.start()
 		end
 		WarehouseUi.toggleStock()
 	end)
+	PadGlyph.watch(arrange) -- (8.3: a gamepad picked up or put down: the chips' keys again)
+	-- 8.3: the first-time hints (their toasts are this HUD's)
+	local hintsOk, hints = pcall(function(): any
+		return require(script.Parent.SandboxHintsUi)
+	end)
+	if hintsOk and type(hints) == "table" then
+		hints.notify = SandboxHud.toast
+		local startedOk, why = pcall(hints.start)
+		if not startedOk then
+			warn(`[SandboxHud] the first-time hints did not start: {why}`)
+		end
+	end
 	-- a new screen size, Hud's column moved (the chat opened or closed) or scaled again: laid out again
 	local camera = workspace.CurrentCamera
 	if camera then

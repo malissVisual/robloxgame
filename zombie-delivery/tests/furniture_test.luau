@@ -294,10 +294,10 @@ do
 end
 
 -- 8.0 SANDBOX collectibles (design/sandbox/KONTRAKT.md): the rare pieces (FurnitureLooks.Collectibles, one block at the
--- catalogue's end) are the only ones with a rarity, every rarity a valid one (FurnitureLooks.Rarities); each in a house
--- room, never a ★ candidate, dearer than every ordinary piece of its class, the rarer the dearer (a rarity's cheapest
--- over the dearest of the one below), its model marked with its rarity; the pieces asked for as asked. And every piece of
--- the catalogue fits the Sprinter's bay (the sprinter worker's: 6.6 wide, 7.6 tall, 14.0 long) the way the packing
+-- catalogue's end; 8.3: 24 of them) are the only ones with a rarity, every rarity a valid one (FurnitureLooks.Rarities);
+-- each in a house room, never a ★ candidate, dearer than every ordinary piece of its class, the rarer the dearer (a
+-- rarity's cheapest over the dearest of the one below), its model marked with its rarity; the pieces asked for as asked.
+-- And every piece of the catalogue fits the Sprinter's bay (the sprinter worker's: 6.6 wide, 7.6 tall, 14.0 long) the way the packing
 -- puts it in (shared/MovingRules.luau): standing, turned 90° about Y at most, or a two-hands or two-person piece lying on
 -- either side (Config.Moving.Pack.Lie: MovingRules.laid); with the moves worker's Config.Moving.Beds.sprinter, that bed
 -- too.
@@ -310,11 +310,11 @@ do
 	check("the rarities, commonest first", table.concat(Rarities, ",") == "uncommon,rare,epic,legendary")
 	local list = FurnitureLooks.Collectibles
 	local first = table.find(Order, list[1]) or 0
-	local block = #list >= 8 and #list <= 12 and first > 0 and first + #list - 1 == #Order
+	local block = #list == 24 and first > 0 and first + #list - 1 == #Order -- (8.3: the first 12 and twelve more)
 	for n, id in list do
 		block = block and Order[first + n - 1] == id
 	end
-	check(`the collectibles ({#list}): 8 to 12, one block at the catalogue's end`, block)
+	check(`the collectibles ({#list}): 24, one block at the catalogue's end`, block)
 	local houseRooms: { [string]: boolean } = {}
 	for _, r in FurnitureLooks.Rooms do
 		houseRooms[r] = true
@@ -371,6 +371,19 @@ do
 		{ "ship_bottle", "hand", true, "kids" },
 		{ "arcade_cabinet", "pair", false, "kids" },
 		{ "stag_head", "both", false, "hall" },
+		-- 8.3
+		{ "antique_typewriter", "hand", false, "bedroom" },
+		{ "vintage_camera", "both", true, "hall" },
+		{ "carved_bear", "both", false, "hall" },
+		{ "gramophone", "both", true, "living" },
+		{ "pocket_watch", "hand", true, "bedroom" },
+		{ "golden_horseshoe", "hand", false, "hall" },
+		{ "crystal_chandelier", "both", true, "kitchen" },
+		{ "alphorn", "pair", false, "garage" },
+		{ "signed_guitar", "both", true, "kids" },
+		{ "ski_trophy", "both", false, "living" },
+		{ "trex_skull", "pair", true, "garage" },
+		{ "zombie_safe", "pair", false, "bedroom" },
 	}
 	for _, w in want do
 		local def = Items[w[1]]
@@ -378,6 +391,9 @@ do
 	end
 	check("the jukebox is heavy, the knight's armour tall, both legendary pieces among the dearest of all",
 		Items.jukebox.weight >= 8 and Items.knight_armour.size.Y >= 6 and Items.oil_painting.rarity == "legendary" and Items.knight_armour.rarity == "legendary")
+	check("8.3: five legendary pieces (the ski trophy, the T. rex skull, the zombie-proof safe besides the two), the safe as heavy as the anvil, the alphorn the longest collectible",
+		count.legendary == 5 and Items.ski_trophy.rarity == "legendary" and Items.trex_skull.rarity == "legendary" and Items.zombie_safe.rarity == "legendary"
+			and Items.zombie_safe.weight == 10 and Items.alphorn.size.X >= 7)
 
 	-- every piece into the Sprinter (and the moves worker's bed for it, once there)
 	local function fitsIn(bed: { Width: number, Height: number, Length: number }, def: any): boolean

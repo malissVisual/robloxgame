@@ -209,7 +209,7 @@ AnalyticsPlan.Events = {
 	-- 8.0 SANDBOX, the collection (server/Collection.luau; field: the rarity)
 	"CollectionAdded", -- pieces came home into the warehouse's stock (value: how many at once; field: the rarest)
 	"CollectionDisplayed", -- a piece put on show on a display stand (value: its $ a minute)
-	"CollectionSold", -- a piece sold (value: its price)
+	"CollectionSold", -- a piece sold (value: its price; 8.3: a second field, the market: "hot", "cold" or none)
 	-- 8.1 SANDBOX, the upgrades (server/Upgrades.luau; value: the level bought, field: the upgrade's id)
 	"UpgradeBought",
 	-- 8.2 SANDBOX, the moves, the grip and the finds (server/SandboxAnalytics.luau; the fields' words: moveHow, band)

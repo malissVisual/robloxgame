@@ -198,7 +198,7 @@ if Config.Sandbox.On then
 			pcall(setState, state)
 		end
 	end)
-	Net.get("Notice").OnClientEvent:Connect(Hud.toast)
+	Net.get("Notice").OnClientEvent:Connect(if SandboxHud and type(SandboxHud.notice) == "function" then SandboxHud.notice else Hud.toast) -- (8.3: in this device's words)
 
 	local function play()
 		pcall(function()

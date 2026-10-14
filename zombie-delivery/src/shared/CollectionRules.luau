@@ -15,13 +15,18 @@
 --                                        the rarest tier whose `min` its value reaches; tier(id) the tier (Config's),
 --                                        tierOf(entry) the piece's
 --   CollectionRules.broken(entry)        its condition is at or under BrokenAt
---   CollectionRules.income(entry, boost?)   $ a minute while it is on show: value × its tier's income × condition (0
---                                        broken) × boost (8.1: the owner's Showroom lights, CollectionRules.boost; 1
---                                        without one)
---   CollectionRules.sell(entry)          $ it sells for (a whole number): value × its tier's sell × condition, at least
---                                        $1; broken: scrap (value × Scrap, at least $1)
---   CollectionRules.view(entry, boost?)  a copy with rarity, value, income (× boost), price and broken for the client
---   CollectionRules.totals(entries, boost?)   { count, shown, value, income (the pieces on show, × boost), sell (all) }
+--   CollectionRules.income(entry, boost?, market?)   $ a minute while it is on show: value × its tier's income ×
+--                                        condition (0 broken) × boost (8.1: the owner's Showroom lights,
+--                                        CollectionRules.boost; 1 without one) × the market's (8.3: shared/Market.luau's
+--                                        View: a hot kind × Config.Market.HotIncome; none: 1)
+--   CollectionRules.sell(entry, market?) $ it sells for (a whole number): value × its tier's sell × condition, at least
+--                                        $1; broken: scrap (value × Scrap, at least $1); 8.3: with the market's View that
+--                                        price through Market.price (hot × HotSell, cold × ColdSell, × the player's demand)
+--   CollectionRules.view(entry, boost?, market?)   a copy with rarity, value, income (× boost, × the market's), price (the
+--                                        market's), broken for the client; 8.3: base (the price without the market) and
+--                                        market ("hot", "cold" or nil)
+--   CollectionRules.totals(entries, boost?, market?)   { count, shown, value, income (the pieces on show, × boost, × the
+--                                        market's), sell (all, each at the market's price alone) }
 --   CollectionRules.standsFor(profile)   the display stands a player has: the warehouse's start (Config.Warehouse.Stands,
 --                                        else Config's Collection.Stands) + 8.1's More stands (profile.sandboxUpgrades,
 --                                        shared/UpgradeRules.luau), never past Config.Warehouse.MaxStands
@@ -40,6 +45,7 @@
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
 local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.1: the stands and the lights a player bought
+local Market = require(script.Parent.Market) -- 8.3: the market (hot and cold kinds, the player's demand)
 
 local CollectionRules = {}
 
@@ -66,6 +72,8 @@ export type View = {
 	income: number, -- $ a minute on show (rounded to cents)
 	price: number, -- $ it sells for now
 	broken: boolean,
+	base: number, -- 8.3: $ it sells for without the market (Market.batch prices a bulk sale from it)
+	market: string?, -- 8.3: "hot", "cold" or nil (Market.tag)
 }
 export type Totals = { count: number, shown: number, value: number, income: number, sell: number }
 
@@ -138,26 +146,30 @@ local function boostOf(boost: number?): number
 	return if finite(boost) and (boost :: number) > 0 then boost :: number else 1
 end
 
--- $ a minute while it stands on show (0 when broken), × the owner's boost (8.1: the Showroom lights).
-function CollectionRules.income(entry: { item: string, condition: number }, boost: number?): number
+-- $ a minute while it stands on show (0 when broken), × the owner's boost (8.1: the Showroom lights), × the market's
+-- (8.3: a hot kind's).
+function CollectionRules.income(entry: { item: string, condition: number }, boost: number?, market: Market.View?): number
 	if CollectionRules.broken(entry) then
 		return 0
 	end
-	return CollectionRules.valueOf(entry) * CollectionRules.tierOf(entry).income * condition(entry) * boostOf(boost)
+	return CollectionRules.valueOf(entry) * CollectionRules.tierOf(entry).income * condition(entry) * boostOf(boost) * Market.incomeFactor(market, entry.item)
 end
 
--- $ it sells for (a whole number, at least 1): its tier's share of its worth, scrap when broken.
-function CollectionRules.sell(entry: { item: string, condition: number }): number
+-- $ it sells for (a whole number, at least 1): its tier's share of its worth, scrap when broken; 8.3: with the
+-- market's View, the market's price for it now (Market.price).
+function CollectionRules.sell(entry: { item: string, condition: number }, market: Market.View?): number
 	local value = CollectionRules.valueOf(entry)
 	local price = if CollectionRules.broken(entry)
 		then value * tune().Scrap
 		else value * CollectionRules.tierOf(entry).sell * condition(entry)
-	return math.max(1, math.floor(price + 0.5))
+	local base = math.max(1, math.floor(price + 0.5))
+	return if market then Market.price(base, market, entry.item) else base
 end
 
--- A copy of the piece with what the client shows: its rarity, value, $ a minute on show (to the cent, × the boost),
--- price, broken.
-function CollectionRules.view(entry: Entry, boost: number?): View
+-- A copy of the piece with what the client shows: its rarity, value, $ a minute on show (to the cent, × the boost and
+-- the market's), price (the market's), broken; 8.3: its price without the market and its market tag.
+function CollectionRules.view(entry: Entry, boost: number?, market: Market.View?): View
+	local base = CollectionRules.sell(entry)
 	return {
 		uid = entry.uid,
 		item = entry.item,
@@ -168,23 +180,25 @@ function CollectionRules.view(entry: Entry, boost: number?): View
 		got = entry.got,
 		rarity = CollectionRules.rarityOf(CollectionRules.defOf(entry.item)),
 		value = CollectionRules.valueOf(entry),
-		income = math.floor(CollectionRules.income(entry, boost) * 100 + 0.5) / 100,
-		price = CollectionRules.sell(entry),
+		income = math.floor(CollectionRules.income(entry, boost, market) * 100 + 0.5) / 100,
+		price = if market then Market.price(base, market, entry.item) else base,
 		broken = CollectionRules.broken(entry),
+		base = base,
+		market = Market.tag(market, entry.item),
 	}
 end
 
--- The pieces' count, how many stand on show, their value, the income of the ones on show (× the boost) and the price of
--- them all.
-function CollectionRules.totals(entries: { Entry }, boost: number?): Totals
+-- The pieces' count, how many stand on show, their value, the income of the ones on show (× the boost, the market's)
+-- and the price of them all (each at the market's price alone).
+function CollectionRules.totals(entries: { Entry }, boost: number?, market: Market.View?): Totals
 	local out: Totals = { count = 0, shown = 0, value = 0, income = 0, sell = 0 }
 	for _, entry in entries do
 		out.count += 1
 		out.value += CollectionRules.valueOf(entry)
-		out.sell += CollectionRules.sell(entry)
+		out.sell += CollectionRules.sell(entry, market)
 		if entry.stand ~= nil then
 			out.shown += 1
-			out.income += CollectionRules.income(entry, boost)
+			out.income += CollectionRules.income(entry, boost, market)
 		end
 	end
 	return out

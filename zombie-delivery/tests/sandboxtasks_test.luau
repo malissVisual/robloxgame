@@ -53,7 +53,7 @@ local function made(daily: { { string | number } }, weekly: { string | number }?
 end
 
 -- ── The pools ───────────────────────────────────────────────────────────────
-local EVENTS = { home = true, rare = true, clean = true, moves = true, trips = true, shown = true, sell = true, income = true, upgrade = true, danny = true }
+local EVENTS = { home = true, rare = true, clean = true, moves = true, trips = true, shown = true, sell = true, income = true, upgrade = true, danny = true, hotsell = true, hotincome = true } -- (8.3: the market's two)
 do
 	local seen: { [string]: boolean } = {}
 	local bad = {}
@@ -99,6 +99,10 @@ do
 	end
 	check("enough groups for three dailies (and one skipped)", kinds >= T.Daily + 1, kinds)
 	check("the danny kind is the sofa (a two-person piece Danny lifts with you)", (SandboxTasks.def("danny") :: any).item == "sofa" and FurnitureLooks.Items.sofa.class == "pair")
+	local hotsell, hotincome = SandboxTasks.def("hotsell"), SandboxTasks.def("hotincome")
+	check("8.3, the market's kinds: \"Sell a hot item\" and \"Earn $N from hot items on show\", one group (never both a day)", hotsell ~= nil and hotincome ~= nil
+		and SandboxTasks.titleOf(hotsell :: SandboxTasks.Def, 1) == "Sell a hot item" and SandboxTasks.titleOf(hotincome :: SandboxTasks.Def, 150) == "Earn $150 from hot items on show"
+		and (hotsell :: SandboxTasks.Def).group == "market" and (hotincome :: SandboxTasks.Def).group == "market")
 	check("the bonus and the high end's share: positive", T.AllDaily > 0 and T.TopShare >= 0)
 	check("SandboxTasks.def: unknown ids and garbage are nil", SandboxTasks.def("nope") == nil and SandboxTasks.def(5) == nil and SandboxTasks.def(nil) == nil)
 end
@@ -376,6 +380,12 @@ do
 		and not home.claimed and home.unit == nil and home.money == SandboxTasks.rewardOf(SandboxTasks.def("home") :: SandboxTasks.Def, 10))
 	check("… money tasks read in $ (unit)", sell.unit == "$" and sell.progress == 50 and not sell.done and (view.weekly :: any).unit == "$" and (view.weekly :: any).slot == "weekly"
 		and (view.weekly :: any).weekly == true)
+	-- 8.3: the market's: the hot pieces sold a count, what the hot pieces on show earned in $
+	local market = made({ { "hotsell", 2 }, { "hotincome", 150 }, { "home", 10 } })
+	local done = SandboxTasks.note(market, "hotsell", 1)
+	SandboxTasks.note(market, "hotincome", 40)
+	local rows = SandboxTasks.view(market, NOW).daily
+	check("8.3: hotsell counts the hot pieces sold, hotincome the dollars (unit $)", #done == 0 and rows[1].progress == 1 and rows[1].unit == nil and rows[2].progress == 40 and rows[2].unit == "$")
 end
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)
