@@ -1,88 +1,95 @@
 --!strict
 -- 8.2 SANDBOX, the ZDC warehouse in the owner's own Blender model (design/blender-warehouse/warehouse.py →
--- roblox/ZDCWarehouseArt.fbx). The owner imports ZDCWarehouseArt.fbx once in Roblox Studio (File → Import 3D, the
--- defaults) and publishes. server/Main.server.luau takes the import out of the Workspace first thing (into ServerStorage);
--- this finds it there (or still in the Workspace: a top-level child named ZDCWarehouseArt, or one holding its markers),
--- learns from its markers how the importer turned and scaled it, and dresses every plot's warehouse with clones:
--- server/Warehouse.luau hands each warehouse Model here once it has built it.
+-- roblox/ZDCWarehouseArt.fbx: the warehouse in five levels, 8.0.4). The owner imports ZDCWarehouseArt.fbx once in
+-- Roblox Studio (File → Import 3D, the defaults) and publishes. server/Main.server.luau takes the import out of the
+-- Workspace first thing (into ServerStorage); this finds it there (or still in the Workspace: a top-level child named
+-- ZDCWarehouseArt, or one holding its markers), learns from its markers how the importer turned and scaled it and
+-- dresses every plot's warehouse with one level's clones: server/Warehouse.luau hands each warehouse Model here once it
+-- has built it. The level is WarehouseMesh.level(plot) (today Config.Warehouse.ArtLevel, 4: the size the game's
+-- warehouse is; a later "warehouse level" upgrade answers it per plot).
 -- The parts warehouse (shared/WarehouseLayout.luau) stays as the fallback and as the collision. Only its parts that are
 -- just looks (the attribute WarehouseVisual: the layout's `visual` pieces, i.e. the shell's walls, gables, roof, ribs,
--- bands, trims, gutters and downpipes, the roller door and its bollards, the ZDC sign, the floor, the hall's beams, posts
--- and lamp housings) are hidden, and the solid ones among them still collide where they did. Everything that works keeps
--- working and is seen: the owner's sign over the door and the STOCK board (their words are rewritten), the stands, the
--- UPGRADES desk and its sign, the floor's paint, the bay, the prompts, the hall's lamp glows and their lights. No import,
--- or a warehouse of another size: nothing changes at all.
+-- bands, trims, gutters and downpipes, the roller door and its bollards, the ZDC sign, the floor, the hall's beams, posts,
+-- lamp housings and lamp glows) are hidden: the solid ones still collide where they did, the glows' lights still shine.
+-- Everything else keeps working and is seen: the owner's sign over the door and the STOCK board (their words are
+-- rewritten), the stands, the UPGRADES desk and its sign, the floor's paint, the bay, the prompts. The level's things
+-- outside the walls that one bumps into (level 4: the office annex) get an unseen solid block each. No import, a level
+-- the import lacks, or a warehouse of another size than the level: nothing changes at all.
 --
---   WarehouseMesh.ready()       is the import there and complete? (the first call looks for it, out of the world)
---   WarehouseMesh.dress(model)  dresses one plot's warehouse (Warehouse's Model, its attribute Plot); again: true and
---                               nothing more; false: left as it was
---   WarehouseMesh.Looks         each finish's colour and material
---   WarehouseMesh.Attribute     the attribute of a part that is only looks ("WarehouseVisual")
+--   WarehouseMesh.ready()        is the import there (any level complete)? (the first call looks, out of the world)
+--   WarehouseMesh.level(plot)    the level a plot's warehouse wears (1 … 5)
+--   WarehouseMesh.dress(model)   dresses one plot's warehouse (Warehouse's Model, its attribute Plot); again: true and
+--                                nothing more; false: left as it was
+--   WarehouseMesh.Looks          each finish's colour and material
+--   WarehouseMesh.Attribute      the attribute of a part that is only looks ("WarehouseVisual")
 --
--- The pieces are named "warehouse_<finish>" ("warehouse2_<finish>" ... where a finish has more than 10,000 triangles;
--- warehouse.py export_game), all in the building's frame: the middle of its bottom, x east, y up, z south (the door's
--- side). The markers WarehouseMark_o / _x / _y / _z are that origin and 10 studs east, up and south; WarehouseMark_b is
--- the walls' corner (W / 2, H, D / 2) and WarehouseMark_r the ridge (0, H + Ridge, 0): the warehouse the model was made
--- for. (Not "mark_o": FurnitureMesh, HouseMesh and VanMesh look for a model with that when theirs is not named.)
+-- The import (warehouse.py export_game; design/blender-warehouse/NAVOD.md): the pieces "lvl<N>_<finish>" (past 10,000
+-- triangles "lvl<N>b_<finish>" ...), each level from its origin: the roller door's middle on the ground, x to the right
+-- seen from outside, y up, z into the building. mark_o / mark_x / mark_y / mark_z are those axes (10 studs each);
+-- mark_lvl<N> each level's origin; mark_lvl<N>_box the building's corner (W / 2, H, D), mark_lvl<N>_door the door's
+-- (its half width, its height, 0) and mark_lvl<N>_top the roof's top (0, H + its rise, 0): the warehouse that level is.
+-- collide_lvl<N>_<k> are boxes (a prop's: the game makes an unseen solid block of each).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
+local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared").SandboxMap)
 local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared").WarehouseLayout)
-local DayNight = require(script.Parent.DayNight)
 
 local WarehouseMesh = {}
 
 local NAME = "ZDCWarehouseArt"
-local MARK = "WarehouseMark"
 local ATTRIBUTE = "WarehouseVisual"
+local LEVELS = 5
 WarehouseMesh.Attribute = ATTRIBUTE
 
-type Look = { color: Color3, material: Enum.Material, transparency: number?, reflectance: number?, night: Color3?, shadow: boolean? }
+type Look = { color: Color3, material: Enum.Material, transparency: number?, reflectance: number?, shadow: boolean? }
 local function rgb(r: number, g: number, b: number): Color3
 	return Color3.fromRGB(r, g, b)
 end
 local P, METAL, GLASS = Enum.Material.SmoothPlastic, Enum.Material.Metal, Enum.Material.Glass
--- warehouse.py's FINISHES (the model has no texture coordinates: smooth colours); night: glows (DayNight.nightLight);
--- shadow false: casts none (the floor and the linings inside, the skylights, the lamps' lenses).
+-- warehouse.py's FINISHES (the model has no texture coordinates: smooth colours). shadow false: casts none.
 local LOOKS: { [string]: Look } = {
-	clad = { color = rgb(188, 194, 200), material = P }, -- the walls' corrugated sheet (the parts' CLAD)
-	rib = { color = rgb(160, 167, 175), material = P }, -- its ribs (RIBS)
-	orange = { color = rgb(240, 132, 44), material = P }, -- the ZDC stripe, the door's slats, the sign's frame
-	concrete = { color = rgb(168, 166, 158), material = P }, -- the plinth
-	trim = { color = rgb(42, 45, 50), material = P }, -- corners, gutters, downpipes, barge boards, the sign, the lamps
-	roof = { color = rgb(118, 124, 132), material = P },
-	roofin = { color = rgb(201, 204, 203), material = P, shadow = false }, -- the roof's underside (the ceiling, the soffits)
-	skylight = { color = rgb(207, 227, 234), material = GLASS, transparency = 0.4, shadow = false },
-	steel = { color = rgb(74, 78, 86), material = METAL }, -- the portal frames, the door's rails
-	galv = { color = rgb(150, 156, 160), material = METAL }, -- the purlins
-	liner = { color = rgb(214, 216, 212), material = P, shadow = false }, -- the walls' lining inside
-	seam = { color = rgb(180, 184, 182), material = P, shadow = false },
-	kick = { color = rgb(142, 140, 134), material = P, shadow = false },
-	floor = { color = rgb(150, 152, 150), material = P, shadow = false }, -- the concrete floor's slabs and joints
-	floor2 = { color = rgb(140, 142, 140), material = P, shadow = false },
-	floor3 = { color = rgb(162, 163, 160), material = P, shadow = false },
-	joint = { color = rgb(108, 110, 110), material = P, shadow = false },
-	rubber = { color = rgb(26, 27, 29), material = Enum.Material.Rubber },
-	yellow = { color = rgb(242, 198, 42), material = P }, -- the bollards
-	white = { color = rgb(238, 238, 232), material = P },
-	logo = { color = rgb(240, 132, 44), material = P, night = rgb(255, 150, 60) }, -- the sign's ZDC letters
-	glow = { color = rgb(214, 208, 192), material = P, night = rgb(255, 236, 200), shadow = false }, -- the wall lights
-	red = { color = rgb(200, 50, 46), material = P }, -- the fire bell
+	plaster = { color = rgb(216, 212, 204), material = P },
+	metal = { color = rgb(142, 154, 166), material = P }, -- the corrugated sheet
+	metal2 = { color = rgb(111, 124, 136), material = P }, -- the darker sheet, the roof's seams, the ridge
+	concrete = { color = rgb(167, 163, 155), material = P }, -- the plinth, ramps, planters
+	floor = { color = rgb(156, 154, 148), material = P, shadow = false }, -- the concrete floor's slabs and joints
+	floor2 = { color = rgb(148, 146, 140), material = P, shadow = false },
+	floor3 = { color = rgb(166, 164, 158), material = P, shadow = false },
+	joint = { color = rgb(116, 114, 110), material = P, shadow = false },
+	orange = { color = rgb(232, 118, 43), material = P }, -- ZDC's: the band, the corners, the door's frame, the letters
+	trim = { color = rgb(237, 235, 230), material = P },
+	steel = { color = rgb(90, 96, 104), material = METAL }, -- the trusses, the rails, the canopy
+	dark = { color = rgb(42, 45, 49), material = P },
+	roof = { color = rgb(75, 80, 87), material = P },
+	glass = { color = rgb(47, 66, 82), material = GLASS, reflectance = 0.2 },
+	glasslit = { color = rgb(191, 214, 226), material = P, shadow = false }, -- the windows seen from inside
+	skylight = { color = rgb(216, 230, 234), material = GLASS, reflectance = 0.1 },
+	glow = { color = rgb(255, 241, 214), material = Enum.Material.Neon, shadow = false }, -- the lamps (the hall's always lit)
+	yellow = { color = rgb(242, 194, 48), material = P }, -- the bollards
+	door = { color = rgb(201, 204, 208), material = P, reflectance = 0.05 },
+	wood = { color = rgb(154, 117, 80), material = P },
+	rubber = { color = rgb(26, 26, 28), material = Enum.Material.Rubber },
+	solar = { color = rgb(30, 46, 74), material = GLASS, reflectance = 0.2 },
+	green = { color = rgb(79, 127, 59), material = P },
+	red = { color = rgb(200, 50, 46), material = P },
+	white = { color = rgb(246, 244, 238), material = P },
+	zinc = { color = rgb(155, 162, 166), material = METAL }, -- the gutters and downpipes
 }
 WarehouseMesh.Looks = LOOKS
 
 type Piece = { finish: string, part: BasePart, cf: CFrame, size: Vector3 }
+type Solid = { cf: CFrame, size: Vector3 }
+type Level = { pieces: { Piece }, solids: { Solid }, box: Vector3?, door: Vector3?, top: Vector3? }
 
-local pieces: { Piece }? = nil
-local box: Vector3? = nil -- the warehouse the model was made for: its walls (W, H, D)
-local ridge = 0 -- ... and its ridge's height
+local levels: { [number]: Level } = {}
 local tried = false
 local function say(text: string)
 	pcall(warn, `{NAME}: {text}`) -- (Studio's output; nothing outside Roblox)
 end
 
--- The imported model: by its name, else any top-level model with the markers in it.
+-- The imported model: by its name, else any top-level model with its markers in it.
 local function find(): Instance?
 	for _, place in { ServerStorage, workspace } :: { Instance } do
 		local named = place:FindFirstChild(NAME)
@@ -92,12 +99,21 @@ local function find(): Instance?
 	end
 	for _, place in { ServerStorage, workspace } :: { Instance } do
 		for _, child in place:GetChildren() do
-			if child:IsA("Model") and child:FindFirstChild(`{MARK}_o`, true) then
+			if child:IsA("Model") and child:FindFirstChild("mark_o", true) and child:FindFirstChild("mark_lvl1", true) then
 				return child
 			end
 		end
 	end
 	return nil
+end
+
+local function levelOf(n: number): Level
+	local lv = levels[n]
+	if not lv then
+		lv = { pieces = {}, solids = {}, box = nil, door = nil, top = nil }
+		levels[n] = lv
+	end
+	return lv
 end
 
 local function loadArt()
@@ -109,16 +125,13 @@ local function loadArt()
 	art.Parent = ServerStorage -- out of the world: only the clones on the warehouses are seen
 	local marks: { [string]: Vector3 } = {}
 	for _, d in art:GetDescendants() do
-		if d:IsA("BasePart") then
-			local key = string.match(d.Name, `^{MARK}_(%a)$`)
-			if key then
-				marks[key] = d.Position
-			end
+		if d:IsA("BasePart") and string.sub(d.Name, 1, 5) == "mark_" then
+			marks[string.sub(d.Name, 6)] = d.Position
 		end
 	end
-	local o, x, y, z, corner, top = marks.o, marks.x, marks.y, marks.z, marks.b, marks.r
-	if not (o and x and y and z and corner and top) then
-		say(`the markers {MARK}_o, _x, _y, _z, _b and _r are missing; the warehouses keep their own look`)
+	local o, x, y, z = marks.o, marks.x, marks.y, marks.z
+	if not (o and x and y and z) then
+		say("the markers mark_o, mark_x, mark_y and mark_z are missing; the warehouses keep their own look")
 		return
 	end
 	local scale = (x - o).Magnitude / 10
@@ -129,13 +142,39 @@ local function loadArt()
 		say("the import came out mirrored or flat; the warehouses keep their own look")
 		return
 	end
-	local frame = CFrame.fromMatrix(o, ux, uy, uz) -- the building's bottom middle, the game's axes, as the importer placed it
-	local found: { Piece } = {}
+	local frame = CFrame.fromMatrix(o, ux, uy, uz) -- the export's axes as the importer placed them
+	-- each level's origin, its markers from there
+	local origins: { [number]: Vector3 } = {}
+	for n = 1, LEVELS do
+		local at = marks[`lvl{n}`]
+		if at then
+			local origin = frame:PointToObjectSpace(at) / scale
+			origins[n] = origin
+			local lv = levelOf(n)
+			local function mark(key: string): Vector3?
+				local p = marks[`lvl{n}_{key}`]
+				return if p then frame:PointToObjectSpace(p) / scale - origin else nil
+			end
+			lv.box, lv.door, lv.top = mark("box"), mark("door"), mark("top")
+		end
+	end
 	for _, d in art:GetDescendants() do
-		if not d:IsA("BasePart") or string.sub(d.Name, 1, #MARK) == MARK then
+		if not d:IsA("BasePart") then
 			continue
 		end
-		local finish = string.match(d.Name, "^warehouse%d*_(%w+)$")
+		local n, finish = string.match(d.Name, "^lvl(%d+)%l?_(%w+)$")
+		local solidOf = string.match(d.Name, "^collide_lvl(%d+)_%d+$")
+		local level = tonumber(n or solidOf)
+		local origin = if level then origins[level] else nil
+		if not level or not origin then
+			continue
+		end
+		local rel = frame:ToObjectSpace(d.CFrame)
+		local cf = rel - rel.Position + (rel.Position / scale - origin)
+		if solidOf then
+			table.insert(levelOf(level).solids, { cf = cf, size = d.Size / scale })
+			continue
+		end
 		local look = if finish then LOOKS[finish] else nil
 		if not finish or not look then
 			continue
@@ -157,17 +196,19 @@ local function loadArt()
 		d.Transparency = look.transparency or 0
 		d.Reflectance = look.reflectance or 0
 		d.CastShadow = look.shadow ~= false
-		local rel = frame:ToObjectSpace(d.CFrame)
-		table.insert(found, { finish = finish, part = d, cf = rel - rel.Position + rel.Position / scale, size = d.Size / scale })
+		table.insert(levelOf(level).pieces, { finish = finish, part = d, cf = cf, size = d.Size / scale })
 	end
-	if #found == 0 then
-		say("no pieces named warehouse_<finish>; the warehouses keep their own look")
-		return
+	local complete = 0
+	for n, lv in levels do
+		if #lv.pieces > 0 and lv.box and lv.door and lv.top then
+			complete += 1
+		else
+			levels[n] = nil
+		end
 	end
-	local c = frame:PointToObjectSpace(corner) / scale
-	pieces = found
-	box = Vector3.new(math.abs(c.X) * 2, c.Y, math.abs(c.Z) * 2)
-	ridge = (frame:PointToObjectSpace(top) / scale).Y
+	if complete == 0 then
+		say("no level has its pieces lvl<N>_<finish> and its markers mark_lvl<N>, _box, _door, _top; the warehouses keep their own look")
+	end
 end
 
 function WarehouseMesh.ready(): boolean
@@ -178,9 +219,20 @@ function WarehouseMesh.ready(): boolean
 		end)
 		if not ok then
 			say(tostring(err))
+			table.clear(levels)
 		end
 	end
-	return pieces ~= nil
+	return next(levels) ~= nil
+end
+
+-- The level a plot's warehouse wears: Config.Warehouse.ArtLevel (the size the game's warehouse is today). The one
+-- place a later "warehouse level" upgrade answers per plot.
+function WarehouseMesh.level(_plot: number?): number
+	local want = (Config.Warehouse :: any).ArtLevel
+	if type(want) ~= "number" or want ~= want then
+		return 4
+	end
+	return math.clamp(math.floor(want), 1, LEVELS)
 end
 
 -- A part that is only looks, hidden (it still collides and is queried if it did; its lights keep shining).
@@ -196,21 +248,33 @@ local function hide(part: BasePart)
 	end
 end
 
+local function close(a: number, b: number): boolean
+	return math.abs(a - b) < 0.05
+end
+
 local function dressNow(model: Model): boolean
 	local id = model:GetAttribute("Plot")
 	local plot = if type(id) == "number" then SandboxMap.Plots[id] else nil
-	local want = box
-	if not plot or not want then
+	if not plot then
 		return false
 	end
-	-- the warehouse as the layout builds it on this plot: its walls' box and its ridge (only moved: every one looks south)
+	local n = WarehouseMesh.level(plot.id)
+	local lv = levels[n]
+	if not lv then
+		say(`plot {plot.id}: the import has no level {n}; it keeps its own look`)
+		return false
+	end
+	-- the warehouse as the layout builds it on this plot (its door looks south: only moved) against the level
 	local outline = WarehouseLayout.outline(plot)
-	local have = Vector3.new(outline.x1 - outline.x0, plot.warehouse.sy, outline.z1 - outline.z0)
-	if (have - want).Magnitude > 0.05 or math.abs(outline.top - ridge) > 0.05 then
-		say(`plot {id}: the warehouse is {have} (its ridge {outline.top}), the model was made for {want} (its ridge {ridge}); it keeps its own look`)
+	local door = WarehouseLayout.door(plot)
+	local box, gap, top = lv.box :: Vector3, lv.door :: Vector3, lv.top :: Vector3
+	if not (close(math.abs(box.X) * 2, outline.x1 - outline.x0) and close(box.Y, plot.warehouse.sy) and close(box.Z, outline.z1 - outline.z0)
+		and close(math.abs(gap.X) * 2, door.width) and close(gap.Y, door.height) and close(top.Y, outline.top)) then
+		say(`plot {plot.id}: the warehouse is {outline.x1 - outline.x0} × {plot.warehouse.sy} × {outline.z1 - outline.z0} (door {door.width} × {door.height}, ridge {outline.top}), level {n} is {math.abs(box.X) * 2} × {box.Y} × {box.Z} (door {math.abs(gap.X) * 2} × {gap.Y}, top {top.Y}); it keeps its own look`)
 		return false
 	end
-	local base = CFrame.new((outline.x0 + outline.x1) / 2, 0, (outline.z0 + outline.z1) / 2)
+	-- the level's origin on the door's middle, on the ground; its z into the building (north)
+	local base = CFrame.new(door.x, 0, door.z) * CFrame.Angles(0, math.pi, 0)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") and d:GetAttribute(ATTRIBUTE) == true then
 			hide(d)
@@ -218,18 +282,26 @@ local function dressNow(model: Model): boolean
 	end
 	local folder = Instance.new("Folder")
 	folder.Name = "WarehouseMesh"
-	for _, item in pieces :: { Piece } do
+	for _, item in lv.pieces do
 		local p = item.part:Clone()
 		p.Size = item.size
 		p.CFrame = base * item.cf
 		p.Parent = folder
-		local look = LOOKS[item.finish]
-		if look.night then
-			DayNight.nightLight(p, look.night, look.color, look.material.Name)
-		end
+	end
+	for k, s in lv.solids do
+		local block = Instance.new("Part")
+		block.Name = `WarehouseSolid{k}`
+		block.Size = s.size
+		block.CFrame = base * s.cf
+		block.Anchored = true
+		block.CanCollide, block.CanQuery, block.CanTouch = true, true, false
+		block.Transparency = 1
+		block.CastShadow = false
+		block.Parent = folder
 	end
 	folder.Parent = model
 	model:SetAttribute("MeshArt", true)
+	model:SetAttribute("WarehouseLevel", n)
 	return true
 end
 

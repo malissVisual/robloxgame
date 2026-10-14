@@ -137,7 +137,6 @@ with tempfile.TemporaryDirectory() as tmp:
     # warehouse stays as built (tools/warehouse/mesh-check.py dresses them with one).
     source = open(os.path.join(os.path.dirname(SHARED), "server", "WarehouseMesh.luau"), encoding="utf-8").read()
     source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
-    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
     storage = ('local storage = M.Instance.new("Folder")\n'
                'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
                'local workspace = M.workspace\n')

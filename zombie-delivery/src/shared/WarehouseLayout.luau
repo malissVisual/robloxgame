@@ -59,7 +59,8 @@
 -- (collides and is queried; the rest is decoration), shadow (casts one: the big parts only), transparency, words
 -- (SurfaceGui text: face, lines { text, color, size (share of the face's height), font }, back (a panel colour), lit), light
 -- (a PointLight: range, brightness, color) and stand (the stand it belongs to). 8.2: visual (only looks: the owner's
--- Blender model ZDCWarehouseArt draws it, so server/WarehouseMesh.luau hides it once imported; a solid one still collides).
+-- Blender model ZDCWarehouseArt draws it, so server/WarehouseMesh.luau hides it once imported; a solid one still collides,
+-- a lamp's glow still has its light).
 
 local Config = require(script.Parent.Config)
 local SandboxMap = require(script.Parent.SandboxMap)
@@ -532,7 +533,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 			lamps += 1
 			local housing = look(add(`Lamp{lamps}`, "inside", { 0.7, 3.2, 3.2 }, { x, h - 1.35, z }, TRIM, "Metal"))
 			housing.shape, housing.roll = "Cylinder", 90
-			local glow = add(`LampGlow{lamps}`, "inside", { 0.14, 2.6, 2.6 }, { x, h - 1.77, z }, GLOW, "Neon")
+			local glow = look(add(`LampGlow{lamps}`, "inside", { 0.14, 2.6, 2.6 }, { x, h - 1.77, z }, GLOW, "Neon")) -- (its light stays)
 			glow.shape, glow.roll = "Cylinder", 90
 			glow.light = { range = T.Lamp.Range, brightness = T.Lamp.Brightness, color = T.Lamp.Color }
 		end
