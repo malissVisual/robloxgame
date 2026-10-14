@@ -20,7 +20,7 @@
 --     ("+5 pieces in your warehouse", when a state's stock grew): Hud.toast; without client/Hud.luau a column of its own
 --     at the top left with its own toasts in the same look
 --   * 8.3: once after joining (and again when the market's day turns while you play) "🔥 Hot today: Old Globe, Jukebox,
---     Sofa (sell ×1.6, on show ×1.25)" (shared/Market.luau hotToast, the state's market), held back while the HUD is
+--     Sofa (sell ×1.4, on show ×1.2)" (shared/Market.luau hotToast, the state's market), held back while the HUD is
 --     hidden (the start screen) and told when it shows
 -- Standing in Hud's column keeps it clear of what the HUD still shows in the sandbox: the toasts flow under it, the
 -- health row (bottom left on a computer; on a touch screen the left column the column stands beside), MOUSE [ALT] and

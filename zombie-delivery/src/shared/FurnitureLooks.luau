@@ -1461,9 +1461,8 @@ collectible("oil_painting", "Oil Painting", "🎨", 4.8, 3.8, 0.6, "both", 3, 60
 collectible("knight_armour", "Knight's Armour", "🛡️", 2.6, 6.8, 1.8, "both", 6, 5500, false, "living", "legendary")
 -- 8.3: twelve more for The Old Chalet (the book's 68 pieces), three of each rarity: a chalet's alpine things (the carved
 -- bear, the alphorn, the ski trophy) beside Grandpa's treasures, and two legendary jokes of a moving company in a zombie
--- world (the T. rex skull in the garage, the zombie-proof safe in the bedroom). Their weights against Danny's AUTO
--- (Config.MoveHelper.LightWeight 5): the light two-hands ones (the camera, the gramophone, the chandelier, the guitar) he
--- carries alone, the solid carved bear and the marble-based ski trophy (6, 5) and the three pair pieces he asks a hand for.
+-- world (the T. rex skull in the garage, the zombie-proof safe in the bedroom). (8.4: Danny carries what you give him,
+-- whatever its weight; a pair piece waits for him at the other end.)
 collectible("antique_typewriter", "Antique Typewriter", "⌨️", 1.8, 1.2, 1.6, "hand", 3, 900, false, "bedroom", "uncommon")
 collectible("vintage_camera", "Vintage Camera", "📷", 1.6, 4.4, 1.6, "both", 3, 950, true, "hall", "uncommon")
 collectible("carved_bear", "Carved Wooden Bear", "🐻", 1.8, 3.3, 1.4, "both", 6, 880, false, "hall", "uncommon")

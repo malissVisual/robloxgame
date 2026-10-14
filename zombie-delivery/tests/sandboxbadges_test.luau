@@ -131,10 +131,12 @@ check("upgraded: none bought, the warehouse at its start, junk: no", not Rules.u
 	and not Rules.upgraded(nil) and not Rules.upgraded({ lights = "x" }))
 check("upgraded: a level of the lights, More stands: yes", Rules.upgraded({ lights = 1 }) and Rules.upgraded({ warehouse = 3, stands = 1 }))
 -- 8.3: a save from before 8.3 gets the Big Warehouse (the ZDC Warehouse's level 3) for free (UpgradeRules.fromSave): a
--- veteran who bought nothing is not "Upgraded"; the levels under it count by their purchase's moment (fromBought)
+-- veteran who bought nothing is not "Upgraded"; 8.4: the Workshop and the Storehouse were only ever bought (they count from
+-- the save too: bought before the badges' ids were set); the Big Warehouse alone waits for its purchase's moment (fromBought)
 local veteran = UpgradeRules.fromSave({ money = 500 })
-check("8.3: upgraded: a veteran's free Big Warehouse (nothing bought): no; the Workshop … the Big Warehouse alone: no (their moment says it)",
-	veteran.warehouse == 3 and not Rules.upgraded(veteran) and not Rules.upgraded({ warehouse = 1 }) and not Rules.upgraded({ warehouse = 3 }))
+check("8.3: upgraded: a veteran's free Big Warehouse (nothing bought): no; the Big Warehouse alone: no (its moment says it)",
+	veteran.warehouse == 3 and not Rules.upgraded(veteran) and not Rules.upgraded({ warehouse = 3 }))
+check("8.4: upgraded: the Workshop, the Storehouse (only ever bought): yes", Rules.upgraded({ warehouse = 1 }) and Rules.upgraded({ warehouse = 2 }))
 check("8.3: upgraded: the Logistics Center (only ever bought): yes", Rules.upgraded({ warehouse = 4 }))
 check("8.3: fromBought: a level bought at the desk (the warehouse's too) earns firstUpgrade; junk: nothing", list(Rules.fromBought("warehouse", 1)) == "firstUpgrade"
 	and list(Rules.fromBought("lights", 2)) == "firstUpgrade" and #Rules.fromBought("nope", 1) == 0 and #Rules.fromBought("lights", 0) == 0 and #Rules.fromBought(nil, nil) == 0)

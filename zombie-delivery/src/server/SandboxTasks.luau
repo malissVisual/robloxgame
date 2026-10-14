@@ -83,9 +83,16 @@ local function saveSoon(player: Player)
 	end)
 end
 
--- The kinds that can't be done now: "upgrade" once every upgrade is at its top; 8.3: "offer" while the visitors are off.
+-- The kinds that can't be done now: "upgrade" once every upgrade is at its top; 8.3: "offer" while the visitors are off;
+-- 8.4: "shown" while the warehouse has fewer stands than its highest target (the Garage, the Workshop, the Storehouse).
 local function skipFor(profile: PlayerData.Profile): { [string]: boolean }?
 	local skip: { [string]: boolean }? = if Config.Visitors.On then nil else { offer = true }
+	for _, def in T.DailyPool do
+		if def.event == "shown" and CollectionRules.standsFor(profile) < def.target[2] then
+			skip = skip or {}
+			;(skip :: { [string]: boolean }).shown = true
+		end
+	end
 	for _, id in UpgradeRules.Order do
 		local def = UpgradeRules.def(id)
 		if def and UpgradeRules.level(profile.sandboxUpgrades, id) < def.max then

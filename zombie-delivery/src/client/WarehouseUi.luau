@@ -52,7 +52,7 @@
 -- 8.3, the market (shared/Market.luau; the state's `market`, the player's View: today's hot and cold kinds and their
 -- own demand; every price and $/min in the state is the market's already):
 --   * both windows: a line under the title "Today's market: 🔥 Old Globe, Jukebox, Sofa · ❄ Wardrobe · new in 5 h"; a
---     tile of a hot kind "🔥 HOT ×1.6", of a cold one "❄ COLD", of a kind the player sold today "📉 −10%" (on its
+--     tile of a hot kind "🔥 HOT ×1.4", of a cold one "❄ COLD", of a kind the player sold today "📉 −10%" (on its
 --     picture, under ON STAND n)
 --   * SELL's question says why the price is what it is ("Market: Vintage Radio −10% (you sold 2 today)", hot, cold)
 --     and sends the price it showed ({ kind = "sell", uid, expect }); SELL…'s totals are the market's (StockPlan.price:
@@ -1033,7 +1033,7 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 		})
 		Ui.corner(ribbon, 10)
 	end
-	-- 8.3: the market's tags on the picture, under ON STAND n: 🔥 HOT ×1.6 / ❄ COLD, 📉 −10% (the player's demand)
+	-- 8.3: the market's tags on the picture, under ON STAND n: 🔥 HOT ×1.4 / ❄ COLD, 📉 −10% (the player's demand)
 	local tagY = if entry.stand then 30 else 6
 	local market = marketNow()
 	local tags: { { string } } = {}
