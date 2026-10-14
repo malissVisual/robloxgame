@@ -237,7 +237,9 @@ check("…Ann's \"ok\" with a press time the server never reached (made up): a m
 E.now += G.Lift.Again + 0.05
 pick(ann, 2)
 local outside = lastGrip(ann, "open")
-answer(ann, outside, (outside.zone0 + outside.zone + 0.1) / outside.speed) -- (an "ok" with the needle past the zone)
+-- (an "ok" with the needle short of the zone on its first sweep: the zone starts at Zone.Start or later, so this is
+-- always outside; past the zone the needle could have swung back into it)
+answer(ann, outside, (outside.zone0 - 0.1) / outside.speed)
 check("…an \"ok\" with the needle outside the zone (the client's lie): a miss", carrying(ann) == nil and lastGrip(ann, "result").outcome == "knock")
 E.now += G.Lift.Again + 0.05
 pick(ann, 2)
