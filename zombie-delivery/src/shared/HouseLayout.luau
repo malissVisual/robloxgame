@@ -594,6 +594,7 @@ type Shape = {
 	collectibles: { number },
 	legendary: number,
 	backDoor: number?,
+	roomy: number?, -- 8.5.2: the rooms', the hall's and the corridor's sizes × this (the big house's Config.Furniture.Big.Roomy)
 	found: { [string]: any }?, -- 8.3 economy: the move owner's book (HouseLayout.plan's `found`)
 }
 local BIG_CONFIG = (T :: any).Big
@@ -685,20 +686,27 @@ local function planHouse(seed: number, shape: Shape): Plan
 	-- The shell: a front row (kitchen, the entrance hall with the front door, the living room), the corridor across
 	-- the house, a back row (garage, kids' room, bathroom, bedroom in one of four orders; 8.3 the big house: six rooms), then
 	-- maybe mirrored.
+	-- (8.5.2, the owner: "more room in the house": the big house's rooms, its hall and its corridor `roomy` times as wide
+	-- and deep, whole studs; the same dice, the doors and the furniture as they were: only the room round them grows)
+	local roomy = shape.roomy or 1
+	local function grow(n: number): number
+		return if roomy == 1 then n else math.floor(n * roomy + 0.5)
+	end
 	local order = shape.orders[rng.int(1, #shape.orders)]
 	local widths: { [string]: number } = {}
 	local W = 0
 	for _, id in order do
 		local range = shape.widths[id]
-		widths[id] = rng.int(range[1], range[2])
+		widths[id] = grow(rng.int(range[1], range[2]))
 		W += widths[id]
 	end
-	local F = shape.front + 2 * rng.int(0, 2)
-	local C = T.Corridor
-	local B = 22 + 2 * rng.int(0, 1)
+	local F = grow(shape.front + 2 * rng.int(0, 2))
+	local C = grow(T.Corridor)
+	local B = grow(22 + 2 * rng.int(0, 1))
 	local D = F + C + B
-	local half = T.HallWidth / 2
-	local rest = W - T.HallWidth
+	local hallWide = grow(T.HallWidth)
+	local half = hallWide / 2
+	local rest = W - hallWide
 	local kw = math.floor(rest * (shape.kitchen + rng.num() * 0.06) + 0.5)
 	local lw = rest - kw
 	local x0, x1 = -half - kw, half + lw
@@ -1762,6 +1770,8 @@ local function live(shape: Shape, found: { [string]: any }?): Shape
 	if shape.kind == "big" then
 		local L = (T :: any).Big
 		made.front, made.kitchen, made.backDoor = L.Front, L.Kitchen, L.BackDoor
+		local roomy = L.Roomy -- (8.5.2: 1 … 2, else as it was)
+		made.roomy = if type(roomy) == "number" and roomy == roomy then math.clamp(roomy, 1, 2) else 1
 		made.spots, made.stars = L.Spots, L.Stars
 		made.collectibles, made.legendary = L.Collectibles.Count, L.Collectibles.Legendary
 	else
