@@ -9,7 +9,8 @@
 -- shadows; the two doors' daylight at Porch's; the panes, the lamps' discs and the porches' walls of daylight in its
 -- Neon colours; tests/sandboxlight_runtime_test.luau holds them to the caps); the front door's two leaves and the back
 -- door's leaf shut in their doorways (8.3 walk-in doors: shared/DoorSwing.luau's door leaves, DoorLeaf ±1, DoorSwing,
--- DoorAngle; no collision, a PathfindingModifier PassThrough), the back door's porch and EXIT sign.
+-- DoorAngle; no collision, a PathfindingModifier PassThrough), the back door's porch and EXIT sign. 8.5 walking
+-- through: both ways out walkable from inside each doorway across its porch to its wall of daylight.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local M = require("./ItemMock")
@@ -18,6 +19,7 @@ Config.Sandbox.On = true -- (the big house is the sandbox's: its doors swing the
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 local FurnitureLooks = require("./FurnitureLooks")
+local LightRules = require("./SandboxLightRules") -- 8.5.2: a room's ceiling lamps
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -222,7 +224,7 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 	check(`{tag}: {parts} parts (at most Big.InteriorMaxParts {L.InteriorMaxParts}, {#plan.spots} pieces)`, parts <= L.InteriorMaxParts)
 	local lamps = 0
 	for _, room in plan.rooms do
-		lamps += if math.max(room.max.X - room.min.X, room.max.Z - room.min.Z) > LIT.Lamp.Long then 2 else 1
+		lamps += #LightRules.lamps(room.min.X, room.max.X, room.min.Z, room.max.Z) -- (8.5.2: a lamp a cell of the room's grid)
 	end
 	check(`{tag}: a ceiling lamp a room, two in a long one ({roomLights} for {#plan.rooms} rooms: Config.SandboxLight.House.Lamp), the two doors' daylight ({doorLights}: Porch), no shadows`,
 		roomLights == lamps and doorLights == 2 and #wrongLight == 0, table.concat(wrongLight, ", "))
@@ -269,6 +271,33 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 	check(`{tag}: the front door's two leaves shut across its doorway (FrontDoorLeaf: DoorLeaf -1 / 1, DoorSwing -1, DoorAngle 90), not solid, Danny's paths through them`, frontsOk)
 	check(`{tag}: the back door's leaf shut in its doorway (BackLeaf: DoorLeaf 1 at its south jamb, DoorSwing -1, DoorAngle 90), not solid, Danny's paths through it`,
 		back ~= nil and #backs == 1 and leaf(backs[1], backs[1], 1, back, 0, 0, 0, 1))
+	-- 8.5 walking through (Config.Moving.Doors): both ways out walkable, nothing that collides a body's width and height
+	-- from the zone's Depth inside each doorway through it and across its porch up to its wall of daylight (where the walk
+	-- goes on while the trip's fade starts; the leaves, the jambs, the lintel, the mats never in the way)
+	local D = Config.Moving.Doors
+	local mid = (plan.min + plan.max) / 2
+	local blocked: { string } = {}
+	for _, d in { front, back } do
+		local out = if d.axis == "Z" then M.Vector3.new(if d.at.X > mid.X then 1 else -1, 0, 0) else M.Vector3.new(0, 0, if d.at.Z > mid.Z then 1 else -1)
+		local a0, a1 = -(plan.wall / 2 + D.Depth), plan.wall / 2 + 6 - 0.05
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") and p.CanCollide then
+				local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = p.CFrame:GetComponents()
+				local s = p.Size
+				local hx = (math.abs(r00) * s.X + math.abs(r01) * s.Y + math.abs(r02) * s.Z) / 2
+				local hy = (math.abs(r10) * s.X + math.abs(r11) * s.Y + math.abs(r12) * s.Z) / 2
+				local hz = (math.abs(r20) * s.X + math.abs(r21) * s.Y + math.abs(r22) * s.Z) / 2
+				local dx, dz = x - o.X - d.at.X, z - o.Z - d.at.Z
+				local along, side = dx * out.X + dz * out.Z, dx * out.Z - dz * out.X
+				local ha, hs = math.abs(out.X) * hx + math.abs(out.Z) * hz, math.abs(out.Z) * hx + math.abs(out.X) * hz
+				if along - ha < a1 and along + ha > a0 and math.abs(side) - hs < 1 and y - o.Y - hy < 5.5 and y - o.Y + hy > 0.3 then
+					table.insert(blocked, p.Name)
+				end
+			end
+		end
+	end
+	check(`{tag}: 8.5 both ways out walkable: nothing that collides from {D.Depth} studs inside each doorway through it and across its porch to its wall of daylight`,
+		back ~= nil and #blocked == 0, table.concat(blocked, ", "))
 	-- the back door's porch and the way out signs
 	local exits = 0
 	for _, s in named.ExitSign or {} do

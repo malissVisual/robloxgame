@@ -20,6 +20,13 @@
 -- the PAINT shop (the van's PaintPoint); the line placed as above; nothing while the screen is covered, SoftGap after;
 -- the ✕ on one dismisses it alone (the guide stays on); a window opened, a purchase or SoftSeconds on the screen: done;
 -- a move wins; the ring makes nothing loop after loop.
+-- 8.4, Danny for hire's steps (SandboxSteps.danny) at the same three sizes: "Hire Danny to carry with you" on a move
+-- while he is for hire and the money pays him (the chevron over his body, "(L1)" with a gamepad), never while something
+-- covers the screen or his card is open (which shows his offer: done); hired: 8.5 "Take out your clipboard (Q) and pick a
+-- piece for Danny" in the house ("(tap 📋)" on a phone, "(R1)" with a gamepad; with the clipboard out "Pick a piece to
+-- give it to Danny") until a piece goes on his list; "Heavy piece: press Lift and wait for Danny" with a
+-- two-person piece's Lift near (looked for at most once a second, no more once done) until your Lift calls him; the
+-- line under the move's panel and Danny's strip, clear of the money, the touch buttons and the player list.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's, as movehud.luau) ────────
@@ -459,7 +466,7 @@ check("a computer: under the move's panel at the screen's scale, never on it, in
 	and math.abs((b.x0 + b.x1) / 2 - M.width / 2) < 1 and inside(b) and not overlap(b, box(money)), `{show(panelBox)} / {show(b)}`)
 screen(true)
 panelBox = box(panel)
-attribute("MoveHelper", "hired") -- (8.3: Danny hired)
+attribute("MoveHelper", "offer") -- (8.3: Danny on the move; 8.4: for hire, the money not known yet: no hire step, not done)
 tick()
 local strip = MoveHelperHud.strip()
 b = hintBox()
@@ -834,6 +841,146 @@ check("… the move gone: the paint step again", SandboxGuide.step() == "paint" 
 M.remotes.VanPaint.OnClientEvent:Fire({ kind = "bought", id = "red" })
 tick()
 check("something bought at the PAINT shop: done, quiet", SandboxGuide.step() ~= "paint" and not hint.Visible)
+
+-- ── 8.4: Danny for hire's steps (hire him, give him a piece, a heavy piece) ─
+-- a move from your plot, Danny for hire by your van at $170 (your money pays him), his body in workspace.Npcs (its
+-- MoveHelper your MoveHelperId), the move's pieces' own prompts tagged MovePrompt (a heavy one's Lift)
+local DANNY_ID = -2000000001
+local npcs = make("Folder", { Name = "Npcs" }, M.workspace)
+local dannyModel = make("Model", { Name = "Danny" }, npcs)
+dannyModel:SetAttribute("MoveHelper", DANNY_ID)
+local dannyAt = M.Vector3.new(plot.vanSpot.x + 6, 3, plot.vanSpot.z)
+dannyModel.PrimaryPart = make("BasePart", { Name = "HumanoidRootPart", Position = dannyAt }, dannyModel) -- (the recorder's IsA: its own class)
+local tagged, tagLooks = {}, 0
+M.services.CollectionService.GetTagged = function(_, name)
+	tagLooks += 1
+	return tagged[name] or {}
+end
+-- the line under the move's panel and Danny's strip, in the middle, on the screen, clear of the money, the touch buttons
+-- (its ✕ a finger's size) or Roblox's player list
+local function dannyClear(what)
+	local hb, cb2 = hintBox(), closeBox()
+	local strip2, panel2 = box(MoveHelperHud.strip()), box(MovingHud.panel())
+	local ok = shown() and inside(hb) and inside(cb2) and math.abs((hb.x0 + hb.x1) / 2 - M.width / 2) < 1 and hb.y0 >= strip2.y1 and cb2.y0 >= strip2.y1 - 0.01
+		and not overlap(hb, panel2) and not overlap(cb2, panel2) and not overlap(hb, box(money)) and not overlap(cb2, box(money))
+	if M.touch then
+		ok = ok and clearOfTouch(hb) and clearOfTouch(cb2) and cb2.x1 - cb2.x0 >= 44 - 0.01 and cb2.y1 - cb2.y0 >= 44 - 0.01
+	else
+		local list = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y0 = 0, x1 = M.width, y1 = math.min(M.height * 0.45, 52 + 40) }
+		ok = ok and not overlap(hb, list) and not overlap(cb2, list)
+	end
+	check(`… {what}: the line under the move's panel and Danny's strip, in the middle, on the screen, clear of the money{if M.touch then ", the touch buttons (its ✕ a finger's size)" else " and the player list"}`,
+		ok, `{show(hb)} under {show(strip2)}`)
+end
+stand(plot.vanSpot.x - 14, plot.vanSpot.z)
+attribute("MoveHelperId", DANNY_ID)
+attribute("MoveHelperDoing", "Waiting by the van for hire")
+attribute("MoveHelperPrice", 170)
+attribute("MoveHelper", "offer")
+moving.OnClientEvent:Fire("state", view())
+wait(G.SoftGap + 0.02)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`8.4 {size[4]}: a move, Danny for hire, $170 in reach: "Hire Danny to carry with you" (before the move's own step)`, SandboxGuide.step() == "hire"
+		and words.Text == "Hire Danny to carry with you" and shown() and closeButton.Visible, words.Text)
+	dannyClear(size[4])
+end
+check("… the chevron over Danny (DANNY · its metres)", marker.Enabled and at(dannyAt.X, dannyAt.Z + 0) and string.find(tag.Text, "^DANNY · %d+ m$") ~= nil, tag.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"Hire Danny to carry with you (L1)\" (SandboxPad's button for him)", words.Text == "Hire Danny to carry with you (L1)", words.Text)
+M.gamepad = false
+tick()
+coveredNow = true -- (the move's card, a grip check: something covers the screen)
+tick()
+check("… never while something covers the screen (the move's own step instead: quiet, done before)", SandboxGuide.step() ~= "hire" and not hint.Visible)
+coveredNow = false
+wait(G.SoftGap + 0.02)
+tick()
+check("… uncovered: back after SoftGap", SandboxGuide.step() == "hire" and shown())
+coveredNow, windowNow = true, "MoveHelperCard"
+tick()
+check("… his card opened (a window): quiet", SandboxGuide.step() ~= "hire" and not hint.Visible)
+coveredNow, windowNow = false, nil
+wait(G.SoftGap + 0.02)
+tick()
+check("… shut again: his offer was seen there, hire done (not again)", SandboxGuide.step() ~= "hire" and not hint.Visible)
+attribute("MoveHelperPrice", nil)
+attribute("MoveHelperQueue", 0)
+attribute("MoveHelper", "hired")
+tick()
+check("hired (MoveHelper = hired): hire done; outside his list says nothing yet (the move's step: quiet)", SandboxGuide.step() ~= "hire" and not hint.Visible)
+moving.OnClientEvent:Fire("state", view({ inside = true }))
+wait(G.SoftGap + 0.02)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	-- (8.5 orders mode: the clipboard's key in the device's way, Q on a computer, its 📋 button on a phone)
+	local want = if size[1] then "Take out your clipboard (tap 📋) and pick a piece for Danny" else "Take out your clipboard (Q) and pick a piece for Danny"
+	check(`{size[4]}: in the house, his list empty: "{want}" (8.5: orders mode, the device's key)`, SandboxGuide.step() == "give"
+		and words.Text == want and shown(), words.Text)
+	dannyClear(size[4])
+end
+check("… no 3D target in the house", not marker.Enabled and lit() == 0)
+M.gamepad = true
+tick()
+check("… with a gamepad: \"(R1)\" (8.5: R1 takes the clipboard out)", words.Text == "Take out your clipboard (R1) and pick a piece for Danny", words.Text)
+M.player.Character:SetAttribute("ClipboardHeld", true) -- (8.5: the server's, the clipboard out)
+tick()
+check("8.5 the clipboard out: \"Pick a piece to give it to Danny (R1)\" with a gamepad (R1 at a piece)", words.Text == "Pick a piece to give it to Danny (R1)", words.Text)
+M.gamepad = false
+tick()
+check("… a computer: \"Pick a piece to give it to Danny\" (a click: no key)", words.Text == "Pick a piece to give it to Danny" and shown(), words.Text)
+M.player.Character:SetAttribute("ClipboardHeld", nil)
+tick()
+check("… put away again: the clipboard's words again", words.Text == "Take out your clipboard (Q) and pick a piece for Danny", words.Text)
+attribute("MoveHelperQueue", 1)
+tick()
+check("… a piece given him (his list went up): give done, quiet", SandboxGuide.step() ~= "give" and not hint.Visible)
+-- a heavy piece: the Sofa (two people, still in the house) near you, its own Lift prompt
+local sofaPart = make("BasePart", { Name = "Root", Position = M.root.Position + M.Vector3.new(4, 0, 3) }, make("Model", { Name = "Sofa" }, M.workspace))
+local lift = make("ProximityPrompt", { Name = "Pick", ActionText = "Lift", ObjectText = "Sofa", Enabled = true }, sofaPart)
+lift:SetAttribute("MoveOwner", M.player.UserId)
+tagged.MovePrompt = { lift }
+local looksBefore = tagLooks
+for _ = 1, 4 do
+	tick()
+end
+check("8.4 a heavy piece looked for at most once a second (a few looks: one scan at most)", tagLooks - looksBefore <= 1, tagLooks - looksBefore)
+wait(1.05)
+for _, size in SIZES do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`{size[4]}: a two-person piece near (its Lift): "Heavy piece: press Lift and wait for Danny"`, SandboxGuide.step() == "lift"
+		and words.Text == "Heavy piece: press Lift and wait for Danny" and shown(), words.Text)
+	dannyClear(size[4])
+end
+M.gamepad = true
+tick()
+check("… with a gamepad the same (the prompt's Lift shows its own button)", words.Text == "Heavy piece: press Lift and wait for Danny", words.Text)
+M.gamepad = false
+attribute("MoveHelperCall", "Sofa")
+tick()
+check("… your Lift called him (MoveHelperCall: you wait for him): lift done, quiet", SandboxGuide.step() ~= "lift" and not hint.Visible)
+attribute("MoveHelperCall", nil)
+wait(1.05)
+looksBefore = tagLooks
+for _ = 1, 10 do
+	tick()
+end
+check("… done: no more looks for heavy pieces", tagLooks == looksBefore and SandboxGuide.step() ~= "lift", tagLooks - looksBefore)
+before = made
+for _ = 1, 20 do
+	tick()
+end
+check("… twenty looks on a move with Danny make no instance", made == before, made - before)
+moving.OnClientEvent:Fire("state", nil)
+for _, name in { "MoveHelper", "MoveHelperQueue", "MoveHelperDoing", "MoveHelperId" } do
+	attribute(name, nil)
+end
+tagged.MovePrompt = nil
+tick()
 SandboxGuide.covered, SandboxGuide.windowOpen = nil, nil
 screen(false)
 check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",

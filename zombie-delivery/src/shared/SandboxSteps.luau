@@ -24,8 +24,15 @@
 --   vanHome       your van stands at your plot's van spot (its 🎨 Paint van prompt is on)
 --   window        the sandbox window open now (its client module's name: "UpgradeUi", "WarehouseUi", "VanPaintUi", …)
 --   covered       something covers the screen (client/SandboxHintsUi.luau isCovered: a grip check, the move's cards,
---                 a sandbox window, the start screen)
+--                 a sandbox window, Danny's card, the start screen)
 --   hush          something else talks now (a first-time hint waits or just showed; a soft step just ended)
+--   8.4, Danny for hire (server/MoveHelper.luau; nil or false: not known, nothing said):
+--   helper        Danny on your move: "offer" (for hire) | "hired" (the player attribute MoveHelper; nil: none)
+--   helperPrice   his price while he is for hire (MoveHelperPrice)
+--   helperQueue   the pieces on his list while he is hired (MoveHelperQueue)
+--   waiting       you wait for him at a two-person piece (MoveHelperCall: you pressed its Lift)
+--   heavy         the two-person pieces still to carry out (the Moving state's items: class "pair", home or set down)
+--   heavyNear     one of them within Config.SandboxGuide.HeavyNear studs of you, its Lift shown (the client's look)
 --
 -- The steps (SandboxSteps.decide, the first that fits; the owner's table):
 --   in the house                        inside    "Carry the furniture out to your van (E to pick up)"   (no target)
@@ -43,7 +50,7 @@
 -- that went up, not one a save brought along; `earn` only says something, so the client counts it done after
 -- Config.SandboxGuide.InfoSeconds on the screen). A quiet step shows no hint and no 3D guide, except the drive steps
 -- (nav: drive, back, home): their arrow stays while you drive.
---   SandboxSteps.decide(state) -> Step                 the step now
+--   SandboxSteps.decide(state, done?) -> Step          the step now (8.4: with `done`, Danny's step first in a move)
 --   SandboxSteps.doneBy(state, done, last)             marks in `done` (id → true) the steps this state shows done;
 --                                                      `last` keeps the counts of the look before (vanLoad, delivered,
 --                                                      shown: nil = not known yet, then only taken, nothing marked)
@@ -81,19 +88,41 @@
 -- day may say it again, unless it was dismissed (done.hotGone).
 --   SandboxSteps.choose(state, done) -> Step           the step now: the core's (decide) or a soft one
 --   SandboxSteps.dismiss(step, done) -> boolean        the ✕ on a soft step: gone for the session (false: a core step)
---   SandboxSteps.words(step, state) -> string          its words with the price or the piece in them
+--   SandboxSteps.words(step, state) -> string          its words with the price or the piece in them (8.5: give's
+--                                                      once your clipboard is out)
 --   SandboxSteps.detail(step, state) -> (string?, number?)   what its words depend on (the client makes them again only
 --                                                      when it changes: no string a look)
 --   SandboxSteps.growPrice(state) -> number?           the next warehouse level's price when `grow` fits (nil: not now)
 --   SandboxSteps.upgradeFor(state) -> (id?, price?)    the upgrade `upgrade` names (nil: none in reach)
--- HOOK (Danny's hire, 8.3: "hire Danny for the move, click pieces to assign them", server/MoveHelper.luau and
--- client/MoveHelperCard.luau; not built here): his steps belong to the core loop, in SandboxSteps.decide, at the two
--- places marked "HOOK Danny" (the planning's, before LAUNCH; the move's, before `inside`), on a State field the guide's
--- readMove fills from the Moving state (client/SandboxGuide.luau, marked the same), with a done mark in doneBy.
+--
+-- 8.4, Danny for hire (server/MoveHelper.luau, client/MoveHelperCard.luau; the owner: "I have to PAY for him when I want
+-- help … click on something, and that assigns it to him"): three steps of the move, each said once as a soft step is
+-- (SoftSeconds at most, its ✕ dismisses it, SoftGap after the one before; never while something covers the screen, his
+-- card too, or something else talks). In a move the first that fits and is not done comes before the move's own step
+-- (SandboxSteps.decide with `done`; he only comes with a move: nothing before LAUNCH). None while you sit in a vehicle,
+-- carry a piece or wait for him. The order (SandboxSteps.Danny):
+--   lift   hired, one of the move's two-person pieces near you (heavyNear)
+--          "Heavy piece: press Lift and wait for Danny"                          (the hint only)
+--   give   hired, his list empty, you in the house (where the pieces are)
+--          8.5 (orders mode, shared/ClipboardRules.luau): "Take out your clipboard (Q) and pick a piece for Danny"
+--          (the device's way: "(R1)", "(tap 📋)"); with your clipboard out (`clipboard`) "Pick a piece to give it to
+--          Danny" (a gamepad's "(R1)": it points at nothing)                      (the hint only)
+--   hire   for hire, his price in your money (money ≥ helperPrice)
+--          "Hire Danny to carry with you" (a gamepad's "(L1)")                    Danny (his body)
+-- Done by what the player did (doneBy): hire once he is hired or his card opened while he is for hire (the offer seen);
+-- give once his list went up while you play or his card opened while he is hired (it says how); lift once you waited
+-- for him at a piece (your Lift called him).
+--   SandboxSteps.danny(state, done) -> Step?           Danny's step now (nil: none)
+--   SandboxSteps.onDevice(step, words?, device) -> string   the words for "keys" | "pad" | "touch": a prompt's E a
+--                                                      phone's "tap", a gamepad's X; a Danny step's gamepad button
+--                                                      in brackets (SandboxPad's "danny" L1, 8.5 "clipboard" R1);
+--                                                      8.5 words that name their step's own key ("(Q)") say it in the
+--                                                      device's way instead ("(R1)", "(tap 📋)": SandboxPad.say)
 
 local SandboxMap = require(script.Parent.SandboxMap)
 local Config = require(script.Parent.Config)
 local UpgradeRules = require(script.Parent.UpgradeRules) -- 8.3: the UPGRADES desk's prices (the soft steps)
+local SandboxPad = require(script.Parent.SandboxPad) -- 8.4: the device's words (onDevice)
 
 local SandboxSteps = {}
 
@@ -123,13 +152,23 @@ export type State = {
 	window: string?,
 	covered: boolean?,
 	hush: boolean?,
+	-- 8.4, Danny for hire (all optional: a state without them has no Danny step)
+	helper: string?,
+	helperPrice: number?,
+	helperQueue: number?,
+	waiting: boolean?,
+	heavy: number?,
+	heavyNear: boolean?,
+	clipboard: boolean?, -- 8.5 your clipboard is out (orders mode: the character attribute ClipboardHeld)
 }
 
 -- target: what the 3D guide points at (client/SandboxGuide.luau finds it): "board" | "curb" | "door" | "van" |
 -- "unload" | "stand" | 8.3: "desk" (the UPGRADES desk) | "hot" (a free stand, else the 📦 STOCK chip) | "paint" (the
--- van's 🎨 prompt) | nil (the hint only). nav: the arrow stays while you drive, done or not. info: it only says
--- something (done after a while on the screen). soft: 8.3, a soft step (SandboxSteps.choose; its ✕ dismisses it).
-export type Step = { id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean }
+-- van's 🎨 prompt) | 8.4: "danny" (Danny's body) | nil (the hint only). nav: the arrow stays while you drive, done or not.
+-- info: it only says something (done after a while on the screen). soft: 8.3, a soft step (SandboxSteps.choose; its ✕
+-- dismisses it; 8.4: Danny's steps too). pad: 8.4, the SandboxPad action whose gamepad button follows its words in
+-- brackets (SandboxSteps.onDevice; nil: none).
+export type Step = { id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean, pad: string? }
 
 -- 8.3: hot the hot pieces in the stock (not on show, not broken), hotName the first one's name, day the market's day,
 -- hotSold a hot kind sold today.
@@ -145,16 +184,18 @@ export type Summary = {
 }
 
 -- The counts of the look before (SandboxSteps.doneBy): a step is done when its count goes up while you play. 8.3: the
--- warehouse's level, the other upgrades' levels added up, the hot pieces in the stock and the market's day.
-export type Last = { vanLoad: number?, delivered: number?, shown: number?, level: number?, bought: number?, hot: number?, day: number? }
+-- warehouse's level, the other upgrades' levels added up, the hot pieces in the stock and the market's day. 8.4: the
+-- pieces on Danny's list.
+export type Last = { vanLoad: number?, delivered: number?, shown: number?, level: number?, bought: number?, hot: number?, day: number?, queue: number? }
 
 -- A display stand's place in the world (client/SandboxGuide.luau reads them from shared/WarehouseLayout.luau).
 export type Place = { x: number, y: number, z: number }
 
 local HOUSE = SandboxMap.House.name
+local DANNY = Config.MoveHelper.Name -- 8.4
 
-local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?): Step
-	return { id = id, hint = hint, target = target, nav = nav, info = info, soft = soft == true }
+local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?, pad: string?): Step
+	return { id = id, hint = hint, target = target, nav = nav, info = info, soft = soft == true, pad = pad }
 end
 
 SandboxSteps.Steps = {
@@ -174,17 +215,29 @@ SandboxSteps.Steps = {
 	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
 	upgrade = step("upgrade", "New upgrade in reach at the UPGRADES desk", "desk", false, false, true),
 	paint = step("paint", "🎨 Make your van your own: E at its side opens the PAINT SHOP", "paint", false, false, true),
+	-- 8.4, Danny for hire (soft: said once; their words the same on every device, a gamepad's button added: onDevice)
+	lift = step("lift", `Heavy piece: press Lift and wait for {DANNY}`, nil, false, false, true),
+	-- (8.5 orders mode: its words say the clipboard's key, SandboxSteps.words without it out)
+	give = step("give", `Take out your clipboard ({Config.MoveHelper.Clipboard.Key}) and pick a piece for {DANNY}`, nil, false, false, true, "clipboard"),
+	hire = step("hire", `Hire {DANNY} to carry with you`, "danny", false, false, true, "danny"),
 } :: { [string]: Step }
 
 -- 8.3: the soft steps in their order (the first that fits shows).
 SandboxSteps.Soft = { "grow", "hot", "upgrade", "paint" } :: { string }
 
+-- 8.4: Danny's steps in their order (the first that fits and is not done shows, before the move's own step).
+SandboxSteps.Danny = { "lift", "give", "hire" } :: { string }
+
 local S = SandboxSteps.Steps
 local G = Config.SandboxGuide
 
-function SandboxSteps.decide(s: State): Step
+function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 	if s.move then
-		-- HOOK Danny (8.3 hire, the move's part; see the header): "click a piece to give it to Danny" goes here
+		-- 8.4 Danny for hire (see the header): his step that fits and is not done comes first
+		local danny = if done then SandboxSteps.danny(s, done) else nil
+		if danny then
+			return danny
+		end
 		if s.inside then
 			return S.inside
 		end
@@ -200,8 +253,7 @@ function SandboxSteps.decide(s: State): Step
 		return if s.delivered > 0 then S.back else S.drive
 	end
 	if s.planning then
-		-- HOOK Danny (8.3 hire, the planning's part; see the header): "hire Danny for the move" goes here
-		return if s.planningMine then S.plan else S.planCrew
+		return if s.planningMine then S.plan else S.planCrew -- (8.4: no Danny yet: he comes with the move)
 	end
 	local free = s.freeStands
 	if s.stock > 0 and (free == nil or free > 0) then
@@ -304,6 +356,21 @@ function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
 	if day ~= nil then
 		last.day = day
 	end
+	-- 8.4 Danny for hire: hired, or his card opened (it shows his offer, then how to give him pieces); a piece given him
+	-- while you play (his list went up); your Lift called him to a heavy piece (you wait for him)
+	local helper, queue = s.helper, s.helperQueue
+	if s.move and helper ~= nil then
+		if helper == "hired" or window == "MoveHelperCard" then
+			done.hire = true
+		end
+		if helper == "hired" and (window == "MoveHelperCard" or (queue ~= nil and rose(last.queue, queue))) then
+			done.give = true
+		end
+		if s.waiting == true then
+			done.lift = true
+		end
+	end
+	last.queue = if s.move and helper == "hired" then queue else nil
 end
 
 -- The hint line and the 3D guide: a step not done yet shows both (the guide when it has a target); a done one is quiet,
@@ -321,6 +388,53 @@ function SandboxSteps.text(s: Step, touch: boolean, words: string?): string
 		return hint
 	end
 	return (string.gsub(hint, "%f[%w]E%f[%W]", "tap"))
+end
+
+-- 8.4: the words on a device (SandboxPad's "keys" | "pad" | "touch"): a computer's as they are, a phone's taps
+-- (SandboxSteps.text), a gamepad's prompts on X (SandboxPad.say "use") and a Danny step's button after them ("(R1)":
+-- a gamepad points at nothing). `words`: a soft step's (SandboxSteps.words) instead of the step's own.
+function SandboxSteps.onDevice(s: Step, words: string?, device: string): string
+	local hint = words or s.hint
+	-- 8.5: words that name their step's own key in brackets ("(Q)": the clipboard's) say it in this device's way
+	local action = if s.pad then SandboxPad.Actions[s.pad] else nil
+	local named = action ~= nil and string.find(hint, `({action.key})`, 1, true) ~= nil
+	if named and s.pad then
+		hint = SandboxPad.say(hint, s.pad, device)
+	end
+	if device ~= "pad" then
+		return SandboxSteps.text(s, device == "touch", hint)
+	end
+	local said = SandboxPad.say(hint, "use", device)
+	return if s.pad and not named then SandboxPad.withKey(said, s.pad, device) else said
+end
+
+-- ── 8.4, Danny for hire ────────────────────────────────────────────────────
+
+-- Does Danny's step fit (never while you sit, carry or wait for him; each only with what it needs known)?
+local function dannyFits(id: string, s: State): boolean
+	if s.seated or s.carrying or s.waiting == true then
+		return false
+	elseif id == "hire" then
+		local price, money = s.helperPrice, s.money
+		return s.helper == "offer" and price ~= nil and money ~= nil and money >= price
+	elseif id == "give" then
+		return s.helper == "hired" and s.helperQueue == 0 and s.inside
+	elseif id == "lift" then
+		return s.helper == "hired" and s.heavyNear == true and (s.heavy or 0) > 0
+	end
+	return false
+end
+
+function SandboxSteps.danny(s: State, done: { [string]: boolean }): Step?
+	if not s.move or s.helper == nil or s.covered or s.hush then
+		return nil
+	end
+	for _, id in SandboxSteps.Danny do
+		if done[id] ~= true and dannyFits(id, s) then
+			return S[id]
+		end
+	end
+	return nil
 end
 
 -- ── 8.3, the soft steps ────────────────────────────────────────────────────
@@ -374,9 +488,9 @@ end
 
 -- The step now: the core loop's while it has something to do (a move, the planning, a core step not done yet; `earn`,
 -- which only says something, gives way), else the first soft step that fits and is not done (none while the screen is
--- covered or something else talks), else the core's (quiet).
+-- covered or something else talks), else the core's (quiet). 8.4: in a move Danny's step first (decide's).
 function SandboxSteps.choose(s: State, done: { [string]: boolean }): Step
-	local core = SandboxSteps.decide(s)
+	local core = SandboxSteps.decide(s, done)
 	if s.move or s.planning or (done[core.id] ~= true and not core.info) or s.covered or s.hush then
 		return core
 	end
@@ -406,6 +520,8 @@ function SandboxSteps.detail(step: Step, s: State): (string?, number?)
 		return SandboxSteps.upgradeFor(s)
 	elseif step.id == "hot" then
 		return s.hot, nil
+	elseif step.id == "give" and s.clipboard == true then
+		return "clipboard", nil -- (8.5: its words change once the clipboard is out)
 	end
 	return nil, nil
 end
@@ -424,6 +540,8 @@ function SandboxSteps.words(step: Step, s: State): string
 		end
 	elseif step.id == "hot" and s.hot then
 		return `🔥 Your {s.hot} is hot today: sell it or show it`
+	elseif step.id == "give" and s.clipboard == true then
+		return `Pick a piece to give it to {DANNY}` -- (8.5: the clipboard out, orders mode)
 	end
 	return step.hint
 end

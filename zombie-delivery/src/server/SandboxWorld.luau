@@ -21,9 +21,19 @@
 --             the big move: the FrontDoor unseen behind its two leaves (FrontLeafWest, FrontLeafEast), the back door at
 --             House.back ("BackDoor": SandboxBackDoor, unseen, no collision; its leaf "BackLeaf"): door leaves that
 --             swing (shared/DoorSwing.luau: DoorLeaf -1 / 1 / -1, DoorSwing 1, DoorDark); dressed, all hidden with the
---             chalet and the model's doors copied as the leaves that swing ("FrontDoorLeaf" ×2, "BackDoorLeaf")
+--             chalet and the model's doors copied as the leaves that swing ("FrontDoorLeaf" ×2, "BackDoorLeaf"). 8.5
+--             walking through: the leaves swing out of the house (DoorSwing -1: seen against the dark doorway, never
+--             behind it; 8.5.1 past square: Config.Moving.Doors.Wide), and the doorways are walkable: the House box
+--             (unseen when dressed, what you bumped into) no longer collides nor stops a ray; its "HouseSolid" pieces do,
+--             the box less a hall behind each doorway (Config.Moving.Doors.Hall Depth deep, the opening's width and
+--             height), each hall lined dark ("DoorHalls": the house is a shell behind its walls, a camera that follows
+--             you in sees a dark hall)
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
+--   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
+--             Auction House on Depot Row, east of the crossroads (shared/AuctionHouseLayout.luau's parts, its place
+--             Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
+--             client paints), the consignment desk's prompt (AuctionDesk), the lot's pedestal (AuctionLotStand), two lamps
 --   Boundary  the invisible walls on the Bounds
 --   Far       (a Persistent model: every client always has it) outside the Bounds: the far meadow, the green hills and
 --             the snowy peaks that close the view; no collision but the far meadow's, no shadows
@@ -40,7 +50,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AlpineLayout = require(Shared.AlpineLayout)
+local AuctionHouseLayout = require(Shared.AuctionHouseLayout) -- 8.8: the Auction House (only while Config.Auction.On)
 local ChaletLooks = require(Shared.ChaletLooks)
+local Config = require(Shared.Config) -- 8.5 walk-in doors: the doors' halls (Config.Moving.Doors.Hall)
 local RenderBudget = require(Shared.RenderBudget)
 local SandboxMap = require(Shared.SandboxMap)
 local SandboxScenery = require(Shared.SandboxScenery)
@@ -270,11 +282,15 @@ end
 
 -- 8.3 walk-in doors: the house's doors' leaves (shared/DoorSwing.luau's attributes; client/WalkDoors.luau swings them,
 -- server/Moving.luau says when), the front door's two and the back door's one, each hinged at its opening's side
--- (DoorLeaf ±1), swinging into the house (DoorSwing 1), a dark hall where it stood (DoorDark: the house's body behind
--- it). Dressed in the owner's Blender house (its doors part of the model: still): leaves made like them just in front
+-- (DoorLeaf ±1), a dark doorway where it stood (DoorDark: the house's body behind it). 8.5: swinging out of the house
+-- (DoorSwing -1, was 1: swung in, a leaf went behind its dark doorway at once and its swing was never seen; out it
+-- swings in front of it, as the interior's swing out onto their porches). Dressed in the owner's Blender house (its
+-- doors part of the model: still): leaves made like them just in front
 -- of them (SandboxScenery.frontLeaves, backLeaves; models "FrontDoorLeaf", "BackDoorLeaf" in the model's own finishes,
 -- HouseMesh.Looks), the chalet's own leaves hidden with it, swinging no more; else the chalet's own leaves (house's
--- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. Returns the leaves.
+-- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. 8.5.1 (the owner: "the doors
+-- just disappear"): they open Config.Moving.Doors.Wide degrees (DoorAngle), past square: square to the wall they were
+-- edge-on to a camera walking up, two slivers by a black doorway. Returns the leaves.
 function SandboxWorld.doorLeaves(house: Model): { Instance }
 	local H = MAP.House
 	local body = house:FindFirstChild("House_" .. H.id)
@@ -302,7 +318,8 @@ function SandboxWorld.doorLeaves(house: Model): { Instance }
 					end
 				end
 				model:SetAttribute("DoorLeaf", leaf.hinge)
-				model:SetAttribute("DoorSwing", 1)
+				model:SetAttribute("DoorSwing", -1) -- (8.5: out of the house)
+				model:SetAttribute("DoorAngle", Config.Moving.Doors.Wide) -- (8.5.1: their faces stay in sight)
 				model:SetAttribute("DoorDark", true)
 				model.Parent = house
 				table.insert(made, model)
@@ -314,12 +331,68 @@ function SandboxWorld.doorLeaves(house: Model): { Instance }
 		local leaf = body:FindFirstChild(name)
 		if leaf then
 			leaf:SetAttribute("DoorLeaf", if name == "FrontLeafWest" then -1 elseif name == "FrontLeafEast" then 1 else S.BackDoor.Hinge)
-			leaf:SetAttribute("DoorSwing", 1)
+			leaf:SetAttribute("DoorSwing", -1) -- (8.5: out of the house)
+			leaf:SetAttribute("DoorAngle", Config.Moving.Doors.Wide) -- (8.5.1)
 			leaf:SetAttribute("DoorDark", true)
 			table.insert(made, leaf)
 		end
 	end
 	return made
+end
+
+-- 8.5 walk-in doors (the owner: "so it doesn't feel like I bumped into the door, but I keep walking smoothly"): the
+-- doorways walkable. The House box (the chalet's body; unseen under the owner's Blender house, still what stopped you at
+-- its door) no longer collides nor stops a ray; "HouseSolid" pieces of the house's own (unseen) do instead: the box less
+-- a hall behind each doorway (the front door's, the back door's: Config.Moving.Doors.Hall Depth studs into the house,
+-- the opening's width, the door's height), so you walk on through the open door while the trip's fade starts
+-- (server/Moving.luau's WalkIn), the walls either side as solid as ever. Each hall lined dark in "DoorHalls" (its back,
+-- sides, ceiling and floor, from just behind the model's own door: the house is a shell behind its walls, and a camera
+-- that follows you in sees a dark hall, never the hollow model); decoration, never colliding. `frame`: the front door's
+-- (its foot on the front wall, -Z out); `top`: the doorways' height.
+local function doorHalls(model: Model, body: Model, frame: CFrame, top: number)
+	local H = MAP.House
+	local box = H.house
+	local hall = Config.Moving.Doors.Hall
+	local house = body:FindFirstChild("House")
+	if not (house and house:IsA("BasePart")) then
+		return
+	end
+	local w, h, d = box.sx, box.sy, box.sz
+	local depth = math.min(hall.Depth, d / 2 - 1)
+	local back = H.back
+	local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0)
+	local bx = frame:PointToObjectSpace(backFrame.Position).X -- (the back door's middle across the house, the front's frame)
+	-- the solid pieces, each a box x0 … x1, y0 … y1, z0 … z1 in the front door's frame (the house from z 0 back to d)
+	local function solid(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number)
+		local p = block(body, "HouseSolid", Vector3.new(x1 - x0, y1 - y0, z1 - z0), frame * CFrame.new((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), house.Color, house.Material)
+		p.Transparency = 1
+		p.CastShadow = false
+	end
+	solid(-w / 2, w / 2, 0, h, depth, d - depth) -- (between the two halls)
+	for _, way in { { x = 0, half = S.FrontDoor.Width / 2, z0 = 0 }, { x = bx, half = S.BackDoor.Width / 2, z0 = d - depth } } do
+		solid(-w / 2, way.x - way.half, 0, h, way.z0, way.z0 + depth)
+		solid(way.x + way.half, w / 2, 0, h, way.z0, way.z0 + depth)
+		solid(way.x - way.half, way.x + way.half, top, h, way.z0, way.z0 + depth) -- (over the doorway)
+	end
+	house.CanCollide = false
+	house.CanQuery = false
+	-- the halls' dark lining, each in its own door's frame (its foot on its wall, -Z out, the hall from z `from` to depth)
+	local holder = folder(model, "DoorHalls")
+	local dark = rgb(hall.Color)
+	local from, t = 0.35, 0.1 -- (from just behind the model's own door, 0.34 deep in its pocket)
+	local long = depth - from
+	for _, way in { { frame = frame, width = S.FrontDoor.Width }, { frame = backFrame, width = S.BackDoor.Width } } do
+		local half = way.width / 2
+		local function line(size: Vector3, at: Vector3)
+			deco(block(holder, "DoorHall", size, way.frame * CFrame.new(at), dark, Enum.Material.SmoothPlastic)).CastShadow = false
+		end
+		line(Vector3.new(way.width, top, t), Vector3.new(0, top / 2, depth - t / 2)) -- (its back)
+		for _, side in { -1, 1 } do
+			line(Vector3.new(t, top, long), Vector3.new(side * (half - t / 2), top / 2, from + long / 2))
+		end
+		line(Vector3.new(way.width, t, long), Vector3.new(0, top - t / 2, from + long / 2)) -- (its ceiling)
+		line(Vector3.new(way.width, 0.04, long), Vector3.new(0, 0.02, from + long / 2)) -- (its floor, on the lawn)
+	end
 end
 
 local function house(world: Instance): Model
@@ -399,6 +472,7 @@ local function house(world: Instance): Model
 		doorway.Transparency = 1
 		doorway.CastShadow = false
 		deco(block(body, "BackLeaf", Vector3.new(width, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
+		doorHalls(model, body, frame, size.Y) -- 8.5 walk-in doors: the doorways walkable, a dark hall behind each
 	end
 	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
 	-- part, where the model's door is); else the chalet as it is
@@ -439,6 +513,87 @@ local function house(world: Instance): Model
 	end
 	model.Parent = world
 	SandboxWorld.doorLeaves(model) -- 8.3 walk-in doors: its doors' leaves swing (the model's doors copied when dressed)
+	return model
+end
+
+-- ── 8.8 The Auction House ──────────────────────────────────────────────────
+
+-- shared/AuctionHouseLayout.luau's parts (only while Config.Auction.On) in the Atomic model "AuctionHouse", dressed by
+-- their tags: the sign's and the lot display's words (client/AuctionUi.luau paints them from the auction's view), the
+-- desk's "Consign a piece" prompt (attribute AuctionDesk: the client opens the window), the lot's pedestal (attribute
+-- AuctionLotStand: where the server's step shows the piece), the lamps' light.
+local function auctionHouse(world: Instance): Model
+	local H = Config.Auction.House
+	local model = Instance.new("Model")
+	model.Name = "AuctionHouse"
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model:SetAttribute("AuctionHouse", true)
+	local cream, gold = Color3.fromRGB(250, 242, 222), Color3.fromRGB(255, 206, 92)
+	local function surface(part: BasePart, face: Enum.NormalId, names: { string }, boxes: { { number } }, texts: { string }, colors: { Color3 })
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Words"
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 0.3
+		gui.MaxDistance = H.Range
+		for n, name in names do
+			local b = boxes[n]
+			local line = Instance.new("TextLabel")
+			line.Name = name
+			line.BackgroundTransparency = 1
+			line.Position = UDim2.fromScale(b[1], b[2])
+			line.Size = UDim2.fromScale(b[3], b[4])
+			line.Text = texts[n] or ""
+			line.TextScaled = true
+			line.Font = if n == 1 or b[4] >= 0.2 then Enum.Font.GothamBlack else Enum.Font.GothamBold
+			line.TextColor3 = colors[n] or cream
+			line.TextXAlignment = if b[5] == 1 then Enum.TextXAlignment.Left elseif b[5] == 2 then Enum.TextXAlignment.Right else Enum.TextXAlignment.Center
+			line.Parent = gui
+		end
+		gui.Parent = part
+	end
+	for _, spec in AuctionHouseLayout.parts() do
+		local size = Vector3.new(spec.sx, spec.sy, spec.sz)
+		local frame = CFrame.new(spec.x, spec.y, spec.z) * CFrame.Angles(0, math.rad(spec.yaw), 0)
+		local p: BasePart = if spec.shape == "wedge"
+			then wedge(model, spec.name, size, frame, rgb(spec.color), material(spec.material))
+			else block(model, spec.name, size, frame, rgb(spec.color), material(spec.material))
+		if not spec.solid then
+			deco(p)
+		end
+		p.Transparency = spec.alpha or 0
+		if spec.tag == "sign" then -- (its words: Title, and Next: the client's "Next auction in 12:34")
+			surface(p, Enum.NormalId.Front, AuctionHouseLayout.SignLabels, { { 0.03, 0.06, 0.94, 0.58 }, { 0.03, 0.66, 0.94, 0.28 } }, { "AUCTION HOUSE", "" }, { gold, cream })
+		elseif spec.tag == "screen" then -- (the lot on the podium: the client writes it; built empty but for the title)
+			surface(p, Enum.NormalId.Front, AuctionHouseLayout.ScreenLabels,
+				{ { 0.04, 0.05, 0.92, 0.11 }, { 0.04, 0.19, 0.92, 0.2 }, { 0.04, 0.41, 0.92, 0.1 }, { 0.04, 0.53, 0.92, 0.24 }, { 0.04, 0.8, 0.6, 0.13, 1 }, { 0.66, 0.8, 0.3, 0.13, 2 } },
+				{ "AUCTION HOUSE", "No lot on the podium", "", "", "", "" }, { gold, cream, cream, gold, cream, cream })
+		elseif spec.tag == "notice" then -- (faces the hall: the part's -X)
+			surface(p, Enum.NormalId.Left, { "Title", "Line" }, { { 0.05, 0.08, 0.9, 0.5 }, { 0.05, 0.62, 0.9, 0.28 } }, { "CONSIGN HERE", "rare · epic · legendary" }, { gold, cream })
+		elseif spec.tag == "desk" then
+			local prompt = Instance.new("ProximityPrompt")
+			prompt.Name = "AuctionDeskPrompt"
+			prompt.ActionText = "Consign a piece"
+			prompt.ObjectText = "Auction desk"
+			prompt.KeyboardKeyCode = Enum.KeyCode.E
+			prompt.HoldDuration = 0
+			prompt.MaxActivationDistance = 9
+			prompt.RequiresLineOfSight = false
+			prompt:SetAttribute("AuctionDesk", true)
+			prompt.Parent = p
+		elseif spec.tag == "stand" then
+			p:SetAttribute("AuctionLotStand", true)
+		elseif spec.tag == "lamp" then
+			local light = Instance.new("PointLight")
+			light.Brightness = H.Lamp.Brightness
+			light.Range = H.Lamp.Range
+			light.Color = rgb(H.Lamp.Color)
+			light.Shadows = false
+			light.Parent = p
+		end
+	end
+	model.Parent = world
 	return model
 end
 
@@ -628,6 +783,9 @@ function SandboxWorld.build(): Folder
 	roads(world)
 	house(world)
 	scenery(world)
+	if Config.Auction.On then -- 8.8: the Auction House, only once the auction is on (nothing of it shows before)
+		auctionHouse(world)
+	end
 	boundary(world)
 	far(world)
 	world.Parent = workspace -- (in one go)

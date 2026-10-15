@@ -77,7 +77,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "upgrades",
 		name = "Upgrades",
-		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (the Logistics centre's 20 stands, the lights, the van, Danny). RESET: none (the Garage; the pieces on the lost stands go back to the stock). LV 1 – 5: the warehouse at that level (1 the Garage … 5 the Logistics centre), the rest as it is. 8.3: UNLOCK PAINTS: every paint and livery of the PAINT shop owned for free (wear them at the van). RESET PAINTS: none, the van back in ZDC cream.",
+		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (the Logistics centre's 24 stands and More stands' 8, the lights, the van, Danny). RESET: none (the Garage; the pieces on the lost stands go back to the stock). LV 1 – 5: the warehouse at that level (1 the Garage … 5 the Logistics centre), the rest as it is. 8.3: UNLOCK PAINTS: every paint and livery of the PAINT shop owned for free (wear them at the van). RESET PAINTS: none, the van back in ZDC cream.",
 	},
 } :: { Group }
 

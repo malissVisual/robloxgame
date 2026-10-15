@@ -26,6 +26,12 @@
 --   SandboxLightRules.lux(lights, x, y, z)    the light at a point: Σ brightness × falloff (lights: { x, y, z,
 --                                             brightness, range })
 --   SandboxLightRules.load(lights)            Σ brightness × range (a room's or a hall's light budget)
+--   SandboxLightRules.lamps(x0, x1, z0, z1)   8.5.2: a house room's ceiling lamps (server/HouseInterior.luau hangs them),
+--                                             { { x, z } } over the middles of a grid on its floor: along each side one
+--                                             lamp in a room no longer than House.Lamp.Long, else two, more down a side
+--                                             longer than twice Lamp.Span (a lamp each Span at most: a long corridor, a
+--                                             big living room), never closer than Lamp.Apart (a room just over Long keeps
+--                                             one: two close lamps make a hot spot); its budget is RoomLoad a lamp
 --   SandboxLightRules.luma(color)             a { r, g, b } colour's luma (Rec. 709, 0 … 255)
 
 local Config = require(script.Parent.Config)
@@ -152,6 +158,29 @@ function SandboxLightRules.load(lights: { Light }): number
 		sum += l.brightness * l.range
 	end
 	return sum
+end
+
+function SandboxLightRules.lamps(x0: number, x1: number, z0: number, z1: number): { { number } }
+	local lamp = L.House.Lamp
+	local function along(length: number): number
+		if length <= lamp.Long then
+			return 1
+		end
+		local n = math.max(2, math.ceil(length / (lamp.Span or lamp.Long) - 1e-9))
+		while n > 1 and length / n < (lamp.Apart or 0) do
+			n -= 1
+		end
+		return n
+	end
+	local lx, lz = x1 - x0, z1 - z0
+	local nx, nz = along(lx), along(lz)
+	local spots: { { number } } = {}
+	for i = 1, nx do
+		for j = 1, nz do
+			table.insert(spots, { x0 + lx * (i - 0.5) / nx, z0 + lz * (j - 0.5) / nz })
+		end
+	end
+	return spots
 end
 
 function SandboxLightRules.luma(c: { number }): number

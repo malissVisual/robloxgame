@@ -9,7 +9,8 @@
 -- Cargo: every character with the Carrying attribute (server/Cargo.luau; players and the people in workspace.Npcs)
 -- holds it: both upper arms forward-down, the forearms forward under the box at chest height (the gun in the hand
 -- is hidden meanwhile); "horse" is a lead: the right hand a little forward on the rope. Blended in and out too.
--- 5.0: the phone (the PhoneHeld attribute, server/KitWear.luau) is held the same way: the right forearm up.
+-- 5.0: the phone (the PhoneHeld attribute, server/KitWear.luau) is held the same way: the right forearm up. 8.5: Danny's
+-- clipboard (ClipboardHeld, server/Clipboard.luau) too, the kind "clipboard": a notepad lying in the palm, read.
 -- 3.9: a holstered gun (the Holstered attribute, server/CloseCombat.luau; yours as client/Holster.luau shows it) is
 -- hidden the same way on foot, so the arms hang empty. A melee swing (V) moves the right arm on top of whatever else
 -- it does: a quick wind-up and a punch forward, or an overhead strike with the gun, about Config.Melee.SwingTime long
@@ -17,7 +18,9 @@
 -- key press (Holster.localSwing; your MeleeAt is not played again).
 -- 3.10: getting into a car the right hand goes to the door's handle, getting out it pushes the door (the character's
 -- BoardAt / BoardReach and AlightAt / AlightReach attributes, server/Vehicles.luau; the curve is shared/Boarding.luau
--- reach), laid on the right arm like the swing; everybody sees it, yours too from the same attributes.
+-- reach), laid on the right arm like the swing; everybody sees it, yours too from the same attributes. 8.5.1: Danny's
+-- too (the same attributes on his body in workspace.Npcs, server/MoveHelper.luau's boardIn / boardOut: the owner's
+-- "go, open the door and get in"), followed like the people's carry and gestures.
 -- 5.7: a short gesture on top of everything (shared/Gestures.luau: wave, give, take, knock), from the Gesture /
 -- GestureAt attributes the server sets on characters and people (server/Npcs.luau Npcs.act): the receiver waves at the
 -- door and reaches for the piece, the courier holds it out or reaches for it, knocks at the door. Both arms, R15 and R6.
@@ -290,6 +293,18 @@ local function carryGoals(kind: string?, character: Model?): ArmGoals
 			rw = CFrame.Angles(math.rad(-6), 0, 0) * CFrame.Angles(0, math.rad(roll), 0),
 		}
 	end
+	if kind == "clipboard" then
+		-- 8.5 Danny's clipboard (the ClipboardHeld attribute, server/Clipboard.luau): held like the phone, a notepad in
+		-- front of the chest read from above: the upper arm forward and in, the forearm level, the board lying in the
+		-- palm turned up (the wrist's roll, as the phone's) with its far end (the clip) tipped up toward the face; the
+		-- left arm swings free.
+		local roll = if inPalm(character) then PHONE_ROLL else 0
+		return {
+			rs = CFrame.Angles(0, math.rad(18), 0) * CFrame.Angles(math.rad(28), 0, 0),
+			re = CFrame.Angles(math.rad(64), 0, 0),
+			rw = CFrame.Angles(math.rad(12), 0, 0) * CFrame.Angles(0, math.rad(roll), 0),
+		}
+	end
 	if kind == "horse" then
 		-- Leading on a rope: the right hand a little forward and out, the elbow soft; the left arm swings free.
 		return {
@@ -318,7 +333,7 @@ end
 local B = Config.Body
 local SIDES = { 1, -1 }
 local function reachGoals(character: Model, rig: Rig, kind: string): ArmGoals?
-	if kind == "phone" or kind == "horse" or rig.kind ~= "r15" or character:GetAttribute("Pushing") ~= nil then
+	if kind == "phone" or kind == "clipboard" or kind == "horse" or rig.kind ~= "r15" or character:GetAttribute("Pushing") ~= nil then
 		return nil
 	end
 	local at, size = character:GetAttribute("CarryAt"), character:GetAttribute("CarrySize")
@@ -505,8 +520,8 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 	end
 	if rig.kind == "r6" then
 		-- R6: the shoulders swing about their Z axis (mirrored on the left); no elbows, so the arms come well forward.
-		local lead = kind == "horse"
-		local rightCarry = if carryT > 0 then CFrame.Angles(0, 0, math.rad(if lead then 25 else 75)) else nil
+		local lead = kind == "horse" or kind == "clipboard" -- (8.5: the clipboard one-handed too, the arm well up)
+		local rightCarry = if carryT > 0 then CFrame.Angles(0, 0, math.rad(if kind == "clipboard" then 60 elseif lead then 25 else 75)) else nil
 		local leftCarry = if carryT > 0 and not lead then CFrame.Angles(0, 0, -math.rad(75)) else nil
 		local rightSwing = if shape then CFrame.Angles(0, 0, shape.r6Wind + (shape.r6Hit - shape.r6Wind) * sw.k) else nil
 		local r6Right = if gesture and gesture.r6Right then CFrame.Angles(0, 0, gesture.r6Right) else nil
@@ -522,13 +537,13 @@ function ArmPose.apply(character: Model, t: number, pitch: number)
 end
 
 -- What a character holds (the server's Carrying attribute; 5.0: "phone" while the server shows the phone in its
--- right hand, the PhoneHeld attribute), or nil.
+-- right hand, the PhoneHeld attribute; 8.5: "clipboard", Danny's clipboard, ClipboardHeld), or nil.
 local function carryingOf(character: Model): string?
 	local value = character:GetAttribute("Carrying")
 	if type(value) == "string" and value ~= "" then
 		return value
 	end
-	return if character:GetAttribute("PhoneHeld") == true then "phone" else nil
+	return if character:GetAttribute("PhoneHeld") == true then "phone" elseif character:GetAttribute("ClipboardHeld") == true then "clipboard" else nil
 end
 
 -- The gun in the hand is hidden (on this client) while the hands hold cargo or (3.9) it is holstered on foot, and comes
@@ -625,7 +640,7 @@ local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, 
 	-- steps aside, only a body the gait leaves alone (beyond its range) leans here)
 	-- 6.7: a load in both hands (a heavy one that slows you more) leans the upper body back against it
 	local carry = carries[character]
-	local load = if carry and carry.kind ~= "phone" and carry.kind ~= "horse" and character:GetAttribute("Pushing") == nil
+	local load = if carry and carry.kind ~= "phone" and carry.kind ~= "clipboard" and carry.kind ~= "horse" and character:GetAttribute("Pushing") == nil
 		then carry.t * math.rad(if character:GetAttribute("CarrySpeed") ~= nil then B.CarryHeavy elseif character:GetAttribute("CarryHands") == 1 then 0 else B.CarryLean)
 		else 0
 	local goal = (LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) - LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1))
@@ -843,8 +858,8 @@ local npcHooks: { [Instance]: RBXScriptConnection } = {}
 local npcFolder: Instance? = nil
 
 local function npcCheck(model: Model)
-	if carryingOf(model) or model:GetAttribute("GestureAt") ~= nil then
-		npcActive[model] = true
+	if carryingOf(model) or model:GetAttribute("GestureAt") ~= nil or model:GetAttribute("BoardAt") ~= nil or model:GetAttribute("AlightAt") ~= nil then
+		npcActive[model] = true -- (8.5.1: Danny's hand on the van's door, BoardAt / AlightAt)
 	end
 end
 
@@ -859,7 +874,7 @@ local function watchNpcs(folder: Instance)
 		end
 		local model = child
 		npcHooks[model] = model.AttributeChanged:Connect(function(name: string)
-			if name == "Carrying" or name == "PhoneHeld" or name == "GestureAt" or name == "Gesture" then
+			if name == "Carrying" or name == "PhoneHeld" or name == "GestureAt" or name == "Gesture" or name == "BoardAt" or name == "AlightAt" then
 				npcCheck(model)
 			end
 		end)
@@ -927,9 +942,10 @@ local function step(dt: number)
 			end
 			local humanoid, root = Bodies.of(model)
 			if root and (root.Position - eye).Magnitude <= range then
-				poseCharacter(model, humanoid, false, 0, RAISE_TIME, dt, nil, nil, gestureOf(model))
+				poseCharacter(model, humanoid, false, 0, RAISE_TIME, dt, nil, reachOf(model), gestureOf(model)) -- (8.5.1 his reach)
 			end
-			if not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil then
+			if not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil and not swung[model]
+				and model:GetAttribute("BoardAt") == nil and model:GetAttribute("AlightAt") == nil then
 				npcActive[model] = nil
 			end
 		end

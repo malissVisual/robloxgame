@@ -179,7 +179,7 @@
         { to: at('Stand2', 0, -2), lines: [[`Display stands (${p1.stands} at level ${p1.level})`, 'a piece on show earns $ every minute']] },
         { to: IS(p1.unload.x + p1.unload.r * 0.7, p1.unload.z + p1.unload.r * 0.71), lines: [['Unload circle', "back the van in: the load goes", 'into your stock (P → SHOW ZONES shows it)']] },
         { to: IS(p1.vanSpot.x + 1.5, p1.vanSpot.z + 6), lines: [['Your Sprinter van', 'parked back to the warehouse door']] },
-        { to: at('TerminalDesk', 0, -0.6), lines: [['UPGRADES desk', 'warehouse levels 1 – 5, lights, engine, Danny']] },
+        { to: at('TerminalDesk', 0, -0.6), lines: [['UPGRADES desk', 'warehouse levels 1 – 5, More stands,', "lights, the van's engine, Danny's training"]] },
         { to: at('Floor', -p1.size[0] * 0.44, p1.size[2] * 0.2), lines: [[`Your warehouse, level ${p1.level}: ${p1.levelName}`, 'it grows bigger with every level']] },
         { to: IS(p1.board.x, p1.board.z + 0.6), lines: [['Kiosk: take a move here (E)', 'the Moving contracts board']] },
       ];

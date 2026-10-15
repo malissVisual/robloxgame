@@ -6,7 +6,10 @@
 -- middle), the easing (fast into the stop opening, slow then quick shutting), the dark doorway's size; the timing: the
 -- leaf opens before the zone and is open by the end of the dwell at a walk (the trip never waits for it), the server's
 -- move lands while the client's screen is black (FadeOut + Margin after the fade out, inside its black until it sees
--- itself there), Danny's own step within the dark, nothing the fade's own safety lifts early.
+-- itself there), Danny's own step within the dark, nothing the fade's own safety lifts early. 8.5 walking through: the
+-- approach a bit larger and the leaf quicker but seen, fully open before you reach the doorway at a walk, a run and with
+-- a piece in both hands (the network's moments counted); the fade starting as you cross the threshold, your walk going
+-- on into the house's dark hall (Hall) until the screen is black, the move behind it; out onto the porch at a walk.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -157,7 +160,12 @@ do
 	end
 	check("the swing's share: 0 … 1 both ways, never back", DoorSwing.ease(0, true) == 0 and DoorSwing.ease(1, true) == 1 and DoorSwing.ease(0, false) == 0
 		and DoorSwing.ease(1, false) == 1 and monotone and DoorSwing.ease(-1, true) == 0 and DoorSwing.ease(2, false) == 1)
-	check("…opening fast, easing into the stop; shutting slow, then quicker into the frame", DoorSwing.ease(0.5, true) > 0.8 and DoorSwing.ease(0.5, false) < 0.3)
+	check("…opening quick, easing into the stop; shutting slow, then quicker into the frame", DoorSwing.ease(0.5, true) > 0.7 and DoorSwing.ease(0.5, false) < 0.3)
+	-- 8.5.1 (the owner: "the doors just disappear"): 8.5's cubic ease over 0.25 s had the leaves half open in 50 ms, nearly
+	-- all the way in 100 ms: a pop. Quadratic: its first tenth of the time a fifth of the way at most, half its time not
+	-- even 80 %, the whole of it seen
+	check("8.5.1 …never a pop: its first tenth a fifth of the way at most, half its time under 80 %", DoorSwing.ease(0.1, true) <= 0.2
+		and DoorSwing.ease(0.5, true) < 0.8 and DoorSwing.ease(0.9, true) > 0.95)
 	local x, y, z = DoorSwing.dark(4, 7, 0.4)
 	local x2, _, z2 = DoorSwing.dark(0.4, 7, 4)
 	check("the dark doorway: the leaf's whole face (two halves meet with no seam), thin in its middle plane", x == 4 and y == 7 and z <= 0.05 and x2 <= 0.05
@@ -168,15 +176,54 @@ end
 
 check("the doors swing; the numbers are there", D.Swing == true and D.Open > 0 and D.Close > 0 and D.Shut > 0 and D.FadeOut > 0 and D.Margin > 0
 	and D.Dark > 0 and D.FadeIn > 0 and D.Wait > 0 and D.Stream > 0 and D.Arrive > 0 and D.Angle > 0 and D.Angle <= 180)
-check("about the owner's numbers: the leaf ~0.35 s, the fade out ~0.25 s, the fade in ~0.35 s", near(D.Open, 0.35, 0.1) and near(D.FadeOut, 0.25, 0.1)
-	and near(D.FadeIn, 0.35, 0.1))
-check("the leaf starts opening before the zone (its approach deeper and wider)", D.Approach > D.Depth + 1 and D.ApproachSide >= 0)
--- walking up at the walk (or with a two-hands piece: the slowest carry but a drag), the leaf has opened by the end of
--- the dwell: the trip never stops you at a shut door
+check("about the owner's numbers: the fade out ~0.25 s, the fade in ~0.35 s; 8.5 the leaf quick but seen (0.25 … 0.35 s; 8.5.1 0.35, 8.5's 0.25 a pop)",
+	D.Open >= 0.25 and D.Open <= 0.35 and D.Open < D.Close and near(D.FadeOut, 0.25, 0.1) and near(D.FadeIn, 0.35, 0.1), D.Open)
+check("8.5.1 the sandbox house's leaves open past square (Wide: seen, not edge-on to a player walking up), walking through waits for most of the swing (Seen)",
+	D.Wide > 90 and D.Wide <= 120 and D.Seen > 0.5 and D.Seen < 1 and DoorSwing.ease(D.Seen, true) >= 0.8, `{D.Wide} {D.Seen}`)
+check("the leaf starts opening before the zone (its approach deeper and wider); 8.5 a bit larger (was 8 deep, 2 wider)", D.Approach > D.Depth + 1
+	and D.Approach > 8 and D.ApproachSide > 2)
+-- 8.5 walking through, on the clock as the game runs it: the server sees a client's body VIEW s late and looks every
+-- Every s; its word (the leaf's DoorOpen, the fade) reaches the client's screen WORD s after it said it
+local VIEW, WORD = 0.1, 0.05
 local walk = Config.Movement.Walk
+local run = Config.Movement.Sprint
 local slow = walk * Config.Moving.Speed.Both
-check("…and it is open by the end of the dwell at a walk, even with a piece in both hands", (D.Approach - D.Depth) / walk + D.Dwell >= D.Open
-	and (D.Approach - D.Depth) / slow + D.Dwell >= D.Open, (D.Approach - D.Depth) / walk + D.Dwell)
+-- the leaf: the server opens it as it sees you in its approach coming at it (Approach studs out), or farther out at a
+-- run (your walk through its doorway within Lead s): fully open on your screen before you reach its doorway, at a walk,
+-- at a run, with a piece in both hands (the slowest carry but a drag)
+local function openBefore(speed: number): number
+	return math.max(D.Approach, speed * D.Lead) / speed - VIEW - D.Every - WORD - D.Open
+end
+check("8.5 the leaf fully open before you reach the doorway: at a walk, at a run, with a piece in both hands", openBefore(walk) >= 0
+	and openBefore(run) >= 0 and openBefore(slow) >= 0 and D.Lead > 0, `{openBefore(walk)} {openBefore(run)} {openBefore(slow)}`)
+-- the trip: the server sends the fade out as its look sees your walk take your root across the threshold (Cross studs
+-- out of the doorway's face) within Ahead s; on your screen you are then at the threshold or a stud or so past it
+-- (studs into the doorway: positive)
+local function fadeAt(speed: number, late: boolean): number
+	return -D.Cross + speed * (VIEW + WORD - D.Ahead + (if late then D.Every else 0))
+end
+check("8.5 walking through: the fade starts on your screen as you cross the threshold (a stud before it at most, two past it at most, at a walk)",
+	fadeAt(walk, false) >= -1 and fadeAt(walk, true) <= 2 and D.Ahead > 0 and D.Ahead <= VIEW + D.Every, `{fadeAt(walk, false)} … {fadeAt(walk, true)}`)
+-- …and your walk goes on into the house's dark hall (Hall.Depth studs, your root half a stud from its end): never at its
+-- end before your screen is black (a walk or a run), at a walk not before the move either
+local stop = D.Hall.Depth - 0.5
+check("8.5 …your walk into the house's dark hall never reaches its end before your screen is black (a walk, a run; the move too at a walk)",
+	fadeAt(walk, true) + walk * (D.FadeOut + D.Margin) <= stop and fadeAt(run, true) + run * D.FadeOut <= stop and D.Through >= stop,
+	`{fadeAt(walk, true) + walk * (D.FadeOut + D.Margin)} {fadeAt(run, true) + run * D.FadeOut} of {stop}`)
+-- …and out of the house onto its porch (server/HouseInterior.luau: 6 studs past the wall, Config.Furniture.Wall thick,
+-- its threshold the wall's inner face), at a walk
+local porchStop = Config.Furniture.Wall + 6 - 0.5
+-- 8.5.1 (the owner: "I'd like them to open nicely"): the screen never darkens before the swing is mostly done. From
+-- the approach at a walk the leaf opened Approach studs out (seen VIEW + Every late at most), the fade starts at the
+-- threshold (Ahead s early at most): the swing over by then. From just beside the door (the leaf opening as you step
+-- in), the fade waits until it has swung Seen × Open s (server/Moving.luau's WalkIn.swung): 80 % open as the screen
+-- starts to darken, all the way before it is black.
+local swungAtFade = (D.Approach / walk - VIEW - D.Every - D.Ahead) / D.Open
+check("8.5.1 the screen never dark before the swing is mostly done: from the approach at a walk fully open as the fade starts; from beside the door the fade waits (Seen), 80 % open, all the way open before black",
+	swungAtFade >= 1 and DoorSwing.ease(D.Seen, true) >= 0.8 and D.Seen * D.Open + D.FadeOut >= D.Open, `{swungAtFade} {DoorSwing.ease(D.Seen, true)}`)
+check("8.5 …and out by a door inside: onto its porch, at a walk never at its end before the move", fadeAt(walk, true) + walk * (D.FadeOut + D.Margin) <= porchStop,
+	`{fadeAt(walk, true) + walk * (D.FadeOut + D.Margin)} of {porchStop}`)
+check("8.5 a light dwell stays for standing at a door (under the old 0.25 s)", D.Dwell > 0 and D.Dwell <= 0.25)
 -- the client's screen is black FadeOut s after the fade out reaches it; the server moves you FadeOut + Margin s after it
 -- sent it: the message and the move both cross the network, Margin is the room for their unevenness
 local moveAt = D.FadeOut + D.Margin

@@ -5,6 +5,13 @@
 --   MoveLayout.panel(W, S)                        the move's panel at the top in the middle (client/MovingHud.luau)
 --   MoveLayout.strip(panel, S, rowH)              the depot helper's strip under it (client/MoveHelperHud.luau): its
 --                                                 top left and its scale
+--   MoveLayout.stripClear(b, W, H, chips, keep)   8.4: that strip `b` kept clear of the HUD's chips at the top left
+--                                                 (`chips`: the sandbox's money block, the TASKS chip; a small phone,
+--                                                 667 … 780 px wide, has them under its ends): shifted right just past
+--                                                 them while it stays on the screen (GAP from its edge), off them and
+--                                                 off `keep` (the touch controls), else just under them in its place
+--                                                 across, else where it was. Returns `b` itself when nothing is in its
+--                                                 way (every screen 844 px wide or more)
 --   MoveLayout.list(W, H, S, touch, under, playerList?, floor?)   the move's list (L … client/MovingHud.luau): on a
 --                                                 computer at the right under `under` (the lowest of the move's top
 --                                                 blocks) and under Roblox's player list when that is in the way, down to
@@ -80,6 +87,47 @@ function MoveLayout.strip(panel: Box, S: number, rowH: number): Box
 	local cx = (panel.x0 + panel.x1) / 2
 	local w = MoveLayout.PANEL_W * S
 	return box(cx - w / 2, y0, cx + w / 2, y0 + (26 + rowH + 8) * S)
+end
+
+function MoveLayout.stripClear(b: Box, W: number, H: number, chips: { Box }, keep: { Box }): Box
+	local gap = MoveLayout.GAP
+	local hit, right, below = false, -math.huge, -math.huge
+	for _, chip in chips do
+		hit = hit or TouchLayout.overlap(b, chip)
+		if chip.y0 < b.y1 and chip.y1 > b.y0 then
+			right = math.max(right, chip.x1) -- (beside it: what a shift right has to pass)
+		end
+		if chip.x0 < b.x1 and chip.x1 > b.x0 then
+			below = math.max(below, chip.y1) -- (over or under it: what it goes under)
+		end
+	end
+	if not hit then
+		return b
+	end
+	local function free(c: Box): boolean
+		if c.x0 < gap or c.x1 > W - gap or c.y1 > H - gap then
+			return false
+		end
+		for _, other in chips do
+			if TouchLayout.overlap(c, other) then
+				return false
+			end
+		end
+		for _, other in keep do
+			if TouchLayout.overlap(c, other) then
+				return false
+			end
+		end
+		return true
+	end
+	local dx = right + gap - b.x0
+	local shifted = box(b.x0 + dx, b.y0, b.x1 + dx, b.y1)
+	if free(shifted) then
+		return shifted
+	end
+	local dy = below + gap - b.y0
+	local under = box(b.x0, b.y0 + dy, b.x1, b.y1 + dy)
+	return if free(under) then under else b
 end
 
 function MoveLayout.list(W: number, H: number, S: number, touch: boolean, under: number, playerList: Box?, floor: number?): (Box, number, boolean)

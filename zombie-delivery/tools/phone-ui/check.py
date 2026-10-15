@@ -30,15 +30,24 @@ on sandbox_mock.luau) at 844 x 390, 1280 x 800 (the chat shut and open) and 1920
 panel's rows, CLAIM's request, the toasts, closing, the texts fitting, a phone's finger sizes, clear of the controls.
 8.3 SANDBOX: every device's way to the chips (the keys, the gamepad's D-pad glyphs and routes), the gamepad in every
 sandbox window, the notices in the device's words and the first-time hints (sandboxpad.luau on sandbox_mock.luau).
+8.5 SANDBOX: Danny's clipboard, orders mode (the real DannyOrders beside Danny's card and status line: dannyorders.luau):
+the line at the bottom and the touch 📋 button at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080, the keys, the outline.
 8.3 SANDBOX: a showroom visitor's offer card (the real OfferCard: offercard.luau on sandbox_mock.luau) at 844 x 390,
 1280 x 800 and 1920 x 1080: its words, clear of the chips and the touch controls, ACCEPT / DECLINE's requests (the id
 only), the gamepad's selection on DECLINE and B, waiting under another window, the clock running out. 8.3 review:
 another window opening only hides it (the offer waits); smaller phones (667 x 375, 740 x 360, 780 x 360).
 8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
 keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
-words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad.
+words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad. 8.4: the guide's steps for
+Danny for hire (hire him, give him a piece, a heavy piece's Lift) in the same scene.
 8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
 and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
+8.8 SANDBOX, the auction: the Auction House's window (the real AuctionUi: auction.luau, the folder from auctionenv.py) at
+844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: the live lot, the consign picker and the results, nothing while the
+auction is off.
+8.7 trading between players: the offer composer, the FOR SALE price picker and the buy question (the real TradeUi), the
+offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (WarehouseUi): trade.luau at 844 x 390,
+667 x 375, 1280 x 800 and 1920 x 1080: on the screen, nothing on each other, the words fitting, a finger's size, the requests.
 """
 import argparse
 from pathlib import Path
@@ -297,17 +306,34 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "vanpaint.luau"], cwd=folder, check=True)
+# 8.8 SANDBOX, the auction: the Auction House's window (client/AuctionUi.luau, shared/AuctionRules.luau; nothing while
+# Config.Auction.On is false): tools/phone-ui/auction.luau at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 (the live
+# lot, the consign picker, the results: on the screen, nothing on each other, the words fitting, a finger's buttons; BID,
+# CONSIGN and WITHDRAW's requests, the stub's unanswered request given up, the building's sign and lot display painted).
+from auctionenv import auction_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    auction_env(Path(folder))
+    subprocess.run([args.luau, "auction.luau"], cwd=folder, check=True)
 # 8.3 Danny for hire: his card (client/MoveHelperCard.luau: HIRE, CLEAR QUEUE, the clicks and taps on him and on the
 # pieces, the gamepad's prompts) and his status line (client/MoveHelperHud.luau with the card), beside the real
 # SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone
 # (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder; dannycard_preview.py draws
 # the same scenes). 8.3 review: a tap beside the card is no tap in the world, the gamepad on it, its reach, the line's
-# words on every device, smaller phones (667 x 375, 740 x 360, 780 x 360).
+# words on every device, smaller phones (667 x 375, 740 x 360, 780 x 360). 8.6: the crew's orders (PUT IT DOWN, GET OUT)
+# in the card and in the orders menu at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080, the status line's GET OUT,
+# and the bubble over Danny's head (client/DannyBubble.luau).
 from dannycardenv import dannycard_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:
     dannycard_env(Path(folder))
     subprocess.run([args.luau, "dannycard.luau"], cwd=folder, check=True)
+# 8.5 Danny's clipboard, orders mode (client/DannyOrders.luau: its line at the bottom, the touch 📋 button, the piece
+# pointed at; Q, R1 / B, the status line's 📋 ORDERS) in the same folder: tools/phone-ui/dannyorders.luau at 844 x 390,
+# 667 x 375, 1280 x 800 and 1920 x 1080, clear of the HUD's chips, the touch controls, the move's panel and Danny's strip.
+with tempfile.TemporaryDirectory() as folder:
+    dannycard_env(Path(folder))
+    subprocess.run([args.luau, "dannyorders.luau"], cwd=folder, check=True)
 # 8.3 the showroom's visitors: a visitor's offer card (client/OfferCard.luau) beside the real SandboxHud and
 # SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/offercard.luau on a phone (844 x 390), a
 # computer (1280 x 800) and 1920 x 1080 (offercardenv.py builds the folder; offercard_preview.py draws the same scenes).
@@ -317,6 +343,16 @@ from offercardenv import offercard_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     offercard_env(Path(folder))
     subprocess.run([args.luau, "offercard.luau"], cwd=folder, check=True)
+# 8.7 trading between players: the offer composer, the FOR SALE price picker and the buy question (client/TradeUi.luau),
+# the offer card with a player's offer (client/OfferCard.luau: the queue, the PlayerTrade remote) and the STOCK list's 🏷
+# (client/WarehouseUi.luau) beside the real SandboxHud: tools/phone-ui/trade.luau at 844 x 390, 667 x 375, 1280 x 800
+# and 1920 x 1080 (tradeenv.py builds the folder): on the screen, nothing on each other, the words fitting, a finger's
+# size on a phone, every request.
+from tradeenv import trade_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    trade_env(Path(folder))
+    subprocess.run([args.luau, "trade.luau"], cwd=folder, check=True)
 # 8.3 keys: the key hints (client/KeyHints.luau with shared/SandboxPad.luau's actions and client/PadGlyph.luau) in
 # sandboxenv.py's folder (keyhintsenv.py: the real KeyHints, its HudContract, Holster and Drive stand-ins):
 # tools/phone-ui/keyhints.luau on a computer (1280 x 800) with its keys and with a gamepad (the platform's glyphs, at

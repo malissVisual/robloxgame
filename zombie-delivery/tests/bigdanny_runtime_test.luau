@@ -150,12 +150,15 @@ local function pieceOf(spot: number): any
 	return built[#built].pieces[spot]
 end
 local function follow(model: any)
-	model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * CF(0, 0, -3)
+	if not E.welded(model) then -- (8.6: where Moving's weld keeps it: carried in two, lengthwise)
+		model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * CF(0, 0, -3)
+	end
 end
 -- 8.3 a click on a piece (its model: the Moving remote's ("helper", "assign", model)) by Ann, from beside it.
 local function give(model: any)
 	local was = E.rootOf(ann).Position
 	E.place(ann, model.PrimaryPart.Position + V3(3, 0, 0))
+	ann.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: her clipboard out, server/Clipboard.luau's)
 	E.request(ann, "helper", "assign", model)
 	E.place(ann, was)
 end
@@ -417,6 +420,10 @@ if pick and backDoor then
 	check("…off his list (lifted with him), the marker gone", #danny.queue == 0 and markOf(model) == nil and model:GetAttribute("DannyNeeds") == nil
 		and not told(ann, "You took", noticeAt))
 	local function farEnd(): any
+		local ends = danny.gripped == model.PrimaryPart and danny.holdEnd -- (8.6 his end, decided at the lift)
+		if ends then
+			return model.PrimaryPart.CFrame * ends
+		end
 		return (model.PrimaryPart.CFrame * CF(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 	end
 	local steer = PairCarry.newSteer(0)
@@ -464,7 +471,7 @@ if pick and backDoor then
 	local exitIn = origin * exits[2]
 	local w1, d1, h1 = walk(V3(inRoom.X, y, inRoom.Z))
 	local w2, d2, h2 = walk(V3(inHall.X, y, inHall.Z))
-	local w3, d3, h3 = walk(V3(exitIn.X - Config.Moving.Doors.Through - 2, y, exitIn.Z))
+	local w3, d3, h3 = walk(V3(exitIn.X - (Config.Moving.Doors.Depth + 4.5), y, exitIn.Z)) -- (8 studs short of it: clear of its zone)
 	check("out of its room by its doorway and along the corridor to the back door together: he never leaves its far end, on the floor",
 		math.max(w1, w2, w3) < 0.05 and not (d1 or d2 or d3) and helped() and math.max(h1, h2, h3) < 0.5 and room ~= nil, `{math.max(w1, w2, w3)} off, {math.max(h1, h2, h3)} up`)
 	-- out of the back door, the door nearer to it (8.1 walk-in doors: into its zone facing it, the dwell): he comes

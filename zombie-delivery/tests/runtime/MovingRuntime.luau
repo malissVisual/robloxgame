@@ -16,7 +16,9 @@
 -- 8.3 Danny for hire: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and
 -- records it (Runtime.spent); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
 -- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
--- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it).
+-- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it). 8.5 Danny getting in and out
+-- like a player: Vehicles.swingDoor records each door swing (Runtime.doorSwings); RunService's Heartbeat (his pose every
+-- frame meanwhile) fires only when a test fires it.
 local Mock = require("./ItemMock") :: any
 local CityConfig = require("./Config") :: any
 CityConfig.Sandbox.On = false
@@ -97,6 +99,19 @@ O.__index = function(self: any, key: string): any
 		return position
 	end
 	return baseIndex(self, key)
+end
+-- 8.6 a WeldConstraint keeps its Part1 where it was from its Part0 as it was made (Roblox's physics); the recorder only
+-- records that (its Rel) and Runtime.welded(model) puts a welded piece there: the tests' stand-in for the weld (a piece
+-- carried in two lies along the carry, turned: server/Moving.luau's holdOffset).
+local baseNewIndex = O.__newindex
+O.__newindex = function(self: any, key: string, value: any)
+	baseNewIndex(self, key, value)
+	if key == "Parent" and value ~= nil and self.props.ClassName == "WeldConstraint" then
+		local a, b = self.props.Part0, self.props.Part1
+		if a and b then
+			self.props.Rel = a.CFrame:ToObjectSpace(b.CFrame)
+		end
+	end
 end
 local SIGNALS = { "Triggered", "AncestryChanged", "Died", "HealthChanged", "StateChanged", "AttributeChanged", "CharacterAdded", "Destroying" }
 local create = Mock.Instance.new
@@ -335,6 +350,18 @@ function Runtime.rootOf(player: any): any
 	return player.Character:FindFirstChild("HumanoidRootPart")
 end
 
+-- 8.6 a welded piece (server/Moving.luau's weldTo) put where its weld keeps it from its holder; false: no weld on it.
+function Runtime.welded(model: any): boolean
+	local root = model and model.PrimaryPart
+	local weld = root and root:FindFirstChild("WeldConstraint")
+	local rel = weld and weld.props.Rel
+	if not weld or weld.destroyed or not rel or not weld.props.Part0 then
+		return false
+	end
+	root.CFrame = weld.props.Part0.CFrame * rel
+	return true
+end
+
 function Runtime.place(player: any, at: any)
 	Runtime.rootOf(player).CFrame = Mock.CFrame.new(at.X, at.Y, at.Z)
 end
@@ -460,6 +487,11 @@ Runtime.PlayerData = stub("PlayerData", {
 			return own
 		end
 		return { story = Runtime.story[player], car = Runtime.carId, money = moneyOf(player) }
+	end,
+	-- 8.4: was the player's save read? A test's own Runtime.profiles[player] stands for one (its sandboxHouseSeed the
+	-- save's, kept there as Moving sets it); without one: a fresh profile, never saved (Moving's own memory counts)
+	loaded = function(player: any): boolean
+		return Runtime.profiles[player] ~= nil
 	end,
 	notify = noop, -- (7.2 review: the profile's car changed)
 	markStory = function(player: any, key: string): boolean
@@ -645,7 +677,13 @@ Runtime.Vehicles = stub("Vehicles", {
 	yieldSeat = function(_seat: any, _player: any): boolean
 		return false
 	end,
+	-- 8.5: a cabin door swung for Danny getting in or out (server/MoveHelper.luau): recorded in Runtime.doorSwings
+	-- (the car, the door, openAt, closeAt: openAt nil shuts it from closeAt; the server time and the clock it came at)
+	swingDoor = function(car: any, index: number, openAt: number?, closeAt: number)
+		table.insert(Runtime.doorSwings, { car = car, door = index, openAt = openAt, closeAt = closeAt, now = Runtime.now, clock = Runtime.clock })
+	end,
 })
+Runtime.doorSwings = {} -- 8.5 { { car, door, openAt, closeAt, now, clock } } every Vehicles.swingDoor
 
 Runtime.Zombies = stub("Zombies", {
 	hunts = function()
@@ -811,6 +849,9 @@ local services: { [string]: any } = {
 			obj:SetAttribute("Tag_" .. tag, nil)
 		end,
 	},
+	-- 8.5: Danny's pose every frame while he gets in or out of the van (server/MoveHelper.luau hooks Heartbeat only
+	-- then); nothing fires it but a test
+	RunService = { Heartbeat = signal() },
 }
 Runtime.game = { GetService = function(_, name: string): any
 	assert(services[name], `MovingRuntime: unmocked service {name}`)

@@ -1559,6 +1559,7 @@ E.real = {
 	SandboxTasks = true, SandboxLeaders = true, WarehouseMesh = true, VanPaint = true,
 	Visitors = true, VisitorOffers = true, -- 8.3: the showroom's visitors (tests/visitors_runtime_test.luau; off in the e2e)
 	SandboxBadges = true, -- 8.3: the Roblox badges (every id 0 here: it listens and counts the moves, it never calls BadgeService)
+	PlayerTrade = true, -- 8.7: trading between players (the stands' trade prompts: Warehouse.onTrade)
 }
 E.fakes = {}
 
@@ -1662,7 +1663,7 @@ local function stub(name: string, fields: { [string]: any }): any
 		error(`SandboxE2E: unmocked {name}.{tostring(key)}`, 2)
 	end })
 end
-for _, name in { "CarRighting", "Admin", "Transport", "KitWear", "Horn", "SprinterMesh" } do
+for _, name in { "CarRighting", "Admin", "Transport", "KitWear", "Horn", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
 	E.fakes[name] = stub(name, { start = noop })
 end
 E.fakes.DayNight = stub("DayNight", { nightLight = noop, start = noop, isNight = function()

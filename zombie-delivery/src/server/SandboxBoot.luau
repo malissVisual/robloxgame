@@ -13,12 +13,13 @@
 --     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
 --   * PlayerData (its own saves, Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
 --     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
---     (the moves' lobby, the crew panel), Transport, KitWear, Horn;
+--     (the moves' lobby, the crew panel), Transport, KitWear, Horn, 8.5's Clipboard (Danny's clipboard: orders mode);
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), the
 --     collection (Collection: its payout loop) and 8.2's collection book (CollectionBook: its remote, its hook on
 --     Collection.add), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the vans' engines), 8.2's
 --     daily tasks (SandboxTasks) and SandboxLeaders (the player list's columns, the TOP MOVERS board), 8.3's showroom
---     visitors (Visitors: their offers, server/VisitorOffers.luau), the Sprinter's model (SprinterMesh) and last
+--     visitors (Visitors: their offers, server/VisitorOffers.luau), 8.7's trading between players (PlayerTrade: the
+--     stands' trade prompts go to it, Warehouse.onTrade), the Sprinter's model (SprinterMesh) and last
 --     Moving (it wraps the hooks set here: Vehicles.callCar …).
 --   The modules written alongside this one (SandboxWorld.build, Collection.start, Warehouse.start, SprinterMesh.start)
 --   run only when they are in the place (a FindFirstChild guard); every service through `safely` (one that fails only
@@ -397,6 +398,9 @@ local function services()
 	safely("Horn", function()
 		require(Server.Horn).start()
 	end)
+	safely("Clipboard", function() -- 8.5: Danny's clipboard in your hand (orders mode)
+		require(Server.Clipboard).start()
+	end)
 end
 
 -- The sandbox's own pieces (after PlayerData: the collection reads the saves), then the moves (last: Moving wraps the
@@ -431,6 +435,13 @@ local function sandbox()
 	optional("SandboxLeaders", "start") -- 8.2: the player list's $ / $/min / collection and the TOP MOVERS board
 	optional("Visitors", "start") -- 8.3: the showroom's visitors and their offers (after the warehouses and the daily tasks)
 	optional("SandboxBadges", "start") -- 8.3: the Roblox badges (listeners only; after what it listens to, before Moving)
+	optional("PlayerTrade", "start") -- 8.7: trading between players (after the collection, the book, the visitors' offers)
+	safely("PlayerTrade's prompts", function() -- 8.7: the stands' trade prompts go to it (Warehouse.onTrade)
+		local trade, warehouse = Server:FindFirstChild("PlayerTrade"), Server:FindFirstChild("Warehouse")
+		if trade and trade:IsA("ModuleScript") and warehouse and warehouse:IsA("ModuleScript") then
+			(require(warehouse) :: any).onTrade = (require(trade) :: any).prompt
+		end
+	end)
 	optional("SprinterMesh", "start") -- (before any van: PLAY parks one)
 	vehicleHooks()
 	safely("Moving", function()
@@ -451,6 +462,18 @@ function SandboxBoot.start(queueState: (Player) -> ())
 	end
 	remotes(queueState)
 	print(`[Server] Zombie Delivery {Config.Version} SANDBOX is running`)
+	-- 8.5.1: Studio kept old scripts after a sync? (this side's stamp against the shared Config's version)
+	local stamp = script.Parent:FindFirstChild("BuildStamp")
+	local ok, built = false, nil
+	if stamp then
+		ok, built = pcall(require, stamp :: ModuleScript)
+	end
+	if ok and type(built) == "string" then
+		workspace:SetAttribute("ServerBuild", built)
+		if built ~= Config.Version then
+			warn(`[Server] STUDIO HAS A MIX OF OLD AND NEW SCRIPTS: the server's are {built}, ReplicatedStorage.Shared's (Config) {Config.Version}. Fix: Stop, Rojo Disconnect, delete ReplicatedStorage.Shared, ServerScriptService.Server and StarterPlayer.StarterPlayerScripts.Client, then Rojo Connect and Play.`)
+		end
+	end
 end
 
 return SandboxBoot

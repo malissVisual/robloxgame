@@ -35,6 +35,16 @@
 --     busy), Config.SandboxGuide.SoftGap s apart; each shows SoftSeconds at most,
 --     and the ✕ on one dismisses that step alone for the session (the guide stays on; on a core step the ✕ hides the
 --     guide as before).
+--   * 8.4, Danny for hire (SandboxSteps.danny: in a move, before its own step, each said once as a soft step):
+--     "Hire Danny to carry with you" while he is for hire and your money pays him (the chevron over his body: the
+--     model in workspace.Npcs whose MoveHelper is your player attribute MoveHelperId, as client/MoveHelperCard.luau
+--     finds it), "Pick a piece to give it to Danny" in the house once he is hired with his list empty, "Heavy piece:
+--     press Lift and wait for Danny" the first time a two-person piece of your move is within Config.SandboxGuide
+--     .HeavyNear studs (its own Lift prompt, tagged MovePrompt, looked for at most once a second and only while that
+--     step may still show). Read from your player attributes (MoveHelper, MoveHelperPrice, MoveHelperQueue,
+--     MoveHelperCall: every look) and the Moving state (its two-person pieces left: readMove). In a move with him, what
+--     covers the screen and what talks are asked too (his card, the move's cards, a grip check, a hint): his steps
+--     wait for them. A gamepad's words end in its button: "(L1)" at him, "(R1)" at a piece (SandboxSteps.onDevice).
 --   * Cheap: one loop every Config.SandboxGuide.Every seconds (no frame-by-frame work, no tables made in it: the state,
 --     the path's points and the instances are made once and reused; a string only when the words or the metres change).
 --   * 8.3 (design/warehouse-levels/KONTRAKT.md): your warehouse has a level (1 Garage … 5 Logistics Center, the player
@@ -52,6 +62,7 @@
 --                                   client/SandboxHintsUi.luau)
 -- Presentation only.
 
+local CollectionService = game:GetService("CollectionService") -- 8.4: the move's pieces' prompts (a heavy one near)
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -98,6 +109,7 @@ local LABELS: { [string]: string } = {
 	warehouse = "WAREHOUSE",
 	desk = "UPGRADES DESK", -- 8.3
 	paint = "PAINT SHOP", -- 8.3
+	danny = string.upper(Config.MoveHelper.Name), -- 8.4
 }
 local RING = 4 -- 8.3: px the ring round the 📦 STOCK chip stands out of it
 
@@ -131,6 +143,13 @@ local state: SandboxSteps.State = {
 	window = nil,
 	covered = false,
 	hush = false,
+	helper = nil, -- 8.4, Danny for hire (SandboxSteps.State)
+	helperPrice = nil,
+	helperQueue = nil,
+	waiting = false,
+	heavy = 0,
+	heavyNear = false,
+	clipboard = false, -- 8.5 Danny's clipboard out (orders mode)
 }
 local softAfter = 0 -- 8.3: os.clock() before which no soft step shows (one just ended: Config.SandboxGuide.SoftGap)
 local hintsUi: any = nil -- 8.3: client/SandboxHintsUi.luau (looked for once; false: not there)
@@ -160,29 +179,50 @@ local function seated(): boolean
 	return humanoid ~= nil and humanoid.SeatPart ~= nil
 end
 
+-- 8.4: Danny on your move, from your player attributes (server/MoveHelper.luau's: for hire or hired, his price, his
+-- list, your call to him): every look and every Moving state (they change without one). 8.5: your clipboard out (your
+-- character's ClipboardHeld, server/Clipboard.luau's: the give step's words then).
+local function readHelper()
+	local helper = player:GetAttribute("MoveHelper")
+	local price, queue = player:GetAttribute("MoveHelperPrice"), player:GetAttribute("MoveHelperQueue")
+	local call = player:GetAttribute("MoveHelperCall")
+	state.helper = if move ~= nil and (helper == "offer" or helper == "hired") then helper else nil
+	state.helperPrice = if type(price) == "number" then price else nil
+	state.helperQueue = if type(queue) == "number" then queue else nil
+	state.waiting = type(call) == "string" and call ~= ""
+	local character = player.Character
+	state.clipboard = character ~= nil and character:GetAttribute("ClipboardHeld") == true
+end
+
 -- The Moving remote's state: what the steps read from it (once a message, not every look).
 local function readMove(view: any)
 	move = if type(view) == "table" then view else nil
-	local carrying, inVan, delivered = false, 0, 0
+	local carrying, inVan, delivered, heavy = false, 0, 0, 0
 	if move then
 		local counts = if type(move.counts) == "table" then move.counts else {}
 		inVan = tonumber(counts.out) or 0
 		delivered = tonumber(counts.delivered) or 0
 		if type(move.items) == "table" then
 			for _, item in move.items do
-				if type(item) == "table" and item.mine == true and item.state == "carried" then
-					carrying = true
+				if type(item) == "table" then
+					if item.mine == true and item.state == "carried" then
+						carrying = true
+					end
+					if item.class == "pair" and (item.state == "home" or item.state == "ground") then
+						heavy += 1 -- 8.4: a two-person piece still to carry out (Danny's "press Lift and wait")
+					end
 				end
 			end
 		end
 		mine = move.mine ~= false
-		-- HOOK Danny (8.3 hire: shared/SandboxSteps.luau's header): his part of the Moving state is read here
 	end
 	state.move = move ~= nil
 	state.inside = move ~= nil and move.inside == true
 	state.carrying = carrying
 	state.vanLoad = inVan
 	state.delivered = delivered
+	state.heavy = heavy -- 8.4
+	readHelper() -- 8.4 (Danny's part: your player attributes)
 end
 
 -- shared/WarehouseLayout.luau (the warehouse's, written alongside: required only when it is there).
@@ -399,6 +439,56 @@ local function vanHome(): boolean
 	return dx * dx + dz * dz <= reach * reach
 end
 
+-- 8.4: Danny's body on your move (the model in workspace.Npcs whose MoveHelper is your player attribute MoveHelperId,
+-- as client/MoveHelperCard.luau finds it): looked up at most once a second, kept while it stays.
+local function dannyRoot(): BasePart?
+	local id = player:GetAttribute("MoveHelperId")
+	local known = world.danny
+	if type(id) ~= "number" then
+		world.danny = nil
+		return nil
+	elseif not (known and known.Parent and known:GetAttribute("MoveHelper") == id) then
+		world.danny, known = nil, nil
+		local now = os.clock()
+		local folder = workspace:FindFirstChild("Npcs")
+		if folder and now >= (world.dannyLookAt or 0) then
+			world.dannyLookAt = now + 1
+			for _, child in folder:GetChildren() do
+				if child:IsA("Model") and child:GetAttribute("MoveHelper") == id then
+					world.danny, known = child, child
+					break
+				end
+			end
+		end
+	end
+	local root = known and (known.PrimaryPart or known:FindFirstChild("HumanoidRootPart"))
+	return if root and root:IsA("BasePart") then root else nil
+end
+
+-- 8.4: is a two-person piece of your move within Config.SandboxGuide.HeavyNear studs of `at`, its Lift shown (its own
+-- prompt, tagged MovePrompt, with your move's owner: MovingHud's rule)? Looked for at most once a second.
+local function heavyNear(at: Vector3): boolean
+	local now = os.clock()
+	if now < (world.heavyAt or 0) then
+		return world.heavyNear == true
+	end
+	world.heavyAt = now + 1
+	local with = player:GetAttribute("MoveWith")
+	local found = false
+	for _, prompt in CollectionService:GetTagged("MovePrompt") do
+		local part = prompt.Parent
+		if prompt:IsA("ProximityPrompt") and prompt.Enabled and string.sub(prompt.ActionText, 1, 4) == "Lift" and part and part:IsA("BasePart") then
+			local owner = prompt:GetAttribute("MoveOwner")
+			if (owner == player.UserId or (owner ~= nil and owner == with)) and (part.Position - at).Magnitude <= G.HeavyNear then
+				found = true
+				break
+			end
+		end
+	end
+	world.heavyNear = found
+	return found
+end
+
 -- The nearest empty stand of the ones this warehouse has bought (8.1: never a locked one; 8.3: the server's count, else
 -- the level's own stands, the spots being all the level has; nil: none, or not known).
 local function freeStand(plotId: number, px: number, pz: number): Vector3?
@@ -471,6 +561,11 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 				return point.WorldPosition, LABELS.paint
 			end
 			return chassis.Position, LABELS.paint
+		end
+	elseif kind == "danny" then -- 8.4: Danny, for hire on your move
+		local root = dannyRoot()
+		if root then
+			return root.Position + Vector3.new(0, 2, 0), LABELS.danny
 		end
 	end
 	return nil, nil
@@ -961,14 +1056,20 @@ local function look()
 		state.freeStands = if count then math.max(0, count - summary.shown) else nil
 	end
 	-- 8.3, the soft steps: the market's (the Collection's state), and only off a move what covers the screen, the
-	-- window open, the van at home (only while a paint step could come), something else talking
+	-- window open, the van at home (only while a paint step could come), something else talking. 8.4: Danny on your
+	-- move (your attributes), a heavy piece near (only while its step may still show), and in a move with him what
+	-- covers the screen and what talks too (his steps wait for them as the soft ones do)
 	state.hot, state.hotCount, state.day, state.hotSold = summary.hotName, summary.hot, summary.day, summary.hotSold
+	readHelper()
+	state.heavyNear = root ~= nil and state.helper == "hired" and done.lift ~= true and (state.heavy or 0) > 0 and not state.carrying
+		and not state.seated and not state.waiting and heavyNear(root.Position)
 	local calm = not state.move and not state.planning
-	state.covered = calm and ask(SandboxGuide.covered, "isCovered") == true
+	local asks = calm or state.helper ~= nil
+	state.covered = asks and ask(SandboxGuide.covered, "isCovered") == true
 	local window = if state.covered then ask(SandboxGuide.windowOpen, "window") else nil -- (a window open covers it)
 	state.window = if type(window) == "string" then window else nil
 	state.vanHome = calm and state.painted == false and vanHome()
-	state.hush = calm and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
+	state.hush = asks and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
 	SandboxSteps.doneBy(state, done, last)
 	local step = SandboxSteps.choose(state, done)
 	if step ~= current then
@@ -1016,8 +1117,9 @@ local function look()
 		if step ~= ui.textStep or device ~= ui.textDevice or a ~= ui.textA or b ~= ui.textB then
 			ui.textStep, ui.textDevice, ui.textA, ui.textB = step, device, a, b
 			local words = SandboxSteps.words(step, state)
-			-- (8.3 keys: a gamepad's "X at the back", a touch screen's "tap at the back")
-			ui.stepText = if device == "pad" then SandboxPad.say(words, "use", device) else SandboxSteps.text(step, touch, words)
+			-- (8.3 keys: a gamepad's "X at the back", a touch screen's "tap at the back"; 8.4: a gamepad's "(R1)" after
+			-- Danny's "Pick a piece …")
+			ui.stepText = SandboxSteps.onDevice(step, words, device)
 		end
 		setHint(hint, ui.stepText, true)
 	end

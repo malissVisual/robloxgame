@@ -18,6 +18,9 @@
 --     stored one); the money never goes negative or NaN through the API.
 --   * Unknown keys: a newer server's top-level keys are written back as they were (the leave save, a rejoin, again);
 --     the keys this version knows are its own (an old optional value is never brought back); RESET MY SAVE drops them.
+--   * 8.4: the house the moving card shows (sandboxHouseSeed): written with its flag, read back on another server's
+--     join (the same house), dropped once a trip spent it; only a whole number in Config.Moving.Sandbox.Seeds' range,
+--     only from a real save written with its flag (junk, an older save, a lock-only record, a new player: none).
 --   * Size: the biggest realistic sandbox save, measured.
 --   * The shutdown (BindToClose): every player saved at once, in parallel, waited for (a failed try too); a store that
 --     never answers is given up on at CloseWait.
@@ -581,6 +584,63 @@ for key in E.saves.Player_218.rewards or {} do
 	none = none and string.sub(key, 1, 6) ~= "paint:" and string.sub(key, 1, 8) ~= "paintOn:" and string.sub(key, 1, 3) ~= "mv:"
 end
 check("a new player's save: no paint key, no \"mv:\" key", none)
+
+-- ── 8.4: the house the moving card shows, kept across servers ──────────────
+-- (server/Moving.luau sets and drops profile.sandboxHouseSeed with its SB.seeds: tests/sandboxmove_runtime_test.luau)
+do
+	local Seeds = Config.Moving.Sandbox.Seeds
+	local houseSave = save83(900)
+	houseSave.sandboxHouseSeed, houseSave.sandboxHouseSeedKept = 424242, true
+	E.saves.Player_219 = houseSave
+	local H1 = E.join(219, "Hal")
+	check("8.4 a save with the house's seed and its flag: read into the profile", (PlayerData.get(H1) :: any).sandboxHouseSeed == 424242)
+	E.leave(H1)
+	check("… the leave save writes it back with its flag", E.saves.Player_219.sandboxHouseSeed == 424242 and E.saves.Player_219.sandboxHouseSeedKept == true)
+	local H2 = E.join(219, "Hal") -- (another server: a fresh profile from the stored save)
+	local ph = PlayerData.get(H2) :: any
+	check("… joining another server: the same seed (the same house)", ph.sandboxHouseSeed == 424242)
+	ph.sandboxHouseSeed = nil -- (a trip home spent it: Moving drops it)
+	E.leave(H2)
+	check("… dropped: the save written without it (its flag still on)", E.saves.Player_219.sandboxHouseSeed == nil and E.saves.Player_219.sandboxHouseSeedKept == true)
+	local H3 = E.join(219, "Hal")
+	check("… the next server: none (its card rolls a new house)", (PlayerData.get(H3) :: any).sandboxHouseSeed == nil)
+	local ph3 = PlayerData.get(H3) :: any
+	ph3.sandboxHouseSeed = Seeds -- (a new one rolled: the top of the range)
+	PlayerData.save(H3)
+	check("… a new one rolled is written by the next save", E.saves.Player_219.sandboxHouseSeed == Seeds)
+	E.leave(H3)
+	-- only a whole number in the seeds' range, only from a real save written with its flag
+	-- (±∞ and NaN: no DataStore keeps them, SaveGuard writes ±2^53 and 0: too big, and 0, both caught here)
+	local bad = { 0, -5, 1.5, Seeds + 1, 2 ^ 53, -(2 ^ 53), "424242", true, { 424242 } }
+	local kept = {}
+	for index, value in bad do
+		local junkSave = save83(100)
+		junkSave.sandboxHouseSeed, junkSave.sandboxHouseSeedKept = value, true
+		E.saves.Player_220 = junkSave
+		local J = E.join(220, "Jo")
+		local pj = PlayerData.get(J) :: any
+		if pj == nil or pj.sandboxHouseSeed ~= nil then
+			table.insert(kept, `{index}: {tostring(value)}`)
+		end
+		E.leave(J)
+	end
+	check("8.4 a seed that is no whole number 1 … Config.Moving.Sandbox.Seeds (0, negative, a fraction, too big, ±2^53, a string, a boolean, a table): none, loaded and not kicked",
+		#kept == 0, table.concat(kept, "; "))
+	local old = save83(100)
+	old.sandboxHouseSeed = 424242 -- (no flag: written before 8.4)
+	E.saves.Player_220 = old
+	local J2 = E.join(220, "Jo")
+	check("… without its flag: none", (PlayerData.get(J2) :: any).sandboxHouseSeed == nil)
+	E.leave(J2)
+	E.saves.Player_220 = { sandboxHouseSeed = 424242, sandboxHouseSeedKept = true, lock = { job = "another-server", at = 0 } } -- (no money: no real save)
+	local J3 = E.join(220, "Jo")
+	check("… a lock-only record (no money: a new player's): none", (PlayerData.get(J3) :: any).sandboxHouseSeed == nil)
+	E.leave(J3)
+	local fresh = E.join(221, "Kim")
+	check("… a new player: none", (PlayerData.get(fresh) :: any).sandboxHouseSeed == nil)
+	E.leave(fresh)
+	check("… a new player's save: the flag, no seed", E.saves.Player_221.sandboxHouseSeedKept == true and E.saves.Player_221.sandboxHouseSeed == nil)
+end
 
 -- ── Size: the biggest realistic sandbox save ───────────────────────────────
 local O = E.join(214, "Oz")

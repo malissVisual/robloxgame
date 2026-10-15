@@ -608,6 +608,7 @@ E.request(sol, "helper", "hire")
 local solIron = solBuild.pieces[ironSpot.id]
 local outsideSol = E.rootOf(sol).Position
 E.place(sol, solIron.PrimaryPart.Position + V3(3, 0, 0))
+sol.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: his clipboard out, server/Clipboard.luau's)
 E.request(sol, "helper", "assign", solIron)
 E.place(sol, outsideSol)
 check("8.3 Sol hires Danny and gives him the branding iron", danny.hirer == sol and danny.queue[1] == ironSpot.id, danny.queue[1])
@@ -652,8 +653,10 @@ check("…comes out by them with it and loads it into the van at the barn", came
 -- put at the far end each step, as his constraints hold him in Roblox).
 local H = Config.MoveHelper
 local s = danny.s
-local function hold(model: any) -- (Sol's weld, the root set straight)
-	model.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + 1))
+local function hold(model: any) -- (Sol's weld, the root set straight; 8.6 where Moving's weld keeps it: lengthwise)
+	if not E.welded(model) then
+		model.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + 1))
+	end
 end
 local function steps(seconds: number, done: (() -> boolean)?, carried: any?): boolean
 	for index = 1, math.ceil(seconds / 0.1 - 1e-9) do
@@ -677,6 +680,10 @@ local function steps(seconds: number, done: (() -> boolean)?, carried: any?): bo
 	return done == nil
 end
 local function farEndOf(model: any): any
+	local ends = danny.gripped == model.PrimaryPart and danny.holdEnd -- (8.6 his end, decided at the lift)
+	if ends then
+		return model.PrimaryPart.CFrame * ends
+	end
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 end
 local function heldBy(spot: number): boolean
@@ -768,6 +775,7 @@ for _, sp in solBuild.plan.spots do
 end
 local nextModel = solBuild.pieces[nextPiece.id]
 E.place(sol, nextModel.PrimaryPart.Position + V3(3, 0, 0))
+sol.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode)
 E.request(sol, "helper", "assign", nextModel)
 E.place(sol, barnOut + V3(-20, 0, 0)) -- (out of the way, hands free)
 local saidBefore = #E.said

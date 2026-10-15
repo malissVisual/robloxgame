@@ -101,6 +101,55 @@ for _, case in DESK do
 	check(`{name}: a computer's ring at the HUD's scale, its lines whole`, ringScale == S and r == RADIUS and width == PILL_W)
 end
 
+-- 8.4: Danny's strip clear of the HUD's chips at the top left (MoveLayout.stripClear): the sandbox's money block (170 ×
+-- 92 right of the touch screen's left column) and the TASKS chip under it, as client/SandboxHud.luau and
+-- client/SandboxTasksUi.luau put them on a phone (tools/phone-ui/dannycard.luau runs the real ones)
+do
+	local box = TouchLayout.box
+	local function chipsFor(S: number): { TouchLayout.Box }
+		local x0 = 16 + 200 * S + 8 -- (right of the left column: client/Hud.luau's TopStack)
+		return { box(x0, 16, x0 + 170, 108), box(x0, 113, x0 + 100, 157) }
+	end
+	local function keepFor(W: number, H: number, S: number): { TouchLayout.Box }
+		local cluster = TouchLayout.cluster(W, H, S)
+		local list = table.clone(TouchLayout.buttons(cluster))
+		table.insert(list, cluster.thumb)
+		table.insert(list, cluster.jump)
+		return list
+	end
+	for _, size in { { 667, 339 }, { 740, 324 }, { 780, 324 } } do
+		local W, H = size[1], size[2]
+		local S = scaleFor(W, H)
+		local panel = MoveLayout.panel(W, S)
+		local strip = MoveLayout.strip(panel, S, math.ceil(MoveLayout.MIN_TOUCH / S))
+		local chips, keep = chipsFor(S), keepFor(W, H, S)
+		local hits = MoveLayout.overlap(strip, chips[1]) or MoveLayout.overlap(strip, chips[2])
+		local clear = MoveLayout.stripClear(strip, W, H, chips, keep)
+		local free = true
+		for _, b in chips do
+			free = free and not MoveLayout.overlap(clear, b)
+		end
+		for _, b in keep do
+			free = free and not MoveLayout.overlap(clear, b)
+		end
+		check(`8.4 {W} × {H + 36}: the strip under the panel lay on the chips; moved: off them and the touch controls, shifted right just past them, still under the panel, on the screen`,
+			hits and free and clear.y0 == strip.y0 and math.abs(clear.x0 - (chips[1].x1 + MoveLayout.GAP)) < 0.01 and clear.x0 < panel.x1
+			and clear.x1 <= W - MoveLayout.GAP and clear.x1 - clear.x0 == strip.x1 - strip.x0, `{show(strip)} → {show(clear)}`)
+	end
+	for _, size in { { 844, 354 }, { 932, 394 }, { 1024, 732 }, { 1280, 684 }, { 1920, 1044 } } do
+		local W, H = size[1], size[2]
+		local S = scaleFor(W, H)
+		local strip = MoveLayout.strip(MoveLayout.panel(W, S), S, math.ceil(MoveLayout.MIN_TOUCH / S))
+		check(`8.4 {W} × {H}: nothing in its way: the strip where it was (the same box)`, MoveLayout.stripClear(strip, W, H, chipsFor(S), keepFor(W, H, S)) == strip)
+	end
+	-- no room to the right (a strip as wide as the screen's middle): under the chips, in its place across
+	local wide = box(150, 80, 600, 130)
+	local under = MoveLayout.stripClear(wide, 667, 339, { box(134, 16, 304, 108), box(134, 113, 234, 157) }, {})
+	check("8.4 no room right of the chips: just under them, in its place across", under.x0 == 150 and under.y0 == 157 + MoveLayout.GAP and under.x1 == 600, show(under))
+	local stuck = MoveLayout.stripClear(wide, 667, 200, { box(134, 16, 304, 108), box(134, 113, 234, 157) }, {})
+	check("8.4 … no room under them either: where it was", stuck == wide)
+end
+
 -- a very short screen: the ring shrinks to stay whole, never folds onto itself
 local tinyScale, tinyR, tinyW = MoveLayout.ring(568, 280, 0.55, true, RADIUS, PILL_W, PILL_H)
 check("a very short screen: the ring smaller but whole", (2 * tinyR + PILL_H) * tinyScale <= 280 - 2 * MoveLayout.GAP + 0.01

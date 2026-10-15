@@ -24,6 +24,9 @@
 -- stick Steer, X Get out; the horn, the list and the chat have none), the KEYS chip without its F1. A touch screen:
 -- none (its buttons say what they do). It changes at once when the last input's type does (PadGlyph.watch) and at
 -- the next look anyway. The city's strip as before (a keyboard only).
+-- 8.5 Danny's clipboard (orders mode; shared/SandboxPad.luau's "clipboard", "stow", "dannygive"): while Danny works for
+-- your move and your hands are free, [Q] Clipboard (a gamepad's R1); with it out [LMB] Give to Danny (bright: the mode;
+-- R1) and [Q] Put away (B).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -123,6 +126,15 @@ local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 	add(first, chipText("E", "Use", nil, "use"))
 	if character:GetAttribute("Carrying") ~= nil then
 		add(first, chipText("G", "Put down", nil, "putdown"))
+	elseif player:GetAttribute("MoveHelper") == "hired" then
+		-- 8.5 Danny's clipboard (orders mode, client/DannyOrders.luau): only while he works for your move
+		local key = Config.MoveHelper.Clipboard.Key
+		if character:GetAttribute("ClipboardHeld") == true then
+			add(first, chipText("LMB", "Give to Danny", true, "dannygive"))
+			add(first, chipText(key, "Put away", nil, "stow"))
+		else
+			add(first, chipText(key, "Clipboard", nil, "clipboard"))
+		end
 	end
 	if type(character:GetAttribute("CarryGrip")) == "string" then
 		add(first, chipText("LMB/F", "Grip", nil, "grip"))

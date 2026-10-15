@@ -15,11 +15,16 @@
 --      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
 --   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
 --      (8.3: the chalet's leaves open before the fade, the move FadeOut + Margin s after it, the arrival a step past the
---      door facing in, the leaves shut again Shut s later).
+--      door facing in, the leaves shut again Shut s later). 8.5 walking through: from 14 studs out on through the door
+--      without a stop (no dwell): the way in clear of anything that collides (the House box no more), the leaf fully
+--      open before she reached the doorway, the fade out as her root crossed its threshold while she walked on, the move
+--      before her walk reached the end of its dark hall; the chalet's doorways walkable (HouseSolid, the halls' lining).
 --   5. A sturdy two-hands piece through the grip lift check: a crew mate's answer does nothing, a forged "ok" is a miss
 --      (a knock), the client's "ok" with a good press time lifts it balanced; a wobble answered (steady), one missed (a
 --      stagger).
---   6. Out through the doorway, loaded at the back doors; a one-hand piece loaded from inside the walk-in bay.
+--   6. Out through the doorway, loaded at the back doors; a one-hand piece loaded from inside the walk-in bay. 8.5: out by
+--      walking on through the doorway inside with the piece (the fade as she crossed its threshold, the way onto the
+--      porch clear, the move before its wall of daylight).
 --   7. Home: no trip at another player's plot; backed into your circle: trip 1 (Collection.add: item, variant, condition,
 --      name: the very look the piece had), into the book; trip 2 nose-in. Bob: a death mid-carry, the respawn by his
 --      van, his trip.
@@ -36,6 +41,9 @@
 --      engine on her van and on one CAR brings later; Danny's training; 8.3: her warehouse level kept, then the
 --      Logistics Center (level 5) with every piece still on its stand.
 --  14. Bob cannot use Ann's stands or desk; her kiosk opens only his own move.
+--  14b. 8.7 trading between players: at Ann's stand Bob has Make an offer (tagged for client/TradePrompts.luau: hidden
+--      from her), its composer, his offer on her card, her ACCEPT: the money and the piece moved (the fee gone), the
+--      stand free; Ann's Set price (her FOR SALE sign on the tag for everybody), Bob's Buy $X, its question, BUY.
 --  15. A full server: the fifth player waits for a plot, gets Bob's when he leaves.
 --  16. A full warehouse at a trip.
 --  17. Leaving mid-move with a piece in the van; coming back. Last: the all-time best in its OrderedDataStore.
@@ -45,7 +53,8 @@
 --  19. 8.3 the PAINT shop: the van's 🎨 Paint van prompt at home, the window, a paint bought and worn.
 --  20. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
 --      piece out by its doorway inside (the real plan's second way out), loaded, home. 8.3 walk-in doors: the back
---      door's leaves (the map's, the interior's) swing open as she walks up to them, the fade as the front door's.
+--      door's leaves (the map's, the interior's) swing open as she walks up to them, the fade as the front door's. 8.5:
+--      in and out by the back door walking through it without a stop, as by the front door.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -202,13 +211,27 @@ do
 	for name, hinge in { FrontLeafWest = -1, FrontLeafEast = 1, BackLeaf = -1 } do
 		local leaf = leaves[name]
 		local by = if name == "BackLeaf" then back else door
-		leavesOk = leavesOk and leaf ~= nil and by ~= nil and leaf:GetAttribute("DoorLeaf") == hinge and leaf:GetAttribute("DoorSwing") == 1
+		leavesOk = leavesOk and leaf ~= nil and by ~= nil and leaf:GetAttribute("DoorLeaf") == hinge and leaf:GetAttribute("DoorSwing") == -1
 			and leaf:GetAttribute("DoorDark") == true and leaf.CanCollide == false and V3(leaf.Position.X - by.Position.X, 0, leaf.Position.Z - by.Position.Z).Magnitude < 2
 	end
 	S.frontDoor = door
 	S.frontLeaf, S.backLeaf = leaves.FrontLeafEast, leaves.BackLeaf
-	check("8.3 …the doors' leaves door leaves (FrontLeafWest, FrontLeafEast, BackLeaf: DoorLeaf -1 / 1 / -1 at their jambs; DoorSwing 1: into the house; DoorDark: a dark hall behind them), never colliding",
+	check("8.3 …the doors' leaves door leaves (FrontLeafWest, FrontLeafEast, BackLeaf: DoorLeaf -1 / 1 / -1 at their jambs; 8.5 DoorSwing -1: out of the house; DoorDark: a dark doorway behind them), never colliding",
 		leavesOk and door ~= nil and door.CanCollide == false and door:GetAttribute("DoorLeaf") == nil)
+	-- 8.5 walking through: the chalet's House box no longer what you bump into (its HouseSolid pieces, the box less a hall
+	-- behind each doorway, collide instead), the halls lined dark
+	local box, solids, lining = nil :: any, 0, 0
+	for _, d in workspace:GetDescendants() do
+		if d.Name == "House" and d:IsA("BasePart") and d.Parent and d.Parent.Name == "House_" .. House.id then
+			box = d
+		elseif d.Name == "HouseSolid" and d.CanCollide then
+			solids += 1
+		elseif d.Name == "DoorHall" and not d.CanCollide then
+			lining += 1
+		end
+	end
+	check("8.5 …the chalet's doorways walkable: its House box collides with nothing (7 HouseSolid pieces do, the box less its two doors' halls), each hall lined dark",
+		box ~= nil and box.CanCollide == false and box.CanQuery == false and solids == 7 and lining == 10, `{solids} {lining}`)
 	check("…the sandbox's own DataStore (Config.Sandbox.Store); analytics on (a live server)", E.storeName == Config.Sandbox.Store and Config.Analytics.Enabled)
 	check("(a day whose tasks for Ann hold trips, sell and the weekly income)", S.day ~= nil)
 end
@@ -402,12 +425,83 @@ function H.isInside(player: any): boolean
 end
 S.into = {} -- player → the flat way into the house from its door (where they came in facing)
 S.rooms = {} -- player → the origin of the interior they last walked into
--- Walks up to the chalet's front door and stands in its zone facing it: the dwell, the fade, inside.
+S.trip = {} -- 8.5 player → their last walk through a door: { at, v, clock, moved } where their root was, its walk and the clock as the fade out reached them; the clock of the move (its fade in)
+-- 8.5 walking through: walks the player along `points` without a stop (E.walk's steps at their walk), their client's
+-- fades watched (S.trip: where they were, their walk and the clock as the fade out came, the clock of the fade in: the
+-- move); false when the game did not move them on the way (no trip).
+function H.walkThrough(player: any, points: { any }): boolean
+	local client = E.clients[player]
+	S.trip[player] = nil
+	E.clients[player] = function(remote: string, kind: any, a: any, ...: any)
+		local trip = S.trip[player]
+		if remote == "Moving" and kind == "fade" and a == "out" and trip == nil then
+			local root = E.rootOf(player)
+			S.trip[player] = { at = root.Position, v = root.AssemblyLinearVelocity, clock = E.clock, moved = nil }
+		elseif remote == "Moving" and kind == "fade" and a == "in" and trip and trip.moved == nil then
+			trip.moved = E.clock
+		end
+		if client then
+			return client(remote, kind, a, ...)
+		end
+		return nil
+	end
+	local moved = not E.walkPath(player, points)
+	E.clients[player] = client
+	return moved
+end
+-- 8.5: the parts that collide in the flat box round the line from `from` to `to` (`half` either side of it, a body's
+-- height over the ground from `from`'s feet), but the players' bodies and the floors under their feet: their names.
+function H.solidOn(from: any, to: any, half: number): { string }
+	local way = V3(to.X - from.X, 0, to.Z - from.Z)
+	local length = way.Magnitude
+	local along = way / length
+	local across = V3(-along.Z, 0, along.X)
+	local feet = from.Y - 3
+	local hit: { string } = {}
+	local bodies: { any } = {}
+	for _, player in E.Players:GetPlayers() do
+		if player.Character then
+			table.insert(bodies, player.Character)
+		end
+	end
+	for _, d in workspace:GetDescendants() do
+		if d:IsA("BasePart") and d.CanCollide then
+			local mine = false
+			for _, body in bodies do
+				mine = mine or d:IsDescendantOf(body)
+			end
+			local rel = d.Position - from
+			if mine or math.abs(rel:Dot(across)) > half + 30 or rel:Dot(along) < -30 or rel:Dot(along) > length + 30 then
+				continue -- (a body's own, or far off the way)
+			end
+			-- the part's box against the way's box: its corners' spans along, across and up overlap the way's
+			local s, cf = d.Size, d.CFrame
+			local lo, hi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+			for _, x in { -0.5, 0.5 } do
+				for _, y in { -0.5, 0.5 } do
+					for _, z in { -0.5, 0.5 } do
+						local p = cf * V3(x * s.X, y * s.Y, z * s.Z) - from
+						local q = { p:Dot(along), p:Dot(across), p.Y + from.Y - feet }
+						for i = 1, 3 do
+							lo[i], hi[i] = math.min(lo[i], q[i]), math.max(hi[i], q[i])
+						end
+					end
+				end
+			end
+			if lo[1] < length - 1e-3 and hi[1] > 1e-3 and lo[2] < half - 1e-3 and hi[2] > -half + 1e-3 and lo[3] < 5.5 and hi[3] > 0.3 then
+				table.insert(hit, d.Name)
+			end
+		end
+	end
+	return hit
+end
+-- Walks up to the chalet's front door and on through it (8.5: from beyond its approach into its dark hall, no stop:
+-- the leaf open on the way, the fade as she crosses the threshold, the move in the dark), inside.
 function H.enterHouse(player: any): boolean
 	local facing = H.yawLook(House.door.yaw)
 	local door = V3(House.door.x, House.door.y + 3, House.door.z)
-	E.walk(player, door + facing * 6)
-	E.walk(player, door + facing * 1.5)
+	E.walk(player, door + facing * 14)
+	H.walkThrough(player, { door - facing * (Config.Moving.Doors.Hall.Depth - 1) })
 	local inside = E.waitUntil(function(): boolean
 		return H.isInside(player)
 	end, 3)
@@ -419,7 +513,8 @@ function H.enterHouse(player: any): boolean
 	end
 	return inside
 end
--- Walks out by the interior's front-door way ("LeaveDoor" by the player's interior), facing it.
+-- Walks out by the interior's front-door way ("LeaveDoor" by the player's interior): up to it, then on through its
+-- doorway onto the porch without a stop (8.5: the fade as they cross its threshold, the move in the dark).
 function H.leaveHouse(player: any): boolean
 	local origin = E.interiorAt(E.rootOf(player).Position)
 	local exit: any = nil
@@ -434,10 +529,11 @@ function H.leaveHouse(player: any): boolean
 	local inside = exit.Position - V3(0, 3.5, 0)
 	local way = S.into[player] or V3(0, 0, 1)
 	local up = V3(0, Config.Furniture.EntryUp, 0)
+	S.leftBy = { at = inside, way = way } -- (8.5: the doorway's threshold inside, a root's height up, and the way in)
 	if not E.walk(player, inside + way * 5 + up) then
 		return not H.isInside(player)
 	end
-	E.walk(player, inside + way * 1.5 + up)
+	H.walkThrough(player, { inside - way * 5 + up }) -- (onto the porch: 6 studs past the wall)
 	return E.waitUntil(function(): boolean
 		return not H.isInside(player)
 	end, 3)
@@ -713,9 +809,28 @@ do
 		return client(remote, kind, a, b, c, ...)
 	end
 	local fadeAt = #E.sent
-	check("…walked up to the front door and stood in its zone facing it: in after the dwell, no E", H.enterHouse(ann), E.rootOf(ann).Position)
+	local wayIn = { from = V3(House.door.x, 3, House.door.z) + H.yawLook(House.door.yaw) * 14, to = V3(House.door.x, 3, House.door.z) - H.yawLook(House.door.yaw) * (D.Hall.Depth - 1) }
+	local solidIn = H.solidOn(wayIn.from, wayIn.to, 1)
+	check("…walked up to the front door and on through it without a stop (8.5): inside, no E", H.enterHouse(ann), E.rootOf(ann).Position)
 	E.clients[ann] = client
 	opening:Disconnect()
+	-- 8.5 walking through (the owner: "so it doesn't feel like I bumped into the door, but I keep walking smoothly")
+	local trip = S.trip[ann]
+	local facing = H.yawLook(House.door.yaw)
+	local foot = V3(House.door.x, 3, House.door.z)
+	local along = if trip then (trip.at - foot):Dot(facing) else math.huge -- (studs out of the door's face; < 0 in its doorway)
+	local speed = if trip then trip.v:Dot(-facing) else 0
+	check("8.5 the way in clear: nothing that collides from 14 studs out of the door through its doorway to its dark hall's end (a body's width and height)",
+		#solidIn == 0, table.concat(solidIn, ", "))
+	check("8.5 the trip by walking through: the fade out came while she walked on at her walk, as her root crossed the door's threshold (no dwell, no stop)",
+		trip ~= nil and speed > E.walkSpeed(ann) * 0.9 and along <= 2.5 and along >= -2, `{along} out, {speed} studs/s`)
+	local reach = if trip and speed > 0 then trip.clock + along / speed else 0 -- (when her walk took her to the door's face)
+	check("8.5 the leaf fully open before she reached the doorway (open Open s, with the network's moment, before her walk got there)",
+		openedAt ~= nil and trip ~= nil and (openedAt :: number) + D.Open + 0.15 <= reach, openedAt and reach - (openedAt :: number))
+	local last = seen[#seen]
+	local walked = if trip and last then along - speed * (last.at - trip.clock) else math.huge -- (where her walk had taken her as she was moved)
+	check("8.5 …and the move came while her walk went on into the house's dark hall, before its end (Hall.Depth)", last ~= nil and last.what == "in"
+		and walked >= -(D.Hall.Depth - 0.5) and walked < 0, walked)
 	local out, back = seen[1], seen[#seen]
 	check("8.3 the chalet's leaf swung open as she walked up to it, open Open s before the fade out started (and still open then)", openedAt ~= nil
 		and out ~= nil and out.what == "out" and out.open == true and out.at - (openedAt or 0) >= D.Open - 1e-6, out and openedAt and out.at - openedAt)
@@ -794,8 +909,22 @@ do
 	S.auto[ann] = true -- (the wobbles on the way: her client answers them)
 
 	-- 6. Out through the doorway; a wobble answered, one missed; loaded at the back doors.
-	check("6. carried out through the doorway (walked into its zone inside): outside with the piece", H.leaveHouse(ann)
+	check("6. carried out through the doorway (8.5: walked on through it inside, no stop): outside with the piece", H.leaveHouse(ann)
 		and ann.Character:GetAttribute("MoveCarry") == piece.spot, E.rootOf(ann).Position)
+	-- 8.5 the way out as the way in: the fade out as her walk (the carry's) took her across the doorway's threshold inside,
+	-- the porch clear before her and the move before she reached its end (its wall of daylight, Wall + 6 studs out)
+	do
+		local trip, by = S.trip[ann], S.leftBy
+		local along = if trip then (trip.at - by.at):Dot(by.way) else math.huge
+		local speed = if trip then -trip.v:Dot(by.way) else 0
+		local moved: number? = if trip then trip.moved else nil
+		local stop = Config.Furniture.Wall + 6 - 0.5
+		local solid = H.solidOn(by.at + by.way * 5, by.at - by.way * stop, 1)
+		check("8.5 …out by walking through: the fade out while she walked on with the piece, as her root crossed the doorway's threshold inside; the way onto the porch clear",
+			trip ~= nil and speed > 0.5 * E.walkSpeed(ann) and along <= 2.5 and along >= -2 and #solid == 0, `{along}, {speed} studs/s; {table.concat(solid, ", ")}`)
+		local walked = if trip and moved then along - speed * (moved - trip.clock) else -math.huge
+		check("8.5 …the move before her walk reached the porch's end (its wall of daylight)", walked >= -stop and walked < 0, walked)
+	end
 	check("…the piece came along (welded in front of her)", H.flat(model.PrimaryPart.Position, E.rootOf(ann).Position) < 8, model.PrimaryPart.Position)
 	local wobbleAt = #E.sent
 	local opened = Moving.gripCheck(ann)
@@ -1530,6 +1659,88 @@ do
 	check("…GIVE UP with nothing home: MoveGaveUp (how far: started)", #H.events("MoveGaveUp", bob) == 1)
 end
 
+-- ── 14b. 8.7: trading between players ────────────────────────────────────
+
+do
+	local Rules = require("./PlayerTradeRules")
+	local T = Config.PlayerTrade
+	local shown = {}
+	for _, entry in Collection.stock(ann2) do
+		if entry.stand then
+			table.insert(shown, entry)
+		end
+	end
+	table.sort(shown, function(a: any, b: any): boolean
+		return a.stand < b.stand
+	end)
+	local first = shown[1]
+	H.profileOf(bob).money = 100000
+	H.toStand(bob, plots[1], first.stand)
+	local offerPrompt = H.standPrompt(1, first.stand, "MakeOffer")
+	local pricePrompt = H.standPrompt(1, first.stand, "SetPrice")
+	check("14b. Ann's piece on show: Make an offer for everybody else (tagged with her UserId: hidden from her), her own Set price (CargoOwner)",
+		offerPrompt ~= nil and offerPrompt.Enabled == true and offerPrompt:GetAttribute(T.SellerAttribute) == 11 and offerPrompt:GetAttribute("CargoOwner") == nil
+		and pricePrompt ~= nil and pricePrompt:GetAttribute("CargoOwner") == 11 and H.standPrompt(1, first.stand, "Buy").Enabled == false)
+	local at = #E.sent
+	local ok, why = E.trigger(offerPrompt, bob)
+	E.advance(0.3)
+	local compose = Rules.readPiece(E.lastKind(bob, "PlayerTrade", "compose", at))
+	check("…Bob's Make an offer: the composer (the piece, its value, the bounds)", ok and compose ~= nil and compose.uid == first.uid and compose.seller == 11
+		and compose.value == Rules.value(first), why)
+	local price = Rules.presets((compose :: any).value)[3].price
+	at = #E.sent
+	local moneyAt = #money
+	local annMoney, bobMoney = H.profileOf(ann2).money, H.profileOf(bob).money
+	E.fire(bob, "PlayerTrade", { kind = "offer", seller = 11, uid = first.uid, stand = first.stand, price = price })
+	E.advance(0.3)
+	local card = E.lastKind(ann2, "PlayerTrade", "offer", at)
+	check("…SEND: Ann's offer card (a player's) and her toast", card ~= nil and card.player == true and card.price == price and E.heard(ann2, "offers", at))
+	E.fire(ann2, "PlayerTrade", { kind = "answer", id = card and card.id, accept = true })
+	E.advance(0.5)
+	local fee = Rules.fee(price)
+	local bobHas = nil
+	for _, entry in Collection.stock(bob) do
+		if entry.item == first.item and entry.got >= first.got and entry.stand == nil then
+			bobHas = entry
+		end
+	end
+	check("…ACCEPT: the piece Bob's (in his stock), the money moved, the 8 % fee gone", H.byUid(Collection.stock(ann2), first.uid) == nil and bobHas ~= nil
+		and H.paid(bob, "PlayerBuy", moneyAt) == -price and H.paid(ann2, "PlayerSale", moneyAt) == price and H.paid(ann2, "TradeFee", moneyAt) == -fee
+		and H.profileOf(bob).money == bobMoney - price and H.profileOf(ann2).money - annMoney - H.paid(ann2, "CollectionIncome", moneyAt) == price - fee)
+	H.rebuilt()
+	check("…her stand free (no piece, no prompts for it)", Warehouse.shown(1, first.stand) == nil and offerPrompt.Enabled == false)
+	-- the FOR SALE sign: Ann's Set price, the tag, Bob's Buy $X, its question, BUY
+	local second = shown[2]
+	if second then
+		H.toStand(ann2, plots[1], second.stand)
+		at = #E.sent
+		E.trigger(H.standPrompt(1, second.stand, "SetPrice"), ann2)
+		E.advance(0.3)
+		local picker = Rules.readPiece(E.lastKind(ann2, "PlayerTrade", "pricing", at))
+		local sign = Rules.clamp(Rules.value(second) * 2, Rules.value(second))
+		E.fire(ann2, "PlayerTrade", { kind = "price", uid = second.uid, price = sign })
+		H.rebuilt()
+		local tag = Warehouse.model(1):FindFirstChild(`Stand{second.stand}`):FindFirstChild("Tag")
+		local line = tag and tag:FindFirstChild("Back") and tag:FindFirstChild("Back"):FindFirstChild("Line3")
+		local buy = H.standPrompt(1, second.stand, "Buy")
+		check("…Ann's Set price: her picker; SET: the sign on her tag for everybody, Bob's Buy $X", picker ~= nil and picker.uid == second.uid
+			and line ~= nil and line.Visible == true and line.Text == `🏷 FOR SALE {WarehouseLayout.money(sign)}` and buy.Enabled == true
+			and buy.ActionText == `Buy {WarehouseLayout.money(sign)}`)
+		H.toStand(bob, plots[1], second.stand)
+		E.advance(0.5)
+		at = #E.sent
+		moneyAt = #money
+		E.trigger(buy, bob)
+		E.advance(0.3)
+		local question = Rules.readPiece(E.lastKind(bob, "PlayerTrade", "confirm", at))
+		E.fire(bob, "PlayerTrade", { kind = "buy", seller = 11, uid = second.uid, stand = second.stand, price = question and question.price })
+		E.advance(0.5)
+		check("…Bob's Buy $X: the question, BUY: the piece his, the sign's price paid", question ~= nil and question.price == sign
+			and H.byUid(Collection.stock(ann2), second.uid) == nil and H.paid(bob, "PlayerBuy", moneyAt) == -sign and H.paid(ann2, "TradeFee", moneyAt) == -Rules.fee(sign))
+		H.rebuilt()
+	end
+end
+
 -- ── 15. A full server: the fifth player waits for a plot ──────────────────
 
 local cid = E.join(33, "Cid")
@@ -1759,11 +1970,27 @@ do
 	end)
 	local fadeFrom = #E.sent
 	E.walk(ann2, backAt + out * 8)
-	E.walk(ann2, backAt + out * 1.5)
+	local hallEnd = backAt - out * (Config.Moving.Doors.Hall.Depth - 1)
+	local solidIn = H.solidOn(backAt + out * 8, hallEnd, 1)
+	H.walkThrough(ann2, { hallEnd }) -- (8.5: on through it into its dark hall, no stop)
 	local inside = E.waitUntil(function(): boolean
 		return H.isInside(ann2)
 	end, 3)
 	backOpening:Disconnect()
+	-- 8.5 walking through the back door as the front one: its way clear, the fade as her root crossed its threshold while
+	-- she walked on, its leaf fully open before she got there, the move before the end of its dark hall
+	do
+		local D = Config.Moving.Doors
+		local trip = S.trip[ann2]
+		local along = if trip then (trip.at - backAt):Dot(out) else math.huge
+		local speed = if trip then -trip.v:Dot(out) else 0
+		local reach = if trip and speed > 0 then trip.clock + along / speed else 0
+		local walked = if trip and trip.moved then along - speed * (trip.moved - trip.clock) else math.huge
+		check("8.5 the back door walked through: its way in clear (nothing that collides from 8 studs out to its dark hall's end), the fade out as she crossed its threshold walking on",
+			#solidIn == 0 and trip ~= nil and speed > E.walkSpeed(ann2) * 0.9 and along <= 2.5 and along >= -2, `{table.concat(solidIn, ", ")}; {along} out, {speed} studs/s`)
+		check("…its leaf (BackLeaf) fully open before she reached it; the move before the end of its dark hall", backOpenAt ~= nil and (backOpenAt :: number) + D.Open + 0.15 <= reach
+			and walked >= -(D.Hall.Depth - 0.5) and walked < 0, `{backOpenAt and reach - (backOpenAt :: number)} {walked}`)
+	end
 	local backFades = {}
 	for _, args in E.received(ann2, "Moving", fadeFrom) do
 		if args[1] == "fade" then
@@ -1806,12 +2033,24 @@ do
 		innerOpen = innerOpen or innerLeaf:GetAttribute("DoorOpen") == true
 	end) else nil
 	E.walk(ann2, door + S.into[ann2] * 5 + up)
-	E.walk(ann2, door + S.into[ann2] * 1.5 + up)
+	local porchStop = Config.Furniture.Wall + 6 - 0.5 -- (its porch's wall of daylight: 6 past the wall, the root half a stud off it)
+	local solidOut = H.solidOn(door + S.into[ann2] * 5, door - S.into[ann2] * porchStop, 1)
+	H.walkThrough(ann2, { door - S.into[ann2] * 5 + up }) -- (8.5: on through its doorway onto its porch, no stop)
 	local outAgain = E.waitUntil(function(): boolean
 		return not H.isInside(ann2)
 	end, 3)
 	if innerOpening then
 		innerOpening:Disconnect()
+	end
+	do
+		local trip = S.trip[ann2]
+		local into = S.into[ann2]
+		local along = if trip then (trip.at - door):Dot(into) else math.huge
+		local speed = if trip then -trip.v:Dot(into) else 0
+		local walked = if trip and trip.moved then along - speed * (trip.moved - trip.clock) else -math.huge
+		check("8.5 …and out by it walking through: its way onto the porch clear, the fade out as she crossed its threshold inside with the piece, the move before the porch's end",
+			#solidOut == 0 and trip ~= nil and speed > 0.5 * E.walkSpeed(ann2) and along <= 2.5 and along >= -2 and walked >= -porchStop and walked < 0,
+			`{table.concat(solidOut, ", ")}; {along}, {speed} studs/s, {walked}`)
 	end
 	check("8.3 …the interior's back door leaf (BackLeaf: DoorLeaf 1, out onto its porch) swung open as she walked up to it", innerLeaf ~= nil and innerOpen
 		and innerLeaf:GetAttribute("DoorLeaf") == 1 and innerLeaf:GetAttribute("DoorSwing") == -1)

@@ -68,7 +68,7 @@ check("8.3 the money's words", Brain.money(170) == "$170" and Brain.money(1234) 
 -- 8.3 a click on a piece: onto his list, off it -----------------------------------------------------------------------------
 
 local function assign(fields: { [string]: any }): string
-	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true }
+	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true, clipboard = true }
 	for key, value in fields do
 		(a :: any)[key] = value
 	end
@@ -86,6 +86,14 @@ check("…in his arms already: (his)", assign({ his = true, state = "carried", h
 check("…in the van: (van); home or lost: (gone)", assign({ state = "truck" }) == "van" and assign({ state = "delivered" }) == "gone" and assign({ state = "lost" }) == "gone")
 check("…somebody holds it: (held)", assign({ state = "carried", held = true }) == "held" and assign({ held = true }) == "held")
 check("…his list full (Queue 6): (full); one less: add", assign({ count = H.Queue }) == "full" and assign({ count = H.Queue - 1 }) == "add" and H.Queue == 6)
+-- 8.5 orders mode (shared/ClipboardRules.luau, server/Clipboard.luau): a piece goes to him only from a player whose
+-- clipboard is out
+check("8.5 the clipboard away: refused (clipboard), never added, never taken back; out: add / remove", assign({ clipboard = false }) == "clipboard"
+	and assign({ clipboard = false, queued = true }) == "clipboard" and assign({ clipboard = true }) == "add" and assign({ clipboard = true, queued = true }) == "remove")
+check("…but the crew, the piece and the hire come first (no clipboard to take out before he is hired)", assign({ clipboard = false, crew = false }) == "crew"
+	and assign({ clipboard = false, mine = false }) == "piece" and assign({ clipboard = false, hired = false }) == "hire")
+check("…and before the rest (far, in the van, full: the clipboard first)", assign({ clipboard = false, near = false }) == "clipboard"
+	and assign({ clipboard = false, state = "truck" }) == "clipboard" and assign({ clipboard = false, count = H.Queue }) == "clipboard")
 check("8.3 a piece of his list stays his while it is home or on the ground and nobody holds it", Brain.keepQueued("home", false) and Brain.keepQueued("ground", false)
 	and not Brain.keepQueued("carried", true) and not Brain.keepQueued("home", true) and not Brain.keepQueued("truck", false) and not Brain.keepQueued("delivered", false))
 
@@ -117,6 +125,92 @@ check("8.3 the first seat nobody sits in; every one taken: none (he follows on f
 check("8.3 seated: out when nobody drives and the van stands", Brain.getOut(false, true, true) and not Brain.getOut(true, true, true) and not Brain.getOut(false, false, true)
 	and not Brain.getOut(true, false, true))
 check("…at once when the van is wrecked or gone (moving or not)", Brain.getOut(true, false, false) and Brain.getOut(false, false, false))
+
+-- 8.5 his way to the van's door: round the van, never through it (the owner: "Danny got a bit stuck under the car") -----
+
+do
+	local m, edge = H.RideMargin, 0.05
+	local hx, hz = 4, 11 -- (the Sprinter's footprint: 8 × 22)
+	local gx, gz = hx + H.RideStand, -5.75 -- (his spot at its passenger door)
+	check("8.5 his spot at the door is out of the margin he keeps (and of the pathfinding's reach round the hull)", H.RideStand > m and m > H.PathRadius)
+	local x, z, length = Brain.roundVan(14, 0, gx, gz, hx, hz, 0)
+	check("8.5 the straight way keeps RideMargin off the van: straight to his spot", near(x, gx) and near(z, gz) and near(length, math.sqrt((14 - gx) ^ 2 + gz ^ 2)),
+		`{x} {z} {length}`)
+	x, z, length = Brain.roundVan(4, 14.6, gx, gz, hx, hz, 0)
+	check("…from behind the van by its back corner (where he waits; the straight way would scrape its side): round that corner first",
+		near(x, hx + m + edge) and near(z, hz + m + edge) and near(length, math.sqrt((hx + m + edge - 4) ^ 2 + (14.6 - hz - m - edge) ^ 2)
+		+ math.sqrt((gx - hx - m - edge) ^ 2 + (gz - hz - m - edge) ^ 2)), `{x} {z} {length}`)
+	x, z = Brain.roundVan(-14, -8, gx, gz, hx, hz, 0)
+	check("…from its other side, toward the front: round the front (the shorter way)", near(x, -(hx + m + edge)) and near(z, -(hz + m + edge)), `{x} {z}`)
+	x, z = Brain.roundVan(-14, 8, gx, gz, hx, hz, 0)
+	check("…toward the back: round the back", near(x, -(hx + m + edge)) and near(z, hz + m + edge), `{x} {z}`)
+	x, z = Brain.roundVan(hx + m - 0.6, hz + m + 0.6, gx, gz, hx, hz, H.RideCorner)
+	check("…a corner within RideCorner: on to the next point (no stop at it)", near(x, gx) and near(z, gz), `{x} {z}`)
+	x, z = Brain.roundVan(hx + 1, 0, gx, gz, hx, hz, 0)
+	check("…within the margin (by its side): straight out of it first", near(x, hx + m + edge) and near(z, 0), `{x} {z}`)
+	x, z = Brain.roundVan(-1, 2, gx, gz, hx, hz, 0)
+	check("…even from inside its footprint: out of the nearer side, never on through it", near(x, -(hx + m + edge)) and near(z, 2), `{x} {z}`)
+	-- walked from all round the van (half a stud a step toward the next point): never within a stud of its footprint (his
+	-- body), always at his spot in the end
+	local worst, arrived = math.huge, 0
+	for angle = 0, 345, 15 do
+		local px, pz = math.cos(math.rad(angle)) * 18, math.sin(math.rad(angle)) * 24
+		for _ = 1, 400 do
+			local nx, nz = Brain.roundVan(px, pz, gx, gz, hx, hz, H.RideCorner)
+			local dx, dz = nx - px, nz - pz
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d < 0.05 then
+				break
+			end
+			local step = math.min(0.5, d)
+			px, pz = px + dx / d * step, pz + dz / d * step
+			worst = math.min(worst, math.max(math.abs(px) - hx, math.abs(pz) - hz))
+		end
+		if math.abs(px - gx) < 0.06 and math.abs(pz - gz) < 0.06 then
+			arrived += 1
+		end
+	end
+	check("…walked to his spot from all round the van: always there, never within a stud of its footprint", arrived == 24 and worst > 1, `{arrived} {worst}`)
+	local a = Brain.newApproach()
+	local fade = false
+	for step = 1, 300 do -- (30 s coming closer, from 120 studs off)
+		fade = fade or Brain.rideBlink(a, 120 - step * 0.4, 0.1)
+	end
+	check("8.5 his walk to the van to ride, coming closer: never the fade into the seat (even a long one)", not fade)
+	a = Brain.newApproach()
+	Brain.rideBlink(a, 10, 0.1)
+	local steps = 0
+	repeat
+		steps += 1
+	until Brain.rideBlink(a, 10 - H.CallGain * 0.5, 0.1) or steps > 1000
+	check("…no closer by CallGain studs for RideBlink s (his way blocked, the van rolling on): the last resort", near(steps * 0.1, H.RideBlink, 0.11), steps * 0.1)
+	check("…RideFar studs or more to go (driven off without him): the last resort at once", Brain.rideBlink(Brain.newApproach(), H.RideFar, 0.1)
+		and not Brain.rideBlink(Brain.newApproach(), H.RideFar - 1, 0.1))
+	check("…more patient than your call's (CallBlink)", H.RideBlink > H.CallBlink)
+end
+-- 8.5.1 his outline guard on every way outside (the owner: "Danny STILL goes through it") ------------------------------
+do
+	local hx, hz, pad = 4, 11, H.RideHug
+	check("8.5.1 RideHug: his body's half width and a hair, inside the ride's margin", pad > 1 and pad < H.RideMargin)
+	check("8.5.1 a way across the van's outline (the straight line from its passenger door to behind it, scraping its back corner)",
+		Brain.crossesVan(hx + H.RideStand, -5.75, 4, 14.6, hx, hz, pad) and not Brain.crossesVan(hx + H.RideStand, -5.75, hx + pad + 0.1, 14.6, hx, hz, pad))
+	check("…a way along its side, outside the outline, or from inside it out", not Brain.crossesVan(hx + pad + 0.01, -20, hx + pad + 0.01, 20, hx, hz, pad)
+		and Brain.crossesVan(0, 0, 20, 0, hx, hz, pad))
+	local x, z = Brain.outOfVan(0.8, 4, hx, hz, pad)
+	check("8.5.1 out of the van: through its nearer side, a hair past the outline", near(x, hx + pad + 0.05) and near(z, 4), `{x} {z}`)
+	x, z = Brain.outOfVan(-1, 10.5, hx, hz, pad)
+	check("…by its back: out of the back", near(x, -1) and near(z, hz + pad + 0.05), `{x} {z}`)
+	x, z = Brain.outOfVan(-1, 10.5, hx, hz, pad, true)
+	check("…sideways (a van driving along its length): its side, the nearer one", near(x, -(hx + pad + 0.05)) and near(z, 10.5), `{x} {z}`)
+	x, z = Brain.outOfVan(hx + pad + 1, 3, hx, hz, pad)
+	check("…a point outside it as it is", near(x, hx + pad + 1) and near(z, 3))
+	local gx, gz = 1.5, hz + 2.1 -- (the spot behind its back he loads from: nearer the van than RideMargin)
+	x, z = Brain.roundVan(hx + 3, -5, gx, gz, hx, hz, 0, 2.0)
+	check("8.5.1 roundVan with a margin of its own: round the corner that far out (a goal nearer the van than RideMargin)",
+		near(x, hx + 2.05) and near(z, hz + 2.05), `{x} {z}`)
+	x, z = Brain.roundVan(hx + 3, -5, gx, gz, hx, hz, 0)
+	check("…RideMargin's own: no way round to a goal within it (straight: the guard gives it the goal's own margin)", near(x, gx) and near(z, gz), `{x} {z}`)
+end
 -- The way ------------------------------------------------------------------------------------------------------------------
 
 local doors: Brain.Doors = { outX = 100, outZ = 0, inX = 5000, inZ = 0 }
@@ -256,6 +350,58 @@ check("…StuckSnap s: a nudge to his way's next point", Brain.unstuck(H.StuckSn
 -- The far end of your piece (7.x) ------------------------------------------------------------------------------------------
 
 check("his root Standoff past the far face", near(Brain.farEnd(3.2), 1.6 + H.Standoff))
+do
+	-- 8.6 his end (the owner: "he teleports from side to side"): the face across the piece from you, in its own frame
+	local ax, az, half = Brain.holdEnd(7.2, 3.2, -6.1, 0) -- (the Sofa lengthwise: you at its -X end)
+	check("8.6 his end: the far end of its length (you at one end: he at the other)", ax == 1 and az == 0 and near(half, 3.6))
+	ax, az, half = Brain.holdEnd(6.0, 3.8, 0, 2.4) -- (the Dining Table broadside: you at its +Z side)
+	check("…the face across it from you wherever you hold it (its -Z face, its half depth)", ax == 0 and az == -1 and near(half, 1.9))
+	ax, az = Brain.holdEnd(3.8, 3.8, 0, 0)
+	local bx, bz = Brain.holdEnd(6.0, 3.8, 0, 0)
+	check("…you at its middle (nothing to go by): the old far face for a square, its length's +X end for a long one",
+		ax == 0 and az == -1 and bx == 1 and bz == 0)
+	ax, az = Brain.holdEnd(6.0, 3.8, -3.1, 1.9) -- (at a corner: the line through its middle leaves by its +X face)
+	check("…at a corner: the face the line from you through its middle comes out at", ax == 1 and az == 0)
+	ax, az = Brain.holdEnd(0 / 0, 3.8, 0 / 0, 2)
+	check("…NaN in: a face, never NaN", (ax == 0 or ax == 1 or ax == -1) and (az == 0 or az == 1 or az == -1) and ax == ax)
+	-- 8.6 his lead follows his end's own way, changing HoldLead.Rate studs a second at most
+	local L = H.HoldLead
+	local trail = Brain.newTrail()
+	local function look(x: number, z: number, seconds: number): (number, number)
+		return Brain.endLead(trail, x, z, 0.1, seconds, false)
+	end
+	local lx, lz = look(0, 0, 0.2)
+	check("8.6 his lead: none at the first look", lx == 0 and lz == 0)
+	local x, most, last = 0, 0, 0
+	for _ = 1, 30 do
+		x += 1
+		lx = look(x, 0, 0.2)
+		most = math.max(most, math.abs(lx - last))
+		last = lx
+	end
+	check("…his end walking +X at 10 studs/s: its velocity × the lead time (2 studs) at the end", near(lx, 2, 1e-3), lx)
+	check("…reached at HoldLead.Rate studs a second at most (never a jump of his aim)", most <= L.Rate * 0.1 + 1e-9 and L.Rate > 0 and L.Rate < 10, most)
+	most = 0
+	for _ = 1, 20 do
+		x -= 1 -- (the way back at once: a 180°)
+		lx = look(x, 0, 0.2)
+		most = math.max(most, math.abs(lx - last))
+		last = lx
+	end
+	check("…a 180°: the lead swings across at Rate at most (8.3's jumped 2 × lead in a look)", most <= L.Rate * 0.1 + 1e-9 and near(lx, -2, 1e-3), `{most} {lx}`)
+	lx, lz = Brain.endLead(trail, x + 50, 0, 0.1, 0.2, false)
+	check("…his end put far off at once (past HoldPace.Jump: a door's fade), or a reset: no lead", lx == 0 and lz == 0
+		and select(1, Brain.endLead(trail, x + 51, 0, 0.1, 0.2, true)) == 0)
+	lx, lz = Brain.endLead(trail, 0 / 0, 0, 0.1, 0.2, false)
+	check("…no place (NaN): none, never NaN", lx == 0 and lz == 0)
+	-- 8.6 the ease back is HoldCap at most
+	local eased = Brain.newTrail()
+	local top = 0
+	for _ = 1, 40 do
+		top = math.max(top, (Brain.holdTrack(eased, 200, false, 10, 0.1)))
+	end
+	check("8.6 eased back from far off (200 studs): HoldCap at most (it was the gap / HoldEase: 400 studs a second)", near(top, H.HoldCap), top)
+end
 check("on the floor there: level with you", near(Brain.endRise(-1.75, -1.75), -1.75))
 check("…a step up or down: with the floor", near(Brain.endRise(-1, -1.75), -1) and near(Brain.endRise(-3, -1.75), -3))
 check("…a step's reach at most (HoldStep): the floor there", near(Brain.endRise(-1.75 + H.HoldStep, -1.75), -1.75 + H.HoldStep)
@@ -456,6 +602,92 @@ for _, text in Brain.Lines do
 	end
 end
 check("his lines are plain text (a bubble's font shows them), short, the van's (no truck)", ascii and short and not truck)
+
+-- 8.6 the bubble over his head: the same action's words as the status line's ------------------------------------------------
+
+do
+	-- every action the server sets (MoveHelperBrain.decide's, the call's "ready", the hire's "offer", the van's "alight",
+	-- GET OUT's "stay", down) has both words
+	local ACTIONS = { "down", "hold", "flee", "help", "deliver", "open", "fetch", "wait", "come", "ready", "needs", "offer", "ride", "seat", "alight", "stay" }
+	local missing: { string } = {}
+	for _, action in ACTIONS do
+		if Brain.Doing[action] == nil then
+			table.insert(missing, action)
+		end
+	end
+	check("8.6 every action he can be at has the status line's words and the bubble's (one entry each: Doing)", #missing == 0, table.concat(missing, ", "))
+	local apart: { string } = {}
+	for action, words in Brain.Doing do
+		for _, full in { false, true } do
+			local line = Brain.doing(action, "Sofa", full)
+			local text, alert = Brain.bubble(action, "Sofa", full, 170)
+			local w = if action == "wait" and full then Brain.Doing.full else words
+			local sameName = (string.find(line, "Sofa", 1, true) ~= nil) == (string.find(text, "Sofa", 1, true) ~= nil)
+			local starts = string.sub(text, 1, #w.icon + 1) == w.icon .. " "
+			if line == "" or text == "" or not sameName or not starts or alert ~= (w.alert == true) or string.find(text, "%s", 1, true) ~= nil then
+				table.insert(apart, `{action}{if full then " (full)" else ""}: "{line}" / "{text}"`)
+			end
+		end
+	end
+	check("8.6 …for every action (the van full or not): the bubble starts with its icon, names the piece exactly when the status line does, its tone the entry's", #apart == 0,
+		table.concat(apart, " | "))
+	check("8.6 the owner's examples: carrying to the van, going for a piece, waiting at a two-person piece (needs you, orange), getting in, riding, waiting, running",
+		Brain.bubble("deliver", "Sofa") == "📦 Carrying: Sofa → van" and Brain.bubble("fetch", "Lamp") == "🚶 Going for: Lamp"
+		and Brain.bubble("needs", "Piano") == "⏳ Needs you: Piano" and select(2, Brain.bubble("needs", "Piano")) == true
+		and Brain.bubble("ride") == "🚐 Getting in the van" and Brain.bubble("seat") == "🪑 Riding" and Brain.bubble("wait") == "💤 Waiting by the van"
+		and Brain.bubble("flee") == "🏃 Running from a zombie" and select(2, Brain.bubble("flee")) == true and select(2, Brain.bubble("deliver", "Sofa")) == false,
+		Brain.bubble("deliver", "Sofa"))
+	check("8.6 for hire: \"🧑‍🔧 For hire · $170\", the status line's price", Brain.bubble("offer", nil, false, 170) == "🧑‍🔧 For hire · $170"
+		and string.find(Brain.status(false, 170, nil, nil), "$170", 1, true) ~= nil and Brain.doing("offer") == "Waiting by the van for hire")
+	check("8.6 the van full: both say so; GET OUT's stay: both say he stays out", Brain.doing("wait", nil, true) == "Waiting: the van is full"
+		and Brain.bubble("wait", nil, true) == "💤 Waiting: the van is full" and Brain.doing("stay") == "Staying out of the van (your order)"
+		and Brain.bubble("stay") == "✋ Staying out of the van")
+	check("8.6 something unknown: both as waiting at the van", Brain.doing("dance") == Brain.doing("wait") and Brain.bubble("dance") == Brain.bubble("wait"))
+	check("8.6 the list's counter: \"list: 3\", none for an empty list or garbage", Brain.listChip(3) == "list: 3" and Brain.listChip(1) == "list: 1"
+		and Brain.listChip(0) == nil and Brain.listChip(nil) == nil and Brain.listChip(0 / 0) == nil and Brain.listChip("3") == nil)
+end
+
+-- 8.6 the crew's orders: PUT IT DOWN, GET OUT ---------------------------------------------------------------------------------
+
+do
+	local function o(fields: { [string]: any }): Brain.Order
+		local made: any = { hired = true, down = false, holding = nil, seated = false, boarding = false, riding = false, leaving = false, moving = false }
+		for key, value in fields do
+			made[key] = value
+		end
+		return made
+	end
+	check("8.6 PUT IT DOWN: a piece in his arms or the far end of yours: ok; nothing in his hands: \"empty\"", Brain.orderCheck("putdown", o({ holding = "hand" })) == "ok"
+		and Brain.orderCheck("putdown", o({ holding = "pair" })) == "ok" and Brain.orderCheck("putdown", o({})) == "empty")
+	check("8.6 …not hired: \"hire\"; down: \"down\"", Brain.orderCheck("putdown", o({ hired = false, holding = "hand" })) == "hire"
+		and Brain.orderCheck("putdown", o({ down = true, holding = "hand" })) == "down" and Brain.orderCheck("getout", o({ hired = false, seated = true })) == "hire")
+	check("8.6 GET OUT: seated, getting in, or on his way to the van to ride: ok; anywhere else: \"notin\"", Brain.orderCheck("getout", o({ seated = true })) == "ok"
+		and Brain.orderCheck("getout", o({ boarding = true })) == "ok" and Brain.orderCheck("getout", o({ riding = true })) == "ok"
+		and Brain.orderCheck("getout", o({})) == "notin" and Brain.orderCheck("getout", o({ holding = "hand" })) == "notin")
+	check("8.6 …getting out already: \"leaving\"; the van rolling with him in it: \"moving\" (on foot after it: ok)", Brain.orderCheck("getout", o({ leaving = true })) == "leaving"
+		and Brain.orderCheck("getout", o({ seated = true, moving = true })) == "moving" and Brain.orderCheck("getout", o({ riding = true, moving = true })) == "ok")
+	check("8.6 an unknown order: \"unknown\" (the old ones too)", Brain.orderCheck("follow", o({ seated = true })) == "unknown" and Brain.orderCheck("stay", o({})) == "unknown")
+	check("8.6 the orders that apply now: PUT IT DOWN while he carries, GET OUT while he is in (the van rolling too: its press says to stop), none else",
+		Brain.orders(o({ holding = "hand" })) == "putdown" and Brain.orders(o({ seated = true })) == "getout" and Brain.orders(o({ seated = true, moving = true })) == "getout"
+		and Brain.orders(o({})) == nil and Brain.orders(o({ hired = false, holding = "hand" })) == nil and Brain.orders(o({ down = true, seated = true })) == nil
+		and Brain.orders(o({ leaving = true })) == nil)
+	local list = Brain.orderList("putdown,getout,dance")
+	check("8.6 …as a list (unknown kinds and garbage dropped)", #list == 2 and list[1] == "putdown" and list[2] == "getout" and #Brain.orderList(nil) == 0
+		and #Brain.orderList(3) == 0)
+	check("8.6 the buttons' words", Brain.orderWords("putdown") == "⬇ PUT IT DOWN" and Brain.orderWords("getout") == "🚪 GET OUT")
+	local bad: { string } = {}
+	for _, why in { "hire", "down", "empty", "notin", "leaving", "moving" } do
+		local text = Brain.orderWhy(why)
+		if not text or not string.find(text, H.Name, 1, true) or string.find(text, "click", 1, true) or string.find(text, "%s", 1, true) then
+			table.insert(bad, why)
+		end
+	end
+	check("8.6 every refusal has a notice naming him (no device's words: no \"click\"), \"ok\" and \"unknown\" none", #bad == 0 and Brain.orderWhy("ok") == nil
+		and Brain.orderWhy("unknown") == nil and Brain.orderWhy("empty") == "Danny isn't carrying anything." and Brain.orderWhy("notin") == "Danny isn't in the van.",
+		table.concat(bad, ", "))
+	check("8.6 his answers: \"Setting it down.\", \"Hopping out, boss.\" (plain text, short: checked with every line above)", Brain.Lines.putDown == "Setting it down."
+		and Brain.Lines.getOut == "Hopping out, boss." and Brain.Lines.putTogether ~= nil and Brain.Lines.stayOut ~= nil)
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

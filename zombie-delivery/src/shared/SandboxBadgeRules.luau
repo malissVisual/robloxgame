@@ -22,6 +22,8 @@
 --                                         in it (paid.hot) → hotSale
 --   SandboxBadgeRules.fromAdded(item)     Collection.onAdded: a legendary piece came home → legendary
 --   SandboxBadgeRules.fromBought(id, level)   8.3: Upgrades.onBought: a level bought at the UPGRADES desk → firstUpgrade
+--   (8.7: firstDeal is a moment's too, with no rule here: server/PlayerTrade.luau gives it to the seller and the buyer of
+--   a deal between players, SandboxBadges.give)
 --   SandboxBadgeRules.stateOf(profile, shown)   a player's State from their profile (the moves' counter, the collection
 --                                         book, the upgrades, the van's paint) and whether a piece of theirs is on show
 --   SandboxBadgeRules.fromState(state)    firstMove, tenMoves, firstShow, legendary, fullBook, firstUpgrade, warehouse5,
@@ -82,6 +84,7 @@ SandboxBadgeRules.Order = {
 	"firstShow",
 	"firstSale",
 	"hotSale",
+	"firstDeal", -- 8.7: a piece sold to or bought from another player (server/PlayerTrade.luau gives it, both sides)
 	"legendary",
 	"fullBook",
 	"firstUpgrade",
@@ -203,11 +206,16 @@ end
 -- (8.3: the ZDC Warehouse's upgrade level a real save from before 8.3 gets without buying anything: the Big Warehouse)
 local GIVEN = UpgradeRules.level(UpgradeRules.fromSave({ money = 0 }), "warehouse")
 
+-- (8.4: a warehouse level between the start and GIVEN was bought too: the migration only ever gives GIVEN; GIVEN itself
+-- stays unclear and waits for the purchase, fromBought)
 function SandboxBadgeRules.upgraded(levels: any): boolean
 	local none = UpgradeRules.empty()
 	for _, id in UpgradeRules.Order do
-		local start = if id == "warehouse" then math.max(GIVEN, UpgradeRules.level(none, id)) else UpgradeRules.level(none, id)
-		if UpgradeRules.level(levels, id) > start then
+		local start = UpgradeRules.level(none, id)
+		local level = UpgradeRules.level(levels, id)
+		if id == "warehouse" and level > start and level ~= GIVEN then
+			return true
+		elseif id ~= "warehouse" and level > start then
 			return true
 		end
 	end

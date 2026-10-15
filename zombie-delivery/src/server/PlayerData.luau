@@ -79,6 +79,10 @@
 -- read only from a real save written with its flag (vanPaintKept); older saves: nothing bought, the factory's look. (8.4
 -- review: and in `rewards` as "paint:<id>" / "paintOn:<id>": a save an 8.2 server wrote again gets it back from there; the
 -- market's demand is not kept so: it is lost there, a day's worth at most.)
+-- 8.4 SANDBOX: the house the moving card shows (sandboxHouseSeed: its seed, server/Moving.luau's SB.seeds, kept until a
+-- trip brings something home), read only from a real save written with its flag (sandboxHouseSeedKept) and only a
+-- whole number 1 … Config.Moving.Sandbox.Seeds; else none (the next card rolls one). Leaving and joining another server
+-- shows the same house (no reroll by server hopping). Not mirrored into `rewards` (an 8.2 server drops it: a new house).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- 8.3 SAVES (Config.Saving, shared/SaveGuard.luau): a save is written (UpdateAsync) only while the stored save is still
 -- this server's session's (its lock: the JobId, the session and the save's number: never over another server's save
@@ -210,6 +214,10 @@ export type Profile = {
 	-- 8.3 SANDBOX: the van's paint (shared/VanPaintRules.luau: the paints and liveries bought, the ones worn): read only
 	-- from a real save written with its flag (VanPaintRules.fromSave); an older one starts with the empty one
 	vanPaint: VanPaintRules.Saved,
+	-- 8.4 SANDBOX: the seed of the house the moving card shows (server/Moving.luau sets and drops it with SB.seeds): read
+	-- only from a real save written with its flag (sandboxHouseSeedKept), a whole number 1 … Config.Moving.Sandbox.Seeds;
+	-- nil: none yet (the next card rolls one)
+	sandboxHouseSeed: number?,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -329,6 +337,7 @@ local function newProfile(): Profile
 		sandboxMoves = 0, -- 8.3: no move finished yet (the badges)
 		market = Market.empty(), -- 8.3: nothing sold yet
 		vanPaint = VanPaintRules.empty(), -- 8.3: nothing bought, the factory's look
+		sandboxHouseSeed = nil, -- 8.4: no house rolled yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -676,6 +685,11 @@ local function applySaved(profile: Profile, saved: any)
 	-- (or a lock-only record) starts with the empty one (VanPaintRules.fromSave; 8.4 review: a real save without the flag,
 	-- from the "paint:" keys of its own `rewards`: an 8.2 server dropped the field)
 	profile.vanPaint = VanPaintRules.fromSave(saved)
+	-- 8.4: the house the moving card shows, only from a real save written with its flag (sandboxHouseSeedKept), and only
+	-- a whole number in the seeds' range (Config.Moving.Sandbox.Seeds: Moving rolls 1 … that); else none
+	local seed = saved.sandboxHouseSeed
+	profile.sandboxHouseSeed = if saved.money ~= nil and saved.sandboxHouseSeedKept == true and type(seed) == "number" and seed == math.floor(seed)
+		and seed >= 1 and seed <= Config.Moving.Sandbox.Seeds then seed else nil
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -1101,6 +1115,8 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		marketKept = true, -- 8.3: Market.Flag (applySaved reads the market's demand only with it)
 		vanPaint = profile.vanPaint, -- 8.3
 		vanPaintKept = true, -- 8.3: VanPaintRules.Flag (applySaved reads the van's paint only with it)
+		sandboxHouseSeed = profile.sandboxHouseSeed, -- 8.4 (nil: none)
+		sandboxHouseSeedKept = true, -- 8.4 (applySaved reads the house's seed only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

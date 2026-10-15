@@ -32,7 +32,13 @@
 -- 8.1 walk-in doors: the chalet's front door walked through both ways (no E: its Enter house off), out 4 studs from it
 -- facing the road, no way straight back, its doormat over the garden path while a move runs. 8.3 the big move: its plan
 -- HouseLayout's kind "big" (Config.Moving.Sandbox.Kind); its back door (House.back) a second way in, its own doormat
--- and walk-in zone.
+-- and walk-in zone. 8.5 walking through: the leaf opens as you walk at the door (whichever way you look; from farther
+-- out at a run), never as you walk past it; walking into a doorway is the trip at the first look (no dwell, your walk
+-- carried on), in by the front door, out by the doorway inside, in by the back door; walking back out of the hall or
+-- along the doorway goes nowhere; standing at a door facing it, the dwell as before.
+-- 8.4: the house kept across servers: a player with a save has the seed of their card's house in it (rolled, kept
+-- through GIVE UP and leaving); another server with that save shows the same house (a loaded save's seed counts over
+-- the server's memory); a trip home drops it and the next card rolls a new one into it.
 -- 8.2 analytics: Moving's listeners (onStart, onEnterHouse, onLoad, onTrip, onFinish; server/SandboxAnalytics.luau's)
 -- hear each moment with its numbers, and every real end's words come out as AnalyticsPlan.moveHow's word (FINISH, the
 -- admin's end, GIVE UP after a trip, the owner leaving).
@@ -825,6 +831,140 @@ do
 	check("the move over: both doormats hidden again (no move at the house)", mat.Transparency == 1 and backMat.Transparency == 1)
 end
 
+-- 8.5 walking through (the owner: "the doors should open when I'm at them, so it doesn't feel like I bumped into the
+-- door, but I keep walking smoothly, and then the transition"; Config.Moving.Doors Lead, Cross, Ahead): the leaf opens
+-- as Bob comes at the door, walking at it in its approach whichever way he looks, from farther out only at a run (his
+-- walk through its doorway within Lead s), never as he walks past it; walking into the doorway is the trip at once (one
+-- look, no dwell, his walk carried on), in by the front door, out by the doorway inside, in by the back door; walking
+-- back out of the hall or past the doorway goes nowhere; standing at the door facing it, the 8.3 dwell as before. 8.5.1
+-- (the owner: "I'd like them to open nicely"): walking in from just beside a shut door, its leaf only starting to
+-- swing, the fade waits until it has swung most of the way (Seen × Open s: WalkIn.swung), then in, still walking.
+do
+	local D = T.Doors
+	check("(Bob's move for walking through)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
+	step()
+	local o = E.interiors[#E.interiors]
+	local root = E.rootOf(bob)
+	local foot = V3(House.door.x, House.door.y, House.door.z)
+	local back = V3(House.back.x, House.back.y, House.back.z)
+	local backFacing = V3(0, 0, 1) -- (House.back yaw 180: out to the south)
+	local up = V3(0, Config.Furniture.EntryUp, 0)
+	local into = V3(0, 0, 1) -- (the fake plan's +Z)
+	local exitAt = o * V3(0, 0, 0.5) + up
+	local side = V3(1, 0, 0)
+	local walk, run = Config.Movement.Walk, Config.Movement.Sprint
+	-- Bob at `at` looking along `look`, walking at `v` (studs/s, flat: as Roblox reports a walking body's root)
+	local function go(at: any, look: any, v: any)
+		root.CFrame = M.CFrame.lookAt(at, at + look)
+		root.AssemblyLinearVelocity = v
+	end
+	local function isIn(): boolean
+		return (root.Position - o.Position).Magnitude < 100
+	end
+	local function shut(leaf: any): boolean
+		go(foot + up + facing * 40, facing, V3(0, 0, 0))
+		step(D.Shut + 0.05)
+		return leaf:GetAttribute("DoorOpen") ~= true
+	end
+	go(foot + up + facing * 40, facing, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm) -- (the last move's end took him out of the house: its re-arm)
+	check("(the front door's leaf shut, Bob far from it)", shut(frontDoor))
+	-- walking at it in its approach, looking along the house (not at the door): open
+	go(foot + up + facing * (D.Approach - 1), side, -facing * walk)
+	step(0.1)
+	check("8.5 walking at the door in its approach looking along the house (not facing it squarely): its leaf opens, not in", frontDoor:GetAttribute("DoorOpen") == true and not isIn())
+	check("(…shut again)", shut(frontDoor))
+	-- walking past it along the house, 2 studs out of the door: nothing
+	go(foot + up + facing * 2 - side * 2, side, side * walk)
+	step(0.01)
+	check("8.5 walking past the door along the house (2 studs out, through its zone): its leaf stays shut, not in", frontDoor:GetAttribute("DoorOpen") ~= true and not isIn())
+	-- farther than its approach: at a walk nothing yet, at a run (through its doorway within Lead s) open
+	local far = D.Approach + 6
+	check("(farther than its approach, within a run's Lead, beyond a walk's)", far > walk * D.Lead and far < run * D.Lead)
+	go(foot + up + facing * far + side * 1.5, -facing, -facing * walk)
+	step(0.01)
+	check("8.5 walking at the door from farther than its approach: not yet open", frontDoor:GetAttribute("DoorOpen") ~= true)
+	go(foot + up + facing * far + side * 1.5, -facing, -facing * run)
+	step(0.01)
+	check("8.5 …running at it from there (through its doorway within Lead s): its leaf opens already", frontDoor:GetAttribute("DoorOpen") == true and not isIn())
+	step(D.Open) -- (8.5.1: his run there: the leaf swung all the way meanwhile)
+	-- walking through: a stud out of the door, walking in: in at the first look (no dwell), still walking, facing in
+	local since = #E.messages
+	go(foot + up + facing * 1, -facing, -facing * walk)
+	step(0.01)
+	local fadeOut, fadeIn: any, any = nil, nil
+	for index = since + 1, #E.messages do
+		local m = E.messages[index]
+		if m.player == bob and m.kind == "fade" then
+			if m.a == "out" then
+				fadeOut = fadeOut or m
+			else
+				fadeIn = m
+			end
+		end
+	end
+	local v = root.AssemblyLinearVelocity
+	check("8.5 walking into the doorway (a stud out of the door, at a walk): in at the first look, no dwell; the fade out and in as ever",
+		isIn() and fadeOut ~= nil and fadeOut.b == D.FadeOut and fadeIn ~= nil and fadeIn.b == D.FadeIn and frontDoor:GetAttribute("DoorOpen") == true)
+	check("…he comes in still walking at his walk, facing into the house", v ~= nil and math.abs(v:Dot(into) - walk) < 1e-6 and root.CFrame.LookVector:Dot(into) > 0.99,
+		v and v:Dot(into))
+	-- the way out inside, walking through: out of the zone, Rearm, then a stud in front of the doorway walking out
+	go(exitAt + into * 8, -into, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	step(D.Open) -- (8.5.1: facing it in its approach, its leaf swung open meanwhile: his walk up to it)
+	go(exitAt + into * 1, -into, -into * walk)
+	step(0.01)
+	check("8.5 out by walking through the doorway inside (a stud in front of it, at a walk): out at the first look, 4 studs out of the door, facing the road, still walking",
+		not isIn() and math.abs(flatDistance(root.Position, foot) - 4) < 0.5 and root.CFrame.LookVector:Dot(facing) > 0.99
+		and math.abs(root.AssemblyLinearVelocity:Dot(facing) - walk) < 1e-6, root.Position)
+	-- in its dark hall walking back out (turned round), and walking along the doorway: nowhere
+	go(foot + up + facing * 8, facing, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	go(foot + up - facing * 3, facing, facing * walk)
+	step(0.01)
+	check("8.5 in the door's dark hall walking back out (turned round): not in", not isIn())
+	go(foot + up - facing * 0.5 - side * 1, side, side * walk)
+	step(0.01)
+	check("8.5 …nor walking across the doorway on its threshold", not isIn())
+	-- standing at the door facing it (no walk): the 8.3 dwell as before
+	go(foot + up + facing * 1, -facing, V3(0, 0, 0))
+	step(0.01)
+	check("8.5 standing at the door facing it: not in at the first look (the dwell)", not isIn())
+	step(math.max(D.Dwell, D.Open) + 0.01)
+	check("…in after the dwell (8.3)", isIn())
+	-- the back door, walking through it from outside: out by the doorway inside first (walking), round to the back
+	go(exitAt + into * 8, -into, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	go(exitAt + into * 1, -into, -into * walk)
+	step(0.01)
+	check("(out by the front door again, walking)", not isIn())
+	go(back + up + backFacing * 30, backFacing, V3(0, 0, 0))
+	step(0.1)
+	step(D.Rearm)
+	check("(the back door's leaf shut)", shut(backLeaf))
+	-- 8.5.1 from just beside it, its leaf shut: walking into its doorway, its leaf only starting to swing
+	go(back + up + backFacing * 1, -backFacing, -backFacing * walk)
+	step(0.01)
+	check("8.5 walking at the back door: its leaf opens (8.5.1 since when, the server's time: DoorOpenAt, for a client that first sees it opening)",
+		backLeaf:GetAttribute("DoorOpen") == true and backLeaf:GetAttribute("DoorOpenAt") == E.now)
+	check("8.5.1 …walking into its doorway from just beside it (its leaf only starting to swing): not yet in, the fade waits for the swing",
+		not isIn())
+	local waited = 0
+	while not isIn() and waited < D.Open do
+		go(back + up + backFacing * 1, -backFacing, -backFacing * walk) -- (walking on: the test holds him at the threshold)
+		step(0.05)
+		waited += 0.05
+	end
+	check("8.5.1 …in once it has swung most of the way (Seen × Open s, no dwell), still walking", isIn() and waited >= D.Open * D.Seen - 0.06
+		and waited <= D.Open * D.Seen + 0.11 and math.abs(root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector) - walk) < 1e-6, waited)
+	root.AssemblyLinearVelocity = V3(0, 0, 0)
+	Moving.admin(bob, "end")
+end
+
 -- 8.3 economy: no house reroll (server/Moving.luau SB.seeds, by user id): a move called off with nothing home (GIVE UP,
 -- the admin's end, the owner leaving) keeps its house, so starting, peeking and calling off never fishes for a legendary;
 -- a trip home (Ann's moves above) or the admin's REFILL gives a new one
@@ -845,6 +985,86 @@ do
 	check("…the next move built with the new one", string.find(Moving.admin(bob2, "start"), "started", 1, true) ~= nil and built[#built] == seeds[#seeds]
 		and built[#built] ~= bobSeed)
 	Moving.admin(bob2, "end")
+end
+
+-- 8.4: the house kept across servers (server/Moving.luau SB.seedOf / SB.keepSeed; server/PlayerData.luau's
+-- sandboxHouseSeed, which tests/saving_runtime_test.luau writes to and reads from the DataStore). Dee has a save (a
+-- test's own profile, E.profiles: PlayerData.loaded): the seed of the house her card shows goes into it as it is rolled
+-- and stays through GIVE UP and her leaving. Joining another server with that save shows the same house: Moving takes a
+-- loaded save's seed over anything the server remembers of her, so a join here with the save another server wrote is
+-- the join there (a save with another house in it: that house; one a trip spent there: a new house, never the one this
+-- server remembered). A trip home drops it from the save; the next card rolls a new one into it.
+do
+	local function join(save: any): any
+		local player = E.player(44, "Dee", V3(plot1.spawn.x, 3, plot1.spawn.z))
+		E.plots[player] = plot1 -- (Ann's, free: she left)
+		E.profiles[player] = save
+		return player
+	end
+	local function started(player: any): boolean
+		return string.find(Moving.admin(player, "start"), "started", 1, true) ~= nil
+	end
+	local dee = join({ money = 5000 }) -- (a save without a house yet)
+	local save = E.profiles[dee]
+	E.place(dee, moves:FindFirstChild("MovingBoard1"):FindFirstChild("Board").Position + V3(0, 0, 4))
+	trigger(board1, dee)
+	local first = seeds[#seeds]
+	check("8.4 Dee's card (her save read, no house in it): a house rolled, its seed in her save (her next save writes it)",
+		E.last(dee, "Moving", "contract") ~= nil and save.sandboxHouseSeed == first and first >= 1 and first <= S.Seeds and first == math.floor(first))
+	check("…her move built in it", started(dee) and built[#built] == first)
+	E.request(dee, "giveup")
+	check("…GIVE UP with nothing home: called off, the seed still in her save", Moving.busy(dee) == nil and E.last(dee, "Moving", "result").a.delivered == 0
+		and save.sandboxHouseSeed == first)
+	E.leave(dee)
+	local wrote = table.clone(save) -- (what her leave save writes)
+	check("…she leaves: her save keeps it", wrote.sandboxHouseSeed == first)
+	-- another server, the same save
+	local dee2 = join(table.clone(wrote))
+	check("8.4 she joins another server with that save: the same house (the save's seed)", started(dee2) and built[#built] == first)
+	Moving.admin(dee2, "end")
+	E.leave(dee2)
+	-- the save as another server left it: there she rolled a new house into it, or a trip spent hers
+	local other = if first == S.Seeds then first - 1 else first + 1
+	local dee3 = join({ money = 5000, sandboxHouseSeed = other })
+	check("…a save with another house in it (rolled on another server): that house, not the one this server remembered", started(dee3) and built[#built] == other)
+	Moving.admin(dee3, "end")
+	E.leave(dee3)
+	local dee4 = join({ money = 5000 })
+	local spent = E.profiles[dee4]
+	check("…a save whose house a trip spent on another server (none in it): a new house, never the one this server remembered",
+		started(dee4) and built[#built] ~= first and built[#built] ~= other and spent.sandboxHouseSeed == built[#built])
+	-- a trip home here spends it: out of the save, a new house next
+	local spentSeed = built[#built]
+	local car = E.cars[dee4]
+	step()
+	park(car, { x = House.curb.x, z = House.curb.z, yaw = 0 })
+	E.place(dee4, outside)
+	trigger(promptIn(frontDoor, "Enter house"), dee4)
+	local piece = newItem(1)
+	E.place(dee4, piece.PrimaryPart.Position + V3(1, 0, 0))
+	trigger(promptIn(piece, "Pick up"), dee4)
+	step()
+	E.place(dee4, E.interiors[#E.interiors].Position + V3(0, 3, 1))
+	trigger(promptIn(workspace, "Leave house"), dee4)
+	car.model:SetAttribute("BackOpen", true)
+	E.place(dee4, car.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
+	step()
+	trigger(promptIn(car.model, "Load"), dee4)
+	step()
+	park(car, plot1.vanSpot)
+	step()
+	check("8.4 a trip home brings a piece into her warehouse: the house spent, its seed out of her save", E.last(dee4, "Moving", "state").a.trips == 1
+		and spent.sandboxHouseSeed == nil, `{E.last(dee4, "Moving", "state").a.trips} {spent.sandboxHouseSeed}`)
+	E.request(dee4, "finish")
+	check("…her next move: a new house, its seed in her save", started(dee4) and built[#built] ~= spentSeed and spent.sandboxHouseSeed == built[#built])
+	Moving.admin(dee4, "end")
+	E.leave(dee4)
+	-- a save not read (a fresh profile, never saved: Studio without a DataStore): this server's memory of her as before
+	local dee5 = join(nil)
+	local remembered = spent.sandboxHouseSeed
+	check("…without a save read: this server's own memory of her (8.3 economy: the same house on a rejoin here)", started(dee5) and built[#built] == remembered)
+	Moving.admin(dee5, "end")
+	E.leave(dee5)
 end
 
 -- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or
