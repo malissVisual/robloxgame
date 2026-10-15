@@ -1,8 +1,8 @@
 # Zombie Delivery
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
-> small alpine test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): a meadow with one
-> road, **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
+> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): since 8.9 the owner's village
+> **Jinočany** (8.0 – 8.8: an alpine meadow with one road), at first **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
 > plan, `design/jinocany/NAVRH.md`; refilled with a new random layout every move, with 2 – 4 **collectibles** from
 > uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. **Jinočany step 1:** six houses to
 > empty (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`): The Old Farmstead (the big house, The
@@ -160,6 +160,20 @@
 > the trades' and the auction's sounds (stand-ins until it is uploaded). **Jinočany 1a**: the big house is **The Old
 > Farmstead** on **Pražská**; the soundscape is the village's (fields, the D5's far hum from the east, the chapel's
 > bell, a dog, a tractor; no cowbells), the light at 50° (design/jinocany/NAVRH.md).
+>
+> **8.9** (Jinočany step 1, design/jinocany/NAVRH.md): the sandbox map is the owner's village. **The world**
+> (`shared/VillageLooks.luau`, `shared/VillageScenery.luau`, `server/VillageWorld.luau`, `Config.Village`,
+> `Config.VillageWorld`; the data generated from `design/jinocany/plan.json` by `tools/village/sandboxmap.py` into
+> `SandboxMap`'s JINOCANY section): Hlavní, Hornická (ROAD CLOSED), Školní, Lidická, Na Pouštce, Fibichova, Smetanova
+> and Mirešická round today's plots, Depot Row, Pražská and the turnaround (all where they were); 81 houses and
+> terraces in Atomic chunks, the green with its chapel and cross, the pond, the Corner Drugstore, the orchard, tree
+> lines, fields in their crops' colours, the D5 at the east edge with cars (client-side, `client/VillageTraffic.luau`)
+> and a flat far horizon; the Alps gone (spruces, peaks, hills, mounds, fence). The map is 2,253 parts (2,354 with the
+> Auction House) of 2,500. **Six houses to empty** (`SandboxMap.Houses`, `Config.Moving.Sandbox.Houses`): The Old
+> Farmstead (the big house, its back door) and five family houses in the village's look (Hlavní 5 and 11, Školní 20,
+> Lidická 30, Smetanova 84); a player's card holds a house and its seed (`sandboxHouse`, `sandboxHouseKept` in the
+> save), the next card the next free house, two players never the same house; the guide, the chevron, the kiosk and
+> the admin follow the contract's house. `design/sandbox/map.png` drawn again (north up, Czech names).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
