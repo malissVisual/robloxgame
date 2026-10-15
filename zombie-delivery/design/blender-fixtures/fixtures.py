@@ -103,8 +103,26 @@ def materials():
         for key, value in SPECIAL.get(name, {}).items():
             if p.inputs.get(key) is not None:
                 p.inputs[key].default_value = value
+        if FINISHES[name][4] == "Wood" and not m.node_tree.nodes.get("Grain"):
+            grain(m, p, rgba)
         m["finish"] = name
         M[name] = m
+
+
+def grain(m, p, rgba):
+    """A wood finish's grain in Blender's renders (bands along x: a worktop's, a seat's planks; the game draws its own)."""
+    nt = m.node_tree
+    coords = nt.nodes.new("ShaderNodeTexCoord")
+    wave = nt.nodes.new("ShaderNodeTexWave")
+    wave.name, wave.bands_direction = "Grain", "Y"
+    for key, value in (("Scale", 1.6), ("Distortion", 1.6), ("Detail", 2.0), ("Detail Scale", 1.2)):
+        wave.inputs[key].default_value = value
+    nt.links.new(coords.outputs["Object"], wave.inputs["Vector"])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].color = tuple(c * 0.86 for c in rgba[:3]) + (1,)
+    ramp.color_ramp.elements[1].color = rgba
+    nt.links.new(wave.outputs["Fac"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], p.inputs["Base Color"])
 
 
 # ───────────────────────────────────────────────────────────── stavební kameny (souřadnice od spodku středu kusu)
@@ -356,7 +374,7 @@ def tiles(name, origin, u, v, cols, rows, su, sv, finish, gap=0.04, relief=0.05,
     return place(obj(name, bm, finish, smooth=False), (0, 0, 0))
 
 
-def holed(name, x0, x1, y0, y1, hx0, hx1, hy0, hy1, z0, z1, finish, r=0.02):
+def holed(name, x0, x1, y0, y1, hx0, hx1, hy0, hy1, z0, z1, finish, r=0.02, seg=2):
     """A slab with a rectangular hole (a worktop round its sink)."""
     bm = bmesh.new()
 
@@ -370,7 +388,7 @@ def holed(name, x0, x1, y0, y1, hx0, hx1, hy0, hy1, z0, z1, finish, r=0.02):
         bm.faces.new((ot[k], ot[m], it[m], it[k]))
         bm.faces.new((ib[k], ib[m], ob[m], ob[k]))
     sharpen(bm)
-    return bevel(place(obj(name, bm, finish), (0, 0, 0)), r, 2)
+    return bevel(place(obj(name, bm, finish), (0, 0, 0)), r, seg)
 
 
 def rect_frame(name, hw, hh, profile, finish, place_at):
@@ -412,7 +430,8 @@ def front_panel(name, x0, x1, z0, z1, finish, frame=0.16, raised=True, t=0.06, y
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bmesh.ops.scale(bm, vec=Vector((w, t, h)), verts=bm.verts)
-    bmesh.ops.bevel(bm, geom=bm.verts[:] + bm.edges[:], offset=0.012, segments=1, affect="EDGES")
+    face = next(f for f in bm.faces if f.normal.y < -0.99)
+    bmesh.ops.bevel(bm, geom=face.verts[:] + face.edges[:], offset=0.012, segments=1, affect="EDGES")
     face = max((f for f in bm.faces if f.normal.y < -0.99), key=lambda f: f.calc_area())
     bmesh.ops.inset_individual(bm, faces=[face], thickness=frame, depth=0.0)
     bmesh.ops.inset_individual(bm, faces=[face], thickness=0.025, depth=-0.025)
@@ -423,8 +442,8 @@ def front_panel(name, x0, x1, z0, z1, finish, frame=0.16, raised=True, t=0.06, y
 
 def knob(x, z, finish, y=FRONT - 0.06, r=0.06):
     """A turned wooden knob out of the front (from y forward 0.12)."""
-    return lathe("Knoflík", [(0.001, 0), (r * 0.55, 0), (r * 0.5, 0.04), (r, 0.08), (r * 0.8, 0.12), (0.001, 0.12)], (x, y, z), finish,
-                 seg=8, rot=OUT_FRONT)
+    return lathe("Knoflík", [(0.0, 0), (r * 0.55, 0), (r * 0.5, 0.04), (r, 0.08), (r * 0.8, 0.12), (0.0, 0.12)], (x, y, z), finish,
+                 seg=10, rot=OUT_FRONT)
 
 
 def base_body(W, D, gaps=()):
@@ -443,7 +462,7 @@ def base_body(W, D, gaps=()):
 def worktop(W, D, hole=None):
     """The scrubbed wooden worktop: a slab (round the sink's hole) and its lip along the front."""
     if hole:
-        holed("Pracovní deska", -W / 2, W / 2, -D / 2 + 0.1, D / 2, *hole, TOP, WT, "worktop", r=0.02)
+        holed("Pracovní deska", -W / 2, W / 2, -D / 2 + 0.1, D / 2, *hole, TOP, WT, "worktop", r=0.02, seg=2)
     else:
         box("Pracovní deska", (W, D - 0.1, WT - TOP), (0, 0.05, (TOP + WT) / 2), "worktop", r=0.02, seg=2)
     box("Lišta desky", (W, 0.1, 0.28), (0, -D / 2 + 0.05, WT - 0.14), "worktop", r=0.03, seg=2)
@@ -480,17 +499,16 @@ def sink(W, H, D):
     loft("Dřez", [rr(hw, hd, 0.16, WT, n, cy=cy), rr(hw, hd, 0.16, WT + 0.02, n, cy=cy), rr(hw - 0.07, hd - 0.07, 0.12, WT + 0.025, n, cy=cy),
                   rr(hw - 0.1, hd - 0.1, 0.1, WT - 0.005, n, cy=cy), rr(hw - 0.12, hd - 0.12, 0.1, 2.5, n, cy=cy),
                   rr(hw - 0.16, hd - 0.16, 0.08, 2.42, n, cy=cy), rr(hw - 0.24, hd - 0.24, 0.04, 2.4, n, cy=cy)], "steel", cap0=False)
-    cyl("Odtok", 0.08, 0.01, (0, cy, 2.405), "steel", seg=10)
     # the drainer beside it: a steel plate with ribs
     box("Odkapávač", (1.25, 2 * hd - 0.1, 0.015), (hw + 0.7, cy, WT + 0.0075), "steel", r=0.006, seg=1)
-    for k in range(5):
-        box("Žebro", (0.035, 2 * hd - 0.3, 0.01), (hw + 0.25 + k * 0.22, cy, WT + 0.02), "steel", r=0)
+    for k in range(4):
+        box("Žebro", (0.035, 2 * hd - 0.3, 0.01), (hw + 0.3 + k * 0.28, cy, WT + 0.02), "steel", r=0)
     # the swan-neck tap behind it and its two valves
     ty = 0.9
     cyl("Patka baterie", 0.09, 0.06, (0, ty, WT + 0.03), "steel", seg=10)
     neck = [(0, ty, WT + 0.03)] + [(0, ty, 3.38)] + [(0, ty - 0.26 + 0.26 * math.cos(a), 3.38 + 0.26 * math.sin(a))
-                                                 for a in (math.pi * k / 8 for k in range(1, 9))] + [(0, ty - 0.52, 3.28)]
-    sweep("Baterie", neck, 0.045, "steel")
+                                                 for a in (math.pi * k / 6 for k in range(1, 7))] + [(0, ty - 0.52, 3.28)]
+    sweep("Baterie", neck, 0.045, "steel", seg=7)
     for s in (-1, 1):
         cyl("Kohoutek", 0.055, 0.12, (s * 0.26, ty, WT + 0.06), "steel", seg=8)
         for turn in (0.4, 0.4 + math.pi / 2):
@@ -502,6 +520,10 @@ def stove(W, H, D):
     box("Sokl", (W - 0.1, D - 0.3, 0.25), (0, 0.15, 0.125), "blackglass", r=0.01, seg=1)
     box("Tělo sporáku", (W - 0.04, D / 2 - front, 2.65), (0, (front + D / 2) / 2, 0.25 + 1.325), "enamel", r=0.1, seg=3)
     box("Varná deska", (W - 0.1, D / 2 - front - 0.04, 0.06), (0, (front + D / 2) / 2, 2.93), "blackglass", r=0.02, seg=1)
+    for y in (front + 0.025, D / 2 - 0.025):
+        box("Rámeček", (W - 0.06, 0.03, 0.045), (0, y, 2.94), "chrome", r=0)
+    for x in (-(W / 2 - 0.03), W / 2 - 0.03):
+        box("Rámeček", (0.03, D / 2 - front - 0.05, 0.045), (x, (front + D / 2) / 2, 2.94), "chrome", r=0)
     for x in (-0.68, 0.68):
         torus("Hořák", 0.33, 0.02, (x, 0.1, 2.962), "chrome", seg=18, ring_seg=4)
         cyl("Plotýnka", 0.2, 0.03, (x, 0.1, 2.97), "blackglass", seg=14, edge=0.008)
@@ -574,7 +596,7 @@ def eckbank(W, H, D, cushioned):
         chamfer("Výplň opěradla", (bw, 0.04, 1.39), (-hw + sw + bw / 2 + k * (bw + sw), 0.65, 2.355), "pine", c=0.05)
     box("Madlo opěradla", (2 * hw, 0.3, 0.12), (0, 0.65, 3.28), "pine", r=0.05, seg=2)
     # the end boards: high at the back, a sweep down to an arm at the front, a foot
-    curve = bezier((0.42, 3.4), (0.12, 3.4), (-0.05, 2.62), (-0.58, 2.6), 7)
+    curve = bezier((0.42, 3.4), (0.12, 3.4), (-0.05, 2.62), (-0.58, 2.6), 8)
     side = [(-0.77, 0.0), (0.8, 0.0), (0.8, 3.4)] + curve + [(-0.72, 2.57), (-0.79, 2.48), (-0.8, 2.35), (-0.8, 1.5),
                                                               (-0.74, 1.36), (-0.71, 0.45), (-0.77, 0.18)]
     for s in (-1, 1):
@@ -583,6 +605,8 @@ def eckbank(W, H, D, cushioned):
         cw = (2 * hw - 0.06) / 2
         for s in (-1, 1):
             box("Polštář", (cw, 1.2, 0.2), (s * (cw / 2 + 0.015), -0.17, 1.6), "cushion", r=0.085, seg=3)
+            for k in range(3):
+                ball("Knoflík polštáře", 0.045, (s * (cw / 2 + 0.015) + (k - 1) * cw / 3.2, -0.17, 1.7), "cushion", scale=(1, 1, 0.45), seg=8)
 
 
 def corner_bench(W, H, D):
@@ -593,13 +617,29 @@ def bench(W, H, D):
     eckbank(W, H, D, False)
 
 
-def bunch(x, y, heads, lean):
-    """Dried flowers in a little jug: brown stems fanned out, rust and cream heads."""
-    lathe("Džbánek", [(0.001, 0.12), (0.1, 0.12), (0.135, 0.2), (0.13, 0.32), (0.08, 0.41), (0.095, 0.46), (0.001, 0.46)], (x, y, 0), "candle", seg=10)
-    for k, (h, a, spread, fin, big) in enumerate(heads):
-        tip = (x + math.cos(a) * spread + lean[0], y + math.sin(a) * spread + lean[1], h)
-        tube("Stonek", (x + math.cos(a) * 0.03, y + math.sin(a) * 0.03, 0.42), tip, 0.011, "woodwork", 4)
-        ball("Kvítek", big, tip, fin, scale=(1, 1, 1.5 if fin == "flower" else 1), seg=6, rings=4)
+def bunch(x, y, turn, hand):
+    """Dried flowers in a little jug with a handle (towards `hand`): thin brown stems fanned out, rust strawflowers,
+    sprigs of cream ones and seed ears."""
+    lathe("Džbánek", [(0.0, 0.12), (0.1, 0.12), (0.135, 0.2), (0.13, 0.31), (0.085, 0.4), (0.1, 0.45), (0.0, 0.45)], (x, y, 0), "candle", seg=10)
+    hx, hy = hand
+    sweep("Ucho džbánku", [(x + hx * 0.11, y + hy * 0.11, 0.39), (x + hx * 0.2, y + hy * 0.2, 0.37), (x + hx * 0.21, y + hy * 0.21, 0.27),
+                           (x + hx * 0.13, y + hy * 0.13, 0.21)], 0.018, "candle", seg=4)
+    for k in range(11):
+        a = turn + k * 2 * math.pi / 11 + 0.3 * math.sin(k * 2.3)
+        spread = 0.06 + 0.1 * ((k * 5) % 3) / 2
+        h = 0.95 + 0.33 * ((k * 7) % 5) / 4
+        ca, sa = math.cos(a), math.sin(a)
+        tip = (x + ca * spread, y + sa * spread, h)
+        sweep("Stonek", [(x + ca * 0.02, y + sa * 0.02, 0.43), (x + ca * spread * 0.4, y + sa * spread * 0.4, (0.43 + h) / 2), tip], 0.009, "woodwork", seg=3)
+        kind = k % 4
+        if kind in (0, 2):
+            ball("Kvítek", 0.05 if kind == 0 else 0.042, tip, "flower", scale=(1, 1, 0.8), seg=6, rings=3)
+        elif kind == 1:
+            for j in range(3):
+                b = a + j * 2.1
+                ball("Kvítek", 0.028, (tip[0] + math.cos(b) * 0.035, tip[1] + math.sin(b) * 0.035, h - 0.02 * j), "candle", seg=5, rings=3)
+        else:
+            ball("Klas", 0.03, (tip[0], tip[1], h + 0.04), "woodwork", scale=(1, 1, 2.6), seg=5, rings=3)
 
 
 def corner_shelf(W, H, D):
@@ -610,15 +650,17 @@ def corner_shelf(W, H, D):
     outline = [(-c, c), (-c, -(c - 0.02))] + curve[::-1][1:-1] + [(c - 0.02, c)]
     plate("Police", outline, 0.0, 0.12, "woodwork", r=0.03, seg=2)
     plate("Lišta police", [(x * 0.97, y * 0.97) for x, y in outline], 0.12, 0.15, "woodwork", r=0.01, seg=1)
+    # a crocheted doily under the candle and the jugs, its front edge scalloped
+    edge = bezier((-1.0, -0.55), (-0.3, -0.5), (0.5, 0.3), (0.55, 1.0), 18)
+    lace = [(x + 0.025 * (k % 2) * 0.707, y - 0.025 * (k % 2) * 0.707) for k, (x, y) in enumerate(edge)]
+    plate("Dečka", [(-1.0, 1.0)] + lace[::-1], 0.15, 0.158, "candle", r=0)
     cx, cy = -0.62, 0.62
-    lathe("Svícen", [(0.001, 0.15), (0.17, 0.15), (0.17, 0.19), (0.09, 0.23), (0.05, 0.32), (0.07, 0.41), (0.045, 0.46),
-                     (0.11, 0.48), (0.11, 0.52), (0.001, 0.52)], (cx, cy, 0), "woodwork", seg=10)
+    lathe("Svícen", [(0.0, 0.15), (0.17, 0.15), (0.17, 0.19), (0.09, 0.23), (0.05, 0.32), (0.07, 0.41), (0.045, 0.46),
+                     (0.11, 0.48), (0.11, 0.52), (0.0, 0.52)], (cx, cy, 0), "woodwork", seg=10)
     cyl("Svíčka", 0.065, 0.5, (cx, cy, 0.77), "candle", seg=10, edge=0.012)
     tube("Knot", (cx, cy, 1.02), (cx, cy, 1.07), 0.01, "woodwork", 4)
-    bunch(-0.84, 0.0, [(1.08, 0.3, 0.05, "flower", 0.07), (1.2, 1.4, 0.1, "candle", 0.08), (0.98, -0.9, 0.12, "flower", 0.065),
-                        (1.26, 2.6, 0.06, "flower", 0.07), (1.02, 3.6, 0.12, "candle", 0.075), (1.14, 4.8, 0.09, "flower", 0.06)], (0.04, 0.0))
-    bunch(0.0, 0.84, [(1.1, 0.1, 0.06, "flower", 0.07), (1.22, 1.7, 0.08, "candle", 0.08), (0.98, 3.0, 0.12, "flower", 0.065),
-                       (1.25, 4.2, 0.07, "flower", 0.07), (1.04, 5.3, 0.12, "candle", 0.075), (1.16, 2.4, 0.11, "flower", 0.06)], (0.0, -0.04))
+    bunch(-0.82, -0.12, 0.2, (0.0, -1.0))
+    bunch(0.12, 0.82, 1.1, (1.0, 0.0))
 
 
 # ───────────────────────────────────────────────────────────── koupelna
@@ -633,16 +675,16 @@ def tub(W, H, D):
     loft("Voda", [rr(3.335, 1.435, 1.03, 1.75, n)], "water", cap0=False)
     for sx in (-1, 1):
         for sy in (-1, 1):
-            lathe("Nožka", [(0.001, 0), (0.15, 0), (0.19, 0.06), (0.16, 0.15), (0.11, 0.24), (0.13, 0.32), (0.19, 0.4), (0.001, 0.4)],
+            lathe("Nožka", [(0.0, 0), (0.2, 0), (0.25, 0.06), (0.21, 0.15), (0.14, 0.24), (0.17, 0.32), (0.25, 0.42), (0.0, 0.42)],
                   (sx * 2.45, sy * 0.78, 0), "chrome", seg=8)
     x = -3.47
     for s in (-1, 1):
-        cyl("Sloupek baterie", 0.05, 0.32, (x, s * 0.28, 2.36), "chrome", seg=8)
-        cyl("Kohoutek", 0.04, 0.08, (x, s * 0.28, 2.58), "chrome", seg=8)
+        cyl("Sloupek baterie", 0.065, 0.32, (x, s * 0.3, 2.36), "chrome", seg=8)
+        cyl("Kohoutek", 0.05, 0.08, (x, s * 0.3, 2.58), "chrome", seg=8)
         for turn in (0.3, 0.3 + math.pi / 2):
-            box("Křížek", (0.2, 0.03, 0.03), (x, s * 0.28, 2.63), "chrome", r=0, rot=euler(rz=turn))
-    tube("Baterie", (x, -0.3, 2.5), (x, 0.3, 2.5), 0.05, "chrome", 10)
-    sweep("Výtok", [(x, 0, 2.5), (x + 0.12, 0, 2.6), (x + 0.3, 0, 2.62), (x + 0.45, 0, 2.55), (x + 0.52, 0, 2.44)], 0.04, "chrome")
+            box("Křížek", (0.26, 0.04, 0.04), (x, s * 0.3, 2.64), "chrome", r=0, rot=euler(rz=turn))
+    tube("Baterie", (x, -0.32, 2.5), (x, 0.32, 2.5), 0.065, "chrome", 10)
+    sweep("Výtok", [(x, 0, 2.5), (x + 0.14, 0, 2.62), (x + 0.34, 0, 2.64), (x + 0.52, 0, 2.56), (x + 0.6, 0, 2.42)], 0.05, "chrome")
 
 
 def toilet(W, H, D):
@@ -663,8 +705,8 @@ def toilet(W, H, D):
 
 def basin(W, H, D):
     """A pedestal basin with a mixer tap, a little shelf with a cup and a framed mirror over it (up to 6.9)."""
-    lathe("Noha umyvadla", [(0.001, 0), (0.4, 0), (0.4, 0.06), (0.3, 0.16), (0.24, 0.55), (0.21, 1.4), (0.23, 2.0), (0.3, 2.35),
-                            (0.34, 2.5), (0.001, 2.5)], (0, 0.15, 0), "porcelain", seg=14, scale=(1, 0.8))
+    lathe("Noha umyvadla", [(0.0, 0), (0.4, 0), (0.4, 0.06), (0.3, 0.16), (0.24, 0.55), (0.21, 1.4), (0.23, 2.0), (0.3, 2.35),
+                            (0.34, 2.5), (0.0, 2.5)], (0, 0.15, 0), "porcelain", seg=14, scale=(1, 0.8))
     n = 4
     prof = [(1.0, 0.6, 0.45, 2.45, 0.05), (1.15, 0.75, 0.5, 2.62, 0.0), (1.25, 0.84, 0.55, 2.85, 0.0), (1.28, 0.87, 0.56, 3.0, 0.0),
             (1.27, 0.86, 0.55, 3.08, 0.0), (1.22, 0.81, 0.52, 3.1, 0.0), (1.1, 0.62, 0.45, 3.1, -0.1), (1.05, 0.57, 0.42, 3.04, -0.1),
@@ -680,11 +722,11 @@ def basin(W, H, D):
     box("Polička", (1.5, 0.24, 0.05), (0, D / 2 - 0.12, 3.72), "porcelain", r=0.02, seg=1)
     for s in (-1, 1):
         box("Držák", (0.05, 0.16, 0.12), (s * 0.6, D / 2 - 0.08, 3.64), "chrome", r=0.01, seg=1)
-    lathe("Kelímek", [(0.001, 3.745), (0.08, 3.745), (0.1, 4.0), (0.001, 4.0)], (0.42, D / 2 - 0.12, 0), "porcelain", seg=10)
+    lathe("Kelímek", [(0.0, 3.745), (0.08, 3.745), (0.1, 4.0), (0.0, 4.0)], (0.42, D / 2 - 0.12, 0), "porcelain", seg=10)
     # the mirror in its frame
-    prof = [(0.0, D / 2), (0.0, D / 2 - 0.09), (0.03, D / 2 - 0.12), (0.1, D / 2 - 0.13), (0.15, D / 2 - 0.11), (0.17, D / 2 - 0.07), (0.17, D / 2)]
+    prof = [(0.0, D / 2), (0.0, D / 2 - 0.06), (0.03, D / 2 - 0.085), (0.1, D / 2 - 0.095), (0.15, D / 2 - 0.075), (0.17, D / 2 - 0.045), (0.17, D / 2)]
     rect_frame("Rám zrcadla", 1.2, 1.5, prof, "porcelain", Matrix.Translation((0, 0, 5.4)))
-    box("Zrcadlo", (2.1, 0.02, 2.7), (0, D / 2 - 0.05, 5.4), "mirror", r=0)
+    box("Zrcadlo", (2.1, 0.02, 2.7), (0, D / 2 - 0.035, 5.4), "mirror", r=0)
 
 
 # ───────────────────────────────────────────────────────────── kachlová kamna (Kachelofen)
@@ -766,27 +808,27 @@ def workbench(W, H, D):
         box("Lub", (0.12, 1.5, 0.28), (sx * 2.9, 0, 2.76), "wood", r=0)
         box("Příčka", (0.1, 1.5, 0.14), (sx * 2.9, 0, 0.62), "wood", r=0)
     for k in range(3):
-        chamfer("Polička", (5.6, 0.58, 0.08), (0, -0.6 + k * 0.6, 0.73), "wood", c=0.012)
+        box("Polička", (5.6, 0.58, 0.08), (0, -0.6 + k * 0.6, 0.73), "wood", r=0)
     # on the shelf: a toolbox and two cans of paint
     chamfer("Kufřík", (1.3, 0.62, 0.52), (-1.6, -0.15, 0.77 + 0.26), "vise", c=0.03)
     box("Víko kufříku", (1.34, 0.66, 0.06), (-1.6, -0.15, 1.31), "vise", r=0.015, seg=1)
     sweep("Držadlo", [(-1.95, -0.15, 1.34), (-1.9, -0.15, 1.48), (-1.6, -0.15, 1.52), (-1.3, -0.15, 1.48), (-1.25, -0.15, 1.34)], 0.03, "steel", 6)
     for x, r, h in ((1.1, 0.26, 0.55), (1.75, 0.2, 0.42)):
-        cyl("Plechovka", r, h, (x, 0.1, 0.77 + h / 2), "steel", seg=12, edge=0.015)
+        cyl("Plechovka", r, h, (x, 0.1, 0.77 + h / 2), "steel", seg=10)
     # the pegboard on the wall over the top, its frame, its holes and the tools on it
     pb, z0, z1 = D / 2, 3.2, REACH["workbench"]
     box("Děrovaná deska", (6.0, 0.08, z1 - z0), (0, pb - 0.04, (z0 + z1) / 2), "board", r=0)
     for x in (-3.04, 3.04):
-        box("Rám desky", (0.1, 0.07, z1 - z0), (x, pb - 0.045, (z0 + z1) / 2), "wood", r=0.01, seg=1)
+        box("Rám desky", (0.1, 0.07, z1 - z0), (x, pb - 0.045, (z0 + z1) / 2), "wood", r=0)
     for z in (z0 + 0.05, z1 - 0.05):
-        box("Rám desky", (6.18, 0.07, 0.1), (0, pb - 0.045, z), "wood", r=0.01, seg=1)
+        box("Rám desky", (6.18, 0.07, 0.1), (0, pb - 0.045, z), "wood", r=0)
     f = pb - 0.08
-    holes = [(x - 0.03, z - 0.03, x + 0.03, z + 0.03) for x in (-2.7 + 0.3 * i for i in range(19)) for z in (z0 + 0.3 + 0.3 * j for j in range(7))]
+    holes = [(x - 0.035, z - 0.035, x + 0.035, z + 0.035) for x in (-2.7 + 0.36 * i for i in range(16)) for z in (z0 + 0.36 + 0.4 * j for j in range(5))]
     quads("Dírky", holes, f - 0.003, "vise")
     tf = f - 0.06
     # a hammer
     cyl("Násada kladiva", 0.045, 0.95, (-2.3, tf, 4.1), "wood", seg=8)
-    chamfer("Kladivo", (0.5, 0.12, 0.14), (-2.3, tf, 4.62), "steel", c=0.02)
+    box("Kladivo", (0.5, 0.12, 0.14), (-2.3, tf, 4.62), "steel", r=0)
     # a saw
     prism("Pila", [(-1.95, 4.8), (-0.7, 4.8), (-0.7, 4.38), (-1.95, 4.62)], tf - 0.01, tf + 0.01, "steel", r=0)
     prism("Rukojeť pily", [(-0.72, 4.3), (-0.42, 4.3), (-0.28, 4.48), (-0.28, 4.74), (-0.4, 4.9), (-0.72, 4.88)], tf - 0.05, tf + 0.05, "wood", r=0.02, seg=1)
@@ -794,18 +836,18 @@ def workbench(W, H, D):
     for k, (x, ln) in enumerate(((0.05, 0.78), (0.3, 0.66), (0.52, 0.56))):
         top = 5.1
         box("Klíč", (0.07, 0.025, ln), (x, tf, top - ln / 2), "steel", r=0)
-        cyl("Očko klíče", 0.07, 0.03, (x, tf, top - ln), "steel", axis="Y", seg=10)
-        box("Čelist klíče", (0.16, 0.03, 0.1), (x, tf, top + 0.02), "steel", r=0.01, seg=1)
+        cyl("Očko klíče", 0.07, 0.03, (x, tf, top - ln), "steel", axis="Y", seg=6)
+        box("Čelist klíče", (0.16, 0.03, 0.1), (x, tf, top + 0.02), "steel", r=0)
     # screwdrivers
     for x in (1.0, 1.25, 1.5):
-        cyl("Rukojeť šroubováku", 0.06, 0.36, (x, tf, 4.85), "wood", seg=8, edge=0.015)
-        cyl("Šroubovák", 0.018, 0.5, (x, tf, 4.42), "steel", seg=6)
+        cyl("Rukojeť šroubováku", 0.06, 0.36, (x, tf, 4.85), "wood", seg=7)
+        cyl("Šroubovák", 0.018, 0.5, (x, tf, 4.42), "steel", seg=4)
     # pliers
     for turn in (0.18, -0.18):
-        box("Kleště", (0.06, 0.03, 0.7), (2.05, tf, 4.5), "steel", r=0.01, seg=1, rot=euler(ry=turn))
+        box("Kleště", (0.06, 0.03, 0.7), (2.05, tf, 4.5), "steel", r=0, rot=euler(ry=turn))
     # pegs (hooks) for the tools
     for x, z in ((-2.3, 4.45), (-1.6, 4.85), (-0.9, 4.85), (0.05, 5.15), (0.3, 5.15), (0.52, 5.15), (1.0, 5.07), (1.25, 5.07), (1.5, 5.07), (2.05, 4.9)):
-        tube("Háček", (x, f, z), (x, tf - 0.06, z + 0.04), 0.014, "steel", 4)
+        tube("Háček", (x, f, z), (x, tf - 0.06, z + 0.04), 0.014, "steel", 3)
     # the vise on the front edge (its jaws over the top, its handle inside the box)
     vx = 2.45
     chamfer("Svěrák", (0.6, 0.62, 0.1), (vx, -0.84, 3.25), "vise", c=0.02)
@@ -853,21 +895,21 @@ def shelves(W, H, D):
         loft("Přepravka", [rr(0.72, 0.58, 0.1, z, n, cx=x), rr(0.8, 0.64, 0.12, z + 1.12, n, cx=x), rr(0.83, 0.67, 0.13, z + 1.14, n, cx=x),
                            rr(0.83, 0.67, 0.13, z + 1.2, n, cx=x), rr(0.76, 0.6, 0.1, z + 1.2, n, cx=x), rr(0.7, 0.54, 0.08, z + 0.1, n, cx=x)], "crate")
         for s in (-1, 1):
-            box("Úchyt", (0.4, 0.02, 0.12), (x, s * 0.665, z + 0.98), "crate", r=0.02, seg=1)
+            box("Úchyt", (0.4, 0.02, 0.12), (x, s * 0.665, z + 0.98), "crate", r=0)
 
     def carton(x, z, w, d, h, turn=0.0):
         box("Krabice", (w, d, h), (x, 0, z + h / 2), "card", r=0.02, seg=1, rot=euler(rz=turn))
         for s in (-1, 1):
-            box("Klopa", (w - 0.04, d / 2 - 0.02, 0.02), (x, s * d / 4, z + h + 0.008), "card", r=0.005, seg=1, rot=euler(rz=turn))
+            box("Klopa", (w - 0.04, d / 2 - 0.02, 0.02), (x, s * d / 4, z + h + 0.008), "card", r=0, rot=euler(rz=turn))
     top = [z + 0.075 for z in levels]
     crate(1.0, top[0])
     carton(-1.25, top[0], 1.0, 1.0, 0.8, 0.05)
     carton(0.1, top[1], 1.6, 1.3, 1.15)
-    cyl("Plechovka", 0.24, 0.5, (-1.6, -0.1, top[1] + 0.25), "metal", seg=12, edge=0.015)
+    cyl("Plechovka", 0.24, 0.5, (-1.6, -0.1, top[1] + 0.25), "metal", seg=12)
     crate(-0.8, top[2])
     carton(1.3, top[2], 1.1, 1.1, 0.7, -0.06)
     for x, r in ((1.5, 0.25), (0.85, 0.22), (-1.4, 0.25)):
-        cyl("Plechovka", r, 0.45, (x, 0.0, top[3] + 0.225), "metal", seg=12, edge=0.015)
+        cyl("Plechovka", r, 0.45, (x, 0.0, top[3] + 0.225), "metal", seg=12)
     carton(-0.35, top[3], 0.9, 1.0, 0.55, 0.08)
 
 
@@ -977,8 +1019,9 @@ ROOMS = {
                              ("cabinets", 0.7, 6.4, 2.25, 270), ("hood", 0.9, 7.0, 6, 270), ("cabinets", 0.7, 6.4, 9.75, 270),
                              ("sink", 7.1, 0, 1.3, 180), ("corner_bench", 0.8, 0, 16.5, 270), ("bench", 2.8, 0, 19.2, 0),
                              ("corner_shelf", 1.1, 4.9, 18.9, 270)],
-                "camera": ((14.6, 8.4, 9.6), (1.6, 3.1, 10.0), 17)},
-    "Koupelna": {"base": (34, 40), "rect": (0, 12, 0, 10), "walls": "WNE", "floor": "bathtile", "wall": "bathwall", "wainscot": 0,
+                "camera": ((15.6, 8.0, 12.5), (3.0, 3.0, 8.0), 15)},
+    "Koupelna": {"base": (34, 40), "rect": (0, 12, 0, 10), "walls": "WNES", "unseen": "S", "floor": "bathtile", "wall": "bathplaster", "wainscot": 4.5,
+                 "dado": "bathwall", "trim": False,
                  "windows": [("N", 3.6, 5.25, 3, 2.5)],
                  "fixtures": [("tub", 3.6, 0, 8.3, 0), ("toilet", 10.6, 0, 5.4, 90), ("basin", 0.9, 0, 4.0, 270)],
                  "camera": ((6.4, 7.4, -3.4), (5.6, 2.6, 6.2), 19)},
@@ -986,7 +1029,7 @@ ROOMS = {
                "windows": [("N", 8.0, 4, 5, 4)],
                "fixtures": [("kachelofen", 1.6, 0, 7, 270)],
                "camera": ((10.6, 6.0, 1.8), (1.6, 3.4, 7.6), 24)},
-    "Garáž": {"base": (104, 40), "rect": (0, 16, 0, 20), "walls": "WNS", "floor": "concrete", "wall": "garagewall", "wainscot": 0,
+    "Garáž": {"base": (104, 40), "rect": (0, 16, 0, 20), "walls": "WNSE", "floor": "concrete", "wall": "garagewall", "wainscot": 0,
               "windows": [],
               "fixtures": [("garage_door", 0.15, 0, 10, 270), ("workbench", 3.4, 0, 18.8, 0), ("shelves", 13.2, 0, 19.2, 0)],
               "camera": ((13.0, 7.6, 3.2), (5.4, 3.0, 15.0), 18)},
@@ -1016,7 +1059,7 @@ def room_materials():
     def socket(sockets, name, kind):
         return next(x for x in sockets if x.name == name and x.type == kind)
 
-    def bricks(name, c1, c2, mortar, width, height, gapsize, offset, rough):
+    def bricks(name, c1, c2, mortar, width, height, gapsize, offset, rough, wall=False):
         mat, nt, b = nodes(name, c1, rough)
         coords = nt.nodes.new("ShaderNodeTexCoord")
         brick = nt.nodes.new("ShaderNodeTexBrick")
@@ -1026,7 +1069,18 @@ def room_materials():
         brick.inputs["Color1"].default_value = (*linear(c1), 1)
         brick.inputs["Color2"].default_value = (*linear(c2), 1)
         brick.inputs["Mortar"].default_value = (*linear(mortar), 1)
-        nt.links.new(coords.outputs["Object"], brick.inputs["Vector"])
+        if wall:
+            xyz = nt.nodes.new("ShaderNodeSeparateXYZ")
+            along = nt.nodes.new("ShaderNodeMath")
+            uv = nt.nodes.new("ShaderNodeCombineXYZ")
+            nt.links.new(coords.outputs["Object"], xyz.inputs["Vector"])
+            nt.links.new(xyz.outputs["X"], along.inputs[0])
+            nt.links.new(xyz.outputs["Y"], along.inputs[1])
+            nt.links.new(along.outputs[0], uv.inputs["X"])
+            nt.links.new(xyz.outputs["Z"], uv.inputs["Y"])
+            nt.links.new(uv.outputs["Vector"], brick.inputs["Vector"])
+        else:
+            nt.links.new(coords.outputs["Object"], brick.inputs["Vector"])
         nt.links.new(brick.outputs["Color"], b.inputs["Base Color"])
         return mat, nt, b, coords, brick
     out = {}
@@ -1047,7 +1101,7 @@ def room_materials():
     nt.links.new(socket(mix.outputs, "Result", "RGBA"), b.inputs["Base Color"])
     out["planks"] = mat
     out["bathtile"] = bricks("Room bath floor", "#D6E6EC", "#CCDDE4", "#9AA8AE", 1.0, 1.0, 0.03, 0.0, 0.2)[0]
-    out["bathwall"] = bricks("Room bath wall", "#EEF2F0", "#E6ECEA", "#B8C2C0", 0.8, 0.8, 0.025, 0.0, 0.2)[0]
+    out["bathwall"] = bricks("Room bath wall", "#CFE0DC", "#C6D9D5", "#F2F2EE", 0.8, 0.8, 0.03, 0.0, 0.2, wall=True)[0]
     mat, nt, b = nodes("Room concrete", "#8A8A86", 0.9)
     noise = nt.nodes.new("ShaderNodeTexNoise")
     noise.inputs["Scale"].default_value = 0.6
@@ -1057,7 +1111,7 @@ def room_materials():
     nt.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
     nt.links.new(ramp.outputs["Color"], b.inputs["Base Color"])
     out["concrete"] = mat
-    for key, colour, rough in (("plaster", "#E2D8C6", 0.9), ("garagewall", "#A4A49E", 0.9), ("wainscot", "#B07A4A", 0.6),
+    for key, colour, rough in (("plaster", "#E2D8C6", 0.9), ("bathplaster", "#D4DEE0", 0.9), ("garagewall", "#A4A49E", 0.9), ("wainscot", "#B07A4A", 0.6),
                                ("trim", "#845836", 0.5), ("ceiling", "#CDAE84", 0.8), ("beam", "#6C482C", 0.7)):
         out[key] = nodes("Room " + key, colour, rough)[0]
     mat, nt, b = nodes("Room sky", "#9CC8F0", 0.5)
@@ -1095,17 +1149,21 @@ def room_scene(name, spec, mats):
     sides = {"W": ((x0 - wt, 0, z0 - wt), (x0, Hc, z1 + wt)), "E": ((x1, 0, z0 - wt), (x1 + wt, Hc, z1 + wt)),
              "S": ((x0 - wt, 0, z0 - wt), (x1 + wt, Hc, z0)), "N": ((x0 - wt, 0, z1), (x1 + wt, Hc, z1 + wt))}
     for s in spec["walls"]:
-        slab("Zeď", *sides[s], wall)
+        w = slab("Zeď", *sides[s], wall)
+        if s in spec.get("unseen", ""):  # (the wall behind the camera: only the mirror sees it)
+            w.visible_camera = False
+            continue
         if spec["wainscot"]:
-            a, b = sides[s]
-            inset = {"W": (0.08, 0, 0), "E": (-0.08, 0, 0), "S": (0, 0, 0.08), "N": (0, 0, -0.08)}[s]
             inner = {"W": (x0, x0 + 0.08), "E": (x1 - 0.08, x1), "S": (z0, z0 + 0.08), "N": (z1 - 0.08, z1)}[s]
+            dado = mats[spec.get("dado", "wainscot")]
             if s in "WE":
-                slab("Obložení", (inner[0], 0, z0), (inner[1], spec["wainscot"], z1), mats["wainscot"])
-                slab("Lišta", (inner[0] - (0.04 if s == "E" else 0), spec["wainscot"], z0), (inner[1] + (0.04 if s == "W" else 0), spec["wainscot"] + 0.12, z1), mats["trim"])
+                slab("Obložení", (inner[0], 0, z0), (inner[1], spec["wainscot"], z1), dado)
+                if spec.get("trim", True):
+                    slab("Lišta", (inner[0] - (0.04 if s == "E" else 0), spec["wainscot"], z0), (inner[1] + (0.04 if s == "W" else 0), spec["wainscot"] + 0.12, z1), mats["trim"])
             else:
-                slab("Obložení", (x0, 0, inner[0]), (x1, spec["wainscot"], inner[1]), mats["wainscot"])
-                slab("Lišta", (x0, spec["wainscot"], inner[0] - (0.04 if s == "N" else 0)), (x1, spec["wainscot"] + 0.12, inner[1] + (0.04 if s == "S" else 0)), mats["trim"])
+                slab("Obložení", (x0, 0, inner[0]), (x1, spec["wainscot"], inner[1]), dado)
+                if spec.get("trim", True):
+                    slab("Lišta", (x0, spec["wainscot"], inner[0] - (0.04 if s == "N" else 0)), (x1, spec["wainscot"] + 0.12, inner[1] + (0.04 if s == "S" else 0)), mats["trim"])
     if spec["floor"] == "planks":  # (a chalet's ceiling beams)
         for k in range(1, 4):
             z = z0 + (z1 - z0) * k / 4
@@ -1122,7 +1180,7 @@ def room_scene(name, spec, mats):
             slab("Parapet", (t - w / 2 - 0.35, sill - 0.3, zz), (t + w / 2 + 0.35, sill - 0.12, zz + d * 0.45), mats["trim"])
             lamp = bpy.data.objects.new("Světlo z okna", bpy.data.lights.new("Světlo z okna", "AREA"))
             col.objects.link(lamp)
-            lamp.data.energy, lamp.data.size, lamp.data.color = 500, w, (1.0, 0.96, 0.9)
+            lamp.data.energy, lamp.data.size, lamp.data.color = 300, w, (1.0, 0.96, 0.9)
             lamp.location = game_to_blender(base, t, sill + h / 2, zz + d * 0.6)
             lamp.rotation_euler = (math.radians(90), 0, 0 if side == "N" else math.radians(180))
             try:
@@ -1140,13 +1198,13 @@ def room_scene(name, spec, mats):
     sun = bpy.data.objects.new("Stropní světlo", bpy.data.lights.new("Stropní světlo", "AREA"))
     col.objects.link(sun)
     sun.data.shape, sun.data.size, sun.data.size_y = "RECTANGLE", (x1 - x0) * 0.6, (z1 - z0) * 0.6
-    sun.data.energy = 26 * (x1 - x0) * (z1 - z0)
+    sun.data.energy = 9 * (x1 - x0) * (z1 - z0)
     sun.data.color = (1.0, 0.9, 0.78)
     sun.location = game_to_blender(base, (x0 + x1) / 2, Hc - 0.7, (z0 + z1) / 2)
     eye, target, lens = spec["camera"]
     fill = bpy.data.objects.new("Doplňkové světlo", bpy.data.lights.new("Doplňkové světlo", "POINT"))
     col.objects.link(fill)
-    fill.data.energy, fill.data.color, fill.data.shadow_soft_size = 900, (1.0, 0.95, 0.9), 2.0
+    fill.data.energy, fill.data.color, fill.data.shadow_soft_size = 300, (1.0, 0.95, 0.9), 2.0
     fill.location = game_to_blender(base, *eye) + Vector((0, 0, 1.5))
     cam = bpy.data.objects.new("Kamera " + name, bpy.data.cameras.new("Kamera " + name))
     col.objects.link(cam)
