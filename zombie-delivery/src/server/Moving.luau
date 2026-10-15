@@ -136,7 +136,10 @@
 --     doorway from farther), and walking into the doorway is the trip: your root across its threshold (Doors.Cross,
 --     looked Ahead s along your walk) starts the fade at once while you walk on into the house's dark hall (the
 --     sandbox house's doorways are walkable: server/SandboxWorld.luau), no dwell; standing at a door facing it, the
---     8.3 dwell as before.
+--     8.3 dwell as before. 8.5.1 (the owner: "the doors just disappear; I'd like them to open nicely"): a leaf says
+--     since when it is open (DoorOpenAt, the server's time: a client that first sees it opening swings it on from
+--     there), and walking through waits until its leaf has swung Seen × Open s (WalkIn.swung: from just beside a shut
+--     door, the swing mostly seen before the screen darkens).
 --   * 8.3 Danny for hire (the owner: "when you want to take a heavy thing you must wait until the helper comes";
 --     "I have to PAY for him … you click on something, and that assigns it to him"; Config.MoveHelper.WaitForHelper;
 --     server/MoveHelper.luau's call): Lift on a two-person piece with Danny hired for the move calls him (onPick asks
@@ -2108,15 +2111,29 @@ function WalkIn.leavesOf(s: Session, door: any, inside: boolean): { Instance }
 	return found
 end
 
--- Somebody wants these leaves open now: open from now (DoorOpen) until Shut s after the last want.
+-- Somebody wants these leaves open now: open from now (DoorOpen) until Shut s after the last want. 8.5.1: and since
+-- when, in the server's time (DoorOpenAt: a client that first sees it open swings it on from where it is now).
 function WalkIn.open(leaves: { Instance }, clock: number)
 	for _, leaf in leaves do
 		WalkIn.want[leaf] = clock
 		if not WalkIn.opened[leaf] then
 			WalkIn.opened[leaf] = clock
+			leaf:SetAttribute("DoorOpenAt", workspace:GetServerTimeNow())
 			leaf:SetAttribute("DoorOpen", true)
 		end
 	end
+end
+
+-- 8.5.1 (the owner: "I'd like them to open nicely"): has every one of these leaves been swinging open Seen × Open s
+-- (most of its swing seen before the fade darkens the screen)? No leaf: yes.
+function WalkIn.swung(leaves: { Instance }, clock: number): boolean
+	for _, leaf in leaves do
+		local at = WalkIn.opened[leaf]
+		if at == nil or clock - at < T.Doors.Open * T.Doors.Seen then
+			return false
+		end
+	end
+	return true
 end
 
 -- The leaves nobody wanted open for Shut s shut again (DoorOpen false); gone ones forgotten.
@@ -2559,8 +2576,8 @@ end
 -- (the owner: "I keep walking smoothly, and then the transition"): the leaf opens as they come at it (WalkIn.coming),
 -- and walking into the doorway is the trip: their walk at it (PairWalk studs/s or more, within Face of straight at it)
 -- takes their root across its threshold (Cross studs out of its face) now or within Ahead s (the server sees them a
--- moment late, its looks Every s apart): through at once, no dwell, no wait for the leaf (open long before). The dwell
--- stays for standing at a door.
+-- moment late, its looks Every s apart): through at once, no dwell, no wait for the leaf (open long before; 8.5.1 from
+-- just beside the door, until it has swung Seen × Open s: WalkIn.swung). The dwell stays for standing at a door.
 function WalkIn.check(s: Session, player: Player, clock: number)
 	local character, humanoid, root = bodyOf(player)
 	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
@@ -2600,11 +2617,13 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		WalkIn.at[player] = fresh
 		visit = fresh
 	end
-	-- 8.5 walking through: their walk into the doorway takes their root across its threshold (now, or within Ahead s)
+	-- 8.5 walking through: their walk into the doorway takes their root across its threshold (now, or within Ahead s);
+	-- 8.5.1 once its leaf has swung most of the way (WalkIn.swung: from just beside the door, a moment's wait)
 	local mid = WalkIn.frame(s, index, inside)
 	local speed = WalkIn.into(root, out)
 	if mid and not visit.tried and speed >= D.PairWalk
-		and (root.Position.X - mid.X) * out.X + (root.Position.Z - mid.Z) * out.Z - speed * D.Ahead <= D.Cross then
+		and (root.Position.X - mid.X) * out.X + (root.Position.Z - mid.Z) * out.Z - speed * D.Ahead <= D.Cross
+		and WalkIn.swung(WalkIn.leavesOf(s, if inside then s.ways[index] else s.site.doors[index], inside), clock) then
 		visit.tried = true
 		WalkIn.go(s, player, index, inside)
 		return

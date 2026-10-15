@@ -6288,6 +6288,16 @@ Config.CarryGrip = {
 --                     there within Ahead s at your walk (the server sees you a moment late and looks every Every s):
 --                     the fade out starts at once while you walk on into the hall (onto the porch inside), the move
 --                     behind the black, and you arrive still walking. Dwell stays for standing at a door facing it
+--                     8.5.1 (the owner: "the doors, when you go into the house, just disappear. I'd like them to open
+--                     nicely"; on the real house, rendered from a player's camera: 0.25 s of a cubic ease put the leaves
+--                     half open in 50 ms and edge-on to the camera, square to the wall, by 150 ms: a black doorway with
+--                     two slivers): Open 0.35 s along shared/DoorSwing.luau's quadratic ease (seen over its whole time),
+--                     the sandbox house's leaves open Wide degrees (past square, folded back toward the wall: their
+--                     faces stay in sight of whoever walks up), walking through waits for Seen × Open s of the leaf's
+--                     swing before the fade (a walk from just beside the door: the swing mostly done before the screen
+--                     darkens; from the approach it opened long before), and a client that first sees a leaf already
+--                     opening (it streamed in, or the attribute came with its tag) swings it on from where it is now
+--                     (its DoorOpenAt, the server's time it opened) instead of standing it open at once
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6402,12 +6412,13 @@ Config.Moving = {
 		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first; 8.5: for standing at a door, walking through needs none)
 		-- 8.3 the leaves and the trip (server/Moving.luau's WalkIn and travel, client/WalkDoors.luau, client/Fade.luau)
 		-- (8.5: Approach 12 and ApproachSide 3, were 8 and 2; Open 0.25, was 0.35: the leaf open before you get there)
-		Swing = true, Approach = 12, ApproachSide = 3, Angle = 95, Open = 0.25, Close = 0.45, Shut = 1.2,
+		Swing = true, Approach = 12, ApproachSide = 3, Angle = 95, Open = 0.35, Close = 0.45, Shut = 1.2, -- (8.5.1: Open 0.35, was 0.25)
 		FadeOut = 0.25, Margin = 0.1, Stream = 2, Wait = 1.5, Arrive = 6, Dark = 0.15, FadeIn = 0.35,
 		Sound = { Open = 0.55, Shut = 0.4, ShutPitch = 0.75, Range = 70 },
 		-- 8.5 walking through (server/Moving.luau's WalkIn.coming and check; server/SandboxWorld.luau's door halls)
 		Lead = 0.9, Cross = 0, Ahead = 0.15,
 		Hall = { Depth = 11, Color = { 24, 18, 14 } :: { number } },
+		Wide = 110, Seen = 0.6, -- 8.5.1 (the doors opening nicely)
 	},
 	Slots = 6,
 	Tick = 0.2,
@@ -6760,6 +6771,14 @@ Config.MoveStory = {
 --   RideMargin         studs he keeps off the van's footprint on his way to its door: the straight way when it keeps this
 --                      off, else round the footprint's corners this far out (the shorter way round)
 --   RideCorner         a corner of that way within this many studs: he walks on to the next point (no stop at it)
+--   RideHug            8.5.1 (the owner: "Danny STILL goes through it"; server/MoveHelper.luau's go, MoveHelperBrain.
+--                      crossesVan / outOfVan): studs round the move's van's footprint his body keeps off on EVERY way
+--                      of his outside (his body's half width and a hair): a way across it (a path that knows nothing of
+--                      the van, the straight line from behind it to its front) goes round the van instead (RideMargin
+--                      out; nearer the van than that, its goal's own distance), his root inside the van itself (parked
+--                      over him; a load into the walk-in bay left him on the ground under its floor) is put beside its
+--                      nearer side at once, faded in (never a walk through its shell); waiting by it while it drives at
+--                      him he steps out of its way (its side, RideMargin out)
 --   RideBlink / RideFar   the last resort, a fade into the seat: no closer by CallGain studs for RideBlink s, or RideFar
 --                      studs or more to go on foot (the van driven off without him: more than from deep in the biggest
 --                      house to the van at its curb, so by the house or the warehouse he always walks). At his spot he
@@ -6865,6 +6884,7 @@ Config.MoveHelper = {
 	RideStand = 2.8, -- 8.5 getting in like a player
 	RideMargin = 2.4,
 	RideCorner = 1.2,
+	RideHug = 1.6, -- 8.5.1
 	RideBlink = 20,
 	RideFar = 200,
 	SeatYield = 2, -- 8.3 review

@@ -131,6 +131,44 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{built_as[m[1]]}")' if m[1] in built_as else f"E.{m[1]}", source)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(head + source)
+    # 8.5.1 (the owner: "Danny STILL goes through the van"): the REAL vehicle factory, server/Vehicles.luau and its art
+    # builders staged as tools/vehicle-preview/export_fleet.py stages them, on the same recorder (rbxmock: ItemMock's,
+    # so MovingRuntime's), each under a RealVan name: tests/movehelper_realvan_runtime_test.luau builds the Sprinter the
+    # game builds (its hull, its seats and doors, their attachments) into the moves' runtime and rides Danny round it.
+    # Net, World and PlayerData empty (nothing of them is used to build), DayNight the recorder's night light;
+    # RealVanVehicles.__testBuild / __testStyle / __testDoors are its build, styleFor and doorsOf.
+    real_van = {"Vehicles": "src/server/Vehicles.luau", "Builder": "src/server/VehicleArt/Builder.luau", "Geometry": "src/server/VehicleArt/Geometry.luau",
+                "BikeGeometry": "src/server/BikeArt/Geometry.luau", "ScooterGeometry": "src/server/ScooterArt/Geometry.luau",
+                "ModelBuilder": "src/server/ModelArt/Builder.luau", "VanMesh": "src/server/VanMesh.luau"}
+    real_prefix = ('local Mock = require("./rbxmock")\nlocal game, workspace, Instance, Vector3, Vector2, Color3, CFrame, Enum, PhysicalProperties, UDim2, typeof = '
+                   'Mock.game, Mock.workspace, Mock.Instance, Mock.Vector3, Mock.Vector2, Mock.Color3, Mock.CFrame, Mock.Enum, Mock.PhysicalProperties, Mock.UDim2, Mock.typeof\n')
+    for name in ("Net", "World", "PlayerData"):
+        open(os.path.join(tmp, "RealVan" + name + ".luau"), "w", encoding="utf-8").write("return {}\n")
+    open(os.path.join(tmp, "RealVanDayNight.luau"), "w", encoding="utf-8").write('local Mock = require("./rbxmock")\nreturn { nightLight = Mock.nightLight }\n')
+    for name, path in real_van.items():
+        source = open(os.path.join(os.path.dirname(HERE), path), encoding="utf-8").read()
+        source = source.replace("require(script.Parent.BikeArt.Geometry)", 'require("./RealVanBikeGeometry")')
+        source = source.replace("require(script.Parent.ModelArt.Builder)", 'require("./RealVanModelBuilder")')
+        source = source.replace("require(script.Parent.ScooterArt.Geometry)", 'require("./RealVanScooterGeometry")')
+        source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: f'require("./RealVan{m[1]}")' if m[1] == "Net" else f'require("./{m[1]}")', source)
+        source = re.sub(r"require\(script\.Parent\.(?:VehicleArt\.)?(\w+)\)", r'require("./RealVan\1")', source)
+        if name == "Vehicles":
+            source = re.sub(r"^return Vehicles$", "Vehicles.__testBuild = build\nVehicles.__testStyle = styleFor\nVehicles.__testDoors = doorsOf\nreturn Vehicles", source, flags=re.M)
+        open(os.path.join(tmp, "RealVan" + name + ".luau"), "w", encoding="utf-8").write(real_prefix + source)
+    # 8.5.1 (Danny's hand on the van's door; the house's doors opening nicely): the real client/ArmPose.luau and
+    # client/WalkDoors.luau as ArmPoseClient.luau and WalkDoorsClient.luau for tests/armpose_npc_test.luau and
+    # tests/walkdoors_test.luau, their Roblox globals and their client modules tests/runtime/ClientRuntime.luau's, their
+    # shared modules the copies above and shared/Joints.luau.
+    shutil.copy(os.path.join(HERE, "runtime", "ClientRuntime.luau"), os.path.join(tmp, "ClientRuntime.luau"))
+    shutil.copy(os.path.join(SHARED, "Joints.luau"), os.path.join(tmp, "Joints.luau"))
+    client_head = ('local E = require("./ClientRuntime")\nlocal game, workspace, CFrame, Vector3, Color3, Enum, Instance, os = '
+                   'E.game, E.workspace, E.CFrame, E.Vector3, E.Color3, E.Enum, E.Instance, E.os\n')
+    for module, built in (("ArmPose", "ArmPoseClient"), ("WalkDoors", "WalkDoorsClient")):
+        source = open(os.path.join(os.path.dirname(SHARED), "client", module + ".luau"), encoding="utf-8").read()
+        source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\):WaitForChild\("(\w+)"\)\)', r'require("./\1")', source)
+        source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+        source = re.sub(r"require\(script\.Parent\.(\w+)\)", r"E.\1", source)
+        open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(client_head + source)
     # 8.3 (Danny's hops): the real server/Npcs.luau as NpcsServer.luau for tests/npcs_runtime_test.luau, one line on
     # top: setfenv to tests/runtime/NpcsRuntime.luau's environment (its services, a person's body on the item recorder,
     # a require that gives the Shared copies above for ReplicatedStorage.Shared's modules).

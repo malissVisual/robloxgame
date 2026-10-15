@@ -188,6 +188,29 @@ do
 		and not Brain.rideBlink(Brain.newApproach(), H.RideFar - 1, 0.1))
 	check("…more patient than your call's (CallBlink)", H.RideBlink > H.CallBlink)
 end
+-- 8.5.1 his outline guard on every way outside (the owner: "Danny STILL goes through it") ------------------------------
+do
+	local hx, hz, pad = 4, 11, H.RideHug
+	check("8.5.1 RideHug: his body's half width and a hair, inside the ride's margin", pad > 1 and pad < H.RideMargin)
+	check("8.5.1 a way across the van's outline (the straight line from its passenger door to behind it, scraping its back corner)",
+		Brain.crossesVan(hx + H.RideStand, -5.75, 4, 14.6, hx, hz, pad) and not Brain.crossesVan(hx + H.RideStand, -5.75, hx + pad + 0.1, 14.6, hx, hz, pad))
+	check("…a way along its side, outside the outline, or from inside it out", not Brain.crossesVan(hx + pad + 0.01, -20, hx + pad + 0.01, 20, hx, hz, pad)
+		and Brain.crossesVan(0, 0, 20, 0, hx, hz, pad))
+	local x, z = Brain.outOfVan(0.8, 4, hx, hz, pad)
+	check("8.5.1 out of the van: through its nearer side, a hair past the outline", near(x, hx + pad + 0.05) and near(z, 4), `{x} {z}`)
+	x, z = Brain.outOfVan(-1, 10.5, hx, hz, pad)
+	check("…by its back: out of the back", near(x, -1) and near(z, hz + pad + 0.05), `{x} {z}`)
+	x, z = Brain.outOfVan(-1, 10.5, hx, hz, pad, true)
+	check("…sideways (a van driving along its length): its side, the nearer one", near(x, -(hx + pad + 0.05)) and near(z, 10.5), `{x} {z}`)
+	x, z = Brain.outOfVan(hx + pad + 1, 3, hx, hz, pad)
+	check("…a point outside it as it is", near(x, hx + pad + 1) and near(z, 3))
+	local gx, gz = 1.5, hz + 2.1 -- (the spot behind its back he loads from: nearer the van than RideMargin)
+	x, z = Brain.roundVan(hx + 3, -5, gx, gz, hx, hz, 0, 2.0)
+	check("8.5.1 roundVan with a margin of its own: round the corner that far out (a goal nearer the van than RideMargin)",
+		near(x, hx + 2.05) and near(z, hz + 2.05), `{x} {z}`)
+	x, z = Brain.roundVan(hx + 3, -5, gx, gz, hx, hz, 0)
+	check("…RideMargin's own: no way round to a goal within it (straight: the guard gives it the goal's own margin)", near(x, gx) and near(z, gz), `{x} {z}`)
+end
 -- The way ------------------------------------------------------------------------------------------------------------------
 
 local doors: Brain.Doors = { outX = 100, outZ = 0, inX = 5000, inZ = 0 }

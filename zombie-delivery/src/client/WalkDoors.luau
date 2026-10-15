@@ -9,7 +9,9 @@
 --     nothing is pushed. A double door (DoorLeaf 0, a part) swings as two halves made here, the part hidden here
 --     meanwhile; DoorDark shows a dark doorway where it stood while it is open (a house's solid body behind it). A leaf
 --     first seen open (streamed in, joined late) stands open at once; an invisible one (a Blender house's door over it)
---     does not swing.
+--     does not swing. 8.5.1 (the owner: "the doors just disappear"): one first seen while it is still opening (its
+--     DoorOpenAt, the server's time it opened, under Open s ago: it streamed in as it opened, or its DoorOpen came with
+--     its tag) swings on from where it is by now, never stood open at once.
 --   * the trip's arrival: client/Fade.luau holds the black until your body is where the server put it, then calls
 --     Fade.onArrive: here the camera is put behind you, looking the way you face there (client/CameraRig.luau face; a
 --     touch screen's Roblox camera turned the same way): no snap, no spin once the screen clears.
@@ -121,8 +123,17 @@ local function step(dt: number)
 end
 
 -- Open or shut it: swung from where it is now (a swing turned round midway takes only the rest of its time); `now`: at
--- once (first seen that way).
-local function swing(leaf: Leaf, open: boolean, now: boolean)
+-- once (first seen that way). 8.5.1 `since`: first seen opening, `since` s after it began: on from there.
+local function swing(leaf: Leaf, open: boolean, now: boolean, since: number?)
+	if now and open and since and since >= 0 and since < D.Open then
+		leaf.opening, leaf.u, leaf.from, leaf.t, leaf.time = true, 0, 0, since / D.Open, D.Open
+		pcall(pose, leaf, DoorSwing.ease(leaf.t, true))
+		moving[leaf] = true
+		if not stepper then
+			stepper = RunService.Heartbeat:Connect(step)
+		end
+		return
+	end
 	if now then
 		moving[leaf] = nil
 		leaf.opening = open
@@ -252,7 +263,8 @@ local function watch(inst: Instance)
 		swing(leaf, inst:GetAttribute("DoorOpen") == true, false)
 	end))
 	if inst:GetAttribute("DoorOpen") == true then
-		swing(leaf, true, true)
+		local at = inst:GetAttribute("DoorOpenAt") -- 8.5.1 (still opening: on from where it is)
+		swing(leaf, true, true, if type(at) == "number" then workspace:GetServerTimeNow() - at else nil)
 	elseif leaf.hidden then
 		pose(leaf, 0)
 	end
