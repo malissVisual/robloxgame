@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.5.1"
+Config.Version = "8.5.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6241,6 +6241,10 @@ Config.CarryGrip = {
 --                     value delivered / XpPerValue + XpPerStar × the stars, at most XpMax (7.0 review: a one-lamp move
 --                     is no full move); the crew within Present studs of the truck shares it (Economy.crewSplit)
 --   Tether / Grace    a pair thing's helper stays within Tether studs of its end; farther for Grace s, it goes down
+--   PairLift          8.6 carried in two (the owner: "the table seems to float between them"; MovingRules.pairLift,
+--                     server/Moving.luau's holdOffset): lengthwise (its long side along the carry: the two at its ends)
+--                     and low: its grips (two thirds of its height, Grip studs over its bottom at most: FurnitureLooks
+--                     grips) Hands studs under the carriers' roots, its bottom Clear studs over the floor at least
 --   Pace              a carried thing that moves faster than the carry's walk × Factor + Slack goes down (a teleport)
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
@@ -6389,6 +6393,7 @@ Config.Moving = {
 	Present = 250,
 	Tether = 6,
 	Grace = 1.5,
+	PairLift = { Hands = 0.3, Grip = 2.4, Clear = 0.5 }, -- 8.6
 	Pace = { Factor = 1.8, Slack = 8 },
 	Horde = {
 		Count = 14,
@@ -6558,10 +6563,14 @@ Config.Furniture = {
 	--   Collectibles           its collector's pieces (Count: at least, at most; Legendary: the chance of one), the
 	--                          house's Odds and Salt
 	--   InteriorMaxParts       an interior's parts at most, its furniture included (tests/biglayout_test.luau)
+	--   Roomy                  8.5.2 (the owner: "more room in the house"): its rooms, its hall and its corridor this
+	--                          many times as wide and deep (whole studs; the dice, the doors and the furniture as they
+	--                          were: 1.25, half as much floor again round the same pieces; 1: as before, at most 2)
 	Big = {
 		Front = 26,
 		Kitchen = 0.4,
 		BackDoor = 6,
+		Roomy = 1.25,
 		Spots = { 34, 40 } :: { number },
 		Stars = 4,
 		Collectibles = { Count = { 2, 3 } :: { number }, Legendary = 0.06 },
@@ -6667,6 +6676,13 @@ Config.MoveStory = {
 --                      root's height: your jump never lifts him; a floor farther off, a roof or a ceiling, is not his)
 --   HoldResponse       the Responsiveness of the constraints that keep him there (AlignPosition / AlignOrientation on
 --                      his root); his own walk is off meanwhile (Npcs.carried)
+--   8.6 (the owner: "he teleports from side to side"; a screenshot: Danny beside the Dining Table, at its side): his end is
+--   the face of the piece across it from you, decided once as the hold starts, in the piece's own frame (MoveHelperBrain.
+--   holdEnd; a crew mate's too, server/PairHold.luau): carried in two the piece lies along the carry (Config.Moving
+--   PairLift), so that is the far end of its length; its turn, a square-ish piece, a lag never make it another end
+--   Edge               carrying in two, the hands of both (yours and the far end's: client/ArmPose.luau's box, the
+--                      CarryAt / CarrySize attributes) on its end's edge at its grips' height: Width across at most,
+--                      Height, Depth (studs)
 --   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
 --   PairCarry.luau the leader's steering, MoveHelperBrain.holdSpeed / holdTrack the far end's holder, server/PairHold.luau
 --   the constraints; Danny and a crew mate who helps lift alike):
@@ -6701,7 +6717,11 @@ Config.MoveStory = {
 --                      leader's velocity ahead of his place (Base + the leader's ping, Player:GetNetworkPing, × Ping;
 --                      Most s, Far studs at most; the velocity smoothed over Smooth s), so on the leader's screen, where
 --                      his body shows that late, he walks at his end (Base 0 and Ping 0: off). A crew mate is not led
---                      (on their own screen they would walk ahead of the piece)
+--                      (on their own screen they would walk ahead of the piece). 8.6 (the owner: "he teleports from side
+--                      to side"): the velocity is his END's own (the piece's turn moves it too: MoveHelperBrain.endLead),
+--                      and the lead changes Rate studs a second at most (it was your root's velocity, taken at once: a
+--                      step back, a turn's step aside, an uneven look at you threw his aim up to Far × 2 studs across in
+--                      a tenth of a second, and he ran there)
 --   RunHint            carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
 --                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
 --                      run key or button says this once a carry
@@ -6731,6 +6751,9 @@ Config.MoveStory = {
 --   WaitForHelper      Danny hired for the move (his body up, his hands not on another piece): a two-person Lift calls him
 --                      ("Danny, give me a hand!"), you wait at your end while he walks to its other end, and its lift
 --                      check opens once he is there (false: today's rules, you drag it alone and he comes to it)
+--   CallCheck          8.6 (the owner: "he does come to me and waits, but it doesn't look good"): false, once he is there
+--                      it goes up at once on his "On three... lift!" (balanced: he steadies it), no lift check after the
+--                      wait; true: 8.3's lift check opens then (its hit lifts it)
 --   CallReady / CallClose / CallStuck   in place for your call: within CallReady studs of his place at its far end, or
 --                      within CallClose and blocked CallStuck s (the hold walks him the rest: no snap)
 --   CallGain / CallBlink   his walk to your call (or your dragged piece): no closer by CallGain studs for CallBlink s,
@@ -6835,7 +6858,8 @@ Config.MoveHelper = {
 	HoldLegs = { From = 0.8, To = 0.4, Band = 0.3 },
 	HoldCap = 40, -- 8.3 keeping up
 	HoldPace = { Fall = 0.5, Jump = 12 },
-	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1 },
+	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1, Rate = 5 }, -- (8.6 Rate)
+	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6 }, -- 8.6
 	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
 	PathHeight = 5,
@@ -6865,6 +6889,7 @@ Config.MoveHelper = {
 	TalkRepeat = 12,
 	-- 8.3 your call
 	WaitForHelper = true,
+	CallCheck = false, -- 8.6
 	CallReady = 3,
 	CallClose = 6,
 	CallStuck = 1.5,
@@ -7841,7 +7866,8 @@ Config.VanPaint = {
 --   Every      s between two looks at where you are (the easing writes every frame only while it moves)
 --   LiteBloom  a phone's or a tablet's bloom: × this (client/DeviceBudget.luau lite)
 --   House      the house's inside (server/HouseInterior.luau): Lamp (each room's ceiling light, a PointLight: Brightness,
---              Range, Color; a room longer than Long gets two), Porch (the daylight through the front door: a
+--              Range, Color; a room longer than Long gets two; 8.5.2, the roomier big house: along a side longer than
+--              twice Span a lamp each Span at most, never two closer than Apart: SandboxLightRules.lamps), Porch (the daylight through the front door: a
 --              SurfaceLight's Brightness, Range, Color) and the Neon parts' colours: Glow (the ceiling lamps' discs),
 --              Tube (the garage's), Window / BathWindow (the panes' daylight), Daylight (the porch's wall of daylight)
 --   Warehouse  the hall (shared/WarehouseLayout.luau, server/WarehouseMesh.luau): Lamp (each of its hall lights, a
@@ -7921,7 +7947,7 @@ Config.SandboxLight = {
 	Every = 0.1,
 	LiteBloom = 0.6,
 	House = {
-		Lamp = { Brightness = 0.5, Range = 24, Long = 28, Color = { 255, 230, 196 } :: { number } },
+		Lamp = { Brightness = 0.5, Range = 24, Long = 28, Span = 36, Apart = 16, Color = { 255, 230, 196 } :: { number } },
 		Porch = { Brightness = 0.45, Range = 12, Color = { 255, 246, 230 } :: { number } },
 		Glow = { 220, 188, 148 } :: { number },
 		Tube = { 196, 206, 218 } :: { number },

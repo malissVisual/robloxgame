@@ -22,6 +22,12 @@
 --   most), Danny and a crew mate alike; Danny is also aimed a little ahead (server/MoveHelper.luau, HoldLead), a crew mate
 --   not (on their own screen they would walk ahead of the piece). Neither runs meanwhile (the CarryPair attribute,
 --   client/PairSteer.luau holds their walk at CarrySpeed).
+--   8.6 (the owner: "he teleports from side to side"): the far end is the face of the piece across it from the leader,
+--   decided once as the hold starts and kept in the piece's own frame (MoveHelperBrain.holdEnd): carried in two the
+--   piece lies along the carry (server/Moving.luau's holdOffset), so the two hold the ends of its length; a crew mate's
+--   end as Danny's (it was always the piece's -Z: its long side once the piece lies along the carry).
+--   PairHold.endOffset(ax, az, reach, rise) -> CFrame   8.6 the far end's place in the piece's frame: `reach` studs out
+--                                            of its middle along its axis (ax, az), `rise` over it, turned back to it
 --   PairHold.make(model, root, anchor, offset, limit, options) -> Hold   the hold made (options: ghost, flat, owner;
 --                                            8.3 lift: the height by the lift, the align along the ground)
 --   PairHold.aim(hold, offset, limit, flat?)   its far end's place in the piece's frame, its top speed, along the
@@ -33,9 +39,10 @@
 --   PairHold.drop(hold)                      let go: the constraints gone, the groups and the body's owner given back
 --   PairHold.walkOf(player, fallback)        a leader's walk now (their CarrySpeed × their boosts), else `fallback`
 --   PairHold.pingOf(player)                  8.3 a leader's ping (Player:GetNetworkPing, s; 0 without one): Danny's lead
---   PairHold.follow(player, root, anchor, depth, carrierRoot, carrier, away) -> boolean   a crew mate holding the far
---                                            end of `anchor`'s piece (`depth` its size along the carry): held there,
---                                            one look of Moving's tick (away: a door's trip is on); true while held
+--   PairHold.follow(player, root, anchor, size, carrierRoot, carrier, away) -> boolean   a crew mate holding the far
+--                                            end of `anchor`'s piece (`size` its size; 8.6 its end decided at the
+--                                            hold's start): held there, one look of Moving's tick (away: a door's trip
+--                                            is on); true while held
 --   PairHold.free(player)                    a crew mate let go (their body theirs again); PairHold.of(player): the hold
 
 local Players = game:GetService("Players")
@@ -72,7 +79,7 @@ export type Hold = {
 
 export type Options = { ghost: boolean, flat: boolean, owner: Player?, lift: boolean? }
 
-type Mate = { hold: Hold, trail: Brain.Trail, at: number }
+type Mate = { hold: Hold, trail: Brain.Trail, at: number, ax: number, az: number, reach: number } -- (8.6 their end)
 
 local mates: { [Player]: Mate } = {}
 
@@ -130,6 +137,10 @@ function PairHold.ghost(hold: Hold, on: boolean)
 			end
 		end
 	end
+end
+
+function PairHold.endOffset(ax: number, az: number, reach: number, rise: number): CFrame
+	return CFrame.new(ax * reach, rise, az * reach) * CFrame.Angles(0, math.atan2(ax, az), 0) -- (looking along -axis: in)
 end
 
 function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: CFrame, limit: number, options: Options): Hold
@@ -281,7 +292,7 @@ function PairHold.of(player: Player): Hold?
 	return if mate then mate.hold else nil
 end
 
-function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, depth: number, carrierRoot: BasePart, carrier: Player, away: boolean?): boolean
+function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, size: { X: number, Y: number, Z: number }, carrierRoot: BasePart, carrier: Player, away: boolean?): boolean
 	local character = player.Character
 	if not character or not root.Parent or not anchor.Parent then
 		PairHold.free(player)
@@ -293,15 +304,20 @@ function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, depth
 		PairHold.free(player)
 		mate = nil
 	end
-	-- the far end: Standoff past the far face (its -Z, away from the leader), at the leader's root height, turned to them
+	-- the far end: Standoff past the face across the piece from the leader (8.6: decided as the hold starts, kept in the
+	-- piece's frame: MoveHelperBrain.holdEnd), at the leader's root height, turned to them
 	local rise = carrierRoot.Position.Y - anchor.Position.Y
-	local offset = CFrame.new(0, rise, -Brain.farEnd(depth)) * CFrame.Angles(0, math.pi, 0)
 	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Config.Movement.Walk))
 	if not mate then
-		mate = { hold = PairHold.make(character, root, anchor, offset, speed, { ghost = false, flat = true, owner = player }), trail = Brain.newTrail(), at = clock }
+		local from = anchor.CFrame:PointToObjectSpace(carrierRoot.Position)
+		local ax, az, half = Brain.holdEnd(size.X, size.Z, from.X, from.Z)
+		local reach = Brain.farEnd(half * 2)
+		local made = PairHold.make(character, root, anchor, PairHold.endOffset(ax, az, reach, rise), speed, { ghost = false, flat = true, owner = player })
+		mate = { hold = made, trail = Brain.newTrail(), at = clock, ax = ax, az = az, reach = reach }
 		mates[player] = mate
 	end
 	local m = mate :: Mate
+	local offset = PairHold.endOffset(m.ax, m.az, m.reach, rise)
 	local hold = m.hold
 	local dt = math.clamp(clock - m.at, 0, 0.5)
 	m.at = clock

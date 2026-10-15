@@ -91,6 +91,11 @@
 --                                              the carrier (8.3: else the carrier's floor: never a roof, never a pop)
 --   MoveHelperBrain.farEnd(depth)              how far in front of the piece's middle his root stands (its far face
 --                                              and Standoff)
+--   MoveHelperBrain.holdEnd(sizeX, sizeZ, fromX, fromZ)   8.6 his end of your piece (the owner: "he teleports from
+--                                              side to side"): the face across it from you (`from`: your root in its
+--                                              frame), decided once as the hold starts → its axis (±X or ±Z of the
+--                                              piece) and the half size along it; carried in two the far end of its
+--                                              length
 --   8.1 carrying in two (the owner: "when I turn around he teleports"; the leader's steering: shared/PairCarry.luau):
 --   the far end's holder (Danny, or a crew mate who helps lift: server/PairHold.luau) is never put there at once while
 --   holding, he walks there at a top speed that fits the pair's walk and the swing of a turn:
@@ -105,13 +110,18 @@
 --                                              `reset` (a new hold, a door's fade) or a jump past HoldPace.Jump: none
 --   MoveHelperBrain.leadTime(ping)             8.3 the seconds Danny is aimed ahead: HoldLead.Base + ping × Ping, 0 … Most
 --   MoveHelperBrain.holdLead(trail, seconds)   8.3 how far ahead (x, z studs): the leader's smoothed velocity × seconds,
---                                              HoldLead.Far at most
+--                                              HoldLead.Far at most (8.6: Danny's hold uses endLead instead)
+--   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset)   8.6 Danny's lead now: one look at his END's place (x,
+--                                              z: the piece's turn moves it too), its velocity smoothed over
+--                                              HoldLead.Smooth s × `seconds` (Far at most), reached at HoldLead.Rate
+--                                              studs a second at most (never a jump of his aim); reset: none
 --   MoveHelperBrain.holdTurn()                 his body's top turn (radians a second: HoldTurn × PairTurn)
 --   MoveHelperBrain.newTrail()                 a holder's record of how long he has been behind
 --   MoveHelperBrain.holdTrack(trail, gap, crossed, speed, dt)   one look: `gap` studs off his place, the piece in the
 --                                              other world (`crossed`: a door's fade) → (top speed now, snap): snap
 --                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
---                                              ease of HoldEase s (the gap / HoldEase a second); else `speed`
+--                                              ease of HoldEase s (the gap / HoldEase a second; 8.6: HoldCap at most,
+--                                              unless `speed` is more); else `speed`
 --   8.3 (the owner: "he just jumps weirdly … make him walk like me, backwards too"):
 --   MoveHelperBrain.holdClimb(trail, height, dt, snap)   his root's height now: toward `height` at HoldClimb studs a
 --                                              second at most (a step stepped, never popped; at once on a new hold or a
@@ -502,6 +512,27 @@ function MoveHelperBrain.farEnd(depth: number): number
 	return depth / 2 + cfg().Standoff
 end
 
+-- 8.6 his end of your piece (the owner: "the carrying is still bad. He teleports from side to side"; a screenshot: Danny
+-- beside the Dining Table, at its side): the face of the piece across it from you, in the piece's own frame, decided
+-- once as the hold starts and kept all the carry (its turn, a square-ish piece, a late look at you: never another end).
+-- `sizeX`, `sizeZ`: the piece's size; `fromX`, `fromZ`: your root in its frame. The face where the line from you through
+-- its middle comes out (even: its length's, else its -Z, the old far face); carried in two the piece lies along the
+-- carry (server/Moving.luau's holdOffset), so that is the far end of its length. Returns that face's way out of the
+-- middle (a unit axis of the piece: ±X or ±Z) and the piece's half size along it.
+function MoveHelperBrain.holdEnd(sizeX: number, sizeZ: number, fromX: number, fromZ: number): (number, number, number)
+	local hx = if sizeX == sizeX then math.max(sizeX, 0) / 2 else 0
+	local hz = if sizeZ == sizeZ then math.max(sizeZ, 0) / 2 else 0
+	local x = if fromX == fromX then -fromX else 0 -- (away from you)
+	local z = if fromZ == fromZ then -fromZ else 0
+	-- (the line leaves the box by an X face when |x| / hx > |z| / hz)
+	local byX, byZ = math.abs(x) * hz, math.abs(z) * hx
+	local useX = if math.abs(byX - byZ) <= 1e-9 then hx > hz else byX > byZ
+	if useX then
+		return if x < 0 then -1 else 1, 0, hx
+	end
+	return 0, if z > 0 then 1 else -1, hz
+end
+
 -- His root's height over the piece's middle: the floor's under the far end (`floorRise`, his stand height on it) when it
 -- is within HoldStep of the carrier's floor (`carrierRise`: his stand height on the floor under the carrier's feet):
 -- up and down stairs and steps. 8.3 (the owner: "he just jumps weirdly"): a floor farther off is not his (a porch's
@@ -535,7 +566,8 @@ function MoveHelperBrain.holdTurn(): number
 end
 
 -- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards; the leader's root at the last
--- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz))
+-- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz); 8.6: his end's place
+-- at the last look (endX, endZ; nil: none yet), its smoothed velocity (evx, evz) and his lead now (leadX, leadZ))
 export type Trail = {
 	behind: number,
 	ease: number,
@@ -548,10 +580,17 @@ export type Trail = {
 	pace: number,
 	vx: number,
 	vz: number,
+	endX: number?,
+	endZ: number?,
+	evx: number,
+	evz: number,
+	leadX: number,
+	leadZ: number,
 }
 
 function MoveHelperBrain.newTrail(): Trail
-	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0 }
+	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0,
+		endX = nil, endZ = nil, evx = 0, evz = 0, leadX = 0, leadZ = 0 }
 end
 
 -- 8.3 keeping up: one look at the leader's root (`x`, `z`), `dt` s after the last: their real speed along the ground
@@ -607,6 +646,53 @@ function MoveHelperBrain.holdLead(trail: Trail, seconds: number): (number, numbe
 		dx, dz = dx / far * most, dz / far * most
 	end
 	return dx, dz
+end
+
+-- 8.6 Danny's lead now (the owner: "he teleports from side to side"): 8.3's lead was your root's velocity × leadTime,
+-- taken at once: your step back, a turn's step aside, an uneven look at you (the server hears your walk in bursts) threw
+-- his aim up to HoldLead.Far × 2 studs across within a tenth of a second, and his hold ran him there at its top speed.
+-- Now one look at his END's place (`x`, `z`: the piece's turn moves it too, not just your root), `dt` s after the last:
+-- its velocity smoothed over HoldLead.Smooth s (HoldCap at most); the lead goes toward that × `seconds` (HoldLead.Far
+-- studs at most) at HoldLead.Rate studs a second at most: his aim moves with his end, never faster than Rate on top.
+-- `reset` (a new hold, a door's fade: the other world), no place (NaN), or his end more than HoldPace.Jump studs off
+-- its last look (put there at once): nothing measured, no lead.
+function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number, seconds: number, reset: boolean): (number, number)
+	local c = cfg()
+	local lead = c.HoldLead
+	local lastX, lastZ = trail.endX, trail.endZ
+	local known = x == x and z == z
+	trail.endX = if known then x else nil
+	trail.endZ = if known then z else nil
+	local vx, vz = 0, 0
+	if lastX ~= nil and lastZ ~= nil and known and dt == dt and dt > 1e-4 then
+		vx, vz = (x - lastX) / dt, (z - lastZ) / dt
+	end
+	local speed = math.sqrt(vx * vx + vz * vz)
+	if reset or not known or lastX == nil or dt ~= dt or dt <= 1e-4 or speed * dt > c.HoldPace.Jump then
+		trail.evx, trail.evz, trail.leadX, trail.leadZ = 0, 0, 0, 0
+		return 0, 0
+	end
+	if speed > c.HoldCap then -- (a burst: its way, at HoldCap)
+		vx, vz = vx / speed * c.HoldCap, vz / speed * c.HoldCap
+	end
+	local keep = math.exp(-dt / math.max(lead.Smooth, 0.01))
+	trail.evx = vx + (trail.evx - vx) * keep
+	trail.evz = vz + (trail.evz - vz) * keep
+	local s = if seconds == seconds then math.max(seconds, 0) else 0
+	local wantX, wantZ = trail.evx * s, trail.evz * s
+	local far = math.sqrt(wantX * wantX + wantZ * wantZ)
+	if far > lead.Far and far > 0 then
+		wantX, wantZ = wantX / far * lead.Far, wantZ / far * lead.Far
+	end
+	local dx, dz = wantX - trail.leadX, wantZ - trail.leadZ
+	local gap = math.sqrt(dx * dx + dz * dz)
+	local most = math.max(lead.Rate, 0) * dt
+	if gap > most and gap > 0 then
+		dx, dz = dx / gap * most, dz / gap * most
+	end
+	trail.leadX += dx
+	trail.leadZ += dz
+	return trail.leadX, trail.leadZ
 end
 
 -- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
@@ -671,7 +757,7 @@ function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, 
 	end
 	trail.behind = 0
 	trail.ease = c.HoldEase
-	trail.easeSpeed = gap / math.max(c.HoldEase, 0.05)
+	trail.easeSpeed = math.min(gap / math.max(c.HoldEase, 0.05), math.max(speed, c.HoldCap)) -- (8.6: HoldCap at most)
 	return math.max(speed, trail.easeSpeed), false
 end
 

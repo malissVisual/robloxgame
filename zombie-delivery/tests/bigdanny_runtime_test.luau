@@ -150,7 +150,9 @@ local function pieceOf(spot: number): any
 	return built[#built].pieces[spot]
 end
 local function follow(model: any)
-	model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * CF(0, 0, -3)
+	if not E.welded(model) then -- (8.6: where Moving's weld keeps it: carried in two, lengthwise)
+		model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * CF(0, 0, -3)
+	end
 end
 -- 8.3 a click on a piece (its model: the Moving remote's ("helper", "assign", model)) by Ann, from beside it.
 local function give(model: any)
@@ -418,6 +420,10 @@ if pick and backDoor then
 	check("…off his list (lifted with him), the marker gone", #danny.queue == 0 and markOf(model) == nil and model:GetAttribute("DannyNeeds") == nil
 		and not told(ann, "You took", noticeAt))
 	local function farEnd(): any
+		local ends = danny.gripped == model.PrimaryPart and danny.holdEnd -- (8.6 his end, decided at the lift)
+		if ends then
+			return model.PrimaryPart.CFrame * ends
+		end
 		return (model.PrimaryPart.CFrame * CF(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 	end
 	local steer = PairCarry.newSteer(0)

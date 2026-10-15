@@ -416,7 +416,8 @@ local mateHold = PairHold.of(ann)
 local annRoot = E.rootOf(ann)
 check("8.1 the helper held at the sofa's far end by the server: constraints on Ann's root to an attachment on the sofa", mateHold ~= nil
 	and mateHold.align.Parent == annRoot and mateHold.align.Attachment1.Parent == sofaRoot and mateHold.orient.Attachment1 == mateHold.far
-	and math.abs(mateHold.far.CFrame.Position.Z + (E.items.sofa.size.Z / 2 + H.Standoff)) < 1e-6)
+	-- (8.6: the sofa lies along the carry, its +X ahead of Bob: Ann's end the far end of its length, Standoff past it)
+	and math.abs(mateHold.far.CFrame.Position.X - (E.items.sofa.size.X / 2 + H.Standoff)) < 1e-6 and math.abs(mateHold.far.CFrame.Position.Z) < 1e-6)
 check("…at the pair's top speed (never put there), along the ground only (Ann stands on the floor herself)", mateHold ~= nil
 	and math.abs(mateHold.align.MaxVelocity - Brain.holdSpeed(14 * T.Speed.Pair)) < 1e-6 and mateHold.align.MaxAxesForce.Y == 0
 	and mateHold.align.MaxAxesForce.X > 0 and math.abs(mateHold.orient.MaxAngularVelocity - Brain.holdTurn()) < 1e-6)
@@ -432,7 +433,7 @@ local function bobWalks(speed: number, looks: number)
 	for _ = 1, looks do
 		local bobRoot = E.rootOf(bob)
 		bobRoot.CFrame = bobRoot.CFrame + V3(0, 0, speed * 0.2)
-		sofaRoot.CFrame = bobRoot.CFrame * M.CFrame.new(0, 0, -3)
+		E.welded(sofa) -- (8.6: where the weld keeps it)
 		annRoot.CFrame = sofaRoot.CFrame * mateHold.far.CFrame
 		E.clock += 0.2
 		Moving.step()
@@ -453,7 +454,8 @@ E.place(bob, origin.Position + V3(0, 3, 1))
 trigger(leave, ann)
 check("the helper does not lead the way", string.find(E.lastNotice(ann), "front", 1, true) ~= nil)
 trigger(leave, bob)
-check("the carrier leads out, the helper comes along", (E.rootOf(bob).Position - outside).Magnitude < 4 and (E.rootOf(ann).Position - outside).Magnitude < 6)
+check("the carrier leads out, the helper comes along", (E.rootOf(bob).Position - outside).Magnitude < 4
+	and (E.rootOf(ann).Position - outside).Magnitude < 4 + Config.Cargo.CarryFront + E.items.sofa.size.X + H.Standoff) -- (8.6: at its length's far end)
 -- too far apart for Grace s: it goes down (8.1: held, the tether waits for the hold's ease back too)
 sofaRoot.CFrame = E.rootOf(bob).CFrame * M.CFrame.new(0, 0, -3) -- (the weld, in Roblox: it came out with Bob)
 E.clock += 0.2

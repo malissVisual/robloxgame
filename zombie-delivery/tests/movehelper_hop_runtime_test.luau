@@ -166,7 +166,7 @@ local carried: any = nil
 -- The piece in Ann's arms (the weld, in Roblox): server/Moving.luau's place for a carried piece (CarryLow over her
 -- root's middle, CarryFront in front of it), so its middle is as high as in the game.
 local function hold()
-	if carried then
+	if carried and not E.welded(carried) then -- (8.6: where Moving's weld keeps it: carried in two, lengthwise and low)
 		local size = carried.PrimaryPart.Size
 		carried.PrimaryPart.CFrame = E.rootOf(ann).CFrame * M.CFrame.new(0, C.CarryLow + size.Y / 2, -(C.CarryFront + size.Z / 2))
 	end
@@ -219,6 +219,10 @@ local function holding(): boolean
 	return role == "helper"
 end
 local function farEnd(): any
+	local ends = danny and danny.gripped == carried.PrimaryPart and danny.holdEnd -- (8.6 his end, decided at the lift)
+	if ends then
+		return carried.PrimaryPart.CFrame * ends
+	end
 	return (carried.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(carried.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 end
 -- Ann walks to `to` with the piece (the leader's client: shared/PairCarry.luau steer, the pair's walk), `look` after
