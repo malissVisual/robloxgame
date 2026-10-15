@@ -8180,6 +8180,129 @@ Config.Auction = {
 	Window = { Width = 720, Height = 430, Tile = 150, TileTouch = 168, TileHeight = 96 },
 }
 
+-- 8.9 SANDBOX, Jinočany (design/jinocany/NAVRH.md, plan.json): the village's looks. shared/VillageLooks.luau builds
+-- the parts from these numbers (tests/villagelooks_test.luau, tools/village/preview.py); nothing is on the map yet.
+-- Colours { r, g, b }; materials are Enum.Material's names.
+--   Palette   every colour of the village: Render (the old houses' and the rows' walls: cream, ochre, light grey, pale
+--             yellow, apricot), Modern (a new build's: white, light grey), Tiles (the clay roofs: red, brick red, brown,
+--             dark brown), the window Frames (white, brown), the Doors, the Fences (wood, painted green, grey), the
+--             chapel's walls and spire, the drugstore's, the D5's, the barrier's and Sýkorka's, the Crops (a field's
+--             ground) and their Rows, each tree kind's trunk and crowns, the far view's
+--   Budget    parts at most: a house of each kind (old; row: each house of a terraced body; modern), Rich (one of the six
+--             houses to empty, a little richer: for a row, its group's parts at most Rich - row more), a tree, each
+--             landmark kind, a field tile with its rows, the far view (Horizon), and Step1: all the parts VillageLooks
+--             gives step 1's village (plan.json's step-1 houses, the rows in groups of four; the step-1 landmarks; the
+--             fields; the tree lines, the orchard and the green's and the pond's trees; the far view: 1,863 today,
+--             VillageLooks.census). The map holds SandboxScenery.Budget (2,500): Step1 leaves Kept for what stays or is
+--             the map's own (tools/perf/sandbox_count.py's projection, 8.8's map: the roads 111 (Pražská, Depot Row,
+--             the turnaround), the farmstead 130, the ground 23, the boundary 4, the lamps and the signpost 37, the
+--             Auction House 101 once it is on: 406; and the village's new roads and lawns)
+--   Chunk     studs: a piece's chunk is "<floor(x / Chunk)>_<floor(z / Chunk)>" of its house's or its own middle (one
+--             Atomic model each, as SandboxScenery's trees); "ground" (field tiles) and "far" (the D5, the far view)
+--             are big, kept on every client (Persistent)
+--   Front     studs: a house's front wall this far in from its box's front edge (its eaves stay inside the box; the
+--             door's face about 1.2 in from plan.json's door)
+--   RowUnit   studs: one house of a terraced row along the street (plan.py's 18)
+--   Facing    the yaw each of plan.json's landmarks looks (SandboxMap's: 0 north, 90 west, 180 south, 270 east): the
+--             chapel and the green to Hlavní, the pond to Pražská, the drugstore to Depot Row, the D5 to the village,
+--             Sýkorka to its car park; Barrier: the barrier stands on plan.json's road Road, Inset studs in from its
+--             west end, Deep deep, looking (Yaw) east
+--   Trees     per kind: Height { min, max } studs, Wide and Tall (the crown's width and height × the tree's height),
+--             Trunk (its thickness × the height)
+--   Lines     studs between two trees of a Windbreak (Mix: its kinds, in turn at random) and of an Alley (fruit
+--             trees); Orchard { across x, across z } between two rows, Edge studs in from its rect
+--   Fields    a field's crop rows: one every Rows studs across it, at most MaxRows
+--   Far       the far view: Reach (studs the far fields reach out of the Bounds)
+export type VillageTree = { Height: { number }, Wide: number, Tall: number, Trunk: number }
+export type VillageTreeLook = { Trunk: { number }, Crowns: { { number } } }
+Config.Village = {
+	Palette = {
+		Render = { { 238, 226, 198 }, { 222, 186, 116 }, { 204, 204, 198 }, { 240, 224, 156 }, { 236, 208, 176 } } :: { { number } },
+		Modern = { { 242, 242, 238 }, { 206, 208, 208 } } :: { { number } },
+		Tiles = { { 172, 74, 52 }, { 150, 62, 46 }, { 122, 78, 58 }, { 98, 66, 52 } } :: { { number } },
+		Plinth = { 128, 126, 120 } :: { number },
+		Frames = { { 244, 242, 236 }, { 110, 76, 52 } } :: { { number } },
+		Glass = { 62, 80, 94 } :: { number },
+		Doors = { { 104, 70, 44 }, { 58, 84, 62 }, { 112, 44, 38 }, { 72, 60, 52 } } :: { { number } },
+		Fences = { { 134, 98, 66 }, { 82, 110, 78 }, { 112, 112, 108 } } :: { { number } },
+		Gate = { 92, 66, 46 } :: { number },
+		Brick = { 152, 80, 60 } :: { number },
+		Concrete = { 170, 168, 162 } :: { number },
+		Trim = { 248, 246, 240 } :: { number },
+		Anthracite = { 58, 62, 66 } :: { number },
+		Larch = { 172, 124, 80 } :: { number },
+		FlatRoof = { 96, 98, 100 } :: { number },
+		Mailbox = { 46, 84, 58 } :: { number },
+		Chapel = { { 246, 244, 236 }, { 236, 204, 112 } } :: { { number } },
+		Spire = { { 96, 140, 120 }, { 70, 74, 80 } } :: { { number } },
+		Slate = { 80, 84, 90 } :: { number },
+		Stone = { 152, 150, 144 } :: { number },
+		Iron = { 52, 54, 58 } :: { number },
+		Gold = { 212, 172, 74 } :: { number },
+		DarkWood = { 74, 52, 38 } :: { number },
+		Bench = { 142, 102, 64 } :: { number },
+		Notice = { 52, 82, 64 } :: { number },
+		Hedge = { 62, 94, 48 } :: { number },
+		Gravel = { 188, 178, 156 } :: { number },
+		Water = { 62, 100, 106 } :: { number },
+		Bank = { 106, 130, 66 } :: { number },
+		Reeds = { 92, 116, 54 } :: { number },
+		Shop = { Wall = { 236, 238, 236 }, Sign = { 30, 130, 122 }, Canopy = { 30, 130, 122 }, Glass = { 92, 124, 138 }, Door = { 70, 100, 112 } } :: { [string]: { number } },
+		Asphalt = { 58, 58, 62 } :: { number },
+		Line = { 236, 236, 228 } :: { number },
+		Grass = { 110, 136, 64 } :: { number },
+		NoiseWall = { { 112, 126, 116 }, { 98, 112, 104 } } :: { { number } },
+		Rail = { 176, 178, 176 } :: { number },
+		Barrier = { Red = { 200, 44, 40 }, White = { 244, 244, 240 }, Lamp = { 255, 150, 30 }, Post = { 210, 210, 206 } } :: { [string]: { number } },
+		Hardware = { Hall = { 184, 188, 192 }, Roof = { 142, 146, 150 }, Sign = { 36, 82, 160 }, Door = { 120, 124, 128 }, Mesh = { 96, 110, 100 }, Bricks = { 168, 78, 56 }, Blocks = { 176, 174, 168 }, Tiles = { 160, 70, 50 }, Bags = { 222, 218, 206 }, Timber = { 206, 172, 120 }, Pallet = { 170, 136, 92 }, Sand = { 214, 190, 140 }, Gravel = { 150, 146, 140 } } :: { [string]: { number } },
+		Crops = { rapeseed = { 226, 198, 46 }, wheat = { 212, 180, 98 }, ploughed = { 116, 88, 62 }, young = { 124, 156, 70 } } :: { [string]: { number } },
+		Rows = { rapeseed = { 196, 176, 40 }, wheat = { 188, 156, 82 }, ploughed = { 92, 68, 48 }, young = { 104, 136, 58 } } :: { [string]: { number } },
+		Trees = {
+			linden = { Trunk = { 92, 80, 68 }, Crowns = { { 78, 116, 50 }, { 88, 124, 54 }, { 70, 106, 46 } } },
+			oak = { Trunk = { 96, 78, 60 }, Crowns = { { 64, 98, 44 }, { 72, 104, 46 }, { 58, 90, 42 } } },
+			birch = { Trunk = { 228, 224, 214 }, Crowns = { { 118, 158, 70 }, { 128, 166, 76 } } },
+			poplar = { Trunk = { 110, 104, 92 }, Crowns = { { 84, 118, 56 }, { 94, 128, 60 } } },
+			willow = { Trunk = { 104, 92, 76 }, Crowns = { { 132, 150, 92 }, { 120, 142, 84 } } },
+			fruit = { Trunk = { 104, 80, 60 }, Crowns = { { 98, 138, 58 }, { 108, 146, 62 }, { 90, 128, 54 } } },
+		} :: { [string]: VillageTreeLook },
+		Far = { Meadow = { 104, 132, 62 }, Trees = { 60, 88, 46 }, Pylon = { 150, 152, 150 }, Wire = { 60, 62, 64 }, Wall = { 226, 220, 204 }, Roof = { 160, 72, 52 } } :: { [string]: { number } },
+	},
+	Budget = {
+		old = 15,
+		row = 15,
+		modern = 15,
+		Rich = 25,
+		tree = 2,
+		chapel = 26,
+		green = 40,
+		pond = 26,
+		shop = 20,
+		motorway = 16,
+		barrier = 14,
+		hardware = 32,
+		field = 11,
+		Horizon = 140,
+		Step1 = 1900,
+		Kept = 600,
+	} :: { [string]: number },
+	Chunk = 128,
+	Front = 1.5,
+	RowUnit = 18,
+	Facing = { chapel = 180, green = 180, pond = 90, shop = 0, motorway = 90, hardware = 180 } :: { [string]: number },
+	Barrier = { Road = "Hornická", Inset = 8, Deep = 6, Yaw = 270 },
+	Trees = {
+		linden = { Height = { 28, 36 }, Wide = 0.62, Tall = 0.66, Trunk = 0.05 },
+		oak = { Height = { 26, 34 }, Wide = 0.74, Tall = 0.6, Trunk = 0.06 },
+		birch = { Height = { 26, 34 }, Wide = 0.36, Tall = 0.64, Trunk = 0.035 },
+		poplar = { Height = { 38, 48 }, Wide = 0.22, Tall = 0.8, Trunk = 0.035 },
+		willow = { Height = { 20, 26 }, Wide = 0.88, Tall = 0.66, Trunk = 0.07 },
+		fruit = { Height = { 12, 16 }, Wide = 0.8, Tall = 0.64, Trunk = 0.07 },
+	} :: { [string]: VillageTree },
+	Lines = { Windbreak = 36, Alley = 26, Mix = { "linden", "oak", "linden", "birch", "poplar" } :: { string }, Orchard = { 36, 32 } :: { number }, Edge = 12 },
+	Fields = { Rows = 16, MaxRows = 10 },
+	Far = { Reach = 1200 },
+}
+
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).
 -- server/SandboxBadges.luau only listens (the moves, the collection, the upgrades, the save, the TOP MOVERS board) and
 -- awards a badge on the server when its milestone is reached; shared/SandboxBadgeRules.luau has the rules

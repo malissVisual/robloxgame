@@ -28,6 +28,7 @@ PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxb
 PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
 PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
 PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
+PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -384,8 +385,19 @@ with tempfile.TemporaryDirectory() as tmp:
     areas += [("field " + f["kind"], f["rect"]) for f in plan["fields"]] + [("house " + h["id"], h["box"]) for h in plan["houses"] + plan["enter"]]
     lines = ["\t{ name = %s, rect = %s }," % (json.dumps(name, ensure_ascii=False), rect(r)) for name, r in areas]
     trees = ["\t{ %s }," % ", ".join("{ %r, %r }" % (p["x"], p["z"]) for p in t["points"]) for t in plan["treeLines"]]
+    # 8.9: and as the village's entries for tests/villagelooks_test.luau (shared/VillageLooks.luau builds them): every
+    # house (its kind, box, yaw, door, step, one to empty), landmark (kind, rect, step), road, field and tree line.
+    q = lambda text: json.dumps(text, ensure_ascii=False)
+    houses = ["\t{ id = %s, street = %s, kind = %s, box = %s, yaw = %r, door = { x = %r, z = %r, yaw = %r }, step = %r, enter = %s },"
+              % (q(h["id"]), q(h["street"]), q(h["kind"]), rect(h["box"]), h["yaw"], h["door"]["x"], h["door"]["z"], h["door"]["yaw"], h["step"],
+                 "true" if h["enter"] else "false") for h in plan["houses"]]
+    marks = ["\t{ id = %s, kind = %s, rect = %s, step = %r }," % (q(l["id"]), q(l["kind"]), rect(l["rect"]), l["step"]) for l in plan["landmarks"]]
+    roads = ["\t{ name = %s, rect = %s, step = %r }," % (q(r["name"]), rect(r["rect"]), r["step"]) for r in plan["roads"]]
+    fields = ["\t{ kind = %s, rect = %s }," % (q(f["kind"]), rect(f["rect"])) for f in plan["fields"]]
+    paths = ["\t{ kind = %s, points = { %s } }," % (q(t["kind"]), ", ".join("{ x = %r, z = %r }" % (p["x"], p["z"]) for p in t["points"])) for t in plan["treeLines"]]
     open(os.path.join(tmp, "JinocanyPlan.luau"), "w", encoding="utf-8").write(
-        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\n}\n" % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees)))
+        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\nhouses = {\n%s\n},\nlandmarks = {\n%s\n},\nroads = {\n%s\n},\nfields = {\n%s\n},\nlines = {\n%s\n},\n}\n"
+        % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees), "\n".join(houses), "\n".join(marks), "\n".join(roads), "\n".join(fields), "\n".join(paths)))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
