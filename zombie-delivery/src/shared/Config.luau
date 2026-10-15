@@ -8026,8 +8026,8 @@ Config.SandboxLight = {
 --   Reserve     × the piece's worth (its value × its condition): the lot opens there (rounded up to a step) and never
 --               sells for less
 --   Steps       { from $, step $ }: the next bid is always the price + the step of the price's band
---   Fee         the share of a sale the house keeps from the seller (Config.PlayerTrade.Fee instead once it exists: one
---               fee for the trades between players and the auction)
+--   (the fee)   the house keeps Config.PlayerTrade.Fee of a sale from the seller: one fee for the trades between players
+--               and the auction (shared/PlayerTradeRules.luau fee: 8 %, rounded)
 --   Collectors  the NPC bidders: Count of them a lot (their names drawn from Names); each one's max = the worth ×
 --               Rarity[the piece's] × Hot or Cold (the day's market, shared/Market.luau) × a die in Spread, the keenest's
 --               at least the opening price (every lot sells); one answers a bid after Delay s (a die), never later than
@@ -8062,7 +8062,6 @@ Config.Auction = {
 	Rarities = { "rare", "epic", "legendary" } :: { string },
 	Reserve = 1,
 	Steps = { { 0, 25 }, { 500, 50 }, { 1000, 100 }, { 2500, 200 }, { 5000, 250 }, { 10000, 500 }, { 25000, 1000 } } :: { { number } },
-	Fee = 0.08,
 	Collectors = {
 		Count = 3,
 		Rarity = { rare = 1.05, epic = 1.1, legendary = 1.2 } :: { [string]: number },

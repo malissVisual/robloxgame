@@ -45,7 +45,7 @@ do
 		ascending = ascending and A.Steps[i][1] > A.Steps[i - 1][1] and A.Steps[i][2] >= A.Steps[i - 1][2]
 	end
 	check("the bid steps grow with the price", ascending and A.Steps[1][1] == 0)
-	check("the fee: 8 % (the trades' once Config.PlayerTrade has one)", A.Fee == 0.08 and Rules.feeRate() == (if (Config :: any).PlayerTrade and (Config :: any).PlayerTrade.Fee then (Config :: any).PlayerTrade.Fee else 0.08))
+	check("the fee: the trades' (Config.PlayerTrade.Fee, 8 %), no fee of the auction's own", (A :: any).Fee == nil and Rules.feeRate() == Config.PlayerTrade.Fee and Config.PlayerTrade.Fee == 0.08)
 	local C = A.Collectors
 	local seen: { [string]: boolean } = {}
 	local unique = true
@@ -292,13 +292,16 @@ do
 	local sale, fee, buy = AnalyticsPlan.money("AuctionSale", 100), AnalyticsPlan.money("AuctionFee", -8), AnalyticsPlan.money("AuctionBuy", -100)
 	check("the money's reasons in AnalyticsPlan: AuctionSale a source (Sale), AuctionFee and AuctionBuy sinks", sale.reason == "AuctionSale" and sale.flow == "Source" and sale.kind == "Sale"
 		and fee.reason == "AuctionFee" and fee.flow == "Sink" and buy.reason == "AuctionBuy" and buy.flow == "Sink" and buy.kind == "Shop")
-	local saved = (Config :: any).PlayerTrade
-	;(Config :: any).PlayerTrade = { Fee = 0.1 }
-	local shared = Rules.feeRate() == 0.1 and Rules.fee(1000) == 100
-	;(Config :: any).PlayerTrade = { Fee = 2 }
-	local junk = Rules.feeRate() == A.Fee
-	;(Config :: any).PlayerTrade = saved
-	check("one fee with the trades: Config.PlayerTrade.Fee once it exists (junk ignored)", shared and junk)
+	local PlayerTradeRules = require("./PlayerTradeRules")
+	local same = true
+	for price = 1, 20000, 37 do
+		same = same and Rules.fee(price) == PlayerTradeRules.fee(price)
+	end
+	local saved = Config.PlayerTrade.Fee
+	Config.PlayerTrade.Fee = 0.1
+	local follows = Rules.feeRate() == 0.1 and Rules.fee(1000) == 100
+	Config.PlayerTrade.Fee = saved
+	check("one fee with the trades: Config.PlayerTrade.Fee, rounded as PlayerTradeRules.fee, and it follows a change", same and follows)
 end
 
 -- ── Who may consign what ────────────────────────────────────────────────────

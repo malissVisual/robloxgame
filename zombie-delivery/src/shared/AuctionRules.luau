@@ -17,9 +17,9 @@
 --     answers a bid after a short wait (Delay), never past its max: a pure bidding model, seeded by the lot (the same
 --     lot always plays the same).
 --   * The settlement: the top bid whose bidder can pay wins (a collector always can); no bid at all: the keenest
---     collector at the opening price. The seller gets the price less the fee (Config.PlayerTrade.Fee once the trades
---     between players have it, else Config.Auction.Fee); the money's reasons AuctionSale, AuctionFee and AuctionBuy
---     (shared/AnalyticsPlan.luau).
+--     collector at the opening price. The seller gets the price less the fee: the trades' own (8.7, Config.PlayerTrade.Fee
+--     through shared/PlayerTradeRules.luau fee: one fee for both, rounded the same); the money's reasons AuctionSale,
+--     AuctionFee and AuctionBuy (shared/AnalyticsPlan.luau).
 --   * The Grand Auction (later): a daily round of the house's own lots (no seller): Config.Auction.Grand's hooks.
 --
 -- The round's schedule:
@@ -49,7 +49,8 @@
 --   AuctionRules.play(lot, collectors, players?)  the lot played to its end (the tests' and the design's numbers): the
 --                                                 collectors and players { by, name, max, delay } bidding by the rules
 -- The settlement:
---   AuctionRules.feeRate() / fee(price)           the seller's fee's share / $ on a sale (rounded)
+--   AuctionRules.feeRate() / fee(price)           the seller's fee's share (Config.PlayerTrade.Fee) / $ on a sale
+--                                                 (PlayerTradeRules.fee: rounded, never over the price)
 --   AuctionRules.settle(lot, collectors, canPay?) Result: who buys it, the price, the fee, the seller's net
 --   AuctionRules.payments(result)                 { { userId, reason, delta } } the money it moves (the server's step)
 --   AuctionRules.Reasons                          { Sale = "AuctionSale", Fee = "AuctionFee", Buy = "AuctionBuy" }
@@ -74,6 +75,7 @@
 local Config = require(script.Parent.Config)
 local CollectionRules = require(script.Parent.CollectionRules)
 local Market = require(script.Parent.Market)
+local PlayerTradeRules = require(script.Parent.PlayerTradeRules) -- (8.7: the trades' fee, the auction's too)
 
 local AuctionRules = {}
 
@@ -500,7 +502,8 @@ function AuctionRules.play(lot: Lot, collectors: { Collector }, players: { Playe
 		end
 		local top = AuctionRules.leader(lot)
 		local amount = AuctionRules.nextBid(lot)
-		for _, p in players or {} do
+		local list: { Player } = players or {}
+		for _, p in list do
 			if (top == nil or top.by ~= p.by) and amount <= p.max and p.by ~= lot.seller then
 				local at = (if top then top.at else lot.opensAt) + math.max(0, p.delay)
 				if at < lot.endsAt and (best == nil or at < (best :: Bid).at) then
@@ -518,19 +521,13 @@ end
 
 -- ── The settlement ──────────────────────────────────────────────────────────
 
--- The seller's fee: Config.PlayerTrade.Fee once the trades between players have it (one fee for both), else
--- Config.Auction.Fee.
+-- The seller's fee: the trades' between players (8.7, Config.PlayerTrade.Fee), one fee for both.
 function AuctionRules.feeRate(): number
-	local trade = (Config :: any).PlayerTrade
-	local fee = if type(trade) == "table" then trade.Fee else nil
-	if finite(fee) and fee >= 0 and fee < 1 then
-		return fee
-	end
-	return tune().Fee
+	return math.clamp(Config.PlayerTrade.Fee, 0, 1)
 end
 
 function AuctionRules.fee(price: number): number
-	return math.max(0, math.floor((if finite(price) then price else 0) * AuctionRules.feeRate() + 0.5))
+	return PlayerTradeRules.fee(price)
 end
 
 -- Who buys the lot (closed): the top bid whose bidder can pay (canPay(userId, amount); nil: every player can; a
@@ -708,6 +705,7 @@ local function readLot(raw: any): LotView?
 	if type(raw) ~= "table" or not shortString(raw.item, MAX_ID) or not amountOf(raw.price) or not amountOf(raw.next) or not finite(raw.endsAt) then
 		return nil
 	end
+	local market: string? = if raw.market == "hot" or raw.market == "cold" then raw.market else nil
 	return {
 		id = if finite(raw.id) then math.floor(raw.id) else 0,
 		item = raw.item,
@@ -727,7 +725,7 @@ local function readLot(raw: any): LotView?
 		seller = if shortString(raw.seller, MAX_NAME) then raw.seller else "The house",
 		mine = raw.mine == true,
 		fresh = raw.fresh == true,
-		market = if raw.market == "hot" or raw.market == "cold" then raw.market else nil,
+		market = market,
 	}
 end
 

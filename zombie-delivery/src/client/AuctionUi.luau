@@ -34,6 +34,7 @@
 --   AuctionUi.layout(W, H, touch)      the card on a W × H screen (px under Roblox's top bar)
 --   AuctionUi.paint()                  the building's sign and lot display, now (the tick does it)
 --   AuctionUi.notify / onOpen          hooks: the toasts, the window opened
+--   AuctionUi.Wait                     s a request waits for its answer (then "The Auction House didn't answer")
 -- Presentation only: every decision is the server's.
 
 local GuiService = game:GetService("GuiService")
@@ -90,10 +91,10 @@ export type Layout = {
 
 AuctionUi.notify = nil :: ((text: string) -> ())?
 AuctionUi.onOpen = nil :: (() -> ())?
+AuctionUi.Wait = 4 -- s a request waits for the server's answer before it is given up (the stub: nobody answers yet)
 
 local HEADER = 52
 local SCROLLBAR = 6
-local WAIT = 4 -- s a request waits for the server's answer before it is given up (the stub: nobody answers yet)
 local TABS = { { "live", "🔨 LIVE LOT" }, { "consign", "📦 CONSIGN" }, { "results", "🏁 RESULTS" } }
 
 local started = false
@@ -229,7 +230,8 @@ end
 -- The pieces of the stock that may go to auction, the best first.
 local function consignable(): { Piece }
 	local list: { Piece } = {}
-	for _, piece in stock or {} do
+	local pieces: { Piece } = stock or {}
+	for _, piece in pieces do
 		if Rules.consignable(piece) then
 			table.insert(list, piece)
 		end
@@ -242,7 +244,8 @@ local function consignable(): { Piece }
 end
 
 local function pieceOf(uid: string?): Piece?
-	for _, piece in stock or {} do
+	local list: { Piece } = stock or {}
+	for _, piece in list do
 		if piece.uid == uid then
 			return piece
 		end
@@ -466,6 +469,26 @@ local function drawLive(frame: any, layout: Layout, now: number): any
 		table.insert(after, `{iconOf(u.item)} {u.name}`)
 	end
 	line(frame, "Upcoming", if #after > 0 then `Next: {table.concat(after, " · ")}` else "The last lot of this round", rx, y + 92 + layout.button, rw, 16, 12, K.secondary)
+	local snipe = Config.Auction.Snipe.Window
+	line(frame, "Snipe", `A bid in the last {snipe} s puts the clock back to {Rules.clock(snipe)}`, rx, y + 112 + layout.button, rw, 16, 12, K.secondary)
+	-- the round's lots: the ones sold (their price), this one, the ones to come
+	local count = math.max((view :: Rules.View).count, (view :: Rules.View).index)
+	local stripY = layout.h - layout.pad - 52
+	local inner = layout.w - 2 * layout.pad
+	local boxW = math.floor((inner - (count - 1) * 6) / math.max(1, count))
+	for n = 1, count do
+		local done = (view :: Rules.View).results[n]
+		local coming = (view :: Rules.View).upcoming[n - (view :: Rules.View).index]
+		local isNow = n == (view :: Rules.View).index
+		local cell = Ui.make("Frame", { Name = `Lot_{n}`, Size = UDim2.fromOffset(boxW, 52), Position = UDim2.fromOffset(layout.pad + (n - 1) * (boxW + 6), stripY), BackgroundColor3 = if isNow then K.raised else K.row, BorderSizePixel = 0 }, frame)
+		Ui.corner(cell, 8)
+		if isNow then
+			Ui.make("UIStroke", { Name = "Now", ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.red, Thickness = 1, Transparency = 0.2 }, cell)
+		end
+		line(cell, "Number", `LOT {n}`, 8, 6, boxW - 16, 14, 11, if isNow then K.red else K.secondary, Theme.HeadingFont)
+		local what = if isNow then `● NOW · {lot.name}` elseif done and n < (view :: Rules.View).index then `✓ {Rules.money(done.price)} · {done.name}` elseif coming then `{iconOf(coming.item)} {coming.name}` else "—"
+		line(cell, "What", what, 8, 24, boxW - 16, 18, 13, if isNow then K.text elseif done then C.gold else K.secondary, Theme.HeadingFont)
+	end
 	return bid
 end
 
@@ -561,7 +584,7 @@ end
 -- RESULTS: the last round's lots, yours marked.
 local function drawResults(frame: any, layout: Layout, now: number): any
 	local view = current
-	local results = if view then view.results else {}
+	local results: { Rules.ResultView } = if view then view.results else {}
 	local rowH, gap = 44, 6
 	local tall = math.max(0, #results * (rowH + gap) - gap)
 	local list = Ui.make("ScrollingFrame", {
@@ -599,7 +622,7 @@ end
 -- and BID, a request that got no answer.
 local function follow()
 	local now = serverNow()
-	if waiting and os.clock() - waiting.at > WAIT then
+	if waiting and os.clock() - waiting.at > AuctionUi.Wait then
 		waiting = nil
 		toast("The Auction House didn't answer: try again in a moment.")
 		if opened then
@@ -693,7 +716,7 @@ draw = function(keepScroll: boolean)
 	-- the header: the title, the round's line and your money, the ✕
 	local wide = layout.w - (layout.pad * 2 + layout.close + 8)
 	line(frame, "Title", "🔨 AUCTION HOUSE", layout.pad, 10, wide, 24, 18, K.text, Theme.HeadingFont)
-	line(frame, "Subtitle", subtitleOf(now), layout.pad, 33, wide, 16, 12, K.secondary)
+	line(frame, "Subtitle", subtitleOf(now), layout.pad, 34, wide, 16, 12, K.secondary)
 	local close = Ui.closeButton(frame, AuctionUi.close)
 	close.Size = UDim2.fromOffset(layout.close, layout.close)
 	close.Position = UDim2.new(1, -6, 0, 6)
@@ -796,6 +819,7 @@ function AuctionUi.open(which: string?)
 		tab = if current and current.lot then "live" elseif current and #current.results > 0 and current.phase == "results" then "results" else "consign"
 	end
 	if not was then
+		selected = nil -- (a fresh open: no piece picked yet)
 		local onOpen = AuctionUi.onOpen
 		if onOpen then
 			onOpen()
