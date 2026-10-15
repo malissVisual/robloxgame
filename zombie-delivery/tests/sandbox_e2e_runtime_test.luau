@@ -381,7 +381,7 @@ function H.launch(player: any)
 	E.fire(player, "MoveLobby", "launch")
 	E.advance(0.5)
 end
--- The van's middle along the roads: out of the plot, Depot Row, Main Street, round the turnaround to the curb, backed
+-- The van's middle along the roads: out of the plot, Depot Row, Pražská, round the turnaround to the curb, backed
 -- toward the chalet's door (its nose north).
 function H.toHouse(plot: any): { any }
 	return {
@@ -392,7 +392,7 @@ function H.toHouse(plot: any): { any }
 		{ x = House.curb.x, z = House.curb.z, yaw = House.curb.yaw },
 	}
 end
--- Home: Main Street north, Depot Row to the plot, then backed in (nose south, the back doors to the roller door) or
+-- Home: Pražská north, Depot Row to the plot, then backed in (nose south, the back doors to the roller door) or
 -- nose-in (nose north).
 function H.toPlot(plot: any, noseIn: boolean): { any }
 	return {
@@ -749,7 +749,7 @@ end
 
 do
 	local card, ok, why = H.takeContract(ann, plots[1])
-	check("3. Ann at her kiosk: the contract card, The Old Chalet, free to start", ok and card ~= nil and card.id == House.id and card.busy == nil
+	check("3. Ann at her kiosk: the contract card, The Old Farmstead, free to start", ok and card ~= nil and card.id == House.id and card.busy == nil
 		and card.items > 0 and card.story == false, why or (card and card.busy))
 	local before = #E.sent
 	E.fire(ann, "Moving", "start", House.id)

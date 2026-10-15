@@ -472,7 +472,7 @@ end
 -- model's front door; no import here, so the chalet as it is (tools/house-art/check.py dresses it). 8.3 the big move:
 -- its doors' leaves and its back door (House.back) on the model's back door.
 do
-	local chalet = world:FindFirstChild("TheOldChalet")
+	local chalet = world:FindFirstChild("TheOldFarmstead")
 	check("the chalet is a model with its house's id", chalet ~= nil and chalet:IsA("Model") and chalet:GetAttribute("SandboxHouse") == HOUSE.id)
 	local own = chalet and chalet:FindFirstChild("House_" .. HOUSE.id)
 	local h = HOUSE.house
@@ -746,7 +746,7 @@ do
 	check("8.5 the doorways walkable: nothing that collides in either door's hall or its way out (leaves, doorway, the House box)", blocked == nil, blocked)
 	check("8.5 …the house's walls either side of each hall, over its doorway and past its end still solid", walls)
 	local lining = named("DoorHall")
-	local holder = world:FindFirstChild("TheOldChalet"):FindFirstChild("DoorHalls")
+	local holder = world:FindFirstChild("TheOldFarmstead"):FindFirstChild("DoorHalls")
 	local liningOk = #lining == 10 and holder ~= nil
 	for _, b in lining do
 		local c = b.part.Color
@@ -773,11 +773,11 @@ do
 			end
 		end
 	end
-	check("the signpost: ← WAREHOUSES, THE OLD CHALET → (and the other ways round)", texts["← WAREHOUSES"] == 2 and texts["WAREHOUSES →"] == 2 and texts["THE OLD CHALET →"] == 1 and texts["← THE OLD CHALET"] == 1)
-	check("the mailbox says THE OLD CHALET", mailbox == "THE OLD CHALET", mailbox)
+	check("the signpost: ← WAREHOUSES, THE OLD FARMSTEAD → (and the other ways round)", texts["← WAREHOUSES"] == 2 and texts["WAREHOUSES →"] == 2 and texts["THE OLD FARMSTEAD →"] == 1 and texts["← THE OLD FARMSTEAD"] == 1)
+	check("the mailbox says THE OLD FARMSTEAD", mailbox == "THE OLD FARMSTEAD", mailbox)
 end
 
--- the street lamps along Main Street, off its shoulders
+-- the street lamps along Pražská, off its shoulders
 do
 	local poles = named("LampPole")
 	local ok = #poles >= 4
@@ -787,7 +787,7 @@ do
 		local off = math.min(math.abs(x - MAIN.x0), math.abs(x - MAIN.x1))
 		ok = ok and off > RUN and off < RUN + 4 and z > DEPOT.z1 and z < TURN.z - TURN.r and not onAsphalt(x, z)
 	end
-	check(`street lamps along Main Street ({#poles})`, ok)
+	check(`street lamps along Pražská ({#poles})`, ok)
 end
 
 -- shadows only from the bigger parts

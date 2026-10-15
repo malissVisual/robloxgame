@@ -42,8 +42,8 @@
 --   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
 --   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
 --   a move, at the house, outside       door      "Walk in through the front door"                        House.door
---   a move, not at the house            drive     "Drive to The Old Chalet"                               House.curb
---     (after a trip home)               back      "Drive back to The Old Chalet for more, or FINISH"      House.curb
+--   a move, not at the house            drive     "Drive to The Old Farmstead on Pražská"                 House.curb
+--     (after a trip home)               back      "Drive back to The Old Farmstead on Pražská for more, or FINISH"
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
 --   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the board
@@ -206,7 +206,7 @@ export type Last = { vanLoad: number?, delivered: number?, shown: number?, level
 -- A display stand's place in the world (client/SandboxGuide.luau reads them from shared/WarehouseLayout.luau).
 export type Place = { x: number, y: number, z: number }
 
-local HOUSE = SandboxMap.House.name
+local HOUSE = `{SandboxMap.House.name} on {SandboxMap.House.street}` -- (the contract's house and its street)
 local DANNY = Config.MoveHelper.Name -- 8.4
 
 local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?, pad: string?): Step
@@ -586,9 +586,9 @@ function SandboxSteps.atHouse(x: number, z: number, margin: number): boolean
 end
 
 -- ── The path along the roads ───────────────────────────────────────────────
--- Depot Row (the plots' road, east-west) and Main Street (north-south, down to the house). A point north of Depot
--- Row's far edge is on the depot's side (the plots, the row itself), the rest is Main Street's side (the street, the
--- meadow, the house). The path goes out to the row's middle line, along it to Main Street's, along that, then in.
+-- Depot Row (the plots' road, east-west) and Pražská (north-south, down to the house). A point north of Depot Row's
+-- far edge is on the depot's side (the plots, the row itself), the rest is Pražská's side (the street, the meadow, the
+-- house). The path goes out to the row's middle line, along it to Pražská's, along that, then in.
 
 local ROW = SandboxMap.Roads[2]
 local MAIN = SandboxMap.Roads[1]

@@ -1,7 +1,7 @@
 -- 8.3 the big move × Danny for hire: the real server/Moving.luau, server/MoveHelper.luau (on
 -- tests/runtime/MovingRuntime.luau's fakes, Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau,
 -- shared/HouseLayout.luau's kind "big", server/HouseInterior.luau: tests/run_tests.py builds them on the recorder), a solo
--- move into the sandbox's big house (The Old Chalet, the owner's big Blender house: its big plan). No
+-- move into the sandbox's big house (The Old Farmstead, the owner's big Blender house: its big plan). No
 -- physics, no pathfinding: his walk is a straight step (useMover, as tests/movehelper_art_runtime_test.luau's), a carried
 -- piece goes where its carrier is (the test moves it); his paths through the real walls are PathfindingService's in
 -- Roblox (the big house's doorways are a house's; its leaves PassThrough: tests/biglayout_test.luau), the floor under

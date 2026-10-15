@@ -10,7 +10,7 @@
 --     (Collection.onChanged) changes, at most every Every s a player: the changes in between wait for that moment, the
 --     last one always lands.
 --   * The TOP MOVERS board: a wooden alpine signboard (two posts on stone footings, a planked panel, a little gable
---     roof, a flower box) at the crossroads' south-east corner, across Main Street from the signpost
+--     roof, a flower box) at the crossroads' south-east corner, across Pražská from the signpost
 --     (SandboxLeadersRules.spot: off the roads, their shoulders, the plots, the lamps and the trees; its face to the
 --     crossroads). The same board on both faces (a SurfaceGui each): this server's players ranked by what their
 --     collection is worth (SandboxLeadersRules.rank), each with $ a minute, legendaries and the all-time best; written

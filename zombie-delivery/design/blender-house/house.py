@@ -4,7 +4,7 @@ Spuštění v Blenderu: záložka Scripting → Open → house.py → Run Script
 "House": omítnuté zdi s rohovými kvádry a soklem, bílé šambrány, parapety a okna s křížem, truhlíky s muškáty,
 dvoukřídlé zelené dveře, sedlovou střechu z pálených tašek s vikýři, komíny, okapy a svody.
 
-TARGET vybírá, který dům ve hře nahradí: "sandbox" = The Old Chalet v testovacím světě (44 × 14,5 × 34, střecha do
+TARGET vybírá, který dům ve hře nahradí: "sandbox" = The Old Farmstead v testovacím světě (44 × 14,5 × 34, střecha do
 výšky 26), "city" = dům Marge ve městě (155 Willow Ln). Rozměry jsou přesně ty, které má dům ve hře (krabice HOUSE:
 šířka W, výška zdí H, hloubka D; 1 jednotka = 1 stud). Předek domu míří na -Y, střed spodku domu je v počátku. Ve
 městě hra na zeď s dveřmi věší transparent MOVING DAY a staví krabice a srolovaný koberec, proto tam nejsou truhlíky
@@ -19,7 +19,7 @@ from mathutils import Vector, Matrix
 # ───────────────────────────────────────────────────────────── NASTAVENÍ
 EXPORT = False   # True = uloží ZDCHouseArt.fbx pro hru do složky "roblox" vedle .blend souboru
 
-TARGET = "sandbox"   # "sandbox" = The Old Chalet v sandboxu, "city" = dům Marge ve městě
+TARGET = "sandbox"   # "sandbox" = The Old Farmstead v sandboxu, "city" = dům Marge ve městě
 
 # Dům pro každý cíl: krabice ve hře (W, H, D), sklon střechy (None: co nejstrmější pod výškou "top"), přesah střechy
 # vpředu a vzadu, okna (polohy podél zdí), vikýře, komíny (x, y na zadním svahu), keře u vchodu.

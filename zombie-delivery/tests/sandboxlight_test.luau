@@ -160,7 +160,7 @@ do
 	check("the interiors far off the map are the house", Rules.place(9000, 403, 9000, false, false) == "house")
 	check("the move's house says inside: the house (even by a van's bay)", Rules.place(0, 3, 0, true, false) == "house" and Rules.place(0, 3, 0, true, true) == "house")
 	check("in a van's bay: the van (even in front of a warehouse)", Rules.place(plot.vanSpot.x, 3, plot.vanSpot.z, false, true) == "van")
-	check("Main Street is outdoors", Rules.place(0, 3, 100, false, false) == "outdoors")
+	check("Pražská is outdoors", Rules.place(0, 3, 100, false, false) == "outdoors")
 end
 
 -- ── The budget ────────────────────────────────────────────────────────────────
