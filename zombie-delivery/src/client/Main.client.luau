@@ -39,11 +39,12 @@ end
 --                                      panel), 8.3's MoveHelperCard (Danny's command card: a window too), 8.5's
 --                                      DannyOrders (Danny's clipboard, orders mode: no window), OfferCard (a showroom
 --                                      visitor's offer: a window too; 8.7: a player's offer too), VanPaintUi (the PAINT
---                                      shop's window) and 8.7's TradeUi (trading between players: the offer composer,
+--                                      shop's window), 8.7's TradeUi (trading between players: the offer composer,
 --                                      the FOR SALE price picker, the buy question; a window too, the STOCK list's 🏷
---                                      opens its picker and closing that goes back to the list): each started only
---                                      when it is there; 8.7's TradePrompts (the trade prompts on your own stands
---                                      hidden, a big sale's chat line) next to CargoPrompts
+--                                      opens its picker and closing that goes back to the list) and 8.8's AuctionUi (the
+--                                      Auction House's window: it starts nothing while Config.Auction.On is false):
+--                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
+--                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
 -- version and the server's stamp (workspace "ServerBuild"); different: a warning, and in Studio a red banner that says
 -- what to delete before syncing again.
@@ -125,7 +126,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -154,7 +155,8 @@ if Config.Sandbox.On then
 	local OfferCard = ownModule("OfferCard") -- (8.3: a showroom visitor's offer, a window like the others)
 	local PaintUi = ownModule("VanPaintUi") -- (8.3: the PAINT shop's window)
 	local TradeUi = ownModule("TradeUi") -- (8.7: trading between players: the composer, the price picker, the buy question)
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi }
+	local AuctionUi = ownModule("AuctionUi") -- (8.8: the Auction House's window: the live lot, the consign picker, the results)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -263,7 +265,7 @@ if Config.Sandbox.On then
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
 			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
-			or ownOpen(OfferCard) or ownOpen(TradeUi)
+			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	if type(OfferCard) == "table" then

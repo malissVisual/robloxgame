@@ -30,6 +30,10 @@
 --             you in sees a dark hall)
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
+--   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
+--             Auction House on Depot Row, east of the crossroads (shared/AuctionHouseLayout.luau's parts, its place
+--             Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
+--             client paints), the consignment desk's prompt (AuctionDesk), the lot's pedestal (AuctionLotStand), two lamps
 --   Boundary  the invisible walls on the Bounds
 --   Far       (a Persistent model: every client always has it) outside the Bounds: the far meadow, the green hills and
 --             the snowy peaks that close the view; no collision but the far meadow's, no shadows
@@ -46,6 +50,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AlpineLayout = require(Shared.AlpineLayout)
+local AuctionHouseLayout = require(Shared.AuctionHouseLayout) -- 8.8: the Auction House (only while Config.Auction.On)
 local ChaletLooks = require(Shared.ChaletLooks)
 local Config = require(Shared.Config) -- 8.5 walk-in doors: the doors' halls (Config.Moving.Doors.Hall)
 local RenderBudget = require(Shared.RenderBudget)
@@ -511,6 +516,87 @@ local function house(world: Instance): Model
 	return model
 end
 
+-- ── 8.8 The Auction House ──────────────────────────────────────────────────
+
+-- shared/AuctionHouseLayout.luau's parts (only while Config.Auction.On) in the Atomic model "AuctionHouse", dressed by
+-- their tags: the sign's and the lot display's words (client/AuctionUi.luau paints them from the auction's view), the
+-- desk's "Consign a piece" prompt (attribute AuctionDesk: the client opens the window), the lot's pedestal (attribute
+-- AuctionLotStand: where the server's step shows the piece), the lamps' light.
+local function auctionHouse(world: Instance): Model
+	local H = Config.Auction.House
+	local model = Instance.new("Model")
+	model.Name = "AuctionHouse"
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model:SetAttribute("AuctionHouse", true)
+	local cream, gold = Color3.fromRGB(250, 242, 222), Color3.fromRGB(255, 206, 92)
+	local function surface(part: BasePart, face: Enum.NormalId, names: { string }, boxes: { { number } }, texts: { string }, colors: { Color3 })
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Words"
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 0.3
+		gui.MaxDistance = H.Range
+		for n, name in names do
+			local b = boxes[n]
+			local line = Instance.new("TextLabel")
+			line.Name = name
+			line.BackgroundTransparency = 1
+			line.Position = UDim2.fromScale(b[1], b[2])
+			line.Size = UDim2.fromScale(b[3], b[4])
+			line.Text = texts[n] or ""
+			line.TextScaled = true
+			line.Font = if n == 1 or b[4] >= 0.2 then Enum.Font.GothamBlack else Enum.Font.GothamBold
+			line.TextColor3 = colors[n] or cream
+			line.TextXAlignment = if b[5] == 1 then Enum.TextXAlignment.Left elseif b[5] == 2 then Enum.TextXAlignment.Right else Enum.TextXAlignment.Center
+			line.Parent = gui
+		end
+		gui.Parent = part
+	end
+	for _, spec in AuctionHouseLayout.parts() do
+		local size = Vector3.new(spec.sx, spec.sy, spec.sz)
+		local frame = CFrame.new(spec.x, spec.y, spec.z) * CFrame.Angles(0, math.rad(spec.yaw), 0)
+		local p: BasePart = if spec.shape == "wedge"
+			then wedge(model, spec.name, size, frame, rgb(spec.color), material(spec.material))
+			else block(model, spec.name, size, frame, rgb(spec.color), material(spec.material))
+		if not spec.solid then
+			deco(p)
+		end
+		p.Transparency = spec.alpha or 0
+		if spec.tag == "sign" then -- (its words: Title, and Next: the client's "Next auction in 12:34")
+			surface(p, Enum.NormalId.Front, AuctionHouseLayout.SignLabels, { { 0.03, 0.06, 0.94, 0.58 }, { 0.03, 0.66, 0.94, 0.28 } }, { "AUCTION HOUSE", "" }, { gold, cream })
+		elseif spec.tag == "screen" then -- (the lot on the podium: the client writes it; built empty but for the title)
+			surface(p, Enum.NormalId.Front, AuctionHouseLayout.ScreenLabels,
+				{ { 0.04, 0.05, 0.92, 0.11 }, { 0.04, 0.19, 0.92, 0.2 }, { 0.04, 0.41, 0.92, 0.1 }, { 0.04, 0.53, 0.92, 0.24 }, { 0.04, 0.8, 0.6, 0.13, 1 }, { 0.66, 0.8, 0.3, 0.13, 2 } },
+				{ "AUCTION HOUSE", "No lot on the podium", "", "", "", "" }, { gold, cream, cream, gold, cream, cream })
+		elseif spec.tag == "notice" then -- (faces the hall: the part's -X)
+			surface(p, Enum.NormalId.Left, { "Title", "Line" }, { { 0.05, 0.08, 0.9, 0.5 }, { 0.05, 0.62, 0.9, 0.28 } }, { "CONSIGN HERE", "rare · epic · legendary" }, { gold, cream })
+		elseif spec.tag == "desk" then
+			local prompt = Instance.new("ProximityPrompt")
+			prompt.Name = "AuctionDeskPrompt"
+			prompt.ActionText = "Consign a piece"
+			prompt.ObjectText = "Auction desk"
+			prompt.KeyboardKeyCode = Enum.KeyCode.E
+			prompt.HoldDuration = 0
+			prompt.MaxActivationDistance = 9
+			prompt.RequiresLineOfSight = false
+			prompt:SetAttribute("AuctionDesk", true)
+			prompt.Parent = p
+		elseif spec.tag == "stand" then
+			p:SetAttribute("AuctionLotStand", true)
+		elseif spec.tag == "lamp" then
+			local light = Instance.new("PointLight")
+			light.Brightness = H.Lamp.Brightness
+			light.Range = H.Lamp.Range
+			light.Color = rgb(H.Lamp.Color)
+			light.Shadows = false
+			light.Parent = p
+		end
+	end
+	model.Parent = world
+	return model
+end
+
 -- ── The scenery ────────────────────────────────────────────────────────────
 
 -- A tree's or a flower's part from AlpineLayout's numbers (a trunk cylinder standing up, a needle spire ellipsoid).
@@ -697,6 +783,9 @@ function SandboxWorld.build(): Folder
 	roads(world)
 	house(world)
 	scenery(world)
+	if Config.Auction.On then -- 8.8: the Auction House, only once the auction is on (nothing of it shows before)
+		auctionHouse(world)
+	end
 	boundary(world)
 	far(world)
 	world.Parent = workspace -- (in one go)
