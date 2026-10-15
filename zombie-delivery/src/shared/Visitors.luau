@@ -46,8 +46,11 @@
 --   Visitors.say(event, roll, name?, price?)      a visitor's line ("greet", "look", "offer", "sold", "declined",
 --                                                 "expired", "gone"; nil: it says nothing)
 --   Visitors.toast(who, price, name)             "🤝 The collector offers $340 for your Gramophone"
---   Visitors.cardLines(offer)                     the card's lines: who, price, item, market ("Market price $260 · +31%")
---   Visitors.readOffer(raw)                       the remote's offer checked (nil for anything else)
+--   Visitors.cardLines(offer)                     the card's lines: who, price, item, market ("Market price $260 · +31%");
+--                                                 8.7: a player's offer (offer.player): "🧑 Ann offers", "Worth $800 · +50%"
+--   Visitors.readOffer(raw)                       the remote's offer checked (nil for anything else); 8.7: a player's too
+--                                                 (server/PlayerTrade.luau's: player = true, who their name, base the
+--                                                 piece's value)
 
 local Config = require(script.Parent.Config)
 local NpcLooks = require(script.Parent.NpcLooks)
@@ -90,6 +93,7 @@ export type Offer = {
 	seconds: number, -- s it stays open (from when it reached the client)
 	rarity: string?,
 	market: string?, -- "hot", "cold" or nil
+	player: boolean?, -- 8.7: another player's offer (server/PlayerTrade.luau: its answer goes back on the "PlayerTrade" remote)
 }
 
 local SQRT2 = math.sqrt(2)
@@ -601,6 +605,14 @@ end
 
 function Visitors.cardLines(offer: Offer): { who: string, price: string, item: string, market: string }
 	local more = if offer.base > 0 then math.floor((offer.price / offer.base - 1) * 100 + 0.5) else 0
+	if offer.player then -- 8.7: another player's offer (its base the piece's value: PlayerTradeRules.value)
+		return {
+			who = `🧑 {offer.who} offers`,
+			price = Market.money(offer.price),
+			item = `for your {offer.name}`,
+			market = `Worth {Market.money(offer.base)} · {if more >= 0 then "+" else "−"}{math.abs(more)}%`,
+		}
+	end
 	return {
 		who = `The {string.lower(offer.who)} offers`,
 		price = Market.money(offer.price),
@@ -633,6 +645,7 @@ function Visitors.readOffer(raw: any): Offer?
 		seconds = seconds,
 		rarity = if shortString(raw.rarity, MAX_ID) then raw.rarity else nil,
 		market = if raw.market == "hot" or raw.market == "cold" then raw.market :: string else nil,
+		player = if raw.player == true then true else nil,
 	}
 end
 

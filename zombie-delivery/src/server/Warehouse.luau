@@ -33,6 +33,13 @@
 --     the attribute Level (1 … 5, set before WarehouseMesh dresses it), workspace.Warehouses the attribute
 --     Level<plot id> (the clients' copy: client/SandboxGuide.luau, shared/SoundPlan.luau). A rebuild only on a real
 --     change of level.
+--   * 8.7, trading between players (server/PlayerTrade.luau decides, Config.PlayerTrade): a full stand's "Set price"
+--     (V, the gamepad's R1; the owner's only, as the others) opens the owner's price picker for a FOR SALE sign; for
+--     every other player "Make an offer" (E, X: the offer composer) and, while the piece carries a sign, "Buy $X" (F, Y:
+--     the buy question). Those two are tagged Config.PlayerTrade.PromptTag with the owner's UserId (SellerAttribute):
+--     client/TradePrompts.luau hides them from the owner, and the server refuses the owner anyway. Each use goes to
+--     Warehouse.onTrade (server/SandboxBoot.luau sets it: PlayerTrade.prompt; none: a notice). A piece with a sign
+--     shows it on its tag, a third line "🏷 FOR SALE $X" for everybody (the tag a little taller: still under the roof).
 -- A collection's changes (Collection.onChanged) rebuild only the stands whose piece changed, Config.Warehouse.Rebuild
 -- apart at most; an owner who leaves takes their pieces with them (the plot is FOR RENT again). Nothing runs per frame.
 -- The van's unloading is the moves' (the plot's unload circle); here only its bay is painted.
@@ -44,6 +51,8 @@
 --   Warehouse.terminal(id)      8.1: plot `id`'s UPGRADES desk (its part with the prompt; nil before start)
 --   Warehouse.isOpen(id, i)     8.1: does plot `id`'s stand i stand there (the owner has it)?
 --   Warehouse.level(id)         8.3: the level plot `id`'s warehouse is built at (1 … 5; nil before start)
+--   Warehouse.onTrade           8.7: fn(by, owner, stand, action) a trade prompt used: action "price" (the owner's Set
+--                               price), "offer" (Make an offer), "buy" (Buy $X) (server/PlayerTrade.luau's prompt)
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -64,11 +73,23 @@ local WarehouseMesh = require(script.Parent.WarehouseMesh) -- 8.2: the owner's B
 
 local T = Config.Warehouse
 local TAG_REACH, TAG_UNDER = 3.5, 0.9 -- 8.3: a stand's tag's half width (7 studs) and its middle under the roof (its half height 0.8)
+local TAG_H, SALE_H = 1.6, 2.4 -- 8.7: a tag's height (studs) without (makeTag's) and with its FOR SALE line
+local TRADE = (Config :: any).PlayerTrade -- 8.7: trading between players (nil or Off: no trade prompts)
+local SALE_INK = Color3.fromRGB(255, 208, 92) -- 8.7: the FOR SALE line's gold
 
 local Warehouse = {}
 
+Warehouse.onTrade = nil :: ((by: Player, owner: Player, stand: number, action: string) -> ())? -- 8.7 (server/SandboxBoot.luau)
+
 type Shown = { uid: string, item: string, variant: number, model: Model, height: number }
-type Prompts = { display: ProximityPrompt, takeDown: ProximityPrompt, sell: ProximityPrompt }
+type Prompts = {
+	display: ProximityPrompt,
+	takeDown: ProximityPrompt,
+	sell: ProximityPrompt,
+	price: ProximityPrompt?, -- 8.7: the owner's Set price (a FOR SALE sign)
+	offer: ProximityPrompt?, -- 8.7: everybody else's Make an offer
+	buy: ProximityPrompt?, -- 8.7: … and Buy $X while the piece carries a sign
+}
 type Stand = {
 	index: number,
 	podium: BasePart,
@@ -79,6 +100,7 @@ type Stand = {
 	prompts: Prompts?,
 	tag: BillboardGui,
 	tagLabels: { TextLabel },
+	saleLabel: TextLabel, -- 8.7: the tag's FOR SALE line (hidden without a sign)
 	shown: Shown?,
 }
 type PlotState = {
@@ -209,8 +231,9 @@ local function build(parent: Instance, d: WarehouseLayout.Piece): (BasePart, { T
 	return p, labels
 end
 
--- A stand's tag over its piece: the name in its rarity's colour, "RARE · +$3/min" (hidden while the stand is empty).
-local function makeTag(podium: BasePart): (BillboardGui, { TextLabel })
+-- A stand's tag over its piece: the name in its rarity's colour, "RARE · +$3/min" (hidden while the stand is empty);
+-- 8.7: a third line "🏷 FOR SALE $X" while the piece carries a sign (setSale: the tag grows for it).
+local function makeTag(podium: BasePart): (BillboardGui, { TextLabel }, TextLabel)
 	local tag = Instance.new("BillboardGui")
 	tag.Name = "Tag"
 	tag.Adornee = podium
@@ -250,7 +273,34 @@ local function makeTag(podium: BasePart): (BillboardGui, { TextLabel })
 		label.Parent = back
 		labels[index] = label
 	end
-	return tag, labels
+	local sale = Instance.new("TextLabel") -- 8.7: the FOR SALE line
+	sale.Name = "Line3"
+	sale.LayoutOrder = 3
+	sale.Size = UDim2.fromScale(0.92, 0.3)
+	sale.BackgroundTransparency = 1
+	sale.Font = Enum.Font.GothamBlack
+	sale.TextScaled = true
+	sale.TextStrokeTransparency = 0.5
+	sale.TextColor3 = SALE_INK
+	sale.Text = ""
+	sale.Visible = false
+	sale.Parent = back
+	return tag, labels, sale
+end
+
+-- 8.7: the tag with or without its FOR SALE line (its lines' shares of the taller tag keep their heights in studs).
+local function setSale(stand: Stand, price: number?)
+	local label = stand.saleLabel
+	local on = price ~= nil
+	local height = if on then SALE_H else TAG_H
+	stand.tag.Size = UDim2.fromScale(7, height)
+	local shares = { 0.52 * TAG_H / height, 0.36 * TAG_H / height }
+	for index, line in stand.tagLabels do
+		line.Size = UDim2.fromScale(0.92, shares[index] or 0.3)
+	end
+	label.Visible = on
+	label.Size = UDim2.fromScale(0.92, 0.7 / SALE_H)
+	label.Text = if price then `🏷 FOR SALE {WarehouseLayout.money(price)}` else ""
 end
 
 -- 8.1: a stand the owner has (its podium, top and plate there; the podium and the top solid) or not (only its painted
@@ -351,8 +401,8 @@ local function buildModel(state: PlotState, level: number)
 		anchor.Name = "Prompts"
 		anchor.CFrame = edge(podium, podiumYaws[i] or 0, spot.yaw, 1.6, -0.3) -- (its offset in the podium)
 		anchor.Parent = podium
-		local tag, tagLabels = makeTag(podium)
-		local stand: Stand = { index = i, podium = podium, parts = standParts[i] or { podium }, solid = solid, open = true, anchor = anchor, prompts = nil, tag = tag, tagLabels = tagLabels, shown = nil }
+		local tag, tagLabels, saleLabel = makeTag(podium)
+		local stand: Stand = { index = i, podium = podium, parts = standParts[i] or { podium }, solid = solid, open = true, anchor = anchor, prompts = nil, tag = tag, tagLabels = tagLabels, saleLabel = saleLabel, shown = nil }
 		setOpen(stand, i <= open) -- (an upgrade stand: its spot only, until an owner has it)
 		stands[i] = stand
 	end
@@ -469,11 +519,19 @@ local function refresh(state: PlotState)
 		local now = stand.shown
 		if entry and now then
 			setLines(stand.tagLabels, WarehouseLayout.tagLines(entry.name, rarityOf(entry), rates[index] or 0))
+			local sale = if TRADE and TRADE.On then entry.sale else nil -- 8.7: its FOR SALE sign
+			setSale(stand, sale)
 			-- (over the piece: from the podium's middle up past its top; 8.3: its top under the hall's roof where its half
 			-- width reaches back, a Garage's low back slope: WarehouseLayout.ceiling, so a tall piece's tag sits lower)
 			local top = WarehouseLayout.FloorTop + T.StandHeight + now.height
 			local roof = WarehouseLayout.ceiling(state.site, stand.podium.Position.Z - TAG_REACH) - TAG_UNDER
 			stand.tag.StudsOffsetWorldSpace = Vector3.new(0, math.min(top + 1.3, roof) - stand.podium.Position.Y, 0)
+			if sale then
+				-- 8.7: the taller tag with its FOR SALE line: its middle higher by its extra half height, as far under the
+				-- roof (its top where the plain tag's would be: tools/warehouse/mesh-check.py's room under the roof)
+				local grow = (SALE_H - TAG_H) / 2
+				stand.tag.StudsOffsetWorldSpace = Vector3.new(0, math.min(top + 1.3 + grow, roof - grow) - stand.podium.Position.Y, 0)
+			end
 			stand.tag.Enabled = true
 		else
 			stand.tag.Enabled = false
@@ -486,6 +544,24 @@ local function refresh(state: PlotState)
 			prompts.display.ObjectText = `Stand {index}`
 			prompts.takeDown.ObjectText = if entry then entry.name else ""
 			prompts.sell.ObjectText = if entry then entry.name else ""
+			-- 8.7: Set price (the owner), Make an offer and Buy $X (everybody else)
+			local name = if entry then entry.name else ""
+			local sale = if entry then entry.sale else nil
+			local price, offer, buy = prompts.price, prompts.offer, prompts.buy
+			if price then
+				price.Enabled = entry ~= nil
+				price.ActionText = if sale then `Price {WarehouseLayout.money(sale)}` else "Set price"
+				price.ObjectText = name
+			end
+			if offer then
+				offer.Enabled = entry ~= nil
+				offer.ObjectText = name
+			end
+			if buy then
+				buy.Enabled = sale ~= nil
+				buy.ActionText = if sale then `Buy {WarehouseLayout.money(sale)}` else "Buy"
+				buy.ObjectText = name
+			end
 		end
 	end
 	setLines(state.stockLabels, WarehouseLayout.stockLines(stock, income, shown, math.min(count, #state.stands)))
@@ -516,6 +592,23 @@ end
 -- not theirs, but a client can't be trusted).
 local function use(state: PlotState, stand: Stand, by: Player, action: string)
 	local owner = state.owner
+	if action == "offer" or action == "buy" or action == "price" then
+		-- 8.7: a trade prompt (server/PlayerTrade.luau checks who may do what)
+		local now = os.clock()
+		if (busy[by] or 0) > now then
+			return
+		end
+		busy[by] = now + 0.4
+		local hook = Warehouse.onTrade
+		if not owner then
+			notice:FireClient(by, "This warehouse is for rent.")
+		elseif not hook then
+			notice:FireClient(by, "Trading isn't open on this server.")
+		else
+			hook(by, owner, stand.index, action)
+		end
+		return
+	end
 	if by ~= owner then
 		notice:FireClient(by, if owner then `This is {owner.DisplayName}'s warehouse.` else "This warehouse is for rent.")
 		return
@@ -579,6 +672,25 @@ local function useDesk(state: PlotState, by: Player)
 	Upgrades.open(by)
 end
 
+-- 8.7: a trade prompt for everybody but the owner: tagged Config.PlayerTrade.PromptTag with the owner's UserId
+-- (client/TradePrompts.luau hides it from them; the server checks anyway).
+local function tradePrompt(stand: Stand, name: string, action: string, key: Enum.KeyCode, pad: Enum.KeyCode, owner: Player): ProximityPrompt
+	local p = Instance.new("ProximityPrompt")
+	p.Name = name
+	p.ActionText = action
+	p.ObjectText = ""
+	p.KeyboardKeyCode = key
+	p.GamepadKeyCode = pad
+	p.HoldDuration = 0
+	p.MaxActivationDistance = T.PromptDistance
+	p.RequiresLineOfSight = false
+	p.Enabled = false
+	p:SetAttribute(TRADE.SellerAttribute, owner.UserId)
+	CollectionService:AddTag(p, TRADE.PromptTag)
+	p.Parent = stand.anchor
+	return p
+end
+
 -- New prompts for a new owner (a prompt hidden for a player stays hidden on their client: fresh ones show right).
 local function remakePrompts(state: PlotState, owner: Player?)
 	local oldDesk = state.deskPrompt
@@ -610,6 +722,11 @@ local function remakePrompts(state: PlotState, owner: Player?)
 			old.display:Destroy()
 			old.takeDown:Destroy()
 			old.sell:Destroy()
+			for _, extra: ProximityPrompt? in { old.price, old.offer, old.buy } do -- (8.7: the trade's, when there are any)
+				if extra then
+					extra:Destroy()
+				end
+			end
 			stand.prompts = nil
 		end
 		if owner then
@@ -627,6 +744,21 @@ local function remakePrompts(state: PlotState, owner: Player?)
 			made.sell.Triggered:Connect(function(by: Player)
 				use(state, stand, by, "sell")
 			end)
+			if TRADE and TRADE.On then -- 8.7: trading between players
+				local price = prompt(stand, "SetPrice", "Set price", Enum.KeyCode.V, Enum.KeyCode.ButtonR1, 0, owner)
+				local offer = tradePrompt(stand, "MakeOffer", "Make an offer", Enum.KeyCode.E, Enum.KeyCode.ButtonX, owner)
+				local buy = tradePrompt(stand, "Buy", "Buy", Enum.KeyCode.F, Enum.KeyCode.ButtonY, owner)
+				price.Triggered:Connect(function(by: Player)
+					use(state, stand, by, "price")
+				end)
+				offer.Triggered:Connect(function(by: Player)
+					use(state, stand, by, "offer")
+				end)
+				buy.Triggered:Connect(function(by: Player)
+					use(state, stand, by, "buy")
+				end)
+				made.price, made.offer, made.buy = price, offer, buy
+			end
 			stand.prompts = made
 		end
 	end

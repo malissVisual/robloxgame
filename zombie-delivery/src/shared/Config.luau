@@ -5642,6 +5642,8 @@ Config.Robust = {
 		MoveHelperOrder = 3, -- 8.6: an order to Danny, PUT IT DOWN / GET OUT (the Moving remote's ("helper", "putdown" | "getout"))
 		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
+		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
+		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 	},
 }
 
@@ -7171,7 +7173,7 @@ Config.Collection = {
 	IdleAfter = 600, -- 8.3 economy: the stands of a player idle this long earn only IdleShare of their income
 	IdleShare = 0.25,
 	IdleMove = 4,
-	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint" } :: { string },
+	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
 }
 
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
@@ -7744,6 +7746,44 @@ Config.Visitors = {
 	} :: { VisitorKind },
 }
 
+-- 8.7 SANDBOX, trading between players (the owner: "I'd like customers to be players too … I want selling to make
+-- sense"). Another player is a buyer who wants a piece they lack (for their book, a legendary, a hot kind) and pays more
+-- than the game would. shared/PlayerTradeRules.luau has the rules (tests/playertrade_test.luau), server/PlayerTrade.luau
+-- decides every offer and sale (tests/playertrade_runtime_test.luau), client/TradeUi.luau is the composer, the price
+-- picker and the buy question, client/OfferCard.luau the seller's card (a visitor's and a player's offers).
+--   On          false: no trade prompts, every request refused
+--   MinTimes    a price is at least this × the piece's value (its sell price to the game without the market:
+--               CollectionRules.sell, its condition in it; the same every day, so a FOR SALE sign stays valid)
+--   MaxTimes    … and at most this × it (money passed between friends' accounts stays bounded)
+--   Fee         the ZDC fee: this share of the price is taken from the seller's side and disappears (a money sink)
+--   Expire      s an offer stays open for the seller's answer
+--   PerSeller   open offers one seller holds at most (a buyer holds one at a time)
+--   Presets     the composer's and the picker's quick prices: × the value (clamped to the bounds)
+--   StepShare   the −/+ step: the roundest of 1, 2, 5 × 10ⁿ at most this × the price shown (never under the value's;
+--               $1 at least): 10 % a tap, so 10 × is a dozen taps past the 3 × preset
+--   BigSale     $: a sale this big or bigger is told to the whole server in the chat (0: never)
+--   Tick        s between two looks at the offers' clocks
+--   PromptTag / SellerAttribute   the CollectionService tag and attribute (the seller's UserId) of the stands' prompts
+--               for the other players ("Make an offer", "Buy $X"): client/TradePrompts.luau hides them from the seller
+-- The tuning: a piece sells to the game for about a quarter of an hour of showing it (Config.Collection); a player who
+-- lacks it pays 1 – 10 × that, the seller keeps 92 % (at 2 × the game's price: 1.84 ×, so selling to a player makes
+-- sense; at 1 × it is a loss of 8 %, so a sign at the game's price is pointless). A legendary sells to the game for
+-- $1,100 – 1,400: at 2 × it is a big sale.
+Config.PlayerTrade = {
+	On = true,
+	MinTimes = 1,
+	MaxTimes = 10,
+	Fee = 0.08,
+	Expire = 45,
+	PerSeller = 3,
+	Presets = { 1, 1.5, 2, 3 } :: { number },
+	StepShare = 0.1,
+	BigSale = 2500,
+	Tick = 0.5,
+	PromptTag = "TradePrompt",
+	SellerAttribute = "TradeSeller",
+}
+
 -- 8.3 SANDBOX, the PAINT shop (the owner: give players a way to make their van their own). A 🎨 Paint van prompt on your
 -- own Sprinter while it stands at your plot's van spot opens the shop's window (client/VanPaintUi.luau; its 3D picture
 -- client/VanPaintPreview.luau). server/VanPaint.luau sells, keeps what you own (profile.vanPaint: { owned, worn }, read
@@ -7995,6 +8035,7 @@ Config.SandboxBadges = {
 		warehouse5 = { id = 0, name = "Logistics Tycoon", description = "Grow your warehouse to level 5." },
 		painted = { id = 0, name = "Fresh Paint", description = "Paint your van at the PAINT shop." },
 		topMover = { id = 0, name = "Top Mover", description = "Top the TOP MOVERS board on a full server." },
+		firstDeal = { id = 0, name = "First Deal", description = "Sell a piece to another player, or buy one from them." }, -- 8.7: trading
 	} :: { [string]: SandboxBadgeDef },
 	Studio = false,
 	Moves = 10,

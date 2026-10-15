@@ -26,6 +26,7 @@ PURE += ("DoorSwing",)  # 8.3 walk-in doors: a door leaf's swing (tests/doorswin
 PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxbadges_test.luau, tests/sandboxbadges_runtime_test.luau)
 PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
 PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
+PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -311,6 +312,16 @@ with tempfile.TemporaryDirectory() as tmp:
         source = source.replace(f"require(script.Parent.{module})", f"require({built})")
     assert "script.Parent" not in source, "server/VisitorOffers.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "VisitorOffersServer.luau"), "w", encoding="utf-8").write(head + source)
+    # 8.7 SANDBOX, trading between players: the real server/PlayerTrade.luau as PlayerTradeServer.luau for
+    # tests/playertrade_runtime_test.luau on the same runtime (its PlayerData, Collection, CollectionBook, VisitorOffers
+    # and SandboxBadges the real ones above and below).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "PlayerTrade.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    for module, built in (("PlayerData", '"./PlayerDataServer"'), ("Collection", '"./CollectionServer"'), ("CollectionBook", '"./CollectionBookServer"'),
+                          ("VisitorOffers", '"./VisitorOffersServer"'), ("SandboxBadges", '"./SandboxBadgesServer"')):
+        source = source.replace(f"require(script.Parent.{module})", f"require({built})")
+    assert "script.Parent" not in source, "server/PlayerTrade.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "PlayerTradeServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.3 SANDBOX, the Roblox badges: the real server/SandboxBadges.luau as SandboxBadgesServer.luau for
     # tests/sandboxbadges_runtime_test.luau on the same runtime: its PlayerData, Collection and Upgrades the real ones
     # above, Moving and SandboxLeaders the test's stand-ins (E.Moving: its onResult; E.SandboxLeaders: the board's rows),
