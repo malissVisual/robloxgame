@@ -100,6 +100,11 @@
 --                                              the carrier (8.3: else the carrier's floor: never a roof, never a pop)
 --   MoveHelperBrain.farEnd(depth)              how far in front of the piece's middle his root stands (its far face
 --                                              and Standoff)
+--   MoveHelperBrain.holdEnd(sizeX, sizeZ, fromX, fromZ)   8.6 his end of your piece (the owner: "he teleports from
+--                                              side to side"): the face across it from you (`from`: your root in its
+--                                              frame), decided once as the hold starts → its axis (±X or ±Z of the
+--                                              piece) and the half size along it; carried in two the far end of its
+--                                              length
 --   8.1 carrying in two (the owner: "when I turn around he teleports"; the leader's steering: shared/PairCarry.luau):
 --   the far end's holder (Danny, or a crew mate who helps lift: server/PairHold.luau) is never put there at once while
 --   holding, he walks there at a top speed that fits the pair's walk and the swing of a turn:
@@ -114,13 +119,18 @@
 --                                              `reset` (a new hold, a door's fade) or a jump past HoldPace.Jump: none
 --   MoveHelperBrain.leadTime(ping)             8.3 the seconds Danny is aimed ahead: HoldLead.Base + ping × Ping, 0 … Most
 --   MoveHelperBrain.holdLead(trail, seconds)   8.3 how far ahead (x, z studs): the leader's smoothed velocity × seconds,
---                                              HoldLead.Far at most
+--                                              HoldLead.Far at most (8.6: Danny's hold uses endLead instead)
+--   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset)   8.6 Danny's lead now: one look at his END's place (x,
+--                                              z: the piece's turn moves it too), its velocity smoothed over
+--                                              HoldLead.Smooth s × `seconds` (Far at most), reached at HoldLead.Rate
+--                                              studs a second at most (never a jump of his aim); reset: none
 --   MoveHelperBrain.holdTurn()                 his body's top turn (radians a second: HoldTurn × PairTurn)
 --   MoveHelperBrain.newTrail()                 a holder's record of how long he has been behind
 --   MoveHelperBrain.holdTrack(trail, gap, crossed, speed, dt)   one look: `gap` studs off his place, the piece in the
 --                                              other world (`crossed`: a door's fade) → (top speed now, snap): snap
 --                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
---                                              ease of HoldEase s (the gap / HoldEase a second); else `speed`
+--                                              ease of HoldEase s (the gap / HoldEase a second; 8.6: HoldCap at most,
+--                                              unless `speed` is more); else `speed`
 --   8.3 (the owner: "he just jumps weirdly … make him walk like me, backwards too"):
 --   MoveHelperBrain.holdClimb(trail, height, dt, snap)   his root's height now: toward `height` at HoldClimb studs a
 --                                              second at most (a step stepped, never popped; at once on a new hold or a
@@ -132,6 +142,22 @@
 --   MoveHelperBrain.aside(x, z, door)          a place in a doorway (Aside's zone): the place beside it, along the wall
 --                                              (he never stands where you walk through); else the place itself
 --   MoveHelperBrain.doing(action, name, full)  what he does, in words (client/MoveHelperHud.luau's line)
+-- 8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
+-- him, for example, put it down on the ground, or get out of the car"):
+--   MoveHelperBrain.bubble(action, name, full, price)   the same action's words over his head (client/DannyBubble.luau):
+--                                              (an icon and short words, "📦 Carrying: Sofa → van", "🧑‍🔧 For hire ·
+--                                              $100"; alert: the movers' orange, he needs you or is in trouble). One
+--                                              table (Doing) holds both: the bubble and the status line never disagree
+--   MoveHelperBrain.listChip(count)            the bubble's counter: "list: 3" (nil: his list is empty)
+--   MoveHelperBrain.orderCheck(kind, o)        an order of the crew checked (an Order): "ok" | why: "hire" | "down" |
+--                                              "empty" (PUT IT DOWN with nothing in his hands) | "notin" (GET OUT, him
+--                                              not in the van, not getting in, not on his way to it) | "leaving"
+--                                              (getting out already) | "moving" (the van rolls) | "unknown"
+--   MoveHelperBrain.orders(o)                  the orders that apply now ("putdown" | "getout", comma-separated; nil:
+--                                              none): his card's buttons, the orders menu, the status line's GET OUT
+--   MoveHelperBrain.orderList(text)            that text as a list (unknown kinds dropped)
+--   MoveHelperBrain.orderWords(kind)           a button's words: "⬇ PUT IT DOWN", "🚪 GET OUT"
+--   MoveHelperBrain.orderWhy(why)              a refusal's notice ("Danny isn't carrying anything."), nil: none
 --   MoveHelperBrain.Lines                      what he says (a speech bubble over his head; plain text)
 --   MoveHelperBrain.line(key, sandbox)         his line for `key` (8.0 SANDBOX: SandboxLines' where the test world has
 --                                              no Wall and no depot)
@@ -516,6 +542,27 @@ function MoveHelperBrain.farEnd(depth: number): number
 	return depth / 2 + cfg().Standoff
 end
 
+-- 8.6 his end of your piece (the owner: "the carrying is still bad. He teleports from side to side"; a screenshot: Danny
+-- beside the Dining Table, at its side): the face of the piece across it from you, in the piece's own frame, decided
+-- once as the hold starts and kept all the carry (its turn, a square-ish piece, a late look at you: never another end).
+-- `sizeX`, `sizeZ`: the piece's size; `fromX`, `fromZ`: your root in its frame. The face where the line from you through
+-- its middle comes out (even: its length's, else its -Z, the old far face); carried in two the piece lies along the
+-- carry (server/Moving.luau's holdOffset), so that is the far end of its length. Returns that face's way out of the
+-- middle (a unit axis of the piece: ±X or ±Z) and the piece's half size along it.
+function MoveHelperBrain.holdEnd(sizeX: number, sizeZ: number, fromX: number, fromZ: number): (number, number, number)
+	local hx = if sizeX == sizeX then math.max(sizeX, 0) / 2 else 0
+	local hz = if sizeZ == sizeZ then math.max(sizeZ, 0) / 2 else 0
+	local x = if fromX == fromX then -fromX else 0 -- (away from you)
+	local z = if fromZ == fromZ then -fromZ else 0
+	-- (the line leaves the box by an X face when |x| / hx > |z| / hz)
+	local byX, byZ = math.abs(x) * hz, math.abs(z) * hx
+	local useX = if math.abs(byX - byZ) <= 1e-9 then hx > hz else byX > byZ
+	if useX then
+		return if x < 0 then -1 else 1, 0, hx
+	end
+	return 0, if z > 0 then 1 else -1, hz
+end
+
 -- His root's height over the piece's middle: the floor's under the far end (`floorRise`, his stand height on it) when it
 -- is within HoldStep of the carrier's floor (`carrierRise`: his stand height on the floor under the carrier's feet):
 -- up and down stairs and steps. 8.3 (the owner: "he just jumps weirdly"): a floor farther off is not his (a porch's
@@ -549,7 +596,8 @@ function MoveHelperBrain.holdTurn(): number
 end
 
 -- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards; the leader's root at the last
--- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz))
+-- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz); 8.6: his end's place
+-- at the last look (endX, endZ; nil: none yet), its smoothed velocity (evx, evz) and his lead now (leadX, leadZ))
 export type Trail = {
 	behind: number,
 	ease: number,
@@ -562,10 +610,17 @@ export type Trail = {
 	pace: number,
 	vx: number,
 	vz: number,
+	endX: number?,
+	endZ: number?,
+	evx: number,
+	evz: number,
+	leadX: number,
+	leadZ: number,
 }
 
 function MoveHelperBrain.newTrail(): Trail
-	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0 }
+	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0,
+		endX = nil, endZ = nil, evx = 0, evz = 0, leadX = 0, leadZ = 0 }
 end
 
 -- 8.3 keeping up: one look at the leader's root (`x`, `z`), `dt` s after the last: their real speed along the ground
@@ -621,6 +676,53 @@ function MoveHelperBrain.holdLead(trail: Trail, seconds: number): (number, numbe
 		dx, dz = dx / far * most, dz / far * most
 	end
 	return dx, dz
+end
+
+-- 8.6 Danny's lead now (the owner: "he teleports from side to side"): 8.3's lead was your root's velocity × leadTime,
+-- taken at once: your step back, a turn's step aside, an uneven look at you (the server hears your walk in bursts) threw
+-- his aim up to HoldLead.Far × 2 studs across within a tenth of a second, and his hold ran him there at its top speed.
+-- Now one look at his END's place (`x`, `z`: the piece's turn moves it too, not just your root), `dt` s after the last:
+-- its velocity smoothed over HoldLead.Smooth s (HoldCap at most); the lead goes toward that × `seconds` (HoldLead.Far
+-- studs at most) at HoldLead.Rate studs a second at most: his aim moves with his end, never faster than Rate on top.
+-- `reset` (a new hold, a door's fade: the other world), no place (NaN), or his end more than HoldPace.Jump studs off
+-- its last look (put there at once): nothing measured, no lead.
+function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number, seconds: number, reset: boolean): (number, number)
+	local c = cfg()
+	local lead = c.HoldLead
+	local lastX, lastZ = trail.endX, trail.endZ
+	local known = x == x and z == z
+	trail.endX = if known then x else nil
+	trail.endZ = if known then z else nil
+	local vx, vz = 0, 0
+	if lastX ~= nil and lastZ ~= nil and known and dt == dt and dt > 1e-4 then
+		vx, vz = (x - lastX) / dt, (z - lastZ) / dt
+	end
+	local speed = math.sqrt(vx * vx + vz * vz)
+	if reset or not known or lastX == nil or dt ~= dt or dt <= 1e-4 or speed * dt > c.HoldPace.Jump then
+		trail.evx, trail.evz, trail.leadX, trail.leadZ = 0, 0, 0, 0
+		return 0, 0
+	end
+	if speed > c.HoldCap then -- (a burst: its way, at HoldCap)
+		vx, vz = vx / speed * c.HoldCap, vz / speed * c.HoldCap
+	end
+	local keep = math.exp(-dt / math.max(lead.Smooth, 0.01))
+	trail.evx = vx + (trail.evx - vx) * keep
+	trail.evz = vz + (trail.evz - vz) * keep
+	local s = if seconds == seconds then math.max(seconds, 0) else 0
+	local wantX, wantZ = trail.evx * s, trail.evz * s
+	local far = math.sqrt(wantX * wantX + wantZ * wantZ)
+	if far > lead.Far and far > 0 then
+		wantX, wantZ = wantX / far * lead.Far, wantZ / far * lead.Far
+	end
+	local dx, dz = wantX - trail.leadX, wantZ - trail.leadZ
+	local gap = math.sqrt(dx * dx + dz * dz)
+	local most = math.max(lead.Rate, 0) * dt
+	if gap > most and gap > 0 then
+		dx, dz = dx / gap * most, dz / gap * most
+	end
+	trail.leadX += dx
+	trail.leadZ += dz
+	return trail.leadX, trail.leadZ
 end
 
 -- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
@@ -685,7 +787,7 @@ function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, 
 	end
 	trail.behind = 0
 	trail.ease = c.HoldEase
-	trail.easeSpeed = gap / math.max(c.HoldEase, 0.05)
+	trail.easeSpeed = math.min(gap / math.max(c.HoldEase, 0.05), math.max(speed, c.HoldCap)) -- (8.6: HoldCap at most)
 	return math.max(speed, trail.easeSpeed), false
 end
 
@@ -829,35 +931,147 @@ function MoveHelperBrain.trained(owner: any): number
 	return UpgradeRules.dannySpeed(if ok then level else nil)
 end
 
--- ── Words ──────────────────────────────────────────────────────────────────
+-- ── 8.6 the crew's direct orders ─────────────────────────────────────────
 
-local DOING: { [string]: string } = {
-	down = "Down: back at the van soon",
-	hold = "Carrying the %s with you",
-	flee = "Running from the zombies",
-	help = "Coming to lift the %s",
-	deliver = "Carrying the %s to the van",
-	open = "Opening the van's back",
-	fetch = "Going for the %s",
-	wait = "Waiting at the van",
-	come = "Coming to lift the %s with you", -- 8.3 your call
-	ready = "At the %s: on three!",
-	needs = "Waiting for you at the %s", -- 8.3 a two-person piece of his list
-	offer = "Waiting by the van for hire",
-	ride = "Getting in the van",
-	seat = "Riding in the van",
-	alight = "Getting out of the van", -- 8.5 (his way out at its door)
+-- 8.6 what the server knows of him when an order comes (server/MoveHelper.luau fills it).
+export type Order = {
+	hired: boolean, -- somebody of the crew hired him for this move
+	down: boolean, -- down (or no body yet)
+	holding: string?, -- nil, "hand" (a piece in his arms alone) or "pair" (the other end of a piece a player carries)
+	seated: boolean, -- in the van's passenger seat
+	boarding: boolean, -- getting in (8.5: the slide in through its door)
+	riding: boolean, -- on his way to the van's door to ride (MoveHelperBrain.decide's "ride")
+	leaving: boolean, -- getting out already (8.5: the slide out)
+	moving: boolean, -- the van faster than Config.Cargo.BoardMaxSpeed
 }
 
-function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string
-	if action == "wait" and full then
-		return "Waiting: the van is full"
+-- (the orders in the order the clients show them)
+local ORDERS = { "putdown", "getout" }
+
+function MoveHelperBrain.orderCheck(kind: string, o: Order): string
+	if kind ~= "putdown" and kind ~= "getout" then
+		return "unknown"
+	elseif not o.hired then
+		return "hire"
+	elseif o.down then
+		return "down"
+	elseif kind == "putdown" then
+		return if o.holding == "hand" or o.holding == "pair" then "ok" else "empty"
+	elseif o.leaving then
+		return "leaving"
+	elseif not (o.seated or o.boarding or o.riding) then
+		return "notin"
+	elseif o.moving and (o.seated or o.boarding) then
+		return "moving"
 	end
-	local text = DOING[action] or "Waiting at the van"
+	return "ok"
+end
+
+function MoveHelperBrain.orders(o: Order): string?
+	local out: { string }? = nil
+	for _, kind in ORDERS do
+		local verdict = MoveHelperBrain.orderCheck(kind, o)
+		if verdict == "ok" or verdict == "moving" then -- (a van that rolls: GET OUT shows, its press says to stop it)
+			out = out or {}
+			table.insert(out :: { string }, kind)
+		end
+	end
+	return if out then table.concat(out, ",") else nil
+end
+
+function MoveHelperBrain.orderList(text: any): { string }
+	local out: { string } = {}
+	if type(text) ~= "string" then
+		return out
+	end
+	for kind in string.gmatch(text, "[^,]+") do
+		if table.find(ORDERS, kind) then
+			table.insert(out, kind)
+		end
+	end
+	return out
+end
+
+local ORDER_WORDS: { [string]: string } = {
+	putdown = "⬇ PUT IT DOWN",
+	getout = "🚪 GET OUT",
+}
+
+function MoveHelperBrain.orderWords(kind: string): string
+	return ORDER_WORDS[kind] or string.upper(kind)
+end
+
+local ORDER_WHY: { [string]: string } = {
+	hire = "Hire %s first: then he takes your orders.",
+	down = "%s is down: he is back at the van soon.",
+	empty = "%s isn't carrying anything.",
+	notin = "%s isn't in the van.",
+	leaving = "%s is getting out already.",
+	moving = "Stop the van first: then %s can get out.",
+}
+
+function MoveHelperBrain.orderWhy(why: string): string?
+	local text = ORDER_WHY[why]
+	return if text then string.format(text, cfg().Name) else nil
+end
+
+-- ── Words ──────────────────────────────────────────────────────────────────
+
+-- What he does: the status line's words (line), and 8.6 the bubble's over his head (an icon, its short words; alert:
+-- the movers' orange, he needs you or something is wrong), one entry each so the two never disagree. "%s" is the piece.
+export type Doing = { line: string, icon: string, short: string, alert: boolean? }
+
+local DOING: { [string]: Doing } = {
+	down = { line = "Down: back at the van soon", icon = "🤕", short = "Down: back at the van soon", alert = true },
+	hold = { line = "Carrying the %s with you", icon = "🤝", short = "Carrying: %s with you" },
+	flee = { line = "Running from the zombies", icon = "🏃", short = "Running from a zombie", alert = true },
+	help = { line = "Coming to lift the %s", icon = "🏃", short = "Coming to lift: %s" },
+	deliver = { line = "Carrying the %s to the van", icon = "📦", short = "Carrying: %s → van" },
+	open = { line = "Opening the van's back", icon = "🔓", short = "Opening the van's back" },
+	fetch = { line = "Going for the %s", icon = "🚶", short = "Going for: %s" },
+	wait = { line = "Waiting at the van", icon = "💤", short = "Waiting by the van" },
+	full = { line = "Waiting: the van is full", icon = "💤", short = "Waiting: the van is full" }, -- (wait, the van full)
+	come = { line = "Coming to lift the %s with you", icon = "🏃", short = "Coming to lift: %s" }, -- 8.3 your call
+	ready = { line = "At the %s: on three!", icon = "💪", short = "At the %s: on three!", alert = true },
+	needs = { line = "Waiting for you at the %s", icon = "⏳", short = "Needs you: %s", alert = true }, -- 8.3 his list's two-person piece
+	offer = { line = "Waiting by the van for hire", icon = "🧑‍🔧", short = "For hire" },
+	ride = { line = "Getting in the van", icon = "🚐", short = "Getting in the van" },
+	seat = { line = "Riding in the van", icon = "🪑", short = "Riding" },
+	alight = { line = "Getting out of the van", icon = "🚪", short = "Getting out of the van" }, -- 8.5 (his way out at its door)
+	stay = { line = "Staying out of the van (your order)", icon = "✋", short = "Staying out of the van" }, -- 8.6 GET OUT
+}
+MoveHelperBrain.Doing = DOING :: { [string]: Doing } -- (read only: the tests go through every action)
+
+local function words(action: string, full: boolean?): Doing
+	if action == "wait" and full then
+		return DOING.full
+	end
+	return DOING[action] or DOING.wait
+end
+
+local function named(text: string, name: string?): string
 	if string.find(text, "%s", 1, true) then
 		return string.format(text, name or "piece")
 	end
 	return text
+end
+
+function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string
+	return named(words(action, full).line, name)
+end
+
+function MoveHelperBrain.bubble(action: string, name: string?, full: boolean?, price: number?): (string, boolean)
+	local w = words(action, full)
+	local short = named(w.short, name)
+	if action == "offer" and price then
+		short = `{short} · {UpgradeRules.money(price)}`
+	end
+	return `{w.icon} {short}`, w.alert == true
+end
+
+function MoveHelperBrain.listChip(count: any): string?
+	local n = if finite(count) then math.max(0, math.floor(count)) else 0
+	return if n > 0 then `list: {n}` else nil
 end
 
 MoveHelperBrain.Lines = {
@@ -883,6 +1097,10 @@ MoveHelperBrain.Lines = {
 	callOff = "No problem, boss.", -- 8.3 a call you called off
 	ride = "Wait up, I'm riding with you!", -- 8.3 riding with you
 	out = "Back to work!",
+	putDown = "Setting it down.", -- 8.6 the crew's orders: PUT IT DOWN
+	putTogether = "Easy... setting it down.", -- (a two-person piece: both ends at once)
+	getOut = "Hopping out, boss.", -- GET OUT
+	stayOut = "Okay, I'll stay out.", -- (on his way to the van: he stays out)
 } :: { [string]: string }
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.

@@ -34,6 +34,18 @@ check("both × 0.75, pair × 0.7 (8.1: two carry slowly, was 0.8), drag × 0.35"
 check("the carry's walk", near(Rules.carrySpeed(14, "pair", 8), 9.8) and near(Rules.carrySpeed(14, "drag", 8), 4.9))
 check("dragging is the slowest, a light thing in a hand the fastest", Rules.speedFactor("drag", 1) < Rules.speedFactor("both", 1) and Rules.speedFactor("both", 1) < Rules.speedFactor("hand", 1))
 check("a hand free only with a hand thing", Rules.hands("hand") == 1 and Rules.hands("both") == 2 and Rules.hands("pair") == 2 and Rules.hands("drag") == 2)
+do
+	-- 8.6 carried in two (the owner: "the table seems to float between them"): low, its grips at the hands
+	local P = Config.Moving.PairLift
+	local middle, grip = Rules.pairLift(3.3, -3) -- (the Dining Table, a body's feet 3 studs under its root)
+	check("8.6 carried in two: the Dining Table's grips (two thirds up) at the hands (PairLift.Hands under the root), its bottom off the floor",
+		near(grip, -P.Hands) and near(middle - 3.3 / 2, -P.Hands - 2.2) and middle - 3.3 / 2 >= -3 + P.Clear - 1e-9 and middle + 3.3 / 2 < 1.5)
+	local lowMiddle, lowGrip = Rules.pairLift(9, -3)
+	check("…a tall one: its bottom PairLift.Clear over the floor at least, its grips PairLift.Grip over its bottom at most",
+		near(lowMiddle - 4.5, -3 + P.Clear) and near(lowGrip - (lowMiddle - 4.5), P.Grip))
+	local nanMiddle, nanGrip = Rules.pairLift(0 / 0, 0 / 0)
+	check("…NaN in: numbers out", nanMiddle == nanMiddle and nanGrip == nanGrip)
+end
 local thing = { class = "pair", helper = nil } :: any
 check("a pair thing alone is dragged, with a helper carried", Rules.mode(thing) == "drag" and Rules.mode({ class = "pair", helper = 7 } :: any) == "pair")
 check("hand and both are what they are", Rules.mode({ class = "hand" } :: any) == "hand" and Rules.mode({ class = "both" } :: any) == "both")

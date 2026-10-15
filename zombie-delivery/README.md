@@ -1896,6 +1896,12 @@ van: plan several trips home to your warehouse."), and the house is laid out as 
   again (a loaded save's seed counts over what a server remembers; no house is rolled before the save has loaded). The
   admin's 🏠 REFILL HOUSE gives a new one.
 - Its inside is lit like every house's (`Config.SandboxLight.House`), the light budget checked on the big plans.
+- **8.5.2, roomier** (the owner: "more room in the house"): its rooms, its hall and its corridor are `Big.Roomy`
+  (1.25) times as wide and deep, in whole studs (a plan about 122 × 74 inside, was 98 × 59: half as much floor again),
+  with the same dice, doors and furniture, so the same pieces have more room round them. The corridor is 10 wide, the
+  hall 15. A big room's lamps make a grid (`SandboxLightRules.lamps`): along each side one lamp up to `Lamp.Long`, then
+  two, then one each `Lamp.Span` down a long side, never two closer than `Lamp.Apart`; the light test's budget is
+  `RoomLoad` a lamp. A house's (the city's) rooms are as they were.
 
 **Tests:** `biglayout_test` (every piece out by both doors on many seeds), `bigdanny_runtime_test`,
 `sandboxmove_runtime_test`, `vanmove_test`, the e2e's step 20 (round the house to its back door, in, a piece out by its

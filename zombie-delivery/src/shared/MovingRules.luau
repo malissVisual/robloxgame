@@ -15,6 +15,9 @@
 --                                              Both, pair Pair, drag Drag
 --   MovingRules.carrySpeed(walk, mode, weight) the walk speed with it (the character's CarrySpeed attribute)
 --   MovingRules.hands(mode)                    1 (a hand free: you open the truck's back yourself) or 2
+--   MovingRules.pairLift(height, feet)         8.6 carried in two: its middle's and its grips' height over the carriers'
+--                                              roots (`feet`: their feet's, negative): low, the grips at the hands
+--                                              (PairLift: never floating over their heads)
 --   The damage (a share of the condition 0 … 1; fragile things Damage.Fragile × as much)
 --   MovingRules.fallDamage(height, fragile)    a landing (or a thing set down) from `height` studs: nothing up to
 --                                              SafeDrop, then PerStud a stud
@@ -197,6 +200,21 @@ end
 
 function MovingRules.hands(mode: string): number
 	return if mode == "hand" then 1 else 2
+end
+
+-- 8.6 carried in two (the owner: "the table seems to float between them": its bottom was at your hips, its top over your
+-- head): its grips (two thirds of its height, PairLift.Grip studs over its bottom at most: shared/FurnitureLooks.luau
+-- grips) PairLift.Hands studs under the roots, its bottom PairLift.Clear studs over the floor at least (`feet`: the
+-- feet under the root, a negative number). Returns its middle's height and its grips' over the root.
+function MovingRules.pairLift(height: number, feet: number): (number, number)
+	local p = tune().PairLift
+	local tall = if height == height then math.max(height, 0) else 0
+	local grip = math.min(tall * 2 / 3, p.Grip)
+	local bottom = -p.Hands - grip
+	if feet == feet then
+		bottom = math.max(bottom, feet + p.Clear)
+	end
+	return bottom + tall / 2, bottom + grip
 end
 
 -- ── Damage ─────────────────────────────────────────────────────────────────
