@@ -174,6 +174,14 @@
 > Lidická 30, Smetanova 84); a player's card holds a house and its seed (`sandboxHouse`, `sandboxHouseKept` in the
 > save), the next card the next free house, two players never the same house; the guide, the chevron, the kiosk and
 > the admin follow the contract's house. `design/sandbox/map.png` drawn again (north up, Czech names).
+>
+> **8.9.1** (the owner: "the crosshair only when I want to shoot … I want the mouse normally, take the Alt away";
+> "with the clipboard, E should mark for Danny, not pick up"): in the sandbox the mouse is free (`CameraRig.aimOnly`:
+> the cursor shows, no crosshair dot, the right mouse turns the camera, the wheel zooms); the locked aim and its dot
+> come only while a weapon (a Tool) is held (`CameraRig.armed`); no MOUSE [ALT] button, Alt does nothing; the city as
+> before. With Danny's clipboard out, a piece's Pick up / Lift prompts hide on your screen only and **E · Give to
+> Danny** / **Take back** take their place (`client/DannyOrders.luau`; a click still works; doors and the van's Load
+> keep their E; a gamepad keeps R1).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
