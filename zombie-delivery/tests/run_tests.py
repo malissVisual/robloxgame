@@ -707,6 +707,23 @@ def pad_check():
 if not pad_check():
     ok = False
 
+# 8.5.1: the server's and the client's BuildStamp equal Config.Version (they find a Studio left with old scripts).
+def build_stamp_check():
+    root = os.path.dirname(HERE)
+    config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
+    version = re.search(r'^Config\.Version = "([^"]+)"', config, re.M)
+    bad = []
+    for side in ("server", "client"):
+        path = os.path.join(root, "src", side, "BuildStamp.luau")
+        stamp = re.search(r'^return "([^"]+)"', open(path, encoding="utf-8").read(), re.M) if os.path.exists(path) else None
+        if not version or not stamp or stamp.group(1) != version.group(1):
+            bad.append(f"{side}/BuildStamp.luau is {stamp.group(1) if stamp else 'missing'}, Config.Version {version.group(1) if version else '?'}")
+    print("== build stamps: " + (f"server and client at {version.group(1)}" if not bad else "; ".join(bad)))
+    return not bad
+
+if not build_stamp_check():
+    ok = False
+
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that
 # moved, like 6.22's KitArt, or a typo shows here instead of as "X is not a valid member of Folder" in Studio).
 requires = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "check-requires.py")], capture_output=True, text=True)
