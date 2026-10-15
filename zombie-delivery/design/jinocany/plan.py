@@ -70,6 +70,10 @@ LANDMARKS = [
     ("station", "zastávka Zbuzany", "Zbuzany stop", (150, 290, 672, 690), 3, "station"),
 ]
 
+# The owner's choice (step 2): the van's PAINT shop at Sýkorka. Its two bays in the car park: the van's pivot (as a
+# plot's vanSpot), nose north to the store; VanPaint's prompt works there instead of at the plot's van spot.
+PAINT_BAYS = [{"x": -950, "z": -525, "yaw": 0}, {"x": -890, "z": -525, "yaw": 0}]
+
 # Fields (the crops' colours on the ground): rect, kind.
 FIELDS = [
     ((-1180, 420, -680, -505), "wheat"),
@@ -355,6 +359,14 @@ def picture(roads, landmarks, houses, enter, path):
     for road in roads:
         street_name(img, road)
     draw = ImageDraw.Draw(img)
+    # the paint bays (step 2): the van's outline, dashed orange
+    for bay in PAINT_BAYS:
+        b = R(rect(bay["x"] - 5, bay["x"] + 5, bay["z"] - 11, bay["z"] + 11))
+        for k in range(int(b[1]), int(b[3]), 8):
+            draw.line([b[0], k, b[0], k + 4], fill=COL["accent"], width=3)
+            draw.line([b[2], k, b[2], k + 4], fill=COL["accent"], width=3)
+        draw.line([b[0], b[1], b[2], b[1]], fill=COL["accent"], width=3)
+        draw.line([b[0], b[3], b[2], b[3]], fill=COL["accent"], width=3)
     # the houses to empty (step 1): an orange ring and their number
     fn = font(20, True)
     for i, e in enumerate(enter):
@@ -377,7 +389,7 @@ def picture(roads, landmarks, houses, enter, path):
     tag(draw, *at(130, 40, 0, 4), "Drogerie (vymyšlený obchod)")
     tag(draw, *at(-536, -380, 0, -46), "Škola · krok 2", "velké stěhování pro 2+ hráče")
     tag(draw, *at(-790, -440, 0, -46), "Hřiště · krok 2")
-    tag(draw, *at(-840, -630, 10, -44), "Stavebniny Sýkorka · krok 2", "místo Ptáčka: barvy a výbava dodávky")
+    tag(draw, *at(-840, -630, 10, -44), "Stavebniny Sýkorka · krok 2", "místo Ptáčka, s lakovnou dodávky")
     tag(draw, *at(-1150, 300, 0, 10), "Nová zástavba · krok 3", "lidé se nastěhovávají")
     tag(draw, *at(150, 690, -300, -60), "Železnice a zastávka Zbuzany · krok 3")
     tag(draw, *at(300, -660, -330, 0), "D5: kulisa, jezdí po ní auta")
@@ -403,6 +415,7 @@ def picture(roads, landmarks, houses, enter, path):
         (COL["asphalt"], "silnice (názvy ulic jako v Jinočanech)"),
         (COL["rapeseed"], "řepka"), (COL["wheat"], "obilí"), (COL["ploughed"], "oranice"),
         (COL["tree"], "stromořadí, ovocné aleje"),
+        (COL["accent"], "lakovna: místo pro dodávku (krok 2)"),
     ]
     for colour, text in rows:
         draw.rectangle([lx, y + 3, lx + 26, y + 23], fill=colour, outline=(20, 20, 20))
@@ -418,7 +431,7 @@ def picture(roads, landmarks, houses, enter, path):
     draw.text((lx, y), "KROKY", font=font(20, True), fill=COL["white"])
     y += 34
     for line in ("1  Hlavní, náves, staré jádro, řadovky,", "    6 domů ke stěhování, D5 a pole",
-                 "2  Severní, Žižkova, škola, hřiště,", "    Stavebniny Sýkorka, další domy",
+                 "2  Severní, Žižkova, škola, hřiště,", "    Stavebniny Sýkorka s lakovnou, další domy",
                  "3  nová zástavba (nastěhování),", "    vlak a zastávka Zbuzany"):
         draw.text((lx, y), line, font=font(18), fill=COL["white"])
         y += 27
@@ -474,6 +487,7 @@ def main():
         "bounds": BOUNDS,
         "plots": PLOTS,
         "turnaround": TURNAROUND,
+        "paintBays": PAINT_BAYS,
         "bigHouse": BIG_HOUSE,
         "roads": roads,
         "landmarks": landmarks,

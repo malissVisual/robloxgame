@@ -1,5 +1,8 @@
 # Mapa, krok 2: menší alpské údolí (plán)
 
+> **Odloženo (15. 10. 2026):** vlastník vybral pro sandbox Jinočany místo Alp (`design/jinocany/NAVRH.md`). Město
+> zůstává, jak je (je vypnuté), a tento plán se teď nestaví.
+
 Toto je jen plán, ve hře se zatím nic nemění. Navazuje na **krok 1** (pryč japonská zahrada, domy jako chaty, prstenec
 hor a lesy, nic se nestěhuje) a začít smí, až bude krok 1 v `main`. Krok 3 pak promění střed města ve staré
 město (Altstadt) s kostelem a náměstím.
