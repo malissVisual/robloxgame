@@ -753,7 +753,8 @@ do
 		and #walkBad == 0, table.concat(walkBad, "; "))
 
 	-- 8.3 economy: HouseLayout.plan(seed, kind, found): a house that rolls a legendary tries the ones not in the move
-	-- owner's collection book first; an empty book, or one with every legendary, changes nothing (the same plan)
+	-- owner's collection book first; an empty book, or one with every legendary, changes nothing (the same plan). 8.7
+	-- review: a legendary only bought from a player (its page marked bought) is not in the book: the same plan too
 	local function legendaryOf(plan: any): string?
 		for _, s in plan.spots do
 			if Items[s.item].rarity == "legendary" then
@@ -780,7 +781,7 @@ do
 			allLegendary[id] = { n = 1, best = 1 }
 		end
 	end
-	local tried, other, same = 0, 0, 0
+	local tried, other, same, boughtSame = 0, 0, 0, 0
 	local biasBad = {}
 	for seed = 1, SEEDS2 do
 		local was = legendaryOf(plans[seed])
@@ -790,6 +791,9 @@ do
 		tried += 1
 		if sameSpots(HouseLayout.plan(seed, "house", {}), plans[seed]) and sameSpots(HouseLayout.plan(seed, "house", allLegendary), plans[seed]) then
 			same += 1
+		end
+		if sameSpots(HouseLayout.plan(seed, "house", { [was :: string] = { n = 1, best = 1, bought = true } }), plans[seed]) then
+			boughtSame += 1
 		end
 		local book = { [was :: string] = { n = 1, best = 1 }, sofa = { n = 3, best = 0.9 } }
 		local now = legendaryOf(HouseLayout.plan(seed, "house", book))
@@ -805,6 +809,7 @@ do
 	end
 	check(`8.3 economy: an empty book or one with every legendary: the same plan ({same} of {tried} houses with a legendary)`, tried >= 3 and same == tried)
 	check(`… the book holds the house's legendary: it gets another one, not in the book, the same every time ({other} of {tried})`, other == tried and #biasBad == 0, table.concat(biasBad, "; "))
+	check(`8.7 review: … only bought (its page marked bought): no find, the same plan as an empty book ({boughtSame} of {tried})`, boughtSame == tried, boughtSame)
 end
 
 local function count(t: { [any]: boolean }): number

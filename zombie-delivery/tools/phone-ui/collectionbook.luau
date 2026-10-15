@@ -13,7 +13,8 @@
 -- menu, a tap beside it close it; opening it closes the warehouse's picker; on each screen the card on the screen, the
 -- left column inside it, the texts fitting their room and a phone's buttons a finger's size (44 px); a resize while
 -- open. `luau collectionbook.luau -a dump` prints the preview's scenes as JSON instead (sandbox_preview.py --scenes
--- collectionbook.luau).
+-- collectionbook.luau). 8.7 review: a piece only bought from another player: its card with a gold BOUGHT tag, no find
+-- (the progress, the tabs, no "new" toast), the side's hint saying why when there is room.
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -476,6 +477,22 @@ remote.OnClientEvent:Fire({ kind = "milestone", id = "nope", money = 1e9 })
 remote.OnClientEvent:Fire("junk")
 remote.OnClientEvent:Fire({ kind = "state", book = "x", paid = 5 })
 check("garbage from the remote: no toast, no error (a junk state: an empty book)", #M.toasts == toastsBefore and named(named(gui, "Book"), "Progress").Text == "0 / 68 found")
+-- 8.7 review: a piece only bought from another player (a legendary): shown, tagged, no find
+local withBought = table.clone(FOUND)
+withBought.oil_painting = { n = 1, best = 0.8, bought = true }
+toastsBefore = #M.toasts
+remote.OnClientEvent:Fire(state(withBought, { "found10", "found20", "legendary" }, { "oil_painting" }))
+M.flush()
+window = named(gui, "Book")
+local boughtCard = named(window, "Card_oil_painting")
+local boughtTag = boughtCard and named(boughtCard, "Bought")
+check("8.7 review: a bought piece: its card with its name and a gold \"BOUGHT\" tag on its picture (Bought, not Found), its texts fitting", boughtCard ~= nil
+	and named(boughtCard, "PieceName").Text == "Oil Painting" and boughtTag ~= nil and boughtTag.Text == "BOUGHT" and boughtTag.Parent == named(boughtCard, "Picture")
+	and boughtCard:GetAttribute("Bought") == true and boughtCard:GetAttribute("Found") == false and #badTexts(boughtCard) == 0, boughtCard and badTexts(boughtCard)[1])
+local sideHint = named(named(window, "Side"), "Hint")
+check("… no find: still \"23 / 68 found\", COLLECTIBLES 3/24, no \"new\" toast; the side's hint (where there is room) says why", named(window, "Progress").Text == "23 / 68 found"
+	and string.find(named(window, "Tab_collectibles").Text, " 3/24", 1, true) ~= nil and #M.toasts == toastsBefore
+	and (sideHint == nil or sideHint.Text == "BOUGHT pieces show but don't count: bring one home to find it."), named(window, "Tab_collectibles").Text)
 remote.OnClientEvent:Fire(state(FOUND, { "found10", "found20", "legendary" }))
 
 -- closing

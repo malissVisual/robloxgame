@@ -16,6 +16,9 @@
 --     +50%"), on the screen clear of the money block and the touch controls, its words fitting, a finger's size;
 --     ACCEPT / DECLINE back on the PlayerTrade remote (never the Visitors one); a visitor's offer queued behind it
 --     ("(+1)"), shown when it is answered; the server's closed message; a player's offer on the Visitors remote ignored;
+--   * 8.7 review, one offer a click: with two offers queued, a double click on ACCEPT (on DECLINE too), a double ESC and a
+--     double B each answer the first only; the card is gone a moment (Config.PlayerTrade.CardGap), then shows the next
+--     one with its buttons off (no answer) for CardArm s; then it takes one;
 --   * the STOCK list's 🏷 on a piece on show (only there), inside its picture, clear of the ON STAND ribbon and the
 --     market's tags, gold with the price when it has a sign, a finger's size on a phone; a tap opens the price picker
 --     for that piece (its value from the state), closing it goes back to the STOCK list;
@@ -203,6 +206,11 @@ local function last(remote)
 	local entry = list[#list]
 	return if entry then entry[1] else nil
 end
+-- 8.7 review: the offer card's CardArm s pass (it takes answers from then on)
+local function arm()
+	M.now += Config.PlayerTrade.CardArm
+	M.resume()
+end
 
 for _, s in SCREENS do
 	screen(s.touch, s.w, s.h)
@@ -332,6 +340,7 @@ for _, s in SCREENS do
 	end
 	check(`{L}: … its words fit`, #badTexts(c) == 0, badTexts(c)[1])
 	local visitorsBefore = #sentOn("Visitors")
+	arm()
 	press(named(c, "Accept"))
 	local answer = last("PlayerTrade")
 	check(`{L}: ACCEPT: \{ kind = "answer", id, accept = true \} on the PlayerTrade remote, nothing on the Visitors one`, answer.kind == "answer" and answer.id == "t1"
@@ -344,11 +353,14 @@ M.flush()
 local c = OfferCard.card()
 check("a visitor's offer behind a player's: the player's shown, \"(+1)\" in its title", OfferCard.isOpen() and named(c, "Title").Text == "🤝 PLAYER OFFER (+1)"
 	and named(c, "Who").Text == "🧑 Cid offers", named(c, "Title").Text)
+arm()
 press(named(c, "Decline"))
 local answer = last("PlayerTrade")
+M.now += Config.PlayerTrade.CardGap
 M.resume()
 check("… DECLINE answers the player's (accept false); the visitor's comes next", answer.kind == "answer" and answer.id == "t2" and answer.accept == false
 	and OfferCard.isOpen() and named(c, "Title").Text == "🤝 OFFER" and named(c, "Who").Text == "The collector offers")
+arm()
 press(named(c, "Decline"))
 local visitorAnswer = last("Visitors")
 check("… and its DECLINE goes to the Visitors remote", visitorAnswer.kind == "decline" and visitorAnswer.id == "o1" and not OfferCard.isOpen())
@@ -358,6 +370,72 @@ check("the server's closed message for a player's offer: the card goes, nothing 
 visitors.OnClientEvent:Fire(PLAYER_OFFER)
 M.flush()
 check("a player's offer on the Visitors remote: ignored", not OfferCard.isOpen())
+
+-- 8.7 review: one offer a click. Ann's and Cid's offers queued; each way of answering twice in a row answers Ann's only.
+local ARM, GAP = Config.PlayerTrade.CardArm, Config.PlayerTrade.CardGap
+local function answers(): { any }
+	local out = {}
+	for _, args in sentOn("PlayerTrade") do
+		if type(args[1]) == "table" and args[1].kind == "answer" then
+			table.insert(out, args[1])
+		end
+	end
+	return out
+end
+local function lit(button): boolean
+	return button:GetAttribute("Armed") == true and button.TextTransparency == 0
+end
+for _, way in { "accept", "decline", "escape", "gamepad" } do
+	screen(true, 844, 354)
+	fire(PLAYER_OFFER, { id = `{way}1`, who = "Ann" })
+	fire(PLAYER_OFFER, { id = `{way}2`, who = "Cid", price = 900 })
+	c = OfferCard.card()
+	local before = #answers()
+	local function act() -- (one answer this way: a click, ESC (client/Main.client.luau closes the windows), the gamepad's B)
+		if way == "accept" then
+			press(named(c, "Accept"))
+		elseif way == "decline" then
+			press(named(c, "Decline"))
+		elseif way == "escape" then
+			OfferCard.close()
+		else
+			key("ButtonB")
+		end
+	end
+	check(`{way}: just opened: its buttons off (not Armed, faded)`, OfferCard.isOpen() and named(c, "Who").Text == "🧑 Ann offers"
+		and named(c, "Accept"):GetAttribute("Armed") == false and named(c, "Decline"):GetAttribute("Armed") == false and not lit(named(c, "Accept")))
+	act()
+	check(`{way}: … an answer at once does nothing (nothing sent, Ann's offer still shown)`, #answers() == before and OfferCard.isOpen() and OfferCard.pending().id == `{way}1`)
+	arm()
+	check(`{way}: CardArm s on: its buttons lit`, lit(named(c, "Accept")) and lit(named(c, "Decline")))
+	act()
+	act()
+	local afterTwice = #answers()
+	local list = answers()
+	check(`{way}: twice in a row answers Ann's offer only ({if way == "accept" then "accept" else "decline"}), Cid's still waits`, afterTwice == before + 1
+		and list[#list].id == `{way}1` and list[#list].accept == (way == "accept") and OfferCard.pending() ~= nil and OfferCard.pending().id == `{way}2`, afterTwice - before)
+	check(`{way}: … the card gone a moment, Cid's offer waiting (not at the same spot at once)`, not OfferCard.isOpen() and not c.Visible and OfferCard.pending() ~= nil
+		and OfferCard.pending().id == `{way}2`)
+	M.resume()
+	check(`{way}: … still gone before CardGap s`, not OfferCard.isOpen() and OfferCard.pending() ~= nil and OfferCard.pending().id == `{way}2`)
+	M.now += GAP
+	M.resume()
+	check(`{way}: CardGap s on: Cid's offer on the card ("🧑 Cid offers", "$900"), its buttons off`, OfferCard.isOpen() and named(c, "Who").Text == "🧑 Cid offers"
+		and named(c, "Price").Text == "$900" and named(c, "Accept"):GetAttribute("Armed") == false, named(c, "Who").Text)
+	act()
+	act()
+	check(`{way}: … answers now: none (it only just showed)`, #answers() == before + 1 and OfferCard.isOpen() and OfferCard.pending().id == `{way}2`)
+	M.now += ARM / 2
+	M.resume()
+	press(named(c, "Accept"))
+	check(`{way}: … half of CardArm on: still none`, #answers() == before + 1 and OfferCard.isOpen())
+	M.now += ARM / 2 + 0.01
+	M.resume()
+	press(named(c, "Accept"))
+	list = answers()
+	check(`{way}: … CardArm s on: ACCEPT answers Cid's (once): one answer an offer`, afterTwice == before + 1 and #list == before + 2 and list[#list].id == `{way}2`
+		and list[#list].accept == true and not OfferCard.isOpen() and OfferCard.pending() == nil)
+end
 
 -- ── The STOCK list's 🏷 ─────────────────────────────────────────────────────
 local WarehouseUi = require("./WarehouseUi")
