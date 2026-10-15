@@ -785,6 +785,40 @@ def build_stamp_check():
 if not build_stamp_check():
     ok = False
 
+# 8.9: every sound sheet's .ogg (art/audio/make_audio.py writes them) is as long as shared/SoundSheet.luau's Seconds
+# says (tests/audio_test.luau checks every region lies inside that length; a sheet encoded anew but its regions not
+# written, or the other way round, shows here). ffprobe reads the files (none: skipped).
+def audio_length_check():
+    root = os.path.dirname(HERE)
+    probe = shutil.which("ffprobe")
+    if not probe:
+        print("== audio lengths: ffprobe not found, skipped")
+        return True
+    sheet = open(os.path.join(root, "src", "shared", "SoundSheet.luau"), encoding="utf-8").read()
+    seconds = re.search(r"^SoundSheet\.Seconds = \{ (.*) \} ::", sheet, re.M)
+    lengths = re.findall(r"(\w+) = ([\d.]+)", seconds.group(1)) if seconds else []
+    bad = []
+    for name, value in lengths:
+        path = os.path.join(root, "art", "audio", name + ".ogg")
+        if not os.path.exists(path):
+            bad.append(f"{name}.ogg is missing")
+            continue
+        found = subprocess.run([probe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path], capture_output=True, text=True)
+        try:
+            length = float(found.stdout.strip())
+        except ValueError:
+            bad.append(f"{name}.ogg: no length read")
+            continue
+        if abs(length - float(value)) > 0.02:
+            bad.append(f"{name}.ogg is {length:.3f} s, SoundSheet.Seconds says {value}")
+    if not lengths:
+        bad.append("SoundSheet.Seconds not read")
+    print("== audio lengths: " + (f"every sheet's .ogg as long as its regions say ({', '.join(n for n, _ in lengths)})" if not bad else "; ".join(bad)))
+    return not bad
+
+if not audio_length_check():
+    ok = False
+
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that
 # moved, like 6.22's KitArt, or a typo shows here instead of as "X is not a valid member of Folder" in Studio).
 requires = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "check-requires.py")], capture_output=True, text=True)

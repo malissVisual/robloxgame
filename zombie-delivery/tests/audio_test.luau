@@ -88,10 +88,34 @@ end
 check("the grip's tick is a tick", SoundSheet.Sfx4.grip_tick ~= nil and SoundSheet.Sfx4.grip_tick[2] <= 0.1)
 check("the fourth sheet's id is a string", type(SoundSheet.Sfx4Id) == "string")
 check("the fourth sheet is an asset id or empty", SoundSheet.Sfx4Id == "" or string.match(SoundSheet.Sfx4Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx4Id)
+-- 8.9: the newest features' sounds (sfx5.ogg, a sheet of its own: sfx4 is uploaded): Danny's clipboard, his answers,
+-- orders and whistle, the trades, the auction. Short UI feedback, none loops.
+local USED5 = {
+	"clip_out", "clip_away", "pen_tick", "pen_untick", "soft_nope", "order_chirp", "danny_whistle",
+	"coin_kaching", "offer_ding", "price_paper", "gavel_knock", "sold_bell", "bid_tick",
+}
+local in5 = 0
+for _ in SoundSheet.Sfx5 do
+	in5 += 1
+end
+check(`sfx5 holds the {#USED5} sounds`, in5 == #USED5, in5)
+for _, name in USED5 do
+	local r = SoundSheet.Sfx5[name]
+	check("sfx5 region " .. name, r ~= nil)
+	if r then
+		check(`8.9 {name} is short feedback (at most 2 s) and does not loop`, r[2] > 0 and r[2] <= 2 and SoundSheet.Looped[name] == nil, r[2])
+	end
+end
+check("8.9 the ticks are ticks (a pen's, a bid's: at most 0.3 s)", SoundSheet.Sfx5.pen_tick[2] <= 0.3 and SoundSheet.Sfx5.pen_untick[2] <= 0.3 and SoundSheet.Sfx5.bid_tick[2] <= 0.3)
+check("the fifth sheet's id is a string", type(SoundSheet.Sfx5Id) == "string")
+check("the fifth sheet is an asset id or empty", SoundSheet.Sfx5Id == "" or string.match(SoundSheet.Sfx5Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx5Id)
+check("8.9 sfx4 as uploaded (its length the same: the new sounds went on a sheet of their own)", math.abs(SoundSheet.Seconds.sfx4 - 111.179932) < 1e-6 and SoundSheet.Sfx4.amb_room ~= nil
+	and math.abs(SoundSheet.Sfx4.amb_room[1] - 100.879932) < 1e-6)
 
 -- Every name in one sheet only (client/Sounds.luau looks in them in turn: a name in two would play the first one's).
 local SHEETS: { [string]: { [string]: { number } } } = {
 	sfx = SoundSheet.Sfx, music = SoundSheet.Music, sfx2 = SoundSheet.Sfx2, sfx3 = SoundSheet.Sfx3, sfx4 = SoundSheet.Sfx4,
+	sfx5 = SoundSheet.Sfx5,
 }
 local seen: { [string]: string } = {}
 for sheetName, sheet in SHEETS do
@@ -113,7 +137,7 @@ end
 
 -- The stand-ins (SoundSheet.Fallback): each is for a sound of a later sheet, and plays (a stand-in's stand-in too, in
 -- a few steps, no circle) from older sheets only, as it must while that sheet is not uploaded; a loop's is a loop.
-local ORDER = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4 }
+local ORDER = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5 }
 local function sheetOf(name: string): number?
 	for i, sheet in ORDER do
 		if sheet[name] then
@@ -174,7 +198,7 @@ check("8.1 the Sprinter's back doors stand in with a van's", SoundSheet.Fallback
 -- tasks' done and claimed, FILL BEST's clicks, SELL…'s till) uses the sheets there are: each sound on sfx, sfx2, sfx3
 -- or sfx4, and plays today (from the sheets whose id is in, or a stand-in from an older one; no new sheet).
 local SoundPlan = require("./SoundPlan")
-local uploaded = { true, SoundSheet.Sfx2Id ~= "", SoundSheet.Sfx3Id ~= "", SoundSheet.Sfx4Id ~= "" }
+local uploaded = { true, SoundSheet.Sfx2Id ~= "", SoundSheet.Sfx3Id ~= "", SoundSheet.Sfx4Id ~= "", SoundSheet.Sfx5Id ~= "" }
 local function playsToday(name: string, steps: number): boolean
 	local i = sheetOf(name)
 	if i and uploaded[i] then
@@ -190,6 +214,24 @@ for _, kind in SoundPlan.FeedbackKinds do
 		check(`8.3 {kind}: {cue.name} short feedback (at most 2 s)`, SoundPlan.seconds(cue.name) > 0 and SoundPlan.seconds(cue.name) <= 2, SoundPlan.seconds(cue.name))
 	end
 end
+-- 8.9: until sfx5.ogg is up every new sound has a stand-in from sfx … sfx4 (a sound like it, as quiet), but for
+-- Danny's whistle (his "needs you" toast pings already) and the price tag (its notice pings): silent. Every event
+-- (shared/SoundPlan.luau Events) plays its sfx5 sound, a stand-in today or stays silent, as listed.
+local SILENT5 = { danny_whistle = true, price_paper = true }
+for _, name in USED5 do
+	check(`8.9 {name}: {if SILENT5[name] then "silent" else "a stand-in"} until sfx5 is up`, (SoundSheet.Fallback[name] ~= nil) ~= (SILENT5[name] == true))
+	local standIn = SoundSheet.Fallback[name]
+	if standIn then
+		check(`8.9 {name}'s stand-in {standIn} is on sfx … sfx4 (it plays before sfx5 is up)`, (sheetOf(standIn) or 99) <= 4, standIn)
+		check(`8.9 {name}'s stand-in {standIn} is short too`, SoundPlan.seconds(standIn) > 0 and SoundPlan.seconds(standIn) <= 2, SoundPlan.seconds(standIn))
+	end
+end
+for eventName, e in SoundPlan.Events do
+	check(`8.9 event {eventName}: its sound {e.sound} has its region on sfx5`, SoundSheet.Sfx5[e.sound] ~= nil, e.sound)
+	check(`8.9 event {eventName}: plays today (sfx5, a stand-in) or is silent until sfx5 is up`, playsToday(e.sound, 0) or (SoundSheet.Sfx5Id == "" and SILENT5[e.sound] == true), e.sound)
+end
+check("8.9 a refusal's nope stands in with the notice's own notify (as today until sfx5 is up)", SoundSheet.Fallback.soft_nope == "notify")
+check("8.9 the trade's ka-ching stands in with the sandbox's till, an offer's bell with the old ding", SoundSheet.Fallback.coin_kaching == "sale_register" and SoundSheet.Fallback.offer_ding == "ding")
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end
@@ -206,7 +248,7 @@ for _, def in Config.CarGuns do
 end
 check("weapons listed", weapons > 0)
 -- The regions never overlap (each plays only its own sound).
-for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4 } do
+for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5 } do
 	local list = {}
 	for name, r in sheet do
 		check(`region {name} is valid`, r[1] >= 0 and r[2] > 0)

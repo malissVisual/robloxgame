@@ -93,6 +93,39 @@
 --                                                 out (the same kind within its Gap, or a wait over FeedbackWait)
 --   SoundPlan.hold(lane, now, seconds)            another module's sting plays now (the move's result card's jingle):
 --                                                 the lane's stings wait for it too
+--
+-- 8.9, the newest features' own sounds (art/audio/sfx5.ogg; until it is up a stand-in or silence: SoundSheet.Fallback;
+-- Config.Soundscape.Danny, .Trade, .Auction). Every one is an EVENT by name; client/SandboxSounds.luau event(name) plays
+-- it (its volume, never again within its gap; one that comes with a Notice answers it: no notify under it).
+--   SoundPlan.Events                              event → { sound, volume, pitch, gap, notice }:
+--                                                 8.5 Danny's clipboard: clipboard_out, clipboard_away (a paper rustle and
+--                                                 the clip), danny_give (a pen's tick), danny_takeback (crossed off),
+--                                                 danny_nope (a soft "nope": a pick, an order, the clipboard refused);
+--                                                 8.6 danny_ack (his chirp: he took your order), danny_whistle (he needs
+--                                                 you); 8.7 trade_sold (coins' ka-ching), trade_offer (a desk bell),
+--                                                 trade_price (a price tag): the hook for the trade code; 8.8
+--                                                 auction_bid (a tick), auction_gavel, auction_sold / auction_sold_mine
+--                                                 (the "sold!" bell; yours louder)
+--   SoundPlan.TradeEvents                         the trade code's three (trade_sold, trade_offer, trade_price)
+--   SoundPlan.eventOf(name) -> Event?             an event's sound, volume, pitch, gap, notice (nil: no such event)
+--   SoundPlan.clipboardCue(was, now) -> string?   your ClipboardHeld before and now → clipboard_out | clipboard_away
+--   SoundPlan.giveOutcome(was, now) -> string?    a piece you picked in orders mode: on Danny's list before (its
+--                                                 DannyQueue) and now → danny_give | danny_takeback; nil: no change yet
+--   SoundPlan.orderOutcome(kind, before, now) -> string?   an order sent ("putdown" | "getout") and the crew's
+--                                                 MoveHelperOrders as it was sent and now: it applied and applies no more
+--                                                 (he did it): danny_ack; nil: not yet
+--   SoundPlan.answer(outcome, sent, noticed, now) -> (string?, boolean)   an answer awaited from the server (sent at
+--                                                 `sent`; its outcome now: an event, "" settled quietly, nil not yet;
+--                                                 noticed: when its Notice came) → the event to play now (danny_nope: its
+--                                                 Notice came and nothing changed Grace s later) and whether it is over
+--                                                 (given up Answer s after it was sent)
+--   SoundPlan.whistleCue(was, now) -> string?     the kind of Danny's alert before (nil: not looked at yet; "": none)
+--                                                 and now (his bubble's orange: MoveHelperBrain.Doing's alert actions) →
+--                                                 danny_whistle when it turned to one of Danny.WhistleFor (he needs you)
+--   SoundPlan.auctionCues(was, now) -> { Beat }   two auction views in a row (AuctionRules.View) → { event, at }: the
+--                                                 price up on the same lot (a bid: auction_bid), the lot on the podium
+--                                                 closed (auction_gavel, and the "sold!" bell BellAt s after: yours sold
+--                                                 or bought, auction_sold_mine); nothing on the first view
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -608,6 +641,7 @@ function SoundPlan.seconds(name: string): number
 		{ sheet = SoundSheet.Sfx2, up = SoundSheet.Sfx2Id ~= "" },
 		{ sheet = SoundSheet.Sfx3, up = SoundSheet.Sfx3Id ~= "" },
 		{ sheet = SoundSheet.Sfx4, up = SoundSheet.Sfx4Id ~= "" },
+		{ sheet = SoundSheet.Sfx5, up = SoundSheet.Sfx5Id ~= "" }, -- 8.9
 	}
 	local now: string? = name
 	for _ = 1, 6 do -- (a stand-in's stand-in)
@@ -667,6 +701,133 @@ function SoundPlan.slot(lane: Lane, kind: string, now: number, n: number?): numb
 	end
 	lane.free = math.max(lane.free, at + length)
 	return at
+end
+
+-- ── 8.9: the newest features' sounds (sfx5.ogg) ─────────────────────────────────────────────────────────────────────
+
+export type Event = { sound: string, volume: number, pitch: number, gap: number, notice: boolean }
+export type Beat = { event: string, at: number }
+
+local function event(sound: string, volume: number, gap: number?, notice: boolean?): Event
+	return { sound = sound, volume = volume, pitch = 1, gap = gap or 0.1, notice = notice == true }
+end
+
+do
+	local D, T, A = S.Danny, S.Trade, S.Auction
+	SoundPlan.Events = {
+		-- 8.5 Danny's clipboard (client/DannyOrders.luau, client/MoveHelperCard.luau)
+		clipboard_out = event("clip_out", D.ClipOut, D.ClipGap),
+		clipboard_away = event("clip_away", D.ClipAway, D.ClipGap),
+		danny_give = event("pen_tick", D.Give),
+		danny_takeback = event("pen_untick", D.TakeBack),
+		danny_nope = event("soft_nope", D.Nope),
+		-- 8.6 his orders, his whistle (client/MoveHelperCard.luau, client/DannyBubble.luau)
+		danny_ack = event("order_chirp", D.Ack),
+		danny_whistle = event("danny_whistle", D.Whistle, D.WhistleGap),
+		-- 8.7 trading (the hook: the trade code calls client/SandboxSounds.luau event; each comes with a Notice)
+		trade_sold = event("coin_kaching", T.Sold, T.Gap, true),
+		trade_offer = event("offer_ding", T.Offer, T.Gap, true),
+		trade_price = event("price_paper", T.Price, T.Gap, true),
+		-- 8.8 the auction (client/AuctionUi.luau: auctionCues)
+		auction_bid = event("bid_tick", A.Bid, A.BidGap),
+		auction_gavel = event("gavel_knock", A.Gavel),
+		auction_sold = event("sold_bell", A.Sold),
+		auction_sold_mine = event("sold_bell", A.SoldMine),
+	} :: { [string]: Event }
+end
+SoundPlan.TradeEvents = { "trade_sold", "trade_offer", "trade_price" }
+
+function SoundPlan.eventOf(name: string): Event?
+	return SoundPlan.Events[name]
+end
+
+function SoundPlan.clipboardCue(was: any, now: any): string?
+	if (was == true) == (now == true) then
+		return nil
+	end
+	return if now == true then "clipboard_out" else "clipboard_away"
+end
+
+function SoundPlan.giveOutcome(was: boolean, now: boolean): string?
+	if now and not was then
+		return "danny_give"
+	elseif was and not now then
+		return "danny_takeback"
+	end
+	return nil
+end
+
+-- Is `kind` among the orders that apply (the crew's MoveHelperOrders: "putdown,getout"; anything else: none)?
+local function listed(kind: string, orders: any): boolean
+	if type(orders) ~= "string" then
+		return false
+	end
+	for each in string.gmatch(orders, "[^,]+") do
+		if each == kind then
+			return true
+		end
+	end
+	return false
+end
+
+function SoundPlan.orderOutcome(kind: string, before: any, now: any): string?
+	return if listed(kind, before) and not listed(kind, now) then "danny_ack" else nil
+end
+
+function SoundPlan.answer(outcome: string?, sent: number, noticed: number?, now: number): (string?, boolean)
+	local D = S.Danny
+	if outcome then
+		return if outcome ~= "" then outcome else nil, true
+	end
+	if noticed and now - noticed >= D.Grace then
+		return "danny_nope", true -- (its Notice said why: refused)
+	end
+	return nil, now - sent >= D.Answer -- (no word at all: given up quietly)
+end
+
+function SoundPlan.whistleCue(was: string?, now: string): string?
+	if was == nil or was == now then
+		return nil -- (the first look, or no change)
+	end
+	return if S.Danny.WhistleFor[now] == true then "danny_whistle" else nil
+end
+
+-- A view's lot on the podium (its id, its price), nil: none.
+local function lotOf(view: any): (number?, number)
+	local lot = if type(view) == "table" then view.lot else nil
+	if type(lot) ~= "table" or type(lot.id) ~= "number" then
+		return nil, 0
+	end
+	return lot.id, if type(lot.price) == "number" and lot.price == lot.price then lot.price else 0
+end
+
+function SoundPlan.auctionCues(was: any, now: any): { Beat }
+	local beats: { Beat } = {}
+	if type(was) ~= "table" or type(now) ~= "table" then
+		return beats -- (the first view: nothing happened yet)
+	end
+	local before, oldPrice = lotOf(was)
+	local after, price = lotOf(now)
+	if before and before == after then
+		if price > oldPrice then
+			table.insert(beats, { event = "auction_bid", at = 0 })
+		end
+		return beats
+	end
+	if before then
+		-- the lot that was on the podium closed (another on it now, or none): the gavel, then "sold!" for it (every lot
+		-- sells: a collector buys the rest), louder when it was yours or you bought it
+		table.insert(beats, { event = "auction_gavel", at = 0 })
+		local results = if type(now.results) == "table" then now.results else {}
+		local index = if type(was.index) == "number" then was.index else 0
+		local result = results[index]
+		if type(result) ~= "table" then
+			result = results[#results]
+		end
+		local mine = type(result) == "table" and (result.sold == true or result.won == true)
+		table.insert(beats, { event = if mine then "auction_sold_mine" else "auction_sold", at = S.Auction.BellAt })
+	end
+	return beats
 end
 
 return SoundPlan

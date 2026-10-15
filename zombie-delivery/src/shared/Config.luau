@@ -3727,6 +3727,50 @@ Config.Soundscape = {
 		BulkGap = 1.5,
 		FeedbackWait = 4.5,
 	},
+	-- 8.9, the newest features' own sounds (art/audio/sfx5.ogg; until it is up a stand-in from the older sheets or
+	-- silence: SoundSheet.Fallback). shared/SoundPlan.luau Events names each (the event → its sound, volume, gap);
+	-- client/SandboxSounds.luau event plays one. UI feedback: soft. Volumes 0 … 1.
+	NoticeWait = 0.08, -- s a Notice's notify waits (client/Sounds.luau): a sound of its own answers it instead (an
+	-- answer awaited from the server, a trade's: SandboxSounds' Sounds.answered), never both
+	Danny = {
+		-- 8.5 the clipboard (client/DannyOrders.luau: your character's ClipboardHeld)
+		ClipOut = 0.5, -- taken out: a paper rustle and the clip (clip_out) …
+		ClipAway = 0.42, -- … put away (clip_away) …
+		ClipGap = 0.25, -- … at most every this many seconds
+		Give = 0.55, -- a piece onto his list (pen_tick: ticked on the paper) …
+		TakeBack = 0.5, -- … off it again (pen_untick: crossed off)
+		Nope = 0.5, -- a pick, an order or the clipboard refused (soft_nope; its stand-in the notice's own notify, as loud)
+		-- 8.6 his orders and his whistle (client/MoveHelperCard.luau, client/DannyBubble.luau)
+		Ack = 0.5, -- an order of yours he took (order_chirp)
+		Whistle = 0.55, -- his bubble turned orange because he needs you (danny_whistle; silent until sfx5 is up: his
+		-- "needs you" toast pings already) …
+		WhistleGap = 8, -- … at most every this many seconds …
+		WhistleFor = { needs = true } :: { [string]: boolean }, -- … for these of his alerts (shared/MoveHelperBrain.luau Doing)
+		-- an answer awaited from the server (client/SandboxSounds.luau await: a piece given or taken back, an order, the
+		-- clipboard out): its outcome looked at every Poll s, given up Answer s after it was sent; its Notice came and
+		-- nothing changed Grace s later: refused (the nope)
+		Poll = 0.05,
+		Answer = 2,
+		Grace = 0.3,
+	},
+	-- 8.7 trading between players: SoundPlan.Events' trade_sold, trade_offer and trade_price, the hook the trade code
+	-- calls (client/SandboxSounds.luau event); each answers the Notice that comes with it (its notify left out)
+	Trade = {
+		Sold = 0.6, -- your piece sold to a player (coin_kaching: the coins' ka-ching)
+		Offer = 0.55, -- a player's offer for your piece (offer_ding: a desk bell's ding)
+		Price = 0.45, -- a FOR SALE price set (price_paper: a tag flicked and written on)
+		Gap = 0.4, -- s before the same again
+	},
+	-- 8.8 the auction (client/AuctionUi.luau, SoundPlan.auctionCues: while its window is open; your own lot's bell
+	-- anywhere)
+	Auction = {
+		Bid = 0.4, -- the price went up: a bid (bid_tick) …
+		BidGap = 0.12, -- … at most every this many seconds
+		Gavel = 0.6, -- the lot on the podium closed: the gavel (gavel_knock) …
+		Sold = 0.45, -- … and "sold!" (sold_bell), BellAt s after it …
+		SoldMine = 0.65, -- … louder when it was yours or you bought it
+		BellAt = 0.3,
+	},
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window

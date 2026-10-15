@@ -17,6 +17,10 @@
 --     walls do: never through another house's).
 --   * Throttled: one look every Bubble.Tick s (his body, the distance, the stack under it); the words drawn again only
 --     when they change. Nothing per frame.
+--   * 8.9 his whistle (art/audio/sfx5.ogg, client/SandboxSounds.luau event "danny_whistle"): the bubble turned orange
+--     because he needs you (its icon: shared/MoveHelperBrain.luau Doing's alert action, one of
+--     Config.Soundscape.Danny.WhistleFor: "needs", a piece of his list for two waiting for you), heard as its words are
+--     drawn (shared/SoundPlan.luau whistleCue: not on the first look, not while it stays so), at most every WhistleGap s.
 -- Presentation only.
 --   DannyBubble.start()                          listens (nothing shows without Danny on your move)
 --   DannyBubble.gui()                            the BillboardGui (the checks; nil before built)
@@ -31,6 +35,7 @@ local TextService = game:GetService("TextService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Brain = require(Shared.MoveHelperBrain)
+local SoundPlan = require(Shared.SoundPlan) -- 8.9 (his whistle)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 
@@ -49,6 +54,7 @@ local parts: { [string]: any } = {}
 local found: Model? = nil -- his body (found by MoveHelperId)
 local drawn = "" -- the words, the counter and the tone drawn now
 local faded = -1 -- the transparency applied now
+local alertWas: string? = nil -- 8.9 his alert's kind as last drawn ("": none; nil: not drawn yet)
 
 function DannyBubble.fade(distance: number): (number, boolean)
 	local alpha = math.clamp((distance - B.Near) / math.max(B.Far - B.Near, 1e-3), 0, 1)
@@ -153,6 +159,31 @@ local function build(): BillboardGui?
 	return gui
 end
 
+-- 8.9 what his orange is for: the alert action whose icon the bubble starts with (MoveHelperBrain.Doing), "" none.
+local function alertKind(text: string, alert: boolean): string
+	if not alert then
+		return ""
+	end
+	for action, w in Brain.Doing do
+		if w.alert == true and string.sub(text, 1, #w.icon) == w.icon then
+			return action
+		end
+	end
+	return "alert"
+end
+
+-- 8.9 his whistle when the orange says he needs you (SoundPlan.whistleCue; client/SandboxSounds.luau plays it).
+local function whistle(text: string, alert: boolean)
+	local kind = alertKind(text, alert)
+	local cue = SoundPlan.whistleCue(alertWas, kind)
+	alertWas = kind
+	if cue then
+		pcall(function()
+			(require(script.Parent.SandboxSounds) :: any).event(cue)
+		end)
+	end
+end
+
 -- Its words, the counter and the tone, sized to them (only when they changed).
 local function paint()
 	local gui = parts.gui
@@ -168,6 +199,7 @@ local function paint()
 		return
 	end
 	drawn, faded = key, -1
+	whistle(text, alert) -- 8.9
 	local chipW = if count then widthOf(count, CHIP_TEXT, Theme.HeadingFont) + 2 * CHIP_PAD else 0
 	local room = if count then chipW + CHIP_PAD else 0
 	local width = math.min(B.Wide, B.Pad + widthOf(text, B.Text, Theme.Font) + room + B.Pad)
