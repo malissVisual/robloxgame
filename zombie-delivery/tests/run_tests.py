@@ -89,6 +89,14 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "FurnitureMesh.luau"), encoding="utf-8").read()
     source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
     open(os.path.join(tmp, "FurnitureMesh.luau"), "w", encoding="utf-8").write(prefix + "local game, workspace = M.game, M.workspace\n" + source)
+    # 8.9.1: its server/FixtureMesh.luau (the owner's Blender fixtures) on the same recorder, a ServerStorage of its own:
+    # no import there, so every fixture keeps its parts (tools/fixtures-art/check.py dresses them with one).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "FixtureMesh.luau"), encoding="utf-8").read()
+    source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
+    fixture_storage = ('local storage = M.Instance.new("Folder")\n'
+                       'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
+                       'local workspace = M.workspace\n')
+    open(os.path.join(tmp, "FixtureMesh.luau"), "w", encoding="utf-8").write(prefix + fixture_storage + source)
     # 8.0 SANDBOX: the real server/Main.server.luau and server/SandboxBoot.luau as MainServer.luau and
     # SandboxBootServer.luau for tests/boot_runtime_test.luau: each source wrapped in a function (the test runs it once
     # per world: the sandbox's, the city's), its Roblox globals and `require` tests/runtime/BootRuntime.luau's recorders,
@@ -739,7 +747,7 @@ if not review72_check():
 # the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
 def imports_first_check():
     main = open(os.path.join(os.path.dirname(HERE), "src", "server", "Main.server.luau"), encoding="utf-8").read()
-    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt")
+    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt", "ZDCFixtureArt")  # (8.9.1: the fixtures)
     first = main.find("ServerStorage")
     wait = main.find(":WaitForChild(")
     good = first >= 0 and wait >= 0 and first < wait and all(main.find(f'"{n}"') < wait for n in names)
@@ -915,6 +923,15 @@ if sprinter.returncode != 0:
 warehouse = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "warehouse", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
 print("== warehouse mesh: " + ((warehouse.stdout.strip().splitlines() or ["?"])[-1][:160] if warehouse.returncode == 0 else "FAIL\n" + warehouse.stdout[-1500:] + warehouse.stderr[-1500:]))
 if warehouse.returncode != 0:
+    ok = False
+
+# 8.9.1: the house's fixtures in the owner's Blender model (server/FixtureMesh.luau): tools/fixtures-art/check.py imports
+# design/blender-fixtures/roblox/ZDCFixtureArt.json's pieces (turned, scaled; a stand-in from the contract's table until
+# fixtures.py's manifest exists) and dresses the interiors the real server/HouseInterior.luau builds; scattered,
+# mirrored and wrong-sized imports refused.
+fixtures_art = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "fixtures-art", "check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
+print("== fixtures mesh: " + ((fixtures_art.stdout.strip().splitlines() or ["?"])[-1][:160] if fixtures_art.returncode == 0 else "FAIL\n" + fixtures_art.stdout[-2500:] + fixtures_art.stderr[-1500:]))
+if fixtures_art.returncode != 0:
     ok = False
 
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)

@@ -1561,6 +1561,7 @@ E.real = {
 	SandboxBadges = true, -- 8.3: the Roblox badges (every id 0 here: it listens and counts the moves, it never calls BadgeService)
 	PlayerTrade = true, -- 8.7: trading between players (the stands' trade prompts: Warehouse.onTrade)
 	VillageWorld = true, -- 8.9: Jinočany's village on the map (SandboxWorld builds it)
+	FixtureMesh = true, -- 8.9.1: the houses' fixtures in the owner's Blender model (no import here: the parts' look)
 }
 E.fakes = {}
 
