@@ -16,7 +16,8 @@ pro agenty.
 - **Velikost:** mapa **1 600 × 1 440 studů** (dnes 680 × 920), tedy asi 3,7× větší plocha. Skutečné Jinočany by ve
   velikosti postav měřily asi 6 000 studů, proto jsou vzdálenosti zhruba čtyřikrát kratší a domy mají velikost jako dnes.
 - **Na místě zůstane:** 4 pozemky se sklady ZDC, Depot Row, Main Street (nově **Pražská**), obratiště a velký dům na
-  jejím konci (nově **Statek**, anglicky „The Old Farmstead“). Hráči začínají u svých skladů jako dnes.
+  jejím konci (nově **Statek**, anglicky „The Old Farmstead“) a aukční dům u Depot Row (8.8). Hráči začínají u svých
+  skladů jako dnes.
 - **Nové:** ulice Hlavní přes celou vesnici, **náves s kaplí a křížem**, staré jádro, řadovky, ovocný sad, rybník,
   drogerie, pole a D5 jako okraj mapy. Celkem **103 domů**, z toho **6 ke stěhování** v kroku 1 (Statek + 5 nových).
 - **Zmizí:** smrky, prstenec zasněžených hor, kravské zvony, vzhled chaty a cedule THE OLD CHALET.
@@ -135,6 +136,8 @@ Scope: the sandbox only. The city (`Config.Sandbox.On = false`: `Map.luau`, `ser
   the `Turnaround` (0, 470, r 34).
 - `SandboxMap.House` (id `sandbox_house`, its lot, box, door, curb, back): renamed **"The Old Farmstead"**; still the
   big house (`Config.Moving.Sandbox.Kind = "big"`) and the only one `server/HouseMesh.luau` dresses.
+- 8.8's Auction House (`Config.Auction.House.Spot` (158, -22), 48 × 32, facing Depot Row): `plan.landmarks` `auction`,
+  east of the Corner Drugstore (x 40 – 120).
 
 ## 2. Data (`shared/SandboxMap.luau`)
 

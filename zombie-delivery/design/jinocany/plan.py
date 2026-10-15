@@ -58,6 +58,9 @@ LANDMARKS = [
     ("green", "Náves s kaplí", "The Chapel Green", (-800, -584, -190, -80), 1, "green"),
     ("chapel", "kaple", "Chapel", (-712, -688, -164, -124), 1, "chapel"),
     ("drugstore", "drogerie", "Corner Drugstore", (40, 120, -20, 40), 1, "shop"),
+    # 8.8, the main session's Auction House (Config.Auction.House: Spot (158, -22) looking north to Depot Row, 48 × 32):
+    # it stays where it is
+    ("auction", "aukční dům", "Auction House", (134, 182, -22, 10), 1, "auction"),
     ("pond", "Malý rybník", "Little Pond", (50, 210, 145, 255), 1, "pond"),
     ("orchard", "ovocný sad", "The Orchard", (-400, -70, 20, 260), 1, "orchard"),
     ("school", "škola", "Jinočany School", (-536, -420, -380, -300), 2, "school"),
@@ -326,7 +329,7 @@ def picture(roads, landmarks, houses, enter, path):
         elif k == "station":
             draw.rectangle(box, fill=(170, 170, 176), outline=(90, 90, 96), width=2)
         else:  # shop, school, hardware
-            fill = {"shop": (210, 72, 86), "school": (196, 150, 90), "hardware": (120, 140, 160)}[k]
+            fill = {"shop": (210, 72, 86), "school": (196, 150, 90), "hardware": (120, 140, 160), "auction": (226, 214, 186)}[k]
             draw.rectangle(box, fill=fill, outline=(40, 40, 44), width=3)
     # the zone's concrete and the plots
     for p in PLOTS:
@@ -386,7 +389,8 @@ def picture(roads, landmarks, houses, enter, path):
     tag(draw, *at(-790, -260, 0, 0), "Náves s kaplí a křížem", "střed vesnice, nástěnka zakázek")
     tag(draw, *at(80, 470, 0, -10), "Statek = dnešní velký dům", "na konci Pražské, u polí")
     tag(draw, *at(60, 260, 0, 6), "Malý rybník")
-    tag(draw, *at(130, 40, 0, 4), "Drogerie (vymyšlený obchod)")
+    tag(draw, *at(40, 40, 0, 4), "Drogerie (vymyšlený obchod)")
+    tag(draw, *at(186, -40, 4, 0), "Aukční dům (zůstává)")
     tag(draw, *at(-536, -380, 0, -46), "Škola · krok 2", "velké stěhování pro 2+ hráče")
     tag(draw, *at(-790, -440, 0, -46), "Hřiště · krok 2")
     tag(draw, *at(-840, -630, 10, -44), "Stavebniny Sýkorka · krok 2", "místo Ptáčka, s lakovnou dodávky")
