@@ -1,4 +1,4 @@
--- 8.3 the big move: shared/HouseLayout.luau's kind "big" (the plan of the sandbox's big house, The Old Chalet: the
+-- 8.3 the big move: shared/HouseLayout.luau's kind "big" (the plan of the sandbox's big house, The Old Farmstead: the
 -- owner's big Blender house; Config.Furniture.Big) over many seeds, and the real server/HouseInterior.luau building it
 -- on the recorder (tools/fixtures/item-mock.luau). A big plan: ten rooms on one floor (eight rooms: the house's six,
 -- the guest room and the study; the hall and the corridor), Big.Spots pieces and Big.Collectibles collectibles besides,

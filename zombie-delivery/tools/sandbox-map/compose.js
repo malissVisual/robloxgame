@@ -140,7 +140,7 @@
       roadText(svg, 'DEPOT ROW', rx, S(212, 0)[1], 27, -90);
       roadText(svg, 'DEPOT ROW', rx, S(-100, 0)[1], 27, -90);
       const [, ry] = S(0, 0);
-      roadText(svg, 'MAIN STREET  ▸  TO THE HOUSE', S(0, 230)[0], ry, 27, 0);
+      roadText(svg, 'PRAŽSKÁ  ▸  TO THE HOUSE', S(0, 230)[0], ry, 27, 0);
     }
     // the crossroads' TOP MOVERS board
     {
@@ -155,7 +155,7 @@
       const h = facts.house;
       const hb = h.house;
       const hc = S(hb.x + hb.sx * 0.25, hb.z);
-      pill(svg, [{ text: 'THE OLD CHALET', size: 27, weight: 800 }, { text: "the owner's big European house:", size: 19, weight: 600, color: CREAM }, { text: 'the one house you empty', size: 19, weight: 600, color: CREAM }], [W - 24, hc[1] - 330], { to: hc, align: 'r', valign: 't' });
+      pill(svg, [{ text: 'THE OLD FARMSTEAD', size: 27, weight: 800 }, { text: "the owner's big European house:", size: 19, weight: 600, color: CREAM }, { text: 'the one house you empty', size: 19, weight: 600, color: CREAM }], [W - 24, hc[1] - 330], { to: hc, align: 'r', valign: 't' });
       const curb = S(h.curb.x, h.curb.z);
       const door = S(h.door.x - 6, h.door.z);
       pill(svg, [{ text: 'Curb: stop the van here', size: 22, weight: 800 }, { text: 'nose to the road, back to the door', size: 18, weight: 600, color: CREAM }], [door[0] - 26, curb[1] + 105], { to: curb, align: 'r', valign: 't' });

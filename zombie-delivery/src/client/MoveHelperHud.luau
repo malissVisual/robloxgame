@@ -107,6 +107,14 @@ local function act()
 		return
 	end
 	if getOut() then
+		-- (8.8 its chirp, as the card's GET OUT: client/MoveHelperCard.luau's ordered, read here when pressed, not
+		-- required at the top: the card requires this module)
+		pcall(function()
+			local card = (script.Parent :: Instance):FindFirstChild("MoveHelperCard")
+			if card then
+				(require(card :: ModuleScript) :: any).ordered("getout")
+			end
+		end)
 		remote:FireServer("helper", "getout") -- 8.6 (the server decides)
 		return
 	end

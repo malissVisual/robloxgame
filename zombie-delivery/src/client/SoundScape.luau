@@ -20,17 +20,23 @@
 --              sfx3.ogg the 5.7 hum and wind as before (moved here from client/Sounds.luau); the park's fountain, a 3D
 --              loop at it (Map.Park) while the camera is near
 --   8.0.1, the sandbox (Config.Sandbox.On): none of the city's places (SoundPlan.cityPlaces): no fountain (Map.Park's
---              (0, 0) is on its Main Street), no pond, river or sea to splash or wade in, no park lawn under the feet
+--              (0, 0) is on its Pražská street), no pond, river or sea to splash or wade in, no park lawn under the feet
 --   8.1, the sandbox's own ambience (Config.Soundscape.Sandbox, art/audio/sfx4.ogg's 8.1 part): never the city's day
 --              (its traffic) or night; where you are (SoundPlan.sandboxPlace: the move's state says when you are in the
---              chalet, client/MoveSounds.luau inside) blends the meadow's calm alpine day (a breeze, birds; until sfx4
---              is up its stand-in, sfx2's wind), a warehouse's hall (its lights' hum; a little of the meadow through
---              its roller door) or the chalet's quiet room (SoundPlan.sandboxAmbience); outdoors a cowbell rings far
---              off now and then, a random way round you (3D, every CowbellGap s); in a warehouse the room's echo
---              (SoundService.AmbientReverb, SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND
---              all off). The ZDC Sprinter's back doors have their own swing (SoundPlan.swingSound by its CarId).
---              8.3: a warehouse's hall is the building of its plot's level (workspace.Warehouses' Level<id>, 1 … 5:
---              the Garage is small, the Logistics Center big; SoundPlan.sandboxPlace's levelOf).
+--              farmstead, client/MoveSounds.luau inside) blends the fields (SoundPlan.SandboxLoops), a warehouse's hall
+--              (its lights' hum; a little of the fields through its roller door) or the farmstead's quiet room
+--              (SoundPlan.sandboxAmbience); in a warehouse the room's echo (SoundService.AmbientReverb,
+--              SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND all off). The ZDC Sprinter's
+--              back doors have their own swing (SoundPlan.swingSound by its CarId). 8.3: a warehouse's hall is the
+--              building of its plot's level (workspace.Warehouses' Level<id>, 1 … 5: the Garage is small, the
+--              Logistics Center big; SoundPlan.sandboxPlace's levelOf).
+--   Jinočany (design/jinocany/NAVRH.md §5) in place of the Alps (no cowbell, no alpine meadow): the fields outdoors
+--              (birds and larks over them, a breeze), the D5 motorway's far hum (a 3D loop on the motorway at its
+--              point nearest you: always from the east; faint in a warehouse, none in the house), and outdoors now and
+--              then, each on its own clock (SoundPlan.farGap) and 3D (you hear where): the chapel's bell from its
+--              tower (a few strokes), a dog barking far off, a tractor driving past on the fields (a 3D loop that moves
+--              across your view, fading in and out). Every one is a sound wanted on the next sheet; until then its
+--              stand-in plays (SoundPlan.sandboxSound, picked once: the sheets do not change while you play).
 -- Every look is throttled (Tick, OthersEvery); the steps run on Heartbeat for a handful of bodies.
 
 local Lighting = game:GetService("Lighting")
@@ -353,24 +359,8 @@ end
 
 local loops: { [string]: Sound } = {}
 
--- One 2D loop toward its volume (made the first time it is wanted; paused at silence).
-local function toward(name: string, goal: number, offset: number?)
-	local sound = loops[name]
-	if not sound then
-		if goal <= 0.001 then
-			return
-		end
-		local made = api.make(name, nil, true)
-		if not made then
-			return
-		end
-		made.Volume = 0
-		made.TimePosition = made.PlaybackRegion.Min + (offset or 0)
-		made:Play()
-		loops[name] = made
-		sound = made
-	end
-	assert(sound)
+-- A loop a share of the way (Blend) toward its volume; paused at silence.
+local function fadeLoop(sound: Sound, goal: number)
 	local volume = sound.Volume + (goal - sound.Volume) * S.Blend
 	if goal <= 0.001 and volume < 0.003 then
 		sound.Volume = 0
@@ -385,6 +375,28 @@ local function toward(name: string, goal: number, offset: number?)
 	end
 end
 
+-- One 2D loop toward its volume (made the first time it is wanted, at its pitch: Jinočany's stand-ins).
+local function toward(name: string, goal: number, offset: number?, pitch: number?)
+	local sound = loops[name]
+	if not sound then
+		if goal <= 0.001 then
+			return
+		end
+		local made = api.make(name, nil, true)
+		if not made then
+			return
+		end
+		made.Volume = 0
+		made.PlaybackSpeed = pitch or 1
+		made.TimePosition = made.PlaybackRegion.Min + (offset or 0)
+		made:Play()
+		loops[name] = made
+		sound = made
+	end
+	assert(sound)
+	fadeLoop(sound, goal)
+end
+
 -- Where you are: your body, else the camera's focus.
 local function where(): Vector3
 	local character = player.Character
@@ -396,12 +408,159 @@ local function where(): Vector3
 	return if camera then camera.Focus.Position else Vector3.zero
 end
 
--- 8.1 SANDBOX: the meadow, a warehouse's hall or the chalet's room in place of the city's day and night; a cowbell far
--- off now and then outdoors; the room's echo.
+-- 8.1 SANDBOX: the fields, a warehouse's hall or the farmstead's room in place of the city's day and night; the room's
+-- echo. Jinočany: the D5's far hum, and now and then outdoors the chapel's bell, a dog and a tractor far off.
 local SB = S.Sandbox
 local CITY_LOOPS = { "amb_day", "amb_night", "amb_roof", "ambience", "wind" }
-local nextCowbell = 0
 local reverbName = "" -- the AmbientReverb set here ("": none yet; nothing else in the game sets it)
+
+-- Jinočany: what plays for a wanted sound (SoundPlan.sandboxSound: itself or its stand-in), picked once (chosen nil:
+-- nothing can play it).
+local picks: { [string]: { chosen: SoundPlan.Pick? } } = {}
+local function pick(name: string): SoundPlan.Pick?
+	local known = picks[name]
+	if not known then
+		known = { chosen = SoundPlan.sandboxSound(name, api.has) }
+		picks[name] = known
+	end
+	assert(known)
+	return known.chosen
+end
+
+-- A 3D sound at a spot (a far sound: Volume within `near` studs, nothing past `range`), at its pick's pitch, its
+-- attachment gone when it has played. Only while the camera is within range.
+local function farOnce(chosen: SoundPlan.Pick, spot: Vector3, volume: number, near: number, range: number)
+	local camera = workspace.CurrentCamera
+	if not camera or not api.on() or (camera.CFrame.Position - spot).Magnitude > range then
+		return
+	end
+	local holder = Instance.new("Attachment")
+	holder.Name = "FarSound"
+	holder.WorldPosition = spot
+	local sound = api.make(chosen.name, holder, false)
+	if not sound then
+		holder:Destroy()
+		return
+	end
+	sound.RollOffMode = Enum.RollOffMode.InverseTapered
+	sound.RollOffMinDistance = near
+	sound.RollOffMaxDistance = range
+	sound.Volume = volume * chosen.gain
+	sound.PlaybackSpeed = chosen.pitch * (0.97 + math.random() * 0.06)
+	holder.Parent = workspace.Terrain
+	sound:Play()
+	local region = sound.PlaybackRegion
+	task.delay((region.Max - region.Min) / sound.PlaybackSpeed + 0.5, function()
+		holder:Destroy()
+	end)
+end
+
+-- The D5's far hum: one 3D loop on the motorway at its point nearest you (SoundPlan.motorwaySpot), toward its volume.
+type Hum = { holder: Attachment, sound: Sound, gain: number }
+local hum: Hum? = nil
+local function updateMotorway(at: Vector3, goal: number)
+	local M = SB.Motorway
+	local current = hum
+	if not current then
+		local chosen = if goal > 0.001 then pick(SoundPlan.SandboxFar.motorway) else nil
+		if not chosen then
+			return
+		end
+		local holder = Instance.new("Attachment")
+		holder.Name = "MotorwayHum"
+		local sound = api.make(chosen.name, holder, true)
+		if not sound then
+			holder:Destroy()
+			return
+		end
+		sound.RollOffMode = Enum.RollOffMode.InverseTapered
+		sound.RollOffMinDistance = M.Near
+		sound.RollOffMaxDistance = M.Range
+		sound.PlaybackSpeed = chosen.pitch
+		sound.Volume = 0
+		holder.Parent = workspace.Terrain
+		sound:Play()
+		current = { holder = holder, sound = sound, gain = chosen.gain }
+		hum = current
+	end
+	assert(current)
+	local x, z = SoundPlan.motorwaySpot(at.Z)
+	current.holder.WorldPosition = Vector3.new(x, M.Y, z)
+	fadeLoop(current.sound, goal * current.gain)
+end
+
+-- The chapel's bell from its tower: Strokes strokes, Every s apart.
+local function ringBell()
+	local B = SB.Bell
+	local chosen = pick(SoundPlan.SandboxFar.bell)
+	if not chosen then
+		return
+	end
+	local x, z = SoundPlan.farSpot("bell", 0, 0, 0, 0)
+	local spot = Vector3.new(x, B.Y, z)
+	for i = 0, B.Strokes - 1 do
+		task.delay(i * B.Every, farOnce, chosen, spot, B.Volume, B.Near, B.Range)
+	end
+end
+
+-- A dog barking far off, a random way round you.
+local function barkFar(at: Vector3)
+	local D = SB.Dog
+	local chosen = pick(SoundPlan.SandboxFar.dog)
+	if chosen then
+		local x, z = SoundPlan.farSpot("dog", at.X, at.Z, math.random(), math.random())
+		farOnce(chosen, Vector3.new(x, at.Y + 1, z), D.Volume, D.Near, D.Range)
+	end
+end
+
+-- A tractor driving past on the fields: a 3D loop that moves across your view (SoundPlan.tractorPath), fading in and
+-- out (passShare); fading away indoors, gone at its end.
+type Pass = { holder: Attachment, sound: Sound, born: number, x: number, y: number, z: number, vx: number, vz: number, gain: number }
+local tractor: Pass? = nil
+local function startTractor(at: Vector3)
+	local T = SB.Tractor
+	local chosen = if tractor == nil then pick(SoundPlan.SandboxFar.tractor) else nil
+	if not chosen then
+		return
+	end
+	local x, z, vx, vz = SoundPlan.tractorPath(at.X, at.Z, math.random(), math.random())
+	local holder = Instance.new("Attachment")
+	holder.Name = "TractorSound"
+	holder.WorldPosition = Vector3.new(x, at.Y + 2, z)
+	local sound = api.make(chosen.name, holder, true)
+	if not sound then
+		holder:Destroy()
+		return
+	end
+	sound.RollOffMode = Enum.RollOffMode.InverseTapered
+	sound.RollOffMinDistance = T.Near
+	sound.RollOffMaxDistance = T.Range
+	sound.PlaybackSpeed = chosen.pitch
+	sound.Volume = 0
+	holder.Parent = workspace.Terrain
+	sound:Play()
+	tractor = { holder = holder, sound = sound, born = os.clock(), x = x, y = at.Y + 2, z = z, vx = vx, vz = vz, gain = chosen.gain }
+end
+
+local function updateTractor(now: number, outdoors: boolean)
+	local pass = tractor
+	if not pass then
+		return
+	end
+	local T = SB.Tractor
+	local t = now - pass.born
+	if t >= T.Seconds then
+		pass.holder:Destroy()
+		tractor = nil
+		return
+	end
+	pass.holder.WorldPosition = Vector3.new(pass.x + pass.vx * t, pass.y, pass.z + pass.vz * t)
+	local goal = if outdoors then T.Volume * pass.gain * SoundPlan.passShare(t, T.Seconds, T.Fade) else 0
+	pass.sound.Volume += (goal - pass.sound.Volume) * S.Blend
+end
+
+-- Each far sound's next time (os.clock; 0: not set yet, the first look only sets it).
+local nextFar: { [string]: number } = { bell = 0, dog = 0, tractor = 0 }
 
 local function setReverb(name: string)
 	if name == reverbName then
@@ -444,17 +603,29 @@ local function updateSandbox(playing: boolean)
 		toward(name, 0)
 	end
 	local names = SoundPlan.SandboxLoops
-	toward(names.alpine, mix.alpine * on)
-	toward(names.warehouse, mix.warehouse * on, 3) -- (out of step with the meadow)
+	local fields = pick(names.fields)
+	if fields then
+		toward(fields.name, mix.fields * fields.gain * on, nil, fields.pitch)
+	end
+	toward(names.warehouse, mix.warehouse * on, 3) -- (out of step with the fields)
 	toward(names.room, mix.room * on)
 	setReverb(if playing and api.on() then SoundPlan.reverb(place) else "NoReverb")
+	updateMotorway(at, mix.motorway * on)
 	local now = os.clock()
-	if now >= nextCowbell then
-		local first = nextCowbell == 0
-		nextCowbell = now + SoundPlan.cowbellGap(math.random())
-		if not first and playing and place == "outdoors" and api.on() then
-			local x, z = SoundPlan.cowbellSpot(at.X, at.Z, math.random(), math.random())
-			api.playAt("cowbell_far", Vector3.new(x, at.Y + 2, z), SB.Cowbell, 0.94 + math.random() * 0.12, SB.CowbellFar[2] + 40)
+	local outdoors = playing and place == "outdoors" and api.on()
+	updateTractor(now, outdoors)
+	for kind, due in nextFar do
+		if now >= due then
+			nextFar[kind] = now + SoundPlan.farGap(kind, math.random())
+			if due > 0 and outdoors then
+				if kind == "bell" then
+					ringBell()
+				elseif kind == "dog" then
+					barkFar(at)
+				else
+					startTractor(at)
+				end
+			end
 		end
 	end
 end
@@ -477,7 +648,7 @@ local function updateAmbience()
 end
 
 -- The park's fountain: a 3D loop at it while the camera is near (made and gone with the distance). 8.0.1: only where
--- the city's park is (SoundPlan.cityPlaces: never in the sandbox, where Map.Park's middle is on Main Street).
+-- the city's park is (SoundPlan.cityPlaces: never in the sandbox, where Map.Park's middle is on Pražská).
 local fountain: Attachment? = nil
 local function updateFountain()
 	local camera = workspace.CurrentCamera

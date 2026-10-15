@@ -1459,7 +1459,7 @@ collectible("arcade_cabinet", "Arcade Cabinet", "🕹️", 2.8, 6.0, 3.0, "pair"
 collectible("jukebox", "Jukebox", "🎵", 3.4, 5.4, 2.5, "pair", 9, 3400, false, "garage", "epic")
 collectible("oil_painting", "Oil Painting", "🎨", 4.8, 3.8, 0.6, "both", 3, 6000, true, "living", "legendary")
 collectible("knight_armour", "Knight's Armour", "🛡️", 2.6, 6.8, 1.8, "both", 6, 5500, false, "living", "legendary")
--- 8.3: twelve more for The Old Chalet (the book's 68 pieces), three of each rarity: a chalet's alpine things (the carved
+-- 8.3: twelve more for The Old Farmstead (the book's 68 pieces), three of each rarity: a chalet's alpine things (the carved
 -- bear, the alphorn, the ski trophy) beside Grandpa's treasures, and two legendary jokes of a moving company in a zombie
 -- world (the T. rex skull in the garage, the zombie-proof safe in the bedroom). (8.4: Danny carries what you give him,
 -- whatever its weight; a pair piece waits for him at the other end.)

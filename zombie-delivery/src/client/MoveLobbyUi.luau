@@ -16,6 +16,9 @@
 --     with their name (no doubles while there are no more players than roles);
 --   * the footer: the one primary button: the owner's ▶ LAUNCH (green once everybody is READY; solo at once), a
 --     member's ✔ I'M READY / NOT READY; and CANCEL (the owner) or LEAVE CREW (a member: the crew's own "leave").
+--   * 8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."; MoveRoles.on: the city's only,
+--     never the sandbox): without roles no PICK YOUR ROLE and no role anywhere: a member's row has a plain 👤, says who
+--     leads the move, and READY / NOT READY as ever.
 -- Wide (Config.UiKit.SplitMin and more): the contract and the truck on the left, the crew and the roles on the right;
 -- narrow (a phone held upright): one column that scrolls, the footer stays; a touch screen draws it at least
 -- Config.MoveRoles.Lobby.TouchScale big (the body scrolls under the header). Presentation only.
@@ -113,7 +116,8 @@ local function section(parent: Instance, text: string, order: number, chip: Card
 end
 
 local function memberRow(parent: Instance, member: any, order: number)
-	local def = MoveRoles.get(member.role)
+	local roles = MoveRoles.on() -- (8.8: no roles: nobody's shown)
+	local def = if roles then MoveRoles.get(member.role) else nil
 	local state: string, color: Color3
 	if member.owner == true then
 		state, color = "LEADER", C.gold
@@ -132,7 +136,7 @@ local function memberRow(parent: Instance, member: any, order: number)
 		emojiSize = 26,
 		title = `{string.upper(tostring(member.name))}{tag}`,
 		titleColor = if member.you == true then C.title else K.secondary,
-		facts = if def then `{def.name} · {def.blurb}` else "Picking a role",
+		facts = if def then `{def.name} · {def.blurb}` elseif roles then "Picking a role" elseif member.owner == true then "Leads the move" else "On the crew",
 		value = state,
 		valueColor = color,
 		silent = true,
@@ -456,7 +460,7 @@ local function draw()
 		truckRows(left, v, 10)
 	end
 
-	-- the crew, the roles
+	-- the crew, the roles (8.8: the crew only without roles)
 	local owner = v.mine == true
 	section(right, `CREW {#members}/{tonumber(v.maxCrew) or 4}`, 20, if owner then {
 		name = "Invite",
@@ -475,8 +479,10 @@ local function draw()
 	for index, member in members do
 		memberRow(right, member, 20 + index)
 	end
-	section(right, if v.doubles == true then "PICK YOUR ROLE · MORE OF YOU THAN ROLES: DOUBLES OK" else "PICK YOUR ROLE · ONE EACH", 40)
-	roleGrid(right, v, rightW, 41)
+	if MoveRoles.on() then -- (8.8: no roles, nothing to pick)
+		section(right, if v.doubles == true then "PICK YOUR ROLE · MORE OF YOU THAN ROLES: DOUBLES OK" else "PICK YOUR ROLE · ONE EACH", 40)
+		roleGrid(right, v, rightW, 41)
+	end
 	if not wide then
 		truckRows(right, v, 50)
 	end

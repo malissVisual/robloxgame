@@ -17,7 +17,8 @@
 --   both). A house's plan is the same as before the big house (its dice untouched).
 --   8.3 economy: HouseLayout.plan(seed, kind, found), `found` the move owner's collection book ({ [item] = anything },
 --   optional): a house that rolls a legendary collectible tries the legendaries not in it first (the same seed, kind
---   and book give the same plan; without `found` the plan is as before). A farm ignores it.
+--   and book give the same plan; without `found` the plan is as before). A farm ignores it. 8.7 review: a page only
+--   bought from a player (its `bought` mark, shared/CollectionBookRules.luau) is not in it: that one is still to find.
 --   8.3: HouseLayout.Collectibles is the whole pool a house's collectibles come from: its own entries, then any other
 --   piece of FurnitureLooks.Collectibles (a new one joins on its own, at a wall in the room its catalogue entry names,
 --   when the house has that room). HouseLayout.BigRecipes: the big house's rooms' recipes (its own and the house's).
@@ -664,6 +665,7 @@ local function span(inner: Rect, side: string): (number, number)
 end
 
 -- 8.3 economy: a shuffled list of collectibles with the ones not in `found` first (each part in its shuffled order).
+-- 8.7 review: a page marked bought is no find (the book's own rule: CollectionBookRules.isFound).
 local function unfoundFirst(list: { Entry }, found: { [string]: any }?): { Entry }
 	if not found then
 		return list
@@ -671,7 +673,8 @@ local function unfoundFirst(list: { Entry }, found: { [string]: any }?): { Entry
 	local fresh: { Entry } = {}
 	local seen: { Entry } = {}
 	for _, e in list do
-		table.insert(if found[e.item] then seen else fresh, e)
+		local page = found[e.item]
+		table.insert(if page and not (type(page) == "table" and page.bought == true) then seen else fresh, e)
 	end
 	table.move(seen, 1, #seen, #fresh + 1, fresh)
 	return fresh

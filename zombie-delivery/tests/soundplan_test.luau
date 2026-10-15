@@ -2,13 +2,18 @@
 -- the place (the park's lawns, the pond, the river), the horns by vehicle, the back's sounds, the ambience by the
 -- clock and the height; every name it gives has its region in SoundSheet.Sfx3. 8.0.1: in the sandbox
 -- (Config.Sandbox.On) none of the city's places (no pond, river, sea or park lawn; client/SoundScape.luau's fountain
--- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (the meadow, a warehouse, the chalet), its
--- ambience (a calm alpine day, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the far
--- cowbell, the collection's cues (on a stand, taken down, home), the income's clink (soft, not too often), the
--- Sprinter's sliding door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features'
--- feedback: what the book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare,
--- a task done and claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one
--- after the other (the lane: never two stings over each other, a burst is one). In the standalone Luau CLI.
+-- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (the village, a warehouse, the farmstead), its
+-- ambience (Jinočany's fields, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the
+-- collection's cues (on a stand, taken down, home), the income's clink (soft, not too often), the Sprinter's sliding
+-- door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features' feedback: what the
+-- book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare, a task done and
+-- claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one after the other
+-- (the lane: never two stings over each other, a burst is one). Jinočany (design/jinocany/NAVRH.md §5) in place of the
+-- Alps: no cowbell and no alpine meadow left; the D5's far hum from the east (on the motorway of design/jinocany/plan.json),
+-- the chapel's bell from its tower, a dog and a tractor far off, each with a region or a stand-in that plays. 8.9, the newest features' own
+-- sounds (sfx5): every event a quiet sound of sfx5, the clipboard's out and away, a piece's tick and cross-off, an
+-- order's chirp, an answer's nope after its Notice, Danny's whistle only when he needs you, the auction's tick, gavel
+-- and bell, the trades' hook; Danny's van door as a player's. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -257,13 +262,15 @@ for key, value in MV do
 end
 
 -- ── 8.0.1: the sandbox has none of the city's places ────────────────────────
--- Its Main Street runs over the park's (0, 0): no pond to wade or splash in there (nor a river or a sea), no park lawn
+-- Its Pražská runs over the park's (0, 0): no pond to wade or splash in there (nor a river or a sea), no park lawn
 -- under its concrete pads, no fountain (SoundScape plays it only when SoundPlan.cityPlaces says so).
 Config.Sandbox.On = true
 check("the sandbox: no city places (no fountain at Map.Park)", not SoundPlan.cityPlaces())
-check("… no pond's water at the park's middle (the sandbox's Main Street)", SoundPlan.waterTop(park.x + 10, park.z) == nil and not SoundPlan.inWater(park.x + 18.5, -0.1, park.z))
-check("… steps where the pond was (the meadow by Main Street, its asphalt): grass and concrete, not water", SoundPlan.surface("Grass", park.x + 18.5, 0, park.z) == "grass" and SoundPlan.surface("Asphalt", park.x + 12, -3.5, park.z) == "concrete")
+check("… no pond's water at the park's middle (the sandbox's Pražská)", SoundPlan.waterTop(park.x + 10, park.z) == nil and not SoundPlan.inWater(park.x + 18.5, -0.1, park.z))
+check("… steps where the pond was (the grass by Pražská, its asphalt): grass and concrete, not water", SoundPlan.surface("Grass", park.x + 18.5, 0, park.z) == "grass" and SoundPlan.surface("Asphalt", park.x + 12, -3.5, park.z) == "concrete")
 check("… no river, no sea", SoundPlan.waterTop(riverX, 0) == nil and SoundPlan.waterTop(Map.Sea.x0 + 50, 0) == nil)
+check("8.8 no roles in the sandbox: a two-person piece alone is dragged by anybody (a stray Mover in the state too)", SoundPlan.dragged(alone, 3)
+	and SoundPlan.dragged(state({ team = { role = "mover" } }, alone.items), 3))
 check("… a plot's concrete where the park's lawn was: concrete", not SoundPlan.parkLawn(lawnX, lawnZ) and SoundPlan.surface("Concrete", -65, 0, -85) == "concrete")
 check("… the materials still say their surface (terrain water, grass, planks)", SoundPlan.surface("Water", 0, 0, 0) == "water" and SoundPlan.surface("Grass", 0, 0, 0) == "grass" and SoundPlan.surface("WoodPlanks", 0, 0, 0) == "wood")
 
@@ -276,8 +283,8 @@ end
 local plot = SandboxMap.Plots[1]
 local w = plot.warehouse
 local h = SandboxMap.House
-check("the meadow is outdoors", SoundPlan.sandboxPlace(150, 2, 300, false) == "outdoors")
-check("Main Street is outdoors", SoundPlan.sandboxPlace(0, 1, 200, false) == "outdoors")
+check("the fields are outdoors", SoundPlan.sandboxPlace(150, 2, 300, false) == "outdoors")
+check("Pražská is outdoors", SoundPlan.sandboxPlace(0, 1, 200, false) == "outdoors")
 check("in a warehouse's hall", SoundPlan.sandboxPlace(w.x + 10, 1, w.z, false) == "warehouse")
 check("every plot's warehouse", (function(): boolean
 	for _, p in SandboxMap.Plots do
@@ -314,34 +321,65 @@ check("… a junk level (0, 9, NaN) is clamped or 4: never an error", SoundPlan.
 check("a plot's yard beside the hall is outdoors", SoundPlan.sandboxPlace(plot.spawn.x, 3, plot.spawn.z, false) == "outdoors")
 check("in the move's house (its state's inside): the house", SoundPlan.sandboxPlace(150, 2, 300, true) == "house")
 check("a move's interior far off the map: the house", SoundPlan.sandboxPlace(9000, 400, 9000, false) == "house")
-check("in the chalet's own box: the house", SoundPlan.sandboxPlace(h.house.x, 3, h.house.z, false) == "house")
-check("at the chalet's front door (where you come out): outdoors", SoundPlan.sandboxPlace(h.door.x, 1, h.door.z, false) == "outdoors")
--- The ambience: a calm alpine day outdoors, never the city's traffic.
-local L = SoundPlan.SandboxLoops
-check("the sandbox's outdoor loop is the meadow, not the city's traffic (amb_day) or night", L.alpine == "amb_alpine" and L.alpine ~= "amb_day" and L.alpine ~= "amb_night")
-for part, name in L do
-	check(`the sandbox's {part} loop {name} is in sfx4 and loops`, sfx4(name) and SoundSheet.Looped[name] == true)
+check("in the farmstead's own box: the house", SoundPlan.sandboxPlace(h.house.x, 3, h.house.z, false) == "house")
+check("at the farmstead's front door (where you come out): outdoors", SoundPlan.sandboxPlace(h.door.x, 1, h.door.z, false) == "outdoors")
+-- Jinočany: what the sheets play now. A sound has a region on a sheet (sfx … sfx4, and a newer sheet once there) or a
+-- stand-in that does (SoundSheet.Fallback, as client/Sounds.luau finds it).
+local SHEETS = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, (SoundSheet :: any).Sfx5 }
+local function region(name: string): { number }?
+	for _, sheet in SHEETS do
+		if sheet[name] then
+			return sheet[name]
+		end
+	end
+	return nil
 end
+local function playable(name: string): boolean
+	local seen = 0
+	local at: string? = name
+	while at and seen < 6 do
+		if region(at) then
+			return true
+		end
+		at = SoundSheet.Fallback[at]
+		seen += 1
+	end
+	return false
+end
+local CITY = { amb_day = true, amb_night = true, amb_roof = true, ambience = true, wind = false } -- (wind: the fields' breeze before sfx4)
+-- The ambience: Jinočany's fields outdoors (birds and larks, a breeze), never the city's traffic.
+local L = SoundPlan.SandboxLoops
+check("the sandbox's outdoor loop is the fields (amb_fields), no alpine meadow, not the city's traffic (amb_day) or night",
+	L.fields == "amb_fields" and (L :: any).alpine == nil and not CITY[L.fields])
+for part, name in L do
+	local chosen = SoundPlan.sandboxSound(name, playable)
+	check(`the sandbox's {part} loop {name}: it or its stand-in plays, and loops`, chosen ~= nil and SoundSheet.Looped[chosen.name] == true, chosen and chosen.name)
+end
+local fields = SoundPlan.sandboxSound(L.fields, playable)
+check("the fields' stand-in until a sheet has amb_fields: sfx4's meadow day (birds, a lark, a breeze), at its own pitch",
+	fields ~= nil and (region(L.fields) ~= nil or (fields.name == "amb_alpine" and fields.pitch == 1 and fields.gain == 1)), fields and fields.name)
 -- (a stand-in's stand-in too: none on the way is the city's day or night)
-local standIn: string? = L.alpine
+local standIn: string? = fields and fields.name
 local chain = {}
 while standIn do
 	table.insert(chain, standIn)
-	check(`the meadow's stand-in chain: {standIn} is no city loop`, standIn ~= "amb_day" and standIn ~= "amb_night" and standIn ~= "ambience")
+	check(`the fields' stand-in chain: {standIn} is no city loop`, not CITY[standIn])
 	standIn = SoundSheet.Fallback[standIn]
 	if #chain > 4 then
 		break
 	end
 end
-check("the meadow stands in with a breeze until sfx4 is up", SoundSheet.Fallback[L.alpine] == "wind")
+check("the fields stand in with a breeze until sfx4 is up", SoundSheet.Fallback.amb_alpine == "wind")
 local out4, out3 = SoundPlan.sandboxAmbience("outdoors", true), SoundPlan.sandboxAmbience("outdoors", false)
-check("outdoors: the meadow only", out4.alpine == SB.Alpine and out4.warehouse == 0 and out4.room == 0)
-check("outdoors before sfx4: its breeze, quieter", out3.alpine == SB.AlpineStandIn and out3.alpine > 0 and out3.alpine < out4.alpine)
+check("outdoors: the fields and the D5's hum", out4.fields == SB.Fields and out4.motorway == SB.Motorway.Volume and out4.warehouse == 0 and out4.room == 0)
+check("outdoors before sfx4: the fields' breeze, quieter", out3.fields == SB.FieldsStandIn and out3.fields > 0 and out3.fields < out4.fields)
 local hall = SoundPlan.sandboxAmbience("warehouse", true)
-check("in a warehouse: its hall, the meadow faint through the door", hall.warehouse == SB.Warehouse and hall.alpine > 0 and hall.alpine < out4.alpine and hall.room == 0)
+check("in a warehouse: its hall, the fields faint through the door (as the meadow was)", hall.warehouse == SB.Warehouse and hall.fields > 0 and hall.fields < out4.fields
+	and hall.fields == SB.Fields * SB.FieldsIndoors and hall.room == 0)
+check("… the D5's hum fainter there too", hall.motorway == out4.motorway * SB.FieldsIndoors and hall.motorway < out4.motorway)
 check("in a warehouse before sfx4: the hum's stand-in", SoundPlan.sandboxAmbience("warehouse", false).warehouse == SB.WarehouseStandIn)
 local room = SoundPlan.sandboxAmbience("house", true)
-check("in the house: the quiet room only", room.room == SB.Room and room.alpine == 0 and room.warehouse == 0)
+check("in the house: the quiet room only (no fields, no motorway)", room.room == SB.Room and room.fields == 0 and room.warehouse == 0 and room.motorway == 0)
 check("in the house before sfx4: silence (no stand-in)", SoundPlan.sandboxAmbience("house", false).room == 0 and SoundSheet.Fallback[L.room] == nil)
 for _, mix in { out4, out3, hall, room } do
 	for key, value in mix :: any do
@@ -349,15 +387,142 @@ for _, mix in { out4, out3, hall, room } do
 	end
 end
 check("the warehouse's echo, none outdoors or in the house", SoundPlan.reverb("warehouse") == SB.Reverb.warehouse and SoundPlan.reverb("outdoors") == "NoReverb" and SoundPlan.reverb("house") == (SB.Reverb.house or "NoReverb"))
--- The far cowbell.
-check("the cowbell's gaps", SoundPlan.cowbellGap(0) == SB.CowbellGap[1] and SoundPlan.cowbellGap(1) == SB.CowbellGap[2] and SoundPlan.cowbellGap(2) == SB.CowbellGap[2])
-check("the cowbell rings now and then (20 s at least between two)", SB.CowbellGap[1] >= 20 and SB.CowbellGap[2] > SB.CowbellGap[1])
-for _, r in { { 0, 0 }, { 0.3, 1 }, { 0.77, 0.5 } } do
-	local x, z = SoundPlan.cowbellSpot(10, 20, r[1], r[2])
-	local d = math.sqrt((x - 10) ^ 2 + (z - 20) ^ 2)
-	check(`the cowbell far off ({math.floor(d)} studs)`, d >= SB.CowbellFar[1] - 1e-6 and d <= SB.CowbellFar[2] + 1e-6)
+-- No cowbell in the sandbox (Jinočany: the Alps' cowbells and meadow are gone).
+local named: { string } = {}
+for _, name in SoundPlan.SandboxLoops do
+	table.insert(named, name)
 end
-check("the far cowbell is in sfx4, short, not a loop", sfx4("cowbell_far") and SoundSheet.Looped.cowbell_far == nil and SoundSheet.Sfx4.cowbell_far[2] <= 4)
+for _, name in SoundPlan.SandboxFar do
+	table.insert(named, name)
+end
+for wanted, list in SoundPlan.SandboxStandIns do
+	table.insert(named, wanted)
+	for _, s in list do
+		table.insert(named, s.name)
+	end
+end
+local belled: { string } = {}
+for _, name in named do
+	if string.find(string.lower(name), "cowbell", 1, true) or string.find(string.lower(name), "cuckoo", 1, true) then
+		table.insert(belled, name)
+	end
+end
+check("no cowbell (nor cuckoo) among the sandbox's sounds, wanted or standing in", #belled == 0, table.concat(belled, ", "))
+local alpineKeys: { string } = {}
+for key in SB do
+	if string.find(string.lower(key), "cowbell", 1, true) or string.find(string.lower(key), "alpine", 1, true) then
+		table.insert(alpineKeys, key)
+	end
+end
+check("… nor in Config.Soundscape.Sandbox (no Cowbell, no Alpine)", #alpineKeys == 0, table.concat(alpineKeys, ", "))
+check("… nor SoundPlan's cowbell (its gap and spot gone)", (SoundPlan :: any).cowbellGap == nil and (SoundPlan :: any).cowbellSpot == nil)
+local alpineWanted = false
+for _, name in SoundPlan.SandboxFar do
+	alpineWanted = alpineWanted or string.find(name, "alpine", 1, true) ~= nil
+end
+check("… and no alpine sound wanted (amb_alpine only stands in for the fields)", not alpineWanted and not string.find(L.fields, "alpine", 1, true))
+-- Jinočany's far sounds: each has a region or a stand-in that plays (until the next sheet has it).
+local F = SoundPlan.SandboxFar
+check("the far sounds: the D5, the chapel's bell, a dog, a tractor", F.motorway == "amb_motorway" and F.bell == "chapel_bell" and F.dog == "dog_far" and F.tractor == "tractor_far")
+local LOOPS = { motorway = true, tractor = true }
+for part, name in F do
+	local chosen = SoundPlan.sandboxSound(name, playable)
+	check(`{part} ({name}): a region or a stand-in that plays`, chosen ~= nil, name)
+	if chosen then
+		local r = region(chosen.name) or region(SoundSheet.Fallback[chosen.name] or "")
+		check(`{part}: its sound ({chosen.name}) {if LOOPS[part] then "loops" else "plays once, short"}`, if LOOPS[part]
+			then SoundSheet.Looped[chosen.name] == true else (SoundSheet.Looped[chosen.name] == nil and r ~= nil and r[2] / chosen.pitch <= 4), chosen.name)
+		check(`{part}: a sane pitch and gain ({chosen.pitch}, {chosen.gain})`, chosen.pitch >= 0.4 and chosen.pitch <= 1.5 and chosen.gain > 0 and chosen.gain <= 1)
+		check(`{part}: never the city's day or night loop`, chosen.name ~= "amb_day" and chosen.name ~= "amb_night")
+	end
+end
+for wanted, list in SoundPlan.SandboxStandIns do
+	check(`{wanted}: its stand-ins listed`, #list >= 1, wanted)
+	for _, s in list do
+		check(`{wanted}'s stand-in {s.name} is on a sheet up now (sfx … sfx4)`, region(s.name) ~= nil and (s.pitch or 1) > 0 and (s.gain or 1) > 0, s.name)
+	end
+end
+check("once a sheet has the wanted sound it plays itself, at its own pitch", (function(): boolean
+	local own = SoundPlan.sandboxSound("chapel_bell", function(name: string): boolean
+		return name == "chapel_bell" or playable(name)
+	end)
+	return own ~= nil and own.name == "chapel_bell" and own.pitch == 1 and own.gain == 1
+end)())
+check("nothing on any sheet: silence (no pick)", SoundPlan.sandboxSound("dog_far", function(): boolean
+	return false
+end) == nil)
+-- The D5's far hum: on the motorway of design/jinocany/plan.json (its landmark "d5"), always from the east.
+local Plan = require("./JinocanyPlan")
+local function area(name: string): { x0: number, x1: number, z0: number, z1: number }?
+	for _, a in Plan.areas do
+		if a.name == name then
+			return a.rect
+		end
+	end
+	return nil
+end
+local M = SB.Motorway
+local d5 = area("d5")
+check("the D5's hum on plan.json's motorway: its middle line, end to end", d5 ~= nil and M.X > d5.x0 and M.X < d5.x1 and M.Z0 == d5.z0 and M.Z1 == d5.z1, d5 and `{d5.x0} … {d5.x1}`)
+local eastmost = h.lot.x1
+for _, p in SandboxMap.Plots do
+	eastmost = math.max(eastmost, p.rect.x1)
+end
+check("… east of every plot and the farmstead, and no nearer than Near to them (a far hum)", M.X - eastmost > M.Near, `{M.X - eastmost} studs`)
+check("… heard faintly over the whole map (Range past the plan's west edge)", M.Range > M.X - Plan.bounds.x0 and M.Near > 0 and M.Y > 0)
+for _, z in { -9999, -100, 0, 300, 9999 } do
+	local x, at = SoundPlan.motorwaySpot(z)
+	check(`… its spot for z {z}: on the motorway, nearest you`, x == M.X and at == math.clamp(z, M.Z0, M.Z1))
+end
+-- The chapel's bell: from the chapel (plan.json's landmark "chapel"), heard over the village.
+local Bl = SB.Bell
+local chapel = area("chapel")
+for _, at in { { 0, 0 }, { -900, 500 } } do
+	local x, z = SoundPlan.farSpot("bell", at[1], at[2], 0.4, 0.6)
+	check(`the bell rings from the chapel's tower wherever you are ({at[1]}, {at[2]})`, chapel ~= nil and x == Bl.X and z == Bl.Z and x > chapel.x0 and x < chapel.x1 and z > chapel.z0 and z < chapel.z1)
+end
+local farthest = 0
+for _, cx in { Plan.bounds.x0, Plan.bounds.x1 } do
+	for _, cz in { Plan.bounds.z0, Plan.bounds.z1 } do
+		farthest = math.max(farthest, math.sqrt((cx - Bl.X) ^ 2 + (cz - Bl.Z) ^ 2))
+	end
+end
+check("… heard (faintly) anywhere in the village", Bl.Range > farthest and Bl.Near > 0 and Bl.Y > 0, `{math.floor(farthest)} studs`)
+check("… a few strokes, apart", Bl.Strokes >= 1 and Bl.Strokes <= 6 and Bl.Every >= 0.5 and Bl.Every <= 5)
+-- A dog and a tractor far off, a random way round you; the tractor drives across your view.
+for _, kind in { "dog", "tractor" } do
+	local def = if kind == "dog" then SB.Dog else SB.Tractor
+	for _, r in { { 0, 0 }, { 0.3, 1 }, { 0.77, 0.5 } } do
+		local x, z = SoundPlan.farSpot(kind, 10, 20, r[1], r[2])
+		local d = math.sqrt((x - 10) ^ 2 + (z - 20) ^ 2)
+		check(`the {kind} far off ({math.floor(d)} studs)`, d >= def.Far[1] - 1e-6 and d <= def.Far[2] + 1e-6 and d < def.Range)
+	end
+end
+local T = SB.Tractor
+for _, r in { { 0, 0 }, { 0.25, 1 }, { 0.6, 0.4 } } do
+	local x, z, vx, vz = SoundPlan.tractorPath(10, 20, r[1], r[2])
+	local mx, mz = SoundPlan.farSpot("tractor", 10, 20, r[1], r[2])
+	local half = T.Seconds / 2
+	local speed = math.sqrt(vx * vx + vz * vz)
+	check(`the tractor passes its far spot halfway, at its Speed, across the way ({r[1]})`, math.abs(x + vx * half - mx) < 1e-6 and math.abs(z + vz * half - mz) < 1e-6
+		and math.abs(speed - T.Speed) < 1e-6 and math.abs(vx * (mx - 10) + vz * (mz - 20)) < 1e-6)
+	local nearest = math.huge
+	for t = 0, T.Seconds, 0.5 do
+		nearest = math.min(nearest, math.sqrt((x + vx * t - 10) ^ 2 + (z + vz * t - 20) ^ 2))
+	end
+	check(`… never closer than its Far ({math.floor(nearest)} studs)`, nearest >= T.Far[1] - 1e-6)
+end
+check("the pass fades in and out", SoundPlan.passShare(0, T.Seconds, T.Fade) == 0 and SoundPlan.passShare(T.Seconds, T.Seconds, T.Fade) == 0
+	and SoundPlan.passShare(T.Seconds / 2, T.Seconds, T.Fade) == 1 and math.abs(SoundPlan.passShare(T.Fade / 2, T.Seconds, T.Fade) - 0.5) < 1e-9
+	and math.abs(SoundPlan.passShare(T.Seconds - T.Fade / 2, T.Seconds, T.Fade) - 0.5) < 1e-9 and SoundPlan.passShare(-1, T.Seconds, T.Fade) == 0
+	and T.Fade * 2 <= T.Seconds)
+-- Each now and then, on its own clock.
+for _, kind in { "bell", "dog", "tractor" } do
+	local gap = if kind == "bell" then Bl.Gap elseif kind == "dog" then SB.Dog.Gap else T.Gap
+	check(`the {kind}'s gaps (now and then: 20 s at least)`, SoundPlan.farGap(kind, 0) == gap[1] and SoundPlan.farGap(kind, 1) == gap[2]
+		and SoundPlan.farGap(kind, 2) == gap[2] and gap[1] >= 20 and gap[2] > gap[1])
+end
+check("the tractor's pass is over before the next can come", T.Seconds < T.Gap[1])
 -- The collection's cues (the "Collection" remote's states, one after the other).
 local function stock(list: { { any } }): { [string]: any }
 	local out = {}
@@ -452,7 +617,11 @@ for _, kind in SoundPlan.FeedbackKinds do
 	end
 	check(`{kind}: its sounds on the existing sheets (or their stand-ins), each plays today`, fine)
 end
-check("no new sheet: still sfx, sfx2, sfx3, sfx4 and the music", SoundSheet.Seconds.sfx5 == nil and (SoundSheet :: any).Sfx5 == nil)
+for _, kind in SoundPlan.FeedbackKinds do
+	for _, cue in SoundPlan.feedbackCues(kind, 5) do
+		check(`8.3 {kind}: {cue.name} is no 8.9 sound (sfx5: the newest features' own)`, SoundSheet.Sfx5[cue.name] == nil, cue.name)
+	end
+end
 local function names2(cues: { SoundPlan.Timed }): string
 	local list = {}
 	for _, cue in cues do
@@ -512,17 +681,142 @@ for _, value in { "Discovery", "Milestone", "TaskDone", "Claimed", "Fill", "Bulk
 end
 check("the gaps and the wait: a burst is one, a sting waits a few seconds at most", SB.DiscoveryGap > 0 and SB.MilestoneGap >= SB.DiscoveryGap and SB.TaskDoneGap > 0 and SB.ClaimedGap > 0
 	and SB.FillGap > 0 and SB.BulkGap > 0 and SB.FeedbackWait >= 3 and SB.FeedbackWait <= 6 and SB.FillClicks >= 2 and SB.FillClicks <= 4)
+local FAR_TABLES = { Motorway = true, Bell = true, Dog = true, Tractor = true } -- (Jinočany's far sounds: checked above)
 for key, value in SB do
 	if type(value) == "number" then
 		local most = if string.find(key, "Range", 1, true) then 200 else 60 -- (a range in studs)
 		check(`Config.Soundscape.Sandbox.{key} is a sane number`, value >= 0 and value <= most, value)
-	elseif key ~= "Reverb" then
+	elseif key ~= "Reverb" and not FAR_TABLES[key] then
 		local list = value :: { number }
 		check(`Config.Soundscape.Sandbox.{key} is a range`, #list == 2 and list[1] > 0 and list[2] >= list[1], key)
 	end
 end
-for key, value in { "Alpine", "AlpineStandIn", "Warehouse", "WarehouseStandIn", "Room", "Display", "TakeDown", "Sold", "Stored", "Slide", "Step" } do
+for key in FAR_TABLES do
+	local def = (SB :: any)[key]
+	check(`Config.Soundscape.Sandbox.{key}: a volume (0 … 1), Near inside Range`, type(def) == "table" and def.Volume > 0 and def.Volume <= 1
+		and def.Near > 0 and def.Range > def.Near, key)
+end
+for key, value in { "Fields", "FieldsStandIn", "FieldsIndoors", "Warehouse", "WarehouseStandIn", "Room", "Display", "TakeDown", "Sold", "Stored", "Slide", "Step" } do
 	check(`Config.Soundscape.Sandbox.{value} is a volume (0 … 1)`, SB[value] > 0 and SB[value] <= 1, key)
+end
+
+-- ── 8.9: the newest features' sounds (sfx5.ogg) ─────────────────────────────
+-- Every event (the clipboard, Danny's answers, orders and whistle, the trades' hook, the auction) is a sound of sfx5,
+-- quiet UI feedback; the clipboard, the answers, the whistle and the auction's cues from what changed.
+local MoveHelperBrain = require("./MoveHelperBrain")
+local D, TR, AU = S.Danny, S.Trade, S.Auction
+local EVENTS = {
+	"clipboard_out", "clipboard_away", "danny_give", "danny_takeback", "danny_nope", "danny_ack", "danny_whistle",
+	"trade_sold", "trade_offer", "trade_price", "auction_bid", "auction_gavel", "auction_sold", "auction_sold_mine",
+}
+local listedEvents = 0
+for _ in SoundPlan.Events do
+	listedEvents += 1
+end
+check(`8.9 the {#EVENTS} events, no more`, listedEvents == #EVENTS, listedEvents)
+for _, name in EVENTS do
+	local e = SoundPlan.eventOf(name)
+	check(`8.9 {name}: an event`, e ~= nil)
+	if e then
+		check(`8.9 {name}: its sound {e.sound} is on sfx5`, SoundSheet.Sfx5[e.sound] ~= nil, e.sound)
+		check(`8.9 {name}: quiet UI feedback (volume 0 … 0.7, its own pitch)`, e.volume > 0 and e.volume <= 0.7 and e.pitch == 1, e.volume)
+		check(`8.9 {name}: a gap before it plays again (0 … 10 s)`, e.gap >= 0 and e.gap <= 10, e.gap)
+		check(`8.9 {name}: short (at most 2 s)`, SoundSheet.Sfx5[e.sound] ~= nil and SoundSheet.Sfx5[e.sound][2] <= 2)
+		check(`8.9 {name}: {if e.notice then "answers its Notice (a trade's)" else "no Notice of its own"}`, e.notice == (string.sub(name, 1, 6) == "trade_"))
+	end
+end
+check("8.9 an unknown event: none", SoundPlan.eventOf("nope") == nil)
+check("8.9 the trade code's hook: trade_sold, trade_offer, trade_price", #SoundPlan.TradeEvents == 3 and SoundPlan.eventOf("trade_sold") ~= nil
+	and SoundPlan.eventOf("trade_offer") ~= nil and SoundPlan.eventOf("trade_price") ~= nil and table.find(SoundPlan.TradeEvents, "trade_price") ~= nil)
+check("8.9 a sale's ka-ching, an offer's ding, a price's paper", SoundPlan.Events.trade_sold.sound == "coin_kaching" and SoundPlan.Events.trade_offer.sound == "offer_ding"
+	and SoundPlan.Events.trade_price.sound == "price_paper")
+check("8.9 the auction: a bid's tick, the gavel, the \"sold!\" bell (yours louder)", SoundPlan.Events.auction_bid.sound == "bid_tick" and SoundPlan.Events.auction_gavel.sound == "gavel_knock"
+	and SoundPlan.Events.auction_sold.sound == "sold_bell" and SoundPlan.Events.auction_sold_mine.sound == "sold_bell"
+	and SoundPlan.Events.auction_sold_mine.volume > SoundPlan.Events.auction_sold.volume)
+check("8.9 a bid's tick never machine-guns (BidGap), the whistle never nags (WhistleGap)", SoundPlan.Events.auction_bid.gap >= 0.1 and SoundPlan.Events.danny_whistle.gap >= 5)
+-- the clipboard: taken out, put away (your ClipboardHeld before and now)
+check("8.9 the clipboard taken out: its rustle and clip", SoundPlan.clipboardCue(false, true) == "clipboard_out" and SoundPlan.clipboardCue(nil, true) == "clipboard_out")
+check("… put away (the attribute gone)", SoundPlan.clipboardCue(true, false) == "clipboard_away" and SoundPlan.clipboardCue(true, nil) == "clipboard_away")
+check("… no change: nothing", SoundPlan.clipboardCue(true, true) == nil and SoundPlan.clipboardCue(nil, nil) == nil and SoundPlan.clipboardCue(false, nil) == nil)
+-- a piece given or taken back (its DannyQueue before and now)
+check("8.9 a piece onto his list: the pen's tick", SoundPlan.giveOutcome(false, true) == "danny_give")
+check("… off it: crossed off", SoundPlan.giveOutcome(true, false) == "danny_takeback")
+check("… no change (yet): nothing", SoundPlan.giveOutcome(false, false) == nil and SoundPlan.giveOutcome(true, true) == nil)
+-- an order: it applied as it was sent and applies no more (he did it)
+check("8.9 PUT IT DOWN done: his chirp", SoundPlan.orderOutcome("putdown", "putdown", nil) == "danny_ack" and SoundPlan.orderOutcome("putdown", "putdown,getout", "getout") == "danny_ack")
+check("… GET OUT done: his chirp", SoundPlan.orderOutcome("getout", "getout", nil) == "danny_ack" and SoundPlan.orderOutcome("getout", "putdown,getout", "putdown") == "danny_ack")
+check("… still there (not yet, or refused): nothing", SoundPlan.orderOutcome("getout", "getout", "getout") == nil and SoundPlan.orderOutcome("putdown", "putdown,getout", "putdown") == nil)
+check("… an order that did not apply as it was sent: never a chirp (the server refuses it)", SoundPlan.orderOutcome("getout", nil, nil) == nil and SoundPlan.orderOutcome("getout", "putdown", nil) == nil)
+check("… junk: nothing", SoundPlan.orderOutcome("getout", 5, nil) == nil and SoundPlan.orderOutcome("getoutx", "getout", nil) == nil)
+-- an answer awaited (SandboxSounds.await): its event once it shows, the nope Grace s after its Notice, else given up
+local sent = 500
+local function answered(outcome: string?, noticed: number?, now: number): string
+	local name, over = SoundPlan.answer(outcome, sent, noticed, now)
+	return `{name or "-"}:{over}`
+end
+check("8.9 the answer shows: its sound, over", answered("danny_give", nil, sent + 0.1) == "danny_give:true" and answered("danny_ack", sent + 0.1, sent + 0.2) == "danny_ack:true")
+check("… settled quietly (the clipboard out: its rustle is DannyOrders'): no sound, over", answered("", nil, sent + 0.1) == "-:true")
+check("… nothing yet: wait", answered(nil, nil, sent + 0.1) == "-:false")
+check("… its Notice came, nothing changed: wait Grace s, then the nope", answered(nil, sent + 0.2, sent + 0.2 + D.Grace / 2) == "-:false"
+	and answered(nil, sent + 0.2, sent + 0.2 + D.Grace) == "danny_nope:true")
+check("… no word at all: given up quietly after Answer s", answered(nil, nil, sent + D.Answer - 0.01) == "-:false" and answered(nil, nil, sent + D.Answer) == "-:true")
+check("… the grace is short, the wait a couple of seconds, looked at often", D.Grace >= 0.15 and D.Grace <= 0.5 and D.Answer >= 1 and D.Answer <= 4 and D.Poll > 0 and D.Poll <= 0.1)
+check("… a Notice's notify waits a moment only (NoticeWait)", S.NoticeWait > 0 and S.NoticeWait <= 0.15)
+-- his whistle: the bubble's orange because he needs you
+check("8.9 his whistle: the orange turned to \"needs you\"", SoundPlan.whistleCue("", "needs") == "danny_whistle" and SoundPlan.whistleCue("down", "needs") == "danny_whistle")
+check("… not on the first look, not while it stays", SoundPlan.whistleCue(nil, "needs") == nil and SoundPlan.whistleCue("needs", "needs") == nil)
+check("… not for his other alerts (down, running, on three) nor none", SoundPlan.whistleCue("", "down") == nil and SoundPlan.whistleCue("", "flee") == nil
+	and SoundPlan.whistleCue("", "ready") == nil and SoundPlan.whistleCue("needs", "") == nil)
+for kind in D.WhistleFor do
+	local w = MoveHelperBrain.Doing[kind]
+	check(`8.9 the whistle's {kind} is one of his alerts (MoveHelperBrain.Doing: orange)`, w ~= nil and w.alert == true, kind)
+	if w then
+		local same = 0
+		for _, other in MoveHelperBrain.Doing do
+			if other.alert == true and string.sub(other.icon, 1, #w.icon) == w.icon then
+				same += 1
+			end
+		end
+		check(`… its icon {w.icon} tells it from his other alerts (client/DannyBubble.luau reads it)`, same == 1, same)
+	end
+end
+-- the auction: two views in a row
+local function view(lot: any, results: { any }?, index: number?): any
+	return { phase = if lot then "live" else "results", lot = lot, index = index or 1, results = results or {} }
+end
+local function beats(list: { SoundPlan.Beat }): string
+	local out = {}
+	for _, b in list do
+		table.insert(out, `{b.event}@{b.at}`)
+	end
+	return table.concat(out, ",")
+end
+local lot1 = { id = 1, price = 0 }
+local lot1bid = { id = 1, price = 400 }
+check("8.9 the auction's first view: nothing", beats(SoundPlan.auctionCues(nil, view(lot1))) == "")
+check("… a bid (the price up on the same lot): its tick", beats(SoundPlan.auctionCues(view(lot1), view(lot1bid))) == "auction_bid@0")
+check("… the same price again: nothing", beats(SoundPlan.auctionCues(view(lot1bid), view(lot1bid))) == "")
+local sold = { { item = "x", name = "Clock", price = 400, sold = false, won = false } }
+check("… the lot closed, the next on the podium: the gavel, then \"sold!\"", beats(SoundPlan.auctionCues(view(lot1bid), view({ id = 2, price = 0 }, sold, 2))) == `auction_gavel@0,auction_sold@{AU.BellAt}`)
+check("… the round's last lot closed (no lot now): the same", beats(SoundPlan.auctionCues(view(lot1bid), view(nil, sold))) == `auction_gavel@0,auction_sold@{AU.BellAt}`)
+check("… your piece sold, or you bought it: the louder bell", beats(SoundPlan.auctionCues(view(lot1bid), view(nil, { { name = "Clock", price = 400, sold = true } }))) == `auction_gavel@0,auction_sold_mine@{AU.BellAt}`
+	and beats(SoundPlan.auctionCues(view(lot1bid), view(nil, { { name = "Clock", price = 400, won = true } }))) == `auction_gavel@0,auction_sold_mine@{AU.BellAt}`)
+check("… no lot before (the consignments, the results): nothing", beats(SoundPlan.auctionCues(view(nil), view(lot1))) == "" and beats(SoundPlan.auctionCues(view(nil), view(nil))) == "")
+check("… junk: nothing", beats(SoundPlan.auctionCues("x", view(lot1))) == "" and beats(SoundPlan.auctionCues(view({ id = "a" }), view(lot1))) == "")
+check("… the bell a moment after the gavel", AU.BellAt > 0 and AU.BellAt <= 0.6)
+-- 8.5 Danny getting in and out of the van (server/MoveHelper.luau: Vehicles.swingDoor, the door's DoorOpenAt /
+-- DoorCloseAt every client swings, client/CarVisuals.luau onSwing → SoundScape): his door sounds as a player's
+check("8.5 Danny's van door (Vehicles.swingDoor) sounds as a player's: its latch and its thunk", SoundPlan.swingSound("door", "opening", "sprinter") == "car_door_open"
+	and SoundPlan.swingSound("door", "shut", "sprinter") == "car_door_close" and SoundPlan.swingSound("door", "opening", "zdcvan") == "car_door_open")
+for _, group in { D, TR, AU } do
+	for key, value in group do
+		if type(value) == "number" then
+			check(`Config.Soundscape 8.9 {key} is a sane number`, value >= 0 and value <= 10, value)
+		end
+	end
+end
+for key, value in { D.ClipOut, D.ClipAway, D.Give, D.TakeBack, D.Nope, D.Ack, D.Whistle, TR.Sold, TR.Offer, TR.Price, AU.Bid, AU.Gavel, AU.Sold, AU.SoldMine } do
+	check(`8.9 a quiet UI volume ({key})`, value > 0 and value <= 0.7, value)
 end
 Config.Sandbox.On = sandboxOn
 

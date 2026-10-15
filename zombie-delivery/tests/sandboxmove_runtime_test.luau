@@ -2,13 +2,15 @@
 -- MoveSites with it) on tests/runtime/MovingRuntime.luau's fakes with Config.Sandbox.On (tests/run_tests.py builds
 -- them; the fake art's plan records its seeds and gives each piece a colour variant).
 --   * Moving.start in the sandbox: a Moving contracts kiosk on every plot (SandboxMap plot.board), no depot board, no
---     Wall, no dressing, no soldier, no Marge or Walt: one contract, "The Old Chalet" (SandboxMap.House).
+--     Wall, no dressing, no soldier, no Marge or Walt: one contract, "The Old Farmstead" (SandboxMap.House).
 --   * The card (any plot's board, not from afar): the house, its pieces' worth, 8.3 25 minutes, no horde by default, no
 --     story, the note; its seed a new one once a move brought something home (8.3 economy: no reroll, a move called off
 --     with nothing home keeps its house, the owner leaving too). START → the solo lobby → LAUNCH at a board: the owner's own van
 --     (the Sprinter, its walk-in bay Config.Moving.Beds.sprinter), the house built with the card's seed.
---   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the Driver's
---     call parks the van at House.curb (its nose to the road, its back to the door).
+--   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the call (8.8:
+--     anybody's, no Driver) parks the van at House.curb (its nose to the road, its back to the door).
+--   * 8.8 no roles (tests/noroles_runtime_test.luau has the crew's): the solo planning has no role in it, Ann has none on
+--     the move (no MoveRole, the state's team only says the van was called), the van's Load holds no time.
 --   * Load at the back doors, and from inside the walk-in bay (its own Load, the back shut), every piece inside the
 --     bay; Danny on a solo move (8.3: for hire, not hired: a two-person Lift is dragged alone).
 --   * The drop-off: not another player's plot; the van's back in the owner's plot's unload circle: a trip, every piece
@@ -231,7 +233,7 @@ local moves = workspace:FindFirstChild("Moves")
 check("the sandbox: a kiosk on every plot, no depot board, no Wall, no dressing", moves ~= nil and moves:FindFirstChild("MovingBoard1") ~= nil
 	and moves:FindFirstChild("MovingBoard4") ~= nil and moves:FindFirstChild("MovingBoard") == nil and moves:FindFirstChild("MovingDropOff") == nil
 	and moves:FindFirstChild("MoveDressing") == nil)
-check("one contract: The Old Chalet (no Marge, no Walt)", moves:FindFirstChild("Move_sandbox_house") ~= nil and moves:FindFirstChild("Move_marge") == nil
+check("one contract: The Old Farmstead (no Marge, no Walt)", moves:FindFirstChild("Move_sandbox_house") ~= nil and moves:FindFirstChild("Move_marge") == nil
 	and moves:FindFirstChild("Move_walt") == nil)
 check("no soldier at a Wall", Greeters.soldier() == nil)
 local kiosk1 = moves:FindFirstChild("MovingBoard1")
@@ -257,7 +259,7 @@ local function anyText(list: { string }, word: string): boolean
 	return false
 end
 local corkWords = textsOf(kiosk1)
-check("8.0.1: the plot kiosk's corkboard is the sandbox's: THE OLD CHALET, bring it home to your warehouse", anyText(corkWords, "THE OLD CHALET")
+check("8.0.1: the plot kiosk's corkboard is the sandbox's: THE OLD FARMSTEAD, bring it home to your warehouse", anyText(corkWords, "THE OLD FARMSTEAD")
 	and anyText(corkWords, "Bring it home to your warehouse") and anyText(corkWords, "MOVING CONTRACTS"), table.concat(corkWords, " | "))
 check("…no Marge, no Walt, no Wall, no evacuation on it", not anyText(corkWords, "Marge") and not anyText(corkWords, "Walt") and not anyText(corkWords, "Wall")
 	and not anyText(corkWords, "evacuat"), table.concat(corkWords, " | "))
@@ -277,7 +279,7 @@ local worth = 0
 for _, item in E.items do
 	worth += item.value
 end
-check("the board's card: The Old Chalet, its pieces' worth, 8.3: 25 minutes (several trips)", card ~= nil and card.a.id == House.id and card.a.name == House.name and card.a.items == 6
+check("the board's card: The Old Farmstead, its pieces' worth, 8.3: 25 minutes (several trips)", card ~= nil and card.a.id == House.id and card.a.name == House.name and card.a.items == 6
 	and card.a.estimate == worth and S.Time == 25 * 60 and card.a.time == S.Time and card.a.busy == nil and card.a.address == S.Address, card and card.a.busy)
 check("…no horde by default (no guns in the sandbox), no roamers", S.Horde == false and S.Roam == 0 and card.a.hordeAt == 0)
 check("…no story, the note (no pay per piece), one contract", card.a.story == false and type(card.a.note) == "string" and #card.a.contracts == 1
@@ -307,6 +309,7 @@ E.request(ann, "start", House.id)
 local lobby = E.last(ann, "MoveLobby", "lobby")
 check("START opens the solo lobby on the card (the Sprinter's bay)", lobby ~= nil and lobby.a ~= nil and lobby.a.canLaunch == true and lobby.a.card.name == House.name
 	and lobby.a.card.bed[1] == T.Beds.sprinter.Width and lobby.a.card.bed[2] == T.Beds.sprinter.Length)
+check("8.8 …no role in it (no Driver for a solo owner)", lobby.a.role == nil and lobby.a.members[1].role == nil and not lobby.a.doubles)
 E.place(ann, V3(House.door.x, 3, House.door.z))
 lobbyRequest(ann, "launch")
 check("LAUNCH away from every board: refused", E.built == 0 and string.find(E.lastNotice(ann), "board", 1, true) ~= nil, E.lastNotice(ann))
@@ -321,6 +324,8 @@ local firstSeed = seeds[1] -- (Ann's card's: Cid's card planned the second)
 check("…the house built with the card's seed (planned once)", #built == 1 and built[1] == firstSeed and #seeds == 2 and seeds[2] ~= firstSeed, `{built[1]} {firstSeed} {#seeds}`)
 step()
 local view = E.last(ann, "Moving", "state")
+check("8.8: no role on the move (no MoveRole), the state's team says only whether the van was called", ann:GetAttribute("MoveRole") == nil and view.a.team.called == false
+	and view.a.team.role == nil and view.a.team.crew == nil and view.a.team.free == nil and view.a.team.barricades == nil)
 check("the state: the drop-off is the owner's plot's unload circle, in the HUD's words; no horde", view.a.drop == "your warehouse" and view.a.dropOff.x == plot1.unload.x
 	and view.a.dropOff.z == plot1.unload.z and view.a.hordeAt == nil and view.a.endsAt == E.now + S.Time and view.a.mine == true)
 check("the GPS's house: the van's curb", view.a.house.x == House.curb.x and view.a.house.z == House.curb.z)
@@ -372,7 +377,7 @@ check("…into the interior", (E.rootOf(ann).Position - origin.Position).Magnitu
 local cameIn, ins = lastTold("enter")
 check("8.2: Moving.onEnterHouse: Ann came into her move's house", ins == 1 and cameIn.player == ann and cameIn.facts.owner == ann, ins)
 E.request(ann, "call")
-check("Call truck to door: the van at the house's curb, its nose to the road, its back to the door", flatDistance(truck.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 1
+check("Call truck to door (8.8: no Driver needed): the van at the house's curb, its nose to the road, its back to the door", flatDistance(truck.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 1
 	and truck.chassis.CFrame.LookVector.Z < -0.99, truck.chassis.Position)
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 check("…its back doors toward the house", cargoDoor.WorldPosition.Z > truck.chassis.Position.Z)
@@ -392,7 +397,8 @@ E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
 step()
 local load = promptIn(truck.model, "Load")
 local bayLoad = truck.chassis:FindFirstChild("MoveLoadBay"):FindFirstChildOfClass("ProximityPrompt")
-check("at the open back with the lamp: the doors' Load (the bay's waits)", load.Enabled and not bayLoad.Enabled and string.find(load.ActionText, "Lamp", 1, true) ~= nil
+check("at the open back with the lamp: the doors' Load (the bay's waits; 8.8: no hold, for anybody)", load.Enabled and not bayLoad.Enabled
+	and load.HoldDuration == 0 and bayLoad.HoldDuration == 0 and load:GetAttribute("MoveQuick") == nil and string.find(load.ActionText, "Lamp", 1, true) ~= nil
 	and string.find(load.ObjectText, "% full", 1, true) ~= nil, load.ObjectText)
 trigger(load, ann)
 step()
@@ -472,7 +478,7 @@ check("the van at another player's plot: no trip (and no word on backing up: not
 	and not heard(ann, BACK_UP))
 park(truck, { x = 0, z = 200, yaw = 180 })
 step()
-check("…nor on Main Street", #E.collected == 0 and not heard(ann, BACK_UP))
+check("…nor on Pražská", #E.collected == 0 and not heard(ann, BACK_UP))
 park(truck, plot1.vanSpot)
 check("(the van's back inside the owner's unload circle)", flatDistance(cargoDoor.WorldPosition, V3(plot1.unload.x, 0, plot1.unload.z)) <= plot1.unload.r)
 local tripAt = #E.messages

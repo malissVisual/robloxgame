@@ -12,7 +12,8 @@
 --   * The moves' events: MoveStarted (the session's count, solo / crew); MoveFinished (the minutes; how, the trips, the
 --     pieces' band) with MoveFinishedValue (the worth; how, the pieces, solo / crew) when pieces came home; MoveGaveUp
 --     (how, how far it got) when none did; CollectibleFound for a collectible coming home during a move (its rarity, its
---     id, its worth), never an ordinary piece or one outside a move.
+--     id, its worth), never an ordinary piece or one outside a move; 8.7 review: never one bought from another player
+--     during the move (Collection.transfer: no move brought it).
 --   * GripCheck: one check in Config.Analytics.GripEvery a player (100 checks: 10 events, one a window, each standing
 --     for GripEvery), each player their own window.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
@@ -181,6 +182,15 @@ local tv = Collection.add(ann, { item = "tv", condition = 1 }) :: string
 local found = events(ann, "CollectibleFound", before)
 check("a collectible came home during the move: CollectibleFound (its rarity, its id, its worth at its condition)", #found == 1 and field(found[1], 1) == "rare"
 	and field(found[1], 2) == "gold_record" and found[1].value == math.floor(1600 * 0.9 + 0.5), #found)
+-- 8.7 review: a collectible bought from another player meanwhile (a deal: Collection.transfer) came home with no move
+local seller = E.join(102, "Bob")
+local jukebox = Collection.add(seller, { item = "jukebox", condition = 1 }) :: string
+Collection.display(seller, jukebox, 1)
+before = #custom
+local bought = Collection.transfer(seller, ann, jukebox, 1, 1, 0)
+E.flush()
+check("8.7 review: a collectible bought from a player during her move: no CollectibleFound (it is in her stock all the same)", bought ~= nil and bought.item == "jukebox"
+	and #events(ann, "CollectibleFound", before) == 0, #events(ann, "CollectibleFound", before))
 tell("trip", ann, facts(ann, { trips = 1, pieces = 2, stored = 2, home = 2, value = 1740 }))
 check("the trip home: step 6 (FirstTripHome)", same(steps(ann), { 1, 2, 3, 4, 5, 6 }))
 before = #custom

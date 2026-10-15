@@ -53,7 +53,7 @@ Tohle platí, dokud je zapnutý sandbox (`Config.Sandbox.On = true`, malý alpsk
 | 1 | Joined | Hráč přišel a jeho uložená hra se načetla. |
 | 2 | PressedPlay | Zmáčkl **PLAY** na úvodní obrazovce (u skladu na něj čeká van). |
 | 3 | FirstContract | Vzal si první zakázku na stěhování (LAUNCH u tabule u skladu). |
-| 4 | EnteredHouse | Poprvé vešel do domu (The Old Chalet). |
+| 4 | EnteredHouse | Poprvé vešel do domu (The Old Farmstead). |
 | 5 | FirstPieceInVan | Poprvé naložil věc do vanu. Počítá se i věc, kterou do jeho vanu naloží Danny nebo parťák. |
 | 6 | FirstTripHome | Poprvé dovezl náklad domů ke skladu (věci šly do skladu). |
 | 7 | FirstPieceOnShow | Poprvé dal věc na stojan ve skladu. |

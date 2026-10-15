@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.7"
+Config.Version = "8.8"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3674,24 +3674,40 @@ Config.Soundscape = {
 		Tick = 0.1, -- seconds between the looks at the drag
 	},
 	-- 8.1 SANDBOX, the sandbox's own sounds (art/audio/sfx4.ogg's 8.1 part; until it is up their stand-ins, SoundSheet
-	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" on the meadow, in a "warehouse" (its
-	-- building's box, SandboxMap's plot.warehouse) or in the "house" (inside the Old Chalet: the move's interior, its
-	-- state's inside, or the chalet's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience: the
-	-- city's day and night never play here), plays a cowbell far off now and then and sets the room's echo;
+	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" in the village, in a "warehouse" (8.3:
+	-- its level's building, WarehouseLayout.site) or in the "house" (inside the Old Farmstead: the move's interior, its
+	-- state's inside, or the farmstead's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience:
+	-- the city's day and night never play here), plays Jinočany's far sounds and sets the room's echo;
 	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.
+	-- JINOČANY (design/jinocany/NAVRH.md §5: Jinočany in place of the Alps; no cowbells, no alpine meadow): outdoors the
+	-- fields (birds and larks over them, a breeze), the D5 motorway's far hum from the east, now and then the chapel's
+	-- bell, a dog far off and a tractor on the fields. Each is a sound wanted on the next sheet; until a sheet has it, a
+	-- sound of the sheets up now stands in (shared/SoundPlan.luau SandboxStandIns). Indoors and in a warehouse as before.
 	Sandbox = {
-		Alpine = 0.24, -- amb_alpine outdoors: a calm alpine day (a soft breeze, birds) …
-		AlpineStandIn = 0.09, -- … until sfx4 is up its stand-in, sfx2's wind: a breeze only
-		AlpineIndoors = 0.3, -- … × this in a warehouse (through its open roller door)
+		Fields = 0.24, -- the fields outdoors (amb_fields; its stand-in sfx4's amb_alpine: a breeze, finches, a lark) …
+		FieldsStandIn = 0.09, -- … until sfx4 is up the stand-in's own, sfx2's wind: a breeze only
+		FieldsIndoors = 0.3, -- … × this in a warehouse (through its open roller door; the D5's hum too)
 		Warehouse = 0.22, -- amb_warehouse in a warehouse: the lights' hum, the hall's air, the roof ticking …
 		WarehouseStandIn = 0.12, -- … until sfx4 is up its stand-in, sfx2's hum
 		Room = 0.4, -- amb_room in the house: a quiet room tone and a clock (no stand-in: silent until sfx4 is up)
 		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
 		-- in the game and SOUND is not all off
 		Reverb = { warehouse = "Room" } :: { [string]: string },
-		CowbellGap = { 25, 60 } :: { number }, -- seconds between two cowbells far off outdoors (cowbell_far: random) …
-		CowbellFar = { 70, 130 } :: { number }, -- … studs away, a random way round you (3D: you hear where)
-		Cowbell = 1.5, -- (a 3D sound that far off is quiet: its falloff)
+		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (design/jinocany/plan.json's landmark
+		-- "d5": X, from Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
+		-- studs, fading out (Roblox's inverse taper) to nothing at Range. Outdoors; × FieldsIndoors in a warehouse.
+		Motorway = { X = 360, Z0 = -680, Z1 = 760, Y = 6, Volume = 0.35, Near = 80, Range = 1900 },
+		-- Now and then outdoors, each on its own clock (Gap: seconds between two, a random pick), 3D (you hear where):
+		-- Volume within Near studs, nothing past Range.
+		--   Bell      the chapel's bell (chapel_bell, one stroke) from its little tower (plan.json's landmark "chapel":
+		--             X, Z; Y up), Strokes strokes Every s apart
+		--   Dog       a dog barking far off (dog_far), Far studs (a random pick) a random way round you
+		--   Tractor   a tractor on the fields (tractor_far, a loop), Far studs a random way round you at the middle of
+		--             its pass: it drives across your view at Speed studs a second for Seconds s, fading in and out
+		--             over Fade s
+		Bell = { X = -700, Z = -144, Y = 28, Gap = { 150, 300 } :: { number }, Strokes = 3, Every = 1.8, Volume = 0.8, Near = 200, Range = 2200 },
+		Dog = { Gap = { 45, 110 } :: { number }, Far = { 90, 170 } :: { number }, Volume = 0.8, Near = 30, Range = 260 },
+		Tractor = { Gap = { 80, 170 } :: { number }, Far = { 150, 240 } :: { number }, Seconds = 16, Fade = 4, Speed = 5, Volume = 0.9, Near = 40, Range = 360 },
 		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
 		TakeDown = 0.6, -- … taken down (stand_takedown)
 		Sold = 0.7, -- a sale (sale_register: the till's ka-ching)
@@ -3726,6 +3742,50 @@ Config.Soundscape = {
 		BulkKaAt = 0.12, -- … this many seconds in …
 		BulkGap = 1.5,
 		FeedbackWait = 4.5,
+	},
+	-- 8.9, the newest features' own sounds (art/audio/sfx5.ogg; until it is up a stand-in from the older sheets or
+	-- silence: SoundSheet.Fallback). shared/SoundPlan.luau Events names each (the event → its sound, volume, gap);
+	-- client/SandboxSounds.luau event plays one. UI feedback: soft. Volumes 0 … 1.
+	NoticeWait = 0.08, -- s a Notice's notify waits (client/Sounds.luau): a sound of its own answers it instead (an
+	-- answer awaited from the server, a trade's: SandboxSounds' Sounds.answered), never both
+	Danny = {
+		-- 8.5 the clipboard (client/DannyOrders.luau: your character's ClipboardHeld)
+		ClipOut = 0.5, -- taken out: a paper rustle and the clip (clip_out) …
+		ClipAway = 0.42, -- … put away (clip_away) …
+		ClipGap = 0.25, -- … at most every this many seconds
+		Give = 0.55, -- a piece onto his list (pen_tick: ticked on the paper) …
+		TakeBack = 0.5, -- … off it again (pen_untick: crossed off)
+		Nope = 0.5, -- a pick, an order or the clipboard refused (soft_nope; its stand-in the notice's own notify, as loud)
+		-- 8.6 his orders and his whistle (client/MoveHelperCard.luau, client/DannyBubble.luau)
+		Ack = 0.5, -- an order of yours he took (order_chirp)
+		Whistle = 0.55, -- his bubble turned orange because he needs you (danny_whistle; silent until sfx5 is up: his
+		-- "needs you" toast pings already) …
+		WhistleGap = 8, -- … at most every this many seconds …
+		WhistleFor = { needs = true } :: { [string]: boolean }, -- … for these of his alerts (shared/MoveHelperBrain.luau Doing)
+		-- an answer awaited from the server (client/SandboxSounds.luau await: a piece given or taken back, an order, the
+		-- clipboard out): its outcome looked at every Poll s, given up Answer s after it was sent; its Notice came and
+		-- nothing changed Grace s later: refused (the nope)
+		Poll = 0.05,
+		Answer = 2,
+		Grace = 0.3,
+	},
+	-- 8.7 trading between players: SoundPlan.Events' trade_sold, trade_offer and trade_price, the hook the trade code
+	-- calls (client/SandboxSounds.luau event); each answers the Notice that comes with it (its notify left out)
+	Trade = {
+		Sold = 0.6, -- your piece sold to a player (coin_kaching: the coins' ka-ching)
+		Offer = 0.55, -- a player's offer for your piece (offer_ding: a desk bell's ding)
+		Price = 0.45, -- a FOR SALE price set (price_paper: a tag flicked and written on)
+		Gap = 0.4, -- s before the same again
+	},
+	-- 8.8 the auction (client/AuctionUi.luau, SoundPlan.auctionCues: while its window is open; your own lot's bell
+	-- anywhere)
+	Auction = {
+		Bid = 0.4, -- the price went up: a bid (bid_tick) …
+		BidGap = 0.12, -- … at most every this many seconds
+		Gavel = 0.6, -- the lot on the podium closed: the gavel (gavel_knock) …
+		Sold = 0.45, -- … and "sold!" (sold_bell), BellAt s after it …
+		SoldMine = 0.65, -- … louder when it was yours or you bought it
+		BellAt = 0.3,
 	},
 }
 
@@ -6341,7 +6401,7 @@ Config.CarryGrip = {
 --                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
 --                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
 --                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay.
---                     8.3 the big move: the one house (The Old Chalet, the owner's big Blender house, 44 × 14.5 × 34)
+--                     8.3 the big move: the one house (The Old Farmstead, the owner's big Blender house, 44 × 14.5 × 34)
 --                     empties as a big house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms,
 --                     more pieces, a back door), a longer Time (the Sprinter's bed takes it home in several trips)
 Config.Moving = {
@@ -6434,9 +6494,9 @@ Config.Moving = {
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
-		Client = "The Hubers",
+		Client = "The Nováks", -- (Jinočany: a made-up Czech family; The Hubers in the Alps)
 		Icon = "🏡",
-		Address = "the end of Main Street",
+		Address = "the end of Pražská", -- (SandboxMap.House.street, the Jinočany plan's)
 		Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
 		Kind = "big", -- 8.3: the house's plan (shared/HouseLayout.luau's big house, Config.Furniture.Big)
 		Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
@@ -6455,6 +6515,14 @@ Config.Moving = {
 -- the crew at the door instead: Config.MoveGreeters). shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
 -- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
 -- show them.
+--   On                8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."): the roles at
+--                     all (MoveRoles.on), the city's only: the sandbox (Config.Sandbox.On) never has them, whatever this
+--                     says. Without them nobody picks or has a role (the lobby is the crew, READY and LAUNCH; the HUD
+--                     has no role line), everybody loads and unloads the van with no wait, anybody calls it to the
+--                     door once a move (whoever is first: Driver.Curb, Driver.Near), and nobody has the Mover's or the
+--                     Guard's perks (no pair piece carried alone, everybody × Mover.Climb up stairs, no damage bonus,
+--                     barricades or sight through walls) nor the Driver's truck damage. false takes them out of the
+--                     city too.
 --   Order             the roles, in the lobby's order (a newcomer gets the first free one)
 --   Switch            s between two role switches on a move (solo: switch to do everything; a crew: a free role)
 --   Lobby             Timeout: s the planning stays open; Tick: its loop (the crew joining and leaving); TouchScale:
@@ -6472,6 +6540,7 @@ Config.Moving = {
 --                     zombies outlined through walls within this (client/EnemyOutline.luau)
 --   Chat             the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
 Config.MoveRoles = {
+	On = true, -- (the city's; the sandbox has none)
 	Order = { "driver", "mover", "guard" } :: { string },
 	Switch = 30,
 	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
@@ -6779,8 +6848,8 @@ Config.MoveStory = {
 --   Hire               the hire, for one move, paid by the crew player who hires him (PlayerData.spend, the analytics
 --                      reason HelperHire): Base + PerPiece × the house's pieces (the bigger the house, the more he
 --                      saves you), to Round dollars, Min … Max. The tuning: the sandbox starts you with $500 and a
---                      first haul on show earns about $40 – 50 a minute (8.3 economy), so the Old Chalet's big house
---                      (36 – 43 pieces: $230 – 270) is a real choice on the first move and five or six minutes of
+--                      first haul on show earns about $40 – 50 a minute (8.3 economy), so the Old Farmstead's big
+--                      house (36 – 43 pieces: $230 – 270) is a real choice on the first move and five or six minutes of
 --                      the warehouse's income later; a smaller house (20 or so pieces: about $150) costs less, Max at
 --                      most. Danny's training (Config.SandboxUpgrades danny) makes him faster, not cheaper. No
 --                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
@@ -7209,6 +7278,9 @@ Config.Collection = {
 --   8.4, Danny for hire's steps (hire him, give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step):
 --   HeavyNear     studs: a two-person piece of your move this near you (its Lift shown) says "press Lift and wait for
 --                 Danny" (looked for at most once a second, only while that step may still show)
+--   8.9, trading between players' step ("🏷 Sell to players: set a price on a piece on show", the last soft step):
+--   SellShown     your pieces on show from which it may show (none with a FOR SALE sign yet: one set, it is done)
+--   SellPlayers   the players on the server (you too) from which it may show (alone, nobody would buy)
 Config.SandboxGuide = {
 	Every = 0.2,
 	Fade = 0.5,
@@ -7233,6 +7305,8 @@ Config.SandboxGuide = {
 	SoftGap = 15,
 	PaintMoney = 2000,
 	HeavyNear = 12, -- 8.4
+	SellShown = 4, -- 8.9: the sell step
+	SellPlayers = 2,
 }
 
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
@@ -7322,7 +7396,10 @@ Config.Warehouse = {
 --   Hints                    8.3, the first-time hints (shared/SandboxHints.luau, client/SandboxHintsUi.luau): a hint shows
 --                            Delay s after what made it matter, at least Gap s after the hint before (one at a time), and
 --                            waits while something covers the screen, looked at every Every s; the ⭐ FILL BEST hint
---                            once FillStock pieces that would earn wait in the stock beside a free stand
+--                            once FillStock pieces that would earn wait in the stock beside a free stand. 8.9: the
+--                            clipboard's and a visit's hints looked for every Look s (your clipboard out, where you
+--                            stand: only until both are said); the FOR SALE sign's hint once PriceShown pieces of yours
+--                            are on show
 --   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
 --   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
 --                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
@@ -7343,7 +7420,7 @@ Config.SandboxHud = {
 	TouchScale = 0.8,
 	StockKey = "B",
 	StockPad = "DPadLeft", -- 8.3: the gamepad's way to the STOCK list
-	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5 }, -- 8.3: the first-time hints
+	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5, Look = 1, PriceShown = 3 }, -- 8.3: the first-time hints (8.9: Look, PriceShown)
 	Toast = 3,
 	MaxToasts = 3,
 	Picker = {
@@ -7598,7 +7675,7 @@ Config.SandboxTasks = {
 --   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
 --   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
 --                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
---   Board        the signboard: Corner studs east of Main Street's east edge and south of Depot Row's south edge (the
+--   Board        the signboard: Corner studs east of Pražská's east edge and south of Depot Row's south edge (the
 --                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
 --                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
 --                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
@@ -7767,6 +7844,16 @@ Config.Visitors = {
 --   Tick        s between two looks at the offers' clocks
 --   PromptTag / SellerAttribute   the CollectionService tag and attribute (the seller's UserId) of the stands' prompts
 --               for the other players ("Make an offer", "Buy $X"): client/TradePrompts.luau hides them from the seller
+--   Ticket      8.7 review: s a use of a stand's "Make an offer" / "Buy $X" prompt holds good: the server keeps a ticket
+--               (that seller, piece and stand, the stand's point) and SEND / BUY are taken only with one this fresh
+--   Reach       8.7 review: studs from that stand's point the buyer may stand at SEND / BUY (the prompts' own reach is
+--               Config.Warehouse.PromptDistance: room to step back from the stand while choosing a price)
+--   Cooldown    8.7 review: s before a buyer may offer a seller again after their offer was declined or ran out (none
+--               after a deal): a few accounts can't keep a seller's PerSeller slots full
+--   CardArm     8.7 review: s the offer card (client/OfferCard.luau: a visitor's and a player's) takes no ACCEPT, DECLINE,
+--               ESC or B after it opens or shows the next offer of its queue: a double click answers one offer, never
+--               the next one unread (its buttons look off until then)
+--   CardGap     8.7 review: s the card stays away between one offer answered and the next one shown (the switch seen)
 -- The tuning: a piece sells to the game for about a quarter of an hour of showing it (Config.Collection); a player who
 -- lacks it pays 1 – 10 × that, the seller keeps 92 % (at 2 × the game's price: 1.84 ×, so selling to a player makes
 -- sense; at 1 × it is a loss of 8 %, so a sign at the game's price is pointless). A legendary sells to the game for
@@ -7784,6 +7871,11 @@ Config.PlayerTrade = {
 	Tick = 0.5,
 	PromptTag = "TradePrompt",
 	SellerAttribute = "TradeSeller",
+	Ticket = 120, -- 8.7 review
+	Reach = 40,
+	Cooldown = 60,
+	CardArm = 0.6,
+	CardGap = 0.25,
 }
 
 -- 8.3 SANDBOX, the PAINT shop (the owner: give players a way to make their van their own). A 🎨 Paint van prompt on your
@@ -7868,9 +7960,9 @@ Config.VanPaint = {
 -- 8.3 SANDBOX, the light (the owner: "it is too bright: in the house I cannot see my own character, and walking into the
 -- warehouse is a flashbang"). Every light number of the sandbox, in one place. shared/SandboxLightRules.luau has the
 -- rules; tests/sandboxlight_test.luau and tests/sandboxlight_runtime_test.luau hold every light to Caps.
---   Sky        the fixed alpine afternoon outside (server/SandboxWorld.luau lighting(), as SandboxScenery.Light): Clock
---              (Lighting.ClockTime), Latitude, Brightness (the sun), Exposure (the base ExposureCompensation: the eyes
---              add their place's), Ambient (the light indoors and in the shade: the house's and the hall's fill),
+--   Sky        the fixed warm afternoon outside (server/SandboxWorld.luau lighting(), as SandboxScenery.Light): Clock
+--              (Lighting.ClockTime), Latitude (Jinočany's 50° north; the Alps' 47 before), Brightness (the sun),
+--              Exposure (the base ExposureCompensation: the eyes add their place's), Ambient (the light indoors and in the shade: the house's and the hall's fill),
 --              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
 --              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
 --              the fog's), Decay, Density, Offset, Glare, Haze; Fog (FogStart, FogEnd: only without an Atmosphere); the
@@ -7913,7 +8005,7 @@ Config.VanPaint = {
 Config.SandboxLight = {
 	Sky = {
 		Clock = 15.4,
-		Latitude = 47,
+		Latitude = 50, -- (Jinočany, design/jinocany/NAVRH.md; 47 in the Alps: the same warm afternoon)
 		Brightness = 1.8,
 		Exposure = 0,
 		Ambient = { 78, 72, 68 } :: { number },

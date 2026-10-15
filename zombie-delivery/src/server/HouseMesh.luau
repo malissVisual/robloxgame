@@ -6,7 +6,7 @@
 -- the model's wears the model's MeshParts (anchored, not colliding, not queried, not touched). Its own parts stay where
 -- they are, invisible: the House box and the Roof wedges are still what collides (the model's walls stand on the box's
 -- faces, its roof over the wedges). No import, a house not listed or of another size: the house as World builds it.
--- 8.1 SANDBOX: the sandbox's one house wears it too (The Old Chalet: server/SandboxWorld.luau puts its chalet's parts
+-- 8.1 SANDBOX: the sandbox's one house wears it too (The Old Farmstead: server/SandboxWorld.luau puts its chalet's parts
 -- in a Model "House_sandbox_house" on a box of the model's size, shared/SandboxMap.luau House, and hands it here; the
 -- import is in ServerStorage from the server's first line, server/Main.server.luau, and dress loads it). 8.2.1: the
 -- import is the owner's big house for it (house.py TARGET "sandbox", 44 × 14.5 × 34); Marge's is then another size and
@@ -30,7 +30,7 @@ local NAME = "ZDCHouseArt"
 
 HouseMesh.Homes = {
 	home_suburbs_2_0_00 = true, -- 155 Willow Ln, Marge's (the moves' prologue, Config.Moving)
-	sandbox_house = true, -- 8.1 SANDBOX: The Old Chalet (shared/SandboxMap.luau House, server/SandboxWorld.luau)
+	sandbox_house = true, -- 8.1 SANDBOX: The Old Farmstead (shared/SandboxMap.luau House, server/SandboxWorld.luau)
 } :: { [string]: boolean }
 
 type Look = { color: Color3, material: Enum.Material, reflectance: number?, night: Color3? }

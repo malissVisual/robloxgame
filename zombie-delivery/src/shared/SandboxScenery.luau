@@ -11,13 +11,13 @@
 --                  to it on a gravel shoulder, a slope Run studs wide (a wedge: the cars' frictionless wheels roll up
 --                  and down it anywhere, like the city's kerbs in shared/CurbShape.luau, only gentler), a hip at a
 --                  convex corner, a ring of wedges round the turnaround; the white markings (a dashed centre line,
---                  the edge lines, the give-way line where Main Street meets Depot Row)
+--                  the edge lines, the give-way line where Pražská meets Depot Row)
 --   The house      the curb-to-door Path, the garden's fence round its lot (decoration: nothing stops a mover), the
---                  gate with its THE OLD CHALET board, the mailbox, the flower boxes (the chalet itself is
+--                  gate with its THE OLD FARMSTEAD board, the mailbox, the flower boxes (the house itself is
 --                  shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the owner's Blender house once imported)
 --   The scenery    the alpine spruces (shared/AlpineLayout.luau's two-part trees) in copses and along the edges, never
 --                  on a road, a plot, the house's lot or a van's way; wildflower patches; a rail fence round the edge
---                  (the invisible walls are at the Bounds); the street lamps along Main Street; the signpost at the
+--                  (the invisible walls are at the Bounds); the street lamps along Pražská; the signpost at the
 --                  crossroads
 --   Far away       outside the Bounds only: the far meadow, a ring of green hills (buried balls) and a ring of rocky
 --                  peaks with snow caps (four corner wedges each, as server/Alpine.luau's silhouettes), so the edge
@@ -80,7 +80,7 @@ local TURN = MAP.Turnaround
 SandboxScenery.Budget = 2500 -- parts in workspace.Sandbox at most
 SandboxScenery.Run = 4 -- the shoulders: from the asphalt's top down to the meadow over this many studs (1 in 10)
 SandboxScenery.RoadDepth = 1 -- the asphalt slabs' thickness (their bottom under the meadow's top)
-SandboxScenery.TurnaroundTop = MAP.RoadTop - 0.02 -- (a hair under Main Street's slab where they overlap: no flicker)
+SandboxScenery.TurnaroundTop = MAP.RoadTop - 0.02 -- (a hair under Pražská's slab where they overlap: no flicker)
 SandboxScenery.RingPieces = 24 -- the turnaround's shoulder and edge line, in this many straight pieces
 SandboxScenery.Shadow = { Long = 4, Wide = 1 } -- a part throws a shadow only this big (and RenderBudget's rule)
 SandboxScenery.FenceInset = 4 -- the rail fence this far inside the Bounds (the invisible walls on them)
@@ -269,15 +269,15 @@ local function corner(list: { Ramp }, cx: number, cz: number, sx: number, sz: nu
 	})
 end
 
--- Main Street's shoulders stop here (the turnaround's ring takes over).
+-- Pražská's shoulders stop here (the turnaround's ring takes over).
 SandboxScenery.MainShoulderEnd = TURN.z - 30
 
 function SandboxScenery.ramps(): { Ramp }
 	local run, top = SandboxScenery.Run, MAP.RoadTop
 	local list: { Ramp } = {}
 	local depot, main = MAP.Roads[2], MAP.Roads[1]
-	-- Depot Row: the north side (to the plots' pads), the south side either side of Main Street, both ends and their hips.
-	-- (A concave corner, where Depot Row's south side meets Main Street's, is two shoulders over the same square: their
+	-- Depot Row: the north side (to the plots' pads), the south side either side of Pražská, both ends and their hips.
+	-- (A concave corner, where Depot Row's south side meets Pražská's, is two shoulders over the same square: their
 	-- higher one is the ground there.)
 	edge(list, depot.x0, depot.x1, depot.z0 - run, depot.z0, 0, -1, top)
 	edge(list, depot.x0, main.x0, depot.z1, depot.z1 + run, 0, 1, top)
@@ -288,12 +288,12 @@ function SandboxScenery.ramps(): { Ramp }
 	corner(list, depot.x0, depot.z1, -1, 1, top)
 	corner(list, depot.x1, depot.z0, 1, -1, top)
 	corner(list, depot.x1, depot.z1, 1, 1, top)
-	-- Main Street: both sides from Depot Row to the turnaround.
+	-- Pražská: both sides from Depot Row to the turnaround.
 	local stop = SandboxScenery.MainShoulderEnd
 	edge(list, main.x0 - run, main.x0, depot.z1, stop, -1, 0, top)
 	edge(list, main.x1, main.x1 + run, depot.z1, stop, 1, 0, top)
 	-- The turnaround: a ring of wedges (each on a chord just inside the asphalt's edge, wide enough to close the ring
-	-- at its foot), none where Main Street comes in (its own asphalt there).
+	-- at its foot), none where Pražská comes in (its own asphalt there).
 	local n, r = SandboxScenery.RingPieces, TURN.r
 	local ringTop = SandboxScenery.TurnaroundTop
 	local inner = r * math.cos(math.pi / n)
@@ -370,7 +370,7 @@ function SandboxScenery.markings(): { Strip }
 	strip(list, "EdgeLine", depot.x0 + inset, depot.z0 + inset, depot.x1 - inset, depot.z0 + inset, w, top)
 	strip(list, "EdgeLine", depot.x0 + inset, depot.z1 - inset, main.x0 - inset, depot.z1 - inset, w, top)
 	strip(list, "EdgeLine", main.x1 + inset, depot.z1 - inset, depot.x1 - inset, depot.z1 - inset, w, top)
-	-- Main Street's, up to where they meet the turnaround's (a circle `inset` inside its edge)
+	-- Pražská's, up to where they meet the turnaround's (a circle `inset` inside its edge)
 	local r = TURN.r - inset
 	local function meet(x: number): number
 		return TURN.z - math.sqrt(r * r - (x - TURN.x) ^ 2)
@@ -378,9 +378,9 @@ function SandboxScenery.markings(): { Strip }
 	local westX, eastX = main.x0 + inset, main.x1 - inset
 	strip(list, "EdgeLine", westX, depot.z1 - inset, westX, meet(westX), w, top)
 	strip(list, "EdgeLine", eastX, depot.z1 - inset, eastX, meet(eastX), w, top)
-	-- the give-way line across Main Street's northbound lane (the right-hand one) where it meets Depot Row
+	-- the give-way line across Pražská's northbound lane (the right-hand one) where it meets Depot Row
 	strip(list, "GiveWay", main.x0 + (main.x1 - main.x0) / 2 + 0.6, depot.z1 + 1.2, eastX - 0.3, depot.z1 + 1.2, 0.6, top)
-	-- the turnaround's, in straight pieces from Main Street's east edge line round the south to its west one
+	-- the turnaround's, in straight pieces from Pražská's east edge line round the south to its west one
 	local ringTop = SandboxScenery.TurnaroundTop
 	local from = math.atan2(meet(eastX) - TURN.z, eastX - TURN.x)
 	local to = math.atan2(meet(westX) - TURN.z, westX - TURN.x) + 2 * math.pi
@@ -449,7 +449,7 @@ end
 
 -- ── The trees ──────────────────────────────────────────────────────────────
 
--- The copses (x, z, radius, trees) on the meadows either side of Main Street, then the rows along the edges.
+-- The copses (x, z, radius, trees) on the meadows either side of Pražská, then the rows along the edges.
 local COPSES: { { number } } = {
 	{ -95, 40, 34, 5 },
 	{ -215, 15, 40, 5 },
@@ -583,7 +583,7 @@ end
 
 -- ── The lamps, the fences, the signpost ────────────────────────────────────
 
--- The street lamps along Main Street, either side in turn, off its shoulders, their arms out over the asphalt.
+-- The street lamps along Pražská, either side in turn, off its shoulders, their arms out over the asphalt.
 function SandboxScenery.lamps(): { Lamp }
 	local main = MAP.Roads[1]
 	local list: { Lamp } = {}
@@ -631,7 +631,7 @@ function SandboxScenery.signpost(): { Board }
 	return {
 		{ text = "WAREHOUSES →", back = "← WAREHOUSES", dx = -1, dz = 0, y = 10.2 }, -- (west: plots 1 and 2)
 		{ text = "← WAREHOUSES", back = "WAREHOUSES →", dx = 1, dz = 0, y = 9 }, -- (east: plots 3 and 4)
-		{ text = "THE OLD CHALET →", back = "← THE OLD CHALET", dx = 0, dz = 1, y = 7.8 }, -- (south, down Main Street)
+		{ text = "THE OLD FARMSTEAD →", back = "← THE OLD FARMSTEAD", dx = 0, dz = 1, y = 7.8 }, -- (south, down Pražská)
 	}
 end
 
