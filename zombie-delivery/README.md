@@ -275,6 +275,21 @@ git pull + the sync.
 - After a pull, start the sync, then use Disconnect / Connect in Rojo. The Output must show the new version:
   `[Server] Zombie Delivery 6.8.1 is running`.
 
+**8.7, scripts are re-created, not overwritten:**
+- The Rojo plugin 7.7.0 writes a script's Source with `ScriptEditorService:UpdateSourceAsync` inside `task.spawn` and
+  always reports success. When that write fails or does not take on an existing script, nothing notices it, and every
+  Connect repeats the same write. This is the likeliest reason Studio kept old scripts three times in a row. Deleting
+  the folders and connecting again (new instances) always worked.
+- So `tools/rojo-sync.js` now has Studio **re-create** scripts instead of overwriting them. After every Connect it
+  re-creates all of them, and a changed script while connected. The protocol's class change does this, to the same
+  class.
+- Each batch ends with a check: Studio fetches the biggest scripts once more as a model (`/api/serialize`), and that
+  request confirms the batch. Wait for **`✓ Studio převzalo Connect: … — můžeš dát Play`** in the terminal before
+  Play. If it says **`! Studio nepotvrdilo`**, follow the advice it prints (Rojo's Sync fallback setting must be on).
+- The terminal shows `Config.Version` on disk (`verze: …`). If that is already old, the `git pull` failed, not the sync.
+- A second connection while Studio is connected (a Play test with Rojo's Auto Connect Playtest Server) only gets
+  overwrites, so no script runs twice. `--in-place` brings back the old behaviour. Test: `node tools/rojo-sync.test.js`.
+
 A Play test in Studio starts like a new player, with `Config.StudioStartMoney` ($150; the admin panel, P, gives money
 for testing). A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
 Since 4.2 a save is locked to the server that plays it (UpdateAsync, `Config.SaveLockWait` / `SaveLockStale`): a quick
