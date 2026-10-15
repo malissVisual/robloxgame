@@ -1306,8 +1306,8 @@ local function setHands(s: Session, item: Item)
 			-- 8.6 carried in two: your hands on its near end's edge at its grips' height (client/ArmPose.luau's box: Config.
 			-- MoveHelper.Edge, its width across), not on the sides of its middle (a long piece's: out of reach)
 			local edge = Config.MoveHelper.Edge
-			local _, grip = Rules.pairLift(thing.size.Y, -(root.Size.Y / 2 + humanoid.HipHeight))
-			at = Vector3.new(0, grip, -(Config.Cargo.CarryFront + edge.Depth / 2))
+			local _, hands = Rules.pairLift(thing.size.Y, -(root.Size.Y / 2 + humanoid.HipHeight))
+			at = Vector3.new(0, hands, -(Config.Cargo.CarryFront + edge.Depth / 2))
 			size = Vector3.new(math.min(thing.size.X, thing.size.Z, edge.Width), edge.Height, edge.Depth)
 		end
 		character:SetAttribute("CarryAt", at)
