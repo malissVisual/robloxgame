@@ -1091,7 +1091,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	-- own Model, dressed by server/FixtureMesh.luau once the model is imported
 	local farm = plan.kind == "farm"
 	for _, f in plan.fixtures do
-		local own = farm and FARM_LOOKS[f.kind]
+		local own: FixtureLook? = if farm then FARM_LOOKS[f.kind] else nil
 		local look = own or LOOKS[f.kind]
 		if look and not own and FixtureMesh.Kinds[f.kind] then
 			local fixture = Instance.new("Model")

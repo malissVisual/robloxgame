@@ -249,7 +249,7 @@ function FixtureMesh.dress(model: Model, kind: string, at: CFrame, size: Vector3
 	local ok, err = pcall(function(): any
 		local colours: { [string]: Color3 } = {} -- (the palette: the house's rolled colours, before the parts go)
 		for _, d in model:GetDescendants() do
-			if d:IsA("BasePart") and colours[d.Name] == nil then
+			if d:IsA("BasePart") and not colours[d.Name] then
 				colours[d.Name] = d.Color
 			end
 		end
@@ -258,7 +258,8 @@ function FixtureMesh.dress(model: Model, kind: string, at: CFrame, size: Vector3
 			local p = item.part:Clone()
 			p.Size = item.size
 			p.CFrame = at * item.cf
-			for _, name in LOOKS[item.finish].palette or {} do
+			local palette: { string } = LOOKS[item.finish].palette or {}
+			for _, name in palette do
 				local colour = colours[name]
 				if colour then
 					p.Color = colour
