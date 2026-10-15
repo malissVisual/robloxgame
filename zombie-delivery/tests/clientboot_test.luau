@@ -44,8 +44,8 @@ local CITY = {
 local SANDBOX = {
 	"Drive", "ZombieAnimator", "CarVisuals", "Hud", "CameraRig", "ArmPose", "AdminPanel", "AdminFly", "CrewPanel",
 	"Sounds", "Stamina", "CarBoarding", "GaitPose", "BodyLife", "KeyHints", "Unstuck", "CurbRide", "PerfOverlay",
-	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
-	"QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera)
+	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "DannyBubble",
+	"MoveLobbyUi", "QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera; 8.6: DannyBubble, what Danny does over his head)
 }
 local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)

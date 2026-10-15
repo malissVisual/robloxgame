@@ -112,6 +112,13 @@
 > you; the invisible House box under the Blender house no longer stops you in the doorway (seven solid pieces round an
 > 11-stud dark hall behind each door replace it); crossing the threshold while walking is the trip itself: the fade
 > runs while you walk, and you arrive inside still walking. The same for the back door and the ways out.
+>
+> **8.5.1** (Studio kept an old `ReplicatedStorage.Shared`, Config among it, after the syncs of 8.4 and 8.5, so the
+> server said 8.4 while its own scripts were 8.5's): `server/BuildStamp.luau` and `client/BuildStamp.luau` hold the
+> version their scripts were written for (`tests/run_tests.py` checks they equal `Config.Version`). SandboxBoot and
+> Main.client compare them with Config's and with each other (workspace "ServerBuild"); a mix warns in the Output and,
+> in Studio, shows a red banner: Stop, Rojo Disconnect, delete ReplicatedStorage > Shared, ServerScriptService >
+> Server and StarterPlayer > StarterPlayerScripts > Client, then Connect and Play.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

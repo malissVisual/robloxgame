@@ -2000,7 +2000,9 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 end
 
 -- He lets go. why: "put" (set down gently where he is), "died" (it falls: knocked), "apart" (his end of a pair thing:
--- left behind) or "end". His end of a pair thing: the carrier drags it on alone.
+-- left behind) or "end". His end of a pair thing: the carrier drags it on alone. 8.6 "together" (the crew's PUT IT
+-- DOWN, server/MoveHelper.luau's order): his end of a pair thing goes down with the carrier's, the carrier's own "put"
+-- (as their G: release).
 function Moving.helperDrop(s: Session, npc: Model, why: string)
 	local who = helperIdOf(npc)
 	if not who then
@@ -2012,6 +2014,10 @@ function Moving.helperDrop(s: Session, npc: Model, why: string)
 	end
 	local item = s.items[spot]
 	local thing = s.move.things[spot]
+	if role == "helper" and why == "together" and playerById(thing.carrier) and not s.ended then
+		release(s, playerById(thing.carrier) :: Player, "put")
+		return
+	end
 	if role == "helper" then
 		Rules.release(s.move, who)
 		local carrier = playerById(thing.carrier)

@@ -14,7 +14,8 @@
 --   * stepping aside: his card open (a window), a grip check: the line and the button hidden; your hands full: no button;
 --   * the piece pointed at (the mouse, a gamepad's nearest, a phone's tap a moment): outlined green to give, orange on
 --     his list (its number), red with the reason (too far, in the van, his list full), nothing for another move's;
---     nothing once it is put away; no warnings.
+--     nothing once it is put away; 8.6 Danny himself orange, "📋 Orders for Danny", his click his orders menu; no
+--     warnings.
 local M = require("./sandbox_mock")
 local Config = require("./Config")
 local TouchLayout = require("./TouchLayout")
@@ -468,6 +469,18 @@ rayHit = { Instance = strangerRoot, Position = strangerRoot.Position }
 M.resume()
 p, w = lit()
 check("another move's piece: nothing outlined", p == nil and not mark.Enabled)
+rayHit = { Instance = dannyRoot, Position = dannyRoot.Position }
+M.resume()
+p, w = lit()
+check("8.6 the mouse on Danny himself: outlined orange, \"📋 Orders for Danny\" (a click there opens his orders menu)", p == body and w == "📋 Orders for Danny"
+	and mark.Enabled and mark.Adornee == body and mark.OutlineColor.R > 0.9 and mark.OutlineColor.B < 0.3, w)
+local orderFrom = #sentOn("Moving")
+UIS.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.Unknown, UserInputType = M.Enum.UserInputType.MouseButton1, Position = M.Vector3.new(400, 236, 0) }, false)
+M.resume()
+check("8.6 …its click: his orders menu (the card's short form), nothing given; the line steps aside for it", MoveHelperCard.isMenu() and #sentOn("Moving") == orderFrom
+	and not shown(hint))
+MoveHelperCard.close()
+M.resume()
 rayHit = { Instance = lampRoot, Position = lampRoot.Position }
 M.resume()
 clipboard(false)

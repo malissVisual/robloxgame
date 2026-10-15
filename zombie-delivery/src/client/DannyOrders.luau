@@ -19,7 +19,9 @@
 --     EnemyOutline.luau keeps 7 spare) green when it can be given, orange when it is on his list (take it back), red
 --     when it can't, with its words over it (ClipboardRules.look: the server's MoveHelperBrain.assignCheck guessed from
 --     what this client sees: its own prompt shown, what its weld holds it to, his list, how far; his list's numbers are
---     the server's markers over the pieces), looked at every Clipboard.Look s. A line at the bottom says the mode:
+--     the server's markers over the pieces), looked at every Clipboard.Look s. 8.6 Danny himself (or the piece in his
+--     arms) pointed at: orange, "📋 Orders for Danny" (a click opens his orders menu: client/MoveHelperCard.luau
+--     target). A line at the bottom says the mode:
 --     "📋 Pick what Danny carries · Q put away" (the device's words: ClipboardRules.hint) clear of the HUD's groups, the
 --     chips, the move's top blocks (its panel, Danny's status line, the guide's line), the quick chat's button, the move's
 --     list, the touch controls and the 📋 button (DannyOrders.layout). It is no window (nothing closes for it, the camera
@@ -242,6 +244,9 @@ end
 
 -- The server's answer for a piece, guessed from what this client sees (MoveHelperBrain.assignCheck): its words and tone.
 local function lookOf(model: Model): (string?, string)
+	if model == MoveHelperCard.body() then
+		return `📋 Orders for {H.Name}`, "back" -- 8.6 (a click opens his orders menu: MoveHelperCard.target)
+	end
 	local prompt = MoveHelperCard.promptOf(model)
 	local root, mine = model.PrimaryPart, myRoot()
 	if not prompt or not root then
@@ -291,7 +296,7 @@ local function pointed(): Model?
 		local at = UserInputService:GetMouseLocation()
 		ray = camera:ViewportPointToRay(at.X, at.Y)
 	end
-	return MoveHelperCard.pieceAt(ray.Origin, ray.Direction.Unit)
+	return (MoveHelperCard.target(ray.Origin, ray.Direction.Unit)) -- (8.6: a piece, or Danny himself: his orders)
 end
 
 -- ── Its pieces ─────────────────────────────────────────────────────────────

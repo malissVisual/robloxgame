@@ -454,6 +454,18 @@ function SandboxBoot.start(queueState: (Player) -> ())
 	end
 	remotes(queueState)
 	print(`[Server] Zombie Delivery {Config.Version} SANDBOX is running`)
+	-- 8.5.1: Studio kept old scripts after a sync? (this side's stamp against the shared Config's version)
+	local stamp = script.Parent:FindFirstChild("BuildStamp")
+	local ok, built = false, nil
+	if stamp then
+		ok, built = pcall(require, stamp :: ModuleScript)
+	end
+	if ok and type(built) == "string" then
+		workspace:SetAttribute("ServerBuild", built)
+		if built ~= Config.Version then
+			warn(`[Server] STUDIO HAS A MIX OF OLD AND NEW SCRIPTS: the server's are {built}, ReplicatedStorage.Shared's (Config) {Config.Version}. Fix: Stop, Rojo Disconnect, delete ReplicatedStorage.Shared, ServerScriptService.Server and StarterPlayer.StarterPlayerScripts.Client, then Rojo Connect and Play.`)
+		end
+	end
 end
 
 return SandboxBoot

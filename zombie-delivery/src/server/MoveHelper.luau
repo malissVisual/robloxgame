@@ -107,6 +107,20 @@
 --     he is back at the van Respawn s later.
 --   * He talks a little: a speech bubble (Npcs.say) on the way's events, never the same line within TalkRepeat s (8.0
 --     SANDBOX: MoveHelperBrain.line's sandbox words: no Wall, no depot).
+-- 8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell him,
+-- for example, put it down on the ground, or get out of the car"):
+--   * What he does over his head: setDoing makes the status line's words and the bubble's from the same action
+--     (MoveHelperBrain.doing / bubble: "📦 Carrying: Sofa → van"), the crew's attributes MoveHelperBubble and
+--     MoveHelperAlert (orange: he needs you, he is down, running); client/DannyBubble.luau draws it for the crew only.
+--   * The crew's orders, the Moving remote's ("helper", "putdown" | "getout") at Config.Robust.Limits.MoveHelperOrder:
+--     a crew player's only (anybody else: nothing), checked (MoveHelperBrain.orderCheck), refused with a notice that
+--     says why ("Danny isn't carrying anything.", "Stop the van first …"); the orders that apply now go to the crew
+--     (MoveHelperOrders: his card's buttons, the orders menu, the status line's GET OUT). PUT IT DOWN (putDown): what he
+--     carries set down where he stands, its condition kept; a piece of his list stays off it (your word beats the
+--     list); a two-person piece he holds with you: both ends down (Moving's helperDrop "together"). GET OUT (getOut):
+--     out of the seat as a player gets out (boardOut; his way in called off: boardEnd; on his way to the van: he
+--     stops), "Hopping out, boss."; then no ride while the move's owner stays at the wheel (stayOut: out of the driver's
+--     seat and in again takes him along).
 -- Performance: one helper per move, one loop for all of them, a path at most every Repath s (computed in the background,
 -- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), his list's room in the van
 -- worked out only when the load changes (every Think s); carrying together the physics engine moves him (the loop only
@@ -308,6 +322,10 @@ type Helper = {
 	yieldAt: number, -- 8.3 review: he gave his seat up to a crew mate: no seat for him until then (os.clock)
 	rideWalk: Brain.Approach?, -- his walk to the van to ride (the last resort's clock)
 	board: Board?, -- 8.5 getting in or out of the van's seat now
+	bubble: string, -- 8.6 what he does over his head (MoveHelperBrain.bubble: the same action's as doing)
+	alert: boolean, -- …in the movers' orange
+	stayOut: boolean, -- 8.6 GET OUT: he rides no more while the move's owner stays at the wheel
+	orderIn: Brain.Order, -- 8.6 his state for the crew's orders (orderState fills it)
 }
 
 local ID_BASE = -2000000000 -- (no player's id is this low; Studio's test players are -1, -2 …)
@@ -318,7 +336,8 @@ local WALK = { through = true, near = 0.6, jump = false } -- Npcs.walkTo's optio
 local HANDS = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize" } -- 7.x his arms (client/ArmPose.luau)
 local SIT = "rbxassetid://2506281703" -- 8.3 Roblox's R15 sit (server/Buddy.luau's)
 local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (client/MovingHud.luau's)
-local ATTRIBUTES = { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue" }
+local ATTRIBUTES = { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue",
+	"MoveHelperBubble", "MoveHelperAlert", "MoveHelperOrders" } -- (8.6: the bubble over his head, the orders that apply)
 
 local helpers: { [any]: Helper } = {} -- by the move's session
 local byId: { [number]: Helper } = {}
@@ -644,14 +663,32 @@ local function hireSign(h: Helper)
 	end
 end
 
+-- 8.6 his state for the crew's orders (MoveHelperBrain.orderCheck): hired, down, his hands, the van's seat (in it,
+-- getting in, on his way to it, getting out), the van rolling.
+local function orderState(h: Helper): Brain.Order
+	local o = h.orderIn
+	local spot, role = Rules.holding(h.s.move, h.id)
+	local board = h.board
+	local truck = truckOf(h.s)
+	o.hired, o.down = h.hirer ~= nil, h.dead or h.body == nil
+	o.holding = if role == "helper" then "pair" elseif spot then "hand" else nil
+	o.seated, o.boarding, o.leaving = h.seat ~= nil, board ~= nil and not board.out, board ~= nil and board.out
+	o.riding = board == nil and h.seat == nil and h.action == "ride"
+	o.moving = truck ~= nil and Vehicles.speed(truck) > Config.Cargo.BoardMaxSpeed
+	return o
+end
+
 -- His attributes on the crew (the status line, his card): for hire or hired, the price or his list, what he does; off
--- for those who left.
+-- for those who left. 8.6 the bubble's words (MoveHelperBubble, MoveHelperAlert: client/DannyBubble.luau) and the
+-- orders that apply now (MoveHelperOrders: his card's buttons, the orders menu, the status line's GET OUT).
 local function tellCrew(h: Helper)
 	local s = h.s
 	local hired = h.hirer ~= nil
 	local state = if hired then "hired" else "offer"
 	local price: number? = if hired then nil else h.price
 	local count: number? = if hired then #h.queue else nil
+	local orders = Brain.orders(orderState(h))
+	local alert: boolean? = if h.alert then true else nil
 	for player in s.members do
 		if not player.Parent then
 			continue
@@ -672,6 +709,15 @@ local function tellCrew(h: Helper)
 		if player:GetAttribute("MoveHelperQueue") ~= count then
 			player:SetAttribute("MoveHelperQueue", count)
 		end
+		if player:GetAttribute("MoveHelperBubble") ~= h.bubble then
+			player:SetAttribute("MoveHelperBubble", h.bubble)
+		end
+		if player:GetAttribute("MoveHelperAlert") ~= alert then
+			player:SetAttribute("MoveHelperAlert", alert)
+		end
+		if player:GetAttribute("MoveHelperOrders") ~= orders then
+			player:SetAttribute("MoveHelperOrders", orders)
+		end
 	end
 	for player in h.told do
 		if not s.members[player] then
@@ -684,7 +730,8 @@ local function tellCrew(h: Helper)
 	hireSign(h)
 end
 
--- What he does, in words (made again only when it changes).
+-- What he does, in words (made again only when it changes): the status line's and 8.6 the bubble's over his head, from
+-- the same action (MoveHelperBrain.doing / bubble: one entry each, never apart).
 local function setDoing(h: Helper, action: string, spot: number?)
 	local hired = h.hirer ~= nil
 	if action == h.doingAction and spot == h.doingSpot and h.full == h.doingFull and hired == h.doingHired then
@@ -692,7 +739,10 @@ local function setDoing(h: Helper, action: string, spot: number?)
 	end
 	h.doingAction, h.doingSpot, h.doingFull, h.doingHired = action, spot, h.full, hired
 	local thing = if spot then (h.s.move :: Rules.Move).things[spot] else nil
-	h.doing = if not hired and action == "wait" then Brain.doing("offer") else Brain.doing(action, if thing then thing.name else nil, h.full)
+	local key = if not hired and action == "wait" then "offer" else action
+	local name = if thing then thing.name else nil
+	h.doing = Brain.doing(key, name, h.full)
+	h.bubble, h.alert = Brain.bubble(key, name, h.full, h.price)
 end
 
 -- ── 8.3 your call and his list: the words, the marks ───────────────────────
@@ -2485,7 +2535,10 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	local truck = truckOf(s)
 	local input = h.input
 	input.hired, input.dead, input.holding, input.seated = hired, false, holding, seated
-	input.ride = hired and driven(s, truck) -- 8.3 (you sit at its wheel: he gets in)
+	if h.stayOut and not driven(s, truck) then
+		h.stayOut = false -- 8.6 GET OUT held while the owner stayed at the wheel: they left it, he rides again next time
+	end
+	input.ride = hired and driven(s, truck) and not h.stayOut -- 8.3 (you sit at its wheel: he gets in)
 	input.threat, input.fleeing = threat, h.fleeing
 	input.lift = h.lift
 	input.queued, input.pair = h.pick, h.pair
@@ -2553,7 +2606,7 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	local doing = if action == "come" and nowRole == "helper" then "hold" elseif action == "come" and now and now.ready then "ready"
 		elseif action == "seat" and h.board then "alight" else action -- (8.5 his way out begun: boardOut)
 	h.action, h.spot = if doing == "hold" then "hold" else action, target or spot
-	setDoing(h, doing, target or spot)
+	setDoing(h, if doing == "wait" and h.stayOut then "stay" else doing, target or spot) -- (8.6 GET OUT: he stays out)
 end
 
 -- ── Coming and going ───────────────────────────────────────────────────────
@@ -2654,6 +2707,7 @@ end
 -- 8.3 the hire is over before the move (the one who hired him left it): his list gone, what he holds set down.
 local function endHire(h: Helper, who: Player)
 	h.hirer = nil
+	h.stayOut = false -- (8.6 an order of the hire's: over with it)
 	table.clear(h.queue)
 	endNeeds(h)
 	refreshMarks(h)
@@ -2742,8 +2796,91 @@ local function clearQueue(player: Player)
 	tellCrew(h)
 end
 
+-- 8.6 PUT IT DOWN: what he carries set down where he stands, on the ground, its condition kept (Moving's "put": no fall
+-- worth a knock). A piece in his arms alone (one of his list: he took it off it as he picked it up) stays off his list:
+-- your word beats the list (back on it he would only pick it up again, at once when it is his only one); your
+-- clipboard gives it to him again any time. A two-person piece he holds the far end of: both ends down at once (Moving's
+-- helperDrop "together": its carrier's own "put", as their G), his hold off.
+local function putDown(h: Helper, body: Body, clock: number)
+	local s = h.s
+	local spot, role = Rules.holding(s.move, h.id)
+	local thing = if spot then (s.move :: Rules.Move).things[spot] else nil
+	if not spot or not thing then
+		return
+	end
+	local carrier = if role == "helper" then playerOf(thing.carrier) else nil
+	h.port.helperDrop(s, body.model, if role == "helper" then "together" else "put")
+	if role == "helper" then
+		unhold(h, body) -- (his hold off now: on his feet where he stood)
+	end
+	h.dropping, h.waited, h.vanSaid, h.thinkAt = false, 0, nil, 0
+	poseHands(h, body, nil, nil)
+	say(h, if role == "helper" then "putTogether" else "putDown", clock, true)
+	for player in s.members do
+		if player.Parent then
+			notice:FireClient(player, if carrier == player then `🧑‍🔧 You and {cfg.Name} set the {thing.name} down.`
+				elseif carrier then `🧑‍🔧 {carrier.DisplayName} and {cfg.Name} set the {thing.name} down.`
+				else `🧑‍🔧 {cfg.Name} set the {thing.name} down here: off his list.`)
+		end
+	end
+end
+
+-- 8.6 GET OUT: out of the van's seat now as a player gets out (8.5 boardOut: its door opens, he slides out to his spot
+-- by it), his way in called off (boardEnd: at that spot, the door shut), or on his way to the van he stops. Then he
+-- stays out while the move's owner stays at the wheel (stayOut: no ride; the owner out of the driver's seat ends it,
+-- the next time they sit at the wheel he gets in again as ever): sitting there you sent him out, so he never climbs
+-- back in under your nose a few seconds later; out of the seat and in again is the plain way to take him along.
+local function getOut(h: Helper, body: Body, clock: number)
+	local s = h.s
+	local truck = truckOf(s)
+	local was = if h.seat then "seat" elseif h.board then "board" else "walk"
+	local board = h.board
+	if board and not board.out then
+		boardEnd(h, body, true) -- (on his feet at his spot by the door, its door shut)
+	elseif h.seat then
+		local seat = h.seat :: Seat
+		if truck and seat.Parent and seat:IsDescendantOf(truck.model) and body.humanoid.SeatPart == seat then
+			boardOut(h, body, truck, clock)
+		else
+			unseat(h, body, nil)
+		end
+	end
+	h.stayOut = driven(s, truck)
+	h.rideWalk, h.thinkAt = nil, 0
+	say(h, if was == "walk" then "stayOut" else "getOut", clock, true)
+	tell(h, if h.stayOut then `🧑‍🔧 {cfg.Name} {if was == "walk" then "stays" else "gets out and stays"} out of the van until the driver leaves the wheel.`
+		else `🧑‍🔧 {cfg.Name} gets out of the van.`)
+end
+
+-- 8.6 the crew's orders, ("helper", "putdown" | "getout"): only a crew player's (anybody else has no Danny here:
+-- nothing), checked (MoveHelperBrain.orderCheck: hired, up, something in his hands / in the van or getting in, the van
+-- standing), refused with a notice that says why; done, he says so.
+local function order(player: Player, kind: string)
+	local h = helperOf(player)
+	if not h then
+		return
+	end
+	local verdict = Brain.orderCheck(kind, orderState(h)) -- (down, his body gone too: "down")
+	local body = h.body
+	if verdict ~= "ok" or not body then
+		local text = Brain.orderWhy(verdict)
+		if text then
+			notice:FireClient(player, text)
+		end
+		return
+	end
+	local clock = os.clock()
+	if kind == "putdown" then
+		putDown(h, body, clock)
+	else
+		getOut(h, body, clock)
+	end
+	tellCrew(h)
+end
+
 -- The crew's requests on the Moving remote: ("helper", "hire" | "clear" | "stop") at Config.Robust.Limits.MoveHelper,
--- ("helper", "assign", a piece's model) at MoveHelperAssign; anything else is dropped.
+-- ("helper", "assign", a piece's model) at MoveHelperAssign, 8.6 ("helper", "putdown" | "getout") at MoveHelperOrder;
+-- anything else is dropped.
 local function onRequest(player: Player, action: any, kind: any, arg: any)
 	if action ~= "helper" then
 		return
@@ -2751,6 +2888,11 @@ local function onRequest(player: Player, action: any, kind: any, arg: any)
 	if kind == "assign" then
 		if Net.limit(player, "MoveHelperAssign", Config.Robust.Limits.MoveHelperAssign) then
 			assign(player, arg)
+		end
+		return
+	elseif kind == "putdown" or kind == "getout" then
+		if Net.limit(player, "MoveHelperOrder", Config.Robust.Limits.MoveHelperOrder) then
+			order(player, kind)
 		end
 		return
 	end
@@ -3031,7 +3173,12 @@ local function create(s: any, port: Port): Helper
 		yieldAt = 0,
 		rideWalk = nil,
 		board = nil,
+		bubble = "",
+		alert = false,
+		stayOut = false,
+		orderIn = { hired = false, down = false, holding = nil, seated = false, boarding = false, riding = false, leaving = false, moving = false },
 	}
+	h.bubble = (Brain.bubble("offer", nil, false, h.price)) -- 8.6
 	helpers[s] = h
 	byId[id] = h
 	if spawnBody(h, homeSpot(h)) then

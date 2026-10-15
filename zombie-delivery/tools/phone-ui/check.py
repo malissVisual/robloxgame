@@ -305,7 +305,9 @@ with tempfile.TemporaryDirectory() as folder:
 # SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone
 # (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder; dannycard_preview.py draws
 # the same scenes). 8.3 review: a tap beside the card is no tap in the world, the gamepad on it, its reach, the line's
-# words on every device, smaller phones (667 x 375, 740 x 360, 780 x 360).
+# words on every device, smaller phones (667 x 375, 740 x 360, 780 x 360). 8.6: the crew's orders (PUT IT DOWN, GET OUT)
+# in the card and in the orders menu at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080, the status line's GET OUT,
+# and the bubble over Danny's head (client/DannyBubble.luau).
 from dannycardenv import dannycard_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.5"
+Config.Version = "8.5.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5639,6 +5639,7 @@ Config.Robust = {
 		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
+		MoveHelperOrder = 3, -- 8.6: an order to Danny, PUT IT DOWN / GET OUT (the Moving remote's ("helper", "putdown" | "getout"))
 		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 	},
@@ -6805,6 +6806,17 @@ Config.MoveStory = {
 --   Clipboard.Text     the bottom line's text size at scale 1 (Pad: px round its words, Tall: its height)
 --   Clipboard.Give / Back / No   the outline's colours: it can be given (green), on his list (orange: take it back),
 --                      not now (red, with the reason)
+--   8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
+--   him, for example, put it down on the ground, or get out of the car"; client/DannyBubble.luau, MoveHelperBrain.bubble
+--   / orders, server/MoveHelper.luau's orders; the rate limit Config.Robust.Limits.MoveHelperOrder):
+--   Bubble             what he does over his head, for his move's crew (the server's words: the player attribute
+--                      MoveHelperBubble), stacked over his name tag (or his speech, while he talks): Near / Far studs
+--                      from the camera it fades out between (Far its MaxDistance); AlwaysOnTop only within Top studs
+--                      (nearer, the van or a piece never hides it; farther, the walls of other houses do); Tick s between
+--                      two looks; Text its words' size, Tall its height, Pad px round its words, Gap px over the name
+--                      tag, Wide px at most (its words cut with "…")
+--   (the orders need no numbers of their own: GET OUT waits for the van at Config.Cargo.BoardMaxSpeed or slower, the
+--   speed his own getting in is called off over; after it he stays out while the owner stays at the wheel)
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -6908,6 +6920,8 @@ Config.MoveHelper = {
 		Back = { 240, 132, 44 } :: { number },
 		No = { 226, 72, 62 } :: { number },
 	},
+	-- 8.6 the bubble over his head
+	Bubble = { Near = 35, Far = 75, Top = 20, Tick = 0.15, Text = 13, Tall = 26, Pad = 9, Gap = 4, Wide = 340 },
 }
 
 -- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the
