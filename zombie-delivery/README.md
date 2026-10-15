@@ -187,6 +187,15 @@
 > before. With Danny's clipboard out, a piece's Pick up / Lift prompts hide on your screen only and **E · Give to
 > Danny** / **Take back** take their place (`client/DannyOrders.luau`; a click still works; doors and the van's Load
 > keep their E; a gamepad keeps R1).
+>
+> **8.9.3** (the owner: "Danny can't walk round things, he takes things through the wall … he must come to the thing and
+> take it properly"): inside a house Danny walks the plan's grid (`shared/HouseRoute.luau`: walls, solid fixtures and
+> the pieces standing; he fits through the doorways) to a stand spot at arm's length on the piece's near side with a
+> clear line to it (the old target lay behind or in a wall for 104 of 513 pieces); he takes it only from there (a
+> chest-high ray through no wall), turns to it, bends and the piece glides into his hands (`BodyMotion` lift /
+> setdown; PUT IT DOWN the same down); a piece nobody can get to is refused at assignment. Players can't pick through
+> walls either (the pieces' prompts need line of sight, `Moving.walled` checks it on the server), and his list's
+> markers no longer show through walls.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

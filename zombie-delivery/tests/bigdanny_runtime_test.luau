@@ -284,8 +284,22 @@ check(`for hire on the big house ({Brain.money(price)}: MoveHelperBrain.hirePric
 -- ── The two pieces: a light one by the back door's way, one for two off the corridor ─
 
 local van = cargoDoor.WorldPosition
+local HouseRoute = require("./HouseRoute")
+-- (9.0: the inside part on foot along his grid's way, through the doorways, as his own choice of a door measures it
+-- (MoveHelper's wayFor); the straight line went through the walls: the piece picked from the next room)
 local function wayCost(at: any, way: number): number
-	return (Brain.routeVia(true, at.X, at.Z, false, van.X, van.Z, danny.wayDoors, { way }))
+	local a, b = origin:PointToObjectSpace(at), origin:PointToObjectSpace(danny.ways[way].exitIn)
+	local points = danny.route and HouseRoute.path(danny.route, a.X, a.Z, b.X, b.Z)
+	if not points then
+		return math.huge
+	end
+	local total, x, z = 0, a.X, a.Z
+	for _, p in points do
+		total += math.sqrt((p.x - x) ^ 2 + (p.z - z) ^ 2)
+		x, z = p.x, p.z
+	end
+	local out = danny.ways[way].outside.Position
+	return total + math.sqrt((out.X - van.X) ^ 2 + (out.Z - van.Z) ^ 2)
 end
 -- the light one: the piece (not for two) whose way to the van is the back door's by the most (a plan with none clearly
 -- so: the front door's by the most), either door

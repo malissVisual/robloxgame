@@ -34,7 +34,8 @@
 --                                              "piece" (not this move's) | "far" | "van" (in the van) | "gone" (home
 --                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full";
 --                                              8.5 "clipboard": hired, but the player's clipboard is not out (orders
---                                              mode: shared/ClipboardRules.luau; a click on his list's piece too)
+--                                              mode: shared/ClipboardRules.luau; a click on his list's piece too);
+--                                              9.0 "reach": no spot beside it he can walk to (shared/HouseRoute.luau)
 --   MoveHelperBrain.keepQueued(state, held)    8.3 is a piece of his list still his to carry (home or on the ground,
 --                                              nobody holding it)?
 --   MoveHelperBrain.nextQueued(list)           8.3 the piece of his list he goes for now (Queued: in his list's order, the
@@ -196,6 +197,7 @@ export type Assign = {
 	count: number, -- the pieces on his list
 	near: boolean, -- the player is near enough to it to see it (ClickReach)
 	clipboard: boolean, -- 8.5 the player's clipboard is out (orders mode: the character attribute ClipboardHeld)
+	reach: boolean?, -- 9.0 false: no spot beside it he can walk to (server/MoveHelper.luau's reachable); nil: he can
 }
 
 export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- the front door outside, the exit inside
@@ -291,6 +293,8 @@ function MoveHelperBrain.assignCheck(a: Assign): string
 		return "gone"
 	elseif a.held or a.state == "carried" then
 		return "held"
+	elseif a.reach == false then
+		return "reach" -- (9.0: never a piece he would walk into a wall for)
 	elseif a.count >= cfg().Queue then
 		return "full"
 	end

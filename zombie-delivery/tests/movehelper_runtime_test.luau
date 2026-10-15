@@ -670,9 +670,9 @@ give(box)
 give(clock)
 check("8.3 a click on the Lamp, the Box, the Clock: on his list in that order, a toast each, his word", listIs({ 1, 5, 4 }) and told(sol, "Danny will take the Lamp.", noticeAt)
 	and told(sol, "Danny will take the Box of memories.", noticeAt) and told(sol, "Danny will take the Grandpa's Clock.", noticeAt) and E.saidSince(Brain.Lines.queued, said))
-check("…a marker over each with its number (DannyMark), the pieces' DannyQueue", markOf(lamp) == "🧑‍🔧 Danny · 1" and markOf(box) == "🧑‍🔧 Danny · 2"
+check("…a marker over each with its number (DannyMark; 9.0 never through a wall: not on top), the pieces' DannyQueue", markOf(lamp) == "🧑‍🔧 Danny · 1" and markOf(box) == "🧑‍🔧 Danny · 2"
 	and markOf(clock) == "🧑‍🔧 Danny · 3" and lamp:GetAttribute("DannyQueue") == 1 and clock:GetAttribute("DannyQueue") == 3
-	and lamp.PrimaryPart:FindFirstChild("DannyMark").AlwaysOnTop == true, markOf(lamp))
+	and lamp.PrimaryPart:FindFirstChild("DannyMark").AlwaysOnTop == false, markOf(lamp))
 check("…the status line: 3 pieces to carry", sol:GetAttribute("MoveHelperQueue") == 3)
 noticeAt = #E.messages
 give(lamp)

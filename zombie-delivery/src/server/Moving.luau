@@ -2949,6 +2949,22 @@ end
 
 -- ── The things' prompts ────────────────────────────────────────────────────
 
+-- 9.0 (the owner, 8.9: "He must not take things through walls (that's funny), and neither may the player"): is a wall of
+-- the move's interior between `from` (a player's root) and the piece's middle? A ray at the interior's Shell only (its
+-- walls, floors and ceiling: the furniture, the fixtures and the bodies never block); a piece out of the house, or an
+-- interior without a shell: none. Its prompts need a line of sight too (setupItem: RequiresLineOfSight).
+function Moving.walled(s: Session, from: Vector3, item: Item): boolean
+	local interior = s.interior
+	local shell = if interior and interior.Parent then interior:FindFirstChild("Shell") else nil
+	if not shell or (from - s.origin.Position).Magnitude > 400 then
+		return false
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { shell }
+	return workspace:Raycast(from, item.root.Position - from, params) ~= nil
+end
+
 local function onPick(s: Session, spot: number, player: Player, lifted: boolean?)
 	if s.ended or sessionOf(player) ~= s or traveling[player] then
 		return
@@ -2964,6 +2980,10 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		return
 	end
 	if flat(root.Position, item.root.Position) > T.Reach.Item + math.max(thing.size.X, thing.size.Z) / 2 + 2 then
+		return
+	end
+	if Moving.walled(s, root.Position, item) then
+		say(player, `You can't reach the {thing.name} through the wall.`) -- 9.0 (a pick, a lift, a drag)
 		return
 	end
 	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
@@ -3005,6 +3025,10 @@ local function onHelp(s: Session, spot: number, player: Player, lifted: boolean?
 		return
 	end
 	if flat(root.Position, item.root.Position) > T.Reach.Item + math.max(thing.size.X, thing.size.Z) / 2 + 2 then
+		return
+	end
+	if Moving.walled(s, root.Position, item) then
+		say(player, `You can't reach the {thing.name} through the wall.`) -- 9.0 (Help lift)
 		return
 	end
 	if thing.carrier == player.UserId then
@@ -3101,6 +3125,8 @@ local function setupItem(s: Session, spot: number, model: Model)
 	local pick = newPrompt(root, if thing.class == "pair" then "Lift" else "Pick up", labelOf(thing), Enum.KeyCode.E, hold, T.Reach.Item)
 	local help = newPrompt(root, "Help lift", labelOf(thing), Enum.KeyCode.E, 0.3, T.Reach.Item)
 	help.Enabled = false
+	pick.RequiresLineOfSight = true -- 9.0 (never offered through a wall; the server checks it again: Moving.walled)
+	help.RequiresLineOfSight = true
 	tag(pick, s.owner)
 	tag(help, s.owner)
 	pick.Triggered:Connect(function(player: Player)

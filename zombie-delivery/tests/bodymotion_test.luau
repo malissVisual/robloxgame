@@ -220,7 +220,7 @@ check("the right arm back with the right thigh forward", armApart > 0 and armTog
 
 -- The gestures with the legs ---------------------------------------------------------------------------------------
 
-for _, kind in { "pickup", "land" } do
+for _, kind in { "pickup", "land", "lift", "setdown" } do -- (9.0: Danny's pick-up and setting down)
 	local seconds = Gestures.seconds(kind)
 	check(`{kind}: its seconds from Config.Body`, seconds == B.Gestures[kind] and seconds ~= nil and seconds > 0.2 and seconds < 1.5)
 	if not seconds then

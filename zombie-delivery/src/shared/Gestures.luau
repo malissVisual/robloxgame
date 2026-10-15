@@ -14,6 +14,8 @@
 --          the back (sling) or back to the front (unsling) (server/KitWear.luau; client/BagSway.luau moves the bag)
 --   pickup 6.7: down on the knees, the back bent, the right hand to a piece (a bag) on the ground and up with it
 --   land   6.7: a short dip on the knees (client/BodyLife.luau dips a landing by itself, by the fall)
+--   lift / setdown  9.0: Danny's pick-up and setting down of a piece (server/MoveHelper.luau): a short bend, both hands
+--          to the piece (client/ArmPose.luau reaches its place), up again with it / without it
 -- 6.7: "pickup" and "land" also bend the body (shared/BodyMotion.luau gesture, their seconds Config.Body.Gestures):
 -- the keys waist / neck ({ x, y, z } degrees) and crouch ({ drop, back } studs, the hips' tip in degrees);
 -- client/ArmPose.luau bends the legs so the feet stay where they stood.

@@ -220,6 +220,7 @@ local standing = danny.body.root.Position
 local said = #E.said
 noticeAt = #E.messages
 E.request(sol, "helper", "putdown")
+run(0.6) -- (9.0 his setting down: the Lamp glides down to the floor first)
 local onGround = stateNow(1) == "ground"
 local lampAt = lamp.PrimaryPart.Position
 check("8.6 PUT IT DOWN: the Lamp on the ground where he stands (a step in front of him), out of his hands, its condition kept",
