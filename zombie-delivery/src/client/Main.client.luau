@@ -39,6 +39,68 @@ end
 --                                      DannyOrders (Danny's clipboard, orders mode: no window), OfferCard (a showroom
 --                                      visitor's offer: a window too) and VanPaintUi (the PAINT shop's window): each
 --                                      started only when it is there
+-- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
+-- version and the server's stamp (workspace "ServerBuild"); different: a warning, and in Studio a red banner that says
+-- what to delete before syncing again.
+task.defer(function()
+	local ok, err = pcall(function(): boolean
+		local stamp = Client:FindFirstChild("BuildStamp")
+		if not stamp then
+			return false
+		end
+		local loaded, built = pcall(require, stamp :: ModuleScript)
+		if not loaded or type(built) ~= "string" then
+			return false
+		end
+		local server = workspace:GetAttribute("ServerBuild")
+		local waited = 0
+		while server == nil and waited < 15 do
+			task.wait(0.5)
+			waited += 0.5
+			server = workspace:GetAttribute("ServerBuild")
+		end
+		local parts = {}
+		if built ~= Config.Version then
+			table.insert(parts, `ReplicatedStorage.Shared (Config) is {Config.Version}`)
+		end
+		if type(server) == "string" and server ~= built then
+			table.insert(parts, `the server's scripts are {server}`)
+		end
+		if #parts == 0 then
+			return false
+		end
+		local text = `STUDIO HAS A MIX OF OLD AND NEW SCRIPTS: the client's are {built}, {table.concat(parts, ", ")}. Fix: Stop, Rojo Disconnect, delete ReplicatedStorage > Shared, ServerScriptService > Server and StarterPlayer > StarterPlayerScripts > Client, then Rojo Connect and Play.`
+		warn(`[Client] {text}`)
+		if not game:GetService("RunService"):IsStudio() then
+			return false
+		end
+		local playerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui", 10)
+		if not playerGui then
+			return false
+		end
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "StaleScripts"
+		gui.DisplayOrder = 100
+		gui.ResetOnSpawn = false
+		local label = Instance.new("TextLabel")
+		label.AnchorPoint = Vector2.new(0.5, 0)
+		label.Position = UDim2.new(0.5, 0, 0, 8)
+		label.Size = UDim2.new(0.9, 0, 0, 96)
+		label.BackgroundColor3 = Color3.fromRGB(150, 20, 20)
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 16
+		label.TextWrapped = true
+		label.Text = text
+		label.Parent = gui
+		gui.Parent = playerGui
+		return true
+	end)
+	if not ok then
+		warn(`[Client] the version check failed: {err}`)
+	end
+end)
+
 -- Never required here: the phone, the job board, MISSIONS, CAREER, the garage, the estate, the business, the maps and
 -- their discovery, the tutorial, the buses, the rentals, the zip lines, the guns and the hands (Shooting, Holster, the
 -- weapon wheel), the throw, the city's chips and banners, the leaderboard, the weather, the traffic and the animals.
