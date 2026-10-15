@@ -140,7 +140,7 @@ def stage(tmp: Path, manifest: dict):
     text = (ROOT / "src/server/FurnitureMesh.luau").read_text()
     text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', text)
     (tmp / "FurnitureMesh.luau").write_text(PREFIX + "local game, workspace = M.game, M.workspace\nlocal warn = print\n" + text)
-    # 8.8.1: HouseInterior's server/FixtureMesh.luau (the owner's Blender fixtures), a ServerStorage of its own: no
+    # 8.9.1: HouseInterior's server/FixtureMesh.luau (the owner's Blender fixtures), a ServerStorage of its own: no
     # fixtures import here, so the fixtures keep their parts (tools/fixtures-art/check.py dresses them with one)
     text = (ROOT / "src/server/FixtureMesh.luau").read_text()
     text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', text)

@@ -5,7 +5,7 @@
 -- 8.0.2: the owner's Blender imports (Import 3D leaves each in the Workspace, its parts loose: the sandbox builds no
 -- Marge's house, so nothing took ZDCHouseArt away and its pieces fell apart over the plots) leave the world first
 -- thing, before physics can move a piece; their dressers find them in ServerStorage (FurnitureMesh, HouseMesh,
--- VanMesh, SprinterMesh, 8.2: WarehouseMesh, 8.8.1: FixtureMesh read the pieces where the importer put them, against
+-- VanMesh, SprinterMesh, 8.2: WarehouseMesh, 8.9.1: FixtureMesh read the pieces where the importer put them, against
 -- their markers).
 pcall(function()
 	for _, name in { "ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt", "ZDCFixtureArt" } do
@@ -306,7 +306,7 @@ safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between
 -- wraps the hooks set above (Zombies.hunts, Vehicles.backAllowed, Jobs.returnLent, Vehicles.callCar, the car damage).
 -- 7.1: the moves' furniture in the owner's Blender models: the imported ZDCFurnitureArt leaves the world at once.
 safely("FurnitureMesh", require(Server.FurnitureMesh).start)
-safely("FixtureMesh", require(Server.FixtureMesh).start) -- 8.8.1: the houses' fixtures in the owner's Blender model
+safely("FixtureMesh", require(Server.FixtureMesh).start) -- 8.9.1: the houses' fixtures in the owner's Blender model
 safely("HouseMesh", require(Server.HouseMesh).start) -- 7.2: Marge's house in the owner's Blender model (World dresses it)
 safely("Moving", require(Server.Moving).start)
 print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)

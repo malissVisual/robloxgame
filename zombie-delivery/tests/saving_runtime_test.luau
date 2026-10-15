@@ -21,6 +21,8 @@
 --   * 8.4: the house the moving card shows (sandboxHouseSeed): written with its flag, read back on another server's
 --     join (the same house), dropped once a trip spent it; only a whole number in Config.Moving.Sandbox.Seeds' range,
 --     only from a real save written with its flag (junk, an older save, a lock-only record, a new player: none).
+--     Jinočany: which house it is (sandboxHouse) the same way, only an id shared/SandboxMap.luau knows; a real 8.4 save
+--     with a seed and no house's flag: the farmstead's (its seed was rolled for the one house there was).
 --   * Size: the biggest realistic sandbox save, measured.
 --   * The shutdown (BindToClose): every player saved at once, in parallel, waited for (a failed try too); a store that
 --     never answers is given up on at CloseWait.
@@ -640,6 +642,71 @@ do
 	check("… a new player: none", (PlayerData.get(fresh) :: any).sandboxHouseSeed == nil)
 	E.leave(fresh)
 	check("… a new player's save: the flag, no seed", E.saves.Player_221.sandboxHouseSeedKept == true and E.saves.Player_221.sandboxHouseSeed == nil)
+end
+
+-- ── Jinočany: which house it is (sandboxHouse) ────────────────────────────
+-- (server/Moving.luau keeps it with the seed in SB.houses: tests/sandboxhouses_runtime_test.luau)
+do
+	local SandboxMap = require("./SandboxMap")
+	local linden = SandboxMap.Houses[2].id
+	local houseSave = save83(900)
+	houseSave.sandboxHouseSeed, houseSave.sandboxHouseSeedKept = 424242, true
+	houseSave.sandboxHouse, houseSave.sandboxHouseKept = linden, true
+	E.saves.Player_232 = houseSave
+	local H1 = E.join(232, "Hana")
+	local p1 = PlayerData.get(H1) :: any
+	check("Jinočany: a save with its house and the flag: read into the profile with its seed", p1.sandboxHouse == linden and p1.sandboxHouseSeed == 424242)
+	E.leave(H1)
+	check("… the leave save writes it back with its flag", E.saves.Player_232.sandboxHouse == linden and E.saves.Player_232.sandboxHouseKept == true)
+	local H2 = E.join(232, "Hana")
+	local p2 = PlayerData.get(H2) :: any
+	check("… joining another server: the same house and seed", p2.sandboxHouse == linden and p2.sandboxHouseSeed == 424242)
+	p2.sandboxHouseSeed = nil -- (a trip home spent it: Moving keeps the house, the one emptied last)
+	E.leave(H2)
+	check("… spent: the house written alone (the next card the house after it)", E.saves.Player_232.sandboxHouse == linden
+		and E.saves.Player_232.sandboxHouseSeed == nil)
+	local H3 = E.join(232, "Hana")
+	check("… read back alone", (PlayerData.get(H3) :: any).sandboxHouse == linden and (PlayerData.get(H3) :: any).sandboxHouseSeed == nil)
+	E.leave(H3)
+	-- only an id SandboxMap knows, only from a real save written with its flag
+	local kept = {}
+	for index, value in { "nowhere", "", 5, true, { linden }, string.upper(linden) } :: { any } do
+		local junkSave = save83(100)
+		junkSave.sandboxHouseSeed, junkSave.sandboxHouseSeedKept = 424242, true
+		junkSave.sandboxHouse, junkSave.sandboxHouseKept = value, true
+		E.saves.Player_233 = junkSave
+		local J = E.join(233, "Jan")
+		local pj = PlayerData.get(J) :: any
+		if pj == nil or pj.sandboxHouse ~= nil then
+			table.insert(kept, `{index}: {tostring(value)}`)
+		end
+		E.leave(J)
+	end
+	check("Jinočany: a house that is no SandboxMap.Houses id (unknown, empty, a number, a boolean, a table, another spelling): none, loaded and not kicked",
+		#kept == 0, table.concat(kept, "; "))
+	-- the migration: a real 8.4 save (a seed with its flag, no house's flag): the farmstead's, the one house there was
+	local old = save83(100)
+	old.sandboxHouseSeed, old.sandboxHouseSeedKept = 4242, true
+	old.sandboxHouse = linden -- (no flag: not read)
+	E.saves.Player_233 = old
+	local J2 = E.join(233, "Jan")
+	local pj2 = PlayerData.get(J2) :: any
+	check("Jinočany: an 8.4 save (a seed, no house's flag): the farmstead with that seed (its seed was rolled for it)", pj2.sandboxHouse == SandboxMap.House.id
+		and pj2.sandboxHouseSeed == 4242)
+	E.leave(J2)
+	local older = save83(100) -- (no seed either: none)
+	E.saves.Player_233 = older
+	local J3 = E.join(233, "Jan")
+	check("… an older save without a seed: none", (PlayerData.get(J3) :: any).sandboxHouse == nil)
+	E.leave(J3)
+	E.saves.Player_233 = { sandboxHouse = linden, sandboxHouseKept = true, sandboxHouseSeed = 7, sandboxHouseSeedKept = true, lock = { job = "another-server", at = 0 } }
+	local J4 = E.join(233, "Jan")
+	check("… a lock-only record (no money: a new player's): none", (PlayerData.get(J4) :: any).sandboxHouse == nil)
+	E.leave(J4)
+	local fresh = E.join(234, "Kai")
+	check("… a new player: none; the save the flag, no house", (PlayerData.get(fresh) :: any).sandboxHouse == nil)
+	E.leave(fresh)
+	check("… a new player's save: the flag, no house", E.saves.Player_234.sandboxHouseKept == true and E.saves.Player_234.sandboxHouse == nil)
 end
 
 -- ── Size: the biggest realistic sandbox save ───────────────────────────────

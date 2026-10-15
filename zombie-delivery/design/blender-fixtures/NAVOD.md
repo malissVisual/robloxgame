@@ -5,7 +5,7 @@
 Hezčí modely všeho, co je v domě **pevně zabudované** a co se při stěhování neodnáší: kuchyňská linka, sporák,
 linka s dřezem, horní skříňky, digestoř, rohová lavice se svatým koutkem, vana, záchod, umyvadlo se zrcadlem,
 **kachlová kamna** v obýváku a v garáži ponk, regál a garážová vrata. Dnes je hra staví z kostiček
-(`src/server/HouseInterior.luau`); s tímhle modelem (8.8.1) dostane každý dům (malý i velký) alpskou kuchyni,
+(`src/server/HouseInterior.luau`); s tímhle modelem (8.9.1) dostane každý dům (malý i velký) alpskou kuchyni,
 koupelnu, kamna a garáž z Blenderu. Každý druh má **přesně rozměry ze hry**, takže se ve hře nic jiného nemění:
 kolize, místa nábytku i chození zůstávají. Všechno postavil skript `fixtures.py`, takže každou barvu a tvar můžeš
 změnit a nechat postavit znovu.

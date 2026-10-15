@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""8.3: the sandbox's map from above (design/sandbox/map.png; 8.4: the player guide that showed it is withdrawn for now).
+"""8.3: the sandbox's map from above (design/sandbox/map.png; 8.4: the player guide that showed it is withdrawn for now;
+8.9: the village of Jinočany, step 1, north up, the six houses to empty from design/jinocany/plan.json framed).
 
 The real server code builds the world on tools/perf/world-mock.luau (world_count.py's preparation; export.luau):
 server/SandboxWorld.luau's map, the four kiosks (server/MoveSites.luau plotBoard), the four warehouses (server/Warehouse.luau;
@@ -94,6 +95,9 @@ def export_world(luau: str, out: Path):
             facts = json.loads(line[6:])
     if not parts or facts is None:
         raise SystemExit(result.stdout[-4000:] + "\nsandbox-map: no parts or no facts")
+    # 8.9 Jinočany: the six houses to empty (design/jinocany/plan.json enter: the farmstead and five village houses)
+    plan = json.loads((GAME / "design" / "jinocany" / "plan.json").read_text(encoding="utf-8"))
+    facts["enter"] = [{"id": h["id"], "name": h["name"], "box": h["box"]} for h in plan["enter"]]
     (out / "world.json").write_text(json.dumps(parts))
     (out / "facts.json").write_text(json.dumps(facts))
     return len(parts)

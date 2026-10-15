@@ -1,4 +1,4 @@
-"""Zombie Delivery: zařízení domu v Blenderu (8.8.1): kuchyně, koupelna, kachlová kamna a garáž.
+"""Zombie Delivery: zařízení domu v Blenderu (8.9.1): kuchyně, koupelna, kachlová kamna a garáž.
 
 Spuštění v Blenderu: záložka Scripting → Open → fixtures.py → Run Script (▶, nebo Alt+P). Skript postaví všech 15 druhů
 zařízení, které dům ve hře staví z dílů (server/HouseInterior.luau, LOOKS): kuchyňskou linku, sporák, linku s dřezem,

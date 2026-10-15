@@ -83,6 +83,10 @@
 -- trip brings something home), read only from a real save written with its flag (sandboxHouseSeedKept) and only a
 -- whole number 1 … Config.Moving.Sandbox.Seeds; else none (the next card rolls one). Leaving and joining another server
 -- shows the same house (no reroll by server hopping). Not mirrored into `rewards` (an 8.2 server drops it: a new house).
+-- Jinočany: which house it is (sandboxHouse: a shared/SandboxMap.luau Houses id, server/Moving.luau's SB.houses; with no
+-- seed, the house emptied last: the next card takes the one after it), read only from a real save written with its flag
+-- (sandboxHouseKept) and only an id SandboxMap knows; a real save from before it with a house's seed has the farmstead's
+-- (sandbox_house: the one house there was); else none.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- 8.3 SAVES (Config.Saving, shared/SaveGuard.luau): a save is written (UpdateAsync) only while the stored save is still
 -- this server's session's (its lock: the JobId, the session and the save's number: never over another server's save
@@ -218,6 +222,9 @@ export type Profile = {
 	-- only from a real save written with its flag (sandboxHouseSeedKept), a whole number 1 … Config.Moving.Sandbox.Seeds;
 	-- nil: none yet (the next card rolls one)
 	sandboxHouseSeed: number?,
+	-- Jinočany: the house of that card (a SandboxMap.Houses id; the seed nil: the house emptied last), read only from a
+	-- real save written with its flag (sandboxHouseKept); an older real save with a seed: the farmstead's; nil: none yet
+	sandboxHouse: string?,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -338,6 +345,7 @@ local function newProfile(): Profile
 		market = Market.empty(), -- 8.3: nothing sold yet
 		vanPaint = VanPaintRules.empty(), -- 8.3: nothing bought, the factory's look
 		sandboxHouseSeed = nil, -- 8.4: no house rolled yet
+		sandboxHouse = nil, -- Jinočany: none of the six yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -690,6 +698,16 @@ local function applySaved(profile: Profile, saved: any)
 	local seed = saved.sandboxHouseSeed
 	profile.sandboxHouseSeed = if saved.money ~= nil and saved.sandboxHouseSeedKept == true and type(seed) == "number" and seed == math.floor(seed)
 		and seed >= 1 and seed <= Config.Moving.Sandbox.Seeds then seed else nil
+	-- Jinočany: which house, only from a real save written with its flag (sandboxHouseKept) and only an id SandboxMap
+	-- knows; a real save from before it with a seed: the farmstead's (the one house there was; its seed rolled for it)
+	local house = saved.sandboxHouse
+	if saved.money == nil then
+		profile.sandboxHouse = nil
+	elseif saved.sandboxHouseKept == true then
+		profile.sandboxHouse = if require(Shared.SandboxMap).house(house) then house else nil
+	else
+		profile.sandboxHouse = if profile.sandboxHouseSeed ~= nil then require(Shared.SandboxMap).House.id else nil
+	end
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -1117,6 +1135,8 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		vanPaintKept = true, -- 8.3: VanPaintRules.Flag (applySaved reads the van's paint only with it)
 		sandboxHouseSeed = profile.sandboxHouseSeed, -- 8.4 (nil: none)
 		sandboxHouseSeedKept = true, -- 8.4 (applySaved reads the house's seed only with it)
+		sandboxHouse = profile.sandboxHouse, -- Jinočany (nil: none)
+		sandboxHouseKept = true, -- Jinočany (applySaved reads which house only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

@@ -325,7 +325,10 @@ def stage(tmp: Path, manifest: dict):
     env = 'setfenv(1, require("./WorldMock").env)\n'
     text = (ROOT / "src/server/SandboxWorld.luau").read_text()
     text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', text).replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshWorld")')
+    text = text.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')  # 8.9: Jinočany's village
     (tmp / "SandboxWorldServer.luau").write_text(env + text)
+    text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (ROOT / "src/server/VillageWorld.luau").read_text())
+    (tmp / "VillageWorldServer.luau").write_text(env + text)
     text = (ROOT / "src/server/HouseMesh.luau").read_text()
     text = text.replace("require(script.Parent.DayNight)", '{ nightLight = function(p) p:SetAttribute("NightLight", true) end }')
     (tmp / "HouseMeshWorld.luau").write_text(env + text)

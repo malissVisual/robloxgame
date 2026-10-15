@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""8.8.1: the house's fixtures in the owner's Blender model (server/FixtureMesh.luau) on real interiors, without Studio.
+"""8.9.1: the house's fixtures in the owner's Blender model (server/FixtureMesh.luau) on real interiors, without Studio.
 
 Simulates the Roblox import of design/blender-fixtures/roblox/ZDCFixtureArt.fbx from its manifest (ZDCFixtureArt.json:
 every piece's box in its kind's frame, written by fixtures.py; design/blender-fixtures/KONTRAKT.md): the importer turns
@@ -54,7 +54,7 @@ KINDS = {
     "shelves": (5, 7, 1.6), "garage_door": (12, 8.5, 0.3),
 }
 PALETTE = {"tile": ("Stove",), "tile2": ("Upper",), "pine": ("Seat", "StoveBench"), "cushion": ("Cushion",)}
-TRIANGLES = {"kind": 3000, "kachelofen": 4000, "piece": 10000}  # (8.8.1: the lead relaxed the contract's 1,500: the whole model about 22,000)
+TRIANGLES = {"kind": 3000, "kachelofen": 4000, "piece": 10000}  # (8.9.1: the lead relaxed the contract's 1,500: the whole model about 22,000)
 BASIN_MIRROR = 6.9  # the contract: the basin's mirror up to y 6.9 in its frame
 TOL = 0.05  # the contract's: into the wall behind (and here: into the room in front) at most this
 RUNS = {  # mode → the interiors it builds (kind, seed)

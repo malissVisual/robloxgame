@@ -1,10 +1,14 @@
 # Zombie Delivery
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
-> small alpine test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): a meadow with one
-> road, **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
+> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): since 8.9 the owner's village
+> **Jinočany** (8.0 – 8.8: an alpine meadow with one road), at first **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
 > plan, `design/jinocany/NAVRH.md`; refilled with a new random layout every move, with 2 – 4 **collectibles** from
-> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. Every player drives a
+> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. **Jinočany step 1:** six houses to
+> empty (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`): The Old Farmstead (the big house, The
+> Nováks) and five family houses in the village on Hlavní, Školní, Lidická and Smetanova (a smaller plan, 15 minutes;
+> the village's own look, a rich one, their front doors walked in as the farmstead's). The kiosk offers one at a time: your card keeps its house and seed (in your
+> save too) until a trip brings something home, then the next free house; two players never get the same one. Every player drives a
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
 > from inside. Take the contract at the kiosk by your warehouse, carry the house out (the grip, Danny and two-person
@@ -157,7 +161,21 @@
 > Farmstead** on **Pražská**; the soundscape is the village's (fields, the D5's far hum from the east, the chapel's
 > bell, a dog, a tractor; no cowbells), the light at 50° (design/jinocany/NAVRH.md).
 >
-> **8.8.1** (the owner: "the kitchen and the bathroom in Blender"): the houses' built-in things in the owner's Blender
+> **8.9** (Jinočany step 1, design/jinocany/NAVRH.md): the sandbox map is the owner's village. **The world**
+> (`shared/VillageLooks.luau`, `shared/VillageScenery.luau`, `server/VillageWorld.luau`, `Config.Village`,
+> `Config.VillageWorld`; the data generated from `design/jinocany/plan.json` by `tools/village/sandboxmap.py` into
+> `SandboxMap`'s JINOCANY section): Hlavní, Hornická (ROAD CLOSED), Školní, Lidická, Na Pouštce, Fibichova, Smetanova
+> and Mirešická round today's plots, Depot Row, Pražská and the turnaround (all where they were); 81 houses and
+> terraces in Atomic chunks, the green with its chapel and cross, the pond, the Corner Drugstore, the orchard, tree
+> lines, fields in their crops' colours, the D5 at the east edge with cars (client-side, `client/VillageTraffic.luau`)
+> and a flat far horizon; the Alps gone (spruces, peaks, hills, mounds, fence). The map is 2,253 parts (2,354 with the
+> Auction House) of 2,500. **Six houses to empty** (`SandboxMap.Houses`, `Config.Moving.Sandbox.Houses`): The Old
+> Farmstead (the big house, its back door) and five family houses in the village's look (Hlavní 5 and 11, Školní 20,
+> Lidická 30, Smetanova 84); a player's card holds a house and its seed (`sandboxHouse`, `sandboxHouseKept` in the
+> save), the next card the next free house, two players never the same house; the guide, the chevron, the kiosk and
+> the admin follow the contract's house. `design/sandbox/map.png` drawn again (north up, Czech names).
+>
+> **8.9.1** (the owner: "the kitchen and the bathroom in Blender"): the houses' built-in things in the owner's Blender
 > model **ZDCFixtureArt** (`design/blender-fixtures`, imported once in Studio): the kitchen's counters, stove, sink run,
 > wall cupboards, hood, Eckbank and corner shelf, the bathroom's tub, toilet and basin, the living room's Kachelofen and
 > the garage's workbench, shelving and door (`server/FixtureMesh.luau`; the parts that collide stay, unseen).
@@ -1930,7 +1948,7 @@ server/Moving.luau's WalkIn and travel; the numbers in `Config.Moving.Doors`).
 **Tests:** `doorswing_test`, `sandboxworld_test`, `sandboxmove_runtime_test`, `bigdanny_runtime_test` (his way out's
 leaves open), the e2e's steps 4 and 20; `tools/house-art/check.py` checks the leaves and their dressed copies.
 
-## The houses' fixtures in Blender (8.8.1)
+## The houses' fixtures in Blender (8.9.1)
 
 The owner asked for the kitchen and the bathroom in Blender. `design/blender-fixtures/fixtures.py` models the 15 kinds
 of fixture `shared/HouseLayout.luau` places, each in its exact box: `counter`, `stove`, `sink`, `cabinets`, `hood`,

@@ -9,7 +9,8 @@
 --   warehouses/shown     the pieces on show in them: every stand full, the heaviest pieces (FurnitureLooks' part count;
 --                        8.3: each on a stand it fits, WarehouseLayout.fits)
 --   interior             the house's inside while a move runs (server/HouseInterior.luau): the largest of SEEDS plans
---                        (8.3: the sandbox's house's kind, Config.Moving.Sandbox.Kind: the big plan)
+--                        (8.3: the sandbox's house's kind: the big plan; Jinočany: the biggest of the houses' kinds,
+--                        the farmstead's, Config.Moving.Sandbox.Houses)
 --   danny                Danny's body (server/Npcs.luau on the stand-in's classic R15)
 --   visitors             8.3: the showroom's visitors at the server's cap (Config.Visitors.Cap; server/Visitors.luau's
 --                        bodies, every kind's look in turn, each with the box of a sale: the most it can be)
@@ -28,7 +29,13 @@ local Collection = require("./server/Collection") -- (the stand-in)
 local SandboxPlots = require("./server/SandboxPlots") -- (the stand-in)
 
 local SEEDS = 24 -- house plans tried for the interior's worst case
-local KIND = Config.Moving.Sandbox.Kind or "house" -- (8.3: the big plan)
+-- (8.3: the big plan; Jinočany: the biggest of the houses' contracts' kinds, "big" the farmstead's, else "house")
+local KIND = "house"
+for _, c in (Config.Moving.Sandbox :: any).Houses or {} do
+	if c.Kind == "big" then
+		KIND = "big"
+	end
+end
 
 local function emit(label: string, row: { [string]: number })
 	print(Census.line(label, row))
@@ -57,6 +64,20 @@ for _, child in world:GetChildren() do
 end
 modes("world", world)
 detail("world", Census.list(world))
+
+-- the scenery by its folders (8.9: the lamps and the signpost; the Alps' trees, flowers and fence in an older
+-- checkout) and 8.8's Auction House's parts (built once Config.Auction.On, off here: sandbox_count.py adds them to the
+-- map's against its budget; has-auction.luau, sandbox_count.py's, says whether this checkout has it)
+local scenery = world:FindFirstChild("Scenery")
+if scenery then
+	for _, child in scenery:GetChildren() do
+		emit("scenery/" .. child.Name, Census.under(child))
+	end
+end
+if require("./has-auction") then
+	local auction = #require("./shared/AuctionHouseLayout").parts()
+	emit("auction", { parts = auction, visible = auction })
+end
 
 -- ── The kiosks ─────────────────────────────────────────────────────────────
 local kiosks = Instance.new("Folder")
