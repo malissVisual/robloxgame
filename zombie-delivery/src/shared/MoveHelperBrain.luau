@@ -110,7 +110,7 @@
 --                                              `reset` (a new hold, a door's fade) or a jump past HoldPace.Jump: none
 --   MoveHelperBrain.leadTime(ping)             8.3 the seconds Danny is aimed ahead: HoldLead.Base + ping × Ping, 0 … Most
 --   MoveHelperBrain.holdLead(trail, seconds)   8.3 how far ahead (x, z studs): the leader's smoothed velocity × seconds,
---                                              HoldLead.Far at most
+--                                              HoldLead.Far at most (8.6: Danny's hold uses endLead instead)
 --   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset)   8.6 Danny's lead now: one look at his END's place (x,
 --                                              z: the piece's turn moves it too), its velocity smoothed over
 --                                              HoldLead.Smooth s × `seconds` (Far at most), reached at HoldLead.Rate
