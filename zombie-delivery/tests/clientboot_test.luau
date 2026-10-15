@@ -416,6 +416,20 @@ do -- 8.3 the PAINT shop's window alone: open, it frees the mouse (its swatches 
 	check("… opening it closes the UPGRADES window but not itself", type(onOpen) == "function" and called(run, "UpgradeUi.close") and not called(run, "VanPaintUi.close"))
 end
 
+do -- 8.8 the Auction House's window alone (a window like the others): open, it frees the mouse; it closes the others
+	local run = boot(true, { AuctionUi = "ok", VanPaintUi = "ok" }, true)
+	check("8.8 the Auction House's window starts with the sandbox's own modules, and frees the mouse while open", called(run, "AuctionUi.start") and run.modules.CameraRig.windowOpen() == true)
+	local onOpen = run.modules.AuctionUi.onOpen
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = run.modules.Hud.onCloseWindows
+		onOpen()
+	end
+	check("… opening it closes the PAINT shop's window but not itself", type(onOpen) == "function" and called(run, "VanPaintUi.close") and not called(run, "AuctionUi.close"))
+	run.modules.Hud.onCloseWindows()
+	check("… ESC (the HUD's close) closes it like the others", called(run, "AuctionUi.close"))
+end
+
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)
 	local run = boot(true, {})
 	local ok, where = same(starts(run), concat(SANDBOX, LAST))
