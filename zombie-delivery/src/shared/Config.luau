@@ -7828,6 +7828,16 @@ Config.Visitors = {
 --   Tick        s between two looks at the offers' clocks
 --   PromptTag / SellerAttribute   the CollectionService tag and attribute (the seller's UserId) of the stands' prompts
 --               for the other players ("Make an offer", "Buy $X"): client/TradePrompts.luau hides them from the seller
+--   Ticket      8.7 review: s a use of a stand's "Make an offer" / "Buy $X" prompt holds good: the server keeps a ticket
+--               (that seller, piece and stand, the stand's point) and SEND / BUY are taken only with one this fresh
+--   Reach       8.7 review: studs from that stand's point the buyer may stand at SEND / BUY (the prompts' own reach is
+--               Config.Warehouse.PromptDistance: room to step back from the stand while choosing a price)
+--   Cooldown    8.7 review: s before a buyer may offer a seller again after their offer was declined or ran out (none
+--               after a deal): a few accounts can't keep a seller's PerSeller slots full
+--   CardArm     8.7 review: s the offer card (client/OfferCard.luau: a visitor's and a player's) takes no ACCEPT, DECLINE,
+--               ESC or B after it opens or shows the next offer of its queue: a double click answers one offer, never
+--               the next one unread (its buttons look off until then)
+--   CardGap     8.7 review: s the card stays away between one offer answered and the next one shown (the switch seen)
 -- The tuning: a piece sells to the game for about a quarter of an hour of showing it (Config.Collection); a player who
 -- lacks it pays 1 – 10 × that, the seller keeps 92 % (at 2 × the game's price: 1.84 ×, so selling to a player makes
 -- sense; at 1 × it is a loss of 8 %, so a sign at the game's price is pointless). A legendary sells to the game for
@@ -7845,6 +7855,11 @@ Config.PlayerTrade = {
 	Tick = 0.5,
 	PromptTag = "TradePrompt",
 	SellerAttribute = "TradeSeller",
+	Ticket = 120, -- 8.7 review
+	Reach = 40,
+	Cooldown = 60,
+	CardArm = 0.6,
+	CardGap = 0.25,
 }
 
 -- 8.3 SANDBOX, the PAINT shop (the owner: give players a way to make their van their own). A 🎨 Paint van prompt on your

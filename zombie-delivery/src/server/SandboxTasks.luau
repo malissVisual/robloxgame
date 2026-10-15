@@ -8,7 +8,9 @@
 --
 -- What counts, from the signals that are there (no polling of the world but Danny's hands, see below):
 --   home, rare  Collection.onChanged: the new pieces in your stock since the last look (once a frame: a van unloaded
---               is one look), and how many of them are Config.SandboxTasks.RareRank or rarer (CollectionRules.tierOf)
+--               is one look), and how many of them are Config.SandboxTasks.RareRank or rarer (CollectionRules.tierOf).
+--               8.7 review: a piece bought from another player never came home: Collection.onTransferred marks its new
+--               uid seen at once (two friends passing one piece back and forth finish no task)
 --   shown       Collection.onChanged: the pieces on your stands now (the best counts)
 --   sell        Collection.onPaid "sale": the money a piece sold for
 --   income      Collection.onPaid "income": what the stands paid (CollectionIncome)
@@ -263,6 +265,14 @@ local function onCollection(player: Player)
 	task.defer(lookAtStock, player)
 end
 
+-- 8.7 review: a deal between players (Collection.transfer, before its onChanged): the buyer's new uid is seen already.
+local function onTransferred(buyer: Player, _seller: Player, entry: Collection.Entry)
+	local seen = stockSeen[buyer]
+	if seen then
+		seen[entry.uid] = true
+	end
+end
+
 local function onPaid(player: Player, kind: string, money: number, paid: Collection.Paid?)
 	local hot = if type(paid) == "table" and type(paid.hot) == "number" then paid.hot else 0 -- (8.3: the market's)
 	if kind == "sale" then
@@ -470,6 +480,7 @@ function SandboxTasks.start()
 	started = true
 	remote.OnServerEvent:Connect(onRequest)
 	Collection.onChanged(onCollection)
+	Collection.onTransferred(onTransferred) -- 8.7 review
 	Collection.onPaid(onPaid)
 	Upgrades.onChanged(onUpgrades)
 	local Moving = require(script.Parent.Moving)

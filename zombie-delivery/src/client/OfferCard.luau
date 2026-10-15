@@ -27,6 +27,10 @@
 --     DECLINE go back on that remote ({ kind = "answer", id, accept }). The same window behaviour: hidden (not declined)
 --     when another window opens, ESC declines. Offers wait in a queue, each with its own clock: the card shows the
 --     oldest ("(+1)" in its title while another waits), the next once it is answered, closed or run out.
+--   * 8.7 review, one offer a click: the card takes no answer (ACCEPT, DECLINE, ESC, B) for Config.PlayerTrade.CardArm s
+--     after it opens or shows another offer, its buttons looking off meanwhile, so a double click (or one ESC that
+--     closes twice) answers the offer it was meant for and never the next one unread; after an answer the next offer
+--     of the queue shows CardGap s later (the card gone a moment, then back with the next one's words).
 -- Presentation only.
 --   OfferCard.start()                         listens (nothing outside the sandbox)
 --   OfferCard.open()                          shows the offer that waits (nothing: none)
@@ -84,6 +88,11 @@ local opened = false
 type Waiting = { offer: Rules.Offer, deadline: number }
 local queue: { Waiting } = {}
 local token = 0 -- one wait loop at a time
+-- 8.7 review: the offer the card shows (another one arms it again), os.clock() it takes answers from, and the
+-- os.clock() the next offer of the queue may show after an answer
+local shownId: string? = nil
+local armedAt = 0
+local nextAt = 0
 
 -- The offer the card shows (or will show), nil for none.
 local function head(): Waiting?
@@ -194,10 +203,30 @@ end
 
 local function hide()
 	opened = false
+	shownId = nil -- (8.7 review: shown again, it is armed again)
 	local card = parts.card
 	if card then
 		Ui.gamepadRelease(card)
 		card.Visible = false
+	end
+end
+
+-- 8.7 review: does it take an answer now (CardArm s after it showed this offer)?
+local function armed(): boolean
+	return os.clock() >= armedAt
+end
+
+-- 8.7 review: its buttons look off until it takes answers.
+local function armLook()
+	local on = armed()
+	for _, name in { "accept", "decline" } do
+		local button = parts[name]
+		if button then
+			button.AutoButtonColor = on
+			button.TextTransparency = if on then 0 else 0.55
+			button.BackgroundTransparency = if on then 0 else 0.45
+			button:SetAttribute("Armed", on)
+		end
 	end
 end
 
@@ -210,6 +239,9 @@ local function answer(accept: boolean)
 		hide()
 		return
 	end
+	if not armed() then
+		return -- (8.7 review: too soon after it showed this offer: a double click's second half, ESC closing twice)
+	end
 	local offer = first.offer
 	table.remove(queue, 1)
 	if offer.player then
@@ -218,6 +250,9 @@ local function answer(accept: boolean)
 		remote:FireServer({ kind = if accept then "accept" else "decline", id = offer.id })
 	end
 	hide()
+	if #queue > 0 then
+		nextAt = os.clock() + Config.PlayerTrade.CardGap -- (8.7 review: the next one a moment later, seen as another)
+	end
 	follow()
 end
 
@@ -324,6 +359,12 @@ end
 
 -- The offer's words on the card (8.7: a player's offer, the others waiting behind it).
 local function paint(offer: Rules.Offer)
+	if offer.id ~= shownId then -- (8.7 review: another offer on the card: no answer for CardArm s)
+		shownId = offer.id
+		armedAt = os.clock() + Config.PlayerTrade.CardArm
+		task.delay(Config.PlayerTrade.CardArm, armLook)
+	end
+	armLook()
 	local lines = Rules.cardLines(offer)
 	parts.title.Text = (if offer.player then "🤝 PLAYER OFFER" else "🤝 OFFER") .. (if #queue > 1 then ` (+{#queue - 1})` else "")
 	parts.who.Text = lines.who
@@ -491,11 +532,12 @@ follow = function()
 				hide()
 				return
 			end
-			if not opened and not isCovered() then
+			if not opened and not isCovered() and os.clock() >= nextAt then -- (8.7 review: CardGap after an answer)
 				OfferCard.open()
 			end
 			if opened then
 				clock()
+				armLook()
 			end
 			task.wait(TICK)
 		end

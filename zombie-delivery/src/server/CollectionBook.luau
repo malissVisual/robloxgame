@@ -6,10 +6,14 @@
 -- found 10, found 20, all the furniture, every collectible, a legendary) pay their reward once each
 -- (profile.collectionBookPaid; PlayerData.addMoney "BookMilestone"), with a toast on the player's screen. The server
 -- decides all of it; the client only asks for the state.
+-- 8.7 review: a piece bought from another player (Collection.onTransferred: server/PlayerTrade.luau's deal) is written
+-- in as bought (CollectionBookRules.record's `bought`): the book shows it, tagged, but it is not found, so no milestone,
+-- no badge and no "New in your book" comes of it; the first one a move brings home makes it found.
 --
---   CollectionBook.record(player, item, condition)   one more `item` came home → true when it is new in the book (the
---                                                    state goes out at the frame's end, then the milestones it reached
---                                                    pay); a piece not in the book or a player not loaded: false
+--   CollectionBook.record(player, item, condition, bought?)   one more `item` came home (8.7 review: `bought`: bought
+--                                                    from a player) → true when it is new in the book (the state goes
+--                                                    out at the frame's end, then the milestones it reached pay); a
+--                                                    piece not in the book, a bought one or a player not loaded: false
 --   CollectionBook.book(player)                      a copy of the player's book (CollectionBookRules.view; nil: not
 --                                                    loaded); CollectionBook.paid(player) the paid milestones' ids
 --   CollectionBook.settle(player)                    pays every milestone reached and not paid yet (→ how many)
@@ -17,7 +21,8 @@
 --                                                    piece found (the milestones it reaches pay, as a player's would),
 --                                                    "clear" the book and its milestones empty (they can pay again)
 --                                                    → what to say
---   CollectionBook.start()                           the remote, the hook on Collection.add, joining and leaving
+--   CollectionBook.start()                           the remote, the hooks on Collection.add and (8.7 review)
+--                                                    Collection.transfer, joining and leaving
 --
 -- The "CollectionBook" remote (Config.Robust.Limits.CollectionBook requests a second; anything but a table with kind
 -- "state" is ignored):
@@ -100,12 +105,12 @@ local function push(player: Player, item: string?)
 	end
 end
 
-function CollectionBook.record(player: Player, item: any, condition: any): boolean
+function CollectionBook.record(player: Player, item: any, condition: any, bought: boolean?): boolean
 	local book = bookOf(player)
 	if not book or not Rules.inBook(item) then
 		return false
 	end
-	local new = Rules.record(book, item, condition)
+	local new = Rules.record(book, item, condition, bought == true)
 	push(player, if new then item else nil)
 	return new
 end
@@ -181,6 +186,9 @@ function CollectionBook.start()
 	remote.OnServerEvent:Connect(onRemote)
 	Collection.onAdded(function(player: Player, entry: any)
 		CollectionBook.record(player, entry.item, entry.condition)
+	end)
+	Collection.onTransferred(function(buyer: Player, _seller: Player, entry: any) -- (8.7 review: bought, never found)
+		CollectionBook.record(buyer, entry.item, entry.condition, true)
 	end)
 	PlayerData.Changed:Connect(onJoined)
 	for _, player in Players:GetPlayers() do

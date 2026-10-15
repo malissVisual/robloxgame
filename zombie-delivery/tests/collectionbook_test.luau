@@ -5,6 +5,9 @@
 -- all the furniture), the admin's fill, the view for the remote (what a remote and a DataStore keep), and the save:
 -- clean (garbage never trusted), cleanPaid, backfill from a stock, fromSave (the migration: only a real save; with the
 -- flag its own, an older one its stock's with nothing paid, a new player's empty; running it twice gives the same).
+-- 8.7 review: a piece bought from another player (record's `bought`): a page marked bought, never a find (counts, due,
+-- reached skip it), found for real once one comes home, kept through view, clean and fromSave (the stock's backfill
+-- leaves it bought), the admin's fill a find.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -206,6 +209,33 @@ Rules.record(part, "sofa", 0.3)
 local added = Rules.fill(part)
 check("fill: every piece not found yet once (67 added, in order), the found ones kept", #added == 67 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 68 and same(part.jukebox, { n = 1, best = 1 }))
 check("… a full book: fill adds nothing", #Rules.fill(part) == 0)
+
+-- ── 8.7 review: a piece bought from another player ───────────────────────
+local shop = Rules.empty()
+check("8.7 review, record bought: a page marked bought, never new; n the copies bought, best the best of them", Rules.record(shop, "jukebox", 0.6, true) == false
+	and same(shop.jukebox, { n = 1, best = 0.6, bought = true }) and Rules.record(shop, "jukebox", 0.9, true) == false and same(shop.jukebox, { n = 2, best = 0.9, bought = true }))
+Rules.record(shop, "oil_painting", 1, true) -- (a legendary)
+local bc = Rules.counts(shop)
+check("… no find: found 0, no collectible, no legendary; isFound false; nothing due, A legendary! not reached", bc.found == 0 and bc.collectibles == 0 and bc.legendary == 0
+	and not Rules.isFound(shop, "jukebox") and #Rules.due(shop, {}) == 0 and not Rules.reached(shop, Rules.milestone("legendary") :: any))
+check("… one brought home after it: found for real (a discovery: n 1, that piece's condition)", Rules.record(shop, "jukebox", 0.4) == true and same(shop.jukebox, { n = 1, best = 0.4 })
+	and Rules.counts(shop).found == 1 and Rules.isFound(shop, "jukebox"))
+check("… one bought after that: the found page as it was", Rules.record(shop, "jukebox", 1, true) == false and same(shop.jukebox, { n = 1, best = 0.4 }))
+local allBought = Rules.empty()
+for _, id in Rules.Pieces do
+	Rules.record(allBought, id, 0, true)
+end
+check("… the whole book bought (the review's farm: $14,250 of milestones an account): found 0, nothing due", Rules.counts(allBought).found == 0 and #Rules.due(allBought, {}) == 0)
+check("… view: the mark goes with the page (what a remote and a DataStore keep)", same(Rules.view(allBought).sofa, { n = 1, best = 0, bought = true }) and storable(Rules.view(allBought)))
+check("… clean: bought kept only as true", same(Rules.clean({ sofa = { n = 2, best = 0.5, bought = true }, tv = { n = 1, best = 1, bought = "yes" }, radio = { n = 1, bought = 1 } }),
+	{ sofa = { n = 2, best = 0.5, bought = true }, tv = { n = 1, best = 1 }, radio = { n = 1, best = 0 } }))
+local boughtStock = CollectionRules.clean({ entries = { { uid = "1-1", item = "jukebox", condition = 0.7 }, { uid = "1-2", item = "sofa", condition = 0.5 } }, nextUid = 3 })
+local fromBought = Rules.fromSave({ money = 500, [Rules.Flag] = true, collectionBook = { jukebox = { n = 1, best = 0.7, bought = true } } }, boughtStock)
+check("… fromSave: a bought page stays bought with its piece in the stock (the backfill only where there is no page)", same(fromBought, { jukebox = { n = 1, best = 0.7, bought = true }, sofa = { n = 1, best = 0.5 } }))
+local filledBought = Rules.empty()
+Rules.record(filledBought, "sofa", 0.2, true)
+Rules.fill(filledBought)
+check("… the admin's FILL BOOK: a bought page found too", Rules.counts(filledBought).found == #Rules.Pieces and same(filledBought.sofa, { n = 1, best = 1 }))
 
 -- ── view, paidList ─────────────────────────────────────────────────────────
 local raw = Rules.empty()

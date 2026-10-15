@@ -16,6 +16,9 @@
 -- same model as a dark silhouette (the ViewportFrame tinted Config.CollectionBook.Silhouette) and "???". Only the cards
 -- on screen get a 3D picture, at most Config.CollectionBook.MaxViews at once (client/WarehouseUi.luau's way: each model
 -- built once, the oldest of MaxModels go); the others show the piece's emoji or a "?".
+-- 8.7 review: a piece only bought from another player (its page's `bought`) has its card as a found one's (its name,
+-- its colours, ×n) with a gold "BOUGHT" tag on its picture, but it is no find: the progress, the tabs' counts and the
+-- milestones skip it (CollectionBookRules.counts / isFound) and the side's hint says so while the book has one.
 -- The HUD's 📖 BOOK chip (client/SandboxHud.luau) and the key Config.CollectionBook.Key (C, not while typing nor on the
 -- start screen) open and close it; ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it. It is
 -- modal: the mouse is free while it is open (a Modal button), a touch screen's buttons are under it. Opening it closes
@@ -56,7 +59,7 @@ local WIN = BOOK.Window
 local K = Theme.Contract
 local C = CardKit.Color
 
-export type Found = { n: number, best: number }
+export type Found = { n: number, best: number, bought: boolean? } -- (8.7 review: bought, only ever bought from a player)
 export type State = { book: { [string]: Found }, paid: { [string]: boolean } }
 export type Layout = {
 	touch: boolean,
@@ -421,7 +424,7 @@ local function stateKey(state: State, layout: Layout): string
 	for _, item in Rules.Pieces do
 		local found = state.book[item]
 		if found then
-			table.insert(parts, `{item}:{found.n}:{found.best}`)
+			table.insert(parts, `{item}:{found.n}:{found.best}{if found.bought then ":bought" else ""}`)
 		end
 	end
 	for _, milestone in Rules.Milestones do
@@ -477,7 +480,12 @@ local function drawSide(frame: any, layout: Layout, state: State)
 		y += rowH + 4
 	end
 	if layout.sideH - y >= 48 then
-		Ui.label(side, "Every piece a move brings home goes into your book. The milestones pay once.", UDim2.fromOffset(w, 40), { Name = "Hint", Position = UDim2.fromOffset(0, y + 6), Font = Theme.Font, TextSize = 11, TextColor3 = C.faint, TextWrapped = true, TextXAlignment = left, TextYAlignment = Enum.TextYAlignment.Top })
+		local bought = false -- (8.7 review: a bought page in the book: the hint says why it doesn't count)
+		for _, found in state.book do
+			bought = bought or found.bought == true
+		end
+		local hint = if bought then "BOUGHT pieces show but don't count: bring one home to find it." else "Every piece a move brings home goes into your book. The milestones pay once."
+		Ui.label(side, hint, UDim2.fromOffset(w, 40), { Name = "Hint", Position = UDim2.fromOffset(0, y + 6), Font = Theme.Font, TextSize = 11, TextColor3 = C.faint, TextWrapped = true, TextXAlignment = left, TextYAlignment = Enum.TextYAlignment.Top })
 	end
 end
 
@@ -490,7 +498,7 @@ local function drawTabs(frame: any, layout: Layout, state: State): any
 		local list = listFor(id)
 		local found = 0
 		for _, item in list do
-			if state.book[item] then
+			if Rules.isFound(state.book, item) then -- (8.7 review: a bought-only page is no find)
 				found += 1
 			end
 		end
@@ -537,8 +545,10 @@ local function drawCard(parent: any, item: string, index: number, layout: Layout
 		BorderSizePixel = 0,
 		Selectable = true, -- (8.3: the gamepad walks the grid; the grid scrolls to the card selected)
 	}, parent)
+	local bought = found ~= nil and found.bought == true -- (8.7 review: shown as found, tagged, no find)
 	frame:SetAttribute("Item", item)
-	frame:SetAttribute("Found", found ~= nil)
+	frame:SetAttribute("Found", found ~= nil and not bought)
+	frame:SetAttribute("Bought", bought)
 	Ui.corner(frame, CARD_CORNER)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if found then accent else K.line, Thickness = 1, Transparency = if not found then 0.85 elseif tier.rank <= 1 then 0.75 else 0.4 }, frame)
 	local picture = Ui.make("Frame", {
@@ -563,6 +573,9 @@ local function drawCard(parent: any, item: string, index: number, layout: Layout
 	local inner = w - 16
 	local y = 4 + layout.picture + 6
 	local left, right = Enum.TextXAlignment.Left, Enum.TextXAlignment.Right
+	if bought then
+		Ui.label(picture, "BOUGHT", UDim2.fromOffset(52, 14), { Name = "Bought", Position = UDim2.new(1, -4, 0, 3), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 10, TextColor3 = C.gold, BackgroundColor3 = K.charcoal, BackgroundTransparency = 0.15, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 3 })
+	end
 	if found then
 		Ui.make("Frame", { Name = "RarityBar", Size = UDim2.new(1, 0, 0, 3), Position = UDim2.new(0, 0, 1, -3), BackgroundColor3 = accent, BorderSizePixel = 0, ZIndex = 3 }, picture)
 		Ui.label(frame, nameOf(item), UDim2.fromOffset(inner, 16), { Name = "PieceName", Position = UDim2.fromOffset(8, y), Font = Theme.HeadingFont, TextSize = 13, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = left })
@@ -717,7 +730,7 @@ local function setState(raw: any)
 		for _, item in Rules.Pieces do
 			local found = raw.book[item]
 			if type(found) == "table" and type(found.n) == "number" and found.n >= 1 and type(found.best) == "number" then
-				book[item] = { n = math.floor(found.n), best = math.clamp(found.best, 0, 1) }
+				book[item] = { n = math.floor(found.n), best = math.clamp(found.best, 0, 1), bought = if found.bought == true then true else nil }
 			end
 		end
 	end
@@ -733,7 +746,7 @@ local function setState(raw: any)
 	local new: { string } = {}
 	if type(raw.new) == "table" then
 		for _, item in raw.new do
-			if book[item] and not table.find(new, item) then
+			if Rules.isFound(book, item) and not table.find(new, item) then
 				table.insert(new, item)
 			end
 		end

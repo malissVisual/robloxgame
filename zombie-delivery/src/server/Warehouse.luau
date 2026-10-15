@@ -38,8 +38,10 @@
 --     every other player "Make an offer" (E, X: the offer composer) and, while the piece carries a sign, "Buy $X" (F, Y:
 --     the buy question). Those two are tagged Config.PlayerTrade.PromptTag with the owner's UserId (SellerAttribute):
 --     client/TradePrompts.luau hides them from the owner, and the server refuses the owner anyway. Each use goes to
---     Warehouse.onTrade (server/SandboxBoot.luau sets it: PlayerTrade.prompt; none: a notice). A piece with a sign
---     shows it on its tag, a third line "🏷 FOR SALE $X" for everybody (the tag a little taller: still under the roof).
+--     Warehouse.onTrade (server/SandboxBoot.luau sets it: PlayerTrade.prompt; none: a notice) with the stand's point
+--     (8.7 review: its prompts' attachment, where PlayerTrade checks the buyer still stands at SEND / BUY). A piece with
+--     a sign shows it on its tag, a third line "🏷 FOR SALE $X" for everybody (the tag a little taller: still under the
+--     roof).
 -- A collection's changes (Collection.onChanged) rebuild only the stands whose piece changed, Config.Warehouse.Rebuild
 -- apart at most; an owner who leaves takes their pieces with them (the plot is FOR RENT again). Nothing runs per frame.
 -- The van's unloading is the moves' (the plot's unload circle); here only its bay is painted.
@@ -51,8 +53,9 @@
 --   Warehouse.terminal(id)      8.1: plot `id`'s UPGRADES desk (its part with the prompt; nil before start)
 --   Warehouse.isOpen(id, i)     8.1: does plot `id`'s stand i stand there (the owner has it)?
 --   Warehouse.level(id)         8.3: the level plot `id`'s warehouse is built at (1 … 5; nil before start)
---   Warehouse.onTrade           8.7: fn(by, owner, stand, action) a trade prompt used: action "price" (the owner's Set
---                               price), "offer" (Make an offer), "buy" (Buy $X) (server/PlayerTrade.luau's prompt)
+--   Warehouse.onTrade           8.7: fn(by, owner, stand, action, spot) a trade prompt used: action "price" (the owner's
+--                               Set price), "offer" (Make an offer), "buy" (Buy $X); spot the stand's point (8.7 review:
+--                               its prompts' attachment's WorldPosition) (server/PlayerTrade.luau's prompt)
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -79,7 +82,7 @@ local SALE_INK = Color3.fromRGB(255, 208, 92) -- 8.7: the FOR SALE line's gold
 
 local Warehouse = {}
 
-Warehouse.onTrade = nil :: ((by: Player, owner: Player, stand: number, action: string) -> ())? -- 8.7 (server/SandboxBoot.luau)
+Warehouse.onTrade = nil :: ((by: Player, owner: Player, stand: number, action: string, spot: Vector3) -> ())? -- 8.7 (server/SandboxBoot.luau)
 
 type Shown = { uid: string, item: string, variant: number, model: Model, height: number }
 type Prompts = {
@@ -605,7 +608,7 @@ local function use(state: PlotState, stand: Stand, by: Player, action: string)
 		elseif not hook then
 			notice:FireClient(by, "Trading isn't open on this server.")
 		else
-			hook(by, owner, stand.index, action)
+			hook(by, owner, stand.index, action, stand.anchor.WorldPosition) -- (8.7 review: + where the stand is)
 		end
 		return
 	end
