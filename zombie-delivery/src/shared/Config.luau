@@ -3674,8 +3674,8 @@ Config.Soundscape = {
 		Tick = 0.1, -- seconds between the looks at the drag
 	},
 	-- 8.1 SANDBOX, the sandbox's own sounds (art/audio/sfx4.ogg's 8.1 part; until it is up their stand-ins, SoundSheet
-	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" on the meadow, in a "warehouse" (its
-	-- building's box, SandboxMap's plot.warehouse) or in the "house" (inside the Old Chalet: the move's interior, its
+	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" on the meadow, in a "warehouse" (8.3:
+	-- its level's building, WarehouseLayout.site) or in the "house" (inside the Old Chalet: the move's interior, its
 	-- state's inside, or the chalet's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience: the
 	-- city's day and night never play here), plays a cowbell far off now and then and sets the room's echo;
 	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.

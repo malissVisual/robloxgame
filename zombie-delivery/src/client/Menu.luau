@@ -65,7 +65,9 @@ end
 -- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
 -- from its other side, up Main Street toward the plots, your plot's warehouse (the player's Plot attribute; the first
 -- plot before the server gave you one; 8.3: the building of its level), your van's spot at its roller door, back down
--- the street.
+-- the street. 8.3: every level's front wall is on the door's line; the shot at it pulls back with the building's
+-- footprint (far 1: the Big Warehouse's 80 × 60, the 8.0 shot: 60 east, 40 up, 87 in front of the door; the Garage
+-- close, the Logistics Center from further off).
 local function sandboxShots(): { { Vector3 } }
 	local house = SandboxMap.House.house
 	local door = SandboxMap.House.door
@@ -73,6 +75,7 @@ local function sandboxShots(): { { Vector3 } }
 	local mine = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 0]
 	local plot = mine or SandboxMap.Plots[1]
 	local w, van = (WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)) or plot).warehouse, plot.vanSpot
+	local front, far = w.z + w.sz / 2, math.sqrt(w.sx * w.sx + w.sz * w.sz) / 100
 	-- (8.1: the house is the owner's Blender house's box, its roof over house.sy; 8.2.1: the big one again, 44 wide:
 	-- the two shots as far out as before 8.1)
 	local chalet = Vector3.new(house.x, house.y + house.sy * 0.8, house.z)
@@ -80,7 +83,7 @@ local function sandboxShots(): { { Vector3 } }
 		{ Vector3.new(house.x + 64, 30, door.z - 70), chalet },
 		{ Vector3.new(house.x - 70, 44, door.z - 110), chalet },
 		{ Vector3.new(turn.x + 40, 70, turn.z - 30), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
-		{ Vector3.new(w.x + 60, 40, van.z + 70), Vector3.new(w.x, w.sy * 0.4, w.z + w.sz / 2) },
+		{ Vector3.new(w.x + 60 * far, 40 * far, front + 87 * far), Vector3.new(w.x, w.sy * 0.4, front) },
 		{ Vector3.new(w.x - 50, 26, van.z + 40), Vector3.new(van.x, van.y + 4, van.z) },
 		{ Vector3.new(turn.x - 30, 60, van.z + 90), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
 	}
@@ -98,6 +101,9 @@ local function fly()
 		camera.CFrame = shot(n)
 		while flying do
 			camera.CameraType = Enum.CameraType.Scriptable
+			if Config.Sandbox.On then
+				shots = sandboxShots() -- (8.3: your plot and warehouse level can come after the start screen)
+			end
 			local tween = TweenService:Create(camera, TweenInfo.new(shotSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = shot(n + 1) })
 			tween:Play()
 			local started = os.clock()
