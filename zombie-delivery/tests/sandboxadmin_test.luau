@@ -165,13 +165,19 @@ for _, zone in zones do
 		end
 	elseif zone.kind == "curb" then
 		curbs += 1
-		local curb = SandboxMap.House.curb
-		if zone.shape ~= "box" or zone.x ~= curb.x or zone.z ~= curb.z or zone.yaw ~= curb.yaw or zone.sx <= 0 or zone.sz <= zone.sx then
+		-- (Jinočany: every house to empty's, in SandboxMap.Houses' order, its name on it)
+		local house = SandboxMap.Houses[curbs]
+		local curb = if house then house.curb else SandboxMap.House.curb
+		if zone.shape ~= "box" or zone.x ~= curb.x or zone.z ~= curb.z or zone.yaw ~= curb.yaw or zone.sx <= 0 or zone.sz <= zone.sx
+			or not house or not string.find(zone.label, string.upper(house.name), 1, true) then
 			table.insert(off2, zone.label)
 		end
 	end
 end
-check("SHOW ZONES: every plot's unload circle at its plot, the house's curb at its spot", unloads == #SandboxMap.Plots and curbs == 1 and #off2 == 0, table.concat(off2, ", "))
+check("SHOW ZONES: every plot's unload circle at its plot, every house's curb at its spot (Jinočany: six, each named)", unloads == #SandboxMap.Plots
+	and curbs == #SandboxMap.Houses and curbs == 6 and #off2 == 0, table.concat(off2, ", "))
+check("…the farmstead's says its van's nose is north, the Linden House's south", string.find(zones[#SandboxMap.Plots + 1].label, "nose north", 1, true) ~= nil
+	and string.find(zones[#SandboxMap.Plots + 2].label, "nose south", 1, true) ~= nil, zones[#SandboxMap.Plots + 2].label)
 
 -- The rate limit -----------------------------------------------------------------------------------------------------
 

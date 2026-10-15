@@ -8,7 +8,7 @@
 --   * the Neon of the house's shell and dress (not the furniture): a face bigger than NeonArea (a lamp looking down,
 --     a pane, the porch's wall of daylight) no brighter than NeonLuma; the lamps' discs small, looking down
 --   * the walls' plaster a warm off-white (luma at most WallLuma), never a white
--- 8.3 the big move: the sandbox's own plans too (HouseLayout's kind "big", Config.Moving.Sandbox.Kind: ten rooms, a
+-- 8.3 the big move: the sandbox's own plans too (HouseLayout's kind "big", the farmstead's Kind in Config.Moving.Sandbox.Houses: ten rooms, a
 -- corridor the house's width, the back door's porch), every room held to the same caps.
 -- Run with tests/run_tests.py.
 local M = require("./ItemMock")
@@ -162,9 +162,9 @@ end
 check(`every house built ({built} of {#seeds})`, built == #seeds)
 print(string.format("     (the houses: the brightest face height %.2f on screen, the darkest floor %.2f, the heaviest room %.1f)", worstPeak, darkest, heaviest))
 
--- 8.3 the big move: the sandbox's big plans (Config.Moving.Sandbox.Kind) under the same caps
+-- 8.3 the big move: the sandbox's big plans (the farmstead's kind, Config.Moving.Sandbox.Houses) under the same caps
 do
-	local kind = Config.Moving.Sandbox.Kind
+	local kind = Config.Moving.Sandbox.Houses.sandbox_house.Kind
 	local bigPeak, bigDark, bigLoad, done = 0, math.huge, 0, 0
 	local bigSeeds = { 1, 2, 3, 4, 5, 6, 7, 8, 83, 2026 }
 	for _, seed in bigSeeds do

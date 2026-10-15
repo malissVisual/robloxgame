@@ -29,7 +29,8 @@
 --                                           stock order), each on the next free stand of 1 … stands
 --   SandboxAdmin.standCount(warehouse)      Config.Warehouse's Stands (a count, or a list of stands), 0 without it
 --   SandboxAdmin.zones()                    SHOW ZONES' fixed marks (shared/SandboxMap.luau): each plot's unload
---                                           circle and the house's curb (a van's footprint at the spot)
+--                                           circle and the houses' curbs (a van's footprint at the spot; Jinočany:
+--                                           every house to empty's, SandboxMap.Houses' order, its name on it)
 
 local SandboxMap = require(script.Parent.SandboxMap)
 
@@ -57,7 +58,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "moves",
 		name = "Moves",
-		hint = "The sandbox house (Moving's admin). REFILL calls a running move off: the next START brings a new seed, the house filled anew. SKIP CLOCK: one minute left. HORDE NOW: the horde comes.",
+		hint = "The sandbox's houses (Moving's admin; Jinočany: six, one on your card). REFILL calls a running move off: the next START brings the next house, filled anew. SKIP CLOCK: one minute left. HORDE NOW: the horde comes.",
 	},
 	{
 		id = "collection",
@@ -72,7 +73,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "debug",
 		name = "Debug",
-		hint = "SHOW ZONES (only on your screen): the plots' unload circles, the house's curb, the display stands and every van's cargo bay.",
+		hint = "SHOW ZONES (only on your screen): the plots' unload circles, the houses' curbs, the display stands and every van's cargo bay.",
 	},
 	{
 		id = "upgrades",
@@ -214,20 +215,23 @@ function SandboxAdmin.zones(): { Zone }
 			sz = 0,
 		})
 	end
-	local curb = SandboxMap.House.curb
-	table.insert(list, {
-		kind = "curb",
-		label = "HOUSE CURB · the van here, nose north",
-		shape = "box",
-		x = curb.x,
-		y = curb.y,
-		z = curb.z,
-		yaw = curb.yaw,
-		r = 0,
-		sx = SandboxAdmin.Van[1],
-		sy = 0.3,
-		sz = SandboxAdmin.Van[2],
-	})
+	local NOSE = { [0] = "north", [90] = "west", [180] = "south", [270] = "east" } :: { [number]: string }
+	for _, house in SandboxMap.Houses do -- (Jinočany: every house to empty's curb, the farmstead's first)
+		local curb = house.curb
+		table.insert(list, {
+			kind = "curb",
+			label = `CURB · {string.upper(house.name)} · the van here, nose {NOSE[curb.yaw % 360] or "out"}`,
+			shape = "box",
+			x = curb.x,
+			y = curb.y,
+			z = curb.z,
+			yaw = curb.yaw,
+			r = 0,
+			sx = SandboxAdmin.Van[1],
+			sy = 0.3,
+			sz = SandboxAdmin.Van[2],
+		})
+	end
 	return list
 end
 

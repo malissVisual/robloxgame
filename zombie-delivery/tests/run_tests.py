@@ -28,6 +28,8 @@ PURE += ("SandboxBadgeRules",)  # 8.3 sandbox, the Roblox badges (tests/sandboxb
 PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown keys kept (tests/saveguard_test.luau, tests/saving_runtime_test.luau)
 PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
 PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
+PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
+PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -352,7 +354,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshServer")')
+    source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 8.9 Jinočany: its server/VillageWorld.luau (the village, the D5, the far view) on the same mock as
+    # VillageWorldServer.luau (tests/villageworld_test.luau), its shared modules the copies above.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "VillageWorld.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "VillageWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     # 8.1: its server/HouseMesh.luau on the same mock as HouseMeshServer.luau (no import there: the chalet stays; DayNight
     # a stand-in), and the owner's Blender house as numbers for the test (HouseArt.luau, from
     # design/blender-house/roblox/ZDCHouseArt.json, house.py's manifest: the box it was made for, its front door's
@@ -384,8 +392,30 @@ with tempfile.TemporaryDirectory() as tmp:
     areas += [("field " + f["kind"], f["rect"]) for f in plan["fields"]] + [("house " + h["id"], h["box"]) for h in plan["houses"] + plan["enter"]]
     lines = ["\t{ name = %s, rect = %s }," % (json.dumps(name, ensure_ascii=False), rect(r)) for name, r in areas]
     trees = ["\t{ %s }," % ", ".join("{ %r, %r }" % (p["x"], p["z"]) for p in t["points"]) for t in plan["treeLines"]]
+    # 8.9: and as the village's entries for tests/villagelooks_test.luau (shared/VillageLooks.luau builds them): every
+    # house (its kind, box, yaw, door, curb, step, one to empty), landmark (kind, rect, step), road, field and tree line
+    # (tests/villageworld_test.luau holds the map's village section to them too).
+    q = lambda text: json.dumps(text, ensure_ascii=False)
+    houses = ["\t{ id = %s, street = %s, kind = %s, box = %s, yaw = %r, door = { x = %r, z = %r, yaw = %r }, curb = { x = %r, z = %r }, step = %r, enter = %s },"
+              % (q(h["id"]), q(h["street"]), q(h["kind"]), rect(h["box"]), h["yaw"], h["door"]["x"], h["door"]["z"], h["door"]["yaw"], h["curb"]["x"], h["curb"]["z"], h["step"],
+                 "true" if h["enter"] else "false") for h in plan["houses"]]
+    marks = ["\t{ id = %s, kind = %s, rect = %s, step = %r }," % (q(l["id"]), q(l["kind"]), rect(l["rect"]), l["step"]) for l in plan["landmarks"]]
+    roads = ["\t{ name = %s, rect = %s, step = %r }," % (q(r["name"]), rect(r["rect"]), r["step"]) for r in plan["roads"]]
+    fields = ["\t{ kind = %s, rect = %s }," % (q(f["kind"]), rect(f["rect"])) for f in plan["fields"]]
+    paths = ["\t{ kind = %s, points = { %s } }," % (q(t["kind"]), ", ".join("{ x = %r, z = %r }" % (p["x"], p["z"]) for p in t["points"])) for t in plan["treeLines"]]
+    # Jinočany step 1 (tests/sandboxhouses_test.luau: SandboxMap's Houses, Roads and Bounds against the plan): its houses
+    # to empty (`enter`: id, name, kind, box, door, curb), every village house's street, kind and box by id, and the
+    # turnaround at the end of Pražská
+    def spot(s):
+        return "{ x = %r, z = %r, yaw = %r }" % (s["x"], s["z"], s["yaw"])
+    enter = ["\t{ id = %s, name = %s, kind = %s, box = %s, door = %s, curb = %s }," % (
+        q(e["id"]), q(e["name"]), q(e["kind"]), rect(e["box"]), spot(e["door"]), spot(e["curb"])) for e in plan["enter"]]
+    village = ["\t[%s] = { street = %s, kind = %s, box = %s }," % (q(h["id"]), q(h["street"]), q(h["kind"]), rect(h["box"])) for h in plan["houses"]]
     open(os.path.join(tmp, "JinocanyPlan.luau"), "w", encoding="utf-8").write(
-        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\n}\n" % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees)))
+        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\nhouses = {\n%s\n},\nlandmarks = {\n%s\n},\nroads = {\n%s\n},\nfields = {\n%s\n},\nlines = {\n%s\n},\n"
+        "enter = {\n%s\n},\nvillage = {\n%s\n},\nturnaround = { x = %r, z = %r, r = %r },\n}\n"
+        % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees), "\n".join(houses), "\n".join(marks), "\n".join(roads), "\n".join(fields), "\n".join(paths),
+           "\n".join(enter), "\n".join(village), plan["turnaround"]["x"], plan["turnaround"]["z"], plan["turnaround"]["r"]))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -792,6 +822,20 @@ def jinocany_names_check():
 if not jinocany_names_check():
     ok = False
 
+# Jinočany step 1: the guide's path along the village's roads has SandboxSteps.MaxPoints points at most; the client's
+# beams (client/SandboxGuide.luau's MAX_POINTS - 1, a number tools/perf/sandbox_count.py reads) are as many.
+def guide_points_check():
+    root = os.path.join(os.path.dirname(HERE), "src")
+    steps = re.search(r"^SandboxSteps\.MaxPoints = (\d+)", open(os.path.join(root, "shared", "SandboxSteps.luau"), encoding="utf-8").read(), re.M)
+    guide = re.search(r"^local MAX_POINTS = (\d+)", open(os.path.join(root, "client", "SandboxGuide.luau"), encoding="utf-8").read(), re.M)
+    good = steps is not None and guide is not None and steps.group(1) == guide.group(1)
+    print("== guide points: " + (f"SandboxSteps.MaxPoints and the guide's MAX_POINTS both {steps.group(1)}" if good else
+                                 f"SandboxSteps.MaxPoints {steps and steps.group(1)} but client/SandboxGuide.luau's MAX_POINTS {guide and guide.group(1)}"))
+    return good
+
+if not guide_points_check():
+    ok = False
+
 # 8.5.1: the server's and the client's BuildStamp equal Config.Version (they find a Studio left with old scripts).
 def build_stamp_check():
     root = os.path.dirname(HERE)
@@ -841,6 +885,13 @@ def audio_length_check():
     return not bad
 
 if not audio_length_check():
+    ok = False
+
+# 8.9 Jinočany: shared/SandboxMap.luau's village section is design/jinocany/plan.json's (tools/village/sandboxmap.py
+# writes it; a plan changed but not written again shows here).
+village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "village", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+print("== village data: " + (village.stdout.strip() or village.stderr.strip())[:200])
+if village.returncode != 0:
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

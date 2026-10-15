@@ -2,13 +2,14 @@
 -- legendaries counted, the ranking and its ties, a row's words, the board's columns) and where the TOP MOVERS board
 -- stands: at the crossroads' south-east corner, its face to the crossroads, its whole footprint on flat meadow clear of
 -- the roads and their shoulders, the turnaround, the plots, the vans' ways, the house's lot and path, the signpost, the
--- lamps, the trees and the wildflowers (SandboxMap and SandboxScenery's numbers), and clear of everything the real
+-- lamps and 8.9 the village's trees (SandboxMap, SandboxScenery and VillageScenery's numbers), and clear of everything the real
 -- server/SandboxWorld.luau builds there (SandboxWorldServer.luau on tools/perf/world-mock.luau: only meadow under it).
 -- The board's own parts inside that footprint: tests/sandboxleaders_runtime_test.luau. Run with tests/run_tests.py.
 local Config = require("./Config")
 local Rules = require("./SandboxLeadersRules")
 local SandboxMap = require("./SandboxMap")
 local SandboxScenery = require("./SandboxScenery")
+local VillageScenery = require("./VillageScenery") -- 8.9: the village's trees
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -212,17 +213,16 @@ end
 
 do
 	local B = SandboxMap.Bounds
-	local inset = SandboxScenery.FenceInset + C.Edge
+	local inset = C.Edge
 	local why: string? = nil
-	local trees = SandboxScenery.trees()
-	local flowers = SandboxScenery.flowers()
+	local trees = VillageScenery.trees()
 	local lamps = SandboxScenery.lamps()
 	local sign = SandboxScenery.Signpost
 	local margin = 3 -- studs past the shoulders, the lamps, the trees: room to walk round the board
 	for _, p in samples(0) do
 		local x, z = p[1], p[2]
 		if x < B.x0 + inset or x > B.x1 - inset or z < B.z0 + inset or z > B.z1 - inset then
-			why = "outside the fence"
+			why = "at the map's edge"
 		end
 		for _, road in SandboxMap.Roads do
 			if SandboxScenery.rectDistance(road :: any, x, z) < RUN + margin then
@@ -257,13 +257,8 @@ do
 			end
 		end
 		for _, t in trees do
-			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < t.canopy + margin then
+			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < t.radius + margin then
 				why = `under the tree at {math.floor(t.x)}, {math.floor(t.z)}`
-			end
-		end
-		for _, f in flowers do
-			if math.sqrt((x - f.x) ^ 2 + (z - f.z) ^ 2) < f.size + 1 then
-				why = `on the wildflowers at {math.floor(f.x)}, {math.floor(f.z)}`
 			end
 		end
 		if math.abs(SandboxScenery.groundAt(x, z) - SandboxMap.GroundTop) > 1e-9 then
@@ -274,7 +269,7 @@ do
 			why = `where SandboxScenery says no ({rule or "a plot"}) at {x}, {z}`
 		end
 	end
-	check("the board's footprint: inside the fence, clear of the roads and their shoulders, the turnaround, the plots, the vans' ways, the house, the signpost, the lamps, the trees and the flowers, on flat meadow", why == nil, why)
+	check("the board's footprint: inside the map's edge, clear of the roads and their shoulders, the turnaround, the plots, the vans' ways, the house, the signpost, the lamps and 8.9 the village's trees, on flat meadow", why == nil, why)
 	check("…and it stands on the meadow's top", spot.y == SandboxMap.GroundTop)
 end
 

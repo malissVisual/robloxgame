@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.8"
+Config.Version = "8.9"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6391,19 +6391,27 @@ Config.CarryGrip = {
 --                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
 --                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
 --                     depth; its front door is Doors[1])
---   Sandbox           8.0 SANDBOX (Config.Sandbox.On; design/sandbox/KONTRAKT.md): in place of Contracts the one house of
---                     shared/SandboxMap.luau (House: its id, name, front door, the van's curb), refilled every move (a new
---                     HouseLayout seed), on the Moving contracts board of every player's plot (SandboxMap plot.board); the
---                     move goes with the player's own van (Config.Sandbox.Van, else Van). No Wall: the drop-off is the
---                     move owner's plot (plot.unload: the van's back inside its circle), where every piece in the van goes
---                     into their warehouse's stock (server/Collection.luau Collection.add: a trip). No pay per piece (the
---                     warehouse earns), no XP; no story. Client / Icon / Address / Blurb: the card's; Time / HordeAt: the
---                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
---                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
---                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay.
---                     8.3 the big move: the one house (The Old Farmstead, the owner's big Blender house, 44 × 14.5 × 34)
---                     empties as a big house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms,
---                     more pieces, a back door), a longer Time (the Sprinter's bed takes it home in several trips)
+--   Sandbox           8.0 SANDBOX (Config.Sandbox.On; design/sandbox/KONTRAKT.md): in place of Contracts the houses of
+--                     shared/SandboxMap.luau (Houses: their ids, names, front doors, the van's curbs), each refilled every
+--                     move (a new HouseLayout seed), on the Moving contracts board of every player's plot (SandboxMap
+--                     plot.board); the move goes with the player's own van (Config.Sandbox.Van, else Van). No Wall: the
+--                     drop-off is the move owner's plot (plot.unload: the van's back inside its circle), where every piece
+--                     in the van goes into their warehouse's stock (server/Collection.luau Collection.add: a trip). No pay
+--                     per piece (the warehouse earns), no XP; no story. Icon: the cards'; HordeAt: the horde (s left);
+--                     Horde: does it come at all; Roam: the zombies round the house while somebody is outside near it (0:
+--                     none). Both off by default: the sandbox's client starts no guns (no Shooting, no Holster), so nothing
+--                     to fight them with; the switches stay.
+--                     8.3 the big move: The Old Farmstead (the owner's big Blender house, 44 × 14.5 × 34) empties as a big
+--                     house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms, more pieces, a back
+--                     door), a longer Time (the Sprinter's bed takes it home in several trips).
+--                     Jinočany step 1 (design/jinocany/NAVRH.md §3): Houses, a contract per house of SandboxMap.Houses (by
+--                     its id; server/Moving.luau's kiosk offers one at a time, never one another player has): Client (a
+--                     made-up Czech family), Address (by its street), Blurb (the card's), Kind (its plan: HouseLayout's
+--                     "big" the farmstead, "house" a family house) and Time (the move's clock, s). Its pieces are its
+--                     Kind's (HouseLayout): a family house Config.Furniture.Spots (18 – 24) and Collectibles.Count (1 – 2),
+--                     19 – 26 pieces worth $5,700 – 14,000 at 90 % (Config.Collection's tuning), the farmstead Big.Spots
+--                     (34 – 40) and Big.Collectibles.Count (2 – 3), 36 – 43 pieces worth $10,200 – 21,300: about half
+--                     as much, so 15 minutes against the farmstead's 25 (tests/sandboxhouses_test.luau checks it)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6494,18 +6502,58 @@ Config.Moving = {
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
-		Client = "The Nováks", -- (Jinočany: a made-up Czech family; The Hubers in the Alps)
 		Icon = "🏡",
-		Address = "the end of Pražská", -- (SandboxMap.House.street, the Jinočany plan's)
-		Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
-		Kind = "big", -- 8.3: the house's plan (shared/HouseLayout.luau's big house, Config.Furniture.Big)
-		Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
+		-- Jinočany step 1: a contract per house of SandboxMap.Houses (its id), the families and numbers made up
+		Houses = {
+			sandbox_house = {
+				Client = "The Nováks", -- (The Hubers in the Alps)
+				Address = "the end of Pražská",
+				Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
+				Kind = "big", -- 8.3: the big house's plan (shared/HouseLayout.luau, Config.Furniture.Big)
+				Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
+			},
+			["Hlavní_n_5"] = {
+				Client = "The Dvořáks",
+				Address = "Hlavní 5",
+				Blurb = "A family house under the old linden. Grandma's things are going to the city: one trip or two home.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Hlavní_s_11"] = {
+				Client = "The Svobodas",
+				Address = "Hlavní 11",
+				Blurb = "The house with the blue gate, sold at last. Empty it before the new owners come.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Školní_e_20"] = {
+				Client = "The Procházkas",
+				Address = "Školní 20",
+				Blurb = "The old schoolmaster's house, full of books and odd old things. Mind the fragile ones.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Lidická_e_30"] = {
+				Client = "The Kučeras",
+				Address = "Lidická 30",
+				Blurb = "A family house with a rose garden. The Kučeras are moving out: bring everything home to your warehouse.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Smetanova_w_84"] = {
+				Client = "The Horáks",
+				Address = "Smetanova 84",
+				Blurb = "The end house of the row on Smetanova, packed to the roof. Narrow doors: lift the big pieces with care.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+		} :: { [string]: { Client: string, Address: string, Blurb: string, Kind: string, Time: number } },
 		HordeAt = 3 * 60,
 		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
 		-- 8.4: a house's seed is a whole number 1 … this (server/Moving.luau rolls it); the one a player's card shows is
 		-- kept in their save until a trip brings something home (server/PlayerData.luau's sandboxHouseSeed: another
-		-- number there is none)
+		-- number there is none); Jinočany: with its house (sandboxHouse, a SandboxMap.Houses id)
 		Seeds = 1073741823,
 	},
 }
@@ -7257,7 +7305,7 @@ Config.Collection = {
 --   HideHold      s G is held to hide the guide or bring it back
 --   OffNote       s the "Guide off" line stays before it fades
 --   InfoSeconds   s a step that only says something (the pieces earn money) shows before it counts as done
---   HouseMargin   studs round the house's lot (SandboxMap.House.lot) that count as "at the house"
+--   HouseMargin   studs round the contract's house's lot (SandboxMap.Houses' lot) that count as "at the house"
 --   Direct        studs: a target closer than this gets a straight path, a farther one goes along the roads
 --   Near          studs: closer than this the path hides (the chevron stays)
 --   ChevronHeight studs over the target the chevron floats
@@ -8178,6 +8226,167 @@ Config.Auction = {
 		Lamp = { Brightness = 0.7, Range = 28, Color = { 255, 226, 180 } :: { number } },
 	},
 	Window = { Width = 720, Height = 430, Tile = 150, TileTouch = 168, TileHeight = 96 },
+}
+
+-- 8.9 SANDBOX, Jinočany (design/jinocany/NAVRH.md, plan.json): the village's looks. shared/VillageLooks.luau builds
+-- the parts from these numbers (tests/villagelooks_test.luau, tools/village/preview.py); 8.9 step 1 is on the map
+-- (server/VillageWorld.luau builds it: Config.VillageWorld).
+-- Colours { r, g, b }; materials are Enum.Material's names.
+--   Palette   every colour of the village: Render (the old houses' and the rows' walls: cream, ochre, light grey, pale
+--             yellow, apricot), Modern (a new build's: white, light grey), Tiles (the clay roofs: red, brick red, brown,
+--             dark brown), the window Frames (white, brown), the Doors, the Fences (wood, painted green, grey), the
+--             chapel's walls and spire, the drugstore's, the D5's, the barrier's and Sýkorka's, the Crops (a field's
+--             ground) and their Rows, each tree kind's trunk and crowns, the far view's
+--   Budget    parts at most: a house of each kind (old; row: each house of a terraced body; modern), Rich (one of the six
+--             houses to empty, a little richer: for a row, its group's parts at most Rich - row more), a tree, each
+--             landmark kind, a field tile with its rows, the far view (Horizon), and Step1: all the parts VillageLooks
+--             gives step 1's village (plan.json's step-1 houses, the rows in groups of four; the step-1 landmarks; the
+--             fields; the tree lines, the orchard and the green's and the pond's trees; the far view: 1,863 today,
+--             VillageLooks.census). The map holds SandboxScenery.Budget (2,500): Step1 leaves Kept for what stays or is
+--             the map's own (tools/perf/sandbox_count.py's projection, 8.8's map: the roads 111 (Pražská, Depot Row,
+--             the turnaround), the farmstead 130, the ground 23, the boundary 4, the lamps and the signpost 37, the
+--             Auction House 101 once it is on: 406; and the village's new roads and lawns)
+--   Chunk     studs: a piece's chunk is "<floor(x / Chunk)>_<floor(z / Chunk)>" of its house's or its own middle (one
+--             Atomic model each, as SandboxScenery's trees); "ground" (field tiles) and "far" (the D5, the far view)
+--             are big, kept on every client (Persistent)
+--   Front     studs: a house's front wall this far in from its box's front edge (its eaves stay inside the box; the
+--             door's face about 1.2 in from plan.json's door)
+--   RowUnit   studs: one house of a terraced row along the street (plan.py's 18)
+--   Facing    the yaw each of plan.json's landmarks looks (SandboxMap's: 0 north, 90 west, 180 south, 270 east): the
+--             chapel and the green to Hlavní, the pond to Pražská, the drugstore to Depot Row, the D5 to the village,
+--             Sýkorka to its car park; Barrier: the barrier stands on plan.json's road Road, Inset studs in from its
+--             west end, Deep deep, looking (Yaw) east
+--   Trees     per kind: Height { min, max } studs, Wide and Tall (the crown's width and height × the tree's height),
+--             Trunk (its thickness × the height)
+--   Lines     studs between two trees of a Windbreak (Mix: its kinds, in turn at random) and of an Alley (fruit
+--             trees); Orchard { across x, across z } between two rows, Edge studs in from its rect
+--   Fields    a field's crop rows: one every Rows studs across it, at most MaxRows
+--   Far       the far view: Reach (studs the far fields reach out of the Bounds)
+export type VillageTree = { Height: { number }, Wide: number, Tall: number, Trunk: number }
+export type VillageTreeLook = { Trunk: { number }, Crowns: { { number } } }
+Config.Village = {
+	Palette = {
+		Render = { { 238, 226, 198 }, { 222, 186, 116 }, { 204, 204, 198 }, { 240, 224, 156 }, { 236, 208, 176 } } :: { { number } },
+		Modern = { { 242, 242, 238 }, { 206, 208, 208 } } :: { { number } },
+		Tiles = { { 172, 74, 52 }, { 150, 62, 46 }, { 122, 78, 58 }, { 98, 66, 52 } } :: { { number } },
+		Plinth = { 128, 126, 120 } :: { number },
+		Frames = { { 244, 242, 236 }, { 110, 76, 52 } } :: { { number } },
+		Glass = { 62, 80, 94 } :: { number },
+		Doors = { { 104, 70, 44 }, { 58, 84, 62 }, { 112, 44, 38 }, { 72, 60, 52 } } :: { { number } },
+		Fences = { { 134, 98, 66 }, { 82, 110, 78 }, { 112, 112, 108 } } :: { { number } },
+		Gate = { 92, 66, 46 } :: { number },
+		Brick = { 152, 80, 60 } :: { number },
+		Concrete = { 170, 168, 162 } :: { number },
+		Trim = { 248, 246, 240 } :: { number },
+		Anthracite = { 58, 62, 66 } :: { number },
+		Larch = { 172, 124, 80 } :: { number },
+		FlatRoof = { 96, 98, 100 } :: { number },
+		Mailbox = { 46, 84, 58 } :: { number },
+		Chapel = { { 246, 244, 236 }, { 236, 204, 112 } } :: { { number } },
+		Spire = { { 96, 140, 120 }, { 70, 74, 80 } } :: { { number } },
+		Slate = { 80, 84, 90 } :: { number },
+		Stone = { 152, 150, 144 } :: { number },
+		Iron = { 52, 54, 58 } :: { number },
+		Gold = { 212, 172, 74 } :: { number },
+		DarkWood = { 74, 52, 38 } :: { number },
+		Bench = { 142, 102, 64 } :: { number },
+		Notice = { 52, 82, 64 } :: { number },
+		Hedge = { 62, 94, 48 } :: { number },
+		Gravel = { 188, 178, 156 } :: { number },
+		Water = { 62, 100, 106 } :: { number },
+		Bank = { 106, 130, 66 } :: { number },
+		Reeds = { 92, 116, 54 } :: { number },
+		Shop = { Wall = { 236, 238, 236 }, Sign = { 30, 130, 122 }, Canopy = { 30, 130, 122 }, Glass = { 92, 124, 138 }, Door = { 70, 100, 112 } } :: { [string]: { number } },
+		Asphalt = { 58, 58, 62 } :: { number },
+		Line = { 236, 236, 228 } :: { number },
+		Grass = { 110, 136, 64 } :: { number },
+		NoiseWall = { { 112, 126, 116 }, { 98, 112, 104 } } :: { { number } },
+		Rail = { 176, 178, 176 } :: { number },
+		Barrier = { Red = { 200, 44, 40 }, White = { 244, 244, 240 }, Lamp = { 255, 150, 30 }, Post = { 210, 210, 206 } } :: { [string]: { number } },
+		Hardware = { Hall = { 184, 188, 192 }, Roof = { 142, 146, 150 }, Sign = { 36, 82, 160 }, Door = { 120, 124, 128 }, Mesh = { 96, 110, 100 }, Bricks = { 168, 78, 56 }, Blocks = { 176, 174, 168 }, Tiles = { 160, 70, 50 }, Bags = { 222, 218, 206 }, Timber = { 206, 172, 120 }, Pallet = { 170, 136, 92 }, Sand = { 214, 190, 140 }, Gravel = { 150, 146, 140 } } :: { [string]: { number } },
+		Crops = { rapeseed = { 226, 198, 46 }, wheat = { 212, 180, 98 }, ploughed = { 116, 88, 62 }, young = { 124, 156, 70 } } :: { [string]: { number } },
+		Rows = { rapeseed = { 196, 176, 40 }, wheat = { 188, 156, 82 }, ploughed = { 92, 68, 48 }, young = { 104, 136, 58 } } :: { [string]: { number } },
+		Trees = {
+			linden = { Trunk = { 92, 80, 68 }, Crowns = { { 78, 116, 50 }, { 88, 124, 54 }, { 70, 106, 46 } } },
+			oak = { Trunk = { 96, 78, 60 }, Crowns = { { 64, 98, 44 }, { 72, 104, 46 }, { 58, 90, 42 } } },
+			birch = { Trunk = { 228, 224, 214 }, Crowns = { { 118, 158, 70 }, { 128, 166, 76 } } },
+			poplar = { Trunk = { 110, 104, 92 }, Crowns = { { 84, 118, 56 }, { 94, 128, 60 } } },
+			willow = { Trunk = { 104, 92, 76 }, Crowns = { { 132, 150, 92 }, { 120, 142, 84 } } },
+			fruit = { Trunk = { 104, 80, 60 }, Crowns = { { 98, 138, 58 }, { 108, 146, 62 }, { 90, 128, 54 } } },
+		} :: { [string]: VillageTreeLook },
+		Far = { Meadow = { 104, 132, 62 }, Trees = { 60, 88, 46 }, Pylon = { 150, 152, 150 }, Wire = { 60, 62, 64 }, Wall = { 226, 220, 204 }, Roof = { 160, 72, 52 } } :: { [string]: { number } },
+	},
+	Budget = {
+		old = 15,
+		row = 15,
+		modern = 15,
+		Rich = 25,
+		tree = 2,
+		chapel = 26,
+		green = 40,
+		pond = 26,
+		shop = 20,
+		motorway = 16,
+		barrier = 14,
+		hardware = 32,
+		field = 11,
+		Horizon = 140,
+		Step1 = 1900,
+		Kept = 600,
+	} :: { [string]: number },
+	Chunk = 128,
+	Front = 1.5,
+	RowUnit = 18,
+	Facing = { chapel = 180, green = 180, pond = 90, shop = 0, motorway = 90, hardware = 180 } :: { [string]: number },
+	Barrier = { Road = "Hornická", Inset = 8, Deep = 6, Yaw = 270 },
+	Trees = {
+		linden = { Height = { 28, 36 }, Wide = 0.62, Tall = 0.66, Trunk = 0.05 },
+		oak = { Height = { 26, 34 }, Wide = 0.74, Tall = 0.6, Trunk = 0.06 },
+		birch = { Height = { 26, 34 }, Wide = 0.36, Tall = 0.64, Trunk = 0.035 },
+		poplar = { Height = { 38, 48 }, Wide = 0.22, Tall = 0.8, Trunk = 0.035 },
+		willow = { Height = { 20, 26 }, Wide = 0.88, Tall = 0.66, Trunk = 0.07 },
+		fruit = { Height = { 12, 16 }, Wide = 0.8, Tall = 0.64, Trunk = 0.07 },
+	} :: { [string]: VillageTree },
+	Lines = { Windbreak = 36, Alley = 26, Mix = { "linden", "oak", "linden", "birch", "poplar" } :: { string }, Orchard = { 36, 32 } :: { number }, Edge = 12 },
+	Fields = { Rows = 16, MaxRows = 10 },
+	Far = { Reach = 1200 },
+}
+
+-- 8.9 SANDBOX, Jinočany step 1 on the map (design/jinocany/NAVRH.md §4): shared/VillageScenery.luau lays
+-- shared/SandboxMap.luau's village (its houses, landmarks, fields, lawns, tree lines and orchard) out with
+-- shared/VillageLooks.luau's art, server/VillageWorld.luau makes the parts (tests/villageworld_test.luau), the D5's cars
+-- are client/VillageTraffic.luau's (this screen's only).
+--   Lawn       the village's lawns' colour and material (SandboxMap.Lawns: the gardens round its houses, a little
+--              greener than the meadow)
+--   Trees      a tree of a tree line or the orchard stands where the map's rules let it (SandboxScenery.treeRule: off
+--              the roads and their 12 studs, the plots, the farmstead, the vans' ways; VillageScenery.treeRule: Keep
+--              studs off a village house's box, a landmark's rect or the Auction House's site); where they say no it
+--              moves off its spot, Step studs at a time across its line (then along it), at most Nudge studs, else it is
+--              left out. Two crowns stay Apart × their radii apart
+--   Shadow     a village part throws a shadow only when it is a mass (solid, not a door nor a trunk: the walls, roofs,
+--              gables, chimneys, the landmarks' bodies) or a tree's crown (the tree's shadow), Low studs tall at least
+--              (a plinth's, a bench's shadow is hardly seen), and big enough for SandboxScenery.Shadow and
+--              RenderBudget's rule
+--   Cars      the D5's cars (client/VillageTraffic.luau): Count in all, Speed studs/s (each its own share of Spread
+--              more or less), Beyond studs past the Bounds they run on the far D5 (VillageLooks.horizon's) before they
+--              go round again unseen; a car is a body (Size: width, height, length) and a cabin on it (Cabin, its
+--              share of the length, a little narrower), in one of Colors; Lanes: the share of a carriageway's width
+--              out from its middle each of its two lanes runs
+export type VillageCars = { Count: number, Speed: number, Spread: number, Beyond: number, Size: { number }, Cabin: { number }, Lanes: number, Colors: { { number } } }
+Config.VillageWorld = {
+	Lawn = { Color = { 104, 148, 62 } :: { number }, Material = "Grass" },
+	Trees = { Step = 4, Nudge = 12, Keep = 3, Apart = 0.85 },
+	Shadow = { Low = 2 },
+	Cars = {
+		Count = 12,
+		Speed = 76,
+		Spread = 0.15,
+		Beyond = 800,
+		Size = { 6.4, 3.4, 14 },
+		Cabin = { 0.55, 2.4 },
+		Lanes = 0.25,
+		Colors = { { 196, 32, 38 }, { 236, 236, 232 }, { 34, 38, 44 }, { 46, 84, 150 }, { 150, 154, 158 }, { 92, 120, 76 }, { 226, 176, 52 } },
+	} :: VillageCars,
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).
