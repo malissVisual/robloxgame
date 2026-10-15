@@ -140,6 +140,13 @@ def stage(tmp: Path, manifest: dict):
     text = (ROOT / "src/server/FurnitureMesh.luau").read_text()
     text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', text)
     (tmp / "FurnitureMesh.luau").write_text(PREFIX + "local game, workspace = M.game, M.workspace\nlocal warn = print\n" + text)
+    # 8.9.1: HouseInterior's server/FixtureMesh.luau (the owner's Blender fixtures), a ServerStorage of its own: no
+    # fixtures import here, so the fixtures keep their parts (tools/fixtures-art/check.py dresses them with one)
+    text = (ROOT / "src/server/FixtureMesh.luau").read_text()
+    text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', text)
+    (tmp / "FixtureMesh.luau").write_text(PREFIX + 'local storage = M.Instance.new("Folder")\n'
+                                          'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
+                                          "local workspace = M.workspace\n" + text)
     shutil.copy(ROOT / "tools/vehicle-preview/roblox-mock.luau", tmp / "rbxmock.luau")
     shutil.copy(ROOT / "tools/fixtures/item-mock.luau", tmp / "ItemMock.luau")
     # Blender's coordinates of each piece's box (furniture.py: the item's cell, the game's x = Blender's -x, y = z, z = y).

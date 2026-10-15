@@ -1,0 +1,6926 @@
+{
+ "details": [
+  {
+   "center": [
+    0.0,
+    0.15,
+    0.15
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Sokl",
+   "size": [
+    4.48,
+    0.3,
+    2.3
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.57,
+    0.1
+   ],
+   "finish": "cabinet",
+   "kind": "counter",
+   "name": "Korpus",
+   "size": [
+    4.5,
+    2.54,
+    2.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.9075,
+    0.05
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Pracovní deska",
+   "size": [
+    4.5,
+    0.135,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.835,
+    -1.25
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Lišta desky",
+   "size": [
+    4.5,
+    0.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    1.1,
+    2.43,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "counter",
+   "name": "Šuplík",
+   "size": [
+    2.14,
+    0.46,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    1.1,
+    1.25,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "counter",
+   "name": "Dvířka",
+   "size": [
+    2.14,
+    1.78,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    1.1,
+    2.43,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.25,
+    1.9,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -1.1,
+    2.43,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "counter",
+   "name": "Šuplík",
+   "size": [
+    2.14,
+    0.46,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -1.1,
+    1.25,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "counter",
+   "name": "Dvířka",
+   "size": [
+    2.14,
+    1.78,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -1.1,
+    2.43,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -0.25,
+    1.9,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.125,
+    0.15
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Sokl",
+   "size": [
+    2.9,
+    0.25,
+    2.3
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.575,
+    0.09
+   ],
+   "finish": "enamel",
+   "kind": "stove",
+   "name": "Tělo sporáku",
+   "size": [
+    2.96,
+    2.65,
+    2.42
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.93,
+    0.09
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Varná deska",
+   "size": [
+    2.9,
+    0.06,
+    2.38
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.94,
+    -1.095
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Rámeček",
+   "size": [
+    2.94,
+    0.045,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.94,
+    1.275
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Rámeček",
+   "size": [
+    2.94,
+    0.045,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    1.47,
+    2.94,
+    0.09
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Rámeček",
+   "size": [
+    0.03,
+    0.045,
+    2.37
+   ]
+  },
+  {
+   "center": [
+    -1.47,
+    2.94,
+    0.09
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Rámeček",
+   "size": [
+    0.03,
+    0.045,
+    2.37
+   ]
+  },
+  {
+   "center": [
+    0.68,
+    2.962,
+    0.1
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Hořák",
+   "size": [
+    0.7,
+    0.04,
+    0.6894
+   ]
+  },
+  {
+   "center": [
+    0.68,
+    2.97,
+    0.1
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Plotýnka",
+   "size": [
+    0.39,
+    0.03,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    -0.68,
+    2.962,
+    0.1
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Hořák",
+   "size": [
+    0.7,
+    0.04,
+    0.6894
+   ]
+  },
+  {
+   "center": [
+    -0.68,
+    2.97,
+    0.1
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Plotýnka",
+   "size": [
+    0.39,
+    0.03,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    0.85,
+    2.62,
+    -1.17
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Ovládací knoflík",
+   "size": [
+    0.22,
+    0.22,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.85,
+    2.66,
+    -1.223
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Ryska",
+   "size": [
+    0.025,
+    0.09,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.62,
+    -1.17
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Ovládací knoflík",
+   "size": [
+    0.22,
+    0.22,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.66,
+    -1.223
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Ryska",
+   "size": [
+    0.025,
+    0.09,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    -0.85,
+    2.62,
+    -1.17
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Ovládací knoflík",
+   "size": [
+    0.22,
+    0.22,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -0.85,
+    2.66,
+    -1.223
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Ryska",
+   "size": [
+    0.025,
+    0.09,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    -0.0,
+    2.4,
+    -1.13
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Lišta",
+   "size": [
+    2.7,
+    0.04,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.27,
+    -1.15
+   ],
+   "finish": "enamel",
+   "kind": "stove",
+   "name": "Dvířka trouby",
+   "size": [
+    2.6,
+    1.9,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.25,
+    -1.19
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "name": "Okénko trouby",
+   "size": [
+    1.7,
+    0.8,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.02,
+    -1.265
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Madlo",
+   "size": [
+    2.0,
+    0.07,
+    0.0666
+   ]
+  },
+  {
+   "center": [
+    0.92,
+    2.02,
+    -1.22
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Držák madla",
+   "size": [
+    0.056,
+    0.056,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -0.92,
+    2.02,
+    -1.22
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "name": "Držák madla",
+   "size": [
+    0.056,
+    0.056,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.15,
+    0.15
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Sokl",
+   "size": [
+    8.98,
+    0.3,
+    2.3
+   ]
+  },
+  {
+   "center": [
+    2.75,
+    1.57,
+    0.1
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Korpus",
+   "size": [
+    3.5,
+    2.54,
+    2.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.3,
+    0.1
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Korpus",
+   "size": [
+    2.0,
+    2.0,
+    2.4
+   ]
+  },
+  {
+   "center": [
+    -2.75,
+    1.57,
+    0.1
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Korpus",
+   "size": [
+    3.5,
+    2.54,
+    2.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.9075,
+    0.05
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Pracovní deska",
+   "size": [
+    9.0,
+    0.135,
+    2.5
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.835,
+    -1.25
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Lišta desky",
+   "size": [
+    9.0,
+    0.28,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    3.3375,
+    2.43,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Šuplík",
+   "size": [
+    2.165,
+    0.46,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    3.3375,
+    1.25,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Dvířka",
+   "size": [
+    2.165,
+    1.78,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    3.3375,
+    2.43,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    2.475,
+    1.9,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    1.1125,
+    2.43,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Slepý šuplík",
+   "size": [
+    2.165,
+    0.46,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    1.1125,
+    1.25,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Dvířka",
+   "size": [
+    2.165,
+    1.78,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    0.25,
+    1.9,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -1.1125,
+    2.43,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Slepý šuplík",
+   "size": [
+    2.165,
+    0.46,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -1.1125,
+    1.25,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Dvířka",
+   "size": [
+    2.165,
+    1.78,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -0.25,
+    1.9,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -3.3375,
+    2.43,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Šuplík",
+   "size": [
+    2.165,
+    0.46,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -3.3375,
+    1.25,
+    -1.13
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "name": "Dvířka",
+   "size": [
+    2.165,
+    1.78,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -3.3375,
+    2.43,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -2.475,
+    1.9,
+    -1.22
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.7,
+    -0.1
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Dřez",
+   "size": [
+    2.0,
+    0.6,
+    1.4
+   ]
+  },
+  {
+   "center": [
+    -1.7,
+    2.9825,
+    -0.1
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Odkapávač",
+   "size": [
+    1.25,
+    0.015,
+    1.3
+   ]
+  },
+  {
+   "center": [
+    -1.3,
+    2.995,
+    -0.1
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Žebro",
+   "size": [
+    0.035,
+    0.01,
+    1.1
+   ]
+  },
+  {
+   "center": [
+    -1.58,
+    2.995,
+    -0.1
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Žebro",
+   "size": [
+    0.035,
+    0.01,
+    1.1
+   ]
+  },
+  {
+   "center": [
+    -1.86,
+    2.995,
+    -0.1
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Žebro",
+   "size": [
+    0.035,
+    0.01,
+    1.1
+   ]
+  },
+  {
+   "center": [
+    -2.14,
+    2.995,
+    -0.1
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Žebro",
+   "size": [
+    0.035,
+    0.01,
+    1.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.005,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Patka baterie",
+   "size": [
+    0.1712,
+    0.06,
+    0.18
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.3428,
+    0.64
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Baterie",
+   "size": [
+    0.0877,
+    0.6755,
+    0.6011
+   ]
+  },
+  {
+   "center": [
+    0.26,
+    3.035,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Kohoutek",
+   "size": [
+    0.11,
+    0.12,
+    0.11
+   ]
+  },
+  {
+   "center": [
+    0.26,
+    3.14,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Křížek",
+   "size": [
+    0.2347,
+    0.035,
+    0.1257
+   ]
+  },
+  {
+   "center": [
+    0.26,
+    3.14,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Křížek",
+   "size": [
+    0.1257,
+    0.035,
+    0.2347
+   ]
+  },
+  {
+   "center": [
+    -0.26,
+    3.035,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Kohoutek",
+   "size": [
+    0.11,
+    0.12,
+    0.11
+   ]
+  },
+  {
+   "center": [
+    -0.26,
+    3.14,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Křížek",
+   "size": [
+    0.2347,
+    0.035,
+    0.1257
+   ]
+  },
+  {
+   "center": [
+    -0.26,
+    3.14,
+    0.9
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "name": "Křížek",
+   "size": [
+    0.1257,
+    0.035,
+    0.2347
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.41,
+    0.1
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Korpus",
+   "size": [
+    4.1,
+    2.58,
+    1.2
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.06,
+    0.065
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Spodní lišta",
+   "size": [
+    4.2,
+    0.12,
+    1.27
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.85,
+    0.0
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Římsa",
+   "size": [
+    4.5,
+    0.3,
+    1.4
+   ]
+  },
+  {
+   "center": [
+    1.0175,
+    1.41,
+    -0.53
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Dvířka",
+   "size": [
+    1.985,
+    2.42,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    0.225,
+    0.45,
+    -0.62
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    -1.0175,
+    1.41,
+    -0.53
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Dvířka",
+   "size": [
+    1.985,
+    2.42,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -0.225,
+    0.45,
+    -0.62
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "name": "Knoflík",
+   "size": [
+    0.12,
+    0.1141,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.5,
+    0.0
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Kryt digestoře",
+   "size": [
+    3.0,
+    5.0,
+    1.8
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.066,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Mřížka",
+   "size": [
+    2.6,
+    0.012,
+    1.42
+   ]
+  },
+  {
+   "center": [
+    1.2,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    0.9,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    0.6,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    0.3,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    -0.3,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    -0.6,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    -0.9,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    -1.2,
+    0.055,
+    0.07
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "name": "Lamela",
+   "size": [
+    0.03,
+    0.02,
+    1.38
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.05,
+    -0.05
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sokl",
+   "size": [
+    6.74,
+    0.1,
+    1.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.74,
+    -0.08
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Truhla",
+   "size": [
+    6.74,
+    1.28,
+    1.16
+   ]
+  },
+  {
+   "center": [
+    2.445,
+    0.75,
+    -0.685
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň",
+   "size": [
+    1.41,
+    0.86,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    0.815,
+    0.75,
+    -0.685
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň",
+   "size": [
+    1.41,
+    0.86,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    -0.815,
+    0.75,
+    -0.685
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň",
+   "size": [
+    1.41,
+    0.86,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    -2.445,
+    0.75,
+    -0.685
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň",
+   "size": [
+    1.41,
+    0.86,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -0.585
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sedák",
+   "size": [
+    6.74,
+    0.12,
+    0.43
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -0.145
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sedák",
+   "size": [
+    6.74,
+    0.12,
+    0.41
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    0.29
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sedák",
+   "size": [
+    6.74,
+    0.12,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.36,
+    0.72
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Opěradlo",
+   "size": [
+    6.74,
+    1.72,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.58,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Lišta opěradla",
+   "size": [
+    6.74,
+    0.16,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.13,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Lišta opěradla",
+   "size": [
+    6.74,
+    0.18,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    3.29,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    1.645,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    -1.645,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    -3.29,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    2.4675,
+    2.355,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň opěradla",
+   "size": [
+    1.485,
+    1.39,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    0.8225,
+    2.355,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň opěradla",
+   "size": [
+    1.485,
+    1.39,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    -0.8225,
+    2.355,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň opěradla",
+   "size": [
+    1.485,
+    1.39,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    -2.4675,
+    2.355,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Výplň opěradla",
+   "size": [
+    1.485,
+    1.39,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.28,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Madlo opěradla",
+   "size": [
+    6.74,
+    0.12,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    3.435,
+    1.7,
+    0.0
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Bočnice",
+   "size": [
+    0.13,
+    3.4,
+    1.6
+   ]
+  },
+  {
+   "center": [
+    -3.435,
+    1.7,
+    0.0
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "name": "Bočnice",
+   "size": [
+    0.13,
+    3.4,
+    1.6
+   ]
+  },
+  {
+   "center": [
+    1.685,
+    1.6,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Polštář",
+   "size": [
+    3.34,
+    0.2,
+    1.2
+   ]
+  },
+  {
+   "center": [
+    2.7287,
+    1.7,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Knoflík polštáře",
+   "size": [
+    0.09,
+    0.0405,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    1.685,
+    1.7,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Knoflík polštáře",
+   "size": [
+    0.09,
+    0.0405,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.6413,
+    1.7,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Knoflík polštáře",
+   "size": [
+    0.09,
+    0.0405,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -1.685,
+    1.6,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Polštář",
+   "size": [
+    3.34,
+    0.2,
+    1.2
+   ]
+  },
+  {
+   "center": [
+    -0.6413,
+    1.7,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Knoflík polštáře",
+   "size": [
+    0.09,
+    0.0405,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -1.685,
+    1.7,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Knoflík polštáře",
+   "size": [
+    0.09,
+    0.0405,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    -2.7287,
+    1.7,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "name": "Knoflík polštáře",
+   "size": [
+    0.09,
+    0.0405,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.05,
+    -0.05
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Sokl",
+   "size": [
+    2.14,
+    0.1,
+    1.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.74,
+    -0.08
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Truhla",
+   "size": [
+    2.14,
+    1.28,
+    1.16
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.75,
+    -0.685
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Výplň",
+   "size": [
+    1.7,
+    0.86,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -0.585
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Sedák",
+   "size": [
+    2.14,
+    0.12,
+    0.43
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -0.145
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Sedák",
+   "size": [
+    2.14,
+    0.12,
+    0.41
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    0.29
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Sedák",
+   "size": [
+    2.14,
+    0.12,
+    0.42
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.36,
+    0.72
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Opěradlo",
+   "size": [
+    2.14,
+    1.72,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.58,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Lišta opěradla",
+   "size": [
+    2.14,
+    0.16,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.13,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Lišta opěradla",
+   "size": [
+    2.14,
+    0.18,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.99,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    -0.99,
+    2.355,
+    0.635
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Sloupek",
+   "size": [
+    0.16,
+    1.39,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.355,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Výplň opěradla",
+   "size": [
+    1.82,
+    1.39,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.28,
+    0.65
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Madlo opěradla",
+   "size": [
+    2.14,
+    0.12,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    1.135,
+    1.7,
+    0.0
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Bočnice",
+   "size": [
+    0.13,
+    3.4,
+    1.6
+   ]
+  },
+  {
+   "center": [
+    -1.135,
+    1.7,
+    0.0
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "name": "Bočnice",
+   "size": [
+    0.13,
+    3.4,
+    1.6
+   ]
+  },
+  {
+   "center": [
+    0.0123,
+    0.06,
+    0.0123
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Police",
+   "size": [
+    2.1754,
+    0.12,
+    2.1754
+   ]
+  },
+  {
+   "center": [
+    0.0114,
+    0.135,
+    0.0114
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Lišta police",
+   "size": [
+    2.1113,
+    0.03,
+    2.1113
+   ]
+  },
+  {
+   "center": [
+    0.2237,
+    0.154,
+    0.2237
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Dečka",
+   "size": [
+    1.5525,
+    0.008,
+    1.5525
+   ]
+  },
+  {
+   "center": [
+    0.62,
+    0.335,
+    0.62
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Svícen",
+   "size": [
+    0.34,
+    0.37,
+    0.3234
+   ]
+  },
+  {
+   "center": [
+    0.62,
+    0.77,
+    0.62
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Svíčka",
+   "size": [
+    0.1236,
+    0.5,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    0.62,
+    1.045,
+    0.62
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Knot",
+   "size": [
+    0.02,
+    0.05,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.82,
+    0.285,
+    -0.12
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Džbánek",
+   "size": [
+    0.27,
+    0.33,
+    0.2568
+   ]
+  },
+  {
+   "center": [
+    0.82,
+    0.3016,
+    -0.2863
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Ucho džbánku",
+   "size": [
+    0.036,
+    0.212,
+    0.1204
+   ]
+  },
+  {
+   "center": [
+    0.7808,
+    0.6904,
+    -0.1143
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0547,
+    0.5211,
+    0.0215
+   ]
+  },
+  {
+   "center": [
+    0.7612,
+    0.95,
+    -0.1081
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.075,
+    0.08,
+    0.0866
+   ]
+  },
+  {
+   "center": [
+    0.7711,
+    0.773,
+    -0.0467
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0917,
+    0.6881,
+    0.1309
+   ]
+  },
+  {
+   "center": [
+    0.7138,
+    1.115,
+    0.0459
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.7678,
+    1.095,
+    0.0181
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.7166,
+    1.075,
+    -0.0145
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.7874,
+    0.8554,
+    -0.0661
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0608,
+    0.8516,
+    0.0913
+   ]
+  },
+  {
+   "center": [
+    0.7647,
+    1.28,
+    -0.0249
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.063,
+    0.0672,
+    0.0727
+   ]
+  },
+  {
+   "center": [
+    0.8397,
+    0.7317,
+    -0.0875
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0353,
+    0.6035,
+    0.0483
+   ]
+  },
+  {
+   "center": [
+    0.8496,
+    1.0725,
+    -0.0653
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Klas",
+   "size": [
+    0.0494,
+    0.156,
+    0.047
+   ]
+  },
+  {
+   "center": [
+    0.8947,
+    0.8138,
+    -0.0722
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.1317,
+    0.7697,
+    0.0914
+   ]
+  },
+  {
+   "center": [
+    0.953,
+    1.1975,
+    -0.031
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.075,
+    0.08,
+    0.0866
+   ]
+  },
+  {
+   "center": [
+    0.881,
+    0.6903,
+    -0.1
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0999,
+    0.5222,
+    0.0443
+   ]
+  },
+  {
+   "center": [
+    0.9563,
+    0.95,
+    -0.0682
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.9171,
+    0.93,
+    -0.1146
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.8969,
+    0.91,
+    -0.0573
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.8487,
+    0.7729,
+    -0.15
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0443,
+    0.686,
+    0.0413
+   ]
+  },
+  {
+   "center": [
+    0.8631,
+    1.115,
+    -0.1617
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.063,
+    0.0672,
+    0.0727
+   ]
+  },
+  {
+   "center": [
+    0.8729,
+    0.8555,
+    -0.195
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0979,
+    0.8526,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    0.9141,
+    1.32,
+    -0.2469
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Klas",
+   "size": [
+    0.0494,
+    0.156,
+    0.047
+   ]
+  },
+  {
+   "center": [
+    0.8248,
+    0.7314,
+    -0.187
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0222,
+    0.6043,
+    0.103
+   ]
+  },
+  {
+   "center": [
+    0.828,
+    1.0325,
+    -0.2297
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.075,
+    0.08,
+    0.0866
+   ]
+  },
+  {
+   "center": [
+    0.7883,
+    0.8141,
+    -0.1466
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0473,
+    0.7684,
+    0.0378
+   ]
+  },
+  {
+   "center": [
+    0.7446,
+    1.1975,
+    -0.1755
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.768,
+    1.1775,
+    -0.1195
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.8046,
+    1.1575,
+    -0.168
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    0.747,
+    0.6911,
+    -0.1748
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.1288,
+    0.524,
+    0.0952
+   ]
+  },
+  {
+   "center": [
+    0.6903,
+    0.95,
+    -0.2136
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.063,
+    0.0672,
+    0.0727
+   ]
+  },
+  {
+   "center": [
+    -0.12,
+    0.285,
+    0.82
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Džbánek",
+   "size": [
+    0.27,
+    0.33,
+    0.2568
+   ]
+  },
+  {
+   "center": [
+    -0.2863,
+    0.3016,
+    0.82
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Ucho džbánku",
+   "size": [
+    0.1204,
+    0.212,
+    0.036
+   ]
+  },
+  {
+   "center": [
+    -0.1381,
+    0.6905,
+    0.8534
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0337,
+    0.5212,
+    0.0491
+   ]
+  },
+  {
+   "center": [
+    -0.1472,
+    0.95,
+    0.8735
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.075,
+    0.08,
+    0.0866
+   ]
+  },
+  {
+   "center": [
+    -0.0914,
+    0.7732,
+    0.9031
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0601,
+    0.6882,
+    0.1461
+   ]
+  },
+  {
+   "center": [
+    -0.0579,
+    1.115,
+    1.0072
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.046,
+    1.095,
+    0.9476
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.1034,
+    1.075,
+    0.9674
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.0963,
+    0.8554,
+    0.8783
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0484,
+    0.8517,
+    0.0973
+   ]
+  },
+  {
+   "center": [
+    -0.0799,
+    1.28,
+    0.9224
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.063,
+    0.0672,
+    0.0727
+   ]
+  },
+  {
+   "center": [
+    -0.0805,
+    0.7316,
+    0.8239
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0551,
+    0.6034,
+    0.0197
+   ]
+  },
+  {
+   "center": [
+    -0.0607,
+    1.0725,
+    0.8317
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Klas",
+   "size": [
+    0.0494,
+    0.156,
+    0.047
+   ]
+  },
+  {
+   "center": [
+    -0.0343,
+    0.8145,
+    0.7903
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.1487,
+    0.7703,
+    0.0562
+   ]
+  },
+  {
+   "center": [
+    0.0324,
+    1.1975,
+    0.7712
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.075,
+    0.08,
+    0.0866
+   ]
+  },
+  {
+   "center": [
+    -0.0647,
+    0.6909,
+    0.7837
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0921,
+    0.5226,
+    0.0606
+   ]
+  },
+  {
+   "center": [
+    0.0035,
+    0.95,
+    0.7463
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.0572,
+    0.93,
+    0.7482
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.0249,
+    0.91,
+    0.7996
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.1239,
+    0.7727,
+    0.778
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0195,
+    0.6857,
+    0.0533
+   ]
+  },
+  {
+   "center": [
+    -0.1259,
+    1.115,
+    0.7603
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.063,
+    0.0672,
+    0.0727
+   ]
+  },
+  {
+   "center": [
+    -0.1441,
+    0.8553,
+    0.7311
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0531,
+    0.8523,
+    0.1481
+   ]
+  },
+  {
+   "center": [
+    -0.1629,
+    1.32,
+    0.6683
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Klas",
+   "size": [
+    0.0494,
+    0.156,
+    0.047
+   ]
+  },
+  {
+   "center": [
+    -0.1678,
+    0.7319,
+    0.7738
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0817,
+    0.6049,
+    0.0743
+   ]
+  },
+  {
+   "center": [
+    -0.2009,
+    1.0325,
+    0.7455
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.075,
+    0.08,
+    0.0866
+   ]
+  },
+  {
+   "center": [
+    -0.1588,
+    0.814,
+    0.8275
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.0544,
+    0.7682,
+    0.0232
+   ]
+  },
+  {
+   "center": [
+    -0.2121,
+    1.1975,
+    0.8454
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.1537,
+    1.1775,
+    0.8619
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.169,
+    1.1575,
+    0.8032
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.0461,
+    0.056,
+    0.0439
+   ]
+  },
+  {
+   "center": [
+    -0.2064,
+    0.6904,
+    0.8422
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "name": "Stonek",
+   "size": [
+    0.1497,
+    0.5236,
+    0.0516
+   ]
+  },
+  {
+   "center": [
+    -0.274,
+    0.95,
+    0.8634
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "name": "Kvítek",
+   "size": [
+    0.063,
+    0.0672,
+    0.0727
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.27,
+    0.0
+   ],
+   "finish": "porcelain",
+   "kind": "tub",
+   "name": "Vana",
+   "size": [
+    7.12,
+    1.86,
+    3.32
+   ]
+  },
+  {
+   "center": [
+    -0.0,
+    1.75,
+    0.0
+   ],
+   "finish": "water",
+   "kind": "tub",
+   "name": "Voda",
+   "size": [
+    6.67,
+    0.0,
+    2.87
+   ]
+  },
+  {
+   "center": [
+    2.45,
+    0.21,
+    -0.78
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Nožka",
+   "size": [
+    0.5,
+    0.42,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    2.45,
+    0.21,
+    0.78
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Nožka",
+   "size": [
+    0.5,
+    0.42,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    0.21,
+    -0.78
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Nožka",
+   "size": [
+    0.5,
+    0.42,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    0.21,
+    0.78
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Nožka",
+   "size": [
+    0.5,
+    0.42,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.36,
+    -0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Sloupek baterie",
+   "size": [
+    0.13,
+    0.32,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.58,
+    -0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Kohoutek",
+   "size": [
+    0.1,
+    0.08,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.64,
+    -0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Křížek",
+   "size": [
+    0.2602,
+    0.04,
+    0.115
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.64,
+    -0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Křížek",
+   "size": [
+    0.1151,
+    0.04,
+    0.2602
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.36,
+    0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Sloupek baterie",
+   "size": [
+    0.13,
+    0.32,
+    0.13
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.58,
+    0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Kohoutek",
+   "size": [
+    0.1,
+    0.08,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.64,
+    0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Křížek",
+   "size": [
+    0.2602,
+    0.04,
+    0.115
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.64,
+    0.3
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Křížek",
+   "size": [
+    0.1151,
+    0.04,
+    0.2602
+   ]
+  },
+  {
+   "center": [
+    3.47,
+    2.5,
+    0.0
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Baterie",
+   "size": [
+    0.1236,
+    0.13,
+    0.64
+   ]
+  },
+  {
+   "center": [
+    3.1646,
+    2.5423,
+    0.0
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "name": "Výtok",
+   "size": [
+    0.676,
+    0.2942,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.81,
+    -0.08
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "name": "Mísa",
+   "size": [
+    1.44,
+    1.62,
+    1.96
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.7,
+    -0.08
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "name": "Prkénko a víko",
+   "size": [
+    1.4,
+    0.16,
+    1.92
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.4,
+    1.11
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "name": "Nádržka",
+   "size": [
+    1.5,
+    1.2,
+    0.56
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.05,
+    1.07
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "name": "Víko nádržky",
+   "size": [
+    1.58,
+    0.1,
+    0.64
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.125,
+    1.07
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "name": "Splachovadlo",
+   "size": [
+    0.2,
+    0.05,
+    0.2
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.55,
+    1.0
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "name": "Hrdlo",
+   "size": [
+    0.7,
+    0.5,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.25,
+    0.15
+   ],
+   "finish": "porcelain",
+   "kind": "basin",
+   "name": "Noha umyvadla",
+   "size": [
+    0.8,
+    2.5,
+    0.624
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.775,
+    0.0
+   ],
+   "finish": "porcelain",
+   "kind": "basin",
+   "name": "Umyvadlo",
+   "size": [
+    2.56,
+    0.65,
+    1.74
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.685,
+    -0.08
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Odtok",
+   "size": [
+    0.1331,
+    0.01,
+    0.14
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.125,
+    0.66
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Patka baterie",
+   "size": [
+    0.1522,
+    0.05,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.29,
+    0.66
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Baterie",
+   "size": [
+    0.1046,
+    0.28,
+    0.11
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.3558,
+    0.4871
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Výtok",
+   "size": [
+    0.064,
+    0.1525,
+    0.3634
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.47,
+    0.76
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Páčka",
+   "size": [
+    0.05,
+    0.1254,
+    0.2685
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.72,
+    0.78
+   ],
+   "finish": "porcelain",
+   "kind": "basin",
+   "name": "Polička",
+   "size": [
+    1.5,
+    0.05,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    0.6,
+    3.64,
+    0.82
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Držák",
+   "size": [
+    0.05,
+    0.12,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -0.6,
+    3.64,
+    0.82
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "name": "Držák",
+   "size": [
+    0.05,
+    0.12,
+    0.16
+   ]
+  },
+  {
+   "center": [
+    -0.42,
+    3.8725,
+    0.78
+   ],
+   "finish": "porcelain",
+   "kind": "basin",
+   "name": "Kelímek",
+   "size": [
+    0.2,
+    0.255,
+    0.1902
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.4,
+    0.8525
+   ],
+   "finish": "porcelain",
+   "kind": "basin",
+   "name": "Rám zrcadla",
+   "size": [
+    2.4,
+    3.0,
+    0.095
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.4,
+    0.865
+   ],
+   "finish": "mirror",
+   "kind": "basin",
+   "name": "Zrcadlo",
+   "size": [
+    2.1,
+    2.7,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.2,
+    0.59
+   ],
+   "finish": "grout",
+   "kind": "kachelofen",
+   "name": "Podstavec",
+   "size": [
+    5.44,
+    0.4,
+    2.02
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.95,
+    0.65
+   ],
+   "finish": "grout",
+   "kind": "kachelofen",
+   "name": "Jádro",
+   "size": [
+    5.2,
+    3.1,
+    1.9
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.95,
+    -0.325
+   ],
+   "finish": "tile",
+   "kind": "kachelofen",
+   "name": "Kachle",
+   "size": [
+    5.16,
+    3.06,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    -2.625,
+    1.95,
+    0.65
+   ],
+   "finish": "tile",
+   "kind": "kachelofen",
+   "name": "Kachle",
+   "size": [
+    0.05,
+    3.06,
+    1.86
+   ]
+  },
+  {
+   "center": [
+    2.625,
+    1.95,
+    0.65
+   ],
+   "finish": "tile",
+   "kind": "kachelofen",
+   "name": "Kachle",
+   "size": [
+    0.05,
+    3.06,
+    1.86
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.625,
+    0.56
+   ],
+   "finish": "tile",
+   "kind": "kachelofen",
+   "name": "Římsa spodní",
+   "size": [
+    5.56,
+    0.25,
+    2.08
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.875,
+    0.9
+   ],
+   "finish": "grout",
+   "kind": "kachelofen",
+   "name": "Jádro",
+   "size": [
+    4.0,
+    2.25,
+    1.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.875,
+    0.175
+   ],
+   "finish": "tile2",
+   "kind": "kachelofen",
+   "name": "Kachle",
+   "size": [
+    3.96,
+    2.21,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    -2.025,
+    4.875,
+    0.9
+   ],
+   "finish": "tile2",
+   "kind": "kachelofen",
+   "name": "Kachle",
+   "size": [
+    0.05,
+    2.21,
+    1.36
+   ]
+  },
+  {
+   "center": [
+    2.025,
+    4.875,
+    0.9
+   ],
+   "finish": "tile2",
+   "kind": "kachelofen",
+   "name": "Kachle",
+   "size": [
+    0.05,
+    2.21,
+    1.36
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    6.3,
+    0.69
+   ],
+   "finish": "tile",
+   "kind": "kachelofen",
+   "name": "Římsa",
+   "size": [
+    4.84,
+    0.6,
+    1.82
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.725,
+    -0.33
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Rám dvířek",
+   "size": [
+    0.98,
+    1.47,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.72,
+    -0.395
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Dvířka topeniště",
+   "size": [
+    0.78,
+    1.06,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.81,
+    -0.44
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Růžice",
+   "size": [
+    0.3,
+    0.3,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    0.41,
+    2.37,
+    -0.4
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Pant",
+   "size": [
+    0.07,
+    0.16,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.41,
+    3.07,
+    -0.4
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Pant",
+   "size": [
+    0.07,
+    0.16,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    -0.25,
+    2.57,
+    -0.45
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Západka",
+   "size": [
+    0.2593,
+    0.115,
+    0.05
+   ]
+  },
+  {
+   "center": [
+    -0.37,
+    2.6,
+    -0.465
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Knoflík západky",
+   "size": [
+    0.09,
+    0.09,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.08,
+    -0.3825
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Průduch",
+   "size": [
+    0.68,
+    0.15,
+    0.025
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.08,
+    -0.375
+   ],
+   "finish": "glow",
+   "kind": "kachelofen",
+   "name": "Žár",
+   "size": [
+    0.6,
+    0.1,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    0.15,
+    2.08,
+    -0.385
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Mřížka průduchu",
+   "size": [
+    0.025,
+    0.1,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.08,
+    -0.385
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Mřížka průduchu",
+   "size": [
+    0.025,
+    0.1,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -0.15,
+    2.08,
+    -0.385
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Mřížka průduchu",
+   "size": [
+    0.025,
+    0.1,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.875,
+    0.13
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Dvířka pícky",
+   "size": [
+    0.66,
+    0.6,
+    0.04
+   ]
+  },
+  {
+   "center": [
+    -0.22,
+    4.875,
+    0.09
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Knoflík pícky",
+   "size": [
+    0.08,
+    0.08,
+    0.08
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.35,
+    -0.72
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Tyč na sušení",
+   "size": [
+    5.0,
+    0.11,
+    0.11
+   ]
+  },
+  {
+   "center": [
+    1.75,
+    4.35,
+    -0.28
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Držák tyče",
+   "size": [
+    0.0381,
+    0.044,
+    0.88
+   ]
+  },
+  {
+   "center": [
+    -1.75,
+    4.35,
+    -0.28
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "name": "Držák tyče",
+   "size": [
+    0.0381,
+    0.044,
+    0.88
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -1.425
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Prkno lavice",
+   "size": [
+    6.0,
+    0.12,
+    0.35
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -1.055
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Prkno lavice",
+   "size": [
+    6.0,
+    0.12,
+    0.35
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.44,
+    -0.69
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Prkno lavice",
+   "size": [
+    6.0,
+    0.12,
+    0.34
+   ]
+  },
+  {
+   "center": [
+    2.82,
+    0.69,
+    -1.05
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Podnož",
+   "size": [
+    0.12,
+    1.38,
+    0.94
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.69,
+    -1.05
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Podnož",
+   "size": [
+    0.12,
+    1.38,
+    0.94
+   ]
+  },
+  {
+   "center": [
+    -2.82,
+    0.69,
+    -1.05
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Podnož",
+   "size": [
+    0.12,
+    1.38,
+    0.94
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.28,
+    -1.5
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Lub",
+   "size": [
+    5.8,
+    0.2,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.55,
+    -1.05
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "name": "Příčka",
+   "size": [
+    5.7,
+    0.12,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.05,
+    -0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Deska ponku",
+   "size": [
+    6.4,
+    0.3,
+    0.598
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.05,
+    -0.3
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Deska ponku",
+   "size": [
+    6.4,
+    0.3,
+    0.598
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.05,
+    0.3
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Deska ponku",
+   "size": [
+    6.4,
+    0.3,
+    0.598
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.05,
+    0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Deska ponku",
+   "size": [
+    6.4,
+    0.3,
+    0.598
+   ]
+  },
+  {
+   "center": [
+    2.9,
+    1.45,
+    -0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Noha",
+   "size": [
+    0.3,
+    2.9,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    2.9,
+    1.45,
+    0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Noha",
+   "size": [
+    0.3,
+    2.9,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    -2.9,
+    1.45,
+    -0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Noha",
+   "size": [
+    0.3,
+    2.9,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    -2.9,
+    1.45,
+    0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Noha",
+   "size": [
+    0.3,
+    2.9,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.76,
+    -0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Lub",
+   "size": [
+    5.5,
+    0.28,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.62,
+    -0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Příčka",
+   "size": [
+    5.5,
+    0.14,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.76,
+    0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Lub",
+   "size": [
+    5.5,
+    0.28,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.62,
+    0.9
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Příčka",
+   "size": [
+    5.5,
+    0.14,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    2.9,
+    2.76,
+    0.0
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Lub",
+   "size": [
+    0.12,
+    0.28,
+    1.5
+   ]
+  },
+  {
+   "center": [
+    2.9,
+    0.62,
+    0.0
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Příčka",
+   "size": [
+    0.1,
+    0.14,
+    1.5
+   ]
+  },
+  {
+   "center": [
+    -2.9,
+    2.76,
+    0.0
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Lub",
+   "size": [
+    0.12,
+    0.28,
+    1.5
+   ]
+  },
+  {
+   "center": [
+    -2.9,
+    0.62,
+    0.0
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Příčka",
+   "size": [
+    0.1,
+    0.14,
+    1.5
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.73,
+    -0.6
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Polička",
+   "size": [
+    5.6,
+    0.08,
+    0.58
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.73,
+    0.0
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Polička",
+   "size": [
+    5.6,
+    0.08,
+    0.58
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.73,
+    0.6
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Polička",
+   "size": [
+    5.6,
+    0.08,
+    0.58
+   ]
+  },
+  {
+   "center": [
+    1.6,
+    1.03,
+    -0.15
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Kufřík",
+   "size": [
+    1.3,
+    0.52,
+    0.62
+   ]
+  },
+  {
+   "center": [
+    1.6,
+    1.31,
+    -0.15
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Víko kufříku",
+   "size": [
+    1.34,
+    0.06,
+    0.66
+   ]
+  },
+  {
+   "center": [
+    1.6,
+    1.4386,
+    -0.15
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Držadlo",
+   "size": [
+    0.7489,
+    0.2147,
+    0.06
+   ]
+  },
+  {
+   "center": [
+    -1.1,
+    1.045,
+    0.1
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Plechovka",
+   "size": [
+    0.4946,
+    0.55,
+    0.52
+   ]
+  },
+  {
+   "center": [
+    -1.75,
+    0.98,
+    0.1
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Plechovka",
+   "size": [
+    0.3804,
+    0.42,
+    0.4
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.35,
+    1.16
+   ],
+   "finish": "board",
+   "kind": "workbench",
+   "name": "Děrovaná deska",
+   "size": [
+    6.0,
+    2.3,
+    0.08
+   ]
+  },
+  {
+   "center": [
+    3.04,
+    4.35,
+    1.155
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rám desky",
+   "size": [
+    0.1,
+    2.3,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    -3.04,
+    4.35,
+    1.155
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rám desky",
+   "size": [
+    0.1,
+    2.3,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.25,
+    1.155
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rám desky",
+   "size": [
+    6.18,
+    0.1,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.45,
+    1.155
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rám desky",
+   "size": [
+    6.18,
+    0.1,
+    0.07
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.36,
+    1.117
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Dírky",
+   "size": [
+    5.47,
+    1.67,
+    0.0
+   ]
+  },
+  {
+   "center": [
+    2.3,
+    4.1,
+    1.06
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Násada kladiva",
+   "size": [
+    0.09,
+    0.95,
+    0.09
+   ]
+  },
+  {
+   "center": [
+    2.3,
+    4.62,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Kladivo",
+   "size": [
+    0.5,
+    0.14,
+    0.12
+   ]
+  },
+  {
+   "center": [
+    1.325,
+    4.59,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Pila",
+   "size": [
+    1.25,
+    0.42,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.5,
+    4.5994,
+    1.06
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rukojeť pily",
+   "size": [
+    0.44,
+    0.5988,
+    0.1
+   ]
+  },
+  {
+   "center": [
+    -0.05,
+    4.71,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Klíč",
+   "size": [
+    0.07,
+    0.78,
+    0.025
+   ]
+  },
+  {
+   "center": [
+    -0.05,
+    4.32,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Očko klíče",
+   "size": [
+    0.1212,
+    0.14,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -0.05,
+    5.12,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Čelist klíče",
+   "size": [
+    0.16,
+    0.1,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -0.3,
+    4.77,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Klíč",
+   "size": [
+    0.07,
+    0.66,
+    0.025
+   ]
+  },
+  {
+   "center": [
+    -0.3,
+    4.44,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Očko klíče",
+   "size": [
+    0.1212,
+    0.14,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -0.3,
+    5.12,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Čelist klíče",
+   "size": [
+    0.16,
+    0.1,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -0.52,
+    4.82,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Klíč",
+   "size": [
+    0.07,
+    0.56,
+    0.025
+   ]
+  },
+  {
+   "center": [
+    -0.52,
+    4.54,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Očko klíče",
+   "size": [
+    0.1212,
+    0.14,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -0.52,
+    5.12,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Čelist klíče",
+   "size": [
+    0.16,
+    0.1,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    4.85,
+    1.063
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rukojeť šroubováku",
+   "size": [
+    0.117,
+    0.36,
+    0.1141
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    4.42,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Šroubovák",
+   "size": [
+    0.036,
+    0.5,
+    0.036
+   ]
+  },
+  {
+   "center": [
+    -1.25,
+    4.85,
+    1.063
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rukojeť šroubováku",
+   "size": [
+    0.117,
+    0.36,
+    0.1141
+   ]
+  },
+  {
+   "center": [
+    -1.25,
+    4.42,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Šroubovák",
+   "size": [
+    0.036,
+    0.5,
+    0.036
+   ]
+  },
+  {
+   "center": [
+    -1.5,
+    4.85,
+    1.063
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "name": "Rukojeť šroubováku",
+   "size": [
+    0.117,
+    0.36,
+    0.1141
+   ]
+  },
+  {
+   "center": [
+    -1.5,
+    4.42,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Šroubovák",
+   "size": [
+    0.036,
+    0.5,
+    0.036
+   ]
+  },
+  {
+   "center": [
+    -2.05,
+    4.5,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Kleště",
+   "size": [
+    0.1844,
+    0.6994,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    -2.05,
+    4.5,
+    1.06
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Kleště",
+   "size": [
+    0.1844,
+    0.6994,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    2.3,
+    4.4733,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    1.6,
+    4.8733,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    0.9,
+    4.8733,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -0.05,
+    5.1733,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -0.3,
+    5.1733,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -0.52,
+    5.1733,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    5.0933,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -1.25,
+    5.0933,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -1.5,
+    5.0933,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -2.05,
+    4.9233,
+    1.0611
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Háček",
+   "size": [
+    0.0242,
+    0.0599,
+    0.1266
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.25,
+    -0.84
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Svěrák",
+   "size": [
+    0.6,
+    0.1,
+    0.62
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.51,
+    -0.62
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Čelist",
+   "size": [
+    0.62,
+    0.42,
+    0.3
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.49,
+    -1.02
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Čelist",
+   "size": [
+    0.62,
+    0.38,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.37,
+    -0.82
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "name": "Vedení",
+   "size": [
+    0.24,
+    0.14,
+    0.2
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.64,
+    -0.785
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Lícnice",
+   "size": [
+    0.62,
+    0.12,
+    0.025
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.64,
+    -0.896
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Lícnice",
+   "size": [
+    0.62,
+    0.12,
+    0.025
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.45,
+    -1.045
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Vřeteno",
+   "size": [
+    0.07,
+    0.07,
+    0.25
+   ]
+  },
+  {
+   "center": [
+    -2.45,
+    3.45,
+    -1.165
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Páka",
+   "size": [
+    0.52,
+    0.044,
+    0.0381
+   ]
+  },
+  {
+   "center": [
+    -2.18,
+    3.45,
+    -1.165
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Kulička",
+   "size": [
+    0.066,
+    0.066,
+    0.066
+   ]
+  },
+  {
+   "center": [
+    -2.72,
+    3.45,
+    -1.165
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "name": "Kulička",
+   "size": [
+    0.066,
+    0.066,
+    0.066
+   ]
+  },
+  {
+   "center": [
+    2.41,
+    3.5,
+    -0.71
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Stojna",
+   "size": [
+    0.18,
+    7.0,
+    0.18
+   ]
+  },
+  {
+   "center": [
+    2.38,
+    0.015,
+    -0.68
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Patka",
+   "size": [
+    0.24,
+    0.03,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    2.41,
+    3.5,
+    0.71
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Stojna",
+   "size": [
+    0.18,
+    7.0,
+    0.18
+   ]
+  },
+  {
+   "center": [
+    2.38,
+    0.015,
+    0.68
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Patka",
+   "size": [
+    0.24,
+    0.03,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -2.41,
+    3.5,
+    -0.71
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Stojna",
+   "size": [
+    0.18,
+    7.0,
+    0.18
+   ]
+  },
+  {
+   "center": [
+    -2.38,
+    0.015,
+    -0.68
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Patka",
+   "size": [
+    0.24,
+    0.03,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    -2.41,
+    3.5,
+    0.71
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Stojna",
+   "size": [
+    0.18,
+    7.0,
+    0.18
+   ]
+  },
+  {
+   "center": [
+    -2.38,
+    0.015,
+    0.68
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Patka",
+   "size": [
+    0.24,
+    0.03,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.4,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Police",
+   "size": [
+    4.99,
+    0.15,
+    1.59
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    2.3,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Police",
+   "size": [
+    4.99,
+    0.15,
+    1.59
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    4.2,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Police",
+   "size": [
+    4.99,
+    0.15,
+    1.59
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    6.1,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Police",
+   "size": [
+    4.99,
+    0.15,
+    1.59
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.35,
+    0.78
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    4.8221,
+    1.9558,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.35,
+    0.78
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    4.8221,
+    1.9558,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.15,
+    0.78
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    4.8221,
+    1.9558,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.15,
+    0.78
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    4.8221,
+    1.9558,
+    0.012
+   ]
+  },
+  {
+   "center": [
+    2.48,
+    1.35,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    2.48,
+    1.35,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    2.48,
+    5.15,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    2.48,
+    5.15,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    -2.48,
+    1.35,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    -2.48,
+    1.35,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    -2.48,
+    5.15,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    -2.48,
+    5.15,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Vzpěra",
+   "size": [
+    0.012,
+    1.9356,
+    1.4483
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    1.075,
+    0.0
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "name": "Přepravka",
+   "size": [
+    1.66,
+    1.2,
+    1.34
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    1.455,
+    -0.665
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "name": "Úchyt",
+   "size": [
+    0.4,
+    0.12,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -1.0,
+    1.455,
+    0.665
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "name": "Úchyt",
+   "size": [
+    0.4,
+    0.12,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    1.25,
+    0.875,
+    0.0
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Krabice",
+   "size": [
+    1.0467,
+    0.8,
+    1.0467
+   ]
+  },
+  {
+   "center": [
+    1.25,
+    1.283,
+    -0.25
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    0.9828,
+    0.02,
+    0.5274
+   ]
+  },
+  {
+   "center": [
+    1.25,
+    1.283,
+    0.25
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    0.9828,
+    0.02,
+    0.5274
+   ]
+  },
+  {
+   "center": [
+    -0.1,
+    2.95,
+    0.0
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Krabice",
+   "size": [
+    1.6,
+    1.15,
+    1.3
+   ]
+  },
+  {
+   "center": [
+    -0.1,
+    3.533,
+    -0.325
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    1.56,
+    0.02,
+    0.63
+   ]
+  },
+  {
+   "center": [
+    -0.1,
+    3.533,
+    0.325
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    1.56,
+    0.02,
+    0.63
+   ]
+  },
+  {
+   "center": [
+    1.6,
+    2.625,
+    -0.1
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Plechovka",
+   "size": [
+    0.48,
+    0.5,
+    0.48
+   ]
+  },
+  {
+   "center": [
+    0.8,
+    4.875,
+    0.0
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "name": "Přepravka",
+   "size": [
+    1.66,
+    1.2,
+    1.34
+   ]
+  },
+  {
+   "center": [
+    0.8,
+    5.255,
+    -0.665
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "name": "Úchyt",
+   "size": [
+    0.4,
+    0.12,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    0.8,
+    5.255,
+    0.665
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "name": "Úchyt",
+   "size": [
+    0.4,
+    0.12,
+    0.02
+   ]
+  },
+  {
+   "center": [
+    -1.3,
+    4.625,
+    0.0
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Krabice",
+   "size": [
+    1.1616,
+    0.7,
+    1.1616
+   ]
+  },
+  {
+   "center": [
+    -1.3,
+    4.983,
+    -0.275
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    1.0899,
+    0.02,
+    0.5926
+   ]
+  },
+  {
+   "center": [
+    -1.3,
+    4.983,
+    0.275
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    1.0899,
+    0.02,
+    0.5926
+   ]
+  },
+  {
+   "center": [
+    -1.5,
+    6.4,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Plechovka",
+   "size": [
+    0.5,
+    0.45,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    -0.85,
+    6.4,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Plechovka",
+   "size": [
+    0.44,
+    0.45,
+    0.44
+   ]
+  },
+  {
+   "center": [
+    1.4,
+    6.4,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "name": "Plechovka",
+   "size": [
+    0.5,
+    0.45,
+    0.5
+   ]
+  },
+  {
+   "center": [
+    0.35,
+    6.45,
+    0.0
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Krabice",
+   "size": [
+    0.9738,
+    0.55,
+    1.0655
+   ]
+  },
+  {
+   "center": [
+    0.35,
+    6.733,
+    -0.25
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    0.8956,
+    0.02,
+    0.5472
+   ]
+  },
+  {
+   "center": [
+    0.35,
+    6.733,
+    0.25
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "name": "Klopa",
+   "size": [
+    0.8956,
+    0.02,
+    0.5472
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.04,
+    0.0
+   ],
+   "finish": "rubber",
+   "kind": "garage_door",
+   "name": "Těsnění",
+   "size": [
+    12.0,
+    0.08,
+    0.22
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.1325,
+    0.02
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Segment",
+   "size": [
+    11.96,
+    2.08,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.12,
+    -0.1175
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Kazety",
+   "size": [
+    11.6,
+    1.72,
+    0.035
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.2375,
+    0.02
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Segment",
+   "size": [
+    11.96,
+    2.08,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    3.225,
+    -0.1175
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Kazety",
+   "size": [
+    11.6,
+    1.72,
+    0.035
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.3425,
+    0.02
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Segment",
+   "size": [
+    11.96,
+    2.08,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    5.33,
+    -0.1175
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Kazety",
+   "size": [
+    11.6,
+    1.72,
+    0.035
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    7.4475,
+    0.02
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Segment",
+   "size": [
+    11.96,
+    2.08,
+    0.24
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    7.435,
+    -0.1175
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "name": "Kazety",
+   "size": [
+    11.6,
+    1.72,
+    0.035
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.125,
+    -0.125
+   ],
+   "finish": "rubber",
+   "kind": "garage_door",
+   "name": "Madlo",
+   "size": [
+    0.048,
+    0.55,
+    0.048
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    0.88,
+    -0.115
+   ],
+   "finish": "rubber",
+   "kind": "garage_door",
+   "name": "Držák madla",
+   "size": [
+    0.0346,
+    0.04,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.37,
+    -0.115
+   ],
+   "finish": "rubber",
+   "kind": "garage_door",
+   "name": "Držák madla",
+   "size": [
+    0.0346,
+    0.04,
+    0.03
+   ]
+  },
+  {
+   "center": [
+    0.0,
+    1.62,
+    -0.115
+   ],
+   "finish": "rubber",
+   "kind": "garage_door",
+   "name": "Zámek",
+   "size": [
+    0.1141,
+    0.12,
+    0.03
+   ]
+  }
+ ],
+ "finishes": {
+  "blackglass": {
+   "color": "#1B1B1E",
+   "material": "SmoothPlastic",
+   "palette": false,
+   "reflectance": 0.12
+  },
+  "board": {
+   "color": "#BEA078",
+   "material": "Cardboard",
+   "palette": false
+  },
+  "cabinet": {
+   "color": "#C69864",
+   "material": "Wood",
+   "palette": false
+  },
+  "candle": {
+   "color": "#F2EAD6",
+   "material": "SmoothPlastic",
+   "palette": false
+  },
+  "card": {
+   "color": "#C49E6C",
+   "material": "Cardboard",
+   "palette": false
+  },
+  "chrome": {
+   "color": "#D7DBDF",
+   "material": "Metal",
+   "palette": false,
+   "reflectance": 0.3
+  },
+  "crate": {
+   "color": "#3C6EAA",
+   "material": "SmoothPlastic",
+   "palette": false
+  },
+  "cushion": {
+   "color": "#B03430",
+   "material": "Fabric",
+   "palette": true
+  },
+  "door": {
+   "color": "#C8CCCE",
+   "material": "Metal",
+   "palette": false
+  },
+  "enamel": {
+   "color": "#EFE7D3",
+   "material": "SmoothPlastic",
+   "palette": false,
+   "reflectance": 0.04
+  },
+  "flower": {
+   "color": "#C4704A",
+   "material": "Fabric",
+   "palette": false
+  },
+  "glow": {
+   "color": "#FF8A3A",
+   "material": "Neon",
+   "palette": false
+  },
+  "grout": {
+   "color": "#D6CDBB",
+   "material": "SmoothPlastic",
+   "palette": false
+  },
+  "iron": {
+   "color": "#302C2A",
+   "material": "Metal",
+   "palette": false
+  },
+  "metal": {
+   "color": "#787E84",
+   "material": "Metal",
+   "palette": false
+  },
+  "mirror": {
+   "color": "#C4D6E0",
+   "material": "Glass",
+   "palette": false,
+   "reflectance": 0.5
+  },
+  "pine": {
+   "color": "#BA8652",
+   "material": "Wood",
+   "palette": true
+  },
+  "porcelain": {
+   "color": "#F4F2EC",
+   "material": "SmoothPlastic",
+   "palette": false,
+   "reflectance": 0.08
+  },
+  "rubber": {
+   "color": "#1E1E20",
+   "material": "Rubber",
+   "palette": false
+  },
+  "steel": {
+   "color": "#B0B6BC",
+   "material": "Metal",
+   "palette": false
+  },
+  "tile": {
+   "color": "#406E54",
+   "material": "SmoothPlastic",
+   "palette": true,
+   "reflectance": 0.05
+  },
+  "tile2": {
+   "color": "#577F68",
+   "material": "SmoothPlastic",
+   "palette": true,
+   "reflectance": 0.05
+  },
+  "vise": {
+   "color": "#3C5A8C",
+   "material": "Metal",
+   "palette": false
+  },
+  "water": {
+   "color": "#86BED8",
+   "material": "Glass",
+   "palette": false,
+   "transparency": 0.35
+  },
+  "wood": {
+   "color": "#AA8052",
+   "material": "Wood",
+   "palette": false
+  },
+  "woodwork": {
+   "color": "#845836",
+   "material": "Wood",
+   "palette": false
+  },
+  "worktop": {
+   "color": "#8E6844",
+   "material": "Wood",
+   "palette": false
+  }
+ },
+ "fixtures": {
+  "basin": {
+   "pieces": [
+    "basin_chrome",
+    "basin_mirror",
+    "basin_porcelain"
+   ],
+   "size": [
+    2.6,
+    3.2,
+    1.8
+   ],
+   "triangles": 1112
+  },
+  "bench": {
+   "pieces": [
+    "bench_pine"
+   ],
+   "size": [
+    2.4,
+    3.4,
+    1.6
+   ],
+   "triangles": 1180
+  },
+  "cabinets": {
+   "pieces": [
+    "cabinets_cabinet"
+   ],
+   "size": [
+    4.5,
+    3.0,
+    1.4
+   ],
+   "triangles": 388
+  },
+  "corner_bench": {
+   "pieces": [
+    "corner_bench_cushion",
+    "corner_bench_pine"
+   ],
+   "size": [
+    7.0,
+    3.4,
+    1.6
+   ],
+   "triangles": 2144
+  },
+  "corner_shelf": {
+   "pieces": [
+    "corner_shelf_candle",
+    "corner_shelf_flower",
+    "corner_shelf_woodwork"
+   ],
+   "size": [
+    2.2,
+    1.4,
+    2.2
+   ],
+   "triangles": 1908
+  },
+  "counter": {
+   "pieces": [
+    "counter_cabinet",
+    "counter_worktop"
+   ],
+   "size": [
+    4.5,
+    3.0,
+    2.6
+   ],
+   "triangles": 784
+  },
+  "garage_door": {
+   "pieces": [
+    "garage_door_door",
+    "garage_door_rubber"
+   ],
+   "size": [
+    12.0,
+    8.5,
+    0.3
+   ],
+   "triangles": 756
+  },
+  "hood": {
+   "pieces": [
+    "hood_steel"
+   ],
+   "size": [
+    3.0,
+    2.2,
+    1.8
+   ],
+   "triangles": 476
+  },
+  "kachelofen": {
+   "pieces": [
+    "kachelofen_glow",
+    "kachelofen_grout",
+    "kachelofen_iron",
+    "kachelofen_pine",
+    "kachelofen_tile",
+    "kachelofen_tile2"
+   ],
+   "size": [
+    6.0,
+    6.6,
+    3.2
+   ],
+   "triangles": 2504
+  },
+  "shelves": {
+   "pieces": [
+    "shelves_card",
+    "shelves_crate",
+    "shelves_metal"
+   ],
+   "size": [
+    5.0,
+    7.0,
+    1.6
+   ],
+   "triangles": 1160
+  },
+  "sink": {
+   "pieces": [
+    "sink_cabinet",
+    "sink_steel",
+    "sink_worktop"
+   ],
+   "size": [
+    9.0,
+    3.0,
+    2.6
+   ],
+   "triangles": 1868
+  },
+  "stove": {
+   "pieces": [
+    "stove_blackglass",
+    "stove_chrome",
+    "stove_enamel"
+   ],
+   "size": [
+    3.0,
+    3.0,
+    2.6
+   ],
+   "triangles": 1460
+  },
+  "toilet": {
+   "pieces": [
+    "toilet_porcelain"
+   ],
+   "size": [
+    1.8,
+    3.2,
+    2.8
+   ],
+   "triangles": 1208
+  },
+  "tub": {
+   "pieces": [
+    "tub_chrome",
+    "tub_porcelain",
+    "tub_water"
+   ],
+   "size": [
+    7.2,
+    2.2,
+    3.4
+   ],
+   "triangles": 1394
+  },
+  "workbench": {
+   "pieces": [
+    "workbench_board",
+    "workbench_steel",
+    "workbench_vise",
+    "workbench_wood"
+   ],
+   "size": [
+    6.4,
+    3.2,
+    2.4
+   ],
+   "triangles": 1720
+  }
+ },
+ "pieces": {
+  "basin_chrome": {
+   "center": [
+    0.0,
+    3.19,
+    0.375
+   ],
+   "finish": "chrome",
+   "kind": "basin",
+   "size": [
+    1.25,
+    1.02,
+    1.05
+   ],
+   "triangles": 340
+  },
+  "basin_mirror": {
+   "center": [
+    0.0,
+    5.4,
+    0.865
+   ],
+   "finish": "mirror",
+   "kind": "basin",
+   "size": [
+    2.1,
+    2.7,
+    0.02
+   ],
+   "triangles": 12
+  },
+  "basin_porcelain": {
+   "center": [
+    0.0,
+    3.45,
+    0.015
+   ],
+   "finish": "porcelain",
+   "kind": "basin",
+   "size": [
+    2.56,
+    6.9,
+    1.77
+   ],
+   "triangles": 760
+  },
+  "bench_pine": {
+   "center": [
+    0.0,
+    1.7,
+    0.0
+   ],
+   "finish": "pine",
+   "kind": "bench",
+   "size": [
+    2.4,
+    3.4,
+    1.6
+   ],
+   "triangles": 1180
+  },
+  "cabinets_cabinet": {
+   "center": [
+    0.0,
+    1.5,
+    0.0
+   ],
+   "finish": "cabinet",
+   "kind": "cabinets",
+   "size": [
+    4.5,
+    3.0,
+    1.4
+   ],
+   "triangles": 388
+  },
+  "corner_bench_cushion": {
+   "center": [
+    0.0,
+    1.6101,
+    -0.17
+   ],
+   "finish": "cushion",
+   "kind": "corner_bench",
+   "size": [
+    6.71,
+    0.2203,
+    1.2
+   ],
+   "triangles": 664
+  },
+  "corner_bench_pine": {
+   "center": [
+    0.0,
+    1.7,
+    0.0
+   ],
+   "finish": "pine",
+   "kind": "corner_bench",
+   "size": [
+    7.0,
+    3.4,
+    1.6
+   ],
+   "triangles": 1480
+  },
+  "corner_shelf_candle": {
+   "center": [
+    0.2237,
+    0.6727,
+    0.2383
+   ],
+   "finish": "candle",
+   "kind": "corner_shelf",
+   "size": [
+    1.5525,
+    1.1055,
+    1.5816
+   ],
+   "triangles": 768
+  },
+  "corner_shelf_flower": {
+   "center": [
+    0.3425,
+    1.1118,
+    0.3429
+   ],
+   "finish": "flower",
+   "kind": "corner_shelf",
+   "size": [
+    1.2959,
+    0.4036,
+    1.2318
+   ],
+   "triangles": 288
+  },
+  "corner_shelf_woodwork": {
+   "center": [
+    0.0123,
+    0.699,
+    0.0123
+   ],
+   "finish": "woodwork",
+   "kind": "corner_shelf",
+   "size": [
+    2.1754,
+    1.398,
+    2.1754
+   ],
+   "triangles": 852
+  },
+  "counter_cabinet": {
+   "center": [
+    0.0,
+    1.57,
+    0.07
+   ],
+   "finish": "cabinet",
+   "kind": "counter",
+   "size": [
+    4.5,
+    2.54,
+    2.46
+   ],
+   "triangles": 204
+  },
+  "counter_worktop": {
+   "center": [
+    0.0,
+    1.4875,
+    0.0
+   ],
+   "finish": "worktop",
+   "kind": "counter",
+   "size": [
+    4.5,
+    2.975,
+    2.6
+   ],
+   "triangles": 580
+  },
+  "garage_door_door": {
+   "center": [
+    0.0,
+    4.29,
+    0.0025
+   ],
+   "finish": "door",
+   "kind": "garage_door",
+   "size": [
+    11.96,
+    8.395,
+    0.275
+   ],
+   "triangles": 608
+  },
+  "garage_door_rubber": {
+   "center": [
+    0.0,
+    0.84,
+    -0.0195
+   ],
+   "finish": "rubber",
+   "kind": "garage_door",
+   "size": [
+    12.0,
+    1.68,
+    0.259
+   ],
+   "triangles": 148
+  },
+  "hood_steel": {
+   "center": [
+    0.0,
+    2.5,
+    0.0
+   ],
+   "finish": "steel",
+   "kind": "hood",
+   "size": [
+    3.0,
+    5.0,
+    1.8
+   ],
+   "triangles": 476
+  },
+  "kachelofen_glow": {
+   "center": [
+    0.0,
+    2.08,
+    -0.375
+   ],
+   "finish": "glow",
+   "kind": "kachelofen",
+   "size": [
+    0.6,
+    0.1,
+    0.012
+   ],
+   "triangles": 12
+  },
+  "kachelofen_grout": {
+   "center": [
+    0.0,
+    3.0,
+    0.59
+   ],
+   "finish": "grout",
+   "kind": "kachelofen",
+   "size": [
+    5.44,
+    6.0,
+    2.02
+   ],
+   "triangles": 52
+  },
+  "kachelofen_iron": {
+   "center": [
+    0.0,
+    3.5825,
+    -0.28
+   ],
+   "finish": "iron",
+   "kind": "kachelofen",
+   "size": [
+    3.5381,
+    3.185,
+    0.88
+   ],
+   "triangles": 528
+  },
+  "kachelofen_pine": {
+   "center": [
+    0.0,
+    2.2025,
+    -1.06
+   ],
+   "finish": "pine",
+   "kind": "kachelofen",
+   "size": [
+    6.0,
+    4.405,
+    1.08
+   ],
+   "triangles": 720
+  },
+  "kachelofen_tile": {
+   "center": [
+    0.0,
+    3.51,
+    0.56
+   ],
+   "finish": "tile",
+   "kind": "kachelofen",
+   "size": [
+    5.56,
+    6.18,
+    2.08
+   ],
+   "triangles": 724
+  },
+  "kachelofen_tile2": {
+   "center": [
+    0.0,
+    4.875,
+    0.865
+   ],
+   "finish": "tile2",
+   "kind": "kachelofen",
+   "size": [
+    4.1,
+    2.21,
+    1.43
+   ],
+   "triangles": 468
+  },
+  "shelves_card": {
+   "center": [
+    -0.0537,
+    3.609,
+    0.0
+   ],
+   "finish": "card",
+   "kind": "shelves",
+   "size": [
+    3.6542,
+    6.268,
+    1.3
+   ],
+   "triangles": 272
+  },
+  "shelves_crate": {
+   "center": [
+    -0.1,
+    2.975,
+    0.0
+   ],
+   "finish": "crate",
+   "kind": "shelves",
+   "size": [
+    3.46,
+    5.0,
+    1.35
+   ],
+   "triangles": 328
+  },
+  "shelves_metal": {
+   "center": [
+    0.0,
+    3.5,
+    0.0
+   ],
+   "finish": "metal",
+   "kind": "shelves",
+   "size": [
+    5.0,
+    7.0,
+    1.6
+   ],
+   "triangles": 560
+  },
+  "sink_cabinet": {
+   "center": [
+    0.0,
+    1.57,
+    0.07
+   ],
+   "finish": "cabinet",
+   "kind": "sink",
+   "size": [
+    9.0,
+    2.54,
+    2.46
+   ],
+   "triangles": 452
+  },
+  "sink_steel": {
+   "center": [
+    -0.6625,
+    3.0403,
+    0.1087
+   ],
+   "finish": "steel",
+   "kind": "sink",
+   "size": [
+    3.325,
+    1.2805,
+    1.8173
+   ],
+   "triangles": 560
+  },
+  "sink_worktop": {
+   "center": [
+    0.0,
+    1.4875,
+    0.0
+   ],
+   "finish": "worktop",
+   "kind": "sink",
+   "size": [
+    9.0,
+    2.975,
+    2.6
+   ],
+   "triangles": 856
+  },
+  "stove_blackglass": {
+   "center": [
+    0.0,
+    1.4925,
+    0.04
+   ],
+   "finish": "blackglass",
+   "kind": "stove",
+   "size": [
+    2.9,
+    2.985,
+    2.52
+   ],
+   "triangles": 688
+  },
+  "stove_chrome": {
+   "center": [
+    -0.0,
+    2.4835,
+    -0.0041
+   ],
+   "finish": "chrome",
+   "kind": "stove",
+   "size": [
+    2.97,
+    0.997,
+    2.5883
+   ],
+   "triangles": 476
+  },
+  "stove_enamel": {
+   "center": [
+    0.0,
+    1.575,
+    0.06
+   ],
+   "finish": "enamel",
+   "kind": "stove",
+   "size": [
+    2.96,
+    2.65,
+    2.48
+   ],
+   "triangles": 296
+  },
+  "toilet_porcelain": {
+   "center": [
+    0.0,
+    1.575,
+    0.165
+   ],
+   "finish": "porcelain",
+   "kind": "toilet",
+   "size": [
+    1.58,
+    3.15,
+    2.45
+   ],
+   "triangles": 1208
+  },
+  "tub_chrome": {
+   "center": [
+    0.4501,
+    1.3447,
+    0.0
+   ],
+   "finish": "chrome",
+   "kind": "tub",
+   "size": [
+    6.3001,
+    2.6894,
+    2.06
+   ],
+   "triangles": 656
+  },
+  "tub_porcelain": {
+   "center": [
+    0.0,
+    1.27,
+    0.0
+   ],
+   "finish": "porcelain",
+   "kind": "tub",
+   "size": [
+    7.12,
+    1.86,
+    3.32
+   ],
+   "triangles": 716
+  },
+  "tub_water": {
+   "center": [
+    -0.0,
+    1.75,
+    0.0
+   ],
+   "finish": "water",
+   "kind": "tub",
+   "size": [
+    6.67,
+    0.0,
+    2.87
+   ],
+   "triangles": 22
+  },
+  "workbench_board": {
+   "center": [
+    0.0,
+    4.35,
+    1.16
+   ],
+   "finish": "board",
+   "kind": "workbench",
+   "size": [
+    6.0,
+    2.3,
+    0.08
+   ],
+   "triangles": 12
+  },
+  "workbench_steel": {
+   "center": [
+    -0.105,
+    2.9866,
+    -0.0368
+   ],
+   "finish": "steel",
+   "kind": "workbench",
+   "size": [
+    5.31,
+    4.4333,
+    2.3224
+   ],
+   "triangles": 592
+  },
+  "workbench_vise": {
+   "center": [
+    -0.0125,
+    2.9825,
+    -0.0165
+   ],
+   "finish": "vise",
+   "kind": "workbench",
+   "size": [
+    5.495,
+    4.425,
+    2.267
+   ],
+   "triangles": 424
+  },
+  "workbench_wood": {
+   "center": [
+    0.0,
+    2.75,
+    0.0
+   ],
+   "finish": "wood",
+   "kind": "workbench",
+   "size": [
+    6.4,
+    5.5,
+    2.398
+   ],
+   "triangles": 692
+  }
+ }
+}

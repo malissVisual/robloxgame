@@ -8,8 +8,9 @@
 --          would do)  "⭐ FILL BEST puts your best pieces on show: open 📦 STOCK"
 -- 8.9, the 8.5 – 8.7 features (each the first time it matters; the auction, 8.8, has none while it is off):
 --   orders 8.5 your clipboard out for the first time (orders mode: your character's ClipboardHeld, server/Clipboard.luau)
---          "📋 Orders mode: click a piece to give it to Danny. Click Danny for his orders. (Q) puts it away." (a gamepad's
---          "R1 by a piece …", "L1 at Danny …", "(B)"; a phone's taps and "Tap 📋 to put it away")
+--          "📋 Orders mode: E or click a piece to give it to Danny. Click Danny for his orders. (Q) puts it
+--          away." (9.0: E too; a gamepad's "R1 by a piece …", "L1 at Danny …", "(B)"; a phone's taps and "Tap 📋 to put
+--          it away")
 --   visit  8.7 you walk into another player's warehouse with a piece of theirs on show (its stand's trade prompts on,
 --          tagged Config.PlayerTrade.PromptTag with their owner's UserId: server/Warehouse.luau's)
 --          "🤝 Like a piece here? Make the owner an offer."
@@ -150,7 +151,8 @@ function SandboxHints.text(id: string, device: SandboxPad.Device): string
 		elseif device == "pad" then
 			return `📋 Orders mode: {SandboxPad.keyWord("dannygive", device)} by a piece gives it to {name}. {SandboxPad.keyWord("danny", device)} at {name} for his orders. ({away}) puts it away.`
 		end
-		return `📋 Orders mode: click a piece to give it to {name}. Click {name} for his orders. ({away}) puts it away.`
+		-- (9.0: E by a piece too, client/DannyOrders.luau's prompts in place of its Pick up)
+		return `📋 Orders mode: {Config.MoveHelper.Clipboard.GiveKey} or click a piece to give it to {name}. Click {name} for his orders. ({away}) puts it away.`
 	elseif id == "visit" then
 		return "🤝 Like a piece here? Make the owner an offer."
 	elseif id == "price" then

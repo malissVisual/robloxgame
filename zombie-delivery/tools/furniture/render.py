@@ -67,6 +67,13 @@ def export(luau: str, tmp: Path, seed: int, farm_seed=None) -> Path:
     text = (ROOT / "src/server/FurnitureMesh.luau").read_text()
     text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', text)
     (tmp / "FurnitureMesh.luau").write_text(PREFIX + "local game, workspace = M.game, M.workspace\n" + text)
+    # 8.9.1: HouseInterior's server/FixtureMesh.luau (the owner's Blender fixtures), a ServerStorage of its own: no
+    # fixtures import here, so the fixtures keep their parts (tools/fixtures-art/check.py dresses them with one)
+    text = (ROOT / "src/server/FixtureMesh.luau").read_text()
+    text = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', text)
+    (tmp / "FixtureMesh.luau").write_text(PREFIX + 'local storage = M.Instance.new("Folder")\n'
+                                          'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
+                                          "local workspace = M.workspace\n" + text)
     shutil.copy(ROOT / "tools/vehicle-preview/roblox-mock.luau", tmp / "rbxmock.luau")
     shutil.copy(ROOT / "tools/fixtures/item-mock.luau", tmp / "ItemMock.luau")
     shutil.copy(HERE / "export.luau", tmp / "export.luau")

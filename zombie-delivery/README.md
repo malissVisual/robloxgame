@@ -174,6 +174,19 @@
 > Lidická 30, Smetanova 84); a player's card holds a house and its seed (`sandboxHouse`, `sandboxHouseKept` in the
 > save), the next card the next free house, two players never the same house; the guide, the chevron, the kiosk and
 > the admin follow the contract's house. `design/sandbox/map.png` drawn again (north up, Czech names).
+>
+> **8.9.1** (the owner: "the kitchen and the bathroom in Blender"): the houses' built-in things in the owner's Blender
+> model **ZDCFixtureArt** (`design/blender-fixtures`, imported once in Studio): the kitchen's counters, stove, sink run,
+> wall cupboards, hood, Eckbank and corner shelf, the bathroom's tub, toilet and basin, the living room's Kachelofen and
+> the garage's workbench, shelving and door (`server/FixtureMesh.luau`; the parts that collide stay, unseen).
+>
+> **8.9.2** (the owner: "the crosshair only when I want to shoot … I want the mouse normally, take the Alt away";
+> "with the clipboard, E should mark for Danny, not pick up"): in the sandbox the mouse is free (`CameraRig.aimOnly`:
+> the cursor shows, no crosshair dot, the right mouse turns the camera, the wheel zooms); the locked aim and its dot
+> come only while a weapon (a Tool) is held (`CameraRig.armed`); no MOUSE [ALT] button, Alt does nothing; the city as
+> before. With Danny's clipboard out, a piece's Pick up / Lift prompts hide on your screen only and **E · Give to
+> Danny** / **Take back** take their place (`client/DannyOrders.luau`; a click still works; doors and the van's Load
+> keep their E; a gamepad keeps R1).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1942,6 +1955,32 @@ server/Moving.luau's WalkIn and travel; the numbers in `Config.Moving.Doors`).
 
 **Tests:** `doorswing_test`, `sandboxworld_test`, `sandboxmove_runtime_test`, `bigdanny_runtime_test` (his way out's
 leaves open), the e2e's steps 4 and 20; `tools/house-art/check.py` checks the leaves and their dressed copies.
+
+## The houses' fixtures in Blender (8.9.1)
+
+The owner asked for the kitchen and the bathroom in Blender. `design/blender-fixtures/fixtures.py` models the 15 kinds
+of fixture `shared/HouseLayout.luau` places, each in its exact box: `counter`, `stove`, `sink`, `cabinets`, `hood`,
+`corner_bench`, `bench`, `corner_shelf`, `tub`, `toilet`, `basin`, `kachelofen`, `workbench`, `shelves` and
+`garage_door` (`design/blender-fixtures/KONTRAKT.md`).
+- **The model:** `roblox/ZDCFixtureArt.fbx` holds 38 pieces `<kind>_<finish>`, about 20,000 triangles. Its markers are
+  `mark_o/x/y/z`, `mark_<kind>` (the fixture's bottom middle) and `mark_<kind>_box` (its box's corner).
+  `roblox/ZDCFixtureArt.json` is its manifest. The owner imports it once in Studio (`NAVOD.md`).
+- **The game:** `server/HouseInterior.luau` builds each fixture of those kinds into a Model `Fixture_<kind>` (attribute
+  `Fixture`) in the interior's Decor. `server/FixtureMesh.luau` then dresses it when the import has that kind and the
+  same box:
+  - the parts that collide stay, unseen, and the rest go, so walking, carrying and Danny's paths are as before;
+  - the model's MeshParts are added, none of them physical;
+  - four finishes take the colours the house rolled: `tile` and `tile2` (the Kachelofen's tiles), `pine` (the
+    benches) and `cushion`.
+  - No import, a fixture of another size, or an import that moved: the parts as before.
+- **The check:** `tools/fixtures-art/check.py <luau>` (run by `tests/run_tests.py`) simulates the import (turned,
+  scaled, moved; a scattered, a mirrored and a wrong-sized copy refused) on real interiors of the house, the big house
+  and the farm. It checks:
+  - every piece in place and inside its box (or its allowed reach: the basin's mirror, the hood's flue, the
+    workbench's pegboard, the taps);
+  - the collisions as before and the part budgets kept;
+  - the Neon small and `FixtureMesh.Looks` equal to the model's finishes (`tools/fixtures-art/looks.py --write`
+    syncs them).
 
 ## The big move (8.4)
 

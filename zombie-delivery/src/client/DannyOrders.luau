@@ -24,9 +24,20 @@
 --     target). A line at the bottom says the mode:
 --     "📋 Pick what Danny carries · Q put away" (the device's words: ClipboardRules.hint) clear of the HUD's groups, the
 --     chips, the move's top blocks (its panel, Danny's status line, the guide's line), the quick chat's button, the move's
---     list, the touch controls and the 📋 button (DannyOrders.layout). It is no window (nothing closes for it, the camera
---     keeps the mouse: the crosshair points) and steps aside while one covers the screen (DannyOrders.covered: Main's,
---     his card open, a grip check): the line, the outline and the 📋 button hidden, R1 and B left to the window.
+--     list, the touch controls and the 📋 button (DannyOrders.layout). It is no window (nothing closes for it; 9.0: the
+--     sandbox's cursor is free, client/CameraRig.luau aimOnly, and points) and steps aside while one covers the screen
+--     (DannyOrders.covered: Main's, his card open, a grip check): the line, the outline and the 📋 button hidden, R1 and
+--     B left to the window.
+--   * 9.0 E gives a piece (the owner: "When I hold the clipboard (Q), the E shouldn't show 'pick up'; E should mark the
+--     piece for Danny"): while it is out the Pick up / Lift / Help lift (and any carry prompt) of your move's pieces
+--     hide on this screen only, through their reach (never Enabled: the server's; client/CarBoarding.luau's way), new
+--     ones too, every look; the moment it goes (put away, a new body, the move's end) each gets its own reach back. In
+--     their place the pieces near you (Clipboard.PromptNear studs, the nearest Clipboard.Prompts) that he can take get
+--     a prompt of this client's on Clipboard.GiveKey (E): "Give to Danny" (green in the outline's rule), "Take back" (on
+--     his list), none when he can't (in the van, his list full, somebody holds it: red); its reach the piece's own, its
+--     object the piece's name. It sends what a click sends (MoveHelperCard.give: onto his list or off it, the server
+--     checks). Made once and moved from piece to piece; parked while a window covers the screen and with a gamepad
+--     (its R1 is MoveHelperCard's prompt on the nearest piece). The doors' prompts and the van's keep their E.
 --   * 8.9 its sounds (art/audio/sfx5.ogg, quiet: client/SandboxSounds.luau event): the clipboard taken out (a paper
 --     rustle and the clip) and put away, whoever did it (your ClipboardHeld changed, looked at with the rest every
 --     Clipboard.Look s: shared/SoundPlan.luau clipboardCue; a new body: none); asked out and refused (the server's
@@ -39,9 +50,12 @@
 --   DannyOrders.covered                     set by client/Main.client.luau: does a window cover the screen now?
 --   DannyOrders.hint(), .button()           the bottom line's frame, the touch button (the checks; nil before built)
 --   DannyOrders.lit() -> (Model?, string?)  the piece outlined now and its words (the checks)
+--   DannyOrders.prompts() -> (gives, muted) 9.0 the "Give to Danny" prompts made so far and the pieces' own prompts
+--                                           hidden now with their reach (copies: the checks)
 --   DannyOrders.layout(W, H, S, touch, blocks, hintW) -> (hint, scale, button?)   where the line (hintW px wide at scale
 --                                           1) and the touch button go (pure; px under Roblox's top bar)
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
@@ -76,6 +90,8 @@ local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (client/Moving
 local KEY = (Enum.KeyCode :: any)[C.Key]
 local OUT_PAD = (Enum.KeyCode :: any)[SandboxPad.pads("clipboard")[1] or "ButtonR1"]
 local AWAY_PAD = (Enum.KeyCode :: any)[SandboxPad.pads("stow")[1] or "ButtonB"]
+local GIVE_KEY = (Enum.KeyCode :: any)[C.GiveKey] -- 9.0 the "Give to Danny" prompts' key (E: the pieces' own)
+local GIVE_PAD = (Enum.KeyCode :: any)[SandboxPad.pads("dannygive")[1] or "ButtonR1"]
 local MARGIN, GAP = 8, 8
 local LEAST = 0.8 -- × the HUD's scale: the line at its smallest (its words need the room)
 -- the HUD's groups (client/CarryGripUi.luau's list) and the sandbox's chips' ScreenGuis (a piece of it, "" every piece)
@@ -94,6 +110,9 @@ local placedKey = "" -- what the last place() was for (placed again when it chan
 local placedAt = 0
 local clipBody: Model? = nil -- 8.9 the body the clipboard was last looked at on …
 local clipWas = false -- … and whether it was out then
+local muted: { [ProximityPrompt]: number } = {} -- 9.0 your move's pieces' own prompts hidden while it is out (their reach)
+local gives: { ProximityPrompt } = {} -- 9.0 the "Give to Danny" prompts (made once, moved round)
+local giveOn: { [ProximityPrompt]: Model } = {} -- 9.0 … the piece each one is on now
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
@@ -328,6 +347,188 @@ local function pointed(): Model?
 		ray = camera:ViewportPointToRay(at.X, at.Y)
 	end
 	return (MoveHelperCard.target(ray.Origin, ray.Direction.Unit)) -- (8.6: a piece, or Danny himself: his orders)
+end
+
+-- ── 9.0 E gives a piece ────────────────────────────────────────────────────
+
+-- The piece of your move a prompt is on (the server's prompts, tagged MovePrompt: its model, the attribute MoveSpot)
+-- when the move is yours or your crew's (MoveOwner: client/MovingHud.luau's rule); nil for any other prompt (a door's,
+-- the van's, another move's, the client's own).
+local function pieceOf(prompt: ProximityPrompt): Model?
+	local root = prompt.Parent
+	local model = if root then root.Parent else nil
+	if not root or not model or not model:IsA("Model") or type(model:GetAttribute("MoveSpot")) ~= "number" then
+		return nil
+	end
+	local owner = prompt:GetAttribute("MoveOwner")
+	if type(owner) ~= "number" or (owner ~= player.UserId and player:GetAttribute("MoveWith") ~= owner) then
+		return nil
+	end
+	return model
+end
+
+-- A piece's own prompt hidden on this screen through its reach (never Enabled: the server switches that, and the
+-- outline above and client/MoveHelperCard.luau read it as the server's word; client/CarBoarding.luau's way),
+-- remembered to give back.
+local function mute(prompt: ProximityPrompt)
+	if muted[prompt] then
+		if prompt.MaxActivationDistance > 0 then
+			prompt.MaxActivationDistance = 0 -- (a reach given back by another hand meanwhile: hidden again, the first kept)
+		end
+		return
+	elseif pieceOf(prompt) == nil or prompt.MaxActivationDistance <= 0 then
+		return -- (no piece's of your move; or hidden already: not your crew's, client/MovingHud.luau)
+	end
+	muted[prompt] = prompt.MaxActivationDistance
+	prompt.MaxActivationDistance = 0
+end
+
+-- Every prompt hidden here back as it was (those still there and still hidden by this).
+local function unmuteAll()
+	for prompt, reach in muted do
+		if prompt.Parent and prompt.MaxActivationDistance == 0 then
+			prompt.MaxActivationDistance = reach
+		end
+	end
+	table.clear(muted)
+end
+
+-- A prompt that can't be moved any more (destroyed with its piece): out of the pool.
+local function drop(prompt: ProximityPrompt)
+	giveOn[prompt] = nil
+	local index = table.find(gives, prompt)
+	if index then
+		table.remove(gives, index)
+	end
+end
+
+-- One "Give to Danny" prompt more (made once, moved from piece to piece, parked out of the world when unused).
+local function newGive(): ProximityPrompt
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "DannyGive"
+	prompt.KeyboardKeyCode = GIVE_KEY
+	prompt.GamepadKeyCode = GIVE_PAD
+	prompt.HoldDuration = 0
+	prompt.RequiresLineOfSight = false
+	prompt.Triggered:Connect(function()
+		local piece = giveOn[prompt]
+		if piece and piece.Parent then
+			MoveHelperCard.give(piece) -- (the click's request: onto his list or off it)
+		end
+	end)
+	prompt.Destroying:Connect(function() -- (its piece destroyed with it: out of the pool)
+		drop(prompt)
+	end)
+	table.insert(gives, prompt)
+	return prompt
+end
+
+type Spot = { piece: Model, root: BasePart, far: number, back: boolean, label: string, reach: number }
+
+-- The prompts on the pieces near you that he can take now or give back (the outline's rule, lookOf: green or orange;
+-- red, nothing), the nearest Clipboard.Prompts; a prompt on a piece still wanted stays where it is.
+local function keepGives(show: boolean)
+	local mine = myRoot()
+	local spots: { Spot } = {}
+	if show and mine then
+		local seen: { [Model]: boolean } = {}
+		for prompt in muted do
+			local piece = pieceOf(prompt)
+			local root = if piece then piece.PrimaryPart else nil
+			if piece and root and not seen[piece] then
+				seen[piece] = true
+				local far = (root.Position - mine.Position).Magnitude
+				if far <= C.PromptNear then
+					local _, tone = lookOf(piece)
+					local own = MoveHelperCard.promptOf(piece)
+					if own and (tone == "give" or tone == "back") then
+						table.insert(spots, { piece = piece, root = root, far = far, back = tone == "back", label = own.ObjectText,
+							reach = muted[own] or Config.Moving.Reach.Item })
+					end
+				end
+			end
+		end
+		table.sort(spots, function(a: Spot, b: Spot): boolean
+			return a.far < b.far
+		end)
+	end
+	local chosen: { [Model]: Spot } = {}
+	for index = 1, math.min(#spots, C.Prompts) do
+		chosen[spots[index].piece] = spots[index]
+	end
+	local placed: { [Model]: ProximityPrompt } = {}
+	local free: { ProximityPrompt } = {}
+	for _, prompt in gives do
+		local piece = giveOn[prompt]
+		local spot = if piece then chosen[piece] else nil
+		if piece and spot and prompt.Parent == spot.root and not placed[piece] then
+			placed[piece] = prompt
+		else
+			table.insert(free, prompt)
+		end
+	end
+	for piece, spot in chosen do
+		local prompt = placed[piece]
+		for _ = 1, if prompt then 0 else #free + 1 do
+			local fresh = table.remove(free) or newGive()
+			if pcall(function()
+				fresh.Parent = spot.root
+			end) then
+				prompt = fresh
+				break
+			end
+			drop(fresh) -- (one its last piece took down with it: the next one, else a new one)
+		end
+		if not prompt then
+			continue
+		end
+		local p = prompt :: ProximityPrompt
+		giveOn[p] = piece
+		local action = if spot.back then "Take back" else `Give to {H.Name}`
+		if p.ActionText ~= action then
+			p.ActionText = action
+		end
+		if p.ObjectText ~= spot.label then
+			p.ObjectText = spot.label
+		end
+		if p.MaxActivationDistance ~= spot.reach then
+			p.MaxActivationDistance = spot.reach
+		end
+		if not p.Enabled then
+			p.Enabled = true
+		end
+	end
+	for _, prompt in free do
+		giveOn[prompt] = nil
+		if prompt.Parent ~= nil then
+			prompt.Parent = nil
+		end
+	end
+end
+
+-- The pieces' own prompts hidden while the clipboard is out (new ones too: a piece streamed in, a carry's G) and given
+-- back the moment it goes (put away, a new body, the move's end); the "Give to Danny" prompts while `give` (nothing
+-- covering the screen, no gamepad: its R1 is client/MoveHelperCard.luau's prompt on the nearest piece).
+local function keepPrompts(on: boolean, give: boolean)
+	if on then
+		for _, tagged in CollectionService:GetTagged("MovePrompt") do
+			if tagged:IsA("ProximityPrompt") then
+				mute(tagged)
+			end
+		end
+		for prompt in muted do
+			if not prompt.Parent then
+				muted[prompt] = nil -- (its piece gone)
+			end
+		end
+	elseif next(muted) ~= nil then
+		unmuteAll()
+	end
+	keepGives(on and give)
+end
+
+function DannyOrders.prompts(): ({ ProximityPrompt }, { [ProximityPrompt]: number })
+	return table.clone(gives), table.clone(muted)
 end
 
 -- ── Its pieces ─────────────────────────────────────────────────────────────
@@ -586,6 +787,7 @@ local function step()
 		end
 	end
 	local hide = covered()
+	keepPrompts(on, hired() and not hide and not Ui.gamepadActive()) -- 9.0: E gives the piece by you, not Pick up
 	local showHint = on and hired() and not hide
 	local showButton = Ui.touchLayout() and not Ui.gamepadActive() and hired() and not hide and (on or mayTake())
 	if showHint or showButton then

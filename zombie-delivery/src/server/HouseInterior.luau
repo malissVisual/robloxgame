@@ -43,6 +43,11 @@
 -- out onto the porch, DoorAngle 90), swung open by every client as you walk up to them (frontLeaves); the big house's
 -- back door's leaf too (the part "BackLeaf": DoorLeaf 1, its +X jamb; sidePorch). Each a PathfindingModifier
 -- PassThrough on its part: Danny's paths through it (swingOut).
+-- 8.9.1 the house's fixtures in the owner's Blender model (design/blender-fixtures/KONTRAKT.md): each fixture of
+-- FixtureMesh.Kinds (the kitchen's, the bathroom's, the Kachelofen, the garage's) is built in its own Model
+-- "Fixture_<kind>" (attribute Fixture) in Decor, and once ZDCFixtureArt is imported server/FixtureMesh.luau dresses it
+-- (its solid parts stay, hidden; without the import, or a fixture of another size, its parts as before). The farm's own
+-- looks (FARM_LOOKS), the rugs, mats, stains, antlers and pictures stay loose in Decor.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -50,6 +55,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local DoorSwing = require(Shared.DoorSwing) -- 8.3 walk-in doors: the front door's leaves swing
 local FurnitureLooks = require(Shared.FurnitureLooks)
+local FixtureMesh = require(script.Parent.FixtureMesh) -- 8.9.1: the fixtures in the owner's Blender model
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
 local LightRules = require(Shared.SandboxLightRules) -- 8.5.2: the rooms' ceiling lamps
@@ -1081,11 +1087,20 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		end
 	end
 
-	-- the fixtures (a farm's own looks first: 7.x the farm)
+	-- the fixtures (a farm's own looks first: 7.x the farm); 8.9.1: one of the owner's Blender model's kinds in its
+	-- own Model, dressed by server/FixtureMesh.luau once the model is imported
 	local farm = plan.kind == "farm"
 	for _, f in plan.fixtures do
-		local look = (farm and FARM_LOOKS[f.kind]) or LOOKS[f.kind]
-		if look then
+		local own: FixtureLook? = if farm then FARM_LOOKS[f.kind] else nil
+		local look = own or LOOKS[f.kind]
+		if look and not own and FixtureMesh.Kinds[f.kind] then
+			local fixture = Instance.new("Model")
+			fixture.Name = "Fixture_" .. f.kind
+			fixture:SetAttribute("Fixture", f.kind)
+			look(fixture, origin * f.at, f.size, roll)
+			fixture.Parent = decor
+			FixtureMesh.dress(fixture, f.kind, origin * f.at, f.size)
+		elseif look then
 			look(decor, origin * f.at, f.size, roll)
 		end
 	end

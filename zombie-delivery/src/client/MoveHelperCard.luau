@@ -80,6 +80,8 @@
 --                                                  8.6 menu: the orders menu's size, rows: the card with its orders row)
 --   MoveHelperCard.promptOf(model)                 8.5 a piece's own Pick up / Lift prompt when it is your move's (nil)
 --   MoveHelperCard.giveTarget()                    8.5 the piece the gamepad's "Give to Danny" is on (nil: none)
+--   MoveHelperCard.give(piece)                     9.0 E by a piece in orders mode (client/DannyOrders.luau's prompts):
+--                                                  the click's request (onto his list or off it), its tick or the nope
 --   MoveHelperCard.tapped() -> (Model?, number)    8.5 the piece a click or a tap last gave or took back, and when
 --                                                  (os.clock())
 --   MoveHelperCard.justClosed()                    8.5 it closed a moment ago (the gamepad's B that closed it is not
@@ -479,6 +481,14 @@ local function given(piece: Model)
 	answer(function(): string?
 		return SoundPlan.giveOutcome(was, piece:GetAttribute("DannyQueue") ~= nil)
 	end)
+end
+
+-- 9.0 E by a piece in orders mode (client/DannyOrders.luau's "Give to Danny" / "Take back" prompts): the same request
+-- as a click on it (onto his list or off it; the server checks), only while a click there would give it.
+function MoveHelperCard.give(piece: Model)
+	if mayAct() and hired() and orders() and not opened then
+		given(piece) -- (8.9: its tick or the nope)
+	end
 end
 
 function MoveHelperCard.ordered(kind: string)

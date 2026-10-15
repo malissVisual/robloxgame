@@ -4,7 +4,7 @@
 -- real client/SandboxHud.luau (the money block) and client/SandboxTasksUi.luau (the TASKS chip), a stand-in move's panel
 -- and Hud's groups where client/Hud.luau puts them, on phones held sideways (844 × 390, 667 × 375: the touch layout), a
 -- computer (1280 × 800) and a big screen (1920 × 1080):
---   * the line at the bottom ("📋 Pick what Danny carries · Q put away", a gamepad's B, a phone's "tap 📋 to put away")
+--   * the line at the bottom ("📋 Pick what Danny carries: E or click · Q put away", a gamepad's R1 and B, a phone's "tap 📋 to put away")
 --     only while the clipboard is out (the server's ClipboardHeld) and Danny hired; on a touch screen the 📋 button
 --     (ORDERS, orange while it is out) while he is hired and your hands are free; both on the screen, clear of the HUD's
 --     chips, the touch controls (the buttons, the thumbstick's corner, the jump button), the move's panel, Danny's
@@ -14,8 +14,13 @@
 --   * stepping aside: his card open (a window), a grip check: the line and the button hidden; your hands full: no button;
 --   * the piece pointed at (the mouse, a gamepad's nearest, a phone's tap a moment): outlined green to give, orange on
 --     his list (its number), red with the reason (too far, in the van, his list full), nothing for another move's;
---     nothing once it is put away; 8.6 Danny himself orange, "📋 Orders for Danny", his click his orders menu; no
---     warnings.
+--     nothing once it is put away; 8.6 Danny himself orange, "📋 Orders for Danny", his click his orders menu;
+--   * 9.0 E gives a piece: with the clipboard out the pieces' own Pick up hidden on this screen (their reach; Enabled,
+--     the server's, untouched; nothing sent), a "Give to Danny" prompt of the client's in its place (E, the piece's
+--     name and reach), "Take back" on his list, E sending the click's request each time, the click still working; none
+--     when he can't take it (his list full, in the van) or it is far; parked under a window and with a gamepad (its R1
+--     prompt instead); a phone's to tap; a door's prompt and another player's move's pieces untouched; everything back
+--     at its reach when it is put away, on a new body and at the move's end; no warnings.
 local M = require("./sandbox_mock")
 local Config = require("./Config")
 local TouchLayout = require("./TouchLayout")
@@ -179,7 +184,7 @@ local function piece(name, spot, owner, at)
 	model:SetAttribute("MoveSpot", spot)
 	local root = M.make("BasePart", { Name = "Root", Position = at }, model)
 	model.PrimaryPart = root
-	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name }, root)
+	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name, MaxActivationDistance = Config.Moving.Reach.Item }, root)
 	own:SetAttribute("MoveOwner", owner)
 	tagged.MovePrompt = tagged.MovePrompt or {}
 	table.insert(tagged.MovePrompt, own)
@@ -295,7 +300,7 @@ local function blocks()
 		list["the left column"] = M.leftColumn
 	else
 		list["the health row"] = box(groups.LeftStack)
-		list["MOUSE [ALT], the key hints"] = box(groups.HudButtons)
+		list["the key hints (9.0: no MOUSE [ALT])"] = box(groups.HudButtons)
 	end
 	list["the money block"] = box(SandboxHud.block())
 	list["the TASKS chip"] = box(chip)
@@ -314,8 +319,8 @@ local function clearOfAll(b)
 	return true, nil
 end
 local WORDS = {
-	keys = "📋 Pick what Danny carries · Q put away",
-	pad = "📋 Pick what Danny carries · B put away",
+	keys = "📋 Pick what Danny carries: E or click · Q put away", -- (9.0: E by a piece too)
+	pad = "📋 Pick what Danny carries: R1 by it · B put away",
 	touch = "📋 Tap what Danny carries · tap 📋 to put away",
 }
 local function layoutChecks(label)
@@ -507,6 +512,116 @@ check("a gamepad: the piece \"Give to Danny\" is on (R1's: the nearest) outlined
 gamepad = false
 UIS.LastInputTypeChanged:Fire()
 clipboard(false)
+
+-- ── 9.0 E gives a piece: its own prompts hidden, "Give to Danny" in their place ──
+-- (the owner: "When I hold the clipboard (Q), the E shouldn't show 'pick up'; E should mark the piece for Danny")
+screen(false, 1280, 764)
+rayHit = nil
+local REACH = Config.Moving.Reach.Item
+local door = M.make("BasePart", { Name = "FrontDoor", Position = M.Vector3.new(2, 1, 6) }, M.workspace)
+local enter = M.make("ProximityPrompt", { Name = "Enter", ActionText = "Enter house", ObjectText = "Linden House", MaxActivationDistance = 10 }, door)
+enter:SetAttribute("MoveOwner", 14)
+table.insert(tagged.MovePrompt, enter)
+local strangerPick = strangerRoot:FindFirstChildOfClass("ProximityPrompt")
+local function give()
+	return lampRoot:FindFirstChild("DannyGive")
+end
+local function hiddenNow() -- (how many of the pieces' own prompts this client hides now)
+	local _, muted = DannyOrders.prompts()
+	local n = 0
+	for _ in muted do
+		n += 1
+	end
+	return n
+end
+M.resume()
+check("9.0 the clipboard away: the pieces' own prompts as the server made them, no \"Give to Danny\" of ours", lampPick.MaxActivationDistance == REACH and give() == nil)
+local sentBefore = #M.sent
+clipboard(true)
+local g = give()
+check("9.0 the clipboard out (a computer): the Lamp's own Pick up hidden on this screen (its reach 0; Enabled, the server's, untouched)",
+	lampPick.MaxActivationDistance == 0 and lampPick.Enabled == true and hiddenNow() == 1)
+check("… a \"Give to Danny\" prompt of this client's in its place: E, the piece's name, the piece's own reach, no hold", g ~= nil and g.Enabled
+	and g.ActionText == "Give to Danny" and g.ObjectText == "Lamp" and g.KeyboardKeyCode == M.Enum.KeyCode.E and g.MaxActivationDistance == REACH and g.HoldDuration == 0)
+check("… the door's Enter house keeps its E (no piece's: doors, the van), another player's move's piece its Pick up, none of ours there",
+	enter.MaxActivationDistance == 10 and strangerPick.MaxActivationDistance == REACH and strangerRoot:FindFirstChild("DannyGive") == nil)
+check("… only on this screen: nothing asked of the server for it (another player's prompts are theirs)", #M.sent == sentBefore)
+local fromMoving = #sentOn("Moving")
+g.Triggered:Fire(M.player)
+local moving = sentOn("Moving")
+check("E (its Triggered): the click's request, the Lamp onto his list (\"helper\", \"assign\", the Lamp)", #moving == fromMoving + 1 and moving[#moving][1] == "helper"
+	and moving[#moving][2] == "assign" and moving[#moving][3] == lamp)
+lamp:SetAttribute("DannyQueue", 3) -- (the server's answer: #3 on his list)
+M.resume()
+check("… on his list: the same prompt says \"Take back\"", give() == g and g.Enabled and g.ActionText == "Take back", g.ActionText)
+g.Triggered:Fire(M.player)
+moving = sentOn("Moving")
+check("… E again: the same request (the server takes it back)", #moving == fromMoving + 2 and moving[#moving][2] == "assign" and moving[#moving][3] == lamp)
+lamp:SetAttribute("DannyQueue", nil)
+M.resume()
+check("… off his list: \"Give to Danny\" again", give() == g and g.ActionText == "Give to Danny")
+rayHit = { Instance = lampRoot, Position = lampRoot.Position }
+UIS.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.Unknown, UserInputType = M.Enum.UserInputType.MouseButton1, Position = M.Vector3.new(400, 236, 0) }, false)
+moving = sentOn("Moving")
+check("a click on the Lamp still gives it too", #moving == fromMoving + 3 and moving[#moving][3] == lamp)
+rayHit = nil
+attribute("MoveHelperQueue", Config.MoveHelper.Queue)
+M.resume()
+check("his list full: no prompt on the Lamp (red in the outline: nothing to press), its Pick up still hidden", give() == nil and lampPick.MaxActivationDistance == 0)
+attribute("MoveHelperQueue", 2)
+lampPick.Enabled = false
+local inVan = M.make("WeldConstraint", { Part0 = vanBody, Part1 = lampRoot }, lampRoot)
+M.resume()
+check("in the van (its prompt off, welded to the van): no prompt (the van's Load keeps E)", give() == nil and lampPick.MaxActivationDistance == 0)
+inVan.Parent = nil
+lampPick.Enabled = true
+lampRoot.Position = M.Vector3.new(Config.MoveHelper.Clipboard.PromptNear + 6, 1, 0)
+M.resume()
+check(`farther than Clipboard.PromptNear ({Config.MoveHelper.Clipboard.PromptNear} studs): none`, give() == nil)
+lampRoot.Position = M.Vector3.new(4, 1, 2)
+M.resume()
+check("… near again: back, the same prompt (made once, moved round)", give() == g and #(DannyOrders.prompts()) == 1)
+DannyOrders.covered = function()
+	return true
+end
+M.resume()
+check("a window covering the screen: ours parked (its E the window's), the Pick up still hidden", give() == nil and lampPick.MaxActivationDistance == 0)
+DannyOrders.covered = nil
+M.resume()
+check("… shut: back", give() == g and g.Enabled)
+gamepad = true
+UIS.LastInputTypeChanged:Fire()
+M.resume()
+M.resume()
+local padGive = lampRoot:FindFirstChild("GiveToDanny")
+check("a gamepad: ours parked, MoveHelperCard's R1 \"Give to Danny\" on the nearest piece (one prompt, not two)", give() == nil and padGive ~= nil and padGive.Enabled
+	and lampPick.MaxActivationDistance == 0)
+gamepad = false
+UIS.LastInputTypeChanged:Fire()
+M.resume()
+screen(true, 844, 354)
+check("a phone: the prompt there to tap", give() == g and g.Enabled)
+screen(false, 1280, 764)
+clipboard(false)
+check("the clipboard put away: the Lamp's own Pick up back at its reach exactly, ours parked", lampPick.MaxActivationDistance == REACH and give() == nil
+	and hiddenNow() == 0)
+clipboard(true)
+check("(out again: hidden)", lampPick.MaxActivationDistance == 0 and give() == g)
+local body1 = M.player.Character
+local body2 = M.make("Model")
+M.make("BasePart", { Name = "HumanoidRootPart", Position = M.Vector3.new(0, 0, 0) }, body2)
+M.player.Character = body2
+M.resume()
+check("a new body (a respawn: no clipboard on it): given back, ours parked", lampPick.MaxActivationDistance == REACH and give() == nil)
+M.player.Character = body1
+body1:SetAttribute("ClipboardHeld", nil)
+M.resume()
+clipboard(true)
+check("(out again: hidden)", lampPick.MaxActivationDistance == 0 and give() == g)
+lamp:Destroy() -- (the move's end: the server takes its pieces away, ours on the Lamp with them, and the clipboard)
+clipboard(false)
+check("the move's end (the pieces gone, ours with them): nothing left hidden, no prompt kept", hiddenNow() == 0 and #(DannyOrders.prompts()) == 0
+	and enter.MaxActivationDistance == 10)
 
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL DANNY ORDERS CHECKS PASSED")

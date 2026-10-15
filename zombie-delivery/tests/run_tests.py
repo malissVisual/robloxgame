@@ -90,6 +90,14 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "FurnitureMesh.luau"), encoding="utf-8").read()
     source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
     open(os.path.join(tmp, "FurnitureMesh.luau"), "w", encoding="utf-8").write(prefix + "local game, workspace = M.game, M.workspace\n" + source)
+    # 8.9.1: its server/FixtureMesh.luau (the owner's Blender fixtures) on the same recorder, a ServerStorage of its own:
+    # no import there, so every fixture keeps its parts (tools/fixtures-art/check.py dresses them with one).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "FixtureMesh.luau"), encoding="utf-8").read()
+    source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
+    fixture_storage = ('local storage = M.Instance.new("Folder")\n'
+                       'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
+                       'local workspace = M.workspace\n')
+    open(os.path.join(tmp, "FixtureMesh.luau"), "w", encoding="utf-8").write(prefix + fixture_storage + source)
     # 8.0 SANDBOX: the real server/Main.server.luau and server/SandboxBoot.luau as MainServer.luau and
     # SandboxBootServer.luau for tests/boot_runtime_test.luau: each source wrapped in a function (the test runs it once
     # per world: the sandbox's, the city's), its Roblox globals and `require` tests/runtime/BootRuntime.luau's recorders,
@@ -186,6 +194,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
         "return function(game: any, require: any, CFrame: any)\n" + source + "\nend\n")
+    # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
+    # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
+    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "CameraRig.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "CameraRigClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, workspace: any, script: any, require: any, Instance: any, RaycastParams: any, task: any, os: any, "
+        "CFrame: any, Vector3: any, Vector2: any, Color3: any, UDim: any, UDim2: any, Enum: any)\n" + source + "\nend\n")
     # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
     # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
     # and for tests/movesites_test.luau.
@@ -673,6 +688,7 @@ def sandbox_hud_check():
         bad.append("view.sandbox does not hide the cash line (the money, the level, the XP bar)")
     for text, what in (('Hud.topSlot("job").Visible = false', "the NEXT card and the contract group (the job slot)"),
                        ("hudButtons.more.Visible = false", "PHONE / MENU"), ("view.menu.Visible = false", "MENU's list"),
+                       ("hudButtons.mouse.Visible = false", "MOUSE [ALT] (9.0: the cursor is free there)"),
                        ("weaponBar.Visible = false", "the weapon line"), ("fire.Visible = false", "FIRE"),
                        ("for _, button in view.touchHands do", "the touch hands"), ("LEFT_H = ", "the left column's room for the minimap")):
         if text not in body:
@@ -705,7 +721,7 @@ def sandbox_hud_check():
     keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
     at = keys.find("local function sandboxLines(")
     chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
-    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q")]  # (8.5: Danny's clipboard, LMB and Q)
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q", "E/LMB")]  # (8.5: Danny's clipboard, LMB and Q; 9.0: E/LMB)
     if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
         bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
     print("== sandbox hud: " + (f"the HUD hides its city parts in the sandbox, the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))
@@ -740,7 +756,7 @@ if not review72_check():
 # the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
 def imports_first_check():
     main = open(os.path.join(os.path.dirname(HERE), "src", "server", "Main.server.luau"), encoding="utf-8").read()
-    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt")
+    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt", "ZDCFixtureArt")  # (8.9.1: the fixtures)
     first = main.find("ServerStorage")
     wait = main.find(":WaitForChild(")
     good = first >= 0 and wait >= 0 and first < wait and all(main.find(f'"{n}"') < wait for n in names)
@@ -916,6 +932,15 @@ if sprinter.returncode != 0:
 warehouse = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "warehouse", "mesh-check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
 print("== warehouse mesh: " + ((warehouse.stdout.strip().splitlines() or ["?"])[-1][:160] if warehouse.returncode == 0 else "FAIL\n" + warehouse.stdout[-1500:] + warehouse.stderr[-1500:]))
 if warehouse.returncode != 0:
+    ok = False
+
+# 8.9.1: the house's fixtures in the owner's Blender model (server/FixtureMesh.luau): tools/fixtures-art/check.py imports
+# design/blender-fixtures/roblox/ZDCFixtureArt.json's pieces (turned, scaled; a stand-in from the contract's table until
+# fixtures.py's manifest exists) and dresses the interiors the real server/HouseInterior.luau builds; scattered,
+# mirrored and wrong-sized imports refused.
+fixtures_art = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "fixtures-art", "check.py"), shutil.which(luau) or luau], capture_output=True, text=True)
+print("== fixtures mesh: " + ((fixtures_art.stdout.strip().splitlines() or ["?"])[-1][:160] if fixtures_art.returncode == 0 else "FAIL\n" + fixtures_art.stdout[-2500:] + fixtures_art.stderr[-1500:]))
+if fixtures_art.returncode != 0:
     ok = False
 
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)

@@ -444,7 +444,7 @@ local function blocks(orders)
 		list["the left column (the minimap)"] = M.leftColumn
 	else
 		list["the health row"] = box(groups.LeftStack)
-		list["MOUSE [ALT], the key hints"] = box(groups.HudButtons)
+		list["the key hints (9.0: no MOUSE [ALT])"] = box(groups.HudButtons)
 	end
 	list["the money block"] = box(SandboxHud.block())
 	list["the TASKS chip"] = box(tasksChip)
