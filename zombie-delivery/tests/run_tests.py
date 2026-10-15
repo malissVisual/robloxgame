@@ -185,6 +185,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
         "return function(game: any, require: any, CFrame: any)\n" + source + "\nend\n")
+    # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
+    # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
+    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "CameraRig.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "CameraRigClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, workspace: any, script: any, require: any, Instance: any, RaycastParams: any, task: any, os: any, "
+        "CFrame: any, Vector3: any, Vector2: any, Color3: any, UDim: any, UDim2: any, Enum: any)\n" + source + "\nend\n")
     # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
     # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
     # and for tests/movesites_test.luau.
@@ -672,6 +679,7 @@ def sandbox_hud_check():
         bad.append("view.sandbox does not hide the cash line (the money, the level, the XP bar)")
     for text, what in (('Hud.topSlot("job").Visible = false', "the NEXT card and the contract group (the job slot)"),
                        ("hudButtons.more.Visible = false", "PHONE / MENU"), ("view.menu.Visible = false", "MENU's list"),
+                       ("hudButtons.mouse.Visible = false", "MOUSE [ALT] (9.0: the cursor is free there)"),
                        ("weaponBar.Visible = false", "the weapon line"), ("fire.Visible = false", "FIRE"),
                        ("for _, button in view.touchHands do", "the touch hands"), ("LEFT_H = ", "the left column's room for the minimap")):
         if text not in body:

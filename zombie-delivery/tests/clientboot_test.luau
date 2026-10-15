@@ -13,7 +13,9 @@
 --     SandboxLight (the eyes) starts after SandboxSounds; 8.3 review: another window opening only hides a visitor's
 --     offer card (OfferCard.hide), ESC declines it (OfferCard.close); 8.7: TradePrompts (the trade prompts on your own
 --     stands hidden) right after CargoPrompts, TradeUi (trading between players) a window like the others, the STOCK
---     list's 🏷 opening its price picker and the picker going back to the list. Run with tests/run_tests.py.
+--     list's 🏷 opening its price picker and the picker going back to the list; 9.0: the camera's cursor free unless a
+--     weapon is in the hands (CameraRig.aimOnly, CameraRig.armed: tests/camerarig_test.luau runs the rig itself), the
+--     city's never. Run with tests/run_tests.py.
 
 local Config = require("./Config")
 local ClientMain = require("./ClientMain")
@@ -291,6 +293,8 @@ do
 		and run.required.TradeUi == nil and run.required.TradePrompts == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("8.3: the city never requires the sandbox's walk-in doors' client (WalkDoors)", run.required.WalkDoors == nil)
+	check("9.0: the city's camera keeps its locked aiming (CameraRig.aimOnly and armed never set: Alt and MOUSE as before)",
+		run.modules.CameraRig.aimOnly ~= true and run.modules.CameraRig.armed ~= run.modules.CameraRig.toolEquipped)
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
 
@@ -368,6 +372,8 @@ do
 	local windowOpen = run.modules.CameraRig.windowOpen
 	check("the warehouse's open picker frees the mouse (CameraRig.windowOpen)", type(windowOpen) == "function" and windowOpen() == true)
 	check("… and so does every window the camera's mouseNeeded asks about", run.modules.CameraRig.mouseNeeded == windowOpen)
+	check("9.0: the sandbox's cursor is free unless a weapon is in the hands (CameraRig.aimOnly; armed: a Tool equipped, the rig's toolEquipped)",
+		run.modules.CameraRig.aimOnly == true and run.modules.CameraRig.armed == run.modules.CameraRig.toolEquipped)
 	local covered = run.modules.KeyHints.covered
 	check("the key hints hide under a window", type(covered) == "function" and covered() == true)
 end

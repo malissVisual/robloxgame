@@ -269,6 +269,11 @@ if Config.Sandbox.On then
 			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
+	-- 9.0 (the owner: "aiming with the crosshair only when I want to shoot or have pistols; the mouse normally free, so
+	-- no Alt"): the cursor is free (the right mouse held turns the camera) unless a weapon is in the hands, a Tool
+	-- equipped (no guns here yet: CameraRig's toolEquipped); Alt does nothing, no MOUSE [ALT] (Hud's view.sandbox)
+	CameraRig.aimOnly = true
+	CameraRig.armed = CameraRig.toolEquipped
 	if type(OfferCard) == "table" then
 		OfferCard.covered = CameraRig.windowOpen -- (8.3: a visitor's offer waits while another window is open)
 	end
@@ -276,7 +281,7 @@ if Config.Sandbox.On then
 		WarehouseUi.onPrice = TradeUi.openPrice
 		TradeUi.onBack = WarehouseUi.openStock
 	end
-	-- 8.5 Danny's clipboard (orders mode: no window, nothing closes for it, the camera keeps the mouse): its line, its
+	-- 8.5 Danny's clipboard (orders mode: no window, nothing closes for it; 9.0: the cursor points, free): its line, its
 	-- outline and its 📋 button step aside while a window covers the screen
 	local Orders = ownModule("DannyOrders")
 	if type(Orders) == "table" then

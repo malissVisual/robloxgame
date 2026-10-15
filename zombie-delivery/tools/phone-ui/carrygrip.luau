@@ -328,7 +328,7 @@ local function scene(name)
 		table.insert(overlay, { kind = "pill", box = cluster.sprint, label = "SPRINT" })
 		table.insert(overlay, { kind = "pill", box = cluster.act, label = "PUT DOWN" })
 	else
-		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "MOUSE [ALT]" })
+		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "? KEYS [F1]" }) -- (9.0: no MOUSE [ALT] in the sandbox)
 	end
 	table.insert(scenes, { name = name, width = M.width, height = M.height + 36, inset = 36, touch = M.touch, overlay = overlay, tree = node(M.gui) })
 end

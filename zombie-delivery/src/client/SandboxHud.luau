@@ -23,8 +23,9 @@
 --     Sofa (sell ×1.4, on show ×1.2)" (shared/Market.luau hotToast, the state's market), held back while the HUD is
 --     hidden (the start screen) and told when it shows
 -- Standing in Hud's column keeps it clear of what the HUD still shows in the sandbox: the toasts flow under it, the
--- health row (bottom left on a computer; on a touch screen the left column the column stands beside), MOUSE [ALT] and
--- the key hints at the top right, the move's blocks at the top in the middle (tools/phone-ui/sandbox.luau checks it).
+-- health row (bottom left on a computer; on a touch screen the left column the column stands beside), the key hints
+-- at the top right (9.0: no MOUSE [ALT] there), the move's blocks at the top in the middle (tools/phone-ui/sandbox.luau
+-- checks it).
 -- A touch screen: the block is never smaller than Config.SandboxHud.TouchScale and its chip is a finger's size
 -- (Ui.MinTouch screen px). SandboxHud.start() does nothing when Config.Sandbox.On is false; it also starts
 -- client/WarehouseUi.luau (once).

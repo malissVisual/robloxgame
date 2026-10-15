@@ -24,9 +24,10 @@
 --     target). A line at the bottom says the mode:
 --     "📋 Pick what Danny carries · Q put away" (the device's words: ClipboardRules.hint) clear of the HUD's groups, the
 --     chips, the move's top blocks (its panel, Danny's status line, the guide's line), the quick chat's button, the move's
---     list, the touch controls and the 📋 button (DannyOrders.layout). It is no window (nothing closes for it, the camera
---     keeps the mouse: the crosshair points) and steps aside while one covers the screen (DannyOrders.covered: Main's,
---     his card open, a grip check): the line, the outline and the 📋 button hidden, R1 and B left to the window.
+--     list, the touch controls and the 📋 button (DannyOrders.layout). It is no window (nothing closes for it; 9.0: the
+--     sandbox's cursor is free, client/CameraRig.luau aimOnly, and points) and steps aside while one covers the screen
+--     (DannyOrders.covered: Main's, his card open, a grip check): the line, the outline and the 📋 button hidden, R1 and
+--     B left to the window.
 --   * 8.9 its sounds (art/audio/sfx5.ogg, quiet: client/SandboxSounds.luau event): the clipboard taken out (a paper
 --     rustle and the clip) and put away, whoever did it (your ClipboardHeld changed, looked at with the rest every
 --     Clipboard.Look s: shared/SoundPlan.luau clipboardCue; a new body: none); asked out and refused (the server's
