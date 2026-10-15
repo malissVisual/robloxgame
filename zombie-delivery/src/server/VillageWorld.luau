@@ -22,6 +22,10 @@
 --
 --   VillageWorld.build(world)   builds it into workspace.Sandbox's folder `world` (before it is parented); returns
 --                               the houses, the landmarks and the trees it made
+--   VillageWorld.model(name, pieces)   a Model (unparented) of VillageLooks pieces on the map (VillageLooks.place's),
+--                               one part each, the way build makes them (the six houses to empty will be dressed so)
+--   VillageWorld.chunk(world, key)     the Atomic chunk model Village_<key> (VillageLooks.chunkOf) in world.Village,
+--                               made when first wanted (where such a house goes)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -141,16 +145,30 @@ end
 
 -- One Atomic model per chunk (Config.Village.Chunk's cells), made when first wanted.
 local function chunkOf(holder: Instance, chunks: { [string]: Model }, key: string): Model
-	local model = chunks[key]
+	local model = chunks[key] or holder:FindFirstChild(`Village_{key}`) :: Model?
 	if not model then
 		local made = Instance.new("Model")
 		made.Name = `Village_{key}`
 		made.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 		made.Parent = holder
-		chunks[key] = made
 		model = made
 	end
+	chunks[key] = model :: Model
+	return model :: Model
+end
+
+function VillageWorld.model(name: string, pieces: { VillageLooks.Piece }): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	for _, p in pieces do
+		part(model, p)
+	end
 	return model
+end
+
+function VillageWorld.chunk(world: Instance, key: string): Model
+	local village = world:FindFirstChild("Village") or folder(world, "Village")
+	return chunkOf(village, {}, key)
 end
 
 -- ── The build ──────────────────────────────────────────────────────────────
@@ -187,15 +205,11 @@ function VillageWorld.build(world: Instance): Built
 	local built: Built = { houses = 0, landmarks = 0, trees = 0 }
 	for _, h in VillageScenery.houses() do
 		local pieces = VillageScenery.pieces(h)
-		local model = Instance.new("Model")
-		model.Name = "VillageHouse"
+		local model = VillageWorld.model("VillageHouse", pieces)
 		model:SetAttribute("VillageHouse", h.id)
 		model:SetAttribute("Street", h.street)
 		if #h.ids > 1 then
 			model:SetAttribute("VillageHouses", table.concat(h.ids, ","))
-		end
-		for _, p in pieces do
-			part(model, p)
 		end
 		model.Parent = chunkOf(village, chunks, if pieces[1] then pieces[1].chunk else VillageLooks.chunkOf(h.box.x0, h.box.z0))
 		built.houses += 1
@@ -205,12 +219,8 @@ function VillageWorld.build(world: Instance): Built
 	motorway.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	for _, m in VillageScenery.landmarks() do
 		local pieces = VillageScenery.pieces(m)
-		local model = Instance.new("Model")
-		model.Name = `Landmark_{m.id}`
+		local model = VillageWorld.model(`Landmark_{m.id}`, pieces)
 		model:SetAttribute("VillageLandmark", m.id)
-		for _, p in pieces do
-			part(model, p)
-		end
 		model.Parent = if m.far then motorway else chunkOf(village, chunks, if pieces[1] then pieces[1].chunk else "far")
 		built.landmarks += 1
 	end

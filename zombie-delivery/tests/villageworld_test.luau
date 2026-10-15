@@ -292,6 +292,41 @@ do
 	end
 	check(`every village house's door ({doors}) looks out onto its street, 20 studs at most`, doorBad == nil and doors == #MAP.Village, doorBad)
 
+	-- the hook for the five new houses to empty (their exteriors are the moves' for now): with them, each built once and
+	-- rich, the terraced one in its row's group (its richUnit), every one within its budget, its door onto its street
+	local extra: { VillageLooks.PlanHouse } = {}
+	for _, h in Plan.houses do
+		if h.enter then
+			table.insert(extra, { id = h.id, kind = h.kind, box = h.box, yaw = h.yaw, step = 1, enter = true, street = h.street })
+		end
+	end
+	local withRich = VillageScenery.houses(extra)
+	local seenIds: { [string]: number } = {}
+	local hookBad: string? = nil
+	for _, h in withRich do
+		local rich = h.opts.rich == true
+		for _, id in h.ids do
+			seenIds[id] = (seenIds[id] or 0) + 1
+		end
+		local made = VillageLooks.house(h.kind, h.box, h.yaw, h.seed, h.opts)
+		if #made > VillageLooks.budget(h.kind, #h.ids, rich) then
+			hookBad = `{h.id}: {#made} parts over its budget`
+		end
+		for _, e in extra do
+			if table.find(h.ids, e.id) and not rich then
+				hookBad = `{e.id} not rich`
+			end
+		end
+		if h.kind == "row" and h.opts.richUnit and h.ids[h.opts.richUnit :: number] == nil then
+			hookBad = `{h.id}'s richUnit outside its group`
+		end
+	end
+	for _, e in extra do
+		hookBad = hookBad or (if seenIds[e.id] == 1 then nil else `{e.id} built {seenIds[e.id] or 0} times`)
+	end
+	check(`the hook for the {#extra} new houses to empty: built once each, rich, the terraced one in its row's group, within the budgets`, hookBad == nil and #extra == 5
+		and #withRich > #houses and VillageScenery.houses() == houses, hookBad)
+
 	-- the landmarks: each in its rect off every road; the barrier across Hornická at its west end
 	local kinds: { [string]: number } = {}
 	local markBad: string? = nil

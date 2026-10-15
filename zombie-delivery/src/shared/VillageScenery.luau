@@ -18,7 +18,8 @@
 --   The fields     SandboxMap.Fields, a tile each (VillageLooks.field: the ground in its crop's colour, its rows)
 --   The far view   VillageLooks.horizon round SandboxMap.Bounds
 --
---   VillageScenery.houses()          { Placed }: a house (or a terraced group): kind, box, yaw, seed, opts, ids, street
+--   VillageScenery.houses(extra?)    { Placed }: a house (or a terraced group): kind, box, yaw, seed, opts, ids, street;
+--                                    extra: the houses to empty, rich (their row's group rebuilt round one)
 --   VillageScenery.landmarks()       { Mark }: id, name, kind, box, yaw, seed, opts, far
 --   VillageScenery.pieces(thing)     a house's or a landmark's pieces on the map (VillageLooks.place)
 --   VillageScenery.trees()           { TreeSpot }: kind, x, z, seed, its crown's radius and height, the line or "orchard"
@@ -56,26 +57,39 @@ end
 
 local houseCache: { Placed }? = nil
 
-function VillageScenery.houses(): { Placed }
-	if houseCache then
+-- extra: the hook for the houses to empty (plan.json's enter: SandboxMap.Houses' exteriors, the moves'), each a
+-- PlanHouse with enter = true: dressed rich (VillageLooks' "rich"), a terraced one in its row's group (the group's
+-- richUnit). Without it the village's own houses alone (the same list every time).
+function VillageScenery.houses(extra: { VillageLooks.PlanHouse }?): { Placed }
+	if houseCache and not extra then
 		return houseCache
 	end
 	local list: { Placed } = {}
 	local rows: { VillageLooks.PlanHouse } = {}
 	local streets: { [string]: string } = {}
+	local all: { VillageLooks.PlanHouse } = {}
 	for _, h in MAP.Village do
-		streets[h.id] = h.street
+		table.insert(all, { id = h.id, kind = h.kind, box = rect(h), yaw = h.yaw, step = 1, enter = false, street = h.street })
+	end
+	if extra then
+		for _, h in extra do
+			table.insert(all, h)
+		end
+	end
+	for _, h in all do
+		streets[h.id] = h.street or ""
 		if h.kind == "row" then
-			local row: VillageLooks.PlanHouse = { id = h.id, kind = h.kind, box = rect(h), yaw = h.yaw, step = 1, enter = false, street = h.street }
-			table.insert(rows, row)
+			table.insert(rows, h)
 		else
-			table.insert(list, { id = h.id, kind = h.kind, box = rect(h), yaw = h.yaw, seed = VillageLooks.seedOf(h.id), opts = {}, ids = { h.id }, street = h.street })
+			table.insert(list, { id = h.id, kind = h.kind, box = h.box, yaw = h.yaw, seed = VillageLooks.seedOf(h.id), opts = { rich = h.enter == true }, ids = { h.id }, street = h.street or "" })
 		end
 	end
 	for _, g in VillageLooks.rowGroups(rows) do
-		table.insert(list, { id = g.ids[1], kind = "row", box = g.box, yaw = g.yaw, seed = g.seed, opts = { units = #g.ids }, ids = g.ids, street = streets[g.ids[1]] })
+		table.insert(list, { id = g.ids[1], kind = "row", box = g.box, yaw = g.yaw, seed = g.seed, opts = { units = #g.ids, rich = g.richUnit ~= nil, richUnit = g.richUnit }, ids = g.ids, street = streets[g.ids[1]] })
 	end
-	houseCache = list
+	if not extra then
+		houseCache = list
+	end
 	return list
 end
 
