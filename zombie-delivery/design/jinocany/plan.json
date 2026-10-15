@@ -1,0 +1,3204 @@
+{
+ "about": "Jinočany instead of the Alps: the proposed sandbox map (design/jinocany/NAVRH.md). Studs; x east, z south; yaw as SandboxMap (0 north, 90 west, 180 south, 270 east). Fixed entries are today's SandboxMap data.",
+ "bounds": {
+  "x0": -1180,
+  "x1": 420,
+  "z0": -680,
+  "z1": 760
+ },
+ "plots": [
+  {
+   "id": 1,
+   "rect": {
+    "x0": -255,
+    "x1": -135,
+    "z0": -230,
+    "z1": -78
+   },
+   "warehouse": {
+    "x": -195,
+    "z": -160,
+    "sx": 80,
+    "sz": 60
+   }
+  },
+  {
+   "id": 2,
+   "rect": {
+    "x0": -125,
+    "x1": -5,
+    "z0": -230,
+    "z1": -78
+   },
+   "warehouse": {
+    "x": -65,
+    "z": -160,
+    "sx": 80,
+    "sz": 60
+   }
+  },
+  {
+   "id": 3,
+   "rect": {
+    "x0": 5,
+    "x1": 125,
+    "z0": -230,
+    "z1": -78
+   },
+   "warehouse": {
+    "x": 65,
+    "z": -160,
+    "sx": 80,
+    "sz": 60
+   }
+  },
+  {
+   "id": 4,
+   "rect": {
+    "x0": 135,
+    "x1": 255,
+    "z0": -230,
+    "z1": -78
+   },
+   "warehouse": {
+    "x": 195,
+    "z": -160,
+    "sx": 80,
+    "sz": 60
+   }
+  }
+ ],
+ "turnaround": {
+  "x": 0,
+  "z": 470,
+  "r": 34
+ },
+ "bigHouse": {
+  "id": "sandbox_house",
+  "lot": {
+   "x0": -60,
+   "x1": 60,
+   "z0": 504,
+   "z1": 600
+  },
+  "house": {
+   "x": 0,
+   "z": 540,
+   "sx": 44,
+   "sz": 34
+  },
+  "door": {
+   "x": 0,
+   "z": 523,
+   "yaw": 0
+  },
+  "curb": {
+   "x": 0,
+   "z": 492,
+   "yaw": 0
+  }
+ },
+ "roads": [
+  {
+   "name": "Depot Row",
+   "rect": {
+    "x0": -270,
+    "x1": 270,
+    "z0": -74,
+    "z1": -46
+   },
+   "step": 1,
+   "fixed": true
+  },
+  {
+   "name": "Pražská",
+   "rect": {
+    "x0": -14,
+    "x1": 14,
+    "z0": -46,
+    "z1": 470
+   },
+   "step": 1,
+   "fixed": true
+  },
+  {
+   "name": "Hlavní",
+   "rect": {
+    "x0": -1000,
+    "x1": -270,
+    "z0": -74,
+    "z1": -46
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Hornická",
+   "rect": {
+    "x0": -1180,
+    "x1": -1000,
+    "z0": -74,
+    "z1": -46
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Školní",
+   "rect": {
+    "x0": -572,
+    "x1": -548,
+    "z0": -470,
+    "z1": -74
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Lidická",
+   "rect": {
+    "x0": -392,
+    "x1": -368,
+    "z0": -470,
+    "z1": -74
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Na Pouštce",
+   "rect": {
+    "x0": -832,
+    "x1": -808,
+    "z0": -470,
+    "z1": -74
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Severní",
+   "rect": {
+    "x0": -1024,
+    "x1": -300,
+    "z0": -494,
+    "z1": -470
+   },
+   "step": 2,
+   "fixed": false
+  },
+  {
+   "name": "Žižkova",
+   "rect": {
+    "x0": -1024,
+    "x1": -1000,
+    "z0": -500,
+    "z1": -74
+   },
+   "step": 2,
+   "fixed": false
+  },
+  {
+   "name": "Fibichova",
+   "rect": {
+    "x0": -632,
+    "x1": -608,
+    "z0": -46,
+    "z1": 300
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Smetanova",
+   "rect": {
+    "x0": -460,
+    "x1": -436,
+    "z0": -46,
+    "z1": 300
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Mirešická",
+   "rect": {
+    "x0": -912,
+    "x1": -14,
+    "z0": 300,
+    "z1": 324
+   },
+   "step": 1,
+   "fixed": false
+  },
+  {
+   "name": "Tylova",
+   "rect": {
+    "x0": -912,
+    "x1": -888,
+    "z0": -46,
+    "z1": 300
+   },
+   "step": 3,
+   "fixed": false
+  },
+  {
+   "name": "Čapkova",
+   "rect": {
+    "x0": -1120,
+    "x1": -912,
+    "z0": 150,
+    "z1": 174
+   },
+   "step": 3,
+   "fixed": false
+  }
+ ],
+ "landmarks": [
+  {
+   "id": "green",
+   "label": "Náves s kaplí",
+   "name": "The Chapel Green",
+   "rect": {
+    "x0": -800,
+    "x1": -584,
+    "z0": -190,
+    "z1": -80
+   },
+   "step": 1,
+   "kind": "green"
+  },
+  {
+   "id": "chapel",
+   "label": "kaple",
+   "name": "Chapel",
+   "rect": {
+    "x0": -712,
+    "x1": -688,
+    "z0": -164,
+    "z1": -124
+   },
+   "step": 1,
+   "kind": "chapel"
+  },
+  {
+   "id": "drugstore",
+   "label": "drogerie",
+   "name": "Corner Drugstore",
+   "rect": {
+    "x0": 40,
+    "x1": 120,
+    "z0": -20,
+    "z1": 40
+   },
+   "step": 1,
+   "kind": "shop"
+  },
+  {
+   "id": "pond",
+   "label": "Malý rybník",
+   "name": "Little Pond",
+   "rect": {
+    "x0": 50,
+    "x1": 210,
+    "z0": 145,
+    "z1": 255
+   },
+   "step": 1,
+   "kind": "pond"
+  },
+  {
+   "id": "orchard",
+   "label": "ovocný sad",
+   "name": "The Orchard",
+   "rect": {
+    "x0": -400,
+    "x1": -70,
+    "z0": 20,
+    "z1": 260
+   },
+   "step": 1,
+   "kind": "orchard"
+  },
+  {
+   "id": "school",
+   "label": "škola",
+   "name": "Jinočany School",
+   "rect": {
+    "x0": -536,
+    "x1": -420,
+    "z0": -380,
+    "z1": -300
+   },
+   "step": 2,
+   "kind": "school"
+  },
+  {
+   "id": "pitch",
+   "label": "hřiště",
+   "name": "Village Pitch",
+   "rect": {
+    "x0": -790,
+    "x1": -610,
+    "z0": -440,
+    "z1": -330
+   },
+   "step": 2,
+   "kind": "pitch"
+  },
+  {
+   "id": "hardware",
+   "label": "Stavebniny Sýkorka",
+   "name": "Sýkorka Building Supplies",
+   "rect": {
+    "x0": -990,
+    "x1": -850,
+    "z0": -630,
+    "z1": -545
+   },
+   "step": 2,
+   "kind": "hardware"
+  },
+  {
+   "id": "hardware_lot",
+   "label": "parkoviště",
+   "name": "Car park",
+   "rect": {
+    "x0": -990,
+    "x1": -850,
+    "z0": -545,
+    "z1": -505
+   },
+   "step": 2,
+   "kind": "lot"
+  },
+  {
+   "id": "site",
+   "label": "staveniště",
+   "name": "Building site",
+   "rect": {
+    "x0": -1150,
+    "x1": -930,
+    "z0": 190,
+    "z1": 300
+   },
+   "step": 3,
+   "kind": "site"
+  },
+  {
+   "id": "d5",
+   "label": "dálnice D5 (kulisa)",
+   "name": "D5 Motorway",
+   "rect": {
+    "x0": 330,
+    "x1": 390,
+    "z0": -680,
+    "z1": 760
+   },
+   "step": 1,
+   "kind": "motorway"
+  },
+  {
+   "id": "railway",
+   "label": "železnice (kulisa)",
+   "name": "Railway",
+   "rect": {
+    "x0": -1180,
+    "x1": 420,
+    "z0": 694,
+    "z1": 706
+   },
+   "step": 3,
+   "kind": "railway"
+  },
+  {
+   "id": "station",
+   "label": "zastávka Zbuzany",
+   "name": "Zbuzany stop",
+   "rect": {
+    "x0": 150,
+    "x1": 290,
+    "z0": 672,
+    "z1": 690
+   },
+   "step": 3,
+   "kind": "station"
+  }
+ ],
+ "fields": [
+  {
+   "rect": {
+    "x0": -1180,
+    "x1": 420,
+    "z0": -680,
+    "z1": -505
+   },
+   "kind": "wheat"
+  },
+  {
+   "rect": {
+    "x0": -1180,
+    "x1": -1030,
+    "z0": -505,
+    "z1": 360
+   },
+   "kind": "rapeseed"
+  },
+  {
+   "rect": {
+    "x0": -1180,
+    "x1": -620,
+    "z0": 340,
+    "z1": 680
+   },
+   "kind": "rapeseed"
+  },
+  {
+   "rect": {
+    "x0": -620,
+    "x1": -40,
+    "z0": 340,
+    "z1": 680
+   },
+   "kind": "ploughed"
+  },
+  {
+   "rect": {
+    "x0": -40,
+    "x1": 330,
+    "z0": 620,
+    "z1": 680
+   },
+   "kind": "wheat"
+  },
+  {
+   "rect": {
+    "x0": -280,
+    "x1": 330,
+    "z0": -505,
+    "z1": -250
+   },
+   "kind": "young"
+  },
+  {
+   "rect": {
+    "x0": 230,
+    "x1": 330,
+    "z0": 60,
+    "z1": 620
+   },
+   "kind": "young"
+  },
+  {
+   "rect": {
+    "x0": -1180,
+    "x1": 420,
+    "z0": 710,
+    "z1": 760
+   },
+   "kind": "young"
+  }
+ ],
+ "village": {
+  "x0": -1030,
+  "x1": -280,
+  "z0": -505,
+  "z1": 330
+ },
+ "treeLines": [
+  {
+   "points": [
+    {
+     "x": -1180,
+     "z": 340
+    },
+    {
+     "x": -40,
+     "z": 340
+    }
+   ],
+   "kind": "windbreak"
+  },
+  {
+   "points": [
+    {
+     "x": -1040,
+     "z": -500
+    },
+    {
+     "x": -1040,
+     "z": 330
+    }
+   ],
+   "kind": "windbreak"
+  },
+  {
+   "points": [
+    {
+     "x": -1180,
+     "z": -96
+    },
+    {
+     "x": -1030,
+     "z": -96
+    }
+   ],
+   "kind": "alley"
+  },
+  {
+   "points": [
+    {
+     "x": -1180,
+     "z": -24
+    },
+    {
+     "x": -1030,
+     "z": -24
+    }
+   ],
+   "kind": "alley"
+  },
+  {
+   "points": [
+    {
+     "x": -36,
+     "z": 330
+    },
+    {
+     "x": -36,
+     "z": 460
+    }
+   ],
+   "kind": "alley"
+  },
+  {
+   "points": [
+    {
+     "x": 36,
+     "z": 300
+    },
+    {
+     "x": 36,
+     "z": 460
+    }
+   ],
+   "kind": "alley"
+  },
+  {
+   "points": [
+    {
+     "x": -280,
+     "z": -505
+    },
+    {
+     "x": 300,
+     "z": -505
+    }
+   ],
+   "kind": "windbreak"
+  },
+  {
+   "points": [
+    {
+     "x": 300,
+     "z": -505
+    },
+    {
+     "x": 300,
+     "z": 660
+    }
+   ],
+   "kind": "windbreak"
+  }
+ ],
+ "houses": [
+  {
+   "id": "Hlavní_n_1",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -970.0,
+    "x1": -940.0,
+    "z0": -110.0,
+    "z1": -86.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -955.0,
+    "z": -86.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -955.0,
+    "z": -61,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_n_2",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -924.0,
+    "x1": -894.0,
+    "z0": -110.0,
+    "z1": -86.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -909.0,
+    "z": -86.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -909.0,
+    "z": -61,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_n_3",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -878.0,
+    "x1": -848.0,
+    "z0": -110.0,
+    "z1": -86.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -863.0,
+    "z": -86.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -863.0,
+    "z": -61,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_n_4",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -510.0,
+    "x1": -480.0,
+    "z0": -110.0,
+    "z1": -86.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -495.0,
+    "z": -86.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -495.0,
+    "z": -61,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_n_5",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -464.0,
+    "x1": -434.0,
+    "z0": -110.0,
+    "z1": -86.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -449.0,
+    "z": -86.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -449.0,
+    "z": -61,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": true
+  },
+  {
+   "id": "Hlavní_s_6",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -970.0,
+    "x1": -940.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -955.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -955.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_7",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -878.0,
+    "x1": -848.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -863.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -863.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_8",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -832.0,
+    "x1": -802.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -817.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -817.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_9",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -786.0,
+    "x1": -756.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -771.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -771.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_10",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -740.0,
+    "x1": -710.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -725.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -725.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_11",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -694.0,
+    "x1": -664.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -679.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -679.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": true
+  },
+  {
+   "id": "Hlavní_s_12",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -602.0,
+    "x1": -572.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -587.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -587.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_13",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -556.0,
+    "x1": -526.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -541.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -541.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_14",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -510.0,
+    "x1": -480.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -495.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -495.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_15",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -418.0,
+    "x1": -388.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -403.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -403.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Hlavní_s_16",
+   "street": "Hlavní",
+   "kind": "old",
+   "box": {
+    "x0": -372.0,
+    "x1": -342.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -357.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -357.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Školní_w_17",
+   "street": "Školní",
+   "kind": "old",
+   "box": {
+    "x0": -608.0,
+    "x1": -584.0,
+    "z0": -308.0,
+    "z1": -278.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -584.0,
+    "z": -293.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -559,
+    "z": -293.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Školní_w_18",
+   "street": "Školní",
+   "kind": "old",
+   "box": {
+    "x0": -608.0,
+    "x1": -584.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -584.0,
+    "z": -249.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -559,
+    "z": -249.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Školní_e_19",
+   "street": "Školní",
+   "kind": "old",
+   "box": {
+    "x0": -536.0,
+    "x1": -512.0,
+    "z0": -440.0,
+    "z1": -410.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -536.0,
+    "z": -425.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -561,
+    "z": -425.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Školní_e_20",
+   "street": "Školní",
+   "kind": "old",
+   "box": {
+    "x0": -536.0,
+    "x1": -512.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -536.0,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -561,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": true
+  },
+  {
+   "id": "Školní_e_21",
+   "street": "Školní",
+   "kind": "old",
+   "box": {
+    "x0": -536.0,
+    "x1": -512.0,
+    "z0": -220.0,
+    "z1": -190.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -536.0,
+    "z": -205.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -561,
+    "z": -205.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Školní_e_22",
+   "street": "Školní",
+   "kind": "old",
+   "box": {
+    "x0": -536.0,
+    "x1": -512.0,
+    "z0": -176.0,
+    "z1": -146.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -536.0,
+    "z": -161.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -561,
+    "z": -161.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_w_23",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -428.0,
+    "x1": -404.0,
+    "z0": -440.0,
+    "z1": -410.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -404.0,
+    "z": -425.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -379,
+    "z": -425.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_w_24",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -428.0,
+    "x1": -404.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -404.0,
+    "z": -249.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -379,
+    "z": -249.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_w_25",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -428.0,
+    "x1": -404.0,
+    "z0": -220.0,
+    "z1": -190.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -404.0,
+    "z": -205.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -379,
+    "z": -205.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_w_26",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -428.0,
+    "x1": -404.0,
+    "z0": -176.0,
+    "z1": -146.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -404.0,
+    "z": -161.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -379,
+    "z": -161.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_e_27",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -440.0,
+    "z1": -410.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -425.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -425.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_e_28",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -396.0,
+    "z1": -366.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -381.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -381.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_e_29",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -352.0,
+    "z1": -322.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -337.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -337.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_e_30",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -308.0,
+    "z1": -278.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -293.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -293.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": true
+  },
+  {
+   "id": "Lidická_e_31",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_e_32",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -220.0,
+    "z1": -190.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -205.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -205.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Lidická_e_33",
+   "street": "Lidická",
+   "kind": "old",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -176.0,
+    "z1": -146.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -356.0,
+    "z": -161.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -161.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_34",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -440.0,
+    "z1": -410.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -425.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -425.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_35",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -396.0,
+    "z1": -366.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -381.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -381.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_36",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -352.0,
+    "z1": -322.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -337.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -337.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_37",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -308.0,
+    "z1": -278.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -293.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -293.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_38",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -249.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -249.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_39",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -220.0,
+    "z1": -190.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -205.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -205.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_w_40",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -868.0,
+    "x1": -844.0,
+    "z0": -176.0,
+    "z1": -146.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -844.0,
+    "z": -161.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -819,
+    "z": -161.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_e_41",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -796.0,
+    "x1": -772.0,
+    "z0": -308.0,
+    "z1": -278.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -796.0,
+    "z": -293.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -821,
+    "z": -293.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Na Pouštce_e_42",
+   "street": "Na Pouštce",
+   "kind": "old",
+   "box": {
+    "x0": -796.0,
+    "x1": -772.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -796.0,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -821,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Severní_s_43",
+   "street": "Severní",
+   "kind": "old",
+   "box": {
+    "x0": -994.0,
+    "x1": -964.0,
+    "z0": -458.0,
+    "z1": -434.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -979.0,
+    "z": -458.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -979.0,
+    "z": -483,
+    "yaw": 0
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Severní_s_44",
+   "street": "Severní",
+   "kind": "old",
+   "box": {
+    "x0": -948.0,
+    "x1": -918.0,
+    "z0": -458.0,
+    "z1": -434.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -933.0,
+    "z": -458.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -933.0,
+    "z": -483,
+    "yaw": 0
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Severní_s_45",
+   "street": "Severní",
+   "kind": "old",
+   "box": {
+    "x0": -488.0,
+    "x1": -458.0,
+    "z0": -458.0,
+    "z1": -434.0
+   },
+   "yaw": 0,
+   "door": {
+    "x": -473.0,
+    "z": -458.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -473.0,
+    "z": -483,
+    "yaw": 0
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_46",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -424.0,
+    "z1": -394.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -409.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -409.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_47",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -378.0,
+    "z1": -348.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -363.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -363.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_48",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -332.0,
+    "z1": -302.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -317.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -317.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_49",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -286.0,
+    "z1": -256.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -271.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -271.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_50",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -240.0,
+    "z1": -210.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -225.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -225.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_51",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -194.0,
+    "z1": -164.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -179.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -179.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Žižkova_e_52",
+   "street": "Žižkova",
+   "kind": "old",
+   "box": {
+    "x0": -988.0,
+    "x1": -964.0,
+    "z0": -148.0,
+    "z1": -118.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -988.0,
+    "z": -133.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -1013,
+    "z": -133.0,
+    "yaw": 90
+   },
+   "step": 2,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_53",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 2.0,
+    "z1": 20.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 11.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 11.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_54",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 20.0,
+    "z1": 38.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 29.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 29.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_55",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 38.0,
+    "z1": 56.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 47.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 47.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_56",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 72.0,
+    "z1": 90.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 81.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 81.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_57",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 90.0,
+    "z1": 108.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 99.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 99.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_58",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 108.0,
+    "z1": 126.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 117.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 117.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_59",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 126.0,
+    "z1": 144.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 135.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 135.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_60",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 160.0,
+    "z1": 178.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 169.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 169.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_61",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 178.0,
+    "z1": 196.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 187.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 187.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_62",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 196.0,
+    "z1": 214.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 205.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 205.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_63",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 214.0,
+    "z1": 232.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 223.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 223.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_w_64",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -668.0,
+    "x1": -642.0,
+    "z0": 248.0,
+    "z1": 266.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -642.0,
+    "z": 257.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -619,
+    "z": 257.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_65",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 2.0,
+    "z1": 20.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 11.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 11.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_66",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 20.0,
+    "z1": 38.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 29.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 29.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_67",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 38.0,
+    "z1": 56.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 47.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 47.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_68",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 72.0,
+    "z1": 90.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 81.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 81.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_69",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 90.0,
+    "z1": 108.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 99.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 99.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_70",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 108.0,
+    "z1": 126.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 117.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 117.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_71",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 126.0,
+    "z1": 144.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 135.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 135.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_72",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 160.0,
+    "z1": 178.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 169.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 169.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_73",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 178.0,
+    "z1": 196.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 187.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 187.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_74",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 196.0,
+    "z1": 214.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 205.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 205.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_75",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 214.0,
+    "z1": 232.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 223.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 223.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Fibichova_e_76",
+   "street": "Fibichova",
+   "kind": "row",
+   "box": {
+    "x0": -598.0,
+    "x1": -572.0,
+    "z0": 248.0,
+    "z1": 266.0
+   },
+   "yaw": 90,
+   "door": {
+    "x": -598.0,
+    "z": 257.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -621,
+    "z": 257.0,
+    "yaw": 90
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_77",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 2.0,
+    "z1": 20.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 11.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 11.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_78",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 20.0,
+    "z1": 38.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 29.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 29.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_79",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 38.0,
+    "z1": 56.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 47.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 47.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_80",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 72.0,
+    "z1": 90.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 81.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 81.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_81",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 90.0,
+    "z1": 108.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 99.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 99.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_82",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 108.0,
+    "z1": 126.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 117.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 117.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_83",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 126.0,
+    "z1": 144.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 135.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 135.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_84",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 160.0,
+    "z1": 178.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 169.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 169.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": true
+  },
+  {
+   "id": "Smetanova_w_85",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 178.0,
+    "z1": 196.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 187.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 187.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_86",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 196.0,
+    "z1": 214.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 205.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 205.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_87",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 214.0,
+    "z1": 232.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 223.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 223.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Smetanova_w_88",
+   "street": "Smetanova",
+   "kind": "row",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 248.0,
+    "z1": 266.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -470.0,
+    "z": 257.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 257.0,
+    "yaw": 270
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_89",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -882.0,
+    "x1": -852.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -867.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -867.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_90",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -836.0,
+    "x1": -806.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -821.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -821.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_91",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -790.0,
+    "x1": -760.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -775.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -775.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_92",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -744.0,
+    "x1": -714.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -729.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -729.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_93",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -560.0,
+    "x1": -530.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -545.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -545.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_94",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -422.0,
+    "x1": -392.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -407.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -407.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_95",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -376.0,
+    "x1": -346.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -361.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -361.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Mirešická_n_96",
+   "street": "Mirešická",
+   "kind": "old",
+   "box": {
+    "x0": -330.0,
+    "x1": -300.0,
+    "z0": 264.0,
+    "z1": 288.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -315.0,
+    "z": 288.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -315.0,
+    "z": 313,
+    "yaw": 180
+   },
+   "step": 1,
+   "enter": false
+  },
+  {
+   "id": "Tylova_w_97",
+   "street": "Tylova",
+   "kind": "modern",
+   "box": {
+    "x0": -946.0,
+    "x1": -924.0,
+    "z0": 26.0,
+    "z1": 54.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -924.0,
+    "z": 40.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -899,
+    "z": 40.0,
+    "yaw": 270
+   },
+   "step": 3,
+   "enter": false
+  },
+  {
+   "id": "Tylova_w_98",
+   "street": "Tylova",
+   "kind": "modern",
+   "box": {
+    "x0": -946.0,
+    "x1": -924.0,
+    "z0": 68.0,
+    "z1": 96.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -924.0,
+    "z": 82.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -899,
+    "z": 82.0,
+    "yaw": 270
+   },
+   "step": 3,
+   "enter": false
+  },
+  {
+   "id": "Tylova_w_99",
+   "street": "Tylova",
+   "kind": "modern",
+   "box": {
+    "x0": -946.0,
+    "x1": -924.0,
+    "z0": 110.0,
+    "z1": 138.0
+   },
+   "yaw": 270,
+   "door": {
+    "x": -924.0,
+    "z": 124.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -899,
+    "z": 124.0,
+    "yaw": 270
+   },
+   "step": 3,
+   "enter": false
+  },
+  {
+   "id": "Čapkova_n_100",
+   "street": "Čapkova",
+   "kind": "modern",
+   "box": {
+    "x0": -1090.0,
+    "x1": -1062.0,
+    "z0": 116.0,
+    "z1": 138.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -1076.0,
+    "z": 138.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -1076.0,
+    "z": 163,
+    "yaw": 180
+   },
+   "step": 3,
+   "enter": false
+  },
+  {
+   "id": "Čapkova_n_101",
+   "street": "Čapkova",
+   "kind": "modern",
+   "box": {
+    "x0": -1048.0,
+    "x1": -1020.0,
+    "z0": 116.0,
+    "z1": 138.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -1034.0,
+    "z": 138.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -1034.0,
+    "z": 163,
+    "yaw": 180
+   },
+   "step": 3,
+   "enter": false
+  },
+  {
+   "id": "Čapkova_n_102",
+   "street": "Čapkova",
+   "kind": "modern",
+   "box": {
+    "x0": -1006.0,
+    "x1": -978.0,
+    "z0": 116.0,
+    "z1": 138.0
+   },
+   "yaw": 180,
+   "door": {
+    "x": -992.0,
+    "z": 138.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -992.0,
+    "z": 163,
+    "yaw": 180
+   },
+   "step": 3,
+   "enter": false
+  }
+ ],
+ "enter": [
+  {
+   "id": "sandbox_house",
+   "name": "The Old Farmstead",
+   "label": "Statek (dnešní velký dům)",
+   "kind": "big",
+   "box": {
+    "x0": -22,
+    "x1": 22,
+    "z0": 523,
+    "z1": 557
+   },
+   "door": {
+    "x": 0,
+    "z": 523,
+    "yaw": 0
+   },
+   "curb": {
+    "x": 0,
+    "z": 492,
+    "yaw": 0
+   },
+   "fixed": true
+  },
+  {
+   "id": "Hlavní_n_5",
+   "name": "Hlavní house",
+   "label": "dům, Hlavní",
+   "kind": "house",
+   "box": {
+    "x0": -464.0,
+    "x1": -434.0,
+    "z0": -110.0,
+    "z1": -86.0
+   },
+   "door": {
+    "x": -449.0,
+    "z": -86.0,
+    "yaw": 180
+   },
+   "curb": {
+    "x": -449.0,
+    "z": -61,
+    "yaw": 180
+   },
+   "fixed": false
+  },
+  {
+   "id": "Hlavní_s_11",
+   "name": "Hlavní house",
+   "label": "dům, Hlavní",
+   "kind": "house",
+   "box": {
+    "x0": -694.0,
+    "x1": -664.0,
+    "z0": -34.0,
+    "z1": -10.0
+   },
+   "door": {
+    "x": -679.0,
+    "z": -34.0,
+    "yaw": 0
+   },
+   "curb": {
+    "x": -679.0,
+    "z": -59,
+    "yaw": 0
+   },
+   "fixed": false
+  },
+  {
+   "id": "Školní_e_20",
+   "name": "Školní house",
+   "label": "dům, Školní",
+   "kind": "house",
+   "box": {
+    "x0": -536.0,
+    "x1": -512.0,
+    "z0": -264.0,
+    "z1": -234.0
+   },
+   "door": {
+    "x": -536.0,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -561,
+    "z": -249.0,
+    "yaw": 90
+   },
+   "fixed": false
+  },
+  {
+   "id": "Lidická_e_30",
+   "name": "Lidická house",
+   "label": "dům, Lidická",
+   "kind": "house",
+   "box": {
+    "x0": -356.0,
+    "x1": -332.0,
+    "z0": -308.0,
+    "z1": -278.0
+   },
+   "door": {
+    "x": -356.0,
+    "z": -293.0,
+    "yaw": 90
+   },
+   "curb": {
+    "x": -381,
+    "z": -293.0,
+    "yaw": 90
+   },
+   "fixed": false
+  },
+  {
+   "id": "Smetanova_w_84",
+   "name": "Smetanova house",
+   "label": "dům, Smetanova",
+   "kind": "house",
+   "box": {
+    "x0": -496.0,
+    "x1": -470.0,
+    "z0": 160.0,
+    "z1": 178.0
+   },
+   "door": {
+    "x": -470.0,
+    "z": 169.0,
+    "yaw": 270
+   },
+   "curb": {
+    "x": -447,
+    "z": 169.0,
+    "yaw": 270
+   },
+   "fixed": false
+  }
+ ]
+}
