@@ -59,30 +59,36 @@ local function hex(code: string): Color3
 	return Color3.fromRGB(tonumber(code:sub(1, 2), 16) :: number, tonumber(code:sub(3, 4), 16) :: number, tonumber(code:sub(5, 6), 16) :: number)
 end
 local M = Enum.Material
--- fixtures.py's FINISHES (a palette finish: its colour here when the fixture has no such part).
+-- fixtures.py's FINISHES and GAME (the manifest's "finishes"; tools/fixtures-art/looks.py --write copies them here). A
+-- palette finish: its colour here when the fixture has no such part.
 local LOOKS: { [string]: Look } = {
-	tile = { color = hex("406E54"), material = M.SmoothPlastic, palette = { "Stove" }, reflectance = 0.08 },
-	tile2 = { color = hex("5C8170"), material = M.SmoothPlastic, palette = { "Upper" }, reflectance = 0.08 },
+	cabinet = { color = hex("C69864"), material = M.Wood },
+	worktop = { color = hex("8E6844"), material = M.Wood },
+	enamel = { color = hex("EFE7D3"), material = M.SmoothPlastic, reflectance = 0.04 },
+	blackglass = { color = hex("1B1B1E"), material = M.SmoothPlastic, reflectance = 0.12 },
+	chrome = { color = hex("D7DBDF"), material = M.Metal, reflectance = 0.3 },
+	steel = { color = hex("B0B6BC"), material = M.Metal },
+	porcelain = { color = hex("F4F2EC"), material = M.SmoothPlastic, reflectance = 0.08 },
+	water = { color = hex("86BED8"), material = M.Glass, transparency = 0.35 },
+	mirror = { color = hex("C4D6E0"), material = M.Glass, reflectance = 0.5 },
+	woodwork = { color = hex("845836"), material = M.Wood },
+	candle = { color = hex("F2EAD6"), material = M.SmoothPlastic },
+	flower = { color = hex("C4704A"), material = M.Fabric },
+	tile = { color = hex("406E54"), material = M.SmoothPlastic, palette = { "Stove" }, reflectance = 0.05 },
+	tile2 = { color = hex("577F68"), material = M.SmoothPlastic, palette = { "Upper" }, reflectance = 0.05 },
+	grout = { color = hex("D6CDBB"), material = M.SmoothPlastic },
+	iron = { color = hex("302C2A"), material = M.Metal },
+	glow = { color = hex("FF8A3A"), material = M.Neon },
 	pine = { color = hex("BA8652"), material = M.Wood, palette = { "Seat", "StoveBench" } },
 	cushion = { color = hex("B03430"), material = M.Fabric, palette = { "Cushion" } },
-	wood = { color = hex("966A4A"), material = M.Wood },
-	paint = { color = hex("C69864"), material = M.Wood },
-	enamel = { color = hex("F0EEE8"), material = M.SmoothPlastic, reflectance = 0.1 },
-	white = { color = hex("F6F6F4"), material = M.SmoothPlastic, reflectance = 0.06 },
-	steel = { color = hex("B0B4BA"), material = M.Metal },
-	chrome = { color = hex("D7DBDF"), material = M.Metal, reflectance = 0.3 },
-	iron = { color = hex("2E2A28"), material = M.Metal },
-	dark = { color = hex("242428"), material = M.SmoothPlastic },
-	glass = { color = hex("18181A"), material = M.Glass, reflectance = 0.1 },
-	water = { color = hex("96C8E2"), material = M.Glass, transparency = 0.3 },
-	mirror = { color = hex("C4D6E0"), material = M.Glass, reflectance = 0.5 },
-	glow = { color = hex("FF8232"), material = M.Neon },
-	candle = { color = hex("F4ECD6"), material = M.SmoothPlastic },
-	flowers = { color = hex("C4704A"), material = M.Fabric },
-	board = { color = hex("BEA078"), material = M.SmoothPlastic },
-	blue = { color = hex("3C5A8C"), material = M.Metal },
-	card = { color = hex("C49E6C"), material = M.SmoothPlastic },
+	wood = { color = hex("AA8052"), material = M.Wood },
+	board = { color = hex("BEA078"), material = M.Cardboard },
+	vise = { color = hex("3C5A8C"), material = M.Metal },
+	metal = { color = hex("787E84"), material = M.Metal },
+	card = { color = hex("C49E6C"), material = M.Cardboard },
+	crate = { color = hex("3C6EAA"), material = M.SmoothPlastic },
 	door = { color = hex("C8CCCE"), material = M.Metal },
+	rubber = { color = hex("1E1E20"), material = M.Rubber },
 }
 FixtureMesh.Looks = LOOKS
 

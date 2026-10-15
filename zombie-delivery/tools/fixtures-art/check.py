@@ -7,7 +7,8 @@ the model a quarter round, makes it 3 times bigger and moves it; FixtureMesh mus
 every fixture server/HouseInterior.luau builds (shared/HouseLayout.luau plans of a few seeds of the kinds "house" and
 "big", and a farm). Checks:
   - the manifest: every kind of the contract's table at its size, every piece "<kind>_<finish>" a finish of
-    FixtureMesh.Looks (and the manifest's "finishes", when it has them, the same colours), at most 10,000 triangles a
+    FixtureMesh.Looks (and the manifest's "finishes", when it has them, FixtureMesh.Looks exactly: the colours,
+    materials, palette, shine and see-through; tools/fixtures-art/looks.py --write copies them), at most 10,000 triangles a
     piece, about 1,500 a kind (the Kachelofen 3,000);
   - every fixture of every kind dressed (its Model "Fixture_<kind>", attribute Fixture, MeshArt), every piece of the
     kind once, where the manifest has it in the fixture's frame (the import's turn and scale undone);
@@ -75,16 +76,16 @@ def standin_manifest() -> dict:
 
     for kind in ("counter", "sink"):
         w, h, d = KINDS[kind]
-        add(kind, "paint", "Skříňka", (0, 1.4, 0.075), (w, 2.8, d - 0.15))
-        add(kind, "wood", "Pracovní deska", (0, 2.9, 0), (w, 0.2, d))
+        add(kind, "cabinet", "Skříňka", (0, 1.4, 0.075), (w, 2.8, d - 0.15))
+        add(kind, "worktop", "Pracovní deska", (0, 2.9, 0), (w, 0.2, d))
     add("sink", "steel", "Dřez", (0, 3.01, -0.1), (1.8, 0.06, 1.3))
     add("sink", "chrome", "Baterie", (0, 3.4, 0.75), (0.15, 0.8, 0.15))
     w, h, d = KINDS["stove"]
     add("stove", "enamel", "Sporák", (0, 1.45, 0), (w, 2.9, d))
-    add("stove", "glass", "Varná deska", (0, 2.95, 0.05), (w - 0.2, 0.1, d - 0.3))
+    add("stove", "blackglass", "Varná deska", (0, 2.95, 0.05), (w - 0.2, 0.1, d - 0.3))
     add("stove", "iron", "Dvířka trouby", (0, 1.3, -d / 2 + 0.05), (w - 0.5, 1.5, 0.08))
     w, h, d = KINDS["cabinets"]
-    add("cabinets", "paint", "Horní skříňky", (0, h / 2, 0), (w, h, d))
+    add("cabinets", "cabinet", "Horní skříňky", (0, h / 2, 0), (w, h, d))
     w, h, d = KINDS["hood"]
     add("hood", "steel", "Digestoř", (0, 0.3, 0), (w, 0.6, d))
     add("hood", "steel", "Komín digestoře", (0, 0.6 + 4.4 / 2, d * 0.2), (w * 0.45, 4.4, d * 0.55))  # (to the ceiling)
@@ -95,38 +96,38 @@ def standin_manifest() -> dict:
     w, h, d = KINDS["bench"]
     add("bench", "pine", "Lavice", (0, h / 2, 0), (w, h, d))
     w, h, d = KINDS["corner_shelf"]
-    add("corner_shelf", "wood", "Polička", (0, 0.075, 0), (w, 0.15, d))
+    add("corner_shelf", "woodwork", "Polička", (0, 0.075, 0), (w, 0.15, d))
     add("corner_shelf", "candle", "Svíčka", (w / 2 - 0.45, 0.6, d / 2 - 0.45), (0.3, 0.9, 0.3))
-    add("corner_shelf", "flowers", "Sušené květiny", (w / 2 - 0.5, 0.95, d / 2 - 1.05), (0.7, 1.6, 0.7))  # (over its box)
+    add("corner_shelf", "flower", "Sušené květiny", (w / 2 - 0.5, 0.95, d / 2 - 1.05), (0.7, 1.6, 0.7))  # (over its box)
     w, h, d = KINDS["tub"]
-    add("tub", "white", "Vana", (0, h / 2, 0), (w, h, d))
+    add("tub", "porcelain", "Vana", (0, h / 2, 0), (w, h, d))
     add("tub", "water", "Voda", (0, h - 0.2, 0), (w - 0.6, 0.06, d - 0.6))
     add("tub", "chrome", "Baterie", (w / 2 - 0.6, h + 0.3, d / 2 - 0.4), (0.3, 0.6, 0.3))  # (today's tap, over the tub)
     w, h, d = KINDS["toilet"]
-    add("toilet", "white", "Záchod", (0, 1.55, 0), (1.6, 3.1, d))
+    add("toilet", "porcelain", "Záchod", (0, 1.55, 0), (1.6, 3.1, d))
     add("toilet", "chrome", "Splachování", (0, 3.15, d / 2 - 0.35), (0.2, 0.1, 0.2))
     w, h, d = KINDS["basin"]
-    add("basin", "white", "Umyvadlo", (0, 1.55, 0), (w, 3.1, d))
+    add("basin", "porcelain", "Umyvadlo", (0, 1.55, 0), (w, 3.1, d))
     add("basin", "chrome", "Baterie", (0, 3.35, d / 2 - 0.3), (0.15, 0.5, 0.15))
     add("basin", "mirror", "Zrcadlo", (0, 5.4, d / 2 - 0.12), (2.1, 2.7, 0.05))
-    add("basin", "board", "Rám zrcadla", (0, 5.4, d / 2 - 0.05), (2.4, 3.0, 0.1))
+    add("basin", "woodwork", "Rám zrcadla", (0, 5.4, d / 2 - 0.05), (2.4, 3.0, 0.1))
     w, h, d = KINDS["kachelofen"]
     add("kachelofen", "tile", "Kachle", (0, 1.85, 0.65), (w - 0.8, 3.7, 1.9))
     add("kachelofen", "tile2", "Horní patro", (0, 4.9, 0.9), (w - 2, 2.4, 1.4))
-    add("kachelofen", "dark", "Římsa", (0, 6.35, 0.75), (w - 1.6, 0.5, 1.7))
+    add("kachelofen", "grout", "Římsa", (0, 6.35, 0.75), (w - 1.6, 0.5, 1.7))
     add("kachelofen", "iron", "Dvířka", (0, 2.4, -0.35), (1.3, 1.1, 0.1))
     add("kachelofen", "glow", "Žhavá škvíra", (0, 2.15, -0.42), (0.9, 0.14, 0.05))
     add("kachelofen", "pine", "Lavice u kamen", (0, 0.75, -1.05), (w, 1.5, 1.1))
     w, h, d = KINDS["workbench"]
     add("workbench", "wood", "Ponk", (0, h / 2, 0), (w, h, d))
     add("workbench", "board", "Děrovaná deska", (0, h + 2.1, d / 2 - 0.06), (w, 3.4, 0.12))
-    add("workbench", "blue", "Svěrák", (w / 2 - 0.6, h + 0.25, -d / 2 + 0.4), (0.7, 0.5, 0.6))
+    add("workbench", "vise", "Svěrák", (w / 2 - 0.6, h + 0.25, -d / 2 + 0.4), (0.7, 0.5, 0.6))
     w, h, d = KINDS["shelves"]
-    add("shelves", "steel", "Regál", (0, h / 2, 0), (w, h, d))
+    add("shelves", "metal", "Regál", (0, h / 2, 0), (w, h, d))
     add("shelves", "card", "Krabice", (-0.1, 2.98, 0), (3.4, 5.0, d - 0.3))
     w, h, d = KINDS["garage_door"]
     add("garage_door", "door", "Vrata", (0, h / 2, 0), (w, h, d))
-    add("garage_door", "steel", "Drážky", (0, h / 2, -d / 2 + 0.03), (w, h / 3 + 0.12, 0.06))
+    add("garage_door", "rubber", "Drážky", (0, h / 2, -d / 2 + 0.03), (w, h / 3 + 0.12, 0.06))
     manifest = {"fixtures": {}, "pieces": {}, "details": [], "standin": True}
     for kind, rows in boxes.items():
         names = []
@@ -431,10 +432,20 @@ def main():
     if "finishes" in manifest:
         differ = []
         for name, entry in manifest["finishes"].items():
-            want = colour_of(entry)
-            if name not in looks or (want is not None and want != looks[name]["color"]):
-                differ.append(f"{name} {want} vs {looks.get(name, {}).get('color')}")
-        check(not differ, f"FixtureMesh.Looks has the manifest's {len(manifest['finishes'])} finishes in their colours (fixtures.py's FINISHES)", "; ".join(differ[:8]))
+            want, look = colour_of(entry), looks.get(name)
+            if not look or (want is not None and want != look["color"]):
+                differ.append(f"{name} {want} vs {look and look['color']}")
+            elif isinstance(entry, dict):
+                if "material" in entry and entry["material"] != look["material"]:
+                    differ.append(f"{name} {entry['material']} vs {look['material']}")
+                if "palette" in entry and bool(entry["palette"]) != bool(look["palette"]):
+                    differ.append(f"{name} palette {entry['palette']} vs {look['palette']}")
+                for key, mine in (("reflectance", "r"), ("transparency", "t")):
+                    if abs(float(entry.get(key, 0)) - look[mine]) > 1e-6:
+                        differ.append(f"{name} {key} {entry.get(key, 0)} vs {look[mine]}")
+        extra = sorted(set(looks) - set(manifest["finishes"]))
+        check(not differ and not extra, f"FixtureMesh.Looks is the manifest's {len(manifest['finishes'])} finishes (fixtures.py's FINISHES; "
+              "tools/fixtures-art/looks.py --write copies them)", "; ".join(differ[:8]) + (f" not in the manifest: {extra}" if extra else ""))
     over_piece = [(n, p["triangles"]) for n, p in pieces.items() if p.get("triangles", 0) > TRIANGLES["piece"]]
     tris = {k: sum(pieces[n].get("triangles", 0) for n in fx.get("pieces", []) if n in pieces) for k, fx in fixtures.items()}
     over_kind = [(k, t) for k, t in tris.items() if t > TRIANGLES.get(k, TRIANGLES["kind"])]
