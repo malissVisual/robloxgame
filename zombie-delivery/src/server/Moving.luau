@@ -106,8 +106,9 @@
 --   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
 --     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
 --     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
---     Chalet", 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big", Config.Moving.Sandbox.Kind,
---     its back door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the
+--     Farmstead" on Pražská, 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big",
+--     Config.Moving.Sandbox.Kind, its back door a second way in and out, as a farm's barn doors): its "Enter house" on
+--     the map's front door (the
 --     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
 --     truck to door" to House.curb, out at its door; refilled once a move brought something home (a new HouseLayout
 --     seed: the card's own, SB.seeds, kept until then; 8.3 economy: a move called off with nothing home keeps it, no
@@ -1083,7 +1084,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 		kind = "house",
 		name = contract.name,
 		address = T.Sandbox.Address,
-		street = "Main Street",
+		street = "Pražská",
 		district = "sandbox",
 		x = door.X,
 		z = door.Z,

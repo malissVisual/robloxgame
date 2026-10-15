@@ -2,7 +2,7 @@
 -- MoveSites with it) on tests/runtime/MovingRuntime.luau's fakes with Config.Sandbox.On (tests/run_tests.py builds
 -- them; the fake art's plan records its seeds and gives each piece a colour variant).
 --   * Moving.start in the sandbox: a Moving contracts kiosk on every plot (SandboxMap plot.board), no depot board, no
---     Wall, no dressing, no soldier, no Marge or Walt: one contract, "The Old Chalet" (SandboxMap.House).
+--     Wall, no dressing, no soldier, no Marge or Walt: one contract, "The Old Farmstead" (SandboxMap.House).
 --   * The card (any plot's board, not from afar): the house, its pieces' worth, 8.3 25 minutes, no horde by default, no
 --     story, the note; its seed a new one once a move brought something home (8.3 economy: no reroll, a move called off
 --     with nothing home keeps its house, the owner leaving too). START → the solo lobby → LAUNCH at a board: the owner's own van
@@ -233,7 +233,7 @@ local moves = workspace:FindFirstChild("Moves")
 check("the sandbox: a kiosk on every plot, no depot board, no Wall, no dressing", moves ~= nil and moves:FindFirstChild("MovingBoard1") ~= nil
 	and moves:FindFirstChild("MovingBoard4") ~= nil and moves:FindFirstChild("MovingBoard") == nil and moves:FindFirstChild("MovingDropOff") == nil
 	and moves:FindFirstChild("MoveDressing") == nil)
-check("one contract: The Old Chalet (no Marge, no Walt)", moves:FindFirstChild("Move_sandbox_house") ~= nil and moves:FindFirstChild("Move_marge") == nil
+check("one contract: The Old Farmstead (no Marge, no Walt)", moves:FindFirstChild("Move_sandbox_house") ~= nil and moves:FindFirstChild("Move_marge") == nil
 	and moves:FindFirstChild("Move_walt") == nil)
 check("no soldier at a Wall", Greeters.soldier() == nil)
 local kiosk1 = moves:FindFirstChild("MovingBoard1")
@@ -259,7 +259,7 @@ local function anyText(list: { string }, word: string): boolean
 	return false
 end
 local corkWords = textsOf(kiosk1)
-check("8.0.1: the plot kiosk's corkboard is the sandbox's: THE OLD CHALET, bring it home to your warehouse", anyText(corkWords, "THE OLD CHALET")
+check("8.0.1: the plot kiosk's corkboard is the sandbox's: THE OLD FARMSTEAD, bring it home to your warehouse", anyText(corkWords, "THE OLD FARMSTEAD")
 	and anyText(corkWords, "Bring it home to your warehouse") and anyText(corkWords, "MOVING CONTRACTS"), table.concat(corkWords, " | "))
 check("…no Marge, no Walt, no Wall, no evacuation on it", not anyText(corkWords, "Marge") and not anyText(corkWords, "Walt") and not anyText(corkWords, "Wall")
 	and not anyText(corkWords, "evacuat"), table.concat(corkWords, " | "))
@@ -279,7 +279,7 @@ local worth = 0
 for _, item in E.items do
 	worth += item.value
 end
-check("the board's card: The Old Chalet, its pieces' worth, 8.3: 25 minutes (several trips)", card ~= nil and card.a.id == House.id and card.a.name == House.name and card.a.items == 6
+check("the board's card: The Old Farmstead, its pieces' worth, 8.3: 25 minutes (several trips)", card ~= nil and card.a.id == House.id and card.a.name == House.name and card.a.items == 6
 	and card.a.estimate == worth and S.Time == 25 * 60 and card.a.time == S.Time and card.a.busy == nil and card.a.address == S.Address, card and card.a.busy)
 check("…no horde by default (no guns in the sandbox), no roamers", S.Horde == false and S.Roam == 0 and card.a.hordeAt == 0)
 check("…no story, the note (no pay per piece), one contract", card.a.story == false and type(card.a.note) == "string" and #card.a.contracts == 1
@@ -478,7 +478,7 @@ check("the van at another player's plot: no trip (and no word on backing up: not
 	and not heard(ann, BACK_UP))
 park(truck, { x = 0, z = 200, yaw = 180 })
 step()
-check("…nor on Main Street", #E.collected == 0 and not heard(ann, BACK_UP))
+check("…nor on Pražská", #E.collected == 0 and not heard(ann, BACK_UP))
 park(truck, plot1.vanSpot)
 check("(the van's back inside the owner's unload circle)", flatDistance(cargoDoor.WorldPosition, V3(plot1.unload.x, 0, plot1.unload.z)) <= plot1.unload.r)
 local tripAt = #E.messages

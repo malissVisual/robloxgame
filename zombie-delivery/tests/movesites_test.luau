@@ -80,7 +80,7 @@ for _, p in city do
 end
 check("8.0.1: the plots' kiosk: as many pieces as the depot's, unique names, the same kiosk round the corkboard (the Board solid where it was)",
 	#plot == #city and not twice and sameKiosk, `{#plot} / {#city}`)
-check("8.0.1: …its corkboard says THE OLD CHALET and \"Bring it home to your warehouse.\"", string.find(plotAll, "THE OLD CHALET", 1, true) ~= nil
+check("8.0.1: …its corkboard says THE OLD FARMSTEAD and \"Bring it home to your warehouse.\"", string.find(plotAll, "THE OLD FARMSTEAD", 1, true) ~= nil
 	and string.find(plotAll, "Bring it home to your warehouse.", 1, true) ~= nil, plotAll)
 check("8.0.1: …no Marge, no Walt, no Wall, no evacuation", string.find(plotAll, "MARGE", 1, true) == nil and string.find(plotAll, "WALT", 1, true) == nil
 	and string.find(plotAll, "Wall", 1, true) == nil and string.find(string.upper(plotAll), "EVACUAT", 1, true) == nil, plotAll)

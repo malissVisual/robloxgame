@@ -2,8 +2,9 @@
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
 > small alpine test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): a meadow with one
-> road, **one house to empty** (The Old Chalet, refilled with a new random layout every move, with 2 – 4 **collectibles**
-> from uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. Every player drives a
+> road, **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
+> plan, `design/jinocany/NAVRH.md`; refilled with a new random layout every move, with 2 – 4 **collectibles** from
+> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. Every player drives a
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
 > from inside. Take the contract at the kiosk by your warehouse, carry the house out (the grip, Danny and two-person
@@ -32,7 +33,7 @@
 > and the misses stay with the piece a moment. Easy by default; `Config.CarryGrip.Difficulty` makes it harder later.
 > The warehouse's **UPGRADES desk** (`server/Upgrades.luau`, `client/UpgradeUi.luau`, `Config.SandboxUpgrades`): more
 > stands (12 → 20), showroom lights (more income), the van's engine and Danny's training. The sandbox **sounds like the
-> Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Chalet wears the owner's **Blender
+> Alps** (sfx4's 13 new sounds once uploaded, `client/SandboxSounds.luau`), The Old Farmstead wears the owner's **Blender
 > house** once imported, and the 12 collectibles have their **Blender look** (`ZDCFurnitureArt`, re-import it).
 >
 > **8.2** (more to do with the money and the collection): the **collection book** (📖 BOOK chip, C on a computer;
@@ -68,7 +69,7 @@
 > then you carry it together, backwards too, never a hop; he rides in the van's passenger seat and gives it up to a
 > crew mate (`SeatYield`, `SeatAside`). **Pair-carry keep-up**: nobody runs with a piece for two ("Too heavy to run
 > with", `client/PairSteer.luau`) and Danny follows your real speed (`HoldCap`, `HoldPace`, `HoldLead`). **Swinging
-> doors** (`shared/DoorSwing.luau`, `client/WalkDoors.luau`, `Config.Moving.Doors`): The Old Chalet's leaves swing open
+> doors** (`shared/DoorSwing.luau`, `client/WalkDoors.luau`, `Config.Moving.Doors`): The Old Farmstead's leaves swing open
 > (0.35 s) as you walk up, and the trip through is a smooth fade (0.25 s out, in once you are there). **The big move**
 > (`Config.Moving.Sandbox` Kind "big", `Config.Furniture.Big`): 25 minutes, 34 – 40 pieces and 2 – 3 collectibles in
 > ten rooms, a **back door** as a second way in and out. **The market** (`shared/Market.luau`, `Config.Market`): every
@@ -1757,8 +1758,8 @@ variant's colours; a whole house dressed within `InteriorMaxParts`; without the 
 
 ## The sandbox's big house in the owner's Blender model (8.2.1)
 
-The owner asked to make the European house the sandbox's chalet ("předělej ten dům na chatu v sandboxu"). 8.1 had put Marge's small house (20.36 × 12.60 × 17.57) on The Old Chalet. Shown both, the owner chose the big one ("chci ten velký dům"). `design/blender-house/house.py` has a `TARGET`:
-- `"sandbox"` (the export now): The Old Chalet's old footprint, 44 × 14.5 × 34 (the walls), the roof under 26 (the steepest pitch that fits: 31°);
+The owner asked to make the European house the sandbox's chalet ("předělej ten dům na chatu v sandboxu"). 8.1 had put Marge's small house (20.36 × 12.60 × 17.57) on The Old Farmstead. Shown both, the owner chose the big one ("chci ten velký dům"). `design/blender-house/house.py` has a `TARGET`:
+- `"sandbox"` (the export now): The Old Farmstead's old footprint, 44 × 14.5 × 34 (the walls), the roof under 26 (the steepest pitch that fits: 31°);
 - `"city"`: Marge's 155 Willow Ln, as in 7.2 (the game has one `ZDCHouseArt`, so only one of them wears it).
 
 The house is the same classic European house, with these sandbox changes:
@@ -1903,7 +1904,7 @@ server/Moving.luau's WalkIn and travel; the numbers in `Config.Moving.Doors`).
   crew mate at the other end of a piece for two comes along in the same dark moment, lined up with it, and a hired
   Danny opens the doors he walks through. The eyes (`client/SandboxLight.luau`) take the new place at once behind the
   black: no second change after the fade.
-- **Which doors.** Both doors of The Old Chalet swing, outside and inside. Outside, the chalet's two front leaves and
+- **Which doors.** Both doors of The Old Farmstead swing, outside and inside. Outside, the chalet's two front leaves and
   its back leaf (dressed in the owner's Blender house: copies of the model's own front and back doors,
   `SandboxScenery.frontLeaves` / `backLeaves`); inside, the front door's leaves and the back door's leaf, which swing
   out onto their porches (each with a PathfindingModifier PassThrough).
@@ -1913,8 +1914,8 @@ leaves open), the e2e's steps 4 and 20; `tools/house-art/check.py` checks the le
 
 ## The big move (8.4)
 
-8.2.1 made The Old Chalet the owner's big Blender house (44 × 14.5 × 34). Its move is a big one now: the contract card
-at your kiosk still says **The Old Chalet** (for The Hubers: "A big old house packed full of things. Too much for one
+8.2.1 made The Old Farmstead the owner's big Blender house (44 × 14.5 × 34). Its move is a big one now: the contract card
+at your kiosk still says **The Old Farmstead** (for The Nováks: "A big old house packed full of things. Too much for one
 van: plan several trips home to your warehouse."), and the house is laid out as HouseLayout's kind **"big"**
 (`Config.Moving.Sandbox.Kind`, `Config.Furniture.Big`).
 
@@ -2020,7 +2021,7 @@ while it stands at your plot's van spot, opens the shop (`client/VanPaintUi.luau
 
 ## 24 collectibles (8.4)
 
-Twelve more collectibles for The Old Chalet, three of each rarity, so the house holds **24** and the collection book
+Twelve more collectibles for The Old Farmstead, three of each rarity, so the house holds **24** and the collection book
 **68 pieces** (44 furniture, 24 collectibles; `shared/FurnitureLooks.luau`):
 
 | Rarity | 8.0's twelve | 8.4's twelve |

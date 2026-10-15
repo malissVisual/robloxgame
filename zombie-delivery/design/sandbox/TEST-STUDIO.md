@@ -24,7 +24,7 @@ Zaškrtněte, co sedí. Když něco nesedí, poznamenejte číslo bodu a co jste
 - [ ] Van hráče B stojí u skladu 2, ne u skladu 1.
 
 ## 3. Zakázka
-- [ ] U kiosku (tabule) na svém pozemku: E → karta zakázky „The Old Chalet“ → **START** → **LAUNCH**. Danny čeká u vanu.
+- [ ] U kiosku (tabule) na svém pozemku: E → karta zakázky „The Old Farmstead“ → **START** → **LAUNCH**. Danny čeká u vanu.
 - [ ] B jde ke kiosku hráče A: dostane jen **svou** zakázku. Zakázku hráče A spustit nemůže.
 
 ## 4. K domu a dovnitř

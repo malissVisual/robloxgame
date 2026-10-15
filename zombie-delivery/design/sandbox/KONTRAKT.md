@@ -30,8 +30,8 @@ Everything below is for the workers (agents). **Keep the names and shapes here.*
 
 ## The loop
 1. **PLAY.** You stand at your plot's `spawn`, and your Sprinter van waits at `vanSpot`, nose to the street and back doors to the warehouse's roller door.
-2. **Contract.** The Moving contracts board at `board` offers one contract: "The Old Chalet" (`SandboxMap.House`). Each move gets a new seed, so the house is refilled.
-3. **Drive.** Drive down Main Street to the house. Its front door at `House.door` has "Enter house", which fades you into `HouseInterior`, the existing system.
+2. **Contract.** The Moving contracts board at `board` offers one contract: "The Old Farmstead" (The Old Chalet before the Jinočany plan) (`SandboxMap.House`). Each move gets a new seed, so the house is refilled.
+3. **Drive.** Drive down Pražská (Main Street before the Jinočany plan) to the house. Its front door at `House.door` has "Enter house", which fades you into `HouseInterior`, the existing system.
 4. **Carry.** Carry the pieces out (grip, Danny, two-person lifts all as now) and load them into the van. You can walk inside the van; the load and packing work as now.
 5. **Unload.** Drive back. With the van's back or middle (or the line between them; 8.0.1) inside your plot's `unload` circle, the van's contents go into your warehouse's stock: `Collection.add` for each piece, to the move's owner. This is a "trip". You can do more trips until you press FINISH or the clock runs out.
 6. **Warehouse.** It has its level's display stands (8.3: `Config.Warehouse.Levels`, the Garage's 2 … the Logistics Center's 24, and More stands' small ones from the Big Warehouse on; bought at its UPGRADES desk: design/warehouse-levels/KONTRAKT.md). An empty stand's prompt opens the picker (`Collection.openPicker`), and you choose a piece from your stock. It stands there (its 3D model) and earns money every minute you play. A shown piece's prompt can take it down or sell it.

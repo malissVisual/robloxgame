@@ -3,7 +3,7 @@
 ![Evropský dům v sandboxu](house-preview.png)
 
 Dům, ze kterého se stěhuje, jako **klasický evropský rodinný dům**. V testovacím světě (sandbox) nahradí starou alpskou
-chatu **The Old Chalet** (rodina Huberových na konci Main Street):
+chatu, dnes statek **The Old Farmstead** (do plánu Jinočan The Old Chalet; rodina Novákových na konci Pražské):
 - krémová omítka, šedý sokl, světlé rohové kvádry a bílé římsy mezi patry a pod střechou;
 - dvě patra oken s bílým křížem, šambránami, kamennými parapety a záclonkami;
 - truhlíky s červenými muškáty pod okny;
@@ -54,7 +54,7 @@ Na čem se dá učit:
 Nahoře klikni na záložku **Scripting** a v textovém editoru vyber `house.py`. Nahoře je **NASTAVENÍ**:
 
 ```python
-TARGET = "sandbox"   # "sandbox" = The Old Chalet v sandboxu, "city" = dům Marge ve městě
+TARGET = "sandbox"   # "sandbox" = The Old Farmstead v sandboxu, "city" = dům Marge ve městě
 TARGETS = {
     "sandbox": {"box": (44.0, 14.5, 34.0), ..., "front": [-19.0, -13.0, -7.0, 7.0, 13.0, 19.0],
                 "dormers": [-13.0, 0.0, 13.0], "chimneys": [(-15.0, 6.0), (12.0, 6.0)], ...},
@@ -89,7 +89,7 @@ Jednou ve Studiu (s hrou otevřenou jako obvykle):
    **ServerStorage**. Hra by si ho schovala i sama, ale takhle je to jistota.
 3. Ulož místo (*File → Save*) a *File → Publish to Roblox*, ať ho má i hra na Robloxu.
 
-Vyzkoušení: **Play**, dej **PLAY** a dojeď dodávkou po Main Street na jih až na konec, k domu za otočkou (nebo
+Vyzkoušení: **Play**, dej **PLAY** a dojeď dodávkou po Pražské na jih až na konec, k domu za otočkou (nebo
 rovnou **P** → záložka **SANDBOX** → **📍 TO HOUSE**). Místo chaty tam stojí evropský dům. Dveře, *Enter house*,
 vítající postava i zahrada fungují jako dřív.
 

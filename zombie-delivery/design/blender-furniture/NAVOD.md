@@ -89,7 +89,7 @@ Rozměry kusů v seznamu `ITEMS` neměň: hra má stejné rozměry v `src/shared
 že sedí. Kdybys chtěl kus větší nebo menší i ve hře, řekni Claudovi.
 
 ## 4. Nábytek ve hře
-Hra tyhle modely použije v každém domě při stěhování (Marge's House, v SANDBOXu The Old Chalet) a sběratelské kousky
+Hra tyhle modely použije v každém domě při stěhování (Marge's House, v SANDBOXu The Old Farmstead) a sběratelské kousky
 i na stojanech ve skladu. Hráči nosí pořád stejnou krabici `Root` (kolize, nošení, nakládání do auta i poškození
 zůstávají), jen místo kostiček z dílů uvidí model z Blenderu. Barvy látek, dřeva a laku (a u sběratelských kousků
 zlata, sametu, laku, neonu a srsti) se mění podle varianty kusu, takže dva gauče v různých domech nejsou stejné. Nápisy

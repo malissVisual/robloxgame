@@ -22,7 +22,7 @@
 --                                         board's width), align ("left" | "center" | "right"); the ALL-TIME one only
 --                                         with allTime
 --   SandboxLeadersRules.spot()            where the board stands (a SandboxMap Spot): Config.SandboxLeaders.Board.Corner
---                                         studs off the crossroads' south-east corner (east of Main Street, south of
+--                                         studs off the crossroads' south-east corner (east of Pražská, south of
 --                                         Depot Row; the signpost stands at the south-west one), on the ground there,
 --                                         its face to Yaw (to the crossroads)
 --   SandboxLeadersRules.footprint()       { width, depth }: the ground the board covers (its roof is the widest part)
@@ -197,7 +197,7 @@ end
 
 function SandboxLeadersRules.spot(): SandboxMap.Spot
 	local B = Config.SandboxLeaders.Board
-	local main, depot = road("Main Street", 1), road("Depot Row", 2)
+	local main, depot = road("Pražská", 1), road("Depot Row", 2)
 	local x, z = main.x1 + B.Corner[1], depot.z1 + B.Corner[2]
 	return { x = x, y = SandboxScenery.groundAt(x, z), z = z, yaw = B.Yaw }
 end

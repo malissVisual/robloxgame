@@ -47,8 +47,8 @@ do
 	local step = SandboxSteps.decide(state({}))
 	check("no move: take a contract at the board (your plot's board)", step.id == "contract" and step.hint == "Take a contract at the board" and step.target == "board", show(step))
 	step = SandboxSteps.decide(state({ move = true }))
-	check("a move started, not at the house: drive to The Old Chalet (its curb)", step.id == "drive" and step.hint == "Drive to The Old Chalet" and step.target == "curb" and step.nav, show(step))
-	check("… the house's name from SandboxMap", SandboxMap.House.name == "The Old Chalet")
+	check("a move started, not at the house: drive to The Old Farmstead on Pražská (its curb)", step.id == "drive" and step.hint == "Drive to The Old Farmstead on Pražská" and step.target == "curb" and step.nav, show(step))
+	check("… the house's name from SandboxMap", SandboxMap.House.name == "The Old Farmstead")
 	step = SandboxSteps.decide(state({ move = true, seated = true }))
 	check("… driving there too", step.id == "drive", show(step))
 	step = SandboxSteps.decide(state({ move = true, atHouse = true }))
@@ -69,7 +69,7 @@ do
 	check("… driving home", step.id == "home", show(step))
 	step = SandboxSteps.decide(state({ move = true, delivered = 4 }))
 	check("a trip unloaded, the move still on: back to the house for more, or FINISH", step.id == "back" and step.target == "curb" and step.nav
-		and step.hint == "Drive back to The Old Chalet for more, or FINISH", show(step))
+		and step.hint == "Drive back to The Old Farmstead on Pražská for more, or FINISH", show(step))
 	step = SandboxSteps.decide(state({ move = true, delivered = 4, atHouse = true }))
 	check("… there again: in through the door", step.id == "door", show(step))
 	step = SandboxSteps.decide(state({ stock = 3 }))
@@ -185,7 +185,7 @@ do
 	check("the turnaround's north edge is not", not SandboxSteps.atHouse(t.x, t.z - t.r, margin))
 	local plot = SandboxMap.Plots[1]
 	check("your plot is not", not SandboxSteps.atHouse(plot.spawn.x, plot.spawn.z, margin))
-	check("Main Street's middle is not", not SandboxSteps.atHouse(0, 200, margin))
+	check("Pražská's middle is not", not SandboxSteps.atHouse(0, 200, margin))
 end
 
 -- ── The path along the roads ────────────────────────────────────────────────
@@ -212,7 +212,7 @@ do
 	local plot = SandboxMap.Plots[1]
 	local curb = SandboxMap.House.curb
 	local n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, curb.x, curb.z, out, direct)
-	check("from your plot to the house: out to Depot Row, along it, down Main Street", n == 4 and out[3] == plot.spawn.x and out[4] == rowZ
+	check("from your plot to the house: out to Depot Row, along it, down Pražská", n == 4 and out[3] == plot.spawn.x and out[4] == rowZ
 		and out[5] == 0 and out[6] == rowZ and out[7] == curb.x and out[8] == curb.z, points(n))
 	local inner = true
 	for i = 2, n - 1 do
@@ -220,7 +220,7 @@ do
 	end
 	check("… every turn on a road", inner, points(n))
 	n = SandboxSteps.route(curb.x, curb.z, plot.unload.x, plot.unload.z, out, direct)
-	check("from the house home: up Main Street, along Depot Row, in to the unload circle", n == 4 and out[3] == 0 and out[4] == rowZ
+	check("from the house home: up Pražská, along Depot Row, in to the unload circle", n == 4 and out[3] == 0 and out[4] == rowZ
 		and out[5] == plot.unload.x and out[6] == rowZ and out[7] == plot.unload.x and out[8] == plot.unload.z, points(n))
 	n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, plot.board.x, plot.board.z, out, direct)
 	check("on your plot to its board: straight", n == 2 and out[3] == plot.board.x and out[4] == plot.board.z, points(n))
@@ -228,9 +228,9 @@ do
 	n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, other.board.x, other.board.z, out, direct)
 	check("to another plot: along Depot Row", n == 4 and out[4] == rowZ and out[6] == rowZ, points(n))
 	n = SandboxSteps.route(0, 300, curb.x, curb.z, out, direct)
-	check("on Main Street to the house: straight on", n == 2 and out[3] == curb.x and out[4] == curb.z, points(n))
+	check("on Pražská to the house: straight on", n == 2 and out[3] == curb.x and out[4] == curb.z, points(n))
 	n = SandboxSteps.route(120, 200, curb.x, curb.z, out, direct)
-	check("from the meadow: to Main Street first", n == 3 and out[3] == 0 and out[4] == 200, points(n))
+	check("from the meadow: to Pražská first", n == 3 and out[3] == 0 and out[4] == 200, points(n))
 	n = SandboxSteps.route(5, 5, 5, 5, out, direct)
 	check("already there: two points (a path of nothing)", n == 2, points(n))
 	local count = 0

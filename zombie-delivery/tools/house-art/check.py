@@ -27,7 +27,7 @@ tools/perf/world-mock.luau) with the same import in the Workspace. Checks:
     (the path runs under it); the garden (the fence, the gate, the mailbox, the flower boxes) and the greeter's spot
     (server/MoveGreeters.luau, Config.MoveGreeters.Porch) clear of the model.
 8.2.1: house.py's TARGET says which house the export is for (the manifest's "target"): "sandbox", the owner's big
-house on The Old Chalet (the sandbox checks above; Marge's then another size: left as World builds it), or "city",
+house on The Old Farmstead (the sandbox checks above; Marge's then another size: left as World builds it), or "city",
 Marge's (the checks above it; the sandbox's then another size: the chalet as it is).
 8.3 the big move: the chalet's doors' leaves and its back door (server/SandboxWorld.luau): without the import the
 doorways (FrontDoor, BackDoor) unseen behind their leaves and nothing else changed; the FrontDoor's two leaves
@@ -233,7 +233,7 @@ local Config = require("./Config")
 local world = require("./SandboxWorldServer").build()
 local H = SandboxMap.House
 local h = H.house
-local chalet = world:FindFirstChild("TheOldChalet")
+local chalet = world:FindFirstChild("TheOldFarmstead")
 local own = chalet and chalet:FindFirstChild("House_" .. H.id)
 -- the house's frame: its box's bottom middle, -Z out of the front door
 local base = G.CFrame.new(h.x, h.y, h.z) * G.CFrame.Angles(0, math.rad(H.door.yaw), 0)
@@ -527,7 +527,7 @@ def halls_check(result, W, H, D):
 
 
 def sandbox_check(manifest, plain, art):
-    """8.1 SANDBOX: The Old Chalet (server/SandboxWorld.luau) on house.py's box, dressed by HouseMesh once imported."""
+    """8.1 SANDBOX: The Old Farmstead (server/SandboxWorld.luau) on house.py's box, dressed by HouseMesh once imported."""
     W, H, D = manifest["box"]
     details = manifest["details"]
     for result in (plain, art):
@@ -694,7 +694,7 @@ def sandbox_check(manifest, plain, art):
             if overlap(a, box_of(d)) and not (p["name"] == "Path" and d["name"].startswith("Schod")):
                 clashes.append((p["name"], d["name"]))
     assert not clashes, f"the garden in the model: {clashes[:8]}"
-    return (f"Sandbox house PASS: The Old Chalet on house.py's box ({W:.2f} × {H:.2f} × {D:.2f}) as SandboxWorld builds it: "
+    return (f"Sandbox house PASS: The Old Farmstead on house.py's box ({W:.2f} × {H:.2f} × {D:.2f}) as SandboxWorld builds it: "
             f"without the import the chalet; dressed, all {len(meshes)} pieces in place on House_sandbox_house, anchored, not "
             f"physical; the chalet's {len(own)} parts hidden, the house's solid pieces (8.5: the box less its doors' dark halls, walkable) and the gable solid, the gable "
             f"({house['pitch']:g}°) under the roof ({worst:.2f} studs at the least); the FrontDoor on the model's door, 8.3 the "

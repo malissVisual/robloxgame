@@ -768,6 +768,30 @@ def pad_check():
 if not pad_check():
     ok = False
 
+# Jinočany (design/jinocany/NAVRH.md: the sandbox in Jinočany in place of the Alps): the sandbox's big house is The Old
+# Farmstead and its street Pražská, so no "Old Chalet" and no "Main Street" is left in src (comments too, a name broken
+# over two comment lines too). The city's own files (Config.Sandbox.On = false, on hold) may keep their own names.
+CITY_ONLY = {"shared/Map.luau", "shared/BusLines.luau", "server/World.luau", "server/Alpine.luau", "server/Chalets.luau", "server/Hauptplatz.luau"}
+def jinocany_names_check():
+    src = os.path.join(os.path.dirname(HERE), "src")
+    old = re.compile(r"\bold(?:\s|--)*chalet|\bmain(?:\s|--)*street\b", re.I)
+    bad, scanned = [], 0
+    for folder, _, files in os.walk(src):
+        for name in sorted(files):
+            path = os.path.join(folder, name)
+            rel = os.path.relpath(path, src).replace(os.sep, "/")
+            if not name.endswith(".luau") or rel in CITY_ONLY:
+                continue
+            scanned += 1
+            text = open(path, encoding="utf-8").read()
+            for found in old.finditer(text):
+                bad.append(f"src/{rel}:{text.count(chr(10), 0, found.start()) + 1} says {' '.join(found.group(0).replace('--', ' ').split())!r}")
+    print("== Jinočany names: " + (f"no Old Chalet and no Main Street in {scanned} src modules (The Old Farmstead on Pražská; the city's {len(CITY_ONLY)} own files left out)" if not bad else "; ".join(bad[:20])))
+    return not bad
+
+if not jinocany_names_check():
+    ok = False
+
 # 8.5.1: the server's and the client's BuildStamp equal Config.Version (they find a Studio left with old scripts).
 def build_stamp_check():
     root = os.path.dirname(HERE)
