@@ -327,6 +327,58 @@ check("…StuckSnap s: a nudge to his way's next point", Brain.unstuck(H.StuckSn
 -- The far end of your piece (7.x) ------------------------------------------------------------------------------------------
 
 check("his root Standoff past the far face", near(Brain.farEnd(3.2), 1.6 + H.Standoff))
+do
+	-- 8.6 his end (the owner: "he teleports from side to side"): the face across the piece from you, in its own frame
+	local ax, az, half = Brain.holdEnd(7.2, 3.2, -6.1, 0) -- (the Sofa lengthwise: you at its -X end)
+	check("8.6 his end: the far end of its length (you at one end: he at the other)", ax == 1 and az == 0 and near(half, 3.6))
+	ax, az, half = Brain.holdEnd(6.0, 3.8, 0, 2.4) -- (the Dining Table broadside: you at its +Z side)
+	check("…the face across it from you wherever you hold it (its -Z face, its half depth)", ax == 0 and az == -1 and near(half, 1.9))
+	ax, az = Brain.holdEnd(3.8, 3.8, 0, 0)
+	local bx, bz = Brain.holdEnd(6.0, 3.8, 0, 0)
+	check("…you at its middle (nothing to go by): the old far face for a square, its length's +X end for a long one",
+		ax == 0 and az == -1 and bx == 1 and bz == 0)
+	ax, az = Brain.holdEnd(6.0, 3.8, -3.1, 1.9) -- (at a corner: the line through its middle leaves by its +X face)
+	check("…at a corner: the face the line from you through its middle comes out at", ax == 1 and az == 0)
+	ax, az = Brain.holdEnd(0 / 0, 3.8, 0 / 0, 2)
+	check("…NaN in: a face, never NaN", (ax == 0 or ax == 1 or ax == -1) and (az == 0 or az == 1 or az == -1) and ax == ax)
+	-- 8.6 his lead follows his end's own way, changing HoldLead.Rate studs a second at most
+	local L = H.HoldLead
+	local trail = Brain.newTrail()
+	local function look(x: number, z: number, seconds: number): (number, number)
+		return Brain.endLead(trail, x, z, 0.1, seconds, false)
+	end
+	local lx, lz = look(0, 0, 0.2)
+	check("8.6 his lead: none at the first look", lx == 0 and lz == 0)
+	local x, most, last = 0, 0, 0
+	for _ = 1, 30 do
+		x += 1
+		lx = look(x, 0, 0.2)
+		most = math.max(most, math.abs(lx - last))
+		last = lx
+	end
+	check("…his end walking +X at 10 studs/s: its velocity × the lead time (2 studs) at the end", near(lx, 2, 1e-3), lx)
+	check("…reached at HoldLead.Rate studs a second at most (never a jump of his aim)", most <= L.Rate * 0.1 + 1e-9 and L.Rate > 0 and L.Rate < 10, most)
+	most = 0
+	for _ = 1, 20 do
+		x -= 1 -- (the way back at once: a 180°)
+		lx = look(x, 0, 0.2)
+		most = math.max(most, math.abs(lx - last))
+		last = lx
+	end
+	check("…a 180°: the lead swings across at Rate at most (8.3's jumped 2 × lead in a look)", most <= L.Rate * 0.1 + 1e-9 and near(lx, -2, 1e-3), `{most} {lx}`)
+	lx, lz = Brain.endLead(trail, x + 50, 0, 0.1, 0.2, false)
+	check("…his end put far off at once (past HoldPace.Jump: a door's fade), or a reset: no lead", lx == 0 and lz == 0
+		and select(1, Brain.endLead(trail, x + 51, 0, 0.1, 0.2, true)) == 0)
+	lx, lz = Brain.endLead(trail, 0 / 0, 0, 0.1, 0.2, false)
+	check("…no place (NaN): none, never NaN", lx == 0 and lz == 0)
+	-- 8.6 the ease back is HoldCap at most
+	local eased = Brain.newTrail()
+	local top = 0
+	for _ = 1, 40 do
+		top = math.max(top, (Brain.holdTrack(eased, 200, false, 10, 0.1)))
+	end
+	check("8.6 eased back from far off (200 studs): HoldCap at most (it was the gap / HoldEase: 400 studs a second)", near(top, H.HoldCap), top)
+end
 check("on the floor there: level with you", near(Brain.endRise(-1.75, -1.75), -1.75))
 check("…a step up or down: with the floor", near(Brain.endRise(-1, -1.75), -1) and near(Brain.endRise(-3, -1.75), -3))
 check("…a step's reach at most (HoldStep): the floor there", near(Brain.endRise(-1.75 + H.HoldStep, -1.75), -1.75 + H.HoldStep)

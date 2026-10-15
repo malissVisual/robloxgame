@@ -80,6 +80,16 @@
 --     and he is aimed your velocity × MoveHelperBrain.leadTime (HoldLead: a little + your ping) ahead of his place:
 --     your screen shows his body that late, so there he walks at his end (actHold). Nobody runs with a piece in two
 --     (the CarryPair attribute: client/PairSteer.luau).
+--   * 8.6 (the owner: "the carrying is still bad. He teleports from side to side"; a screenshot: Danny beside the Dining
+--     Table, at its side, the table floating between them): the piece lies along the carry, low (server/Moving.luau's
+--     holdOffset: its grips at the hands), and his end is the face across it from you, decided once as the hold starts
+--     and kept in the piece's own frame (h.holdEnd: MoveHelperBrain.holdEnd), so the far end of its length: your turn,
+--     a square-ish piece, a late look at you never make it another end. His lead follows his END's own way (the
+--     piece's turn in it) and changes HoldLead.Rate studs a second at most (MoveHelperBrain.endLead: it was your root's
+--     velocity, taken at once: your step back, a turn's step aside, an uneven look at you threw his aim across and he
+--     ran there); an ease back is HoldCap at most. His hands on his end's edge at its grips' height (Config.MoveHelper
+--     Edge). Your call: once he is there it goes up at once on his "On three... lift!" (no lift check after the wait,
+--     Config.MoveHelper.CallCheck; the hold turns him to you, never a snap).
 --   * Your two-person piece dragged alone (hired; he could not come to your call: a crew mate's call, him down): he
 --     sprints to its far end and takes it (MoveHelperBrain.pickLift).
 --   * The van's back: somebody of the crew coming with a piece within OpenNear of the shut back while he is within
@@ -244,6 +254,7 @@ type Helper = {
 	helpSince: number, -- 7.x when he set off to your lift (HelpBlink)
 	gripped: BasePart?, -- 7.x the piece whose far end he holds (its root)
 	holdOffset: CFrame?, -- 7.x his place in its frame
+	holdEnd: Vector3?, -- 8.6 his end of it in its own frame (its axis × studs out of its middle), decided as the hold starts
 	trail: Brain.Trail, -- 8.1 how long he has been behind his place at the far end (MoveHelperBrain.holdTrack)
 	holdAt: Vector3?, -- 8.1 where his root was a step ago holding it (his legs' speed)
 	holdLimit: number, -- 8.1 his top speed holding it now (the tests read it)
@@ -305,7 +316,6 @@ local INSIDE = 400 -- studs from a move's interior origin that count as inside i
 local NUDGE = 8 -- studs at most a stuck nudge puts him on (his way's next point)
 local WALK = { through = true, near = 0.6, jump = false } -- Npcs.walkTo's options: he walks on into the next order (8.3: no jump)
 local HANDS = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize" } -- 7.x his arms (client/ArmPose.luau)
-local EDGE = { Width = 2.4, Depth = 0.6 } -- 7.x the piece's near edge his hands hold at its far end (studs)
 local SIT = "rbxassetid://2506281703" -- 8.3 Roblox's R15 sit (server/Buddy.luau's)
 local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (client/MovingHud.luau's)
 local ATTRIBUTES = { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue" }
@@ -984,7 +994,7 @@ local function ungrip(h: Helper, body: Body?)
 		free(body)
 	end
 	steady(h, nil)
-	h.gripped, h.holdOffset, h.lineKey, h.holdAt = nil, nil, nil, nil
+	h.gripped, h.holdOffset, h.lineKey, h.holdAt, h.holdEnd = nil, nil, nil, nil, nil
 end
 
 -- …and on his feet on the floor where he is.
@@ -1016,8 +1026,12 @@ local function poseHands(h: Helper, body: Body, spot: number?, role: string?)
 			return
 		end
 		local middle = offset:Inverse().Position -- (the piece's middle from his root)
-		at = Vector3.new(0, middle.Y, -(cfg.Standoff + EDGE.Depth / 2))
-		size = Vector3.new(math.min(thing.size.X, EDGE.Width), thing.size.Y, EDGE.Depth)
+		-- 8.6 (the owner: "his hands aren't on the table's edge"): its end's edge at its grips' height (MovingRules.pairLift:
+		-- the grips over its middle), as wide as that end (Config.MoveHelper.Edge)
+		local edge = cfg.Edge
+		local mid, grip = Rules.pairLift(thing.size.Y, 0)
+		at = Vector3.new(0, middle.Y + grip - mid, -(cfg.Standoff + edge.Depth / 2))
+		size = Vector3.new(math.min(thing.size.X, thing.size.Z, edge.Width), edge.Height, edge.Depth)
 	else
 		at = body.root.CFrame:PointToObjectSpace(item.root.Position)
 		size = Vector3.new(thing.size.X, thing.size.Y, thing.size.Z)
@@ -1724,15 +1738,24 @@ local function setDownOwn(h: Helper, body: Body)
 	requeue(h, spot)
 end
 
+-- 8.6 his end of the piece in `frame` (the owner: "he teleports from side to side"): the face across it from
+-- `carrierRoot` (MoveHelperBrain.holdEnd; none: its old far face, -Z), Standoff past it: its axis × studs out of the
+-- middle, in the piece's own frame. A hold decides it once as it starts (h.holdEnd) and keeps it.
+local function endIn(thing: Rules.Thing, frame: CFrame, carrierRoot: BasePart?): Vector3
+	local from = if carrierRoot then frame:PointToObjectSpace(carrierRoot.Position) else Vector3.new(0, 0, 1)
+	local ax, az, half = Brain.holdEnd(thing.size.X, thing.size.Z, from.X, from.Z)
+	return Vector3.new(ax, 0, az) * Brain.farEnd(half * 2)
+end
+
 -- 7.x his place at the far end of your piece, in its frame: Standoff past its far face, turned to you, on the floor
 -- under it (within HoldStep of the floor under you). 8.3: that floor from a ray down from your root (your jump never
 -- lifts him), his end's from a step over it to a step under it (MoveHelperBrain.endRise: a floor farther off is not
 -- his); holding it (`trail`), his height follows it at HoldClimb studs a second at most (MoveHelperBrain.holdClimb: at
--- once on a new hold and through a door's fade).
-local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: BasePart, carrierRoot: BasePart?, trail: Brain.Trail?, dt: number?): CFrame
+-- once on a new hold and through a door's fade). 8.6: his end (`ends`: the hold's, endIn's; else across from you now).
+local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: BasePart, carrierRoot: BasePart?, trail: Brain.Trail?, dt: number?, ends: Vector3?): CFrame
 	local frame = anchor.CFrame
-	local ahead = Brain.farEnd(thing.size.Z)
-	local far = frame * Vector3.new(0, 0, -ahead)
+	local out = ends or endIn(thing, frame, carrierRoot)
+	local far = frame * out
 	local stand = body.humanoid.HipHeight + body.root.Size.Y / 2
 	local step = cfg.HoldStep
 	local base: number
@@ -1749,7 +1772,8 @@ local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: Base
 		local crossed = insideAt(h, body.root.Position) ~= insideAt(h, far) -- (a door's fade: there at once)
 		rise = Brain.holdClimb(trail, frame.Position.Y + rise, dt or 0, crossed) - frame.Position.Y
 	end
-	return CFrame.new(0, rise, -ahead) * CFrame.Angles(0, math.pi, 0)
+	local reach = out.Magnitude
+	return PairHold.endOffset(out.X / reach, out.Z / reach, reach, rise)
 end
 
 -- 7.x kept at `offset` in the piece's frame (the mover's constraints; 8.1 at `limit` studs / s at most, put there only
@@ -1799,21 +1823,26 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 		return
 	end
 	local carrierRoot = playerRoot(thing.carrier)
-	if h.gripped ~= item.root then
+	if h.gripped ~= item.root or not h.holdEnd then
 		h.trail, h.holdAt = Brain.newTrail(), nil -- (8.1 a new hold)
+		h.holdEnd = endIn(thing, item.root.CFrame, carrierRoot) -- 8.6 his end, decided once: kept in the piece's frame
 	end
-	local offset = endOffset(h, body, thing, item.root, carrierRoot, h.trail, dt) -- (8.3 his height: holdClimb's)
+	local offset = endOffset(h, body, thing, item.root, carrierRoot, h.trail, dt, h.holdEnd) -- (8.3 his height: holdClimb's)
 	h.holdOffset, h.gripped = offset, item.root
 	-- 8.1 never put there while holding (a door's fade only: the piece in the other world); eased back when stuck behind
 	local here = body.root.Position
 	local crossed = insideAt(h, here) ~= insideAt(h, (item.root.CFrame * offset).Position)
 	local carrier = playerOf(thing.carrier)
 	-- 8.3 keeping up (the owner: "when I run, he just goes behind me"): his top speed follows your real speed (your
-	-- root's, MoveHelperBrain.holdPace), and he is aimed your velocity × leadTime ahead (your screen shows his body late)
+	-- root's, MoveHelperBrain.holdPace), and he is aimed ahead × leadTime (your screen shows his body late). 8.6 (the
+	-- owner: "he teleports from side to side"): ahead along his END's own way (the piece's turn in it), the lead changing
+	-- at HoldLead.Rate studs a second at most (MoveHelperBrain.endLead): your step back, a turn, an uneven look at you
+	-- never throws his aim across (it was your root's velocity, taken at once)
 	local from = if carrierRoot then carrierRoot.Position else nil
 	local pace = Brain.holdPace(h.trail, if from then from.X else 0 / 0, if from then from.Z else 0 / 0, dt, crossed or from == nil)
 	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Rules.carrySpeed(walkSpeed(), "pair", thing.weight)), pace)
-	local leadX, leadZ = Brain.holdLead(h.trail, Brain.leadTime(PairHold.pingOf(carrier)))
+	local endAt = item.root.CFrame * offset.Position
+	local leadX, leadZ = Brain.endLead(h.trail, endAt.X, endAt.Z, dt, Brain.leadTime(PairHold.pingOf(carrier)), crossed or from == nil)
 	local aim = if leadX == 0 and leadZ == 0 then offset
 		else CFrame.new(item.root.CFrame:PointToObjectSpace(item.root.Position + Vector3.new(leadX, 0, leadZ))) * offset
 	local goal = (item.root.CFrame * aim).Position
@@ -1908,19 +1937,21 @@ end
 
 -- His place at the far end of your piece as you will hold it (`frame`: Moving's helperLiftFrame), like endOffset's.
 local function farEndFrom(h: Helper, body: Body, thing: Rules.Thing, frame: CFrame, carrierRoot: BasePart): CFrame
-	local ahead = Brain.farEnd(thing.size.Z)
-	local far = frame * Vector3.new(0, 0, -ahead)
+	local out = endIn(thing, frame, carrierRoot) -- (8.6 the end across from you: lengthwise, its length's far end)
+	local far = frame * out
 	local stand = body.humanoid.HipHeight + body.root.Size.Y / 2
 	local step = cfg.HoldStep
 	local at = carrierRoot.Position
 	local base = floorDown(h, at, at.Y, 40) or (at.Y - stand) -- (the floor under you, as endOffset finds it)
 	local found = floorDown(h, far, base + step, 2 * step + 1)
 	local rise = Brain.endRise(if found then found + stand - frame.Position.Y else 0 / 0, base + stand - frame.Position.Y)
-	return frame * CFrame.new(0, rise, -ahead) * CFrame.Angles(0, math.pi, 0)
+	local reach = out.Magnitude
+	return frame * PairHold.endOffset(out.X / reach, out.Z / reach, reach, rise)
 end
 
--- In place: turned to you, your grip steadied, "On three... lift!" and your lift (Moving opens its check; without the
--- grip it is up at once, him at its far end: joinLift). Not there to lift it any more: the call is off.
+-- In place: turned to you, your grip steadied, "On three... lift!" and your lift (8.6: up at once, him at its far end:
+-- joinLift, the hold turning him to you at holdTurn, never a snap; Config.MoveHelper.CallCheck: Moving opens its check,
+-- him turned to you as he waits for it). Not there to lift it any more: the call is off.
 local function callReady(h: Helper, body: Body, call: Call, clock: number)
 	call.ready, call.readyAt = true, clock
 	mover.halt(body)
@@ -1928,7 +1959,7 @@ local function callReady(h: Helper, body: Body, call: Call, clock: number)
 	local here = body.root.Position
 	if root then
 		local look = Vector3.new(root.Position.X - here.X, 0, root.Position.Z - here.Z)
-		if look.Magnitude > 0.05 then
+		if cfg.CallCheck and look.Magnitude > 0.05 then
 			body.model:PivotTo(CFrame.lookAt(here, here + look))
 		end
 		steady(h, root.Parent :: Model?)
@@ -2946,6 +2977,7 @@ local function create(s: any, port: Port): Helper
 		helpSince = 0,
 		gripped = nil,
 		holdOffset = nil,
+		holdEnd = nil,
 		trail = Brain.newTrail(),
 		holdAt = nil,
 		holdLimit = 0,

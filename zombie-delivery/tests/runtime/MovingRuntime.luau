@@ -100,6 +100,19 @@ O.__index = function(self: any, key: string): any
 	end
 	return baseIndex(self, key)
 end
+-- 8.6 a WeldConstraint keeps its Part1 where it was from its Part0 as it was made (Roblox's physics); the recorder only
+-- records that (its Rel) and Runtime.welded(model) puts a welded piece there: the tests' stand-in for the weld (a piece
+-- carried in two lies along the carry, turned: server/Moving.luau's holdOffset).
+local baseNewIndex = O.__newindex
+O.__newindex = function(self: any, key: string, value: any)
+	baseNewIndex(self, key, value)
+	if key == "Parent" and value ~= nil and self.props.ClassName == "WeldConstraint" then
+		local a, b = self.props.Part0, self.props.Part1
+		if a and b then
+			self.props.Rel = a.CFrame:ToObjectSpace(b.CFrame)
+		end
+	end
+end
 local SIGNALS = { "Triggered", "AncestryChanged", "Died", "HealthChanged", "StateChanged", "AttributeChanged", "CharacterAdded", "Destroying" }
 local create = Mock.Instance.new
 Mock.Instance.new = function(class: string): any
@@ -335,6 +348,18 @@ end
 
 function Runtime.rootOf(player: any): any
 	return player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- 8.6 a welded piece (server/Moving.luau's weldTo) put where its weld keeps it from its holder; false: no weld on it.
+function Runtime.welded(model: any): boolean
+	local root = model and model.PrimaryPart
+	local weld = root and root:FindFirstChild("WeldConstraint")
+	local rel = weld and weld.props.Rel
+	if not weld or weld.destroyed or not rel or not weld.props.Part0 then
+		return false
+	end
+	root.CFrame = weld.props.Part0.CFrame * rel
+	return true
 end
 
 function Runtime.place(player: any, at: any)

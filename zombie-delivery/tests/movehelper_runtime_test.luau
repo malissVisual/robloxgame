@@ -137,9 +137,12 @@ local function told(player: any, text: string, from: number): boolean
 	return false
 end
 -- A carried piece stays in front of its carrier (the weld, in Roblox; its root set straight: the recorder's PivotTo
--- adds its rounding up step after step).
+-- adds its rounding up step after step). 8.6: where its weld keeps it (Runtime.welded: carried in two it lies along
+-- the carry).
 local function follow(model: any, player: any)
-	model.PrimaryPart.CFrame = E.rootOf(player).CFrame * M.CFrame.new(0, 0, -3)
+	if not E.welded(model) then
+		model.PrimaryPart.CFrame = E.rootOf(player).CFrame * M.CFrame.new(0, 0, -3)
+	end
 end
 local danny: any = nil
 -- What he carries alone stays in front of him (the weld, in Roblox).
@@ -207,8 +210,13 @@ end
 local function helped(): boolean
 	return math.abs((sol.Character:GetAttribute("CarrySpeed") or 0) - WALK * T.Speed.Pair) < 1e-6
 end
--- Where his root belongs: the far end of the piece (Standoff past its far face).
+-- Where his root belongs: the far end of the piece (Standoff past its far face; 8.6 holding it, his end decided at the
+-- lift, in its frame: carried in two, the far end of its length).
 local function farEnd(model: any, depth: number): any
+	local ends = danny and danny.gripped == model.PrimaryPart and danny.holdEnd
+	if ends then
+		return model.PrimaryPart.CFrame * ends
+	end
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(depth / 2 + H.Standoff))).Position
 end
 -- 8.3 a click on a piece (its model: the Moving remote's ("helper", "assign", model)) by `who` (Sol), from beside it.
@@ -1354,7 +1362,7 @@ E.place(sol, outside)
 trigger(promptIn(site, "Enter house"), sol)
 E.place(sol, slab.PrimaryPart.Position + V3(0, 0, SLAB.Z / 2 + 2))
 said = #E.said
-Config.CarryGrip.On = true
+Config.CarryGrip.On, H.CallCheck = true, true -- (8.6: the lift check after his arrival is CallCheck's; the game lifts at once: tests/movehelper_carry_runtime_test.luau)
 local function gripOpened(from: number): any
 	for index = #E.messages, from + 1, -1 do
 		local m = E.messages[index]
@@ -1416,7 +1424,7 @@ check("…its hit: up together at once (never dragged alone), Sol leading, Danny
 	and select(2, Rules.holding(danny.s.move, danny.id)) == "helper" and danny.call == nil and sol:GetAttribute("MoveHelperCall") == nil)
 check("8.3 …off his list (no \"You took\": lifted with him), the marker gone", #danny.queue == 0 and markOf(slab) == nil and slab:GetAttribute("DannyNeeds") == nil
 	and not told(sol, "You took", noticeAt))
-Config.CarryGrip.On = false
+Config.CarryGrip.On, H.CallCheck = false, false
 local function together(): boolean
 	return select(2, Rules.holding(danny.s.move, danny.id)) == "helper" and sol.Character:GetAttribute("MoveCarry") == 6
 end
