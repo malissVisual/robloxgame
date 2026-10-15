@@ -52,6 +52,7 @@ local DoorSwing = require(Shared.DoorSwing) -- 8.3 walk-in doors: the front door
 local FurnitureLooks = require(Shared.FurnitureLooks)
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
+local LightRules = require(Shared.SandboxLightRules) -- 8.5.2: the rooms' ceiling lamps
 
 local T = Config.Furniture
 local LIT = Config.SandboxLight.House -- 8.3: the lights' numbers and the Neon's colours (Config.SandboxLight)
@@ -1060,12 +1061,9 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		if FARM_OWN[room.kind] then
 			continue -- 7.x the farm's barn: its lanterns are fixtures; the yard is open to the sky
 		end
-		local lx, lz = room.max.X - room.min.X, room.max.Z - room.min.Z
-		local cx, cz = (room.min.X + room.max.X) / 2, (room.min.Z + room.max.Z) / 2
-		local spots: { { number } } = { { cx, cz } }
-		if math.max(lx, lz) > LIT.Lamp.Long then
-			spots = if lx > lz then { { room.min.X + lx / 4, cz }, { room.max.X - lx / 4, cz } } else { { cx, room.min.Z + lz / 4 }, { cx, room.max.Z - lz / 4 } }
-		end
+		-- (8.5.2: a lamp over each cell of the room's floor, the cells at most Lamp.Long on a side: one in a room, two
+		-- along a long one, a row down a long corridor, a grid in a big room; shared/SandboxLightRules.luau lamps)
+		local spots = LightRules.lamps(room.min.X, room.max.X, room.min.Z, room.max.Z)
 		for _, s in spots do
 			local lamp
 			if room.kind == "garage" then

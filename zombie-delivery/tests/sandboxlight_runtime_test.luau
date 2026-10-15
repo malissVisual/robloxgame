@@ -133,7 +133,9 @@ local function measure(seed: number, kind: string?): Result
 		end
 		local floor = sum / n
 		r.peak, r.floor, r.load = math.max(r.peak, peak * EYES), math.min(r.floor, floor), math.max(r.load, load)
-		if load > CAP.RoomLoad or peak * EYES > CAP.Peak or floor < CAP.Floor then
+		-- (8.5.2: a room's budget is RoomLoad a cell of its lamps' grid, SandboxLightRules.lamps: a big room's more lamps)
+		local budget = CAP.RoomLoad * #Rules.lamps(x0, x1, z0, z1)
+		if load > budget or peak * EYES > CAP.Peak or floor < CAP.Floor then
 			table.insert(r.over, `{room.id} ({room.kind}): load {load}, peak {string.format("%.2f", peak * EYES)}, floor {string.format("%.2f", floor)}`)
 		end
 	end
