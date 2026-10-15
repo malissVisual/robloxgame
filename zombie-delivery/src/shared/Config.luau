@@ -7153,7 +7153,7 @@ Config.Collection = {
 	IdleAfter = 600, -- 8.3 economy: the stands of a player idle this long earn only IdleShare of their income
 	IdleShare = 0.25,
 	IdleMove = 4,
-	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint" } :: { string },
+	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
 }
 
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in

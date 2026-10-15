@@ -93,8 +93,8 @@
 -- exactly (the idle stretch of a payout at the share, the rest in full). Activity is what the server sees, one clock a
 -- player (Meter.active): the character's root moved IdleMove studs or more over the ground since the last such move
 -- (looked at every payout: walking, a van driven; a jump is none), or a call of one of Config.Collection.IdleRemotes
--- (the Collection, Moving, Upgrades, SandboxTasks, Visitors and VanPaint remotes; a bare "state" ask does not count:
--- the clients send those by themselves).
+-- (the Collection, Moving, Upgrades, SandboxTasks, Visitors, VanPaint and 8.7's PlayerTrade remotes; a bare "state"
+-- ask does not count: the clients send those by themselves).
 -- The state's `idle` (the share, only while idle) puts "· idle" on the HUD's income line; the state goes out again when
 -- the player goes idle and when they come back. Roblox kicks an idle player after about 20 minutes, but anti-idle
 -- macros exist: a jump in place or a key pressed now and then does not count.
