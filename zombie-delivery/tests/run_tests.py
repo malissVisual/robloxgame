@@ -19,6 +19,7 @@ PURE += ("SandboxTasks",)  # 8.2 sandbox, the daily tasks (tests/sandboxtasks_te
 PURE += ("SandboxLeadersRules",)  # 8.2 sandbox, showing off (tests/sandboxleaders_test.luau)
 PURE += ("SandboxPad", "SandboxHints")  # 8.3 sandbox, every device's way to the chips and the first-time hints (tests/sandboxpad_test.luau, tests/sandboxhints_test.luau)
 PURE += ("Market",)  # 8.3 sandbox, the market: hot and cold kinds, the demand (tests/market_test.luau)
+PURE += ("AuctionRules", "AuctionHouseLayout")  # 8.8 sandbox, the auction: its rules and the Auction House (tests/auction_test.luau, tests/auctionhouse_test.luau)
 PURE += ("Visitors",)  # 8.3 sandbox, the showroom's visitors: who, when, where they walk, the offers' prices (tests/visitors_test.luau)
 PURE += ("VanPaintRules",)  # 8.3 sandbox, the PAINT shop: the catalogue, the prices, the looks, the save (tests/vanpaint_test.luau)
 PURE += ("SandboxLightRules",)  # 8.3 sandbox, the light (tests/sandboxlight_test.luau, tests/sandboxlight_runtime_test.luau)
@@ -374,6 +375,17 @@ with tempfile.TemporaryDirectory() as tmp:
         "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r, "
         "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, backKnob = %r }\n"
         % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2], sum(knobs) / len(knobs)))
+    # 8.8: the Jinočany plan (design/jinocany/plan.json: the village the sandbox becomes) as JinocanyPlan.luau for
+    # tests/auctionhouse_test.luau: the Auction House stands on none of its roads, landmarks, fields, houses or tree lines.
+    plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "jinocany", "plan.json"), encoding="utf-8"))
+    def rect(r):
+        return "{ x0 = %r, x1 = %r, z0 = %r, z1 = %r }" % (r["x0"], r["x1"], r["z0"], r["z1"])
+    areas = [("road " + r["name"], r["rect"]) for r in plan["roads"]] + [(l["id"], l["rect"]) for l in plan["landmarks"]]
+    areas += [("field " + f["kind"], f["rect"]) for f in plan["fields"]] + [("house " + h["id"], h["box"]) for h in plan["houses"] + plan["enter"]]
+    lines = ["\t{ name = %s, rect = %s }," % (json.dumps(name, ensure_ascii=False), rect(r)) for name, r in areas]
+    trees = ["\t{ %s }," % ", ".join("{ %r, %r }" % (p["x"], p["z"]) for p in t["points"]) for t in plan["treeLines"]]
+    open(os.path.join(tmp, "JinocanyPlan.luau"), "w", encoding="utf-8").write(
+        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\n}\n" % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees)))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).

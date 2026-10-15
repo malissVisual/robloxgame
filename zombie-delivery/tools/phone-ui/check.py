@@ -42,6 +42,9 @@ words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a 
 Danny for hire (hire him, give him a piece, a heavy piece's Lift) in the same scene.
 8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
 and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
+8.8 SANDBOX, the auction: the Auction House's window (the real AuctionUi: auction.luau, the folder from auctionenv.py) at
+844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: the live lot, the consign picker and the results, nothing while the
+auction is off.
 8.7 trading between players: the offer composer, the FOR SALE price picker and the buy question (the real TradeUi), the
 offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (WarehouseUi): trade.luau at 844 x 390,
 667 x 375, 1280 x 800 and 1920 x 1080: on the screen, nothing on each other, the words fitting, a finger's size, the requests.
@@ -303,6 +306,15 @@ with tempfile.TemporaryDirectory() as folder:
 with tempfile.TemporaryDirectory() as folder:
     sandbox_env(Path(folder))
     subprocess.run([args.luau, "vanpaint.luau"], cwd=folder, check=True)
+# 8.8 SANDBOX, the auction: the Auction House's window (client/AuctionUi.luau, shared/AuctionRules.luau; nothing while
+# Config.Auction.On is false): tools/phone-ui/auction.luau at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 (the live
+# lot, the consign picker, the results: on the screen, nothing on each other, the words fitting, a finger's buttons; BID,
+# CONSIGN and WITHDRAW's requests, the stub's unanswered request given up, the building's sign and lot display painted).
+from auctionenv import auction_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    auction_env(Path(folder))
+    subprocess.run([args.luau, "auction.luau"], cwd=folder, check=True)
 # 8.3 Danny for hire: his card (client/MoveHelperCard.luau: HIRE, CLEAR QUEUE, the clicks and taps on him and on the
 # pieces, the gamepad's prompts) and his status line (client/MoveHelperHud.luau with the card), beside the real
 # SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone

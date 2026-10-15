@@ -5636,6 +5636,8 @@ Config.Robust = {
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
 		CollectionBook = 4, -- 8.2: the CollectionBook remote's state (server/CollectionBook.luau)
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
+		Auction = 4, -- 8.8: the Auction remote's state / consign / withdraw (the server's step: design/auction/PLAN.md)
+		AuctionBid = 3, -- 8.8: and its bids (one step a tap)
 		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
@@ -8004,6 +8006,86 @@ Config.SandboxLight = {
 		WallLuma = 220,
 		Step = 0.08,
 	},
+}
+
+-- 8.8 SANDBOX, the auction (design/auction/PLAN.md; the owner: a piece on show earns $/min, so selling it to the game,
+-- about a quarter of an hour of its income, is pointless; he asked for "an auction in the finale"). Every Every s a round
+-- of lots at the Auction House on Depot Row: before it each player consigns one piece at its desk; each lot runs
+-- LotSeconds, players and the NPC collectors bid in steps, the top bid buys it. shared/AuctionRules.luau has the rules
+-- (tests/auction_test.luau), shared/AuctionHouseLayout.luau the building (tests/auctionhouse_test.luau),
+-- client/AuctionUi.luau the window. 8.8 is the groundwork: nothing is paid or moved yet (the server's part, the atomic
+-- transfer and the payments, comes next), and with On false nothing of it shows: no building, no window, no request.
+--   On          false: nothing (no Auction House on the map, no window, nothing sent)
+--   Every       s from one round's start to the next (from 00:00 UTC + Offset: the same on every server); Close: s
+--               before a start the consignments close (the lots are drawn up); Results: s the round's results stay up
+--               after its last lot
+--   MaxLots     lots a round at most (one a player: Config.Sandbox.MaxPlayers); the cheapest first, the best last
+--   LotSeconds  s a lot runs; Gap: s between two lots; Snipe: a bid with less than Window s left puts the clock back to
+--               Window s, at most Most s past the lot's planned end (a full round stays within 3 – 5 minutes)
+--   Rarities    the rarities a player may consign (Config.Collection's tiers); a broken piece never
+--   Reserve     × the piece's worth (its value × its condition): the lot opens there (rounded up to a step) and never
+--               sells for less
+--   Steps       { from $, step $ }: the next bid is always the price + the step of the price's band
+--   (the fee)   the house keeps Config.PlayerTrade.Fee of a sale from the seller: one fee for the trades between players
+--               and the auction (shared/PlayerTradeRules.luau fee: 8 %, rounded)
+--   Collectors  the NPC bidders: Count of them a lot (their names drawn from Names); each one's max = the worth ×
+--               Rarity[the piece's] × Hot or Cold (the day's market, shared/Market.luau) × a die in Spread, the keenest's
+--               at least the opening price (every lot sells); one answers a bid after Delay s (a die), never later than
+--               Last s before the lot's end, and none bids past its max
+--   Salt        the collectors' dice (a lot's seed is its round, its place and its piece: the same lot plays the same)
+--   Grand       the Grand Auction (later; hooks only): On, its daily start (Hour, UTC), Lots of the house's own (Items:
+--               the exclusive legendaries' ids, none yet), Reserve × their worth
+--   House       the building (shared/AuctionHouseLayout.luau): Spot, the middle of its front wall on the ground, looking
+--               out (yaw as SandboxMap's spots; the one place to move it when the Jinočany village is built:
+--               design/jinocany/plan.json keeps x 40 – 120 here for the Corner Drugstore); Width × Depth, Wall (the walls'
+--               height over the floor), Roof (the ridge's rise), Door ({ width, height }), Budget (its parts at most),
+--               Range (studs its signs are drawn from), Lamp (its hanging lamps' light)
+--   Window      the window (client/AuctionUi.luau): Width × Height at most (unscaled px), Tile a consign tile's
+--               narrowest (TileTouch on a touch screen), TileHeight its height
+-- The tuning: a piece on show earns its value × its tier's income a minute (a legendary 1.5 %: $80 – 105), and the game
+-- buys it for about a quarter of an hour of that (Config.Collection sell). At auction it opens at its worth: about 65
+-- minutes of a legendary's income, 100 of an epic's, 125 of a rare's; the collectors usually go 5 – 25 % over (the rarer,
+-- the keener), so after the fee a sale nets the seller five to eight times what the game pays. A player who wants the
+-- piece must beat the keenest collector: a premium for the book, its milestones and the TOP MOVERS board. Rare is in: a
+-- big move brings about 0.6 rares, 0.12 epics and 0.06 legendaries, so without rare most rounds would have no lot.
+export type AuctionSpot = { x: number, y: number, z: number, yaw: number }
+Config.Auction = {
+	On = false,
+	Every = 1800,
+	Offset = 0,
+	Close = 20,
+	Results = 90,
+	MaxLots = Config.Sandbox.MaxPlayers,
+	LotSeconds = 45,
+	Gap = 6,
+	Snipe = { Window = 8, Most = 20 },
+	Rarities = { "rare", "epic", "legendary" } :: { string },
+	Reserve = 1,
+	Steps = { { 0, 25 }, { 500, 50 }, { 1000, 100 }, { 2500, 200 }, { 5000, 250 }, { 10000, 500 }, { 25000, 1000 } } :: { { number } },
+	Collectors = {
+		Count = 3,
+		Rarity = { rare = 1.05, epic = 1.1, legendary = 1.2 } :: { [string]: number },
+		Hot = 1.15,
+		Cold = 0.9,
+		Spread = { 0.9, 1.2 } :: { number },
+		Delay = { 1.5, 5 } :: { number },
+		Last = 1,
+		Names = { "Lady Fairbanks", "Mr. Okonkwo", "Madame Duval", "Dr. Lindgren", "Signor Bellini", "Mrs. Harrow" } :: { string },
+	},
+	Salt = 8808,
+	Grand = { On = false, Hour = 19, Lots = 3, Reserve = 1.5, Items = {} :: { string } },
+	House = {
+		Spot = { x = 158, y = 0, z = -22, yaw = 0 } :: AuctionSpot,
+		Width = 48,
+		Depth = 32,
+		Wall = 16,
+		Roof = 9,
+		Door = { 10, 10 } :: { number },
+		Budget = 140,
+		Range = 220,
+		Lamp = { Brightness = 0.7, Range = 28, Color = { 255, 226, 180 } :: { number } },
+	},
+	Window = { Width = 720, Height = 430, Tile = 150, TileTouch = 168, TileHeight = 96 },
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).
