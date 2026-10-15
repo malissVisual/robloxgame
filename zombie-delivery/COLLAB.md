@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (lead + 2 agents: blender, game) · 8.7.1 the house's fixtures in Blender (the owner: "udělej kuchyň a koupelnu"; `design/blender-fixtures/KONTRAKT.md`) · design/blender-fixtures/*, src/server/FixtureMesh.luau (new), src/server/HouseInterior.luau (the fixtures' models and the dress call only), src/server/Main.server.luau (the import line), tests/run_tests.py, tools/fixtures-art/* · 2026-10-15
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
