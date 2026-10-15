@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude · 8.5.2 the sandbox house roomier inside (the owner: "větší prostor v domě": Config.Furniture.Big.Roomy, the big house's rooms, hall and corridor bigger) · Config (Furniture.Big), HouseLayout (planHouse), biglayout_test · 2026-10-15
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
