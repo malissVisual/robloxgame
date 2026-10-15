@@ -1,17 +1,19 @@
 -- 8.0 SANDBOX, the map (design/sandbox/KONTRAKT.md): shared/SandboxScenery.luau's numbers and the world the real
 -- server/SandboxWorld.luau builds from them (as SandboxWorldServer.luau on tools/perf/world-mock.luau, WorldMock.luau):
--- everything we play on inside SandboxMap.Bounds (the far hills and peaks outside them), the asphalt over every road
--- and the turnaround with a shoulder down to the meadow on every edge (no step a wheel would catch), nothing that
--- collides on the roads, the turnaround, the plots (but their pads), the path from the curb to the house's door or in
--- the door's way, the trees off all of that and off the vans' ways, the part budget, the shadows only on bigger
--- parts, the chalet in its box with its FrontDoor at House.door, the signpost's and the mailbox's words, the light;
+-- everything we play on inside SandboxMap.Bounds (the far view outside them), the asphalt over every road and the
+-- turnaround with a shoulder down to the meadow on every edge (no step a wheel would catch; 8.9 every street of
+-- Jinočany's, none across a junction), nothing that collides on the roads (but Hornická's ROAD CLOSED barrier), the
+-- turnaround, the plots (but their pads), the path from the curb to the house's door or in the door's way, the trees off
+-- all of that and off the vans' ways, the part budget, the shadows only on bigger parts, the chalet in its box with
+-- its FrontDoor at House.door, the signpost's and the mailbox's words, the light; 8.9 the Alps gone (flat ground, no
+-- mound, spruce, wildflower, rail fence, hill or peak: tests/villageworld_test.luau checks the village itself);
 -- 8.1: the house's box the owner's Blender house's, its parts in House_sandbox_house for server/HouseMesh.luau, the
 -- FrontDoor on the model's door; 8.3 the big move and walk-in doors: the back door, the doors' leaves door leaves that
 -- swing (shared/DoorSwing.luau's attributes; dressed, the Blender house's doors copied as leaves in front of them);
 -- 8.5 walking through: the leaves swing out of the house, the doorways walkable (the House box not solid, HouseSolid
 -- the box less a dark hall behind each doorway, nothing solid in a hall or its way out, the walls round it solid);
 -- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
--- box query, Config.SpawnSpot.Pass leaving out the ground's mounds), and not where a player stands.
+-- box query, Config.SpawnSpot.Pass leaving out the ground), and not where a player stands.
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
 local G = Mock.globals
@@ -20,6 +22,7 @@ local workspace, game = Mock.workspace, Mock.game
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
 local SandboxScenery = require("./SandboxScenery")
+local VillageScenery = require("./VillageScenery")
 local SandboxWorld = require("./SandboxWorldServer")
 local HouseMesh = require("./HouseMeshServer")
 local HouseArt = require("./HouseArt")
@@ -52,6 +55,7 @@ end
 local function inRect(r: Rect, x: number, z: number): boolean
 	return x >= r.x0 and x <= r.x1 and z >= r.z0 and z <= r.z1
 end
+local SLABS = SandboxScenery.asphalt()
 local function onAsphalt(x: number, z: number): boolean
 	for _, road in SandboxMap.Roads do
 		if inRect(road :: any, x, z) then
@@ -90,31 +94,14 @@ do
 	end
 	check("the meadow's tiles cover the Bounds but the pads and the lawn, none overlapping", overlap == nil and math.abs(area + holeArea - (B.x1 - B.x0) * (B.z1 - B.z0)) < 1, overlap or area)
 
-	-- the mounds stay well off the roads, the turnaround, the plots and the house's lot, inside the fence
-	local bad: string? = nil
-	for _, m in SandboxScenery.mounds() do
-		local keep = m.base + 10
-		for _, road in SandboxMap.Roads do
-			if SandboxScenery.rectDistance(road :: any, m.x, m.z) < keep + RUN then
-				bad = `mound at {m.x}, {m.z} by {road.name}`
-			end
-		end
-		for _, plot in SandboxMap.Plots do
-			if SandboxScenery.rectDistance(plot.rect, m.x, m.z) < keep then
-				bad = `mound at {m.x}, {m.z} by plot {plot.id}`
-			end
-		end
-		if SandboxScenery.rectDistance(HOUSE.lot, m.x, m.z) < keep or SandboxScenery.circleOut(m.x, m.z) < keep + RUN then
-			bad = `mound at {m.x}, {m.z} by the house`
-		end
-		if SandboxScenery.outside(m.x, m.z) > -(m.base + SandboxScenery.FenceInset + 2) then
-			bad = `mound at {m.x}, {m.z} at the edge`
-		end
-		if m.radius * 2 > 2048 then
-			bad = "a mound's ball too big for a part"
+	-- 8.9: the ground is flat (the Alps' mounds are gone)
+	local flat = true
+	for x = B.x0, B.x1, 40 do
+		for z = B.z0, B.z1, 40 do
+			flat = flat and SandboxScenery.groundAt(x, z) == GROUND
 		end
 	end
-	check("the mounds keep off the roads, the plots and the house, inside the fence", bad == nil, bad)
+	check("8.9: the ground is flat everywhere (no mound)", flat)
 
 	-- the shoulders: wherever a wheel leaves the asphalt it rolls down a slope, never off a step
 	local ramps = SandboxScenery.ramps()
@@ -141,23 +128,32 @@ do
 		end
 	end
 	for _, out in { 0.3, 1.5, 3 } do
-		for x = DEPOT.x0, DEPOT.x1, 5 do
-			edgePoint(x, DEPOT.z0 - out, out, TOP)
-			edgePoint(x, DEPOT.z1 + out, out, TOP)
-		end
-		for z = DEPOT.z0, DEPOT.z1, 4 do
-			edgePoint(DEPOT.x0 - out, z, out, TOP)
-			edgePoint(DEPOT.x1 + out, z, out, TOP)
-		end
-		for _, c in { { DEPOT.x0, DEPOT.z0, -1, -1 }, { DEPOT.x0, DEPOT.z1, -1, 1 }, { DEPOT.x1, DEPOT.z0, 1, -1 }, { DEPOT.x1, DEPOT.z1, 1, 1 } } do
-			for _, a in { 0.2, 0.5, 0.8 } do
-				local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
-				edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, TOP)
+		-- (8.9: every street's slab, each side and corner; Pražská's sides down to the turnaround; nothing past the
+		-- Bounds, where Hornická meets the invisible wall)
+		for _, r in SLABS do
+			local south = if r.name == MAIN.name then TURN.z - TURN.r else r.z1
+			for x = r.x0, r.x1, 5 do
+				edgePoint(x, r.z0 - out, out, TOP)
+				if r.name ~= MAIN.name then
+					edgePoint(x, r.z1 + out, out, TOP)
+				end
 			end
-		end
-		for z = DEPOT.z1, TURN.z - TURN.r, 5 do
-			edgePoint(MAIN.x0 - out, z, out, TOP)
-			edgePoint(MAIN.x1 + out, z, out, TOP)
+			for z = r.z0, south, 4 do
+				if r.x0 - out > B.x0 then
+					edgePoint(r.x0 - out, z, out, TOP)
+				end
+				edgePoint(r.x1 + out, z, out, TOP)
+			end
+			if r.name ~= MAIN.name then
+				for _, c in { { r.x0, r.z0, -1, -1 }, { r.x0, r.z1, -1, 1 }, { r.x1, r.z0, 1, -1 }, { r.x1, r.z1, 1, 1 } } do
+					for _, a in { 0.2, 0.5, 0.8 } do
+						local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
+						if c[1] + c[3] * dx * out > B.x0 then
+							edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, TOP)
+						end
+					end
+				end
+			end
 		end
 		-- (the ring's wedges stand on chords just inside the asphalt's edge: mid-piece the slope starts its sag lower)
 		local top = SandboxScenery.TurnaroundTop
@@ -176,11 +172,11 @@ do
 	end
 	check("no shoulder rises over the asphalt or sinks under the meadow", tall == nil, tall)
 
-	-- the trees: 60 – 120, each where the rules let it stand, apart from each other
-	local trees = SandboxScenery.trees()
+	-- 8.9 the trees: the village's (shared/VillageScenery.luau), each where the rules let it stand, apart from each other
+	local trees = VillageScenery.trees()
 	local why: string? = nil
 	for i, t in trees do
-		local rule = SandboxScenery.treeRule(t.x, t.z, t.canopy)
+		local rule = VillageScenery.treeRule(t.x, t.z, t.radius)
 		if rule then
 			why = `tree {i}: {rule}`
 		end
@@ -190,33 +186,23 @@ do
 				why = `trees {i} and {j} too close`
 			end
 		end
-		if t.variant < 1 or t.variant > 3 then
-			why = `tree {i}'s variant {t.variant}`
-		end
 	end
-	check("60 – 120 trees, every one where the rules let it stand", #trees >= 60 and #trees <= 120 and why == nil, why or #trees)
-	local again = SandboxScenery.trees()
+	check(`8.9: {#trees} trees of the tree lines and the orchard, every one where the rules let it stand`, #trees >= 120 and why == nil, why or #trees)
+	local again = VillageScenery.trees()
 	check("the same trees every time", again == trees and #again == #trees)
 
-	-- far away: the hills' and the peaks' feet outside the Bounds, the far meadow round them
+	-- far away: the far view outside the Bounds (8.9: no hill, no peak)
 	local near: string? = nil
-	for _, h in SandboxScenery.hills() do
-		if SandboxScenery.outside(h.x, h.z) < h.base + 20 then
-			near = `a hill at {math.floor(h.x)}, {math.floor(h.z)}`
+	for _, p in VillageScenery.far() do
+		local x0, x1, y0, y1, z0, z1 = require("./VillageLooks").box(p)
+		if y1 > GROUND + EPS and x0 < B.x1 and x1 > B.x0 and z0 < B.z1 and z1 > B.z0 then
+			near = `{p.name} at {math.floor(x0)}, {math.floor(z0)}`
 		end
-		if h.radius * 2 > 2048 then
-			near = "a hill's ball too big for a part"
-		end
-	end
-	for _, p in SandboxScenery.peaks() do
-		if SandboxScenery.outside(p.x, p.z) < p.half * math.sqrt(2) + 100 then
-			near = `a peak at {math.floor(p.x)}, {math.floor(p.z)}`
-		end
-		if p.half > 2048 or p.height > 2048 or p.capY + p.capHeight < p.base + p.height then
-			near = "a peak too big for its parts or its cap under its top"
+		if p.name == "Peak" or p.name == "Hill" or p.material == "Snow" then
+			near = `an alpine {p.name}`
 		end
 	end
-	check("the hills and the peaks stand outside the Bounds", near == nil, near)
+	check("8.9: the far view stands outside the Bounds (its fields under them), no hill, no peak", near == nil, near)
 end
 
 -- ── The built world ────────────────────────────────────────────────────────
@@ -268,6 +254,18 @@ end
 local function named(name: string): { Box }
 	return byName[name] or {}
 end
+-- (8.9: the village has its own House, Path, EdgeLine, Trunk … : a name in one model or folder)
+local function namedIn(name: string, root: any): { Box }
+	local out: { Box } = {}
+	for _, b in named(name) do
+		if root and b.part:IsDescendantOf(root) then
+			table.insert(out, b)
+		end
+	end
+	return out
+end
+local roadsFolder = world:FindFirstChild("Roads")
+local barrier = world:FindFirstChild("Landmark_barrier", true)
 check(`the part budget holds ({#boxes} parts, at most {SandboxScenery.Budget})`, #boxes <= SandboxScenery.Budget and #boxes > 300, #boxes)
 check("every part is anchored", unanchored == 0, unanchored)
 
@@ -290,7 +288,7 @@ do
 		end
 	end
 	check("everything but the far view is inside SandboxMap.Bounds", out == nil, out)
-	check("the far meadow, hills and peaks are all outside the Bounds", farIn == nil and #named("Peak") > 0 and #named("Hill") > 0, farIn)
+	check("8.9: the far view (its fields, tree lines, pylons, roofs) all outside the Bounds", farIn == nil and #named("FarField") > 0 and #named("FarTrees") > 0 and #named("Peak") == 0 and #named("Hill") == 0, farIn)
 	check("the far view is one Persistent model", far ~= nil and far:IsA("Model") and far.ModelStreamingMode == Enum.ModelStreamingMode.Persistent)
 	local walls = named("InvisibleWall")
 	local sides = { x0 = false, x1 = false, z0 = false, z1 = false }
@@ -331,7 +329,7 @@ do
 			end
 		end
 	end
-	check("the asphalt covers every road of SandboxMap.Roads at RoadTop", missed == nil and #asphalt == 2, missed)
+	check(`the asphalt covers every road of SandboxMap.Roads at RoadTop ({#asphalt} slabs: 8.9 Jinočany's streets too)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads, missed)
 	local ok = disc ~= nil and disc.part.Shape == Enum.PartType.Cylinder and math.abs((disc.x1 - disc.x0) / 2 - TURN.r) < EPS
 	if disc then
 		for deg = 0, 359, 10 do
@@ -345,10 +343,10 @@ do
 	end
 	check("the turnaround is an asphalt disc on the Turnaround (its top within a hair of RoadTop)", ok)
 	check("a shoulder part for every piece of SandboxScenery.ramps", #named("Shoulder") == #SandboxScenery.ramps())
-	check("the markings: centre lines, edge lines, the give-way line", #named("CentreLine") > 20 and #named("EdgeLine") > 10 and #named("GiveWay") == 1)
+	check("the markings: centre lines, edge lines, the give-way line", #namedIn("CentreLine", roadsFolder) > 20 and #namedIn("EdgeLine", roadsFolder) > 10 and #namedIn("GiveWay", roadsFolder) == 1)
 	local raised: string? = nil
 	for _, name in { "CentreLine", "EdgeLine", "GiveWay" } do
-		for _, b in named(name) do
+		for _, b in namedIn(name, roadsFolder) do
 			if b.part.CanCollide or b.y1 > TOP + 0.06 or not onAsphalt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) then
 				raised = `{name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
 			end
@@ -360,7 +358,7 @@ end
 -- nothing that collides stands on the roads, the turnaround, the plots (their pads are the floor), the path from the
 -- curb to the door or in the door's way; the floors themselves never rise over the asphalt's top
 do
-	local FLOOR = { Road = true, Turnaround = true, Shoulder = true, Pad = true, Meadow = true, Lawn = true }
+	local FLOOR = { Road = true, Turnaround = true, Shoulder = true, Pad = true, Meadow = true, Lawn = true, Field = true, VillageLawn = true }
 	local areas: { { name: string, rect: Rect, circle: boolean? } } = {}
 	for _, road in SandboxMap.Roads do
 		table.insert(areas, { name = road.name, rect = road :: any })
@@ -375,8 +373,8 @@ do
 	local blocked: string? = nil
 	local floorHigh: string? = nil
 	for _, b in boxes do
-		if b.far or not b.part.CanCollide then
-			continue
+		if b.far or not b.part.CanCollide or (barrier and b.part:IsDescendantOf(barrier)) or b.name == "InvisibleWall" then
+			continue -- (8.9: Hornická's barrier closes its road on purpose, the Bounds' wall ends it)
 		end
 		if FLOOR[b.name] then
 			if b.y1 > TOP + EPS then
@@ -402,8 +400,8 @@ do
 			end
 		end
 	end
-	check("nothing that collides on the roads, the turnaround, the plots, the path to the door or the door's way", blocked == nil, blocked)
-	check("no floor (asphalt, shoulder, pad, meadow, lawn) rises over RoadTop", floorHigh == nil, floorHigh)
+	check("nothing that collides on the roads (but Hornická's barrier), the turnaround, the plots, the path to the door or the door's way", blocked == nil and barrier ~= nil, blocked)
+	check("no floor (asphalt, shoulder, pad, meadow, lawn, field) rises over RoadTop", floorHigh == nil, floorHigh)
 	local pads = named("Pad")
 	local padOk = #pads == #SandboxMap.Plots
 	for _, plot in SandboxMap.Plots do
@@ -437,7 +435,7 @@ do
 		table.insert(keep, { name = `van way {n}`, rect = way })
 	end
 	local hit: string? = nil
-	for _, name in { "Trunk", "Needles" } do
+	for _, name in { "Trunk", "Crown" } do
 		for _, b in named(name) do
 			for _, k in keep do
 				local r = k.rect
@@ -455,15 +453,21 @@ do
 			end
 		end
 	end
-	check(`the trees ({#trunks}) keep off the roads, the turnaround, the plots, the house's lot, the path and the vans' ways`, hit == nil and #trunks == #SandboxScenery.trees() and #named("Needles") == #trunks, hit)
+	local own = 0 -- (the green's lindens, the pond's willows: the landmarks' own)
+	for _, m in VillageScenery.landmarks() do
+		for _, p in VillageScenery.pieces(m) do
+			own += if p.name == "Trunk" then 1 else 0
+		end
+	end
+	check(`the trees ({#trunks}) keep off the roads, the turnaround, the plots, the house's lot, the path and the vans' ways`, hit == nil and #trunks == #VillageScenery.trees() + own and #named("Crown") == #trunks and #named("Needles") == 0, hit)
 	local solid = true
 	for _, b in trunks do
 		solid = solid and b.part.CanCollide
 	end
-	for _, b in named("Needles") do
+	for _, b in named("Crown") do
 		solid = solid and not b.part.CanCollide
 	end
-	check("a trunk collides, its needles do not", solid)
+	check("a trunk collides, its crown does not", solid)
 end
 
 -- the chalet: in House.house's box, facing north, its FrontDoor at House.door. 8.1: its parts in the Model
@@ -476,7 +480,7 @@ do
 	check("the chalet is a model with its house's id", chalet ~= nil and chalet:IsA("Model") and chalet:GetAttribute("SandboxHouse") == HOUSE.id)
 	local own = chalet and chalet:FindFirstChild("House_" .. HOUSE.id)
 	local h = HOUSE.house
-	local body = named("House")[1]
+	local body = namedIn("House", chalet)[1]
 	local doors = named("FrontDoor")
 	local door = doors[1]
 	check("its parts in a Model House_sandbox_house (Home = its id) as World's Marge's house, the garden beside it",
@@ -684,7 +688,7 @@ do
 			end
 		end
 	end
-	check(`the garden (fence, gate, mailbox, flower boxes, path: {gardenParts} parts) never collides`, gardenSolid == nil and #named("FlowerBox") >= 3 and #named("Mailbox") == 1 and #named("Path") == 1, gardenSolid)
+	check(`the garden (fence, gate, mailbox, flower boxes, path: {gardenParts} parts) never collides`, gardenSolid == nil and #namedIn("FlowerBox", garden) >= 3 and #namedIn("Mailbox", garden) == 1 and #namedIn("Path", garden) == 1, gardenSolid)
 end
 
 -- 8.5 walking through (the owner: "so it doesn't feel like I bumped into the door, but I keep walking smoothly"): the
@@ -697,7 +701,7 @@ end
 do
 	local D = Config.Moving.Doors
 	local h = HOUSE.house
-	local body = named("House")[1]
+	local body = namedIn("House", world:FindFirstChild("TheOldFarmstead"))[1]
 	local solids = named("HouseSolid")
 	local volume, inBox = 0, true
 	for _, b in solids do
@@ -937,15 +941,15 @@ do
 		table.insert(spots, { name = `plot {plot.id}'s vanSpot`, spot = plot.vanSpot })
 	end
 	table.insert(spots, { name = "the house's curb", spot = HOUSE.curb })
-	local mounded = 0
+	local grounded = 0
 	for _, at in spots do
 		local spot = at.spot
 		local free, why = firstTry(spot, nil, true)
 		check(`a van at {at.name} finds room on the first try ({why})`, free, why)
-		-- the mounds' boxes (left out by the pass) would take it
-		local _, unpassed = firstTry(spot, nil, false)
-		if string.find(unpassed, "Mound", 1, true) then
-			mounded += 1
+		-- 8.9: the ground is flat, its parts all under the van's room: even without the pass nothing of it takes the spot
+		local freeAnyway = firstTry(spot, nil, false)
+		if freeAnyway then
+			grounded += 1
 		end
 		-- a player standing there (their body's box: 2 wide, 1 deep, 5 tall on the ground)
 		local feet = if spot == HOUSE.curb then SandboxScenery.TurnaroundTop else GROUND
@@ -953,7 +957,7 @@ do
 		local taken, whyTaken = firstTry(spot, { body }, true)
 		check(`… a player standing at {at.name} takes it`, not taken and whyTaken == "a player in the way", whyTaken)
 	end
-	check(`without the pass the mounds' boxes take every spot (here: {mounded} of {#spots})`, mounded == #spots, mounded)
+	check(`8.9: no mound any more: even without the pass the ground takes none of the spots ({grounded} of {#spots} free)`, grounded == #spots, grounded)
 end
 
 -- the light: a fixed warm afternoon

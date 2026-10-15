@@ -20,9 +20,8 @@ every warehouse a Logistics Center (8.3: level 5, the biggest, More stands at it
 move running with the inside and Danny, the server's cap of visitors. The players' own avatars, the
 greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it. 8.3 the
 big move: its inside is counted for every player at once too (4 moves running: a worst case past the one move's).
-8.9 Jinočany: then a projection of step 1's map (design/jinocany/NAVRH.md) against SandboxScenery.Budget: what today's
-map keeps (its roads, the farmstead, the ground, the boundary, the lamps and the signpost), the Auction House and the
-village as shared/VillageLooks.luau gives it (VillageLooks.census of design/jinocany/plan.json; not built yet).
+8.9 Jinočany: the map is the village's now (server/VillageWorld.luau: world/Village, world/Motorway, world/Far); then the
+map with 8.8's Auction House (built once Config.Auction.On) against SandboxScenery.Budget: over it, the run fails.
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]
 
@@ -93,33 +92,6 @@ def run(luau, cwd):
     return result.stdout
 
 
-def luau_value(v):
-    """A JSON value as a Luau expression."""
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        return repr(v)
-    if isinstance(v, str):
-        return json.dumps(v, ensure_ascii=False)
-    if isinstance(v, list):
-        return "{ " + ", ".join(luau_value(x) for x in v) + " }"
-    if isinstance(v, dict):
-        return "{ " + ", ".join((k if re.fullmatch(r"[A-Za-z_]\w*", k) else "[" + json.dumps(k, ensure_ascii=False) + "]") + " = " + luau_value(x)
-                                for k, x in v.items()) + " }"
-    return "nil"
-
-
-def village_plan(game):
-    """8.9: design/jinocany/plan.json as Luau for VillageLooks.census (its treeLines as lines); nil without the plan
-    or shared/VillageLooks.luau (an older checkout)."""
-    path = os.path.join(game, "design", "jinocany", "plan.json")
-    if not (os.path.exists(path) and os.path.exists(os.path.join(game, "src", "shared", "VillageLooks.luau"))):
-        return "return nil\n"
-    plan = json.load(open(path, encoding="utf-8"))
-    plan["lines"] = plan["treeLines"]
-    return "return " + luau_value(plan) + "\n"
-
-
 def world_rows(luau, game):
     with tempfile.TemporaryDirectory() as out:
         world_count.prepare(game, out, people=True)
@@ -127,45 +99,23 @@ def world_rows(luau, game):
         shutil.copy(os.path.join(HERE, "census.luau"), os.path.join(out, "census.luau"))
         for name, text in (("Collection", COLLECTION), ("SandboxPlots", PLOTS), ("Upgrades", UPGRADES)):
             open(os.path.join(out, "server", name + ".luau"), "w", encoding="utf-8").write(text)
-        open(os.path.join(out, "village-plan.luau"), "w", encoding="utf-8").write(village_plan(game))
+        has = os.path.exists(os.path.join(game, "src", "shared", "AuctionHouseLayout.luau"))
+        open(os.path.join(out, "has-auction.luau"), "w", encoding="utf-8").write(f"return {'true' if has else 'false'}\n")
         return run(luau, out)
 
 
-def village_projection(rows, game):
-    """8.9 Jinočany: step 1's map as it will be (design/jinocany/NAVRH.md): what today's map keeps (the roads, the
-    farmstead, the ground, the boundary, the lamps and the signpost; the spruces, the flowers, the rail fence and the
-    alpine far view go), the Auction House once it is on, and the village VillageLooks gives (not built yet)."""
-    if "village/houses" not in rows:
-        return
+def map_budget(rows, game):
+    """8.9 Jinočany: the map (SandboxWorld's, the village built) with the Auction House (once Config.Auction.On) against
+    SandboxScenery.Budget; False when over it."""
     scenery = open(os.path.join(game, "src", "shared", "SandboxScenery.luau"), encoding="utf-8").read()
     budget = int(re.search(r"^SandboxScenery\.Budget = (\d+)", scenery, re.M).group(1))
-    part = lambda label: rows.get(label, {}).get("parts", 0)
-    entries = [
-        ("kept: the roads (Depot Row, Pražská, the turnaround)", part("world/Roads")),
-        ("kept: the farmstead (today's TheOldChalet)", part("world/TheOldChalet")),
-        ("kept: the ground (its tiles: about today's)", part("world/Ground")),
-        ("kept: the boundary", part("world/Boundary")),
-        ("kept: the lamps and the signpost", part("scenery/Lamps") + part("scenery/Signpost")),
-        ("the Auction House (once Config.Auction.On)", part("auction")),
-        ("village: the houses (the six to empty rich)", part("village/houses")),
-        ("village: the terraced rows (one body a group)", part("village/rows")),
-        ("village: the landmarks (green, chapel, pond, drugstore, D5, barrier)", part("village/landmarks")),
-        ("village: the trees (tree lines, the orchard; before the builder's rules)", part("village/trees")),
-        ("village: the fields", part("village/fields")),
-        ("village: the far view", part("village/far")),
-    ]
-    total = sum(n for _, n in entries)
+    world = sum(row.get("parts", 0) for label, row in rows.items() if label.startswith("world/"))
+    auction = rows.get("auction", {}).get("parts", 0)
+    total = world + auction
     print()
-    print("8.9 Jinočany, step 1 (a projection: VillageLooks gives the village, nothing of it is on the map yet)")
-    print()
-    print("| piece | parts |\n|---|---|")
-    for label, n in entries:
-        print(f"| {label} | {n:,} |")
-    print(f"| **the step-1 map** (SandboxScenery.Budget {budget:,}) | {total:,} |")
-    gone = part("scenery/Trees") + part("scenery/Wildflowers") + part("scenery/Fence") + part("world/Far")
-    print(f"INFO village\tgoing: today's spruces, flowers, rail fence and alpine far view ({gone:,} parts); not counted: "
-          f"the village's new roads (their slabs and shoulders, about 9 parts a road without markings) and lawns: "
-          f"{budget - total:,} parts left for them")
+    print(f"INFO budget\tthe map {world:,} parts, with the Auction House (once Config.Auction.On) {total:,}, "
+          f"of SandboxScenery.Budget {budget:,}: {budget - total:,} left" + ("" if total <= budget else " — OVER BUDGET"))
+    return total <= budget
 
 
 def van_rows(luau, game):
@@ -262,7 +212,8 @@ def main():
             print(f"INFO {label}\t{row['parts']} parts, {row['shadows']} cast shadow, {row['lights']} lights")
     for note in notes:
         print(note)
-    village_projection(rows, game)
+    if not map_budget(rows, game):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

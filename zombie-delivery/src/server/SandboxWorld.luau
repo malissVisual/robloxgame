@@ -5,11 +5,14 @@
 -- is anchored, in workspace.Sandbox:
 --
 --   Ground    the meadow's tiles (Grass, their top at GroundTop), a concrete pad on every plot (the warehouse worker's
---             building stands on it; its top flush with the meadow), the house's lawn, a few gentle mounds (big
---             buried balls: a vehicle's free-room box query passes this folder, Config.SpawnSpot.Pass, or their
---             whole boxes would fill the map)
---   Roads     the asphalt of SandboxMap.Roads and the turnaround (its top a hair under Pražská's where they overlap),
---             the gravel shoulders down to the meadow on every edge (the cars roll off and on anywhere), the markings
+--             building stands on it; its top flush with the meadow), the house's lawn (a vehicle's free-room box query
+--             passes this model, Config.SpawnSpot.Pass); 8.9 the village's fields and lawns (server/VillageWorld.luau);
+--             a Persistent model (8.9: the map is 1,600 studs across: every client always has the ground it drives
+--             on); the Alps' mounds are gone
+--   Roads     the asphalt of SandboxMap.Roads (8.9: Jinočany's streets too, SandboxScenery.asphalt's slabs) and the
+--             turnaround (its top a hair under Pražská's where they overlap), the gravel shoulders down to the meadow
+--             on every edge (the cars roll off and on anywhere; none across a junction), the markings; a Persistent
+--             model as the ground
 --   House     "TheOldFarmstead" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet (the stand-in look)
 --             on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
@@ -29,15 +32,18 @@
 --             the box less a hall behind each doorway (Config.Moving.Doors.Hall Depth deep, the opening's width and
 --             height), each hall lined dark ("DoorHalls": the house is a shell behind its walls, a camera that follows
 --             you in sees a dark hall)
---   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
---             round the edge, the street lamps along Pražská, the signpost at the crossroads
+--   Scenery   the street lamps along Pražská, the signpost at the crossroads (8.9: a Czech village's white boards; the
+--             Alps' spruces, wildflowers and rail fence are gone)
+--   Village   8.9 Jinočany step 1 (server/VillageWorld.luau): the village's houses, landmarks and trees in Atomic
+--             chunks; the D5 in the Persistent model "Motorway"; the far view in "Far" (below)
 --   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
 --             Auction House on Depot Row, east of the crossroads (shared/AuctionHouseLayout.luau's parts, its place
 --             Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
 --             client paints), the consignment desk's prompt (AuctionDesk), the lot's pedestal (AuctionLotStand), two lamps
 --   Boundary  the invisible walls on the Bounds
---   Far       (a Persistent model: every client always has it) outside the Bounds: the far meadow, the green hills and
---             the snowy peaks that close the view; no collision but the far meadow's, no shadows
+--   Far       (a Persistent model: every client always has it) outside the Bounds: 8.9 Jinočany's flat horizon
+--             (server/VillageWorld.luau: far fields, tree lines, pylons, the D5 going on, far roofs); no collision but
+--             the far fields', no shadows (the Alps' green hills and snowy peaks are gone)
 --
 --   SandboxWorld.build()      builds it once (server/Main.server.luau at the server's start, sandbox mode) and lights
 --                             it; returns workspace.Sandbox (a second call returns it as it is)
@@ -51,7 +57,6 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local AlpineLayout = require(Shared.AlpineLayout)
 local AuctionHouseLayout = require(Shared.AuctionHouseLayout) -- 8.8: the Auction House (only while Config.Auction.On)
 local ChaletLooks = require(Shared.ChaletLooks)
 local Config = require(Shared.Config) -- 8.5 walk-in doors: the doors' halls (Config.Moving.Doors.Hall)
@@ -60,6 +65,7 @@ local SandboxMap = require(Shared.SandboxMap)
 local SandboxScenery = require(Shared.SandboxScenery)
 
 local HouseMesh = require(script.Parent.HouseMesh) -- 8.1: the owner's Blender house (design/blender-house)
+local VillageWorld = require(script.Parent.VillageWorld) -- 8.9: Jinočany's village, the D5 and the far view
 
 local SandboxWorld = {}
 
@@ -69,8 +75,8 @@ local C = SandboxScenery.Colors
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder standing up
 local POLE = Color3.fromRGB(50, 50, 54)
 local LAMP_DIM = Color3.fromRGB(196, 194, 182)
-local SIGN = Color3.fromRGB(238, 196, 48) -- the signpost's boards (an alpine walking sign's yellow)
-local INK = Color3.fromRGB(30, 30, 34)
+local SIGN = Color3.fromRGB(C.Sign[1], C.Sign[2], C.Sign[3]) -- the signpost's boards (8.9: a Czech village's white, not the Alps' yellow)
+local INK = Color3.fromRGB(C.Ink[1], C.Ink[2], C.Ink[3])
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -198,20 +204,19 @@ local function fenceRun(parent: Instance, segments: { SandboxScenery.Segment }, 
 	end
 end
 
--- A square pyramid of four corner wedges (each one's apex over its (+X, -Z) corner, put at the pyramid's middle):
--- server/Alpine.luau's far peaks.
-local function pyramid(parent: Instance, name: string, x: number, z: number, y: number, half: number, height: number, yaw: number, color: Color3, look: Enum.Material)
-	for q = 0, 3 do
-		local p = cornerWedge(parent, name, Vector3.new(half, height, half), CFrame.new(x, y + height / 2, z) * CFrame.Angles(0, yaw + q * math.pi / 2, 0) * CFrame.new(-half / 2, 0, half / 2), color, look)
-		deco(p)
-		p.CastShadow = false
-	end
-end
-
 -- ── The ground ─────────────────────────────────────────────────────────────
 
+-- (8.9: a Persistent model: on every client always, the map is too big for its ground to stream in under a car)
+local function persistent(parent: Instance, name: string): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	model.Parent = parent
+	return model
+end
+
 local function ground(world: Instance)
-	local holder = folder(world, "Ground")
+	local holder = persistent(world, "Ground")
 	local top = MAP.GroundTop
 	local tiles = S.meadow()
 	for _, t in tiles do
@@ -222,25 +227,19 @@ local function ground(world: Instance)
 		pad:SetAttribute("Plot", plot.id)
 	end
 	slab(holder, "Lawn", MAP.House.lot, top, 2, rgb(C.Lawn), Enum.Material.Grass)
-	for _, m in S.mounds() do
-		local ball = block(holder, "Mound", Vector3.new(2 * m.radius, 2 * m.radius, 2 * m.radius), CFrame.new(m.x, top + m.height - m.radius, m.z), rgb(m.color), Enum.Material.Grass)
-		ball.Shape = Enum.PartType.Ball
-		ball.CastShadow = false
-	end
 end
 
 -- ── The roads ──────────────────────────────────────────────────────────────
 
 local function roads(world: Instance)
-	local holder = folder(world, "Roads")
-	local main, depot = MAP.Roads[1], MAP.Roads[2]
+	local holder = persistent(world, "Roads")
 	local asphalt = rgb(C.Asphalt)
 	local depth = S.RoadDepth
-	local row = slab(holder, "Road", depot :: any, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
-	row:SetAttribute("Road", depot.name)
-	-- (Pražská from Depot Row's south edge: the junction is Depot Row's asphalt)
-	local street = slab(holder, "Road", { x0 = main.x0, x1 = main.x1, z0 = depot.z1, z1 = main.z1 }, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
-	street:SetAttribute("Road", main.name)
+	-- (8.9: every street's slab; Pražská's from Depot Row's south edge: the junction is Depot Row's asphalt)
+	for _, r in S.asphalt() do
+		local road = slab(holder, "Road", r, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
+		road:SetAttribute("Road", r.name)
+	end
 	local T = MAP.Turnaround
 	local disc = block(holder, "Turnaround", Vector3.new(depth, 2 * T.r, 2 * T.r), CFrame.new(T.x, S.TurnaroundTop - depth / 2, T.z) * UPRIGHT, asphalt, Enum.Material.Asphalt)
 	disc.Shape = Enum.PartType.Cylinder
@@ -601,57 +600,8 @@ end
 
 -- ── The scenery ────────────────────────────────────────────────────────────
 
--- A tree's or a flower's part from AlpineLayout's numbers (a trunk cylinder standing up, a needle spire ellipsoid).
-local function treePart(parent: Instance, spec: AlpineLayout.PartSpec): Part
-	local frame = CFrame.new(spec.x, spec.y, spec.z) * CFrame.Angles(0, spec.yaw, 0)
-	local p: Part
-	if spec.shape == "cylinder" then
-		p = block(parent, spec.name, Vector3.new(spec.sy, spec.sx, spec.sz), frame * UPRIGHT, rgb(spec.color), material(spec.material))
-		p.Shape = Enum.PartType.Cylinder
-	else
-		p = block(parent, spec.name, Vector3.new(spec.sx, spec.sy, spec.sz), frame, rgb(spec.color), material(spec.material))
-		if spec.shape == "ellipsoid" then
-			local mesh = Instance.new("SpecialMesh")
-			mesh.MeshType = Enum.MeshType.Sphere
-			mesh.Parent = p
-		end
-	end
-	if not spec.collide then
-		deco(p)
-	end
-	return p
-end
-
 local function scenery(world: Instance)
 	local holder = folder(world, "Scenery")
-	-- the trees, one Atomic model a chunk (streamed together)
-	local trees = folder(holder, "Trees")
-	local chunks: { [string]: Model } = {}
-	for _, t in S.trees() do
-		local model = chunks[t.chunk]
-		if not model then
-			local made = Instance.new("Model")
-			made.Name = `Trees_{t.chunk}`
-			made.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-			chunks[t.chunk] = made
-			model = made
-		end
-		for _, spec in AlpineLayout.treeParts(t) do
-			treePart(model, spec)
-		end
-	end
-	for _, model in chunks do
-		model.Parent = trees
-	end
-	-- the wildflowers
-	local meadow = folder(holder, "Wildflowers")
-	for _, f in S.flowers() do
-		local bloom = deco(block(meadow, "Flower", Vector3.new(f.size, f.size, f.size), CFrame.new(f.x, f.y, f.z), rgb(f.color), Enum.Material.SmoothPlastic))
-		bloom.Shape = Enum.PartType.Ball
-		bloom.CastShadow = false
-	end
-	-- the rail fence round the world
-	fenceRun(folder(holder, "Fence"), S.fence(), S.FencePost, 3.6, 2, rgb(C.Fence), true)
 	-- the street lamps (a fixed afternoon: their heads stay dim, no lights)
 	local lamps = folder(holder, "Lamps")
 	local up = Vector3.new(0, 0.3, 0)
@@ -665,7 +615,7 @@ local function scenery(world: Instance)
 		deco(block(lamps, "LampHood", Vector3.new(2, 0.3, 1.4), CFrame.lookAt(at + up, at + up + out), POLE, Enum.Material.Metal))
 		deco(block(lamps, "Lamp", Vector3.new(1.7, 0.3, 1.1), CFrame.lookAt(at, at + out), LAMP_DIM, Enum.Material.Glass))
 	end
-	-- the signpost at the crossroads: a post, three yellow boards (to the warehouses either way, to the farmstead)
+	-- the signpost at the crossroads: a post, three white boards (to the warehouses either way, to the farmstead)
 	local sign = folder(holder, "Signpost")
 	local s = S.Signpost
 	block(sign, "SignPost", Vector3.new(0.7, 12, 0.7), CFrame.new(s.x, 6, s.z), Color3.fromRGB(96, 70, 48), Enum.Material.Wood)
@@ -696,26 +646,6 @@ local function boundary(world: Instance)
 		wall.Transparency = 1
 		wall.CanQuery = false
 	end
-end
-
-local function far(world: Instance)
-	local model = Instance.new("Model")
-	model.Name = "Far"
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-	for _, r in S.farGround() do
-		slab(model, "FarMeadow", r, MAP.GroundTop, 2, rgb(C.Far), Enum.Material.Grass).CanQuery = false
-	end
-	for _, h in S.hills() do
-		local ball = deco(block(model, "Hill", Vector3.new(2 * h.radius, 2 * h.radius, 2 * h.radius), CFrame.new(h.x, MAP.GroundTop + h.height - h.radius, h.z), rgb(h.color), Enum.Material.Grass))
-		ball.Shape = Enum.PartType.Ball
-		ball.CastShadow = false
-	end
-	local rock, snow = rgb(C.Rock), rgb(C.Snow)
-	for _, p in S.peaks() do
-		pyramid(model, "Peak", p.x, p.z, p.base, p.half, p.height, p.yaw, rock, Enum.Material.Slate)
-		pyramid(model, "PeakSnow", p.x, p.z, p.capY, p.capHalf, p.capHeight, p.yaw, snow, Enum.Material.Snow)
-	end
-	model.Parent = world
 end
 
 -- ── The light ──────────────────────────────────────────────────────────────
@@ -785,11 +715,11 @@ function SandboxWorld.build(): Folder
 	roads(world)
 	house(world)
 	scenery(world)
+	local village = VillageWorld.build(world) -- 8.9: Jinočany's village, its fields and lawns, the D5, the far view
 	if Config.Auction.On then -- 8.8: the Auction House, only once the auction is on (nothing of it shows before)
 		auctionHouse(world)
 	end
 	boundary(world)
-	far(world)
 	world.Parent = workspace -- (in one go)
 	SandboxWorld.lighting()
 	local parts = 0
@@ -798,7 +728,7 @@ function SandboxWorld.build(): Folder
 			parts += 1
 		end
 	end
-	print(string.format("[SandboxWorld] the sandbox world: %d parts, %d trees, in %.2f s", parts, #S.trees(), os.clock() - started))
+	print(string.format("[SandboxWorld] the sandbox world: %d parts, %d houses, %d landmarks, %d trees, in %.2f s", parts, village.houses, village.landmarks, village.trees, os.clock() - started))
 	return world
 end
 

@@ -58,22 +58,16 @@ end
 modes("world", world)
 detail("world", Census.list(world))
 
--- 8.9 Jinočany: the scenery by its folders (the village keeps the lamps and the signpost), the step-1 village as
--- shared/VillageLooks.luau gives it (its census of design/jinocany/plan.json: village-plan.luau, sandbox_count.py's;
--- nil in a checkout without them: nothing of it is on the map yet) and the Auction House's parts (built once
--- Config.Auction.On): sandbox_count.py's projection of the step-1 map
+-- the scenery by its folders (8.9: the lamps and the signpost; the Alps' trees, flowers and fence in an older
+-- checkout) and 8.8's Auction House's parts (built once Config.Auction.On, off here: sandbox_count.py adds them to the
+-- map's against its budget; has-auction.luau, sandbox_count.py's, says whether this checkout has it)
 local scenery = world:FindFirstChild("Scenery")
 if scenery then
 	for _, child in scenery:GetChildren() do
 		emit("scenery/" .. child.Name, Census.under(child))
 	end
 end
-local villagePlan = require("./village-plan")
-if villagePlan then
-	local census = require("./shared/VillageLooks").census(villagePlan, 1)
-	for _, key in { "houses", "rows", "landmarks", "trees", "fields", "far" } do
-		emit("village/" .. key, { parts = census[key], visible = census[key] })
-	end
+if require("./has-auction") then
 	local auction = #require("./shared/AuctionHouseLayout").parts()
 	emit("auction", { parts = auction, visible = auction })
 end

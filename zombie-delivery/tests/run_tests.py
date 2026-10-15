@@ -29,6 +29,7 @@ PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown ke
 PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
 PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
 PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
+PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -353,7 +354,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "SandboxWorld.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshServer")')
+    source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 8.9 Jinočany: its server/VillageWorld.luau (the village, the D5, the far view) on the same mock as
+    # VillageWorldServer.luau (tests/villageworld_test.luau), its shared modules the copies above.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "VillageWorld.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "VillageWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     # 8.1: its server/HouseMesh.luau on the same mock as HouseMeshServer.luau (no import there: the chalet stays; DayNight
     # a stand-in), and the owner's Blender house as numbers for the test (HouseArt.luau, from
     # design/blender-house/roblox/ZDCHouseArt.json, house.py's manifest: the box it was made for, its front door's
@@ -386,10 +393,11 @@ with tempfile.TemporaryDirectory() as tmp:
     lines = ["\t{ name = %s, rect = %s }," % (json.dumps(name, ensure_ascii=False), rect(r)) for name, r in areas]
     trees = ["\t{ %s }," % ", ".join("{ %r, %r }" % (p["x"], p["z"]) for p in t["points"]) for t in plan["treeLines"]]
     # 8.9: and as the village's entries for tests/villagelooks_test.luau (shared/VillageLooks.luau builds them): every
-    # house (its kind, box, yaw, door, step, one to empty), landmark (kind, rect, step), road, field and tree line.
+    # house (its kind, box, yaw, door, curb, step, one to empty), landmark (kind, rect, step), road, field and tree line
+    # (tests/villageworld_test.luau holds the map's village section to them too).
     q = lambda text: json.dumps(text, ensure_ascii=False)
-    houses = ["\t{ id = %s, street = %s, kind = %s, box = %s, yaw = %r, door = { x = %r, z = %r, yaw = %r }, step = %r, enter = %s },"
-              % (q(h["id"]), q(h["street"]), q(h["kind"]), rect(h["box"]), h["yaw"], h["door"]["x"], h["door"]["z"], h["door"]["yaw"], h["step"],
+    houses = ["\t{ id = %s, street = %s, kind = %s, box = %s, yaw = %r, door = { x = %r, z = %r, yaw = %r }, curb = { x = %r, z = %r }, step = %r, enter = %s },"
+              % (q(h["id"]), q(h["street"]), q(h["kind"]), rect(h["box"]), h["yaw"], h["door"]["x"], h["door"]["z"], h["door"]["yaw"], h["curb"]["x"], h["curb"]["z"], h["step"],
                  "true" if h["enter"] else "false") for h in plan["houses"]]
     marks = ["\t{ id = %s, kind = %s, rect = %s, step = %r }," % (q(l["id"]), q(l["kind"]), rect(l["rect"]), l["step"]) for l in plan["landmarks"]]
     roads = ["\t{ name = %s, rect = %s, step = %r }," % (q(r["name"]), rect(r["rect"]), r["step"]) for r in plan["roads"]]
@@ -853,6 +861,13 @@ def audio_length_check():
     return not bad
 
 if not audio_length_check():
+    ok = False
+
+# 8.9 Jinočany: shared/SandboxMap.luau's village section is design/jinocany/plan.json's (tools/village/sandboxmap.py
+# writes it; a plan changed but not written again shows here).
+village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "village", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+print("== village data: " + (village.stdout.strip() or village.stderr.strip())[:200])
+if village.returncode != 0:
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

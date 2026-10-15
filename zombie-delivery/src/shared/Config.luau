@@ -8181,7 +8181,8 @@ Config.Auction = {
 }
 
 -- 8.9 SANDBOX, Jinočany (design/jinocany/NAVRH.md, plan.json): the village's looks. shared/VillageLooks.luau builds
--- the parts from these numbers (tests/villagelooks_test.luau, tools/village/preview.py); nothing is on the map yet.
+-- the parts from these numbers (tests/villagelooks_test.luau, tools/village/preview.py); 8.9 step 1 is on the map
+-- (server/VillageWorld.luau builds it: Config.VillageWorld).
 -- Colours { r, g, b }; materials are Enum.Material's names.
 --   Palette   every colour of the village: Render (the old houses' and the rows' walls: cream, ochre, light grey, pale
 --             yellow, apricot), Modern (a new build's: white, light grey), Tiles (the clay roofs: red, brick red, brown,
@@ -8301,6 +8302,43 @@ Config.Village = {
 	Lines = { Windbreak = 36, Alley = 26, Mix = { "linden", "oak", "linden", "birch", "poplar" } :: { string }, Orchard = { 36, 32 } :: { number }, Edge = 12 },
 	Fields = { Rows = 16, MaxRows = 10 },
 	Far = { Reach = 1200 },
+}
+
+-- 8.9 SANDBOX, Jinočany step 1 on the map (design/jinocany/NAVRH.md §4): shared/VillageScenery.luau lays
+-- shared/SandboxMap.luau's village (its houses, landmarks, fields, lawns, tree lines and orchard) out with
+-- shared/VillageLooks.luau's art, server/VillageWorld.luau makes the parts (tests/villageworld_test.luau), the D5's cars
+-- are client/VillageTraffic.luau's (this screen's only).
+--   Lawn       the village's lawns' colour and material (SandboxMap.Lawns: the gardens round its houses, a little
+--              greener than the meadow)
+--   Trees      a tree of a tree line or the orchard stands where the map's rules let it (SandboxScenery.treeRule: off
+--              the roads and their 12 studs, the plots, the farmstead, the vans' ways; VillageScenery.treeRule: Keep
+--              studs off a village house's box, a landmark's rect or the Auction House's site); where they say no it
+--              moves off its spot, Step studs at a time across its line (then along it), at most Nudge studs, else it is
+--              left out. Two crowns stay Apart × their radii apart
+--   Shadow     a village part throws a shadow only when it is a mass (solid, not a door nor a trunk: the walls, roofs,
+--              gables, chimneys, the landmarks' bodies) or a tree's crown (the tree's shadow), Low studs tall at least
+--              (a plinth's, a bench's shadow is hardly seen), and big enough for SandboxScenery.Shadow and
+--              RenderBudget's rule
+--   Cars      the D5's cars (client/VillageTraffic.luau): Count in all, Speed studs/s (each its own share of Spread
+--              more or less), Beyond studs past the Bounds they run on the far D5 (VillageLooks.horizon's) before they
+--              go round again unseen; a car is a body (Size: width, height, length) and a cabin on it (Cabin, its
+--              share of the length, a little narrower), in one of Colors; Lanes: the share of a carriageway's width
+--              out from its middle each of its two lanes runs
+export type VillageCars = { Count: number, Speed: number, Spread: number, Beyond: number, Size: { number }, Cabin: { number }, Lanes: number, Colors: { { number } } }
+Config.VillageWorld = {
+	Lawn = { Color = { 104, 148, 62 } :: { number }, Material = "Grass" },
+	Trees = { Step = 4, Nudge = 12, Keep = 3, Apart = 0.85 },
+	Shadow = { Low = 2 },
+	Cars = {
+		Count = 12,
+		Speed = 76,
+		Spread = 0.15,
+		Beyond = 800,
+		Size = { 6.4, 3.4, 14 },
+		Cabin = { 0.55, 2.4 },
+		Lanes = 0.25,
+		Colors = { { 196, 32, 38 }, { 236, 236, 232 }, { 34, 38, 44 }, { 46, 84, 150 }, { 150, 154, 158 }, { 92, 120, 76 }, { 226, 176, 52 } },
+	} :: VillageCars,
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).

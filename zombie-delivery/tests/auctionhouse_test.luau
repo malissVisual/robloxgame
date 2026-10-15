@@ -2,8 +2,8 @@
 -- it only while Config.Auction.On): its place (on Depot Row east of the crossroads, its door to the road, across from
 -- the plots, near the TOP MOVERS board), every part inside its footprint and within its budget, a walk free from the
 -- steps through the doorway down the aisle to the stage, the desk, the lot's pedestal, the sign and the lot display;
--- clear of today's map (the roads and their 12 studs, the plots, the vans' ways, the house, the signpost, the lamps, the
--- trees, the flowers, the board; flat meadow) and of design/jinocany/plan.json (JinocanyPlan.luau: the village's roads,
+-- clear of today's map (the roads and their 12 studs, the plots, the vans' ways, the house, the signpost, the lamps, 8.9
+-- the village's trees, the board; flat meadow) and of design/jinocany/plan.json (JinocanyPlan.luau: the village's roads,
 -- landmarks, fields, houses and tree lines: it stays where it stands when the village is built); turned with its spot;
 -- and the world SandboxWorld builds: nothing of it while the auction is off; on, the model, its parts as laid out, its
 -- words, the desk's prompt, the lamps, nothing of the map within 1.5 studs of it, the map's budget and rules kept.
@@ -16,6 +16,7 @@ local Config = require("./Config")
 local Layout = require("./AuctionHouseLayout")
 local SandboxMap = require("./SandboxMap")
 local SandboxScenery = require("./SandboxScenery")
+local VillageScenery = require("./VillageScenery") -- 8.9: the village's trees
 local Leaders = require("./SandboxLeadersRules")
 local Plan = require("./JinocanyPlan")
 
@@ -167,17 +168,16 @@ end
 -- ── Clear of today's map ────────────────────────────────────────────────────
 do
 	local B = SandboxMap.Bounds
-	local inset = SandboxScenery.FenceInset + C.Edge
+	local inset = C.Edge
 	local why: string? = nil
-	local trees = SandboxScenery.trees()
-	local flowers = SandboxScenery.flowers()
+	local trees = VillageScenery.trees()
 	local lamps = SandboxScenery.lamps()
 	local sign = SandboxScenery.Signpost
 	local margin = 3
 	for _, p in samples(0) do
 		local x, z = p[1], p[2]
 		if x < B.x0 + inset or x > B.x1 - inset or z < B.z0 + inset or z > B.z1 - inset then
-			why = "outside the fence"
+			why = "at the map's edge"
 		end
 		local rule = SandboxScenery.treeRule(x, z, 0) -- (the roads' 12 studs, the turnaround, the plots, the house, its path, the vans' ways, the signpost)
 		if rule or SandboxMap.plotAt(x, z) then
@@ -199,13 +199,8 @@ do
 			end
 		end
 		for _, t in trees do
-			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < t.canopy + margin then
+			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < t.radius + margin then
 				why = `under the tree at {math.floor(t.x)}, {math.floor(t.z)}`
-			end
-		end
-		for _, f in flowers do
-			if math.sqrt((x - f.x) ^ 2 + (z - f.z) ^ 2) < f.size + margin then
-				why = `on the wildflowers at {math.floor(f.x)}, {math.floor(f.z)}`
 			end
 		end
 		if math.abs(SandboxScenery.groundAt(x, z) - SandboxMap.GroundTop) > 1e-9 then
@@ -217,7 +212,7 @@ do
 			end
 		end
 	end
-	check("clear of today's map: inside the fence, 12 studs off every road, off the plots, the vans' ways, the house and its path, the signpost, the lamps, the trees, the flowers and the TOP MOVERS board, on flat meadow", why == nil, why)
+	check("clear of the map: inside its edge, 12 studs off every road, off the plots, the vans' ways, the house and its path, the signpost, the lamps, 8.9 the village's trees and the TOP MOVERS board, on flat meadow", why == nil, why)
 end
 
 -- ── Clear of the Jinočany plan (design/jinocany/plan.json) ──────────────────
