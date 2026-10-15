@@ -24,9 +24,10 @@
 --   HouseRoute.block(grid, pieces)        the pieces standing now ({ Rect }): every cell they leave his body no room in
 --                                         is closed, the rest open again; returns the open cells' count
 --   HouseRoute.open(grid, x, z)           is (x, z) on an open cell
---   HouseRoute.path(grid, fx, fz, tx, tz)   his way from (fx, fz) to (tx, tz): its points after the start ({ { x, z } },
---                                         the last one the goal's nearest open cell within Route.Snap; a start off
---                                         the open cells steps onto the nearest one first); nil: no way
+--   HouseRoute.path(grid, fx, fz, tx, tz, far?)   his way from (fx, fz) to (tx, tz): its points after the start
+--                                         ({ { x, z } }, the last one the goal's nearest open cell within `far` studs,
+--                                         Route.Snap by default; a start off the open cells steps onto the nearest one
+--                                         first); nil: no way
 --   HouseRoute.reach(grid, fx, fz, piece, stand?, avoid?)   where he stands to take `piece` (its footprint): (x, z,
 --                                         studs on foot) or nil (no such spot he can walk to); `avoid`: rects he never
 --                                         stands in (the doorways, where he would wait in your way)
@@ -467,10 +468,10 @@ local function octile(g: Grid, a: number, b: number): number
 	return (math.max(di, dj) + (DIAGONAL - 1) * math.min(di, dj)) * g.step
 end
 
-function HouseRoute.path(g: Grid, fx: number, fz: number, tx: number, tz: number): { Point }?
+function HouseRoute.path(g: Grid, fx: number, fz: number, tx: number, tz: number, far: number?): { Point }?
 	local snap = cfg().Snap
 	local start = nearestOpen(g, fx, fz, snap)
-	local goal = nearestOpen(g, tx, tz, snap)
+	local goal = nearestOpen(g, tx, tz, far or snap)
 	if start == 0 or goal == 0 then
 		return nil
 	end
@@ -497,6 +498,7 @@ function HouseRoute.reach(g: Grid, fx: number, fz: number, piece: Rect, stand: n
 		return nil, nil, nil
 	end
 	local mx, mz = (piece.x0 + piece.x1) / 2, (piece.z0 + piece.z1) / 2
+	local zones: { Rect } = avoid or {}
 	local found, cost = search(g, start, function(k: number): number
 		local x, z = middle(g, k)
 		return math.max(0, toRect(x, z, piece) - far) -- (never more than the way to a cell within `far` of it)
@@ -505,7 +507,7 @@ function HouseRoute.reach(g: Grid, fx: number, fz: number, piece: Rect, stand: n
 		if toRect(x, z, piece) > far then
 			return false
 		end
-		for _, r in avoid or {} do
+		for _, r in zones do
 			if x >= r.x0 and x <= r.x1 and z >= r.z0 and z <= r.z1 then
 				return false
 			end

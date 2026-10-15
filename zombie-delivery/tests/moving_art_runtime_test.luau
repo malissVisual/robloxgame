@@ -182,7 +182,7 @@ for _, s in plan.spots do
 end
 local piece = spot and built[1].pieces[spot.id]
 check("a real one-hand piece in the house", piece ~= nil and piece.PrimaryPart ~= nil and piece:GetAttribute("FurnitureId") == spot.item, spot and spot.item)
-E.place(ann, piece.PrimaryPart.Position + V3(1, 0, 0))
+E.place(ann, piece.PrimaryPart.Position + piece.PrimaryPart.CFrame.LookVector * 1.5) -- (9.0 in front of it, in its room)
 trigger(promptIn(piece, "Pick up"), ann)
 check(`Ann picks up the {spot.item}`, ann.Character:GetAttribute("MoveCarry") == spot.id and ann.Character:GetAttribute("CarryHands") == 1)
 local exitAt = (origin * M.CFrame.new(plan.exit)).Position
@@ -207,7 +207,7 @@ end
 local piece2 = built[1].pieces[second.id]
 E.place(ann, outside)
 trigger(promptIn(site, "Enter house"), ann)
-E.place(ann, piece2.PrimaryPart.Position + V3(1, 0, 0))
+E.place(ann, piece2.PrimaryPart.Position + piece2.PrimaryPart.CFrame.LookVector * 1.5) -- (9.0 in front of it, in its room: never through a wall)
 trigger(promptIn(piece2, "Pick up"), ann)
 E.place(ann, exitAt + V3(0, 3, 0))
 trigger(promptIn(workspace, "Leave house"), ann)

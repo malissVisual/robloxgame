@@ -1694,21 +1694,24 @@ local function endHandle(h: Helper, body: Body?, why: string?)
 	end
 	h.handle = nil
 	local root, weld, to = handle.root, handle.weld, handle.to
-	if root and to and root.Parent then
+	local held = Rules.holding(h.s.move, h.id) == handle.spot -- (set down or knocked out of his hands meanwhile: left alone)
+	if held and root and to and root.Parent then
 		if handle.kind == "pick" and body then
 			root.CFrame = body.root.CFrame * to
 		elseif handle.kind == "put" then
 			root.CFrame = to
 		end
 	end
-	if weld and weld.Parent then
+	if held and weld and weld.Parent then
 		weld.Enabled = true
 	end
-	if root and root.Parent then
+	if held and root and root.Parent then
 		root.Anchored = false
 	end
 	if handle.kind == "put" and body then
-		h.port.helperDrop(h.s, body.model, why or handle.why)
+		if held then
+			h.port.helperDrop(h.s, body.model, why or handle.why)
+		end
 		if handle.requeue then
 			requeue(h, handle.spot)
 		end
@@ -2059,7 +2062,9 @@ local function routeTo(h: Helper, grid: Route.Grid, here: Vector3, target: Vecto
 		h.pathAt, h.pathInside, h.pathKey, h.pathIndex = clock, true, h.routeKey, 1
 		local fx, fz = planAt(h, here)
 		local tx, tz = planAt(h, target)
-		local points = Route.path(grid, fx, fz, tx, tz)
+		-- (a goal off the open cells, in a wall or a piece: the far end of your piece against a wall, its nearest open
+		-- cell within CallClose all the same: as near as he gets, the hold walks him the rest)
+		local points = Route.path(grid, fx, fz, tx, tz) or Route.path(grid, fx, fz, tx, tz, cfg.CallClose)
 		if points then
 			for index, p in points do
 				h.path[index] = worldAt(h, p.x, p.z, here.Y)

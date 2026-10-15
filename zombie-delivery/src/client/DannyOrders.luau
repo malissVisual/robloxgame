@@ -409,7 +409,7 @@ local function newGive(): ProximityPrompt
 	prompt.KeyboardKeyCode = GIVE_KEY
 	prompt.GamepadKeyCode = GIVE_PAD
 	prompt.HoldDuration = 0
-	prompt.RequiresLineOfSight = false
+	prompt.RequiresLineOfSight = true -- (9.0 as the pieces' own prompts it stands in for: never offered through a wall)
 	prompt.Triggered:Connect(function()
 		local piece = giveOn[prompt]
 		if piece and piece.Parent then
