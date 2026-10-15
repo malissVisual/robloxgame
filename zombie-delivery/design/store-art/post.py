@@ -286,23 +286,20 @@ def t2(im, m):
 
 
 INCOME = {"legendary": "+$105/min", "epic": "+$32/min", "rare": "+$14/min", "uncommon": "+$6/min"}
+CHIPS = ("F_zombie_safe", "F_trex_skull", "F_ski_trophy", "F_alphorn", "F_golden_horseshoe")  # (the chips that do not overlap)
 
 
 def t3(im, m):
     im = grade(im, sat=1.14, contrast=1.08)
     im = bloom(im, threshold=200, strength=0.5)
     im = vignette(im, 0.25)
-    shown = 0
     for key, (x, y) in m.items():
         name, rarity = key.split("|")
-        if not (0.06 < x < 0.94 and 0.25 < y < 0.95):
-            continue
-        if rarity in ("legendary", "epic") or (rarity == "rare" and y > 0.44):
+        if name in CHIPS and 0.06 < x < 0.94:
             im = money_chip(im, (x, y - 0.03), INCOME[rarity], 40 if rarity == "legendary" else 32)
-            shown += 1
     im, _ = title(im, "BUILD YOUR", (0.5, 0.015), 120, anchor="ma", rot=0)
     im, _ = title(im, "WAREHOUSE EMPIRE", (0.5, 0.135), 150, anchor="ma", rot=0, fill=((255, 240, 160), (255, 178, 36)))
-    im = pill(im, (0.13, 0.93), "LEVEL 1 → 5", ZDC_RED, 46, text_color=WHITE, back=(214, 34, 40, 235), pointer=False)
+    im = pill(im, (0.155, 0.965), "UPGRADE TO LEVEL 5", ZDC_RED, 44, text_color=WHITE, back=(214, 34, 40, 235), pointer=False)
     im = zdc_badge(im, (0.985, 0.03), 130)
     return im
 
@@ -310,7 +307,7 @@ def t3(im, m):
 def icon(im, m):
     """The icon: a sunburst behind the transparent render, the ZDC badge in a corner."""
     w, h = im.size
-    bg = Image.new("RGB", (w, h))
+    bg = Image.new("RGB", (w, h), (214, 34, 40))
     g = ImageDraw.Draw(bg)
     for i in range(w // 2, 0, -2):
         t = i / (w / 2)
@@ -318,6 +315,13 @@ def icon(im, m):
         g.ellipse((w * 0.42 - i * 1.5, h * 0.42 - i * 1.5, w * 0.42 + i * 1.5, h * 0.42 + i * 1.5), fill=c)
     bg = rays(bg, (0.42, 0.42), (255, 244, 200), count=18, length=0.9, alpha=55, spin=0.15)
     sub = im.convert("RGBA")
+    # the subject as big as the square allows: its bottom on the bottom edge, centred across
+    bb = sub.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
+    cut = sub.crop(bb)
+    k = min(h * 0.94 / cut.height, w * 1.0 / cut.width)
+    cut = cut.resize((int(cut.width * k), int(cut.height * k)), Image.LANCZOS)
+    sub = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sub.alpha_composite(cut, (int((w - cut.width) / 2 + w * 0.03), h - cut.height))
     shadow = Image.new("RGBA", sub.size, (0, 0, 0, 0))
     shadow.putalpha(sub.getchannel("A").filter(ImageFilter.GaussianBlur(w * 0.012)).point(lambda v: v * 0.55))
     out = bg.convert("RGBA")
