@@ -136,8 +136,8 @@ Scope: the sandbox only. The city (`Config.Sandbox.On = false`: `Map.luau`, `ser
   the `Turnaround` (0, 470, r 34).
 - `SandboxMap.House` (id `sandbox_house`, its lot, box, door, curb, back): renamed **"The Old Farmstead"**; still the
   big house (`Config.Moving.Sandbox.Kind = "big"`) and the only one `server/HouseMesh.luau` dresses.
-- 8.8's Auction House (`Config.Auction.House.Spot` (158, -22), 48 × 32, facing Depot Row): `plan.landmarks` `auction`,
-  east of the Corner Drugstore (x 40 – 120).
+- 8.8's Auction House (`Config.Auction.House.Spot` (158, -22), 48 × 32, facing Depot Row): `plan.fixedBuildings`
+  (not a plan landmark: `tests/auctionhouse_test.luau` keeps it clear of those), east of the Corner Drugstore (x 40 – 120).
 
 ## 2. Data (`shared/SandboxMap.luau`)
 

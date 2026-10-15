@@ -307,19 +307,6 @@
    "kind": "shop"
   },
   {
-   "id": "auction",
-   "label": "aukční dům",
-   "name": "Auction House",
-   "rect": {
-    "x0": 134,
-    "x1": 182,
-    "z0": -22,
-    "z1": 10
-   },
-   "step": 1,
-   "kind": "auction"
-  },
-  {
    "id": "pond",
    "label": "Malý rybník",
    "name": "Little Pond",
@@ -448,6 +435,21 @@
    },
    "step": 3,
    "kind": "station"
+  }
+ ],
+ "fixedBuildings": [
+  {
+   "id": "auction",
+   "label": "aukční dům",
+   "name": "Auction House",
+   "rect": {
+    "x0": 134,
+    "x1": 182,
+    "z0": -22,
+    "z1": 10
+   },
+   "step": 1,
+   "kind": "auction"
   }
  ],
  "fields": [

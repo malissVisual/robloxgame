@@ -58,9 +58,6 @@ LANDMARKS = [
     ("green", "Náves s kaplí", "The Chapel Green", (-800, -584, -190, -80), 1, "green"),
     ("chapel", "kaple", "Chapel", (-712, -688, -164, -124), 1, "chapel"),
     ("drugstore", "drogerie", "Corner Drugstore", (40, 120, -20, 40), 1, "shop"),
-    # 8.8, the main session's Auction House (Config.Auction.House: Spot (158, -22) looking north to Depot Row, 48 × 32):
-    # it stays where it is
-    ("auction", "aukční dům", "Auction House", (134, 182, -22, 10), 1, "auction"),
     ("pond", "Malý rybník", "Little Pond", (50, 210, 145, 255), 1, "pond"),
     ("orchard", "ovocný sad", "The Orchard", (-400, -70, 20, 260), 1, "orchard"),
     ("school", "škola", "Jinočany School", (-536, -420, -380, -300), 2, "school"),
@@ -72,6 +69,11 @@ LANDMARKS = [
     ("railway", "železnice (kulisa)", "Railway", (-1180, 420, 694, 706), 3, "railway"),
     ("station", "zastávka Zbuzany", "Zbuzany stop", (150, 290, 672, 690), 3, "station"),
 ]
+
+# Buildings the game has already built that stay where they are (not part of the plan: kept out of `landmarks`, which
+# tests/auctionhouse_test.luau keeps the Auction House clear of). 8.8, the main session's Auction House
+# (Config.Auction.House: Spot (158, -22) looking north to Depot Row, 48 × 32).
+FIXED_BUILDINGS = [("auction", "aukční dům", "Auction House", (134, 182, -22, 10), 1, "auction")]
 
 # The owner's choice (step 2): the van's PAINT shop at Sýkorka. Its two bays in the car park: the van's pivot (as a
 # plot's vanSpot), nose north to the store; VanPaint's prompt works there instead of at the plot's van spot.
@@ -138,10 +140,14 @@ def inside(a, box):
     return a["x0"] >= box["x0"] and a["x1"] <= box["x1"] and a["z0"] >= box["z0"] and a["z1"] <= box["z1"]
 
 
+FIXED_IDS = {f[0] for f in FIXED_BUILDINGS}
+
+
 def build():
     roads = [{"name": n, "rect": rect(x0, x1, z0, z1), "step": s, "fixed": f} for n, x0, x1, z0, z1, s, f in ROADS]
     landmarks = [{"id": i, "label": l, "name": n, "rect": rect(*r), "step": s, "kind": k} for i, l, n, r, s, k in LANDMARKS]
-    blocked = [r["rect"] for r in roads] + [l["rect"] for l in landmarks if l["kind"] not in ("motorway",)]
+    fixed = [{"id": i, "label": l, "name": n, "rect": rect(*r), "step": s, "kind": k} for i, l, n, r, s, k in FIXED_BUILDINGS]
+    blocked = [r["rect"] for r in roads] + [l["rect"] for l in landmarks + fixed if l["kind"] not in ("motorway",)]
     blocked += [p["rect"] for p in PLOTS] + [BIG_HOUSE["lot"], rect(-280, 330, -250, 330)]  # the zone and Pražská's side
     by_name = {r["name"]: r for r in roads}
     houses = []
@@ -189,7 +195,7 @@ def build():
         best["step"] = 1
         enter.append({"id": best["id"], "name": f"{best['street']} house", "label": f"dům, {best['street']}",
                       "kind": "house", "box": best["box"], "door": best["door"], "curb": best["curb"], "fixed": False})
-    return roads, landmarks, houses, enter
+    return roads, landmarks + fixed, houses, enter
 
 
 # ── The picture ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -494,7 +500,8 @@ def main():
         "paintBays": PAINT_BAYS,
         "bigHouse": BIG_HOUSE,
         "roads": roads,
-        "landmarks": landmarks,
+        "landmarks": [l for l in landmarks if l["id"] not in FIXED_IDS],
+        "fixedBuildings": [l for l in landmarks if l["id"] in FIXED_IDS],
         "fields": [{"rect": rect(*r), "kind": k} for r, k in FIELDS],
         "village": rect(*VILLAGE),
         "treeLines": [{"points": [{"x": x, "z": z} for x, z in pts], "kind": k} for pts, k in TREE_LINES],
