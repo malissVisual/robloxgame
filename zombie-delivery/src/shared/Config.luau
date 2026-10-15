@@ -6950,6 +6950,12 @@ Config.MoveStory = {
 --   Clipboard.Text     the bottom line's text size at scale 1 (Pad: px round its words, Tall: its height)
 --   Clipboard.Give / Back / No   the outline's colours: it can be given (green), on his list (orange: take it back),
 --                      not now (red, with the reason)
+--   9.0 (the owner: "When I hold the clipboard (Q), the E shouldn't show 'pick up'; E should mark the piece for Danny"):
+--   with it out your move's pieces' own Pick up / Lift prompts hide on your screen and client/DannyOrders.luau's own
+--   "Give to Danny" / "Take back" prompts stand on the pieces near you that he can take (a door's and the van's keep E)
+--   Clipboard.GiveKey  the keyboard's key of those prompts (E: the pieces' own; a gamepad's R1 stays SandboxPad's
+--                      "dannygive", client/MoveHelperCard.luau's prompt on the nearest piece)
+--   Clipboard.PromptNear / Prompts   studs from you a piece may get one / the most at once (made once, moved round)
 --   8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
 --   him, for example, put it down on the ground, or get out of the car"; client/DannyBubble.luau, MoveHelperBrain.bubble
 --   / orders, server/MoveHelper.luau's orders; the rate limit Config.Robust.Limits.MoveHelperOrder):
@@ -7064,6 +7070,9 @@ Config.MoveHelper = {
 		Give = { 96, 214, 112 } :: { number },
 		Back = { 240, 132, 44 } :: { number },
 		No = { 226, 72, 62 } :: { number },
+		GiveKey = "E", -- 9.0
+		PromptNear = 14,
+		Prompts = 4,
 	},
 	-- 8.6 the bubble over his head
 	Bubble = { Near = 35, Far = 75, Top = 20, Tick = 0.15, Text = 13, Tall = 26, Pad = 9, Gap = 4, Wide = 340 },

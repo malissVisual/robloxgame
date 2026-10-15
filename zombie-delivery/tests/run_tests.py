@@ -712,7 +712,7 @@ def sandbox_hud_check():
     keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
     at = keys.find("local function sandboxLines(")
     chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
-    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q")]  # (8.5: Danny's clipboard, LMB and Q)
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q", "E/LMB")]  # (8.5: Danny's clipboard, LMB and Q; 9.0: E/LMB)
     if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
         bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
     print("== sandbox hud: " + (f"the HUD hides its city parts in the sandbox, the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))

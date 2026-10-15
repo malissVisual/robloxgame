@@ -3,7 +3,8 @@
 -- recorder (the folder: tools/phone-ui/keyhintsenv.py) on a computer (1280 × 800), a console and a phone held sideways
 -- (844 × 390):
 --   * a computer: the move's keys as before ([E] Use, [G] Put down, [LMB/F] Grip, [O] List, [T] Chat (hold); in the
---     driver's seat [W/S] Drive, [A/D] Steer, [H] Horn, [E] Get out), the KEYS chip with its F1;
+--     driver's seat [W/S] Drive, [A/D] Steer, [H] Horn, [E] Get out), the KEYS chip with its F1; 9.0 Danny's clipboard
+--     out: [E/LMB] Give to Danny in place of [E] Use, [Q] Put away (a gamepad: R1, B);
 --   * a gamepad used last on that computer: no keyboard key left; each chip its buttons' glyphs (the platform's
 --     pictures: X Use, B Put down, R2 Grip; in the seat R2 and L2 Drive, the left stick Steer, X Get out), only what a
 --     button does (no Horn, List or Chat), the KEYS chip without F1; a button's word in brackets when the platform gives
@@ -175,6 +176,25 @@ M.player:SetAttribute("MoveWith", 14)
 look()
 check("carrying a piece with a grip on a move: \"[E] Use  [G] Put down  [LMB/F] Grip | [O] List  [T] Chat (hold)\"",
 	joined(textLines()) == "[E] Use  [G] Put down  [LMB/F] Grip | [O] List  [T] Chat (hold)", joined(textLines()))
+-- 9.0 Danny's clipboard out (orders mode): E by a piece gives it to him (client/DannyOrders.luau's prompts), a click too
+character:SetAttribute("Carrying", nil)
+character:SetAttribute("CarryGrip", nil)
+M.player:SetAttribute("MoveHelper", "hired")
+look()
+check("9.0 Danny hired, the clipboard away: \"[E] Use  [Q] Clipboard | [O] List  [T] Chat (hold)\"",
+	joined(textLines()) == "[E] Use  [Q] Clipboard | [O] List  [T] Chat (hold)", joined(textLines()))
+character:SetAttribute("ClipboardHeld", true)
+look()
+check("9.0 the clipboard out: \"[E/LMB] Give to Danny  [Q] Put away\" in place of [E] Use (E gives the piece by you)",
+	joined(textLines()) == "[E/LMB] Give to Danny  [Q] Put away | [O] List  [T] Chat (hold)", joined(textLines()))
+gamepad(true)
+check("… with a gamepad: R1 Give to Danny, B Put away (its own buttons)", joined(padRows()) == "<ButtonR1> Give to Danny  <ButtonB> Put away", joined(padRows()))
+gamepad(false)
+character:SetAttribute("ClipboardHeld", nil)
+M.player:SetAttribute("MoveHelper", nil)
+character:SetAttribute("Carrying", "sofa")
+character:SetAttribute("CarryGrip", "both 4 fragile")
+look()
 
 -- ── The same computer, a gamepad picked up: its glyphs at once ─────────────
 gamepad(true)

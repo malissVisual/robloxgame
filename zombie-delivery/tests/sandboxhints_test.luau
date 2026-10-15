@@ -113,7 +113,7 @@ check("8.9: trading between players is on (Config.PlayerTrade.On): the trade's h
 
 -- the words on every device (the clipboard's: SandboxPad's keys for "dannygive", "danny", "stow")
 local ORDERS = {
-	keys = "📋 Orders mode: click a piece to give it to Danny. Click Danny for his orders. (Q) puts it away.",
+	keys = "📋 Orders mode: E or click a piece to give it to Danny. Click Danny for his orders. (Q) puts it away.", -- (9.0: E too)
 	pad = "📋 Orders mode: R1 by a piece gives it to Danny. L1 at Danny for his orders. (B) puts it away.",
 	touch = "📋 Orders mode: tap a piece to give it to Danny. Tap Danny for his orders. Tap 📋 to put it away.",
 }

@@ -26,7 +26,7 @@
 -- the next look anyway. The city's strip as before (a keyboard only).
 -- 8.5 Danny's clipboard (orders mode; shared/SandboxPad.luau's "clipboard", "stow", "dannygive"): while Danny works for
 -- your move and your hands are free, [Q] Clipboard (a gamepad's R1); with it out [LMB] Give to Danny (bright: the mode;
--- R1) and [Q] Put away (B).
+-- R1) and [Q] Put away (B). 9.0: [E/LMB] Give to Danny in place of [E] Use (E by a piece gives it: client/DannyOrders.luau).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -110,6 +110,8 @@ end
 --               timing check shows, a piece with a grip: the character's CarryGrip; client/CarryGripUi.luau) · [O] List
 --               (on a move: the player's MoveWith; client/MovingHud.luau) · [T] Chat (hold: on a move or in its
 --               planning, MoveLobby; client/QuickChat.luau)
+--   9.0 the clipboard out (orders mode): [E/LMB] Give to Danny in place of [E] Use (E by a piece, a click on one), then
+--               [Q] Put away
 -- (8.3 keys: each with its action, shared/SandboxPad.luau: with a gamepad its buttons, or no chip)
 local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 	local first: { Chip } = {}
@@ -123,14 +125,21 @@ local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 		add(first, chipText("E", "Get out", nil, "getout"))
 		return { first }
 	end
-	add(first, chipText("E", "Use", nil, "use"))
-	if character:GetAttribute("Carrying") ~= nil then
+	local carrying = character:GetAttribute("Carrying") ~= nil
+	local orders = not carrying and player:GetAttribute("MoveHelper") == "hired" and character:GetAttribute("ClipboardHeld") == true
+	if orders then
+		-- 9.0 the clipboard out: E by a piece gives it to Danny (client/DannyOrders.luau's prompts in place of Pick up), a
+		-- click the one you point at (a gamepad: R1, the action's)
+		add(first, chipText("E/LMB", "Give to Danny", true, "dannygive"))
+	else
+		add(first, chipText("E", "Use", nil, "use"))
+	end
+	if carrying then
 		add(first, chipText("G", "Put down", nil, "putdown"))
 	elseif player:GetAttribute("MoveHelper") == "hired" then
 		-- 8.5 Danny's clipboard (orders mode, client/DannyOrders.luau): only while he works for your move
 		local key = Config.MoveHelper.Clipboard.Key
-		if character:GetAttribute("ClipboardHeld") == true then
-			add(first, chipText("LMB", "Give to Danny", true, "dannygive"))
+		if orders then
 			add(first, chipText(key, "Put away", nil, "stow"))
 		else
 			add(first, chipText(key, "Clipboard", nil, "clipboard"))

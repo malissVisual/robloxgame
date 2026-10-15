@@ -71,7 +71,7 @@ SandboxPad.Actions = {
 	takeout = { key = "Z", pad = { "ButtonY" }, hold = true }, -- the van's Take out
 	grip = { key = "LMB / F", pad = { "ButtonR2" }, tap = "GRIP" }, -- the grip check's one press (a phone: its GRIP button)
 	danny = { key = "E", pad = { "ButtonL1" } }, -- "Talk to Danny" (L1 his)
-	dannygive = { key = "LMB", pad = { "ButtonR1" } }, -- 8.3 Danny for hire: a piece onto his list or off it (a click, a tap, R1 at it)
+	dannygive = { key = `{Config.MoveHelper.Clipboard.GiveKey} / LMB`, pad = { "ButtonR1" } }, -- 8.3 Danny for hire: a piece onto his list or off it (a click, a tap, R1 at it; 9.0 E by it)
 	clipboard = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonR1" }, tap = "📋" }, -- 8.5 Danny's clipboard out (orders mode)
 	stow = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonB" }, tap = "📋" }, -- 8.5 … and put away again
 	drive = { key = "W/S", pad = { "ButtonR2", "ButtonL2" } }, -- Roblox's driving: R2 on, L2 back

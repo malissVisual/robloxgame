@@ -251,7 +251,7 @@ local function piece(name, spot, owner, at)
 	model:SetAttribute("MoveSpot", spot)
 	local root = M.make("BasePart", { Name = "Root", Position = at }, model)
 	model.PrimaryPart = root
-	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name }, root)
+	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name, MaxActivationDistance = Config.Moving.Reach.Item }, root)
 	own:SetAttribute("MoveOwner", owner)
 	tagged.MovePrompt = tagged.MovePrompt or {}
 	table.insert(tagged.MovePrompt, own)
