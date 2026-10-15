@@ -1510,6 +1510,9 @@ local function boardEnd(h: Helper, body: Body?, place: boolean)
 		Vehicles.swingDoor(b.car, door, nil, workspace:GetServerTimeNow())
 	end
 	boardFrames()
+	if place and not b.out and body and body.sit then
+		body.sit:Stop(0.15) -- (8.6 review: a move in called off, GET OUT or the owner off the wheel: on his feet, not sitting)
+	end
 	if place and body then
 		local at = seatDoor(b.car, seat)
 		local base = b.car.chassis.Position
@@ -2599,6 +2602,9 @@ end
 local function stepHelper(h: Helper, dt: number, clock: number)
 	local s = h.s
 	local body = h.body
+	if h.stayOut and not driven(s, truckOf(s)) then
+		h.stayOut = false -- 8.6 GET OUT held while the owner stayed at the wheel: they left it (8.6 review: down too)
+	end
 	if h.dead then
 		if body and clock - h.downAt >= FALL then
 			removeBody(h)
@@ -2651,9 +2657,6 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	local truck = truckOf(s)
 	local input = h.input
 	input.hired, input.dead, input.holding, input.seated = hired, false, holding, seated
-	if h.stayOut and not driven(s, truck) then
-		h.stayOut = false -- 8.6 GET OUT held while the owner stayed at the wheel: they left it, he rides again next time
-	end
 	input.ride = hired and driven(s, truck) and not h.stayOut -- 8.3 (you sit at its wheel: he gets in)
 	input.threat, input.fleeing = threat, h.fleeing
 	input.lift = h.lift
@@ -2917,7 +2920,7 @@ end
 -- your word beats the list (back on it he would only pick it up again, at once when it is his only one); your
 -- clipboard gives it to him again any time. A two-person piece he holds the far end of: both ends down at once (Moving's
 -- helperDrop "together": its carrier's own "put", as their G), his hold off.
-local function putDown(h: Helper, body: Body, clock: number)
+local function putDown(h: Helper, body: Body, clock: number, by: Player)
 	local s = h.s
 	local spot, role = Rules.holding(s.move, h.id)
 	local thing = if spot then (s.move :: Rules.Move).things[spot] else nil
@@ -2925,6 +2928,11 @@ local function putDown(h: Helper, body: Body, clock: number)
 		return
 	end
 	local carrier = if role == "helper" then playerOf(thing.carrier) else nil
+	if role == "helper" and carrier ~= by then
+		-- (8.6 review: a piece for two is put down by whoever carries it with him, never from elsewhere by a crew mate)
+		notice:FireClient(by, `🧑‍🔧 {if carrier then carrier.DisplayName else "Someone"} carries the {thing.name} with {cfg.Name}: only they can set it down.`)
+		return
+	end
 	h.port.helperDrop(s, body.model, if role == "helper" then "together" else "put")
 	if role == "helper" then
 		unhold(h, body) -- (his hold off now: on his feet where he stood)
@@ -2936,7 +2944,8 @@ local function putDown(h: Helper, body: Body, clock: number)
 		if player.Parent then
 			notice:FireClient(player, if carrier == player then `🧑‍🔧 You and {cfg.Name} set the {thing.name} down.`
 				elseif carrier then `🧑‍🔧 {carrier.DisplayName} and {cfg.Name} set the {thing.name} down.`
-				else `🧑‍🔧 {cfg.Name} set the {thing.name} down here: off his list.`)
+				elseif by == player then `🧑‍🔧 {cfg.Name} set the {thing.name} down here: off his list.`
+				else `🧑‍🔧 {by.DisplayName} had {cfg.Name} set the {thing.name} down: off his list.`)
 		end
 	end
 end
@@ -2987,7 +2996,7 @@ local function order(player: Player, kind: string)
 	end
 	local clock = os.clock()
 	if kind == "putdown" then
-		putDown(h, body, clock)
+		putDown(h, body, clock, player)
 	else
 		getOut(h, body, clock)
 	end
