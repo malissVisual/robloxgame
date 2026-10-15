@@ -127,7 +127,7 @@ local function screen(touch, w, h)
 	M.flush()
 end
 -- What the chip must keep clear of (tools/phone-ui/sandbox.luau's list): the touch buttons, the thumbstick, the jump,
--- the left column on a phone; the health row and MOUSE [ALT] / the key hints on a computer; the move's panel.
+-- the left column on a phone; the health row and the key hints on a computer; the move's panel.
 local function blocks()
 	local list = {}
 	local S = M.MUi.scaleFor(M.Vector2.new(M.width, M.height))
@@ -231,7 +231,7 @@ local function scene(name, toasts)
 		table.insert(overlay, { kind = "minimap", box = M.leftColumn })
 	else
 		table.insert(overlay, { kind = "minimap", box = { x0 = 16, y0 = M.height - 16 - 30 * S, x1 = 16 + 200 * S, y1 = M.height - 16 } })
-		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "MOUSE [ALT]" })
+		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "? KEYS [F1]" }) -- (9.0: no MOUSE [ALT] in the sandbox)
 		if M.chatOpen then
 			table.insert(overlay, { kind = "chat", box = { x0 = 8, y0 = 0, x1 = 400, y1 = 200 }, label = "Roblox chat" })
 		end

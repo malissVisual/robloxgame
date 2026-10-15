@@ -9,7 +9,8 @@
 --     right hand, massless, never colliding, touched or hit by rays; the character attribute ClipboardHeld.
 --   * The assign remote (Danny's list): refused while the clipboard is away (a notice, nothing on his list, a piece of
 --     his list never taken back), allowed with it out; the rate limit kept (MoveHelperAssign) and its own
---     (Config.Robust.Limits.Clipboard).
+--     (Config.Robust.Limits.Clipboard). 9.0: with it out the server's piece prompts stay as they are (each client hides
+--     its own player's: client/DannyOrders.luau; E sends this same assign).
 --   * Away by itself: a pick (you can't carry with it: the pick puts it away), a seat, death, the phone, a gun up, the
 --     move's end, the hire over (its hirer, a crew mate, left the move: Danny let go); refused while you carry or sit.
 --   * A crew mate may hold it too (Danny hired by another of the crew); garbage requests; leaving.
@@ -201,6 +202,9 @@ E.request(ann, "helper", "assign", lamp)
 check("8.5 a click on the Lamp with the clipboard away: refused (\"📋 Take out your clipboard (Q)\"), not on his list", #danny.queue == 0
 	and told(ann, "📋 Take out your clipboard (Q) to give Danny pieces.", noticeAt) and lamp:GetAttribute("DannyQueue") == nil, E.lastNotice(ann))
 ask(ann, true)
+local lampPick = promptIn(lamp, "Pick up") or promptIn(lamp, "Lift")
+check("9.0 the clipboard out changes none of the pieces' prompts on the server (Ann's client hides hers on her screen only, client/DannyOrders.luau: a crew mate still sees Pick up)",
+	held(ann) and lampPick ~= nil and lampPick.Enabled == true and lampPick.MaxActivationDistance == Config.Moving.Reach.Item)
 noticeAt = #E.messages
 E.request(ann, "helper", "assign", lamp)
 check("…with it out: on his list (\"Danny will take the Lamp.\")", held(ann) and #danny.queue == 1 and danny.queue[1] == 1 and told(ann, "Danny will take the Lamp.", noticeAt))

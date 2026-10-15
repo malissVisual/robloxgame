@@ -179,6 +179,14 @@
 > model **ZDCFixtureArt** (`design/blender-fixtures`, imported once in Studio): the kitchen's counters, stove, sink run,
 > wall cupboards, hood, Eckbank and corner shelf, the bathroom's tub, toilet and basin, the living room's Kachelofen and
 > the garage's workbench, shelving and door (`server/FixtureMesh.luau`; the parts that collide stay, unseen).
+>
+> **8.9.2** (the owner: "the crosshair only when I want to shoot … I want the mouse normally, take the Alt away";
+> "with the clipboard, E should mark for Danny, not pick up"): in the sandbox the mouse is free (`CameraRig.aimOnly`:
+> the cursor shows, no crosshair dot, the right mouse turns the camera, the wheel zooms); the locked aim and its dot
+> come only while a weapon (a Tool) is held (`CameraRig.armed`); no MOUSE [ALT] button, Alt does nothing; the city as
+> before. With Danny's clipboard out, a piece's Pick up / Lift prompts hide on your screen only and **E · Give to
+> Danny** / **Take back** take their place (`client/DannyOrders.luau`; a click still works; doors and the van's Load
+> keep their E; a gamepad keeps R1).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

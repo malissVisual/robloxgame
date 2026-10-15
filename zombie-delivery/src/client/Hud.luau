@@ -1633,7 +1633,7 @@ more.Activated:Connect(function()
 	Ui.gamepadFocus(if menu.Visible then hudButtons.jobs else more) -- 4.2, a gamepad: on to the first entry
 end)
 hudButtons.more = more
--- 6.12.1: MOUSE right of PHONE (a computer only: a touch screen has no mouse to free)
+-- 6.12.1: MOUSE right of PHONE (a computer only: a touch screen has no mouse to free; 9.0: the city's, view.sandbox hides it)
 if hudButtons.mouse then
 	hudButtons.mouse.LayoutOrder = order + 2
 	hudButtons.mouse.Visible = not touchLayout
@@ -3598,11 +3598,12 @@ end)
 -- city's parts of the HUD stay away (Hud.start calls this once; with On = false none of it runs):
 --   hidden   the cash line with the level and the XP bar (client/SandboxHud.luau shows the money: the old line would
 --            say it twice), the minimap and the big map (MapView is not started: M does nothing), the NEXT card and
---            the contract group (the "job" slot), PHONE / MENU and its list (MOUSE [ALT] stays on a computer), the
---            weapon line, FIRE and the touch hands (no guns or fists there: renderWeapons and the frame keep them
---            away too), the bottom bar (client/Hotbar.luau is not started: the hands and the city's items), the bag
---            (I), the job board's marker in the world, the keys J, M, I, Y and 1-9. The savings line and the location
---            tag are modules of their own that the sandbox does not start (client/Main.client.luau).
+--            the contract group (the "job" slot), PHONE / MENU and its list, 9.0 MOUSE [ALT] (the cursor is free
+--            there: client/CameraRig.luau aimOnly, no Alt), the weapon line, FIRE and the touch hands (no guns or
+--            fists there: renderWeapons and the frame keep them away too), the bottom bar (client/Hotbar.luau is not
+--            started: the hands and the city's items), the bag (I), the job board's marker in the world, the keys J,
+--            M, I, Y and 1-9. The savings line and the location tag are modules of their own that the sandbox does not
+--            start (client/Main.client.luau).
 --   kept     the toasts and the server's notices, the health row (alone in the left column now), the action pill
 --            ("G  PUT IT DOWN", "E  GET OUT"), the speed and the fuel while you drive, the car call line, the GPS
 --            marker a move sets (client/MovingHud.luau through MapView.onWaypoint), ESC closing the windows.
@@ -3618,6 +3619,7 @@ function view.sandbox()
 	end
 	Hud.topSlot("job").Visible = false
 	hudButtons.more.Visible = false
+	hudButtons.mouse.Visible = false -- (9.0: the cursor is free there)
 	view.menu.Visible = false
 	weaponBar.Visible = false
 	fire.Visible = false

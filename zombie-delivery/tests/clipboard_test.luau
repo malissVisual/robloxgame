@@ -134,9 +134,11 @@ check("its key: Q on a computer, R1 with a gamepad, 📋 on a touch screen", Cli
 	and C.Key == "Q")
 check("the status line: \"Take out your clipboard (Q) to give him pieces\" (R1, 📋)", ClipboardRules.carries("keys") == "Take out your clipboard (Q) to give him pieces"
 	and ClipboardRules.carries("pad") == "Take out your clipboard (R1) to give him pieces" and ClipboardRules.carries("touch") == "Take out your clipboard (📋) to give him pieces")
-check("the bottom line: \"📋 Pick what Danny carries · Q put away\" (a gamepad's B, a phone's tap 📋)", ClipboardRules.hint("keys") == "📋 Pick what Danny carries · Q put away"
-	and ClipboardRules.hint("pad") == "📋 Pick what Danny carries · B put away" and ClipboardRules.hint("touch") == "📋 Tap what Danny carries · tap 📋 to put away",
+check("the bottom line: \"📋 Pick what Danny carries: E or click · Q put away\" (9.0: E by a piece too; a gamepad's R1 by it and B, a phone's tap 📋)", ClipboardRules.hint("keys") == "📋 Pick what Danny carries: E or click · Q put away"
+	and ClipboardRules.hint("pad") == "📋 Pick what Danny carries: R1 by it · B put away" and ClipboardRules.hint("touch") == "📋 Tap what Danny carries · tap 📋 to put away",
 	ClipboardRules.hint("pad"))
+check("9.0 E gives a piece (client/DannyOrders.luau's prompts): the pieces' own key, near enough for their reach, a few at once",
+	C.GiveKey == "E" and C.PromptNear >= Config.Moving.Reach.Item and C.Prompts >= 1 and C.Prompts <= 8 and C.GiveKey ~= C.Key)
 check("the buttons: 📋 ORDERS / 📋 PUT AWAY on the status line, 📋 CLIPBOARD / 📋 PUT AWAY on his card", ClipboardRules.orders(false) == "📋 ORDERS"
 	and ClipboardRules.orders(true) == "📋 PUT AWAY" and ClipboardRules.cardButton(false) == "📋 CLIPBOARD" and ClipboardRules.cardButton(true) == "📋 PUT AWAY")
 check("his card's words: the key, then how a piece goes to him (a click, a tap, R1)", string.find(ClipboardRules.cardHint("keys"), "(Q): click a piece to give it to him", 1, true) ~= nil

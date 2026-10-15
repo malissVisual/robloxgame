@@ -32,6 +32,14 @@
 -- run, he just goes behind me"): a move's piece in the hands, PairSteer holds the walk at its CarrySpeed every step
 -- before the physics (the sprint's bleed-off too); in two, Shift, the stick click and the touch SPRINT do nothing and
 -- say so once a carry (PairSteer.refuseRun).
+-- 9.0 SANDBOX (the owner: "aiming the way I have the crosshair now only when I want to shoot or have pistols; I want
+-- the mouse normally available, so remove the Alt option"): CameraRig.aimOnly (set by client/Main.client.luau in the
+-- sandbox only) frees the mouse unless a weapon is in the hands (CameraRig.armed: a Tool equipped; the sandbox has no
+-- guns today). Free: the cursor shows, no crosshair, the mouse moves no camera; the right mouse held turns it
+-- (LockCurrentPosition, like Roblox's own camera) while no window needs the mouse; the wheel zooms as before; the
+-- left click is the world's (Danny, a piece, the grip check), never a shot. Armed: the locked mouse and the crosshair
+-- as in the city. Alt and the MOUSE [ALT] button do nothing there (client/Hud.luau hides it). The city (aimOnly false)
+-- is unchanged; a touch screen and a gamepad alone keep the Roblox camera as before.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -128,6 +136,14 @@ end
 CameraRig.freeLook = function(): boolean
 	return false
 end
+-- 9.0, set by Main in the sandbox only: the mouse is free unless CameraRig.armed() (no Alt, no MOUSE button there).
+CameraRig.aimOnly = false
+-- 9.0 (aimOnly): a weapon in the hands now? Then the mouse locks and the crosshair shows. Its own: a Tool equipped.
+function CameraRig.toolEquipped(): boolean
+	local character = player.Character
+	return character ~= nil and character:FindFirstChildOfClass("Tool") ~= nil
+end
+CameraRig.armed = CameraRig.toolEquipped
 
 local supported = UserInputService.KeyboardEnabled and UserInputService.MouseEnabled
 
@@ -381,12 +397,25 @@ function CameraRig.carrying(): string?
 end
 
 -- Is the mouse captured right now (aiming), or free (a window, Alt, the MOUSE button, Roblox's menu, typing)?
+-- 9.0 the sandbox (aimOnly): captured only with a weapon in the hands (CameraRig.armed); Alt and MOUSE do nothing there.
 function CameraRig.locked(): boolean
-	return enabled and supported and not altHeld and not freeMouse and not CameraRig.mouseNeeded() and UserInputService:GetFocusedTextBox() == nil
+	if not enabled or not supported or CameraRig.mouseNeeded() or UserInputService:GetFocusedTextBox() ~= nil then
+		return false
+	end
+	if CameraRig.aimOnly then
+		return CameraRig.armed()
+	end
+	return not altHeld and not freeMouse
+end
+
+-- May the right mouse turn the camera now, the mouse free? 5.4.1 the city: only the phone open (Main's freeLook); 9.0 the
+-- sandbox (aimOnly): whenever no window needs the mouse (Roblox's own camera's way).
+local function freeTurn(): boolean
+	return CameraRig.freeLook() or (CameraRig.aimOnly and not CameraRig.mouseNeeded())
 end
 
 -- 6.12.1: the HUD's MOUSE [ALT] button (client/Hud.luau): Alt held frees the mouse for a moment, a click on the button
--- keeps it free until the next click. Returns whether it is free now.
+-- keeps it free until the next click. Returns whether it is free now. (9.0: the city's only: the sandbox has neither.)
 function CameraRig.toggleFreeMouse(): boolean
 	freeMouse = not freeMouse
 	return freeMouse
@@ -483,7 +512,7 @@ local function update(dt: number)
 	wasActive = true
 
 	local locked = CameraRig.locked()
-	if turning and (locked or not CameraRig.freeLook()) then
+	if turning and (locked or not freeTurn()) then
 		turning = false
 	end
 	UserInputService.MouseBehavior = if locked then Enum.MouseBehavior.LockCenter
@@ -769,13 +798,18 @@ function CameraRig.start()
 		elseif processed then
 			return
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-			if not CameraRig.locked() and CameraRig.freeLook() then
-				turning = true -- 5.4.1: the phone open: the right mouse turns the camera, no gun comes out
+			if not CameraRig.locked() and freeTurn() then
+				turning = true -- 5.4.1: the phone open (9.0: the sandbox's free mouse): the right mouse turns the camera, no gun comes out
 				return
+			elseif CameraRig.aimOnly and not CameraRig.locked() then
+				return -- 9.0 the sandbox, nothing in the hands (or a window open): nothing to aim
 			end
 			Holster.pressDraws(input) -- 6.1.1: the gun away, no aim (3 or B takes it; a note says so)
 			rmbHeld = true
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if CameraRig.aimOnly and not CameraRig.locked() then
+				return -- 9.0 the sandbox's free cursor: the click is the world's (Danny, a piece, the grip check), no shot
+			end
 			-- 6.1.1: the gun away, this click does not draw it (with fists it punches; no shot, no aim)
 			lmbHeld = not Holster.pressDraws(input)
 		end

@@ -3,9 +3,9 @@
 -- in my hand, like a notepad. At that moment I'm in a kind of ordering mode and I click on what he should carry."): the
 -- pure part (no Roblox at its top level: tests/clipboard_test.luau). server/Clipboard.luau holds the clipboard in your
 -- right hand while Danny works for your move (your player attribute MoveHelper = "hired"); only then does a click, a
--- tap or a gamepad's R1 on a piece give it to him or take it back (server/MoveHelper.luau's assign refuses one without
--- it: MoveHelperBrain.assignCheck's "clipboard"). client/DannyOrders.luau shows the mode; Config.MoveHelper.Clipboard
--- has its numbers.
+-- tap, a gamepad's R1 or (9.0) E by a piece give it to him or take it back (server/MoveHelper.luau's assign refuses one
+-- without it: MoveHelperBrain.assignCheck's "clipboard"). client/DannyOrders.luau shows the mode;
+-- Config.MoveHelper.Clipboard has its numbers.
 --   ClipboardRules.check(c) -> (boolean, string?)   may it be out now (a Can: Danny hired, alive, on foot, the right
 --                                              hand there, the hands free, the phone away, no gun up): (true, nil) or
 --                                              (false, why: "hire" | "dead" | "hand" | "seat" | "carry" | "push" |
@@ -30,8 +30,9 @@
 --                                              (not a piece of yours)
 --   ClipboardRules.key(device) -> string       how it comes out on that device: "Q", "R1", "📋" (the touch button)
 --   ClipboardRules.carries(device) -> string   Danny's status line: "Take out your clipboard (Q) to give him pieces"
---   ClipboardRules.hint(device) -> string      the bottom line in orders mode: "📋 Pick what Danny carries · Q put away"
---                                              (a gamepad's B, a phone's "tap 📋 to put away")
+--   ClipboardRules.hint(device) -> string      the bottom line in orders mode: "📋 Pick what Danny carries: E or click · Q
+--                                              put away" (9.0: E by a piece gives it too; a gamepad's "R1 by it · B put
+--                                              away", a phone's "📋 Tap what Danny carries · tap 📋 to put away")
 --   ClipboardRules.orders(on) -> string        the status line's button: "📋 ORDERS" (take it out), "📋 PUT AWAY"
 --   ClipboardRules.cardButton(on) -> string    his card's: "📋 CLIPBOARD", "📋 PUT AWAY"
 --   ClipboardRules.cardHint(device) -> string  his card's words, hired: "📋 Clipboard out (Q): click a piece to give it
@@ -182,7 +183,9 @@ function ClipboardRules.hint(device: SandboxPad.Device): string
 	if device == "touch" then
 		return `📋 Tap what {name} carries · tap {ClipboardRules.key(device)} to put away`
 	end
-	return `📋 Pick what {name} carries · {SandboxPad.keyWord("stow", device) or cfg().Clipboard.Key} put away`
+	-- 9.0: how a piece is given on this device (E by it or a click on it; a gamepad's R1 by it: SandboxPad's "dannygive")
+	local give = if device == "pad" then `{SandboxPad.keyWord("dannygive", device) or "R1"} by it` else `{cfg().Clipboard.GiveKey} or click`
+	return `📋 Pick what {name} carries: {give} · {SandboxPad.keyWord("stow", device) or cfg().Clipboard.Key} put away`
 end
 
 function ClipboardRules.orders(on: boolean): string

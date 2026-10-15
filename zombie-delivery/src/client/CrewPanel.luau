@@ -1104,7 +1104,8 @@ local function build()
 	decline.LayoutOrder = 2
 	decline.TextSize = 15
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	Ui.caps(buttons, if touch then "or CREW for the panel" else "K: the crew panel · Alt frees the mouse", UDim2.new(1, -270, 1, 0), {
+	-- (9.0: the sandbox's cursor is free, no Alt there: client/CameraRig.luau aimOnly)
+	Ui.caps(buttons, if touch then "or CREW for the panel" elseif Config.Sandbox.On then "K: the crew panel" else "K: the crew panel · Alt frees the mouse", UDim2.new(1, -270, 1, 0), {
 		LayoutOrder = 3,
 		TextSize = 12,
 		TextWrapped = true,

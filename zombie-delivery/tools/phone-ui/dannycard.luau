@@ -251,7 +251,7 @@ local function piece(name, spot, owner, at)
 	model:SetAttribute("MoveSpot", spot)
 	local root = M.make("BasePart", { Name = "Root", Position = at }, model)
 	model.PrimaryPart = root
-	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name }, root)
+	local own = M.make("ProximityPrompt", { Name = "Pick", ActionText = "Pick up", ObjectText = name, MaxActivationDistance = Config.Moving.Reach.Item }, root)
 	own:SetAttribute("MoveOwner", owner)
 	tagged.MovePrompt = tagged.MovePrompt or {}
 	table.insert(tagged.MovePrompt, own)
@@ -262,7 +262,7 @@ local stranger, strangerRoot = piece("Vase", 1, 99, M.Vector3.new(-4, 1, 2))
 local grip = require("./CarryGripUi")
 -- the move's panel (client/MovingHud.luau's, a top block) where MoveLayout.panel puts it, and Hud's groups where
 -- client/Hud.luau puts them (sandboxtasks.luau's boxes): a touch screen's left column (the cash, the minimap, the
--- health), a computer's health row at the bottom left and MOUSE [ALT] / the key hints at the top right
+-- health), a computer's health row at the bottom left and the key hints at the top right
 local TopBlocks = require("./TopBlocks")
 local movingGui = M.make("ScreenGui", { Name = "MovingHud", DisplayOrder = 6 }, M.gui)
 local panel = M.make("Frame", { Name = "MovePanel", BackgroundColor3 = M.MTheme.Contract.charcoal, BackgroundTransparency = 0.12 }, movingGui)
@@ -379,7 +379,7 @@ local function scene(name, head)
 		table.insert(overlay, { kind = "minimap", box = M.leftColumn })
 	else
 		table.insert(overlay, { kind = "minimap", box = { x0 = 16, y0 = M.height - 16 - 30 * S, x1 = 16 + 200 * S, y1 = M.height - 16 } })
-		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "MOUSE [ALT]" })
+		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "? KEYS [F1]" }) -- (9.0: no MOUSE [ALT] in the sandbox)
 	end
 	if head then
 		local r = math.max(18, 26 * S)
@@ -449,7 +449,7 @@ local function blocks(withStrip)
 		list["the left column"] = M.leftColumn
 	else
 		list["the health row"] = box(groups.LeftStack)
-		list["MOUSE [ALT], the key hints"] = box(groups.HudButtons)
+		list["the key hints (9.0: no MOUSE [ALT])"] = box(groups.HudButtons)
 	end
 	list["the money block"] = box(SandboxHud.block())
 	list["the TASKS chip"] = box(chip)

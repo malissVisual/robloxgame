@@ -193,6 +193,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
         "return function(game: any, require: any, CFrame: any)\n" + source + "\nend\n")
+    # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
+    # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
+    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "CameraRig.luau"), encoding="utf-8").read()
+    open(os.path.join(tmp, "CameraRigClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, workspace: any, script: any, require: any, Instance: any, RaycastParams: any, task: any, os: any, "
+        "CFrame: any, Vector3: any, Vector2: any, Color3: any, UDim: any, UDim2: any, Enum: any)\n" + source + "\nend\n")
     # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
     # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
     # and for tests/movesites_test.luau.
@@ -680,6 +687,7 @@ def sandbox_hud_check():
         bad.append("view.sandbox does not hide the cash line (the money, the level, the XP bar)")
     for text, what in (('Hud.topSlot("job").Visible = false', "the NEXT card and the contract group (the job slot)"),
                        ("hudButtons.more.Visible = false", "PHONE / MENU"), ("view.menu.Visible = false", "MENU's list"),
+                       ("hudButtons.mouse.Visible = false", "MOUSE [ALT] (9.0: the cursor is free there)"),
                        ("weaponBar.Visible = false", "the weapon line"), ("fire.Visible = false", "FIRE"),
                        ("for _, button in view.touchHands do", "the touch hands"), ("LEFT_H = ", "the left column's room for the minimap")):
         if text not in body:
@@ -712,7 +720,7 @@ def sandbox_hud_check():
     keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
     at = keys.find("local function sandboxLines(")
     chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
-    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q")]  # (8.5: Danny's clipboard, LMB and Q)
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q", "E/LMB")]  # (8.5: Danny's clipboard, LMB and Q; 9.0: E/LMB)
     if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
         bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
     print("== sandbox hud: " + (f"the HUD hides its city parts in the sandbox, the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))

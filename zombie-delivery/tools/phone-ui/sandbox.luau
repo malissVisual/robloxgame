@@ -11,7 +11,7 @@
 -- CANCEL, ESC) sending the right requests, the rarity chips, no redraw for the same state, the STOCK list (ON STAND n,
 -- TAKE DOWN), the 3D pictures only on the tiles on screen and never more than Config.SandboxHud.MaxViews (each model built
 -- once), scrolling; on each screen nothing of it on the touch buttons, the thumbstick, the jump button, what the HUD
--- still shows in the sandbox (the health row: the left column on touch, bottom left on a computer; MOUSE [ALT] and the
+-- still shows in the sandbox (the health row: the left column on touch, bottom left on a computer; 9.0: no MOUSE [ALT], the
 -- key hints at the top right; the toasts, which flow under it in Hud's column) or the move's panel, the texts fitting
 -- their room and a phone's buttons a finger's size (44 px); a second
 -- SandboxHud without client/Hud.luau (its own column and toasts). `luau sandbox.luau -a dump` prints the preview's scenes
@@ -182,7 +182,7 @@ local function screen(touch, w, h)
 	M.flush()
 end
 -- What the block must keep clear of: the touch buttons, the thumbstick's corner, the jump button, what the HUD still
--- shows in the sandbox (the health row: the left column on touch, bottom left on a computer; MOUSE [ALT] and the key
+-- shows in the sandbox (the health row: the left column on touch, bottom left on a computer; 9.0: no MOUSE [ALT], the key
 -- hints at the top right, about Roblox's player list's width and two rows) and the move's panel at the top in the middle.
 local function blocks()
 	local list = {}
@@ -299,10 +299,10 @@ local function scene(name)
 		table.insert(overlay, { kind = "pill", box = cluster.holster, label = "DRAW" })
 		table.insert(overlay, { kind = "minimap", box = M.leftColumn })
 	else
-		-- what the HUD still shows on a computer: the health row bottom left, MOUSE [ALT] and the key hints top right
+		-- what the HUD still shows on a computer: the health row bottom left, the key hints top right (9.0: no MOUSE [ALT])
 		local S = M.MUi.scaleFor(M.Vector2.new(M.width, M.height))
 		table.insert(overlay, { kind = "minimap", box = { x0 = 16, y0 = M.height - 16 - 30 * S, x1 = 16 + 200 * S, y1 = M.height - 16 } })
-		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "MOUSE [ALT]" })
+		table.insert(overlay, { kind = "text", box = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W - 150, y0 = 4, x1 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y1 = 30 }, label = "? KEYS [F1]" }) -- (9.0: no MOUSE [ALT] in the sandbox)
 		if M.chatOpen then
 			table.insert(overlay, { kind = "chat", box = { x0 = 8, y0 = 0, x1 = 400, y1 = 200 }, label = "Roblox chat" })
 		end
