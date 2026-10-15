@@ -211,6 +211,15 @@ end
 F.__add = function(a: any, v: any): any
 	return frame(a.Position + v, a.R)
 end
+-- 9.0 (Danny's piece gliding into his hands): its place and its turn's entries in a straight blend (a plain turn about Y
+-- stays one near enough for the tests)
+function F.Lerp(a: any, b: any, t: number): any
+	local r = {}
+	for k = 1, 9 do
+		r[k] = a.R[k] + (b.R[k] - a.R[k]) * t
+	end
+	return frame(a.Position + (b.Position - a.Position) * t, r)
+end
 function F.ToOrientation(self: any): (number, number, number)
 	local r = self.R
 	return 0, math.atan2(r[3], r[9]), 0
@@ -247,8 +256,65 @@ workspace.Name = "Workspace"
 workspace.GetServerTimeNow = function()
 	return Runtime.now
 end
+-- 9.0 a ray that is not straight down (a sight line: server/Moving.luau's walled, server/MoveHelper.luau's wallBetween):
+-- the parts of params' Include list (and their descendants, CanQuery on) it meets, each its box in its own frame (the
+-- slab test); the nearest hit ({ Instance, Position, Distance }) or nil. Runtime.sights counts them.
+Runtime.sights = 0
+local function sightRay(origin: any, direction: any, params: any): any
+	Runtime.sights += 1
+	if not params or params.FilterType ~= "Include" then
+		return nil
+	end
+	local best: any = nil
+	local bestT = math.huge
+	local function test(part: any)
+		if not part:IsA("BasePart") or part.CanQuery == false then
+			return
+		end
+		local o = part.CFrame:PointToObjectSpace(origin)
+		local e = part.CFrame:PointToObjectSpace(origin + direction)
+		local d = e - o
+		local half = part.Size * 0.5
+		local t0, t1 = 0, 1
+		for _, axis in { "X", "Y", "Z" } do
+			local oa, da, ha = o[axis], d[axis], half[axis]
+			if math.abs(da) < 1e-12 then
+				if oa < -ha or oa > ha then
+					return
+				end
+			else
+				local a, b = (-ha - oa) / da, (ha - oa) / da
+				if a > b then
+					a, b = b, a
+				end
+				t0, t1 = math.max(t0, a), math.min(t1, b)
+				if t0 > t1 then
+					return
+				end
+			end
+		end
+		if t0 > 1e-9 and t0 < bestT then -- (a ray that starts inside a part never hits it: Roblox's own rule)
+			bestT, best = t0, part
+		end
+	end
+	for _, top in params.FilterDescendantsInstances or {} do
+		test(top)
+		for _, part in top:GetDescendants() do
+			test(part)
+		end
+	end
+	if not best then
+		return nil
+	end
+	return { Instance = best, Position = origin + direction * bestT, Distance = direction.Magnitude * bestT }
+end
+Runtime.sightRay = sightRay
+
 -- The floor under a point: an interior's (Runtime.interiorFloor within 400 studs of an interior's origin), else 0.
-workspace.Raycast = function(_, origin: any, _direction: any, _params: any): any
+workspace.Raycast = function(_, origin: any, direction: any, params: any): any
+	if direction and (math.abs(direction.X) > 1e-6 or math.abs(direction.Z) > 1e-6) then
+		return sightRay(origin, direction, params) -- 9.0
+	end
 	local floor = Runtime.floor
 	for _, at in Runtime.interiors do
 		if (origin - at.Position).Magnitude < 400 then
@@ -737,6 +803,7 @@ Runtime.said = {} -- { text } every Npcs.say
 Runtime.saidBy = {} -- { { npc, text, range } } every Npcs.say
 Runtime.acts = {} -- { { npc, kind } } every Npcs.act
 Runtime.glances = {} -- { { npc, at } } every Npcs.glance
+Runtime.faces = {} -- { { npc, at } } every Npcs.face (9.0)
 Runtime.Npcs = stub("Npcs", {
 	look = function(role: string, name: string, title: string?): any
 		return { name = name, title = title, role = role }
@@ -769,6 +836,18 @@ Runtime.Npcs = stub("Npcs", {
 	end,
 	glance = function(npc: any, at: any)
 		table.insert(Runtime.glances, { npc = npc, at = at })
+	end,
+	-- 9.0 (Danny turned to the piece he picks up): turned at once here (the game's turn is a short tween)
+	face = function(npc: any, at: any)
+		table.insert(Runtime.faces, { npc = npc, at = at })
+		local root = npc.PrimaryPart
+		if root then
+			local here = root.Position
+			local look = Mock.Vector3.new(at.X - here.X, 0, at.Z - here.Z)
+			if look.Magnitude > 0.05 then
+				root.CFrame = Mock.CFrame.lookAt(here, here + look)
+			end
+		end
 	end,
 	remove = function(npc: any)
 		npc:Destroy()

@@ -152,6 +152,31 @@
 -- 7.x farm move: a place with several ways in and out (a farm's front door and barn doors: the session's `ways`, each
 -- an exit inside, where you come in by it and its door's outside) has him take the nearest way he may (Moving's
 -- helperExits: a piece may only leave by the exits it fits through) and come out at its own door.
+-- 9.0 (the owner, 8.9: "Danny can't walk around things logically. He goes to take things through the wall: he can't get
+-- to the thing, he got stuck on the wall because he can't walk around it. He must not take things through walls … And he
+-- must come to the thing nicely and take it into his hands properly, with an animation"; Config.MoveHelper Route, Pick,
+-- MarkFar). The cause (tests/houseroute_test.luau measures it on the real plans): he was aimed at a point straight out of
+-- the piece toward where he came in (besidePiece), whatever stood between: in the next room, in a wall, out of the
+-- house; PathfindingService found no way there (a point within its agent radius of a wall) and he walked the straight
+-- line into the wall, the stuck nudge put him on along it, and his take asked only how far the piece's middle was (from
+-- the next room: near enough, a take through the wall). Now:
+--   * Inside a house with a plan (shared/HouseRoute.luau; tests' fakes without walls: as before) his ways are the plan's
+--     grid's (routeTo: the walls, the solid fixtures and every piece standing in the house, blocked again when one goes
+--     or moves: think's routeNow), through the doorways and round the furniture, never into a wall; a stuck nudge puts
+--     him on his way only along open cells, else onto the nearest open one (nudgeInside). PathfindingService outside.
+--   * The piece he goes for: he walks to its near side and stops at arm's length (standOf: HouseRoute.reach, its line to
+--     the piece's middle through no wall); none, or out of his reach there Pick.Tries times: he can't get to it, it is
+--     off his list ("can't get to it"). A piece the crew gives him that has no such spot is refused at once (assign:
+--     MoveHelperBrain.assignCheck's "reach"). He takes it only beside it (canTake: within Pick.Arm of its footprint, his
+--     chest's ray to its middle hitting none of the interior's walls).
+--   * His pick-up (handle, a few steps; everybody sees it: his body's attributes, the server's piece): he turns to it
+--     (Npcs.face, Pick.Turn s), bends and reaches with both arms (Npcs.act "lift": shared/BodyMotion.luau, his hands on
+--     the piece by the Carrying attributes, client/ArmPose.luau), Pick.Bend s later it is his (Moving.helperTake) and it
+--     glides up into his hands over Pick.Lift s (its weld off meanwhile, eased every frame: handFrames) as he stands up
+--     into his carry. Setting one down the other way ("setdown": it glides down to the floor in front of him, then
+--     Moving.helperDrop). A piece for two: his end the same bend ("lift") as your lift takes it up, then the 8.6 carry.
+--   * His list's markers (newMark): AlwaysOnTop off, MaxDistance MarkFar: seen in the same room and through an open
+--     doorway, never through a wall.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -162,6 +187,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
 local Brain = require(Shared.MoveHelperBrain)
+local Route = require(Shared.HouseRoute) -- 9.0 his way inside a house
 local Npcs = require(script.Parent.Npcs)
 local PairHold = require(script.Parent.PairHold) -- 8.1: the far end's hold (Danny's and a crew mate's)
 local PlayerData = require(script.Parent.PlayerData) -- 8.3: the hire's money
@@ -231,6 +257,31 @@ type Call = { player: Player, spot: number, since: number, ready: boolean, ready
 -- that rolls a little carries it along): out or in, the seat, its van and door (index, side: -1 left, 1 right, the
 -- body's outer face there), a doorless climb; where his root starts, stands at the handle (in) and ends (the seat; out:
 -- his spot at the door), each with its heading (radians about Y, 0: the van's front); since when (os.clock), how long.
+-- 9.0 where he goes to take a piece (standOf): its spot, the pieces standing as it was worked out (routeKey), from
+-- inside the house or from its way in, waiting there or not; the stand (nil: he can't get to it).
+type Stand = { spot: number, key: string, from: boolean, wait: boolean, at: Vector3? }
+
+-- 9.0 a way in or out chosen for a goal (wayFor): the goal, from inside or not, the pieces (routeKey) and the ways he
+-- might take then, which.
+type WayPick = { goal: Vector3, inside: boolean, key: string, may: string, which: number }
+
+-- 9.0 his pick-up or his setting down (handle): which piece, the phase ("turn" → "bend" → "lift"; "down") and since when
+-- (os.clock); while the piece glides, its root and its weld to his root (off meanwhile), from where (world) to where
+-- (pick: his hold in his root's frame; put: on the floor, world); a put's why (Moving's helperDrop) and whether it goes
+-- back on his list after.
+type Handle = {
+	kind: string,
+	spot: number,
+	phase: string,
+	at: number,
+	root: BasePart?,
+	weld: WeldConstraint?,
+	from: CFrame?,
+	to: CFrame?,
+	why: string,
+	requeue: boolean,
+}
+
 type Board = {
 	out: boolean,
 	seat: Seat,
@@ -335,6 +386,16 @@ type Helper = {
 	alert: boolean, -- …in the movers' orange
 	stayOut: boolean, -- 8.6 GET OUT: he rides no more while the move's owner stays at the wheel
 	orderIn: Brain.Order, -- 8.6 his state for the crew's orders (orderState fills it)
+	-- 9.0 his way inside the house (shared/HouseRoute.luau), his pick-up
+	route: Route.Grid?, -- the plan's grid (nil: a plan without walls, a test's fake)
+	routeKey: string, -- the pieces standing in the house when it was blocked last
+	doorZones: { Route.Rect }, -- the interior's doorways in the plan's frame (Aside's zones): never a spot to wait in
+	pathInside: boolean, -- path is a way on the grid (inside), not PathfindingService's
+	pathKey: string, -- … worked out with the pieces as routeKey says
+	stand: Stand?, -- where he goes to take the piece he goes for
+	wayPicks: { WayPick }, -- his ways in and out chosen for his last goals (wayFor)
+	tries: { [number]: number }, -- takes that found a piece out of his reach or behind a wall (Pick.Tries: given up)
+	handle: Handle?, -- his pick-up or setting down now
 }
 
 local ID_BASE = -2000000000 -- (no player's id is this low; Studio's test players are -1, -2 …)
@@ -608,7 +669,7 @@ end
 
 local function clearPath(h: Helper)
 	table.clear(h.path)
-	h.pathIndex, h.pathGoal = 1, nil
+	h.pathIndex, h.pathGoal, h.pathInside = 1, nil, false
 end
 
 local function tell(h: Helper, text: string)
@@ -800,14 +861,16 @@ local function shout(character: Model?, text: string)
 	end)
 end
 
--- The marker over a piece of his list (seen through walls: the crew finds it): its number, or "needs you".
+-- The marker over a piece of his list: its number, or "needs you". 9.0 (the owner's screenshot: "Danny · 1 / 2 / 3"
+-- over pieces in the other rooms, through the walls): drawn in the world, not on top (AlwaysOnTop off: a wall hides it,
+-- the same room and an open doorway show it), MarkFar studs at most (the house's rooms, never the street).
 local function newMark(root: BasePart, height: number): BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "DannyMark"
 	gui.Size = UDim2.fromOffset(160, 30)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, height / 2 + 1.8, 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = 160
+	gui.AlwaysOnTop = false
+	gui.MaxDistance = cfg.MarkFar
 	gui.LightInfluence = 0
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
@@ -1521,6 +1584,248 @@ local function boardEnd(h: Helper, body: Body?, place: boolean)
 	end
 end
 
+-- 8.3 his own piece back at the head of his list (set down for your call, knocked out of his arms).
+local function requeue(h: Helper, spot: number?)
+	if spot and h.hirer and not table.find(h.queue, spot) then
+		table.insert(h.queue, 1, spot)
+		refreshMarks(h)
+	end
+end
+
+-- ── 9.0 His pick-up and his setting down ───────────────────────────────────
+
+local function ease(u: number): number
+	local x = math.clamp(u, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
+-- The weld Moving made between the piece and his root (helperTake's WeldConstraint), nil: none.
+local function weldOf(item: any, root: BasePart): WeldConstraint?
+	for _, child in item.root:GetChildren() do
+		if child:IsA("WeldConstraint") and (child :: WeldConstraint).Part0 == root then
+			return child :: WeldConstraint
+		end
+	end
+	return nil
+end
+
+-- Is there a wall of the interior between two points (a ray at its Shell: its walls, floors and ceiling, never the
+-- furniture or the fixtures)? Outside the house, or no shell: none.
+local function wallBetween(h: Helper, from: Vector3, to: Vector3): boolean
+	local interior: Instance? = h.s.interior
+	local shell = if interior and interior.Parent then interior:FindFirstChild("Shell") else nil
+	if not shell or not insideAt(h, from) then
+		return false
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { shell }
+	return workspace:Raycast(from, to - from, params) ~= nil
+end
+
+-- Can he take the piece now: in its world, within Pick.Arm studs of its footprint (in its own frame; a piece out of the
+-- house or no grid: its middle within half its size and PickReach, as before), the ray from his chest to its middle
+-- through none of the interior's walls.
+local function canTake(h: Helper, body: Body, item: any, thing: Rules.Thing): boolean
+	local here = body.root.Position
+	local at: Vector3 = item.root.Position
+	if insideAt(h, here) ~= insideAt(h, at) then
+		return false
+	end
+	local rel = (item.root.CFrame :: CFrame):PointToObjectSpace(here)
+	local dx = math.max(math.abs(rel.X) - thing.size.X / 2, 0)
+	local dz = math.max(math.abs(rel.Z) - thing.size.Z / 2, 0)
+	local near = math.sqrt(dx * dx + dz * dz) <= cfg.Pick.Arm
+	if not near and (not h.route or not insideAt(h, at)) then
+		near = flat(here, at) <= math.max(thing.size.X, thing.size.Z) / 2 + cfg.PickReach
+	end
+	return near and not wallBetween(h, here + Vector3.new(0, 1, 0), at)
+end
+
+-- One frame of a piece's glide (pick: up into his hands, `to` his hold in his root's frame; put: down to the floor,
+-- `to` in the world), eased over Pick.Lift s. True once it is there.
+local function glide(body: Body, handle: Handle, clock: number): boolean
+	local root, from, to = handle.root, handle.from, handle.to
+	if not root or not from or not to or not root.Parent then
+		return true
+	end
+	local u = (clock - handle.at) / math.max(cfg.Pick.Lift, 0.05)
+	local goal = if handle.kind == "pick" then body.root.CFrame * to else to
+	root.CFrame = from:Lerp(goal, ease(u))
+	return u >= 1
+end
+
+-- The glide every frame while a piece glides (his steps are Tick apart: it would jump), his hands on it (poseHands:
+-- CarryAt its real place); the hook gone again once none does.
+local handHook: RBXScriptConnection? = nil
+local function handFrames()
+	local busy = false
+	for _, h in helpers do
+		local handle = h.handle
+		if handle and handle.root then
+			busy = true
+			break
+		end
+	end
+	if busy and not handHook then
+		handHook = game:GetService("RunService").Heartbeat:Connect(function()
+			local clock = os.clock()
+			for _, h in helpers do
+				local body, handle = h.body, h.handle
+				if body and handle and handle.root then
+					pcall(glide :: any, body, handle, clock)
+					pcall(poseHands :: any, h, body, handle.spot, "carrier")
+				end
+			end
+		end)
+	elseif not busy and handHook then
+		handHook:Disconnect()
+		handHook = nil
+	end
+end
+
+-- His pick-up or setting down over (done, or broken off: his fall, the move's end, an order): a gliding piece where it
+-- was going (in his hands; a put's on the floor), its weld on again; a put's piece set down then (Moving.helperDrop:
+-- `why`, else the put's own) and back on his list when it was to be.
+local function endHandle(h: Helper, body: Body?, why: string?)
+	local handle = h.handle
+	if not handle then
+		return
+	end
+	h.handle = nil
+	local root, weld, to = handle.root, handle.weld, handle.to
+	if root and to and root.Parent then
+		if handle.kind == "pick" and body then
+			root.CFrame = body.root.CFrame * to
+		elseif handle.kind == "put" then
+			root.CFrame = to
+		end
+	end
+	if weld and weld.Parent then
+		weld.Enabled = true
+	end
+	if root and root.Parent then
+		root.Anchored = false
+	end
+	if handle.kind == "put" and body then
+		h.port.helperDrop(h.s, body.model, why or handle.why)
+		if handle.requeue then
+			requeue(h, handle.spot)
+		end
+		poseHands(h, body, nil, nil)
+	elseif handle.kind == "pick" and handle.phase ~= "lift" and body then
+		poseHands(h, body, nil, nil) -- (broken off before it was his: the hands down)
+	end
+	h.thinkAt = 0
+	handFrames()
+end
+
+-- He sets the piece in his arms down where he stands (his pick-up the other way): it glides from his hands down to the
+-- floor in front of him as he bends ("setdown"), then Moving.helperDrop(`why`); `again`: back on his list after. Not his
+-- alone (the other end of yours) or busy: set down at once, as before.
+local function startPut(h: Helper, body: Body, why: string, again: boolean?)
+	local s = h.s
+	local spot, role = Rules.holding(s.move, h.id)
+	local item = if spot then s.items[spot] else nil
+	local thing = if spot then (s.move :: Rules.Move).things[spot] else nil
+	if not spot or role ~= "carrier" or not item or not thing or h.handle then
+		h.port.helperDrop(s, body.model, why)
+		if again then
+			requeue(h, spot)
+		end
+		return
+	end
+	mover.halt(body)
+	local from: CFrame = item.root.CFrame
+	local _, yaw = from:ToOrientation()
+	local floor = floorAt(h, from.Position)
+	local to = CFrame.new(from.Position.X, floor + thing.size.Y / 2, from.Position.Z) * CFrame.Angles(0, yaw, 0)
+	local weld = weldOf(item, body.root)
+	if weld then
+		weld.Enabled = false
+		item.root.Anchored = true
+	end
+	h.handle = { kind = "put", spot = spot, phase = "down", at = os.clock(), root = if weld then item.root else nil, weld = weld, from = from, to = to,
+		why = why, requeue = again == true }
+	Npcs.act(body.model, "setdown")
+	handFrames()
+end
+
+-- His pick-up begins at the piece (beside it, within his arm, no wall between): he stops and turns to it (Npcs.face).
+local function startPick(h: Helper, body: Body, spot: number, clock: number)
+	local item = h.s.items[spot]
+	mover.halt(body)
+	h.handle = { kind = "pick", spot = spot, phase = "turn", at = clock, root = nil, weld = nil, from = nil, to = nil, why = "put", requeue = false }
+	if item then
+		Npcs.face(body.model, item.root.Position)
+	end
+end
+
+-- One step of his pick-up or setting down (nothing else for him meanwhile): turned to it (Pick.Turn s; still his to take,
+-- else broken off: a try), the bend and both hands on it (Npcs.act "lift", Pick.Bend s), then his (Moving.helperTake),
+-- off his list, and up it glides into his hands (Pick.Lift s); a put's glide down, then set down (endHandle).
+local function stepHandle(h: Helper, body: Body, clock: number)
+	local handle = h.handle :: Handle
+	local s = h.s
+	local spot = handle.spot
+	local thing = (s.move :: Rules.Move).things[spot]
+	local item = s.items[spot]
+	if not thing or not item or not item.root.Parent then
+		endHandle(h, body)
+		return
+	end
+	local elapsed = clock - handle.at
+	if handle.phase == "turn" then
+		if elapsed < cfg.Pick.Turn then
+			return
+		end
+		if (thing.state ~= "home" and thing.state ~= "ground") or thing.carrier ~= nil or thing.helper ~= nil or not canTake(h, body, item, thing) then
+			h.tries[spot] = (h.tries[spot] or 0) + 1 -- (taken meanwhile, or out of his reach after all: his spot again)
+			h.stand = nil
+			endHandle(h, body)
+			return
+		end
+		handle.phase, handle.at = "bend", clock
+		Npcs.act(body.model, "lift")
+		poseHands(h, body, spot, "carrier") -- (both hands on it where it stands)
+		return
+	elseif handle.phase == "bend" then
+		poseHands(h, body, spot, "carrier")
+		if elapsed < cfg.Pick.Bend then
+			return
+		end
+		local from: CFrame = item.root.CFrame
+		local ok = h.port.helperTake(s, spot, body.model) -- (refused: it can't be his after all; off his list either way)
+		unqueue(h, spot)
+		refreshMarks(h)
+		h.pick, h.stand, h.tries[spot] = nil, nil, nil
+		h.waited, h.dropping, h.thinkAt = 0, false, 0
+		if not ok then
+			endHandle(h, body)
+			return
+		end
+		handle.to = body.root.CFrame:ToObjectSpace(item.root.CFrame) -- (his hold, as Moving welded it)
+		local weld = weldOf(item, body.root)
+		if weld then
+			weld.Enabled = false
+			item.root.Anchored = true
+			item.root.CFrame = from
+			handle.root, handle.weld, handle.from = item.root, weld, from
+		end
+		handle.phase, handle.at = "lift", clock
+		h.action, h.spot = "deliver", spot
+		setDoing(h, "deliver", spot) -- (his now: "Carrying" as it comes up)
+		handFrames()
+		return
+	end
+	-- "lift" (up into his hands) and "down" (a put: down to the floor)
+	local done = glide(body, handle, clock)
+	poseHands(h, body, spot, "carrier")
+	if done then
+		endHandle(h, body)
+	end
+end
+
 local function spawnBody(h: Helper, at: Vector3): boolean
 	local look = Npcs.look("mover", cfg.Name, cfg.Title)
 	look.walkSpeed = walkSpeed() * cfg.Speed
@@ -1565,6 +1870,7 @@ local function removeBody(h: Helper)
 	table.clear(h.hooks)
 	boardEnd(h, nil, false) -- (8.5 his move in or out with him: the seat free again)
 	local body = h.body
+	endHandle(h, body) -- (9.0 a pick-up or a put down done at once)
 	local seat = h.seat
 	h.seat, h.seatCar = nil, nil
 	if seat then
@@ -1585,16 +1891,9 @@ local function removeBody(h: Helper)
 	clearPath(h)
 end
 
--- 8.3 his own piece back at the head of his list (set down for your call, knocked out of his arms).
-local function requeue(h: Helper, spot: number?)
-	if spot and h.hirer and not table.find(h.queue, spot) then
-		table.insert(h.queue, 1, spot)
-		refreshMarks(h)
-	end
-end
-
 -- Down: what he holds falls, he lies on his back; his body goes FALL s later, he is back Respawn s later.
 local function fall(h: Helper, body: Body, clock: number)
+	endHandle(h, body, "died") -- 9.0 (a piece going down with him: knocked)
 	endCall(h, "down", clock) -- 8.3
 	endNeeds(h)
 	boardEnd(h, body, true) -- (8.5 halfway in or out of the van: at his spot at its door first)
@@ -1630,12 +1929,58 @@ local function allowedWays(h: Helper): { number }?
 	return exitsOf(h, (Rules.holding(h.s.move, h.id)))
 end
 
--- 7.x farm move: the best way from `here` (inside or not) to `goal` in the other world, among those he may take.
+-- 9.0 studs on foot inside the house from `a` to `b` along his grid's way (math.huge: none), nil without a grid.
+local function insideCost(h: Helper, a: Vector3, b: Vector3): number?
+	local grid = h.route
+	if not grid then
+		return nil
+	end
+	local origin: CFrame = h.s.origin
+	local pa, pb = origin:PointToObjectSpace(a), origin:PointToObjectSpace(b)
+	local points = Route.path(grid, pa.X, pa.Z, pb.X, pb.Z)
+	if not points then
+		return math.huge
+	end
+	local total, x, z = 0, pa.X, pa.Z
+	for _, point in points do
+		total += math.sqrt((point.x - x) ^ 2 + (point.z - z) ^ 2)
+		x, z = point.x, point.z
+	end
+	return total
+end
+
+-- 7.x farm move: the best way from `here` (inside or not) to `goal` in the other world, among those he may take. 9.0 in
+-- a house with a grid its inside part is his way's own length (insideCost: through the doorways, round the walls; the
+-- straight line had him turn back to the far door once his walk round a wall began), worked out once for a goal
+-- (wayPicks: the pieces as they stand, the ways he may take; a few goals kept) and kept: no change of mind on the way.
 local function wayFor(h: Helper, here: Vector3, inside: boolean, goal: Vector3): Way
 	if #h.ways < 2 then
 		return h.ways[1]
 	end
-	local _, which = Brain.routeVia(inside, here.X, here.Z, not inside, goal.X, goal.Z, h.wayDoors, allowedWays(h))
+	local allowed = allowedWays(h)
+	if not h.route then
+		local _, which = Brain.routeVia(inside, here.X, here.Z, not inside, goal.X, goal.Z, h.wayDoors, allowed)
+		return h.ways[which] or h.ways[1]
+	end
+	local may = if allowed then table.concat(allowed, ",") else "*"
+	for _, pick in h.wayPicks do
+		if pick.inside == inside and pick.key == h.routeKey and pick.may == may and flat(pick.goal, goal) <= cfg.PathAgain then
+			return h.ways[pick.which] or h.ways[1]
+		end
+	end
+	local best, which = math.huge, 1
+	for index, way in h.ways do
+		if allowed and not table.find(allowed, index) then
+			continue
+		end
+		local cost = if inside then (insideCost(h, here, way.exitIn) or 0) + flat(way.outside.Position, goal)
+			else flat(here, way.outside.Position) + (insideCost(h, way.entryIn.Position, goal) or 0)
+		if cost < best then
+			best, which = cost, index
+		end
+	end
+	table.insert(h.wayPicks, 1, { goal = goal, inside = inside, key = h.routeKey, may = may, which = which })
+	h.wayPicks[5] = nil -- (the last four goals)
 	return h.ways[which] or h.ways[1]
 end
 
@@ -1655,11 +2000,109 @@ local function transfer(h: Helper, inside: boolean, clock: number, way: Way?)
 	end
 end
 
+-- ── 9.0 His way inside the house (shared/HouseRoute.luau) ─────────────────
+
+-- A world point in the plan's frame (its origin's: X and Z along the floor), and back at height `y`.
+local function planAt(h: Helper, at: Vector3): (number, number)
+	local p = (h.s.origin :: CFrame):PointToObjectSpace(at)
+	return p.X, p.Z
+end
+
+local function worldAt(h: Helper, x: number, z: number, y: number): Vector3
+	local p = (h.s.origin :: CFrame) * Vector3.new(x, 0, z)
+	return Vector3.new(p.X, y, p.Z)
+end
+
+-- A piece's footprint in the plan's frame (its box turned as it stands: the rect round it).
+local function footprintOf(h: Helper, item: any, thing: Rules.Thing): Route.Rect
+	local frame = (h.s.origin :: CFrame):ToObjectSpace(item.root.CFrame)
+	local _, yaw = frame:ToOrientation()
+	return Route.footprint(frame.Position.X, frame.Position.Z, thing.size.X, thing.size.Z, yaw)
+end
+
+-- His grid with the pieces standing in the house now (at home, or set down in it): blocked again only when one of them
+-- went or moved (routeKey; think's every Think s, an assignment's); nil: no grid (a plan without walls).
+local function routeNow(h: Helper): Route.Grid?
+	local grid = h.route
+	if not grid then
+		return nil
+	end
+	local s = h.s
+	local move: Rules.Move = s.move
+	local list: { Route.Rect } = {}
+	local parts: { string } = {}
+	for _, spot in move.order do
+		local thing = move.things[spot]
+		local item = s.items[spot]
+		if thing and item and item.root.Parent and (thing.state == "home" or thing.state == "ground") and insideAt(h, item.root.Position) then
+			local r = footprintOf(h, item, thing)
+			table.insert(list, r)
+			table.insert(parts, `{spot}:{math.floor(r.x0 * 4 + 0.5)},{math.floor(r.z0 * 4 + 0.5)},{math.floor(r.x1 * 4 + 0.5)},{math.floor(r.z1 * 4 + 0.5)}`)
+		end
+	end
+	local key = table.concat(parts, ";")
+	if key ~= h.routeKey then
+		h.routeKey = key
+		Route.block(grid, list)
+	end
+	return grid
+end
+
+-- The next point of his way to `target`, both inside: the grid's way (worked out again when the target moved PathAgain
+-- studs off its end, the pieces changed or a stuck spell asks: Route.Again s apart at most), on along its corners. No
+-- way: where he stands (never a straight line into a wall; pathFailedAt says so).
+local function routeTo(h: Helper, grid: Route.Grid, here: Vector3, target: Vector3, clock: number): Vector3
+	local goal = h.pathGoal
+	local fresh = h.pathInside and goal ~= nil and h.pathKey == h.routeKey and flat(goal, target) <= cfg.PathAgain
+	if not fresh and (not h.pathInside or clock - h.pathAt >= cfg.Route.Again) then
+		table.clear(h.path)
+		h.pathAt, h.pathInside, h.pathKey, h.pathIndex = clock, true, h.routeKey, 1
+		local fx, fz = planAt(h, here)
+		local tx, tz = planAt(h, target)
+		local points = Route.path(grid, fx, fz, tx, tz)
+		if points then
+			for index, p in points do
+				h.path[index] = worldAt(h, p.x, p.z, here.Y)
+			end
+			h.pathGoal = target
+		else
+			h.pathGoal, h.pathFailedAt = nil, clock
+		end
+	end
+	local path = h.path
+	while h.pathIndex < #path and flat(path[h.pathIndex], here) < 1 do
+		h.pathIndex += 1
+	end
+	return path[h.pathIndex] or here
+end
+
+-- A stuck spell's nudge inside: on to his way's next point when the line there keeps to open cells (NUDGE studs at
+-- most), else onto the nearest open cell (he was off them); nil: neither (a new way is asked instead). Never into a wall.
+local function nudgeInside(h: Helper, grid: Route.Grid, here: Vector3, way: Vector3): Vector3?
+	local fx, fz = planAt(h, here)
+	local wx, wz = planAt(h, way)
+	if flat(here, way) <= NUDGE and Route.open(grid, wx, wz) and Route.clear(grid, fx, fz, wx, wz) then
+		return way
+	end
+	local sx, sz = Route.snap(grid, fx, fz)
+	if sx and sz and (math.abs(sx - fx) > 0.3 or math.abs(sz - fz) > 0.3) then
+		return worldAt(h, sx, sz, here.Y)
+	end
+	return nil
+end
+
 -- ── The way ────────────────────────────────────────────────────────────────
 
 -- The next point toward `target`: his path's (worked out again at most every Repath s, in the background, when the
--- target moved off it, or at once when asked: a stuck spell), else straight.
+-- target moved off it, or at once when asked: a stuck spell), else straight. 9.0 inside the house (both inside): the
+-- plan's grid's (routeTo), never straight.
 local function wayTo(h: Helper, body: Body, here: Vector3, target: Vector3, clock: number): Vector3
+	local grid = h.route
+	if grid and insideAt(h, here) and insideAt(h, target) then
+		return routeTo(h, grid, here, target, clock) -- 9.0
+	elseif h.pathInside then
+		clearPath(h) -- (9.0 a way inside, not this one)
+	end
 	local route = mover.route
 	local goal = h.pathGoal
 	if route and not h.pathing and clock - h.pathAt >= cfg.Repath and (goal == nil or flat(goal, target) > cfg.PathAgain) then
@@ -1667,8 +2110,8 @@ local function wayTo(h: Helper, body: Body, here: Vector3, target: Vector3, cloc
 		task.spawn(function()
 			local ok, points = pcall(route, body, here, target)
 			h.pathing = false
-			if h.body ~= body then
-				return
+			if h.body ~= body or h.pathInside then
+				return -- (9.0 inside since: the grid's way is his)
 			end
 			table.clear(h.path)
 			if ok and points then
@@ -1722,8 +2165,17 @@ local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, nea
 	if van and outOfVan(h, body, van, target) then
 		return false
 	end
+	local grid = if inside then h.route else nil -- 9.0 inside the house: the plan's grid
 	if flat(here, target) > cfg.Far and not walk then
-		placeAt(h, target, nil)
+		local put = target
+		if grid and insideAt(h, target) then
+			local fx, fz = planAt(h, target)
+			local sx, sz = Route.snap(grid, fx, fz)
+			if sx and sz then
+				put = worldAt(h, sx, sz, target.Y) -- (9.0 inside: on an open cell, never in a wall or a piece)
+			end
+		end
+		placeAt(h, put, nil)
 		return false
 	end
 	local last = h.lastPos
@@ -1740,7 +2192,18 @@ local function go(h: Helper, body: Body, goal: Vector3, goalInside: boolean, nea
 	if van then
 		way = aroundVan(van, here, way, target) -- 8.5.1 (a nudge too: along the way round)
 	end
-	if fix == "nudge" then
+	if fix == "nudge" and grid then
+		-- 9.0 inside: along open cells only (nudgeInside), else a new way from where he is (the nudge again later)
+		local spot = nudgeInside(h, grid, here, way)
+		if spot then
+			local step = Vector3.new(spot.X - here.X, 0, spot.Z - here.Z)
+			placeAt(h, spot, if step.Magnitude > 0.05 then step else nil)
+		else
+			h.stuckFor, h.repathed = cfg.StuckRepath, false
+			h.pathAt, h.pathGoal = -math.huge, nil
+		end
+		return false
+	elseif fix == "nudge" then
 		local step = Vector3.new(way.X - here.X, 0, way.Z - here.Z)
 		local spot = if step.Magnitude > NUDGE then here + step.Unit * NUDGE else Vector3.new(way.X, here.Y, way.Z)
 		placeAt(h, spot, if step.Magnitude > 0.05 then step else nil)
@@ -1754,6 +2217,7 @@ end
 
 local function think(h: Helper, body: Body, clock: number)
 	h.thinkAt = clock + cfg.Think
+	routeNow(h) -- 9.0 (the pieces standing in the house: his grid blocked again when one went or moved)
 	local s = h.s
 	local move: Rules.Move = s.move
 	local here = body.root.Position
@@ -1888,14 +2352,12 @@ local function loadHere(h: Helper, body: Body): boolean
 end
 
 -- 8.3 his own piece out of his arms (your call, your lift come first): into the van right here, else set down where
--- he is, back at the head of his list.
+-- he is, back at the head of his list (9.0 his put down: startPut).
 local function setDownOwn(h: Helper, body: Body)
 	if loadHere(h, body) then
 		return
 	end
-	local spot = Rules.holding(h.s.move, h.id)
-	h.port.helperDrop(h.s, body.model, "put")
-	requeue(h, spot)
+	startPut(h, body, "put", true)
 end
 
 -- 8.6 his end of the piece in `frame` (the owner: "he teleports from side to side"): the face across it from
@@ -2034,6 +2496,7 @@ end
 local function takeEnd(h: Helper, body: Body, spot: number, clock: number)
 	mover.halt(body)
 	if h.port.helperTake(h.s, spot, body.model) then
+		Npcs.act(body.model, "lift") -- 9.0 (his end taken up: the bend of his pick-up)
 		say(h, "lift", clock, true)
 		h.lineKey, h.lineAt, h.vanSaid = "three", clock + cfg.ThreeAfter, nil
 	else
@@ -2210,7 +2673,7 @@ end
 -- ── 8.3 his list: the pieces he goes for ───────────────────────────────────
 
 -- Beside a piece, on his side (the way's end: a path can't end inside a piece that stands in the way), out of the
--- doorways.
+-- doorways. (9.0: a piece out of the house, or a plan without walls; in a house standOf's spot.)
 local function besidePiece(h: Helper, here: Vector3, at: Vector3, inside: boolean, half: number): Vector3
 	local from = here
 	if insideAt(h, here) ~= inside then
@@ -2221,8 +2684,77 @@ local function besidePiece(h: Helper, here: Vector3, at: Vector3, inside: boolea
 	return if side.Magnitude > 0.1 then at + side.Unit * (half + 1.5) else at
 end
 
+-- 9.0 where he goes to take the piece at `spot` (`wait`: to wait at it for you, out of the doorways when it can be): in
+-- the house, the spot at arm's length on its near side his way finds (HouseRoute.reach from where he is, or from where
+-- he will come in; worked out again when the pieces moved, he came in or a take there failed); nil: he can't get to it.
+-- Out of the house, or no grid: beside it as before.
+local function standOf(h: Helper, here: Vector3, spot: number, wait: boolean): Vector3?
+	local s = h.s
+	local thing = (s.move :: Rules.Move).things[spot]
+	local item = s.items[spot]
+	local at: Vector3 = item.root.Position
+	local inside = insideAt(h, at)
+	local grid = if inside then h.route else nil
+	if not grid then
+		local beside = besidePiece(h, here, at, inside, math.max(thing.size.X, thing.size.Z) / 2)
+		return if wait then clearOf(h, beside, inside) else beside
+	end
+	local from = insideAt(h, here)
+	local cached = h.stand
+	if cached and cached.spot == spot and cached.key == h.routeKey and cached.from == from and cached.wait == wait then
+		return cached.at
+	end
+	local start = if from then here else wayFor(h, here, false, at).entryIn.Position
+	local fx, fz = planAt(h, start)
+	local piece = footprintOf(h, item, thing)
+	local x, z = Route.reach(grid, fx, fz, piece, nil, if wait then h.doorZones else nil)
+	if not x and wait then
+		x, z = Route.reach(grid, fx, fz, piece) -- (only by a doorway: there all the same)
+	end
+	local stand = if x and z then worldAt(h, x, z, at.Y) else nil
+	h.stand = { spot = spot, key = h.routeKey, from = from, wait = wait, at = stand }
+	return stand
+end
+
+-- 9.0 at the piece he goes for: "take" (he can take it from where he stands: canTake; `stop`: only once at his spot),
+-- "walk" (not yet), "fail" (at his spot and still out of his reach or behind a wall Pick.Tries times: he gives it up).
+-- A try that fails asks for his spot and his way again.
+local function arrive(h: Helper, body: Body, spot: number, stand: Vector3, stop: boolean): string
+	local s = h.s
+	local thing = (s.move :: Rules.Move).things[spot]
+	local item = s.items[spot]
+	local here = body.root.Position
+	local there = flat(here, stand) <= 0.6
+	if (there or not stop) and canTake(h, body, item, thing) then
+		return "take"
+	elseif not there then
+		return "walk"
+	end
+	local tries = (h.tries[spot] or 0) + 1
+	h.tries[spot] = tries
+	h.stand = nil
+	clearPath(h)
+	return if tries >= cfg.Pick.Tries then "fail" else "walk"
+end
+
+-- 9.0 a piece of his list he can't get to (no spot to take it from, or out of his reach there): off his list, the crew
+-- told.
+local function cantReach(h: Helper, spot: number)
+	local thing = (h.s.move :: Rules.Move).things[spot]
+	unqueue(h, spot)
+	if h.needs == spot then
+		endNeeds(h)
+	end
+	refreshMarks(h)
+	h.pick, h.stand, h.thinkAt = nil, nil, 0
+	h.tries[spot] = nil
+	tell(h, `🧑‍🔧 {cfg.Name} can't get to the {if thing then thing.name else "piece"}: it's off his list.`)
+	tellCrew(h)
+end
+
 -- A two-person piece of his list: to it, "give me a hand!" there (the crew's toast once, the marker "needs you", its
--- prompt "Lift with Danny"), then he waits for your lift (your call: he answers it at once).
+-- prompt "Lift with Danny"), then he waits for your lift (your call: he answers it at once). 9.0 at its near side at
+-- arm's length (standOf, out of the doorways), turned to it; none: he can't get to it.
 local function actNeeds(h: Helper, body: Body, spot: number, dt: number, clock: number)
 	local s = h.s
 	local thing = (s.move :: Rules.Move).things[spot]
@@ -2242,10 +2774,14 @@ local function actNeeds(h: Helper, body: Body, spot: number, dt: number, clock: 
 	local at = item.root.Position
 	local inside = insideAt(h, at)
 	local here = body.root.Position
-	local half = math.max(thing.size.X, thing.size.Z) / 2
-	local beside = clearOf(h, besidePiece(h, here, at, inside, half), inside)
-	if insideAt(h, here) == inside and (flat(here, at) <= half + cfg.PickReach or flat(here, beside) <= 0.6) then
+	local stand = standOf(h, here, spot, true)
+	local verdict = if stand then arrive(h, body, spot, stand, true) else "fail"
+	if verdict == "fail" then
+		cantReach(h, spot)
+		return
+	elseif verdict == "take" then
 		mover.halt(body)
+		Npcs.face(body.model, at) -- 9.0 (turned to it)
 		h.needsAt = clock
 		say(h, "ask", clock, true)
 		if h.needsTold ~= spot then
@@ -2256,10 +2792,12 @@ local function actNeeds(h: Helper, body: Body, spot: number, dt: number, clock: 
 		refreshMarks(h)
 		return
 	end
-	go(h, body, beside, inside, 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
+	go(h, body, stand :: Vector3, inside, 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
 end
 
--- To the next piece of his list; there, he picks it up (off his list: in his arms now).
+-- To the next piece of his list; there, he picks it up (off his list: in his arms now). 9.0 to its near side at arm's
+-- length (standOf; none: he can't get to it), and his pick-up there (startPick: turned to it, the bend, the piece up
+-- into his hands), never from the next room.
 local function actFetch(h: Helper, body: Body, spot: number, dt: number, clock: number)
 	local s = h.s
 	local thing = (s.move :: Rules.Move).things[spot]
@@ -2268,20 +2806,16 @@ local function actFetch(h: Helper, body: Body, spot: number, dt: number, clock: 
 		h.pick, h.thinkAt = nil, 0
 		return
 	end
-	local at = item.root.Position
-	local inside = insideAt(h, at)
-	local here = body.root.Position
-	local half = math.max(thing.size.X, thing.size.Z) / 2
-	if insideAt(h, here) == inside and flat(here, at) <= half + cfg.PickReach then
-		mover.halt(body)
-		h.port.helperTake(s, spot, body.model) -- (refused: it can't be his after all; off his list either way)
-		unqueue(h, spot)
-		refreshMarks(h)
-		h.pick = nil
-		h.waited, h.dropping, h.thinkAt = 0, false, 0
+	local stand = standOf(h, body.root.Position, spot, false)
+	local verdict = if stand then arrive(h, body, spot, stand, false) else "fail"
+	if verdict == "fail" then
+		cantReach(h, spot)
+		return
+	elseif verdict == "take" then
+		startPick(h, body, spot, clock)
 		return
 	end
-	go(h, body, besidePiece(h, here, at, inside, half), inside, 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
+	go(h, body, stand :: Vector3, insideAt(h, item.root.Position), 0.5, Brain.speed(walkSpeed(), "fetch", nil, 0), dt, clock)
 end
 
 -- With a piece in his arms: to the van's back and in (shut: he opens it when he may, else he asks and waits); no room
@@ -2296,7 +2830,7 @@ local function actDeliver(h: Helper, body: Body, spot: number, dt: number, clock
 		local out: CFrame = s.site.outside
 		local right = Vector3.new(-out.LookVector.Z, 0, out.LookVector.X)
 		if go(h, body, clearOf(h, out.Position + right * 4, false), false, 1.5, speed, dt, clock) then
-			h.port.helperDrop(s, body.model, "put")
+			startPut(h, body, "put") -- 9.0 (set down, bending)
 			h.thinkAt = 0
 		end
 		return
@@ -2308,7 +2842,7 @@ local function actDeliver(h: Helper, body: Body, spot: number, dt: number, clock
 	if h.dropping then
 		local beside = byTruck(truck, 4 + (spot % 3) * 2.2, 2 + (spot // 3 % 2) * 2.5)
 		if not beside or go(h, body, beside, false, 1, speed, dt, clock) then
-			h.port.helperDrop(s, body.model, "put")
+			startPut(h, body, "put") -- 9.0 (set down, bending)
 			h.dropping, h.waited, h.thinkAt = false, 0, 0
 		end
 		return
@@ -2648,6 +3182,10 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 	if clock >= h.thinkAt then
 		think(h, body, clock)
 	end
+	if h.handle then
+		stepHandle(h, body, clock) -- 9.0 his pick-up or setting down: nothing else meanwhile
+		return
+	end
 	local seated = h.seat ~= nil
 	local threat, threatAt = nil, nil
 	if holding ~= "pair" and not seated then
@@ -2736,6 +3274,7 @@ local function dismiss(h: Helper, why: string?)
 	if body and h.seat then
 		unseat(h, body, nil) -- (8.3 out of the van's seat first)
 	end
+	endHandle(h, body) -- 9.0
 	if body and not h.dead and not s.ended then
 		h.port.helperDrop(s, body.model, "put")
 	end
@@ -2831,6 +3370,7 @@ local function endHire(h: Helper, who: Player)
 	endNeeds(h)
 	refreshMarks(h)
 	local body = h.body
+	endHandle(h, body) -- 9.0
 	if body and not h.dead then
 		h.port.helperDrop(h.s, body.model, "put")
 	end
@@ -2849,7 +3389,37 @@ local ASSIGN_WHY: { [string]: string } = {
 	van = "The %s is in the van already.",
 	held = "Somebody holds the %s.",
 	full = "Danny's list is full: pick a piece of it to take it back first.",
+	reach = "Danny can't get to the %s: clear a way to it first.", -- 9.0
 }
+
+-- 9.0 can he get to the piece at `spot` at all: a spot at arm's length by it (HouseRoute.reach) that his way reaches from
+-- where he is (inside) or from any way in. The assignment's check (MoveHelperBrain.assignCheck's "reach"); a piece out of
+-- the house, or no grid: yes.
+local function reachable(h: Helper, spot: number): boolean
+	local s = h.s
+	local item = s.items[spot]
+	local thing = (s.move :: Rules.Move).things[spot]
+	local grid = routeNow(h)
+	if not grid or not item or not thing or not insideAt(h, item.root.Position) then
+		return true
+	end
+	local piece = footprintOf(h, item, thing)
+	local starts: { Vector3 } = {}
+	local body = h.body
+	if body and insideAt(h, body.root.Position) then
+		table.insert(starts, body.root.Position)
+	end
+	for _, way in h.ways do
+		table.insert(starts, way.entryIn.Position)
+	end
+	for _, at in starts do
+		local fx, fz = planAt(h, at)
+		if Route.reach(grid, fx, fz, piece) then
+			return true
+		end
+	end
+	return false
+end
 
 -- 8.3 a click on a piece (its model): onto his list, or off it again; checked (MoveHelperBrain.assignCheck). 8.5 only
 -- with the player's clipboard out (orders mode: the character attribute ClipboardHeld, server/Clipboard.luau's).
@@ -2869,12 +3439,18 @@ local function assign(player: Player, model: any)
 	local root = rootOf(player)
 	local near = root ~= nil and insideAt(h, root.Position) == insideAt(h, item.root.Position) and flat(root.Position, item.root.Position) <= cfg.ClickReach + 10
 	local character = player.Character
-	local verdict = Brain.assignCheck({ crew = true, hired = h.hirer ~= nil, mine = true, state = thing.state, held = thing.carrier ~= nil or thing.helper ~= nil,
+	local check: Brain.Assign = { crew = true, hired = h.hirer ~= nil, mine = true, state = thing.state, held = thing.carrier ~= nil or thing.helper ~= nil,
 		his = Rules.holding(s.move, h.id) == spot, queued = table.find(h.queue, spot) ~= nil, count = #h.queue, near = near,
-		clipboard = character ~= nil and character:GetAttribute("ClipboardHeld") == true })
+		clipboard = character ~= nil and character:GetAttribute("ClipboardHeld") == true }
+	local verdict = Brain.assignCheck(check)
+	if verdict == "add" and not reachable(h, spot) then
+		check.reach = false -- 9.0 (no spot beside it he can walk to: refused now, never a walk into a wall)
+		verdict = Brain.assignCheck(check)
+	end
 	local clock = os.clock()
 	if verdict == "add" then
 		table.insert(h.queue, spot)
+		h.tries[spot] = nil -- (9.0 given again: his tries afresh)
 		refreshMarks(h)
 		h.thinkAt = 0
 		notice:FireClient(player, `🧑‍🔧 {cfg.Name} will take the {thing.name}.`)
@@ -2933,12 +3509,15 @@ local function putDown(h: Helper, body: Body, clock: number, by: Player)
 		notice:FireClient(by, `🧑‍🔧 {if carrier then carrier.DisplayName else "Someone"} carries the {thing.name} with {cfg.Name}: only they can set it down.`)
 		return
 	end
-	h.port.helperDrop(s, body.model, if role == "helper" then "together" else "put")
+	endHandle(h, body) -- (9.0 a pick-up in progress: done at once, the piece in his hands)
 	if role == "helper" then
+		h.port.helperDrop(s, body.model, "together")
 		unhold(h, body) -- (his hold off now: on his feet where he stood)
+		poseHands(h, body, nil, nil)
+	else
+		startPut(h, body, "put") -- 9.0 (set down, bending: his pick-up the other way)
 	end
 	h.dropping, h.waited, h.vanSaid, h.thinkAt = false, 0, nil, 0
-	poseHands(h, body, nil, nil)
 	say(h, if role == "helper" then "putTogether" else "putDown", clock, true)
 	for player in s.members do
 		if player.Parent then
@@ -3097,10 +3676,11 @@ function MoveHelper.joinLift(s: any, spot: number, player: Player): boolean
 	player:SetAttribute("MoveHelperCall", nil)
 	player:SetAttribute("MoveHelperReady", nil)
 	local body = h.body
-	if h.dead or not body or not h.port.helperTake(s, spot, body.model) then
+	if h.dead or not body or h.handle or not h.port.helperTake(s, spot, body.model) then
 		steady(h, nil)
 		return false
 	end
+	Npcs.act(body.model, "lift") -- 9.0 (his end taken up as yours: the bend of his pick-up)
 	local clock = os.clock()
 	h.vanSaid, h.thinkAt, h.lineKey = nil, 0, nil
 	actHold(h, body, spot, 0, clock)
@@ -3216,6 +3796,18 @@ local function create(s: any, port: Port): Helper
 		table.insert(wayDoors, made.doors)
 	end
 	local doorways, fronts = doorwaysOf(s, origin)
+	-- 9.0 his way inside: the plan's grid (none for a plan without walls) and its doorways' zones (Aside's, the plan's
+	-- frame): no spot to wait in
+	local made, grid = pcall(Route.grid, s.plan)
+	local zones: { Route.Rect } = {}
+	for _, door in (s.plan.doors or {}) :: { any } do
+		local at: Vector3 = door.at
+		local along = (tonumber(door.width) or 4) / 2 + cfg.Aside.Margin
+		local through = cfg.Aside.Depth
+		local wide = door.axis == "X" -- (a wall along X: through it along Z)
+		table.insert(zones, { x0 = at.X - (if wide then along else through), z0 = at.Z - (if wide then through else along),
+			x1 = at.X + (if wide then along else through), z1 = at.Z + (if wide then through else along) })
+	end
 	local h: Helper = {
 		s = s,
 		port = port,
@@ -3302,7 +3894,19 @@ local function create(s: any, port: Port): Helper
 		alert = false,
 		stayOut = false,
 		orderIn = { hired = false, down = false, holding = nil, seated = false, boarding = false, riding = false, leaving = false, moving = false },
+		route = if made then grid else nil,
+		routeKey = "",
+		doorZones = zones,
+		pathInside = false,
+		pathKey = "",
+		stand = nil,
+		wayPicks = {},
+		tries = {},
+		handle = nil,
 	}
+	if not made then
+		warn(`[MoveHelper] no way inside: {grid}`)
+	end
 	h.bubble = (Brain.bubble("offer", nil, false, h.price)) -- 8.6
 	helpers[s] = h
 	byId[id] = h

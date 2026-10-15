@@ -241,6 +241,7 @@ do
 	run(0.4)
 	local noticeAt = #E.messages
 	E.request(bob, "helper", "putdown")
+	run(0.6) -- (9.0 his setting down: the Lamp glides down to the floor first)
 	check("Bob (far off) has Danny put down the Lamp in his arms: on the ground, out of his hands, off his list", holds and stateNow(1) == "ground"
 		and Rules.holding(danny.s.move, danny.id) == nil and #danny.queue == 0, stateNow(1))
 	check("8.6 review: …Sol told who asked: \"Bob had Danny set the Lamp down: off his list.\"", told(sol, "🧑‍🔧 Bob had Danny set the Lamp down: off his list.", noticeAt)

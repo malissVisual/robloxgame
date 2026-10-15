@@ -116,7 +116,12 @@ Config.Body = {
 	-- A piece picked up off the ground stays where it lies this long (server/Cargo.luau), the hands reaching down to
 	-- it, then comes up into them as the body rises.
 	PickupLift = 0.4,
-	Gestures = { pickup = 0.7, land = 0.42 } :: { [string]: number },
+	-- 9.0 Danny's pick-up and setting down ("lift", "setdown": server/MoveHelper.luau, Config.MoveHelper.Pick's times
+	-- within their seconds): a shorter bend, both hands to the piece, LiftDrop studs, the hips LiftHips, the waist LiftBend
+	LiftDrop = 0.45,
+	LiftHips = 18,
+	LiftBend = 28,
+	Gestures = { pickup = 0.7, land = 0.42, lift = 1.0, setdown = 0.8 } :: { [string]: number },
 }
 
 -- 6.24, the gait (the owner: "better animations, how he walks and moves"): client/GaitPose.luau walks every courier and
@@ -6961,6 +6966,25 @@ Config.MoveStory = {
 --                      tag, Wide px at most (its words cut with "…")
 --   (the orders need no numbers of their own: GET OUT waits for the van at Config.Cargo.BoardMaxSpeed or slower, the
 --   speed his own getting in is called off over; after it he stays out while the owner stays at the wheel)
+--   9.0 (the owner, 8.9: "Danny can't walk around things logically. He goes to take things through the wall … He must
+--   not take things through walls, and neither may the player. And he must come to the thing nicely and take it into
+--   his hands properly, with an animation"; shared/HouseRoute.luau, server/MoveHelper.luau's way inside and his
+--   pick-up, server/Moving.luau's sight check):
+--   Route              his way inside a house, on the plan's grid (shared/HouseRoute.luau; PathfindingService only
+--                      outside): Step studs a cell; Radius studs his body keeps off every wall, solid fixture and piece
+--                      standing in the house (a cell he fits in is open: the doorways' 6 studs take him); Stand studs
+--                      from a piece's footprint at most where he stands to take it (arm's length, its near side, his
+--                      line to its middle through no wall; none: "can't get to it", refused at the assignment); Snap
+--                      studs he looks for the nearest open cell from a spot off them (a start, a goal, a stuck nudge:
+--                      onto it, never into a wall); Again s at least between two ways worked out for the same goal
+--   Pick               his pick-up: within Arm studs of the piece's footprint (Stand and the walk's give), his chest's
+--                      line to its middle through no wall (a ray at the interior's walls) he turns to it (Turn s), bends
+--                      and reaches with both arms (Bend s: shared/BodyMotion.luau's "lift", client/ArmPose.luau's hands
+--                      on the piece) and the piece comes up into his hands over Lift s (eased, never snapped), him
+--                      standing up into his carry; putting one down the same the other way ("setdown"). Tries: takes
+--                      that found it out of reach or behind a wall before he gives the piece up ("can't get to it")
+--   MarkFar            studs the 🧑‍🔧 markers over his list's pieces are drawn from (AlwaysOnTop off: never through a
+--                      wall, seen in the same room and through an open doorway)
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -7067,6 +7091,10 @@ Config.MoveHelper = {
 	},
 	-- 8.6 the bubble over his head
 	Bubble = { Near = 35, Far = 75, Top = 20, Tick = 0.15, Text = 13, Tall = 26, Pad = 9, Gap = 4, Wide = 340 },
+	-- 9.0 his way inside a house, his pick-up, his list's markers
+	Route = { Step = 0.5, Radius = 1.25, Stand = 2, Snap = 3, Again = 0.5 },
+	Pick = { Arm = 2.8, Turn = 0.3, Bend = 0.45, Lift = 0.4, Tries = 3 },
+	MarkFar = 60,
 }
 
 -- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the

@@ -28,7 +28,8 @@
 --   BodyMotion.stride(hipR, hipL)  the walk's weight from the stock walk's own thighs (their X swing, radians): the
 --                                  body's bob (studs), the arms' extra swing (radians: the right arm minus it, the left
 --                                  plus) and the chest's turn (radians)
---   BodyMotion.gesture(kind, t)    the "pickup" and "land" gestures in shared/Gestures.luau's format, with the body
+--   BodyMotion.gesture(kind, t)    the "pickup" and "land" gestures (9.0: Danny's "lift" and "setdown", a short bend
+--                                  with both hands to the piece) in shared/Gestures.luau's format, with the body
 --                                  keys: waist / neck { x, y, z } degrees, crouch { drop, back (studs), hips (degrees
 --                                  the pelvis tips forward) }: client/ArmPose.luau bends the legs to it
 -- Frames (as shared/RunCycle.luau): +X right, +Y up, -Z forward; about X a positive angle swings a thigh or an upper arm
@@ -238,6 +239,21 @@ function BodyMotion.gesture(kind: string, t: number): { [string]: { number } }?
 			rw = { -12, 0, 0 },
 			ls = { 40, -8, -6 },
 			le = { 30, 0, 0 },
+		}
+	elseif kind == "lift" or kind == "setdown" then
+		-- 9.0 Danny's two-handed pick-up (the owner: "take it into his hands properly, with an animation") and his setting
+		-- down: a short bend at the knees and the waist, both arms down and forward to the piece (his hands on it come from
+		-- its place: client/ArmPose.luau reaches the box), held while it comes up into them (goes down), then up again.
+		return {
+			crouch = { B.LiftDrop, 0.1, B.LiftHips },
+			waist = { -B.LiftBend, 0, 0 },
+			neck = { 16, 0, 0 },
+			rs = { 58, 6, 4 },
+			re = { 24, 0, 0 },
+			rw = { -10, 0, 0 },
+			ls = { 58, -6, -4 },
+			le = { 24, 0, 0 },
+			lw = { -10, 0, 0 },
 		}
 	elseif kind == "land" then
 		-- A short dip on landing, the arms a little out for the balance.
