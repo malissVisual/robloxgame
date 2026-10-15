@@ -119,6 +119,29 @@
 > Main.client compare them with Config's and with each other (workspace "ServerBuild"); a mix warns in the Output and,
 > in Studio, shows a red banner: Stop, Rojo Disconnect, delete ReplicatedStorage > Shared, ServerScriptService >
 > Server and StarterPlayer > StarterPlayerScripts > Client, then Connect and Play.
+>
+> **8.6** (the owner's feedback on 8.5): **Danny's bubble and orders**: a bubble over his head shows his move's crew
+> what he does now ("📦 Carrying: Sofa → van", "🚶 Going for: Lamp", "⏳ Needs you: Piano" in orange, "🪑 Riding",
+> "💤 Waiting by the van", "🧑‍🔧 For hire · $100", a "list: 3" counter; `client/DannyBubble.luau`, the same server words
+> as his status line: `MoveHelperBrain`'s DOING); **PUT IT DOWN** (what he carries set down where he stands; a piece
+> for two only by whoever carries it with him) and **GET OUT** (out of the van through its door; he stays out while
+> the driver stays at the wheel), on his card, in the orders menu (the clipboard out, a click on him) and GET OUT on his
+> status line (`Config.Robust.Limits.MoveHelperOrder`). **Carrying in two**: a piece for two lies along the carry, low,
+> each holding an end (`Moving.holdOffset`, `MovingRules.pairLift`); his end is decided once at the lift and his lead
+> changes smoothly (`MoveHelperBrain.holdEnd`, `endLead`, `HoldLead.Rate`): no more jumping from side to side; it goes
+> up at once on "On three... lift!"; at the van's back only Load shows. **Danny and the van on the real model**: every
+> walk near it goes round it (`aroundVan`), he never stays inside it (`outOfVan`), steps aside when it reverses at him;
+> his right hand takes the door's handle getting in and pushes it getting out (`client/ArmPose.luau` on NPCs).
+> **The house doors**: they swing open visibly (0.35 s, quadratic, to `Doors.Wide` 110°), the fade waits until the
+> swing is mostly done (`WalkIn.swung`), a client that first sees a leaf while it opens swings it from `DoorOpenAt`.
+>
+> **8.7** (the owner: "customers should be players too … selling should make sense"): **trading between players**
+> (`server/PlayerTrade.luau`, `client/TradeUi.luau`, `Collection.transfer`, `Config.PlayerTrade`): at another
+> player's piece on show **Make an offer** (1× – 10× its value, − / + or 1× · 1.5× · 2× · 3×; "📖 New for your book!"),
+> the owner answers on the offer card (a queue with the visitors' offers; 45 s); a **FOR SALE** sign on a piece on show
+> (Set price at the stand or 🏷 in STOCK; "🏷 FOR SALE $X" on its tag) and **Buy $X** for everybody else, even while
+> the owner is on a move. The server re-checks everything in one step: the piece goes to the buyer's stock and book,
+> the seller gets the price minus an 8% ZDC fee (PlayerSale, PlayerBuy, TradeFee). The First Deal badge (id 0: off).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

@@ -19,7 +19,9 @@
 -- (decide's "come"; inPlace; approach: a fade-over only as the last resort). When you sit at the van's wheel he walks
 -- to its passenger door and rides with you (pickSeat, "ride", "seat"), out again when you get out (getOut). 8.5 his
 -- way to that door goes round the van, never through it (roundVan), and he fades into the seat only when the van is
--- far off or out of his reach a long while (rideBlink).
+-- far off or out of his reach a long while (rideBlink). 8.5.1 (the owner: "Danny STILL goes through it"): every way of
+-- his outside keeps off the van's outline (crossesVan: round it with roundVan), and he is never left inside it
+-- (outOfVan).
 --
 --   MoveHelperBrain.wanted(players, hired)     does a crew of this many players have him (Solo, Duo; a hired Danny stays
 --                                              with any crew of one or more)
@@ -47,11 +49,18 @@
 --                                              all taken, he follows the van on foot)
 --   MoveHelperBrain.getOut(driving, still, carOk)   8.3 seated in the van: out when nobody drives it and it stands, or at
 --                                              once when it is wrecked or gone
---   MoveHelperBrain.roundVan(x, z, gx, gz, halfX, halfZ, reach)   8.5 his way to the van's door in the van's own frame
+--   MoveHelperBrain.roundVan(x, z, gx, gz, halfX, halfZ, reach, margin?)   8.5 his way to the van's door in the van's own frame
 --                                              (its footprint |x| <= halfX, |z| <= halfZ): the next point (x, z) and the
 --                                              way's length: straight when it keeps RideMargin studs off the footprint,
 --                                              else round its corners (RideMargin out, the shorter way round; a corner
 --                                              within `reach` passed); from within the margin straight out first
+--                                              (8.5.1 `margin`: that many studs off instead of RideMargin)
+--   MoveHelperBrain.crossesVan(x, z, gx, gz, halfX, halfZ, pad)   8.5.1 does the way from (x, z) to (gx, gz) cross the
+--                                              van's footprint grown by `pad` (in its own frame)? (his outline guard:
+--                                              any way of his outside, RideHug)
+--   MoveHelperBrain.outOfVan(x, z, halfX, halfZ, pad, sideways)   8.5.1 (x, z) just out of the footprint grown by
+--                                              `pad`, through its nearer side (`sideways`: its left or right only, out
+--                                              of the way of a van driving along its length); a point outside as it is
 --   MoveHelperBrain.rideBlink(a, gap, dt)      8.5 his walk to the van to ride: true for the last resort (a fade into
 --                                              the seat): RideFar studs or more to go, or no closer by CallGain studs
 --                                              for RideBlink s
@@ -366,9 +375,10 @@ end
 -- halfX, |z| <= halfZ; he keeps RideMargin studs off it. The shortest way among the four corners of the footprint
 -- grown by the margin (a hair farther out: the way along a side stays outside): (x, z) of the next point and the way's
 -- length. A first corner within `reach` studs: the point after it (he walks on round it, no stop there). Within the
--- margin already (a nudge, the van parked next to him): straight out of its nearer side first.
-function MoveHelperBrain.roundVan(x: number, z: number, gx: number, gz: number, halfX: number, halfZ: number, reach: number): (number, number, number)
-	local m = cfg().RideMargin
+-- margin already (a nudge, the van parked next to him): straight out of its nearer side first. 8.5.1 `margin`: that many
+-- studs off the footprint instead (the outline guard's way to a goal nearer the van than RideMargin).
+function MoveHelperBrain.roundVan(x: number, z: number, gx: number, gz: number, halfX: number, halfZ: number, reach: number, margin: number?): (number, number, number)
+	local m = margin or cfg().RideMargin
 	local hx, hz = halfX + m, halfZ + m
 	local edge = 0.05
 	local before = 0
@@ -382,7 +392,7 @@ function MoveHelperBrain.roundVan(x: number, z: number, gx: number, gz: number, 
 		end
 		before = dist(x, z, ox, oz)
 		if before > reach then
-			local _, _, rest = MoveHelperBrain.roundVan(ox, oz, gx, gz, halfX, halfZ, reach)
+			local _, _, rest = MoveHelperBrain.roundVan(ox, oz, gx, gz, halfX, halfZ, reach, margin)
 			return ox, oz, before + rest
 		end
 		x, z = ox, oz -- (a step from its edge: on from there)
@@ -425,6 +435,26 @@ function MoveHelperBrain.roundVan(x: number, z: number, gx: number, gz: number, 
 		first = second
 	end
 	return xs[first], zs[first], before + best[6]
+end
+
+-- 8.5.1 (the owner: "Danny STILL goes through it"): his outline guard, for any way of his outside (server/
+-- MoveHelper.luau's go): does the way cross the footprint grown by `pad`?
+function MoveHelperBrain.crossesVan(x: number, z: number, gx: number, gz: number, halfX: number, halfZ: number, pad: number): boolean
+	return crosses(x, z, gx, gz, halfX + pad, halfZ + pad)
+end
+
+-- 8.5.1: (x, z) moved just out of the footprint grown by `pad` (a hair past it), through its nearer side, or its left
+-- or right side (`sideways`: a van driving along its length goes on past him); a point outside it as it is.
+function MoveHelperBrain.outOfVan(x: number, z: number, halfX: number, halfZ: number, pad: number, sideways: boolean?): (number, number)
+	local hx, hz = halfX + pad, halfZ + pad
+	local inX, inZ = hx - math.abs(x), hz - math.abs(z)
+	if inX <= 0 or inZ <= 0 then
+		return x, z
+	end
+	if sideways or inX <= inZ then
+		return (if x < 0 then -1 else 1) * (hx + 0.05), z
+	end
+	return x, (if z < 0 then -1 else 1) * (hz + 0.05)
 end
 
 -- 8.5 one look at his walk to the van to ride (`gap`: studs on foot to his spot at its door): true for the last

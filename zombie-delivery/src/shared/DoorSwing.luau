@@ -24,8 +24,10 @@
 --                                     for a double door): each one's middle and size, its hinge from its middle, its
 --                                     turn open (radians about +Y, signed); a piece at openness u stands at
 --                                     leaf * T(ox + hx, 0, oz + hz) * Ry(yaw * u) * T(-hx, 0, -hz)
---   DoorSwing.ease(t, opening) -> number   the swing's openness at t (0 … 1 of its time): opening fast then easing
---                                     into the stop (cubic out), shutting slow then quicker into the frame (quad in)
+--   DoorSwing.ease(t, opening) -> number   the swing's openness at t (0 … 1 of its time): opening quick then easing
+--                                     into the stop (8.5.1 quadratic out, was cubic: half open in under a third of
+--                                     its time read as a pop, the door gone), shutting slow then quicker into the
+--                                     frame (quad in)
 --   DoorSwing.dark(sx, sy, sz) -> (number, number, number)   the dark doorway's size (DoorDark): the leaf's whole face,
 --                                     thin, in its middle plane (hidden inside the leaf while it is shut; two halves'
 --                                     meet with no seam)
@@ -82,7 +84,7 @@ function DoorSwing.ease(t: number, opening: boolean): number
 	local x = math.clamp(t, 0, 1)
 	if opening then
 		local r = 1 - x
-		return 1 - r * r * r
+		return 1 - r * r
 	end
 	return x * x
 end

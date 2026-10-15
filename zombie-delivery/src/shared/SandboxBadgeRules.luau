@@ -22,6 +22,8 @@
 --                                         in it (paid.hot) → hotSale
 --   SandboxBadgeRules.fromAdded(item)     Collection.onAdded: a legendary piece came home → legendary
 --   SandboxBadgeRules.fromBought(id, level)   8.3: Upgrades.onBought: a level bought at the UPGRADES desk → firstUpgrade
+--   (8.7: firstDeal is a moment's too, with no rule here: server/PlayerTrade.luau gives it to the seller and the buyer of
+--   a deal between players, SandboxBadges.give)
 --   SandboxBadgeRules.stateOf(profile, shown)   a player's State from their profile (the moves' counter, the collection
 --                                         book, the upgrades, the van's paint) and whether a piece of theirs is on show
 --   SandboxBadgeRules.fromState(state)    firstMove, tenMoves, firstShow, legendary, fullBook, firstUpgrade, warehouse5,
@@ -82,6 +84,7 @@ SandboxBadgeRules.Order = {
 	"firstShow",
 	"firstSale",
 	"hotSale",
+	"firstDeal", -- 8.7: a piece sold to or bought from another player (server/PlayerTrade.luau gives it, both sides)
 	"legendary",
 	"fullBook",
 	"firstUpgrade",

@@ -18,7 +18,9 @@
 -- key press (Holster.localSwing; your MeleeAt is not played again).
 -- 3.10: getting into a car the right hand goes to the door's handle, getting out it pushes the door (the character's
 -- BoardAt / BoardReach and AlightAt / AlightReach attributes, server/Vehicles.luau; the curve is shared/Boarding.luau
--- reach), laid on the right arm like the swing; everybody sees it, yours too from the same attributes.
+-- reach), laid on the right arm like the swing; everybody sees it, yours too from the same attributes. 8.5.1: Danny's
+-- too (the same attributes on his body in workspace.Npcs, server/MoveHelper.luau's boardIn / boardOut: the owner's
+-- "go, open the door and get in"), followed like the people's carry and gestures.
 -- 5.7: a short gesture on top of everything (shared/Gestures.luau: wave, give, take, knock), from the Gesture /
 -- GestureAt attributes the server sets on characters and people (server/Npcs.luau Npcs.act): the receiver waves at the
 -- door and reaches for the piece, the courier holds it out or reaches for it, knocks at the door. Both arms, R15 and R6.
@@ -856,8 +858,8 @@ local npcHooks: { [Instance]: RBXScriptConnection } = {}
 local npcFolder: Instance? = nil
 
 local function npcCheck(model: Model)
-	if carryingOf(model) or model:GetAttribute("GestureAt") ~= nil then
-		npcActive[model] = true
+	if carryingOf(model) or model:GetAttribute("GestureAt") ~= nil or model:GetAttribute("BoardAt") ~= nil or model:GetAttribute("AlightAt") ~= nil then
+		npcActive[model] = true -- (8.5.1: Danny's hand on the van's door, BoardAt / AlightAt)
 	end
 end
 
@@ -872,7 +874,7 @@ local function watchNpcs(folder: Instance)
 		end
 		local model = child
 		npcHooks[model] = model.AttributeChanged:Connect(function(name: string)
-			if name == "Carrying" or name == "PhoneHeld" or name == "GestureAt" or name == "Gesture" then
+			if name == "Carrying" or name == "PhoneHeld" or name == "GestureAt" or name == "Gesture" or name == "BoardAt" or name == "AlightAt" then
 				npcCheck(model)
 			end
 		end)
@@ -940,9 +942,10 @@ local function step(dt: number)
 			end
 			local humanoid, root = Bodies.of(model)
 			if root and (root.Position - eye).Magnitude <= range then
-				poseCharacter(model, humanoid, false, 0, RAISE_TIME, dt, nil, nil, gestureOf(model))
+				poseCharacter(model, humanoid, false, 0, RAISE_TIME, dt, nil, reachOf(model), gestureOf(model)) -- (8.5.1 his reach)
 			end
-			if not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil then
+			if not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil and not swung[model]
+				and model:GetAttribute("BoardAt") == nil and model:GetAttribute("AlightAt") == nil then
 				npcActive[model] = nil
 			end
 		end
