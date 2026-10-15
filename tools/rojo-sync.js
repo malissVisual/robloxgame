@@ -22,7 +22,7 @@
  * v src/ a pro jistotu každých 5 s — po `git pull` už není potřeba nic
  * restartovat.
  *
- * SKRIPTY SE NEPŘEPISUJÍ, ALE VYTVÁŘEJÍ ZNOVU (8.6)
+ * SKRIPTY SE NEPŘEPISUJÍ, ALE VYTVÁŘEJÍ ZNOVU (8.7)
  * Plugin 7.7.0 zapisuje Source přes ScriptEditorService:UpdateSourceAsync
  * uvnitř task.spawn a hned hlásí úspěch (plugin/rbx_dom_lua/customProperties.lua).
  * Když se zápis do EXISTUJÍCÍHO skriptu ve Studiu nepovede nebo neprojeví,
@@ -1652,7 +1652,7 @@ function main() {
 		console.log(`  adresa:   http://${HOST}:${PORT}`);
 		console.log(
 			OPTIONS.inPlace
-				? "  režim:    --in-place (skripty se jen přepisují, jako před 8.6)"
+				? "  režim:    --in-place (skripty se jen přepisují, jako před 8.7)"
 				: "  režim:    skripty se po Connect i při změně vytvářejí znovu (--in-place to vypne)"
 		);
 		console.log("");

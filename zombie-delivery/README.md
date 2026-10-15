@@ -275,7 +275,7 @@ git pull + the sync.
 - After a pull, start the sync, then use Disconnect / Connect in Rojo. The Output must show the new version:
   `[Server] Zombie Delivery 6.8.1 is running`.
 
-**8.6, scripts are re-created, not overwritten:**
+**8.7, scripts are re-created, not overwritten:**
 - The Rojo plugin 7.7.0 writes a script's Source with `ScriptEditorService:UpdateSourceAsync` inside `task.spawn` and
   always reports success. When that write fails or does not take on an existing script, nothing notices it, and every
   Connect repeats the same write. This is the likeliest reason Studio kept old scripts three times in a row. Deleting
