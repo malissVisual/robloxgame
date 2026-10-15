@@ -7,8 +7,10 @@
 --     story, the note; its seed a new one once a move brought something home (8.3 economy: no reroll, a move called off
 --     with nothing home keeps its house, the owner leaving too). START → the solo lobby → LAUNCH at a board: the owner's own van
 --     (the Sprinter, its walk-in bay Config.Moving.Beds.sprinter), the house built with the card's seed.
---   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the Driver's
---     call parks the van at House.curb (its nose to the road, its back to the door).
+--   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the call (8.8:
+--     anybody's, no Driver) parks the van at House.curb (its nose to the road, its back to the door).
+--   * 8.8 no roles (tests/noroles_runtime_test.luau has the crew's): the solo planning has no role in it, Ann has none on
+--     the move (no MoveRole, the state's team only says the van was called), the van's Load holds no time.
 --   * Load at the back doors, and from inside the walk-in bay (its own Load, the back shut), every piece inside the
 --     bay; Danny on a solo move (8.3: for hire, not hired: a two-person Lift is dragged alone).
 --   * The drop-off: not another player's plot; the van's back in the owner's plot's unload circle: a trip, every piece
@@ -307,6 +309,7 @@ E.request(ann, "start", House.id)
 local lobby = E.last(ann, "MoveLobby", "lobby")
 check("START opens the solo lobby on the card (the Sprinter's bay)", lobby ~= nil and lobby.a ~= nil and lobby.a.canLaunch == true and lobby.a.card.name == House.name
 	and lobby.a.card.bed[1] == T.Beds.sprinter.Width and lobby.a.card.bed[2] == T.Beds.sprinter.Length)
+check("8.8 …no role in it (no Driver for a solo owner)", lobby.a.role == nil and lobby.a.members[1].role == nil and not lobby.a.doubles)
 E.place(ann, V3(House.door.x, 3, House.door.z))
 lobbyRequest(ann, "launch")
 check("LAUNCH away from every board: refused", E.built == 0 and string.find(E.lastNotice(ann), "board", 1, true) ~= nil, E.lastNotice(ann))
@@ -321,6 +324,8 @@ local firstSeed = seeds[1] -- (Ann's card's: Cid's card planned the second)
 check("…the house built with the card's seed (planned once)", #built == 1 and built[1] == firstSeed and #seeds == 2 and seeds[2] ~= firstSeed, `{built[1]} {firstSeed} {#seeds}`)
 step()
 local view = E.last(ann, "Moving", "state")
+check("8.8: no role on the move (no MoveRole), the state's team says only whether the van was called", ann:GetAttribute("MoveRole") == nil and view.a.team.called == false
+	and view.a.team.role == nil and view.a.team.crew == nil and view.a.team.free == nil and view.a.team.barricades == nil)
 check("the state: the drop-off is the owner's plot's unload circle, in the HUD's words; no horde", view.a.drop == "your warehouse" and view.a.dropOff.x == plot1.unload.x
 	and view.a.dropOff.z == plot1.unload.z and view.a.hordeAt == nil and view.a.endsAt == E.now + S.Time and view.a.mine == true)
 check("the GPS's house: the van's curb", view.a.house.x == House.curb.x and view.a.house.z == House.curb.z)
@@ -372,7 +377,7 @@ check("…into the interior", (E.rootOf(ann).Position - origin.Position).Magnitu
 local cameIn, ins = lastTold("enter")
 check("8.2: Moving.onEnterHouse: Ann came into her move's house", ins == 1 and cameIn.player == ann and cameIn.facts.owner == ann, ins)
 E.request(ann, "call")
-check("Call truck to door: the van at the house's curb, its nose to the road, its back to the door", flatDistance(truck.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 1
+check("Call truck to door (8.8: no Driver needed): the van at the house's curb, its nose to the road, its back to the door", flatDistance(truck.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 1
 	and truck.chassis.CFrame.LookVector.Z < -0.99, truck.chassis.Position)
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 check("…its back doors toward the house", cargoDoor.WorldPosition.Z > truck.chassis.Position.Z)
@@ -392,7 +397,8 @@ E.place(ann, cargoDoor.WorldPosition + V3(0, 0, 2))
 step()
 local load = promptIn(truck.model, "Load")
 local bayLoad = truck.chassis:FindFirstChild("MoveLoadBay"):FindFirstChildOfClass("ProximityPrompt")
-check("at the open back with the lamp: the doors' Load (the bay's waits)", load.Enabled and not bayLoad.Enabled and string.find(load.ActionText, "Lamp", 1, true) ~= nil
+check("at the open back with the lamp: the doors' Load (the bay's waits; 8.8: no hold, for anybody)", load.Enabled and not bayLoad.Enabled
+	and load.HoldDuration == 0 and bayLoad.HoldDuration == 0 and load:GetAttribute("MoveQuick") == nil and string.find(load.ActionText, "Lamp", 1, true) ~= nil
 	and string.find(load.ObjectText, "% full", 1, true) ~= nil, load.ObjectText)
 trigger(load, ann)
 step()

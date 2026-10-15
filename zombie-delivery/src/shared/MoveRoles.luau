@@ -39,6 +39,13 @@
 --     MoveRoles.wear(hp, zombies, seconds)         a barricade's hp after `zombies` bit it for `seconds`
 --   MoveRoles.Chat                                 the quick chat's six lines (an id, an icon, the words)
 --   MoveRoles.whyText(why)                         what the player is told
+-- 8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."): MoveRoles.on() says whether a move
+-- has roles at all: Config.MoveRoles.On, and only in the city (Config.Sandbox.On false: the sandbox never has them).
+-- Off, nobody has a role and every rule above answers as it does for nobody's: the lobby gives none and waits for none
+-- (newLobby, sync, setReady, canLaunch; choose and canSwitch refuse, "noroles"); the carry, the climb, the hits and the
+-- truck are everybody's alike (speedFactor, holdMode, climbFactor, weaponFactor, truckFactor: no Mover's pair alone or
+-- stairs, no Guard's damage, no Driver's truck); the call is anybody's, once a move (canCall: whoever is first); no
+-- barricade (canBarricade, "noroles"). The quick chat stays (it is no role's).
 
 local Config = require(script.Parent.Config)
 
@@ -66,6 +73,12 @@ local function tune(): any
 end
 
 MoveRoles.Order = tune().Order :: { string }
+
+-- 8.8: does a move have roles (Config.MoveRoles.On, the city only)? Read at every call: a test turns the world over.
+function MoveRoles.on(): boolean
+	local sandbox = (Config :: any).Sandbox
+	return tune().On == true and not (sandbox ~= nil and sandbox.On == true)
+end
 
 MoveRoles.Roles = {
 	driver = {
@@ -161,7 +174,9 @@ end
 
 function MoveRoles.newLobby(owner: number, contract: string, now: number): Lobby
 	local lobby: Lobby = { owner = owner, contract = contract, members = { owner }, roles = {}, ready = {}, openedAt = now }
-	lobby.roles[owner] = MoveRoles.freeRole(lobby.roles, lobby.members, owner)
+	if MoveRoles.on() then -- (8.8: no roles: nobody gets one)
+		lobby.roles[owner] = MoveRoles.freeRole(lobby.roles, lobby.members, owner)
+	end
 	return lobby
 end
 
@@ -172,7 +187,7 @@ end
 -- The members now (`ids`; the owner first, then whoever stays in the order they came, then the newcomers): a newcomer
 -- gets the first free role and is NOT READY, a leaver's role and READY go, and a role doubled when there is no room
 -- for doubles (the crew shrank under the roles' count) goes back to the later one's free role. True when anything
--- changed.
+-- changed. (8.8 no roles: the members and their READY only; a newcomer is NOT READY all the same.)
 function MoveRoles.sync(lobby: Lobby, ids: { number }): boolean
 	local list: { number } = { lobby.owner }
 	for _, id in lobby.members do
@@ -198,7 +213,16 @@ function MoveRoles.sync(lobby: Lobby, ids: { number }): boolean
 			changed = true
 		end
 	end
+	for id in lobby.ready do -- (8.8: without roles a leaver's READY goes by itself)
+		if not table.find(list, id) then
+			lobby.ready[id] = nil
+			changed = true
+		end
+	end
 	lobby.members = list
+	if not MoveRoles.on() then
+		return changed
+	end
 	for index, id in list do
 		local role = lobby.roles[id]
 		local doubled = false
@@ -222,7 +246,9 @@ function MoveRoles.sync(lobby: Lobby, ids: { number }): boolean
 end
 
 function MoveRoles.choose(lobby: Lobby, who: number, role: any): (boolean, string?)
-	if not isMember(lobby, who) then
+	if not MoveRoles.on() then
+		return false, "noroles"
+	elseif not isMember(lobby, who) then
 		return false, "member"
 	elseif not MoveRoles.get(role) then
 		return false, "role"
@@ -243,7 +269,7 @@ function MoveRoles.setReady(lobby: Lobby, who: number, on: boolean): (boolean, s
 		return false, "member"
 	elseif who == lobby.owner then
 		return false, "owner"
-	elseif on and not MoveRoles.get(lobby.roles[who]) then
+	elseif on and MoveRoles.on() and not MoveRoles.get(lobby.roles[who]) then
 		return false, "norole"
 	end
 	lobby.ready[who] = on
@@ -264,7 +290,7 @@ function MoveRoles.canLaunch(lobby: Lobby, who: number): (boolean, string?)
 	if who ~= lobby.owner then
 		return false, "owner"
 	end
-	for _, id in lobby.members do
+	for _, id in (if MoveRoles.on() then lobby.members else {}) :: { number } do -- (8.8 no roles: READY only)
 		local role = lobby.roles[id]
 		if not MoveRoles.get(role) then
 			return false, "norole"
@@ -283,7 +309,9 @@ end
 -- A role switch on a move: `last` the time of this player's last one (nil: none yet). Returns ok, why and, for a
 -- cooldown, the whole seconds to wait.
 function MoveRoles.canSwitch(roles: { [number]: string }, members: { number }, who: number, role: any, last: number?, now: number): (boolean, string?, number?)
-	if not MoveRoles.get(role) then
+	if not MoveRoles.on() then
+		return false, "noroles", nil
+	elseif not MoveRoles.get(role) then
 		return false, "role", nil
 	elseif roles[who] == role then
 		return false, "same", nil
@@ -298,9 +326,10 @@ function MoveRoles.canSwitch(roles: { [number]: string }, members: { number }, w
 end
 
 -- × the walk with a thing for `role`: `mode` MovingRules.mode's ("hand", "both", "pair", "drag"), `base` its factor
--- (MovingRules.speedFactor). A Mover carries a pair thing alone (drag) at Mover.Alone, the rest × Mover.Carry.
+-- (MovingRules.speedFactor). A Mover carries a pair thing alone (drag) at Mover.Alone, the rest × Mover.Carry. (8.8
+-- no roles: `base` for everybody.)
 function MoveRoles.speedFactor(role: string?, mode: string, base: number): number
-	if role ~= "mover" then
+	if role ~= "mover" or not MoveRoles.on() then
 		return base
 	end
 	local t = tune().Mover
@@ -310,9 +339,10 @@ function MoveRoles.speedFactor(role: string?, mode: string, base: number): numbe
 	return math.max(base, math.min(1, base * t.Carry))
 end
 
--- How the thing is held: a Mover holds a pair thing alone up in front ("pair"), not dragged low.
+-- How the thing is held: a Mover holds a pair thing alone up in front ("pair"), not dragged low. (8.8 no roles: a pair
+-- thing alone is dragged by everybody.)
 function MoveRoles.holdMode(role: string?, mode: string): string
-	if role == "mover" and mode == "drag" then
+	if role == "mover" and mode == "drag" and MoveRoles.on() then
 		return "pair"
 	end
 	return mode
@@ -326,8 +356,10 @@ function MoveRoles.climbing(rise: number, run: number): boolean
 	return rise >= tune().Mover.Rise * math.max(run, 0.5)
 end
 
+-- × the walk up a climb with it: Mover.Climb unless it is in one hand or a Mover carries it (8.8 no roles: everybody's
+-- Mover.Climb, as it was for anybody but a Mover).
 function MoveRoles.climbFactor(role: string?, mode: string): number
-	if role == "mover" or mode == "hand" then
+	if (role == "mover" and MoveRoles.on()) or mode == "hand" then
 		return 1
 	end
 	return tune().Mover.Climb
@@ -338,18 +370,19 @@ end
 local NOT_WEAPON: { [string]: boolean } = { car = true, other = true, buddy = true }
 
 function MoveRoles.weaponFactor(role: string?, cause: string?): number
-	if role ~= "guard" or (cause and NOT_WEAPON[cause]) then
+	if role ~= "guard" or not MoveRoles.on() or (cause and NOT_WEAPON[cause]) then
 		return 1
 	end
 	return tune().Guard.Damage
 end
 
 function MoveRoles.truckFactor(driverAtWheel: boolean): number
-	return if driverAtWheel then tune().Driver.TruckDamage else 1
+	return if driverAtWheel and MoveRoles.on() then tune().Driver.TruckDamage else 1
 end
 
+-- "Call truck to door": the Driver's, once a move (8.8 no roles: anybody's, once a move: whoever is first).
 function MoveRoles.canCall(role: string?, used: boolean): (boolean, string?)
-	if role ~= "driver" then
+	if role ~= "driver" and MoveRoles.on() then
 		return false, "driver"
 	elseif used then
 		return false, "called"
@@ -358,7 +391,9 @@ function MoveRoles.canCall(role: string?, used: boolean): (boolean, string?)
 end
 
 function MoveRoles.canBarricade(role: string?, placed: number): (boolean, string?)
-	if role ~= "guard" then
+	if not MoveRoles.on() then
+		return false, "noroles"
+	elseif role ~= "guard" then
 		return false, "guard"
 	elseif placed >= tune().Guard.Barricades then
 		return false, "nomore"
@@ -384,9 +419,10 @@ local WHY: { [string]: string } = {
 	same = "That is your role already.",
 	cooldown = "You switched a moment ago.",
 	driver = "Only the Driver calls the truck.",
-	called = "The truck was called once already this move.",
+	called = "The van was called once already this move.",
 	guard = "Only the Guard puts up barricades.",
 	nomore = "No barricades left.",
+	noroles = "Everybody does everything on a move.", -- (8.8: no roles)
 }
 
 function MoveRoles.whyText(why: string?): string

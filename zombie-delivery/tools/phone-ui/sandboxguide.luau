@@ -366,7 +366,7 @@ local function view(extra)
 		counts = { total = 2, out = 0, stars = 1, starsOut = 0, broken = 0, carried = 0, home = 2, delivered = 0, starsDelivered = 0, lost = 0 },
 		fill = 0, truck = true, backOpen = false, house = { x = SandboxMap.House.curb.x, z = SandboxMap.House.curb.z },
 		door = { x = SandboxMap.House.door.x, z = SandboxMap.House.door.z }, dropOff = { x = plot.unload.x, z = plot.unload.z },
-		inside = false, team = { role = "driver", called = false, barricades = 0, free = {}, switchAt = 0 }, trips = 0,
+		inside = false, team = { called = false }, trips = 0, -- (8.8: no roles: the van's call only)
 	}
 	for key, value in extra or {} do
 		v[key] = value

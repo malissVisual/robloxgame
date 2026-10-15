@@ -13,6 +13,9 @@
 --   * The quick chat (the remote's "chat", 1 … 6: MoveRoles.Chat; Config.Robust.Limits.QuickChat): the line goes to
 --     the sender's crew on a move (MoveLobby.moveCrew: Moving's) or in a lobby, never to anybody else;
 --     MoveLobby.onQuickChat hears it too (an AI helper may answer it).
+--   * 8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."; MoveRoles.on: the city's only):
+--     without roles the lobby is the crew, READY and LAUNCH: nobody gets or picks a role (the remote's "role" is
+--     refused), the view carries none, a newcomer hears only to get READY.
 --   Everything is checked here; the remote (MoveLobby) is rate limited (Config.Robust.Limits.MoveLobby).
 --   MoveLobby.open(owner, card) -> string?   opens the owner's lobby for that contract card (or shows it again)
 --   MoveLobby.close(owner, why?)              closes it; everybody in it hears `why`
@@ -100,16 +103,17 @@ function MoveLobby.of(player: Player): Entry?
 	return nil
 end
 
--- What one player sees of the lobby (client/MoveLobbyUi.luau).
+-- What one player sees of the lobby (client/MoveLobbyUi.luau). (8.8 no roles: no role, no doubles in it.)
 local function viewFor(entry: Entry, player: Player): { [string]: any }
 	local lobby = entry.lobby
+	local roles = MoveRoles.on()
 	local members = {}
 	for _, member in entry.players do
 		local id = member.UserId
 		table.insert(members, {
 			userId = id,
 			name = member.DisplayName,
-			role = lobby.roles[id],
+			role = if roles then lobby.roles[id] else nil,
 			ready = id == lobby.owner or lobby.ready[id] == true,
 			owner = id == lobby.owner,
 			you = member == player,
@@ -122,12 +126,12 @@ local function viewFor(entry: Entry, player: Player): { [string]: any }
 		mine = player == entry.owner,
 		card = entry.card,
 		members = members,
-		role = lobby.roles[player.UserId],
+		role = if roles then lobby.roles[player.UserId] else nil,
 		ready = lobby.ready[player.UserId] == true,
 		canLaunch = ok,
 		why = if ok then nil else MoveRoles.whyText(why),
 		waiting = MoveRoles.waiting(lobby),
-		doubles = MoveRoles.doubles(#lobby.members),
+		doubles = roles and MoveRoles.doubles(#lobby.members),
 		maxCrew = Config.Crew.MaxMembers + 1,
 		closesAt = lobby.openedAt + T.Lobby.Timeout,
 	}
@@ -165,7 +169,7 @@ local function sync(entry: Entry)
 		if not table.find(entry.players, new) then
 			setAttribute(new, entry.owner.UserId)
 			if new ~= entry.owner then
-				say(new, `📋 {entry.owner.DisplayName} is planning a move: {entry.card.name}. Pick your role and get READY.`)
+				say(new, `📋 {entry.owner.DisplayName} is planning a move: {entry.card.name}. {if MoveRoles.on() then "Pick your role and get READY." else "Get READY."}`)
 			end
 			entry.dirty = true
 		end

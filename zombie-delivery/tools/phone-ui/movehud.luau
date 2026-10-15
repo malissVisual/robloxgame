@@ -10,6 +10,9 @@
 -- while T is held stays shut; the key O (not Tab) and a taken key left alone; ESC; the GPS cleared only when it is still
 -- the move's; the late grace's countdown; the panel following a resize; a computer's list under the player list.
 -- The city's move screen (Config.Sandbox.On false: its GPS); 8.0.1: in the sandbox the move sets no GPS at all.
+-- 8.8 no roles (the sandbox; the city's roles above): no role on the panel, the list starts with THE VAN (CALL VAN TO
+-- DOOR for anybody, greyed once called; a stray role in a state shows nothing), the planning is the crew without PICK
+-- YOUR ROLE: no role's word or icon anywhere in it.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's) ─────────────────────────
@@ -508,5 +511,70 @@ check("… the city's words as before (a phone with a gamepad: still \"(E)\")", 
 moving.OnClientEvent:Fire("state", nil)
 M.touch, M.gamepad = false, false
 Config.Sandbox.On = wasSandbox
+
+-- ── 8.8 no roles (the sandbox): the panel, the list, the planning ─────────────
+do
+	local was = Config.Sandbox.On
+	Config.Sandbox.On = true
+	local function texts(root)
+		local words = {}
+		for _, object in all(root, function(o)
+			return type(o.Text) == "string" and o.Text ~= ""
+		end) do
+			table.insert(words, object.Text)
+		end
+		return table.concat(words, " | ")
+	end
+	local function roleFree(said)
+		local upper = string.upper(said)
+		return string.find(upper, "ROLE", 1, true) == nil and string.find(upper, "DRIVER", 1, true) == nil and string.find(upper, "MOVER", 1, true) == nil
+			and string.find(upper, "GUARD", 1, true) == nil and string.find(said, "💪", 1, true) == nil and string.find(said, "🛡", 1, true) == nil
+	end
+	moving.OnClientEvent:Fire("state", view({ team = { called = false } }))
+	check("8.8 the sandbox: no role on the panel (no role line, no role's word or icon)", panel.Visible and roleFree(texts(panel)), texts(panel))
+	press(panel)
+	local sheet = named(M.gui, "MoveList")
+	local van = sheet and named(sheet, "Van")
+	local buttons = if van then all(van, function(o)
+		return o.Name == "Ability" and o.ClassName == "TextButton"
+	end) else {}
+	check("…the list starts with THE VAN: CALL VAN TO DOOR, no YOUR ROLE, no SWITCH, no barricade", van ~= nil and named(sheet, "Role") == nil and named(sheet, "Switch") == nil
+		and named(sheet, "SwitchWait") == nil and #buttons == 1 and buttons[1].Text == "📍 CALL VAN TO DOOR" and roleFree(texts(sheet)), sheet and texts(sheet))
+	local before = #sentOn("Moving")
+	press(buttons[1])
+	local sent = sentOn("Moving")
+	check("…its button calls the van, whoever you are (the remote's \"call\")", #sent == before + 1 and sent[#sent][1] == "call")
+	moving.OnClientEvent:Fire("state", view({ team = { called = true } }))
+	sheet = named(M.gui, "MoveList")
+	van = sheet and named(sheet, "Van")
+	buttons = if van then all(van, function(o)
+		return o.Name == "Ability" and o.ClassName == "TextButton"
+	end) else {}
+	before = #sentOn("Moving")
+	if buttons[1] then
+		press(buttons[1])
+	end
+	check("…once called: VAN CALLED (ONCE A MOVE), a tap sends nothing", #buttons == 1 and buttons[1].Text == "🚐 VAN CALLED (ONCE A MOVE)" and #sentOn("Moving") == before,
+		buttons[1] and buttons[1].Text)
+	moving.OnClientEvent:Fire("state", view({ team = { role = "guard", called = false, barricades = 2, free = { "driver" }, switchAt = 0 } }))
+	sheet = named(M.gui, "MoveList")
+	check("…a stray role in a state shows nothing of it (no Guard, no barricade, no switch)", sheet ~= nil and named(sheet, "Van") ~= nil and named(sheet, "Role") == nil
+		and named(sheet, "Switch") == nil and roleFree(texts(sheet)) and roleFree(texts(panel)), sheet and texts(sheet))
+	MovingHud.closeAll()
+	moving.OnClientEvent:Fire("state", nil)
+	lobbyRemote.OnClientEvent:Fire("lobby", {
+		card = { id = "sandbox_house", name = "The Old Chalet", icon = "🏡", client = "The Hubers", address = "the end of Main Street", estimate = 9000, stars = { "a" }, items = 20, time = 1500, hordeAt = 0 },
+		members = { { name = "Courier", owner = true, you = true, ready = true }, { name = "Ann", ready = false } },
+		maxCrew = 4, mine = true, canLaunch = false, waiting = 1, ready = false,
+	})
+	M.resume()
+	local lobby = named(M.gui, "MoveLobby")
+	local card = lobby and named(lobby, "Card")
+	check("…the planning: the crew (LEADER, NOT READY), LAUNCH waits; no PICK YOUR ROLE, no role cards, no role's word or icon", card ~= nil and named(card, "Member21") ~= nil
+		and named(card, "Member22") ~= nil and named(card, "Roles") == nil and named(card, "Role_driver") == nil and named(card, "Launch") ~= nil
+		and string.find(named(card, "Launch").Text, "WAITING FOR 1", 1, true) ~= nil and roleFree(texts(card)), card and texts(card))
+	lobbyRemote.OnClientEvent:Fire("lobby", nil)
+	Config.Sandbox.On = was
+end
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL MOVEHUD CHECKS PASSED")

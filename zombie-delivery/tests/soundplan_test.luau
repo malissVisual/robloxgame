@@ -264,6 +264,8 @@ check("the sandbox: no city places (no fountain at Map.Park)", not SoundPlan.cit
 check("… no pond's water at the park's middle (the sandbox's Main Street)", SoundPlan.waterTop(park.x + 10, park.z) == nil and not SoundPlan.inWater(park.x + 18.5, -0.1, park.z))
 check("… steps where the pond was (the meadow by Main Street, its asphalt): grass and concrete, not water", SoundPlan.surface("Grass", park.x + 18.5, 0, park.z) == "grass" and SoundPlan.surface("Asphalt", park.x + 12, -3.5, park.z) == "concrete")
 check("… no river, no sea", SoundPlan.waterTop(riverX, 0) == nil and SoundPlan.waterTop(Map.Sea.x0 + 50, 0) == nil)
+check("8.8 no roles in the sandbox: a two-person piece alone is dragged by anybody (a stray Mover in the state too)", SoundPlan.dragged(alone, 3)
+	and SoundPlan.dragged(state({ team = { role = "mover" } }, alone.items), 3))
 check("… a plot's concrete where the park's lawn was: concrete", not SoundPlan.parkLawn(lawnX, lawnZ) and SoundPlan.surface("Concrete", -65, 0, -85) == "concrete")
 check("… the materials still say their surface (terrain water, grass, planks)", SoundPlan.surface("Water", 0, 0, 0) == "water" and SoundPlan.surface("Grass", 0, 0, 0) == "grass" and SoundPlan.surface("WoodPlanks", 0, 0, 0) == "wood")
 
