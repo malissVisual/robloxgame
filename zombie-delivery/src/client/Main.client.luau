@@ -28,8 +28,9 @@ end
 --   the sounds, the admin              Sounds; AdminPanel, AdminFly, PerfOverlay (the panel's performance overlay)
 --   the move's horde                   ZombieAnimator, ZombieLife, ZombieFx, EnemyOutline
 --   the moves                          MovingHud (its story cards and the door's fade: MoveStoryUi, Fade, no start of
---                                      their own), MoveHelperHud, MoveLobbyUi, QuickChat, CarryGripUi, and CrewPanel
---                                      (the planning's + INVITE: a move's crew is server/Crew.luau's)
+--                                      their own), MoveHelperHud, DannyBubble (8.6: what Danny does, over his head),
+--                                      MoveLobbyUi, QuickChat, CarryGripUi, and CrewPanel (the planning's + INVITE: a
+--                                      move's crew is server/Crew.luau's)
 --   the HUD                            Hud (the city's parts hidden: client/Hud.luau ── Sandbox ──) and KeyHints (the
 --                                      move's keys and the car's only)
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
@@ -178,6 +179,7 @@ if Config.Sandbox.On then
 	safely("CrashFx", require(Client.CrashFx).start)
 	safely("MovingHud", MovingHud.start)
 	safely("MoveHelperHud", require(Client.MoveHelperHud).start)
+	safely("DannyBubble", require(Client.DannyBubble).start) -- 8.6: what Danny does, over his head (his move's crew only)
 	safely("MoveLobbyUi", MoveLobbyUi.start)
 	safely("QuickChat", QuickChat.start)
 	safely("CarryGripUi", require(Client.CarryGripUi).start)

@@ -123,6 +123,22 @@
 --   MoveHelperBrain.aside(x, z, door)          a place in a doorway (Aside's zone): the place beside it, along the wall
 --                                              (he never stands where you walk through); else the place itself
 --   MoveHelperBrain.doing(action, name, full)  what he does, in words (client/MoveHelperHud.luau's line)
+-- 8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
+-- him, for example, put it down on the ground, or get out of the car"):
+--   MoveHelperBrain.bubble(action, name, full, price)   the same action's words over his head (client/DannyBubble.luau):
+--                                              (an icon and short words, "📦 Carrying: Sofa → van", "🧑‍🔧 For hire ·
+--                                              $100"; alert: the movers' orange, he needs you or is in trouble). One
+--                                              table (Doing) holds both: the bubble and the status line never disagree
+--   MoveHelperBrain.listChip(count)            the bubble's counter: "list: 3" (nil: his list is empty)
+--   MoveHelperBrain.orderCheck(kind, o)        an order of the crew checked (an Order): "ok" | why: "hire" | "down" |
+--                                              "empty" (PUT IT DOWN with nothing in his hands) | "notin" (GET OUT, him
+--                                              not in the van, not getting in, not on his way to it) | "leaving"
+--                                              (getting out already) | "moving" (the van rolls) | "unknown"
+--   MoveHelperBrain.orders(o)                  the orders that apply now ("putdown" | "getout", comma-separated; nil:
+--                                              none): his card's buttons, the orders menu, the status line's GET OUT
+--   MoveHelperBrain.orderList(text)            that text as a list (unknown kinds dropped)
+--   MoveHelperBrain.orderWords(kind)           a button's words: "⬇ PUT IT DOWN", "🚪 GET OUT"
+--   MoveHelperBrain.orderWhy(why)              a refusal's notice ("Danny isn't carrying anything."), nil: none
 --   MoveHelperBrain.Lines                      what he says (a speech bubble over his head; plain text)
 --   MoveHelperBrain.line(key, sandbox)         his line for `key` (8.0 SANDBOX: SandboxLines' where the test world has
 --                                              no Wall and no depot)
@@ -799,35 +815,147 @@ function MoveHelperBrain.trained(owner: any): number
 	return UpgradeRules.dannySpeed(if ok then level else nil)
 end
 
--- ── Words ──────────────────────────────────────────────────────────────────
+-- ── 8.6 the crew's direct orders ─────────────────────────────────────────
 
-local DOING: { [string]: string } = {
-	down = "Down: back at the van soon",
-	hold = "Carrying the %s with you",
-	flee = "Running from the zombies",
-	help = "Coming to lift the %s",
-	deliver = "Carrying the %s to the van",
-	open = "Opening the van's back",
-	fetch = "Going for the %s",
-	wait = "Waiting at the van",
-	come = "Coming to lift the %s with you", -- 8.3 your call
-	ready = "At the %s: on three!",
-	needs = "Waiting for you at the %s", -- 8.3 a two-person piece of his list
-	offer = "Waiting by the van for hire",
-	ride = "Getting in the van",
-	seat = "Riding in the van",
-	alight = "Getting out of the van", -- 8.5 (his way out at its door)
+-- 8.6 what the server knows of him when an order comes (server/MoveHelper.luau fills it).
+export type Order = {
+	hired: boolean, -- somebody of the crew hired him for this move
+	down: boolean, -- down (or no body yet)
+	holding: string?, -- nil, "hand" (a piece in his arms alone) or "pair" (the other end of a piece a player carries)
+	seated: boolean, -- in the van's passenger seat
+	boarding: boolean, -- getting in (8.5: the slide in through its door)
+	riding: boolean, -- on his way to the van's door to ride (MoveHelperBrain.decide's "ride")
+	leaving: boolean, -- getting out already (8.5: the slide out)
+	moving: boolean, -- the van faster than Config.Cargo.BoardMaxSpeed
 }
 
-function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string
-	if action == "wait" and full then
-		return "Waiting: the van is full"
+-- (the orders in the order the clients show them)
+local ORDERS = { "putdown", "getout" }
+
+function MoveHelperBrain.orderCheck(kind: string, o: Order): string
+	if kind ~= "putdown" and kind ~= "getout" then
+		return "unknown"
+	elseif not o.hired then
+		return "hire"
+	elseif o.down then
+		return "down"
+	elseif kind == "putdown" then
+		return if o.holding == "hand" or o.holding == "pair" then "ok" else "empty"
+	elseif o.leaving then
+		return "leaving"
+	elseif not (o.seated or o.boarding or o.riding) then
+		return "notin"
+	elseif o.moving and (o.seated or o.boarding) then
+		return "moving"
 	end
-	local text = DOING[action] or "Waiting at the van"
+	return "ok"
+end
+
+function MoveHelperBrain.orders(o: Order): string?
+	local out: { string }? = nil
+	for _, kind in ORDERS do
+		local verdict = MoveHelperBrain.orderCheck(kind, o)
+		if verdict == "ok" or verdict == "moving" then -- (a van that rolls: GET OUT shows, its press says to stop it)
+			out = out or {}
+			table.insert(out :: { string }, kind)
+		end
+	end
+	return if out then table.concat(out, ",") else nil
+end
+
+function MoveHelperBrain.orderList(text: any): { string }
+	local out: { string } = {}
+	if type(text) ~= "string" then
+		return out
+	end
+	for kind in string.gmatch(text, "[^,]+") do
+		if table.find(ORDERS, kind) then
+			table.insert(out, kind)
+		end
+	end
+	return out
+end
+
+local ORDER_WORDS: { [string]: string } = {
+	putdown = "⬇ PUT IT DOWN",
+	getout = "🚪 GET OUT",
+}
+
+function MoveHelperBrain.orderWords(kind: string): string
+	return ORDER_WORDS[kind] or string.upper(kind)
+end
+
+local ORDER_WHY: { [string]: string } = {
+	hire = "Hire %s first: then he takes your orders.",
+	down = "%s is down: he is back at the van soon.",
+	empty = "%s isn't carrying anything.",
+	notin = "%s isn't in the van.",
+	leaving = "%s is getting out already.",
+	moving = "Stop the van first: then %s can get out.",
+}
+
+function MoveHelperBrain.orderWhy(why: string): string?
+	local text = ORDER_WHY[why]
+	return if text then string.format(text, cfg().Name) else nil
+end
+
+-- ── Words ──────────────────────────────────────────────────────────────────
+
+-- What he does: the status line's words (line), and 8.6 the bubble's over his head (an icon, its short words; alert:
+-- the movers' orange, he needs you or something is wrong), one entry each so the two never disagree. "%s" is the piece.
+export type Doing = { line: string, icon: string, short: string, alert: boolean? }
+
+local DOING: { [string]: Doing } = {
+	down = { line = "Down: back at the van soon", icon = "🤕", short = "Down: back at the van soon", alert = true },
+	hold = { line = "Carrying the %s with you", icon = "🤝", short = "Carrying: %s with you" },
+	flee = { line = "Running from the zombies", icon = "🏃", short = "Running from a zombie", alert = true },
+	help = { line = "Coming to lift the %s", icon = "🏃", short = "Coming to lift: %s" },
+	deliver = { line = "Carrying the %s to the van", icon = "📦", short = "Carrying: %s → van" },
+	open = { line = "Opening the van's back", icon = "🔓", short = "Opening the van's back" },
+	fetch = { line = "Going for the %s", icon = "🚶", short = "Going for: %s" },
+	wait = { line = "Waiting at the van", icon = "💤", short = "Waiting by the van" },
+	full = { line = "Waiting: the van is full", icon = "💤", short = "Waiting: the van is full" }, -- (wait, the van full)
+	come = { line = "Coming to lift the %s with you", icon = "🏃", short = "Coming to lift: %s" }, -- 8.3 your call
+	ready = { line = "At the %s: on three!", icon = "💪", short = "At the %s: on three!", alert = true },
+	needs = { line = "Waiting for you at the %s", icon = "⏳", short = "Needs you: %s", alert = true }, -- 8.3 his list's two-person piece
+	offer = { line = "Waiting by the van for hire", icon = "🧑‍🔧", short = "For hire" },
+	ride = { line = "Getting in the van", icon = "🚐", short = "Getting in the van" },
+	seat = { line = "Riding in the van", icon = "🪑", short = "Riding" },
+	alight = { line = "Getting out of the van", icon = "🚪", short = "Getting out of the van" }, -- 8.5 (his way out at its door)
+	stay = { line = "Staying out of the van (your order)", icon = "✋", short = "Staying out of the van" }, -- 8.6 GET OUT
+}
+MoveHelperBrain.Doing = DOING :: { [string]: Doing } -- (read only: the tests go through every action)
+
+local function words(action: string, full: boolean?): Doing
+	if action == "wait" and full then
+		return DOING.full
+	end
+	return DOING[action] or DOING.wait
+end
+
+local function named(text: string, name: string?): string
 	if string.find(text, "%s", 1, true) then
 		return string.format(text, name or "piece")
 	end
 	return text
+end
+
+function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): string
+	return named(words(action, full).line, name)
+end
+
+function MoveHelperBrain.bubble(action: string, name: string?, full: boolean?, price: number?): (string, boolean)
+	local w = words(action, full)
+	local short = named(w.short, name)
+	if action == "offer" and price then
+		short = `{short} · {UpgradeRules.money(price)}`
+	end
+	return `{w.icon} {short}`, w.alert == true
+end
+
+function MoveHelperBrain.listChip(count: any): string?
+	local n = if finite(count) then math.max(0, math.floor(count)) else 0
+	return if n > 0 then `list: {n}` else nil
 end
 
 MoveHelperBrain.Lines = {
@@ -853,6 +981,10 @@ MoveHelperBrain.Lines = {
 	callOff = "No problem, boss.", -- 8.3 a call you called off
 	ride = "Wait up, I'm riding with you!", -- 8.3 riding with you
 	out = "Back to work!",
+	putDown = "Setting it down.", -- 8.6 the crew's orders: PUT IT DOWN
+	putTogether = "Easy... setting it down.", -- (a two-person piece: both ends at once)
+	getOut = "Hopping out, boss.", -- GET OUT
+	stayOut = "Okay, I'll stay out.", -- (on his way to the van: he stays out)
 } :: { [string]: string }
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.

@@ -6,7 +6,8 @@ recorder (MoveHelperCard's RaycastParams the check's stand-in: mock.RaycastParam
 recorder's, mock.now, as client/OfferCard.luau's: the tap that closed the card swallowed a moment), client/CarryGripUi.luau
 a stand-in (its active(): the check's `open`), and the check itself. 8.5: client/DannyOrders.luau (Danny's clipboard,
 orders mode) on the same recorder, its clock the recorder's too, and tools/phone-ui/dannyorders.luau (its line at the
-bottom and its touch 📋 button) beside the card's check."""
+bottom and its touch 📋 button) beside the card's check. 8.6: client/DannyBubble.luau (what Danny does, over his head)
+on the same recorder (the card's check drives it: its words, its place over his name tag, its fade)."""
 from pathlib import Path
 
 from sandboxenv import HERE, PREFIX, ROOT, local, sandbox_env
@@ -14,7 +15,7 @@ from sandboxenv import HERE, PREFIX, ROOT, local, sandbox_env
 
 def dannycard_env(dest: Path):
     sandbox_env(dest)
-    for name in ("MoveHelperCard", "MoveHelperHud", "TopBlocks", "DannyOrders"):
+    for name in ("MoveHelperCard", "MoveHelperHud", "TopBlocks", "DannyOrders", "DannyBubble"):
         extra = "local RaycastParams = mock.RaycastParams\n" if name == "MoveHelperCard" else ""
         text = local((ROOT / f"src/client/{name}.luau").read_text())
         if name in ("MoveHelperCard", "DannyOrders"):
