@@ -1,8 +1,8 @@
 # 8.4 SANDBOX: Roblox badges, the setup guide
 
-The sandbox can award twelve Roblox badges for its milestones, such as the first move, the first sale or a full
+The sandbox can award thirteen Roblox badges for its milestones, such as the first move, the first sale or a full
 collection book. The code is ready, but every badge is **off** until you create it on Roblox and paste its id into the
-game. A badge whose id is `0` is never awarded, and nothing breaks. You can set up all twelve badges at once, a few at a
+game. A badge whose id is `0` is never awarded, and nothing breaks. You can set up all thirteen badges at once, a few at a
 time, or none.
 
 ## The badges
@@ -18,6 +18,7 @@ Type the **name** and the **description** into Roblox's form exactly as written 
 | `firstShow` | On Display | Put a piece on a display stand in your warehouse. | A piece of yours stands on one of your display stands. |
 | `firstSale` | First Sale | Sell a piece from your collection. | Any sale: one piece, SELL… for many, or a visitor's offer accepted. |
 | `hotSale` | Hot Seller | Sell one of today's hot items. | A sale with a piece of today's hot kind in it (the market). |
+| `firstDeal` | First Deal | Sell a piece to another player, or buy one from them. | A deal between two players (an offer accepted, or a FOR SALE sign bought, from 8.7 on). Both of them get it. |
 | `legendary` | Legendary Find | Bring home a legendary piece. | A legendary piece comes home, or the collection book already holds one. |
 | `fullBook` | Completionist | Find every piece in the collection book. | Every piece of the book is found. |
 | `firstUpgrade` | Upgraded | Buy your first upgrade. | Anything bought at the UPGRADES desk, including a bigger warehouse. |
@@ -27,8 +28,8 @@ Type the **name** and the **description** into Roblox's form exactly as written 
 
 Milestones a player reached earlier also count. The game checks them each time the player joins. If you set up the
 Completionist badge later, a player whose book is already full gets it on their next visit. The exceptions are First
-Sale, Hot Seller and Handle With Care. They happen at a single moment, so only the next sale, the next hot sale or the
-next clean move awards them. Top Mover is checked whenever the board can change: a collection changes, or a player joins.
+Sale, Hot Seller, First Deal and Handle With Care. They happen at a single moment, so only the next sale, the next hot sale, the
+next deal between players or the next clean move awards them. Top Mover is checked whenever the board can change: a collection changes, or a player joins.
 
 ## 1. Create a badge on Roblox
 
@@ -43,7 +44,7 @@ next clean move awards them. Top Mover is checked whenever the board can change:
    - **Name** and **Description**: copy them from the table above.
    - Leave the badge **enabled**.
 5. **The price:** creating a badge can cost Robux. Roblox has also given a few free badges a day for each experience.
-   These rules change, so check what the **Create a Badge** page says right now before you create all twelve. If
+   These rules change, so check what the **Create a Badge** page says right now before you create all thirteen. If
    only a few are free today, create the most important ones first, for example First Move, First Sale and On Display,
    and the rest on later days.
 6. Click **Create**. The badge now appears in the list.

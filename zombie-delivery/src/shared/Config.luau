@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.5.2"
+Config.Version = "8.7"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5639,8 +5639,11 @@ Config.Robust = {
 		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
+		MoveHelperOrder = 3, -- 8.6: an order to Danny, PUT IT DOWN / GET OUT (the Moving remote's ("helper", "putdown" | "getout"))
 		VanPaint = 4, -- 8.3: the VanPaint remote's state / buy / wear (the PAINT shop: server/VanPaint.luau)
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
+		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
+		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 	},
 }
 
@@ -6238,6 +6241,10 @@ Config.CarryGrip = {
 --                     value delivered / XpPerValue + XpPerStar × the stars, at most XpMax (7.0 review: a one-lamp move
 --                     is no full move); the crew within Present studs of the truck shares it (Economy.crewSplit)
 --   Tether / Grace    a pair thing's helper stays within Tether studs of its end; farther for Grace s, it goes down
+--   PairLift          8.6 carried in two (the owner: "the table seems to float between them"; MovingRules.pairLift,
+--                     server/Moving.luau's holdOffset): lengthwise (its long side along the carry: the two at its ends)
+--                     and low: its grips (two thirds of its height, Grip studs over its bottom at most: FurnitureLooks
+--                     grips) Hands studs under the carriers' roots, its bottom Clear studs over the floor at least
 --   Pace              a carried thing that moves faster than the carry's walk × Factor + Slack goes down (a teleport)
 --   Horde / Roam      the horde round the house at HordeAt (Count in Bursts, Every s apart, Near … Far studs from the
 --                     door), the few zombies round it while somebody is outside within Range
@@ -6288,6 +6295,16 @@ Config.CarryGrip = {
 --                     there within Ahead s at your walk (the server sees you a moment late and looks every Every s):
 --                     the fade out starts at once while you walk on into the hall (onto the porch inside), the move
 --                     behind the black, and you arrive still walking. Dwell stays for standing at a door facing it
+--                     8.5.1 (the owner: "the doors, when you go into the house, just disappear. I'd like them to open
+--                     nicely"; on the real house, rendered from a player's camera: 0.25 s of a cubic ease put the leaves
+--                     half open in 50 ms and edge-on to the camera, square to the wall, by 150 ms: a black doorway with
+--                     two slivers): Open 0.35 s along shared/DoorSwing.luau's quadratic ease (seen over its whole time),
+--                     the sandbox house's leaves open Wide degrees (past square, folded back toward the wall: their
+--                     faces stay in sight of whoever walks up), walking through waits for Seen × Open s of the leaf's
+--                     swing before the fade (a walk from just beside the door: the swing mostly done before the screen
+--                     darkens; from the approach it opened long before), and a client that first sees a leaf already
+--                     opening (it streamed in, or the attribute came with its tag) swings it on from where it is now
+--                     (its DoorOpenAt, the server's time it opened) instead of standing it open at once
 --   Pack              the truck bed's packing (shared/MovingRules.luau fit): a thing rests on the highest top under
 --                     it, at least Support of its footprint within Level studs of that (the floor: all of it) round its
 --                     middle (not on one corner). The place it takes has the lowest score: − Contact × the share of its
@@ -6386,6 +6403,7 @@ Config.Moving = {
 	Present = 250,
 	Tether = 6,
 	Grace = 1.5,
+	PairLift = { Hands = 0.3, Grip = 2.4, Clear = 0.5 }, -- 8.6
 	Pace = { Factor = 1.8, Slack = 8 },
 	Horde = {
 		Count = 14,
@@ -6402,12 +6420,13 @@ Config.Moving = {
 		Dwell = 0.15, -- (8.3: 0.15, was 0.25: the leaf's Open comes first; 8.5: for standing at a door, walking through needs none)
 		-- 8.3 the leaves and the trip (server/Moving.luau's WalkIn and travel, client/WalkDoors.luau, client/Fade.luau)
 		-- (8.5: Approach 12 and ApproachSide 3, were 8 and 2; Open 0.25, was 0.35: the leaf open before you get there)
-		Swing = true, Approach = 12, ApproachSide = 3, Angle = 95, Open = 0.25, Close = 0.45, Shut = 1.2,
+		Swing = true, Approach = 12, ApproachSide = 3, Angle = 95, Open = 0.35, Close = 0.45, Shut = 1.2, -- (8.5.1: Open 0.35, was 0.25)
 		FadeOut = 0.25, Margin = 0.1, Stream = 2, Wait = 1.5, Arrive = 6, Dark = 0.15, FadeIn = 0.35,
 		Sound = { Open = 0.55, Shut = 0.4, ShutPitch = 0.75, Range = 70 },
 		-- 8.5 walking through (server/Moving.luau's WalkIn.coming and check; server/SandboxWorld.luau's door halls)
 		Lead = 0.9, Cross = 0, Ahead = 0.15,
 		Hall = { Depth = 11, Color = { 24, 18, 14 } :: { number } },
+		Wide = 110, Seen = 0.6, -- 8.5.1 (the doors opening nicely)
 	},
 	Slots = 6,
 	Tick = 0.2,
@@ -6668,6 +6687,13 @@ Config.MoveStory = {
 --                      root's height: your jump never lifts him; a floor farther off, a roof or a ceiling, is not his)
 --   HoldResponse       the Responsiveness of the constraints that keep him there (AlignPosition / AlignOrientation on
 --                      his root); his own walk is off meanwhile (Npcs.carried)
+--   8.6 (the owner: "he teleports from side to side"; a screenshot: Danny beside the Dining Table, at its side): his end is
+--   the face of the piece across it from you, decided once as the hold starts, in the piece's own frame (MoveHelperBrain.
+--   holdEnd; a crew mate's too, server/PairHold.luau): carried in two the piece lies along the carry (Config.Moving
+--   PairLift), so that is the far end of its length; its turn, a square-ish piece, a lag never make it another end
+--   Edge               carrying in two, the hands of both (yours and the far end's: client/ArmPose.luau's box, the
+--                      CarryAt / CarrySize attributes) on its end's edge at its grips' height: Width across at most,
+--                      Height, Depth (studs)
 --   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
 --   PairCarry.luau the leader's steering, MoveHelperBrain.holdSpeed / holdTrack the far end's holder, server/PairHold.luau
 --   the constraints; Danny and a crew mate who helps lift alike):
@@ -6702,7 +6728,11 @@ Config.MoveStory = {
 --                      leader's velocity ahead of his place (Base + the leader's ping, Player:GetNetworkPing, × Ping;
 --                      Most s, Far studs at most; the velocity smoothed over Smooth s), so on the leader's screen, where
 --                      his body shows that late, he walks at his end (Base 0 and Ping 0: off). A crew mate is not led
---                      (on their own screen they would walk ahead of the piece)
+--                      (on their own screen they would walk ahead of the piece). 8.6 (the owner: "he teleports from side
+--                      to side"): the velocity is his END's own (the piece's turn moves it too: MoveHelperBrain.endLead),
+--                      and the lead changes Rate studs a second at most (it was your root's velocity, taken at once: a
+--                      step back, a turn's step aside, an uneven look at you threw his aim up to Far × 2 studs across in
+--                      a tenth of a second, and he ran there)
 --   RunHint            carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
 --                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
 --                      run key or button says this once a carry
@@ -6732,6 +6762,9 @@ Config.MoveStory = {
 --   WaitForHelper      Danny hired for the move (his body up, his hands not on another piece): a two-person Lift calls him
 --                      ("Danny, give me a hand!"), you wait at your end while he walks to its other end, and its lift
 --                      check opens once he is there (false: today's rules, you drag it alone and he comes to it)
+--   CallCheck          8.6 (the owner: "he does come to me and waits, but it doesn't look good"): false, once he is there
+--                      it goes up at once on his "On three... lift!" (balanced: he steadies it), no lift check after the
+--                      wait; true: 8.3's lift check opens then (its hit lifts it)
 --   CallReady / CallClose / CallStuck   in place for your call: within CallReady studs of his place at its far end, or
 --                      within CallClose and blocked CallStuck s (the hold walks him the rest: no snap)
 --   CallGain / CallBlink   his walk to your call (or your dragged piece): no closer by CallGain studs for CallBlink s,
@@ -6764,6 +6797,14 @@ Config.MoveStory = {
 --   RideMargin         studs he keeps off the van's footprint on his way to its door: the straight way when it keeps this
 --                      off, else round the footprint's corners this far out (the shorter way round)
 --   RideCorner         a corner of that way within this many studs: he walks on to the next point (no stop at it)
+--   RideHug            8.5.1 (the owner: "Danny STILL goes through it"; server/MoveHelper.luau's go, MoveHelperBrain.
+--                      crossesVan / outOfVan): studs round the move's van's footprint his body keeps off on EVERY way
+--                      of his outside (his body's half width and a hair): a way across it (a path that knows nothing of
+--                      the van, the straight line from behind it to its front) goes round the van instead (RideMargin
+--                      out; nearer the van than that, its goal's own distance), his root inside the van itself (parked
+--                      over him; a load into the walk-in bay left him on the ground under its floor) is put beside its
+--                      nearer side at once, faded in (never a walk through its shell); waiting by it while it drives at
+--                      him he steps out of its way (its side, RideMargin out)
 --   RideBlink / RideFar   the last resort, a fade into the seat: no closer by CallGain studs for RideBlink s, or RideFar
 --                      studs or more to go on foot (the van driven off without him: more than from deep in the biggest
 --                      house to the van at its curb, so by the house or the warehouse he always walks). At his spot he
@@ -6790,6 +6831,17 @@ Config.MoveStory = {
 --   Clipboard.Text     the bottom line's text size at scale 1 (Pad: px round its words, Tall: its height)
 --   Clipboard.Give / Back / No   the outline's colours: it can be given (green), on his list (orange: take it back),
 --                      not now (red, with the reason)
+--   8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
+--   him, for example, put it down on the ground, or get out of the car"; client/DannyBubble.luau, MoveHelperBrain.bubble
+--   / orders, server/MoveHelper.luau's orders; the rate limit Config.Robust.Limits.MoveHelperOrder):
+--   Bubble             what he does over his head, for his move's crew (the server's words: the player attribute
+--                      MoveHelperBubble), stacked over his name tag (or his speech, while he talks): Near / Far studs
+--                      from the camera it fades out between (Far its MaxDistance); AlwaysOnTop only within Top studs
+--                      (nearer, the van or a piece never hides it; farther, the walls of other houses do); Tick s between
+--                      two looks; Text its words' size, Tall its height, Pad px round its words, Gap px over the name
+--                      tag, Wide px at most (its words cut with "…")
+--   (the orders need no numbers of their own: GET OUT waits for the van at Config.Cargo.BoardMaxSpeed or slower, the
+--   speed his own getting in is called off over; after it he stays out while the owner stays at the wheel)
 Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
@@ -6825,7 +6877,8 @@ Config.MoveHelper = {
 	HoldLegs = { From = 0.8, To = 0.4, Band = 0.3 },
 	HoldCap = 40, -- 8.3 keeping up
 	HoldPace = { Fall = 0.5, Jump = 12 },
-	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1 },
+	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1, Rate = 5 }, -- (8.6 Rate)
+	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6 }, -- 8.6
 	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
 	PathHeight = 5,
@@ -6855,6 +6908,7 @@ Config.MoveHelper = {
 	TalkRepeat = 12,
 	-- 8.3 your call
 	WaitForHelper = true,
+	CallCheck = false, -- 8.6
 	CallReady = 3,
 	CallClose = 6,
 	CallStuck = 1.5,
@@ -6869,6 +6923,7 @@ Config.MoveHelper = {
 	RideStand = 2.8, -- 8.5 getting in like a player
 	RideMargin = 2.4,
 	RideCorner = 1.2,
+	RideHug = 1.6, -- 8.5.1
 	RideBlink = 20,
 	RideFar = 200,
 	SeatYield = 2, -- 8.3 review
@@ -6891,6 +6946,8 @@ Config.MoveHelper = {
 		Back = { 240, 132, 44 } :: { number },
 		No = { 226, 72, 62 } :: { number },
 	},
+	-- 8.6 the bubble over his head
+	Bubble = { Near = 35, Far = 75, Top = 20, Tick = 0.15, Text = 13, Tall = 26, Pad = 9, Gap = 4, Wide = 340 },
 }
 
 -- 7.0, the moving rework's world (design/rework/NAVRH.md: the city is evacuated, the army builds the Wall round the
@@ -7116,7 +7173,7 @@ Config.Collection = {
 	IdleAfter = 600, -- 8.3 economy: the stands of a player idle this long earn only IdleShare of their income
 	IdleShare = 0.25,
 	IdleMove = 4,
-	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint" } :: { string },
+	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
 }
 
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
@@ -7689,6 +7746,44 @@ Config.Visitors = {
 	} :: { VisitorKind },
 }
 
+-- 8.7 SANDBOX, trading between players (the owner: "I'd like customers to be players too … I want selling to make
+-- sense"). Another player is a buyer who wants a piece they lack (for their book, a legendary, a hot kind) and pays more
+-- than the game would. shared/PlayerTradeRules.luau has the rules (tests/playertrade_test.luau), server/PlayerTrade.luau
+-- decides every offer and sale (tests/playertrade_runtime_test.luau), client/TradeUi.luau is the composer, the price
+-- picker and the buy question, client/OfferCard.luau the seller's card (a visitor's and a player's offers).
+--   On          false: no trade prompts, every request refused
+--   MinTimes    a price is at least this × the piece's value (its sell price to the game without the market:
+--               CollectionRules.sell, its condition in it; the same every day, so a FOR SALE sign stays valid)
+--   MaxTimes    … and at most this × it (money passed between friends' accounts stays bounded)
+--   Fee         the ZDC fee: this share of the price is taken from the seller's side and disappears (a money sink)
+--   Expire      s an offer stays open for the seller's answer
+--   PerSeller   open offers one seller holds at most (a buyer holds one at a time)
+--   Presets     the composer's and the picker's quick prices: × the value (clamped to the bounds)
+--   StepShare   the −/+ step: the roundest of 1, 2, 5 × 10ⁿ at most this × the price shown (never under the value's;
+--               $1 at least): 10 % a tap, so 10 × is a dozen taps past the 3 × preset
+--   BigSale     $: a sale this big or bigger is told to the whole server in the chat (0: never)
+--   Tick        s between two looks at the offers' clocks
+--   PromptTag / SellerAttribute   the CollectionService tag and attribute (the seller's UserId) of the stands' prompts
+--               for the other players ("Make an offer", "Buy $X"): client/TradePrompts.luau hides them from the seller
+-- The tuning: a piece sells to the game for about a quarter of an hour of showing it (Config.Collection); a player who
+-- lacks it pays 1 – 10 × that, the seller keeps 92 % (at 2 × the game's price: 1.84 ×, so selling to a player makes
+-- sense; at 1 × it is a loss of 8 %, so a sign at the game's price is pointless). A legendary sells to the game for
+-- $1,100 – 1,400: at 2 × it is a big sale.
+Config.PlayerTrade = {
+	On = true,
+	MinTimes = 1,
+	MaxTimes = 10,
+	Fee = 0.08,
+	Expire = 45,
+	PerSeller = 3,
+	Presets = { 1, 1.5, 2, 3 } :: { number },
+	StepShare = 0.1,
+	BigSale = 2500,
+	Tick = 0.5,
+	PromptTag = "TradePrompt",
+	SellerAttribute = "TradeSeller",
+}
+
 -- 8.3 SANDBOX, the PAINT shop (the owner: give players a way to make their van their own). A 🎨 Paint van prompt on your
 -- own Sprinter while it stands at your plot's van spot opens the shop's window (client/VanPaintUi.luau; its 3D picture
 -- client/VanPaintPreview.luau). server/VanPaint.luau sells, keeps what you own (profile.vanPaint: { owned, worn }, read
@@ -7940,6 +8035,7 @@ Config.SandboxBadges = {
 		warehouse5 = { id = 0, name = "Logistics Tycoon", description = "Grow your warehouse to level 5." },
 		painted = { id = 0, name = "Fresh Paint", description = "Paint your van at the PAINT shop." },
 		topMover = { id = 0, name = "Top Mover", description = "Top the TOP MOVERS board on a full server." },
+		firstDeal = { id = 0, name = "First Deal", description = "Sell a piece to another player, or buy one from them." }, -- 8.7: trading
 	} :: { [string]: SandboxBadgeDef },
 	Studio = false,
 	Moves = 10,

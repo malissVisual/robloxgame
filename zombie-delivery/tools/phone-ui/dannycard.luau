@@ -26,8 +26,19 @@
 -- line's button is 📋 ORDERS (his card a tap on the line), its words "Take out your clipboard (📋 / Q / R1) to give him
 -- pieces"; his card's row 📋 CLIPBOARD beside CLEAR QUEUE (the Clipboard remote, the card closes), its words the
 -- clipboard's; a click, a tap or R1 on a piece gives it to him only with the clipboard out (the server's ClipboardHeld
--- on your character): without it nothing, with it a click on Danny opens no card. (tools/phone-ui/dannyorders.luau:
--- the mode's line at the bottom and its touch 📋 button.)
+-- on your character): without it nothing. (tools/phone-ui/dannyorders.luau: the mode's line at the bottom and its
+-- touch 📋 button.)
+-- 8.6 the crew's orders and the bubble: with the clipboard out a click on Danny (or on the piece in his arms) opens his
+-- ORDERS MENU (the card's short form), never the full card; the server's MoveHelperOrders shows PUT IT DOWN / GET OUT in
+-- the card (in place of its list's words and hint) and in the menu (else "Nothing to order right now"), at 844 × 390,
+-- 667 × 375, 1280 × 800 and 1920 × 1080 with his head at three spots: on the screen, beside him, clear of the HUD's
+-- chips, the touch controls, the move's panel and Danny's status line, nothing in it on anything else, its words fitting,
+-- every button a finger's size on a phone; a button sends ("helper", "putdown" | "getout") once and closes it; a gamepad:
+-- "Orders for Danny" (L1) in orders mode opens the menu, its selection on the order (on ✕ once none applies), B closes
+-- it; the status line's 🚪 GET OUT while he is in the van (STOP first while you wait); the bubble over his head
+-- (client/DannyBubble.luau): your PlayerGui's, the server's words, "list: 2", over his name tag (over his speech while
+-- he talks), on top near, fading out to Far, the movers' orange when he needs you, the longest piece's name whole, a
+-- long one cut at Wide, for hire in place of the server's "Hire Danny" sign, none without Danny.
 -- `luau dannycard.luau -a dump` prints the preview's scenes as JSON instead (dannycard_preview.py).
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
@@ -743,10 +754,21 @@ check("… while you wait for him: nothing", #sentOn("Moving") == before + 2)
 attribute("MoveHelperCall", nil)
 rayHit = { Instance = dannyRoot, Position = dannyRoot.Position }
 click(400, 200, false)
-check("8.5 the clipboard out: a click on him opens no card (orders only: nothing else fires), sends nothing", not MoveHelperCard.isOpen() and #sentOn("Moving") == before + 2)
+check("8.6 the clipboard out: a click on him opens his ORDERS MENU (the card's short form, never the full card), sends nothing", MoveHelperCard.isOpen()
+	and MoveHelperCard.isMenu() and #sentOn("Moving") == before + 2)
+MoveHelperCard.close()
+-- 8.6 the piece in his arms (welded to his body: Moving's weldTo) is him: its click opens his orders (PUT IT DOWN is there)
+local held = M.make("WeldConstraint", { Name = "Held", Part0 = dannyRoot, Part1 = lampRoot }, lampRoot)
+rayHit = { Instance = lampRoot, Position = lampRoot.Position }
+click(400, 200, false)
+check("8.6 …a click on the piece in his arms: his orders menu too (nothing given)", MoveHelperCard.isMenu() and #sentOn("Moving") == before + 2)
+MoveHelperCard.close()
+held.Parent = nil
+rayHit = { Instance = dannyRoot, Position = dannyRoot.Position }
 clipboard(false)
 click(400, 200, false)
-check("the clipboard away: a click on him opens his card (sends nothing)", MoveHelperCard.isOpen() and #sentOn("Moving") == before + 2)
+check("the clipboard away: a click on him opens his card, the full one (sends nothing)", MoveHelperCard.isOpen() and not MoveHelperCard.isMenu()
+	and #sentOn("Moving") == before + 2)
 MoveHelperCard.close()
 rayHit = nil
 
@@ -925,11 +947,249 @@ for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" } } do
 	MoveHelperCard.close()
 end
 
+-- ── 8.6 the crew's orders: the card's row, the orders menu, the status line's GET OUT ──────────────────────────────
+-- The server's MoveHelperOrders says which apply ("putdown" while he carries, "getout" while he is in the van): the
+-- card shows them in a row over its buttons, the orders menu (the clipboard out, a click on him) as its only row. On a
+-- phone held sideways (844 × 390), a small one (667 × 375), a computer (1280 × 800) and a big screen (1920 × 1080), his
+-- head at three spots: on the screen, beside him, clear of everything, nothing in it on anything else, its words fitting,
+-- every button a finger's size on a phone.
+local Brain = require("./MoveHelperBrain")
+local function noOverlaps(card)
+	local pieces = {}
+	for _, child in card:GetChildren() do
+		if (child.ClassName == "TextLabel" or child.ClassName == "TextButton") and shown(child) then
+			table.insert(pieces, child)
+		end
+	end
+	for i = 1, #pieces do
+		for j = i + 1, #pieces do
+			if overlap(box(pieces[i]), box(pieces[j])) then
+				return false, `{pieces[i].Name} {show(box(pieces[i]))} on {pieces[j].Name} {show(box(pieces[j]))}`
+			end
+		end
+	end
+	return true, nil
+end
+local function orderChecks(label, head, kind, asMenu)
+	local card = MoveHelperCard.card()
+	local c = box(card)
+	check(`{label}: {if asMenu then "the orders menu" else "his card"} open, on the screen`, MoveHelperCard.isOpen() and MoveHelperCard.isMenu() == asMenu
+		and card.Visible and inside(c), show(c))
+	local clear, why = clearOfAll(c, true)
+	check(`{label}: … clear of the touch controls, Hud's groups, the chips, the move's panel and Danny's status line`, clear, why)
+	if head then
+		local onHim = head.x > c.x0 and head.x < c.x1 and head.y > c.y0 and head.y < c.y1
+		local gap = math.max(c.x0 - head.x, head.x - c.x1, c.y0 - head.y, head.y - c.y1, 0)
+		check(`{label}: … beside Danny's head (never on it, a short way off)`, not onHim and gap <= 120, `{show(c)} by {head.x},{head.y}`)
+	end
+	local put, out, none = named(card, "PutDown"), named(card, "GetOut"), named(card, "NoOrders")
+	if kind then
+		local button = if kind == "putdown" then put else out
+		local other = if kind == "putdown" then out else put
+		local b = box(button)
+		check(`{label}: … {Brain.orderWords(kind)} (only the order that applies), inside it`, shown(button) and not shown(other) and not shown(none)
+			and button.Text == Brain.orderWords(kind) and b.x0 >= c.x0 - 0.5 and b.x1 <= c.x1 + 0.5 and b.y0 >= c.y0 - 0.5 and b.y1 <= c.y1 + 0.5, show(b))
+	else
+		check(`{label}: … no order applies: no button{if asMenu then ", \"Nothing to order right now\"" else ", no row"}`, not shown(put) and not shown(out)
+			and (if asMenu then shown(none) and none.Text == "Nothing to order right now" else not shown(none)))
+	end
+	if asMenu then
+		check(`{label}: … the menu: "📋 DANNY · ORDERS", his status; no list, hint, CLEAR QUEUE or 📋 CLIPBOARD`, named(card, "Title").Text == "📋 DANNY · ORDERS"
+			and shown(named(card, "Doing")) and not shown(named(card, "Line")) and not shown(named(card, "Hint")) and not shown(named(card, "Main"))
+			and not shown(named(card, "Clip")), named(card, "Title").Text)
+	else
+		local row = if kind == "putdown" then put elseif kind == "getout" then out else nil
+		check(`{label}: … the card as ever round it (📋 CLIPBOARD and CLEAR QUEUE{if row then " under the row, in place of the list's words and hint" else ""})`,
+			shown(named(card, "Main")) and shown(named(card, "Clip")) and named(card, "Title").Text == "🧑‍🔧 DANNY"
+			and (if row then box(named(card, "Main")).y0 >= box(row).y1 - 0.5 and not shown(named(card, "Line")) and not shown(named(card, "Hint"))
+				and string.find(named(card, "Doing").Text, "2 pieces to carry", 1, true) == 1 else shown(named(card, "Line")) and shown(named(card, "Hint"))))
+		if not row then
+			local fits, lines = wrapFits(named(card, "Hint"))
+			check(`{label}: … its hint fits its lines`, fits, lines)
+		end
+	end
+	local apart, which = noOverlaps(card)
+	check(`{label}: … nothing in it on anything else`, apart, which)
+	check(`{label}: … its words fit`, #badTexts(card) == 0, badTexts(card)[1])
+	if M.touch then
+		check(`{label}: … every button a finger's size`, #smallButtons(card) == 0, smallButtons(card)[1])
+	end
+end
+for _, size in { { true, 844, 354, "phone" }, { true, 667, 339, "667" }, { false, 1280, 764, "computer" }, { false, 1920, 1044, "big" } } do
+	screen(size[1], size[2], size[3])
+	local W, Hh = size[2], size[3]
+	local label = `{W} x {Hh + 36}`
+	attribute("MoveHelperPrice", nil)
+	attribute("MoveHelperQueue", 2)
+	attribute("MoveHelperDoing", "Carrying the Lamp to the van")
+	attribute("MoveHelper", "hired")
+	local spots = { { x = math.floor(W * 0.5), y = math.floor(Hh * 0.5) }, { x = math.floor(W * 0.3), y = math.floor(Hh * 0.4) }, { x = math.floor(W * 0.7), y = math.floor(Hh * 0.6) } }
+	for _, kind in { "putdown", "getout" } do
+		attribute("MoveHelperOrders", kind)
+		for index, head in spots do
+			MoveHelperCard.open(head)
+			M.flush()
+			orderChecks(`{label}, his card, {kind}, him at {head.x},{head.y}`, head, kind, false)
+			if index == 1 and kind == "putdown" then
+				scene(`danny-card-orders-{size[4]}`, head)
+			end
+			MoveHelperCard.close()
+			MoveHelperCard.open(head, true)
+			M.flush()
+			orderChecks(`{label}, the orders menu, {kind}, him at {head.x},{head.y}`, head, kind, true)
+			if index == 1 then
+				scene(`danny-menu-{kind}-{size[4]}`, head)
+			end
+			MoveHelperCard.close()
+		end
+	end
+	attribute("MoveHelperOrders", nil)
+	MoveHelperCard.open(spots[1], true)
+	M.flush()
+	orderChecks(`{label}, the orders menu, none applies`, spots[1], nil, true)
+	MoveHelperCard.close()
+	MoveHelperCard.open(spots[1])
+	M.flush()
+	orderChecks(`{label}, his card, no order applies`, spots[1], nil, false)
+	MoveHelperCard.close()
+end
+-- their buttons: once each, the card closes, the server decides
+screen(true, 844, 354)
+local spot = { x = 422, y = 170 }
+for _, kind in { "putdown", "getout" } do
+	attribute("MoveHelperOrders", kind)
+	for _, asMenu in { true, false } do
+		MoveHelperCard.open(spot, asMenu)
+		before = #sentOn("Moving")
+		local button = named(MoveHelperCard.card(), if kind == "putdown" then "PutDown" else "GetOut")
+		press(button)
+		press(button)
+		sent = sentOn("Moving")
+		check(`8.6 {Brain.orderWords(kind)} in the {if asMenu then "orders menu" else "card"}: the Moving remote's ("helper", "{kind}") once, it closes`, #sent == before + 1
+			and sent[#sent][1] == "helper" and sent[#sent][2] == kind and sent[#sent][3] == nil and not MoveHelperCard.isOpen())
+	end
+end
+-- a gamepad: in orders mode the prompt on him is "Orders for Danny" (L1) and opens the menu, its selection on the order
+gamepad = true
+clipboard(true)
+UIS.LastInputTypeChanged:Fire()
+attribute("MoveHelperOrders", "getout")
+check("8.6 a gamepad, the clipboard out: the prompt on him says \"Orders for Danny\" (L1)", talk.ActionText == "Orders for Danny" and talk.Enabled, talk.ActionText)
+talk.Triggered:Fire()
+M.flush()
+check("8.6 …L1: his orders menu, the gamepad's selection on its order (🚪 GET OUT), kept inside it", MoveHelperCard.isMenu()
+	and M.focus == named(MoveHelperCard.card(), "GetOut") and MoveHelperCard.card().SelectionGroup == true)
+attribute("MoveHelperOrders", nil)
+M.flush()
+check("8.6 …the order gone while it is open (he got out): \"Nothing to order right now\", the selection on ✕", shown(named(MoveHelperCard.card(), "NoOrders"))
+	and not shown(named(MoveHelperCard.card(), "GetOut")) and M.focus == named(MoveHelperCard.card(), "Close"))
+key("ButtonB")
+check("8.6 …B closes it", not MoveHelperCard.isOpen())
+clipboard(false)
+UIS.LastInputTypeChanged:Fire()
+check("8.6 …the clipboard away: \"Talk to Danny\" again", talk.ActionText == "Talk to Danny", talk.ActionText)
+gamepad = false
+UIS.LastInputTypeChanged:Fire()
+-- the status line's GET OUT: the one order a driver reaches (his card shuts in a seat, the clipboard stays away)
+for _, size in { { true, 844, 354, "844 x 390" }, { true, 667, 339, "667 x 375" }, { false, 1280, 764, "1280 x 800" }, { false, 1920, 1044, "1920 x 1080" } } do
+	screen(size[1], size[2], size[3])
+	attribute("MoveHelperDoing", "Riding in the van")
+	attribute("MoveHelperOrders", "getout")
+	M.flush()
+	check(`8.6 {size[4]}: Danny in the van: the status line's button is 🚪 GET OUT, lit`, named(strip, "Action").Text == "🚪 GET OUT"
+		and named(strip, "Action").BackgroundColor3.R > 0.9 and named(strip, "Doing").Text == "Riding in the van", named(strip, "Action").Text)
+	stripChecks(`8.6 {size[4]}, GET OUT on the status line`, size[2] ~= 667) -- (8.4: on the small phone it stands off the middle)
+	if size[4] == "844 x 390" then
+		scene("danny-status-getout-phone", nil)
+	end
+end
+before = #sentOn("Moving")
+press(named(strip, "Action"))
+sent = sentOn("Moving")
+check("8.6 …it sends (\"helper\", \"getout\") (the server decides), no card", #sent == before + 1 and sent[#sent][2] == "getout" and not MoveHelperCard.isOpen())
+attribute("MoveHelperCall", "Sofa")
+check("8.6 …while you wait for him STOP still comes first", named(strip, "Action").Text == "STOP")
+attribute("MoveHelperCall", nil)
+attribute("MoveHelperOrders", nil)
+attribute("MoveHelperDoing", "Carrying the Lamp to the van")
+check("8.6 …he is out: 📋 ORDERS again", named(strip, "Action").Text == "📋 ORDERS", named(strip, "Action").Text)
+
 -- ── A resize while it is open ───────────────────────────────────────────────
 MoveHelperCard.open({ x = 640, y = 320 })
 screen(true, 844, 354)
 cardChecks("a resize to a phone while open: placed again for it", nil, true)
 MoveHelperCard.close()
+
+-- ── 8.6 the bubble over his head (client/DannyBubble.luau) ─────────────────
+-- (last: its BillboardGui lives in the PlayerGui, out of the scenes above)
+local DannyBubble = require("./DannyBubble")
+local B = Config.MoveHelper.Bubble
+local head = M.make("BasePart", { Name = "Head", Size = M.Vector3.new(1.2, 1.2, 1.2), Position = M.Vector3.new(8, 4.6, -6) }, body)
+local nameTag = M.make("BillboardGui", { Name = "NameTag", Size = M.UDim2.fromOffset(240, 46), Enabled = true }, head)
+local hireSign = M.make("BillboardGui", { Name = "HireSign", Enabled = true }, dannyRoot)
+camera.CFrame = M.CFrame.new(8, 10, 10) -- (about 17 studs from his head: near)
+attribute("MoveHelperQueue", 2)
+attribute("MoveHelperBubble", "📦 Carrying: Lamp → van")
+DannyBubble.start()
+M.resume()
+local bubble = DannyBubble.gui()
+local words = bubble and named(bubble, "Words")
+local listChip = bubble and named(bubble, "List")
+check("8.6 the bubble: a BillboardGui in your PlayerGui (only your screen: his move's crew), on his head, the server's words", bubble ~= nil and bubble.Parent == M.gui
+	and bubble.Enabled and bubble.Adornee == head and words.Text == "📦 Carrying: Lamp → van" and bubble.MaxDistance == B.Far)
+check("8.6 …\"list: 2\" beside the words (his list's count), both fitting the pill", shown(listChip) and named(listChip, "Count").Text == "list: 2"
+	and #badTexts(bubble) == 0 and box(words).x1 <= box(listChip).x0 + 0.5, badTexts(bubble)[1])
+local lifted = (bubble.SizeOffset.Y - 0.5) * B.Tall -- (px its bottom stands over his head's point)
+check("8.6 …standing over his name tag (its bottom Gap px over the tag's 46 px, at every distance: both a fixed size on the screen), where the tag stands",
+	math.abs(lifted - (46 + B.Gap)) < 0.01 and bubble.StudsOffsetWorldSpace.Y == 1.2 * 0.5 + 0.9 and box(bubble).y1 - box(bubble).y0 == B.Tall, lifted)
+check("8.6 …small and readable: Tall px high, its words Text px, at most Wide px", box(bubble).y1 - box(bubble).y0 == B.Tall and words.TextSize == B.Text
+	and box(bubble).x1 - box(bubble).x0 <= B.Wide)
+check("8.6 …near (within Top studs): AlwaysOnTop (a piece or the van never hides it), not faded", bubble.AlwaysOnTop == true and words.TextTransparency == 0)
+local speech = M.make("BillboardGui", { Name = "Speech", Size = M.UDim2.fromOffset(200, 80) }, head)
+nameTag.Enabled = false -- (Npcs.say: the speech takes the tag's place)
+M.resume()
+lifted = (bubble.SizeOffset.Y - 0.5) * B.Tall
+check("8.6 …while he talks: over his speech (80 px) instead", math.abs(lifted - (80 + B.Gap)) < 0.01, lifted)
+speech.Parent = nil
+nameTag.Enabled = true
+camera.CFrame = M.CFrame.new(8, 10, 60) -- (about 66 studs off)
+M.resume()
+check("8.6 …farther than Top: not on top (the walls of other houses hide it), fading between Near and Far", bubble.AlwaysOnTop == false and bubble.Enabled
+	and words.TextTransparency > 0.5 and words.TextTransparency < 1, words.TextTransparency)
+camera.CFrame = M.CFrame.new(8, 10, 100)
+M.resume()
+check("8.6 …past Far: gone", not bubble.Enabled)
+camera.CFrame = M.CFrame.new(8, 10, 10)
+attribute("MoveHelperAlert", true)
+attribute("MoveHelperBubble", "⏳ Needs you: Marble slab")
+M.resume()
+check("8.6 he needs you (MoveHelperAlert): the movers' orange, charcoal words", named(bubble, "Pill").BackgroundColor3.R > 0.9 and words.TextColor3.R < 0.2
+	and words.Text == "⏳ Needs you: Marble slab" and #badTexts(bubble) == 0, badTexts(bubble)[1])
+attribute("MoveHelperAlert", nil)
+attribute("MoveHelperBubble", "📦 Carrying: Grandma's Milk Churn → van") -- (the longest piece's name: shared/FurnitureLooks.luau)
+M.resume()
+check("8.6 the longest piece's name with the counter: its words whole (no cut), Wide px at most", #badTexts(bubble) == 0
+	and box(bubble).x1 - box(bubble).x0 <= B.Wide and shown(listChip), badTexts(bubble)[1])
+attribute("MoveHelperQueue", 0)
+M.resume()
+check("8.6 his list empty: no counter", not shown(listChip) and named(bubble, "Pill").BackgroundColor3.R < 0.2)
+attribute("MoveHelperBubble", "📦 Carrying: The Extremely Long Antique Grandfather Clock Of The Old Chalet → van")
+M.resume()
+check("8.6 a long name: Wide px at most, its words cut with …", box(bubble).x1 - box(bubble).x0 <= B.Wide + 0.01 and words.TextTruncate.Name == "AtEnd")
+attribute("MoveHelperPrice", 170)
+attribute("MoveHelper", "offer")
+attribute("MoveHelperBubble", "🧑‍🔧 For hire · $170")
+M.resume()
+check("8.6 for hire: \"🧑‍🔧 For hire · $170\", the server's \"Hire Danny\" sign hidden on this screen (the bubble says it), no counter", words.Text == "🧑‍🔧 For hire · $170"
+	and hireSign.Enabled == false and not shown(listChip) and bubble.Enabled)
+attribute("MoveHelperId", nil)
+M.resume()
+check("8.6 no Danny on your move (MoveHelperId gone): no bubble, his sign as the server made it", not bubble.Enabled and hireSign.Enabled == true)
+attribute("MoveHelperId", DANNY_ID)
+M.resume()
+check("8.6 …back: the bubble again", bubble.Enabled)
+check("8.6 pure: the fade (0 at Near, 1 at Far, on top within Top) and the lift", select(1, DannyBubble.fade(B.Near)) == 0 and select(1, DannyBubble.fade(B.Far)) == 1
+	and select(2, DannyBubble.fade(B.Top)) == true and select(2, DannyBubble.fade(B.Top + 1)) == false and DannyBubble.lift(46, B.Tall) == 0.5 + (46 + B.Gap) / B.Tall)
 
 check("no warnings", #M.warnings == 0, M.warnings[1])
 if dump then

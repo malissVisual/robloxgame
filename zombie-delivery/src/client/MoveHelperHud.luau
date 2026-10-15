@@ -31,6 +31,10 @@
 -- orders) in LIST's place, his card a tap on the line as before; the words say how a piece goes to him
 -- (ClipboardRules.carries: "Take out your clipboard (Q) to give him pieces", the device's key) for hire (the price is
 -- HIRE's) and while his list is empty and the clipboard away. The city's line as before (no clipboard there).
+-- 8.6 the crew's orders (the owner: "… to be able to tell him … get out of the car"): while Danny is in the van, getting
+-- in or on his way to it (the server's MoveHelperOrders holds "getout") the button is 🚪 GET OUT, lit: the Moving
+-- remote's ("helper", "getout"), the server decides. A driver reaches nothing else (his card shuts and the clipboard
+-- stays away in a seat); STOP while you wait for him still comes first.
 --   MoveHelperHud.start(), MoveHelperHud.strip()   the strip (nil before Danny first comes)
 --   MoveHelperHud.useCard(open)                    8.3 HIRE and LIST open his card (open: the card's opener)
 --   MoveHelperHud.cardOpen(open)                   8.4 his card opened or closed (client/MoveHelperCard.luau)
@@ -85,6 +89,11 @@ local function hired(): boolean
 	return player:GetAttribute("MoveHelper") == "hired"
 end
 
+-- 8.6 GET OUT applies now (the server's MoveHelperOrders: he is in the van, getting in or on his way to it).
+local function getOut(): boolean
+	return hired() and table.find(Brain.orderList(player:GetAttribute("MoveHelperOrders")), "getout") ~= nil
+end
+
 local function priceNow(): number
 	local price = player:GetAttribute("MoveHelperPrice")
 	return if type(price) == "number" then price else 0
@@ -95,6 +104,10 @@ end
 local function act()
 	if waiting() then
 		remote:FireServer("helper", "stop")
+		return
+	end
+	if getOut() then
+		remote:FireServer("helper", "getout") -- 8.6 (the server decides)
 		return
 	end
 	local toggle = orders
@@ -347,11 +360,14 @@ local function refresh()
 			(if ready then `{Config.MoveHelper.Name} is at the other end of the {piece}` else `Stay at your end of the {piece}`) .. stopWords(ready), "STOP", true, false)
 	elseif hired() then
 		-- (8.5: with the clipboard the button is 📋 ORDERS, orange while it is out; his list empty and the clipboard
-		-- away, the words say how a piece goes to him)
+		-- away, the words say how a piece goes to him; 8.6 while he is in the van, getting in or on his way to it: 🚪 GET
+		-- OUT, lit: the one order a driver can reach, the clipboard and his card are for on foot)
 		local count = player:GetAttribute("MoveHelperQueue")
-		local how = orders ~= nil and not ordersOn and (type(count) ~= "number" or count <= 0)
+		local out = getOut()
+		local how = not out and orders ~= nil and not ordersOn and (type(count) ~= "number" or count <= 0)
 		paint(frame, `🧑‍🔧 {name} · {Brain.queueText(count)}`, if how then carriesWords() elseif type(doing) == "string" then doing else "",
-			if orders then ClipboardRules.orders(ordersOn) elseif openCard then "LIST" else "CLEAR", false, orders ~= nil and ordersOn)
+			if out then Brain.orderWords("getout") elseif orders then ClipboardRules.orders(ordersOn) elseif openCard then "LIST" else "CLEAR", false,
+			out or (orders ~= nil and ordersOn))
 	else
 		local price = Brain.money(priceNow())
 		-- (8.5: with the clipboard its words alone, the price HIRE's)
@@ -393,7 +409,7 @@ function MoveHelperHud.setOrders(on: boolean)
 end
 
 function MoveHelperHud.start()
-	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue" } do
+	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue", "MoveHelperOrders" } do
 		player:GetAttributeChangedSignal(name):Connect(refresh)
 	end
 	-- 7.0 review: the panel moved, resized, showed or hid (client/TopBlocks.luau), the screen changed size

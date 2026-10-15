@@ -597,9 +597,10 @@ do
 		local want = if n <= 2 then leaves[n] else backLeaves[1]
 		builtOk = builtOk and want ~= nil and leaf.ClassName == "Model" and leaf.Name == (if n <= 2 then "FrontDoorLeaf" else "BackDoorLeaf") and leaf.Parent == dressedHouse
 			and leaf:GetAttribute("DoorLeaf") == want.hinge and leaf:GetAttribute("DoorSwing") == -1 and leaf:GetAttribute("DoorDark") == true
+			and leaf:GetAttribute("DoorAngle") == Config.Moving.Doors.Wide -- (8.5.1: past square, never edge-on)
 			and primary ~= nil and primary.Name == "DoorLeaf" and primary.Color == HouseMesh.Looks.door.color and parts == 8 and still
 	end
-	check("…dressed in the Blender house: two FrontDoorLeaf models and a BackDoorLeaf in it (DoorLeaf ±1, 8.5 DoorSwing -1: out of the house, DoorDark; the model's finishes), never colliding; the chalet's own leaves none",
+	check("…dressed in the Blender house: two FrontDoorLeaf models and a BackDoorLeaf in it (DoorLeaf ±1, 8.5 DoorSwing -1: out of the house, 8.5.1 DoorAngle Wide, DoorDark; the model's finishes), never colliding; the chalet's own leaves none",
 		builtOk, #built)
 	-- 8.3 the big move: the FrontDoor unseen behind its two leaves; the back door at House.back on the Blender house's back
 	-- door (BackDoor: SandboxBackDoor, unseen, no collision; across it, as wide and tall, just outside its leaf) with its
@@ -636,11 +637,12 @@ do
 		local leaf, way = list[1], want[4]
 		count += #list
 		leavesOk = leavesOk and #list == 1 and way ~= nil and leaf.part:GetAttribute("DoorLeaf") == want[2] and leaf.part:GetAttribute("DoorSwing") == -1
+			and leaf.part:GetAttribute("DoorAngle") == Config.Moving.Doors.Wide -- (8.5.1)
 			and leaf.part:GetAttribute("DoorDark") == true and not leaf.part.CanCollide and leaf.part.Transparency == 0 and leaf.part.Parent == own
 			and leaf.x0 >= way.x0 - 0.05 and leaf.x1 <= way.x1 + 0.05 and leaf.y0 >= way.y0 - 0.05 and leaf.y1 <= way.y1 + 0.05
 			and (if want[3] == "west" then math.abs(leaf.x0 - way.x0) < 0.1 else math.abs(leaf.x1 - way.x1) < 0.1)
 	end
-	check("8.3: the doors' leaves shut in their doorways, door leaves hinged at a jamb (FrontLeafWest west, FrontLeafEast east, BackLeaf east: DoorLeaf -1 / 1 / -1, 8.5 DoorSwing -1, DoorDark), the FrontDoor unseen behind them",
+	check("8.3: the doors' leaves shut in their doorways, door leaves hinged at a jamb (FrontLeafWest west, FrontLeafEast east, BackLeaf east: DoorLeaf -1 / 1 / -1, 8.5 DoorSwing -1, 8.5.1 DoorAngle Wide, DoorDark), the FrontDoor unseen behind them",
 		leavesOk and count == 3 and door ~= nil and door.part.Transparency == 1)
 	-- dressed, the back door's leaf copied (SandboxScenery.backLeaves) the same way in front of the Blender house's back
 	-- door: it covers its leaf from outside, hung on the side away from its handle (house.py's: HouseArt.backKnob)

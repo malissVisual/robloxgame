@@ -27,6 +27,11 @@
 --     like, backwards and slowly"): its carrier (the leader) gets PairTurn (client/PairSteer.luau turns their heading
 --     slowly, a way behind them walked backwards: shared/PairCarry.luau), its helper is held at its far end by the
 --     server like Danny (server/PairHold.luau; the tether waits for its ease back too), both at the pair's walk.
+--     8.6 (the owner: "he teleports from side to side", "the table seems to float between them"): carried in two it
+--     lies along the carry, low (holdOffset: a piece wider than deep turned a quarter round, its grips at the hands:
+--     MovingRules.pairLift), the leader at one end of its length and the other at the far one; the leader's hands on its
+--     near end's edge (CarryAt / CarrySize: Config.MoveHelper.Edge). Danny's lift on your call goes up at once once he
+--     is there (Moving.helperCalled: Config.MoveHelper.CallCheck, no lift check after the wait, the steady walk).
 --   * The truck: "Load" (E) at its open back puts what you hold onto the bed (MovingRules' packer: the best scored
 --     place, turned 90°, resting on uneven tops, a both / pair piece lying on its side when it has no place standing,
 --     the bed repacked biggest first when it has no room as it is: the moved models welded anew; "No room" else, and
@@ -34,7 +39,8 @@
 --     Unload) takes the last one in that nothing rests on back into your hands: beside the door on its own spot, and
 --     only while nobody at the back carries a thing.
 --     The back is the owner's and the crew's (Vehicles.backAllowed, BackCrew); its own prompt waits while Load shows
---     (one E at a time).
+--     (one E at a time). 8.6 (the owner's screenshot: "Load" and "Put down" drawn on top of each other): while Load is
+--     up for a carrier at the back, their piece's G prompts draw nothing (Style Custom: G still puts it down).
 --   * The clock: Config.Moving.Time; at HordeAt left the horde (Zombies.spawn + Zombies.march to the door, in bursts);
 --     a few roaming zombies round the house while somebody is outside near it; none inside (the crew on a move is
 --     "hunted" like a job's: no ordinary roamers come round them anywhere). The truck within DropRadius of the
@@ -136,7 +142,10 @@
 --     doorway from farther), and walking into the doorway is the trip: your root across its threshold (Doors.Cross,
 --     looked Ahead s along your walk) starts the fade at once while you walk on into the house's dark hall (the
 --     sandbox house's doorways are walkable: server/SandboxWorld.luau), no dwell; standing at a door facing it, the
---     8.3 dwell as before.
+--     8.3 dwell as before. 8.5.1 (the owner: "the doors just disappear; I'd like them to open nicely"): a leaf says
+--     since when it is open (DoorOpenAt, the server's time: a client that first sees it opening swings it on from
+--     there), and walking through waits until its leaf has swung Seen × Open s (WalkIn.swung: from just beside a shut
+--     door, the swing mostly seen before the screen darkens).
 --   * 8.3 Danny for hire (the owner: "when you want to take a heavy thing you must wait until the helper comes";
 --     "I have to PAY for him … you click on something, and that assigns it to him"; Config.MoveHelper.WaitForHelper;
 --     server/MoveHelper.luau's call): Lift on a two-person piece with Danny hired for the move calls him (onPick asks
@@ -1134,12 +1143,22 @@ local function clearHands(player: Player?)
 end
 
 -- Where a thing sits from its carrier's root: in front of the chest (MovingRules' mode "drag": low, a step ahead).
-local function holdOffset(thing: Rules.Thing, mode: string, root: BasePart, humanoid: Humanoid): CFrame
+-- 8.6 carried in two (mode "pair" with a helper on its other end, or `two`: Danny's call; the owner: "he teleports from
+-- side to side", "the table seems to float between them"): lengthwise, its long side along the carry (a piece wider
+-- than deep turned a quarter round: its +X ahead), its near end in your hands and its far end the other one's
+-- (MoveHelperBrain.holdEnd: decided once); low, its grips at your hands (MovingRules.pairLift).
+local function holdOffset(thing: Rules.Thing, mode: string, root: BasePart, humanoid: Humanoid, two: boolean?): CFrame
 	local size = thing.size
 	local tune = Config.Cargo
+	local feet = -(root.Size.Y / 2 + humanoid.HipHeight)
 	if mode == "drag" then
-		local feet = -(root.Size.Y / 2 + humanoid.HipHeight)
 		return CFrame.new(0, feet + size.Y / 2 + 0.2, -(tune.CarryFront + 1.2 + size.Z / 2))
+	elseif mode == "pair" and (two or thing.helper ~= nil) then
+		local middle = Rules.pairLift(size.Y, feet)
+		if size.X > size.Z then
+			return CFrame.new(0, middle, -(tune.CarryFront + size.X / 2)) * CFrame.Angles(0, math.pi / 2, 0)
+		end
+		return CFrame.new(0, middle, -(tune.CarryFront + size.Z / 2))
 	end
 	return CFrame.new(0, tune.CarryLow + size.Y / 2, -(tune.CarryFront + size.Z / 2))
 end
@@ -1285,8 +1304,17 @@ local function setHands(s: Session, item: Item)
 		character:SetAttribute("Carrying", if mode == "hand" then "crate" else "furniture")
 		character:SetAttribute("CarryCount", 1)
 		character:SetAttribute("CarryHands", Rules.hands(mode))
-		character:SetAttribute("CarryAt", holdOffset(thing, mode, root, humanoid).Position)
-		character:SetAttribute("CarrySize", Vector3.new(thing.size.X, thing.size.Y, thing.size.Z))
+		local at, size = holdOffset(thing, mode, root, humanoid).Position, Vector3.new(thing.size.X, thing.size.Y, thing.size.Z)
+		if mode == "pair" and thing.helper ~= nil then
+			-- 8.6 carried in two: your hands on its near end's edge at its grips' height (client/ArmPose.luau's box: Config.
+			-- MoveHelper.Edge, its width across), not on the sides of its middle (a long piece's: out of reach)
+			local edge = Config.MoveHelper.Edge
+			local _, hands = Rules.pairLift(thing.size.Y, -(root.Size.Y / 2 + humanoid.HipHeight))
+			at = Vector3.new(0, hands, -(Config.Cargo.CarryFront + edge.Depth / 2))
+			size = Vector3.new(math.min(thing.size.X, thing.size.Z, edge.Width), edge.Height, edge.Depth)
+		end
+		character:SetAttribute("CarryAt", at)
+		character:SetAttribute("CarrySize", size)
 		character:SetAttribute("CarrySpeed", speed)
 		character:SetAttribute("MoveCarry", item.spot)
 		-- 8.1 carrying in two: the leader's heading turns PairTurn degrees a second at most (client/PairSteer.luau)
@@ -1883,6 +1911,24 @@ local function refreshTruck(s: Session)
 	unload.Enabled = showUnload
 	unload.ActionText = if out then `Take out {s.move.things[out].name}` else "Take out"
 	unload.ObjectText = `{label} · {fill}% full`
+	-- 8.6 (the owner's screenshot: "Load Dining Table" and "Put down" drawn on top of each other at the van's back): while
+	-- the van's Load is up for a carrier there, their piece's own G prompts draw nothing (ProximityPromptStyle.Custom:
+	-- G still puts it down, the HUD's action pill says so): Load is the one prompt there
+	for _, spot in s.move.order do
+		local item = s.items[spot]
+		local thing = s.move.things[spot]
+		if item and #item.down > 0 then
+			local _, _, at = bodyOrNil(playerById(thing.carrier))
+			local loading = thing.state == "carried" and at ~= nil and ((load.Enabled and door ~= nil and flat(at.Position, door.WorldPosition) <= T.Reach.Truck + 3)
+				or (bay ~= nil and bay.Enabled and SB.inBay(truck, at.Position)))
+			local style = if loading then Enum.ProximityPromptStyle.Custom else Enum.ProximityPromptStyle.Default
+			for _, prompt in item.down do
+				if prompt.Style ~= style then
+					prompt.Style = style
+				end
+			end
+		end
+	end
 	local back = Vehicles.backPrompt(truck)
 	if back then
 		back.Enabled = showBack
@@ -1957,7 +2003,9 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 end
 
 -- He lets go. why: "put" (set down gently where he is), "died" (it falls: knocked), "apart" (his end of a pair thing:
--- left behind) or "end". His end of a pair thing: the carrier drags it on alone.
+-- left behind) or "end". His end of a pair thing: the carrier drags it on alone. 8.6 "together" (the crew's PUT IT
+-- DOWN, server/MoveHelper.luau's order): his end of a pair thing goes down with the carrier's, the carrier's own "put"
+-- (as their G: release).
 function Moving.helperDrop(s: Session, npc: Model, why: string)
 	local who = helperIdOf(npc)
 	if not who then
@@ -1969,6 +2017,10 @@ function Moving.helperDrop(s: Session, npc: Model, why: string)
 	end
 	local item = s.items[spot]
 	local thing = s.move.things[spot]
+	if role == "helper" and why == "together" and playerById(thing.carrier) and not s.ended then
+		release(s, playerById(thing.carrier) :: Player, "put")
+		return
+	end
 	if role == "helper" then
 		Rules.release(s.move, who)
 		local carrier = playerById(thing.carrier)
@@ -2108,15 +2160,29 @@ function WalkIn.leavesOf(s: Session, door: any, inside: boolean): { Instance }
 	return found
 end
 
--- Somebody wants these leaves open now: open from now (DoorOpen) until Shut s after the last want.
+-- Somebody wants these leaves open now: open from now (DoorOpen) until Shut s after the last want. 8.5.1: and since
+-- when, in the server's time (DoorOpenAt: a client that first sees it open swings it on from where it is now).
 function WalkIn.open(leaves: { Instance }, clock: number)
 	for _, leaf in leaves do
 		WalkIn.want[leaf] = clock
 		if not WalkIn.opened[leaf] then
 			WalkIn.opened[leaf] = clock
+			leaf:SetAttribute("DoorOpenAt", workspace:GetServerTimeNow())
 			leaf:SetAttribute("DoorOpen", true)
 		end
 	end
+end
+
+-- 8.5.1 (the owner: "I'd like them to open nicely"): has every one of these leaves been swinging open Seen × Open s
+-- (most of its swing seen before the fade darkens the screen)? No leaf: yes.
+function WalkIn.swung(leaves: { Instance }, clock: number): boolean
+	for _, leaf in leaves do
+		local at = WalkIn.opened[leaf]
+		if at == nil or clock - at < T.Doors.Open * T.Doors.Seen then
+			return false
+		end
+	end
+	return true
 end
 
 -- The leaves nobody wanted open for Shut s shut again (DoorOpen false); gone ones forgotten.
@@ -2559,8 +2625,8 @@ end
 -- (the owner: "I keep walking smoothly, and then the transition"): the leaf opens as they come at it (WalkIn.coming),
 -- and walking into the doorway is the trip: their walk at it (PairWalk studs/s or more, within Face of straight at it)
 -- takes their root across its threshold (Cross studs out of its face) now or within Ahead s (the server sees them a
--- moment late, its looks Every s apart): through at once, no dwell, no wait for the leaf (open long before). The dwell
--- stays for standing at a door.
+-- moment late, its looks Every s apart): through at once, no dwell, no wait for the leaf (open long before; 8.5.1 from
+-- just beside the door, until it has swung Seen × Open s: WalkIn.swung). The dwell stays for standing at a door.
 function WalkIn.check(s: Session, player: Player, clock: number)
 	local character, humanoid, root = bodyOf(player)
 	if not humanoid or not root or humanoid.SeatPart or traveling[player] then
@@ -2600,11 +2666,13 @@ function WalkIn.check(s: Session, player: Player, clock: number)
 		WalkIn.at[player] = fresh
 		visit = fresh
 	end
-	-- 8.5 walking through: their walk into the doorway takes their root across its threshold (now, or within Ahead s)
+	-- 8.5 walking through: their walk into the doorway takes their root across its threshold (now, or within Ahead s);
+	-- 8.5.1 once its leaf has swung most of the way (WalkIn.swung: from just beside the door, a moment's wait)
 	local mid = WalkIn.frame(s, index, inside)
 	local speed = WalkIn.into(root, out)
 	if mid and not visit.tried and speed >= D.PairWalk
-		and (root.Position.X - mid.X) * out.X + (root.Position.Z - mid.Z) * out.Z - speed * D.Ahead <= D.Cross then
+		and (root.Position.X - mid.X) * out.X + (root.Position.Z - mid.Z) * out.Z - speed * D.Ahead <= D.Cross
+		and WalkIn.swung(WalkIn.leavesOf(s, if inside then s.ways[index] else s.site.doors[index], inside), clock) then
 		visit.tried = true
 		WalkIn.go(s, player, index, inside)
 		return
@@ -2831,15 +2899,23 @@ function Moving.helperLiftFrame(s: Session, spot: number, player: Player): CFram
 	if not thing or not humanoid or not root then
 		return nil
 	end
-	return root.CFrame * holdOffset(thing, "pair", root, humanoid)
+	return root.CFrame * holdOffset(thing, "pair", root, humanoid, true) -- (8.6: as two hold it, lengthwise)
 end
 
--- He is in place: `player`'s lift now (its check opens; without the grip it is up, him at its far end). True when the
--- check is open or the piece is up. 8.3 review: that check opened by his arrival, not by a press (maybe half a minute
--- after it), is marked `called`: unanswered it closes without a knock (Grip.tick), the next Lift opens a new one.
+-- He is in place: `player`'s lift now (8.6: up at once, him at its far end; Config.MoveHelper.CallCheck true: its check
+-- opens, as without the grip it is up). True when the check is open or the piece is up. 8.3 review: that check opened
+-- by his arrival, not by a press (maybe half a minute after it), is marked `called`: unanswered it closes without a
+-- knock (Grip.tick), the next Lift opens a new one.
 function Moving.helperCalled(s: Session, spot: number, player: Player): boolean
-	onPick(s, spot, player)
+	-- 8.6 (the owner: "he does come to me and waits, but it doesn't look good"): Config.MoveHelper.CallCheck false, up at
+	-- once on his "On three... lift!" (no lift check after the wait; balanced: he steadies it, the steady walk)
+	local check = Config.MoveHelper.CallCheck == true
+	onPick(s, spot, player, not check)
 	local hold = Grip.holds[player]
+	if not check and hold and hold.carrying and hold.spot == spot and s.items[spot] then
+		hold.steady = true
+		setHands(s, s.items[spot])
+	end
 	local open = if hold then hold.open else nil
 	if hold and open and hold.spot == spot and open.check.what == "lift" then
 		open.called = true
@@ -4191,7 +4267,7 @@ local function watchCarried(s: Session, clock: number)
 			-- 8.1 carrying in two: the crew mate held at the far end by the server, as Danny is (server/PairHold.luau: never
 			-- put there but through a door's fade, eased back when stuck); the tether waits for that ease too
 			local grace = T.Grace
-			if helperRoot and require(script.Parent.PairHold).follow(helper, helperRoot, item.root, thing.size.Z, root, holder, traveling[helper] == true or traveling[holder] == true) then
+			if helperRoot and require(script.Parent.PairHold).follow(helper, helperRoot, item.root, thing.size, root, holder, traveling[helper] == true or traveling[holder] == true) then
 				grace += Config.MoveHelper.HoldStuck + Config.MoveHelper.HoldEase
 			end
 			if helperRoot and flat(helperRoot.Position, item.root.Position) > reach and not traveling[helper] then

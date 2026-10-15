@@ -836,7 +836,9 @@ end
 -- as Bob comes at the door, walking at it in its approach whichever way he looks, from farther out only at a run (his
 -- walk through its doorway within Lead s), never as he walks past it; walking into the doorway is the trip at once (one
 -- look, no dwell, his walk carried on), in by the front door, out by the doorway inside, in by the back door; walking
--- back out of the hall or past the doorway goes nowhere; standing at the door facing it, the 8.3 dwell as before.
+-- back out of the hall or past the doorway goes nowhere; standing at the door facing it, the 8.3 dwell as before. 8.5.1
+-- (the owner: "I'd like them to open nicely"): walking in from just beside a shut door, its leaf only starting to
+-- swing, the fade waits until it has swung most of the way (Seen × Open s: WalkIn.swung), then in, still walking.
 do
 	local D = T.Doors
 	check("(Bob's move for walking through)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
@@ -886,6 +888,7 @@ do
 	go(foot + up + facing * far + side * 1.5, -facing, -facing * run)
 	step(0.01)
 	check("8.5 …running at it from there (through its doorway within Lead s): its leaf opens already", frontDoor:GetAttribute("DoorOpen") == true and not isIn())
+	step(D.Open) -- (8.5.1: his run there: the leaf swung all the way meanwhile)
 	-- walking through: a stud out of the door, walking in: in at the first look (no dwell), still walking, facing in
 	local since = #E.messages
 	go(foot + up + facing * 1, -facing, -facing * walk)
@@ -910,6 +913,7 @@ do
 	go(exitAt + into * 8, -into, V3(0, 0, 0))
 	step(0.1)
 	step(D.Rearm)
+	step(D.Open) -- (8.5.1: facing it in its approach, its leaf swung open meanwhile: his walk up to it)
 	go(exitAt + into * 1, -into, -into * walk)
 	step(0.01)
 	check("8.5 out by walking through the doorway inside (a stud in front of it, at a walk): out at the first look, 4 studs out of the door, facing the road, still walking",
@@ -942,12 +946,21 @@ do
 	step(0.1)
 	step(D.Rearm)
 	check("(the back door's leaf shut)", shut(backLeaf))
-	go(back + up + backFacing * 9, -backFacing, -backFacing * walk)
-	step(0.1)
-	check("8.5 walking at the back door: its leaf opens", backLeaf:GetAttribute("DoorOpen") == true and not isIn())
+	-- 8.5.1 from just beside it, its leaf shut: walking into its doorway, its leaf only starting to swing
 	go(back + up + backFacing * 1, -backFacing, -backFacing * walk)
 	step(0.01)
-	check("8.5 …walking into its doorway: in at the first look (no dwell), still walking", isIn() and math.abs(root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector) - walk) < 1e-6)
+	check("8.5 walking at the back door: its leaf opens (8.5.1 since when, the server's time: DoorOpenAt, for a client that first sees it opening)",
+		backLeaf:GetAttribute("DoorOpen") == true and backLeaf:GetAttribute("DoorOpenAt") == E.now)
+	check("8.5.1 …walking into its doorway from just beside it (its leaf only starting to swing): not yet in, the fade waits for the swing",
+		not isIn())
+	local waited = 0
+	while not isIn() and waited < D.Open do
+		go(back + up + backFacing * 1, -backFacing, -backFacing * walk) -- (walking on: the test holds him at the threshold)
+		step(0.05)
+		waited += 0.05
+	end
+	check("8.5.1 …in once it has swung most of the way (Seen × Open s, no dwell), still walking", isIn() and waited >= D.Open * D.Seen - 0.06
+		and waited <= D.Open * D.Seen + 0.11 and math.abs(root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector) - walk) < 1e-6, waited)
 	root.AssemblyLinearVelocity = V3(0, 0, 0)
 	Moving.admin(bob, "end")
 end

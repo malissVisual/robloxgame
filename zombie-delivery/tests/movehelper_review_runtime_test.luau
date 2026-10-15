@@ -213,7 +213,7 @@ E.place(two, outside + V3(6, 0, 0))
 
 -- 6. the lift check his arrival opens -------------------------------------------------------------------------------------------
 
-Config.CarryGrip.On = true
+Config.CarryGrip.On, Config.MoveHelper.CallCheck = true, true -- (8.6: the lift check after his arrival is CallCheck's; the game lifts at once)
 local gripFrom = #E.messages
 noticeAt = #E.messages
 local condition = danny.s.move.things[3].condition
@@ -249,7 +249,7 @@ for _, result in grips(one, gripFrom, "result") do
 	end
 end
 check("…that one, opened by her press, unanswered is a miss as ever (its knock)", outcome == "knock" and danny.s.move.things[3].condition < condition, outcome)
-Config.CarryGrip.On = false
+Config.CarryGrip.On, Config.MoveHelper.CallCheck = false, false
 E.Net.get("PutDown").OnServerEvent:Fire(one)
 check("(the call off)", danny.call == nil)
 

@@ -23,10 +23,11 @@
 --             swing (shared/DoorSwing.luau: DoorLeaf -1 / 1 / -1, DoorSwing 1, DoorDark); dressed, all hidden with the
 --             chalet and the model's doors copied as the leaves that swing ("FrontDoorLeaf" ×2, "BackDoorLeaf"). 8.5
 --             walking through: the leaves swing out of the house (DoorSwing -1: seen against the dark doorway, never
---             behind it), and the doorways are walkable: the House box (unseen when dressed, what you bumped into) no
---             longer collides nor stops a ray; its "HouseSolid" pieces do, the box less a hall behind each doorway
---             (Config.Moving.Doors.Hall Depth deep, the opening's width and height), each hall lined dark ("DoorHalls":
---             the house is a shell behind its walls, a camera that follows you in sees a dark hall)
+--             behind it; 8.5.1 past square: Config.Moving.Doors.Wide), and the doorways are walkable: the House box
+--             (unseen when dressed, what you bumped into) no longer collides nor stops a ray; its "HouseSolid" pieces do,
+--             the box less a hall behind each doorway (Config.Moving.Doors.Hall Depth deep, the opening's width and
+--             height), each hall lined dark ("DoorHalls": the house is a shell behind its walls, a camera that follows
+--             you in sees a dark hall)
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Main Street, the signpost at the crossroads
 --   Boundary  the invisible walls on the Bounds
@@ -282,7 +283,9 @@ end
 -- doors part of the model: still): leaves made like them just in front
 -- of them (SandboxScenery.frontLeaves, backLeaves; models "FrontDoorLeaf", "BackDoorLeaf" in the model's own finishes,
 -- HouseMesh.Looks), the chalet's own leaves hidden with it, swinging no more; else the chalet's own leaves (house's
--- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. Returns the leaves.
+-- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. 8.5.1 (the owner: "the doors
+-- just disappear"): they open Config.Moving.Doors.Wide degrees (DoorAngle), past square: square to the wall they were
+-- edge-on to a camera walking up, two slivers by a black doorway. Returns the leaves.
 function SandboxWorld.doorLeaves(house: Model): { Instance }
 	local H = MAP.House
 	local body = house:FindFirstChild("House_" .. H.id)
@@ -311,6 +314,7 @@ function SandboxWorld.doorLeaves(house: Model): { Instance }
 				end
 				model:SetAttribute("DoorLeaf", leaf.hinge)
 				model:SetAttribute("DoorSwing", -1) -- (8.5: out of the house)
+				model:SetAttribute("DoorAngle", Config.Moving.Doors.Wide) -- (8.5.1: their faces stay in sight)
 				model:SetAttribute("DoorDark", true)
 				model.Parent = house
 				table.insert(made, model)
@@ -323,6 +327,7 @@ function SandboxWorld.doorLeaves(house: Model): { Instance }
 		if leaf then
 			leaf:SetAttribute("DoorLeaf", if name == "FrontLeafWest" then -1 elseif name == "FrontLeafEast" then 1 else S.BackDoor.Hinge)
 			leaf:SetAttribute("DoorSwing", -1) -- (8.5: out of the house)
+			leaf:SetAttribute("DoorAngle", Config.Moving.Doors.Wide) -- (8.5.1)
 			leaf:SetAttribute("DoorDark", true)
 			table.insert(made, leaf)
 		end

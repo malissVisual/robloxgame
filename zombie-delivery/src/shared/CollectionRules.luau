@@ -6,7 +6,9 @@
 --
 -- A piece (Entry) is one thing a move brought home: its furniture id (shared/FurnitureLooks.luau Items, the moves'
 -- catalogue: its `value`), its colours (variant), its condition (0 … 1), its name, the display stand it stands on (nil:
--- in the stock) and when it came home (os.time).
+-- in the stock) and when it came home (os.time). 8.7: a piece on show may carry a FOR SALE sign: its price (`sale`, a
+-- whole number of dollars; server/PlayerTrade.luau sets it, shared/PlayerTradeRules.luau has its bounds), the price any
+-- other player may buy it for while it stands there; it goes when the piece leaves its stand.
 --
 --   CollectionRules.defOf(item)          the piece's furniture def (FurnitureLooks.Items) or nil (an id that left the
 --                                        catalogue: worth $0)
@@ -36,13 +38,19 @@
 --   CollectionRules.empty()              a new player's
 --   CollectionRules.clean(raw)           a saved one checked, never trusted: entries with a uid (unique), a short item
 --                                        id, variant, condition, name, a stand (a whole number, one piece a stand) and
---                                        got; MaxStock at most; nextUid past every uid's number
+--                                        got; MaxStock at most; nextUid past every uid's number; 8.7: a sale (a whole
+--                                        number 1 … 2^40, only on a piece on a stand: else none)
 --   CollectionRules.fromSave(saved)      the migration (server/PlayerData.luau applySaved): only a real save (money in
 --                                        it) written with the flag (SaveFlag) has a collection; an older one, a new
---                                        player or a lock-only record start with the empty one
+--                                        player or a lock-only record start with the empty one. 8.7: a piece's `sale` needs
+--                                        no migration of its own: a piece without one is simply not for sale (a save from
+--                                        before 8.7, or written again by an 8.2 – 8.6 server, whose clean drops the field it
+--                                        does not know: the sign is lost there, nothing breaks)
 --   CollectionRules.fitStands(collection, stands, fits?)   pieces on a stand past `stands` back to the stock (how
 --                                        many); 8.3: with fits(stand, item), a piece that no longer fits its stand too
---                                        (a warehouse level down: a small stand where a big one stood)
+--                                        (a warehouse level down: a small stand where a big one stood); 8.7: their FOR
+--                                        SALE signs go with them
+--   CollectionRules.saleOf(value)        8.7: a sign's price as the save keeps it: a whole number 1 … 2^40, else nil
 --   CollectionRules.uid(userId, n)       a piece's uid: "<userId>-<n>" (unique among every player's)
 
 local Config = require(script.Parent.Config)
@@ -60,6 +68,7 @@ export type Entry = {
 	name: string,
 	stand: number?, -- on show on this display stand of your warehouse (nil: in the stock)
 	got: number, -- os.time() it came home
+	sale: number?, -- 8.7: its FOR SALE sign's price ($; only while it is on show: server/PlayerTrade.luau)
 }
 export type Saved = { entries: { Entry }, nextUid: number }
 export type View = {
@@ -77,6 +86,7 @@ export type View = {
 	broken: boolean,
 	base: number, -- 8.3: $ it sells for without the market (Market.batch prices a bulk sale from it)
 	market: string?, -- 8.3: "hot", "cold" or nil (Market.tag)
+	sale: number?, -- 8.7: its FOR SALE sign's price (nil: none)
 }
 export type Totals = { count: number, shown: number, value: number, income: number, sell: number }
 
@@ -188,6 +198,7 @@ function CollectionRules.view(entry: Entry, boost: number?, market: Market.View?
 		broken = CollectionRules.broken(entry),
 		base = base,
 		market = Market.tag(market, entry.item),
+		sale = entry.sale,
 	}
 end
 
@@ -259,6 +270,10 @@ local function shortString(value: any, most: number): boolean
 	return type(value) == "string" and #value >= 1 and #value <= most
 end
 
+function CollectionRules.saleOf(value: any): number?
+	return if finite(value) and value == math.floor(value) and value >= 1 and value < 2 ^ 40 then value else nil
+end
+
 -- A saved collection, checked: never trusted, never an error. A piece without a uid or an item is dropped (a second
 -- piece with a uid seen already too); the rest is mended (variant 1 … 99, condition 0 … 1, a name, got ≥ 0); a second
 -- piece on one stand goes back to the stock; MaxStock pieces at most (the first ones); nextUid past every uid.
@@ -297,6 +312,7 @@ function CollectionRules.clean(raw: any): Saved
 				name = name,
 				stand = stand,
 				got = if finite(e.got) then math.clamp(math.floor(e.got), 0, 2 ^ 40) else 0,
+				sale = if stand ~= nil then CollectionRules.saleOf(e.sale) else nil, -- (8.7: a sign only on a stand)
 			})
 		end
 	end
@@ -324,6 +340,7 @@ function CollectionRules.fitStands(collection: Saved, stands: number, fits: ((nu
 		local stand = entry.stand
 		if stand ~= nil and (stand < 1 or stand > stands or (fits ~= nil and not fits(stand, entry.item))) then
 			entry.stand = nil
+			entry.sale = nil -- (8.7: its FOR SALE sign goes with it)
 			moved += 1
 		end
 	end

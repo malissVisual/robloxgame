@@ -112,7 +112,9 @@ local danny: any = nil
 -- straight: the recorder's PivotTo adds its rounding up step after step).
 local carried: any = nil
 local function follow(model: any)
-	model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * M.CFrame.new(0, 0, -3)
+	if not E.welded(model) then -- (8.6: where Moving's weld keeps it: carried in two, lengthwise)
+		model.PrimaryPart.CFrame = E.rootOf(ann).CFrame * M.CFrame.new(0, 0, -3)
+	end
 end
 local function pieceOf(spot: number): any
 	return built[#built].pieces[spot]
@@ -154,6 +156,10 @@ local function helped(): boolean
 	return math.abs((ann.Character:GetAttribute("CarrySpeed") or 0) - WALK * T.Speed.Pair) < 1e-6
 end
 local function farEnd(model: any): any
+	local ends = danny and danny.gripped == model.PrimaryPart and danny.holdEnd -- (8.6 his end, decided at the lift)
+	if ends then
+		return model.PrimaryPart.CFrame * ends
+	end
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 end
 -- Ann walks to `to` with the piece (8.1 the leader's client: the heading turns PairTurn degrees a second at most toward

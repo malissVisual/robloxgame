@@ -161,17 +161,25 @@ local sofa = itemModel(3)
 local SOFA = E.items.sofa.size
 E.place(sol, sofa.PrimaryPart.Position + V3(0, 0, 3)) -- (facing -Z: the sofa in front of her, Danny's end beyond it)
 local character = sol.Character
--- The sofa in Sol's arms (the weld, in Roblox), 3 studs in front of her root.
+-- The sofa in Sol's arms (the weld, in Roblox: 8.6 where Moving's weld keeps it, Runtime.welded: lengthwise), else 3
+-- studs in front of her root.
 local function follow()
-	sofa.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -3)
+	if not E.welded(sofa) then
+		sofa.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -3)
+	end
 end
--- His place: Standoff past the sofa's far face; his aim: that plus his lead now (her velocity × leadTime: this
+-- His place: Standoff past the sofa's far face (8.6 holding it: his end decided at the lift, the far end of its length);
+-- his aim: that plus his lead now (8.6 his end's velocity × leadTime toward which it moves at HoldLead.Rate: this
 -- runtime's player has no ping).
 local function place(): any
+	local ends = danny and danny.gripped == sofa.PrimaryPart and danny.holdEnd
+	if ends then
+		return sofa.PrimaryPart.CFrame * ends
+	end
 	return (sofa.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(SOFA.Z / 2 + H.Standoff))).Position
 end
 local function lead(): (number, number)
-	return Brain.holdLead(danny.trail, Brain.leadTime(0))
+	return danny.trail.leadX, danny.trail.leadZ
 end
 local function aim(): any
 	local x, z = lead()

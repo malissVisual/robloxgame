@@ -28,8 +28,9 @@ end
 --   the sounds, the admin              Sounds; AdminPanel, AdminFly, PerfOverlay (the panel's performance overlay)
 --   the move's horde                   ZombieAnimator, ZombieLife, ZombieFx, EnemyOutline
 --   the moves                          MovingHud (its story cards and the door's fade: MoveStoryUi, Fade, no start of
---                                      their own), MoveHelperHud, MoveLobbyUi, QuickChat, CarryGripUi, and CrewPanel
---                                      (the planning's + INVITE: a move's crew is server/Crew.luau's)
+--                                      their own), MoveHelperHud, DannyBubble (8.6: what Danny does, over his head),
+--                                      MoveLobbyUi, QuickChat, CarryGripUi, and CrewPanel (the planning's + INVITE: a
+--                                      move's crew is server/Crew.luau's)
 --   the HUD                            Hud (the city's parts hidden: client/Hud.luau ── Sandbox ──) and KeyHints (the
 --                                      move's keys and the car's only)
 --   the sandbox's own                  SandboxHud (the money, the income, the stock), WarehouseUi (the stands' picker),
@@ -37,8 +38,12 @@ end
 --                                      CollectionBookUi (the collection book), SandboxTasksUi (the TASKS chip and
 --                                      panel), 8.3's MoveHelperCard (Danny's command card: a window too), 8.5's
 --                                      DannyOrders (Danny's clipboard, orders mode: no window), OfferCard (a showroom
---                                      visitor's offer: a window too) and VanPaintUi (the PAINT shop's window): each
---                                      started only when it is there
+--                                      visitor's offer: a window too; 8.7: a player's offer too), VanPaintUi (the PAINT
+--                                      shop's window) and 8.7's TradeUi (trading between players: the offer composer,
+--                                      the FOR SALE price picker, the buy question; a window too, the STOCK list's 🏷
+--                                      opens its picker and closing that goes back to the list): each started only
+--                                      when it is there; 8.7's TradePrompts (the trade prompts on your own stands
+--                                      hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
 -- version and the server's stamp (workspace "ServerBuild"); different: a warning, and in Studio a red banner that says
 -- what to delete before syncing again.
@@ -120,7 +125,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -148,7 +153,8 @@ if Config.Sandbox.On then
 	local DannyCard = ownModule("MoveHelperCard") -- (8.3: Danny's command card, a window like the others)
 	local OfferCard = ownModule("OfferCard") -- (8.3: a showroom visitor's offer, a window like the others)
 	local PaintUi = ownModule("VanPaintUi") -- (8.3: the PAINT shop's window)
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi }
+	local TradeUi = ownModule("TradeUi") -- (8.7: trading between players: the composer, the price picker, the buy question)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi }
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -178,12 +184,14 @@ if Config.Sandbox.On then
 	safely("CrashFx", require(Client.CrashFx).start)
 	safely("MovingHud", MovingHud.start)
 	safely("MoveHelperHud", require(Client.MoveHelperHud).start)
+	safely("DannyBubble", require(Client.DannyBubble).start) -- 8.6: what Danny does, over his head (his move's crew only)
 	safely("MoveLobbyUi", MoveLobbyUi.start)
 	safely("QuickChat", QuickChat.start)
 	safely("CarryGripUi", require(Client.CarryGripUi).start)
 	safely("WalkDoors", require(Client.WalkDoors).start) -- 8.3: the doors' leaves swing, the trip's camera behind you
 	-- (8.0 merge: the moves' and the warehouse stands' prompts are their owner's: the others' hidden, as in the city)
 	safely("CargoPrompts", require(Client.CargoPrompts).start)
+	safely("TradePrompts", require(Client.TradePrompts).start) -- 8.7: the trade prompts on your own stands hidden; a big sale's chat line
 	for _, entry in own do
 		local start = entry.module.start
 		if type(start) == "function" then
@@ -255,11 +263,15 @@ if Config.Sandbox.On then
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
 			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
-			or ownOpen(OfferCard)
+			or ownOpen(OfferCard) or ownOpen(TradeUi)
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	if type(OfferCard) == "table" then
 		OfferCard.covered = CameraRig.windowOpen -- (8.3: a visitor's offer waits while another window is open)
+	end
+	if type(TradeUi) == "table" and type(WarehouseUi) == "table" then -- 8.7: the STOCK list's 🏷 opens the price picker; closing it goes back
+		WarehouseUi.onPrice = TradeUi.openPrice
+		TradeUi.onBack = WarehouseUi.openStock
 	end
 	-- 8.5 Danny's clipboard (orders mode: no window, nothing closes for it, the camera keeps the mouse): its line, its
 	-- outline and its 📋 button step aside while a window covers the screen

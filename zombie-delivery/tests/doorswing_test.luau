@@ -160,7 +160,12 @@ do
 	end
 	check("the swing's share: 0 … 1 both ways, never back", DoorSwing.ease(0, true) == 0 and DoorSwing.ease(1, true) == 1 and DoorSwing.ease(0, false) == 0
 		and DoorSwing.ease(1, false) == 1 and monotone and DoorSwing.ease(-1, true) == 0 and DoorSwing.ease(2, false) == 1)
-	check("…opening fast, easing into the stop; shutting slow, then quicker into the frame", DoorSwing.ease(0.5, true) > 0.8 and DoorSwing.ease(0.5, false) < 0.3)
+	check("…opening quick, easing into the stop; shutting slow, then quicker into the frame", DoorSwing.ease(0.5, true) > 0.7 and DoorSwing.ease(0.5, false) < 0.3)
+	-- 8.5.1 (the owner: "the doors just disappear"): 8.5's cubic ease over 0.25 s had the leaves half open in 50 ms, nearly
+	-- all the way in 100 ms: a pop. Quadratic: its first tenth of the time a fifth of the way at most, half its time not
+	-- even 80 %, the whole of it seen
+	check("8.5.1 …never a pop: its first tenth a fifth of the way at most, half its time under 80 %", DoorSwing.ease(0.1, true) <= 0.2
+		and DoorSwing.ease(0.5, true) < 0.8 and DoorSwing.ease(0.9, true) > 0.95)
 	local x, y, z = DoorSwing.dark(4, 7, 0.4)
 	local x2, _, z2 = DoorSwing.dark(0.4, 7, 4)
 	check("the dark doorway: the leaf's whole face (two halves meet with no seam), thin in its middle plane", x == 4 and y == 7 and z <= 0.05 and x2 <= 0.05
@@ -171,8 +176,10 @@ end
 
 check("the doors swing; the numbers are there", D.Swing == true and D.Open > 0 and D.Close > 0 and D.Shut > 0 and D.FadeOut > 0 and D.Margin > 0
 	and D.Dark > 0 and D.FadeIn > 0 and D.Wait > 0 and D.Stream > 0 and D.Arrive > 0 and D.Angle > 0 and D.Angle <= 180)
-check("about the owner's numbers: the fade out ~0.25 s, the fade in ~0.35 s; 8.5 the leaf quick but seen (0.2 … 0.35 s, was 0.35)",
-	D.Open >= 0.2 and D.Open <= 0.35 and D.Open < D.Close and near(D.FadeOut, 0.25, 0.1) and near(D.FadeIn, 0.35, 0.1), D.Open)
+check("about the owner's numbers: the fade out ~0.25 s, the fade in ~0.35 s; 8.5 the leaf quick but seen (0.25 … 0.35 s; 8.5.1 0.35, 8.5's 0.25 a pop)",
+	D.Open >= 0.25 and D.Open <= 0.35 and D.Open < D.Close and near(D.FadeOut, 0.25, 0.1) and near(D.FadeIn, 0.35, 0.1), D.Open)
+check("8.5.1 the sandbox house's leaves open past square (Wide: seen, not edge-on to a player walking up), walking through waits for most of the swing (Seen)",
+	D.Wide > 90 and D.Wide <= 120 and D.Seen > 0.5 and D.Seen < 1 and DoorSwing.ease(D.Seen, true) >= 0.8, `{D.Wide} {D.Seen}`)
 check("the leaf starts opening before the zone (its approach deeper and wider); 8.5 a bit larger (was 8 deep, 2 wider)", D.Approach > D.Depth + 1
 	and D.Approach > 8 and D.ApproachSide > 2)
 -- 8.5 walking through, on the clock as the game runs it: the server sees a client's body VIEW s late and looks every
@@ -206,6 +213,14 @@ check("8.5 …your walk into the house's dark hall never reaches its end before 
 -- …and out of the house onto its porch (server/HouseInterior.luau: 6 studs past the wall, Config.Furniture.Wall thick,
 -- its threshold the wall's inner face), at a walk
 local porchStop = Config.Furniture.Wall + 6 - 0.5
+-- 8.5.1 (the owner: "I'd like them to open nicely"): the screen never darkens before the swing is mostly done. From
+-- the approach at a walk the leaf opened Approach studs out (seen VIEW + Every late at most), the fade starts at the
+-- threshold (Ahead s early at most): the swing over by then. From just beside the door (the leaf opening as you step
+-- in), the fade waits until it has swung Seen × Open s (server/Moving.luau's WalkIn.swung): 80 % open as the screen
+-- starts to darken, all the way before it is black.
+local swungAtFade = (D.Approach / walk - VIEW - D.Every - D.Ahead) / D.Open
+check("8.5.1 the screen never dark before the swing is mostly done: from the approach at a walk fully open as the fade starts; from beside the door the fade waits (Seen), 80 % open, all the way open before black",
+	swungAtFade >= 1 and DoorSwing.ease(D.Seen, true) >= 0.8 and D.Seen * D.Open + D.FadeOut >= D.Open, `{swungAtFade} {DoorSwing.ease(D.Seen, true)}`)
 check("8.5 …and out by a door inside: onto its porch, at a walk never at its end before the move", fadeAt(walk, true) + walk * (D.FadeOut + D.Margin) <= porchStop,
 	`{fadeAt(walk, true) + walk * (D.FadeOut + D.Margin)} of {porchStop}`)
 check("8.5 a light dwell stays for standing at a door (under the old 0.25 s)", D.Dwell > 0 and D.Dwell <= 0.25)

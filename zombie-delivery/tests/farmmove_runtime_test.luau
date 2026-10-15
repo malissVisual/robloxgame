@@ -653,8 +653,10 @@ check("…comes out by them with it and loads it into the van at the barn", came
 -- put at the far end each step, as his constraints hold him in Roblox).
 local H = Config.MoveHelper
 local s = danny.s
-local function hold(model: any) -- (Sol's weld, the root set straight)
-	model.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + 1))
+local function hold(model: any) -- (Sol's weld, the root set straight; 8.6 where Moving's weld keeps it: lengthwise)
+	if not E.welded(model) then
+		model.PrimaryPart.CFrame = E.rootOf(sol).CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + 1))
+	end
 end
 local function steps(seconds: number, done: (() -> boolean)?, carried: any?): boolean
 	for index = 1, math.ceil(seconds / 0.1 - 1e-9) do
@@ -678,6 +680,10 @@ local function steps(seconds: number, done: (() -> boolean)?, carried: any?): bo
 	return done == nil
 end
 local function farEndOf(model: any): any
+	local ends = danny.gripped == model.PrimaryPart and danny.holdEnd -- (8.6 his end, decided at the lift)
+	if ends then
+		return model.PrimaryPart.CFrame * ends
+	end
 	return (model.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(model.PrimaryPart.Size.Z / 2 + H.Standoff))).Position
 end
 local function heldBy(spot: number): boolean

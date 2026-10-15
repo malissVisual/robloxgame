@@ -11,7 +11,9 @@
 --     SandboxHud.setState; ESC closes the warehouse's picker; the picker frees the mouse; 8.3: the server's notices go
 --     through SandboxHud.notice (in this device's words) when it has one, else straight to the HUD's toasts; 8.3:
 --     SandboxLight (the eyes) starts after SandboxSounds; 8.3 review: another window opening only hides a visitor's
---     offer card (OfferCard.hide), ESC declines it (OfferCard.close). Run with tests/run_tests.py.
+--     offer card (OfferCard.hide), ESC declines it (OfferCard.close); 8.7: TradePrompts (the trade prompts on your own
+--     stands hidden) right after CargoPrompts, TradeUi (trading between players) a window like the others, the STOCK
+--     list's 🏷 opening its price picker and the picker going back to the list. Run with tests/run_tests.py.
 
 local Config = require("./Config")
 local ClientMain = require("./ClientMain")
@@ -44,10 +46,10 @@ local CITY = {
 local SANDBOX = {
 	"Drive", "ZombieAnimator", "CarVisuals", "Hud", "CameraRig", "ArmPose", "AdminPanel", "AdminFly", "CrewPanel",
 	"Sounds", "Stamina", "CarBoarding", "GaitPose", "BodyLife", "KeyHints", "Unstuck", "CurbRide", "PerfOverlay",
-	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "MoveLobbyUi",
-	"QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera)
+	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "DannyBubble",
+	"MoveLobbyUi", "QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", "TradePrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera; 8.6: DannyBubble, what Danny does over his head; 8.7: TradePrompts)
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi" } -- (8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi" } -- (8.7: TradeUi, trading between players; 8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
@@ -140,6 +142,12 @@ local function boot(sandbox: boolean, own: { [string]: string }, warehouseOpen: 
 				end else nil,
 				notice = if name == "SandboxHud" then function(_text: any) -- (8.3: the notices in this device's words)
 					table.insert(run.calls, "SandboxHud.notice")
+				end else nil,
+				openPrice = if name == "TradeUi" then function(_entry: any) -- (8.7: the STOCK list's 🏷)
+					table.insert(run.calls, "TradeUi.openPrice")
+				end else nil,
+				openStock = if name == "WarehouseUi" then function() -- (8.7: back from the price picker)
+					table.insert(run.calls, "WarehouseUi.openStock")
 				end else nil,
 			}
 		elseif kind == "bare" then
@@ -275,11 +283,12 @@ end
 -- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok" })
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok", TradeUi = "ok" })
 	local ok, where = same(starts(run), CITY)
 	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
 	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil
-		and run.required.MoveHelperCard == nil and run.required.DannyOrders == nil and run.required.VanPaintUi == nil and run.required.OfferCard == nil)
+		and run.required.MoveHelperCard == nil and run.required.DannyOrders == nil and run.required.VanPaintUi == nil and run.required.OfferCard == nil
+		and run.required.TradeUi == nil and run.required.TradePrompts == nil)
 	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
 	check("8.3: the city never requires the sandbox's walk-in doors' client (WalkDoors)", run.required.WalkDoors == nil)
 	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
@@ -288,9 +297,9 @@ end
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
 
 do
-	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok" }, true)
+	local run = boot(true, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok", TradeUi = "ok" }, true)
 	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
-	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, MoveHelperCard, DannyOrders, OfferCard, VanPaintUi, then SandboxSounds and SandboxLight`, ok, where)
+	check(`the sandbox starts its {#SANDBOX} systems, then SandboxHud, WarehouseUi, SandboxGuide, UpgradeUi, CollectionBookUi, SandboxTasksUi, MoveHelperCard, DannyOrders, OfferCard, VanPaintUi, TradeUi, then SandboxSounds and SandboxLight`, ok, where)
 	local city: { string } = {}
 	for _, name in CITY_ONLY do
 		if run.required[name] then
@@ -341,6 +350,10 @@ do
 	check("… and 8.3 the PAINT shop's window (a window like the others, with its onOpen)", called(run, "VanPaintUi.close") and type(run.modules.VanPaintUi.onOpen) == "function")
 	check("… and 8.3 a visitor's offer card (a window like the others, with its onOpen; it waits while the camera's windowOpen says another is open)", called(run, "OfferCard.close")
 		and type(run.modules.OfferCard.onOpen) == "function" and run.modules.OfferCard.covered == run.modules.CameraRig.windowOpen)
+	check("… and 8.7 trading between players (TradeUi: a window like the others, with its onOpen; the camera's windowOpen counts it)", called(run, "TradeUi.close")
+		and type(run.modules.TradeUi.onOpen) == "function")
+	check("8.7: the STOCK list's 🏷 opens TradeUi's price picker, which goes back to the STOCK list", run.modules.WarehouseUi.onPrice == run.modules.TradeUi.openPrice
+		and type(run.modules.TradeUi.openPrice) == "function" and run.modules.TradeUi.onBack == run.modules.WarehouseUi.openStock and type(run.modules.WarehouseUi.openStock) == "function")
 	check("8.5 Danny's clipboard (orders mode) is no window: ESC never closes it, no onOpen; it steps aside under the camera's windowOpen",
 		not called(run, "DannyOrders.close") and type(run.modules.DannyOrders.onOpen) ~= "function" and run.modules.DannyOrders.covered == run.modules.CameraRig.windowOpen)
 	-- 8.1 review: opening a sandbox window closes the others, never itself (its onOpen runs once it counts as open)
