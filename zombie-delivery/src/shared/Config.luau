@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.5.1"
+Config.Version = "8.5.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6561,10 +6561,14 @@ Config.Furniture = {
 	--   Collectibles           its collector's pieces (Count: at least, at most; Legendary: the chance of one), the
 	--                          house's Odds and Salt
 	--   InteriorMaxParts       an interior's parts at most, its furniture included (tests/biglayout_test.luau)
+	--   Roomy                  8.5.2 (the owner: "more room in the house"): its rooms, its hall and its corridor this
+	--                          many times as wide and deep (whole studs; the dice, the doors and the furniture as they
+	--                          were: 1.25, half as much floor again round the same pieces; 1: as before, at most 2)
 	Big = {
 		Front = 26,
 		Kitchen = 0.4,
 		BackDoor = 6,
+		Roomy = 1.25,
 		Spots = { 34, 40 } :: { number },
 		Stars = 4,
 		Collectibles = { Count = { 2, 3 } :: { number }, Legendary = 0.06 },
@@ -7822,7 +7826,8 @@ Config.VanPaint = {
 --   Every      s between two looks at where you are (the easing writes every frame only while it moves)
 --   LiteBloom  a phone's or a tablet's bloom: × this (client/DeviceBudget.luau lite)
 --   House      the house's inside (server/HouseInterior.luau): Lamp (each room's ceiling light, a PointLight: Brightness,
---              Range, Color; a room longer than Long gets two), Porch (the daylight through the front door: a
+--              Range, Color; a room longer than Long gets two; 8.5.2, the roomier big house: along a side longer than
+--              twice Span a lamp each Span at most, never two closer than Apart: SandboxLightRules.lamps), Porch (the daylight through the front door: a
 --              SurfaceLight's Brightness, Range, Color) and the Neon parts' colours: Glow (the ceiling lamps' discs),
 --              Tube (the garage's), Window / BathWindow (the panes' daylight), Daylight (the porch's wall of daylight)
 --   Warehouse  the hall (shared/WarehouseLayout.luau, server/WarehouseMesh.luau): Lamp (each of its hall lights, a
@@ -7902,7 +7907,7 @@ Config.SandboxLight = {
 	Every = 0.1,
 	LiteBloom = 0.6,
 	House = {
-		Lamp = { Brightness = 0.5, Range = 24, Long = 28, Color = { 255, 230, 196 } :: { number } },
+		Lamp = { Brightness = 0.5, Range = 24, Long = 28, Span = 36, Apart = 16, Color = { 255, 230, 196 } :: { number } },
 		Porch = { Brightness = 0.45, Range = 12, Color = { 255, 246, 230 } :: { number } },
 		Glow = { 220, 188, 148 } :: { number },
 		Tube = { 196, 206, 218 } :: { number },

@@ -19,6 +19,7 @@ Config.Sandbox.On = true -- (the big house is the sandbox's: its doors swing the
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 local FurnitureLooks = require("./FurnitureLooks")
+local LightRules = require("./SandboxLightRules") -- 8.5.2: a room's ceiling lamps
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -223,7 +224,7 @@ for _, seed in { 1, 2, 3, 4, 5, 6 } do
 	check(`{tag}: {parts} parts (at most Big.InteriorMaxParts {L.InteriorMaxParts}, {#plan.spots} pieces)`, parts <= L.InteriorMaxParts)
 	local lamps = 0
 	for _, room in plan.rooms do
-		lamps += if math.max(room.max.X - room.min.X, room.max.Z - room.min.Z) > LIT.Lamp.Long then 2 else 1
+		lamps += #LightRules.lamps(room.min.X, room.max.X, room.min.Z, room.max.Z) -- (8.5.2: a lamp a cell of the room's grid)
 	end
 	check(`{tag}: a ceiling lamp a room, two in a long one ({roomLights} for {#plan.rooms} rooms: Config.SandboxLight.House.Lamp), the two doors' daylight ({doorLights}: Porch), no shadows`,
 		roomLights == lamps and doorLights == 2 and #wrongLight == 0, table.concat(wrongLight, ", "))
