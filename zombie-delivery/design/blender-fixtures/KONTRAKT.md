@@ -1,4 +1,4 @@
-# 8.7.1: the house's fixtures in Blender (the contract)
+# 8.8.1: the house's fixtures in Blender (the contract)
 
 The owner asked for the house's built-in things in their own Blender model: the kitchen, the bathroom, the Kachelofen
 and the garage's things. Today `server/HouseInterior.luau`'s `LOOKS` build them from parts. The new model is

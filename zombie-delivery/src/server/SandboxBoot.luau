@@ -14,7 +14,7 @@
 --   * PlayerData (its own saves, Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
 --     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
 --     (the moves' lobby, the crew panel), Transport, KitWear, Horn, 8.5's Clipboard (Danny's clipboard: orders mode);
---   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), 8.7.1's
+--   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), 8.8.1's
 --     FixtureMesh (the Blender fixtures of the moves' houses), the collection (Collection: its payout loop) and 8.2's
 --     collection book (CollectionBook: its remote, its hook on Collection.add), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the vans' engines), 8.2's
 --     daily tasks (SandboxTasks) and SandboxLeaders (the player list's columns, the TOP MOVERS board), 8.3's showroom
@@ -411,7 +411,7 @@ local function sandbox()
 	safely("FurnitureMesh", function()
 		require(Server.FurnitureMesh).start()
 	end)
-	safely("FixtureMesh", function() -- 8.7.1: the houses' fixtures in the owner's Blender model (before the moves' houses)
+	safely("FixtureMesh", function() -- 8.8.1: the houses' fixtures in the owner's Blender model (before the moves' houses)
 		require(Server.FixtureMesh).start()
 	end)
 	optional("Collection", "start")

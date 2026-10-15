@@ -1,5 +1,5 @@
 --!strict
--- 8.7.1, the house's fixtures in the owner's own Blender model (the owner: "udělej kuchyň a koupelnu";
+-- 8.8.1, the house's fixtures in the owner's own Blender model (the owner: "udělej kuchyň a koupelnu";
 -- design/blender-fixtures/fixtures.py → roblox/ZDCFixtureArt.fbx, the contract design/blender-fixtures/KONTRAKT.md).
 -- The owner imports ZDCFixtureArt.fbx once in Roblox Studio (File → Import 3D, the defaults) and publishes; this finds
 -- the imported model (a top-level child of ServerStorage or Workspace named ZDCFixtureArt, or one holding mark_o and

@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(os.path.dirname(SHARED), "server", "FurnitureMesh.luau"), encoding="utf-8").read()
     source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
     open(os.path.join(tmp, "FurnitureMesh.luau"), "w", encoding="utf-8").write(prefix + "local game, workspace = M.game, M.workspace\n" + source)
-    # 8.7.1: its server/FixtureMesh.luau (the owner's Blender fixtures) on the same recorder, a ServerStorage of its own:
+    # 8.8.1: its server/FixtureMesh.luau (the owner's Blender fixtures) on the same recorder, a ServerStorage of its own:
     # no import there, so every fixture keeps its parts (tools/fixtures-art/check.py dresses them with one).
     source = open(os.path.join(os.path.dirname(SHARED), "server", "FixtureMesh.luau"), encoding="utf-8").read()
     source = re.sub(r'require\(ReplicatedStorage:WaitForChild\("Shared"\)\.(\w+)\)', r'require("./\1")', source)
@@ -717,7 +717,7 @@ if not review72_check():
 # the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
 def imports_first_check():
     main = open(os.path.join(os.path.dirname(HERE), "src", "server", "Main.server.luau"), encoding="utf-8").read()
-    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt", "ZDCFixtureArt")  # (8.7.1: the fixtures)
+    names = ("ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt", "ZDCFixtureArt")  # (8.8.1: the fixtures)
     first = main.find("ServerStorage")
     wait = main.find(":WaitForChild(")
     good = first >= 0 and wait >= 0 and first < wait and all(main.find(f'"{n}"') < wait for n in names)
@@ -874,7 +874,7 @@ print("== warehouse mesh: " + ((warehouse.stdout.strip().splitlines() or ["?"])[
 if warehouse.returncode != 0:
     ok = False
 
-# 8.7.1: the house's fixtures in the owner's Blender model (server/FixtureMesh.luau): tools/fixtures-art/check.py imports
+# 8.8.1: the house's fixtures in the owner's Blender model (server/FixtureMesh.luau): tools/fixtures-art/check.py imports
 # design/blender-fixtures/roblox/ZDCFixtureArt.json's pieces (turned, scaled; a stand-in from the contract's table until
 # fixtures.py's manifest exists) and dresses the interiors the real server/HouseInterior.luau builds; scattered,
 # mirrored and wrong-sized imports refused.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""8.7.1: server/FixtureMesh.luau's Looks from the blender model's finishes (design/blender-fixtures/KONTRAKT.md).
+"""8.8.1: server/FixtureMesh.luau's Looks from the blender model's finishes (design/blender-fixtures/KONTRAKT.md).
 
 Reads the finishes from the manifest ZDCFixtureArt.json ("finishes": name → color, material, palette, reflectance,
 transparency) or straight from fixtures.py (its FINISHES, GAME and PALETTE tables, before an export), and prints the
