@@ -20,6 +20,19 @@
 --                                              that price, else refused (the prices moved) and the state sent again
 --   Collection.sellAt(player, uid, price, reason)   8.3 visitors: sell it at a price the server set (a visitor's offer,
 --                                              server/VisitorOffers.luau), paid as `reason`; else as sell → money?, why
+--   Collection.setSale(player, uid, price?)    8.7 trading: a FOR SALE sign on a piece on show at that price (a whole
+--                                              number; nil: the sign off) → ok, why (the bounds are server/PlayerTrade's)
+--   Collection.transfer(seller, buyer, uid, stand, price, fee)   8.7 trading: the deal between two players, all in one
+--                                              go with no yield (server/PlayerTrade.luau prices it): checked first (both
+--                                              here with their saves, not the same player, the buyer with a warehouse,
+--                                              the seller's piece still on stand `stand`, room in the buyer's stock, the
+--                                              buyer's money), then the seller's stands counted at the old rates, the
+--                                              piece out of the seller's collection and into the buyer's stock (a new uid
+--                                              of the buyer's, not on show, no sign; got now), the price from the buyer
+--                                              ("PlayerBuy"), to the seller ("PlayerSale") less the fee ("TradeFee"); both
+--                                              changed, both saved soon → the buyer's new entry (a copy), nil and why
+--                                              (a Refusal: { code, text }: "save", "self", "house", "gone", "full",
+--                                              "money", "left")
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
 --   Collection.stands(player)                  8.1: the display stands you have (CollectionRules.standsFor: 8.3 your
 --                                              warehouse level's big ones and the More stands you bought)
@@ -71,6 +84,10 @@
 -- earned up to that moment is counted; every Tick s the whole dollars are paid ("CollectionIncome"), the cents wait for
 -- the next payout; leaving pays what was counted. A sale pays "CollectionSale". Analytics (PlayerData.track):
 -- CollectionAdded (once a frame: how many came home, the rarest), CollectionDisplayed, CollectionSold.
+-- 8.7 trading (server/PlayerTrade.luau): a piece on show may carry a FOR SALE sign (entry.sale, its price; in the state's
+-- View too); taking it down (one, or TAKE ALL DOWN), a stand lost to a level down and selling it end the sign, a move to
+-- another stand keeps it. A deal between players (Collection.transfer) is no "sale" for onPaid (the daily sell tasks, the
+-- sale badges): a piece passed back and forth between friends must earn nobody a task.
 -- 8.3 economy, AFK (the owner: the money should take long to save up, not come by itself): the stands pay in full while
 -- their owner plays; after Config.Collection.IdleAfter s without activity only IdleShare of it (0: nothing), counted
 -- exactly (the idle stretch of a payout at the share, the rest in full). Activity is what the server sees, one clock a
@@ -482,6 +499,7 @@ function Collection.undisplay(player: Player, uid: string): (boolean, string?)
 	end
 	settle(player)
 	entry.stand = nil
+	entry.sale = nil -- (8.7: its FOR SALE sign comes down with it)
 	changed(player)
 	return true, nil
 end
@@ -540,6 +558,103 @@ function Collection.sellAt(player: Player, uid: string, price: number, reason: s
 	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
 	changed(player)
 	return price, nil
+end
+
+-- 8.7 trading: a FOR SALE sign on a piece on show (its price, a whole number of dollars; nil: the sign comes off). The
+-- price's bounds are server/PlayerTrade.luau's (shared/PlayerTradeRules.luau): here only a sane number.
+function Collection.setSale(player: Player, uid: string, price: number?): (boolean, string?)
+	local collection = collectionOf(player)
+	if not collection then
+		return false, "Your save isn't loaded yet."
+	end
+	local entry = find(collection, uid)
+	if not entry then
+		return false, "That piece isn't in your stock."
+	end
+	if price ~= nil and Rules.saleOf(price) == nil then
+		return false, "That's no price."
+	end
+	if price ~= nil and entry.stand == nil then
+		return false, `Put your {entry.name} on show first: a FOR SALE sign stands on its stand.`
+	end
+	if entry.sale == price then
+		return true, nil
+	end
+	entry.sale = price
+	PlayerData.saveSoon(player) -- (the sign survives a rejoin)
+	changed(player)
+	return true, nil
+end
+
+export type Refusal = { code: string, text: string }
+
+local function refusal(code: string, text: string): (nil, Refusal)
+	return nil, { code = code, text = text }
+end
+
+function Collection.transfer(seller: Player, buyer: Player, uid: string, stand: number, price: number, fee: number): (Entry?, Refusal?)
+	-- (every check before anything moves, and nothing in here yields: the deal is one step)
+	if seller == buyer then
+		return refusal("self", "That's your own piece.")
+	end
+	if not seller.Parent or not buyer.Parent then
+		return refusal("left", "They left the server.")
+	end
+	local from, to = collectionOf(seller), collectionOf(buyer)
+	local buyerProfile = PlayerData.get(buyer)
+	if not from or not to or not buyerProfile then
+		return refusal("save", "A save isn't loaded yet.")
+	end
+	if not finite(price) or price ~= math.floor(price) or price < 1 or price >= 2 ^ 40 or not finite(fee) or fee < 0 or fee > price then
+		return refusal("gone", "That's no price.")
+	end
+	local housed = Collection.hasWarehouse
+	if housed and not housed(buyer) then
+		return refusal("house", "You need a warehouse of your own to buy: wait for a free plot.")
+	end
+	if housed and not housed(seller) then
+		return refusal("gone", "That piece isn't on show any more.")
+	end
+	local entry, index = find(from, uid)
+	if not entry or not index or entry.stand == nil or entry.stand ~= stand then
+		return refusal("gone", "That piece isn't on show there any more.")
+	end
+	if #to.entries >= Config.Collection.MaxStock then
+		return refusal("full", `Your warehouse is full ({Config.Collection.MaxStock} pieces): sell some first.`)
+	end
+	if buyerProfile.money < price then
+		return refusal("money", `You have {Market.money(buyerProfile.money)}: not enough for {Market.money(price)}.`)
+	end
+	-- the moves
+	settle(seller) -- (what the seller's stands earned up to now, at the old rates)
+	table.remove(from.entries, index)
+	local newUid = Rules.uid(buyer.UserId, to.nextUid)
+	to.nextUid += 1
+	while find(to, newUid) do -- (never from a clean save; a guard all the same)
+		newUid = Rules.uid(buyer.UserId, to.nextUid)
+		to.nextUid += 1
+	end
+	local piece: Entry = {
+		uid = newUid,
+		item = entry.item,
+		variant = entry.variant,
+		condition = entry.condition,
+		name = entry.name,
+		stand = nil,
+		got = os.time(),
+		sale = nil,
+	}
+	table.insert(to.entries, piece)
+	PlayerData.spend(buyer, price, "PlayerBuy", entry.item)
+	PlayerData.addMoney(seller, price, "PlayerSale", entry.item)
+	if fee > 0 then
+		PlayerData.spend(seller, fee, "TradeFee", entry.item)
+	end
+	PlayerData.saveSoon(seller)
+	PlayerData.saveSoon(buyer)
+	changed(seller)
+	changed(buyer)
+	return table.clone(piece), nil
 end
 
 -- The admin's CLEAR STOCK (server/Admin.luau "sandbox"): the whole collection gone, on show or not, for nothing (what
@@ -866,6 +981,7 @@ local function undisplayAll(player: Player): (number?, string?)
 	settle(player) -- (what they earned up to now still counts)
 	for _, entry in collection.entries do
 		entry.stand = nil
+		entry.sale = nil -- (8.7: the FOR SALE signs too)
 	end
 	remote:FireClient(player, { kind = "bulk", action = "undisplayall", count = shown })
 	changed(player)

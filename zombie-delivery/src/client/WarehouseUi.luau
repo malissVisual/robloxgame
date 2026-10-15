@@ -33,6 +33,7 @@
 --   WarehouseUi.layout(W, H, touch)      the card and its grid on a W × H screen (px under Roblox's top bar)
 --   WarehouseUi.views()                  the 3D pictures alive now
 --   WarehouseUi.notify / onOpen          hooks: the toasts (client/SandboxHud.luau sets it), the window opened
+--   WarehouseUi.onPrice                  8.7: fn(entry) the 🏷 of a piece on show tapped (its View: the price picker)
 --   WarehouseUi.Rarity / Rarities        the rarities' colours (common grey, uncommon green, rare blue, epic purple,
 --                                        legendary gold) and their order
 -- 8.2, the warehouse's quality of life (which pieces: shared/StockPlan.luau, the rules server/Collection.luau decides
@@ -59,6 +60,10 @@
 --     each next piece of a kind under the demand of the ones before it) and its SELL sends the total it showed
 --     ({ kind = "sellmany", filter, expect }): the server sells only at that total (the prices moved: it says so and
 --     sends the state again). Only prices the server sent are expected (a guessed one is never sent).
+-- 8.7, trading between players (server/PlayerTrade.luau): THE STOCK LIST's tile of a piece on show has a 🏷 at its
+-- picture's top right (gold while it carries a FOR SALE sign, the state's entry.sale; its price line then says
+-- "🏷 For sale $1,200" in gold instead of "Sell $Y"): a tap opens the FOR SALE price picker (WarehouseUi.onPrice:
+-- client/Main.client.luau sets it to client/TradeUi.luau's openPrice, which comes back to the list when it closes).
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): which stands are small depends on your warehouse's level (the player
 -- attribute Config.SandboxUpgrades.WarehouseAttribute, 1 … 5, server/Upgrades.luau; 4 until the server sets it, as a
 -- plain Plot): WarehouseLayout.fits and count ask with it, so TOO BIG and its words follow a level up.
@@ -148,6 +153,7 @@ local RULES = {
 
 WarehouseUi.notify = nil :: ((text: string) -> ())?
 WarehouseUi.onOpen = nil :: (() -> ())?
+WarehouseUi.onPrice = nil :: ((entry: Entry) -> ())? -- 8.7: the 🏷 on a piece on show (client/TradeUi.luau's price picker)
 WarehouseUi.Rules = nil :: any -- shared/CollectionRules.luau once found (start)
 
 local TILE_TEXT = 100 -- a tile's height besides its picture and buttons (unscaled px)
@@ -1062,6 +1068,25 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 		Ui.corner(pill, 10)
 		tagY += 24
 	end
+	-- 8.7: the STOCK list's 🏷 on a piece on show (its FOR SALE sign: the price picker), a square at the picture's top
+	-- right (the ribbon and the tags are at its left), gold while the piece has a sign (its price: the SellPrice line)
+	if stand == nil and entry.stand ~= nil then
+		local sale = amount((entry :: any).sale)
+		local side = if layout.touch then math.max(24, math.ceil(Ui.MinTouch / layout.scale)) else 24
+		local picW = w - 12
+		local priceButton = CardKit.bigButton(picture, { name = "Price", text = "🏷", kind = if sale then "gold" else "shut", height = side, textSize = 12, z = 5, onClick = function()
+			local hook = WarehouseUi.onPrice
+			if hook then
+				hook(entry)
+			end
+		end })
+		priceButton.Size = UDim2.fromOffset(side, side)
+		priceButton.Position = UDim2.fromOffset(picW - 6 - side, 6)
+		if not sale then
+			priceButton.TextColor3 = K.text
+		end
+		priceButton:SetAttribute("Sale", sale)
+	end
 	local inner = w - 20
 	if tooBig then
 		-- 8.2: a veil over its picture and the words (wrapped: they fit a narrow tile too)
@@ -1077,7 +1102,9 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	-- the one big number: what it earns a minute on show; the price under it
 	Ui.label(frame, WarehouseUi.rate(values.perMinute), UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = if tooBig then K.secondary else C.money, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 22
-	Ui.label(frame, `Sell {Ui.money(values.sell)}`, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	-- (8.7: a piece with a FOR SALE sign says its sign's price there, in gold: the game's price is in SELL's question)
+	local sign = if stand == nil and entry.stand ~= nil then amount((entry :: any).sale) else nil
+	Ui.label(frame, if sign then `🏷 For sale {Ui.money(sign)}` else `Sell {Ui.money(values.sell)}`, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if sign then C.gold else K.secondary, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	-- the buttons: DISPLAY / SELL (the picker), TAKE DOWN / SELL (a piece on show), SELL (the stock list)
 	local buttons: { any } = {}
 	local first: any = nil
@@ -1243,7 +1270,7 @@ local function stateKey(state: State?, layout: Layout): string
 	table.insert(parts, if open then tostring(open.stand) else "-")
 	if state then
 		for _, entry in state.stock do
-			table.insert(parts, `{tostring(entry.uid)}:{entry.item}:{tostring(entry.variant)}:{tostring(entry.condition)}:{tostring(entry.stand)}:{tostring(entry.name)}`)
+			table.insert(parts, `{tostring(entry.uid)}:{entry.item}:{tostring(entry.variant)}:{tostring(entry.condition)}:{tostring(entry.stand)}:{tostring(entry.name)}:{tostring((entry :: any).sale)}`)
 		end
 		table.insert(parts, tostring(state.income))
 		table.insert(parts, tostring(state.stands)) -- (8.2: FILL BEST's free stands)

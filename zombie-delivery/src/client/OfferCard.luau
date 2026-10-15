@@ -21,6 +21,12 @@
 --     when the top blocks move.
 --   * A gamepad: the selection starts on DECLINE (an A pressed by habit never sells), stays inside the card; B declines.
 --   * One window at a time (client/Main.client.luau registers it: onOpen, ESC).
+--   * 8.7, trading between players: another player's offer for your piece comes the same way on the "PlayerTrade" remote
+--     (server/PlayerTrade.luau: { kind = "offer", player = true, who = their name, base = the piece's value }): the card
+--     says "🤝 PLAYER OFFER", "🧑 Ann offers", "$1,200", "for your Gramophone", "Worth $800 · +50%", and its ACCEPT /
+--     DECLINE go back on that remote ({ kind = "answer", id, accept }). The same window behaviour: hidden (not declined)
+--     when another window opens, ESC declines. Offers wait in a queue, each with its own clock: the card shows the
+--     oldest ("(+1)" in its title while another waits), the next once it is answered, closed or run out.
 -- Presentation only.
 --   OfferCard.start()                         listens (nothing outside the sandbox)
 --   OfferCard.open()                          shows the offer that waits (nothing: none)
@@ -68,13 +74,32 @@ local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint"
 local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "" } -- (a ScreenGui: its piece, "" every piece)
 
 local remote = Net.get("Visitors")
+local tradeRemote = Net.get("PlayerTrade") -- 8.7: a player's offer comes and is answered there
 local started = false
 local gui: ScreenGui? = nil
 local parts: { [string]: any } = {} -- the card's pieces (built once)
 local opened = false
-local waiting: Rules.Offer? = nil -- the offer that waits (shown or not)
-local deadline = 0 -- os.clock() its clock runs out
+-- 8.7: the offers that wait (shown or not), oldest first, each with the os.clock() its clock runs out; the card shows
+-- the first
+type Waiting = { offer: Rules.Offer, deadline: number }
+local queue: { Waiting } = {}
 local token = 0 -- one wait loop at a time
+
+-- The offer the card shows (or will show), nil for none.
+local function head(): Waiting?
+	return queue[1]
+end
+
+-- Takes the offer with this id out of the queue (→ whether it was the one shown).
+local function drop(id: any): boolean
+	for index, waiting in queue do
+		if waiting.offer.id == id then
+			table.remove(queue, index)
+			return index == 1
+		end
+	end
+	return false
+end
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
@@ -176,17 +201,24 @@ local function hide()
 	end
 end
 
--- The offer's answer (once): the card closes, the offer stops waiting.
+-- The offer's answer (once): the card closes, the offer stops waiting (8.7: a player's on the PlayerTrade remote; the
+-- next offer in the queue comes after it).
+local follow: () -> ()
 local function answer(accept: boolean)
-	local offer = waiting
-	if not offer then
+	local first = head()
+	if not first then
 		hide()
 		return
 	end
-	waiting = nil
-	token += 1
-	remote:FireServer({ kind = if accept then "accept" else "decline", id = offer.id })
+	local offer = first.offer
+	table.remove(queue, 1)
+	if offer.player then
+		tradeRemote:FireServer({ kind = "answer", id = offer.id, accept = accept })
+	else
+		remote:FireServer({ kind = if accept then "accept" else "decline", id = offer.id })
+	end
 	hide()
+	follow()
 end
 
 local function build(): Frame?
@@ -290,9 +322,10 @@ local function build(): Frame?
 	return card
 end
 
--- The offer's words on the card.
+-- The offer's words on the card (8.7: a player's offer, the others waiting behind it).
 local function paint(offer: Rules.Offer)
 	local lines = Rules.cardLines(offer)
+	parts.title.Text = (if offer.player then "🤝 PLAYER OFFER" else "🤝 OFFER") .. (if #queue > 1 then ` (+{#queue - 1})` else "")
 	parts.who.Text = lines.who
 	parts.price.Text = lines.price
 	parts.item.Text = lines.item
@@ -301,9 +334,9 @@ end
 
 -- The clock: the bar and "⏳ 28 s".
 local function clock()
-	local left = math.max(0, deadline - os.clock())
-	local offer = waiting
-	local total = if offer then math.max(1, offer.seconds) else 1
+	local first = head()
+	local left = if first then math.max(0, first.deadline - os.clock()) else 0
+	local total = if first then math.max(1, first.offer.seconds) else 1
 	if parts.time then
 		parts.time.Text = `⏳ {math.ceil(left)} s`
 	end
@@ -391,7 +424,8 @@ function OfferCard.card(): Frame?
 end
 
 function OfferCard.pending(): Rules.Offer?
-	return waiting
+	local first = head()
+	return if first then first.offer else nil
 end
 
 -- ESC (the Roblox menu), the gamepad's B: a DECLINE of the offer it shows.
@@ -411,10 +445,11 @@ function OfferCard.hide()
 end
 
 function OfferCard.open()
-	local offer = waiting
-	if not offer or opened then
+	local first = head()
+	if not first or opened then
 		return
 	end
+	local offer = first.offer
 	local card = build()
 	if not card then
 		return
@@ -431,14 +466,28 @@ function OfferCard.open()
 	Ui.gamepadFocus(parts.decline) -- (never ACCEPT: an A pressed by habit sells nothing)
 end
 
--- An offer waits: its clock, the card when nothing covers the screen, gone when its time is up.
-local function follow()
+-- Offers wait: their clocks (one run out leaves the queue; the shown one's card goes), the card when nothing covers the
+-- screen.
+follow = function()
 	token += 1
 	local mine = token
 	task.spawn(function()
-		while token == mine and waiting do
-			if os.clock() >= deadline then
-				waiting = nil
+		while token == mine and #queue > 0 do
+			local now = os.clock()
+			local gone = false
+			for index = #queue, 1, -1 do
+				if now >= queue[index].deadline then
+					table.remove(queue, index)
+					gone = true
+					if index == 1 and opened then
+						hide()
+					end
+				end
+			end
+			if gone and opened and queue[1] then
+				paint((queue[1] :: Waiting).offer) -- (one behind it ran out: its "(+1)" again)
+			end
+			if #queue == 0 then
 				hide()
 				return
 			end
@@ -453,26 +502,40 @@ local function follow()
 	end)
 end
 
-local function onMessage(message: any)
+-- A remote's message: `player` on the PlayerTrade remote (8.7: only a player's offer there), else the Visitors one.
+local function onMessage(message: any, player: boolean)
 	if type(message) ~= "table" then
 		return
 	end
 	if message.kind == "offer" then
 		local offer = Rules.readOffer(message)
-		if not offer then
+		if not offer or (offer.player == true) ~= player then
 			return
 		end
-		hide()
-		waiting = offer
-		deadline = os.clock() + offer.seconds
+		local shown = drop(offer.id)
+		if not player then
+			-- (a visitor's: one at a time on the server, a new one replaces the one before it)
+			for index = #queue, 1, -1 do
+				if not queue[index].offer.player then
+					shown = shown or index == 1
+					table.remove(queue, index)
+				end
+			end
+		end
+		table.insert(queue, { offer = offer, deadline = os.clock() + offer.seconds })
+		if shown or #queue == 1 then
+			hide()
+		elseif opened then
+			paint((queue[1] :: Waiting).offer) -- ("(+1)" in the title: another waits)
+		end
 		follow()
 	elseif message.kind == "closed" then
-		local offer = waiting
-		if offer and message.id == offer.id then
-			waiting = nil
-			token += 1
+		if drop(message.id) then
 			hide()
+		elseif opened and queue[1] then
+			paint((queue[1] :: Waiting).offer)
 		end
+		follow()
 	end
 end
 
@@ -481,7 +544,14 @@ function OfferCard.start()
 		return
 	end
 	started = true
-	remote.OnClientEvent:Connect(onMessage)
+	remote.OnClientEvent:Connect(function(message: any)
+		onMessage(message, false)
+	end)
+	tradeRemote.OnClientEvent:Connect(function(message: any) -- 8.7: a player's offer (the remote's other messages are client/TradeUi.luau's)
+		if type(message) == "table" and (message.kind == "offer" or message.kind == "closed") then
+			onMessage(message, true)
+		end
+	end)
 	UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
 		if opened and input.KeyCode == Enum.KeyCode.ButtonB then
 			answer(false)
