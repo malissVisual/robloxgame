@@ -6391,19 +6391,27 @@ Config.CarryGrip = {
 --                     middle (its back to the door: "Call truck to door"); Out: studs out of a door where you come out;
 --                     House: the farmhouse (server/MoveSites.luau builds it: At its middle, Size width × wall height ×
 --                     depth; its front door is Doors[1])
---   Sandbox           8.0 SANDBOX (Config.Sandbox.On; design/sandbox/KONTRAKT.md): in place of Contracts the one house of
---                     shared/SandboxMap.luau (House: its id, name, front door, the van's curb), refilled every move (a new
---                     HouseLayout seed), on the Moving contracts board of every player's plot (SandboxMap plot.board); the
---                     move goes with the player's own van (Config.Sandbox.Van, else Van). No Wall: the drop-off is the
---                     move owner's plot (plot.unload: the van's back inside its circle), where every piece in the van goes
---                     into their warehouse's stock (server/Collection.luau Collection.add: a trip). No pay per piece (the
---                     warehouse earns), no XP; no story. Client / Icon / Address / Blurb: the card's; Time / HordeAt: the
---                     move's clock (s) and the horde (s left); Horde: does it come at all; Roam: the zombies round the
---                     house while somebody is outside near it (0: none). Both off by default: the sandbox's client
---                     starts no guns (no Shooting, no Holster), so nothing to fight them with; the switches stay.
---                     8.3 the big move: the one house (The Old Farmstead, the owner's big Blender house, 44 × 14.5 × 34)
---                     empties as a big house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms,
---                     more pieces, a back door), a longer Time (the Sprinter's bed takes it home in several trips)
+--   Sandbox           8.0 SANDBOX (Config.Sandbox.On; design/sandbox/KONTRAKT.md): in place of Contracts the houses of
+--                     shared/SandboxMap.luau (Houses: their ids, names, front doors, the van's curbs), each refilled every
+--                     move (a new HouseLayout seed), on the Moving contracts board of every player's plot (SandboxMap
+--                     plot.board); the move goes with the player's own van (Config.Sandbox.Van, else Van). No Wall: the
+--                     drop-off is the move owner's plot (plot.unload: the van's back inside its circle), where every piece
+--                     in the van goes into their warehouse's stock (server/Collection.luau Collection.add: a trip). No pay
+--                     per piece (the warehouse earns), no XP; no story. Icon: the cards'; HordeAt: the horde (s left);
+--                     Horde: does it come at all; Roam: the zombies round the house while somebody is outside near it (0:
+--                     none). Both off by default: the sandbox's client starts no guns (no Shooting, no Holster), so nothing
+--                     to fight them with; the switches stay.
+--                     8.3 the big move: The Old Farmstead (the owner's big Blender house, 44 × 14.5 × 34) empties as a big
+--                     house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms, more pieces, a back
+--                     door), a longer Time (the Sprinter's bed takes it home in several trips).
+--                     Jinočany step 1 (design/jinocany/NAVRH.md §3): Houses, a contract per house of SandboxMap.Houses (by
+--                     its id; server/Moving.luau's kiosk offers one at a time, never one another player has): Client (a
+--                     made-up Czech family), Address (by its street), Blurb (the card's), Kind (its plan: HouseLayout's
+--                     "big" the farmstead, "house" a family house) and Time (the move's clock, s). Its pieces are its
+--                     Kind's (HouseLayout): a family house Config.Furniture.Spots (18 – 24) and Collectibles.Count (1 – 2),
+--                     19 – 26 pieces worth $5,700 – 14,000 at 90 % (Config.Collection's tuning), the farmstead Big.Spots
+--                     (34 – 40) and Big.Collectibles.Count (2 – 3), 36 – 43 pieces worth $10,200 – 21,300: about half
+--                     as much, so 15 minutes against the farmstead's 25 (tests/sandboxhouses_test.luau checks it)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6494,18 +6502,58 @@ Config.Moving = {
 	Tick = 0.2,
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
-		Client = "The Nováks", -- (Jinočany: a made-up Czech family; The Hubers in the Alps)
 		Icon = "🏡",
-		Address = "the end of Pražská", -- (SandboxMap.House.street, the Jinočany plan's)
-		Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
-		Kind = "big", -- 8.3: the house's plan (shared/HouseLayout.luau's big house, Config.Furniture.Big)
-		Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
+		-- Jinočany step 1: a contract per house of SandboxMap.Houses (its id), the families and numbers made up
+		Houses = {
+			sandbox_house = {
+				Client = "The Nováks", -- (The Hubers in the Alps)
+				Address = "the end of Pražská",
+				Blurb = "A big old house packed full of things. Too much for one van: plan several trips home to your warehouse.",
+				Kind = "big", -- 8.3: the big house's plan (shared/HouseLayout.luau, Config.Furniture.Big)
+				Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
+			},
+			["Hlavní_n_5"] = {
+				Client = "The Dvořáks",
+				Address = "Hlavní 5",
+				Blurb = "A family house under the old linden. Grandma's things are going to the city: one trip or two home.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Hlavní_s_11"] = {
+				Client = "The Svobodas",
+				Address = "Hlavní 11",
+				Blurb = "The house with the blue gate, sold at last. Empty it before the new owners come.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Školní_e_20"] = {
+				Client = "The Procházkas",
+				Address = "Školní 20",
+				Blurb = "The old schoolmaster's house, full of books and odd old things. Mind the fragile ones.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Lidická_e_30"] = {
+				Client = "The Kučeras",
+				Address = "Lidická 30",
+				Blurb = "A family house with a rose garden. The Kučeras are moving out: bring everything home to your warehouse.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+			["Smetanova_w_84"] = {
+				Client = "The Horáks",
+				Address = "Smetanova 84",
+				Blurb = "The end house of the row on Smetanova, packed to the roof. Narrow doors: lift the big pieces with care.",
+				Kind = "house",
+				Time = 15 * 60,
+			},
+		} :: { [string]: { Client: string, Address: string, Blurb: string, Kind: string, Time: number } },
 		HordeAt = 3 * 60,
 		Horde = false, -- (off: nobody carries a gun in the test world; true: the horde at HordeAt left)
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
 		-- 8.4: a house's seed is a whole number 1 … this (server/Moving.luau rolls it); the one a player's card shows is
 		-- kept in their save until a trip brings something home (server/PlayerData.luau's sandboxHouseSeed: another
-		-- number there is none)
+		-- number there is none); Jinočany: with its house (sandboxHouse, a SandboxMap.Houses id)
 		Seeds = 1073741823,
 	},
 }
@@ -7257,7 +7305,7 @@ Config.Collection = {
 --   HideHold      s G is held to hide the guide or bring it back
 --   OffNote       s the "Guide off" line stays before it fades
 --   InfoSeconds   s a step that only says something (the pieces earn money) shows before it counts as done
---   HouseMargin   studs round the house's lot (SandboxMap.House.lot) that count as "at the house"
+--   HouseMargin   studs round the contract's house's lot (SandboxMap.Houses' lot) that count as "at the house"
 --   Direct        studs: a target closer than this gets a straight path, a farther one goes along the roads
 --   Near          studs: closer than this the path hides (the chevron stays)
 --   ChevronHeight studs over the target the chevron floats

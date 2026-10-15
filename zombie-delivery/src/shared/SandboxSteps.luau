@@ -9,7 +9,8 @@
 --   carrying      you carry a piece (one of the state's items is `mine` and "carried")
 --   vanLoad       the pieces in the van now (the state's counts.out)
 --   delivered     the pieces unloaded at home on this move (the state's counts.delivered: a trip or more done)
---   atHouse       you stand (or drive) at the house (SandboxSteps.atHouse)
+--   atHouse       you stand (or drive) at the house (SandboxSteps.atHouse: the move's)
+--   house         Jinočany: the move's house (the Moving state's `contract`: a SandboxMap.Houses id; nil: the farmstead)
 --   seated        you sit in a vehicle
 --   planning      the move's planning lobby is open (the MoveLobby remote's "lobby"); planningMine: yours (LAUNCH)
 --   stock         your pieces in the stock, not on show (the Collection remote's "state")
@@ -41,9 +42,11 @@
 --   in the house                        inside    "Carry the furniture out to your van (E to pick up)"   (no target)
 --   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
 --   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
---   a move, at the house, outside       door      "Walk in through the front door"                        House.door
---   a move, not at the house            drive     "Drive to The Old Farmstead on Pražská"                 House.curb
---     (after a trip home)               back      "Drive back to The Old Farmstead on Pražská for more, or FINISH"
+--   a move, at the house, outside       door      "Walk in through the front door"                        its door
+--   a move, not at the house            drive     "Drive to The Linden House on Hlavní"                   its curb
+--     (after a trip home)               back      "Drive back to The Linden House on Hlavní for more, or FINISH"
+--   (Jinočany: the move's house and its street, SandboxSteps.words with the state's `house`; the step's own hint the
+--   farmstead's, "Drive to The Old Farmstead on Pražská")
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
 --   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the board
@@ -59,10 +62,14 @@
 --                                                      shown: nil = not known yet, then only taken, nothing marked)
 --   SandboxSteps.visible(step, done, seated) -> (hint, guide)   show the hint line? the 3D guide?
 --   SandboxSteps.text(step, touch) -> string           the hint's words ("E" is "tap" on a touch screen)
---   SandboxSteps.atHouse(x, z, margin) -> boolean       in the house's lot or within `margin` studs of it
+--   SandboxSteps.atHouse(x, z, margin, house?) -> boolean   in the house's lot or within `margin` studs of it (Jinočany:
+--                                                      `house` a SandboxMap.Houses id, the move's; nil: the farmstead)
 --   SandboxSteps.route(fx, fz, tx, tz, out, direct) -> n   the path on the ground, along the roads: n points written
 --                                                      into `out` as x1, z1, x2, z2 … (no table made: the guide calls
---                                                      it five times a second); straight when within `direct` studs
+--                                                      it five times a second); straight when within `direct` studs.
+--                                                      Jinočany: along every road of SandboxMap.Roads (the shortest
+--                                                      way along their middle lines, from the road nearest the start to
+--                                                      the one nearest the target), MaxPoints points at most
 --   SandboxSteps.collection(msg, total?) -> Summary    the Collection remote's "state": stock, shown, free, taken (8.3:
 --                                                      the hot pieces in the stock, the first one's name, the market's
 --                                                      day, a hot kind sold today; 8.9: the pieces on show with a FOR
@@ -173,6 +180,8 @@ export type State = {
 	-- 8.9, trading between players (all optional: a state without them has no sell step)
 	players: number?,
 	signs: number?,
+	-- Jinočany: the move's house (a SandboxMap.Houses id; nil: the farmstead)
+	house: string?,
 }
 
 -- target: what the 3D guide points at (client/SandboxGuide.luau finds it): "board" | "curb" | "door" | "van" |
@@ -206,7 +215,7 @@ export type Last = { vanLoad: number?, delivered: number?, shown: number?, level
 -- A display stand's place in the world (client/SandboxGuide.luau reads them from shared/WarehouseLayout.luau).
 export type Place = { x: number, y: number, z: number }
 
-local HOUSE = `{SandboxMap.House.name} on {SandboxMap.House.street}` -- (the contract's house and its street)
+local HOUSE = `{SandboxMap.House.name} on {SandboxMap.House.street}` -- (the farmstead and its street: the steps' own words)
 local DANNY = Config.MoveHelper.Name -- 8.4
 
 local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?, pad: string?): Step
@@ -556,8 +565,16 @@ function SandboxSteps.detail(step: Step, s: State): (string?, number?)
 		return s.hot, nil
 	elseif step.id == "give" and s.clipboard == true then
 		return "clipboard", nil -- (8.5: its words change once the clipboard is out)
+	elseif step.id == "drive" or step.id == "back" then
+		return s.house, nil -- (Jinočany: the move's house)
 	end
 	return nil, nil
+end
+
+-- Jinočany: "The Linden House on Hlavní", the house's name on its street (nil or an unknown id: the farmstead's).
+function SandboxSteps.houseWords(id: string?): string
+	local h = SandboxMap.house(id)
+	return if h then `{h.name} on {h.street}` else HOUSE
 end
 
 function SandboxSteps.words(step: Step, s: State): string
@@ -576,31 +593,101 @@ function SandboxSteps.words(step: Step, s: State): string
 		return `🔥 Your {s.hot} is hot today: sell it or show it`
 	elseif step.id == "give" and s.clipboard == true then
 		return `Pick a piece to give it to {DANNY}` -- (8.5: the clipboard out, orders mode)
+	elseif step.id == "drive" and s.house ~= nil then -- (Jinočany: the move's house and its street)
+		return `Drive to {SandboxSteps.houseWords(s.house)}`
+	elseif step.id == "back" and s.house ~= nil then
+		return `Drive back to {SandboxSteps.houseWords(s.house)} for more, or FINISH`
 	end
 	return step.hint
 end
 
-function SandboxSteps.atHouse(x: number, z: number, margin: number): boolean
-	local lot = SandboxMap.House.lot
+function SandboxSteps.atHouse(x: number, z: number, margin: number, house: string?): boolean
+	local lot = (SandboxMap.house(house) or SandboxMap.House).lot
 	return x >= lot.x0 - margin and x <= lot.x1 + margin and z >= lot.z0 - margin and z <= lot.z1 + margin
 end
 
 -- ── The path along the roads ───────────────────────────────────────────────
--- Depot Row (the plots' road, east-west) and Pražská (north-south, down to the house). A point north of Depot Row's
--- far edge is on the depot's side (the plots, the row itself), the rest is Pražská's side (the street, the meadow, the
--- house). The path goes out to the row's middle line, along it to Pražská's, along that, then in.
+-- Along the roads' middle lines (SandboxMap.Roads: Depot Row, the plots' road; Pražská down to the farmstead;
+-- Jinočany: the village's streets too, each one east-west when it is longer along X). The path goes out from the start
+-- to the middle line of the road nearest it, along the roads the shortest way to the middle line of the road nearest
+-- the target (through the junctions where two roads meet: the crossing of their middle lines; Dijkstra on those few
+-- points), then in. A point on the line it already runs along replaces the last one (no bend), MaxPoints at most (the
+-- target always last). Every table is made once, here: the guide calls it five times a second.
 
-local ROW = SandboxMap.Roads[2]
-local MAIN = SandboxMap.Roads[1]
-local ROW_Z = (ROW.z0 + ROW.z1) / 2
-local MAIN_X = (MAIN.x0 + MAIN.x1) / 2
-local DEPOT_EDGE = ROW.z1 -- (z grows southwards: smaller z is north, the plots' side)
+SandboxSteps.MaxPoints = 8 -- (client/SandboxGuide.luau: a path of seven beams)
 local MIN_STEP = 3 -- studs: a point this close to the last one is left out
+local ROADS = SandboxMap.Roads
+-- each road's middle line: along X (at z = mid, from lo to hi) or along Z (at x = mid)
+local ALONG_X: { boolean } = {}
+local MID: { number } = {}
+for i, r in ROADS do
+	ALONG_X[i] = r.x1 - r.x0 >= r.z1 - r.z0
+	MID[i] = if ALONG_X[i] then (r.z0 + r.z1) / 2 else (r.x0 + r.x1) / 2
+end
+-- the junctions (two roads whose rects meet): where their middle lines cross (two along one axis: the middle of where
+-- they meet), the nodes 1 … #JX; the search adds the start's (#JX + 1) and the target's (#JX + 2)
+local JX: { number }, JZ: { number }, JA: { number }, JB: { number } = {}, {}, {}, {}
+for i, a in ROADS do
+	for j, b in ROADS do
+		if j > i and a.x0 <= b.x1 + 1e-6 and b.x0 <= a.x1 + 1e-6 and a.z0 <= b.z1 + 1e-6 and b.z0 <= a.z1 + 1e-6 then
+			local x: number, z: number = 0, 0
+			if ALONG_X[i] ~= ALONG_X[j] then
+				x, z = if ALONG_X[i] then MID[j] else MID[i], if ALONG_X[i] then MID[i] else MID[j]
+			elseif ALONG_X[i] then
+				x, z = (math.max(a.x0, b.x0) + math.min(a.x1, b.x1)) / 2, (MID[i] + MID[j]) / 2
+			else
+				x, z = (MID[i] + MID[j]) / 2, (math.max(a.z0, b.z0) + math.min(a.z1, b.z1)) / 2
+			end
+			table.insert(JX, x)
+			table.insert(JZ, z)
+			table.insert(JA, i)
+			table.insert(JB, j)
+		end
+	end
+end
+local NODES = #JX + 2
+for k = #JX + 1, NODES do -- (the start's and the target's: set every search, on one road each)
+	JX[k], JZ[k], JA[k], JB[k] = 0, 0, 0, 0
+end
+local DIST: { number }, PREV: { number }, DONE: { boolean }, ORDER: { number } = {}, {}, {}, {}
+for k = 1, NODES do
+	DIST[k], PREV[k], DONE[k], ORDER[k] = 0, 0, false, 0
+end
+
+-- The road nearest (x, z) (its rect; a tie: the first) and the point of its middle line there.
+local function nearestRoad(x: number, z: number): (number, number, number)
+	local best, bestD = 1, math.huge
+	for i, r in ROADS do
+		local dx = math.max(r.x0 - x, 0, x - r.x1)
+		local dz = math.max(r.z0 - z, 0, z - r.z1)
+		local d = dx * dx + dz * dz
+		if d < bestD - 1e-9 then
+			best, bestD = i, d
+		end
+	end
+	local r = ROADS[best]
+	if ALONG_X[best] then
+		return best, math.clamp(x, r.x0, r.x1), MID[best]
+	end
+	return best, MID[best], math.clamp(z, r.z0, r.z1)
+end
 
 local function push(out: { number }, n: number, x: number, z: number): number
 	if n > 0 then
 		local dx, dz = x - out[n * 2 - 1], z - out[n * 2]
 		if dx * dx + dz * dz < MIN_STEP * MIN_STEP then
+			return n
+		end
+		if n > 1 then
+			-- (on along the line the last two points run: the last one moves on instead, no bend in a straight run)
+			local ax, az = out[n * 2 - 1] - out[n * 2 - 3], out[n * 2] - out[n * 2 - 2]
+			if math.abs(ax * dz - az * dx) < 1e-6 * math.max(1, math.abs(ax) + math.abs(az)) * math.max(1, math.abs(dx) + math.abs(dz)) and ax * dx + az * dz > 0 then
+				out[n * 2 - 1], out[n * 2] = x, z
+				return n
+			end
+		end
+		if n >= SandboxSteps.MaxPoints then -- (no room left: the last point gives way)
+			out[n * 2 - 1], out[n * 2] = x, z
 			return n
 		end
 	end
@@ -610,26 +697,61 @@ local function push(out: { number }, n: number, x: number, z: number): number
 	return n
 end
 
+-- Do nodes u and v lie on one road?
+local function shares(u: number, v: number): boolean
+	local a, b = JA[u], JB[u]
+	local c, d = JA[v], JB[v]
+	return (a ~= 0 and (a == c or a == d)) or (b ~= 0 and (b == c or b == d))
+end
+
 function SandboxSteps.route(fx: number, fz: number, tx: number, tz: number, out: { number }, direct: number): number
 	local n = push(out, 0, fx, fz)
 	local dx, dz = tx - fx, tz - fz
 	if dx * dx + dz * dz > direct * direct then
-		local fromDepot, toDepot = fz <= DEPOT_EDGE, tz <= DEPOT_EDGE
-		if fromDepot and toDepot then
-			n = push(out, n, fx, ROW_Z)
-			n = push(out, n, tx, ROW_Z)
-		elseif fromDepot then
-			n = push(out, n, fx, ROW_Z)
-			n = push(out, n, MAIN_X, ROW_Z)
-			n = push(out, n, MAIN_X, tz)
-		elseif toDepot then
-			n = push(out, n, MAIN_X, fz)
-			n = push(out, n, MAIN_X, ROW_Z)
-			n = push(out, n, tx, ROW_Z)
-		else
-			n = push(out, n, MAIN_X, fz)
-			n = push(out, n, MAIN_X, tz)
+		local from, ex, ez = nearestRoad(fx, fz)
+		local to, qx, qz = nearestRoad(tx, tz)
+		n = push(out, n, ex, ez)
+		if from ~= to then
+			-- the shortest way through the junctions from the start's road to the target's
+			local s, t = NODES - 1, NODES
+			JX[s], JZ[s], JA[s], JB[s] = ex, ez, from, 0
+			JX[t], JZ[t], JA[t], JB[t] = qx, qz, to, 0
+			for k = 1, NODES do
+				DIST[k], PREV[k], DONE[k] = math.huge, 0, false
+			end
+			DIST[s] = 0
+			for _ = 1, NODES do
+				local u, best = 0, math.huge
+				for k = 1, NODES do
+					if not DONE[k] and DIST[k] < best then
+						u, best = k, DIST[k]
+					end
+				end
+				if u == 0 or u == t then
+					break
+				end
+				DONE[u] = true
+				for v = 1, NODES do
+					if not DONE[v] and shares(u, v) then
+						local alt = best + math.abs(JX[u] - JX[v]) + math.abs(JZ[u] - JZ[v])
+						if alt < DIST[v] then
+							DIST[v], PREV[v] = alt, u
+						end
+					end
+				end
+			end
+			-- the junctions on it, from the start's side (none found: straight on to the target's road)
+			local count, at = 0, PREV[t]
+			while at ~= 0 and at ~= s and count < NODES do
+				count += 1
+				ORDER[count] = at
+				at = PREV[at]
+			end
+			for k = count, 1, -1 do
+				n = push(out, n, JX[ORDER[k]], JZ[ORDER[k]])
+			end
 		end
+		n = push(out, n, qx, qz)
 	end
 	n = push(out, n, tx, tz)
 	if n == 1 then -- (already there: a path of one point is the target twice)

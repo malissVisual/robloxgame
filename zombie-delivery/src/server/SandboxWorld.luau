@@ -10,6 +10,8 @@
 --             whole boxes would fill the map)
 --   Roads     the asphalt of SandboxMap.Roads and the turnaround (its top a hair under Pražská's where they overlap),
 --             the gravel shoulders down to the meadow on every edge (the cars roll off and on anywhere), the markings
+--             (Jinočany: the village's streets a slab each, attribute Road = its name, their shoulders as every road's;
+--             no markings on them yet)
 --   House     "TheOldFarmstead" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet (the stand-in look)
 --             on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
@@ -29,6 +31,13 @@
 --             the box less a hall behind each doorway (Config.Moving.Doors.Hall Depth deep, the opening's width and
 --             height), each hall lined dark ("DoorHalls": the house is a shell behind its walls, a camera that follows
 --             you in sees a dark hall)
+--   Houses    Jinočany step 1 (design/jinocany/NAVRH.md §3): every other house to empty (SandboxMap.Houses after the
+--             farmstead) as a stand-in until the village's own look dresses it (SandboxWorld.standIn): a Model named
+--             after the house (attribute SandboxHouse = its id, Atomic), its own parts in "House_<id>" (attribute
+--             Home): a plain box of walls ("House") on its box with a red gable roof over it, its name on a board over
+--             the front door, and the front door walked through as the farmstead's (SandboxWorld.walkIn: "FrontDoor",
+--             attribute SandboxDoor, unseen, no collision, at its door; its two leaves; the box less a dark hall
+--             behind the doorway). server/Moving.luau finds each house's FrontDoor by its model's SandboxHouse.
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
 --             round the edge, the street lamps along Pražská, the signpost at the crossroads
 --   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
@@ -45,7 +54,21 @@
 --                             Alps' 47° before the Jinočany plan; in sandbox mode the city's DayNight and Weather do not
 --                             run): the clock, the sun, the ambient light, the Atmosphere's soft far haze, the sky, the
 --                             clouds and the colour grade; the workspace's clock attributes for whatever reads them
---   SandboxWorld.doorLeaves(house)   8.3 walk-in doors: the house's doors' leaves that swing (house's build does it)
+--   SandboxWorld.doorLeaves(house)   8.3 walk-in doors: the house's doors' leaves that swing (house's build does it;
+--                             Jinočany: any house to empty, found by the model's SandboxHouse, the farmstead's without)
+--   Jinočany, the hooks for a house to empty's own look (the village's art kit replaces the stand-in with them):
+--   SandboxWorld.standIn(world, house)          the stand-in of a house of SandboxMap.Houses (its Model, built and
+--                                               parented, its leaves made); SandboxWorld.build stands one on each
+--                                               house after the farmstead
+--   SandboxWorld.walkIn(model, body, house, frame)   a house's doors walked through: `body` (its Model "House_<id>")
+--                                               holds its walls' box (a part "House", on house.house's box) and its
+--                                               "FrontDoor" (the doorway at house.door, `frame` the door's: its foot
+--                                               on the front wall, -Z out); makes the FrontDoor the moves' door
+--                                               (SandboxDoor, unseen, no collision), its two leaves (FrontLeafWest,
+--                                               FrontLeafEast), the back door where the house has one (house.back:
+--                                               BackDoor, SandboxBackDoor; BackLeaf) and the dark halls behind them
+--                                               (the walls' box no longer solid: HouseSolid pieces, DoorHalls).
+--                                               doorLeaves after it (with the model parented) makes the leaves swing
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -241,6 +264,11 @@ local function roads(world: Instance)
 	-- (Pražská from Depot Row's south edge: the junction is Depot Row's asphalt)
 	local street = slab(holder, "Road", { x0 = main.x0, x1 = main.x1, z0 = depot.z1, z1 = main.z1 }, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
 	street:SetAttribute("Road", main.name)
+	for index, road in MAP.Roads do -- (Jinočany: the village's streets; they only touch each other: no flicker)
+		if index > 2 then
+			slab(holder, "Road", road :: any, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt):SetAttribute("Road", road.name)
+		end
+	end
 	local T = MAP.Turnaround
 	local disc = block(holder, "Turnaround", Vector3.new(depth, 2 * T.r, 2 * T.r), CFrame.new(T.x, S.TurnaroundTop - depth / 2, T.z) * UPRIGHT, asphalt, Enum.Material.Asphalt)
 	disc.Shape = Enum.PartType.Cylinder
@@ -292,16 +320,22 @@ end
 -- HouseMesh.Looks), the chalet's own leaves hidden with it, swinging no more; else the chalet's own leaves (house's
 -- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. 8.5.1 (the owner: "the doors
 -- just disappear"): they open Config.Moving.Doors.Wide degrees (DoorAngle), past square: square to the wall they were
--- edge-on to a camera walking up, two slivers by a black doorway. Returns the leaves.
+-- edge-on to a camera walking up, two slivers by a black doorway. Returns the leaves. Jinočany: any house to empty
+-- (its model's SandboxHouse: SandboxMap.Houses' id; none: the farmstead), its back door's only where it has one.
 function SandboxWorld.doorLeaves(house: Model): { Instance }
-	local H = MAP.House
+	local H = MAP.house(house:GetAttribute("SandboxHouse")) or MAP.House
 	local body = house:FindFirstChild("House_" .. H.id)
 	local made: { Instance } = {}
 	if not body then
 		return made
 	end
 	if body:GetAttribute("MeshArt") == true then
-		for _, door in { { spot = H.door, name = "FrontDoorLeaf", leaves = S.frontLeaves() }, { spot = H.back, name = "BackDoorLeaf", leaves = S.backLeaves() } } do
+		local doors: { { spot: SandboxMap.Spot, name: string, leaves: { SandboxScenery.FrontLeaf } } } = { { spot = H.door, name = "FrontDoorLeaf", leaves = S.frontLeaves() } }
+		local back = H.back
+		if back then
+			table.insert(doors, { spot = back, name = "BackDoorLeaf", leaves = S.backLeaves() })
+		end
+		for _, door in doors do
 			local d = door.spot
 			local frame = CFrame.new(d.x, d.y, d.z) * CFrame.Angles(0, math.rad(d.yaw), 0)
 			for _, leaf in door.leaves do
@@ -350,28 +384,38 @@ end
 -- (server/Moving.luau's WalkIn), the walls either side as solid as ever. Each hall lined dark in "DoorHalls" (its back,
 -- sides, ceiling and floor, from just behind the model's own door: the house is a shell behind its walls, and a camera
 -- that follows you in sees a dark hall, never the hollow model); decoration, never colliding. `frame`: the front door's
--- (its foot on the front wall, -Z out); `top`: the doorways' height.
-local function doorHalls(model: Model, body: Model, frame: CFrame, top: number)
-	local H = MAP.House
+-- (its foot on the front wall, -Z out); `top`: the doorways' height. Jinočany: house `H` (SandboxMap.Houses'), its front
+-- door looking any way (its box's width across the door, its depth back from it), a back door's hall only where it has
+-- one (else the solid behind the front hall reaches the back wall).
+local function doorHalls(model: Model, body: Model, H: SandboxMap.House, frame: CFrame, top: number)
 	local box = H.house
 	local hall = Config.Moving.Doors.Hall
 	local house = body:FindFirstChild("House")
 	if not (house and house:IsA("BasePart")) then
 		return
 	end
-	local w, h, d = box.sx, box.sy, box.sz
+	local turned = H.door.yaw % 180 ~= 0 -- (its front to the west or the east: its width along Z)
+	local w, h, d = if turned then box.sz else box.sx, box.sy, if turned then box.sx else box.sz
 	local depth = math.min(hall.Depth, d / 2 - 1)
 	local back = H.back
-	local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0)
-	local bx = frame:PointToObjectSpace(backFrame.Position).X -- (the back door's middle across the house, the front's frame)
 	-- the solid pieces, each a box x0 … x1, y0 … y1, z0 … z1 in the front door's frame (the house from z 0 back to d)
 	local function solid(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number)
 		local p = block(body, "HouseSolid", Vector3.new(x1 - x0, y1 - y0, z1 - z0), frame * CFrame.new((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), house.Color, house.Material)
 		p.Transparency = 1
 		p.CastShadow = false
 	end
-	solid(-w / 2, w / 2, 0, h, depth, d - depth) -- (between the two halls)
-	for _, way in { { x = 0, half = S.FrontDoor.Width / 2, z0 = 0 }, { x = bx, half = S.BackDoor.Width / 2, z0 = d - depth } } do
+	local ways: { { x: number, half: number, z0: number } } = { { x = 0, half = S.FrontDoor.Width / 2, z0 = 0 } }
+	local linings: { { frame: CFrame, width: number } } = { { frame = frame, width = S.FrontDoor.Width } }
+	if back then
+		local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0)
+		local bx = frame:PointToObjectSpace(backFrame.Position).X -- (the back door's middle across the house, the front's frame)
+		solid(-w / 2, w / 2, 0, h, depth, d - depth) -- (between the two halls)
+		table.insert(ways, { x = bx, half = S.BackDoor.Width / 2, z0 = d - depth })
+		table.insert(linings, { frame = backFrame, width = S.BackDoor.Width })
+	else
+		solid(-w / 2, w / 2, 0, h, depth, d) -- (behind the front door's hall: the rest of the house)
+	end
+	for _, way in ways do
 		solid(-w / 2, way.x - way.half, 0, h, way.z0, way.z0 + depth)
 		solid(way.x + way.half, w / 2, 0, h, way.z0, way.z0 + depth)
 		solid(way.x - way.half, way.x + way.half, top, h, way.z0, way.z0 + depth) -- (over the doorway)
@@ -383,7 +427,7 @@ local function doorHalls(model: Model, body: Model, frame: CFrame, top: number)
 	local dark = rgb(hall.Color)
 	local from, t = 0.35, 0.1 -- (from just behind the model's own door, 0.34 deep in its pocket)
 	local long = depth - from
-	for _, way in { { frame = frame, width = S.FrontDoor.Width }, { frame = backFrame, width = S.BackDoor.Width } } do
+	for _, way in linings do
 		local half = way.width / 2
 		local function line(size: Vector3, at: Vector3)
 			deco(block(holder, "DoorHall", size, way.frame * CFrame.new(at), dark, Enum.Material.SmoothPlastic)).CastShadow = false
@@ -395,6 +439,84 @@ local function doorHalls(model: Model, body: Model, frame: CFrame, top: number)
 		line(Vector3.new(way.width, t, long), Vector3.new(0, top - t / 2, from + long / 2)) -- (its ceiling)
 		line(Vector3.new(way.width, 0.04, long), Vector3.new(0, 0.02, from + long / 2)) -- (its floor, on the lawn)
 	end
+end
+
+-- 8.3 the big move, 8.5 walk-in doors (the farmstead's build did it; Jinočany: every house to empty's): the house's
+-- doors walked through. Its FrontDoor (in `body`, at H.door: `frame`) is the doorway, the moves' front door, unseen
+-- (SandboxDoor, no collision: server/Moving.luau puts its "Enter house" prompt there), behind its two leaves (each
+-- half of it, a part of their own, each its doorway's side: SandboxWorld.doorLeaves makes them door leaves, the doors'
+-- swing is the client's); the back door at H.back where the house has one (the owner's model's, in the middle of its
+-- back wall): its doorway "BackDoor" (attribute SandboxBackDoor, unseen, no collision: server/Moving.luau's second
+-- way in) as the FrontDoor is to the front, S.BackDoor.Width wide, and its leaf; then the dark halls behind them
+-- (doorHalls: the walls' box "House" no longer solid). All of them the house's own parts: the farmstead dressed in the
+-- owner's model hides them with the chalet (copies of the model's doors swing instead: doorLeaves).
+function SandboxWorld.walkIn(model: Model, body: Model, H: SandboxMap.House, frame: CFrame)
+	local front = body:FindFirstChild("FrontDoor")
+	if not (front and front:IsA("BasePart")) then
+		return
+	end
+	front:SetAttribute("SandboxDoor", true)
+	front.CanCollide = false
+	local size = front.Size
+	front.Transparency = 1
+	front.CastShadow = false
+	for _, side in { -1, 1 } do
+		deco(block(body, if side < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(size.X / 2, size.Y, size.Z + 0.04),
+			front.CFrame * CFrame.new(side * size.X / 4, 0, 0), front.Color, front.Material))
+	end
+	local back = H.back
+	if back then
+		local width = S.BackDoor.Width
+		local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0) * frame:ToObjectSpace(front.CFrame)
+		local doorway = deco(block(body, "BackDoor", Vector3.new(width, size.Y, size.Z), backFrame, front.Color, front.Material))
+		doorway:SetAttribute("SandboxBackDoor", true)
+		doorway.Transparency = 1
+		doorway.CastShadow = false
+		deco(block(body, "BackLeaf", Vector3.new(width, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
+	end
+	doorHalls(model, body, H, frame, size.Y) -- 8.5 walk-in doors: the doorways walkable, a dark hall behind each
+end
+
+-- Jinočany step 1: a house to empty of the village (SandboxMap.Houses after the farmstead) until the village's own look
+-- dresses it: in the Model named after it (attribute SandboxHouse = its id; Atomic: it streams in whole, its door's
+-- prompt with it), its own parts in "House_<id>" (attribute Home): its walls' box "House" on house.house (the village's
+-- render), a red gable roof over it (its ridge along the front, decoration), the front door (ChaletLooks' door's size,
+-- just outside the front wall at house.door) walked through as the farmstead's (SandboxWorld.walkIn), its name on a
+-- board over the door (their numbers SandboxScenery.StandIn's). Returns the model (parented to `world`, its leaves door
+-- leaves).
+function SandboxWorld.standIn(world: Instance, H: SandboxMap.House): Model
+	local look = S.StandIn
+	local model = Instance.new("Model")
+	model.Name = (string.gsub(H.name, "[^%w]", ""))
+	model:SetAttribute("SandboxHouse", H.id)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	local body = Instance.new("Model")
+	body.Name = "House_" .. H.id
+	body:SetAttribute("Home", H.id)
+	body.Parent = model
+	local box, door = H.house, H.door
+	local frame = CFrame.new(door.x, door.y, door.z) * CFrame.Angles(0, math.rad(door.yaw), 0)
+	local turned = door.yaw % 180 ~= 0
+	local w, h, d = if turned then box.sz else box.sx, box.sy, if turned then box.sx else box.sz
+	local walls = block(body, "House", Vector3.new(w, h, d), frame * CFrame.new(0, h / 2, d / 2), rgb(look.Render), Enum.Material.Plaster)
+	body.PrimaryPart = walls
+	model.PrimaryPart = walls
+	-- (a wedge's slope looks to its -Z: the front half's to the street, the back half's turned round)
+	local half = d / 2 + look.Eaves
+	local rise = half * math.tan(math.rad(look.Pitch))
+	for n = 0, 1 do
+		deco(wedge(body, "Roof", Vector3.new(w + 2 * look.Eaves, rise, half), frame * CFrame.new(0, h + rise / 2, d / 2 + (n - 0.5) * half) * CFrame.Angles(0, n * math.pi, 0), rgb(look.Roof), Enum.Material.Slate))
+	end
+	local door3 = look.DoorSize -- (ChaletLooks' door's: just outside the front wall)
+	block(body, "FrontDoor", Vector3.new(door3[1], door3[2], door3[3]), frame * CFrame.new(0, door3[2] / 2, -door3[3] / 2), rgb(look.Door), Enum.Material.Wood)
+	local sign = look.Board
+	local board = deco(block(body, "NameBoard", Vector3.new(math.min(w - 2, sign[1]), sign[2], 0.2), frame * CFrame.new(0, sign[3], -0.12), rgb(look.Sign), Enum.Material.WoodPlanks))
+	board.CastShadow = false
+	label(board, Enum.NormalId.Front, string.upper(H.name), Color3.fromRGB(250, 244, 228))
+	SandboxWorld.walkIn(model, body, H, frame)
+	model.Parent = world
+	SandboxWorld.doorLeaves(model)
+	return model
 end
 
 local function house(world: Instance): Model
@@ -457,25 +579,7 @@ local function house(world: Instance): Model
 	-- SandboxBackDoor, unseen, no collision: server/Moving.luau's second way in) as the FrontDoor is to the front,
 	-- S.BackDoor.Width wide, and its leaf. All of them the house's own parts: dressed in the owner's model they are hidden
 	-- with the chalet (copies of the model's doors swing instead: doorLeaves).
-	local front = body:FindFirstChild("FrontDoor") :: BasePart?
-	if front then
-		local size = front.Size
-		front.Transparency = 1
-		front.CastShadow = false
-		for _, side in { -1, 1 } do
-			deco(block(body, if side < 0 then "FrontLeafWest" else "FrontLeafEast", Vector3.new(size.X / 2, size.Y, size.Z + 0.04),
-				front.CFrame * CFrame.new(side * size.X / 4, 0, 0), front.Color, front.Material))
-		end
-		local back = H.back
-		local width = S.BackDoor.Width
-		local backFrame = CFrame.new(back.x, back.y, back.z) * CFrame.Angles(0, math.rad(back.yaw), 0) * frame:ToObjectSpace(front.CFrame)
-		local doorway = deco(block(body, "BackDoor", Vector3.new(width, size.Y, size.Z), backFrame, front.Color, front.Material))
-		doorway:SetAttribute("SandboxBackDoor", true)
-		doorway.Transparency = 1
-		doorway.CastShadow = false
-		deco(block(body, "BackLeaf", Vector3.new(width, size.Y, size.Z + 0.04), backFrame, front.Color, front.Material))
-		doorHalls(model, body, frame, size.Y) -- 8.5 walk-in doors: the doorways walkable, a dark hall behind each
-	end
+	SandboxWorld.walkIn(model, body, H, frame) -- (Jinočany: every house to empty's, the stand-ins' too)
 	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
 	-- part, where the model's door is); else the chalet as it is
 	if HouseMesh.dress(body, H.id) then
@@ -784,6 +888,11 @@ function SandboxWorld.build(): Folder
 	ground(world)
 	roads(world)
 	house(world)
+	for index, h in MAP.Houses do -- (Jinočany: the village's houses to empty, each a stand-in for now)
+		if index > 1 then
+			SandboxWorld.standIn(world, h)
+		end
+	end
 	scenery(world)
 	if Config.Auction.On then -- 8.8: the Auction House, only once the auction is on (nothing of it shows before)
 		auctionHouse(world)

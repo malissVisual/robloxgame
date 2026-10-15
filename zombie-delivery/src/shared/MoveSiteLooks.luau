@@ -22,8 +22,8 @@
 --   MoveSiteLooks.board(sandbox?)       the Moving contracts kiosk (frame: its foot, -Z toward the yard); Moving hangs its
 --                                       prompt on the piece named "Board" (the corkboard). 8.0 SANDBOX (sandbox true: the
 --                                       plots' kiosks, server/MoveSites.luau plotBoard): no evacuation, no Wall, no city
---                                       houses on it: the farmstead's photo and notices about bringing it home to your
---                                       warehouse, the same kiosk round them
+--                                       houses on it: the village's houses to empty (Jinočany: six, one on each card)
+--                                       and notices about bringing it home to your warehouse, the same kiosk round them
 --   MoveSiteLooks.house(title, park)    a contract's house dressed for moving day (frame: its front door's foot, -Z out
 --                                       to the street; park: studs from the door to the truck's kerb spot, Map.Home park)
 --   MoveSiteLooks.banner()              the depot's ZDC MOVING & EVACUATION banner (frame: its middle, -Z to the yard)
@@ -339,13 +339,14 @@ local function photo(emoji: string, caption: string, sky: { number }): { Words }
 	return { { face = "Front", back = sky, inset = 0.07, lines = { line(emoji, INK, 0.6), line(caption, CHARCOAL, 0.2, "Bold") } } }
 end
 
--- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the one house, what to do with it.
+-- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the houses to empty, what to do with them.
+-- Jinočany: one kiosk for every player, each card its own house of six (SandboxMap.Houses): the village's, not one's.
 local function sandboxPins(p: { Piece }, top: number, low: number)
-	local house = string.upper(SandboxMap.House.name)
-	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", house, { 148, 196, 228 }), RED)
+	local count = #SandboxMap.Houses
+	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", `{count} HOUSES TO EMPTY`, { 148, 196, 228 }), RED)
 	pinned(p, "FlyerHouse", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
-		line(house, RED, 0.16, "Black"),
-		line("END OF PRAŽSKÁ", CHARCOAL, 0.12, "Bold"), -- (SandboxMap.House.street, by hand: string.upper leaves ž and á)
+		line("JINOČANY", RED, 0.16, "Black"), -- (by hand: string.upper leaves č)
+		line("A HOUSE ON YOUR CARD", CHARCOAL, 0.12, "Bold"),
 		line("Bring it home to your warehouse.", CHARCOAL, 0.1),
 	} } }, YELLOW)
 	pinned(p, "PhotoStand", { 1.3, 1.15 }, 0.85, top, -4, PAPER, photo("🏺", "PUT IT ON SHOW", { 170, 206, 140 }), { 60, 110, 200 })
@@ -359,7 +360,7 @@ local function sandboxPins(p: { Piece }, top: number, low: number)
 	pinned(p, "PhotoWarehouse", { 1.3, 1.15 }, -0.85, low, 2, PAPER, photo("🏭", "YOUR WAREHOUSE", { 196, 180, 220 }), YELLOW)
 	pinned(p, "FlyerRefill", { 1.2, 1.2 }, 0.85, low, -3, PAPER, { { face = "Front", lines = {
 		line("NEW EVERY MOVE", CHARCOAL, 0.24, "Black"),
-		line("The farmstead is filled again", CHARCOAL, 0.15),
+		line("The next house is full again", CHARCOAL, 0.15),
 	} } }, { 60, 150, 80 })
 	pinned(p, "PhotoEarn", { 1.3, 1.15 }, 2.55, low, -2, PAPER, photo("💰", "EARNS EVERY MINUTE", { 210, 226, 236 }), RED)
 end

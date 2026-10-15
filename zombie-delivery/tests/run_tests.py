@@ -384,8 +384,21 @@ with tempfile.TemporaryDirectory() as tmp:
     areas += [("field " + f["kind"], f["rect"]) for f in plan["fields"]] + [("house " + h["id"], h["box"]) for h in plan["houses"] + plan["enter"]]
     lines = ["\t{ name = %s, rect = %s }," % (json.dumps(name, ensure_ascii=False), rect(r)) for name, r in areas]
     trees = ["\t{ %s }," % ", ".join("{ %r, %r }" % (p["x"], p["z"]) for p in t["points"]) for t in plan["treeLines"]]
+    # Jinočany step 1 (tests/sandboxhouses_test.luau: SandboxMap's Houses, Roads and Bounds against the plan): its roads
+    # (name, step, rect), its houses to empty (`enter`: id, name, kind, box, door, curb) and every village house's street
+    # and kind by id
+    def spot(s):
+        return "{ x = %r, z = %r, yaw = %r }" % (s["x"], s["z"], s["yaw"])
+    roads = ["\t{ name = %s, step = %r, rect = %s }," % (json.dumps(r["name"], ensure_ascii=False), r["step"], rect(r["rect"])) for r in plan["roads"]]
+    enter = ["\t{ id = %s, name = %s, kind = %s, box = %s, door = %s, curb = %s }," % (
+        json.dumps(e["id"], ensure_ascii=False), json.dumps(e["name"], ensure_ascii=False), json.dumps(e["kind"]), rect(e["box"]), spot(e["door"]), spot(e["curb"]))
+        for e in plan["enter"]]
+    village = ["\t[%s] = { street = %s, kind = %s, box = %s }," % (
+        json.dumps(h["id"], ensure_ascii=False), json.dumps(h["street"], ensure_ascii=False), json.dumps(h["kind"]), rect(h["box"])) for h in plan["houses"]]
     open(os.path.join(tmp, "JinocanyPlan.luau"), "w", encoding="utf-8").write(
-        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\n}\n" % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees)))
+        "return {\nbounds = %s,\nareas = {\n%s\n},\ntreeLines = {\n%s\n},\nroads = {\n%s\n},\nenter = {\n%s\n},\nvillage = {\n%s\n},\nturnaround = { x = %r, z = %r, r = %r },\n}\n" % (
+            rect(plan["bounds"]), "\n".join(lines), "\n".join(trees), "\n".join(roads), "\n".join(enter), "\n".join(village),
+            plan["turnaround"]["x"], plan["turnaround"]["z"], plan["turnaround"]["r"]))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -790,6 +803,20 @@ def jinocany_names_check():
     return not bad
 
 if not jinocany_names_check():
+    ok = False
+
+# Jinočany step 1: the guide's path along the village's roads has SandboxSteps.MaxPoints points at most; the client's
+# beams (client/SandboxGuide.luau's MAX_POINTS - 1, a number tools/perf/sandbox_count.py reads) are as many.
+def guide_points_check():
+    root = os.path.join(os.path.dirname(HERE), "src")
+    steps = re.search(r"^SandboxSteps\.MaxPoints = (\d+)", open(os.path.join(root, "shared", "SandboxSteps.luau"), encoding="utf-8").read(), re.M)
+    guide = re.search(r"^local MAX_POINTS = (\d+)", open(os.path.join(root, "client", "SandboxGuide.luau"), encoding="utf-8").read(), re.M)
+    good = steps is not None and guide is not None and steps.group(1) == guide.group(1)
+    print("== guide points: " + (f"SandboxSteps.MaxPoints and the guide's MAX_POINTS both {steps.group(1)}" if good else
+                                 f"SandboxSteps.MaxPoints {steps and steps.group(1)} but client/SandboxGuide.luau's MAX_POINTS {guide and guide.group(1)}"))
+    return good
+
+if not guide_points_check():
     ok = False
 
 # 8.5.1: the server's and the client's BuildStamp equal Config.Version (they find a Studio left with old scripts).

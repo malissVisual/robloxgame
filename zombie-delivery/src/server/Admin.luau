@@ -1609,8 +1609,12 @@ Sandbox.run.van = function(player: Player)
 end
 
 -- To the house's front door (facing it: Enter house); driving your van: the van to its curb, its back to the door.
+-- (Jinočany: your move's house, else your card's: Moving.houseOf; none yet: the farmstead)
 Sandbox.run.house = function(player: Player)
-	local house = Sandbox.Map.House
+	local ok, found = pcall(function(): any
+		return require(Server.Moving).houseOf(player)
+	end)
+	local house = (if ok and type(found) == "table" then Sandbox.Map.house(found.id) else nil) or Sandbox.Map.House
 	local vehicle = Sandbox.driven(player)
 	if vehicle and Sandbox.park(vehicle, house.curb) then
 		say(player, `ADMIN: {house.name}, your van at its curb.`)

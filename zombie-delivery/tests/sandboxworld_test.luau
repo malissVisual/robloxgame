@@ -104,8 +104,13 @@ do
 				bad = `mound at {m.x}, {m.z} by plot {plot.id}`
 			end
 		end
-		if SandboxScenery.rectDistance(HOUSE.lot, m.x, m.z) < keep or SandboxScenery.circleOut(m.x, m.z) < keep + RUN then
+		if SandboxScenery.circleOut(m.x, m.z) < keep + RUN then
 			bad = `mound at {m.x}, {m.z} by the house`
+		end
+		for _, h in SandboxMap.Houses do -- (Jinočany: every house to empty's lot)
+			if SandboxScenery.rectDistance(h.lot, m.x, m.z) < keep then
+				bad = `mound at {m.x}, {m.z} by {h.name}`
+			end
 		end
 		if SandboxScenery.outside(m.x, m.z) > -(m.base + SandboxScenery.FenceInset + 2) then
 			bad = `mound at {m.x}, {m.z} at the edge`
@@ -140,19 +145,37 @@ do
 			worst, at = margin, string.format("%.1f, %.1f (%.1f out)", x, z, out)
 		end
 	end
+	-- (Jinočany: every road but Pražská the same way, the village's streets too; a point past the world's edge is none)
+	local function inside(x: number, z: number): boolean
+		return x > B.x0 and x < B.x1 and z > B.z0 and z < B.z1
+	end
 	for _, out in { 0.3, 1.5, 3 } do
-		for x = DEPOT.x0, DEPOT.x1, 5 do
-			edgePoint(x, DEPOT.z0 - out, out, TOP)
-			edgePoint(x, DEPOT.z1 + out, out, TOP)
-		end
-		for z = DEPOT.z0, DEPOT.z1, 4 do
-			edgePoint(DEPOT.x0 - out, z, out, TOP)
-			edgePoint(DEPOT.x1 + out, z, out, TOP)
-		end
-		for _, c in { { DEPOT.x0, DEPOT.z0, -1, -1 }, { DEPOT.x0, DEPOT.z1, -1, 1 }, { DEPOT.x1, DEPOT.z0, 1, -1 }, { DEPOT.x1, DEPOT.z1, 1, 1 } } do
-			for _, a in { 0.2, 0.5, 0.8 } do
-				local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
-				edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, TOP)
+		for index, road in SandboxMap.Roads do
+			if index == 1 then
+				continue
+			end
+			for x = road.x0, road.x1, 5 do
+				for _, z in { road.z0 - out, road.z1 + out } do
+					if inside(x, z) then
+						edgePoint(x, z, out, TOP)
+					end
+				end
+			end
+			for z = road.z0, road.z1, 4 do
+				for _, x in { road.x0 - out, road.x1 + out } do
+					if inside(x, z) then
+						edgePoint(x, z, out, TOP)
+					end
+				end
+			end
+			for _, c in { { road.x0, road.z0, -1, -1 }, { road.x0, road.z1, -1, 1 }, { road.x1, road.z0, 1, -1 }, { road.x1, road.z1, 1, 1 } } do
+				for _, a in { 0.2, 0.5, 0.8 } do
+					local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
+					local x, z = c[1] + c[3] * dx * out, c[2] + c[4] * dz * out
+					if inside(x, z) then
+						edgePoint(x, z, out, TOP)
+					end
+				end
 			end
 		end
 		for z = DEPOT.z1, TURN.z - TURN.r, 5 do
@@ -239,8 +262,21 @@ check("a second build returns it as it is", SandboxWorld.build() == world)
 type Box = { part: any, name: string, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, far: boolean, cap: number? }
 local far = world:FindFirstChild("Far")
 local boxes: { Box } = {}
-local byName: { [string]: { Box } } = {}
+local byName: { [string]: { Box } } = {} -- (Jinočany: the stand-ins' parts are in standBoxes, by their house's id)
+local standBoxes: { [string]: { Box } } = {}
 local unanchored = 0
+-- (the house to empty a part is of, when it is a stand-in's: its nearest model with SandboxHouse, not the farmstead)
+local function standInOf(d: any): string?
+	local at = d.Parent
+	while at and at ~= world do
+		local id = at:GetAttribute("SandboxHouse")
+		if id ~= nil then
+			return if id ~= HOUSE.id then id else nil
+		end
+		at = at.Parent
+	end
+	return nil
+end
 for _, d in world:GetDescendants() do
 	if d:IsA("BasePart") then
 		local size = d.Size
@@ -258,8 +294,14 @@ for _, d in world:GetDescendants() do
 		end
 		local box: Box = { part = d, name = d.Name, x0 = x - hx, x1 = x + hx, y0 = y0, y1 = y1, z0 = z - hz, z1 = z + hz, far = far ~= nil and d:IsDescendantOf(far), cap = cap }
 		table.insert(boxes, box)
-		byName[d.Name] = byName[d.Name] or {}
-		table.insert(byName[d.Name], box)
+		local standIn = standInOf(d)
+		if standIn then
+			standBoxes[standIn] = standBoxes[standIn] or {}
+			table.insert(standBoxes[standIn], box)
+		else
+			byName[d.Name] = byName[d.Name] or {}
+			table.insert(byName[d.Name], box)
+		end
 		if not d.Anchored then
 			unanchored += 1
 		end
@@ -331,7 +373,17 @@ do
 			end
 		end
 	end
-	check("the asphalt covers every road of SandboxMap.Roads at RoadTop", missed == nil and #asphalt == 2, missed)
+	check("the asphalt covers every road of SandboxMap.Roads at RoadTop (Jinočany: a slab each, Pražská's from Depot Row's edge)", missed == nil
+		and #asphalt == #SandboxMap.Roads and #SandboxMap.Roads == 10, missed)
+	local labelled = true
+	for _, road in SandboxMap.Roads do
+		local found = false
+		for _, b in asphalt do
+			found = found or b.part:GetAttribute("Road") == road.name
+		end
+		labelled = labelled and found
+	end
+	check("…each slab says its road (the attribute Road: Hlavní, Školní …)", labelled)
 	local ok = disc ~= nil and disc.part.Shape == Enum.PartType.Cylinder and math.abs((disc.x1 - disc.x0) / 2 - TURN.r) < EPS
 	if disc then
 		for deg = 0, 359, 10 do
@@ -372,11 +424,24 @@ do
 	table.insert(areas, { name = "the path from the curb to the door", rect = { x0 = SandboxScenery.Path.x0, x1 = SandboxScenery.Path.x1, z0 = SandboxScenery.Path.z0, z1 = HOUSE.door.z - 0.01 } })
 	local d = HOUSE.door
 	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - 2.5, x1 = d.x + 2.5, z0 = d.z - 5, z1 = d.z - 0.01 } })
+	-- (Jinočany: every other house to empty's door's way, 5 out of it, and its walk to its curb)
+	for index, h in SandboxMap.Houses do
+		if index > 1 then
+			local hd, c = h.door, h.curb
+			local ox, oz = -math.sin(math.rad(hd.yaw)), -math.cos(math.rad(hd.yaw))
+			local ax, az = hd.x + ox * 0.01, hd.z + oz * 0.01
+			local bx, bz = hd.x + ox * 5, hd.z + oz * 5
+			local wide = if ox ~= 0 then 0 else 2.5
+			local deep = if oz ~= 0 then 0 else 2.5
+			table.insert(areas, { name = `{h.name}'s door's way`, rect = { x0 = math.min(ax, bx) - wide, x1 = math.max(ax, bx) + wide, z0 = math.min(az, bz) - deep, z1 = math.max(az, bz) + deep } })
+			table.insert(areas, { name = `{h.name}'s walk to its curb`, rect = { x0 = math.min(hd.x, c.x) - wide, x1 = math.max(hd.x, c.x) + wide, z0 = math.min(hd.z + oz * 0.01, c.z) - deep, z1 = math.max(hd.z + oz * 0.01, c.z) + deep } })
+		end
+	end
 	local blocked: string? = nil
 	local floorHigh: string? = nil
 	for _, b in boxes do
-		if b.far or not b.part.CanCollide then
-			continue
+		if b.far or not b.part.CanCollide or b.name == "InvisibleWall" then
+			continue -- (Jinočany: the world's edge closes Hornická, which runs to it: ROAD CLOSED)
 		end
 		if FLOOR[b.name] then
 			if b.y1 > TOP + EPS then
@@ -759,6 +824,102 @@ do
 			and b.part.Transparency == 0 and math.abs(c.R * 255 - D.Hall.Color[1]) < 1 and math.abs(c.G * 255 - D.Hall.Color[2]) < 1 and math.abs(c.B * 255 - D.Hall.Color[3]) < 1
 	end
 	check("8.5 …each hall lined dark (DoorHalls: its back, sides, ceiling and floor, in the hall, seen, never colliding)", liningOk, #lining)
+end
+
+-- Jinočany step 1: the village's five other houses to empty, each a stand-in (SandboxWorld.standIn) until the village's
+-- own look: a model of its own (SandboxHouse = its id, Atomic), its parts in House_<id> (Home): the walls' box on
+-- house.house, its FrontDoor (SandboxDoor, no collision, unseen) just outside the front wall at its door, two leaves
+-- (door leaves, out of the house), no back door, the walls' box walkable (the house's HouseSolid pieces: the box less the
+-- front door's hall, nothing colliding in the hall or in the door's way), the hall lined dark, its name over the door.
+do
+	local D = Config.Moving.Doors
+	local made, okAll, why = 0, true, nil :: string?
+	for index, h in SandboxMap.Houses do
+		if index == 1 then
+			continue
+		end
+		local model: any = nil
+		for _, child in world:GetChildren() do
+			if child:GetAttribute("SandboxHouse") == h.id then
+				model = child
+			end
+		end
+		local list = standBoxes[h.id] or {}
+		local function all(name: string): { Box }
+			local found = {}
+			for _, b in list do
+				if b.name == name then
+					table.insert(found, b)
+				end
+			end
+			return found
+		end
+		local body = model and model:FindFirstChild("House_" .. h.id)
+		local walls, doors, solids, lining = all("House"), all("FrontDoor"), all("HouseSolid"), all("DoorHall")
+		local west, east = all("FrontLeafWest"), all("FrontLeafEast")
+		local box = h.house
+		local wall = walls[1]
+		local door = doors[1]
+		local ox, oz = -math.sin(math.rad(h.door.yaw)), -math.cos(math.rad(h.door.yaw)) -- (out of the door)
+		local ok = model ~= nil and model:IsA("Model") and model.ModelStreamingMode == Enum.ModelStreamingMode.Atomic and body ~= nil
+			and body:GetAttribute("Home") == h.id and #walls == 1 and #doors == 1 and #west == 1 and #east == 1 and #all("BackDoor") == 0 and #all("BackLeaf") == 0
+		ok = ok and math.abs(wall.x0 - (box.x - box.sx / 2)) < EPS and math.abs(wall.x1 - (box.x + box.sx / 2)) < EPS and math.abs(wall.z0 - (box.z - box.sz / 2)) < EPS
+			and math.abs(wall.z1 - (box.z + box.sz / 2)) < EPS and math.abs(wall.y0 - box.y) < EPS and not wall.part.CanCollide and not wall.part.CanQuery
+		local dx, dz = (door.x0 + door.x1) / 2, (door.z0 + door.z1) / 2
+		ok = ok and door.part:GetAttribute("SandboxDoor") == true and not door.part.CanCollide and door.part.Transparency == 1
+			and math.abs((dx - h.door.x) * oz) + math.abs((dz - h.door.z) * ox) < 0.1 -- (across: its middle on the door's)
+			and (dx - h.door.x) * ox + (dz - h.door.z) * oz > 0 and (dx - h.door.x) * ox + (dz - h.door.z) * oz < 0.5 -- (just outside the wall)
+		for _, leaf in { west[1], east[1] } do
+			ok = ok and leaf ~= nil and leaf.part:GetAttribute("DoorLeaf") ~= nil and leaf.part:GetAttribute("DoorSwing") == -1 and leaf.part:GetAttribute("DoorDark") == true
+				and not leaf.part.CanCollide
+		end
+		ok = ok and west[1].part:GetAttribute("DoorLeaf") == -1 and east[1].part:GetAttribute("DoorLeaf") == 1
+		-- the hall: nothing that collides from 5 out of the door to the hall's end, the opening's width wide
+		local hallDepth = math.min(D.Hall.Depth, (if h.door.yaw % 180 ~= 0 then box.sx else box.sz) / 2 - 1)
+		local half = SandboxScenery.FrontDoor.Width / 2 - 0.2
+		local blocked: string? = nil
+		for _, b in boxes do
+			if b.part.CanCollide and not b.far and b.y1 > GROUND + 0.3 and b.y0 < 6 then
+				-- the box's span along the way in (from 5 out to the hall's end) and across it
+				local cx, cz = (b.x0 + b.x1) / 2 - h.door.x, (b.z0 + b.z1) / 2 - h.door.z
+				local hxb, hzb = (b.x1 - b.x0) / 2, (b.z1 - b.z0) / 2
+				local along = -(cx * ox + cz * oz) -- (into the house)
+				local alongHalf = math.abs(ox) * hxb + math.abs(oz) * hzb
+				local across = cx * oz - cz * ox
+				local acrossHalf = math.abs(oz) * hxb + math.abs(ox) * hzb
+				if along + alongHalf > -5 and along - alongHalf < hallDepth - 0.2 and across + acrossHalf > -half and across - acrossHalf < half then
+					blocked = b.name
+				end
+			end
+		end
+		local liningOk = #lining == 5
+		for _, b in lining do
+			liningOk = liningOk and not b.part.CanCollide and not b.part.CanQuery and b.part.Parent ~= nil and b.part.Parent.Name == "DoorHalls"
+		end
+		local texts: { string } = {}
+		for _, d in (if model then model:GetDescendants() else {}) do
+			if d.ClassName == "TextLabel" then
+				table.insert(texts, d.Text)
+			end
+		end
+		ok = ok and #solids == 4 and blocked == nil and liningOk and table.find(texts, string.upper(h.name)) ~= nil
+		for _, b in list do -- (all of it in its lot: nothing on its street)
+			if b.part.CanCollide and (b.x0 < h.lot.x0 - EPS or b.x1 > h.lot.x1 + EPS or b.z0 < h.lot.z0 - EPS or b.z1 > h.lot.z1 + EPS) then
+				ok = false
+			end
+		end
+		if ok then
+			made += 1
+		elseif okAll then
+			okAll, why = false, `{h.name}: {#walls} walls, {#doors} doors, {#solids} solid, {#lining} lining, blocked {blocked}`
+		end
+	end
+	check("Jinočany: a stand-in on each of the five family houses: its model (SandboxHouse, Atomic), its walls' box on its box, its FrontDoor (SandboxDoor) at its door, two leaves, no back door",
+		okAll and made == 5, why)
+	check("…walkable as the farmstead's (4 HouseSolid pieces: the box less the front door's hall, nothing solid in the hall or the door's way), the hall lined dark, its name over the door",
+		okAll, why)
+	check("SandboxWorld.walkIn and SandboxWorld.standIn: the hooks for the village's own look", type(SandboxWorld.walkIn) == "function" and type(SandboxWorld.standIn) == "function"
+		and type(SandboxWorld.doorLeaves) == "function")
 end
 
 -- the words: the signpost's boards, the gate's and the mailbox's

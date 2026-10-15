@@ -11,14 +11,18 @@
 --                  to it on a gravel shoulder, a slope Run studs wide (a wedge: the cars' frictionless wheels roll up
 --                  and down it anywhere, like the city's kerbs in shared/CurbShape.luau, only gentler), a hip at a
 --                  convex corner, a ring of wedges round the turnaround; the white markings (a dashed centre line,
---                  the edge lines, the give-way line where Pražská meets Depot Row)
---   The house      the curb-to-door Path, the garden's fence round its lot (decoration: nothing stops a mover), the
---                  gate with its THE OLD FARMSTEAD board, the mailbox, the flower boxes (the house itself is
---                  shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the owner's Blender house once imported)
---   The scenery    the alpine spruces (shared/AlpineLayout.luau's two-part trees) in copses and along the edges, never
---                  on a road, a plot, the house's lot or a van's way; wildflower patches; a rail fence round the edge
---                  (the invisible walls are at the Bounds); the street lamps along Pražská; the signpost at the
---                  crossroads
+--                  the edge lines, the give-way line where Pražská meets Depot Row). Jinočany step 1: every road's
+--                  edges the same way (ramps: none where another road's asphalt or the world's edge is), the
+--                  village streets' markings not yet (the village's own look comes with its houses)
+--   The house      the farmstead's (SandboxMap.House): the curb-to-door Path, the garden's fence round its lot
+--                  (decoration: nothing stops a mover), the gate with its THE OLD FARMSTEAD board, the mailbox, the
+--                  flower boxes (the house itself is shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the
+--                  owner's Blender house once imported). Jinočany: the village's houses to empty are SandboxMap.Houses'
+--                  (server/SandboxWorld.luau stands a stand-in on each)
+--   The scenery    the alpine spruces (shared/AlpineLayout.luau's two-part trees) in copses and in rows round the
+--                  8.0 map (OLD_EDGE: the plots, Pražská and the farmstead), never on a road, a plot, a house's lot or
+--                  a van's way; wildflower patches; a rail fence round the edge (the invisible walls are at the
+--                  Bounds); the street lamps along Pražská; the signpost at the crossroads
 --   Far away       outside the Bounds only: the far meadow, a ring of green hills (buried balls) and a ring of rocky
 --                  peaks with snow caps (four corner wedges each, as server/Alpine.luau's silhouettes), so the edge
 --                  looks closed
@@ -72,8 +76,9 @@ export type Peak = { x: number, z: number, yaw: number, base: number, half: numb
 
 local MAP = SandboxMap
 local BOUNDS = MAP.Bounds
-local HOUSE = MAP.House
+local HOUSE = MAP.House -- (the farmstead: its garden, path and gate are this module's)
 local TURN = MAP.Turnaround
+local OLD_EDGE = { x0 = -340, x1 = 340, z0 = -280, z1 = 640 } :: Rect -- (8.0 – 8.9's Bounds: the tree rows round them)
 
 -- ── The numbers ────────────────────────────────────────────────────────────
 
@@ -92,6 +97,19 @@ SandboxScenery.WallHeight = 300
 -- the big house's 31° (house.py TARGET "sandbox", the manifest's "pitch")
 SandboxScenery.Chalet = { Seed = 1, Render = 2, Shade = 0, Pitch = 31 }
 SandboxScenery.Path = { x0 = HOUSE.door.x - 3, x1 = HOUSE.door.x + 3, z0 = HOUSE.curb.z, z1 = HOUSE.door.z } :: Rect -- the curb to the door, kept clear
+-- Jinočany: the village's houses to empty until their own look (server/SandboxWorld.luau standIn): the walls' render, the
+-- red tile roof (its pitch, its eaves out of the walls), the front door (ChaletLooks' door: width, height, depth) and
+-- the name board over it (its widest, its height, its middle over the ground) with its wood
+SandboxScenery.StandIn = {
+	Render = { 236, 226, 204 } :: { number },
+	Roof = { 168, 70, 50 } :: { number },
+	Door = { 96, 64, 44 } :: { number },
+	Sign = { 150, 108, 66 } :: { number },
+	Pitch = 35,
+	Eaves = 0.8,
+	DoorSize = { 4, 7, 0.4 } :: { number },
+	Board = { 12, 1.4, 8.4 } :: { number },
+}
 SandboxScenery.Garden = { Front = HOUSE.lot.z0 + 6, Gate = 6, Inset = 1, Post = 8, Height = 3.2 } -- the lot's fence: its front line, the gate's half width
 SandboxScenery.Clear = { Road = 12, Turnaround = 14, Plot = 8, Lot = 6, Sign = 8, Edge = 2, Trees = 0.85, Flowers = 2 }
 SandboxScenery.Trees = { Height = { 28, 50 } :: { number }, Edge = { 24, 34 } :: { number }, Canopy = 0.19, Chunk = 128, Max = 120 }
@@ -192,10 +210,9 @@ function SandboxScenery.meadow(): ({ Rect }, { Rect })
 	return tiles, holes
 end
 
-local MOUNDS: { { number } } = { -- x, z, base (the cap's radius at the ground), height
+local MOUNDS: { { number } } = { -- x, z, base (the cap's radius at the ground), height (Jinočany: none on Mirešická)
 	{ -205, 120, 44, 4.2 },
 	{ -120, 250, 34, 3.2 },
-	{ -265, 330, 40, 4 },
 	{ -170, 460, 48, 4.6 },
 	{ 190, 140, 46, 4.4 },
 	{ 110, 270, 32, 3 },
@@ -272,26 +289,105 @@ end
 -- Pražská's shoulders stop here (the turnaround's ring takes over).
 SandboxScenery.MainShoulderEnd = TURN.z - 30
 
+-- Is (x, z) on a road's asphalt (SandboxMap.Roads' rects, their edges in)?
+local function onRoads(x: number, z: number): boolean
+	for _, r in MAP.Roads do
+		if x >= r.x0 and x <= r.x1 and z >= r.z0 and z <= r.z1 then
+			return true
+		end
+	end
+	return false
+end
+
+-- The stretches of road `index`'s edge with meadow beyond it: the edge runs along X (`alongX`) or Z from `a` to `b`,
+-- across at `at`, the meadow `out` (±1) of it. Where another road's asphalt lies just beyond it (a junction), or the
+-- world's edge, none.
+local function openSpans(index: number, alongX: boolean, a: number, b: number, at: number, out: number): { { number } }
+	local probe = at + out * 0.5
+	if (alongX and (probe < BOUNDS.z0 or probe > BOUNDS.z1)) or (not alongX and (probe < BOUNDS.x0 or probe > BOUNDS.x1)) then
+		return {}
+	end
+	local spans: { { number } } = { { a, b } }
+	for j, other in MAP.Roads do
+		local lo, hi = if alongX then other.x0 else other.z0, if alongX then other.x1 else other.z1
+		local near, far = if alongX then other.z0 else other.x0, if alongX then other.z1 else other.x1
+		if j ~= index and probe > near and probe < far then
+			local left: { { number } } = {}
+			for _, s in spans do
+				if hi <= s[1] or lo >= s[2] then
+					table.insert(left, s)
+				else
+					if lo > s[1] then
+						table.insert(left, { s[1], lo })
+					end
+					if hi < s[2] then
+						table.insert(left, { hi, s[2] })
+					end
+				end
+			end
+			spans = left
+		end
+	end
+	return spans
+end
+
+-- Does one of `spans` start (or end, `atEnd`) at `v`?
+local function spanAt(spans: { { number } }, v: number, atEnd: boolean): boolean
+	for _, s in spans do
+		if math.abs((if atEnd then s[2] else s[1]) - v) < 1e-6 then
+			return true
+		end
+	end
+	return false
+end
+
 function SandboxScenery.ramps(): { Ramp }
 	local run, top = SandboxScenery.Run, MAP.RoadTop
 	local list: { Ramp } = {}
-	local depot, main = MAP.Roads[2], MAP.Roads[1]
-	-- Depot Row: the north side (to the plots' pads), the south side either side of Pražská, both ends and their hips.
-	-- (A concave corner, where Depot Row's south side meets Pražská's, is two shoulders over the same square: their
-	-- higher one is the ground there.)
-	edge(list, depot.x0, depot.x1, depot.z0 - run, depot.z0, 0, -1, top)
-	edge(list, depot.x0, main.x0, depot.z1, depot.z1 + run, 0, 1, top)
-	edge(list, main.x1, depot.x1, depot.z1, depot.z1 + run, 0, 1, top)
-	edge(list, depot.x0 - run, depot.x0, depot.z0, depot.z1, -1, 0, top)
-	edge(list, depot.x1, depot.x1 + run, depot.z0, depot.z1, 1, 0, top)
-	corner(list, depot.x0, depot.z0, -1, -1, top)
-	corner(list, depot.x0, depot.z1, -1, 1, top)
-	corner(list, depot.x1, depot.z0, 1, -1, top)
-	corner(list, depot.x1, depot.z1, 1, 1, top)
-	-- Pražská: both sides from Depot Row to the turnaround.
+	local depot = MAP.Roads[2]
+	-- Every road but Pražská: each side where meadow lies beyond it, and a hip at each convex corner (both its sides
+	-- open there, no asphalt past it). (A concave corner, where one road's side meets another's, as Depot Row's south
+	-- side meets Pražská's, is two shoulders over the same square: their higher one is the ground there.)
+	for index, r in MAP.Roads do
+		if index == 1 then
+			continue
+		end
+		local north = openSpans(index, true, r.x0, r.x1, r.z0, -1)
+		local south = openSpans(index, true, r.x0, r.x1, r.z1, 1)
+		local west = openSpans(index, false, r.z0, r.z1, r.x0, -1)
+		local east = openSpans(index, false, r.z0, r.z1, r.x1, 1)
+		for _, s in north do
+			edge(list, s[1], s[2], r.z0 - run, r.z0, 0, -1, top)
+		end
+		for _, s in south do
+			edge(list, s[1], s[2], r.z1, r.z1 + run, 0, 1, top)
+		end
+		for _, s in west do
+			edge(list, r.x0 - run, r.x0, s[1], s[2], -1, 0, top)
+		end
+		for _, s in east do
+			edge(list, r.x1, r.x1 + run, s[1], s[2], 1, 0, top)
+		end
+		for _, c in { { r.x0, r.z0, -1, -1 }, { r.x0, r.z1, -1, 1 }, { r.x1, r.z0, 1, -1 }, { r.x1, r.z1, 1, 1 } } do
+			local cx, cz, sx, sz = c[1], c[2], c[3], c[4]
+			local along = if sz < 0 then north else south -- (the side along X at this corner)
+			local across = if sx < 0 then west else east
+			local px, pz = cx + sx * 0.5, cz + sz * 0.5
+			if spanAt(along, cx, sx > 0) and spanAt(across, cz, sz > 0) and not onRoads(px, pz)
+				and px > BOUNDS.x0 and px < BOUNDS.x1 and pz > BOUNDS.z0 and pz < BOUNDS.z1 then
+				corner(list, cx, cz, sx, sz, top)
+			end
+		end
+	end
+	-- Pražská: both sides from Depot Row to the turnaround (Jinočany: none where Mirešická comes in).
+	local main = MAP.Roads[1]
 	local stop = SandboxScenery.MainShoulderEnd
-	edge(list, main.x0 - run, main.x0, depot.z1, stop, -1, 0, top)
-	edge(list, main.x1, main.x1 + run, depot.z1, stop, 1, 0, top)
+	for _, s in openSpans(1, false, depot.z1, stop, main.x0, -1) do
+		edge(list, main.x0 - run, main.x0, s[1], s[2], -1, 0, top)
+	end
+	for _, s in openSpans(1, false, depot.z1, stop, main.x1, 1) do
+		edge(list, main.x1, main.x1 + run, s[1], s[2], 1, 0, top)
+	end
 	-- The turnaround: a ring of wedges (each on a chord just inside the asphalt's edge, wide enough to close the ring
 	-- at its foot), none where Pražská comes in (its own asphalt there).
 	local n, r = SandboxScenery.RingPieces, TURN.r
@@ -376,7 +472,15 @@ function SandboxScenery.markings(): { Strip }
 		return TURN.z - math.sqrt(r * r - (x - TURN.x) ^ 2)
 	end
 	local westX, eastX = main.x0 + inset, main.x1 - inset
-	strip(list, "EdgeLine", westX, depot.z1 - inset, westX, meet(westX), w, top)
+	-- (Jinočany: the west one stops at a street coming in from the west, Mirešická, and goes on past it)
+	local westFrom = depot.z1 - inset
+	for index, road in MAP.Roads do
+		if index > 2 and math.abs(road.x1 - main.x0) < 1e-6 and road.z0 > westFrom then
+			strip(list, "EdgeLine", westX, westFrom, westX, road.z0 - inset, w, top)
+			westFrom = road.z1 + inset
+		end
+	end
+	strip(list, "EdgeLine", westX, westFrom, westX, meet(westX), w, top)
 	strip(list, "EdgeLine", eastX, depot.z1 - inset, eastX, meet(eastX), w, top)
 	-- the give-way line across Pražská's northbound lane (the right-hand one) where it meets Depot Row
 	strip(list, "GiveWay", main.x0 + (main.x1 - main.x0) / 2 + 0.6, depot.z1 + 1.2, eastX - 0.3, depot.z1 + 1.2, 0.6, top)
@@ -396,7 +500,8 @@ end
 
 SandboxScenery.Signpost = { x = MAP.Roads[1].x0 - 12, z = MAP.Roads[2].z1 + 12 } -- the crossroads' south-west corner
 
--- The vans' ways off the asphalt: each plot's apron from the van's spot to Depot Row, the house's curb.
+-- The vans' ways off the asphalt: each plot's apron from the van's spot to Depot Row, every house's curb (Jinočany:
+-- SandboxMap.Houses', the farmstead's first).
 function SandboxScenery.vanPaths(): { Rect }
 	local list: { Rect } = {}
 	local depot = MAP.Roads[2]
@@ -404,8 +509,10 @@ function SandboxScenery.vanPaths(): { Rect }
 		local v = plot.vanSpot
 		table.insert(list, { x0 = v.x - 14, x1 = v.x + 14, z0 = v.z - 14, z1 = depot.z0 })
 	end
-	local c = HOUSE.curb
-	table.insert(list, { x0 = c.x - 14, x1 = c.x + 14, z0 = c.z - 14, z1 = c.z + 14 })
+	for _, h in MAP.Houses do
+		local c = h.curb
+		table.insert(list, { x0 = c.x - 14, x1 = c.x + 14, z0 = c.z - 14, z1 = c.z + 14 })
+	end
 	return list
 end
 
@@ -429,8 +536,10 @@ function SandboxScenery.treeRule(x: number, z: number, r: number): string?
 			return "plot"
 		end
 	end
-	if rectDistance(HOUSE.lot, x, z) < r + C.Lot then
-		return "house"
+	for _, h in MAP.Houses do -- (Jinočany: every house to empty, the farmstead first)
+		if rectDistance(h.lot, x, z) < r + C.Lot then
+			return "house"
+		end
 	end
 	if rectDistance(SandboxScenery.Path, x, z) < r + C.Lot then
 		return "path"
@@ -521,10 +630,12 @@ function SandboxScenery.trees(): { Tree }
 			end
 		end
 	end
-	row(BOUNDS.x0 + 18, BOUNDS.z0 + 22, BOUNDS.x1 - 18, BOUNDS.z0 + 22, 30, 9, 0.8)
-	row(BOUNDS.x0 + 18, BOUNDS.z1 - 19, BOUNDS.x1 - 18, BOUNDS.z1 - 19, 32, 9, 0.75)
-	row(BOUNDS.x0 + 36, -225, BOUNDS.x0 + 36, -85, 30, 6, 0.9)
-	row(BOUNDS.x1 - 36, -225, BOUNDS.x1 - 36, -85, 30, 6, 0.9)
+	-- (Jinočany: round the 8.0 map, OLD_EDGE, as before the Bounds grew: the village's own trees come with its look)
+	local edge = OLD_EDGE
+	row(edge.x0 + 18, edge.z0 + 22, edge.x1 - 18, edge.z0 + 22, 30, 9, 0.8)
+	row(edge.x0 + 18, edge.z1 - 19, edge.x1 - 18, edge.z1 - 19, 32, 9, 0.75)
+	row(edge.x0 + 36, -225, edge.x0 + 36, -85, 30, 6, 0.9)
+	row(edge.x1 - 36, -225, edge.x1 - 36, -85, 30, 6, 0.9)
 	-- then the copses on the meadows
 	for _, copse in COPSES do
 		local cx, cz, radius, count = copse[1], copse[2], copse[3], copse[4]
@@ -599,16 +710,50 @@ function SandboxScenery.lamps(): { Lamp }
 	return list
 end
 
--- The rail fence round the world, FenceInset inside the Bounds.
+-- The rail fence round the world, FenceInset inside the Bounds. Jinočany: open where a road runs out to the world's
+-- edge (Hornická, a stud clear of its asphalt either side; the invisible wall at the Bounds closes it).
 function SandboxScenery.fence(): { Segment }
 	local i = SandboxScenery.FenceInset
 	local x0, x1, z0, z1 = BOUNDS.x0 + i, BOUNDS.x1 - i, BOUNDS.z0 + i, BOUNDS.z1 - i
-	return {
-		{ ax = x0, az = z0, bx = x1, bz = z0 },
-		{ ax = x1, az = z0, bx = x1, bz = z1 },
-		{ ax = x1, az = z1, bx = x0, bz = z1 },
-		{ ax = x0, az = z1, bx = x0, bz = z0 },
-	}
+	local list: { Segment } = {}
+	-- one side from (ax, az) to (bx, bz), along X or Z, less the roads that cross it
+	local function side(ax: number, az: number, bx: number, bz: number)
+		local alongX = az == bz
+		local lo, hi = if alongX then math.min(ax, bx) else math.min(az, bz), if alongX then math.max(ax, bx) else math.max(az, bz)
+		local spans: { { number } } = { { lo, hi } }
+		for _, r in MAP.Roads do
+			local across0, across1 = if alongX then r.z0 else r.x0, if alongX then r.z1 else r.x1
+			local at = if alongX then az else ax
+			if at >= across0 and at <= across1 then
+				local cut0, cut1 = (if alongX then r.x0 else r.z0) - 1, (if alongX then r.x1 else r.z1) + 1
+				local left: { { number } } = {}
+				for _, s in spans do
+					if cut1 <= s[1] or cut0 >= s[2] then
+						table.insert(left, s)
+					else
+						if cut0 > s[1] then
+							table.insert(left, { s[1], cut0 })
+						end
+						if cut1 < s[2] then
+							table.insert(left, { cut1, s[2] })
+						end
+					end
+				end
+				spans = left
+			end
+		end
+		local forward = (if alongX then bx - ax else bz - az) > 0
+		for k = 1, #spans do
+			local s = spans[if forward then k else #spans + 1 - k]
+			local a, b = if forward then s[1] else s[2], if forward then s[2] else s[1]
+			table.insert(list, if alongX then { ax = a, az = az, bx = b, bz = bz } else { ax = ax, az = a, bx = bx, bz = b })
+		end
+	end
+	side(x0, z0, x1, z0)
+	side(x1, z0, x1, z1)
+	side(x1, z1, x0, z1)
+	side(x0, z1, x0, z0)
+	return list
 end
 
 -- The garden's fence round the house's lot: its front a little in (clear of the turnaround's shoulder), the gate on

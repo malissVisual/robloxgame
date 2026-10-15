@@ -37,10 +37,10 @@ local Items = FurnitureLooks.Items
 local SEEDS = 40
 
 local LIT = Config.SandboxLight.House
-check("Config.Furniture.Big: its numbers (pieces, ★, collectibles 2-3 and a legendary in one of 17: 8.3 economy, more than a house's; the back door, a part budget); Config.Moving.Sandbox's kind",
+check("Config.Furniture.Big: its numbers (pieces, ★, collectibles 2-3 and a legendary in one of 17: 8.3 economy, more than a house's; the back door, a part budget); the farmstead's contract's kind (Config.Moving.Sandbox.Houses)",
 	type(L) == "table" and L.Spots[1] >= 30 and L.Spots[2] >= L.Spots[1] and L.Stars >= T.Stars and L.Collectibles.Count[1] == 2 and L.Collectibles.Count[2] == 3
 	and L.Collectibles.Count[1] >= T.Collectibles.Count[1] and L.Collectibles.Count[2] > T.Collectibles.Count[2] and L.Collectibles.Legendary == 0.06
-	and L.Collectibles.Legendary > T.Collectibles.Legendary and L.Collectibles.Odds == nil and L.BackDoor >= 5 and L.InteriorMaxParts > 0 and table.find(HouseLayout.Kinds, "big") ~= nil and Config.Moving.Sandbox.Kind == "big")
+	and L.Collectibles.Legendary > T.Collectibles.Legendary and L.Collectibles.Odds == nil and L.BackDoor >= 5 and L.InteriorMaxParts > 0 and table.find(HouseLayout.Kinds, "big") ~= nil and Config.Moving.Sandbox.Houses.sandbox_house.Kind == "big")
 
 -- ── the plans ────────────────────────────────────────────────────────────────
 local function counts(plan: any): (number, number, number, number)

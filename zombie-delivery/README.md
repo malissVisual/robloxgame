@@ -4,7 +4,11 @@
 > small alpine test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): a meadow with one
 > road, **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
 > plan, `design/jinocany/NAVRH.md`; refilled with a new random layout every move, with 2 – 4 **collectibles** from
-> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. Every player drives a
+> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. **Jinočany step 1:** six houses to
+> empty (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`): The Old Farmstead (the big house, The
+> Nováks) and five family houses in the village on Hlavní, Školní, Lidická and Smetanova (a smaller plan, 15 minutes;
+> stand-in looks until the village's art). The kiosk offers one at a time: your card keeps its house and seed (in your
+> save too) until a trip brings something home, then the next free house; two players never get the same one. Every player drives a
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
 > from inside. Take the contract at the kiosk by your warehouse, carry the house out (the grip, Danny and two-person

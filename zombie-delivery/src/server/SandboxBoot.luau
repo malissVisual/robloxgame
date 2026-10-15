@@ -34,7 +34,8 @@
 --     day is off (no Tutorial: the van never waits for it). A respawn leaves the van where it is (a new one only when
 --     it is gone, and never on a move: there the move's CAR brings it back);
 --   * CAR (the SpawnCar remote → Vehicles.callCar) parks your van at the sandbox's spot nearest you: your vanSpot, or
---     the house's curb (SandboxMap.House.curb) when you are nearer the house. No chauffeur (server/CarCall.luau drives
+--     the house's curb when you are nearer the house (Jinočany: your move's house, else your card's, server/Moving.luau
+--     houseOf; else the nearest of SandboxMap.Houses). No chauffeur (server/CarCall.luau drives
 --     the city's roads, which are not here) and no repair bay: every van parked here comes repaired. A forced spawn
 --     (an admin's: Vehicles.homeGarage) and Vehicles.placeNear (you in the driver's seat) park it the same way;
 --   * RequestState sends the State (Main's queueState).
@@ -119,15 +120,29 @@ local function homeWords(player: Player): string
 end
 
 -- The sandbox's parking spot nearest the player: their vanSpot, or the house's curb when they are nearer the house.
--- Also what the notice says about it.
+-- Also what the notice says about it. Jinočany: the house of their move, else of their card (Moving.houseOf), else
+-- the house to empty nearest them (SandboxMap.Houses').
 local function parkingNear(player: Player): (SandboxMap.Spot, string)
 	local home = SandboxBoot.vanSpot(player)
-	local curb = SandboxMap.House.curb
 	local root = rootOf(player)
 	if root then
 		local at = root.Position
-		if (at.X - curb.x) ^ 2 + (at.Z - curb.z) ^ 2 < (at.X - home.x) ^ 2 + (at.Z - home.z) ^ 2 then
-			return curb, `at {SandboxMap.House.name}`
+		local ok, found = pcall(function(): any
+			return require(Server.Moving).houseOf(player)
+		end)
+		local house: SandboxMap.House? = if ok and type(found) == "table" then SandboxMap.house(found.id) else nil
+		if not house then
+			local best = math.huge
+			for _, h in SandboxMap.Houses do
+				local d = (at.X - h.curb.x) ^ 2 + (at.Z - h.curb.z) ^ 2
+				if d < best then
+					house, best = h, d
+				end
+			end
+		end
+		local curb = if house then house.curb else SandboxMap.House.curb
+		if house and (at.X - curb.x) ^ 2 + (at.Z - curb.z) ^ 2 < (at.X - home.x) ^ 2 + (at.Z - home.z) ^ 2 then
+			return curb, `at {house.name}`
 		end
 	end
 	return home, homeWords(player)

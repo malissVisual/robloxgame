@@ -21,11 +21,14 @@
 --   MoveSites.dressing(parent)        the "MoveDressing" folder: the depot's ZDC MOVING & EVACUATION banner (Persistent)
 --                                     and the city's evacuation spots (Atomic each)
 --   MoveSites.build(parent, place, pieces, name, mode?)   one set as a Model (the others' builder)
---   8.0 SANDBOX (design/sandbox/KONTRAKT.md): no Wall, no dressing, no city house; a kiosk on every player's plot:
+--   8.0 SANDBOX (design/sandbox/KONTRAKT.md): no Wall, no dressing, no city house (no moving-day dress on the sandbox's
+--   houses either: Jinočany's six stand on the map as server/SandboxWorld.luau builds them, server/Moving.luau's SB.site
+--   their doors and curbs); a kiosk on every player's plot:
 --   MoveSites.plotBoard(parent, plot)    the "MovingBoard<id>" kiosk (Persistent) at the plot's board spot
 --                                     (shared/SandboxMap.luau plot.board: by the warehouse's roller door, on its wall's
 --                                     outside, facing out), half a stud farther out (its plinth against the wall), its
---                                     corkboard the sandbox's (MoveSiteLooks.board(true): the farmstead, no Wall);
+--                                     corkboard the sandbox's (MoveSiteLooks.board(true): Jinočany's houses to empty,
+--                                     no Wall; each card shows its player's own house, server/Moving.luau SB.contractFor);
 --                                     returns the model and its corkboard ("Board", the part Moving hangs its prompt
 --                                     on; its attribute Plot = the plot's id)
 --   MoveSites.plotBoardPlace(plot)    where that kiosk's foot stands (tools/move-sites/check.py checks it there)
