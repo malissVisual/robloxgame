@@ -1560,6 +1560,7 @@ E.real = {
 	Visitors = true, VisitorOffers = true, -- 8.3: the showroom's visitors (tests/visitors_runtime_test.luau; off in the e2e)
 	SandboxBadges = true, -- 8.3: the Roblox badges (every id 0 here: it listens and counts the moves, it never calls BadgeService)
 	PlayerTrade = true, -- 8.7: trading between players (the stands' trade prompts: Warehouse.onTrade)
+	FixtureMesh = true, -- 8.7.1: the houses' fixtures in the owner's Blender model (no import here: the parts' look)
 }
 E.fakes = {}
 
