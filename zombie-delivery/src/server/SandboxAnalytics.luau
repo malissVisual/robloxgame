@@ -18,7 +18,8 @@
 --               crew); GripCheck (Moving.onGrip: one check in Config.Analytics.GripEvery a player, a random one of each
 --               window: AnalyticsPlan.sample; value: GripEvery, the outcome, lift / wobble, fragile / sturdy);
 --               CollectibleFound (Collection.onChanged: a collectible, a FurnitureLooks piece with its own rarity, came
---               home into the owner's stock during their move; value: its worth at its condition, $; its rarity, its id).
+--               home into the owner's stock during their move; value: its worth at its condition, $; its rarity, its id;
+--               8.7 review: not one bought from another player meanwhile: Collection.onTransferred makes its uid known).
 --               UpgradeBought (server/Upgrades.luau), CollectionAdded / Displayed / Sold (server/Collection.luau) and
 --               MoveDone (server/Moving.luau) stay their modules' own.
 --
@@ -189,6 +190,14 @@ local function hookCollection()
 		end
 		if shown then
 			reach(player, "FirstPieceOnShow")
+		end
+	end)
+	-- 8.7 review: a piece bought from another player during the buyer's move (Collection.transfer, before its
+	-- onChanged) came home with no move: its uid is known already
+	Collection.onTransferred(function(buyer: Player, _seller: Player, entry: any)
+		local move = moves[buyer]
+		if move then
+			move.known[entry.uid] = true
 		end
 	end)
 end

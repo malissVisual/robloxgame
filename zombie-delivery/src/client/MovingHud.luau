@@ -32,6 +32,11 @@
 -- truck's Load / Unload for the Driver) holds no time for it; a Guard sees the zombies through walls
 -- (client/EnemyOutline.luau setXray). The contract card's START opens the planning.
 -- (the list's YOUR ROLE comes first; its countdown "SWITCH ROLE IN n S" is kept up to date every second)
+-- 8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."; MoveRoles.on: the city's only, never
+-- the sandbox): without roles no role anywhere: no role line on the panel (its last line is FINISH's alone), the list
+-- starts with THE VAN: CALL VAN TO DOOR for anybody of the crew (the remote's "call", once a move: whoever is first),
+-- no SWITCH, no barricade; nobody sees through walls; the truck's prompts hold no time for anybody (the server's: no
+-- MoveQuick).
 -- 7.x farm move: the contract card lists the board's contracts (card.contracts: a chip each, the open ones ask the
 -- server for their card: the Moving remote's ("card", id); a locked one shows why), its CHAPTERS from the same list
 -- (MoveStoryUi.chapters' open map: chapter 1 ▶ PLAY once the prologue is done).
@@ -80,7 +85,7 @@ local C = CardKit.Color
 local TAG = "MovePrompt"
 local ORANGE = Color3.fromRGB(240, 132, 44)
 local PANEL_W = MoveLayout.PANEL_W
-local PANEL_H = MoveLayout.PANEL_H -- (7.0 planning: + the role's line)
+local PANEL_H = MoveLayout.PANEL_H -- (7.0 planning: + the role's line; 8.8 without roles: FINISH's row alone)
 local CARD_W = 440
 local LIST_KEY = Enum.KeyCode.O -- 7.0 review: Tab is Roblox's player list (L the leaderboard)
 local GIVE_UP_SURE = 3 -- s: a second tap of GIVE UP within this gives the move up (7.x van moves: FINISH's too)
@@ -408,8 +413,11 @@ local function nextStep(s: any): string
 	return `Walk in through {s.name}'s door` -- (8.1 walk-in doors: no E)
 end
 
--- 7.0 planning: your role and what only it does (the panel's last line).
+-- 7.0 planning: your role and what only it does (the panel's last line; 8.8 without roles: none, the line is empty).
 local function roleLine(s: any): string
+	if not MoveRoles.on() then
+		return ""
+	end
 	local team = if type(s.team) == "table" then s.team else {}
 	local def = MoveRoles.get(team.role)
 	if not def then
@@ -542,19 +550,21 @@ end
 
 -- 7.0 planning: YOUR ROLE at the list's top: the role, its ability's button (the Driver's call, the Guard's barricade)
 -- and SWITCH to a free role (a chip each; a while after a switch: when, counted down in place: refs.switchWait).
+-- 8.8 without roles: THE VAN in its place: the call to the door, anybody's (once a move), and no SWITCH.
 local function roleCard(parent: Instance, s: any, finger: number)
 	local team = if type(s.team) == "table" then s.team else {}
-	local def = MoveRoles.get(team.role)
-	if not def then
+	local roles = MoveRoles.on()
+	local def = if roles then MoveRoles.get(team.role) else nil
+	if roles and not def then
 		return
 	end
-	local card = Ui.make("Frame", { Name = "Role", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.card, BorderSizePixel = 0, LayoutOrder = 0 }, parent)
+	local card = Ui.make("Frame", { Name = if def then "Role" else "Van", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.card, BorderSizePixel = 0, LayoutOrder = 0 }, parent)
 	Ui.corner(card, 6)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, card)
 	Ui.list(card, true, 6)
-	local color = Color3.fromRGB(def.color[1], def.color[2], def.color[3])
-	text(card, `YOUR ROLE · {def.icon} {string.upper(def.name)}`, UDim2.new(1, 0, 0, 18), { LayoutOrder = 1, Font = Theme.HeadingFont, TextSize = 14, TextColor3 = color })
-	text(card, def.hint, UDim2.new(1, 0, 0, 0), {
+	local color = if def then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) else ORANGE
+	text(card, if def then `YOUR ROLE · {def.icon} {string.upper(def.name)}` else "🚐 THE VAN", UDim2.new(1, 0, 0, 18), { LayoutOrder = 1, Font = Theme.HeadingFont, TextSize = 14, TextColor3 = color })
+	text(card, if def then def.hint else "Anybody of the crew calls it to the house's door, once a move.", UDim2.new(1, 0, 0, 0), {
 		LayoutOrder = 2,
 		TextSize = 12,
 		TextColor3 = C.faint,
@@ -563,8 +573,13 @@ local function roleCard(parent: Instance, s: any, finger: number)
 		AutomaticSize = Enum.AutomaticSize.Y,
 	})
 	local ability: { text: string, action: string, on: boolean }? = nil
-	if def.id == "driver" then
-		ability = { text = if team.called == true then "🚚 TRUCK CALLED (ONCE A MOVE)" else "📍 CALL TRUCK TO DOOR", action = "call", on = team.called ~= true }
+	if not def or def.id == "driver" then -- (8.8 without roles: the call, anybody's)
+		local called = team.called == true
+		ability = {
+			text = if def then (if called then "🚚 TRUCK CALLED (ONCE A MOVE)" else "📍 CALL TRUCK TO DOOR") elseif called then "🚐 VAN CALLED (ONCE A MOVE)" else "📍 CALL VAN TO DOOR",
+			action = "call",
+			on = not called,
+		}
 	elseif def.id == "guard" then
 		local left = tonumber(team.barricades) or 0
 		ability = { text = if left > 0 then `🪵 PUT UP A BARRICADE · {left} LEFT` else "🪵 NO BARRICADES LEFT", action = "barricade", on = left > 0 }
@@ -586,8 +601,8 @@ local function roleCard(parent: Instance, s: any, finger: number)
 		})
 	end
 	local wait = math.ceil((tonumber(team.switchAt) or 0) - workspace:GetServerTimeNow())
-	local free = if type(team.free) == "table" then team.free else {}
-	if wait > 0 then
+	local free = if type(team.free) == "table" and roles then team.free else {}
+	if wait > 0 and roles then
 		refs.switchWait = text(card, `SWITCH ROLE IN {wait} S`, UDim2.new(1, 0, 0, 16), { Name = "SwitchWait", LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
 	elseif #free > 0 then
 		text(card, "SWITCH ROLE", UDim2.new(1, 0, 0, 14), { LayoutOrder = 4, Font = Theme.HeadingFont, TextSize = 11, TextColor3 = C.faint })
@@ -1049,8 +1064,8 @@ end
 
 local function setState(view: any)
 	state = if type(view) == "table" then view else nil
-	-- 7.0 planning: a Guard sees the zombies through walls
-	local team = if state and type(state.team) == "table" then state.team else nil
+	-- 7.0 planning: a Guard sees the zombies through walls (8.8 without roles: nobody)
+	local team = if state and type(state.team) == "table" and MoveRoles.on() then state.team else nil
 	pcall(EnemyOutline.setXray, if team and team.role == "guard" then Config.MoveRoles.Guard.XRay else 0)
 	refreshPanel()
 	updateGps()

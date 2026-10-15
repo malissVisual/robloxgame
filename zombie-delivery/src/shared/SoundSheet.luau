@@ -12,6 +12,9 @@
 -- brook) (Sfx4); until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX4.md says how
 -- to upload it). 8.1: and the sandbox's, at its end (the meadow, the warehouse's hall and the chalet's room, the
 -- stands, the till, the trip home's fanfare, the ZDC Sprinter's doors and step).
+-- 8.9: art/audio/sfx5.ogg holds the newest features' sounds (Danny's clipboard, his orders' chirp and his whistle,
+-- a trade's coins, an offer's bell, a price tag, the auction's gavel, its "sold!" bell and a bid's tick) (Sfx5);
+-- until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX5.md says how to upload it).
 
 local SoundSheet = {}
 
@@ -20,6 +23,7 @@ SoundSheet.MusicId = "rbxassetid://71392718953355" -- "rbxassetid://…" of art/
 SoundSheet.Sfx2Id = "rbxassetid://86322785000784" -- "rbxassetid://…" of art/audio/sfx2.ogg
 SoundSheet.Sfx3Id = "rbxassetid://86357789297571" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)
 SoundSheet.Sfx4Id = "rbxassetid://134212774972582" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)
+SoundSheet.Sfx5Id = "" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)
 
 SoundSheet.Sfx = {
 	gun_light = { 0.0, 0.349977 },
@@ -144,6 +148,22 @@ SoundSheet.Sfx4 = {
 	amb_room = { 100.879932, 10.0 },
 } :: { [string]: { number } }
 
+SoundSheet.Sfx5 = {
+	clip_out = { 0.0, 0.42 },
+	clip_away = { 0.72, 0.42 },
+	pen_tick = { 1.44, 0.17 },
+	pen_untick = { 1.91, 0.26 },
+	soft_nope = { 2.47, 0.36 },
+	order_chirp = { 3.13, 0.2 },
+	danny_whistle = { 3.63, 0.62 },
+	coin_kaching = { 4.55, 0.9 },
+	offer_ding = { 5.75, 1.3 },
+	price_paper = { 7.35, 0.38 },
+	gavel_knock = { 8.03, 0.5 },
+	sold_bell = { 8.83, 1.6 },
+	bid_tick = { 10.73, 0.08 },
+} :: { [string]: { number } }
+
 -- Sounds that loop (their region repeats seamlessly).
 SoundSheet.Looped = { amb_alpine = true, amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, amb_room = true, amb_warehouse = true, ambience = true, birds_alpine_loop = true, engine = true, freewheel = true, scooter = true, stream_loop = true, wind = true, wind_peaks_loop = true, wood_scrape_loop = true, zip = true } :: { [string]: boolean }
 
@@ -203,9 +223,20 @@ SoundSheet.Fallback = {
 	van_step_up = "step_metal_a",
 	amb_alpine = "wind",
 	amb_warehouse = "ambience",
+	clip_out = "ui_open",
+	clip_away = "ui_click",
+	pen_tick = "grip_tick",
+	pen_untick = "ui_click",
+	soft_nope = "notify",
+	order_chirp = "ui_open",
+	coin_kaching = "sale_register",
+	offer_ding = "ding",
+	gavel_knock = "knock",
+	sold_bell = "ding",
+	bid_tick = "grip_tick",
 } :: { [string]: string }
 
 -- Every sheet's length in seconds (its regions lie inside).
-SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 111.179932 } :: { [string]: number }
+SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 111.179932, sfx5 = 11.11 } :: { [string]: number }
 
 return SoundSheet

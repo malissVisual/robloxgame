@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Zombie Delivery's own sounds and music, synthesized from scratch (numpy + ffmpeg): minimal and soft, nothing
-borrowed. Writes five files for Roblox (one upload each, the game plays regions of them):
+borrowed. Writes six files for Roblox (one upload each, the game plays regions of them):
   sfx.ogg    every sound effect one after another (src/shared/SoundSheet.luau has the regions)
   music.ogg  four seamless music loops one after another
   sfx2.ogg   5.7: the world's sounds (knocks, doors, steps, the zip line, the bikes, the bus, the phone, coins, the
@@ -16,6 +16,9 @@ borrowed. Writes five files for Roblox (one upload each, the game plays regions 
              sandbox's (the alpine meadow's calm day and a cowbell far off, the warehouse's hall, the chalet's quiet
              room, a piece put on a stand, taken down, sold at the till, a trip's pieces home, the ZDC Sprinter's back
              doors, its sliding door and its step)
+  sfx5.ogg   8.9: the newest features' (Danny's clipboard taken out and put away, a piece ticked onto his list and
+             crossed off, a soft "nope", his orders' chirp and his whistle; a trade's coins, an offer's desk bell, a price
+             tag; the auction's gavel, its "sold!" bell and a bid's tick)
 and regions.json + src/shared/SoundSheet.luau (the regions, the stand-ins (FALLBACK), the sheets' lengths; the asset ids
 stay to be filled in).
 Run: python3 art/audio/make_audio.py   (from zombie-delivery/)
@@ -28,7 +31,7 @@ import argparse, hashlib, json, math, os, subprocess, sys, wave
 import numpy as np
 
 ARGS = argparse.ArgumentParser(description="Synthesizes the game's sound sheets.")
-ARGS.add_argument("--sheets", default="", help="comma-separated sheets to encode again although their .ogg exists (sfx, music, sfx2, sfx3, sfx4) or 'all'")
+ARGS.add_argument("--sheets", default="", help="comma-separated sheets to encode again although their .ogg exists (sfx, music, sfx2, sfx3, sfx4, sfx5) or 'all'")
 REWRITE = {s.strip() for s in ARGS.parse_args().sheets.split(",") if s.strip()}
 
 SR = 44100
@@ -1001,6 +1004,130 @@ creak5 = render_loop([(6.3, squeak5(0.55, 190, 250, 1.0) * 0.6)], RL)
 put4("amb_room", room5(norm(band5(RL, 50, 250), 1.0) + norm(band5(RL, 800, 4000), 1.0) * 0.05 + norm(clock5, 1.0) * 0.1 + norm(creak5, 1.0) * 0.06, 0.4, 0.04), -28)
 LOOPED |= {"amb_alpine", "amb_warehouse", "amb_room"}
 
+# ── 8.9: the newest features' sounds (sfx5.ogg) ───────────────────────────────
+# Danny's clipboard (8.5: taken out and put away, a piece ticked onto his list and crossed off again, a soft "nope"
+# for a pick the server refused), his orders (8.6: a chirp when he takes one, his whistle when he needs you), trading
+# between players (8.7: a sale's coins, an offer's desk bell, a price written on its tag) and the auction (8.8: the
+# gavel, the "sold!" bell, a bid's tick). A sheet of their own (sfx4 is uploaded: its bytes stay), their own random
+# generator (as 5.7's): every sheet above comes out as before. UI feedback, fitted soft (fit, as 7.1's): the ticks -27,
+# the clipboard, the tag and the nope -24 … -25, the chirp -23, the whistle -20, the desk bell and the gavel -19, the
+# ka-ching and the "sold!" bell -16; each one's last 30 ms faded (put5).
+rng6 = np.random.default_rng(8900)
+def noise6(sec): return rng6.standard_normal(samples(sec))
+def tick6(sec=0.015, lo=1800, hi=7000, decay=0.0025):
+    return bandpass(noise6(sec), lo, hi) * env(samples(sec), 0.0003, decay)
+def modes6(parts, sec):
+    """A struck body (as modes above, its own phases): decaying sines (freq, amp, decay s)."""
+    x = t(sec); s = np.zeros_like(x)
+    for f, a, d in parts:
+        s += a * np.sin(2 * np.pi * f * x + rng6.uniform(0, 2 * np.pi)) * np.exp(-x / d)
+    return s * env(len(x), 0.0005, 10)
+def room6(sig, tail, wet, sec):
+    """A small room round a one-shot (a decaying tail of noise; padded, so it does not wrap), cut to sec with a fade."""
+    padded = np.concatenate([sig, np.zeros(samples(tail))]); n = len(padded); m = samples(tail); ir = np.zeros(n)
+    ir[:m] = rng6.standard_normal(m) * np.exp(-np.arange(m) / (m / 4)) * wet
+    ir[0] = 1.0
+    y = np.fft.irfft(np.fft.rfft(padded) * np.fft.rfft(ir), n)[:samples(sec)]
+    return y * np.clip((sec - t(sec)) / 0.06, 0, 1)
+SFX5 = {}
+def put5(name, sig, lufs):
+    """Fitted (fit), its last 30 ms faded out (a bell cut while it still rings would click at its region's end)."""
+    y = np.asarray(sig, dtype=float)
+    SFX5[name] = fit(y * np.clip((len(y) - np.arange(len(y))) / samples(0.03), 0, 1), lufs)
+
+# The clipboard (8.5). Paper moving: a hiss swelling and falling, its fibres crackling over it; the spring clip snapping
+# onto the sheet (a bright tick, the steel ringing short, the board's hollow tap under it).
+def rustle6(sec, count, lo, hi):
+    n = samples(sec); shape = hump(n, 0.35, 0.5)
+    out = bandpass(noise6(sec), lo, hi) * shape * 0.3
+    for _ in range(count):
+        k = samples(rng6.uniform(0, sec * 0.9)); c = tick6(0.006, 1500, 7500, 0.0012) * rng6.uniform(0.2, 1) * shape[k]
+        out[k:k + len(c)] += c[:n - k]
+    return out
+def clip6(f, amp):
+    return mix(tick6(0.012, 2500, 9000, 0.0015), modes6(((f, 0.35, 0.025), (f * 1.47, 0.22, 0.018), (f * 2.62, 0.12, 0.012)), 0.12),
+               thump(300, 190, 0.12, 0.018) * 0.35) * amp
+# Taken out: the sheet rustling as it comes up, then the clip snapping down on it.
+put5("clip_out", lowpass(mix(at(rustle6(0.24, 34, 900, 6000), 0, 0.42), at(clip6(2900, 1.0), 0.22, 0.42)), 10000), -24)
+# Put away: the clip lifted (a lighter click), the sheet sliding (a shorter rustle, darker) and the board's soft tap.
+put5("clip_away", lowpass(mix(
+    at(clip6(2450, 0.6), 0, 0.42),
+    at(rustle6(0.2, 22, 700, 4200), 0.03, 0.42),
+    at(mix(thump(220, 140, 0.15, 0.03) * 0.18, tick6(0.012, 900, 3500, 0.002) * 0.2), 0.26, 0.42)), 9000), -25)
+# A ballpoint on paper: a fine scratch, its grain the paper's fibres, in and out quickly. Ticked onto his list: the tip
+# touching down, a short stroke down and the flick up (brighter). Crossed off: three quick strokes back and forth, darker.
+def stroke6(sec, lo, hi, rate):
+    x = t(sec)
+    grain = 0.6 + 0.4 * np.sin(2 * np.pi * rate * x + rng6.uniform(0, 2 * np.pi))
+    return bandpass(noise6(sec), lo, hi) * grain * hump(len(x), 0.2, 0.45)
+put5("pen_tick", mix(
+    at(tick6(0.008, 3000, 9000, 0.001) * 0.5, 0, 0.17),
+    at(stroke6(0.045, 2200, 7000, 180), 0.004, 0.17),
+    at(stroke6(0.075, 2800, 8500, 240) * 0.85, 0.052, 0.17)), -27)
+put5("pen_untick", mix(
+    *[at(mix(stroke6(0.06, 1600, 5500, 150 + 30 * i), tick6(0.006, 2500, 8000, 0.001) * 0.25) * amp, i * 0.075, 0.26)
+      for i, amp in enumerate((1.0, 0.85, 0.65))]), -27)
+# A soft "nope" (a pick refused): two muted wooden notes falling a minor third, "uh-uh", round and short.
+def mute6(f, sec):
+    x = t(sec)
+    s = np.sin(2 * np.pi * f * x) + 0.25 * np.sin(4 * np.pi * f * x) * np.exp(-x / 0.03)
+    return lowpass(s * env(len(x), 0.008, 0.07), 1600)
+put5("soft_nope", mix(at(mute6(note(69), 0.16), 0, 0.36), at(mute6(note(66), 0.2), 0.12, 0.36),
+                      at(thump(190, 120, 0.12, 0.02) * 0.2, 0, 0.36)), -25)
+
+# Danny (8.6). His acknowledgement: two quick notes gliding up ("okay!"), soft as a bird's chirp.
+def glide6(f0, f1, sec):
+    x = t(sec); f = f0 * (f1 / f0) ** (x / sec)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    return (np.sin(ph) + 0.15 * np.sin(2 * ph)) * hump(len(x), 0.15, 0.5)
+put5("order_chirp", mix(at(glide6(1320, 1660, 0.06), 0, 0.2), at(glide6(1760, 2350, 0.085), 0.08, 0.2)), -23)
+# His whistle (he needs you): a breathy two-tone whistle, "fwee-fwoo", up and then down, a little room round it.
+def whistle6(sec, f0, f1, curve):
+    x = t(sec); u = x / sec
+    f = f0 + (f1 - f0) * u ** curve + 16 * np.sin(2 * np.pi * 5.5 * x) * np.clip(u * 3, 0, 1)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    breath = bandpass(noise6(sec), 1200, 4500) * 0.05
+    return (np.sin(ph) + 0.04 * np.sin(2 * ph) + breath) * hump(len(x), 0.12, 0.3)
+put5("danny_whistle", room6(mix(at(whistle6(0.2, 1450, 2250, 0.6), 0, 0.62), at(whistle6(0.28, 2300, 1650, 1.4), 0.24, 0.62)), 0.3, 0.025, 0.62), -20)
+
+# Trading (8.7). A sale: the coins' ka-ching ("ka": a stack of coins clacking down, "ching": them ringing bright), two
+# settling after.
+def coin6(f, amp, sec=0.3):
+    return mix(modes6(((f, amp, rng6.uniform(0.1, 0.2)), (f * 1.52, amp * 0.55, 0.07), (f * 2.41, amp * 0.3, 0.045)), sec),
+               tick6(0.008, 3000, 9500, 0.0012) * amp * 0.35)
+coins = mix(*[at(mix(tick6(0.01, 2000, 8000, 0.0015) * (0.5 + 0.12 * i), modes6(((rng6.uniform(2600, 3600), 0.15, 0.012),), 0.02)), i * 0.014, 0.9) for i in range(4)],
+            at(thump(380, 220, 0.1, 0.015) * 0.4, 0, 0.9),
+            at(bell(note(100), 0.6, 0.3) * 0.45, 0.075, 0.9))
+for start, f, amp in ((0.07, 3950, 0.6), (0.1, 4620, 0.5), (0.15, 5310, 0.4), (0.36, 4280, 0.16), (0.49, 4870, 0.1)):
+    coins += at(coin6(f, amp), start, 0.9)
+put5("coin_kaching", lowpass(coins, 12000), -16)
+# An offer for your piece: a desk bell's "ding!" (the striker's tick, the dome ringing, its close partials beating).
+def desk_bell(f0, sec):
+    parts = ((1.0, 1.0, 0.42), (1.004, 0.7, 0.42), (2.42, 0.35, 0.2), (3.95, 0.18, 0.1), (5.6, 0.08, 0.06))
+    return mix(modes6(tuple((f0 * m, a, d) for m, a, d in parts), sec), tick6(0.01, 3000, 9000, 0.0015) * 0.3)
+put5("offer_ding", lowpass(desk_bell(1975, 1.3), 10000), -19)
+# A price set: the tag's card flicked, the price written on it (two quick strokes), the tag's string tapping the stand.
+put5("price_paper", mix(
+    at(mix(bandpass(noise6(0.04), 2000, 9000) * env(samples(0.04), 0.0005, 0.012) * 0.8, tick6(0.015, 600, 2500, 0.003) * 0.4), 0, 0.38),
+    at(stroke6(0.05, 2000, 6500, 170), 0.07, 0.38),
+    at(stroke6(0.06, 2200, 7000, 210) * 0.8, 0.13, 0.38),
+    at(tick6(0.012, 900, 4000, 0.002) * 0.3, 0.26, 0.38)), -24)
+
+# The auction (8.8). The gavel: hard maple on its sound block (the clack, the block's hollow ring, a thump under it),
+# a small bounce, the room.
+def gavel6(amp):
+    return mix(modes6(((620, 0.6, 0.04), (1430, 0.4, 0.025), (2350, 0.25, 0.015), (3900, 0.12, 0.008)), 0.3),
+               thump(260, 120, 0.3, 0.05) * 0.7, tick6(0.015, 1500, 6000, 0.002) * 0.6) * amp
+put5("gavel_knock", room6(mix(at(gavel6(1.0), 0, 0.5), at(gavel6(0.25), 0.055, 0.5)), 0.35, 0.03, 0.5), -19)
+# "Sold!": a brass hand bell rung twice (its clapper, the close partials beating).
+def hand_bell(f0, sec):
+    parts = ((1.0, 1.0, 0.45), (1.008, 0.6, 0.45), (2.38, 0.5, 0.26), (2.395, 0.3, 0.26), (3.96, 0.25, 0.14), (5.5, 0.12, 0.08), (7.2, 0.06, 0.05))
+    return mix(modes6(tuple((f0 * m, a, d) for m, a, d in parts), sec), tick6(0.012, 1500, 6000, 0.002) * 0.3)
+put5("sold_bell", lowpass(mix(at(hand_bell(1318, 1.4), 0, 1.6), at(hand_bell(1318, 1.4) * 0.8, 0.2, 1.6)), 11000), -16)
+# A bid: a soft tick (a paddle's, a counter's).
+put5("bid_tick", mix(modes6(((1850, 0.4, 0.012), (3600, 0.15, 0.006)), 0.08), tick6(0.01, 2000, 7000, 0.0015) * 0.4,
+                     thump(500, 300, 0.05, 0.008) * 0.2), -27)
+
 # ── Write the sheets ──────────────────────────────────────────────────────────
 REGIONS_PATH = os.path.join(HERE, "regions.json")
 OLD = json.load(open(REGIONS_PATH)) if os.path.exists(REGIONS_PATH) else {}
@@ -1016,7 +1143,8 @@ def build_sheet(items, gap):
     pcm = (np.clip(np.concatenate(parts), -1, 1) * 32767).astype("<i2").tobytes()
     return regions, pcm, pos / SR
 SHEETS = [("sfx", list(SFX.items()), 0.3), ("music", [(k, v[0]) for k, v in MUSIC.items()], 0.5),
-          ("sfx2", list(SFX2.items()), 0.3), ("sfx3", list(SFX3.items()), 0.3), ("sfx4", list(SFX4.items()), 0.3)]
+          ("sfx2", list(SFX2.items()), 0.3), ("sfx3", list(SFX3.items()), 0.3), ("sfx4", list(SFX4.items()), 0.3),
+          ("sfx5", list(SFX5.items()), 0.3)]
 # Stand-ins (SoundSheet.Fallback, client/Sounds.luau): what plays while a sheet is not uploaded yet (its id empty): a
 # sound of an older sheet (a stand-in of a stand-in works too). A sound not here stays silent until its sheet is up; a
 # loop stands in only for a loop (tests/audio_test.luau checks every one resolves without its own sheet).
@@ -1039,6 +1167,13 @@ FALLBACK = {
     "stand_display": "putdown", "stand_takedown": "pickup", "sale_register": "purchase", "stored_fanfare": "task_done",
     "van_slide_open": "car_door_open", "van_slide_close": "car_door_close", "sprinter_back_open": "van_back_open",
     "sprinter_back_close": "van_back_close", "van_step_up": "step_metal_a", "amb_alpine": "wind", "amb_warehouse": "ambience",
+    # 8.9 (sfx5): the clipboard the UI's open and click, the pen the grip's soft tick and the click, the nope the notice's
+    # own notify (what a refusal's notice plays today), the chirp the UI's rising blip, the ka-ching the till, an offer's
+    # bell and "sold!" the old ding, the gavel the door's knock, a bid's tick the grip's; silent until it is up: Danny's
+    # whistle (his "needs you" toast pings already) and the price tag (its notice pings)
+    "clip_out": "ui_open", "clip_away": "ui_click", "pen_tick": "grip_tick", "pen_untick": "ui_click", "soft_nope": "notify",
+    "order_chirp": "ui_open", "coin_kaching": "sale_register", "offer_ding": "ding", "gavel_knock": "knock",
+    "sold_bell": "ding", "bid_tick": "grip_tick",
 }
 built ={name: build_sheet(items, gap) for name, items, gap in SHEETS}
 # 6.12: an uploaded sheet keeps its .ogg byte for byte unless it is named (--sheets): check first, write nothing on a
@@ -1068,13 +1203,13 @@ for name, (regions, pcm, _) in built.items():
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav, "-c:a", "libvorbis", "-q:a", "5",
                     "-fflags", "+bitexact", "-flags:a", "+bitexact", ogg], check=True)
     os.remove(wav)
-sfx_regions, music_regions, sfx2_regions, sfx3_regions, sfx4_regions = (built[n][0] for n in ("sfx", "music", "sfx2", "sfx3", "sfx4"))
-json.dump({"sfx": sfx_regions, "music": music_regions, "sfx2": sfx2_regions, "sfx3": sfx3_regions, "sfx4": sfx4_regions,
+sfx_regions, music_regions, sfx2_regions, sfx3_regions, sfx4_regions, sfx5_regions = (built[n][0] for n in ("sfx", "music", "sfx2", "sfx3", "sfx4", "sfx5"))
+json.dump({"sfx": sfx_regions, "music": music_regions, "sfx2": sfx2_regions, "sfx3": sfx3_regions, "sfx4": sfx4_regions, "sfx5": sfx5_regions,
            "looped": sorted(LOOPED), "pcm_sha256": hashes}, open(REGIONS_PATH, "w"), indent=2)
 
 # Keep the asset ids already pasted into SoundSheet (a re-run must not wipe them; upload the new files and update).
 sheet_path = os.path.join(ROOT, "src", "shared", "SoundSheet.luau")
-old_ids = {"SfxId": "", "MusicId": "", "Sfx2Id": "", "Sfx3Id": "", "Sfx4Id": ""}
+old_ids = {"SfxId": "", "MusicId": "", "Sfx2Id": "", "Sfx3Id": "", "Sfx4Id": "", "Sfx5Id": ""}
 if os.path.exists(sheet_path):
     import re
     for key in old_ids:
@@ -1082,7 +1217,7 @@ if os.path.exists(sheet_path):
         if m:
             old_ids[key] = m.group(1)
 # (a sheet written anew is a new file: its old id would play the old sounds; it must be uploaded again)
-for name, key in (("sfx", "SfxId"), ("music", "MusicId"), ("sfx2", "Sfx2Id"), ("sfx3", "Sfx3Id"), ("sfx4", "Sfx4Id")):
+for name, key in (("sfx", "SfxId"), ("music", "MusicId"), ("sfx2", "Sfx2Id"), ("sfx3", "Sfx3Id"), ("sfx4", "Sfx4Id"), ("sfx5", "Sfx5Id")):
     if plan[name] == "write" and old_ids[key]:
         print(f"note: {name}.ogg was written anew: upload it and replace SoundSheet.{key} (it still holds the old upload)")
 lua = ["--!strict",
@@ -1099,12 +1234,16 @@ lua = ["--!strict",
        "-- brook) (Sfx4); until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX4.md says how",
        "-- to upload it). 8.1: and the sandbox's, at its end (the meadow, the warehouse's hall and the chalet's room, the",
        "-- stands, the till, the trip home's fanfare, the ZDC Sprinter's doors and step).",
+       "-- 8.9: art/audio/sfx5.ogg holds the newest features' sounds (Danny's clipboard, his orders' chirp and his whistle,",
+       "-- a trade's coins, an offer's bell, a price tag, the auction's gavel, its \"sold!\" bell and a bid's tick) (Sfx5);",
+       "-- until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX5.md says how to upload it).",
        "", "local SoundSheet = {}", "",
        f'SoundSheet.SfxId = "{old_ids["SfxId"]}" -- "rbxassetid://…" of art/audio/sfx.ogg',
        f'SoundSheet.MusicId = "{old_ids["MusicId"]}" -- "rbxassetid://…" of art/audio/music.ogg',
        f'SoundSheet.Sfx2Id = "{old_ids["Sfx2Id"]}" -- "rbxassetid://…" of art/audio/sfx2.ogg',
        f'SoundSheet.Sfx3Id = "{old_ids["Sfx3Id"]}" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)',
-       f'SoundSheet.Sfx4Id = "{old_ids["Sfx4Id"]}" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)', "",
+       f'SoundSheet.Sfx4Id = "{old_ids["Sfx4Id"]}" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)',
+       f'SoundSheet.Sfx5Id = "{old_ids["Sfx5Id"]}" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)', "",
        "SoundSheet.Sfx = {"]
 for k, (s, l) in sfx_regions.items():
     lua.append(f"\t{k} = {{ {s}, {l} }},")
@@ -1120,6 +1259,9 @@ for k, (s, l) in sfx3_regions.items():
 lua += ["} :: { [string]: { number } }", "", "SoundSheet.Sfx4 = {"]
 for k, (s, l) in sfx4_regions.items():
     lua.append(f"\t{k} = {{ {s}, {l} }},")
+lua += ["} :: { [string]: { number } }", "", "SoundSheet.Sfx5 = {"]
+for k, (s, l) in sfx5_regions.items():
+    lua.append(f"\t{k} = {{ {s}, {l} }},")
 lua += ["} :: { [string]: { number } }", "", "-- Sounds that loop (their region repeats seamlessly).",
         "SoundSheet.Looped = { " + ", ".join(f"{k} = true" for k in sorted(LOOPED)) + " } :: { [string]: boolean }", "",
         "-- Stand-ins while a sheet is not uploaded (its id empty): a sound of an older sheet (a stand-in's stand-in too);",
@@ -1134,3 +1276,5 @@ open(sheet_path, "w").write("\n".join(lua))
 print("  ".join(f"{name}: {len(dict(items))} sounds, {built[name][2]:.1f} s ({plan[name]})" for name, items, _ in SHEETS))
 if plan["sfx4"] == "write":
     print("sfx4: " + ", ".join(f"{k} {len(v) / SR:.2f} s ({loudness(v):.1f} LUFS)" for k, v in SFX4.items()))
+if plan["sfx5"] == "write":
+    print("sfx5: " + ", ".join(f"{k} {len(v) / SR:.2f} s ({loudness(v):.1f} LUFS, peak {np.max(np.abs(v)):.2f})" for k, v in SFX5.items()))

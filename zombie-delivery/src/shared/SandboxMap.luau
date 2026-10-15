@@ -8,8 +8,10 @@
 -- in Roblox: CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(yaw), 0) (SandboxMap.cframe).
 --
 --   Bounds           the world's edge (the scenery fills it; nothing you play with is outside)
---   Roads            the asphalt rects: Main Street (north-south, the plots to the house) and Depot Row (the plots')
---   Turnaround       the circle at Main Street's south end, before the house
+--   Roads            the asphalt rects: Pražská (north-south, the plots to the house; renamed by the Jinočany plan,
+--                    design/jinocany/NAVRH.md: the streets keep their Czech names, diacritics and all) and Depot Row
+--                    (the plots')
+--   Turnaround       the circle at Pražská's south end, before the house
 --   Plots            four players' plots along Depot Row's north side (SandboxPlots claims one per player):
 --                      rect        the plot's ground (x0, x1, z0, z1)
 --                      warehouse   the building: its middle at the ground and its size (x across, y up, z deep);
@@ -20,7 +22,8 @@
 --                      unload      the circle the van's back must be in to unload into the warehouse
 --                      spawn       where the player appears (beside the van, inside the plot)
 --                      board       the Moving contracts board (by the roller door, on the wall's outside)
---   House            the one house to empty: its lot, the house's box (its footprint's middle, its bottom, its size:
+--   House            the one house to empty, its name and its street (The Old Farmstead on Pražská, the Jinočany
+--                    plan's names), its lot, the house's box (its footprint's middle, its bottom, its size:
 --                    the walls' box, the roof over it), its front door (outside, looking out: north to the road), curb
 --                    (the van's pivot, nose north, back to the door). 8.1: the box is the owner's Blender house's
 --                    (server/HouseMesh.luau dresses only a box of its size), its front wall where the chalet's always
@@ -51,7 +54,7 @@ SandboxMap.RoadTop = 0.4
 SandboxMap.Bounds = { x0 = -340, x1 = 340, z0 = -280, z1 = 640 } :: Rect
 
 SandboxMap.Roads = {
-	{ name = "Main Street", x0 = -14, x1 = 14, z0 = -74, z1 = 470 },
+	{ name = "Pražská", x0 = -14, x1 = 14, z0 = -74, z1 = 470 },
 	{ name = "Depot Row", x0 = -270, x1 = 270, z0 = -74, z1 = -46 },
 } :: { { name: string, x0: number, x1: number, z0: number, z1: number } }
 
@@ -80,7 +83,8 @@ SandboxMap.Plots = plots
 
 SandboxMap.House = {
 	id = "sandbox_house",
-	name = "The Old Chalet",
+	name = "The Old Farmstead",
+	street = "Pražská", -- (the road it stands on, one of SandboxMap.Roads: the contract's address, the guide's words)
 	lot = { x0 = -60, x1 = 60, z0 = 504, z1 = 600 } :: Rect,
 	-- (the front wall at the door, z 523; the house's box back from it: tools/house-art/check.py, house.py's TARGETS
 	-- "sandbox" box; sy the walls' height, the roof over it up to 26)

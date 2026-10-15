@@ -8,12 +8,13 @@
 --             building stands on it; its top flush with the meadow), the house's lawn, a few gentle mounds (big
 --             buried balls: a vehicle's free-room box query passes this folder, Config.SpawnSpot.Pass, or their
 --             whole boxes would fill the map)
---   Roads     the asphalt of SandboxMap.Roads and the turnaround (its top a hair under Main Street's where they overlap),
+--   Roads     the asphalt of SandboxMap.Roads and the turnaround (its top a hair under Pražská's where they overlap),
 --             the gravel shoulders down to the meadow on every edge (the cars roll off and on anywhere), the markings
---   House     "TheOldChalet" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet on SandboxMap.House.house,
+--   House     "TheOldFarmstead" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet (the stand-in look)
+--             on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
 --             server/Moving.luau puts its "Enter house" prompt there) at House.door; the path from the curb to it, the
---             garden's fence and gate (THE OLD CHALET over it), the mailbox, the flower boxes (all decoration). 8.1: the
+--             garden's fence and gate (THE OLD FARMSTEAD over it), the mailbox, the flower boxes (all decoration). 8.1: the
 --             chalet's parts in the Model "House_sandbox_house" (attribute Home) on the owner's Blender house's box:
 --             once ZDCHouseArt is imported, server/HouseMesh.luau dresses it (the chalet's parts hidden but still
 --             colliding, its gable re-cut under the model's roof; the FrontDoor where the model's door is), the garden
@@ -29,7 +30,7 @@
 --             height), each hall lined dark ("DoorHalls": the house is a shell behind its walls, a camera that follows
 --             you in sees a dark hall)
 --   Scenery   the spruces (shared/AlpineLayout.luau's two-part trees, in Atomic chunks), the wildflowers, the rail fence
---             round the edge, the street lamps along Main Street, the signpost at the crossroads
+--             round the edge, the street lamps along Pražská, the signpost at the crossroads
 --   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
 --             Auction House on Depot Row, east of the crossroads (shared/AuctionHouseLayout.luau's parts, its place
 --             Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
@@ -40,7 +41,8 @@
 --
 --   SandboxWorld.build()      builds it once (server/Main.server.luau at the server's start, sandbox mode) and lights
 --                             it; returns workspace.Sandbox (a second call returns it as it is)
---   SandboxWorld.lighting()   the fixed warm alpine afternoon (in sandbox mode the city's DayNight and Weather do not
+--   SandboxWorld.lighting()   the fixed warm afternoon at Jinočany's latitude, 50° north (Config.SandboxLight.Sky; the
+--                             Alps' 47° before the Jinočany plan; in sandbox mode the city's DayNight and Weather do not
 --                             run): the clock, the sun, the ambient light, the Atmosphere's soft far haze, the sky, the
 --                             clouds and the colour grade; the workspace's clock attributes for whatever reads them
 --   SandboxWorld.doorLeaves(house)   8.3 walk-in doors: the house's doors' leaves that swing (house's build does it)
@@ -236,7 +238,7 @@ local function roads(world: Instance)
 	local depth = S.RoadDepth
 	local row = slab(holder, "Road", depot :: any, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
 	row:SetAttribute("Road", depot.name)
-	-- (Main Street from Depot Row's south edge: the junction is Depot Row's asphalt)
+	-- (Pražská from Depot Row's south edge: the junction is Depot Row's asphalt)
 	local street = slab(holder, "Road", { x0 = main.x0, x1 = main.x1, z0 = depot.z1, z1 = main.z1 }, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
 	street:SetAttribute("Road", main.name)
 	local T = MAP.Turnaround
@@ -398,7 +400,7 @@ end
 local function house(world: Instance): Model
 	local H = MAP.House
 	local model = Instance.new("Model")
-	model.Name = "TheOldChalet"
+	model.Name = "TheOldFarmstead"
 	model:SetAttribute("SandboxHouse", H.id)
 	-- 8.2 perf (design/performance/REPORT.md, section 9): with StreamingEnabled it streams in and out whole (its door's
 	-- prompt, the garden and the owner's Blender house with it), never a house half there
@@ -663,7 +665,7 @@ local function scenery(world: Instance)
 		deco(block(lamps, "LampHood", Vector3.new(2, 0.3, 1.4), CFrame.lookAt(at + up, at + up + out), POLE, Enum.Material.Metal))
 		deco(block(lamps, "Lamp", Vector3.new(1.7, 0.3, 1.1), CFrame.lookAt(at, at + out), LAMP_DIM, Enum.Material.Glass))
 	end
-	-- the signpost at the crossroads: a post, three yellow boards (to the warehouses either way, to the chalet)
+	-- the signpost at the crossroads: a post, three yellow boards (to the warehouses either way, to the farmstead)
 	local sign = folder(holder, "Signpost")
 	local s = S.Signpost
 	block(sign, "SignPost", Vector3.new(0.7, 12, 0.7), CFrame.new(s.x, 6, s.z), Color3.fromRGB(96, 70, 48), Enum.Material.Wood)

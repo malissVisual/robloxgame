@@ -9,8 +9,8 @@
 --     lines and the banners go under it. Its words wrap rather than grow wide; on a touch screen it is at least
 --     TouchScale big and its ✕ a finger's size.
 --   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts) along the
---     roads (SandboxSteps.route: out to Depot Row, along Main Street, in), a floating orange chevron over the target and
---     its distance tag ("THE OLD CHALET · 420 m"). Inside the house only the hint (no target there).
+--     roads (SandboxSteps.route: out to Depot Row, along Pražská, in), a floating orange chevron over the target and
+--     its distance tag ("THE OLD FARMSTEAD · 420 m"). Inside the house only the hint (no target there).
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and
@@ -45,6 +45,10 @@
 --     MoveHelperCall: every look) and the Moving state (its two-person pieces left: readMove). In a move with him, what
 --     covers the screen and what talks are asked too (his card, the move's cards, a grip check, a hint): his steps
 --     wait for them. A gamepad's words end in its button: "(L1)" at him, "(R1)" at a piece (SandboxSteps.onDevice).
+--   * 8.9, trading between players (8.7), the last soft step: "🏷 Sell to players: set a price on a piece on show" while
+--     Config.SandboxGuide.SellPlayers players are on the server (counted at most once a second, only while it may
+--     show) and SellShown pieces of yours are on show with no FOR SALE sign (the Collection remote's state: its views'
+--     `sale`); the chevron over your nearest piece on show (its Set price prompt, SET PRICE); done once a sign is set.
 --   * Cheap: one loop every Config.SandboxGuide.Every seconds (no frame-by-frame work, no tables made in it: the state,
 --     the path's points and the instances are made once and reused; a string only when the words or the metres change).
 --   * 8.3 (design/warehouse-levels/KONTRAKT.md): your warehouse has a level (1 Garage … 5 Logistics Center, the player
@@ -110,6 +114,7 @@ local LABELS: { [string]: string } = {
 	desk = "UPGRADES DESK", -- 8.3
 	paint = "PAINT SHOP", -- 8.3
 	danny = string.upper(Config.MoveHelper.Name), -- 8.4
+	sale = "SET PRICE", -- 8.9
 }
 local RING = 4 -- 8.3: px the ring round the 📦 STOCK chip stands out of it
 
@@ -150,6 +155,8 @@ local state: SandboxSteps.State = {
 	heavy = 0,
 	heavyNear = false,
 	clipboard = false, -- 8.5 Danny's clipboard out (orders mode)
+	players = nil, -- 8.9, the sell step (SandboxSteps.State)
+	signs = nil,
 }
 local softAfter = 0 -- 8.3: os.clock() before which no soft step shows (one just ended: Config.SandboxGuide.SoftGap)
 local hintsUi: any = nil -- 8.3: client/SandboxHintsUi.luau (looked for once; false: not there)
@@ -507,6 +514,24 @@ local function freeStand(plotId: number, px: number, pz: number): Vector3?
 	return if spot then Vector3.new(spot.x, spot.y + 3, spot.z) else nil
 end
 
+-- 8.9: the nearest of your stands with a piece on show (its Set price prompt; nil: none known).
+local function shownStand(plotId: number, px: number, pz: number): Vector3?
+	local spots = standsOf(plotId)
+	local index = SandboxSteps.nearestShown(px, pz, spots, summary.taken)
+	local spot = if index then spots[index] else nil
+	return if spot then Vector3.new(spot.x, spot.y + 3, spot.z) else nil
+end
+
+-- 8.9: the players on the server (you too), counted at most once a second.
+local function playerCount(): number
+	local now = os.clock()
+	if now >= (world.playersAt or 0) then
+		world.playersAt = now + 1
+		world.players = #Players:GetPlayers()
+	end
+	return world.players
+end
+
 -- Where the step's target is and its tag's name (nil: nothing to point at now).
 local function targetOf(kind: string?, px: number, pz: number): (Vector3?, string?)
 	if kind == nil then
@@ -566,6 +591,14 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 		local root = dannyRoot()
 		if root then
 			return root.Position + Vector3.new(0, 2, 0), LABELS.danny
+		end
+	elseif kind == "sale" then -- 8.9: your nearest piece on show (its Set price prompt), else your warehouse
+		if plotId and plot then
+			local spot = shownStand(plotId, px, pz)
+			if spot then
+				return spot, LABELS.sale
+			end
+			return Vector3.new(plot.door.x, plot.door.y + 4, plot.door.z), LABELS.warehouse
 		end
 	end
 	return nil, nil
@@ -1064,6 +1097,9 @@ local function look()
 	state.heavyNear = root ~= nil and state.helper == "hired" and done.lift ~= true and (state.heavy or 0) > 0 and not state.carrying
 		and not state.seated and not state.waiting and heavyNear(root.Position)
 	local calm = not state.move and not state.planning
+	-- 8.9: the sell step's: your signs (the Collection's state) and the players here (only while it may show)
+	state.signs = if world.collectionSeen then summary.signs else nil
+	state.players = if calm and done.sell ~= true and summary.signs == 0 and summary.shown >= G.SellShown then playerCount() else nil
 	local asks = calm or state.helper ~= nil
 	state.covered = asks and ask(SandboxGuide.covered, "isCovered") == true
 	local window = if state.covered then ask(SandboxGuide.windowOpen, "window") else nil -- (a window open covers it)

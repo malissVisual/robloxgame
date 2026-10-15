@@ -33,14 +33,17 @@
 --   waiting       you wait for him at a two-person piece (MoveHelperCall: you pressed its Lift)
 --   heavy         the two-person pieces still to carry out (the Moving state's items: class "pair", home or set down)
 --   heavyNear     one of them within Config.SandboxGuide.HeavyNear studs of you, its Lift shown (the client's look)
+--   8.9, trading between players (nil: not known, nothing said):
+--   players       the players on the server, you too (the client's Players list)
+--   signs         your pieces on show with a FOR SALE sign (the Collection remote's "state": its views' `sale`)
 --
 -- The steps (SandboxSteps.decide, the first that fits; the owner's table):
 --   in the house                        inside    "Carry the furniture out to your van (E to pick up)"   (no target)
 --   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
 --   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
 --   a move, at the house, outside       door      "Walk in through the front door"                        House.door
---   a move, not at the house            drive     "Drive to The Old Chalet"                               House.curb
---     (after a trip home)               back      "Drive back to The Old Chalet for more, or FINISH"      House.curb
+--   a move, not at the house            drive     "Drive to The Old Farmstead on Pražská"                 House.curb
+--     (after a trip home)               back      "Drive back to The Old Farmstead on Pražská for more, or FINISH"
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
 --   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the board
@@ -62,8 +65,10 @@
 --                                                      it five times a second); straight when within `direct` studs
 --   SandboxSteps.collection(msg, total?) -> Summary    the Collection remote's "state": stock, shown, free, taken (8.3:
 --                                                      the hot pieces in the stock, the first one's name, the market's
---                                                      day, a hot kind sold today)
+--                                                      day, a hot kind sold today; 8.9: the pieces on show with a FOR
+--                                                      SALE sign)
 --   SandboxSteps.nearestFree(x, z, spots, taken) -> index?   the nearest empty stand (spots[i] = { x, y, z }, taken[i])
+--   SandboxSteps.nearestShown(x, z, spots, taken) -> index?  8.9: the nearest stand with a piece on show (taken[i])
 --
 -- 8.3, the soft steps: what 8.3 added, each said at its moment and never nagging (SandboxSteps.choose). The core loop
 -- always wins: a move (in the house, carrying, the van loaded, the drive home, back), the planning, and a core step not
@@ -81,9 +86,14 @@
 --   paint    nothing bought at the PAINT shop yet, the van parked at home (its 🎨 prompt on), and a warehouse past the
 --            Garage (UpgradeRules.warehouseLevel) or Config.SandboxGuide.PaintMoney ($2,000) in your pocket
 --            "🎨 Make your van your own: E at its side opens the PAINT SHOP"              the van's 🎨 prompt
+--   sell     8.9 (8.7 trading between players, while Config.PlayerTrade.On): Config.SandboxGuide.SellPlayers players on
+--            the server or more (you too), SellShown pieces of yours on show or more, none with a FOR SALE sign yet
+--            "🏷 Sell to players: set a price on a piece on show"                        your nearest piece on show
+--            (its Set price prompt); done once a sign is set (one from a save too: the player knows it)
 -- (The collection book and the TASKS have their first-time hints, shared/SandboxHints.luau "book" and "tasks": no step
--- here.) A soft step is done for the session by what the player did (its window opened while it fits, a level bought, a
--- hot piece sold or put on show, a paint bought), after Config.SandboxGuide.SoftSeconds on the screen (the client's) or
+-- here; 8.9: nor the clipboard, a visit, a player's offer: "orders", "visit", "deal".) A soft step is done for the
+-- session by what the player did (its window opened while it fits, a level bought, a hot piece sold or put on show, a
+-- paint bought, 8.9: a FOR SALE sign set), after Config.SandboxGuide.SoftSeconds on the screen (the client's) or
 -- by the guide's ✕ (SandboxSteps.dismiss: only that step goes, the guide stays on). `hot` is once a market day: a new
 -- day may say it again, unless it was dismissed (done.hotGone).
 --   SandboxSteps.choose(state, done) -> Step           the step now: the core's (decide) or a soft one
@@ -160,18 +170,22 @@ export type State = {
 	heavy: number?,
 	heavyNear: boolean?,
 	clipboard: boolean?, -- 8.5 your clipboard is out (orders mode: the character attribute ClipboardHeld)
+	-- 8.9, trading between players (all optional: a state without them has no sell step)
+	players: number?,
+	signs: number?,
 }
 
 -- target: what the 3D guide points at (client/SandboxGuide.luau finds it): "board" | "curb" | "door" | "van" |
 -- "unload" | "stand" | 8.3: "desk" (the UPGRADES desk) | "hot" (a free stand, else the 📦 STOCK chip) | "paint" (the
--- van's 🎨 prompt) | 8.4: "danny" (Danny's body) | nil (the hint only). nav: the arrow stays while you drive, done or not.
+-- van's 🎨 prompt) | 8.4: "danny" (Danny's body) | 8.9: "sale" (your nearest piece on show: its Set price prompt) | nil
+-- (the hint only). nav: the arrow stays while you drive, done or not.
 -- info: it only says something (done after a while on the screen). soft: 8.3, a soft step (SandboxSteps.choose; its ✕
 -- dismisses it; 8.4: Danny's steps too). pad: 8.4, the SandboxPad action whose gamepad button follows its words in
 -- brackets (SandboxSteps.onDevice; nil: none).
 export type Step = { id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean, pad: string? }
 
 -- 8.3: hot the hot pieces in the stock (not on show, not broken), hotName the first one's name, day the market's day,
--- hotSold a hot kind sold today.
+-- hotSold a hot kind sold today. 8.9: signs the pieces on show with a FOR SALE sign.
 export type Summary = {
 	stock: number,
 	shown: number,
@@ -181,6 +195,7 @@ export type Summary = {
 	hotName: string?,
 	day: number?,
 	hotSold: boolean,
+	signs: number,
 }
 
 -- The counts of the look before (SandboxSteps.doneBy): a step is done when its count goes up while you play. 8.3: the
@@ -191,7 +206,7 @@ export type Last = { vanLoad: number?, delivered: number?, shown: number?, level
 -- A display stand's place in the world (client/SandboxGuide.luau reads them from shared/WarehouseLayout.luau).
 export type Place = { x: number, y: number, z: number }
 
-local HOUSE = SandboxMap.House.name
+local HOUSE = `{SandboxMap.House.name} on {SandboxMap.House.street}` -- (the contract's house and its street)
 local DANNY = Config.MoveHelper.Name -- 8.4
 
 local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?, pad: string?): Step
@@ -220,10 +235,14 @@ SandboxSteps.Steps = {
 	-- (8.5 orders mode: its words say the clipboard's key, SandboxSteps.words without it out)
 	give = step("give", `Take out your clipboard ({Config.MoveHelper.Clipboard.Key}) and pick a piece for {DANNY}`, nil, false, false, true, "clipboard"),
 	hire = step("hire", `Hire {DANNY} to carry with you`, "danny", false, false, true, "danny"),
+	-- 8.9, trading between players (8.7): the last soft step (its words the same on every device: the stand's Set price
+	-- prompt shows its own key)
+	sell = step("sell", "🏷 Sell to players: set a price on a piece on show", "sale", false, false, true),
 } :: { [string]: Step }
 
--- 8.3: the soft steps in their order (the first that fits shows).
-SandboxSteps.Soft = { "grow", "hot", "upgrade", "paint" } :: { string }
+-- 8.3: the soft steps in their order (the first that fits shows). 8.9: sell last (after every step before it; never in a
+-- move or its planning, as every soft step).
+SandboxSteps.Soft = { "grow", "hot", "upgrade", "paint", "sell" } :: { string }
 
 -- 8.4: Danny's steps in their order (the first that fits and is not done shows, before the move's own step).
 SandboxSteps.Danny = { "lift", "give", "hire" } :: { string }
@@ -321,6 +340,11 @@ function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
 	end
 	if s.painted == true then
 		done.paint = true
+	end
+	-- 8.9: a FOR SALE sign on one of your pieces (set now, or a save's: the player knows how)
+	local signs = s.signs
+	if signs ~= nil and signs > 0 then
+		done.sell = true
 	end
 	-- … bought: the warehouse's level, another upgrade's (a count that goes up while you play, as above)
 	local levels = s.levels
@@ -473,6 +497,14 @@ local function paintFits(s: State): boolean
 	return (levels ~= nil and UpgradeRules.warehouseLevel(levels) > 1) or (money ~= nil and money >= G.PaintMoney) -- (past the Garage)
 end
 
+-- 8.9: trading on, others on the server to buy, pieces enough on show and no sign yet.
+local function sellFits(s: State): boolean
+	local trade = (Config :: any).PlayerTrade
+	local players, signs = s.players, s.signs
+	return type(trade) == "table" and trade.On == true and players ~= nil and players >= G.SellPlayers and s.shown >= G.SellShown
+		and signs == 0
+end
+
 local function fits(id: string, s: State): boolean
 	if id == "grow" then
 		return SandboxSteps.growPrice(s) ~= nil
@@ -482,6 +514,8 @@ local function fits(id: string, s: State): boolean
 		return (SandboxSteps.upgradeFor(s)) ~= nil
 	elseif id == "paint" then
 		return paintFits(s)
+	elseif id == "sell" then
+		return sellFits(s)
 	end
 	return false
 end
@@ -552,9 +586,9 @@ function SandboxSteps.atHouse(x: number, z: number, margin: number): boolean
 end
 
 -- ── The path along the roads ───────────────────────────────────────────────
--- Depot Row (the plots' road, east-west) and Main Street (north-south, down to the house). A point north of Depot
--- Row's far edge is on the depot's side (the plots, the row itself), the rest is Main Street's side (the street, the
--- meadow, the house). The path goes out to the row's middle line, along it to Main Street's, along that, then in.
+-- Depot Row (the plots' road, east-west) and Pražská (north-south, down to the house). A point north of Depot Row's
+-- far edge is on the depot's side (the plots, the row itself), the rest is Pražská's side (the street, the meadow, the
+-- house). The path goes out to the row's middle line, along it to Pražská's, along that, then in.
 
 local ROW = SandboxMap.Roads[2]
 local MAIN = SandboxMap.Roads[1]
@@ -613,7 +647,7 @@ end
 -- "hot", the state's `market` View: its day, its hot kinds and the demand's `sold` today).
 local MAX_NAME = 48 -- (a longer name from the network is no piece of ours: "piece")
 function SandboxSteps.collection(msg: any, total: number?): Summary
-	local summary: Summary = { stock = 0, shown = 0, free = nil, taken = {}, hot = 0, hotName = nil, day = nil, hotSold = false }
+	local summary: Summary = { stock = 0, shown = 0, free = nil, taken = {}, hot = 0, hotName = nil, day = nil, hotSold = false, signs = 0 }
 	if type(msg) ~= "table" then
 		return summary
 	end
@@ -625,6 +659,10 @@ function SandboxSteps.collection(msg: any, total: number?): Summary
 				if type(stand) == "number" then
 					summary.shown += 1
 					summary.taken[stand] = true
+					local sale = entry.sale
+					if type(sale) == "number" and sale > 0 and sale < math.huge then
+						summary.signs += 1 -- (8.9: a FOR SALE sign)
+					end
 				else
 					summary.stock += 1
 					if entry.market == "hot" and entry.broken ~= true then
@@ -664,11 +702,12 @@ function SandboxSteps.collection(msg: any, total: number?): Summary
 	return summary
 end
 
-function SandboxSteps.nearestFree(x: number, z: number, spots: { [number]: Place }, taken: { [number]: boolean }): number?
+-- The nearest spot whose taken[i] is `want` (true: a piece on show there; false: empty).
+local function nearest(x: number, z: number, spots: { [number]: Place }, taken: { [number]: boolean }, want: boolean): number?
 	local best: number? = nil
 	local bestD = math.huge
 	for index, spot in spots do
-		if not taken[index] then
+		if (taken[index] == true) == want then
 			local dx, dz = spot.x - x, spot.z - z
 			local d = dx * dx + dz * dz
 			if d < bestD then
@@ -677,6 +716,14 @@ function SandboxSteps.nearestFree(x: number, z: number, spots: { [number]: Place
 		end
 	end
 	return best
+end
+
+function SandboxSteps.nearestFree(x: number, z: number, spots: { [number]: Place }, taken: { [number]: boolean }): number?
+	return nearest(x, z, spots, taken, false)
+end
+
+function SandboxSteps.nearestShown(x: number, z: number, spots: { [number]: Place }, taken: { [number]: boolean }): number?
+	return nearest(x, z, spots, taken, true)
 end
 
 return SandboxSteps

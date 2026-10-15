@@ -19,28 +19,44 @@
 --     Collection.setSale: within the bounds; 0 takes it off). Everybody else then has "Buy $X" there: the buy question
 --     ({ kind = "confirm" }), then BUY (PlayerTrade.buy: only at the price the question showed; the owner may be away
 --     on a move, only online: their plot exists only then).
+--   * 8.7 review, who may send: the client only asks, so SEND and BUY are taken only from a buyer who used that stand's
+--     prompt (Warehouse.onTrade → PlayerTrade.prompt → compose / askBuy leave a ticket: the seller, the piece's uid, the
+--     stand, the time, the stand's point) less than Config.PlayerTrade.Ticket s ago, for that very piece, and who stands
+--     within Reach studs of that stand's point now (their character's root); a ticket is spent by its offer or its buy.
+--     After an offer declined or run out, its buyer may offer that seller again only Cooldown s later (an accepted one:
+--     at once). A guessed uid ("<UserId>-<n>") from anywhere, or a few accounts keeping a seller's PerSeller slots full
+--     from afar, get nothing.
 --   * The deal (Collection.transfer, one step with no yield: every check again, then the money and the piece): the
---     piece into the buyer's stock (not on show), their collection book marks it found (CollectionBook.record), the
---     seller's stand free (their income counted at the old rates first); the price from the buyer ("PlayerBuy"), to the
---     seller ("PlayerSale") less the ZDC fee ("TradeFee": it disappears); a visitor's offer for that piece closed
---     ("gone": VisitorOffers.close) and every other player's offer for it ("gone"; its own buyer's quietly); both saved
---     soon (Collection.transfer); the toasts "🤝 Sold Gramophone to Ann for $1,200 (fee $96)" and "📦 Bought Gramophone
+--     piece into the buyer's stock (not on show), their collection book marks it BOUGHT, never found (8.7 review:
+--     Collection.onTransferred → CollectionBook.record's `bought`: no milestone, no badge; the daily tasks' "home" and
+--     "rare" and the analytics' CollectibleFound skip its new uid too), the seller's stand free (their income counted
+--     at the old rates first); the price from the buyer ("PlayerBuy"), to the seller ("PlayerSale") less the ZDC fee
+--     ("TradeFee": it disappears); a visitor's offer for that piece closed ("gone": VisitorOffers.close) and every other
+--     player's offer for it ("gone"; its own buyer's quietly); 8.7 review: both saved at once, the buyer's first
+--     (Collection.transfer); the toasts "🤝 Sold Gramophone to Ann for $1,200 (fee $96)" and "📦 Bought Gramophone
 --     from Bob for $1,200"; the badge firstDeal for both (SandboxBadges.give: off while its id is 0); a big sale
 --     (Config.PlayerTrade.BigSale) a chat line for the whole server ({ kind = "news" }: client/TradePrompts.luau).
 --     Analytics: PlayerTrade on the buyer (the price; how: "made", "sold", "declined", "expired", "gone", "left",
 --     "failed", "bought" (closed as its buyer bought the piece by its sign), "sign" (a sign bought); the piece's rarity).
 --
---   PlayerTrade.prompt(by, owner, stand, action)    a stand's trade prompt: "offer" (compose), "buy" (askBuy), "price"
---                                                  (pricing: the owner's only)
---   PlayerTrade.compose(buyer, seller, stand) -> Piece?, why    the composer's piece sent to the buyer
---   PlayerTrade.offer(buyer, seller, uid, stand, price) -> Offer?, why   an offer made (a copy)
+--   PlayerTrade.prompt(by, owner, stand, action, spot?)   a stand's trade prompt: "offer" (compose), "buy" (askBuy),
+--                                                  "price" (pricing: the owner's only); 8.7 review: spot the stand's
+--                                                  point (server/Warehouse.luau: its prompts' attachment)
+--   PlayerTrade.compose(buyer, seller, stand, spot?) -> Piece?, why    the composer's piece sent to the buyer (8.7
+--                                                  review: and the "offer" ticket; spot nil: no Reach check, a server
+--                                                  caller's own, as the tests')
+--   PlayerTrade.offer(buyer, seller, uid, stand, price) -> Offer?, why   an offer made (a copy; 8.7 review: only with
+--                                                  the "offer" ticket for that piece and stand)
 --   PlayerTrade.answer(seller, id, accept) -> money?, why       ACCEPT / DECLINE
 --   PlayerTrade.pricing(owner, stand) -> why?                   the price picker sent to the owner
 --   PlayerTrade.setPrice(owner, uid, price?) -> ok, why          the sign (nil or 0: off)
---   PlayerTrade.askBuy(buyer, seller, stand) -> why?            the buy question sent to the buyer
---   PlayerTrade.buy(buyer, seller, uid, stand, price) -> money?, why   a sign bought
+--   PlayerTrade.askBuy(buyer, seller, stand, spot?) -> why?     the buy question sent to the buyer (8.7 review: and
+--                                                  the "buy" ticket)
+--   PlayerTrade.buy(buyer, seller, uid, stand, price) -> money?, why   a sign bought (8.7 review: only with the "buy"
+--                                                  ticket for that piece and stand)
 --   PlayerTrade.open(player?) -> { Offer }                      the open offers (copies; to or from that player)
---   PlayerTrade.tick()                                          closes the offers whose clock ran out
+--   PlayerTrade.tick()                                          closes the offers whose clock ran out (and forgets
+--                                                               the cooldowns that ended)
 --   PlayerTrade.start()                                         the remote, the collections' changes, leaving, the clock
 --
 -- The "PlayerTrade" remote (Config.Robust.Limits.PlayerTrade requests a second, a new offer TradeOffer a second on top;
@@ -58,7 +74,7 @@ local BookRules = require(Shared.CollectionBookRules)
 local Market = require(Shared.Market)
 local PlayerData = require(script.Parent.PlayerData)
 local Collection = require(script.Parent.Collection)
-local CollectionBook = require(script.Parent.CollectionBook)
+local CollectionBook = require(script.Parent.CollectionBook) -- (the composer's "new for your book")
 local VisitorOffers = require(script.Parent.VisitorOffers)
 local SandboxBadges = require(script.Parent.SandboxBadges)
 
@@ -89,6 +105,11 @@ local offers: { [string]: Offer } = {}
 local counter = 0
 local started = false
 local dealing: { seller: Player, uid: string }? = nil -- the deal in progress (its own collection changes close nothing)
+-- 8.7 review: what a stand's prompt let a buyer send ("offer": the composer, "buy": the buy question), and when a buyer
+-- may offer a seller again (by UserId: a rejoin keeps it)
+type Ticket = { seller: Player, uid: string, stand: number, at: number, spot: Vector3? }
+local tickets: { [Player]: { [string]: Ticket } } = {}
+local cooldowns: { [number]: { [number]: number } } = {} -- buyer's UserId → seller's UserId → os.clock() it ends
 
 local function tune()
 	return Config.PlayerTrade
@@ -181,6 +202,71 @@ local function copy(offer: Offer): Offer
 	return table.clone(offer)
 end
 
+-- ── 8.7 review: tickets, presence, the cooldown ────────────────────────────
+
+-- Is the player's character within Reach studs of a stand's point? (no point: a server caller's ticket, nothing to
+-- check; no character: not there)
+local function near(player: Player, spot: Vector3?): boolean
+	if spot == nil then
+		return true
+	end
+	local character = player.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if not root or not root:IsA("BasePart") then
+		return false
+	end
+	return ((root :: BasePart).Position - spot).Magnitude <= tune().Reach
+end
+
+-- A stand's prompt used: the window it opens may send this (kind "offer" or "buy"), for that piece on that stand.
+local function issue(buyer: Player, kind: string, seller: Player, entry: Entry, spot: Vector3?)
+	local mine: { [string]: Ticket } = tickets[buyer] or {}
+	tickets[buyer] = mine
+	mine[kind] = { seller = seller, uid = entry.uid, stand = entry.stand :: number, at = os.clock(), spot = spot }
+end
+
+local function punch(buyer: Player, kind: string) -- (a ticket used: gone)
+	local mine = tickets[buyer]
+	if mine then
+		mine[kind] = nil
+	end
+end
+
+-- Why `buyer` may not send this now (nil: their ticket is for this seller, piece and stand, fresh, and they are near).
+local function unticketed(buyer: Player, kind: string, seller: Player, uid: any, stand: any): string?
+	local mine = tickets[buyer]
+	local ticket = if mine then mine[kind] else nil
+	local use = if kind == "buy" then "Buy" else "Make an offer"
+	if not ticket or ticket.seller ~= seller or ticket.uid ~= uid or ticket.stand ~= stand then
+		return `Walk up to {nameOf(seller)}'s stand and use {use} there.`
+	end
+	if os.clock() - ticket.at > tune().Ticket then
+		punch(buyer, kind)
+		return `That was a while ago: use {use} at {nameOf(seller)}'s stand again.`
+	end
+	if not near(buyer, ticket.spot) then
+		return `You walked away from {nameOf(seller)}'s warehouse: go back to {if kind == "buy" then "buy it" else "send your offer"}.`
+	end
+	return nil
+end
+
+-- Why `buyer` may not offer `seller` yet: an offer of theirs to them was declined or ran out a moment ago.
+local function cooling(buyer: Player, seller: Player): string?
+	local mine = cooldowns[buyer.UserId]
+	local ends = if mine then mine[seller.UserId] else nil
+	local left = if ends then ends - os.clock() else 0
+	if left > 0 then
+		return `You can make {nameOf(seller)} another offer in {math.ceil(left)} s.`
+	end
+	return nil
+end
+
+local function cool(offer: Offer)
+	local mine: { [number]: number } = cooldowns[offer.buyer.UserId] or {}
+	cooldowns[offer.buyer.UserId] = mine
+	mine[offer.seller.UserId] = os.clock() + tune().Cooldown
+end
+
 -- What the buyer hears when their offer closes (the seller's card just closes; a deal's toasts are the deal's).
 local function buyerWords(offer: Offer, how: string): string?
 	local seller, name = nameOf(offer.seller), offer.name
@@ -205,6 +291,9 @@ local function finish(offer: Offer, how: string, money: number?, text: string?)
 	offer.closed = true
 	if offers[offer.id] == offer then
 		offers[offer.id] = nil
+	end
+	if how == "declined" or how == "expired" then
+		cool(offer) -- (8.7 review: no new offer to that seller for Cooldown s)
 	end
 	send(offer.seller, { kind = "closed", id = offer.id, how = how, money = money })
 	send(offer.buyer, { kind = "result", id = offer.id, how = how })
@@ -275,8 +364,9 @@ end
 
 -- ── The deal ───────────────────────────────────────────────────────────────
 
--- The deal itself (Collection.transfer: every check again, then the money and the piece, with no yield), and after it
--- the other offers and a visitor's offer for that piece, the book, the toasts, the badge, a big sale's chat line.
+-- The deal itself (Collection.transfer: every check again, then the money and the piece, with no yield; 8.7 review:
+-- the book's bought mark comes from its onTransferred, both saves from it too), and after it the other offers and a
+-- visitor's offer for that piece, the toasts, the badge, a big sale's chat line.
 -- → the price paid, or nil and the refusal.
 local function deal(buyer: Player, seller: Player, uid: string, stand: number, price: number): (number?, Collection.Refusal?)
 	local fee = Rules.fee(price)
@@ -299,7 +389,6 @@ local function deal(buyer: Player, seller: Player, uid: string, stand: number, p
 	if visitor and visitor.uid == uid then
 		VisitorOffers.close(seller, "gone")
 	end
-	CollectionBook.record(buyer, piece.item, piece.condition)
 	say(seller, Rules.soldToast(piece.name, nameOf(buyer), price, fee))
 	say(buyer, Rules.boughtToast(piece.name, nameOf(seller), price))
 	SandboxBadges.give(seller, "firstDeal")
@@ -328,7 +417,7 @@ end
 
 -- ── The API ────────────────────────────────────────────────────────────────
 
-function PlayerTrade.compose(buyer: Player, seller: Player, stand: number): ({ [string]: any }?, string?)
+function PlayerTrade.compose(buyer: Player, seller: Player, stand: number, spot: Vector3?): ({ [string]: any }?, string?)
 	local why = cannotBuy(buyer, seller)
 	if why then
 		return nil, why
@@ -344,17 +433,30 @@ function PlayerTrade.compose(buyer: Player, seller: Player, stand: number): ({ [
 	if countTo(seller) >= tune().PerSeller then
 		return nil, `{nameOf(seller)} has {tune().PerSeller} offers open already: try again in a moment.`
 	end
-	why = stockFull(buyer)
+	why = cooling(buyer, seller) or stockFull(buyer)
 	if why then
 		return nil, why
 	end
 	local message = pieceMessage("compose", seller, buyer, entry)
+	issue(buyer, "offer", seller, entry, spot) -- (8.7 review: what its SEND may ask)
 	send(buyer, message)
 	return message, nil
 end
 
 function PlayerTrade.offer(buyer: Player, seller: Player, uid: any, stand: any, price: any): (Offer?, string?)
 	local why = cannotBuy(buyer, seller)
+	if why then
+		return nil, why
+	end
+	local mine = offerFrom(buyer)
+	if mine then
+		return nil, `Your offer for the {mine.name} is still open: wait for {nameOf(mine.seller)}'s answer.`
+	end
+	if countTo(seller) >= tune().PerSeller then
+		return nil, `{nameOf(seller)} has {tune().PerSeller} offers open already: try again in a moment.`
+	end
+	-- 8.7 review: only from the composer a stand's prompt opened, near that stand, and not right after a no
+	why = cooling(buyer, seller) or unticketed(buyer, "offer", seller, uid, stand)
 	if why then
 		return nil, why
 	end
@@ -367,13 +469,6 @@ function PlayerTrade.offer(buyer: Player, seller: Player, uid: any, stand: any, 
 	if not ok then
 		return nil, bad
 	end
-	local mine = offerFrom(buyer)
-	if mine then
-		return nil, `Your offer for the {mine.name} is still open: wait for {nameOf(mine.seller)}'s answer.`
-	end
-	if countTo(seller) >= tune().PerSeller then
-		return nil, `{nameOf(seller)} has {tune().PerSeller} offers open already: try again in a moment.`
-	end
 	why = stockFull(buyer)
 	if why then
 		return nil, why
@@ -381,6 +476,7 @@ function PlayerTrade.offer(buyer: Player, seller: Player, uid: any, stand: any, 
 	if moneyOf(buyer) < price then
 		return nil, `You have {Market.money(moneyOf(buyer))}: not enough for {Market.money(price)}.`
 	end
+	punch(buyer, "offer") -- (8.7 review: one offer a composer)
 	counter += 1
 	local now = os.clock()
 	local offer: Offer = {
@@ -491,7 +587,7 @@ function PlayerTrade.setPrice(owner: Player, uid: any, price: any): (boolean, st
 	return ok, why
 end
 
-function PlayerTrade.askBuy(buyer: Player, seller: Player, stand: number): string?
+function PlayerTrade.askBuy(buyer: Player, seller: Player, stand: number, spot: Vector3?): string?
 	local why = cannotBuy(buyer, seller)
 	if why then
 		return why
@@ -513,12 +609,13 @@ function PlayerTrade.askBuy(buyer: Player, seller: Player, stand: number): strin
 	end
 	local message = pieceMessage("confirm", seller, buyer, entry)
 	message.price = price
+	issue(buyer, "buy", seller, entry, spot) -- (8.7 review: what its BUY may ask)
 	send(buyer, message)
 	return nil
 end
 
 function PlayerTrade.buy(buyer: Player, seller: Player, uid: any, stand: any, price: any): (number?, string?)
-	local why = cannotBuy(buyer, seller)
+	local why = cannotBuy(buyer, seller) or unticketed(buyer, "buy", seller, uid, stand) -- (8.7 review: the question's)
 	if why then
 		return nil, why
 	end
@@ -540,6 +637,7 @@ function PlayerTrade.buy(buyer: Player, seller: Player, uid: any, stand: any, pr
 	if not money then
 		return nil, if refused then refused.text else "Nothing was traded."
 	end
+	punch(buyer, "buy")
 	PlayerData.track("event", buyer, "PlayerTrade", money, "sign", rarityOf(entry))
 	return money, nil
 end
@@ -561,9 +659,19 @@ function PlayerTrade.tick()
 			finish(offer, "expired")
 		end
 	end
+	for buyerId, mine in cooldowns do -- (8.7 review: the ended ones forgotten)
+		for sellerId, ends in mine do
+			if ends <= now then
+				mine[sellerId] = nil
+			end
+		end
+		if next(mine) == nil then
+			cooldowns[buyerId] = nil
+		end
+	end
 end
 
-function PlayerTrade.prompt(by: Player, owner: Player, stand: number, action: string)
+function PlayerTrade.prompt(by: Player, owner: Player, stand: number, action: string, spot: Vector3?)
 	local why: string? = nil
 	if action == "price" then
 		if by ~= owner then
@@ -572,10 +680,10 @@ function PlayerTrade.prompt(by: Player, owner: Player, stand: number, action: st
 			why = PlayerTrade.pricing(by, stand)
 		end
 	elseif action == "offer" then
-		local _, refused = PlayerTrade.compose(by, owner, stand)
+		local _, refused = PlayerTrade.compose(by, owner, stand, spot)
 		why = refused
 	elseif action == "buy" then
-		why = PlayerTrade.askBuy(by, owner, stand)
+		why = PlayerTrade.askBuy(by, owner, stand, spot)
 	end
 	say(by, why)
 end
@@ -649,6 +757,7 @@ local function onCollection(player: Player)
 end
 
 local function left(player: Player)
+	tickets[player] = nil -- (8.7 review: the cooldowns stay, by UserId)
 	for _, offer in openList() do
 		if offer.buyer == player then
 			finish(offer, "left", nil, "") -- (the buyer is going: nothing to tell them)

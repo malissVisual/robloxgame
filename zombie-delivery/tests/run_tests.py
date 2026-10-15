@@ -768,6 +768,30 @@ def pad_check():
 if not pad_check():
     ok = False
 
+# Jinočany (design/jinocany/NAVRH.md: the sandbox in Jinočany in place of the Alps): the sandbox's big house is The Old
+# Farmstead and its street Pražská, so no "Old Chalet" and no "Main Street" is left in src (comments too, a name broken
+# over two comment lines too). The city's own files (Config.Sandbox.On = false, on hold) may keep their own names.
+CITY_ONLY = {"shared/Map.luau", "shared/BusLines.luau", "server/World.luau", "server/Alpine.luau", "server/Chalets.luau", "server/Hauptplatz.luau"}
+def jinocany_names_check():
+    src = os.path.join(os.path.dirname(HERE), "src")
+    old = re.compile(r"\bold(?:\s|--)*chalet|\bmain(?:\s|--)*street\b", re.I)
+    bad, scanned = [], 0
+    for folder, _, files in os.walk(src):
+        for name in sorted(files):
+            path = os.path.join(folder, name)
+            rel = os.path.relpath(path, src).replace(os.sep, "/")
+            if not name.endswith(".luau") or rel in CITY_ONLY:
+                continue
+            scanned += 1
+            text = open(path, encoding="utf-8").read()
+            for found in old.finditer(text):
+                bad.append(f"src/{rel}:{text.count(chr(10), 0, found.start()) + 1} says {' '.join(found.group(0).replace('--', ' ').split())!r}")
+    print("== Jinočany names: " + (f"no Old Chalet and no Main Street in {scanned} src modules (The Old Farmstead on Pražská; the city's {len(CITY_ONLY)} own files left out)" if not bad else "; ".join(bad[:20])))
+    return not bad
+
+if not jinocany_names_check():
+    ok = False
+
 # 8.5.1: the server's and the client's BuildStamp equal Config.Version (they find a Studio left with old scripts).
 def build_stamp_check():
     root = os.path.dirname(HERE)
@@ -783,6 +807,40 @@ def build_stamp_check():
     return not bad
 
 if not build_stamp_check():
+    ok = False
+
+# 8.9: every sound sheet's .ogg (art/audio/make_audio.py writes them) is as long as shared/SoundSheet.luau's Seconds
+# says (tests/audio_test.luau checks every region lies inside that length; a sheet encoded anew but its regions not
+# written, or the other way round, shows here). ffprobe reads the files (none: skipped).
+def audio_length_check():
+    root = os.path.dirname(HERE)
+    probe = shutil.which("ffprobe")
+    if not probe:
+        print("== audio lengths: ffprobe not found, skipped")
+        return True
+    sheet = open(os.path.join(root, "src", "shared", "SoundSheet.luau"), encoding="utf-8").read()
+    seconds = re.search(r"^SoundSheet\.Seconds = \{ (.*) \} ::", sheet, re.M)
+    lengths = re.findall(r"(\w+) = ([\d.]+)", seconds.group(1)) if seconds else []
+    bad = []
+    for name, value in lengths:
+        path = os.path.join(root, "art", "audio", name + ".ogg")
+        if not os.path.exists(path):
+            bad.append(f"{name}.ogg is missing")
+            continue
+        found = subprocess.run([probe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path], capture_output=True, text=True)
+        try:
+            length = float(found.stdout.strip())
+        except ValueError:
+            bad.append(f"{name}.ogg: no length read")
+            continue
+        if abs(length - float(value)) > 0.02:
+            bad.append(f"{name}.ogg is {length:.3f} s, SoundSheet.Seconds says {value}")
+    if not lengths:
+        bad.append("SoundSheet.Seconds not read")
+    print("== audio lengths: " + (f"every sheet's .ogg as long as its regions say ({', '.join(n for n, _ in lengths)})" if not bad else "; ".join(bad)))
+    return not bad
+
+if not audio_length_check():
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

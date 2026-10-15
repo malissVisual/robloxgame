@@ -47,8 +47,8 @@ do
 	local step = SandboxSteps.decide(state({}))
 	check("no move: take a contract at the board (your plot's board)", step.id == "contract" and step.hint == "Take a contract at the board" and step.target == "board", show(step))
 	step = SandboxSteps.decide(state({ move = true }))
-	check("a move started, not at the house: drive to The Old Chalet (its curb)", step.id == "drive" and step.hint == "Drive to The Old Chalet" and step.target == "curb" and step.nav, show(step))
-	check("… the house's name from SandboxMap", SandboxMap.House.name == "The Old Chalet")
+	check("a move started, not at the house: drive to The Old Farmstead on Pražská (its curb)", step.id == "drive" and step.hint == "Drive to The Old Farmstead on Pražská" and step.target == "curb" and step.nav, show(step))
+	check("… the house's name from SandboxMap", SandboxMap.House.name == "The Old Farmstead")
 	step = SandboxSteps.decide(state({ move = true, seated = true }))
 	check("… driving there too", step.id == "drive", show(step))
 	step = SandboxSteps.decide(state({ move = true, atHouse = true }))
@@ -69,7 +69,7 @@ do
 	check("… driving home", step.id == "home", show(step))
 	step = SandboxSteps.decide(state({ move = true, delivered = 4 }))
 	check("a trip unloaded, the move still on: back to the house for more, or FINISH", step.id == "back" and step.target == "curb" and step.nav
-		and step.hint == "Drive back to The Old Chalet for more, or FINISH", show(step))
+		and step.hint == "Drive back to The Old Farmstead on Pražská for more, or FINISH", show(step))
 	step = SandboxSteps.decide(state({ move = true, delivered = 4, atHouse = true }))
 	check("… there again: in through the door", step.id == "door", show(step))
 	step = SandboxSteps.decide(state({ stock = 3 }))
@@ -185,7 +185,7 @@ do
 	check("the turnaround's north edge is not", not SandboxSteps.atHouse(t.x, t.z - t.r, margin))
 	local plot = SandboxMap.Plots[1]
 	check("your plot is not", not SandboxSteps.atHouse(plot.spawn.x, plot.spawn.z, margin))
-	check("Main Street's middle is not", not SandboxSteps.atHouse(0, 200, margin))
+	check("Pražská's middle is not", not SandboxSteps.atHouse(0, 200, margin))
 end
 
 -- ── The path along the roads ────────────────────────────────────────────────
@@ -212,7 +212,7 @@ do
 	local plot = SandboxMap.Plots[1]
 	local curb = SandboxMap.House.curb
 	local n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, curb.x, curb.z, out, direct)
-	check("from your plot to the house: out to Depot Row, along it, down Main Street", n == 4 and out[3] == plot.spawn.x and out[4] == rowZ
+	check("from your plot to the house: out to Depot Row, along it, down Pražská", n == 4 and out[3] == plot.spawn.x and out[4] == rowZ
 		and out[5] == 0 and out[6] == rowZ and out[7] == curb.x and out[8] == curb.z, points(n))
 	local inner = true
 	for i = 2, n - 1 do
@@ -220,7 +220,7 @@ do
 	end
 	check("… every turn on a road", inner, points(n))
 	n = SandboxSteps.route(curb.x, curb.z, plot.unload.x, plot.unload.z, out, direct)
-	check("from the house home: up Main Street, along Depot Row, in to the unload circle", n == 4 and out[3] == 0 and out[4] == rowZ
+	check("from the house home: up Pražská, along Depot Row, in to the unload circle", n == 4 and out[3] == 0 and out[4] == rowZ
 		and out[5] == plot.unload.x and out[6] == rowZ and out[7] == plot.unload.x and out[8] == plot.unload.z, points(n))
 	n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, plot.board.x, plot.board.z, out, direct)
 	check("on your plot to its board: straight", n == 2 and out[3] == plot.board.x and out[4] == plot.board.z, points(n))
@@ -228,9 +228,9 @@ do
 	n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, other.board.x, other.board.z, out, direct)
 	check("to another plot: along Depot Row", n == 4 and out[4] == rowZ and out[6] == rowZ, points(n))
 	n = SandboxSteps.route(0, 300, curb.x, curb.z, out, direct)
-	check("on Main Street to the house: straight on", n == 2 and out[3] == curb.x and out[4] == curb.z, points(n))
+	check("on Pražská to the house: straight on", n == 2 and out[3] == curb.x and out[4] == curb.z, points(n))
 	n = SandboxSteps.route(120, 200, curb.x, curb.z, out, direct)
-	check("from the meadow: to Main Street first", n == 3 and out[3] == 0 and out[4] == 200, points(n))
+	check("from the meadow: to Pražská first", n == 3 and out[3] == 0 and out[4] == 200, points(n))
 	n = SandboxSteps.route(5, 5, 5, 5, out, direct)
 	check("already there: two points (a path of nothing)", n == 2, points(n))
 	local count = 0
@@ -305,7 +305,7 @@ do
 	end
 
 	-- the order and their words
-	check("the soft steps' order: grow, hot, upgrade, paint", table.concat(SandboxSteps.Soft, ",") == "grow,hot,upgrade,paint")
+	check("the soft steps' order: grow, hot, upgrade, paint (8.9: then sell)", table.concat(SandboxSteps.Soft, ",") == "grow,hot,upgrade,paint,sell")
 	for _, id in SandboxSteps.Soft do
 		local def = Steps[id]
 		check(`{id}: a soft step (its ✕ dismisses it), not a nav or info one`, def ~= nil and def.soft and not def.nav and not def.info)
@@ -583,6 +583,96 @@ do
 		and chosen(dannyState(), closed).id == "door")
 	check("… its details none (its words its own)", SandboxSteps.detail(hire, dannyState()) == nil and SandboxSteps.words(give, dannyState()) == give.hint)
 	check("Config: a heavy piece \"near\" within a Lift's reach or so", Config.SandboxGuide.HeavyNear >= Config.Moving.Reach.Item and Config.SandboxGuide.HeavyNear <= 20)
+end
+
+-- ── 8.9: trading between players' step (set a price on a piece on show) ─────
+do
+	local Steps = SandboxSteps.Steps
+	local G = Config.SandboxGuide
+	local sell = Steps.sell
+	local NONE = {} -- (a field given as NONE is left out: not known)
+	-- no move, nothing in the stock (the core's `earn` only says something: it gives way), SellShown pieces on show,
+	-- none with a sign, SellPlayers players on the server (then the fields given)
+	local function selling(fields: { [string]: any }?): SandboxSteps.State
+		local s: { [string]: any } = { stock = 0, shown = G.SellShown, freeStands = 0, players = G.SellPlayers, signs = 0 }
+		for key, value in fields or {} do
+			s[key] = value
+		end
+		local made = state(s) :: any
+		for key, value in made do
+			if value == NONE then
+				made[key] = nil
+			end
+		end
+		return made
+	end
+	local function chosen(s: SandboxSteps.State, done: { [string]: boolean }?): SandboxSteps.Step
+		return SandboxSteps.choose(s, done or {})
+	end
+
+	check("8.9 Config: the sell step from 4 pieces on show and 2 players on the server", G.SellShown == 4 and G.SellPlayers == 2)
+	check("the step: \"🏷 Sell to players: set a price on a piece on show\", a soft one (said once, its ✕ dismisses it), the chevron over a piece on show",
+		sell ~= nil and sell.id == "sell" and sell.hint == "🏷 Sell to players: set a price on a piece on show" and sell.target == "sale" and sell.soft
+		and not sell.nav and not sell.info and sell.pad == nil, sell and sell.hint)
+	check("… the last soft step (after the existing steps' order)", SandboxSteps.Soft[#SandboxSteps.Soft] == "sell" and table.find(SandboxSteps.Danny, "sell") == nil)
+	check("… its words the same on every device (no key: the stand's Set price prompt shows its own)", SandboxSteps.onDevice(sell, nil, "keys") == sell.hint
+		and SandboxSteps.onDevice(sell, nil, "pad") == sell.hint and SandboxSteps.onDevice(sell, nil, "touch") == sell.hint
+		and SandboxSteps.words(sell, selling()) == sell.hint and SandboxSteps.detail(sell, selling()) == nil)
+
+	-- when it shows
+	check(`{G.SellShown} pieces on show, no sign, {G.SellPlayers} players on the server: "🏷 Sell to players …"`, chosen(selling()).id == "sell")
+	check("… with more of both too", chosen(selling({ shown = 9, players = 6 })).id == "sell")
+	check(`… not with {G.SellShown - 1} on show`, chosen(selling({ shown = G.SellShown - 1 })).id ~= "sell")
+	check("… not alone on the server (nobody to buy), nor with the players not known", chosen(selling({ players = 1 })).id ~= "sell"
+		and chosen(selling({ players = NONE })).id ~= "sell")
+	check("… not with a sign up already, nor before the collection's state came (signs not known)", chosen(selling({ signs = 1 })).id ~= "sell"
+		and chosen(selling({ signs = NONE })).id ~= "sell")
+	check("… never in a move or its planning (it never interrupts a move)", chosen(selling({ move = true })).id == "drive"
+		and chosen(selling({ move = true, atHouse = true, inside = true })).id == "inside" and chosen(selling({ planning = true, planningMine = true })).id == "plan")
+	check("… never while something covers the screen or something else talks (a first-time hint)", chosen(selling({ covered = true })).id ~= "sell"
+		and chosen(selling({ hush = true })).id ~= "sell")
+	check("… after a core step not done yet (pieces in the stock, a stand free: put them on show first)", chosen(selling({ stock = 2, freeStands = 2 })).id == "show")
+	local every = selling({ stock = 4, freeStands = 2, money = 2000, levels = {}, hot = "Jukebox", hotCount = 1, hotSold = false, day = 1, painted = false, vanHome = true })
+	check("… after the existing soft steps (grow, hot, upgrade, paint first; then sell)", chosen(every, { show = true }).id == "grow"
+		and chosen(every, { show = true, grow = true, hot = true, upgrade = true }).id == "paint"
+		and chosen(every, { show = true, grow = true, hot = true, upgrade = true, paint = true }).id == "sell")
+	local trade = Config.PlayerTrade
+	trade.On = false
+	check("… not while trading between players is off (Config.PlayerTrade.On)", chosen(selling()).id ~= "sell")
+	trade.On = true
+
+	-- done (once a session)
+	local done: { [string]: boolean } = {}
+	local last: SandboxSteps.Last = {}
+	SandboxSteps.doneBy(selling(), done, last)
+	check("no sign: not done", done.sell == nil)
+	SandboxSteps.doneBy(selling({ signs = 1 }), done, last)
+	check("a sign set: done", done.sell == true and chosen(selling(), done).id ~= "sell")
+	local saved: { [string]: boolean } = {}
+	SandboxSteps.doneBy(selling({ signs = 2 }), saved, {})
+	check("… a sign a save brought along too (the player knows how)", saved.sell == true)
+	local closed: { [string]: boolean } = {}
+	check("its ✕: that step gone for the session", SandboxSteps.dismiss(sell, closed) and closed.sell == true and chosen(selling(), closed).id ~= "sell")
+	local hint, guide = SandboxSteps.visible(sell, {}, false)
+	check("… before: the hint and the chevron", hint and guide)
+	hint, guide = SandboxSteps.visible(sell, { sell = true }, false)
+	check("… done: quiet", not hint and not guide)
+
+	-- the collection's signs and the nearest piece on show
+	local summary = SandboxSteps.collection({ kind = "state", stands = 6, stock = {
+		{ uid = "a", item = "sofa", stand = 1, sale = 1500 },
+		{ uid = "b", item = "lamp", stand = 2 },
+		{ uid = "c", item = "vase", stand = 3, sale = 0 },
+		{ uid = "d", item = "rug", sale = 900 }, -- (no stand: no sign, whatever it says)
+		{ uid = "e", item = "clock", stand = 4, sale = "x" },
+	} }, nil)
+	check("the Collection's state: the pieces on show with a FOR SALE sign (a price over 0, on a stand)", summary.signs == 1 and summary.shown == 4, summary.signs)
+	check("… none: 0; nothing yet: 0", SandboxSteps.collection({ kind = "state", stock = { { uid = "z", stand = 1 } } }, 2).signs == 0 and SandboxSteps.collection(nil).signs == 0)
+	local spots = { { x = 0, y = 0, z = 0 }, { x = 10, y = 0, z = 0 }, { x = 20, y = 0, z = 0 } }
+	check("the nearest stand with a piece on show (the chevron's)", SandboxSteps.nearestShown(19, 0, spots, { [1] = true, [2] = true }) == 2
+		and SandboxSteps.nearestShown(-5, 0, spots, { [3] = true }) == 3)
+	check("… none on show: none", SandboxSteps.nearestShown(5, 0, spots, {}) == nil)
+	check("… the nearest empty one as before", SandboxSteps.nearestFree(19, 0, spots, { [3] = true }) == 2)
 end
 
 -- ── Config.SandboxGuide ─────────────────────────────────────────────────────

@@ -27,6 +27,11 @@
 --     list, the touch controls and the 📋 button (DannyOrders.layout). It is no window (nothing closes for it, the camera
 --     keeps the mouse: the crosshair points) and steps aside while one covers the screen (DannyOrders.covered: Main's,
 --     his card open, a grip check): the line, the outline and the 📋 button hidden, R1 and B left to the window.
+--   * 8.9 its sounds (art/audio/sfx5.ogg, quiet: client/SandboxSounds.luau event): the clipboard taken out (a paper
+--     rustle and the clip) and put away, whoever did it (your ClipboardHeld changed, looked at with the rest every
+--     Clipboard.Look s: shared/SoundPlan.luau clipboardCue; a new body: none); asked out and refused (the server's
+--     notice), the soft nope in place of the notice's ping (SandboxSounds.await). The pieces' tick and cross-off are
+--     client/MoveHelperCard.luau's (it sends them).
 -- Presentation only.
 --   DannyOrders.start()                     listens (nothing outside the sandbox)
 --   DannyOrders.on() -> boolean             the clipboard out (orders mode)
@@ -48,6 +53,7 @@ local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
 local ClipboardRules = require(Shared.ClipboardRules)
 local SandboxPad = require(Shared.SandboxPad)
+local SoundPlan = require(Shared.SoundPlan) -- 8.9 (the clipboard's sounds)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local PadGlyph = require(script.Parent.PadGlyph)
@@ -86,6 +92,8 @@ local litPiece: Model? = nil
 local litWords: string? = nil
 local placedKey = "" -- what the last place() was for (placed again when it changes, or a second later)
 local placedAt = 0
+local clipBody: Model? = nil -- 8.9 the body the clipboard was last looked at on …
+local clipWas = false -- … and whether it was out then
 
 -- ── Where it goes (pure maths: the phone-ui check runs it) ──────────────────
 
@@ -192,12 +200,35 @@ function DannyOrders.on(): boolean
 	return character ~= nil and character:GetAttribute("ClipboardHeld") == true
 end
 
+-- 8.9 the newest sounds (client/SandboxSounds.luau: found when first wanted; nothing where it is not there).
+local function sandboxSounds(): any
+	local ok, found = pcall(function(): any
+		return require(script.Parent.SandboxSounds)
+	end)
+	return if ok then found else nil
+end
+
+local function sound(event: string)
+	local found = sandboxSounds()
+	if found then
+		pcall(found.event, event)
+	end
+end
+
 function DannyOrders.toggle(out: boolean?)
 	local want = if out == nil then not DannyOrders.on() else out
 	if want and not hired() then
 		return -- (no Danny working for you: nothing to give orders to)
 	end
+	local was = DannyOrders.on()
 	remote:FireServer(want)
+	local found = if want and not was then sandboxSounds() else nil
+	if found then
+		-- 8.9 asked out: its rustle comes with ClipboardHeld (step); refused, the server's notice: the soft nope
+		pcall(found.await, function(): string?
+			return if DannyOrders.on() then "" else nil
+		end)
+	end
 end
 
 -- Does a window, his card or a grip check cover the screen now?
@@ -543,6 +574,17 @@ local function step()
 	end
 	local on = DannyOrders.on()
 	MoveHelperHud.setOrders(on)
+	-- 8.9 the clipboard taken out or put away (by you or by the server): its sound (a new body: none)
+	local character = player.Character
+	if character ~= clipBody then
+		clipBody, clipWas = character, on
+	elseif on ~= clipWas then
+		local cue = SoundPlan.clipboardCue(clipWas, on)
+		clipWas = on
+		if cue then
+			sound(cue)
+		end
+	end
 	local hide = covered()
 	local showHint = on and hired() and not hide
 	local showButton = Ui.touchLayout() and not Ui.gamepadActive() and hired() and not hide and (on or mayTake())

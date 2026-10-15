@@ -40,7 +40,7 @@ local FRAME = 1 / 60
 -- ── The leaves as the server builds them ─────────────────────────────────────
 
 local world = SandboxWorld.build()
-local chalet = world:FindFirstChild("TheOldChalet")
+local chalet = world:FindFirstChild("TheOldFarmstead")
 local plain: { any } = {}
 for _, d in (if chalet then chalet:GetDescendants() else {}) do
 	if d:GetAttribute("DoorLeaf") ~= nil then

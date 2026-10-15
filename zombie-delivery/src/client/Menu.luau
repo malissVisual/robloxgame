@@ -10,7 +10,7 @@
 -- hairline rows (no corners), and the controls card has the ZDC heading.
 -- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
 -- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
--- (shared/SandboxMap.luau: the chalet, Main Street, your plot), never over the old city. PLAY does what the city's does.
+-- (shared/SandboxMap.luau: the farmstead, Pražská, your plot), never over the old city. PLAY does what the city's does.
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): the two shots of your warehouse look at the building of its level
 -- (WarehouseLayout.site: 1 the Garage … 5 the Logistics Center).
 
@@ -63,7 +63,7 @@ local function warehouseLevel(id: number, mine: boolean): number
 end
 
 -- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
--- from its other side, up Main Street toward the plots, your plot's warehouse (the player's Plot attribute; the first
+-- from its other side, up Pražská toward the plots, your plot's warehouse (the player's Plot attribute; the first
 -- plot before the server gave you one; 8.3: the building of its level), your van's spot at its roller door, back down
 -- the street. 8.3: every level's front wall is on the door's line; the shot at it pulls back with the building's
 -- footprint (far 1: the Big Warehouse's 80 × 60, the 8.0 shot: 60 east, 40 up, 87 in front of the door; the Garage

@@ -441,6 +441,60 @@
       10.0
     ]
   },
+  "sfx5": {
+    "clip_out": [
+      0.0,
+      0.42
+    ],
+    "clip_away": [
+      0.72,
+      0.42
+    ],
+    "pen_tick": [
+      1.44,
+      0.17
+    ],
+    "pen_untick": [
+      1.91,
+      0.26
+    ],
+    "soft_nope": [
+      2.47,
+      0.36
+    ],
+    "order_chirp": [
+      3.13,
+      0.2
+    ],
+    "danny_whistle": [
+      3.63,
+      0.62
+    ],
+    "coin_kaching": [
+      4.55,
+      0.9
+    ],
+    "offer_ding": [
+      5.75,
+      1.3
+    ],
+    "price_paper": [
+      7.35,
+      0.38
+    ],
+    "gavel_knock": [
+      8.03,
+      0.5
+    ],
+    "sold_bell": [
+      8.83,
+      1.6
+    ],
+    "bid_tick": [
+      10.73,
+      0.08
+    ]
+  },
   "looped": [
     "amb_alpine",
     "amb_day",
@@ -465,6 +519,7 @@
     "music": "19575952dd46b6321373b1a31e5e31897da59ec6fa2f417d2d9dfc69bf3191cc",
     "sfx2": "343535d0809e9e63ea1b48f0b914ebb29651ae4d9ae6f66b1d5a55ad8d85cb9b",
     "sfx3": "63d310abebf8b82ef8c94715657fa9c92738ea6f48cd62ae490dad840d4230b0",
-    "sfx4": "94c9b8813b8aedf54b97519fa59248aebd1406f47a9a061f29873a3791f5194c"
+    "sfx4": "94c9b8813b8aedf54b97519fa59248aebd1406f47a9a061f29873a3791f5194c",
+    "sfx5": "afaed1c03e0364c47344711b2139461e325e50a275bb17990b04776a186cc483"
   }
 }

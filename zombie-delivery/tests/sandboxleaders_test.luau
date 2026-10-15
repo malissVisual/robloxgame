@@ -192,9 +192,9 @@ local function samples(by: number): { { number } }
 end
 
 do
-	check("the spot: the crossroads' south-east corner (east of Main Street, south of Depot Row)", spot.x > MAIN.x1 and spot.z > DEPOT.z1 and spot.x < MAIN.x1 + 60 and spot.z < DEPOT.z1 + 60, `{spot.x}, {spot.z}`)
+	check("the spot: the crossroads' south-east corner (east of Pražská, south of Depot Row)", spot.x > MAIN.x1 and spot.z > DEPOT.z1 and spot.x < MAIN.x1 + 60 and spot.z < DEPOT.z1 + 60, `{spot.x}, {spot.z}`)
 	local sign = SandboxScenery.Signpost
-	check("near the signpost (across Main Street from it)", (spot.x - sign.x) ^ 2 + (spot.z - sign.z) ^ 2 < 90 ^ 2 and sign.x < MAIN.x0 and spot.x > MAIN.x1)
+	check("near the signpost (across Pražská from it)", (spot.x - sign.x) ^ 2 + (spot.z - sign.z) ^ 2 < 90 ^ 2 and sign.x < MAIN.x0 and spot.x > MAIN.x1)
 	local lx, lz = Rules.look(spot)
 	local cx, cz = (MAIN.x0 + MAIN.x1) / 2, (DEPOT.z0 + DEPOT.z1) / 2
 	local tx, tz = cx - spot.x, cz - spot.z

@@ -65,6 +65,12 @@
 --       Guard       × Guard.Damage on the zombies (Zombies.damage wrapped), plank barricades outside ("barricade": they
 --                   stop the zombies, which wear them down), the outline through walls (client/EnemyOutline.luau).
 --     (The owner took the Technician out: the front door is never locked, the interior is lit from the start.)
+--     8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."; MoveRoles.on: Config.MoveRoles.On,
+--     the city's only, never the sandbox): without roles nobody has one (no MoveRole; the remote's "role" and
+--     "barricade" do nothing; the state's team says only whether the van was called), the truck's Load / Unload hold no
+--     time for anybody (truckPrompts: hold 0, no MoveQuick), anybody calls the van to the door once a move (whoever is
+--     first: callTruck), and the carry, the climb, the hits and the truck are everybody's alike (no Mover's pair piece
+--     alone or stairs, no Guard's damage, no Driver's truck: teamHooks leave them be).
 --   * 7.0 greeters (server/MoveGreeters.luau; Config.MoveGreeters, the words shared/MoveStory.luau's): the client
 --     greets the crew on the house's porch and reacts to the move (MoveGreeters.sync in the tick, gone at the end:
 --     MoveGreeters.done in cleanup), the soldier at the Wall welcomes a delivered truck (done), Marge greets a player
@@ -100,8 +106,9 @@
 --   * 8.0 SANDBOX (Config.Sandbox.On when Moving.start runs; design/sandbox/KONTRAKT.md; Config.Moving.Sandbox; the
 --     state and the helpers in the table SB, the blocks marked "8.0 SANDBOX"): the owner's small test world in place of
 --     the city, the city's game as it was otherwise. One contract, the house of shared/SandboxMap.luau (House: "The Old
---     Chalet", 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big", Config.Moving.Sandbox.Kind,
---     its back door a second way in and out, as a farm's barn doors): its "Enter house" on the map's front door (the
+--     Farmstead" on Pražská, 8.2.1 the owner's big Blender house; 8.3 its plan HouseLayout's kind "big",
+--     Config.Moving.Sandbox.Kind, its back door a second way in and out, as a farm's barn doors): its "Enter house" on
+--     the map's front door (the
 --     part with the attribute SandboxDoor, server/SandboxWorld.luau's; else an invisible one at House.door), "Call
 --     truck to door" to House.curb, out at its door; refilled once a move brought something home (a new HouseLayout
 --     seed: the card's own, SB.seeds, kept until then; 8.3 economy: a move called off with nothing home keeps it, no
@@ -795,9 +802,9 @@ local function newTeam(): Team
 	}
 end
 
--- This player's role on the move (nil: none).
+-- This player's role on the move (nil: none; 8.8: nobody's without roles).
 local function roleOf(s: Session, player: Player?): string?
-	return if player then s.team.of[player.UserId] else nil
+	return if player and MoveRoles.on() then s.team.of[player.UserId] else nil
 end
 
 -- The carry's walk for this thing: its carrier's role's (a Mover lifts a pair thing alone, carries faster).
@@ -1077,7 +1084,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 		kind = "house",
 		name = contract.name,
 		address = T.Sandbox.Address,
-		street = "Main Street",
+		street = "Pražská",
 		district = "sandbox",
 		x = door.X,
 		z = door.Z,
@@ -1807,14 +1814,15 @@ local function truckPrompts(s: Session)
 	end
 	s.loadIn = nil
 	local label = SB.vanLabel(truck)
-	local load = newPrompt(door, "Load", label, Enum.KeyCode.E, 0.25, T.Reach.Truck)
+	local roles = MoveRoles.on() -- (8.8: without roles nobody waits at the back: no hold at all, no MoveQuick)
+	local load = newPrompt(door, "Load", label, Enum.KeyCode.E, if roles then 0.25 else 0, T.Reach.Truck)
 	-- (the owner's report: on the door's own attachment Unload stacked with Load and the back's E: its own spot, 2.5
 	-- studs aside from the door's middle, toward the bed's edge; destroyed with the prompts at the end)
 	local side = Instance.new("Attachment")
 	side.Name = "MoveTakeOut"
 	side.Position = door.Position + Vector3.new(2.5, 0, 0)
 	side.Parent = door.Parent
-	local unload = newPrompt(side, "Take out", label, Enum.KeyCode.Z, 0.4, T.Reach.Truck)
+	local unload = newPrompt(side, "Take out", label, Enum.KeyCode.Z, if roles then 0.4 else 0, T.Reach.Truck)
 	unload.GamepadKeyCode = Enum.KeyCode.ButtonY
 	load.Enabled, unload.Enabled = false, false
 	tag(load, s.owner)
@@ -1835,17 +1843,21 @@ local function truckPrompts(s: Session)
 		middle.Name = "MoveLoadBay"
 		middle.Position = Vector3.new(cx, bedFloor(truck) + 3, cz)
 		middle.Parent = door.Parent
-		local inside = newPrompt(middle, "Load", label, Enum.KeyCode.E, 0.25, math.max(bed.Length, bed.Width) / 2 + 3)
+		local inside = newPrompt(middle, "Load", label, Enum.KeyCode.E, if roles then 0.25 else 0, math.max(bed.Length, bed.Width) / 2 + 3)
 		inside.Enabled = false
 		tag(inside, s.owner)
 		inside.Triggered:Connect(function(player: Player)
 			onLoad(s, player)
 		end)
-		inside:SetAttribute("MoveQuick", "driver")
+		if roles then
+			inside:SetAttribute("MoveQuick", "driver")
+		end
 		s.loadIn = inside
 	end
-	for _, prompt in { load, unload } do
-		prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver; a new van's too)
+	if roles then
+		for _, prompt in { load, unload } do
+			prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver; a new van's too)
+		end
 	end
 end
 
@@ -3089,9 +3101,9 @@ local function driverAtWheel(s: Session): boolean
 	return false
 end
 
--- The Driver's "Call truck to door" (once a move): the empty van to the curb of the site's door nearest the caller
--- (7.x farm move: a farm's farmhouse door or barn doors, its back to the door; a house's kerb along the road), with a
--- fade for the caller.
+-- The Driver's "Call truck to door" (once a move; 8.8 without roles anybody's: whoever is first): the empty van to the
+-- curb of the site's door nearest the caller (7.x farm move: a farm's farmhouse door or barn doors, its back to the door;
+-- a house's kerb along the road), with a fade for the caller.
 local function callTruck(s: Session, player: Player)
 	local ok, why = MoveRoles.canCall(roleOf(s, player), s.team.called)
 	if not ok then
@@ -3238,15 +3250,18 @@ local function switchRole(s: Session, player: Player, role: any)
 	end
 end
 
--- The Moving remote's role requests on a move: ("role", id) a switch, ("call") the truck, ("barricade").
+-- The Moving remote's role requests on a move: ("role", id) a switch, ("call") the truck, ("barricade"). (8.8 without
+-- roles: only the call; a switch or a barricade asked does nothing.)
 local function teamRequest(s: Session, player: Player, action: string, arg: any)
 	if s.ended or sessionOf(player) ~= s then
 		return
 	end
-	if action == "role" then
-		switchRole(s, player, arg)
-	elseif action == "call" then
+	if action == "call" then
 		callTruck(s, player)
+	elseif not MoveRoles.on() then
+		return
+	elseif action == "role" then
+		switchRole(s, player, arg)
 	elseif action == "barricade" then
 		putBarricade(s, player)
 	end
@@ -3315,8 +3330,12 @@ local function teamTick(s: Session)
 	end
 end
 
--- Everybody on the move has a role: the lobby's at the start, a newcomer the first free one; a leaver's goes.
+-- Everybody on the move has a role: the lobby's at the start, a newcomer the first free one; a leaver's goes. (8.8
+-- without roles: nobody has one, nothing to do.)
 local function teamSync(s: Session)
+	if not MoveRoles.on() then
+		return
+	end
 	local team = s.team
 	local ids = memberIds(s)
 	local changed = false
@@ -3353,14 +3372,18 @@ end
 
 -- The move starts: the lobby's roles (by user id; nil: the admin's start, everybody gets a free one), the house's
 -- "Enter house" (never locked), the Driver's no-wait truck prompts. (No fuse box: the interior is lit as it was built.)
+-- 8.8 without roles: only the Enter prompts (the truck's prompts wait for nobody: truckPrompts).
 local function teamSetup(s: Session, roles: { [number]: string }?)
+	enterPrompt(s)
+	if not MoveRoles.on() then
+		return
+	end
 	for _, id in memberIds(s) do
 		local role = if roles then roles[id] else nil
 		if MoveRoles.get(role) then
 			s.team.of[id] = role :: string
 		end
 	end
-	enterPrompt(s)
 	for _, prompt in { s.load, s.unload, s.loadIn } do
 		if prompt then
 			prompt:SetAttribute("MoveQuick", "driver") -- (client/MovingHud.luau: no hold for a Driver)
@@ -3383,6 +3406,9 @@ local function teamCleanup(s: Session)
 		prompt:Destroy()
 	end
 	table.clear(team.doors)
+	if not MoveRoles.on() then
+		return -- (8.8: nobody had a role)
+	end
 	for id in team.of do
 		local player = playerById(id)
 		if player then
@@ -3394,9 +3420,12 @@ local function teamCleanup(s: Session)
 	end
 end
 
--- What one player sees of the roles (client/MovingHud.luau).
+-- What one player sees of the roles (client/MovingHud.luau). 8.8 without roles: only whether the van was called.
 local function teamView(s: Session, player: Player): { [string]: any }
 	local team = s.team
+	if not MoveRoles.on() then
+		return { called = team.called }
+	end
 	local id = player.UserId
 	local ids = memberIds(s)
 	local crew = {}
@@ -3421,11 +3450,11 @@ local function teamView(s: Session, player: Player): { [string]: any }
 	}
 end
 
--- The hooks for the roles (wireHooks): the Guard's hits, the Driver's truck.
+-- The hooks for the roles (wireHooks): the Guard's hits, the Driver's truck. (8.8 without roles: every hit as it was.)
 local function teamHooks()
 	local damage = Zombies.damage
 	Zombies.damage = function(z: any, amount: number, by: Player?, info: any): boolean
-		if by and amount < math.huge then
+		if by and amount < math.huge and MoveRoles.on() then
 			local s = sessionOf(by)
 			local zroot = if type(z) == "table" then z.root else nil
 			local at: Vector3? = if typeof(zroot) == "Instance" and zroot:IsA("BasePart") then zroot.Position else nil
@@ -3439,7 +3468,7 @@ local function teamHooks()
 	end
 	local hurtCar = Vehicles.damage
 	Vehicles.damage = function(car: Vehicles.Car, amount: number, reason: string?, cause: string?): number
-		if amount > 0 and amount < math.huge then
+		if amount > 0 and amount < math.huge and MoveRoles.on() then
 			local s = sessions[car.owner]
 			if s and not s.ended and s.truck == car then
 				amount *= MoveRoles.truckFactor(driverAtWheel(s)) -- (its load: onCarDamaged gets what it took)

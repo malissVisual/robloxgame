@@ -14,6 +14,8 @@
 -- waits and opens when that one closes; the clock counts down and runs out (the card goes, nothing sent); the server's
 -- closed message closes it; junk ignored; 8.3 review: smaller phones (667 × 375, 740 × 360, 780 × 360: the card smaller,
 -- its buttons still a finger's size, clear of the chips and the touch controls); a resize while open; no warnings.
+-- 8.7 review: the card takes an answer only Config.PlayerTrade.CardArm s after it showed its offer (arm() below lets
+-- that time pass before each answer here; tools/phone-ui/trade.luau checks the double click and the double ESC).
 -- `luau offercard.luau -a dump` prints the preview's scenes as JSON instead (offercard_preview.py).
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
@@ -63,6 +65,11 @@ end
 local UIS = M.services.UserInputService
 local function key(code, processed)
 	UIS.InputBegan:Fire({ KeyCode = M.Enum.KeyCode[code], UserInputType = M.Enum.UserInputType.Keyboard, Position = M.Vector3.new(0, 0, 0) }, processed == true)
+end
+-- 8.7 review: the card's CardArm s pass (it takes answers from then on)
+local function arm()
+	M.now += Config.PlayerTrade.CardArm
+	M.resume()
 end
 local box, overlap = M.box, TouchLayout.overlap
 local function show(b)
@@ -120,7 +127,7 @@ local TopBlocks = require("./TopBlocks")
 local movingGui = M.make("ScreenGui", { Name = "MovingHud", DisplayOrder = 6 }, M.gui)
 local panel = M.make("Frame", { Name = "MovePanel", BackgroundColor3 = M.MTheme.Contract.charcoal, BackgroundTransparency = 0.12 }, movingGui)
 M.make("UICorner", { CornerRadius = M.UDim.new(0, 8) }, panel)
-M.make("TextLabel", { Name = "Title", Text = "THE OLD CHALET · 14:52", TextSize = 14, Font = M.Enum.Font.GothamBold, TextColor3 = M.MTheme.Contract.text,
+M.make("TextLabel", { Name = "Title", Text = "THE OLD FARMSTEAD · 14:52", TextSize = 14, Font = M.Enum.Font.GothamBold, TextColor3 = M.MTheme.Contract.text,
 	BackgroundTransparency = 1, Position = M.UDim2.fromOffset(12, 8), Size = M.UDim2.new(1, -24, 0, 20), TextXAlignment = M.Enum.TextXAlignment.Left }, panel)
 M.make("TextLabel", { Name = "Count", Text = "📦 2 / 6 out · van 18%", TextSize = 12, Font = M.Enum.Font.GothamMedium, TextColor3 = M.MTheme.Contract.secondary,
 	BackgroundTransparency = 1, Position = M.UDim2.fromOffset(12, 32), Size = M.UDim2.new(1, -24, 0, 18), TextXAlignment = M.Enum.TextXAlignment.Left }, panel)
@@ -348,6 +355,7 @@ check("ACCEPT: { kind = \"accept\", id } once (the second tap nothing), only the
 check("… the hints no longer held back by it", HintsUi.window() == nil and not HintsUi.isCovered(), HintsUi.window())
 -- DECLINE
 offer("o2")
+arm()
 press(named(card, "Decline"))
 sent = sentOn("Visitors")
 check("DECLINE: { kind = \"decline\", id }, the card closes", sent[#sent][1].kind == "decline" and sent[#sent][1].id == "o2" and not OfferCard.isOpen())
@@ -357,12 +365,14 @@ check("a hot kind: \"🔥 Market price $980 · +28%\"", named(card, "Market").Te
 cardChecks("844 x 390, a hot jukebox")
 scene("offer-phone-hot")
 -- the gamepad
+arm()
 OfferCard.close()
 sent = sentOn("Visitors")
 check("closing it (ESC, the Roblox menu: client/Main.client.luau while Hud.escaping) is a DECLINE", sent[#sent][1].kind == "decline" and sent[#sent][1].id == "o3" and not OfferCard.isOpen())
 offer("o4")
 check("the gamepad: the selection on DECLINE (an A by habit never sells), kept inside the card", M.focus == named(card, "Decline") and card.SelectionGroup == true
 	and card.SelectionBehaviorUp.Name == "Stop" and card.SelectionBehaviorDown.Name == "Stop" and card.SelectionBehaviorLeft.Name == "Stop" and card.SelectionBehaviorRight.Name == "Stop")
+arm()
 key("ButtonB")
 sent = sentOn("Visitors")
 check("… B declines", sent[#sent][1].kind == "decline" and sent[#sent][1].id == "o4" and not OfferCard.isOpen() and M.focus == nil)
@@ -389,6 +399,7 @@ M.now += 5
 covered = false
 M.resume()
 check("… that window closed: the card opens with the time left (\"⏳ 25 s\")", OfferCard.isOpen() and named(card, "Time").Text == "⏳ 25 s" and opened == opens + 1, named(card, "Time").Text)
+arm()
 OfferCard.close()
 -- 8.3 review: another window opening over it (STOCK, the BOOK to compare prices: Main's Hud.onCloseWindows, no escape)
 -- only hides it
@@ -405,6 +416,7 @@ covered = false
 M.resume()
 check("… that window closed: the same offer again, with the time left (\"⏳ 26 s\")", OfferCard.isOpen() and named(card, "Time").Text == "⏳ 26 s"
 	and #sentOn("Visitors") == before and M.focus == named(card, "Decline"), named(card, "Time").Text)
+arm()
 press(named(card, "Accept"))
 sent = sentOn("Visitors")
 check("… and ACCEPT still answers it", #sent == before + 1 and sent[#sent][1].kind == "accept" and sent[#sent][1].id == "o11")
@@ -439,6 +451,7 @@ screen(true, 844, 354, true)
 offer("o8")
 cardChecks("844 x 390, a move's panel at the top")
 check("844 x 390: the card at its full touch size (scale 1: nothing to shrink for)", OfferCard.card():FindFirstChild("Scale").Scale == 1)
+arm()
 OfferCard.close()
 
 -- 8.3 review: smaller phones (667 × 375: 667 × 339 under Roblox's top bar, where the card lay on the 📋 TASKS chip;
@@ -456,6 +469,7 @@ for _, size in { { 667, 339 }, { 740, 324 }, { 780, 324 } } do
 			check(`{label}: … smaller there (the room under the TASKS chip)`, scale < 1, scale)
 			scene("offer-phone-small")
 		end
+		arm()
 		OfferCard.close()
 	end
 end
@@ -468,6 +482,7 @@ for _, size in { { 1280, 764, "computer" }, { 1920, 1044, "big" } } do
 	offer(`c{size[1]}`)
 	cardChecks(label)
 	scene(`offer-{size[3]}`)
+	arm()
 	OfferCard.close()
 end
 
@@ -475,6 +490,7 @@ end
 offer("o9")
 screen(true, 844, 354)
 cardChecks("a resize to a phone while open: placed again for it")
+arm()
 OfferCard.close()
 
 check("no warnings", #M.warnings == 0, M.warnings[1])

@@ -29,8 +29,9 @@
 --                                              buyer's money), then the seller's stands counted at the old rates, the
 --                                              piece out of the seller's collection and into the buyer's stock (a new uid
 --                                              of the buyer's, not on show, no sign; got now), the price from the buyer
---                                              ("PlayerBuy"), to the seller ("PlayerSale") less the fee ("TradeFee"); both
---                                              changed, both saved soon → the buyer's new entry (a copy), nil and why
+--                                              ("PlayerBuy"), to the seller ("PlayerSale") less the fee ("TradeFee"); the
+--                                              onTransferred listeners, both changed; 8.7 review: both saved at once, the
+--                                              buyer's first (below) → the buyer's new entry (a copy), nil and why
 --                                              (a Refusal: { code, text }: "save", "self", "house", "gone", "full",
 --                                              "money", "left")
 --   Collection.incomePerMinute(player)         what your pieces on show earn a minute now (8.1: with your lights)
@@ -51,6 +52,11 @@
 --                                              save has loaded)
 --   Collection.onAdded(fn)                     8.2: fn(player, entry) after a piece came home (Collection.add took it;
 --                                              entry a copy): the collection book (server/CollectionBook.luau)
+--   Collection.onTransferred(fn)               8.7 review: fn(buyer, seller, entry) after a deal between players
+--                                              (Collection.transfer; entry the buyer's new piece, a copy: its new uid),
+--                                              before the collections' change (onChanged) and the saves: the book marks
+--                                              it bought (server/CollectionBook.luau), the daily tasks and the analytics
+--                                              take its uid as seen (server/SandboxTasks.luau, SandboxAnalytics.luau)
 --   Collection.onPaid(fn)                      8.2: fn(player, "income" | "sale", money, paid) after the stands paid or a
 --                                              piece sold (server/SandboxTasks.luau); 8.3: paid = { hot }: the dollars of
 --                                              that income the hot kinds earned, the hot pieces of that sale
@@ -87,7 +93,13 @@
 -- 8.7 trading (server/PlayerTrade.luau): a piece on show may carry a FOR SALE sign (entry.sale, its price; in the state's
 -- View too); taking it down (one, or TAKE ALL DOWN), a stand lost to a level down and selling it end the sign, a move to
 -- another stand keeps it. A deal between players (Collection.transfer) is no "sale" for onPaid (the daily sell tasks, the
--- sale badges): a piece passed back and forth between friends must earn nobody a task.
+-- sale badges) and no piece come home for onAdded: a piece passed back and forth between friends must earn nobody a
+-- task. 8.7 review: its new uid is none either (onTransferred: the "home" / "rare" tasks and CollectibleFound skip it,
+-- the book marks it bought, never found). The deal's two saves are written at once, the buyer's first and the seller's
+-- once it landed (no saveSoon: its Gap and the request budget's Reserve put up to a minute between the two, and a crash
+-- there duped the piece or made money): a crash between them leaves the piece in both saves, paid for by the buyer,
+-- never the price with nobody's piece. (A follow-up could close that last step: a pending deal in the buyer's save,
+-- settled on the seller's next load.)
 -- 8.3 economy, AFK (the owner: the money should take long to save up, not come by itself): the stands pay in full while
 -- their owner plays; after Config.Collection.IdleAfter s without activity only IdleShare of it (0: nothing), counted
 -- exactly (the idle stretch of a payout at the share, the rest in full). Activity is what the server sees, one clock a
@@ -158,6 +170,7 @@ local notice = Net.get("Notice")
 
 local listeners: { (Player) -> () } = {}
 local addedListeners: { (Player, Entry) -> () } = {} -- 8.2: Collection.onAdded's
+local transferredTo: { (Player, Player, Entry) -> () } = {} -- 8.7 review: Collection.onTransferred's
 export type Paid = { hot: number } -- 8.3: Collection.onPaid's last argument
 local paidTo: { (Player, string, number, Paid) -> () } = {} -- 8.2: Collection.onPaid's fns
 
@@ -650,10 +663,20 @@ function Collection.transfer(seller: Player, buyer: Player, uid: string, stand: 
 	if fee > 0 then
 		PlayerData.spend(seller, fee, "TradeFee", entry.item)
 	end
-	PlayerData.saveSoon(seller)
-	PlayerData.saveSoon(buyer)
+	for _, fn in transferredTo do -- (8.7 review: before onChanged's look at the stock and before the saves)
+		task.spawn(fn, buyer, seller, table.clone(piece))
+	end
 	changed(seller)
 	changed(buyer)
+	-- 8.7 review: both saved now, not soon (PlayerData.save: no Gap, no budget Reserve; the session's lock and the saves'
+	-- seq as ever), the buyer first: a crash between the two leaves a piece the buyer paid for in both saves, never the
+	-- price with nobody's piece. The seller's waits for the buyer's to land; not written (a failed write, the buyer
+	-- leaving: their leave save carries it), the seller's own saves carry theirs (the fee's Soon, the autosave).
+	task.spawn(function()
+		if PlayerData.save(buyer) then
+			PlayerData.save(seller)
+		end
+	end)
 	return table.clone(piece), nil
 end
 
@@ -736,6 +759,10 @@ end
 
 function Collection.onAdded(fn: (Player, Entry) -> ())
 	table.insert(addedListeners, fn)
+end
+
+function Collection.onTransferred(fn: (Player, Player, Entry) -> ())
+	table.insert(transferredTo, fn)
 end
 
 function Collection.onPaid(fn: (Player, string, number, Paid) -> ())
