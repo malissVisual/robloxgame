@@ -48,6 +48,10 @@ auction is off.
 8.7 trading between players: the offer composer, the FOR SALE price picker and the buy question (the real TradeUi), the
 offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (WarehouseUi): trade.luau at 844 x 390,
 667 x 375, 1280 x 800 and 1920 x 1080: on the screen, nothing on each other, the words fitting, a finger's size, the requests.
+8.9 the first-time hints for 8.5 - 8.7 (the clipboard out, another player's warehouse with pieces on show, three pieces on
+show and no FOR SALE sign, a player's offer: the real SandboxHintsUi beside SandboxHud, DannyOrders, OfferCard, TradeUi):
+sandboxhints.luau: when each comes, once, held back while a window covers the screen, the device's words, their toasts
+at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide's sell step in sandboxguide.luau.
 """
 import argparse
 from pathlib import Path
@@ -353,6 +357,17 @@ from tradeenv import trade_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     trade_env(Path(folder))
     subprocess.run([args.luau, "trade.luau"], cwd=folder, check=True)
+# 8.9: the first-time hints for the 8.5 – 8.7 features (client/SandboxHintsUi.luau, shared/SandboxHints.luau: the
+# clipboard out, another player's warehouse with pieces on show, three pieces on show and no FOR SALE sign, a player's
+# offer) beside the real SandboxHud, SandboxTasksUi, DannyOrders, MoveHelperHud, MoveHelperCard, OfferCard and TradeUi:
+# tools/phone-ui/sandboxhints.luau (sandboxhintsenv.py builds the folder): when each comes, once, held back while a window
+# covers the screen, the device's words, and their toasts in Hud's column at 844 x 390, 667 x 375, 1280 x 800 and
+# 1920 x 1080: on the screen, clear of the touch controls, the chips, the move's panel, Danny's line, orders mode's line.
+from sandboxhintsenv import sandboxhints_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    sandboxhints_env(Path(folder))
+    subprocess.run([args.luau, "sandboxhints.luau"], cwd=folder, check=True)
 # 8.3 keys: the key hints (client/KeyHints.luau with shared/SandboxPad.luau's actions and client/PadGlyph.luau) in
 # sandboxenv.py's folder (keyhintsenv.py: the real KeyHints, its HudContract, Holster and Drive stand-ins):
 # tools/phone-ui/keyhints.luau on a computer (1280 x 800) with its keys and with a gamepad (the platform's glyphs, at

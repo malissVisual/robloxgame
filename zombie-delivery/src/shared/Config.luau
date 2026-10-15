@@ -7209,6 +7209,9 @@ Config.Collection = {
 --   8.4, Danny for hire's steps (hire him, give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step):
 --   HeavyNear     studs: a two-person piece of your move this near you (its Lift shown) says "press Lift and wait for
 --                 Danny" (looked for at most once a second, only while that step may still show)
+--   8.9, trading between players' step ("🏷 Sell to players: set a price on a piece on show", the last soft step):
+--   SellShown     your pieces on show from which it may show (none with a FOR SALE sign yet: one set, it is done)
+--   SellPlayers   the players on the server (you too) from which it may show (alone, nobody would buy)
 Config.SandboxGuide = {
 	Every = 0.2,
 	Fade = 0.5,
@@ -7233,6 +7236,8 @@ Config.SandboxGuide = {
 	SoftGap = 15,
 	PaintMoney = 2000,
 	HeavyNear = 12, -- 8.4
+	SellShown = 4, -- 8.9: the sell step
+	SellPlayers = 2,
 }
 
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md, "warehouse"): the ZDC warehouse on every plot (SandboxMap.Plots' warehouse:
@@ -7322,7 +7327,10 @@ Config.Warehouse = {
 --   Hints                    8.3, the first-time hints (shared/SandboxHints.luau, client/SandboxHintsUi.luau): a hint shows
 --                            Delay s after what made it matter, at least Gap s after the hint before (one at a time), and
 --                            waits while something covers the screen, looked at every Every s; the ⭐ FILL BEST hint
---                            once FillStock pieces that would earn wait in the stock beside a free stand
+--                            once FillStock pieces that would earn wait in the stock beside a free stand. 8.9: the
+--                            clipboard's and a visit's hints looked for every Look s (your clipboard out, where you
+--                            stand: only until both are said); the FOR SALE sign's hint once PriceShown pieces of yours
+--                            are on show
 --   Toast / MaxToasts        the block's own toasts (only when client/Hud.luau's toasts are not there): seconds, how many
 --   Picker                   the picker's card (Width × Height at most, Margin from the screen's edges), its tiles
 --                            (Tile: the narrowest on a computer, TileTouch on a touch screen; Picture: the picture's
@@ -7343,7 +7351,7 @@ Config.SandboxHud = {
 	TouchScale = 0.8,
 	StockKey = "B",
 	StockPad = "DPadLeft", -- 8.3: the gamepad's way to the STOCK list
-	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5 }, -- 8.3: the first-time hints
+	Hints = { Delay = 1.5, Gap = 6, Every = 0.5, FillStock = 5, Look = 1, PriceShown = 3 }, -- 8.3: the first-time hints (8.9: Look, PriceShown)
 	Toast = 3,
 	MaxToasts = 3,
 	Picker = {
