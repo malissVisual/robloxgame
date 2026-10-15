@@ -41,6 +41,9 @@
 --      engine on her van and on one CAR brings later; Danny's training; 8.3: her warehouse level kept, then the
 --      Logistics Center (level 5) with every piece still on its stand.
 --  14. Bob cannot use Ann's stands or desk; her kiosk opens only his own move.
+--  14b. 8.7 trading between players: at Ann's stand Bob has Make an offer (tagged for client/TradePrompts.luau: hidden
+--      from her), its composer, his offer on her card, her ACCEPT: the money and the piece moved (the fee gone), the
+--      stand free; Ann's Set price (her FOR SALE sign on the tag for everybody), Bob's Buy $X, its question, BUY.
 --  15. A full server: the fifth player waits for a plot, gets Bob's when he leaves.
 --  16. A full warehouse at a trip.
 --  17. Leaving mid-move with a piece in the van; coming back. Last: the all-time best in its OrderedDataStore.
@@ -1654,6 +1657,88 @@ do
 	E.fire(bob, "Moving", "giveup")
 	E.advance(2)
 	check("…GIVE UP with nothing home: MoveGaveUp (how far: started)", #H.events("MoveGaveUp", bob) == 1)
+end
+
+-- ── 14b. 8.7: trading between players ────────────────────────────────────
+
+do
+	local Rules = require("./PlayerTradeRules")
+	local T = Config.PlayerTrade
+	local shown = {}
+	for _, entry in Collection.stock(ann2) do
+		if entry.stand then
+			table.insert(shown, entry)
+		end
+	end
+	table.sort(shown, function(a: any, b: any): boolean
+		return a.stand < b.stand
+	end)
+	local first = shown[1]
+	H.profileOf(bob).money = 100000
+	H.toStand(bob, plots[1], first.stand)
+	local offerPrompt = H.standPrompt(1, first.stand, "MakeOffer")
+	local pricePrompt = H.standPrompt(1, first.stand, "SetPrice")
+	check("14b. Ann's piece on show: Make an offer for everybody else (tagged with her UserId: hidden from her), her own Set price (CargoOwner)",
+		offerPrompt ~= nil and offerPrompt.Enabled == true and offerPrompt:GetAttribute(T.SellerAttribute) == 11 and offerPrompt:GetAttribute("CargoOwner") == nil
+		and pricePrompt ~= nil and pricePrompt:GetAttribute("CargoOwner") == 11 and H.standPrompt(1, first.stand, "Buy").Enabled == false)
+	local at = #E.sent
+	local ok, why = E.trigger(offerPrompt, bob)
+	E.advance(0.3)
+	local compose = Rules.readPiece(E.lastKind(bob, "PlayerTrade", "compose", at))
+	check("…Bob's Make an offer: the composer (the piece, its value, the bounds)", ok and compose ~= nil and compose.uid == first.uid and compose.seller == 11
+		and compose.value == Rules.value(first), why)
+	local price = Rules.presets((compose :: any).value)[3].price
+	at = #E.sent
+	local moneyAt = #money
+	local annMoney, bobMoney = H.profileOf(ann2).money, H.profileOf(bob).money
+	E.fire(bob, "PlayerTrade", { kind = "offer", seller = 11, uid = first.uid, stand = first.stand, price = price })
+	E.advance(0.3)
+	local card = E.lastKind(ann2, "PlayerTrade", "offer", at)
+	check("…SEND: Ann's offer card (a player's) and her toast", card ~= nil and card.player == true and card.price == price and E.heard(ann2, "offers", at))
+	E.fire(ann2, "PlayerTrade", { kind = "answer", id = card and card.id, accept = true })
+	E.advance(0.5)
+	local fee = Rules.fee(price)
+	local bobHas = nil
+	for _, entry in Collection.stock(bob) do
+		if entry.item == first.item and entry.got >= first.got and entry.stand == nil then
+			bobHas = entry
+		end
+	end
+	check("…ACCEPT: the piece Bob's (in his stock), the money moved, the 8 % fee gone", H.byUid(Collection.stock(ann2), first.uid) == nil and bobHas ~= nil
+		and H.paid(bob, "PlayerBuy", moneyAt) == -price and H.paid(ann2, "PlayerSale", moneyAt) == price and H.paid(ann2, "TradeFee", moneyAt) == -fee
+		and H.profileOf(bob).money == bobMoney - price and H.profileOf(ann2).money - annMoney - H.paid(ann2, "CollectionIncome", moneyAt) == price - fee)
+	H.rebuilt()
+	check("…her stand free (no piece, no prompts for it)", Warehouse.shown(1, first.stand) == nil and offerPrompt.Enabled == false)
+	-- the FOR SALE sign: Ann's Set price, the tag, Bob's Buy $X, its question, BUY
+	local second = shown[2]
+	if second then
+		H.toStand(ann2, plots[1], second.stand)
+		at = #E.sent
+		E.trigger(H.standPrompt(1, second.stand, "SetPrice"), ann2)
+		E.advance(0.3)
+		local picker = Rules.readPiece(E.lastKind(ann2, "PlayerTrade", "pricing", at))
+		local sign = Rules.clamp(Rules.value(second) * 2, Rules.value(second))
+		E.fire(ann2, "PlayerTrade", { kind = "price", uid = second.uid, price = sign })
+		H.rebuilt()
+		local tag = Warehouse.model(1):FindFirstChild(`Stand{second.stand}`):FindFirstChild("Tag")
+		local line = tag and tag:FindFirstChild("Back") and tag:FindFirstChild("Back"):FindFirstChild("Line3")
+		local buy = H.standPrompt(1, second.stand, "Buy")
+		check("…Ann's Set price: her picker; SET: the sign on her tag for everybody, Bob's Buy $X", picker ~= nil and picker.uid == second.uid
+			and line ~= nil and line.Visible == true and line.Text == `🏷 FOR SALE {WarehouseLayout.money(sign)}` and buy.Enabled == true
+			and buy.ActionText == `Buy {WarehouseLayout.money(sign)}`)
+		H.toStand(bob, plots[1], second.stand)
+		E.advance(0.5)
+		at = #E.sent
+		moneyAt = #money
+		E.trigger(buy, bob)
+		E.advance(0.3)
+		local question = Rules.readPiece(E.lastKind(bob, "PlayerTrade", "confirm", at))
+		E.fire(bob, "PlayerTrade", { kind = "buy", seller = 11, uid = second.uid, stand = second.stand, price = question and question.price })
+		E.advance(0.5)
+		check("…Bob's Buy $X: the question, BUY: the piece his, the sign's price paid", question ~= nil and question.price == sign
+			and H.byUid(Collection.stock(ann2), second.uid) == nil and H.paid(bob, "PlayerBuy", moneyAt) == -sign and H.paid(ann2, "TradeFee", moneyAt) == -Rules.fee(sign))
+		H.rebuilt()
+	end
 end
 
 -- ── 15. A full server: the fifth player waits for a plot ──────────────────

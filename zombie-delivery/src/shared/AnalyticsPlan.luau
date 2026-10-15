@@ -220,6 +220,7 @@ AnalyticsPlan.Events = {
 	"GripCheck", -- a grip check's outcome, one in GripEvery a player (value: GripEvery; fields: outcome, lift / wobble, fragile)
 	"CollectibleFound", -- a collectible came home into the stock (value: its worth, $; fields: the rarity, its id)
 	"VisitorOffer", -- 8.3: a showroom visitor's offer (server/VisitorOffers.luau; value: its $; fields: "made", "sold", "declined", "expired", "gone" or "left", the piece's rarity)
+	"PlayerTrade", -- 8.7: a trade between players (server/PlayerTrade.luau; value: its $; fields: "made", "sold", "declined", "expired", "gone", "left", "failed" (the deal refused at ACCEPT) or "bought" (its buyer bought the piece by its sign) for an offer, "sign" for a FOR SALE sign bought; the piece's rarity)
 }
 
 -- A name Roblox takes and a dashboard shows well: a capital letter, then letters and digits, 32 at most.
@@ -289,6 +290,7 @@ AnalyticsPlan.Sources = {
 	CollectionIncome = "Gameplay", -- 8.0: the warehouse's display stands earn every minute you play (server/Collection.luau)
 	CollectionSale = "Sale", -- 8.0: a piece of your collection sold (server/Collection.luau; the item SKU its furniture id)
 	VisitorOffer = "Sale", -- 8.3: a showroom visitor's offer accepted: the piece sold at it (server/VisitorOffers.luau → Collection.sellAt; the SKU its furniture id)
+	PlayerSale = "Sale", -- 8.7: a piece sold to another player: the whole price (server/PlayerTrade.luau → Collection.transfer; the SKU its furniture id; the fee goes out as TradeFee)
 	BookMilestone = "Gameplay", -- 8.2: a collection book milestone, paid once (server/CollectionBook.luau; the SKU its id)
 	AuctionSale = "Sale", -- 8.8: your piece sold at the Auction House, the whole price (shared/AuctionRules.luau payments; the fee goes out as AuctionFee; the SKU its furniture id)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
@@ -325,6 +327,8 @@ AnalyticsPlan.Sinks = {
 	Reroll = "ContextualPurchase",
 	Rental = "ContextualPurchase",
 	HelperHire = "ContextualPurchase", -- 8.3: Danny hired for a move (server/MoveHelper.luau; the SKU the move's contract id)
+	PlayerBuy = "Shop", -- 8.7: a piece bought from another player (server/PlayerTrade.luau → Collection.transfer; the SKU its furniture id)
+	TradeFee = "ContextualPurchase", -- 8.7: the ZDC fee on a sale between players, from the seller's side (Config.PlayerTrade.Fee: it disappears, a money sink)
 }
 
 -- The frequent small ones: summed a player and sent every Config.Analytics.BatchSeconds (and when they leave).
