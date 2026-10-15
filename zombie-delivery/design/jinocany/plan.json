@@ -73,6 +73,18 @@
   "z": 470,
   "r": 34
  },
+ "paintBays": [
+  {
+   "x": -950,
+   "z": -525,
+   "yaw": 0
+  },
+  {
+   "x": -890,
+   "z": -525,
+   "yaw": 0
+  }
+ ],
  "bigHouse": {
   "id": "sandbox_house",
   "lot": {
@@ -423,6 +435,21 @@
    },
    "step": 3,
    "kind": "station"
+  }
+ ],
+ "fixedBuildings": [
+  {
+   "id": "auction",
+   "label": "aukční dům",
+   "name": "Auction House",
+   "rect": {
+    "x0": 134,
+    "x1": 182,
+    "z0": -22,
+    "z1": 10
+   },
+   "step": 1,
+   "kind": "auction"
   }
  ],
  "fields": [

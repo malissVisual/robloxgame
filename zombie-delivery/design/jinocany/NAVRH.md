@@ -1,6 +1,7 @@
 # Jinočany místo Alp (návrh)
 
-Toto je jen plán, ve hře se zatím nic nemění. Týká se **sandboxu**, tedy hry, kterou teď testujete
+**Stav: schváleno 15. 10. 2026** (rozhodnutí jsou níže v části „Rozhodnuto“). Ve hře se zatím nic nemění; postaví to
+hlavní session. Týká se **sandboxu**, tedy hry, kterou teď testujete
 (`Config.Sandbox.On = true`). Alpský vzhled sandboxu se vymění za vesnici podle skutečných Jinočan. Pozemky, sklady,
 dodávky, stěhování, sbírka a vylepšení fungují dál stejně.
 
@@ -15,7 +16,8 @@ pro agenty.
 - **Velikost:** mapa **1 600 × 1 440 studů** (dnes 680 × 920), tedy asi 3,7× větší plocha. Skutečné Jinočany by ve
   velikosti postav měřily asi 6 000 studů, proto jsou vzdálenosti zhruba čtyřikrát kratší a domy mají velikost jako dnes.
 - **Na místě zůstane:** 4 pozemky se sklady ZDC, Depot Row, Main Street (nově **Pražská**), obratiště a velký dům na
-  jejím konci (nově **Statek**, anglicky „The Old Farmstead“). Hráči začínají u svých skladů jako dnes.
+  jejím konci (nově **Statek**, anglicky „The Old Farmstead“) a aukční dům u Depot Row (8.8). Hráči začínají u svých
+  skladů jako dnes.
 - **Nové:** ulice Hlavní přes celou vesnici, **náves s kaplí a křížem**, staré jádro, řadovky, ovocný sad, rybník,
   drogerie, pole a D5 jako okraj mapy. Celkem **103 domů**, z toho **6 ke stěhování** v kroku 1 (Statek + 5 nových).
 - **Zmizí:** smrky, prstenec zasněžených hor, kravské zvony, vzhled chaty a cedule THE OLD CHALET.
@@ -42,7 +44,7 @@ pro agenty.
 | Hornická | konec mapy na západě (ROAD CLOSED) | 1 |
 | Škola | velké stěhování pro dva a více hráčů | 2 |
 | Fotbalové hřiště | místo pro akce a denní úkoly | 2 |
-| Stavebniny Ptáček | vymyšlené **Stavebniny Sýkorka** („Sýkorka Building Supplies“) | 2 |
+| Stavebniny Ptáček | vymyšlené **Stavebniny Sýkorka** („Sýkorka Building Supplies“) s **lakovnou dodávky** | 2 |
 | Severní, Žižkova | severní ulice ke stavebninám | 2 |
 | Nová zástavba (Čapkova, Tylova) | moderní domy a staveniště; lidé se sem **nastěhovávají** | 3 |
 | Železnice, zastávka Zbuzany | vlak projíždí (kulisa), zastávka | 3 |
@@ -64,8 +66,9 @@ pro agenty.
 1. **Malé Jinočany:** Hlavní, náves, staré jádro, řadovky, Mirešická, sad, rybník, drogerie, pole a D5. Stěhovat jde
    **6 domů**: Statek (velký dům jako dnes) a 5 rodinných domů (2 na Hlavní, Školní, Lidická, Smetanova). Kiosek
    u skladu nabídne zakázku na jeden z nich. Tohle je největší změna v kódu: dnes hra počítá s jediným domem.
-2. **Celá vesnice:** Severní a Žižkova, škola (velké stěhování pro 2+ hráče), hřiště, Stavebniny Sýkorka a dalších
-   asi 6 domů ke stěhování.
+2. **Celá vesnice:** Severní a Žižkova, škola (velké stěhování pro 2+ hráče), hřiště, dalších asi 6 domů ke stěhování
+   a **Stavebniny Sýkorka s lakovnou**: dodávku půjde lakovat jen tam (dnes se lakuje u skladu). Dodávka zajede na
+   jedno ze dvou lakovacích míst na parkovišti a otevře se stejné okno lakovny jako dnes.
 3. **Navíc:** nová zástavba, kde se lidé nastěhovávají (vozíte věci ze skladu do domu; to je nová mechanika a potřebuje
    vlastní návrh, protože bere věci ze sbírky), vlak a zastávka Zbuzany.
 
@@ -98,14 +101,13 @@ Domy proto musí být lehké (jedna krabice, střecha, dveře, okna, plot), vzd�
 - **Háčky v písmu** (viz výše).
 - **Model z Blenderu** obléká jen velký dům; ostatní domy se skládají z dílů.
 
-## Co prosím rozhodnout
+## Rozhodnuto (15. 10. 2026)
 
-1. **Statek:** přejmenovat velký dům na „The Old Farmstead“ (Statek)? Doporučuji ano.
-2. **Počet domů v kroku 1:** navrženo 6 (Statek + 5). Víc domů znamená víc práce, ale pestřejší zakázky.
-3. **Stavebniny Sýkorka (krok 2):** přesunout tam lakovnu dodávky, aby byl důvod tam jezdit, nebo jen kulisa?
-4. **Město a plán alpského údolí:** město (`Config.Sandbox.On = false`) je vypnuté a má alpské úpravy z kroku 1 i
-   plán `design/rework/MAPA-KROK2.md`. Doporučuji město teď nechat být a plán alpského údolí odložit.
-5. **Háčky v názvech ulic:** nechat (doporučeno), nebo psát bez nich?
+1. **Statek:** velký dům se přejmenuje na „The Old Farmstead“ (Statek).
+2. **Domy v kroku 1:** 6 (Statek + 5 rodinných domů).
+3. **Stavebniny Sýkorka:** s lakovnou dodávky (krok 2). Lakovat půjde jen tam, ne už u skladu.
+4. **Město a alpské údolí:** město zůstane, jak je (je vypnuté), plán `design/rework/MAPA-KROK2.md` je odložený.
+5. **Názvy ulic:** česky s háčky a čárkami.
 
 ## Jak se to postaví
 
@@ -134,6 +136,8 @@ Scope: the sandbox only. The city (`Config.Sandbox.On = false`: `Map.luau`, `ser
   the `Turnaround` (0, 470, r 34).
 - `SandboxMap.House` (id `sandbox_house`, its lot, box, door, curb, back): renamed **"The Old Farmstead"**; still the
   big house (`Config.Moving.Sandbox.Kind = "big"`) and the only one `server/HouseMesh.luau` dresses.
+- 8.8's Auction House (`Config.Auction.House.Spot` (158, -22), 48 × 32, facing Depot Row): `plan.fixedBuildings`
+  (not a plan landmark: `tests/auctionhouse_test.luau` keeps it clear of those), east of the Corner Drugstore (x 40 – 120).
 
 ## 2. Data (`shared/SandboxMap.luau`)
 
@@ -174,6 +178,17 @@ Scope: the sandbox only. The city (`Config.Sandbox.On = false`: `Map.luau`, `ser
 - The far horizon (outside `Bounds`): flat far fields, tree lines, pylons, a few far roofs; no peaks.
 - `SandboxScenery.Budget`: the map at most 2,500 parts in step 1 (measure with `tools/perf/sandbox_count.py`).
 - Lighting (`SandboxWorld.lighting`, Config): `Latitude` 47 → 50, the same warm afternoon.
+
+## 4b. Step 2: the PAINT shop at Sýkorka (the owner's choice)
+
+- Today `server/VanPaint.luau` enables a van's "🎨 Paint van" prompt (`PaintPrompt` on its `PaintPoint`) while the van
+  stands at its plot's `vanSpot` (`VanPaint.atHome`, `Config.VanPaint.Prompt.Home` / `Still`). In step 2 it is enabled
+  only while the van stands still in one of Sýkorka's two paint bays (`plan.paintBays`: the van's pivot, nose north to
+  the store, as a vanSpot) and no longer at the plot; the server checks the bay again when the prompt is pressed. The
+  window (`client/VanPaintUi.luau`), the catalogue, the prices and the save stay as they are.
+- The sandbox guide (`shared/SandboxSteps.luau` `vanHome` / `painted`, `client/SandboxGuide.luau`) sends you to Sýkorka
+  to paint; a map marker and a sign at the bays ("PAINT SHOP").
+- Until step 2 is built the paint stays at the plot (today's).
 
 ## 5. Sounds and texts
 

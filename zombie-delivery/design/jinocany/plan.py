@@ -70,6 +70,15 @@ LANDMARKS = [
     ("station", "zastávka Zbuzany", "Zbuzany stop", (150, 290, 672, 690), 3, "station"),
 ]
 
+# Buildings the game has already built that stay where they are (not part of the plan: kept out of `landmarks`, which
+# tests/auctionhouse_test.luau keeps the Auction House clear of). 8.8, the main session's Auction House
+# (Config.Auction.House: Spot (158, -22) looking north to Depot Row, 48 × 32).
+FIXED_BUILDINGS = [("auction", "aukční dům", "Auction House", (134, 182, -22, 10), 1, "auction")]
+
+# The owner's choice (step 2): the van's PAINT shop at Sýkorka. Its two bays in the car park: the van's pivot (as a
+# plot's vanSpot), nose north to the store; VanPaint's prompt works there instead of at the plot's van spot.
+PAINT_BAYS = [{"x": -950, "z": -525, "yaw": 0}, {"x": -890, "z": -525, "yaw": 0}]
+
 # Fields (the crops' colours on the ground): rect, kind.
 FIELDS = [
     ((-1180, 420, -680, -505), "wheat"),
@@ -131,10 +140,14 @@ def inside(a, box):
     return a["x0"] >= box["x0"] and a["x1"] <= box["x1"] and a["z0"] >= box["z0"] and a["z1"] <= box["z1"]
 
 
+FIXED_IDS = {f[0] for f in FIXED_BUILDINGS}
+
+
 def build():
     roads = [{"name": n, "rect": rect(x0, x1, z0, z1), "step": s, "fixed": f} for n, x0, x1, z0, z1, s, f in ROADS]
     landmarks = [{"id": i, "label": l, "name": n, "rect": rect(*r), "step": s, "kind": k} for i, l, n, r, s, k in LANDMARKS]
-    blocked = [r["rect"] for r in roads] + [l["rect"] for l in landmarks if l["kind"] not in ("motorway",)]
+    fixed = [{"id": i, "label": l, "name": n, "rect": rect(*r), "step": s, "kind": k} for i, l, n, r, s, k in FIXED_BUILDINGS]
+    blocked = [r["rect"] for r in roads] + [l["rect"] for l in landmarks + fixed if l["kind"] not in ("motorway",)]
     blocked += [p["rect"] for p in PLOTS] + [BIG_HOUSE["lot"], rect(-280, 330, -250, 330)]  # the zone and Pražská's side
     by_name = {r["name"]: r for r in roads}
     houses = []
@@ -182,7 +195,7 @@ def build():
         best["step"] = 1
         enter.append({"id": best["id"], "name": f"{best['street']} house", "label": f"dům, {best['street']}",
                       "kind": "house", "box": best["box"], "door": best["door"], "curb": best["curb"], "fixed": False})
-    return roads, landmarks, houses, enter
+    return roads, landmarks + fixed, houses, enter
 
 
 # ── The picture ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -322,7 +335,7 @@ def picture(roads, landmarks, houses, enter, path):
         elif k == "station":
             draw.rectangle(box, fill=(170, 170, 176), outline=(90, 90, 96), width=2)
         else:  # shop, school, hardware
-            fill = {"shop": (210, 72, 86), "school": (196, 150, 90), "hardware": (120, 140, 160)}[k]
+            fill = {"shop": (210, 72, 86), "school": (196, 150, 90), "hardware": (120, 140, 160), "auction": (226, 214, 186)}[k]
             draw.rectangle(box, fill=fill, outline=(40, 40, 44), width=3)
     # the zone's concrete and the plots
     for p in PLOTS:
@@ -355,6 +368,14 @@ def picture(roads, landmarks, houses, enter, path):
     for road in roads:
         street_name(img, road)
     draw = ImageDraw.Draw(img)
+    # the paint bays (step 2): the van's outline, dashed orange
+    for bay in PAINT_BAYS:
+        b = R(rect(bay["x"] - 5, bay["x"] + 5, bay["z"] - 11, bay["z"] + 11))
+        for k in range(int(b[1]), int(b[3]), 8):
+            draw.line([b[0], k, b[0], k + 4], fill=COL["accent"], width=3)
+            draw.line([b[2], k, b[2], k + 4], fill=COL["accent"], width=3)
+        draw.line([b[0], b[1], b[2], b[1]], fill=COL["accent"], width=3)
+        draw.line([b[0], b[3], b[2], b[3]], fill=COL["accent"], width=3)
     # the houses to empty (step 1): an orange ring and their number
     fn = font(20, True)
     for i, e in enumerate(enter):
@@ -374,10 +395,11 @@ def picture(roads, landmarks, houses, enter, path):
     tag(draw, *at(-790, -260, 0, 0), "Náves s kaplí a křížem", "střed vesnice, nástěnka zakázek")
     tag(draw, *at(80, 470, 0, -10), "Statek = dnešní velký dům", "na konci Pražské, u polí")
     tag(draw, *at(60, 260, 0, 6), "Malý rybník")
-    tag(draw, *at(130, 40, 0, 4), "Drogerie (vymyšlený obchod)")
+    tag(draw, *at(40, 40, 0, 4), "Drogerie (vymyšlený obchod)")
+    tag(draw, *at(186, -40, 4, 0), "Aukční dům (zůstává)")
     tag(draw, *at(-536, -380, 0, -46), "Škola · krok 2", "velké stěhování pro 2+ hráče")
     tag(draw, *at(-790, -440, 0, -46), "Hřiště · krok 2")
-    tag(draw, *at(-840, -630, 10, -44), "Stavebniny Sýkorka · krok 2", "místo Ptáčka: barvy a výbava dodávky")
+    tag(draw, *at(-840, -630, 10, -44), "Stavebniny Sýkorka · krok 2", "místo Ptáčka, s lakovnou dodávky")
     tag(draw, *at(-1150, 300, 0, 10), "Nová zástavba · krok 3", "lidé se nastěhovávají")
     tag(draw, *at(150, 690, -300, -60), "Železnice a zastávka Zbuzany · krok 3")
     tag(draw, *at(300, -660, -330, 0), "D5: kulisa, jezdí po ní auta")
@@ -403,6 +425,7 @@ def picture(roads, landmarks, houses, enter, path):
         (COL["asphalt"], "silnice (názvy ulic jako v Jinočanech)"),
         (COL["rapeseed"], "řepka"), (COL["wheat"], "obilí"), (COL["ploughed"], "oranice"),
         (COL["tree"], "stromořadí, ovocné aleje"),
+        (COL["accent"], "lakovna: místo pro dodávku (krok 2)"),
     ]
     for colour, text in rows:
         draw.rectangle([lx, y + 3, lx + 26, y + 23], fill=colour, outline=(20, 20, 20))
@@ -418,7 +441,7 @@ def picture(roads, landmarks, houses, enter, path):
     draw.text((lx, y), "KROKY", font=font(20, True), fill=COL["white"])
     y += 34
     for line in ("1  Hlavní, náves, staré jádro, řadovky,", "    6 domů ke stěhování, D5 a pole",
-                 "2  Severní, Žižkova, škola, hřiště,", "    Stavebniny Sýkorka, další domy",
+                 "2  Severní, Žižkova, škola, hřiště,", "    Stavebniny Sýkorka s lakovnou, další domy",
                  "3  nová zástavba (nastěhování),", "    vlak a zastávka Zbuzany"):
         draw.text((lx, y), line, font=font(18), fill=COL["white"])
         y += 27
@@ -474,9 +497,11 @@ def main():
         "bounds": BOUNDS,
         "plots": PLOTS,
         "turnaround": TURNAROUND,
+        "paintBays": PAINT_BAYS,
         "bigHouse": BIG_HOUSE,
         "roads": roads,
-        "landmarks": landmarks,
+        "landmarks": [l for l in landmarks if l["id"] not in FIXED_IDS],
+        "fixedBuildings": [l for l in landmarks if l["id"] in FIXED_IDS],
         "fields": [{"rect": rect(*r), "kind": k} for r, k in FIELDS],
         "village": rect(*VILLAGE),
         "treeLines": [{"points": [{"x": x, "z": z} for x, z in pts], "kind": k} for pts, k in TREE_LINES],
