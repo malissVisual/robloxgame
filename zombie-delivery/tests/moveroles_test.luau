@@ -3,8 +3,14 @@
 -- the switch and its cooldown, the Mover's carry, the climb, the Guard's hits and barricades, the Driver's truck and
 -- call; the quick chat's lines; every refusal has words. The owner took the Technician out: three roles, one each while
 -- there are no more than three players, doubles beyond that; no lock, no fuse box.
+-- 8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."): all of the above is the city's with
+-- Config.MoveRoles.On (MoveRoles.on); the sandbox has no roles whatever the switch says: the lobby gives none and waits
+-- only for READY, nobody switches, carries a pair piece alone or climbs at full pace, no damage bonus, no truck's cut,
+-- no barricade, anybody calls the van once a move; the city with the switch off the same.
 local MoveRoles = require("./MoveRoles")
 local Config = require("./Config")
+local sandboxOn = Config.Sandbox.On
+Config.Sandbox.On = false -- (the city's roles first, the switch on; 8.8: the sandbox's none at the end)
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -137,6 +143,43 @@ check("barricades: the Guard, Barricades of them", MoveRoles.canBarricade("guard
 check("a barricade wears Bite hp a second for each zombie at it", near(MoveRoles.wear(400, 2, 1), 400 - 2 * R.Guard.Bite) and MoveRoles.wear(400, 0, 5) == 400
 	and MoveRoles.wear(10, 3, 10) == 0 and MoveRoles.wear(50, 1, 0) == 50)
 
+-- 8.8: no roles (the sandbox; the city with the switch off) ---------------------------------------------------------------
+
+check("the city with the switch on: roles", R.On == true and MoveRoles.on())
+Config.Sandbox.On = true
+check("the sandbox: no roles, whatever the switch says", R.On == true and not MoveRoles.on())
+local plain = MoveRoles.newLobby(ANN, "sandbox_house", 100)
+check("a new lobby: the owner in it, no role", #plain.members == 1 and plain.members[1] == ANN and next(plain.roles) == nil)
+check("…solo: LAUNCH at once", MoveRoles.canLaunch(plain, ANN) == true and MoveRoles.waiting(plain) == 0)
+check("the crew joins: no role, NOT READY, LAUNCH waits", MoveRoles.sync(plain, { ANN, BOB }) == true and next(plain.roles) == nil and plain.ready[BOB] ~= true
+	and MoveRoles.waiting(plain) == 1 and select(2, MoveRoles.canLaunch(plain, ANN)) == "notready")
+check("…nothing new: no change", MoveRoles.sync(plain, { ANN, BOB }) == false)
+ok, why = MoveRoles.choose(plain, BOB, "mover")
+check("no role to pick (not even a free one)", ok == false and why == "noroles" and next(plain.roles) == nil)
+ok, why = MoveRoles.setReady(plain, BOB, true)
+check("READY without a role: LAUNCH", ok == true and why == nil and MoveRoles.canLaunch(plain, ANN) == true and MoveRoles.waiting(plain) == 0)
+check("four of them: no role, no doubles to speak of", MoveRoles.sync(plain, { ANN, BOB, CID, DAN }) and next(plain.roles) == nil and MoveRoles.waiting(plain) == 2)
+check("leavers: their READY goes", MoveRoles.sync(plain, { ANN }) == true and plain.ready[BOB] == nil and #plain.members == 1 and MoveRoles.waiting(plain) == 0)
+check("…and back: NOT READY again", MoveRoles.sync(plain, { ANN, BOB }) == true and MoveRoles.waiting(plain) == 1)
+can, no, wait = MoveRoles.canSwitch({}, { ANN, BOB }, BOB, "guard", nil, 0)
+check("on a move: no switch", can == false and no == "noroles" and wait == nil)
+check("nobody carries a pair piece alone: dragged at Drag, low (a stray \"mover\" too)", near(MoveRoles.speedFactor("mover", "drag", S.Drag), S.Drag)
+	and near(MoveRoles.speedFactor(nil, "drag", S.Drag), S.Drag) and MoveRoles.holdMode("mover", "drag") == "drag" and MoveRoles.holdMode(nil, "drag") == "drag")
+check("…nor faster with the rest", near(MoveRoles.speedFactor("mover", "both", S.Both), S.Both) and near(MoveRoles.speedFactor("mover", "pair", S.Pair), S.Pair))
+check("up stairs: everybody × Climb with both hands (one hand not)", near(MoveRoles.climbFactor("mover", "both"), R.Mover.Climb)
+	and near(MoveRoles.climbFactor(nil, "pair"), R.Mover.Climb) and MoveRoles.climbFactor(nil, "hand") == 1)
+check("no damage bonus", MoveRoles.weaponFactor("guard", nil) == 1 and MoveRoles.weaponFactor("guard", "melee") == 1 and MoveRoles.weaponFactor(nil, nil) == 1)
+check("the truck takes every hit whole", MoveRoles.truckFactor(true) == 1 and MoveRoles.truckFactor(false) == 1)
+check("anybody calls the van, once a move", MoveRoles.canCall(nil, false) == true and MoveRoles.canCall("mover", false) == true
+	and select(2, MoveRoles.canCall(nil, true)) == "called")
+check("no barricades", MoveRoles.canBarricade("guard", 0) == false and select(2, MoveRoles.canBarricade("guard", 0)) == "noroles" and MoveRoles.canBarricade(nil, 0) == false)
+Config.Sandbox.On = false
+R.On = false
+check("the city with the switch off: no roles there either", not MoveRoles.on() and next(MoveRoles.newLobby(ANN, "marge", 0).roles) == nil
+	and MoveRoles.canCall(nil, false) == true and MoveRoles.holdMode("mover", "drag") == "drag")
+R.On = true
+check("…on again: the roles as before", MoveRoles.on() and MoveRoles.newLobby(ANN, "marge", 0).roles[ANN] == "driver" and select(2, MoveRoles.canCall(nil, false)) == "driver")
+
 -- The quick chat, the words ----------------------------------------------------------------------------------------------
 
 local lines = {}
@@ -150,13 +193,15 @@ end
 check("the quick chat's six lines", #MoveRoles.Chat == 6 and MoveRoles.Chat[2].id == "hand" and lines[1] == "Hold the door" and lines[2] == "Need a hand here" and lines[3] == "Zombies!" and lines[4] == "Truck's here"
 	and lines[5] == "I'll come pick you up" and lines[6] == "Done — let's go")
 local worded = true
-for _, code in { "member", "role", "taken", "owner", "norole", "notready", "same", "cooldown", "driver", "called", "guard", "nomore" } do
+for _, code in { "member", "role", "taken", "owner", "norole", "notready", "same", "cooldown", "driver", "called", "guard", "nomore", "noroles" } do
 	if MoveRoles.whyText(code) == MoveRoles.whyText("no such code") then
 		worded = false
 		print("  (no words for " .. code .. ")")
 	end
 end
 check("every refusal has its own words", worded and MoveRoles.whyText(nil) ~= "")
+
+Config.Sandbox.On = sandboxOn
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

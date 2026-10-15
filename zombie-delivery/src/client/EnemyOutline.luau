@@ -19,7 +19,8 @@
 --   * The phone's SETTINGS turns it off and on for this session (EnemyOutline.toggle, Main wires it; like the sound).
 --   * 7.0 planning: a Guard on a move sees the zombies through walls (EnemyOutline.setXray(studs), client/MovingHud.luau
 --     sets Config.MoveRoles.Guard.XRay for the role): an outlined zombie within that of the camera is drawn
---     AlwaysOnTop; 0 (everybody else) keeps the rule above.
+--     AlwaysOnTop; 0 (everybody else) keeps the rule above. 8.8: no roles (shared/MoveRoles.luau MoveRoles.on: the
+--     sandbox never has them): always 0.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")

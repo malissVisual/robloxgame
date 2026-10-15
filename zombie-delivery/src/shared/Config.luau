@@ -6455,6 +6455,14 @@ Config.Moving = {
 -- the crew at the door instead: Config.MoveGreeters). shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
 -- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
 -- show them.
+--   On                8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."): the roles at
+--                     all (MoveRoles.on), the city's only: the sandbox (Config.Sandbox.On) never has them, whatever this
+--                     says. Without them nobody picks or has a role (the lobby is the crew, READY and LAUNCH; the HUD
+--                     has no role line), everybody loads and unloads the van with no wait, anybody calls it to the
+--                     door once a move (whoever is first: Driver.Curb, Driver.Near), and nobody has the Mover's or the
+--                     Guard's perks (no pair piece carried alone, everybody × Mover.Climb up stairs, no damage bonus,
+--                     barricades or sight through walls) nor the Driver's truck damage. false takes them out of the
+--                     city too.
 --   Order             the roles, in the lobby's order (a newcomer gets the first free one)
 --   Switch            s between two role switches on a move (solo: switch to do everything; a crew: a free role)
 --   Lobby             Timeout: s the planning stays open; Tick: its loop (the crew joining and leaving); TouchScale:
@@ -6472,6 +6480,7 @@ Config.Moving = {
 --                     zombies outlined through walls within this (client/EnemyOutline.luau)
 --   Chat             the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
 Config.MoveRoles = {
+	On = true, -- (the city's; the sandbox has none)
 	Order = { "driver", "mover", "guard" } :: { string },
 	Switch = 30,
 	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },

@@ -423,7 +423,7 @@ local function moveState(tvState, tvCondition)
 		},
 		counts = { total = 2, out = 0, stars = 0, starsOut = 0, broken = 0, carried = if tvState == "carried" then 1 else 0, home = 1 }, fill = 0,
 		truck = true, backOpen = false, house = { x = 263, z = 839 }, door = { x = 263, z = 857 }, dropOff = { x = 178, z = -98 }, inside = true,
-		team = { role = "driver", called = false, barricades = 0, free = {}, switchAt = 0 },
+		team = { called = false }, -- (8.8: the sandbox's moves have no roles: the van's call only)
 	}
 end
 moving.OnClientEvent:Fire("state", moveState("carried", 1))

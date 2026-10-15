@@ -35,7 +35,8 @@
 --   SoundPlan.moveItem(view, spot)                the state's piece at `spot` (a table) or nil
 --   SoundPlan.isBox(item)                         is the piece a box (cardboard: its name says Box, or the 📦 icon)
 --   SoundPlan.carryCue(item, up)                  the sound of your hands taking (up) or putting down a piece
---   SoundPlan.dragged(view, spot)                 is the piece in your hands dragged (two people's, alone, no Mover)
+--   SoundPlan.dragged(view, spot)                 is the piece in your hands dragged (two people's, alone, no Mover;
+--                                                 8.8 without roles: alone is dragged)
 --   SoundPlan.resultCue(result)                   the end: the Wall's gate when the load got there, else nil
 --
 -- 8.1 SANDBOX, the sandbox's sounds (art/audio/sfx4.ogg's 8.1 part, Config.Soundscape.Sandbox; client/SoundScape.luau
@@ -313,7 +314,7 @@ function SoundPlan.dragged(view: any, spot: any): boolean
 	if type(item.by) == "string" and string.find(item.by, " + ", 1, true) then
 		return false
 	end
-	local team = if type(view.team) == "table" then view.team else nil
+	local team = if type(view.team) == "table" and MoveRoles.on() then view.team else nil -- (8.8: no roles: nobody's)
 	local role = if team and type(team.role) == "string" then team.role else nil
 	return MoveRoles.holdMode(role, "drag") == "drag" -- (a Mover holds it up alone)
 end

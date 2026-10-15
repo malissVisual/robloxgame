@@ -13,6 +13,7 @@
 --   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
 --   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
 --      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
+--      8.8 no roles: none in the planning or on the move; the van's Loads hold no time (step 6).
 --   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
 --      (8.3: the chalet's leaves open before the fade, the move FadeOut + Margin s after it, the arrival a step past the
 --      door facing in, the leaves shut again Shut s later). 8.5 walking through: from 14 studs out on through the door
@@ -754,6 +755,7 @@ do
 	E.fire(ann, "Moving", "start", House.id)
 	local lobby = E.lastOf(ann, "MoveLobby", "lobby", before)
 	check("…START opens the planning lobby (solo: LAUNCH at once)", lobby ~= nil and lobby[2] ~= nil and lobby[2].canLaunch == true, E.lastNotice(ann))
+	check("…8.8: no role in it (the owner: everyone is the same)", lobby ~= nil and lobby[2] ~= nil and lobby[2].role == nil and lobby[2].members[1].role == nil)
 	before = #E.sent
 	E.fire(ann, "MoveLobby", "launch")
 	E.advance(0.5)
@@ -762,6 +764,8 @@ do
 	S.annMove = view.id
 	check("…its drop-off is her plot's unload circle; no horde; the clock runs", view.drop == "your warehouse" and view.dropOff.x == plots[1].unload.x
 		and view.dropOff.z == plots[1].unload.z and view.hordeAt == nil and view.endsAt > E.now)
+	check("…8.8: no role on the move (no MoveRole; the state's team: only the van's call, not made yet)", ann:GetAttribute("MoveRole") == nil
+		and view.team.role == nil and view.team.called == false)
 	check("…Danny comes with her crew of one, for hire (8.3), his id for his card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).hirer == nil
 		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
 	E.fire(ann, "Moving", "helper", "van")
@@ -970,6 +974,8 @@ do
 	local bayLoad = bay and bay:FindFirstChildOfClass("ProximityPrompt")
 	local doorLoad = E.promptIn(H.doorOf(annVan), "Load")
 	check("…inside the walk-in bay: the bay's own Load (the doors' waits)", bayLoad ~= nil and bayLoad.Enabled and not doorLoad.Enabled)
+	check("…8.8: no wait at either Load (no role needed: no hold, no MoveQuick)", bayLoad ~= nil and bayLoad.HoldDuration == 0 and doorLoad.HoldDuration == 0
+		and bayLoad:GetAttribute("MoveQuick") == nil and doorLoad:GetAttribute("MoveQuick") == nil)
 	local ok = E.trigger(bayLoad, ann)
 	check("…loaded from inside the bay", ok and H.itemOf(ann, small.spot).state == "truck" and H.inBay(annVan, model) and H.stateOf(ann).counts.out == 2,
 		E.lastNotice(ann))
